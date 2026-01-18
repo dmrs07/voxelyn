@@ -1,11 +1,27 @@
-import type { Surface2D } from "../core/surface2d";
+/**
+ * WebGL adapter for uploading Surface2D as a texture.
+ * @module
+ */
 
+import type { Surface2D } from "../core/surface2d.js";
+
+/** WebGL texture wrapper with dimensions */
 export type WebGLTextureInfo = {
+  /** WebGL texture object */
   texture: WebGLTexture;
+  /** Texture width */
   width: number;
+  /** Texture height */
   height: number;
 };
 
+/**
+ * Creates a WebGL texture for Surface2D uploads.
+ * @param gl - WebGL rendering context
+ * @param width - Texture width
+ * @param height - Texture height
+ * @returns Texture info object
+ */
 export function createTexture(
   gl: WebGLRenderingContext,
   width: number,
@@ -32,6 +48,12 @@ export function createTexture(
   return { texture, width, height };
 }
 
+/**
+ * Updates a WebGL texture with Surface2D data.
+ * @param gl - WebGL rendering context
+ * @param info - Texture info from createTexture
+ * @param surface - Source surface
+ */
 export function updateTexture(
   gl: WebGLRenderingContext,
   info: WebGLTextureInfo,

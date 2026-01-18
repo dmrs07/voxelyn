@@ -1,16 +1,34 @@
-import type { Surface2D } from "../../core/surface2d";
+import type { Surface2D } from "../../core/surface2d.js";
 
+/**
+ * Sprite data for blitting operations.
+ * Contains pixel data as packed RGBA8888.
+ */
 export type Sprite = {
-  width: number;
-  height: number;
-  pixels: Uint32Array;
+  /** Sprite width in pixels */
+  readonly width: number;
+  /** Sprite height in pixels */
+  readonly height: number;
+  /** Pixel data as packed RGBA8888 */
+  readonly pixels: Uint32Array;
 };
 
+/** Options for colorkey blitting */
 export type BlitOptions = {
+  /** Color to treat as transparent (default 0) */
   colorkey?: number;
+  /** Alpha threshold for transparency (0-255) */
   alphaThreshold?: number;
 };
 
+/**
+ * Blits a sprite to a surface with colorkey transparency and clipping.
+ * @param dst - Destination surface
+ * @param sprite - Source sprite
+ * @param dx - Destination X coordinate
+ * @param dy - Destination Y coordinate
+ * @param options - Blit options
+ */
 export function blitColorkey(
   dst: Surface2D,
   sprite: Sprite,
@@ -43,7 +61,7 @@ export function blitColorkey(
     let di = (dy + sy) * dw + (dx + sx0);
     let si = sy * cw + sx0;
     for (let sx = sx0; sx < sx1; sx++) {
-      const c = sp[si++];
+      const c = sp[si++]!;
       if (c !== colorkey) {
         if (alphaThreshold > 0) {
           const a = (c >>> 24) & 0xff;
@@ -52,14 +70,22 @@ export function blitColorkey(
             continue;
           }
         }
-        dp[di++] = c;
-      } else {
-        di++;
+        dp[di] = c;
       }
+      di++;
     }
   }
 }
 
+/**
+ * Blits a sprite without bounds checking (faster, unsafe).
+ * Caller must ensure sprite fits entirely within destination.
+ * @param dst - Destination surface
+ * @param sprite - Source sprite
+ * @param dx - Destination X coordinate
+ * @param dy - Destination Y coordinate
+ * @param colorkey - Color to treat as transparent
+ */
 export function blitColorkeyUnsafe(
   dst: Surface2D,
   sprite: Sprite,
@@ -78,7 +104,7 @@ export function blitColorkeyUnsafe(
     let di = (dy + sy) * dw + dx;
     let si = sy * cw;
     for (let sx = 0; sx < cw; sx++) {
-      const c = sp[si++];
+      const c = sp[si++]!;
       if (c !== ck) dp[di] = c;
       di++;
     }

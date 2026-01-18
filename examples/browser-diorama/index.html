@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voxelyn - Diorama de Natureza</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: #eee;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 1.8rem;
+        background: linear-gradient(90deg, #4ade80, #22d3ee);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .subtitle {
+        color: #888;
+        margin-bottom: 15px;
+        font-size: 0.9rem;
+      }
+      #game-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        border: 3px solid #333;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        cursor: crosshair;
+      }
+      .hud {
+        display: flex;
+        gap: 20px;
+        font-size: 0.9rem;
+        background: rgba(0,0,0,0.5);
+        padding: 8px 16px;
+        border-radius: 20px;
+      }
+      .hud span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #fps { color: #4ade80; font-weight: bold; }
+      #mat { color: #fbbf24; }
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin-top: 15px;
+        background: rgba(255,255,255,0.05);
+        padding: 15px 20px;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        max-width: 768px;
+      }
+      .controls h3 {
+        grid-column: span 2;
+        margin: 0 0 5px;
+        font-size: 1rem;
+        color: #22d3ee;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .control-group strong {
+        color: #fbbf24;
+      }
+      kbd {
+        background: #333;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.8rem;
+        border: 1px solid #555;
+      }
+      .materials {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .mat-btn {
+        padding: 6px 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.75rem;
+        transition: transform 0.1s, box-shadow 0.1s;
+        color: #fff;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      }
+      .mat-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      }
+      .mat-btn.active {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🌿 Diorama de Natureza</h1>
+    <p class="subtitle">Explore, construa e destrua um mundo de pixels interativo</p>
+
+    <div id="game-container">
+      <canvas id="c" width="384" height="216"></canvas>
+
+      <div class="hud">
+        <span id="fps">FPS: --</span>
+        <span id="mat">Material: Areia (1)</span>
+      </div>
+
+      <div class="materials">
+        <button class="mat-btn active" data-mat="1" style="background:#d2b45a">1 Areia</button>
+        <button class="mat-btn" data-mat="2" style="background:#285ac8">2 Água</button>
+        <button class="mat-btn" data-mat="3" style="background:#5a5a5a">3 Pedra</button>
+        <button class="mat-btn" data-mat="4" style="background:#8b5a2b">4 Terra</button>
+        <button class="mat-btn" data-mat="5" style="background:#ff6400">5 Fogo</button>
+        <button class="mat-btn" data-mat="6" style="background:#ff3c00">6 Lava</button>
+        <button class="mat-btn" data-mat="7" style="background:#fafaff">7 Neve</button>
+        <button class="mat-btn" data-mat="8" style="background:#8b5a2b">8 Madeira</button>
+        <button class="mat-btn" data-mat="9" style="background:#32b432">9 Folha</button>
+        <button class="mat-btn" data-mat="0" style="background:#87ceeb">0 Apagar</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <h3>⌨️ Controles</h3>
+
+      <div class="control-group">
+        <strong>Movimento</strong>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou Setas</span>
+      </div>
+
+      <div class="control-group">
+        <strong>Pular</strong>
+        <span><kbd>Espaço</kbd> ou <kbd>W</kbd></span>
+      </div>
+
+      <div class="control-group">
+        <strong>Atirar Flecha</strong>
+        <span><kbd>Clique Esquerdo</kbd> ou <kbd>F</kbd></span>
+      </div>
+
+      <div class="control-group">
+        <strong>Pintar Material</strong>
+        <span><kbd>Shift</kbd> + <kbd>Clique Esquerdo</kbd></span>
+      </div>
+
+      <div class="control-group">
+        <strong>Apagar</strong>
+        <span><kbd>Clique Direito</kbd> (segurar)</span>
+      </div>
+
+      <div class="control-group">
+        <strong>Selecionar Material</strong>
+        <span><kbd>1</kbd>-<kbd>9</kbd>, <kbd>0</kbd></span>
+      </div>
+    </div>
+
+    <script>
+      // Sincronizar botões de material com o jogo
+      document.querySelectorAll('.mat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mat = btn.dataset.mat;
+          document.querySelectorAll('.mat-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          // Simular tecla pressionada
+          document.dispatchEvent(new KeyboardEvent('keydown', { code: `Digit${mat}` }));
+        });
+      });
+
+      // Atualizar botão ativo quando pressionar tecla
+      document.addEventListener('keydown', (e) => {
+        const match = e.code.match(/Digit(\d)/);
+        if (match) {
+          document.querySelectorAll('.mat-btn').forEach(b => b.classList.remove('active'));
+          const btn = document.querySelector(`.mat-btn[data-mat="${match[1]}"]`);
+          if (btn) btn.classList.add('active');
+        }
+      });
+    </script>
+    <script type="module" src="../../dist/examples/browser-diorama/index.js"></script>
+  </body>
+</html>

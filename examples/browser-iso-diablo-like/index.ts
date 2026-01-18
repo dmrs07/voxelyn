@@ -5,8 +5,8 @@ import {
   projectIso,
   forEachIsoOrder,
   blitColorkey
-} from "../../src/index";
-import { presentToCanvas } from "../../src/adapters/canvas2d";
+} from "../../src/index.js";
+import { presentToCanvas } from "../../src/adapters/canvas2d.js";
 
 const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");

@@ -1,14 +1,14 @@
-export * from "./core/surface2d";
-export * from "./core/grid2d";
-export * from "./core/traversal2d";
-export * from "./core/rng";
-export * from "./core/palette";
+export * from "./core/surface2d.js";
+export * from "./core/grid2d.js";
+export * from "./core/traversal2d.js";
+export * from "./core/rng.js";
+export * from "./core/palette.js";
 
-export * from "./extras/iso/iso";
-export * from "./extras/sprites/blit";
-export * from "./extras/voxels/voxelGrid3d";
-export * from "./extras/voxels/renderSlices";
-export * from "./extras/voxels/renderRaycastCPU";
+export * from "./extras/iso/iso.js";
+export * from "./extras/sprites/blit.js";
+export * from "./extras/voxels/voxelGrid3d.js";
+export * from "./extras/voxels/renderSlices.js";
+export * from "./extras/voxels/renderRaycastCPU.js";
 
-export * from "./adapters/canvas2d";
-export * from "./adapters/webglTexture";
+export * from "./adapters/canvas2d.js";
+export * from "./adapters/webglTexture.js";
