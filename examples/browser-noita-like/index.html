@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voxelyn - Noita-like</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: monospace; }
+      canvas { image-rendering: pixelated; width: 512px; height: 512px; }
+      #wrap { display: grid; place-items: center; height: 100vh; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <div>Voxelyn Noita-like</div>
+      <canvas id="c" width="128" height="128"></canvas>
+      <div id="fps">fps</div>
+    </div>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>

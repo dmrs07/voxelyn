@@ -1,0 +1,14 @@
+{
+  "name": "voxelyn",
+  "version": "0.1.0",
+  "description": "Ultra lightweight headless pixels/grid/iso/voxels toolkit",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node dist/tests/run.js",
+    "examples": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
