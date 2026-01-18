@@ -1,17 +1,36 @@
-import type { Surface2D } from "../../core/surface2d";
-import type { Palette } from "../../core/palette";
-import type { VoxelGrid3D } from "./voxelGrid3d";
+import type { Surface2D } from "../../core/surface2d.js";
+import type { Palette } from "../../core/palette.js";
+import type { VoxelGrid3D } from "./voxelGrid3d.js";
 
+/**
+ * Simple camera for CPU raycast rendering.
+ * Defines ray origin and direction vectors.
+ */
 export type RaycastCamera = {
+  /** Camera X origin */
   originX: number;
+  /** Camera Y origin */
   originY: number;
+  /** Camera Z origin */
   originZ: number;
+  /** Ray direction X component */
   dirX: number;
+  /** Ray direction Y component */
   dirY: number;
+  /** Ray direction Z component */
   dirZ: number;
+  /** Ray march step size */
   step: number;
 };
 
+/**
+ * Renders a voxel grid using simple CPU raymarching.
+ * @param grid - Source voxel grid
+ * @param camera - Camera configuration
+ * @param surface - Target surface
+ * @param palette - Color palette for material mapping
+ * @param maxSteps - Maximum ray march steps (default 64)
+ */
 export function renderRaycastCPU(
   grid: VoxelGrid3D,
   camera: RaycastCamera,
@@ -48,7 +67,7 @@ export function renderRaycastCPU(
           continue;
         }
         const idx = (zi * grid.height + yi) * grid.width + xi;
-        const mat = grid.data[idx] & 0xff;
+        const mat = grid.data[idx]! & 0xff;
         if (mat !== 0) {
           hit = mat;
           break;

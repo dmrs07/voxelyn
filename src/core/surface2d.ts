@@ -1,13 +1,29 @@
+/**
+ * Represents a 2D pixel buffer with RGBA8888 packed pixels.
+ * Core rendering target for all drawing operations.
+ */
 export type Surface2D = {
-  width: number;
-  height: number;
-  pixels: Uint32Array;
+  /** Width in pixels */
+  readonly width: number;
+  /** Height in pixels */
+  readonly height: number;
+  /** Pixel data as packed RGBA8888 (little-endian) */
+  readonly pixels: Uint32Array;
 };
 
+/** Options for creating a Surface2D */
 export type Surface2DCreateOptions = {
+  /** Pre-allocated pixel buffer (must be at least width*height) */
   pixels?: Uint32Array;
 };
 
+/**
+ * Creates a new 2D surface for pixel rendering.
+ * @param width - Surface width in pixels
+ * @param height - Surface height in pixels
+ * @param options - Optional configuration
+ * @returns A new Surface2D instance
+ */
 export function createSurface2D(
   width: number,
   height: number,
@@ -21,10 +37,22 @@ export function createSurface2D(
   return { width, height, pixels };
 }
 
+/**
+ * Fills the entire surface with a single color.
+ * @param surface - Target surface
+ * @param color - RGBA8888 packed color value
+ */
 export function clearSurface(surface: Surface2D, color: number): void {
   surface.pixels.fill(color >>> 0);
 }
 
+/**
+ * Sets a pixel with bounds checking.
+ * @param surface - Target surface
+ * @param x - X coordinate
+ * @param y - Y coordinate
+ * @param color - RGBA8888 packed color value
+ */
 export function setPixel(
   surface: Surface2D,
   x: number,
@@ -37,6 +65,13 @@ export function setPixel(
   surface.pixels[y * surface.width + x] = color >>> 0;
 }
 
+/**
+ * Sets a pixel without bounds checking (faster, unsafe).
+ * @param surface - Target surface
+ * @param x - X coordinate (must be in bounds)
+ * @param y - Y coordinate (must be in bounds)
+ * @param color - RGBA8888 packed color value
+ */
 export function setPixelUnsafe(
   surface: Surface2D,
   x: number,
@@ -46,13 +81,29 @@ export function setPixelUnsafe(
   surface.pixels[y * surface.width + x] = color >>> 0;
 }
 
+/**
+ * Gets a pixel value with bounds checking.
+ * @param surface - Source surface
+ * @param x - X coordinate
+ * @param y - Y coordinate
+ * @returns RGBA8888 packed color, or 0 if out of bounds
+ */
 export function getPixel(surface: Surface2D, x: number, y: number): number {
   if (x < 0 || y < 0 || x >= surface.width || y >= surface.height) {
     return 0;
   }
-  return surface.pixels[y * surface.width + x] >>> 0;
+  return surface.pixels[y * surface.width + x]! >>> 0;
 }
 
+/**
+ * Fills a rectangle with clipping to surface bounds.
+ * @param surface - Target surface
+ * @param x - Top-left X coordinate
+ * @param y - Top-left Y coordinate
+ * @param width - Rectangle width
+ * @param height - Rectangle height
+ * @param color - RGBA8888 packed color value
+ */
 export function fillRect(
   surface: Surface2D,
   x: number,

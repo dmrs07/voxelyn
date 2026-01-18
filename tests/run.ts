@@ -4,13 +4,13 @@ import {
   makePalette,
   packRGBA,
   renderToSurface
-} from "../src/index";
+} from "../src/index.js";
 import {
   forEachRowMajor,
   forEachBottomUp,
   forEachMorton,
   forEachChunkOrder
-} from "../src/core/traversal2d";
+} from "../src/core/traversal2d.js";
 
 const assert = (cond: boolean, msg: string): void => {
   if (!cond) throw new Error(msg);
