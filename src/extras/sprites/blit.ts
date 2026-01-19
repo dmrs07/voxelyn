@@ -62,17 +62,21 @@ export function blitColorkey(
     let si = sy * cw + sx0;
     for (let sx = sx0; sx < sx1; sx++) {
       const c = sp[si++]!;
-      if (c !== colorkey) {
-        if (alphaThreshold > 0) {
-          const a = (c >>> 24) & 0xff;
-          if (a <= alphaThreshold) {
-            di++;
-            continue;
-          }
-        }
-        dp[di] = c;
+      // Skip pixels matching colorkey (transparent)
+      if (c === colorkey) {
+        di++;
+        continue;
       }
-      di++;
+      // Skip pixels below alpha threshold if enabled
+      if (alphaThreshold > 0) {
+        const a = (c >>> 24) & 0xff;
+        if (a <= alphaThreshold) {
+          di++;
+          continue;
+        }
+      }
+      // Write visible pixel and advance
+      dp[di++] = c;
     }
   }
 }

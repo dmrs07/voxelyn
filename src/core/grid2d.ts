@@ -414,11 +414,14 @@ export function renderToSurface(
   const gw = grid.width;
   const sp = surface.pixels;
   const cells = grid.cells;
+  const cellsLen = cells.length;
   for (let y = 0; y < h; y++) {
     let gi = y * gw;
     let si = y * surface.width;
     for (let x = 0; x < w; x++) {
-      const mat = cells[gi++]! & CELL_MATERIAL_MASK;
+      // Safe access: default to material 0 if index out of bounds
+      const mat = gi < cellsLen ? (cells[gi] ?? 0) & CELL_MATERIAL_MASK : 0;
+      gi++;
       sp[si++] = palette[mat] ?? 0;
     }
   }
@@ -469,12 +472,15 @@ export function renderToSurfaceShaded(
   const gw = grid.width;
   const sp = surface.pixels;
   const cells = grid.cells;
+  const cellsLen = cells.length;
   
   for (let y = 0; y < h; y++) {
     let gi = y * gw;
     let si = y * surface.width;
     for (let x = 0; x < w; x++) {
-      const cell = cells[gi++]!;
+      // Safe access: default to cell 0 if index out of bounds
+      const cell = gi < cellsLen ? (cells[gi] ?? 0) : 0;
+      gi++;
       const mat = cell & CELL_MATERIAL_MASK;
       const baseColor = palette[mat] ?? 0;
       sp[si++] = shader(mat, x, y, baseColor, cell);

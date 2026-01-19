@@ -64,7 +64,9 @@ const mortonDecode2D = (code: number): { x: number; y: number } => {
 
 /**
  * Traverses a rectangle in Morton (Z-order) pattern.
- * Provides better cache locality for hierarchical data.
+ * Provides better spatial locality for quad-tree-like access patterns
+ * and hierarchical spatial queries. Note: for purely sequential array
+ * access, row-major order typically has better cache locality.
  * @param width - Rectangle width
  * @param height - Rectangle height
  * @param fn - Callback for each cell

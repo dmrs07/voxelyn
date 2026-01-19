@@ -18,13 +18,11 @@ export function makePalette(
 ): Palette {
   const pal = new Uint32Array(size);
   pal.fill(fill >>> 0);
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    if (entry) {
-      const [idx, color] = entry;
-      if (idx >= 0 && idx < size) {
-        pal[idx] = color >>> 0;
-      }
+  for (const entry of entries) {
+    if (!entry) continue; // Skip undefined/sparse entries
+    const [idx, color] = entry;
+    if (idx >= 0 && idx < size) {
+      pal[idx] = color >>> 0;
     }
   }
   return pal;
@@ -137,7 +135,9 @@ export function makePaletteWithVariants(
   const size = 256;
   const pal = new Uint32Array(size);
   
-  for (const [matId, baseColor] of baseMaterials) {
+  for (const entry of baseMaterials) {
+    if (!entry) continue; // Skip undefined/sparse entries
+    const [matId, baseColor] = entry;
     const startIdx = matId * variantsPerMaterial;
     const midVariant = (variantsPerMaterial / 2) | 0;
     
@@ -147,12 +147,13 @@ export function makePaletteWithVariants(
       
       if (v < midVariant) {
         // Darker variants
-        const t = v / midVariant;
+        const t = midVariant > 0 ? v / midVariant : 0;
         const factor = darkFactor + (1 - darkFactor) * t;
         pal[idx] = multiplyColor(baseColor, factor);
       } else if (v > midVariant) {
         // Lighter variants
-        const t = (v - midVariant) / (variantsPerMaterial - midVariant - 1);
+        const divisor = variantsPerMaterial - midVariant - 1;
+        const t = divisor > 0 ? (v - midVariant) / divisor : 0;
         const factor = 1 + (lightFactor - 1) * t;
         pal[idx] = multiplyColor(baseColor, factor);
       } else {
