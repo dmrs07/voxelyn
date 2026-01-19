@@ -7,6 +7,10 @@ export type SliceAxis = "x" | "y" | "z";
 
 /**
  * Renders a 2D slice of a voxel grid to a surface.
+ * 
+ * Note: Assumes grid.data array size matches width * height * depth.
+ * Out-of-bounds indices default to material 0 (empty).
+ * 
  * @param grid - Source voxel grid
  * @param axis - Axis perpendicular to slice plane
  * @param sliceIndex - Index along the axis
@@ -23,6 +27,8 @@ export function renderSlices(
   const w = surface.width;
   const h = surface.height;
   const sp = surface.pixels;
+  const data = grid.data;
+  const dataLen = data.length;
 
   if (axis === "z") {
     const z = Math.max(0, Math.min(grid.depth - 1, sliceIndex | 0));
@@ -31,7 +37,7 @@ export function renderSlices(
     for (let y = 0; y < sh; y++) {
       for (let x = 0; x < sw; x++) {
         const i = (z * grid.height + y) * grid.width + x;
-        const mat = grid.data[i]! & 0xff;
+        const mat = i < dataLen ? (data[i] ?? 0) & 0xff : 0;
         sp[y * w + x] = palette[mat] ?? 0;
       }
     }
@@ -45,7 +51,7 @@ export function renderSlices(
     for (let z = 0; z < sd; z++) {
       for (let x = 0; x < sw; x++) {
         const i = (z * grid.height + y) * grid.width + x;
-        const mat = grid.data[i]! & 0xff;
+        const mat = i < dataLen ? (data[i] ?? 0) & 0xff : 0;
         sp[z * w + x] = palette[mat] ?? 0;
       }
     }
@@ -58,7 +64,7 @@ export function renderSlices(
   for (let z = 0; z < sd; z++) {
     for (let y = 0; y < sh; y++) {
       const i = (z * grid.height + y) * grid.width + x;
-      const mat = grid.data[i]! & 0xff;
+      const mat = i < dataLen ? (data[i] ?? 0) & 0xff : 0;
       sp[y * w + z] = palette[mat] ?? 0;
     }
   }

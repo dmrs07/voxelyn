@@ -67,7 +67,14 @@ export function renderRaycastCPU(
           continue;
         }
         const idx = (zi * grid.height + yi) * grid.width + xi;
-        const mat = grid.data[idx]! & 0xff;
+        // Bounds check for malformed grid dimensions
+        if (idx < 0 || idx >= grid.data.length) {
+          x += camera.dirX * step;
+          y += camera.dirY * step;
+          z += camera.dirZ * step;
+          continue;
+        }
+        const mat = (grid.data[idx] ?? 0) & 0xff;
         if (mat !== 0) {
           hit = mat;
           break;
