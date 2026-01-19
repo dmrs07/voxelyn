@@ -152,19 +152,6 @@ const makeWallTexture = (
             } else {
               // PORTA FECHADA (MADEIRA COM FERRO)
               const innerX = x - (archX - archRadius + borderSize);
-            /**
-             * The inner width of the arch excluding borders.
-             * 
-             * @remarks
-             * Currently unused. This variable calculates the full diameter of the arch's
-             * inner space (excluding border size), which could be useful for:
-             * - Positioning elements within the arch
-             * - Calculating inner arch dimensions
-             * - Collision detection or boundaries
-             * 
-             * Consider removing if not needed, or use for arch interior calculations.
-             */
-              const innerW = (archRadius - borderSize) * 2;
               
               // Tábuas verticais de madeira
               const plankW = 5;
@@ -288,14 +275,14 @@ const makeCrateTexture = () => {
              
              // Coordenada relativa à face
              const relY = y - topEdgeY;
-             const relX = isLeft ? x : (15-x); // Symmetry for pattern
+             const relX = isLeft ? x : (w - 1 - x); // Symmetry for pattern
 
              // Moldura (Bordas externas)
              if (relY < 2 || relY > wallH - 2 || x < 2 || x > 13 || (x > 7 && x < 9)) {
                  col = COLORS.woodFrame;
              } 
              // Cruz ("X") na lateral para parecer caixa de carga
-             else if (Math.abs(relY - relX) < 1.5 || Math.abs(relY - (8-relX)) < 1.5) {
+             else if (Math.abs(relY - relX) < 1.5 || Math.abs(relY - (cx - relX)) < 1.5) {
                  col = COLORS.woodFrame;
              }
          }
@@ -306,12 +293,11 @@ const makeCrateTexture = () => {
   return { width: w, height: h, pixels };
 };
 
-const makeCrystalTexture = (frame: number) => {
+const makeCrystalTexture = (hoverOffset: number) => {
   const w = 10, h = 18;
   const pixels = new Uint32Array(w * h);
-  const hover = Math.sin(frame * 0.08) * 2;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const dy = y - (6 + hover); const dx = x - 5;
+    const dy = y - (6 + hoverOffset); const dx = x - 5;
     if (Math.abs(dx)/4 + Math.abs(dy)/8 < 1) {
        const b = 1 - Math.abs(dx)/4;
        pixels[y*w+x] = packRGBA(Math.floor(100+b*100), Math.floor(220+b*35), 255, 255);
@@ -320,6 +306,12 @@ const makeCrystalTexture = (frame: number) => {
   }
   return { width: w, height: h, pixels };
 };
+
+// Pre-generate crystal animation frames (cache)
+const CRYSTAL_FRAMES = 60;
+const crystalFrames = Array.from({ length: CRYSTAL_FRAMES }, (_, i) => 
+  makeCrystalTexture(Math.sin(i * 0.08) * 2)
+);
 
 const makePedestalTexture = () => {
   const w = 12, h = 10;
@@ -445,7 +437,8 @@ const render = () => {
             blitColorkey(surface, texCrate, sx - 8, sy - 20, { colorkey: key });
         } else if (prop.type === 'crystal') {
             blitColorkey(surface, texPedestal, sx - 6, sy - 10, { colorkey: key });
-            blitColorkey(surface, makeCrystalTexture(frame), sx - 5, sy - 28, { colorkey: key });
+            const crystalSprite = crystalFrames[frame % CRYSTAL_FRAMES];
+            if (crystalSprite) blitColorkey(surface, crystalSprite, sx - 5, sy - 28, { colorkey: key });
         }
       }
 
