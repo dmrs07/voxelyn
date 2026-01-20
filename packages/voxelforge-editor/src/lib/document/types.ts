@@ -1,9 +1,12 @@
+import { Palette, Material, DEFAULT_MATERIALS } from '@voxelyn/core';
+
 /**
  * VoxelForge Editor - Document Model
  * Core types for representing an editable document
  */
 
-// (no external core types used here)
+// Material type is imported from voxelyn/core as the foundation
+
 
 /** Unique identifier for layers */
 export type LayerId = string;
@@ -50,19 +53,6 @@ export type ReferenceLayer = LayerBase & {
 
 /** Union of all layer types */
 export type Layer = GridLayer | VoxelLayer | ReferenceLayer;
-
-/** Material definition with properties */
-export type Material = {
-  id: number; // 0-255
-  name: string;
-  color: number; // Packed RGBA
-  density: number; // 0 = floats, 100 = heavy
-  friction: number;
-  isLiquid: boolean;
-  isGas: boolean;
-  flammable: boolean;
-  isoHeight?: number; // Override height in iso mode (undefined = use default based on density)
-};
 
 /** Camera state for the viewport */
 export type CameraState = {
@@ -150,17 +140,8 @@ export const createVoxelLayer = (
   depth,
 });
 
-/** Default material palette */
-export const createDefaultPalette = (): Material[] => [
-  { id: 0, name: 'Air', color: 0x00000000, density: 0, friction: 0, isLiquid: false, isGas: true, flammable: false },
-  { id: 1, name: 'Stone', color: 0xff606060, density: 100, friction: 0.9, isLiquid: false, isGas: false, flammable: false },
-  { id: 2, name: 'Dirt', color: 0xff8b4513, density: 80, friction: 0.7, isLiquid: false, isGas: false, flammable: false },
-  { id: 3, name: 'Sand', color: 0xffc2b280, density: 70, friction: 0.5, isLiquid: false, isGas: false, flammable: false },
-  { id: 4, name: 'Water', color: 0x803060ff, density: 50, friction: 0.1, isLiquid: true, isGas: false, flammable: false },
-  { id: 5, name: 'Lava', color: 0xffff4500, density: 90, friction: 0.3, isLiquid: true, isGas: false, flammable: false },
-  { id: 6, name: 'Wood', color: 0xff8b5a2b, density: 60, friction: 0.8, isLiquid: false, isGas: false, flammable: true },
-  { id: 7, name: 'Grass', color: 0xff228b22, density: 40, friction: 0.6, isLiquid: false, isGas: false, flammable: true },
-];
+/** Creates default palette from voxelyn core */
+export const createDefaultPalette = (): Material[] => DEFAULT_MATERIALS;
 
 /** Creates a new empty document */
 export const createDocument = (

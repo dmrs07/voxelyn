@@ -49,7 +49,10 @@ export const renderDocumentToSurface = (
     }
   }
 
-  for (const layer of doc.layers) {
+  // Sort layers by zIndex (ascending - lower zIndex drawn first = behind)
+  const sortedLayers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
+  
+  for (const layer of sortedLayers) {
     if (!layer.visible || layer.type !== 'grid2d') continue;
     const grid = layer as GridLayer;
     const opacity = Math.max(0, Math.min(1, layer.opacity));

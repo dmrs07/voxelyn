@@ -3,6 +3,8 @@ export * from "./core/grid2d.js";
 export * from "./core/traversal2d.js";
 export * from "./core/rng.js";
 export * from "./core/palette.js";
+export * from "./core/textures.js";
+export * from "./core/behaviors.js";
 
 export * from "./extras/iso/iso.js";
 export * from "./extras/sprites/blit.js";

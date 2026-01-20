@@ -10,6 +10,7 @@ export type Command = {
   description: string;
   execute: (doc: EditorDocument) => EditorDocument;
   undo: (doc: EditorDocument) => EditorDocument;
+  canExecute?: (doc: EditorDocument) => boolean; // Optional validation
 };
 
 /** History state for undo/redo */
@@ -32,7 +33,19 @@ export const executeCommand = (
   doc: EditorDocument,
   command: Command
 ): { history: HistoryState; doc: EditorDocument } => {
+  // Check if command can execute (optional validation)
+  if (command.canExecute && !command.canExecute(doc)) {
+    // Command cannot execute - don't record it
+    return { history, doc };
+  }
+
   const newDoc = command.execute(doc);
+  
+  // Only record if document actually changed
+  if (newDoc === doc) {
+    return { history, doc };
+  }
+
   const newPast = [...history.past, command].slice(-history.maxSize);
   
   return {
@@ -235,6 +248,11 @@ export const createDeleteLayerCommand = (layerId: LayerId): Command => {
     id: createCommandId(),
     description: 'Delete layer',
     
+    canExecute: (doc) => {
+      // Only allow deletion if there's more than one layer
+      return doc.layers.length > 1 && doc.layers.some(l => l.id === layerId);
+    },
+    
     execute: (doc) => {
       deletedIndex = doc.layers.findIndex(l => l.id === layerId);
       if (deletedIndex === -1) return doc;
@@ -242,7 +260,7 @@ export const createDeleteLayerCommand = (layerId: LayerId): Command => {
       deletedLayer = doc.layers[deletedIndex];
       const newLayers = doc.layers.filter(l => l.id !== layerId);
       
-      // Don't delete the last layer
+      // Don't delete the last layer (should be caught by canExecute)
       if (newLayers.length === 0) return doc;
       
       const newActiveId = doc.activeLayerId === layerId 

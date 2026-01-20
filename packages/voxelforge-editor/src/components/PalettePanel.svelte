@@ -2,6 +2,7 @@
   import { documentStore, toolStore, palette } from '$lib/stores';
   import type { Material } from '$lib/document/types';
   import { ArrowsLeftRight } from 'phosphor-svelte';
+  import MaterialEditor from './MaterialEditor.svelte';
   
   let materials = $state<Material[]>([]);
   let primaryMat = $state(1);
@@ -23,6 +24,15 @@
   const swapColors = () => {
     toolStore.swapMaterials();
   };
+
+  const handlePaletteChange = (newPalette: Material[]) => {
+    materials = newPalette;
+    const doc = $documentStore;
+    documentStore.set({
+      ...doc,
+      palette: newPalette,
+    });
+  };
   
   const unpackColor = (color: number): string => {
     const r = color & 0xff;
@@ -35,6 +45,8 @@
 
 <div class="palette-panel">
   <div class="panel-header">Palette</div>
+  
+  <MaterialEditor {palette} onPaletteChange={handlePaletteChange} />
   
   <div class="current-colors">
     <div class="color-stack">

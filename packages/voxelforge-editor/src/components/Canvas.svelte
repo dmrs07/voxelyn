@@ -413,9 +413,11 @@
     ctx.translate(doc.camera.x, doc.camera.y);
     ctx.scale(doc.camera.zoom, doc.camera.zoom);
 
-    // Draw layers
+    // Draw layers sorted by zIndex (ascending - lower zIndex drawn first = behind)
     const pendingForLayer = isDrawing && layer?.id ? pendingPixels : null;
-    for (const l of doc.layers) {
+    const sortedLayers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
+    
+    for (const l of sortedLayers) {
       if (!l.visible || l.type !== 'grid2d') continue;
 
       ctx.globalAlpha = l.opacity;
