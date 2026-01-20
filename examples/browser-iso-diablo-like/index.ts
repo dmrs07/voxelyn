@@ -61,6 +61,16 @@ const COLORS = {
   bannerGold: packRGBA(180, 140, 50, 255),
   rune: packRGBA(0, 200, 255, 255),
   particleMagic: packRGBA(150, 240, 255, 255),
+
+  // Santander (Personagem)
+  armorLight: packRGBA(110, 110, 120, 255),
+  armorDark: packRGBA(70, 70, 80, 255),
+  armorRust: packRGBA(90, 60, 50, 255),
+  leatherBelt: packRGBA(80, 50, 30, 255),
+
+  // O Medo (Manifestação)
+  fearShadow: packRGBA(20, 10, 25, 255),
+  fearEyes: packRGBA(220, 50, 50, 255),
 };
 
 const key = packRGBA(0, 0, 0, 0);
@@ -71,6 +81,8 @@ const key = packRGBA(0, 0, 0, 0);
 
 // Helper de ruído simples
 const noise = (x: number, y: number) => Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 % 1;
+
+type Facing = 'down_right' | 'down_left' | 'up_right' | 'up_left';
 
 // 1. Textura de Parede (com portas e banners)
 const makeWallTexture = (
@@ -324,6 +336,102 @@ const makePedestalTexture = () => {
 };
 
 // ============================================================================
+// SANTANDER: Sprite procedural simplificado
+// ============================================================================
+
+
+const makeWarriorSprite = (facing: Facing, frame: number) => {
+    const w = 20; // Sprite um pouco mais largo para a armadura
+    const h = 26;
+    const pixels = new Uint32Array(w * h);
+
+    // Animação sutil de "respiração" / peso
+    const breathe = Math.floor(Math.sin(frame * 0.1) * 1.5);
+    const breatheOffset = Math.sin(frame * 0.1) * 0.5;
+
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            let col = key;
+            const dx = x - w/2;
+            const ay = y - breathe; // Coordenada Y ajustada pela animação
+            const isLitSide = (facing.includes('right') && x > w/2) || (facing.includes('left') && x < w/2);
+
+            // --- CORPO BASE (Armadura Pesada) ---
+            // O corpo é desenhado em camadas para dar volume
+
+            // Tronco e Pernas
+            if (ay >= 10 && ay < 24 && Math.abs(dx) < 6) {
+                 col = COLORS.armorDark;
+                 // Luz dependendo da direção (isométrico)
+                 if (isLitSide && Math.abs(dx) < 4) col = COLORS.armorLight;
+
+                 // Cinto de couro
+                 if (ay >= 16 && ay <= 17) col = COLORS.leatherBelt;
+                 
+                 // Divisão das pernas
+                 if (ay > 18 && Math.abs(dx) < 1) col = key;
+
+                 // Detalhes de ferrugem nas bordas e juntas
+                 if ((Math.abs(dx) === 5 || ay === 10 || ay === 18) && noise(x, ay) > 0.6) col = COLORS.armorRust;
+            }
+            
+            // Capacete e Ombreiras
+            if (ay >= 2 && ay < 12) {
+                // Capacete
+                if (Math.abs(dx) < 5 && ay < 9) {
+                    col = COLORS.armorLight;
+                    // Visor escuro
+                    if (ay >= 6 && ay <= 7 && Math.abs(dx) < 3) col = COLORS.void;
+                    // Sombra lateral do capacete
+                    if ((facing.includes('right') && x < w/2) || (facing.includes('left') && x > w/2)) {
+                        if (Math.abs(dx) >= 3) col = COLORS.armorDark;
+                    }
+                    // Ferrugem no topo
+                    if (ay === 2 && noise(x, ay) > 0.7) col = COLORS.armorRust;
+                }
+                // Ombreiras
+                if (ay >= 8 && ay < 12 && Math.abs(dx) >= 5 && Math.abs(dx) < 8) {
+                    col = COLORS.armorDark;
+                    if (isLitSide && Math.abs(dx) < 7) col = COLORS.armorLight;
+                    if (noise(x, ay) > 0.65) col = COLORS.armorRust;
+                }
+            }
+
+            // --- A MANIFESTAÇÃO DO MEDO (Sombra Parasita) ---
+            // Uma massa trêmula que se agarra aos ombros e costas
+            // Usamos um ruído que se move com o tempo para a tremulação
+            const fearNoise = noise(x * 0.2 + frame * 0.05, y * 0.2 + frame * 0.05 + breatheOffset);
+            
+            // Área da sombra (ombros, costas e acima da cabeça)
+            // A forma é definida por uma combinação de elipses e o ruído
+            const headDist = Math.sqrt(dx*dx + (ay-5)*(ay-5));
+            const shoulderDist = Math.sqrt(dx*dx + (ay-10)*(ay-10));
+            let isFearArea = (headDist < 10 || (shoulderDist < 12 && ay > 5)) && ay > -2;
+
+            // Adiciona tremulação nas bordas e preenche a forma
+            if (isFearArea && fearNoise > 0.35) {
+                // Sobrepõe a sombra sobre a armadura em algumas partes
+                if (col !== key || fearNoise > 0.5) {
+                    col = COLORS.fearShadow;
+                }
+            }
+
+            // Olhos do medo (piscando nervosamente)
+            // Aparecem dentro da área da sombra, em pontos de alto ruído
+            if (col === COLORS.fearShadow && fearNoise > 0.88 && ay < 8 && Math.abs(dx) < 8) {
+                 // Piscar rápido e aleatório
+                 if (Math.sin(frame * 0.8 + x*y) > 0.2) {
+                    col = COLORS.fearEyes;
+                 }
+            }
+
+            pixels[y * w + x] = col;
+        }
+    }
+    return { width: w, height: h, pixels };
+};
+
+// ============================================================================
 // ASSETS & MAPA
 // ============================================================================
 const FACE_W = TILE_W / 2;
@@ -369,6 +477,97 @@ const props = [
   { x: 6, y: 6, type: 'crystal' }
 ];
 
+const player = {
+  x: 4.5,
+  y: 4.5,
+  z: 0,
+  facing: 'down_right' as Facing,
+  targetX: 4.5,
+  targetY: 4.5,
+};
+
+// ============================================================================
+// CONTROLES: Movimentação Isométrica
+// ============================================================================
+const MOVE_SPEED = 0.08;
+const keys: Record<string, boolean> = {};
+
+// Limites do tabuleiro (excluindo paredes)
+const MIN_POS = 1;
+const MAX_POS = MAP_SIZE - 1;
+
+// Verificar colisão com props
+const hasCollision = (x: number, y: number): boolean => {
+  const tileX = Math.round(x);
+  const tileY = Math.round(y);
+  // Paredes
+  if (tileX < MIN_POS || tileY < MIN_POS || tileX >= MAX_POS || tileY >= MAX_POS) return true;
+  // Props (caixas)
+  for (const prop of props) {
+    if (prop.type === 'crate' && Math.abs(x - prop.x) < 0.8 && Math.abs(y - prop.y) < 0.8) return true;
+  }
+  return false;
+};
+
+document.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  // Prevenir scroll da página
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
+    e.preventDefault();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+const updatePlayer = () => {
+  // Movimento isométrico:
+  // W = mover para cima-esquerda (y--)
+  // S = mover para baixo-direita (y++)
+  // A = mover para baixo-esquerda (x--)
+  // D = mover para cima-direita (x++)
+  
+  let dx = 0;
+  let dy = 0;
+  
+  // WASD para movimento isométrico
+  if (keys['w'] || keys['arrowup']) { dy -= 1; }
+  if (keys['s'] || keys['arrowdown']) { dy += 1; }
+  if (keys['a'] || keys['arrowleft']) { dx -= 1; }
+  if (keys['d'] || keys['arrowright']) { dx += 1; }
+  
+  // Normalizar diagonal
+  if (dx !== 0 && dy !== 0) {
+    dx *= 0.707;
+    dy *= 0.707;
+  }
+  
+  // Aplicar movimento se houver input
+  if (dx !== 0 || dy !== 0) {
+    const newX = player.x + dx * MOVE_SPEED;
+    const newY = player.y + dy * MOVE_SPEED;
+    
+    // Verificar colisão separadamente para X e Y (permite deslizar em paredes)
+    if (!hasCollision(newX, player.y)) {
+      player.x = newX;
+    }
+    if (!hasCollision(player.x, newY)) {
+      player.y = newY;
+    }
+    
+    // Atualizar facing baseado na direção do movimento
+    if (dx > 0 && dy > 0) player.facing = 'down_right';
+    else if (dx < 0 && dy < 0) player.facing = 'up_left';
+    else if (dx > 0 && dy < 0) player.facing = 'up_right';
+    else if (dx < 0 && dy > 0) player.facing = 'down_left';
+    else if (dx > 0) player.facing = 'down_right';
+    else if (dx < 0) player.facing = 'down_left';
+    else if (dy > 0) player.facing = 'down_right';
+    else if (dy < 0) player.facing = 'up_left';
+  }
+};
+
 const runes = [
   { x: 5, y: 4, c: 'n' }, { x: 7, y: 4, c: 'O' }, { x: 5, y: 5, c: 'O' },
   { x: 7, y: 5, c: 'X' }, { x: 5, y: 7, c: '#' }, { x: 7, y: 7, c: 'O' }, { x: 6, y: 8, c: 'X' }
@@ -402,10 +601,31 @@ const drawRune = (target: Surface2D, sx: number, sy: number, char: string, frame
   }
 };
 
+const drawWarrior = (
+  target: Surface2D,
+  x: number,
+  y: number,
+  z: number,
+  facing: Facing,
+  frame: number
+) => {
+  const iso = projectIso(x - MAP_SIZE / 2, y - MAP_SIZE / 2, z, TILE_W, TILE_H, Z_STEP);
+  const sx = (target.width / 2 + iso.sx) | 0;
+  const sy = (145 + iso.sy) | 0;
+
+  const sprite = makeWarriorSprite(facing, frame);
+  blitColorkey(target, sprite, sx - sprite.width / 2, sy - sprite.height + 2, { colorkey: key });
+};
+
 let frame = 0;
 const render = () => {
   frame++;
   fillRect(surface, 0, 0, surface.width, surface.height, COLORS.bg);
+
+  // Atualizar posição do jogador
+  updatePlayer();
+
+  player.z = Math.abs(Math.sin(frame * 0.05) * 0.1);
 
   particles = particles.filter(p => p.life > 0);
   for (const p of particles) { p.x += p.vx; p.y += p.vy; p.z += p.vz; p.life -= 0.015; }
@@ -446,6 +666,10 @@ const render = () => {
           const pIso = projectIso(p.x - MAP_SIZE/2, p.y - MAP_SIZE/2, p.z, TILE_W, TILE_H, Z_STEP);
           const psx = (surface.width/2 + pIso.sx)|0; const psy = (145 + pIso.sy)|0;
           fillRect(surface, psx, psy, 2, 2, p.color);
+      }
+
+      if (Math.round(player.x) === x && Math.round(player.y) === y) {
+        drawWarrior(surface, player.x, player.y, player.z, player.facing, frame);
       }
     }
   });
