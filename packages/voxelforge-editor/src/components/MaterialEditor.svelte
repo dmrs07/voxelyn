@@ -113,10 +113,10 @@
 <div class="material-editor">
   <div class="editor-header">
     <h3>Material Editor</h3>
-    <button class="btn-icon" title="Add preset material" on:click={addPresetMaterial}>
+    <button class="btn-icon" title="Add preset material" onclick={addPresetMaterial}>
       <Plus size={20} />
     </button>
-    <button class="btn-icon" title="Regenerate textures" on:click={regenerateTextureSheet}>
+    <button class="btn-icon" title="Regenerate textures" onclick={regenerateTextureSheet}>
       <FloppyDisk size={20} />
     </button>
   </div>
@@ -131,10 +131,10 @@
             class="material-item {selectedMaterialIndex === index ? 'selected' : ''}"
             role="button"
             tabindex="0"
-            on:click={() => {
+            onclick={() => {
               selectedMaterialIndex = index;
             }}
-            on:keydown={(e) => {
+            onkeydown={(e) => {
               if (e.key === 'Enter') selectedMaterialIndex = index;
             }}
           >
@@ -142,7 +142,9 @@
             <div class="material-name">{material.name}</div>
             <button
               class="btn-remove"
-              on:click|stopPropagation={() => removeMaterial(index)}
+              onclick={() => {
+                removeMaterial(index);
+              }}
               title="Delete material"
             >
               <Trash size={16} />
@@ -159,20 +161,22 @@
         <h4>Properties</h4>
 
         <div class="prop">
-          <label>Name</label>
+          <label for="mat-name">Name</label>
           <input
+            id="mat-name"
             type="text"
             value={material.name}
-            on:change={(e) => updateSelectedMaterial('name', e.currentTarget.value)}
+            onchange={(e) => updateSelectedMaterial('name', e.currentTarget.value)}
           />
         </div>
 
         <div class="prop">
-          <label>Color</label>
+          <label for="mat-color">Color</label>
           <input
+            id="mat-color"
             type="color"
             value="#{material.color.toString(16).slice(0, 6).padStart(6, '0')}"
-            on:change={(e) => {
+            onchange={(e) => {
               const hex = e.currentTarget.value.substring(1);
               const color = parseInt(hex + 'FF', 16);
               updateSelectedMaterial('color', color);
@@ -181,58 +185,64 @@
         </div>
 
         <div class="prop">
-          <label>Density ({material.density})</label>
+          <label for="mat-density">Density ({material.density})</label>
           <input
+            id="mat-density"
             type="range"
             min="0"
             max="100"
             value={material.density}
-            on:change={(e) => updateSelectedMaterial('density', Number(e.currentTarget.value))}
+            onchange={(e) => updateSelectedMaterial('density', Number(e.currentTarget.value))}
           />
         </div>
 
         <div class="prop">
-          <label>Friction ({material.friction.toFixed(2)})</label>
+          <label for="mat-friction">Friction ({material.friction.toFixed(2)})</label>
           <input
+            id="mat-friction"
             type="range"
             min="0"
             max="1"
             step="0.1"
             value={material.friction}
-            on:change={(e) => updateSelectedMaterial('friction', Number(e.currentTarget.value))}
+            onchange={(e) => updateSelectedMaterial('friction', Number(e.currentTarget.value))}
           />
         </div>
 
         <div class="prop-flags">
-          <label>
+          <label for="mat-liquid">
             <input
+              id="mat-liquid"
               type="checkbox"
               checked={material.isLiquid}
-              on:change={(e) => updateSelectedMaterial('isLiquid', e.currentTarget.checked)}
+              onchange={(e) => updateSelectedMaterial('isLiquid', e.currentTarget.checked)}
             />
             Liquid
           </label>
-          <label>
+          <label for="mat-gas">
             <input
+              id="mat-gas"
               type="checkbox"
               checked={material.isGaseous}
-              on:change={(e) => updateSelectedMaterial('isGaseous', e.currentTarget.checked)}
+              onchange={(e) => updateSelectedMaterial('isGaseous', e.currentTarget.checked)}
             />
             Gaseous
           </label>
-          <label>
+          <label for="mat-transparent">
             <input
+              id="mat-transparent"
               type="checkbox"
               checked={material.isTransparent}
-              on:change={(e) => updateSelectedMaterial('isTransparent', e.currentTarget.checked)}
+              onchange={(e) => updateSelectedMaterial('isTransparent', e.currentTarget.checked)}
             />
             Transparent
           </label>
-          <label>
+          <label for="mat-flammable">
             <input
+              id="mat-flammable"
               type="checkbox"
               checked={material.flammable}
-              on:change={(e) => updateSelectedMaterial('flammable', e.currentTarget.checked)}
+              onchange={(e) => updateSelectedMaterial('flammable', e.currentTarget.checked)}
             />
             Flammable
           </label>
@@ -240,13 +250,14 @@
 
         {#if material.isoHeight !== undefined}
           <div class="prop">
-            <label>ISO Height ({material.isoHeight}px)</label>
+            <label for="mat-height">ISO Height ({material.isoHeight}px)</label>
             <input
+              id="mat-height"
               type="range"
               min="0"
               max="32"
               value={material.isoHeight}
-              on:change={(e) => updateSelectedMaterial('isoHeight', Number(e.currentTarget.value))}
+              onchange={(e) => updateSelectedMaterial('isoHeight', Number(e.currentTarget.value))}
             />
           </div>
         {/if}

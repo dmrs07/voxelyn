@@ -1,6 +1,6 @@
 <script lang="ts">
   import { documentStore, toolStore, palette } from '$lib/stores';
-  import type { Material } from '$lib/document/types';
+  import type { Material } from '@voxelyn/core';
   import { ArrowsLeftRight } from 'phosphor-svelte';
   import MaterialEditor from './MaterialEditor.svelte';
   
@@ -46,7 +46,7 @@
 <div class="palette-panel">
   <div class="panel-header">Palette</div>
   
-  <MaterialEditor {palette} onPaletteChange={handlePaletteChange} />
+  <MaterialEditor palette={materials} onPaletteChange={handlePaletteChange} />
   
   <div class="current-colors">
     <div class="color-stack">

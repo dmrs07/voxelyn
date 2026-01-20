@@ -3,7 +3,7 @@
  * Generates realistic textures for different material types.
  */
 
-import { packRGBA, unpackRGBA, adjustBrightness, multiplyColor } from './palette';
+import { packRGBA, unpackRGBA } from './palette';
 import type { Material } from './palette';
 
 // ============================================================================

@@ -1,4 +1,5 @@
-import { Palette, Material, DEFAULT_MATERIALS } from '@voxelyn/core';
+import type { Palette, Material } from '@voxelyn/core';
+import { DEFAULT_MATERIALS } from '@voxelyn/core';
 
 /**
  * VoxelForge Editor - Document Model
@@ -6,6 +7,11 @@ import { Palette, Material, DEFAULT_MATERIALS } from '@voxelyn/core';
  */
 
 // Material type is imported from voxelyn/core as the foundation
+
+/**
+ * Re-export Material type for convenience
+ */
+export type { Material } from '@voxelyn/core';
 
 
 /** Unique identifier for layers */

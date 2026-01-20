@@ -39,7 +39,7 @@ export const MaterialBehaviors = {
   /**
    * Burning/combustion behavior
    */
-  burning: (intensity: number = 1): MaterialBehavior => {
+  burning: (_intensity: number = 1): MaterialBehavior => {
     return (material, context) => {
       const burnEffect = Math.sin(context.time * 0.01) * 0.2 + 0.8;
       return {
@@ -53,7 +53,7 @@ export const MaterialBehaviors = {
    */
   melting: (
     meltTemp: number = 800,
-    liquidMaterial?: Material
+    _liquidMaterial?: Material
   ): MaterialBehavior => {
     return (material, context) => {
       const temp = context.temperature ?? 0;
@@ -98,8 +98,8 @@ export const MaterialBehaviors = {
   /**
    * Flowing behavior - spreads to adjacent cells (liquid-like)
    */
-  flowing: (flowForce: number = 0.5): MaterialBehavior => {
-    return (material, context) => {
+  flowing: (_flowForce: number = 0.5): MaterialBehavior => {
+    return (material, _context) => {
       return {
         isLiquid: true,
         friction: material.friction * 0.1,
