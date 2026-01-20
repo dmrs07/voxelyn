@@ -15,7 +15,6 @@ import {
   createSurface2D,
   makePalette,
   packRGBA,
-  paintRect,
   paintCircle,
   renderToSurfaceShaded,
   stepActiveChunks,
@@ -27,12 +26,11 @@ import {
   markChunkDirtyByXY,
   inBounds,
   multiplyColor,
-  lerpColor,
   adjustBrightness
-} from "../../src/index.js";
-import type { ShaderFn } from "../../src/core/grid2d.js";
-import { presentToCanvas } from "../../src/adapters/canvas2d.js";
-import { RNG } from "../../src/core/rng.js";
+} from "../../packages/voxelyn-core/src/index.js";
+import type { ShaderFn } from "../../packages/voxelyn-core/src/core/grid2d.js";
+import { presentToCanvas } from "../../packages/voxelyn-core/src/adapters/canvas2d.js";
+import { RNG } from "../../packages/voxelyn-core/src/core/rng.js";
 
 // ============================================================================
 // CONFIGURAÇÃO DO MUNDO
@@ -76,7 +74,7 @@ const IS_SOLID: Record<number, boolean> = {
   [MAT.ICE]: true
 };
 
-const IS_LIQUID: Record<number, boolean> = {
+const _IS_LIQUID: Record<number, boolean> = {
   [MAT.WATER]: true,
   [MAT.LAVA]: true
 };
@@ -87,7 +85,7 @@ const IS_GAS: Record<number, boolean> = {
 };
 
 // Blocos que caem como unidade (não como pó)
-const IS_FALLING_BLOCK: Record<number, boolean> = {
+const _IS_FALLING_BLOCK: Record<number, boolean> = {
   [MAT.ROCK]: true,
   [MAT.WOOD]: true,
   [MAT.ICE]: true
@@ -197,7 +195,7 @@ function updateSurfaceHeightCache(): void {
  * Shader de profundidade - escurece pixels baseado na distância da superfície.
  * Também adiciona variação de textura com ruído.
  */
-const depthShader: ShaderFn = (material, x, y, baseColor, _cell) => {
+const depthShader: ShaderFn = (material, x, y, baseColor) => {
   // Materiais que não recebem shading
   if (material === MAT.EMPTY || material === MAT.FIRE || material === MAT.LAVA ||
       material === MAT.SMOKE || material === MAT.STEAM || material === MAT.SNOW ||
@@ -481,7 +479,7 @@ function drawGrassTuft(x: number, y: number): void {
 }
 
 /** Desenha nuvem decorativa (usando vapor) */
-function drawCloud(cx: number, cy: number, size: number): void {
+function _drawCloud(cx: number, cy: number, size: number): void {
   for (let i = 0; i < size; i++) {
     const angle = (i / size) * Math.PI * 2;
     const r = size * 0.4 + rng.nextInt(size * 0.2 | 0);
@@ -525,7 +523,7 @@ function drawRockFormation(x: number, baseY: number, size: number = 1): void {
 }
 
 /** Desenha rio de lava - CURVO com poças como na referência */
-function drawLavaRiver(startX: number, startY: number, endY: number, curveDir: number = 1): void {
+function _drawLavaRiver(startX: number, startY: number, endY: number, curveDir: number = 1): void {
   let x = startX;
   let width = 4;
   
@@ -668,7 +666,7 @@ function drawHorizonClouds(startX: number, endX: number, baseY: number): void {
 }
 
 // Função antiga mantida para compatibilidade
-function drawTree(tx: number, ty: number): void {
+function _drawTree(tx: number, ty: number): void {
   drawPineTree(tx, ty, 20);
 }
 
@@ -751,7 +749,7 @@ function tryLiquidSpread(x1: number, y1: number, x2: number, y2: number, mat: nu
 /**
  * Verifica se uma posição tem suporte sólido (chão ou bloco sólido abaixo)
  */
-function hasGroundSupport(x: number, y: number): boolean {
+function _hasGroundSupport(x: number, y: number): boolean {
   if (!inBounds(grid, x, y + 1)) return true; // Fundo do mundo = suportado
   const below = getMaterial(getXY(grid, x, y + 1));
   return IS_SOLID[below] === true;

@@ -1,0 +1,42 @@
+{
+  "name": "@voxelyn/core",
+  "version": "0.1.0",
+  "description": "Ultra lightweight headless pixels/grid/iso/voxels toolkit",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./adapters/canvas2d": {
+      "types": "./dist/src/adapters/canvas2d.d.ts",
+      "import": "./dist/src/adapters/canvas2d.js"
+    },
+    "./adapters/webgl": {
+      "types": "./dist/src/adapters/webglTexture.d.ts",
+      "import": "./dist/src/adapters/webglTexture.js"
+    },
+    "./extras/iso": {
+      "types": "./dist/src/extras/iso/iso.d.ts",
+      "import": "./dist/src/extras/iso/iso.js"
+    },
+    "./extras/voxels": {
+      "types": "./dist/src/extras/voxels/voxelGrid3d.d.ts",
+      "import": "./dist/src/extras/voxels/voxelGrid3d.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "pnpm build && node dist/tests/run.js",
+    "dev": "tsc -w"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

@@ -13,9 +13,9 @@ import {
   getXY,
   markChunkActiveByXY,
   markChunkDirtyByXY
-} from "../../src/index.js";
-import { presentToCanvas } from "../../src/adapters/canvas2d.js";
-import { RNG } from "../../src/core/rng.js";
+} from "../../packages/voxelyn-core/src/index.js";
+import { presentToCanvas } from "../../packages/voxelyn-core/src/adapters/canvas2d.js";
+import { RNG } from "../../packages/voxelyn-core/src/core/rng.js";
 
 const W = 128;
 const H = 128;
