@@ -1103,7 +1103,6 @@
         fps = Math.round(fpsSmoothed);
         fpsFrameCount = 0;
         fpsLastTime = now;
-
       }
 
       // TODO: test performance impact of this with different framerates
