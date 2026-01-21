@@ -31,7 +31,6 @@ export type VoxelRaycastCamera = {
 export type { VoxelBounds } from './voxel-grid';
 export { buildVoxelGridFromDocument, buildVoxelGridFromDocumentWithBounds, computeVoxelBounds } from './voxel-grid';
 
-
 const packColor = (r: number, g: number, b: number, a: number): number =>
   ((a & 0xff) << 24) | ((b & 0xff) << 16) | ((g & 0xff) << 8) | (r & 0xff);
 
