@@ -47,9 +47,7 @@ jobs:
         run: pnpm icons:generate
 
       - name: Build Electron (${{ matrix.platform }})
-        run: |
-          cd packages/voxelforge-electron
-          npx electron-builder --${{ matrix.platform }} --publish=never
+        run: pnpm --filter @voxelforge/electron dist -- --${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

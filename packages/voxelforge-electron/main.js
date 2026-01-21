@@ -22,8 +22,11 @@ const createWindow = () => {
     return;
   }
 
-  const indexPath = path.join(app.getAppPath(), 'renderer', 'index.html');
-  win.loadFile(indexPath);
+  const indexPath = path.join(__dirname, 'renderer', 'index.html');
+  win.loadFile(indexPath).catch((error) => {
+    console.error('Failed to load renderer:', indexPath);
+    console.error(error);
+  });
 };
 
 app.whenReady().then(() => {
