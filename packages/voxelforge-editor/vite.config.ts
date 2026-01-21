@@ -8,6 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(`${__dirname}/package.json`, 'utf-8'));
 
 export default defineConfig({
+  base: './',
   plugins: [svelte()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
