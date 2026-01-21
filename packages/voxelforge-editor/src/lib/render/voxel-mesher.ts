@@ -1,62 +1,17 @@
-import type { EditorDocument, GridLayer, VoxelLayer } from '../document/types';
+import type { EditorDocument } from '../document/types';
 import type { Material } from '@voxelyn/core';
-import { createVoxelGrid3D, type VoxelGrid3D } from '@voxelyn/core';
-import { computeVoxelBounds, type VoxelBounds } from './render-voxel3d';
+import { buildVoxelGridFromDocument, computeVoxelBounds, type VoxelBounds } from './voxel-grid';
 
 type Vec3 = { x: number; y: number; z: number };
 
+/**
+ * Greedy-meshed voxel surface data for WebGL rendering.
+ */
 export type VoxelMesh = {
   positions: Float32Array;
   colors: Float32Array;
   indices: Uint32Array;
   bounds: VoxelBounds;
-};
-
-const buildVoxelGridFromDocument = (doc: EditorDocument): VoxelGrid3D => {
-  const width = doc.width;
-  const height = doc.height;
-  const depth = doc.depth;
-  const data = new Uint16Array(width * height * depth);
-
-  const visibleLayers = doc.layers.filter(layer => layer.visible);
-  const sortedLayers = [...visibleLayers].sort((a, b) => a.zIndex - b.zIndex);
-
-  for (const layer of sortedLayers) {
-    if (layer.type === 'voxel3d') {
-      const voxelLayer = layer as VoxelLayer;
-      const zOffset = Math.round(voxelLayer.zIndex);
-      for (let z = 0; z < voxelLayer.depth; z += 1) {
-        const targetZ = z + zOffset;
-        if (targetZ < 0 || targetZ >= depth) continue;
-        for (let y = 0; y < voxelLayer.height; y += 1) {
-          const row = (z * voxelLayer.height + y) * voxelLayer.width;
-          const targetRow = (targetZ * height + y) * width;
-          for (let x = 0; x < voxelLayer.width; x += 1) {
-            const cell = voxelLayer.data[row + x] ?? 0;
-            if ((cell & 0xff) === 0) continue;
-            data[targetRow + x] = cell;
-          }
-        }
-      }
-      continue;
-    }
-
-    if (layer.type === 'grid2d') {
-      const gridLayer = layer as GridLayer;
-      const targetZ = Math.max(0, Math.min(depth - 1, Math.round(gridLayer.zIndex)));
-      for (let y = 0; y < gridLayer.height; y += 1) {
-        const row = y * gridLayer.width;
-        const targetRow = (targetZ * height + y) * width;
-        for (let x = 0; x < gridLayer.width; x += 1) {
-          const cell = gridLayer.data[row + x] ?? 0;
-          if ((cell & 0xff) === 0) continue;
-          data[targetRow + x] = cell;
-        }
-      }
-    }
-  }
-
-  return createVoxelGrid3D(width, height, depth, { data });
 };
 
 const unpackColor = (color: number) => ({
@@ -72,6 +27,9 @@ const shade = (color: number, normal: Vec3, lightDir: Vec3): [number, number, nu
   return [base.r * dot, base.g * dot, base.b * dot, base.a];
 };
 
+/**
+ * Builds a greedy mesh from the current document using the palette and light direction.
+ */
 export const buildGreedyMeshFromDocument = (
   doc: EditorDocument,
   palette: Material[],
@@ -90,7 +48,6 @@ export const buildGreedyMeshFromDocument = (
   let indexOffset = 0;
 
   const dims = [grid.width, grid.height, grid.depth];
-  const mask = new Int32Array(dims[0] * dims[1]);
 
   const voxelAt = (x: number, y: number, z: number): number => {
     if (x < 0 || y < 0 || z < 0 || x >= grid.width || y >= grid.height || z >= grid.depth) return 0;
@@ -128,6 +85,7 @@ export const buildGreedyMeshFromDocument = (
   for (let axis = 0; axis < 3; axis += 1) {
     const u = (axis + 1) % 3;
     const v = (axis + 2) % 3;
+    const mask = new Int32Array(dims[u] * dims[v]);
     const x = [0, 0, 0];
     const q = [0, 0, 0];
     q[axis] = 1;

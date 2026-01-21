@@ -1,7 +1,7 @@
 import { createSurface2D, type Surface2D } from '@voxelyn/core';
-import { createVoxelGrid3D, type VoxelGrid3D } from '@voxelyn/core';
-import type { EditorDocument, GridLayer, VoxelLayer } from '../document/types';
+import type { VoxelGrid3D } from '@voxelyn/core';
 import type { Material } from '@voxelyn/core';
+import type { VoxelBounds } from './voxel-grid';
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -28,15 +28,9 @@ export type VoxelRaycastCamera = {
   target: Vec3;
 };
 
-export type VoxelBounds = {
-  minX: number;
-  minY: number;
-  minZ: number;
-  maxX: number;
-  maxY: number;
-  maxZ: number;
-  empty: boolean;
-};
+export type { VoxelBounds } from './voxel-grid';
+export { buildVoxelGridFromDocument, buildVoxelGridFromDocumentWithBounds, computeVoxelBounds } from './voxel-grid';
+
 
 const packColor = (r: number, g: number, b: number, a: number): number =>
   ((a & 0xff) << 24) | ((b & 0xff) << 16) | ((g & 0xff) << 8) | (r & 0xff);
@@ -79,89 +73,6 @@ const buildRayCache = (width: number, height: number, fov: number): RayCache => 
   return { width, height, fov: fovValue, dirs };
 };
 
-export const buildVoxelGridFromDocument = (doc: EditorDocument): VoxelGrid3D => {
-  const width = doc.width;
-  const height = doc.height;
-  const depth = doc.depth;
-  const data = new Uint16Array(width * height * depth);
-
-  const visibleLayers = doc.layers.filter(layer => layer.visible);
-  const voxelLayers = visibleLayers.filter(layer => layer.type === 'voxel3d') as VoxelLayer[];
-  const gridLayers = visibleLayers.filter(layer => layer.type === 'grid2d') as GridLayer[];
-
-  const sortedLayers = [...voxelLayers].sort((a, b) => a.zIndex - b.zIndex);
-  for (const layer of sortedLayers) {
-    const size = layer.width * layer.height * layer.depth;
-    const limit = Math.min(size, data.length);
-    for (let i = 0; i < limit; i += 1) {
-      const cell = layer.data[i] ?? 0;
-      if ((cell & 0xff) !== 0) data[i] = cell;
-    }
-  }
-
-  if (voxelLayers.length === 0) {
-    const sortedGrid = [...gridLayers].sort((a, b) => a.zIndex - b.zIndex);
-    for (const layer of sortedGrid) {
-      for (let y = 0; y < layer.height; y += 1) {
-        for (let x = 0; x < layer.width; x += 1) {
-          const idx2d = y * layer.width + x;
-          const cell = layer.data[idx2d] ?? 0;
-          if ((cell & 0xff) === 0) continue;
-          const idx3d = x + y * width;
-          data[idx3d] = cell;
-        }
-      }
-    }
-  }
-
-  return createVoxelGrid3D(width, height, depth, { data });
-};
-
-export const buildVoxelGridFromDocumentWithBounds = (
-  doc: EditorDocument
-): { grid: VoxelGrid3D; bounds: VoxelBounds } => {
-  const grid = buildVoxelGridFromDocument(doc);
-  const bounds = computeVoxelBounds(grid);
-  return { grid, bounds };
-};
-
-export const computeVoxelBounds = (grid: VoxelGrid3D): VoxelBounds => {
-  const { width, height, depth, data } = grid;
-  let minX = width;
-  let minY = height;
-  let minZ = depth;
-  let maxX = -1;
-  let maxY = -1;
-  let maxZ = -1;
-
-  const slice = width * height;
-  for (let i = 0; i < data.length; i += 1) {
-    const cell = data[i] ?? 0;
-    if ((cell & 0xff) === 0) continue;
-    const z = Math.floor(i / slice);
-    const rem = i - z * slice;
-    const y = Math.floor(rem / width);
-    const x = rem - y * width;
-
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (z < minZ) minZ = z;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-    if (z > maxZ) maxZ = z;
-  }
-
-  const empty = maxX < 0 || maxY < 0 || maxZ < 0;
-  return {
-    minX: empty ? 0 : minX,
-    minY: empty ? 0 : minY,
-    minZ: empty ? 0 : minZ,
-    maxX: empty ? 0 : maxX,
-    maxY: empty ? 0 : maxY,
-    maxZ: empty ? 0 : maxZ,
-    empty,
-  };
-};
 
 export const renderVoxelRaycast = (
   grid: VoxelGrid3D,

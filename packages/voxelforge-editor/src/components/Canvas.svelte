@@ -31,7 +31,9 @@
   let fpsSmoothed = 0;
   let fpsFrameCount = 0;
   let fpsLastTime = performance.now();
-  let fpsLastAdaptive = performance.now();
+  let needsRender = true;
+  let overlayNeedsRender = true;
+  let lastOverlayFrame = 0;
   const referenceImages = new Map<string, HTMLImageElement>();
   
   // Local state from stores
@@ -45,6 +47,13 @@
   let gridStep: number = get(uiStore.gridStep);
   let cursorPosition: { x: number; y: number } | null = get(uiStore.cursorPosition);
   let isPanModifier = false;
+  let lastDocDims = { width: 0, height: 0, depth: 0 };
+  let lastViewMode = '2d' as EditorDocument['viewMode'];
+
+  const invalidateRender = () => {
+    needsRender = true;
+    overlayNeedsRender = true;
+  };
 
   type AnchorPoint = {
     id: string;
@@ -239,6 +248,7 @@
       const next = e.deltaY > 0 ? view3d.distance * 1.1 : view3d.distance * 0.9;
       view3d.distance = Math.max(20, Math.min(2000, next));
       view3dDirty = true;
+      invalidateRender();
       render();
       return;
     }
@@ -280,6 +290,7 @@
     const newY = viewY - worldY * newZoom;
 
     documentStore.setCamera({ x: newX, y: newY, zoom: newZoom });
+    invalidateRender();
   };
 
   const stepZoom = (delta: number) => {
@@ -289,6 +300,7 @@
     const viewX = canvas.clientWidth / 2;
     const viewY = canvas.clientHeight / 2;
     applyZoomAt(viewX, viewY, nextZoom);
+    invalidateRender();
   };
 
   const fitToWindow = () => {
@@ -298,6 +310,7 @@
     const newX = canvas.clientWidth / 2 - doc.width * newZoom / 2;
     const newY = canvas.clientHeight / 2 - doc.height * newZoom / 2;
     documentStore.setCamera({ x: newX, y: newY, zoom: newZoom });
+    invalidateRender();
   };
   
   const handleContextMenu = (e: MouseEvent) => {
@@ -400,7 +413,10 @@
 
     const image = new Image();
     image.src = url;
-    image.onload = () => render();
+    image.onload = () => {
+      invalidateRender();
+      render();
+    };
     referenceImages.set(url, image);
     return image;
   };
@@ -576,6 +592,7 @@
       target: { ...anchor.target },
     };
     view3dDirty = true;
+    invalidateRender();
     render();
   };
 
@@ -605,6 +622,7 @@
       view3d.pitch = -0.1;
     }
     view3dDirty = true;
+    invalidateRender();
     render();
   };
 
@@ -615,6 +633,7 @@
       z: view3d.target.z + dz,
     };
     view3dDirty = true;
+    invalidateRender();
     render();
   };
 
@@ -723,7 +742,17 @@
   };
 
   const buildViewProjection = () => {
-    const aspect = canvas.clientWidth / canvas.clientHeight;
+    if (!canvas) {
+      return new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+      ]);
+    }
+    const width = Math.max(1, canvas.clientWidth);
+    const height = Math.max(1, canvas.clientHeight);
+    const aspect = width / height;
     const proj = makePerspective(view3dSettings.fov, aspect, view3dSettings.near, view3dSettings.far);
     const { camera } = getViewBasis();
     const view = makeLookAt(camera, view3d.target);
@@ -757,6 +786,7 @@
       };
     }
     view3dDirty = true;
+    invalidateRender();
     render();
   };
 
@@ -769,7 +799,8 @@
   const render3d = () => {
     if (!ctx || !canvas || !voxelMeshRenderer) return;
 
-    const gridKey = `${doc.meta.modified}-${doc.layers.length}`;
+    const lightKey = `${lightDir.x.toFixed(2)}:${lightDir.y.toFixed(2)}:${lightDir.z.toFixed(2)}`;
+    const gridKey = `${doc.meta.modified}-${doc.layers.length}-${lightKey}`;
     if (!voxelMeshCache || voxelMeshCache.key !== gridKey) {
       const mesh = buildGreedyMeshFromDocument(doc, doc.palette, lightDir);
       voxelMeshCache = { key: gridKey, mesh };
@@ -856,26 +887,37 @@
     // Iso mode uses its own renderer
     if (doc.viewMode === 'iso') {
       renderIso();
+      needsRender = false;
       return;
     }
 
     if (doc.viewMode === '3d') {
       render3d();
+      needsRender = false;
       return;
     }
 
     const hasReferenceLayer = doc.layers.some(layer => layer.type === 'reference' && layer.visible);
     if (hasReferenceLayer) {
       render2d();
+      needsRender = false;
       return;
     }
     
     if (useWebGL && webglRenderer) {
       renderWebgl();
       renderOverlay();
+      needsRender = false;
       return;
     }
     render2d();
+    needsRender = false;
+  };
+
+  const shouldAnimateSelection = () => {
+    if (doc.viewMode === '3d') return false;
+    const selection = toolState.selectionPreview ?? doc.selection;
+    return selection.active && selection.width > 0 && selection.height > 0;
   };
   
   // Keyboard shortcuts
@@ -953,12 +995,22 @@
     const unsubs = [
       documentStore.subscribe(d => {
         doc = d;
-        view3d.target = { x: d.width / 2, y: d.height / 2, z: d.depth / 2 };
+        const dimsChanged =
+          d.width !== lastDocDims.width ||
+          d.height !== lastDocDims.height ||
+          d.depth !== lastDocDims.depth;
+        const viewModeChanged = lastViewMode !== d.viewMode;
+        if (dimsChanged || (viewModeChanged && d.viewMode === '3d')) {
+          view3d.target = { x: d.width / 2, y: d.height / 2, z: d.depth / 2 };
+        }
+        lastDocDims = { width: d.width, height: d.height, depth: d.depth };
+        lastViewMode = d.viewMode;
         view3dDirty = true;
         if (d.viewMode === '3d') {
           uiStore.cursorPosition.set(null);
         }
         syncAnchors();
+        invalidateRender();
         render();
       }),
       toolStore.activeTool.subscribe(t => { tool = t; }),
@@ -966,8 +1018,8 @@
       toolStore.primaryMaterial.subscribe(m => { primaryMat = m; }),
       toolStore.secondaryMaterial.subscribe(m => { secondaryMat = m; }),
       activeLayer.subscribe(l => { layer = l as GridLayer | null; }),
-      uiStore.showGrid.subscribe(g => { showGrid = g; render(); }),
-      uiStore.gridStep.subscribe(step => { gridStep = step; render(); }),
+      uiStore.showGrid.subscribe(g => { showGrid = g; invalidateRender(); render(); }),
+      uiStore.gridStep.subscribe(step => { gridStep = step; invalidateRender(); render(); }),
       uiStore.cursorPosition.subscribe(pos => { cursorPosition = pos; }),
     ];
     
@@ -983,6 +1035,7 @@
       webglRenderer?.resize(canvas.width, canvas.height);
       voxelMeshRenderer?.resize(canvas.width, canvas.height);
       view3dDirty = true;
+      invalidateRender();
       render();
     });
     resizeObserver.observe(canvas);
@@ -1005,6 +1058,7 @@
     });
     
     syncAnchors();
+    invalidateRender();
     render();
     
     // Animation loop for smooth updates
@@ -1021,11 +1075,18 @@
         fpsFrameCount = 0;
         fpsLastTime = now;
 
-        if (doc.viewMode === '3d' && now - fpsLastAdaptive > 800) {
-          fpsLastAdaptive = now;
-        }
       }
-      render();
+
+      // TODO: test performance impact of this with different framerates
+      if (shouldAnimateSelection() && now - lastOverlayFrame >= 1000 / 60) {
+        overlayNeedsRender = true;
+        lastOverlayFrame = now;
+      }
+
+      if (needsRender || overlayNeedsRender || (doc.viewMode === '3d' && view3dDirty)) {
+        render();
+        overlayNeedsRender = false;
+      }
     };
     loop();
     
@@ -1117,6 +1178,7 @@
                 oninput={(e) => {
                   lightDir = { ...lightDir, x: parseFloat(e.currentTarget.value) };
                   voxelMeshCache = null;
+                  invalidateRender();
                   render();
                 }}
               />
@@ -1132,6 +1194,7 @@
                 oninput={(e) => {
                   lightDir = { ...lightDir, y: parseFloat(e.currentTarget.value) };
                   voxelMeshCache = null;
+                  invalidateRender();
                   render();
                 }}
               />
@@ -1147,6 +1210,7 @@
                 oninput={(e) => {
                   lightDir = { ...lightDir, z: parseFloat(e.currentTarget.value) };
                   voxelMeshCache = null;
+                  invalidateRender();
                   render();
                 }}
               />
