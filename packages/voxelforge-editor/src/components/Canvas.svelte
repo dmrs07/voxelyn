@@ -1098,7 +1098,13 @@
         lastOverlayFrame = now;
       }
 
-      if (needsRender || overlayNeedsRender || (doc.viewMode === '3d' && view3dDirty)) {
+      // Promote 3D dirtiness into a one-shot render request to avoid continuous re-renders.
+      if (doc.viewMode === '3d' && view3dDirty) {
+        needsRender = true;
+        view3dDirty = false;
+      }
+
+      if (needsRender || overlayNeedsRender) {
         render();
         overlayNeedsRender = false;
       }
