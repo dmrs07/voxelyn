@@ -13,13 +13,13 @@
     "dist": "pnpm -w icons:generate && pnpm --filter @voxelforge/editor build && electron-builder --publish=never"
   },
   "devDependencies": {
-    "electron": "33.2.1",
+    "electron": "^33.4.11",
     "electron-builder": "24.13.3"
   },
   "build": {
     "appId": "com.voxelforge.editor",
     "productName": "VoxelForge",
-    "electronVersion": "33.2.1",
+    "electronVersion": "33.4.11",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "icon": "assets/icon.png",
     "directories": {
