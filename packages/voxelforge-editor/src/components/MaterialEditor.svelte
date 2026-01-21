@@ -85,7 +85,7 @@
     setTimeout(() => renderTexturePreview(), 0);
   }
 
-  function updateSelectedMaterial(key: keyof Material, value: any) {
+  function updateSelectedMaterial<K extends keyof Material>(key: K, value: Material[K]) {
     const material = palette[selectedMaterialIndex];
     if (material) {
       const updated = { ...material, [key]: value };
@@ -297,11 +297,6 @@
     margin-bottom: 0.5rem;
   }
 
-  .editor-header h3 {
-    margin: 0;
-    flex: 1;
-    font-size: 1rem;
-  }
 
   .btn-icon {
     display: flex;
