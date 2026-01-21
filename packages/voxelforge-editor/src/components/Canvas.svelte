@@ -596,8 +596,22 @@
     render();
   };
 
+  let anchorIdCounter = 0;
+
+  const generateAnchorId = (): string => {
+    // Prefer crypto.randomUUID when available for strong uniqueness guarantees
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `anchor_${crypto.randomUUID()}`;
+    }
+
+    // Fallback: use a monotonically increasing counter combined with randomness
+    anchorIdCounter += 1;
+    const randomPart = Math.random().toString(36).slice(2, 10);
+    return `anchor_${anchorIdCounter.toString(36)}_${randomPart}`;
+  };
+
   const addAnchor = () => {
-    const id = `anchor_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = generateAnchorId();
     const next: AnchorPoint = {
       id,
       name: `Anchor ${customAnchors.length + 1}`,
