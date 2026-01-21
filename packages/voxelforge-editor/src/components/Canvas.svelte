@@ -37,7 +37,7 @@
   const referenceImages = new Map<string, HTMLImageElement>();
   
   // Local state from stores
-  let doc = $state<EditorDocument>(get(documentStore));
+  let doc: EditorDocument = get(documentStore);
   let tool: ToolId = get(toolStore.activeTool);
   let settings: ToolSettings = get(toolStore.settings);
   let primaryMat: number = get(toolStore.primaryMaterial);
