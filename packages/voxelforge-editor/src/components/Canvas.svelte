@@ -693,6 +693,23 @@
 
   let lastViewProj: Float32Array | null = null;
 
+  /**
+   * Multiplies two 4x4 matrices (a × b).
+   * 
+   * Matrix Layout Convention: Column-major order (OpenGL/WebGL standard)
+   * - Matrices are stored as 16-element Float32Arrays
+   * - Elements are indexed as: [m0, m1, m2, m3, m4, m5, ..., m15]
+   * - Column 0: [m0, m1, m2, m3], Column 1: [m4, m5, m6, m7], etc.
+   * - This matches WebGL's uniform matrix layout
+   * 
+   * Algorithm: Standard matrix multiplication C = A × B
+   * - For each row i of A and column j of B:
+   *   C[i,j] = A[i,0]*B[0,j] + A[i,1]*B[1,j] + A[i,2]*B[2,j] + A[i,3]*B[3,j]
+   * 
+   * @param a - Left matrix (16 elements, column-major)
+   * @param b - Right matrix (16 elements, column-major)
+   * @returns Result matrix a × b (16 elements, column-major)
+   */
   const multiplyMat4 = (a: Float32Array, b: Float32Array): Float32Array => {
     const out = new Float32Array(16);
     for (let i = 0; i < 4; i += 1) {
@@ -708,6 +725,36 @@
     return out;
   };
 
+  /**
+   * Creates a perspective projection matrix for 3D rendering.
+   * 
+   * Matrix Layout: Column-major order (OpenGL/WebGL standard)
+   * 
+   * Mathematical Formula (based on standard perspective projection):
+   * The returned matrix transforms view-space coordinates to clip-space coordinates.
+   * After perspective division (dividing by w), this creates the perspective effect where
+   * distant objects appear smaller.
+   * 
+   * Matrix structure (column-major):
+   * [ cot/aspect    0            0               0     ]
+   * [     0        cot           0               0     ]
+   * [     0         0     (far+near)/(near-far)  -1    ]
+   * [     0         0    2*far*near/(near-far)   0     ]
+   * 
+   * Where:
+   * - cot = 1.0 / tan(fov/2)  (cotangent of half the field of view)
+   * - near = near plane distance
+   * - far = far plane distance
+   * 
+   * Reference: This implements the standard OpenGL perspective projection matrix.
+   * See: https://www.khronos.org/opengl/wiki/GluPerspective_code
+   * 
+   * @param fov - Field of view angle in radians
+   * @param aspect - Aspect ratio (width / height)
+   * @param near - Near clipping plane distance (must be positive)
+   * @param far - Far clipping plane distance (must be positive, > near)
+   * @returns 4x4 perspective projection matrix (16 elements, column-major)
+   */
   const makePerspective = (fov: number, aspect: number, near: number, far: number): Float32Array => {
     const f = 1.0 / Math.tan(fov / 2);
     const nf = 1 / (near - far);
@@ -719,6 +766,42 @@
     ]);
   };
 
+  /**
+   * Creates a view matrix (camera matrix) that transforms world coordinates to camera/view space.
+   * This implements the "look-at" camera model, positioning the camera at 'eye' looking toward 'target'.
+   * 
+   * Matrix Layout: Column-major order (OpenGL/WebGL standard)
+   * 
+   * Algorithm:
+   * 1. Compute the forward vector (z-axis): normalized(eye - target)
+   *    - Points from target to eye (OpenGL right-handed convention)
+   * 
+   * 2. Compute the right vector (x-axis): normalized(worldUp × forward)
+   *    - Cross product of world up vector (0, 1, 0) with forward
+   *    - Creates a vector pointing to the camera's right
+   * 
+   * 3. Compute the up vector (y-axis): forward × right
+   *    - Cross product ensures orthogonality
+   *    - Creates the camera's local up direction
+   * 
+   * 4. Build the view matrix from the orthonormal basis (right, up, forward) and eye position:
+   *    Matrix structure (column-major):
+   *    [ right.x    up.x    forward.x    0 ]
+   *    [ right.y    up.y    forward.y    0 ]
+   *    [ right.z    up.z    forward.z    0 ]
+   *    [ -dot(right,eye)  -dot(up,eye)  -dot(forward,eye)  1 ]
+   * 
+   * The translation components (last column in row-major, last row in column-major)
+   * are negative dot products because we're transforming the world relative to the camera,
+   * not the camera relative to the world.
+   * 
+   * Reference: Standard "look-at" view matrix construction
+   * See: https://www.khronos.org/opengl/wiki/GluLookAt_code
+   * 
+   * @param eye - Camera position in world space
+   * @param target - Point the camera is looking at in world space
+   * @returns 4x4 view matrix (16 elements, column-major)
+   */
   const makeLookAt = (eye: { x: number; y: number; z: number }, target: { x: number; y: number; z: number }) => {
     const zx = eye.x - target.x;
     const zy = eye.y - target.y;
