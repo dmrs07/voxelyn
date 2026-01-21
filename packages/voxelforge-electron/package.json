@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "VoxelForge Electron shell",
-  "homepage": "https://example.com/voxelforge",
+  "homepage": "https://github.com/dmrs07/voxelyn",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dmrs07/voxelyn.git"
+  },
   "author": "VoxelForge <dev@voxelforge.local>",
   "main": "main.js",
   "scripts": {
@@ -13,13 +17,13 @@
     "dist": "pnpm -w icons:generate && pnpm --filter @voxelforge/editor build && electron-builder --publish=never"
   },
   "devDependencies": {
-    "electron": "33.2.1",
+    "electron": "^33.4.11",
     "electron-builder": "24.13.3"
   },
   "build": {
     "appId": "com.voxelforge.editor",
     "productName": "VoxelForge",
-    "electronVersion": "33.2.1",
+    "electronVersion": "33.4.11",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "icon": "assets/icon.png",
     "directories": {
@@ -47,6 +51,7 @@
     "extraMetadata": {
       "homepage": "https://example.com/voxelforge",
       "author": "VoxelForge <dev@voxelforge.local>"
-    }
+    },
+    "publish": []
   }
 }
