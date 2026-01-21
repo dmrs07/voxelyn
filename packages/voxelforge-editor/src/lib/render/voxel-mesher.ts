@@ -161,9 +161,9 @@ export const buildGreedyMeshFromDocument = (
 
           addQuad(origin, du, dv, normal, materialId);
 
-          for (let y = 0; y < h; y += 1) {
+          for (let yOffset = 0; yOffset < h; yOffset += 1) {
             for (let x2 = 0; x2 < w; x2 += 1) {
-              mask[n + x2 + y * dims[u]] = 0;
+              mask[n + x2 + yOffset * dims[u]] = 0;
             }
           }
 
