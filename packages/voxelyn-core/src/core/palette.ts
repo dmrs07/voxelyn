@@ -5,6 +5,25 @@ export type Palette = Uint32Array;
 export type PaletteEntry = [index: number, color: number];
 
 /**
+ * Material definition with physical and visual properties.
+ * This is the foundation type for all voxel-based content in voxelyn.
+ */
+export type Material = {
+  id: number; // 0-255, index in palette
+  name: string; // Display name
+  color: number; // Packed RGBA8888 color
+  density: number; // 0 = floats, 100 = heavy (affects physics simulation)
+  friction: number; // 0-1 (affects sliding behavior)
+  isLiquid: boolean; // For fluid simulation
+  /** @deprecated Use `isGaseous`. Scheduled for removal in v0.6.0. */
+  isGas: boolean;
+  isGaseous: boolean; // Gas that expands/spreads
+  isTransparent: boolean; // Allows visibility through (for rendering)
+  flammable: boolean; // Can burn/ignite
+  isoHeight?: number; // Override height in iso mode (pixels)
+};
+
+/**
  * Creates a color palette for material-to-color mapping.
  * @param size - Number of palette entries (default 256)
  * @param fill - Default fill color for all entries
@@ -27,6 +46,95 @@ export function makePalette(
   }
   return pal;
 }
+
+/**
+ * Creates a Material instance with default values.
+ */
+export function makeMaterial(overrides: Partial<Material>): Material {
+  const isGaseous = overrides.isGaseous ?? false;
+  const isGas = overrides.isGas ?? isGaseous;
+  return {
+    id: 0,
+    name: 'Unnamed',
+    color: 0xffffffff,
+    density: 50,
+    friction: 0.5,
+    isLiquid: false,
+    isGaseous,
+    // Keep deprecated field for backward compatibility only.
+    isGas,
+    isTransparent: false,
+    flammable: false,
+    ...overrides,
+  };
+}
+
+/** Default materials for voxel content */
+export const DEFAULT_MATERIALS: Material[] = [
+  makeMaterial({
+    id: 0,
+    name: 'Air',
+    color: packRGBA(200, 220, 255, 0),
+    density: 0,
+    isGaseous: true,
+    isTransparent: true,
+  }),
+  makeMaterial({
+    id: 1,
+    name: 'Stone',
+    color: packRGBA(128, 128, 128),
+    density: 95,
+    friction: 0.8,
+  }),
+  makeMaterial({
+    id: 2,
+    name: 'Dirt',
+    color: packRGBA(139, 90, 43),
+    density: 85,
+    friction: 0.7,
+  }),
+  makeMaterial({
+    id: 3,
+    name: 'Sand',
+    color: packRGBA(194, 178, 128),
+    density: 80,
+    friction: 0.5,
+  }),
+  makeMaterial({
+    id: 4,
+    name: 'Water',
+    color: packRGBA(0, 100, 200, 180),
+    density: 50,
+    friction: 0.1,
+    isLiquid: true,
+    isTransparent: true,
+  }),
+  makeMaterial({
+    id: 5,
+    name: 'Lava',
+    color: packRGBA(255, 100, 0, 200),
+    density: 60,
+    friction: 0.2,
+    isLiquid: true,
+    flammable: true,
+  }),
+  makeMaterial({
+    id: 6,
+    name: 'Wood',
+    color: packRGBA(139, 69, 19),
+    density: 60,
+    friction: 0.6,
+    flammable: true,
+  }),
+  makeMaterial({
+    id: 7,
+    name: 'Grass',
+    color: packRGBA(34, 139, 34),
+    density: 55,
+    friction: 0.7,
+    flammable: true,
+  }),
+];
 
 /**
  * Packs RGBA components into a single 32-bit value (little-endian).

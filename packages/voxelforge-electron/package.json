@@ -1,0 +1,52 @@
+{
+  "name": "@voxelforge/electron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VoxelForge Electron shell",
+  "homepage": "https://example.com/voxelforge",
+  "author": "VoxelForge <dev@voxelforge.local>",
+  "main": "main.js",
+  "scripts": {
+    "dev": "VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "start": "electron .",
+    "build": "pnpm -w icons:generate && pnpm --filter @voxelforge/editor build && electron-builder",
+    "dist": "pnpm -w icons:generate && pnpm --filter @voxelforge/editor build && electron-builder --publish=never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "com.voxelforge.editor",
+    "productName": "VoxelForge",
+    "electronVersion": "33.2.1",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "icon": "assets/icon.png",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/icon.png",
+      "../voxelforge-editor/dist/**/*"
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": ["portable", "nsis"],
+      "icon": "assets/icon.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Graphics",
+      "maintainer": "VoxelForge <dev@voxelforge.local>",
+      "executableName": "voxelforge"
+    },
+    "extraMetadata": {
+      "homepage": "https://example.com/voxelforge",
+      "author": "VoxelForge <dev@voxelforge.local>"
+    }
+  }
+}

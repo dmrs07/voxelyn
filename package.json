@@ -1,14 +1,32 @@
 {
-  "name": "voxelyn",
+  "name": "voxelyn-monorepo",
   "version": "0.1.0",
-  "description": "Ultra lightweight headless pixels/grid/iso/voxels toolkit",
-  "type": "module",
+  "private": true,
+  "description": "Voxelyn monorepo - pixel/voxel toolkit and editor",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node dist/tests/run.js",
-    "examples": "npm run build"
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @voxelforge/editor dev",
+    "dev:core": "pnpm --filter @voxelyn/core dev",
+    "dev:electron": "pnpm --filter @voxelforge/electron dev",
+    "build:electron": "pnpm --filter @voxelforge/electron dist",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "test": "pnpm -r test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "@eslint/js": "^9.39.2",
+    "@phosphor-icons/core": "^2.1.1",
+    "electron": "^33.4.11",
+    "electron-builder": "^24.13.3",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^2.46.1",
+    "prettier": "^3.8.0",
+    "prettier-plugin-svelte": "^3.4.1",
+    "sharp": "^0.34.5",
+    "svelte-eslint-parser": "^1.4.1",
+    "typescript-eslint": "^8.53.1"
   }
 }

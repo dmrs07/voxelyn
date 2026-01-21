@@ -1,455 +1,306 @@
-import {
-  createSurface2D,
-  fillRect,
-  packRGBA,
-  projectIso,
-  forEachIsoOrder,
-  blitColorkey,
-} from "../../src/index.js";
-import type { Surface2D } from "../../src/index.js";
-import { presentToCanvas } from "../../src/adapters/canvas2d.js";
+import { createSurface2D, fillRect, packRGBA, projectIso, forEachIsoOrder, blitColorkey } from "../../packages/voxelyn-core/src/index.js";
+import { presentToCanvas } from "../../packages/voxelyn-core/src/adapters/canvas2d.js";
 
 const canvas = document.getElementById("c") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d");
-if (!ctx) throw new Error("no ctx");
-
+const ctx = canvas.getContext("2d")!;
 const surface = createSurface2D(canvas.width, canvas.height);
 
 // ============================================================================
-// CONFIGURAÇÕES & PALETA
+// CONFIG & CORES (ultra-compact)
 // ============================================================================
-const TILE_W = 32;
-const TILE_H = 16;
-const WALL_HEIGHT = 48;
-const Z_STEP = 4;
-
-const COLORS = {
-  bg: packRGBA(8, 8, 10, 255),
-  
-  // Chão
-  floorTop: packRGBA(50, 45, 55, 255),
-  floorSide: packRGBA(30, 25, 35, 255),
-  floorCrack: packRGBA(35, 30, 40, 255),
-  floorMoss: packRGBA(60, 70, 50, 255),
-  
-  // Paredes
-  wallTop: packRGBA(90, 85, 80, 255),
-  wallLeftFace: packRGBA(70, 60, 50, 255),
-  wallRightFace: packRGBA(50, 40, 30, 255),
-  wallMortar: packRGBA(20, 15, 10, 255),
-  wallInside: packRGBA(25, 20, 15, 255),
-
-  // Portas/Madeira
-  woodLight: packRGBA(100, 70, 40, 255),
-  woodDark: packRGBA(70, 45, 25, 255),
-  woodMid: packRGBA(85, 60, 35, 255),
-  woodFrame: packRGBA(50, 30, 15, 255),
-  
-  iron: packRGBA(50, 50, 60, 255),
-  doorIron: packRGBA(50, 50, 60, 255),
-  doorIronLight: packRGBA(80, 80, 90, 255),
-  doorWoodDark: packRGBA(60, 40, 20, 255),
-  void: packRGBA(5, 5, 8, 255),
-
-  // Props
-  crateHighlight: packRGBA(120, 90, 50, 255),
-  crystal: packRGBA(100, 220, 255, 255),
-  
-  // Efeitos
-  banner: packRGBA(0, 80, 160, 255),
-  bannerLight: packRGBA(40, 120, 220, 255),
-  bannerGold: packRGBA(180, 140, 50, 255),
-  rune: packRGBA(0, 200, 255, 255),
-  particleMagic: packRGBA(150, 240, 255, 255),
+const TW = 32, TH = 16, WH = 48, ZS = 4, MAP = 10;
+const rgb = (r: number, g: number, b: number) => packRGBA(r, g, b, 255);
+const C = {
+  bg: rgb(8, 8, 10), floor: rgb(50, 45, 55), floorEdge: rgb(30, 25, 35),
+  wallL: rgb(70, 60, 50), wallR: rgb(50, 40, 30), mortar: rgb(20, 15, 10),
+  wood: rgb(85, 60, 35), woodDark: rgb(50, 30, 15), iron: rgb(50, 50, 60),
+  void: rgb(5, 5, 8), armor: rgb(90, 90, 100), armorDark: rgb(60, 60, 70),
+  shadow: rgb(20, 10, 25), eyes: rgb(220, 50, 50), portal: rgb(80, 40, 180),
 };
-
-const key = packRGBA(0, 0, 0, 0);
-
-// ============================================================================
-// GERADORES DE TEXTURA
-// ============================================================================
-
-// Helper de ruído simples
+const KEY = packRGBA(0, 0, 0, 0);
 const noise = (x: number, y: number) => Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 % 1;
 
-// 1. Textura de Parede (com portas e banners)
-const makeWallTexture = (
-  w: number, 
-  h: number, 
-  colorBase: number, 
-  inclination: number, // 1 ou -1
-  feature: 'none' | 'banner' | 'door_closed' | 'door_open'
-) => {
-  const pixels = new Uint32Array(w * h);
-  const brickH = 10;
-  const archW = w * 0.75; 
-  const archH = h * 0.72; 
-  const archX = w / 2;
-  const archTopY = h - archH; 
-  const archRadius = archW / 2;
+type Facing = 'dr' | 'dl' | 'ur' | 'ul';
+type RoomType = 'dungeon' | 'crypt' | 'cave';
+type Portal = { x: number; y: number; side: 'top' | 'left' };
+
+// ============================================================================
+// GERADOR DE TEXTURAS (simplificado)
+// ============================================================================
+const makeWall = (inc: number, hasPortal: boolean) => {
+  const w = TW / 2, h = WH;
+  const px = new Uint32Array(w * h);
+  const base = inc > 0 ? C.wallL : C.wallR;
+  const archR = w * 0.35;
   
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const shift = inclination > 0 ? (x / 2) : ((w - x) / 2);
+      const shift = inc > 0 ? x / 2 : (w - x) / 2;
       const isoY = y - shift;
-      const row = Math.floor(isoY / brickH);
-      const mortarH = Math.abs(isoY % brickH) < 1.5;
-      const rowOffset = (Math.abs(row) % 2) * (w / 2);
-      const mortarV = (x + rowOffset) % 16 < 1.5;
+      const row = Math.floor(isoY / 10);
+      const mortar = Math.abs(isoY % 10) < 1.5 || (x + (row % 2) * 8) % 16 < 1.5;
+      let col = mortar ? C.mortar : base;
       
-      let col = (mortarH || mortarV) ? COLORS.wallMortar : colorBase;
-
-      if (y > h - 12 && (x + y) % 2 === 0) col = COLORS.wallMortar;
-
-      if (feature === 'door_closed' || feature === 'door_open') {
-        const dx = x - archX;
-        const circleCY = archTopY + archRadius;
-        let isInsideArch = false;
-        let distFromEdge = 0;
-        
-        if (y >= circleCY) {
-          isInsideArch = Math.abs(dx) < archRadius;
-          distFromEdge = archRadius - Math.abs(dx);
-        } else if (y >= archTopY) {
-          const dyCircle = y - circleCY;
-          const distSq = dx * dx + dyCircle * dyCircle;
-          isInsideArch = distSq < archRadius * archRadius;
-          distFromEdge = archRadius - Math.sqrt(distSq);
-        }
-
-        if (isInsideArch) {
-          // Moldura do arco (Archivolt) - borda de pedra
-          const borderSize = 3;
-          const isBorder = distFromEdge < borderSize;
-          
-          if (isBorder) {
-            // Pedra da borda do arco com variação
-            const stoneVar = ((x + y) % 3 === 0) ? -10 : 0;
-            col = packRGBA(85 + stoneVar, 75 + stoneVar, 65 + stoneVar, 255);
-          } else {
-            if (feature === 'door_open') {
-              // PORTA VAZADA (VOID) com profundidade
-              // Simular espessura da parede interna
-              const thicknessSize = 5;
-              let showThickness = false;
-              
-              if (inclination > 0) {
-                // Parede fundo: vemos espessura na esquerda
-                showThickness = dx < -archRadius + thicknessSize + borderSize;
-              } else {
-                // Parede lateral: vemos espessura na direita
-                showThickness = dx > archRadius - thicknessSize - borderSize;
-              }
-              
-              if (showThickness) {
-                // Parede interna (mais escura que a externa)
-                const innerShade = ((x + y) % 2 === 0) ? COLORS.wallInside : COLORS.wallMortar;
-                col = innerShade;
-              } else {
-                col = COLORS.void;
-              }
-
-            } else {
-              // PORTA FECHADA (MADEIRA COM FERRO)
-              const innerX = x - (archX - archRadius + borderSize);
-              
-              // Tábuas verticais de madeira
-              const plankW = 5;
-              const plankIdx = Math.floor(innerX / plankW);
-              const plankPos = innerX % plankW;
-              const isPlankGap = plankPos < 1;
-              
-              // Feragens horizontais (seguem perspectiva isométrica)
-              const ironSpacing = 14;
-              const ironThickness = 3;
-              const isoYDoor = y - shift * 0.5; // Menos inclinação para as feragens
-              const isIron = (isoYDoor % ironSpacing) < ironThickness;
-              
-              if (isIron) {
-                // Faixa de ferro
-                const ironHighlight = (isoYDoor % ironSpacing) < 1;
-                col = ironHighlight ? COLORS.doorIronLight : COLORS.doorIron;
-                
-                // Rebites/pregos
-                if (innerX % 8 < 2 && (isoYDoor % ironSpacing) > 0.5 && (isoYDoor % ironSpacing) < 2) {
-                  col = COLORS.doorIronLight;
-                }
-              } else {
-                // Madeira
-                if (isPlankGap) {
-                  col = COLORS.doorWoodDark;
-                } else {
-                  // Variação na cor da madeira por tábua
-                  const woodVar = (plankIdx % 2 === 0) ? 0 : 8;
-                  col = packRGBA(80 + woodVar, 50 + woodVar, 30 + woodVar, 255);
-                  
-                  // Veios da madeira (linhas verticais sutis)
-                  if ((innerX + y * 0.3) % 4 < 1) {
-                    col = COLORS.doorWoodDark;
-                  }
-                }
-              }
-            }
-          }
-        }
+      if (hasPortal) {
+        const dx = x - w / 2, archTop = h * 0.28;
+        const inArch = y >= archTop && (
+          y >= archTop + archR ? Math.abs(dx) < archR :
+          dx * dx + (y - archTop - archR) ** 2 < archR * archR
+        );
+        if (inArch) col = C.void;
       }
-
-      if (feature === 'banner') {
-        const bx = x - w / 2;
-        const bannerIsoY = isoY;
-        if (Math.abs(bx) < 6 && bannerIsoY > 10 && bannerIsoY < h - 14) {
-          if (bannerIsoY < 13 || bannerIsoY > h - 18 || Math.abs(bx) >= 5) col = COLORS.bannerGold;
-          else {
-             col = packRGBA(0, 80 + ((x+Math.floor(bannerIsoY))%3 ? 0:10), 160, 255);
-             if (Math.abs(bx) < 2 && bannerIsoY > 22 && bannerIsoY < h - 24) col = COLORS.bannerLight;
-          }
-        }
-      }
-      pixels[y * w + x] = col;
+      px[y * w + x] = col;
     }
   }
-  return { width: w, height: h, pixels };
+  return { width: w, height: h, pixels: px };
 };
 
-const makeFloorTexture = (variant: 'clean' | 'cracked' | 'mossy') => {
-  const pixels = new Uint32Array(TILE_W * TILE_H);
-  const hw = TILE_W / 2; const hh = TILE_H / 2;
-  for (let y = 0; y < TILE_H; y++) {
-    for (let x = 0; x < TILE_W; x++) {
-      const dx = Math.abs(x - hw) / hw; const dy = Math.abs(y - hh) / hh;
+const makeFloor = (seed: number) => {
+  const px = new Uint32Array(TW * TH);
+  const hw = TW / 2, hh = TH / 2;
+  for (let y = 0; y < TH; y++) {
+    for (let x = 0; x < TW; x++) {
+      const dx = Math.abs(x - hw) / hw, dy = Math.abs(y - hh) / hh;
       if (dx + dy <= 1) {
-        let c = COLORS.floorTop;
-        const n = noise(x, y);
-        if (variant === 'cracked' && n > 0.8 && Math.abs(x - y) < 3) c = COLORS.floorCrack;
-        if (variant === 'mossy' && n > 0.6) c = COLORS.floorMoss;
-        if (dx + dy > 0.9) c = COLORS.floorSide;
-        pixels[y * TILE_W + x] = c;
-      } else pixels[y * TILE_W + x] = key;
+        const n = noise(x + seed, y + seed);
+        px[y * TW + x] = dx + dy > 0.9 ? C.floorEdge : 
+          n > 0.85 ? rgb(35 + (n * 20 | 0), 30, 40) : C.floor;
+      } else px[y * TW + x] = KEY;
     }
   }
-  return { width: TILE_W, height: TILE_H, pixels };
+  return { width: TW, height: TH, pixels: px };
 };
 
 // ============================================================================
-// CORREÇÃO: Nova Textura de Caixa (Cubo Sólido)
+// SISTEMA DE QUADRANTES/SALAS
 // ============================================================================
-const makeCrateTexture = () => {
-  const w = 16;
-  const h = 22; // Altura visual da caixa
-  const pixels = new Uint32Array(w * h);
-  
-  // Geometria
-  const topH = 8;     // Altura da face do topo
-  const wallH = 12;   // Altura das paredes laterais
-  const cx = 8;       // Centro X
+type Room = {
+  seed: number;
+  type: RoomType;
+  portals: Portal[];
+  floor: ReturnType<typeof makeFloor>;
+  wallsL: ReturnType<typeof makeWall>[];
+  wallsR: ReturnType<typeof makeWall>[];
+};
 
+let roomCount = 0;
+const rng = (seed: number) => {
+  let s = seed;
+  return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+};
+
+const generateRoom = (seed?: number): Room => {
+  const s = seed ?? (Date.now() + roomCount++ * 1337);
+  const rand = rng(s);
+  const type: RoomType = ['dungeon', 'crypt', 'cave'][rand() * 3 | 0] as RoomType;
+  
+  // Gera 1-3 portais aleatórios
+  const portalCount = 1 + (rand() * 3 | 0);
+  const portals: Portal[] = [];
+  for (let i = 0; i < portalCount; i++) {
+    const side = rand() > 0.5 ? 'top' : 'left';
+    const pos = 2 + (rand() * (MAP - 4) | 0);
+    if (!portals.some(p => p.side === side && Math.abs(p.x - pos) < 2 && Math.abs(p.y - pos) < 2)) {
+      portals.push({ x: side === 'top' ? pos : 0, y: side === 'left' ? pos : 0, side });
+    }
+  }
+  
+  // Gera texturas de parede com portais
+  const wallsL: ReturnType<typeof makeWall>[] = [];
+  const wallsR: ReturnType<typeof makeWall>[] = [];
+  for (let i = 0; i < MAP; i++) {
+    wallsL.push(makeWall(-1, portals.some(p => p.side === 'left' && p.y === i)));
+    wallsR.push(makeWall(1, portals.some(p => p.side === 'top' && p.x === i)));
+  }
+  
+  return { seed: s, type, portals, floor: makeFloor(s), wallsL, wallsR };
+};
+
+let currentRoom = generateRoom();
+
+// ============================================================================
+// JOGADOR
+// ============================================================================
+const player = { x: 5, y: 5, z: 0, facing: 'dr' as Facing };
+const keys: Record<string, boolean> = {};
+const SPEED = 0.08;
+
+const checkPortalCollision = (): Portal | null => {
+  for (const p of currentRoom.portals) {
+    if (p.side === 'top' && player.y < 1.5 && Math.abs(player.x - p.x) < 1.5) return p;
+    if (p.side === 'left' && player.x < 1.5 && Math.abs(player.y - p.y) < 1.5) return p;
+  }
+  return null;
+};
+
+const teleportToNewRoom = () => {
+  currentRoom = generateRoom();
+  // Spawn no centro da sala
+  player.x = 5;
+  player.y = 5;
+};
+
+const updatePlayer = () => {
+  let dx = 0, dy = 0;
+  if (keys['w'] || keys['arrowup']) dy -= 1;
+  if (keys['s'] || keys['arrowdown']) dy += 1;
+  if (keys['a'] || keys['arrowleft']) dx -= 1;
+  if (keys['d'] || keys['arrowright']) dx += 1;
+  
+  if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+  
+  if (dx || dy) {
+    const nx = player.x + dx * SPEED;
+    const ny = player.y + dy * SPEED;
+    
+    // Verifica se está perto de um portal
+    const nearPortal = checkPortalCollision();
+    
+    // Limites normais
+    let minX = 1, minY = 1;
+    
+    // Se perto de um portal, permite passar pela borda correspondente
+    if (nearPortal) {
+      if (nearPortal.side === 'left') minX = -1;
+      if (nearPortal.side === 'top') minY = -1;
+    }
+    
+    // Aplica movimento
+    if (nx >= minX && nx < MAP - 1) player.x = nx;
+    if (ny >= minY && ny < MAP - 1) player.y = ny;
+    
+    // Atualiza direção
+    if (dx !== 0 || dy !== 0) {
+      player.facing = dx > 0 ? (dy >= 0 ? 'dr' : 'ur') : (dy > 0 ? 'dl' : 'ul');
+    }
+    
+    // Teleporte ao sair da sala
+    if (player.x < 0 || player.y < 0) {
+      teleportToNewRoom();
+    }
+  }
+};
+
+document.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if ('wasd'.includes(e.key.toLowerCase()) || e.key.startsWith('Arrow')) e.preventDefault();
+});
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// ============================================================================
+// SPRITE DO GUERREIRO (ultra-simplificado)
+// ============================================================================
+const makeWarrior = (facing: Facing, frame: number) => {
+  const w = 16, h = 22;
+  const px = new Uint32Array(w * h);
+  const breath = Math.sin(frame * 0.1) | 0;
+  const fearN = (x: number, y: number) => noise(x * 0.2 + frame * 0.05, y * 0.2);
+  
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      let col = key;
-      const dx = Math.abs(x - cx);
-      const dyTop = Math.abs(y - 4); // Centro do topo em Y=4
-
-      // 1. Face do Topo (Diamante)
-      // Equação: dx/8 + dy/4 <= 1
-      if (y < topH) {
-         if (dx/8 + dyTop/4 <= 1) {
-             col = COLORS.woodLight;
-             // Moldura do topo
-             if (dx/8 + dyTop/4 > 0.7) col = COLORS.woodFrame;
-             // Detalhe interno
-             if (dx < 1 || dyTop < 1) col = COLORS.woodMid;
-         }
-      } 
-      // 2. Faces Laterais (Extrusão para baixo)
-      else {
-         // Precisamos verificar se estamos "abaixo" das arestas do topo
-         // Aresta esquerda inferior: y = 0.5*x + 4
-         // Aresta direita inferior:  y = -0.5*x + 12 (para x >= 8)
-         const isLeft = x < cx;
-         const topEdgeY = isLeft ? (0.5 * x + 4) : (-0.5 * x + 12);
-         const bottomEdgeY = topEdgeY + wallH;
-
-         if (y >= topEdgeY && y < bottomEdgeY) {
-             // Esquerda (Sombra) vs Direita (Luz média)
-             col = isLeft ? COLORS.woodDark : COLORS.woodMid;
-             
-             // Coordenada relativa à face
-             const relY = y - topEdgeY;
-             const relX = isLeft ? x : (w - 1 - x); // Symmetry for pattern
-
-             // Moldura (Bordas externas)
-             if (relY < 2 || relY > wallH - 2 || x < 2 || x > 13 || (x > 7 && x < 9)) {
-                 col = COLORS.woodFrame;
-             } 
-             // Cruz ("X") na lateral para parecer caixa de carga
-             else if (Math.abs(relY - relX) < 1.5 || Math.abs(relY - (cx - relX)) < 1.5) {
-                 col = COLORS.woodFrame;
-             }
-         }
+      const dx = x - w / 2, ay = y - breath;
+      let col = KEY;
+      
+      // Corpo
+      if (ay >= 8 && ay < 20 && Math.abs(dx) < 5) {
+        col = (facing.includes('r') && x > w / 2) ? C.armor : C.armorDark;
+        if (ay > 15 && Math.abs(dx) < 1) col = KEY; // Pernas
       }
-      pixels[y * w + x] = col;
+      // Cabeça
+      if (ay >= 2 && ay < 8 && Math.abs(dx) < 4) {
+        col = C.armor;
+        if (ay >= 5 && ay <= 6 && Math.abs(dx) < 2) col = C.void; // Visor
+      }
+      // Sombra do medo
+      const dist = Math.sqrt(dx * dx + (ay - 5) ** 2);
+      if (dist < 9 && fearN(x, y) > 0.4 && (col !== KEY || fearN(x, y) > 0.6)) {
+        col = C.shadow;
+        if (fearN(x, y) > 0.9 && ay < 7 && Math.sin(frame * 0.8 + x * y) > 0.3) col = C.eyes;
+      }
+      
+      px[y * w + x] = col;
     }
   }
-  return { width: w, height: h, pixels };
-};
-
-const makeCrystalTexture = (hoverOffset: number) => {
-  const w = 10, h = 18;
-  const pixels = new Uint32Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const dy = y - (6 + hoverOffset); const dx = x - 5;
-    if (Math.abs(dx)/4 + Math.abs(dy)/8 < 1) {
-       const b = 1 - Math.abs(dx)/4;
-       pixels[y*w+x] = packRGBA(Math.floor(100+b*100), Math.floor(220+b*35), 255, 255);
-       if (Math.abs(dx)<1 && Math.abs(dy)<3) pixels[y*w+x] = packRGBA(255,255,255,255);
-    }
-  }
-  return { width: w, height: h, pixels };
-};
-
-// Pre-generate crystal animation frames (cache)
-const CRYSTAL_FRAMES = 60;
-const crystalFrames = Array.from({ length: CRYSTAL_FRAMES }, (_, i) => 
-  makeCrystalTexture(Math.sin(i * 0.08) * 2)
-);
-
-const makePedestalTexture = () => {
-  const w = 12, h = 10;
-  const pixels = new Uint32Array(w * h);
-  for(let y=0; y<h; y++) for(let x=0; x<w; x++) {
-      if(y<4 && Math.abs(x-6)/6 + Math.abs(y-2)/2 <= 1) pixels[y*w+x] = COLORS.wallTop;
-      else if(y>=4 && x>=2 && x<10) pixels[y*w+x] = (x<4||x>=8) ? COLORS.wallInside : COLORS.wallMortar;
-  }
-  return { width: w, height: h, pixels };
+  return { width: w, height: h, pixels: px };
 };
 
 // ============================================================================
-// ASSETS & MAPA
+// TEXTURAS PRÉ-GERADAS
 // ============================================================================
-const FACE_W = TILE_W / 2;
-const wallAssets = {
-  left: {
-    plain: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallRightFace, -1, 'none'),
-    banner: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallRightFace, -1, 'banner'),
-    door_open: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallRightFace, -1, 'door_open'),
-    door_closed: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallRightFace, -1, 'door_closed'),
-  },
-  right: {
-    plain: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallLeftFace, 1, 'none'),
-    banner: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallLeftFace, 1, 'banner'),
-    door_open: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallLeftFace, 1, 'door_open'),
-    door_closed: makeWallTexture(FACE_W, WALL_HEIGHT, COLORS.wallLeftFace, 1, 'door_closed'),
-  }
-};
-const floors = { clean: makeFloorTexture('clean'), cracked: makeFloorTexture('cracked'), mossy: makeFloorTexture('mossy') };
-const texWallTop = makeFloorTexture('clean');
-const texCrate = makeCrateTexture();
-const texPedestal = makePedestalTexture();
-
-const MAP_SIZE = 12;
-const floorMap: ('clean'|'cracked'|'mossy')[][] = [];
-for (let y = 0; y < MAP_SIZE; y++) {
-  floorMap[y] = [];
-  for (let x = 0; x < MAP_SIZE; x++) {
-    const r = Math.abs(noise(x * 3.7, y * 2.3));
-    const row = floorMap[y];
-    if (row) row[x] = r > 0.7 ? 'cracked' : (r > 0.5 ? 'mossy' : 'clean');
-  }
-}
-
-const walls: Record<string, keyof typeof wallAssets.left> = {
-  '2,0': 'door_open', '5,0': 'banner', '9,0': 'door_closed',
-  '0,2': 'door_open', '0,5': 'banner', '0,9': 'door_closed'
-};
-
-const props = [
-  { x: 2, y: 2, type: 'crate' },
-  { x: 2, y: 3, type: 'crate' },
-  { x: 10, y: 10, type: 'crate' },
-  { x: 6, y: 6, type: 'crystal' }
-];
-
-const runes = [
-  { x: 5, y: 4, c: 'n' }, { x: 7, y: 4, c: 'O' }, { x: 5, y: 5, c: 'O' },
-  { x: 7, y: 5, c: 'X' }, { x: 5, y: 7, c: '#' }, { x: 7, y: 7, c: 'O' }, { x: 6, y: 8, c: 'X' }
-];
-
-interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: number; }
-let particles: Particle[] = [];
-const spawnParticle = (x: number, y: number, z: number, color: number) => {
-  if (particles.length > 100) return;
-  particles.push({ x, y, z, vx: (Math.random()-0.5)*0.05, vy: (Math.random()-0.5)*0.05, vz: 0.02+Math.random()*0.03, life: 1.0, color });
-};
-
+const texWallTop = makeFloor(0);
 // ============================================================================
 // RENDERIZAÇÃO
 // ============================================================================
-
-const drawIsoPillar = (target: Surface2D, sx: number, sy: number, type: 'corner'|'left'|'back', feat: keyof typeof wallAssets.left) => {
-  const topY = sy - WALL_HEIGHT;
-  if (type === 'back' || type === 'corner') blitColorkey(target, wallAssets.right[feat]??wallAssets.right.plain, sx - FACE_W, topY + TILE_H/2, { colorkey: key });
-  if (type === 'left' || type === 'corner') blitColorkey(target, wallAssets.left[feat]??wallAssets.left.plain, sx, topY + TILE_H/2, { colorkey: key });
-  blitColorkey(target, texWallTop, sx - TILE_W/2, topY, { colorkey: key });
+const drawPillar = (sx: number, sy: number, type: 'corner' | 'left' | 'back', wallIdx: number) => {
+  const topY = sy - WH;
+  if (type === 'back' || type === 'corner') {
+    const wall = currentRoom.wallsR[wallIdx];
+    if (wall) blitColorkey(surface, wall, sx - TW / 4, topY + TH / 2, { colorkey: KEY });
+  }
+  if (type === 'left' || type === 'corner') {
+    const wall = currentRoom.wallsL[wallIdx];
+    if (wall) blitColorkey(surface, wall, sx, topY + TH / 2, { colorkey: KEY });
+  }
+  blitColorkey(surface, texWallTop, sx - TW / 2, topY, { colorkey: KEY });
 };
 
-const drawRune = (target: Surface2D, sx: number, sy: number, char: string, frame: number) => {
-  const patterns: Record<string, number[]> = { 'X': [1,0,1,0,1,0,1,0,1], 'O': [1,1,1,1,0,1,1,1,1], '#': [1,0,1,1,1,1,1,0,1], 'n': [1,1,1,0,0,0,0,0,0] };
-  const pattern = patterns[char] ?? [1,0,1,0,1,0,1,0,1];
-  const pulse = Math.sin(frame * 0.1) * 0.3 + 0.7;
-  for (let i = 0; i < pattern.length; i++) if (pattern[i]) {
-      const b = Math.floor(200 * pulse + Math.random() * 55);
-      fillRect(target, sx - 4 + (i%3)*3, sy - 2 + Math.floor(i/3)*2, 2, 2, packRGBA(0, b, 255, 255));
+const drawWarrior = (x: number, y: number, z: number, facing: Facing, frame: number) => {
+  const iso = projectIso(x - MAP / 2, y - MAP / 2, z, TW, TH, ZS);
+  const sx = (surface.width / 2 + iso.sx) | 0;
+  const sy = (145 + iso.sy) | 0;
+  const sprite = makeWarrior(facing, frame);
+  blitColorkey(surface, sprite, sx - 8, sy - 20, { colorkey: KEY });
+};
+
+// HUD minimalista
+const drawHUD = () => {
+  const portalGlow = Math.sin(frame * 0.1) * 20 + 60;
+  fillRect(surface, 4, 4, 100, 12, rgb(20, 20, 25));
+  fillRect(surface, 6, 6, 96, 8, rgb(40, 30, 50));
+  
+  // Indicador de portais
+  for (let i = 0; i < currentRoom.portals.length; i++) {
+    fillRect(surface, 110 + i * 10, 6, 6, 6, rgb(portalGlow | 0, 30, 120));
   }
 };
 
 let frame = 0;
 const render = () => {
   frame++;
-  fillRect(surface, 0, 0, surface.width, surface.height, COLORS.bg);
+  fillRect(surface, 0, 0, surface.width, surface.height, C.bg);
+  updatePlayer();
+  player.z = Math.abs(Math.sin(frame * 0.05) * 0.1);
 
-  particles = particles.filter(p => p.life > 0);
-  for (const p of particles) { p.x += p.vx; p.y += p.vy; p.z += p.vz; p.life -= 0.015; }
-  if (frame % 8 === 0) {
-    for (const r of runes) if (Math.random()>0.7) spawnParticle(r.x, r.y, 0.1, COLORS.particleMagic);
-    spawnParticle(6, 6, 0.8, COLORS.crystal);
-  }
+  forEachIsoOrder(MAP, MAP, (x, y) => {
+    const lx = x - MAP / 2, ly = y - MAP / 2;
+    const iso = projectIso(lx, ly, 0, TW, TH, ZS);
+    const sx = (surface.width / 2 + iso.sx) | 0;
+    const sy = (145 + iso.sy) | 0;
 
-  forEachIsoOrder(MAP_SIZE, MAP_SIZE, (x, y) => {
-    const lx = x - MAP_SIZE/2; const ly = y - MAP_SIZE/2;
-    const iso = projectIso(lx, ly, 0, TILE_W, TILE_H, Z_STEP);
-    const sx = (surface.width/2 + iso.sx)|0; const sy = (145 + iso.sy)|0;
-    
-    const isBack = y === 0; const isLeft = x === 0;
-    const feat = walls[`${x},${y}`] ?? 'plain';
+    const isBack = y === 0, isLeft = x === 0;
 
-    if (isBack && isLeft) drawIsoPillar(surface, sx, sy, 'corner', feat);
-    else if (isLeft) drawIsoPillar(surface, sx, sy, 'left', feat);
-    else if (isBack) drawIsoPillar(surface, sx, sy, 'back', feat);
+    if (isBack && isLeft) drawPillar(sx, sy, 'corner', 0);
+    else if (isLeft) drawPillar(sx, sy, 'left', y);
+    else if (isBack) drawPillar(sx, sy, 'back', x);
     else {
-      blitColorkey(surface, floors[floorMap[y]?.[x]??'clean'], sx - TILE_W/2, sy - TILE_H/2, { colorkey: key });
-      const rune = runes.find(r => r.x === x && r.y === y);
-      if (rune) drawRune(surface, sx, sy - TILE_H/4, rune.c, frame);
-
-      const prop = props.find(p => p.x === x && p.y === y);
-      if (prop) {
-        if (prop.type === 'crate') {
-            // Ajustado offset Y para a nova altura da caixa
-            blitColorkey(surface, texCrate, sx - 8, sy - 20, { colorkey: key });
-        } else if (prop.type === 'crystal') {
-            blitColorkey(surface, texPedestal, sx - 6, sy - 10, { colorkey: key });
-            const crystalSprite = crystalFrames[frame % CRYSTAL_FRAMES];
-            if (crystalSprite) blitColorkey(surface, crystalSprite, sx - 5, sy - 28, { colorkey: key });
+      blitColorkey(surface, currentRoom.floor, sx - TW / 2, sy - TH / 2, { colorkey: KEY });
+      
+      // Portal glow no chão
+      for (const p of currentRoom.portals) {
+        if ((p.side === 'top' && p.x === x && y === 1) || (p.side === 'left' && p.y === y && x === 1)) {
+          const glow = (Math.sin(frame * 0.15) * 30 + 50) | 0;
+          fillRect(surface, sx - 4, sy - 2, 8, 4, rgb(glow, 20, glow * 2));
         }
       }
 
-      for (const p of particles) if (Math.round(p.x)===x && Math.round(p.y)===y) {
-          const pIso = projectIso(p.x - MAP_SIZE/2, p.y - MAP_SIZE/2, p.z, TILE_W, TILE_H, Z_STEP);
-          const psx = (surface.width/2 + pIso.sx)|0; const psy = (145 + pIso.sy)|0;
-          fillRect(surface, psx, psy, 2, 2, p.color);
+      // Desenha jogador
+      if (Math.round(player.x) === x && Math.round(player.y) === y) {
+        drawWarrior(player.x, player.y, player.z, player.facing, frame);
       }
     }
   });
 
+  drawHUD();
   presentToCanvas(ctx, surface);
   requestAnimationFrame(render);
 };

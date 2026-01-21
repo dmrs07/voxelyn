@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+**/dist
+**/build
+**/.svelte-kit
+**/coverage
+**/.vite
+**/.turbo
+**/pnpm-lock.yaml
+**/package-lock.json
