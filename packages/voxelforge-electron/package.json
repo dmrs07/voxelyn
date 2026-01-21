@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "VoxelForge Electron shell",
-  "homepage": "https://example.com/voxelforge",
+  "homepage": "https://github.com/dmrs07/voxelyn",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dmrs07/voxelyn.git"
+  },
   "author": "VoxelForge <dev@voxelforge.local>",
   "main": "main.js",
   "scripts": {
@@ -47,6 +51,7 @@
     "extraMetadata": {
       "homepage": "https://example.com/voxelforge",
       "author": "VoxelForge <dev@voxelforge.local>"
-    }
+    },
+    "publish": []
   }
 }
