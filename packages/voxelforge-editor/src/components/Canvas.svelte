@@ -2,15 +2,7 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { documentStore, toolStore, uiStore, activeLayer } from '$lib/stores';
-  import { 
-    bresenhamLine, 
-    getBrushPoints, 
-    floodFill, 
-    createPaintDataFromPoints,
-    getRectPoints,
-    getEllipsePoints,
-    magicWandSelect
-  } from '$lib/tools';
+  import { toolRegistry, getToolByHotkey, type ToolRuntimeState, type ToolContext } from '$lib/tool-system';
   import { renderDocumentToSurface } from '$lib/render/render-surface';
   import { renderDocumentIso, screenToIso } from '$lib/render/render-iso';
   import { createWebglRenderer, type WebglRenderer } from '$lib/render/webgl-renderer';
@@ -35,28 +27,52 @@
   let layer: GridLayer | null = get(activeLayer) as GridLayer | null;
   let showGrid: boolean = get(uiStore.showGrid);
   let gridStep: number = get(uiStore.gridStep);
+  let cursorPosition: { x: number; y: number } | null = get(uiStore.cursorPosition);
+  let isPanModifier = false;
   
-  // Canvas state
-  let isPanning = false;
-  let isDrawing = false;
-  let isSelecting = false;
-  let startPoint: { x: number; y: number } | null = null;
-  let currentPoint: { x: number; y: number } | null = null;
-  let lastPoint: { x: number; y: number } | null = null;
-  let pendingPixels = new Map<number, { index: number; oldValue: number; newValue: number }>();
+  // Tool runtime state
+  const toolState: ToolRuntimeState = {
+    isPanning: false,
+    isDrawing: false,
+    isSelecting: false,
+    startPoint: null,
+    currentPoint: null,
+    lastPoint: null,
+    pendingPixels: new Map(),
+    currentMaterial: 1,
+    selectionPreview: null,
+    selectionOp: 'replace',
+    activePointerToolId: null,
+  };
+
   const addPendingPixels = (pixels: Array<{ index: number; oldValue: number; newValue: number }>) => {
     for (const px of pixels) {
-      const existing = pendingPixels.get(px.index);
+      const existing = toolState.pendingPixels.get(px.index);
       if (existing) {
         existing.newValue = px.newValue;
       } else {
-        pendingPixels.set(px.index, { ...px });
+        toolState.pendingPixels.set(px.index, { ...px });
       }
     }
   };
-  let currentMaterial = 1;
-  let selectionPreview: Selection | null = null;
-  let selectionOp: SelectionOp = 'replace';
+
+  const commitPendingPixels = (toolId: ToolId) => {
+    if (!layer || toolState.pendingPixels.size === 0) return;
+
+    const payload = {
+      layerId: layer.id,
+      pixels: Array.from(toolState.pendingPixels.values()),
+    };
+
+    if (toolId === 'eraser') {
+      documentStore.erase(payload);
+    } else if (toolId === 'fill') {
+      documentStore.fill(payload);
+    } else {
+      documentStore.paint(payload);
+    }
+    toolState.pendingPixels.clear();
+  };
   
   // Convert screen coords to grid coords
   const screenToGrid = (screenX: number, screenY: number): { x: number; y: number } => {
@@ -98,208 +114,64 @@
     return createRectSelection(x, y, width, height);
   };
 
+  const buildToolContext = (): ToolContext => ({
+    doc,
+    layer,
+    settings,
+    primaryMaterial: primaryMat,
+    secondaryMaterial: secondaryMat,
+    cursorPosition,
+    state: toolState,
+    screenToGrid,
+    getSelectionOp,
+    buildRectSelection,
+    mergeSelection: (incoming, op) => mergeSelection(doc.selection, incoming, op, doc.width, doc.height),
+    addPendingPixels,
+    commitPendingPixels,
+    setSelectionPreview: (selection) => { toolState.selectionPreview = selection; },
+    commitSelection: (selection) => {
+      documentStore.select({ before: doc.selection, after: selection });
+    },
+    setPrimaryMaterial: (material) => { toolStore.primaryMaterial.set(material); },
+    setCameraByDelta: (dx, dy) => {
+      documentStore.setCamera({ x: doc.camera.x + dx, y: doc.camera.y + dy });
+    },
+    setPointerCapture: (pointerId) => canvas.setPointerCapture(pointerId),
+    releasePointerCapture: (pointerId) => canvas.releasePointerCapture(pointerId),
+    render,
+  });
+
   const handlePointerDown = (e: PointerEvent) => {
-    if (!layer || layer.type !== 'grid2d') return;
-    
-    const gridPos = screenToGrid(e.clientX, e.clientY);
-    
-    // Middle click or space = pan
-    if (e.button === 1 || (e.button === 0 && tool === 'pan')) {
-      isPanning = true;
-      canvas.setPointerCapture(e.pointerId);
-      return;
-    }
-    
-    // Right click = secondary material
-    const mat = e.button === 2 ? secondaryMat : primaryMat;
-    currentMaterial = mat;
-    
-    if (tool === 'eyedropper') {
-      const idx = gridPos.y * layer.width + gridPos.x;
-      if (idx >= 0 && idx < layer.data.length) {
-        const pickedMat = layer.data[idx] & 0xff;
-        toolStore.primaryMaterial.set(pickedMat);
-      }
+    const toolCtx = buildToolContext();
+    const toolOverride: ToolId = e.button === 1 || isPanModifier ? 'pan' : tool;
+    const activeTool = toolRegistry[toolOverride] ?? toolRegistry.pencil;
+    toolState.activePointerToolId = toolOverride;
+
+    if (e.altKey && toolOverride !== 'eyedropper') {
+      toolRegistry.eyedropper.onPointerDown(toolCtx, e);
       return;
     }
 
-    if (tool === 'select') {
-      isSelecting = true;
-      startPoint = gridPos;
-      currentPoint = gridPos;
-      selectionOp = getSelectionOp(e);
-      selectionPreview = buildRectSelection(startPoint, currentPoint);
-      canvas.setPointerCapture(e.pointerId);
-      render();
-      return;
-    }
+    activeTool.onPointerDown(toolCtx, e);
+  };
 
-    if (tool === 'wand') {
-      const result = magicWandSelect(layer.data, layer.width, layer.height, gridPos.x, gridPos.y, settings.tolerance);
-      if (result) {
-        const op = getSelectionOp(e);
-        const wandSelection: Selection = {
-          active: true,
-          x: result.x,
-          y: result.y,
-          width: result.width,
-          height: result.height,
-          mask: result.mask,
-        };
-        const merged = mergeSelection(doc.selection, wandSelection, op, doc.width, doc.height);
-        documentStore.select({ before: doc.selection, after: merged });
-      }
-      return;
-    }
-    
-    if (tool === 'fill') {
-      const points = floodFill(layer.data, layer.width, layer.height, gridPos.x, gridPos.y, mat, settings.tolerance);
-      if (points.length > 0) {
-        const paintData = createPaintDataFromPoints(layer.id, layer, points, mat);
-        documentStore.fill(paintData);
-      }
-      return;
-    }
-    
-    // Start drawing for shape tools
-    if (tool === 'line' || tool === 'rect' || tool === 'ellipse') {
-      isDrawing = true;
-      startPoint = gridPos;
-      currentPoint = gridPos;
-      pendingPixels.clear();
-      canvas.setPointerCapture(e.pointerId);
-      updateShapePreview();
-      render();
-      return;
-    }
-    
-    if (tool === 'pencil' || tool === 'eraser') {
-      isDrawing = true;
-      lastPoint = gridPos;
-      pendingPixels.clear();
-      canvas.setPointerCapture(e.pointerId);
-      
-      const brushMat = tool === 'eraser' ? 0 : mat;
-      const points = getBrushPoints(gridPos.x, gridPos.y, settings.brushSize, settings.brushShape);
-      const paintData = createPaintDataFromPoints(layer.id, layer, points, brushMat);
-      addPendingPixels(paintData.pixels);
-      
-      render();
-    }
-  };
-  
-  const updateShapePreview = () => {
-    if (!layer || !startPoint || !currentPoint) return;
-    
-    pendingPixels.clear();
-    let points: { x: number; y: number }[] = [];
-    
-    if (tool === 'line') {
-      points = bresenhamLine(startPoint.x, startPoint.y, currentPoint.x, currentPoint.y);
-    } else if (tool === 'rect') {
-      points = getRectPoints(startPoint.x, startPoint.y, currentPoint.x, currentPoint.y, settings.brushShape === 'square');
-    } else if (tool === 'ellipse') {
-      points = getEllipsePoints(startPoint.x, startPoint.y, currentPoint.x, currentPoint.y, settings.brushShape === 'square');
-    }
-    
-    const paintData = createPaintDataFromPoints(layer.id, layer, points, currentMaterial);
-    addPendingPixels(paintData.pixels);
-  };
-  
   const handlePointerMove = (e: PointerEvent) => {
     const gridPos = screenToGrid(e.clientX, e.clientY);
+    cursorPosition = gridPos;
     uiStore.cursorPosition.set(gridPos);
-    
-    if (isPanning) {
-      documentStore.setCamera({
-        x: doc.camera.x + e.movementX,
-        y: doc.camera.y + e.movementY,
-      });
-      return;
-    }
 
-    if (isSelecting && startPoint) {
-      currentPoint = gridPos;
-      const rectSelection = buildRectSelection(startPoint, currentPoint);
-      selectionPreview = mergeSelection(doc.selection, rectSelection, selectionOp, doc.width, doc.height);
-      render();
-      return;
-    }
-    
-    // Shape tools preview
-    if (isDrawing && startPoint && (tool === 'line' || tool === 'rect' || tool === 'ellipse')) {
-      currentPoint = gridPos;
-      updateShapePreview();
-      render();
-      return;
-    }
-    
-    if (isDrawing && lastPoint && layer && layer.type === 'grid2d') {
-      const mat = tool === 'eraser' ? 0 : (e.buttons === 2 ? secondaryMat : primaryMat);
-      
-      // Interpolate between last point and current
-      const linePoints = bresenhamLine(lastPoint.x, lastPoint.y, gridPos.x, gridPos.y);
-      const allPoints: { x: number; y: number }[] = [];
-      
-      for (const lp of linePoints) {
-        allPoints.push(...getBrushPoints(lp.x, lp.y, settings.brushSize, settings.brushShape));
-      }
-      
-      const paintData = createPaintDataFromPoints(layer.id, layer, allPoints, mat);
-      addPendingPixels(paintData.pixels);
-      
-      lastPoint = gridPos;
-      render();
-    }
+    const toolCtx = buildToolContext();
+    const activeToolId = toolState.activePointerToolId ?? tool;
+    const activeTool = toolRegistry[activeToolId] ?? toolRegistry.pencil;
+    activeTool.onPointerMove(toolCtx, e);
   };
-  
+
   const handlePointerUp = (e: PointerEvent) => {
-    if (isPanning) {
-      isPanning = false;
-      canvas.releasePointerCapture(e.pointerId);
-      return;
-    }
-
-    if (isSelecting) {
-      isSelecting = false;
-      canvas.releasePointerCapture(e.pointerId);
-
-      if (selectionPreview) {
-        documentStore.select({
-          before: doc.selection,
-          after: selectionPreview,
-        });
-      }
-
-      selectionPreview = null;
-      startPoint = null;
-      currentPoint = null;
-      return;
-    }
-    
-    if (isDrawing && layer) {
-      isDrawing = false;
-      canvas.releasePointerCapture(e.pointerId);
-      
-      // Commit pending pixels
-      if (pendingPixels.size > 0) {
-        const payload = {
-          layerId: layer.id,
-          pixels: Array.from(pendingPixels.values()),
-        };
-
-        if (tool === 'eraser') {
-          documentStore.erase(payload);
-        } else {
-          documentStore.paint(payload);
-        }
-        pendingPixels.clear();
-      }
-      
-      startPoint = null;
-      currentPoint = null;
-      lastPoint = null;
-    }
+    const toolCtx = buildToolContext();
+    const activeToolId = toolState.activePointerToolId ?? tool;
+    const activeTool = toolRegistry[activeToolId] ?? toolRegistry.pencil;
+    activeTool.onPointerUp(toolCtx, e);
+    toolState.activePointerToolId = null;
   };
   
   const handleWheel = (e: WheelEvent) => {
@@ -308,7 +180,6 @@
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.125, Math.min(8, doc.camera.zoom * zoomFactor));
     
-    // Zoom toward cursor
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
@@ -317,17 +188,60 @@
     const viewX = localX / dpr;
     const viewY = localY / dpr;
 
+    applyZoomAt(viewX, viewY, newZoom);
+  };
+
+  const zoomLevels = [0.125, 0.25, 0.5, 1, 2, 4, 8];
+
+  const getNearestZoomIndex = (zoom: number) => {
+    let nearestIndex = 0;
+    let nearestDistance = Math.abs(zoomLevels[0] - zoom);
+    for (let i = 1; i < zoomLevels.length; i++) {
+      const distance = Math.abs(zoomLevels[i] - zoom);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = i;
+      }
+    }
+    return nearestIndex;
+  };
+
+  const applyZoomAt = (viewX: number, viewY: number, newZoom: number) => {
     const worldX = (viewX - doc.camera.x) / doc.camera.zoom;
     const worldY = (viewY - doc.camera.y) / doc.camera.zoom;
 
     const newX = viewX - worldX * newZoom;
     const newY = viewY - worldY * newZoom;
-    
+
+    documentStore.setCamera({ x: newX, y: newY, zoom: newZoom });
+  };
+
+  const stepZoom = (delta: number) => {
+    const currentIndex = getNearestZoomIndex(doc.camera.zoom);
+    const nextIndex = Math.max(0, Math.min(zoomLevels.length - 1, currentIndex + delta));
+    const nextZoom = zoomLevels[nextIndex];
+    const viewX = canvas.clientWidth / 2;
+    const viewY = canvas.clientHeight / 2;
+    applyZoomAt(viewX, viewY, nextZoom);
+  };
+
+  const fitToWindow = () => {
+    const zoomX = canvas.clientWidth / doc.width;
+    const zoomY = canvas.clientHeight / doc.height;
+    const newZoom = Math.max(0.125, Math.min(8, Math.min(zoomX, zoomY)));
+    const newX = canvas.clientWidth / 2 - doc.width * newZoom / 2;
+    const newY = canvas.clientHeight / 2 - doc.height * newZoom / 2;
     documentStore.setCamera({ x: newX, y: newY, zoom: newZoom });
   };
   
   const handleContextMenu = (e: MouseEvent) => {
     e.preventDefault();
+  };
+
+  const getCursorStyle = () => {
+    if (toolState.isPanning || isPanModifier) return 'grabbing';
+    const activeTool = toolRegistry[tool] ?? toolRegistry.pencil;
+    return activeTool.cursor;
   };
   
   const renderOverlay = (clear = true) => {
@@ -374,7 +288,7 @@
     ctx.strokeRect(0, 0, doc.width, doc.height);
 
     // Draw selection (marching ants)
-    const selectionToDraw = selectionPreview ?? doc.selection;
+    const selectionToDraw = toolState.selectionPreview ?? doc.selection;
     if (selectionToDraw.active && selectionToDraw.width > 0 && selectionToDraw.height > 0) {
       const dash = 4 / doc.camera.zoom;
       const offset = (performance.now() / 50) % (dash * 2);
@@ -390,6 +304,11 @@
         selectionToDraw.height
       );
       ctx.restore();
+    }
+
+    const activeTool = toolRegistry[tool] ?? toolRegistry.pencil;
+    if (activeTool.renderOverlay) {
+      activeTool.renderOverlay(buildToolContext(), ctx);
     }
 
     ctx.restore();
@@ -414,7 +333,7 @@
     ctx.scale(doc.camera.zoom, doc.camera.zoom);
 
     // Draw layers sorted by zIndex (ascending - lower zIndex drawn first = behind)
-    const pendingForLayer = isDrawing && layer?.id ? pendingPixels : null;
+    const pendingForLayer = toolState.isDrawing && layer?.id ? toolState.pendingPixels : null;
     const sortedLayers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
     
     for (const l of sortedLayers) {
@@ -464,9 +383,9 @@
     if (!webglRenderer) return;
     const surface = renderDocumentToSurface(
       doc,
-      Array.from(pendingPixels.values()),
+      Array.from(toolState.pendingPixels.values()),
       layer?.id ?? null,
-      isDrawing
+      toolState.isDrawing
     );
     webglRenderer.render(surface, doc.camera);
   };
@@ -512,6 +431,15 @@
         } else {
           documentStore.undo();
         }
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        stepZoom(1);
+      } else if (e.key === '-') {
+        e.preventDefault();
+        stepZoom(-1);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        fitToWindow();
       } else if (e.key === 'y') {
         e.preventDefault();
         documentStore.redo();
@@ -531,23 +459,31 @@
         }
       }
     } else {
-      switch (e.key.toLowerCase()) {
-        case 'b': toolStore.activeTool.set('pencil'); break;
-        case 'e': toolStore.activeTool.set('eraser'); break;
-        case 'g': toolStore.activeTool.set('fill'); break;
-        case 'i': toolStore.activeTool.set('eyedropper'); break;
-        case 'h': toolStore.activeTool.set('pan'); break;
-        case 'm': toolStore.activeTool.set('select'); break;
-        case 'w': toolStore.activeTool.set('wand'); break;
-        case 'l': toolStore.activeTool.set('line'); break;
-        case 'r': toolStore.activeTool.set('rect'); break;
-        case 'o': toolStore.activeTool.set('ellipse'); break;
-        case 'x': toolStore.swapMaterials(); break;
-        case '[': toolStore.setBrushSize(settings.brushSize - 1); break;
-        case ']': toolStore.setBrushSize(settings.brushSize + 1); break;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        isPanModifier = true;
+        return;
+      }
+
+      const hotkeyTool = getToolByHotkey(e.key);
+      if (hotkeyTool) {
+        toolStore.activeTool.set(hotkeyTool.id);
+      } else {
+        switch (e.key.toLowerCase()) {
+          case 'x': toolStore.swapMaterials(); break;
+          case '[': toolStore.setBrushSize(settings.brushSize - 1); break;
+          case ']': toolStore.setBrushSize(settings.brushSize + 1); break;
+          case 'f': toolStore.toggleShapeFilled(); break;
+        }
       }
     }
     render();
+  };
+
+  const handleKeyUp = (e: KeyboardEvent) => {
+    if (e.code === 'Space') {
+      isPanModifier = false;
+    }
   };
   
   onMount(() => {
@@ -565,6 +501,7 @@
       activeLayer.subscribe(l => { layer = l as GridLayer | null; }),
       uiStore.showGrid.subscribe(g => { showGrid = g; render(); }),
       uiStore.gridStep.subscribe(step => { gridStep = step; render(); }),
+      uiStore.cursorPosition.subscribe(pos => { cursorPosition = pos; }),
     ];
     
     // Resize observer
@@ -608,12 +545,14 @@
     loop();
     
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     
     return () => {
       unsubs.forEach(u => u());
       resizeObserver.disconnect();
       cancelAnimationFrame(frame);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   });
 </script>
@@ -626,6 +565,7 @@
   <canvas
     bind:this={canvas}
     class="editor-canvas overlay"
+    style={`cursor: ${getCursorStyle()};`}
     onpointerdown={handlePointerDown}
     onpointermove={handlePointerMove}
     onpointerup={handlePointerUp}
@@ -655,7 +595,6 @@
   }
 
   .editor-canvas.overlay {
-    cursor: crosshair;
     touch-action: none;
   }
 </style>

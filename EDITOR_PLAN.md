@@ -72,8 +72,8 @@
 
 ### Fase 3: Sistema de Ferramentas
 
-- [ ] **3.1 Arquitetura de Tools**
-  - [ ] Interface `Tool`
+- [x] **3.1 Arquitetura de Tools**
+  - [x] Interface `Tool`
     ```ts
     type Tool = {
       id: string;
@@ -87,51 +87,51 @@
       renderOverlay?(ctx: ToolContext, surface: Surface2D): void;
     };
     ```
-  - [ ] ToolContext com estado compartilhado
-  - [ ] Tool registry com hotkeys
+  - [x] ToolContext com estado compartilhado
+  - [x] Tool registry com hotkeys
 
 - [ ] **3.2 Ferramentas de Pintura**
-  - [ ] **Pencil/Brush**
-    - [ ] Tamanho variável (1-64 px)
-    - [ ] Formas: quadrado, círculo, diamante
-    - [ ] Interpolação Bresenham entre pontos
-    - [ ] Preview do brush no cursor
-  - [ ] **Eraser**
-    - [ ] Mesmo que brush mas pinta material 0
+  - [x] **Pencil/Brush**
+    - [x] Tamanho variável (1-64 px)
+    - [x] Formas: quadrado, círculo, diamante
+    - [x] Interpolação Bresenham entre pontos
+    - [x] Preview do brush no cursor
+  - [x] **Eraser**
+    - [x] Mesmo que brush mas pinta material 0
   - [ ] **Bucket Fill**
-    - [ ] Flood fill com threshold de tolerância
+    - [x] Flood fill com threshold de tolerância
     - [ ] Opção: fill contiguous ou fill same color
     - [ ] Limite de área para evitar travamento
-  - [ ] **Line Tool**
-    - [ ] Preview em tempo real
-    - [ ] Snap 45° com Shift
-  - [ ] **Rectangle/Ellipse**
-    - [ ] Filled ou outline
-    - [ ] Snap 1:1 com Shift
-  - [ ] **Eyedropper**
-    - [ ] Pick material da célula clicada
-    - [ ] Atalho: Alt+Click em qualquer tool
+  - [x] **Line Tool**
+    - [x] Preview em tempo real
+    - [x] Snap 45° com Shift
+  - [x] **Rectangle/Ellipse**
+    - [x] Filled ou outline
+    - [x] Snap 1:1 com Shift
+  - [x] **Eyedropper**
+    - [x] Pick material da célula clicada
+    - [x] Atalho: Alt+Click em qualquer tool
 
 - [ ] **3.3 Ferramentas de Seleção**
-  - [ ] **Rect Select**
-    - [ ] Drag para selecionar área
-    - [ ] Shift+Drag para adicionar
-    - [ ] Alt+Drag para subtrair
+  - [x] **Rect Select**
+    - [x] Drag para selecionar área
+    - [x] Shift+Drag para adicionar
+    - [x] Alt+Drag para subtrair
   - [ ] **Lasso Select** (freeform)
-  - [ ] **Magic Wand**
-    - [ ] Seleciona área contígua do mesmo material
-    - [ ] Tolerância configurável
+  - [x] **Magic Wand**
+    - [x] Seleciona área contígua do mesmo material
+    - [x] Tolerância configurável
   - [ ] **Select All / Deselect**
 
 - [ ] **3.4 Ferramentas de Navegação**
-  - [ ] **Pan** (Hand tool)
-    - [ ] Middle-click drag em qualquer tool
-    - [ ] Spacebar + drag
-  - [ ] **Zoom**
-    - [ ] Scroll wheel
-    - [ ] Ctrl+Plus/Minus
-    - [ ] Fit to window
-    - [ ] Zoom levels: 12.5%, 25%, 50%, 100%, 200%, 400%, 800%
+  - [x] **Pan** (Hand tool)
+    - [x] Middle-click drag em qualquer tool
+    - [x] Spacebar + drag
+  - [x] **Zoom**
+    - [x] Scroll wheel
+    - [x] Ctrl+Plus/Minus
+    - [x] Fit to window
+    - [x] Zoom levels: 12.5%, 25%, 50%, 100%, 200%, 400%, 800%
   - [ ] **Rotate View** (só para modo iso/3D)
     - [ ] 90° steps ou livre
 
@@ -151,8 +151,9 @@
   - [ ] Lock (impedir edição)
   - [ ] Opacidade (0-100%)
   - [ ] Blend modes: normal, multiply, screen, overlay
-  - [ ] Merge layers
+  - [ ] Merge layers (rever, pois layers tem um z-index diferente, não faz sentido mergear. Pense numa solução)
   - [ ] Flatten all
+  - [ ] Construção assistida (talvez por atalho, nao sei, que seja facil construir coisas inter layers só colocando um bloco em cima do outro) (por exemplo, que seja possivel um avanço suava entre layers para criar estruturas que crescem no eixo z (exemplo, arvore, torre))
 
 - [ ] **4.3 Layer Panel UI**
   - [ ] Lista com thumbnails

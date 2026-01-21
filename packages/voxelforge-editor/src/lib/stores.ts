@@ -332,6 +332,7 @@ export type ToolId = 'pencil' | 'eraser' | 'fill' | 'select' | 'pan' | 'eyedropp
 export type ToolSettings = {
   brushSize: number;
   brushShape: 'square' | 'circle' | 'diamond';
+  shapeFilled: boolean;
   tolerance: number; // For fill tool
 };
 
@@ -340,6 +341,7 @@ const createToolStore = () => {
   const settings = writable<ToolSettings>({
     brushSize: 1,
     brushShape: 'square',
+    shapeFilled: false,
     tolerance: 0,
   });
   const primaryMaterial = writable<number>(1); // Stone
@@ -375,6 +377,16 @@ const createToolStore = () => {
     /** Set brush size with bounds */
     setBrushSize: (size: number) => {
       settings.update(s => ({ ...s, brushSize: Math.max(1, Math.min(64, size)) }));
+    },
+
+    /** Set brush shape */
+    setBrushShape: (shape: ToolSettings['brushShape']) => {
+      settings.update(s => ({ ...s, brushShape: shape }));
+    },
+
+    /** Toggle filled shape rendering */
+    toggleShapeFilled: () => {
+      settings.update(s => ({ ...s, shapeFilled: !s.shapeFilled }));
     },
   };
 };

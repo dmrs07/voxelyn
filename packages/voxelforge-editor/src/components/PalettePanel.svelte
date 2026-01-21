@@ -1,7 +1,7 @@
 <script lang="ts">
   import { documentStore, toolStore, palette } from '$lib/stores';
   import type { Material } from '@voxelyn/core';
-  import { ArrowsLeftRight } from 'phosphor-svelte';
+  import { ArrowsLeftRight, Swatches } from 'phosphor-svelte';
   import MaterialEditor from './MaterialEditor.svelte';
   
   let materials = $state<Material[]>([]);
@@ -46,7 +46,12 @@
 <div class="palette-panel">
   <div class="panel-header">Palette</div>
   
-  <MaterialEditor palette={materials} onPaletteChange={handlePaletteChange} />
+  <details class="material-editor-details" open>
+    <summary class="material-editor-summary"><Swatches size={16} weight="bold" /> Material Editor</summary>
+    <div class="material-editor-content" style="margin-top: 8px;">
+      <MaterialEditor palette={materials} onPaletteChange={handlePaletteChange} orientation="vertical" />
+    </div>
+  </details>
   
   <div class="current-colors">
     <div class="color-stack">

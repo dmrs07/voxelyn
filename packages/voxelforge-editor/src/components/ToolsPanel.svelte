@@ -17,9 +17,15 @@
   
   let activeTool = $state<ToolId>('pencil');
   let brushSize = $state(1);
+  let brushShape = $state<ToolSettings['brushShape']>('square');
+  let shapeFilled = $state(false);
   
   toolStore.activeTool.subscribe((t: ToolId) => activeTool = t);
-  toolStore.settings.subscribe((s: ToolSettings) => brushSize = s.brushSize);
+  toolStore.settings.subscribe((s: ToolSettings) => {
+    brushSize = s.brushSize;
+    brushShape = s.brushShape;
+    shapeFilled = s.shapeFilled;
+  });
   
   const tools: Array<{ id: ToolId; icon: typeof PencilSimple; label: string; key: string }> = [
     { id: 'pencil', icon: PencilSimple, label: 'Pencil', key: 'B' },
@@ -40,6 +46,10 @@
   
   const changeBrushSize = (delta: number) => {
     toolStore.setBrushSize(brushSize + delta);
+  };
+
+  const setBrushShape = (shape: ToolSettings['brushShape']) => {
+    toolStore.setBrushShape(shape);
   };
 </script>
 
@@ -69,12 +79,42 @@
         <input 
           type="range" 
           min="1" 
-          max="32" 
+          max="64" 
           value={brushSize}
           oninput={(e) => toolStore.setBrushSize(parseInt(e.currentTarget.value))}
         />
-        <button onclick={() => changeBrushSize(1)} disabled={brushSize >= 32}><Plus size={14} weight="bold" /></button>
+        <button onclick={() => changeBrushSize(1)} disabled={brushSize >= 64}><Plus size={14} weight="bold" /></button>
       </div>
+    </label>
+
+    <label>
+      Shape
+      <div class="shape-controls">
+        <button
+          class:active={brushShape === 'square'}
+          onclick={() => setBrushShape('square')}
+          title="Square"
+        >□</button>
+        <button
+          class:active={brushShape === 'circle'}
+          onclick={() => setBrushShape('circle')}
+          title="Circle"
+        >○</button>
+        <button
+          class:active={brushShape === 'diamond'}
+          onclick={() => setBrushShape('diamond')}
+          title="Diamond"
+        >◇</button>
+      </div>
+    </label>
+
+    <label class="fill-toggle">
+      <input
+        type="checkbox"
+        checked={shapeFilled}
+        onchange={() => toolStore.toggleShapeFilled()}
+      />
+      Filled Shapes (F)
     </label>
   </div>
 </div>
@@ -168,6 +208,38 @@
   
   .size-controls input[type="range"] {
     flex: 1;
+    accent-color: #6a6aae;
+  }
+
+  .shape-controls {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .shape-controls button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .shape-controls button.active {
+    background: #4a4a8e;
+    box-shadow: 0 0 0 2px #6a6aae;
+  }
+
+  .fill-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .fill-toggle input {
     accent-color: #6a6aae;
   }
 </style>

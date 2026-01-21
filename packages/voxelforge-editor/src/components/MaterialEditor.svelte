@@ -12,9 +12,10 @@
   interface Props {
     palette: Material[];
     onPaletteChange?: (palette: Material[]) => void;
+    orientation?: 'horizontal' | 'vertical';
   }
   
-  let { palette = [], onPaletteChange = () => {} }: Props = $props();
+  let { palette = [], onPaletteChange = () => {}, orientation = 'horizontal' }: Props = $props();
 
   let selectedMaterialIndex = $state(0);
   let showTexturePreview = $state(true);
@@ -110,9 +111,8 @@
   });
 </script>
 
-<div class="material-editor">
+<div class="material-editor" class:vertical={orientation === 'vertical'}>
   <div class="editor-header">
-    <h3>Material Editor</h3>
     <button class="btn-icon" title="Add preset material" onclick={addPresetMaterial}>
       <Plus size={20} />
     </button>
@@ -121,7 +121,7 @@
     </button>
   </div>
 
-  <div class="editor-content">
+  <div class="editor-content" class:vertical={orientation === 'vertical'}>
     <!-- Material list -->
     <div class="material-list">
       <h4>Materials ({palette.length})</h4>
@@ -283,6 +283,11 @@
     background: var(--bg-secondary, #1e1e1e);
     border-radius: 4px;
     font-size: 0.875rem;
+    min-width: 600px;
+  }
+
+  .material-editor.vertical {
+    min-width: 300px;
   }
 
   .editor-header {
@@ -319,9 +324,14 @@
 
   .editor-content {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: 1fr 1.5fr 1fr;
+    gap: 1.5rem;
     max-height: 400px;
+  }
+
+  .editor-content.vertical {
+    grid-template-columns: 1fr;
+    max-height: none;
   }
 
   .material-list {
@@ -329,6 +339,10 @@
     flex-direction: column;
     gap: 0.5rem;
     overflow-y: auto;
+  }
+
+  .editor-content.vertical .material-list {
+    max-height: 200px;
   }
 
   .material-list h4 {
@@ -490,5 +504,9 @@
     border-radius: 4px;
     background: var(--bg-tertiary, #2d2d2d);
     image-rendering: pixelated;
+  }
+
+  .editor-content.vertical .texture-preview {
+    align-items: flex-start;
   }
 </style>

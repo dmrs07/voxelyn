@@ -40,7 +40,7 @@
   
   <main
     class="workspace"
-    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette) ? '240px' : '0px'}`}
+    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette) ? '400px' : '0px'}`}
   >
     <aside class="left-sidebar" class:collapsed={!panels.tools}>
       {#if panels.tools}
