@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build Core
+        run: pnpm --filter @voxelyn/core build
+
       - name: Build Editor
         run: pnpm --filter @voxelforge/editor build
 
