@@ -800,7 +800,22 @@
     if (!ctx || !canvas || !voxelMeshRenderer) return;
 
     const lightKey = `${lightDir.x.toFixed(2)}:${lightDir.y.toFixed(2)}:${lightDir.z.toFixed(2)}`;
-    const gridKey = `${doc.meta.modified}-${doc.layers.length}-${lightKey}`;
+    const layersKey = JSON.stringify(
+      doc.layers.map((layer: any) => ({
+        v: layer.visible ?? true,
+        m:
+          layer.meta?.modified ??
+          layer.modified ??
+          layer.version ??
+          layer.updatedAt ??
+          0,
+      }))
+    );
+    const paletteKey =
+      (doc.palette as any)?.version ??
+      (doc.palette as any)?.meta?.modified ??
+      JSON.stringify(doc.palette);
+    const gridKey = `${doc.meta.modified}-${layersKey}-${paletteKey}-${lightKey}`;
     if (!voxelMeshCache || voxelMeshCache.key !== gridKey) {
       const mesh = buildGreedyMeshFromDocument(doc, doc.palette, lightDir);
       voxelMeshCache = { key: gridKey, mesh };
