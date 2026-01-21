@@ -159,6 +159,10 @@ const ensureGridLayer = (layer: GridLayer | null): layer is GridLayer => {
   return Boolean(layer && layer.type === 'grid2d');
 };
 
+const ensureEditableGridLayer = (layer: GridLayer | null): layer is GridLayer => {
+  return Boolean(layer && layer.type === 'grid2d' && !layer.locked);
+};
+
 const startDrawing = (ctx: ToolContext, e: PointerEvent) => {
   ctx.state.isDrawing = true;
   ctx.setPointerCapture(e.pointerId);
@@ -176,7 +180,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'b',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -192,7 +196,7 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.buttons === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       const linePoints = bresenhamLine(ctx.state.lastPoint.x, ctx.state.lastPoint.y, gridPos.x, gridPos.y);
@@ -223,7 +227,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'e',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentMaterial = 0;
       ctx.state.lastPoint = gridPos;
@@ -238,7 +242,7 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const linePoints = bresenhamLine(ctx.state.lastPoint.x, ctx.state.lastPoint.y, gridPos.x, gridPos.y);
       const allPoints: GridPoint[] = [];
@@ -268,7 +272,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'g',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.pendingPixels.clear();
@@ -295,7 +299,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'm',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.isSelecting = true;
       ctx.state.startPoint = gridPos;
@@ -381,7 +385,7 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentPoint = gridPos;
       ctx.state.pendingPixels.clear();
@@ -404,7 +408,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'r',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -418,7 +422,7 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentPoint = gridPos;
       ctx.state.pendingPixels.clear();
@@ -441,7 +445,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'o',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -455,7 +459,7 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentPoint = gridPos;
       ctx.state.pendingPixels.clear();

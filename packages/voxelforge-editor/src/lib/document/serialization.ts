@@ -36,6 +36,7 @@ type SerializedLayer = {
   visible: boolean;
   locked: boolean;
   opacity: number;
+  blendMode?: 'normal' | 'multiply' | 'screen' | 'overlay';
   zIndex?: number;
   isoHeight?: number;
   width?: number;
@@ -84,6 +85,7 @@ export const serializeDocument = (doc: EditorDocument): SerializedDocument => {
       visible: layer.visible,
       locked: layer.locked,
       opacity: layer.opacity,
+      blendMode: layer.blendMode,
     };
 
     if (layer.type === 'grid2d') {
@@ -154,6 +156,7 @@ export const deserializeDocument = (data: SerializedDocument): EditorDocument =>
       visible: sl.visible,
       locked: sl.locked,
       opacity: sl.opacity,
+        blendMode: sl.blendMode ?? 'normal',
       zIndex: sl.zIndex ?? index,
       isoHeight: sl.isoHeight ?? 0,
     };

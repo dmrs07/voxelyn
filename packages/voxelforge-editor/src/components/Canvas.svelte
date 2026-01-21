@@ -6,7 +6,7 @@
   import { renderDocumentToSurface } from '$lib/render/render-surface';
   import { renderDocumentIso, screenToIso } from '$lib/render/render-iso';
   import { createWebglRenderer, type WebglRenderer } from '$lib/render/webgl-renderer';
-  import type { GridLayer, EditorDocument, Selection } from '$lib/document/types';
+  import type { GridLayer, EditorDocument, Selection, BlendMode } from '$lib/document/types';
   import { createRectSelection } from '$lib/document/types';
   import { mergeSelection, type SelectionOp } from '$lib/document/selection';
   import type { ToolId, ToolSettings } from '$lib/stores';
@@ -17,6 +17,7 @@
   let webglRenderer: WebglRenderer | null = null;
   let useWebGL = false;
   let dpr = 1;
+  const referenceImages = new Map<string, HTMLImageElement>();
   
   // Local state from stores
   let doc: EditorDocument = get(documentStore);
@@ -72,6 +73,11 @@
       documentStore.paint(payload);
     }
     toolState.pendingPixels.clear();
+
+    const canStepTools: ToolId[] = ['pencil', 'eraser', 'line', 'rect', 'ellipse', 'fill'];
+    if (settings.autoLayerStep && canStepTools.includes(toolId)) {
+      documentStore.stepActiveLayer(settings.autoLayerStepDirection, settings.autoLayerStepCreate);
+    }
   };
   
   // Convert screen coords to grid coords
@@ -314,6 +320,30 @@
     ctx.restore();
   };
 
+  const getCompositeOperation = (blendMode: BlendMode): GlobalCompositeOperation => {
+    switch (blendMode) {
+      case 'multiply':
+      case 'screen':
+      case 'overlay':
+        return blendMode;
+      case 'normal':
+      default:
+        return 'source-over';
+    }
+  };
+
+  const getReferenceImage = (url: string) => {
+    if (!url) return null;
+    const cached = referenceImages.get(url);
+    if (cached) return cached;
+
+    const image = new Image();
+    image.src = url;
+    image.onload = () => render();
+    referenceImages.set(url, image);
+    return image;
+  };
+
   const render2d = () => {
     if (!ctx || !canvas) return;
 
@@ -337,9 +367,20 @@
     const sortedLayers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
     
     for (const l of sortedLayers) {
-      if (!l.visible || l.type !== 'grid2d') continue;
+      if (!l.visible) continue;
 
       ctx.globalAlpha = l.opacity;
+      ctx.globalCompositeOperation = getCompositeOperation(l.blendMode ?? 'normal');
+
+      if (l.type === 'reference') {
+        const image = getReferenceImage(l.imageUrl);
+        if (image && image.complete) {
+          ctx.drawImage(image, 0, 0, doc.width, doc.height);
+        }
+        continue;
+      }
+
+      if (l.type !== 'grid2d') continue;
 
       // Draw each pixel
       for (let y = 0; y < l.height; y++) {
@@ -370,9 +411,10 @@
           ctx.fillRect(x, y, 1, 1);
         }
       }
-
-      ctx.globalAlpha = 1;
     }
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
 
     // Draw grid + border + selection
     ctx.restore();
@@ -410,6 +452,12 @@
     // Iso mode uses its own renderer
     if (doc.viewMode === 'iso') {
       renderIso();
+      return;
+    }
+
+    const hasReferenceLayer = doc.layers.some(layer => layer.type === 'reference' && layer.visible);
+    if (hasReferenceLayer) {
+      render2d();
       return;
     }
     

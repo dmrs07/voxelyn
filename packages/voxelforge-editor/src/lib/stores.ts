@@ -9,7 +9,10 @@ import {
   type EditorDocument, 
   type LayerId, 
   type ViewMode,
-  createGridLayer 
+  createGridLayer,
+  createVoxelLayer,
+  createReferenceLayer,
+  createLayerId
 } from './document/types';
 import { 
   createHistory, 
@@ -25,8 +28,15 @@ import {
   createAddLayerCommand,
   createDeleteLayerCommand,
   createToggleVisibilityCommand,
+  createToggleLockCommand,
   createSetZIndexCommand,
   createSetIsoHeightCommand,
+  createSetOpacityCommand,
+  createSetBlendModeCommand,
+  createRenameLayerCommand,
+  createReorderLayersCommand,
+  createMergeDownCommand,
+  createFlattenGridLayersCommand,
   type HistoryState,
   type Command,
   type PaintData,
@@ -174,11 +184,83 @@ const createDocumentStore = () => {
       doc.set(result.doc);
       history.set(result.history);
     },
+
+    addVoxelLayer: (name?: string, zIndex?: number) => {
+      const currentDoc = get(doc);
+      const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
+      const newZIndex = zIndex ?? maxZIndex + 1;
+      const layer = createVoxelLayer(
+        currentDoc.width,
+        currentDoc.height,
+        currentDoc.depth,
+        name ?? `Voxel ${currentDoc.layers.length + 1}`,
+        newZIndex
+      );
+      const command = createAddLayerCommand(layer);
+      const currentHistory = get(history);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    addReferenceLayer: (imageUrl: string, name?: string, zIndex?: number) => {
+      const currentDoc = get(doc);
+      const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
+      const newZIndex = zIndex ?? maxZIndex + 1;
+      const layer = createReferenceLayer(
+        imageUrl,
+        name ?? `Reference ${currentDoc.layers.length + 1}`,
+        newZIndex
+      );
+      const command = createAddLayerCommand(layer);
+      const currentHistory = get(history);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
     
     deleteLayer: (layerId: LayerId) => {
       const currentDoc = get(doc);
       const currentHistory = get(history);
       const command = createDeleteLayerCommand(layerId);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    duplicateLayer: (layerId: LayerId) => {
+      const currentDoc = get(doc);
+      const sourceLayer = currentDoc.layers.find(l => l.id === layerId);
+      if (!sourceLayer) return;
+
+      const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
+      const newZIndex = maxZIndex + 1;
+
+      const duplicatedLayer = sourceLayer.type === 'grid2d'
+        ? {
+          ...sourceLayer,
+          id: createLayerId(),
+          name: `${sourceLayer.name} Copy`,
+          zIndex: newZIndex,
+          data: new Uint16Array(sourceLayer.data),
+        }
+        : sourceLayer.type === 'voxel3d'
+          ? {
+            ...sourceLayer,
+            id: createLayerId(),
+            name: `${sourceLayer.name} Copy`,
+            zIndex: newZIndex,
+            data: new Uint16Array(sourceLayer.data),
+          }
+          : {
+            ...sourceLayer,
+            id: createLayerId(),
+            name: `${sourceLayer.name} Copy`,
+            zIndex: newZIndex,
+          };
+
+      const command = createAddLayerCommand(duplicatedLayer);
+      const currentHistory = get(history);
       const result = executeCommand(currentHistory, currentDoc, command);
       doc.set(result.doc);
       history.set(result.history);
@@ -192,11 +274,105 @@ const createDocumentStore = () => {
       doc.set(result.doc);
       history.set(result.history);
     },
+
+    toggleLayerLock: (layerId: LayerId) => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createToggleLockCommand(layerId);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    renameLayer: (layerId: LayerId, name: string) => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createRenameLayerCommand(layerId, name);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    setLayerOpacity: (layerId: LayerId, opacity: number) => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createSetOpacityCommand(layerId, opacity);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    setLayerBlendMode: (layerId: LayerId, blendMode: 'normal' | 'multiply' | 'screen' | 'overlay') => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createSetBlendModeCommand(layerId, blendMode);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
     
     setLayerZIndex: (layerId: LayerId, zIndex: number) => {
       const currentDoc = get(doc);
       const currentHistory = get(history);
       const command = createSetZIndexCommand(layerId, zIndex);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    stepActiveLayer: (direction: 'up' | 'down', createIfMissing = true) => {
+      const currentDoc = get(doc);
+      const sorted = [...currentDoc.layers].sort((a, b) => a.zIndex - b.zIndex);
+      const activeIndex = sorted.findIndex(l => l.id === currentDoc.activeLayerId);
+      if (activeIndex === -1) return;
+
+      const delta = direction === 'up' ? 1 : -1;
+      const next = sorted[activeIndex + delta];
+      if (next) {
+        doc.update(d => ({ ...d, activeLayerId: next.id }));
+        return;
+      }
+
+      if (!createIfMissing) return;
+
+      const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
+      const minZIndex = currentDoc.layers.reduce((min, l) => Math.min(min, l.zIndex), 0);
+      const newZIndex = direction === 'up' ? maxZIndex + 1 : minZIndex - 1;
+      const layer = createGridLayer(
+        currentDoc.width,
+        currentDoc.height,
+        `Layer ${currentDoc.layers.length + 1}`,
+        newZIndex
+      );
+      const command = createAddLayerCommand(layer);
+      const currentHistory = get(history);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    reorderLayers: (orderedLayerIds: LayerId[]) => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createReorderLayersCommand(orderedLayerIds);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    mergeLayerDown: (upperLayerId: LayerId, lowerLayerId: LayerId) => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createMergeDownCommand(upperLayerId, lowerLayerId);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+    },
+
+    flattenGridLayers: () => {
+      const currentDoc = get(doc);
+      const currentHistory = get(history);
+      const command = createFlattenGridLayersCommand();
       const result = executeCommand(currentHistory, currentDoc, command);
       doc.set(result.doc);
       history.set(result.history);
@@ -333,6 +509,9 @@ export type ToolSettings = {
   brushSize: number;
   brushShape: 'square' | 'circle' | 'diamond';
   shapeFilled: boolean;
+  autoLayerStep: boolean;
+  autoLayerStepDirection: 'up' | 'down';
+  autoLayerStepCreate: boolean;
   tolerance: number; // For fill tool
 };
 
@@ -342,6 +521,9 @@ const createToolStore = () => {
     brushSize: 1,
     brushShape: 'square',
     shapeFilled: false,
+    autoLayerStep: false,
+    autoLayerStepDirection: 'up',
+    autoLayerStepCreate: true,
     tolerance: 0,
   });
   const primaryMaterial = writable<number>(1); // Stone
@@ -387,6 +569,18 @@ const createToolStore = () => {
     /** Toggle filled shape rendering */
     toggleShapeFilled: () => {
       settings.update(s => ({ ...s, shapeFilled: !s.shapeFilled }));
+    },
+
+    toggleAutoLayerStep: () => {
+      settings.update(s => ({ ...s, autoLayerStep: !s.autoLayerStep }));
+    },
+
+    setAutoLayerStepDirection: (direction: ToolSettings['autoLayerStepDirection']) => {
+      settings.update(s => ({ ...s, autoLayerStepDirection: direction }));
+    },
+
+    toggleAutoLayerStepCreate: () => {
+      settings.update(s => ({ ...s, autoLayerStepCreate: !s.autoLayerStepCreate }));
     },
   };
 };

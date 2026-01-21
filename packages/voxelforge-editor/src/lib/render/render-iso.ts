@@ -3,8 +3,8 @@
  * Renders Grid2D layers as isometric tiles with configurable height and z-index
  */
 
-import { projectIso, forEachIsoOrder, type DrawCommand, sortDrawCommands, makeDrawKey } from '@voxelyn/core/extras/iso';
-import type { EditorDocument, GridLayer, Material, Layer } from '../document/types';
+import { projectIso, forEachIsoOrder, type DrawCommand, sortDrawCommands, makeDrawKey } from '@voxelyn/core';
+import type { EditorDocument, GridLayer, Material, Layer, BlendMode } from '../document/types';
 
 /** Height mode presets for isometric rendering */
 export type IsoHeightMode = 
@@ -151,6 +151,18 @@ const sortLayersByZIndex = (layers: Layer[]): Layer[] => {
   return [...layers].sort((a, b) => a.zIndex - b.zIndex);
 };
 
+const getCompositeOperation = (blendMode: BlendMode): GlobalCompositeOperation => {
+  switch (blendMode) {
+    case 'multiply':
+    case 'screen':
+    case 'overlay':
+      return blendMode;
+    case 'normal':
+    default:
+      return 'source-over';
+  }
+};
+
 /**
  * Renders the document in isometric 2.5D mode
  */
@@ -195,8 +207,9 @@ export const renderDocumentIso = (
     const layerBaseZ = baselineZ + layer.zIndex * opts.defaultHeight;
     const layerPixelOffset = layer.isoHeight;
     const layerOpacity = layer.opacity;
+    const layerBlendMode = layer.blendMode ?? 'normal';
     
-    forEachIsoOrder(grid.width, grid.height, (x, y) => {
+    forEachIsoOrder(grid.width, grid.height, (x: number, y: number) => {
       const idx = y * grid.width + x;
       const cell = grid.data[idx];
       const mat = cell & 0xff;
@@ -222,6 +235,7 @@ export const renderDocumentIso = (
         key,
         draw: () => {
           ctx.globalAlpha = layerOpacity;
+          ctx.globalCompositeOperation = getCompositeOperation(layerBlendMode);
           
           // Draw walls if height > 0
           if (materialHeight > 0) {
@@ -238,6 +252,7 @@ export const renderDocumentIso = (
   }
   
   ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   
   // Sort and execute draw commands
   sortDrawCommands(commands);

@@ -139,27 +139,27 @@
 
 ### Fase 4: Sistema de Camadas (Layers)
 
-- [ ] **4.1 Layer Types**
-  - [ ] `GridLayer` - usa Grid2D do voxelyn
-  - [ ] `VoxelLayer` - usa VoxelGrid3D
-  - [ ] `ReferenceLayer` - imagem de referência (não editável)
+- [x] **4.1 Layer Types**
+  - [x] `GridLayer` - usa Grid2D do voxelyn
+  - [x] `VoxelLayer` - usa VoxelGrid3D
+  - [x] `ReferenceLayer` - imagem de referência (não editável)
 
 - [ ] **4.2 Layer Operations**
-  - [ ] Criar/duplicar/deletar layer
-  - [ ] Reordenar (drag & drop)
-  - [ ] Visibilidade toggle
-  - [ ] Lock (impedir edição)
-  - [ ] Opacidade (0-100%)
-  - [ ] Blend modes: normal, multiply, screen, overlay
-  - [ ] Merge layers (rever, pois layers tem um z-index diferente, não faz sentido mergear. Pense numa solução)
-  - [ ] Flatten all
-  - [ ] Construção assistida (talvez por atalho, nao sei, que seja facil construir coisas inter layers só colocando um bloco em cima do outro) (por exemplo, que seja possivel um avanço suava entre layers para criar estruturas que crescem no eixo z (exemplo, arvore, torre))
+  - [x] Criar/duplicar/deletar layer
+  - [x] Reordenar (drag & drop)
+  - [x] Visibilidade toggle
+  - [x] Lock (impedir edição)
+  - [x] Opacidade (0-100%)
+  - [x] Blend modes: normal, multiply, screen, overlay
+  - [x] Merge layers (rever, pois layers tem um z-index diferente, não faz sentido mergear. Pense numa solução)
+  - [x] Flatten all
+  - [x] Construção assistida (talvez por atalho, nao sei, que seja facil construir coisas inter layers só colocando um bloco em cima do outro) (por exemplo, que seja possivel um avanço suava entre layers para criar estruturas que crescem no eixo z (exemplo, arvore, torre))
 
 - [ ] **4.3 Layer Panel UI**
-  - [ ] Lista com thumbnails
-  - [ ] Ícones de visibilidade/lock
-  - [ ] Context menu com opções
-  - [ ] Rename inline
+  - [x] Lista com thumbnails
+  - [x] Ícones de visibilidade/lock
+  - [x] Context menu com opções
+  - [x] Rename inline
 
 ---
 
@@ -182,19 +182,24 @@
     };
     ```
 
-- [ ] **5.2 Palette UI**
-  - [ ] Grid de swatches coloridos
+- [ ] **5.2 Material Editor UI**
+  - [ ] Grid de swatches (cor do material)
   - [ ] Seleção primária/secundária (left/right click)
-  - [ ] Color picker popup (HSV + RGB + Hex)
-  - [ ] Import/export paleta (.pal, .gpl, .ase)
-  - [ ] Paletas predefinidas: Pico-8, DB32, Endesga64
+  - [ ] Material picker popup:
+    - [ ] Color picker (HSV + RGB + Hex + Alpha)
+    - [ ] Propriedades físicas (density, friction, etc.)
+    - [ ] Flags: isLiquid, isGas, flamable
+  - [ ] Import/export paleta (.pal, .gpl, .ase) - converte cores para materiais
+  - [ ] Material presets: básicos (terra, água, areia, pedra)
 
-- [ ] **5.3 Color Picker**
-  - [ ] HSV wheel ou square
+- [ ] **5.3 Color/Material Picker**
+  - [ ] HSV wheel ou square (para editar cor do material)
   - [ ] RGB sliders
   - [ ] Hex input
   - [ ] Alpha slider
-  - [ ] Swatches recentes
+  - [ ] Materiais recentes usados
+  - [ ] Quick edit: Alt+Click no swatch abre editor inline
+
 
 ---
 

@@ -1,4 +1,4 @@
-import type { Palette, Material } from '@voxelyn/core';
+import type { Material } from '@voxelyn/core';
 import { DEFAULT_MATERIALS } from '@voxelyn/core';
 
 /**
@@ -23,6 +23,9 @@ export type ViewMode = '2d' | 'iso' | '3d';
 /** Layer types */
 export type LayerType = 'grid2d' | 'voxel3d' | 'reference';
 
+/** Blend modes supported by layers */
+export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay';
+
 /** Base layer interface */
 export type LayerBase = {
   id: LayerId;
@@ -30,6 +33,7 @@ export type LayerBase = {
   visible: boolean;
   locked: boolean;
   opacity: number; // 0-1
+  blendMode: BlendMode;
   zIndex: number; // Z-index for iso/3d modes (can be negative)
   isoHeight: number; // Height offset in iso mode (pixels)
 };
@@ -116,6 +120,7 @@ export const createGridLayer = (
   visible: true,
   locked: false,
   opacity: 1,
+  blendMode: 'normal',
   zIndex,
   isoHeight: 0,
   type: 'grid2d',
@@ -137,6 +142,7 @@ export const createVoxelLayer = (
   visible: true,
   locked: false,
   opacity: 1,
+  blendMode: 'normal',
   zIndex,
   isoHeight: 0,
   type: 'voxel3d',
@@ -144,6 +150,24 @@ export const createVoxelLayer = (
   width,
   height,
   depth,
+});
+
+/** Creates a new reference layer (non-editable image) */
+export const createReferenceLayer = (
+  imageUrl: string,
+  name = 'Reference',
+  zIndex = 0
+): ReferenceLayer => ({
+  id: createLayerId(),
+  name,
+  visible: true,
+  locked: true,
+  opacity: 1,
+  blendMode: 'normal',
+  zIndex,
+  isoHeight: 0,
+  type: 'reference',
+  imageUrl,
 });
 
 /** Creates default palette from voxelyn core */
@@ -352,6 +376,9 @@ export const deserializeDocument = (data: unknown): EditorDocument | null => {
         visible: layer.visible === true,
         locked: layer.locked === true,
         opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
+        blendMode: (layer.blendMode as BlendMode) || 'normal',
+        zIndex: typeof layer.zIndex === 'number' ? layer.zIndex : 0,
+        isoHeight: typeof layer.isoHeight === 'number' ? layer.isoHeight : 0,
       };
       
       if (layer.type === 'reference') {
@@ -419,6 +446,9 @@ export const validateDocument = (doc: EditorDocument): string[] => {
   doc.layers.forEach((layer, idx) => {
     if (!layer.id || !layer.name) errors.push(`Layer ${idx} has missing id or name`);
     if (layer.opacity < 0 || layer.opacity > 1) errors.push(`Layer ${idx} opacity must be 0-1`);
+    if (!['normal', 'multiply', 'screen', 'overlay'].includes(layer.blendMode)) {
+      errors.push(`Layer ${idx} has invalid blend mode`);
+    }
     
     if (layer.type === 'grid2d' || layer.type === 'voxel3d') {
       const gl = layer as GridLayer | VoxelLayer;

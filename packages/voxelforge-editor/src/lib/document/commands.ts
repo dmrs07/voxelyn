@@ -2,6 +2,7 @@
  * VoxelForge Editor - Command Pattern for Undo/Redo
  */
 
+import { createLayerId } from './types';
 import type { EditorDocument, Layer, LayerId, Selection } from './types';
 
 /** Base command interface */
@@ -319,6 +320,34 @@ export const createToggleVisibilityCommand = (layerId: LayerId): Command => ({
   },
 });
 
+/** Creates a command to toggle layer lock */
+export const createToggleLockCommand = (layerId: LayerId): Command => ({
+  id: createCommandId(),
+  description: 'Toggle layer lock',
+
+  execute: (doc) => {
+    const layerIndex = doc.layers.findIndex(l => l.id === layerId);
+    if (layerIndex === -1) return doc;
+
+    const layer = doc.layers[layerIndex];
+    const newLayers = [...doc.layers];
+    newLayers[layerIndex] = { ...layer, locked: !layer.locked };
+
+    return { ...doc, layers: newLayers };
+  },
+
+  undo: (doc) => {
+    const layerIndex = doc.layers.findIndex(l => l.id === layerId);
+    if (layerIndex === -1) return doc;
+
+    const layer = doc.layers[layerIndex];
+    const newLayers = [...doc.layers];
+    newLayers[layerIndex] = { ...layer, locked: !layer.locked };
+
+    return { ...doc, layers: newLayers };
+  },
+});
+
 /** Creates a command to rename a layer */
 export const createRenameLayerCommand = (layerId: LayerId, newName: string): Command => {
   let oldName = '';
@@ -377,6 +406,78 @@ export const createSetOpacityCommand = (layerId: LayerId, opacity: number): Comm
       newLayers[layerIndex] = { ...newLayers[layerIndex], opacity: oldOpacity };
       
       return { ...doc, layers: newLayers };
+    },
+  };
+};
+
+/** Creates a command to change layer blend mode */
+export const createSetBlendModeCommand = (
+  layerId: LayerId,
+  blendMode: Layer['blendMode']
+): Command => {
+  let oldBlendMode: Layer['blendMode'] = 'normal';
+
+  return {
+    id: createCommandId(),
+    description: `Change blend mode to ${blendMode}`,
+
+    execute: (doc) => {
+      const layerIndex = doc.layers.findIndex(l => l.id === layerId);
+      if (layerIndex === -1) return doc;
+
+      oldBlendMode = doc.layers[layerIndex].blendMode ?? 'normal';
+      const newLayers = [...doc.layers];
+      newLayers[layerIndex] = { ...newLayers[layerIndex], blendMode };
+
+      return { ...doc, layers: newLayers, meta: { ...doc.meta, modified: Date.now() } };
+    },
+
+    undo: (doc) => {
+      const layerIndex = doc.layers.findIndex(l => l.id === layerId);
+      if (layerIndex === -1) return doc;
+
+      const newLayers = [...doc.layers];
+      newLayers[layerIndex] = { ...newLayers[layerIndex], blendMode: oldBlendMode };
+
+      return { ...doc, layers: newLayers, meta: { ...doc.meta, modified: Date.now() } };
+    },
+  };
+};
+
+/** Creates a command to reorder layers by z-index order (top to bottom) */
+export const createReorderLayersCommand = (
+  orderedLayerIds: LayerId[]
+): Command => {
+  let previousZIndexes: Record<LayerId, number> = {};
+
+  return {
+    id: createCommandId(),
+    description: 'Reorder layers',
+
+    execute: (doc) => {
+      previousZIndexes = doc.layers.reduce<Record<LayerId, number>>((acc, layer) => {
+        acc[layer.id] = layer.zIndex;
+        return acc;
+      }, {});
+
+      const total = orderedLayerIds.length;
+      const nextLayers = doc.layers.map(layer => {
+        const index = orderedLayerIds.indexOf(layer.id);
+        if (index === -1) return layer;
+        const zIndex = total - 1 - index;
+        return { ...layer, zIndex };
+      });
+
+      return { ...doc, layers: nextLayers, meta: { ...doc.meta, modified: Date.now() } };
+    },
+
+    undo: (doc) => {
+      const nextLayers = doc.layers.map(layer => ({
+        ...layer,
+        zIndex: previousZIndexes[layer.id] ?? layer.zIndex,
+      }));
+
+      return { ...doc, layers: nextLayers, meta: { ...doc.meta, modified: Date.now() } };
     },
   };
 };
@@ -440,5 +541,124 @@ export const createSetIsoHeightCommand = (layerId: LayerId, isoHeight: number): 
       
       return { ...doc, layers: newLayers, meta: { ...doc.meta, modified: Date.now() } };
     },
+  };
+};
+
+const cloneLayer = (layer: Layer): Layer => {
+  if (layer.type === 'grid2d') {
+    return { ...layer, data: new Uint16Array(layer.data) };
+  }
+  if (layer.type === 'voxel3d') {
+    return { ...layer, data: new Uint16Array(layer.data) };
+  }
+  return { ...layer };
+};
+
+const cloneLayers = (layers: Layer[]): Layer[] => layers.map(cloneLayer);
+
+/** Creates a command to merge a layer down into the next lower layer */
+export const createMergeDownCommand = (upperLayerId: LayerId, lowerLayerId: LayerId): Command => {
+  let previousLayers: Layer[] = [];
+  let previousActiveLayerId = '';
+
+  return {
+    id: createCommandId(),
+    description: 'Merge layer down',
+
+    execute: (doc) => {
+      const upper = doc.layers.find(l => l.id === upperLayerId);
+      const lower = doc.layers.find(l => l.id === lowerLayerId);
+      if (!upper || !lower) return doc;
+      if (upper.type !== 'grid2d' || lower.type !== 'grid2d') return doc;
+      if (upper.width !== lower.width || upper.height !== lower.height) return doc;
+
+      previousLayers = cloneLayers(doc.layers);
+      previousActiveLayerId = doc.activeLayerId;
+
+      const nextLowerData = new Uint16Array(lower.data);
+      for (let i = 0; i < upper.data.length; i += 1) {
+        const cell = upper.data[i];
+        if ((cell & 0xff) !== 0) {
+          nextLowerData[i] = cell;
+        }
+      }
+
+      const nextLayers = doc.layers
+        .filter(l => l.id !== upperLayerId)
+        .map(l => l.id === lowerLayerId ? { ...l, data: nextLowerData } : l);
+
+      return {
+        ...doc,
+        layers: nextLayers,
+        activeLayerId: lowerLayerId,
+        meta: { ...doc.meta, modified: Date.now() },
+      };
+    },
+
+    undo: (doc) => ({
+      ...doc,
+      layers: cloneLayers(previousLayers),
+      activeLayerId: previousActiveLayerId,
+      meta: { ...doc.meta, modified: Date.now() },
+    }),
+  };
+};
+
+/** Creates a command to flatten all grid layers into one */
+export const createFlattenGridLayersCommand = (): Command => {
+  let previousLayers: Layer[] = [];
+  let previousActiveLayerId = '';
+
+  return {
+    id: createCommandId(),
+    description: 'Flatten grid layers',
+
+    execute: (doc) => {
+      const gridLayers = doc.layers.filter(l => l.type === 'grid2d') as Layer[];
+      if (gridLayers.length <= 1) return doc;
+
+      previousLayers = cloneLayers(doc.layers);
+      previousActiveLayerId = doc.activeLayerId;
+
+      const sorted = [...gridLayers].sort((a, b) => a.zIndex - b.zIndex) as Layer[];
+      const base = sorted[0] as Layer & { type: 'grid2d'; data: Uint16Array; width: number; height: number };
+      const merged = new Uint16Array(base.data.length);
+
+      for (const layer of sorted) {
+        if (layer.type !== 'grid2d' || !layer.visible) continue;
+        const grid = layer as Layer & { type: 'grid2d'; data: Uint16Array };
+        for (let i = 0; i < grid.data.length; i += 1) {
+          const cell = grid.data[i];
+          if ((cell & 0xff) !== 0) {
+            merged[i] = cell;
+          }
+        }
+      }
+
+      const flattenedLayer = {
+        ...base,
+        id: createLayerId(),
+        name: 'Flattened',
+        data: merged,
+        locked: false,
+      };
+
+      const nonGridLayers = doc.layers.filter(l => l.type !== 'grid2d');
+      const nextLayers = [...nonGridLayers, flattenedLayer];
+
+      return {
+        ...doc,
+        layers: nextLayers,
+        activeLayerId: flattenedLayer.id,
+        meta: { ...doc.meta, modified: Date.now() },
+      };
+    },
+
+    undo: (doc) => ({
+      ...doc,
+      layers: cloneLayers(previousLayers),
+      activeLayerId: previousActiveLayerId,
+      meta: { ...doc.meta, modified: Date.now() },
+    }),
   };
 };
