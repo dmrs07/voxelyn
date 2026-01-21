@@ -15,7 +15,8 @@ export type Material = {
   density: number; // 0 = floats, 100 = heavy (affects physics simulation)
   friction: number; // 0-1 (affects sliding behavior)
   isLiquid: boolean; // For fluid simulation
-  isGas: boolean; // For gas simulation (deprecated, use isGaseous)
+  /** @deprecated Use `isGaseous`. Scheduled for removal in v0.6.0. */
+  isGas: boolean;
   isGaseous: boolean; // Gas that expands/spreads
   isTransparent: boolean; // Allows visibility through (for rendering)
   flammable: boolean; // Can burn/ignite
@@ -50,6 +51,8 @@ export function makePalette(
  * Creates a Material instance with default values.
  */
 export function makeMaterial(overrides: Partial<Material>): Material {
+  const isGaseous = overrides.isGaseous ?? false;
+  const isGas = overrides.isGas ?? isGaseous;
   return {
     id: 0,
     name: 'Unnamed',
@@ -57,8 +60,9 @@ export function makeMaterial(overrides: Partial<Material>): Material {
     density: 50,
     friction: 0.5,
     isLiquid: false,
-    isGas: false,
-    isGaseous: false,
+    isGaseous,
+    // Keep deprecated field for backward compatibility only.
+    isGas,
     isTransparent: false,
     flammable: false,
     ...overrides,
