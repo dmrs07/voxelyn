@@ -1,11 +1,11 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const url = require('url');
 
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
+    title: 'VoxelForge',
     backgroundColor: '#12121a',
     webPreferences: {
       contextIsolation: true,
@@ -22,17 +22,12 @@ const createWindow = () => {
     return;
   }
 
-  const indexPath = path.join(__dirname, '../voxelforge-editor/dist/index.html');
-  win.loadURL(
-    url.format({
-      pathname: indexPath,
-      protocol: 'file:',
-      slashes: true,
-    })
-  );
+  const indexPath = path.join(app.getAppPath(), 'renderer', 'index.html');
+  win.loadFile(indexPath);
 };
 
 app.whenReady().then(() => {
+  app.setName('VoxelForge');
   createWindow();
 
   app.on('activate', () => {
