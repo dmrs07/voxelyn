@@ -125,14 +125,20 @@ export const createWebglRenderer = (canvas: HTMLCanvasElement): WebglRenderer | 
 
     updateTexture(gl, textureInfo, surface);
 
+    const dpr = canvas.width / Math.max(1, canvas.clientWidth || canvas.width);
+    const scaleX = surface.width * camera.zoom * dpr;
+    const scaleY = surface.height * camera.zoom * dpr;
+    const translateX = camera.x * dpr;
+    const translateY = camera.y * dpr;
+
     gl.clearColor(0.1, 0.1, 0.18, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(program);
     gl.bindVertexArray(vao);
 
-    if (scaleLocation) gl.uniform2f(scaleLocation, camera.zoom, camera.zoom);
-    if (translateLocation) gl.uniform2f(translateLocation, camera.x, camera.y);
+    if (scaleLocation) gl.uniform2f(scaleLocation, scaleX, scaleY);
+    if (translateLocation) gl.uniform2f(translateLocation, translateX, translateY);
     if (viewportLocation) gl.uniform2f(viewportLocation, gl.canvas.width, gl.canvas.height);
 
     gl.activeTexture(gl.TEXTURE0);
