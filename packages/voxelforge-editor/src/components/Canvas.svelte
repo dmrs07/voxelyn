@@ -736,15 +736,15 @@
    * distant objects appear smaller.
    * 
    * Matrix structure (column-major):
-   * [ f/aspect   0        0          0     ]
-   * [    0       f        0          0     ]
-   * [    0       0    (f+n)/(n-f)   -1     ]
-   * [    0       0   2*f*n/(n-f)    0     ]
+   * [ cot/aspect    0            0               0     ]
+   * [     0        cot           0               0     ]
+   * [     0         0     (far+near)/(near-far)  -1    ]
+   * [     0         0    2*far*near/(near-far)   0     ]
    * 
    * Where:
-   * - f = 1.0 / tan(fov/2)  (cotangent of half the field of view)
-   * - n = near plane distance
-   * - f = far plane distance
+   * - cot = 1.0 / tan(fov/2)  (cotangent of half the field of view)
+   * - near = near plane distance
+   * - far = far plane distance
    * 
    * Reference: This implements the standard OpenGL perspective projection matrix.
    * See: https://www.khronos.org/opengl/wiki/GluPerspective_code
