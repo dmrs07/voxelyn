@@ -115,7 +115,9 @@ export const createWebglRenderer = (canvas: HTMLCanvasElement): WebglRenderer | 
   const render = (surface: Surface2D, camera: CameraState) => {
     if (surface.width !== surfaceWidth || surface.height !== surfaceHeight) {
       // Delete old texture before creating a new one to prevent memory leak
-      gl.deleteTexture(textureInfo.texture);
+      if (textureInfo.texture) {
+        gl.deleteTexture(textureInfo.texture);
+      }
       textureInfo = createTexture(gl, surface.width, surface.height);
       surfaceWidth = surface.width;
       surfaceHeight = surface.height;
@@ -143,10 +145,10 @@ export const createWebglRenderer = (canvas: HTMLCanvasElement): WebglRenderer | 
   };
 
   const dispose = () => {
-    gl.deleteVertexArray(vao);
-    gl.deleteBuffer(buffer);
-    gl.deleteProgram(program);
-    gl.deleteTexture(textureInfo.texture);
+    if (vao) gl.deleteVertexArray(vao);
+    if (buffer) gl.deleteBuffer(buffer);
+    if (program) gl.deleteProgram(program);
+    if (textureInfo.texture) gl.deleteTexture(textureInfo.texture);
   };
 
   return { resize, render, dispose };
