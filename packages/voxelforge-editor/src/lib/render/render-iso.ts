@@ -34,6 +34,8 @@ const DEFAULT_ISO_SETTINGS: IsoSettings = {
   lightDir: { x: -0.5, y: -0.5, z: 1 },
 };
 
+export const ISO_DEFAULTS = DEFAULT_ISO_SETTINGS;
+
 /** Unpacks RGBA from packed uint32 */
 const unpack = (color: number) => ({
   r: color & 0xff,
