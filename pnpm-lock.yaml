@@ -76,8 +76,8 @@ importers:
   packages/voxelforge-electron:
     devDependencies:
       electron:
-        specifier: 33.2.1
-        version: 33.2.1
+        specifier: ^33.4.11
+        version: 33.4.11
       electron-builder:
         specifier: 24.13.3
         version: 24.13.3(electron-builder-squirrel-windows@24.13.3)
@@ -1096,11 +1096,6 @@ packages:
 
   electron-publish@24.13.1:
     resolution: {integrity: sha512-2ZgdEqJ8e9D17Hwp5LEq5mLQPjqU3lv/IALvgp+4W8VeNhryfGhYEQC/PgDPMrnWUp+l60Ou5SJLsu+k4mhQ8A==}
-
-  electron@33.2.1:
-    resolution: {integrity: sha512-SG/nmSsK9Qg1p6wAW+ZfqU+AV8cmXMTIklUL18NnOKfZLlum4ZsDoVdmmmlL39ZmeCaq27dr7CgslRPahfoVJg==}
-    engines: {node: '>= 12.20.55'}
-    hasBin: true
 
   electron@33.4.11:
     resolution: {integrity: sha512-xmdAs5QWRkInC7TpXGNvzo/7exojubk+72jn1oJL7keNeIlw7xNglf8TGtJtkR4rWC5FJq0oXiIXPS9BcK2Irg==}
@@ -3183,14 +3178,6 @@ snapshots:
       fs-extra: 10.1.0
       lazy-val: 1.0.5
       mime: 2.6.0
-    transitivePeerDependencies:
-      - supports-color
-
-  electron@33.2.1:
-    dependencies:
-      '@electron/get': 2.0.3
-      '@types/node': 20.19.30
-      extract-zip: 2.0.1
     transitivePeerDependencies:
       - supports-color
 
