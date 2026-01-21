@@ -120,7 +120,7 @@ export const createWebglRenderer = (canvas: HTMLCanvasElement): WebglRenderer | 
 
     updateTexture(gl, textureInfo, surface);
 
-    const dpr = canvas.width / (canvas.clientWidth || canvas.width);
+    const dpr = canvas.width / Math.max(1, canvas.clientWidth || canvas.width);
     const scaleX = surface.width * camera.zoom * dpr;
     const scaleY = surface.height * camera.zoom * dpr;
     const translateX = camera.x * dpr;
