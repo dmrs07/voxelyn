@@ -80,6 +80,10 @@
     far: 5000,
   };
   
+  // Horizon line position in 3D grid as a ratio of maxZ depth (0.0 = front, 1.0 = back)
+  // This creates a visual reference line at 60% depth to help with spatial orientation
+  const HORIZON_LINE_RATIO = 0.6;
+  
   // Tool runtime state
   const toolState: ToolRuntimeState = {
     isPanning: false,
@@ -980,7 +984,7 @@
       ctx.stroke();
     }
 
-    const horizonZ = maxZ * 0.6;
+    const horizonZ = maxZ * HORIZON_LINE_RATIO;
     const h1 = project3dPoint({ x: 0, y: gridY, z: horizonZ });
     const h2 = project3dPoint({ x: maxX, y: gridY, z: horizonZ });
     if (h1 && h2) {
