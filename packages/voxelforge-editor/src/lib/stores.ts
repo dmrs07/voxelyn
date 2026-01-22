@@ -591,7 +591,7 @@ export const toolStore = createToolStore();
 // UI Store
 // ============================================================================
 
-export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation';
+export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation' | 'ai';
 
 const createUIStore = () => {
   const panels = writable<Record<PanelId, boolean>>({
@@ -599,6 +599,7 @@ const createUIStore = () => {
     layers: true,
     palette: true,
     simulation: false,
+    ai: false,
   });
   
   const showGrid = writable(true);

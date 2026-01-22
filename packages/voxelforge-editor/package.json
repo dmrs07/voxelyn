@@ -11,6 +11,7 @@
     "lint": "eslint -c ../../eslint.config.js \"src/**/*.{ts,svelte,js}\""
   },
   "dependencies": {
+    "@voxelyn/ai": "workspace:*",
     "@voxelyn/core": "workspace:*",
     "phosphor-svelte": "^3.0.1"
   },
