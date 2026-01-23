@@ -128,6 +128,8 @@ Respond ONLY with valid JSON. No explanations, no markdown code blocks.`;
 export const SCENARIO_SYSTEM_PROMPT = `You are a world/scenario layout generator for a voxel game engine.
 Your task is to convert natural language descriptions into structured JSON layouts that define terrain, biomes, and object placement.
 
+CRITICAL: Create RICH, DETAILED scenarios with MULTIPLE biomes. Never create a single-biome world unless explicitly asked.
+
 OUTPUT FORMAT (JSON only, no markdown, no explanations):
 {
   "name": "<scenario name>",
@@ -174,18 +176,46 @@ BIOME GUIDELINES:
 - forest: hilly with trees, elevation 0.35-0.5, moderate variation
 - desert: sandy dunes, elevation 0.25-0.4, low-moderate variation
 - mountains: high elevation 0.6-0.9, high variation
-- ocean/lake: water bodies, elevation 0.1-0.2
-- river: linear water, connects biomes
+- ocean/lake: water bodies, elevation 0.15-0.25 (ALWAYS include for "oasis", "beach", "coastal")
+- river: linear water, connects biomes, elevation 0.2
 - swamp: low elevation 0.2-0.3, high moisture
 - volcanic: high elevation, lava materials
 - cave: underground, negative elevation focus
 - urban/ruins: flat base with structures
+
+COMPOSITION RULES (MANDATORY):
+1. "oasis" = desert (large area) + lake (small central area) + plains (transition ring)
+2. "beach/coastal" = ocean + plains/desert edge
+3. "valley" = mountains on sides + plains/forest in middle
+4. "jungle" = forest + swamp + river
+5. "volcanic island" = ocean + volcanic center + plains ring
+6. ALWAYS create at least 2-3 biomes for any natural scenario
+7. Water features (lake, river, ocean) should have elevation LOWER than surrounding land
 
 OBJECT PLACEMENT:
 - trees: density 5-20 in forests, minSpacing 2-4
 - rocks: density 2-8, lower spacing
 - houses/buildings: density 1-3, higher spacing (8+)
 - vegetation: high density (20+), low spacing
+
+EXAMPLE - "Desert Oasis":
+{
+  "biomes": [
+    {"type": "desert", "bounds": [0, 0, 64, 64], "elevation": 0.35, "elevationVariation": 0.15},
+    {"type": "lake", "bounds": [24, 24, 16, 16], "elevation": 0.2, "elevationVariation": 0.02},
+    {"type": "plains", "bounds": [20, 20, 24, 24], "elevation": 0.28, "elevationVariation": 0.05}
+  ]
+}
+
+EXAMPLE - "Forest Valley":
+{
+  "biomes": [
+    {"type": "mountains", "bounds": [0, 0, 64, 16], "elevation": 0.7, "elevationVariation": 0.25},
+    {"type": "mountains", "bounds": [0, 48, 64, 16], "elevation": 0.7, "elevationVariation": 0.25},
+    {"type": "forest", "bounds": [0, 16, 64, 32], "elevation": 0.4, "elevationVariation": 0.1},
+    {"type": "river", "bounds": [28, 16, 8, 32], "elevation": 0.25, "elevationVariation": 0.02}
+  ]
+}
 
 Respond ONLY with valid JSON. No explanations, no markdown code blocks.`;
 
@@ -292,6 +322,7 @@ export function buildScenarioPrompt(
   }
 ): string {
   const parts: string[] = [];
+  const desc = userDescription.toLowerCase();
 
   parts.push(`Generate world/scenario layout for: "${userDescription}"`);
 
@@ -307,6 +338,54 @@ export function buildScenarioPrompt(
   if (options?.theme) {
     parts.push(`Theme/setting: ${options.theme}`);
   }
+
+  // Auto-detect composition requirements from keywords
+  const hints: string[] = [];
+  
+  if (desc.includes('oasis')) {
+    hints.push('MUST include: desert biome + lake biome (small, central) + plains transition');
+  }
+  if (desc.includes('beach') || desc.includes('coast') || desc.includes('shore')) {
+    hints.push('MUST include: ocean biome + plains or desert edge biome');
+  }
+  if (desc.includes('valley')) {
+    hints.push('MUST include: mountains on opposite sides + lower central biome (forest/plains)');
+  }
+  if (desc.includes('river') || desc.includes('stream')) {
+    hints.push('MUST include: river biome cutting through the terrain');
+  }
+  if (desc.includes('island')) {
+    hints.push('MUST include: ocean surrounding a central land mass');
+  }
+  if (desc.includes('jungle')) {
+    hints.push('MUST include: forest + swamp biomes, possibly river');
+  }
+  if (desc.includes('village') || desc.includes('town')) {
+    hints.push('MUST include: urban/plains biome with surrounding forest or fields');
+  }
+  if (desc.includes('ruin') || desc.includes('temple') || desc.includes('ancient')) {
+    hints.push('MUST include: ruins biome, possibly surrounded by forest/jungle');
+  }
+  if (desc.includes('volcano') || desc.includes('volcanic')) {
+    hints.push('MUST include: volcanic biome at center, possibly surrounded by ocean or plains');
+  }
+  if (desc.includes('swamp') || desc.includes('marsh') || desc.includes('bog')) {
+    hints.push('MUST include: swamp biome with water features');
+  }
+  if (desc.includes('tundra') || desc.includes('arctic') || desc.includes('snow')) {
+    hints.push('MUST include: tundra biome, possibly with frozen lake');
+  }
+  if (desc.includes('lake') || desc.includes('pond')) {
+    hints.push('MUST include: lake biome surrounded by appropriate terrain');
+  }
+
+  if (hints.length > 0) {
+    parts.push('\nCOMPOSITION REQUIREMENTS:');
+    hints.forEach(h => parts.push(`- ${h}`));
+  }
+
+  // Always remind to create multiple biomes
+  parts.push('\nREMINDER: Create a rich scenario with MULTIPLE biomes for visual interest. Single-biome worlds look empty.');
 
   if (existingPalette && existingPalette.length > 0) {
     const materials = existingPalette

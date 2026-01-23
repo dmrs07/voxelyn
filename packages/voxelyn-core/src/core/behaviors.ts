@@ -28,9 +28,85 @@ export type BehaviorContext = {
   time: number; // Milliseconds since behavior started
   temperature?: number; // Local temperature
   pressure?: number; // Local pressure
+  density?: number; // Local density
+  humidity?: number; // Local humidity
   adjacentMaterials?: number[]; // Material IDs of adjacent cells
+  /**
+   * Volumetric neighbor sampler for 3D behaviors.
+   * Use for local diffusion, reactions, or flow rules.
+   */
+  getNeighbors?: (query?: NeighborQuery) => NeighborSample[];
   iteration?: number; // Physics iteration count
 };
+
+export type NeighborQuery = {
+  radius?: number;
+  includeCenter?: boolean;
+  mode?: 'moore' | 'von-neumann';
+};
+
+export type NeighborSample = {
+  x: number;
+  y: number;
+  z: number;
+  materialId: number;
+  temperature?: number;
+  pressure?: number;
+  density?: number;
+};
+
+export type NeighborSampler = (x: number, y: number, z: number) => NeighborSample | null;
+
+export type BehaviorContext3DOptions = {
+  x: number;
+  y: number;
+  z: number;
+  time: number;
+  sampler: NeighborSampler;
+  temperature?: number;
+  pressure?: number;
+  density?: number;
+  humidity?: number;
+  iteration?: number;
+};
+
+/**
+ * Helper to construct a 3D behavior context with volumetric neighbors.
+ */
+export function createBehaviorContext3D(options: BehaviorContext3DOptions): BehaviorContext {
+  const getNeighbors = (query: NeighborQuery = {}): NeighborSample[] => {
+    const radius = Math.max(1, Math.floor(query.radius ?? 1));
+    const includeCenter = query.includeCenter ?? false;
+    const mode = query.mode ?? 'moore';
+    const out: NeighborSample[] = [];
+
+    for (let dz = -radius; dz <= radius; dz++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (!includeCenter && dx === 0 && dy === 0 && dz === 0) continue;
+          if (mode === 'von-neumann' && Math.abs(dx) + Math.abs(dy) + Math.abs(dz) > radius) continue;
+          const sample = options.sampler(options.x + dx, options.y + dy, options.z + dz);
+          if (sample) out.push(sample);
+        }
+      }
+    }
+
+    return out;
+  };
+
+  return {
+    x: options.x,
+    y: options.y,
+    z: options.z,
+    time: options.time,
+    temperature: options.temperature,
+    pressure: options.pressure,
+    density: options.density,
+    humidity: options.humidity,
+    getNeighbors,
+    iteration: options.iteration,
+  };
+}
 
 /**
  * Predefined material behavior templates

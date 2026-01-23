@@ -881,6 +881,184 @@ function placeObjects(
 }
 
 // ============================================================================
+// LAYOUT ENRICHMENT
+// ============================================================================
+
+/**
+ * Enriches a layout by detecting keywords and adding missing biomes.
+ * This compensates for AI models that generate overly simple layouts.
+ */
+function enrichLayout(layout: ScenarioLayout): ScenarioLayout {
+  const desc = (layout.name + ' ' + layout.description).toLowerCase();
+  const [width, height] = layout.size;
+  const biomes = [...layout.biomes];
+  const existingTypes = new Set(biomes.map(b => b.type));
+
+  // Oasis detection: desert without water
+  if (desc.includes('oasis') && existingTypes.has('desert') && !existingTypes.has('lake')) {
+    const centerX = Math.floor(width * 0.35);
+    const centerY = Math.floor(height * 0.35);
+    const lakeSize = Math.floor(Math.min(width, height) * 0.25);
+    
+    // Add lake at center
+    biomes.push({
+      type: 'lake',
+      bounds: [centerX, centerY, lakeSize, lakeSize],
+      elevation: 0.18,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    
+    // Add grass/plains ring around lake
+    const ringSize = lakeSize + 8;
+    const ringX = centerX - 4;
+    const ringY = centerY - 4;
+    biomes.push({
+      type: 'plains',
+      bounds: [ringX, ringY, ringSize, ringSize],
+      elevation: 0.25,
+      elevationVariation: 0.05,
+      moisture: 0.7,
+      surfaceMaterial: 'grass',
+      undergroundMaterial: 'dirt',
+    });
+  }
+
+  // Valley detection: needs mountains on sides
+  if (desc.includes('valley') && !existingTypes.has('mountains')) {
+    const mtHeight = Math.floor(height * 0.25);
+    biomes.unshift({
+      type: 'mountains',
+      bounds: [0, 0, width, mtHeight],
+      elevation: 0.7,
+      elevationVariation: 0.25,
+      moisture: 0.3,
+      surfaceMaterial: 'stone',
+      undergroundMaterial: 'stone',
+    });
+    biomes.unshift({
+      type: 'mountains',
+      bounds: [0, height - mtHeight, width, mtHeight],
+      elevation: 0.7,
+      elevationVariation: 0.25,
+      moisture: 0.3,
+      surfaceMaterial: 'stone',
+      undergroundMaterial: 'stone',
+    });
+  }
+
+  // River detection: add river if mentioned but missing
+  if ((desc.includes('river') || desc.includes('stream')) && !existingTypes.has('river')) {
+    const riverWidth = Math.max(4, Math.floor(width * 0.1));
+    const riverX = Math.floor((width - riverWidth) / 2);
+    biomes.push({
+      type: 'river',
+      bounds: [riverX, 0, riverWidth, height],
+      elevation: 0.2,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Beach/coastal detection
+  if ((desc.includes('beach') || desc.includes('coast')) && !existingTypes.has('ocean')) {
+    const oceanWidth = Math.floor(width * 0.3);
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, 0, oceanWidth, height],
+      elevation: 0.15,
+      elevationVariation: 0.03,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Island detection
+  if (desc.includes('island') && !existingTypes.has('ocean')) {
+    // Surround with ocean
+    const margin = Math.floor(Math.min(width, height) * 0.15);
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, 0, width, margin],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, height - margin, width, margin],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, 0, margin, height],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [width - margin, 0, margin, height],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Lake detection
+  if (desc.includes('lake') && !existingTypes.has('lake') && !existingTypes.has('ocean')) {
+    const lakeSize = Math.floor(Math.min(width, height) * 0.3);
+    const lakeX = Math.floor((width - lakeSize) / 2);
+    const lakeY = Math.floor((height - lakeSize) / 2);
+    biomes.push({
+      type: 'lake',
+      bounds: [lakeX, lakeY, lakeSize, lakeSize],
+      elevation: 0.18,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Swamp detection
+  if ((desc.includes('swamp') || desc.includes('marsh')) && !existingTypes.has('swamp')) {
+    const swampSize = Math.floor(Math.min(width, height) * 0.4);
+    const swampX = Math.floor((width - swampSize) / 2);
+    const swampY = Math.floor((height - swampSize) / 2);
+    biomes.push({
+      type: 'swamp',
+      bounds: [swampX, swampY, swampSize, swampSize],
+      elevation: 0.22,
+      elevationVariation: 0.08,
+      moisture: 0.9,
+      surfaceMaterial: 'dirt',
+      undergroundMaterial: 'dirt',
+    });
+  }
+
+  return {
+    ...layout,
+    biomes,
+  };
+}
+
+// ============================================================================
 // MAIN BUILDER
 // ============================================================================
 
@@ -905,12 +1083,15 @@ export function buildScenarioFromLayout(
   layout: ScenarioLayout,
   options: ScenarioBuildOptions = {}
 ): ScenarioBuildResult {
-  const [width, height] = layout.size;
-  const depth = layout.depth;
-  const seed = layout.seed;
+  // Enrich layout with missing elements based on description
+  const enrichedLayout = enrichLayout(layout);
+  
+  const [width, height] = enrichedLayout.size;
+  const depth = enrichedLayout.depth;
+  const seed = enrichedLayout.seed;
 
   // Generate heightmap
-  const heightmap = generateHeightmap(width, height, layout.heightmap, layout.biomes);
+  const heightmap = generateHeightmap(width, height, enrichedLayout.heightmap, enrichedLayout.biomes);
 
   // Build terrain with vegetation
   const { terrain, materials } = buildTerrain(
@@ -918,7 +1099,7 @@ export function buildScenarioFromLayout(
     height,
     depth,
     heightmap,
-    layout.biomes,
+    enrichedLayout.biomes,
     options,
     seed
   );
@@ -930,15 +1111,15 @@ export function buildScenarioFromLayout(
     height,
     depth,
     heightmap,
-    layout.biomes,
+    enrichedLayout.biomes,
     seed
   );
   vegMaterials.forEach(m => materials.add(m));
 
   // Place objects
   const objects = placeObjects(
-    layout.objects,
-    layout.biomes,
+    enrichedLayout.objects,
+    enrichedLayout.biomes,
     heightmap,
     width,
     height,
