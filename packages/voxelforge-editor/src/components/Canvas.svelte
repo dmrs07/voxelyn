@@ -574,7 +574,8 @@
   };
 
   const getDefaultAnchors = (): AnchorPoint[] => {
-    const center = { x: doc.width / 2, y: doc.height / 2, z: doc.depth / 2 };
+    // In 3D view: x=doc.width, y=doc.depth(vertical), z=doc.height
+    const center = { x: doc.width / 2, y: doc.depth / 2, z: doc.height / 2 };
     const baseDistance = Math.max(doc.width, doc.height, doc.depth) * 1.6;
     return [
       { id: 'center', name: 'Center', yaw: 0.8, pitch: -0.45, distance: baseDistance, target: center },
@@ -955,15 +956,17 @@
 
   const draw3dGrid = () => {
     if (!ctx || !canvas) return;
-    const gridY = 0;
-    const step = Math.max(1, Math.floor(Math.max(doc.width, doc.depth) / 16));
+    const gridY = 0; // Grid at base level (y=0 in 3D, which is z=0 in document)
+    const step = Math.max(1, Math.floor(Math.max(doc.width, doc.height) / 16));
     const maxX = doc.width;
-    const maxZ = doc.depth;
+    const maxZ = doc.height; // Document height maps to 3D Z
+    const maxY = doc.depth;  // Document depth maps to 3D Y (vertical)
 
     ctx.save();
     ctx.strokeStyle = 'rgba(120, 140, 180, 0.25)';
     ctx.lineWidth = 1;
 
+    // Draw grid lines parallel to Z axis (document Y)
     for (let x = 0; x <= maxX; x += step) {
       const p1 = project3dPoint({ x, y: gridY, z: 0 });
       const p2 = project3dPoint({ x, y: gridY, z: maxZ });
@@ -974,6 +977,7 @@
       ctx.stroke();
     }
 
+    // Draw grid lines parallel to X axis
     for (let z = 0; z <= maxZ; z += step) {
       const p1 = project3dPoint({ x: 0, y: gridY, z });
       const p2 = project3dPoint({ x: maxX, y: gridY, z });
@@ -984,15 +988,21 @@
       ctx.stroke();
     }
 
-    const horizonZ = maxZ * HORIZON_LINE_RATIO;
-    const h1 = project3dPoint({ x: 0, y: gridY, z: horizonZ });
-    const h2 = project3dPoint({ x: maxX, y: gridY, z: horizonZ });
-    if (h1 && h2) {
-      ctx.strokeStyle = 'rgba(220, 230, 255, 0.35)';
-      ctx.lineWidth = 1.5;
+    // Draw horizon line at certain height
+    const horizonY = maxY * HORIZON_LINE_RATIO;
+    const h1 = project3dPoint({ x: 0, y: horizonY, z: 0 });
+    const h2 = project3dPoint({ x: maxX, y: horizonY, z: 0 });
+    const h3 = project3dPoint({ x: maxX, y: horizonY, z: maxZ });
+    const h4 = project3dPoint({ x: 0, y: horizonY, z: maxZ });
+    if (h1 && h2 && h3 && h4) {
+      ctx.strokeStyle = 'rgba(220, 230, 255, 0.15)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(h1.x, h1.y);
       ctx.lineTo(h2.x, h2.y);
+      ctx.lineTo(h3.x, h3.y);
+      ctx.lineTo(h4.x, h4.y);
+      ctx.closePath();
       ctx.stroke();
     }
 
@@ -1036,8 +1046,20 @@
     return selection.active && selection.width > 0 && selection.height > 0;
   };
   
+  // Check if focus is on an input element
+  const isInputFocused = (): boolean => {
+    const active = document.activeElement;
+    if (!active) return false;
+    const tag = active.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || 
+           (active as HTMLElement).isContentEditable;
+  };
+  
   // Keyboard shortcuts
   const handleKeyDown = (e: KeyboardEvent) => {
+    // Skip if focus is on an input element
+    if (isInputFocused()) return;
+    
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'z') {
         e.preventDefault();
@@ -1096,6 +1118,9 @@
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
+    // Skip if focus is on an input element
+    if (isInputFocused()) return;
+    
     if (e.code === 'Space') {
       isPanModifier = false;
     }

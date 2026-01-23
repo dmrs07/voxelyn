@@ -9,6 +9,7 @@ import {
   type EditorDocument, 
   type LayerId, 
   type ViewMode,
+  type VoxelLayer,
   createGridLayer,
   createVoxelLayer,
   createReferenceLayer,
@@ -201,6 +202,41 @@ const createDocumentStore = () => {
       const result = executeCommand(currentHistory, currentDoc, command);
       doc.set(result.doc);
       history.set(result.history);
+    },
+
+    /** Add a voxel layer with pre-existing data */
+    addVoxelLayerWithData: (
+      data: Uint16Array,
+      width: number,
+      height: number,
+      depth: number,
+      name?: string,
+      zIndex?: number
+    ) => {
+      const currentDoc = get(doc);
+      const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
+      const newZIndex = zIndex ?? maxZIndex + 1;
+      const layer: VoxelLayer = {
+        id: createLayerId(),
+        name: name ?? `Voxel ${currentDoc.layers.length + 1}`,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        blendMode: 'normal',
+        zIndex: newZIndex,
+        isoHeight: 0,
+        type: 'voxel3d',
+        data: data.slice(), // Copy the data
+        width,
+        height,
+        depth,
+      };
+      const command = createAddLayerCommand(layer);
+      const currentHistory = get(history);
+      const result = executeCommand(currentHistory, currentDoc, command);
+      doc.set(result.doc);
+      history.set(result.history);
+      return layer.id;
     },
 
     addReferenceLayer: (imageUrl: string, name?: string, zIndex?: number) => {

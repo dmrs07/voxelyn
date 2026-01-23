@@ -29,6 +29,8 @@ const shade = (color: number, normal: Vec3, lightDir: Vec3): [number, number, nu
 
 /**
  * Builds a greedy mesh from the current document using the palette and light direction.
+ * Note: Swaps Y and Z to convert from document coordinates (X,Y,Z where Z is vertical)
+ * to 3D world coordinates (X,Y,Z where Y is vertical).
  */
 export const buildGreedyMeshFromDocument = (
   doc: EditorDocument,
@@ -47,11 +49,16 @@ export const buildGreedyMeshFromDocument = (
   const indices: number[] = [];
   let indexOffset = 0;
 
-  const dims = [grid.width, grid.height, grid.depth];
+  // Swap height and depth for 3D rendering (Y becomes vertical)
+  const dims = [grid.width, grid.depth, grid.height];
 
   const voxelAt = (x: number, y: number, z: number): number => {
-    if (x < 0 || y < 0 || z < 0 || x >= grid.width || y >= grid.height || z >= grid.depth) return 0;
-    return grid.data[(z * grid.height + y) * grid.width + x] ?? 0;
+    // Map from 3D coords (x, y=vertical, z=depth) back to grid coords (x, y, z)
+    const gx = x;
+    const gy = z; // grid Y = 3D Z
+    const gz = y; // grid Z = 3D Y (vertical)
+    if (gx < 0 || gy < 0 || gz < 0 || gx >= grid.width || gy >= grid.height || gz >= grid.depth) return 0;
+    return grid.data[(gz * grid.height + gy) * grid.width + gx] ?? 0;
   };
 
   const addQuad = (

@@ -91,6 +91,76 @@
   let client: GeminiClient | null = null;
 
   // ============================================================================
+  // Prompt Helpers & Suggestions
+  // ============================================================================
+
+  // Material tags derived from palette
+  const materialTags = $derived(
+    palette
+      .filter(m => m.id > 0) // Skip air
+      .map(m => ({ id: m.id, name: m.name.toLowerCase(), display: m.name }))
+  );
+
+  // Context-aware suggestions based on active tab
+  const promptSuggestions = $derived.by(() => {
+    switch (activeTab) {
+      case 'texture':
+        return {
+          quickTags: ['rough', 'smooth', 'weathered', 'metallic', 'organic', 'crystalline', 'mossy', 'cracked'],
+          templates: [
+            { label: '🧱 Brick Wall', prompt: 'red brick wall with cement mortar, weathered and slightly cracked' },
+            { label: '🪨 Stone', prompt: 'rough stone surface with gray and brown tones, natural cracks' },
+            { label: '🪵 Wood Planks', prompt: 'wooden planks with visible grain, warm brown tones, slight knots' },
+            { label: '🌿 Grass', prompt: 'grass texture with variation in green shades, some dry patches' },
+            { label: '⚙️ Metal', prompt: 'brushed metal surface with scratches and slight rust spots' },
+          ],
+          materialHint: 'Use material names to reference palette colors',
+        };
+      case 'object':
+        return {
+          quickTags: ['wooden', 'stone', 'metal', 'ancient', 'medieval', 'fantasy', 'simple', 'detailed'],
+          templates: [
+            { label: '🌳 Tree', prompt: 'oak tree with thick trunk and leafy canopy' },
+            { label: '🏠 House', prompt: 'small medieval house with stone base and wooden roof' },
+            { label: '⚔️ Sword', prompt: 'iron sword with leather-wrapped handle' },
+            { label: '🪨 Boulder', prompt: 'large natural boulder with moss patches' },
+            { label: '🏺 Barrel', prompt: 'wooden barrel with metal bands' },
+            { label: '🔥 Campfire', prompt: 'campfire with stones around it and burning logs' },
+          ],
+          materialHint: 'Add #material to specify voxel materials',
+        };
+      case 'scenario':
+        return {
+          quickTags: ['forest', 'mountains', 'desert', 'ocean', 'river', 'village', 'ruins', 'cave'],
+          templates: [
+            { label: '🌲 Forest Valley', prompt: 'dense forest valley with tall pine trees and a small stream' },
+            { label: '🏔️ Mountain Range', prompt: 'snowy mountain peaks with rocky cliffs and alpine meadows' },
+            { label: '🏜️ Desert Oasis', prompt: 'sandy desert with dunes, an oasis with palm trees and water' },
+            { label: '🏘️ Village', prompt: 'small village with houses, a central square, and farmland around' },
+            { label: '🏚️ Ancient Ruins', prompt: 'overgrown ancient temple ruins in a jungle setting' },
+            { label: '🌊 Coastal', prompt: 'rocky coastline with beaches, cliffs, and a lighthouse' },
+          ],
+          materialHint: 'Biomes: forest, plains, mountains, desert, ocean, river, swamp',
+        };
+    }
+  });
+
+  // Insert tag into prompt at cursor position
+  function insertTag(tag: string) {
+    prompt = prompt ? `${prompt} ${tag}` : tag;
+  }
+
+  // Insert material reference
+  function insertMaterial(name: string) {
+    prompt = prompt ? `${prompt} #${name}` : `#${name}`;
+  }
+
+  // Use a template prompt
+  function useTemplate(templatePrompt: string) {
+    prompt = templatePrompt;
+  }
+
+  // ============================================================================
   // Lifecycle
   // ============================================================================
 
@@ -154,10 +224,14 @@
   // ============================================================================
 
   async function generateTexture() {
-    if (!client || !prompt.trim()) return;
+    if (!client || !prompt.trim()) {
+      console.log('[AIPanel] Texture generation aborted - no client or prompt');
+      return;
+    }
     
     isGenerating = true;
     error = null;
+    console.log('[AIPanel] Starting texture generation with prompt:', prompt);
 
     try {
       const result = await client.predictTextureParams(prompt, palette, {
@@ -166,20 +240,25 @@
         tileable,
       });
 
+      console.log('[AIPanel] Texture prediction result:', result);
       lastGenerationMs = result.generationTimeMs ?? null;
 
       if (!result.success) {
         error = result.error ?? 'Generation failed';
+        console.error('[AIPanel] Texture generation failed:', error);
         return;
       }
 
       textureParams = result.data ?? null;
+      console.log('[AIPanel] Texture params:', textureParams);
       
       if (textureParams) {
         texturePreview = generateTextureFromParams(textureParams, textureSize, textureSize);
+        console.log('[AIPanel] Texture preview generated, length:', texturePreview?.length);
         renderTexturePreview();
       }
     } catch (e) {
+      console.error('[AIPanel] Texture generation error:', e);
       error = e instanceof Error ? e.message : 'Unknown error';
     } finally {
       isGenerating = false;
@@ -187,10 +266,14 @@
   }
 
   async function generateObject() {
-    if (!client || !prompt.trim()) return;
+    if (!client || !prompt.trim()) {
+      console.log('[AIPanel] Object generation aborted - no client or prompt');
+      return;
+    }
     
     isGenerating = true;
     error = null;
+    console.log('[AIPanel] Starting object generation with prompt:', prompt);
 
     try {
       const result = await client.predictObjectBlueprint(prompt, palette, {
@@ -198,15 +281,19 @@
         detailLevel: objectDetailLevel,
       });
 
+      console.log('[AIPanel] Object prediction result:', result);
       lastGenerationMs = result.generationTimeMs ?? null;
 
       if (!result.success) {
         error = result.error ?? 'Generation failed';
+        console.error('[AIPanel] Object generation failed:', error);
         return;
       }
 
       objectBlueprint = result.data ?? null;
+      console.log('[AIPanel] Object blueprint:', objectBlueprint);
     } catch (e) {
+      console.error('[AIPanel] Object generation error:', e);
       error = e instanceof Error ? e.message : 'Unknown error';
     } finally {
       isGenerating = false;
@@ -214,10 +301,15 @@
   }
 
   async function generateScenario() {
-    if (!client || !prompt.trim()) return;
+    if (!client || !prompt.trim()) {
+      console.log('[AIPanel] Scenario generation aborted - no client or prompt');
+      return;
+    }
     
     isGenerating = true;
     error = null;
+    console.log('[AIPanel] Starting scenario generation with prompt:', prompt);
+    console.log('[AIPanel] Size:', scenarioSize, 'Depth:', scenarioDepth);
 
     try {
       const result = await client.predictScenarioLayout(prompt, palette, {
@@ -225,21 +317,28 @@
         depth: scenarioDepth,
       });
 
+      console.log('[AIPanel] Scenario prediction result:', result);
       lastGenerationMs = result.generationTimeMs ?? null;
 
       if (!result.success) {
         error = result.error ?? 'Generation failed';
+        console.error('[AIPanel] Scenario generation failed:', error);
         return;
       }
 
       scenarioLayout = result.data ?? null;
+      console.log('[AIPanel] Scenario layout:', scenarioLayout);
 
       if (scenarioLayout) {
+        console.log('[AIPanel] Building scenario from layout...');
         const builtScenario = buildScenarioFromLayout(scenarioLayout);
+        console.log('[AIPanel] Built scenario:', builtScenario);
         scenarioPreview = getScenarioPreview(builtScenario);
+        console.log('[AIPanel] Scenario preview generated, length:', scenarioPreview?.length);
         renderScenarioPreview();
       }
     } catch (e) {
+      console.error('[AIPanel] Scenario generation error:', e);
       error = e instanceof Error ? e.message : 'Unknown error';
     } finally {
       isGenerating = false;
@@ -247,6 +346,8 @@
   }
 
   function handleGenerate() {
+    console.log('[AIPanel] handleGenerate called, activeTab:', activeTab);
+    console.log('[AIPanel] client:', !!client, 'apiKeyValid:', apiKeyValid, 'prompt:', prompt);
     switch (activeTab) {
       case 'texture':
         generateTexture();
@@ -460,6 +561,38 @@
       rows={3}
       ></textarea>
     </label>
+
+    <!-- Quick Tags -->
+    <div class="quick-tags">
+      <span class="tag-label">Quick add:</span>
+      {#each promptSuggestions.quickTags as tag}
+        <button class="tag-chip" onclick={() => insertTag(tag)}>{tag}</button>
+      {/each}
+    </div>
+
+    <!-- Material Tags -->
+    {#if materialTags.length > 0}
+      <div class="material-tags">
+        <span class="tag-label">Materials:</span>
+        {#each materialTags.slice(0, 8) as mat}
+          <button class="tag-chip material" onclick={() => insertMaterial(mat.name)}>
+            #{mat.name}
+          </button>
+        {/each}
+      </div>
+    {/if}
+
+    <!-- Templates -->
+    <div class="templates">
+      <span class="tag-label">Templates:</span>
+      <div class="template-list">
+        {#each promptSuggestions.templates as tmpl}
+          <button class="template-btn" onclick={() => useTemplate(tmpl.prompt)} title={tmpl.prompt}>
+            {tmpl.label}
+          </button>
+        {/each}
+      </div>
+    </div>
   </section>
 
   <!-- Tab-specific Options -->
@@ -786,6 +919,80 @@
 
   .prompt-section textarea::placeholder {
     color: #555;
+  }
+
+  /* Quick Tags & Material Tags */
+  .quick-tags,
+  .material-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .tag-label {
+    color: #666;
+    font-size: 10px;
+    margin-right: 4px;
+  }
+
+  .tag-chip {
+    padding: 2px 8px;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    color: #aaa;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tag-chip:hover {
+    background: #2a2a4e;
+    border-color: #6366f1;
+    color: #fff;
+  }
+
+  .tag-chip.material {
+    background: #1a2e1a;
+    border-color: #2a4a2a;
+    color: #8b8;
+  }
+
+  .tag-chip.material:hover {
+    background: #2a4e2a;
+    border-color: #4a8a4a;
+    color: #afa;
+  }
+
+  /* Templates */
+  .templates {
+    margin-top: 6px;
+  }
+
+  .template-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .template-btn {
+    padding: 4px 8px;
+    background: #12121a;
+    border: 1px solid #2a2a4e;
+    border-radius: 4px;
+    color: #888;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .template-btn:hover {
+    background: #1a1a2e;
+    border-color: #6366f1;
+    color: #fff;
   }
 
   .options-section {

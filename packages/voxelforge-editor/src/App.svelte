@@ -28,16 +28,47 @@
   function handleTextureGenerated(texture: Uint32Array, params: unknown, materialId?: number) {
     console.log('Texture generated:', { texture, params, materialId });
     // TODO: Apply texture to material in palette
+    // For now, just show success message
+    alert(`Texture generated successfully! Size: ${Math.sqrt(texture.length)}px`);
   }
 
   function handleObjectGenerated(data: Uint16Array, width: number, height: number, depth: number, blueprint: unknown) {
     console.log('Object generated:', { data, width, height, depth, blueprint });
-    // TODO: Create new layer with object
+    
+    // Create a new voxel layer with the generated object
+    const blueprintObj = blueprint as { name?: string };
+    const layerId = documentStore.addVoxelLayerWithData(
+      data,
+      width,
+      height,
+      depth,
+      blueprintObj?.name ?? 'AI Object'
+    );
+    
+    // Switch to 3D view mode to see the result
+    documentStore.setViewMode('3d');
+    console.log('Created voxel layer:', layerId);
   }
 
   function handleScenarioGenerated(terrain: Uint16Array, width: number, height: number, depth: number, layout: unknown) {
     console.log('Scenario generated:', { terrain, width, height, depth, layout });
-    // TODO: Create new document/layers with scenario
+    
+    // Create a new document with the scenario dimensions
+    const layoutObj = layout as { name?: string };
+    documentStore.newDocument(width, height, depth, layoutObj?.name ?? 'AI Scenario');
+    
+    // Add the terrain as a voxel layer
+    documentStore.addVoxelLayerWithData(
+      terrain,
+      width,
+      height,
+      depth,
+      'Terrain'
+    );
+    
+    // Switch to 3D view mode
+    documentStore.setViewMode('3d');
+    console.log('Created scenario with terrain layer');
   }
 </script>
 
