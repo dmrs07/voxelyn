@@ -1,0 +1,124 @@
+/**
+ * @voxelyn/ai - Premium AI Module
+ *
+ * Generate textures, objects, and scenarios using Google Gemini.
+ * Hybrid AI + Procedural approach: AI predicts parameters, procedural generators build content.
+ *
+ * @example
+ * ```ts
+ * import { createGeminiClient, generateTextureFromParams } from '@voxelyn/ai';
+ *
+ * // Initialize client with your API key
+ * const client = createGeminiClient({ apiKey: 'your-gemini-api-key' });
+ *
+ * // Generate texture for a material
+ * const result = await client.predictTextureParams('rusty metal with scratches');
+ * if (result.success) {
+ *   const texture = generateTextureFromParams(result.data, 32, 32);
+ *   // texture is Uint32Array of RGBA8888 pixels
+ * }
+ *
+ * // Generate an object
+ * const objResult = await client.predictObjectBlueprint('small wooden barrel');
+ * if (objResult.success) {
+ *   const voxels = buildVoxelsFromBlueprint(objResult.data);
+ *   // voxels.data is Uint16Array of material IDs
+ * }
+ *
+ * // Generate a scenario
+ * const sceneResult = await client.predictScenarioLayout('forest with river and village');
+ * if (sceneResult.success) {
+ *   const scene = buildScenarioFromLayout(sceneResult.data);
+ *   // scene.terrain, scene.objects, scene.heightmap
+ * }
+ * ```
+ *
+ * @packageDocumentation
+ */
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type {
+  // Core types
+  TextureParams,
+  TextureBaseType,
+  NoiseConfig,
+  TextureEffects,
+  ColorVariation,
+  ObjectBlueprint,
+  Primitive,
+  PrimitiveType,
+  ScenarioLayout,
+  BiomeRegion,
+  BiomeType,
+  ObjectPlacement,
+  HeightmapParams,
+  // API types
+  GenerationType,
+  AIGenerationResult,
+  AIClientConfig,
+  AIGeneratedParams,
+} from './types';
+
+export {
+  DEFAULT_TEXTURE_PARAMS,
+  DEFAULT_OBJECT_BLUEPRINT,
+  DEFAULT_SCENARIO_LAYOUT,
+} from './types';
+
+// ============================================================================
+// CLIENT
+// ============================================================================
+
+export {
+  createGeminiClient,
+  type GeminiClient,
+  type TextureGenerationOptions,
+  type ObjectGenerationOptions,
+  type ScenarioGenerationOptions,
+} from './gemini-client';
+
+// ============================================================================
+// GENERATORS
+// ============================================================================
+
+export {
+  generateTextureFromParams,
+  generateTexturePreview,
+  makeTileable,
+} from './generators/texture-gen';
+
+export {
+  buildVoxelsFromBlueprint,
+  estimateVoxelCount,
+  getVoxelSlice,
+  type VoxelBuildResult,
+  type BuildOptions,
+} from './generators/object-interpreter';
+
+export {
+  buildScenarioFromLayout,
+  getScenarioPreview,
+  getScenarioStats,
+  type ScenarioBuildResult,
+  type PlacedObject,
+  type ScenarioBuildOptions,
+} from './generators/scenario-gen';
+
+// ============================================================================
+// PROMPTS (for advanced users who want to customize)
+// ============================================================================
+
+export {
+  TEXTURE_SYSTEM_PROMPT,
+  OBJECT_SYSTEM_PROMPT,
+  SCENARIO_SYSTEM_PROMPT,
+  buildTexturePrompt,
+  buildObjectPrompt,
+  buildScenarioPrompt,
+  validateTextureParams,
+  validateObjectBlueprint,
+  validateScenarioLayout,
+} from './prompts/templates';

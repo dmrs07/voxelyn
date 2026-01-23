@@ -8,17 +8,68 @@
   import LayersPanel from './components/LayersPanel.svelte';
   import PalettePanel from './components/PalettePanel.svelte';
   import StatusBar from './components/StatusBar.svelte';
-  import { uiStore } from '$lib/stores';
-  import { Cube } from 'phosphor-svelte';
+  import AIGeneratorPanel from './components/AIGeneratorPanel.svelte';
+  import { uiStore, documentStore, palette } from '$lib/stores';
+  import { Cube, Sparkle } from 'phosphor-svelte';
 
   const VERSION = __APP_VERSION__;
   
-  let panels = $state({ tools: true, layers: true, palette: true, simulation: false });
+  let panels = $state({ tools: true, layers: true, palette: true, simulation: false, ai: false });
   uiStore.panels.subscribe((value) => (panels = value));
+
+  let currentPalette = $state<import('@voxelyn/core').Material[]>([]);
+  palette.subscribe((value) => (currentPalette = value));
 
   const togglePanel = (id: keyof typeof panels) => {
     uiStore.panels.toggle(id);
   };
+
+  // AI Generation handlers
+  function handleTextureGenerated(texture: Uint32Array, params: unknown, materialId?: number) {
+    console.log('Texture generated:', { texture, params, materialId });
+    // TODO: Apply texture to material in palette
+    // For now, just show success message
+    alert(`Texture generated successfully! Size: ${Math.sqrt(texture.length)}px`);
+  }
+
+  function handleObjectGenerated(data: Uint16Array, width: number, height: number, depth: number, blueprint: unknown) {
+    console.log('Object generated:', { data, width, height, depth, blueprint });
+    
+    // Create a new voxel layer with the generated object
+    const blueprintObj = blueprint as { name?: string };
+    const layerId = documentStore.addVoxelLayerWithData(
+      data,
+      width,
+      height,
+      depth,
+      blueprintObj?.name ?? 'AI Object'
+    );
+    
+    // Switch to 3D view mode to see the result
+    documentStore.setViewMode('3d');
+    console.log('Created voxel layer:', layerId);
+  }
+
+  function handleScenarioGenerated(terrain: Uint16Array, width: number, height: number, depth: number, layout: unknown) {
+    console.log('Scenario generated:', { terrain, width, height, depth, layout });
+    
+    // Create a new document with the scenario dimensions
+    const layoutObj = layout as { name?: string };
+    documentStore.newDocument(width, height, depth, layoutObj?.name ?? 'AI Scenario');
+    
+    // Add the terrain as a voxel layer
+    documentStore.addVoxelLayerWithData(
+      terrain,
+      width,
+      height,
+      depth,
+      'Terrain'
+    );
+    
+    // Switch to 3D view mode
+    documentStore.setViewMode('3d');
+    console.log('Created scenario with terrain layer');
+  }
 </script>
 
 <div class="app">
@@ -35,12 +86,16 @@
       <button class:active={panels.tools} onclick={() => togglePanel('tools')}>Tools</button>
       <button class:active={panels.layers} onclick={() => togglePanel('layers')}>Layers</button>
       <button class:active={panels.palette} onclick={() => togglePanel('palette')}>Palette</button>
+      <button class="ai-toggle" class:active={panels.ai} onclick={() => togglePanel('ai')}>
+        <Sparkle size={12} weight="fill" />
+        AI
+      </button>
     </div>
   </header>
   
   <main
     class="workspace"
-    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette) ? '400px' : '0px'}`}
+    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette || panels.ai) ? '400px' : '0px'}`}
   >
     <aside class="left-sidebar" class:collapsed={!panels.tools}>
       {#if panels.tools}
@@ -52,7 +107,15 @@
       <Canvas />
     </section>
     
-    <aside class="right-sidebar" class:collapsed={!panels.layers && !panels.palette}>
+    <aside class="right-sidebar" class:collapsed={!panels.layers && !panels.palette && !panels.ai}>
+      {#if panels.ai}
+        <AIGeneratorPanel 
+          palette={currentPalette}
+          onTextureGenerated={handleTextureGenerated}
+          onObjectGenerated={handleObjectGenerated}
+          onScenarioGenerated={handleScenarioGenerated}
+        />
+      {/if}
       {#if panels.layers}
         <LayersPanel />
       {/if}
@@ -147,6 +210,20 @@
     background: #2b2b54;
     color: #fff;
     border-color: #4a4a8e;
+  }
+
+  .panel-toggles .ai-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, #1a1a2e, #2a2a4e);
+    border-color: #6366f1;
+  }
+
+  .panel-toggles .ai-toggle.active {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border-color: #8b5cf6;
   }
   
   .workspace {

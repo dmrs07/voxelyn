@@ -1,0 +1,42 @@
+{
+  "name": "@voxelyn/ai",
+  "version": "0.1.0",
+  "description": "Premium AI module for Voxelyn - Generate textures, objects, and scenarios with Gemini",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@voxelyn/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "keywords": [
+    "voxel",
+    "ai",
+    "gemini",
+    "procedural-generation",
+    "texture",
+    "game-dev"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "@voxelyn/core": ">=0.1.0"
+  }
+}

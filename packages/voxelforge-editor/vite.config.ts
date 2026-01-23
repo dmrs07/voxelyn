@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,6 +16,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '$lib': `${__dirname}/src/lib`,
+      '@voxelyn/ai': resolve(__dirname, '../voxelyn-ai/src/index.ts'),
+      '@voxelyn/core': resolve(__dirname, '../voxelyn-core/src/index.ts'),
     },
     conditions: ['browser', 'import', 'module', 'default'],
   },
