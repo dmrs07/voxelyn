@@ -3,8 +3,11 @@
  */
 
 import type { ToolSettings } from './stores';
-import type { EditorDocument, GridLayer, LayerId } from './document/types';
+import type { EditorDocument, GridLayer, VoxelLayer, LayerId } from './document/types';
 import type { PaintData } from './document/commands';
+
+/** A layer that can be painted on (2D grid or 3D voxel) */
+export type PaintableLayer = GridLayer | VoxelLayer;
 
 /** Context passed to tools */
 export type ToolContext = {
@@ -117,7 +120,7 @@ export const floodFill = (
   return points;
 };
 
-/** Creates paint data from points */
+/** Creates paint data from points for Grid2D layers */
 export const createPaintDataFromPoints = (
   layerId: LayerId,
   layer: GridLayer,
@@ -143,6 +146,53 @@ export const createPaintDataFromPoints = (
   }
   
   return { layerId, pixels };
+};
+
+/** Creates paint data from points for Voxel3D layers at a specific Z level */
+export const createPaintDataFromPointsVoxel = (
+  layerId: LayerId,
+  layer: VoxelLayer,
+  points: GridPoint[],
+  z: number,
+  newMaterial: number
+): PaintData => {
+  const pixels: PaintData['pixels'] = [];
+  const seen = new Set<number>();
+  const { width, height, depth } = layer;
+  
+  if (z < 0 || z >= depth) return { layerId, pixels };
+  
+  for (const { x, y } of points) {
+    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+    
+    // Voxel index: x + y * width + z * width * height
+    const index = x + y * width + z * width * height;
+    if (seen.has(index)) continue;
+    seen.add(index);
+    
+    const oldValue = layer.data[index];
+    const newValue = newMaterial & 0xffff;
+    
+    if (oldValue !== newValue) {
+      pixels.push({ index, oldValue, newValue });
+    }
+  }
+  
+  return { layerId, pixels };
+};
+
+/** Creates paint data from points - auto-detects layer type */
+export const createPaintDataForLayer = (
+  layerId: LayerId,
+  layer: PaintableLayer,
+  points: GridPoint[],
+  newMaterial: number,
+  z = 0
+): PaintData => {
+  if (layer.type === 'voxel3d') {
+    return createPaintDataFromPointsVoxel(layerId, layer, points, z, newMaterial);
+  }
+  return createPaintDataFromPoints(layerId, layer, points, newMaterial);
 };
 
 /** Get points for a rectangle (outline or filled) */

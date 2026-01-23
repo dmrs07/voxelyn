@@ -3,7 +3,7 @@
  */
 
 import { createSurface2D } from '@voxelyn/core';
-import type { EditorDocument, GridLayer, LayerId, BlendMode } from '../document/types';
+import type { EditorDocument, GridLayer, VoxelLayer, LayerId, BlendMode } from '../document/types';
 
 const unpack = (color: number) => ({
   r: color & 0xff,
@@ -73,31 +73,72 @@ export const renderDocumentToSurface = (
   const sortedLayers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
   
   for (const layer of sortedLayers) {
-    if (!layer.visible || layer.type !== 'grid2d') continue;
-    const grid = layer as GridLayer;
+    if (!layer.visible) continue;
     const opacity = Math.max(0, Math.min(1, layer.opacity));
     const blendMode = layer.blendMode ?? 'normal';
 
-    for (let y = 0; y < grid.height; y += 1) {
-      const rowOffset = y * grid.width;
-      const surfaceOffset = y * surface.width;
-      for (let x = 0; x < grid.width; x += 1) {
-        const index = rowOffset + x;
-        let cell = grid.data[index];
+    // Handle Grid2D layers
+    if (layer.type === 'grid2d') {
+      const grid = layer as GridLayer;
 
-        if (layer.id === activeLayerId && pendingMap.has(index)) {
-          cell = pendingMap.get(index) ?? cell;
+      for (let y = 0; y < grid.height; y += 1) {
+        const rowOffset = y * grid.width;
+        const surfaceOffset = y * surface.width;
+        for (let x = 0; x < grid.width; x += 1) {
+          const index = rowOffset + x;
+          let cell = grid.data[index];
+
+          if (layer.id === activeLayerId && pendingMap.has(index)) {
+            cell = pendingMap.get(index) ?? cell;
+          }
+
+          const mat = cell & 0xff;
+          if (mat === 0) continue;
+
+          const material = doc.palette[mat];
+          if (!material) continue;
+
+          const srcColor = material.color >>> 0;
+          const dstColor = pixels[surfaceOffset + x] ?? 0;
+          pixels[surfaceOffset + x] = blend(dstColor, srcColor, opacity, blendMode);
         }
+      }
+    }
 
-        const mat = cell & 0xff;
-        if (mat === 0) continue;
+    // Handle Voxel3D layers - project top-down view (highest non-air voxel per column)
+    if (layer.type === 'voxel3d') {
+      const voxel = layer as VoxelLayer;
+      const vw = voxel.width;
+      const vh = voxel.height;
+      const vd = voxel.depth;
 
-        const material = doc.palette[mat];
-        if (!material) continue;
+      for (let y = 0; y < vh && y < surface.height; y++) {
+        for (let x = 0; x < vw && x < surface.width; x++) {
+          // Find topmost non-air voxel
+          for (let z = vd - 1; z >= 0; z--) {
+            const voxelIndex = x + y * vw + z * vw * vh;
+            const mat = voxel.data[voxelIndex] ?? 0;
+            if (mat === 0) continue;
 
-        const srcColor = material.color >>> 0;
-        const dstColor = pixels[surfaceOffset + x] ?? 0;
-        pixels[surfaceOffset + x] = blend(dstColor, srcColor, opacity, blendMode);
+            const material = doc.palette[mat];
+            if (!material) break;
+
+            // Apply depth shading (higher = brighter)
+            const depthFactor = 0.6 + (z / vd) * 0.4;
+            const c = unpack(material.color);
+            const shadedColor = pack(
+              Math.round(c.r * depthFactor),
+              Math.round(c.g * depthFactor),
+              Math.round(c.b * depthFactor),
+              c.a
+            ) >>> 0;
+
+            const surfaceIndex = y * surface.width + x;
+            const dstColor = pixels[surfaceIndex] ?? 0;
+            pixels[surfaceIndex] = blend(dstColor, shadedColor, opacity, blendMode);
+            break;
+          }
+        }
       }
     }
   }

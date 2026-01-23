@@ -564,6 +564,7 @@ const createToolStore = () => {
   });
   const primaryMaterial = writable<number>(1); // Stone
   const secondaryMaterial = writable<number>(0); // Air
+  const activeZ = writable<number>(0); // Current Z level for voxel editing
   
   return {
     activeTool: {
@@ -582,6 +583,20 @@ const createToolStore = () => {
     secondaryMaterial: {
       subscribe: secondaryMaterial.subscribe,
       set: secondaryMaterial.set,
+    },
+    activeZ: {
+      subscribe: activeZ.subscribe,
+      set: activeZ.set,
+    },
+    
+    /** Set active Z level with bounds */
+    setActiveZ: (z: number, maxDepth = 64) => {
+      activeZ.set(Math.max(0, Math.min(maxDepth - 1, z)));
+    },
+    
+    /** Step Z level up or down */
+    stepActiveZ: (delta: number, maxDepth = 64) => {
+      activeZ.update(z => Math.max(0, Math.min(maxDepth - 1, z + delta)));
     },
     
     /** Swap primary and secondary materials */

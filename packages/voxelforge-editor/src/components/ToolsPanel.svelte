@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { toolStore, type ToolId, type ToolSettings } from '$lib/stores';
+  import { toolStore, activeLayer, documentStore, type ToolId, type ToolSettings } from '$lib/stores';
   import {
     PencilSimple,
     Eraser,
@@ -12,19 +12,33 @@
     Rectangle,
     Circle,
     Minus,
-    Plus
+    Plus,
+    Stack
   } from 'phosphor-svelte';
+  import type { VoxelLayer } from '$lib/document/types';
   
   let activeTool = $state<ToolId>('pencil');
   let brushSize = $state(1);
   let brushShape = $state<ToolSettings['brushShape']>('square');
   let shapeFilled = $state(false);
+  let activeZ = $state(0);
+  let isVoxelLayer = $state(false);
+  let maxDepth = $state(32);
   
   toolStore.activeTool.subscribe((t: ToolId) => activeTool = t);
   toolStore.settings.subscribe((s: ToolSettings) => {
     brushSize = s.brushSize;
     brushShape = s.brushShape;
     shapeFilled = s.shapeFilled;
+  });
+  toolStore.activeZ.subscribe((z: number) => activeZ = z);
+  
+  // Track if current layer is a voxel layer
+  activeLayer.subscribe(layer => {
+    isVoxelLayer = layer?.type === 'voxel3d';
+    if (layer?.type === 'voxel3d') {
+      maxDepth = (layer as VoxelLayer).depth;
+    }
   });
   
   const tools: Array<{ id: ToolId; icon: typeof PencilSimple; label: string; key: string }> = [
@@ -117,6 +131,34 @@
       Filled Shapes (F)
     </label>
   </div>
+
+  {#if isVoxelLayer}
+    <div class="divider"></div>
+    
+    <div class="z-level-settings">
+      <label>
+        <Stack size={16} weight="bold" /> Z Level: {activeZ}
+        <div class="z-controls">
+          <button onclick={() => toolStore.stepActiveZ(-1, maxDepth)} disabled={activeZ <= 0}>
+            <Minus size={14} weight="bold" />
+          </button>
+          <input 
+            type="range" 
+            min="0" 
+            max={maxDepth - 1}
+            value={activeZ}
+            oninput={(e) => toolStore.setActiveZ(parseInt(e.currentTarget.value), maxDepth)}
+          />
+          <button onclick={() => toolStore.stepActiveZ(1, maxDepth)} disabled={activeZ >= maxDepth - 1}>
+            <Plus size={14} weight="bold" />
+          </button>
+        </div>
+      </label>
+      <div class="z-info">
+        Editing at height {activeZ} of {maxDepth}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -241,5 +283,59 @@
 
   .fill-toggle input {
     accent-color: #6a6aae;
+  }
+
+  .z-level-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .z-level-settings label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #9aa0b2;
+  }
+
+  .z-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  
+  .z-controls button {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .z-controls button:hover:not(:disabled) {
+    background: #2a2a4e;
+  }
+  
+  .z-controls button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  .z-controls input[type="range"] {
+    flex: 1;
+    accent-color: #6a6aae;
+  }
+
+  .z-info {
+    font-size: 10px;
+    color: #666;
+    text-align: center;
   }
 </style>

@@ -10,10 +10,11 @@
   import { createWebglRenderer, type WebglRenderer } from '$lib/render/webgl-renderer';
   import { projectIso } from '@voxelyn/core';
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cube, Minus, Plus } from 'phosphor-svelte';
-  import type { GridLayer, EditorDocument, Selection, BlendMode } from '$lib/document/types';
+  import type { GridLayer, VoxelLayer, EditorDocument, Selection, BlendMode, Layer } from '$lib/document/types';
   import { createRectSelection } from '$lib/document/types';
   import { mergeSelection, type SelectionOp } from '$lib/document/selection';
   import type { ToolId, ToolSettings } from '$lib/stores';
+  import type { PaintableLayer } from '$lib/tools';
 
   let canvas: HTMLCanvasElement;
   let webglCanvas: HTMLCanvasElement;
@@ -42,7 +43,8 @@
   let settings: ToolSettings = get(toolStore.settings);
   let primaryMat: number = get(toolStore.primaryMaterial);
   let secondaryMat: number = get(toolStore.secondaryMaterial);
-  let layer: GridLayer | null = get(activeLayer) as GridLayer | null;
+  let activeZ: number = get(toolStore.activeZ);
+  let layer: PaintableLayer | null = get(activeLayer) as PaintableLayer | null;
   let showGrid: boolean = get(uiStore.showGrid);
   let gridStep: number = get(uiStore.gridStep);
   let cursorPosition: { x: number; y: number } | null = get(uiStore.cursorPosition);
@@ -176,6 +178,7 @@
   const buildToolContext = (): ToolContext => ({
     doc,
     layer,
+    activeZ,
     settings,
     primaryMaterial: primaryMat,
     secondaryMaterial: secondaryMat,
@@ -1158,7 +1161,8 @@
       toolStore.settings.subscribe(s => { settings = s; }),
       toolStore.primaryMaterial.subscribe(m => { primaryMat = m; }),
       toolStore.secondaryMaterial.subscribe(m => { secondaryMat = m; }),
-      activeLayer.subscribe(l => { layer = l as GridLayer | null; }),
+      toolStore.activeZ.subscribe(z => { activeZ = z; }),
+      activeLayer.subscribe(l => { layer = l as PaintableLayer | null; }),
       uiStore.showGrid.subscribe(g => { showGrid = g; invalidateRender(); render(); }),
       uiStore.gridStep.subscribe(step => { gridStep = step; invalidateRender(); render(); }),
       uiStore.cursorPosition.subscribe(pos => { cursorPosition = pos; }),

@@ -3,8 +3,8 @@
  * Renders Grid2D layers as isometric tiles with configurable height and z-index
  */
 
-import { projectIso, forEachIsoOrder, type DrawCommand, sortDrawCommands, makeDrawKey } from '@voxelyn/core';
-import type { EditorDocument, GridLayer, Material, Layer, BlendMode } from '../document/types';
+import { projectIso, forEachIsoOrder } from '@voxelyn/core';
+import type { EditorDocument, GridLayer, VoxelLayer, Material, Layer, BlendMode } from '../document/types';
 
 /** Height mode presets for isometric rendering */
 export type IsoHeightMode = 
@@ -22,6 +22,7 @@ export type IsoSettings = {
   heightMode: IsoHeightMode; // How to calculate material height
   baselineZ: number;       // Baseline Z for the grid (default 0)
   lightDir: { x: number; y: number; z: number }; // Light direction for shading
+  voxelZScale: number;     // Z scale multiplier for voxel layers (default 1)
 };
 
 const DEFAULT_ISO_SETTINGS: IsoSettings = {
@@ -32,6 +33,7 @@ const DEFAULT_ISO_SETTINGS: IsoSettings = {
   heightMode: 'density',
   baselineZ: 0,
   lightDir: { x: -0.5, y: -0.5, z: 1 },
+  voxelZScale: 1,
 };
 
 export const ISO_DEFAULTS = DEFAULT_ISO_SETTINGS;
@@ -193,15 +195,11 @@ export const renderDocumentIso = (
   ctx.scale(camera.zoom, camera.zoom);
   ctx.translate(centerX / camera.zoom, centerY / camera.zoom);
   
-  // Collect all draw commands from all layers
-  const commands: DrawCommand[] = [];
-  
   // Sort layers by zIndex (lowest first = drawn first = behind)
   const sortedLayers = sortLayersByZIndex(doc.layers);
   
   for (const layer of sortedLayers) {
-    if (!layer.visible || layer.type !== 'grid2d') continue;
-    const grid = layer as GridLayer;
+    if (!layer.visible) continue;
     
     // Layer's base Z position (from zIndex + isoHeight)
     // zIndex acts as a multiplier for layer stacking
@@ -210,59 +208,165 @@ export const renderDocumentIso = (
     const layerPixelOffset = layer.isoHeight;
     const layerOpacity = layer.opacity;
     const layerBlendMode = layer.blendMode ?? 'normal';
-    
-    forEachIsoOrder(grid.width, grid.height, (x: number, y: number) => {
-      const idx = y * grid.width + x;
-      const cell = grid.data[idx];
-      const mat = cell & 0xff;
+
+    // Handle Grid2D layers - draw directly in iso order (no closures for performance)
+    if (layer.type === 'grid2d') {
+      const grid = layer as GridLayer;
       
-      if (mat === 0) return;
-      
-      const material = doc.palette[mat];
-      if (!material) return;
-      
-      const materialHeight = getMaterialHeight(material, opts);
-      const totalZ = layerBaseZ + materialHeight;
-      
-      // Project to screen (including layer's pixel offset)
-      const { sx, sy: baseSy } = projectIso(x, y, totalZ, tileW, tileH, zStep);
-      const sy = baseSy - layerPixelOffset;
-      
-      // Create draw command with proper sort key
-      // Key includes layer zIndex for proper inter-layer sorting
-      // Higher zIndex = drawn later = in front
-      const key = makeDrawKey(x, y, Math.floor(totalZ + layer.zIndex * 100), layer.zIndex + 128);
-      
-      commands.push({
-        key,
-        draw: () => {
-          ctx.globalAlpha = layerOpacity;
-          ctx.globalCompositeOperation = getCompositeOperation(layerBlendMode);
-          
-          // Draw walls if height > 0
-          if (materialHeight > 0) {
-            const wallPixelHeight = materialHeight * zStep / opts.defaultHeight * 4;
-            drawIsoWalls(ctx, sx, sy, tileW, tileH, wallPixelHeight, material.color, lightDir);
-          }
-          
-          // Draw top face (brightest)
-          const topBrightness = 0.9 + 0.1 * lightDir.z;
-          drawIsoTile(ctx, sx, sy, tileW, tileH, shadeColor(material.color, topBrightness));
-        },
+      ctx.globalAlpha = layerOpacity;
+      ctx.globalCompositeOperation = getCompositeOperation(layerBlendMode);
+
+      forEachIsoOrder(grid.width, grid.height, (x: number, y: number) => {
+        const idx = y * grid.width + x;
+        const cell = grid.data[idx];
+        const mat = cell & 0xff;
+        
+        if (mat === 0) return;
+        
+        const material = doc.palette[mat];
+        if (!material) return;
+        
+        const materialHeight = getMaterialHeight(material, opts);
+        const totalZ = layerBaseZ + materialHeight;
+        
+        // Project to screen (including layer's pixel offset)
+        const { sx, sy: baseSy } = projectIso(x, y, totalZ, tileW, tileH, zStep);
+        const sy = baseSy - layerPixelOffset;
+        
+        // Draw walls if height > 0
+        if (materialHeight > 0) {
+          const wallPixelHeight = materialHeight * zStep;
+          drawIsoWalls(ctx, sx, sy, tileW, tileH, wallPixelHeight, material.color, lightDir);
+        }
+        
+        // Draw top face (brightest)
+        const topBrightness = 0.9 + 0.1 * lightDir.z;
+        drawIsoTile(ctx, sx, sy, tileW, tileH, shadeColor(material.color, topBrightness));
       });
-    });
+    }
+
+    // Handle Voxel3D layers - render with occlusion culling for performance
+    if (layer.type === 'voxel3d') {
+      const voxel = layer as VoxelLayer;
+      const vw = voxel.width;
+      const vh = voxel.height;
+      const vd = voxel.depth;
+      const voxelZScale = opts.voxelZScale;
+
+      // Helper to check if voxel exists at position
+      const hasVoxel = (x: number, y: number, z: number): boolean => {
+        if (x < 0 || x >= vw || y < 0 || y >= vh || z < 0 || z >= vd) return false;
+        const idx = x + y * vw + z * vw * vh;
+        return (voxel.data[idx] ?? 0) !== 0;
+      };
+
+      // Pre-calculate visible voxels (only those with at least one exposed face)
+      const visibleVoxels: Array<{ x: number; y: number; z: number; mat: number; showTop: boolean; showLeft: boolean; showRight: boolean }> = [];
+
+      for (let z = 0; z < vd; z++) {
+        for (let y = 0; y < vh; y++) {
+          for (let x = 0; x < vw; x++) {
+            const voxelIndex = x + y * vw + z * vw * vh;
+            const mat = voxel.data[voxelIndex] ?? 0;
+            if (mat === 0) continue;
+
+            // Check which faces are visible (not occluded by adjacent voxels)
+            // In isometric view, camera looks from (+X,+Y,+Z) toward origin
+            // Visible faces are those pointing TOWARD camera:
+            // - Top face (+Z normal): blocked by voxel above (z+1)
+            // - Left wall (+Y normal): blocked by voxel in front-left (y+1)
+            // - Right wall (+X normal): blocked by voxel in front-right (x+1)
+            const showTop = !hasVoxel(x, y, z + 1);
+            const showLeft = !hasVoxel(x, y + 1, z);
+            const showRight = !hasVoxel(x + 1, y, z);
+
+            // Only add if at least one face is visible
+            if (showTop || showLeft || showRight) {
+              visibleVoxels.push({ x, y, z, mat, showTop, showLeft, showRight });
+            }
+          }
+        }
+      }
+
+      // Sort by isometric depth (back to front)
+      // For correct isometric rendering:
+      // 1. Lower Z layers drawn first (bottom to top)
+      // 2. Within same Z, lower (x+y) drawn first (back to front diagonal)
+      // 3. Tie-breaker: y - x for left-right ordering
+      visibleVoxels.sort((a, b) => {
+        // Primary: Z layer (bottom to top)
+        if (a.z !== b.z) return a.z - b.z;
+        
+        // Secondary: diagonal depth (back to front)
+        const diagA = a.x + a.y;
+        const diagB = b.x + b.y;
+        if (diagA !== diagB) return diagA - diagB;
+        
+        // Tertiary: left-right ordering
+        return a.x - b.x;
+      });
+
+      // Draw all visible voxels directly (no closure allocation)
+      ctx.globalAlpha = layerOpacity;
+      ctx.globalCompositeOperation = getCompositeOperation(layerBlendMode);
+
+      for (const v of visibleVoxels) {
+        const material = doc.palette[v.mat];
+        if (!material) continue;
+
+        // Project the TOP of the voxel (z + 1 level)
+        const voxelTopZ = layerBaseZ + (v.z + 1) * voxelZScale;
+        const { sx, sy: baseSy } = projectIso(v.x, v.y, voxelTopZ, tileW, tileH, zStep);
+        const sy = baseSy - layerPixelOffset;
+
+        const wallPixelHeight = zStep * voxelZScale;
+        const hw = tileW / 2;
+        const hh = tileH / 2;
+
+        // Draw left wall if visible (goes DOWN from top face)
+        if (v.showLeft) {
+          const leftBrightness = 0.5 + 0.15 * lightDir.x;
+          ctx.fillStyle = shadeColor(material.color, leftBrightness);
+          ctx.beginPath();
+          ctx.moveTo(sx - hw, sy);           // top-left of top face
+          ctx.lineTo(sx, sy + hh);           // bottom-center of top face
+          ctx.lineTo(sx, sy + hh + wallPixelHeight);  // bottom of wall
+          ctx.lineTo(sx - hw, sy + wallPixelHeight);  // left bottom of wall
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Draw right wall if visible (goes DOWN from top face)
+        if (v.showRight) {
+          const rightBrightness = 0.65 + 0.15 * lightDir.y;
+          ctx.fillStyle = shadeColor(material.color, rightBrightness);
+          ctx.beginPath();
+          ctx.moveTo(sx + hw, sy);           // top-right of top face
+          ctx.lineTo(sx, sy + hh);           // bottom-center of top face
+          ctx.lineTo(sx, sy + hh + wallPixelHeight);  // bottom of wall
+          ctx.lineTo(sx + hw, sy + wallPixelHeight);  // right bottom of wall
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Draw top face if visible
+        if (v.showTop) {
+          const topBrightness = 0.9 + 0.1 * lightDir.z;
+          ctx.fillStyle = shadeColor(material.color, topBrightness);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - hh);           // top vertex
+          ctx.lineTo(sx + hw, sy);           // right vertex
+          ctx.lineTo(sx, sy + hh);           // bottom vertex
+          ctx.lineTo(sx - hw, sy);           // left vertex
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
   }
   
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
-  
-  // Sort and execute draw commands
-  sortDrawCommands(commands);
-  for (const cmd of commands) {
-    cmd.draw();
-  }
-  
-  ctx.globalAlpha = 1;
   
   // Draw grid lines (optional, at baseline)
   if (showGrid && camera.zoom >= 0.5) {
