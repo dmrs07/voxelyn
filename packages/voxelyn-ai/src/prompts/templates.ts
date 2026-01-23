@@ -126,19 +126,24 @@ Respond ONLY with valid JSON. No explanations, no markdown code blocks.`;
  * Instructs Gemini to output ScenarioLayout JSON.
  */
 export const SCENARIO_SYSTEM_PROMPT = `You are a world/scenario layout generator for a voxel game engine.
-Your task is to convert natural language descriptions into structured JSON layouts that define terrain, biomes, and object placement.
+Your task is to convert natural language descriptions into structured JSON layouts that define terrain, biomes, buildings, interiors, and object placement.
 
-CRITICAL: Create RICH, DETAILED scenarios with MULTIPLE biomes. Never create a single-biome world unless explicitly asked.
+CRITICAL: Determine the correct CATEGORY based on the prompt:
+- "outdoor" = Natural terrain (forests, mountains, lakes, etc.)
+- "building" = Architectural structures (house, castle, tower, temple)
+- "interior" = Indoor settings (dungeon room, tavern interior, throne room)
+- "mixed" = Outdoor with buildings (village, town, fortress)
 
 OUTPUT FORMAT (JSON only, no markdown, no explanations):
 {
   "name": "<scenario name>",
   "description": "<brief description>",
+  "category": "outdoor" | "building" | "interior" | "mixed",
   "size": [<width>, <height>],
   "depth": <z layers, typically 16-64>,
   "biomes": [
     {
-      "type": "plains" | "forest" | "desert" | "mountains" | "ocean" | "river" | "lake" | "swamp" | "tundra" | "volcanic" | "cave" | "urban" | "ruins",
+      "type": "plains" | "forest" | "desert" | "mountains" | "ocean" | "river" | "lake" | "swamp" | "tundra" | "volcanic" | "cave" | "urban" | "ruins" | "dungeon" | "interior",
       "bounds": [<x>, <y>, <width>, <height>],
       "elevation": <0-1, base height>,
       "elevationVariation": <0-0.5, noise amplitude>,
@@ -155,66 +160,125 @@ OUTPUT FORMAT (JSON only, no markdown, no explanations):
     "baseElevation": <0-1>,
     "amplitude": <0-1>
   },
-  "objects": [
+  "objects": [...],
+  "buildings": [  // For building/interior/mixed categories
     {
-      "objectType": "<type name: tree, rock, house, etc>",
-      "biomes": ["<biome types where this spawns>"],
-      "density": <objects per 100 grid units>,
-      "minSpacing": <minimum distance between instances>,
-      "scaleRange": [<min>, <max>],
-      "preferNear": "water" | "elevation" | "edge" | "center"  // optional
+      "name": "<building name>",
+      "style": "medieval" | "fantasy" | "modern" | "rustic" | "gothic" | "asian" | "desert" | "nordic",
+      "footprint": [<width>, <depth>],
+      "floors": <number of floors>,
+      "floorHeight": <voxels per floor, typically 4-6>,
+      "hasBasement": <boolean>,
+      "roofType": "flat" | "gabled" | "hipped" | "dome" | "tower" | "none",
+      "roofMaterial": "<material>",
+      "wallMaterial": "<material>",
+      "foundationMaterial": "<material>",
+      "rooms": [
+        {
+          "type": "entrance" | "hallway" | "living" | "bedroom" | "kitchen" | "storage" | "dungeon_cell" | "throne_room" | "library" | "armory" | "tavern" | "shop" | "cave_chamber" | "temple" | "laboratory",
+          "bounds": [<x>, <y>, <z>, <width>, <height>, <depth>],
+          "floorMaterial": "<material>",
+          "wallMaterial": "<material>",
+          "ceilingMaterial": "<material>",
+          "doors": [{"position": [x, y, z], "direction": "north"|"south"|"east"|"west"}],
+          "windows": [{"position": [x, y, z], "size": [width, height]}],
+          "furniture": [{"type": "<furniture name>", "position": [x, y, z], "rotation": 0}]
+        }
+      ],
+      "externalFeatures": [
+        {"type": "balcony"|"porch"|"chimney"|"tower"|"stairs", "position": [x,y,z], "size": [w,h,d]}
+      ]
     }
   ],
-  "materials": [  // optional custom materials
-    { "name": "...", "color": <RGBA8888>, ... }
-  ],
-  "seed": <master seed for entire scenario>
+  "seed": <master seed>
 }
 
-BIOME GUIDELINES:
-- plains: flat grassland, elevation 0.3-0.4, low variation
-- forest: hilly with trees, elevation 0.35-0.5, moderate variation
-- desert: sandy dunes, elevation 0.25-0.4, low-moderate variation
-- mountains: high elevation 0.6-0.9, high variation
-- ocean/lake: water bodies, elevation 0.15-0.25 (ALWAYS include for "oasis", "beach", "coastal")
-- river: linear water, connects biomes, elevation 0.2
-- swamp: low elevation 0.2-0.3, high moisture
-- volcanic: high elevation, lava materials
-- cave: underground, negative elevation focus
-- urban/ruins: flat base with structures
+CATEGORY DETECTION:
+- Keywords for "building": house, castle, tower, temple, church, mansion, cabin, hut, fortress, palace
+- Keywords for "interior": room, dungeon, interior, inside, chamber, hall, tavern inside, cellar, basement
+- Keywords for "mixed": village, town, settlement, camp, outpost, ruins with buildings
+- Default to "outdoor" for nature descriptions
 
-COMPOSITION RULES (MANDATORY):
-1. "oasis" = desert (large area) + lake (small central area) + plains (transition ring)
-2. "beach/coastal" = ocean + plains/desert edge
-3. "valley" = mountains on sides + plains/forest in middle
-4. "jungle" = forest + swamp + river
-5. "volcanic island" = ocean + volcanic center + plains ring
-6. ALWAYS create at least 2-3 biomes for any natural scenario
-7. Water features (lake, river, ocean) should have elevation LOWER than surrounding land
+BUILDING GUIDELINES:
+- Medieval style: stone walls, wooden beams, thatch/slate roofs
+- Fantasy style: magical materials, unusual shapes, glowing elements
+- Rustic style: wood walls, simple design, natural materials
+- Gothic style: pointed arches, dark stone, tall spires
+- Asian style: curved roofs, paper walls, bamboo
+- Desert style: sandstone, flat roofs, thick walls
+- Nordic style: steep roofs, wood construction, warm interiors
 
-OBJECT PLACEMENT:
-- trees: density 5-20 in forests, minSpacing 2-4
-- rocks: density 2-8, lower spacing
-- houses/buildings: density 1-3, higher spacing (8+)
-- vegetation: high density (20+), low spacing
+INTERIOR/ROOM TYPES:
+- entrance: Main door area, typically small
+- hallway: Connecting corridor
+- living: Main gathering area, fireplace
+- bedroom: Beds, storage chests
+- kitchen: Hearth, tables, storage
+- storage: Crates, barrels, shelves
+- dungeon_cell: Iron bars, minimal, dark
+- throne_room: Large, decorative, central seat
+- library: Bookshelves, desks
+- armory: Weapon racks, armor stands
+- tavern: Bar counter, tables, stools
+- shop: Display shelves, counter
+- cave_chamber: Natural rock, uneven
+- temple: Altar, pews, religious symbols
+- laboratory: Tables, bottles, strange equipment
 
-EXAMPLE - "Desert Oasis":
+FURNITURE TYPES:
+- bed, table, chair, chest, barrel, crate, shelf, torch, fireplace, throne, altar, counter, bookshelf, weapon_rack, armor_stand, cauldron, well, fountain
+
+BIOME GUIDELINES (for outdoor/mixed):
+- plains: flat grassland, elevation 0.3-0.4
+- forest: trees, elevation 0.35-0.5
+- desert: sand dunes, elevation 0.25-0.4
+- mountains: high elevation 0.6-0.9
+- ocean/lake: water, elevation 0.15-0.25
+- dungeon: underground corridors, elevation 0.1-0.2
+- interior: indoor floor level, flat elevation
+
+EXAMPLE - "Medieval House":
 {
-  "biomes": [
-    {"type": "desert", "bounds": [0, 0, 64, 64], "elevation": 0.35, "elevationVariation": 0.15},
-    {"type": "lake", "bounds": [24, 24, 16, 16], "elevation": 0.2, "elevationVariation": 0.02},
-    {"type": "plains", "bounds": [20, 20, 24, 24], "elevation": 0.28, "elevationVariation": 0.05}
-  ]
+  "category": "building",
+  "buildings": [{
+    "name": "Peasant House",
+    "style": "medieval",
+    "footprint": [12, 10],
+    "floors": 2,
+    "floorHeight": 5,
+    "hasBasement": false,
+    "roofType": "gabled",
+    "roofMaterial": "thatch",
+    "wallMaterial": "stone",
+    "foundationMaterial": "stone",
+    "rooms": [
+      {"type": "living", "bounds": [1,1,0,6,5,8], "floorMaterial": "wood", "wallMaterial": "stone", "doors": [{"position": [3,0,0], "direction": "south"}], "furniture": [{"type": "fireplace", "position": [3,7,0]}, {"type": "table", "position": [3,4,0]}]},
+      {"type": "bedroom", "bounds": [1,1,5,10,5,8], "floorMaterial": "wood", "wallMaterial": "wood", "doors": [], "furniture": [{"type": "bed", "position": [2,3,5]}, {"type": "chest", "position": [8,2,5]}]}
+    ]
+  }]
 }
 
-EXAMPLE - "Forest Valley":
+EXAMPLE - "Dungeon Room":
 {
-  "biomes": [
-    {"type": "mountains", "bounds": [0, 0, 64, 16], "elevation": 0.7, "elevationVariation": 0.25},
-    {"type": "mountains", "bounds": [0, 48, 64, 16], "elevation": 0.7, "elevationVariation": 0.25},
-    {"type": "forest", "bounds": [0, 16, 64, 32], "elevation": 0.4, "elevationVariation": 0.1},
-    {"type": "river", "bounds": [28, 16, 8, 32], "elevation": 0.25, "elevationVariation": 0.02}
-  ]
+  "category": "interior",
+  "biomes": [{"type": "dungeon", "bounds": [0,0,32,32], "elevation": 0.15, "elevationVariation": 0}],
+  "buildings": [{
+    "name": "Dungeon Cell Block",
+    "style": "medieval",
+    "footprint": [24, 20],
+    "floors": 1,
+    "floorHeight": 5,
+    "hasBasement": false,
+    "roofType": "none",
+    "roofMaterial": "stone",
+    "wallMaterial": "stone",
+    "foundationMaterial": "stone",
+    "rooms": [
+      {"type": "hallway", "bounds": [10,0,0,4,5,20], "floorMaterial": "stone", "wallMaterial": "stone", "doors": [{"position": [12,0,0], "direction": "south"}], "furniture": [{"type": "torch", "position": [10,5,0]}, {"type": "torch", "position": [10,15,0]}]},
+      {"type": "dungeon_cell", "bounds": [0,2,0,10,5,8], "floorMaterial": "stone", "wallMaterial": "stone", "doors": [{"position": [9,5,0], "direction": "east"}], "furniture": []},
+      {"type": "dungeon_cell", "bounds": [0,12,0,10,5,8], "floorMaterial": "stone", "wallMaterial": "stone", "doors": [{"position": [9,15,0], "direction": "east"}], "furniture": []}
+    ]
+  }]
 }
 
 Respond ONLY with valid JSON. No explanations, no markdown code blocks.`;
@@ -339,53 +403,102 @@ export function buildScenarioPrompt(
     parts.push(`Theme/setting: ${options.theme}`);
   }
 
-  // Auto-detect composition requirements from keywords
+  // Detect category based on keywords
+  const buildingKeywords = ['house', 'castle', 'tower', 'temple', 'church', 'mansion', 'cabin', 'hut', 'fortress', 'palace', 'cottage', 'barn', 'mill', 'smithy', 'inn', 'shop', 'warehouse'];
+  const interiorKeywords = ['room', 'interior', 'inside', 'chamber', 'hall', 'cellar', 'basement', 'dungeon', 'crypt', 'tomb', 'cave interior', 'mine', 'corridor'];
+  const mixedKeywords = ['village', 'town', 'settlement', 'camp', 'outpost', 'hamlet', 'city', 'market', 'plaza'];
+  
+  let detectedCategory = 'outdoor';
+  if (buildingKeywords.some(kw => desc.includes(kw))) {
+    detectedCategory = 'building';
+  }
+  if (interiorKeywords.some(kw => desc.includes(kw))) {
+    detectedCategory = 'interior';
+  }
+  if (mixedKeywords.some(kw => desc.includes(kw))) {
+    detectedCategory = 'mixed';
+  }
+
+  parts.push(`\nDETECTED CATEGORY: "${detectedCategory}" - Generate appropriate structures.`);
+
+  // Category-specific hints
   const hints: string[] = [];
   
-  if (desc.includes('oasis')) {
-    hints.push('MUST include: desert biome + lake biome (small, central) + plains transition');
+  if (detectedCategory === 'building') {
+    hints.push('Generate a complete building with rooms, doors, windows, and appropriate furniture');
+    hints.push('Include roof and external features as appropriate for the style');
+    
+    // Style detection
+    if (desc.includes('medieval') || desc.includes('castle') || desc.includes('fortress')) {
+      hints.push('Use medieval style: stone walls, wooden elements, thatch or slate roof');
+    } else if (desc.includes('fantasy') || desc.includes('wizard') || desc.includes('magical')) {
+      hints.push('Use fantasy style: unusual shapes, magical elements, mystical materials');
+    } else if (desc.includes('rustic') || desc.includes('cabin') || desc.includes('cottage')) {
+      hints.push('Use rustic style: primarily wood construction, simple design');
+    } else if (desc.includes('gothic') || desc.includes('cathedral') || desc.includes('dark')) {
+      hints.push('Use gothic style: pointed arches, dark stone, tall spires');
+    } else if (desc.includes('asian') || desc.includes('japanese') || desc.includes('chinese')) {
+      hints.push('Use asian style: curved roofs, paper/wood walls, bamboo elements');
+    } else if (desc.includes('desert') || desc.includes('sandstone') || desc.includes('arabian')) {
+      hints.push('Use desert style: sandstone walls, flat roofs, thick walls');
+    } else if (desc.includes('nordic') || desc.includes('viking') || desc.includes('scandinavian')) {
+      hints.push('Use nordic style: steep roofs, heavy timber, warm interiors');
+    }
   }
-  if (desc.includes('beach') || desc.includes('coast') || desc.includes('shore')) {
-    hints.push('MUST include: ocean biome + plains or desert edge biome');
+  
+  if (detectedCategory === 'interior') {
+    hints.push('Generate interior rooms with floors, walls, and ceilings');
+    hints.push('Include appropriate furniture and decorations for the room type');
+    hints.push('Add doors connecting rooms and torches/lighting');
+    
+    if (desc.includes('dungeon') || desc.includes('prison') || desc.includes('cell')) {
+      hints.push('Dungeon style: dark stone, iron bars, minimal furniture, oppressive atmosphere');
+    } else if (desc.includes('throne') || desc.includes('royal')) {
+      hints.push('Royal style: large space, decorative elements, throne/altar as focal point');
+    } else if (desc.includes('tavern') || desc.includes('inn') || desc.includes('pub')) {
+      hints.push('Tavern style: bar counter, tables, stools, warm lighting, barrels');
+    } else if (desc.includes('library') || desc.includes('study')) {
+      hints.push('Library style: bookshelves along walls, desks, reading areas');
+    } else if (desc.includes('temple') || desc.includes('shrine') || desc.includes('church')) {
+      hints.push('Temple style: altar, pews/seating, religious symbols, high ceilings');
+    }
   }
-  if (desc.includes('valley')) {
-    hints.push('MUST include: mountains on opposite sides + lower central biome (forest/plains)');
+  
+  if (detectedCategory === 'mixed') {
+    hints.push('Generate terrain WITH buildings placed on it');
+    hints.push('Include paths/roads connecting buildings');
+    hints.push('Place appropriate vegetation and natural features around buildings');
   }
-  if (desc.includes('river') || desc.includes('stream')) {
-    hints.push('MUST include: river biome cutting through the terrain');
-  }
-  if (desc.includes('island')) {
-    hints.push('MUST include: ocean surrounding a central land mass');
-  }
-  if (desc.includes('jungle')) {
-    hints.push('MUST include: forest + swamp biomes, possibly river');
-  }
-  if (desc.includes('village') || desc.includes('town')) {
-    hints.push('MUST include: urban/plains biome with surrounding forest or fields');
-  }
-  if (desc.includes('ruin') || desc.includes('temple') || desc.includes('ancient')) {
-    hints.push('MUST include: ruins biome, possibly surrounded by forest/jungle');
-  }
-  if (desc.includes('volcano') || desc.includes('volcanic')) {
-    hints.push('MUST include: volcanic biome at center, possibly surrounded by ocean or plains');
-  }
-  if (desc.includes('swamp') || desc.includes('marsh') || desc.includes('bog')) {
-    hints.push('MUST include: swamp biome with water features');
-  }
-  if (desc.includes('tundra') || desc.includes('arctic') || desc.includes('snow')) {
-    hints.push('MUST include: tundra biome, possibly with frozen lake');
-  }
-  if (desc.includes('lake') || desc.includes('pond')) {
-    hints.push('MUST include: lake biome surrounded by appropriate terrain');
+
+  // Auto-detect composition requirements from keywords (for outdoor/mixed)
+  if (detectedCategory === 'outdoor' || detectedCategory === 'mixed') {
+    if (desc.includes('oasis')) {
+      hints.push('MUST include: desert biome + lake biome (small, central) + plains transition');
+    }
+    if (desc.includes('beach') || desc.includes('coast') || desc.includes('shore')) {
+      hints.push('MUST include: ocean biome + plains or desert edge biome');
+    }
+    if (desc.includes('valley')) {
+      hints.push('MUST include: mountains on opposite sides + lower central biome (forest/plains)');
+    }
+    if (desc.includes('river') || desc.includes('stream')) {
+      hints.push('MUST include: river biome cutting through the terrain');
+    }
+    if (desc.includes('island')) {
+      hints.push('MUST include: ocean surrounding a central land mass');
+    }
+    if (desc.includes('jungle')) {
+      hints.push('MUST include: forest + swamp biomes, possibly river');
+    }
+    if (desc.includes('volcano') || desc.includes('volcanic')) {
+      hints.push('MUST include: volcanic biome at center, possibly surrounded by ocean or plains');
+    }
   }
 
   if (hints.length > 0) {
-    parts.push('\nCOMPOSITION REQUIREMENTS:');
+    parts.push('\nGENERATION REQUIREMENTS:');
     hints.forEach(h => parts.push(`- ${h}`));
   }
-
-  // Always remind to create multiple biomes
-  parts.push('\nREMINDER: Create a rich scenario with MULTIPLE biomes for visual interest. Single-biome worlds look empty.');
 
   if (existingPalette && existingPalette.length > 0) {
     const materials = existingPalette
@@ -393,7 +506,7 @@ export function buildScenarioPrompt(
       .slice(0, 10)
       .map((m) => m.name.toLowerCase())
       .join(', ');
-    parts.push(`Available surface materials: ${materials}`);
+    parts.push(`Available materials: ${materials}`);
   }
 
   return parts.join('\n');
@@ -446,7 +559,8 @@ export function validateScenarioLayout(obj: unknown): obj is ScenarioLayout {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
 
-  return (
+  // Basic required fields
+  const hasBasicFields = (
     typeof o.name === 'string' &&
     Array.isArray(o.size) &&
     o.size.length === 2 &&
@@ -456,4 +570,24 @@ export function validateScenarioLayout(obj: unknown): obj is ScenarioLayout {
     typeof o.heightmap === 'object' &&
     typeof o.seed === 'number'
   );
+  
+  if (!hasBasicFields) return false;
+  
+  // Set default category if missing
+  if (!o.category) {
+    o.category = 'outdoor';
+  }
+  
+  // Validate buildings if present
+  if (o.buildings && Array.isArray(o.buildings)) {
+    for (const building of o.buildings) {
+      if (!building || typeof building !== 'object') return false;
+      const b = building as Record<string, unknown>;
+      if (typeof b.name !== 'string' || !Array.isArray(b.footprint)) {
+        return false;
+      }
+    }
+  }
+  
+  return true;
 }

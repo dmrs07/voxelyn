@@ -539,7 +539,7 @@ export type HistoryInfo = {
 // Tool Store
 // ============================================================================
 
-export type ToolId = 'pencil' | 'eraser' | 'fill' | 'select' | 'pan' | 'eyedropper' | 'line' | 'rect' | 'ellipse' | 'wand';
+export type ToolId = 'pencil' | 'eraser' | 'fill' | 'select' | 'move' | 'pan' | 'eyedropper' | 'line' | 'rect' | 'ellipse' | 'wand';
 
 export type ToolSettings = {
   brushSize: number;

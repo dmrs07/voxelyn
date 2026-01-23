@@ -54,6 +54,9 @@ export type ToolContext = {
   setCameraByDelta: (dx: number, dy: number) => void;
   setPointerCapture: (pointerId: number) => void;
   releasePointerCapture: (pointerId: number) => void;
+  moveSelection: (dx: number, dy: number) => void;
+  rotateSelection: (angle: 90 | 180 | 270) => void;
+  flipSelection: (axis: 'horizontal' | 'vertical') => void;
   render: () => void;
 };
 
@@ -338,6 +341,78 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.state.selectionPreview = null;
       ctx.state.startPoint = null;
       ctx.state.currentPoint = null;
+    },
+  },
+  move: {
+    id: 'move',
+    name: 'Move',
+    cursor: 'move',
+    hotkey: 'v',
+    onPointerDown: (ctx, e) => {
+      if (!ctx.doc.selection?.active) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      ctx.state.startPoint = gridPos;
+      ctx.state.lastPoint = gridPos;
+      ctx.setPointerCapture(e.pointerId);
+      startDrawing(ctx, e);
+    },
+    onPointerMove: (ctx, e) => {
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ctx.doc.selection?.active) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      const dx = gridPos.x - ctx.state.lastPoint.x;
+      const dy = gridPos.y - ctx.state.lastPoint.y;
+      if (dx !== 0 || dy !== 0) {
+        ctx.moveSelection(dx, dy);
+        ctx.state.lastPoint = gridPos;
+        ctx.render();
+      }
+    },
+    onPointerUp: (ctx, e) => {
+      if (!ctx.state.isDrawing) return;
+      stopDrawing(ctx, e);
+      ctx.state.startPoint = null;
+      ctx.state.lastPoint = null;
+    },
+    onKeyDown: (ctx, e) => {
+      if (!ctx.doc.selection?.active) return;
+      // Arrow keys to nudge selection
+      const step = e.shiftKey ? 10 : 1;
+      switch (e.key) {
+        case 'ArrowUp': ctx.moveSelection(0, -step); ctx.render(); e.preventDefault(); break;
+        case 'ArrowDown': ctx.moveSelection(0, step); ctx.render(); e.preventDefault(); break;
+        case 'ArrowLeft': ctx.moveSelection(-step, 0); ctx.render(); e.preventDefault(); break;
+        case 'ArrowRight': ctx.moveSelection(step, 0); ctx.render(); e.preventDefault(); break;
+        // Rotation with [ and ] keys (Shift for opposite direction)
+        case '[':
+          ctx.rotateSelection(e.shiftKey ? 270 : 90);
+          ctx.render();
+          e.preventDefault();
+          break;
+        case ']':
+          ctx.rotateSelection(e.shiftKey ? 90 : 270);
+          ctx.render();
+          e.preventDefault();
+          break;
+        // Flip with \ key (backslash) - Shift for vertical
+        case '\\':
+          ctx.flipSelection(e.shiftKey ? 'vertical' : 'horizontal');
+          ctx.render();
+          e.preventDefault();
+          break;
+      }
+    },
+    renderOverlay: (ctx, overlay) => {
+      if (!ctx.doc.selection?.active) return;
+      const sel = ctx.doc.selection;
+      overlay.save();
+      overlay.strokeStyle = 'rgba(0, 200, 255, 0.8)';
+      overlay.lineWidth = 2 / ctx.doc.camera.zoom;
+      overlay.setLineDash([4, 4]);
+      overlay.strokeRect(sel.x, sel.y, sel.width, sel.height);
+      // Draw move handles
+      overlay.fillStyle = 'rgba(0, 200, 255, 0.5)';
+      overlay.fillRect(sel.x + sel.width / 2 - 3, sel.y + sel.height / 2 - 3, 6, 6);
+      overlay.restore();
     },
   },
   pan: {

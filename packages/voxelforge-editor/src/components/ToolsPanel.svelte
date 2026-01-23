@@ -13,7 +13,8 @@
     Circle,
     Minus,
     Plus,
-    Stack
+    Stack,
+    ArrowsOutCardinal
   } from 'phosphor-svelte';
   import type { VoxelLayer } from '$lib/document/types';
   
@@ -47,6 +48,7 @@
     { id: 'fill', icon: PaintBucket, label: 'Fill', key: 'G' },
     { id: 'eyedropper', icon: Eyedropper, label: 'Eyedropper', key: 'I' },
     { id: 'select', icon: Selection, label: 'Select', key: 'M' },
+    { id: 'move', icon: ArrowsOutCardinal, label: 'Move', key: 'V' },
     { id: 'wand', icon: MagicWand, label: 'Magic Wand', key: 'W' },
     { id: 'pan', icon: Hand, label: 'Pan', key: 'H' },
     { id: 'line', icon: LineSegment, label: 'Line', key: 'L' },

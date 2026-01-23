@@ -166,7 +166,7 @@ async function withRetry<T>(
 export function createGeminiClient(config: AIClientConfig): GeminiClient {
   const {
     apiKey,
-    model = 'gemini-2.0-flash',
+    model = 'gemini-2.0-flash', // Best free tier: 4K RPM, unlimited RPD
     maxRetries = 2,
     timeoutMs = 30000,
     debug = false,

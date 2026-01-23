@@ -12,7 +12,7 @@
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cube, Minus, Plus } from 'phosphor-svelte';
   import type { GridLayer, VoxelLayer, EditorDocument, Selection, BlendMode, Layer } from '$lib/document/types';
   import { createRectSelection } from '$lib/document/types';
-  import { mergeSelection, type SelectionOp } from '$lib/document/selection';
+  import { mergeSelection, translateSelection, rotateSelectionMask, flipSelectionMask, type SelectionOp } from '$lib/document/selection';
   import type { ToolId, ToolSettings } from '$lib/stores';
   import type { PaintableLayer } from '$lib/tools';
 
@@ -175,6 +175,254 @@
     return createRectSelection(x, y, width, height);
   };
 
+  /** Move selection and its contents by the given delta */
+  const moveSelection = (dx: number, dy: number): void => {
+    if (!layer || !doc.selection.active) return;
+
+    const sel = doc.selection;
+    const layerWidth = layer.type === 'voxel3d' ? layer.width : layer.width;
+    const layerHeight = layer.type === 'voxel3d' ? layer.height : layer.height;
+
+    // Collect pixels inside selection that need to move
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+    const srcPixels = new Map<number, number>(); // store source pixel values
+
+    // First pass: collect source pixels
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+
+        const srcX = sel.x + sx;
+        const srcY = sel.y + sy;
+        if (srcX < 0 || srcX >= layerWidth || srcY < 0 || srcY >= layerHeight) continue;
+
+        const srcIdx = srcY * layerWidth + srcX;
+        srcPixels.set(srcIdx, layer.data[srcIdx]);
+      }
+    }
+
+    // Second pass: create pixel changes (clear source, fill destination)
+    for (const [srcIdx, value] of srcPixels) {
+      const srcX = srcIdx % layerWidth;
+      const srcY = Math.floor(srcIdx / layerWidth);
+      const dstX = srcX + dx;
+      const dstY = srcY + dy;
+
+      // Clear source pixel
+      pixels.push({ index: srcIdx, oldValue: value, newValue: 0 });
+
+      // Set destination pixel if in bounds
+      if (dstX >= 0 && dstX < layerWidth && dstY >= 0 && dstY < layerHeight) {
+        const dstIdx = dstY * layerWidth + dstX;
+        // Don't overwrite if destination is also a source pixel (handled separately)
+        if (!srcPixels.has(dstIdx)) {
+          pixels.push({ index: dstIdx, oldValue: layer.data[dstIdx], newValue: value });
+        } else {
+          // Update the clear to the new value
+          const clearPixel = pixels.find(p => p.index === dstIdx);
+          if (clearPixel) clearPixel.newValue = value;
+        }
+      }
+    }
+
+    // Apply transform
+    const newSelection = translateSelection(sel, dx, dy, doc.width, doc.height);
+    documentStore.transform({
+      layerId: layer.id,
+      pixels,
+      selectionBefore: sel,
+      selectionAfter: newSelection,
+    });
+  };
+
+  /** Rotate selection contents by the given angle */
+  const rotateSelection = (angle: 90 | 180 | 270): void => {
+    if (!layer || !doc.selection.active) return;
+
+    const sel = doc.selection;
+    const layerWidth = layer.type === 'voxel3d' ? layer.width : layer.width;
+    const layerHeight = layer.type === 'voxel3d' ? layer.height : layer.height;
+
+    // Extract pixel values from selection area
+    const srcData = new Uint16Array(sel.width * sel.height);
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const srcX = sel.x + sx;
+        const srcY = sel.y + sy;
+        if (srcX >= 0 && srcX < layerWidth && srcY >= 0 && srcY < layerHeight) {
+          srcData[sy * sel.width + sx] = layer.data[srcY * layerWidth + srcX];
+        }
+      }
+    }
+
+    // Rotate the mask if present
+    const { mask: newMask, width: newSelW, height: newSelH } = sel.mask
+      ? rotateSelectionMask(sel.mask, sel.width, sel.height, angle)
+      : { mask: undefined, width: angle === 180 ? sel.width : sel.height, height: angle === 180 ? sel.height : sel.width };
+
+    // Rotate the pixel data
+    const rotatedData = new Uint16Array(newSelW * newSelH);
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const srcIdx = sy * sel.width + sx;
+        let dstX: number;
+        let dstY: number;
+
+        if (angle === 90) {
+          dstX = sel.height - 1 - sy;
+          dstY = sx;
+        } else if (angle === 180) {
+          dstX = sel.width - 1 - sx;
+          dstY = sel.height - 1 - sy;
+        } else {
+          // 270
+          dstX = sy;
+          dstY = sel.width - 1 - sx;
+        }
+
+        const dstIdx = dstY * newSelW + dstX;
+        rotatedData[dstIdx] = srcData[srcIdx];
+      }
+    }
+
+    // Calculate new selection position (centered on old center)
+    const oldCenterX = sel.x + sel.width / 2;
+    const oldCenterY = sel.y + sel.height / 2;
+    const newX = Math.round(oldCenterX - newSelW / 2);
+    const newY = Math.round(oldCenterY - newSelH / 2);
+
+    // Build pixel changes
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+
+    // Clear old selection area
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+        const srcX = sel.x + sx;
+        const srcY = sel.y + sy;
+        if (srcX >= 0 && srcX < layerWidth && srcY >= 0 && srcY < layerHeight) {
+          const idx = srcY * layerWidth + srcX;
+          pixels.push({ index: idx, oldValue: layer.data[idx], newValue: 0 });
+        }
+      }
+    }
+
+    // Set new rotated data
+    for (let dy = 0; dy < newSelH; dy += 1) {
+      for (let dx = 0; dx < newSelW; dx += 1) {
+        const inMask = newMask ? newMask[dy * newSelW + dx] > 0 : true;
+        if (!inMask) continue;
+        const dstX = newX + dx;
+        const dstY = newY + dy;
+        if (dstX >= 0 && dstX < layerWidth && dstY >= 0 && dstY < layerHeight) {
+          const idx = dstY * layerWidth + dstX;
+          const value = rotatedData[dy * newSelW + dx];
+          // Check if already in pixels list
+          const existing = pixels.find(p => p.index === idx);
+          if (existing) {
+            existing.newValue = value;
+          } else {
+            pixels.push({ index: idx, oldValue: layer.data[idx], newValue: value });
+          }
+        }
+      }
+    }
+
+    const newSelection: Selection = {
+      active: true,
+      x: newX,
+      y: newY,
+      width: newSelW,
+      height: newSelH,
+      mask: newMask,
+    };
+
+    documentStore.transform({
+      layerId: layer.id,
+      pixels,
+      selectionBefore: sel,
+      selectionAfter: newSelection,
+    });
+  };
+
+  /** Flip selection contents horizontally or vertically */
+  const flipSelection = (axis: 'horizontal' | 'vertical'): void => {
+    if (!layer || !doc.selection.active) return;
+
+    const sel = doc.selection;
+    const layerWidth = layer.type === 'voxel3d' ? layer.width : layer.width;
+    const layerHeight = layer.type === 'voxel3d' ? layer.height : layer.height;
+
+    // Extract pixel values from selection area
+    const srcData = new Uint16Array(sel.width * sel.height);
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const srcX = sel.x + sx;
+        const srcY = sel.y + sy;
+        if (srcX >= 0 && srcX < layerWidth && srcY >= 0 && srcY < layerHeight) {
+          srcData[sy * sel.width + sx] = layer.data[srcY * layerWidth + srcX];
+        }
+      }
+    }
+
+    // Flip the mask if present
+    const newMask = sel.mask
+      ? flipSelectionMask(sel.mask, sel.width, sel.height, axis)
+      : undefined;
+
+    // Flip the pixel data
+    const flippedData = new Uint16Array(sel.width * sel.height);
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const srcIdx = sy * sel.width + sx;
+        let dstX: number;
+        let dstY: number;
+
+        if (axis === 'horizontal') {
+          dstX = sel.width - 1 - sx;
+          dstY = sy;
+        } else {
+          dstX = sx;
+          dstY = sel.height - 1 - sy;
+        }
+
+        const dstIdx = dstY * sel.width + dstX;
+        flippedData[dstIdx] = srcData[srcIdx];
+      }
+    }
+
+    // Build pixel changes (in-place flip, selection position stays same)
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+
+    for (let sy = 0; sy < sel.height; sy += 1) {
+      for (let sx = 0; sx < sel.width; sx += 1) {
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+        const dstX = sel.x + sx;
+        const dstY = sel.y + sy;
+        if (dstX >= 0 && dstX < layerWidth && dstY >= 0 && dstY < layerHeight) {
+          const idx = dstY * layerWidth + dstX;
+          const newValue = flippedData[sy * sel.width + sx];
+          pixels.push({ index: idx, oldValue: layer.data[idx], newValue });
+        }
+      }
+    }
+
+    const newSelection: Selection = {
+      ...sel,
+      mask: newMask,
+    };
+
+    documentStore.transform({
+      layerId: layer.id,
+      pixels,
+      selectionBefore: sel,
+      selectionAfter: newSelection,
+    });
+  };
+
   const buildToolContext = (): ToolContext => ({
     doc,
     layer,
@@ -201,6 +449,9 @@
     setPointerCapture: (pointerId) => canvas.setPointerCapture(pointerId),
     releasePointerCapture: (pointerId) => canvas.releasePointerCapture(pointerId),
     render,
+    moveSelection,
+    rotateSelection,
+    flipSelection,
   });
 
   const handlePointerDown = (e: PointerEvent) => {
