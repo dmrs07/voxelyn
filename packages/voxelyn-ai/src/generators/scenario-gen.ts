@@ -1565,7 +1565,8 @@ function buildBuildings(
     // Get ground height at building location
     const centerIdx = buildingY * width + buildingX;
     const groundH = heightmap[centerIdx] ?? 0.3;
-    const groundZ = Math.floor(groundH * depth);
+    // Clamp groundZ to valid range [0, depth-1] to avoid out-of-bounds when groundH === 1.0
+    const groundZ = Math.min(Math.floor(groundH * depth), depth - 1);
 
     // Clear area for building first
     for (let dy = 0; dy < fh; dy++) {
