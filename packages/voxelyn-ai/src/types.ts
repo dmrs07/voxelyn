@@ -208,7 +208,111 @@ export type BiomeType =
   | 'volcanic'
   | 'cave'
   | 'urban'
-  | 'ruins';
+  | 'ruins'
+  | 'dungeon'
+  | 'interior';
+
+/**
+ * Scenario category determines generation style.
+ */
+export type ScenarioCategory = 
+  | 'outdoor'      // Natural terrain with biomes
+  | 'building'     // Architectural structure (house, castle, tower)
+  | 'interior'     // Indoor setting (room, dungeon, cave interior)
+  | 'mixed';       // Combination (village with interiors)
+
+/**
+ * Building style for architectural generation.
+ */
+export type BuildingStyle =
+  | 'medieval'
+  | 'fantasy'
+  | 'modern'
+  | 'rustic'
+  | 'gothic'
+  | 'asian'
+  | 'desert'
+  | 'nordic';
+
+/**
+ * Room type for interior generation.
+ */
+export type RoomType =
+  | 'entrance'
+  | 'hallway'
+  | 'living'
+  | 'bedroom'
+  | 'kitchen'
+  | 'storage'
+  | 'dungeon_cell'
+  | 'throne_room'
+  | 'library'
+  | 'armory'
+  | 'tavern'
+  | 'shop'
+  | 'cave_chamber'
+  | 'temple'
+  | 'laboratory';
+
+/**
+ * A room definition for interior generation.
+ */
+export type RoomDefinition = {
+  /** Room type/purpose. */
+  type: RoomType;
+  /** Room bounds [x, y, z, width, height, depth]. */
+  bounds: [number, number, number, number, number, number];
+  /** Floor material. */
+  floorMaterial: string;
+  /** Wall material. */
+  wallMaterial: string;
+  /** Ceiling material (optional, defaults to wall). */
+  ceilingMaterial?: string;
+  /** Door positions as [x, y, z, direction]. */
+  doors: Array<{ position: [number, number, number]; direction: 'north' | 'south' | 'east' | 'west' }>;
+  /** Window positions (optional). */
+  windows?: Array<{ position: [number, number, number]; size: [number, number] }>;
+  /** Furniture/props to place. */
+  furniture: Array<{
+    type: string;
+    position: [number, number, number];
+    rotation?: number;
+  }>;
+};
+
+/**
+ * Building definition for architectural generation.
+ */
+export type BuildingDefinition = {
+  /** Building name/type. */
+  name: string;
+  /** Building style. */
+  style: BuildingStyle;
+  /** Overall footprint [width, depth]. */
+  footprint: [number, number];
+  /** Number of floors (including ground). */
+  floors: number;
+  /** Floor height in voxels. */
+  floorHeight: number;
+  /** Has basement/cellar. */
+  hasBasement: boolean;
+  /** Roof type. */
+  roofType: 'flat' | 'gabled' | 'hipped' | 'dome' | 'tower' | 'none';
+  /** Roof material. */
+  roofMaterial: string;
+  /** Primary wall material. */
+  wallMaterial: string;
+  /** Foundation material. */
+  foundationMaterial: string;
+  /** Rooms on each floor. */
+  rooms: RoomDefinition[];
+  /** External features (balconies, porches). */
+  externalFeatures?: Array<{
+    type: 'balcony' | 'porch' | 'chimney' | 'tower' | 'stairs';
+    position: [number, number, number];
+    size: [number, number, number];
+  }>;
+};
 
 /**
  * A region in the scenario layout.
@@ -274,16 +378,20 @@ export type ScenarioLayout = {
   name: string;
   /** Brief description. */
   description: string;
+  /** Scenario category (outdoor, building, interior, mixed). */
+  category: ScenarioCategory;
   /** World size [width, height] in voxels. */
   size: [number, number];
   /** World depth (Z layers). */
   depth: number;
-  /** Biome regions that compose the world. */
+  /** Biome regions that compose the world (for outdoor/mixed). */
   biomes: BiomeRegion[];
   /** Heightmap generation parameters. */
   heightmap: HeightmapParams;
   /** Object placement rules. */
   objects: ObjectPlacement[];
+  /** Building definitions (for building/interior/mixed). */
+  buildings?: BuildingDefinition[];
   /** Custom material definitions for this scenario. */
   materials?: Partial<Material>[];
   /** User's original prompt. */
@@ -298,6 +406,7 @@ export type ScenarioLayout = {
 export const DEFAULT_SCENARIO_LAYOUT: ScenarioLayout = {
   name: 'Empty World',
   description: 'A flat empty world',
+  category: 'outdoor',
   size: [128, 128],
   depth: 32,
   biomes: [
@@ -351,8 +460,14 @@ export type AIGenerationResult<T> = {
 export type AIClientConfig = {
   /** Google Gemini API key. */
   apiKey: string;
-  /** Model to use (default: gemini-2.0-flash). */
-  model?: 'gemini-2.0-flash' | 'gemini-2.0-flash-lite' | 'gemini-1.5-pro' | 'gemini-pro';
+  /** Model to use (default: gemini-2.0-flash-lite - best free tier). */
+  model?: 
+    | 'gemini-2.0-flash-lite'  // 4K RPM, unlimited RPD - RECOMMENDED
+    | 'gemini-2.5-flash-lite'  // 4K RPM, unlimited RPD - newest
+    | 'gemini-2.0-flash'       // 2K RPM, unlimited RPD
+    | 'gemini-2.5-flash'       // 1K RPM, 10K RPD
+    | 'gemini-1.5-pro'
+    | 'gemini-pro';
   /** Maximum retries on failure. */
   maxRetries?: number;
   /** Request timeout in ms. */

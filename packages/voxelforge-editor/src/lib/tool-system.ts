@@ -3,12 +3,13 @@
  */
 
 import type { ToolId, ToolSettings } from './stores';
-import type { EditorDocument, GridLayer, Selection } from './document/types';
+import type { EditorDocument, GridLayer, VoxelLayer, Selection } from './document/types';
 import type { SelectionOp } from './document/selection';
-import type { GridPoint } from './tools';
+import type { GridPoint, PaintableLayer } from './tools';
 import {
   bresenhamLine,
   createPaintDataFromPoints,
+  createPaintDataForLayer,
   floodFill,
   getBrushPoints,
   getEllipsePoints,
@@ -34,7 +35,8 @@ export type ToolRuntimeState = {
 
 export type ToolContext = {
   doc: EditorDocument;
-  layer: GridLayer | null;
+  layer: PaintableLayer | null;
+  activeZ: number;  // Current Z level for voxel editing
   settings: ToolSettings;
   primaryMaterial: number;
   secondaryMaterial: number;
@@ -52,6 +54,9 @@ export type ToolContext = {
   setCameraByDelta: (dx: number, dy: number) => void;
   setPointerCapture: (pointerId: number) => void;
   releasePointerCapture: (pointerId: number) => void;
+  moveSelection: (dx: number, dy: number) => void;
+  rotateSelection: (angle: 90 | 180 | 270) => void;
+  flipSelection: (axis: 'horizontal' | 'vertical') => void;
   render: () => void;
 };
 
@@ -155,12 +160,20 @@ const renderBrushPreview = (ctx: ToolContext, overlay: CanvasRenderingContext2D)
   overlay.restore();
 };
 
-const ensureGridLayer = (layer: GridLayer | null): layer is GridLayer => {
+const ensureGridLayer = (layer: PaintableLayer | null): layer is GridLayer => {
   return Boolean(layer && layer.type === 'grid2d');
 };
 
-const ensureEditableGridLayer = (layer: GridLayer | null): layer is GridLayer => {
+const ensurePaintableLayer = (layer: PaintableLayer | null): layer is PaintableLayer => {
+  return Boolean(layer && (layer.type === 'grid2d' || layer.type === 'voxel3d'));
+};
+
+const ensureEditableGridLayer = (layer: PaintableLayer | null): layer is GridLayer => {
   return Boolean(layer && layer.type === 'grid2d' && !layer.locked);
+};
+
+const ensureEditableLayer = (layer: PaintableLayer | null): layer is PaintableLayer => {
+  return Boolean(layer && (layer.type === 'grid2d' || layer.type === 'voxel3d') && !layer.locked);
 };
 
 const startDrawing = (ctx: ToolContext, e: PointerEvent) => {
@@ -180,7 +193,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'b',
     onPointerDown: (ctx, e) => {
-      if (!ensureEditableGridLayer(ctx.layer)) return;
+      if (!ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -191,12 +204,12 @@ const tools: Record<ToolId, ToolDefinition> = {
       startDrawing(ctx, e);
 
       const points = getBrushPoints(gridPos.x, gridPos.y, ctx.settings.brushSize, ctx.settings.brushShape);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, mat);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, mat, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureEditableGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.buttons === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       const linePoints = bresenhamLine(ctx.state.lastPoint.x, ctx.state.lastPoint.y, gridPos.x, gridPos.y);
@@ -204,7 +217,7 @@ const tools: Record<ToolId, ToolDefinition> = {
       for (const lp of linePoints) {
         allPoints.push(...getBrushPoints(lp.x, lp.y, ctx.settings.brushSize, ctx.settings.brushShape));
       }
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, allPoints, mat);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, allPoints, mat, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.state.lastPoint = gridPos;
       ctx.render();
@@ -227,7 +240,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'e',
     onPointerDown: (ctx, e) => {
-      if (!ensureEditableGridLayer(ctx.layer)) return;
+      if (!ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentMaterial = 0;
       ctx.state.lastPoint = gridPos;
@@ -237,19 +250,19 @@ const tools: Record<ToolId, ToolDefinition> = {
       startDrawing(ctx, e);
 
       const points = getBrushPoints(gridPos.x, gridPos.y, ctx.settings.brushSize, ctx.settings.brushShape);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, 0);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, 0, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureEditableGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const linePoints = bresenhamLine(ctx.state.lastPoint.x, ctx.state.lastPoint.y, gridPos.x, gridPos.y);
       const allPoints: GridPoint[] = [];
       for (const lp of linePoints) {
         allPoints.push(...getBrushPoints(lp.x, lp.y, ctx.settings.brushSize, ctx.settings.brushShape));
       }
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, allPoints, 0);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, allPoints, 0, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.state.lastPoint = gridPos;
       ctx.render();
@@ -272,6 +285,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'g',
     onPointerDown: (ctx, e) => {
+      // Fill only works on Grid2D for now (flood fill needs 2D data)
       if (!ensureEditableGridLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
@@ -286,7 +300,7 @@ const tools: Record<ToolId, ToolDefinition> = {
         ctx.settings.tolerance
       );
       if (points.length === 0) return;
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, mat);
+      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer as GridLayer, points, mat);
       ctx.addPendingPixels(paintData.pixels);
       ctx.commitPendingPixels('fill');
     },
@@ -299,7 +313,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'm',
     onPointerDown: (ctx, e) => {
-      if (!ensureEditableGridLayer(ctx.layer)) return;
+      if (!ensurePaintableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.isSelecting = true;
       ctx.state.startPoint = gridPos;
@@ -327,6 +341,78 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.state.selectionPreview = null;
       ctx.state.startPoint = null;
       ctx.state.currentPoint = null;
+    },
+  },
+  move: {
+    id: 'move',
+    name: 'Move',
+    cursor: 'move',
+    hotkey: 'v',
+    onPointerDown: (ctx, e) => {
+      if (!ctx.doc.selection?.active) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      ctx.state.startPoint = gridPos;
+      ctx.state.lastPoint = gridPos;
+      ctx.setPointerCapture(e.pointerId);
+      startDrawing(ctx, e);
+    },
+    onPointerMove: (ctx, e) => {
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ctx.doc.selection?.active) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      const dx = gridPos.x - ctx.state.lastPoint.x;
+      const dy = gridPos.y - ctx.state.lastPoint.y;
+      if (dx !== 0 || dy !== 0) {
+        ctx.moveSelection(dx, dy);
+        ctx.state.lastPoint = gridPos;
+        ctx.render();
+      }
+    },
+    onPointerUp: (ctx, e) => {
+      if (!ctx.state.isDrawing) return;
+      stopDrawing(ctx, e);
+      ctx.state.startPoint = null;
+      ctx.state.lastPoint = null;
+    },
+    onKeyDown: (ctx, e) => {
+      if (!ctx.doc.selection?.active) return;
+      // Arrow keys to nudge selection
+      const step = e.shiftKey ? 10 : 1;
+      switch (e.key) {
+        case 'ArrowUp': ctx.moveSelection(0, -step); ctx.render(); e.preventDefault(); break;
+        case 'ArrowDown': ctx.moveSelection(0, step); ctx.render(); e.preventDefault(); break;
+        case 'ArrowLeft': ctx.moveSelection(-step, 0); ctx.render(); e.preventDefault(); break;
+        case 'ArrowRight': ctx.moveSelection(step, 0); ctx.render(); e.preventDefault(); break;
+        // Rotation with [ and ] keys (Shift for opposite direction)
+        case '[':
+          ctx.rotateSelection(e.shiftKey ? 270 : 90);
+          ctx.render();
+          e.preventDefault();
+          break;
+        case ']':
+          ctx.rotateSelection(e.shiftKey ? 90 : 270);
+          ctx.render();
+          e.preventDefault();
+          break;
+        // Flip with \ key (backslash) - Shift for vertical
+        case '\\':
+          ctx.flipSelection(e.shiftKey ? 'vertical' : 'horizontal');
+          ctx.render();
+          e.preventDefault();
+          break;
+      }
+    },
+    renderOverlay: (ctx, overlay) => {
+      if (!ctx.doc.selection?.active) return;
+      const sel = ctx.doc.selection;
+      overlay.save();
+      overlay.strokeStyle = 'rgba(0, 200, 255, 0.8)';
+      overlay.lineWidth = 2 / ctx.doc.camera.zoom;
+      overlay.setLineDash([4, 4]);
+      overlay.strokeRect(sel.x, sel.y, sel.width, sel.height);
+      // Draw move handles
+      overlay.fillStyle = 'rgba(0, 200, 255, 0.5)';
+      overlay.fillRect(sel.x + sel.width / 2 - 3, sel.y + sel.height / 2 - 3, 6, 6);
+      overlay.restore();
     },
   },
   pan: {
@@ -371,7 +457,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'l',
     onPointerDown: (ctx, e) => {
-      if (!ensureGridLayer(ctx.layer)) return;
+      if (!ensurePaintableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -380,17 +466,17 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.state.pendingPixels.clear();
       startDrawing(ctx, e);
       const points = buildShapePoints('line', gridPos, gridPos, ctx.settings, e.shiftKey);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, mat);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, mat, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentPoint = gridPos;
       ctx.state.pendingPixels.clear();
       const points = buildShapePoints('line', ctx.state.startPoint, gridPos, ctx.settings, e.shiftKey);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, ctx.state.currentMaterial);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, ctx.state.currentMaterial, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
@@ -408,7 +494,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'r',
     onPointerDown: (ctx, e) => {
-      if (!ensureEditableGridLayer(ctx.layer)) return;
+      if (!ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -417,17 +503,17 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.state.pendingPixels.clear();
       startDrawing(ctx, e);
       const points = buildShapePoints('rect', gridPos, gridPos, ctx.settings, e.shiftKey);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, mat);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, mat, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentPoint = gridPos;
       ctx.state.pendingPixels.clear();
       const points = buildShapePoints('rect', ctx.state.startPoint, gridPos, ctx.settings, e.shiftKey);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, ctx.state.currentMaterial);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, ctx.state.currentMaterial, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
@@ -445,7 +531,7 @@ const tools: Record<ToolId, ToolDefinition> = {
     cursor: 'crosshair',
     hotkey: 'o',
     onPointerDown: (ctx, e) => {
-      if (!ensureEditableGridLayer(ctx.layer)) return;
+      if (!ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const mat = e.button === 2 ? ctx.secondaryMaterial : ctx.primaryMaterial;
       ctx.state.currentMaterial = mat;
@@ -454,17 +540,17 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.state.pendingPixels.clear();
       startDrawing(ctx, e);
       const points = buildShapePoints('ellipse', gridPos, gridPos, ctx.settings, e.shiftKey);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, mat);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, mat, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableGridLayer(ctx.layer)) return;
+      if (!ctx.state.isDrawing || !ctx.state.startPoint || !ensureEditableLayer(ctx.layer)) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       ctx.state.currentPoint = gridPos;
       ctx.state.pendingPixels.clear();
       const points = buildShapePoints('ellipse', ctx.state.startPoint, gridPos, ctx.settings, e.shiftKey);
-      const paintData = createPaintDataFromPoints(ctx.layer.id, ctx.layer, points, ctx.state.currentMaterial);
+      const paintData = createPaintDataForLayer(ctx.layer.id, ctx.layer, points, ctx.state.currentMaterial, ctx.activeZ);
       ctx.addPendingPixels(paintData.pixels);
       ctx.render();
     },

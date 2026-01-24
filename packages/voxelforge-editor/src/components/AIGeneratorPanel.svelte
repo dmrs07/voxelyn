@@ -13,6 +13,7 @@
     CircleNotch
   } from 'phosphor-svelte';
   import {
+    createClient,
     createGeminiClient,
     generateTextureFromParams,
     buildVoxelsFromBlueprint,
@@ -21,7 +22,8 @@
     DEFAULT_TEXTURE_PARAMS,
   } from '@voxelyn/ai';
   import type {
-    GeminiClient,
+    LLMClient,
+    LLMProvider,
     TextureParams,
     ObjectBlueprint,
     ScenarioLayout,
@@ -87,8 +89,18 @@
   let textureCanvas: HTMLCanvasElement | null = $state(null);
   let scenarioCanvas: HTMLCanvasElement | null = $state(null);
 
+  // LLM Provider selection
+  let selectedProvider = $state<LLMProvider>('gemini');
+  const availableProviders: { id: LLMProvider; name: string; needsKey: boolean }[] = [
+    { id: 'gemini', name: 'Google Gemini', needsKey: true },
+    { id: 'openai', name: 'OpenAI', needsKey: true },
+    { id: 'anthropic', name: 'Anthropic Claude', needsKey: true },
+    { id: 'groq', name: 'Groq', needsKey: true },
+    { id: 'ollama', name: 'Ollama (Local)', needsKey: false },
+  ];
+
   // Client instance
-  let client: GeminiClient | null = null;
+  let client: LLMClient | null = null;
 
   // ============================================================================
   // Prompt Helpers & Suggestions
@@ -178,6 +190,25 @@
   // ============================================================================
 
   function initializeClient() {
+    const providerConfig = availableProviders.find(p => p.id === selectedProvider);
+    
+    // Ollama doesn't need an API key
+    if (selectedProvider === 'ollama') {
+      try {
+        client = createClient({
+          provider: 'ollama',
+          model: 'llama3.2',
+        });
+        apiKeyValid = true;
+        testConnection();
+      } catch (e) {
+        client = null;
+        apiKeyValid = false;
+        error = e instanceof Error ? e.message : 'Failed to initialize Ollama client';
+      }
+      return;
+    }
+
     if (!apiKey.trim()) {
       client = null;
       apiKeyValid = null;
@@ -185,11 +216,38 @@
     }
 
     try {
-      client = createGeminiClient({
-        apiKey: apiKey.trim(),
-        model: 'gemini-2.0-flash',
-        debug: true,
-      });
+      switch (selectedProvider) {
+        case 'gemini':
+          client = createClient({
+            provider: 'gemini',
+            apiKey: apiKey.trim(),
+            model: 'gemini-2.0-flash',
+          });
+          break;
+        case 'openai':
+          client = createClient({
+            provider: 'openai',
+            apiKey: apiKey.trim(),
+            model: 'gpt-4o-mini',
+          });
+          break;
+        case 'anthropic':
+          client = createClient({
+            provider: 'anthropic',
+            apiKey: apiKey.trim(),
+            model: 'claude-sonnet-4-20250514',
+          });
+          break;
+        case 'groq':
+          client = createClient({
+            provider: 'groq',
+            apiKey: apiKey.trim(),
+            model: 'llama-3.3-70b-versatile',
+          });
+          break;
+        default:
+          throw new Error(`Unknown provider: ${selectedProvider}`);
+      }
       testConnection();
     } catch (e) {
       client = null;
@@ -495,29 +553,68 @@
 
   <!-- API Key Section -->
   <section class="api-key-section">
+    <!-- Provider Selection -->
     <label>
-      <Key size={14} />
-      <span>Gemini API Key</span>
-      {#if apiKeyValid === true}
-        <Check size={14} class="valid" />
-      {:else if apiKeyValid === false}
-        <Warning size={14} class="invalid" />
-      {/if}
+      <Sparkle size={14} />
+      <span>LLM Provider</span>
     </label>
-    <div class="api-key-input">
-      <input
-        type={showApiKey ? 'text' : 'password'}
-        bind:value={apiKey}
-        onblur={handleApiKeyChange}
-        placeholder="Enter your API key..."
-      />
-      <button class="toggle-visibility" onclick={() => showApiKey = !showApiKey}>
-        {showApiKey ? 'Hide' : 'Show'}
-      </button>
-    </div>
-    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="api-link">
-      Get API key →
-    </a>
+    <select 
+      bind:value={selectedProvider} 
+      onchange={() => { apiKeyValid = null; initializeClient(); }}
+      class="provider-select"
+    >
+      {#each availableProviders as provider}
+        <option value={provider.id}>{provider.name}</option>
+      {/each}
+    </select>
+
+    <!-- API Key Input (conditionally shown) -->
+    {#if availableProviders.find(p => p.id === selectedProvider)?.needsKey}
+      <label>
+        <Key size={14} />
+        <span>{selectedProvider === 'gemini' ? 'Gemini' : selectedProvider === 'openai' ? 'OpenAI' : selectedProvider === 'anthropic' ? 'Anthropic' : 'Groq'} API Key</span>
+        {#if apiKeyValid === true}
+          <Check size={14} class="valid" />
+        {:else if apiKeyValid === false}
+          <Warning size={14} class="invalid" />
+        {/if}
+      </label>
+      <div class="api-key-input">
+        <input
+          type={showApiKey ? 'text' : 'password'}
+          bind:value={apiKey}
+          onblur={handleApiKeyChange}
+          placeholder="Enter your API key..."
+        />
+        <button class="toggle-visibility" onclick={() => showApiKey = !showApiKey}>
+          {showApiKey ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      {#if selectedProvider === 'gemini'}
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="api-link">
+          Get Gemini API key →
+        </a>
+      {:else if selectedProvider === 'openai'}
+        <a href="https://platform.openai.com/api-keys" target="_blank" class="api-link">
+          Get OpenAI API key →
+        </a>
+      {:else if selectedProvider === 'anthropic'}
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" class="api-link">
+          Get Anthropic API key →
+        </a>
+      {:else if selectedProvider === 'groq'}
+        <a href="https://console.groq.com/keys" target="_blank" class="api-link">
+          Get Groq API key →
+        </a>
+      {/if}
+    {:else}
+      <div class="ollama-info">
+        <span>Ollama runs locally. Make sure it's running on port 11434.</span>
+        <a href="https://ollama.ai" target="_blank" class="api-link">
+          Install Ollama →
+        </a>
+      </div>
+    {/if}
   </section>
 
   <!-- Tabs -->
@@ -825,6 +922,32 @@
 
   .api-key-section label :global(.invalid) {
     color: #ef4444;
+  }
+
+  .provider-select {
+    padding: 6px 10px;
+    background: #12121a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+
+  .provider-select:hover {
+    border-color: #6366f1;
+  }
+
+  .ollama-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: #12121a;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #888;
   }
 
   .api-key-input {

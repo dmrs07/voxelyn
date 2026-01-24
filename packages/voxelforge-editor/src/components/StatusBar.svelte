@@ -1,6 +1,6 @@
 <script lang="ts">
   import { get } from 'svelte/store';
-  import { documentStore, uiStore, type HistoryInfo } from '$lib/stores';
+  import { documentStore, uiStore, toolStore, type HistoryInfo, type ToolId } from '$lib/stores';
   import type { EditorDocument } from '$lib/document/types';
   import {
     Folder,
@@ -12,7 +12,9 @@
     ArrowClockwise,
     MagnifyingGlassMinus,
     MagnifyingGlassPlus,
-    GridFour
+    GridFour,
+    Info,
+    PaintBrush
   } from 'phosphor-svelte';
   
   let doc = $state<EditorDocument>(get(documentStore));
@@ -22,6 +24,8 @@
   let showFileMenu = $state(false);
   let showGrid = $state(true);
   let gridStep = $state(1);
+  let activeTool = $state<ToolId>('pencil');
+  let showTextures = $state(false);
   
   documentStore.subscribe((d: EditorDocument) => doc = d);
   documentStore.history.subscribe((h: HistoryInfo) => {
@@ -31,6 +35,31 @@
   uiStore.cursorPosition.subscribe(p => cursorPos = p);
   uiStore.showGrid.subscribe(v => showGrid = v);
   uiStore.gridStep.subscribe(v => gridStep = v);
+  toolStore.activeTool.subscribe((t: ToolId) => activeTool = t);
+  uiStore.showTextures.subscribe(v => showTextures = v);
+
+  // Contextual help hints based on current state
+  const getContextHint = (): string => {
+    if (doc.viewMode === '3d') {
+      return 'Ctrl+Click: add voxel | Shift+Click: remove | Drag: orbit | Right drag: pan';
+    }
+    if (doc.viewMode === 'iso') {
+      return 'Ghost voxel shows placement position | Use tools to edit the grid';
+    }
+    switch (activeTool) {
+      case 'select': return 'Draw to select | Shift: add | Alt: subtract | Ctrl: intersect';
+      case 'move': return 'Drag selection to move | Arrow keys: nudge | [ ]: rotate | \\: flip';
+      case 'pencil': return 'Click: draw | [ ]: brush size | Right click: secondary color';
+      case 'eraser': return 'Click to erase | [ ]: brush size';
+      case 'fill': return 'Click to flood fill area';
+      case 'line': return 'Drag to draw line | Shift: snap to axis';
+      case 'rect': return 'Drag to draw rectangle | Shift: square | F: toggle fill';
+      case 'ellipse': return 'Drag to draw ellipse | Shift: circle | F: toggle fill';
+      case 'wand': return 'Click to select similar pixels | Shift: add to selection';
+      case 'eyedropper': return 'Click to pick color | Hold Alt with any tool';
+      default: return '';
+    }
+  };
   
   const zoomLevels = [12.5, 25, 50, 100, 200, 400, 800];
   
@@ -132,6 +161,13 @@
         onclick={() => setViewMode('3d')}
       >3D</button>
     </div>
+    
+    {#if getContextHint()}
+      <span class="context-hint">
+        <Info size={12} weight="fill" />
+        {getContextHint()}
+      </span>
+    {/if}
   </div>
   
   <div class="right">
@@ -142,6 +178,15 @@
         title="Toggle grid"
       ><GridFour size={14} weight="fill" /> Grid</button>
       <button onclick={cycleGridStep} title="Grid density">Step {gridStep}×</button>
+    </div>
+    
+    <div class="texture-toggle">
+      <button
+        class:active={showTextures}
+        onclick={() => uiStore.showTextures.toggle()}
+        title="Toggle procedural textures (ISO/3D views)"
+        disabled={doc.viewMode === '2d'}
+      ><PaintBrush size={14} weight="fill" /> Textures</button>
     </div>
 
     <span class="divider"></span>
@@ -174,10 +219,33 @@
     color: #888;
   }
   
-  .left, .center, .right {
+  .left {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .center {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .context-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #6a6aae;
+    background: #252538;
+    padding: 4px 10px;
+    border-radius: 4px;
+    max-width: 450px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .right {
@@ -275,6 +343,42 @@
 
   .grid-controls button.active {
     background: #4a4a8e;
+  }
+
+  .texture-toggle {
+    display: flex;
+    align-items: center;
+  }
+
+  .texture-toggle button {
+    height: 20px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 3px;
+    background: #252538;
+    color: #fff;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .texture-toggle button.active {
+    background: #6a4a9e;
+  }
+
+  .texture-toggle button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .texture-toggle button:hover:not(:disabled) {
+    background: #3a3a5e;
+  }
+
+  .texture-toggle button.active:hover {
+    background: #7a5aae;
   }
   
   .zoom-controls button {

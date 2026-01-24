@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { toolStore, activeLayer, documentStore, type ToolId, type ToolSettings } from '$lib/stores';
   import { get } from 'svelte/store';
-  import { toolStore, documentStore, type ToolId, type ToolSettings } from '$lib/stores';
   import {
     generateTerrainFromSpec,
     type TerrainGenSpec,
@@ -26,21 +26,44 @@
     Rectangle,
     Circle,
     Minus,
-    Plus
+    Plus,
+    Stack,
+    ArrowsOutCardinal,
+    PaintRoller,
+    Trash
   } from 'phosphor-svelte';
+  import type { VoxelLayer, GridLayer } from '$lib/document/types';
   
   let activeTool = $state<ToolId>('pencil');
   let brushSize = $state(1);
   let brushShape = $state<ToolSettings['brushShape']>('square');
   let shapeFilled = $state(false);
-  let isGenerating = $state(false);
-  let lastMetrics = $state<{ durationMs: number; pixels: number; usedImage: boolean } | null>(null);
+  let activeZ = $state(0);
+  let isVoxelLayer = $state(false);
+  let maxDepth = $state(32);
+  let hasSelection = $state(false);
+  let primaryMat = $state(1);
   
   toolStore.activeTool.subscribe((t: ToolId) => activeTool = t);
   toolStore.settings.subscribe((s: ToolSettings) => {
     brushSize = s.brushSize;
     brushShape = s.brushShape;
     shapeFilled = s.shapeFilled;
+  });
+  toolStore.activeZ.subscribe((z: number) => activeZ = z);
+  toolStore.primaryMaterial.subscribe((m: number) => primaryMat = m);
+  
+  // Track if current layer is a voxel layer
+  activeLayer.subscribe(layer => {
+    isVoxelLayer = layer?.type === 'voxel3d';
+    if (layer?.type === 'voxel3d') {
+      maxDepth = (layer as VoxelLayer).depth;
+    }
+  });
+
+  // Track selection state
+  documentStore.subscribe(doc => {
+    hasSelection = doc.selection?.active && doc.selection.width > 0 && doc.selection.height > 0;
   });
   
   const tools: Array<{ id: ToolId; icon: typeof PencilSimple; label: string; key: string }> = [
@@ -49,6 +72,7 @@
     { id: 'fill', icon: PaintBucket, label: 'Fill', key: 'G' },
     { id: 'eyedropper', icon: Eyedropper, label: 'Eyedropper', key: 'I' },
     { id: 'select', icon: Selection, label: 'Select', key: 'M' },
+    { id: 'move', icon: ArrowsOutCardinal, label: 'Move', key: 'V' },
     { id: 'wand', icon: MagicWand, label: 'Magic Wand', key: 'W' },
     { id: 'pan', icon: Hand, label: 'Pan', key: 'H' },
     { id: 'line', icon: LineSegment, label: 'Line', key: 'L' },
@@ -68,125 +92,92 @@
     toolStore.setBrushShape(shape);
   };
 
-  const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-
-  const pickConditioningImage = (): Promise<File | null> => {
-    return new Promise((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (event) => {
-        const file = (event.target as HTMLInputElement).files?.[0] ?? null;
-        resolve(file);
-      };
-      input.oncancel = () => resolve(null);
-      input.click();
-    });
-  };
-
-  const resolvePaletteIndex = (palette: Array<{ name: string }>, name: string): number => {
-    const index = palette.findIndex((mat) => mat.name.toLowerCase() === name.toLowerCase());
-    return index >= 0 ? index : 1;
-  };
-
-  const resolveMaterialIndex = (
-    spec: TerrainGenSpec,
-    palette: Array<{ name: string }>,
-    height: number,
-    biomeIndex: number
-  ): number => {
-    const biome = spec.biomes[biomeIndex];
-    const layers = spec.layers.filter((layer) => layer.biomeId === biome?.id);
-    const matchingLayer = layers.find(
-      (layer) => height >= layer.minHeight && height <= layer.maxHeight
-    );
-    if (matchingLayer) {
-      return resolvePaletteIndex(palette, matchingLayer.materialId);
-    }
-    if (biome?.materialIds?.length) {
-      return resolvePaletteIndex(palette, biome.materialIds[0]);
-    }
-    return 1;
-  };
-
-  const applyTerrainResult = (
-    spec: TerrainGenSpec,
-    result: TerrainGenResult
-  ) => {
+  // Fill selection with current material
+  const fillSelection = () => {
     const doc = get(documentStore);
-    const layer = doc.layers.find((entry) => entry.id === doc.activeLayerId);
-    if (!layer || layer.type !== 'grid2d' || layer.locked) {
-      throw new Error('Active layer must be an unlocked 2D grid layer.');
+    const layer = get(activeLayer);
+    if (!layer || !doc.selection?.active) return;
+    
+    if (layer.type !== 'grid2d') {
+      console.warn('Fill selection only works on 2D grid layers');
+      return;
     }
-
-    const pixels = new Array(layer.data.length);
-    for (let i = 0; i < layer.data.length; i += 1) {
-      const oldValue = layer.data[i] ?? 0;
-      const height = clamp01((result.heightMap[i] ?? 0) + (result.detailNoise[i] ?? 0));
-      const biomeIndex = result.biomeMask[i] ?? 0;
-      const newValue = resolveMaterialIndex(spec, doc.palette, height, biomeIndex);
-      pixels[i] = { index: i, oldValue, newValue };
+    
+    const gridLayer = layer as GridLayer;
+    const sel = doc.selection;
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+    
+    for (let sy = 0; sy < sel.height; sy++) {
+      for (let sx = 0; sx < sel.width; sx++) {
+        // Check if pixel is in selection mask
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+        
+        const x = sel.x + sx;
+        const y = sel.y + sy;
+        
+        if (x < 0 || x >= gridLayer.width || y < 0 || y >= gridLayer.height) continue;
+        
+        const index = y * gridLayer.width + x;
+        const oldValue = gridLayer.data[index];
+        const newValue = primaryMat;
+        
+        if (oldValue !== newValue) {
+          pixels.push({ index, oldValue, newValue });
+        }
+      }
     }
-
-    documentStore.paint({ layerId: layer.id, pixels });
+    
+    if (pixels.length > 0) {
+      documentStore.fill({ layerId: layer.id, pixels });
+    }
   };
 
-  const generateTerrain = async () => {
-    if (isGenerating) return;
-    isGenerating = true;
-    const start = performance.now();
-
-    try {
-      const doc = get(documentStore);
-      const baseSpec = createDefaultTerrainGenSpec(doc.width, doc.height);
-      const imageFile = await pickConditioningImage();
-      const spec: TerrainGenSpec = imageFile
-        ? { ...baseSpec, images: { heightmap: imageFile.name } }
-        : baseSpec;
-
-      const validation = validateTerrainGenSpec(spec);
-      if (!validation.ok) {
-        console.error('[AI Terrain] Spec validation failed', validation.errors);
-        return;
-      }
-
-      let conditioning;
-      if (imageFile) {
-        const conditioningStart = performance.now();
-        const imageData = await loadImageDataFromFile(imageFile);
-        conditioning = conditioningFromImageData(imageData, {
-          biomeBins: spec.biomes.length,
-          detailStrength: spec.noise.detailStrength,
-        });
-        const conditioningMs = performance.now() - conditioningStart;
-        console.info('[AI Terrain] Conditioning ready', { conditioningMs });
-      }
-
-      const generationStart = performance.now();
-      const result = generateTerrainFromSpec(spec, conditioning);
-      const generationMs = performance.now() - generationStart;
-
-      applyTerrainResult(spec, result);
-
-      const totalMs = performance.now() - start;
-      const pixels = doc.width * doc.height;
-      const usedImage = Boolean(conditioning);
-      lastMetrics = { durationMs: Math.round(totalMs), pixels, usedImage };
-      console.info('[AI Terrain] Generation metrics', {
-        totalMs,
-        generationMs,
-        pixels,
-        usedImage,
-        memoryKb: Math.round(
-          (result.heightMap.byteLength + result.biomeMask.byteLength + result.detailNoise.byteLength) /
-            1024
-        ),
-      });
-    } catch (err) {
-      console.error('[AI Terrain] Generation failed', err);
-    } finally {
-      isGenerating = false;
+  // Clear selection (fill with air/0)
+  const clearSelection = () => {
+    const doc = get(documentStore);
+    const layer = get(activeLayer);
+    if (!layer || !doc.selection?.active) return;
+    
+    if (layer.type !== 'grid2d') {
+      console.warn('Clear selection only works on 2D grid layers');
+      return;
     }
+    
+    const gridLayer = layer as GridLayer;
+    const sel = doc.selection;
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+    
+    for (let sy = 0; sy < sel.height; sy++) {
+      for (let sx = 0; sx < sel.width; sx++) {
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+        
+        const x = sel.x + sx;
+        const y = sel.y + sy;
+        
+        if (x < 0 || x >= gridLayer.width || y < 0 || y >= gridLayer.height) continue;
+        
+        const index = y * gridLayer.width + x;
+        const oldValue = gridLayer.data[index];
+        
+        if (oldValue !== 0) {
+          pixels.push({ index, oldValue, newValue: 0 });
+        }
+      }
+    }
+    
+    if (pixels.length > 0) {
+      documentStore.erase({ layerId: layer.id, pixels });
+    }
+  };
+
+  // Deselect all
+  const deselectAll = () => {
+    documentStore.select({ 
+      before: get(documentStore).selection, 
+      after: { active: false, x: 0, y: 0, width: 0, height: 0 } 
+    });
   };
 </script>
 
@@ -255,23 +246,67 @@
     </label>
   </div>
 
-  <div class="divider"></div>
-
-  <div class="ai-terrain">
-    <div class="panel-header">AI Terrain</div>
-    <p class="ai-terrain__help">
-      Click to generate from noise, or choose an optional heightmap/biome mask when prompted.
-    </p>
-    <button class="ai-terrain__btn" onclick={generateTerrain} disabled={isGenerating}>
-      {isGenerating ? 'Generating...' : 'Generate Terrain'}
-    </button>
-    {#if lastMetrics}
-      <div class="ai-terrain__metrics">
-        Last run: {lastMetrics.durationMs}ms · {lastMetrics.pixels.toLocaleString()} px
-        {lastMetrics.usedImage ? ' · image conditioned' : ''}
+  {#if hasSelection}
+    <div class="divider"></div>
+    
+    <div class="selection-actions">
+      <div class="panel-header">Selection</div>
+      <div class="action-buttons">
+        <button 
+          class="action-btn fill-btn" 
+          onclick={fillSelection}
+          title="Fill selection with current material"
+        >
+          <PaintRoller size={14} weight="bold" />
+          Fill
+        </button>
+        <button 
+          class="action-btn clear-btn" 
+          onclick={clearSelection}
+          title="Clear selection (erase)"
+        >
+          <Trash size={14} weight="bold" />
+          Clear
+        </button>
+        <button 
+          class="action-btn" 
+          onclick={deselectAll}
+          title="Deselect all (Esc)"
+        >
+          <Selection size={14} weight="bold" />
+          Deselect
+        </button>
       </div>
-    {/if}
-  </div>
+    </div>
+  {/if}
+
+  {#if isVoxelLayer}
+    <div class="divider"></div>
+    
+    <div class="z-level-settings">
+      <label>
+        <Stack size={16} weight="bold" /> Z Level: {activeZ}
+        <div class="z-controls">
+          <button onclick={() => toolStore.stepActiveZ(-1, maxDepth)} disabled={activeZ <= 0}>
+            <Minus size={14} weight="bold" />
+          </button>
+          <input 
+            type="range" 
+            min="0" 
+            max={maxDepth - 1}
+            value={activeZ}
+            oninput={(e) => toolStore.setActiveZ(parseInt(e.currentTarget.value), maxDepth)}
+          />
+          <button onclick={() => toolStore.stepActiveZ(1, maxDepth)} disabled={activeZ >= maxDepth - 1}>
+            <Plus size={14} weight="bold" />
+          </button>
+        </div>
+      </label>
+      <div class="z-info">
+        Editing at height {activeZ} of {maxDepth}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -398,41 +433,108 @@
     accent-color: #6a6aae;
   }
 
-  .ai-terrain {
+  .z-level-settings {
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
 
-  .ai-terrain__help {
-    margin: 0;
-    font-size: 11px;
-    color: #8f95b2;
-    line-height: 1.4;
-  }
-
-  .ai-terrain__btn {
-    padding: 8px 10px;
-    border: none;
-    border-radius: 6px;
-    background: #3a3f6b;
-    color: #fff;
+  .z-level-settings label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     font-size: 12px;
+    color: #9aa0b2;
+  }
+
+  .z-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  
+  .z-controls button {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #fff;
     cursor: pointer;
-    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-
-  .ai-terrain__btn:hover {
-    background: #4a4f86;
+  
+  .z-controls button:hover:not(:disabled) {
+    background: #2a2a4e;
   }
-
-  .ai-terrain__btn:disabled {
-    opacity: 0.6;
+  
+  .z-controls button:disabled {
+    opacity: 0.4;
     cursor: not-allowed;
   }
+  
+  .z-controls input[type="range"] {
+    flex: 1;
+    accent-color: #6a6aae;
+  }
 
-  .ai-terrain__metrics {
-    font-size: 11px;
-    color: #7d83a3;
+  .z-info {
+    font-size: 10px;
+    color: #666;
+    text-align: center;
+  }
+
+  .selection-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: #1a1a2e;
+    color: #9aa0b2;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+
+  .action-btn:hover {
+    background: #2a2a4e;
+    color: #fff;
+  }
+
+  .action-btn.fill-btn {
+    background: #2d4a3d;
+    color: #6ee7b7;
+  }
+
+  .action-btn.fill-btn:hover {
+    background: #3d6a52;
+    color: #a7f3d0;
+  }
+
+  .action-btn.clear-btn {
+    background: #4a2d2d;
+    color: #fca5a5;
+  }
+
+  .action-btn.clear-btn:hover {
+    background: #6a3d3d;
+    color: #fecaca;
   }
 </style>

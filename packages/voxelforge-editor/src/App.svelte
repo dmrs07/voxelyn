@@ -27,9 +27,42 @@
   // AI Generation handlers
   function handleTextureGenerated(texture: Uint32Array, params: unknown, materialId?: number) {
     console.log('Texture generated:', { texture, params, materialId });
-    // TODO: Apply texture to material in palette
-    // For now, just show success message
-    alert(`Texture generated successfully! Size: ${Math.sqrt(texture.length)}px`);
+    
+    if (materialId !== undefined && materialId !== null) {
+      // Apply texture to existing material
+      const materialIndex = currentPalette.findIndex(m => m.id === materialId);
+      if (materialIndex >= 0) {
+        const material = currentPalette[materialIndex];
+        // Update the material's texture/color based on average color from generated texture
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < texture.length; i++) {
+          const color = texture[i];
+          r += color & 0xff;
+          g += (color >> 8) & 0xff;
+          b += (color >> 16) & 0xff;
+        }
+        const count = texture.length || 1;
+        const avgColor = 
+          (Math.round(r / count) & 0xff) |
+          ((Math.round(g / count) & 0xff) << 8) |
+          ((Math.round(b / count) & 0xff) << 16) |
+          0xff000000;
+        
+        // Update palette with new color
+        const newPalette = [...currentPalette];
+        newPalette[materialIndex] = { ...material, color: avgColor };
+        
+        const doc = documentStore;
+        documentStore.set({
+          ...$documentStore,
+          palette: newPalette,
+        });
+        
+        console.log(`Applied texture to material: ${material.name}`);
+      }
+    } else {
+      console.log('Texture generated (no target material). Size:', Math.sqrt(texture.length));
+    }
   }
 
   function handleObjectGenerated(data: Uint16Array, width: number, height: number, depth: number, blueprint: unknown) {

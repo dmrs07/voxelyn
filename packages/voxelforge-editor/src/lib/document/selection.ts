@@ -144,3 +144,77 @@ export const translateSelection = (
 
   return moved;
 };
+
+/** Rotates a selection mask by the given angle (90, 180, 270 degrees) */
+export const rotateSelectionMask = (
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  angle: 90 | 180 | 270
+): { mask: Uint8Array; width: number; height: number } => {
+  if (angle === 180) {
+    const newMask = new Uint8Array(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const srcIdx = y * width + x;
+        const dstIdx = (height - 1 - y) * width + (width - 1 - x);
+        newMask[dstIdx] = mask[srcIdx];
+      }
+    }
+    return { mask: newMask, width, height };
+  }
+
+  // 90 or 270 degrees - dimensions swap
+  const newWidth = height;
+  const newHeight = width;
+  const newMask = new Uint8Array(newWidth * newHeight);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const srcIdx = y * width + x;
+      let dstX: number;
+      let dstY: number;
+
+      if (angle === 90) {
+        dstX = height - 1 - y;
+        dstY = x;
+      } else {
+        // 270
+        dstX = y;
+        dstY = width - 1 - x;
+      }
+
+      const dstIdx = dstY * newWidth + dstX;
+      newMask[dstIdx] = mask[srcIdx];
+    }
+  }
+
+  return { mask: newMask, width: newWidth, height: newHeight };
+};
+
+/** Flips a selection mask horizontally or vertically */
+export const flipSelectionMask = (
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  axis: 'horizontal' | 'vertical'
+): Uint8Array => {
+  const newMask = new Uint8Array(width * height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const srcIdx = y * width + x;
+      let dstIdx: number;
+
+      if (axis === 'horizontal') {
+        dstIdx = y * width + (width - 1 - x);
+      } else {
+        dstIdx = (height - 1 - y) * width + x;
+      }
+
+      newMask[dstIdx] = mask[srcIdx];
+    }
+  }
+
+  return newMask;
+};

@@ -2,10 +2,36 @@
  * @voxelyn/ai - Scenario Generator
  *
  * Builds complete world/scenario voxel data from AI-predicted layouts.
- * Handles terrain generation, biome placement, and object distribution.
+ * Handles terrain generation, biome placement, object distribution,
+ * building generation, and interior room layouts.
+ * 
+ * Now integrates with @voxelyn/core's advanced procedural generation:
+ * - GradientNoise with zoom factor, octaves, fBm
+ * - Height thresholds for terrain types
+ * - Raycast shadows for depth
+ * - Surface/subsurface material selection
  */
 
-import type { ScenarioLayout, BiomeRegion, BiomeType, ObjectPlacement, HeightmapParams } from '../types';
+import type {
+  ScenarioLayout,
+  BiomeRegion,
+  BiomeType,
+  ObjectPlacement,
+  HeightmapParams,
+  BuildingDefinition,
+  RoomDefinition,
+  BuildingStyle,
+} from '../types';
+
+import {
+  buildEnhancedTerrain,
+  biomeRegionsToTerrainLayers,
+  DEFAULT_TERRAIN_LAYERS,
+  type EnhancedHeightmapParams,
+  type TerrainLayer,
+  type TerrainLightingParams,
+  type EnhancedTerrainResult,
+} from './scenario-terrain';
 
 // ============================================================================
 // TYPES
@@ -23,6 +49,10 @@ export type ScenarioBuildResult = {
   depth: number; // Z (vertical)
   /** Heightmap as 2D array [x + y * width]. */
   heightmap: Float32Array;
+  /** Shadow/lighting map (0 = shadow, 1 = lit) */
+  lightingMap?: Float32Array;
+  /** Biome index per cell */
+  biomeMap?: Uint8Array;
   /** Object instances to place. */
   objects: PlacedObject[];
   /** Materials used. */
@@ -49,6 +79,17 @@ export type ScenarioBuildOptions = {
   biomeMaterials?: Partial<Record<BiomeType, { surface: number; underground: number }>>;
   /** Scale factor for terrain detail. */
   detailScale?: number;
+  /** 
+   * Use enhanced terrain generation from @voxelyn/core 
+   * Enables: zoom factor, octaves, height thresholds, shadows
+   */
+  useEnhancedTerrain?: boolean;
+  /** Enhanced heightmap parameters (when useEnhancedTerrain is true) */
+  enhancedHeightmapParams?: Partial<EnhancedHeightmapParams>;
+  /** Custom terrain layers (height thresholds) */
+  terrainLayers?: TerrainLayer[];
+  /** Lighting/shadow configuration */
+  lighting?: TerrainLightingParams;
 };
 
 // ============================================================================
@@ -129,6 +170,8 @@ const DEFAULT_BIOME_MATERIALS: Record<BiomeType, { surface: number; underground:
   cave: { surface: 0, underground: 1 }, // air, stone
   urban: { surface: 1, underground: 2 }, // stone, dirt
   ruins: { surface: 1, underground: 2 },
+  dungeon: { surface: 0, underground: 1 }, // air, stone
+  interior: { surface: 0, underground: 0 }, // all air
 };
 
 const DEFAULT_MATERIAL_MAPPING: Record<string, number> = {
@@ -151,6 +194,58 @@ const DEFAULT_MATERIAL_MAPPING: Record<string, number> = {
   moss: 16,
   coral: 17,
   clay: 18,
+  // Building materials (19+)
+  cobblestone: 19,
+  brick: 20,
+  plank: 21,
+  thatch: 22,
+  tile: 23,
+  marble: 24,
+  sandstone: 25,
+  dark_stone: 26,
+  timber: 27,
+  iron: 28,
+  glass: 29,
+  carpet: 30,
+  rug: 31,
+  // Furniture materials (32+)
+  table_wood: 32,
+  chair_wood: 33,
+  bed_frame: 34,
+  bed_sheets: 35,
+  bookshelf: 36,
+  torch: 37,
+  chandelier: 38,
+  barrel: 39,
+  crate: 40,
+  chest: 41,
+  anvil: 42,
+  cauldron: 43,
+  throne: 44,
+};
+
+// ============================================================================
+// BUILDING STYLE MATERIALS
+// ============================================================================
+
+/**
+ * Default materials for each building style.
+ */
+const BUILDING_STYLE_MATERIALS: Record<BuildingStyle, {
+  wall: number;
+  floor: number;
+  roof: number;
+  foundation: number;
+  trim: number;
+}> = {
+  medieval: { wall: 19, floor: 21, roof: 22, foundation: 1, trim: 27 },
+  fantasy: { wall: 24, floor: 24, roof: 23, foundation: 1, trim: 28 },
+  modern: { wall: 1, floor: 1, roof: 1, foundation: 1, trim: 28 },
+  rustic: { wall: 6, floor: 21, roof: 22, foundation: 1, trim: 6 },
+  gothic: { wall: 26, floor: 26, roof: 26, foundation: 26, trim: 28 },
+  asian: { wall: 6, floor: 21, roof: 23, foundation: 1, trim: 6 },
+  desert: { wall: 25, floor: 25, roof: 25, foundation: 25, trim: 6 },
+  nordic: { wall: 6, floor: 21, roof: 22, foundation: 1, trim: 6 },
 };
 
 // ============================================================================
@@ -881,6 +976,885 @@ function placeObjects(
 }
 
 // ============================================================================
+// BUILDING GENERATION
+// ============================================================================
+
+/**
+ * Set a voxel in the terrain array.
+ */
+function setTerrainVoxel(
+  terrain: Uint16Array,
+  x: number,
+  y: number,
+  z: number,
+  mat: number,
+  width: number,
+  height: number,
+  depth: number,
+  materials: Set<number>,
+  overwrite = true
+): boolean {
+  if (x < 0 || x >= width || y < 0 || y >= height || z < 0 || z >= depth) return false;
+  const idx = x + y * width + z * width * height;
+  if (overwrite || terrain[idx] === 0) {
+    terrain[idx] = mat;
+    materials.add(mat);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Resolve material name to ID.
+ */
+function resolveMaterial(name: string, matMap: Record<string, number>): number {
+  return matMap[name.toLowerCase()] ?? matMap[name] ?? 1;
+}
+
+/**
+ * Generate a rectangular room with floor, walls, and optional ceiling.
+ */
+function generateRoom(
+  terrain: Uint16Array,
+  room: RoomDefinition,
+  materials: Set<number>,
+  matMap: Record<string, number>,
+  width: number,
+  height: number,
+  depth: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
+  offsetZ: number = 0
+): void {
+  const [rx, ry, rz, rw, rh, rd] = room.bounds;
+  const floorMat = resolveMaterial(room.floorMaterial, matMap);
+  const wallMat = resolveMaterial(room.wallMaterial, matMap);
+  const ceilingMat = room.ceilingMaterial
+    ? resolveMaterial(room.ceilingMaterial, matMap)
+    : wallMat;
+
+  const startX = rx + offsetX;
+  const startY = ry + offsetY;
+  const startZ = rz + offsetZ;
+
+  // Generate floor
+  for (let dy = 0; dy < rh; dy++) {
+    for (let dx = 0; dx < rw; dx++) {
+      setTerrainVoxel(terrain, startX + dx, startY + dy, startZ, floorMat, width, height, depth, materials);
+    }
+  }
+
+  // Generate walls (perimeter)
+  for (let dz = 1; dz < rd; dz++) {
+    for (let dy = 0; dy < rh; dy++) {
+      for (let dx = 0; dx < rw; dx++) {
+        const isEdgeX = dx === 0 || dx === rw - 1;
+        const isEdgeY = dy === 0 || dy === rh - 1;
+
+        if (isEdgeX || isEdgeY) {
+          setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, wallMat, width, height, depth, materials);
+        } else {
+          // Interior is air
+          setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, 0, width, height, depth, materials);
+        }
+      }
+    }
+  }
+
+  // Generate ceiling
+  for (let dy = 0; dy < rh; dy++) {
+    for (let dx = 0; dx < rw; dx++) {
+      setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + rd - 1, ceilingMat, width, height, depth, materials);
+    }
+  }
+
+  // Generate doors (carve openings)
+  for (const door of room.doors) {
+    const [doorX, doorY, doorZ] = door.position;
+    const doorW = door.direction === 'north' || door.direction === 'south' ? 2 : 1;
+    const doorH = door.direction === 'east' || door.direction === 'west' ? 2 : 1;
+    const doorHeight = 3; // Door height in voxels
+
+    for (let dz = 1; dz < doorHeight; dz++) {
+      for (let dy = 0; dy < doorH; dy++) {
+        for (let dx = 0; dx < doorW; dx++) {
+          setTerrainVoxel(
+            terrain,
+            startX + doorX + dx,
+            startY + doorY + dy,
+            startZ + doorZ + dz,
+            0, // air
+            width,
+            height,
+            depth,
+            materials
+          );
+        }
+      }
+    }
+  }
+
+  // Generate windows (carve openings)
+  if (room.windows) {
+    for (const window of room.windows) {
+      const [winX, winY, winZ] = window.position;
+      const [winW, winH] = window.size;
+
+      for (let dz = 0; dz < winH; dz++) {
+        for (let dx = 0; dx < winW; dx++) {
+          // Set to glass material (29)
+          setTerrainVoxel(
+            terrain,
+            startX + winX + dx,
+            startY + winY,
+            startZ + winZ + dz,
+            29, // glass
+            width,
+            height,
+            depth,
+            materials
+          );
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Generate a roof for a building.
+ */
+function generateRoof(
+  terrain: Uint16Array,
+  footprint: [number, number],
+  roofType: BuildingDefinition['roofType'],
+  roofMat: number,
+  materials: Set<number>,
+  width: number,
+  height: number,
+  depth: number,
+  startX: number,
+  startY: number,
+  startZ: number
+): void {
+  const [fw, fh] = footprint;
+
+  switch (roofType) {
+    case 'flat':
+      // Simple flat roof
+      for (let dy = 0; dy < fh; dy++) {
+        for (let dx = 0; dx < fw; dx++) {
+          setTerrainVoxel(terrain, startX + dx, startY + dy, startZ, roofMat, width, height, depth, materials);
+        }
+      }
+      break;
+
+    case 'gabled': {
+      // Peaked roof along the longer axis
+      const isWidthLonger = fw >= fh;
+      const peakHeight = Math.ceil((isWidthLonger ? fh : fw) / 2);
+
+      for (let dz = 0; dz < peakHeight; dz++) {
+        const inset = dz;
+        if (isWidthLonger) {
+          // Peak runs along X
+          for (let dx = 0; dx < fw; dx++) {
+            for (let dy = inset; dy < fh - inset; dy++) {
+              setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, roofMat, width, height, depth, materials);
+            }
+          }
+        } else {
+          // Peak runs along Y
+          for (let dy = 0; dy < fh; dy++) {
+            for (let dx = inset; dx < fw - inset; dx++) {
+              setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, roofMat, width, height, depth, materials);
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case 'hipped': {
+      // Roof slopes on all sides
+      const peakHeight = Math.ceil(Math.min(fw, fh) / 2);
+
+      for (let dz = 0; dz < peakHeight; dz++) {
+        const inset = dz;
+        for (let dy = inset; dy < fh - inset; dy++) {
+          for (let dx = inset; dx < fw - inset; dx++) {
+            setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, roofMat, width, height, depth, materials);
+          }
+        }
+      }
+      break;
+    }
+
+    case 'dome': {
+      // Hemispherical dome
+      const centerX = fw / 2;
+      const centerY = fh / 2;
+      const radius = Math.min(fw, fh) / 2;
+
+      for (let dz = 0; dz <= radius; dz++) {
+        const ringRadius = Math.sqrt(radius * radius - dz * dz);
+        for (let dy = 0; dy < fh; dy++) {
+          for (let dx = 0; dx < fw; dx++) {
+            const distFromCenter = Math.sqrt(
+              Math.pow(dx - centerX, 2) + Math.pow(dy - centerY, 2)
+            );
+            if (distFromCenter <= ringRadius) {
+              setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, roofMat, width, height, depth, materials);
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case 'tower': {
+      // Conical/pyramidal tower roof
+      const centerX = fw / 2;
+      const centerY = fh / 2;
+      const roofHeight = Math.max(fw, fh);
+
+      for (let dz = 0; dz < roofHeight; dz++) {
+        const shrink = (dz / roofHeight) * Math.min(fw, fh) / 2;
+        for (let dy = 0; dy < fh; dy++) {
+          for (let dx = 0; dx < fw; dx++) {
+            const distX = Math.abs(dx - centerX);
+            const distY = Math.abs(dy - centerY);
+            const maxDist = Math.min(fw, fh) / 2 - shrink;
+            if (distX <= maxDist && distY <= maxDist) {
+              setTerrainVoxel(terrain, startX + dx, startY + dy, startZ + dz, roofMat, width, height, depth, materials);
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case 'none':
+    default:
+      // No roof
+      break;
+  }
+}
+
+/**
+ * Place furniture items in a room.
+ */
+function placeFurniture(
+  terrain: Uint16Array,
+  furniture: RoomDefinition['furniture'],
+  materials: Set<number>,
+  width: number,
+  height: number,
+  depth: number,
+  roomOffsetX: number,
+  roomOffsetY: number,
+  roomOffsetZ: number
+): void {
+  const furnitureMaterials: Record<string, number> = {
+    table: 32,
+    chair: 33,
+    bed: 34,
+    bookshelf: 36,
+    torch: 37,
+    chandelier: 38,
+    barrel: 39,
+    crate: 40,
+    chest: 41,
+    anvil: 42,
+    cauldron: 43,
+    throne: 44,
+    bench: 33,
+    desk: 32,
+    wardrobe: 36,
+    shelf: 36,
+    stool: 33,
+    rack: 6,
+    counter: 32,
+    altar: 24,
+    lectern: 6,
+  };
+
+  for (const item of furniture) {
+    const [fx, fy, fz] = item.position;
+    const mat = furnitureMaterials[item.type.toLowerCase()] ?? 6; // default to wood
+
+    // Simple 1x1 or 2x1 furniture placement
+    const px = roomOffsetX + fx;
+    const py = roomOffsetY + fy;
+    const pz = roomOffsetZ + fz + 1; // +1 to be above floor
+
+    setTerrainVoxel(terrain, px, py, pz, mat, width, height, depth, materials);
+
+    // Larger furniture items
+    if (['bed', 'table', 'counter', 'altar', 'bookshelf', 'wardrobe'].includes(item.type.toLowerCase())) {
+      // Place 2x1
+      const rotation = item.rotation ?? 0;
+      const dx = rotation % 2 === 0 ? 1 : 0;
+      const dy = rotation % 2 === 1 ? 1 : 0;
+      setTerrainVoxel(terrain, px + dx, py + dy, pz, mat, width, height, depth, materials);
+    }
+
+    // Tall furniture items
+    if (['bookshelf', 'wardrobe', 'torch', 'chandelier'].includes(item.type.toLowerCase())) {
+      setTerrainVoxel(terrain, px, py, pz + 1, mat, width, height, depth, materials);
+    }
+  }
+}
+
+/**
+ * Generate a complete building from its definition.
+ */
+function generateBuilding(
+  terrain: Uint16Array,
+  building: BuildingDefinition,
+  materials: Set<number>,
+  matMap: Record<string, number>,
+  width: number,
+  height: number,
+  depth: number,
+  buildingX: number,
+  buildingY: number,
+  groundZ: number
+): void {
+  const [fw, fh] = building.footprint;
+  const wallMat = resolveMaterial(building.wallMaterial, matMap);
+  const foundationMat = resolveMaterial(building.foundationMaterial, matMap);
+  const roofMat = resolveMaterial(building.roofMaterial, matMap);
+  const styleMats = BUILDING_STYLE_MATERIALS[building.style];
+  const floorMat = styleMats?.floor ?? 21;
+
+  // Build foundation layer
+  for (let dy = 0; dy < fh; dy++) {
+    for (let dx = 0; dx < fw; dx++) {
+      setTerrainVoxel(
+        terrain,
+        buildingX + dx,
+        buildingY + dy,
+        groundZ,
+        foundationMat,
+        width,
+        height,
+        depth,
+        materials
+      );
+    }
+  }
+
+  // Build basement if present
+  const currentZ = groundZ + 1;
+  if (building.hasBasement) {
+    const basementRoom: RoomDefinition = {
+      type: 'storage',
+      bounds: [0, 0, 0, fw, fh, building.floorHeight],
+      floorMaterial: 'stone',
+      wallMaterial: 'stone',
+      doors: [],
+      furniture: [],
+    };
+    generateRoom(
+      terrain,
+      basementRoom,
+      materials,
+      matMap,
+      width,
+      height,
+      depth,
+      buildingX,
+      buildingY,
+      groundZ - building.floorHeight
+    );
+  }
+
+  // Build each floor
+  for (let floor = 0; floor < building.floors; floor++) {
+    const floorStartZ = currentZ + floor * building.floorHeight;
+
+    // Generate floor rooms if defined, otherwise create default room
+    const floorRooms = building.rooms.filter((r) => {
+      // Check if room's Z is within this floor
+      const roomFloor = Math.floor(r.bounds[2] / building.floorHeight);
+      return roomFloor === floor;
+    });
+
+    if (floorRooms.length > 0) {
+      for (const room of floorRooms) {
+        generateRoom(
+          terrain,
+          room,
+          materials,
+          matMap,
+          width,
+          height,
+          depth,
+          buildingX,
+          buildingY,
+          floorStartZ
+        );
+
+        // Place furniture
+        placeFurniture(
+          terrain,
+          room.furniture,
+          materials,
+          width,
+          height,
+          depth,
+          buildingX + room.bounds[0],
+          buildingY + room.bounds[1],
+          floorStartZ + room.bounds[2]
+        );
+      }
+    } else {
+      // Default: single room for the entire floor
+      const defaultRoom: RoomDefinition = {
+        type: 'living',
+        bounds: [0, 0, 0, fw, fh, building.floorHeight],
+        floorMaterial: building.wallMaterial,
+        wallMaterial: building.wallMaterial,
+        doors: [{ position: [Math.floor(fw / 2), 0, 0], direction: 'south' }],
+        furniture: [],
+      };
+      generateRoom(
+        terrain,
+        defaultRoom,
+        materials,
+        matMap,
+        width,
+        height,
+        depth,
+        buildingX,
+        buildingY,
+        floorStartZ
+      );
+    }
+  }
+
+  // Build roof
+  const roofStartZ = currentZ + building.floors * building.floorHeight;
+  generateRoof(
+    terrain,
+    building.footprint,
+    building.roofType,
+    roofMat,
+    materials,
+    width,
+    height,
+    depth,
+    buildingX,
+    buildingY,
+    roofStartZ
+  );
+
+  // Build external features
+  if (building.externalFeatures) {
+    for (const feature of building.externalFeatures) {
+      const [fx, fy, fz] = feature.position;
+      const [fsw, fsh, fsd] = feature.size;
+      const featureMat = styleMats?.trim ?? wallMat;
+
+      switch (feature.type) {
+        case 'chimney':
+          // Vertical stack
+          for (let dz = 0; dz < fsd; dz++) {
+            setTerrainVoxel(
+              terrain,
+              buildingX + fx,
+              buildingY + fy,
+              groundZ + fz + dz,
+              featureMat,
+              width,
+              height,
+              depth,
+              materials
+            );
+          }
+          break;
+
+        case 'balcony':
+        case 'porch':
+          // Platform
+          for (let dy = 0; dy < fsh; dy++) {
+            for (let dx = 0; dx < fsw; dx++) {
+              setTerrainVoxel(
+                terrain,
+                buildingX + fx + dx,
+                buildingY + fy + dy,
+                groundZ + fz,
+                floorMat,
+                width,
+                height,
+                depth,
+                materials
+              );
+            }
+          }
+          break;
+
+        case 'stairs':
+          // Staircase
+          for (let dz = 0; dz < fsd; dz++) {
+            const step = dz;
+            for (let dy = 0; dy < fsh; dy++) {
+              setTerrainVoxel(
+                terrain,
+                buildingX + fx + step,
+                buildingY + fy + dy,
+                groundZ + fz + dz,
+                1, // stone
+                width,
+                height,
+                depth,
+                materials
+              );
+            }
+          }
+          break;
+
+        case 'tower':
+          // Small attached tower
+          for (let dz = 0; dz < fsd; dz++) {
+            for (let dy = 0; dy < fsh; dy++) {
+              for (let dx = 0; dx < fsw; dx++) {
+                const isEdge = dx === 0 || dx === fsw - 1 || dy === 0 || dy === fsh - 1;
+                const mat = isEdge ? wallMat : 0;
+                setTerrainVoxel(
+                  terrain,
+                  buildingX + fx + dx,
+                  buildingY + fy + dy,
+                  groundZ + fz + dz,
+                  mat,
+                  width,
+                  height,
+                  depth,
+                  materials
+                );
+              }
+            }
+          }
+          break;
+      }
+    }
+  }
+}
+
+/**
+ * Build all buildings in a scenario.
+ */
+function buildBuildings(
+  terrain: Uint16Array,
+  buildings: BuildingDefinition[],
+  heightmap: Float32Array,
+  materials: Set<number>,
+  options: ScenarioBuildOptions,
+  width: number,
+  height: number,
+  depth: number
+): void {
+  const matMap = { ...DEFAULT_MATERIAL_MAPPING, ...options.materialMapping };
+
+  for (const building of buildings) {
+    // Determine building position (center of terrain for single building)
+    const [fw, fh] = building.footprint;
+    const buildingX = Math.floor((width - fw) / 2);
+    const buildingY = Math.floor((height - fh) / 2);
+
+    // Get ground height at building location
+    const centerIdx = buildingY * width + buildingX;
+    const groundH = heightmap[centerIdx] ?? 0.3;
+    // Clamp groundZ to valid range [0, depth-1] to avoid out-of-bounds when groundH === 1.0
+    const groundZ = Math.min(Math.floor(groundH * depth), depth - 1);
+
+    // Clear area for building first
+    for (let dy = 0; dy < fh; dy++) {
+      for (let dx = 0; dx < fw; dx++) {
+        for (let dz = groundZ; dz < depth; dz++) {
+          setTerrainVoxel(terrain, buildingX + dx, buildingY + dy, dz, 0, width, height, depth, materials, true);
+        }
+      }
+    }
+
+    generateBuilding(
+      terrain,
+      building,
+      materials,
+      matMap,
+      width,
+      height,
+      depth,
+      buildingX,
+      buildingY,
+      groundZ
+    );
+  }
+}
+
+/**
+ * Generate a standalone interior scene (dungeon, room, etc.).
+ */
+function buildInterior(
+  terrain: Uint16Array,
+  layout: ScenarioLayout,
+  materials: Set<number>,
+  options: ScenarioBuildOptions,
+  width: number,
+  height: number,
+  depth: number
+): void {
+  const matMap = { ...DEFAULT_MATERIAL_MAPPING, ...options.materialMapping };
+
+  // For interior-only scenarios, fill with stone/dungeon walls and carve rooms
+  const isUnderground = layout.description?.toLowerCase().includes('dungeon') ||
+                        layout.description?.toLowerCase().includes('cave') ||
+                        layout.description?.toLowerCase().includes('underground');
+
+  if (isUnderground) {
+    // Fill entire space with stone
+    for (let z = 0; z < depth; z++) {
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          setTerrainVoxel(terrain, x, y, z, 1, width, height, depth, materials); // stone
+        }
+      }
+    }
+  }
+
+  // Generate rooms from buildings (interior uses building.rooms)
+  if (layout.buildings && layout.buildings.length > 0) {
+    for (const building of layout.buildings) {
+      for (const room of building.rooms) {
+        generateRoom(terrain, room, materials, matMap, width, height, depth, 0, 0, 0);
+        placeFurniture(
+          terrain,
+          room.furniture,
+          materials,
+          width,
+          height,
+          depth,
+          room.bounds[0],
+          room.bounds[1],
+          room.bounds[2]
+        );
+      }
+    }
+  } else {
+    // Default: create a simple central room
+    const roomW = Math.floor(width * 0.6);
+    const roomH = Math.floor(height * 0.6);
+    const roomD = Math.floor(depth * 0.5);
+    const startX = Math.floor((width - roomW) / 2);
+    const startY = Math.floor((height - roomH) / 2);
+    const startZ = Math.floor((depth - roomD) / 2);
+
+    const defaultRoom: RoomDefinition = {
+      type: 'dungeon_cell',
+      bounds: [startX, startY, startZ, roomW, roomH, roomD],
+      floorMaterial: 'stone',
+      wallMaterial: 'cobblestone',
+      doors: [{ position: [Math.floor(roomW / 2), 0, 0], direction: 'south' }],
+      furniture: [
+        { type: 'torch', position: [2, 2, 0] },
+        { type: 'torch', position: [roomW - 3, 2, 0] },
+      ],
+    };
+
+    generateRoom(terrain, defaultRoom, materials, matMap, width, height, depth, 0, 0, 0);
+    placeFurniture(
+      terrain,
+      defaultRoom.furniture,
+      materials,
+      width,
+      height,
+      depth,
+      defaultRoom.bounds[0],
+      defaultRoom.bounds[1],
+      defaultRoom.bounds[2]
+    );
+  }
+}
+
+// ============================================================================
+// LAYOUT ENRICHMENT
+// ============================================================================
+
+/**
+ * Enriches a layout by detecting keywords and adding missing biomes.
+ * This compensates for AI models that generate overly simple layouts.
+ */
+function enrichLayout(layout: ScenarioLayout): ScenarioLayout {
+  const desc = (layout.name + ' ' + layout.description).toLowerCase();
+  const [width, height] = layout.size;
+  const biomes = [...layout.biomes];
+  const existingTypes = new Set(biomes.map(b => b.type));
+
+  // Oasis detection: desert without water
+  if (desc.includes('oasis') && existingTypes.has('desert') && !existingTypes.has('lake')) {
+    const centerX = Math.floor(width * 0.35);
+    const centerY = Math.floor(height * 0.35);
+    const lakeSize = Math.floor(Math.min(width, height) * 0.25);
+    
+    // Add lake at center
+    biomes.push({
+      type: 'lake',
+      bounds: [centerX, centerY, lakeSize, lakeSize],
+      elevation: 0.18,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    
+    // Add grass/plains ring around lake
+    const ringSize = lakeSize + 8;
+    const ringX = centerX - 4;
+    const ringY = centerY - 4;
+    biomes.push({
+      type: 'plains',
+      bounds: [ringX, ringY, ringSize, ringSize],
+      elevation: 0.25,
+      elevationVariation: 0.05,
+      moisture: 0.7,
+      surfaceMaterial: 'grass',
+      undergroundMaterial: 'dirt',
+    });
+  }
+
+  // Valley detection: needs mountains on sides
+  if (desc.includes('valley') && !existingTypes.has('mountains')) {
+    const mtHeight = Math.floor(height * 0.25);
+    biomes.unshift({
+      type: 'mountains',
+      bounds: [0, 0, width, mtHeight],
+      elevation: 0.7,
+      elevationVariation: 0.25,
+      moisture: 0.3,
+      surfaceMaterial: 'stone',
+      undergroundMaterial: 'stone',
+    });
+    biomes.unshift({
+      type: 'mountains',
+      bounds: [0, height - mtHeight, width, mtHeight],
+      elevation: 0.7,
+      elevationVariation: 0.25,
+      moisture: 0.3,
+      surfaceMaterial: 'stone',
+      undergroundMaterial: 'stone',
+    });
+  }
+
+  // River detection: add river if mentioned but missing
+  if ((desc.includes('river') || desc.includes('stream')) && !existingTypes.has('river')) {
+    const riverWidth = Math.max(4, Math.floor(width * 0.1));
+    const riverX = Math.floor((width - riverWidth) / 2);
+    biomes.push({
+      type: 'river',
+      bounds: [riverX, 0, riverWidth, height],
+      elevation: 0.2,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Beach/coastal detection
+  if ((desc.includes('beach') || desc.includes('coast')) && !existingTypes.has('ocean')) {
+    const oceanWidth = Math.floor(width * 0.3);
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, 0, oceanWidth, height],
+      elevation: 0.15,
+      elevationVariation: 0.03,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Island detection
+  if (desc.includes('island') && !existingTypes.has('ocean')) {
+    // Surround with ocean
+    const margin = Math.floor(Math.min(width, height) * 0.15);
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, 0, width, margin],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, height - margin, width, margin],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [0, 0, margin, height],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+    biomes.unshift({
+      type: 'ocean',
+      bounds: [width - margin, 0, margin, height],
+      elevation: 0.12,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Lake detection
+  if (desc.includes('lake') && !existingTypes.has('lake') && !existingTypes.has('ocean')) {
+    const lakeSize = Math.floor(Math.min(width, height) * 0.3);
+    const lakeX = Math.floor((width - lakeSize) / 2);
+    const lakeY = Math.floor((height - lakeSize) / 2);
+    biomes.push({
+      type: 'lake',
+      bounds: [lakeX, lakeY, lakeSize, lakeSize],
+      elevation: 0.18,
+      elevationVariation: 0.02,
+      moisture: 1,
+      surfaceMaterial: 'water',
+      undergroundMaterial: 'sand',
+    });
+  }
+
+  // Swamp detection
+  if ((desc.includes('swamp') || desc.includes('marsh')) && !existingTypes.has('swamp')) {
+    const swampSize = Math.floor(Math.min(width, height) * 0.4);
+    const swampX = Math.floor((width - swampSize) / 2);
+    const swampY = Math.floor((height - swampSize) / 2);
+    biomes.push({
+      type: 'swamp',
+      bounds: [swampX, swampY, swampSize, swampSize],
+      elevation: 0.22,
+      elevationVariation: 0.08,
+      moisture: 0.9,
+      surfaceMaterial: 'dirt',
+      undergroundMaterial: 'dirt',
+    });
+  }
+
+  return {
+    ...layout,
+    biomes,
+  };
+}
+
+// ============================================================================
 // MAIN BUILDER
 // ============================================================================
 
@@ -905,46 +1879,210 @@ export function buildScenarioFromLayout(
   layout: ScenarioLayout,
   options: ScenarioBuildOptions = {}
 ): ScenarioBuildResult {
-  const [width, height] = layout.size;
-  const depth = layout.depth;
-  const seed = layout.seed;
+  // Enrich layout with missing elements based on description
+  const enrichedLayout = enrichLayout(layout);
+  
+  const [width, height] = enrichedLayout.size;
+  const depth = enrichedLayout.depth;
+  const seed = enrichedLayout.seed;
+  const category = enrichedLayout.category ?? 'outdoor';
 
-  // Generate heightmap
-  const heightmap = generateHeightmap(width, height, layout.heightmap, layout.biomes);
+  // Use enhanced terrain if requested
+  const useEnhanced = options.useEnhancedTerrain ?? false;
 
-  // Build terrain with vegetation
-  const { terrain, materials } = buildTerrain(
-    width,
-    height,
-    depth,
-    heightmap,
-    layout.biomes,
-    options,
-    seed
-  );
+  // Enhanced terrain result (if using enhanced mode)
+  let enhancedResult: EnhancedTerrainResult | null = null;
 
-  // Add trees and vegetation
-  const vegMaterials = addVegetation(
-    terrain,
-    width,
-    height,
-    depth,
-    heightmap,
-    layout.biomes,
-    seed
-  );
-  vegMaterials.forEach(m => materials.add(m));
+  // Generate heightmap (used even for buildings to determine ground level)
+  let heightmap: Float32Array;
+  
+  if (useEnhanced && (category === 'outdoor' || category === 'mixed')) {
+    // Use @voxelyn/core enhanced heightmap generation
+    const enhancedParams: EnhancedHeightmapParams = {
+      octaves: enrichedLayout.heightmap.octaves,
+      persistence: enrichedLayout.heightmap.persistence,
+      scale: enrichedLayout.heightmap.scale,
+      seed: enrichedLayout.heightmap.seed,
+      baseElevation: enrichedLayout.heightmap.baseElevation,
+      amplitude: enrichedLayout.heightmap.amplitude,
+      // Enhanced features
+      zoomFactor: options.enhancedHeightmapParams?.zoomFactor ?? 80,
+      noiseDetail: options.enhancedHeightmapParams?.noiseDetail,
+      ridgedMountains: options.enhancedHeightmapParams?.ridgedMountains ?? true,
+      domainWarping: options.enhancedHeightmapParams?.domainWarping ?? false,
+      warpScale: options.enhancedHeightmapParams?.warpScale ?? 0.5,
+      ...options.enhancedHeightmapParams,
+    };
+    
+    // Determine terrain layers
+    const terrainLayers = options.terrainLayers 
+      ?? (enrichedLayout.biomes.length > 0 
+          ? biomeRegionsToTerrainLayers(enrichedLayout.biomes, { ...DEFAULT_MATERIAL_MAPPING, ...options.materialMapping })
+          : DEFAULT_TERRAIN_LAYERS);
+    
+    // Build enhanced terrain with shadows
+    enhancedResult = buildEnhancedTerrain(
+      width,
+      height,
+      depth,
+      enhancedParams,
+      terrainLayers,
+      options.lighting ?? {
+        enabled: true,
+        lightDirection: { x: -0.6, y: -0.4 },
+        intensity: 0.35,
+        maxDistance: 20,
+        ambientOcclusion: true,
+        aoRadius: 3,
+      }
+    );
+    
+    heightmap = enhancedResult.heightmap;
+  } else {
+    heightmap = generateHeightmap(width, height, enrichedLayout.heightmap, enrichedLayout.biomes);
+  }
 
-  // Place objects
-  const objects = placeObjects(
-    layout.objects,
-    layout.biomes,
-    heightmap,
-    width,
-    height,
-    depth,
-    seed
-  );
+  // Initialize terrain and materials based on category
+  let terrain: Uint16Array;
+  let materials: Set<number>;
+  let objects: PlacedObject[] = [];
+  let lightingMap: Float32Array | undefined;
+  let biomeMap: Uint8Array | undefined;
+
+  switch (category) {
+    case 'interior': {
+      // Pure interior scene - no terrain, just rooms
+      terrain = new Uint16Array(width * height * depth);
+      materials = new Set<number>();
+      
+      buildInterior(terrain, enrichedLayout, materials, options, width, height, depth);
+      break;
+    }
+
+    case 'building': {
+      // Building on flat ground
+      terrain = new Uint16Array(width * height * depth);
+      materials = new Set<number>();
+      
+      // Create flat ground
+      const groundZ = Math.floor(depth * 0.2);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          for (let z = 0; z <= groundZ; z++) {
+            const mat = z === groundZ ? 7 : 2; // grass on top, dirt below
+            setTerrainVoxel(terrain, x, y, z, mat, width, height, depth, materials);
+          }
+          // Update heightmap for building placement
+          heightmap[y * width + x] = groundZ / depth;
+        }
+      }
+      
+      // Generate buildings
+      if (enrichedLayout.buildings && enrichedLayout.buildings.length > 0) {
+        buildBuildings(terrain, enrichedLayout.buildings, heightmap, materials, options, width, height, depth);
+      }
+      break;
+    }
+
+    case 'mixed': {
+      // Terrain with buildings - use enhanced if available
+      if (enhancedResult) {
+        terrain = enhancedResult.terrain;
+        materials = enhancedResult.materials;
+        lightingMap = enhancedResult.lightingMap;
+        biomeMap = enhancedResult.biomeMap;
+      } else {
+        const terrainResult = buildTerrain(
+          width,
+          height,
+          depth,
+          heightmap,
+          enrichedLayout.biomes,
+          options,
+          seed
+        );
+        terrain = terrainResult.terrain;
+        materials = terrainResult.materials;
+      }
+
+      // Add vegetation
+      const vegMaterials = addVegetation(
+        terrain,
+        width,
+        height,
+        depth,
+        heightmap,
+        enrichedLayout.biomes,
+        seed
+      );
+      vegMaterials.forEach(m => materials.add(m));
+
+      // Generate buildings on terrain
+      if (enrichedLayout.buildings && enrichedLayout.buildings.length > 0) {
+        buildBuildings(terrain, enrichedLayout.buildings, heightmap, materials, options, width, height, depth);
+      }
+
+      // Place objects
+      objects = placeObjects(
+        enrichedLayout.objects,
+        enrichedLayout.biomes,
+        heightmap,
+        width,
+        height,
+        depth,
+        seed
+      );
+      break;
+    }
+
+    case 'outdoor':
+    default: {
+      // Use enhanced terrain if available
+      if (enhancedResult) {
+        terrain = enhancedResult.terrain;
+        materials = enhancedResult.materials;
+        lightingMap = enhancedResult.lightingMap;
+        biomeMap = enhancedResult.biomeMap;
+      } else {
+        // Standard terrain generation
+        const terrainResult = buildTerrain(
+          width,
+          height,
+          depth,
+          heightmap,
+          enrichedLayout.biomes,
+          options,
+          seed
+        );
+        terrain = terrainResult.terrain;
+        materials = terrainResult.materials;
+      }
+
+      // Add trees and vegetation
+      const vegMaterials = addVegetation(
+        terrain,
+        width,
+        height,
+        depth,
+        heightmap,
+        enrichedLayout.biomes,
+        seed
+      );
+      vegMaterials.forEach(m => materials.add(m));
+
+      // Place objects
+      objects = placeObjects(
+        enrichedLayout.objects,
+        enrichedLayout.biomes,
+        heightmap,
+        width,
+        height,
+        depth,
+        seed
+      );
+      break;
+    }
+  }
 
   return {
     terrain,
@@ -952,6 +2090,8 @@ export function buildScenarioFromLayout(
     height,
     depth,
     heightmap,
+    lightingMap,
+    biomeMap,
     objects,
     materials,
   };
@@ -988,7 +2128,32 @@ export function getScenarioPreview(
     16: 0xff3c7850, // moss
     17: 0xff9678ff, // coral
     18: 0xff466496, // clay
-    19: 0xfffee6c8, // ice
+    19: 0xff787878, // cobblestone (dark gray)
+    20: 0xff4040a0, // brick (reddish)
+    21: 0xff5080c0, // plank (light wood)
+    22: 0xff60b0d0, // thatch (straw yellow)
+    23: 0xff6060c0, // tile (terracotta)
+    24: 0xffffffff, // marble (white)
+    25: 0xff80c0f0, // sandstone (tan-orange)
+    26: 0xff404040, // dark_stone
+    27: 0xff205080, // timber (dark brown)
+    28: 0xffa0a0a0, // iron (metallic)
+    29: 0x80ffc8a0, // glass (semi-transparent cyan)
+    30: 0xff4050a0, // carpet (red)
+    31: 0xff2040a0, // rug (darker red)
+    32: 0xff306090, // table_wood
+    33: 0xff305080, // chair_wood
+    34: 0xff204060, // bed_frame
+    35: 0xfff0f0f0, // bed_sheets (white)
+    36: 0xff204080, // bookshelf (dark wood)
+    37: 0xff00c8ff, // torch (orange glow)
+    38: 0xff50ffff, // chandelier (yellow)
+    39: 0xff305070, // barrel (brown)
+    40: 0xff406080, // crate (wood)
+    41: 0xff608080, // chest (metal trim)
+    42: 0xff404040, // anvil (dark metal)
+    43: 0xff504040, // cauldron (iron)
+    44: 0xff00d0ff, // throne (gold)
     ...colorMap,
   };
 

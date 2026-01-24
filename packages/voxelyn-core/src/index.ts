@@ -5,7 +5,12 @@ export * from "./core/rng.js";
 export * from "./core/palette.js";
 export * from "./core/textures.js";
 export * from "./core/behaviors.js";
-export * from "./core/terrainGen.js";
+export * from "./core/material-physics.js";
+export * from "./core/terrain/noise.js";
+export * from "./core/terrain/shadows.js";
+export * from "./core/terrain/biome-map.js";
+export * from "./core/terrain/biome-blend.js";
+export * from "./core/terrain/terrain-shapers.js";
 
 export * from "./extras/iso/iso.js";
 export * from "./extras/sprites/blit.js";

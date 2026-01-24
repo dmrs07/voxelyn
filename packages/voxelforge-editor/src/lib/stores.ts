@@ -539,7 +539,7 @@ export type HistoryInfo = {
 // Tool Store
 // ============================================================================
 
-export type ToolId = 'pencil' | 'eraser' | 'fill' | 'select' | 'pan' | 'eyedropper' | 'line' | 'rect' | 'ellipse' | 'wand';
+export type ToolId = 'pencil' | 'eraser' | 'fill' | 'select' | 'move' | 'pan' | 'eyedropper' | 'line' | 'rect' | 'ellipse' | 'wand';
 
 export type ToolSettings = {
   brushSize: number;
@@ -564,6 +564,7 @@ const createToolStore = () => {
   });
   const primaryMaterial = writable<number>(1); // Stone
   const secondaryMaterial = writable<number>(0); // Air
+  const activeZ = writable<number>(0); // Current Z level for voxel editing
   
   return {
     activeTool: {
@@ -582,6 +583,20 @@ const createToolStore = () => {
     secondaryMaterial: {
       subscribe: secondaryMaterial.subscribe,
       set: secondaryMaterial.set,
+    },
+    activeZ: {
+      subscribe: activeZ.subscribe,
+      set: activeZ.set,
+    },
+    
+    /** Set active Z level with bounds */
+    setActiveZ: (z: number, maxDepth = 64) => {
+      activeZ.set(Math.max(0, Math.min(maxDepth - 1, z)));
+    },
+    
+    /** Step Z level up or down */
+    stepActiveZ: (delta: number, maxDepth = 64) => {
+      activeZ.update(z => Math.max(0, Math.min(maxDepth - 1, z + delta)));
     },
     
     /** Swap primary and secondary materials */
@@ -642,6 +657,7 @@ const createUIStore = () => {
   const showPixelGrid = writable(true); // Only at high zoom
   const gridStep = writable(1);
   const cursorPosition = writable<{ x: number; y: number } | null>(null);
+  const showTextures = writable(false); // Toggle procedural textures rendering
   
   return {
     panels: {
@@ -665,6 +681,11 @@ const createUIStore = () => {
     cursorPosition: {
       subscribe: cursorPosition.subscribe,
       set: cursorPosition.set,
+    },
+    showTextures: {
+      subscribe: showTextures.subscribe,
+      toggle: () => showTextures.update(v => !v),
+      set: showTextures.set,
     },
   };
 };

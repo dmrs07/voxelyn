@@ -108,6 +108,22 @@ export {
 } from './generators/scenario-gen';
 
 // ============================================================================
+// ENHANCED TERRAIN (integrates with @voxelyn/core)
+// ============================================================================
+
+export {
+  buildEnhancedTerrain,
+  generateEnhancedHeightmap,
+  getTerrainLayerForHeight,
+  biomeRegionsToTerrainLayers,
+  DEFAULT_TERRAIN_LAYERS,
+  type EnhancedHeightmapParams,
+  type TerrainLayer,
+  type TerrainLightingParams,
+  type EnhancedTerrainResult,
+} from './generators/scenario-terrain';
+
+// ============================================================================
 // PROMPTS (for advanced users who want to customize)
 // ============================================================================
 
@@ -122,3 +138,45 @@ export {
   validateObjectBlueprint,
   validateScenarioLayout,
 } from './prompts/templates';
+
+// ============================================================================
+// MULTI-PROVIDER LLM SUPPORT
+// ============================================================================
+
+export {
+  // Factory functions
+  createLLMClient,
+  createClient,
+  createAutoClient,
+  getAvailableProviders,
+  // Provider clients
+  GeminiClient as GeminiLLMClient,
+  OpenAIClient,
+  AnthropicClient,
+  CopilotLLMClient,
+  OllamaClient,
+  GroqClient,
+  // Provider-specific factories
+  createGeminiClient as createGeminiLLMClient,
+  createOpenAIClient,
+  createAnthropicClient,
+  createCopilotClient,
+  createOllamaClient,
+  createGroqClient,
+  // Base class for custom providers
+  BaseLLMClient,
+  extractJSON,
+  // Types
+  type LLMProvider,
+  type ModelId,
+  type LLMClient,
+  type LLMClientConfig,
+  type QuickConfig,
+  type ProviderInfo,
+  type GeminiConfig,
+  type OpenAIConfig,
+  type AnthropicConfig,
+  type CopilotConfig,
+  type OllamaConfig,
+  type GroqConfig,
+} from './llm';
