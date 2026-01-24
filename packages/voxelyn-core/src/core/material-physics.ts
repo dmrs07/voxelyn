@@ -248,7 +248,7 @@ export function applyMaterialReactions(params: MaterialPhysicsStepParams): void 
 
         const rate = rule.rate ?? 1;
         if (rate < 1) {
-          const chance = hash2D(x + step, y - step, seed) % 1;
+          const chance = hash2D(x + step, y - step, seed);
           if (chance > rate) continue;
         }
 

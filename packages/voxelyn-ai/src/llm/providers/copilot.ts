@@ -123,9 +123,13 @@ export class CopilotLLMClient extends BaseLLMClient {
     }
 
     if (this.token) {
-      // Get current env from globalThis
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const currentEnv = (globalThis as any).process?.env ?? {};
+      // Get current env with fallback for different JavaScript environments
+      const currentEnv =
+        (typeof process !== 'undefined' && process.env) ||
+        (typeof globalThis !== 'undefined' &&
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (globalThis as any).process?.env) ||
+        {};
       options.env = {
         ...currentEnv,
         GITHUB_TOKEN: this.token,
