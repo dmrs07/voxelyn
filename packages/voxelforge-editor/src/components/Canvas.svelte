@@ -1776,6 +1776,7 @@
       cancelAnimationFrame(frame);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      webglRenderer?.dispose();
     };
   });
 </script>

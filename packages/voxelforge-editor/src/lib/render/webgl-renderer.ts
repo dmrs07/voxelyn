@@ -9,6 +9,7 @@ import type { CameraState } from '../document/types';
 export type WebglRenderer = {
   resize: (width: number, height: number) => void;
   render: (surface: Surface2D, camera: CameraState) => void;
+  dispose: () => void;
 };
 
 const createShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
@@ -113,6 +114,10 @@ export const createWebglRenderer = (canvas: HTMLCanvasElement): WebglRenderer | 
 
   const render = (surface: Surface2D, camera: CameraState) => {
     if (surface.width !== surfaceWidth || surface.height !== surfaceHeight) {
+      // Delete old texture before creating a new one to prevent memory leak
+      if (textureInfo.texture) {
+        gl.deleteTexture(textureInfo.texture);
+      }
       textureInfo = createTexture(gl, surface.width, surface.height);
       surfaceWidth = surface.width;
       surfaceHeight = surface.height;
@@ -145,5 +150,12 @@ export const createWebglRenderer = (canvas: HTMLCanvasElement): WebglRenderer | 
     gl.bindVertexArray(null);
   };
 
-  return { resize, render };
+  const dispose = () => {
+    if (vao) gl.deleteVertexArray(vao);
+    if (buffer) gl.deleteBuffer(buffer);
+    if (program) gl.deleteProgram(program);
+    if (textureInfo.texture) gl.deleteTexture(textureInfo.texture);
+  };
+
+  return { resize, render, dispose };
 };

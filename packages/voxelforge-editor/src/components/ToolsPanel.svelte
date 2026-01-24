@@ -2,6 +2,19 @@
   import { toolStore, activeLayer, documentStore, type ToolId, type ToolSettings } from '$lib/stores';
   import { get } from 'svelte/store';
   import {
+    generateTerrainFromSpec,
+    type TerrainGenSpec,
+    type TerrainGenResult,
+  } from '@voxelyn/core';
+  import {
+    conditioningFromImageData,
+    loadImageDataFromFile,
+  } from '$lib/ai/image-conditioning';
+  import {
+    createDefaultTerrainGenSpec,
+    validateTerrainGenSpec,
+  } from '$lib/ai/scene-schema';
+  import {
     PencilSimple,
     Eraser,
     PaintBucket,
