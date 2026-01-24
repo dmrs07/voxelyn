@@ -46,17 +46,6 @@ export type MaterialPhysicsStepParams = {
   globals?: MaterialPhysicsGlobals;
 };
 
-/**
- * Clamps a numeric value to the range [0, 1].
- * @param value - The number to clamp.
- * @returns The clamped value, guaranteed to be between 0 and 1 inclusive.
- * @example
- * clamp01(1.5)  // returns 1
- * clamp01(-0.3) // returns 0
- * clamp01(0.5)  // returns 0.5
- */
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
-
 const hash2D = (x: number, y: number, seed: number): number => {
   let h = (x * 374761393 + y * 668265263) ^ seed;
   h = (h ^ (h >> 13)) * 1274126177;
