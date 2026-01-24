@@ -108,6 +108,22 @@ export {
 } from './generators/scenario-gen';
 
 // ============================================================================
+// ENHANCED TERRAIN (integrates with @voxelyn/core)
+// ============================================================================
+
+export {
+  buildEnhancedTerrain,
+  generateEnhancedHeightmap,
+  getTerrainLayerForHeight,
+  biomeRegionsToTerrainLayers,
+  DEFAULT_TERRAIN_LAYERS,
+  type EnhancedHeightmapParams,
+  type TerrainLayer,
+  type TerrainLightingParams,
+  type EnhancedTerrainResult,
+} from './generators/scenario-terrain';
+
+// ============================================================================
 // PROMPTS (for advanced users who want to customize)
 // ============================================================================
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { toolStore, activeLayer, documentStore, type ToolId, type ToolSettings } from '$lib/stores';
+  import { get } from 'svelte/store';
   import {
     PencilSimple,
     Eraser,
@@ -14,9 +15,11 @@
     Minus,
     Plus,
     Stack,
-    ArrowsOutCardinal
+    ArrowsOutCardinal,
+    PaintRoller,
+    Trash
   } from 'phosphor-svelte';
-  import type { VoxelLayer } from '$lib/document/types';
+  import type { VoxelLayer, GridLayer } from '$lib/document/types';
   
   let activeTool = $state<ToolId>('pencil');
   let brushSize = $state(1);
@@ -25,6 +28,8 @@
   let activeZ = $state(0);
   let isVoxelLayer = $state(false);
   let maxDepth = $state(32);
+  let hasSelection = $state(false);
+  let primaryMat = $state(1);
   
   toolStore.activeTool.subscribe((t: ToolId) => activeTool = t);
   toolStore.settings.subscribe((s: ToolSettings) => {
@@ -33,6 +38,7 @@
     shapeFilled = s.shapeFilled;
   });
   toolStore.activeZ.subscribe((z: number) => activeZ = z);
+  toolStore.primaryMaterial.subscribe((m: number) => primaryMat = m);
   
   // Track if current layer is a voxel layer
   activeLayer.subscribe(layer => {
@@ -40,6 +46,11 @@
     if (layer?.type === 'voxel3d') {
       maxDepth = (layer as VoxelLayer).depth;
     }
+  });
+
+  // Track selection state
+  documentStore.subscribe(doc => {
+    hasSelection = doc.selection?.active && doc.selection.width > 0 && doc.selection.height > 0;
   });
   
   const tools: Array<{ id: ToolId; icon: typeof PencilSimple; label: string; key: string }> = [
@@ -66,6 +77,94 @@
 
   const setBrushShape = (shape: ToolSettings['brushShape']) => {
     toolStore.setBrushShape(shape);
+  };
+
+  // Fill selection with current material
+  const fillSelection = () => {
+    const doc = get(documentStore);
+    const layer = get(activeLayer);
+    if (!layer || !doc.selection?.active) return;
+    
+    if (layer.type !== 'grid2d') {
+      console.warn('Fill selection only works on 2D grid layers');
+      return;
+    }
+    
+    const gridLayer = layer as GridLayer;
+    const sel = doc.selection;
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+    
+    for (let sy = 0; sy < sel.height; sy++) {
+      for (let sx = 0; sx < sel.width; sx++) {
+        // Check if pixel is in selection mask
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+        
+        const x = sel.x + sx;
+        const y = sel.y + sy;
+        
+        if (x < 0 || x >= gridLayer.width || y < 0 || y >= gridLayer.height) continue;
+        
+        const index = y * gridLayer.width + x;
+        const oldValue = gridLayer.data[index];
+        const newValue = primaryMat;
+        
+        if (oldValue !== newValue) {
+          pixels.push({ index, oldValue, newValue });
+        }
+      }
+    }
+    
+    if (pixels.length > 0) {
+      documentStore.fill({ layerId: layer.id, pixels });
+    }
+  };
+
+  // Clear selection (fill with air/0)
+  const clearSelection = () => {
+    const doc = get(documentStore);
+    const layer = get(activeLayer);
+    if (!layer || !doc.selection?.active) return;
+    
+    if (layer.type !== 'grid2d') {
+      console.warn('Clear selection only works on 2D grid layers');
+      return;
+    }
+    
+    const gridLayer = layer as GridLayer;
+    const sel = doc.selection;
+    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
+    
+    for (let sy = 0; sy < sel.height; sy++) {
+      for (let sx = 0; sx < sel.width; sx++) {
+        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
+        if (!inMask) continue;
+        
+        const x = sel.x + sx;
+        const y = sel.y + sy;
+        
+        if (x < 0 || x >= gridLayer.width || y < 0 || y >= gridLayer.height) continue;
+        
+        const index = y * gridLayer.width + x;
+        const oldValue = gridLayer.data[index];
+        
+        if (oldValue !== 0) {
+          pixels.push({ index, oldValue, newValue: 0 });
+        }
+      }
+    }
+    
+    if (pixels.length > 0) {
+      documentStore.erase({ layerId: layer.id, pixels });
+    }
+  };
+
+  // Deselect all
+  const deselectAll = () => {
+    documentStore.select({ 
+      before: get(documentStore).selection, 
+      after: { active: false, x: 0, y: 0, width: 0, height: 0 } 
+    });
   };
 </script>
 
@@ -133,6 +232,40 @@
       Filled Shapes (F)
     </label>
   </div>
+
+  {#if hasSelection}
+    <div class="divider"></div>
+    
+    <div class="selection-actions">
+      <div class="panel-header">Selection</div>
+      <div class="action-buttons">
+        <button 
+          class="action-btn fill-btn" 
+          onclick={fillSelection}
+          title="Fill selection with current material"
+        >
+          <PaintRoller size={14} weight="bold" />
+          Fill
+        </button>
+        <button 
+          class="action-btn clear-btn" 
+          onclick={clearSelection}
+          title="Clear selection (erase)"
+        >
+          <Trash size={14} weight="bold" />
+          Clear
+        </button>
+        <button 
+          class="action-btn" 
+          onclick={deselectAll}
+          title="Deselect all (Esc)"
+        >
+          <Selection size={14} weight="bold" />
+          Deselect
+        </button>
+      </div>
+    </div>
+  {/if}
 
   {#if isVoxelLayer}
     <div class="divider"></div>
@@ -339,5 +472,56 @@
     font-size: 10px;
     color: #666;
     text-align: center;
+  }
+
+  .selection-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    background: #1a1a2e;
+    color: #9aa0b2;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+
+  .action-btn:hover {
+    background: #2a2a4e;
+    color: #fff;
+  }
+
+  .action-btn.fill-btn {
+    background: #2d4a3d;
+    color: #6ee7b7;
+  }
+
+  .action-btn.fill-btn:hover {
+    background: #3d6a52;
+    color: #a7f3d0;
+  }
+
+  .action-btn.clear-btn {
+    background: #4a2d2d;
+    color: #fca5a5;
+  }
+
+  .action-btn.clear-btn:hover {
+    background: #6a3d3d;
+    color: #fecaca;
   }
 </style>

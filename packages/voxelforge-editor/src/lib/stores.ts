@@ -657,6 +657,7 @@ const createUIStore = () => {
   const showPixelGrid = writable(true); // Only at high zoom
   const gridStep = writable(1);
   const cursorPosition = writable<{ x: number; y: number } | null>(null);
+  const showTextures = writable(false); // Toggle procedural textures rendering
   
   return {
     panels: {
@@ -680,6 +681,11 @@ const createUIStore = () => {
     cursorPosition: {
       subscribe: cursorPosition.subscribe,
       set: cursorPosition.set,
+    },
+    showTextures: {
+      subscribe: showTextures.subscribe,
+      toggle: () => showTextures.update(v => !v),
+      set: showTextures.set,
     },
   };
 };

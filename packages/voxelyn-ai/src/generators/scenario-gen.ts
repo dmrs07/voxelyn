@@ -4,6 +4,12 @@
  * Builds complete world/scenario voxel data from AI-predicted layouts.
  * Handles terrain generation, biome placement, object distribution,
  * building generation, and interior room layouts.
+ * 
+ * Now integrates with @voxelyn/core's advanced procedural generation:
+ * - GradientNoise with zoom factor, octaves, fBm
+ * - Height thresholds for terrain types
+ * - Raycast shadows for depth
+ * - Surface/subsurface material selection
  */
 
 import type {
@@ -16,6 +22,16 @@ import type {
   RoomDefinition,
   BuildingStyle,
 } from '../types';
+
+import {
+  buildEnhancedTerrain,
+  biomeRegionsToTerrainLayers,
+  DEFAULT_TERRAIN_LAYERS,
+  type EnhancedHeightmapParams,
+  type TerrainLayer,
+  type TerrainLightingParams,
+  type EnhancedTerrainResult,
+} from './scenario-terrain';
 
 // ============================================================================
 // TYPES
@@ -33,6 +49,10 @@ export type ScenarioBuildResult = {
   depth: number; // Z (vertical)
   /** Heightmap as 2D array [x + y * width]. */
   heightmap: Float32Array;
+  /** Shadow/lighting map (0 = shadow, 1 = lit) */
+  lightingMap?: Float32Array;
+  /** Biome index per cell */
+  biomeMap?: Uint8Array;
   /** Object instances to place. */
   objects: PlacedObject[];
   /** Materials used. */
@@ -59,6 +79,17 @@ export type ScenarioBuildOptions = {
   biomeMaterials?: Partial<Record<BiomeType, { surface: number; underground: number }>>;
   /** Scale factor for terrain detail. */
   detailScale?: number;
+  /** 
+   * Use enhanced terrain generation from @voxelyn/core 
+   * Enables: zoom factor, octaves, height thresholds, shadows
+   */
+  useEnhancedTerrain?: boolean;
+  /** Enhanced heightmap parameters (when useEnhancedTerrain is true) */
+  enhancedHeightmapParams?: Partial<EnhancedHeightmapParams>;
+  /** Custom terrain layers (height thresholds) */
+  terrainLayers?: TerrainLayer[];
+  /** Lighting/shadow configuration */
+  lighting?: TerrainLightingParams;
 };
 
 // ============================================================================
@@ -1314,7 +1345,7 @@ function generateBuilding(
   }
 
   // Build basement if present
-  let currentZ = groundZ + 1;
+  const currentZ = groundZ + 1;
   if (building.hasBasement) {
     const basementRoom: RoomDefinition = {
       type: 'storage',
@@ -1855,13 +1886,67 @@ export function buildScenarioFromLayout(
   const seed = enrichedLayout.seed;
   const category = enrichedLayout.category ?? 'outdoor';
 
+  // Use enhanced terrain if requested
+  const useEnhanced = options.useEnhancedTerrain ?? false;
+
+  // Enhanced terrain result (if using enhanced mode)
+  let enhancedResult: EnhancedTerrainResult | null = null;
+
   // Generate heightmap (used even for buildings to determine ground level)
-  const heightmap = generateHeightmap(width, height, enrichedLayout.heightmap, enrichedLayout.biomes);
+  let heightmap: Float32Array;
+  
+  if (useEnhanced && (category === 'outdoor' || category === 'mixed')) {
+    // Use @voxelyn/core enhanced heightmap generation
+    const enhancedParams: EnhancedHeightmapParams = {
+      octaves: enrichedLayout.heightmap.octaves,
+      persistence: enrichedLayout.heightmap.persistence,
+      scale: enrichedLayout.heightmap.scale,
+      seed: enrichedLayout.heightmap.seed,
+      baseElevation: enrichedLayout.heightmap.baseElevation,
+      amplitude: enrichedLayout.heightmap.amplitude,
+      // Enhanced features
+      zoomFactor: options.enhancedHeightmapParams?.zoomFactor ?? 80,
+      noiseDetail: options.enhancedHeightmapParams?.noiseDetail,
+      ridgedMountains: options.enhancedHeightmapParams?.ridgedMountains ?? true,
+      domainWarping: options.enhancedHeightmapParams?.domainWarping ?? false,
+      warpScale: options.enhancedHeightmapParams?.warpScale ?? 0.5,
+      ...options.enhancedHeightmapParams,
+    };
+    
+    // Determine terrain layers
+    const terrainLayers = options.terrainLayers 
+      ?? (enrichedLayout.biomes.length > 0 
+          ? biomeRegionsToTerrainLayers(enrichedLayout.biomes, { ...DEFAULT_MATERIAL_MAPPING, ...options.materialMapping })
+          : DEFAULT_TERRAIN_LAYERS);
+    
+    // Build enhanced terrain with shadows
+    enhancedResult = buildEnhancedTerrain(
+      width,
+      height,
+      depth,
+      enhancedParams,
+      terrainLayers,
+      options.lighting ?? {
+        enabled: true,
+        lightDirection: { x: -0.6, y: -0.4 },
+        intensity: 0.35,
+        maxDistance: 20,
+        ambientOcclusion: true,
+        aoRadius: 3,
+      }
+    );
+    
+    heightmap = enhancedResult.heightmap;
+  } else {
+    heightmap = generateHeightmap(width, height, enrichedLayout.heightmap, enrichedLayout.biomes);
+  }
 
   // Initialize terrain and materials based on category
   let terrain: Uint16Array;
   let materials: Set<number>;
   let objects: PlacedObject[] = [];
+  let lightingMap: Float32Array | undefined;
+  let biomeMap: Uint8Array | undefined;
 
   switch (category) {
     case 'interior': {
@@ -1899,18 +1984,25 @@ export function buildScenarioFromLayout(
     }
 
     case 'mixed': {
-      // Terrain with buildings
-      const terrainResult = buildTerrain(
-        width,
-        height,
-        depth,
-        heightmap,
-        enrichedLayout.biomes,
-        options,
-        seed
-      );
-      terrain = terrainResult.terrain;
-      materials = terrainResult.materials;
+      // Terrain with buildings - use enhanced if available
+      if (enhancedResult) {
+        terrain = enhancedResult.terrain;
+        materials = enhancedResult.materials;
+        lightingMap = enhancedResult.lightingMap;
+        biomeMap = enhancedResult.biomeMap;
+      } else {
+        const terrainResult = buildTerrain(
+          width,
+          height,
+          depth,
+          heightmap,
+          enrichedLayout.biomes,
+          options,
+          seed
+        );
+        terrain = terrainResult.terrain;
+        materials = terrainResult.materials;
+      }
 
       // Add vegetation
       const vegMaterials = addVegetation(
@@ -1944,18 +2036,26 @@ export function buildScenarioFromLayout(
 
     case 'outdoor':
     default: {
-      // Standard terrain generation
-      const terrainResult = buildTerrain(
-        width,
-        height,
-        depth,
-        heightmap,
-        enrichedLayout.biomes,
-        options,
-        seed
-      );
-      terrain = terrainResult.terrain;
-      materials = terrainResult.materials;
+      // Use enhanced terrain if available
+      if (enhancedResult) {
+        terrain = enhancedResult.terrain;
+        materials = enhancedResult.materials;
+        lightingMap = enhancedResult.lightingMap;
+        biomeMap = enhancedResult.biomeMap;
+      } else {
+        // Standard terrain generation
+        const terrainResult = buildTerrain(
+          width,
+          height,
+          depth,
+          heightmap,
+          enrichedLayout.biomes,
+          options,
+          seed
+        );
+        terrain = terrainResult.terrain;
+        materials = terrainResult.materials;
+      }
 
       // Add trees and vegetation
       const vegMaterials = addVegetation(
@@ -1989,6 +2089,8 @@ export function buildScenarioFromLayout(
     height,
     depth,
     heightmap,
+    lightingMap,
+    biomeMap,
     objects,
     materials,
   };

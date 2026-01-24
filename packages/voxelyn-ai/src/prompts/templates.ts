@@ -281,6 +281,21 @@ EXAMPLE - "Dungeon Room":
   }]
 }
 
+ENHANCED TERRAIN FEATURES (for outdoor/mixed):
+When generating outdoor terrain, the engine supports advanced procedural generation with:
+- Zoom factor: Higher values (80-150) create smoother, more natural terrain
+- Height thresholds: Terrain types are assigned based on elevation (water < 0.4, sand < 0.5, grass < 0.7, mountain >= 0.7)
+- Ridged noise: Creates sharp mountain peaks and ridges (recommended for mountains biome)
+- Domain warping: Creates organic, flowing terrain shapes (good for swamps, forests)
+- Raycast shadows: Adds depth with light direction shadows
+- Ambient occlusion: Darkens crevices and valleys
+
+HEIGHTMAP PARAMETERS for smooth terrain:
+- For gentle rolling hills: octaves=4-5, persistence=0.4-0.5, amplitude=0.3
+- For dramatic mountains: octaves=5-6, persistence=0.5-0.6, amplitude=0.6
+- For flat plains with detail: octaves=3-4, persistence=0.3-0.4, amplitude=0.15
+- For desert dunes: octaves=3, persistence=0.6, amplitude=0.25
+
 Respond ONLY with valid JSON. No explanations, no markdown code blocks.`;
 
 // ============================================================================

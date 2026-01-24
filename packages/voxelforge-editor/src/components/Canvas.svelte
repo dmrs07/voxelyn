@@ -28,8 +28,14 @@
   let view3dPointer = { x: 0, y: 0 };
   let view3dOrbiting = false;
   let view3dPanning = false;
+  let view3dEditing = $state(false);  // Enables editing in 3D view
   let fps = $state(0);
   let fpsSmoothed = 0;
+  
+  // Ghost voxel state for isometric/3D preview
+  let ghostVoxel = $state<{ x: number; y: number; z: number; visible: boolean }>({
+    x: 0, y: 0, z: 0, visible: false
+  });
   let fpsFrameCount = 0;
   let fpsLastTime = performance.now();
   let needsRender = true;
@@ -48,6 +54,7 @@
   let showGrid: boolean = get(uiStore.showGrid);
   let gridStep: number = get(uiStore.gridStep);
   let cursorPosition: { x: number; y: number } | null = get(uiStore.cursorPosition);
+  let showTextures: boolean = get(uiStore.showTextures);
   let isPanModifier = false;
   let lastDocDims = { width: 0, height: 0, depth: 0 };
   let lastViewMode = '2d' as EditorDocument['viewMode'];
@@ -481,6 +488,14 @@
     cursorPosition = gridPos;
     uiStore.cursorPosition.set(gridPos);
 
+    // Update ghost voxel for isometric view
+    if (doc.viewMode === 'iso') {
+      ghostVoxel = { x: gridPos.x, y: gridPos.y, z: 0, visible: true };
+      overlayNeedsRender = true;
+    } else {
+      ghostVoxel = { ...ghostVoxel, visible: false };
+    }
+
     const toolCtx = buildToolContext();
     const activeToolId = toolState.activePointerToolId ?? tool;
     const activeTool = toolRegistry[activeToolId] ?? toolRegistry.pencil;
@@ -778,13 +793,100 @@
       doc.camera,
       {},
       showGrid,
-      gridStep
+      gridStep,
+      showTextures
     );
     renderIsoOverlay();
   };
 
+  /** Draws a ghost voxel at the cursor position in isometric view */
+  const drawGhostVoxel = () => {
+    if (!ctx || !canvas || !ghostVoxel.visible) return;
+    if (!['pencil', 'eraser', 'line', 'rect', 'ellipse', 'fill'].includes(tool)) return;
+
+    const { tileW, tileH, zStep, baselineZ } = ISO_DEFAULTS;
+    const centerX = canvas.clientWidth / 2 + doc.camera.x;
+    const centerY = canvas.clientHeight / 3 + doc.camera.y;
+
+    const gx = ghostVoxel.x;
+    const gy = ghostVoxel.y;
+    const gz = baselineZ;
+
+    // Project ghost voxel position
+    const projected = projectIso(gx, gy, gz, tileW, tileH, zStep);
+    const sx = projected.sx;
+    const sy = projected.sy;
+
+    ctx.save();
+    ctx.scale(doc.camera.zoom, doc.camera.zoom);
+    ctx.translate(centerX / doc.camera.zoom, centerY / doc.camera.zoom);
+
+    // Get material color
+    const mat = tool === 'eraser' ? 0 : primaryMat;
+    const material = doc.palette[mat];
+    const baseColor = material?.color ?? 0xffffffff;
+    const r = baseColor & 0xff;
+    const g = (baseColor >> 8) & 0xff;
+    const b = (baseColor >> 16) & 0xff;
+
+    const hw = tileW / 2;
+    const hh = tileH / 2;
+    const wallHeight = zStep;
+
+    // Draw ghost with transparency
+    ctx.globalAlpha = tool === 'eraser' ? 0.3 : 0.5;
+
+    // Draw left wall
+    ctx.fillStyle = `rgba(${Math.round(r * 0.6)},${Math.round(g * 0.6)},${Math.round(b * 0.6)},0.5)`;
+    ctx.beginPath();
+    ctx.moveTo(sx - hw, sy);
+    ctx.lineTo(sx, sy + hh);
+    ctx.lineTo(sx, sy + hh + wallHeight);
+    ctx.lineTo(sx - hw, sy + wallHeight);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw right wall
+    ctx.fillStyle = `rgba(${Math.round(r * 0.7)},${Math.round(g * 0.7)},${Math.round(b * 0.7)},0.5)`;
+    ctx.beginPath();
+    ctx.moveTo(sx + hw, sy);
+    ctx.lineTo(sx, sy + hh);
+    ctx.lineTo(sx, sy + hh + wallHeight);
+    ctx.lineTo(sx + hw, sy + wallHeight);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw top face
+    ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - hh);
+    ctx.lineTo(sx + hw, sy);
+    ctx.lineTo(sx, sy + hh);
+    ctx.lineTo(sx - hw, sy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw outline
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = tool === 'eraser' ? '#ff4444' : '#44ff44';
+    ctx.lineWidth = 2 / doc.camera.zoom;
+    ctx.stroke();
+
+    // Draw coordinate indicator
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.font = `${10 / doc.camera.zoom}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`(${gx}, ${gy})`, sx, sy - hh - 8 / doc.camera.zoom);
+
+    ctx.restore();
+  };
+
   const renderIsoOverlay = () => {
     if (!ctx || !canvas) return;
+
+    // Draw ghost voxel first
+    drawGhostVoxel();
 
     const selectionToDraw = toolState.selectionPreview ?? doc.selection;
     if (!selectionToDraw.active || selectionToDraw.width <= 0 || selectionToDraw.height <= 0) {
@@ -1115,9 +1217,182 @@
     return multiplyMat4(proj, view);
   };
 
+  /**
+   * Raycast from screen coordinates to find the first voxel hit in 3D space.
+   * Uses DDA (Digital Differential Analyzer) algorithm for efficient voxel traversal.
+   */
+  const raycast3d = (screenX: number, screenY: number): { hit: boolean; x: number; y: number; z: number; normal: { x: number; y: number; z: number } } | null => {
+    if (!canvas) return null;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    
+    // Convert screen coords to NDC (-1 to 1)
+    const ndcX = (screenX / width) * 2 - 1;
+    const ndcY = 1 - (screenY / height) * 2;
+
+    // Get camera position and direction
+    const { camera } = getViewBasis();
+    
+    // Calculate ray direction from camera through screen point
+    const aspect = width / height;
+    const tanHalfFov = Math.tan(view3dSettings.fov / 2);
+    
+    // Calculate ray in camera space
+    const rayDirCameraX = ndcX * tanHalfFov * aspect;
+    const rayDirCameraY = ndcY * tanHalfFov;
+    const rayDirCameraZ = -1;
+
+    // Transform to world space using inverse view rotation
+    const forward = {
+      x: view3d.target.x - camera.x,
+      y: view3d.target.y - camera.y,
+      z: view3d.target.z - camera.z,
+    };
+    const fLen = Math.hypot(forward.x, forward.y, forward.z) || 1;
+    const fwd = { x: forward.x / fLen, y: forward.y / fLen, z: forward.z / fLen };
+    
+    const upWorld = { x: 0, y: 1, z: 0 };
+    const right = {
+      x: fwd.y * upWorld.z - fwd.z * upWorld.y,
+      y: fwd.z * upWorld.x - fwd.x * upWorld.z,
+      z: fwd.x * upWorld.y - fwd.y * upWorld.x,
+    };
+    const rLen = Math.hypot(right.x, right.y, right.z) || 1;
+    const r = { x: right.x / rLen, y: right.y / rLen, z: right.z / rLen };
+    
+    const up = {
+      x: r.y * fwd.z - r.z * fwd.y,
+      y: r.z * fwd.x - r.x * fwd.z,
+      z: r.x * fwd.y - r.y * fwd.x,
+    };
+
+    // Ray direction in world space
+    const rayDir = {
+      x: r.x * rayDirCameraX + up.x * rayDirCameraY + fwd.x * rayDirCameraZ,
+      y: r.y * rayDirCameraX + up.y * rayDirCameraY + fwd.y * rayDirCameraZ,
+      z: r.z * rayDirCameraX + up.z * rayDirCameraY + fwd.z * rayDirCameraZ,
+    };
+    const dirLen = Math.hypot(rayDir.x, rayDir.y, rayDir.z);
+    rayDir.x /= dirLen;
+    rayDir.y /= dirLen;
+    rayDir.z /= dirLen;
+
+    // Find voxel layer to raycast against
+    const voxelLayer = doc.layers.find(l => l.type === 'voxel3d' && l.visible) as VoxelLayer | undefined;
+    if (!voxelLayer) return null;
+
+    // DDA raycast through voxel grid
+    const maxDist = Math.max(doc.width, doc.height, doc.depth) * 2;
+    let t = 0;
+    let lastNormal = { x: 0, y: 1, z: 0 };
+
+    while (t < maxDist) {
+      const px = camera.x + rayDir.x * t;
+      const py = camera.y + rayDir.y * t;
+      const pz = camera.z + rayDir.z * t;
+
+      // Map world to voxel coords (Y in 3D = depth, Z in 3D = height)
+      const vx = Math.floor(px);
+      const vy = Math.floor(pz);  // Document Y
+      const vz = Math.floor(py);  // Document Z (depth/height)
+
+      if (vx >= 0 && vx < voxelLayer.width &&
+          vy >= 0 && vy < voxelLayer.height &&
+          vz >= 0 && vz < voxelLayer.depth) {
+        const idx = vx + vy * voxelLayer.width + vz * voxelLayer.width * voxelLayer.height;
+        if (voxelLayer.data[idx] !== 0) {
+          return { hit: true, x: vx, y: vy, z: vz, normal: lastNormal };
+        }
+      }
+
+      // Step to next voxel boundary
+      const tDeltaX = rayDir.x !== 0 ? Math.abs(1 / rayDir.x) : Infinity;
+      const tDeltaY = rayDir.y !== 0 ? Math.abs(1 / rayDir.y) : Infinity;
+      const tDeltaZ = rayDir.z !== 0 ? Math.abs(1 / rayDir.z) : Infinity;
+
+      const tMaxX = rayDir.x > 0 ? (Math.floor(px) + 1 - px) * tDeltaX : (px - Math.floor(px)) * tDeltaX;
+      const tMaxY = rayDir.y > 0 ? (Math.floor(py) + 1 - py) * tDeltaY : (py - Math.floor(py)) * tDeltaY;
+      const tMaxZ = rayDir.z > 0 ? (Math.floor(pz) + 1 - pz) * tDeltaZ : (pz - Math.floor(pz)) * tDeltaZ;
+
+      if (tMaxX < tMaxY && tMaxX < tMaxZ) {
+        t += tMaxX + 0.001;
+        lastNormal = { x: rayDir.x > 0 ? -1 : 1, y: 0, z: 0 };
+      } else if (tMaxY < tMaxZ) {
+        t += tMaxY + 0.001;
+        lastNormal = { x: 0, y: rayDir.y > 0 ? -1 : 1, z: 0 };
+      } else {
+        t += tMaxZ + 0.001;
+        lastNormal = { x: 0, y: 0, z: rayDir.z > 0 ? -1 : 1 };
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * Paint a voxel at the specified 3D coordinates
+   */
+  const paintVoxel3d = (x: number, y: number, z: number, material: number) => {
+    const voxelLayer = doc.layers.find(l => l.type === 'voxel3d' && !l.locked) as VoxelLayer | undefined;
+    if (!voxelLayer) return;
+
+    if (x < 0 || x >= voxelLayer.width ||
+        y < 0 || y >= voxelLayer.height ||
+        z < 0 || z >= voxelLayer.depth) return;
+
+    const idx = x + y * voxelLayer.width + z * voxelLayer.width * voxelLayer.height;
+    const oldValue = voxelLayer.data[idx];
+    if (oldValue === material) return;
+
+    documentStore.paint({
+      layerId: voxelLayer.id,
+      pixels: [{ index: idx, oldValue, newValue: material }],
+    });
+  };
+
   const handlePointerDown3d = (e: PointerEvent) => {
     e.preventDefault();
     view3dPointer = { x: e.clientX, y: e.clientY };
+
+    // Check for edit mode (Ctrl+click to place, Shift+click to remove)
+    if (view3dEditing || e.ctrlKey || e.metaKey || e.shiftKey) {
+      const rect = canvas.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      const hit = raycast3d(screenX, screenY);
+
+      if (hit && hit.hit) {
+        if (e.shiftKey) {
+          // Remove voxel (eraser mode)
+          paintVoxel3d(hit.x, hit.y, hit.z, 0);
+        } else {
+          // Place voxel on the face we hit (add in normal direction)
+          // Normal maps: Y in 3D -> Z in doc, Z in 3D -> Y in doc
+          const placeX = hit.x + Math.round(hit.normal.x);
+          const placeY = hit.y + Math.round(hit.normal.z);  // Z normal -> Y coord
+          const placeZ = hit.z + Math.round(hit.normal.y);  // Y normal -> Z coord
+          paintVoxel3d(placeX, placeY, placeZ, primaryMat);
+        }
+        invalidateRender();
+        render();
+        return;
+      } else if (e.ctrlKey || e.metaKey) {
+        // Clicked empty space with Ctrl - place at ground level towards cursor
+        // This provides a way to start building when there are no voxels
+        const voxelLayer = doc.layers.find(l => l.type === 'voxel3d' && !l.locked) as VoxelLayer | undefined;
+        if (voxelLayer) {
+          // Place at center of document at z=0
+          const cx = Math.floor(doc.width / 2);
+          const cy = Math.floor(doc.height / 2);
+          paintVoxel3d(cx, cy, 0, primaryMat);
+          invalidateRender();
+          render();
+        }
+        return;
+      }
+    }
+
     view3dPanning = e.button === 2 || isPanModifier;
     view3dOrbiting = !view3dPanning;
     canvas.setPointerCapture(e.pointerId);
@@ -1417,6 +1692,7 @@
       uiStore.showGrid.subscribe(g => { showGrid = g; invalidateRender(); render(); }),
       uiStore.gridStep.subscribe(step => { gridStep = step; invalidateRender(); render(); }),
       uiStore.cursorPosition.subscribe(pos => { cursorPosition = pos; }),
+      uiStore.showTextures.subscribe(t => { showTextures = t; invalidateRender(); render(); }),
     ];
     
     // Resize observer
@@ -1616,6 +1892,28 @@
                 }}
               />
             </label>
+          </div>
+        </div>
+
+        <div class="view-3d-edit-section">
+          <div class="anchors-header">
+            <span>Edit Mode</span>
+            <button 
+              class="edit-toggle" 
+              class:active={view3dEditing}
+              onclick={() => { view3dEditing = !view3dEditing; }}
+              title="Toggle edit mode"
+            >
+              {view3dEditing ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <div class="edit-help">
+            <small>
+              <strong>Ctrl+Click:</strong> Place voxel<br/>
+              <strong>Shift+Click:</strong> Remove voxel<br/>
+              <strong>Drag:</strong> Orbit camera<br/>
+              <strong>Right Drag:</strong> Pan camera
+            </small>
           </div>
         </div>
       </div>
@@ -1848,5 +2146,52 @@
   .anchor-btn:hover {
     background: #2b2b54;
     color: #fff;
+  }
+
+  .view-3d-edit-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #2b2b3f;
+    padding-top: 10px;
+    margin-top: 4px;
+  }
+
+  .edit-toggle {
+    padding: 3px 8px;
+    border: none;
+    border-radius: 4px;
+    background: #1f1f33;
+    color: #9aa0b2;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .edit-toggle.active {
+    background: #22c55e;
+    color: #fff;
+  }
+
+  .edit-toggle:hover {
+    background: #303050;
+  }
+
+  .edit-toggle.active:hover {
+    background: #16a34a;
+  }
+
+  .edit-help {
+    background: #141420;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 10px;
+    color: #9aa0b2;
+    line-height: 1.5;
+  }
+
+  .edit-help strong {
+    color: #cdd3ff;
   }
 </style>

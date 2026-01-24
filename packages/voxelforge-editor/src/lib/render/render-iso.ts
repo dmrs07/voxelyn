@@ -5,6 +5,13 @@
 
 import { projectIso, forEachIsoOrder } from '@voxelyn/core';
 import type { EditorDocument, GridLayer, VoxelLayer, Material, Layer, BlendMode } from '../document/types';
+import { 
+  getTextureTile, 
+  initTextureCache,
+  drawTexturedIsoTile,
+  drawTexturedIsoWalls,
+  type TextureTile 
+} from './texture-cache';
 
 /** Height mode presets for isometric rendering */
 export type IsoHeightMode = 
@@ -178,10 +185,31 @@ export const renderDocumentIso = (
   camera: { x: number; y: number; zoom: number; rotation: number },
   settings: Partial<IsoSettings> = {},
   showGrid: boolean = true,
-  gridStep: number = 1
+  gridStep: number = 1,
+  showTextures: boolean = false
 ) => {
   const opts: IsoSettings = { ...DEFAULT_ISO_SETTINGS, ...settings };
   const { tileW, tileH, zStep, baselineZ, lightDir } = opts;
+  
+  // Initialize texture cache if textures enabled
+  if (showTextures) {
+    initTextureCache(16);
+  }
+  
+  // Cache for texture tiles
+  const textureCache = new Map<number, TextureTile | null>();
+  
+  const getMatTexture = (material: Material): TextureTile | null => {
+    if (!showTextures) return null;
+    
+    if (textureCache.has(material.id)) {
+      return textureCache.get(material.id) ?? null;
+    }
+    
+    const tile = getTextureTile(material, ctx);
+    textureCache.set(material.id, tile);
+    return tile;
+  };
   
   // Clear canvas
   ctx.fillStyle = '#1a1a2e';
@@ -233,15 +261,30 @@ export const renderDocumentIso = (
         const { sx, sy: baseSy } = projectIso(x, y, totalZ, tileW, tileH, zStep);
         const sy = baseSy - layerPixelOffset;
         
+        // Get texture tile if textures enabled
+        const textureTile = getMatTexture(material);
+        
         // Draw walls if height > 0
         if (materialHeight > 0) {
           const wallPixelHeight = materialHeight * zStep;
-          drawIsoWalls(ctx, sx, sy, tileW, tileH, wallPixelHeight, material.color, lightDir);
+          
+          if (textureTile) {
+            const leftBrightness = 0.6 + 0.2 * lightDir.x;
+            const rightBrightness = 0.7 + 0.2 * lightDir.y;
+            drawTexturedIsoWalls(ctx, sx, sy, tileW, tileH, wallPixelHeight, textureTile, leftBrightness, rightBrightness);
+          } else {
+            drawIsoWalls(ctx, sx, sy, tileW, tileH, wallPixelHeight, material.color, lightDir);
+          }
         }
         
         // Draw top face (brightest)
         const topBrightness = 0.9 + 0.1 * lightDir.z;
-        drawIsoTile(ctx, sx, sy, tileW, tileH, shadeColor(material.color, topBrightness));
+        
+        if (textureTile) {
+          drawTexturedIsoTile(ctx, sx, sy, tileW, tileH, textureTile, topBrightness);
+        } else {
+          drawIsoTile(ctx, sx, sy, tileW, tileH, shadeColor(material.color, topBrightness));
+        }
       });
     }
 
@@ -322,44 +365,90 @@ export const renderDocumentIso = (
         const wallPixelHeight = zStep * voxelZScale;
         const hw = tileW / 2;
         const hh = tileH / 2;
+        
+        // Get texture tile if textures enabled
+        const textureTile = getMatTexture(material);
 
         // Draw left wall if visible (goes DOWN from top face)
         if (v.showLeft) {
           const leftBrightness = 0.5 + 0.15 * lightDir.x;
-          ctx.fillStyle = shadeColor(material.color, leftBrightness);
-          ctx.beginPath();
-          ctx.moveTo(sx - hw, sy);           // top-left of top face
-          ctx.lineTo(sx, sy + hh);           // bottom-center of top face
-          ctx.lineTo(sx, sy + hh + wallPixelHeight);  // bottom of wall
-          ctx.lineTo(sx - hw, sy + wallPixelHeight);  // left bottom of wall
-          ctx.closePath();
-          ctx.fill();
+          
+          if (textureTile) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(sx - hw, sy);
+            ctx.lineTo(sx, sy + hh);
+            ctx.lineTo(sx, sy + hh + wallPixelHeight);
+            ctx.lineTo(sx - hw, sy + wallPixelHeight);
+            ctx.closePath();
+            ctx.clip();
+            
+            if (textureTile.pattern) {
+              ctx.globalAlpha = leftBrightness * layerOpacity;
+              ctx.fillStyle = textureTile.pattern;
+              ctx.fillRect(sx - hw, sy, hw, wallPixelHeight + hh);
+            }
+            ctx.restore();
+          } else {
+            ctx.fillStyle = shadeColor(material.color, leftBrightness);
+            ctx.beginPath();
+            ctx.moveTo(sx - hw, sy);           // top-left of top face
+            ctx.lineTo(sx, sy + hh);           // bottom-center of top face
+            ctx.lineTo(sx, sy + hh + wallPixelHeight);  // bottom of wall
+            ctx.lineTo(sx - hw, sy + wallPixelHeight);  // left bottom of wall
+            ctx.closePath();
+            ctx.fill();
+          }
         }
 
         // Draw right wall if visible (goes DOWN from top face)
         if (v.showRight) {
           const rightBrightness = 0.65 + 0.15 * lightDir.y;
-          ctx.fillStyle = shadeColor(material.color, rightBrightness);
-          ctx.beginPath();
-          ctx.moveTo(sx + hw, sy);           // top-right of top face
-          ctx.lineTo(sx, sy + hh);           // bottom-center of top face
-          ctx.lineTo(sx, sy + hh + wallPixelHeight);  // bottom of wall
-          ctx.lineTo(sx + hw, sy + wallPixelHeight);  // right bottom of wall
-          ctx.closePath();
-          ctx.fill();
+          
+          if (textureTile) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(sx + hw, sy);
+            ctx.lineTo(sx, sy + hh);
+            ctx.lineTo(sx, sy + hh + wallPixelHeight);
+            ctx.lineTo(sx + hw, sy + wallPixelHeight);
+            ctx.closePath();
+            ctx.clip();
+            
+            if (textureTile.pattern) {
+              ctx.globalAlpha = rightBrightness * layerOpacity;
+              ctx.fillStyle = textureTile.pattern;
+              ctx.fillRect(sx, sy, hw, wallPixelHeight + hh);
+            }
+            ctx.restore();
+          } else {
+            ctx.fillStyle = shadeColor(material.color, rightBrightness);
+            ctx.beginPath();
+            ctx.moveTo(sx + hw, sy);           // top-right of top face
+            ctx.lineTo(sx, sy + hh);           // bottom-center of top face
+            ctx.lineTo(sx, sy + hh + wallPixelHeight);  // bottom of wall
+            ctx.lineTo(sx + hw, sy + wallPixelHeight);  // right bottom of wall
+            ctx.closePath();
+            ctx.fill();
+          }
         }
 
         // Draw top face if visible
         if (v.showTop) {
           const topBrightness = 0.9 + 0.1 * lightDir.z;
-          ctx.fillStyle = shadeColor(material.color, topBrightness);
-          ctx.beginPath();
-          ctx.moveTo(sx, sy - hh);           // top vertex
-          ctx.lineTo(sx + hw, sy);           // right vertex
-          ctx.lineTo(sx, sy + hh);           // bottom vertex
-          ctx.lineTo(sx - hw, sy);           // left vertex
-          ctx.closePath();
-          ctx.fill();
+          
+          if (textureTile) {
+            drawTexturedIsoTile(ctx, sx, sy, tileW, tileH, textureTile, topBrightness);
+          } else {
+            ctx.fillStyle = shadeColor(material.color, topBrightness);
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - hh);           // top vertex
+            ctx.lineTo(sx + hw, sy);           // right vertex
+            ctx.lineTo(sx, sy + hh);           // bottom vertex
+            ctx.lineTo(sx - hw, sy);           // left vertex
+            ctx.closePath();
+            ctx.fill();
+          }
         }
       }
     }
