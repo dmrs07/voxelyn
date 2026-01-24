@@ -91,9 +91,9 @@ export class CopilotLLMClient extends BaseLLMClient {
     }
 
     try {
-      // Dynamic import using a string variable to avoid TypeScript module resolution
-      const moduleName = '@github/copilot-sdk';
-      this.SDK = (await (Function('moduleName', 'return import(moduleName)')(moduleName))) as CopilotSDK;
+      // Lazily import the Copilot SDK so it's only required when this provider is used
+      const sdkModule = await import('@github/copilot-sdk');
+      this.SDK = sdkModule as unknown as CopilotSDK;
       return this.SDK;
     } catch {
       throw new Error(
