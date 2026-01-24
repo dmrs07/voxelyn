@@ -5,10 +5,9 @@ import {
   generateHeightMap as generateNoiseHeightMap,
   clamp01,
   smoothstep,
-  lerp,
   type NoiseDetailConfig
 } from "./noise.js";
-import { generateShadowMap, updateShadowMap } from "./shadows.js";
+import { generateShadowMap } from "./shadows.js";
 
 // Re-export noise types for convenience
 export type { NoiseDetailConfig } from "./noise.js";
@@ -175,18 +174,6 @@ export type BiomeFieldParams = {
 // COLOR UTILITIES (Biome-specific, prefixed to avoid conflicts with palette.js)
 // ============================================================================
 
-/** Pack RGBA into uint32 (biome-specific) */
-const biomePackRGBA = (r: number, g: number, b: number, a: number): number =>
-  ((a & 0xff) << 24) | ((b & 0xff) << 16) | ((g & 0xff) << 8) | (r & 0xff);
-
-/** Unpack uint32 to RGBA (biome-specific) */
-const biomeUnpackRGBA = (color: number): RGBA => [
-  color & 0xff,
-  (color >> 8) & 0xff,
-  (color >> 16) & 0xff,
-  (color >> 24) & 0xff,
-];
-
 /** Linear interpolation between two colors (biome-specific) */
 export const biomeLerpColor = (c1: RGBA, c2: RGBA, t: number): RGBA => {
   const clampT = Math.max(0, Math.min(1, t));
@@ -256,13 +243,11 @@ function generateClimateMap(
   params: NonNullable<BiomeFieldParams['climate']>
 ): ClimateGenerator {
   const noise = new GradientNoise(seed);
-  const cellNoise = new CellularNoise(seed + 1000);
   
   const temperatureMode = params.temperatureMode ?? 'latitude';
   const baseTemperature = params.baseTemperature ?? 0.5;
   const temperatureVariation = params.temperatureVariation ?? 0.4;
   const moistureScale = params.moistureScale ?? 0.02;
-  const elevationScale = params.elevationScale ?? 0.015;
   const octaves = params.octaves ?? 4;
 
   const cellCount = width * height;
@@ -572,7 +557,7 @@ export function generateBiomeField(params: BiomeFieldParams): BiomeField {
         const cellIndex = x + y * width;
         const h = heightMap[cellIndex] ?? 0.5;
         
-        const { biomeIndex, normalizedHeight } = getTerrainTypeForHeight(h, biomes);
+        const { biomeIndex } = getTerrainTypeForHeight(h, biomes);
         
         // Set primary biome with full weight
         indices[cellIndex * maxBiomesPerCell] = biomeIndex;
