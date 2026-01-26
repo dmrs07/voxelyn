@@ -17,6 +17,10 @@ export type Camera = {
   targetX: number;
   /** Target Y for smooth following */
   targetY: number;
+  /** Camera velocity X (for spring-damper physics) */
+  velX: number;
+  /** Camera velocity Y (for spring-damper physics) */
+  velY: number;
   /** World origin X - tracks grid shifts for floating origin */
   worldOriginX: number;
   /** World origin Y - tracks grid shifts for floating origin */
@@ -27,15 +31,21 @@ export type Camera = {
   viewHeight: number;
   /** Dead zone - camera won't move if player within this radius of center */
   deadZone: number;
-  /** Smoothing factor (0-1, lower = smoother/slower) */
-  smoothing: number;
+  /** Spring stiffness (0-1, higher = snappier) */
+  stiffness: number;
+  /** Spring damping (0-1, higher = less oscillation) */
+  damping: number;
+  /** Zoom level (for future use) */
+  zoom: number;
 };
 
 export type CameraConfig = {
   viewWidth: number;
   viewHeight: number;
   deadZone?: number;
-  smoothing?: number;
+  stiffness?: number;
+  damping?: number;
+  zoom?: number;
 };
 
 // ============================================================================
@@ -48,12 +58,16 @@ export function createCamera(config: CameraConfig): Camera {
     y: 0,
     targetX: 0,
     targetY: 0,
+    velX: 0,
+    velY: 0,
     worldOriginX: 0,
     worldOriginY: 0,
     viewWidth: config.viewWidth,
     viewHeight: config.viewHeight,
-    deadZone: config.deadZone ?? 8,
-    smoothing: config.smoothing ?? 0.15,
+    deadZone: config.deadZone ?? 4,
+    stiffness: config.stiffness ?? 0.08,
+    damping: config.damping ?? 0.75,
+    zoom: config.zoom ?? 1,
   };
 }
 
@@ -149,9 +163,14 @@ export function gridToScreen(
 // CAMERA UPDATE
 // ============================================================================
 
+/** Snap threshold - if camera is closer than this to target, snap instantly */
+const CAMERA_SNAP_THRESHOLD = 0.5;
+/** Minimum velocity to prevent jitter */
+const CAMERA_MIN_VELOCITY = 0.01;
+
 /**
- * Update camera to follow a target position (usually player)
- * Uses smooth interpolation with dead zone
+ * Update camera to follow a target position using spring-damper physics
+ * Creates smooth ease-in and ease-out motion without overshoot
  */
 export function updateCamera(
   camera: Camera,
@@ -159,27 +178,61 @@ export function updateCamera(
   targetWorldY: number
 ): void {
   // Calculate desired camera center position
-  // Camera position is top-left of viewport, so offset by half view size
   const desiredX = targetWorldX - camera.viewWidth * 0.5;
   const desiredY = targetWorldY - camera.viewHeight * 0.5;
 
-  // Calculate distance from current target to desired position
-  const dx = desiredX - camera.targetX;
-  const dy = desiredY - camera.targetY;
+  // Calculate distance from current to desired position
+  const dx = desiredX - camera.x;
+  const dy = desiredY - camera.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // Only update target if outside dead zone
-  if (distance > camera.deadZone) {
-    // Move target toward desired, respecting dead zone
-    const moveDistance = distance - camera.deadZone;
-    const ratio = moveDistance / distance;
-    camera.targetX += dx * ratio;
-    camera.targetY += dy * ratio;
+  // Apply dead zone - only move if outside threshold
+  if (distance <= camera.deadZone) {
+    // Inside dead zone - gradually slow down
+    camera.velX *= camera.damping * 0.5;
+    camera.velY *= camera.damping * 0.5;
+  } else {
+    // Spring-damper physics:
+    // velocity = velocity * damping + (target - position) * stiffness
+    const effectiveDx = dx - (dx / distance) * camera.deadZone;
+    const effectiveDy = dy - (dy / distance) * camera.deadZone;
+    
+    camera.velX = camera.velX * camera.damping + effectiveDx * camera.stiffness;
+    camera.velY = camera.velY * camera.damping + effectiveDy * camera.stiffness;
   }
+  
+  // Snap velocity to zero if very small to prevent perpetual micro-movements
+  if (Math.abs(camera.velX) < CAMERA_MIN_VELOCITY) camera.velX = 0;
+  if (Math.abs(camera.velY) < CAMERA_MIN_VELOCITY) camera.velY = 0;
+  
+  // Apply velocity
+  camera.x += camera.velX;
+  camera.y += camera.velY;
+  
+  // Prevent overshoot - if we crossed the target, clamp
+  const newDx = desiredX - camera.x;
+  const newDy = desiredY - camera.y;
+  
+  // Check if we crossed the target (sign change) or are very close
+  if (Math.abs(newDx) < CAMERA_SNAP_THRESHOLD || (dx * newDx < 0)) {
+    camera.x = desiredX;
+    camera.velX = 0;
+  }
+  if (Math.abs(newDy) < CAMERA_SNAP_THRESHOLD || (dy * newDy < 0)) {
+    camera.y = desiredY;
+    camera.velY = 0;
+  }
+}
 
-  // Smooth interpolation toward target
-  camera.x += (camera.targetX - camera.x) * camera.smoothing;
-  camera.y += (camera.targetY - camera.y) * camera.smoothing;
+/**
+ * Get rounded camera position for pixel-perfect rendering
+ * Use this when drawing to avoid sub-pixel artifacts
+ */
+export function getCameraRenderPos(camera: Camera): { x: number; y: number } {
+  return {
+    x: Math.round(camera.x),
+    y: Math.round(camera.y)
+  };
 }
 
 /**

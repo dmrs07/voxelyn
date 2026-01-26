@@ -34,6 +34,14 @@ import {
   screenToGrid,
   type Camera 
 } from "./camera.js";
+import {
+  drawAnimatedSprite,
+  WIZARD_SPRITE_FRAMES,
+  PALETTE as SPRITE_PALETTE,
+  updateParticles,
+  renderParticles,
+  spawnParticle,
+} from "./sprite.js";
 
 // ============================================================================
 // WORLD CONFIGURATION
@@ -49,8 +57,8 @@ let currentBiome: BiomeType | "random" = "cavern";
 let infiniteMode = false;
 let chunkManager: ChunkManager | null = null;
 
-// Camera for infinite scrolling
-let camera: Camera = createCamera({ viewWidth: W, viewHeight: H, deadZone: 4, smoothing: 0.12 });
+// Camera for infinite scrolling (spring-damper physics)
+let camera: Camera = createCamera({ viewWidth: W, viewHeight: H, deadZone: 4, stiffness: 0.08, damping: 0.75 });
 
 // Use palette from materials module
 const palette = createPalette();
@@ -75,6 +83,7 @@ const input = {
   left: false,
   right: false,
   jump: false,
+  fly: false,       // Flight key (W)
   mouseX: 0,      // Screen coordinates
   mouseY: 0,
   mouseGridX: 0,  // Grid coordinates (for infinite mode)
@@ -87,6 +96,21 @@ const input = {
 };
 
 // ============================================================================
+// PLAYER PHYSICS CONSTANTS
+// ============================================================================
+
+const PLAYER_ACCEL = 0.35;        // Horizontal acceleration
+const PLAYER_MAX_SPEED = 1.8;     // Max horizontal speed (reduced for better control)
+const PLAYER_FRICTION = 0.82;     // Ground friction (velocity multiplier)
+const PLAYER_AIR_FRICTION = 0.92; // Air friction (less drag in air)
+const PLAYER_GRAVITY = 0.28;      // Gravity acceleration
+const PLAYER_JUMP_FORCE = 3.8;    // Jump velocity
+const PLAYER_MAX_FALL = 5.0;      // Terminal velocity
+const PLAYER_COYOTE_TIME = 6;     // Frames to allow jump after leaving ground
+const PLAYER_FLY_FORCE = 0.45;    // Upward force when flying
+const PLAYER_MAX_AIR_TIME = 120;  // Max flight frames (2s at 60fps)
+
+// ============================================================================
 // PLAYER STATE
 // ============================================================================
 
@@ -95,9 +119,17 @@ const player = {
   y: Math.floor(H * 0.35),
   width: 2,
   height: 3,
+  vx: 0,                          // Horizontal velocity
   vy: 0,
-  onGround: false
+  onGround: false,
+  facingRight: true,              // For projectile origin
+  coyoteCounter: 0,               // Frames since leaving ground
+  wasOnGround: false,             // Previous frame ground state
+  airTime: 0,                     // Flight time counter
 };
+
+// Animation state
+let animationTick = 0;
 
 type Projectile = {
   x: number;
@@ -163,6 +195,53 @@ const addLight = (
 // ============================================================================
 
 /**
+ * Find a safe spawn location above solid ground
+ * Scans from center outward to find first empty cell above solid
+ */
+const findSpawnLocation = (x0: number, y0: number, radius = 15): { x: number; y: number } => {
+  for (let dx = 0; dx <= radius; dx++) {
+    for (const sign of [1, -1]) {
+      if (dx === 0 && sign === -1) continue; // Skip duplicate center check
+      const x = x0 + dx * sign;
+      if (x < 0 || x >= W - player.width) continue;
+      
+      // Scan from top down to find surface
+      for (let y = Math.max(0, y0 - 20); y < H - player.height - 1; y++) {
+        // Check if player-sized area is empty
+        let canFit = true;
+        for (let py = 0; py < player.height && canFit; py++) {
+          for (let px = 0; px < player.width && canFit; px++) {
+            const mat = getMat(x + px, y + py);
+            if (mat !== MATERIAL.EMPTY && !isGas(mat)) {
+              canFit = false;
+            }
+          }
+        }
+        
+        if (canFit) {
+          // Check if there's solid ground below
+          let hasSolidBelow = false;
+          for (let px = 0; px < player.width; px++) {
+            const matBelow = getMat(x + px, y + player.height);
+            if (isSolid(matBelow)) {
+              hasSolidBelow = true;
+              break;
+            }
+          }
+          
+          if (hasSolidBelow) {
+            return { x, y };
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback: return original position (upper area)
+  return { x: x0, y: Math.min(y0, Math.floor(H * 0.2)) };
+};
+
+/**
  * Regenerate the world with new parameters
  */
 const regenerateWorld = (seed?: number, biome?: BiomeType | "random"): void => {
@@ -181,12 +260,7 @@ const regenerateWorld = (seed?: number, biome?: BiomeType | "random"): void => {
     ? getRandomBiome(currentSeed)
     : currentBiome;
   
-  // Reset player position
-  player.x = Math.floor(W * 0.5);
-  player.y = Math.floor(H * 0.35);
-  player.vy = 0;
-  
-  // Clear projectiles
+  // Clear projectiles first
   projectiles.length = 0;
   
   // Generate terrain using new module
@@ -198,6 +272,14 @@ const regenerateWorld = (seed?: number, biome?: BiomeType | "random"): void => {
     useCellularAutomata: true,
     caIterations: 4,
   });
+  
+  // Find safe spawn location AFTER terrain generation
+  const spawn = findSpawnLocation(Math.floor(W * 0.5), Math.floor(H * 0.35));
+  player.x = spawn.x;
+  player.y = spawn.y;
+  player.vx = 0;
+  player.vy = 0;
+  player.airTime = 0;
   
   // Update biome display
   if (biomeEl) {
@@ -223,8 +305,8 @@ const toggleInfiniteMode = (): void => {
       scrollDirection: "both", // Allow vertical too for full freedom
     });
     
-    // Reset camera to follow player
-    camera = createCamera({ viewWidth: W, viewHeight: H, deadZone: 4, smoothing: 0.12 });
+    // Reset camera to follow player with spring-damper physics
+    camera = createCamera({ viewWidth: W, viewHeight: H, deadZone: 4, stiffness: 0.08, damping: 0.75 });
     
     // Pre-generate initial world
     chunkManager.pregenerate();
@@ -235,7 +317,7 @@ const toggleInfiniteMode = (): void => {
     console.log("Infinite mode enabled");
   } else {
     chunkManager = null;
-    camera = createCamera({ viewWidth: W, viewHeight: H, deadZone: 4, smoothing: 0.12 });
+    camera = createCamera({ viewWidth: W, viewHeight: H, deadZone: 4, stiffness: 0.08, damping: 0.75 });
     regenerateWorld(); // Generate fixed world
     console.log("Infinite mode disabled");
   }
@@ -618,30 +700,89 @@ const placePlayer = (): void => {
 const updatePlayer = (): void => {
   clearPlayer();
 
-  const moveX = (input.left ? -1 : 0) + (input.right ? 1 : 0);
+  // --- Check ground state ---
+  player.wasOnGround = player.onGround;
   player.onGround = !canPlacePlayerAt(player.x, player.y + 1);
 
-  if (input.jump && player.onGround) {
-    player.vy = -4;
+  // --- Coyote time handling ---
+  if (player.onGround) {
+    player.coyoteCounter = PLAYER_COYOTE_TIME;
+  } else if (player.coyoteCounter > 0) {
+    player.coyoteCounter--;
   }
 
-  player.vy = Math.min(player.vy + 1, 4);
-
-  if (moveX !== 0) {
-    const nextX = player.x + moveX;
-    if (canPlacePlayerAt(nextX, player.y)) player.x = nextX;
+  // --- Horizontal movement with acceleration ---
+  const inputX = (input.left ? -1 : 0) + (input.right ? 1 : 0);
+  
+  if (inputX !== 0) {
+    // Accelerate toward input direction
+    player.vx += inputX * PLAYER_ACCEL;
+    player.vx = Math.max(-PLAYER_MAX_SPEED, Math.min(PLAYER_MAX_SPEED, player.vx));
+    player.facingRight = inputX > 0;
+  } else {
+    // Apply friction when no input
+    const friction = player.onGround ? PLAYER_FRICTION : PLAYER_AIR_FRICTION;
+    player.vx *= friction;
+    // Snap to zero if very slow
+    if (Math.abs(player.vx) < 0.1) player.vx = 0;
   }
 
-  const steps = Math.abs(player.vy);
-  const stepDir = Math.sign(player.vy);
-  for (let i = 0; i < steps; i++) {
-    const nextY = player.y + stepDir;
+  // --- Jump with coyote time ---
+  if (input.jump && player.coyoteCounter > 0) {
+    player.vy = -PLAYER_JUMP_FORCE;
+    player.coyoteCounter = 0; // Consume coyote time
+  }
+
+  // --- Flight mechanic (hold W to fly, limited by airTime) ---
+  if (input.fly && player.airTime < PLAYER_MAX_AIR_TIME && !player.onGround) {
+    player.vy -= PLAYER_FLY_FORCE;
+    player.airTime++;
+    // Spawn flight particles occasionally
+    if (player.airTime % 4 === 0) {
+      spawnParticle(player.x + 1, player.y + player.height, 9, 0.8, 15);
+    }
+  }
+
+  // --- Apply gravity ---
+  player.vy = Math.min(player.vy + PLAYER_GRAVITY, PLAYER_MAX_FALL);
+
+  // --- Move horizontally (pixel by pixel) ---
+  const stepsX = Math.ceil(Math.abs(player.vx));
+  const stepDirX = Math.sign(player.vx);
+  let remainingVx = Math.abs(player.vx);
+  
+  for (let i = 0; i < stepsX && remainingVx > 0; i++) {
+    const step = Math.min(1, remainingVx);
+    const nextX = player.x + stepDirX;
+    if (canPlacePlayerAt(nextX, player.y)) {
+      player.x = nextX;
+      remainingVx -= step;
+    } else {
+      player.vx = 0;
+      break;
+    }
+  }
+
+  // --- Move vertically (pixel by pixel) ---
+  const stepsY = Math.ceil(Math.abs(player.vy));
+  const stepDirY = Math.sign(player.vy);
+  let remainingVy = Math.abs(player.vy);
+  
+  for (let i = 0; i < stepsY && remainingVy > 0; i++) {
+    const step = Math.min(1, remainingVy);
+    const nextY = player.y + stepDirY;
     if (canPlacePlayerAt(player.x, nextY)) {
       player.y = nextY;
+      remainingVy -= step;
     } else {
       player.vy = 0;
       break;
     }
+  }
+
+  // --- Reset flight when on ground ---
+  if (player.onGround) {
+    player.airTime = 0;
   }
 
   placePlayer();
@@ -650,12 +791,12 @@ const updatePlayer = (): void => {
 const spawnProjectile = (wand: WandDefinition): void => {
   const aimBaseX = player.x + player.width * 0.5;
   const aimBaseY = player.y + 1;
-  // Use grid coordinates for aiming
+  // Use grid coordinates for aiming (mouse already converted via camera)
   const dx = input.mouseGridX - aimBaseX;
   const dy = input.mouseGridY - aimBaseY;
   const baseAngle = Math.atan2(dy, dx);
-  const dirX = Math.cos(baseAngle);
-  const originX = player.x + (dirX >= 0 ? player.width : -1);
+  // Use facing direction for projectile origin to avoid self-hits
+  const originX = player.x + (player.facingRight ? player.width : -1);
   const originY = player.y + 1;
 
   for (let i = 0; i < wand.burst; i++) {
@@ -930,6 +1071,40 @@ const drawBackground = (): void => {
   ctx.restore();
 };
 
+/**
+ * Draw the player sprite with appropriate animation
+ */
+const drawPlayerSprite = (): void => {
+  // Determine animation pose based on player state
+  let pose: keyof typeof WIZARD_SPRITE_FRAMES = 'idle';
+  
+  if (!player.onGround && input.fly && player.airTime > 0) {
+    pose = 'fly';
+  } else if (!player.onGround) {
+    pose = 'jump';
+  } else if (Math.abs(player.vx) > 0.1) {
+    pose = 'walk';
+  }
+  
+  const flip = !player.facingRight;
+  
+  // Offset sprite to center on collision box
+  // Player collision is 2×3 pixels, sprite is 16×16
+  // Center horizontally and align bottom
+  const spriteX = player.x - 7;  // Center 16px sprite on 2px width
+  const spriteY = player.y - 13; // Align bottom of sprite with collision box
+  
+  drawAnimatedSprite(
+    ctx,
+    spriteX,
+    spriteY,
+    WIZARD_SPRITE_FRAMES[pose].right,
+    animationTick,
+    SPRITE_PALETTE,
+    flip
+  );
+};
+
 let last = performance.now();
 let frames = 0;
 let acc = 0;
@@ -958,6 +1133,9 @@ const applyGridShift = (shift: ShiftResult): void => {
 };
 
 const tick = (): void => {
+  // Increment animation tick
+  animationTick++;
+  
   // Update chunk manager in infinite mode (handles grid shifting)
   if (infiniteMode && chunkManager) {
     const shift = chunkManager.update(player.x, player.y);
@@ -980,6 +1158,7 @@ const tick = (): void => {
   updateBrush();
   updateWand();
   updateProjectiles();
+  updateParticles();
 
   stepActiveChunks(grid, "bottom-up", perCell);
   renderToSurface(grid, surface, palette);
@@ -987,6 +1166,13 @@ const tick = (): void => {
   computeLights();
   applyPostProcess();
   presentToCanvas(ctx, surface);
+  
+  // Draw player sprite on top of terrain
+  drawPlayerSprite();
+  
+  // Draw particles
+  renderParticles(ctx);
+  
   drawBackground();
 
   if (wandCooldown > 0) wandCooldown -= 1;
@@ -1053,6 +1239,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyA") input.left = true;
   if (event.code === "KeyD") input.right = true;
   if (event.code === "Space") input.jump = true;
+  if (event.code === "KeyW") input.fly = true;
   if (event.code === "KeyV") setMode("wand");
   if (event.code === "KeyB") setMode("brush");
   if (event.code === "KeyE") setMode("erase");
@@ -1065,6 +1252,7 @@ window.addEventListener("keyup", (event) => {
   if (event.code === "KeyA") input.left = false;
   if (event.code === "KeyD") input.right = false;
   if (event.code === "Space") input.jump = false;
+  if (event.code === "KeyW") input.fly = false;
 });
 
 canvas.addEventListener("contextmenu", (event) => event.preventDefault());
