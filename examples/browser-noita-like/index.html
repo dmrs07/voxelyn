@@ -5,21 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Voxelyn - Noita-like</title>
     <style>
-      body { margin: 0; background: #111; color: #ddd; font-family: monospace; }
-      canvas { image-rendering: pixelated; width: 512px; height: 512px; }
-      #wrap { display: grid; place-items: center; height: 100vh; gap: 8px; }
+      body { margin: 0; background: #0b0d12; color: #e3e6f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      canvas { image-rendering: pixelated; width: 640px; height: 480px; border: 1px solid #2a2f3a; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+      #wrap { display: grid; place-items: center; min-height: 100vh; gap: 10px; padding: 20px 0; }
+      #hud { display: grid; gap: 6px; text-align: center; font-size: 12px; }
+      .pill { background: #1b2230; padding: 4px 8px; border-radius: 999px; display: inline-block; }
+      .muted { color: #9aa3b2; }
+      .controls { max-width: 720px; line-height: 1.4; text-align: center; }
+      
+      /* Generation controls */
+      #gen-controls { 
+        display: flex; 
+        gap: 8px; 
+        align-items: center; 
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .btn {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        transition: background 0.15s;
+      }
+      .btn:hover { background: #1d4ed8; }
+      .btn:active { background: #1e40af; }
+      .btn.secondary { background: #475569; }
+      .btn.secondary:hover { background: #334155; }
+      
+      select, input[type="number"] {
+        background: #1b2230;
+        color: #e3e6f0;
+        border: 1px solid #2a2f3a;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 12px;
+      }
+      select:focus, input:focus { outline: 1px solid #2563eb; }
+      
+      label { font-size: 11px; color: #9aa3b2; }
+      
+      #biome-display {
+        background: #1b2230;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 11px;
+      }
     </style>
   </head>
   <body>
     <div id="wrap">
-      <div>Voxelyn Noita-like</div>
-      <canvas id="c" width="128" height="128"></canvas>
-      <div id="fps">fps</div>
+      <div class="pill">Voxelyn Noita Prototype</div>
+      <canvas id="c" width="160" height="120"></canvas>
+      <div id="hud">
+        <div id="status">status</div>
+        <div id="fps" class="muted">fps</div>
+        <div id="biome-display">Biome: -</div>
+        
+        <!-- Generation Controls -->
+        <div id="gen-controls">
+          <button id="btn-generate" class="btn">🎲 Generate World</button>
+          <div>
+            <label>Biome:</label>
+            <select id="select-biome">
+              <option value="random">Random</option>
+              <option value="cavern">Stone Caverns</option>
+              <option value="desert">Desert Wastes</option>
+              <option value="frozen">Frozen Depths</option>
+              <option value="volcanic">Volcanic Depths</option>
+              <option value="fungal">Fungal Caverns</option>
+              <option value="flooded">Flooded Caves</option>
+              <option value="toxic">Toxic Depths</option>
+              <option value="surface">Surface</option>
+            </select>
+          </div>
+          <div>
+            <label>Seed:</label>
+            <input type="number" id="input-seed" value="1337" min="0" max="999999" style="width: 70px;">
+          </div>
+          <button id="btn-infinite" class="btn secondary">∞ Infinite Mode</button>
+        </div>
+        
+        <div class="controls muted">
+          WASD move · Space jump · V Wand mode · B Brush mode · E Erase mode · Q/R cycle wands · 1-0 select material · Mouse wheel size
+        </div>
+      </div>
     </div>
-    <!-- 
-      Build path: Requires TypeScript compilation with outDir set to 'dist'.
-      Run: npx tsc (from project root) to generate dist/examples/browser-noita-like/index.js
-    -->
     <script type="module" src="../../dist/examples/browser-noita-like/index.js"></script>
   </body>
 </html>
