@@ -65,7 +65,7 @@ describe('progression', () => {
     killer.attack = 999;
     registerEntity(state.level, killer);
 
-    const result = attackEntity(state.level, killer, player, state.simTimeMs, state.simTick);
+    const result = attackEntity(state, killer, player, state.simTimeMs);
     expect(result.didAttack).toBe(true);
     expect(player.alive).toBe(false);
     expect(player.hp).toBe(0);

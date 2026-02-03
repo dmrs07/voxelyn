@@ -1,39 +1,28 @@
-import { forEachIsoOrder, getVoxel, projectIso } from '@voxelyn/core';
-import type { Entity, GameState } from '../game/types';
-import { MATERIALS, isPassableMaterial } from '../world/materials';
+import { forEachIsoOrder, getVoxel, makeDrawKey, projectIso } from '@voxelyn/core';
+import { FOG_BASE_RANGE } from '../game/constants';
+import type { Entity, GameState, ParticleState, ProjectileState } from '../game/types';
 import { drawHud } from '../ui/hud';
 import { drawPowerUpMenu } from '../ui/powerup-menu';
-import { ENEMY_COLORS } from './sprites';
+import { computeFogVisibility, type FogLightSource } from './fog';
+import { drawEntitySprite } from './sprites';
+import { MATERIALS } from '../world/materials';
 
-const colorCache = new Map<number, string>();
-const CARDINAL_DIRS: Array<[number, number]> = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
-const WALL_REVEAL_DIRS: Array<[number, number]> = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-  [1, 1],
-  [1, -1],
-  [-1, 1],
-  [-1, -1],
-];
 const index2D = (width: number, x: number, y: number): number => y * width + x;
 
-const toCss = (color: number): string => {
-  const cached = colorCache.get(color);
-  if (cached) return cached;
+const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v));
+
+const unpack = (color: number): [number, number, number, number] => {
   const r = color & 0xff;
   const g = (color >> 8) & 0xff;
   const b = (color >> 16) & 0xff;
   const a = ((color >> 24) & 0xff) / 255;
-  const css = `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
-  colorCache.set(color, css);
-  return css;
+  return [r, g, b, a];
+};
+
+const hashNoise = (x: number, y: number, seed: number): number => {
+  let h = (x * 374761393 + y * 668265263 + seed * 2654435761) >>> 0;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return ((h ^ (h >> 16)) & 0xff) / 255;
 };
 
 const drawDiamond = (
@@ -42,7 +31,7 @@ const drawDiamond = (
   y: number,
   tileW: number,
   tileH: number,
-  color: number
+  fillStyle: string
 ): void => {
   ctx.beginPath();
   ctx.moveTo(x, y - tileH / 2);
@@ -50,7 +39,7 @@ const drawDiamond = (
   ctx.lineTo(x, y + tileH / 2);
   ctx.lineTo(x - tileW / 2, y);
   ctx.closePath();
-  ctx.fillStyle = toCss(color);
+  ctx.fillStyle = fillStyle;
   ctx.fill();
 };
 
@@ -61,9 +50,9 @@ const drawWallBlock = (
   tileW: number,
   tileH: number,
   blockHeight: number,
-  topColor: number,
-  leftColor: number,
-  rightColor: number
+  topColor: string,
+  leftColor: string,
+  rightColor: string
 ): void => {
   ctx.beginPath();
   ctx.moveTo(x - tileW / 2, y);
@@ -71,7 +60,7 @@ const drawWallBlock = (
   ctx.lineTo(x, y + tileH / 2 - blockHeight);
   ctx.lineTo(x - tileW / 2, y - blockHeight);
   ctx.closePath();
-  ctx.fillStyle = toCss(leftColor);
+  ctx.fillStyle = leftColor;
   ctx.fill();
 
   ctx.beginPath();
@@ -80,38 +69,10 @@ const drawWallBlock = (
   ctx.lineTo(x, y + tileH / 2 - blockHeight);
   ctx.lineTo(x + tileW / 2, y - blockHeight);
   ctx.closePath();
-  ctx.fillStyle = toCss(rightColor);
+  ctx.fillStyle = rightColor;
   ctx.fill();
 
   drawDiamond(ctx, x, y - blockHeight, tileW, tileH, topColor);
-};
-
-const drawEntity = (
-  ctx: CanvasRenderingContext2D,
-  entity: Entity,
-  tileW: number,
-  tileH: number,
-  originX: number,
-  originY: number,
-  mapW: number,
-  mapH: number
-): void => {
-  const iso = projectIso(entity.x - mapW / 2, entity.y - mapH / 2, 0, tileW, tileH, 10);
-  const sx = originX + iso.sx;
-  const sy = originY + iso.sy - 18;
-
-  const color = entity.kind === 'player' ? 'rgba(94,220,248,1)' : toCss(ENEMY_COLORS[entity.archetype]);
-
-  ctx.beginPath();
-  ctx.arc(sx, sy, entity.kind === 'player' ? 7 : 6, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-
-  const hpRatio = Math.max(0, Math.min(1, entity.hp / Math.max(1, entity.maxHp)));
-  ctx.fillStyle = 'rgba(30,35,46,0.95)';
-  ctx.fillRect(sx - 10, sy - 12, 20, 3);
-  ctx.fillStyle = entity.kind === 'player' ? 'rgba(110,226,138,1)' : 'rgba(240,116,116,1)';
-  ctx.fillRect(sx - 10, sy - 12, Math.floor(20 * hpRatio), 3);
 };
 
 export class IsoRenderer {
@@ -120,10 +81,14 @@ export class IsoRenderer {
   private readonly tileH = 24;
   private readonly zStep = 20;
   private readonly wallHeight = 56;
-  private readonly hudHeight = 72;
+  private readonly hudHeight = 80;
   private cameraX = 0;
   private cameraY = 0;
   private cameraInitialized = false;
+  private passableMask = new Uint8Array(0);
+  private visibilityMask = new Uint8Array(0);
+  private cachedLevelSeed = -1;
+  private colorLightCache = new Map<string, string>();
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -133,112 +98,84 @@ export class IsoRenderer {
     this.ctx = ctx;
   }
 
-  private computeVisibilityMask(state: GameState, focusX: number, focusY: number): Uint8Array {
-    const width = state.level.width;
-    const height = state.level.height;
-    const size = width * height;
-    const passableMask = new Uint8Array(size);
+  private ensureBuffers(state: GameState): void {
+    const size = state.level.width * state.level.height;
+    if (this.passableMask.length !== size) {
+      this.passableMask = new Uint8Array(size);
+      this.visibilityMask = new Uint8Array(size);
+      this.cachedLevelSeed = -1;
+    }
 
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const idx = index2D(width, x, y);
-        passableMask[idx] = isPassableMaterial(getVoxel(state.level.grid, x, y, 0)) ? 1 : 0;
+    if (this.cachedLevelSeed === state.level.seed) return;
+
+    for (let y = 0; y < state.level.height; y += 1) {
+      for (let x = 0; x < state.level.width; x += 1) {
+        const i = index2D(state.level.width, x, y);
+        this.passableMask[i] = state.level.heightMap[i] < 0.5 ? 1 : 0;
       }
     }
 
-    const visibility = new Uint8Array(size);
-    if (focusX < 0 || focusY < 0 || focusX >= width || focusY >= height) {
-      return visibility;
+    this.cachedLevelSeed = state.level.seed;
+  }
+
+  private lightColor(color: number, factor: number): string {
+    const q = clamp(Math.round(factor * 100), 5, 180);
+    const key = `${color}:${q}`;
+    const cached = this.colorLightCache.get(key);
+    if (cached) return cached;
+
+    const [r, g, b, a] = unpack(color);
+    const lit = `rgba(${Math.round(clamp(r * (q / 100), 0, 255))}, ${Math.round(clamp(g * (q / 100), 0, 255))}, ${Math.round(clamp(b * (q / 100), 0, 255))}, ${a.toFixed(3)})`;
+    this.colorLightCache.set(key, lit);
+    return lit;
+  }
+
+  private computeFogMask(state: GameState, heroX: number, heroY: number): void {
+    const lightSources: FogLightSource[] = [];
+    for (const light of state.level.fungalLights) {
+      lightSources.push({ x: light.x, y: light.y, radius: light.radius });
+    }
+    for (const projectile of state.projectiles) {
+      if (!projectile.alive) continue;
+      lightSources.push({ x: projectile.x, y: projectile.y, radius: 2 });
     }
 
-    const startIdx = index2D(width, focusX, focusY);
-    if (passableMask[startIdx] === 0) {
-      visibility[startIdx] = 1;
-      return visibility;
+    computeFogVisibility({
+      width: state.level.width,
+      height: state.level.height,
+      passableMask: this.passableMask,
+      heroX,
+      heroY,
+      baseRange: FOG_BASE_RANGE,
+      lightSources,
+      output: this.visibilityMask,
+    });
+  }
+
+  private tileGlow(state: GameState, x: number, y: number): number {
+    let glow = 0;
+
+    for (const light of state.level.fungalLights) {
+      const dx = x - light.x;
+      const dy = y - light.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > light.radius) continue;
+
+      const pulse = 0.72 + (Math.sin(state.simTick * 0.08 + light.x * 0.7 + light.y * 0.5) * 0.28 + 0.28);
+      const falloff = 1 - dist / Math.max(0.001, light.radius);
+      glow += falloff * light.intensity * pulse * 0.28;
     }
 
-    const degree = new Uint8Array(size);
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const idx = index2D(width, x, y);
-        if (passableMask[idx] === 0) continue;
-        let count = 0;
-        for (const [dx, dy] of CARDINAL_DIRS) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-          if (passableMask[index2D(width, nx, ny)] === 1) count += 1;
-        }
-        degree[idx] = count;
-      }
+    for (const projectile of state.projectiles) {
+      if (!projectile.alive) continue;
+      const dx = x - projectile.x;
+      const dy = y - projectile.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 2.5) continue;
+      glow += (1 - dist / 2.5) * 0.35;
     }
 
-    const visiblePassable = new Uint8Array(size);
-    if ((degree[startIdx] ?? 0) >= 3) {
-      visiblePassable[startIdx] = 1;
-      for (const [dx, dy] of CARDINAL_DIRS) {
-        const nx = focusX + dx;
-        const ny = focusY + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-        const neighborIdx = index2D(width, nx, ny);
-        if (passableMask[neighborIdx] === 1) {
-          visiblePassable[neighborIdx] = 1;
-        }
-      }
-    } else {
-      const queue = new Int32Array(size);
-      let qh = 0;
-      let qt = 0;
-      queue[qt] = startIdx;
-      qt += 1;
-      visiblePassable[startIdx] = 1;
-
-      while (qh < qt) {
-        const idx = queue[qh] ?? startIdx;
-        qh += 1;
-        const cx = idx % width;
-        const cy = Math.floor(idx / width);
-
-        for (const [dx, dy] of CARDINAL_DIRS) {
-          const nx = cx + dx;
-          const ny = cy + dy;
-          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-
-          const nextIdx = index2D(width, nx, ny);
-          if (passableMask[nextIdx] === 0 || visiblePassable[nextIdx] === 1) continue;
-
-          visiblePassable[nextIdx] = 1;
-          if ((degree[nextIdx] ?? 0) <= 2) {
-            queue[qt] = nextIdx;
-            qt += 1;
-          }
-        }
-      }
-    }
-
-    for (let i = 0; i < size; i += 1) {
-      if (visiblePassable[i] === 1) {
-        visibility[i] = 1;
-      }
-    }
-
-    for (let i = 0; i < size; i += 1) {
-      if (visiblePassable[i] === 0) continue;
-      const x = i % width;
-      const y = Math.floor(i / width);
-
-      for (const [dx, dy] of WALL_REVEAL_DIRS) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-        const neighborIdx = index2D(width, nx, ny);
-        if (passableMask[neighborIdx] === 0) {
-          visibility[neighborIdx] = 1;
-        }
-      }
-    }
-
-    return visibility;
+    return glow;
   }
 
   private clampCamera(
@@ -267,7 +204,7 @@ export class IsoRenderer {
       maxSy = Math.max(maxSy, corner.sy + this.tileH / 2);
     }
 
-    const marginX = 24;
+    const marginX = 32;
     const topBound = this.hudHeight + 24;
     const bottomBound = screenH - 24;
 
@@ -362,13 +299,124 @@ export class IsoRenderer {
     ctx.restore();
   }
 
+  private drawEntity(entity: Entity, state: GameState): void {
+    const ctx = this.ctx;
+    const iso = projectIso(
+      entity.x - state.level.width / 2,
+      entity.y - state.level.height / 2,
+      entity.z,
+      this.tileW,
+      this.tileH,
+      this.zStep
+    );
+
+    const bob = Math.sin((state.simTick + entity.animPhase * 2) * 0.25) * (entity.kind === 'player' ? 1.6 : 1.2);
+    const sx = this.cameraX + iso.sx;
+    const sy = this.cameraY + iso.sy - 8 + bob;
+    const flash = entity.hitFlashUntilMs > state.simTimeMs;
+    drawEntitySprite(ctx, entity, sx, sy, state.simTick, 2, flash);
+
+    if (entity.kind === 'enemy') {
+      const hpRatio = Math.max(0, Math.min(1, entity.hp / Math.max(1, entity.maxHp)));
+      ctx.fillStyle = 'rgba(28,34,42,0.95)';
+      ctx.fillRect(sx - 12, sy - 36, 24, 3);
+      ctx.fillStyle = 'rgba(241,110,110,0.95)';
+      ctx.fillRect(sx - 12, sy - 36, Math.floor(24 * hpRatio), 3);
+
+      if (entity.alertUntilMs > state.simTimeMs) {
+        ctx.fillStyle = 'rgba(255,230,116,0.98)';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('!', sx, sy - 42);
+      }
+    }
+  }
+
+  private drawProjectile(projectile: ProjectileState, state: GameState): void {
+    const ctx = this.ctx;
+    const iso = projectIso(
+      projectile.x - state.level.width / 2,
+      projectile.y - state.level.height / 2,
+      projectile.z,
+      this.tileW,
+      this.tileH,
+      this.zStep
+    );
+
+    const sx = this.cameraX + iso.sx;
+    const sy = this.cameraY + iso.sy - 10;
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, projectile.kind === 'guardian_shard' ? 4.2 : 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = projectile.kind === 'guardian_shard' ? 'rgba(206,120,255,0.95)' : 'rgba(132,244,154,0.95)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, projectile.kind === 'guardian_shard' ? 7 : 6, 0, Math.PI * 2);
+    ctx.strokeStyle = projectile.kind === 'guardian_shard' ? 'rgba(206,120,255,0.38)' : 'rgba(132,244,154,0.34)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  private drawParticle(particle: ParticleState, state: GameState): void {
+    const ctx = this.ctx;
+    const alpha = clamp(particle.lifeMs / 420, 0, 1);
+
+    const iso = projectIso(
+      particle.x - state.level.width / 2,
+      particle.y - state.level.height / 2,
+      particle.z,
+      this.tileW,
+      this.tileH,
+      this.zStep
+    );
+    const sx = this.cameraX + iso.sx;
+    const sy = this.cameraY + iso.sy - 12;
+
+    if (particle.text) {
+      const [r, g, b] = unpack(particle.color);
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(particle.text, sx, sy);
+      return;
+    }
+
+    const [r, g, b] = unpack(particle.color);
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+    ctx.fillRect(Math.floor(sx), Math.floor(sy), 2, 2);
+  }
+
+  private drawScreenFlashes(state: GameState): void {
+    const ctx = this.ctx;
+    const { width, height } = this.canvas;
+
+    if (state.screenFlash.damageMs > 0) {
+      const a = clamp(state.screenFlash.damageMs / 180, 0, 1) * 0.22;
+      ctx.fillStyle = `rgba(210, 38, 64, ${a.toFixed(3)})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    if (state.screenFlash.healMs > 0) {
+      const a = clamp(state.screenFlash.healMs / 180, 0, 1) * 0.16;
+      ctx.fillStyle = `rgba(78, 210, 120, ${a.toFixed(3)})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+  }
+
   render(state: GameState): void {
     const ctx = this.ctx;
     const { width, height } = this.canvas;
+
+    this.ensureBuffers(state);
+
     const player = state.level.entities.get(state.playerId);
     const fallbackPlayerPos = { x: state.level.entry.x, y: state.level.entry.y };
     const followX = player?.x ?? fallbackPlayerPos.x;
     const followY = player?.y ?? fallbackPlayerPos.y;
+
+    this.computeFogMask(state, followX, followY);
+
     const playerIso = projectIso(
       followX - state.level.width / 2,
       followY - state.level.height / 2,
@@ -398,23 +446,32 @@ export class IsoRenderer {
       this.cameraY += (clamped.y - this.cameraY) * 0.18;
     }
 
+    if (state.cameraShakeMs > 0) {
+      const power = clamp(state.cameraShakeMs / 180, 0, 1) * 3;
+      this.cameraX += Math.sin(state.simTick * 2.1) * power;
+      this.cameraY += Math.cos(state.simTick * 2.6) * power;
+    }
+
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#0b1322');
-    gradient.addColorStop(1, '#050911');
+    gradient.addColorStop(0, '#091223');
+    gradient.addColorStop(1, '#040811');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    const visibility = this.computeVisibilityMask(state, followX, followY);
-
     forEachIsoOrder(state.level.width, state.level.height, (x, y) => {
       const idx = index2D(state.level.width, x, y);
-      if (visibility[idx] === 0) return;
+      if (this.visibilityMask[idx] === 0) return;
 
       const material = (getVoxel(state.level.grid, x, y, 0) & 0xffff) as keyof typeof MATERIALS;
       const visual = MATERIALS[material] ?? MATERIALS[1];
       const iso = projectIso(x - state.level.width / 2, y - state.level.height / 2, 0, this.tileW, this.tileH, this.zStep);
       const sx = this.cameraX + iso.sx;
       const sy = this.cameraY + iso.sy;
+
+      const baseLight = state.level.baseLightMap[idx] ?? 1;
+      const jitter = (hashNoise(x, y, state.level.seed) - 0.5) * (visual.blocks ? 0.08 : 0.14);
+      const glow = this.tileGlow(state, x, y);
+      const light = clamp(baseLight + jitter + glow, 0.18, 1.35);
 
       if (visual.blocks) {
         drawWallBlock(
@@ -424,12 +481,12 @@ export class IsoRenderer {
           this.tileW,
           this.tileH,
           this.wallHeight,
-          visual.colorTop,
-          visual.colorLeft,
-          visual.colorRight
+          this.lightColor(visual.colorTop, light + 0.05),
+          this.lightColor(visual.colorLeft, light * 0.92),
+          this.lightColor(visual.colorRight, light * 0.85)
         );
       } else {
-        drawDiamond(ctx, sx, sy, this.tileW, this.tileH, visual.colorFlat);
+        drawDiamond(ctx, sx, sy, this.tileW, this.tileH, this.lightColor(visual.colorFlat, light));
 
         if (material === 4 || material === 5 || material === 6) {
           const pulse = (Math.sin(state.simTick * 0.18 + x * 0.2 + y * 0.2) + 1) * 0.5;
@@ -445,29 +502,51 @@ export class IsoRenderer {
       }
     });
 
-    const entities = Array.from(state.level.entities.values())
-      .filter((entity) => entity.alive)
-      .sort((a, b) => (a.x + a.y) - (b.x + b.y));
+    const drawCommands: Array<{ key: number; draw: () => void }> = [];
 
-    for (const entity of entities) {
-      const entityIdx = index2D(state.level.width, entity.x, entity.y);
-      if (entity.kind !== 'player' && visibility[entityIdx] === 0) {
-        continue;
-      }
+    for (const entity of state.level.entities.values()) {
+      if (!entity.alive) continue;
+      const idx = index2D(state.level.width, entity.x, entity.y);
+      if (this.visibilityMask[idx] === 0 && entity.kind !== 'player') continue;
 
-      drawEntity(
-        ctx,
-        entity,
-        this.tileW,
-        this.tileH,
-        this.cameraX,
-        this.cameraY,
-        state.level.width,
-        state.level.height
-      );
+      drawCommands.push({
+        key: makeDrawKey(entity.x, entity.y, entity.z, 2),
+        draw: () => this.drawEntity(entity, state),
+      });
+    }
+
+    for (const projectile of state.projectiles) {
+      if (!projectile.alive) continue;
+      const px = Math.round(projectile.x);
+      const py = Math.round(projectile.y);
+      if (px < 0 || py < 0 || px >= state.level.width || py >= state.level.height) continue;
+      if (this.visibilityMask[index2D(state.level.width, px, py)] === 0) continue;
+
+      drawCommands.push({
+        key: makeDrawKey(px, py, 1, 3),
+        draw: () => this.drawProjectile(projectile, state),
+      });
+    }
+
+    for (const particle of state.particles) {
+      const px = Math.round(particle.x);
+      const py = Math.round(particle.y);
+      if (px < 0 || py < 0 || px >= state.level.width || py >= state.level.height) continue;
+      if (this.visibilityMask[index2D(state.level.width, px, py)] === 0) continue;
+
+      drawCommands.push({
+        key: makeDrawKey(px, py, 2, 4),
+        draw: () => this.drawParticle(particle, state),
+      });
+    }
+
+    drawCommands.sort((a, b) => a.key - b.key);
+    for (const command of drawCommands) {
+      command.draw();
     }
 
     this.drawObjectiveIndicator(state);
+    this.drawScreenFlashes(state);
     drawHud(ctx, state);
     if (state.phase === 'powerup_choice') {
       drawPowerUpMenu(ctx, state);

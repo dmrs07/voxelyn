@@ -4,7 +4,9 @@ export type MaterialId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export type EntityKind = 'player' | 'enemy';
 
-export type EnemyArchetype = 'stalker' | 'bruiser' | 'spitter' | 'guardian';
+export type EnemyArchetype = 'stalker' | 'bruiser' | 'spitter' | 'guardian' | 'spore_bomber';
+
+export type ProjectileKind = 'spore_blob' | 'guardian_shard';
 
 export type PowerUpId =
   | 'vital_boost'
@@ -31,6 +33,8 @@ export type DamageEvent = {
   targetId: string;
   amount: number;
   tick: number;
+  x: number;
+  y: number;
 };
 
 export type PowerUpChoice = {
@@ -53,6 +57,10 @@ export type EntityBase = {
   alive: boolean;
   nextMoveAt: number;
   nextAttackAt: number;
+  facing: Vec2;
+  hitFlashUntilMs: number;
+  alertUntilMs: number;
+  animPhase: number;
 };
 
 export type PlayerState = EntityBase & {
@@ -67,6 +75,7 @@ export type PlayerState = EntityBase & {
 export type EnemyState = EntityBase & {
   kind: 'enemy';
   archetype: EnemyArchetype;
+  aiState: 'patrol' | 'chase' | 'explode_windup';
   moveCooldownMs: number;
   attackCooldownMs: number;
   detectRadius: number;
@@ -74,9 +83,47 @@ export type EnemyState = EntityBase & {
   preferredMaxRange: number;
   patrolOrigin: Vec2;
   patrolTarget: Vec2 | null;
+  fuseUntilMs: number | null;
 };
 
 export type Entity = PlayerState | EnemyState;
+
+export type FungalLight = {
+  x: number;
+  y: number;
+  radius: number;
+  intensity: number;
+  color: { r: number; g: number; b: number };
+};
+
+export type ProjectileState = {
+  id: string;
+  kind: ProjectileKind;
+  sourceId: string;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  speed: number;
+  damage: number;
+  ttlMs: number;
+  radius: number;
+  alive: boolean;
+};
+
+export type ParticleState = {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  lifeMs: number;
+  color: number;
+  text: string | null;
+};
 
 export type LevelState = {
   grid: VoxelGrid3D;
@@ -90,6 +137,11 @@ export type LevelState = {
   height: number;
   depth: number;
   nextEntityOcc: number;
+  heightMap: Float32Array;
+  shadowMap: Float32Array;
+  aoMap: Float32Array;
+  baseLightMap: Float32Array;
+  fungalLights: FungalLight[];
 };
 
 export type GameState = {
@@ -103,7 +155,14 @@ export type GameState = {
   pendingPowerUpChoices: PowerUpChoice[];
   activePowerUpChoice: PowerUpChoice | null;
   damageEvents: DamageEvent[];
+  projectiles: ProjectileState[];
+  particles: ParticleState[];
   messages: string[];
+  screenFlash: {
+    damageMs: number;
+    healMs: number;
+  };
+  cameraShakeMs: number;
 };
 
 export type ControlSnapshot = {

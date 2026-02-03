@@ -1,7 +1,13 @@
+import { ALERT_FLASH_MS, BOMBER_FUSE_MS, BOMBER_RADIUS } from '../game/constants';
 import type { EnemyState, GameState, PlayerState, Vec2 } from '../game/types';
-import { attackEntity, tryMoveEntity } from '../combat/combat';
+import {
+  applyExplosionDamage,
+  attackEntity,
+  spawnProjectile,
+  tryMoveEntity,
+} from '../combat/combat';
 import { isPassableMaterial } from '../world/materials';
-import { inBounds2D, materialAt } from '../world/level';
+import { inBounds2D, materialAt, unregisterEntity } from '../world/level';
 
 const manhattan = (a: Vec2, b: Vec2): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
@@ -139,8 +145,15 @@ const bfsStepToward = (
   return { x: stepX, y: stepY };
 };
 
+const setChaseState = (enemy: EnemyState, nowMs: number): void => {
+  if (enemy.aiState !== 'chase') {
+    enemy.alertUntilMs = Math.max(enemy.alertUntilMs, nowMs + ALERT_FLASH_MS);
+  }
+  enemy.aiState = 'chase';
+};
+
 const tryAttackPlayer = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): boolean => {
-  const result = attackEntity(state.level, enemy, player, nowMs, state.simTick);
+  const result = attackEntity(state, enemy, player, nowMs);
   if (!result.didAttack) return false;
 
   if (!player.alive) {
@@ -171,12 +184,54 @@ const patrolStep = (state: GameState, enemy: EnemyState): Vec2 | null => {
 };
 
 const moveEnemy = (state: GameState, enemy: EnemyState, step: Vec2, nowMs: number): void => {
-  tryMoveEntity(state.level, enemy, step.x, step.y, nowMs);
+  const fromX = enemy.x;
+  const fromY = enemy.y;
+  const moved = tryMoveEntity(state.level, enemy, step.x, step.y, nowMs);
+  if (moved) {
+    enemy.facing = { x: Math.sign(step.x - fromX), y: Math.sign(step.y - fromY) };
+  }
 };
 
-const updateEnemy = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): void => {
-  if (!enemy.alive) return;
+const handleBomber = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): void => {
+  const enemyPos = { x: enemy.x, y: enemy.y };
+  const playerPos = { x: player.x, y: player.y };
+  const distance = manhattan(enemyPos, playerPos);
 
+  if (enemy.aiState === 'explode_windup') {
+    if ((enemy.fuseUntilMs ?? 0) <= nowMs) {
+      applyExplosionDamage(state, enemy, BOMBER_RADIUS, enemy.attack);
+      enemy.alive = false;
+      unregisterEntity(state.level, enemy);
+      state.messages.push('Um fungo explosivo detona!');
+    }
+    return;
+  }
+
+  if (distance <= 2) {
+    enemy.aiState = 'explode_windup';
+    enemy.fuseUntilMs = nowMs + BOMBER_FUSE_MS;
+    enemy.alertUntilMs = Math.max(enemy.alertUntilMs, nowMs + ALERT_FLASH_MS);
+    return;
+  }
+
+  if (distance <= enemy.detectRadius) {
+    setChaseState(enemy, nowMs);
+  } else {
+    enemy.aiState = 'patrol';
+  }
+
+  if (nowMs < enemy.nextMoveAt) return;
+
+  const next = enemy.aiState === 'chase'
+    ? bfsStepToward(state, enemy, playerPos, 12) ?? greedyStepToward(state, enemy, playerPos)
+    : patrolStep(state, enemy);
+
+  if (next) {
+    moveEnemy(state, enemy, next, nowMs);
+  }
+};
+
+const handleRangedEnemy = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): void => {
   const enemyPos = { x: enemy.x, y: enemy.y };
   const playerPos = { x: player.x, y: player.y };
   const distance = manhattan(enemyPos, playerPos);
@@ -187,40 +242,78 @@ const updateEnemy = (state: GameState, enemy: EnemyState, player: PlayerState, n
   }
 
   const seesPlayer = distance <= enemy.detectRadius;
+  if (seesPlayer) {
+    setChaseState(enemy, nowMs);
+  } else {
+    enemy.aiState = 'patrol';
+  }
 
-  if (enemy.archetype === 'spitter' || enemy.archetype === 'guardian') {
-    const hasLOS = seesPlayer && hasLineOfSight(state, enemyPos, playerPos);
-    const inRange = distance >= enemy.preferredMinRange && distance <= 6;
+  const hasLOS = seesPlayer && hasLineOfSight(state, enemyPos, playerPos);
+  const inRange = distance >= enemy.preferredMinRange && distance <= 6;
 
-    if (hasLOS && inRange) {
-      if (tryAttackPlayer(state, enemy, player, nowMs)) return;
+  if (hasLOS && inRange && nowMs >= enemy.nextAttackAt) {
+    spawnProjectile(state, {
+      kind: enemy.archetype === 'guardian' ? 'guardian_shard' : 'spore_blob',
+      sourceId: enemy.id,
+      x: enemy.x,
+      y: enemy.y,
+      targetX: player.x,
+      targetY: player.y,
+      damage: enemy.attack,
+      speed: enemy.archetype === 'guardian' ? 8 : 6.5,
+      ttlMs: enemy.archetype === 'guardian' ? 1200 : 1450,
+      radius: enemy.archetype === 'guardian' ? 0.2 : 0.16,
+    });
+    enemy.nextAttackAt = nowMs + enemy.attackCooldownMs;
+  }
+
+  if (nowMs < enemy.nextMoveAt) return;
+
+  if (distance < enemy.preferredMinRange) {
+    const fleeStep = greedyStepAway(state, enemy, playerPos);
+    if (fleeStep) {
+      moveEnemy(state, enemy, fleeStep, nowMs);
+      return;
     }
+  }
 
-    if (nowMs >= enemy.nextMoveAt) {
-      if (distance < enemy.preferredMinRange) {
-        const fleeStep = greedyStepAway(state, enemy, playerPos);
-        if (fleeStep) {
-          moveEnemy(state, enemy, fleeStep, nowMs);
-          return;
-        }
+  if (enemy.aiState === 'chase' && seesPlayer) {
+    const shouldAdvance = distance > enemy.preferredMaxRange || !hasLOS;
+    if (shouldAdvance) {
+      const toward = bfsStepToward(state, enemy, playerPos, 12) ?? greedyStepToward(state, enemy, playerPos);
+      if (toward) {
+        moveEnemy(state, enemy, toward, nowMs);
+        return;
       }
-
-      if (seesPlayer) {
-        const toward = bfsStepToward(state, enemy, playerPos, 12) ?? greedyStepToward(state, enemy, playerPos);
-        if (toward) {
-          moveEnemy(state, enemy, toward, nowMs);
-          return;
-        }
-      }
-
-      const patrol = patrolStep(state, enemy);
-      if (patrol) moveEnemy(state, enemy, patrol, nowMs);
     }
+  }
 
+  const patrol = patrolStep(state, enemy);
+  if (patrol) {
+    moveEnemy(state, enemy, patrol, nowMs);
+  }
+};
+
+const handleMeleeEnemy = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): void => {
+  const enemyPos = { x: enemy.x, y: enemy.y };
+  const playerPos = { x: player.x, y: player.y };
+  const distance = manhattan(enemyPos, playerPos);
+
+  if (distance === 1) {
+    tryAttackPlayer(state, enemy, player, nowMs);
     return;
   }
 
-  if (seesPlayer && nowMs >= enemy.nextMoveAt) {
+  const seesPlayer = distance <= enemy.detectRadius;
+  if (seesPlayer) {
+    setChaseState(enemy, nowMs);
+  } else {
+    enemy.aiState = 'patrol';
+  }
+
+  if (nowMs < enemy.nextMoveAt) return;
+
+  if (enemy.aiState === 'chase') {
     const step = bfsStepToward(state, enemy, playerPos, 10) ?? greedyStepToward(state, enemy, playerPos);
     if (step) {
       moveEnemy(state, enemy, step, nowMs);
@@ -228,10 +321,26 @@ const updateEnemy = (state: GameState, enemy: EnemyState, player: PlayerState, n
     }
   }
 
-  if (nowMs >= enemy.nextMoveAt) {
-    const patrol = patrolStep(state, enemy);
-    if (patrol) moveEnemy(state, enemy, patrol, nowMs);
+  const patrol = patrolStep(state, enemy);
+  if (patrol) {
+    moveEnemy(state, enemy, patrol, nowMs);
   }
+};
+
+const updateEnemy = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): void => {
+  if (!enemy.alive) return;
+
+  if (enemy.archetype === 'spore_bomber') {
+    handleBomber(state, enemy, player, nowMs);
+    return;
+  }
+
+  if (enemy.archetype === 'spitter' || enemy.archetype === 'guardian') {
+    handleRangedEnemy(state, enemy, player, nowMs);
+    return;
+  }
+
+  handleMeleeEnemy(state, enemy, player, nowMs);
 };
 
 export const updateEnemiesAI = (state: GameState, nowMs: number): void => {

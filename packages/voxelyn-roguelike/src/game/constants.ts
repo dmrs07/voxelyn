@@ -15,6 +15,18 @@ export const PLAYER_MOVE_COOLDOWN_MS = 90;
 export const PLAYER_ATTACK_COOLDOWN_MS = 280;
 
 export const PLAYER_MIN_SPAWN_DISTANCE = 8;
+export const MAX_PARTICLES = 160;
+export const MAX_PROJECTILES = 64;
+export const HIT_FLASH_MS = 140;
+export const ALERT_FLASH_MS = 700;
+export const SCREEN_FLASH_MS = 150;
+export const CAMERA_SHAKE_MS = 180;
+export const FOG_BASE_RANGE = 7;
+export const FUNGAL_LIGHT_REVEAL_RADIUS = 5;
+export const LIGHT_DIR = { x: -0.6, y: -0.4 } as const;
+export const PROJECTILE_SPEED = 7;
+export const BOMBER_FUSE_MS = 900;
+export const BOMBER_RADIUS = 2;
 
 export const MATERIAL_AIR: MaterialId = 0;
 export const MATERIAL_ROCK: MaterialId = 1;
@@ -78,6 +90,15 @@ export const ENEMY_ARCHETYPE_STATS: Record<
     detectRadius: 12,
     preferredMinRange: 2,
     preferredMaxRange: 6,
+  },
+  spore_bomber: {
+    hp: 26,
+    attack: 11,
+    moveCooldownMs: 140,
+    attackCooldownMs: 800,
+    detectRadius: 9,
+    preferredMinRange: 1,
+    preferredMaxRange: 2,
   },
 };
 

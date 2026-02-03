@@ -1,4 +1,8 @@
-import { tryPlayerBumpAction } from '../combat/combat';
+import {
+  tryPlayerBumpAction,
+  updateParticles,
+  updateProjectiles,
+} from '../combat/combat';
 import { updateEnemiesAI } from '../entities/ai';
 import { applyPlayerRegen } from '../entities/player';
 import { Controls } from '../input/controls';
@@ -65,7 +69,12 @@ export class GameLoop {
     this.state.simTick += 1;
     this.state.simTimeMs += SIMULATION_STEP_MS;
 
+    this.state.screenFlash.damageMs = Math.max(0, this.state.screenFlash.damageMs - SIMULATION_STEP_MS);
+    this.state.screenFlash.healMs = Math.max(0, this.state.screenFlash.healMs - SIMULATION_STEP_MS);
+    this.state.cameraShakeMs = Math.max(0, this.state.cameraShakeMs - SIMULATION_STEP_MS);
+
     if (this.state.phase === 'game_over' || this.state.phase === 'victory') {
+      updateParticles(this.state, SIMULATION_STEP_MS);
       return;
     }
 
@@ -73,6 +82,7 @@ export class GameLoop {
       if (pickChoice) {
         resolvePowerUpChoice(this.state, pickChoice);
       }
+      updateParticles(this.state, SIMULATION_STEP_MS);
       return;
     }
 
@@ -84,17 +94,15 @@ export class GameLoop {
 
     applyPlayerRegen(player, SIMULATION_STEP_MS);
 
+    // 1) Player input/melee
     if (dx !== 0 || dy !== 0) {
-      const action = tryPlayerBumpAction(this.state.level, player, dx, dy, this.state.simTimeMs, this.state.simTick);
+      const action = tryPlayerBumpAction(this.state, player, dx, dy, this.state.simTimeMs);
       if (action.killedEnemyIds.length > 0) {
         handleEnemyKills(this.state, action.killedEnemyIds);
-        startNextPowerUpChoiceIfNeeded(this.state);
-        if (this.state.activePowerUpChoice) {
-          return;
-        }
       }
     }
 
+    // 2) Enemy AI decisions/moves/attacks
     updateEnemiesAI(this.state, this.state.simTimeMs);
     const playerAfterAi = getPlayer(this.state);
     if (!playerAfterAi || !playerAfterAi.alive) {
@@ -102,6 +110,22 @@ export class GameLoop {
       return;
     }
 
+    // 3) Projectile simulation/impacts
+    const projectileResult = updateProjectiles(this.state, SIMULATION_STEP_MS);
+    if (projectileResult.killedEnemyIds.length > 0) {
+      handleEnemyKills(this.state, projectileResult.killedEnemyIds);
+    }
+
+    const playerAfterProjectiles = getPlayer(this.state);
+    if (!playerAfterProjectiles || !playerAfterProjectiles.alive) {
+      this.state.phase = 'game_over';
+      return;
+    }
+
+    // 4) Particle lifecycle
+    updateParticles(this.state, SIMULATION_STEP_MS);
+
+    // 5) Power-up queue & transitions
     startNextPowerUpChoiceIfNeeded(this.state);
     if (this.state.activePowerUpChoice) {
       return;
@@ -115,6 +139,10 @@ export class GameLoop {
 
     if (shouldAdvanceFloor(this.state)) {
       advanceToNextFloor(this.state);
+    }
+
+    if (this.state.messages.length > 10) {
+      this.state.messages.splice(0, this.state.messages.length - 10);
     }
   }
 }

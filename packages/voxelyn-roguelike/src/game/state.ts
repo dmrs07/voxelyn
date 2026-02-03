@@ -1,15 +1,32 @@
-import { RNG } from '@voxelyn/core';
+import { RNG, combineLighting, generateAmbientOcclusion, generateShadowMap } from '@voxelyn/core';
 import { createPlayer } from '../entities/player';
 import { isEnemy } from '../entities/enemy';
 import { rollDistinctPowerUps } from '../powerups/system';
 import { generateFloor } from '../world/generator';
 import { registerEntity } from '../world/level';
 import { spawnEnemiesForFloor } from '../world/spawn';
-import { FLOOR_COUNT_MVP } from './constants';
+import { FLOOR_COUNT_MVP, LIGHT_DIR } from './constants';
 import type { GameState, LevelState, PlayerState, PowerUpChoice } from './types';
 
 const createLevelState = (baseSeed: number, floorNumber: number): LevelState => {
   const generated = generateFloor(baseSeed, floorNumber);
+  const shadowMap = generateShadowMap(
+    generated.width,
+    generated.height,
+    generated.heightMap,
+    LIGHT_DIR,
+    20,
+    0.45
+  );
+  const aoMap = generateAmbientOcclusion(
+    generated.width,
+    generated.height,
+    generated.heightMap,
+    3,
+    0.35
+  );
+  const baseLightMap = combineLighting(shadowMap, aoMap, 0.72, 0.28);
+
   return {
     grid: generated.grid,
     entities: new Map(),
@@ -22,6 +39,11 @@ const createLevelState = (baseSeed: number, floorNumber: number): LevelState => 
     height: generated.height,
     depth: generated.depth,
     nextEntityOcc: 0,
+    heightMap: generated.heightMap,
+    shadowMap,
+    aoMap,
+    baseLightMap,
+    fungalLights: generated.fungalLights,
   };
 };
 
@@ -74,7 +96,14 @@ export const createGameState = (baseSeed: number): GameState => {
     pendingPowerUpChoices: [],
     activePowerUpChoice: null,
     damageEvents: [],
+    projectiles: [],
+    particles: [],
     messages: ['Desca na mina e alcance o nucleo no andar 10.'],
+    screenFlash: {
+      damageMs: 0,
+      healMs: 0,
+    },
+    cameraShakeMs: 0,
   };
 };
 
@@ -133,6 +162,12 @@ export const advanceToNextFloor = (state: GameState): void => {
   state.playerId = player.id;
   state.pendingPowerUpChoices = [];
   state.activePowerUpChoice = null;
+  state.damageEvents = [];
+  state.projectiles = [];
+  state.particles = [];
+  state.screenFlash.damageMs = 0;
+  state.screenFlash.healMs = 0;
+  state.cameraShakeMs = 0;
   state.phase = 'running';
   state.messages.push(`Andar ${nextFloor} alcancado.`);
 };

@@ -26,14 +26,14 @@ describe('combat and ai', () => {
     registerEntity(state.level, enemy);
 
     const beforeHp = enemy.hp;
-    const action1 = tryPlayerBumpAction(state.level, player, 1, 0, 1000, 1);
+    const action1 = tryPlayerBumpAction(state, player, 1, 0, 1000);
     expect(action1.attacked).toBe(true);
     expect(action1.moved).toBe(false);
     expect(player.x).not.toBe(tx);
     expect(enemy.hp).toBeLessThan(beforeHp);
 
     const hpAfterFirst = enemy.hp;
-    const action2 = tryPlayerBumpAction(state.level, player, 1, 0, 1000, 2);
+    const action2 = tryPlayerBumpAction(state, player, 1, 0, 1000);
     expect(action2.attacked).toBe(false);
     expect(enemy.hp).toBe(hpAfterFirst);
   });

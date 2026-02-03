@@ -28,6 +28,11 @@ export const createEnemy = (
     alive: true,
     nextMoveAt: 0,
     nextAttackAt: 0,
+    facing: { x: -1, y: 0 },
+    hitFlashUntilMs: 0,
+    alertUntilMs: 0,
+    animPhase: 0,
+    aiState: 'patrol',
     moveCooldownMs: template.moveCooldownMs,
     attackCooldownMs: template.attackCooldownMs,
     detectRadius: template.detectRadius,
@@ -35,6 +40,7 @@ export const createEnemy = (
     preferredMaxRange: template.preferredMaxRange,
     patrolOrigin: { x, y },
     patrolTarget: null,
+    fuseUntilMs: null,
   };
 };
 

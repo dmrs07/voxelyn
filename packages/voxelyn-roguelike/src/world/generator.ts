@@ -1,6 +1,7 @@
 import { createVoxelGrid3D, RNG, setVoxel } from '@voxelyn/core';
 import {
   FLOOR_HASH_MAGIC,
+  FUNGAL_LIGHT_REVEAL_RADIUS,
   MATERIAL_AIR,
   MATERIAL_CORE,
   MATERIAL_ENTRY,
@@ -12,7 +13,7 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from '../game/constants';
-import type { Vec2 } from '../game/types';
+import type { FungalLight, Vec2 } from '../game/types';
 import {
   computeDistanceMap,
   ensureSingleConnectedComponent,
@@ -29,6 +30,8 @@ export type GeneratedFloor = {
   height: number;
   depth: number;
   mask: Uint8Array;
+  heightMap: Float32Array;
+  fungalLights: FungalLight[];
 };
 
 const inBounds = (x: number, y: number): boolean =>
@@ -237,6 +240,75 @@ const writeGrid = (
   return grid;
 };
 
+const buildHeightMap = (mask: Uint8Array): Float32Array => {
+  const out = new Float32Array(mask.length);
+  for (let i = 0; i < mask.length; i += 1) {
+    out[i] = mask[i] === 1 ? 0 : 1;
+  }
+  return out;
+};
+
+const chooseFungalLights = (
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  entry: Vec2,
+  exit: Vec2,
+  floorNumber: number,
+  rng: RNG
+): FungalLight[] => {
+  const candidates: number[] = [];
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const idx = maskIndex(width, x, y);
+      if (mask[idx] !== 1) continue;
+      if ((x === entry.x && y === entry.y) || (x === exit.x && y === exit.y)) continue;
+      candidates.push(idx);
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  const target = Math.min(20, Math.max(7, 7 + floorNumber));
+  const lights: FungalLight[] = [];
+
+  let guard = 0;
+  while (lights.length < target && guard < candidates.length * 6) {
+    guard += 1;
+    const idx = candidates[rng.nextInt(candidates.length)] ?? 0;
+    const x = idx % width;
+    const y = Math.floor(idx / width);
+
+    let tooClose = false;
+    for (const light of lights) {
+      const dx = light.x - x;
+      const dy = light.y - y;
+      if (dx * dx + dy * dy < 25) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+
+    const palette = [
+      { r: 116, g: 255, b: 142 },
+      { r: 138, g: 238, b: 255 },
+      { r: 216, g: 118, b: 255 },
+    ] as const;
+    const color = palette[rng.nextInt(palette.length)] ?? palette[0];
+
+    lights.push({
+      x,
+      y,
+      radius: Math.max(3, FUNGAL_LIGHT_REVEAL_RADIUS - 1 + rng.nextInt(3)),
+      intensity: 0.4 + rng.nextFloat01() * 0.7,
+      color: { r: color.r, g: color.g, b: color.b },
+    });
+  }
+
+  return lights;
+};
+
 export const generateFloor = (baseSeed: number, floorNumber: number): GeneratedFloor => {
   const seed = floorSeedFor(baseSeed, floorNumber);
   const rng = new RNG(seed + 1337);
@@ -254,6 +326,16 @@ export const generateFloor = (baseSeed: number, floorNumber: number): GeneratedF
   const exit = findFarthestReachable(distances, WORLD_WIDTH, WORLD_HEIGHT, entry);
 
   const grid = writeGrid(mask, entry, exit, seed, floorNumber);
+  const heightMap = buildHeightMap(mask);
+  const fungalLights = chooseFungalLights(
+    mask,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    entry,
+    exit,
+    floorNumber,
+    new RNG(seed ^ 0x5a9d2f3b)
+  );
 
   return {
     grid,
@@ -264,5 +346,7 @@ export const generateFloor = (baseSeed: number, floorNumber: number): GeneratedF
     height: WORLD_HEIGHT,
     depth: WORLD_DEPTH,
     mask,
+    heightMap,
+    fungalLights,
   };
 };

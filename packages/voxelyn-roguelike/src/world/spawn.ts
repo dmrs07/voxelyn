@@ -18,21 +18,24 @@ const sampleArchetype = (floor: number, rng: RNG): EnemyArchetype => {
   }
 
   if (floor <= 7) {
-    if (r < 0.45) return 'stalker';
-    if (r < 0.8) return 'bruiser';
-    return 'spitter';
+    if (r < 0.41) return 'stalker';
+    if (r < 0.74) return 'bruiser';
+    if (r < 0.92) return 'spitter';
+    return 'spore_bomber';
   }
 
   if (floor <= 9) {
-    if (r < 0.3) return 'stalker';
-    if (r < 0.65) return 'bruiser';
-    return 'spitter';
+    if (r < 0.25) return 'stalker';
+    if (r < 0.57) return 'bruiser';
+    if (r < 0.82) return 'spitter';
+    return 'spore_bomber';
   }
 
   // floor 10 base composition follows floor 9, guardian is injected separately.
-  if (r < 0.3) return 'stalker';
-  if (r < 0.65) return 'bruiser';
-  return 'spitter';
+  if (r < 0.24) return 'stalker';
+  if (r < 0.56) return 'bruiser';
+  if (r < 0.8) return 'spitter';
+  return 'spore_bomber';
 };
 
 export const enemyCountForFloor = (floor: number): number => Math.min(6 + floor * 2, SPAWN_COUNT_CAP);
