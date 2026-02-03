@@ -4,6 +4,7 @@
 
 import { createSurface2D } from '@voxelyn/core';
 import type { EditorDocument, GridLayer, VoxelLayer, LayerId, BlendMode } from '../document/types';
+export type Voxel2DRenderMode = 'slice' | 'projection';
 
 const unpack = (color: number) => ({
   r: color & 0xff,
@@ -57,7 +58,10 @@ export const renderDocumentToSurface = (
   doc: EditorDocument,
   pendingPixels: Array<{ index: number; oldValue: number; newValue: number }>,
   activeLayerId: LayerId | null,
-  isDrawing: boolean
+  isDrawing: boolean,
+  floatingOverridesByLayer: Map<LayerId, Map<number, number>> = new Map(),
+  voxel2DMode: Voxel2DRenderMode = 'slice',
+  activeZ = 0
 ) => {
   const surface = createSurface2D(doc.width, doc.height);
   const pixels = surface.pixels;
@@ -76,6 +80,7 @@ export const renderDocumentToSurface = (
     if (!layer.visible) continue;
     const opacity = Math.max(0, Math.min(1, layer.opacity));
     const blendMode = layer.blendMode ?? 'normal';
+    const floatingOverrides = floatingOverridesByLayer.get(layer.id);
 
     // Handle Grid2D layers
     if (layer.type === 'grid2d') {
@@ -86,7 +91,11 @@ export const renderDocumentToSurface = (
         const surfaceOffset = y * surface.width;
         for (let x = 0; x < grid.width; x += 1) {
           const index = rowOffset + x;
-          let cell = grid.data[index];
+          let cell = grid.data[index] ?? 0;
+
+          if (floatingOverrides?.has(index)) {
+            cell = floatingOverrides.get(index) ?? cell;
+          }
 
           if (layer.id === activeLayerId && pendingMap.has(index)) {
             cell = pendingMap.get(index) ?? cell;
@@ -111,32 +120,55 @@ export const renderDocumentToSurface = (
       const vw = voxel.width;
       const vh = voxel.height;
       const vd = voxel.depth;
+      const getVoxelCell = (index: number): number => {
+        if (floatingOverrides?.has(index)) {
+          return floatingOverrides.get(index) ?? 0;
+        }
+        return voxel.data[index] ?? 0;
+      };
 
-      for (let y = 0; y < vh && y < surface.height; y++) {
-        for (let x = 0; x < vw && x < surface.width; x++) {
-          // Find topmost non-air voxel
-          for (let z = vd - 1; z >= 0; z--) {
+      if (voxel2DMode === 'slice') {
+        const z = Math.max(0, Math.min(vd - 1, activeZ));
+        for (let y = 0; y < vh && y < surface.height; y += 1) {
+          for (let x = 0; x < vw && x < surface.width; x += 1) {
             const voxelIndex = x + y * vw + z * vw * vh;
-            const mat = voxel.data[voxelIndex] ?? 0;
+            const mat = getVoxelCell(voxelIndex) & 0xffff;
             if (mat === 0) continue;
-
             const material = doc.palette[mat];
-            if (!material) break;
-
-            // Apply depth shading (higher = brighter)
-            const depthFactor = 0.6 + (z / vd) * 0.4;
-            const c = unpack(material.color);
-            const shadedColor = pack(
-              Math.round(c.r * depthFactor),
-              Math.round(c.g * depthFactor),
-              Math.round(c.b * depthFactor),
-              c.a
-            ) >>> 0;
+            if (!material) continue;
 
             const surfaceIndex = y * surface.width + x;
             const dstColor = pixels[surfaceIndex] ?? 0;
-            pixels[surfaceIndex] = blend(dstColor, shadedColor, opacity, blendMode);
-            break;
+            pixels[surfaceIndex] = blend(dstColor, material.color >>> 0, opacity, blendMode);
+          }
+        }
+      } else {
+        for (let y = 0; y < vh && y < surface.height; y += 1) {
+          for (let x = 0; x < vw && x < surface.width; x += 1) {
+            // Find topmost non-air voxel
+            for (let z = vd - 1; z >= 0; z -= 1) {
+              const voxelIndex = x + y * vw + z * vw * vh;
+              const mat = getVoxelCell(voxelIndex) & 0xffff;
+              if (mat === 0) continue;
+
+              const material = doc.palette[mat];
+              if (!material) break;
+
+              // Apply depth shading (higher = brighter)
+              const depthFactor = 0.6 + (z / Math.max(1, vd - 1)) * 0.4;
+              const c = unpack(material.color);
+              const shadedColor = pack(
+                Math.round(c.r * depthFactor),
+                Math.round(c.g * depthFactor),
+                Math.round(c.b * depthFactor),
+                c.a
+              ) >>> 0;
+
+              const surfaceIndex = y * surface.width + x;
+              const dstColor = pixels[surfaceIndex] ?? 0;
+              pixels[surfaceIndex] = blend(dstColor, shadedColor, opacity, blendMode);
+              break;
+            }
           }
         }
       }
