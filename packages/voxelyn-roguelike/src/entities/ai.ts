@@ -7,9 +7,23 @@ import {
   tryMoveEntity,
 } from '../combat/combat';
 import { isPassableMaterial } from '../world/materials';
-import { inBounds2D, materialAt, unregisterEntity } from '../world/level';
+import {
+  inBounds2D,
+  isBiofluidCell,
+  isDynamicHazardCell,
+  isWalkableCell,
+  materialAt,
+  unregisterEntity,
+} from '../world/level';
 
 const manhattan = (a: Vec2, b: Vec2): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+
+const vecToAnimFacing = (x: number, y: number): 'dr' | 'dl' | 'ur' | 'ul' => {
+  if (x >= 0 && y >= 0) return 'dr';
+  if (x < 0 && y >= 0) return 'dl';
+  if (x >= 0 && y < 0) return 'ur';
+  return 'ul';
+};
 
 const keyOf = (x: number, y: number): number => (y << 16) | x;
 
@@ -19,6 +33,23 @@ const neighbors4 = (x: number, y: number): Vec2[] => [
   { x, y: y + 1 },
   { x, y: y - 1 },
 ];
+
+const shouldAvoidBiofluid = (enemy: EnemyState): boolean => enemy.archetype !== 'spore_bomber';
+
+const canEnterCell = (
+  state: GameState,
+  enemy: EnemyState,
+  candidate: Vec2,
+  target: Vec2,
+  avoidBiofluid: boolean
+): boolean => {
+  if (!inBounds2D(state.level, candidate.x, candidate.y)) return false;
+  if (candidate.x === target.x && candidate.y === target.y) return true;
+  if (!isWalkableCell(state.level, candidate.x, candidate.y, enemy.occ)) return false;
+  if (avoidBiofluid && isBiofluidCell(state.level, candidate.x, candidate.y)) return false;
+  if (avoidBiofluid && isDynamicHazardCell(state.level, candidate.x, candidate.y)) return false;
+  return true;
+};
 
 const hasLineOfSight = (state: GameState, from: Vec2, to: Vec2): boolean => {
   let x0 = from.x;
@@ -52,14 +83,14 @@ const hasLineOfSight = (state: GameState, from: Vec2, to: Vec2): boolean => {
   return true;
 };
 
-const greedyStepToward = (state: GameState, enemy: EnemyState, target: Vec2): Vec2 | null => {
+const greedyStepToward = (
+  state: GameState,
+  enemy: EnemyState,
+  target: Vec2,
+  avoidBiofluid: boolean
+): Vec2 | null => {
   const options = neighbors4(enemy.x, enemy.y)
-    .filter((candidate) => inBounds2D(state.level, candidate.x, candidate.y))
-    .filter((candidate) => {
-      if (candidate.x === target.x && candidate.y === target.y) return true;
-      return state.level.occupancy[candidate.y * state.level.width + candidate.x] === 0;
-    })
-    .filter((candidate) => isPassableMaterial(materialAt(state.level, candidate.x, candidate.y, 0)));
+    .filter((candidate) => canEnterCell(state, enemy, candidate, target, avoidBiofluid));
 
   if (options.length === 0) return null;
 
@@ -67,11 +98,16 @@ const greedyStepToward = (state: GameState, enemy: EnemyState, target: Vec2): Ve
   return options[0] ?? null;
 };
 
-const greedyStepAway = (state: GameState, enemy: EnemyState, target: Vec2): Vec2 | null => {
+const greedyStepAway = (
+  state: GameState,
+  enemy: EnemyState,
+  target: Vec2,
+  avoidBiofluid: boolean
+): Vec2 | null => {
   const options = neighbors4(enemy.x, enemy.y)
-    .filter((candidate) => inBounds2D(state.level, candidate.x, candidate.y))
-    .filter((candidate) => state.level.occupancy[candidate.y * state.level.width + candidate.x] === 0)
-    .filter((candidate) => isPassableMaterial(materialAt(state.level, candidate.x, candidate.y, 0)));
+    .filter((candidate) => isWalkableCell(state.level, candidate.x, candidate.y, enemy.occ))
+    .filter((candidate) => !(avoidBiofluid && isBiofluidCell(state.level, candidate.x, candidate.y)))
+    .filter((candidate) => !(avoidBiofluid && isDynamicHazardCell(state.level, candidate.x, candidate.y)));
 
   if (options.length === 0) return null;
   options.sort((a, b) => manhattan(b, target) - manhattan(a, target));
@@ -82,7 +118,8 @@ const bfsStepToward = (
   state: GameState,
   enemy: EnemyState,
   target: Vec2,
-  radius: number
+  radius: number,
+  avoidBiofluid: boolean
 ): Vec2 | null => {
   const maxNodes = state.level.width * state.level.height;
   const queueX = new Int32Array(maxNodes);
@@ -117,10 +154,7 @@ const bfsStepToward = (
       const k = keyOf(next.x, next.y);
       if (visited.has(k)) continue;
       if (!isPassableMaterial(materialAt(state.level, next.x, next.y, 0))) continue;
-
-      const occ = state.level.occupancy[next.y * state.level.width + next.x] ?? 0;
-      const canEnter = occ === 0 || (next.x === target.x && next.y === target.y);
-      if (!canEnter) continue;
+      if (!canEnterCell(state, enemy, next, target, avoidBiofluid)) continue;
 
       visited.add(k);
       parent.set(k, keyOf(x, y));
@@ -145,11 +179,46 @@ const bfsStepToward = (
   return { x: stepX, y: stepY };
 };
 
+const chooseTowardStep = (
+  state: GameState,
+  enemy: EnemyState,
+  target: Vec2,
+  radius: number
+): Vec2 | null => {
+  const avoidBiofluid = shouldAvoidBiofluid(enemy);
+  const strict = bfsStepToward(state, enemy, target, radius, avoidBiofluid)
+    ?? greedyStepToward(state, enemy, target, avoidBiofluid);
+  if (strict || !avoidBiofluid) return strict;
+
+  return bfsStepToward(state, enemy, target, radius, false)
+    ?? greedyStepToward(state, enemy, target, false);
+};
+
+const chooseAwayStep = (
+  state: GameState,
+  enemy: EnemyState,
+  target: Vec2
+): Vec2 | null => {
+  const avoidBiofluid = shouldAvoidBiofluid(enemy);
+  const strict = greedyStepAway(state, enemy, target, avoidBiofluid);
+  if (strict || !avoidBiofluid) return strict;
+  return greedyStepAway(state, enemy, target, false);
+};
+
 const setChaseState = (enemy: EnemyState, nowMs: number): void => {
   if (enemy.aiState !== 'chase') {
     enemy.alertUntilMs = Math.max(enemy.alertUntilMs, nowMs + ALERT_FLASH_MS);
   }
   enemy.aiState = 'chase';
+};
+
+const faceToward = (enemy: EnemyState, target: Vec2): void => {
+  const dx = Math.sign(target.x - enemy.x);
+  const dy = Math.sign(target.y - enemy.y);
+  if (dx !== 0 || dy !== 0) {
+    enemy.facing = { x: dx, y: dy };
+    enemy.animFacing = vecToAnimFacing(dx, dy);
+  }
 };
 
 const tryAttackPlayer = (state: GameState, enemy: EnemyState, player: PlayerState, nowMs: number): boolean => {
@@ -180,7 +249,7 @@ const patrolStep = (state: GameState, enemy: EnemyState): Vec2 | null => {
     ) ?? { ...origin };
   }
 
-  return greedyStepToward(state, enemy, enemy.patrolTarget);
+  return chooseTowardStep(state, enemy, enemy.patrolTarget, 7);
 };
 
 const moveEnemy = (state: GameState, enemy: EnemyState, step: Vec2, nowMs: number): void => {
@@ -198,7 +267,9 @@ const handleBomber = (state: GameState, enemy: EnemyState, player: PlayerState, 
   const distance = manhattan(enemyPos, playerPos);
 
   if (enemy.aiState === 'explode_windup') {
+    enemy.animIntent = 'cast';
     if ((enemy.fuseUntilMs ?? 0) <= nowMs) {
+      enemy.animIntent = 'die';
       applyExplosionDamage(state, enemy, BOMBER_RADIUS, enemy.attack);
       enemy.alive = false;
       unregisterEntity(state.level, enemy);
@@ -211,6 +282,7 @@ const handleBomber = (state: GameState, enemy: EnemyState, player: PlayerState, 
     enemy.aiState = 'explode_windup';
     enemy.fuseUntilMs = nowMs + BOMBER_FUSE_MS;
     enemy.alertUntilMs = Math.max(enemy.alertUntilMs, nowMs + ALERT_FLASH_MS);
+    enemy.animIntent = 'cast';
     return;
   }
 
@@ -223,7 +295,7 @@ const handleBomber = (state: GameState, enemy: EnemyState, player: PlayerState, 
   if (nowMs < enemy.nextMoveAt) return;
 
   const next = enemy.aiState === 'chase'
-    ? bfsStepToward(state, enemy, playerPos, 12) ?? greedyStepToward(state, enemy, playerPos)
+    ? chooseTowardStep(state, enemy, playerPos, 12)
     : patrolStep(state, enemy);
 
   if (next) {
@@ -237,6 +309,7 @@ const handleRangedEnemy = (state: GameState, enemy: EnemyState, player: PlayerSt
   const distance = manhattan(enemyPos, playerPos);
 
   if (distance === 1) {
+    faceToward(enemy, playerPos);
     tryAttackPlayer(state, enemy, player, nowMs);
     return;
   }
@@ -252,6 +325,8 @@ const handleRangedEnemy = (state: GameState, enemy: EnemyState, player: PlayerSt
   const inRange = distance >= enemy.preferredMinRange && distance <= 6;
 
   if (hasLOS && inRange && nowMs >= enemy.nextAttackAt) {
+    faceToward(enemy, playerPos);
+    enemy.animIntent = 'cast';
     spawnProjectile(state, {
       kind: enemy.archetype === 'guardian' ? 'guardian_shard' : 'spore_blob',
       sourceId: enemy.id,
@@ -270,7 +345,7 @@ const handleRangedEnemy = (state: GameState, enemy: EnemyState, player: PlayerSt
   if (nowMs < enemy.nextMoveAt) return;
 
   if (distance < enemy.preferredMinRange) {
-    const fleeStep = greedyStepAway(state, enemy, playerPos);
+    const fleeStep = chooseAwayStep(state, enemy, playerPos);
     if (fleeStep) {
       moveEnemy(state, enemy, fleeStep, nowMs);
       return;
@@ -280,7 +355,7 @@ const handleRangedEnemy = (state: GameState, enemy: EnemyState, player: PlayerSt
   if (enemy.aiState === 'chase' && seesPlayer) {
     const shouldAdvance = distance > enemy.preferredMaxRange || !hasLOS;
     if (shouldAdvance) {
-      const toward = bfsStepToward(state, enemy, playerPos, 12) ?? greedyStepToward(state, enemy, playerPos);
+      const toward = chooseTowardStep(state, enemy, playerPos, 12);
       if (toward) {
         moveEnemy(state, enemy, toward, nowMs);
         return;
@@ -300,6 +375,7 @@ const handleMeleeEnemy = (state: GameState, enemy: EnemyState, player: PlayerSta
   const distance = manhattan(enemyPos, playerPos);
 
   if (distance === 1) {
+    faceToward(enemy, playerPos);
     tryAttackPlayer(state, enemy, player, nowMs);
     return;
   }
@@ -314,7 +390,7 @@ const handleMeleeEnemy = (state: GameState, enemy: EnemyState, player: PlayerSta
   if (nowMs < enemy.nextMoveAt) return;
 
   if (enemy.aiState === 'chase') {
-    const step = bfsStepToward(state, enemy, playerPos, 10) ?? greedyStepToward(state, enemy, playerPos);
+    const step = chooseTowardStep(state, enemy, playerPos, 10);
     if (step) {
       moveEnemy(state, enemy, step, nowMs);
       return;

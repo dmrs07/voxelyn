@@ -2,6 +2,12 @@ import { RNG, combineLighting, generateAmbientOcclusion, generateShadowMap } fro
 import { createPlayer } from '../entities/player';
 import { isEnemy } from '../entities/enemy';
 import { rollDistinctPowerUps } from '../powerups/system';
+import { createCorridorEventsForLevel } from '../world/corridor-events';
+import {
+  buildCorridorCandidates,
+  createDynamicCellsForLevel,
+} from '../world/dynamic-corridors';
+import { generateLevelFeatures } from '../world/features';
 import { generateFloor } from '../world/generator';
 import { registerEntity } from '../world/level';
 import { spawnEnemiesForFloor } from '../world/spawn';
@@ -10,6 +16,16 @@ import type { GameState, LevelState, PlayerState, PowerUpChoice } from './types'
 
 const createLevelState = (baseSeed: number, floorNumber: number): LevelState => {
   const generated = generateFloor(baseSeed, floorNumber);
+  const generatedFeatures = generateLevelFeatures({
+    mask: generated.mask,
+    width: generated.width,
+    height: generated.height,
+    entry: generated.entry,
+    exit: generated.exit,
+    seed: generated.seed,
+    floorNumber,
+    modules: generated.layoutModules,
+  });
   const shadowMap = generateShadowMap(
     generated.width,
     generated.height,
@@ -26,8 +42,16 @@ const createLevelState = (baseSeed: number, floorNumber: number): LevelState => 
     0.35
   );
   const baseLightMap = combineLighting(shadowMap, aoMap, 0.72, 0.28);
+  const corridorCandidates = buildCorridorCandidates(
+    generated.mask,
+    generated.width,
+    generated.height,
+    generated.entry,
+    generated.exit,
+    generatedFeatures.featureMap
+  );
 
-  return {
+  const level: LevelState = {
     grid: generated.grid,
     entities: new Map(),
     occupancy: new Int32Array(generated.width * generated.height),
@@ -44,7 +68,17 @@ const createLevelState = (baseSeed: number, floorNumber: number): LevelState => 
     aoMap,
     baseLightMap,
     fungalLights: generated.fungalLights,
+    featureMap: generatedFeatures.featureMap,
+    interactables: generatedFeatures.interactables,
+    layoutModules: generated.layoutModules,
+    occludableWalls: new Uint8Array(generated.width * generated.height),
+    corridorCandidates,
+    dynamicCells: [],
+    corridorEvents: [],
   };
+  level.dynamicCells = createDynamicCellsForLevel(level, generated.seed ^ 0x4c221a);
+  level.corridorEvents = createCorridorEventsForLevel(level, generated.seed ^ 0x2ab11f);
+  return level;
 };
 
 const createPlayerForLevel = (level: LevelState, previous: PlayerState | null): PlayerState => {
@@ -104,6 +138,19 @@ export const createGameState = (baseSeed: number): GameState => {
       healMs: 0,
     },
     cameraShakeMs: 0,
+    activeDebuffs: {
+      slowUntilMs: 0,
+      crystalBuffUntilMs: 0,
+      biofluidNextTickAt: 0,
+      portalLockUntilMs: 0,
+    },
+    uiAlerts: [],
+    pathRecovery: {
+      forcedOpenCount: 0,
+      lastRecoverAtMs: 0,
+      blockedSinceMs: 0,
+      lastPathCheckAtMs: 0,
+    },
   };
 };
 
@@ -168,6 +215,17 @@ export const advanceToNextFloor = (state: GameState): void => {
   state.screenFlash.damageMs = 0;
   state.screenFlash.healMs = 0;
   state.cameraShakeMs = 0;
+  state.activeDebuffs.slowUntilMs = 0;
+  state.activeDebuffs.crystalBuffUntilMs = 0;
+  state.activeDebuffs.biofluidNextTickAt = 0;
+  state.activeDebuffs.portalLockUntilMs = 0;
+  state.uiAlerts = [];
+  state.pathRecovery = {
+    forcedOpenCount: 0,
+    lastRecoverAtMs: 0,
+    blockedSinceMs: 0,
+    lastPathCheckAtMs: 0,
+  };
   state.phase = 'running';
   state.messages.push(`Andar ${nextFloor} alcancado.`);
 };

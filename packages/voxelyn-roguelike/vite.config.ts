@@ -8,6 +8,7 @@ export default defineConfig({
   base: './',
   resolve: {
     alias: {
+      '@voxelyn/animation': resolve(__dirname, '../voxelyn-animation/src/index.ts'),
       '@voxelyn/core': resolve(__dirname, '../voxelyn-core/src/index.ts'),
     },
     conditions: ['browser', 'import', 'module', 'default'],

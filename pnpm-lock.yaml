@@ -105,6 +105,19 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  packages/voxelyn-animation:
+    dependencies:
+      '@voxelyn/core':
+        specifier: workspace:*
+        version: link:../voxelyn-core
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.0.9)
+
   packages/voxelyn-core:
     devDependencies:
       typescript:
@@ -113,6 +126,9 @@ importers:
 
   packages/voxelyn-roguelike:
     dependencies:
+      '@voxelyn/animation':
+        specifier: workspace:*
+        version: link:../voxelyn-animation
       '@voxelyn/core':
         specifier: workspace:*
         version: link:../voxelyn-core

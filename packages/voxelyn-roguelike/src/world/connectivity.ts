@@ -84,6 +84,80 @@ export const computeDistanceMap = (
   return dist;
 };
 
+export const reconstructPathFromDistance = (
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  dist: Int32Array,
+  start: Vec2,
+  end: Vec2
+): Vec2[] => {
+  const out: Vec2[] = [];
+  if (!inBounds(width, height, start.x, start.y) || !inBounds(width, height, end.x, end.y)) {
+    return out;
+  }
+
+  const endIdx = maskIndex(width, end.x, end.y);
+  if ((dist[endIdx] ?? -1) < 0) {
+    return out;
+  }
+
+  let cursor = { x: end.x, y: end.y };
+  out.push(cursor);
+
+  while (!(cursor.x === start.x && cursor.y === start.y)) {
+    const currentDist = dist[maskIndex(width, cursor.x, cursor.y)] ?? -1;
+    if (currentDist <= 0) {
+      break;
+    }
+
+    let moved = false;
+    const neighbors: Array<[number, number]> = [
+      [cursor.x + 1, cursor.y],
+      [cursor.x - 1, cursor.y],
+      [cursor.x, cursor.y + 1],
+      [cursor.x, cursor.y - 1],
+    ];
+
+    for (const [nx, ny] of neighbors) {
+      if (!inBounds(width, height, nx, ny)) continue;
+      const ni = maskIndex(width, nx, ny);
+      if (mask[ni] !== 1) continue;
+      const nd = dist[ni] ?? -1;
+      if (nd === currentDist - 1) {
+        cursor = { x: nx, y: ny };
+        out.push(cursor);
+        moved = true;
+        break;
+      }
+    }
+
+    if (!moved) {
+      break;
+    }
+  }
+
+  if (out.length === 0) return out;
+  const last = out[out.length - 1];
+  if (!last || last.x !== start.x || last.y !== start.y) {
+    return [];
+  }
+
+  out.reverse();
+  return out;
+};
+
+export const reconstructShortestPath = (
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  start: Vec2,
+  end: Vec2
+): Vec2[] => {
+  const dist = computeDistanceMap(mask, width, height, start);
+  return reconstructPathFromDistance(mask, width, height, dist, start, end);
+};
+
 export const findFarthestReachable = (
   dist: Int32Array,
   width: number,

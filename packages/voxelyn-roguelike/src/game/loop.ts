@@ -8,6 +8,9 @@ import { applyPlayerRegen } from '../entities/player';
 import { Controls } from '../input/controls';
 import { resolvePowerUpChoice, startNextPowerUpChoiceIfNeeded } from '../powerups/system';
 import { IsoRenderer } from '../render/iso-renderer';
+import { updateCorridorEvents } from '../world/corridor-events';
+import { updateDynamicCorridors } from '../world/dynamic-corridors';
+import { applyPlayerFeatureInteractions } from '../world/features';
 import { SIMULATION_STEP_MS } from './constants';
 import {
   advanceToNextFloor,
@@ -72,6 +75,17 @@ export class GameLoop {
     this.state.screenFlash.damageMs = Math.max(0, this.state.screenFlash.damageMs - SIMULATION_STEP_MS);
     this.state.screenFlash.healMs = Math.max(0, this.state.screenFlash.healMs - SIMULATION_STEP_MS);
     this.state.cameraShakeMs = Math.max(0, this.state.cameraShakeMs - SIMULATION_STEP_MS);
+    this.state.uiAlerts = this.state.uiAlerts.filter((item) => item.untilMs > this.state.simTimeMs);
+
+    for (const entity of this.state.level.entities.values()) {
+      if (!entity.alive) {
+        entity.animIntent = 'die';
+        continue;
+      }
+      if (entity.animIntent !== 'die') {
+        entity.animIntent = 'idle';
+      }
+    }
 
     if (this.state.phase === 'game_over' || this.state.phase === 'victory') {
       updateParticles(this.state, SIMULATION_STEP_MS);
@@ -93,6 +107,13 @@ export class GameLoop {
     }
 
     applyPlayerRegen(player, SIMULATION_STEP_MS);
+    if (this.state.activeDebuffs.slowUntilMs > this.state.simTimeMs) {
+      player.animSpeedMul = 0.72;
+    } else if (this.state.activeDebuffs.crystalBuffUntilMs > this.state.simTimeMs) {
+      player.animSpeedMul = 1.12;
+    } else {
+      player.animSpeedMul = 1;
+    }
 
     // 1) Player input/melee
     if (dx !== 0 || dy !== 0) {
@@ -102,7 +123,27 @@ export class GameLoop {
       }
     }
 
-    // 2) Enemy AI decisions/moves/attacks
+    applyPlayerFeatureInteractions(this.state, player);
+    if (!player.alive) {
+      this.state.phase = 'game_over';
+      return;
+    }
+
+    // 2) Dynamic corridors + corridor events
+    updateDynamicCorridors(this.state);
+    const playerAfterDynamic = getPlayer(this.state);
+    if (!playerAfterDynamic || !playerAfterDynamic.alive) {
+      this.state.phase = 'game_over';
+      return;
+    }
+    updateCorridorEvents(this.state);
+    const playerAfterEvents = getPlayer(this.state);
+    if (!playerAfterEvents || !playerAfterEvents.alive) {
+      this.state.phase = 'game_over';
+      return;
+    }
+
+    // 3) Enemy AI decisions/moves/attacks
     updateEnemiesAI(this.state, this.state.simTimeMs);
     const playerAfterAi = getPlayer(this.state);
     if (!playerAfterAi || !playerAfterAi.alive) {
@@ -110,7 +151,7 @@ export class GameLoop {
       return;
     }
 
-    // 3) Projectile simulation/impacts
+    // 4) Projectile simulation/impacts
     const projectileResult = updateProjectiles(this.state, SIMULATION_STEP_MS);
     if (projectileResult.killedEnemyIds.length > 0) {
       handleEnemyKills(this.state, projectileResult.killedEnemyIds);
@@ -122,10 +163,16 @@ export class GameLoop {
       return;
     }
 
-    // 4) Particle lifecycle
+    applyPlayerFeatureInteractions(this.state, playerAfterProjectiles);
+    if (!playerAfterProjectiles.alive) {
+      this.state.phase = 'game_over';
+      return;
+    }
+
+    // 5) Particle lifecycle
     updateParticles(this.state, SIMULATION_STEP_MS);
 
-    // 5) Power-up queue & transitions
+    // 6) Power-up queue & transitions
     startNextPowerUpChoiceIfNeeded(this.state);
     if (this.state.activePowerUpChoice) {
       return;

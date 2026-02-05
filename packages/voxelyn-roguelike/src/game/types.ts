@@ -1,4 +1,5 @@
 import type { VoxelGrid3D } from '@voxelyn/core';
+import type { AnimationFacing, AnimationIntent } from '@voxelyn/animation';
 
 export type MaterialId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -7,6 +8,22 @@ export type EntityKind = 'player' | 'enemy';
 export type EnemyArchetype = 'stalker' | 'bruiser' | 'spitter' | 'guardian' | 'spore_bomber';
 
 export type ProjectileKind = 'spore_blob' | 'guardian_shard';
+
+export type MapModuleKind =
+  | 'fungal_chamber'
+  | 'hive_tunnels'
+  | 'mining_zone'
+  | 'vertical_pocket'
+  | 'root_zone'
+  | 'mirror_pocket';
+
+export type DynamicCellKind = 'root_barrier' | 'pressure_gate' | 'spore_lane';
+
+export type DynamicCellPhase = 'open' | 'warning' | 'closed';
+
+export type CorridorEventKind = 'spore_wave' | 'ambush_ping';
+
+export type TileFeatureFlags = number;
 
 export type PowerUpId =
   | 'vital_boost'
@@ -61,6 +78,9 @@ export type EntityBase = {
   hitFlashUntilMs: number;
   alertUntilMs: number;
   animPhase: number;
+  animIntent: AnimationIntent;
+  animFacing: AnimationFacing;
+  animSpeedMul: number;
 };
 
 export type PlayerState = EntityBase & {
@@ -125,6 +145,80 @@ export type ParticleState = {
   text: string | null;
 };
 
+export type TerminalInteractable = {
+  id: string;
+  type: 'terminal';
+  x: number;
+  y: number;
+  active: boolean;
+  linkedGateId: string;
+};
+
+export type GateInteractable = {
+  id: string;
+  type: 'gate';
+  x: number;
+  y: number;
+  open: boolean;
+};
+
+export type OneWayPortalInteractable = {
+  id: string;
+  type: 'one_way_portal';
+  x: number;
+  y: number;
+  target: Vec2;
+};
+
+export type CrystalInteractable = {
+  id: string;
+  type: 'crystal';
+  x: number;
+  y: number;
+  used: boolean;
+};
+
+export type SporeVentInteractable = {
+  id: string;
+  type: 'spore_vent';
+  x: number;
+  y: number;
+  cooldownMs: number;
+  nextTriggerAt: number;
+};
+
+export type LevelInteractable =
+  | TerminalInteractable
+  | GateInteractable
+  | OneWayPortalInteractable
+  | CrystalInteractable
+  | SporeVentInteractable;
+
+export type DynamicCellState = {
+  id: string;
+  kind: DynamicCellKind;
+  x: number;
+  y: number;
+  phase: DynamicCellPhase;
+  nextTransitionMs: number;
+  openMs: number;
+  warningMs: number;
+  closedMs: number;
+  damagePerTick: number;
+  slowMs: number;
+  nextDamageTickAt: number;
+};
+
+export type CorridorEventState = {
+  id: string;
+  kind: CorridorEventKind;
+  cells: Vec2[];
+  activeUntilMs: number;
+  cooldownUntilMs: number;
+  nextEffectTickAt: number;
+  severity: 1 | 2 | 3;
+};
+
 export type LevelState = {
   grid: VoxelGrid3D;
   entities: Map<string, Entity>;
@@ -142,6 +236,13 @@ export type LevelState = {
   aoMap: Float32Array;
   baseLightMap: Float32Array;
   fungalLights: FungalLight[];
+  featureMap: Uint16Array;
+  interactables: LevelInteractable[];
+  layoutModules: MapModuleKind[];
+  occludableWalls: Uint8Array;
+  corridorCandidates: Uint8Array;
+  dynamicCells: DynamicCellState[];
+  corridorEvents: CorridorEventState[];
 };
 
 export type GameState = {
@@ -163,6 +264,23 @@ export type GameState = {
     healMs: number;
   };
   cameraShakeMs: number;
+  activeDebuffs: {
+    slowUntilMs: number;
+    crystalBuffUntilMs: number;
+    biofluidNextTickAt: number;
+    portalLockUntilMs: number;
+  };
+  uiAlerts: Array<{
+    text: string;
+    untilMs: number;
+    tone: 'info' | 'warn' | 'buff';
+  }>;
+  pathRecovery: {
+    forcedOpenCount: number;
+    lastRecoverAtMs: number;
+    blockedSinceMs: number;
+    lastPathCheckAtMs: number;
+  };
 };
 
 export type ControlSnapshot = {

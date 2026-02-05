@@ -24,6 +24,7 @@ import {
   occupancyAt,
   unregisterEntity,
 } from '../world/level';
+import { getPlayerAttackBonus } from '../world/features';
 
 export type AttackResult = {
   didAttack: boolean;
@@ -38,6 +39,13 @@ export type ProjectileUpdateResult = {
 };
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
+
+const vecToAnimFacing = (x: number, y: number): 'dr' | 'dl' | 'ur' | 'ul' => {
+  if (x >= 0 && y >= 0) return 'dr';
+  if (x < 0 && y >= 0) return 'dl';
+  if (x >= 0 && y < 0) return 'ur';
+  return 'ul';
+};
 
 export const calculateDamage = (attack: number, reduction: number): number => {
   const dmg = Math.round(attack - reduction);
@@ -117,11 +125,13 @@ const applyRawDamage = (
   const damage = calculateDamage(amount, target.damageReduction);
   target.hp -= damage;
   target.hitFlashUntilMs = Math.max(target.hitFlashUntilMs, nowMs + HIT_FLASH_MS);
+  target.animIntent = 'hit';
 
   const killedIds: string[] = [];
   if (target.hp <= 0) {
     target.hp = 0;
     target.alive = false;
+    target.animIntent = 'die';
     killedIds.push(target.id);
     unregisterEntity(state.level, target);
     if (target.kind === 'enemy') {
@@ -176,8 +186,13 @@ export const attackEntity = (
     return { didAttack: false, damage: 0, killedIds: [], healed: 0 };
   }
 
-  const result = applyRawDamage(state, source.id, target, source.attack, nowMs);
+  const buffedAttack = source.kind === 'player'
+    ? source.attack + getPlayerAttackBonus(state)
+    : source.attack;
+  const result = applyRawDamage(state, source.id, target, buffedAttack, nowMs);
   source.nextAttackAt = nowMs + source.attackCooldownMs;
+  source.animIntent = 'attack';
+  source.animFacing = vecToAnimFacing(source.facing.x, source.facing.y);
   return result;
 };
 
@@ -208,6 +223,8 @@ export const tryMoveEntity = (
     entity.nextMoveAt = nowMs + entity.moveCooldownMs;
     if (dx !== 0 || dy !== 0) {
       entity.facing = { x: Math.sign(dx), y: Math.sign(dy) };
+      entity.animFacing = vecToAnimFacing(entity.facing.x, entity.facing.y);
+      entity.animIntent = 'move';
       entity.animPhase = (entity.animPhase + 1) & 0xff;
     }
   }
@@ -230,6 +247,7 @@ export const tryPlayerBumpAction = (
   }
 
   player.facing = { x: Math.sign(dx), y: Math.sign(dy) };
+  player.animFacing = vecToAnimFacing(player.facing.x, player.facing.y);
 
   const tx = player.x + dx;
   const ty = player.y + dy;
@@ -243,6 +261,7 @@ export const tryPlayerBumpAction = (
     if (target && target.kind === 'enemy' && target.alive) {
       const result = attackEntity(state, player, target, nowMs);
       if (result.didAttack) {
+        player.animIntent = 'attack';
         return {
           moved: false,
           attacked: true,
@@ -254,6 +273,15 @@ export const tryPlayerBumpAction = (
   }
 
   const moved = tryMoveEntity(state.level, player, tx, ty, nowMs);
+  if (moved) {
+    // Temporary debuffs/buffs adjust movement cadence without mutating base stats.
+    if (state.activeDebuffs.slowUntilMs > nowMs) {
+      player.nextMoveAt += 65;
+    }
+    if (state.activeDebuffs.crystalBuffUntilMs > nowMs) {
+      player.nextMoveAt = Math.max(nowMs, player.nextMoveAt - 24);
+    }
+  }
   return { moved, attacked: false, killedEnemyIds: [] };
 };
 

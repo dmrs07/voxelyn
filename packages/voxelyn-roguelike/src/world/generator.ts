@@ -1,5 +1,10 @@
 import { createVoxelGrid3D, RNG, setVoxel } from '@voxelyn/core';
 import {
+  CA_CLOSE_IF_WALL_NEIGHBORS_GE,
+  CA_OPEN_IF_WALL_NEIGHBORS_LE,
+  CA_PROTECT_PATH_RADIUS,
+  CA_TARGET_OPEN_MAX,
+  CA_TARGET_OPEN_MIN,
   FLOOR_HASH_MAGIC,
   FUNGAL_LIGHT_REVEAL_RADIUS,
   MATERIAL_AIR,
@@ -13,13 +18,22 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from '../game/constants';
-import type { FungalLight, Vec2 } from '../game/types';
+import type { FungalLight, MapModuleKind, Vec2 } from '../game/types';
 import {
   computeDistanceMap,
   ensureSingleConnectedComponent,
   findFarthestReachable,
+  hasPath,
   maskIndex,
+  reconstructShortestPath,
 } from './connectivity';
+import {
+  applyOpenRatioCorrection,
+  buildProtectedMask,
+  computeOpenRatio,
+  runCellularAutomata,
+} from './generator-ca';
+import { applyModules, chooseModules } from './generator-modules';
 
 export type GeneratedFloor = {
   grid: ReturnType<typeof createVoxelGrid3D>;
@@ -32,6 +46,7 @@ export type GeneratedFloor = {
   mask: Uint8Array;
   heightMap: Float32Array;
   fungalLights: FungalLight[];
+  layoutModules: MapModuleKind[];
 };
 
 const inBounds = (x: number, y: number): boolean =>
@@ -177,7 +192,10 @@ const findNearestPassable = (mask: Uint8Array, width: number, height: number, fr
   return { x: 1, y: 1 };
 };
 
-const buildMask = (seed: number, floorNumber: number): Uint8Array => {
+const buildMask = (
+  seed: number,
+  floorNumber: number
+): { mask: Uint8Array; layoutModules: MapModuleKind[] } => {
   const rng = new RNG(seed + 17);
   const mask = new Uint8Array(WORLD_WIDTH * WORLD_HEIGHT);
 
@@ -185,11 +203,83 @@ const buildMask = (seed: number, floorNumber: number): Uint8Array => {
   const startY = nearestOddInside(Math.floor(WORLD_HEIGHT / 2), WORLD_HEIGHT);
   carveMaze(mask, WORLD_WIDTH, WORLD_HEIGHT, rng, startX, startY);
   carveLoops(mask, WORLD_WIDTH, WORLD_HEIGHT, rng, floorNumber);
-
+  const layoutModules = chooseModules(floorNumber, new RNG(seed ^ 0x2da91b));
+  applyModules(mask, WORLD_WIDTH, WORLD_HEIGHT, layoutModules, new RNG(seed ^ 0x44c12f));
   carveRooms(mask, WORLD_WIDTH, WORLD_HEIGHT, rng);
-  enforceBorders(mask, WORLD_WIDTH, WORLD_HEIGHT);
 
-  return mask;
+  const provisionalEntry = findNearestPassable(mask, WORLD_WIDTH, WORLD_HEIGHT, {
+    x: Math.floor(WORLD_WIDTH / 2),
+    y: Math.floor(WORLD_HEIGHT / 2),
+  });
+  const provisionalDist = computeDistanceMap(mask, WORLD_WIDTH, WORLD_HEIGHT, provisionalEntry);
+  const provisionalExit = findFarthestReachable(
+    provisionalDist,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    provisionalEntry
+  );
+  const protectedPath = reconstructShortestPath(
+    mask,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    provisionalEntry,
+    provisionalExit
+  );
+  const protectedMask = buildProtectedMask(
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    provisionalEntry,
+    provisionalExit,
+    protectedPath,
+    CA_PROTECT_PATH_RADIUS
+  );
+
+  let shapedMask = runCellularAutomata(
+    mask,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    protectedMask
+  );
+  let ratio = computeOpenRatio(shapedMask);
+  if (ratio < CA_TARGET_OPEN_MIN || ratio > CA_TARGET_OPEN_MAX) {
+    applyOpenRatioCorrection(
+      shapedMask,
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+      protectedMask,
+      new RNG(seed ^ 0x93a4d2),
+      CA_TARGET_OPEN_MIN,
+      CA_TARGET_OPEN_MAX
+    );
+    shapedMask = runCellularAutomata(
+      shapedMask,
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+      protectedMask,
+      {
+        iterations: 1,
+        rules: {
+          openIfWallNeighborsLE: CA_OPEN_IF_WALL_NEIGHBORS_LE,
+          closeIfWallNeighborsGE: CA_CLOSE_IF_WALL_NEIGHBORS_GE,
+        },
+      }
+    );
+    ratio = computeOpenRatio(shapedMask);
+    if (ratio < CA_TARGET_OPEN_MIN || ratio > CA_TARGET_OPEN_MAX) {
+      applyOpenRatioCorrection(
+        shapedMask,
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        protectedMask,
+        new RNG(seed ^ 0x15db73),
+        CA_TARGET_OPEN_MIN,
+        CA_TARGET_OPEN_MAX
+      );
+    }
+  }
+
+  enforceBorders(shapedMask, WORLD_WIDTH, WORLD_HEIGHT);
+  return { mask: shapedMask, layoutModules };
 };
 
 const writeGrid = (
@@ -312,7 +402,8 @@ const chooseFungalLights = (
 export const generateFloor = (baseSeed: number, floorNumber: number): GeneratedFloor => {
   const seed = floorSeedFor(baseSeed, floorNumber);
   const rng = new RNG(seed + 1337);
-  const mask = buildMask(seed, floorNumber);
+  const built = buildMask(seed, floorNumber);
+  const mask = built.mask;
 
   let entry = findNearestPassable(mask, WORLD_WIDTH, WORLD_HEIGHT, {
     x: Math.floor(WORLD_WIDTH / 2),
@@ -322,8 +413,45 @@ export const generateFloor = (baseSeed: number, floorNumber: number): GeneratedF
   ensureSingleConnectedComponent(mask, WORLD_WIDTH, WORLD_HEIGHT, entry, rng);
   entry = findNearestPassable(mask, WORLD_WIDTH, WORLD_HEIGHT, entry);
 
-  const distances = computeDistanceMap(mask, WORLD_WIDTH, WORLD_HEIGHT, entry);
-  const exit = findFarthestReachable(distances, WORLD_WIDTH, WORLD_HEIGHT, entry);
+  let distances = computeDistanceMap(mask, WORLD_WIDTH, WORLD_HEIGHT, entry);
+  let exit = findFarthestReachable(distances, WORLD_WIDTH, WORLD_HEIGHT, entry);
+
+  const finalPath = reconstructShortestPath(
+    mask,
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    entry,
+    exit
+  );
+  const finalProtectedMask = buildProtectedMask(
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    entry,
+    exit,
+    finalPath,
+    0
+  );
+  const finalRatio = computeOpenRatio(mask);
+  if (finalRatio < CA_TARGET_OPEN_MIN || finalRatio > CA_TARGET_OPEN_MAX) {
+    applyOpenRatioCorrection(
+      mask,
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+      finalProtectedMask,
+      new RNG(seed ^ 0xa42f11),
+      CA_TARGET_OPEN_MIN,
+      CA_TARGET_OPEN_MAX
+    );
+    enforceBorders(mask, WORLD_WIDTH, WORLD_HEIGHT);
+    if (!hasPath(mask, WORLD_WIDTH, WORLD_HEIGHT, entry, exit)) {
+      ensureSingleConnectedComponent(mask, WORLD_WIDTH, WORLD_HEIGHT, entry, new RNG(seed ^ 0xbf0011));
+      distances = computeDistanceMap(mask, WORLD_WIDTH, WORLD_HEIGHT, entry);
+      exit = findFarthestReachable(distances, WORLD_WIDTH, WORLD_HEIGHT, entry);
+    } else {
+      distances = computeDistanceMap(mask, WORLD_WIDTH, WORLD_HEIGHT, entry);
+      exit = findFarthestReachable(distances, WORLD_WIDTH, WORLD_HEIGHT, entry);
+    }
+  }
 
   const grid = writeGrid(mask, entry, exit, seed, floorNumber);
   const heightMap = buildHeightMap(mask);
@@ -348,5 +476,6 @@ export const generateFloor = (baseSeed: number, floorNumber: number): GeneratedF
     mask,
     heightMap,
     fungalLights,
+    layoutModules: built.layoutModules,
   };
 };
