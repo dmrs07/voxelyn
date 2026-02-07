@@ -3,7 +3,7 @@
  */
 
 import type { ToolSettings } from './stores';
-import type { EditorDocument, GridLayer, VoxelLayer, LayerId } from './document/types';
+import type { EditorDocument, GridLayer, VoxelLayer, LayerId, Selection } from './document/types';
 import type { PaintData } from './document/commands';
 
 /** A layer that can be painted on (2D grid or 3D voxel) */
@@ -349,4 +349,101 @@ export const magicWandSelect = (
   }
   
   return { x: minX, y: minY, width: selWidth, height: selHeight, mask };
+};
+
+const pointInPolygon = (x: number, y: number, polygon: GridPoint[]): boolean => {
+  let inside = false;
+  const count = polygon.length;
+  if (count < 3) return false;
+
+  for (let i = 0, j = count - 1; i < count; j = i, i += 1) {
+    const pi = polygon[i];
+    const pj = polygon[j];
+    const intersect = ((pi.y > y) !== (pj.y > y)) &&
+      (x < ((pj.x - pi.x) * (y - pi.y)) / ((pj.y - pi.y) || 1e-9) + pi.x);
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
+};
+
+const closePolygon = (points: GridPoint[]): GridPoint[] => {
+  if (points.length === 0) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first.x === last.x && first.y === last.y) return points;
+  return [...points, first];
+};
+
+export const rasterizePolygonSelection = (polygonPoints: GridPoint[]): Selection | null => {
+  if (polygonPoints.length < 3) return null;
+
+  const polygon = closePolygon(polygonPoints);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const point of polygon) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null;
+  }
+
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  if (width < 1 || height < 1) return null;
+
+  const mask = new Uint8Array(width * height);
+
+  // Fill by scanline/even-odd rule over cell centers.
+  for (let y = minY; y <= maxY; y += 1) {
+    for (let x = minX; x <= maxX; x += 1) {
+      if (pointInPolygon(x + 0.5, y + 0.5, polygon)) {
+        mask[(y - minY) * width + (x - minX)] = 1;
+      }
+    }
+  }
+
+  // Always rasterize polygon edges into the mask.
+  for (let i = 0; i < polygon.length - 1; i += 1) {
+    const start = polygon[i];
+    const end = polygon[i + 1];
+    const line = bresenhamLine(start.x, start.y, end.x, end.y);
+    for (const point of line) {
+      const lx = point.x - minX;
+      const ly = point.y - minY;
+      if (lx < 0 || ly < 0 || lx >= width || ly >= height) continue;
+      mask[ly * width + lx] = 1;
+    }
+  }
+
+  let hasPixels = false;
+  for (let i = 0; i < mask.length; i += 1) {
+    if (mask[i] > 0) {
+      hasPixels = true;
+      break;
+    }
+  }
+  if (!hasPixels) return null;
+
+  return {
+    active: true,
+    x: minX,
+    y: minY,
+    width,
+    height,
+    mask,
+  };
+};
+
+export const pointsNear = (a: GridPoint, b: GridPoint, maxDistance = 2): boolean => {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy <= maxDistance * maxDistance;
 };

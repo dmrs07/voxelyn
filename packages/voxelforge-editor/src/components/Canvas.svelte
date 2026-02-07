@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { documentStore, toolStore, uiStore, activeLayer } from '$lib/stores';
+  import { documentStore, toolStore, uiStore, activeLayer, type Voxel2DRenderMode } from '$lib/stores';
   import { toolRegistry, getToolByHotkey, type ToolRuntimeState, type ToolContext } from '$lib/tool-system';
   import { renderDocumentToSurface } from '$lib/render/render-surface';
   import { renderDocumentIso, screenToIso, ISO_DEFAULTS } from '$lib/render/render-iso';
@@ -10,11 +10,17 @@
   import { createWebglRenderer, type WebglRenderer } from '$lib/render/webgl-renderer';
   import { projectIso } from '@voxelyn/core';
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cube, Minus, Plus } from 'phosphor-svelte';
-  import type { GridLayer, VoxelLayer, EditorDocument, Selection, BlendMode, Layer } from '$lib/document/types';
+  import type { VoxelLayer, EditorDocument, Selection, BlendMode } from '$lib/document/types';
   import { createRectSelection } from '$lib/document/types';
-  import { mergeSelection, translateSelection, rotateSelectionMask, flipSelectionMask, type SelectionOp } from '$lib/document/selection';
+  import { mergeSelection, type SelectionOp } from '$lib/document/selection';
   import type { ToolId, ToolSettings } from '$lib/stores';
   import type { PaintableLayer } from '$lib/tools';
+  import {
+    buildFloatingOverrides,
+    getFloatingSelection,
+    isPointInFloatingSelection,
+    type FloatingSelectionSession,
+  } from '$lib/document/floating-selection';
 
   let canvas: HTMLCanvasElement;
   let webglCanvas: HTMLCanvasElement;
@@ -55,6 +61,8 @@
   let gridStep: number = get(uiStore.gridStep);
   let cursorPosition: { x: number; y: number } | null = get(uiStore.cursorPosition);
   let showTextures: boolean = get(uiStore.showTextures);
+  let voxel2DMode: Voxel2DRenderMode = get(uiStore.voxel2DMode);
+  let floatingSession: FloatingSelectionSession | null = null;
   let isPanModifier = false;
   let lastDocDims = { width: 0, height: 0, depth: 0 };
   let lastViewMode = '2d' as EditorDocument['viewMode'];
@@ -105,6 +113,10 @@
     currentMaterial: 1,
     selectionPreview: null,
     selectionOp: 'replace',
+    freehandPath: [],
+    polygonPoints: [],
+    polygonHoverPoint: null,
+    polygonSelectionOp: 'replace',
     activePointerToolId: null,
   };
 
@@ -140,6 +152,21 @@
     if (settings.autoLayerStep && canStepTools.includes(toolId)) {
       documentStore.stepActiveLayer(settings.autoLayerStepDirection, settings.autoLayerStepCreate);
     }
+  };
+
+  const getEffectiveVoxel2DMode = (): Voxel2DRenderMode => {
+    if (floatingSession?.layerType === 'voxel3d') return 'slice';
+    return voxel2DMode;
+  };
+
+  const getFloatingOverridesByLayer = (): Map<string, Map<number, number>> => {
+    if (!floatingSession) return new Map();
+    return new Map([[floatingSession.layerId, buildFloatingOverrides(floatingSession)]]);
+  };
+
+  const getCurrentFloatingSelection = (): Selection | null => {
+    if (!floatingSession) return null;
+    return getFloatingSelection(floatingSession);
   };
   
   // Convert screen coords to grid coords
@@ -182,254 +209,6 @@
     return createRectSelection(x, y, width, height);
   };
 
-  /** Move selection and its contents by the given delta */
-  const moveSelection = (dx: number, dy: number): void => {
-    if (!layer || !doc.selection.active) return;
-
-    const sel = doc.selection;
-    const layerWidth = layer.type === 'voxel3d' ? layer.width : layer.width;
-    const layerHeight = layer.type === 'voxel3d' ? layer.height : layer.height;
-
-    // Collect pixels inside selection that need to move
-    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
-    const srcPixels = new Map<number, number>(); // store source pixel values
-
-    // First pass: collect source pixels
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
-        if (!inMask) continue;
-
-        const srcX = sel.x + sx;
-        const srcY = sel.y + sy;
-        if (srcX < 0 || srcX >= layerWidth || srcY < 0 || srcY >= layerHeight) continue;
-
-        const srcIdx = srcY * layerWidth + srcX;
-        srcPixels.set(srcIdx, layer.data[srcIdx]);
-      }
-    }
-
-    // Second pass: create pixel changes (clear source, fill destination)
-    for (const [srcIdx, value] of srcPixels) {
-      const srcX = srcIdx % layerWidth;
-      const srcY = Math.floor(srcIdx / layerWidth);
-      const dstX = srcX + dx;
-      const dstY = srcY + dy;
-
-      // Clear source pixel
-      pixels.push({ index: srcIdx, oldValue: value, newValue: 0 });
-
-      // Set destination pixel if in bounds
-      if (dstX >= 0 && dstX < layerWidth && dstY >= 0 && dstY < layerHeight) {
-        const dstIdx = dstY * layerWidth + dstX;
-        // Don't overwrite if destination is also a source pixel (handled separately)
-        if (!srcPixels.has(dstIdx)) {
-          pixels.push({ index: dstIdx, oldValue: layer.data[dstIdx], newValue: value });
-        } else {
-          // Update the clear to the new value
-          const clearPixel = pixels.find(p => p.index === dstIdx);
-          if (clearPixel) clearPixel.newValue = value;
-        }
-      }
-    }
-
-    // Apply transform
-    const newSelection = translateSelection(sel, dx, dy, doc.width, doc.height);
-    documentStore.transform({
-      layerId: layer.id,
-      pixels,
-      selectionBefore: sel,
-      selectionAfter: newSelection,
-    });
-  };
-
-  /** Rotate selection contents by the given angle */
-  const rotateSelection = (angle: 90 | 180 | 270): void => {
-    if (!layer || !doc.selection.active) return;
-
-    const sel = doc.selection;
-    const layerWidth = layer.type === 'voxel3d' ? layer.width : layer.width;
-    const layerHeight = layer.type === 'voxel3d' ? layer.height : layer.height;
-
-    // Extract pixel values from selection area
-    const srcData = new Uint16Array(sel.width * sel.height);
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const srcX = sel.x + sx;
-        const srcY = sel.y + sy;
-        if (srcX >= 0 && srcX < layerWidth && srcY >= 0 && srcY < layerHeight) {
-          srcData[sy * sel.width + sx] = layer.data[srcY * layerWidth + srcX];
-        }
-      }
-    }
-
-    // Rotate the mask if present
-    const { mask: newMask, width: newSelW, height: newSelH } = sel.mask
-      ? rotateSelectionMask(sel.mask, sel.width, sel.height, angle)
-      : { mask: undefined, width: angle === 180 ? sel.width : sel.height, height: angle === 180 ? sel.height : sel.width };
-
-    // Rotate the pixel data
-    const rotatedData = new Uint16Array(newSelW * newSelH);
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const srcIdx = sy * sel.width + sx;
-        let dstX: number;
-        let dstY: number;
-
-        if (angle === 90) {
-          dstX = sel.height - 1 - sy;
-          dstY = sx;
-        } else if (angle === 180) {
-          dstX = sel.width - 1 - sx;
-          dstY = sel.height - 1 - sy;
-        } else {
-          // 270
-          dstX = sy;
-          dstY = sel.width - 1 - sx;
-        }
-
-        const dstIdx = dstY * newSelW + dstX;
-        rotatedData[dstIdx] = srcData[srcIdx];
-      }
-    }
-
-    // Calculate new selection position (centered on old center)
-    const oldCenterX = sel.x + sel.width / 2;
-    const oldCenterY = sel.y + sel.height / 2;
-    const newX = Math.round(oldCenterX - newSelW / 2);
-    const newY = Math.round(oldCenterY - newSelH / 2);
-
-    // Build pixel changes
-    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
-
-    // Clear old selection area
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
-        if (!inMask) continue;
-        const srcX = sel.x + sx;
-        const srcY = sel.y + sy;
-        if (srcX >= 0 && srcX < layerWidth && srcY >= 0 && srcY < layerHeight) {
-          const idx = srcY * layerWidth + srcX;
-          pixels.push({ index: idx, oldValue: layer.data[idx], newValue: 0 });
-        }
-      }
-    }
-
-    // Set new rotated data
-    for (let dy = 0; dy < newSelH; dy += 1) {
-      for (let dx = 0; dx < newSelW; dx += 1) {
-        const inMask = newMask ? newMask[dy * newSelW + dx] > 0 : true;
-        if (!inMask) continue;
-        const dstX = newX + dx;
-        const dstY = newY + dy;
-        if (dstX >= 0 && dstX < layerWidth && dstY >= 0 && dstY < layerHeight) {
-          const idx = dstY * layerWidth + dstX;
-          const value = rotatedData[dy * newSelW + dx];
-          // Check if already in pixels list
-          const existing = pixels.find(p => p.index === idx);
-          if (existing) {
-            existing.newValue = value;
-          } else {
-            pixels.push({ index: idx, oldValue: layer.data[idx], newValue: value });
-          }
-        }
-      }
-    }
-
-    const newSelection: Selection = {
-      active: true,
-      x: newX,
-      y: newY,
-      width: newSelW,
-      height: newSelH,
-      mask: newMask,
-    };
-
-    documentStore.transform({
-      layerId: layer.id,
-      pixels,
-      selectionBefore: sel,
-      selectionAfter: newSelection,
-    });
-  };
-
-  /** Flip selection contents horizontally or vertically */
-  const flipSelection = (axis: 'horizontal' | 'vertical'): void => {
-    if (!layer || !doc.selection.active) return;
-
-    const sel = doc.selection;
-    const layerWidth = layer.type === 'voxel3d' ? layer.width : layer.width;
-    const layerHeight = layer.type === 'voxel3d' ? layer.height : layer.height;
-
-    // Extract pixel values from selection area
-    const srcData = new Uint16Array(sel.width * sel.height);
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const srcX = sel.x + sx;
-        const srcY = sel.y + sy;
-        if (srcX >= 0 && srcX < layerWidth && srcY >= 0 && srcY < layerHeight) {
-          srcData[sy * sel.width + sx] = layer.data[srcY * layerWidth + srcX];
-        }
-      }
-    }
-
-    // Flip the mask if present
-    const newMask = sel.mask
-      ? flipSelectionMask(sel.mask, sel.width, sel.height, axis)
-      : undefined;
-
-    // Flip the pixel data
-    const flippedData = new Uint16Array(sel.width * sel.height);
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const srcIdx = sy * sel.width + sx;
-        let dstX: number;
-        let dstY: number;
-
-        if (axis === 'horizontal') {
-          dstX = sel.width - 1 - sx;
-          dstY = sy;
-        } else {
-          dstX = sx;
-          dstY = sel.height - 1 - sy;
-        }
-
-        const dstIdx = dstY * sel.width + dstX;
-        flippedData[dstIdx] = srcData[srcIdx];
-      }
-    }
-
-    // Build pixel changes (in-place flip, selection position stays same)
-    const pixels: Array<{ index: number; oldValue: number; newValue: number }> = [];
-
-    for (let sy = 0; sy < sel.height; sy += 1) {
-      for (let sx = 0; sx < sel.width; sx += 1) {
-        const inMask = sel.mask ? sel.mask[sy * sel.width + sx] > 0 : true;
-        if (!inMask) continue;
-        const dstX = sel.x + sx;
-        const dstY = sel.y + sy;
-        if (dstX >= 0 && dstX < layerWidth && dstY >= 0 && dstY < layerHeight) {
-          const idx = dstY * layerWidth + dstX;
-          const newValue = flippedData[sy * sel.width + sx];
-          pixels.push({ index: idx, oldValue: layer.data[idx], newValue });
-        }
-      }
-    }
-
-    const newSelection: Selection = {
-      ...sel,
-      mask: newMask,
-    };
-
-    documentStore.transform({
-      layerId: layer.id,
-      pixels,
-      selectionBefore: sel,
-      selectionAfter: newSelection,
-    });
-  };
-
   const buildToolContext = (): ToolContext => ({
     doc,
     layer,
@@ -455,10 +234,15 @@
     },
     setPointerCapture: (pointerId) => canvas.setPointerCapture(pointerId),
     releasePointerCapture: (pointerId) => canvas.releasePointerCapture(pointerId),
+    hasFloating: () => documentStore.hasFloating(),
+    getFloatingSelection: () => getCurrentFloatingSelection(),
+    beginFloatingFromSelection: (z) => documentStore.beginFloatingFromSelection(z),
+    moveFloatingBy: (dx, dy) => documentStore.moveFloatingBy(dx, dy),
+    rotateFloating: (angle) => documentStore.rotateFloating(angle),
+    flipFloating: (axis) => documentStore.flipFloating(axis),
+    commitFloating: () => { documentStore.commitFloating('enter'); },
+    cancelFloating: () => { documentStore.cancelFloating(); },
     render,
-    moveSelection,
-    rotateSelection,
-    flipSelection,
   });
 
   const handlePointerDown = (e: PointerEvent) => {
@@ -466,8 +250,17 @@
       handlePointerDown3d(e);
       return;
     }
-    const toolCtx = buildToolContext();
     const toolOverride: ToolId = e.button === 1 || isPanModifier ? 'pan' : tool;
+    const gridPos = screenToGrid(e.clientX, e.clientY);
+
+    if (
+      floatingSession &&
+      !isPointInFloatingSelection(floatingSession, gridPos.x, gridPos.y)
+    ) {
+      documentStore.commitFloating('outside-click');
+    }
+
+    const toolCtx = buildToolContext();
     const activeTool = toolRegistry[toolOverride] ?? toolRegistry.pencil;
     toolState.activePointerToolId = toolOverride;
 
@@ -490,7 +283,12 @@
 
     // Update ghost voxel for isometric view
     if (doc.viewMode === 'iso') {
-      ghostVoxel = { x: gridPos.x, y: gridPos.y, z: 0, visible: true };
+      ghostVoxel = {
+        x: gridPos.x,
+        y: gridPos.y,
+        z: layer?.type === 'voxel3d' ? activeZ : 0,
+        visible: true,
+      };
       overlayNeedsRender = true;
     } else {
       ghostVoxel = { ...ghostVoxel, visible: false };
@@ -714,10 +512,13 @@
 
     // Draw layers sorted by zIndex (ascending - lower zIndex drawn first = behind)
     const pendingForLayer = toolState.isDrawing && layer?.id ? toolState.pendingPixels : null;
+    const floatingOverridesByLayer = getFloatingOverridesByLayer();
+    const effectiveVoxelMode = getEffectiveVoxel2DMode();
     const sortedLayers = [...doc.layers].sort((a, b) => a.zIndex - b.zIndex);
     
     for (const l of sortedLayers) {
       if (!l.visible) continue;
+      const floatingOverrides = floatingOverridesByLayer.get(l.id);
 
       ctx.globalAlpha = l.opacity;
       ctx.globalCompositeOperation = getCompositeOperation(l.blendMode ?? 'normal');
@@ -730,13 +531,58 @@
         continue;
       }
 
+      if (l.type === 'voxel3d') {
+        const vw = l.width;
+        const vh = l.height;
+        const vd = l.depth;
+        const z = Math.max(0, Math.min(vd - 1, activeZ));
+
+        const getVoxelCell = (index: number): number => {
+          if (floatingOverrides?.has(index)) {
+            return floatingOverrides.get(index) ?? 0;
+          }
+          return l.data[index] ?? 0;
+        };
+
+        for (let y = 0; y < vh; y += 1) {
+          for (let x = 0; x < vw; x += 1) {
+            let mat = 0;
+            if (effectiveVoxelMode === 'slice') {
+              const idx = x + y * vw + z * vw * vh;
+              mat = getVoxelCell(idx) & 0xffff;
+            } else {
+              for (let vz = vd - 1; vz >= 0; vz -= 1) {
+                const idx = x + y * vw + vz * vw * vh;
+                mat = getVoxelCell(idx) & 0xffff;
+                if (mat !== 0) break;
+              }
+            }
+            if (mat === 0) continue;
+
+            const material = doc.palette[mat];
+            if (!material) continue;
+            const color = material.color;
+            const r = color & 0xff;
+            const g = (color >> 8) & 0xff;
+            const b = (color >> 16) & 0xff;
+            const a = (color >> 24) & 0xff;
+            ctx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+            ctx.fillRect(x, y, 1, 1);
+          }
+        }
+        continue;
+      }
       if (l.type !== 'grid2d') continue;
 
       // Draw each pixel
       for (let y = 0; y < l.height; y++) {
         for (let x = 0; x < l.width; x++) {
           const idx = y * l.width + x;
-          let cell = l.data[idx];
+          let cell = l.data[idx] ?? 0;
+
+          if (floatingOverrides?.has(idx)) {
+            cell = floatingOverrides.get(idx) ?? cell;
+          }
 
           // Apply pending pixels for preview
           if (l.id === layer?.id && pendingForLayer) {
@@ -773,11 +619,15 @@
 
   const renderWebgl = () => {
     if (!webglRenderer) return;
+    const floatingOverrides = getFloatingOverridesByLayer();
     const surface = renderDocumentToSurface(
       doc,
       Array.from(toolState.pendingPixels.values()),
       layer?.id ?? null,
-      toolState.isDrawing
+      toolState.isDrawing,
+      floatingOverrides,
+      getEffectiveVoxel2DMode(),
+      activeZ
     );
     webglRenderer.render(surface, doc.camera);
   };
@@ -785,6 +635,7 @@
   const renderIso = () => {
     if (!ctx || !canvas) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const floatingOverrides = getFloatingOverridesByLayer();
     renderDocumentIso(
       ctx,
       doc,
@@ -794,7 +645,8 @@
       {},
       showGrid,
       gridStep,
-      showTextures
+      showTextures,
+      floatingOverrides
     );
     renderIsoOverlay();
   };
@@ -810,12 +662,14 @@
 
     const gx = ghostVoxel.x;
     const gy = ghostVoxel.y;
-    const gz = baselineZ;
+    const layerBaseZ = baselineZ + ((layer?.zIndex ?? 0) * ISO_DEFAULTS.defaultHeight);
+    const layerPixelOffset = layer?.isoHeight ?? 0;
+    const gz = layer?.type === 'voxel3d' ? layerBaseZ + (activeZ + 1) : baselineZ;
 
     // Project ghost voxel position
     const projected = projectIso(gx, gy, gz, tileW, tileH, zStep);
     const sx = projected.sx;
-    const sy = projected.sy;
+    const sy = projected.sy - layerPixelOffset;
 
     ctx.save();
     ctx.scale(doc.camera.zoom, doc.camera.zoom);
@@ -896,16 +750,19 @@
     const { tileW, tileH, zStep, baselineZ } = ISO_DEFAULTS;
     const centerX = canvas.clientWidth / 2 + doc.camera.x;
     const centerY = canvas.clientHeight / 3 + doc.camera.y;
+    const layerBaseZ = baselineZ + ((layer?.zIndex ?? 0) * ISO_DEFAULTS.defaultHeight);
+    const selectionZ = layer?.type === 'voxel3d' ? layerBaseZ + (activeZ + 1) : baselineZ;
+    const selectionPixelOffset = layer?.isoHeight ?? 0;
 
     const x0 = selectionToDraw.x;
     const y0 = selectionToDraw.y;
     const x1 = selectionToDraw.x + selectionToDraw.width;
     const y1 = selectionToDraw.y + selectionToDraw.height;
 
-    const p1 = projectIso(x0, y0, baselineZ, tileW, tileH, zStep);
-    const p2 = projectIso(x1, y0, baselineZ, tileW, tileH, zStep);
-    const p3 = projectIso(x1, y1, baselineZ, tileW, tileH, zStep);
-    const p4 = projectIso(x0, y1, baselineZ, tileW, tileH, zStep);
+    const p1 = projectIso(x0, y0, selectionZ, tileW, tileH, zStep);
+    const p2 = projectIso(x1, y0, selectionZ, tileW, tileH, zStep);
+    const p3 = projectIso(x1, y1, selectionZ, tileW, tileH, zStep);
+    const p4 = projectIso(x0, y1, selectionZ, tileW, tileH, zStep);
 
     ctx.save();
     ctx.scale(doc.camera.zoom, doc.camera.zoom);
@@ -919,10 +776,10 @@
     ctx.lineDashOffset = -offset;
 
     ctx.beginPath();
-    ctx.moveTo(p1.sx, p1.sy);
-    ctx.lineTo(p2.sx, p2.sy);
-    ctx.lineTo(p3.sx, p3.sy);
-    ctx.lineTo(p4.sx, p4.sy);
+    ctx.moveTo(p1.sx, p1.sy - selectionPixelOffset);
+    ctx.lineTo(p2.sx, p2.sy - selectionPixelOffset);
+    ctx.lineTo(p3.sx, p3.sy - selectionPixelOffset);
+    ctx.lineTo(p4.sx, p4.sy - selectionPixelOffset);
     ctx.closePath();
     ctx.stroke();
 
@@ -1588,8 +1445,25 @@
   const handleKeyDown = (e: KeyboardEvent) => {
     // Skip if focus is on an input element
     if (isInputFocused()) return;
+
+    const activeToolDef = toolRegistry[tool] ?? toolRegistry.pencil;
+    if (activeToolDef.onKeyDown) {
+      activeToolDef.onKeyDown(buildToolContext(), e);
+      if (e.defaultPrevented) {
+        render();
+        return;
+      }
+    }
+
+    if (!e.ctrlKey && !e.metaKey && e.key === 'Enter' && documentStore.hasFloating()) {
+      e.preventDefault();
+      documentStore.commitFloating('enter');
+      render();
+      return;
+    }
     
     if (e.ctrlKey || e.metaKey) {
+      const keyLower = e.key.toLowerCase();
       if (e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -1609,25 +1483,42 @@
       } else if (e.key === 'y') {
         e.preventDefault();
         documentStore.redo();
-      } else if (e.key === 'c') {
+      } else if (keyLower === 'a') {
         e.preventDefault();
-        documentStore.copySelection();
-      } else if (e.key === 'x') {
+        documentStore.selectAllActivePlane(activeZ);
+      } else if (keyLower === 'c') {
         e.preventDefault();
-        documentStore.cutSelection();
-      } else if (e.key === 'v') {
+        documentStore.copySelection(activeZ);
+      } else if (keyLower === 'x') {
+        e.preventDefault();
+        documentStore.cutSelection(activeZ);
+      } else if (keyLower === 'v') {
         e.preventDefault();
         const cursor = get(uiStore.cursorPosition) as { x: number; y: number } | null;
         if (cursor) {
-          documentStore.pasteSelection(cursor.x, cursor.y);
+          documentStore.pasteSelection(cursor.x, cursor.y, activeZ);
         } else {
-          documentStore.pasteSelection();
+          documentStore.pasteSelection(undefined, undefined, activeZ);
         }
       }
     } else {
       if (e.code === 'Space') {
         e.preventDefault();
         isPanModifier = true;
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (documentStore.hasFloating()) {
+          documentStore.cancelFloating();
+        } else if (doc.selection.active) {
+          documentStore.select({
+            before: doc.selection,
+            after: { active: false, x: 0, y: 0, width: 0, height: 0 },
+          });
+        }
+        render();
         return;
       }
 
@@ -1683,16 +1574,40 @@
         invalidateRender();
         render();
       }),
-      toolStore.activeTool.subscribe(t => { tool = t; }),
+      toolStore.activeTool.subscribe(t => {
+        if (tool !== t && documentStore.hasFloating()) {
+          documentStore.commitFloating('tool-switch');
+        }
+        if (tool !== t) {
+          toolState.freehandPath = [];
+          toolState.polygonPoints = [];
+          toolState.polygonHoverPoint = null;
+          toolState.selectionPreview = null;
+          toolState.isSelecting = false;
+          toolState.isDrawing = false;
+        }
+        tool = t;
+      }),
       toolStore.settings.subscribe(s => { settings = s; }),
       toolStore.primaryMaterial.subscribe(m => { primaryMat = m; }),
       toolStore.secondaryMaterial.subscribe(m => { secondaryMat = m; }),
-      toolStore.activeZ.subscribe(z => { activeZ = z; }),
+      toolStore.activeZ.subscribe(z => {
+        if (activeZ !== z && documentStore.hasFloating()) {
+          documentStore.commitFloating('view-change');
+        }
+        activeZ = z;
+      }),
+      documentStore.floating.subscribe(session => {
+        floatingSession = session;
+        invalidateRender();
+        render();
+      }),
       activeLayer.subscribe(l => { layer = l as PaintableLayer | null; }),
       uiStore.showGrid.subscribe(g => { showGrid = g; invalidateRender(); render(); }),
       uiStore.gridStep.subscribe(step => { gridStep = step; invalidateRender(); render(); }),
       uiStore.cursorPosition.subscribe(pos => { cursorPosition = pos; }),
       uiStore.showTextures.subscribe(t => { showTextures = t; invalidateRender(); render(); }),
+      uiStore.voxel2DMode.subscribe(mode => { voxel2DMode = mode; invalidateRender(); render(); }),
     ];
     
     // Resize observer

@@ -9,6 +9,9 @@ import {
   type EditorDocument, 
   type LayerId, 
   type ViewMode,
+  type GridLayer,
+  type Layer,
+  type Selection,
   type VoxelLayer,
   createGridLayer,
   createVoxelLayer,
@@ -50,41 +53,175 @@ import {
   exportLayerAsPNG 
 } from './document/serialization';
 import {
-  buildPasteData,
-  copySelectionFromLayer,
-  createEraseDataFromSelection,
   type ClipboardData,
 } from './document/clipboard';
+import {
+  buildClipboardFromFloating,
+  buildFloatingTransformData,
+  createFloatingFromClipboard,
+  createFloatingFromSelection,
+  flipFloatingSelection,
+  getFloatingSelection,
+  moveFloatingSelection,
+  rotateFloatingSelection,
+  type FloatingSelectionSession,
+} from './document/floating-selection';
 
 // ============================================================================
 // Document Store
 // ============================================================================
 
+export type FloatingCommitReason = 'enter' | 'tool-switch' | 'outside-click' | 'save' | 'export' | 'view-change' | 'layer-change';
+type PaintableLayer = GridLayer | VoxelLayer;
+
+const isPaintableLayer = (layer: Layer | undefined): layer is PaintableLayer =>
+  Boolean(layer && (layer.type === 'grid2d' || layer.type === 'voxel3d'));
+
+const masksEqual = (a?: Uint8Array, b?: Uint8Array): boolean => {
+  if (!a && !b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+const selectionsEqual = (a: Selection, b: Selection): boolean =>
+  a.active === b.active &&
+  a.x === b.x &&
+  a.y === b.y &&
+  a.width === b.width &&
+  a.height === b.height &&
+  masksEqual(a.mask, b.mask);
+
 const createDocumentStore = () => {
   const doc = writable<EditorDocument>(createDocument(128, 128, 32, 'Untitled'));
   const history = writable<HistoryState>(createHistory(100));
+  const floating = writable<FloatingSelectionSession | null>(null);
   let clipboard: ClipboardData | null = null;
+
+  const getActivePaintableLayer = (currentDoc: EditorDocument): PaintableLayer | null => {
+    const layer = currentDoc.layers.find(l => l.id === currentDoc.activeLayerId);
+    if (!isPaintableLayer(layer) || layer.locked) return null;
+    return layer;
+  };
+
+  const applyCommand = (command: Command): void => {
+    const currentDoc = get(doc);
+    const currentHistory = get(history);
+    const result = executeCommand(currentHistory, currentDoc, command);
+    doc.set(result.doc);
+    history.set(result.history);
+  };
+
+  const commitFloatingInternal = (_reason: FloatingCommitReason): boolean => {
+    const currentFloating = get(floating);
+    if (!currentFloating) return false;
+
+    const currentDoc = get(doc);
+    const layer = currentDoc.layers.find(l => l.id === currentFloating.layerId);
+    if (!layer || (layer.type !== 'grid2d' && layer.type !== 'voxel3d')) {
+      floating.set(null);
+      return false;
+    }
+
+    const transformData = buildFloatingTransformData(currentFloating, layer.data);
+    const selectionAfter = getFloatingSelection(currentFloating);
+    const noPixelsChanged = transformData.pixels.length === 0;
+    const noSelectionChanged = selectionsEqual(currentFloating.selectionBefore, selectionAfter);
+
+    if (noPixelsChanged && noSelectionChanged) {
+      floating.set(null);
+      return true;
+    }
+
+    const command = createTransformCommand(transformData);
+    const currentHistory = get(history);
+    const result = executeCommand(currentHistory, currentDoc, command);
+    doc.set(result.doc);
+    history.set(result.history);
+    floating.set(null);
+    return true;
+  };
+
+  const cancelFloatingInternal = (): boolean => {
+    const currentFloating = get(floating);
+    if (!currentFloating) return false;
+    floating.set(null);
+    doc.update(d => ({ ...d, selection: { ...currentFloating.selectionBefore, mask: currentFloating.selectionBefore.mask?.slice() } }));
+    return true;
+  };
+
+  const ensureFloatingCommitted = (reason: FloatingCommitReason): void => {
+    if (get(floating)) {
+      commitFloatingInternal(reason);
+    }
+  };
+
+  const copySelectionToClipboard = (activeZ = 0): boolean => {
+    const currentFloating = get(floating);
+    if (currentFloating) {
+      clipboard = buildClipboardFromFloating(currentFloating);
+      return true;
+    }
+
+    const currentDoc = get(doc);
+    const activeLayer = getActivePaintableLayer(currentDoc);
+    if (!activeLayer) return false;
+    const floatingFromSelection = createFloatingFromSelection(activeLayer, currentDoc.selection, activeZ);
+    if (!floatingFromSelection) return false;
+    clipboard = buildClipboardFromFloating(floatingFromSelection);
+    return true;
+  };
+
+  const beginFloatingFromSelectionInternal = (activeZ: number): boolean => {
+    ensureFloatingCommitted('tool-switch');
+    const currentDoc = get(doc);
+    const activeLayer = getActivePaintableLayer(currentDoc);
+    if (!activeLayer) return false;
+    const session = createFloatingFromSelection(activeLayer, currentDoc.selection, activeZ);
+    if (!session) return false;
+    floating.set(session);
+    doc.update(d => ({ ...d, selection: getFloatingSelection(session) }));
+    return true;
+  };
+
+  const beginFloatingFromClipboardInternal = (x: number, y: number, activeZ: number): boolean => {
+    ensureFloatingCommitted('tool-switch');
+    const currentDoc = get(doc);
+    const activeLayer = getActivePaintableLayer(currentDoc);
+    if (!activeLayer || !clipboard) return false;
+    const session = createFloatingFromClipboard(activeLayer, clipboard, x, y, activeZ, currentDoc.selection);
+    if (!session) return false;
+    floating.set(session);
+    doc.update(d => ({ ...d, selection: getFloatingSelection(session) }));
+    return true;
+  };
   
   return {
     subscribe: doc.subscribe,
+    floating: {
+      subscribe: floating.subscribe,
+    },
+    hasFloating: () => get(floating) !== null,
     
     /** Replace the entire document */
     set: (newDoc: EditorDocument) => {
+      ensureFloatingCommitted('view-change');
       doc.set(newDoc);
       history.set(createHistory(100));
+      floating.set(null);
     },
     
     /** Execute a command with undo support */
     execute: (command: Command) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(command);
     },
     
     /** Undo last action */
     undo: () => {
+      ensureFloatingCommitted('tool-switch');
       const currentDoc = get(doc);
       const currentHistory = get(history);
       const result = undoCommand(currentHistory, currentDoc);
@@ -96,6 +233,7 @@ const createDocumentStore = () => {
     
     /** Redo last undone action */
     redo: () => {
+      ensureFloatingCommitted('tool-switch');
       const currentDoc = get(doc);
       const currentHistory = get(history);
       const result = redoCommand(currentHistory, currentDoc);
@@ -115,60 +253,37 @@ const createDocumentStore = () => {
     
     // Helper actions
     paint: (data: PaintData) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createPaintCommand(data);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(createPaintCommand(data));
     },
 
     erase: (data: PaintData) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createEraseCommand(data);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(createEraseCommand(data));
     },
 
     fill: (data: PaintData) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createFillCommand(data);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(createFillCommand(data));
     },
 
     paste: (data: PaintData) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createPasteCommand(data);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(createPasteCommand(data));
     },
 
     select: (data: SelectionData) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createSelectionCommand(data);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(createSelectionCommand(data));
     },
 
     transform: (data: TransformData) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createTransformCommand(data);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('tool-switch');
+      applyCommand(createTransformCommand(data));
     },
     
     addLayer: (name?: string, zIndex?: number) => {
+      ensureFloatingCommitted('layer-change');
       const currentDoc = get(doc);
       // Default zIndex is one above the highest existing layer
       const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
@@ -179,14 +294,11 @@ const createDocumentStore = () => {
         name ?? `Layer ${currentDoc.layers.length + 1}`,
         newZIndex
       );
-      const command = createAddLayerCommand(layer);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      applyCommand(createAddLayerCommand(layer));
     },
 
     addVoxelLayer: (name?: string, zIndex?: number) => {
+      ensureFloatingCommitted('layer-change');
       const currentDoc = get(doc);
       const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
       const newZIndex = zIndex ?? maxZIndex + 1;
@@ -197,11 +309,7 @@ const createDocumentStore = () => {
         name ?? `Voxel ${currentDoc.layers.length + 1}`,
         newZIndex
       );
-      const command = createAddLayerCommand(layer);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      applyCommand(createAddLayerCommand(layer));
     },
 
     /** Add a voxel layer with pre-existing data */
@@ -213,6 +321,7 @@ const createDocumentStore = () => {
       name?: string,
       zIndex?: number
     ) => {
+      ensureFloatingCommitted('layer-change');
       const currentDoc = get(doc);
       const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
       const newZIndex = zIndex ?? maxZIndex + 1;
@@ -231,15 +340,12 @@ const createDocumentStore = () => {
         height,
         depth,
       };
-      const command = createAddLayerCommand(layer);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      applyCommand(createAddLayerCommand(layer));
       return layer.id;
     },
 
     addReferenceLayer: (imageUrl: string, name?: string, zIndex?: number) => {
+      ensureFloatingCommitted('layer-change');
       const currentDoc = get(doc);
       const maxZIndex = currentDoc.layers.reduce((max, l) => Math.max(max, l.zIndex), -1);
       const newZIndex = zIndex ?? maxZIndex + 1;
@@ -248,23 +354,16 @@ const createDocumentStore = () => {
         name ?? `Reference ${currentDoc.layers.length + 1}`,
         newZIndex
       );
-      const command = createAddLayerCommand(layer);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      applyCommand(createAddLayerCommand(layer));
     },
     
     deleteLayer: (layerId: LayerId) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createDeleteLayerCommand(layerId);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createDeleteLayerCommand(layerId));
     },
 
     duplicateLayer: (layerId: LayerId) => {
+      ensureFloatingCommitted('layer-change');
       const currentDoc = get(doc);
       const sourceLayer = currentDoc.layers.find(l => l.id === layerId);
       if (!sourceLayer) return;
@@ -295,68 +394,41 @@ const createDocumentStore = () => {
             zIndex: newZIndex,
           };
 
-      const command = createAddLayerCommand(duplicatedLayer);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      applyCommand(createAddLayerCommand(duplicatedLayer));
     },
     
     toggleLayerVisibility: (layerId: LayerId) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createToggleVisibilityCommand(layerId);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createToggleVisibilityCommand(layerId));
     },
 
     toggleLayerLock: (layerId: LayerId) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createToggleLockCommand(layerId);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createToggleLockCommand(layerId));
     },
 
     renameLayer: (layerId: LayerId, name: string) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createRenameLayerCommand(layerId, name);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createRenameLayerCommand(layerId, name));
     },
 
     setLayerOpacity: (layerId: LayerId, opacity: number) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createSetOpacityCommand(layerId, opacity);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createSetOpacityCommand(layerId, opacity));
     },
 
     setLayerBlendMode: (layerId: LayerId, blendMode: 'normal' | 'multiply' | 'screen' | 'overlay') => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createSetBlendModeCommand(layerId, blendMode);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createSetBlendModeCommand(layerId, blendMode));
     },
     
     setLayerZIndex: (layerId: LayerId, zIndex: number) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createSetZIndexCommand(layerId, zIndex);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createSetZIndexCommand(layerId, zIndex));
     },
 
     stepActiveLayer: (direction: 'up' | 'down', createIfMissing = true) => {
+      ensureFloatingCommitted('layer-change');
       const currentDoc = get(doc);
       const sorted = [...currentDoc.layers].sort((a, b) => a.zIndex - b.zIndex);
       const activeIndex = sorted.findIndex(l => l.id === currentDoc.activeLayerId);
@@ -380,54 +452,36 @@ const createDocumentStore = () => {
         `Layer ${currentDoc.layers.length + 1}`,
         newZIndex
       );
-      const command = createAddLayerCommand(layer);
-      const currentHistory = get(history);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      applyCommand(createAddLayerCommand(layer));
     },
 
     reorderLayers: (orderedLayerIds: LayerId[]) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createReorderLayersCommand(orderedLayerIds);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createReorderLayersCommand(orderedLayerIds));
     },
 
     mergeLayerDown: (upperLayerId: LayerId, lowerLayerId: LayerId) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createMergeDownCommand(upperLayerId, lowerLayerId);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createMergeDownCommand(upperLayerId, lowerLayerId));
     },
 
     flattenGridLayers: () => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createFlattenGridLayersCommand();
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createFlattenGridLayersCommand());
     },
     
     setLayerIsoHeight: (layerId: LayerId, isoHeight: number) => {
-      const currentDoc = get(doc);
-      const currentHistory = get(history);
-      const command = createSetIsoHeightCommand(layerId, isoHeight);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+      ensureFloatingCommitted('layer-change');
+      applyCommand(createSetIsoHeightCommand(layerId, isoHeight));
     },
     
     setActiveLayer: (layerId: LayerId) => {
+      ensureFloatingCommitted('layer-change');
       doc.update(d => ({ ...d, activeLayerId: layerId }));
     },
     
     setViewMode: (mode: ViewMode) => {
+      ensureFloatingCommitted('view-change');
       doc.update(d => ({ ...d, viewMode: mode }));
     },
     
@@ -437,6 +491,7 @@ const createDocumentStore = () => {
     
     /** Save document to file */
     saveToFile: () => {
+      ensureFloatingCommitted('save');
       const currentDoc = get(doc);
       saveDocumentToFile(currentDoc);
     },
@@ -444,9 +499,11 @@ const createDocumentStore = () => {
     /** Load document from file */
     loadFromFile: async () => {
       try {
+        ensureFloatingCommitted('view-change');
         const newDoc = await loadDocumentFromFile();
         doc.set(newDoc);
         history.set(createHistory(100));
+        floating.set(null);
         return true;
       } catch (e) {
         console.error('Failed to load file:', e);
@@ -456,6 +513,7 @@ const createDocumentStore = () => {
     
     /** Export active layer as PNG */
     exportLayerPNG: () => {
+      ensureFloatingCommitted('export');
       const currentDoc = get(doc);
       const activeLayer = currentDoc.layers.find(l => l.id === currentDoc.activeLayerId);
       if (activeLayer && activeLayer.type === 'grid2d') {
@@ -465,61 +523,93 @@ const createDocumentStore = () => {
     
     /** Create new document */
     newDocument: (width: number, height: number, depth: number, name: string) => {
+      ensureFloatingCommitted('view-change');
       doc.set(createDocument(width, height, depth, name));
       history.set(createHistory(100));
+      floating.set(null);
     },
 
     /** Copy selection to clipboard */
-    copySelection: () => {
-      const currentDoc = get(doc);
-      const activeLayer = currentDoc.layers.find(l => l.id === currentDoc.activeLayerId);
-      if (!activeLayer || activeLayer.type !== 'grid2d') return false;
-
-      const copied = copySelectionFromLayer(activeLayer, currentDoc.selection);
-      if (!copied) return false;
-
-      clipboard = copied;
-      return true;
+    copySelection: (activeZ = 0) => {
+      return copySelectionToClipboard(activeZ);
     },
 
     /** Cut selection to clipboard */
-    cutSelection: () => {
-      const currentDoc = get(doc);
-      const activeLayer = currentDoc.layers.find(l => l.id === currentDoc.activeLayerId);
-      if (!activeLayer || activeLayer.type !== 'grid2d') return false;
-
-      const copied = copySelectionFromLayer(activeLayer, currentDoc.selection);
-      if (!copied) return false;
-
-      clipboard = copied;
-
-      const eraseData = createEraseDataFromSelection(activeLayer, currentDoc.selection);
-      if (!eraseData || eraseData.pixels.length === 0) return true;
-
-      const currentHistory = get(history);
-      const command = createEraseCommand(eraseData);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
-      return true;
+    cutSelection: (activeZ = 0) => {
+      const didCopy = copySelectionToClipboard(activeZ);
+      if (!didCopy) return false;
+      return beginFloatingFromSelectionInternal(activeZ);
     },
 
     /** Paste clipboard at position (defaults to selection origin) */
-    pasteSelection: (x?: number, y?: number) => {
+    pasteSelection: (x?: number, y?: number, activeZ = 0) => {
       const currentDoc = get(doc);
-      const activeLayer = currentDoc.layers.find(l => l.id === currentDoc.activeLayerId);
-      if (!activeLayer || activeLayer.type !== 'grid2d' || !clipboard) return false;
+      const activeLayer = getActivePaintableLayer(currentDoc);
+      if (!activeLayer || !clipboard) return false;
 
       const destX = x ?? currentDoc.selection.x ?? 0;
       const destY = y ?? currentDoc.selection.y ?? 0;
-      const paintData = buildPasteData(activeLayer, clipboard, destX, destY);
-      if (paintData.pixels.length === 0) return false;
+      return beginFloatingFromClipboardInternal(destX, destY, activeZ);
+    },
 
-      const currentHistory = get(history);
-      const command = createPasteCommand(paintData);
-      const result = executeCommand(currentHistory, currentDoc, command);
-      doc.set(result.doc);
-      history.set(result.history);
+    beginFloatingFromSelection: (activeZ: number) => {
+      return beginFloatingFromSelectionInternal(activeZ);
+    },
+
+    beginFloatingFromClipboard: (x: number, y: number, activeZ: number) => {
+      return beginFloatingFromClipboardInternal(x, y, activeZ);
+    },
+
+    moveFloatingBy: (dx: number, dy: number) => {
+      const currentFloating = get(floating);
+      if (!currentFloating) return;
+      const next = moveFloatingSelection(currentFloating, dx, dy);
+      floating.set(next);
+      doc.update(d => ({ ...d, selection: getFloatingSelection(next) }));
+    },
+
+    rotateFloating: (angle: 90 | 180 | 270) => {
+      const currentFloating = get(floating);
+      if (!currentFloating) return;
+      const next = rotateFloatingSelection(currentFloating, angle);
+      floating.set(next);
+      doc.update(d => ({ ...d, selection: getFloatingSelection(next) }));
+    },
+
+    flipFloating: (axis: 'horizontal' | 'vertical') => {
+      const currentFloating = get(floating);
+      if (!currentFloating) return;
+      const next = flipFloatingSelection(currentFloating, axis);
+      floating.set(next);
+      doc.update(d => ({ ...d, selection: getFloatingSelection(next) }));
+    },
+
+    commitFloating: (reason: FloatingCommitReason) => commitFloatingInternal(reason),
+
+    cancelFloating: () => {
+      cancelFloatingInternal();
+    },
+
+    selectAllActivePlane: (activeZ: number) => {
+      ensureFloatingCommitted('tool-switch');
+      const currentDoc = get(doc);
+      const activeLayer = getActivePaintableLayer(currentDoc);
+      if (!activeLayer) return false;
+
+      const selection: Selection = {
+        active: true,
+        x: 0,
+        y: 0,
+        width: activeLayer.width,
+        height: activeLayer.height,
+      };
+
+      applyCommand(createSelectionCommand({
+        before: currentDoc.selection,
+        after: selection,
+      }));
+      // Keep activeZ in signature for API stability and voxel parity.
+      void activeZ;
       return true;
     },
   };
@@ -539,7 +629,20 @@ export type HistoryInfo = {
 // Tool Store
 // ============================================================================
 
-export type ToolId = 'pencil' | 'eraser' | 'fill' | 'select' | 'move' | 'pan' | 'eyedropper' | 'line' | 'rect' | 'ellipse' | 'wand';
+export type ToolId =
+  | 'pencil'
+  | 'eraser'
+  | 'fill'
+  | 'select'
+  | 'lasso_freehand'
+  | 'lasso_polygon'
+  | 'move'
+  | 'pan'
+  | 'eyedropper'
+  | 'line'
+  | 'rect'
+  | 'ellipse'
+  | 'wand';
 
 export type ToolSettings = {
   brushSize: number;
@@ -643,6 +746,7 @@ export const toolStore = createToolStore();
 // ============================================================================
 
 export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation' | 'ai';
+export type Voxel2DRenderMode = 'slice' | 'projection';
 
 const createUIStore = () => {
   const panels = writable<Record<PanelId, boolean>>({
@@ -658,6 +762,7 @@ const createUIStore = () => {
   const gridStep = writable(1);
   const cursorPosition = writable<{ x: number; y: number } | null>(null);
   const showTextures = writable(false); // Toggle procedural textures rendering
+  const voxel2DMode = writable<Voxel2DRenderMode>('slice');
   
   return {
     panels: {
@@ -686,6 +791,11 @@ const createUIStore = () => {
       subscribe: showTextures.subscribe,
       toggle: () => showTextures.update(v => !v),
       set: showTextures.set,
+    },
+    voxel2DMode: {
+      subscribe: voxel2DMode.subscribe,
+      set: (mode: Voxel2DRenderMode) => voxel2DMode.set(mode),
+      cycle: () => voxel2DMode.update(mode => mode === 'slice' ? 'projection' : 'slice'),
     },
   };
 };

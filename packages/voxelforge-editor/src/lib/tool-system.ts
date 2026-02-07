@@ -3,7 +3,7 @@
  */
 
 import type { ToolId, ToolSettings } from './stores';
-import type { EditorDocument, GridLayer, VoxelLayer, Selection } from './document/types';
+import type { EditorDocument, GridLayer, Selection } from './document/types';
 import type { SelectionOp } from './document/selection';
 import type { GridPoint, PaintableLayer } from './tools';
 import {
@@ -15,6 +15,8 @@ import {
   getEllipsePoints,
   getRectPoints,
   magicWandSelect,
+  pointsNear,
+  rasterizePolygonSelection,
 } from './tools';
 
 export type PendingPixel = { index: number; oldValue: number; newValue: number };
@@ -30,6 +32,10 @@ export type ToolRuntimeState = {
   currentMaterial: number;
   selectionPreview: Selection | null;
   selectionOp: SelectionOp;
+  freehandPath: GridPoint[];
+  polygonPoints: GridPoint[];
+  polygonHoverPoint: GridPoint | null;
+  polygonSelectionOp: SelectionOp;
   activePointerToolId: ToolId | null;
 };
 
@@ -54,9 +60,14 @@ export type ToolContext = {
   setCameraByDelta: (dx: number, dy: number) => void;
   setPointerCapture: (pointerId: number) => void;
   releasePointerCapture: (pointerId: number) => void;
-  moveSelection: (dx: number, dy: number) => void;
-  rotateSelection: (angle: 90 | 180 | 270) => void;
-  flipSelection: (axis: 'horizontal' | 'vertical') => void;
+  hasFloating: () => boolean;
+  getFloatingSelection: () => Selection | null;
+  beginFloatingFromSelection: (activeZ: number) => boolean;
+  moveFloatingBy: (dx: number, dy: number) => void;
+  rotateFloating: (angle: 90 | 180 | 270) => void;
+  flipFloating: (axis: 'horizontal' | 'vertical') => void;
+  commitFloating: () => void;
+  cancelFloating: () => void;
   render: () => void;
 };
 
@@ -184,6 +195,22 @@ const startDrawing = (ctx: ToolContext, e: PointerEvent) => {
 const stopDrawing = (ctx: ToolContext, e: PointerEvent) => {
   ctx.state.isDrawing = false;
   ctx.releasePointerCapture(e.pointerId);
+};
+
+const isPointInSelection = (selection: Selection, point: GridPoint): boolean => {
+  if (!selection.active || selection.width < 1 || selection.height < 1) return false;
+  const lx = point.x - selection.x;
+  const ly = point.y - selection.y;
+  if (lx < 0 || ly < 0 || lx >= selection.width || ly >= selection.height) return false;
+  if (!selection.mask) return true;
+  return (selection.mask[ly * selection.width + lx] ?? 0) > 0;
+};
+
+const commitLassoSelection = (ctx: ToolContext, points: GridPoint[], op: SelectionOp) => {
+  const lassoSelection = rasterizePolygonSelection(points);
+  if (!lassoSelection) return;
+  const merged = ctx.mergeSelection(lassoSelection, op);
+  ctx.commitSelection(merged);
 };
 
 const tools: Record<ToolId, ToolDefinition> = {
@@ -343,26 +370,175 @@ const tools: Record<ToolId, ToolDefinition> = {
       ctx.state.currentPoint = null;
     },
   },
+  lasso_freehand: {
+    id: 'lasso_freehand',
+    name: 'Lasso (Freehand)',
+    cursor: 'crosshair',
+    hotkey: 'q',
+    onPointerDown: (ctx, e) => {
+      if (!ensurePaintableLayer(ctx.layer)) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      ctx.state.isSelecting = true;
+      ctx.state.startPoint = gridPos;
+      ctx.state.currentPoint = gridPos;
+      ctx.state.selectionOp = ctx.getSelectionOp(e);
+      ctx.state.freehandPath = [gridPos];
+      ctx.setPointerCapture(e.pointerId);
+      ctx.render();
+    },
+    onPointerMove: (ctx, e) => {
+      if (!ctx.state.isSelecting) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      const last = ctx.state.freehandPath[ctx.state.freehandPath.length - 1] ?? gridPos;
+      const segment = bresenhamLine(last.x, last.y, gridPos.x, gridPos.y);
+      for (let i = 1; i < segment.length; i += 1) {
+        ctx.state.freehandPath.push(segment[i]);
+      }
+      ctx.state.currentPoint = gridPos;
+      ctx.render();
+    },
+    onPointerUp: (ctx, e) => {
+      if (!ctx.state.isSelecting) return;
+      ctx.state.isSelecting = false;
+      ctx.releasePointerCapture(e.pointerId);
+      commitLassoSelection(ctx, ctx.state.freehandPath, ctx.state.selectionOp);
+      ctx.state.startPoint = null;
+      ctx.state.currentPoint = null;
+      ctx.state.freehandPath = [];
+      ctx.render();
+    },
+    renderOverlay: (ctx, overlay) => {
+      const points = ctx.state.freehandPath;
+      if (points.length < 2) return;
+      overlay.save();
+      overlay.strokeStyle = 'rgba(0, 220, 160, 0.9)';
+      overlay.lineWidth = 1.5 / ctx.doc.camera.zoom;
+      overlay.beginPath();
+      overlay.moveTo(points[0].x + 0.5, points[0].y + 0.5);
+      for (let i = 1; i < points.length; i += 1) {
+        overlay.lineTo(points[i].x + 0.5, points[i].y + 0.5);
+      }
+      overlay.stroke();
+      overlay.restore();
+    },
+  },
+  lasso_polygon: {
+    id: 'lasso_polygon',
+    name: 'Lasso (Polygon)',
+    cursor: 'crosshair',
+    hotkey: 'p',
+    onPointerDown: (ctx, e) => {
+      if (!ensurePaintableLayer(ctx.layer)) return;
+      const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+
+      if (e.button === 2) {
+        ctx.state.polygonPoints = [];
+        ctx.state.polygonHoverPoint = null;
+        ctx.render();
+        return;
+      }
+
+      if (ctx.state.polygonPoints.length === 0) {
+        ctx.state.polygonSelectionOp = ctx.getSelectionOp(e);
+      }
+
+      const first = ctx.state.polygonPoints[0];
+      const shouldCloseByFirstPoint = Boolean(
+        first && ctx.state.polygonPoints.length >= 3 && pointsNear(first, gridPos, 2)
+      );
+      const shouldCloseByDoubleClick = e.detail >= 2 && ctx.state.polygonPoints.length >= 2;
+
+      if (shouldCloseByFirstPoint || shouldCloseByDoubleClick) {
+        const polygon = shouldCloseByFirstPoint
+          ? [...ctx.state.polygonPoints]
+          : [...ctx.state.polygonPoints, gridPos];
+        commitLassoSelection(ctx, polygon, ctx.state.polygonSelectionOp);
+        ctx.state.polygonPoints = [];
+        ctx.state.polygonHoverPoint = null;
+        ctx.render();
+        return;
+      }
+
+      ctx.state.polygonPoints = [...ctx.state.polygonPoints, gridPos];
+      ctx.state.polygonHoverPoint = gridPos;
+      ctx.render();
+    },
+    onPointerMove: (ctx, e) => {
+      if (ctx.state.polygonPoints.length === 0) return;
+      ctx.state.polygonHoverPoint = ctx.screenToGrid(e.clientX, e.clientY);
+      ctx.render();
+    },
+    onPointerUp: () => {},
+    onKeyDown: (ctx, e) => {
+      if (ctx.state.polygonPoints.length === 0) return;
+      if (e.key === 'Escape') {
+        ctx.state.polygonPoints = [];
+        ctx.state.polygonHoverPoint = null;
+        ctx.render();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Enter' && ctx.state.polygonPoints.length >= 3) {
+        commitLassoSelection(ctx, ctx.state.polygonPoints, ctx.state.polygonSelectionOp);
+        ctx.state.polygonPoints = [];
+        ctx.state.polygonHoverPoint = null;
+        ctx.render();
+        e.preventDefault();
+      }
+    },
+    renderOverlay: (ctx, overlay) => {
+      const points = ctx.state.polygonPoints;
+      if (points.length === 0) return;
+
+      overlay.save();
+      overlay.strokeStyle = 'rgba(255, 200, 0, 0.95)';
+      overlay.fillStyle = 'rgba(255, 200, 0, 0.85)';
+      overlay.lineWidth = 1.5 / ctx.doc.camera.zoom;
+      overlay.beginPath();
+      overlay.moveTo(points[0].x + 0.5, points[0].y + 0.5);
+      for (let i = 1; i < points.length; i += 1) {
+        overlay.lineTo(points[i].x + 0.5, points[i].y + 0.5);
+      }
+      if (ctx.state.polygonHoverPoint) {
+        overlay.lineTo(ctx.state.polygonHoverPoint.x + 0.5, ctx.state.polygonHoverPoint.y + 0.5);
+      }
+      overlay.stroke();
+
+      for (const point of points) {
+        overlay.beginPath();
+        overlay.arc(point.x + 0.5, point.y + 0.5, 2 / ctx.doc.camera.zoom, 0, Math.PI * 2);
+        overlay.fill();
+      }
+      overlay.restore();
+    },
+  },
   move: {
     id: 'move',
     name: 'Move',
     cursor: 'move',
     hotkey: 'v',
     onPointerDown: (ctx, e) => {
-      if (!ctx.doc.selection?.active) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
+      const activeSelection = ctx.getFloatingSelection() ?? ctx.doc.selection;
+      if (!activeSelection?.active || !isPointInSelection(activeSelection, gridPos)) return;
+
+      if (!ctx.hasFloating()) {
+        const started = ctx.beginFloatingFromSelection(ctx.activeZ);
+        if (!started) return;
+      }
+
       ctx.state.startPoint = gridPos;
       ctx.state.lastPoint = gridPos;
       ctx.setPointerCapture(e.pointerId);
       startDrawing(ctx, e);
     },
     onPointerMove: (ctx, e) => {
-      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ctx.doc.selection?.active) return;
+      if (!ctx.state.isDrawing || !ctx.state.lastPoint || !ctx.hasFloating()) return;
       const gridPos = ctx.screenToGrid(e.clientX, e.clientY);
       const dx = gridPos.x - ctx.state.lastPoint.x;
       const dy = gridPos.y - ctx.state.lastPoint.y;
       if (dx !== 0 || dy !== 0) {
-        ctx.moveSelection(dx, dy);
+        ctx.moveFloatingBy(dx, dy);
         ctx.state.lastPoint = gridPos;
         ctx.render();
       }
@@ -375,35 +551,50 @@ const tools: Record<ToolId, ToolDefinition> = {
     },
     onKeyDown: (ctx, e) => {
       if (!ctx.doc.selection?.active) return;
+      if (!ctx.hasFloating()) {
+        const started = ctx.beginFloatingFromSelection(ctx.activeZ);
+        if (!started) return;
+      }
+
       // Arrow keys to nudge selection
       const step = e.shiftKey ? 10 : 1;
       switch (e.key) {
-        case 'ArrowUp': ctx.moveSelection(0, -step); ctx.render(); e.preventDefault(); break;
-        case 'ArrowDown': ctx.moveSelection(0, step); ctx.render(); e.preventDefault(); break;
-        case 'ArrowLeft': ctx.moveSelection(-step, 0); ctx.render(); e.preventDefault(); break;
-        case 'ArrowRight': ctx.moveSelection(step, 0); ctx.render(); e.preventDefault(); break;
+        case 'Enter':
+          ctx.commitFloating();
+          ctx.render();
+          e.preventDefault();
+          break;
+        case 'Escape':
+          ctx.cancelFloating();
+          ctx.render();
+          e.preventDefault();
+          break;
+        case 'ArrowUp': ctx.moveFloatingBy(0, -step); ctx.render(); e.preventDefault(); break;
+        case 'ArrowDown': ctx.moveFloatingBy(0, step); ctx.render(); e.preventDefault(); break;
+        case 'ArrowLeft': ctx.moveFloatingBy(-step, 0); ctx.render(); e.preventDefault(); break;
+        case 'ArrowRight': ctx.moveFloatingBy(step, 0); ctx.render(); e.preventDefault(); break;
         // Rotation with [ and ] keys (Shift for opposite direction)
         case '[':
-          ctx.rotateSelection(e.shiftKey ? 270 : 90);
+          ctx.rotateFloating(e.shiftKey ? 270 : 90);
           ctx.render();
           e.preventDefault();
           break;
         case ']':
-          ctx.rotateSelection(e.shiftKey ? 90 : 270);
+          ctx.rotateFloating(e.shiftKey ? 90 : 270);
           ctx.render();
           e.preventDefault();
           break;
         // Flip with \ key (backslash) - Shift for vertical
         case '\\':
-          ctx.flipSelection(e.shiftKey ? 'vertical' : 'horizontal');
+          ctx.flipFloating(e.shiftKey ? 'vertical' : 'horizontal');
           ctx.render();
           e.preventDefault();
           break;
       }
     },
     renderOverlay: (ctx, overlay) => {
-      if (!ctx.doc.selection?.active) return;
-      const sel = ctx.doc.selection;
+      const sel = ctx.getFloatingSelection() ?? ctx.doc.selection;
+      if (!sel?.active) return;
       overlay.save();
       overlay.strokeStyle = 'rgba(0, 200, 255, 0.8)';
       overlay.lineWidth = 2 / ctx.doc.camera.zoom;

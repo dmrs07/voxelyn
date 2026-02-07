@@ -14,6 +14,7 @@ Biblioteca headless ultra leve e determinística para pixels, simulação por c�
   - `Iso`: projeção isométrica + ordem de desenho
   - `Sprites`: blit com colorkey (alpha simples opcional)
   - `Voxels`: grade 3D densa + render slices + raycast CPU simples
+  - `Animation` (`@voxelyn/animation`): runtime procedural pixel + importers Aseprite/TexturePacker
 - **Adapters (opt-in)**
   - `Canvas2D`: `Surface2D` -> `ImageData`
   - `WebGL`: upload de textura 2D
@@ -35,6 +36,12 @@ python3 -m http.server 8080
 
 - Noita-like: `http://localhost:8080/examples/browser-noita-like/index.html`
 - Iso Diablo-like: `http://localhost:8080/examples/browser-iso-diablo-like/index.html`
+
+## Pacote de animação
+
+- Desenvolvimento: `pnpm run dev:animation`
+- Build: `pnpm run build:animation`
+- Testes: `pnpm run test:animation`
 
 ## Guia rápido (Noita-like)
 

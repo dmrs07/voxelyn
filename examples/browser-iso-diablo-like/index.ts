@@ -1,5 +1,6 @@
 import { createSurface2D, fillRect, packRGBA, projectIso, forEachIsoOrder, blitColorkey } from "../../packages/voxelyn-core/src/index.js";
 import { presentToCanvas } from "../../packages/voxelyn-core/src/adapters/canvas2d.js";
+import { createAnimationPlayer, createProceduralCharacter, stepAnimation } from "../../packages/voxelyn-animation/src/index.js";
 
 const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -188,41 +189,21 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
 // ============================================================================
-// SPRITE DO GUERREIRO (ultra-simplificado)
+// SPRITE/ANIMACAO PROCEDURAL DO GUERREIRO
 // ============================================================================
-const makeWarrior = (facing: Facing, frame: number) => {
-  const w = 16, h = 22;
-  const px = new Uint32Array(w * h);
-  const breath = Math.sin(frame * 0.1) | 0;
-  const fearN = (x: number, y: number) => noise(x * 0.2 + frame * 0.05, y * 0.2);
-  
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const dx = x - w / 2, ay = y - breath;
-      let col = KEY;
-      
-      // Corpo
-      if (ay >= 8 && ay < 20 && Math.abs(dx) < 5) {
-        col = (facing.includes('r') && x > w / 2) ? C.armor : C.armorDark;
-        if (ay > 15 && Math.abs(dx) < 1) col = KEY; // Pernas
-      }
-      // Cabeça
-      if (ay >= 2 && ay < 8 && Math.abs(dx) < 4) {
-        col = C.armor;
-        if (ay >= 5 && ay <= 6 && Math.abs(dx) < 2) col = C.void; // Visor
-      }
-      // Sombra do medo
-      const dist = Math.sqrt(dx * dx + (ay - 5) ** 2);
-      if (dist < 9 && fearN(x, y) > 0.4 && (col !== KEY || fearN(x, y) > 0.6)) {
-        col = C.shadow;
-        if (fearN(x, y) > 0.9 && ay < 7 && Math.sin(frame * 0.8 + x * y) > 0.3) col = C.eyes;
-      }
-      
-      px[y * w + x] = col;
-    }
-  }
-  return { width: w, height: h, pixels: px };
-};
+const proceduralWarrior = createProceduralCharacter({
+  id: 'demo-warrior',
+  style: 'player',
+  width: 16,
+  height: 22,
+});
+const warriorAnimation = createAnimationPlayer({
+  set: proceduralWarrior.clips,
+  width: proceduralWarrior.width,
+  height: proceduralWarrior.height,
+  seed: 1337,
+});
+let lastAnimationTick = 0;
 
 // ============================================================================
 // TEXTURAS PRÉ-GERADAS
@@ -248,7 +229,14 @@ const drawWarrior = (x: number, y: number, z: number, facing: Facing, frame: num
   const iso = projectIso(x - MAP / 2, y - MAP / 2, z, TW, TH, ZS);
   const sx = (surface.width / 2 + iso.sx) | 0;
   const sy = (145 + iso.sy) | 0;
-  const sprite = makeWarrior(facing, frame);
+  const dtMs = Math.max(1, (frame - lastAnimationTick) * 16);
+  lastAnimationTick = frame;
+  const moving = Boolean(
+    keys['w'] || keys['a'] || keys['s'] || keys['d'] ||
+    keys['arrowup'] || keys['arrowleft'] || keys['arrowdown'] || keys['arrowright']
+  );
+  const anim = stepAnimation(warriorAnimation, dtMs, moving ? 'move' : 'idle', facing);
+  const sprite = anim.sprite;
   blitColorkey(surface, sprite, sx - 8, sy - 20, { colorkey: KEY });
 };
 
