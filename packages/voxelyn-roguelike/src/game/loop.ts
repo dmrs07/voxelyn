@@ -82,7 +82,8 @@ export class GameLoop {
         entity.animIntent = 'die';
         continue;
       }
-      if (entity.animIntent !== 'die') {
+      // Only reset to idle if not in move cooldown (still animating walk)
+      if (entity.animIntent !== 'die' && this.state.simTimeMs >= entity.nextMoveAt) {
         entity.animIntent = 'idle';
       }
     }

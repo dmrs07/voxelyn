@@ -556,8 +556,9 @@ export class IsoRenderer {
       this.zStep
     );
 
-    // Grounding offset - smaller for player to anchor feet to ground
-    const groundOffset = entity.kind === 'player' ? 4 : 6;
+    // Grounding offset - positive pushes sprite down toward ground
+    // Enemies keep old offset behavior inverted
+    const groundOffset = entity.kind === 'player' ? 12 : -6;
     
     // Movement bob only when moving, subtle breathing when idle
     const isMoving = entity.animIntent === 'move';
@@ -565,17 +566,21 @@ export class IsoRenderer {
     const bobFreq = isMoving ? 0.35 : 0.08;
     const bob = Math.sin((state.simTick + entity.animPhase * 2) * bobFreq) * bobAmplitude;
 
-    const sx = this.cameraX + iso.sx;
+    // Tile center position
+    const tileCenterX = this.cameraX + iso.sx;
     const groundY = this.cameraY + iso.sy;
-    const sy = groundY - groundOffset + bob;
+    
+    // Sprite position: centered on tile, with grounding offset
+    const sx = tileCenterX;
+    const sy = groundY + groundOffset + bob;
 
-    // Draw ground shadow ellipse for visual grounding
-    const shadowScale = entity.kind === 'player' ? 1.0 : 0.85;
+    // Draw ground shadow ellipse - centered on tile
+    const shadowScale = entity.kind === 'player' ? 1.2 : 0.85;
     const shadowAlpha = 0.22 + (isMoving ? 0.04 : 0);
     ctx.save();
     ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
     ctx.beginPath();
-    ctx.ellipse(sx, groundY + 2, 10 * shadowScale, 4.5 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.ellipse(tileCenterX, groundY + 4, 12 * shadowScale, 5 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -883,7 +888,9 @@ export class IsoRenderer {
       this.zStep
     );
     const sx = this.cameraX + iso.sx;
-    const sy = this.cameraY + iso.sy - this.effectYOffset;
+    // Match grounding offset from entity rendering
+    const groundOffset = 12;
+    const sy = this.cameraY + iso.sy - this.effectYOffset + groundOffset;
 
     ctx.save();
     ctx.globalAlpha = 0.72;

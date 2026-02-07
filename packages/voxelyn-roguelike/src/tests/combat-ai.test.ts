@@ -38,6 +38,33 @@ describe('combat and ai', () => {
     expect(enemy.hp).toBe(hpAfterFirst);
   });
 
+  it('auto-attacks adjacent enemy even if input points elsewhere', () => {
+    const state = createGameState(4545);
+    const player = getPlayer(state);
+    expect(player).not.toBeNull();
+    if (!player) return;
+
+    for (const entity of Array.from(state.level.entities.values())) {
+      if (entity.kind === 'enemy') unregisterEntity(state.level, entity);
+    }
+
+    const tx = player.x + 1;
+    const ty = player.y;
+    setMaterialAt(state.level, tx, ty, 0, MATERIAL_FUNGAL_FLOOR);
+
+    const identity = nextEntityIdentity(state.level);
+    const enemy = createEnemy(identity.id, identity.occ, 'stalker', tx, ty, state.floorNumber);
+    registerEntity(state.level, enemy);
+
+    player.nextAttackAt = 0;
+    const beforeHp = enemy.hp;
+    const action = tryPlayerBumpAction(state, player, -1, 0, 2000);
+
+    expect(action.attacked).toBe(true);
+    expect(action.moved).toBe(false);
+    expect(enemy.hp).toBeLessThan(beforeHp);
+  });
+
   it('stalker ai moves toward player when in detection radius', () => {
     const state = createGameState(8888);
     const player = getPlayer(state);

@@ -6,6 +6,7 @@ export type PowerUpDefinition = {
   name: string;
   description: string;
   apply: (player: PlayerState) => void;
+  maxStacks?: number;
 };
 
 export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
@@ -13,6 +14,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
     id: 'vital_boost',
     name: 'Nucleo Vital',
     description: '+20 HP maximo e cura imediata de 20.',
+    maxStacks: 4,
     apply: (player) => {
       player.maxHp += 20;
       player.hp += 20;
@@ -23,6 +25,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
     id: 'attack_boost',
     name: 'Lamina Micelial',
     description: '+3 de dano base.',
+    maxStacks: 3,
     apply: (player) => {
       player.attack += 3;
     },
@@ -31,6 +34,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
     id: 'swift_boots',
     name: 'Servos de Impulso',
     description: 'Movimento 10% mais rapido (cooldown menor).',
+    maxStacks: 3,
     apply: (player) => {
       player.moveCooldownMs = Math.max(45, Math.round(player.moveCooldownMs * 0.9));
     },
@@ -39,6 +43,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
     id: 'iron_skin',
     name: 'Casca Reforcada',
     description: '+1 de reducao de dano.',
+    maxStacks: 3,
     apply: (player) => {
       player.damageReduction += 1;
     },
@@ -47,6 +52,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
     id: 'vampiric_spores',
     name: 'Esporos Vampiricos',
     description: 'Recupera 1 HP ao acertar ataques.',
+    maxStacks: 2,
     apply: (player) => {
       player.lifeOnHit += 1;
     },
@@ -55,6 +61,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
     id: 'fungal_regen',
     name: 'Regeneracao Fungica',
     description: 'Regenera 1 HP por segundo.',
+    maxStacks: 3,
     apply: (player) => {
       player.regenPerSecond += 1;
     },

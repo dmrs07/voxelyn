@@ -41,10 +41,58 @@ export type ProjectileUpdateResult = {
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 
 const vecToAnimFacing = (x: number, y: number): 'dr' | 'dl' | 'ur' | 'ul' => {
-  if (x >= 0 && y >= 0) return 'dr';
-  if (x < 0 && y >= 0) return 'dl';
-  if (x >= 0 && y < 0) return 'ur';
-  return 'ul';
+  // Isometric cardinal directions:
+  // D (+X) = DR, A (-X) = UL, S (+Y) = DL, W (-Y) = UR
+  if (x > 0 && y > 0) return 'dr';
+  if (x < 0 && y < 0) return 'ul';
+  if (x > 0 && y < 0) return 'ur';
+  if (x < 0 && y > 0) return 'dl';
+  // Pure cardinal directions
+  if (x > 0) return 'dr';
+  if (x < 0) return 'ul';
+  if (y > 0) return 'dl';
+  if (y < 0) return 'ur';
+  return 'dr'; // default
+};
+
+const findAdjacentEnemyTarget = (
+  state: GameState,
+  player: PlayerState,
+  dx: number,
+  dy: number
+): EnemyState | null => {
+  const candidates: EnemyState[] = [];
+
+  const pushIfEnemy = (x: number, y: number): EnemyState | null => {
+    if (!inBounds2D(state.level, x, y)) return null;
+    const occ = occupancyAt(state.level, x, y);
+    if (occ <= 0 || occ === player.occ) return null;
+    const target = entityByOcc(state.level, occ);
+    if (target && target.kind === 'enemy' && target.alive) {
+      candidates.push(target);
+      return target;
+    }
+    return null;
+  };
+
+  // Prefer the enemy in the input direction (if any).
+  if (dx !== 0 || dy !== 0) {
+    const preferred = pushIfEnemy(player.x + dx, player.y + dy);
+    if (preferred) return preferred;
+  }
+
+  // Otherwise evaluate all adjacent enemies.
+  pushIfEnemy(player.x + 1, player.y);
+  pushIfEnemy(player.x - 1, player.y);
+  pushIfEnemy(player.x, player.y + 1);
+  pushIfEnemy(player.x, player.y - 1);
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => {
+    if (a.hp !== b.hp) return a.hp - b.hp;
+    return a.occ - b.occ;
+  });
+  return candidates[0] ?? null;
 };
 
 export const calculateDamage = (attack: number, reduction: number): number => {
@@ -246,8 +294,28 @@ export const tryPlayerBumpAction = (
     return { moved: false, attacked: false, killedEnemyIds: [] };
   }
 
-  player.facing = { x: Math.sign(dx), y: Math.sign(dy) };
-  player.animFacing = vecToAnimFacing(player.facing.x, player.facing.y);
+  const preferredFacing = { x: Math.sign(dx), y: Math.sign(dy) };
+  player.facing = preferredFacing;
+  player.animFacing = vecToAnimFacing(preferredFacing.x, preferredFacing.y);
+
+  // Auto-attack any adjacent enemy when attack is ready.
+  const adjacentTarget = findAdjacentEnemyTarget(state, player, dx, dy);
+  if (adjacentTarget && nowMs >= player.nextAttackAt) {
+    const faceX = Math.sign(adjacentTarget.x - player.x);
+    const faceY = Math.sign(adjacentTarget.y - player.y);
+    if (faceX !== 0 || faceY !== 0) {
+      player.facing = { x: faceX, y: faceY };
+      player.animFacing = vecToAnimFacing(faceX, faceY);
+    }
+    const result = attackEntity(state, player, adjacentTarget, nowMs);
+    if (result.didAttack) {
+      return {
+        moved: false,
+        attacked: true,
+        killedEnemyIds: result.killedIds,
+      };
+    }
+  }
 
   const tx = player.x + dx;
   const ty = player.y + dy;

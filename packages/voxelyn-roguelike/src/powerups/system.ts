@@ -1,19 +1,46 @@
 import { RNG } from '@voxelyn/core';
-import type { GameState, PowerUpChoice, PowerUpId } from '../game/types';
+import type { GameState, PlayerState, PowerUpChoice, PowerUpId } from '../game/types';
 import { POWER_UP_IDS, POWER_UP_POOL } from './pool';
 
-export const rollDistinctPowerUps = (rng: RNG): [PowerUpId, PowerUpId] => {
-  const first = POWER_UP_IDS[rng.nextInt(POWER_UP_IDS.length)] ?? POWER_UP_IDS[0]!;
-  let second = POWER_UP_IDS[rng.nextInt(POWER_UP_IDS.length)] ?? POWER_UP_IDS[0]!;
+export const getPowerUpStacks = (player: PlayerState): Record<PowerUpId, number> => {
+  const counts = {} as Record<PowerUpId, number>;
+  for (const id of POWER_UP_IDS) {
+    counts[id] = 0;
+  }
+  for (const id of player.powerUps) {
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+};
 
-  if (POWER_UP_IDS.length > 1) {
+const getAvailablePowerUps = (player: PlayerState): PowerUpId[] => {
+  const stacks = getPowerUpStacks(player);
+  return POWER_UP_IDS.filter((id) => {
+    const def = POWER_UP_POOL[id];
+    const maxStacks = def?.maxStacks ?? Number.POSITIVE_INFINITY;
+    return (stacks[id] ?? 0) < maxStacks;
+  });
+};
+
+export const rollDistinctPowerUps = (rng: RNG, player: PlayerState): [PowerUpId, PowerUpId] | null => {
+  const available = getAvailablePowerUps(player);
+  if (available.length === 0) return null;
+  if (available.length === 1) {
+    const only = available[0]!;
+    return [only, only];
+  }
+
+  const first = available[rng.nextInt(available.length)] ?? available[0]!;
+  let second = available[rng.nextInt(available.length)] ?? available[0]!;
+
+  if (available.length > 1) {
     let guard = 0;
     while (second === first && guard < 16) {
-      second = POWER_UP_IDS[rng.nextInt(POWER_UP_IDS.length)] ?? POWER_UP_IDS[0]!;
+      second = available[rng.nextInt(available.length)] ?? available[0]!;
       guard += 1;
     }
     if (second === first) {
-      second = POWER_UP_IDS.find((id) => id !== first) ?? first;
+      second = available.find((id) => id !== first) ?? first;
     }
   }
 

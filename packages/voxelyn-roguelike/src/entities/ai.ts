@@ -19,10 +19,18 @@ import {
 const manhattan = (a: Vec2, b: Vec2): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
 const vecToAnimFacing = (x: number, y: number): 'dr' | 'dl' | 'ur' | 'ul' => {
-  if (x >= 0 && y >= 0) return 'dr';
-  if (x < 0 && y >= 0) return 'dl';
-  if (x >= 0 && y < 0) return 'ur';
-  return 'ul';
+  // Isometric cardinal directions:
+  // D (+X) = DR, A (-X) = UL, S (+Y) = DL, W (-Y) = UR
+  if (x > 0 && y > 0) return 'dr';
+  if (x < 0 && y < 0) return 'ul';
+  if (x > 0 && y < 0) return 'ur';
+  if (x < 0 && y > 0) return 'dl';
+  // Pure cardinal directions
+  if (x > 0) return 'dr';
+  if (x < 0) return 'ul';
+  if (y > 0) return 'dl';
+  if (y < 0) return 'ur';
+  return 'dr'; // default
 };
 
 const keyOf = (x: number, y: number): number => (y << 16) | x;

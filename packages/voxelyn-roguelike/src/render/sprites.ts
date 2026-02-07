@@ -8,22 +8,41 @@ import {
   type ProceduralCharacter,
 } from '@voxelyn/animation';
 import type { EnemyArchetype, Entity, Vec2 } from '../game/types';
+import {
+  getHeroSpriteset,
+  HERO_FRAME_HEIGHT,
+  HERO_FRAME_WIDTH,
+  loadHeroSpriteset,
+} from './hero-spritesheet';
+
+// Start loading hero spritesheet immediately
+loadHeroSpriteset().catch((err: unknown) => console.warn('Failed to load hero spritesheet:', err));
 
 export type { PixelSprite };
 
 const clampScale = (scale: number): number => Math.max(1, Math.floor(scale));
 
 const facingFromVec = (facing: Vec2): AnimationFacing => {
-  if (facing.x >= 0 && facing.y >= 0) return 'dr';
-  if (facing.x < 0 && facing.y >= 0) return 'dl';
-  if (facing.x >= 0 && facing.y < 0) return 'ur';
-  return 'ul';
+  // Isometric cardinal directions:
+  // D (+X) = DR, A (-X) = UL, S (+Y) = DL, W (-Y) = UR
+  // Diagonals use both components
+  if (facing.x > 0 && facing.y > 0) return 'dr';
+  if (facing.x < 0 && facing.y < 0) return 'ul';
+  if (facing.x > 0 && facing.y < 0) return 'ur';
+  if (facing.x < 0 && facing.y > 0) return 'dl';
+  // Pure cardinal directions
+  if (facing.x > 0) return 'dr';
+  if (facing.x < 0) return 'ul';
+  if (facing.y > 0) return 'dl';
+  if (facing.y < 0) return 'ur';
+  return 'dr'; // default
 };
 
 type RuntimeEntry = {
-  character: ProceduralCharacter;
+  character: ProceduralCharacter | null;
   player: AnimationPlayer;
   lastSimTick: number;
+  useSpritesheet: boolean;
 };
 
 const runtimeByEntity = new Map<string, RuntimeEntry>();
@@ -75,8 +94,51 @@ const styleFromEntity = (entity: Entity): ProceduralCharacter['style'] => {
 
 const ensureRuntime = (entity: Entity): RuntimeEntry => {
   const existing = runtimeByEntity.get(entity.id);
+
+  // For player, check if spritesheet is loaded and upgrade runtime if needed
+  if (entity.kind === 'player') {
+    const heroSet = getHeroSpriteset();
+    if (heroSet) {
+      // Upgrade to spritesheet if not already using it
+      if (existing && !existing.useSpritesheet) {
+        const player = createAnimationPlayer({
+          set: heroSet,
+          width: HERO_FRAME_WIDTH,
+          height: HERO_FRAME_HEIGHT,
+          seed: entity.occ * 104729,
+        });
+        const upgraded: RuntimeEntry = {
+          character: null,
+          player,
+          lastSimTick: existing.lastSimTick,
+          useSpritesheet: true,
+        };
+        runtimeByEntity.set(entity.id, upgraded);
+        return upgraded;
+      }
+
+      if (!existing) {
+        const player = createAnimationPlayer({
+          set: heroSet,
+          width: HERO_FRAME_WIDTH,
+          height: HERO_FRAME_HEIGHT,
+          seed: entity.occ * 104729,
+        });
+        const created: RuntimeEntry = {
+          character: null,
+          player,
+          lastSimTick: -1,
+          useSpritesheet: true,
+        };
+        runtimeByEntity.set(entity.id, created);
+        return created;
+      }
+    }
+  }
+
   if (existing) return existing;
 
+  // Fallback to procedural character for enemies or until spritesheet loads
   const character = createProceduralCharacter({
     id: entity.id,
     style: styleFromEntity(entity),
@@ -93,6 +155,7 @@ const ensureRuntime = (entity: Entity): RuntimeEntry => {
     character,
     player,
     lastSimTick: -1,
+    useSpritesheet: false,
   };
   runtimeByEntity.set(entity.id, created);
   return created;
@@ -136,6 +199,9 @@ const drawSpriteFallback = (
   }
 };
 
+// Target display height for entities (in pixels)
+const TARGET_ENTITY_HEIGHT = 60;
+
 export const drawEntitySprite = (
   ctx: CanvasRenderingContext2D,
   entity: Entity,
@@ -146,10 +212,14 @@ export const drawEntitySprite = (
   flash = false
 ): void => {
   const sprite = frameForEntity(entity, simTick);
-  const safeScale = clampScale(scale);
+
+  // Normalize scale based on sprite size to achieve consistent display height
+  // Procedural sprites are 16x20, spritesheet frames are 48x50
+  const heightScale = TARGET_ENTITY_HEIGHT / sprite.height;
+  const effectiveScale = Math.max(1, Math.round(heightScale * (scale / 3)));
 
   if (typeof document === 'undefined') {
-    drawSpriteFallback(ctx, sprite, sx, sy, safeScale);
+    drawSpriteFallback(ctx, sprite, sx, sy, effectiveScale);
     return;
   }
 
@@ -157,10 +227,15 @@ export const drawEntitySprite = (
   stage.bytes.set(new Uint8ClampedArray(sprite.pixels.buffer));
   stage.ctx.putImageData(stage.imageData, 0, 0);
 
-  const drawX = Math.floor(sx - (sprite.width * safeScale) / 2);
-  const drawY = Math.floor(sy - sprite.height * safeScale);
-  const drawW = sprite.width * safeScale;
-  const drawH = sprite.height * safeScale;
+  // Spritesheet character may not be centered in frame - apply correction
+  // Positive xCorrect moves sprite left, positive yCorrect moves sprite up
+  const useSpritesheet = entity.kind === 'player' && sprite.width === 48;
+  const xCorrect = useSpritesheet ? 4 : 0; // Shift left to center character in tile
+  
+  const drawX = Math.floor(sx - (sprite.width * effectiveScale) / 2 - xCorrect * effectiveScale);
+  const drawY = Math.floor(sy - sprite.height * effectiveScale);
+  const drawW = sprite.width * effectiveScale;
+  const drawH = sprite.height * effectiveScale;
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;

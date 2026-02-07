@@ -104,9 +104,12 @@ const createPlayerForLevel = (level: LevelState, previous: PlayerState | null): 
 };
 
 const enqueueChoiceFromEnemyKill = (state: GameState, enemyId: string): void => {
+  const player = getPlayer(state);
+  if (!player) return;
   const occ = Number(enemyId.slice(1)) || 0;
   const rng = new RNG((state.level.seed ^ state.simTick ^ (occ * 7919)) >>> 0);
-  const options = rollDistinctPowerUps(rng);
+  const options = rollDistinctPowerUps(rng, player);
+  if (!options) return;
   const choice: PowerUpChoice = {
     sourceEnemyId: enemyId,
     options,
