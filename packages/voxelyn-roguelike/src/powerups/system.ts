@@ -24,11 +24,7 @@ const getAvailablePowerUps = (player: PlayerState): PowerUpId[] => {
 
 export const rollDistinctPowerUps = (rng: RNG, player: PlayerState): [PowerUpId, PowerUpId] | null => {
   const available = getAvailablePowerUps(player);
-  if (available.length === 0) return null;
-  if (available.length === 1) {
-    const only = available[0]!;
-    return [only, only];
-  }
+  if (available.length < 2) return null;
 
   const first = available[rng.nextInt(available.length)] ?? available[0]!;
   let second = available[rng.nextInt(available.length)] ?? available[0]!;
