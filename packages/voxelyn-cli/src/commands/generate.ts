@@ -80,6 +80,68 @@ const generateTextureFallback = async (
   return outPath;
 };
 
+type ScenarioIntent = {
+  ring: boolean;
+  spiral: boolean;
+  crater: boolean;
+  island: boolean;
+  ridge: boolean;
+  river: boolean;
+  water: boolean;
+  volcano: boolean;
+  canyon: boolean;
+  mesa: boolean;
+  dunes: boolean;
+  forest: boolean;
+  glacier: boolean;
+};
+
+const normalizePrompt = (prompt: string): string =>
+  prompt.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const hasAny = (text: string, words: string[]): boolean =>
+  words.some((word) => {
+    if (word.includes(' ')) {
+      return text.includes(word);
+    }
+    const re = new RegExp(`\\b${escapeRegExp(word)}\\b`);
+    return re.test(text);
+  });
+
+const parseScenarioIntent = (prompt: string): ScenarioIntent => {
+  const text = normalizePrompt(prompt);
+  const ring =
+    hasAny(text, ['ring', 'o ring', 'o-ring', 'donut', 'torus', 'circle', 'circular', 'atoll']);
+  const spiral = hasAny(text, ['spiral', 'spiralling', 'spiraling', 'swirl', 'whirlpool', 'helix']);
+  const crater = hasAny(text, ['crater', 'caldera', 'impact']);
+  const island = hasAny(text, ['island', 'archipelago', 'atoll']);
+  const ridge = hasAny(text, ['mountain', 'mountains', 'ridge', 'peaks', 'hills']);
+  const river = hasAny(text, ['river', 'stream', 'creek']);
+  const water = hasAny(text, ['water', 'ocean', 'sea', 'lake', 'lagoon', 'bay', 'coast']);
+  const volcano = hasAny(text, ['volcano', 'volcanic', 'lava', 'magma']);
+  const canyon = hasAny(text, ['canyon', 'gorge', 'ravine', 'chasm']);
+  const mesa = hasAny(text, ['mesa', 'plateau', 'tableland']);
+  const dunes = hasAny(text, ['dune', 'dunes', 'desert', 'sandy']);
+  const forest = hasAny(text, ['forest', 'woodland', 'trees']);
+  const glacier = hasAny(text, ['glacier', 'ice', 'frozen', 'tundra']);
+
+  return { ring, spiral, crater, island, ridge, river, water, volcano, canyon, mesa, dunes, forest, glacier };
+};
+
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const smoothstep = (edge0: number, edge1: number, x: number): number => {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
+const gaussian = (x: number, mean: number, sigma: number): number => {
+  const d = x - mean;
+  return Math.exp(-(d * d) / (2 * sigma * sigma));
+};
+
 const generateScenarioFallback = async (
   prompt: string,
   outDir: string,
@@ -96,11 +158,79 @@ const generateScenarioFallback = async (
   };
   const width = 32;
   const height = 32;
-  const noise = new GradientNoise(Math.abs(hash(prompt)) % 100000, { octaves: 4, falloff: 0.55 });
+  const intent = parseScenarioIntent(prompt);
+  const seed = Math.abs(hash(prompt)) % 100000;
+  const noise = new GradientNoise(seed, { octaves: 4, falloff: 0.55 });
   const heightmap: number[] = [];
+  const maxR = Math.min(width, height) / 2;
+  const hasShape = intent.ring || intent.spiral || intent.crater;
+  const baseZoom = intent.ridge ? 14 : 18;
+  const ridgeZoom = 9;
+  const ringRadius = 0.6;
+  const ringWidth = 0.1;
+  const spiralWidth = 0.06;
+  const spiralPitch = 0.05;
+  const spiralStart = 0.05;
+  const TAU = Math.PI * 2;
+
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      heightmap.push(Number(noise.sampleZoomed(x, y, 18).toFixed(4)));
+      const nx = (x - (width - 1) / 2) / maxR;
+      const ny = (y - (height - 1) / 2) / maxR;
+      const r = Math.sqrt(nx * nx + ny * ny);
+
+      const baseNoise = noise.sampleZoomed(x, y, baseZoom);
+      let h = hasShape ? 0.18 + baseNoise * 0.08 : baseNoise * 0.45 + 0.25;
+
+      if (intent.ridge) {
+        const ridged = noise.sampleZoomed(x + 1000, y + 1000, ridgeZoom);
+        h += Math.pow(ridged, 2) * 0.25;
+      }
+
+      if (intent.ring) {
+        const ringMask = smoothstep(ringWidth, 0, Math.abs(r - ringRadius));
+        h += ringMask * 0.95;
+        const lagoon = smoothstep(0, ringRadius - ringWidth * 1.1, ringRadius - r);
+        h -= lagoon * 0.45;
+      }
+
+      if (intent.crater) {
+        const crater = gaussian(r, 0.35, 0.12);
+        const rim = gaussian(r, 0.48, 0.05);
+        h -= crater * 0.35;
+        h += rim * 0.2;
+      }
+
+      if (intent.spiral) {
+        let theta = Math.atan2(ny, nx);
+        if (theta < 0) theta += TAU;
+        const turn = Math.max(
+          0,
+          Math.floor((r - spiralStart) / (spiralPitch * TAU))
+        );
+        const rCurve = spiralStart + spiralPitch * (theta + TAU * turn);
+        const d = Math.abs(r - rCurve);
+        const spiralMask = smoothstep(spiralWidth, 0, d);
+        const spiralDepth = intent.ring ? 0.65 : 0.3;
+        h -= spiralMask * spiralDepth;
+        if (!intent.ring) {
+          h += spiralMask * 0.2;
+        }
+      }
+
+      if (intent.river) {
+        const river = Math.abs(Math.sin((x / width) * Math.PI * 2 + seed * 0.001));
+        const riverMask = gaussian(river, 0, 0.25);
+        h -= riverMask * 0.2;
+      }
+
+      if (intent.water || intent.island || intent.ring) {
+        const edge = smoothstep(0.7, 1.05, r);
+        h -= edge * 0.4;
+      }
+
+      h = clamp01(h);
+      heightmap.push(Number(h.toFixed(4)));
     }
   }
   const outPath = path.join(outDir, 'scenario.json');

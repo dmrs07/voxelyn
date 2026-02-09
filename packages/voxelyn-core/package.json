@@ -9,43 +9,53 @@
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
-      "import": "./dist/src/index.js"
+      "import": "./dist/src/index.js",
+      "default": "./dist/src/index.js"
     },
     "./adapters/canvas2d": {
       "types": "./dist/src/adapters/canvas2d.d.ts",
-      "import": "./dist/src/adapters/canvas2d.js"
+      "import": "./dist/src/adapters/canvas2d.js",
+      "default": "./dist/src/adapters/canvas2d.js"
     },
     "./adapters/webgl": {
       "types": "./dist/src/adapters/webglTexture.d.ts",
-      "import": "./dist/src/adapters/webglTexture.js"
+      "import": "./dist/src/adapters/webglTexture.js",
+      "default": "./dist/src/adapters/webglTexture.js"
     },
     "./extras/iso": {
       "types": "./dist/src/extras/iso/iso.d.ts",
-      "import": "./dist/src/extras/iso/iso.js"
+      "import": "./dist/src/extras/iso/iso.js",
+      "default": "./dist/src/extras/iso/iso.js"
     },
     "./extras/voxels": {
       "types": "./dist/src/extras/voxels/voxelGrid3d.d.ts",
-      "import": "./dist/src/extras/voxels/voxelGrid3d.js"
+      "import": "./dist/src/extras/voxels/voxelGrid3d.js",
+      "default": "./dist/src/extras/voxels/voxelGrid3d.js"
     },
     "./extras/importers": {
       "types": "./dist/src/extras/importers/index.d.ts",
-      "import": "./dist/src/extras/importers/index.js"
+      "import": "./dist/src/extras/importers/index.js",
+      "default": "./dist/src/extras/importers/index.js"
     },
     "./extras/importers/tiled": {
       "types": "./dist/src/extras/importers/tiled.d.ts",
-      "import": "./dist/src/extras/importers/tiled.js"
+      "import": "./dist/src/extras/importers/tiled.js",
+      "default": "./dist/src/extras/importers/tiled.js"
     },
     "./extras/importers/spine": {
       "types": "./dist/src/extras/importers/spine.d.ts",
-      "import": "./dist/src/extras/importers/spine.js"
+      "import": "./dist/src/extras/importers/spine.js",
+      "default": "./dist/src/extras/importers/spine.js"
     },
     "./extras/importers/unity": {
       "types": "./dist/src/extras/importers/unity.d.ts",
-      "import": "./dist/src/extras/importers/unity.js"
+      "import": "./dist/src/extras/importers/unity.js",
+      "default": "./dist/src/extras/importers/unity.js"
     },
     "./extras/importers/obj": {
       "types": "./dist/src/extras/importers/obj.d.ts",
-      "import": "./dist/src/extras/importers/obj.js"
+      "import": "./dist/src/extras/importers/obj.js",
+      "default": "./dist/src/extras/importers/obj.js"
     }
   },
   "files": [

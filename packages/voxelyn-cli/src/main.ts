@@ -61,6 +61,12 @@ export const main = async (): Promise<void> => {
     let positionals = [...parsed.positionals];
     const hasPluginCommand = Boolean(parsed.rawCommand && pluginRegistry.has(parsed.rawCommand));
 
+    // Handle 'help' as a command
+    if (!command && parsed.rawCommand === 'help') {
+      logger.info(formatHelp());
+      return;
+    }
+
     if (!command && parsed.rawCommand && !hasPluginCommand) {
       command = 'create';
       positionals = [parsed.rawCommand, ...positionals];
