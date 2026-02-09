@@ -133,6 +133,14 @@ export function parseObj(text: string, options: ObjParseOptions = {}): ObjMesh {
     }
   }
 
+  if (indices.length === 0) {
+    return {
+      positions: new Float32Array(outPositions),
+      uvs: usesUV ? new Float32Array(outUvs) : undefined,
+      normals: usesNormal ? new Float32Array(outNormals) : undefined,
+      indices: new Uint16Array(0)
+    };
+  }
   const maxIndex = indices.reduce((max, val) => (val > max ? val : max), 0);
   const IndexArray = maxIndex > 65535 ? Uint32Array : Uint16Array;
 
