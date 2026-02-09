@@ -2,7 +2,7 @@ import { GameLoop } from './game/loop';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) {
-  throw new Error('Canvas #game nao encontrado.');
+  throw new Error('Canvas #game não encontrado.');
 }
 
 const baseSeed = 0xdecafbad;
