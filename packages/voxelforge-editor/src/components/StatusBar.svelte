@@ -1,6 +1,6 @@
 <script lang="ts">
   import { get } from 'svelte/store';
-  import { documentStore, uiStore, toolStore, type HistoryInfo, type ToolId } from '$lib/stores';
+  import { documentStore, uiStore, toolStore, type HistoryInfo, type ToolId, type Voxel2DRenderMode } from '$lib/stores';
   import type { EditorDocument } from '$lib/document/types';
   import {
     Folder,
@@ -26,6 +26,7 @@
   let gridStep = $state(1);
   let activeTool = $state<ToolId>('pencil');
   let showTextures = $state(false);
+  let voxel2DMode = $state<Voxel2DRenderMode>('slice');
   
   documentStore.subscribe((d: EditorDocument) => doc = d);
   documentStore.history.subscribe((h: HistoryInfo) => {
@@ -37,6 +38,7 @@
   uiStore.gridStep.subscribe(v => gridStep = v);
   toolStore.activeTool.subscribe((t: ToolId) => activeTool = t);
   uiStore.showTextures.subscribe(v => showTextures = v);
+  uiStore.voxel2DMode.subscribe(v => voxel2DMode = v);
 
   // Contextual help hints based on current state
   const getContextHint = (): string => {
@@ -48,7 +50,9 @@
     }
     switch (activeTool) {
       case 'select': return 'Draw to select | Shift: add | Alt: subtract | Ctrl: intersect';
-      case 'move': return 'Drag selection to move | Arrow keys: nudge | [ ]: rotate | \\: flip';
+      case 'lasso_freehand': return 'Drag to lasso | Shift: add | Alt: subtract | Ctrl: intersect';
+      case 'lasso_polygon': return 'Click points to lasso | Enter/double-click: close | Esc: cancel';
+      case 'move': return 'Drag selection to move | Arrow: nudge | [ ]: rotate | \\: flip | Enter/Esc: apply/cancel';
       case 'pencil': return 'Click: draw | [ ]: brush size | Right click: secondary color';
       case 'eraser': return 'Click to erase | [ ]: brush size';
       case 'fill': return 'Click to flood fill area';
@@ -178,6 +182,14 @@
         title="Toggle grid"
       ><GridFour size={14} weight="fill" /> Grid</button>
       <button onclick={cycleGridStep} title="Grid density">Step {gridStep}×</button>
+    </div>
+
+    <div class="voxel-mode">
+      <button
+        onclick={() => uiStore.voxel2DMode.cycle()}
+        title="Toggle voxel 2D render mode"
+        disabled={doc.viewMode !== '2d'}
+      >Voxel {voxel2DMode === 'slice' ? 'Slice' : 'Proj'}</button>
     </div>
     
     <div class="texture-toggle">
@@ -343,6 +355,31 @@
 
   .grid-controls button.active {
     background: #4a4a8e;
+  }
+
+  .voxel-mode {
+    display: flex;
+    align-items: center;
+  }
+
+  .voxel-mode button {
+    height: 20px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 3px;
+    background: #252538;
+    color: #fff;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .voxel-mode button:hover:not(:disabled) {
+    background: #3a3a5e;
+  }
+
+  .voxel-mode button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .texture-toggle {

@@ -1,0 +1,22 @@
+{
+  "name": "@voxelyn/roguelike",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voxelyn Roguelike MVP (1-10 floors)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@voxelyn/animation": "workspace:*",
+    "@voxelyn/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0",
+    "vitest": "^3.2.4"
+  }
+}

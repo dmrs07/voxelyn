@@ -3,8 +3,8 @@
  * Generates realistic textures for different material types.
  */
 
-import { packRGBA, unpackRGBA } from './palette';
-import type { Material } from './palette';
+import { packRGBA, unpackRGBA } from './palette.js';
+import type { Material } from './palette.js';
 
 // ============================================================================
 // NOISE GENERATORS

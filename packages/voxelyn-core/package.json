@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Ultra lightweight headless pixels/grid/iso/voxels toolkit",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "exports": {
@@ -25,6 +26,26 @@
     "./extras/voxels": {
       "types": "./dist/src/extras/voxels/voxelGrid3d.d.ts",
       "import": "./dist/src/extras/voxels/voxelGrid3d.js"
+    },
+    "./extras/importers": {
+      "types": "./dist/src/extras/importers/index.d.ts",
+      "import": "./dist/src/extras/importers/index.js"
+    },
+    "./extras/importers/tiled": {
+      "types": "./dist/src/extras/importers/tiled.d.ts",
+      "import": "./dist/src/extras/importers/tiled.js"
+    },
+    "./extras/importers/spine": {
+      "types": "./dist/src/extras/importers/spine.d.ts",
+      "import": "./dist/src/extras/importers/spine.js"
+    },
+    "./extras/importers/unity": {
+      "types": "./dist/src/extras/importers/unity.d.ts",
+      "import": "./dist/src/extras/importers/unity.js"
+    },
+    "./extras/importers/obj": {
+      "types": "./dist/src/extras/importers/obj.d.ts",
+      "import": "./dist/src/extras/importers/obj.js"
     }
   },
   "files": [

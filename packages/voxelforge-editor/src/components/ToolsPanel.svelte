@@ -72,6 +72,8 @@
     { id: 'fill', icon: PaintBucket, label: 'Fill', key: 'G' },
     { id: 'eyedropper', icon: Eyedropper, label: 'Eyedropper', key: 'I' },
     { id: 'select', icon: Selection, label: 'Select', key: 'M' },
+    { id: 'lasso_freehand', icon: LineSegment, label: 'Lasso Freehand', key: 'Q' },
+    { id: 'lasso_polygon', icon: Rectangle, label: 'Lasso Polygon', key: 'P' },
     { id: 'move', icon: ArrowsOutCardinal, label: 'Move', key: 'V' },
     { id: 'wand', icon: MagicWand, label: 'Magic Wand', key: 'W' },
     { id: 'pan', icon: Hand, label: 'Pan', key: 'H' },

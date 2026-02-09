@@ -1,0 +1,23 @@
+{
+  "name": "@voxelyn/cli",
+  "version": "0.1.0",
+  "description": "Voxelyn CLI - scaffold games and demos",
+  "type": "module",
+  "bin": {
+    "voxelyn": "./dist/src/index.js"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -w",
+    "test": "pnpm build && node --test 'dist/tests/**/*.js'"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "typescript": "^5.6.3"
+  }
+}

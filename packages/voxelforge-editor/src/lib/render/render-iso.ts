@@ -4,7 +4,7 @@
  */
 
 import { projectIso, forEachIsoOrder } from '@voxelyn/core';
-import type { EditorDocument, GridLayer, VoxelLayer, Material, Layer, BlendMode } from '../document/types';
+import type { EditorDocument, GridLayer, VoxelLayer, Material, Layer, BlendMode, LayerId } from '../document/types';
 import { 
   getTextureTile, 
   initTextureCache,
@@ -186,7 +186,8 @@ export const renderDocumentIso = (
   settings: Partial<IsoSettings> = {},
   showGrid: boolean = true,
   gridStep: number = 1,
-  showTextures: boolean = false
+  showTextures: boolean = false,
+  floatingOverridesByLayer: Map<LayerId, Map<number, number>> = new Map()
 ) => {
   const opts: IsoSettings = { ...DEFAULT_ISO_SETTINGS, ...settings };
   const { tileW, tileH, zStep, baselineZ, lightDir } = opts;
@@ -228,6 +229,7 @@ export const renderDocumentIso = (
   
   for (const layer of sortedLayers) {
     if (!layer.visible) continue;
+    const floatingOverrides = floatingOverridesByLayer.get(layer.id);
     
     // Layer's base Z position (from zIndex + isoHeight)
     // zIndex acts as a multiplier for layer stacking
@@ -246,7 +248,9 @@ export const renderDocumentIso = (
 
       forEachIsoOrder(grid.width, grid.height, (x: number, y: number) => {
         const idx = y * grid.width + x;
-        const cell = grid.data[idx];
+        const cell = floatingOverrides?.has(idx)
+          ? (floatingOverrides.get(idx) ?? 0)
+          : (grid.data[idx] ?? 0);
         const mat = cell & 0xff;
         
         if (mat === 0) return;
@@ -295,12 +299,18 @@ export const renderDocumentIso = (
       const vh = voxel.height;
       const vd = voxel.depth;
       const voxelZScale = opts.voxelZScale;
+      const getVoxelCell = (index: number): number => {
+        if (floatingOverrides?.has(index)) {
+          return floatingOverrides.get(index) ?? 0;
+        }
+        return voxel.data[index] ?? 0;
+      };
 
       // Helper to check if voxel exists at position
       const hasVoxel = (x: number, y: number, z: number): boolean => {
         if (x < 0 || x >= vw || y < 0 || y >= vh || z < 0 || z >= vd) return false;
         const idx = x + y * vw + z * vw * vh;
-        return (voxel.data[idx] ?? 0) !== 0;
+        return getVoxelCell(idx) !== 0;
       };
 
       // Pre-calculate visible voxels (only those with at least one exposed face)
@@ -310,7 +320,7 @@ export const renderDocumentIso = (
         for (let y = 0; y < vh; y++) {
           for (let x = 0; x < vw; x++) {
             const voxelIndex = x + y * vw + z * vw * vh;
-            const mat = voxel.data[voxelIndex] ?? 0;
+            const mat = getVoxelCell(voxelIndex);
             if (mat === 0) continue;
 
             // Check which faces are visible (not occluded by adjacent voxels)
