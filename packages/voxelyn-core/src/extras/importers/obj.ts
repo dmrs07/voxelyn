@@ -99,18 +99,18 @@ export function parseObj(text: string, options: ObjParseOptions = {}): ObjMesh {
     const pos = positions[vert.v];
     if (!pos) throw new Error('OBJ invalid vertex index');
     const newIndex = outPositions.length / 3;
-    outPositions.push(pos[0], pos[1], pos[2]);
+    outPositions.push(pos[0] ?? 0, pos[1] ?? 0, pos[2] ?? 0);
 
     if (usesUV) {
       const uv = vert.vt !== undefined ? uvs[vert.vt] : undefined;
-      const u = uv ? uv[0] : 0;
-      const v = uv ? uv[1] : 0;
+      const u = uv?.[0] ?? 0;
+      const v = uv?.[1] ?? 0;
       outUvs.push(u, flipV ? 1 - v : v);
     }
 
     if (usesNormal) {
       const n = vert.vn !== undefined ? normals[vert.vn] : undefined;
-      outNormals.push(n ? n[0] : 0, n ? n[1] : 0, n ? n[2] : 0);
+      outNormals.push(n?.[0] ?? 0, n?.[1] ?? 0, n?.[2] ?? 0);
     }
 
     vertexMap.set(key, newIndex);

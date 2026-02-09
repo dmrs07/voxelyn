@@ -3,6 +3,9 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Template } from './types.js';
 import { renderTemplate } from './templates.js';
+import { CliError } from './errors.js';
+
+export type LogFn = (message: string) => void;
 
 export const isValidName = (name: string): boolean => {
   if (!name) return false;
@@ -28,14 +31,14 @@ export const ensureWritableDir = async (
   const entries = await readdir(dir);
   if (entries.length > 0) {
     if (!opts.force) {
-      throw new Error('Target directory is not empty. Use --force to overwrite.');
+      throw new CliError('ERR_DIR_NOT_EMPTY', 'Target directory is not empty. Use --force to overwrite.');
     }
     if (!opts.yes) {
       if (!opts.confirmOverwrite) {
-        throw new Error('Overwrite confirmation required.');
+        throw new CliError('ERR_CONFIRM_REQUIRED', 'Overwrite confirmation required.');
       }
       const ok = await opts.confirmOverwrite();
-      if (!ok) throw new Error('Aborted by user.');
+      if (!ok) throw new CliError('ERR_ABORTED', 'Aborted by user.');
     }
   }
 };
@@ -44,7 +47,8 @@ export const writeTemplateFiles = async (
   dir: string,
   template: Template,
   name: string,
-  dryRun: boolean
+  dryRun: boolean,
+  log: LogFn = console.log
 ): Promise<void> => {
   for (const [filePath, rawContent] of Object.entries(template.files)) {
     const outPath = path.join(dir, filePath);
@@ -52,7 +56,7 @@ export const writeTemplateFiles = async (
     if (!dryRun) await mkdir(outDir, { recursive: true });
     const content = renderTemplate(rawContent, name);
     if (dryRun) {
-      console.log(`[dry-run] write ${outPath}`);
+      log(`[dry-run] write ${outPath}`);
     } else {
       await writeFile(outPath, content, 'utf8');
     }

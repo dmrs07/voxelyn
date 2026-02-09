@@ -75,6 +75,7 @@ export const attemptInteractionAt = (state: GameState, target: Vec2): boolean =>
           setInspectOverlay(state, INSPECT_TEXTS.terminal_broken);
           return true;
         }
+        // Terminal is broken and no enemies nearby - show repair modal
         state.interactionModal = {
           kind: 'terminal_repair',
           sourceId: item.id,

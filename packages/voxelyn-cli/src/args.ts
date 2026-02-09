@@ -5,7 +5,10 @@ const COMMAND_ALIASES: Record<string, CommandName> = {
   dev: 'dev',
   serve: 'dev',
   build: 'build',
-  preview: 'preview'
+  preview: 'preview',
+  deploy: 'deploy',
+  generate: 'generate',
+  plugin: 'plugin'
 };
 
 const setCommand = (current: CommandName | undefined, next: CommandName): CommandName => {
@@ -18,6 +21,7 @@ const setCommand = (current: CommandName | undefined, next: CommandName): Comman
 export const parseArgs = (argv: string[]): ParsedArgs => {
   const options: CliOptions = {};
   let command: CommandName | undefined;
+  let rawCommand: string | undefined;
   const positionals: string[] = [];
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -83,6 +87,50 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
         options.noInstall = true;
         continue;
       }
+      if (arg === '--verbose') {
+        options.verbose = true;
+        continue;
+      }
+      if (arg === '--quiet') {
+        options.quiet = true;
+        continue;
+      }
+      if (arg === '--no-color') {
+        options.noColor = true;
+        continue;
+      }
+      if (arg === '--version' || arg === '-v') {
+        options.version = true;
+        continue;
+      }
+      if (arg === '--dir' && argv[i + 1]) {
+        options.deployDir = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--dir=')) {
+        options.deployDir = arg.slice('--dir='.length);
+        continue;
+      }
+      if (arg === '--channel' && argv[i + 1]) {
+        options.deployChannel = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--channel=')) {
+        options.deployChannel = arg.slice('--channel='.length);
+        continue;
+      }
+      if (arg === '--build') {
+        options.deployBuild = true;
+        continue;
+      }
+      if (arg === '--prompt' && argv[i + 1]) {
+        options.prompt = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--prompt=')) {
+        options.prompt = arg.slice('--prompt='.length);
+        continue;
+      }
       continue;
     }
 
@@ -92,10 +140,15 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
       continue;
     }
 
+    if (!command && !rawCommand) {
+      rawCommand = arg;
+      continue;
+    }
+
     positionals.push(arg);
   }
 
-  return { command, options, positionals };
+  return { command, rawCommand, options, positionals };
 };
 
 export const formatHelp = (): string => `Voxelyn CLI
@@ -106,6 +159,9 @@ Usage:
   voxelyn build [options]
   voxelyn preview [options]
   voxelyn serve [options]
+  voxelyn deploy [options]
+  voxelyn generate <type> --prompt "..."
+  voxelyn plugin <add|remove|list> [name]
   voxelyn --list
 
 Options:
@@ -119,12 +175,23 @@ Options:
   --pm <pm>           npm | pnpm | yarn | bun
   --git               Initialize git repo
   --dry-run           Print actions without writing
+  --verbose           Verbose logging
+  --quiet             Suppress non-error output
+  --no-color          Disable ANSI colors
+  --version           Show CLI version
   --help              Show help
+
+Deploy options:
+  --dir <path>        Directory to deploy (default: dist)
+  --channel <name>    Itch.io channel (default: alpha)
+  --build             Run build before deploy
+
+Generate options:
+  --prompt <text>     Prompt for generation
 
 Examples:
   voxelyn create my-game vanilla
-  voxelyn create my-game --no-install
-  voxelyn dev
-  voxelyn build
-  voxelyn preview
+  voxelyn deploy --build --channel=alpha
+  voxelyn generate texture --prompt "stone"
+  voxelyn plugin list
 `;

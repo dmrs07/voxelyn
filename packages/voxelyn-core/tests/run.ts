@@ -112,7 +112,11 @@ if (mesh.normals) assert(mesh.normals.length === vertexCount * 3, "obj normal le
 
 const meshFlipped = parseObj(objFixture, { flipV: true });
 if (mesh.uvs && meshFlipped.uvs) {
-  assert(meshFlipped.uvs[1] === 1 - mesh.uvs[1], "obj flipV");
+  const originalV = mesh.uvs[1];
+  const flippedV = meshFlipped.uvs[1];
+  if (originalV !== undefined && flippedV !== undefined) {
+    assert(flippedV === 1 - originalV, "obj flipV");
+  }
 }
 
 console.log("tests ok");

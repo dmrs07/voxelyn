@@ -398,10 +398,10 @@ canvas {
 
 export const TEMPLATE_NAMES = TEMPLATE_LIST.map((t) => t.name);
 
-export const listTemplates = (): void => {
-  console.log('Available templates:');
+export const listTemplates = (write: (message: string) => void): void => {
+  write('Available templates:');
   for (const t of TEMPLATE_LIST) {
-    console.log(`- ${t.name}: ${t.description}`);
+    write(`- ${t.name}: ${t.description}`);
   }
 };
 

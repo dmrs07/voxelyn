@@ -2,9 +2,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
+import { CliError } from './errors.js';
 
 const PM_LIST = ['npm', 'pnpm', 'yarn', 'bun'] as const;
 export type PackageManager = (typeof PM_LIST)[number];
+
+export type LogFn = (message: string) => void;
 
 export const isPackageManager = (value: string | undefined): value is PackageManager =>
   Boolean(value && PM_LIST.includes(value as PackageManager));
@@ -20,7 +23,7 @@ export const detectPackageManager = (): PackageManager => {
 export const resolvePackageManager = (value?: string): PackageManager => {
   if (!value) return detectPackageManager();
   if (!isPackageManager(value)) {
-    throw new Error(`Unknown package manager: ${value}`);
+    throw new CliError('ERR_INVALID_PM', `Unknown package manager: ${value}`);
   }
   return value;
 };
@@ -31,14 +34,13 @@ export const readPackageScripts = async (cwd: string): Promise<Record<string, st
   try {
     raw = await readFile(pkgPath, 'utf8');
   } catch {
-    throw new Error('package.json not found in current directory.');
+    throw new CliError('ERR_NO_PACKAGE_JSON', 'package.json not found in current directory.');
   }
   const parsed = JSON.parse(raw) as { scripts?: Record<string, string> };
   return parsed.scripts ?? {};
 };
 
-const formatCommand = (cmd: string, args: string[]): string =>
-  [cmd, ...args].join(' ');
+const formatCommand = (cmd: string, args: string[]): string => [cmd, ...args].join(' ');
 
 export const formatInstallCommand = (pm: PackageManager): string =>
   pm === 'yarn' ? 'yarn install' : `${pm} install`;
@@ -49,11 +51,16 @@ export const formatRunCommand = (pm: PackageManager, script: string): string => 
   return `${pm} run ${script}`;
 };
 
-export const runInstall = (pm: PackageManager, cwd: string, dryRun: boolean): void => {
+export const runInstall = (
+  pm: PackageManager,
+  cwd: string,
+  dryRun: boolean,
+  log: LogFn = console.log
+): void => {
   const cmd = pm;
   const args = ['install'];
   if (dryRun) {
-    console.log(`[dry-run] ${formatInstallCommand(pm)}`);
+    log(`[dry-run] ${formatInstallCommand(pm)}`);
     return;
   }
   const result = spawnSync(cmd, args, { cwd, stdio: 'inherit' });
@@ -62,11 +69,58 @@ export const runInstall = (pm: PackageManager, cwd: string, dryRun: boolean): vo
   }
 };
 
+export const runAdd = (
+  pm: PackageManager,
+  deps: string[],
+  cwd: string,
+  dryRun: boolean,
+  log: LogFn = console.log
+): void => {
+  if (deps.length === 0) return;
+  const cmd = pm;
+  let args: string[] = [];
+  if (pm === 'npm') args = ['install', '--save', ...deps];
+  if (pm === 'pnpm') args = ['add', ...deps];
+  if (pm === 'yarn') args = ['add', ...deps];
+  if (pm === 'bun') args = ['add', ...deps];
+
+  if (dryRun) {
+    log(`[dry-run] ${formatCommand(cmd, args)}`);
+    return;
+  }
+  const result = spawnSync(cmd, args, { cwd, stdio: 'inherit' });
+  if (result.error) throw result.error;
+};
+
+export const runRemove = (
+  pm: PackageManager,
+  deps: string[],
+  cwd: string,
+  dryRun: boolean,
+  log: LogFn = console.log
+): void => {
+  if (deps.length === 0) return;
+  const cmd = pm;
+  let args: string[] = [];
+  if (pm === 'npm') args = ['uninstall', ...deps];
+  if (pm === 'pnpm') args = ['remove', ...deps];
+  if (pm === 'yarn') args = ['remove', ...deps];
+  if (pm === 'bun') args = ['remove', ...deps];
+
+  if (dryRun) {
+    log(`[dry-run] ${formatCommand(cmd, args)}`);
+    return;
+  }
+  const result = spawnSync(cmd, args, { cwd, stdio: 'inherit' });
+  if (result.error) throw result.error;
+};
+
 export const runScript = (
   pm: PackageManager,
   script: string,
   cwd: string,
-  dryRun: boolean
+  dryRun: boolean,
+  log: LogFn = console.log
 ): void => {
   const cmd = pm;
   let args: string[] = [];
@@ -79,7 +133,7 @@ export const runScript = (
   }
 
   if (dryRun) {
-    console.log(`[dry-run] ${formatCommand(cmd, args)}`);
+    log(`[dry-run] ${formatCommand(cmd, args)}`);
     return;
   }
 

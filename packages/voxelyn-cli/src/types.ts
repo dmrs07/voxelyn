@@ -16,12 +16,28 @@ export type CliOptions = {
   help?: boolean;
   install?: boolean;
   noInstall?: boolean;
+  verbose?: boolean;
+  quiet?: boolean;
+  noColor?: boolean;
+  version?: boolean;
+  deployDir?: string;
+  deployChannel?: string;
+  deployBuild?: boolean;
+  prompt?: string;
 };
 
-export type CommandName = 'create' | 'dev' | 'build' | 'preview';
+export type CommandName =
+  | 'create'
+  | 'dev'
+  | 'build'
+  | 'preview'
+  | 'deploy'
+  | 'generate'
+  | 'plugin';
 
 export type ParsedArgs = {
   command?: CommandName;
+  rawCommand?: string;
   options: CliOptions;
   positionals: string[];
 };

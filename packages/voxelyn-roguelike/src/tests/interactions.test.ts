@@ -45,6 +45,12 @@ describe('interactions', () => {
     terminal.broken = true;
     terminal.active = false;
 
+    // Clear all existing enemies from the level
+    const existingEnemies = Array.from(state.level.entities.values()).filter(e => e.kind === 'enemy');
+    for (const e of existingEnemies) {
+      unregisterEntity(state.level, e);
+    }
+
     expect(moveEntity(state.level, player, terminal.x, terminal.y)).toBe(true);
 
     const enemyPos = findNearbyWalkable(state, terminal.x, terminal.y);

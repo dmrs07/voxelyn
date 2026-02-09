@@ -93,7 +93,7 @@ export function parseUnityMeta(text: string): UnitySpriteSheet {
 
     if (!inSprites) continue;
 
-    if (indent <= spritesIndent) {
+    if (indent < spritesIndent) {
       inSprites = false;
       section = null;
       current = null;
@@ -121,7 +121,7 @@ export function parseUnityMeta(text: string): UnitySpriteSheet {
     const value = keyMatch[2];
 
     if (key === 'rect' || key === 'pivot' || key === 'border') {
-      section = key as typeof section;
+      section = key as 'rect' | 'pivot' | 'border';
       continue;
     }
 
