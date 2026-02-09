@@ -29,6 +29,7 @@ import {
   SPORE_VENT_COOLDOWN_MS,
   SPORE_VENT_DENSITY,
   TERMINAL_PUZZLE_CHANCE,
+  TERMINAL_BROKEN_CHANCE,
 } from '../game/constants';
 import type {
   GameState,
@@ -342,12 +343,14 @@ export const generateLevelFeatures = (input: GenerationInput): GeneratedFeatures
         const tx = terminalCell % input.width;
         const ty = Math.floor(terminalCell / input.width);
         featureMap[terminalCell] |= FEATURE_TERMINAL;
+        const broken = rng.nextFloat01() < TERMINAL_BROKEN_CHANCE;
         interactables.push({
           id: `terminal_${input.floorNumber}_${tx}_${ty}`,
           type: 'terminal',
           x: tx,
           y: ty,
           active: false,
+          broken,
           linkedGateId: gateId,
         });
       }
@@ -356,6 +359,11 @@ export const generateLevelFeatures = (input: GenerationInput): GeneratedFeatures
         (item): item is Extract<LevelInteractable, { type: 'terminal' }> =>
           item.type === 'terminal' && item.linkedGateId === gateId
       );
+
+      if (linkedTerminals.length > 0 && linkedTerminals.every((item) => item.broken)) {
+        const pick = linkedTerminals[rng.nextInt(linkedTerminals.length)];
+        if (pick) pick.broken = false;
+      }
 
       // If we could not place both terminals, keep gate open to avoid accidental lock.
       if (linkedTerminals.length < 2) {
@@ -405,6 +413,27 @@ const featureFlagsAt = (state: GameState, x: number, y: number): TileFeatureFlag
   return state.level.featureMap[maskIndex(state.level.width, x, y)] ?? 0;
 };
 
+export const activateTerminal = (state: GameState, interactable: Extract<LevelInteractable, { type: 'terminal' }>): void => {
+  if (interactable.active) return;
+  interactable.active = true;
+  pushAlert(state, 'Terminal ativado.', 'info');
+
+  const required = state.level.interactables.filter(
+    (item): item is Extract<LevelInteractable, { type: 'terminal' }> =>
+      item.type === 'terminal' && item.linkedGateId === interactable.linkedGateId
+  );
+  const allActive = required.length > 0 && required.every((item) => item.active);
+  if (allActive) {
+    const gate = state.level.interactables.find(
+      (item): item is GateInteractable => item.type === 'gate' && item.id === interactable.linkedGateId
+    );
+    if (gate && !gate.open) {
+      gate.open = true;
+      pushAlert(state, 'Portao destravado!', 'buff');
+    }
+  }
+};
+
 export const applyPlayerFeatureInteractions = (state: GameState, player: PlayerState): void => {
   const now = state.simTimeMs;
   const flags = featureFlagsAt(state, player.x, player.y);
@@ -445,26 +474,9 @@ export const applyPlayerFeatureInteractions = (state: GameState, player: PlayerS
     }
 
     if (interactable.type === 'terminal') {
+      if (interactable.broken) continue;
       if (!interactable.active) {
-        interactable.active = true;
-        pushAlert(state, 'Terminal ativado.', 'info');
-
-        const required = state.level.interactables.filter(
-          (
-            item
-          ): item is Extract<LevelInteractable, { type: 'terminal' }> =>
-            item.type === 'terminal' && item.linkedGateId === interactable.linkedGateId
-        );
-        const allActive = required.length > 0 && required.every((item) => item.active);
-        if (allActive) {
-          const gate = state.level.interactables.find(
-            (item): item is GateInteractable => item.type === 'gate' && item.id === interactable.linkedGateId
-          );
-          if (gate && !gate.open) {
-            gate.open = true;
-            pushAlert(state, 'Portao destravado!', 'buff');
-          }
-        }
+        activateTerminal(state, interactable);
       }
       continue;
     }

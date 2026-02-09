@@ -6,11 +6,13 @@ import {
 import { updateEnemiesAI } from '../entities/ai';
 import { applyPlayerRegen } from '../entities/player';
 import { Controls } from '../input/controls';
+import { attemptInteractionAt, cancelInteractionModal, confirmInteractionModal } from './interactions';
 import { resolvePowerUpChoice, startNextPowerUpChoiceIfNeeded } from '../powerups/system';
 import { IsoRenderer } from '../render/iso-renderer';
 import { updateCorridorEvents } from '../world/corridor-events';
 import { updateDynamicCorridors } from '../world/dynamic-corridors';
 import { applyPlayerFeatureInteractions } from '../world/features';
+import { inBounds2D } from '../world/level';
 import { SIMULATION_STEP_MS } from './constants';
 import {
   advanceToNextFloor,
@@ -60,7 +62,7 @@ export class GameLoop {
 
     while (this.accumulator >= SIMULATION_STEP_MS) {
       const input = this.controls.snapshot();
-      this.simulateStep(input.dx, input.dy, input.pickChoice);
+      this.simulateStep(input.dx, input.dy, input.pickChoice, input.interact, input.cancel);
       this.accumulator -= SIMULATION_STEP_MS;
     }
 
@@ -68,7 +70,19 @@ export class GameLoop {
     this.frameHandle = requestAnimationFrame(this.frame);
   };
 
-  private simulateStep(dx: number, dy: number, pickChoice: 1 | 2 | null): void {
+  private simulateStep(dx: number, dy: number, pickChoice: 1 | 2 | null, interact: boolean, cancel: boolean): void {
+    const clickedTile = this.renderer.consumeClickedTile();
+    const hoveredTile = this.renderer.getHoveredTile();
+
+    if (this.state.interactionModal) {
+      if (cancel) {
+        cancelInteractionModal(this.state);
+      } else if (interact || clickedTile) {
+        confirmInteractionModal(this.state);
+      }
+      return;
+    }
+
     this.state.simTick += 1;
     this.state.simTimeMs += SIMULATION_STEP_MS;
 
@@ -105,6 +119,35 @@ export class GameLoop {
     if (!player || !player.alive) {
       this.state.phase = 'game_over';
       return;
+    }
+
+    if (this.state.inspectOverlay && this.state.inspectOverlay.untilMs <= this.state.simTimeMs) {
+      this.state.inspectOverlay = null;
+    }
+
+    if (this.state.phase === 'running' && (interact || clickedTile)) {
+      let target = clickedTile ?? hoveredTile ?? null;
+      if (!target) {
+        const facing = player.facing;
+        const fx = player.x + Math.sign(facing.x);
+        const fy = player.y + Math.sign(facing.y);
+        const facingTarget = { x: fx, y: fy };
+        target = inBounds2D(this.state.level, facingTarget.x, facingTarget.y)
+          ? facingTarget
+          : { x: player.x, y: player.y };
+      }
+      if (!target) {
+        target = { x: player.x, y: player.y };
+      }
+
+      const handled = attemptInteractionAt(this.state, target);
+      if (this.state.interactionModal) {
+        return;
+      }
+      if (handled) {
+        dx = 0;
+        dy = 0;
+      }
     }
 
     applyPlayerRegen(player, SIMULATION_STEP_MS);

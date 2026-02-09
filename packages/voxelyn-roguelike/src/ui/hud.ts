@@ -100,7 +100,7 @@ export const drawHud = (ctx: CanvasRenderingContext2D, state: GameState): void =
   const hint =
     state.phase === 'powerup_choice'
       ? 'Escolha: tecla 1 ou 2'
-      : 'Mover: WASD/Setas | Objetivo: achar Saida/Nucleo';
+      : 'Mover: WASD/Setas | Interagir: E/Clique | Objetivo: achar Saida/Nucleo';
   drawClampedText(ctx, hint, rightX, 56, rightTextMax);
 
   const statusParts: string[] = [];

@@ -130,6 +130,8 @@ export const createGameState = (baseSeed: number): GameState => {
     floorNumber: 1,
     simTick: 0,
     simTimeMs: 0,
+    inspectOverlay: null,
+    interactionModal: null,
     pendingPowerUpChoices: [],
     activePowerUpChoice: null,
     damageEvents: [],
@@ -212,6 +214,8 @@ export const advanceToNextFloor = (state: GameState): void => {
   state.playerId = player.id;
   state.pendingPowerUpChoices = [];
   state.activePowerUpChoice = null;
+  state.inspectOverlay = null;
+  state.interactionModal = null;
   state.damageEvents = [];
   state.projectiles = [];
   state.particles = [];

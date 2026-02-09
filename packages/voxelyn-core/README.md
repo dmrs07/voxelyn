@@ -2,9 +2,64 @@
 
 Ultra-lightweight, zero-dependency headless toolkit for **pixels**, **grids**, **isometric**, and **voxel** content. Designed for games, simulations, and procedural generation.
 
+Voxelyn core is a headless foundation. You bring the renderer, input, and game loop. The core stays small, portable, and easy to integrate.
+
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)]()
+
+## What it is / isn't
+
+What it is:
+- A compact, headless core for pixels, grids, iso, and voxels
+- A toolbox for procedural generation and fast simulation
+- A browser-first library that also runs in Node
+
+What it isn't:
+- A full game engine with scene graph, physics, and audio
+- A renderer replacement (you bring Canvas2D/WebGL/engine of choice)
+
+---
+
+## Why use Voxelyn?
+- Super-fast 2D workflows with TypedArrays and chunked simulation
+- Friendly, documented API focused on developer experience
+- Web-first and browser-native by design
+- Open source with MIT license
+- Compact builds when tree-shaken
+
+---
+
+## Ecosystem
+
+- Voxelforge Editor: visual layout and voxel tools
+- `@voxelyn/cli`: project scaffolding and templates
+- `@voxelyn/animation`: Aseprite and TexturePacker importers
+
+---
+
+## Supported formats (v0.1)
+
+- [x] Tiled JSON tile layers (numeric arrays only, no base64/compression)
+- [x] Spine JSON (parse-only, no runtime)
+- [x] Unity `.meta` (TextureImporter sprites subset)
+- [x] Wavefront OBJ (v/vt/vn/f, negative indices, triangulation)
+- [ ] Tiled base64/compressed data (planned)
+- [ ] Spine runtime (planned)
+
+Notes:
+- Importers live under `@voxelyn/core/extras/importers/*` and are intentionally minimal.
+- Importers expect data already loaded (no IO helpers in core).
+- For Aseprite and TexturePacker, use `@voxelyn/animation`.
+
+---
+
+## Examples gallery
+
+- `examples/browser-diorama`
+- `examples/browser-harvesting`
+- `examples/browser-iso-diablo-like`
+- `examples/browser-noita-like`
 
 ## Features
 
@@ -25,6 +80,37 @@ npm install @voxelyn/core
 # or
 pnpm add @voxelyn/core
 ```
+
+---
+
+## CLI
+
+Scaffold a project with `@voxelyn/cli`:
+
+```bash
+npm i -g @voxelyn/cli
+voxelyn --name my-game --template vanilla
+```
+
+---
+
+## Templates
+
+Available now:
+- `vanilla` (TypeScript + Canvas2D)
+- `react` (TypeScript + React)
+- `svelte` (TypeScript + Svelte)
+
+Planned:
+- `vue`
+- `nextjs`
+- `remix`
+- `solid`
+- `bun`
+- `webpack`
+- `esbuild`
+- `rollup`
+- `parcel`
 
 ---
 
@@ -618,6 +704,13 @@ for (let y = 0; y < height; y++) {
 ## API Reference
 
 Full API documentation available in TypeScript declarations (`dist/src/*.d.ts`).
+
+---
+
+## Stability / SemVer
+
+- Core modules follow semver and aim for stability.
+- Importers under `@voxelyn/core/extras/importers/*` are experimental and may change faster.
 
 ---
 

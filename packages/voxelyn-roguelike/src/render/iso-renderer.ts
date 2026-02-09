@@ -22,6 +22,7 @@ import type {
   ProjectileState,
 } from '../game/types';
 import { drawHud, HUD_HEIGHT } from '../ui/hud';
+import { drawInteractionPanel } from '../ui/interaction-panel';
 import { drawPowerUpMenu } from '../ui/powerup-menu';
 import { isCellInActiveCorridorEvent } from '../world/corridor-events';
 import { computeFogVisibility, type FogLightSource } from './fog';
@@ -247,6 +248,17 @@ export class IsoRenderer {
       this.mouseY = e.clientY - rect.top;
     });
 
+    this.canvas.addEventListener('click', (e) => {
+      if (this.lastLevelWidth <= 0 || this.lastLevelHeight <= 0) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const tile = this.screenToTile(sx, sy, this.lastLevelWidth, this.lastLevelHeight);
+      if (tile) {
+        this.clickedTile = tile;
+      }
+    });
+
     this.canvas.addEventListener('mouseleave', () => {
       this.mouseX = -1;
       this.mouseY = -1;
@@ -277,6 +289,18 @@ export class IsoRenderer {
       return null;
     }
     return { x: tileX, y: tileY };
+  }
+
+  public consumeClickedTile(): { x: number; y: number } | null {
+    const tile = this.clickedTile;
+    this.clickedTile = null;
+    return tile;
+  }
+
+  public getHoveredTile(): { x: number; y: number } | null {
+    if (this.mouseX < 0 || this.mouseY < 0) return null;
+    if (this.lastLevelWidth <= 0 || this.lastLevelHeight <= 0) return null;
+    return this.screenToTile(this.mouseX, this.mouseY, this.lastLevelWidth, this.lastLevelHeight);
   }
 
   private ensureBuffers(state: GameState): void {
@@ -745,7 +769,7 @@ export class IsoRenderer {
     const interactables = this.interactablesByCell.get(idx) ?? [];
     for (const item of interactables) {
       if (item.type === 'terminal') {
-        const sprite = getTerminalSprite(item.active);
+        const sprite = getTerminalSprite(item.active, item.broken);
         drawBillboardSprite(ctx, sprite, sx, sy, FEATURE_POPUP_SCALE, options);
       }
 
@@ -797,7 +821,10 @@ export class IsoRenderer {
   private mouseX = -1;
   private mouseY = -1;
   private hoveredTile: { x: number; y: number } | null = null;
+  private clickedTile: { x: number; y: number } | null = null;
   private mouseListenerAttached = false;
+  private lastLevelWidth = 0;
+  private lastLevelHeight = 0;
 
   private drawOccludedWall(
     sx: number,
@@ -984,6 +1011,8 @@ export class IsoRenderer {
     this.currentDt = dt;
 
     this.ensureBuffers(state);
+    this.lastLevelWidth = state.level.width;
+    this.lastLevelHeight = state.level.height;
 
     const player = state.level.entities.get(state.playerId);
     const fallbackPlayerPos = { x: state.level.entry.x, y: state.level.entry.y };
@@ -1200,6 +1229,7 @@ export class IsoRenderer {
     if (state.phase === 'powerup_choice') {
       drawPowerUpMenu(ctx, state);
     }
+    drawInteractionPanel(ctx, state);
 
     if (state.phase === 'game_over' || state.phase === 'victory') {
       this.drawEndScreen(state.phase);
@@ -1213,7 +1243,10 @@ export class IsoRenderer {
     // Check interactables first (more specific)
     for (const item of interactables) {
       if (item.type === 'crystal' && !item.used) return 'Cristal';
-      if (item.type === 'terminal') return item.active ? 'Terminal (ativo)' : 'Terminal';
+      if (item.type === 'terminal') {
+        if (item.broken) return 'Terminal quebrado';
+        return item.active ? 'Terminal (ativo)' : 'Terminal';
+      }
       if (item.type === 'gate') return item.open ? 'Portao (aberto)' : 'Portao (fechado)';
       if (item.type === 'one_way_portal') return 'Portal';
       if (item.type === 'spore_vent') return 'Respiradouro de Esporos';

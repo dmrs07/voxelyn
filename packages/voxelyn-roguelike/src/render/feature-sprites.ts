@@ -137,12 +137,20 @@ export const createRootBarrierSprite = (): PixelSprite => {
 // ============================================================================
 // Terminal Sprite (tech console)
 // ============================================================================
-export const createTerminalSprite = (active: boolean): PixelSprite => {
+export const createTerminalSprite = (active: boolean, broken: boolean): PixelSprite => {
   const sprite = createSprite(8, 10);
-  const body = rgba(70, 80, 95, 255);
-  const frame = rgba(50, 60, 75, 255);
-  const screen = active ? rgba(140, 242, 176, 255) : rgba(115, 155, 188, 200);
-  const screenGlow = active ? rgba(100, 200, 150, 255) : rgba(90, 120, 150, 200);
+  const body = broken ? rgba(60, 70, 82, 255) : rgba(70, 80, 95, 255);
+  const frame = broken ? rgba(40, 50, 62, 255) : rgba(50, 60, 75, 255);
+  const screen = broken
+    ? rgba(170, 90, 90, 200)
+    : active
+      ? rgba(140, 242, 176, 255)
+      : rgba(115, 155, 188, 200);
+  const screenGlow = broken
+    ? rgba(120, 70, 70, 220)
+    : active
+      ? rgba(100, 200, 150, 255)
+      : rgba(90, 120, 150, 200);
 
   // Base/body
   fillRect(sprite, 1, 6, 6, 4, body);
@@ -153,6 +161,11 @@ export const createTerminalSprite = (active: boolean): PixelSprite => {
   // Screen
   fillRect(sprite, 2, 2, 4, 3, screen);
   setPixel(sprite, 2, 2, screenGlow);
+  if (broken) {
+    setPixel(sprite, 3, 3, rgba(40, 20, 20, 255));
+    setPixel(sprite, 4, 4, rgba(40, 20, 20, 255));
+    setPixel(sprite, 5, 2, rgba(40, 20, 20, 255));
+  }
 
   return sprite;
 };
@@ -404,11 +417,11 @@ export const getRootBarrierSprite = (): PixelSprite => {
   return sprite;
 };
 
-export const getTerminalSprite = (active: boolean): PixelSprite => {
-  const key = `terminal_${active}`;
+export const getTerminalSprite = (active: boolean, broken: boolean): PixelSprite => {
+  const key = `terminal_${active}_${broken}`;
   let sprite = spriteCache.get(key);
   if (!sprite) {
-    sprite = createTerminalSprite(active);
+    sprite = createTerminalSprite(active, broken);
     spriteCache.set(key, sprite);
   }
   return sprite;

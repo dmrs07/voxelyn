@@ -204,3 +204,19 @@ export const EVENT_SPORE_WAVE_ACTIVE_MS = 1700;
 export const EVENT_AMBUSH_ACTIVE_MS = 1250;
 export const EVENT_MIN_COOLDOWN_MS = 2600;
 export const EVENT_MAX_COOLDOWN_MS = 5200;
+
+export const INTERACT_RANGE = 1;
+export const INSPECT_OVERLAY_MS = 2200;
+export const TERMINAL_BROKEN_CHANCE = 0.55;
+export const TERMINAL_REPAIR_RADIUS = 6;
+
+export const INSPECT_TEXTS = {
+  fungal_cluster: 'Uma colonia de fungos pulsa em silencio.',
+  debris: 'Escombros oxidados de mineracao antiga.',
+  crate: 'Caixa de suprimentos vazia, coberta de poeira.',
+  beacon: 'Sinalizador gasto. Ainda emite um brilho fraco.',
+  track: 'Trilhos tortos, lembranca da mineracao.',
+  terminal_broken: 'Terminal quebrado. Elimine inimigos proximos para consertar.',
+  terminal_ready: 'Terminal quebrado. Pronto para conserto.',
+  terminal_active: 'Terminal ativo.',
+} as const;

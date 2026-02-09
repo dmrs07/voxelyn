@@ -151,6 +151,7 @@ export type TerminalInteractable = {
   x: number;
   y: number;
   active: boolean;
+  broken: boolean;
   linkedGateId: string;
 };
 
@@ -253,6 +254,8 @@ export type GameState = {
   floorNumber: number;
   simTick: number;
   simTimeMs: number;
+  inspectOverlay: InspectOverlay | null;
+  interactionModal: InteractionModal | null;
   pendingPowerUpChoices: PowerUpChoice[];
   activePowerUpChoice: PowerUpChoice | null;
   damageEvents: DamageEvent[];
@@ -283,8 +286,21 @@ export type GameState = {
   };
 };
 
+export type InspectOverlay = {
+  text: string;
+  untilMs: number;
+};
+
+export type InteractionModal = {
+  kind: 'terminal_repair';
+  sourceId: string;
+  text: string;
+};
+
 export type ControlSnapshot = {
   dx: number;
   dy: number;
   pickChoice: 1 | 2 | null;
+  interact: boolean;
+  cancel: boolean;
 };

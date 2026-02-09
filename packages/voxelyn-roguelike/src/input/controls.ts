@@ -6,6 +6,8 @@ export class Controls {
   private readonly keys: Record<string, boolean> = {};
   private readonly choiceQueue: Array<1 | 2> = [];
   private lastMoveKey: string | null = null;
+  private interactQueued = false;
+  private cancelQueued = false;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const key = event.key.toLowerCase();
@@ -25,6 +27,18 @@ export class Controls {
 
     if (key === '2') {
       this.choiceQueue.push(2);
+      event.preventDefault();
+      return;
+    }
+
+    if (key === 'e') {
+      this.interactQueued = true;
+      event.preventDefault();
+      return;
+    }
+
+    if (key === 'escape') {
+      this.cancelQueued = true;
       event.preventDefault();
     }
   };
@@ -52,6 +66,10 @@ export class Controls {
 
   snapshot(): ControlSnapshot {
     const pickChoice = this.choiceQueue.shift() ?? null;
+    const interact = this.interactQueued;
+    const cancel = this.cancelQueued;
+    this.interactQueued = false;
+    this.cancelQueued = false;
 
     let dx = 0;
     let dy = 0;
@@ -75,6 +93,6 @@ export class Controls {
       }
     }
 
-    return { dx, dy, pickChoice };
+    return { dx, dy, pickChoice, interact, cancel };
   }
 }
