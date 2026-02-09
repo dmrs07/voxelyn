@@ -152,7 +152,7 @@ export const renderDocumentToSurface = (
               if (mat === 0) continue;
 
               const material = doc.palette[mat];
-              if (!material) break;
+              if (!material) continue;
 
               // Apply depth shading (higher = brighter)
               const depthFactor = 0.6 + (z / Math.max(1, vd - 1)) * 0.4;
