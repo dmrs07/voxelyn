@@ -245,6 +245,56 @@ const resolveCliEntryPath = async () => {
   );
 };
 
+const canSpawnCommand = async (command) => {
+  if (typeof command !== 'string' || command.trim().length === 0) {
+    return false;
+  }
+  return await new Promise((resolve) => {
+    const probe = spawn(command, ['--version'], {
+      stdio: 'ignore',
+      shell: false,
+    });
+    probe.once('error', () => {
+      resolve(false);
+    });
+    probe.once('close', () => {
+      resolve(true);
+    });
+  });
+};
+
+const resolveCliInvocation = async (args) => {
+  try {
+    const cliEntryPath = await resolveCliEntryPath();
+    return {
+      command: process.execPath,
+      argv: [cliEntryPath, ...args],
+      mode: 'embedded',
+      details: cliEntryPath,
+    };
+  } catch (embeddedError) {
+    const envBin = process.env.VOXELYN_CLI_BIN?.trim();
+    const fallbackCommands = envBin ? [envBin] : ['voxelyn'];
+    for (const fallback of fallbackCommands) {
+      // Fallback only when bundled entry is unavailable.
+      if (await canSpawnCommand(fallback)) {
+        return {
+          command: fallback,
+          argv: [...args],
+          mode: 'fallback',
+          details: fallback,
+        };
+      }
+    }
+
+    const message =
+      embeddedError instanceof Error ? embeddedError.message : String(embeddedError);
+    throw new Error(
+      `${message}\nFallback CLI command not found. Reinstall the app build that bundles the CLI, or set VOXELYN_CLI_ENTRY/VOXELYN_CLI_BIN.`
+    );
+  }
+};
+
 const resolveCliCwd = async (requestedCwd, primary) => {
   let cwd = requestedCwd;
   if (typeof cwd !== 'string' || cwd.trim().length === 0) {
@@ -268,11 +318,11 @@ const resolveCliCwd = async (requestedCwd, primary) => {
 
 const runCli = async ({ cwd, args }) => {
   const primary = validateCliArgs(args);
-  const cliEntryPath = await resolveCliEntryPath();
+  const invocation = await resolveCliInvocation(args);
   const resolvedCwd = await resolveCliCwd(cwd, primary);
   const runId = createRunId();
 
-  const child = spawn(process.execPath, [cliEntryPath, ...args], {
+  const child = spawn(invocation.command, invocation.argv, {
     cwd: resolvedCwd,
     env: {
       ...process.env,
@@ -282,6 +332,13 @@ const runCli = async ({ cwd, args }) => {
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
   });
+
+  if (invocation.mode === 'fallback') {
+    sendToRenderer('cli:stderr', {
+      runId,
+      chunk: `[voxelforge] Bundled CLI not found. Using fallback command "${invocation.details}".\n`,
+    });
+  }
 
   cliRuns.set(runId, {
     child,

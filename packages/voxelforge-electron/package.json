@@ -51,8 +51,8 @@
     },
     "extraResources": [
       {
-        "from": "../voxelyn-cli/dist",
-        "to": "voxelyn-cli/dist",
+        "from": "cli/voxelyn-cli",
+        "to": "voxelyn-cli",
         "filter": ["**/*"]
       }
     ],
