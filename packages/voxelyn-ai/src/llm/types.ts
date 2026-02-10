@@ -31,7 +31,14 @@ export type LLMProvider =
  * Model identifiers for each provider
  */
 export type ModelId = {
-  gemini: 'gemini-2.5-flash-lite' | 'gemini-2.0-flash' | 'gemini-1.5-pro' | 'gemini-1.5-flash';
+  gemini:
+    | 'gemini-2.0-flash-lite'
+    | 'gemini-2.5-flash-lite'
+    | 'gemini-2.0-flash'
+    | 'gemini-2.5-flash'
+    | 'gemini-1.5-pro'
+    | 'gemini-1.5-flash'
+    | 'gemini-pro';
   openai: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4-turbo' | 'gpt-3.5-turbo' | 'o1' | 'o1-mini';
   anthropic: 'claude-sonnet-4-20250514' | 'claude-3-5-sonnet-20241022' | 'claude-3-5-haiku-20241022' | 'claude-3-opus-20240229';
   copilot: 'gpt-4o' | 'claude-sonnet-4' | 'claude-3.5-sonnet' | 'o1' | 'o3-mini';

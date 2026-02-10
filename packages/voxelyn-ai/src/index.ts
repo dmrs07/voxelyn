@@ -100,12 +100,34 @@ export {
 
 export {
   buildScenarioFromLayout,
+  enrichScenarioLayoutWithIntent,
   getScenarioPreview,
   getScenarioStats,
   type ScenarioBuildResult,
   type PlacedObject,
   type ScenarioBuildOptions,
 } from './generators/scenario-gen';
+
+// ============================================================================
+// SCENARIO INTENT V2
+// ============================================================================
+
+export {
+  parseScenarioIntent,
+  resolveScenarioIntent,
+  clearScenarioIntentCache,
+  compileIntentToDirectives,
+  enrichScenarioLayoutWithIntent as enrichScenarioLayoutWithResolvedIntent,
+  type IntentMode,
+  type MacroForm,
+  type WaterSystem,
+  type ReliefEnergy,
+  type ScenarioIntentBiomeTarget,
+  type ScenarioIntentV2,
+  type ScenarioIntentDirective,
+  type ScenarioIntentResolverOptions,
+  type IntentEnrichmentContext,
+} from './intent';
 
 // ============================================================================
 // ENHANCED TERRAIN (integrates with @voxelyn/core)
@@ -120,6 +142,7 @@ export {
   type EnhancedHeightmapParams,
   type TerrainLayer,
   type TerrainLightingParams,
+  type TerrainIntentOptions,
   type EnhancedTerrainResult,
 } from './generators/scenario-terrain';
 

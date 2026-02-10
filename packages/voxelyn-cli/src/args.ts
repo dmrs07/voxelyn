@@ -18,6 +18,19 @@ const setCommand = (current: CommandName | undefined, next: CommandName): Comman
   return next;
 };
 
+const parseNumber = (raw: string | undefined): number | undefined => {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const parseInteger = (raw: string | undefined): number | undefined => {
+  const n = parseNumber(raw);
+  if (n === undefined) return undefined;
+  const int = Math.trunc(n);
+  return Number.isFinite(int) ? int : undefined;
+};
+
 export const parseArgs = (argv: string[]): ParsedArgs => {
   const options: CliOptions = {};
   let command: CommandName | undefined;
@@ -131,6 +144,104 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
         options.prompt = arg.slice('--prompt='.length);
         continue;
       }
+      if (arg === '--provider' && argv[i + 1]) {
+        options.provider = argv[++i] as CliOptions['provider'];
+        continue;
+      }
+      if (arg.startsWith('--provider=')) {
+        options.provider = arg.slice('--provider='.length) as CliOptions['provider'];
+        continue;
+      }
+      if (arg === '--model' && argv[i + 1]) {
+        options.model = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--model=')) {
+        options.model = arg.slice('--model='.length);
+        continue;
+      }
+      if (arg === '--seed' && argv[i + 1]) {
+        options.seed = parseInteger(argv[++i]);
+        continue;
+      }
+      if (arg.startsWith('--seed=')) {
+        options.seed = parseInteger(arg.slice('--seed='.length));
+        continue;
+      }
+      if (arg === '--size' && argv[i + 1]) {
+        options.size = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--size=')) {
+        options.size = arg.slice('--size='.length);
+        continue;
+      }
+      if (arg === '--depth' && argv[i + 1]) {
+        options.depth = parseInteger(argv[++i]);
+        continue;
+      }
+      if (arg.startsWith('--depth=')) {
+        options.depth = parseInteger(arg.slice('--depth='.length));
+        continue;
+      }
+      if (arg === '--scale' && argv[i + 1]) {
+        options.scale = parseNumber(argv[++i]);
+        continue;
+      }
+      if (arg.startsWith('--scale=')) {
+        options.scale = parseNumber(arg.slice('--scale='.length));
+        continue;
+      }
+      if (arg === '--texture-size' && argv[i + 1]) {
+        options.textureSize = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--texture-size=')) {
+        options.textureSize = arg.slice('--texture-size='.length);
+        continue;
+      }
+      if (arg === '--out-format' && argv[i + 1]) {
+        options.outFormat = argv[++i] as CliOptions['outFormat'];
+        continue;
+      }
+      if (arg.startsWith('--out-format=')) {
+        options.outFormat = arg.slice('--out-format='.length) as CliOptions['outFormat'];
+        continue;
+      }
+      if (arg === '--enhanced-terrain') {
+        options.enhancedTerrain = true;
+        continue;
+      }
+      if (arg === '--no-enhanced-terrain') {
+        options.enhancedTerrain = false;
+        continue;
+      }
+      if (arg === '--workers' && argv[i + 1]) {
+        const next = argv[++i]!;
+        options.workers = next === 'auto' ? 'auto' : parseInteger(next);
+        continue;
+      }
+      if (arg.startsWith('--workers=')) {
+        const raw = arg.slice('--workers='.length);
+        options.workers = raw === 'auto' ? 'auto' : parseInteger(raw);
+        continue;
+      }
+      if (arg === '--debug-ai') {
+        options.debugAi = true;
+        continue;
+      }
+      if (arg === '--intent-mode' && argv[i + 1]) {
+        options.intentMode = argv[++i] as CliOptions['intentMode'];
+        continue;
+      }
+      if (arg.startsWith('--intent-mode=')) {
+        options.intentMode = arg.slice('--intent-mode='.length) as CliOptions['intentMode'];
+        continue;
+      }
+      if (arg === '--intent-strict') {
+        options.intentStrict = true;
+        continue;
+      }
       continue;
     }
 
@@ -188,10 +299,24 @@ Deploy options:
 
 Generate options:
   --prompt <text>     Prompt for generation
+  --provider <name>   auto | gemini | openai | anthropic | groq | ollama | copilot
+  --model <id>        Model id override
+  --seed <int>        Seed override for deterministic generation
+  --size <N|WxH>      Output resolution for texture/scenario
+  --texture-size <N|WxH>  Texture resolution (overrides --size for texture)
+  --depth <int>       Scenario vertical depth (z layers)
+  --scale <float>     World/voxel scale multiplier
+  --out-format <fmt>  bundle | layout | terrain-spec
+  --enhanced-terrain / --no-enhanced-terrain  Toggle enhanced terrain pipeline
+  --workers <auto|N>  Scenario worker parallelism
+  --intent-mode <m>   fast | balanced | deep
+  --intent-strict     Enforce strict intent constraints
+  --debug-ai          Verbose AI debug logging
 
 Examples:
   voxelyn create my-game vanilla
   voxelyn deploy --build --channel=alpha
   voxelyn generate texture --prompt "stone"
+  voxelyn generate scenario --prompt "vast volcanic island" --size 256x256 --depth 64 --workers auto
   voxelyn plugin list
 `;

@@ -22,6 +22,11 @@ import type {
   RoomDefinition,
   BuildingStyle,
 } from '../types';
+import type { ScenarioIntentDirective, ScenarioIntentV2 } from '../intent';
+import {
+  compileIntentToDirectives,
+  enrichScenarioLayoutWithIntent as enrichScenarioLayoutWithIntentBase,
+} from '../intent';
 
 import {
   buildEnhancedTerrain,
@@ -90,6 +95,16 @@ export type ScenarioBuildOptions = {
   terrainLayers?: TerrainLayer[];
   /** Lighting/shadow configuration */
   lighting?: TerrainLightingParams;
+  /** Resolution multiplier derived from intent / user options. */
+  resolutionScale?: number;
+  /** Scenario chunk size used by heavy terrain loops. */
+  chunkSize?: number;
+  /** Optional workers config (currently falls back to single-thread). */
+  workers?: number | 'auto';
+  /** Resolved scenario intent to guide generation. */
+  intent?: ScenarioIntentV2;
+  /** Compiled directives from ScenarioIntentV2. */
+  intentDirective?: ScenarioIntentDirective;
 };
 
 // ============================================================================
@@ -327,6 +342,48 @@ const OASIS_FEATURES: BiomeFeature[] = [
 // HEIGHTMAP GENERATION
 // ============================================================================
 
+const buildBiomeIndexGrid = (
+  width: number,
+  height: number,
+  biomes: BiomeRegion[]
+): Int16Array => {
+  const grid = new Int16Array(width * height);
+  grid.fill(-1);
+
+  for (let biomeIndex = 0; biomeIndex < biomes.length; biomeIndex += 1) {
+    const biome = biomes[biomeIndex];
+    if (!biome) continue;
+    const [bx, by, bw, bh] = biome.bounds;
+    const minX = Math.max(0, bx);
+    const minY = Math.max(0, by);
+    const maxX = Math.min(width, bx + bw);
+    const maxY = Math.min(height, by + bh);
+
+    for (let y = minY; y < maxY; y += 1) {
+      const row = y * width;
+      for (let x = minX; x < maxX; x += 1) {
+        grid[row + x] = biomeIndex;
+      }
+    }
+  }
+
+  return grid;
+};
+
+const getBiomeAt = (
+  x: number,
+  y: number,
+  width: number,
+  biomes: BiomeRegion[],
+  biomeIndexGrid: Int16Array
+): BiomeRegion | undefined => {
+  const biomeIndex = biomeIndexGrid[y * width + x];
+  if (biomeIndex === undefined || biomeIndex < 0) {
+    return undefined;
+  }
+  return biomes[biomeIndex];
+};
+
 /**
  * Generate heightmap from parameters.
  */
@@ -334,21 +391,11 @@ function generateHeightmap(
   width: number,
   height: number,
   params: HeightmapParams,
-  biomes: BiomeRegion[]
+  biomes: BiomeRegion[],
+  biomeIndexGrid: Int16Array
 ): Float32Array {
   const noise = new Noise(params.seed);
   const heightmap = new Float32Array(width * height);
-
-  // Create biome lookup grid
-  const biomeAt = (x: number, y: number): BiomeRegion | undefined => {
-    for (const biome of biomes) {
-      const [bx, by, bw, bh] = biome.bounds;
-      if (x >= bx && x < bx + bw && y >= by && y < by + bh) {
-        return biome;
-      }
-    }
-    return undefined;
-  };
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -361,7 +408,7 @@ function generateHeightmap(
       );
 
       // Get biome influence
-      const biome = biomeAt(x, y);
+      const biome = getBiomeAt(x, y, width, biomes, biomeIndexGrid);
       let elevation = params.baseElevation;
       let variation = params.amplitude;
 
@@ -416,27 +463,22 @@ function buildTerrain(
   depth: number,
   heightmap: Float32Array,
   biomes: BiomeRegion[],
+  biomeIndexGrid: Int16Array,
   options: ScenarioBuildOptions,
-  seed: number = 12345
+  seed: number = 12345,
+  terrainHeights?: Uint16Array
 ): { terrain: Uint16Array; materials: Set<number> } {
   const terrain = new Uint16Array(width * height * depth);
   const materials = new Set<number>();
   const detailNoise = new Noise(seed + 1);
   const vegetationNoise = new Noise(seed + 2);
+  const chunkSize = Math.max(16, options.chunkSize ?? 64);
+  const resolvedHeights =
+    terrainHeights ??
+    Uint16Array.from(heightmap, (h) => Math.min(depth - 1, Math.max(0, Math.floor(h * depth))));
 
   const biomeMats = { ...DEFAULT_BIOME_MATERIALS, ...options.biomeMaterials };
   const matMap = { ...DEFAULT_MATERIAL_MAPPING, ...options.materialMapping };
-
-  // Biome lookup with distance blending
-  const biomeAt = (x: number, y: number): BiomeRegion | undefined => {
-    for (const biome of biomes) {
-      const [bx, by, bw, bh] = biome.bounds;
-      if (x >= bx && x < bx + bw && y >= by && y < by + bh) {
-        return biome;
-      }
-    }
-    return undefined;
-  };
 
   // Resolve material name to ID
   const resolveMat = (name: string): number => {
@@ -470,96 +512,99 @@ function buildTerrain(
     return surfaceMat;
   };
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const h = heightmap[y * width + x] ?? 0;
-      const terrainHeight = Math.floor(h * depth);
+  for (let chunkY = 0; chunkY < height; chunkY += chunkSize) {
+    const maxY = Math.min(height, chunkY + chunkSize);
+    for (let chunkX = 0; chunkX < width; chunkX += chunkSize) {
+      const maxX = Math.min(width, chunkX + chunkSize);
+      for (let y = chunkY; y < maxY; y++) {
+        const row = y * width;
+        for (let x = chunkX; x < maxX; x++) {
+          const idx2d = row + x;
+          const terrainHeight = resolvedHeights[idx2d] ?? 0;
+          const biome = getBiomeAt(x, y, width, biomes, biomeIndexGrid);
 
-      const biome = biomeAt(x, y);
-      let surfaceMat = 7; // grass default
-      let undergroundMat = 2; // dirt default
+          let surfaceMat = 7; // grass default
+          let undergroundMat = 2; // dirt default
 
-      if (biome) {
-        if (biome.surfaceMaterial && biome.undergroundMaterial) {
-          surfaceMat = resolveMat(biome.surfaceMaterial);
-          undergroundMat = resolveMat(biome.undergroundMaterial);
-        } else if (biome.type) {
-          const biomeType = biome.type as keyof typeof biomeMats;
-          const defaultMats = biomeMats[biomeType];
-          if (defaultMats) {
-            surfaceMat = defaultMats.surface;
-            undergroundMat = defaultMats.underground;
-          }
-        }
-      }
-
-      // Fill terrain with layers
-      for (let z = 0; z < depth; z++) {
-        const idx = x + y * width + z * width * height;
-
-        if (z <= terrainHeight) {
-          terrain[idx] = getLayerMaterial(z, terrainHeight, surfaceMat, undergroundMat, x, y);
-          materials.add(terrain[idx]!);
-        } else {
-          terrain[idx] = 0; // air
-        }
-      }
-
-      // Handle water for water biomes
-      if (biome && ['ocean', 'lake', 'river'].includes(biome.type)) {
-        const waterLevel = Math.floor(biome.elevation * depth);
-        for (let z = terrainHeight + 1; z <= waterLevel; z++) {
-          if (z < depth) {
-            const idx = x + y * width + z * width * height;
-            terrain[idx] = 4; // water
-            materials.add(4);
-          }
-        }
-        // Add sand/gravel at water bottom
-        if (terrainHeight > 0 && terrainHeight < waterLevel) {
-          const bottomIdx = x + y * width + terrainHeight * width * height;
-          terrain[bottomIdx] = 3; // sand
-          materials.add(3);
-        }
-      }
-
-      // Add vegetation detail on grass surfaces
-      if (biome && ['forest', 'plains'].includes(biome.type) && surfaceMat === 7) {
-        const veg = vegetationNoise.noise(x * 0.3, y * 0.3);
-        const surfaceZ = terrainHeight + 1;
-        
-        if (surfaceZ < depth) {
-          const idx = x + y * width + surfaceZ * width * height;
-          
-          // Forest gets dense vegetation
-          if (biome.type === 'forest') {
-            if (veg > 0.4) {
-              // Short grass/shrubs - use darker green (7 is grass)
-              terrain[idx] = 7;
-              materials.add(7);
-            }
-            // Tall trees - handled by placeVegetation
-          } else if (biome.type === 'plains') {
-            // Sparse grass tufts
-            if (veg > 0.7) {
-              terrain[idx] = 7;
-              materials.add(7);
+          if (biome) {
+            if (biome.surfaceMaterial && biome.undergroundMaterial) {
+              surfaceMat = resolveMat(biome.surfaceMaterial);
+              undergroundMat = resolveMat(biome.undergroundMaterial);
+            } else if (biome.type) {
+              const biomeType = biome.type as keyof typeof biomeMats;
+              const defaultMats = biomeMats[biomeType];
+              if (defaultMats) {
+                surfaceMat = defaultMats.surface;
+                undergroundMat = defaultMats.underground;
+              }
             }
           }
-        }
-      }
 
-      // Add rocky outcrops on mountains
-      if (biome && biome.type === 'mountains') {
-        const rockNoise = detailNoise.fbm(x * 0.15, y * 0.15, 3, 0.5);
-        if (rockNoise > 0.65) {
-          const extraHeight = Math.floor((rockNoise - 0.65) * 10);
-          for (let ez = 1; ez <= extraHeight; ez++) {
-            const z = terrainHeight + ez;
-            if (z < depth) {
-              const idx = x + y * width + z * width * height;
-              terrain[idx] = 1; // stone
-              materials.add(1);
+          // Fill terrain with layers (skip air writes; array is zero-initialized)
+          for (let z = 0; z <= terrainHeight; z++) {
+            const idx = idx2d + z * width * height;
+            const mat = getLayerMaterial(z, terrainHeight, surfaceMat, undergroundMat, x, y);
+            terrain[idx] = mat;
+            materials.add(mat);
+          }
+
+          // Handle water for water biomes
+          if (biome && ['ocean', 'lake', 'river'].includes(biome.type)) {
+            const waterLevel = Math.floor(biome.elevation * depth);
+            for (let z = terrainHeight + 1; z <= waterLevel; z++) {
+              if (z < depth) {
+                const idx = idx2d + z * width * height;
+                terrain[idx] = 4; // water
+                materials.add(4);
+              }
+            }
+            // Add sand/gravel at water bottom
+            if (terrainHeight > 0 && terrainHeight < waterLevel) {
+              const bottomIdx = idx2d + terrainHeight * width * height;
+              terrain[bottomIdx] = 3; // sand
+              materials.add(3);
+            }
+          }
+
+          // Add vegetation detail on grass surfaces
+          if (biome && ['forest', 'plains'].includes(biome.type) && surfaceMat === 7) {
+            const veg = vegetationNoise.noise(x * 0.3, y * 0.3);
+            const surfaceZ = terrainHeight + 1;
+
+            if (surfaceZ < depth) {
+              const idx = idx2d + surfaceZ * width * height;
+
+              // Forest gets dense vegetation
+              if (biome.type === 'forest') {
+                if (veg > 0.4) {
+                  // Short grass/shrubs - use darker green (7 is grass)
+                  terrain[idx] = 7;
+                  materials.add(7);
+                }
+                // Tall trees - handled by placeVegetation
+              } else if (biome.type === 'plains') {
+                // Sparse grass tufts
+                if (veg > 0.7) {
+                  terrain[idx] = 7;
+                  materials.add(7);
+                }
+              }
+            }
+          }
+
+          // Add rocky outcrops on mountains
+          if (biome && biome.type === 'mountains') {
+            const rockNoise = detailNoise.fbm(x * 0.15, y * 0.15, 3, 0.5);
+            if (rockNoise > 0.65) {
+              const extraHeight = Math.floor((rockNoise - 0.65) * 10);
+              for (let ez = 1; ez <= extraHeight; ez++) {
+                const z = terrainHeight + ez;
+                if (z < depth) {
+                  const idx = idx2d + z * width * height;
+                  terrain[idx] = 1; // stone
+                  materials.add(1);
+                }
+              }
             }
           }
         }
@@ -580,21 +625,16 @@ function addVegetation(
   depth: number,
   heightmap: Float32Array,
   biomes: BiomeRegion[],
-  seed: number
+  biomeIndexGrid: Int16Array,
+  seed: number,
+  terrainHeights?: Uint16Array
 ): Set<number> {
   const materials = new Set<number>();
   const rng = new SeededRandom(seed + 100);
   const noise = new Noise(seed + 101);
-
-  const biomeAt = (x: number, y: number): BiomeRegion | undefined => {
-    for (const biome of biomes) {
-      const [bx, by, bw, bh] = biome.bounds;
-      if (x >= bx && x < bx + bw && y >= by && y < by + bh) {
-        return biome;
-      }
-    }
-    return undefined;
-  };
+  const resolvedHeights =
+    terrainHeights ??
+    Uint16Array.from(heightmap, (h) => Math.min(depth - 1, Math.max(0, Math.floor(h * depth))));
 
   // Check if position is near water (for oasis detection)
   const isNearWater = (x: number, y: number, radius: number): boolean => {
@@ -603,8 +643,7 @@ function addVegetation(
         const nx = x + dx;
         const ny = y + dy;
         if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-          const h = heightmap[ny * width + nx] ?? 0;
-          const gz = Math.floor(h * depth);
+          const gz = resolvedHeights[ny * width + nx] ?? 0;
           const idx = nx + ny * width + gz * width * height;
           if (terrain[idx] === 4) return true; // water
         }
@@ -627,8 +666,7 @@ function addVegetation(
 
   // Get ground height at position
   const getGroundZ = (x: number, y: number): number => {
-    const h = heightmap[y * width + x] ?? 0;
-    return Math.floor(h * depth);
+    return resolvedHeights[y * width + x] ?? 0;
   };
 
   // Feature placement functions
@@ -857,7 +895,7 @@ function addVegetation(
   // Main placement loop
   for (let y = 2; y < height - 2; y++) {
     for (let x = 2; x < width - 2; x++) {
-      const biome = biomeAt(x, y);
+      const biome = getBiomeAt(x, y, width, biomes, biomeIndexGrid);
       if (!biome) continue;
 
       // Get features for this biome
@@ -893,13 +931,23 @@ function placeObjects(
   placements: ObjectPlacement[],
   biomes: BiomeRegion[],
   heightmap: Float32Array,
+  biomeIndexGrid: Int16Array,
   width: number,
   height: number,
   depth: number,
-  seed: number
+  seed: number,
+  terrainHeights?: Uint16Array
 ): PlacedObject[] {
   const objects: PlacedObject[] = [];
   const rng = new SeededRandom(seed);
+  const resolvedHeights = terrainHeights ?? new Uint16Array(width * height);
+
+  if (!terrainHeights) {
+    for (let i = 0; i < resolvedHeights.length; i += 1) {
+      const h = heightmap[i] ?? 0;
+      resolvedHeights[i] = Math.min(depth - 1, Math.max(0, Math.floor(h * depth)));
+    }
+  }
 
   // Track placed positions for spacing
   const placed: Array<{ x: number; y: number; type: string }> = [];
@@ -917,16 +965,6 @@ function placeObjects(
     return false;
   };
 
-  const getBiomeAt = (x: number, y: number): BiomeType | null => {
-    for (const biome of biomes) {
-      const [bx, by, bw, bh] = biome.bounds;
-      if (x >= bx && x < bx + bw && y >= by && y < by + bh) {
-        return biome.type;
-      }
-    }
-    return null;
-  };
-
   for (const placement of placements) {
     const targetCount = Math.floor((placement.density / 100) * width * height);
     let attempts = 0;
@@ -939,7 +977,7 @@ function placeObjects(
       const y = rng.nextInt(height);
 
       // Check biome
-      const biome = getBiomeAt(x, y);
+      const biome = getBiomeAt(x, y, width, biomes, biomeIndexGrid)?.type ?? null;
       if (!biome || !placement.biomes.includes(biome)) {
         continue;
       }
@@ -950,8 +988,8 @@ function placeObjects(
       }
 
       // Get terrain height at position
-      const h = heightmap[y * width + x] ?? 0;
-      const z = Math.floor(h * depth) + 1;
+      const h = resolvedHeights[y * width + x] ?? 0;
+      const z = Math.min(depth - 1, h + 1);
 
       // Calculate scale
       const [minScale, maxScale] = placement.scaleRange;
@@ -1684,7 +1722,7 @@ function buildInterior(
  * Enriches a layout by detecting keywords and adding missing biomes.
  * This compensates for AI models that generate overly simple layouts.
  */
-function enrichLayout(layout: ScenarioLayout): ScenarioLayout {
+function enrichLayoutLegacy(layout: ScenarioLayout): ScenarioLayout {
   const desc = (layout.name + ' ' + layout.description).toLowerCase();
   const [width, height] = layout.size;
   const biomes = [...layout.biomes];
@@ -1854,6 +1892,20 @@ function enrichLayout(layout: ScenarioLayout): ScenarioLayout {
   };
 }
 
+export function enrichScenarioLayoutWithIntent(
+  layout: ScenarioLayout,
+  intent: ScenarioIntentV2,
+  directive?: ScenarioIntentDirective
+): ScenarioLayout {
+  const compiled = directive ?? compileIntentToDirectives(intent);
+  const enrichedByIntent = enrichScenarioLayoutWithIntentBase(layout, {
+    directive: compiled,
+    resolutionScale: compiled.terrain.resolutionScale,
+  });
+
+  return enrichLayoutLegacy(enrichedByIntent);
+}
+
 // ============================================================================
 // MAIN BUILDER
 // ============================================================================
@@ -1879,16 +1931,32 @@ export function buildScenarioFromLayout(
   layout: ScenarioLayout,
   options: ScenarioBuildOptions = {}
 ): ScenarioBuildResult {
-  // Enrich layout with missing elements based on description
-  const enrichedLayout = enrichLayout(layout);
-  
+  const directive = options.intentDirective ?? (options.intent ? compileIntentToDirectives(options.intent) : undefined);
+
+  // Enrich layout with intent directives first, then legacy keyword enrichment.
+  let enrichedLayout = options.intent
+    ? enrichScenarioLayoutWithIntent(layout, options.intent, directive)
+    : enrichLayoutLegacy(layout);
+
+  if (options.resolutionScale && Number.isFinite(options.resolutionScale) && options.resolutionScale > 0) {
+    const [w, h] = enrichedLayout.size;
+    enrichedLayout = {
+      ...enrichedLayout,
+      size: [
+        Math.max(32, Math.min(1024, Math.round(w * options.resolutionScale))),
+        Math.max(32, Math.min(1024, Math.round(h * options.resolutionScale))),
+      ],
+    };
+  }
+
   const [width, height] = enrichedLayout.size;
   const depth = enrichedLayout.depth;
   const seed = enrichedLayout.seed;
   const category = enrichedLayout.category ?? 'outdoor';
+  const biomeIndexGrid = buildBiomeIndexGrid(width, height, enrichedLayout.biomes);
 
   // Use enhanced terrain if requested
-  const useEnhanced = options.useEnhancedTerrain ?? false;
+  const useEnhanced = options.useEnhancedTerrain ?? true;
 
   // Enhanced terrain result (if using enhanced mode)
   let enhancedResult: EnhancedTerrainResult | null = null;
@@ -1934,13 +2002,23 @@ export function buildScenarioFromLayout(
         maxDistance: 20,
         ambientOcclusion: true,
         aoRadius: 3,
+      },
+      {
+        resolutionScale: options.resolutionScale ?? directive?.terrain.resolutionScale ?? 1,
+        macroForm: directive?.topology.macroForm,
+        waterSystem: directive?.topology.waterSystem,
+        reliefEnergy: directive?.topology.reliefEnergy,
       }
     );
     
     heightmap = enhancedResult.heightmap;
   } else {
-    heightmap = generateHeightmap(width, height, enrichedLayout.heightmap, enrichedLayout.biomes);
+    heightmap = generateHeightmap(width, height, enrichedLayout.heightmap, enrichedLayout.biomes, biomeIndexGrid);
   }
+
+  const terrainHeights = Uint16Array.from(heightmap, (h) =>
+    Math.min(depth - 1, Math.max(0, Math.floor(h * depth)))
+  );
 
   // Initialize terrain and materials based on category
   let terrain: Uint16Array;
@@ -1998,8 +2076,10 @@ export function buildScenarioFromLayout(
           depth,
           heightmap,
           enrichedLayout.biomes,
+          biomeIndexGrid,
           options,
-          seed
+          seed,
+          terrainHeights
         );
         terrain = terrainResult.terrain;
         materials = terrainResult.materials;
@@ -2013,7 +2093,9 @@ export function buildScenarioFromLayout(
         depth,
         heightmap,
         enrichedLayout.biomes,
-        seed
+        biomeIndexGrid,
+        seed,
+        terrainHeights
       );
       vegMaterials.forEach(m => materials.add(m));
 
@@ -2027,10 +2109,12 @@ export function buildScenarioFromLayout(
         enrichedLayout.objects,
         enrichedLayout.biomes,
         heightmap,
+        biomeIndexGrid,
         width,
         height,
         depth,
-        seed
+        seed,
+        terrainHeights
       );
       break;
     }
@@ -2051,8 +2135,10 @@ export function buildScenarioFromLayout(
           depth,
           heightmap,
           enrichedLayout.biomes,
+          biomeIndexGrid,
           options,
-          seed
+          seed,
+          terrainHeights
         );
         terrain = terrainResult.terrain;
         materials = terrainResult.materials;
@@ -2066,7 +2152,9 @@ export function buildScenarioFromLayout(
         depth,
         heightmap,
         enrichedLayout.biomes,
-        seed
+        biomeIndexGrid,
+        seed,
+        terrainHeights
       );
       vegMaterials.forEach(m => materials.add(m));
 
@@ -2075,10 +2163,12 @@ export function buildScenarioFromLayout(
         enrichedLayout.objects,
         enrichedLayout.biomes,
         heightmap,
+        biomeIndexGrid,
         width,
         height,
         depth,
-        seed
+        seed,
+        terrainHeights
       );
       break;
     }

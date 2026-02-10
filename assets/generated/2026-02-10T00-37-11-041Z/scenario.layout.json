@@ -1,0 +1,36 @@
+{
+  "name": "Procedural Scenario",
+  "description": "spiralling O ring",
+  "category": "outdoor",
+  "size": [
+    128,
+    128
+  ],
+  "depth": 32,
+  "biomes": [
+    {
+      "type": "plains",
+      "bounds": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "elevation": 0.35,
+      "elevationVariation": 0.12,
+      "moisture": 0.5,
+      "surfaceMaterial": "grass",
+      "undergroundMaterial": "dirt"
+    }
+  ],
+  "heightmap": {
+    "octaves": 4,
+    "persistence": 0.45,
+    "scale": 4,
+    "seed": 1549562054,
+    "baseElevation": 0.33,
+    "amplitude": 0.35
+  },
+  "objects": [],
+  "seed": 1549562054
+}

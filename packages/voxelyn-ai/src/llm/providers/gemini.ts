@@ -34,7 +34,7 @@ export class GeminiClient extends BaseLLMClient {
   constructor(config: GeminiConfig) {
     super(config);
 
-    this.model = config.model ?? 'gemini-2.0-flash';
+    this.model = config.model ?? 'gemini-2.5-flash-lite';
     this.genAI = new GoogleGenerativeAI(config.apiKey);
     this.generativeModel = this.genAI.getGenerativeModel({
       model: this.model,
@@ -46,27 +46,39 @@ export class GeminiClient extends BaseLLMClient {
     userPrompt: string,
     options?: { temperature?: number; maxTokens?: number }
   ): Promise<string> {
-    const result = await this.generativeModel.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+    try {
+      const result = await this.generativeModel.generateContent({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }],
+          },
+        ],
+        generationConfig: {
+          temperature: options?.temperature ?? 0.7,
+          maxOutputTokens: options?.maxTokens ?? 4096,
+          responseMimeType: 'application/json',
         },
-      ],
-      generationConfig: {
-        temperature: options?.temperature ?? 0.7,
-        maxOutputTokens: options?.maxTokens ?? 4096,
-      },
-    });
+      });
 
-    const response = result.response;
-    const text = response.text();
+      const response = result.response;
+      const text = response.text();
 
-    if (!text) {
-      throw new Error('Empty response from Gemini');
+      if (!text) {
+        throw new Error('GEMINI_EMPTY_RESPONSE');
+      }
+
+      return text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes('429') || message.toLowerCase().includes('quota')) {
+        throw new Error(`GEMINI_RATE_LIMIT: ${message}`);
+      }
+      if (message.toLowerCase().includes('timeout') || message.toLowerCase().includes('abort')) {
+        throw new Error(`GEMINI_TIMEOUT: ${message}`);
+      }
+      throw new Error(`GEMINI_ERROR: ${message}`);
     }
-
-    return text;
   }
 }
 

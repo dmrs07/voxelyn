@@ -20,6 +20,7 @@ import {
 } from '@voxelyn/core';
 
 import type { BiomeRegion, BiomeType, HeightmapParams } from '../types';
+import type { MacroForm, ReliefEnergy, WaterSystem } from '../intent';
 
 // ============================================================================
 // TYPES
@@ -76,6 +77,13 @@ export type TerrainLightingParams = {
   ambientOcclusion?: boolean;
   /** AO radius */
   aoRadius?: number;
+};
+
+export type TerrainIntentOptions = {
+  resolutionScale?: number;
+  macroForm?: MacroForm;
+  waterSystem?: WaterSystem;
+  reliefEnergy?: ReliefEnergy;
 };
 
 /**
@@ -166,11 +174,13 @@ export const DEFAULT_TERRAIN_LAYERS: TerrainLayer[] = [
 export function generateEnhancedHeightmap(
   width: number,
   height: number,
-  params: EnhancedHeightmapParams
+  params: EnhancedHeightmapParams,
+  intent?: TerrainIntentOptions
 ): Float32Array {
   const heightmap = new Float32Array(width * height);
   
-  const zoomFactor = params.zoomFactor ?? 100;
+  const resolutionScale = intent?.resolutionScale ?? 1;
+  const zoomFactor = (params.zoomFactor ?? 100) * Math.max(0.25, resolutionScale);
   const noiseDetail: NoiseDetailConfig = params.noiseDetail ?? {
     octaves: params.octaves,
     falloff: params.persistence,
@@ -215,8 +225,39 @@ export function generateEnhancedHeightmap(
         h = h + (cell.f2 - cell.f1) * 0.05;
       }
 
+      const nx = (x / Math.max(1, width - 1)) * 2 - 1;
+      const ny = (y / Math.max(1, height - 1)) * 2 - 1;
+      const radial = Math.sqrt(nx * nx + ny * ny);
+
+      if (intent?.macroForm === 'ring') {
+        const ringDist = Math.abs(radial - 0.55);
+        h += Math.max(0, 1 - ringDist * 6) * 0.35;
+      } else if (intent?.macroForm === 'island') {
+        h -= Math.max(0, radial - 0.4) * 0.55;
+      } else if (intent?.macroForm === 'canyon') {
+        const canyon = Math.exp(-Math.pow(nx * 2.1, 2));
+        h -= canyon * 0.28;
+      } else if (intent?.macroForm === 'valley') {
+        const valley = Math.exp(-Math.pow(ny * 2.2, 2));
+        h -= valley * 0.18;
+      } else if (intent?.macroForm === 'volcanic') {
+        const crater = Math.exp(-(radial * radial) / 0.12);
+        const rim = Math.exp(-Math.pow(radial - 0.33, 2) / 0.01);
+        h -= crater * 0.2;
+        h += rim * 0.2;
+      }
+
+      if (intent?.waterSystem === 'coast' || intent?.waterSystem === 'oceanic') {
+        h -= Math.max(0, radial - 0.6) * 0.22;
+      } else if (intent?.waterSystem === 'river') {
+        const river = Math.exp(-Math.pow(nx * 2.8, 2));
+        h -= river * 0.15;
+      }
+
+      const reliefMultiplier = intent?.reliefEnergy === 'high' ? 1.25 : intent?.reliefEnergy === 'low' ? 0.82 : 1;
+
       // Apply base elevation and amplitude
-      h = params.baseElevation + (h - 0.5) * params.amplitude * 2;
+      h = params.baseElevation + (h - 0.5) * params.amplitude * 2 * reliefMultiplier;
       
       heightmap[idx] = Math.max(0, Math.min(1, h));
     }
@@ -330,13 +371,14 @@ export function buildEnhancedTerrain(
   depth: number,
   heightParams: EnhancedHeightmapParams,
   layers: TerrainLayer[] = DEFAULT_TERRAIN_LAYERS,
-  lighting?: TerrainLightingParams
+  lighting?: TerrainLightingParams,
+  intent?: TerrainIntentOptions
 ): EnhancedTerrainResult {
   const terrain = new Uint16Array(width * height * depth);
   const materials = new Set<number>();
 
   // Generate heightmap with advanced noise
-  const heightmap = generateEnhancedHeightmap(width, height, heightParams);
+  const heightmap = generateEnhancedHeightmap(width, height, heightParams, intent);
 
   // Generate biome map
   const biomeMap = generateBiomeMap(width, height, heightmap, layers);

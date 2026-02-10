@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "name": "Procedural Scenario",
+  "seed": 1549562054,
+  "size": {
+    "width": 128,
+    "height": 128
+  },
+  "biomes": [
+    {
+      "id": "plains",
+      "label": "plains",
+      "color": "#7f7f7f",
+      "materialIds": [
+        "grass",
+        "dirt"
+      ],
+      "heightRange": [
+        0.19999999999999998,
+        0.55
+      ]
+    }
+  ],
+  "noise": {
+    "baseFrequency": 0.03,
+    "octaves": 4,
+    "lacunarity": 2,
+    "gain": 0.45,
+    "warp": 0.2,
+    "detailStrength": 0.08
+  },
+  "heightCurves": [
+    {
+      "id": "default",
+      "points": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.5,
+          "y": 0.6
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "id": "plains-0",
+      "biomeId": "plains",
+      "materialId": "grass",
+      "minHeight": 0.19999999999999998,
+      "maxHeight": 0.6
+    }
+  ]
+}

@@ -23,6 +23,8 @@ export type VoxelBuildResult = {
   depth: number;
   /** Materials used (id -> count). */
   materialUsage: Map<number, number>;
+  /** Build warnings for oversized/scaled blueprints. */
+  warnings?: string[];
 };
 
 /**
@@ -35,6 +37,10 @@ export type BuildOptions = {
   defaultMaterial?: number;
   /** Padding around the object. */
   padding?: number;
+  /** Scale multiplier applied to blueprint bounds, positions, and sizes. */
+  scale?: number;
+  /** Upper safety limit for dimensions after scaling. */
+  maxDimension?: number;
 };
 
 // ============================================================================
@@ -338,7 +344,15 @@ export function buildVoxelsFromBlueprint(
     materialMapping = {},
     defaultMaterial = 1,
     padding = 0,
+    scale = 1,
+    maxDimension = 1024,
   } = options;
+  const warnings: string[] = [];
+  const safeScale = Number.isFinite(scale) ? Math.max(0.1, Math.min(8, scale)) : 1;
+
+  if (safeScale !== scale) {
+    warnings.push(`Scale ${scale} clamped to ${safeScale} for safety.`);
+  }
 
   // Merge blueprint mapping with provided mapping
   const fullMapping: Record<string, number> = {
@@ -346,11 +360,39 @@ export function buildVoxelsFromBlueprint(
     ...materialMapping,
   };
 
+  const scaleSize = (value: number): number => {
+    const scaled = Math.round(value * safeScale);
+    return Math.max(1, Math.min(maxDimension, scaled));
+  };
+
+  const scalePosition = (value: number): number => {
+    const scaled = Math.round(value * safeScale);
+    return Math.max(0, Math.min(maxDimension - 1, scaled));
+  };
+
+  const scaledPrimitives: Primitive[] = blueprint.primitives.map((primitive) => ({
+    ...primitive,
+    position: [
+      scalePosition(primitive.position[0]),
+      scalePosition(primitive.position[1]),
+      scalePosition(primitive.position[2]),
+    ],
+    size: [
+      scaleSize(primitive.size[0]),
+      scaleSize(primitive.size[1]),
+      scaleSize(primitive.size[2]),
+    ],
+  }));
+
   // Calculate bounds with padding
   const [bw, bh, bd] = blueprint.bounds;
-  const width = bw + padding * 2;
-  const height = bh + padding * 2;
-  const depth = bd + padding * 2;
+  const width = Math.max(1, Math.min(maxDimension, scaleSize(bw))) + padding * 2;
+  const height = Math.max(1, Math.min(maxDimension, scaleSize(bh))) + padding * 2;
+  const depth = Math.max(1, Math.min(maxDimension, scaleSize(bd))) + padding * 2;
+  const totalVoxels = width * height * depth;
+  if (totalVoxels > 8_000_000) {
+    warnings.push(`Scaled blueprint is large (${totalVoxels} voxels). Generation may be slow.`);
+  }
 
   // Create voxel array (0 = air)
   const data = new Uint16Array(width * height * depth);
@@ -387,7 +429,7 @@ export function buildVoxelsFromBlueprint(
   };
 
   // Process primitives in order (later primitives override earlier)
-  for (const primitive of blueprint.primitives) {
+  for (const primitive of scaledPrimitives) {
     const materialId = resolveMaterial(primitive.material);
     const builder = PRIMITIVE_BUILDERS[primitive.type];
 
@@ -405,6 +447,7 @@ export function buildVoxelsFromBlueprint(
     height,
     depth,
     materialUsage,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 

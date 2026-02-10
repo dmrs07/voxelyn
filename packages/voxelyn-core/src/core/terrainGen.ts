@@ -117,11 +117,50 @@ const resampleMask = (
   return out;
 };
 
+const sampleCurve = (points: TerrainHeightCurvePoint[], value: number): number => {
+  if (points.length === 0) return clamp01(value);
+  if (points.length === 1) return clamp01(points[0]?.y ?? value);
+
+  if (value <= (points[0]?.x ?? 0)) {
+    return clamp01(points[0]?.y ?? value);
+  }
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    if (!p0 || !p1) continue;
+    if (value >= p0.x && value <= p1.x) {
+      const span = p1.x - p0.x;
+      if (span === 0) return clamp01(p1.y);
+      const t = (value - p0.x) / span;
+      return clamp01(p0.y + (p1.y - p0.y) * t);
+    }
+  }
+
+  return clamp01(points[points.length - 1]?.y ?? value);
+};
+
+const applyHeightCurves = (spec: TerrainGenSpec, source: Float32Array): Float32Array => {
+  if (!spec.heightCurves.length) return source;
+  const curves = spec.heightCurves.map((curve) => [...curve.points].sort((a, b) => a.x - b.x));
+  const out = new Float32Array(source.length);
+
+  for (let i = 0; i < source.length; i += 1) {
+    let value = source[i] ?? 0;
+    for (const points of curves) {
+      value = sampleCurve(points, value);
+    }
+    out[i] = clamp01(value);
+  }
+
+  return out;
+};
+
 const buildNoiseMap = (spec: TerrainGenSpec) => {
   const { width, height } = spec.size;
   const data = new Float32Array(width * height);
   const seed = spec.seed ?? 0;
-  const { baseFrequency, octaves, lacunarity, gain } = spec.noise;
+  const { baseFrequency, octaves, lacunarity, gain, warp } = spec.noise;
   let totalAmplitude = 0;
   let amplitude = 1;
   for (let octave = 0; octave < octaves; octave += 1) {
@@ -129,23 +168,32 @@ const buildNoiseMap = (spec: TerrainGenSpec) => {
     amplitude *= gain;
   }
   for (let y = 0; y < height; y += 1) {
+    const row = y * width;
     for (let x = 0; x < width; x += 1) {
       let value = 0;
       let frequency = baseFrequency;
       amplitude = 1;
       for (let octave = 0; octave < octaves; octave += 1) {
-        const sampleX = Math.floor(x * frequency);
-        const sampleY = Math.floor(y * frequency);
+        let sampleXf = x * frequency;
+        let sampleYf = y * frequency;
+        if (warp > 0) {
+          const warpX = (hash2d((x + octave * 17) | 0, (y + octave * 31) | 0, seed + 3001) * 2 - 1) * warp;
+          const warpY = (hash2d((x + octave * 53) | 0, (y + octave * 71) | 0, seed + 5003) * 2 - 1) * warp;
+          sampleXf += warpX * frequency * 12;
+          sampleYf += warpY * frequency * 12;
+        }
+        const sampleX = Math.floor(sampleXf);
+        const sampleY = Math.floor(sampleYf);
         const n = hash2d(sampleX, sampleY, seed + octave * 1013);
         value += (n * 2 - 1) * amplitude;
         amplitude *= gain;
         frequency *= lacunarity;
       }
       value = (value / totalAmplitude + 1) * 0.5;
-      data[y * width + x] = clamp01(value);
+      data[row + x] = clamp01(value);
     }
   }
-  return data;
+  return applyHeightCurves(spec, data);
 };
 
 const buildDetailNoise = (spec: TerrainGenSpec) => {
@@ -166,8 +214,33 @@ const buildBiomeMask = (spec: TerrainGenSpec, heightMap: Float32Array) => {
   const { width, height } = spec.size;
   const mask = new Uint8Array(width * height);
   const biomes = spec.biomes;
+  const biomeById = new Map<string, number>();
+  for (let i = 0; i < biomes.length; i += 1) {
+    const biome = biomes[i];
+    if (biome?.id) {
+      biomeById.set(biome.id, i);
+    }
+  }
+
   for (let i = 0; i < heightMap.length; i += 1) {
     const value = heightMap[i] ?? 0;
+
+    // Layer-first mapping: if a layer matches this height, use its biomeId.
+    let layerMappedBiome: number | undefined;
+    for (const layer of spec.layers) {
+      if (value >= layer.minHeight && value <= layer.maxHeight) {
+        const idx = biomeById.get(layer.biomeId);
+        if (idx !== undefined) {
+          layerMappedBiome = idx;
+          break;
+        }
+      }
+    }
+    if (layerMappedBiome !== undefined) {
+      mask[i] = layerMappedBiome;
+      continue;
+    }
+
     let biomeIndex = 0;
     for (let b = 0; b < biomes.length; b += 1) {
       const biome = biomes[b];

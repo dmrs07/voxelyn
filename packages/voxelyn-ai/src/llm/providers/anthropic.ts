@@ -57,37 +57,51 @@ export class AnthropicClient extends BaseLLMClient {
     options?: { temperature?: number; maxTokens?: number }
   ): Promise<string> {
     const messages: AnthropicMessage[] = [{ role: 'user', content: userPrompt }];
+    try {
+      const response = await fetch(`${this.baseURL}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          max_tokens: options?.maxTokens ?? 4096,
+          system: systemPrompt,
+          messages,
+          temperature: options?.temperature ?? 0.7,
+        }),
+        signal: AbortSignal.timeout(this.config.timeoutMs),
+      });
 
-    const response = await fetch(`${this.baseURL}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: this.model,
-        max_tokens: options?.maxTokens ?? 4096,
-        system: systemPrompt,
-        messages,
-        temperature: options?.temperature ?? 0.7,
-      }),
-      signal: AbortSignal.timeout(this.config.timeoutMs),
-    });
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 429) {
+          throw new Error(`ANTHROPIC_RATE_LIMIT: ${errorText}`);
+        }
+        throw new Error(`ANTHROPIC_API_ERROR_${response.status}: ${errorText}`);
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Anthropic API error (${response.status}): ${errorText}`);
+      const data = (await response.json()) as AnthropicResponse;
+      const text = data.content
+        .filter((c) => c.type === 'text' && typeof c.text === 'string')
+        .map((c) => c.text.trim())
+        .filter(Boolean)
+        .join('\n');
+
+      if (!text) {
+        throw new Error('ANTHROPIC_EMPTY_RESPONSE');
+      }
+
+      return text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes('abort') || message.toLowerCase().includes('timeout')) {
+        throw new Error(`ANTHROPIC_TIMEOUT: ${message}`);
+      }
+      throw new Error(message.startsWith('ANTHROPIC_') ? message : `ANTHROPIC_ERROR: ${message}`);
     }
-
-    const data = (await response.json()) as AnthropicResponse;
-    const textContent = data.content.find((c) => c.type === 'text');
-
-    if (!textContent?.text) {
-      throw new Error('Empty response from Anthropic');
-    }
-
-    return textContent.text;
   }
 }
 

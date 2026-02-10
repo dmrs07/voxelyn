@@ -24,6 +24,19 @@ export type CliOptions = {
   deployChannel?: string;
   deployBuild?: boolean;
   prompt?: string;
+  provider?: 'auto' | 'gemini' | 'openai' | 'anthropic' | 'groq' | 'ollama' | 'copilot';
+  model?: string;
+  seed?: number;
+  size?: string;
+  depth?: number;
+  scale?: number;
+  textureSize?: string;
+  outFormat?: 'bundle' | 'layout' | 'terrain-spec';
+  enhancedTerrain?: boolean;
+  workers?: 'auto' | number;
+  debugAi?: boolean;
+  intentMode?: 'fast' | 'balanced' | 'deep';
+  intentStrict?: boolean;
 };
 
 export type CommandName =

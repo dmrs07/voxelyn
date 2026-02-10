@@ -1,0 +1,9 @@
+{
+  "totalVoxels": 524288,
+  "filledVoxels": 196608,
+  "objectCount": 0,
+  "biomeBreakdown": {
+    "2": 180224,
+    "7": 16384
+  }
+}
