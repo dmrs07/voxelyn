@@ -42,6 +42,84 @@ type AIDynamicModule = {
   createGeminiClient?: (cfg: { apiKey: string; model?: string; debug?: boolean }) => AnyAIClient;
   createClient?: (cfg: unknown) => AnyAIClient;
   createAutoClient?: (cfg?: { preferredProvider?: string; debug?: boolean }) => AnyAIClient | null;
+  buildDefaultMaterialMapping?: () => Record<string, number>;
+  clampSizeToMaxVoxels?: (size: [number, number, number], maxVoxels: number) => [number, number, number];
+  deriveSizeFromMaxVoxels?: (maxVoxels: number) => [number, number, number];
+  generateObjectWithQuality?: (options: {
+    prompt: string;
+    provider: Exclude<Provider, 'auto'>;
+    providerInput?: string;
+    baseModel: string;
+    modelExplicitlySet?: boolean;
+    detailLevel: 'low' | 'medium' | 'high';
+    requestedMaxSize?: [number, number, number];
+    maxSize: [number, number, number];
+    maxVoxels?: number;
+    scale?: number;
+    qualityProfile?: 'fast' | 'balanced' | 'high' | 'ultra';
+    attempts?: number;
+    minScore?: number;
+    modelEscalation?: boolean;
+    allowBase?: boolean;
+    strictQuality?: boolean;
+    materialMapping?: Record<string, number>;
+    onLog?: (message: string) => void;
+    runPrediction: (input: {
+      prompt: string;
+      model: string;
+      temperature: number;
+      attempt: number;
+    }) => Promise<{
+      success: boolean;
+      data?: unknown;
+      error?: string;
+      modelUsed?: string;
+    }>;
+  }) => Promise<{
+    blueprint: unknown;
+    voxels: {
+      data: Uint16Array;
+      width: number;
+      height: number;
+      depth: number;
+      materialUsage: Map<number, number>;
+      warnings?: string[];
+    };
+    analysis: {
+      score: number;
+      filledVoxels: number;
+      totalVoxels: number;
+      penaltyEntries: Array<{ code: string; message: string; amount: number }>;
+      breakdown: Record<string, number>;
+      metrics: {
+        semanticIntent: string;
+        basePlateDetected: boolean;
+        tailLikePrimitive: boolean;
+        horizontalToVerticalRatio: number;
+        filledExtent: { width: number; height: number; depth: number };
+      };
+    };
+    report: {
+      mode: 'ai';
+      qualityProfile: 'fast' | 'balanced' | 'high' | 'ultra';
+      qualityTarget: number;
+      attemptsPlanned: number;
+      attemptsUsed: number;
+      escalationUsed: boolean;
+      selectedAttempt: number;
+      selectedModel: string;
+      selectedTemperature: number;
+      clampFactor: number;
+      expectedFillRange: { min: number; max: number };
+      attempts: unknown[];
+      requestedMaxSize: [number, number, number];
+      effectiveMaxSize: [number, number, number];
+    };
+    selectedAttempt: number;
+    selectedModel: string;
+    selectedTemperature: number;
+    promptForAttempt: string;
+  }>;
   generateTextureFromParams?: (params: unknown, width: number, height: number) => Uint32Array;
   buildScenarioFromLayout?: (layout: unknown, options?: unknown) => {
     terrain: Uint16Array;
@@ -98,7 +176,73 @@ type AIDynamicModule = {
   ) => Promise<unknown>;
   compileIntentToDirectives?: (intent: unknown) => unknown;
   enrichScenarioLayoutWithIntent?: (layout: unknown, intent: unknown, directive?: unknown) => unknown;
+  deriveArtifactViewSettings?: (input: {
+    artifactType: 'scenario';
+    prompt?: string;
+    intent?: unknown;
+    metrics: {
+      heightMin: number;
+      heightMax: number;
+      heightSpan: number;
+      slopeMean: number;
+      waterCoverage: number;
+      landComponents: number;
+    };
+    extents: { width: number; height: number; depth: number };
+    generatedFrom?: string;
+  } | {
+    artifactType: 'object';
+    prompt: string;
+    metrics: {
+      horizontalToVerticalRatio: number;
+      componentCohesion?: number;
+      extents: { width: number; height: number; depth: number };
+    };
+    generatedFrom?: string;
+  } | {
+    artifactType: 'texture';
+    prompt?: string;
+    meta: { width: number; height: number; detailHint?: number };
+    generatedFrom?: string;
+  }) => unknown;
   DEFAULT_SCENARIO_LAYOUT?: unknown;
+};
+
+type CoreDynamicModule = {
+  extractTerrainTopSurface?: (
+    terrain: Uint16Array,
+    width: number,
+    height: number,
+    depth: number,
+  ) => { topZByCell: Float32Array };
+  computeScenarioReliefMetrics?: (
+    heightmap: ArrayLike<number>,
+    width: number,
+    height: number,
+    topZByCell?: ArrayLike<number>,
+  ) => {
+    heightMin: number;
+    heightMax: number;
+    heightSpan: number;
+    slopeMean: number;
+    waterCoverage: number;
+    landComponents: number;
+  };
+  computeVoxelFillMetrics?: (
+    voxels: Uint16Array,
+    width: number,
+    height: number,
+    depth: number,
+  ) => {
+    horizontalToVerticalRatio: number;
+    extents: { width: number; height: number; depth: number };
+  };
+  computeVoxelConnectivity?: (
+    voxels: Uint16Array,
+    width: number,
+    height: number,
+    depth: number,
+  ) => { largestComponentRatio: number };
 };
 
 type ScenarioBuiltResult = {
@@ -126,6 +270,7 @@ const DEFAULT_TEXTURE_SIZE = 64;
 const DEFAULT_SCENARIO_SIZE: [number, number] = [128, 128];
 const DEFAULT_SCENARIO_DEPTH = 32;
 const DEFAULT_SCALE = 1;
+const DEFAULT_OBJECT_SIZE: [number, number, number] = [18, 18, 18];
 
 const makeOutputDir = async (dryRun: boolean): Promise<string> => {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -203,6 +348,59 @@ const parseDimension = (raw: string | undefined): [number, number] | null => {
   return null;
 };
 
+const parseObjectDimension = (raw: string | undefined): [number, number, number] | null => {
+  if (!raw) return null;
+  const value = raw.trim().toLowerCase();
+  const m3 = value.match(/^(\d+)x(\d+)x(\d+)$/);
+  if (m3) {
+    const x = Number(m3[1]);
+    const y = Number(m3[2]);
+    const z = Number(m3[3]);
+    if ([x, y, z].every((entry) => Number.isInteger(entry) && entry > 0)) {
+      return [x, y, z];
+    }
+    return null;
+  }
+
+  const m2 = value.match(/^(\d+)x(\d+)$/);
+  if (m2) {
+    const x = Number(m2[1]);
+    const y = Number(m2[2]);
+    if (Number.isInteger(x) && Number.isInteger(y) && x > 0 && y > 0) {
+      return [x, y, Math.max(1, Math.min(x, y))];
+    }
+    return null;
+  }
+
+  const single = Number(value);
+  if (Number.isInteger(single) && single > 0) {
+    return [single, single, single];
+  }
+
+  return null;
+};
+
+const size3DVolume = (size: [number, number, number]): number => size[0] * size[1] * size[2];
+
+const clampSizeToMaxVoxelsFallback = (
+  size: [number, number, number],
+  maxVoxels: number,
+): [number, number, number] => {
+  const currentVolume = size3DVolume(size);
+  if (currentVolume <= maxVoxels) return size;
+  const factor = Math.cbrt(maxVoxels / currentVolume);
+  return [
+    Math.max(1, Math.floor(size[0] * factor)),
+    Math.max(1, Math.floor(size[1] * factor)),
+    Math.max(1, Math.floor(size[2] * factor)),
+  ];
+};
+
+const deriveSizeFromMaxVoxelsFallback = (maxVoxels: number): [number, number, number] => {
+  const edge = Math.max(1, Math.floor(Math.cbrt(maxVoxels)));
+  return [edge, edge, edge];
+};
+
 const parsePositiveInt = (value: number | undefined, fallback: number): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   const n = Math.round(value);
@@ -217,6 +415,118 @@ const parseScale = (value: number | undefined): number => {
 };
 
 const parseProvider = (value: CliOptions['provider']): Provider => value ?? 'auto';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const computeScenarioReliefMetricsFallback = (
+  heightmap: Float32Array,
+  width: number,
+  height: number,
+): {
+  heightMin: number;
+  heightMax: number;
+  heightSpan: number;
+  slopeMean: number;
+  waterCoverage: number;
+  landComponents: number;
+} => {
+  const total = width * height;
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < total; i += 1) {
+    const value = Number(heightmap[i] ?? 0);
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+
+  const span = Math.max(1e-6, max - min);
+  const normalized = new Float32Array(total);
+  let waterCount = 0;
+  const threshold = 0.26;
+  for (let i = 0; i < total; i += 1) {
+    const h = clamp01(((heightmap[i] ?? 0) - min) / span);
+    normalized[i] = h;
+    if (h <= threshold) waterCount += 1;
+  }
+
+  let slopeSum = 0;
+  let slopeSamples = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = x + y * width;
+      const center = normalized[idx] ?? 0;
+      if (x + 1 < width) {
+        slopeSum += Math.abs(center - (normalized[idx + 1] ?? 0));
+        slopeSamples += 1;
+      }
+      if (y + 1 < height) {
+        slopeSum += Math.abs(center - (normalized[idx + width] ?? 0));
+        slopeSamples += 1;
+      }
+    }
+  }
+
+  const land = new Uint8Array(total);
+  for (let i = 0; i < total; i += 1) {
+    land[i] = (normalized[i] ?? 0) > threshold ? 1 : 0;
+  }
+
+  let components = 0;
+  const queue = new Uint32Array(total);
+  for (let i = 0; i < total; i += 1) {
+    if (land[i] === 0) continue;
+    land[i] = 0;
+    components += 1;
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = i;
+    while (head < tail) {
+      const current = queue[head++]!;
+      const cx = current % width;
+      const cy = Math.floor(current / width);
+      if (cx > 0) {
+        const n = current - 1;
+        if (land[n] === 1) {
+          land[n] = 0;
+          queue[tail++] = n;
+        }
+      }
+      if (cx + 1 < width) {
+        const n = current + 1;
+        if (land[n] === 1) {
+          land[n] = 0;
+          queue[tail++] = n;
+        }
+      }
+      if (cy > 0) {
+        const n = current - width;
+        if (land[n] === 1) {
+          land[n] = 0;
+          queue[tail++] = n;
+        }
+      }
+      if (cy + 1 < height) {
+        const n = current + width;
+        if (land[n] === 1) {
+          land[n] = 0;
+          queue[tail++] = n;
+        }
+      }
+    }
+  }
+
+  return {
+    heightMin: min,
+    heightMax: max,
+    heightSpan: max - min,
+    slopeMean: slopeSamples > 0 ? slopeSum / slopeSamples : 0,
+    waterCoverage: total > 0 ? waterCount / total : 0,
+    landComponents: components,
+  };
+};
 
 const hash = (input: string): number => {
   let h = 0;
@@ -522,6 +832,42 @@ const layoutToTerrainSpec = (layout: Record<string, unknown>): Record<string, un
   };
 };
 
+const resolveProviderConfig = (
+  provider: Exclude<Provider, 'auto'>,
+  model: string | undefined,
+): Record<string, unknown> | null => {
+  switch (provider) {
+    case 'gemini': {
+      const apiKey =
+        process.env.VOXELYN_AI_API_KEY ??
+        process.env.GEMINI_API_KEY ??
+        process.env.GOOGLE_AI_API_KEY ??
+        process.env.GOOGLE_API_KEY;
+      return apiKey ? { provider, apiKey, model } : null;
+    }
+    case 'openai': {
+      const apiKey = process.env.OPENAI_API_KEY;
+      return apiKey ? { provider, apiKey, model } : null;
+    }
+    case 'anthropic': {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      return apiKey ? { provider, apiKey, model } : null;
+    }
+    case 'groq': {
+      const apiKey = process.env.GROQ_API_KEY;
+      return apiKey ? { provider, apiKey, model } : null;
+    }
+    case 'copilot': {
+      const token = process.env.GITHUB_TOKEN ?? process.env.COPILOT_TOKEN;
+      return token ? { provider, token, model } : null;
+    }
+    case 'ollama':
+      return { provider, model, baseURL: process.env.OLLAMA_BASE_URL };
+    default:
+      return null;
+  }
+};
+
 const resolveProviderClient = (
   aiModule: AIDynamicModule,
   options: CliOptions,
@@ -572,38 +918,7 @@ const resolveProviderClient = (
     return null;
   }
 
-  const providerConfig = (() => {
-    switch (provider) {
-      case 'gemini': {
-        const apiKey =
-          process.env.VOXELYN_AI_API_KEY ??
-          process.env.GEMINI_API_KEY ??
-          process.env.GOOGLE_AI_API_KEY ??
-          process.env.GOOGLE_API_KEY;
-        return apiKey ? { provider, apiKey, model: options.model } : null;
-      }
-      case 'openai': {
-        const apiKey = process.env.OPENAI_API_KEY;
-        return apiKey ? { provider, apiKey, model: options.model } : null;
-      }
-      case 'anthropic': {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        return apiKey ? { provider, apiKey, model: options.model } : null;
-      }
-      case 'groq': {
-        const apiKey = process.env.GROQ_API_KEY;
-        return apiKey ? { provider, apiKey, model: options.model } : null;
-      }
-      case 'copilot': {
-        const token = process.env.GITHUB_TOKEN ?? process.env.COPILOT_TOKEN;
-        return token ? { provider, token, model: options.model } : null;
-      }
-      case 'ollama':
-        return { provider, model: options.model, baseURL: process.env.OLLAMA_BASE_URL };
-      default:
-        return null;
-    }
-  })();
+  const providerConfig = resolveProviderConfig(provider, options.model);
 
   if (!providerConfig) {
     logger.info(`[generate] Missing credentials for provider=${provider}.`);
@@ -769,6 +1084,7 @@ const writeScenarioBundle = async (
   provider: string,
   model: string,
   scenario: ScenarioBuiltResult,
+  viewSettings: unknown | null,
   dryRun: boolean
 ): Promise<void> => {
   await writeJson(path.join(outDir, 'scenario.layout.json'), scenario.layout, dryRun);
@@ -788,6 +1104,9 @@ const writeScenarioBundle = async (
 
   const terrainSpec = layoutToTerrainSpec(scenario.layout);
   await writeJson(path.join(outDir, 'terrain.spec.json'), terrainSpec, dryRun);
+  if (viewSettings) {
+    await writeJson(path.join(outDir, 'view.settings.json'), viewSettings, dryRun);
+  }
 
   await writeJson(
     path.join(outDir, 'manifest.json'),
@@ -813,6 +1132,7 @@ const writeScenarioBundle = async (
         'scenario.terrain.u16',
         'scenario.preview.ppm',
         'terrain.spec.json',
+        ...(viewSettings ? ['view.settings.json'] : []),
       ],
     },
     dryRun
@@ -831,6 +1151,7 @@ const writeTextureBundle = async (
   pixels: Uint32Array,
   params: unknown,
   mode: 'ai' | 'procedural',
+  viewSettings: unknown | null,
   dryRun: boolean
 ): Promise<void> => {
   await writeJson(path.join(outDir, 'texture.params.json'), params, dryRun);
@@ -840,6 +1161,9 @@ const writeTextureBundle = async (
     dryRun
   );
   await writePpm(path.join(outDir, 'texture.ppm'), width, height, pixels, dryRun);
+  if (viewSettings) {
+    await writeJson(path.join(outDir, 'view.settings.json'), viewSettings, dryRun);
+  }
   await writeJson(
     path.join(outDir, 'manifest.json'),
     {
@@ -852,7 +1176,12 @@ const writeTextureBundle = async (
       model,
       scale,
       size: [width, height],
-      files: ['texture.params.json', 'texture.meta.json', 'texture.ppm'],
+      files: [
+        'texture.params.json',
+        'texture.meta.json',
+        'texture.ppm',
+        ...(viewSettings ? ['view.settings.json'] : []),
+      ],
     },
     dryRun
   );
@@ -875,10 +1204,21 @@ const writeObjectBundle = async (
     warnings?: string[];
   },
   mode: 'ai' | 'procedural',
+  qualityReport: unknown | null,
+  metaExtra: Record<string, unknown> | null,
+  viewSettings: unknown | null,
   dryRun: boolean
 ): Promise<void> => {
   await writeJson(path.join(outDir, 'object.blueprint.json'), blueprint, dryRun);
   await writeTypedArray(path.join(outDir, 'object.voxels.u16'), voxels.data, dryRun);
+
+  if (qualityReport) {
+    await writeJson(path.join(outDir, 'object.quality.json'), qualityReport, dryRun);
+  }
+  if (viewSettings) {
+    await writeJson(path.join(outDir, 'view.settings.json'), viewSettings, dryRun);
+  }
+
   await writeJson(
     path.join(outDir, 'object.meta.json'),
     {
@@ -890,6 +1230,7 @@ const writeObjectBundle = async (
       scale,
       seed,
       mode,
+      ...(metaExtra ?? {}),
     },
     dryRun
   );
@@ -905,7 +1246,13 @@ const writeObjectBundle = async (
       model,
       scale,
       bounds: [voxels.width, voxels.height, voxels.depth],
-      files: ['object.blueprint.json', 'object.voxels.u16', 'object.meta.json'],
+      files: [
+        'object.blueprint.json',
+        'object.voxels.u16',
+        'object.meta.json',
+        ...(qualityReport ? ['object.quality.json'] : []),
+        ...(viewSettings ? ['view.settings.json'] : []),
+      ],
     },
     dryRun
   );
@@ -939,6 +1286,7 @@ export const runGenerate = async (
   const scenarioDepth = parsePositiveInt(options.depth, DEFAULT_SCENARIO_DEPTH);
   const scale = parseScale(options.scale);
   const seed = parsePositiveInt(options.seed, hash(prompt));
+  const autoView = options.autoView ?? true;
 
   if (type === 'scenario') {
     guardScenarioVolume(scenarioSize[0], scenarioSize[1], scenarioDepth, options.force, logger);
@@ -947,6 +1295,8 @@ export const runGenerate = async (
   const outDir = await makeOutputDir(dryRun);
   const aiModuleRaw = await importFromProject('@voxelyn/ai', process.cwd());
   const aiModule = aiModuleRaw as unknown as AIDynamicModule | null;
+  const coreModuleRaw = await importFromProject('@voxelyn/core', process.cwd());
+  const coreModule = coreModuleRaw as unknown as CoreDynamicModule | null;
 
   const client = aiModule ? resolveProviderClient(aiModule, options, logger) : null;
   const providerName = client?.provider ?? parseProvider(options.provider);
@@ -985,6 +1335,20 @@ export const runGenerate = async (
       return { ...fallback, mode: 'procedural' as const };
     });
 
+    let textureViewSettings: unknown | null = null;
+    if (autoView && aiModule?.deriveArtifactViewSettings) {
+      try {
+        textureViewSettings = aiModule.deriveArtifactViewSettings({
+          artifactType: 'texture',
+          prompt,
+          meta: { width, height },
+          generatedFrom: texture.mode,
+        });
+      } catch (error) {
+        logger.info(`[generate] failed to derive texture view settings: ${String(error)}`);
+      }
+    }
+
     await writeTextureBundle(
       outDir,
       prompt,
@@ -997,6 +1361,7 @@ export const runGenerate = async (
       texture.pixels,
       texture.params,
       texture.mode,
+      textureViewSettings,
       dryRun
     );
 
@@ -1005,12 +1370,211 @@ export const runGenerate = async (
   }
 
   if (type === 'object') {
-    const aiObject = async (): Promise<{ blueprint: unknown; voxels: ReturnType<NonNullable<AIDynamicModule['buildVoxelsFromBlueprint']>> } | null> => {
+    const requestedObjectSize = parseObjectDimension(options.size) ?? DEFAULT_OBJECT_SIZE;
+    const detailLevel =
+      options.detail === 'low' || options.detail === 'medium' || options.detail === 'high'
+        ? options.detail
+        : 'high';
+    const qualityProfile =
+      options.quality === 'fast' ||
+      options.quality === 'balanced' ||
+      options.quality === 'high' ||
+      options.quality === 'ultra'
+        ? options.quality
+        : 'ultra';
+    const attempts = parsePositiveInt(options.attempts, 0);
+    const maxVoxels = parsePositiveInt(options.maxVoxels, 0);
+    const minScore =
+      typeof options.minScore === 'number' && Number.isFinite(options.minScore)
+        ? Math.max(0, Math.min(1, options.minScore))
+        : undefined;
+    const modelEscalation = options.modelEscalation ?? true;
+    const strictQuality = Boolean(options.strictQuality);
+    const allowBase = Boolean(options.allowBase);
+
+    const clampSizeToMaxVoxels =
+      aiModule?.clampSizeToMaxVoxels ?? clampSizeToMaxVoxelsFallback;
+    const deriveSizeFromMaxVoxels =
+      aiModule?.deriveSizeFromMaxVoxels ?? deriveSizeFromMaxVoxelsFallback;
+
+    const effectiveObjectSize =
+      maxVoxels > 0
+        ? options.size
+          ? clampSizeToMaxVoxels(requestedObjectSize, maxVoxels)
+          : deriveSizeFromMaxVoxels(maxVoxels)
+        : requestedObjectSize;
+
+    const clampFactor =
+      size3DVolume(effectiveObjectSize) / Math.max(1, size3DVolume(requestedObjectSize));
+
+    logger.info(
+      `[generate:object] config detail=${detailLevel} quality=${qualityProfile} ` +
+        `attempts=${attempts > 0 ? attempts : 'profile'} requestedSize=${requestedObjectSize.join('x')} ` +
+        `effectiveSize=${effectiveObjectSize.join('x')} clampFactor=${clampFactor.toFixed(3)} ` +
+        `targetVoxels=${size3DVolume(effectiveObjectSize)} ` +
+        `${maxVoxels > 0 ? `maxVoxels=${maxVoxels} ` : ''}scale=${scale}`,
+    );
+    if (maxVoxels > 0 && clampFactor < 0.92) {
+      logger.info(
+        `[generate] Object size clamped by ${(100 * (1 - clampFactor)).toFixed(1)}% due to --max-voxels.`,
+      );
+    }
+
+    const aiObjectWithQuality = async (): Promise<{
+      blueprint: unknown;
+      voxels: {
+        data: Uint16Array;
+        width: number;
+        height: number;
+        depth: number;
+        materialUsage: Map<number, number>;
+        warnings?: string[];
+      };
+      qualityReport: unknown;
+      metaExtra: Record<string, unknown>;
+      provider: string;
+      model: string;
+    } | null> => {
+      if (!aiModule?.generateObjectWithQuality || !aiModule.createClient) {
+        return null;
+      }
+
+      const providerInput = parseProvider(options.provider);
+      let providerResolved: Exclude<Provider, 'auto'> | null = null;
+      let baseModel = options.model ?? '';
+
+      if (providerInput === 'auto') {
+        const autoClient = aiModule.createAutoClient?.({ debug: Boolean(options.debugAi) }) ?? null;
+        if (!autoClient?.provider) {
+          logger.info('[generate] Unable to auto-detect provider for object quality generation.');
+          return null;
+        }
+        providerResolved = autoClient.provider as Exclude<Provider, 'auto'>;
+        baseModel = options.model ?? autoClient.model ?? '';
+      } else {
+        providerResolved = providerInput;
+      }
+
+      const baseProviderConfig = resolveProviderConfig(providerResolved, baseModel);
+      if (!baseProviderConfig) {
+        logger.info(`[generate] Missing credentials for provider=${providerResolved}.`);
+        return null;
+      }
+
+      const qualityResult = await aiModule.generateObjectWithQuality({
+        prompt,
+        provider: providerResolved,
+        providerInput,
+        baseModel,
+        modelExplicitlySet: Boolean(options.model),
+        detailLevel,
+        requestedMaxSize: requestedObjectSize,
+        maxSize: effectiveObjectSize,
+        maxVoxels: maxVoxels > 0 ? maxVoxels : undefined,
+        scale,
+        qualityProfile,
+        attempts: attempts > 0 ? attempts : undefined,
+        minScore,
+        modelEscalation,
+        allowBase,
+        strictQuality,
+        materialMapping: aiModule.buildDefaultMaterialMapping?.(),
+        onLog: (msg) => logger.info(`[generate:object] ${msg}`),
+        runPrediction: async ({ prompt: promptForAttempt, model, temperature }) => {
+          try {
+            const providerConfig = resolveProviderConfig(providerResolved!, model);
+            if (!providerConfig) {
+              return {
+                success: false,
+                error: `Missing credentials for provider=${providerResolved}.`,
+              };
+            }
+            const runnerClient = aiModule.createClient!(providerConfig);
+            if (!runnerClient.predictObjectBlueprint) {
+              return {
+                success: false,
+                error: 'predictObjectBlueprint is not available for the selected provider client.',
+              };
+            }
+
+            const result = await runnerClient.predictObjectBlueprint(promptForAttempt, undefined, {
+              maxSize: effectiveObjectSize,
+              detailLevel,
+              temperature,
+            });
+            return {
+              success: Boolean(result.success && result.data),
+              data: result.data,
+              error: result.error,
+              modelUsed: runnerClient.model ?? model,
+            };
+          } catch (error) {
+            return {
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+              modelUsed: model,
+            };
+          }
+        },
+      });
+
+      if (qualityResult.analysis.score < qualityResult.report.qualityTarget && !strictQuality) {
+        logger.info(
+          `[generate] quality target not reached. best=${qualityResult.analysis.score.toFixed(3)} ` +
+            `< target=${qualityResult.report.qualityTarget.toFixed(3)} (using best attempt anyway).`,
+        );
+      }
+
+      return {
+        blueprint: qualityResult.blueprint,
+        voxels: qualityResult.voxels,
+        qualityReport: qualityResult.report,
+        metaExtra: {
+          totalVoxels: qualityResult.analysis.totalVoxels,
+          filledVoxels: qualityResult.analysis.filledVoxels,
+          requestedDetailLevel: detailLevel,
+          requestedMaxSize: requestedObjectSize,
+          effectiveMaxSize: effectiveObjectSize,
+          requestedMaxVoxels: maxVoxels > 0 ? maxVoxels : undefined,
+          clampFactor: qualityResult.report.clampFactor,
+          qualityProfile: qualityResult.report.qualityProfile,
+          qualityScore: Number(qualityResult.analysis.score.toFixed(4)),
+          qualityTarget: Number(qualityResult.report.qualityTarget.toFixed(4)),
+          attemptsPlanned: qualityResult.report.attemptsPlanned,
+          attemptsUsed: qualityResult.report.attemptsUsed,
+          qualityPenalties: qualityResult.analysis.penaltyEntries,
+          qualityBreakdown: qualityResult.analysis.breakdown,
+          semanticSummary: {
+            intent: qualityResult.analysis.metrics.semanticIntent,
+            basePlateDetected: qualityResult.analysis.metrics.basePlateDetected,
+            tailLikePrimitive: qualityResult.analysis.metrics.tailLikePrimitive,
+            horizontalToVerticalRatio: qualityResult.analysis.metrics.horizontalToVerticalRatio,
+            filledExtent: qualityResult.analysis.metrics.filledExtent,
+          },
+          selectedModel: qualityResult.selectedModel,
+          selectedTemperature: qualityResult.selectedTemperature,
+          escalationUsed: qualityResult.report.escalationUsed,
+          attemptPrompt: qualityResult.promptForAttempt,
+        },
+        provider: providerResolved,
+        model: qualityResult.selectedModel,
+      };
+    };
+
+    const aiObjectLegacy = async (): Promise<{
+      blueprint: unknown;
+      voxels: ReturnType<NonNullable<AIDynamicModule['buildVoxelsFromBlueprint']>>;
+      provider: string;
+      model: string;
+    } | null> => {
       if (!aiModule || !client?.predictObjectBlueprint || !aiModule.buildVoxelsFromBlueprint) {
         return null;
       }
 
-      const result = await client.predictObjectBlueprint(prompt);
+      const result = await client.predictObjectBlueprint(prompt, undefined, {
+        maxSize: effectiveObjectSize,
+        detailLevel,
+      });
       if (!result.success || !result.data) {
         logger.info(`[generate] AI object generation failed: ${result.error ?? 'unknown'}`);
         return null;
@@ -1020,13 +1584,52 @@ export const runGenerate = async (
         blueprint: result.data,
         voxels: aiModule.buildVoxelsFromBlueprint(result.data, {
           scale,
+          maxDimension: Math.max(...effectiveObjectSize),
         }) as ReturnType<NonNullable<AIDynamicModule['buildVoxelsFromBlueprint']>>,
+        provider: String(client.provider ?? providerName),
+        model: String(client.model ?? modelName),
       };
     };
 
     const objectResult = await withTiming('object', debug, logger, async () => {
-      const ai = await aiObject();
-      if (ai) return { ...ai, mode: 'ai' as const };
+      try {
+        const aiQuality = await aiObjectWithQuality();
+        if (aiQuality) {
+          return {
+            mode: 'ai' as const,
+            blueprint: aiQuality.blueprint,
+            voxels: aiQuality.voxels,
+            qualityReport: aiQuality.qualityReport,
+            metaExtra: aiQuality.metaExtra,
+            provider: aiQuality.provider,
+            model: aiQuality.model,
+          };
+        }
+      } catch (error) {
+        if (strictQuality) {
+          throw error;
+        }
+        logger.info(`[generate] quality pipeline failed: ${String(error)}`);
+      }
+
+      const aiLegacy = await aiObjectLegacy();
+      if (aiLegacy) {
+        return {
+          mode: 'ai' as const,
+          blueprint: aiLegacy.blueprint,
+          voxels: aiLegacy.voxels,
+          qualityReport: null,
+          metaExtra: {
+            requestedDetailLevel: detailLevel,
+            requestedMaxSize: requestedObjectSize,
+            effectiveMaxSize: effectiveObjectSize,
+            requestedMaxVoxels: maxVoxels > 0 ? maxVoxels : undefined,
+            clampFactor: Number(clampFactor.toFixed(4)),
+          } as Record<string, unknown>,
+          provider: aiLegacy.provider,
+          model: aiLegacy.model,
+        };
+      }
 
       const size = Math.max(4, Math.min(24, Math.floor(8 * scale)));
       const data = new Uint16Array(size * size * size);
@@ -1066,19 +1669,78 @@ export const runGenerate = async (
           materialUsage: new Map<number, number>([[6, data.reduce((acc, v) => (v === 6 ? acc + 1 : acc), 0)]]),
           warnings: ['Procedural fallback object was used.'],
         },
+        qualityReport: null,
+        metaExtra: {
+          requestedDetailLevel: detailLevel,
+          requestedMaxSize: requestedObjectSize,
+          effectiveMaxSize: effectiveObjectSize,
+          requestedMaxVoxels: maxVoxels > 0 ? maxVoxels : undefined,
+          clampFactor: Number(clampFactor.toFixed(4)),
+        } as Record<string, unknown>,
+        provider: providerName,
+        model: modelName,
       };
     });
+
+    const objectFillMetrics = coreModule?.computeVoxelFillMetrics
+      ? coreModule.computeVoxelFillMetrics(
+          objectResult.voxels.data,
+          objectResult.voxels.width,
+          objectResult.voxels.height,
+          objectResult.voxels.depth,
+        )
+      : null;
+    const objectConnectivity = coreModule?.computeVoxelConnectivity
+      ? coreModule.computeVoxelConnectivity(
+          objectResult.voxels.data,
+          objectResult.voxels.width,
+          objectResult.voxels.height,
+          objectResult.voxels.depth,
+        )
+      : null;
+
+    const objectViewMetrics = {
+      horizontalToVerticalRatio:
+        objectFillMetrics?.horizontalToVerticalRatio ??
+        Math.max(objectResult.voxels.width, objectResult.voxels.depth) /
+          Math.max(1, objectResult.voxels.height),
+      componentCohesion: objectConnectivity?.largestComponentRatio,
+      extents:
+        objectFillMetrics?.extents ??
+        {
+          width: objectResult.voxels.width,
+          height: objectResult.voxels.height,
+          depth: objectResult.voxels.depth,
+        },
+    };
+
+    let objectViewSettings: unknown | null = null;
+    if (autoView && aiModule?.deriveArtifactViewSettings) {
+      try {
+        objectViewSettings = aiModule.deriveArtifactViewSettings({
+          artifactType: 'object',
+          prompt,
+          metrics: objectViewMetrics,
+          generatedFrom: objectResult.mode,
+        });
+      } catch (error) {
+        logger.info(`[generate] failed to derive object view settings: ${String(error)}`);
+      }
+    }
 
     await writeObjectBundle(
       outDir,
       prompt,
       seed,
       scale,
-      providerName,
-      modelName,
+      objectResult.provider,
+      objectResult.model,
       objectResult.blueprint,
       objectResult.voxels,
       objectResult.mode,
+      objectResult.qualityReport,
+      objectResult.metaExtra,
+      objectViewSettings,
       dryRun
     );
 
@@ -1168,6 +1830,62 @@ export const runGenerate = async (
     return generateScenarioFallback(prompt, scenarioSize, scenarioDepth, seed);
   });
 
+  if (!scenario.intent) {
+    try {
+      if (aiModule?.resolveScenarioIntent) {
+        scenario.intent = await aiModule.resolveScenarioIntent(prompt, {
+          mode: options.intentMode ?? 'balanced',
+          strict: Boolean(options.intentStrict),
+          cacheKey: `${prompt}:${seed}:${scenario.width}x${scenario.height}:${scenario.depth}:${providerName}:${modelName}:fallback-intent`,
+        });
+      } else if (aiModule?.parseScenarioIntent) {
+        scenario.intent = aiModule.parseScenarioIntent(prompt, 'auto');
+      }
+    } catch (error) {
+      logger.info(`[generate] failed to resolve fallback scenario intent: ${String(error)}`);
+    }
+  }
+  if (!scenario.directive && scenario.intent && aiModule?.compileIntentToDirectives) {
+    try {
+      scenario.directive = aiModule.compileIntentToDirectives(scenario.intent);
+    } catch (error) {
+      logger.info(`[generate] failed to compile fallback scenario directives: ${String(error)}`);
+    }
+  }
+
+  const scenarioTopSurface = coreModule?.extractTerrainTopSurface
+    ? coreModule.extractTerrainTopSurface(scenario.terrain, scenario.width, scenario.height, scenario.depth)
+    : null;
+  const reliefMetrics =
+    coreModule?.computeScenarioReliefMetrics
+      ? coreModule.computeScenarioReliefMetrics(
+          scenario.heightmap,
+          scenario.width,
+          scenario.height,
+          scenarioTopSurface?.topZByCell,
+        )
+      : computeScenarioReliefMetricsFallback(scenario.heightmap, scenario.width, scenario.height);
+
+  let scenarioViewSettings: unknown | null = null;
+  if (autoView && aiModule?.deriveArtifactViewSettings) {
+    try {
+      scenarioViewSettings = aiModule.deriveArtifactViewSettings({
+        artifactType: 'scenario',
+        prompt,
+        intent: scenario.intent,
+        metrics: reliefMetrics,
+        extents: {
+          width: scenario.width,
+          height: scenario.height,
+          depth: scenario.depth,
+        },
+        generatedFrom: scenario.mode,
+      });
+    } catch (error) {
+      logger.info(`[generate] failed to derive scenario view settings: ${String(error)}`);
+    }
+  }
+
   if (outFormat === 'layout') {
     await writeJson(path.join(outDir, 'scenario.layout.json'), scenario.layout, dryRun);
     await writeJson(
@@ -1217,6 +1935,7 @@ export const runGenerate = async (
     providerName,
     modelName,
     scenario,
+    scenarioViewSettings,
     dryRun
   );
 

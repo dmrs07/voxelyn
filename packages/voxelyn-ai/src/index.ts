@@ -99,6 +99,31 @@ export {
 } from './generators/object-interpreter';
 
 export {
+  QUALITY_PROFILES,
+  generateObjectWithQuality,
+  resolveAttemptPlan,
+  evaluateObjectCandidate,
+  buildObjectPromptV2,
+  buildDefaultMaterialMapping,
+  clampSizeToMaxVoxels,
+  deriveSizeFromMaxVoxels,
+  isModelUnavailableError,
+  isRetryableGenerationError,
+  type QualityProfile,
+  type PenaltyEntry,
+  type QualityBreakdown,
+  type AttemptPlanEntry,
+  type AttemptPlan,
+  type AttemptRecord,
+  type ObjectCandidateAnalysis,
+  type ObjectQualityReport,
+  type GenerateObjectWithQualityResult,
+  type GenerateObjectWithQualityOptions,
+  type RunPredictionInput,
+  type RunPredictionOutput,
+} from './object-quality';
+
+export {
   buildScenarioFromLayout,
   enrichScenarioLayoutWithIntent,
   getScenarioPreview,
@@ -107,6 +132,26 @@ export {
   type PlacedObject,
   type ScenarioBuildOptions,
 } from './generators/scenario-gen';
+
+// ============================================================================
+// VIEW SETTINGS INTENT (deterministic artifact framing)
+// ============================================================================
+
+export {
+  deriveScenarioViewIntent,
+  deriveObjectViewIntent,
+  deriveTextureViewIntent,
+  deriveArtifactViewSettings,
+  type ScenarioViewClass,
+  type ObjectViewClass,
+  type TextureViewClass,
+  type ScenarioViewIntent,
+  type ObjectViewIntent,
+  type TextureViewIntent,
+  type ObjectViewMetrics,
+  type TextureViewMeta,
+  type DeriveArtifactViewInput,
+} from './view-intent';
 
 // ============================================================================
 // SCENARIO INTENT V2

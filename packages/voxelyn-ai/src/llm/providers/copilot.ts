@@ -92,7 +92,8 @@ export class CopilotLLMClient extends BaseLLMClient {
 
     try {
       // Lazily import the Copilot SDK so it's only required when this provider is used
-      const sdkModule = await import('@github/copilot-sdk');
+      const sdkModuleName = '@github/copilot-sdk';
+      const sdkModule = await import(/* @vite-ignore */ sdkModuleName);
       this.SDK = sdkModule as unknown as CopilotSDK;
       return this.SDK;
     } catch {

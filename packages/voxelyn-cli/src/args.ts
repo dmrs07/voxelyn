@@ -168,12 +168,92 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
         options.seed = parseInteger(arg.slice('--seed='.length));
         continue;
       }
-      if (arg === '--size' && argv[i + 1]) {
+      if ((arg === '--size' || arg === '--tamanho') && argv[i + 1]) {
         options.size = argv[++i];
         continue;
       }
       if (arg.startsWith('--size=')) {
         options.size = arg.slice('--size='.length);
+        continue;
+      }
+      if (arg.startsWith('--tamanho=')) {
+        options.size = arg.slice('--tamanho='.length);
+        continue;
+      }
+      if ((arg === '--detail' || arg === '--detail-level' || arg === '--detalhe') && argv[i + 1]) {
+        options.detail = (argv[++i] as CliOptions['detail']) ?? options.detail;
+        continue;
+      }
+      if (
+        arg.startsWith('--detail=') ||
+        arg.startsWith('--detail-level=') ||
+        arg.startsWith('--detalhe=')
+      ) {
+        const raw =
+          arg.startsWith('--detail=')
+            ? arg.slice('--detail='.length)
+            : arg.startsWith('--detail-level=')
+              ? arg.slice('--detail-level='.length)
+              : arg.slice('--detalhe='.length);
+        options.detail = raw as CliOptions['detail'];
+        continue;
+      }
+      if ((arg === '--max-voxels' || arg === '--voxels' || arg === '--qtd') && argv[i + 1]) {
+        options.maxVoxels = parseInteger(argv[++i]);
+        continue;
+      }
+      if (arg.startsWith('--max-voxels=')) {
+        options.maxVoxels = parseInteger(arg.slice('--max-voxels='.length));
+        continue;
+      }
+      if (arg.startsWith('--voxels=')) {
+        options.maxVoxels = parseInteger(arg.slice('--voxels='.length));
+        continue;
+      }
+      if (arg.startsWith('--qtd=')) {
+        options.maxVoxels = parseInteger(arg.slice('--qtd='.length));
+        continue;
+      }
+      if (arg === '--quality' && argv[i + 1]) {
+        options.quality = (argv[++i] as CliOptions['quality']) ?? options.quality;
+        continue;
+      }
+      if (arg.startsWith('--quality=')) {
+        options.quality = arg.slice('--quality='.length) as CliOptions['quality'];
+        continue;
+      }
+      if (arg === '--attempts' && argv[i + 1]) {
+        options.attempts = parseInteger(argv[++i]);
+        continue;
+      }
+      if (arg.startsWith('--attempts=')) {
+        options.attempts = parseInteger(arg.slice('--attempts='.length));
+        continue;
+      }
+      if (arg === '--min-score' && argv[i + 1]) {
+        options.minScore = parseNumber(argv[++i]);
+        continue;
+      }
+      if (arg.startsWith('--min-score=')) {
+        options.minScore = parseNumber(arg.slice('--min-score='.length));
+        continue;
+      }
+      if (arg === '--model-escalation' && argv[i + 1]) {
+        const value = (argv[++i] ?? '').toLowerCase();
+        options.modelEscalation = value === 'on' || value === 'true' || value === '1';
+        continue;
+      }
+      if (arg.startsWith('--model-escalation=')) {
+        const value = arg.slice('--model-escalation='.length).toLowerCase();
+        options.modelEscalation = value === 'on' || value === 'true' || value === '1';
+        continue;
+      }
+      if (arg === '--allow-base' || arg === '--allow-scene') {
+        options.allowBase = true;
+        continue;
+      }
+      if (arg === '--strict-quality') {
+        options.strictQuality = true;
         continue;
       }
       if (arg === '--depth' && argv[i + 1]) {
@@ -242,6 +322,20 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
         options.intentStrict = true;
         continue;
       }
+      if (arg === '--auto-view' && argv[i + 1]) {
+        const value = (argv[++i] ?? '').toLowerCase();
+        options.autoView = value === 'on' || value === 'true' || value === '1';
+        continue;
+      }
+      if (arg.startsWith('--auto-view=')) {
+        const value = arg.slice('--auto-view='.length).toLowerCase();
+        options.autoView = value === 'on' || value === 'true' || value === '1';
+        continue;
+      }
+      if (arg === '--no-auto-view') {
+        options.autoView = false;
+        continue;
+      }
       continue;
     }
 
@@ -303,6 +397,14 @@ Generate options:
   --model <id>        Model id override
   --seed <int>        Seed override for deterministic generation
   --size <N|WxH>      Output resolution for texture/scenario
+  --detail <level>    Object detail: low | medium | high
+  --max-voxels <N>    Object voxel budget (aliases: --voxels, --qtd)
+  --quality <profile> fast | balanced | high | ultra
+  --attempts <N>      Object generation attempts
+  --min-score <0..1>  Minimum quality score target
+  --model-escalation <on|off>  Escalate model/temperature across attempts
+  --allow-base        Allow baseplate/backdrop primitives
+  --strict-quality    Fail if quality target is not reached
   --texture-size <N|WxH>  Texture resolution (overrides --size for texture)
   --depth <int>       Scenario vertical depth (z layers)
   --scale <float>     World/voxel scale multiplier
@@ -311,6 +413,8 @@ Generate options:
   --workers <auto|N>  Scenario worker parallelism
   --intent-mode <m>   fast | balanced | deep
   --intent-strict     Enforce strict intent constraints
+  --auto-view <on|off>  Generate deterministic view.settings.json
+  --no-auto-view      Disable auto view.settings generation
   --debug-ai          Verbose AI debug logging
 
 Examples:

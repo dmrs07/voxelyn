@@ -3,6 +3,16 @@ import {
   createSurface2D,
   makePalette,
   packRGBA,
+  parseBundleManifest,
+  validateBundleManifestFiles,
+  parseViewSettings,
+  validateViewSettingsForManifest,
+  computeScenarioReliefMetrics,
+  decodePpm,
+  extractTerrainTopSurface,
+  collectVisibleVoxels,
+  computeVoxelConnectivity,
+  computeVoxelFillMetrics,
   getMaterial,
   getFlags,
   getXY
@@ -118,5 +128,99 @@ if (mesh.uvs && meshFlipped.uvs) {
     assert(flippedV === 1 - originalV, "obj flipV");
   }
 }
+
+const manifest = parseBundleManifest({
+  version: 1,
+  type: "object",
+  files: ["object.meta.json", "object.voxels.u16"],
+});
+validateBundleManifestFiles(manifest, ["object.meta.json"], "object");
+
+const parsedView = parseViewSettings({
+  version: 1,
+  artifactType: "scenario",
+  presetId: "scenario-flatlands-v1",
+  intent: {
+    semanticClass: "flatlands",
+    confidence: 0.82,
+    macroForm: "plain",
+  },
+  iso: {
+    tileW: 32,
+    tileH: 16,
+    zStep: 18,
+    defaultHeight: 14,
+    baselineZ: 0,
+    axisScale: { x: 1, y: 1, z: 1 },
+    centerBiasY: 0.56,
+  },
+  relief: {
+    strength: 2.2,
+    exponent: 1.15,
+    terrainBlend: 0.48,
+    verticalOffset: 0,
+  },
+  camera: {
+    x: 0,
+    y: 14,
+    zoom: 1.05,
+    rotation: 0,
+  },
+});
+validateViewSettingsForManifest(parsedView, "scenario");
+
+const ppmText = "P6\n2 1\n255\n";
+const ppmData = new Uint8Array([
+  ...new TextEncoder().encode(ppmText),
+  255, 0, 0,
+  0, 255, 0,
+]);
+const decoded = decodePpm(ppmData.buffer);
+assert(decoded.width === 2 && decoded.height === 1, "ppm decode dimensions");
+assert(decoded.pixels.length === 2, "ppm decode pixels");
+
+const terrain = new Uint16Array([
+  // z0
+  1, 0,
+  0, 2,
+  // z1
+  0, 3,
+  0, 0,
+]);
+const topSurface = extractTerrainTopSurface(terrain, 2, 2, 2);
+assert(topSurface.topMaterialByCell[0] === 1, "top material cell 0");
+assert(topSurface.topMaterialByCell[1] === 3, "top material cell 1");
+
+const voxels = new Uint16Array([
+  // z0
+  1, 1,
+  0, 0,
+  // z1
+  0, 0,
+  2, 0,
+]);
+const visible = collectVisibleVoxels(voxels, 2, 2, 2);
+assert(visible.length >= 2, "visible voxel extraction");
+
+const connectivity = computeVoxelConnectivity(voxels, 2, 2, 2);
+assert(connectivity.componentCount === 2, "connectivity components");
+
+const fillMetrics = computeVoxelFillMetrics(voxels, 2, 2, 2);
+assert(fillMetrics.filledVoxels === 3, "fill metrics filled count");
+assert(fillMetrics.fillRatio > 0.3 && fillMetrics.fillRatio < 0.4, "fill metrics ratio");
+
+const reliefMetrics = computeScenarioReliefMetrics(
+  new Float32Array([
+    0.1, 0.2, 0.8,
+    0.2, 0.35, 0.9,
+    0.15, 0.4, 0.88,
+  ]),
+  3,
+  3,
+);
+assert(reliefMetrics.heightSpan > 0.7, "scenario relief height span");
+assert(reliefMetrics.slopeMean > 0.09, "scenario relief slope mean");
+assert(reliefMetrics.waterCoverage > 0 && reliefMetrics.waterCoverage < 0.6, "scenario water coverage");
+assert(reliefMetrics.landComponents >= 1, "scenario land components");
 
 console.log("tests ok");

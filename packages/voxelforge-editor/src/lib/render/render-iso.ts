@@ -30,6 +30,8 @@ export type IsoSettings = {
   baselineZ: number;       // Baseline Z for the grid (default 0)
   lightDir: { x: number; y: number; z: number }; // Light direction for shading
   voxelZScale: number;     // Z scale multiplier for voxel layers (default 1)
+  axisScale: { x: number; y: number; z: number }; // World scale by axis before projection
+  centerBiasY: number;     // Vertical center bias as ratio of canvas height
 };
 
 const DEFAULT_ISO_SETTINGS: IsoSettings = {
@@ -41,9 +43,80 @@ const DEFAULT_ISO_SETTINGS: IsoSettings = {
   baselineZ: 0,
   lightDir: { x: -0.5, y: -0.5, z: 1 },
   voxelZScale: 1,
+  axisScale: { x: 1, y: 1, z: 1 },
+  centerBiasY: 1 / 3,
+};
+
+const BASE_ISO_SETTINGS: IsoSettings = {
+  ...DEFAULT_ISO_SETTINGS,
+  lightDir: { ...DEFAULT_ISO_SETTINGS.lightDir },
+  axisScale: { ...DEFAULT_ISO_SETTINGS.axisScale },
 };
 
 export const ISO_DEFAULTS = DEFAULT_ISO_SETTINGS;
+
+export const resetIsoViewDefaults = (): void => {
+  DEFAULT_ISO_SETTINGS.tileW = BASE_ISO_SETTINGS.tileW;
+  DEFAULT_ISO_SETTINGS.tileH = BASE_ISO_SETTINGS.tileH;
+  DEFAULT_ISO_SETTINGS.zStep = BASE_ISO_SETTINGS.zStep;
+  DEFAULT_ISO_SETTINGS.defaultHeight = BASE_ISO_SETTINGS.defaultHeight;
+  DEFAULT_ISO_SETTINGS.heightMode = BASE_ISO_SETTINGS.heightMode;
+  DEFAULT_ISO_SETTINGS.baselineZ = BASE_ISO_SETTINGS.baselineZ;
+  DEFAULT_ISO_SETTINGS.lightDir = { ...BASE_ISO_SETTINGS.lightDir };
+  DEFAULT_ISO_SETTINGS.voxelZScale = BASE_ISO_SETTINGS.voxelZScale;
+  DEFAULT_ISO_SETTINGS.axisScale = { ...BASE_ISO_SETTINGS.axisScale };
+  DEFAULT_ISO_SETTINGS.centerBiasY = BASE_ISO_SETTINGS.centerBiasY;
+};
+
+export const applyIsoViewDefaults = (input: {
+  tileW?: number;
+  tileH?: number;
+  zStep?: number;
+  defaultHeight?: number;
+  baselineZ?: number;
+  axisScale?: { x: number; y: number; z: number };
+  centerBiasY?: number;
+}): void => {
+  if (typeof input.tileW === 'number' && Number.isFinite(input.tileW) && input.tileW > 0) {
+    DEFAULT_ISO_SETTINGS.tileW = input.tileW;
+  }
+  if (typeof input.tileH === 'number' && Number.isFinite(input.tileH) && input.tileH > 0) {
+    DEFAULT_ISO_SETTINGS.tileH = input.tileH;
+  }
+  if (typeof input.zStep === 'number' && Number.isFinite(input.zStep) && input.zStep > 0) {
+    DEFAULT_ISO_SETTINGS.zStep = input.zStep;
+  }
+  if (
+    typeof input.defaultHeight === 'number' &&
+    Number.isFinite(input.defaultHeight) &&
+    input.defaultHeight >= 0
+  ) {
+    DEFAULT_ISO_SETTINGS.defaultHeight = input.defaultHeight;
+  }
+  if (typeof input.baselineZ === 'number' && Number.isFinite(input.baselineZ)) {
+    DEFAULT_ISO_SETTINGS.baselineZ = input.baselineZ;
+  }
+  if (input.axisScale) {
+    const next = input.axisScale;
+    if (typeof next.x === 'number' && Number.isFinite(next.x) && Math.abs(next.x) > 1e-6) {
+      DEFAULT_ISO_SETTINGS.axisScale.x = next.x;
+    }
+    if (typeof next.y === 'number' && Number.isFinite(next.y) && Math.abs(next.y) > 1e-6) {
+      DEFAULT_ISO_SETTINGS.axisScale.y = next.y;
+    }
+    if (typeof next.z === 'number' && Number.isFinite(next.z) && Math.abs(next.z) > 1e-6) {
+      DEFAULT_ISO_SETTINGS.axisScale.z = next.z;
+    }
+  }
+  if (
+    typeof input.centerBiasY === 'number' &&
+    Number.isFinite(input.centerBiasY) &&
+    input.centerBiasY >= 0 &&
+    input.centerBiasY <= 1
+  ) {
+    DEFAULT_ISO_SETTINGS.centerBiasY = input.centerBiasY;
+  }
+};
 
 /** Unpacks RGBA from packed uint32 */
 const unpack = (color: number) => ({
@@ -190,7 +263,14 @@ export const renderDocumentIso = (
   floatingOverridesByLayer: Map<LayerId, Map<number, number>> = new Map()
 ) => {
   const opts: IsoSettings = { ...DEFAULT_ISO_SETTINGS, ...settings };
-  const { tileW, tileH, zStep, baselineZ, lightDir } = opts;
+  const { tileW, tileH, zStep, baselineZ, lightDir, centerBiasY } = opts;
+  const axisScale = {
+    x: Math.abs(opts.axisScale.x) > 1e-6 ? opts.axisScale.x : 1,
+    y: Math.abs(opts.axisScale.y) > 1e-6 ? opts.axisScale.y : 1,
+    z: Math.abs(opts.axisScale.z) > 1e-6 ? opts.axisScale.z : 1,
+  };
+  const projectScaled = (x: number, y: number, z: number) =>
+    projectIso(x * axisScale.x, y * axisScale.y, z * axisScale.z, tileW, tileH, zStep);
   
   // Initialize texture cache if textures enabled
   if (showTextures) {
@@ -218,7 +298,7 @@ export const renderDocumentIso = (
   
   // Calculate center offset
   const centerX = canvasWidth / 2 + camera.x;
-  const centerY = canvasHeight / 3 + camera.y;
+  const centerY = canvasHeight * centerBiasY + camera.y;
   
   ctx.save();
   ctx.scale(camera.zoom, camera.zoom);
@@ -262,7 +342,7 @@ export const renderDocumentIso = (
         const totalZ = layerBaseZ + materialHeight;
         
         // Project to screen (including layer's pixel offset)
-        const { sx, sy: baseSy } = projectIso(x, y, totalZ, tileW, tileH, zStep);
+        const { sx, sy: baseSy } = projectScaled(x, y, totalZ);
         const sy = baseSy - layerPixelOffset;
         
         // Get texture tile if textures enabled
@@ -270,7 +350,7 @@ export const renderDocumentIso = (
         
         // Draw walls if height > 0
         if (materialHeight > 0) {
-          const wallPixelHeight = materialHeight * zStep;
+          const wallPixelHeight = materialHeight * zStep * axisScale.z;
           
           if (textureTile) {
             const leftBrightness = 0.6 + 0.2 * lightDir.x;
@@ -369,10 +449,10 @@ export const renderDocumentIso = (
 
         // Project the TOP of the voxel (z + 1 level)
         const voxelTopZ = layerBaseZ + (v.z + 1) * voxelZScale;
-        const { sx, sy: baseSy } = projectIso(v.x, v.y, voxelTopZ, tileW, tileH, zStep);
+        const { sx, sy: baseSy } = projectScaled(v.x, v.y, voxelTopZ);
         const sy = baseSy - layerPixelOffset;
 
-        const wallPixelHeight = zStep * voxelZScale;
+        const wallPixelHeight = zStep * voxelZScale * axisScale.z;
         const hw = tileW / 2;
         const hh = tileH / 2;
         
@@ -475,16 +555,16 @@ export const renderDocumentIso = (
     const firstGrid = sortedLayers.find(l => l.type === 'grid2d') as GridLayer | undefined;
     if (firstGrid) {
       for (let x = 0; x <= firstGrid.width; x += gridStep) {
-        const p1 = projectIso(x, 0, baselineZ, tileW, tileH, zStep);
-        const p2 = projectIso(x, firstGrid.height, baselineZ, tileW, tileH, zStep);
+        const p1 = projectScaled(x, 0, baselineZ);
+        const p2 = projectScaled(x, firstGrid.height, baselineZ);
         ctx.beginPath();
         ctx.moveTo(p1.sx, p1.sy);
         ctx.lineTo(p2.sx, p2.sy);
         ctx.stroke();
       }
       for (let y = 0; y <= firstGrid.height; y += gridStep) {
-        const p1 = projectIso(0, y, baselineZ, tileW, tileH, zStep);
-        const p2 = projectIso(firstGrid.width, y, baselineZ, tileW, tileH, zStep);
+        const p1 = projectScaled(0, y, baselineZ);
+        const p2 = projectScaled(firstGrid.width, y, baselineZ);
         ctx.beginPath();
         ctx.moveTo(p1.sx, p1.sy);
         ctx.lineTo(p2.sx, p2.sy);
@@ -506,18 +586,22 @@ export const screenToIso = (
   settings: Partial<IsoSettings> = {}
 ): { x: number; y: number } => {
   const opts: IsoSettings = { ...DEFAULT_ISO_SETTINGS, ...settings };
-  const { tileW, tileH } = opts;
+  const { tileW, tileH, centerBiasY } = opts;
+  const axisScaleX = Math.abs(opts.axisScale.x) > 1e-6 ? opts.axisScale.x : 1;
+  const axisScaleY = Math.abs(opts.axisScale.y) > 1e-6 ? opts.axisScale.y : 1;
   
   const centerX = canvasWidth / 2 + camera.x;
-  const centerY = canvasHeight / 3 + camera.y;
+  const centerY = canvasHeight * centerBiasY + camera.y;
   
   // Transform screen to world
   const worldX = (screenX - centerX) / camera.zoom;
   const worldY = (screenY - centerY) / camera.zoom;
   
   // Inverse isometric projection (at z=0)
-  const x = (worldX / (tileW / 2) + worldY / (tileH / 2)) / 2;
-  const y = (worldY / (tileH / 2) - worldX / (tileW / 2)) / 2;
+  const scaledX = (worldX / (tileW / 2) + worldY / (tileH / 2)) / 2;
+  const scaledY = (worldY / (tileH / 2) - worldX / (tileW / 2)) / 2;
+  const x = scaledX / axisScaleX;
+  const y = scaledY / axisScaleY;
   
   return { x: Math.floor(x), y: Math.floor(y) };
 };

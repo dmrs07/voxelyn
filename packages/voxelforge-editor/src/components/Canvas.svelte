@@ -657,8 +657,9 @@
     if (!['pencil', 'eraser', 'line', 'rect', 'ellipse', 'fill'].includes(tool)) return;
 
     const { tileW, tileH, zStep, baselineZ } = ISO_DEFAULTS;
+    const axisScale = ISO_DEFAULTS.axisScale;
     const centerX = canvas.clientWidth / 2 + doc.camera.x;
-    const centerY = canvas.clientHeight / 3 + doc.camera.y;
+    const centerY = canvas.clientHeight * ISO_DEFAULTS.centerBiasY + doc.camera.y;
 
     const gx = ghostVoxel.x;
     const gy = ghostVoxel.y;
@@ -667,7 +668,14 @@
     const gz = layer?.type === 'voxel3d' ? layerBaseZ + (activeZ + 1) : baselineZ;
 
     // Project ghost voxel position
-    const projected = projectIso(gx, gy, gz, tileW, tileH, zStep);
+    const projected = projectIso(
+      gx * axisScale.x,
+      gy * axisScale.y,
+      gz * axisScale.z,
+      tileW,
+      tileH,
+      zStep,
+    );
     const sx = projected.sx;
     const sy = projected.sy - layerPixelOffset;
 
@@ -685,7 +693,7 @@
 
     const hw = tileW / 2;
     const hh = tileH / 2;
-    const wallHeight = zStep;
+    const wallHeight = zStep * axisScale.z;
 
     // Draw ghost with transparency
     ctx.globalAlpha = tool === 'eraser' ? 0.3 : 0.5;
@@ -748,8 +756,9 @@
     }
 
     const { tileW, tileH, zStep, baselineZ } = ISO_DEFAULTS;
+    const axisScale = ISO_DEFAULTS.axisScale;
     const centerX = canvas.clientWidth / 2 + doc.camera.x;
-    const centerY = canvas.clientHeight / 3 + doc.camera.y;
+    const centerY = canvas.clientHeight * ISO_DEFAULTS.centerBiasY + doc.camera.y;
     const layerBaseZ = baselineZ + ((layer?.zIndex ?? 0) * ISO_DEFAULTS.defaultHeight);
     const selectionZ = layer?.type === 'voxel3d' ? layerBaseZ + (activeZ + 1) : baselineZ;
     const selectionPixelOffset = layer?.isoHeight ?? 0;
@@ -759,10 +768,10 @@
     const x1 = selectionToDraw.x + selectionToDraw.width;
     const y1 = selectionToDraw.y + selectionToDraw.height;
 
-    const p1 = projectIso(x0, y0, selectionZ, tileW, tileH, zStep);
-    const p2 = projectIso(x1, y0, selectionZ, tileW, tileH, zStep);
-    const p3 = projectIso(x1, y1, selectionZ, tileW, tileH, zStep);
-    const p4 = projectIso(x0, y1, selectionZ, tileW, tileH, zStep);
+    const p1 = projectIso(x0 * axisScale.x, y0 * axisScale.y, selectionZ * axisScale.z, tileW, tileH, zStep);
+    const p2 = projectIso(x1 * axisScale.x, y0 * axisScale.y, selectionZ * axisScale.z, tileW, tileH, zStep);
+    const p3 = projectIso(x1 * axisScale.x, y1 * axisScale.y, selectionZ * axisScale.z, tileW, tileH, zStep);
+    const p4 = projectIso(x0 * axisScale.x, y1 * axisScale.y, selectionZ * axisScale.z, tileW, tileH, zStep);
 
     ctx.save();
     ctx.scale(doc.camera.zoom, doc.camera.zoom);

@@ -15,6 +15,7 @@ export * from "./core/terrainGen.js";
 
 export * from "./extras/iso/iso.js";
 export * from "./extras/sprites/blit.js";
+export * from "./extras/bundles/bundle-utils.js";
 export * from "./extras/voxels/voxelGrid3d.js";
 export * from "./extras/voxels/renderSlices.js";
 export * from "./extras/voxels/renderRaycastCPU.js";

@@ -52,6 +52,8 @@ test('parse generate scenario options (resolution, intent, workers)', () => {
     '--intent-mode',
     'deep',
     '--intent-strict',
+    '--auto-view',
+    'off',
     '--debug-ai',
   ]);
 
@@ -69,6 +71,7 @@ test('parse generate scenario options (resolution, intent, workers)', () => {
   assert.equal(parsed.options.workers, 'auto');
   assert.equal(parsed.options.intentMode, 'deep');
   assert.equal(parsed.options.intentStrict, true);
+  assert.equal(parsed.options.autoView, false);
   assert.equal(parsed.options.debugAi, true);
 });
 
@@ -92,4 +95,38 @@ test('parse generate texture options including texture-size precedence inputs', 
   assert.equal(parsed.options.provider, 'gemini');
   assert.equal(parsed.options.enhancedTerrain, false);
   assert.equal(parsed.options.workers, 3);
+});
+
+test('parse generate object quality options with pt aliases', () => {
+  const parsed = parseArgs([
+    'generate',
+    'object',
+    '--prompt',
+    'rato do tibia',
+    '--detalhe',
+    'high',
+    '--tamanho',
+    '24x24x24',
+    '--qtd',
+    '12000',
+    '--quality',
+    'ultra',
+    '--attempts',
+    '6',
+    '--min-score',
+    '0.72',
+    '--model-escalation=off',
+    '--strict-quality',
+  ]);
+
+  assert.equal(parsed.command, 'generate');
+  assert.deepEqual(parsed.positionals, ['object']);
+  assert.equal(parsed.options.detail, 'high');
+  assert.equal(parsed.options.size, '24x24x24');
+  assert.equal(parsed.options.maxVoxels, 12000);
+  assert.equal(parsed.options.quality, 'ultra');
+  assert.equal(parsed.options.attempts, 6);
+  assert.equal(parsed.options.minScore, 0.72);
+  assert.equal(parsed.options.modelEscalation, false);
+  assert.equal(parsed.options.strictQuality, true);
 });

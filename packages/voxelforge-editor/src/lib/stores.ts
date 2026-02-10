@@ -745,7 +745,7 @@ export const toolStore = createToolStore();
 // UI Store
 // ============================================================================
 
-export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation' | 'ai';
+export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation' | 'ai' | 'assets';
 export type Voxel2DRenderMode = 'slice' | 'projection';
 
 const createUIStore = () => {
@@ -755,6 +755,7 @@ const createUIStore = () => {
     palette: true,
     simulation: false,
     ai: false,
+    assets: false,
   });
   
   const showGrid = writable(true);

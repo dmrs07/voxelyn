@@ -9,12 +9,15 @@
   import PalettePanel from './components/PalettePanel.svelte';
   import StatusBar from './components/StatusBar.svelte';
   import AIGeneratorPanel from './components/AIGeneratorPanel.svelte';
+  import AssetLibraryPanel from './components/AssetLibraryPanel.svelte';
   import { uiStore, documentStore, palette } from '$lib/stores';
-  import { Cube, Sparkle } from 'phosphor-svelte';
+  import { applyIsoViewDefaults, resetIsoViewDefaults } from '$lib/render/render-iso';
+  import { Archive, Cube, Sparkle } from 'phosphor-svelte';
+  import type { BundleViewSettings } from '@voxelyn/core';
 
   const VERSION = __APP_VERSION__;
   
-  let panels = $state({ tools: true, layers: true, palette: true, simulation: false, ai: false });
+  let panels = $state({ tools: true, layers: true, palette: true, simulation: false, ai: false, assets: false });
   uiStore.panels.subscribe((value) => (panels = value));
 
   let currentPalette = $state<import('@voxelyn/core').Material[]>([]);
@@ -22,6 +25,33 @@
 
   const togglePanel = (id: keyof typeof panels) => {
     uiStore.panels.toggle(id);
+  };
+
+  const applyAutoViewSettings = (viewSettings: BundleViewSettings | null | undefined): void => {
+    if (!viewSettings) return;
+    resetIsoViewDefaults();
+    applyIsoViewDefaults({
+      tileW: viewSettings.iso.tileW,
+      tileH: viewSettings.iso.tileH,
+      zStep: viewSettings.iso.zStep,
+      defaultHeight: viewSettings.iso.defaultHeight,
+      baselineZ: viewSettings.iso.baselineZ,
+      axisScale: viewSettings.iso.axisScale,
+      centerBiasY: viewSettings.iso.centerBiasY,
+    });
+    documentStore.setCamera({
+      x: viewSettings.camera.x,
+      y: viewSettings.camera.y,
+      zoom: viewSettings.camera.zoom,
+      rotation: viewSettings.camera.rotation,
+    });
+  };
+
+  const readMetaViewSettings = (meta: unknown): BundleViewSettings | null => {
+    if (!meta || typeof meta !== 'object') return null;
+    const candidate = (meta as { viewSettings?: unknown }).viewSettings;
+    if (!candidate || typeof candidate !== 'object') return null;
+    return candidate as BundleViewSettings;
   };
 
   // AI Generation handlers
@@ -103,6 +133,45 @@
     documentStore.setViewMode('3d');
     console.log('Created scenario with terrain layer');
   }
+
+  function handleObjectImported(data: Uint16Array, width: number, height: number, depth: number, meta?: unknown) {
+    const name =
+      typeof meta === 'object' && meta !== null && 'id' in meta
+        ? `Bundle Object ${(meta as { id?: string }).id ?? ''}`.trim()
+        : 'Bundle Object';
+    const layerId = documentStore.addVoxelLayerWithData(data, width, height, depth, name);
+    documentStore.setViewMode('3d');
+    applyAutoViewSettings(readMetaViewSettings(meta));
+    console.log('Imported object bundle as layer', { layerId, meta });
+  }
+
+  function handleScenarioImported(
+    terrain: Uint16Array,
+    width: number,
+    height: number,
+    depth: number,
+    meta?: unknown,
+  ) {
+    const title =
+      typeof meta === 'object' && meta !== null && 'id' in meta
+        ? `Bundle Scenario ${(meta as { id?: string }).id ?? ''}`.trim()
+        : 'Bundle Scenario';
+    documentStore.newDocument(width, height, depth, title);
+    documentStore.addVoxelLayerWithData(terrain, width, height, depth, 'Terrain');
+    documentStore.setViewMode('3d');
+    applyAutoViewSettings(readMetaViewSettings(meta));
+    console.log('Imported scenario bundle', { meta });
+  }
+
+  function handleTextureImported(texture: Uint32Array, _width: number, _height: number, meta?: unknown) {
+    handleTextureGenerated(texture, { source: 'bundle', meta }, undefined);
+    applyAutoViewSettings(readMetaViewSettings(meta));
+    console.log('Imported texture bundle', { meta });
+  }
+
+  function handleApplyViewSettings(viewSettings: BundleViewSettings): void {
+    applyAutoViewSettings(viewSettings);
+  }
 </script>
 
 <div class="app">
@@ -123,12 +192,16 @@
         <Sparkle size={12} weight="fill" />
         AI
       </button>
+      <button class:active={panels.assets} onclick={() => togglePanel('assets')}>
+        <Archive size={12} weight="fill" />
+        Assets
+      </button>
     </div>
   </header>
   
   <main
     class="workspace"
-    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette || panels.ai) ? '400px' : '0px'}`}
+    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette || panels.ai || panels.assets) ? '400px' : '0px'}`}
   >
     <aside class="left-sidebar" class:collapsed={!panels.tools}>
       {#if panels.tools}
@@ -140,7 +213,15 @@
       <Canvas />
     </section>
     
-    <aside class="right-sidebar" class:collapsed={!panels.layers && !panels.palette && !panels.ai}>
+    <aside class="right-sidebar" class:collapsed={!panels.layers && !panels.palette && !panels.ai && !panels.assets}>
+      {#if panels.assets}
+        <AssetLibraryPanel
+          onObjectImported={handleObjectImported}
+          onScenarioImported={handleScenarioImported}
+          onTextureImported={handleTextureImported}
+          onApplyViewSettings={handleApplyViewSettings}
+        />
+      {/if}
       {#if panels.ai}
         <AIGeneratorPanel 
           palette={currentPalette}

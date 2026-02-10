@@ -28,6 +28,14 @@ export type CliOptions = {
   model?: string;
   seed?: number;
   size?: string;
+  detail?: 'low' | 'medium' | 'high';
+  maxVoxels?: number;
+  quality?: 'fast' | 'balanced' | 'high' | 'ultra';
+  attempts?: number;
+  minScore?: number;
+  modelEscalation?: boolean;
+  allowBase?: boolean;
+  strictQuality?: boolean;
   depth?: number;
   scale?: number;
   textureSize?: string;
@@ -37,6 +45,7 @@ export type CliOptions = {
   debugAi?: boolean;
   intentMode?: 'fast' | 'balanced' | 'deep';
   intentStrict?: boolean;
+  autoView?: boolean;
 };
 
 export type CommandName =

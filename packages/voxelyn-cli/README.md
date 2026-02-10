@@ -63,6 +63,14 @@ Generate options:
 - `--model <id>`: explicit model id
 - `--seed <int>`: deterministic seed
 - `--size <N|WxH>`: scenario/texture size
+- `--detail <low|medium|high>`: object detail level
+- `--max-voxels <N>`: object voxel budget (aliases: `--voxels`, `--qtd`)
+- `--quality <fast|balanced|high|ultra>`: object quality profile (default: `ultra`)
+- `--attempts <N>`: object generation attempts override
+- `--min-score <0..1>`: quality target override
+- `--model-escalation <on|off>`: model/temperature escalation policy
+- `--allow-base`: allow baseplate/backdrop geometry in generated objects
+- `--strict-quality`: fail if quality target is not reached
 - `--texture-size <N|WxH>`: texture size override (takes precedence over `--size` for `texture`)
 - `--depth <int>`: scenario depth in Z voxels
 - `--scale <float>`: world/voxel scale multiplier
@@ -71,6 +79,8 @@ Generate options:
 - `--workers <auto|N>`: optional chunk worker parallelism hint for scenario generation
 - `--intent-mode <fast|balanced|deep>`: ScenarioIntent pipeline mode
 - `--intent-strict`: enforce stricter intent conflict resolution
+- `--auto-view <on|off>`: generate deterministic `view.settings.json` (default: `on`)
+- `--no-auto-view`: disable `view.settings.json` generation
 - `--debug-ai`: print stage/provider debug timings
 
 By default, `create` installs dependencies unless `--no-install` or `--dry-run` is used.
@@ -119,6 +129,7 @@ Default output format is `bundle`.
 - `texture.params.json`
 - `texture.ppm`
 - `texture.meta.json`
+- `view.settings.json` (when auto-view is enabled)
 
 ### Scenario bundle
 
@@ -133,6 +144,7 @@ Default output format is `bundle`.
 - `scenario.preview.ppm`
 - `terrain.spec.json`
 - `scenario.scale.json`
+- `view.settings.json` (when auto-view is enabled)
 
 ### Object bundle
 
@@ -140,6 +152,7 @@ Default output format is `bundle`.
 - `object.blueprint.json`
 - `object.voxels.u16`
 - `object.meta.json`
+- `view.settings.json` (when auto-view is enabled)
 
 Alternative scenario outputs:
 
