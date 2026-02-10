@@ -13,8 +13,8 @@
   "scripts": {
     "dev": "VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
     "start": "electron .",
-    "build": "pnpm -w icons:generate && pnpm --filter @voxelforge/editor build && node scripts/copy-renderer.mjs && electron-builder",
-    "dist": "pnpm -w icons:generate && pnpm --filter @voxelforge/editor build && node scripts/copy-renderer.mjs && electron-builder --publish=never"
+    "build": "pnpm -w icons:generate && pnpm --filter @voxelyn/cli build && pnpm --filter @voxelforge/editor build && node scripts/copy-renderer.mjs && node scripts/copy-cli.mjs && electron-builder",
+    "dist": "pnpm -w icons:generate && pnpm --filter @voxelyn/cli build && pnpm --filter @voxelforge/editor build && node scripts/copy-renderer.mjs && node scripts/copy-cli.mjs && electron-builder --publish=never"
   },
   "devDependencies": {
     "electron": "^33.4.11",
@@ -33,7 +33,8 @@
       "main.js",
       "preload.js",
       "assets/icon.png",
-      "renderer/**/*"
+      "renderer/**/*",
+      "cli/**/*"
     ],
     "mac": {
       "target": "dmg"
@@ -48,6 +49,13 @@
       "maintainer": "VoxelForge <dev@voxelforge.local>",
       "executableName": "voxelforge"
     },
+    "extraResources": [
+      {
+        "from": "../voxelyn-cli/dist",
+        "to": "voxelyn-cli/dist",
+        "filter": ["**/*"]
+      }
+    ],
     "extraMetadata": {
       "homepage": "https://example.com/voxelforge",
       "author": "VoxelForge <dev@voxelforge.local>"

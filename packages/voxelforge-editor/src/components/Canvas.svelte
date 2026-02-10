@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { documentStore, toolStore, uiStore, activeLayer, type Voxel2DRenderMode } from '$lib/stores';
+  import { documentStore, toolStore, uiStore, activeLayer, worldStore, type Voxel2DRenderMode } from '$lib/stores';
   import { toolRegistry, getToolByHotkey, type ToolRuntimeState, type ToolContext } from '$lib/tool-system';
   import { renderDocumentToSurface } from '$lib/render/render-surface';
   import { renderDocumentIso, screenToIso, ISO_DEFAULTS } from '$lib/render/render-iso';
@@ -11,6 +11,8 @@
   import { projectIso } from '@voxelyn/core';
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Cube, Minus, Plus } from 'phosphor-svelte';
   import type { VoxelLayer, EditorDocument, Selection, BlendMode } from '$lib/document/types';
+  import type { WorldStoreState } from '$lib/world/store';
+  import type { Vec3, WorldItem } from '$lib/world/types';
   import { createRectSelection } from '$lib/document/types';
   import { mergeSelection, type SelectionOp } from '$lib/document/selection';
   import type { ToolId, ToolSettings } from '$lib/stores';
@@ -50,7 +52,7 @@
   const referenceImages = new Map<string, HTMLImageElement>();
   
   // Local state from stores
-  let doc: EditorDocument = get(documentStore);
+  let doc = $state<EditorDocument>(get(documentStore));
   let tool: ToolId = get(toolStore.activeTool);
   let settings: ToolSettings = get(toolStore.settings);
   let primaryMat: number = get(toolStore.primaryMaterial);
@@ -66,6 +68,26 @@
   let isPanModifier = false;
   let lastDocDims = { width: 0, height: 0, depth: 0 };
   let lastViewMode = '2d' as EditorDocument['viewMode'];
+  let worldState = $state<WorldStoreState>({
+    world: {
+      worldVersion: 1,
+      viewMode: '3d',
+      items: [],
+      hero: { spawn: [0, 0, 0], collision: 'aabb' },
+      composer: { snapEnabled: true, snapSize: 1, snapFromMeta: true, rotationStepDeg: 15, space: 'world' },
+    },
+    selectedItemId: null,
+    composerMode: false,
+    testMode: false,
+    heroPosition: [0, 0, 0],
+    heroSpawnPlacementMode: false,
+    loading: false,
+    dirty: false,
+    message: null,
+    error: null,
+  });
+  let worldDragging = false;
+  let worldDragStartPos: Vec3 = [0, 0, 0];
 
   const invalidateRender = () => {
     needsRender = true;
@@ -245,7 +267,247 @@
     render,
   });
 
+  const getSelectedWorldItem = (): WorldItem | null =>
+    worldState.world.items.find((item) => item.id === worldState.selectedItemId) ?? null;
+
+  const snapValue = (value: number, step: number): number => {
+    if (!Number.isFinite(step) || step <= 0) return value;
+    return Math.round(value / step) * step;
+  };
+
+  const getItemSnapStep = (item: WorldItem): number => {
+    const snap = worldState.world.composer.snapSize;
+    if (!worldState.world.composer.snapEnabled) return 0;
+    if (!worldState.world.composer.snapFromMeta) return snap;
+    const mx = Math.max(1, Number(item.meta.width ?? 1));
+    const my = Math.max(1, Number(item.meta.height ?? 1));
+    const mz = Math.max(1, Number(item.meta.depth ?? 1));
+    return Math.max(0.25, Math.max(mx, my, mz, snap));
+  };
+
+  const applySnapToPosition = (item: WorldItem, position: Vec3): Vec3 => {
+    const step = getItemSnapStep(item);
+    if (step <= 0) return position;
+    return [snapValue(position[0], step), snapValue(position[1], step), snapValue(position[2], step)];
+  };
+
+  const worldToScreen = (position: Vec3): { x: number; y: number } | null => {
+    if (!canvas) return null;
+    if (doc.viewMode === '2d') {
+      return {
+        x: position[0] * doc.camera.zoom + doc.camera.x,
+        y: position[1] * doc.camera.zoom + doc.camera.y,
+      };
+    }
+    if (doc.viewMode === 'iso') {
+      const { tileW, tileH, zStep, axisScale, centerBiasY } = ISO_DEFAULTS;
+      const projected = projectIso(
+        position[0] * axisScale.x,
+        position[2] * axisScale.y,
+        position[1] * axisScale.z,
+        tileW,
+        tileH,
+        zStep
+      );
+      return {
+        x: canvas.clientWidth / 2 + doc.camera.x + projected.sx * doc.camera.zoom,
+        y: canvas.clientHeight * centerBiasY + doc.camera.y + projected.sy * doc.camera.zoom,
+      };
+    }
+    return project3dPoint({ x: position[0], y: position[1], z: position[2] });
+  };
+
+  const getRayFromScreen3d = (screenX: number, screenY: number): { origin: Vec3; direction: Vec3 } | null => {
+    if (!canvas) return null;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const ndcX = (screenX / width) * 2 - 1;
+    const ndcY = 1 - (screenY / height) * 2;
+    const aspect = width / height;
+    const tanHalfFov = Math.tan(view3dSettings.fov / 2);
+
+    const rayDirCameraX = ndcX * tanHalfFov * aspect;
+    const rayDirCameraY = ndcY * tanHalfFov;
+    const rayDirCameraZ = -1;
+    const { camera } = getViewBasis();
+    const forward = {
+      x: view3d.target.x - camera.x,
+      y: view3d.target.y - camera.y,
+      z: view3d.target.z - camera.z,
+    };
+    const fLen = Math.hypot(forward.x, forward.y, forward.z) || 1;
+    const fwd = { x: forward.x / fLen, y: forward.y / fLen, z: forward.z / fLen };
+    const upWorld = { x: 0, y: 1, z: 0 };
+    const right = {
+      x: fwd.y * upWorld.z - fwd.z * upWorld.y,
+      y: fwd.z * upWorld.x - fwd.x * upWorld.z,
+      z: fwd.x * upWorld.y - fwd.y * upWorld.x,
+    };
+    const rLen = Math.hypot(right.x, right.y, right.z) || 1;
+    const r = { x: right.x / rLen, y: right.y / rLen, z: right.z / rLen };
+    const up = {
+      x: r.y * fwd.z - r.z * fwd.y,
+      y: r.z * fwd.x - r.x * fwd.z,
+      z: r.x * fwd.y - r.y * fwd.x,
+    };
+    const dir = {
+      x: r.x * rayDirCameraX + up.x * rayDirCameraY + fwd.x * rayDirCameraZ,
+      y: r.y * rayDirCameraX + up.y * rayDirCameraY + fwd.y * rayDirCameraZ,
+      z: r.z * rayDirCameraX + up.z * rayDirCameraY + fwd.z * rayDirCameraZ,
+    };
+    const dLen = Math.hypot(dir.x, dir.y, dir.z) || 1;
+    return {
+      origin: [camera.x, camera.y, camera.z],
+      direction: [dir.x / dLen, dir.y / dLen, dir.z / dLen],
+    };
+  };
+
+  const screenToWorldPlacement = (clientX: number, clientY: number, baseY = 0): Vec3 => {
+    if (!canvas) return [0, baseY, 0];
+    const rect = canvas.getBoundingClientRect();
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+    if (doc.viewMode === '2d') {
+      const x = (screenX - doc.camera.x) / doc.camera.zoom;
+      const y = (screenY - doc.camera.y) / doc.camera.zoom;
+      return [x, y, baseY];
+    }
+    if (doc.viewMode === 'iso') {
+      const iso = screenToIso(screenX, screenY, canvas.clientWidth, canvas.clientHeight, doc.camera);
+      return [iso.x, baseY, iso.y];
+    }
+    const ray = getRayFromScreen3d(screenX, screenY);
+    if (!ray) return [view3d.target.x, baseY, view3d.target.z];
+    const dirY = ray.direction[1];
+    if (Math.abs(dirY) < 1e-6) return [view3d.target.x, baseY, view3d.target.z];
+    const t = (baseY - ray.origin[1]) / dirY;
+    if (!Number.isFinite(t) || t < 0) return [view3d.target.x, baseY, view3d.target.z];
+    return [
+      ray.origin[0] + ray.direction[0] * t,
+      baseY,
+      ray.origin[2] + ray.direction[2] * t,
+    ];
+  };
+
+  const hitTestWorldItem = (clientX: number, clientY: number): WorldItem | null => {
+    const radius = 12;
+    for (let i = worldState.world.items.length - 1; i >= 0; i -= 1) {
+      const item = worldState.world.items[i];
+      const projected = worldToScreen(item.transform.position);
+      if (!projected) continue;
+      const dx = projected.x - clientX;
+      const dy = projected.y - clientY;
+      if (Math.hypot(dx, dy) <= radius) return item;
+    }
+    return null;
+  };
+
+  const drawWorldOverlay2d = () => {
+    if (!ctx) return;
+    for (const item of worldState.world.items) {
+      const selected = item.id === worldState.selectedItemId;
+      const x = item.transform.position[0];
+      const y = item.transform.position[1];
+      ctx.save();
+      ctx.lineWidth = 2 / doc.camera.zoom;
+      ctx.strokeStyle = selected ? '#4ade80' : '#60a5fa';
+      ctx.beginPath();
+      ctx.arc(x, y, 6 / doc.camera.zoom, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (worldState.testMode) {
+      ctx.save();
+      ctx.lineWidth = 2 / doc.camera.zoom;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(worldState.heroPosition[0], worldState.heroPosition[1], 7 / doc.camera.zoom, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  const drawWorldOverlayIso = () => {
+    if (!ctx) return;
+    ctx.save();
+    for (const item of worldState.world.items) {
+      const selected = item.id === worldState.selectedItemId;
+      const projected = worldToScreen(item.transform.position);
+      if (!projected) continue;
+      ctx.strokeStyle = selected ? '#4ade80' : '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(projected.x, projected.y, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (worldState.testMode) {
+      const hero = worldToScreen(worldState.heroPosition);
+      if (hero) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hero.x, hero.y, 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  };
+
+  const drawWorldOverlay3d = () => {
+    if (!ctx) return;
+    ctx.save();
+    for (const item of worldState.world.items) {
+      const selected = item.id === worldState.selectedItemId;
+      const projected = worldToScreen(item.transform.position);
+      if (!projected) continue;
+      ctx.strokeStyle = selected ? '#4ade80' : '#60a5fa';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(projected.x, projected.y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (worldState.testMode) {
+      const hero = worldToScreen(worldState.heroPosition);
+      if (hero) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(hero.x, hero.y, 8, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  };
+
   const handlePointerDown = (e: PointerEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+
+    if (worldState.heroSpawnPlacementMode) {
+      e.preventDefault();
+      const anchor = doc.viewMode === '2d' ? worldState.world.hero.spawn[2] : worldState.world.hero.spawn[1];
+      const spawn = screenToWorldPlacement(e.clientX, e.clientY, anchor);
+      worldStore.setHeroSpawn(spawn);
+      invalidateRender();
+      render();
+      return;
+    }
+
+    if (worldState.composerMode && !worldState.testMode) {
+      const hit = hitTestWorldItem(localX, localY);
+      worldStore.setSelectedItem(hit?.id ?? null);
+      if (hit && e.button === 0) {
+        worldDragging = true;
+        worldDragStartPos = [...hit.transform.position] as Vec3;
+        canvas.setPointerCapture(e.pointerId);
+      }
+      e.preventDefault();
+      invalidateRender();
+      render();
+      return;
+    }
+
     if (doc.viewMode === '3d') {
       handlePointerDown3d(e);
       return;
@@ -273,6 +535,18 @@
   };
 
   const handlePointerMove = (e: PointerEvent) => {
+    if (worldState.composerMode && worldDragging && !worldState.testMode) {
+      const selected = getSelectedWorldItem();
+      if (!selected) return;
+      const anchor = doc.viewMode === '2d' ? worldDragStartPos[2] : worldDragStartPos[1];
+      const currentPos = screenToWorldPlacement(e.clientX, e.clientY, anchor);
+      const snapped = applySnapToPosition(selected, currentPos);
+      worldStore.updateSelectedTransform({ position: snapped });
+      invalidateRender();
+      render();
+      return;
+    }
+
     if (doc.viewMode === '3d') {
       handlePointerMove3d(e);
       return;
@@ -301,6 +575,16 @@
   };
 
   const handlePointerUp = (e: PointerEvent) => {
+    if (worldState.composerMode && worldDragging) {
+      worldDragging = false;
+      if (canvas.hasPointerCapture(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+      invalidateRender();
+      render();
+      return;
+    }
+
     if (doc.viewMode === '3d') {
       handlePointerUp3d(e);
       return;
@@ -310,6 +594,49 @@
     const activeTool = toolRegistry[activeToolId] ?? toolRegistry.pencil;
     activeTool.onPointerUp(toolCtx, e);
     toolState.activePointerToolId = null;
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    if (!worldState.composerMode) return;
+    if (!e.dataTransfer) return;
+    if (!e.dataTransfer.types.includes('application/x-voxelyn-project-item')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    if (!worldState.composerMode) return;
+    if (!e.dataTransfer) return;
+    const raw = e.dataTransfer.getData('application/x-voxelyn-project-item');
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw) as { type?: string; sourceRef?: string; meta?: Record<string, unknown> };
+      if ((payload.type !== 'scene' && payload.type !== 'asset') || typeof payload.sourceRef !== 'string') {
+        return;
+      }
+      e.preventDefault();
+      const selected = getSelectedWorldItem();
+      const anchor = doc.viewMode === '2d' ? selected?.transform.position[2] ?? 0 : selected?.transform.position[1] ?? 0;
+      const placement = screenToWorldPlacement(e.clientX, e.clientY, anchor);
+      const prototypeItem: WorldItem = {
+        id: 'drop-prototype',
+        type: payload.type,
+        sourceRef: payload.sourceRef,
+        transform: { position: placement, rotation: [0, 0, 0], scale: [1, 1, 1] },
+        meta: payload.meta ?? {},
+      };
+      const snapped = applySnapToPosition(prototypeItem, placement);
+      worldStore.addItem({
+        type: payload.type,
+        sourceRef: payload.sourceRef,
+        position: snapped,
+        meta: payload.meta ?? {},
+      });
+      invalidateRender();
+      render();
+    } catch (error) {
+      console.error('Failed to drop project entry', error);
+    }
   };
   
   const handleWheel = (e: WheelEvent) => {
@@ -460,6 +787,10 @@
     const activeTool = toolRegistry[tool] ?? toolRegistry.pencil;
     if (activeTool.renderOverlay) {
       activeTool.renderOverlay(buildToolContext(), ctx);
+    }
+
+    if (worldState.composerMode || worldState.testMode || worldState.world.items.length > 0) {
+      drawWorldOverlay2d();
     }
 
     ctx.restore();
@@ -793,6 +1124,10 @@
     ctx.stroke();
 
     ctx.restore();
+
+    if (worldState.composerMode || worldState.testMode || worldState.world.items.length > 0) {
+      drawWorldOverlayIso();
+    }
   };
 
   const getDefaultAnchors = (): AnchorPoint[] => {
@@ -1290,27 +1625,47 @@
   const handlePointerUp3d = (e: PointerEvent) => {
     view3dOrbiting = false;
     view3dPanning = false;
-    canvas.releasePointerCapture(e.pointerId);
+    if (canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
   };
 
   const render3d = () => {
     if (!ctx || !canvas || !voxelMeshRenderer) return;
 
+    const getRecordNumber = (input: unknown, key: string): number | null => {
+      if (!input || typeof input !== 'object') return null;
+      const value = (input as Record<string, unknown>)[key];
+      return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    };
+
     const lightKey = `${lightDir.x.toFixed(2)}:${lightDir.y.toFixed(2)}:${lightDir.z.toFixed(2)}`;
     const layersKey = JSON.stringify(
-      doc.layers.map((layer: any) => ({
-        v: layer.visible ?? true,
-        m:
-          layer.meta?.modified ??
-          layer.modified ??
-          layer.version ??
-          layer.updatedAt ??
-          0,
-      }))
+      doc.layers.map((layer) => {
+        const layerRecord = layer as unknown as Record<string, unknown>;
+        const metaRecord = layerRecord.meta && typeof layerRecord.meta === 'object'
+          ? (layerRecord.meta as Record<string, unknown>)
+          : null;
+        const modified =
+          getRecordNumber(metaRecord, 'modified') ??
+          getRecordNumber(layerRecord, 'modified') ??
+          getRecordNumber(layerRecord, 'version') ??
+          getRecordNumber(layerRecord, 'updatedAt') ??
+          0;
+        return {
+          v: layer.visible ?? true,
+          m: modified,
+        };
+      })
     );
+    const paletteRecord = doc.palette as unknown as Record<string, unknown>;
+    const paletteMetaRecord =
+      paletteRecord.meta && typeof paletteRecord.meta === 'object'
+        ? (paletteRecord.meta as Record<string, unknown>)
+        : null;
     const paletteKey =
-      (doc.palette as any)?.version ??
-      (doc.palette as any)?.meta?.modified ??
+      getRecordNumber(paletteRecord, 'version') ??
+      getRecordNumber(paletteMetaRecord, 'modified') ??
       JSON.stringify(doc.palette);
     const gridKey = `${doc.meta.modified}-${layersKey}-${paletteKey}-${lightKey}`;
     if (!voxelMeshCache || voxelMeshCache.key !== gridKey) {
@@ -1327,6 +1682,9 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     draw3dGrid();
+    if (worldState.composerMode || worldState.testMode || worldState.world.items.length > 0) {
+      drawWorldOverlay3d();
+    }
     ctx.restore();
 
     view3dDirty = false;
@@ -1470,15 +1828,56 @@
       render();
       return;
     }
+
+    if (worldState.testMode && !e.ctrlKey && !e.metaKey) {
+      const speed = e.shiftKey ? 0.5 : 1;
+      if (doc.viewMode === '2d') {
+        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          worldStore.moveHeroBy([0, -speed, 0]);
+        } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          worldStore.moveHeroBy([0, speed, 0]);
+        } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          worldStore.moveHeroBy([-speed, 0, 0]);
+        } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          worldStore.moveHeroBy([speed, 0, 0]);
+        }
+      } else {
+        if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          worldStore.moveHeroBy([0, 0, -speed]);
+        } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          worldStore.moveHeroBy([0, 0, speed]);
+        } else if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          worldStore.moveHeroBy([-speed, 0, 0]);
+        } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          worldStore.moveHeroBy([speed, 0, 0]);
+        }
+      }
+    }
     
     if (e.ctrlKey || e.metaKey) {
       const keyLower = e.key.toLowerCase();
       if (e.key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          documentStore.redo();
+        if (worldState.composerMode) {
+          if (e.shiftKey) {
+            worldStore.redo();
+          } else {
+            worldStore.undo();
+          }
         } else {
-          documentStore.undo();
+          if (e.shiftKey) {
+            documentStore.redo();
+          } else {
+            documentStore.undo();
+          }
         }
       } else if (e.key === '+' || e.key === '=') {
         e.preventDefault();
@@ -1491,7 +1890,11 @@
         fitToWindow();
       } else if (e.key === 'y') {
         e.preventDefault();
-        documentStore.redo();
+        if (worldState.composerMode) {
+          worldStore.redo();
+        } else {
+          documentStore.redo();
+        }
       } else if (keyLower === 'a') {
         e.preventDefault();
         documentStore.selectAllActivePlane(activeZ);
@@ -1579,6 +1982,7 @@
         if (d.viewMode === '3d') {
           uiStore.cursorPosition.set(null);
         }
+        worldStore.setViewMode(d.viewMode);
         syncAnchors();
         invalidateRender();
         render();
@@ -1617,6 +2021,11 @@
       uiStore.cursorPosition.subscribe(pos => { cursorPosition = pos; }),
       uiStore.showTextures.subscribe(t => { showTextures = t; invalidateRender(); render(); }),
       uiStore.voxel2DMode.subscribe(mode => { voxel2DMode = mode; invalidateRender(); render(); }),
+      worldStore.subscribe((value) => {
+        worldState = value;
+        invalidateRender();
+        render();
+      }),
     ];
     
     // Resize observer
@@ -1718,6 +2127,8 @@
     onpointermove={handlePointerMove}
     onpointerup={handlePointerUp}
     onwheel={handleWheel}
+    ondragover={handleDragOver}
+    ondrop={handleDrop}
     oncontextmenu={handleContextMenu}
   ></canvas>
 

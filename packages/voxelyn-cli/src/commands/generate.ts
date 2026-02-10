@@ -536,6 +536,173 @@ const hash = (input: string): number => {
   return Math.abs(h);
 };
 
+type PromptShapeIntent = {
+  ring: boolean;
+  spiral: boolean;
+  crater: boolean;
+  river: boolean;
+  water: boolean;
+  island: boolean;
+};
+
+const normalizePromptText = (prompt: string): string =>
+  prompt.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+const hasPromptKeyword = (text: string, words: string[]): boolean => {
+  for (const word of words) {
+    if (word.includes(' ')) {
+      if (text.includes(word)) return true;
+      continue;
+    }
+    const re = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    if (re.test(text)) return true;
+  }
+  return false;
+};
+
+const parsePromptShapeIntent = (prompt: string): PromptShapeIntent => {
+  const text = normalizePromptText(prompt);
+  return {
+    ring: hasPromptKeyword(text, ['ring', 'o ring', 'o-ring', 'donut', 'torus', 'atoll', 'anel']),
+    spiral: hasPromptKeyword(text, ['spiral', 'spiralling', 'spiraling', 'swirl', 'helical', 'espiral']),
+    crater: hasPromptKeyword(text, ['crater', 'caldera', 'impact']),
+    river: hasPromptKeyword(text, ['river', 'stream', 'creek', 'rio', 'riacho']),
+    water: hasPromptKeyword(text, ['water', 'ocean', 'sea', 'lake', 'lagoon', 'coast', 'mar', 'lago']),
+    island: hasPromptKeyword(text, ['island', 'archipelago', 'atoll', 'ilha']),
+  };
+};
+
+const smoothstep = (edge0: number, edge1: number, x: number): number => {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
+const gaussian = (x: number, mean: number, sigma: number): number => {
+  const d = x - mean;
+  return Math.exp(-(d * d) / (2 * sigma * sigma));
+};
+
+const rebuildScenarioTerrainFromHeightmap = (
+  scenario: ScenarioBuiltResult,
+  intent: PromptShapeIntent
+): ScenarioBuiltResult => {
+  const terrain = new Uint16Array(scenario.width * scenario.height * scenario.depth);
+  const biomeMap = new Uint8Array(scenario.width * scenario.height);
+  const waterThreshold = intent.ring || intent.spiral ? 0.33 : intent.water ? 0.29 : 0.26;
+  const waterLevel = Math.max(1, Math.floor(scenario.depth * (intent.ring || intent.water ? 0.3 : 0.25)));
+
+  for (let y = 0; y < scenario.height; y += 1) {
+    for (let x = 0; x < scenario.width; x += 1) {
+      const idx2d = y * scenario.width + x;
+      const h = clamp01(scenario.heightmap[idx2d] ?? 0);
+      const top = Math.min(scenario.depth - 1, Math.max(0, Math.floor(h * scenario.depth)));
+      const isWater = h < waterThreshold;
+      biomeMap[idx2d] = isWater ? 1 : 0;
+
+      for (let z = 0; z <= top; z += 1) {
+        const idx3d = idx2d + z * scenario.width * scenario.height;
+        terrain[idx3d] = z === top ? (isWater ? 3 : 7) : 2;
+      }
+
+      if (isWater) {
+        for (let z = top + 1; z <= waterLevel && z < scenario.depth; z += 1) {
+          const idx3d = idx2d + z * scenario.width * scenario.height;
+          terrain[idx3d] = 4;
+        }
+      }
+    }
+  }
+
+  return {
+    ...scenario,
+    terrain,
+    biomeMap,
+    preview: buildTopDownPreview(terrain, scenario.width, scenario.height, scenario.depth),
+    stats: scenarioStats(terrain, scenario.width, scenario.height, scenario.depth, []),
+  };
+};
+
+const applyPromptShapeOverrides = (
+  scenario: ScenarioBuiltResult,
+  prompt: string,
+  logger: Logger
+): ScenarioBuiltResult => {
+  const intent = parsePromptShapeIntent(prompt);
+  const hasStrongShape = intent.ring || intent.spiral || intent.crater;
+  if (!hasStrongShape) return scenario;
+
+  const width = scenario.width;
+  const height = scenario.height;
+  if (width < 8 || height < 8) return scenario;
+
+  const nextHeightmap = new Float32Array(scenario.heightmap);
+  const cx = (width - 1) / 2;
+  const cy = (height - 1) / 2;
+  const maxR = Math.max(1, Math.min(width, height) * 0.5);
+  const ringRadius = 0.6;
+  const ringWidth = 0.1;
+  const spiralWidth = 0.06;
+  const spiralPitch = 0.05;
+  const spiralStart = 0.05;
+  const seed = hash(prompt);
+  const TAU = Math.PI * 2;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = y * width + x;
+      const original = nextHeightmap[idx] ?? 0;
+      const nx = (x - cx) / maxR;
+      const ny = (y - cy) / maxR;
+      const r = Math.sqrt(nx * nx + ny * ny);
+
+      let target = original;
+
+      if (intent.ring) {
+        const ringMask = smoothstep(ringWidth, 0, Math.abs(r - ringRadius));
+        const centerBasin = clamp01((ringRadius - ringWidth * 1.1 - r) / (ringRadius - ringWidth * 1.1));
+        target += ringMask * 0.95;
+        target -= centerBasin * 0.45;
+      }
+
+      if (intent.spiral) {
+        let theta = Math.atan2(ny, nx);
+        if (theta < 0) theta += TAU;
+        const turn = Math.max(0, Math.floor((r - spiralStart) / (spiralPitch * TAU)));
+        const rCurve = spiralStart + spiralPitch * (theta + TAU * turn);
+        const distance = Math.abs(r - rCurve);
+        const spiralMask = smoothstep(spiralWidth, 0, distance);
+        const spiralDepth = intent.ring ? 0.65 : 0.3;
+        target -= spiralMask * spiralDepth;
+        if (!intent.ring) target += spiralMask * 0.15;
+      }
+
+      if (intent.crater) {
+        const crater = gaussian(r, 0.36, 0.12);
+        const rim = gaussian(r, 0.5, 0.06);
+        target -= crater * 0.35;
+        target += rim * 0.22;
+      }
+
+      if (intent.river) {
+        const riverWave = Math.sin((x / Math.max(1, width - 1)) * TAU + seed * 0.0017) * 0.2;
+        const riverMask = gaussian(Math.abs(ny - riverWave), 0, 0.09);
+        target -= riverMask * 0.2;
+      }
+
+      if (intent.water || intent.island || intent.ring) {
+        const edge = smoothstep(0.72, 1.08, r);
+        target -= edge * 0.4;
+      }
+
+      const blend = intent.ring || intent.spiral ? 0.7 : 0.5;
+      nextHeightmap[idx] = clamp01(original * (1 - blend) + target * blend);
+    }
+  }
+
+  logger.info('[generate] Applied prompt-shape overrides for scenario (ring/spiral-aware fallback).');
+  return rebuildScenarioTerrainFromHeightmap({ ...scenario, heightmap: nextHeightmap }, intent);
+};
+
 const withTiming = async <T>(
   label: string,
   enabled: boolean,
@@ -1749,7 +1916,7 @@ export const runGenerate = async (
   }
 
   // Scenario
-  const scenario = await withTiming('scenario', debug, logger, async () => {
+  let scenario = await withTiming('scenario', debug, logger, async () => {
     if (aiModule && client?.predictScenarioLayout && aiModule.buildScenarioFromLayout) {
       const result = await client.predictScenarioLayout(prompt, undefined, {
         targetSize: scenarioSize,
@@ -1829,6 +1996,8 @@ export const runGenerate = async (
 
     return generateScenarioFallback(prompt, scenarioSize, scenarioDepth, seed);
   });
+
+  scenario = applyPromptShapeOverrides(scenario, prompt, logger);
 
   if (!scenario.intent) {
     try {

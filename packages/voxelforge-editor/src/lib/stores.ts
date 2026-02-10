@@ -66,6 +66,8 @@ import {
   rotateFloatingSelection,
   type FloatingSelectionSession,
 } from './document/floating-selection';
+import { projectStore } from './project/store';
+import { worldStore } from './world/store';
 
 // ============================================================================
 // Document Store
@@ -745,7 +747,7 @@ export const toolStore = createToolStore();
 // UI Store
 // ============================================================================
 
-export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation' | 'ai' | 'assets';
+export type PanelId = 'tools' | 'layers' | 'palette' | 'simulation' | 'ai' | 'assets' | 'project' | 'console';
 export type Voxel2DRenderMode = 'slice' | 'projection';
 
 const createUIStore = () => {
@@ -756,6 +758,8 @@ const createUIStore = () => {
     simulation: false,
     ai: false,
     assets: false,
+    project: true,
+    console: false,
   });
   
   const showGrid = writable(true);
@@ -814,3 +818,5 @@ export const activeLayer = derived(documentStore, $doc =>
 
 /** Palette as array derived from document */
 export const palette = derived(documentStore, $doc => $doc.palette);
+
+export { projectStore, worldStore };

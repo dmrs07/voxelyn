@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { documentStore, uiStore, toolStore, type HistoryInfo, type ToolId, type Voxel2DRenderMode } from '$lib/stores';
+  import { documentStore, uiStore, toolStore, projectStore, worldStore, type HistoryInfo, type ToolId, type Voxel2DRenderMode } from '$lib/stores';
   import type { EditorDocument } from '$lib/document/types';
   import {
     Folder,
     FilePlus,
     FolderOpen,
+    Hammer,
     FloppyDisk,
     FileImage,
     ArrowCounterClockwise,
@@ -22,11 +24,13 @@
   let canUndo = $state(false);
   let canRedo = $state(false);
   let showFileMenu = $state(false);
+  let showBuildMenu = $state(false);
   let showGrid = $state(true);
   let gridStep = $state(1);
   let activeTool = $state<ToolId>('pencil');
   let showTextures = $state(false);
   let voxel2DMode = $state<Voxel2DRenderMode>('slice');
+  let isDesktopShell = $state(false);
   
   documentStore.subscribe((d: EditorDocument) => doc = d);
   documentStore.history.subscribe((h: HistoryInfo) => {
@@ -104,30 +108,71 @@
     showFileMenu = false;
     await documentStore.loadFromFile();
   };
+
+  const handleOpenProject = async () => {
+    showFileMenu = false;
+    const opened = await projectStore.openProjectFolder();
+    if (opened) {
+      await worldStore.loadFromProject();
+    }
+  };
   
   const handleExport = () => {
     showFileMenu = false;
     documentStore.exportLayerPNG();
   };
+
+  const handleGenerateMap = async () => {
+    showBuildMenu = false;
+    await worldStore.generateMap();
+  };
+
+  onMount(() => {
+    isDesktopShell = Boolean(window?.voxelynDesktop?.isDesktop);
+  });
 </script>
 
 <div class="status-bar">
   <div class="left">
-    <div class="file-menu-container">
-      <button 
-        class="file-btn"
-        onclick={() => showFileMenu = !showFileMenu}
-      ><Folder size={14} weight="fill" /> File</button>
-      {#if showFileMenu}
-        <div class="file-menu">
-          <button onclick={handleNew}><FilePlus size={14} weight="fill" /> New</button>
-          <button onclick={handleLoad}><FolderOpen size={14} weight="fill" /> Open...</button>
-          <button onclick={handleSave}><FloppyDisk size={14} weight="fill" /> Save</button>
-          <div class="menu-divider"></div>
-          <button onclick={handleExport}><FileImage size={14} weight="fill" /> Export PNG</button>
-        </div>
-      {/if}
-    </div>
+    {#if isDesktopShell}
+      <div class="desktop-toolbar">
+        <button class="file-btn" onclick={handleNew} title="New"><FilePlus size={14} weight="fill" /> New</button>
+        <button class="file-btn" onclick={handleLoad} title="Open"><FolderOpen size={14} weight="fill" /> Open</button>
+        <button class="file-btn" onclick={handleOpenProject} title="Open Project Folder"><Folder size={14} weight="fill" /> Open Project</button>
+        <button class="file-btn" onclick={handleSave} title="Save"><FloppyDisk size={14} weight="fill" /> Save</button>
+        <button class="file-btn" onclick={handleExport} title="Export PNG"><FileImage size={14} weight="fill" /> Export</button>
+        <button class="file-btn" onclick={handleGenerateMap} title="Generate Map"><Hammer size={14} weight="fill" /> Generate Map</button>
+      </div>
+    {:else}
+      <div class="file-menu-container">
+        <button 
+          class="file-btn"
+          onclick={() => showFileMenu = !showFileMenu}
+        ><Folder size={14} weight="fill" /> File</button>
+        {#if showFileMenu}
+          <div class="file-menu">
+            <button onclick={handleNew}><FilePlus size={14} weight="fill" /> New</button>
+            <button onclick={handleLoad}><FolderOpen size={14} weight="fill" /> Open...</button>
+            <button onclick={handleOpenProject}><FolderOpen size={14} weight="fill" /> Open Project Folder...</button>
+            <button onclick={handleSave}><FloppyDisk size={14} weight="fill" /> Save</button>
+            <div class="menu-divider"></div>
+            <button onclick={handleExport}><FileImage size={14} weight="fill" /> Export PNG</button>
+          </div>
+        {/if}
+      </div>
+
+      <div class="file-menu-container">
+        <button 
+          class="file-btn"
+          onclick={() => showBuildMenu = !showBuildMenu}
+        ><Hammer size={14} weight="fill" /> Build</button>
+        {#if showBuildMenu}
+          <div class="file-menu">
+            <button onclick={handleGenerateMap}><Hammer size={14} weight="fill" /> Generate Map</button>
+          </div>
+        {/if}
+      </div>
+    {/if}
     
     <span class="divider"></span>
     
@@ -235,6 +280,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .desktop-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
   }
 
   .center {

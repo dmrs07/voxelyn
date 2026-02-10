@@ -4,6 +4,12 @@
 
 ---
 
+## Menubar Oficial
+
+- Desktop Electron (`packages/voxelforge-electron`): o menubar oficial é o **menu nativo** do Electron (`File/Edit/View/Window`).
+- UI do editor (`packages/voxelforge-editor`): em runtime desktop, a barra interna funciona como **toolbar** de ações e não replica menubar nativo.
+- Runtime web (Vite/browser): a barra interna pode exibir menubar textual.
+
 ## 📋 TODO EXTENSO
 
 ### Fase 1: Setup do Projeto (Monorepo)

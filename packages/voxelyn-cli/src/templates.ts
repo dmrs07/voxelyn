@@ -6,11 +6,36 @@ dist
 .DS_Store
 `;
 
+const projectMarker = `{
+  "version": 1,
+  "name": "{{name}}",
+  "paths": {
+    "assets": "assets",
+    "scenes": "scenes",
+    "worlds": "worlds",
+    "generated": "assets/generated",
+    "ai": "ai",
+    "build": "build"
+  }
+}
+`;
+
+const projectScaffoldFiles: Record<string, string> = {
+  'voxelyn.project.json': projectMarker,
+  'assets/.gitkeep': '',
+  'assets/generated/.gitkeep': '',
+  'scenes/.gitkeep': '',
+  'worlds/.gitkeep': '',
+  'ai/.gitkeep': '',
+  'build/maps/.gitkeep': '',
+};
+
 export const TEMPLATE_LIST: Template[] = [
   {
     name: 'vanilla',
     description: 'Vite + TypeScript + Canvas2D',
     files: {
+      ...projectScaffoldFiles,
       '.gitignore': gitignore,
       'package.json': `{
   "name": "{{name}}",
@@ -111,6 +136,7 @@ body {
     name: 'react',
     description: 'Vite + React + TypeScript + Canvas2D',
     files: {
+      ...projectScaffoldFiles,
       '.gitignore': gitignore,
       'package.json': `{
   "name": "{{name}}",
@@ -255,6 +281,7 @@ canvas {
     name: 'svelte',
     description: 'Vite + Svelte + TypeScript + Canvas2D',
     files: {
+      ...projectScaffoldFiles,
       '.gitignore': gitignore,
       'package.json': `{
   "name": "{{name}}",

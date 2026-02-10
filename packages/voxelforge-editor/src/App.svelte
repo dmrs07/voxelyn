@@ -3,6 +3,8 @@
 </script>
 
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import Canvas from './components/Canvas.svelte';
   import ToolsPanel from './components/ToolsPanel.svelte';
   import LayersPanel from './components/LayersPanel.svelte';
@@ -10,15 +12,27 @@
   import StatusBar from './components/StatusBar.svelte';
   import AIGeneratorPanel from './components/AIGeneratorPanel.svelte';
   import AssetLibraryPanel from './components/AssetLibraryPanel.svelte';
-  import { uiStore, documentStore, palette } from '$lib/stores';
+  import ProjectBrowserPanel from './components/ProjectBrowserPanel.svelte';
+  import ConsolePanel from './components/ConsolePanel.svelte';
+  import DesktopCommandModal from './components/DesktopCommandModal.svelte';
+  import { uiStore, documentStore, palette, projectStore, worldStore } from '$lib/stores';
   import { applyIsoViewDefaults, resetIsoViewDefaults } from '$lib/render/render-iso';
-  import { Archive, Cube, Sparkle } from 'phosphor-svelte';
+  import { Archive, Cube, Sparkle, Terminal } from 'phosphor-svelte';
   import type { BundleViewSettings } from '@voxelyn/core';
+  import { uiCommandStore, type UiCommandState } from '$lib/desktop/ui-command-store';
+  import { cliConsoleStore } from '$lib/cli-console/store';
 
   const VERSION = __APP_VERSION__;
   
-  let panels = $state({ tools: true, layers: true, palette: true, simulation: false, ai: false, assets: false });
+  let panels = $state({ tools: true, layers: true, palette: true, simulation: false, ai: false, assets: false, project: true, console: false });
   uiStore.panels.subscribe((value) => (panels = value));
+  let isDesktopShell = $state(false);
+  let uiCommandState = $state<UiCommandState>({
+    available: false,
+    activeModal: null,
+    latestEvent: null,
+  });
+  let lastHandledCommandId = 0;
 
   let currentPalette = $state<import('@voxelyn/core').Material[]>([]);
   palette.subscribe((value) => (currentPalette = value));
@@ -82,7 +96,6 @@
         const newPalette = [...currentPalette];
         newPalette[materialIndex] = { ...material, color: avgColor };
         
-        const doc = documentStore;
         documentStore.set({
           ...$documentStore,
           palette: newPalette,
@@ -172,18 +185,63 @@
   function handleApplyViewSettings(viewSettings: BundleViewSettings): void {
     applyAutoViewSettings(viewSettings);
   }
+
+  const handleDesktopEvent = async (type: string): Promise<void> => {
+    if (type === 'refresh-project') {
+      await projectStore.refresh();
+      await worldStore.loadFromProject();
+      return;
+    }
+
+    if (type === 'cli-help') {
+      const projectRoot = get(projectStore).projectRoot ?? undefined;
+      await cliConsoleStore.runCommand({
+        cwd: projectRoot,
+        args: ['--help'],
+        label: 'voxelyn --help',
+      });
+      uiStore.panels.show('console');
+      return;
+    }
+
+    if (type === 'close-project') {
+      projectStore.clear();
+      await worldStore.loadFromProject();
+    }
+  };
+
+  onMount(() => {
+    isDesktopShell = Boolean(window?.voxelynDesktop?.isDesktop);
+    projectStore.initialize();
+    cliConsoleStore.initialize();
+    uiCommandStore.initialize();
+
+    const unsubscribeUiCommands = uiCommandStore.subscribe((next) => {
+      uiCommandState = next;
+      if (!next.latestEvent || next.latestEvent.id === lastHandledCommandId) return;
+      lastHandledCommandId = next.latestEvent.id;
+      void handleDesktopEvent(next.latestEvent.type);
+      uiCommandStore.clearLatestEvent();
+    });
+
+    return () => {
+      unsubscribeUiCommands();
+    };
+  });
 </script>
 
 <div class="app">
   <header class="menu-bar">
     <div class="logo"><Cube size={20} weight="fill" /> VoxelForge <span class="version">v{VERSION}</span></div>
-    <nav class="menu">
-      <button>File</button>
-      <button>Edit</button>
-      <button>View</button>
-      <button>Layer</button>
-      <button>Help</button>
-    </nav>
+    {#if !isDesktopShell}
+      <nav class="menu">
+        <button>File</button>
+        <button>Edit</button>
+        <button>View</button>
+        <button>Layer</button>
+        <button>Help</button>
+      </nav>
+    {/if}
     <div class="panel-toggles">
       <button class:active={panels.tools} onclick={() => togglePanel('tools')}>Tools</button>
       <button class:active={panels.layers} onclick={() => togglePanel('layers')}>Layers</button>
@@ -196,12 +254,17 @@
         <Archive size={12} weight="fill" />
         Assets
       </button>
+      <button class:active={panels.project} onclick={() => togglePanel('project')}>Project</button>
+      <button class:active={panels.console} onclick={() => togglePanel('console')}>
+        <Terminal size={12} weight="fill" />
+        Console
+      </button>
     </div>
   </header>
   
   <main
     class="workspace"
-    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette || panels.ai || panels.assets) ? '400px' : '0px'}`}
+    style={`grid-template-columns: ${panels.tools ? '200px' : '0px'} 1fr ${(panels.layers || panels.palette || panels.ai || panels.assets || panels.project || panels.console) ? '420px' : '0px'}`}
   >
     <aside class="left-sidebar" class:collapsed={!panels.tools}>
       {#if panels.tools}
@@ -213,7 +276,13 @@
       <Canvas />
     </section>
     
-    <aside class="right-sidebar" class:collapsed={!panels.layers && !panels.palette && !panels.ai && !panels.assets}>
+    <aside class="right-sidebar" class:collapsed={!panels.layers && !panels.palette && !panels.ai && !panels.assets && !panels.project && !panels.console}>
+      {#if panels.project}
+        <ProjectBrowserPanel />
+      {/if}
+      {#if panels.console}
+        <ConsolePanel />
+      {/if}
       {#if panels.assets}
         <AssetLibraryPanel
           onObjectImported={handleObjectImported}
@@ -240,6 +309,7 @@
   </main>
   
   <StatusBar />
+  <DesktopCommandModal modal={uiCommandState.activeModal} on:close={() => uiCommandStore.closeModal()} />
 </div>
 
 <style>
