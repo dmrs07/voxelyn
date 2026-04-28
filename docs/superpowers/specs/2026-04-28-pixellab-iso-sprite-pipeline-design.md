@@ -204,9 +204,11 @@ type AtlasManifest = {
     promptHash: string;
     configHash: string;
     pipelineVersion: string;
+    atlasHash: string;            // sha256 of the final atlas PNG bytes
     pixellabModelVersion?: string;
     generatedAt: string;
-    pixellabCharacterId?: string;
+    // pixellabCharacterId is intentionally NOT in the committed manifest.
+    // It lives in .voxelyn-cache/pixellab-character-ids.json (gitignored).
   };
 };
 ```
@@ -384,10 +386,15 @@ for each spec in CHARACTERS (filtered by --character):
         size: 48,
       )
 
-  packed = packAtlas(rawFrames, spec)        // stride math from §4.3
-  manifest = buildManifest(spec, packed.rects, hashes, pixellabCharacterId)
+  packed     = packAtlas(rawFrames, spec)              // stride math from §4.3
+  atlasHash  = sha256(packed.png)
+  manifest   = buildManifest(spec, packed.rects, {
+                  conceptHash, configHash, promptHash, pipelineVersion,
+                  atlasHash,                                   // pair audit
+                  // pixellabCharacterId is recorded in .voxelyn-cache only
+              })
 
-  // Atomic writes
+  // Atomic writes — PNG first so the manifest never references a missing image
   writeFileSync(<id>.atlas.png.tmp, packed.png)
   writeFileSync(<id>.atlas.json.tmp, manifest)
   rename(<id>.atlas.png.tmp,  <id>.atlas.png)
@@ -451,10 +458,13 @@ export function buildClipsFromAtlas(
 - `manifest.directions` exactly `['DR','DL','UR','UL']`.
 - `manifest.source === 'pixellab'`, `version === 1`.
 - Every clip × direction has `framesPerDirection` rects, all 48×48, all in-bounds.
+- **Pair audit (dev only):** `sha256(pngBytes) === manifest.generation.atlasHash`. Mismatch → warn in dev, throw `AtlasLoadError` if `strict` mode is enabled. Skipped in prod to avoid the hashing cost on hot boot.
 
 Failures throw typed errors: `AtlasLoadError`, `AtlasDecodeError`, `AtlasMissingError`.
 
 After `buildClipsFromAtlas` runs, the raw decoded atlas buffer is dropped (only the per-frame `Uint32Array` slices are retained).
+
+> **Implementation note.** `buildClipsFromAtlas` must **copy** frame pixels into a new `Uint32Array` per frame. Do not retain `subarray` views into the decoded atlas buffer — `subarray` shares the underlying `ArrayBuffer`, which would keep the full decoded atlas alive in memory and defeat the drop above.
 
 ### 5.2 Cache & dedupe
 
@@ -587,9 +597,10 @@ The "log-once per `spriteId`" guard is keyed by spriteId in a module-level `Set`
 - `render/anchor-driven-draw.test.ts` — `drawEntitySprite` uses `runtime.character.anchor` for both 32×32 (16,29) and 48×48 (24,43).
 
 **`packages/voxelyn-cli`:**
-- `commands/sprites/hash.test.ts` — deterministic hashing; canonical-JSON ordering.
+- `commands/sprites/hash.test.ts` — deterministic hashing; canonical-JSON ordering; `atlasHash` reflects PNG bytes.
 - `commands/sprites/pack-atlas.test.ts` — atlas dimensions match stride math; rects pixel-accurate.
 - `commands/sprites/dry-run.test.ts` — plan emitted; PixelLab client never invoked.
+- `commands/sprites/manifest-shape.test.ts` — committed manifests never include `pixellabCharacterId`; that field stays in `.voxelyn-cache` only.
 
 ### 6.3 Rollout (each phase independently mergeable)
 
