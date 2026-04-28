@@ -69,6 +69,13 @@ const neighbors4 = (x: number, y: number): Vec2[] => [
   { x, y: y - 1 },
 ];
 
+const CARDINAL_DIRS: Vec2[] = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
+
 const buildMainPathSet = (
   mask: Uint8Array,
   width: number,
@@ -202,14 +209,244 @@ const GAMEPLAY_FEATURE_MASK =
   FEATURE_TERMINAL |
   FEATURE_GATE;
 
-const placeDecorativeProps = (
+const hasCandidateNeighbor = (candidateSet: Set<number>, width: number, height: number, idx: number): boolean => {
+  const x = idx % width;
+  const y = Math.floor(idx / width);
+  for (const n of neighbors4(x, y)) {
+    if (!inBounds(width, height, n.x, n.y)) return true;
+    if (!candidateSet.has(maskIndex(width, n.x, n.y))) return true;
+  }
+  return false;
+};
+
+const hasCornerWalls = (candidateSet: Set<number>, width: number, height: number, idx: number): boolean => {
+  const x = idx % width;
+  const y = Math.floor(idx / width);
+  const blocked = {
+    east: !inBounds(width, height, x + 1, y) || !candidateSet.has(maskIndex(width, x + 1, y)),
+    west: !inBounds(width, height, x - 1, y) || !candidateSet.has(maskIndex(width, x - 1, y)),
+    south: !inBounds(width, height, x, y + 1) || !candidateSet.has(maskIndex(width, x, y + 1)),
+    north: !inBounds(width, height, x, y - 1) || !candidateSet.has(maskIndex(width, x, y - 1)),
+  };
+  return (
+    (blocked.north && blocked.west) ||
+    (blocked.north && blocked.east) ||
+    (blocked.south && blocked.west) ||
+    (blocked.south && blocked.east)
+  );
+};
+
+const isAdjacentToSet = (width: number, height: number, idx: number, cells: Set<number>): boolean => {
+  const x = idx % width;
+  const y = Math.floor(idx / width);
+  return neighbors4(x, y).some((n) => inBounds(width, height, n.x, n.y) && cells.has(maskIndex(width, n.x, n.y)));
+};
+
+const squaredDistanceToPoint = (width: number, idx: number, point: Vec2): number => {
+  const x = idx % width;
+  const y = Math.floor(idx / width);
+  const dx = x - point.x;
+  const dy = y - point.y;
+  return dx * dx + dy * dy;
+};
+
+const pathExistsWithBlockingFeatures = (
+  mask: Uint8Array,
+  featureMap: Uint16Array,
+  width: number,
+  height: number,
+  entry: Vec2,
+  exit: Vec2
+): boolean => {
+  const entryIdx = maskIndex(width, entry.x, entry.y);
+  const exitIdx = maskIndex(width, exit.x, exit.y);
+  const isOpen = (idx: number): boolean => {
+    if ((mask[idx] ?? 0) !== 1) return false;
+    const flags = featureMap[idx] ?? 0;
+    if ((flags & FEATURE_ROOT_BARRIER) !== 0) return false;
+    if ((flags & FEATURE_PROP_CRATE) !== 0) return false;
+    if ((flags & FEATURE_TERMINAL) !== 0) return false;
+    return true;
+  };
+
+  if (!isOpen(entryIdx) || !isOpen(exitIdx)) return false;
+
+  const queue = new Int32Array(width * height);
+  const visited = new Uint8Array(width * height);
+  let head = 0;
+  let tail = 0;
+  queue[tail] = entryIdx;
+  visited[entryIdx] = 1;
+  tail += 1;
+
+  while (head < tail) {
+    const current = queue[head] ?? 0;
+    head += 1;
+    if (current === exitIdx) return true;
+
+    const x = current % width;
+    const y = Math.floor(current / width);
+    for (const n of neighbors4(x, y)) {
+      if (!inBounds(width, height, n.x, n.y)) continue;
+      const ni = maskIndex(width, n.x, n.y);
+      if (visited[ni] === 1 || !isOpen(ni)) continue;
+      visited[ni] = 1;
+      queue[tail] = ni;
+      tail += 1;
+    }
+  }
+
+  return false;
+};
+
+const shuffledOffsetsInRadius = (radius: number, rng: RNG): Vec2[] => {
+  const offsetsByDistance: Vec2[][] = Array.from({ length: radius + 1 }, () => []);
+  for (let dy = -radius; dy <= radius; dy += 1) {
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      const distance = Math.abs(dx) + Math.abs(dy);
+      if (distance === 0 || distance > radius) continue;
+      offsetsByDistance[distance]?.push({ x: dx, y: dy });
+    }
+  }
+
+  const offsets: Vec2[] = [];
+  for (let distance = 1; distance < offsetsByDistance.length; distance += 1) {
+    const bucket = offsetsByDistance[distance] ?? [];
+    for (let i = bucket.length - 1; i > 0; i -= 1) {
+      const j = rng.nextInt(i + 1);
+      const temp = bucket[i] ?? { x: 0, y: 0 };
+      bucket[i] = bucket[j] ?? temp;
+      bucket[j] = temp;
+    }
+    offsets.push(...bucket);
+  }
+
+  return offsets;
+};
+
+const shuffleCells = (cells: number[], rng: RNG): void => {
+  for (let i = cells.length - 1; i > 0; i -= 1) {
+    const j = rng.nextInt(i + 1);
+    const temp = cells[i] ?? 0;
+    cells[i] = cells[j] ?? temp;
+    cells[j] = temp;
+  }
+};
+
+const placeCells = (
+  featureMap: Uint16Array,
+  cells: number[],
+  flag: number,
+  occupied: Set<number>,
+  targetCount: number
+): number => {
+  let placed = 0;
+  for (const cell of cells) {
+    if (placed >= targetCount) break;
+    if (occupied.has(cell)) continue;
+    featureMap[cell] |= flag;
+    occupied.add(cell);
+    placed += 1;
+  }
+  return placed;
+};
+
+const placeBiofluidLanes = (
   featureMap: Uint16Array,
   candidates: number[],
+  width: number,
+  height: number,
+  mainPath: Set<number>,
+  rng: RNG,
+  occupied: Set<number>,
+  targetCount: number
+): void => {
+  const candidateSet = new Set(candidates);
+  const mainPathCells = candidates.filter((idx) => mainPath.has(idx));
+  const canPlace = (idx: number): boolean =>
+    candidateSet.has(idx) &&
+    !occupied.has(idx) &&
+    (featureMap[idx] & FEATURE_ROOT_BARRIER) === 0;
+
+  let placed = 0;
+  let guard = 0;
+  const maxAttempts = Math.max(24, targetCount * 12);
+  while (placed < targetCount && guard < maxAttempts) {
+    guard += 1;
+    const anchorPool = mainPathCells.length > 0 && rng.nextFloat01() < 0.72 ? mainPathCells : candidates;
+    const anchor = anchorPool[rng.nextInt(anchorPool.length)] ?? 0;
+    if (!canPlace(anchor)) continue;
+
+    const dir = CARDINAL_DIRS[rng.nextInt(CARDINAL_DIRS.length)] ?? CARDINAL_DIRS[0]!;
+    const targetLength = 4 + rng.nextInt(5);
+    const ax = anchor % width;
+    const ay = Math.floor(anchor / width);
+    const cells: number[] = [anchor];
+
+    const extend = (sign: -1 | 1): void => {
+      for (let step = 1; cells.length < targetLength; step += 1) {
+        const x = ax + dir.x * step * sign;
+        const y = ay + dir.y * step * sign;
+        if (!inBounds(width, height, x, y)) break;
+        const idx = maskIndex(width, x, y);
+        if (!canPlace(idx)) break;
+        cells.push(idx);
+      }
+    };
+
+    if (rng.nextFloat01() < 0.5) {
+      extend(1);
+      extend(-1);
+    } else {
+      extend(-1);
+      extend(1);
+    }
+
+    const sortedCells = [...cells].sort((a, b) => {
+      const ax0 = a % width;
+      const ay0 = Math.floor(a / width);
+      const bx0 = b % width;
+      const by0 = Math.floor(b / width);
+      return (ax0 - bx0) * dir.x + (ay0 - by0) * dir.y;
+    });
+
+    if (sortedCells.length < 3) continue;
+    placed += placeCells(featureMap, sortedCells, FEATURE_BIOFLUID, occupied, targetCount - placed);
+  }
+
+  while (placed < targetCount) {
+    const idx = sampleDistinctCell(candidates, rng, occupied, canPlace);
+    if (idx == null) break;
+    featureMap[idx] |= FEATURE_BIOFLUID;
+    placed += 1;
+  }
+};
+
+const placeDecorativeProps = (
+  featureMap: Uint16Array,
+  mask: Uint8Array,
+  candidates: number[],
+  width: number,
+  height: number,
+  mainPath: Set<number>,
+  entry: Vec2,
+  exit: Vec2,
   rng: RNG,
   modules: MapModuleKind[],
   occupied: Set<number>
 ): void => {
   const canDecorate = (idx: number): boolean => (featureMap[idx] & GAMEPLAY_FEATURE_MASK) === 0;
+  const candidateSet = new Set(candidates);
+  const pickDecorCell = (predicate: (idx: number) => boolean): number | null => {
+    for (let i = 0; i < candidates.length * 2; i += 1) {
+      const idx = candidates[rng.nextInt(candidates.length)] ?? 0;
+      if (occupied.has(idx)) continue;
+      if (!canDecorate(idx)) continue;
+      if (!predicate(idx)) continue;
+      return idx;
+    }
+    return null;
+  };
 
   const fungalDensity =
     PROP_FUNGAL_CLUSTER_DENSITY +
@@ -228,18 +465,184 @@ const placeDecorativeProps = (
     (modules.includes('mining_zone') ? 0.01 : 0) +
     (modules.includes('mirror_pocket') ? 0.008 : 0);
 
-  const placeCount = (flag: number, targetCount: number): void => {
-    for (let i = 0; i < targetCount; i += 1) {
-      const idx = sampleDistinctCell(candidates, rng, occupied, canDecorate);
-      if (idx == null) continue;
+  const placeCluster = (
+    flag: number,
+    anchor: number,
+    radius: number,
+    wanted: number,
+    predicate: (idx: number) => boolean = () => true
+  ): number => {
+    if (!canDecorate(anchor) || occupied.has(anchor) || !predicate(anchor)) return 0;
+
+    let placed = 0;
+    featureMap[anchor] |= flag;
+    occupied.add(anchor);
+    placed += 1;
+
+    const ax = anchor % width;
+    const ay = Math.floor(anchor / width);
+    for (const offset of shuffledOffsetsInRadius(radius, rng)) {
+      if (placed >= wanted) break;
+      const x = ax + offset.x;
+      const y = ay + offset.y;
+      if (!inBounds(width, height, x, y)) continue;
+      const idx = maskIndex(width, x, y);
+      if (!candidateSet.has(idx) || occupied.has(idx) || !canDecorate(idx) || !predicate(idx)) continue;
       featureMap[idx] |= flag;
+      occupied.add(idx);
+      placed += 1;
+    }
+
+    return placed;
+  };
+
+  const placeFungalColonies = (targetCount: number): void => {
+    let placed = 0;
+    let guard = 0;
+    while (placed < targetCount && guard < targetCount * 10) {
+      guard += 1;
+      const anchor = pickDecorCell((idx) => !mainPath.has(idx) && hasCornerWalls(candidateSet, width, height, idx));
+      if (anchor == null) break;
+
+      placed += placeCluster(
+        FEATURE_PROP_FUNGAL_CLUSTER,
+        anchor,
+        2,
+        Math.min(targetCount - placed, 3 + rng.nextInt(4)),
+        (idx) => !mainPath.has(idx) && hasCandidateNeighbor(candidateSet, width, height, idx)
+      );
+
+      if (placed >= targetCount || rng.nextFloat01() >= 0.7) continue;
+      const ax = anchor % width;
+      const ay = Math.floor(anchor / width);
+      const dir = CARDINAL_DIRS[rng.nextInt(CARDINAL_DIRS.length)] ?? CARDINAL_DIRS[0]!;
+      const distance = 3 + rng.nextInt(2);
+      const sx = ax + dir.x * distance;
+      const sy = ay + dir.y * distance;
+      if (!inBounds(width, height, sx, sy)) continue;
+      const satellite = maskIndex(width, sx, sy);
+      if (!candidateSet.has(satellite)) continue;
+      placed += placeCluster(
+        FEATURE_PROP_FUNGAL_CLUSTER,
+        satellite,
+        1,
+        Math.min(targetCount - placed, 2 + rng.nextInt(3)),
+        (idx) => !mainPath.has(idx) && hasCandidateNeighbor(candidateSet, width, height, idx)
+      );
     }
   };
 
-  placeCount(FEATURE_PROP_FUNGAL_CLUSTER, Math.max(4, Math.floor(candidates.length * fungalDensity)));
-  placeCount(FEATURE_PROP_DEBRIS, Math.max(4, Math.floor(candidates.length * debrisDensity)));
-  placeCount(FEATURE_PROP_CRATE, Math.floor(candidates.length * crateDensity));
-  placeCount(FEATURE_PROP_BEACON, Math.floor(candidates.length * beaconDensity));
+  const placeRubblePiles = (targetCount: number): void => {
+    let placed = 0;
+    let guard = 0;
+    while (placed < targetCount && guard < targetCount * 10) {
+      guard += 1;
+      const anchor = pickDecorCell((idx) => hasCandidateNeighbor(candidateSet, width, height, idx));
+      if (anchor == null) break;
+      placed += placeCluster(
+        FEATURE_PROP_DEBRIS,
+        anchor,
+        1,
+        Math.min(targetCount - placed, 2 + rng.nextInt(3))
+      );
+    }
+
+    while (placed < targetCount) {
+      const idx = sampleDistinctCell(candidates, rng, occupied, canDecorate);
+      if (idx == null) break;
+      featureMap[idx] |= FEATURE_PROP_DEBRIS;
+      placed += 1;
+    }
+  };
+
+  const placeCrateRuns = (targetCount: number): void => {
+    let placed = 0;
+    const placedCells: number[] = [];
+    const anchors = candidates.filter((idx) =>
+      !occupied.has(idx) &&
+      canDecorate(idx) &&
+      !mainPath.has(idx) &&
+      isAdjacentToSet(width, height, idx, mainPath) &&
+      squaredDistanceToPoint(width, idx, entry) > 16 &&
+      squaredDistanceToPoint(width, idx, exit) > 16
+    );
+    shuffleCells(anchors, rng);
+
+    for (const anchor of anchors) {
+      if (placed >= targetCount) break;
+      if (
+        occupied.has(anchor) ||
+        !canDecorate(anchor) ||
+        mainPath.has(anchor) ||
+        !isAdjacentToSet(width, height, anchor, mainPath)
+      ) {
+        continue;
+      }
+      const dir = CARDINAL_DIRS[rng.nextInt(CARDINAL_DIRS.length)] ?? CARDINAL_DIRS[0]!;
+      const ax = anchor % width;
+      const ay = Math.floor(anchor / width);
+      const length = Math.min(targetCount - placed, 2 + rng.nextInt(modules.includes('mining_zone') ? 3 : 2));
+      const cells: number[] = [];
+
+      for (let step = 0; step < length; step += 1) {
+        const x = ax + dir.x * step;
+        const y = ay + dir.y * step;
+        if (!inBounds(width, height, x, y)) continue;
+        const idx = maskIndex(width, x, y);
+        if (!candidateSet.has(idx) || occupied.has(idx) || !canDecorate(idx)) continue;
+        if (mainPath.has(idx) || !isAdjacentToSet(width, height, idx, mainPath)) continue;
+        cells.push(idx);
+      }
+
+      if (cells.length < 2) continue;
+      for (const cell of cells) {
+        featureMap[cell] |= FEATURE_PROP_CRATE;
+        occupied.add(cell);
+        placedCells.push(cell);
+        placed += 1;
+      }
+    }
+
+    if (!pathExistsWithBlockingFeatures(mask, featureMap, width, height, entry, exit)) {
+      for (const cell of placedCells) {
+        featureMap[cell] &= ~FEATURE_PROP_CRATE;
+        occupied.delete(cell);
+      }
+    }
+  };
+
+  const placeBeaconPairs = (targetCount: number): void => {
+    let placed = 0;
+    let guard = 0;
+    while (placed < targetCount && guard < Math.max(18, targetCount * 8)) {
+      guard += 1;
+      const anchor = pickDecorCell((idx) => !mainPath.has(idx));
+      if (anchor == null) break;
+
+      featureMap[anchor] |= FEATURE_PROP_BEACON;
+      occupied.add(anchor);
+      placed += 1;
+      if (placed >= targetCount) break;
+
+      const ax = anchor % width;
+      const ay = Math.floor(anchor / width);
+      const dir = CARDINAL_DIRS[rng.nextInt(CARDINAL_DIRS.length)] ?? CARDINAL_DIRS[0]!;
+      const pairDistance = 2 + rng.nextInt(2);
+      const px = ax + dir.x * pairDistance;
+      const py = ay + dir.y * pairDistance;
+      if (!inBounds(width, height, px, py)) continue;
+      const pair = maskIndex(width, px, py);
+      if (!candidateSet.has(pair) || occupied.has(pair) || !canDecorate(pair)) continue;
+      featureMap[pair] |= FEATURE_PROP_BEACON;
+      occupied.add(pair);
+      placed += 1;
+    }
+  };
+
+  placeFungalColonies(Math.max(6, Math.floor(candidates.length * fungalDensity)));
+  placeRubblePiles(Math.max(4, Math.floor(candidates.length * debrisDensity)));
+  placeCrateRuns(Math.floor(candidates.length * crateDensity));
+  placeBeaconPairs(Math.floor(candidates.length * beaconDensity));
 };
 
 export const generateLevelFeatures = (input: GenerationInput): GeneratedFeatures => {
@@ -248,18 +651,15 @@ export const generateLevelFeatures = (input: GenerationInput): GeneratedFeatures
   const interactables: LevelInteractable[] = [];
 
   const candidates = choosePassableCells(input.mask, input.width, input.height, input.entry, input.exit);
+  const candidateSet = new Set(candidates);
   const mainPath = buildMainPathSet(input.mask, input.width, input.height, input.entry, input.exit);
   const used = new Set<number>();
 
   markTracks(featureMap, input.width, input.height, rng, input.modules);
   placeRootBarriers(featureMap, candidates, mainPath, rng, input.modules);
 
-  const bioCount = Math.floor(candidates.length * BIOFLUID_DENSITY);
-  for (let i = 0; i < bioCount; i += 1) {
-    const idx = sampleDistinctCell(candidates, rng, used, (cell) => !mainPath.has(cell) && (featureMap[cell] & FEATURE_ROOT_BARRIER) === 0);
-    if (idx == null) continue;
-    featureMap[idx] |= FEATURE_BIOFLUID;
-  }
+  const bioCount = Math.max(4, Math.floor(candidates.length * BIOFLUID_DENSITY));
+  placeBiofluidLanes(featureMap, candidates, input.width, input.height, mainPath, rng, used, bioCount);
 
   const ventCount = Math.max(1, Math.floor(candidates.length * SPORE_VENT_DENSITY));
   for (let i = 0; i < ventCount; i += 1) {
@@ -331,14 +731,19 @@ export const generateLevelFeatures = (input: GenerationInput): GeneratedFeatures
       interactables.push(gate);
 
       for (let i = 0; i < 2; i += 1) {
-        const terminalCell = sampleDistinctCell(candidates, rng, used, (cell) => {
+        const terminalPredicate = (cell: number, requireWall: boolean): boolean => {
           if (cell === gateCell) return false;
+          if (mainPath.has(cell)) return false;
+          if (requireWall && !hasCandidateNeighbor(candidateSet, input.width, input.height, cell)) return false;
           const x = cell % input.width;
           const y = Math.floor(cell / input.width);
           const dx = x - gx;
           const dy = y - gy;
           return dx * dx + dy * dy >= 16;
-        });
+        };
+        const terminalCell =
+          sampleDistinctCell(candidates, rng, used, (cell) => terminalPredicate(cell, true)) ??
+          sampleDistinctCell(candidates, rng, used, (cell) => terminalPredicate(cell, false));
         if (terminalCell == null) continue;
         const tx = terminalCell % input.width;
         const ty = Math.floor(terminalCell / input.width);
@@ -372,7 +777,19 @@ export const generateLevelFeatures = (input: GenerationInput): GeneratedFeatures
     }
   }
 
-  placeDecorativeProps(featureMap, candidates, rng, input.modules, new Set<number>(used));
+  placeDecorativeProps(
+    featureMap,
+    input.mask,
+    candidates,
+    input.width,
+    input.height,
+    mainPath,
+    input.entry,
+    input.exit,
+    rng,
+    input.modules,
+    new Set<number>(used)
+  );
 
   const entryIdx = maskIndex(input.width, input.entry.x, input.entry.y);
   const exitIdx = maskIndex(input.width, input.exit.x, input.exit.y);
@@ -499,7 +916,7 @@ export const applyPlayerFeatureInteractions = (state: GameState, player: PlayerS
 };
 
 export const getPlayerAttackBonus = (state: GameState): number => {
-  if (state.simTimeMs <= state.activeDebuffs.crystalBuffUntilMs) {
+  if (state.activeDebuffs.crystalBuffUntilMs > 0 && state.simTimeMs <= state.activeDebuffs.crystalBuffUntilMs) {
     return CRYSTAL_ATTACK_BONUS;
   }
   return 0;

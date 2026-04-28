@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { spawnProjectile, updateProjectiles } from '../combat/combat';
 import { createEnemy } from '../entities/enemy';
 import { createGameState, getPlayer } from '../game/state';
-import { MATERIAL_FUNGAL_FLOOR, MATERIAL_ROCK } from '../game/constants';
-import { nextEntityIdentity, registerEntity, setMaterialAt, unregisterEntity } from '../world/level';
+import { FEATURE_BIOFLUID, MATERIAL_FUNGAL_FLOOR, MATERIAL_ROCK } from '../game/constants';
+import { index2D, nextEntityIdentity, registerEntity, setMaterialAt, unregisterEntity } from '../world/level';
 
 describe('projectiles', () => {
   it('travels and damages enemy target on collision', () => {
@@ -15,6 +15,7 @@ describe('projectiles', () => {
     for (const entity of Array.from(state.level.entities.values())) {
       if (entity.kind === 'enemy') unregisterEntity(state.level, entity);
     }
+    state.level.featureMap.fill(0);
 
     const ex = player.x + 4;
     const ey = player.y;
@@ -88,5 +89,9 @@ describe('projectiles', () => {
 
     expect(enemy.hp).toBe(enemy.maxHp);
     expect(state.projectiles.length).toBe(0);
+    expect([
+      index2D(state.level.width, player.x + 1, ey),
+      index2D(state.level.width, player.x + 3, ey),
+    ].some((idx) => ((state.level.featureMap[idx] ?? 0) & FEATURE_BIOFLUID) !== 0)).toBe(true);
   });
 });

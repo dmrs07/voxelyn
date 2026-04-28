@@ -2,7 +2,9 @@ import { getVoxel, setVoxel } from '@voxelyn/core';
 import {
   FEATURE_BIOFLUID,
   FEATURE_GATE,
+  FEATURE_PROP_CRATE,
   FEATURE_ROOT_BARRIER,
+  FEATURE_TERMINAL,
 } from '../game/constants';
 import { isPassableMaterial } from './materials';
 import type { DynamicCellState, Entity, LevelState } from '../game/types';
@@ -66,6 +68,8 @@ export const isDynamicHazardCell = (level: LevelState, x: number, y: number): bo
 export const isFeatureBlockedCell = (level: LevelState, x: number, y: number): boolean => {
   const flags = featureFlagsAt(level, x, y);
   if ((flags & FEATURE_ROOT_BARRIER) !== 0) return true;
+  if ((flags & FEATURE_PROP_CRATE) !== 0) return true;
+  if ((flags & FEATURE_TERMINAL) !== 0) return true;
 
   if ((flags & FEATURE_GATE) !== 0) {
     const gate = gateAt(level, x, y);

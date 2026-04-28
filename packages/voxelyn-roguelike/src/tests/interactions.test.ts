@@ -12,14 +12,22 @@ import type { LevelInteractable } from '../game/types';
 import { createEnemy } from '../entities/enemy';
 import { inBounds2D, isWalkableCell, moveEntity, nextEntityIdentity, registerEntity, unregisterEntity } from '../world/level';
 
-const findNearbyWalkable = (state: ReturnType<typeof createGameState>, x: number, y: number): { x: number; y: number } | null => {
-  for (let r = 1; r <= 4; r += 1) {
+type TerminalInteractable = Extract<LevelInteractable, { type: 'terminal' }>;
+
+const findNearbyWalkable = (
+  state: ReturnType<typeof createGameState>,
+  x: number,
+  y: number,
+  maxRadius = 4
+): { x: number; y: number } | null => {
+  for (let r = 1; r <= maxRadius; r += 1) {
     for (let dy = -r; dy <= r; dy += 1) {
       for (let dx = -r; dx <= r; dx += 1) {
         const nx = x + dx;
         const ny = y + dy;
         if (!inBounds2D(state.level, nx, ny)) continue;
         if (dx === 0 && dy === 0) continue;
+        if (Math.abs(dx) + Math.abs(dy) > r) continue;
         if (isWalkableCell(state.level, nx, ny, 0)) {
           return { x: nx, y: ny };
         }
@@ -29,18 +37,26 @@ const findNearbyWalkable = (state: ReturnType<typeof createGameState>, x: number
   return null;
 };
 
+const createStateWithTerminal = (): {
+  state: ReturnType<typeof createGameState>;
+  terminal: TerminalInteractable;
+} => {
+  for (let offset = 0; offset < 200; offset += 1) {
+    const state = createGameState(424242 + offset);
+    const terminal = state.level.interactables.find(
+      (item): item is TerminalInteractable => item.type === 'terminal'
+    );
+    if (terminal) return { state, terminal };
+  }
+  throw new Error('Expected deterministic seed sweep to produce a terminal');
+};
+
 describe('interactions', () => {
   it('requires clearing enemies before terminal repair', () => {
-    const state = createGameState(424242);
+    const { state, terminal } = createStateWithTerminal();
     const player = getPlayer(state);
     expect(player).not.toBeNull();
     if (!player) return;
-
-    const terminal = state.level.interactables.find(
-      (item) => item.type === 'terminal'
-    ) as Extract<LevelInteractable, { type: 'terminal' }> | undefined;
-    expect(terminal).toBeDefined();
-    if (!terminal) return;
 
     terminal.broken = true;
     terminal.active = false;
@@ -51,7 +67,10 @@ describe('interactions', () => {
       unregisterEntity(state.level, e);
     }
 
-    expect(moveEntity(state.level, player, terminal.x, terminal.y)).toBe(true);
+    const playerPos = findNearbyWalkable(state, terminal.x, terminal.y, 1);
+    expect(playerPos).not.toBeNull();
+    if (!playerPos) return;
+    expect(moveEntity(state.level, player, playerPos.x, playerPos.y)).toBe(true);
 
     const enemyPos = findNearbyWalkable(state, terminal.x, terminal.y);
     expect(enemyPos).not.toBeNull();
@@ -103,7 +122,14 @@ describe('interactions', () => {
 
     const x = targetIdx % state.level.width;
     const y = Math.floor(targetIdx / state.level.width);
-    expect(moveEntity(state.level, player, x, y)).toBe(true);
+    if (isWalkableCell(state.level, x, y, player.occ)) {
+      expect(moveEntity(state.level, player, x, y)).toBe(true);
+    } else {
+      const playerPos = findNearbyWalkable(state, x, y);
+      expect(playerPos).not.toBeNull();
+      if (!playerPos) return;
+      expect(moveEntity(state.level, player, playerPos.x, playerPos.y)).toBe(true);
+    }
 
     state.simTimeMs = 2000;
     const handled = attemptInteractionAt(state, { x, y });

@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" shape-rendering="crispEdges" font-family="'JetBrains Mono', ui-monospace, monospace">
+  <title>Voxelyn — Core Chamber Battle</title>
+  <desc>Isometric splash: the Excavator faces Guardian, Bruiser, Stalker, Spitter and Spore Bomber inside the magenta core chamber on FL10.</desc>
+
+  <defs>
+    <!-- Ambient chamber haze -->
+    <radialGradient id="bgHaze" cx="50%" cy="60%" r="70%">
+      <stop offset="0%" stop-color="#160a22"/>
+      <stop offset="55%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#04060d"/>
+    </radialGradient>
+    <!-- Core energy glow (magenta) -->
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f0c6ff" stop-opacity="1"/>
+      <stop offset="30%" stop-color="#c86bff" stop-opacity="0.9"/>
+      <stop offset="70%" stop-color="#6a2a9e" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#2a0a40" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Entry cyan glow (far back-left) -->
+    <radialGradient id="entryGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#caf3fb"/>
+      <stop offset="40%" stop-color="#5ed0ec" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#184858" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Exit gold glow (back-right) -->
+    <radialGradient id="exitGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff4c9"/>
+      <stop offset="40%" stop-color="#f6c453" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#5a4018" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Fungal patch glow -->
+    <radialGradient id="fungalGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#bffcd4"/>
+      <stop offset="50%" stop-color="#4e8a5a" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#1a2a1c" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Vignette -->
+    <radialGradient id="vignette" cx="50%" cy="55%" r="75%">
+      <stop offset="55%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.85"/>
+    </radialGradient>
+
+    <!-- Iso tile shape (64x32 diamond) -->
+    <g id="tile">
+      <polygon points="32,0 64,16 32,32 0,16" fill="#3e4a63" stroke="#1a2038" stroke-width="1"/>
+    </g>
+    <g id="tileRock">
+      <polygon points="32,0 64,16 32,32 0,16" fill="#6b7a93" stroke="#1a2038" stroke-width="1"/>
+    </g>
+    <g id="tileCore">
+      <polygon points="32,0 64,16 32,32 0,16" fill="#c86bff" stroke="#1a2038" stroke-width="1"/>
+    </g>
+    <g id="tileDark">
+      <polygon points="32,0 64,16 32,32 0,16" fill="#1a2238" stroke="#0e1628" stroke-width="1"/>
+    </g>
+    <g id="tileFungal">
+      <polygon points="32,0 64,16 32,32 0,16" fill="#4e8a5a" stroke="#1a2f22" stroke-width="1"/>
+    </g>
+
+    <!-- Ground shadow ellipse -->
+    <radialGradient id="unitShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- BACKDROP -->
+  <rect width="1600" height="900" fill="url(#bgHaze)"/>
+
+  <!-- Distant entry light (back-left of chamber) -->
+  <ellipse cx="220" cy="260" rx="320" ry="140" fill="url(#entryGlow)" opacity="0.6"/>
+  <!-- Distant exit light (back-right) -->
+  <ellipse cx="1380" cy="240" rx="300" ry="130" fill="url(#exitGlow)" opacity="0.55"/>
+
+  <!-- CHAMBER FLOOR — isometric tile grid, laid out in a diamond around the core -->
+  <g transform="translate(800 430)">
+    <!-- Outer rock ring + inner dark floor + central core glow plate.
+         Tiles placed at iso coords (i - j)*32 x, (i + j)*16 y. Radius ~7. -->
+    <g id="floor"></g>
+
+    <!-- Hand-placed tiles (diamond radius 7). Rock ring at radius 6-7, dark floor inside, core at center. -->
+    <!-- Row offsets are precomputed. Each tile references the symbol shifted by -32,-16. -->
+    <!-- i from -7..7, j from -7..7; we render only |i+j|<=7 && |i-j|<=7. -->
+    <!-- Rock ring (|i|+|j|==7): -->
+    <!-- (-7,0), (-6,-1),(-6,1), (-5,-2),(-5,2), (-4,-3),(-4,3), (-3,-4),(-3,4), (-2,-5),(-2,5), (-1,-6),(-1,6), (0,-7),(0,7),
+         (1,-6),(1,6), (2,-5),(2,5), (3,-4),(3,4), (4,-3),(4,3), (5,-2),(5,2), (6,-1),(6,1), (7,0) -->
+    <g id="ring"></g>
+  </g>
+
+  <!-- We fill the floor + ring programmatically via repeated <use>. Doing it manually inline below: -->
+  <g transform="translate(800 430)">
+    <!-- FLOOR (rock ring + dark floor + fungal patches + core). The coordinate formula: tx = (i - j)*32 - 32, ty = (i + j)*16 - 16. -->
+
+    <!-- ring (|i|+|j| == 7) -->
+    <use href="#tileRock" x="-256" y="-128"/>   <!-- i=-7,j=0  -->
+    <use href="#tileRock" x="-192" y="-144"/>   <!-- i=-6,j=-1 -->
+    <use href="#tileRock" x="-224" y="-112"/>   <!-- i=-6,j=1  -->
+    <use href="#tileRock" x="-128" y="-160"/>   <!-- i=-5,j=-2 -->
+    <use href="#tileRock" x="-192" y="-96"/>    <!-- i=-5,j=2  -->
+    <use href="#tileRock" x="-64"  y="-176"/>   <!-- i=-4,j=-3 -->
+    <use href="#tileRock" x="-160" y="-80"/>    <!-- i=-4,j=3  -->
+    <use href="#tileRock" x="0"    y="-192"/>   <!-- i=-3,j=-4 -->
+    <use href="#tileRock" x="-128" y="-64"/>    <!-- i=-3,j=4  -->
+    <use href="#tileRock" x="64"   y="-208"/>   <!-- i=-2,j=-5 -->
+    <use href="#tileRock" x="-96"  y="-48"/>    <!-- i=-2,j=5  -->
+    <use href="#tileRock" x="128"  y="-224"/>   <!-- i=-1,j=-6 -->
+    <use href="#tileRock" x="-64"  y="-32"/>    <!-- i=-1,j=6  -->
+    <use href="#tileRock" x="192"  y="-240"/>   <!-- i=0,j=-7  -->
+    <use href="#tileRock" x="-32"  y="-16"/>    <!-- i=0,j=7   -->
+    <use href="#tileRock" x="256"  y="-224"/>   <!-- i=1,j=-6  -->
+    <use href="#tileRock" x="0"    y="0"/>      <!-- i=1,j=6   -->
+    <use href="#tileRock" x="320"  y="-208"/>   <!-- i=2,j=-5  -->
+    <use href="#tileRock" x="32"   y="16"/>     <!-- i=2,j=5   -->
+    <use href="#tileRock" x="384"  y="-192"/>   <!-- i=3,j=-4  -->
+    <use href="#tileRock" x="64"   y="32"/>     <!-- i=3,j=4   -->
+    <use href="#tileRock" x="448"  y="-176"/>   <!-- i=4,j=-3  -->
+    <use href="#tileRock" x="96"   y="48"/>     <!-- i=4,j=3   -->
+    <use href="#tileRock" x="512"  y="-160"/>   <!-- i=5,j=-2  -->
+    <use href="#tileRock" x="128"  y="64"/>     <!-- i=5,j=2   -->
+    <use href="#tileRock" x="576"  y="-144"/>   <!-- i=6,j=-1  -->
+    <use href="#tileRock" x="160"  y="80"/>     <!-- i=6,j=1   -->
+    <use href="#tileRock" x="608"  y="-128"/>   <!-- i=7,j=0   -->
+
+    <!-- inner floor (|i|+|j| <= 6, not center) — dark tiles -->
+    <!-- We'll paint a 13x13 diamond of dark tiles using manually-listed coords. -->
+    <!-- Radius 6 ring ring + radius 5..1 rows. -->
+    <!-- To keep the SVG readable, we emit only enough inner tiles for a convincing chamber floor. -->
+    <use href="#tileDark" x="-192" y="-112"/>
+    <use href="#tileDark" x="-160" y="-128"/>
+    <use href="#tileDark" x="-128" y="-144"/>
+    <use href="#tileDark" x="-96"  y="-160"/>
+    <use href="#tileDark" x="-64"  y="-144"/>
+    <use href="#tileDark" x="-32"  y="-128"/>
+    <use href="#tileDark" x="0"    y="-144"/>
+    <use href="#tileDark" x="32"   y="-160"/>
+    <use href="#tileDark" x="64"   y="-176"/>
+    <use href="#tileDark" x="96"   y="-160"/>
+    <use href="#tileDark" x="128"  y="-144"/>
+    <use href="#tileDark" x="160"  y="-128"/>
+    <use href="#tileDark" x="192"  y="-112"/>
+    <use href="#tileDark" x="224"  y="-96"/>
+    <use href="#tileDark" x="256"  y="-80"/>
+
+    <use href="#tileDark" x="-160" y="-96"/>
+    <use href="#tileDark" x="-128" y="-112"/>
+    <use href="#tileDark" x="-96"  y="-128"/>
+    <use href="#tileDark" x="-64"  y="-112"/>
+    <use href="#tileDark" x="-32"  y="-96"/>
+    <use href="#tileDark" x="0"    y="-112"/>
+    <use href="#tileDark" x="32"   y="-128"/>
+    <use href="#tileDark" x="64"   y="-144"/>
+    <use href="#tileDark" x="96"   y="-128"/>
+    <use href="#tileDark" x="128"  y="-112"/>
+    <use href="#tileDark" x="160"  y="-96"/>
+    <use href="#tileDark" x="192"  y="-80"/>
+    <use href="#tileDark" x="224"  y="-64"/>
+
+    <use href="#tileDark" x="-128" y="-80"/>
+    <use href="#tileDark" x="-96"  y="-96"/>
+    <use href="#tileDark" x="-64"  y="-80"/>
+    <use href="#tileDark" x="-32"  y="-64"/>
+    <use href="#tileDark" x="0"    y="-80"/>
+    <use href="#tileDark" x="32"   y="-96"/>
+    <use href="#tileDark" x="64"   y="-112"/>
+    <use href="#tileDark" x="96"   y="-96"/>
+    <use href="#tileDark" x="128"  y="-80"/>
+    <use href="#tileDark" x="160"  y="-64"/>
+    <use href="#tileDark" x="192"  y="-48"/>
+
+    <use href="#tileDark" x="-96"  y="-64"/>
+    <use href="#tileDark" x="-64"  y="-48"/>
+    <use href="#tileDark" x="-32"  y="-32"/>
+    <use href="#tileDark" x="0"    y="-48"/>
+    <use href="#tileDark" x="32"   y="-64"/>
+    <use href="#tileDark" x="64"   y="-80"/>
+    <use href="#tileDark" x="96"   y="-64"/>
+    <use href="#tileDark" x="128"  y="-48"/>
+    <use href="#tileDark" x="160"  y="-32"/>
+
+    <!-- Fungal patches scattered on the dark floor -->
+    <use href="#tileFungal" x="-160" y="-128"/>
+    <use href="#tileFungal" x="192"  y="-80"/>
+    <use href="#tileFungal" x="-96"  y="-96"/>
+    <use href="#tileFungal" x="160"  y="-32"/>
+    <use href="#tileFungal" x="-32"  y="-32"/>
+
+    <!-- Central CORE tile — lit from below -->
+    <use href="#tileCore" x="-32" y="-16"/>
+    <circle cx="0" cy="0" r="140" fill="url(#coreGlow)"/>
+
+    <!-- Fungal pool glows -->
+    <ellipse cx="-128" cy="-112" rx="60" ry="20" fill="url(#fungalGlow)" opacity="0.8"/>
+    <ellipse cx="224"  cy="-56"  rx="60" ry="20" fill="url(#fungalGlow)" opacity="0.8"/>
+  </g>
+
+  <!-- CORE PILLAR + EXIT BEACON glows on the chamber floor -->
+  <g transform="translate(800 430)">
+    <!-- Central core pillar silhouette rising out of the floor -->
+    <polygon points="-20,-20 20,-20 20,-140 0,-160 -20,-140" fill="#3a1a55" stroke="#c86bff" stroke-width="1.5"/>
+    <polygon points="-12,-28 12,-28 12,-140 0,-152 -12,-140" fill="#c86bff" opacity="0.85"/>
+    <polygon points="-6,-40 6,-40 6,-136 0,-146 -6,-136" fill="#f0c6ff"/>
+    <!-- Core floating crystal shard -->
+    <polygon points="0,-180 14,-160 0,-140 -14,-160" fill="#f0c6ff" stroke="#c86bff" stroke-width="1"/>
+    <circle cx="0" cy="-160" r="46" fill="url(#coreGlow)" opacity="0.6"/>
+  </g>
+
+  <!-- ENTITIES — painted in iso back-to-front order (smaller y = further back) -->
+  <!-- All units share the same body sketch language: chunky pixel blocks, silhouette-first. -->
+
+  <!-- SPITTER (back-left, ranged, kiting) -->
+  <g transform="translate(600 310)">
+    <ellipse cx="0" cy="46" rx="32" ry="8" fill="url(#unitShadow)"/>
+    <!-- body -->
+    <rect x="-16" y="-4" width="32" height="28" fill="#4e8a5a"/>
+    <rect x="-14" y="-2" width="28" height="24" fill="#6fe19a" opacity="0.9"/>
+    <!-- head / maw -->
+    <rect x="-10" y="-20" width="20" height="18" fill="#3a6a3a"/>
+    <rect x="-6" y="-12" width="12" height="6" fill="#101018"/> <!-- mouth -->
+    <!-- eyes -->
+    <rect x="-7" y="-18" width="4" height="3" fill="#c86bff"/>
+    <rect x="3" y="-18" width="4" height="3" fill="#c86bff"/>
+    <!-- legs -->
+    <rect x="-14" y="22" width="6" height="18" fill="#2a4a2a"/>
+    <rect x="8" y="22" width="6" height="18" fill="#2a4a2a"/>
+    <!-- projectile spark (arcing toward hero) -->
+    <circle cx="40" cy="-4" r="5" fill="#bffcd4"/>
+    <circle cx="40" cy="-4" r="9" fill="#6fe19a" opacity="0.4"/>
+    <circle cx="60" cy="16" r="3" fill="#bffcd4" opacity="0.7"/>
+    <circle cx="78" cy="38" r="2" fill="#bffcd4" opacity="0.5"/>
+    <!-- label -->
+    <text x="0" y="58" text-anchor="middle" font-size="11" fill="#8695b2" letter-spacing="2">SPITTER</text>
+  </g>
+
+  <!-- STALKER (mid, flanking the hero, mid-leap) -->
+  <g transform="translate(640 500)">
+    <ellipse cx="0" cy="46" rx="28" ry="7" fill="url(#unitShadow)"/>
+    <!-- motion smear trail -->
+    <rect x="-34" y="-8" width="14" height="22" fill="#e04f5f" opacity="0.25"/>
+    <rect x="-20" y="-6" width="10" height="18" fill="#e04f5f" opacity="0.45"/>
+    <!-- body -->
+    <rect x="-12" y="-6" width="28" height="22" fill="#e04f5f"/>
+    <rect x="-10" y="-4" width="24" height="18" fill="#8a2030" opacity="0.8"/>
+    <!-- head + claw -->
+    <rect x="-8" y="-18" width="18" height="14" fill="#a44860"/>
+    <rect x="-5" y="-14" width="4" height="2" fill="#fff"/>
+    <rect x="5" y="-14" width="4" height="2" fill="#fff"/>
+    <polygon points="18,-4 32,-8 36,0 24,4" fill="#f6c453"/>
+    <!-- legs (mid-leap, trailing) -->
+    <rect x="-10" y="14" width="6" height="14" fill="#6a3a4a"/>
+    <rect x="6" y="14" width="6" height="16" fill="#6a3a4a"/>
+    <text x="0" y="58" text-anchor="middle" font-size="11" fill="#8695b2" letter-spacing="2">STALKER</text>
+  </g>
+
+  <!-- BRUISER (front-left, armored, winding up) -->
+  <g transform="translate(520 620)">
+    <ellipse cx="0" cy="56" rx="42" ry="9" fill="url(#unitShadow)"/>
+    <!-- heavy torso -->
+    <rect x="-28" y="-4" width="56" height="40" fill="#6b7a93"/>
+    <rect x="-24" y="0" width="48" height="32" fill="#3e4a63"/>
+    <rect x="-22" y="2" width="44" height="12" fill="#8a99b5" opacity="0.7"/> <!-- shoulder plate -->
+    <!-- head -->
+    <rect x="-12" y="-22" width="24" height="20" fill="#3e4a63"/>
+    <rect x="-8" y="-16" width="4" height="2" fill="#e04f5f"/>
+    <rect x="4" y="-16" width="4" height="2" fill="#e04f5f"/>
+    <!-- raised hammer (anticipation wind-up) -->
+    <rect x="-48" y="-50" width="8" height="38" fill="#3e4a63"/>
+    <rect x="-58" y="-62" width="28" height="18" fill="#6b7a93"/>
+    <rect x="-56" y="-60" width="24" height="14" fill="#8a99b5"/>
+    <!-- legs -->
+    <rect x="-18" y="36" width="12" height="22" fill="#2a3344"/>
+    <rect x="6" y="36" width="12" height="22" fill="#2a3344"/>
+    <text x="0" y="74" text-anchor="middle" font-size="11" fill="#8695b2" letter-spacing="2">BRUISER</text>
+  </g>
+
+  <!-- SPORE BOMBER (front, close to hero, INFLATING — about to detonate) -->
+  <g transform="translate(900 640)">
+    <ellipse cx="0" cy="50" rx="48" ry="10" fill="url(#unitShadow)"/>
+    <!-- inflated bulb body -->
+    <circle cx="0" cy="10" r="38" fill="#4e8a5a"/>
+    <circle cx="0" cy="10" r="32" fill="#6fe19a" opacity="0.7"/>
+    <circle cx="-10" cy="0" r="8" fill="#bffcd4" opacity="0.8"/>
+    <circle cx="12" cy="6" r="5" fill="#bffcd4" opacity="0.8"/>
+    <!-- face -->
+    <rect x="-8" y="-6" width="4" height="3" fill="#c86bff"/>
+    <rect x="4" y="-6" width="4" height="3" fill="#c86bff"/>
+    <rect x="-6" y="4" width="12" height="3" fill="#1a0820"/>
+    <!-- pre-detonation shockwave ring -->
+    <circle cx="0" cy="10" r="54" fill="none" stroke="#bffcd4" stroke-width="1.5" opacity="0.5"/>
+    <circle cx="0" cy="10" r="68" fill="none" stroke="#6fe19a" stroke-width="1" opacity="0.35"/>
+    <!-- legs (tiny, barely touching ground) -->
+    <rect x="-8" y="42" width="5" height="8" fill="#2a4a2a"/>
+    <rect x="3" y="42" width="5" height="8" fill="#2a4a2a"/>
+    <text x="0" y="68" text-anchor="middle" font-size="11" fill="#8695b2" letter-spacing="2">SPORE BOMBER</text>
+  </g>
+
+  <!-- HERO — EXCAVATOR (center foreground, mid-swing, facing right toward Bomber+Guardian) -->
+  <g transform="translate(780 570)">
+    <ellipse cx="0" cy="58" rx="36" ry="9" fill="url(#unitShadow)"/>
+    <!-- back leg planted, front leg forward (lunge stance) -->
+    <rect x="-16" y="36" width="8" height="22" fill="#1a2038"/>
+    <rect x="8" y="30" width="8" height="26" fill="#1a2038"/>
+    <!-- torso (squash-stretch: stretched forward during strike) -->
+    <rect x="-16" y="-10" width="36" height="46" fill="#3e4a63"/>
+    <rect x="-12" y="-6" width="28" height="38" fill="#6b7a93"/>
+    <rect x="-10" y="-4" width="24" height="6" fill="#8a99b5"/> <!-- chest plate -->
+    <!-- shoulder lamp (facing right) -->
+    <circle cx="16" cy="-4" r="6" fill="#5ed0ec"/>
+    <circle cx="16" cy="-4" r="12" fill="#5ed0ec" opacity="0.35"/>
+    <circle cx="16" cy="-4" r="22" fill="#5ed0ec" opacity="0.12"/>
+    <!-- head + visor -->
+    <rect x="-10" y="-30" width="22" height="20" fill="#6b7a93"/>
+    <rect x="-6" y="-26" width="14" height="6" fill="#0e1424"/> <!-- visor slit -->
+    <rect x="-4" y="-24" width="2" height="2" fill="#5ed0ec"/>
+    <rect x="4" y="-24" width="2" height="2" fill="#5ed0ec"/>
+    <rect x="-4" y="-34" width="12" height="6" fill="#5ed0ec"/> <!-- helmet lamp -->
+    <!-- pickaxe (mid-strike smear toward right) -->
+    <rect x="20" y="-20" width="8" height="26" fill="#3e4a63"/>
+    <polygon points="28,-28 46,-20 42,-4 24,-10" fill="#6b7a93"/>
+    <polygon points="30,-26 44,-20 40,-6 26,-10" fill="#8a99b5"/>
+    <!-- strike smear trail -->
+    <rect x="-8" y="-18" width="28" height="2" fill="#dbe4f2" opacity="0.5"/>
+    <rect x="-6" y="-14" width="30" height="2" fill="#dbe4f2" opacity="0.3"/>
+    <!-- shoulder glow bloom -->
+    <circle cx="16" cy="-4" r="40" fill="#5ed0ec" opacity="0.06"/>
+    <text x="0" y="80" text-anchor="middle" font-size="12" fill="#dbe4f2" letter-spacing="3" font-weight="600">EXCAVATOR</text>
+  </g>
+
+  <!-- GUARDIAN (back-right, elevated on core pedestal, firing tri-shards forward) -->
+  <g transform="translate(1040 380)">
+    <ellipse cx="0" cy="70" rx="56" ry="12" fill="url(#unitShadow)"/>
+    <!-- pedestal / fortress base -->
+    <polygon points="-42,56 42,56 52,70 -52,70" fill="#2a1040"/>
+    <polygon points="-38,50 38,50 44,58 -44,58" fill="#4a1a5a"/>
+    <!-- body: fortress-like, symmetric -->
+    <polygon points="-30,10 30,10 40,50 -40,50" fill="#4a1a5a"/>
+    <polygon points="-26,14 26,14 34,46 -34,46" fill="#8a3aaa"/>
+    <polygon points="-22,18 22,18 28,42 -28,42" fill="#c86bff" opacity="0.7"/>
+    <!-- shoulder spires -->
+    <polygon points="-34,10 -26,-14 -22,10" fill="#c86bff"/>
+    <polygon points="34,10 26,-14 22,10" fill="#c86bff"/>
+    <!-- head / core eye -->
+    <polygon points="-14,-22 14,-22 18,10 -18,10" fill="#2a0a40"/>
+    <circle cx="0" cy="-4" r="8" fill="#f0c6ff"/>
+    <circle cx="0" cy="-4" r="5" fill="#fff"/>
+    <circle cx="0" cy="-4" r="16" fill="#c86bff" opacity="0.35"/>
+    <!-- crown -->
+    <polygon points="-10,-28 -6,-36 -2,-28" fill="#f6c453"/>
+    <polygon points="-2,-30 2,-40 6,-30" fill="#f6c453"/>
+    <polygon points="6,-28 10,-36 14,-28" fill="#f6c453"/>
+    <!-- tri-shard barrage, fanning toward hero (left) -->
+    <g fill="#f0c6ff">
+      <polygon points="-60,8 -40,4 -48,16"/>
+      <polygon points="-80,24 -58,18 -68,30"/>
+      <polygon points="-50,34 -30,28 -38,40"/>
+      <polygon points="-110,10 -90,4 -98,18"/>
+      <polygon points="-130,36 -110,30 -118,44"/>
+    </g>
+    <g fill="#c86bff" opacity="0.7">
+      <polygon points="-100,22 -84,18 -90,30"/>
+      <polygon points="-76,42 -60,38 -66,48"/>
+    </g>
+    <!-- charge glow at chest -->
+    <circle cx="-14" cy="22" r="10" fill="#f0c6ff" opacity="0.5"/>
+    <circle cx="-14" cy="22" r="18" fill="#c86bff" opacity="0.3"/>
+    <text x="0" y="96" text-anchor="middle" font-size="12" fill="#f0c6ff" letter-spacing="3" font-weight="600">GUARDIAN</text>
+  </g>
+
+  <!-- Environment ambience — volumetric shafts + dust motes -->
+  <g opacity="0.35">
+    <polygon points="200,40 360,40 720,900 420,900" fill="#5ed0ec" opacity="0.08"/>
+    <polygon points="1240,40 1400,40 1180,900 900,900" fill="#f6c453" opacity="0.06"/>
+    <polygon points="700,60 900,60 900,520 700,520" fill="#c86bff" opacity="0.07"/>
+  </g>
+
+  <!-- dust motes -->
+  <g fill="#dbe4f2">
+    <circle cx="340" cy="340" r="1.5" opacity="0.6"/>
+    <circle cx="440" cy="480" r="1" opacity="0.4"/>
+    <circle cx="560" cy="220" r="1.2" opacity="0.5"/>
+    <circle cx="760" cy="320" r="1" opacity="0.7"/>
+    <circle cx="960" cy="260" r="1.3" opacity="0.5"/>
+    <circle cx="1140" cy="420" r="1" opacity="0.4"/>
+    <circle cx="1220" cy="560" r="1.5" opacity="0.6"/>
+    <circle cx="260" cy="600" r="1" opacity="0.4"/>
+    <circle cx="1320" cy="300" r="1.2" opacity="0.5"/>
+  </g>
+
+  <!-- spore particles drifting around the bomber -->
+  <g fill="#bffcd4" opacity="0.7">
+    <circle cx="820" cy="580" r="1.5"/>
+    <circle cx="860" cy="560" r="1"/>
+    <circle cx="940" cy="540" r="1.2"/>
+    <circle cx="980" cy="600" r="1.5"/>
+    <circle cx="840" cy="680" r="1"/>
+    <circle cx="960" cy="690" r="1.2"/>
+  </g>
+
+  <!-- VIGNETTE -->
+  <rect width="1600" height="900" fill="url(#vignette)"/>
+
+  <!-- TITLE -->
+  <g transform="translate(800 140)" text-anchor="middle">
+    <text y="0" font-family="'Space Grotesk', sans-serif" font-size="72" font-weight="600" fill="#dbe4f2" letter-spacing="-2">
+      VOXELYN<tspan fill="#c86bff"> / CORE</tspan>
+    </text>
+    <text y="34" font-size="12" fill="#8695b2" letter-spacing="6">FL 10 · THE EXCAVATOR VS. THE GUARDIAN</text>
+  </g>
+
+  <!-- FOOTER META -->
+  <g font-size="10" fill="#55668a" letter-spacing="2">
+    <text x="48" y="860">VOXELYN · SPLASH · CORE CHAMBER</text>
+    <text x="1552" y="860" text-anchor="end">04.24.26 · 01/01</text>
+  </g>
+</svg>

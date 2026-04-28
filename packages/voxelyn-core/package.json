@@ -1,6 +1,6 @@
 {
   "name": "@voxelyn/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ultra lightweight headless pixels/grid/iso/voxels toolkit",
   "type": "module",
   "sideEffects": false,
@@ -62,10 +62,14 @@
     "dist",
     "src"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "pnpm build && node dist/tests/run.js",
-    "dev": "tsc -w"
+    "dev": "tsc -w",
+    "prepublishOnly": "pnpm build"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

@@ -12,8 +12,8 @@ export type PowerUpDefinition = {
 export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
   vital_boost: {
     id: 'vital_boost',
-    name: 'Nucleo Vital',
-    description: '+20 HP maximo e cura imediata de 20.',
+    name: 'Cristal de Éter',
+    description: '+20 HP máximo e cura imediata de 20.',
     maxStacks: 4,
     apply: (player) => {
       player.maxHp += 20;
@@ -23,7 +23,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
   },
   attack_boost: {
     id: 'attack_boost',
-    name: 'Lamina Micelial',
+    name: 'Cortador Cerâmico',
     description: '+3 de dano base.',
     maxStacks: 3,
     apply: (player) => {
@@ -32,8 +32,8 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
   },
   swift_boots: {
     id: 'swift_boots',
-    name: 'Servos de Impulso',
-    description: 'Movimento 10% mais rapido (cooldown menor).',
+    name: 'Pernas Articuladas',
+    description: 'Movimento 10% mais rápido (cooldown menor).',
     maxStacks: 3,
     apply: (player) => {
       player.moveCooldownMs = Math.max(45, Math.round(player.moveCooldownMs * 0.9));
@@ -41,8 +41,8 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
   },
   iron_skin: {
     id: 'iron_skin',
-    name: 'Casca Reforcada',
-    description: '+1 de reducao de dano.',
+    name: 'Liga Reforçada',
+    description: '+1 de redução de dano.',
     maxStacks: 3,
     apply: (player) => {
       player.damageReduction += 1;
@@ -50,7 +50,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
   },
   vampiric_spores: {
     id: 'vampiric_spores',
-    name: 'Esporos Vampiricos',
+    name: 'Esporos Vampíricos',
     description: 'Recupera 1 HP ao acertar ataques.',
     maxStacks: 2,
     apply: (player) => {
@@ -59,7 +59,7 @@ export const POWER_UP_POOL: Record<PowerUpId, PowerUpDefinition> = {
   },
   fungal_regen: {
     id: 'fungal_regen',
-    name: 'Regeneracao Fungica',
+    name: 'Regeneração Fúngica',
     description: 'Regenera 1 HP por segundo.',
     maxStacks: 3,
     apply: (player) => {

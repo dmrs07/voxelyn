@@ -1,6 +1,6 @@
 {
   "name": "@voxelyn/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Voxelyn CLI - scaffold games and demos",
   "type": "module",
   "bin": {
@@ -11,10 +11,17 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -w",
-    "test": "pnpm build && node --test 'dist/tests/**/*.js'"
+    "test": "pnpm build && node --test 'dist/tests/**/*.js'",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.1",

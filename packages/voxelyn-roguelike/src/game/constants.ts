@@ -13,6 +13,9 @@ export const PLAYER_BASE_HP = 100;
 export const PLAYER_BASE_ATTACK = 12;
 export const PLAYER_MOVE_COOLDOWN_MS = 90;
 export const PLAYER_ATTACK_COOLDOWN_MS = 280;
+export const POWERUP_KILLS_PER_CHOICE_EARLY = 4;
+export const POWERUP_KILLS_PER_CHOICE_LATE = 5;
+export const POWERUP_SAFE_CHOICE_RADIUS = 5;
 
 export const PLAYER_MIN_SPAWN_DISTANCE = 8;
 export const MAX_PARTICLES = 160;
@@ -79,46 +82,46 @@ export const ENEMY_ARCHETYPE_STATS: Record<
   }
 > = {
   stalker: {
-    hp: 16,
-    attack: 4,
-    moveCooldownMs: 100,
-    attackCooldownMs: 320,
-    detectRadius: 8,
+    hp: 24,
+    attack: 7,
+    moveCooldownMs: 85,
+    attackCooldownMs: 290,
+    detectRadius: 9,
     preferredMinRange: 1,
     preferredMaxRange: 1,
   },
   bruiser: {
-    hp: 32,
-    attack: 9,
-    moveCooldownMs: 180,
-    attackCooldownMs: 650,
-    detectRadius: 6,
+    hp: 52,
+    attack: 12,
+    moveCooldownMs: 200,
+    attackCooldownMs: 620,
+    detectRadius: 7,
     preferredMinRange: 1,
     preferredMaxRange: 1,
   },
   spitter: {
     hp: 20,
     attack: 6,
-    moveCooldownMs: 140,
-    attackCooldownMs: 700,
+    moveCooldownMs: 130,
+    attackCooldownMs: 560,
     detectRadius: 10,
     preferredMinRange: 3,
     preferredMaxRange: 5,
   },
   guardian: {
-    hp: 95,
-    attack: 14,
+    hp: 210,
+    attack: 24,
     moveCooldownMs: 150,
-    attackCooldownMs: 700,
+    attackCooldownMs: 620,
     detectRadius: 12,
     preferredMinRange: 2,
     preferredMaxRange: 6,
   },
   spore_bomber: {
-    hp: 26,
-    attack: 11,
-    moveCooldownMs: 140,
-    attackCooldownMs: 800,
+    hp: 18,
+    attack: 22,
+    moveCooldownMs: 150,
+    attackCooldownMs: 740,
     detectRadius: 9,
     preferredMinRange: 1,
     preferredMaxRange: 2,
@@ -193,8 +196,8 @@ export const SPORE_LANE_TICK_MS = 260;
 
 // Pop-up sprite rendering constants
 export const FEATURE_POPUP_SCALE = 2.5;
-export const FEATURE_SHADOW_ALPHA = 0.2;
-export const FEATURE_TILT_X = 0; // No horizontal shear - sprites stand upright
+export const FEATURE_SHADOW_ALPHA = 0.38;
+export const FEATURE_TILT_X = 0;
 
 export const EVENT_AMBUSH_CHANCE_PER_FLOOR_BASE = 0.08;
 export const EVENT_SPORE_WAVE_CHANCE_PER_FLOOR_BASE = 0.1;
@@ -213,7 +216,7 @@ export const TERMINAL_REPAIR_RADIUS = 6;
 export const INSPECT_TEXTS = {
   fungal_cluster: 'Uma colonia de fungos pulsa em silencio.',
   debris: 'Escombros oxidados de mineracao antiga.',
-  crate: 'Caixa de suprimentos vazia, coberta de poeira.',
+  crate: 'Caixa empilhada bloqueando o corredor.',
   beacon: 'Sinalizador gasto. Ainda emite um brilho fraco.',
   track: 'Trilhos tortos, lembranca da mineracao.',
   terminal_broken: 'Terminal quebrado. Elimine inimigos proximos para consertar.',

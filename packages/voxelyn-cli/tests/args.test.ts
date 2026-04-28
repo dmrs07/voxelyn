@@ -130,3 +130,19 @@ test('parse generate object quality options with pt aliases', () => {
   assert.equal(parsed.options.modelEscalation, false);
   assert.equal(parsed.options.strictQuality, true);
 });
+
+test('parse sprites generate options', () => {
+  const parsed = parseArgs([
+    'sprites',
+    'generate',
+    '--character',
+    'striker',
+    '--emit-plan',
+    '--dry-run',
+  ]);
+  assert.equal(parsed.command, 'sprites');
+  assert.deepEqual(parsed.positionals, ['generate']);
+  assert.equal(parsed.options.character, 'striker');
+  assert.equal(parsed.options.emitPlan, true);
+  assert.equal(parsed.options.dryRun, true);
+});

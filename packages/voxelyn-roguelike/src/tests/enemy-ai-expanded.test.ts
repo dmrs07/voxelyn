@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { updateEnemiesAI } from '../entities/ai';
 import { createEnemy } from '../entities/enemy';
-import { MATERIAL_FUNGAL_FLOOR } from '../game/constants';
+import { FEATURE_BIOFLUID, MATERIAL_FUNGAL_FLOOR } from '../game/constants';
 import { createGameState, getPlayer } from '../game/state';
-import { nextEntityIdentity, registerEntity, setMaterialAt, unregisterEntity } from '../world/level';
+import { index2D, nextEntityIdentity, registerEntity, setMaterialAt, unregisterEntity } from '../world/level';
 
 describe('enemy ai expanded', () => {
   it('spitter fires projectile when player is in range and line of sight', () => {
@@ -15,6 +15,7 @@ describe('enemy ai expanded', () => {
     for (const entity of Array.from(state.level.entities.values())) {
       if (entity.kind === 'enemy') unregisterEntity(state.level, entity);
     }
+    state.level.featureMap.fill(0);
 
     const sx = player.x - 4;
     const sy = player.y;
@@ -58,5 +59,6 @@ describe('enemy ai expanded', () => {
     updateEnemiesAI(state, (bomber.fuseUntilMs ?? 1000) + 1);
     expect(bomber.alive).toBe(false);
     expect(state.level.entities.has(bomber.id)).toBe(false);
+    expect((state.level.featureMap[index2D(state.level.width, bx, by)] ?? 0) & FEATURE_BIOFLUID).not.toBe(0);
   });
 });

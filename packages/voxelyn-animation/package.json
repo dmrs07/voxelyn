@@ -1,6 +1,6 @@
 {
   "name": "@voxelyn/animation",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Procedural pixel animation runtime and importers for Voxelyn",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,10 +15,15 @@
     "dist",
     "src"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
+    "clean": "rm -rf dist",
     "dev": "tsc --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@voxelyn/core": "workspace:*"

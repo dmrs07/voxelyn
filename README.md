@@ -37,6 +37,10 @@ python3 -m http.server 8080
 - Noita-like: `http://localhost:8080/examples/browser-noita-like/index.html`
 - Iso Diablo-like: `http://localhost:8080/examples/browser-iso-diablo-like/index.html`
 
+## Concept art
+
+Design bundle em `docs/concept-art/` (abra `docs/concept-art/index.html`). Linguagem visual — tipografia, paleta e layout de HUD — puxada dessas páginas para a tela de título e o HUD do roguelike.
+
 ## Pacote de animação
 
 - Desenvolvimento: `pnpm run dev:animation`

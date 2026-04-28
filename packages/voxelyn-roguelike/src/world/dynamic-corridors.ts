@@ -9,6 +9,7 @@ import {
   DYNAMIC_SOFTLOCK_GRACE_MS,
   DYNAMIC_WARNING_MS,
   FEATURE_GATE,
+  FEATURE_PROP_CRATE,
   FEATURE_ROOT_BARRIER,
   FEATURE_TERMINAL,
   SCREEN_FLASH_MS,
@@ -61,6 +62,7 @@ const shouldSkipCandidate = (level: LevelState, x: number, y: number): boolean =
   if ((flags & FEATURE_ROOT_BARRIER) !== 0) return true;
   if ((flags & FEATURE_GATE) !== 0) return true;
   if ((flags & FEATURE_TERMINAL) !== 0) return true;
+  if ((flags & FEATURE_PROP_CRATE) !== 0) return true;
   return false;
 };
 
@@ -145,7 +147,7 @@ export const buildCorridorCandidates = (
       const i = index2D(width, x, y);
       if ((mask[i] ?? 0) !== 1) continue;
       if ((x === entry.x && y === entry.y) || (x === exit.x && y === exit.y)) continue;
-      if ((featureMap[i] ?? 0) & (FEATURE_ROOT_BARRIER | FEATURE_GATE | FEATURE_TERMINAL)) continue;
+      if ((featureMap[i] ?? 0) & (FEATURE_ROOT_BARRIER | FEATURE_GATE | FEATURE_TERMINAL | FEATURE_PROP_CRATE)) continue;
 
       let degree = 0;
       if (mask[index2D(width, x + 1, y)] === 1) degree += 1;

@@ -1,6 +1,6 @@
 {
   "name": "@voxelyn/ai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Premium AI module for Voxelyn - Generate textures, objects, and scenarios with Gemini",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,10 +14,14 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

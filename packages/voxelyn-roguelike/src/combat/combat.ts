@@ -1,10 +1,12 @@
 import {
+  FEATURE_BIOFLUID,
   HIT_FLASH_MS,
   MAX_PARTICLES,
   MAX_PROJECTILES,
   PROJECTILE_SPEED,
   SCREEN_FLASH_MS,
 } from '../game/constants';
+import { enemyDisplayName } from '../game/lore';
 import type {
   Entity,
   EnemyState,
@@ -18,6 +20,7 @@ import { isPassableMaterial } from '../world/materials';
 import {
   entityByOcc,
   inBounds2D,
+  index2D,
   isWalkableCell,
   materialAt,
   moveEntity,
@@ -159,6 +162,21 @@ const spawnDamageNumber = (
   });
 };
 
+const guardianShieldReduction = (state: GameState, target: Entity, sourceId: string): number => {
+  if (target.kind !== 'enemy' || target.archetype === 'guardian') return 0;
+
+  const source = state.level.entities.get(sourceId);
+  if (!source || source.kind !== 'player') return 0;
+
+  for (const entity of state.level.entities.values()) {
+    if (entity.kind !== 'enemy' || entity.archetype !== 'guardian' || !entity.alive) continue;
+    const distance = Math.abs(entity.x - target.x) + Math.abs(entity.y - target.y);
+    if (distance <= 4) return 2;
+  }
+
+  return 0;
+};
+
 const applyRawDamage = (
   state: GameState,
   levelSourceId: string,
@@ -170,7 +188,8 @@ const applyRawDamage = (
     return { didAttack: false, damage: 0, killedIds: [], healed: 0 };
   }
 
-  const damage = calculateDamage(amount, target.damageReduction);
+  const shieldReduction = guardianShieldReduction(state, target, levelSourceId);
+  const damage = calculateDamage(amount, target.damageReduction + shieldReduction);
   target.hp -= damage;
   target.hitFlashUntilMs = Math.max(target.hitFlashUntilMs, nowMs + HIT_FLASH_MS);
   target.animIntent = 'hit';
@@ -183,12 +202,20 @@ const applyRawDamage = (
     killedIds.push(target.id);
     unregisterEntity(state.level, target);
     if (target.kind === 'enemy') {
-      state.messages.push('Inimigo eliminado.');
+      state.messages.push(`${enemyDisplayName(target.archetype)} eliminado.`);
     }
   }
 
   pushDamageEvent(state, levelSourceId, target.id, damage, target.x, target.y);
   spawnDamageNumber(state, target.x, target.y, `-${damage}`, 0xff8a8aff);
+  if (shieldReduction > 0) {
+    spawnDamageNumber(state, target.x, target.y - 0.2, 'WARD', 0xffff6bc8);
+    state.uiAlerts.push({
+      text: 'Guardian protege aliados proximos',
+      tone: 'warn',
+      untilMs: state.simTimeMs + 900,
+    });
+  }
 
   let healed = 0;
   const source = state.level.entities.get(levelSourceId);
@@ -423,6 +450,20 @@ const spawnImpactParticles = (state: GameState, x: number, y: number, color: num
   }
 };
 
+const markCorrosiveResidue = (state: GameState, x: number, y: number, radius: number): void => {
+  const cx = Math.round(x);
+  const cy = Math.round(y);
+
+  for (let yy = cy - radius; yy <= cy + radius; yy += 1) {
+    for (let xx = cx - radius; xx <= cx + radius; xx += 1) {
+      if (Math.abs(xx - cx) + Math.abs(yy - cy) > radius) continue;
+      if (!inBounds2D(state.level, xx, yy)) continue;
+      if (!isPassableMaterial(materialAt(state.level, xx, yy, 0))) continue;
+      state.level.featureMap[index2D(state.level.width, xx, yy)] |= FEATURE_BIOFLUID;
+    }
+  }
+};
+
 const removeDeadProjectiles = (state: GameState): void => {
   if (state.projectiles.length === 0) return;
   let write = 0;
@@ -467,6 +508,9 @@ export const updateProjectiles = (state: GameState, stepMs: number): ProjectileU
 
       if (!isPassableMaterial(materialAt(state.level, cx, cy, 0))) {
         spawnImpactParticles(state, projectile.x, projectile.y, 0xfff0b05fff);
+        if (projectile.kind === 'spore_blob') {
+          markCorrosiveResidue(state, projectile.x, projectile.y, 1);
+        }
         projectile.alive = false;
         break;
       }
@@ -496,6 +540,9 @@ export const updateProjectiles = (state: GameState, stepMs: number): ProjectileU
       }
 
       spawnImpactParticles(state, projectile.x, projectile.y, 0xff9bdbff);
+      if (projectile.kind === 'spore_blob') {
+        markCorrosiveResidue(state, projectile.x, projectile.y, 1);
+      }
       projectile.alive = false;
     }
   }
@@ -531,6 +578,8 @@ export const applyExplosionDamage = (
       }
     }
   }
+
+  markCorrosiveResidue(state, source.x, source.y, Math.max(1, radius));
 
   for (let i = 0; i < 18; i += 1) {
     const t = (i / 18) * Math.PI * 2;

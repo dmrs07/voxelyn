@@ -1,5 +1,5 @@
 import type { AnimationFacing, PixelSprite, ProceduralCharacter } from '../../types.js';
-import { applyAttackSlash, applyCastSpark, applyDieDissolve, applyHitOverlay } from '../effects.js';
+import { applyCastSpark, applyDieDissolve, applyHitOverlay } from '../effects.js';
 import { clearSprite, fillRect, plot } from '../primitives.js';
 
 const isLeftFacing = (facing: AnimationFacing): boolean => facing === 'dl' || facing === 'ul';
@@ -23,52 +23,84 @@ export const drawWarriorFrame = (
   const cx = Math.floor(out.width / 2);
   const isWalking = clipId === 'walk';
   const isIdle = clipId === 'idle';
-  
-  // Walk stride motion
-  const stride = isWalking ? Math.sin(localTMs * 0.028) : 0;
-  
-  // Idle breathing and subtle sway
-  const breathe = Math.sin(tMs * 0.004) * 0.6;
-  const idleSway = isIdle ? Math.sin(tMs * 0.0025) * 0.4 : 0;
-  
-  // Bob: pronounced for walk, subtle for idle
-  const bob = isWalking
-    ? Math.sin(localTMs * 0.024)
-    : breathe * 0.5;
-  
-  const yBase = Math.floor(out.height - 4 + bob);
+  const isAttack = clipId === 'attack';
   const left = isLeftFacing(facing);
+  const dir = left ? -1 : 1;
 
-  // Legs - idle has subtle weight shift
-  const legA = isWalking ? Math.round(stride * 2) : Math.round(idleSway * 0.5);
+  // Attack phases: 0.00-0.35 anticipation (wind back), 0.35-0.55 strike (stretch forward),
+  // 0.55-0.75 smear (blurred forward pose), 0.75-1.00 recovery (snap back).
+  const atkPhase = isAttack ? clipPhase(localTMs, 280) : 0;
+  const antic = isAttack && atkPhase < 0.35 ? atkPhase / 0.35 : 0;
+  const strike = isAttack && atkPhase >= 0.35 && atkPhase < 0.55
+    ? (atkPhase - 0.35) / 0.2
+    : 0;
+  const smear = isAttack && atkPhase >= 0.55 && atkPhase < 0.75 ? 1 : 0;
+  const recovery = isAttack && atkPhase >= 0.75 ? (atkPhase - 0.75) / 0.25 : 0;
+
+  // Idle squash/stretch breath: compress torso 1px on downbeat.
+  const breathRaw = Math.sin(tMs * 0.004);
+  const breathCompress = isIdle && breathRaw < -0.5 ? 1 : 0;
+  const stride = isWalking ? Math.sin(localTMs * 0.028) : 0;
+
+  // Walk bob snaps to whole pixels (was sub-pixel).
+  const walkBob = isWalking ? Math.round(Math.sin(localTMs * 0.024)) : 0;
+
+  // Attack body shift: pull back during anticipation, lunge during strike, hold on smear, ease back.
+  const attackShift = isAttack
+    ? dir * Math.round(antic * -2 + strike * 3 + smear * 3 + (1 - recovery) * 3 * (recovery > 0 ? 1 : 0))
+    : 0;
+  // On recovery, blend 3 -> 0.
+  const attackShiftRecover = isAttack && recovery > 0 ? dir * Math.round(3 * (1 - recovery)) : 0;
+  const bodyShiftX = isAttack ? (recovery > 0 ? attackShiftRecover : attackShift) : 0;
+
+  const yBase = Math.floor(out.height - 4) + walkBob + breathCompress;
+  const torsoTop = yBase - 12 + (breathCompress > 0 ? 1 : 0);
+  const torsoH = 7 - breathCompress;
+
+  // Legs
+  const legA = isWalking ? Math.round(stride * 2) : 0;
   const legB = -legA;
-  fillRect(out, cx - 2 + legA, yBase - 5, 2, 5, p.playerAccent);
-  fillRect(out, cx + legB, yBase - 5, 2, 5, p.playerAccent);
+  fillRect(out, cx - 2 + legA + bodyShiftX, yBase - 5, 2, 5, p.playerAccent);
+  fillRect(out, cx + legB + bodyShiftX, yBase - 5, 2, 5, p.playerAccent);
 
-  // Torso - breathing makes it slightly wider on inhale
-  const torsoExpand = isIdle ? Math.max(0, Math.round(breathe * 0.4)) : 0;
-  fillRect(out, cx - 4 - torsoExpand, yBase - 12, 8 + torsoExpand * 2, 7, p.playerPrimary);
-  fillRect(out, cx - 3, yBase - 11, 6, 5, p.playerSecondary);
+  // Torso — squash on breath downbeat
+  fillRect(out, cx - 4 + bodyShiftX, torsoTop, 8, torsoH, p.playerPrimary);
+  fillRect(out, cx - 3 + bodyShiftX, torsoTop + 1, 6, Math.max(1, torsoH - 2), p.playerSecondary);
 
-  // Head + visor - slight tilt with sway
-  const headShift = isIdle ? Math.round(idleSway * 0.3) : 0;
-  fillRect(out, cx - 3 + headShift, yBase - 16, 6, 4, p.highlight);
-  fillRect(out, cx - 2 + headShift, yBase - 15, 4, 2, p.shadow);
+  // Head + visor — follows body shift
+  fillRect(out, cx - 3 + bodyShiftX, yBase - 16 + breathCompress, 6, 4, p.highlight);
+  fillRect(out, cx - 2 + bodyShiftX, yBase - 15 + breathCompress, 4, 2, p.shadow);
 
-  // Shoulder light depending on facing
+  // Shoulder lamp — facing-dependent
   if (left) {
-    fillRect(out, cx - 4 - torsoExpand, yBase - 12, 2, 3, p.highlight);
+    fillRect(out, cx - 4 + bodyShiftX, torsoTop, 2, 3, p.highlight);
   } else {
-    fillRect(out, cx + 2 + torsoExpand, yBase - 12, 2, 3, p.highlight);
+    fillRect(out, cx + 2 + bodyShiftX, torsoTop, 2, 3, p.highlight);
   }
 
-  // Arm / weapon hand - idle has subtle motion
-  const armBob = isIdle ? Math.round(Math.sin(tMs * 0.0035) * 0.6) : 0;
-  const handX = left ? cx - 5 - torsoExpand : cx + 4 + torsoExpand;
-  fillRect(out, handX, yBase - 10 + armBob, 2, 4, p.playerPrimary);
+  // Weapon/hand arm — anticipation pulls back, strike+smear thrusts forward.
+  const handX = left
+    ? cx - 5 + bodyShiftX - Math.round(antic * -2 + (strike + smear) * 3)
+    : cx + 4 + bodyShiftX + Math.round(antic * -2 + (strike + smear) * 3);
+  const handY = yBase - 10 + (breathCompress > 0 ? 1 : 0);
+  fillRect(out, handX, handY, 2, 4, p.playerPrimary);
 
-  if (clipId === 'attack') {
-    applyAttackSlash(out, facing, clipPhase(localTMs, 260), p.highlight);
+  // Attack smear trail — ghosted row between hand and torso during smear phase.
+  if (smear > 0) {
+    const trailStart = left ? handX + 2 : handX - 3;
+    fillRect(out, trailStart, handY + 1, 3, 2, p.highlight);
+  }
+
+  if (isAttack) {
+    // Slash appears during strike + smear phases.
+    if (atkPhase >= 0.35 && atkPhase <= 0.75) {
+      const cyMid = Math.floor(out.height / 2) + 1;
+      const reach = 6 + (smear > 0 ? 1 : 0);
+      fillRect(out, cx + dir * 1 + bodyShiftX, cyMid - 4, dir > 0 ? reach : -reach, 1, p.highlight);
+      if (smear > 0) {
+        fillRect(out, cx + dir * 2 + bodyShiftX, cyMid - 3, dir > 0 ? reach - 1 : -(reach - 1), 1, p.highlight);
+      }
+    }
   }
 
   if (clipId === 'cast') {
@@ -83,13 +115,13 @@ export const drawWarriorFrame = (
     applyDieDissolve(out, clipPhase(localTMs, 520));
   }
 
-  // Eye blink pattern - occasional blink with variable timing
+  // Eye blink pattern (deterministic, tMs-based — no randomness)
   const blinkCycle = Math.floor(tMs / 2800) % 5;
   const blinkPhase = (tMs % 2800) / 2800;
   const isBlinking = blinkCycle === 0 && blinkPhase > 0.92 && blinkPhase < 0.97;
   if (!isBlinking) {
-    const eyeX = left ? cx - 1 + headShift : cx + headShift;
-    plot(out, eyeX, yBase - 15, p.playerAccent);
+    const eyeX = left ? cx - 1 + bodyShiftX : cx + bodyShiftX;
+    plot(out, eyeX, yBase - 15 + breathCompress, p.playerAccent);
   }
 
   return out;

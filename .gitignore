@@ -36,3 +36,12 @@ coverage/
 # Cache
 .cache/
 .parcel-cache/
+.voxelyn-cache/
+
+# Local agent/output artifacts
+.codex
+.codex/
+output/
+
+# Generated PixelLab reference renders
+docs/concept-art/pixellab-reference/*.png

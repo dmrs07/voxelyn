@@ -43,6 +43,7 @@ export type AnimationFrameRef = {
   frameIndex: number;
   sprite: PixelSprite;
   localTMs: number;
+  overlayTag?: 'cast' | 'hit' | 'die';
 };
 
 export type AnimationPlayer = {
@@ -56,7 +57,7 @@ export type AnimationPlayer = {
   lockUntilEnd: boolean;
 };
 
-export type ProceduralCharacterDef = {
+type ProceduralCharacterCommonDef = {
   id: string;
   seed?: number;
   width?: number;
@@ -65,11 +66,24 @@ export type ProceduralCharacterDef = {
   style?: 'player' | 'stalker' | 'bruiser' | 'spitter' | 'guardian' | 'spore_bomber';
 };
 
+export type ProceduralCharacterDef =
+  | (ProceduralCharacterCommonDef & {
+      source?: 'authored';
+  /** When true, use hand-authored pose-grid sprites for this style (32x32, 4 facings, 5 states).
+   *  Default false — falls back to procedural generator. */
+      useAuthored?: boolean;
+    })
+  | (ProceduralCharacterCommonDef & {
+      source: 'pixellab';
+      spriteId: string;
+    });
+
 export type ProceduralCharacter = {
   id: string;
   seed: number;
   width: number;
   height: number;
+  anchor: { x: number; y: number };
   palette: Record<string, number>;
   style: NonNullable<ProceduralCharacterDef['style']>;
   clips: AnimationSet;

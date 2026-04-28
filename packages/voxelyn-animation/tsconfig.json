@@ -12,13 +12,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "baseUrl": ".",
-    "paths": {
-      "@voxelyn/core": ["../voxelyn-core/src/index.ts"],
-      "@voxelyn/core/*": ["../voxelyn-core/src/*"]
-    },
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": true,

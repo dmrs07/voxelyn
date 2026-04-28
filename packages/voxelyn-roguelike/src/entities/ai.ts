@@ -381,6 +381,8 @@ const handleMeleeEnemy = (state: GameState, enemy: EnemyState, player: PlayerSta
   const enemyPos = { x: enemy.x, y: enemy.y };
   const playerPos = { x: player.x, y: player.y };
   const distance = manhattan(enemyPos, playerPos);
+  const playerIsLoud = player.animIntent === 'move' || nowMs < player.nextMoveAt;
+  const vibrationBonus = enemy.archetype === 'stalker' && playerIsLoud ? 3 : 0;
 
   if (distance === 1) {
     faceToward(enemy, playerPos);
@@ -388,7 +390,8 @@ const handleMeleeEnemy = (state: GameState, enemy: EnemyState, player: PlayerSta
     return;
   }
 
-  const seesPlayer = distance <= enemy.detectRadius;
+  const seesPlayer = distance <= enemy.detectRadius + vibrationBonus;
+  enemy.animSpeedMul = enemy.archetype === 'stalker' && seesPlayer && vibrationBonus > 0 ? 1.25 : 1;
   if (seesPlayer) {
     setChaseState(enemy, nowMs);
   } else {
@@ -398,9 +401,12 @@ const handleMeleeEnemy = (state: GameState, enemy: EnemyState, player: PlayerSta
   if (nowMs < enemy.nextMoveAt) return;
 
   if (enemy.aiState === 'chase') {
-    const step = chooseTowardStep(state, enemy, playerPos, 10);
+    const step = chooseTowardStep(state, enemy, playerPos, enemy.archetype === 'stalker' ? 13 : 10);
     if (step) {
       moveEnemy(state, enemy, step, nowMs);
+      if (enemy.archetype === 'stalker' && vibrationBonus > 0) {
+        enemy.nextMoveAt = Math.max(nowMs, enemy.nextMoveAt - 35);
+      }
       return;
     }
   }

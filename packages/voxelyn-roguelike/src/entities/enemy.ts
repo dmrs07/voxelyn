@@ -10,7 +10,8 @@ export const createEnemy = (
   floorNumber: number
 ): EnemyState => {
   const template = ENEMY_ARCHETYPE_STATS[archetype];
-  const floorScale = 1 + Math.max(0, floorNumber - 1) * 0.07;
+  const floorDepth = Math.max(0, floorNumber - 1);
+  const floorScale = 1 + floorDepth * 0.1;
 
   return {
     id,
@@ -23,7 +24,7 @@ export const createEnemy = (
     blocks: true,
     hp: Math.round(template.hp * floorScale),
     maxHp: Math.round(template.hp * floorScale),
-    attack: Math.round(template.attack * (1 + Math.max(0, floorNumber - 1) * 0.05)),
+    attack: Math.round(template.attack * (1 + floorDepth * 0.06)),
     damageReduction: archetype === 'guardian' ? 2 : archetype === 'bruiser' ? 1 : 0,
     alive: true,
     nextMoveAt: 0,

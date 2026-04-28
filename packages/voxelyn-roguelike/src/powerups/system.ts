@@ -1,4 +1,5 @@
 import { RNG } from '@voxelyn/core';
+import { POWERUP_SAFE_CHOICE_RADIUS } from '../game/constants';
 import type { GameState, PlayerState, PowerUpChoice, PowerUpId } from '../game/types';
 import { POWER_UP_IDS, POWER_UP_POOL } from './pool';
 
@@ -47,9 +48,24 @@ export const enqueuePowerUpChoice = (state: GameState, choice: PowerUpChoice): v
   state.pendingPowerUpChoices.push(choice);
 };
 
+const hasNearbyThreat = (state: GameState): boolean => {
+  const player = state.level.entities.get(state.playerId);
+  if (!player || player.kind !== 'player') return true;
+
+  for (const entity of state.level.entities.values()) {
+    if (entity.kind !== 'enemy' || !entity.alive) continue;
+    const dx = Math.abs(entity.x - player.x);
+    const dy = Math.abs(entity.y - player.y);
+    if (dx + dy <= POWERUP_SAFE_CHOICE_RADIUS) return true;
+  }
+
+  return state.projectiles.some((projectile) => projectile.alive);
+};
+
 export const startNextPowerUpChoiceIfNeeded = (state: GameState): void => {
   if (state.activePowerUpChoice) return;
   if (state.pendingPowerUpChoices.length === 0) return;
+  if (hasNearbyThreat(state)) return;
 
   const next = state.pendingPowerUpChoices.shift() ?? null;
   if (!next) return;
@@ -76,7 +92,9 @@ export const resolvePowerUpChoice = (state: GameState, pick: 1 | 2): boolean => 
   state.activePowerUpChoice = null;
   if (state.pendingPowerUpChoices.length > 0) {
     startNextPowerUpChoiceIfNeeded(state);
-  } else {
+  }
+
+  if (!state.activePowerUpChoice) {
     state.phase = 'running';
   }
 

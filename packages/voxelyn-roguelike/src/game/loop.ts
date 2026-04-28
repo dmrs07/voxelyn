@@ -13,7 +13,17 @@ import { updateCorridorEvents } from '../world/corridor-events';
 import { updateDynamicCorridors } from '../world/dynamic-corridors';
 import { applyPlayerFeatureInteractions } from '../world/features';
 import { inBounds2D } from '../world/level';
-import { SIMULATION_STEP_MS } from './constants';
+import {
+  FEATURE_BIOFLUID,
+  FEATURE_PROP_BEACON,
+  FEATURE_PROP_CRATE,
+  FEATURE_PROP_DEBRIS,
+  FEATURE_PROP_FUNGAL_CLUSTER,
+  FEATURE_CRYSTAL,
+  FEATURE_SPORE_VENT,
+  SIMULATION_STEP_MS,
+} from './constants';
+import { enemyDisplayName, getFloorTheme } from './lore';
 import {
   advanceToNextFloor,
   getPlayer,
@@ -51,6 +61,63 @@ export class GameLoop {
     this.running = false;
     this.controls.detach();
     cancelAnimationFrame(this.frameHandle);
+  }
+
+  advanceTime(ms: number): void {
+    const steps = Math.max(1, Math.round(ms / SIMULATION_STEP_MS));
+    for (let i = 0; i < steps; i += 1) {
+      const input = this.controls.snapshot();
+      this.simulateStep(input.dx, input.dy, input.pickChoice, input.interact, input.cancel);
+    }
+    this.renderer.render(this.state);
+  }
+
+  renderGameToText(): string {
+    const player = getPlayer(this.state);
+    const featureCounts = {
+      biofluid: 0,
+      fungal: 0,
+      debris: 0,
+      crate: 0,
+      beacon: 0,
+      crystal: 0,
+      sporeVent: 0,
+    };
+    for (const flags of this.state.level.featureMap) {
+      if ((flags & FEATURE_BIOFLUID) !== 0) featureCounts.biofluid += 1;
+      if ((flags & FEATURE_PROP_FUNGAL_CLUSTER) !== 0) featureCounts.fungal += 1;
+      if ((flags & FEATURE_PROP_DEBRIS) !== 0) featureCounts.debris += 1;
+      if ((flags & FEATURE_PROP_CRATE) !== 0) featureCounts.crate += 1;
+      if ((flags & FEATURE_PROP_BEACON) !== 0) featureCounts.beacon += 1;
+      if ((flags & FEATURE_CRYSTAL) !== 0) featureCounts.crystal += 1;
+      if ((flags & FEATURE_SPORE_VENT) !== 0) featureCounts.sporeVent += 1;
+    }
+    const enemies = Array.from(this.state.level.entities.values())
+      .filter((entity) => entity.kind === 'enemy' && entity.alive)
+      .slice(0, 8)
+      .map((entity) => ({
+        x: entity.x,
+        y: entity.y,
+        hp: entity.hp,
+        archetype: entity.archetype,
+        codexName: enemyDisplayName(entity.archetype),
+      }));
+    const floorTheme = getFloorTheme(this.state.floorNumber);
+
+    return JSON.stringify({
+      coordinateSystem: 'grid origin top-left; x projects down-right, y projects down-left',
+      phase: this.state.phase,
+      floorNumber: this.state.floorNumber,
+      floorTheme: {
+        id: floorTheme.id,
+        name: floorTheme.name,
+        threat: enemyDisplayName(floorTheme.threat),
+      },
+      simTick: this.state.simTick,
+      player: player ? { x: player.x, y: player.y, hp: player.hp, maxHp: player.maxHp } : null,
+      enemies,
+      featureCounts,
+    });
   }
 
   private readonly frame = (now: number): void => {

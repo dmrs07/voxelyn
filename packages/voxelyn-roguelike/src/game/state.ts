@@ -11,7 +11,13 @@ import { generateLevelFeatures } from '../world/features';
 import { generateFloor } from '../world/generator';
 import { registerEntity } from '../world/level';
 import { spawnEnemiesForFloor } from '../world/spawn';
-import { FLOOR_COUNT_MVP, LIGHT_DIR } from './constants';
+import {
+  FLOOR_COUNT_MVP,
+  LIGHT_DIR,
+  POWERUP_KILLS_PER_CHOICE_EARLY,
+  POWERUP_KILLS_PER_CHOICE_LATE,
+} from './constants';
+import { getFloorTheme } from './lore';
 import type { GameState, LevelState, PlayerState, PowerUpChoice } from './types';
 
 const createLevelState = (baseSeed: number, floorNumber: number): LevelState => {
@@ -117,6 +123,9 @@ const enqueueChoiceFromEnemyKill = (state: GameState, enemyId: string): void => 
   state.pendingPowerUpChoices.push(choice);
 };
 
+const killsRequiredForPowerUp = (floorNumber: number): number =>
+  floorNumber <= 3 ? POWERUP_KILLS_PER_CHOICE_EARLY : POWERUP_KILLS_PER_CHOICE_LATE;
+
 export const createGameState = (baseSeed: number): GameState => {
   const level = createLevelState(baseSeed, 1);
   const player = createPlayerForLevel(level, null);
@@ -134,10 +143,11 @@ export const createGameState = (baseSeed: number): GameState => {
     interactionModal: null,
     pendingPowerUpChoices: [],
     activePowerUpChoice: null,
+    powerUpKillCharge: 0,
     damageEvents: [],
     projectiles: [],
     particles: [],
-    messages: ['Desca na mina e alcance o nucleo no andar 10.'],
+    messages: [getFloorTheme(1).lore],
     screenFlash: {
       damageMs: 0,
       healMs: 0,
@@ -175,8 +185,25 @@ export const hasAliveGuardian = (state: GameState): boolean => {
 };
 
 export const handleEnemyKills = (state: GameState, killedEnemyIds: string[]): void => {
-  for (const enemyId of killedEnemyIds) {
+  if (killedEnemyIds.length === 0) return;
+
+  state.powerUpKillCharge += killedEnemyIds.length;
+  const required = killsRequiredForPowerUp(state.floorNumber);
+
+  while (
+    state.powerUpKillCharge >= required &&
+    !state.activePowerUpChoice &&
+    state.pendingPowerUpChoices.length === 0
+  ) {
+    const enemyId = killedEnemyIds[killedEnemyIds.length - 1] ?? `floor_${state.floorNumber}`;
     enqueueChoiceFromEnemyKill(state, enemyId);
+    if (state.pendingPowerUpChoices.length === 0) {
+      state.powerUpKillCharge = 0;
+      return;
+    }
+
+    state.powerUpKillCharge -= required;
+    state.messages.push('Mutacao pronta: escolha quando a luta abrir uma brecha.');
   }
 };
 
@@ -214,6 +241,7 @@ export const advanceToNextFloor = (state: GameState): void => {
   state.playerId = player.id;
   state.pendingPowerUpChoices = [];
   state.activePowerUpChoice = null;
+  state.powerUpKillCharge = 0;
   state.inspectOverlay = null;
   state.interactionModal = null;
   state.damageEvents = [];
@@ -234,7 +262,8 @@ export const advanceToNextFloor = (state: GameState): void => {
     lastPathCheckAtMs: 0,
   };
   state.phase = 'running';
-  state.messages.push(`Andar ${nextFloor} alcancado.`);
+  const theme = getFloorTheme(nextFloor);
+  state.messages.push(`Andar ${nextFloor}: ${theme.name}. ${theme.lore}`);
 };
 
 export const countAliveEnemies = (state: GameState): number => {

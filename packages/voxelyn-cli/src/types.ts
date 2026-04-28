@@ -12,6 +12,8 @@ export type CliOptions = {
   pm?: string;
   git?: boolean;
   dryRun?: boolean;
+  emitPlan?: boolean;
+  character?: string;
   list?: boolean;
   help?: boolean;
   install?: boolean;
@@ -55,6 +57,7 @@ export type CommandName =
   | 'preview'
   | 'deploy'
   | 'generate'
+  | 'sprites'
   | 'plugin';
 
 export type ParsedArgs = {

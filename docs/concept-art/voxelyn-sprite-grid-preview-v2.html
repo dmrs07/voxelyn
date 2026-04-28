@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voxelyn — Sprite Grid Preview v2</title>
+<style>
+:root{
+  --bg:#080d17;
+  --surface:#0d1422;
+  --surface-2:#111b2c;
+  --line:#20304b;
+  --line-2:#314465;
+  --ink:#dbe4f2;
+  --muted:#8292af;
+  --dim:#4f617f;
+  --cyan:#5ed0ec;
+  --gold:#f6c453;
+  --violet:#c86bff;
+  --green:#6fe19a;
+  --red:#e04f5f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace}
+body{
+  background:
+    linear-gradient(180deg,rgba(94,208,236,.06),transparent 280px),
+    radial-gradient(ellipse at 70% -120px,rgba(200,107,255,.14),transparent 520px),
+    var(--bg);
+}
+button,input,select{font:inherit}
+.shell{width:min(1640px,calc(100vw - 40px));margin:0 auto;padding:28px 0 56px}
+.topbar{
+  display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:end;
+  border-top:2px solid var(--ink);border-bottom:1px solid var(--line);
+  padding:13px 0 15px;
+}
+.kicker,.stamp{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.stamp{text-align:right}
+h1{margin:0;font-family:Inter,system-ui,sans-serif;font-size:40px;line-height:1;letter-spacing:0;text-align:center}
+h1 span{color:var(--violet)}
+.stats{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
+  border-bottom:1px solid var(--line);padding:12px 0 18px;
+}
+.stats span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.stats b{display:block;margin-top:5px;font-family:Inter,system-ui,sans-serif;font-size:14px;color:var(--ink);letter-spacing:0;text-transform:none}
+.controls{
+  display:grid;grid-template-columns:auto auto auto auto 1fr auto;gap:10px;align-items:center;
+  margin:22px 0 18px;
+}
+.seg{display:flex;border:1px solid var(--line-2);background:rgba(17,27,44,.72)}
+.seg button,.control{
+  border:0;border-right:1px solid var(--line-2);background:transparent;color:var(--muted);
+  padding:9px 12px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+}
+.seg button:last-child{border-right:0}
+.seg button.active{background:var(--violet);color:#160820}
+.control{border:1px solid var(--line-2);background:rgba(17,27,44,.72)}
+.control.active{background:var(--cyan);border-color:var(--cyan);color:#07111f}
+.playback{
+  display:flex;align-items:center;gap:10px;padding:0 10px;
+  border:1px solid var(--line-2);background:rgba(17,27,44,.72);
+}
+.zoom{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.zoom input,.playback input{accent-color:var(--violet)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.matrix{
+  border:1px solid var(--line-2);
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),
+    linear-gradient(180deg,rgba(255,255,255,.02) 1px,transparent 1px),
+    rgba(9,14,24,.92);
+  background-size:32px 32px;
+  overflow:auto;
+  max-height:calc(100vh - 190px);
+}
+.grid{
+  display:grid;
+  grid-template-columns:96px repeat(4, minmax(156px, 1fr));
+  min-width:720px;
+}
+.corner,.colhead,.rowhead{
+  position:sticky;z-index:4;background:rgba(13,20,34,.96);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);border-right:1px solid var(--line);
+}
+.corner{left:0;top:0;height:44px}
+.colhead{top:0;height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+.rowhead{
+  left:0;display:flex;align-items:center;padding-left:12px;color:var(--muted);
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+}
+.cell{
+  padding:0;background:transparent;color:inherit;cursor:pointer;
+  min-height:132px;border-right:1px solid rgba(32,48,75,.74);border-bottom:1px solid rgba(32,48,75,.74);
+  display:flex;align-items:center;justify-content:center;position:relative;isolation:isolate;
+}
+.cell.active{background:rgba(94,208,236,.07);box-shadow:inset 0 0 0 1px var(--cyan)}
+.cell::before{
+  content:"";position:absolute;left:50%;bottom:18px;width:82px;height:38px;
+  transform:translateX(-50%);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  border:1px solid rgba(94,208,236,.12);background:rgba(94,208,236,.025);z-index:-1;
+}
+.cell canvas{image-rendering:pixelated;image-rendering:crisp-edges;transition:transform .16s ease,filter .16s ease}
+.cell:hover canvas{transform:translateY(-5px) scale(1.18);filter:drop-shadow(0 0 14px rgba(94,208,236,.24))}
+.cell .tag{position:absolute;right:8px;bottom:6px;color:var(--dim);font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.cell.active .tag{color:var(--cyan)}
+.sprite-title{
+  grid-column:1 / -1;position:sticky;left:0;z-index:3;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px;background:linear-gradient(90deg,rgba(17,27,44,.98),rgba(17,27,44,.86));
+  border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2);
+}
+.sprite-title b{font-family:Inter,system-ui,sans-serif;font-size:19px;letter-spacing:0}
+.sprite-title span{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.inspector{
+  position:sticky;top:18px;border:1px solid var(--line-2);background:rgba(13,20,34,.94);
+  min-height:560px;padding:16px;
+}
+.stage{
+  height:300px;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(ellipse 180px 48px at 50% 78%,rgba(0,0,0,.64),transparent),
+    linear-gradient(180deg,#111b2c,#060a12);
+  border:1px solid var(--line);position:relative;overflow:hidden;
+}
+.stage::before{
+  content:"";position:absolute;left:50%;bottom:48px;width:132px;height:64px;transform:translateX(-50%);
+  clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  background:rgba(94,208,236,.04);border:1px solid rgba(94,208,236,.16);
+}
+.stage canvas{position:relative;image-rendering:pixelated;image-rendering:crisp-edges;filter:drop-shadow(0 0 18px rgba(200,107,255,.24))}
+.stage-hud{
+  position:absolute;left:10px;right:10px;bottom:8px;display:flex;justify-content:space-between;
+  color:var(--muted);font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+}
+.meta{margin-top:14px;display:grid;gap:9px}
+.meta div{display:flex;justify-content:space-between;border-bottom:1px solid rgba(32,48,75,.7);padding-bottom:7px;font-size:11px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+.timeline{margin-top:14px}
+.timeline-head{display:flex;justify-content:space-between;color:var(--muted);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.timeline-head b{color:var(--ink);font-weight:500;letter-spacing:0;text-transform:none}
+.bar{height:4px;margin:9px 0 10px;background:#07111f;border:1px solid rgba(49,68,101,.75)}
+.bar span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet))}
+.frame-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.frame-thumb{
+  min-height:72px;border:1px solid var(--line);background:rgba(7,17,31,.72);color:var(--dim);
+  cursor:pointer;display:grid;place-items:center;position:relative;padding:3px;
+}
+.frame-thumb.active{border-color:var(--gold);background:rgba(246,196,83,.08);color:var(--gold)}
+.frame-thumb canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+.frame-thumb span{position:absolute;right:4px;bottom:3px;font-size:8px;letter-spacing:.08em;text-transform:uppercase}
+.palette{display:flex;gap:5px;margin-top:14px;flex-wrap:wrap}
+.swatch{width:24px;height:24px;border:1px solid rgba(219,228,242,.22)}
+.note{margin-top:14px;color:var(--muted);font-size:11px;line-height:1.6}
+.empty{padding:80px 20px;text-align:center;color:var(--muted)}
+@media(max-width:980px){
+  .topbar,.stats,.layout,.controls{grid-template-columns:1fr}
+  h1{text-align:left}
+  .stamp{text-align:left}
+  .matrix{max-height:none}
+  .inspector{position:relative;top:auto}
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div class="kicker">@voxelyn/animation</div>
+    <h1>Sprite Grid <span>Preview v2</span></h1>
+    <div class="stamp">authored 32x32 · iso actors</div>
+  </header>
+  <section class="stats">
+    <span>Sprites<b id="statSprites">0</b></span>
+    <span>Estados<b>idle · walk · attack · hit · die</b></span>
+    <span>Facings<b>DR · DL · UR · UL</b></span>
+    <span>Fonte<b>generated-v2.ts</b></span>
+  </section>
+  <section class="controls">
+    <div class="seg" id="spriteFilter"></div>
+    <div class="seg" id="stateFilter"></div>
+    <div class="seg" id="facingFilter"></div>
+    <div class="playback">
+      <button class="control active" id="playToggle">pause</button>
+      <div class="zoom">speed <input id="speed" type="range" min="0.35" max="2" value="1" step="0.05"></div>
+    </div>
+    <div class="zoom">zoom <input id="zoom" type="range" min="2" max="6" value="4" step="1"></div>
+    <button class="control" id="exportSheet">export png</button>
+  </section>
+  <section class="layout">
+    <div class="matrix"><div class="grid" id="grid"></div></div>
+    <aside class="inspector">
+      <div class="stage">
+        <canvas id="stage" width="280" height="280"></canvas>
+        <div class="stage-hud"><span id="mLoop">loop</span><span id="mClock">0ms</span></div>
+      </div>
+      <div class="meta">
+        <div><span>sprite</span><b id="mSprite">-</b></div>
+        <div><span>state</span><b id="mState">-</b></div>
+        <div><span>facing</span><b id="mFacing">-</b></div>
+        <div><span>frame</span><b id="mFrame">-</b></div>
+      </div>
+      <div class="timeline">
+        <div class="timeline-head"><span>timeline</span><b id="mFrames">-</b></div>
+        <div class="bar"><span id="progress"></span></div>
+        <div class="frame-strip" id="frameStrip"></div>
+      </div>
+      <div class="palette" id="palette"></div>
+      <p class="note">Preview em loop para revisão: clips não-loopados repetem com pausa curta para deixar ataques, hit e morte visíveis.</p>
+    </aside>
+  </section>
+</main>
+<script src="./sprite-data-authored-v2.js"></script>
+<script>
+(function(){
+  const sprites = window.VOXELYN_SPRITES_V2 || [];
+  const states = ['idle','walk','attack','hit','die'];
+  const facings = ['DR','DL','UR','UL'];
+  const grid = document.getElementById('grid');
+  const zoomEl = document.getElementById('zoom');
+  const speedEl = document.getElementById('speed');
+  const playToggle = document.getElementById('playToggle');
+  const stage = document.getElementById('stage');
+  const stageCtx = stage.getContext('2d');
+  const progressEl = document.getElementById('progress');
+  const frameStrip = document.getElementById('frameStrip');
+  stageCtx.imageSmoothingEnabled = false;
+
+  const filters = { sprite:'all', state:'all', facing:'all' };
+  const selected = { sprite:sprites[0], state:'idle', facing:'DR', frame:0 };
+  const cells = [];
+  const poseCache = new WeakMap();
+  let elapsed = 0;
+  let lastNow = performance.now();
+  let playing = true;
+  let speed = Number(speedEl.value);
+  let stripKey = '';
+  let frameButtons = [];
+  let paletteKey = '';
+
+  document.getElementById('statSprites').textContent = String(sprites.length);
+
+  const gridFromRows = rows => rows.map(row => Array.from(row, ch => parseInt(ch, 36) || 0));
+
+  function colorFromPacked(value){
+    if (typeof value === 'string') return value;
+    if (typeof value !== 'number') return null;
+    const r = value & 0xff;
+    const g = (value >>> 8) & 0xff;
+    const b = (value >>> 16) & 0xff;
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function totalDuration(def, state){
+    const frames = def.states[state]?.frames || [];
+    return frames.reduce((sum, frame) => sum + (frame.dur || 0), 0);
+  }
+
+  function frameStart(def, state, index){
+    const frames = def.states[state]?.frames || [];
+    return frames.slice(0, index).reduce((sum, frame) => sum + (frame.dur || 0), 0);
+  }
+
+  function clipClock(def, state, t){
+    const st = def.states[state];
+    const total = totalDuration(def, state);
+    if (!st || total <= 0) return { at:0, total:0, cycle:1, inGap:false };
+    if (st.loop) return { at:t % total, total, cycle:total, inGap:false };
+    const cycle = total + 320;
+    const atCycle = t % cycle;
+    return {
+      at:Math.min(atCycle, total - 1),
+      total,
+      cycle,
+      inGap:atCycle >= total,
+    };
+  }
+
+  function frameFor(def, state, t){
+    const st = def.states[state];
+    if (!st || !st.frames.length) return { frame:null, index:0 };
+    const clock = clipClock(def, state, t);
+    let at = clock.at;
+    for (let i = 0, acc = 0; i < st.frames.length; i += 1) {
+      acc += st.frames[i].dur || 0;
+      if (at < acc) return { frame:st.frames[i], index:i, ...clock };
+    }
+    return { frame:st.frames[st.frames.length - 1], index:st.frames.length - 1, ...clock };
+  }
+
+  function clear(ctx, w, h){
+    ctx.clearRect(0, 0, w, h);
+  }
+
+  function drawDiamondShadow(ctx, x, y, scale, alpha){
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.moveTo(x, y - 6 * scale);
+    ctx.lineTo(x + 14 * scale, y);
+    ctx.lineTo(x, y + 6 * scale);
+    ctx.lineTo(x - 14 * scale, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function parsedPose(def, poseKey){
+    let defCache = poseCache.get(def);
+    if (!defCache) {
+      defCache = new Map();
+      poseCache.set(def, defCache);
+    }
+    if (!defCache.has(poseKey)) {
+      const rows = def.poses[poseKey];
+      defCache.set(poseKey, rows ? gridFromRows(rows) : null);
+    }
+    return defCache.get(poseKey);
+  }
+
+  function resolvePose(def, facing, poseName){
+    return (
+      parsedPose(def, `${facing}:${poseName}`) ||
+      parsedPose(def, `DR:${poseName}`) ||
+      parsedPose(def, poseName)
+    );
+  }
+
+  function drawSprite(ctx, def, state, facing, frameIndex, x, y, scale, options = {}){
+    const frames = def.states[state].frames;
+    const frame = frames[Math.min(frameIndex, frames.length - 1)] || frames[0];
+    if (!frame) return;
+    const pose = resolvePose(def, facing, frame.pose);
+    if (!pose) return;
+    const sx = frame.sx ?? 1;
+    const sy = frame.sy ?? 1;
+    const tx = frame.tx || 0;
+    const ty = frame.ty || 0;
+    const alpha = (frame.alpha ?? 1) * (options.alpha ?? 1);
+    const tint = options.tint ?? colorFromPacked(frame.tint);
+    const drawScale = scale;
+    const w = def.width * drawScale;
+    const h = def.height * drawScale;
+
+    if (options.shadow !== false) drawDiamondShadow(ctx, x, y + 1 * drawScale, drawScale, .34);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x + tx * drawScale, y + ty * drawScale);
+    ctx.scale(sx, sy);
+    const dx = -w / 2;
+    const dy = -h;
+    for (let yy = 0; yy < pose.length; yy += 1) {
+      for (let xx = 0; xx < pose[yy].length; xx += 1) {
+        const idx = pose[yy][xx];
+        if (!idx) continue;
+        ctx.fillStyle = tint || def.palette[idx] || '#fff';
+        ctx.fillRect(dx + xx * drawScale, dy + yy * drawScale, drawScale, drawScale);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawCell(item, t, force = false){
+    const info = frameFor(item.def, item.state, t);
+    const scale = Number(zoomEl.value);
+    if (!force && item.lastIndex === info.index && item.lastScale === scale && item.lastGap === info.inGap) return;
+    item.lastIndex = info.index;
+    item.lastScale = scale;
+    item.lastGap = info.inGap;
+    clear(item.ctx, item.canvas.width, item.canvas.height);
+    drawSprite(item.ctx, item.def, item.state, item.facing, info.index, item.canvas.width / 2, item.canvas.height - 22, scale);
+    const frames = item.def.states[item.state]?.frames || [];
+    item.tag.textContent = `${info.index + 1}/${frames.length}`;
+  }
+
+  function buildSegment(id, values, key){
+    const host = document.getElementById(id);
+    host.innerHTML = '';
+    for (const value of values) {
+      const btn = document.createElement('button');
+      btn.textContent = value;
+      btn.className = filters[key] === value ? 'active' : '';
+      btn.addEventListener('click', () => {
+        filters[key] = value;
+        buildControls();
+        renderGrid();
+      });
+      host.appendChild(btn);
+    }
+  }
+
+  function buildControls(){
+    buildSegment('spriteFilter', ['all', ...sprites.map(s => s.id)], 'sprite');
+    buildSegment('stateFilter', ['all', ...states], 'state');
+    buildSegment('facingFilter', ['all', ...facings], 'facing');
+  }
+
+  function spriteVisible(def){ return filters.sprite === 'all' || filters.sprite === def.id; }
+  function stateVisible(state){ return filters.state === 'all' || filters.state === state; }
+  function facingVisible(facing){ return filters.facing === 'all' || filters.facing === facing; }
+
+  function visibleFacings(){ return facings.filter(facingVisible); }
+
+  function updateCellSelection(){
+    for (const item of cells) {
+      const active = item.def === selected.sprite && item.state === selected.state && item.facing === selected.facing;
+      item.cell.classList.toggle('active', active);
+    }
+  }
+
+  function renderGrid(){
+    const shownFacings = visibleFacings();
+    grid.style.gridTemplateColumns = `96px repeat(${shownFacings.length}, minmax(156px, 1fr))`;
+    grid.innerHTML = '';
+    cells.length = 0;
+
+    const corner = document.createElement('div');
+    corner.className = 'corner';
+    grid.appendChild(corner);
+
+    for (const facing of shownFacings) {
+      const head = document.createElement('div');
+      head.className = 'colhead';
+      head.textContent = facing;
+      grid.appendChild(head);
+    }
+
+    for (const def of sprites.filter(spriteVisible)) {
+      const title = document.createElement('div');
+      title.className = 'sprite-title';
+      title.innerHTML = `<b>${def.name}</b><span>${def.id} · ${def.width}x${def.height}</span>`;
+      grid.appendChild(title);
+
+      for (const state of states.filter(stateVisible)) {
+        const row = document.createElement('div');
+        row.className = 'rowhead';
+        row.textContent = state;
+        grid.appendChild(row);
+
+        for (const facing of shownFacings) {
+          const cell = document.createElement('button');
+          cell.className = 'cell';
+          cell.type = 'button';
+          const canvas = document.createElement('canvas');
+          canvas.width = 156;
+          canvas.height = 132;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = false;
+          const tag = document.createElement('span');
+          tag.className = 'tag';
+          tag.textContent = '1/1';
+          cell.append(canvas, tag);
+          cell.addEventListener('click', () => select(def, state, facing));
+          grid.appendChild(cell);
+          cells.push({ cell, canvas, ctx, def, state, facing, tag, lastIndex:-1, lastScale:0, lastGap:false });
+        }
+      }
+    }
+    updateCellSelection();
+    drawAll(true);
+  }
+
+  function select(def, state, facing){
+    selected.sprite = def;
+    selected.state = state;
+    selected.facing = facing;
+    selected.frame = 0;
+    stripKey = '';
+    updateCellSelection();
+    drawSelected(elapsed, true);
+  }
+
+  function buildFrameStrip(def, state, facing){
+    const key = `${def.id}:${state}:${facing}`;
+    if (key === stripKey) return;
+    stripKey = key;
+    frameButtons = [];
+    frameStrip.innerHTML = '';
+    const frames = def.states[state]?.frames || [];
+    frames.forEach((frame, index) => {
+      const button = document.createElement('button');
+      button.className = 'frame-thumb';
+      button.type = 'button';
+      const canvas = document.createElement('canvas');
+      canvas.width = 82;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      drawSprite(ctx, def, state, facing, index, canvas.width / 2, canvas.height - 9, 2, { shadow:false });
+      const label = document.createElement('span');
+      label.textContent = frame.tag || `fr ${index + 1}`;
+      button.append(canvas, label);
+      button.addEventListener('click', () => {
+        elapsed = frameStart(def, state, index);
+        playing = false;
+        updatePlayToggle();
+        drawAll(true);
+      });
+      frameStrip.appendChild(button);
+      frameButtons.push(button);
+    });
+  }
+
+  function updateFrameStrip(index){
+    frameButtons.forEach((button, i) => button.classList.toggle('active', i === index));
+  }
+
+  function updatePalette(def){
+    if (paletteKey === def.id) return;
+    paletteKey = def.id;
+    const palette = document.getElementById('palette');
+    palette.innerHTML = '';
+    for (const color of def.palette.filter(Boolean)) {
+      const swatch = document.createElement('span');
+      swatch.className = 'swatch';
+      swatch.style.background = color;
+      palette.appendChild(swatch);
+    }
+  }
+
+  function drawSelected(t){
+    const def = selected.sprite || sprites[0];
+    if (!def) return;
+    const frames = def.states[selected.state]?.frames || [];
+    const info = frameFor(def, selected.state, t);
+    const prev = frames.length > 1 ? (info.index + frames.length - 1) % frames.length : info.index;
+    const next = frames.length > 1 ? (info.index + 1) % frames.length : info.index;
+    clear(stageCtx, stage.width, stage.height);
+    if (frames.length > 1) {
+      drawSprite(stageCtx, def, selected.state, selected.facing, prev, stage.width / 2, 238, 6, {
+        alpha:.16,
+        tint:'#5ed0ec',
+        shadow:false,
+      });
+      drawSprite(stageCtx, def, selected.state, selected.facing, next, stage.width / 2, 238, 6, {
+        alpha:.12,
+        tint:'#f6c453',
+        shadow:false,
+      });
+    }
+    drawSprite(stageCtx, def, selected.state, selected.facing, info.index, stage.width / 2, 238, 6);
+    document.getElementById('mSprite').textContent = `${def.name} / ${def.id}`;
+    document.getElementById('mState').textContent = selected.state;
+    document.getElementById('mFacing').textContent = selected.facing;
+    document.getElementById('mFrame').textContent = `${info.index + 1}/${frames.length}${info.frame?.tag ? ` · ${info.frame.tag}` : ''}`;
+    document.getElementById('mFrames').textContent = `${frames.length} fr · ${info.total}ms`;
+    document.getElementById('mLoop').textContent = def.states[selected.state]?.loop ? 'native loop' : 'review loop';
+    document.getElementById('mClock').textContent = `${Math.round(info.at)}ms`;
+    progressEl.style.width = `${info.total ? Math.min(100, (info.at / info.total) * 100) : 0}%`;
+    buildFrameStrip(def, selected.state, selected.facing);
+    updateFrameStrip(info.index);
+    updatePalette(def);
+  }
+
+  function drawAll(force = false){
+    for (const item of cells) drawCell(item, elapsed, force);
+    drawSelected(elapsed);
+  }
+
+  function exportPng(){
+    const canvas = document.createElement('canvas');
+    const scale = 3;
+    const cellW = 128;
+    const cellH = 116;
+    canvas.width = facings.length * cellW;
+    canvas.height = sprites.length * states.length * cellH;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#080d17';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    let y = 0;
+    for (const def of sprites) {
+      for (const state of states) {
+        for (let i = 0; i < facings.length; i += 1) {
+          const frame = frameFor(def, state, elapsed);
+          drawSprite(ctx, def, state, facings[i], frame.index, i * cellW + cellW / 2, y + cellH - 18, scale);
+        }
+        y += cellH;
+      }
+    }
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = 'voxelyn-sprite-grid-preview-v2.png';
+    link.click();
+  }
+
+  function updatePlayToggle(){
+    playToggle.textContent = playing ? 'pause' : 'play';
+    playToggle.classList.toggle('active', playing);
+  }
+
+  function animate(now){
+    const dt = Math.min(now - lastNow, 80);
+    lastNow = now;
+    if (playing) elapsed += dt * speed;
+    drawAll();
+    requestAnimationFrame(animate);
+  }
+
+  playToggle.addEventListener('click', () => {
+    playing = !playing;
+    updatePlayToggle();
+    drawAll(true);
+  });
+  speedEl.addEventListener('input', () => {
+    speed = Number(speedEl.value);
+  });
+  zoomEl.addEventListener('input', renderGrid);
+  document.getElementById('exportSheet').addEventListener('click', exportPng);
+
+  buildControls();
+  renderGrid();
+  updatePlayToggle();
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voxelyn Roguelike — Concept Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #0b1220;
+  --bg-2: #070b12;
+  --panel: #111a2c;
+  --panel-2: #0e1626;
+  --rule: #1e2a44;
+  --rule-2: #2a3a5a;
+  --ink: #dbe4f2;
+  --ink-2: #8695b2;
+  --ink-3: #55668a;
+
+  /* Game palette from repo */
+  --rock: #6b7a93;
+  --rock-d: #3e4a63;
+  --fungal: #4e8a5a;
+  --fungal-glow: #6fe19a;
+  --ore: #4a6b8e;
+  --ore-lit: #7db2e0;
+  --entry: #5ed0ec;
+  --exit: #f6c453;
+  --core: #c86bff;
+  --biofluid: #5aa370;
+  --blood: #e04f5f;
+
+  --px: 6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font-family:"JetBrains Mono",ui-monospace,monospace;
+  -webkit-font-smoothing:antialiased;
+}
+body{
+  background:
+    radial-gradient(ellipse 1400px 600px at 50% -100px, rgba(200,107,255,.06), transparent 60%),
+    radial-gradient(ellipse 1000px 500px at 90% 110%, rgba(94,208,236,.05), transparent 55%),
+    var(--bg);
+}
+
+.sheet{max-width:1440px;margin:0 auto;padding:48px 48px 96px}
+
+/* ===== Masthead ===== */
+header.masthead{
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items:end;
+  gap: 24px;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 16px 0 14px;
+}
+.mast-left{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+.mast-right{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);text-align:right}
+.mast-right .dot{display:inline-block;width:8px;height:8px;background:var(--core);margin-right:6px;vertical-align:1px;box-shadow:0 0 10px var(--core)}
+h1.title{
+  font-family:"Space Grotesk",sans-serif;
+  font-weight:600;
+  font-size:56px;
+  letter-spacing:-0.03em;
+  margin:0;line-height:.95;
+  text-align:center;
+}
+h1.title .thin{font-weight:400;color:var(--ink-2)}
+h1.title .mark{color:var(--core)}
+
+.subline{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:24px;
+  padding: 12px 0 24px;
+  border-bottom: 1px solid var(--rule);
+  font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);
+}
+.subline b{display:block;color:var(--ink);font-weight:600;font-size:13px;letter-spacing:0;text-transform:none;font-family:"Space Grotesk",sans-serif;margin-top:4px}
+
+/* ===== Block heads ===== */
+section.block{margin-top:56px}
+.block-head{
+  display:grid;grid-template-columns:80px 1fr auto;gap:20px;
+  align-items:baseline;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:24px;
+}
+.block-num{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:44px;letter-spacing:-0.02em;color:var(--ink-3)}
+.block-title{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:26px;letter-spacing:-0.01em}
+.block-meta{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+
+/* ===== Pixel sprite core ===== */
+.sprite{position:relative;image-rendering:pixelated}
+.sprite-anchor{position:absolute;width:var(--px);height:var(--px);background:transparent}
+
+/* ===== 1. Central iso gameplay mockup ===== */
+.mockup-wrap{
+  border:1px solid var(--rule-2);
+  background: var(--panel-2);
+  padding: 0;
+  position:relative;
+  overflow:hidden;
+}
+.mockup-topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;
+  border-bottom:1px solid var(--rule);
+  background: var(--panel);
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
+}
+.mockup-topbar .dotset{display:flex;gap:6px}
+.mockup-topbar .dotset i{width:8px;height:8px;background:var(--rule-2);display:inline-block}
+.mockup-canvas{
+  position:relative;
+  aspect-ratio: 16/9;
+  background:
+    radial-gradient(ellipse 400px 300px at 50% 55%, #111a2c 0%, #070b12 75%);
+  overflow:hidden;
+}
+.hud{
+  position:absolute;inset:0;pointer-events:none;
+  padding:16px;
+  display:grid;
+  grid-template-rows: auto 1fr auto;
+}
+.hud-top{display:flex;justify-content:space-between;align-items:flex-start}
+.hud-hp{
+  background: rgba(7,11,18,.7);
+  border:1px solid var(--rule-2);
+  padding:8px 10px;
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+}
+.hud-hp .bar{margin-top:5px;width:180px;height:8px;background:var(--rule);position:relative;border:1px solid var(--rule-2)}
+.hud-hp .bar i{position:absolute;inset:0;width:78%;background:linear-gradient(90deg,var(--blood),#ff8090)}
+.hud-hp b{color:var(--ink);font-family:"Space Grotesk",sans-serif;margin-right:6px}
+.hud-floor{
+  background: rgba(7,11,18,.7);
+  border:1px solid var(--rule-2);
+  padding:8px 12px;
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;text-align:right;
+}
+.hud-floor b{display:block;color:var(--core);font-family:"Space Grotesk",sans-serif;font-size:18px;letter-spacing:0;margin-top:2px}
+.hud-bottom{
+  display:flex;gap:8px;align-items:flex-end;
+}
+.powerslot{
+  width:44px;height:44px;border:1px solid var(--rule-2);background:rgba(7,11,18,.7);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.powerslot .k{position:absolute;bottom:1px;right:3px;font-size:9px;color:var(--ink-3)}
+.minimap{
+  margin-left:auto;
+  width:120px;height:88px;border:1px solid var(--rule-2);background:rgba(7,11,18,.8);
+  padding:4px;
+  display:grid;grid-template-columns:repeat(16,1fr);grid-template-rows:repeat(10,1fr);gap:0;
+}
+.minimap i{background:transparent}
+.minimap i.f{background:var(--rock-d)}
+.minimap i.p{background:var(--entry)}
+.minimap i.e{background:var(--exit)}
+.minimap i.m{background:var(--blood)}
+
+/* iso grid inside canvas */
+.iso{
+  position:absolute;left:50%;top:55%;
+  transform: translate(-50%, -50%);
+  width: 820px;height: 520px;
+}
+.iso-tile{
+  position:absolute;
+  width:64px;height:32px;
+  transform: translate(-50%, -50%);
+}
+.iso-tile .top{
+  position:absolute;inset:0;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  background: var(--rock);
+  border: 0;
+}
+.iso-tile .top.fungal{background: var(--fungal)}
+.iso-tile .top.ore{background: var(--ore)}
+.iso-tile .top.entry{background: var(--entry); box-shadow: 0 0 24px var(--entry)}
+.iso-tile .top.exit{background: var(--exit); box-shadow: 0 0 24px var(--exit)}
+.iso-tile .top.core{background: var(--core); box-shadow: 0 0 40px var(--core)}
+.iso-tile .top.biofluid{background: var(--biofluid)}
+.iso-tile .top.dark{background: #1a2238}
+.iso-tile .shade{
+  position:absolute;inset:0;
+  clip-path: polygon(0% 50%, 50% 100%, 100% 50%, 100% 50%, 50% 100%, 0% 50%);
+  background: rgba(0,0,0,.35);
+}
+/* fog vignette */
+.iso::after{
+  content:"";position:absolute;inset:-60px;
+  background: radial-gradient(ellipse 450px 260px at 50% 50%, transparent 40%, rgba(7,11,18,.85) 75%, rgba(7,11,18,1) 100%);
+  pointer-events:none;
+}
+.iso-ent{
+  position:absolute; transform: translate(-50%, -100%);
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+}
+.scan{
+  position:absolute;inset:0;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 3px, rgba(255,255,255,.02) 3px 4px);
+  pointer-events:none;
+}
+
+/* ===== 2. Floor modules ===== */
+.modules{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.module{
+  border:1px solid var(--rule-2);
+  background: var(--panel-2);
+}
+.module .mod-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:10px 14px;border-bottom:1px solid var(--rule);
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);
+}
+.module .mod-head b{color:var(--ink);font-family:"Space Grotesk",sans-serif;font-size:15px;letter-spacing:-0.01em;text-transform:none}
+.module .mod-viz{
+  aspect-ratio: 4/3;
+  position:relative;
+  overflow:hidden;
+  background: #050913;
+}
+.module .mod-desc{
+  padding: 12px 14px;
+  font-size:11px;line-height:1.55;color:var(--ink-2);
+  border-top: 1px solid var(--rule);
+}
+.module .mod-tags{
+  display:flex;gap:4px;flex-wrap:wrap;padding:0 14px 12px;
+}
+.module .mod-tags span{
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  border:1px solid var(--rule-2);padding:2px 6px;color:var(--ink-3);
+}
+
+/* Module viz: schematic top-down layout using grid */
+.tgrid{
+  position:absolute;inset:0;
+  display:grid;
+}
+.tgrid div{background:transparent}
+.rock{background:var(--rock-d)}
+.floor{background:#151f33}
+.fung{background:#1c3a22;box-shadow: inset 0 0 8px rgba(111,225,154,.4)}
+.oretile{background:#1f2e4a}
+.track{background:#3a4a6a}
+.barrier{background:#5e3a1c}
+.crystal{background:#3a2a5a;box-shadow: inset 0 0 6px rgba(200,107,255,.5)}
+.biofluid{background:#24463a}
+.spore{background:#2a1f3a;box-shadow: inset 0 0 6px rgba(200,107,255,.6)}
+.entry{background:var(--entry);box-shadow:0 0 8px var(--entry)}
+.exit{background:var(--exit);box-shadow:0 0 8px var(--exit)}
+.gate{background:#6a2a2a}
+
+/* ===== 3. Enemies ===== */
+.enemies{
+  display:grid;grid-template-columns: repeat(5, 1fr);gap:16px;
+}
+.enemy{
+  border:1px solid var(--rule-2);
+  background: var(--panel-2);
+  display:grid;grid-template-rows:auto 1fr auto;
+  min-height: 320px;
+}
+.enemy .e-head{
+  padding:10px 14px;border-bottom:1px solid var(--rule);
+  display:flex;justify-content:space-between;align-items:baseline;
+}
+.enemy .e-head b{font-family:"Space Grotesk",sans-serif;font-size:15px;letter-spacing:-0.01em;color:var(--ink)}
+.enemy .e-head .id{font-size:10px;letter-spacing:.2em;color:var(--ink-3)}
+.enemy .e-art{
+  display:flex;align-items:center;justify-content:center;
+  padding:16px 8px;
+  background:
+    radial-gradient(ellipse 120px 40px at 50% 90%, rgba(0,0,0,.6), transparent),
+    linear-gradient(to bottom, #0a1020, #050913);
+  border-bottom:1px solid var(--rule);
+  min-height: 140px;
+}
+.enemy .e-stats{
+  padding:10px 14px;
+  display:grid;grid-template-columns: repeat(3,1fr);gap:4px;
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+  border-bottom:1px solid var(--rule);
+}
+.enemy .e-stats div b{display:block;color:var(--ink);font-size:13px;letter-spacing:0;text-transform:none;font-family:"Space Grotesk",sans-serif;margin-top:2px}
+.enemy .e-body{padding:10px 14px;font-size:10.5px;line-height:1.5;color:var(--ink-2)}
+.enemy .e-floors{padding:0 14px 12px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.enemy .e-floors b{color:var(--fungal-glow)}
+
+/* ===== 4. Hero ===== */
+.hero-panel{
+  display:grid;grid-template-columns: 1.3fr 1fr;gap:20px;
+  border:1px solid var(--rule-2);background:var(--panel-2);
+}
+.hero-art-wrap{
+  border-right:1px solid var(--rule);
+  padding:20px;
+  display:grid;grid-template-rows:auto 1fr;gap:14px;
+}
+.hero-sheet{
+  display:grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.hero-pose{
+  aspect-ratio: 1;
+  background:
+    radial-gradient(ellipse 80% 30% at 50% 90%, rgba(0,0,0,.6), transparent),
+    linear-gradient(to bottom, #0a1020, #050913);
+  border: 1px solid var(--rule);
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.hero-pose .lbl{
+  position:absolute;top:4px;left:6px;
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+}
+.hero-pose .dir{
+  position:absolute;bottom:4px;right:6px;
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+}
+.hero-info{
+  padding:20px;
+}
+.hero-info h3{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:26px;letter-spacing:-0.01em;margin:0 0 4px}
+.hero-info .r{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-2);margin-bottom:14px}
+.hero-info p{font-size:12px;line-height:1.55;color:var(--ink-2);margin:0 0 12px}
+.statgrid{
+  display:grid;grid-template-columns: repeat(3,1fr);gap:8px;margin:14px 0;
+}
+.statgrid div{
+  border:1px solid var(--rule-2);padding:8px;
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+}
+.statgrid div b{display:block;font-size:18px;letter-spacing:-0.01em;text-transform:none;color:var(--ink);font-family:"Space Grotesk",sans-serif;margin-top:2px}
+
+/* ===== 5. Power-ups ===== */
+.powerups{
+  display:grid;grid-template-columns: repeat(6, 1fr);gap:14px;
+}
+.pu{
+  border:1px solid var(--rule-2);background:var(--panel-2);
+  padding:14px;text-align:center;
+}
+.pu .art{
+  height:80px;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(200,107,255,.1), transparent 60%),
+    #0a1020;
+  border:1px solid var(--rule);
+  margin-bottom:10px;
+}
+.pu .nm{font-family:"Space Grotesk",sans-serif;font-size:12.5px;font-weight:600;letter-spacing:-0.01em;color:var(--ink)}
+.pu .fn{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+
+/* ===== 6. Hazards + Tiles ===== */
+.hazards{
+  display:grid;grid-template-columns: repeat(8, 1fr);gap:10px;
+}
+.hz{
+  aspect-ratio:1;border:1px solid var(--rule-2);background:#0a1020;
+  position:relative;display:flex;align-items:flex-end;justify-content:flex-start;
+  overflow:hidden;
+}
+.hz .lbl{
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 5px;background:rgba(7,11,18,.8);color:var(--ink-2);border-top:1px solid var(--rule);border-right:1px solid var(--rule);
+}
+
+/* ===== 7. Floor progression strip ===== */
+.floors{
+  display:grid;grid-template-columns: repeat(10, 1fr);gap:8px;
+}
+.floor-cell{
+  border:1px solid var(--rule-2);background:var(--panel-2);
+  padding:10px 10px 12px;
+  display:grid;grid-template-rows:auto auto 1fr;gap:6px;
+  min-height: 160px;
+}
+.floor-cell .n{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:18px;letter-spacing:-0.01em}
+.floor-cell .tier{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.floor-cell .viz{
+  border:1px solid var(--rule);
+  position:relative;overflow:hidden;
+  background: #05080f;
+  display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(6,1fr);
+}
+.floor-cell .viz i{background:transparent}
+.floor-cell.early .viz{background:#08131a}
+.floor-cell.mid .viz{background:#0a0d18}
+.floor-cell.late .viz{background:#120818}
+.floor-cell .e{display:flex;gap:3px;flex-wrap:wrap;font-size:8px;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase}
+.floor-cell .e span{padding:1px 4px;border:1px solid var(--rule-2)}
+.floor-cell.late{border-color: var(--core)}
+.floor-cell.late .n{color: var(--core)}
+
+/* ===== Footer ===== */
+footer.foot{
+  margin-top:72px;padding-top:18px;border-top:2px solid var(--ink);
+  display:flex;justify-content:space-between;
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
+}
+footer.foot span b{color:var(--ink-2)}
+
+@media (max-width:1100px){
+  .modules{grid-template-columns: repeat(2,1fr)}
+  .enemies{grid-template-columns: repeat(2,1fr)}
+  .powerups{grid-template-columns: repeat(3,1fr)}
+  .hazards{grid-template-columns: repeat(4,1fr)}
+  .floors{grid-template-columns: repeat(5,1fr)}
+  .hero-panel{grid-template-columns: 1fr}
+}
+</style>
+</head>
+<body>
+<main class="sheet">
+
+  <header class="masthead">
+    <div class="mast-left">@voxelyn/roguelike · MVP</div>
+    <h1 class="title">Voxelyn<span class="thin"> / </span><span class="mark">roguelike</span></h1>
+    <div class="mast-right"><span class="dot"></span>Concept Art · 04.24.26</div>
+  </header>
+
+  <div class="subline">
+    <span>Genre<b>Isometric voxel roguelike</b></span>
+    <span>Objective<b>Desce na mina · núcleo no andar 10</b></span>
+    <span>Structure<b>10 floors · 64×64×4 voxels</b></span>
+    <span>Perspective<b>Pixelated isometric</b></span>
+  </div>
+
+  <!-- ========= 01 · GAMEPLAY MOCKUP ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">01</div>
+      <div class="block-title">Gameplay Mockup · in-engine feel</div>
+      <div class="block-meta">iso · fog · hud</div>
+    </div>
+
+    <div class="mockup-wrap">
+      <div class="mockup-topbar">
+        <span>VOXELYN_MVP.EXE — mining descent</span>
+        <span class="dotset"><i></i><i></i><i></i></span>
+      </div>
+      <div class="mockup-canvas">
+        <div class="iso" id="isoStage"></div>
+        <div class="scan"></div>
+
+        <div class="hud">
+          <div class="hud-top">
+            <div class="hud-hp">
+              <b>HP</b> 78 / 100
+              <div class="bar"><i></i></div>
+            </div>
+            <div class="hud-floor">Depth <b>ANDAR 04</b></div>
+          </div>
+          <div></div>
+          <div class="hud-bottom">
+            <div class="powerslot"><span class="k">Q</span><div id="puSlot1"></div></div>
+            <div class="powerslot"><span class="k">E</span><div id="puSlot2"></div></div>
+            <div class="powerslot"><span class="k">R</span></div>
+            <div class="minimap" id="minimap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========= 02 · FLOOR MODULES ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">02</div>
+      <div class="block-title">Floor Modules</div>
+      <div class="block-meta">6 of 6 · procedural</div>
+    </div>
+
+    <div class="modules">
+
+      <article class="module">
+        <div class="mod-head"><b>Fungal Chamber</b><span>MOD · FUN</span></div>
+        <div class="mod-viz">
+          <div class="tgrid" style="grid-template-columns:repeat(20,1fr);grid-template-rows:repeat(15,1fr)">
+            <!-- rocks border + organic fungal rooms -->
+          </div>
+          <div id="modFungal"></div>
+        </div>
+        <div class="mod-desc">Organic cave rooms carved by cellular generation. Glowing fungal floors light a short radius; biofluid pools between chambers.</div>
+        <div class="mod-tags"><span>fungal floor</span><span>bio light</span><span>spore vent</span></div>
+      </article>
+
+      <article class="module">
+        <div class="mod-head"><b>Hive Tunnels</b><span>MOD · HIV</span></div>
+        <div class="mod-viz"><div id="modHive"></div></div>
+        <div class="mod-desc">Winding tunnel networks carved by a drunk-walker. Tight corridors force line-of-sight combat with stalkers and spitters.</div>
+        <div class="mod-tags"><span>walker gen</span><span>tight LOS</span><span>ambush</span></div>
+      </article>
+
+      <article class="module">
+        <div class="mod-head"><b>Mining Zone</b><span>MOD · MIN</span></div>
+        <div class="mod-viz"><div id="modMine"></div></div>
+        <div class="mod-desc">Rectangular mined sectors linked by corridor stubs. Metal-ore deposits, tracks, debris, and crates with loot.</div>
+        <div class="mod-tags"><span>rect rooms</span><span>ore</span><span>tracks</span><span>crates</span></div>
+      </article>
+
+      <article class="module">
+        <div class="mod-head"><b>Vertical Pocket</b><span>MOD · VRT</span></div>
+        <div class="mod-viz"><div id="modVert"></div></div>
+        <div class="mod-desc">Clustered voxel pockets connected by narrow one-tile paths. Great for traps and fall-back tactics.</div>
+        <div class="mod-tags"><span>clusters</span><span>1-tile path</span><span>terminal</span></div>
+      </article>
+
+      <article class="module">
+        <div class="mod-head"><b>Root Zone</b><span>MOD · RT</span></div>
+        <div class="mod-viz"><div id="modRoot"></div></div>
+        <div class="mod-desc">Obstructed by root barriers snaking through open floor. Chop or route around — bruisers stalk the clearings.</div>
+        <div class="mod-tags"><span>root barrier</span><span>crystals</span><span>open floor</span></div>
+      </article>
+
+      <article class="module">
+        <div class="mod-head"><b>Mirror Pocket</b><span>MOD · MIR</span></div>
+        <div class="mod-viz"><div id="modMirror"></div></div>
+        <div class="mod-desc">Symmetrical mirrored caves bridged by one-way portals. Disorienting, heavily fogged, hosts mini-encounters.</div>
+        <div class="mod-tags"><span>symmetry</span><span>portal</span><span>fog</span><span>beacon</span></div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ========= 03 · ENEMIES ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">03</div>
+      <div class="block-title">Enemy Roster</div>
+      <div class="block-meta">5 of 5 · iso pixel</div>
+    </div>
+    <div class="enemies" id="enemyGrid"></div>
+  </section>
+
+  <!-- ========= 04 · PROTAGONIST ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">04</div>
+      <div class="block-title">Protagonist · Spritesheet</div>
+      <div class="block-meta">iso facings · 6 states</div>
+    </div>
+
+    <div class="hero-panel">
+      <div class="hero-art-wrap">
+        <div class="hero-sheet" id="heroSheet"></div>
+      </div>
+      <div class="hero-info">
+        <h3>Excavator</h3>
+        <div class="r">Unnamed player · hp 100 · atk 12</div>
+        <p>A lone descender in a reinforced mine-suit. Bump-melee at close range, fast-footed, readable silhouette against fungal glow. Animation rows cover idle, walk, attack, cast, hit, and die — with down/up isometric facings mirrored for left.</p>
+        <div class="statgrid">
+          <div>Max HP<b>100</b></div>
+          <div>Attack<b>12</b></div>
+          <div>Speed<b>Fast</b></div>
+          <div>States<b>6</b></div>
+          <div>Facings<b>4</b></div>
+          <div>Range<b>Melee</b></div>
+        </div>
+        <p style="font-size:11px;color:var(--ink-3);margin-top:14px;border-top:1px dashed var(--rule);padding-top:12px">
+          Silhouette test: helmet lamp + shoulder plate read at 16px. Power-up tints overlay onto suit chroma without changing silhouette.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========= 05 · POWER-UPS ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">05</div>
+      <div class="block-title">Power-ups</div>
+      <div class="block-meta">6 · loot drops</div>
+    </div>
+    <div class="powerups" id="powerupsRow"></div>
+  </section>
+
+  <!-- ========= 06 · HAZARDS + PROPS ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">06</div>
+      <div class="block-title">Hazards & Props</div>
+      <div class="block-meta">8 · tileable</div>
+    </div>
+    <div class="hazards" id="hazardRow"></div>
+  </section>
+
+  <!-- ========= 07 · FLOOR PROGRESSION ========= -->
+  <section class="block">
+    <div class="block-head">
+      <div class="block-num">07</div>
+      <div class="block-title">Floor Progression · 1 → 10</div>
+      <div class="block-meta">early · mid · late · core</div>
+    </div>
+    <div class="floors" id="floorStrip"></div>
+  </section>
+
+  <footer class="foot">
+    <span><b>Voxelyn</b> · concept sheet 01</span>
+    <span><b>mein-spiel studio</b> · internal</span>
+    <span>rev <b>04.24.26</b> · page 01/01</span>
+  </footer>
+
+</main>
+
+<script>
+/* ------------------------------------------------------------------
+   Pixel sprite renderer (box-shadow trick)
+------------------------------------------------------------------ */
+function renderSprite(grid, palette, px = 5){
+  const rows = grid.length, cols = grid[0].length;
+  const root = document.createElement("div");
+  root.className = "sprite";
+  root.style.width  = (cols * px) + "px";
+  root.style.height = (rows * px) + "px";
+  const pts = [];
+  for (let y=0; y<rows; y++){
+    for (let x=0; x<cols; x++){
+      const c = grid[y][x];
+      if (!c) continue;
+      pts.push(`${x*px}px ${y*px}px 0 0 ${palette[c]}`);
+    }
+  }
+  const dot = document.createElement("div");
+  dot.className = "sprite-anchor";
+  dot.style.setProperty("--px", px + "px");
+  dot.style.boxShadow = pts.join(",");
+  root.appendChild(dot);
+  return root;
+}
+function g(str, legend){
+  return str.trim().split("\n").map(row => [...row].map(ch => legend[ch] ?? 0));
+}
+
+/* ============================================================
+   ISO STAGE — central mockup
+============================================================ */
+(function buildIso(){
+  const stage = document.getElementById("isoStage");
+  const MAP = [
+    // 0 empty, 1 rock/wall, 2 floor, 3 fungal, 4 ore, 5 entry, 6 exit, 7 biofluid
+    "0000011111111100000",
+    "0000012222222100000",
+    "0000012333322100000",
+    "0001112333322111100",
+    "0012222333322211200",
+    "0012332222222232200",
+    "0012332244422232200",
+    "0015332224222236200",
+    "0012332222222232200",
+    "0012222277722222200",
+    "0001112777721111100",
+    "0000012227222100000",
+    "0000012222222100000",
+    "0000011111111100000",
+  ];
+  const TW = 64, TH = 32;
+  const rows = MAP.length, cols = MAP[0].length;
+  const ox = 410, oy = 60;
+  for (let y=0; y<rows; y++){
+    for (let x=0; x<cols; x++){
+      const v = MAP[y][x];
+      if (v === "0") continue;
+      const px = ox + (x - y) * (TW/2);
+      const py = oy + (x + y) * (TH/2);
+      const tile = document.createElement("div");
+      tile.className = "iso-tile";
+      tile.style.left = px + "px";
+      tile.style.top  = py + "px";
+      tile.style.zIndex = (y * 100 + x);
+      const top = document.createElement("div");
+      top.className = "top";
+      if (v === "1") top.classList.add("dark");
+      if (v === "3") top.classList.add("fungal");
+      if (v === "4") top.classList.add("ore");
+      if (v === "5") top.classList.add("entry");
+      if (v === "6") top.classList.add("exit");
+      if (v === "7") top.classList.add("biofluid");
+      tile.appendChild(top);
+      stage.appendChild(tile);
+    }
+  }
+  // player pawn at roughly center
+  function isoAt(x, y, color, label, glow){
+    const px = ox + (x - y) * (TW/2);
+    const py = oy + (x + y) * (TH/2);
+    const pawn = document.createElement("div");
+    pawn.style.position = "absolute";
+    pawn.style.left = px + "px";
+    pawn.style.top  = (py - 14) + "px";
+    pawn.style.transform = "translate(-50%, -100%)";
+    pawn.style.zIndex = 9999;
+    pawn.innerHTML = `
+      <div style="width:16px;height:22px;background:${color};
+        box-shadow: 0 0 14px ${glow || color}, inset 0 -4px 0 rgba(0,0,0,.35);
+        margin:0 auto;"></div>
+      <div style="width:18px;height:5px;background:rgba(0,0,0,.5);border-radius:50%;margin:2px auto 0;filter:blur(1px)"></div>
+      <div style="font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#dbe4f2;text-align:center;margin-top:3px;text-shadow:0 1px 2px #000">${label}</div>`;
+    stage.appendChild(pawn);
+  }
+  isoAt(7, 6, "#dbe4f2", "you", "#5ed0ec");
+  isoAt(10, 7, "#e04f5f", "stalker");
+  isoAt(11, 5, "#b56aff", "spitter");
+  isoAt(4, 9, "#f6c453", "loot");
+
+  // highlighted tile under cursor
+  (function cursor(){
+    const x=8,y=7;
+    const px = ox + (x - y) * (TW/2);
+    const py = oy + (x + y) * (TH/2);
+    const c = document.createElement("div");
+    c.style.position="absolute";
+    c.style.left=(px-32)+"px"; c.style.top=(py-16)+"px";
+    c.style.width="64px"; c.style.height="32px";
+    c.style.clipPath="polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)";
+    c.style.background="rgba(246,196,83,.25)";
+    c.style.boxShadow="inset 0 0 0 2px #f6c453";
+    c.style.zIndex=9998;
+    stage.appendChild(c);
+  })();
+})();
+
+/* ============================================================
+   MINIMAP
+============================================================ */
+(function minimap(){
+  const mm = document.getElementById("minimap");
+  // 16x10
+  const plan = [
+    "1111111111111111",
+    "1..1111...11..21",
+    "1.p...1...1...11",
+    "1.11m.111.1.m.11",
+    "1.1...1.1.1...11",
+    "1.1.11111.111111",
+    "1.1.1....m...e.1",
+    "1...1.1111.1...1",
+    "11111.......1111",
+    "1111111111111111",
+  ];
+  plan.forEach(row => {
+    [...row].forEach(ch => {
+      const i = document.createElement("i");
+      if (ch === "1") i.className = "f";
+      else if (ch === "p") i.className = "p";
+      else if (ch === "e") i.className = "e";
+      else if (ch === "m") i.className = "m";
+      mm.appendChild(i);
+    });
+  });
+})();
+
+/* ============================================================
+   MODULE TOP-DOWN SCHEMATICS (small pixel plans)
+============================================================ */
+function modulePlan(hostId, rows, cols, plan, legend){
+  const host = document.getElementById(hostId);
+  host.style.position="absolute"; host.style.inset="8px";
+  host.style.display="grid";
+  host.style.gridTemplateColumns=`repeat(${cols}, 1fr)`;
+  host.style.gridTemplateRows=`repeat(${rows}, 1fr)`;
+  plan.forEach(row => {
+    [...row].forEach(ch => {
+      const d = document.createElement("div");
+      d.className = legend[ch] || "";
+      host.appendChild(d);
+    });
+  });
+}
+// FUNGAL — organic rooms, biofluid pools
+modulePlan("modFungal", 12, 18, [
+  "rrrrrrrrrrrrrrrrrr",
+  "rffffrrrrrrrfffffr",
+  "rfFFfrfffrrfFFFFfr",
+  "rfFFfrfFfrrfFFbbfr",
+  "rffffrfFfrrfFFbbfr",
+  "rrrrfrfFfrrfFFFFfr",
+  "rffffrfFffrfFFFFfr",
+  "rfFFfrfFFfrfffffrr",
+  "rfFFfrrrFfrrrrrrr ",
+  "rffffrrrfffffffrr ",
+  "rrrrrrrrrrrrrrrrrr",
+  "rrrrrrrrrrrrrrrrrr",
+], {" ":"","r":"rock","f":"floor","F":"fung","b":"biofluid"});
+
+// HIVE — winding tunnels
+modulePlan("modHive", 12, 18, [
+  "rrrrrrrrrrrrrrrrrr",
+  "rffrrrrrrrrrrrfffr",
+  "rfrfffrrrrrrrrffrr",
+  "rfrrffrrrrrrrrfrrr",
+  "rfrrrffrrrrrrfffrr",
+  "rffrrrffrrrrffrrrr",
+  "rrfrrrrffrrfffrrrr",
+  "rrfrrrrrffffrrrrrr",
+  "rrffffffffffffrrrr",
+  "rrrrrrrrrrrrffrrrr",
+  "rrrrrrrrrrrrffrrrr",
+  "rrrrrrrrrrrrrrrrrr",
+], {"r":"rock","f":"floor"});
+
+// MINING — rectangular rooms
+modulePlan("modMine", 12, 18, [
+  "rrrrrrrrrrrrrrrrrr",
+  "rfffffrrrrrrffffrr",
+  "rfofoofrrrrrffofrr",
+  "rfofoofrrrrrfoofrr",
+  "rfffffrrrrrrffffrr",
+  "rrrfrrrrrrrrrfrrrr",
+  "rrrfffffffffffffrr",
+  "rrrrrrrrrrrrrrfrrr",
+  "rrffffrrrrrrrffrrr",
+  "rrfcccfrrrrrrfrrrr",
+  "rrffffrrrrrrrrrrrr",
+  "rrrrrrrrrrrrrrrrrr",
+], {"r":"rock","f":"floor","o":"oretile","c":"track"});
+
+// VERTICAL POCKETS
+modulePlan("modVert", 12, 18, [
+  "rrrrrrrrrrrrrrrrrr",
+  "rfffrrrrfffrrrfffr",
+  "rfttfrrfttffrfttfr",
+  "rffffrrffffrrffffr",
+  "rrrfrrrrrfrrrrrfrr",
+  "rrrfrrrrrfrrrrrfrr",
+  "rrrfffffffffffffrr",
+  "rrrfrrrrrfrrrrrfrr",
+  "rfffrrrfffrrrfffrr",
+  "rffffrrffffrrffffr",
+  "rffffrrffffrrffffr",
+  "rrrrrrrrrrrrrrrrrr",
+], {"r":"rock","f":"floor","t":"track"});
+
+// ROOT ZONE
+modulePlan("modRoot", 12, 18, [
+  "rrrrrrrrrrrrrrrrrr",
+  "rfffffffffffffffrr",
+  "rfbbfffbbbffbbbffr",
+  "rfffffffffffffffrr",
+  "rffccfbbffbbfffffr",
+  "rfffffffbbffffccfr",
+  "rfbbfffffffbbfffrr",
+  "rffffbbffffffffffr",
+  "rfffffffbbffccffrr",
+  "rffccfffffffffffrr",
+  "rfffffffffffffffrr",
+  "rrrrrrrrrrrrrrrrrr",
+], {"r":"rock","f":"floor","b":"barrier","c":"crystal"});
+
+// MIRROR POCKET
+modulePlan("modMirror", 12, 18, [
+  "rrrrrrrrrrrrrrrrrr",
+  "rfffffrrrrrrfffffr",
+  "rfsfsfrrrrrrfsfsfr",
+  "rfffffrsssrrfffffr",
+  "rrfrrrrrrrrrrrrfrr",
+  "rrffffrrsrrrfffffr",
+  "rrfcfrrsssrrfcfrrr",
+  "rrffrrrsssrrfffrrr",
+  "rrfrrrrrrrrrrrfrrr",
+  "rffffrrrrrrrrfffrr",
+  "rffffrrrrrrrrfffrr",
+  "rrrrrrrrrrrrrrrrrr",
+], {"r":"rock","f":"floor","c":"crystal","s":"spore"});
+
+/* ============================================================
+   ENEMIES — iso pixel sprites
+============================================================ */
+const enemies = [
+  {
+    id:"E01", n:"Stalker", t:"melee hunter",
+    hp:"12", dmg:"6", mv:"fast",
+    floors:"FL <b>1–9</b>",
+    desc:"Fast basic melee. Common early; uses line-of-sight dashes toward the player.",
+    pal:[null,"#2a1a2a","#6a3a4a","#a44860","#e04f5f","#1a1a2a","#dbe4f2","#8a2030"],
+    grid:g(`
+.........66..........
+........6666.........
+........4444.........
+.......443344........
+......44332244.......
+......44332244.......
+.......442244........
+........2222.........
+........2222.........
+.......222222........
+......2.2222.2.......
+......2..11..2.......
+.........11..........
+........5555.........
+`, {".":0,"1":2,"2":3,"3":4,"4":5,"5":5,"6":7})
+  },
+  {
+    id:"E02", n:"Bruiser", t:"armored melee",
+    hp:"28", dmg:"10", mv:"slow",
+    floors:"FL <b>1–9</b>",
+    desc:"Tough melee tank with damage reduction. Telegraphs a wind-up before a heavy swing.",
+    pal:[null,"#1a2038","#3e4a63","#6b7a93","#b56aff","#dbe4f2"],
+    grid:g(`
+........2222.........
+.......222222........
+.......233332........
+......24433442.......
+......23344332.......
+......23333332.......
+.......222222........
+......2333333.2......
+......2233332..2.....
+.......222222........
+.......22..22........
+.......22..22........
+......333..333.......
+......555..555.......
+`, {".":0,"2":2,"3":3,"4":4,"5":1})
+  },
+  {
+    id:"E03", n:"Spitter", t:"ranged fungal",
+    hp:"9", dmg:"4 (proj)", mv:"kite",
+    floors:"FL <b>4–9</b>",
+    desc:"Keeps distance, launches spore blobs in an arc. Fragile up close.",
+    pal:[null,"#1d3a22","#3d6a3a","#6fe19a","#c86bff","#dbe4f2"],
+    grid:g(`
+.........33..........
+........3333.........
+.......322223........
+.......322223........
+......32111223.......
+......32155123.......
+......32111123.......
+.......322223........
+........2442.........
+........2442.........
+.......222222........
+......2..22..2.......
+.........11..........
+........5555.........
+`, {".":0,"1":3,"2":2,"3":1,"4":4,"5":5})
+  },
+  {
+    id:"E04", n:"Spore Bomber", t:"suicide aoe",
+    hp:"8", dmg:"18 (aoe)", mv:"waddle",
+    floors:"FL <b>4–9</b>",
+    desc:"Winds up and detonates near the player. Cloud lingers and slows movement.",
+    pal:[null,"#2a1a3a","#5a3a70","#b56aff","#f6c453","#dbe4f2"],
+    grid:g(`
+.........44..........
+........4444.........
+.......244442........
+......22444422.......
+......23333332.......
+.....2233333322......
+.....2333443332......
+.....2334444332......
+.....2333443332......
+.....2233333322......
+......23333332.......
+.......222222........
+.......22..22........
+......55....55.......
+`, {".":0,"1":1,"2":2,"3":3,"4":4,"5":5})
+  },
+  {
+    id:"E05", n:"Guardian", t:"FL10 boss",
+    hp:"180", dmg:"22 (shards)", mv:"fortress",
+    floors:"FL <b>10</b>",
+    desc:"Core guardian. Fires tri-shards, damage reduction, phase-shift when wounded. Victory on defeat + core reached.",
+    pal:[null,"#1a0820","#4a1a5a","#8a3aaa","#c86bff","#f6c453","#dbe4f2"],
+    grid:g(`
+.......5....5........
+........5..5.........
+........3333.........
+.......322223........
+......32255223.......
+......32544523.......
+......32444423.......
+.....3322552233......
+.....3255555523......
+.....3255445523......
+.....3322552233......
+......23322332.......
+......23...322.......
+......3.....3........
+`, {".":0,"1":1,"2":2,"3":3,"4":4,"5":5})
+  },
+];
+
+(function renderEnemies(){
+  const grid = document.getElementById("enemyGrid");
+  enemies.forEach(e => {
+    const card = document.createElement("article");
+    card.className = "enemy";
+    card.innerHTML = `
+      <div class="e-head"><b>${e.n}</b><span class="id">${e.id}</span></div>
+      <div class="e-art"></div>
+      <div class="e-stats">
+        <div>hp<b>${e.hp}</b></div>
+        <div>dmg<b>${e.dmg}</b></div>
+        <div>mv<b>${e.mv}</b></div>
+      </div>
+      <div class="e-body">${e.desc}</div>
+      <div class="e-floors">${e.floors} · ${e.t}</div>
+    `;
+    card.querySelector(".e-art").appendChild(renderSprite(e.grid, e.pal, 6));
+    grid.appendChild(card);
+  });
+})();
+
+/* ============================================================
+   HERO — 6 poses (idle, walk, attack, cast, hit, die) + facings
+============================================================ */
+const heroPal = [
+  null,
+  "#1a2038",   // suit dark
+  "#3e4a63",   // suit mid
+  "#6b7a93",   // suit light
+  "#5ed0ec",   // lamp cyan
+  "#f6c453",   // accent
+  "#dbe4f2",   // highlight
+  "#e04f5f",   // blood
+];
+const heroBase = `
+........44..........
+.......4444.........
+.......3663.........
+.......3333.........
+......333333........
+......322223........
+.....32222223.......
+.....31222213.......
+.....31222213.......
+.....32222223........
+......333333........
+.......3..3.........
+......2....2........
+.....22....22.......
+`;
+function poseVariant(p){
+  // slight jitter per pose by shifting / swapping cells
+  let rows = heroBase.trim().split("\n");
+  if (p === "walk")  { rows[12] = "......2....2........"; rows[13]=".....22....2.2......"; }
+  if (p === "attack"){ rows[7]  = ".....31222213555555."; rows[8]="......3222232.......";}
+  if (p === "cast")  { rows[1]  = "...77..44..77......."; rows[2]=".....4444..........."; }
+  if (p === "hit")   { rows[3]  = ".......7337........."; rows[7]=".....31727213......."; }
+  if (p === "die")   { rows = [
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....................",
+    "....444.............",
+    "...3333333..........",
+    "..3322222233........",
+    "..3311222133........",
+    "...32222223.........",
+    "....333333..........",
+    "....................",
+    "....................",
+  ]; }
+  return g(rows.join("\n"), {".":0,"1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7});
+}
+(function renderHero(){
+  const sheet = document.getElementById("heroSheet");
+  const poses = [
+    {n:"idle",  d:"down"},
+    {n:"walk",  d:"down"},
+    {n:"attack",d:"down"},
+    {n:"cast",  d:"down"},
+    {n:"hit",   d:"down"},
+    {n:"die",   d:"-"},
+  ];
+  poses.forEach(p => {
+    const cell = document.createElement("div");
+    cell.className = "hero-pose";
+    cell.innerHTML = `<span class="lbl">${p.n}</span><span class="dir">${p.d}</span>`;
+    cell.appendChild(renderSprite(poseVariant(p.n), heroPal, 5));
+    sheet.appendChild(cell);
+  });
+})();
+
+/* ============================================================
+   POWER-UPS (from repo: Nucleo Vital, Lamina Micelial, etc.)
+============================================================ */
+const powerups = [
+  {n:"Núcleo Vital",    fn:"+MAX HP · heal",
+    pal:[null,"#e04f5f","#ff8090","#2a0d14","#f6c453"],
+    grid:g(`
+.....1111.....
+....122221....
+...12222221...
+...12244221...
+...12444421...
+...12244221...
+...12222221...
+....122221....
+.....1111.....
+`,{".":0,"1":1,"2":2,"3":3,"4":4})
+  },
+  {n:"Lâmina Micelial", fn:"+Damage",
+    pal:[null,"#6fe19a","#3d6a3a","#1d3a22","#dbe4f2"],
+    grid:g(`
+....4..........
+....44.........
+....344........
+....3344.......
+....33344......
+....333344.....
+.....333344....
+......333344...
+..22....33344..
+..2222....3344.
+...2222....334.
+....222........
+`,{".":0,"2":2,"3":1,"4":4})
+  },
+  {n:"Servos de Impulso", fn:"+Speed",
+    pal:[null,"#5ed0ec","#2a6a80","#0a1a28","#dbe4f2"],
+    grid:g(`
+...11..11...
+..1111111...
+.111221111..
+.112223111..
+.112233211..
+.111222111..
+..1112111...
+...1.1.1....
+...4.4.4....
+`,{".":0,"1":1,"2":2,"3":3,"4":4})
+  },
+  {n:"Casca Reforçada", fn:"DMG reduction",
+    pal:[null,"#6b7a93","#3e4a63","#1a2038","#dbe4f2"],
+    grid:g(`
+....1111....
+...122221...
+..12332221..
+..12333321..
+..12322321..
+..12333321..
+..12322321..
+..12333321..
+...122221...
+....3333....
+`,{".":0,"1":1,"2":2,"3":3,"4":4})
+  },
+  {n:"Esporos Vampíricos", fn:"Life on hit",
+    pal:[null,"#c86bff","#7a3aaa","#2a0d3a","#e04f5f"],
+    grid:g(`
+.....44.....
+....4444....
+...411114...
+..41112214..
+..41122114..
+..41111114..
+...411114...
+....4114....
+.....44.....
+.....11.....
+....1111....
+`,{".":0,"1":1,"2":4,"3":3,"4":2})
+  },
+  {n:"Regeneração Fúngica", fn:"Passive regen",
+    pal:[null,"#6fe19a","#3d6a3a","#1d3a22","#dbe4f2"],
+    grid:g(`
+......4......
+.....444.....
+....44144....
+...4411144...
+...4414144...
+...4411144...
+....44144....
+.....444.....
+......4......
+...4..4..4...
+....1.1.1....
+`,{".":0,"1":1,"2":2,"3":3,"4":1})
+  },
+];
+(function renderPowerups(){
+  const host = document.getElementById("powerupsRow");
+  powerups.forEach(p => {
+    const c = document.createElement("div");
+    c.className = "pu";
+    c.innerHTML = `<div class="art"></div><div class="nm">${p.n}</div><div class="fn">${p.fn}</div>`;
+    c.querySelector(".art").appendChild(renderSprite(p.grid, p.pal, 4));
+    host.appendChild(c);
+  });
+
+  // HUD slots also show 2 of these
+  const a = document.getElementById("puSlot1");
+  const b = document.getElementById("puSlot2");
+  a.appendChild(renderSprite(powerups[0].grid, powerups[0].pal, 2));
+  b.appendChild(renderSprite(powerups[2].grid, powerups[2].pal, 2));
+})();
+
+/* ============================================================
+   HAZARDS & PROPS
+============================================================ */
+const hazards = [
+  {n:"spore vent",  bg:"linear-gradient(#2a1a3a,#0a0a1a)",
+    fn: el => {
+      el.innerHTML = `
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+          <div style="width:30%;height:25%;background:#3a2a5a;position:relative">
+            <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:60%;height:12px;background:radial-gradient(ellipse,#c86bff,transparent 70%)"></div>
+          </div>
+        </div>`;
+    }
+  },
+  {n:"biofluid", bg:"#24463a",
+    fn: el => {
+      el.innerHTML = `<div style="position:absolute;inset:0;background:
+        repeating-linear-gradient(to bottom,#24463a 0 6px,#3a6a54 6px 7px);"></div>`;
+    }
+  },
+  {n:"tracks", bg:"#121a2a",
+    fn: el => {
+      el.innerHTML = `
+        <div style="position:absolute;inset:20% 10%;background:#2a3a5a;
+          background-image:linear-gradient(90deg,#3a4a6a 2px,transparent 2px);background-size:10px 100%"></div>`;
+    }
+  },
+  {n:"crate", bg:"#0e1424",
+    fn: el => {
+      el.innerHTML = `<div style="position:absolute;inset:25%;background:#8a5a2a;
+        box-shadow:inset 0 0 0 2px #3a2a10, inset 0 4px 0 #b58a4a"></div>`;
+    }
+  },
+  {n:"terminal", bg:"#0a0e1a",
+    fn: el => {
+      el.innerHTML = `<div style="position:absolute;left:20%;right:20%;top:25%;bottom:20%;
+        background:#1a2038;border:2px solid #3e4a63">
+        <div style="position:absolute;inset:4px;background:#0a1a2a;
+          background-image:repeating-linear-gradient(to bottom,#5ed0ec 0 1px,transparent 1px 4px)"></div></div>`;
+    }
+  },
+  {n:"beacon", bg:"#08101c",
+    fn: el => {
+      el.innerHTML = `<div style="position:absolute;left:42%;top:20%;width:16%;height:45%;background:#3e4a63"></div>
+        <div style="position:absolute;left:35%;top:12%;width:30%;height:12%;background:#f6c453;box-shadow:0 0 18px #f6c453"></div>`;
+    }
+  },
+  {n:"root wall", bg:"#1a1008",
+    fn: el => {
+      el.innerHTML = `<div style="position:absolute;inset:0;background:
+        repeating-linear-gradient(30deg,#5e3a1c 0 6px,#3a2010 6px 10px)"></div>`;
+    }
+  },
+  {n:"crystal", bg:"#0a0a1a",
+    fn: el => {
+      el.innerHTML = `
+        <div style="position:absolute;left:30%;bottom:15%;width:14%;height:55%;background:#c86bff;transform:skewX(-15deg);box-shadow:0 0 14px #c86bff"></div>
+        <div style="position:absolute;left:48%;bottom:15%;width:10%;height:40%;background:#b56aff;transform:skewX(10deg);box-shadow:0 0 10px #b56aff"></div>
+        <div style="position:absolute;left:60%;bottom:15%;width:12%;height:48%;background:#c86bff;transform:skewX(-8deg);box-shadow:0 0 12px #c86bff"></div>`;
+    }
+  },
+];
+(function renderHazards(){
+  const host = document.getElementById("hazardRow");
+  hazards.forEach(h => {
+    const cell = document.createElement("div");
+    cell.className = "hz";
+    cell.style.background = h.bg;
+    h.fn(cell);
+    const lbl = document.createElement("span");
+    lbl.className = "lbl"; lbl.textContent = h.n;
+    cell.appendChild(lbl);
+    host.appendChild(cell);
+  });
+})();
+
+/* ============================================================
+   FLOOR PROGRESSION 1..10
+============================================================ */
+(function floorStrip(){
+  const host = document.getElementById("floorStrip");
+  const tiers = [
+    {n:1, t:"early", enemies:["Stalker","Bruiser"], module:"Mining", palette:["#0a1a28","#2a3a5a","#5ed0ec"]},
+    {n:2, t:"early", enemies:["Stalker"], module:"Hive", palette:["#0a1a20","#2a4a3a","#5ed0ec"]},
+    {n:3, t:"early", enemies:["Stalker","Bruiser"], module:"Fungal", palette:["#0a1a14","#3a6a4a","#6fe19a"]},
+    {n:4, t:"mid", enemies:["+Spitter"], module:"Hive", palette:["#0a0e1a","#3a5a4a","#6fe19a"]},
+    {n:5, t:"mid", enemies:["Spitter","Bomber"], module:"Vertical", palette:["#0a0a1a","#3a3a5a","#b56aff"]},
+    {n:6, t:"mid", enemies:["All"], module:"Root", palette:["#1a0e14","#5e3a1c","#e04f5f"]},
+    {n:7, t:"mid", enemies:["All"], module:"Mirror", palette:["#0e0a1e","#3a2a5a","#b56aff"]},
+    {n:8, t:"mid", enemies:["All"], module:"Mining", palette:["#0a0e1a","#3a3a5a","#f6c453"]},
+    {n:9, t:"mid", enemies:["All"], module:"Fungal", palette:["#0a1014","#3a6a4a","#6fe19a"]},
+    {n:10,t:"late",enemies:["Guardian"], module:"Core", palette:["#1a0820","#8a3aaa","#c86bff"]},
+  ];
+  tiers.forEach(f => {
+    const cell = document.createElement("div");
+    cell.className = "floor-cell " + f.t;
+    const vizCells = Array.from({length:48}, (_, i) => {
+      const r = Math.random();
+      const color = r < 0.15 ? f.palette[2]
+                  : r < 0.55 ? f.palette[1]
+                  : f.palette[0];
+      return `<i style="background:${color}"></i>`;
+    }).join("");
+    cell.innerHTML = `
+      <div class="n">FL ${String(f.n).padStart(2,"0")}</div>
+      <div class="tier">${f.module} · ${f.t}</div>
+      <div class="viz">${vizCells}</div>
+      <div class="e">${f.enemies.map(e=>`<span>${e}</span>`).join("")}</div>
+    `;
+    host.appendChild(cell);
+  });
+})();
+</script>
+</body>
+</html>

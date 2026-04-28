@@ -1,6 +1,8 @@
 import {
   createAnimationPlayer,
   createProceduralCharacter,
+  getLoadedAtlas,
+  SPRITE_BY_ARCHETYPE,
   stepAnimation,
   type AnimationFacing,
   type AnimationPlayer,
@@ -8,15 +10,6 @@ import {
   type ProceduralCharacter,
 } from '@voxelyn/animation';
 import type { EnemyArchetype, Entity, Vec2 } from '../game/types';
-import {
-  getHeroSpriteset,
-  HERO_FRAME_HEIGHT,
-  HERO_FRAME_WIDTH,
-  loadHeroSpriteset,
-} from './hero-spritesheet';
-
-// Start loading hero spritesheet immediately
-loadHeroSpriteset().catch((err: unknown) => console.warn('Failed to load hero spritesheet:', err));
 
 export type { PixelSprite };
 
@@ -40,12 +33,47 @@ const facingFromVec = (facing: Vec2): AnimationFacing => {
 
 type RuntimeEntry = {
   character: ProceduralCharacter | null;
+  style: ProceduralCharacter['style'];
   player: AnimationPlayer;
   lastSimTick: number;
-  useSpritesheet: boolean;
 };
 
 const runtimeByEntity = new Map<string, RuntimeEntry>();
+
+export type AnchorDrawInput = {
+  spriteWidth: number;
+  spriteHeight: number;
+  anchor: { x: number; y: number };
+  sx: number;
+  sy: number;
+  scale: number;
+};
+
+export type AnchorDrawResult = {
+  usefulHeight: number;
+  footRowsBelow: number;
+  effectiveScale: number;
+  drawX: number;
+  drawY: number;
+  drawW: number;
+  drawH: number;
+};
+
+const TARGET_ENTITY_HEIGHT = 60;
+
+export const computeAnchorDraw = (input: AnchorDrawInput): AnchorDrawResult => {
+  const usefulHeight = input.anchor.y;
+  const footRowsBelow = input.spriteHeight - input.anchor.y;
+  const heightScale = TARGET_ENTITY_HEIGHT / usefulHeight;
+  const effectiveScale = Math.max(1, Math.round(heightScale * (input.scale / 3)));
+  const drawW = input.spriteWidth * effectiveScale;
+  const drawH = input.spriteHeight * effectiveScale;
+  const drawX = Math.floor(input.sx - input.anchor.x * effectiveScale);
+  const drawY = Math.floor(
+    input.sy - input.spriteHeight * effectiveScale + footRowsBelow * effectiveScale
+  );
+  return { usefulHeight, footRowsBelow, effectiveScale, drawX, drawY, drawW, drawH };
+};
 
 type StageCanvas = {
   canvas: HTMLCanvasElement;
@@ -93,57 +121,26 @@ const styleFromEntity = (entity: Entity): ProceduralCharacter['style'] => {
 };
 
 const ensureRuntime = (entity: Entity): RuntimeEntry => {
+  const style = styleFromEntity(entity);
   const existing = runtimeByEntity.get(entity.id);
+  if (existing && existing.style === style) return existing;
 
-  // For player, check if spritesheet is loaded and upgrade runtime if needed
-  if (entity.kind === 'player') {
-    const heroSet = getHeroSpriteset();
-    if (heroSet) {
-      // Upgrade to spritesheet if not already using it
-      if (existing && !existing.useSpritesheet) {
-        const player = createAnimationPlayer({
-          set: heroSet,
-          width: HERO_FRAME_WIDTH,
-          height: HERO_FRAME_HEIGHT,
-          seed: entity.occ * 104729,
-        });
-        const upgraded: RuntimeEntry = {
-          character: null,
-          player,
-          lastSimTick: existing.lastSimTick,
-          useSpritesheet: true,
-        };
-        runtimeByEntity.set(entity.id, upgraded);
-        return upgraded;
-      }
-
-      if (!existing) {
-        const player = createAnimationPlayer({
-          set: heroSet,
-          width: HERO_FRAME_WIDTH,
-          height: HERO_FRAME_HEIGHT,
-          seed: entity.occ * 104729,
-        });
-        const created: RuntimeEntry = {
-          character: null,
-          player,
-          lastSimTick: -1,
-          useSpritesheet: true,
-        };
-        runtimeByEntity.set(entity.id, created);
-        return created;
-      }
-    }
-  }
-
-  if (existing) return existing;
-
-  // Fallback to procedural character for enemies or until spritesheet loads
-  const character = createProceduralCharacter({
-    id: entity.id,
-    style: styleFromEntity(entity),
-    seed: entity.occ * 7919,
-  });
+  const spriteId = SPRITE_BY_ARCHETYPE[style];
+  const usePixelLab = spriteId !== undefined && getLoadedAtlas(spriteId) !== undefined;
+  const character = usePixelLab
+    ? createProceduralCharacter({
+        id: entity.id,
+        style,
+        seed: entity.occ * 7919,
+        source: 'pixellab',
+        spriteId,
+      })
+    : createProceduralCharacter({
+        id: entity.id,
+        style,
+        seed: entity.occ * 7919,
+        useAuthored: true,
+      });
   const player = createAnimationPlayer({
     set: character.clips,
     width: character.width,
@@ -153,15 +150,15 @@ const ensureRuntime = (entity: Entity): RuntimeEntry => {
 
   const created: RuntimeEntry = {
     character,
+    style,
     player,
     lastSimTick: -1,
-    useSpritesheet: false,
   };
   runtimeByEntity.set(entity.id, created);
   return created;
 };
 
-const frameForEntity = (entity: Entity, simTick: number): PixelSprite => {
+const frameForEntity = (entity: Entity, simTick: number): { runtime: RuntimeEntry; sprite: PixelSprite } => {
   const runtime = ensureRuntime(entity);
   const stepTicks = runtime.lastSimTick < 0 ? 1 : Math.max(0, simTick - runtime.lastSimTick);
   runtime.lastSimTick = simTick;
@@ -171,19 +168,17 @@ const frameForEntity = (entity: Entity, simTick: number): PixelSprite => {
   const intent = entity.animIntent ?? 'idle';
 
   const ref = stepAnimation(runtime.player, dtMs, intent, facing);
-  return ref.sprite;
+  return { runtime, sprite: ref.sprite };
 };
 
 const drawSpriteFallback = (
   ctx: CanvasRenderingContext2D,
   sprite: PixelSprite,
-  sx: number,
-  sy: number,
+  drawX: number,
+  drawY: number,
   scale: number
 ): void => {
   const safeScale = clampScale(scale);
-  const px = Math.floor(sx - (sprite.width * safeScale) / 2);
-  const py = Math.floor(sy - sprite.height * safeScale);
 
   for (let y = 0; y < sprite.height; y += 1) {
     for (let x = 0; x < sprite.width; x += 1) {
@@ -194,13 +189,10 @@ const drawSpriteFallback = (
       const g = (packed >>> 8) & 0xff;
       const b = (packed >>> 16) & 0xff;
       ctx.fillStyle = `rgba(${r},${g},${b},${(a / 255).toFixed(3)})`;
-      ctx.fillRect(px + x * safeScale, py + y * safeScale, safeScale, safeScale);
+      ctx.fillRect(drawX + x * safeScale, drawY + y * safeScale, safeScale, safeScale);
     }
   }
 };
-
-// Target display height for entities (in pixels)
-const TARGET_ENTITY_HEIGHT = 60;
 
 export const drawEntitySprite = (
   ctx: CanvasRenderingContext2D,
@@ -211,15 +203,22 @@ export const drawEntitySprite = (
   scale = 2,
   flash = false
 ): void => {
-  const sprite = frameForEntity(entity, simTick);
-
-  // Normalize scale based on sprite size to achieve consistent display height
-  // Procedural sprites are 16x20, spritesheet frames are 48x50
-  const heightScale = TARGET_ENTITY_HEIGHT / sprite.height;
-  const effectiveScale = Math.max(1, Math.round(heightScale * (scale / 3)));
+  const { runtime, sprite } = frameForEntity(entity, simTick);
+  const anchor = runtime.character?.anchor ?? {
+    x: Math.floor(sprite.width / 2),
+    y: sprite.height,
+  };
+  const layout = computeAnchorDraw({
+    spriteWidth: sprite.width,
+    spriteHeight: sprite.height,
+    anchor,
+    sx,
+    sy,
+    scale,
+  });
 
   if (typeof document === 'undefined') {
-    drawSpriteFallback(ctx, sprite, sx, sy, effectiveScale);
+    drawSpriteFallback(ctx, sprite, layout.drawX, layout.drawY, layout.effectiveScale);
     return;
   }
 
@@ -227,31 +226,21 @@ export const drawEntitySprite = (
   stage.bytes.set(new Uint8ClampedArray(sprite.pixels.buffer));
   stage.ctx.putImageData(stage.imageData, 0, 0);
 
-  // Spritesheet character may not be centered in frame - apply correction
-  // Positive xCorrect moves sprite left, positive yCorrect moves sprite up
-  const useSpritesheet = entity.kind === 'player' && sprite.width === 48;
-  const xCorrect = useSpritesheet ? 4 : 0; // Shift left to center character in tile
-  
-  const drawX = Math.floor(sx - (sprite.width * effectiveScale) / 2 - xCorrect * effectiveScale);
-  const drawY = Math.floor(sy - sprite.height * effectiveScale);
-  const drawW = sprite.width * effectiveScale;
-  const drawH = sprite.height * effectiveScale;
-
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(stage.canvas, drawX, drawY, drawW, drawH);
+  ctx.drawImage(stage.canvas, layout.drawX, layout.drawY, layout.drawW, layout.drawH);
   if (flash) {
     // Flash overlay sem quadrado: reaplica sprite com blend aditivo.
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.28;
-    ctx.drawImage(stage.canvas, drawX, drawY, drawW, drawH);
+    ctx.drawImage(stage.canvas, layout.drawX, layout.drawY, layout.drawW, layout.drawH);
   }
   ctx.restore();
 };
 
 /**
- * Draws a billboard sprite with isometric tilt and drop shadow.
- * Used for features that need 3D "pop-up" presence.
+ * Draws a feature sprite anchored on the isometric ground plane.
+ * The sprite art carries volume; the optional shear is only for effects.
  */
 export const drawBillboardSprite = (
   ctx: CanvasRenderingContext2D,
@@ -286,7 +275,7 @@ export const drawBillboardSprite = (
     ctx.restore();
   }
 
-  // 2. Draw tilted sprite (shear transform for billboard effect)
+  // 2. Draw sprite art, with optional shear for non-solid effects
   ctx.save();
   ctx.translate(sx, sy);
   ctx.transform(1, 0, tiltX, 1, 0, 0);

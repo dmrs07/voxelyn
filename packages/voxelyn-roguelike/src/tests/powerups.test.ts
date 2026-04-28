@@ -1,6 +1,8 @@
 import { RNG } from '@voxelyn/core';
 import { describe, expect, it } from 'vitest';
-import { createGameState, getPlayer } from '../game/state';
+import { createEnemy } from '../entities/enemy';
+import { POWERUP_KILLS_PER_CHOICE_EARLY } from '../game/constants';
+import { createGameState, getPlayer, handleEnemyKills } from '../game/state';
 import { POWER_UP_POOL } from '../powerups/pool';
 import {
   enqueuePowerUpChoice,
@@ -8,6 +10,13 @@ import {
   rollDistinctPowerUps,
   startNextPowerUpChoiceIfNeeded,
 } from '../powerups/system';
+import { nextEntityIdentity, registerEntity, unregisterEntity } from '../world/level';
+
+const clearEnemies = (state: ReturnType<typeof createGameState>): void => {
+  for (const entity of Array.from(state.level.entities.values())) {
+    if (entity.kind === 'enemy') unregisterEntity(state.level, entity);
+  }
+};
 
 describe('powerups', () => {
   it('rolls two distinct options while pool has multiple choices', () => {
@@ -72,6 +81,7 @@ describe('powerups', () => {
     if (!player) return;
 
     const beforeAttack = player.attack;
+    clearEnemies(state);
 
     enqueuePowerUpChoice(state, {
       sourceEnemyId: 'e999',
@@ -87,6 +97,7 @@ describe('powerups', () => {
 
   it('processes queued choices one by one', () => {
     const state = createGameState(1002);
+    clearEnemies(state);
 
     enqueuePowerUpChoice(state, {
       sourceEnemyId: 'e11',
@@ -108,5 +119,42 @@ describe('powerups', () => {
     expect(resolvePowerUpChoice(state, 1)).toBe(true);
     expect(state.activePowerUpChoice).toBeNull();
     expect(state.phase).toBe('running');
+  });
+
+  it('gates reward choices behind a kill meter instead of every kill', () => {
+    const state = createGameState(1004);
+    clearEnemies(state);
+
+    handleEnemyKills(state, ['e101', 'e102', 'e103']);
+    expect(state.pendingPowerUpChoices.length).toBe(0);
+    expect(state.powerUpKillCharge).toBe(POWERUP_KILLS_PER_CHOICE_EARLY - 1);
+
+    handleEnemyKills(state, ['e104']);
+    expect(state.pendingPowerUpChoices.length).toBe(1);
+    expect(state.powerUpKillCharge).toBe(0);
+  });
+
+  it('waits to open reward choices while a threat is nearby', () => {
+    const state = createGameState(1005);
+    const player = getPlayer(state);
+    expect(player).not.toBeNull();
+    if (!player) return;
+
+    clearEnemies(state);
+
+    const identity = nextEntityIdentity(state.level);
+    const enemyX = player.x + 1 < state.level.width ? player.x + 1 : player.x - 1;
+    const enemy = createEnemy(identity.id, identity.occ, 'stalker', enemyX, player.y, state.floorNumber);
+    registerEntity(state.level, enemy);
+
+    enqueuePowerUpChoice(state, {
+      sourceEnemyId: 'e777',
+      options: ['attack_boost', 'swift_boots'],
+    });
+    startNextPowerUpChoiceIfNeeded(state);
+
+    expect(state.activePowerUpChoice).toBeNull();
+    expect(state.phase).toBe('running');
+    expect(state.pendingPowerUpChoices.length).toBe(1);
   });
 });

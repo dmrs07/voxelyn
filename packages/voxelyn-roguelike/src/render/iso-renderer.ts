@@ -21,6 +21,7 @@ import type {
   ParticleState,
   ProjectileState,
 } from '../game/types';
+import { getFloorTheme, type RGB } from '../game/lore';
 import { drawHud, HUD_HEIGHT } from '../ui/hud';
 import { drawInteractionPanel } from '../ui/interaction-panel';
 import { drawPowerUpMenu } from '../ui/powerup-menu';
@@ -53,6 +54,20 @@ const unpack = (color: number): [number, number, number, number] => {
   return [r, g, b, a];
 };
 
+const pack = (r: number, g: number, b: number, a = 255): number =>
+  (((a & 0xff) << 24) | ((b & 0xff) << 16) | ((g & 0xff) << 8) | (r & 0xff)) >>> 0;
+
+const mixPacked = (color: number, tint: RGB, strength: number): number => {
+  const [r, g, b, a] = unpack(color);
+  const s = clamp(strength, 0, 1);
+  return pack(
+    Math.round(r * (1 - s) + tint.r * s),
+    Math.round(g * (1 - s) + tint.g * s),
+    Math.round(b * (1 - s) + tint.b * s),
+    Math.round(a * 255),
+  );
+};
+
 const hashNoise = (x: number, y: number, seed: number): number => {
   let h = (x * 374761393 + y * 668265263 + seed * 2654435761) >>> 0;
   h = (h ^ (h >> 13)) * 1274126177;
@@ -65,7 +80,7 @@ const drawDiamond = (
   y: number,
   tileW: number,
   tileH: number,
-  fillStyle: string
+  fillStyle: string,
 ): void => {
   ctx.beginPath();
   ctx.moveTo(x, y - tileH / 2);
@@ -74,6 +89,63 @@ const drawDiamond = (
   ctx.lineTo(x - tileW / 2, y);
   ctx.closePath();
   ctx.fillStyle = fillStyle;
+  ctx.fill();
+};
+
+const drawConnectedIsoFluid = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  tileW: number,
+  tileH: number,
+  alpha: number,
+  pulse: number,
+  connections: { east: boolean; west: boolean; south: boolean; north: boolean },
+): void => {
+  const fillAlpha = 0.18 * alpha;
+  const coreAlpha = 0.28 * alpha;
+  const glowAlpha = (0.16 + pulse * 0.1) * alpha;
+  const halfStream = Math.max(3, tileH * 0.16);
+
+  const drawArm = (dx: number, dy: number): void => {
+    const length = Math.hypot(dx, dy);
+    if (length <= 0) return;
+    const px = (-dy / length) * halfStream;
+    const py = (dx / length) * halfStream;
+    ctx.beginPath();
+    ctx.moveTo(x + px, y + py);
+    ctx.lineTo(x + dx + px, y + dy + py);
+    ctx.lineTo(x + dx - px, y + dy - py);
+    ctx.lineTo(x - px, y - py);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(74, 236, 136, ${fillAlpha.toFixed(3)})`;
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(178, 255, 196, ${glowAlpha.toFixed(3)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + dx * 0.92, y + dy * 0.92);
+    ctx.stroke();
+  };
+
+  if (connections.east) drawArm(tileW / 2, tileH / 2);
+  if (connections.west) drawArm(-tileW / 2, -tileH / 2);
+  if (connections.south) drawArm(-tileW / 2, tileH / 2);
+  if (connections.north) drawArm(tileW / 2, -tileH / 2);
+
+  ctx.beginPath();
+  ctx.moveTo(x, y - tileH * 0.28);
+  ctx.lineTo(x + tileW * 0.32, y);
+  ctx.lineTo(x, y + tileH * 0.28);
+  ctx.lineTo(x - tileW * 0.32, y);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(69, 218, 166, ${coreAlpha.toFixed(3)})`;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(x, y + 1, tileW * 0.16, tileH * 0.12, 0, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(206, 255, 214, ${glowAlpha.toFixed(3)})`;
   ctx.fill();
 };
 
@@ -86,7 +158,7 @@ const drawWallBlock = (
   blockHeight: number,
   topColor: string,
   leftColor: string,
-  rightColor: string
+  rightColor: string,
 ): void => {
   ctx.beginPath();
   ctx.moveTo(x - tileW / 2, y);
@@ -115,7 +187,7 @@ const buildWallSectionPath = (
   y: number,
   tileW: number,
   tileH: number,
-  blockHeight: number
+  blockHeight: number,
 ): void => {
   ctx.beginPath();
   ctx.moveTo(x - tileW / 2, y);
@@ -146,7 +218,7 @@ const applyDitherToWallSection = (
   blockHeight: number,
   phase = 0,
   compositeOperation: GlobalCompositeOperation = 'destination-out',
-  color = 'rgba(0,0,0,0.9)'
+  color = 'rgba(0,0,0,0.9)',
 ): void => {
   ctx.save();
   buildWallSectionPath(ctx, x, y, tileW, tileH, blockHeight);
@@ -181,7 +253,7 @@ const drawWallCutRim = (
   y: number,
   tileW: number,
   tileH: number,
-  intensity: number
+  intensity: number,
 ): void => {
   const edge = clamp(0.35 + intensity * 0.45, 0.25, 0.9);
 
@@ -269,7 +341,12 @@ export class IsoRenderer {
   /**
    * Convert screen coordinates to tile coordinates (inverse iso projection).
    */
-  private screenToTile(sx: number, sy: number, levelWidth: number, levelHeight: number): { x: number; y: number } | null {
+  private screenToTile(
+    sx: number,
+    sy: number,
+    levelWidth: number,
+    levelHeight: number,
+  ): { x: number; y: number } | null {
     // Reverse the camera offset
     const rx = sx - this.cameraX;
     const ry = sy - this.cameraY;
@@ -427,7 +504,8 @@ export class IsoRenderer {
       const dist = Math.hypot(dx, dy);
       if (dist > light.radius) continue;
 
-      const pulse = 0.72 + (Math.sin(state.simTick * 0.08 + light.x * 0.7 + light.y * 0.5) * 0.28 + 0.28);
+      const pulse =
+        0.72 + (Math.sin(state.simTick * 0.08 + light.x * 0.7 + light.y * 0.5) * 0.28 + 0.28);
       const falloff = 1 - dist / Math.max(0.001, light.radius);
       glow += falloff * light.intensity * pulse * 0.28;
     }
@@ -450,13 +528,13 @@ export class IsoRenderer {
     mapW: number,
     mapH: number,
     screenW: number,
-    screenH: number
+    screenH: number,
   ): { x: number; y: number } {
     const corners = [
       projectIso(0 - mapW / 2, 0 - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
-      projectIso((mapW - 1) - mapW / 2, 0 - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
-      projectIso(0 - mapW / 2, (mapH - 1) - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
-      projectIso((mapW - 1) - mapW / 2, (mapH - 1) - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
+      projectIso(mapW - 1 - mapW / 2, 0 - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
+      projectIso(0 - mapW / 2, mapH - 1 - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
+      projectIso(mapW - 1 - mapW / 2, mapH - 1 - mapH / 2, 0, this.tileW, this.tileH, this.zStep),
     ];
 
     let minSx = Number.POSITIVE_INFINITY;
@@ -479,12 +557,10 @@ export class IsoRenderer {
     const minCamY = bottomBound - maxSy;
     const maxCamY = topBound - minSy;
 
-    const x = minCamX <= maxCamX
-      ? Math.max(minCamX, Math.min(maxCamX, targetX))
-      : (minCamX + maxCamX) / 2;
-    const y = minCamY <= maxCamY
-      ? Math.max(minCamY, Math.min(maxCamY, targetY))
-      : (minCamY + maxCamY) / 2;
+    const x =
+      minCamX <= maxCamX ? Math.max(minCamX, Math.min(maxCamX, targetX)) : (minCamX + maxCamX) / 2;
+    const y =
+      minCamY <= maxCamY ? Math.max(minCamY, Math.min(maxCamY, targetY)) : (minCamY + maxCamY) / 2;
 
     return { x, y };
   }
@@ -502,15 +578,11 @@ export class IsoRenderer {
       0,
       this.tileW,
       this.tileH,
-      this.zStep
+      this.zStep,
     );
     const sx = this.cameraX + iso.sx;
     const sy = this.cameraY + iso.sy;
-    const inView =
-      sx >= 16 &&
-      sx <= width - 16 &&
-      sy >= this.hudHeight + 16 &&
-      sy <= height - 16;
+    const inView = sx >= 16 && sx <= width - 16 && sy >= this.hudHeight + 16 && sy <= height - 16;
 
     const pulse = (Math.sin(state.simTick * 0.12) + 1) * 0.5;
 
@@ -541,7 +613,10 @@ export class IsoRenderer {
       const ny = vy / len;
 
       const indicatorX = Math.max(24, Math.min(width - 24, centerX + nx * (width * 0.38)));
-      const indicatorY = Math.max(this.hudHeight + 24, Math.min(height - 24, centerY + ny * (height * 0.35)));
+      const indicatorY = Math.max(
+        this.hudHeight + 24,
+        Math.min(height - 24, centerY + ny * (height * 0.35)),
+      );
       const angle = Math.atan2(ny, nx);
       const size = 10;
 
@@ -577,13 +652,13 @@ export class IsoRenderer {
       entity.z,
       this.tileW,
       this.tileH,
-      this.zStep
+      this.zStep,
     );
 
     // Grounding offset - positive pushes sprite down toward ground
     // Enemies keep old offset behavior inverted
     const groundOffset = entity.kind === 'player' ? 12 : -6;
-    
+
     // Movement bob only when moving, subtle breathing when idle
     const isMoving = entity.animIntent === 'move';
     const bobAmplitude = isMoving ? (entity.kind === 'player' ? 1.2 : 0.9) : 0.4;
@@ -593,7 +668,7 @@ export class IsoRenderer {
     // Tile center position
     const tileCenterX = this.cameraX + iso.sx;
     const groundY = this.cameraY + iso.sy;
-    
+
     // Sprite position: centered on tile, with grounding offset
     const sx = tileCenterX;
     const sy = groundY + groundOffset + bob;
@@ -634,7 +709,7 @@ export class IsoRenderer {
     idx: number,
     sx: number,
     sy: number,
-    light: number
+    light: number,
   ): void {
     const ctx = this.ctx;
     const flags = state.level.featureMap[idx] ?? 0;
@@ -643,10 +718,18 @@ export class IsoRenderer {
 
     // Flat ground overlays only (BIOFLUID, TRACK, SPORE_VENT)
     if ((flags & FEATURE_BIOFLUID) !== 0) {
-      ctx.fillStyle = `rgba(74, 220, 188, ${(0.22 * alphaScale).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.ellipse(sx, sy + 3, 11, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
+      const hasBiofluid = (nx: number, ny: number): boolean => {
+        if (nx < 0 || ny < 0 || nx >= state.level.width || ny >= state.level.height) return false;
+        const nidx = index2D(state.level.width, nx, ny);
+        return ((state.level.featureMap[nidx] ?? 0) & FEATURE_BIOFLUID) !== 0;
+      };
+      const pulse = (Math.sin(state.simTick * 0.1 + x * 0.3 + y * 0.23) + 1) * 0.5;
+      drawConnectedIsoFluid(ctx, sx, sy + 1, this.tileW, this.tileH, alphaScale, pulse, {
+        east: hasBiofluid(x + 1, y),
+        west: hasBiofluid(x - 1, y),
+        south: hasBiofluid(x, y + 1),
+        north: hasBiofluid(x, y - 1),
+      });
     }
 
     if ((flags & FEATURE_TRACK) !== 0) {
@@ -730,7 +813,7 @@ export class IsoRenderer {
     idx: number,
     sx: number,
     sy: number,
-    light: number
+    light: number,
   ): void {
     const ctx = this.ctx;
     const flags = state.level.featureMap[idx] ?? 0;
@@ -738,7 +821,7 @@ export class IsoRenderer {
     const options = {
       tiltX: FEATURE_TILT_X,
       shadowAlpha: FEATURE_SHADOW_ALPHA,
-      shadowScale: 0.35,
+      shadowScale: 0.44,
       alpha,
     };
 
@@ -832,7 +915,7 @@ export class IsoRenderer {
     topColor: string,
     leftColor: string,
     rightColor: string,
-    simTick: number
+    simTick: number,
   ): void {
     const ctx = this.ctx;
     const baseHeight = Math.min(this.wallHeight - 6, WALL_BASE_HEIGHT_VISIBLE);
@@ -840,17 +923,7 @@ export class IsoRenderer {
     const cutY = sy - baseHeight;
     const shimmer = (Math.sin(simTick * 0.18 + sx * 0.018 + sy * 0.011) + 1) * 0.5;
 
-    drawWallBlock(
-      ctx,
-      sx,
-      sy,
-      this.tileW,
-      this.tileH,
-      baseHeight,
-      topColor,
-      leftColor,
-      rightColor
-    );
+    drawWallBlock(ctx, sx, sy, this.tileW, this.tileH, baseHeight, topColor, leftColor, rightColor);
 
     ctx.save();
     ctx.globalAlpha = 0.42 + shimmer * 0.16;
@@ -863,28 +936,16 @@ export class IsoRenderer {
       upperHeight,
       topColor,
       leftColor,
-      rightColor
+      rightColor,
     );
     ctx.restore();
 
-    applyDitherToWallSection(
-      ctx,
-      sx,
-      cutY,
-      this.tileW,
-      this.tileH,
-      upperHeight,
-      shimmer * 10
-    );
+    applyDitherToWallSection(ctx, sx, cutY, this.tileW, this.tileH, upperHeight, shimmer * 10);
 
     drawWallCutRim(ctx, sx, cutY, this.tileW, this.tileH, shimmer);
   }
 
-  private drawOccludedWallFrontDither(
-    sx: number,
-    sy: number,
-    simTick: number
-  ): void {
+  private drawOccludedWallFrontDither(sx: number, sy: number, simTick: number): void {
     const baseHeight = Math.min(this.wallHeight - 6, WALL_BASE_HEIGHT_VISIBLE);
     const upperHeight = Math.max(8, Math.floor((this.wallHeight - baseHeight) * 0.58));
     const cutY = sy - baseHeight;
@@ -900,29 +961,8 @@ export class IsoRenderer {
       upperHeight,
       shimmer * 10,
       'source-over',
-      `rgba(170, 186, 214, ${alpha.toFixed(3)})`
+      `rgba(170, 186, 214, ${alpha.toFixed(3)})`,
     );
-  }
-
-  private drawHeroSilhouette(player: Entity, state: GameState): void {
-    const ctx = this.ctx;
-    const iso = projectIso(
-      player.x - state.level.width / 2,
-      player.y - state.level.height / 2,
-      player.z,
-      this.tileW,
-      this.tileH,
-      this.zStep
-    );
-    const sx = this.cameraX + iso.sx;
-    // Match grounding offset from entity rendering
-    const groundOffset = 12;
-    const sy = this.cameraY + iso.sy - this.effectYOffset + groundOffset;
-
-    ctx.save();
-    ctx.globalAlpha = 0.72;
-    drawEntitySprite(ctx, player, sx, sy, state.simTick, this.entitySpriteScale, false);
-    ctx.restore();
   }
 
   private drawProjectile(projectile: ProjectileState, state: GameState): void {
@@ -933,7 +973,7 @@ export class IsoRenderer {
       projectile.z,
       this.tileW,
       this.tileH,
-      this.zStep
+      this.zStep,
     );
 
     const sx = this.cameraX + iso.sx;
@@ -941,12 +981,14 @@ export class IsoRenderer {
 
     ctx.beginPath();
     ctx.arc(sx, sy, projectile.kind === 'guardian_shard' ? 4.2 : 3.2, 0, Math.PI * 2);
-    ctx.fillStyle = projectile.kind === 'guardian_shard' ? 'rgba(206,120,255,0.95)' : 'rgba(132,244,154,0.95)';
+    ctx.fillStyle =
+      projectile.kind === 'guardian_shard' ? 'rgba(206,120,255,0.95)' : 'rgba(132,244,154,0.95)';
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(sx, sy, projectile.kind === 'guardian_shard' ? 7 : 6, 0, Math.PI * 2);
-    ctx.strokeStyle = projectile.kind === 'guardian_shard' ? 'rgba(206,120,255,0.38)' : 'rgba(132,244,154,0.34)';
+    ctx.strokeStyle =
+      projectile.kind === 'guardian_shard' ? 'rgba(206,120,255,0.38)' : 'rgba(132,244,154,0.34)';
     ctx.lineWidth = 1;
     ctx.stroke();
   }
@@ -961,7 +1003,7 @@ export class IsoRenderer {
       particle.z,
       this.tileW,
       this.tileH,
-      this.zStep
+      this.zStep,
     );
     const sx = this.cameraX + iso.sx;
     const sy = this.cameraY + iso.sy - Math.round(this.effectYOffset * 1.2);
@@ -1037,18 +1079,18 @@ export class IsoRenderer {
       0,
       this.tileW,
       this.tileH,
-      this.zStep
+      this.zStep,
     );
 
     const desiredX = width * 0.5 - playerIso.sx;
-    const desiredY = (height * 0.56) - playerIso.sy;
+    const desiredY = height * 0.56 - playerIso.sy;
     const clamped = this.clampCamera(
       desiredX,
       desiredY,
       state.level.width,
       state.level.height,
       width,
-      height
+      height,
     );
 
     if (!this.cameraInitialized) {
@@ -1086,9 +1128,10 @@ export class IsoRenderer {
     this.occlusionMask.set(occlusion.mask);
     state.level.occludableWalls = occlusion.mask;
 
+    const theme = getFloorTheme(state.floorNumber);
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#091223');
-    gradient.addColorStop(1, '#040811');
+    gradient.addColorStop(0, theme.bgTop);
+    gradient.addColorStop(1, theme.bgBottom);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
@@ -1112,7 +1155,14 @@ export class IsoRenderer {
 
       const material = (getVoxel(state.level.grid, x, y, 0) & 0xffff) as keyof typeof MATERIALS;
       const visual = MATERIALS[material] ?? MATERIALS[1];
-      const iso = projectIso(x - state.level.width / 2, y - state.level.height / 2, 0, this.tileW, this.tileH, this.zStep);
+      const iso = projectIso(
+        x - state.level.width / 2,
+        y - state.level.height / 2,
+        0,
+        this.tileW,
+        this.tileH,
+        this.zStep,
+      );
       const sx = this.cameraX + iso.sx;
       const sy = this.cameraY + iso.sy;
 
@@ -1120,39 +1170,36 @@ export class IsoRenderer {
       const jitter = (hashNoise(x, y, state.level.seed) - 0.5) * (visual.blocks ? 0.08 : 0.14);
       const glow = this.tileGlow(state, x, y);
       const light = clamp(baseLight + jitter + glow, 0.18, 1.35);
+      const tint = visual.blocks ? theme.wallTint : theme.floorTint;
+      const tintStrength = visual.blocks ? 0.2 : material === 2 ? 0.3 : 0.12;
+      const colorTop = mixPacked(visual.colorTop, tint, tintStrength);
+      const colorLeft = mixPacked(visual.colorLeft, tint, tintStrength);
+      const colorRight = mixPacked(visual.colorRight, tint, tintStrength);
+      const colorFlat = mixPacked(visual.colorFlat, tint, tintStrength);
 
       if (visual.blocks) {
-        const top = this.lightColor(visual.colorTop, light + 0.05);
-        const left = this.lightColor(visual.colorLeft, light * 0.92);
-        const right = this.lightColor(visual.colorRight, light * 0.85);
+        const top = this.lightColor(colorTop, light + 0.05);
+        const left = this.lightColor(colorLeft, light * 0.92);
+        const right = this.lightColor(colorRight, light * 0.85);
         if (this.occlusionMask[idx] === 1) {
           this.drawOccludedWall(sx, sy, top, left, right, state.simTick);
           frontWallDitherOverlays.push({ sx, sy });
         } else {
-          drawWallBlock(
-            ctx,
-            sx,
-            sy,
-            this.tileW,
-            this.tileH,
-            this.wallHeight,
-            top,
-            left,
-            right
-          );
+          drawWallBlock(ctx, sx, sy, this.tileW, this.tileH, this.wallHeight, top, left, right);
         }
       } else {
-        drawDiamond(ctx, sx, sy, this.tileW, this.tileH, this.lightColor(visual.colorFlat, light));
+        drawDiamond(ctx, sx, sy, this.tileW, this.tileH, this.lightColor(colorFlat, light));
 
         if (material === 4 || material === 5 || material === 6) {
           const pulse = (Math.sin(state.simTick * 0.18 + x * 0.2 + y * 0.2) + 1) * 0.5;
           ctx.beginPath();
           ctx.arc(sx, sy - 3, material === 6 ? 6 + pulse * 2 : 4.5 + pulse * 1.4, 0, Math.PI * 2);
-          ctx.fillStyle = material === 6
-            ? 'rgba(233,92,255,0.95)'
-            : material === 5
-              ? 'rgba(99,218,242,0.9)'
-              : 'rgba(247,206,92,0.9)';
+          ctx.fillStyle =
+            material === 6
+              ? 'rgba(233,92,255,0.95)'
+              : material === 5
+                ? 'rgba(99,218,242,0.9)'
+                : 'rgba(247,206,92,0.9)';
           ctx.fill();
         }
 
@@ -1177,7 +1224,6 @@ export class IsoRenderer {
       if (!entity.alive) continue;
       const idx = index2D(state.level.width, entity.x, entity.y);
       if (this.visibilityMask[idx] === 0 && entity.kind !== 'player') continue;
-
 
       drawCommands.push({
         key: makeDrawKey(entity.x, entity.y, entity.z, 2),
@@ -1213,10 +1259,6 @@ export class IsoRenderer {
     drawCommands.sort((a, b) => a.key - b.key);
     for (const command of drawCommands) {
       command.draw();
-    }
-
-    if (player && player.alive && occlusion.heroHeavilyOccluded) {
-      this.drawHeroSilhouette(player, state);
     }
 
     for (const overlay of frontWallDitherOverlays) {
@@ -1332,7 +1374,11 @@ export class IsoRenderer {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e5edff';
     ctx.font = 'bold 38px monospace';
-    ctx.fillText(phase === 'victory' ? 'VITORIA!' : 'GAME OVER', width / 2, Math.floor(height * 0.45));
+    ctx.fillText(
+      phase === 'victory' ? 'VITORIA!' : 'GAME OVER',
+      width / 2,
+      Math.floor(height * 0.45),
+    );
     ctx.font = '16px monospace';
     ctx.fillText('Recarregue a pagina para jogar novamente.', width / 2, Math.floor(height * 0.52));
     ctx.restore();

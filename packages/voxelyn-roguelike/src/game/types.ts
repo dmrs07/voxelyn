@@ -258,6 +258,7 @@ export type GameState = {
   interactionModal: InteractionModal | null;
   pendingPowerUpChoices: PowerUpChoice[];
   activePowerUpChoice: PowerUpChoice | null;
+  powerUpKillCharge: number;
   damageEvents: DamageEvent[];
   projectiles: ProjectileState[];
   particles: ParticleState[];

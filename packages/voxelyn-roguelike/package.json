@@ -5,6 +5,7 @@
   "description": "Voxelyn Roguelike MVP (1-10 floors)",
   "type": "module",
   "scripts": {
+    "prebuild": "node ../../scripts/render-pixellab-reference.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

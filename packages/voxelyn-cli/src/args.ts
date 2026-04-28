@@ -8,6 +8,7 @@ const COMMAND_ALIASES: Record<string, CommandName> = {
   preview: 'preview',
   deploy: 'deploy',
   generate: 'generate',
+  sprites: 'sprites',
   plugin: 'plugin'
 };
 
@@ -82,6 +83,18 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
       }
       if (arg === '--dry-run') {
         options.dryRun = true;
+        continue;
+      }
+      if (arg === '--emit-plan') {
+        options.emitPlan = true;
+        continue;
+      }
+      if (arg === '--character' && argv[i + 1]) {
+        options.character = argv[++i];
+        continue;
+      }
+      if (arg.startsWith('--character=')) {
+        options.character = arg.slice('--character='.length);
         continue;
       }
       if (arg === '--list') {
@@ -341,6 +354,10 @@ export const parseArgs = (argv: string[]): ParsedArgs => {
 
     const normalized = COMMAND_ALIASES[arg];
     if (normalized) {
+      if (command === 'sprites') {
+        positionals.push(arg);
+        continue;
+      }
       command = setCommand(command, normalized);
       continue;
     }
@@ -366,6 +383,7 @@ Usage:
   voxelyn serve [options]
   voxelyn deploy [options]
   voxelyn generate <type> --prompt "..."
+  voxelyn sprites generate [--character <id>] [--force] [--dry-run]
   voxelyn plugin <add|remove|list> [name]
   voxelyn --list
 
@@ -380,6 +398,8 @@ Options:
   --pm <pm>           npm | pnpm | yarn | bun
   --git               Initialize git repo
   --dry-run           Print actions without writing
+  --emit-plan         Write .voxelyn-cache/pixellab-plan.json for sprite generation
+  --character <id>    Restrict sprite generation to one character
   --verbose           Verbose logging
   --quiet             Suppress non-error output
   --no-color          Disable ANSI colors

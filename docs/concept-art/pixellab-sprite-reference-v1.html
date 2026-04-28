@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voxelyn - PixelLab Sprite Reference v1</title>
+<style>
+:root{
+  --bg:#f6f7f2;
+  --ink:#172033;
+  --muted:#667085;
+  --line:#d5dae3;
+  --accent:#2b6df3;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,sans-serif}
+body{min-height:100vh}
+.shell{width:min(1380px,calc(100vw - 40px));margin:0 auto;padding:36px 0 64px}
+.top{
+  display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;
+  border-top:2px solid var(--ink);border-bottom:1px solid var(--line);padding:14px 0 18px;
+}
+h1{margin:0;font-size:38px;line-height:1;letter-spacing:0}
+.meta{text-align:right;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;border-bottom:1px solid var(--line);padding:12px 0 18px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+.strip b{display:block;margin-top:4px;color:var(--ink);font-size:14px;text-transform:none;letter-spacing:0}
+.sheet{margin-top:28px}
+.sheet img{display:block;width:100%;height:auto;border:1px solid var(--line);image-rendering:auto;background:#fff}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;margin-top:32px}
+.item{border-top:1px solid var(--line);padding-top:14px}
+.item h2{margin:0 0 12px;font-size:20px;letter-spacing:0}
+.item img{display:block;width:100%;height:auto;border:1px solid var(--line);background:#fff}
+.links{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.links a{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.1em;text-decoration:none}
+.links a:hover{text-decoration:underline}
+@media(max-width:860px){
+  .top,.strip,.grid{grid-template-columns:1fr}
+  .meta{text-align:left}
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <h1>PixelLab Sprite Reference v1</h1>
+    <div class="meta">Voxelyn · 48px iso actors</div>
+  </header>
+  <section class="strip">
+    <span>Use<b>Character creation reference</b></span>
+    <span>Facings<b>DR · DL · UR · UL</b></span>
+    <span>Export<b>PNG sheets, no animation UI</b></span>
+  </section>
+
+  <section class="sheet">
+    <img src="./pixellab-reference/voxelyn-pixellab-reference-sheet-v1.png" alt="Combined PixelLab sprite reference sheet" />
+  </section>
+
+  <section class="grid">
+    <article class="item">
+      <h2>Excavator</h2>
+      <img src="./pixellab-reference/excavator-reference-v1.png" alt="Excavator PixelLab sprite reference" />
+      <div class="links"><a href="./pixellab-reference/excavator-reference-v1.png">annotated png</a><a href="./pixellab-reference/excavator-sprite-only-v1.png">sprite-only png</a></div>
+    </article>
+    <article class="item">
+      <h2>Striker</h2>
+      <img src="./pixellab-reference/striker-reference-v1.png" alt="Striker PixelLab sprite reference" />
+      <div class="links"><a href="./pixellab-reference/striker-reference-v1.png">annotated png</a><a href="./pixellab-reference/striker-sprite-only-v1.png">sprite-only png</a></div>
+    </article>
+    <article class="item">
+      <h2>Bruiser</h2>
+      <img src="./pixellab-reference/bruiser-reference-v1.png" alt="Bruiser PixelLab sprite reference" />
+      <div class="links"><a href="./pixellab-reference/bruiser-reference-v1.png">annotated png</a><a href="./pixellab-reference/bruiser-sprite-only-v1.png">sprite-only png</a></div>
+    </article>
+    <article class="item">
+      <h2>Spitter</h2>
+      <img src="./pixellab-reference/spitter-reference-v1.png" alt="Spitter PixelLab sprite reference" />
+      <div class="links"><a href="./pixellab-reference/spitter-reference-v1.png">annotated png</a><a href="./pixellab-reference/spitter-sprite-only-v1.png">sprite-only png</a></div>
+    </article>
+    <article class="item">
+      <h2>Spore Bomber</h2>
+      <img src="./pixellab-reference/spore_bomber-reference-v1.png" alt="Spore Bomber PixelLab sprite reference" />
+      <div class="links"><a href="./pixellab-reference/spore_bomber-reference-v1.png">annotated png</a><a href="./pixellab-reference/spore_bomber-sprite-only-v1.png">sprite-only png</a></div>
+    </article>
+    <article class="item">
+      <h2>Guardian</h2>
+      <img src="./pixellab-reference/guardian-reference-v1.png" alt="Guardian PixelLab sprite reference" />
+      <div class="links"><a href="./pixellab-reference/guardian-reference-v1.png">annotated png</a><a href="./pixellab-reference/guardian-sprite-only-v1.png">sprite-only png</a></div>
+    </article>
+  </section>
+</main>
+</body>
+</html>

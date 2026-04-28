@@ -11,6 +11,7 @@ import { runPreview } from './commands/preview.js';
 import { runDeploy } from './commands/deploy.js';
 import { runGenerate } from './commands/generate.js';
 import { runPlugin } from './commands/plugin.js';
+import { runSprites } from './commands/sprites/index.js';
 import { createLogger } from './ui.js';
 import { loadPlugins } from './plugins.js';
 import { readPackageJson } from './config.js';
@@ -117,6 +118,11 @@ export const main = async (): Promise<void> => {
 
     if (command === 'generate') {
       await runGenerate(parsed.options, positionals, logger);
+      return;
+    }
+
+    if (command === 'sprites') {
+      await runSprites(positionals, parsed.options, logger.info);
       return;
     }
 

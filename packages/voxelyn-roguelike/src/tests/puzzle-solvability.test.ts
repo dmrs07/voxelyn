@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FEATURE_GATE, FEATURE_ROOT_BARRIER } from '../game/constants';
+import {
+  FEATURE_GATE,
+  FEATURE_PROP_CRATE,
+  FEATURE_ROOT_BARRIER,
+  FEATURE_TERMINAL,
+} from '../game/constants';
 import { createGameState } from '../game/state';
 import type { LevelState } from '../game/types';
 
@@ -20,6 +25,8 @@ const isNavigableCell = (level: LevelState, x: number, y: number): boolean => {
 
   const flags = level.featureMap[i] ?? 0;
   if ((flags & FEATURE_ROOT_BARRIER) !== 0) return false;
+  if ((flags & FEATURE_PROP_CRATE) !== 0) return false;
+  if ((flags & FEATURE_TERMINAL) !== 0) return false;
   if ((flags & FEATURE_GATE) !== 0 && isGateClosedAt(level, x, y)) return false;
   return true;
 };
