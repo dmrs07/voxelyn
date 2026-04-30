@@ -94,3 +94,10 @@ Named spritesheet-v2 conversion pass:
 - Regenerated all six `<id>.atlas.png`/`<id>.atlas.json` files. Manifests now report `source: "spritesheet-v2"`, `motion: "baked"`, frame size `181x168`, and anchor `{ x: 90, y: 144 }`.
 - Direct pixel-exact validation checked 896 emitted atlas frames against the source spritesheets.
 - Verified: `pnpm --filter @voxelyn/cli test`, `pnpm --filter @voxelyn/animation test -- pixellab-motion sprite-atlas-validation engine-source-switch`, `pnpm --filter @voxelyn/roguelike exec vitest run src/tests/render-anchor.test.ts src/tests/animation-integration.test.ts`, `pnpm --filter @voxelyn/roguelike build`, and `git diff --check`.
+
+Native sprite scale correction:
+- Fixed the renderer scale clamp that forced 181x168 atlas frames to draw at full canvas size. Native sprites now downscale fractionally to the intended entity height while preserving the foot anchor.
+- This keeps Bruiser and Guardian larger because their art has larger opaque bounds, without adding special-case scale multipliers.
+- Added a render-anchor regression test for 181x168 sprites drawing at about 106x98 on the current world scale.
+- Verified: `pnpm --filter @voxelyn/roguelike exec vitest run src/tests/render-anchor.test.ts src/tests/animation-integration.test.ts`, `pnpm --filter @voxelyn/roguelike build`, and `git diff --check`.
+- Visual browser verification is still blocked by the local environment: Vite needs escalated local binding and the Playwright client fails because the `playwright` package is not installed.

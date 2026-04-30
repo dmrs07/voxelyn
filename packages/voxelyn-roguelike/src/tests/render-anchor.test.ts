@@ -40,7 +40,23 @@ describe('computeAnchorDraw', () => {
       scale: 3,
     });
 
-    expect(result.effectiveScale).toBe(2);
-    expect(result.drawY + 43 * result.effectiveScale).toBe(100);
+    expect(result.effectiveScale).toBeCloseTo(84 / 43);
+    expect(result.drawY + 43 * result.effectiveScale).toBeCloseTo(100);
+  });
+
+  it('downscales native 181x168 sprites while preserving the foot anchor', () => {
+    const result = computeAnchorDraw({
+      spriteWidth: 181,
+      spriteHeight: 168,
+      anchor: { x: 90, y: 144 },
+      sx: 100,
+      sy: 100,
+      scale: 3,
+    });
+
+    expect(result.effectiveScale).toBeCloseTo(84 / 144);
+    expect(result.drawW).toBeCloseTo(105.58, 2);
+    expect(result.drawH).toBeCloseTo(98);
+    expect(result.drawY + 144 * result.effectiveScale).toBeCloseTo(100);
   });
 });

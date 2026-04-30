@@ -13,7 +13,7 @@ import type { EnemyArchetype, Entity, Vec2 } from '../game/types';
 
 export type { PixelSprite };
 
-const clampScale = (scale: number): number => Math.max(1, Math.floor(scale));
+const clampRasterScale = (scale: number): number => Math.max(1, Math.floor(scale));
 
 const facingFromVec = (facing: Vec2): AnimationFacing => {
   // Isometric cardinal directions:
@@ -60,12 +60,13 @@ export type AnchorDrawResult = {
 };
 
 const TARGET_ENTITY_HEIGHT = 84;
+const MIN_ENTITY_SCALE = 0.35;
 
 export const computeAnchorDraw = (input: AnchorDrawInput): AnchorDrawResult => {
   const usefulHeight = input.anchor.y;
   const footRowsBelow = input.spriteHeight - input.anchor.y;
   const heightScale = TARGET_ENTITY_HEIGHT / usefulHeight;
-  const effectiveScale = Math.max(1, Math.round(heightScale * (input.scale / 3)));
+  const effectiveScale = Math.max(MIN_ENTITY_SCALE, heightScale * (input.scale / 3));
   const drawW = input.spriteWidth * effectiveScale;
   const drawH = input.spriteHeight * effectiveScale;
   const drawX = Math.floor(input.sx - input.anchor.x * effectiveScale);
@@ -181,7 +182,7 @@ const drawSpriteFallback = (
   drawY: number,
   scale: number,
 ): void => {
-  const safeScale = clampScale(scale);
+  const safeScale = clampRasterScale(scale);
 
   for (let y = 0; y < sprite.height; y += 1) {
     for (let x = 0; x < sprite.width; x += 1) {
@@ -260,7 +261,7 @@ export const drawBillboardSprite = (
   } = {},
 ): void => {
   const { tiltX = -0.25, shadowAlpha = 0.2, shadowScale = 0.35, alpha = 1 } = options;
-  const safeScale = clampScale(scale);
+  const safeScale = clampRasterScale(scale);
 
   const stage = stageFor(sprite.width, sprite.height);
   stage.bytes.set(new Uint8ClampedArray(sprite.pixels.buffer));
