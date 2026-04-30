@@ -66,3 +66,31 @@ PixelLab reference correction:
 - Built `@voxelyn/roguelike`; verified the new reference HTML and PNGs are copied into `packages/voxelyn-roguelike/dist/concept-art/...`.
 - Deployed the updated static build via Vercel CLI, then copied the new reference files into the lightweight `voxelyn-roguelike-vercel-0428` staging package and deployed a preview. Public reference URL for PixelLab: `https://voxelyn-roguelike-vercel-0428-7blx5kuy8.vercel.app/concept-art/pixellab-sprite-reference-v1.html`.
 - A stale PixelLab attempt created only a new `excavator` character and one idle animation, then PixelLab returned `Trial limit reached for animating character (4 directions)` on `walk`. Archived that partial state as `.voxelyn-cache/pixellab-recreate-state.stale-reference-2026-04-28T18-20-14.json`; no atlas plan/result files were overwritten.
+
+GPT spritesheet atlas pass:
+- Added stable source copies for the GPT-generated animated sheets under `assets/source/gpt-spritesheets/` and ignored the original dated drop folder `docs/concept-art/gpt tilesets/`.
+- Added a deterministic `gpt-sheet` importer to the sprites CLI. It slices the 1024x1536 sheets by row/column windows, removes checker backgrounds, fits frames into the existing 48x48 atlas contract, mirrors left-facing directions, and emits the same atlas PNG/JSON format as the PixelLab path.
+- Expanded enemy specs to include `hit` and `die` clips, since the GPT sheets provide them.
+- Marked GPT manifests as `source: "gpt-sheet"` and `motion: "baked"` so runtime uses the sheet's baked animation instead of applying the PixelLab squash/lunge/tint wrapper on top.
+- Regenerated all six character atlases from GPT sheets. Direct validation: every manifest is `gpt-sheet/baked`, all expected clips exist, and atlas edge contact is `0` for every character.
+- Verified: `pnpm --filter @voxelyn/cli test`, `pnpm --filter @voxelyn/animation test -- pixellab-motion sprite-atlas-validation engine-source-switch`, `pnpm --filter @voxelyn/roguelike exec vitest run src/tests/render-anchor.test.ts src/tests/animation-integration.test.ts`, and `pnpm --filter @voxelyn/roguelike build`.
+- Added `spritesheetgen` cutter JSON support and switched the Excavator atlas to the cleaner cutter export at `assets/source/gpt-spritesheets/excavator-cutter.*`; validation stayed at `edgeContact=0`.
+
+Local character spritesheet conversion pass:
+- Added first-priority local spritesheetgen import support for `assets/sprites/characters/<id>/spritesheet.json` + `spritesheet.png`, with manifest source widened to `spritesheetgen`.
+- Regenerated all six committed `<id>.atlas.png`/`<id>.atlas.json` files from the local per-character spritesheets. All manifests now report `source: "spritesheetgen"` and `motion: "baked"`.
+- Direct atlas sanity: all six generated atlases have expected clip/frame counts, `empty=0`, and `edgeContact=0`.
+- Verified after the swap: `pnpm --filter @voxelyn/cli test`, `pnpm --filter @voxelyn/animation test -- pixellab-motion sprite-atlas-validation engine-source-switch`, `pnpm --filter @voxelyn/roguelike exec vitest run src/tests/render-anchor.test.ts src/tests/animation-integration.test.ts`, and `pnpm --filter @voxelyn/roguelike build`.
+
+Character size adjustment:
+- Increased the renderer's target entity height so 48x48 character atlases draw larger in-game while keeping the sprite anchor grounded.
+- Moved enemy health/alert UI to follow the scaled sprite top instead of a fixed offset, and slightly increased entity shadows.
+- Verified: `pnpm --filter @voxelyn/roguelike exec vitest run src/tests/render-anchor.test.ts src/tests/animation-integration.test.ts`, `pnpm --filter @voxelyn/roguelike build`, and `git diff --check`.
+- Started Vite at `http://127.0.0.1:5175/` and confirmed it responds over HTTP. Browser screenshot verification was blocked because `playwright` is not installed and `agent-browser` is not available on PATH.
+
+Named spritesheet-v2 conversion pass:
+- Swapped the character atlas pipeline to prefer `assets/sprites/characters/<id>/<id>.spritesheet.json` + `<id>.png` over Atlas/source-spritesheet inputs.
+- Preserved native spritesheet fidelity by copying source pixels into a 181x168 canvas without resampling; the 167px-tall rows are padded transparently and aligned by the 90/144 anchor.
+- Regenerated all six `<id>.atlas.png`/`<id>.atlas.json` files. Manifests now report `source: "spritesheet-v2"`, `motion: "baked"`, frame size `181x168`, and anchor `{ x: 90, y: 144 }`.
+- Direct pixel-exact validation checked 896 emitted atlas frames against the source spritesheets.
+- Verified: `pnpm --filter @voxelyn/cli test`, `pnpm --filter @voxelyn/animation test -- pixellab-motion sprite-atlas-validation engine-source-switch`, `pnpm --filter @voxelyn/roguelike exec vitest run src/tests/render-anchor.test.ts src/tests/animation-integration.test.ts`, `pnpm --filter @voxelyn/roguelike build`, and `git diff --check`.

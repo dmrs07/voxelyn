@@ -29,4 +29,18 @@ describe('computeAnchorDraw', () => {
     expect(result.footRowsBelow).toBe(5);
     expect(result.usefulHeight).toBe(43);
   });
+
+  it('keeps larger 48x48 sprites grounded at the anchor point', () => {
+    const result = computeAnchorDraw({
+      spriteWidth: 48,
+      spriteHeight: 48,
+      anchor: { x: 24, y: 43 },
+      sx: 100,
+      sy: 100,
+      scale: 3,
+    });
+
+    expect(result.effectiveScale).toBe(2);
+    expect(result.drawY + 43 * result.effectiveScale).toBe(100);
+  });
 });

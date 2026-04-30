@@ -59,7 +59,7 @@ export type AnchorDrawResult = {
   drawH: number;
 };
 
-const TARGET_ENTITY_HEIGHT = 60;
+const TARGET_ENTITY_HEIGHT = 84;
 
 export const computeAnchorDraw = (input: AnchorDrawInput): AnchorDrawResult => {
   const usefulHeight = input.anchor.y;
@@ -70,7 +70,7 @@ export const computeAnchorDraw = (input: AnchorDrawInput): AnchorDrawResult => {
   const drawH = input.spriteHeight * effectiveScale;
   const drawX = Math.floor(input.sx - input.anchor.x * effectiveScale);
   const drawY = Math.floor(
-    input.sy - input.spriteHeight * effectiveScale + footRowsBelow * effectiveScale
+    input.sy - input.spriteHeight * effectiveScale + footRowsBelow * effectiveScale,
   );
   return { usefulHeight, footRowsBelow, effectiveScale, drawX, drawY, drawW, drawH };
 };
@@ -158,7 +158,10 @@ const ensureRuntime = (entity: Entity): RuntimeEntry => {
   return created;
 };
 
-const frameForEntity = (entity: Entity, simTick: number): { runtime: RuntimeEntry; sprite: PixelSprite } => {
+const frameForEntity = (
+  entity: Entity,
+  simTick: number,
+): { runtime: RuntimeEntry; sprite: PixelSprite } => {
   const runtime = ensureRuntime(entity);
   const stepTicks = runtime.lastSimTick < 0 ? 1 : Math.max(0, simTick - runtime.lastSimTick);
   runtime.lastSimTick = simTick;
@@ -176,7 +179,7 @@ const drawSpriteFallback = (
   sprite: PixelSprite,
   drawX: number,
   drawY: number,
-  scale: number
+  scale: number,
 ): void => {
   const safeScale = clampScale(scale);
 
@@ -201,8 +204,8 @@ export const drawEntitySprite = (
   sy: number,
   simTick: number,
   scale = 2,
-  flash = false
-): void => {
+  flash = false,
+): AnchorDrawResult => {
   const { runtime, sprite } = frameForEntity(entity, simTick);
   const anchor = runtime.character?.anchor ?? {
     x: Math.floor(sprite.width / 2),
@@ -219,7 +222,7 @@ export const drawEntitySprite = (
 
   if (typeof document === 'undefined') {
     drawSpriteFallback(ctx, sprite, layout.drawX, layout.drawY, layout.effectiveScale);
-    return;
+    return layout;
   }
 
   const stage = stageFor(sprite.width, sprite.height);
@@ -236,6 +239,7 @@ export const drawEntitySprite = (
     ctx.drawImage(stage.canvas, layout.drawX, layout.drawY, layout.drawW, layout.drawH);
   }
   ctx.restore();
+  return layout;
 };
 
 /**
@@ -253,7 +257,7 @@ export const drawBillboardSprite = (
     shadowAlpha?: number;
     shadowScale?: number;
     alpha?: number;
-  } = {}
+  } = {},
 ): void => {
   const { tiltX = -0.25, shadowAlpha = 0.2, shadowScale = 0.35, alpha = 1 } = options;
   const safeScale = clampScale(scale);

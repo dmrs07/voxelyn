@@ -30,13 +30,23 @@ export type PackedAtlas = {
   png: Uint8Array;
 };
 
-const FRAME = 48;
+export type PackAtlasOptions = {
+  frameWidth?: number;
+  frameHeight?: number;
+};
+
+const DEFAULT_FRAME = 48;
 const GUTTER = 2;
-const STRIDE = FRAME + GUTTER;
 const DIRECTIONS: Direction[] = ['DR', 'DL', 'UR', 'UL'];
 const CLIP_ORDER: ClipId[] = ['idle', 'walk', 'attack', 'cast', 'hit', 'die'];
 
-export const packAtlas = (raw: RawFramesByClip): PackedAtlas => {
+export const packAtlas = (raw: RawFramesByClip, opts: PackAtlasOptions = {}): PackedAtlas => {
+  const frameWidth = opts.frameWidth ?? DEFAULT_FRAME;
+  const frameHeight = opts.frameHeight ?? DEFAULT_FRAME;
+  if (frameWidth < 1 || frameHeight < 1) {
+    throw new Error(`frame size must be positive, got ${frameWidth}x${frameHeight}`);
+  }
+
   const presentClips = CLIP_ORDER.filter((clipId) => raw[clipId]);
   let maxFramesPerDirection = 0;
   for (const clipId of presentClips) {
@@ -47,8 +57,8 @@ export const packAtlas = (raw: RawFramesByClip): PackedAtlas => {
 
   const columns = maxFramesPerDirection;
   const rows = presentClips.length * DIRECTIONS.length;
-  const imageWidth = columns * FRAME + Math.max(0, columns - 1) * GUTTER;
-  const imageHeight = rows * FRAME + Math.max(0, rows - 1) * GUTTER;
+  const imageWidth = columns * frameWidth + Math.max(0, columns - 1) * GUTTER;
+  const imageHeight = rows * frameHeight + Math.max(0, rows - 1) * GUTTER;
   const png = new PNG({ width: imageWidth, height: imageHeight });
   png.data.fill(0);
 
@@ -59,18 +69,20 @@ export const packAtlas = (raw: RawFramesByClip): PackedAtlas => {
     for (const direction of DIRECTIONS) {
       const frames = raw[clipId]![direction];
       for (let i = 0; i < frames.length; i += 1) {
-        const dx = i * STRIDE;
-        const dy = rowIndex * STRIDE;
+        const dx = i * (frameWidth + GUTTER);
+        const dy = rowIndex * (frameHeight + GUTTER);
         const src = frames[i]!;
-        if (src.byteLength !== FRAME * FRAME * 4) {
-          throw new Error(`${clipId}.${direction}[${i}] must be raw 48x48 RGBA bytes`);
+        if (src.byteLength !== frameWidth * frameHeight * 4) {
+          throw new Error(
+            `${clipId}.${direction}[${i}] must be raw ${frameWidth}x${frameHeight} RGBA bytes`,
+          );
         }
-        for (let y = 0; y < FRAME; y += 1) {
-          const srcOffset = y * FRAME * 4;
+        for (let y = 0; y < frameHeight; y += 1) {
+          const srcOffset = y * frameWidth * 4;
           const dstOffset = ((dy + y) * imageWidth + dx) * 4;
-          png.data.set(src.subarray(srcOffset, srcOffset + FRAME * 4), dstOffset);
+          png.data.set(src.subarray(srcOffset, srcOffset + frameWidth * 4), dstOffset);
         }
-        rects[clipId]![direction].push({ x: dx, y: dy, w: FRAME, h: FRAME });
+        rects[clipId]![direction].push({ x: dx, y: dy, w: frameWidth, h: frameHeight });
       }
       rowIndex += 1;
     }

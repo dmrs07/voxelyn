@@ -674,7 +674,7 @@ export class IsoRenderer {
     const sy = groundY + groundOffset + bob;
 
     // Draw ground shadow ellipse - centered on tile
-    const shadowScale = entity.kind === 'player' ? 1.2 : 0.85;
+    const shadowScale = entity.kind === 'player' ? 1.45 : 1.05;
     const shadowAlpha = 0.22 + (isMoving ? 0.04 : 0);
     ctx.save();
     ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
@@ -684,20 +684,29 @@ export class IsoRenderer {
     ctx.restore();
 
     const flash = entity.hitFlashUntilMs > state.simTimeMs;
-    drawEntitySprite(ctx, entity, sx, sy, state.simTick, this.entitySpriteScale, flash);
+    const spriteLayout = drawEntitySprite(
+      ctx,
+      entity,
+      sx,
+      sy,
+      state.simTick,
+      this.entitySpriteScale,
+      flash,
+    );
 
     if (entity.kind === 'enemy') {
       const hpRatio = Math.max(0, Math.min(1, entity.hp / Math.max(1, entity.maxHp)));
+      const hpBarY = spriteLayout.drawY - 8;
       ctx.fillStyle = 'rgba(28,34,42,0.95)';
-      ctx.fillRect(sx - 12, sy - 36, 24, 3);
+      ctx.fillRect(sx - 12, hpBarY, 24, 3);
       ctx.fillStyle = 'rgba(241,110,110,0.95)';
-      ctx.fillRect(sx - 12, sy - 36, Math.floor(24 * hpRatio), 3);
+      ctx.fillRect(sx - 12, hpBarY, Math.floor(24 * hpRatio), 3);
 
       if (entity.alertUntilMs > state.simTimeMs) {
         ctx.fillStyle = 'rgba(255,230,116,0.98)';
         ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('!', sx, sy - 42);
+        ctx.fillText('!', sx, hpBarY - 6);
       }
     }
   }

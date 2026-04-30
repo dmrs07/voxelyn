@@ -7,6 +7,8 @@ test('buildManifest produces a v1 manifest without pixellabCharacterId', () => {
   const spec = CHARACTERS.find((character) => character.id === 'striker')!;
   const manifest = buildManifest({
     spec,
+    source: 'pixellab',
+    motion: 'procedural',
     rects: {
       idle: {
         DR: [{ x: 0, y: 0, w: 48, h: 48 }],
@@ -28,6 +30,7 @@ test('buildManifest produces a v1 manifest without pixellabCharacterId', () => {
   assert.equal(manifest.id, 'striker');
   assert.equal(manifest.version, 1);
   assert.equal(manifest.source, 'pixellab');
+  assert.equal(manifest.motion, 'procedural');
   assert.equal(manifest.frameWidth, 48);
   assert.deepEqual(manifest.anchor, { x: 24, y: 43 });
   assert.equal(manifest.generation.atlasHash, 'd');

@@ -1,0 +1,2468 @@
+{
+  "frames": {
+    "spore_bomber_idle_UL_00": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "UL",
+        "row": 0,
+        "column": 0,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_UR_00": {
+      "frame": {
+        "x": 181,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "UR",
+        "row": 0,
+        "column": 1,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_DL_00": {
+      "frame": {
+        "x": 362,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "DL",
+        "row": 0,
+        "column": 2,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_DR_00": {
+      "frame": {
+        "x": 543,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "DR",
+        "row": 0,
+        "column": 3,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_UL_01": {
+      "frame": {
+        "x": 0,
+        "y": 167,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "UL",
+        "row": 1,
+        "column": 0,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_UR_01": {
+      "frame": {
+        "x": 181,
+        "y": 167,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "UR",
+        "row": 1,
+        "column": 1,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_DL_01": {
+      "frame": {
+        "x": 362,
+        "y": 167,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "DL",
+        "row": 1,
+        "column": 2,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_idle_DR_01": {
+      "frame": {
+        "x": 543,
+        "y": 167,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "idle",
+        "direction": "DR",
+        "row": 1,
+        "column": 3,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_UL_00": {
+      "frame": {
+        "x": 0,
+        "y": 334,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "UL",
+        "row": 2,
+        "column": 0,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_UR_00": {
+      "frame": {
+        "x": 181,
+        "y": 334,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "UR",
+        "row": 2,
+        "column": 1,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_DL_00": {
+      "frame": {
+        "x": 362,
+        "y": 334,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "DL",
+        "row": 2,
+        "column": 2,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_DR_00": {
+      "frame": {
+        "x": 543,
+        "y": 334,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "DR",
+        "row": 2,
+        "column": 3,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_UL_01": {
+      "frame": {
+        "x": 0,
+        "y": 501,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "UL",
+        "row": 3,
+        "column": 0,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_UR_01": {
+      "frame": {
+        "x": 181,
+        "y": 501,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "UR",
+        "row": 3,
+        "column": 1,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_DL_01": {
+      "frame": {
+        "x": 362,
+        "y": 501,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "DL",
+        "row": 3,
+        "column": 2,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_DR_01": {
+      "frame": {
+        "x": 543,
+        "y": 501,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "DR",
+        "row": 3,
+        "column": 3,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_UL_02": {
+      "frame": {
+        "x": 0,
+        "y": 668,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "UL",
+        "row": 4,
+        "column": 0,
+        "frameInClip": 2,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_UR_02": {
+      "frame": {
+        "x": 181,
+        "y": 668,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "UR",
+        "row": 4,
+        "column": 1,
+        "frameInClip": 2,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_DL_02": {
+      "frame": {
+        "x": 362,
+        "y": 668,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "DL",
+        "row": 4,
+        "column": 2,
+        "frameInClip": 2,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_walk_DR_02": {
+      "frame": {
+        "x": 543,
+        "y": 668,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "walk",
+        "direction": "DR",
+        "row": 4,
+        "column": 3,
+        "frameInClip": 2,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_UL_00": {
+      "frame": {
+        "x": 0,
+        "y": 835,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "UL",
+        "row": 5,
+        "column": 0,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_UR_00": {
+      "frame": {
+        "x": 181,
+        "y": 835,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "UR",
+        "row": 5,
+        "column": 1,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_DL_00": {
+      "frame": {
+        "x": 362,
+        "y": 835,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "DL",
+        "row": 5,
+        "column": 2,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_DR_00": {
+      "frame": {
+        "x": 543,
+        "y": 835,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "DR",
+        "row": 5,
+        "column": 3,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_UL_01": {
+      "frame": {
+        "x": 0,
+        "y": 1002,
+        "w": 181,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 168
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "UL",
+        "row": 6,
+        "column": 0,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_UR_01": {
+      "frame": {
+        "x": 181,
+        "y": 1002,
+        "w": 181,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 168
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "UR",
+        "row": 6,
+        "column": 1,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_DL_01": {
+      "frame": {
+        "x": 362,
+        "y": 1002,
+        "w": 181,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 168
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "DL",
+        "row": 6,
+        "column": 2,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_DR_01": {
+      "frame": {
+        "x": 543,
+        "y": 1002,
+        "w": 181,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 168
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "DR",
+        "row": 6,
+        "column": 3,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_UL_02": {
+      "frame": {
+        "x": 0,
+        "y": 1170,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "UL",
+        "row": 7,
+        "column": 0,
+        "frameInClip": 2,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_UR_02": {
+      "frame": {
+        "x": 181,
+        "y": 1170,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "UR",
+        "row": 7,
+        "column": 1,
+        "frameInClip": 2,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_DL_02": {
+      "frame": {
+        "x": 362,
+        "y": 1170,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "DL",
+        "row": 7,
+        "column": 2,
+        "frameInClip": 2,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_attack_DR_02": {
+      "frame": {
+        "x": 543,
+        "y": 1170,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "attack",
+        "direction": "DR",
+        "row": 7,
+        "column": 3,
+        "frameInClip": 2,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_UL_00": {
+      "frame": {
+        "x": 0,
+        "y": 1337,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "UL",
+        "row": 8,
+        "column": 0,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_UR_00": {
+      "frame": {
+        "x": 181,
+        "y": 1337,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "UR",
+        "row": 8,
+        "column": 1,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_DL_00": {
+      "frame": {
+        "x": 362,
+        "y": 1337,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "DL",
+        "row": 8,
+        "column": 2,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_DR_00": {
+      "frame": {
+        "x": 543,
+        "y": 1337,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "DR",
+        "row": 8,
+        "column": 3,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_UL_01": {
+      "frame": {
+        "x": 0,
+        "y": 1504,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "UL",
+        "row": 9,
+        "column": 0,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_UR_01": {
+      "frame": {
+        "x": 181,
+        "y": 1504,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "UR",
+        "row": 9,
+        "column": 1,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_DL_01": {
+      "frame": {
+        "x": 362,
+        "y": 1504,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "DL",
+        "row": 9,
+        "column": 2,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_hit_DR_01": {
+      "frame": {
+        "x": 543,
+        "y": 1504,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "hit",
+        "direction": "DR",
+        "row": 9,
+        "column": 3,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_UL_00": {
+      "frame": {
+        "x": 0,
+        "y": 1671,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "UL",
+        "row": 10,
+        "column": 0,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_UR_00": {
+      "frame": {
+        "x": 181,
+        "y": 1671,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "UR",
+        "row": 10,
+        "column": 1,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_DL_00": {
+      "frame": {
+        "x": 362,
+        "y": 1671,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "DL",
+        "row": 10,
+        "column": 2,
+        "frameInClip": 0,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_DR_00": {
+      "frame": {
+        "x": 543,
+        "y": 1671,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "DR",
+        "row": 10,
+        "column": 3,
+        "frameInClip": 0,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_UL_01": {
+      "frame": {
+        "x": 0,
+        "y": 1838,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "UL",
+        "row": 11,
+        "column": 0,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_UR_01": {
+      "frame": {
+        "x": 181,
+        "y": 1838,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "UR",
+        "row": 11,
+        "column": 1,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_DL_01": {
+      "frame": {
+        "x": 362,
+        "y": 1838,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "DL",
+        "row": 11,
+        "column": 2,
+        "frameInClip": 1,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_DR_01": {
+      "frame": {
+        "x": 543,
+        "y": 1838,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "DR",
+        "row": 11,
+        "column": 3,
+        "frameInClip": 1,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_UL_02": {
+      "frame": {
+        "x": 0,
+        "y": 2005,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "UL",
+        "row": 12,
+        "column": 0,
+        "frameInClip": 2,
+        "facingVector": [
+          -1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_UR_02": {
+      "frame": {
+        "x": 181,
+        "y": 2005,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "UR",
+        "row": 12,
+        "column": 1,
+        "frameInClip": 2,
+        "facingVector": [
+          1,
+          -1
+        ],
+        "backFacingRead": true,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_DL_02": {
+      "frame": {
+        "x": 362,
+        "y": 2005,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "DL",
+        "row": 12,
+        "column": 2,
+        "frameInClip": 2,
+        "facingVector": [
+          -1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    },
+    "spore_bomber_die_DR_02": {
+      "frame": {
+        "x": 543,
+        "y": 2005,
+        "w": 181,
+        "h": 167
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 181,
+        "h": 167
+      },
+      "sourceSize": {
+        "w": 181,
+        "h": 167
+      },
+      "meta": {
+        "character": "spore_bomber",
+        "displayName": "Spore Bomber",
+        "clip": "die",
+        "direction": "DR",
+        "row": 12,
+        "column": 3,
+        "frameInClip": 2,
+        "facingVector": [
+          1,
+          1
+        ],
+        "backFacingRead": false,
+        "anchor": {
+          "x": 90,
+          "y": 144
+        }
+      }
+    }
+  },
+  "animations": {
+    "idle_UL": [
+      "spore_bomber_idle_UL_00",
+      "spore_bomber_idle_UL_01"
+    ],
+    "idle_UR": [
+      "spore_bomber_idle_UR_00",
+      "spore_bomber_idle_UR_01"
+    ],
+    "idle_DL": [
+      "spore_bomber_idle_DL_00",
+      "spore_bomber_idle_DL_01"
+    ],
+    "idle_DR": [
+      "spore_bomber_idle_DR_00",
+      "spore_bomber_idle_DR_01"
+    ],
+    "walk_UL": [
+      "spore_bomber_walk_UL_00",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_02"
+    ],
+    "walk_UR": [
+      "spore_bomber_walk_UR_00",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_02"
+    ],
+    "walk_DL": [
+      "spore_bomber_walk_DL_00",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_02"
+    ],
+    "walk_DR": [
+      "spore_bomber_walk_DR_00",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_02"
+    ],
+    "run_UL": [
+      "spore_bomber_walk_UL_00",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_02"
+    ],
+    "run_UR": [
+      "spore_bomber_walk_UR_00",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_02"
+    ],
+    "run_DL": [
+      "spore_bomber_walk_DL_00",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_02"
+    ],
+    "run_DR": [
+      "spore_bomber_walk_DR_00",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_02"
+    ],
+    "attack_UL": [
+      "spore_bomber_attack_UL_00",
+      "spore_bomber_attack_UL_01",
+      "spore_bomber_attack_UL_02"
+    ],
+    "attack_UR": [
+      "spore_bomber_attack_UR_00",
+      "spore_bomber_attack_UR_01",
+      "spore_bomber_attack_UR_02"
+    ],
+    "attack_DL": [
+      "spore_bomber_attack_DL_00",
+      "spore_bomber_attack_DL_01",
+      "spore_bomber_attack_DL_02"
+    ],
+    "attack_DR": [
+      "spore_bomber_attack_DR_00",
+      "spore_bomber_attack_DR_01",
+      "spore_bomber_attack_DR_02"
+    ],
+    "hit_UL": [
+      "spore_bomber_hit_UL_00",
+      "spore_bomber_hit_UL_01"
+    ],
+    "hit_UR": [
+      "spore_bomber_hit_UR_00",
+      "spore_bomber_hit_UR_01"
+    ],
+    "hit_DL": [
+      "spore_bomber_hit_DL_00",
+      "spore_bomber_hit_DL_01"
+    ],
+    "hit_DR": [
+      "spore_bomber_hit_DR_00",
+      "spore_bomber_hit_DR_01"
+    ],
+    "die_UL": [
+      "spore_bomber_die_UL_00",
+      "spore_bomber_die_UL_01",
+      "spore_bomber_die_UL_02"
+    ],
+    "die_UR": [
+      "spore_bomber_die_UR_00",
+      "spore_bomber_die_UR_01",
+      "spore_bomber_die_UR_02"
+    ],
+    "die_DL": [
+      "spore_bomber_die_DL_00",
+      "spore_bomber_die_DL_01",
+      "spore_bomber_die_DL_02"
+    ],
+    "die_DR": [
+      "spore_bomber_die_DR_00",
+      "spore_bomber_die_DR_01",
+      "spore_bomber_die_DR_02"
+    ]
+  },
+  "expandedAnimations": {
+    "idle_UL_8f": [
+      "spore_bomber_idle_UL_00",
+      "spore_bomber_idle_UL_01",
+      "spore_bomber_idle_UL_00",
+      "spore_bomber_idle_UL_01",
+      "spore_bomber_idle_UL_00",
+      "spore_bomber_idle_UL_01",
+      "spore_bomber_idle_UL_00",
+      "spore_bomber_idle_UL_01"
+    ],
+    "walk_UL_8f": [
+      "spore_bomber_walk_UL_00",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_02",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_00",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_02",
+      "spore_bomber_walk_UL_01"
+    ],
+    "run_UL_8f": [
+      "spore_bomber_walk_UL_00",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_02",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_00",
+      "spore_bomber_walk_UL_01",
+      "spore_bomber_walk_UL_02",
+      "spore_bomber_walk_UL_01"
+    ],
+    "attack_UL_8f": [
+      "spore_bomber_attack_UL_00",
+      "spore_bomber_attack_UL_00",
+      "spore_bomber_attack_UL_01",
+      "spore_bomber_attack_UL_01",
+      "spore_bomber_attack_UL_02",
+      "spore_bomber_attack_UL_02",
+      "spore_bomber_attack_UL_02",
+      "spore_bomber_attack_UL_02"
+    ],
+    "hit_UL_4f": [
+      "spore_bomber_hit_UL_00",
+      "spore_bomber_hit_UL_01",
+      "spore_bomber_hit_UL_01",
+      "spore_bomber_hit_UL_01"
+    ],
+    "die_UL_8f": [
+      "spore_bomber_die_UL_00",
+      "spore_bomber_die_UL_00",
+      "spore_bomber_die_UL_01",
+      "spore_bomber_die_UL_01",
+      "spore_bomber_die_UL_02",
+      "spore_bomber_die_UL_02",
+      "spore_bomber_die_UL_02",
+      "spore_bomber_die_UL_02"
+    ],
+    "idle_UR_8f": [
+      "spore_bomber_idle_UR_00",
+      "spore_bomber_idle_UR_01",
+      "spore_bomber_idle_UR_00",
+      "spore_bomber_idle_UR_01",
+      "spore_bomber_idle_UR_00",
+      "spore_bomber_idle_UR_01",
+      "spore_bomber_idle_UR_00",
+      "spore_bomber_idle_UR_01"
+    ],
+    "walk_UR_8f": [
+      "spore_bomber_walk_UR_00",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_02",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_00",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_02",
+      "spore_bomber_walk_UR_01"
+    ],
+    "run_UR_8f": [
+      "spore_bomber_walk_UR_00",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_02",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_00",
+      "spore_bomber_walk_UR_01",
+      "spore_bomber_walk_UR_02",
+      "spore_bomber_walk_UR_01"
+    ],
+    "attack_UR_8f": [
+      "spore_bomber_attack_UR_00",
+      "spore_bomber_attack_UR_00",
+      "spore_bomber_attack_UR_01",
+      "spore_bomber_attack_UR_01",
+      "spore_bomber_attack_UR_02",
+      "spore_bomber_attack_UR_02",
+      "spore_bomber_attack_UR_02",
+      "spore_bomber_attack_UR_02"
+    ],
+    "hit_UR_4f": [
+      "spore_bomber_hit_UR_00",
+      "spore_bomber_hit_UR_01",
+      "spore_bomber_hit_UR_01",
+      "spore_bomber_hit_UR_01"
+    ],
+    "die_UR_8f": [
+      "spore_bomber_die_UR_00",
+      "spore_bomber_die_UR_00",
+      "spore_bomber_die_UR_01",
+      "spore_bomber_die_UR_01",
+      "spore_bomber_die_UR_02",
+      "spore_bomber_die_UR_02",
+      "spore_bomber_die_UR_02",
+      "spore_bomber_die_UR_02"
+    ],
+    "idle_DL_8f": [
+      "spore_bomber_idle_DL_00",
+      "spore_bomber_idle_DL_01",
+      "spore_bomber_idle_DL_00",
+      "spore_bomber_idle_DL_01",
+      "spore_bomber_idle_DL_00",
+      "spore_bomber_idle_DL_01",
+      "spore_bomber_idle_DL_00",
+      "spore_bomber_idle_DL_01"
+    ],
+    "walk_DL_8f": [
+      "spore_bomber_walk_DL_00",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_02",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_00",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_02",
+      "spore_bomber_walk_DL_01"
+    ],
+    "run_DL_8f": [
+      "spore_bomber_walk_DL_00",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_02",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_00",
+      "spore_bomber_walk_DL_01",
+      "spore_bomber_walk_DL_02",
+      "spore_bomber_walk_DL_01"
+    ],
+    "attack_DL_8f": [
+      "spore_bomber_attack_DL_00",
+      "spore_bomber_attack_DL_00",
+      "spore_bomber_attack_DL_01",
+      "spore_bomber_attack_DL_01",
+      "spore_bomber_attack_DL_02",
+      "spore_bomber_attack_DL_02",
+      "spore_bomber_attack_DL_02",
+      "spore_bomber_attack_DL_02"
+    ],
+    "hit_DL_4f": [
+      "spore_bomber_hit_DL_00",
+      "spore_bomber_hit_DL_01",
+      "spore_bomber_hit_DL_01",
+      "spore_bomber_hit_DL_01"
+    ],
+    "die_DL_8f": [
+      "spore_bomber_die_DL_00",
+      "spore_bomber_die_DL_00",
+      "spore_bomber_die_DL_01",
+      "spore_bomber_die_DL_01",
+      "spore_bomber_die_DL_02",
+      "spore_bomber_die_DL_02",
+      "spore_bomber_die_DL_02",
+      "spore_bomber_die_DL_02"
+    ],
+    "idle_DR_8f": [
+      "spore_bomber_idle_DR_00",
+      "spore_bomber_idle_DR_01",
+      "spore_bomber_idle_DR_00",
+      "spore_bomber_idle_DR_01",
+      "spore_bomber_idle_DR_00",
+      "spore_bomber_idle_DR_01",
+      "spore_bomber_idle_DR_00",
+      "spore_bomber_idle_DR_01"
+    ],
+    "walk_DR_8f": [
+      "spore_bomber_walk_DR_00",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_02",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_00",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_02",
+      "spore_bomber_walk_DR_01"
+    ],
+    "run_DR_8f": [
+      "spore_bomber_walk_DR_00",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_02",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_00",
+      "spore_bomber_walk_DR_01",
+      "spore_bomber_walk_DR_02",
+      "spore_bomber_walk_DR_01"
+    ],
+    "attack_DR_8f": [
+      "spore_bomber_attack_DR_00",
+      "spore_bomber_attack_DR_00",
+      "spore_bomber_attack_DR_01",
+      "spore_bomber_attack_DR_01",
+      "spore_bomber_attack_DR_02",
+      "spore_bomber_attack_DR_02",
+      "spore_bomber_attack_DR_02",
+      "spore_bomber_attack_DR_02"
+    ],
+    "hit_DR_4f": [
+      "spore_bomber_hit_DR_00",
+      "spore_bomber_hit_DR_01",
+      "spore_bomber_hit_DR_01",
+      "spore_bomber_hit_DR_01"
+    ],
+    "die_DR_8f": [
+      "spore_bomber_die_DR_00",
+      "spore_bomber_die_DR_00",
+      "spore_bomber_die_DR_01",
+      "spore_bomber_die_DR_01",
+      "spore_bomber_die_DR_02",
+      "spore_bomber_die_DR_02",
+      "spore_bomber_die_DR_02",
+      "spore_bomber_die_DR_02"
+    ]
+  },
+  "meta": {
+    "app": "ChatGPT",
+    "schema": "voxelyn.spritesheet.v2",
+    "image": "spore_bomber.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 724,
+      "h": 2172
+    },
+    "scale": "1",
+    "character": "spore_bomber",
+    "displayName": "Spore Bomber",
+    "directions": [
+      "UL",
+      "UR",
+      "DL",
+      "DR"
+    ],
+    "directionColumns": {
+      "UL": 0,
+      "UR": 1,
+      "DL": 2,
+      "DR": 3
+    },
+    "logicalGrid": {
+      "columns": 4,
+      "rows": 13,
+      "nominalCellSize": {
+        "w": 181.0,
+        "h": 167.07692307692307
+      },
+      "xBounds": [
+        0,
+        181,
+        362,
+        543,
+        724
+      ],
+      "yBounds": [
+        0,
+        167,
+        334,
+        501,
+        668,
+        835,
+        1002,
+        1170,
+        1337,
+        1504,
+        1671,
+        1838,
+        2005,
+        2172
+      ]
+    },
+    "clipRows": {
+      "idle": [
+        0,
+        1
+      ],
+      "walk": [
+        2,
+        3,
+        4
+      ],
+      "run": [
+        2,
+        3,
+        4
+      ],
+      "attack": [
+        5,
+        6,
+        7
+      ],
+      "hit": [
+        8,
+        9
+      ],
+      "die": [
+        10,
+        11,
+        12
+      ]
+    },
+    "clipMeta": {
+      "idle": {
+        "fps": 5,
+        "loop": true,
+        "notes": "short breathing/stance loop"
+      },
+      "walk": {
+        "fps": 9,
+        "loop": true,
+        "notes": "locomotion loop"
+      },
+      "run": {
+        "fps": 12,
+        "loop": true,
+        "aliasOf": "walk",
+        "notes": "same source frames as walk, faster playback"
+      },
+      "attack": {
+        "fps": 12,
+        "loop": false,
+        "notes": "windup -> active -> recovery/action-impact"
+      },
+      "hit": {
+        "fps": 10,
+        "loop": false,
+        "notes": "recoil/stagger"
+      },
+      "die": {
+        "fps": 8,
+        "loop": false,
+        "holdLastFrame": true,
+        "notes": "collapse/destruction/remains"
+      }
+    },
+    "facingVectors": {
+      "UL": [
+        -1,
+        -1
+      ],
+      "UR": [
+        1,
+        -1
+      ],
+      "DL": [
+        -1,
+        1
+      ],
+      "DR": [
+        1,
+        1
+      ]
+    },
+    "defaultAnchor": {
+      "x": 90,
+      "y": 144
+    },
+    "sourceHashSha256": "5a9b8a7c614afb5f21fd250fd507dc630d06f8086251c142601b218eac778f31",
+    "notes": [
+      "Generated atlas interpreted as 4 directions x 13 pose rows.",
+      "Use animations for actual source rows; use expandedAnimations where a fixed 8/4-frame budget is expected.",
+      "Rows 2-4 are shared by walk and run; run should use faster playback."
+    ]
+  }
+}

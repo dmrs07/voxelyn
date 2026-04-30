@@ -390,12 +390,15 @@ const makeClipFromLoaded = (
   clipId: string,
   loaded: LoadedClip,
   style: PixelLabStyle,
-  anchor: { x: number; y: number }
+  anchor: { x: number; y: number },
+  bakedMotion: boolean
 ): AnimationClip => {
   const durationMs = Math.max(1, loaded.durationMs);
   const manifestFrameCount = Math.max(1, loaded.framesPerDirection);
   const fps = Math.max(1, Math.round((manifestFrameCount * 1000) / durationMs));
-  const motion = motionForClip(clipId, style, loaded.loop);
+  const motion = bakedMotion
+    ? { loop: loaded.loop, frames: [{ dur: 1 }] }
+    : motionForClip(clipId, style, loaded.loop);
   return {
     id: clipId,
     fps,
@@ -429,9 +432,10 @@ export const buildPixelLabCharacter = (
   const clips: AnimationSet = {};
   const style = def.style ?? atlas.manifest.runtimeArchetype;
   const anchor = { ...atlas.manifest.anchor };
+  const bakedMotion = atlas.manifest.motion === 'baked';
   for (const [clipId, loaded] of Object.entries(atlas.clips)) {
     if (!loaded) continue;
-    (clips as Record<string, AnimationClip>)[clipId] = makeClipFromLoaded(clipId, loaded, style, anchor);
+    (clips as Record<string, AnimationClip>)[clipId] = makeClipFromLoaded(clipId, loaded, style, anchor, bakedMotion);
   }
 
   const clipMap = clips as Record<string, AnimationClip | undefined>;

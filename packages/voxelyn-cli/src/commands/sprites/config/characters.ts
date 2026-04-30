@@ -4,6 +4,8 @@ const ENEMY_CLIPS = (attackMs: number, attackIntent: string): CharacterSpec['cli
   idle: { frames: 6, durationMs: 1000, loop: true, intent: 'breathing idle stance' },
   walk: { frames: 8, durationMs: 760, loop: true, intent: 'walk cycle on ground' },
   attack: { frames: 8, durationMs: attackMs, loop: false, intent: attackIntent },
+  hit: { frames: 4, durationMs: 220, loop: false, intent: 'recoil flinch' },
+  die: { frames: 8, durationMs: 980, loop: false, intent: 'collapse and dissolve' },
 });
 
 export const CHARACTERS: CharacterSpec[] = [

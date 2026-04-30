@@ -21,7 +21,8 @@ export type AtlasManifest = {
   id: string;
   runtimeArchetype: 'player' | 'stalker' | 'bruiser' | 'spitter' | 'guardian' | 'spore_bomber';
   displayName: string;
-  source: 'pixellab';
+  source: 'pixellab' | 'gpt-sheet' | 'spritesheetgen' | 'spritesheet-v2';
+  motion?: 'procedural' | 'baked';
   version: 1;
   frameWidth: number;
   frameHeight: number;
@@ -34,6 +35,7 @@ export type AtlasManifest = {
     configHash: string;
     pipelineVersion: string;
     atlasHash: string;
+    sourceHash?: string;
     pixellabModelVersion?: string;
     generatedAt: string;
   };

@@ -45,3 +45,8 @@ output/
 
 # Generated PixelLab reference renders
 docs/concept-art/pixellab-reference/*.png
+
+# Local GPT sprite-sheet drop folder. Stable copies live under assets/source.
+docs/concept-art/gpt tilesets/
+assets/sprites/characters/*/spritesheet.json
+assets/sprites/characters/*/spritesheet.png

@@ -40,7 +40,7 @@ test('consume mode produces atlas.png and atlas.json for striker', async () => {
         styleNotes: 'y',
         spec,
       },
-    ])
+    ]),
   );
   writeFileSync(
     path.join(cwd, '.voxelyn-cache/pixellab-results/plab-1.json'),
@@ -51,8 +51,10 @@ test('consume mode produces atlas.png and atlas.json for striker', async () => {
         idle: framesByDirection(6),
         walk: framesByDirection(8),
         attack: framesByDirection(8),
+        hit: framesByDirection(4),
+        die: framesByDirection(8),
       },
-    })
+    }),
   );
 
   await runSpritesGenerate({
@@ -74,9 +76,10 @@ test('consume mode produces atlas.png and atlas.json for striker', async () => {
 
   assert.ok(existsSync(path.join(cwd, 'assets/sprites/characters/striker/striker.atlas.png')));
   const manifest = JSON.parse(
-    readFileSync(path.join(cwd, 'assets/sprites/characters/striker/striker.atlas.json'), 'utf-8')
+    readFileSync(path.join(cwd, 'assets/sprites/characters/striker/striker.atlas.json'), 'utf-8'),
   );
   assert.equal(manifest.id, 'striker');
+  assert.equal(manifest.source, 'pixellab');
   assert.equal(manifest.frameWidth, 48);
   assert.equal(manifest.generation.atlasHash.length, 64);
 });

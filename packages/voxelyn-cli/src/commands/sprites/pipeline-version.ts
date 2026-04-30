@@ -1,1 +1,1 @@
-export const PIPELINE_VERSION = '1';
+export const PIPELINE_VERSION = '2';

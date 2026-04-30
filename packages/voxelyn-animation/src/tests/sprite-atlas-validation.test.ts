@@ -41,6 +41,36 @@ describe('validateManifest', () => {
     expect(() => validateManifest('striker', okManifest(), 50, 200)).not.toThrow();
   });
 
+  it('passes GPT sheet manifests with baked motion', () => {
+    const manifest = okManifest();
+    manifest.source = 'gpt-sheet';
+    manifest.motion = 'baked';
+    expect(() => validateManifest('striker', manifest, 50, 200)).not.toThrow();
+  });
+
+  it('passes spritesheetgen manifests with baked motion', () => {
+    const manifest = okManifest();
+    manifest.source = 'spritesheetgen';
+    manifest.motion = 'baked';
+    expect(() => validateManifest('striker', manifest, 50, 200)).not.toThrow();
+  });
+
+  it('passes spritesheet-v2 manifests with native frame sizes', () => {
+    const manifest = okManifest();
+    manifest.source = 'spritesheet-v2';
+    manifest.motion = 'baked';
+    manifest.frameWidth = 181;
+    manifest.frameHeight = 167;
+    manifest.anchor = { x: 90, y: 144 };
+    manifest.clips.idle!.dirs = {
+      DR: [{ x: 0, y: 0, w: 181, h: 167 }],
+      DL: [{ x: 0, y: 169, w: 181, h: 167 }],
+      UR: [{ x: 0, y: 338, w: 181, h: 167 }],
+      UL: [{ x: 0, y: 507, w: 181, h: 167 }],
+    };
+    expect(() => validateManifest('striker', manifest, 181, 674)).not.toThrow();
+  });
+
   it('rejects wrong frame size', () => {
     const manifest = okManifest();
     manifest.frameWidth = 32;

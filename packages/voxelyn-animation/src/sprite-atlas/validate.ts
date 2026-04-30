@@ -2,8 +2,6 @@ import { DIRECTIONS, type Direction } from './direction.js';
 import { AtlasLoadError } from './errors.js';
 import type { AtlasManifest, ClipId, ClipManifest, FrameRect } from './types.js';
 
-const REQUIRED_FRAME_SIZE = 48;
-
 const fail = (spriteId: string, reason: string): never => {
   throw new AtlasLoadError(spriteId, reason);
 };
@@ -25,15 +23,20 @@ const validateRect = (
   index: number,
   rect: FrameRect,
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number,
 ): void => {
   const x = assertFiniteNumber(spriteId, `${clipId}.${direction}[${index}].x`, rect.x);
   const y = assertFiniteNumber(spriteId, `${clipId}.${direction}[${index}].y`, rect.y);
   const w = assertFiniteNumber(spriteId, `${clipId}.${direction}[${index}].w`, rect.w);
   const h = assertFiniteNumber(spriteId, `${clipId}.${direction}[${index}].h`, rect.h);
 
-  if (w !== REQUIRED_FRAME_SIZE || h !== REQUIRED_FRAME_SIZE) {
-    fail(spriteId, `${clipId}.${direction}[${index}] wrong rect size`);
+  if (w !== frameWidth || h !== frameHeight) {
+    fail(
+      spriteId,
+      `${clipId}.${direction}[${index}] wrong rect size, expected ${frameWidth}x${frameHeight}`,
+    );
   }
   if (x < 0 || y < 0 || x + w > imageWidth || y + h > imageHeight) {
     fail(spriteId, `${clipId}.${direction}[${index}] rect out of image bounds`);
@@ -45,7 +48,9 @@ const validateClip = (
   clipId: ClipId,
   clip: ClipManifest,
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number,
 ): void => {
   if (clip.framesPerDirection < 1) {
     fail(spriteId, `${clipId} framesPerDirection < 1`);
@@ -62,11 +67,21 @@ const validateClip = (
     if (rects.length !== clip.framesPerDirection) {
       fail(
         spriteId,
-        `${clipId}.${direction} expected ${clip.framesPerDirection} rects, got ${rects.length}`
+        `${clipId}.${direction} expected ${clip.framesPerDirection} rects, got ${rects.length}`,
       );
     }
     for (let i = 0; i < rects.length; i += 1) {
-      validateRect(spriteId, clipId, direction, i, rects[i]!, imageWidth, imageHeight);
+      validateRect(
+        spriteId,
+        clipId,
+        direction,
+        i,
+        rects[i]!,
+        imageWidth,
+        imageHeight,
+        frameWidth,
+        frameHeight,
+      );
     }
   }
 };
@@ -75,16 +90,30 @@ export const validateManifest = (
   spriteId: string,
   manifest: AtlasManifest,
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): void => {
-  if (manifest.source !== 'pixellab') {
+  if (
+    manifest.source !== 'pixellab' &&
+    manifest.source !== 'gpt-sheet' &&
+    manifest.source !== 'spritesheetgen' &&
+    manifest.source !== 'spritesheet-v2'
+  ) {
     fail(spriteId, `unexpected source ${manifest.source}`);
+  }
+  if (
+    manifest.motion !== undefined &&
+    manifest.motion !== 'procedural' &&
+    manifest.motion !== 'baked'
+  ) {
+    fail(spriteId, `unexpected motion ${manifest.motion}`);
   }
   if (manifest.version !== 1) {
     fail(spriteId, `unsupported version ${manifest.version}`);
   }
-  if (manifest.frameWidth !== REQUIRED_FRAME_SIZE || manifest.frameHeight !== REQUIRED_FRAME_SIZE) {
-    fail(spriteId, `expected 48x48 frames, got ${manifest.frameWidth}x${manifest.frameHeight}`);
+  const frameWidth = assertFiniteNumber(spriteId, 'frameWidth', manifest.frameWidth);
+  const frameHeight = assertFiniteNumber(spriteId, 'frameHeight', manifest.frameHeight);
+  if (frameWidth < 1 || frameHeight < 1) {
+    fail(spriteId, `frame size must be positive, got ${frameWidth}x${frameHeight}`);
   }
   if (
     manifest.directions.length !== DIRECTIONS.length ||
@@ -102,6 +131,14 @@ export const validateManifest = (
   ) {
     fail(spriteId, 'anchor must be {x,y} numbers');
   }
+  if (
+    manifest.anchor.x < 0 ||
+    manifest.anchor.y < 0 ||
+    manifest.anchor.x > frameWidth ||
+    manifest.anchor.y > frameHeight
+  ) {
+    fail(spriteId, 'anchor must be inside frame bounds');
+  }
 
   const clipIds = Object.keys(manifest.clips) as ClipId[];
   if (clipIds.length === 0) {
@@ -109,6 +146,14 @@ export const validateManifest = (
   }
 
   for (const clipId of clipIds) {
-    validateClip(spriteId, clipId, manifest.clips[clipId]!, imageWidth, imageHeight);
+    validateClip(
+      spriteId,
+      clipId,
+      manifest.clips[clipId]!,
+      imageWidth,
+      imageHeight,
+      frameWidth,
+      frameHeight,
+    );
   }
 };

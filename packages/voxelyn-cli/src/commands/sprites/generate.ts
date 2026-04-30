@@ -6,6 +6,7 @@ import type { CharacterSpec, ClipId } from './config/types.js';
 import { sha256Bytes, sha256CanonicalJson, sha256File } from './hash.js';
 import { packAtlas, PNG, type RawFramesByClip } from './pack-atlas.js';
 import { PIPELINE_VERSION } from './pipeline-version.js';
+import { readGptSheetFrames, type GptSheetFrames } from './gpt-sheet.js';
 import {
   PLAN_PATH,
   readPixellabPlan,
@@ -60,18 +61,20 @@ const decodeFramePng = (
   clipId: ClipId,
   direction: Direction,
   frameIndex: number,
-  encoded: string
+  encoded: string,
 ): Uint8Array => {
   const png = PNG.sync.read(Buffer.from(toBase64Payload(encoded), 'base64'));
   if (png.width !== 48 || png.height !== 48) {
-    throw new Error(`${spriteId} ${clipId}.${direction}[${frameIndex}] is ${png.width}x${png.height}, expected 48x48`);
+    throw new Error(
+      `${spriteId} ${clipId}.${direction}[${frameIndex}] is ${png.width}x${png.height}, expected 48x48`,
+    );
   }
   return new Uint8Array(png.data);
 };
 
 const emitPlanForSpecs = async (
   input: RunSpritesGenerateInput,
-  specs: CharacterSpec[]
+  specs: CharacterSpec[],
 ): Promise<void> => {
   const cacheFile = path.join(input.cwd, '.voxelyn-cache/pixellab-character-ids.json');
   const cache = await readPixellabIdCache(cacheFile);
@@ -102,7 +105,7 @@ const emitPlanForSpecs = async (
 const readRawFramesFromResult = async (
   input: RunSpritesGenerateInput,
   spec: CharacterSpec,
-  planItem: PixellabPlanItem
+  planItem: PixellabPlanItem,
 ): Promise<RawFramesByClip> => {
   if (!planItem.pixellabCharacterId) {
     throw new Error(`${spec.id} plan item does not have pixellabCharacterId`);
@@ -121,11 +124,11 @@ const readRawFramesFromResult = async (
       const frames = dirMap[direction] ?? [];
       if (frames.length !== clipSpec.frames) {
         throw new Error(
-          `${spec.id} ${clipId}.${direction} has ${frames.length} frames, expected ${clipSpec.frames}`
+          `${spec.id} ${clipId}.${direction} has ${frames.length} frames, expected ${clipSpec.frames}`,
         );
       }
       raw[clipId]![direction] = frames.map((frame, index) =>
-        decodeFramePng(spec.id, clipId, direction, index, frame)
+        decodeFramePng(spec.id, clipId, direction, index, frame),
       );
     }
   }
@@ -133,38 +136,106 @@ const readRawFramesFromResult = async (
   return raw;
 };
 
-const consumeResultsForSpecs = async (
+type FrameSource = {
+  raw: RawFramesByClip;
+  source: 'pixellab' | 'gpt-sheet' | 'spritesheetgen' | 'spritesheet-v2';
+  motion?: 'procedural' | 'baked';
+  frameWidth?: number;
+  frameHeight?: number;
+  anchor?: { x: number; y: number };
+  sourceHash?: string;
+  sourceConfig?: unknown;
+  promptHashInput: string;
+};
+
+const readRawFramesForSpec = async (
   input: RunSpritesGenerateInput,
-  specs: CharacterSpec[]
-): Promise<void> => {
-  const plan = await readPixellabPlan(input.cwd);
-  if (plan.length === 0) {
-    input.log('[sprites] no plan; run with --emit-plan first');
-    return;
+  spec: CharacterSpec,
+  plan: PixellabPlanItem[],
+): Promise<FrameSource | null> => {
+  const gptSheet = await readGptSheetFrames(input.cwd, spec);
+  if (gptSheet) {
+    const sourceHash =
+      'path' in gptSheet.sheet
+        ? sha256File(gptSheet.sheetPath)
+        : sha256CanonicalJson({
+            image: sha256File(path.join(input.cwd, gptSheet.sheet.imagePath)),
+            json: sha256File(path.join(input.cwd, gptSheet.sheet.jsonPath)),
+          });
+    const sourcePath =
+      'path' in gptSheet.sheet
+        ? gptSheet.sheet.path
+        : `${gptSheet.sheet.imagePath}\n${gptSheet.sheet.jsonPath}`;
+    return {
+      raw: gptSheet.raw,
+      source: gptSheet.source,
+      motion: 'baked',
+      frameWidth: gptSheet.frameWidth,
+      frameHeight: gptSheet.frameHeight,
+      anchor: gptSheet.anchor,
+      sourceHash,
+      sourceConfig: gptSheet.sheet,
+      promptHashInput: `${gptSheet.source}\n${sourcePath}\n${sourceHash}`,
+    };
   }
 
-  for (const spec of specs) {
-    const planItem = plan.find((item) => item.spriteId === spec.id);
-    if (!planItem?.pixellabCharacterId) {
-      input.log(`[sprites] skip ${spec.id} (no plan/result)`);
-      continue;
-    }
+  const planItem = plan.find((item) => item.spriteId === spec.id);
+  if (!planItem?.pixellabCharacterId) {
+    input.log(`[sprites] skip ${spec.id} (no GPT sheet and no PixelLab plan/result)`);
+    return null;
+  }
 
-    const raw = await readRawFramesFromResult(input, spec, planItem);
-    const packed = packAtlas(raw);
+  return {
+    raw: await readRawFramesFromResult(input, spec, planItem),
+    source: 'pixellab',
+    motion: 'procedural',
+    frameWidth: 48,
+    frameHeight: 48,
+    anchor: spec.anchor,
+    promptHashInput: `${spec.basePrompt}\n${spec.styleNotes}`,
+  };
+};
+
+const consumeResultsForSpecs = async (
+  input: RunSpritesGenerateInput,
+  specs: CharacterSpec[],
+): Promise<void> => {
+  const plan = await readPixellabPlan(input.cwd);
+
+  for (const spec of specs) {
+    const frameSource = await readRawFramesForSpec(input, spec, plan);
+    if (!frameSource) continue;
+
+    const frameWidth = frameSource.frameWidth ?? 48;
+    const frameHeight = frameSource.frameHeight ?? 48;
+    const anchor = frameSource.anchor ?? spec.anchor;
+    const packed = packAtlas(frameSource.raw, { frameWidth, frameHeight });
     const conceptHash = sha256File(path.join(input.cwd, spec.conceptArtPath));
-    const configHash = sha256CanonicalJson(spec);
-    const promptHash = sha256Bytes(new TextEncoder().encode(`${spec.basePrompt}\n${spec.styleNotes}`));
+    const configHash = sha256CanonicalJson({
+      spec,
+      frameSource: frameSource.source,
+      sourceConfig: frameSource.sourceConfig,
+      frameWidth,
+      frameHeight,
+      anchor,
+    });
+    const promptHash = sha256Bytes(new TextEncoder().encode(frameSource.promptHashInput));
     const atlasHash = sha256Bytes(packed.png);
     const manifest = buildManifest({
       spec,
+      source: frameSource.source,
+      motion: frameSource.motion,
       rects: packed.rects,
+      frameWidth,
+      frameHeight,
+      anchor,
       hashes: {
         conceptHash,
         promptHash,
         configHash,
         pipelineVersion: PIPELINE_VERSION,
         atlasHash,
+        sourceHash: frameSource.sourceHash,
       },
       generatedAt: new Date().toISOString(),
     });
@@ -175,13 +246,16 @@ const consumeResultsForSpecs = async (
     if (!input.force && existingRaw) {
       try {
         const existing = JSON.parse(existingRaw) as {
+          source?: unknown;
           generation?: Record<string, unknown>;
         };
         const same =
+          existing.source === frameSource.source &&
           existing.generation?.conceptHash === conceptHash &&
           existing.generation?.configHash === configHash &&
           existing.generation?.promptHash === promptHash &&
-          existing.generation?.pipelineVersion === PIPELINE_VERSION;
+          existing.generation?.pipelineVersion === PIPELINE_VERSION &&
+          existing.generation?.sourceHash === frameSource.sourceHash;
         if (same) {
           input.log(`[sprites] skip ${spec.id}: up to date`);
           continue;
@@ -194,7 +268,7 @@ const consumeResultsForSpecs = async (
     await writeAtomic(path.join(outputDir, `${spec.id}.atlas.png`), packed.png);
     await writeAtomic(manifestPath, new TextEncoder().encode(JSON.stringify(manifest, null, 2)));
     input.log(
-      `[sprites] wrote ${spec.id}: ${packed.imageWidth}x${packed.imageHeight}, atlasHash=${atlasHash.slice(0, 12)}...`
+      `[sprites] wrote ${spec.id}: ${packed.imageWidth}x${packed.imageHeight}, atlasHash=${atlasHash.slice(0, 12)}...`,
     );
   }
 };
@@ -210,7 +284,9 @@ export const runSpritesGenerate = async (input: RunSpritesGenerateInput): Promis
 
   for (const spec of specs) {
     if (input.dryRun) {
-      input.log(`[sprites] would generate ${spec.id} (clips: ${Object.keys(spec.clips).join(',')})`);
+      input.log(
+        `[sprites] would generate ${spec.id} (clips: ${Object.keys(spec.clips).join(',')})`,
+      );
       continue;
     }
   }

@@ -6,11 +6,12 @@ export type AtlasManifest = {
   id: string;
   runtimeArchetype: CharacterSpec['runtimeArchetype'];
   displayName: string;
-  source: 'pixellab';
+  source: 'pixellab' | 'gpt-sheet' | 'spritesheetgen' | 'spritesheet-v2';
+  motion?: 'procedural' | 'baked';
   version: 1;
-  frameWidth: 48;
-  frameHeight: 48;
-  anchor: CharacterSpec['anchor'];
+  frameWidth: number;
+  frameHeight: number;
+  anchor: { x: number; y: number };
   directions: CharacterSpec['directions'];
   clips: Partial<
     Record<
@@ -29,6 +30,7 @@ export type AtlasManifest = {
     configHash: string;
     pipelineVersion: string;
     atlasHash: string;
+    sourceHash?: string;
     pixellabModelVersion?: string;
     generatedAt: string;
   };
@@ -36,13 +38,19 @@ export type AtlasManifest = {
 
 export type BuildManifestInput = {
   spec: CharacterSpec;
+  source: AtlasManifest['source'];
+  motion?: AtlasManifest['motion'];
   rects: Partial<Record<ClipId, Record<Direction, FrameRect[]>>>;
+  frameWidth?: number;
+  frameHeight?: number;
+  anchor?: { x: number; y: number };
   hashes: {
     conceptHash: string;
     promptHash: string;
     configHash: string;
     pipelineVersion: string;
     atlasHash: string;
+    sourceHash?: string;
     pixellabModelVersion?: string;
   };
   generatedAt: string;
@@ -68,11 +76,12 @@ export const buildManifest = (input: BuildManifestInput): AtlasManifest => {
     id: input.spec.id,
     runtimeArchetype: input.spec.runtimeArchetype,
     displayName: input.spec.displayName,
-    source: 'pixellab',
+    source: input.source,
+    motion: input.motion,
     version: 1,
-    frameWidth: 48,
-    frameHeight: 48,
-    anchor: input.spec.anchor,
+    frameWidth: input.frameWidth ?? 48,
+    frameHeight: input.frameHeight ?? 48,
+    anchor: input.anchor ?? input.spec.anchor,
     directions: input.spec.directions,
     clips,
     generation: {
@@ -81,6 +90,7 @@ export const buildManifest = (input: BuildManifestInput): AtlasManifest => {
       configHash: input.hashes.configHash,
       pipelineVersion: input.hashes.pipelineVersion,
       atlasHash: input.hashes.atlasHash,
+      sourceHash: input.hashes.sourceHash,
       pixellabModelVersion: input.hashes.pixellabModelVersion,
       generatedAt: input.generatedAt,
     },

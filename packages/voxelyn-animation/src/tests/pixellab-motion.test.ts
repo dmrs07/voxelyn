@@ -42,12 +42,16 @@ const makeClip = (
   },
 });
 
-const atlasWith = (clips: Partial<Record<ClipId, LoadedClip>>): LoadedAtlas => ({
+const atlasWith = (
+  clips: Partial<Record<ClipId, LoadedClip>>,
+  motion?: LoadedAtlas['manifest']['motion']
+): LoadedAtlas => ({
   manifest: {
     id: 'motion-test',
     runtimeArchetype: 'stalker',
     displayName: 'Motion Test',
-    source: 'pixellab',
+    source: motion === 'baked' ? 'gpt-sheet' : 'pixellab',
+    motion,
     version: 1,
     frameWidth: W,
     frameHeight: H,
@@ -146,5 +150,24 @@ describe('PixelLab motion wrapper', () => {
 
     expect(nonZeroPixels(out).length).toBeGreaterThan(0);
     expect(borderHasOpaquePixels(out)).toBe(false);
+  });
+
+  it('does not add procedural motion over baked GPT sheet frames', () => {
+    const source = spriteWithBlock(18, 18, 30, 43);
+    const character = buildPixelLabCharacter(
+      { id: 'striker', source: 'pixellab', spriteId: 'striker', style: 'stalker' },
+      atlasWith({
+        idle: makeClip('idle', 1000, true, 1, source),
+        walk: makeClip('walk', 760, true, 8, source),
+      }, 'baked')
+    );
+
+    const early = blank();
+    const later = blank();
+    renderProceduralFrame(character, 'walk', 0, 'dr', early);
+    renderProceduralFrame(character, 'walk', 360, 'dr', later);
+
+    expect(hashSprite(early)).toBe(hashSprite(later));
+    expect(nonZeroPixels(early).length).toBeGreaterThan(0);
   });
 });
