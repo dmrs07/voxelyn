@@ -13,7 +13,7 @@ services:
     name: voxelyn-survival-server
     runtime: node
     plan: starter
-    region: oregon # trocar por regiao mais proxima; medir latencia do Brasil antes do co-op
+    region: virginia # US East: menor RTT para o Brasil que a costa oeste (Render nao tem regiao BR)
     numInstances: 1 # alpha: instancia unica (salas em memoria, sem KV/Postgres)
     buildCommand: >-
       corepack enable &&
