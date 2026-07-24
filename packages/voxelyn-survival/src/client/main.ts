@@ -137,8 +137,12 @@ const runSolo = (): void => {
 // ONLINE (servidor autoritativo; solo permanece disponivel offline)
 // ---------------------------------------------------------------------------
 const defaultServerUrl = (): string => {
+  // 1) override em runtime por query (?server=)  2) build-time (VITE_SERVER_URL)
+  // 3) fallback local
   const q = new URLSearchParams(location.search).get('server');
   if (q) return q;
+  const env = (import.meta.env as Record<string, string | undefined>).VITE_SERVER_URL;
+  if (env) return env;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${location.hostname || 'localhost'}:8080`;
 };
