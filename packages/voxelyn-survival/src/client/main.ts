@@ -82,13 +82,6 @@ const runSolo = (): void => {
 
   const gate = new RestartGate(RESTART_ARM_MS);
 
-  const restartKey = (e: KeyboardEvent): void => {
-    if (e.key.toLowerCase() === 'r' && state.phase !== 'running' && state.phase !== 'choice') {
-      state = createRun({ seed: (Date.now() ^ 0x9e3779b9) >>> 0 });
-      gate.reset();
-    }
-  };
-  window.addEventListener('keydown', restartKey);
 
   const frame = (now: number): void => {
     if (!running) return;
@@ -115,7 +108,7 @@ const runSolo = (): void => {
 
     if (state.phase !== 'running') {
       const { drain, armed } = gate.frame(now, true);
-      if (drain) input.clearTaps();
+      if (drain) input.clearPendingUiInput();
       renderer.render(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
@@ -136,14 +129,13 @@ const runSolo = (): void => {
       if (state.phase !== 'running') break;
     }
     // durante a run a fila de toques nao tem consumidor: drena todo frame
-    if (gate.frame(now, false).drain) input.clearTaps();
+    if (gate.frame(now, false).drain) input.clearPendingUiInput();
     renderer.render(state, accumulator / TICK_MS, input.state, now);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
   stopLoop = () => {
     running = false;
-    window.removeEventListener('keydown', restartKey);
   };
 };
 
@@ -214,7 +206,7 @@ const runOnline = (url: string): void => {
         const terminal = state.phase !== 'running' && state.phase !== 'choice';
         renderer.render(state, 1, input.state, now);
         const { drain, armed } = gate.frame(now, terminal);
-        if (drain) input.clearTaps();
+        if (drain) input.clearPendingUiInput();
         if (terminal) {
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o

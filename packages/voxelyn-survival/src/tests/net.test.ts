@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SurvivalServer } from '@voxelyn/survival-server';
-import { emptyCommand } from '@voxelyn/survival-sim';
+import { emptyCommand, type PlayerCommand } from '@voxelyn/survival-sim';
 import { NetClient } from '../client/net';
 
 /**
@@ -177,6 +177,43 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.caches[0].opened).toBe(true); // antes: crate desenhada para sempre
     expect(view.coreTaken).toBe(true);
+  });
+
+  it('bordas sobrevivem ao throttle: um uso entre envios nao e perdido', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    a.connect();
+    loop.advance(3);
+
+    const room = loop.server.roomForClient('A')!;
+    room.state.playerExtras[0].consumables = 5;
+    room.state.players[0].hp = 10;
+    const before = room.state.playerExtras[0].consumables;
+
+    const idle = (): PlayerCommand => {
+      const c = emptyCommand();
+      c.aim = { x: 1, y: 0 };
+      return c;
+    };
+
+    // normaliza a janela do throttle (~25 Hz): ultimo envio em T
+    const T = 10_000;
+    a.setCommand(idle());
+    a.pump(T);
+
+    // frame com a borda cai DENTRO da janela: pump nao transmite
+    const withConsume = idle();
+    withConsume.consume = true;
+    a.setCommand(withConsume);
+    a.pump(T + 10);
+
+    // frame seguinte sem borda; antes ele sobrescrevia o comando e o uso sumia
+    a.setCommand(idle());
+    a.pump(T + 100); // agora sim transmite
+    loop.tick();
+    loop.tick();
+
+    expect(room.state.playerExtras[0].consumables).toBe(before - 1);
   });
 
   it('resetSession descarta token e estado: o proximo hello entra em sala nova', () => {

@@ -82,8 +82,27 @@ export class NetClient {
     this.status = 'offline';
   }
 
+  /**
+   * Acumula a intencao do frame. Eixos continuos (move/aim/fire) usam o valor
+   * mais recente; campos de BORDA acumulam ate pump() realmente transmitir.
+   * O throttle de ~25 Hz descarta frames inteiros — sem acumular, uma esquiva
+   * ou um uso que caia numa janela nao enviada desaparece, porque o frame
+   * seguinte traz esses campos em false.
+   */
   setCommand(cmd: PlayerCommand): void {
-    this.command = cmd;
+    if (!this.command) {
+      this.command = { ...cmd, move: { ...cmd.move }, aim: { ...cmd.aim } };
+      return;
+    }
+    const acc = this.command;
+    acc.move = { ...cmd.move };
+    acc.aim = { ...cmd.aim };
+    acc.fire = cmd.fire;
+    acc.dodge = acc.dodge || cmd.dodge;
+    acc.ability = acc.ability || cmd.ability;
+    acc.interact = acc.interact || cmd.interact;
+    acc.consume = acc.consume || cmd.consume;
+    if (cmd.choose !== null) acc.choose = cmd.choose;
   }
 
   /** Envia a intencao corrente (com throttle ~25 Hz para respeitar o rate limit). */
@@ -93,6 +112,12 @@ export class NetClient {
     this.lastSendMs = nowMs;
     this.seq += 1;
     this.send(encodeMessage({ t: 'cmd', seq: this.seq, clientTick: this.state?.tick ?? 0, commands: [this.command] }));
+    // bordas transmitidas: zera o acumulador (a mensagem ja foi serializada)
+    this.command.dodge = false;
+    this.command.ability = false;
+    this.command.interact = false;
+    this.command.consume = false;
+    this.command.choose = null;
   }
 
   requestResync(reason = 'client'): void {

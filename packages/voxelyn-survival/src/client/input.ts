@@ -32,6 +32,7 @@ export class SurvivalInput {
   private queuedConsume = false;
   private queuedAbility = false;
   private queuedChoice: 0 | 1 | null = null;
+  private queuedRestart = false;
 
   readonly state: InputState = {
     joystick: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
@@ -81,6 +82,7 @@ export class SurvivalInput {
     if (k === 'e') this.queuedInteract = true;
     if (k === 'f') this.queuedConsume = true;
     if (k === 'q' || k === 'shift') this.queuedAbility = true;
+    if (k === 'r') this.queuedRestart = true;
     if (k === '1') this.queuedChoice = 0;
     if (k === '2') this.queuedChoice = 1;
     if ([' ', 'w', 'a', 's', 'd', 'e', 'f', 'q', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
@@ -198,14 +200,16 @@ export class SurvivalInput {
   }
 
   /**
-   * Descarta toques de gameplay acumulados. A fila so existe para UI (menu de
-   * escolha, tela de fim); durante a run ninguem a consome, entao sem este
-   * dreno cada toque no joystick/mira/botao — e cada clique de tiro no mouse —
-   * fica guardado e o primeiro hasTap() apos a morte reinicia a run na hora,
-   * antes do jogador ver o resultado.
+   * Descarta intencoes de UI pendentes (toques e a tecla R). A fila de toques
+   * so existe para UI (menu de escolha, tela de fim); durante a run ninguem a
+   * consome, entao sem este dreno cada toque no joystick/mira/botao — e cada
+   * clique de tiro no mouse — fica guardado e o primeiro hasTap() apos a morte
+   * reinicia a run na hora, antes do jogador ver o resultado. A tecla R e
+   * travada do mesmo jeito e precisa do mesmo dreno.
    */
-  clearTaps(): void {
+  clearPendingUiInput(): void {
     this.state.tapQueue.length = 0;
+    this.queuedRestart = false;
   }
 
   hasTap(): boolean {
@@ -216,13 +220,15 @@ export class SurvivalInput {
     return false;
   }
 
-  /** Reinicio tambem por teclado, alinhado com o texto da tela de fim. */
+  /**
+   * Reinicio por teclado, alinhado com o texto da tela de fim. A tecla fica
+   * TRAVADA ate ser consumida: se o jogador apertar R antes de a porta armar,
+   * o pedido sobrevive ao keyup em vez de se perder.
+   */
   consumeRestartKey(): boolean {
-    if (this.keys['r']) {
-      this.keys['r'] = false;
-      return true;
-    }
-    return false;
+    if (!this.queuedRestart) return false;
+    this.queuedRestart = false;
+    return true;
   }
 
   /** Converte o estado bruto em PlayerCommand. worldAim: funcao tela->direcao de mira. */
