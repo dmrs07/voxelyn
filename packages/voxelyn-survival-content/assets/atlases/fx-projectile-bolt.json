@@ -1,0 +1,42 @@
+{
+  "id": "fx-projectile-bolt",
+  "version": 1,
+  "atlas": "fx-projectile-bolt.png",
+  "frameWidth": 16,
+  "frameHeight": 16,
+  "anchorX": 8,
+  "anchorY": 8,
+  "directions": 1,
+  "authoredDirs": [
+    "n"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.3,
+    "h": 0.3
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#59f2c2",
+    "#7ab8ff",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "fly": {
+      "frames": 4,
+      "fps": 20,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "n": {
+      "fly": 0
+    }
+  },
+  "generation": {
+    "tool": "procedural (tools/entities.mjs)",
+    "prompt": "biolum energy bolt with electric spark trail",
+    "seedOrRef": "deterministic-code-v1"
+  }
+}

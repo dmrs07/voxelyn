@@ -1,0 +1,71 @@
+{
+  "id": "enemy-stalker",
+  "version": 1,
+  "atlas": "enemy-stalker.png",
+  "frameWidth": 24,
+  "frameHeight": 24,
+  "anchorX": 12,
+  "anchorY": 22,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "ur"
+  ],
+  "flipPairs": {
+    "dl": "dr",
+    "ul": "ur"
+  },
+  "hitbox": {
+    "w": 0.64,
+    "h": 0.6
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#46566e",
+    "#a8e63c"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 12,
+      "loop": true
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "hit": 8,
+      "die": 10
+    },
+    "ur": {
+      "idle": 14,
+      "walk": 18,
+      "hit": 22,
+      "die": 24
+    }
+  },
+  "generation": {
+    "tool": "procedural (tools/entities.mjs)",
+    "prompt": "low chitinous multi-legged cave predator, acid eyes, strong silhouette, iso 2:1",
+    "seedOrRef": "deterministic-code-v1"
+  }
+}

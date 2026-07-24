@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "generated": "2026-07-24",
+  "ids": [
+    "player-prospector",
+    "enemy-stalker",
+    "enemy-spitter",
+    "fx-projectile-bolt",
+    "fx-impact-burst"
+  ]
+}
