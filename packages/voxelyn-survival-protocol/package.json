@@ -1,0 +1,27 @@
+{
+  "name": "@voxelyn/survival-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voxelyn Survival - versioned co-op wire protocol: messages, runtime validation, chunk-diff codec",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@voxelyn/survival-sim": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
+  }
+}

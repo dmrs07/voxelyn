@@ -9,9 +9,9 @@ import {
   SURF_GAS,
   SURF_SCORCHED,
   HEAT_MAX,
-} from '../sim/constants';
+} from '@voxelyn/survival-sim';
 import type { InputState } from './input';
-import type { SemanticEvent, SurvivalState } from '../sim/types';
+import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 
 export const TILE_W = 32;
 export const TILE_H = 16;

@@ -36,3 +36,9 @@ coverage/
 # Cache
 .cache/
 .parcel-cache/
+
+# Stray compiled outputs next to TS sources (survival packages build to dist/)
+packages/voxelyn-survival-sim/src/**/*.js
+packages/voxelyn-survival-sim/src/**/*.d.ts
+packages/voxelyn-survival-protocol/src/**/*.js
+packages/voxelyn-survival-protocol/src/**/*.d.ts

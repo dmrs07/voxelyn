@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createRun, emptyCommand, stepRun } from '../sim/run';
-import type { SurvivalState } from '../sim/types';
+import { createRun, emptyCommand, stepRun } from '../src/run';
+import type { SurvivalState } from '../src/types';
 
 const stepIdle = (state: SurvivalState, ticks: number): void => {
   for (let t = 0; t < ticks; t++) stepRun(state, [emptyCommand()]);

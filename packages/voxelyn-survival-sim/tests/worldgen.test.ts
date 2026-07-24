@@ -5,8 +5,8 @@ import {
   SURF_NONE,
   WORLD_H,
   WORLD_W,
-} from '../sim/constants';
-import { floodOpen, generateWorld } from '../sim/worldgen';
+} from '../src/constants';
+import { floodOpen, generateWorld } from '../src/worldgen';
 
 const SEEDS = [1, 2, 3, 42, 1337, 0xdecafbad, 987654321, 7];
 

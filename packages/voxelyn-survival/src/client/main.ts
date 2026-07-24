@@ -1,6 +1,6 @@
-import { TICK_MS } from '../sim/constants';
-import { createRun, stepRun } from '../sim/run';
-import type { SurvivalState } from '../sim/types';
+import { TICK_MS } from '@voxelyn/survival-sim';
+import { createRun, stepRun } from '@voxelyn/survival-sim';
+import type { SurvivalState } from '@voxelyn/survival-sim';
 import { SurvivalInput } from './input';
 import { SurvivalRenderer } from './render';
 

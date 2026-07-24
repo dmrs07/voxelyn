@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../sim/run';
-import type { PlayerCommand } from '../sim/types';
+import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
+import type { PlayerCommand } from '../src/types';
 
 /** Script de comandos deterministico: anda em espiral, atira em rajadas, esquiva. */
 const scriptedCommand = (tick: number): PlayerCommand => {

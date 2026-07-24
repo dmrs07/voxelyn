@@ -1,23 +1,18 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  base: './',
   resolve: {
     alias: {
       '@voxelyn/survival-sim': resolve(__dirname, '../voxelyn-survival-sim/src/index.ts'),
       '@voxelyn/core': resolve(__dirname, '../voxelyn-core/src/index.ts'),
     },
-    conditions: ['browser', 'import', 'module', 'default'],
-  },
-  server: {
-    port: 5175,
   },
   test: {
     environment: 'node',
-    include: ['src/tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts'],
   },
 });

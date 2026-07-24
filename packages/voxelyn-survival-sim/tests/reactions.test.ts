@@ -11,11 +11,11 @@ import {
   SURF_FUNGAL,
   SURF_GAS,
   SURF_NONE,
-} from '../sim/constants';
-import { breakSolid, explodeAt, setSurface, stepCells } from '../sim/cells';
-import { spawnEnemy } from '../sim/entities';
-import { createRun, resolveChainedEvents } from '../sim/run';
-import type { SemanticEvent, SurvivalState } from '../sim/types';
+} from '../src/constants';
+import { breakSolid, explodeAt, setSurface, stepCells } from '../src/cells';
+import { spawnEnemy } from '../src/entities';
+import { createRun, resolveChainedEvents } from '../src/run';
+import type { SemanticEvent, SurvivalState } from '../src/types';
 
 /** Limpa um retangulo do mapa para cenario controlado. */
 const clearArea = (state: SurvivalState, x0: number, y0: number, x1: number, y1: number): void => {

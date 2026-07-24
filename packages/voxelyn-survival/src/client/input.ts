@@ -1,5 +1,5 @@
-import type { PlayerCommand, Vec2 } from '../sim/types';
-import { emptyCommand } from '../sim/run';
+import type { PlayerCommand, Vec2 } from '@voxelyn/survival-sim';
+import { emptyCommand } from '@voxelyn/survival-sim';
 
 export type TouchButton = {
   id: 'dodge' | 'ability' | 'consume' | 'interact';
