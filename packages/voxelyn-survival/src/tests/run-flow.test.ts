@@ -31,10 +31,14 @@ describe('fluxo da run', () => {
     expect(state.player.y).toBe(before.y);
   });
 
-  it('extracao na entrada sem o nucleo encerra como "extracted"', () => {
+  it('extracao no spawn e bloqueada ate o jogador deixar a zona de entrada', () => {
     const state = createRun({ seed: 11 });
     const cmd = emptyCommand();
     cmd.interact = true;
+    stepRun(state, [cmd]);
+    expect(state.phase).toBe('running'); // toque acidental nao encerra a run
+
+    state.leftEntryZone = true; // jogador explorou e voltou
     stepRun(state, [cmd]);
     expect(state.phase).toBe('extracted');
   });

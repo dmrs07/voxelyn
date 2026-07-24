@@ -112,6 +112,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     corePos: world.corePos,
     coreTaken: false,
     guardianAwake: false,
+    leftEntryZone: false,
     player,
     playerExtra: {
       aim: { x: 1, y: 0 },
@@ -224,6 +225,12 @@ const stepPlayer = (state: SurvivalState, cmd: PlayerCommand, events: SemanticEv
       const speed = PLAYER_SPEED * surfaceSpeedMul(state, player);
       moveEntity(state, player, nx * speed * dt, ny * speed * dt);
     }
+  }
+
+  // extracao so libera depois de deixar a zona de entrada uma vez
+  if (!state.leftEntryZone) {
+    const distFromEntry = Math.hypot(player.x - (state.entry.x + 0.5), player.y - (state.entry.y + 0.5));
+    if (distFromEntry > 4) state.leftEntryZone = true;
   }
 
   // calor decai
@@ -339,7 +346,7 @@ const stepPlayer = (state: SurvivalState, cmd: PlayerCommand, events: SemanticEv
       }
     }
     const distEntry = Math.hypot(player.x - (state.entry.x + 0.5), player.y - (state.entry.y + 0.5));
-    if (distEntry < 1.6) {
+    if (distEntry < 1.6 && state.leftEntryZone) {
       state.phase = extra.hasCore ? 'extracted_with_core' : 'extracted';
       events.push({ t: 'extracted', withCore: extra.hasCore });
     }

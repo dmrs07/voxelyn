@@ -119,6 +119,7 @@ export type SurvivalState = {
   corePos: Vec2;
   coreTaken: boolean;
   guardianAwake: boolean;
+  leftEntryZone: boolean;
 
   player: Entity;
   playerExtra: PlayerExtra;
