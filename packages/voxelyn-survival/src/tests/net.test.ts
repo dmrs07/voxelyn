@@ -150,6 +150,17 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(alivePlayers.length).toBe(2); // o renderer itera view.players
   });
 
+  it('sem parceiro, o view NAO expoe um player fantasma', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    a.connect();
+    loop.advance(5);
+    const view = a.sampleRenderState(loop['now'] as number)!;
+    // o slot 1 existe no state local, mas nao veio no snapshot -> nao-joined
+    expect(view.playerExtras[0].joined).toBe(true);
+    expect(view.playerExtras[1].joined).toBe(false);
+  });
+
   it('dois clientes completam a run: extracao coletiva chega no view', () => {
     const loop = new Loop();
     const a = loop.connect('A');

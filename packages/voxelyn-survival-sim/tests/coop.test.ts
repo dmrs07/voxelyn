@@ -78,6 +78,34 @@ describe('co-op: multiplayer na simulacao', () => {
     expect(state.phase).toBe('extracted');
   });
 
+  it('ondas de contaminacao disparam UMA vez cada (sentinel nao e apagado)', () => {
+    const state = createRun({ seed: 33, playerCount: 1 });
+    state.enemies = [];
+    state.contamination = 0.4; // cruza o primeiro limiar
+    let waveMessages = 0;
+    for (let t = 0; t < 200; t++) {
+      const res = stepRun(state, [emptyCommand()]);
+      waveMessages += res.events.filter(
+        (e) => e.t === 'message' && e.text.includes('contaminacao')
+      ).length;
+    }
+    expect(waveMessages).toBe(1); // antes: repetia a cada poucos ticks
+    expect(state.contaminationWaves).toBe(1);
+  });
+
+  it('sala co-op (playerCount=2) nunca pausa em choice, mesmo com 1 slot em jogo', () => {
+    const state = createRun({ seed: 33, playerCount: 2 });
+    state.playerExtras[1].joined = false; // online solo: parceiro ausente
+    const cache = state.caches[0];
+    state.players[0].x = cache.x + 0.5;
+    state.players[0].y = cache.y + 0.5;
+    const interact = emptyCommand();
+    interact.interact = true;
+    stepRun(state, [interact, emptyCommand()]);
+    expect(state.phase).toBe('running'); // nunca trava em 'choice'
+    expect(state.playerExtras[0].modifiers.length).toBe(1);
+  });
+
   it('determinismo co-op: mesma seed e mesmos comandos por slot geram o mesmo hash', () => {
     const scripted = (t: number, slot: number): PlayerCommand => {
       const c = emptyCommand();

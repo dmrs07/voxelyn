@@ -147,6 +147,8 @@ export type SurvivalState = {
 
   pendingChoice: [ModifierId, ModifierId] | null;
   contamination: number;
+  /** Quantos limiares de contaminacao ja dispararam (one-shot, serializavel). */
+  contaminationWaves: number;
   nextEntityId: number;
 
   // fila deterministica de celulas reagindo (indices), processada com orcamento

@@ -463,9 +463,10 @@ export class SurvivalRenderer {
     // desenha TODOS os players (co-op): o parceiro precisa estar visivel para
     // coordenacao e revive. state.player e apenas o alias LOCAL (camera/HUD/mira).
     for (const pl of state.players) {
-      if (!pl.alive) continue;
       const slot = pl.slot ?? 0;
       const ex = state.playerExtras[slot];
+      // slot reservado/nao reivindicado nao existe em jogo (nada de fantasma)
+      if (!ex.joined || !pl.alive) continue;
       const isLocal = pl === player;
       const anim = this.animFor(pl.id, pl.x, pl.y, pl.hp, pl.alive, nowMs);
       items.push({

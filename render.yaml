@@ -18,9 +18,7 @@ services:
     buildCommand: >-
       corepack enable &&
       pnpm install --no-frozen-lockfile &&
-      pnpm --filter @voxelyn/survival-sim build &&
-      pnpm --filter @voxelyn/survival-protocol build &&
-      pnpm --filter @voxelyn/survival-server build
+      pnpm --filter @voxelyn/survival-server... build
     startCommand: node packages/voxelyn-survival-server/dist/bin/serve.js
     healthCheckPath: /healthz
     autoDeploy: true
@@ -41,7 +39,7 @@ services:
     buildCommand: >-
       corepack enable &&
       pnpm install --no-frozen-lockfile &&
-      pnpm --filter @voxelyn/survival build
+      pnpm --filter @voxelyn/survival... build
     staticPublishPath: packages/voxelyn-survival/dist
     autoDeploy: true
     envVars:

@@ -170,6 +170,16 @@ export class NetClient {
       return { x: p.x + (cx - p.x) * alpha, y: p.y + (cy - p.y) * alpha };
     };
 
+    // slots ausentes do frame nao existem no servidor (ex.: parceiro que ainda
+    // nao entrou): marca como nao-joined para o renderer nao desenhar fantasma.
+    const presentSlots = new Set<number>();
+    for (const snap of this.curr.entities.values()) {
+      if (snap.kind === 'player') presentSlots.add(snap.id - 1);
+    }
+    for (let s = 0; s < state.players.length; s++) {
+      state.playerExtras[s].joined = presentSlots.has(s);
+    }
+
     const enemies: Entity[] = [];
     for (const snap of this.curr.entities.values()) {
       const pos = lerpPos(snap.id, snap.x, snap.y);

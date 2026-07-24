@@ -161,6 +161,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     charges: [],
     pendingChoice: null,
     contamination: 0,
+    contaminationWaves: 0,
     // reserva todos os ids de player (1..playerCount) antes dos inimigos, para
     // que nenhum inimigo colida com um id de player nos snapshots por id
     nextEntityId: playerCount + 1,
@@ -254,7 +255,11 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const dt = 1 / TICK_HZ;
-  const coop = joinedPlayers(state).length > 1;
+  // Modo da SALA (nao quantos entraram): uma sala online (playerCount>1) nunca
+  // pausa em 'choice' — o protocolo nao transporta pendingChoice e o cliente
+  // online nao renderiza o menu, entao pausar travaria o jogador. Solo local
+  // (playerCount===1) mantem o menu de escolha.
+  const coop = state.config.playerCount > 1;
 
   // slots nao reivindicados, abatidos e mortos nao agem
   if (!extra.joined || !player.alive || extra.downed) return;
@@ -559,11 +564,12 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
     [0.6, 3],
     [0.85, 4],
   ];
-  for (const [level, count] of thresholds) {
-    const marker = Math.floor(level * 100);
-    if (state.contamination >= level && !state.vents.some((v) => v.nextEmitAt === -marker)) {
-      // usa um vent sentinel para registrar o threshold consumido (deterministico e serializavel)
-      state.vents.push({ x: 0, y: 0, nextEmitAt: -marker });
+  for (let w = 0; w < thresholds.length; w++) {
+    const [level, count] = thresholds[w];
+    // contador one-shot: vents sao reescritos por stepCells, entao um sentinel
+    // ali seria apagado e a onda dispararia repetidamente.
+    if (state.contamination >= level && state.contaminationWaves <= w) {
+      state.contaminationWaves = w + 1;
       events.push({ t: 'message', text: 'O Veio se agita - a contaminacao aumenta.' });
       let spawned = 0;
       for (let attempt = 0; attempt < 80 && spawned < count; attempt++) {
@@ -730,6 +736,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   }
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));
+  mix(state.contaminationWaves);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));
