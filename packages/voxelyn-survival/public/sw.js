@@ -39,14 +39,29 @@ self.addEventListener('fetch', (event) => {
 
   // network-first para navegacao (pega updates), cache como fallback offline
   if (req.mode === 'navigate') {
+    // A raiz e o shell do JOGO. Guardar toda navegacao sob './' faria uma visita
+    // a sprites.html (o visualizador interno) substituir esse shell, e o proximo
+    // lancamento offline abriria o visualizador em vez do jogo. Cada navegacao
+    // e cacheada pela propria URL; './' so e atualizado pela propria raiz.
+    const isRoot = url.pathname === '/' || url.pathname.endsWith('/index.html');
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('./', copy));
+          if (res.ok) {
+            const byUrl = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, byUrl));
+            if (isRoot) {
+              const asRoot = res.clone();
+              caches.open(CACHE).then((c) => c.put('./', asRoot));
+            }
+          }
           return res;
         })
-        .catch(() => caches.match('./').then((r) => r || caches.match('./index.html')))
+        .catch(() =>
+          caches
+            .match(req)
+            .then((r) => r || (isRoot ? caches.match('./').then((x) => x || caches.match('./index.html')) : undefined))
+        )
     );
     return;
   }

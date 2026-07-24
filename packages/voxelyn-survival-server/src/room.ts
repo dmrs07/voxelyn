@@ -22,6 +22,16 @@ import {
 
 const HASH_INTERVAL_TICKS = 20;
 
+/**
+ * Quanto tempo um slot desconectado continua reservado (e seu avatar continua
+ * na sim, para que uma reconexao retome a run onde parou). Passado isso o slot
+ * e APOSENTADO: o avatar sai da sim e a vaga volta a ser oferecida.
+ * Curto o bastante para nao prender o parceiro que ficou — um avatar
+ * desconectado nao anda, entao ele bloqueia a extracao coletiva enquanto
+ * contar como "de pe" — e longo o bastante para uma queda de rede movel.
+ */
+const DISCONNECT_GRACE_TICKS = 20 * 45;
+
 export type Slot = {
   slot: number;
   clientId: string | null; // null = desconectado (player permanece na sim)
@@ -31,6 +41,8 @@ export type Slot = {
   needsFullResync: boolean;
   lastAckSeq: number;
   lastWorldSig: string | null; // ultima WorldFlags enviada a este cliente
+  disconnectedAtTick: number | null; // null = conectado
+  retired: boolean; // grace expirado: token morto, vaga reofertada
 };
 
 /**
@@ -82,10 +94,10 @@ export class GameRoom {
   }
 
   hasOpenSlot(): boolean {
-    // Apenas capacidade nao alocada abre vaga para um cliente NOVO. Slots ja
-    // criados ficam reservados pelo seu resume token, mesmo desconectados —
-    // so o dono pode reivindicar via reattach().
-    return this.slots.length < this.maxPlayers;
+    // Capacidade nao alocada, ou um slot aposentado (dono nao voltou dentro do
+    // grace). Slots apenas desconectados seguem reservados pelo resume token —
+    // so o dono pode reivindica-los via reattach().
+    return this.slots.length < this.maxPlayers || this.slots.some((s) => s.retired);
   }
 
   /** Marca o avatar do slot como efetivamente em jogo, posicionado na entrada. */
@@ -104,10 +116,26 @@ export class GameRoom {
     e.joined = true;
   }
 
-  /** Cria um NOVO slot para um cliente inedito. Nunca reivindica slot alheio. */
+  /** Cria (ou reocupa) um slot para um cliente inedito. Nunca herda slot vivo. */
   attach(clientId: string): Slot | null {
-    // slots desconectados sao token-reservados: um visitante novo NAO os herda
-    // (evita que um estranho controle o avatar e aprenda o token do original).
+    // slots apenas desconectados sao token-reservados: um visitante novo NAO os
+    // herda (evita que um estranho controle o avatar e aprenda o token do
+    // original). Ja um slot APOSENTADO foi abandonado e pode ser reocupado,
+    // sempre com token novo — o token antigo morreu junto.
+    const retired = this.slots.find((s) => s.retired);
+    if (retired) {
+      retired.clientId = clientId;
+      retired.resumeToken = this.makeToken();
+      retired.gate = new SequenceGate();
+      retired.command = emptyCommand();
+      retired.needsFullResync = true;
+      retired.lastAckSeq = -1;
+      retired.lastWorldSig = null;
+      retired.disconnectedAtTick = null;
+      retired.retired = false;
+      this.claimAvatar(retired.slot); // avatar novo na entrada
+      return retired;
+    }
     if (this.slots.length >= this.maxPlayers) return null;
     this.claimAvatar(this.slots.length);
     const slot: Slot = {
@@ -119,6 +147,8 @@ export class GameRoom {
       needsFullResync: true,
       lastAckSeq: -1,
       lastWorldSig: null,
+      disconnectedAtTick: null,
+      retired: false,
     };
     this.slots.push(slot);
     return slot;
@@ -127,8 +157,9 @@ export class GameRoom {
   /** Reanexa por resume token (reconexao). */
   reattach(resumeToken: string, clientId: string): Slot | null {
     const slot = this.slots.find((s) => s.resumeToken === resumeToken);
-    if (!slot) return null;
+    if (!slot || slot.retired) return null; // token de slot aposentado nao vale
     slot.clientId = clientId;
+    slot.disconnectedAtTick = null;
     slot.needsFullResync = true;
     return slot;
   }
@@ -139,6 +170,25 @@ export class GameRoom {
     if (slot) {
       slot.clientId = null;
       slot.command = emptyCommand(); // desconectado para de agir
+      slot.disconnectedAtTick = this.state.tick; // inicia o grace
+    }
+  }
+
+  /**
+   * Aposenta slots cujo dono nao voltou dentro do grace. Sem isto o avatar
+   * desconectado fica `joined` para sempre: como ele nao anda, `standingPlayers`
+   * o conta na extracao coletiva e o parceiro que ficou nunca consegue extrair,
+   * nem recebe um substituto (a sala tampouco expira, pois segue com um cliente
+   * conectado).
+   */
+  private retireStaleSlots(): void {
+    for (const slot of this.slots) {
+      if (slot.retired || slot.disconnectedAtTick === null) continue;
+      if (this.state.tick - slot.disconnectedAtTick < DISCONNECT_GRACE_TICKS) continue;
+      slot.retired = true;
+      slot.resumeToken = this.makeToken(); // invalida o token do dono anterior
+      const extra = this.state.playerExtras[slot.slot];
+      if (extra) extra.joined = false; // avatar sai da sim
     }
   }
 
@@ -159,6 +209,7 @@ export class GameRoom {
 
   /** Avanca a simulacao um tick e produz os diffs de chunk do tick. */
   step(): { events: SemanticEvent[]; chunkDiffs: ChunkDiff[]; removed: number[] } {
+    this.retireStaleSlots();
     const cmds: PlayerCommand[] = [];
     for (let s = 0; s < this.state.players.length; s++) {
       cmds[s] = this.slots[s]?.command ?? emptyCommand();

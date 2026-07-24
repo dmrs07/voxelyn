@@ -323,6 +323,97 @@ describe('servidor autoritativo de co-op', () => {
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
 
+  it('parceiro desconectado deixa de travar a extracao apos o grace', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.connect('B');
+    h.hello('A');
+    h.hello('B');
+    h.tick(1);
+
+    const room = h.server.roomForClient('A')!;
+    room.state.leftEntryZone = true;
+    // A na saida; B longe (e vai cair da rede)
+    room.state.players[0].x = room.state.entry.x + 0.5;
+    room.state.players[0].y = room.state.entry.y + 0.5;
+    room.state.players[1].x = room.state.entry.x + 25;
+    room.state.players[1].y = room.state.entry.y + 25;
+    h.disconnect('B');
+
+    // dentro do grace o slot segue reservado: o avatar parado bloqueia a saida
+    h.cmd('A', 5, interact());
+    h.tick(5);
+    expect(room.state.phase).toBe('running');
+    expect(room.state.playerExtras[1].joined).toBe(true);
+    expect(room.hasOpenSlot()).toBe(false); // token do B ainda vale
+
+    // passado o grace, o slot aposenta e o avatar sai da sim
+    h.tick(20 * 45 + 2);
+    expect(room.state.playerExtras[1].joined).toBe(false);
+    expect(room.hasOpenSlot()).toBe(true); // vaga reofertada
+
+    h.cmd('A', 200, interact());
+    h.tick(3);
+    expect(room.state.phase).toBe('extracted'); // antes: preso para sempre
+  });
+
+  it('token de slot aposentado nao reanexa; a vaga aceita um novo jogador', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.connect('B');
+    h.hello('A');
+    h.hello('B');
+    h.tick(1);
+    const wb = h.drain('B').find((m) => m.t === 'welcome');
+    if (wb?.t !== 'welcome') throw new Error('sem welcome');
+    const deadToken = wb.resumeToken;
+
+    const room = h.server.roomForClient('A')!;
+    h.disconnect('B');
+    h.tick(20 * 45 + 2); // grace expira
+
+    // o dono anterior tenta voltar com o token antigo
+    h.connect('B2');
+    h.hello('B2', deadToken);
+    const rejected = h.drain('B2');
+    expect(rejected.some((m) => m.t === 'reject')).toBe(true);
+
+    // um jogador novo ocupa a vaga liberada, com avatar fresco na entrada
+    h.connect('C');
+    h.hello('C');
+    h.tick(1);
+    expect(h.server.roomForClient('C')?.id).toBe(room.id);
+    expect(room.state.playerExtras[1].joined).toBe(true);
+    expect(room.state.players[1].hp).toBe(room.state.players[1].maxHp);
+  });
+
+  it('reconexao dentro do grace mantem o avatar onde estava (sem teleporte)', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.connect('B');
+    h.hello('A');
+    h.hello('B');
+    h.tick(1);
+    const wb = h.drain('B').find((m) => m.t === 'welcome');
+    if (wb?.t !== 'welcome') throw new Error('sem welcome');
+
+    const room = h.server.roomForClient('A')!;
+    room.state.players[1].x = room.state.entry.x + 18;
+    room.state.players[1].y = room.state.entry.y + 12;
+    room.state.players[1].hp = 40;
+
+    h.disconnect('B');
+    h.tick(40); // blip curto, bem dentro do grace
+    h.connect('B2');
+    h.hello('B2', wb.resumeToken);
+    h.tick(1);
+
+    // retomar a run nao pode virar cura/teleporte gratuito para a entrada
+    expect(room.state.players[1].hp).toBe(40);
+    expect(room.state.players[1].x).toBeCloseTo(room.state.entry.x + 18, 5);
+    expect(room.slots[1].clientId).toBe('B2');
+  });
+
   it('resume tokens sao imprevisiveis: nao derivam de seed, id da sala nem ordem', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 40; i++) {
