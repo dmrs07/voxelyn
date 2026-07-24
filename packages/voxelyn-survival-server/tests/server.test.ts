@@ -361,6 +361,24 @@ describe('servidor autoritativo de co-op', () => {
     expect(served.length).toBe(1);
   });
 
+  it('sala de capacidade 1 e recusada: sala online nunca roda em modo solo', () => {
+    // capacidade 1 faria a sim rodar como solo local e entrar em 'choice' ao
+    // abrir um bau — fase que o cliente online nao sabe responder (deadlock)
+    const server = new SurvivalServer({ maxPlayersPerRoom: 1, baseSeed: 31337 });
+    server.addConnection('A', 0);
+    server.handleMessage('A', JSON.stringify({ t: 'hello', versions: CURRENT_VERSIONS }), 5);
+    const room = server.roomForClient('A')!;
+    expect(room.maxPlayers).toBe(2);
+    expect(room.state.config.playerCount).toBe(2);
+
+    // abrir um bau nao pode pausar a sala
+    room.state.players[0].x = room.state.caches[0].x + 0.5;
+    room.state.players[0].y = room.state.caches[0].y + 0.5;
+    server.handleMessage('A', JSON.stringify({ t: 'cmd', seq: 1, clientTick: 1, commands: [interact()] }), 10);
+    server.tick();
+    expect(room.state.phase).toBe('running');
+  });
+
   it('capacidade da sala e limitada ao MAX_PLAYERS da sim', () => {
     // configuracao acima do suportado: a sim clampa createRun a 2 players, e um
     // terceiro slot deixaria viewerState() sem playerExtras -> quebra do tick

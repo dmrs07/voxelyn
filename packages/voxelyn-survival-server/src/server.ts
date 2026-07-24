@@ -58,10 +58,15 @@ export class SurvivalServer {
   private readonly log: (line: Record<string, unknown>) => void;
 
   constructor(opts: ServerOptions = {}) {
-    // A sim clampa createRun a MAX_PLAYERS; se a sala aceitasse mais, o cliente
-    // extra receberia um slot sem playerExtras correspondente e viewerState()
-    // quebraria o loop autoritativo no tick seguinte.
-    this.maxPlayers = Math.max(1, Math.min(MAX_PLAYERS, opts.maxPlayersPerRoom ?? 2));
+    // Capacidade valida de uma sala autoritativa: [2, MAX_PLAYERS].
+    // Teto: a sim clampa createRun a MAX_PLAYERS; uma sala maior daria ao
+    // cliente extra um slot sem playerExtras, e viewerState() quebraria o loop.
+    // Piso: uma sala de capacidade 1 faz a sim rodar em modo SOLO local
+    // (playerCount === 1), onde abrir um bau entra em phase 'choice' — fase que
+    // o protocolo nao transporta e o cliente online nao sabe responder, travando
+    // a sala para sempre. Jogar sozinho online continua funcionando: e uma sala
+    // de capacidade 2 com o segundo slot ainda nao reivindicado.
+    this.maxPlayers = Math.max(2, Math.min(MAX_PLAYERS, opts.maxPlayersPerRoom ?? 2));
     this.baseSeed = opts.baseSeed ?? 0x5c0ffee;
     this.log = opts.logger ?? (() => {});
   }

@@ -246,6 +246,44 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(diverged).toContain('incoerente');
   });
 
+  it('full_resync estabelece nova baseline: nao interpola a partir de antes da queda', () => {
+    // Usa o MESMO NetClient atraves da queda, como runOnline faz (o cliente e
+    // persistente entre reconexoes). Com um NetClient novo o historico ja
+    // nasceria vazio e o bug nao apareceria.
+    const server = new SurvivalServer({ maxPlayersPerRoom: 2, baseSeed: 5150 });
+    let now = 0;
+    let cid = 'A';
+    const a: NetClient = new NetClient((raw) => {
+      for (const o of server.handleMessage(cid, raw, now)) a.receive(JSON.stringify(o.msg), now);
+    });
+    server.addConnection(cid, now);
+    a.connect();
+    for (let i = 0; i < 5; i++) {
+      now += 50;
+      for (const o of server.tick()) if (o.clientId === cid) a.receive(JSON.stringify(o.msg), now);
+    }
+    const token = a.resumeToken;
+    const room = server.roomForClient(cid)!;
+    const before = room.state.players[0].x;
+
+    // queda longa; o mundo segue e o avatar acaba longe de onde estava
+    server.removeConnection(cid);
+    now += 5000;
+    room.state.players[0].x = room.state.entry.x + 30;
+    expect(room.state.players[0].x).not.toBeCloseTo(before, 1);
+
+    // reconecta com o MESMO cliente
+    cid = 'A2';
+    server.addConnection(cid, now);
+    a.connect(token ?? undefined);
+
+    // no instante do resync alpha~0: com o historico antigo preservado, o
+    // render mostraria a posicao de antes da queda interpolada num span do
+    // tamanho da desconexao
+    const view = a.sampleRenderState(now)!;
+    expect(view.players[0].x).toBeCloseTo(room.state.players[0].x, 3);
+  });
+
   it('reconexao aplica o full_resync (mundo alterado nao volta ao estado gerado)', () => {
     const loop = new Loop();
     const a = loop.connect('A');

@@ -158,6 +158,9 @@ export class NetClient {
         // o renderer le as arrays do state; aponta-as para o espelho
         this.state.solid = this.mirror.solid;
         this.state.surface = this.mirror.surface;
+        // sessao nova (ou reconexao): frames da sessao anterior nao valem
+        this.prev = null;
+        this.curr = null;
         this.status = 'online';
         // O mundo estatico e gerado LOCALMENTE pela seed; se o hash nao bate
         // com o do servidor (versao de geracao diferente, por exemplo), todo o
@@ -172,7 +175,15 @@ export class NetClient {
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
         this.divergedAt = 0; // mundo reconstruido: zera o anti-repeticao
         this.applyWorld(msg.world);
+        // Um resync NAO e um frame incremental: e uma baseline nova. Sem
+        // descartar o historico, a reconexao interpolaria o estado autoritativo
+        // recem-chegado a partir de posicoes anteriores a queda, ao longo de um
+        // span do tamanho da desconexao — entidades e camera ficariam visivelmente
+        // atrasadas ate o proximo snapshot chegar.
+        this.prev = null;
+        this.curr = null;
         this.ingestFrame(msg.entities, [], msg.serverTick, nowMs);
+        this.prev = null; // ingestFrame move curr->prev; aqui nao ha "antes"
         break;
       }
       case 'snapshot': {
