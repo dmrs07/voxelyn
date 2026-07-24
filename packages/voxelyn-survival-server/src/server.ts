@@ -200,7 +200,7 @@ export class SurvivalServer {
   private resyncMsg(room: GameRoom, clientId: string): Outbound {
     const slot = room.slotForClient(clientId);
     if (slot) slot.needsFullResync = false;
-    return { clientId, msg: room.buildFullResync() };
+    return { clientId, msg: room.buildFullResync(slot ?? undefined) };
   }
 
   /** Avanca todas as salas ativas um tick e retorna snapshots para clientes conectados. */

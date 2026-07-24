@@ -84,6 +84,19 @@ export type ProjectileSnapshot = {
   hostile: boolean;
 };
 
+/**
+ * Estado de mundo que nao vive no grid (chunk diffs) nem nas entidades: baus
+ * abertos, nucleo retirado, guardiao acordado. O cliente gera esses objetos
+ * localmente pela seed, mas nao pode inferir se ja foram consumidos — sem isto
+ * o renderer desenha para sempre um bau ja aberto ou um nucleo ja retirado.
+ * Poucos bytes: enviado no full_resync e nos snapshots apenas quando muda.
+ */
+export type WorldFlags = {
+  openedCaches: number[]; // indices em state.caches
+  coreTaken: boolean;
+  guardianAwake: boolean;
+};
+
 export type ServerWelcome = {
   t: 'welcome';
   versions: VersionTriple;
@@ -118,6 +131,8 @@ export type ServerSnapshot = {
   chunkDiffs: ChunkDiff[];
   events: SemanticEvent[];
   contamination: number;
+  // enviado apenas nos ticks em que muda (o cliente mantem o ultimo aplicado)
+  world?: WorldFlags;
   // estado privado do viewer (HUD)
   you?: ViewerState;
   // hash autoritativo periodico para deteccao de divergencia
@@ -132,6 +147,8 @@ export type ServerFullResync = {
   // versoes de chunk + celulas completas por chunk (via chunk-diff sobre baseline vazia)
   chunkDiffs: ChunkDiff[];
   entities: EntitySnapshot[];
+  // sempre presente: e a base que reconecta/late-join sincroniza de uma vez
+  world: WorldFlags;
   authHash: string;
 };
 

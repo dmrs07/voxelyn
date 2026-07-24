@@ -322,4 +322,32 @@ describe('servidor autoritativo de co-op', () => {
     expect(withPlayers).toBeDefined();
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
+
+  it('abrir um bau propaga WorldFlags uma vez e depois so no full_resync', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    h.drain('A');
+    h.tick(2);
+    // baseline: ja recebeu as flags iniciais, nada aberto
+    h.drain('A');
+
+    const room = h.server.roomForClient('A')!;
+    room.state.caches[0].opened = true;
+    h.tick(1);
+    const first = h.drain('A').filter((m) => m.t === 'snapshot');
+    const withWorld = first.find((s) => s.t === 'snapshot' && s.world);
+    expect(withWorld).toBeDefined();
+    if (withWorld?.t === 'snapshot') expect(withWorld.world!.openedCaches).toContain(0);
+
+    // sem novas mudancas, as flags nao viajam de novo (delta, nao estado por tick)
+    h.tick(10);
+    expect(h.drain('A').filter((m) => m.t === 'snapshot' && m.world).length).toBe(0);
+
+    // quem reconecta/chega tarde recebe tudo de uma vez no full_resync
+    h.send('A', { t: 'resync', reason: 'test' });
+    const resync = h.drain('A').find((m) => m.t === 'full_resync');
+    expect(resync).toBeDefined();
+    if (resync?.t === 'full_resync') expect(resync.world.openedCaches).toContain(0);
+  });
 });

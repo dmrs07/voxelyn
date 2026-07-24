@@ -201,7 +201,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
     let dirX = 0;
     let dirY = 0;
-    let speed = def.speed * (enemy.elite ? 1.12 : 1) * surfaceSpeedMul(state, enemy);
+    const speed = def.speed * (enemy.elite ? 1.12 : 1) * surfaceSpeedMul(state, enemy);
 
     if (aggro && player) {
       dirX = player.x - enemy.x;

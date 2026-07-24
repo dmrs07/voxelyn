@@ -51,12 +51,12 @@ describe('reacoes sistemicas', () => {
 
     tickCells(state, events, 40);
 
-    let fungalLeft = 0;
+    let _fungalLeft = 0;
     let scorchedOrFire = 0;
     for (let y = 45; y <= 55; y++) {
       for (let x = 45; x <= 55; x++) {
         const surf = state.surface[y * w + x];
-        if (surf === SURF_FUNGAL) fungalLeft++;
+        if (surf === SURF_FUNGAL) _fungalLeft++;
         else scorchedOrFire++;
       }
     }

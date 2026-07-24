@@ -17,6 +17,7 @@ import {
   type EntitySnapshot,
   type ProjectileSnapshot,
   type ServerMessage,
+  type WorldFlags,
 } from '@voxelyn/survival-protocol';
 
 export type NetStatus = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';
@@ -103,11 +104,13 @@ export class NetClient {
       }
       case 'full_resync': {
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
+        this.applyWorld(msg.world);
         this.ingestFrame(msg.entities, [], msg.serverTick, nowMs);
         break;
       }
       case 'snapshot': {
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
+        if (msg.world) this.applyWorld(msg.world);
         this.ingestFrame(msg.entities, msg.projectiles, msg.serverTick, nowMs);
         if (this.state) {
           this.state.phase = msg.phase;
@@ -144,6 +147,21 @@ export class NetClient {
       default:
         break;
     }
+  }
+
+  /**
+   * Aplica o estado autoritativo de mundo consumivel ao espelho local. O cliente
+   * gera baus/nucleo pela seed, mas nao simula quem os consumiu: sem isto um bau
+   * ja aberto (ou o nucleo ja retirado) continuaria desenhado para sempre.
+   * Idempotente por design — reaplicar o mesmo frame nao muda nada.
+   */
+  private applyWorld(world: WorldFlags): void {
+    const state = this.state;
+    if (!state) return;
+    const opened = new Set(world.openedCaches);
+    for (let i = 0; i < state.caches.length; i++) state.caches[i].opened = opened.has(i);
+    state.coreTaken = world.coreTaken;
+    state.guardianAwake = world.guardianAwake;
   }
 
   private ingestFrame(entities: EntitySnapshot[], projectiles: ProjectileSnapshot[], tick: number, nowMs: number): void {

@@ -161,6 +161,24 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(view.playerExtras[1].joined).toBe(false);
   });
 
+  it('bau aberto no servidor deixa de ser desenhado no cliente', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    a.connect();
+    loop.advance(3);
+
+    const room = loop.server.roomForClient('A')!;
+    expect(a.sampleRenderState(loop['now'] as number)!.caches[0].opened).toBe(false);
+
+    room.state.caches[0].opened = true;
+    room.state.coreTaken = true;
+    loop.advance(3);
+
+    const view = a.sampleRenderState(loop['now'] as number)!;
+    expect(view.caches[0].opened).toBe(true); // antes: crate desenhada para sempre
+    expect(view.coreTaken).toBe(true);
+  });
+
   it('dois clientes completam a run: extracao coletiva chega no view', () => {
     const loop = new Loop();
     const a = loop.connect('A');

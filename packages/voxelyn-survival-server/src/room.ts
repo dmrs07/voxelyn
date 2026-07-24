@@ -15,6 +15,7 @@ import {
   type ServerFullResync,
   type ServerSnapshot,
   type ViewerState,
+  type WorldFlags,
   SequenceGate,
 } from '@voxelyn/survival-protocol';
 
@@ -28,6 +29,7 @@ export type Slot = {
   command: PlayerCommand;
   needsFullResync: boolean;
   lastAckSeq: number;
+  lastWorldSig: string | null; // ultima WorldFlags enviada a este cliente
 };
 
 /**
@@ -111,6 +113,7 @@ export class GameRoom {
       command: emptyCommand(),
       needsFullResync: true,
       lastAckSeq: -1,
+      lastWorldSig: null,
     };
     this.slots.push(slot);
     return slot;
@@ -222,6 +225,19 @@ export class GameRoom {
     };
   }
 
+  /** Flags de mundo consumivel (baus/nucleo/guardiao) que o cliente nao infere. */
+  private worldFlags(): WorldFlags {
+    const openedCaches: number[] = [];
+    for (let i = 0; i < this.state.caches.length; i++) {
+      if (this.state.caches[i].opened) openedCaches.push(i);
+    }
+    return { openedCaches, coreTaken: this.state.coreTaken, guardianAwake: this.state.guardianAwake };
+  }
+
+  private static worldSig(w: WorldFlags): string {
+    return `${w.openedCaches.join(',')}|${w.coreTaken ? 1 : 0}|${w.guardianAwake ? 1 : 0}`;
+  }
+
   private projectileSnapshots(): ProjectileSnapshot[] {
     return this.state.projectiles.map((p) => ({ id: p.id, x: round3(p.x), y: round3(p.y), hostile: p.hostile }));
   }
@@ -245,6 +261,13 @@ export class GameRoom {
       contamination: round3(this.state.contamination),
       you: this.viewerState(slot.slot),
     };
+    // flags de mundo so viajam quando mudam (abrir bau, pegar nucleo, acordar guardiao)
+    const world = this.worldFlags();
+    const sig = GameRoom.worldSig(world);
+    if (sig !== slot.lastWorldSig) {
+      snap.world = world;
+      slot.lastWorldSig = sig;
+    }
     if (this.state.tick % HASH_INTERVAL_TICKS === 0) {
       snap.authHash = hashAuthoritativeState(this.state);
     }
@@ -252,15 +275,19 @@ export class GameRoom {
   }
 
   /** Reenvio completo do mundo para um cliente (join/reconnect/divergencia). */
-  buildFullResync(): ServerFullResync {
+  buildFullResync(slot?: Slot): ServerFullResync {
     const throwaway = new ChunkTracker(this.width, this.height);
     const chunkDiffs = throwaway.fullSnapshot(this.state);
+    const world = this.worldFlags();
+    // o resync ja carrega as flags: evita reenvia-las no snapshot seguinte
+    if (slot) slot.lastWorldSig = GameRoom.worldSig(world);
     return {
       t: 'full_resync',
       serverTick: this.state.tick,
       seed: this.seed,
       chunkDiffs,
       entities: this.entitySnapshots(),
+      world,
       authHash: hashAuthoritativeState(this.state),
     };
   }

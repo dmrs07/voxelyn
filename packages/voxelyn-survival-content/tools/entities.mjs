@@ -103,7 +103,7 @@ const drawStalker = (dir, { bob = 0, legPhase = 0 }) => {
     [3, 1],
     [6, 0],
   ];
-  legs.forEach(([ox, ph], i) => {
+  legs.forEach(([ox], i) => {
     const lift = (phase + i) % 2 === 1 ? 1 : 0;
     line(g, cx + ox * 0.5, 15 + yb, cx + ox, 21 - lift + yb, 'rockShadow');
   });

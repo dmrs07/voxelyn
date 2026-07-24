@@ -125,7 +125,7 @@ export const explodeAt = (
  * Passo celular: processa fila deterministica de celulas reagindo com orcamento fixo.
  * Excedente fica na fila para o proximo passo (degrada latencia, nunca o determinismo).
  */
-export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void => {
+export const stepCells = (state: SurvivalState, _events: SemanticEvent[]): void => {
   if (state.tick % CELL_STEP_INTERVAL !== 0) return;
   const w = W(state);
   const h = H(state);
