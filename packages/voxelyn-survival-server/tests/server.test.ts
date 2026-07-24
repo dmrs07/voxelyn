@@ -323,6 +323,25 @@ describe('servidor autoritativo de co-op', () => {
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
 
+  it('um segundo hello no mesmo socket e rejeitado (nao vaza salas)', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const first = h.server.roomForClient('A')!;
+    h.drain('A');
+
+    // retry bugado (ou cliente hostil) manda hello de novo no mesmo socket
+    h.hello('A');
+    const replies = h.drain('A');
+    expect(replies.some((m) => m.t === 'reject')).toBe(true);
+    expect(replies.some((m) => m.t === 'welcome')).toBe(false);
+    expect(h.server.roomForClient('A')?.id).toBe(first.id); // continua na mesma
+
+    // ao fechar o socket, nenhuma sala fica com cliente fantasma
+    h.disconnect('A');
+    expect(first.connectedCount()).toBe(0);
+  });
+
   it('parceiro desconectado deixa de travar a extracao apos o grace', () => {
     const h = new Harness();
     h.connect('A');

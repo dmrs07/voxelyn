@@ -75,6 +75,13 @@ export type Projectile = {
   hostile: boolean; // true = do inimigo
   leavesBiofluid: boolean;
   ttl: number;
+  /**
+   * Ids ja atingidos por ESTE projetil. So importa para bolts perfurantes: eles
+   * sobrevivem ao acerto, e cada substep anti-tunneling anda ~0.325 tiles
+   * enquanto o raio de colisao do inimigo e 0.5-0.9, entao sem memoria o mesmo
+   * alvo levaria dano (e sifao) varias vezes ao ser atravessado.
+   */
+  hits?: number[];
 };
 
 export type Cache = {

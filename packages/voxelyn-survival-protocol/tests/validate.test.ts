@@ -5,6 +5,9 @@ import {
   checkProtocolVersion,
   CURRENT_VERSIONS,
   decodeMessage,
+  decodeClientMessage,
+  encodeMessage,
+  LIMITS,
   validateClientMessage,
   validatePlayerCommand,
 } from '../src/index';
@@ -92,5 +95,36 @@ describe('deduplicacao e rate limit', () => {
     expect(rl.allow(200)).toBe(true);
     expect(rl.allow(300)).toBe(false); // 4a na mesma janela
     expect(rl.allow(1300)).toBe(true); // janela deslizou
+  });
+});
+
+describe('limites de payload: ingresso vs egresso', () => {
+  it('o limite de comando NAO pode descartar um full_resync', () => {
+    // full_resync leva o grid inteiro: ~290 KB num mundo 96x96
+    const big = encodeMessage({
+      t: 'full_resync',
+      serverTick: 10,
+      seed: 1,
+      chunkDiffs: Array.from({ length: 36 }, (_, i) => ({
+        chunk: i,
+        version: 1,
+        solid: Array.from({ length: 256 }, () => 1),
+        surface: Array.from({ length: 256 }, () => 0),
+      })),
+      entities: [],
+      world: { openedCaches: [], coreTaken: false, guardianAwake: false },
+      authHash: 'deadbeef',
+    } as never);
+    expect(big.length).toBeGreaterThan(LIMITS.maxClientMessageBytes);
+
+    // cliente aceita frames do servidor (antes: descartava TODO resync)
+    expect(decodeMessage(big)).not.toBeNull();
+    // servidor segue apertado contra entrada nao confiavel
+    expect(decodeClientMessage(big)).toBeNull();
+  });
+
+  it('o teto de egresso ainda existe (peer hostil nao e ilimitado)', () => {
+    const absurd = `{"t":"snapshot","pad":"${'x'.repeat(LIMITS.maxServerMessageBytes)}"}`;
+    expect(decodeMessage(absurd)).toBeNull();
   });
 });

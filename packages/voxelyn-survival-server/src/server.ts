@@ -3,7 +3,7 @@ import {
   LIMITS,
   RateLimiter,
   checkProtocolVersion,
-  decodeMessage,
+  decodeClientMessage,
   validateClientMessage,
   type ServerMessage,
 } from '@voxelyn/survival-protocol';
@@ -129,7 +129,7 @@ export class SurvivalServer {
       return []; // rate limit: descarta silenciosamente
     }
 
-    const decoded = decodeMessage(raw);
+    const decoded = decodeClientMessage(raw);
     if (!decoded) return [{ clientId, msg: { t: 'reject', reason: 'mensagem invalida' } }];
 
     const validated = validateClientMessage(decoded);
@@ -140,6 +140,15 @@ export class SurvivalServer {
       case 'hello': {
         const vc = checkProtocolVersion(msg.versions);
         if (!vc.ok) return [{ clientId, msg: { t: 'reject', reason: vc.reason, field: vc.field } }];
+
+        // Um socket = uma sessao. Um segundo hello anexaria o MESMO clientId a
+        // outro slot/sala e sobrescreveria conn.room; no close, removeConnection
+        // so desanexa a ultima, e as anteriores ficam com clientId nao-nulo para
+        // sempre — connectedCount() nunca zera, a sala nunca expira e segue
+        // simulando (um cliente hostil vazaria salas a vontade).
+        if (conn.room) {
+          return [{ clientId, msg: { t: 'reject', reason: 'sessao ja iniciada neste socket' } }];
+        }
 
         // reconexao por resume token
         if (msg.resumeToken) {
@@ -200,7 +209,10 @@ export class SurvivalServer {
   private resyncMsg(room: GameRoom, clientId: string): Outbound {
     const slot = room.slotForClient(clientId);
     if (slot) slot.needsFullResync = false;
-    return { clientId, msg: room.buildFullResync(slot ?? undefined) };
+    // NAO marca as WorldFlags como enviadas aqui: se este resync se perder, o
+    // cliente ficaria sem elas para sempre. Deixa o proximo snapshot reenviar
+    // (sao poucos bytes) em vez de otimizar um caminho de recuperacao.
+    return { clientId, msg: room.buildFullResync() };
   }
 
   /** Avanca todas as salas ativas um tick e retorna snapshots para clientes conectados. */

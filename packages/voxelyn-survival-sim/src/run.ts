@@ -528,6 +528,7 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       } else {
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
+          if (proj.hits?.includes(enemy.id)) continue; // ja atravessado
           if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) < enemy.radius + 0.2) {
             let dmg = proj.damage;
             const enemyCell = cellIndexAt(state, enemy.x, enemy.y);
@@ -544,7 +545,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             if (proj.explosive) {
               explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events);
             }
-            if (!proj.piercing || proj.explosive) dead = true;
+            if (proj.piercing && !proj.explosive) {
+              // sobrevive ao acerto: registra o alvo para nao reacertar nos
+              // substeps seguintes enquanto atravessa o mesmo inimigo
+              (proj.hits ??= []).push(enemy.id);
+            } else {
+              dead = true;
+            }
             break;
           }
         }

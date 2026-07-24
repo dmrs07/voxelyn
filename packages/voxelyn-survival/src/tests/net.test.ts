@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SurvivalServer } from '@voxelyn/survival-server';
-import { emptyCommand, type PlayerCommand } from '@voxelyn/survival-sim';
+import { breakSolid, emptyCommand, type PlayerCommand } from '@voxelyn/survival-sim';
 import { NetClient } from '../client/net';
 
 /**
@@ -177,6 +177,43 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.caches[0].opened).toBe(true); // antes: crate desenhada para sempre
     expect(view.coreTaken).toBe(true);
+  });
+
+  it('reconexao aplica o full_resync (mundo alterado nao volta ao estado gerado)', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    a.connect();
+    loop.advance(3);
+
+    // Destroi terreno e deixa o ChunkTracker ABSORVER esse diff. A partir daqui
+    // a mudanca so chega a um cliente novo pelo full_resync: os snapshots
+    // seguintes nao a reenviam (a baseline do tracker ja a inclui).
+    const room = loop.server.roomForClient('A')!;
+    const w = room.state.config.width;
+    let broken = -1;
+    for (let y = 20; y < 60 && broken < 0; y++) {
+      for (let x = 20; x < 60; x++) {
+        const i = y * w + x;
+        if (room.state.solid[i] !== 0) {
+          breakSolid(room.state, x, y, []);
+          if (room.state.solid[i] === 0) broken = i;
+          break;
+        }
+      }
+    }
+    expect(broken).toBeGreaterThan(0);
+    loop.advance(3); // tracker consome o diff
+
+    const token = a.resumeToken;
+    loop.server.removeConnection('A');
+    const a2 = loop.connect('A2');
+    a2.connect(token ?? undefined);
+    loop.advance(2);
+
+    // o resync tem ~290 KB: sob o limite de comando ele era descartado em
+    // silencio e o cliente ficava com a parede que a geracao local criou
+    const view = a2.sampleRenderState(loop['now'] as number)!;
+    expect(view.solid[broken]).toBe(room.state.solid[broken]);
   });
 
   it('bordas sobrevivem ao throttle: um uso entre envios nao e perdido', () => {

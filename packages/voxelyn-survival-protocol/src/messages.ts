@@ -8,7 +8,17 @@ import type { ChunkDiff } from './chunk-diff.js';
 export const LIMITS = {
   maxCommandsPerMessage: 8,
   maxCommandMessagesPerSecond: 40, // > TICK_HZ para tolerar jitter, com folga
-  maxMessageBytes: 16 * 1024,
+  /**
+   * Limite de INGRESSO (cliente -> servidor). E um controle anti-abuso sobre
+   * entrada nao confiavel; comandos sao pequenos por natureza.
+   */
+  maxClientMessageBytes: 16 * 1024,
+  /**
+   * Limite de EGRESSO (servidor -> cliente). Precisa ser folgado: full_resync
+   * carrega o grid inteiro (~290 KB num mundo 96x96) e e justamente o caminho
+   * de recuperacao. Aplicar aqui o limite de comando descartaria TODO resync.
+   */
+  maxServerMessageBytes: 4 * 1024 * 1024,
   maxChunkDiffsPerSnapshot: 64,
   heartbeatIntervalMs: 2000,
   heartbeatTimeoutMs: 8000,
@@ -171,8 +181,8 @@ export type AnyMessage = ClientMessage | ServerMessage;
 export const encodeMessage = (msg: AnyMessage): string => JSON.stringify(msg);
 
 /** Parse tolerante: retorna null em JSON invalido (nunca lanca). */
-export const decodeMessage = (raw: string): AnyMessage | null => {
-  if (raw.length > LIMITS.maxMessageBytes) return null;
+const decodeWithLimit = (raw: string, maxBytes: number): AnyMessage | null => {
+  if (raw.length > maxBytes) return null;
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && typeof parsed.t === 'string') {
@@ -183,3 +193,15 @@ export const decodeMessage = (raw: string): AnyMessage | null => {
     return null;
   }
 };
+
+/** Ingresso no servidor: entrada nao confiavel, limite apertado. */
+export const decodeClientMessage = (raw: string): AnyMessage | null =>
+  decodeWithLimit(raw, LIMITS.maxClientMessageBytes);
+
+/**
+ * Frames vindos do servidor no cliente. Limite generoso — apenas um teto de
+ * memoria contra um peer hostil, nao o limite de comando (que descartaria
+ * full_resync inteiro).
+ */
+export const decodeMessage = (raw: string): AnyMessage | null =>
+  decodeWithLimit(raw, LIMITS.maxServerMessageBytes);

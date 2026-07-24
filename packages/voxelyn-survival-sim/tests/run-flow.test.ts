@@ -156,3 +156,66 @@ describe('guardiao: invocacao de 50%', () => {
     expect(state.enemies.filter((e) => e.archetype === 'stalker').length).toBe(after);
   });
 });
+
+describe('projetil perfurante', () => {
+  it('atinge cada inimigo uma unica vez ao atravessa-lo', () => {
+    const state = createRun({ seed: 777, playerCount: 1 });
+    state.enemies = [];
+    state.projectiles = [];
+    const target = spawnEnemy(state, 'bruiser', 40, 40, false);
+    const hpBefore = target.hp;
+
+    // bolt perfurante vindo da esquerda, atravessando o alvo
+    state.projectiles.push({
+      id: 9001,
+      owner: state.player.id,
+      x: target.x - 1.2,
+      y: target.y,
+      vx: 13,
+      vy: 0,
+      damage: 10,
+      piercing: true,
+      conductive: false,
+      explosive: false,
+      hostile: false,
+      leavesBiofluid: false,
+      ttl: 30,
+    });
+
+    // ticks suficientes para o bolt cruzar todo o corpo do alvo
+    for (let t = 0; t < 6; t++) stepRun(state, [emptyCommand()]);
+
+    // antes: cada substep dentro do raio aplicava dano de novo
+    expect(hpBefore - target.hp).toBe(10);
+  });
+
+  it('ainda atinge um SEGUNDO inimigo no caminho', () => {
+    const state = createRun({ seed: 777, playerCount: 1 });
+    state.enemies = [];
+    state.projectiles = [];
+    const first = spawnEnemy(state, 'bruiser', 40, 40, false);
+    const second = spawnEnemy(state, 'bruiser', 43, 40, false);
+    const hp1 = first.hp;
+    const hp2 = second.hp;
+
+    state.projectiles.push({
+      id: 9002,
+      owner: state.player.id,
+      x: first.x - 1.2,
+      y: first.y,
+      vx: 13,
+      vy: 0,
+      damage: 10,
+      piercing: true,
+      conductive: false,
+      explosive: false,
+      hostile: false,
+      leavesBiofluid: false,
+      ttl: 30,
+    });
+    for (let t = 0; t < 10; t++) stepRun(state, [emptyCommand()]);
+
+    expect(hp1 - first.hp).toBe(10);
+    expect(hp2 - second.hp).toBe(10); // perfuracao segue valendo
+  });
+});

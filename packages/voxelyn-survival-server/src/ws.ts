@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { encodeMessage } from '@voxelyn/survival-protocol';
+import { LIMITS, encodeMessage } from '@voxelyn/survival-protocol';
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { SurvivalServer, type ServerOptions } from './server.js';
 
@@ -41,7 +41,10 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     res.end();
   });
 
-  const wss = new WebSocketServer({ server: http });
+  // maxPayload no TRANSPORTE: sem ele o ws monta o frame inteiro e converte
+  // para UTF-8 antes de qualquer checagem, e um peer nao autenticado poderia
+  // forcar o servidor a bufferizar frames muito maiores que o limite anunciado.
+  const wss = new WebSocketServer({ server: http, maxPayload: LIMITS.maxClientMessageBytes });
   const sockets = new Map<string, WebSocket>();
   let nextId = 1;
 
