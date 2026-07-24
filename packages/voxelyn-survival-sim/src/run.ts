@@ -616,6 +616,24 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
 };
 
 /** Converte players com hp<=0 em abatidos (co-op) ou mortos; encerra a run se todos cairem. */
+/**
+ * Mata o player do slot e DEVOLVE o nucleo ao mundo se ele o carregava.
+ * Sem isso o morto continua com hasCore: ele sai de standingPlayers e de
+ * anyDowned, mas a extracao calcula withCore sobre TODOS os extras, entao o
+ * parceiro sairia sozinho com 'extracted_with_core' sem nunca ter o nucleo.
+ */
+const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
+  const p = state.players[slot];
+  const e = state.playerExtras[slot];
+  p.alive = false;
+  if (e.hasCore) {
+    e.hasCore = false;
+    state.coreTaken = false; // volta ao pedestal, recuperavel pelo parceiro
+    events.push({ t: 'message', text: 'O nucleo caiu com o portador.' });
+  }
+  events.push({ t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector' });
+};
+
 const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): void => {
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
@@ -625,8 +643,7 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
     if (e.downed) {
       // abatido morre ao esgotar o tempo de sangramento
       if (state.tick >= e.bleedoutAt) {
-        p.alive = false;
-        events.push({ t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector' });
+        killPlayer(state, slot, events);
       }
       continue;
     }
@@ -642,9 +659,8 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
         e.bleedoutAt = state.tick + BLEEDOUT_TICKS;
         events.push({ t: 'player_down', slot });
       } else {
-        p.alive = false;
         events.push({ t: 'player_down', slot });
-        events.push({ t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector' });
+        killPlayer(state, slot, events);
       }
     }
   }

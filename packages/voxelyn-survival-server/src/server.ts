@@ -7,6 +7,7 @@ import {
   validateClientMessage,
   type ServerMessage,
 } from '@voxelyn/survival-protocol';
+import { MAX_PLAYERS } from '@voxelyn/survival-sim';
 import { GameRoom } from './room.js';
 
 export type Outbound = { clientId: string; msg: ServerMessage };
@@ -48,7 +49,10 @@ export class SurvivalServer {
   private readonly log: (line: Record<string, unknown>) => void;
 
   constructor(opts: ServerOptions = {}) {
-    this.maxPlayers = opts.maxPlayersPerRoom ?? 2;
+    // A sim clampa createRun a MAX_PLAYERS; se a sala aceitasse mais, o cliente
+    // extra receberia um slot sem playerExtras correspondente e viewerState()
+    // quebraria o loop autoritativo no tick seguinte.
+    this.maxPlayers = Math.max(1, Math.min(MAX_PLAYERS, opts.maxPlayersPerRoom ?? 2));
     this.baseSeed = opts.baseSeed ?? 0x5c0ffee;
     this.log = opts.logger ?? (() => {});
   }

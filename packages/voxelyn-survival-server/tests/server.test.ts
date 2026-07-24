@@ -323,6 +323,28 @@ describe('servidor autoritativo de co-op', () => {
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
 
+  it('capacidade da sala e limitada ao MAX_PLAYERS da sim', () => {
+    // configuracao acima do suportado: a sim clampa createRun a 2 players, e um
+    // terceiro slot deixaria viewerState() sem playerExtras -> quebra do tick
+    const h = new Harness();
+    (h as unknown as { server: SurvivalServer }).server = new SurvivalServer({
+      maxPlayersPerRoom: 5,
+      baseSeed: 4242,
+    });
+    for (const id of ['A', 'B', 'C']) {
+      h.connect(id);
+      h.hello(id);
+    }
+    const room = h.server.roomForClient('A')!;
+    expect(room.maxPlayers).toBe(2);
+    expect(room.state.players.length).toBe(2);
+    // C nao cabe na sala de A; ganha outra sala em vez de um slot fantasma
+    expect(h.server.roomForClient('C')?.id).not.toBe(room.id);
+
+    // e o loop autoritativo continua de pe
+    expect(() => h.tick(5)).not.toThrow();
+  });
+
   it('um segundo hello no mesmo socket e rejeitado (nao vaza salas)', () => {
     const h = new Harness();
     h.connect('A');

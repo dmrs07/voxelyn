@@ -214,3 +214,59 @@ describe('co-op: multiplayer na simulacao', () => {
     expect(state.phase).toBe('extracted');
   });
 });
+
+describe('nucleo e morte do portador', () => {
+  it('portador que sangra ate morrer devolve o nucleo ao mundo', () => {
+    const state = createRun({ seed: 7, playerCount: 2 });
+    // slot 1 pegou o nucleo e esta abatido, prestes a sangrar
+    state.coreTaken = true;
+    state.playerExtras[1].hasCore = true;
+    state.playerExtras[1].downed = true;
+    state.playerExtras[1].bleedoutAt = state.tick + 1;
+    state.players[1].hp = 0;
+
+    idle(state, 3);
+
+    expect(state.players[1].alive).toBe(false);
+    expect(state.playerExtras[1].hasCore).toBe(false);
+    expect(state.coreTaken).toBe(false); // recuperavel pelo parceiro
+  });
+
+  it('parceiro sobrevivente NAO extrai com nucleo que nao carrega', () => {
+    const state = createRun({ seed: 7, playerCount: 2 });
+    state.enemies = [];
+    state.coreTaken = true;
+    state.playerExtras[1].hasCore = true;
+    state.playerExtras[1].downed = true;
+    state.playerExtras[1].bleedoutAt = state.tick + 1;
+    state.players[1].hp = 0;
+    idle(state, 3); // slot 1 morre carregando o nucleo
+
+    // slot 0 vai sozinho para a saida
+    state.leftEntryZone = true;
+    state.players[0].x = state.entry.x + 0.5;
+    state.players[0].y = state.entry.y + 0.5;
+    const cmd = emptyCommand();
+    cmd.interact = true;
+    stepRun(state, [cmd, emptyCommand()]);
+
+    // antes: 'extracted_with_core' sem nunca ter tocado no nucleo
+    expect(state.phase).toBe('extracted');
+  });
+
+  it('morte solo tambem devolve o nucleo (estado consistente)', () => {
+    const state = createRun({ seed: 7, playerCount: 1 });
+    state.coreTaken = true;
+    state.playerExtra.hasCore = true;
+    state.player.hp = 1;
+    const w = state.config.width;
+    const i = Math.floor(state.player.y) * w + Math.floor(state.player.x);
+    state.surface[i] = 4; // SURF_FIRE
+    state.surfaceTimer[i] = 200;
+    idle(state, 6);
+
+    expect(state.phase).toBe('dead');
+    expect(state.playerExtra.hasCore).toBe(false);
+    expect(state.coreTaken).toBe(false);
+  });
+});
