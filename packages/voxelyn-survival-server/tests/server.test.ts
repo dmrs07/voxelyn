@@ -376,6 +376,41 @@ describe('servidor autoritativo de co-op', () => {
     expect(room.state.phase).toBe('extracted'); // antes: preso para sempre
   });
 
+  it('quem ocupa um slot aposentado NAO herda upgrades, frascos nem o nucleo', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.connect('B');
+    h.hello('A');
+    h.hello('B');
+    h.tick(1);
+
+    const room = h.server.roomForClient('A')!;
+    // B acumula progresso e sai com o nucleo
+    const be = room.state.playerExtras[1];
+    be.modifiers = ['piercing', 'explosive'];
+    be.consumables = 4;
+    be.hasCore = true;
+    room.state.coreTaken = true;
+
+    h.disconnect('B');
+    h.tick(20 * 45 + 2); // grace expira -> slot aposenta
+
+    // ao aposentar, o progresso do antigo dono e descartado na hora
+    expect(be.hasCore).toBe(false);
+    expect(be.modifiers).toEqual([]);
+    // o nucleo saiu com quem abandonou: volta ao mundo em vez de sumir da run
+    expect(room.state.coreTaken).toBe(false);
+
+    // um jogador novo entra na vaga e comeca do zero
+    h.connect('C');
+    h.hello('C');
+    h.tick(1);
+    const ce = room.state.playerExtras[1];
+    expect(ce.modifiers).toEqual([]);
+    expect(ce.consumables).toBe(1);
+    expect(ce.hasCore).toBe(false);
+  });
+
   it('token de slot aposentado nao reanexa; a vaga aceita um novo jogador', () => {
     const h = new Harness();
     h.connect('A');

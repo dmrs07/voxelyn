@@ -1,7 +1,6 @@
 import { RNG } from '@voxelyn/core';
 import {
   CHUNK,
-  CHUNKS_X,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_NONE,
@@ -10,6 +9,7 @@ import {
   SURF_BIOFLUID,
   SURF_FUNGAL,
   SURF_NONE,
+  WORLD_W,
 } from './constants.js';
 import type { Vec2 } from './types.js';
 
@@ -278,7 +278,14 @@ export const generateWorld = (seed: number, w: number, h: number): GeneratedWorl
   throw new Error(`generateWorld: nenhum mapa solucionavel para seed ${seed}`);
 };
 
-export const chunkOf = (x: number, y: number): number =>
-  Math.floor(y / CHUNK) * CHUNKS_X + Math.floor(x / CHUNK);
+/**
+ * Indice do chunk de (x,y). O stride vem da LARGURA REAL do mundo: createRun
+ * aceita dimensoes customizadas, e usar a constante do mundo padrao (96 -> 6
+ * chunks) faria um mundo de 64 marcar chunks errados a partir da segunda
+ * linha — e escrever fora de chunkVersion mais adiante. O ChunkTracker ja
+ * calcula ceil(width/CHUNK); isto o mantem em acordo.
+ */
+export const chunkOf = (x: number, y: number, width: number = WORLD_W): number =>
+  Math.floor(y / CHUNK) * Math.ceil(width / CHUNK) + Math.floor(x / CHUNK);
 
 export const cellIdx = (w: number, x: number, y: number): number => y * w + x;

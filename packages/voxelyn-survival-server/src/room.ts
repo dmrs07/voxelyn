@@ -3,6 +3,7 @@ import {
   createRun,
   emptyCommand,
   hashAuthoritativeState,
+  resetPlayerProgress,
   stepRun,
   type PlayerCommand,
   type SemanticEvent,
@@ -188,7 +189,16 @@ export class GameRoom {
       slot.retired = true;
       slot.resumeToken = this.makeToken(); // invalida o token do dono anterior
       const extra = this.state.playerExtras[slot.slot];
-      if (extra) extra.joined = false; // avatar sai da sim
+      if (!extra) continue;
+      extra.joined = false; // avatar sai da sim
+      // O proximo ocupante e um jogador NOVO: nao pode herdar modificadores,
+      // frascos nem a posse do nucleo de quem abandonou.
+      if (extra.hasCore) {
+        // o nucleo saiu com quem abandonou; devolve ao mundo, senao a run do
+        // parceiro fica sem objetivo alcancavel por culpa alheia
+        this.state.coreTaken = false;
+      }
+      resetPlayerProgress(extra);
     }
   }
 

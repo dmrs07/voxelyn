@@ -6,7 +6,9 @@ import {
   WORLD_H,
   WORLD_W,
 } from '../src/constants';
-import { floodOpen, generateWorld } from '../src/worldgen';
+import { chunkOf, floodOpen, generateWorld } from '../src/worldgen';
+import { createRun } from '../src/run';
+import { setSurface } from '../src/cells';
 
 const SEEDS = [1, 2, 3, 42, 1337, 0xdecafbad, 987654321, 7];
 
@@ -56,5 +58,28 @@ describe('worldgen', () => {
     expect(a.entry).toEqual(b.entry);
     expect(a.corePos).toEqual(b.corePos);
     expect(a.enemySpawns).toEqual(b.enemySpawns);
+  });
+});
+
+describe('chunkOf com mundos customizados', () => {
+  it('usa a largura real, nao a constante do mundo padrao', () => {
+    // mundo 64 de largura -> 4 chunks por linha (o padrao 96 tem 6)
+    expect(chunkOf(0, 0, 64)).toBe(0);
+    expect(chunkOf(48, 0, 64)).toBe(3);
+    expect(chunkOf(0, 16, 64)).toBe(4); // antes: 6, com stride do mundo padrao
+    expect(chunkOf(0, 32, 64)).toBe(8);
+  });
+
+  it('mutacoes em mundo customizado marcam o chunk certo e ficam no vetor', () => {
+    const state = createRun({ seed: 5, width: 64, height: 64 });
+    const chunks = state.chunkVersion.length;
+    expect(chunks).toBe(16); // 4x4
+
+    const before = Array.from(state.chunkVersion);
+    setSurface(state, 40 * 64 + 8, 4, 10); // linha 40 -> chunkY 2, chunkX 0 -> 8
+    const changed: number[] = [];
+    for (let i = 0; i < chunks; i++) if (state.chunkVersion[i] !== before[i]) changed.push(i);
+
+    expect(changed).toEqual([8]); // antes: indice 12, fora da coluna correta
   });
 });

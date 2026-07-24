@@ -3,6 +3,7 @@
 export * from './constants.js';
 export * from './types.js';
 export {
+  resetPlayerProgress,
   createRun,
   stepRun,
   createSnapshot,

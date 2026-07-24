@@ -83,6 +83,19 @@ export class SurvivalRenderer {
   }
 
   /** Consome eventos semanticos da sim e cria FX/mensagens/shake. */
+  /**
+   * Id da entidade do jogador LOCAL. Feedback de dano (cor do numero e shake da
+   * camera) depende disto: no co-op o cliente do slot 1 tem id 2, e fixar 1
+   * daria feedback de inimigo ao proprio dano e shake pelo dano do parceiro.
+   */
+  localPlayerId = 1;
+  /** Largura do mundo, para converter indice de celula em (x,y) nos FX. */
+  worldWidth = 96;
+
+  setLocalPlayerId(id: number): void {
+    this.localPlayerId = id;
+  }
+
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     for (const ev of events) {
       switch (ev.t) {
@@ -92,7 +105,7 @@ export class SurvivalRenderer {
           break;
         case 'discharge':
           for (const cell of ev.cells.slice(0, 40)) {
-            this.fxList.push({ kind: 'spark', x: (cell % 96) + 0.5, y: Math.floor(cell / 96) + 0.5, life: 260, maxLife: 260 });
+            this.fxList.push({ kind: 'spark', x: (cell % this.worldWidth) + 0.5, y: Math.floor(cell / this.worldWidth) + 0.5, life: 260, maxLife: 260 });
           }
           break;
         case 'hit':
@@ -101,11 +114,11 @@ export class SurvivalRenderer {
             x: ev.x,
             y: ev.y,
             text: `${Math.round(ev.amount)}`,
-            color: ev.target === 1 ? PAL.blood : PAL.bone,
+            color: ev.target === this.localPlayerId ? PAL.blood : PAL.bone,
             life: 550,
             maxLife: 550,
           });
-          if (ev.target === 1) this.shake = { power: 3, until: nowMs + 120 };
+          if (ev.target === this.localPlayerId) this.shake = { power: 3, until: nowMs + 120 };
           break;
         case 'death':
           this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.9, color: PAL.blood, life: 260, maxLife: 260 });
@@ -137,6 +150,7 @@ export class SurvivalRenderer {
   }
 
   render(state: SurvivalState, alpha: number, input: InputState, nowMs: number): void {
+    this.worldWidth = state.config.width; // FX por indice de celula seguem o mundo real
     void alpha;
     const ctx = this.ctx;
     const vw = window.innerWidth;

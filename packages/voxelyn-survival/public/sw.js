@@ -11,16 +11,25 @@ const CACHE = 'voxelyn-survival-v1';
 // promessa do PWA — falha ate o usuario carregar a pagina online outra vez.
 // Em dev (sem build) a lista fica vazia e o shell abaixo basta.
 const BUILD_ASSETS = self.__VOXELYN_PRECACHE__ ?? [];
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', ...BUILD_ASSETS];
+
+// OBRIGATORIOS: sem qualquer um destes o solo offline nao inicia. Se um deles
+// falhar, o install TEM de falhar — engolir a falha ativaria um worker com
+// cache parcial, e o index em cache apontaria para um bundle que nao existe.
+// Falhando, o worker anterior (com cache completo) continua no ar.
+const REQUIRED = ['./', './index.html', ...BUILD_ASSETS];
+// OPCIONAIS: cosmeticos/metadados. Um icone ausente nao pode derrubar o install.
+const OPTIONAL = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      // addAll e atomico: um 404 em qualquer entrada aborta o install inteiro e
-      // o SW nunca ativa. Cacheia uma a uma para nao perder o resto por causa
-      // de um arquivo ausente.
-      .then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => undefined))))
+      .then(async (c) => {
+        // addAll e atomico e rejeita se qualquer entrada falhar: e exatamente o
+        // que queremos para os obrigatorios.
+        await c.addAll(REQUIRED);
+        await Promise.all(OPTIONAL.map((u) => c.add(u).catch(() => undefined)));
+      })
       .then(() => self.skipWaiting())
   );
 });

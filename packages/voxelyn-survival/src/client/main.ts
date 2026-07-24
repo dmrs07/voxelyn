@@ -75,6 +75,7 @@ const applyAdaptiveQuality = (dt: number): void => {
 let stopLoop: (() => void) | null = null;
 
 const runSolo = (): void => {
+  renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   let state: SurvivalState = createRun({ seed: (Date.now() ^ 0x5f3759df) >>> 0 });
   let accumulator = 0;
   let lastTime = performance.now();
@@ -198,6 +199,7 @@ const runOnline = (url: string): void => {
 
     if (net.status === 'online') {
       setBanner(null);
+      renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
       const cmd = input.snapshot(playerScreen());
       net.setCommand(cmd);
       net.pump(now);

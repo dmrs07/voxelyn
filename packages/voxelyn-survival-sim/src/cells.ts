@@ -26,7 +26,7 @@ const W = (state: SurvivalState): number => state.config.width;
 const H = (state: SurvivalState): number => state.config.height;
 
 export const markDirty = (state: SurvivalState, x: number, y: number): void => {
-  state.chunkVersion[chunkOf(x, y)]++;
+  state.chunkVersion[chunkOf(x, y, W(state))]++;
 };
 
 export const setSurface = (state: SurvivalState, i: number, kind: number, timer: number): void => {

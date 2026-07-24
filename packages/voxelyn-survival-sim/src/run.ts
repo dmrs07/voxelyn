@@ -116,6 +116,27 @@ const makeExtra = (): PlayerExtra => ({
   joined: true, // default seguro: solo/local ja esta em jogo
 });
 
+/**
+ * Zera o estado PERSISTENTE de um slot (upgrades, inventario, nucleo), sem
+ * tocar em posicao/vida — quem chama cuida disso. Usado quando um slot
+ * abandonado e reocupado: o novo jogador nao pode herdar os modificadores,
+ * os frascos nem a posse do nucleo de quem saiu.
+ */
+export const resetPlayerProgress = (extra: PlayerExtra): void => {
+  extra.modifiers = [];
+  extra.consumables = 1;
+  extra.hasCore = false;
+  extra.heat = 0;
+  extra.overheatedUntil = 0;
+  extra.nextShotAt = 0;
+  extra.dodgeUntil = 0;
+  extra.iframesUntil = 0;
+  extra.dodgeCooldownUntil = 0;
+  extra.abilityCooldownUntil = 0;
+  extra.aim = { x: 1, y: 0 };
+  extra.dodgeDir = { x: 1, y: 0 };
+};
+
 export const createRun = (config: RunConfig): SurvivalState => {
   const width = config.width ?? WORLD_W;
   const height = config.height ?? WORLD_H;
