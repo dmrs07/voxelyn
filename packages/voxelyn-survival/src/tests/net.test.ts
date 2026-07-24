@@ -179,6 +179,31 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(view.coreTaken).toBe(true);
   });
 
+  it('resetSession descarta token e estado: o proximo hello entra em sala nova', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    a.connect();
+    loop.advance(5);
+    const firstRoom = loop.server.roomForClient('A')!;
+    expect(a.resumeToken).toBeTruthy();
+
+    // fim de run online: o jogador pede outra descida
+    firstRoom.state.phase = 'dead';
+    a.resetSession();
+    expect(a.resumeToken).toBeNull(); // senao o hello reentraria na sala morta
+    expect(a.sampleRenderState(loop['now'] as number)).toBeNull();
+
+    // reconecta como sessao nova (server ve outra conexao, sem token)
+    loop.server.removeConnection('A');
+    const a2 = loop.connect('A2');
+    a2.connect();
+    loop.advance(5);
+    const secondRoom = loop.server.roomForClient('A2')!;
+    expect(a2.status).toBe('online');
+    expect(secondRoom.id).not.toBe(firstRoom.id); // sala terminal nao e reusada
+    expect(secondRoom.state.phase).toBe('running');
+  });
+
   it('dois clientes completam a run: extracao coletiva chega no view', () => {
     const loop = new Loop();
     const a = loop.connect('A');

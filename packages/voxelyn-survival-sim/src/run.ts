@@ -148,6 +148,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     corePos: world.corePos,
     coreTaken: false,
     guardianAwake: false,
+    guardianSummoned: false,
     leftEntryZone: false,
     players,
     playerExtras,
@@ -736,6 +737,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));
   mix(state.contaminationWaves);
+  mix(state.guardianSummoned ? 1 : 0);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

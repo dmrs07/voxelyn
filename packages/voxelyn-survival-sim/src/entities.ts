@@ -323,14 +323,14 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
   }
 
-  // guardiao invoca stalkers a 50% (uma vez)
+  // guardiao invoca stalkers a 50% (uma vez). O gatilho e um flag explicito:
+  // inferir "ja invocou" da existencia de um stalker com id maior que o do
+  // guardiao quebra quando uma onda de contaminacao spawna um stalker antes
+  // dos 50% — o id maior fica em state.enemies mesmo depois de morto e
+  // bloqueia a invocacao para sempre.
   const guardian = state.enemies.find((e) => e.archetype === 'guardian');
-  if (
-    guardian &&
-    guardian.alive &&
-    guardian.hp < guardian.maxHp * 0.5 &&
-    !state.enemies.some((e) => e.archetype === 'stalker' && e.id > guardian.id)
-  ) {
+  if (guardian && guardian.alive && guardian.hp < guardian.maxHp * 0.5 && !state.guardianSummoned) {
+    state.guardianSummoned = true;
     spawnEnemy(state, 'stalker', Math.floor(guardian.x) - 2, Math.floor(guardian.y), false);
     spawnEnemy(state, 'stalker', Math.floor(guardian.x) + 2, Math.floor(guardian.y), false);
   }

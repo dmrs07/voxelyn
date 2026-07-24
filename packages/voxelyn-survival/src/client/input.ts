@@ -197,9 +197,29 @@ export class SurvivalInput {
     return null;
   }
 
+  /**
+   * Descarta toques de gameplay acumulados. A fila so existe para UI (menu de
+   * escolha, tela de fim); durante a run ninguem a consome, entao sem este
+   * dreno cada toque no joystick/mira/botao — e cada clique de tiro no mouse —
+   * fica guardado e o primeiro hasTap() apos a morte reinicia a run na hora,
+   * antes do jogador ver o resultado.
+   */
+  clearTaps(): void {
+    this.state.tapQueue.length = 0;
+  }
+
   hasTap(): boolean {
     if (this.state.tapQueue.length > 0) {
       this.state.tapQueue.length = 0;
+      return true;
+    }
+    return false;
+  }
+
+  /** Reinicio tambem por teclado, alinhado com o texto da tela de fim. */
+  consumeRestartKey(): boolean {
+    if (this.keys['r']) {
+      this.keys['r'] = false;
       return true;
     }
     return false;

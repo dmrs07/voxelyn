@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
+import { spawnEnemy } from '../src/entities';
 import type { SurvivalState } from '../src/types';
 
 const stepIdle = (state: SurvivalState, ticks: number): void => {
@@ -116,5 +117,42 @@ describe('fluxo da run', () => {
     stepIdle(state, 2000); // 100s de sim
     expect(state.tick).toBeGreaterThan(0);
     expect(['running', 'dead']).toContain(state.phase);
+  });
+});
+
+describe('guardiao: invocacao de 50%', () => {
+  it('nao e bloqueada por um stalker spawnado antes (id maior que o do guardiao)', () => {
+    const state = createRun({ seed: 4242, playerCount: 1 });
+    // acorda o guardiao e o coloca abaixo de 50%
+    const guardian = state.enemies.find((e) => e.archetype === 'guardian');
+    expect(guardian, 'seed sem guardiao').toBeDefined();
+    state.guardianAwake = true;
+
+    // uma onda de contaminacao spawna um stalker ANTES dos 50%: id maior que o
+    // do guardiao. Ele morre, mas continua em state.enemies.
+    spawnEnemy(state, 'stalker', Math.floor(state.entry.x) + 4, Math.floor(state.entry.y), false);
+    const intruder = state.enemies[state.enemies.length - 1];
+    expect(intruder.id).toBeGreaterThan(guardian!.id);
+    intruder.alive = false;
+    intruder.hp = 0;
+
+    const stalkersBefore = state.enemies.filter((e) => e.archetype === 'stalker').length;
+    guardian!.hp = guardian!.maxHp * 0.4;
+    stepRun(state, [emptyCommand()]);
+
+    // antes: o stalker de id maior fazia a sim achar que ja tinha invocado
+    expect(state.guardianSummoned).toBe(true);
+    expect(state.enemies.filter((e) => e.archetype === 'stalker').length).toBe(stalkersBefore + 2);
+  });
+
+  it('invoca uma unica vez, mesmo com o guardiao muito tempo abaixo de 50%', () => {
+    const state = createRun({ seed: 4242, playerCount: 1 });
+    const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
+    state.guardianAwake = true;
+    guardian.hp = guardian.maxHp * 0.3;
+    stepRun(state, [emptyCommand()]);
+    const after = state.enemies.filter((e) => e.archetype === 'stalker').length;
+    for (let t = 0; t < 40; t++) stepRun(state, [emptyCommand()]);
+    expect(state.enemies.filter((e) => e.archetype === 'stalker').length).toBe(after);
   });
 });

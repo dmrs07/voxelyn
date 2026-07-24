@@ -323,6 +323,47 @@ describe('servidor autoritativo de co-op', () => {
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
 
+  it('resume tokens sao imprevisiveis: nao derivam de seed, id da sala nem ordem', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      // mesma seed base e mesma ordem de entrada em todas as iteracoes: se o
+      // token fosse derivado desses dados, repetiria entre servidores iguais
+      const h = new Harness();
+      h.connect('A');
+      h.connect('B');
+      h.hello('A');
+      h.hello('B');
+      for (const id of ['A', 'B']) {
+        const w = h.drain(id).find((m) => m.t === 'welcome');
+        if (w?.t !== 'welcome') throw new Error('sem welcome');
+        expect(w.resumeToken).toMatch(/^[0-9a-f]{32}$/); // 128 bits de CSPRNG
+        // nao pode conter seed nem id da sala (dados que o participante conhece)
+        expect(w.resumeToken).not.toContain(String(w.seed));
+        seen.add(w.resumeToken);
+      }
+    }
+    expect(seen.size).toBe(80); // nenhuma colisao/repeticao entre execucoes
+  });
+
+  it('comandos de borda valem um tick: consume nao drena o inventario', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    h.drain('A');
+
+    const room = h.server.roomForClient('A')!;
+    // varios frascos: com 1 so, drenar-por-tick e gastar-uma-vez dariam 0 igual
+    room.state.playerExtras[0].consumables = 5;
+    room.state.players[0].hp = 10; // ferido, senao o consumo pode ser ignorado
+
+    // cliente envia consume:true e depois "congela" (suspenso / conexao travada)
+    h.cmd('A', 1, { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, consume: true });
+    h.tick(30); // 30 ticks sem nova mensagem
+
+    // antes: gastava um frasco por tick, zerando o inventario em 5 ticks
+    expect(room.state.playerExtras[0].consumables).toBe(4);
+  });
+
   it('abrir um bau propaga WorldFlags uma vez e depois so no full_resync', () => {
     const h = new Harness();
     h.connect('A');

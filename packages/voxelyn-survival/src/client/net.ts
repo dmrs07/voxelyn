@@ -65,6 +65,23 @@ export class NetClient {
     this.status = this.resumeToken ? 'reconnecting' : 'offline';
   }
 
+  /**
+   * Abandona a sessao atual para comecar uma run nova. Descarta o resume token
+   * (senao o proximo hello reentraria na MESMA sala, ja terminada) e todo o
+   * estado espelhado, para que nenhum frame da run antiga vaze na proxima.
+   */
+  resetSession(): void {
+    this.resumeToken = null;
+    this.state = null;
+    this.mirror = null;
+    this.prev = null;
+    this.curr = null;
+    this.viewer = null;
+    this.command = null;
+    this.events.length = 0;
+    this.status = 'offline';
+  }
+
   setCommand(cmd: PlayerCommand): void {
     this.command = cmd;
   }

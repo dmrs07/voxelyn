@@ -131,6 +131,8 @@ export type SurvivalState = {
   corePos: Vec2;
   coreTaken: boolean;
   guardianAwake: boolean;
+  /** O guardiao ja invocou seus stalkers de 50% (one-shot, serializavel). */
+  guardianSummoned: boolean;
   leftEntryZone: boolean;
 
   // Fonte da verdade: arrays de players. player/playerExtra sao aliases do slot 0

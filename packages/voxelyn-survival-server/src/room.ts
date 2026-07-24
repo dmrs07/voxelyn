@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   createRun,
   emptyCommand,
@@ -42,7 +43,6 @@ export class GameRoom {
   readonly mapHash: string;
   private readonly tracker: ChunkTracker;
   private prevAliveEnemies = new Set<number>();
-  private tokenCounter = 0;
 
   constructor(
     readonly id: string,
@@ -65,10 +65,15 @@ export class GameRoom {
     return this.state.config.height;
   }
 
-  private makeToken(slot: number): string {
-    this.tokenCounter++;
-    const rand = ((this.seed ^ (slot * 0x9e3779b9) ^ (this.tokenCounter * 0x85ebca6b)) >>> 0).toString(16);
-    return `r${this.id}-s${slot}-${rand}`;
+  /**
+   * Token de retomada. E uma CREDENCIAL: quem o apresenta assume o avatar do
+   * slot via reattach(). Nao pode derivar de seed/id/contador — o cliente
+   * recebe a seed no welcome e o id da sala no proprio token, entao qualquer
+   * formula deterministica deixaria o participante calcular o token do
+   * parceiro e sequestrar o slot. 128 bits de CSPRNG, sem dado derivavel.
+   */
+  private makeToken(): string {
+    return randomBytes(16).toString('hex');
   }
 
   /** Vagas conectadas (com cliente ativo). */
@@ -108,7 +113,7 @@ export class GameRoom {
     const slot: Slot = {
       slot: this.slots.length,
       clientId,
-      resumeToken: this.makeToken(this.slots.length),
+      resumeToken: this.makeToken(),
       gate: new SequenceGate(),
       command: emptyCommand(),
       needsFullResync: true,
@@ -159,6 +164,18 @@ export class GameRoom {
       cmds[s] = this.slots[s]?.command ?? emptyCommand();
     }
     const { events } = stepRun(this.state, cmds);
+    // A intencao corrente persiste entre ticks (o cliente envia a ~25 Hz, o
+    // servidor roda a 20 Hz), mas campos de BORDA nao podem persistir: um
+    // cliente suspenso logo apos enviar consume:true gastaria um consumivel
+    // por tick ate zerar o inventario. Zera as bordas depois de aplicadas —
+    // reativa-las exige uma nova mensagem do cliente.
+    for (const slot of this.slots) {
+      slot.command.dodge = false;
+      slot.command.ability = false;
+      slot.command.interact = false;
+      slot.command.consume = false;
+      slot.command.choose = null;
+    }
     const chunkDiffs = this.tracker.diff(this.state);
 
     const nowAlive = new Set<number>();

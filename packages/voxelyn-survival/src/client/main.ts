@@ -4,10 +4,14 @@ import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SurvivalInput } from './input';
 import { SurvivalRenderer } from './render';
 import { NetClient } from './net';
+import { RestartGate } from './restart';
 import { FpsGovernor, loadQuality, nextLowerQuality, saveQuality, type QualityLevel } from './settings';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
+
+/** Espera antes de aceitar toque como reinicio: a tela de fim precisa ser lida. */
+const RESTART_ARM_MS = 900;
 
 const menu = document.getElementById('menu') as HTMLDivElement;
 const banner = document.getElementById('banner') as HTMLDivElement;
@@ -76,9 +80,12 @@ const runSolo = (): void => {
   let lastTime = performance.now();
   let running = true;
 
+  const gate = new RestartGate(RESTART_ARM_MS);
+
   const restartKey = (e: KeyboardEvent): void => {
     if (e.key.toLowerCase() === 'r' && state.phase !== 'running' && state.phase !== 'choice') {
       state = createRun({ seed: (Date.now() ^ 0x9e3779b9) >>> 0 });
+      gate.reset();
     }
   };
   window.addEventListener('keydown', restartKey);
@@ -107,9 +114,14 @@ const runSolo = (): void => {
     }
 
     if (state.phase !== 'running') {
+      const { drain, armed } = gate.frame(now, true);
+      if (drain) input.clearTaps();
       renderer.render(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
-      if (input.hasTap()) state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
+      if (armed && (input.hasTap() || input.consumeRestartKey())) {
+        state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
+        gate.reset();
+      }
       accumulator = 0;
       requestAnimationFrame(frame);
       return;
@@ -123,6 +135,8 @@ const runSolo = (): void => {
       accumulator -= TICK_MS;
       if (state.phase !== 'running') break;
     }
+    // durante a run a fila de toques nao tem consumidor: drena todo frame
+    if (gate.frame(now, false).drain) input.clearTaps();
     renderer.render(state, accumulator / TICK_MS, input.state, now);
     requestAnimationFrame(frame);
   };
@@ -152,6 +166,7 @@ const runOnline = (url: string): void => {
   let running = true;
   let lastTime = performance.now();
   let reconnectAt = 0;
+  const gate = new RestartGate(RESTART_ARM_MS);
 
   // NetClient PERSISTENTE entre reconexoes: preserva resumeToken e a sequencia
   // de comandos. Se recriado a cada retry, o cliente enviaria seqs baixas que o
@@ -196,9 +211,21 @@ const runOnline = (url: string): void => {
       net.pump(now);
       const state = net.sampleRenderState(now);
       if (state) {
+        const terminal = state.phase !== 'running' && state.phase !== 'choice';
         renderer.render(state, 1, input.state, now);
-        if (state.phase !== 'running' && state.phase !== 'choice') {
+        const { drain, armed } = gate.frame(now, terminal);
+        if (drain) input.clearTaps();
+        if (terminal) {
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
+          // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
+          // resume token (senao o hello reentraria nesta mesma sala terminal) e
+          // reabre o socket — o matchmaking so considera salas 'running'.
+          if (armed && (input.hasTap() || input.consumeRestartKey())) {
+            gate.reset();
+            setBanner('Descendo de novo…');
+            net.resetSession();
+            ws?.close(); // onclose agenda o reconnect, agora sem token
+          }
         }
       }
     } else {
