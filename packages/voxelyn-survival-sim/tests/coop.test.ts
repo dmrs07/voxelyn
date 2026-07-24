@@ -19,6 +19,40 @@ describe('co-op: multiplayer na simulacao', () => {
     expect(d).toBeLessThan(4);
   });
 
+  it('inimigos nao colidem com ids de player em co-op (ids reservados)', () => {
+    const state = createRun({ seed: 9, playerCount: 2 });
+    const playerIds = new Set(state.players.map((p) => p.id)); // {1, 2}
+    for (const e of state.enemies) {
+      expect(playerIds.has(e.id), `inimigo com id de player: ${e.id}`).toBe(false);
+    }
+    expect(state.enemies.every((e) => e.id > 2)).toBe(true);
+  });
+
+  it('projetil hostil fere o player 2, nao apenas o slot 0', () => {
+    const state = createRun({ seed: 9, playerCount: 2 });
+    state.enemies = []; // isola do dano de contato
+    const p2 = state.players[1];
+    const hpBefore = p2.hp;
+    state.projectiles.push({
+      id: 999,
+      owner: 100,
+      x: p2.x,
+      y: p2.y,
+      vx: 1,
+      vy: 0,
+      damage: 9,
+      piercing: false,
+      conductive: false,
+      explosive: false,
+      hostile: true,
+      leavesBiofluid: false,
+      ttl: 5,
+    });
+    stepRun(state, [emptyCommand(), emptyCommand()]);
+    expect(p2.hp).toBeLessThan(hpBefore);
+    expect(state.players[0].hp).toBe(state.players[0].maxHp); // player 1 longe, intacto
+  });
+
   it('determinismo co-op: mesma seed e mesmos comandos por slot geram o mesmo hash', () => {
     const scripted = (t: number, slot: number): PlayerCommand => {
       const c = emptyCommand();

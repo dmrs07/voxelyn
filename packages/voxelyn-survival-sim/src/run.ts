@@ -160,7 +160,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
     charges: [],
     pendingChoice: null,
     contamination: 0,
-    nextEntityId: 2,
+    // reserva todos os ids de player (1..playerCount) antes dos inimigos, para
+    // que nenhum inimigo colida com um id de player nos snapshots por id
+    nextEntityId: playerCount + 1,
     reactionQueue: [],
   };
 
@@ -497,15 +499,18 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
       // impacto em entidades
       if (proj.hostile) {
-        const p = state.player;
-        if (p.alive && Math.hypot(p.x - proj.x, p.y - proj.y) < p.radius + 0.2) {
-          damageEntity(state, p, proj.damage, events);
-          if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
-            setSurface(state, i, SURF_BIOFLUID, 0);
+        for (const p of state.players) {
+          if (!p.alive || state.playerExtras[p.slot ?? 0].downed) continue;
+          if (Math.hypot(p.x - proj.x, p.y - proj.y) < p.radius + 0.2) {
+            damageEntity(state, p, proj.damage, events);
+            if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+              setSurface(state, i, SURF_BIOFLUID, 0);
+            }
+            dead = true;
+            break;
           }
-          dead = true;
-          break;
         }
+        if (dead) break;
       } else {
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;

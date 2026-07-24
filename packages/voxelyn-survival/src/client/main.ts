@@ -149,23 +149,28 @@ const defaultServerUrl = (): string => {
 
 const runOnline = (url: string): void => {
   let ws: WebSocket | null = null;
-  let net: NetClient | null = null;
   let running = true;
   let lastTime = performance.now();
   let reconnectAt = 0;
 
+  // NetClient PERSISTENTE entre reconexoes: preserva resumeToken e a sequencia
+  // de comandos. Se recriado a cada retry, o cliente enviaria seqs baixas que o
+  // SequenceGate do servidor descartaria, travando os controles apos reconectar.
+  const net = new NetClient((raw) => {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(raw);
+  });
+  net.onEvents = (events) => {
+    renderer.ingestEvents(events, performance.now());
+    haptics(events);
+  };
+
   const connect = (): void => {
-    setBanner('Conectando…');
+    setBanner(net.resumeToken ? 'Reconectando…' : 'Conectando…');
     ws = new WebSocket(url);
-    net = new NetClient((raw) => ws?.readyState === WebSocket.OPEN && ws.send(raw));
-    net.onEvents = (events) => {
-      renderer.ingestEvents(events, performance.now());
-      haptics(events);
-    };
-    ws.onopen = () => net?.connect(net.resumeToken ?? undefined);
-    ws.onmessage = (ev) => net?.receive(typeof ev.data === 'string' ? ev.data : '', performance.now());
+    ws.onopen = () => net.connect(net.resumeToken ?? undefined);
+    ws.onmessage = (ev) => net.receive(typeof ev.data === 'string' ? ev.data : '', performance.now());
     ws.onclose = () => {
-      net?.markOffline();
+      net.markOffline();
       if (running) reconnectAt = performance.now() + 1500;
     };
     ws.onerror = () => ws?.close();
@@ -178,7 +183,7 @@ const runOnline = (url: string): void => {
     applyAdaptiveQuality(delta);
     lastTime = now;
 
-    if (net && net.status === 'online') {
+    if (net.status === 'online') {
       setBanner(null);
       const cmd = input.snapshot(playerScreen());
       net.setCommand(cmd);
@@ -191,7 +196,7 @@ const runOnline = (url: string): void => {
         }
       }
     } else {
-      setBanner(net?.status === 'reconnecting' ? 'Reconectando…' : 'Offline — tentando reconectar');
+      setBanner(net.status === 'reconnecting' ? 'Reconectando…' : 'Offline — tentando reconectar');
       if (reconnectAt && now >= reconnectAt && (!ws || ws.readyState === WebSocket.CLOSED)) {
         reconnectAt = 0;
         connect();

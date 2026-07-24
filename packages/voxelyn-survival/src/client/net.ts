@@ -234,6 +234,11 @@ export class NetClient {
       ex.aim.y = this.viewer.aimY;
       ex.overheatedUntil = this.viewer.overheated ? state.tick + 1 : 0;
     }
+
+    // o renderer segue state.player/playerExtra (camera, HUD, mira): aponta-os
+    // para o slot LOCAL, nao o slot 0 (senao o cliente do slot 1 renderiza o outro)
+    state.player = state.players[this.slot] ?? state.players[0];
+    state.playerExtra = state.playerExtras[this.slot] ?? state.playerExtras[0];
     return state;
   }
 

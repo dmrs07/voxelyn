@@ -51,6 +51,15 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     const view = a.sampleRenderState(1000);
     expect(view).not.toBeNull();
     expect(view!.players.length).toBe(2);
+
+    // os aliases de render (camera/HUD) seguem o slot LOCAL de cada cliente
+    expect(a.slot).toBe(0);
+    expect(b.slot).toBe(1);
+    const va = a.sampleRenderState(1000)!;
+    const vb = b.sampleRenderState(1000)!;
+    expect(va.player).toBe(va.players[0]);
+    expect(vb.player).toBe(vb.players[1]);
+    expect(vb.playerExtra).toBe(vb.playerExtras[1]);
   });
 
   it('o espelho do cliente segue o mundo destrutivel do servidor', () => {
