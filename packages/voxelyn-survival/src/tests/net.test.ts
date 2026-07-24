@@ -123,6 +123,33 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(room.slots[1].clientId).toBe('B2');
   });
 
+  it('resume token invalido limpa o token e dispara onReject (sessao nova)', () => {
+    const loop = new Loop();
+    const c = loop.connect('A');
+    let rejected = false;
+    c.onReject = () => {
+      rejected = true;
+    };
+    // finge que ja tinha um token de uma sessao anterior (servidor nao o conhece)
+    (c as unknown as { resumeToken: string }).resumeToken = 'token-fantasma';
+    c.connect('token-fantasma');
+    expect(rejected).toBe(true);
+    expect(c.resumeToken).toBeNull(); // limpo -> proximo handshake e sessao nova
+    expect(c.status).toBe('offline');
+  });
+
+  it('o view expoe os DOIS players para o renderer (parceiro visivel)', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    const b = loop.connect('B');
+    a.connect();
+    b.connect();
+    loop.advance(5);
+    const view = a.sampleRenderState(loop['now'] as number)!;
+    const alivePlayers = view.players.filter((p) => p.alive);
+    expect(alivePlayers.length).toBe(2); // o renderer itera view.players
+  });
+
   it('dois clientes completam a run: extracao coletiva chega no view', () => {
     const loop = new Loop();
     const a = loop.connect('A');

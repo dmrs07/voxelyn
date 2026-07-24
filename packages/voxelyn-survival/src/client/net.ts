@@ -39,6 +39,7 @@ export class NetClient {
   slot = 0;
   readonly events: SemanticEvent[] = [];
   onEvents: ((events: SemanticEvent[]) => void) | null = null;
+  onReject: ((reason: string) => void) | null = null;
 
   private state: SurvivalState | null = null;
   private mirror: ClientWorldMirror | null = null;
@@ -132,7 +133,13 @@ export class NetClient {
         break;
       }
       case 'reject':
+        // resume token invalido (ex.: servidor reiniciou e perdeu as salas):
+        // limpa o token para que o proximo handshake seja uma sessao NOVA,
+        // e sinaliza o chamador para fechar/reabrir o socket (o servidor mantem
+        // o socket aberto no reject, entao sem isso o cliente fica travado).
+        this.resumeToken = null;
         this.status = 'offline';
+        this.onReject?.(msg.reason);
         break;
       default:
         break;

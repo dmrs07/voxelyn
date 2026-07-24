@@ -73,18 +73,16 @@ export class GameRoom {
   }
 
   hasOpenSlot(): boolean {
-    return this.slots.length < this.maxPlayers || this.slots.some((s) => s.clientId === null);
+    // Apenas capacidade nao alocada abre vaga para um cliente NOVO. Slots ja
+    // criados ficam reservados pelo seu resume token, mesmo desconectados —
+    // so o dono pode reivindicar via reattach().
+    return this.slots.length < this.maxPlayers;
   }
 
-  /** Anexa um cliente a um slot novo ou vago. Retorna o slot ou null se cheio. */
+  /** Cria um NOVO slot para um cliente inedito. Nunca reivindica slot alheio. */
   attach(clientId: string): Slot | null {
-    // reaproveita slot desconectado
-    const free = this.slots.find((s) => s.clientId === null);
-    if (free) {
-      free.clientId = clientId;
-      free.needsFullResync = true;
-      return free;
-    }
+    // slots desconectados sao token-reservados: um visitante novo NAO os herda
+    // (evita que um estranho controle o avatar e aprenda o token do original).
     if (this.slots.length >= this.maxPlayers) return null;
     const slot: Slot = {
       slot: this.slots.length,

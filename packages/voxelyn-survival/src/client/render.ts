@@ -460,42 +460,61 @@ export class SurvivalRenderer {
       });
     }
 
-    if (player.alive) {
-      const anim = this.animFor(player.id, player.x, player.y, player.hp, player.alive, nowMs);
+    // desenha TODOS os players (co-op): o parceiro precisa estar visivel para
+    // coordenacao e revive. state.player e apenas o alias LOCAL (camera/HUD/mira).
+    for (const pl of state.players) {
+      if (!pl.alive) continue;
+      const slot = pl.slot ?? 0;
+      const ex = state.playerExtras[slot];
+      const isLocal = pl === player;
+      const anim = this.animFor(pl.id, pl.x, pl.y, pl.hp, pl.alive, nowMs);
       items.push({
-        depth: player.x + player.y,
+        depth: pl.x + pl.y,
         draw: () => {
-          const flick = state.playerExtra.iframesUntil > state.tick && state.tick % 2 === 0;
-          const [psx, psy] = toScreen(player.x, player.y);
-          const size = player.radius * TILE_W * 0.9 * z;
+          const [psx, psy] = toScreen(pl.x, pl.y);
+          const size = pl.radius * TILE_W * 0.9 * z;
           drawShadow(psx, psy, size);
+          const flick = isLocal && ex.iframesUntil > state.tick && state.tick % 2 === 0;
           if (!flick) {
+            const anAnim = ex.downed ? 'die' : anim.anim;
             const drew = this.sprites.drawEntity(
               ctx,
               'prospector',
-              anim.anim,
-              state.playerExtra.aim.x,
-              state.playerExtra.aim.y,
+              anAnim,
+              ex.aim.x,
+              ex.aim.y,
               nowMs - anim.animStartMs,
               psx,
               psy,
-              spriteZoom
+              spriteZoom,
+              // parceiro (nao-local) recebe leve tint frio para diferenciar
+              isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }
             );
-            if (!drew) drawVectorBody(psx, psy, 1, player.radius, PAL.player, false);
+            if (!drew) drawVectorBody(psx, psy, 1, pl.radius, isLocal ? PAL.player : PAL.biolum, false);
           }
-          drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, player.hp / player.maxHp);
-          // indicador de mira
-          const [sx, sy] = toScreen(player.x, player.y);
-          const aim = state.playerExtra.aim;
-          const alen = Math.hypot(aim.x, aim.y) || 1;
-          const axs = ((aim.x - aim.y) / alen) * 20 * z;
-          const ays = ((aim.x + aim.y) / alen) * 10 * z;
-          ctx.strokeStyle = 'rgba(232,241,255,0.5)';
-          ctx.lineWidth = z * 0.8;
-          ctx.beginPath();
-          ctx.moveTo(psx + axs * 0.4, psy - 8 * z + ays * 0.4);
-          ctx.lineTo(psx + axs, psy - 8 * z + ays);
-          ctx.stroke();
+          drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
+
+          // marcador de abatido (precisa de revive)
+          if (ex.downed) {
+            ctx.fillStyle = PAL.blood;
+            ctx.font = `bold ${Math.round(7 * z)}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('!', psx, psy - size * 2.6 - 8 * z);
+          }
+
+          // indicador de mira: somente o player local
+          if (isLocal) {
+            const aim = ex.aim;
+            const alen = Math.hypot(aim.x, aim.y) || 1;
+            const axs = ((aim.x - aim.y) / alen) * 20 * z;
+            const ays = ((aim.x + aim.y) / alen) * 10 * z;
+            ctx.strokeStyle = 'rgba(232,241,255,0.5)';
+            ctx.lineWidth = z * 0.8;
+            ctx.beginPath();
+            ctx.moveTo(psx + axs * 0.4, psy - 8 * z + ays * 0.4);
+            ctx.lineTo(psx + axs, psy - 8 * z + ays);
+            ctx.stroke();
+          }
         },
       });
     }

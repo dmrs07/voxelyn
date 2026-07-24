@@ -82,7 +82,15 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   const loop = setInterval(() => {
     const outbound = survival.tick();
     for (const o of outbound) send(o.clientId, encodeMessage(o.msg));
-    survival.reapStale(Date.now());
+    // fecha os sockets cujas conexoes o heartbeat reaper removeu; sem isso o
+    // cliente (ex.: PWA em background) segue "online" sobre um socket cujo
+    // clientId ja nao existe e nunca recebe o 'close' que dispara o reconnect.
+    const stale = survival.reapStale(Date.now());
+    for (const id of stale) {
+      const s = sockets.get(id);
+      s?.close(1001, 'idle timeout');
+      sockets.delete(id);
+    }
   }, TICK_MS);
 
   const port = opts.port ?? Number(process.env.PORT ?? 8080);

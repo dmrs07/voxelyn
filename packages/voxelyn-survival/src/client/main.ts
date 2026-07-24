@@ -163,6 +163,12 @@ const runOnline = (url: string): void => {
     renderer.ingestEvents(events, performance.now());
     haptics(events);
   };
+  // resume token rejeitado: fecha o socket para acionar o caminho de reconexao
+  // com uma sessao nova (token ja foi limpo pelo NetClient).
+  net.onReject = () => {
+    setBanner('Sessao expirada — reconectando…');
+    ws?.close();
+  };
 
   const connect = (): void => {
     setBanner(net.resumeToken ? 'Reconectando…' : 'Conectando…');

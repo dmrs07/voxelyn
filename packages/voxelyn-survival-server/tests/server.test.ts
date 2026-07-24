@@ -204,6 +204,41 @@ describe('servidor autoritativo de co-op', () => {
     expect(lastA?.t === 'snapshot' && ['extracted', 'extracted_with_core'].includes(lastA.phase)).toBe(true);
   });
 
+  it('slot desconectado fica reservado ao token: um novo cliente NAO o herda', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.connect('B');
+    h.hello('A');
+    h.hello('B');
+    const roomA = h.server.roomForClient('A')!;
+    h.drain('A');
+    h.drain('B');
+
+    // B cai: o slot 1 fica vago mas token-reservado
+    h.disconnect('B');
+    expect(roomA.slots[1].clientId).toBeNull();
+
+    // um visitante novo (sem token) NAO deve herdar o avatar de B; vai para outra sala
+    h.connect('C');
+    h.hello('C');
+    const welcomeC = h.drain('C').find((m) => m.t === 'welcome');
+    expect(welcomeC?.t).toBe('welcome');
+    const roomC = h.server.roomForClient('C')!;
+    expect(roomC.id).not.toBe(roomA.id); // sala diferente
+    expect(roomA.slots[1].clientId).toBeNull(); // slot de B intacto, ainda reservado
+    if (welcomeC?.t === 'welcome') {
+      expect(welcomeC.resumeToken).not.toBe(roomA.slots[1].resumeToken); // token de B nao vazou
+    }
+  });
+
+  it('reapStale expira conexoes ociosas e retorna os ids removidos', () => {
+    const server = new SurvivalServer({ maxPlayersPerRoom: 2 });
+    server.addConnection('X', 0);
+    const dead = server.reapStale(60_000); // muito alem do heartbeatTimeoutMs
+    expect(dead).toContain('X');
+    expect(server.connectionCount()).toBe(0);
+  });
+
   it('snapshots trazem os dois players e um hash autoritativo periodico', () => {
     const h = new Harness();
     h.connect('A');
