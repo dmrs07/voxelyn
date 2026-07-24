@@ -18,6 +18,14 @@ export default defineConfig({
         replacement: resolve(__dirname, '../voxelyn-survival-content/src/index.ts'),
       },
       {
+        find: '@voxelyn/survival-server',
+        replacement: resolve(__dirname, '../voxelyn-survival-server/src/server.ts'),
+      },
+      {
+        find: '@voxelyn/survival-protocol',
+        replacement: resolve(__dirname, '../voxelyn-survival-protocol/src/index.ts'),
+      },
+      {
         find: '@voxelyn/survival-sim',
         replacement: resolve(__dirname, '../voxelyn-survival-sim/src/index.ts'),
       },

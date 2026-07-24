@@ -16,6 +16,7 @@
     "paths": {
       "@voxelyn/survival-content": ["../voxelyn-survival-content/src/index.ts"],
       "@voxelyn/survival-content/assets/*": ["../voxelyn-survival-content/assets/*"],
+      "@voxelyn/survival-protocol": ["../voxelyn-survival-protocol/src/index.ts"],
       "@voxelyn/survival-sim": ["../voxelyn-survival-sim/src/index.ts"],
       "@voxelyn/survival-sim/*": ["../voxelyn-survival-sim/src/*"],
       "@voxelyn/core": ["../voxelyn-core/src/index.ts"],

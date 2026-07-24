@@ -14,6 +14,7 @@ import {
   type ProjectileSnapshot,
   type ServerFullResync,
   type ServerSnapshot,
+  type ViewerState,
   SequenceGate,
 } from '@voxelyn/survival-protocol';
 
@@ -161,7 +162,10 @@ export class GameRoom {
         hp: Math.round(p.hp),
         maxHp: p.maxHp,
         alive: p.alive,
-        elite: this.state.playerExtras[i].downed, // reaproveita 'elite' como flag de abatido no wire do player
+        elite: false,
+        downed: this.state.playerExtras[i].downed,
+        facingX: round3(this.state.playerExtras[i].aim.x),
+        facingY: round3(this.state.playerExtras[i].aim.y),
       });
     }
     for (const e of this.state.enemies) {
@@ -176,9 +180,26 @@ export class GameRoom {
         maxHp: e.maxHp,
         alive: true,
         elite: e.elite,
+        facingX: round3(e.facing.x),
+        facingY: round3(e.facing.y),
       });
     }
     return out;
+  }
+
+  private viewerState(slot: number): ViewerState {
+    const e = this.state.playerExtras[slot];
+    return {
+      slot,
+      heat: round3(e.heat),
+      consumables: e.consumables,
+      modifiers: [...e.modifiers],
+      hasCore: e.hasCore,
+      downed: e.downed,
+      aimX: round3(e.aim.x),
+      aimY: round3(e.aim.y),
+      overheated: this.state.tick < e.overheatedUntil,
+    };
   }
 
   private projectileSnapshots(): ProjectileSnapshot[] {
@@ -202,6 +223,7 @@ export class GameRoom {
       chunkDiffs: tickChunkDiffs,
       events,
       contamination: round3(this.state.contamination),
+      you: this.viewerState(slot.slot),
     };
     if (this.state.tick % HASH_INTERVAL_TICKS === 0) {
       snap.authHash = hashAuthoritativeState(this.state);

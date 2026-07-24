@@ -59,6 +59,22 @@ export type EntitySnapshot = {
   maxHp: number;
   alive: boolean;
   elite: boolean;
+  downed?: boolean; // players abatidos
+  facingX?: number;
+  facingY?: number;
+};
+
+/** Estado autoritativo privado do proprio viewer (HUD do jogador local). */
+export type ViewerState = {
+  slot: number;
+  heat: number;
+  consumables: number;
+  modifiers: string[];
+  hasCore: boolean;
+  downed: boolean;
+  aimX: number;
+  aimY: number;
+  overheated: boolean;
 };
 
 export type ProjectileSnapshot = {
@@ -102,6 +118,8 @@ export type ServerSnapshot = {
   chunkDiffs: ChunkDiff[];
   events: SemanticEvent[];
   contamination: number;
+  // estado privado do viewer (HUD)
+  you?: ViewerState;
   // hash autoritativo periodico para deteccao de divergencia
   authHash?: string;
 };

@@ -1,87 +1,241 @@
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { createRun, stepRun } from '@voxelyn/survival-sim';
-import type { SurvivalState } from '@voxelyn/survival-sim';
+import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SurvivalInput } from './input';
 import { SurvivalRenderer } from './render';
+import { NetClient } from './net';
+import { FpsGovernor, loadQuality, nextLowerQuality, saveQuality, type QualityLevel } from './settings';
 
 const canvas = document.getElementById('game');
-if (!(canvas instanceof HTMLCanvasElement)) {
-  throw new Error('Canvas #game nao encontrado.');
-}
+if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
+
+const menu = document.getElementById('menu') as HTMLDivElement;
+const banner = document.getElementById('banner') as HTMLDivElement;
+const serverInput = document.getElementById('server') as HTMLInputElement;
+const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 
 const renderer = new SurvivalRenderer(canvas);
 const input = new SurvivalInput(canvas);
 input.attach();
 
-let state: SurvivalState = createRun({ seed: (Date.now() ^ 0x5f3759df) >>> 0 });
-let accumulator = 0;
-let lastTime = performance.now();
+let quality: QualityLevel = loadQuality();
+qualitySelect.value = quality;
+renderer.setQuality(quality);
+const governor = new FpsGovernor();
 
 const resize = (): void => {
   renderer.resize();
   input.layoutButtons(window.innerWidth, window.innerHeight);
 };
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 resize();
 
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'r' && state.phase !== 'running' && state.phase !== 'choice') {
-    state = createRun({ seed: (Date.now() ^ 0x9e3779b9) >>> 0 });
+const playerScreen = (): { x: number; y: number } => ({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+
+const setBanner = (text: string | null): void => {
+  if (!text) {
+    banner.classList.add('hidden');
+  } else {
+    banner.textContent = text;
+    banner.classList.remove('hidden');
   }
-});
+};
 
-const frame = (now: number): void => {
-  const delta = Math.min(120, now - lastTime);
-  lastTime = now;
-  accumulator += delta;
+const haptics = (events: SemanticEvent[]): void => {
+  if (!('vibrate' in navigator)) return;
+  for (const e of events) {
+    if (e.t === 'player_down') navigator.vibrate(120);
+    else if (e.t === 'dodge') navigator.vibrate(15);
+  }
+};
 
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+const applyAdaptiveQuality = (dt: number): void => {
+  governor.sample(dt);
+  if (governor.shouldDowngrade(renderer.quality.targetFps)) {
+    const lower = nextLowerQuality(renderer.quality.level);
+    if (lower) {
+      quality = lower;
+      renderer.setQuality(lower);
+      saveQuality(lower);
+      qualitySelect.value = lower;
+      setBanner(`Qualidade reduzida para ${lower} (desempenho)`);
+      setTimeout(() => setBanner(null), 1800);
+    }
+  }
+};
 
-  if (state.phase === 'choice' && state.pendingChoice) {
-    // overlay pausado: renderiza mundo + cartas e espera escolha
-    renderer.render(state, 1, input.state, now);
-    const regions = renderer.renderChoice(state.pendingChoice, vw, vh);
-    const choice = input.consumeChoiceTap(regions);
-    if (choice !== null) {
-      const cmd = { ...input.snapshot(playerScreen()), choose: choice };
+// ---------------------------------------------------------------------------
+// SOLO (simulacao local, funciona offline)
+// ---------------------------------------------------------------------------
+let stopLoop: (() => void) | null = null;
+
+const runSolo = (): void => {
+  let state: SurvivalState = createRun({ seed: (Date.now() ^ 0x5f3759df) >>> 0 });
+  let accumulator = 0;
+  let lastTime = performance.now();
+  let running = true;
+
+  const restartKey = (e: KeyboardEvent): void => {
+    if (e.key.toLowerCase() === 'r' && state.phase !== 'running' && state.phase !== 'choice') {
+      state = createRun({ seed: (Date.now() ^ 0x9e3779b9) >>> 0 });
+    }
+  };
+  window.addEventListener('keydown', restartKey);
+
+  const frame = (now: number): void => {
+    if (!running) return;
+    const delta = Math.min(120, now - lastTime);
+    applyAdaptiveQuality(delta);
+    lastTime = now;
+    accumulator += delta;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    if (state.phase === 'choice' && state.pendingChoice) {
+      renderer.render(state, 1, input.state, now);
+      const regions = renderer.renderChoice(state.pendingChoice, vw, vh);
+      const choice = input.consumeChoiceTap(regions);
+      if (choice !== null) {
+        const cmd = { ...input.snapshot(playerScreen()), choose: choice };
+        const result = stepRun(state, [cmd]);
+        renderer.ingestEvents(result.events, now);
+      }
+      accumulator = 0;
+      requestAnimationFrame(frame);
+      return;
+    }
+
+    if (state.phase !== 'running') {
+      renderer.render(state, 1, input.state, now);
+      renderer.renderEnd(state, vw, vh);
+      if (input.hasTap()) state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
+      accumulator = 0;
+      requestAnimationFrame(frame);
+      return;
+    }
+
+    while (accumulator >= TICK_MS) {
+      const cmd = input.snapshot(playerScreen());
       const result = stepRun(state, [cmd]);
       renderer.ingestEvents(result.events, now);
+      haptics(result.events);
+      accumulator -= TICK_MS;
+      if (state.phase !== 'running') break;
     }
-    accumulator = 0;
+    renderer.render(state, accumulator / TICK_MS, input.state, now);
     requestAnimationFrame(frame);
-    return;
-  }
-
-  if (state.phase !== 'running') {
-    renderer.render(state, 1, input.state, now);
-    renderer.renderEnd(state, vw, vh);
-    if (input.hasTap()) {
-      state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
-    }
-    accumulator = 0;
-    requestAnimationFrame(frame);
-    return;
-  }
-
-  while (accumulator >= TICK_MS) {
-    const cmd = input.snapshot(playerScreen());
-    const result = stepRun(state, [cmd]);
-    renderer.ingestEvents(result.events, now);
-    accumulator -= TICK_MS;
-    if (state.phase !== 'running') break;
-  }
-
-  renderer.render(state, accumulator / TICK_MS, input.state, now);
+  };
   requestAnimationFrame(frame);
+  stopLoop = () => {
+    running = false;
+    window.removeEventListener('keydown', restartKey);
+  };
 };
 
-/** Posicao do jogador em coordenadas de tela (para mira com mouse). */
-const playerScreen = (): { x: number; y: number } => {
-  return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+// ---------------------------------------------------------------------------
+// ONLINE (servidor autoritativo; solo permanece disponivel offline)
+// ---------------------------------------------------------------------------
+const defaultServerUrl = (): string => {
+  const q = new URLSearchParams(location.search).get('server');
+  if (q) return q;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.hostname || 'localhost'}:8080`;
 };
 
-requestAnimationFrame(frame);
+const runOnline = (url: string): void => {
+  let ws: WebSocket | null = null;
+  let net: NetClient | null = null;
+  let running = true;
+  let lastTime = performance.now();
+  let reconnectAt = 0;
 
-// re-layout em mudanca de orientacao
-window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+  const connect = (): void => {
+    setBanner('Conectando…');
+    ws = new WebSocket(url);
+    net = new NetClient((raw) => ws?.readyState === WebSocket.OPEN && ws.send(raw));
+    net.onEvents = (events) => {
+      renderer.ingestEvents(events, performance.now());
+      haptics(events);
+    };
+    ws.onopen = () => net?.connect(net.resumeToken ?? undefined);
+    ws.onmessage = (ev) => net?.receive(typeof ev.data === 'string' ? ev.data : '', performance.now());
+    ws.onclose = () => {
+      net?.markOffline();
+      if (running) reconnectAt = performance.now() + 1500;
+    };
+    ws.onerror = () => ws?.close();
+  };
+  connect();
+
+  const frame = (now: number): void => {
+    if (!running) return;
+    const delta = Math.min(120, now - lastTime);
+    applyAdaptiveQuality(delta);
+    lastTime = now;
+
+    if (net && net.status === 'online') {
+      setBanner(null);
+      const cmd = input.snapshot(playerScreen());
+      net.setCommand(cmd);
+      net.pump(now);
+      const state = net.sampleRenderState(now);
+      if (state) {
+        renderer.render(state, 1, input.state, now);
+        if (state.phase !== 'running' && state.phase !== 'choice') {
+          renderer.renderEnd(state, window.innerWidth, window.innerHeight);
+        }
+      }
+    } else {
+      setBanner(net?.status === 'reconnecting' ? 'Reconectando…' : 'Offline — tentando reconectar');
+      if (reconnectAt && now >= reconnectAt && (!ws || ws.readyState === WebSocket.CLOSED)) {
+        reconnectAt = 0;
+        connect();
+      }
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  stopLoop = () => {
+    running = false;
+    ws?.close();
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Menu
+// ---------------------------------------------------------------------------
+qualitySelect.addEventListener('change', () => {
+  quality = qualitySelect.value as QualityLevel;
+  renderer.setQuality(quality);
+  saveQuality(quality);
+});
+
+const startSolo = (): void => {
+  menu.classList.add('hidden');
+  stopLoop?.();
+  runSolo();
+};
+const startOnline = (): void => {
+  menu.classList.add('hidden');
+  stopLoop?.();
+  runOnline(serverInput.value.trim() || defaultServerUrl());
+};
+
+document.getElementById('btn-solo')?.addEventListener('click', startSolo);
+document.getElementById('btn-online')?.addEventListener('click', startOnline);
+serverInput.placeholder = defaultServerUrl();
+
+// auto-start por query (?online=1)
+const params = new URLSearchParams(location.search);
+if (params.get('online') === '1') startOnline();
+else if (params.get('solo') === '1') startSolo();
+
+// PWA: registra o service worker (app shell offline para o solo)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      /* PWA opcional; o jogo funciona sem SW */
+    });
+  });
+}

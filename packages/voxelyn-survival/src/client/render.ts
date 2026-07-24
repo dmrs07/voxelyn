@@ -13,6 +13,7 @@ import {
 import type { InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, deriveAnim, type EntityAnimState } from './sprites';
+import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -53,12 +54,18 @@ export class SurvivalRenderer {
   messages: Array<{ text: string; until: number }> = [];
   readonly sprites = new SpriteBank();
   private readonly animStates = new Map<number, EntityAnimState>();
+  quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D indisponivel');
     this.ctx = ctx;
     this.sprites.load();
+  }
+
+  setQuality(level: QualityLevel): void {
+    this.quality = PRESETS[level];
+    this.resize();
   }
 
   private animFor(id: number, x: number, y: number, hp: number, alive: boolean, nowMs: number): EntityAnimState {
@@ -68,7 +75,7 @@ export class SurvivalRenderer {
   }
 
   resize(): void {
-    const dpr = Math.min(2, window.devicePixelRatio || 1); // DPR limitado (mobile)
+    const dpr = Math.min(this.quality.maxDpr, window.devicePixelRatio || 1); // DPR limitado por qualidade
     this.canvas.width = Math.floor(window.innerWidth * dpr);
     this.canvas.height = Math.floor(window.innerHeight * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -145,8 +152,12 @@ export class SurvivalRenderer {
     let shakeX = 0;
     let shakeY = 0;
     if (nowMs < this.shake.until) {
-      shakeX = (Math.random() - 0.5) * this.shake.power;
-      shakeY = (Math.random() - 0.5) * this.shake.power;
+      shakeX = (Math.random() - 0.5) * this.shake.power * this.quality.shakeScale;
+      shakeY = (Math.random() - 0.5) * this.shake.power * this.quality.shakeScale;
+    }
+    // teto de FX conforme qualidade (descarta os mais antigos)
+    if (this.fxList.length > this.quality.maxFx) {
+      this.fxList.splice(0, this.fxList.length - this.quality.maxFx);
     }
 
     const isoX = (x: number, y: number): number => (x - y) * (TILE_W / 2);
@@ -172,15 +183,17 @@ export class SurvivalRenderer {
     const y0 = Math.max(0, py - range);
     const y1 = Math.min(h - 1, py + range);
 
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const i = y * w + x;
-        if (state.surface[i] === SURF_FIRE) lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
-        else if (state.solid[i] === SOLID_CRYSTAL) lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
+    if (this.quality.dynamicLights) {
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = y * w + x;
+          if (state.surface[i] === SURF_FIRE) lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
+          else if (state.solid[i] === SOLID_CRYSTAL) lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
+        }
       }
-    }
-    for (const c of state.charges) {
-      lights.push({ x: (c.idx % w) + 0.5, y: Math.floor(c.idx / w) + 0.5, r: 3, power: 0.9 });
+      for (const c of state.charges) {
+        lights.push({ x: (c.idx % w) + 0.5, y: Math.floor(c.idx / w) + 0.5, r: 3, power: 0.9 });
+      }
     }
 
     const brightness = (x: number, y: number): number => {
