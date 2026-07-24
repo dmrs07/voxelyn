@@ -95,7 +95,16 @@ export const damageEntity = (
   events: SemanticEvent[]
 ): void => {
   if (!ent.alive) return;
-  if (ent.kind === 'player' && state.playerExtra.iframesUntil > state.tick) return;
+  if (ent.kind === 'player') {
+    const extra = state.playerExtras[ent.slot ?? 0];
+    if (extra.iframesUntil > state.tick) return;
+    // abatido nao recebe mais dano de vida (sangra por tempo); ignora acertos
+    if (extra.downed) return;
+    ent.hp = Math.max(0, ent.hp - amount);
+    events.push({ t: 'hit', x: ent.x, y: ent.y, amount, target: ent.id });
+    // morte/abatimento do player e resolvido em run.ts (resolveDownedAndDeaths)
+    return;
+  }
   ent.hp -= amount;
   events.push({ t: 'hit', x: ent.x, y: ent.y, amount, target: ent.id });
   if (ent.hp <= 0) {
@@ -153,16 +162,31 @@ export const spawnEnemy = (
 
 const distTo = (a: Entity, b: Entity): number => Math.hypot(a.x - b.x, a.y - b.y);
 
+/** Player de pe (vivo, nao abatido) mais proximo de (x,y). */
+const nearestTarget = (state: SurvivalState, x: number, y: number): Entity | null => {
+  let best: Entity | null = null;
+  let bestD = Infinity;
+  for (const p of state.players) {
+    if (!p.alive || state.playerExtras[p.slot ?? 0].downed) continue;
+    const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+};
+
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
-  const player = state.player;
   const dt = 1 / TICK_HZ;
 
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
     if (enemy.stunnedUntil > state.tick) continue;
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
-    const dist = distTo(enemy, player);
-    const aggro = player.alive && dist <= def.aggroRange + (enemy.elite ? 3 : 0);
+    const player = nearestTarget(state, enemy.x, enemy.y);
+    const dist = player ? distTo(enemy, player) : Infinity;
+    const aggro = player !== null && dist <= def.aggroRange + (enemy.elite ? 3 : 0);
 
     // guardiao dorme ate o nucleo ser tomado ou o jogador chegar perto
     if (enemy.archetype === 'guardian' && !state.guardianAwake) {
@@ -178,7 +202,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     let dirY = 0;
     let speed = def.speed * (enemy.elite ? 1.12 : 1) * surfaceSpeedMul(state, enemy);
 
-    if (aggro) {
+    if (aggro && player) {
       dirX = player.x - enemy.x;
       dirY = player.y - enemy.y;
       const len = Math.hypot(dirX, dirY) || 1;
@@ -265,7 +289,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
 
     // cuspir (spitter e guardiao)
-    if (aggro && (enemy.archetype === 'spitter' || enemy.archetype === 'guardian')) {
+    if (aggro && player && (enemy.archetype === 'spitter' || enemy.archetype === 'guardian')) {
       const cooldown = enemy.archetype === 'guardian' ? 44 : 56;
       if (state.tick >= enemy.rangedReadyAt) {
         enemy.rangedReadyAt = state.tick + cooldown;
@@ -291,9 +315,8 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       }
     }
 
-    // dano de contato
-    const contactDist = distTo(enemy, player);
-    if (player.alive && contactDist < enemy.radius + player.radius + 0.12 && state.tick >= enemy.contactReadyAt) {
+    // dano de contato ao player de pe mais proximo
+    if (player && distTo(enemy, player) < enemy.radius + player.radius + 0.12 && state.tick >= enemy.contactReadyAt) {
       damageEntity(state, player, def.contactDamage * (enemy.elite ? 1.4 : 1), events);
       enemy.contactReadyAt = state.tick + def.contactCooldown;
     }
@@ -319,7 +342,7 @@ export const applyExplosionDamage = (
   radius: number,
   events: SemanticEvent[]
 ): void => {
-  const all = [state.player, ...state.enemies];
+  const all = [...state.players, ...state.enemies];
   for (const ent of all) {
     if (!ent.alive) continue;
     const d = Math.hypot(ent.x - ex, ent.y - ey);

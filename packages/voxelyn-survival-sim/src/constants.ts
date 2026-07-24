@@ -77,4 +77,11 @@ export const VENT_BASE_INTERVAL_TICKS = 160;
 export const ENEMY_MIN_SPAWN_DIST = 12;
 export const GUARDIAN_HP = 420;
 
+// Co-op: estado abatido, revive e extracao coletiva.
+export const MAX_PLAYERS = 2;
+export const BLEEDOUT_TICKS = 20 * TICK_HZ; // ~20s abatido antes de morrer
+export const REVIVE_RADIUS = 1.5;
+export const REVIVE_HP_FRACTION = 0.35;
+export const EXTRACT_RADIUS = 3;
+
 export const RUN_SEED_MIX = 0x9e3779b9;

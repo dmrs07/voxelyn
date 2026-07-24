@@ -6,6 +6,7 @@ export type RunConfig = {
   seed: number;
   width?: number;
   height?: number;
+  playerCount?: number; // 1 (solo, padrao) ou 2 (co-op)
 };
 
 export type RunPhase = 'running' | 'choice' | 'dead' | 'extracted' | 'extracted_with_core';
@@ -33,6 +34,7 @@ export type Entity = {
   rangedReadyAt: number;
   stunnedUntil: number;
   facing: Vec2;
+  slot?: number; // players: indice em playerExtras
 };
 
 export type PlayerExtra = {
@@ -48,6 +50,8 @@ export type PlayerExtra = {
   modifiers: ModifierId[];
   hasCore: boolean;
   dodgeDir: Vec2;
+  downed: boolean; // co-op: abatido, aguardando revive
+  bleedoutAt: number; // tick em que o abatido morre se nao revivido
 };
 
 export type Projectile = {
@@ -89,7 +93,8 @@ export type SemanticEvent =
   | { t: 'consume'; x: number; y: number }
   | { t: 'overheat'; x: number; y: number }
   | { t: 'guardian_awake' }
-  | { t: 'player_down' }
+  | { t: 'player_down'; slot?: number }
+  | { t: 'revive'; x: number; y: number; slot: number }
   | { t: 'extracted'; withCore: boolean }
   | { t: 'message'; text: string };
 
@@ -121,6 +126,10 @@ export type SurvivalState = {
   guardianAwake: boolean;
   leftEntryZone: boolean;
 
+  // Fonte da verdade: arrays de players. player/playerExtra sao aliases do slot 0
+  // (mesma referencia de objeto), preservando o caminho solo.
+  players: Entity[];
+  playerExtras: PlayerExtra[];
   player: Entity;
   playerExtra: PlayerExtra;
   enemies: Entity[];
@@ -142,10 +151,23 @@ export type StepResult = {
   events: SemanticEvent[];
 };
 
+export type PlayerSnapshot = {
+  slot: number;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  heat: number;
+  hasCore: boolean;
+  downed: boolean;
+  alive: boolean;
+};
+
 export type SurvivalSnapshot = {
   tick: number;
   phase: RunPhase;
   player: { x: number; y: number; hp: number; heat: number; hasCore: boolean };
+  players: PlayerSnapshot[];
   enemyCount: number;
   contamination: number;
 };
