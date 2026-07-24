@@ -47,5 +47,19 @@ export default [
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
+  {
+    // scripts de build/validacao de sprites: rodam em Node, nao no browser
+    files: ['packages/voxelyn-survival-content/tools/**/*.mjs'],
+    languageOptions: {
+      globals: { Buffer: 'readonly', console: 'readonly', process: 'readonly', URL: 'readonly' },
+    },
+  },
+  {
+    // service worker do PWA: escopo ServiceWorkerGlobalScope, nao window
+    files: ['packages/voxelyn-survival/public/sw.js'],
+    languageOptions: {
+      globals: { self: 'readonly', caches: 'readonly', fetch: 'readonly', console: 'readonly', URL: 'readonly' },
+    },
+  },
   prettier,
 ];

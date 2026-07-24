@@ -3,10 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "description": "Voxelyn monorepo - pixel/voxel toolkit and editor",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "pnpm -r build",
     "dev": "pnpm --filter @voxelforge/editor dev",
     "dev:roguelike": "pnpm --filter @voxelyn/roguelike dev",
+    "dev:survival": "pnpm --filter @voxelyn/survival dev",
+    "dev:server": "pnpm --filter @voxelyn/survival-server... build && pnpm --filter @voxelyn/survival-server start",
+    "build:survival": "pnpm --filter @voxelyn/survival-server... build && pnpm --filter @voxelyn/survival... build",
+    "test:survival": "pnpm --filter @voxelyn/survival-sim test && pnpm --filter @voxelyn/survival-protocol test && pnpm --filter @voxelyn/survival-content test && pnpm --filter @voxelyn/survival-server test && pnpm --filter @voxelyn/survival test",
     "dev:animation": "pnpm --filter @voxelyn/animation dev",
     "dev:core": "pnpm --filter @voxelyn/core dev",
     "dev:electron": "pnpm --filter @voxelforge/electron dev",

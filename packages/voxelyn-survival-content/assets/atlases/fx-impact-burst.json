@@ -1,0 +1,41 @@
+{
+  "id": "fx-impact-burst",
+  "version": 1,
+  "atlas": "fx-impact-burst.png",
+  "frameWidth": 16,
+  "frameHeight": 16,
+  "anchorX": 8,
+  "anchorY": 8,
+  "directions": 1,
+  "authoredDirs": [
+    "n"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0,
+    "h": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#2f6b4f",
+    "#59f2c2",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "burst": {
+      "frames": 5,
+      "fps": 24,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "n": {
+      "burst": 0
+    }
+  },
+  "generation": {
+    "tool": "procedural (tools/entities.mjs)",
+    "prompt": "expanding impact ring, biolum to fungus fade",
+    "seedOrRef": "deterministic-code-v1"
+  }
+}

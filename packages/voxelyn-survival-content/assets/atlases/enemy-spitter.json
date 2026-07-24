@@ -1,0 +1,78 @@
+{
+  "id": "enemy-spitter",
+  "version": 1,
+  "atlas": "enemy-spitter.png",
+  "frameWidth": 24,
+  "frameHeight": 24,
+  "anchorX": 12,
+  "anchorY": 22,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "ur"
+  ],
+  "flipPairs": {
+    "dl": "dr",
+    "ul": "ur"
+  },
+  "hitbox": {
+    "w": 0.68,
+    "h": 0.7
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1f3d33",
+    "#2f6b4f",
+    "#66c28a",
+    "#a8e63c"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 8,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 8,
+      "hit": 12,
+      "die": 14
+    },
+    "ur": {
+      "idle": 18,
+      "walk": 22,
+      "attack": 26,
+      "hit": 30,
+      "die": 32
+    }
+  },
+  "generation": {
+    "tool": "procedural (tools/entities.mjs)",
+    "prompt": "bulbous acid-sac creature with nozzle, ranged spitter, iso 2:1, restricted palette",
+    "seedOrRef": "deterministic-code-v1"
+  }
+}

@@ -1,0 +1,60 @@
+# Render Blueprint para o Voxelyn Survival (alpha).
+# - Web Service Node: servidor autoritativo de co-op (HTTP + WebSocket).
+# - Static Site: cliente PWA.
+# Uma unica instancia de servidor durante o alpha (o estado das salas e em memoria).
+#
+# Deploy: conecte o repositorio no Render e aponte para este blueprint.
+# Passo a passo e rollback: docs/deploy/render.md
+services:
+  # ---------------------------------------------------------------------------
+  # Servidor autoritativo (HTTP + wss)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: voxelyn-survival-server
+    runtime: node
+    plan: starter
+    region: oregon # trocar por regiao mais proxima; medir latencia do Brasil antes do co-op
+    numInstances: 1 # alpha: instancia unica (salas em memoria, sem KV/Postgres)
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --no-frozen-lockfile &&
+      pnpm --filter @voxelyn/survival-server... build
+    startCommand: node packages/voxelyn-survival-server/dist/bin/serve.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # CORS: origem do Static Site (preencher com a URL publica do cliente)
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # PORT e injetada pelo Render; o servidor faz bind em 0.0.0.0:$PORT
+
+  # ---------------------------------------------------------------------------
+  # Cliente PWA (Static Site)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: voxelyn-survival-client
+    runtime: static
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --no-frozen-lockfile &&
+      pnpm --filter @voxelyn/survival... build
+    staticPublishPath: packages/voxelyn-survival/dist
+    autoDeploy: true
+    envVars:
+      # URL wss publica do servidor (preencher com a URL do web service acima)
+      - key: VITE_SERVER_URL
+        sync: false
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      # SPA: qualquer rota cai no index (o cliente e single-page)
+      - type: rewrite
+        source: /*
+        destination: /index.html

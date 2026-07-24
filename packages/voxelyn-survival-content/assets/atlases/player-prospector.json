@@ -1,0 +1,82 @@
+{
+  "id": "player-prospector",
+  "version": 1,
+  "atlas": "player-prospector.png",
+  "frameWidth": 24,
+  "frameHeight": 32,
+  "anchorX": 12,
+  "anchorY": 30,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "ur"
+  ],
+  "flipPairs": {
+    "dl": "dr",
+    "ul": "ur"
+  },
+  "hitbox": {
+    "w": 0.68,
+    "h": 1
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#1f3d33",
+    "#2e3a4d",
+    "#46566e",
+    "#59f2c2",
+    "#66c28a",
+    "#b8a98f",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 4,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 4,
+      "fps": 8,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 8,
+      "hit": 12,
+      "die": 14
+    },
+    "ur": {
+      "idle": 18,
+      "walk": 22,
+      "attack": 26,
+      "hit": 30,
+      "die": 32
+    }
+  },
+  "generation": {
+    "tool": "procedural (tools/entities.mjs)",
+    "prompt": "isolated underground prospector, helmet lamp biolum accent, back bio-tank, iso 2:1, restricted palette",
+    "seedOrRef": "deterministic-code-v1"
+  }
+}
