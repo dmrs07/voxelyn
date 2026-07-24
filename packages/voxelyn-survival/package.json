@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@voxelyn/survival-content": "workspace:*",
     "@voxelyn/survival-sim": "workspace:*"
   },
   "devDependencies": {

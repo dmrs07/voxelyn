@@ -12,6 +12,7 @@ import {
 } from '@voxelyn/survival-sim';
 import type { InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import { SpriteBank, deriveAnim, type EntityAnimState } from './sprites';
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -50,11 +51,20 @@ export class SurvivalRenderer {
   fxList: Fx[] = [];
   shake: CameraShake = { power: 0, until: 0 };
   messages: Array<{ text: string; until: number }> = [];
+  readonly sprites = new SpriteBank();
+  private readonly animStates = new Map<number, EntityAnimState>();
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D indisponivel');
     this.ctx = ctx;
+    this.sprites.load();
+  }
+
+  private animFor(id: number, x: number, y: number, hp: number, alive: boolean, nowMs: number): EntityAnimState {
+    const next = deriveAnim(this.animStates.get(id), x, y, hp, alive, nowMs);
+    this.animStates.set(id, next);
+    return next;
   }
 
   resize(): void {
@@ -350,26 +360,31 @@ export class SurvivalRenderer {
       });
     }
 
-    // entidades
-    const drawEntity = (
-      ex: number,
-      ey: number,
-      radius: number,
-      color: string,
-      elite: boolean,
-      hpFrac: number,
-      isPlayer: boolean
-    ): void => {
-      const b = brightness(ex, ey);
-      if (b <= 0.05 && !isPlayer) return;
-      const [sx, sy] = toScreen(ex, ey);
-      const size = radius * TILE_W * 0.9 * z;
-      // sombra de contato
+    // sombra de contato + barra de vida, comuns aos caminhos sprite e vetorial
+    const drawShadow = (sx: number, sy: number, size: number): void => {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath();
       ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
-      // corpo (silhueta legivel com outline proprio)
+    };
+    const drawHealthBar = (sx: number, topY: number, size: number, hpFrac: number): void => {
+      if (hpFrac >= 1) return;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(sx - size, topY, size * 2, 2.4 * z);
+      ctx.fillStyle = hpFrac > 0.4 ? PAL.fungusLight : PAL.blood;
+      ctx.fillRect(sx - size, topY, size * 2 * hpFrac, 2.4 * z);
+    };
+
+    // fallback vetorial (arquetipos ainda sem sprite: bruiser/bomber/guardian)
+    const drawVectorBody = (
+      sx: number,
+      sy: number,
+      b: number,
+      radius: number,
+      color: string,
+      elite: boolean
+    ): void => {
+      const size = radius * TILE_W * 0.9 * z;
       const bodyH = size * 2.1;
       ctx.fillStyle = shade(color, 0.45 + b * 0.65);
       ctx.strokeStyle = shade(color, 0.2);
@@ -385,45 +400,77 @@ export class SurvivalRenderer {
         ctx.ellipse(sx, sy - bodyH * 0.55, size * 1.05, bodyH * 0.65, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
-      // barra de vida (somente ferido)
-      if (hpFrac < 1) {
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(sx - size, sy - bodyH - 5 * z, size * 2, 2.4 * z);
-        ctx.fillStyle = hpFrac > 0.4 ? PAL.fungusLight : PAL.blood;
-        ctx.fillRect(sx - size, sy - bodyH - 5 * z, size * 2 * hpFrac, 2.4 * z);
-      }
     };
+
+    const spriteZoom = Math.max(1, Math.round(z));
 
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
+      const b = brightness(enemy.x, enemy.y);
+      if (b <= 0.05) continue;
       const colorMap: Record<string, string> = {
-        stalker: '#9a86c9',
+        stalker: PAL.rockLight,
         bruiser: PAL.rust,
         spitter: PAL.acid,
-        bomber: '#d98a3b',
+        bomber: PAL.fire,
         guardian: PAL.blood,
       };
+      const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       items.push({
         depth: enemy.x + enemy.y,
-        draw: () =>
-          drawEntity(
-            enemy.x,
-            enemy.y,
-            enemy.radius,
-            colorMap[enemy.archetype] ?? PAL.bone,
-            enemy.elite,
-            enemy.hp / enemy.maxHp,
-            false
-          ),
+        draw: () => {
+          const [sx, sy] = toScreen(enemy.x, enemy.y);
+          const size = enemy.radius * TILE_W * 0.9 * z;
+          drawShadow(sx, sy, size);
+          const drew = this.sprites.drawEntity(
+            ctx,
+            enemy.archetype,
+            anim.anim,
+            enemy.facing.x,
+            enemy.facing.y,
+            nowMs - anim.animStartMs,
+            sx,
+            sy,
+            spriteZoom,
+            enemy.elite ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 } : undefined
+          );
+          if (!drew) drawVectorBody(sx, sy, b, enemy.radius, colorMap[enemy.archetype] ?? PAL.bone, enemy.elite);
+          if (enemy.elite && drew) {
+            ctx.strokeStyle = PAL.fire;
+            ctx.lineWidth = z;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, size * 1.05, size * 0.55, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          drawHealthBar(sx, sy - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+        },
       });
     }
 
     if (player.alive) {
+      const anim = this.animFor(player.id, player.x, player.y, player.hp, player.alive, nowMs);
       items.push({
         depth: player.x + player.y,
         draw: () => {
           const flick = state.playerExtra.iframesUntil > state.tick && state.tick % 2 === 0;
-          if (!flick) drawEntity(player.x, player.y, player.radius, PAL.player, false, player.hp / player.maxHp, true);
+          const [psx, psy] = toScreen(player.x, player.y);
+          const size = player.radius * TILE_W * 0.9 * z;
+          drawShadow(psx, psy, size);
+          if (!flick) {
+            const drew = this.sprites.drawEntity(
+              ctx,
+              'prospector',
+              anim.anim,
+              state.playerExtra.aim.x,
+              state.playerExtra.aim.y,
+              nowMs - anim.animStartMs,
+              psx,
+              psy,
+              spriteZoom
+            );
+            if (!drew) drawVectorBody(psx, psy, 1, player.radius, PAL.player, false);
+          }
+          drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, player.hp / player.maxHp);
           // indicador de mira
           const [sx, sy] = toScreen(player.x, player.y);
           const aim = state.playerExtra.aim;
@@ -433,8 +480,8 @@ export class SurvivalRenderer {
           ctx.strokeStyle = 'rgba(232,241,255,0.5)';
           ctx.lineWidth = z * 0.8;
           ctx.beginPath();
-          ctx.moveTo(sx + axs * 0.4, sy - 8 * z + ays * 0.4);
-          ctx.lineTo(sx + axs, sy - 8 * z + ays);
+          ctx.moveTo(psx + axs * 0.4, psy - 8 * z + ays * 0.4);
+          ctx.lineTo(psx + axs, psy - 8 * z + ays);
           ctx.stroke();
         },
       });
@@ -445,10 +492,14 @@ export class SurvivalRenderer {
         depth: proj.x + proj.y,
         draw: () => {
           const [sx, sy] = toScreen(proj.x, proj.y);
-          ctx.fillStyle = proj.hostile ? PAL.acid : PAL.biolum;
-          ctx.beginPath();
-          ctx.arc(sx, sy - 6 * z, Math.max(2, 2.2 * z), 0, Math.PI * 2);
-          ctx.fill();
+          // sprite biolum para tiros do jogador; cuspe inimigo permanece vetorial (acido)
+          const drew = !proj.hostile && this.sprites.drawBolt(ctx, sx, sy - 6 * z, nowMs, Math.max(1, Math.round(z)));
+          if (!drew) {
+            ctx.fillStyle = proj.hostile ? PAL.acid : PAL.biolum;
+            ctx.beginPath();
+            ctx.arc(sx, sy - 6 * z, Math.max(2, 2.2 * z), 0, Math.PI * 2);
+            ctx.fill();
+          }
         },
       });
     }
