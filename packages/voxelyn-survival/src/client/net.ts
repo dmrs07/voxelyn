@@ -1,6 +1,7 @@
 import {
   ARCHETYPES,
   createRun,
+  hashStaticWorld,
   type Entity,
   type EnemyArchetype,
   type ModifierId,
@@ -40,11 +41,14 @@ export class NetClient {
   slot = 0;
   readonly events: SemanticEvent[] = [];
   onEvents: ((events: SemanticEvent[]) => void) | null = null;
-  onReject: ((reason: string) => void) | null = null;
+  onReject: ((reason: string, field?: string) => void) | null = null;
+  /** Disparado quando o cliente detecta divergencia e pede um full_resync. */
+  onDiverged: ((reason: string) => void) | null = null;
 
   private state: SurvivalState | null = null;
   private mirror: ClientWorldMirror | null = null;
   private seq = 0;
+  private divergedAt = 0; // tick do ultimo pedido por divergencia (throttle)
   private pending = false;
   private lastSendMs = 0;
   private command: PlayerCommand | null = null;
@@ -124,6 +128,19 @@ export class NetClient {
     this.send(encodeMessage({ t: 'resync', reason }));
   }
 
+  /**
+   * Divergencia detectada: pede o mundo autoritativo. Estrangulado porque o
+   * servidor coalesce resyncs num cooldown — insistir a cada snapshot so
+   * geraria trafego sem acelerar a recuperacao.
+   */
+  private diverge(reason: string): void {
+    const now = this.state?.tick ?? 0;
+    if (this.divergedAt !== 0 && now - this.divergedAt < 40) return;
+    this.divergedAt = now || 1;
+    this.onDiverged?.(reason);
+    this.requestResync(reason);
+  }
+
   ping(nowMs: number): void {
     this.send(encodeMessage({ t: 'ping', seq: this.seq, clientTimeMs: nowMs }));
   }
@@ -142,16 +159,26 @@ export class NetClient {
         this.state.solid = this.mirror.solid;
         this.state.surface = this.mirror.surface;
         this.status = 'online';
+        // O mundo estatico e gerado LOCALMENTE pela seed; se o hash nao bate
+        // com o do servidor (versao de geracao diferente, por exemplo), todo o
+        // terreno esta errado. Pede o mundo autoritativo em vez de renderizar
+        // uma caverna que nao existe.
+        if (msg.mapHash && hashStaticWorld(this.state) !== msg.mapHash) {
+          this.diverge('mapHash divergente na geracao local');
+        }
         break;
       }
       case 'full_resync': {
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
+        this.divergedAt = 0; // mundo reconstruido: zera o anti-repeticao
         this.applyWorld(msg.world);
         this.ingestFrame(msg.entities, [], msg.serverTick, nowMs);
         break;
       }
       case 'snapshot': {
-        if (this.mirror) this.mirror.apply(msg.chunkDiffs);
+        if (this.mirror && this.mirror.apply(msg.chunkDiffs)) {
+          this.diverge('diff de chunk incoerente com o mundo local');
+        }
         if (msg.world) this.applyWorld(msg.world);
         this.ingestFrame(msg.entities, msg.projectiles, msg.serverTick, nowMs);
         if (this.state) {
@@ -184,7 +211,7 @@ export class NetClient {
         // o socket aberto no reject, entao sem isso o cliente fica travado).
         this.resumeToken = null;
         this.status = 'offline';
-        this.onReject?.(msg.reason);
+        this.onReject?.(msg.reason, msg.field);
         break;
       default:
         break;

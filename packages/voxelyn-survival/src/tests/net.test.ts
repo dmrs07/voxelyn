@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SurvivalServer } from '@voxelyn/survival-server';
+import { CURRENT_VERSIONS } from '@voxelyn/survival-protocol';
 import { breakSolid, emptyCommand, type PlayerCommand } from '@voxelyn/survival-sim';
 import { NetClient } from '../client/net';
 
@@ -177,6 +178,72 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.caches[0].opened).toBe(true); // antes: crate desenhada para sempre
     expect(view.coreTaken).toBe(true);
+  });
+
+  it('mapHash divergente no welcome dispara resync (mundo local descartado)', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    let diverged = '';
+    a.onDiverged = (reason) => {
+      diverged = reason;
+    };
+    // servidor anuncia um mundo estatico diferente do que o cliente gerou
+    a.receive(
+      JSON.stringify({
+        t: 'welcome',
+        versions: CURRENT_VERSIONS,
+        playerId: 1,
+        resumeToken: 'tok',
+        seed: 99,
+        worldWidth: 96,
+        worldHeight: 96,
+        mapHash: 'deadbeef',
+      }),
+      0
+    );
+    expect(diverged).toContain('mapHash'); // antes: seguia renderizando terreno errado
+  });
+
+  it('mapHash igual no welcome NAO dispara resync', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    let diverged = '';
+    a.onDiverged = (reason) => {
+      diverged = reason;
+    };
+    a.connect();
+    loop.advance(3);
+    expect(diverged).toBe(''); // caminho normal: geracao local confere
+    expect(a.status).toBe('online');
+  });
+
+  it('diff de chunk incoerente dispara resync em vez de terreno errado', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    let diverged = '';
+    a.onDiverged = (reason) => {
+      diverged = reason;
+    };
+    a.connect();
+    loop.advance(3);
+
+    // snapshot com chunk fora da grade deste mundo (36 chunks em 96x96)
+    a.receive(
+      JSON.stringify({
+        t: 'snapshot',
+        serverTick: 99,
+        ackSeq: 0,
+        phase: 'running',
+        entities: [],
+        projectiles: [],
+        removedEntities: [],
+        chunkDiffs: [{ c: 9999, v: 1, cells: [{ i: 0, solid: 1, surface: 0 }] }],
+        events: [],
+        contamination: 0,
+      }),
+      0
+    );
+    expect(diverged).toContain('incoerente');
   });
 
   it('reconexao aplica o full_resync (mundo alterado nao volta ao estado gerado)', () => {

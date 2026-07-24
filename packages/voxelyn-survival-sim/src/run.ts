@@ -796,3 +796,16 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   }
   return (h >>> 0).toString(16).padStart(8, '0');
 };
+
+/** Hash FNV-1a das camadas estaticas iniciais (validacao de geracao local no cliente). */
+export const hashStaticWorld = (state: SurvivalState): string => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < state.solid.length; i++) {
+    const v = state.solid[i] | (state.surface[i] << 8);
+    h ^= v & 0xff;
+    h = Math.imul(h, 0x01000193);
+    h ^= (v >>> 8) & 0xff;
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+};

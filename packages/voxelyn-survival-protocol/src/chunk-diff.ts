@@ -151,10 +151,20 @@ export class ClientWorldMirror {
     this.chunkVersions = new Uint32Array(this.cx * chunksY(height));
   }
 
-  /** Aplica um lote de diffs. Diffs com versao <= a versao ja aplicada sao ignorados. */
-  apply(diffs: ChunkDiff[]): void {
+  /**
+   * Aplica um lote de diffs. Diffs obsoletos sao ignorados.
+   * @returns true se algum diff era INCOERENTE com este mundo (indice de chunk
+   * fora da grade) — sinal de divergencia que o chamador deve tratar pedindo
+   * um full_resync, em vez de seguir renderizando terreno errado.
+   */
+  apply(diffs: ChunkDiff[]): boolean {
     const w = this.width;
+    let diverged = false;
     for (const diff of diffs) {
+      if (diff.c < 0 || diff.c >= this.chunkVersions.length) {
+        diverged = true; // diff de um mundo que nao e este
+        continue;
+      }
       // ignora diffs obsoletos (reordenacao/reentrega)
       if (diff.v !== 0 && diff.v < this.chunkVersions[diff.c]) continue;
       const cxi = diff.c % this.cx;
@@ -173,6 +183,7 @@ export class ClientWorldMirror {
       }
       this.chunkVersions[diff.c] = diff.v;
     }
+    return diverged;
   }
 }
 

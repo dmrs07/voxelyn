@@ -8,6 +8,7 @@ export {
   stepRun,
   createSnapshot,
   hashAuthoritativeState,
+  hashStaticWorld,
   emptyCommand,
   resolveChainedEvents,
   standingPlayers,

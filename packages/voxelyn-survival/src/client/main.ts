@@ -37,6 +37,11 @@ resize();
 
 const playerScreen = (): { x: number; y: number } => ({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
+/** Devolve o jogador ao menu (erro sem retry: URL invalida, versao incompativel). */
+const backToMenu = (): void => {
+  menu.classList.remove('hidden');
+};
+
 const setBanner = (text: string | null): void => {
   if (!text) {
     banner.classList.add('hidden');
@@ -159,6 +164,7 @@ const runOnline = (url: string): void => {
   let running = true;
   let lastTime = performance.now();
   let reconnectAt = 0;
+  let fatal = false; // erro sem retry (versao incompativel, URL invalida)
   const gate = new RestartGate(RESTART_ARM_MS);
 
   // NetClient PERSISTENTE entre reconexoes: preserva resumeToken e a sequencia
@@ -171,21 +177,39 @@ const runOnline = (url: string): void => {
     renderer.ingestEvents(events, performance.now());
     haptics(events);
   };
-  // resume token rejeitado: fecha o socket para acionar o caminho de reconexao
-  // com uma sessao nova (token ja foi limpo pelo NetClient).
-  net.onReject = () => {
+  // Nem todo reject e recuperavel. Incompatibilidade de versao (o servidor
+  // marca o campo) nunca melhora com retry: o cliente e antigo. Reconectar em
+  // loop so gera churn durante um deploy — melhor parar e pedir recarga.
+  net.onReject = (reason, field) => {
+    if (field) {
+      fatal = true;
+      setBanner(`Versao incompativel (${field}) — recarregue a pagina.`);
+      ws?.close();
+      return;
+    }
     setBanner('Sessao expirada — reconectando…');
     ws?.close();
   };
+  net.onDiverged = () => setBanner('Ressincronizando o mundo…');
 
   const connect = (): void => {
     setBanner(net.resumeToken ? 'Reconectando…' : 'Conectando…');
-    ws = new WebSocket(url);
+    try {
+      // URL malformada ou esquema nao-WebSocket lanca AQUI, de forma sincrona.
+      // Sem tratar, o menu ja esta escondido e o loop ainda nao comecou: o
+      // jogador fica numa tela morta, sem retry e sem como corrigir a URL.
+      ws = new WebSocket(url);
+    } catch {
+      fatal = true;
+      setBanner(`Endereco de servidor invalido: ${url}`);
+      backToMenu();
+      return;
+    }
     ws.onopen = () => net.connect(net.resumeToken ?? undefined);
     ws.onmessage = (ev) => net.receive(typeof ev.data === 'string' ? ev.data : '', performance.now());
     ws.onclose = () => {
       net.markOffline();
-      if (running) reconnectAt = performance.now() + 1500;
+      if (running && !fatal) reconnectAt = performance.now() + 1500;
     };
     ws.onerror = () => ws?.close();
   };
@@ -223,6 +247,10 @@ const runOnline = (url: string): void => {
         }
       }
     } else {
+      if (fatal) {
+        requestAnimationFrame(frame);
+        return; // banner ja explica; nao insiste
+      }
       setBanner(net.status === 'reconnecting' ? 'Reconectando…' : 'Offline — tentando reconectar');
       if (reconnectAt && now >= reconnectAt && (!ws || ws.readyState === WebSocket.CLOSED)) {
         reconnectAt = 0;
