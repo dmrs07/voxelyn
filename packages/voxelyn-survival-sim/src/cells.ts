@@ -18,9 +18,9 @@ import {
   SURF_NONE,
   SURF_SCORCHED,
   VENT_BASE_INTERVAL_TICKS,
-} from './constants';
-import { chunkOf } from './worldgen';
-import type { SemanticEvent, SurvivalState } from './types';
+} from './constants.js';
+import { chunkOf } from './worldgen.js';
+import type { SemanticEvent, SurvivalState } from './types.js';
 
 const W = (state: SurvivalState): number => state.config.width;
 const H = (state: SurvivalState): number => state.config.height;

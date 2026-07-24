@@ -44,3 +44,7 @@ packages/voxelyn-survival-protocol/src/**/*.js
 packages/voxelyn-survival-protocol/src/**/*.d.ts
 packages/voxelyn-survival-content/src/**/*.js
 packages/voxelyn-survival-content/src/**/*.d.ts
+packages/voxelyn-survival-server/src/**/*.js
+packages/voxelyn-survival-server/src/**/*.d.ts
+packages/voxelyn-survival-server/bin/**/*.js
+packages/voxelyn-survival-server/bin/**/*.d.ts

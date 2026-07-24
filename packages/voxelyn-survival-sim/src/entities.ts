@@ -9,9 +9,9 @@ import {
   SURF_GAS,
   SURF_NONE,
   TICK_HZ,
-} from './constants';
-import { breakSolid, explodeAt, igniteCell, setSurface } from './cells';
-import type { Entity, EnemyArchetype, SemanticEvent, SurvivalState } from './types';
+} from './constants.js';
+import { breakSolid, explodeAt, igniteCell, setSurface } from './cells.js';
+import type { Entity, EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
 
 export type ArchetypeDef = {
   hp: number;

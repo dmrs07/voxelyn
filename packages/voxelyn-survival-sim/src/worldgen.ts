@@ -10,8 +10,8 @@ import {
   SURF_BIOFLUID,
   SURF_FUNGAL,
   SURF_NONE,
-} from './constants';
-import type { Vec2 } from './types';
+} from './constants.js';
+import type { Vec2 } from './types.js';
 
 export type GeneratedWorld = {
   solid: Uint8Array;

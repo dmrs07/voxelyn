@@ -1,12 +1,12 @@
 import type { PlayerCommand } from '@voxelyn/survival-sim';
-import { LIMITS } from './messages';
+import { LIMITS } from './messages.js';
 import type {
   ClientCommand,
   ClientHeartbeat,
   ClientHello,
   ClientMessage,
   ClientResyncRequest,
-} from './messages';
+} from './messages.js';
 
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; reason: string };
 

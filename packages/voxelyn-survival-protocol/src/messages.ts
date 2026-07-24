@@ -1,6 +1,6 @@
 import type { PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';
-import type { VersionTriple } from './version';
-import type { ChunkDiff } from './chunk-diff';
+import type { VersionTriple } from './version.js';
+import type { ChunkDiff } from './chunk-diff.js';
 
 // ---------------------------------------------------------------------------
 // Limites de payload e taxa (aplicados no servidor; documentados no protocolo).

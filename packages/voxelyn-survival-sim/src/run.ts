@@ -41,8 +41,8 @@ import {
   TICK_HZ,
   WORLD_H,
   WORLD_W,
-} from './constants';
-import { breakSolid, dischargeAt, explodeAt, setSurface, stepCells } from './cells';
+} from './constants.js';
+import { breakSolid, dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
 import {
   applyExplosionDamage,
   damageEntity,
@@ -50,8 +50,8 @@ import {
   spawnEnemy,
   surfaceSpeedMul,
   updateEnemies,
-} from './entities';
-import { generateWorld } from './worldgen';
+} from './entities.js';
+import { generateWorld } from './worldgen.js';
 import type {
   Entity,
   EnemyArchetype,
@@ -63,7 +63,7 @@ import type {
   StepResult,
   SurvivalSnapshot,
   SurvivalState,
-} from './types';
+} from './types.js';
 
 const MODIFIER_POOL: ModifierId[] = ['piercing', 'conductive', 'explosive', 'siphon'];
 
