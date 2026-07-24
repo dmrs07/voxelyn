@@ -9,6 +9,9 @@ export {
   hashAuthoritativeState,
   emptyCommand,
   resolveChainedEvents,
+  standingPlayers,
+  joinedPlayers,
+  nearestStandingPlayer,
 } from './run.js';
 export { generateWorld, floodOpen, chunkOf, cellIdx } from './worldgen.js';
 export { ARCHETYPES, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';

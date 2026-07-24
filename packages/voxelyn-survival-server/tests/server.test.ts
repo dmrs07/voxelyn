@@ -231,6 +231,75 @@ describe('servidor autoritativo de co-op', () => {
     }
   });
 
+  it('um unico cliente conectado joga em modo SOLO (avatar do parceiro nao existe ainda)', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const room = h.server.roomForClient('A')!;
+
+    // o slot 1 existe na sim mas nao foi reivindicado
+    expect(room.state.playerExtras[0].joined).toBe(true);
+    expect(room.state.playerExtras[1].joined).toBe(false);
+
+    h.tick(3);
+    // snapshots expoem apenas o player em jogo
+    const snap = h.drain('A').filter((m) => m.t === 'snapshot').pop();
+    expect(snap?.t === 'snapshot' && snap.entities.filter((e) => e.kind === 'player').length).toBe(1);
+
+    // extracao com um unico jogador em jogo nao espera "todos na saida"
+    room.state.leftEntryZone = true;
+    room.state.players[0].x = room.state.entry.x + 0.6;
+    room.state.players[0].y = room.state.entry.y + 0.6;
+    h.cmd('A', 1, interact());
+    h.tick(2);
+    expect(['extracted', 'extracted_with_core']).toContain(room.state.phase);
+  });
+
+  it('parceiro que entra depois recebe avatar novo na entrada (nao um ja usado)', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const room = h.server.roomForClient('A')!;
+    // A explora e se machuca por um tempo
+    for (let t = 0; t < 40; t++) {
+      h.cmd('A', t + 1, move(1, 0.5));
+      h.tick(1);
+    }
+    room.state.players[1].hp = 5; // simula "dano" que teria vazado para o slot reservado
+
+    h.connect('B');
+    h.hello('B');
+    const p2 = room.state.players[1];
+    expect(room.state.playerExtras[1].joined).toBe(true);
+    expect(p2.hp).toBe(p2.maxHp); // avatar reivindicado nasce integro
+    expect(Math.hypot(p2.x - room.state.entry.x, p2.y - room.state.entry.y)).toBeLessThan(4);
+  });
+
+  it('sala sem clientes nao e pareada com um cliente novo', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const roomA = h.server.roomForClient('A')!;
+    h.disconnect('A'); // sala fica reservada, sem clientes
+
+    h.connect('B');
+    h.hello('B');
+    const roomB = h.server.roomForClient('B')!;
+    expect(roomB.id).not.toBe(roomA.id); // nunca herda a run abandonada
+  });
+
+  it('salas abandonadas expiram apos a carencia', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    expect(h.server.roomCount()).toBe(1);
+    h.disconnect('A');
+    h.tick(5);
+    expect(h.server.roomCount()).toBe(1); // ainda na carencia (reconnect possivel)
+    h.tick(20 * 90 + 5);
+    expect(h.server.roomCount()).toBe(0); // expirada
+  });
+
   it('reapStale expira conexoes ociosas e retorna os ids removidos', () => {
     const server = new SurvivalServer({ maxPlayersPerRoom: 2 });
     server.addConnection('X', 0);

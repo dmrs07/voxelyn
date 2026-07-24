@@ -53,6 +53,31 @@ describe('co-op: multiplayer na simulacao', () => {
     expect(state.players[0].hp).toBe(state.players[0].maxHp); // player 1 longe, intacto
   });
 
+  it('slot nao reivindicado (joined=false) fica fora da sim: sem dano, sem co-op', () => {
+    const state = createRun({ seed: 21, playerCount: 2 });
+    state.playerExtras[1].joined = false; // parceiro ainda nao entrou
+    state.enemies = [];
+
+    // fogo sob o avatar reservado nao deve feri-lo
+    const w = state.config.width;
+    const p2 = state.players[1];
+    const i = Math.floor(p2.y) * w + Math.floor(p2.x);
+    state.surface[i] = 4; // SURF_FIRE
+    state.surfaceTimer[i] = 200;
+    idle(state, 5);
+    expect(p2.hp).toBe(p2.maxHp);
+
+    // extracao com um unico slot em jogo nao exige o parceiro na saida
+    state.leftEntryZone = true;
+    state.players[0].x = state.entry.x + 0.5;
+    state.players[0].y = state.entry.y + 0.5;
+    state.players[1].x = state.entry.x + 30; // longe
+    const cmd = emptyCommand();
+    cmd.interact = true;
+    stepRun(state, [cmd, emptyCommand()]);
+    expect(state.phase).toBe('extracted');
+  });
+
   it('determinismo co-op: mesma seed e mesmos comandos por slot geram o mesmo hash', () => {
     const scripted = (t: number, slot: number): PlayerCommand => {
       const c = emptyCommand();

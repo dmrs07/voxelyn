@@ -52,6 +52,13 @@ export type PlayerExtra = {
   dodgeDir: Vec2;
   downed: boolean; // co-op: abatido, aguardando revive
   bleedoutAt: number; // tick em que o abatido morre se nao revivido
+  /**
+   * Slot efetivamente ocupado por um jogador. Slots reservados mas ainda nao
+   * reivindicados (co-op online aguardando o parceiro) ficam `false`: nao sao
+   * alvo, nao sofrem dano/perigos, nao contam para co-op nem para a extracao
+   * coletiva, e nao aparecem nos snapshots. Solo/local nasce sempre `true`.
+   */
+  joined: boolean;
 };
 
 export type Projectile = {

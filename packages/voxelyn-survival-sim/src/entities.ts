@@ -167,7 +167,8 @@ const nearestTarget = (state: SurvivalState, x: number, y: number): Entity | nul
   let best: Entity | null = null;
   let bestD = Infinity;
   for (const p of state.players) {
-    if (!p.alive || state.playerExtras[p.slot ?? 0].downed) continue;
+    const e = state.playerExtras[p.slot ?? 0];
+    if (!e.joined || !p.alive || e.downed) continue;
     const d = (p.x - x) ** 2 + (p.y - y) ** 2;
     if (d < bestD) {
       bestD = d;
@@ -342,7 +343,9 @@ export const applyExplosionDamage = (
   radius: number,
   events: SemanticEvent[]
 ): void => {
-  const all = [...state.players, ...state.enemies];
+  // explosoes so atingem slots em jogo (reservados/nao reivindicados ficam fora)
+  const joined = state.players.filter((p) => state.playerExtras[p.slot ?? 0].joined);
+  const all = [...joined, ...state.enemies];
   for (const ent of all) {
     if (!ent.alive) continue;
     const d = Math.hypot(ent.x - ex, ent.y - ey);

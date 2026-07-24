@@ -114,6 +114,7 @@ const makeExtra = (): PlayerExtra => ({
   dodgeDir: { x: 1, y: 0 },
   downed: false,
   bleedoutAt: 0,
+  joined: true, // default seguro: solo/local ja esta em jogo
 });
 
 export const createRun = (config: RunConfig): SurvivalState => {
@@ -178,9 +179,16 @@ export const createRun = (config: RunConfig): SurvivalState => {
   return state;
 };
 
-/** Players de pe (vivos e nao abatidos). */
+/** Slots efetivamente em jogo (reivindicados por um jogador). */
+export const joinedPlayers = (state: SurvivalState): Entity[] =>
+  state.players.filter((p) => state.playerExtras[p.slot ?? 0].joined);
+
+/** Players de pe (em jogo, vivos e nao abatidos). */
 export const standingPlayers = (state: SurvivalState): Entity[] =>
-  state.players.filter((p) => p.alive && !state.playerExtras[p.slot ?? 0].downed);
+  state.players.filter((p) => {
+    const e = state.playerExtras[p.slot ?? 0];
+    return e.joined && p.alive && !e.downed;
+  });
 
 /** Player de pe mais proximo de (x,y), ou null. */
 export const nearestStandingPlayer = (state: SurvivalState, x: number, y: number): Entity | null => {
@@ -200,7 +208,7 @@ const cellIndexAt = (state: SurvivalState, x: number, y: number): number =>
   Math.floor(y) * state.config.width + Math.floor(x);
 
 const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void => {
-  const targets = [...state.players, ...state.enemies];
+  const targets = [...joinedPlayers(state), ...state.enemies];
   for (const ent of targets) {
     if (!ent.alive) continue;
     const surf = state.surface[cellIndexAt(state, ent.x, ent.y)];
@@ -219,7 +227,7 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
     const ev = events[i];
     if (ev.t === 'discharge') {
       const cells = new Set(ev.cells);
-      for (const ent of [...state.players, ...state.enemies]) {
+      for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
         if (cells.has(cellIndexAt(state, ent.x, ent.y))) {
           damageEntity(state, ent, DISCHARGE_DAMAGE, events);
@@ -246,10 +254,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const dt = 1 / TICK_HZ;
-  const coop = state.players.length > 1;
+  const coop = joinedPlayers(state).length > 1;
 
-  // abatidos nao agem (aguardam revive); mortos idem
-  if (!player.alive || extra.downed) return;
+  // slots nao reivindicados, abatidos e mortos nao agem
+  if (!extra.joined || !player.alive || extra.downed) return;
 
   // mira
   const aimLen = Math.hypot(cmd.aim.x, cmd.aim.y);
@@ -387,7 +395,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         if (other === slot) continue;
         const op = state.players[other];
         const oe = state.playerExtras[other];
-        if (!op.alive || !oe.downed) continue;
+        if (!oe.joined || !op.alive || !oe.downed) continue;
         if (Math.hypot(player.x - op.x, player.y - op.y) <= REVIVE_RADIUS) {
           oe.downed = false;
           oe.bleedoutAt = 0;
@@ -433,7 +441,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       const allAtEntry = standingPlayers(state).every(
         (p) => Math.hypot(p.x - (state.entry.x + 0.5), p.y - (state.entry.y + 0.5)) <= EXTRACT_RADIUS
       );
-      const anyDowned = state.playerExtras.some((e, i) => state.players[i].alive && e.downed);
+      const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
       if (allAtEntry && !anyDowned) {
         const withCore = state.playerExtras.some((e) => e.hasCore);
         state.phase = withCore ? 'extracted_with_core' : 'extracted';
@@ -500,7 +508,8 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       // impacto em entidades
       if (proj.hostile) {
         for (const p of state.players) {
-          if (!p.alive || state.playerExtras[p.slot ?? 0].downed) continue;
+          const pe = state.playerExtras[p.slot ?? 0];
+          if (!pe.joined || !p.alive || pe.downed) continue;
           if (Math.hypot(p.x - proj.x, p.y - proj.y) < p.radius + 0.2) {
             damageEntity(state, p, proj.damage, events);
             if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
@@ -577,7 +586,7 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
     const e = state.playerExtras[slot];
-    if (!p.alive) continue;
+    if (!e.joined || !p.alive) continue;
 
     if (e.downed) {
       // abatido morre ao esgotar o tempo de sangramento
@@ -591,7 +600,7 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
     if (p.hp <= 0) {
       p.hp = 0;
       const hasStandingAlly = state.players.some(
-        (o, i) => i !== slot && o.alive && !state.playerExtras[i].downed
+        (o, i) => i !== slot && state.playerExtras[i].joined && o.alive && !state.playerExtras[i].downed
       );
       if (hasStandingAlly) {
         // co-op: entra em estado abatido, revivel pelo parceiro
@@ -607,8 +616,9 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
   }
 
   // run acaba quando nenhum player pode continuar (todos mortos ou abatidos)
-  const anyActive = state.players.some((p, i) => p.alive && !state.playerExtras[i].downed);
-  if (!anyActive) {
+  const joined = state.players.filter((_, i) => state.playerExtras[i].joined);
+  const anyActive = joined.some((p) => p.alive && !state.playerExtras[p.slot ?? 0].downed);
+  if (joined.length > 0 && !anyActive) {
     state.phase = 'dead';
   }
 };
@@ -667,17 +677,20 @@ export const createSnapshot = (state: SurvivalState, viewerId?: string): Surviva
       heat: state.playerExtra.heat,
       hasCore: state.playerExtra.hasCore,
     },
-    players: state.players.map((p, i) => ({
-      slot: i,
-      x: p.x,
-      y: p.y,
-      hp: p.hp,
-      maxHp: p.maxHp,
-      heat: state.playerExtras[i].heat,
-      hasCore: state.playerExtras[i].hasCore,
-      downed: state.playerExtras[i].downed,
-      alive: p.alive,
-    })),
+    players: joinedPlayers(state).map((p) => {
+      const i = p.slot ?? 0;
+      return {
+        slot: i,
+        x: p.x,
+        y: p.y,
+        hp: p.hp,
+        maxHp: p.maxHp,
+        heat: state.playerExtras[i].heat,
+        hasCore: state.playerExtras[i].hasCore,
+        downed: state.playerExtras[i].downed,
+        alive: p.alive,
+      };
+    }),
     enemyCount: state.enemies.filter((e) => e.alive).length,
     contamination: state.contamination,
   };
@@ -704,6 +717,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
     const e = state.playerExtras[slot];
+    if (!e.joined) continue; // slots reservados nao influenciam o hash
     mix(Math.round(p.x * 1000));
     mix(Math.round(p.y * 1000));
     mix(Math.round(p.hp * 100));

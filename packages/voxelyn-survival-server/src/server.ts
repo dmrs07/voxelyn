@@ -11,6 +11,12 @@ import { GameRoom } from './room.js';
 
 export type Outbound = { clientId: string; msg: ServerMessage };
 
+/**
+ * Carencia antes de expirar uma sala sem clientes conectados (em ticks de 20 Hz).
+ * Generosa o bastante para cobrir reconexao por resume token (~90s).
+ */
+const ABANDON_GRACE_TICKS = 20 * 90;
+
 export type ServerOptions = {
   maxPlayersPerRoom?: number;
   baseSeed?: number;
@@ -32,6 +38,9 @@ type Conn = {
 export class SurvivalServer {
   private readonly conns = new Map<string, Conn>();
   private readonly rooms: GameRoom[] = [];
+  /** roomId -> tick em que a sala ficou sem clientes (para expiracao). */
+  private readonly emptySince = new Map<string, number>();
+  private tickCount = 0;
   private roomCounter = 0;
   private seedCounter = 0;
   private readonly maxPlayers: number;
@@ -58,18 +67,49 @@ export class SurvivalServer {
     this.conns.delete(clientId);
   }
 
+  private dropRoom(room: GameRoom, reason: string): void {
+    const idx = this.rooms.indexOf(room);
+    if (idx >= 0) {
+      this.rooms.splice(idx, 1);
+      this.log({ ev: 'room_close', room: room.id, reason });
+    }
+  }
+
   private reapRoom(room: GameRoom): void {
-    // sala vazia (nenhum slot jamais conectou de novo) e finalizada -> descarta
-    const anyEver = room.slots.length > 0;
-    const anyConnected = room.connectedCount() > 0;
-    if (anyEver && !anyConnected && (room.state.phase !== 'running')) {
-      const idx = this.rooms.indexOf(room);
-      if (idx >= 0) this.rooms.splice(idx, 1);
+    // sala sem clientes e ja finalizada -> descarta na hora; salas 'running'
+    // abandonadas expiram pela varredura periodica (sweepRooms).
+    if (room.connectedCount() === 0 && room.state.phase !== 'running') {
+      this.dropRoom(room, 'finished_and_empty');
+    }
+  }
+
+  /**
+   * Expira salas abandonadas: sem nenhum cliente conectado por
+   * ABANDON_GRACE_TICKS. Sem isso, abas fechadas vazam salas e trabalho de
+   * simulacao indefinidamente no servidor unico do alpha.
+   */
+  private sweepRooms(): void {
+    for (const room of [...this.rooms]) {
+      if (room.connectedCount() > 0) {
+        this.emptySince.delete(room.id);
+        continue;
+      }
+      const since = this.emptySince.get(room.id);
+      if (since === undefined) {
+        this.emptySince.set(room.id, this.tickCount);
+      } else if (this.tickCount - since >= ABANDON_GRACE_TICKS) {
+        this.emptySince.delete(room.id);
+        this.dropRoom(room, 'abandoned');
+      }
     }
   }
 
   private openRoom(): GameRoom {
-    let room = this.rooms.find((r) => r.hasOpenSlot() && r.state.phase === 'running');
+    // so reaproveita sala com capacidade livre E pelo menos um cliente ativo:
+    // uma sala reservada/abandonada nunca e pareada com um cliente novo.
+    let room = this.rooms.find(
+      (r) => r.hasOpenSlot() && r.state.phase === 'running' && r.connectedCount() > 0
+    );
     if (!room) {
       const seed = (this.baseSeed + this.seedCounter++ * 0x9e3779b9) >>> 0;
       room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers);
@@ -166,6 +206,8 @@ export class SurvivalServer {
   /** Avanca todas as salas ativas um tick e retorna snapshots para clientes conectados. */
   tick(): Outbound[] {
     const out: Outbound[] = [];
+    this.tickCount += 1;
+    this.sweepRooms(); // expira salas abandonadas antes de simular
     for (const room of this.rooms) {
       const terminal =
         room.state.phase === 'dead' ||

@@ -48,6 +48,8 @@ export class GameRoom {
     readonly maxPlayers: number
   ) {
     this.state = createRun({ seed, playerCount: maxPlayers });
+    // nenhum avatar entra na sim ate que um cliente reivindique o slot
+    for (const e of this.state.playerExtras) e.joined = false;
     this.tracker = new ChunkTracker(this.state.config.width, this.state.config.height);
     this.tracker.seed(this.state);
     for (const enemy of this.state.enemies) if (enemy.alive) this.prevAliveEnemies.add(enemy.id);
@@ -79,11 +81,28 @@ export class GameRoom {
     return this.slots.length < this.maxPlayers;
   }
 
+  /** Marca o avatar do slot como efetivamente em jogo, posicionado na entrada. */
+  private claimAvatar(slot: number): void {
+    const p = this.state.players[slot];
+    const e = this.state.playerExtras[slot];
+    if (!p || !e || e.joined) return;
+    // o avatar so entra na sim quando reivindicado: ate la nao e alvo, nao sofre
+    // dano e nao conta para co-op/extracao. Ao entrar, (re)posiciona na entrada.
+    p.x = this.state.entry.x + 0.5 + slot;
+    p.y = this.state.entry.y + 0.5;
+    p.hp = p.maxHp;
+    p.alive = true;
+    e.downed = false;
+    e.bleedoutAt = 0;
+    e.joined = true;
+  }
+
   /** Cria um NOVO slot para um cliente inedito. Nunca reivindica slot alheio. */
   attach(clientId: string): Slot | null {
     // slots desconectados sao token-reservados: um visitante novo NAO os herda
     // (evita que um estranho controle o avatar e aprenda o token do original).
     if (this.slots.length >= this.maxPlayers) return null;
+    this.claimAvatar(this.slots.length);
     const slot: Slot = {
       slot: this.slots.length,
       clientId,
@@ -105,6 +124,7 @@ export class GameRoom {
     slot.needsFullResync = true;
     return slot;
   }
+
 
   detach(clientId: string): void {
     const slot = this.slots.find((s) => s.clientId === clientId);
@@ -150,6 +170,8 @@ export class GameRoom {
   private entitySnapshots(): EntitySnapshot[] {
     const out: EntitySnapshot[] = [];
     for (let i = 0; i < this.state.players.length; i++) {
+      // slots reservados mas nao reivindicados nao existem para os clientes
+      if (!this.state.playerExtras[i].joined) continue;
       const p = this.state.players[i];
       out.push({
         id: p.id,
