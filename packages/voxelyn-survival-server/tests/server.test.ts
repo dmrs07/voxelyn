@@ -323,6 +323,44 @@ describe('servidor autoritativo de co-op', () => {
     expect(snaps.some((s) => s.t === 'snapshot' && typeof s.authHash === 'string')).toBe(true);
   });
 
+  it('intencao velha para de andar e atirar (cliente suspenso nao se mata)', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const room = h.server.roomForClient('A')!;
+
+    // cliente manda "correndo para a direita atirando" e some (PWA suspenso)
+    h.cmd('A', 1, { ...move(1, 0), fire: true });
+    h.tick(3);
+    const xAfterFewTicks = room.state.players[0].x;
+    expect(xAfterFewTicks).toBeGreaterThan(room.state.entry.x); // andou mesmo
+
+    // sem novas mensagens, o avatar precisa parar em vez de seguir por 8s
+    h.tick(60);
+    const xStopped = room.state.players[0].x;
+    h.tick(60);
+    expect(room.state.players[0].x).toBeCloseTo(xStopped, 6);
+    expect(room.slots[0].command.fire).toBe(false);
+    expect(room.slots[0].command.move).toEqual({ x: 0, y: 0 });
+  });
+
+  it('resync tem cooldown proprio e coalesce pedidos em rajada', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    h.drain('A'); // consome welcome + resync inicial
+
+    // rajada de pedidos: nao pode virar um full_resync por mensagem
+    for (let i = 0; i < 20; i++) h.send('A', { t: 'resync', reason: 'flood' });
+    const immediate = h.drain('A').filter((m) => m.t === 'full_resync');
+    expect(immediate.length).toBe(0); // antes: 20 resyncs de ~290 KB cada
+
+    // o pedido nao se perde: sai um unico resync quando o cooldown expira
+    h.tick(25);
+    const served = h.drain('A').filter((m) => m.t === 'full_resync');
+    expect(served.length).toBe(1);
+  });
+
   it('capacidade da sala e limitada ao MAX_PLAYERS da sim', () => {
     // configuracao acima do suportado: a sim clampa createRun a 2 players, e um
     // terceiro slot deixaria viewerState() sem playerExtras -> quebra do tick
@@ -553,7 +591,9 @@ describe('servidor autoritativo de co-op', () => {
     expect(h.drain('A').filter((m) => m.t === 'snapshot' && m.world).length).toBe(0);
 
     // quem reconecta/chega tarde recebe tudo de uma vez no full_resync
+    // (o pedido passa pelo cooldown de resync: fica pendente e sai no tick seguinte)
     h.send('A', { t: 'resync', reason: 'test' });
+    h.tick(25);
     const resync = h.drain('A').find((m) => m.t === 'full_resync');
     expect(resync).toBeDefined();
     if (resync?.t === 'full_resync') expect(resync.world.openedCaches).toContain(0);

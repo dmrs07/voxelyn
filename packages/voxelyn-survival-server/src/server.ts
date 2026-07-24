@@ -18,6 +18,15 @@ export type Outbound = { clientId: string; msg: ServerMessage };
  */
 const ABANDON_GRACE_TICKS = 20 * 90;
 
+/**
+ * Intervalo minimo entre full_resyncs para um mesmo cliente. Cada resync
+ * serializa o grid inteiro (~290 KB); no limite de mensagens compartilhado
+ * (40/s) um unico peer forcaria ~12 MB/s de serializacao e alocacao, o que
+ * compete com o loop autoritativo. Pedidos dentro da janela nao sao perdidos:
+ * ficam COALESCIDOS em needsFullResync e sao servidos assim que ela expira.
+ */
+const RESYNC_COOLDOWN_TICKS = 20;
+
 export type ServerOptions = {
   maxPlayersPerRoom?: number;
   baseSeed?: number;
@@ -188,9 +197,16 @@ export class SurvivalServer {
           },
         ];
 
-      case 'resync':
-        if (conn.room) return [this.resyncMsg(conn.room, clientId)];
-        return [];
+      case 'resync': {
+        if (!conn.room) return [];
+        const slot = conn.room.slotForClient(clientId);
+        if (slot && this.tickCount - slot.lastResyncTick < RESYNC_COOLDOWN_TICKS) {
+          // dentro do cooldown: marca pendente e serve no tick em que expirar
+          slot.needsFullResync = true;
+          return [];
+        }
+        return [this.resyncMsg(conn.room, clientId)];
+      }
 
       default:
         return [];
@@ -212,7 +228,10 @@ export class SurvivalServer {
 
   private resyncMsg(room: GameRoom, clientId: string): Outbound {
     const slot = room.slotForClient(clientId);
-    if (slot) slot.needsFullResync = false;
+    if (slot) {
+      slot.needsFullResync = false;
+      slot.lastResyncTick = this.tickCount;
+    }
     // NAO marca as WorldFlags como enviadas aqui: se este resync se perder, o
     // cliente ficaria sem elas para sempre. Deixa o proximo snapshot reenviar
     // (sao poucos bytes) em vez de otimizar um caminho de recuperacao.
@@ -234,7 +253,14 @@ export class SurvivalServer {
         ? { events: [], chunkDiffs: [], removed: [] }
         : room.step();
       for (const slot of room.slots) {
-        if (slot.clientId === null || slot.needsFullResync) continue;
+        if (slot.clientId === null) continue;
+        if (slot.needsFullResync) {
+          // pedido coalescido: so sai quando o cooldown deste cliente expira
+          if (this.tickCount - slot.lastResyncTick >= RESYNC_COOLDOWN_TICKS) {
+            out.push(this.resyncMsg(room, slot.clientId));
+          }
+          continue;
+        }
         out.push({ clientId: slot.clientId, msg: room.buildSnapshot(slot, chunkDiffs, removed, events) });
       }
     }

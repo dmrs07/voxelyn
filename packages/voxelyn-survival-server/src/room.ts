@@ -33,6 +33,16 @@ const HASH_INTERVAL_TICKS = 20;
  */
 const DISCONNECT_GRACE_TICKS = 20 * 45;
 
+/**
+ * Por quantos ticks a ultima intencao continua valendo sem mensagem nova.
+ * O cliente envia a ~25 Hz; meio segundo cobre jitter com folga. Passado isso,
+ * move/fire sao neutralizados: um PWA suspenso ou uma rede travada deixariam o
+ * avatar correndo e atirando por ate 8s (o timeout do heartbeat) — tempo de
+ * sobra para entrar no fogo, superaquecer e morrer numa run com permadeath.
+ * A mira e preservada: ela so orienta o sprite, nao move nem dispara.
+ */
+const COMMAND_STALE_TICKS = 10;
+
 export type Slot = {
   slot: number;
   clientId: string | null; // null = desconectado (player permanece na sim)
@@ -44,6 +54,8 @@ export type Slot = {
   lastWorldSig: string | null; // ultima WorldFlags enviada a este cliente
   disconnectedAtTick: number | null; // null = conectado
   retired: boolean; // grace expirado: token morto, vaga reofertada
+  commandAtTick: number; // tick da ultima intencao recebida (expira continuos)
+  lastResyncTick: number; // ultimo full_resync servido (cooldown anti-flood)
 };
 
 /**
@@ -134,6 +146,8 @@ export class GameRoom {
       retired.lastWorldSig = null;
       retired.disconnectedAtTick = null;
       retired.retired = false;
+      retired.commandAtTick = this.state.tick;
+      retired.lastResyncTick = -1000;
       this.claimAvatar(retired.slot); // avatar novo na entrada
       return retired;
     }
@@ -150,6 +164,8 @@ export class GameRoom {
       lastWorldSig: null,
       disconnectedAtTick: null,
       retired: false,
+      commandAtTick: this.state.tick,
+      lastResyncTick: -1000,
     };
     this.slots.push(slot);
     return slot;
@@ -213,7 +229,10 @@ export class GameRoom {
     if (!slot.gate.accept(seq)) return false; // duplicata/fora de ordem
     slot.lastAckSeq = slot.gate.ackSeq;
     // usa o comando mais recente do lote como intencao corrente
-    if (commands.length > 0) slot.command = commands[commands.length - 1];
+    if (commands.length > 0) {
+      slot.command = commands[commands.length - 1];
+      slot.commandAtTick = this.state.tick;
+    }
     return true;
   }
 
@@ -222,7 +241,17 @@ export class GameRoom {
     this.retireStaleSlots();
     const cmds: PlayerCommand[] = [];
     for (let s = 0; s < this.state.players.length; s++) {
-      cmds[s] = this.slots[s]?.command ?? emptyCommand();
+      const slot = this.slots[s];
+      if (!slot) {
+        cmds[s] = emptyCommand();
+        continue;
+      }
+      // intencao velha demais: para de andar e de atirar (mantem a mira)
+      if (this.state.tick - slot.commandAtTick > COMMAND_STALE_TICKS) {
+        slot.command.move = { x: 0, y: 0 };
+        slot.command.fire = false;
+      }
+      cmds[s] = slot.command;
     }
     const { events } = stepRun(this.state, cmds);
     // A intencao corrente persiste entre ticks (o cliente envia a ~25 Hz, o

@@ -37,6 +37,8 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
 
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
+  /** Buffer reaproveitado para tint isolado (evita alocar canvas por frame). */
+  private tintBuffer: HTMLCanvasElement | null = null;
 
   load(): void {
     for (const { manifest, url } of SOURCES) {
@@ -88,6 +90,19 @@ export class SpriteBank {
     const dx = footX - manifest.anchorX * zoom;
     const dy = footY - manifest.anchorY * zoom;
 
+    // Tint NUNCA e aplicado no canvas principal: 'source-atop' ali recolore o
+    // retangulo inteiro da cena (fundo e terreno sao opacos), nao so o sprite.
+    // Compoe num buffer offscreen do tamanho do frame, onde os unicos pixels
+    // opacos sao os do proprio sprite.
+    let src: CanvasImageSource = image;
+    let sx = rect.sx;
+    let sy = rect.sy;
+    if (tint && tint.alpha > 0) {
+      src = this.tintedFrame(image, rect, manifest.frameWidth, manifest.frameHeight, tint);
+      sx = 0;
+      sy = 0;
+    }
+
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     if (rect.flip) {
@@ -95,18 +110,43 @@ export class SpriteBank {
       ctx.scale(-1, 1);
       ctx.translate(-footX, 0);
       const fdx = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
-      ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, fdx, dy, dw, dh);
+      ctx.drawImage(src, sx, sy, rect.sw, rect.sh, fdx, dy, dw, dh);
     } else {
-      ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, dw, dh);
-    }
-    if (tint && tint.alpha > 0) {
-      ctx.globalAlpha = tint.alpha;
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = tint.color;
-      ctx.fillRect(Math.min(dx, footX - dw), dy, dw, dh);
+      ctx.drawImage(src, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
     }
     ctx.restore();
     return true;
+  }
+
+  /** Frame com tint aplicado apenas sobre os pixels do sprite (buffer offscreen). */
+  private tintedFrame(
+    image: CanvasImageSource,
+    rect: { sx: number; sy: number; sw: number; sh: number },
+    w: number,
+    h: number,
+    tint: { color: string; alpha: number }
+  ): HTMLCanvasElement {
+    if (!this.tintBuffer) this.tintBuffer = document.createElement('canvas');
+    const buf = this.tintBuffer;
+    if (buf.width !== w || buf.height !== h) {
+      buf.width = w;
+      buf.height = h;
+    }
+    const bctx = buf.getContext('2d');
+    if (!bctx) return buf;
+    bctx.globalCompositeOperation = 'source-over';
+    bctx.globalAlpha = 1;
+    bctx.clearRect(0, 0, w, h);
+    bctx.imageSmoothingEnabled = false;
+    bctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, w, h);
+    // agora sim: 'source-atop' recolore apenas os pixels ja desenhados
+    bctx.globalCompositeOperation = 'source-atop';
+    bctx.globalAlpha = tint.alpha;
+    bctx.fillStyle = tint.color;
+    bctx.fillRect(0, 0, w, h);
+    bctx.globalCompositeOperation = 'source-over';
+    bctx.globalAlpha = 1;
+    return buf;
   }
 
   drawBolt(ctx: CanvasRenderingContext2D, sx: number, sy: number, elapsedMs: number, zoom: number): boolean {
