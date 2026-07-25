@@ -12,8 +12,8 @@ processos não compartilham salas.
 ## Pré-requisitos
 
 - Conta no Render com acesso ao repositório `dmrs07/voxelyn`.
-- Node 22 / pnpm 10 (o blueprint usa `corepack enable`; a raiz declara
-  `packageManager` e `engines.node`).
+- Node 22 / pnpm 10. A raiz declara `packageManager` e limita `engines.node` à
+  série 22; o Render instala as dependências antes de executar o `buildCommand`.
 
 ## Passo a passo
 
@@ -37,11 +37,26 @@ processos não compartilham salas.
 | --- | --- | --- | --- |
 | server | `PORT` | injetada pelo Render | runtime (bind `0.0.0.0:$PORT`) |
 | server | `ALLOWED_ORIGINS` | `https://…client.onrender.com` | runtime |
-| server | `NODE_VERSION` | `22` | build |
+| server | `NODE_VERSION` | `22.22.0` | build |
+| client | `NODE_VERSION` | `22.22.0` | build |
 | client | `VITE_SERVER_URL` | `wss://…server.onrender.com` | **build-time** |
 
 O client também aceita override em runtime: `?server=wss://host` na URL, ou o
 campo "Servidor" no menu. Útil para testar contra outro backend sem rebuild.
+
+## Build no Render
+
+O Render já executa a instalação de dependências com pnpm antes do comando de
+build. Por isso o blueprint chama somente os scripts necessários:
+
+```sh
+pnpm --filter @voxelyn/survival-server... build
+pnpm --filter @voxelyn/survival... build
+```
+
+Não execute `corepack enable` no `buildCommand`: no ambiente do Render ele pode
+tentar recriar links em `/usr/bin`, que é somente leitura. Também não é
+necessário repetir `pnpm install` dentro do comando de build.
 
 ## Health checks
 
@@ -81,11 +96,11 @@ deploy no alpha.
 ## Latência (Brasil)
 
 Antes de declarar o co-op adequado, meça o RTT do Brasil para a região escolhida
-(o blueprint usa `oregon` como placeholder). O snapshot já traz `serverTick`; o
-cliente pode medir RTT via `ping`/`pong`. Se o RTT ficar alto, escolha a região
-Render mais próxima disponível e reavalie — o slice usa interpolação e tolerâncias
-de co-op (sem rollback netcode), então latências moderadas são aceitáveis, mas
-picos altos degradam a sensação.
+(o blueprint usa `virginia`). O snapshot já traz `serverTick`; o cliente pode
+medir RTT via `ping`/`pong`. Se o RTT ficar alto, escolha a região Render mais
+próxima disponível e reavalie — o slice usa interpolação e tolerâncias de co-op
+(sem rollback netcode), então latências moderadas são aceitáveis, mas picos altos
+degradam a sensação.
 
 ## Limites do alpha (não fazer ainda)
 
