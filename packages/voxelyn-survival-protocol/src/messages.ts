@@ -85,9 +85,6 @@ export type ViewerState = {
   aimX: number;
   aimY: number;
   overheated: boolean;
-  // Ticks absolutos do servidor: usados pelo HUD para animar cooldown sem prever regra.
-  dodgeCooldownUntil: number;
-  abilityCooldownUntil: number;
 };
 
 export type ProjectileSnapshot = {
