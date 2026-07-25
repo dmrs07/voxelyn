@@ -139,6 +139,48 @@ export const boundingBox = (g) => {
   return maxX < 0 ? null : { minX, minY, maxX, maxY };
 };
 
+/**
+ * Normaliza o conteúdo no canvas canônico sem cortar pixels.
+ *
+ * O desenho procedural trabalha em coordenadas expressivas e alguns ataques,
+ * fragmentos e outlines podem alcançar a borda. Para preservar os 2 px de
+ * respiro definidos pela Art Bible, enquadramos a bounding box dentro da área
+ * segura usando nearest-neighbor determinístico. Frames que já cabem são apenas
+ * reposicionados; frames maiores são reduzidos pelo menor fator necessário.
+ * O conteúdo permanece centralizado em X e alinhado à base em Y, preservando a
+ * leitura dos pés em relação ao anchor e evitando jitter entre poses.
+ */
+export const fitToMargin = (src, margin = 2) => {
+  const box = boundingBox(src);
+  if (!box) return src;
+
+  const safeWidth = src.w - margin * 2;
+  const safeHeight = src.h - margin * 2;
+  if (safeWidth <= 0 || safeHeight <= 0) throw new Error(`margem ${margin} inválida para ${src.w}x${src.h}`);
+
+  const contentWidth = box.maxX - box.minX + 1;
+  const contentHeight = box.maxY - box.minY + 1;
+  const scale = Math.min(1, safeWidth / contentWidth, safeHeight / contentHeight);
+  const targetWidth = Math.max(1, Math.floor(contentWidth * scale));
+  const targetHeight = Math.max(1, Math.floor(contentHeight * scale));
+  const offsetX = margin + Math.floor((safeWidth - targetWidth) / 2);
+  const offsetY = src.h - margin - targetHeight;
+  const out = grid(src.w, src.h);
+
+  for (let y = 0; y < targetHeight; y++) {
+    const sourceY = box.minY + Math.min(contentHeight - 1, Math.floor((y * contentHeight) / targetHeight));
+    for (let x = 0; x < targetWidth; x++) {
+      const sourceX = box.minX + Math.min(contentWidth - 1, Math.floor((x * contentWidth) / targetWidth));
+      const sourceIndex = (sourceY * src.w + sourceX) * 4;
+      if (src.buf[sourceIndex + 3] === 0) continue;
+      const targetIndex = ((offsetY + y) * out.w + offsetX + x) * 4;
+      out.buf.set(src.buf.subarray(sourceIndex, sourceIndex + 4), targetIndex);
+    }
+  }
+
+  return out;
+};
+
 export const blitToAtlas = (atlas, src, col) => {
   const ox = col * src.w;
   for (let y = 0; y < src.h; y++) {
