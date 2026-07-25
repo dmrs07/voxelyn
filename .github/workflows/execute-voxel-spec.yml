@@ -1,92 +1,12 @@
 name: Execute voxel character spec
 
 on:
-  workflow_dispatch:
   pull_request:
-    branches:
-      - main
-    types:
-      - opened
-      - reopened
-      - synchronize
-  push:
-    branches:
-      - docs/voxel-character-sprite-production-spec
-    paths:
-      - .github/workflows/execute-voxel-spec.yml
-
-permissions:
-  contents: write
-
-concurrency:
-  group: execute-voxel-spec-pr-30
-  cancel-in-progress: false
+    branches: [main]
+    types: [synchronize]
 
 jobs:
-  implement-and-validate:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: docs/voxel-character-sprite-production-spec
-
-      - name: Verify staged transfer
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat scripts/voxel_bundle.part{0..5} | sha256sum | grep '^28eb0d355954e11c85f60af7ddaf8d74c572ee834cdf9475b192b7e8ada7500c  -$'
-          cat scripts/apply_voxel_spec.py.part{0..2} > scripts/apply_voxel_spec.py
-          sha256sum scripts/apply_voxel_spec.py | grep '^846055a94315cd1dae82558b80234dff993c8d7c00ab12bd2e2c5659995b4246  scripts/apply_voxel_spec.py$'
-
-      - name: Apply revised spec and implementation
-        run: python scripts/apply_voxel_spec.py
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate voxel atlases
-        run: pnpm --filter @voxelyn/survival-content generate
-
-      - name: Validate content pipeline
-        run: pnpm --filter @voxelyn/survival-content test
-
-      - name: Test simulation and protocol
-        run: |
-          pnpm --filter @voxelyn/survival-sim test
-          pnpm --filter @voxelyn/survival-protocol test
-          pnpm --filter @voxelyn/survival-server test
-          pnpm --filter @voxelyn/survival test
-
-      - name: Build survival packages
-        run: pnpm build:survival
-
-      - name: Verify PWA atlas precache
-        run: pnpm --filter @voxelyn/survival build:offline-check
-
-      - name: Commit implementation
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f scripts/voxel_bundle.part{0..5}
-          rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part{0..2}
-          rm -f .github/workflows/execute-voxel-spec.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'feat(survival): implement voxel character sprite system'
-          git push origin HEAD:docs/voxel-character-sprite-production-spec
+      - run: echo runner-ok
