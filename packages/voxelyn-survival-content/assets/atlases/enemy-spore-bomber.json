@@ -1,7 +1,7 @@
 {
-  "id": "enemy-stalker",
+  "id": "enemy-spore-bomber",
   "version": 2,
-  "atlas": "enemy-stalker.png",
+  "atlas": "enemy-spore-bomber.png",
   "frameWidth": 24,
   "frameHeight": 24,
   "anchorX": 12,
@@ -15,8 +15,8 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 0.64,
-    "h": 0.6
+    "w": 0.62,
+    "h": 0.72
   },
   "footprint": {
     "w": 1,
@@ -28,11 +28,13 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
+    "#1f3d33",
+    "#2e3a4d",
     "#46566e",
-    "#6e4a33",
+    "#59f2c2",
     "#d93b4c",
-    "#ff7a2f",
-    "#ffd166"
+    "#e8f1ff",
+    "#ff7a2f"
   ],
   "animations": {
     "idle": {
@@ -59,6 +61,11 @@
       "frames": 5,
       "fps": 10,
       "loop": false
+    },
+    "special": {
+      "frames": 6,
+      "fps": 10,
+      "loop": false
     }
   },
   "frameMap": {
@@ -66,34 +73,38 @@
       "idle": 0,
       "walk": 4,
       "attack": 10,
-      "hit": 14,
-      "die": 16
+      "special": 14,
+      "hit": 20,
+      "die": 22
     },
     "dl": {
-      "idle": 21,
-      "walk": 25,
-      "attack": 31,
-      "hit": 35,
-      "die": 37
+      "idle": 27,
+      "walk": 31,
+      "attack": 37,
+      "special": 41,
+      "hit": 47,
+      "die": 49
     },
     "ur": {
-      "idle": 42,
-      "walk": 46,
-      "attack": 52,
-      "hit": 56,
-      "die": 58
+      "idle": 54,
+      "walk": 58,
+      "attack": 64,
+      "special": 68,
+      "hit": 74,
+      "die": 76
     },
     "ul": {
-      "idle": 63,
-      "walk": 67,
-      "attack": 73,
-      "hit": 77,
-      "die": 79
+      "idle": 81,
+      "walk": 85,
+      "attack": 91,
+      "special": 95,
+      "hit": 101,
+      "die": 103
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric low red chitin predator with one mineral blade, four authored directions",
+    "prompt": "voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod",
     "seedOrRef": "deterministic-code-v2"
   }
 }

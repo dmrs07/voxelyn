@@ -297,6 +297,16 @@ export class GameRoom {
         downed: this.state.playerExtras[i].downed,
         facingX: round3(this.state.playerExtras[i].aim.x),
         facingY: round3(this.state.playerExtras[i].aim.y),
+        action: p.action ? {
+          kind: p.action.kind,
+          phase: p.action.phase,
+          startedAt: p.action.startedAt,
+          releaseAt: p.action.releaseAt,
+          endsAt: p.action.endsAt,
+          dx: round3(p.action.direction.x),
+          dy: round3(p.action.direction.y),
+          target: p.action.target,
+        } : undefined,
       });
     }
     for (const e of this.state.enemies) {
@@ -313,6 +323,16 @@ export class GameRoom {
         elite: e.elite,
         facingX: round3(e.facing.x),
         facingY: round3(e.facing.y),
+        action: e.action ? {
+          kind: e.action.kind,
+          phase: e.action.phase,
+          startedAt: e.action.startedAt,
+          releaseAt: e.action.releaseAt,
+          endsAt: e.action.endsAt,
+          dx: round3(e.action.direction.x),
+          dy: round3(e.action.direction.y),
+          target: e.action.target,
+        } : undefined,
       });
     }
     return out;

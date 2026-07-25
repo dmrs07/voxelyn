@@ -1,10 +1,13 @@
 {
-  "version": 1,
-  "generated": "2026-07-24",
+  "version": 2,
+  "generated": "deterministic-code-v2",
   "ids": [
     "player-prospector",
     "enemy-stalker",
     "enemy-spitter",
+    "enemy-spore-bomber",
+    "enemy-bruiser",
+    "enemy-guardian",
     "fx-projectile-bolt",
     "fx-impact-burst"
   ]

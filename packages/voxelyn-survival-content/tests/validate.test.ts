@@ -38,12 +38,30 @@ describe('resolvedor de frames', () => {
     expect(idleWrap.sx).toBe(resolveFrame(m, 'idle', 'dr', 1).sx);
   });
 
-  it('direcoes espelhadas usam o atlas da direcao autorada com flip', () => {
+  it('direcoes isometricas autoradas usam colunas proprias sem flip', () => {
     const m = loadManifest('player-prospector');
+    expect(m.authoredDirs).toEqual(['dr', 'dl', 'ur', 'ul']);
+    expect(m.flipPairs).toEqual({});
+
     const dr = resolveFrame(m, 'walk', 'dr', 2);
     const dl = resolveFrame(m, 'walk', 'dl', 2);
+    expect(dr.flip).toBe(false);
+    expect(dl.flip).toBe(false);
+    expect(dl.sx).not.toBe(dr.sx);
+  });
+
+  it('mantem suporte a flipPairs quando um manifest o declara explicitamente', () => {
+    const authored = loadManifest('player-prospector');
+    const symmetric: SpriteManifestEntry = {
+      ...authored,
+      authoredDirs: ['dr'],
+      flipPairs: { dl: 'dr' },
+      frameMap: { dr: authored.frameMap.dr },
+    };
+    const dr = resolveFrame(symmetric, 'walk', 'dr', 2);
+    const dl = resolveFrame(symmetric, 'walk', 'dl', 2);
     expect(dl.flip).toBe(true);
-    expect(dl.sx).toBe(dr.sx); // dl reusa o atlas de dr
+    expect(dl.sx).toBe(dr.sx);
   });
 
   it('dirFromFacing classifica os quadrantes isometricos', () => {

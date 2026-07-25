@@ -5,47 +5,57 @@ import {
   type SpriteManifestEntry,
 } from '@voxelyn/survival-content';
 
-// Manifests e atlases carregados via vite (?url para PNG, import JSON).
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
 import stalkerManifest from '@voxelyn/survival-content/assets/atlases/enemy-stalker.json';
 import spitterManifest from '@voxelyn/survival-content/assets/atlases/enemy-spitter.json';
+import bomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.json';
+import bruiserManifest from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.json';
+import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-guardian.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
 import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.png?url';
+import bomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.png?url';
+import bruiserUrl from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.png?url';
+import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 
-type Loaded = { manifest: SpriteManifestEntry; image: HTMLImageElement; ready: boolean };
-
+type Loaded = { manifest: SpriteManifestEntry; image: HTMLImageElement; ready: boolean; failed: boolean };
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
   { manifest: stalkerManifest as unknown as SpriteManifestEntry, url: stalkerUrl },
   { manifest: spitterManifest as unknown as SpriteManifestEntry, url: spitterUrl },
+  { manifest: bomberManifest as unknown as SpriteManifestEntry, url: bomberUrl },
+  { manifest: bruiserManifest as unknown as SpriteManifestEntry, url: bruiserUrl },
+  { manifest: guardianManifest as unknown as SpriteManifestEntry, url: guardianUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
 ];
 
-/** Mapeia arquetipos da sim para ids de sprite do primeiro pacote. */
 const ARCHETYPE_SPRITE: Record<string, string> = {
   prospector: 'player-prospector',
   stalker: 'enemy-stalker',
   spitter: 'enemy-spitter',
+  bomber: 'enemy-spore-bomber',
+  bruiser: 'enemy-bruiser',
+  guardian: 'enemy-guardian',
 };
 
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
-  /** Buffer reaproveitado para tint isolado (evita alocar canvas por frame). */
   private tintBuffer: HTMLCanvasElement | null = null;
 
   load(): void {
     for (const { manifest, url } of SOURCES) {
       const image = new Image();
-      const entry: Loaded = { manifest, image, ready: false };
-      image.onload = () => {
-        entry.ready = true;
+      const entry: Loaded = { manifest, image, ready: false, failed: false };
+      image.onload = () => { entry.ready = true; };
+      image.onerror = () => {
+        entry.failed = true;
+        console.warn(`[sprites] atlas failed to load; using fallback: ${manifest.id}`);
       };
       image.src = url;
       this.byId.set(manifest.id, entry);
@@ -53,8 +63,13 @@ export class SpriteBank {
   }
 
   get(id: string): Loaded | null {
-    const e = this.byId.get(id);
-    return e && e.ready ? e : null;
+    const entry = this.byId.get(id);
+    return entry && entry.ready ? entry : null;
+  }
+
+  manifestForArchetype(archetype: string): SpriteManifestEntry | null {
+    const id = ARCHETYPE_SPRITE[archetype];
+    return id ? this.byId.get(id)?.manifest ?? null : null;
   }
 
   spriteForArchetype(archetype: string): Loaded | null {
@@ -62,14 +77,10 @@ export class SpriteBank {
     return id ? this.get(id) : null;
   }
 
-  /**
-   * Desenha uma entidade com sprite. Retorna true se desenhou (sprite pronto),
-   * false se o chamador deve usar o fallback vetorial.
-   */
   drawEntity(
     ctx: CanvasRenderingContext2D,
     archetype: string,
-    anim: string,
+    animation: string,
     facingX: number,
     facingY: number,
     elapsedMs: number,
@@ -81,24 +92,21 @@ export class SpriteBank {
     const loaded = this.spriteForArchetype(archetype);
     if (!loaded) return false;
     const { manifest, image } = loaded;
-    const dir = manifest.directions > 1 ? dirFromFacing(facingX, facingY) : manifest.authoredDirs[0];
-    const frame = frameAtTime(manifest, anim, elapsedMs);
-    const rect = resolveFrame(manifest, anim, dir, frame);
-
+    const fallbackAnimation = animation === 'special' && !manifest.animations.special ? 'attack' : animation;
+    const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
+    const direction = manifest.directions > 1 ? dirFromFacing(facingX, facingY) : manifest.authoredDirs[0];
+    const frame = frameAtTime(manifest, useAnimation, elapsedMs);
+    const rect = resolveFrame(manifest, useAnimation, direction, frame);
     const dw = manifest.frameWidth * zoom;
     const dh = manifest.frameHeight * zoom;
     const dx = footX - manifest.anchorX * zoom;
     const dy = footY - manifest.anchorY * zoom;
 
-    // Tint NUNCA e aplicado no canvas principal: 'source-atop' ali recolore o
-    // retangulo inteiro da cena (fundo e terreno sao opacos), nao so o sprite.
-    // Compoe num buffer offscreen do tamanho do frame, onde os unicos pixels
-    // opacos sao os do proprio sprite.
-    let src: CanvasImageSource = image;
+    let source: CanvasImageSource = image;
     let sx = rect.sx;
     let sy = rect.sy;
     if (tint && tint.alpha > 0) {
-      src = this.tintedFrame(image, rect, manifest.frameWidth, manifest.frameHeight, tint);
+      source = this.tintedFrame(image, rect, manifest.frameWidth, manifest.frameHeight, tint);
       sx = 0;
       sy = 0;
     }
@@ -109,44 +117,42 @@ export class SpriteBank {
       ctx.translate(footX, 0);
       ctx.scale(-1, 1);
       ctx.translate(-footX, 0);
-      const fdx = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
-      ctx.drawImage(src, sx, sy, rect.sw, rect.sh, fdx, dy, dw, dh);
+      const flippedX = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
+      ctx.drawImage(source, sx, sy, rect.sw, rect.sh, flippedX, dy, dw, dh);
     } else {
-      ctx.drawImage(src, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
+      ctx.drawImage(source, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
     }
     ctx.restore();
     return true;
   }
 
-  /** Frame com tint aplicado apenas sobre os pixels do sprite (buffer offscreen). */
   private tintedFrame(
     image: CanvasImageSource,
     rect: { sx: number; sy: number; sw: number; sh: number },
-    w: number,
-    h: number,
+    width: number,
+    height: number,
     tint: { color: string; alpha: number }
   ): HTMLCanvasElement {
     if (!this.tintBuffer) this.tintBuffer = document.createElement('canvas');
-    const buf = this.tintBuffer;
-    if (buf.width !== w || buf.height !== h) {
-      buf.width = w;
-      buf.height = h;
+    const buffer = this.tintBuffer;
+    if (buffer.width !== width || buffer.height !== height) {
+      buffer.width = width;
+      buffer.height = height;
     }
-    const bctx = buf.getContext('2d');
-    if (!bctx) return buf;
+    const bctx = buffer.getContext('2d');
+    if (!bctx) return buffer;
     bctx.globalCompositeOperation = 'source-over';
     bctx.globalAlpha = 1;
-    bctx.clearRect(0, 0, w, h);
+    bctx.clearRect(0, 0, width, height);
     bctx.imageSmoothingEnabled = false;
-    bctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, w, h);
-    // agora sim: 'source-atop' recolore apenas os pixels ja desenhados
+    bctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, width, height);
     bctx.globalCompositeOperation = 'source-atop';
     bctx.globalAlpha = tint.alpha;
     bctx.fillStyle = tint.color;
-    bctx.fillRect(0, 0, w, h);
+    bctx.fillRect(0, 0, width, height);
     bctx.globalCompositeOperation = 'source-over';
     bctx.globalAlpha = 1;
-    return buf;
+    return buffer;
   }
 
   drawBolt(ctx: CanvasRenderingContext2D, sx: number, sy: number, elapsedMs: number, zoom: number): boolean {
@@ -176,10 +182,6 @@ export class SpriteBank {
   }
 }
 
-/**
- * Estado de animacao derivado no cliente (a sim autoritativa nao carrega intent
- * de animacao para entidades survival). Deriva anim de movimento/vida/dano.
- */
 export type EntityAnimState = {
   anim: string;
   animStartMs: number;
@@ -190,14 +192,14 @@ export type EntityAnimState = {
 };
 
 export const deriveAnim = (
-  prev: EntityAnimState | undefined,
+  previous: EntityAnimState | undefined,
   x: number,
   y: number,
   hp: number,
   alive: boolean,
   nowMs: number
 ): EntityAnimState => {
-  const state: EntityAnimState = prev ?? {
+  const state: EntityAnimState = previous ?? {
     anim: 'idle',
     animStartMs: nowMs,
     lastX: x,
@@ -205,17 +207,10 @@ export const deriveAnim = (
     lastHp: hp,
     hitUntilMs: 0,
   };
-
   const moved = Math.hypot(x - state.lastX, y - state.lastY) > 0.004;
   const tookDamage = hp < state.lastHp - 0.01;
   if (tookDamage) state.hitUntilMs = nowMs + 180;
-
-  let next: string;
-  if (!alive) next = 'die';
-  else if (nowMs < state.hitUntilMs) next = 'hit';
-  else if (moved) next = 'walk';
-  else next = 'idle';
-
+  const next = !alive ? 'die' : nowMs < state.hitUntilMs ? 'hit' : moved ? 'walk' : 'idle';
   if (next !== state.anim) {
     state.anim = next;
     state.animStartMs = nowMs;

@@ -1,11 +1,11 @@
 {
-  "id": "enemy-stalker",
+  "id": "enemy-bruiser",
   "version": 2,
-  "atlas": "enemy-stalker.png",
-  "frameWidth": 24,
-  "frameHeight": 24,
-  "anchorX": 12,
-  "anchorY": 22,
+  "atlas": "enemy-bruiser.png",
+  "frameWidth": 40,
+  "frameHeight": 48,
+  "anchorX": 20,
+  "anchorY": 45,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -15,12 +15,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 0.64,
-    "h": 0.6
+    "w": 0.92,
+    "h": 1.1
   },
   "footprint": {
-    "w": 1,
-    "h": 1,
+    "w": 1.25,
+    "h": 1.25,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -28,11 +28,11 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
+    "#2e3a4d",
     "#46566e",
-    "#6e4a33",
-    "#d93b4c",
-    "#ff7a2f",
-    "#ffd166"
+    "#59f2c2",
+    "#7ab8ff",
+    "#b8a98f"
   ],
   "animations": {
     "idle": {
@@ -93,7 +93,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric low red chitin predator with one mineral blade, four authored directions",
+    "prompt": "voxel-isometric compact geode bruiser, broad shoulders, pale rock plates and electric core",
     "seedOrRef": "deterministic-code-v2"
   }
 }

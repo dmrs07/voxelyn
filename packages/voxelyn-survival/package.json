@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:offline-check": "vite build && node scripts/check-precache.mjs"
   },
   "dependencies": {
     "@voxelyn/survival-content": "workspace:*",

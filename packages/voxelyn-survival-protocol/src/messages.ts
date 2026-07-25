@@ -1,4 +1,4 @@
-import type { PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';
+import type { EntityActionKind, EntityActionPhase, PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
 import type { ChunkDiff } from './chunk-diff.js';
 
@@ -59,6 +59,17 @@ export type ClientMessage = ClientHello | ClientCommand | ClientHeartbeat | Clie
 // ---------------------------------------------------------------------------
 // Servidor -> Cliente. O servidor e autoritativo sobre tudo.
 // ---------------------------------------------------------------------------
+export type EntityActionSnapshot = {
+  kind: EntityActionKind;
+  phase: EntityActionPhase;
+  startedAt: number;
+  releaseAt: number;
+  endsAt: number;
+  dx: number;
+  dy: number;
+  target?: number;
+};
+
 export type EntitySnapshot = {
   id: number;
   kind: 'player' | 'enemy';
@@ -72,6 +83,7 @@ export type EntitySnapshot = {
   downed?: boolean; // players abatidos
   facingX?: number;
   facingY?: number;
+  action?: EntityActionSnapshot;
 };
 
 /** Estado autoritativo privado do proprio viewer (HUD do jogador local). */

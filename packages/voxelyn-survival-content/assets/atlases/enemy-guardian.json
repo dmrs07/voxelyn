@@ -1,11 +1,11 @@
 {
-  "id": "enemy-stalker",
+  "id": "enemy-guardian",
   "version": 2,
-  "atlas": "enemy-stalker.png",
-  "frameWidth": 24,
-  "frameHeight": 24,
-  "anchorX": 12,
-  "anchorY": 22,
+  "atlas": "enemy-guardian.png",
+  "frameWidth": 40,
+  "frameHeight": 48,
+  "anchorX": 20,
+  "anchorY": 45,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -15,12 +15,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 0.64,
-    "h": 0.6
+    "w": 1.36,
+    "h": 1.4
   },
   "footprint": {
-    "w": 1,
-    "h": 1,
+    "w": 1.7,
+    "h": 1.7,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -28,11 +28,11 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
+    "#2e3a4d",
     "#46566e",
-    "#6e4a33",
-    "#d93b4c",
-    "#ff7a2f",
-    "#ffd166"
+    "#7ab8ff",
+    "#b8a98f",
+    "#e8f1ff"
   ],
   "animations": {
     "idle": {
@@ -59,6 +59,11 @@
       "frames": 5,
       "fps": 10,
       "loop": false
+    },
+    "special": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
     }
   },
   "frameMap": {
@@ -66,34 +71,38 @@
       "idle": 0,
       "walk": 4,
       "attack": 10,
-      "hit": 14,
-      "die": 16
+      "special": 14,
+      "hit": 18,
+      "die": 20
     },
     "dl": {
-      "idle": 21,
-      "walk": 25,
-      "attack": 31,
-      "hit": 35,
-      "die": 37
+      "idle": 25,
+      "walk": 29,
+      "attack": 35,
+      "special": 39,
+      "hit": 43,
+      "die": 45
     },
     "ur": {
-      "idle": 42,
-      "walk": 46,
-      "attack": 52,
-      "hit": 56,
-      "die": 58
+      "idle": 50,
+      "walk": 54,
+      "attack": 60,
+      "special": 64,
+      "hit": 68,
+      "die": 70
     },
     "ul": {
-      "idle": 63,
-      "walk": 67,
-      "attack": 73,
-      "hit": 77,
-      "die": 79
+      "idle": 75,
+      "walk": 79,
+      "attack": 85,
+      "special": 89,
+      "hit": 93,
+      "die": 95
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric low red chitin predator with one mineral blade, four authored directions",
+    "prompt": "voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core",
     "seedOrRef": "deterministic-code-v2"
   }
 }

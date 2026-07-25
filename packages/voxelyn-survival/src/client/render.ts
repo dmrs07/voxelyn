@@ -13,6 +13,7 @@ import {
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, deriveAnim, type EntityAnimState } from './sprites';
+import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { drawVoxelEntity } from './voxel-fallback';
@@ -57,6 +58,7 @@ export class SurvivalRenderer {
   readonly sprites = new SpriteBank();
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
+  private readonly presentation = new EntityPresentation();
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -100,6 +102,7 @@ export class SurvivalRenderer {
   }
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
+    this.presentation.ingest(events, nowMs);
     for (const ev of events) {
       switch (ev.t) {
         case 'explosion':
@@ -412,6 +415,7 @@ export class SurvivalRenderer {
       const b = brightness(enemy.x, enemy.y);
       if (b <= 0.05) continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
+      const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
       items.push({
         depth: enemy.x + enemy.y,
         draw: () => {
@@ -421,10 +425,10 @@ export class SurvivalRenderer {
           const drew = this.sprites.drawEntity(
             ctx,
             enemy.archetype,
-            anim.anim,
-            enemy.facing.x,
-            enemy.facing.y,
-            nowMs - anim.animStartMs,
+            presented.anim,
+            presented.facingX,
+            presented.facingY,
+            presented.elapsedMs,
             sx,
             sy,
             spriteZoom,
@@ -463,6 +467,7 @@ export class SurvivalRenderer {
       if (!ex.joined || !pl.alive) continue;
       const isLocal = pl === player;
       const anim = this.animFor(pl.id, pl.x, pl.y, pl.hp, pl.alive, nowMs);
+      const presented = this.presentation.animationFor(pl, state, anim, nowMs, ex.downed);
       items.push({
         depth: pl.x + pl.y,
         draw: () => {
@@ -471,14 +476,13 @@ export class SurvivalRenderer {
           drawShadow(psx, psy, size);
           const flick = isLocal && ex.iframesUntil > state.tick && state.tick % 2 === 0;
           if (!flick) {
-            const anAnim = ex.downed ? 'die' : anim.anim;
             const drew = this.sprites.drawEntity(
               ctx,
               'prospector',
-              anAnim,
-              ex.aim.x,
-              ex.aim.y,
-              nowMs - anim.animStartMs,
+              presented.anim,
+              presented.facingX,
+              presented.facingY,
+              presented.elapsedMs,
               psx,
               psy,
               spriteZoom,
@@ -521,6 +525,28 @@ export class SurvivalRenderer {
             ctx.moveTo(psx + axs * 0.4, psy - 8 * z + ays * 0.4);
             ctx.lineTo(psx + axs, psy - 8 * z + ays);
             ctx.stroke();
+          }
+        },
+      });
+    }
+
+    for (const tombstone of this.presentation.tombstones(nowMs)) {
+      items.push({
+        depth: tombstone.x + tombstone.y,
+        draw: () => {
+          const [tsx, tsy] = toScreen(tombstone.x, tombstone.y);
+          const elapsed = nowMs - tombstone.startedMs;
+          const drew = this.sprites.drawEntity(
+            ctx, tombstone.archetype, 'die', tombstone.facingX, tombstone.facingY,
+            elapsed, tsx, tsy, spriteZoom
+          );
+          if (!drew) {
+            drawVoxelEntity(ctx, {
+              sx: tsx, sy: tsy, z,
+              radius: tombstone.archetype === 'guardian' ? 0.68 : 0.34,
+              brightness: 0.7, archetype: tombstone.archetype,
+              elite: false, nowMs,
+            });
           }
         },
       });

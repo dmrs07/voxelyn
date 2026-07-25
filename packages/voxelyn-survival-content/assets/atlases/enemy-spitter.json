@@ -1,6 +1,6 @@
 {
   "id": "enemy-spitter",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-spitter.png",
   "frameWidth": 24,
   "frameHeight": 24,
@@ -9,23 +9,30 @@
   "directions": 4,
   "authoredDirs": [
     "dr",
-    "ur"
+    "dl",
+    "ur",
+    "ul"
   ],
-  "flipPairs": {
-    "dl": "dr",
-    "ul": "ur"
-  },
+  "flipPairs": {},
   "hitbox": {
     "w": 0.68,
-    "h": 0.7
+    "h": 0.72
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
     "#0b0e14",
     "#1f3d33",
     "#2f6b4f",
+    "#46566e",
     "#66c28a",
-    "#a8e63c"
+    "#a8e63c",
+    "#e8f1ff"
   ],
   "animations": {
     "idle": {
@@ -34,13 +41,13 @@
       "loop": true
     },
     "walk": {
-      "frames": 4,
-      "fps": 8,
+      "frames": 6,
+      "fps": 10,
       "loop": true
     },
     "attack": {
       "frames": 4,
-      "fps": 10,
+      "fps": 12,
       "loop": false
     },
     "hit": {
@@ -49,7 +56,7 @@
       "loop": false
     },
     "die": {
-      "frames": 4,
+      "frames": 5,
       "fps": 10,
       "loop": false
     }
@@ -58,21 +65,35 @@
     "dr": {
       "idle": 0,
       "walk": 4,
-      "attack": 8,
-      "hit": 12,
-      "die": 14
+      "attack": 10,
+      "hit": 14,
+      "die": 16
+    },
+    "dl": {
+      "idle": 21,
+      "walk": 25,
+      "attack": 31,
+      "hit": 35,
+      "die": 37
     },
     "ur": {
-      "idle": 18,
-      "walk": 22,
-      "attack": 26,
-      "hit": 30,
-      "die": 32
+      "idle": 42,
+      "walk": 46,
+      "attack": 52,
+      "hit": 56,
+      "die": 58
+    },
+    "ul": {
+      "idle": 63,
+      "walk": 67,
+      "attack": 73,
+      "hit": 77,
+      "die": 79
     }
   },
   "generation": {
-    "tool": "procedural (tools/entities.mjs)",
-    "prompt": "bulbous acid-sac creature with nozzle, ranged spitter, iso 2:1, restricted palette",
-    "seedOrRef": "deterministic-code-v1"
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents",
+    "seedOrRef": "deterministic-code-v2"
   }
 }
