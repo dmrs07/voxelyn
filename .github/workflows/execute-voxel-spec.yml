@@ -1,12 +1,76 @@
 name: Execute voxel character spec
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     types: [synchronize]
 
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: voxel-spec-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  diagnose:
+  apply:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - run: echo runner-ok
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.0 --activate
+
+      - name: Reassemble implementation script
+        run: cat scripts/apply_voxel_spec.py.part* > scripts/apply_voxel_spec.py
+
+      - name: Apply reviewed voxel specification
+        run: python3 scripts/apply_voxel_spec.py
+
+      - name: Remove transport fragments
+        run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part*
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate character atlases
+        run: pnpm --filter @voxelyn/survival-content generate
+
+      - name: Validate and test survival packages
+        run: pnpm test:survival
+
+      - name: Build survival packages
+        run: pnpm build:survival
+
+      - name: Verify PWA atlas precache
+        run: pnpm --filter @voxelyn/survival build:offline-check
+
+      - name: Commit generated implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No implementation changes to commit."
+            exit 0
+          fi
+          git commit -m "feat(survival): implement voxel character spec [voxel-spec-applied]"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
