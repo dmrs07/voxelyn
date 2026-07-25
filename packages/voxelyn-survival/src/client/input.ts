@@ -53,7 +53,6 @@ export class SurvivalInput {
   constructor(private readonly canvas: HTMLCanvasElement) {}
 
   attach(): void {
-    this.state.usingTouch = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
