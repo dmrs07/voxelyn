@@ -38,31 +38,44 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.33.0 --activate
 
+      - name: Initialize execution log
+        run: : > /tmp/voxel-execution.log
+
       - name: Reassemble implementation script
         run: cat scripts/apply_voxel_spec.py.part* > scripts/apply_voxel_spec.py
 
       - name: Apply reviewed voxel specification
         run: |
           set -o pipefail
-          python3 scripts/apply_voxel_spec.py 2>&1 | tee /tmp/apply-voxel.log
+          python3 scripts/apply_voxel_spec.py 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Remove transport fragments
         run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part*
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Generate character atlases
-        run: pnpm --filter @voxelyn/survival-content generate
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Validate and test survival packages
-        run: pnpm test:survival
+        run: |
+          set -o pipefail
+          pnpm test:survival 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Build survival packages
-        run: pnpm build:survival
+        run: |
+          set -o pipefail
+          pnpm build:survival 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Verify PWA atlas precache
-        run: pnpm --filter @voxelyn/survival build:offline-check
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Commit generated implementation
         run: |
@@ -86,10 +99,10 @@ jobs:
             echo '### Falha ao executar a spec voxel'
             echo
             echo '```text'
-            if [ -f /tmp/apply-voxel.log ]; then
-              tail -n 80 /tmp/apply-voxel.log
+            if [ -f /tmp/voxel-execution.log ]; then
+              tail -n 120 /tmp/voxel-execution.log
             else
-              echo 'A falha ocorreu depois da aplicação da spec. Consulte o job do GitHub Actions.'
+              echo 'O log consolidado não foi criado. Consulte o job do GitHub Actions.'
             fi
             echo '```'
           } > /tmp/voxel-failure.md
