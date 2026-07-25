@@ -3,7 +3,6 @@ import { emptyCommand } from '@voxelyn/survival-sim';
 
 export type TouchButton = {
   id: 'dodge' | 'ability' | 'consume' | 'interact';
-  label: string;
   cx: number;
   cy: number;
   r: number;
@@ -12,17 +11,26 @@ export type TouchButton = {
 
 export type InputState = {
   joystick: { active: boolean; originX: number; originY: number; dx: number; dy: number; pointerId: number };
-  aimTouch: { active: boolean; dx: number; dy: number; pointerId: number };
+  aimTouch: {
+    active: boolean;
+    originX: number;
+    originY: number;
+    dx: number;
+    dy: number;
+    pointerId: number;
+  };
   buttons: TouchButton[];
   usingTouch: boolean;
   tapQueue: Array<{ x: number; y: number }>;
 };
 
-const JOY_RADIUS = 56;
+export const MOVE_JOYSTICK_RADIUS = 56;
+export const AIM_JOYSTICK_RADIUS = 60;
+const AIM_DEAD_ZONE = 0.12;
 
 /**
- * Entrada mobile-first: joystick virtual a esquerda, area de mira com autofire a
- * direita, botoes de esquiva/habilidade/consumivel/interacao. Teclado+mouse no desktop.
+ * Entrada mobile-first: joystick virtual de movimento a esquerda, joystick fixo
+ * de mira/auto-fire a direita e quatro acoes acima da mira. Teclado+mouse no desktop.
  */
 export class SurvivalInput {
   private readonly keys: Record<string, boolean> = {};
@@ -36,7 +44,7 @@ export class SurvivalInput {
 
   readonly state: InputState = {
     joystick: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
-    aimTouch: { active: false, dx: 0, dy: 0, pointerId: -1 },
+    aimTouch: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
     buttons: [],
     usingTouch: false,
     tapQueue: [],
@@ -63,15 +71,22 @@ export class SurvivalInput {
   }
 
   layoutButtons(width: number, height: number): void {
-    const r = Math.max(26, Math.min(38, height * 0.075));
-    const margin = r * 0.7;
-    const baseX = width - r - margin - 8;
-    const baseY = height - r - margin - 8;
+    const r = Math.max(24, Math.min(34, height * 0.066));
+    const safeRight = Math.max(16, width * 0.025);
+    const safeBottom = Math.max(14, height * 0.035);
+    const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
+    const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
+
+    // A origem permanece fixa inclusive enquanto o dedo esta fora do controle.
+    this.state.aimTouch.originX = aimX;
+    this.state.aimTouch.originY = aimY;
+
+    // Acoes em arco acima/esquerda do joystick de tiro, sem sobrepor sua zona util.
     this.state.buttons = [
-      { id: 'dodge', label: 'ESQ', cx: baseX, cy: baseY, r, pressed: false },
-      { id: 'ability', label: 'PLS', cx: baseX - (r * 2 + margin), cy: baseY - r * 0.4, r: r * 0.85, pressed: false },
-      { id: 'consume', label: 'VIA', cx: baseX - r * 0.4, cy: baseY - (r * 2 + margin), r: r * 0.85, pressed: false },
-      { id: 'interact', label: 'USA', cx: baseX - (r * 1.75 + margin), cy: baseY - (r * 1.75 + margin), r: r * 0.8, pressed: false },
+      { id: 'dodge', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.8, cy: aimY + r * 0.25, r, pressed: false },
+      { id: 'ability', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.45, cy: aimY - r * 1.65, r: r * 0.92, pressed: false },
+      { id: 'consume', cx: aimX + r * 0.15, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.78, r: r * 0.88, pressed: false },
+      { id: 'interact', cx: aimX + AIM_JOYSTICK_RADIUS + r * 0.15, cy: aimY - r * 1.2, r: r * 0.86, pressed: false },
     ];
   }
 
@@ -116,10 +131,17 @@ export class SurvivalInput {
         if (btn.id === 'interact') this.queuedInteract = true;
         return;
       }
-      if (x < window.innerWidth * 0.45 && !this.state.joystick.active) {
+
+      if (x < window.innerWidth * 0.48 && !this.state.joystick.active) {
         this.state.joystick = { active: true, originX: x, originY: y, dx: 0, dy: 0, pointerId: e.pointerId };
-      } else if (!this.state.aimTouch.active) {
-        this.state.aimTouch = { active: true, dx: 0, dy: 0, pointerId: e.pointerId };
+        return;
+      }
+
+      const aim = this.state.aimTouch;
+      const inAimZone = Math.hypot(x - aim.originX, y - aim.originY) <= AIM_JOYSTICK_RADIUS * 1.65;
+      if (inAimZone && !aim.active) {
+        aim.active = true;
+        aim.pointerId = e.pointerId;
         this.updateAimTouch(x, y);
       }
     } else {
@@ -131,16 +153,20 @@ export class SurvivalInput {
   };
 
   private updateAimTouch(x: number, y: number): void {
-    // direcao a partir do centro da metade direita (mira relativa e estavel)
-    const cx = window.innerWidth * 0.5;
-    const cy = window.innerHeight * 0.5;
-    const dx = x - cx;
-    const dy = y - cy;
+    const aim = this.state.aimTouch;
+    const dx = x - aim.originX;
+    const dy = y - aim.originY;
     const len = Math.hypot(dx, dy);
-    if (len > 8) {
-      this.state.aimTouch.dx = dx / len;
-      this.state.aimTouch.dy = dy / len;
+    const clamp = Math.min(1, len / AIM_JOYSTICK_RADIUS);
+
+    if (clamp <= AIM_DEAD_ZONE || len <= 2) {
+      aim.dx = 0;
+      aim.dy = 0;
+      return;
     }
+
+    aim.dx = (dx / len) * clamp;
+    aim.dy = (dy / len) * clamp;
   }
 
   private readonly onPointerMove = (e: PointerEvent): void => {
@@ -149,7 +175,7 @@ export class SurvivalInput {
         const dx = e.clientX - this.state.joystick.originX;
         const dy = e.clientY - this.state.joystick.originY;
         const len = Math.hypot(dx, dy);
-        const clamp = Math.min(1, len / JOY_RADIUS);
+        const clamp = Math.min(1, len / MOVE_JOYSTICK_RADIUS);
         if (len > 2) {
           this.state.joystick.dx = (dx / len) * clamp;
           this.state.joystick.dy = (dy / len) * clamp;
@@ -173,6 +199,8 @@ export class SurvivalInput {
       }
       if (e.pointerId === this.state.aimTouch.pointerId) {
         this.state.aimTouch.active = false;
+        this.state.aimTouch.dx = 0;
+        this.state.aimTouch.dy = 0;
         this.state.aimTouch.pointerId = -1;
       }
       for (const b of this.state.buttons) b.pressed = false;
@@ -252,12 +280,12 @@ export class SurvivalInput {
       cmd.move = { x: mx + my * 2, y: my * 2 - mx };
     }
 
-    // mira
-    if (this.state.aimTouch.active) {
+    // mira: vetor contido no joystick direito, sem depender da posicao do personagem.
+    if (this.state.aimTouch.active && (this.state.aimTouch.dx !== 0 || this.state.aimTouch.dy !== 0)) {
       const ax = this.state.aimTouch.dx;
       const ay = this.state.aimTouch.dy;
       cmd.aim = { x: ax + ay * 2, y: ay * 2 - ax };
-      cmd.fire = true; // autofire enquanto mira (mobile)
+      cmd.fire = true;
     } else if (!this.state.usingTouch) {
       const dx = this.mouse.x - playerScreen.x;
       const dy = this.mouse.y - playerScreen.y;
