@@ -7,6 +7,7 @@ import {
 import type { InputState, TouchButton } from './input';
 
 type CooldownButtonId = Extract<TouchButton['id'], 'dodge' | 'ability'>;
+export type CooldownMode = 'authoritative' | 'predicted';
 
 type CooldownSpec = {
   duration: number;
@@ -33,14 +34,35 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 export const cooldownRemainingFraction = (readyAt: number, tick: number, duration: number): number =>
   clamp01((readyAt - tick) / Math.max(1, duration));
 
+/** Online usa predição visual; solo sempre segue os timers autoritativos. */
+export const cooldownModeForState = (state: SurvivalState): CooldownMode =>
+  state.config.playerCount > 1 ? 'predicted' : 'authoritative';
+
+/**
+ * Calcula o próximo readyAt sem permitir que um toque rejeitado invente cooldown
+ * em modo autoritativo ou que taps repetidos reiniciem um cooldown já em curso.
+ */
+export const resolveCooldownReadyAt = (
+  mode: CooldownMode,
+  authoritativeReadyAt: number,
+  predictedReadyAt: number,
+  pressChanged: boolean,
+  tick: number,
+  duration: number
+): number => {
+  if (mode === 'authoritative') return authoritativeReadyAt;
+  const currentReadyAt = Math.max(authoritativeReadyAt, predictedReadyAt);
+  if (pressChanged && tick >= currentReadyAt) return tick + duration;
+  return currentReadyAt;
+};
+
 /**
  * Desenha um radial de 360° sobre os botões com cooldown real na simulação.
  * A máscara escura começa cobrindo o círculo inteiro e recua no sentido horário,
  * revelando o ícone conforme a ação fica disponível. Ao completar, há um pulso curto.
  *
- * No solo, o tick autoritativo de PlayerExtra reconcilia a animação. No online,
- * enquanto o protocolo não transporta esses dois timers privados, o HUD faz uma
- * predição visual usando os mesmos tempos compartilhados pela simulação.
+ * No solo, o timer é exclusivamente autoritativo. No online, enquanto o protocolo
+ * não transporta esses dois timers privados, o HUD prediz apenas os comandos locais.
  */
 export class TouchCooldownOverlay {
   private readonly ctx: CanvasRenderingContext2D;
@@ -48,7 +70,8 @@ export class TouchCooldownOverlay {
   private readonly readyPulseUntil = new Map<CooldownButtonId, number>();
   private readonly predictedReadyAt = new Map<CooldownButtonId, number>();
   private readonly seenPressSeq: Record<CooldownButtonId, number> = { dodge: 0, ability: 0 };
-  private lastTick = 0;
+  private lastState: SurvivalState | null = null;
+  private lastUsingTouch = false;
 
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -57,41 +80,61 @@ export class TouchCooldownOverlay {
   }
 
   render(state: SurvivalState, input: InputState, tick: number, nowMs: number): void {
-    // Nova run: o tick volta para zero; nenhum timer visual da run anterior sobrevive.
-    if (tick + 0.001 < this.lastTick) this.reset(input);
-    this.lastTick = tick;
+    // Cada createRun/welcome produz uma nova identidade de estado. Isso cobre
+    // reinícios e matchmaking em salas cujo tick pode ser maior que o anterior.
+    if (state !== this.lastState) {
+      this.reset(input);
+      this.lastState = state;
+    }
 
-    // Enquanto mouse/teclado estão ativos, apenas acompanha as sequências para
-    // que uma ação antiga não pareça recém-usada ao voltar para touch.
-    if (!input.usingTouch || state.phase !== 'running') {
+    // A transição touch -> mouse elimina radiais, predições e pulsos pendentes.
+    if (!input.usingTouch) {
+      if (this.lastUsingTouch) this.reset(input);
+      else this.syncPressSequences(input);
+      this.lastUsingTouch = false;
+      return;
+    }
+    this.lastUsingTouch = true;
+
+    if (state.phase !== 'running') {
       this.syncPressSequences(input);
       return;
     }
+
+    const mode = cooldownModeForState(state);
 
     for (const button of input.buttons) {
       if (button.id !== 'dodge' && button.id !== 'ability') continue;
       const id: CooldownButtonId = button.id;
       const spec = COOLDOWNS[id];
       const pressSeq = input.actionPressSeq[id];
+      const pressChanged = pressSeq !== this.seenPressSeq[id];
+      this.seenPressSeq[id] = pressSeq;
+
       const authoritativeReadyAt = spec.readyAt(state);
       const predicted = this.predictedReadyAt.get(id) ?? 0;
-      const currentReadyAt = Math.max(authoritativeReadyAt, predicted);
+      const readyAt = resolveCooldownReadyAt(
+        mode,
+        authoritativeReadyAt,
+        predicted,
+        pressChanged,
+        tick,
+        spec.duration
+      );
 
-      if (pressSeq !== this.seenPressSeq[id]) {
-        this.seenPressSeq[id] = pressSeq;
-        // Taps repetidos durante cooldown não reiniciam o radial.
-        if (tick >= currentReadyAt) this.predictedReadyAt.set(id, tick + spec.duration);
+      if (mode === 'predicted' && readyAt > authoritativeReadyAt && readyAt > tick) {
+        this.predictedReadyAt.set(id, readyAt);
+      } else {
+        this.predictedReadyAt.delete(id);
       }
 
-      const readyAt = Math.max(authoritativeReadyAt, this.predictedReadyAt.get(id) ?? 0);
       const remaining = cooldownRemainingFraction(readyAt, tick, spec.duration);
 
       if (remaining > 0) {
         this.cooling.add(id);
         this.drawCooldown(button, remaining, spec);
-      } else {
-        this.predictedReadyAt.delete(id);
-        if (this.cooling.delete(id)) this.readyPulseUntil.set(id, nowMs + 240);
+      } else if (this.cooling.delete(id)) {
+        this.readyPulseUntil.set(id, nowMs + 240);
       }
 
       const pulseUntil = this.readyPulseUntil.get(id) ?? 0;
