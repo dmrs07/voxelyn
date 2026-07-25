@@ -27,6 +27,7 @@ export type InputState = {
     pointerId: number;
   };
   buttons: TouchButton[];
+  actionPressSeq: { dodge: number; ability: number };
   usingTouch: boolean;
   tapQueue: Array<{ x: number; y: number }>;
 };
@@ -53,6 +54,7 @@ export class SurvivalInput {
     joystick: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
     aimTouch: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
     buttons: [],
+    actionPressSeq: { dodge: 0, ability: 0 },
     usingTouch: false,
     tapQueue: [],
   };
@@ -104,10 +106,16 @@ export class SurvivalInput {
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     const k = e.key.toLowerCase();
     this.keys[k] = true;
-    if (k === ' ') this.queuedDodge = true;
+    if (k === ' ') {
+      this.queuedDodge = true;
+      this.state.actionPressSeq.dodge += 1;
+    }
     if (k === 'e') this.queuedInteract = true;
     if (k === 'f') this.queuedConsume = true;
-    if (k === 'q' || k === 'shift') this.queuedAbility = true;
+    if (k === 'q' || k === 'shift') {
+      this.queuedAbility = true;
+      this.state.actionPressSeq.ability += 1;
+    }
     if (k === 'r') this.queuedRestart = true;
     if (k === '1') this.queuedChoice = 0;
     if (k === '2') this.queuedChoice = 1;
@@ -136,8 +144,14 @@ export class SurvivalInput {
       const btn = this.buttonAt(x, y);
       if (btn) {
         btn.pressed = true;
-        if (btn.id === 'dodge') this.queuedDodge = true;
-        if (btn.id === 'ability') this.queuedAbility = true;
+        if (btn.id === 'dodge') {
+          this.queuedDodge = true;
+          this.state.actionPressSeq.dodge += 1;
+        }
+        if (btn.id === 'ability') {
+          this.queuedAbility = true;
+          this.state.actionPressSeq.ability += 1;
+        }
         if (btn.id === 'consume') this.queuedConsume = true;
         if (btn.id === 'interact') this.queuedInteract = true;
         return;
