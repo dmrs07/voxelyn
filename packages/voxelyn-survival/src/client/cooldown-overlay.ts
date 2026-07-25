@@ -48,6 +48,7 @@ export class TouchCooldownOverlay {
   private readonly readyPulseUntil = new Map<CooldownButtonId, number>();
   private readonly predictedReadyAt = new Map<CooldownButtonId, number>();
   private readonly seenPressSeq: Record<CooldownButtonId, number> = { dodge: 0, ability: 0 };
+  private lastTick = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -56,7 +57,16 @@ export class TouchCooldownOverlay {
   }
 
   render(state: SurvivalState, input: InputState, tick: number, nowMs: number): void {
-    if (!input.usingTouch || state.phase !== 'running') return;
+    // Nova run: o tick volta para zero; nenhum timer visual da run anterior sobrevive.
+    if (tick + 0.001 < this.lastTick) this.reset(input);
+    this.lastTick = tick;
+
+    // Enquanto mouse/teclado estão ativos, apenas acompanha as sequências para
+    // que uma ação antiga não pareça recém-usada ao voltar para touch.
+    if (!input.usingTouch || state.phase !== 'running') {
+      this.syncPressSequences(input);
+      return;
+    }
 
     for (const button of input.buttons) {
       if (button.id !== 'dodge' && button.id !== 'ability') continue;
@@ -91,6 +101,18 @@ export class TouchCooldownOverlay {
         this.readyPulseUntil.delete(id);
       }
     }
+  }
+
+  private syncPressSequences(input: InputState): void {
+    this.seenPressSeq.dodge = input.actionPressSeq.dodge;
+    this.seenPressSeq.ability = input.actionPressSeq.ability;
+  }
+
+  private reset(input: InputState): void {
+    this.cooling.clear();
+    this.readyPulseUntil.clear();
+    this.predictedReadyAt.clear();
+    this.syncPressSequences(input);
   }
 
   private drawCooldown(button: TouchButton, remaining: number, spec: CooldownSpec): void {
