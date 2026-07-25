@@ -9,6 +9,13 @@ export type TouchButton = {
   pressed: boolean;
 };
 
+export type TouchSafeArea = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+};
+
 export type InputState = {
   joystick: { active: boolean; originX: number; originY: number; dx: number; dy: number; pointerId: number };
   aimTouch: {
@@ -70,10 +77,14 @@ export class SurvivalInput {
     window.removeEventListener('pointercancel', this.onPointerUp);
   }
 
-  layoutButtons(width: number, height: number): void {
+  layoutButtons(
+    width: number,
+    height: number,
+    safeArea: Pick<TouchSafeArea, 'right' | 'bottom'> = { right: 0, bottom: 0 }
+  ): void {
     const r = Math.max(24, Math.min(34, height * 0.066));
-    const safeRight = Math.max(16, width * 0.025);
-    const safeBottom = Math.max(14, height * 0.035);
+    const safeRight = Math.max(16, width * 0.025) + Math.max(0, safeArea.right);
+    const safeBottom = Math.max(14, height * 0.035) + Math.max(0, safeArea.bottom);
     const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
     const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
 
@@ -81,7 +92,7 @@ export class SurvivalInput {
     this.state.aimTouch.originX = aimX;
     this.state.aimTouch.originY = aimY;
 
-    // Acoes em arco acima/esquerda do joystick de tiro, dentro da safe area.
+    // Acoes em arco acima/esquerda do joystick de tiro, dentro da safe area real.
     this.state.buttons = [
       { id: 'dodge', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.8, cy: aimY + r * 0.25, r, pressed: false },
       { id: 'ability', cx: aimX - AIM_JOYSTICK_RADIUS * 0.72, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.58, r: r * 0.92, pressed: false },
@@ -145,6 +156,8 @@ export class SurvivalInput {
         this.updateAimTouch(x, y);
       }
     } else {
+      // Dispositivos hibridos podem alternar touch e mouse durante a mesma sessao.
+      this.state.usingTouch = false;
       this.mouse.down = true;
       this.mouse.x = x;
       this.mouse.y = y;
@@ -184,6 +197,7 @@ export class SurvivalInput {
         this.updateAimTouch(e.clientX, e.clientY);
       }
     } else {
+      this.state.usingTouch = false;
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;
     }
