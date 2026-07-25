@@ -7,8 +7,7 @@ on:
     types: [synchronize]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: voxel-validation-${{ github.event.pull_request.number || github.ref }}
@@ -26,7 +25,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,46 +62,25 @@ jobs:
           set -o pipefail
           pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Persist failure diagnostics
-        if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure'
+      - name: Write validation summary
+        if: always()
         run: |
           {
             echo "tests=${{ steps.tests.outcome }}"
             echo "build=${{ steps.build.outcome }}"
             echo "offline=${{ steps.offline.outcome }}"
             echo
-            tail -n 240 /tmp/voxel-validation.log
-          } > .github/voxel-validation.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/voxel-validation.log
-          git commit -m "chore(ci): capture voxel validation failure [skip voxel]"
-          git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+            cat /tmp/voxel-validation.log
+          } > /tmp/voxel-validation-full.log
 
-      - name: Report failure on PR
-        if: (steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure') && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          {
-            echo '### Falha ao validar a implementação da spec voxel'
-            echo
-            echo 'O diagnóstico completo foi salvo em `.github/voxel-validation.log`.'
-          } > /tmp/voxel-failure.md
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/voxel-failure.md
-
-      - name: Remove stale diagnostics after success
-        if: steps.tests.outcome == 'success' && steps.build.outcome == 'success' && steps.offline.outcome == 'success'
-        run: |
-          if [ -f .github/voxel-validation.log ]; then
-            rm .github/voxel-validation.log
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "chore(ci): clear voxel validation diagnostics [skip voxel]"
-            git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
-          fi
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxel-validation-${{ github.run_id }}
+          path: /tmp/voxel-validation-full.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Enforce validation result
         if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure'
