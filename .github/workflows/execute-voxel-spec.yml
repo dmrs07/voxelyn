@@ -50,7 +50,7 @@ jobs:
           python3 scripts/apply_voxel_spec.py 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Remove transport fragments
-        run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part*
+        run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part* .github/voxel-spec-trigger
 
       - name: Install dependencies
         run: |
