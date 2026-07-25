@@ -4,7 +4,7 @@ import { PNG } from 'pngjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { blitToAtlas, colorsUsed, grid, isEmpty } from './lib.mjs';
+import { blitToAtlas, colorsUsed, fitToMargin, grid, isEmpty } from './lib.mjs';
 import { ANIM_ORDER, ENTITY_SPECS } from './entities.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -28,10 +28,14 @@ const buildEntity = (spec) => {
       frameMap[dir][anim] = col;
       const def = spec.animations[anim];
       for (let f = 0; f < def.frames; f++) {
-        const frame = spec.draw(dir, anim, f);
-        if (frame.w !== spec.frameWidth || frame.h !== spec.frameHeight) {
-          throw new Error(`${spec.id} ${dir}/${anim}/${f}: ${frame.w}x${frame.h} != ${spec.frameWidth}x${spec.frameHeight}`);
+        const rawFrame = spec.draw(dir, anim, f);
+        if (rawFrame.w !== spec.frameWidth || rawFrame.h !== spec.frameHeight) {
+          throw new Error(`${spec.id} ${dir}/${anim}/${f}: ${rawFrame.w}x${rawFrame.h} != ${spec.frameWidth}x${spec.frameHeight}`);
         }
+        // FX keep their authored canvas because their radial motion intentionally
+        // uses the full 16x16 area. Character sheets must preserve the Art Bible's
+        // two-pixel safe margin in every pose.
+        const frame = spec.id.startsWith('fx-') ? rawFrame : fitToMargin(rawFrame, 2);
         if (isEmpty(frame)) throw new Error(`${spec.id} ${dir}/${anim}/${f}: frame vazio`);
         for (const hex of colorsUsed(frame)) palette.add(hex);
         blitToAtlas(atlas, frame, col++);
