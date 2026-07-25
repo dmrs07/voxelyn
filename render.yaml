@@ -15,16 +15,13 @@ services:
     plan: starter
     region: virginia # US East: menor RTT para o Brasil que a costa oeste (Render nao tem regiao BR)
     numInstances: 1 # alpha: instancia unica (salas em memoria, sem KV/Postgres)
-    buildCommand: >-
-      corepack enable &&
-      pnpm install --no-frozen-lockfile &&
-      pnpm --filter @voxelyn/survival-server... build
+    buildCommand: pnpm --filter @voxelyn/survival-server... build
     startCommand: node packages/voxelyn-survival-server/dist/bin/serve.js
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
-        value: '22'
+        value: '22.22.0'
       # CORS: origem do Static Site (preencher com a URL publica do cliente)
       - key: ALLOWED_ORIGINS
         sync: false
@@ -36,13 +33,12 @@ services:
   - type: web
     name: voxelyn-survival-client
     runtime: static
-    buildCommand: >-
-      corepack enable &&
-      pnpm install --no-frozen-lockfile &&
-      pnpm --filter @voxelyn/survival... build
+    buildCommand: pnpm --filter @voxelyn/survival... build
     staticPublishPath: packages/voxelyn-survival/dist
     autoDeploy: true
     envVars:
+      - key: NODE_VERSION
+        value: '22.22.0'
       # URL wss publica do servidor (preencher com a URL do web service acima)
       - key: VITE_SERVER_URL
         sync: false
