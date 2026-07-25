@@ -51,7 +51,7 @@ jobs:
           python3 scripts/apply_voxel_spec.py 2>&1 | tee -a /tmp/voxel-execution.log
 
       - name: Remove transport fragments
-        run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part* .github/voxel-spec-trigger
+        run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part* .github/voxel-spec-trigger .github/voxel-failure.log
 
       - name: Install dependencies
         run: |
@@ -90,21 +90,23 @@ jobs:
           git commit -m "feat(survival): implement voxel character spec [voxel-spec-applied]"
           git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
 
-      - name: Report execution failure on PR
+      - name: Persist and report execution failure
         if: failure() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          tail -n 200 /tmp/voxel-execution.log > .github/voxel-failure.log
           {
             echo '### Falha ao executar a spec voxel'
             echo
             echo '```text'
-            if [ -f /tmp/voxel-execution.log ]; then
-              tail -n 120 /tmp/voxel-execution.log
-            else
-              echo 'O log consolidado não foi criado. Consulte o job do GitHub Actions.'
-            fi
+            cat .github/voxel-failure.log
             echo '```'
           } > /tmp/voxel-failure.md
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/voxel-failure.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/voxel-failure.log
+          git commit -m "chore(ci): record voxel spec failure [skip voxel]"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
