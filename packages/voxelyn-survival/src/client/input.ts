@@ -53,6 +53,7 @@ export class SurvivalInput {
   constructor(private readonly canvas: HTMLCanvasElement) {}
 
   attach(): void {
+    this.state.usingTouch = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
@@ -81,12 +82,12 @@ export class SurvivalInput {
     this.state.aimTouch.originX = aimX;
     this.state.aimTouch.originY = aimY;
 
-    // Acoes em arco acima/esquerda do joystick de tiro, sem sobrepor sua zona util.
+    // Acoes em arco acima/esquerda do joystick de tiro, dentro da safe area.
     this.state.buttons = [
       { id: 'dodge', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.8, cy: aimY + r * 0.25, r, pressed: false },
-      { id: 'ability', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.45, cy: aimY - r * 1.65, r: r * 0.92, pressed: false },
-      { id: 'consume', cx: aimX + r * 0.15, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.78, r: r * 0.88, pressed: false },
-      { id: 'interact', cx: aimX + AIM_JOYSTICK_RADIUS + r * 0.15, cy: aimY - r * 1.2, r: r * 0.86, pressed: false },
+      { id: 'ability', cx: aimX - AIM_JOYSTICK_RADIUS * 0.72, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.58, r: r * 0.92, pressed: false },
+      { id: 'consume', cx: aimX, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.82, r: r * 0.88, pressed: false },
+      { id: 'interact', cx: aimX + AIM_JOYSTICK_RADIUS * 0.7, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.52, r: r * 0.86, pressed: false },
     ];
   }
 
