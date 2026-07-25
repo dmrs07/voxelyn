@@ -35,7 +35,7 @@ describe('touch modality', () => {
     input.state.aimTouch.dx = 1;
     input.state.aimTouch.dy = 0.5;
     input.state.aimTouch.pointerId = 2;
-    input.state.buttons[0].pressed = true;
+    input.state.buttons[0]!.pressed = true;
 
     deactivateTouchControls(input.state);
 
