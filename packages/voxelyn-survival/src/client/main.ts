@@ -1,7 +1,8 @@
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { createRun, stepRun } from '@voxelyn/survival-sim';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
-import { SurvivalInput } from './input';
+import { TouchCooldownOverlay } from './cooldown-overlay';
+import { SurvivalInput, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
 import { NetClient } from './net';
 import { RestartGate } from './restart';
@@ -20,6 +21,7 @@ const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 
 const renderer = new SurvivalRenderer(canvas);
 const input = new SurvivalInput(canvas);
+const cooldownOverlay = new TouchCooldownOverlay(canvas);
 input.attach();
 
 let quality: QualityLevel = loadQuality();
@@ -27,9 +29,22 @@ qualitySelect.value = quality;
 renderer.setQuality(quality);
 const governor = new FpsGovernor();
 
+const readCssPixels = (name: string): number => {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+};
+
+const readSafeArea = (): TouchSafeArea => ({
+  top: readCssPixels('--safe-area-inset-top'),
+  right: readCssPixels('--safe-area-inset-right'),
+  bottom: readCssPixels('--safe-area-inset-bottom'),
+  left: readCssPixels('--safe-area-inset-left'),
+});
+
 const resize = (): void => {
   renderer.resize();
-  input.layoutButtons(window.innerWidth, window.innerHeight);
+  input.layoutButtons(window.innerWidth, window.innerHeight, readSafeArea());
 };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
@@ -88,7 +103,6 @@ const runSolo = (): void => {
 
   const gate = new RestartGate(RESTART_ARM_MS);
 
-
   const frame = (now: number): void => {
     if (!running) return;
     const delta = Math.min(120, now - lastTime);
@@ -136,7 +150,9 @@ const runSolo = (): void => {
     }
     // durante a run a fila de toques nao tem consumidor: drena todo frame
     if (gate.frame(now, false).drain) input.clearPendingUiInput();
-    renderer.render(state, accumulator / TICK_MS, input.state, now);
+    const alpha = accumulator / TICK_MS;
+    renderer.render(state, alpha, input.state, now);
+    cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -231,6 +247,7 @@ const runOnline = (url: string): void => {
       if (state) {
         const terminal = state.phase !== 'running' && state.phase !== 'choice';
         renderer.render(state, 1, input.state, now);
+        cooldownOverlay.render(state, input.state, state.tick, now);
         const { drain, armed } = gate.frame(now, terminal);
         if (drain) input.clearPendingUiInput();
         if (terminal) {

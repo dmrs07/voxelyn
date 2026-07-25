@@ -3,26 +3,56 @@ import { emptyCommand } from '@voxelyn/survival-sim';
 
 export type TouchButton = {
   id: 'dodge' | 'ability' | 'consume' | 'interact';
-  label: string;
   cx: number;
   cy: number;
   r: number;
   pressed: boolean;
 };
 
+export type TouchSafeArea = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+};
+
 export type InputState = {
   joystick: { active: boolean; originX: number; originY: number; dx: number; dy: number; pointerId: number };
-  aimTouch: { active: boolean; dx: number; dy: number; pointerId: number };
+  aimTouch: {
+    active: boolean;
+    originX: number;
+    originY: number;
+    dx: number;
+    dy: number;
+    pointerId: number;
+  };
   buttons: TouchButton[];
+  actionPressSeq: { dodge: number; ability: number };
   usingTouch: boolean;
   tapQueue: Array<{ x: number; y: number }>;
 };
 
-const JOY_RADIUS = 56;
+export const MOVE_JOYSTICK_RADIUS = 56;
+export const AIM_JOYSTICK_RADIUS = 60;
+const AIM_DEAD_ZONE = 0.12;
+
+/** Cancela qualquer ponteiro touch ainda ativo ao selecionar mouse/trackpad. */
+export const deactivateTouchControls = (state: InputState): void => {
+  state.usingTouch = false;
+  state.joystick.active = false;
+  state.joystick.dx = 0;
+  state.joystick.dy = 0;
+  state.joystick.pointerId = -1;
+  state.aimTouch.active = false;
+  state.aimTouch.dx = 0;
+  state.aimTouch.dy = 0;
+  state.aimTouch.pointerId = -1;
+  for (const button of state.buttons) button.pressed = false;
+};
 
 /**
- * Entrada mobile-first: joystick virtual a esquerda, area de mira com autofire a
- * direita, botoes de esquiva/habilidade/consumivel/interacao. Teclado+mouse no desktop.
+ * Entrada mobile-first: joystick virtual de movimento a esquerda, joystick fixo
+ * de mira/auto-fire a direita e quatro acoes acima da mira. Teclado+mouse no desktop.
  */
 export class SurvivalInput {
   private readonly keys: Record<string, boolean> = {};
@@ -36,8 +66,9 @@ export class SurvivalInput {
 
   readonly state: InputState = {
     joystick: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
-    aimTouch: { active: false, dx: 0, dy: 0, pointerId: -1 },
+    aimTouch: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
     buttons: [],
+    actionPressSeq: { dodge: 0, ability: 0 },
     usingTouch: false,
     tapQueue: [],
   };
@@ -62,26 +93,55 @@ export class SurvivalInput {
     window.removeEventListener('pointercancel', this.onPointerUp);
   }
 
-  layoutButtons(width: number, height: number): void {
-    const r = Math.max(26, Math.min(38, height * 0.075));
-    const margin = r * 0.7;
-    const baseX = width - r - margin - 8;
-    const baseY = height - r - margin - 8;
+  layoutButtons(
+    width: number,
+    height: number,
+    safeArea: Pick<TouchSafeArea, 'right' | 'bottom'> = { right: 0, bottom: 0 }
+  ): void {
+    const r = Math.max(24, Math.min(34, height * 0.066));
+    const safeRight = Math.max(16, width * 0.025) + Math.max(0, safeArea.right);
+    const safeBottom = Math.max(14, height * 0.035) + Math.max(0, safeArea.bottom);
+    const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
+    const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
+
+    // A origem permanece fixa inclusive enquanto o dedo esta fora do controle.
+    this.state.aimTouch.originX = aimX;
+    this.state.aimTouch.originY = aimY;
+
+    // Acoes em arco acima/esquerda do joystick de tiro, dentro da safe area real.
     this.state.buttons = [
-      { id: 'dodge', label: 'ESQ', cx: baseX, cy: baseY, r, pressed: false },
-      { id: 'ability', label: 'PLS', cx: baseX - (r * 2 + margin), cy: baseY - r * 0.4, r: r * 0.85, pressed: false },
-      { id: 'consume', label: 'VIA', cx: baseX - r * 0.4, cy: baseY - (r * 2 + margin), r: r * 0.85, pressed: false },
-      { id: 'interact', label: 'USA', cx: baseX - (r * 1.75 + margin), cy: baseY - (r * 1.75 + margin), r: r * 0.8, pressed: false },
+      { id: 'dodge', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.8, cy: aimY + r * 0.25, r, pressed: false },
+      {
+        id: 'ability',
+        cx: aimX - AIM_JOYSTICK_RADIUS * 0.72,
+        cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.58,
+        r: r * 0.92,
+        pressed: false,
+      },
+      { id: 'consume', cx: aimX, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.82, r: r * 0.88, pressed: false },
+      {
+        id: 'interact',
+        cx: aimX + AIM_JOYSTICK_RADIUS * 0.7,
+        cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.52,
+        r: r * 0.86,
+        pressed: false,
+      },
     ];
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     const k = e.key.toLowerCase();
     this.keys[k] = true;
-    if (k === ' ') this.queuedDodge = true;
+    if (k === ' ') {
+      this.queuedDodge = true;
+      this.state.actionPressSeq.dodge += 1;
+    }
     if (k === 'e') this.queuedInteract = true;
     if (k === 'f') this.queuedConsume = true;
-    if (k === 'q' || k === 'shift') this.queuedAbility = true;
+    if (k === 'q' || k === 'shift') {
+      this.queuedAbility = true;
+      this.state.actionPressSeq.ability += 1;
+    }
     if (k === 'r') this.queuedRestart = true;
     if (k === '1') this.queuedChoice = 0;
     if (k === '2') this.queuedChoice = 1;
@@ -101,6 +161,10 @@ export class SurvivalInput {
     return null;
   }
 
+  private selectMouseModality(): void {
+    deactivateTouchControls(this.state);
+  }
+
   private readonly onPointerDown = (e: PointerEvent): void => {
     const x = e.clientX;
     const y = e.clientY;
@@ -110,19 +174,34 @@ export class SurvivalInput {
       const btn = this.buttonAt(x, y);
       if (btn) {
         btn.pressed = true;
-        if (btn.id === 'dodge') this.queuedDodge = true;
-        if (btn.id === 'ability') this.queuedAbility = true;
+        if (btn.id === 'dodge') {
+          this.queuedDodge = true;
+          this.state.actionPressSeq.dodge += 1;
+        }
+        if (btn.id === 'ability') {
+          this.queuedAbility = true;
+          this.state.actionPressSeq.ability += 1;
+        }
         if (btn.id === 'consume') this.queuedConsume = true;
         if (btn.id === 'interact') this.queuedInteract = true;
         return;
       }
-      if (x < window.innerWidth * 0.45 && !this.state.joystick.active) {
+
+      if (x < window.innerWidth * 0.48 && !this.state.joystick.active) {
         this.state.joystick = { active: true, originX: x, originY: y, dx: 0, dy: 0, pointerId: e.pointerId };
-      } else if (!this.state.aimTouch.active) {
-        this.state.aimTouch = { active: true, dx: 0, dy: 0, pointerId: e.pointerId };
+        return;
+      }
+
+      const aim = this.state.aimTouch;
+      const inAimZone = Math.hypot(x - aim.originX, y - aim.originY) <= AIM_JOYSTICK_RADIUS * 1.65;
+      if (inAimZone && !aim.active) {
+        aim.active = true;
+        aim.pointerId = e.pointerId;
         this.updateAimTouch(x, y);
       }
     } else {
+      // Mouse/trackpad ganha a modalidade e invalida dedos ainda pressionados.
+      this.selectMouseModality();
       this.mouse.down = true;
       this.mouse.x = x;
       this.mouse.y = y;
@@ -131,16 +210,20 @@ export class SurvivalInput {
   };
 
   private updateAimTouch(x: number, y: number): void {
-    // direcao a partir do centro da metade direita (mira relativa e estavel)
-    const cx = window.innerWidth * 0.5;
-    const cy = window.innerHeight * 0.5;
-    const dx = x - cx;
-    const dy = y - cy;
+    const aim = this.state.aimTouch;
+    const dx = x - aim.originX;
+    const dy = y - aim.originY;
     const len = Math.hypot(dx, dy);
-    if (len > 8) {
-      this.state.aimTouch.dx = dx / len;
-      this.state.aimTouch.dy = dy / len;
+    const clamp = Math.min(1, len / AIM_JOYSTICK_RADIUS);
+
+    if (clamp <= AIM_DEAD_ZONE || len <= 2) {
+      aim.dx = 0;
+      aim.dy = 0;
+      return;
     }
+
+    aim.dx = (dx / len) * clamp;
+    aim.dy = (dy / len) * clamp;
   }
 
   private readonly onPointerMove = (e: PointerEvent): void => {
@@ -149,7 +232,7 @@ export class SurvivalInput {
         const dx = e.clientX - this.state.joystick.originX;
         const dy = e.clientY - this.state.joystick.originY;
         const len = Math.hypot(dx, dy);
-        const clamp = Math.min(1, len / JOY_RADIUS);
+        const clamp = Math.min(1, len / MOVE_JOYSTICK_RADIUS);
         if (len > 2) {
           this.state.joystick.dx = (dx / len) * clamp;
           this.state.joystick.dy = (dy / len) * clamp;
@@ -158,6 +241,7 @@ export class SurvivalInput {
         this.updateAimTouch(e.clientX, e.clientY);
       }
     } else {
+      this.selectMouseModality();
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;
     }
@@ -173,6 +257,8 @@ export class SurvivalInput {
       }
       if (e.pointerId === this.state.aimTouch.pointerId) {
         this.state.aimTouch.active = false;
+        this.state.aimTouch.dx = 0;
+        this.state.aimTouch.dy = 0;
         this.state.aimTouch.pointerId = -1;
       }
       for (const b of this.state.buttons) b.pressed = false;
@@ -243,7 +329,7 @@ export class SurvivalInput {
     if (this.keys.a || this.keys.arrowleft) mx -= 1;
     if (this.keys.d || this.keys.arrowright) mx += 1;
 
-    if (this.state.joystick.active) {
+    if (this.state.usingTouch && this.state.joystick.active) {
       mx = this.state.joystick.dx;
       my = this.state.joystick.dy;
     }
@@ -252,12 +338,16 @@ export class SurvivalInput {
       cmd.move = { x: mx + my * 2, y: my * 2 - mx };
     }
 
-    // mira
-    if (this.state.aimTouch.active) {
+    // mira: vetor contido no joystick direito, sem depender da posicao do personagem.
+    if (
+      this.state.usingTouch &&
+      this.state.aimTouch.active &&
+      (this.state.aimTouch.dx !== 0 || this.state.aimTouch.dy !== 0)
+    ) {
       const ax = this.state.aimTouch.dx;
       const ay = this.state.aimTouch.dy;
       cmd.aim = { x: ax + ay * 2, y: ay * 2 - ax };
-      cmd.fire = true; // autofire enquanto mira (mobile)
+      cmd.fire = true;
     } else if (!this.state.usingTouch) {
       const dx = this.mouse.x - playerScreen.x;
       const dy = this.mouse.y - playerScreen.y;
