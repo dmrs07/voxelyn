@@ -39,24 +39,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate and test survival packages
-        id: tests
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          pnpm test:survival 2>&1 | tee /tmp/voxel-validation.log
-
       - name: Build survival packages
         id: build
-        if: steps.tests.outcome == 'success'
         continue-on-error: true
         run: |
           set -o pipefail
-          pnpm build:survival 2>&1 | tee -a /tmp/voxel-validation.log
+          pnpm build:survival 2>&1 | tee /tmp/voxel-validation.log
+
+      - name: Validate and test survival packages
+        id: tests
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm test:survival 2>&1 | tee -a /tmp/voxel-validation.log
 
       - name: Verify PWA atlas precache
         id: offline
-        if: steps.tests.outcome == 'success' && steps.build.outcome == 'success'
+        if: steps.build.outcome == 'success' && steps.tests.outcome == 'success'
         continue-on-error: true
         run: |
           set -o pipefail
@@ -66,8 +66,8 @@ jobs:
         if: always()
         run: |
           {
-            echo "tests=${{ steps.tests.outcome }}"
             echo "build=${{ steps.build.outcome }}"
+            echo "tests=${{ steps.tests.outcome }}"
             echo "offline=${{ steps.offline.outcome }}"
             echo
             cat /tmp/voxel-validation.log
@@ -83,5 +83,5 @@ jobs:
           retention-days: 7
 
       - name: Enforce validation result
-        if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure'
+        if: steps.build.outcome == 'failure' || steps.tests.outcome == 'failure' || steps.offline.outcome == 'failure'
         run: exit 1
