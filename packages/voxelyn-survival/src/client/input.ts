@@ -36,6 +36,20 @@ export const MOVE_JOYSTICK_RADIUS = 56;
 export const AIM_JOYSTICK_RADIUS = 60;
 const AIM_DEAD_ZONE = 0.12;
 
+/** Cancela qualquer ponteiro touch ainda ativo ao selecionar mouse/trackpad. */
+export const deactivateTouchControls = (state: InputState): void => {
+  state.usingTouch = false;
+  state.joystick.active = false;
+  state.joystick.dx = 0;
+  state.joystick.dy = 0;
+  state.joystick.pointerId = -1;
+  state.aimTouch.active = false;
+  state.aimTouch.dx = 0;
+  state.aimTouch.dy = 0;
+  state.aimTouch.pointerId = -1;
+  for (const button of state.buttons) button.pressed = false;
+};
+
 /**
  * Entrada mobile-first: joystick virtual de movimento a esquerda, joystick fixo
  * de mira/auto-fire a direita e quatro acoes acima da mira. Teclado+mouse no desktop.
@@ -97,9 +111,21 @@ export class SurvivalInput {
     // Acoes em arco acima/esquerda do joystick de tiro, dentro da safe area real.
     this.state.buttons = [
       { id: 'dodge', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.8, cy: aimY + r * 0.25, r, pressed: false },
-      { id: 'ability', cx: aimX - AIM_JOYSTICK_RADIUS * 0.72, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.58, r: r * 0.92, pressed: false },
+      {
+        id: 'ability',
+        cx: aimX - AIM_JOYSTICK_RADIUS * 0.72,
+        cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.58,
+        r: r * 0.92,
+        pressed: false,
+      },
       { id: 'consume', cx: aimX, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.82, r: r * 0.88, pressed: false },
-      { id: 'interact', cx: aimX + AIM_JOYSTICK_RADIUS * 0.7, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.52, r: r * 0.86, pressed: false },
+      {
+        id: 'interact',
+        cx: aimX + AIM_JOYSTICK_RADIUS * 0.7,
+        cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.52,
+        r: r * 0.86,
+        pressed: false,
+      },
     ];
   }
 
@@ -133,6 +159,10 @@ export class SurvivalInput {
       if (Math.hypot(x - b.cx, y - b.cy) <= b.r * 1.25) return b;
     }
     return null;
+  }
+
+  private selectMouseModality(): void {
+    deactivateTouchControls(this.state);
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
@@ -170,8 +200,8 @@ export class SurvivalInput {
         this.updateAimTouch(x, y);
       }
     } else {
-      // Dispositivos hibridos podem alternar touch e mouse durante a mesma sessao.
-      this.state.usingTouch = false;
+      // Mouse/trackpad ganha a modalidade e invalida dedos ainda pressionados.
+      this.selectMouseModality();
       this.mouse.down = true;
       this.mouse.x = x;
       this.mouse.y = y;
@@ -211,7 +241,7 @@ export class SurvivalInput {
         this.updateAimTouch(e.clientX, e.clientY);
       }
     } else {
-      this.state.usingTouch = false;
+      this.selectMouseModality();
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;
     }
@@ -299,7 +329,7 @@ export class SurvivalInput {
     if (this.keys.a || this.keys.arrowleft) mx -= 1;
     if (this.keys.d || this.keys.arrowright) mx += 1;
 
-    if (this.state.joystick.active) {
+    if (this.state.usingTouch && this.state.joystick.active) {
       mx = this.state.joystick.dx;
       my = this.state.joystick.dy;
     }
@@ -309,7 +339,11 @@ export class SurvivalInput {
     }
 
     // mira: vetor contido no joystick direito, sem depender da posicao do personagem.
-    if (this.state.aimTouch.active && (this.state.aimTouch.dx !== 0 || this.state.aimTouch.dy !== 0)) {
+    if (
+      this.state.usingTouch &&
+      this.state.aimTouch.active &&
+      (this.state.aimTouch.dx !== 0 || this.state.aimTouch.dy !== 0)
+    ) {
       const ax = this.state.aimTouch.dx;
       const ay = this.state.aimTouch.dy;
       cmd.aim = { x: ax + ay * 2, y: ay * 2 - ax };
