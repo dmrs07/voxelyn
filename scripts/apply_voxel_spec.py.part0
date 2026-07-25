@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import base64
+import json
+
+ROOT = Path(__file__).resolve().parents[1]
+import io
+import tarfile
+
+BUNDLE = ''.join(Path(__file__).with_name(f'voxel_bundle.part{i}').read_text() for i in range(6))
+with tarfile.open(fileobj=io.BytesIO(base64.b64decode(BUNDLE)), mode='r:gz') as archive:
+    archive.extractall(ROOT)
+    for member in archive.getmembers():
+        if member.isfile():
+            print('wrote', member.name)
+
+def patch(path: str, old: str, new: str, count: int = 1) -> None:
+    target = ROOT / path
+    text = target.read_text()
+    actual = text.count(old)
+    if actual < count:
+        raise RuntimeError(f'{path}: expected at least {count} occurrences, found {actual}: {old[:100]!r}')
+    target.write_text(text.replace(old, new, count))
+    print('patched', path)
+
+run = 'packages/voxelyn-survival-sim/src/run.ts'
+patch(run,
+"    events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y });",
+"""    events.push({
+      t: 'action_start', entity: player.id, action: 'player_shot', x: player.x, y: player.y,
+      dx: extra.aim.x, dy: extra.aim.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 7,
+    });
+    events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y, owner: player.id });""")
+patch(run,
+"    events.push({ t: 'pulse', x: player.x, y: player.y });",
+"""    events.push({
+      t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
+      dx: player.facing.x, dy: player.facing.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
+    });
+    events.push({ t: 'pulse', x: player.x, y: player.y });""")
+patch(run,
+"          events.push({ t: 'revive', x: op.x, y: op.y, slot: other });",
+"          events.push({ t: 'revive', x: op.x, y: op.y, slot: other, tick: state.tick });")
+patch(run,
+"  events.push({ t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector' });",
+"""  events.push({
+    t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector',
+    facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+  });""")
+old_down = "        events.push({ t: 'player_down', slot });"
+new_down = """        events.push({
+          t: 'player_down', slot, x: p.x, y: p.y,
+          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+        });"""
+patch(run, old_down, new_down)
+patch(run, old_down, new_down)
+patch(run,
+"""    mix(enemy.alive ? 1 : 0);
+  }
+  for (const proj of state.projectiles) {""",
+"""    mix(enemy.alive ? 1 : 0);
+    if (enemy.action) {
+      mix(enemy.action.kind.length);
+      mix(enemy.action.kind.charCodeAt(0));
+      mix(enemy.action.startedAt);
+      mix(enemy.action.releaseAt);
+      mix(enemy.action.endsAt);
+      mix(Math.round(enemy.action.direction.x * 1000));
+      mix(Math.round(enemy.action.direction.y * 1000));
+    }
+  }
+  for (const proj of state.projectiles) {""")
+
+messages = 'packages/voxelyn-survival-protocol/src/messages.ts'
+patch(messages,
+"import type { PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';",
+"import type { EntityActionKind, EntityActionPhase, PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';")
+patch(messages, 'export type EntitySnapshot = {', """export type EntityActionSnapshot = {
+  kind: EntityActionKind;
+  phase: EntityActionPhase;
+  startedAt: number;
+  releaseAt: number;
+  endsAt: number;
+  dx: number;
+  dy: number;
+  target?: number;
+};
+
+export type EntitySnapshot = {""")
+patch(messages, '  facingY?: number;\n};', '  facingY?: number;\n  action?: EntityActionSnapshot;\n};')
+version = 'packages/voxelyn-survival-protocol/src/version.ts'
+patch(version, 'export const PROTOCOL_VERSION = 1;', 'export const PROTOCOL_VERSION = 2;')
+patch(version, 'export const SIMULATION_VERSION = 1;', 'export const SIMULATION_VERSION = 2;')
+patch(version, 'export const CONTENT_VERSION = 1;', 'export const CONTENT_VERSION = 2;')
+
+room = 'packages/voxelyn-survival-server/src/room.ts'
+patch(room,
+"        facingY: round3(this.state.playerExtras[i].aim.y),\n      });",
+"""        facingY: round3(this.state.playerExtras[i].aim.y),
+        action: p.action ? {
+          kind: p.action.kind,
+          phase: p.action.phase,
+          startedAt: p.action.startedAt,
+          releaseAt: p.action.releaseAt,
+          endsAt: p.action.endsAt,
+          dx: round3(p.action.direction.x),
+          dy: round3(p.action.direction.y),
+          target: p.action.target,
+        } : undefined,
+      });""")
+patch(room,
+"        facingY: round3(e.facing.y),\n      });",
+"""        facingY: round3(e.facing.y),
+        action: e.action ? {
+          kind: e.action.kind,
+          phase: e.action.phase,
+          startedAt: e.action.startedAt,
+          releaseAt:
