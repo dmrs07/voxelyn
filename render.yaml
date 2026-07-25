@@ -15,7 +15,13 @@ services:
     plan: starter
     region: virginia # US East: menor RTT para o Brasil que a costa oeste (Render nao tem regiao BR)
     numInstances: 1 # alpha: instancia unica (salas em memoria, sem KV/Postgres)
-    buildCommand: pnpm --filter @voxelyn/survival-server... build
+    # O buildCommand roda num checkout LIMPO: sem instalar, o tsc nao acha
+    # sequer typescript/vitest e o build morre. --frozen-lockfile falha alto se
+    # o lockfile estiver defasado, em vez de resolver silenciosamente outra arvore.
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @voxelyn/survival-server... build
     startCommand: node packages/voxelyn-survival-server/dist/bin/serve.js
     healthCheckPath: /healthz
     autoDeploy: true
@@ -33,7 +39,10 @@ services:
   - type: web
     name: voxelyn-survival-client
     runtime: static
-    buildCommand: pnpm --filter @voxelyn/survival... build
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @voxelyn/survival... build
     staticPublishPath: packages/voxelyn-survival/dist
     autoDeploy: true
     envVars:
