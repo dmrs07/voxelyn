@@ -10,10 +10,12 @@ import {
   SURF_SCORCHED,
   HEAT_MAX,
 } from '@voxelyn/survival-sim';
-import type { InputState } from './input';
+import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, deriveAnim, type EntityAnimState } from './sprites';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
+import { TouchIconBank } from './touch-icons';
+import { drawVoxelEntity } from './voxel-fallback';
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -53,6 +55,7 @@ export class SurvivalRenderer {
   shake: CameraShake = { power: 0, until: 0 };
   messages: Array<{ text: string; until: number }> = [];
   readonly sprites = new SpriteBank();
+  private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   quality: QualityPreset = PRESETS.high;
 
@@ -387,7 +390,7 @@ export class SurvivalRenderer {
       });
     }
 
-    // sombra de contato + barra de vida, comuns aos caminhos sprite e vetorial
+    // sombra de contato + barra de vida, comuns aos caminhos sprite e voxel
     const drawShadow = (sx: number, sy: number, size: number): void => {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath();
@@ -402,46 +405,12 @@ export class SurvivalRenderer {
       ctx.fillRect(sx - size, topY, size * 2 * hpFrac, 2.4 * z);
     };
 
-    // fallback vetorial (arquetipos ainda sem sprite: bruiser/bomber/guardian)
-    const drawVectorBody = (
-      sx: number,
-      sy: number,
-      b: number,
-      radius: number,
-      color: string,
-      elite: boolean
-    ): void => {
-      const size = radius * TILE_W * 0.9 * z;
-      const bodyH = size * 2.1;
-      ctx.fillStyle = shade(color, 0.45 + b * 0.65);
-      ctx.strokeStyle = shade(color, 0.2);
-      ctx.lineWidth = Math.max(1, z * 0.7);
-      ctx.beginPath();
-      ctx.ellipse(sx, sy - bodyH * 0.55, size * 0.85, bodyH * 0.55, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (elite) {
-        ctx.strokeStyle = PAL.fire;
-        ctx.lineWidth = z;
-        ctx.beginPath();
-        ctx.ellipse(sx, sy - bodyH * 0.55, size * 1.05, bodyH * 0.65, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    };
-
     const spriteZoom = Math.max(1, Math.round(z));
 
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
       const b = brightness(enemy.x, enemy.y);
       if (b <= 0.05) continue;
-      const colorMap: Record<string, string> = {
-        stalker: PAL.rockLight,
-        bruiser: PAL.rust,
-        spitter: PAL.acid,
-        bomber: PAL.fire,
-        guardian: PAL.blood,
-      };
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       items.push({
         depth: enemy.x + enemy.y,
@@ -461,7 +430,18 @@ export class SurvivalRenderer {
             spriteZoom,
             enemy.elite ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 } : undefined
           );
-          if (!drew) drawVectorBody(sx, sy, b, enemy.radius, colorMap[enemy.archetype] ?? PAL.bone, enemy.elite);
+          if (!drew) {
+            drawVoxelEntity(ctx, {
+              sx,
+              sy,
+              z,
+              radius: enemy.radius,
+              brightness: b,
+              archetype: enemy.archetype,
+              elite: enemy.elite,
+              nowMs,
+            });
+          }
           if (enemy.elite && drew) {
             ctx.strokeStyle = PAL.fire;
             ctx.lineWidth = z;
@@ -505,7 +485,19 @@ export class SurvivalRenderer {
               // parceiro (nao-local) recebe leve tint frio para diferenciar
               isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }
             );
-            if (!drew) drawVectorBody(psx, psy, 1, pl.radius, isLocal ? PAL.player : PAL.biolum, false);
+            if (!drew) {
+              drawVoxelEntity(ctx, {
+                sx: psx,
+                sy: psy,
+                z,
+                radius: pl.radius,
+                brightness: 1,
+                archetype: 'prospector',
+                elite: false,
+                nowMs,
+                allyTint: !isLocal,
+              });
+            }
           }
           drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
 
@@ -647,31 +639,84 @@ export class SurvivalRenderer {
       my += 26;
     }
 
-    // controles touch
+    // controles touch: movimento livre a esquerda, mira fixa 360 graus a direita.
     if (input.usingTouch) {
       if (input.joystick.active) {
-        ctx.strokeStyle = 'rgba(232,241,255,0.25)';
+        ctx.fillStyle = 'rgba(11,14,20,0.28)';
+        ctx.beginPath();
+        ctx.arc(input.joystick.originX, input.joystick.originY, MOVE_JOYSTICK_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(232,241,255,0.3)';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(input.joystick.originX, input.joystick.originY, 56, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = 'rgba(232,241,255,0.35)';
+        ctx.fillStyle = 'rgba(232,241,255,0.38)';
         ctx.beginPath();
-        ctx.arc(input.joystick.originX + input.joystick.dx * 56, input.joystick.originY + input.joystick.dy * 56, 22, 0, Math.PI * 2);
+        ctx.arc(
+          input.joystick.originX + input.joystick.dx * MOVE_JOYSTICK_RADIUS,
+          input.joystick.originY + input.joystick.dy * MOVE_JOYSTICK_RADIUS,
+          22,
+          0,
+          Math.PI * 2
+        );
         ctx.fill();
       }
+
+      const aim = input.aimTouch;
+      ctx.fillStyle = aim.active ? 'rgba(89,242,194,0.13)' : 'rgba(11,14,20,0.34)';
+      ctx.beginPath();
+      ctx.arc(aim.originX, aim.originY, AIM_JOYSTICK_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = aim.active ? 'rgba(89,242,194,0.62)' : 'rgba(232,241,255,0.3)';
+      ctx.lineWidth = aim.active ? 2.4 : 1.8;
+      ctx.stroke();
+
+      // Reticula discreta comunica que este controle mira e atira.
+      ctx.strokeStyle = aim.active ? 'rgba(89,242,194,0.72)' : 'rgba(232,241,255,0.28)';
+      ctx.lineWidth = 1.4;
+      const mark = AIM_JOYSTICK_RADIUS * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(aim.originX - mark, aim.originY);
+      ctx.lineTo(aim.originX + mark, aim.originY);
+      ctx.moveTo(aim.originX, aim.originY - mark);
+      ctx.lineTo(aim.originX, aim.originY + mark);
+      ctx.stroke();
+
+      ctx.fillStyle = aim.active ? 'rgba(89,242,194,0.52)' : 'rgba(232,241,255,0.26)';
+      ctx.beginPath();
+      ctx.arc(
+        aim.originX + aim.dx * AIM_JOYSTICK_RADIUS,
+        aim.originY + aim.dy * AIM_JOYSTICK_RADIUS,
+        23,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      ctx.strokeStyle = aim.active ? PAL.biolum : 'rgba(232,241,255,0.38)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
       for (const b of input.buttons) {
-        ctx.fillStyle = b.pressed ? 'rgba(255,209,102,0.5)' : 'rgba(232,241,255,0.14)';
+        ctx.fillStyle = b.pressed ? 'rgba(255,209,102,0.5)' : 'rgba(11,14,20,0.48)';
         ctx.beginPath();
         ctx.arc(b.cx, b.cy, b.r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(232,241,255,0.4)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = b.pressed ? PAL.loot : 'rgba(232,241,255,0.44)';
+        ctx.lineWidth = b.pressed ? 2 : 1.5;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(232,241,255,0.8)';
-        ctx.font = `bold ${Math.round(b.r * 0.42)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText(b.label, b.cx, b.cy + b.r * 0.15);
+
+        const iconColor = b.pressed ? PAL.loot : 'rgba(232,241,255,0.88)';
+        const drewIcon = this.touchIcons.draw(ctx, b.id, b.cx, b.cy, b.r * 1.05, iconColor);
+        if (!drewIcon) {
+          // Primeiro frame antes do SVG carregar: placeholder geometrico, nunca sigla textual.
+          ctx.fillStyle = iconColor;
+          ctx.beginPath();
+          ctx.moveTo(b.cx, b.cy - b.r * 0.28);
+          ctx.lineTo(b.cx + b.r * 0.28, b.cy);
+          ctx.lineTo(b.cx, b.cy + b.r * 0.28);
+          ctx.lineTo(b.cx - b.r * 0.28, b.cy);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
     }
   }
