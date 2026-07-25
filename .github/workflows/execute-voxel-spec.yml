@@ -1,4 +1,4 @@
-name: Execute voxel character spec
+name: Validate voxel character spec
 
 on:
   workflow_dispatch:
@@ -11,11 +11,11 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: voxel-spec-${{ github.event.pull_request.number || github.ref }}
+  group: voxel-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
-  apply:
+  validate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -38,60 +38,50 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.33.0 --activate
 
-      - name: Initialize execution log
-        run: |
-          : > /tmp/voxel-execution.log
-
       - name: Install dependencies
-        run: |
-          set -o pipefail
-          pnpm install --frozen-lockfile 2>&1 | tee -a /tmp/voxel-execution.log
-
-      - name: Reassemble implementation script
-        run: cat scripts/apply_voxel_spec.py.part* > scripts/apply_voxel_spec.py
-
-      - name: Apply reviewed voxel specification
-        run: |
-          set -o pipefail
-          python3 scripts/apply_voxel_spec.py 2>&1 | tee -a /tmp/voxel-execution.log
-
-      - name: Remove transport fragments
-        run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part* .github/voxel-spec-trigger .github/voxel-failure.log
-
-      - name: Generate character atlases
-        run: |
-          set -o pipefail
-          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/voxel-execution.log
-
-      - name: Commit generated implementation
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No implementation changes to commit."
-          else
-            git commit -m "feat(survival): implement voxel character spec [voxel-spec-applied]"
-            git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
-          fi
+        run: pnpm install --frozen-lockfile
 
       - name: Validate and test survival packages
+        id: tests
+        continue-on-error: true
         run: |
           set -o pipefail
-          pnpm test:survival 2>&1 | tee -a /tmp/voxel-execution.log
+          pnpm test:survival 2>&1 | tee /tmp/voxel-validation.log
 
       - name: Build survival packages
+        id: build
+        if: steps.tests.outcome == 'success'
+        continue-on-error: true
         run: |
           set -o pipefail
-          pnpm build:survival 2>&1 | tee -a /tmp/voxel-execution.log
+          pnpm build:survival 2>&1 | tee -a /tmp/voxel-validation.log
 
       - name: Verify PWA atlas precache
+        id: offline
+        if: steps.tests.outcome == 'success' && steps.build.outcome == 'success'
+        continue-on-error: true
         run: |
           set -o pipefail
-          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/voxel-execution.log
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Report execution failure
-        if: failure() && github.event_name == 'pull_request'
+      - name: Persist failure diagnostics
+        if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure'
+        run: |
+          {
+            echo "tests=${{ steps.tests.outcome }}"
+            echo "build=${{ steps.build.outcome }}"
+            echo "offline=${{ steps.offline.outcome }}"
+            echo
+            tail -n 240 /tmp/voxel-validation.log
+          } > .github/voxel-validation.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/voxel-validation.log
+          git commit -m "chore(ci): capture voxel validation failure [skip voxel]"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+
+      - name: Report failure on PR
+        if: (steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure') && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -99,10 +89,22 @@ jobs:
           {
             echo '### Falha ao validar a implementação da spec voxel'
             echo
-            echo 'A implementação foi persistida no branch para correção.'
-            echo
-            echo '```text'
-            tail -n 160 /tmp/voxel-execution.log
-            echo '```'
+            echo 'O diagnóstico completo foi salvo em `.github/voxel-validation.log`.'
           } > /tmp/voxel-failure.md
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/voxel-failure.md
+
+      - name: Remove stale diagnostics after success
+        if: steps.tests.outcome == 'success' && steps.build.outcome == 'success' && steps.offline.outcome == 'success'
+        run: |
+          if [ -f .github/voxel-validation.log ]; then
+            rm .github/voxel-validation.log
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore(ci): clear voxel validation diagnostics [skip voxel]"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+          fi
+
+      - name: Enforce validation result
+        if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure' || steps.offline.outcome == 'failure'
+        run: exit 1
