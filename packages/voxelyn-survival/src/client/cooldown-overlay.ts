@@ -37,11 +37,17 @@ export const cooldownRemainingFraction = (readyAt: number, tick: number, duratio
  * Desenha um radial de 360° sobre os botões com cooldown real na simulação.
  * A máscara escura começa cobrindo o círculo inteiro e recua no sentido horário,
  * revelando o ícone conforme a ação fica disponível. Ao completar, há um pulso curto.
+ *
+ * No solo, o tick autoritativo de PlayerExtra reconcilia a animação. No online,
+ * enquanto o protocolo não transporta esses dois timers privados, o HUD faz uma
+ * predição visual usando os mesmos tempos compartilhados pela simulação.
  */
 export class TouchCooldownOverlay {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly cooling = new Set<CooldownButtonId>();
   private readonly readyPulseUntil = new Map<CooldownButtonId, number>();
+  private readonly predictedReadyAt = new Map<CooldownButtonId, number>();
+  private readonly seenPressSeq: Record<CooldownButtonId, number> = { dodge: 0, ability: 0 };
 
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -56,13 +62,26 @@ export class TouchCooldownOverlay {
       if (button.id !== 'dodge' && button.id !== 'ability') continue;
       const id: CooldownButtonId = button.id;
       const spec = COOLDOWNS[id];
-      const remaining = cooldownRemainingFraction(spec.readyAt(state), tick, spec.duration);
+      const pressSeq = input.actionPressSeq[id];
+      const authoritativeReadyAt = spec.readyAt(state);
+      const predicted = this.predictedReadyAt.get(id) ?? 0;
+      const currentReadyAt = Math.max(authoritativeReadyAt, predicted);
+
+      if (pressSeq !== this.seenPressSeq[id]) {
+        this.seenPressSeq[id] = pressSeq;
+        // Taps repetidos durante cooldown não reiniciam o radial.
+        if (tick >= currentReadyAt) this.predictedReadyAt.set(id, tick + spec.duration);
+      }
+
+      const readyAt = Math.max(authoritativeReadyAt, this.predictedReadyAt.get(id) ?? 0);
+      const remaining = cooldownRemainingFraction(readyAt, tick, spec.duration);
 
       if (remaining > 0) {
         this.cooling.add(id);
-        this.drawCooldown(button, remaining, spec.accent);
-      } else if (this.cooling.delete(id)) {
-        this.readyPulseUntil.set(id, nowMs + 240);
+        this.drawCooldown(button, remaining, spec);
+      } else {
+        this.predictedReadyAt.delete(id);
+        if (this.cooling.delete(id)) this.readyPulseUntil.set(id, nowMs + 240);
       }
 
       const pulseUntil = this.readyPulseUntil.get(id) ?? 0;
@@ -74,7 +93,7 @@ export class TouchCooldownOverlay {
     }
   }
 
-  private drawCooldown(button: TouchButton, remaining: number, accent: string): void {
+  private drawCooldown(button: TouchButton, remaining: number, spec: CooldownSpec): void {
     const ctx = this.ctx;
     const start = -Math.PI / 2;
     const revealed = 1 - remaining;
@@ -95,7 +114,7 @@ export class TouchCooldownOverlay {
     if (revealed > 0.002) {
       ctx.beginPath();
       ctx.arc(button.cx, button.cy, radius - 1.5, start, revealAngle);
-      ctx.strokeStyle = accent;
+      ctx.strokeStyle = spec.accent;
       ctx.globalAlpha = 0.88;
       ctx.lineWidth = Math.max(2, button.r * 0.09);
       ctx.lineCap = 'round';
@@ -103,7 +122,7 @@ export class TouchCooldownOverlay {
     }
 
     // Contagem curta apenas para cooldowns de pelo menos um segundo.
-    const seconds = (remaining * COOLDOWNS[button.id as CooldownButtonId].duration) / TICK_HZ;
+    const seconds = (remaining * spec.duration) / TICK_HZ;
     if (seconds >= 0.95) {
       ctx.globalAlpha = 0.92;
       ctx.fillStyle = '#e8f1ff';
