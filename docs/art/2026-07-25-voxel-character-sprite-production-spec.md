@@ -1,12 +1,12 @@
 # Voxelyn Survival — Production Spec: personagens voxel isométricos
 
 **Data:** 2026-07-25  
-**Escopo:** `packages/voxelyn-survival`, `packages/voxelyn-survival-content`  
+**Escopo:** `packages/voxelyn-survival`, `packages/voxelyn-survival-content`, `packages/voxelyn-survival-sim`, `packages/voxelyn-survival-protocol` e `packages/voxelyn-survival-server`  
 **Base obrigatória:** `docs/art/voxelyn-survival-art-bible.md`
 
 ## 1. Objetivo
 
-Substituir os personagens procedurais/fallback atuais por um conjunto coerente de **sprites pré-renderizados com aparência voxel**, altamente legíveis, isolados e animados, para as seis entidades principais do Voxelyn Survival:
+Substituir os personagens procedurais/fallback atuais por sprites pré-renderizados com aparência voxel, isolados, legíveis e animados para:
 
 - `player-prospector`;
 - `enemy-stalker`;
@@ -15,107 +15,108 @@ Substituir os personagens procedurais/fallback atuais por um conjunto coerente d
 - `enemy-spore-bomber`;
 - `enemy-guardian`.
 
-Os sprites devem ser inspirados na linguagem de pose, volume, progressão de ataque e decomposição das seis folhas de referência fornecidas na tarefa original, mas precisam ser **designs autorais do universo Voxelyn**, sem copiar personagens, paletas, proporções ou detalhes identificáveis das referências.
+As folhas anexadas são referência de linguagem de pose, volume, telegraph, impacto e decomposição. Os designs finais devem ser autorais do universo Voxelyn, sem copiar personagens, proporções, paletas ou detalhes identificáveis.
 
-A meta não é apenas trocar desenhos. O resultado deve formar um pipeline de produção reproduzível, com turnaround consistente, animações coerentes entre direções, manifests completos, validação automatizada e integração real no jogo.
+A entrega inclui arte, pipeline reproduzível, manifests, integração com a simulação autoritativa, protocolo online, tombstones visuais, validação automatizada, PWA/offline e evidências in-game.
 
 ## 2. Resultado visual esperado
 
 - Perspectiva isométrica 2:1, câmera fixa e coerente com o terreno.
 - Aparência de modelo voxel pré-renderizado, com volumes facetados e leitura tridimensional clara.
-- Silhuetas individualizadas: nenhum personagem pode parecer apenas uma recoloração ou variação de escala de outro.
-- Materiais reconhecíveis em movimento: metal, quitina, fungo, rocha, esporos e cristal devem reagir à luz de maneiras diferentes.
-- Key light sempre no topo-esquerda, conforme a Art Bible.
-- Detalhes suficientes para leitura em zoom 2×, sem virar ruído quando exibidos no viewport mobile de 844×390.
-- Outline seletivo e escuro, nunca preto puro.
-- Emissivos reservados para identidade, perigo e timing de ataque.
+- Silhuetas individualizadas; nenhuma entidade pode ser apenas recoloração ou escala de outra.
+- Materiais distintos: metal, quitina, fungo, rocha, esporos e cristais.
+- Key light no topo-esquerda.
+- Boa leitura em zoom 2× e no viewport mobile 844×390.
+- Outline seletivo de 1 px usando a sombra mais escura do próprio sprite.
+- Saturação alta reservada a perigo, ataque, interação e recompensa.
 
-## 3. Interpretação das direções
-
-Os quatro lados do personagem não são vistas ortográficas de frente, costas, esquerda e direita. São quatro facings diagonais do espaço isométrico:
+## 3. Direções isométricas
 
 | ID | Leitura visual | Vetor de mundo |
 | --- | --- | --- |
-| `dr` | frente em 3/4, voltado para baixo-direita da tela | `+x` |
-| `dl` | frente em 3/4, voltado para baixo-esquerda da tela | `+y` |
-| `ur` | costas em 3/4, voltado para cima-direita da tela | `-y` |
-| `ul` | costas em 3/4, voltado para cima-esquerda da tela | `-x` |
+| `dr` | frente em 3/4, baixo-direita da tela | `+x` |
+| `dl` | frente em 3/4, baixo-esquerda da tela | `+y` |
+| `ur` | costas em 3/4, cima-direita da tela | `-y` |
+| `ul` | costas em 3/4, cima-esquerda da tela | `-x` |
 
-### Regra de autoria
+A regra padrão deste pacote é autorar as quatro direções. `flipPairs` só é permitido quando a entidade for realmente simétrica e a comparação no viewer comprovar que iluminação, volumes, arma, antena, mochila, lâmina, núcleo e marcas laterais continuam corretos.
 
-Para este pacote, a regra padrão é **autorizar e renderizar as quatro direções individualmente**. Não usar `flipPairs` por conveniência.
+Prospector, stalker e bomber devem usar quatro direções autoradas. Para os demais, qualquer flip precisa ser justificado no manifest.
 
-Flip horizontal só pode ser aceito quando:
+## 4. Isolamento, alpha e efeitos
 
-1. a entidade for realmente simétrica;
-2. arma, antena, mochila, núcleo, cicatriz, lâmina e emissivos não mudarem de lado de forma incorreta;
-3. a comparação lado a lado no sprite viewer não revelar quebra de volume ou iluminação;
-4. a decisão estiver documentada no manifest.
+Cada frame de entidade deve:
 
-O `player-prospector`, o `enemy-stalker`, o `enemy-spore-bomber` e qualquer criatura com arma ou detalhe lateral devem, por padrão, ter quatro direções autoradas.
+- usar fundo transparente real, sem checkerboard embutido;
+- usar exclusivamente alpha 0 ou 255;
+- não conter sombra elíptica de contato;
+- preservar ao menos 2 px de respiro nas bordas;
+- manter anchor estável;
+- evitar jitter involuntário;
+- não compartilhar pixels com frames vizinhos;
+- respeitar hitbox e footprint definidos no manifest.
 
-## 4. Isolamento e composição dos frames
+Fumaça, gases, nuvens, arcos, ácido em voo e partículas com alpha parcial devem ser assets separados `fx-*`, sincronizados por eventos autoritativos. Atlases de entidade permanecem binários. Fragmentos sólidos podem existir no frame de morte desde que mantenham alpha binário e não alterem colisão.
 
-Cada frame deve:
+Orçamento padrão de efeitos por ação: até 1 emissor principal e 24 partículas visíveis por entidade; o preset de qualidade pode reduzir esse teto.
 
-- ter fundo transparente real;
-- não conter checkerboard embutido;
-- não conter sombra elíptica de contato, pois ela pertence ao engine;
-- não compartilhar pixels com o frame vizinho;
-- preservar pelo menos 2 px lógicos de respiro em todas as bordas;
-- usar alpha binário, exceto partículas e gases nos níveis permitidos pela Art Bible;
-- manter o mesmo anchor de pés/base durante toda a animação;
-- evitar jitter involuntário do centro de massa;
-- separar hitbox e footprint da arte.
+## 5. Pipeline obrigatório
 
-Poeira, estilhaços, ácido, fumaça e fragmentos podem transbordar visualmente o footprint, mas não podem alterar a colisão lógica.
+1. Silhouette sheet em fundo claro e escuro.
+2. Turnaround neutro `dr`, `dl`, `ur`, `ul`.
+3. Voxel master ou representação volumétrica equivalente.
+4. Key poses de cada animação.
+5. Inbetweens derivados das key poses.
+6. Render em resolução de trabalho alta.
+7. Downsample nearest-neighbor para a resolução lógica.
+8. Quantização para a paleta aprovada.
+9. Normalização de alpha, anchor, canvas e limite de cores.
+10. Montagem do atlas e manifest.
+11. Validador verde.
+12. Teste no sprite viewer, desktop, mobile e PWA offline.
 
-## 5. Pipeline de produção obrigatório
-
-A produção deve seguir esta ordem por entidade:
-
-1. **Silhouette sheet** em fundo claro e escuro.
-2. **Turnaround neutro** com `dr`, `dl`, `ur`, `ul`.
-3. **Voxel master** ou representação volumétrica equivalente, com materiais e pontos assimétricos definidos.
-4. **Key poses** de cada animação.
-5. **Inbetweens derivados das key poses**, nunca frames independentes gerados sem continuidade.
-6. Renderização em resolução de trabalho alta.
-7. Downsample nearest-neighbor para a resolução lógica aprovada.
-8. Quantização para a paleta do Veio Fúngico.
-9. Normalização de alpha, anchor e canvas.
-10. Montagem do atlas e do manifest.
-11. `validate-sprites`/validador equivalente verde.
-12. Comparação no sprite viewer e em cena real.
-
-A fonte de verdade deve continuar sendo reproduzível. Não adicionar apenas um PNG opaco sem registrar origem, parâmetros e versão no manifest.
+A fonte de verdade deve ser reproduzível. Todo manifest registra ferramenta, prompt, seed/referência e versão.
 
 ## 6. Escala e resolução
 
-A Art Bible continua sendo a restrição principal. Os modelos podem ser produzidos em resolução alta, porém o export lógico deve preservar a relação com os tiles e a escala do mundo.
+Esta spec mantém os canvases canônicos da Art Bible:
 
-Baseline recomendado:
-
-| Entidade | Categoria lógica | Canvas inicial de export |
+| Entidade | Categoria | Canvas lógico |
 | --- | --- | --- |
 | `player-prospector` | humanoide | 24×32 |
-| `enemy-stalker` | criatura pequena/larga | 32×32 |
-| `enemy-spitter` | criatura pequena/média | 32×32 |
-| `enemy-bruiser` | criatura grande | 40×48 |
-| `enemy-spore-bomber` | criatura média | 32×40 |
-| `enemy-guardian` | chefe/grande | 48×56 ou 56×64 |
+| `enemy-stalker` | pequena | 24×24 |
+| `enemy-spitter` | pequena | 24×24 |
+| `enemy-spore-bomber` | pequena | 24×24 |
+| `enemy-bruiser` | grande | 40×48 |
+| `enemy-guardian` | grande | 40×48 |
 
-Esses valores são ponto de partida, não licença para cortar membros ou efeitos. Um aumento de canvas é permitido quando:
+Guardian e bruiser devem se diferenciar por ocupação, massa, proporção e silhueta dentro do mesmo canvas grande. Alterar esses tamanhos exige primeiro versionar a Art Bible e, na mesma entrega, atualizar viewer, manifests, validador, escala em cena e testes de regressão.
 
-- o footprint lógico permanece inalterado;
-- o personagem continua coerente com a escala do cenário;
-- o sprite viewer comprova ganho real de legibilidade;
-- os testes de anchor, borda e atlas são atualizados.
+Limites de ocupação:
 
-Não ampliar todos indiscriminadamente. O guardian deve parecer enorme por massa e silhueta, não apenas por aplicar `scale()` no mesmo desenho.
+- pelo menos 2 px livres em cada borda;
+- humanoide ocupa aproximadamente 16×24 px;
+- pequenas não podem exceder a leitura de um tile lógico;
+- grandes podem transbordar visualmente o tile, mas usam footprint explícito e escala de desenho 1:1.
 
-## 7. Contrato mínimo de animações
+## 7. Paleta e limite de cores
 
-Todos os personagens vivos devem possuir:
+Usar apenas a paleta mestra `veio-fungico.v01`. Esta entrega não adiciona púrpura ou magenta.
+
+Mapeamento aprovado:
+
+- carapaça do stalker: `blood`, `rust`, `rockShadow` e `rock`;
+- núcleos minerais de bruiser/guardian: `electric` ou `biolum` sobre `rockShadow`/`rock`;
+- bomber: `fungusDark`, `rockShadow`, `fire`, `blood` e `biolum`;
+- ácido: apenas `acid` nos pontos de perigo imediato.
+
+Cada atlas de entidade pode usar no máximo 16 cores RGB distintas. Transparente não conta. Outline, sombras internas e highlights contam. O validador deve verificar o limite por sprite/atlas e também por frame, evitando que um atlas passe usando toda a paleta mestra.
+
+Qualquer nova paleta exige `veio-fungico.v02`, atualização da Art Bible, `ALLOWED_HEX`, manifests e testes no mesmo PR.
+
+## 8. Contrato de animações
+
+### 8.1 Entidades vivas
 
 | Animação | Frames | FPS | Loop |
 | --- | ---: | ---: | --- |
@@ -125,335 +126,379 @@ Todos os personagens vivos devem possuir:
 | `hit` | 2 | 12 | não |
 | `die` | 5 | 10 | não |
 
-Animações adicionais devem representar comportamento real da simulação, não decoração desconectada.
+### 8.2 Prospector em co-op
 
-### Continuidade
+| Animação | Frames | FPS | Loop |
+| --- | ---: | ---: | --- |
+| `downed` | 4 | 6 | sim |
+| `revive` | 6 | 8 | não |
 
-- `idle → walk` e `walk → idle` não podem produzir teleport visual.
-- O primeiro frame de `attack` deve partir da pose-base ou de uma antecipação curta.
-- O frame de impacto precisa ser visualmente identificável.
-- `die` nunca volta para `idle` e termina em pose estável ou frame vazio apenas quando a entidade é removida imediatamente após a animação.
-- Efeitos de morte devem permanecer orientados de acordo com a direção inicial, sem girar o personagem para uma direção genérica.
+Estados distintos:
 
-## 8. Direção individual por personagem
+- `downed`: player continua `alive === true`, não age e aguarda revive/bleedout;
+- `revive`: começa no evento autoritativo de revive e interrompe imediatamente `downed`;
+- `die`: apenas morte terminal (`alive === false`), após bleedout ou quando não existe aliado de pé.
 
-### 8.1 `player-prospector` — explorador mecânico do Veio
+Prioridade visual:
 
-Inspiração funcional da primeira referência: pequeno robô explorador, cabeça arredondada, visor luminoso, membros mecânicos finos, aro/ferramenta circular e morte por desmontagem.
+1. tombstone de morte terminal;
+2. `revive` até concluir;
+3. `downed` enquanto `playerExtras.downed`;
+4. `hit`;
+5. `attack`/`special`;
+6. `walk`;
+7. `idle`.
 
-Design Voxelyn:
+`revive` pode voltar a `idle`/`walk` ao terminar. `die` nunca volta. A morte terminal é apresentada por tombstone visual mesmo após a entidade sair do estado autoritativo.
 
-- capacete de mineração branco-pálido/metal envelhecido;
-- visor bioluminescente frio em ciano;
-- pequena antena ou lâmpada superior;
-- tanque ou módulo fúngico nas costas;
-- aro industrial amarelo-óxido na cintura, reinterpretado como ferramenta modular de mineração/defesa;
-- pernas articuladas finas, claramente distintas das criaturas orgânicas.
+## 9. Intenção autoritativa de animação
 
-Animações e comportamento:
+A implementação deve introduzir um evento semântico versionado de início de ação:
 
-- `walk`: passada mecânica, compressão leve dos joelhos e balanço controlado do módulo dorsal;
-- `attack`: o aro/ferramenta se desloca ou gira, com arco emissivo curto e frame de impacto claro;
-- `hit`: visor pisca e o torso recua sem perder o anchor;
-- `die`: desmontagem progressiva em peças, faíscas e fumaça; não simplesmente afundar no chão;
-- futuro `dodge`: deslocamento curto com inclinação do corpo;
-- futuro `ability`: pulso radial de energia do módulo central.
+```ts
+type ActionKind = 'attack' | 'special' | 'detonate';
 
-Assimetria obrigatória: ferramenta, tanque e lâmpada devem manter o lado correto em todas as direções.
-
-### 8.2 `enemy-stalker` — predador quitinoso de lâmina
-
-Inspiração funcional da segunda referência: criatura vermelha agachada, corrida predatória, membro cortante dourado e golpes largos.
-
-Design Voxelyn:
-
-- carapaça quitinosa em vermelho de dano, magenta escuro e tons minerais;
-- silhueta inclinada para frente, pernas traseiras prontas para arrancada;
-- um membro anterior transformado em lâmina mineral/fúngica de alto contraste;
-- cabeça baixa, olhos ou fendas emissivas pequenas;
-- leitura de assassino rápido, não de tanque.
-
-Animações e comportamento:
-
-- `walk`: corrida baixa com centro de massa avançado;
-- `attack`: antecipação curta seguida de corte em arco; o efeito não pode esconder o corpo inteiro;
-- `hit`: perda rápida de equilíbrio;
-- `die`: colapso segmentado da carapaça, com membros cedendo antes do torso;
-- `special` opcional: `lunge` de 6 frames quando houver evento correspondente na simulação.
-
-A lâmina deve permanecer no mesmo lado anatômico nas quatro direções. Portanto, não usar flip por padrão.
-
-### 8.3 `enemy-spitter` — anfíbio fúngico corrosivo
-
-Inspiração funcional da terceira referência: criatura verde esguia, olhos salientes, boca expressiva, ataque de cuspe e morte por liquefação.
-
-Design Voxelyn:
-
-- corpo fungo-anfíbio alongado;
-- olhos ou bolsas sensoriais bulbosas;
-- boca larga e bolsa de ácido visível;
-- braços longos e mãos/pés aderentes;
-- verde fúngico como base, reservando `acid` para saliva, bolsa inflada e impacto.
-
-Animações e comportamento:
-
-- `walk`: passada irregular, braços atrasando o movimento;
-- `attack`: bolsa da garganta infla, cabeça recua, cuspe é liberado no frame de impacto e há recuperação curta;
-- `hit`: perda momentânea de pressão da bolsa;
-- `die`: corpo desaba e se dissolve em poça corrosiva/fúngica, com redução de volume coerente;
-- `special`: pode reutilizar a sequência de cuspida quando a sim distinguir windup e release.
-
-Não transformar o corpo inteiro em verde neon. A cor ácida deve indicar ataque e perigo imediato.
-
-### 8.4 `enemy-bruiser` — geodo de impacto
-
-Inspiração funcional da quarta referência: golem compacto de rocha e cristal, ataques pesados/rotacionais e morte por desmoronamento.
-
-Design Voxelyn:
-
-- massa mineral baixa e larga;
-- placas de rocha sobre um núcleo púrpura emissivo;
-- braços ou ombros grandes para comunicar impacto;
-- peso visual concentrado próximo ao chão;
-- cristais e fissuras assimétricos para impedir leitura de “bola de pedra genérica”.
-
-Animações e comportamento:
-
-- `walk`: passos curtos, corpo atrasado pelo peso, pequenas lascas no contato;
-- `attack`: golpe de ombro ou braço com antecipação e follow-through pesado;
-- `hit`: fissura/núcleo pisca, com recuo mínimo pela massa;
-- `die`: placas cedem em etapas, núcleo apaga e o corpo termina como pilha de entulho;
-- `special`: ground slam ou giro de impacto somente quando conectado à ação real da criatura.
-
-### 8.5 `enemy-spore-bomber` — portador de esporos instáveis
-
-Inspiração funcional da quinta referência: figura encapuzada com único olho luminoso, orbe explosivo, lançamento e morte em nuvem púrpura.
-
-Design Voxelyn:
-
-- corpo coberto por manto fúngico ou placas que lembram um capuz;
-- um olho/núcleo emissivo central;
-- saco de esporos ou cápsula perfurada carregada junto ao corpo;
-- partículas discretas em idle, aumentando apenas durante o windup;
-- silhueta compacta e instável, diferente do spitter esguio.
-
-Animações e comportamento:
-
-- `walk`: passos curtos, carga oscilando com atraso;
-- `attack`: preparação e arremesso de orbe quando houver ataque à distância;
-- `hit`: vazamento curto de esporos;
-- `die`: expansão, explosão controlada em nuvem e assentamento em restos/pó;
-- `special`: inflar/armar explosão em 4–6 frames, com telegraph inequívoco.
-
-O emissivo laranja/vermelho deve marcar a iminência da explosão; o púrpura permanece identidade mineral/fúngica.
-
-### 8.6 `enemy-guardian` — titã mineral do Veio
-
-Inspiração funcional da sexta referência: gigante simiesco, braços de pedra enormes, postura de esmagamento, golpes no chão, escavação e morte como montanha de entulho.
-
-Design Voxelyn:
-
-- maior massa do elenco;
-- torso escuro e compacto;
-- antebraços/mãos de rocha clara desproporcionalmente grandes;
-- máscara, crista ou placa frontal pálida;
-- núcleo violeta protegido no peito;
-- postura de guardião territorial, não apenas bruiser ampliado.
-
-Animações e comportamento:
-
-- `walk`: passada pesada, possível apoio dos punhos, deslocamento mínimo do anchor;
-- `attack`: esmagamento vertical ou varrida de braço com telegraph longo;
-- `hit`: fragmentos pequenos, núcleo pisca, corpo quase não recua;
-- `die`: joelhos cedem, braços sustentam a massa por um instante e o corpo desmorona em formação rochosa persistente;
-- `special`: ground slam, invocação mineral ou mergulho no solo, conforme a ação real disponível na simulação.
-
-O guardian deve continuar identificável em silhueta sem partículas, emissivos ou cor.
-
-## 9. Atlas e manifests
-
-Estrutura esperada:
-
-```text
-packages/voxelyn-survival-content/assets/
-  concepts/
-    player-prospector/
-    enemy-stalker/
-    enemy-spitter/
-    enemy-bruiser/
-    enemy-spore-bomber/
-    enemy-guardian/
-  atlases/
-    player-prospector.v02.png
-    player-prospector.v02.json
-    ...
+type ActionStartEvent = {
+  t: 'action_start';
+  entity: number;
+  archetype: string;
+  action: ActionKind;
+  x: number;
+  y: number;
+  facingX: number;
+  facingY: number;
+  startTick: number;
+  releaseTick: number;
+  endTick: number;
+};
 ```
 
-Nome de frame conceitual:
+O estado ativo também deve viajar em `EntitySnapshot` para late join/full resync:
 
-```text
-<entity-id>/<anim>/<dir>/<frame>
+```ts
+type EntityActionSnapshot = {
+  kind: ActionKind;
+  startTick: number;
+  releaseTick: number;
+  endTick: number;
+  facingX: number;
+  facingY: number;
+};
 ```
 
-Exemplo:
+Regras:
 
-```text
-enemy-stalker/attack/ul/002
+- o cliente não infere ataques por proximidade;
+- o evento identifica exatamente a entidade e a direção;
+- ataques inimigos com antecipação começam antes do dano/projétil;
+- `shot` passa a carregar `owner` para rastreabilidade;
+- dano de contato é aplicado no `releaseTick`, se o alvo ainda estiver no alcance;
+- o renderer converte `(serverTick - startTick)` em progresso da animação;
+- no solo, usa-se o mesmo evento e o mesmo estado; não existem dois contratos visuais.
+
+## 10. Windup autoritativo do bomber
+
+O bomber não detona mais instantaneamente ao entrar no raio. A simulação deve possuir ação `detonate`:
+
+- começa ao atingir o raio de ativação;
+- emite `action_start` com entidade, facing e ticks;
+- dura pelo menos 10 ticks a 20 Hz;
+- durante o windup, o bomber para ou desacelera de forma determinística;
+- a explosão e a morte ocorrem no `releaseTick`;
+- se morrer por dano antes do release, mantém a regra atual de detonar ao morrer, mas emite morte/tombstone e FX coerentes;
+- o estado viaja em snapshots e full resync;
+- testes cobrem início, não detonação antecipada, release, morte durante windup e reconexão no meio do telegraph.
+
+## 11. Tombstones de morte
+
+O cliente mantém tombstones visuais independentes do array autoritativo:
+
+```ts
+type VisualTombstone = {
+  entity: number;
+  archetype: string;
+  x: number;
+  y: number;
+  facingX: number;
+  facingY: number;
+  elite: boolean;
+  startedAtTick: number;
+  expiresAtTick: number;
+};
 ```
 
-Os manifests devem registrar:
+O evento `death` deve incluir facing, elite e tick. Ao recebê-lo, o renderer cria/atualiza o tombstone antes de a entidade ser removida. O tombstone:
 
-- versão incrementada;
-- quatro direções;
-- `authoredDirs` reais;
-- `flipPairs` vazio quando não houver espelhamento;
-- dimensões e anchor;
-- hitbox e footprint preservados;
-- animações, FPS e loop;
-- paleta;
-- ferramenta/origem da geração;
-- prompt e referência interna suficientes para reprodução;
-- hash ou seed quando aplicável.
+- desenha `die` até o último frame;
+- preserva posição e direção;
+- não possui hitbox, HP ou interação;
+- expira após a duração do manifest;
+- funciona em solo e online;
+- não duplica ao receber evento repetido/reconectar;
+- sobrevive à remoção do inimigo no snapshot seguinte.
 
-## 10. Integração no jogo
+Players mortos também usam tombstone. Players abatidos não.
 
-### 10.1 Remover fallback progressivamente
+## 12. Direção individual por personagem
 
-- Não apagar o fallback antes de cada atlas novo carregar e renderizar corretamente.
-- A substituição deve ser por entidade e coberta por teste.
-- Ao final do pacote, os seis personagens não podem depender do fallback vetorial em condições normais.
-- O fallback permanece como safety net para falha de carregamento, com log explícito e telemetria em desenvolvimento.
+### `player-prospector`
 
-### 10.2 Estados de animação
+Pequeno explorador mecânico: capacete pálido, visor `biolum`, lâmpada/antena, módulo fúngico dorsal, aro industrial `loot`/`rust`, pernas articuladas.
 
-O cliente já resolve direção e frames pelo manifest. A integração deve garantir:
+- `walk`: passada mecânica e balanço dorsal;
+- `attack`: ferramenta/aro se desloca com impacto curto;
+- `hit`: visor pisca e torso recua;
+- `downed`: ajoelha/desmonta parcialmente, mas mantém núcleo funcional;
+- `revive`: remonta e reacende o visor;
+- `die`: desmontagem progressiva em peças sólidas; fumaça/faíscas em `fx-*` separado.
 
-- `idle` quando a velocidade estiver abaixo do threshold;
-- `walk` durante deslocamento;
-- `attack` disparado pelo evento/estado real de ataque, sem inferência frágil baseada apenas em proximidade;
-- `hit` ao receber dano, com prioridade curta sobre `idle`/`walk`;
-- `die` ao atingir zero HP, sem interrupção por outro estado;
-- `special` quando a simulação expuser o comportamento correspondente.
+Ferramenta, tanque e lâmpada mantêm o lado anatômico nas quatro direções.
 
-A simulação continua autoritativa. A camada visual pode guardar timestamps/animation intent, mas não pode alterar dano, cooldown, colisão ou determinismo.
+### `enemy-stalker`
 
-No online, qualquer dado novo necessário para distinguir `attack`, `hit`, `die` ou `special` deve entrar no protocolo de maneira versionada e testada. Não criar animação falsa exclusiva do cliente que contradiga o servidor.
+Predador quitinoso baixo, vermelho mineral, centro de massa avançado e uma lâmina lateral `loot`/`fire`.
 
-## 11. Validação automatizada
+- corrida baixa;
+- `attack` com antecipação e corte em arco separado `fx-*` quando necessário;
+- `hit` perde equilíbrio;
+- `die` colapsa por segmentos.
 
-Além das validações já existentes, adicionar ou confirmar testes para:
+A lâmina impede uso de flip.
 
-- todas as seis entidades presentes no índice de atlases;
-- quatro direções resolvíveis por animação;
+### `enemy-spitter`
+
+Anfíbio fúngico esguio, olhos bulbosos, boca larga e bolsa de ácido.
+
+- caminhada irregular;
+- `attack` infla a garganta antes do `releaseTick`;
+- `hit` perde pressão;
+- `die` desaba em massa/poça sólida; spray e gás ficam em `fx-*`.
+
+O corpo não pode ser neon; `acid` marca apenas bolsa, saliva e impacto.
+
+### `enemy-bruiser`
+
+Geodo compacto, baixo e largo, placas `rock`/`bone`, núcleo `electric`, braços pesados.
+
+- passos curtos e pesados;
+- golpe de ombro/punho com follow-through;
+- pouco recuo em `hit`;
+- morte por desmoronamento em entulho.
+
+### `enemy-spore-bomber`
+
+Portador compacto com capuz fúngico, olho emissivo e cápsula perfurada.
+
+- carga oscila ao caminhar;
+- `special`/`detonate` expande a silhueta e muda emissivos de `biolum` para `fire`/`blood`;
+- `die` termina em restos sólidos; nuvem usa `fx-*` separado.
+
+O telegraph depende do windup autoritativo da seção 10.
+
+### `enemy-guardian`
+
+Titã mineral, torso escuro, antebraços claros enormes, máscara pálida e núcleo `electric`.
+
+- passada pesada e apoio dos punhos;
+- esmagamento/varrida com telegraph longo;
+- quase não recua em `hit`;
+- morre cedendo joelhos, apoiando os braços e virando formação de entulho.
+
+Deve continuar distinguível do bruiser sem cor ou emissivos.
+
+## 13. Manifest, footprint e nomes estáveis
+
+Os arquivos carregáveis mantêm nomes estáveis:
+
+```text
+assets/atlases/player-prospector.png
+assets/atlases/player-prospector.json
+```
+
+A versão vive em `manifest.version`. Não usar `.v02` no filename nesta entrega. Isso preserva gerador, imports estáticos do Vite, viewer e precache. O versionamento do arquivo físico só poderá ser adotado junto de uma migração completa para índice dinâmico/aliases.
+
+Contrato de footprint:
+
+```ts
+type SpriteFootprint = {
+  w: number;       // largura em tiles lógicos
+  h: number;       // altura em tiles lógicos
+  offsetX: number; // deslocamento do centro em tiles de mundo
+  offsetY: number;
+};
+```
+
+- origem padrão: centro do tile sob o anchor;
+- `offsetX = 0` e `offsetY = 0` para entidades centradas;
+- pequenas e player usam inicialmente `{w: 1, h: 1, offsetX: 0, offsetY: 0}`;
+- bruiser/guardian podem usar footprint maior, definido explicitamente conforme colisão existente;
+- hitbox continua independente;
+- gerador, tipo TS, manifests, validador e overlay do viewer devem aceitar e exibir o campo;
+- manifests antigos sem footprint recebem fallback compatível `{w: 1, h: 1, offsetX: 0, offsetY: 0}` durante uma versão de transição.
+
+Os manifests também registram quatro direções, `authoredDirs`, `flipPairs`, dimensões, anchor, hitbox, animações, paleta, até 16 cores, ferramenta, prompt e seed/referência.
+
+## 14. Integração no jogo
+
+- Adicionar os seis atlases ao `SpriteBank` e ao índice.
+- Manter fallback apenas como safety net de carregamento, com aviso único em desenvolvimento.
+- Ao fim do pacote, nenhuma das seis entidades usa fallback no fluxo normal.
+- `idle` e `walk` derivam de movimento somente quando não existe estado de prioridade maior.
+- `attack`, `special`, `detonate`, `downed`, `revive` e `die` dependem do contrato autoritativo.
+- A camada visual não altera dano, cooldown, colisão ou determinismo.
+- Full resync carrega ação ativa; eventos seguintes mantêm a linha do tempo.
+
+## 15. Validação automatizada
+
+Adicionar ou confirmar testes para:
+
+- seis entidades no índice e no `SpriteBank`;
+- quatro direções resolvíveis;
 - contagem canônica de frames;
+- `downed`/`revive` no prospector;
 - nenhum frame obrigatório vazio;
-- alpha válido;
-- cores pertencentes à paleta declarada;
-- conteúdo sem tocar as bordas;
-- anchor constante e dentro do canvas;
-- `flipPairs` não apontando para direção ausente;
-- versão incrementada quando o PNG mudar;
-- fallback usado apenas quando o asset falhar;
-- estado `die` não reiniciando ou voltando para `idle`;
-- direção visual estável durante ataque e morte;
-- ausência de jitter excessivo entre frames consecutivos.
+- alpha binário em entidade;
+- cores dentro da paleta e no máximo 16 por atlas e frame;
+- 2 px de borda livre;
+- anchor dentro do canvas;
+- footprint válido e fallback de compatibilidade;
+- `flipPairs` válidos;
+- versão incrementada quando PNG mudar;
+- largura/altura e bytes dentro do orçamento;
+- action state em sim, snapshots e full resync;
+- ataque aplicado no `releaseTick`;
+- windup do bomber;
+- tombstone após remoção;
+- `downed → revive → idle/walk`;
+- bleedout `downed → die`;
+- direção estável em ataque e morte;
+- jitter de bounding box relativo ao anchor.
 
-O teste de jitter pode medir a bounding box do conteúdo relativo ao anchor e falhar apenas para deslocamentos incompatíveis com a animação declarada, tolerando lunge, salto, fragmentos e dissolução.
+Outline e sombras internas entram na contagem de 16 cores. Transparência não.
 
-## 12. Validação visual obrigatória
+## 16. Validação visual
 
-Capturar e anexar ao PR:
+Capturar no PR:
 
-1. silhouette sheet de cada entidade em fundo claro;
-2. silhouette sheet de cada entidade em fundo escuro;
-3. turnaround com quatro direções;
-4. sprite viewer exibindo `idle`, `walk`, `attack`, `hit` e `die`;
-5. cena desktop;
-6. cena mobile landscape em 844×390;
-7. comparação antes/depois;
-8. quadro com as seis entidades lado a lado na escala real do jogo.
+1. silhouette sheet clara e escura;
+2. turnaround das quatro direções;
+3. viewer com todas as animações;
+4. `downed`, `revive` e morte terminal do prospector;
+5. telegraph e release do bomber;
+6. tombstone após desaparecimento do snapshot;
+7. cena desktop;
+8. cena mobile 844×390;
+9. quadro das seis entidades na escala real;
+10. comparação antes/depois.
 
-Critérios de aprovação:
+Critérios:
 
-- identificação de cada arquétipo em menos de 200 ms;
-- diferença clara entre stalker e spitter;
-- diferença clara entre bruiser e guardian;
-- perigo do bomber legível antes da explosão;
-- visor do prospector visível sem competir com projéteis;
-- nenhuma animação some sob partículas próprias;
-- nenhuma direção parece pertencer a outro modelo;
-- nenhuma morte parece apenas `scaleY → 0` ou recorte vertical genérico.
+- arquétipo identificável em menos de 200 ms;
+- stalker diferente de spitter;
+- bruiser diferente de guardian;
+- bomber legível antes da explosão;
+- nenhuma direção parece outro modelo;
+- nenhum efeito esconde a ação;
+- nenhuma morte é apenas `scaleY → 0` ou recorte vertical genérico.
 
-## 13. Estratégia de entrega
+## 17. PWA/offline reproduzível
 
-Produzir em slices, sem sacrificar fidelidade:
+A validação obrigatória inclui:
 
-### Slice A — fundação e personagem
+1. build de produção do cliente;
+2. inspeção do service worker gerado, confirmando que todos os PNG/JSON usados pelo `SpriteBank` aparecem em `self.__VOXELYN_PRECACHE__` ou no manifest de precache equivalente;
+3. primeira instalação online;
+4. fechamento da aba;
+5. bloqueio de rede;
+6. reload offline;
+7. início de run solo e abertura do sprite viewer sem requests falhos de atlas.
 
-- pipeline de voxel master/render/downsample;
-- `player-prospector` completo;
-- validação do fluxo no sprite viewer e em mobile.
+Adicionar teste de build que falha quando um asset importado pelo jogo não estiver no precache. Atlases não podem depender de URL externa.
 
-### Slice B — inimigos pequenos
+## 18. Orçamentos mensuráveis
 
-- `enemy-stalker` completo;
-- `enemy-spitter` completo;
-- integração de ataques e mortes específicas.
+Por atlas de entidade:
 
-### Slice C — inimigos pesados
+- largura máxima: 4096 px;
+- altura máxima: canvas canônico da entidade;
+- PNG máximo: 512 KiB;
+- memória RGBA decodificada: máximo 8 MiB.
 
-- `enemy-bruiser` completo;
-- `enemy-spore-bomber` completo;
-- telegraphs de slam/explosão.
+Pacote dos seis:
+
+- PNG transferido total: máximo 2,5 MiB;
+- memória RGBA total: máximo 24 MiB;
+- no máximo 6 requests de PNG e 6 manifests, salvo bundling mais eficiente;
+- carregamento frio dos atlases: p95 ≤ 1,5 s em perfil Slow 4G do browser;
+- frame de render em 844×390: p95 ≤ 16,7 ms e nenhum frame > 50 ms durante 60 s de combate;
+- sem aumento superior a 10% no tempo de build do pacote de conteúdo.
+
+Se um atlas exceder largura, o packer deve criar múltiplas linhas/páginas e o manifest deve mapear `sx`/`sy`; não reduzir frames nem aumentar canvas silenciosamente. Se exceder bytes/memória, simplificar frames, paleta ou efeitos antes do merge. Os números devem constar no PR.
+
+## 19. Estratégia de entrega
+
+### Slice A — contrato e prospector
+
+- corrigir spec;
+- footprint;
+- action state/evento;
+- tombstones;
+- `player-prospector` com quatro direções, `downed` e `revive`;
+- viewer e testes.
+
+### Slice B — pequenos
+
+- stalker e spitter completos;
+- ataques autoritativos e projéteis identificados por owner.
+
+### Slice C — pesados
+
+- bruiser e bomber;
+- windup autoritativo do bomber;
+- FX separados.
 
 ### Slice D — guardian e fechamento
 
-- `enemy-guardian` completo;
-- remoção do fallback normal para os seis personagens;
-- quadro de escala final;
-- regressão visual e de performance.
+- guardian completo;
+- fallback apenas de erro;
+- PWA/offline;
+- performance e evidências.
 
-Cada slice deve ser um PR revisável. Não abrir seis PRs simultâneos com pipelines divergentes.
+Os slices podem ser commits separados no mesmo PR desta execução. Cada slice deve terminar verde antes do próximo.
 
-## 14. Performance e carregamento
+## 20. Fora de escopo
 
-- Preferir um atlas por entidade ou agrupamento coerente, evitando dezenas de requests pequenos.
-- Não aumentar memória de textura sem medir.
-- Registrar dimensões finais e bytes por atlas no PR.
-- Carregamento deve continuar compatível com PWA/offline.
-- Falha de um atlas não deve impedir o restante do jogo de iniciar.
-- Não introduzir filtragem bilinear; manter `imageSmoothingEnabled = false`.
-- Não criar modelos voxel 3D completos em runtime apenas para obter sprites, salvo decisão arquitetural separada e medida.
+- copiar as referências;
+- migrar o jogo para 3D em runtime;
+- trocar câmera;
+- alterar balanceamento além do timing estritamente necessário ao windup autoritativo;
+- props e tiles;
+- novas paletas nesta entrega;
+- animações cosméticas antes das obrigatórias;
+- alpha parcial dentro de atlas de entidade;
+- filenames versionados sem migração completa;
+- spritesheets finais gerados por IA sem pipeline e validação.
 
-## 15. Fora de escopo
+## 21. Definition of Done
 
-- copiar ou redesenhar fielmente os personagens das referências;
-- trocar a câmera isométrica;
-- migrar o jogo inteiro para renderização 3D;
-- alterar balanceamento de HP, dano, velocidade ou spawn;
-- produzir props e tiles neste mesmo pacote;
-- adicionar dezenas de animações cosméticas antes de concluir as obrigatórias;
-- remover o fallback antes da validação dos novos atlases;
-- gerar spritesheets finais diretamente por IA sem turnaround, key poses, normalização e validação.
+- seis entidades com design voxel autoral;
+- quatro direções consistentes;
+- `idle`, `walk`, `attack`, `hit`, `die` em todas;
+- `downed` e `revive` no prospector;
+- bomber com windup autoritativo;
+- action state em solo, snapshot e full resync;
+- tombstones de morte funcionando;
+- manifests estáveis, footprint e limite de 16 cores;
+- atlases reproduzíveis e validados;
+- nenhum fallback no fluxo normal;
+- desktop, mobile e PWA offline funcionando;
+- orçamentos cumpridos;
+- testes/builds verdes;
+- evidência visual e comparação antes/depois.
 
-## 16. Definition of Done
+## 22. Instrução de execução para o agente
 
-A tarefa estará concluída quando:
-
-- as seis entidades tiverem design voxel autoral e silhueta própria;
-- cada uma possuir quatro direções isométricas consistentes;
-- `idle`, `walk`, `attack`, `hit` e `die` estiverem presentes e integradas;
-- os especiais necessários estiverem produzidos ou explicitamente faseados conforme a simulação;
-- todos os atlases e manifests forem reproduzíveis e validados;
-- o jogo usar os novos assets em desktop, mobile e PWA;
-- o fallback não for utilizado no fluxo normal para nenhuma das seis entidades;
-- os testes, builds e validadores do monorepo estiverem verdes nas áreas tocadas;
-- o PR apresentar evidência visual completa e comparação antes/depois;
-- uma revisão final verificar Art Bible, legibilidade, direção, anchor, performance e consistência entre frames.
-
-## 17. Instrução de execução para o agente
-
-Antes de implementar, leia integralmente:
+Ler integralmente:
 
 - `docs/art/voxelyn-survival-art-bible.md`;
 - `docs/art/2026-07-24-phase3-first-pack-notes.md`;
@@ -461,17 +506,19 @@ Antes de implementar, leia integralmente:
 - `packages/voxelyn-survival-content/tools/entities.mjs`;
 - `packages/voxelyn-survival-content/tools/validate.mjs`;
 - `packages/voxelyn-survival-content/src/manifest.ts`;
-- o sprite viewer e a integração do `SpriteBank` no cliente;
-- o fallback voxel atual em `packages/voxelyn-survival/src/client/voxel-fallback.ts`.
+- sprite viewer, `SpriteBank`, renderer e fallback voxel;
+- simulação de entidades/downed/revive;
+- protocolo, room snapshots e cliente de rede;
+- service worker/build PWA.
 
-Não trate os sprites atuais como direção final. Eles são baseline técnico e safety net. Preserve o que já funciona no contrato, mas redesenhe o conteúdo visual e as animações com a qualidade descrita nesta spec.
+Não tratar os sprites atuais como direção final. Preservar contratos válidos, corrigir os pontos incompatíveis descritos nesta spec e executar os slices em ordem.
 
-Ao finalizar cada slice:
+Ao terminar cada slice:
 
-1. rode os testes e builds relevantes;
-2. gere os atlases de forma reproduzível;
-3. rode o validador;
-4. capture as evidências visuais;
-5. documente decisões de direção, escala, flips e assimetrias;
-6. peça revisão focada em arte, integração, regressão e performance;
-7. corrija os achados antes de avançar para o slice seguinte.
+1. gerar os atlases de forma reproduzível;
+2. rodar validador, testes e builds relevantes;
+3. capturar evidências;
+4. registrar dimensões, bytes, memória e performance;
+5. revisar direção, anchor, footprint, protocolo, PWA e regressões;
+6. chamar `@codex` no PR;
+7. corrigir os achados antes de avançar.

@@ -1,6 +1,6 @@
 {
   "id": "player-prospector",
-  "version": 1,
+  "version": 2,
   "atlas": "player-prospector.png",
   "frameWidth": 24,
   "frameHeight": 32,
@@ -9,15 +9,20 @@
   "directions": 4,
   "authoredDirs": [
     "dr",
-    "ur"
+    "dl",
+    "ur",
+    "ul"
   ],
-  "flipPairs": {
-    "dl": "dr",
-    "ul": "ur"
-  },
+  "flipPairs": {},
   "hitbox": {
     "w": 0.68,
     "h": 1
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
@@ -28,8 +33,11 @@
     "#46566e",
     "#59f2c2",
     "#66c28a",
+    "#6e4a33",
+    "#7ab8ff",
     "#b8a98f",
-    "#e8f1ff"
+    "#e8f1ff",
+    "#ffd166"
   ],
   "animations": {
     "idle": {
@@ -38,7 +46,7 @@
       "loop": true
     },
     "walk": {
-      "frames": 4,
+      "frames": 6,
       "fps": 10,
       "loop": true
     },
@@ -53,7 +61,17 @@
       "loop": false
     },
     "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    },
+    "downed": {
       "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "revive": {
+      "frames": 6,
       "fps": 8,
       "loop": false
     }
@@ -62,21 +80,43 @@
     "dr": {
       "idle": 0,
       "walk": 4,
-      "attack": 8,
-      "hit": 12,
-      "die": 14
+      "attack": 10,
+      "hit": 14,
+      "downed": 16,
+      "revive": 20,
+      "die": 26
+    },
+    "dl": {
+      "idle": 31,
+      "walk": 35,
+      "attack": 41,
+      "hit": 45,
+      "downed": 47,
+      "revive": 51,
+      "die": 57
     },
     "ur": {
-      "idle": 18,
-      "walk": 22,
-      "attack": 26,
-      "hit": 30,
-      "die": 32
+      "idle": 62,
+      "walk": 66,
+      "attack": 72,
+      "hit": 76,
+      "downed": 78,
+      "revive": 82,
+      "die": 88
+    },
+    "ul": {
+      "idle": 93,
+      "walk": 97,
+      "attack": 103,
+      "hit": 107,
+      "downed": 109,
+      "revive": 113,
+      "die": 119
     }
   },
   "generation": {
-    "tool": "procedural (tools/entities.mjs)",
-    "prompt": "isolated underground prospector, helmet lamp biolum accent, back bio-tank, iso 2:1, restricted palette",
-    "seedOrRef": "deterministic-code-v1"
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric underground prospector, pale mining helmet, cyan visor, asymmetric tool ring and fungal back module",
+    "seedOrRef": "deterministic-code-v2"
   }
 }

@@ -6,14 +6,31 @@ export type RunConfig = {
   seed: number;
   width?: number;
   height?: number;
-  playerCount?: number; // 1 (solo, padrao) ou 2 (co-op)
+  playerCount?: number;
 };
 
 export type RunPhase = 'running' | 'choice' | 'dead' | 'extracted' | 'extracted_with_core';
-
 export type EnemyArchetype = 'stalker' | 'bruiser' | 'spitter' | 'bomber' | 'guardian';
-
 export type ModifierId = 'piercing' | 'conductive' | 'explosive' | 'siphon';
+
+export type EntityActionKind =
+  | 'player_shot'
+  | 'ranged'
+  | 'contact'
+  | 'charge'
+  | 'detonate'
+  | 'slam'
+  | 'pulse';
+export type EntityActionPhase = 'windup' | 'release' | 'recovery';
+export type EntityAction = {
+  kind: EntityActionKind;
+  phase: EntityActionPhase;
+  startedAt: number;
+  releaseAt: number;
+  endsAt: number;
+  direction: Vec2;
+  target?: number;
+};
 
 export type Entity = {
   id: number;
@@ -28,13 +45,13 @@ export type Entity = {
   radius: number;
   alive: boolean;
   elite: boolean;
-  // temporizadores em ticks absolutos
   nextActionAt: number;
   contactReadyAt: number;
   rangedReadyAt: number;
   stunnedUntil: number;
   facing: Vec2;
-  slot?: number; // players: indice em playerExtras
+  action?: EntityAction;
+  slot?: number;
 };
 
 export type PlayerExtra = {
@@ -50,14 +67,8 @@ export type PlayerExtra = {
   modifiers: ModifierId[];
   hasCore: boolean;
   dodgeDir: Vec2;
-  downed: boolean; // co-op: abatido, aguardando revive
-  bleedoutAt: number; // tick em que o abatido morre se nao revivido
-  /**
-   * Slot efetivamente ocupado por um jogador. Slots reservados mas ainda nao
-   * reivindicados (co-op online aguardando o parceiro) ficam `false`: nao sao
-   * alvo, nao sofrem dano/perigos, nao contam para co-op nem para a extracao
-   * coletiva, e nao aparecem nos snapshots. Solo/local nasce sempre `true`.
-   */
+  downed: boolean;
+  bleedoutAt: number;
   joined: boolean;
 };
 
@@ -72,34 +83,23 @@ export type Projectile = {
   piercing: boolean;
   conductive: boolean;
   explosive: boolean;
-  hostile: boolean; // true = do inimigo
+  hostile: boolean;
   leavesBiofluid: boolean;
   ttl: number;
-  /**
-   * Ids ja atingidos por ESTE projetil. So importa para bolts perfurantes: eles
-   * sobrevivem ao acerto, e cada substep anti-tunneling anda ~0.325 tiles
-   * enquanto o raio de colisao do inimigo e 0.5-0.9, entao sem memoria o mesmo
-   * alvo levaria dano (e sifao) varias vezes ao ser atravessado.
-   */
   hits?: number[];
 };
 
-export type Cache = {
-  x: number;
-  y: number;
-  opened: boolean;
-  options: [ModifierId, ModifierId] | null;
-};
-
+export type Cache = { x: number; y: number; opened: boolean; options: [ModifierId, ModifierId] | null };
 export type Vent = { x: number; y: number; nextEmitAt: number };
 
 export type SemanticEvent =
+  | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
   | { t: 'hit'; x: number; y: number; amount: number; target: number }
-  | { t: 'death'; x: number; y: number; entity: number; archetype: string }
+  | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
   | { t: 'explosion'; x: number; y: number; radius: number }
   | { t: 'discharge'; cells: number[] }
   | { t: 'ignite'; x: number; y: number }
-  | { t: 'shot'; x: number; y: number; dx: number; dy: number }
+  | { t: 'shot'; x: number; y: number; dx: number; dy: number; owner: number }
   | { t: 'dodge'; x: number; y: number }
   | { t: 'pulse'; x: number; y: number }
   | { t: 'pickup_core'; x: number; y: number }
@@ -107,14 +107,14 @@ export type SemanticEvent =
   | { t: 'consume'; x: number; y: number }
   | { t: 'overheat'; x: number; y: number }
   | { t: 'guardian_awake' }
-  | { t: 'player_down'; slot?: number }
-  | { t: 'revive'; x: number; y: number; slot: number }
+  | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
+  | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }
   | { t: 'message'; text: string };
 
 export type PlayerCommand = {
-  move: Vec2; // -1..1 (normalizado pela sim)
-  aim: Vec2; // direcao de mira (nao normalizada obrigatoriamente)
+  move: Vec2;
+  aim: Vec2;
   fire: boolean;
   ability: boolean;
   dodge: boolean;
@@ -128,22 +128,16 @@ export type SurvivalState = {
   rng: RNG;
   tick: number;
   phase: RunPhase;
-
   solid: Uint8Array;
   surface: Uint8Array;
   surfaceTimer: Uint16Array;
   chunkVersion: Uint32Array;
-
   entry: Vec2;
   corePos: Vec2;
   coreTaken: boolean;
   guardianAwake: boolean;
-  /** O guardiao ja invocou seus stalkers de 50% (one-shot, serializavel). */
   guardianSummoned: boolean;
   leftEntryZone: boolean;
-
-  // Fonte da verdade: arrays de players. player/playerExtra sao aliases do slot 0
-  // (mesma referencia de objeto), preservando o caminho solo.
   players: Entity[];
   playerExtras: PlayerExtra[];
   player: Entity;
@@ -153,22 +147,14 @@ export type SurvivalState = {
   caches: Cache[];
   vents: Vent[];
   charges: Array<{ idx: number; until: number }>;
-
   pendingChoice: [ModifierId, ModifierId] | null;
   contamination: number;
-  /** Quantos limiares de contaminacao ja dispararam (one-shot, serializavel). */
   contaminationWaves: number;
   nextEntityId: number;
-
-  // fila deterministica de celulas reagindo (indices), processada com orcamento
   reactionQueue: number[];
 };
 
-export type StepResult = {
-  state: SurvivalState;
-  events: SemanticEvent[];
-};
-
+export type StepResult = { state: SurvivalState; events: SemanticEvent[] };
 export type PlayerSnapshot = {
   slot: number;
   x: number;
@@ -180,7 +166,6 @@ export type PlayerSnapshot = {
   downed: boolean;
   alive: boolean;
 };
-
 export type SurvivalSnapshot = {
   tick: number;
   phase: RunPhase;

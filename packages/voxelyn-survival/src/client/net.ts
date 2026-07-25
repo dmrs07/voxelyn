@@ -281,6 +281,15 @@ export class NetClient {
           pl.facing.x = snap.facingX ?? pl.facing.x;
           pl.facing.y = snap.facingY ?? pl.facing.y;
           state.playerExtras[slot].downed = snap.downed ?? false;
+          pl.action = snap.action ? {
+            kind: snap.action.kind,
+            phase: snap.action.phase,
+            startedAt: snap.action.startedAt,
+            releaseAt: snap.action.releaseAt,
+            endsAt: snap.action.endsAt,
+            direction: { x: snap.action.dx, y: snap.action.dy },
+            target: snap.action.target,
+          } : undefined;
         }
       } else {
         const def = ARCHETYPES[snap.archetype as EnemyArchetype] ?? ARCHETYPES.stalker;
@@ -302,6 +311,15 @@ export class NetClient {
           rangedReadyAt: 0,
           stunnedUntil: 0,
           facing: { x: snap.facingX ?? 1, y: snap.facingY ?? 0 },
+          action: snap.action ? {
+            kind: snap.action.kind,
+            phase: snap.action.phase,
+            startedAt: snap.action.startedAt,
+            releaseAt: snap.action.releaseAt,
+            endsAt: snap.action.endsAt,
+            direction: { x: snap.action.dx, y: snap.action.dy },
+            target: snap.action.target,
+          } : undefined,
         });
       }
     }

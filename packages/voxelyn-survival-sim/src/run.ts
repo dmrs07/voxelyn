@@ -354,7 +354,11 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       leavesBiofluid: false,
       ttl: Math.ceil(TICK_HZ * 1.4),
     });
-    events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y });
+    events.push({
+      t: 'action_start', entity: player.id, action: 'player_shot', x: player.x, y: player.y,
+      dx: extra.aim.x, dy: extra.aim.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 7,
+    });
+    events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y, owner: player.id });
     if (extra.heat >= HEAT_MAX) {
       extra.overheatedUntil = state.tick + OVERHEAT_LOCK_TICKS;
       extra.heat = HEAT_MAX * 0.55;
@@ -366,6 +370,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   // habilidade: pulso cinetico (empurra criaturas, apaga fogo, dissipa gas)
   if (cmd.ability && state.tick >= extra.abilityCooldownUntil) {
     extra.abilityCooldownUntil = state.tick + ABILITY_COOLDOWN_TICKS;
+    events.push({
+      t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
+      dx: player.facing.x, dy: player.facing.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
+    });
     events.push({ t: 'pulse', x: player.x, y: player.y });
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
@@ -426,7 +434,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           oe.downed = false;
           oe.bleedoutAt = 0;
           op.hp = Math.max(1, Math.floor(op.maxHp * REVIVE_HP_FRACTION));
-          events.push({ t: 'revive', x: op.x, y: op.y, slot: other });
+          events.push({ t: 'revive', x: op.x, y: op.y, slot: other, tick: state.tick });
           events.push({ t: 'message', text: `Parceiro revivido.` });
           return;
         }
@@ -631,7 +639,10 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
     state.coreTaken = false; // volta ao pedestal, recuperavel pelo parceiro
     events.push({ t: 'message', text: 'O nucleo caiu com o portador.' });
   }
-  events.push({ t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector' });
+  events.push({
+    t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector',
+    facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+  });
 };
 
 const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): void => {
@@ -657,9 +668,15 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
         // co-op: entra em estado abatido, revivel pelo parceiro
         e.downed = true;
         e.bleedoutAt = state.tick + BLEEDOUT_TICKS;
-        events.push({ t: 'player_down', slot });
+        events.push({
+          t: 'player_down', slot, x: p.x, y: p.y,
+          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+        });
       } else {
-        events.push({ t: 'player_down', slot });
+        events.push({
+          t: 'player_down', slot, x: p.x, y: p.y,
+          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+        });
         killPlayer(state, slot, events);
       }
     }
@@ -788,6 +805,15 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(enemy.y * 1000));
     mix(Math.round(enemy.hp * 100));
     mix(enemy.alive ? 1 : 0);
+    if (enemy.action) {
+      mix(enemy.action.kind.length);
+      mix(enemy.action.kind.charCodeAt(0));
+      mix(enemy.action.startedAt);
+      mix(enemy.action.releaseAt);
+      mix(enemy.action.endsAt);
+      mix(Math.round(enemy.action.direction.x * 1000));
+      mix(Math.round(enemy.action.direction.y * 1000));
+    }
   }
   for (const proj of state.projectiles) {
     mix(proj.id);

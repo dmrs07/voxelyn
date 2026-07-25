@@ -1,11 +1,17 @@
-// Contrato de manifest de sprites (docs/art/voxelyn-survival-art-bible.md #9).
-// Os manifests em JSON (assets/atlases/*.json) sao a fonte da verdade do layout;
-// este modulo fornece os tipos e o resolvedor de frames.
-
+// Runtime contract for generated Voxelyn Survival sprite manifests.
 export type SpriteAnimationDefinition = {
   frames: number;
   fps: number;
   loop: boolean;
+};
+
+export type SpriteFootprint = {
+  /** Occupied width and height in logical isometric tiles. */
+  w: number;
+  h: number;
+  /** Offset, in logical tiles, from the visual anchor to footprint center. */
+  offsetX: number;
+  offsetY: number;
 };
 
 export type SpriteManifestEntry = {
@@ -20,10 +26,11 @@ export type SpriteManifestEntry = {
   authoredDirs: string[];
   flipPairs: Record<string, string>;
   hitbox: { w: number; h: number };
+  footprint: SpriteFootprint;
   palette: string;
   paletteColors: string[];
   animations: Record<string, SpriteAnimationDefinition>;
-  /** dir -> anim -> coluna inicial no atlas (linha unica). */
+  /** dir -> anim -> starting column in the stable, single-row atlas. */
   frameMap: Record<string, Record<string, number>>;
   generation?: { tool: string; prompt: string; seedOrRef?: string };
 };
@@ -36,55 +43,60 @@ export type FrameRect = {
   flip: boolean;
 };
 
-/**
- * Direcao 4-way a partir de um vetor de facing (mundo). Retorna dr/dl/ur/ul.
- * Converte para espaco de tela iso (sdx = x-y, sdy = x+y) e classifica por
- * setor angular de 90deg centrado em cada direcao autorada:
- *   world +x -> dr, world +y -> dl, world -y -> ur, world -x -> ul.
- */
+/** Map a world-space facing vector to one of the four authored isometric facings. */
 export const dirFromFacing = (fx: number, fy: number): string => {
   const sdx = fx - fy;
   const sdy = fx + fy;
-  const a = Math.atan2(sdy, sdx); // -PI..PI
-  if (a >= 0 && a < Math.PI / 2) return 'dr';
-  if (a >= Math.PI / 2) return 'dl';
-  if (a < -Math.PI / 2) return 'ul';
+  const angle = Math.atan2(sdy, sdx);
+  if (angle >= 0 && angle < Math.PI / 2) return 'dr';
+  if (angle >= Math.PI / 2) return 'dl';
+  if (angle < -Math.PI / 2) return 'ul';
   return 'ur';
 };
 
-/** Resolve o retangulo-fonte de um frame no atlas, aplicando flip quando necessario. */
 export const resolveFrame = (
-  m: SpriteManifestEntry,
-  anim: string,
-  dir: string,
+  manifest: SpriteManifestEntry,
+  animation: string,
+  direction: string,
   frame: number
 ): FrameRect => {
-  const useAnim = m.animations[anim] ? anim : Object.keys(m.animations)[0];
-  const flip = Boolean(m.flipPairs[dir]);
-  const srcDir = flip ? m.flipPairs[dir] : dir;
-  const dirMap = m.frameMap[srcDir] ?? m.frameMap[m.authoredDirs[0]];
+  const useAnim = manifest.animations[animation] ? animation : Object.keys(manifest.animations)[0];
+  const flip = Boolean(manifest.flipPairs[direction]);
+  const sourceDirection = flip ? manifest.flipPairs[direction] : direction;
+  const dirMap = manifest.frameMap[sourceDirection] ?? manifest.frameMap[manifest.authoredDirs[0]];
   const start = dirMap[useAnim] ?? dirMap[Object.keys(dirMap)[0]] ?? 0;
-  const count = m.animations[useAnim]?.frames ?? 1;
-  const f = ((frame % count) + count) % count;
-  const col = start + f;
-  return { sx: col * m.frameWidth, sy: 0, sw: m.frameWidth, sh: m.frameHeight, flip };
+  const count = manifest.animations[useAnim]?.frames ?? 1;
+  const normalized = ((frame % count) + count) % count;
+  return {
+    sx: (start + normalized) * manifest.frameWidth,
+    sy: 0,
+    sw: manifest.frameWidth,
+    sh: manifest.frameHeight,
+    flip,
+  };
 };
 
-/** Frame atual em funcao do tempo (ms), respeitando fps e loop. */
 export const frameAtTime = (
-  m: SpriteManifestEntry,
-  anim: string,
+  manifest: SpriteManifestEntry,
+  animation: string,
   elapsedMs: number
 ): number => {
-  const def = m.animations[anim] ?? m.animations[Object.keys(m.animations)[0]];
-  const idx = Math.floor((elapsedMs / 1000) * def.fps);
-  return def.loop ? idx % def.frames : Math.min(idx, def.frames - 1);
+  const def = manifest.animations[animation] ?? manifest.animations[Object.keys(manifest.animations)[0]];
+  const index = Math.floor((Math.max(0, elapsedMs) / 1000) * def.fps);
+  return def.loop ? index % def.frames : Math.min(index, def.frames - 1);
 };
 
-export const FIRST_PACK_IDS = [
+export const CHARACTER_SPRITE_IDS = [
   'player-prospector',
   'enemy-stalker',
   'enemy-spitter',
+  'enemy-spore-bomber',
+  'enemy-bruiser',
+  'enemy-guardian',
+] as const;
+
+export const FIRST_PACK_IDS = [
+  ...CHARACTER_SPRITE_IDS,
   'fx-projectile-bolt',
   'fx-impact-burst',
 ] as const;
