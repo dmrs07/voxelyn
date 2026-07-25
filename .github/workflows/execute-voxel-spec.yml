@@ -42,7 +42,9 @@ jobs:
         run: cat scripts/apply_voxel_spec.py.part* > scripts/apply_voxel_spec.py
 
       - name: Apply reviewed voxel specification
-        run: python3 scripts/apply_voxel_spec.py
+        run: |
+          set -o pipefail
+          python3 scripts/apply_voxel_spec.py 2>&1 | tee /tmp/apply-voxel.log
 
       - name: Remove transport fragments
         run: rm -f scripts/apply_voxel_spec.py scripts/apply_voxel_spec.py.part* scripts/voxel_bundle.part*
@@ -73,3 +75,22 @@ jobs:
           fi
           git commit -m "feat(survival): implement voxel character spec [voxel-spec-applied]"
           git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+
+      - name: Report execution failure on PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo '### Falha ao executar a spec voxel'
+            echo
+            echo '```text'
+            if [ -f /tmp/apply-voxel.log ]; then
+              tail -n 80 /tmp/apply-voxel.log
+            else
+              echo 'A falha ocorreu depois da aplicação da spec. Consulte o job do GitHub Actions.'
+            fi
+            echo '```'
+          } > /tmp/voxel-failure.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/voxel-failure.md
