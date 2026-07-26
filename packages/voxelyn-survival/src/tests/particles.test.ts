@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VoxelParticles } from '../client/particles';
+import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs } from '../client/particles';
 import { SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
@@ -124,9 +124,68 @@ describe('particulas voxel', () => {
     expect(topo(quebra)).toBeLessThan(topo(estouro));
   });
 
+  // O chamador varre as celulas de gas visiveis a cada frame, e a janela de
+  // 200ms continua aberta o tempo todo. Sem trava por celula, uma unica celula
+  // empurrava ~12 motes por bucket a 60Hz — todos na MESMA posicao, porque a
+  // semente e constante dentro do bucket. Duplicatas invisiveis comendo o teto.
+  it('emite no maximo um mote de gas por celula por janela de tempo', () => {
+    const p = new VoxelParticles();
+    for (let ms = 0; ms < 600; ms += 16) p.emitGas(5.5, 7.5, ms, 1);
+    // Tres janelas de 200ms => no maximo tres motes, nunca um por frame.
+    expect(p.count).toBeLessThanOrEqual(3);
+  });
+
+  it('nao deixa o gas expulsar as particulas de explosao', () => {
+    const p = new VoxelParticles();
+    p.budget = 40;
+    p.ingest([explosion(20, 20)], 96, 1);
+    const aposEstouro = p.count;
+    // Meio segundo de gas de varias celulas, no ritmo real do render.
+    for (let ms = 0; ms < 500; ms += 16) {
+      for (let cx = 0; cx < 6; cx++) p.emitGas(cx + 0.5, 3.5, ms, 1);
+    }
+    const items = (p as unknown as { items: Array<{ kind: string }> }).items;
+    expect(aposEstouro).toBeGreaterThan(0);
+    expect(items.filter((i) => i.kind !== 'gas').length).toBeGreaterThan(0);
+  });
+
+  // Fisica igual em qualquer taxa de atualizacao: 12 passos de 8ms tem de levar
+  // a particula ao mesmo lugar que 3 passos de 32ms.
+  it('avanca igual a 60Hz e a 120Hz para o mesmo tempo real', () => {
+    const rapido = new VoxelParticles();
+    const lento = new VoxelParticles();
+    rapido.ingest([explosion(10, 10)], 96, 1);
+    lento.ingest([explosion(10, 10)], 96, 1);
+    for (let i = 0; i < 12; i++) rapido.step(8);
+    for (let i = 0; i < 3; i++) lento.step(32);
+    const topo = (p: VoxelParticles) => {
+      const items = (p as unknown as { items: Array<{ z: number }> }).items;
+      return items.length ? Math.max(...items.map((i) => i.z)) : 0;
+    };
+    expect(topo(rapido)).toBeCloseTo(topo(lento), 1);
+  });
+
   it('ignora eventos que nao geram materia', () => {
     const p = new VoxelParticles();
     p.ingest([{ t: 'message', text: 'oi' }, { t: 'extracted', withCore: true }], 96, 1);
     expect(p.count).toBe(0);
+  });
+});
+
+describe('passo do frame', () => {
+  it('usa o tempo real decorrido', () => {
+    expect(frameDeltaMs(1000, 1033)).toBeCloseTo(33);
+    expect(frameDeltaMs(1000, 1008)).toBeCloseTo(8);
+  });
+
+  it('cai no padrao no primeiro frame e em relogio invalido', () => {
+    expect(frameDeltaMs(0, 1000)).toBe(FALLBACK_FRAME_MS);
+    expect(frameDeltaMs(NaN, 1000)).toBe(FALLBACK_FRAME_MS);
+    // relogio andando para tras nao pode virar passo negativo
+    expect(frameDeltaMs(2000, 1000)).toBe(FALLBACK_FRAME_MS);
+  });
+
+  it('limita o salto de uma aba que volta do segundo plano', () => {
+    expect(frameDeltaMs(1000, 61000)).toBe(100);
   });
 });

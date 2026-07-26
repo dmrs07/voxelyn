@@ -13,7 +13,7 @@ import {
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
-import { VoxelParticles } from './particles';
+import { VoxelParticles, frameDeltaMs } from './particles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
@@ -59,6 +59,8 @@ export class SurvivalRenderer {
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly particles = new VoxelParticles();
+  /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
+  private lastFrameMs = 0;
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -591,7 +593,12 @@ export class SurvivalRenderer {
     for (const item of items) item.draw();
 
     // FX
-    const dtFx = 16.7;
+    // Vem do relogio, nao de um 16.7 fixo: em rAF o passo fixo amarrava a vida
+    // e a fisica dos efeitos a taxa do monitor, e a 120Hz tudo durava metade do
+    // tempo e percorria metade da distancia. Vale para os FX antigos tambem —
+    // eles ja tinham a duracao expressa em ms, so nao a respeitavam.
+    const dtFx = frameDeltaMs(this.lastFrameMs, nowMs);
+    this.lastFrameMs = nowMs;
     // As particulas voxel entram DEPOIS das paredes e entidades, com ordem do
     // pintor propria: brasa e gas sao volume no ar, tem de passar por cima do
     // chao e do bloco, mas continuam atras do HUD.

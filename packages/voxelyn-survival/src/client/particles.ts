@@ -56,14 +56,42 @@ const seeded = (seed: number) => {
 const eventSeed = (x: number, y: number, salt: number): number =>
   Math.imul(Math.round(x * 16) | 0, 374761393) ^ Math.imul(Math.round(y * 16) | 0, 668265263) ^ salt;
 
+/**
+ * Tempo decorrido do frame, em ms, a partir do relogio do render.
+ *
+ * O render roda em requestAnimationFrame, entao passar um passo fixo de 16.7ms
+ * amarra a fisica das particulas a taxa de atualizacao do monitor: a 120Hz um
+ * mote de 900ms durava 450ms reais e caia pela metade da distancia; a 30Hz
+ * durava 1.8s e voava o dobro. O passo tem de vir do relogio.
+ *
+ * O teto de 100ms existe para a aba voltar do segundo plano sem teleportar todo
+ * mundo; a vida, essa, consome o tempo real, entao o que ficou velho durante a
+ * pausa expira como deve.
+ */
+export const FALLBACK_FRAME_MS = 16.7;
+export const frameDeltaMs = (lastMs: number, nowMs: number): number => {
+  if (!Number.isFinite(lastMs) || lastMs <= 0) return FALLBACK_FRAME_MS;
+  const dt = nowMs - lastMs;
+  if (!(dt > 0)) return FALLBACK_FRAME_MS;
+  return Math.min(100, dt);
+};
+
 export class VoxelParticles {
   private items: Particle[] = [];
+  /**
+   * Ultimo bucket de tempo em que cada celula emitiu gas. Limitado ao numero de
+   * celulas do mundo, entao nao cresce sem teto.
+   */
+  private readonly lastGasBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
   get count(): number { return this.items.length; }
 
-  clear(): void { this.items.length = 0; }
+  clear(): void {
+    this.items.length = 0;
+    this.lastGasBucket.clear();
+  }
 
   private push(p: Particle): void {
     // Descarta o mais VELHO, nao o novo: um burst recente e o que o jogador
@@ -154,6 +182,17 @@ export class VoxelParticles {
     const bucket = (nowMs / 200) | 0;
     const every = Math.max(1, Math.round(3 / scale));
     if (bucket % every !== phase % every) return;
+
+    // O chamador percorre as celulas de gas visiveis a CADA frame, e a condicao
+    // acima continua verdadeira pelos 200ms inteiros do bucket. Sem esta trava
+    // uma unica celula empurrava ~12 motes por bucket a 60Hz — e, como a
+    // semente e constante dentro do bucket, os 12 nasciam na MESMA posicao com
+    // a MESMA velocidade: duplicatas invisiveis, empilhadas, comendo o
+    // orcamento e expulsando as brasas de explosao.
+    const cell = ((x | 0) << 16) | (y | 0);
+    if (this.lastGasBucket.get(cell) === bucket) return;
+    this.lastGasBucket.set(cell, bucket);
+
     // A semente inclui o INSTANTE, nao so a celula: com semente fixa por celula
     // todo mote nascia no mesmo ponto e o gas subia em fila indiana, uma linha
     // vertical em vez de uma coluna que se abre.
