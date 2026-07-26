@@ -13,6 +13,7 @@ import {
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
+import { VoxelParticles } from './particles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
@@ -57,6 +58,7 @@ export class SurvivalRenderer {
   messages: Array<{ text: string; until: number }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
+  readonly particles = new VoxelParticles();
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -105,6 +107,10 @@ export class SurvivalRenderer {
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     this.presentation.ingest(events, nowMs);
+    // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
+    // O cliente nunca decide que houve explosao — so a desenha.
+    this.particles.budget = this.quality.maxFx * 2;
+    this.particles.ingest(events, this.worldWidth, this.quality.maxFx / PRESETS.high.maxFx);
     for (const ev of events) {
       switch (ev.t) {
         case 'explosion':
@@ -280,6 +286,9 @@ export class SurvivalRenderer {
         }
         if (surf === SURF_GAS) {
           diamond(sx, sy, `rgba(168, 230, 60, ${0.16 + 0.1 * Math.sin(nowMs * 0.004 + x + y)})`);
+          // A mancha no chao diz ONDE o gas esta; os motes subindo dizem que
+          // ele esta VIVO e para onde vai. Sem eles o gas era so uma textura.
+          this.particles.emitGas(x + 0.5, y + 0.5, nowMs, this.quality.maxFx / PRESETS.high.maxFx);
         }
         // marcadores de objetivo
         if (x === state.corePos.x && y === state.corePos.y && !state.coreTaken) {
@@ -583,6 +592,11 @@ export class SurvivalRenderer {
 
     // FX
     const dtFx = 16.7;
+    // As particulas voxel entram DEPOIS das paredes e entidades, com ordem do
+    // pintor propria: brasa e gas sao volume no ar, tem de passar por cima do
+    // chao e do bloco, mas continuam atras do HUD.
+    this.particles.step(dtFx);
+    this.particles.draw(ctx, toScreen, z, TILE_H);
     this.fxList = this.fxList.filter((fx) => (fx.life -= dtFx) > 0);
     for (const fx of this.fxList) {
       const t = 1 - fx.life / fx.maxLife;
