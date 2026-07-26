@@ -14,6 +14,13 @@ export const SOLID_ROCK = 1;
 export const SOLID_FRAGILE = 2;
 export const SOLID_ORE = 3;
 export const SOLID_CRYSTAL = 4;
+// Estados intermediarios: existem para o jogador VER o material mudando antes
+// de ceder. Sem o estagio visivel, corrosao e rachadura viram morte invisivel,
+// que e justamente o que o design proibe.
+export const SOLID_FRAGILE_WEAK = 5; // frágil corroído, cede ao proximo toque
+export const SOLID_ORE_SPENT = 6; // veio esgotado ou contaminado: nao conduz
+export const SOLID_CRYSTAL_DULL = 7; // cristal opaco: nao emite luz nem descarrega
+export const SOLID_ORE_CHIPPED = 8; // veio ja lascado, a um golpe de esgotar
 
 // Camada de superficie (o que cobre o chao de uma celula aberta).
 export const SURF_NONE = 0;
@@ -42,6 +49,12 @@ export const FIRE_SPREAD_BIOFLUID = 0.85;
 export const BIOFLUID_SLOW = 0.55;
 export const DISCHARGE_DAMAGE = 26;
 export const DISCHARGE_TICKS = 6;
+
+// Propagacao por material solido. Orcamentos separados do biofluido porque um
+// veio de minerio atravessa a sala inteira e nao pode custar um tick.
+export const BUDGET_VEIN_CELLS = 64;
+export const BUDGET_RESONANCE_CELLS = 24;
+
 
 export const PLAYER_HP = 100;
 export const PLAYER_SPEED = 4.6; // tiles/s

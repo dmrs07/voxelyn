@@ -16,7 +16,7 @@ import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
-export type ParticleKind = 'ember' | 'gas' | 'debris' | 'spark' | 'rubble' | 'crystalShard';
+export type ParticleKind = 'ember' | 'gas' | 'debris' | 'spark' | 'rubble' | 'crystalShard' | 'acidDrip' | 'oreChip';
 
 type Particle = {
   x: number; // tile
@@ -47,6 +47,9 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // renderizado, senao o entulho nao parece feito da pedra que acabou de cair.
   rubble: ['#6e4a33', '#46566e', '#2e3a4d'],
   crystalShard: ['#59f2c2', '#2f6b4f', '#1f3d33'],
+  // Corrosao pinga; lasca de minerio salta.
+  acidDrip: ['#a8e63c', '#2f6b4f', '#1f3d33'],
+  oreChip: ['#ffd166', '#6e4a33', '#2e3a4d'],
 };
 
 /**
@@ -170,6 +173,15 @@ export class VoxelParticles {
           this.burst(ev.x, ev.y, kind, n(6), 1.6, 1.5, 620, 7);
           break;
         }
+        case 'corrode':
+          // Poucas gotas e vida curta: a informacao de verdade esta no BLOCO,
+          // que mudou de estado no grid e fica na tela. A particula so aponta
+          // onde olhar no instante em que acontece.
+          this.burst(ev.x, ev.y, 'acidDrip', n(5), 0.9, 1.0, 420, 11);
+          break;
+        case 'chip':
+          this.burst(ev.x, ev.y, 'oreChip', n(4), 1.4, 1.4, 380, 13);
+          break;
         case 'death':
           // Acompanha o desabamento do sprite: a criatura vira materia.
           this.burst(ev.x, ev.y, 'debris', n(9), 1.5, 1.3, 560, ev.entity);

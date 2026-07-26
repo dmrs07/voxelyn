@@ -1,8 +1,13 @@
 import {
   SOLID_CRYSTAL,
+  SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SOLID_ROCK,
   SOLID_ORE,
+  SOLID_ORE_CHIPPED,
+  SOLID_ORE_SPENT,
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
@@ -19,6 +24,22 @@ import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { drawVoxelEntity } from './voxel-fallback';
+
+/**
+ * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
+ * de cadeia de ternarios: com oito materiais a cadeia vira uma linha ilegivel e
+ * um material novo passa despercebido.
+ */
+const TERRAIN_KIND_INDEX: Record<number, number> = {
+  [SOLID_ROCK]: 0,
+  [SOLID_FRAGILE]: 1,
+  [SOLID_ORE]: 2,
+  [SOLID_CRYSTAL]: 3,
+  [SOLID_FRAGILE_WEAK]: 4,
+  [SOLID_ORE_SPENT]: 5,
+  [SOLID_CRYSTAL_DULL]: 6,
+  [SOLID_ORE_CHIPPED]: 7,
+};
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -220,6 +241,9 @@ export class SurvivalRenderer {
         for (let x = x0; x <= x1; x++) {
           const i = y * w + x;
           if (state.surface[i] === SURF_FIRE) lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
+          // Apenas o cristal VIVO ilumina. Opacado pelo acido ele continua na
+          // tela com a mesma silhueta, mas o mapa escurece — que e exatamente a
+          // perda que o jogador tem de sentir.
           else if (state.solid[i] === SOLID_CRYSTAL) lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
         }
       }
@@ -333,8 +357,9 @@ export class SurvivalRenderer {
             // Bloco voxel pre-renderizado. Um drawImage substitui os tres fills
             // de poligono; o caminho de poligono abaixo continua como fallback
             // para quando o atlas ainda nao carregou ou falhou.
-            const kindIndex =
-              solid === SOLID_FRAGILE ? 1 : solid === SOLID_ORE ? 2 : solid === SOLID_CRYSTAL ? 3 : 0;
+            // Espelha BLOCK_KINDS do atlas de terreno, na ordem em que o
+            // gerador empacota os tipos.
+            const kindIndex = TERRAIN_KIND_INDEX[solid] ?? 0;
             if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
 
             const hw = (TILE_W / 2) * z;
@@ -343,7 +368,27 @@ export class SurvivalRenderer {
             let top = PAL.rockLight;
             let left = PAL.rock;
             let right = PAL.rockShadow;
-            if (solid === SOLID_FRAGILE) {
+            // Os estados corroidos precisam se distinguir TAMBEM no fallback:
+            // se o atlas falhar de vez, um bloco enfraquecido apareceria como
+            // rocha comum para sempre, e cair sem aviso e exatamente o que o
+            // design proibe.
+            if (solid === SOLID_FRAGILE_WEAK) {
+              top = '#6e4a33';
+              left = '#4a3122';
+              right = '#2f1f16';
+            } else if (solid === SOLID_ORE_CHIPPED) {
+              top = '#8a6a3a';
+              left = '#5c452a';
+              right = '#3a2b1c';
+            } else if (solid === SOLID_ORE_SPENT) {
+              top = '#3a3f44';
+              left = '#2a2e33';
+              right = '#1c1f23';
+            } else if (solid === SOLID_CRYSTAL_DULL) {
+              top = '#2f6b4f';
+              left = '#1f3d33';
+              right = '#152721';
+            } else if (solid === SOLID_FRAGILE) {
               top = '#5a5346';
               left = '#463f35';
               right = '#332e27';

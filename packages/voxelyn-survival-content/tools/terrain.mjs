@@ -32,7 +32,19 @@ export const lightFactor = (level) => 0.46 + (level / (LIGHT_LEVELS - 1)) * 0.6;
 /** Variantes por tipo: quebram a repeticao sem custar nada em runtime. */
 export const VARIANTS = 3;
 
-export const BLOCK_KINDS = ['rock', 'fragile', 'ore', 'crystal'];
+// A ordem espelha os valores de SOLID_* da simulacao, incluindo os estados
+// intermediarios: o jogador precisa VER o material a caminho de ceder, senao
+// corrosao e rachadura viram morte invisivel.
+export const BLOCK_KINDS = [
+  'rock',
+  'fragile',
+  'ore',
+  'crystal',
+  'fragileWeak',
+  'oreSpent',
+  'crystalDull',
+  'oreChipped',
+];
 
 const hash2 = (x, y, seed) => {
   let h = (x * 374761393) ^ (y * 668265263) ^ (seed * 2246822519);
@@ -66,12 +78,28 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
   if (kind === 'fragile') {
     // Rocha rachada: ferrugem aflora em manchas, mais densa perto da superficie.
     if ((h >>> 3) % (surface ? 4 : 7) === 0) return 'rust';
+  } else if (kind === 'fragileWeak') {
+    // Corroido: a ferrugem toma conta e a materia apodrece. Le como "prestes a
+    // cair" pela densidade, sem precisar de contorno nem de piscar.
+    if ((h >>> 3) % (surface ? 2 : 3) === 0) return 'rust';
+    if ((h >>> 6) % 4 === 0) return 'fungusDeep';
   } else if (kind === 'ore') {
     // O veio ATRAVESSA o bloco em vez de ficar pintado no topo.
     if ((h >>> 3) % (surface ? 4 : 6) === 0) return 'loot';
     if ((h >>> 6) % 6 === 0) return 'rust';
+  } else if (kind === 'oreChipped') {
+    // Metade do veio ja saiu: o metal rareia e sobra a marca de onde estava.
+    if ((h >>> 3) % (surface ? 9 : 12) === 0) return 'loot';
+    if ((h >>> 6) % 5 === 0) return 'rust';
+  } else if (kind === 'oreSpent') {
+    // Esgotado ou contaminado: so a cicatriz, nenhum metal.
+    if ((h >>> 6) % 4 === 0) return 'rockDeep';
   } else if (kind === 'crystal') {
     if ((h >>> 3) % (surface ? 5 : 8) === 0) return 'biolum';
+  } else if (kind === 'crystalDull') {
+    // Opaco: mesma FORMA de cristal, nenhuma luz. A silhueta continua dizendo
+    // "aqui havia cristal", que e a informacao que o jogador precisa.
+    if ((h >>> 3) % (surface ? 5 : 8) === 0) return 'fungusDeep';
   }
   return base;
 };
@@ -116,8 +144,8 @@ const blockModel = (kind, variant) => {
 
       // Cristal cresce ACIMA da superficie: e o unico bloco com silhueta
       // propria, para o jogador reconhecer de longe o que vale minerar.
-      if (kind === 'crystal' && (h >>> 8) % 9 === 0) {
-        boxes.push(box(x, y, height, 1, 1, 2, 'biolum'));
+      if ((kind === 'crystal' || kind === 'crystalDull') && (h >>> 8) % 9 === 0) {
+        boxes.push(box(x, y, height, 1, 1, 2, kind === 'crystal' ? 'biolum' : 'fungusDeep'));
       }
     }
   }

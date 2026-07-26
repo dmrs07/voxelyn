@@ -9,7 +9,9 @@ import {
   GAS_LIFE_TICKS,
   GAS_SPREAD_CHANCE,
   SOLID_CRYSTAL,
+  SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
   SOLID_NONE,
   SURF_BIOFLUID,
   SURF_FIRE,
@@ -50,7 +52,21 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
 };
 
 /** Descarga eletrica: BFS pela poca de biofluido conectada, com orcamento. */
-export const dischargeAt = (state: SurvivalState, sx: number, sy: number, events: SemanticEvent[]): void => {
+/**
+ * Alastra por celulas conectadas que satisfacam `connected`, partindo da
+ * vizinhanca 3x3 de (sx, sy), ate o orcamento.
+ *
+ * Era especifico de biofluido; virou generico porque veio de minerio e cadeia
+ * de cristal alastram exatamente do mesmo jeito, so mudando o material. Manter
+ * tres copias divergiria os orcamentos e o determinismo com o tempo.
+ */
+export const floodFrom = (
+  state: SurvivalState,
+  sx: number,
+  sy: number,
+  budget: number,
+  connected: (index: number) => boolean
+): number[] => {
   const w = W(state);
   const h = H(state);
   const startCells: number[] = [];
@@ -60,15 +76,15 @@ export const dischargeAt = (state: SurvivalState, sx: number, sy: number, events
       const ny = sy + dy;
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
       const i = ny * w + nx;
-      if (state.surface[i] === SURF_BIOFLUID) startCells.push(i);
+      if (connected(i)) startCells.push(i);
     }
   }
-  if (startCells.length === 0) return;
+  if (startCells.length === 0) return [];
 
   const seen = new Set<number>(startCells);
   const queue = [...startCells];
   let head = 0;
-  while (head < queue.length && seen.size < BUDGET_DISCHARGE_CELLS) {
+  while (head < queue.length && seen.size < budget) {
     const cur = queue[head++];
     const cx = cur % w;
     const neighbors = [cur - 1, cur + 1, cur - w, cur + w];
@@ -76,17 +92,29 @@ export const dischargeAt = (state: SurvivalState, sx: number, sy: number, events
     for (let k = 0; k < 4; k++) {
       if (!valid[k]) continue;
       const ni = neighbors[k];
-      if (seen.has(ni) || state.surface[ni] !== SURF_BIOFLUID) continue;
+      if (seen.has(ni) || !connected(ni)) continue;
       seen.add(ni);
       queue.push(ni);
     }
   }
+  return [...seen];
+};
 
-  const cells = [...seen];
+/** Planta carga temporaria nas celulas dadas e anuncia a descarga. */
+export const chargeCells = (state: SurvivalState, cells: number[], events: SemanticEvent[]): void => {
+  if (cells.length === 0) return;
   for (const i of cells) {
     state.charges.push({ idx: i, until: state.tick + DISCHARGE_TICKS });
   }
   events.push({ t: 'discharge', cells });
+};
+
+export const dischargeAt = (state: SurvivalState, sx: number, sy: number, events: SemanticEvent[]): void => {
+  chargeCells(
+    state,
+    floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => state.surface[i] === SURF_BIOFLUID),
+    events
+  );
 };
 
 export const explodeAt = (
@@ -106,17 +134,12 @@ export const explodeAt = (
       const dy = y + 0.5 - ey;
       if (dx * dx + dy * dy > radius * radius) continue;
       const i = y * w + x;
-      if (state.solid[i] === SOLID_FRAGILE) {
-        state.solid[i] = SOLID_NONE;
-        state.surface[i] = SURF_SCORCHED;
-        markDirty(state, x, y);
-        events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid: SOLID_FRAGILE });
-      } else if (state.solid[i] === SOLID_CRYSTAL) {
-        state.solid[i] = SOLID_NONE;
-        markDirty(state, x, y);
-        events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid: SOLID_CRYSTAL });
-        dischargeAt(state, x, y, events);
-      } else if (state.solid[i] === SOLID_NONE) {
+      // Delega em vez de repetir: esta copia da regra de quebra ja existia e
+      // teria de aprender cada material novo por conta propria — um bloco
+      // corroido seria indestrutivel ate por explosao.
+      if (state.solid[i] !== SOLID_NONE) {
+        breakSolid(state, x, y, events);
+      } else {
         igniteCell(state, i, events);
       }
     }
@@ -225,7 +248,7 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
   const w = W(state);
   const i = y * w + x;
   const solid = state.solid[i];
-  if (solid === SOLID_FRAGILE) {
+  if (solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK) {
     state.solid[i] = SOLID_NONE;
     state.surface[i] = SURF_SCORCHED;
     markDirty(state, x, y);
@@ -237,6 +260,13 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
     markDirty(state, x, y);
     events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     dischargeAt(state, x, y, events);
+    return true;
+  }
+  if (solid === SOLID_CRYSTAL_DULL) {
+    // Quebra, mas sem descarga: a energia dele ja foi embora com o acido.
+    state.solid[i] = SOLID_NONE;
+    markDirty(state, x, y);
+    events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     return true;
   }
   return false;

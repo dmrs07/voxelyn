@@ -17,4 +17,5 @@ export {
 } from './run.js';
 export { generateWorld, floodOpen, chunkOf, cellIdx } from './worldgen.js';
 export { ARCHETYPES, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
-export { explodeAt, dischargeAt, igniteCell, breakSolid, setSurface, stepCells } from './cells.js';
+export { explodeAt, dischargeAt, igniteCell, breakSolid, setSurface, stepCells, floodFrom, chargeCells } from './cells.js';
+export { impactSolid, impactSurface, projectileClass, type ProjectileClass, type SolidImpact } from './materials.js';

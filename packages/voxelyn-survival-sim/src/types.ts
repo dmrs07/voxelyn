@@ -103,6 +103,14 @@ export type SemanticEvent =
    * pela grade, e a grade ja mudou quando o evento chega.
    */
   | { t: 'break'; x: number; y: number; solid: number }
+  /**
+   * Material cedendo por corrosao, sem ainda ter caido. O ESTADO em si viaja
+   * pelo diff de chunk (o cliente ve o bloco enfraquecido no grid); este evento
+   * so marca o instante, para o cliente cuspir respingo no lugar certo.
+   */
+  | { t: 'corrode'; x: number; y: number; solid: number }
+  /** Lasca arrancada de um veio de minerio por impacto cinetico. */
+  | { t: 'chip'; x: number; y: number }
   | { t: 'discharge'; cells: number[] }
   | { t: 'ignite'; x: number; y: number }
   | { t: 'shot'; x: number; y: number; dx: number; dy: number; owner: number }
