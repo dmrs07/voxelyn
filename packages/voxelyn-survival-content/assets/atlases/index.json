@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "generated": "deterministic-code-v2",
+  "version": 3,
+  "generated": "deterministic-code-v3-layered-player",
   "ids": [
     "player-prospector",
     "enemy-stalker",
@@ -9,6 +9,8 @@
     "enemy-bruiser",
     "enemy-guardian",
     "fx-projectile-bolt",
-    "fx-impact-burst"
+    "fx-impact-burst",
+    "layer-player-prospector-lower",
+    "layer-player-prospector-upper"
   ]
 }
