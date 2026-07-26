@@ -102,8 +102,14 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-guardian',
 ] as const;
 
+export const PLAYER_LAYER_SPRITE_IDS = [
+  'layer-player-prospector-lower',
+  'layer-player-prospector-upper',
+] as const;
+
 export const FIRST_PACK_IDS = [
   ...CHARACTER_SPRITE_IDS,
+  ...PLAYER_LAYER_SPRITE_IDS,
   'fx-projectile-bolt',
   'fx-impact-burst',
 ] as const;
