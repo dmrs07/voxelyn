@@ -139,45 +139,95 @@ const drawProspector = (dir, pose = {}) => {
 // ---------------------------------------------------------------------------
 const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
 
-/** Modelo 3D do prospector para uma animacao/frame. Eixos: x leste, y sul, z cima. */
-const prospectorModel = (anim, f) => {
-  const bob = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
-  const st = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
-  const sw = anim === 'attack' ? [0, 0, 1, 2][f % 4] : 0;
-  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  // morte e abatimento derrubam o corpo: o torso desce e as pernas recolhem
-  const fall = anim === 'die' ? Math.min(5, f) : anim === 'downed' ? 5 : 0;
-  const rise = anim === 'revive' ? Math.min(5, 5 - f) : 0;
-  const drop = Math.max(fall, rise);
-  const y0 = -bob + flinch + drop;
-
+/** Prospector de pe. `y0` desloca o corpo (bob, recuo de dano). */
+const prospectorStanding = ({ bob = 0, st = 0, sw = 0, lean = 0, crouch = 0 } = {}) => {
   const b = [];
-  const legZ = Math.max(0, 5 - drop);
+  // `crouch` encurta as pernas E baixa todo o resto na mesma medida: sem isso
+  // o tronco descola das pernas nos frames de queda e de revive.
+  const c = Math.max(0, Math.min(3, crouch));
+  const legH = Math.max(1, 3 - c);
+  const up = bob - c;
   // botas + pernas
-  b.push(box(-2, -1, Math.max(0, st), 2, 2, 1, 'rust'));
-  b.push(box(1, -1, Math.max(0, -st), 2, 2, 1, 'rust'));
-  b.push(box(-2, -1, 1 + Math.max(0, st), 2, 2, Math.max(1, legZ - 1), 'rockDeep'));
-  b.push(box(1, -1, 1 + Math.max(0, -st), 2, 2, Math.max(1, legZ - 1), 'rockDeep'));
+  b.push(box(-2, -1 + lean, Math.max(0, st), 2, 2, 1, 'rust'));
+  b.push(box(1, -1 + lean, Math.max(0, -st), 2, 2, 1, 'rust'));
+  b.push(box(-2, -1 + lean, 1 + Math.max(0, st), 2, 2, legH, 'rockDeep'));
+  b.push(box(1, -1 + lean, 1 + Math.max(0, -st), 2, 2, legH, 'rockDeep'));
   // cinto
-  b.push(box(-2, -1, 5 - y0, 5, 2, 1, 'loot'));
+  b.push(box(-2, -1 + lean, 5 + up, 5, 2, 1, 'loot'));
   // torso: peitoral na frente, modulo fungico nas costas
-  b.push(box(-2, -1, 6 - y0, 5, 2, 4, 'rock'));
-  b.push(box(-2, -2, 6 - y0, 5, 1, 4, 'rust'));
-  b.push(box(-1, 1, 7 - y0, 3, 1, 3, 'fungus'));
-  b.push(box(-1, 2, 8 - y0, 3, 1, 1, 'biolum'));
-  // ombreiras: largura maxima da silhueta
-  b.push(box(-3, -1, 9 - y0, 1, 2, 1, 'rock'));
-  b.push(box(3, -1, 9 - y0, 1, 2, 1, 'rock'));
-  // pescoco + capacete estreito + visor + lanterna
-  b.push(box(-1, -1, 10 - y0, 3, 2, 1, 'rockDeep'));
-  b.push(box(-1, -1, 11 - y0, 3, 3, 2, 'bone'));
-  b.push(box(-1, -2, 11 - y0, 3, 1, 1, 'biolum'));
-  b.push(box(0, -2, 13 - y0, 1, 1, 1, 'loot'));
+  b.push(box(-2, -1 + lean, 6 + up, 5, 2, 4, 'rock'));
+  b.push(box(-2, -2 + lean, 6 + up, 5, 1, 4, 'rust'));
+  b.push(box(-1, 1 + lean, 7 + up, 3, 1, 3, 'fungus'));
+  b.push(box(-1, 2 + lean, 8 + up, 3, 1, 1, 'biolum'));
+  // ombreiras
+  b.push(box(-3, -1 + lean, 9 + up, 1, 2, 1, 'rock'));
+  b.push(box(3, -1 + lean, 9 + up, 1, 2, 1, 'rock'));
+  // pescoco + capacete + visor + lanterna
+  b.push(box(-1, -1 + lean * 2, 10 + up, 3, 2, 1, 'rockDeep'));
+  b.push(box(-1, -1 + lean * 2, 11 + up, 3, 3, 2, 'bone'));
+  b.push(box(-1, -2 + lean * 2, 11 + up, 3, 1, 1, 'biolum'));
+  b.push(box(0, -2 + lean * 2, 13 + up, 1, 1, 1, 'loot'));
   // bracos + picareta
-  b.push(box(-3, -1, 6 - y0, 1, 2, 3, 'rock'));
-  b.push(box(3, -1, 6 - y0 + sw, 1, 2, 3, 'rock'));
-  b.push(box(3, -2, 4 - y0 + sw * 3, 1, 1, 3, 'loot'));
+  b.push(box(-3, -1 + lean, 6 + up, 1, 2, 3, 'rock'));
+  b.push(box(3, -1 + lean, 6 + up + sw, 1, 2, 3, 'rock'));
+  b.push(box(3, -2 + lean, 4 + up + sw * 3, 1, 1, 3, 'loot'));
   return b;
+};
+
+/**
+ * Prospector CAIDO, de costas no chao. Silhueta horizontal — em co-op este e
+ * o estado que o parceiro precisa reconhecer de longe para vir reanimar, entao
+ * ele nao pode parecer so uma versao baixinha da pose em pe.
+ * O modulo fungico e o visor ficam virados para cima, funcionando como farol.
+ */
+const prospectorProne = ({ breath = 0, settle = 0 } = {}) => {
+  const z = settle;
+  const b = [];
+  // pernas dobradas para fora
+  b.push(box(-3, 2, z, 2, 2, 2, 'rockDeep'));
+  b.push(box(1, 2, z, 2, 2, 2, 'rockDeep'));
+  b.push(box(-3, 4, z, 2, 1, 1, 'rust'));
+  b.push(box(1, 4, z, 2, 1, 1, 'rust'));
+  // torso deitado, peitoral virado para cima
+  b.push(box(-2, -1, z, 5, 3, 2, 'rock'));
+  b.push(box(-2, -1, z + 2, 5, 3, 1, 'rust'));
+  b.push(box(-2, 2, z, 5, 1, 1, 'loot'));
+  // modulo fungico brilhando para cima: farol de revive
+  b.push(box(-1, 0, z + 3 + breath, 3, 1, 1, 'biolum'));
+  // capacete no chao, visor para cima
+  b.push(box(-1, -3, z, 3, 2, 2, 'bone'));
+  b.push(box(-1, -3, z + 2, 3, 2, 1, 'biolum'));
+  // bracos abertos
+  b.push(box(-5, 0, z, 2, 2, 1, 'rock'));
+  b.push(box(3, 0, z, 2, 2, 1, 'rock'));
+  // picareta caida ao lado
+  b.push(box(4, 2, z, 1, 3, 1, 'loot'));
+  return b;
+};
+
+/** Modelo 3D do prospector para uma animacao/frame. */
+const prospectorModel = (anim, f) => {
+  if (anim === 'idle') return prospectorStanding({ bob: [0, 0, 1, 0][f % 4] });
+  if (anim === 'walk') return prospectorStanding({ st: [0, 1, 2, 1, 0, -1][f % 6] });
+  if (anim === 'attack') return prospectorStanding({ sw: [0, 0, 1, 2][f % 4] });
+  // dano: recuo real do tronco e da cabeca, nao um pixel de bob
+  if (anim === 'hit') return prospectorStanding({ lean: [1, 0][f % 2], bob: [1, 0][f % 2] });
+  // queda: dois frames tombando, depois o corpo ja no chao assentando
+  if (anim === 'die') {
+    if (f === 0) return prospectorStanding({ lean: 1, crouch: 1 });
+    if (f === 1) return prospectorStanding({ lean: 2, crouch: 3 });
+    return prospectorProne({ settle: Math.max(0, 4 - f) });
+  }
+  // abatido: respira devagar, com o farol pulsando
+  if (anim === 'downed') return prospectorProne({ breath: [0, 0, 1, 0][f % 4] });
+  // revive: espelha a queda — sobe do chao ate ficar de pe
+  if (anim === 'revive') {
+    if (f <= 2) return prospectorProne({ settle: f });
+    if (f === 3) return prospectorStanding({ lean: 2, crouch: 3 });
+    if (f === 4) return prospectorStanding({ lean: 1, crouch: 1 });
+    return prospectorStanding({});
+  }
+  return prospectorStanding({});
 };
 
 const prospectorFrame = (dir, anim, f) =>
