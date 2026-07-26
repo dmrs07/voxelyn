@@ -19,6 +19,8 @@ export type SpriteManifestEntry = {
   version: number;
   atlas: string;
   frameWidth: number;
+  /** Frames por linha do atlas. Ausente = linha unica (formato antigo). */
+  columns?: number;
   frameHeight: number;
   anchorX: number;
   anchorY: number;
@@ -67,9 +69,14 @@ export const resolveFrame = (
   const start = dirMap[useAnim] ?? dirMap[Object.keys(dirMap)[0]] ?? 0;
   const count = manifest.animations[useAnim]?.frames ?? 1;
   const normalized = ((frame % count) + count) % count;
+  // Atlas pode ter varias LINHAS: um sheet de linha unica estourava o limite de
+  // 4096px de largura de textura (real em GPU mobile) assim que os frames
+  // cresceram. `columns` diz quantos frames cabem por linha.
+  const index = start + normalized;
+  const columns = manifest.columns ?? Number.MAX_SAFE_INTEGER;
   return {
-    sx: (start + normalized) * manifest.frameWidth,
-    sy: 0,
+    sx: (index % columns) * manifest.frameWidth,
+    sy: Math.floor(index / columns) * manifest.frameHeight,
     sw: manifest.frameWidth,
     sh: manifest.frameHeight,
     flip,
