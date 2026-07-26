@@ -4,6 +4,7 @@
   "atlas": "player-prospector.png",
   "frameWidth": 32,
   "frameHeight": 40,
+  "columns": 124,
   "anchorX": 16,
   "anchorY": 38,
   "directions": 4,

@@ -181,13 +181,14 @@ export const fitToMargin = (src, margin = 2) => {
   return out;
 };
 
-export const blitToAtlas = (atlas, src, col) => {
+export const blitToAtlas = (atlas, src, col, row = 0) => {
   const ox = col * src.w;
+  const oy = row * src.h;
   for (let y = 0; y < src.h; y++) {
     for (let x = 0; x < src.w; x++) {
       const si = (y * src.w + x) * 4;
       if (src.buf[si + 3] === 0) continue;
-      const di = (y * atlas.w + ox + x) * 4;
+      const di = ((oy + y) * atlas.w + ox + x) * 4;
       atlas.buf.set(src.buf.subarray(si, si + 4), di);
     }
   }

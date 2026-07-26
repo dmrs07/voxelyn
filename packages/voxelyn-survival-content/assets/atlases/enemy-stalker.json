@@ -2,10 +2,11 @@
   "id": "enemy-stalker",
   "version": 2,
   "atlas": "enemy-stalker.png",
-  "frameWidth": 24,
-  "frameHeight": 24,
-  "anchorX": 12,
-  "anchorY": 22,
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "columns": 84,
+  "anchorX": 16,
+  "anchorY": 30,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -28,11 +29,12 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
-    "#46566e",
+    "#2f6b4f",
+    "#59f2c2",
+    "#66c28a",
     "#6e4a33",
-    "#d93b4c",
-    "#ff7a2f",
-    "#ffd166"
+    "#b8a98f",
+    "#d93b4c"
   ],
   "animations": {
     "idle": {

@@ -11,13 +11,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, '../assets/atlases');
 mkdirSync(OUT, { recursive: true });
 
+const MAX_TEXTURE = 4096;
+
 const orderedAnims = (spec) => ANIM_ORDER.filter((a) => spec.animations[a]);
 
 const buildEntity = (spec) => {
   const anims = orderedAnims(spec);
   const framesPerDir = anims.reduce((sum, a) => sum + spec.animations[a].frames, 0);
   const totalCols = framesPerDir * spec.authoredDirs.length;
-  const atlas = grid(totalCols * spec.frameWidth, spec.frameHeight);
+  // Teto de largura de textura (4096) e real em GPU mobile: acima disso o
+  // atlas simplesmente nao carrega no aparelho. Quando os frames nao cabem numa
+  // linha, o sheet passa a ter varias — cortar frames de animacao para caber
+  // seria degradar o jogo por causa de empacotamento.
+  const columns = Math.min(totalCols, Math.floor(MAX_TEXTURE / spec.frameWidth));
+  const rows = Math.ceil(totalCols / columns);
+  const atlas = grid(columns * spec.frameWidth, rows * spec.frameHeight);
   const frameMap = {};
   const palette = new Set();
   let col = 0;
@@ -38,7 +46,8 @@ const buildEntity = (spec) => {
         const frame = spec.id.startsWith('fx-') ? rawFrame : fitToMargin(rawFrame, 2);
         if (isEmpty(frame)) throw new Error(`${spec.id} ${dir}/${anim}/${f}: frame vazio`);
         for (const hex of colorsUsed(frame)) palette.add(hex);
-        blitToAtlas(atlas, frame, col++);
+        blitToAtlas(atlas, frame, col % columns, Math.floor(col / columns));
+        col++;
       }
     }
   }
@@ -54,6 +63,7 @@ const buildEntity = (spec) => {
     atlas: `${spec.id}.png`,
     frameWidth: spec.frameWidth,
     frameHeight: spec.frameHeight,
+    columns,
     anchorX: spec.anchorX,
     anchorY: spec.anchorY,
     directions: spec.directions,

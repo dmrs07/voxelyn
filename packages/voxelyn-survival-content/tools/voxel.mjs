@@ -25,6 +25,7 @@ export const RAMPS = {
   rust: ['bone', 'rust', 'rockShadow'],
   bone: ['bone', 'rust', 'rockShadow'],
   fungus: ['fungusLight', 'fungus', 'fungusDark'],
+  fungusDeep: ['fungus', 'fungusDark', 'dark'],
   biolum: ['biolum', 'fungusLight', 'fungus'],
   acid: ['acid', 'fungusLight', 'fungus'],
   fire: ['loot', 'fire', 'blood'],

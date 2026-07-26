@@ -26,4 +26,36 @@ describe('voxel character manifests', () => {
   it('maps cardinal vectors to four distinct isometric facings', () => {
     expect(new Set([[1, 0], [0, 1], [-1, 0], [0, -1]].map(([x, y]) => dirFromFacing(x, y))).size).toBe(4);
   });
+
+  // O guardiao tem frames suficientes para estourar o teto de 4096px de largura
+  // de textura, entao seu atlas tem DUAS linhas. Antes de `columns`, resolveFrame
+  // devolvia sy=0 sempre e sx crescia para fora da imagem: os frames da segunda
+  // linha eram recortados de area vazia e a entidade sumia em pleno ataque.
+  it('resolves frames that live on the second atlas row', () => {
+    const manifest = guardian as unknown as SpriteManifestEntry;
+    const totalFrames =
+      manifest.authoredDirs.length *
+      Object.values(manifest.animations).reduce((sum, def) => sum + def.frames, 0);
+    expect(manifest.columns).toBeLessThan(totalFrames); // ou seja: mais de uma linha
+    // 'ul'/'attack' comeca exatamente na virada de linha.
+    expect(resolveFrame(manifest, 'attack', 'ul', 0)).toMatchObject({ sx: 0, sy: manifest.frameHeight });
+    expect(resolveFrame(manifest, 'attack', 'ul', 1)).toMatchObject({
+      sx: manifest.frameWidth,
+      sy: manifest.frameHeight,
+    });
+  });
+
+  it('keeps every frame inside its atlas width', () => {
+    for (const manifest of manifests) {
+      const width = (manifest.columns ?? Number.MAX_SAFE_INTEGER) * manifest.frameWidth;
+      for (const direction of manifest.authoredDirs) {
+        for (const [animation, def] of Object.entries(manifest.animations)) {
+          for (let frame = 0; frame < def.frames; frame++) {
+            const rect = resolveFrame(manifest, animation, direction, frame);
+            expect(rect.sx + rect.sw).toBeLessThanOrEqual(width);
+          }
+        }
+      }
+    }
+  });
 });

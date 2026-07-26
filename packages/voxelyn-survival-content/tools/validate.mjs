@@ -10,11 +10,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
 const CANONICAL = {
   'player-prospector': [32, 40],
-  'enemy-stalker': [24, 24],
-  'enemy-spitter': [24, 24],
-  'enemy-spore-bomber': [24, 24],
-  'enemy-bruiser': [40, 48],
-  'enemy-guardian': [40, 48],
+  'enemy-stalker': [32, 32],
+  'enemy-spitter': [32, 32],
+  'enemy-spore-bomber': [32, 32],
+  'enemy-bruiser': [48, 56],
+  'enemy-guardian': [48, 56],
   'fx-projectile-bolt': [16, 16],
   'fx-impact-burst': [16, 16],
 };
@@ -25,12 +25,14 @@ const MAX_TOTAL_PNG_BYTES = 2.5 * 1024 * 1024;
 const MAX_DECODED_BYTES = 24 * 1024 * 1024;
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
-const framePixels = (png, m, col) => {
+const framePixels = (png, m, index) => {
   const pixels = [];
-  const x0 = col * m.frameWidth;
+  const columns = m.columns ?? Number.MAX_SAFE_INTEGER;
+  const x0 = (index % columns) * m.frameWidth;
+  const y0 = Math.floor(index / columns) * m.frameHeight;
   for (let y = 0; y < m.frameHeight; y++) {
     for (let x = 0; x < m.frameWidth; x++) {
-      const i = (y * png.width + x0 + x) * 4;
+      const i = ((y0 + y) * png.width + x0 + x) * 4;
       pixels.push([x, y, png.data[i], png.data[i + 1], png.data[i + 2], png.data[i + 3]]);
     }
   }
@@ -47,15 +49,18 @@ export const validateManifest = (id) => {
   const png = PNG.sync.read(readFileSync(pngPath));
   const anims = ANIM_ORDER.filter((a) => m.animations[a]);
   const framesPerDir = anims.reduce((s, a) => s + m.animations[a].frames, 0);
-  const expectedCols = framesPerDir * m.authoredDirs.length;
-  const expectedW = expectedCols * m.frameWidth;
+  const totalFrames = framesPerDir * m.authoredDirs.length;
+  const columns = m.columns ?? totalFrames;
+  const expectedW = Math.min(totalFrames, columns) * m.frameWidth;
+  const expectedRows = Math.ceil(totalFrames / columns);
+  const expectedH = expectedRows * m.frameHeight;
 
   const canonical = CANONICAL[id];
   if (canonical && (m.frameWidth !== canonical[0] || m.frameHeight !== canonical[1])) {
     errors.push(`${id}: canvas ${m.frameWidth}x${m.frameHeight} != canônico ${canonical[0]}x${canonical[1]}`);
   }
   if (png.width !== expectedW) errors.push(`${id}: largura ${png.width} != ${expectedW}`);
-  if (png.height !== m.frameHeight) errors.push(`${id}: altura ${png.height} != ${m.frameHeight}`);
+  if (png.height !== expectedH) errors.push(`${id}: altura ${png.height} != ${expectedH}`);
   if (png.width > MAX_ATLAS_WIDTH) errors.push(`${id}: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
   if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push(`${id}: PNG excede 512 KiB`);
   if (!(m.anchorX >= 0 && m.anchorX < m.frameWidth)) errors.push(`${id}: anchorX fora do frame`);

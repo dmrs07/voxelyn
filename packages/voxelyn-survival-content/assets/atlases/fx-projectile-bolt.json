@@ -4,6 +4,7 @@
   "atlas": "fx-projectile-bolt.png",
   "frameWidth": 16,
   "frameHeight": 16,
+  "columns": 4,
   "anchorX": 8,
   "anchorY": 8,
   "directions": 1,
