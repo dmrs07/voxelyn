@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EntityPresentation, recoilAtElapsed } from './presentation';
+import { EntityPresentation, locomotionFacing, recoilAtElapsed } from './presentation';
 
 const baseAnim = (anim: string, animStartMs = 0) => ({
   anim,
@@ -26,6 +26,33 @@ const actionEntity = (archetype: string, kind: string) => ({
   },
 });
 
+describe('locomotionFacing', () => {
+  it.each([
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ])('usa a direção real do deslocamento (%s, %s) durante walk, sem cair em DR', (moveX, moveY) => {
+    const facing = locomotionFacing(
+      { ...baseAnim('walk'), moveFacingX: moveX, moveFacingY: moveY } as never,
+      0,
+      0
+    );
+
+    expect(facing).toEqual({ x: moveX, y: moveY });
+  });
+
+  it('preserva o facing autoritativo fora da caminhada', () => {
+    const facing = locomotionFacing(
+      { ...baseAnim('idle'), moveFacingX: 0, moveFacingY: -1 } as never,
+      -1,
+      0
+    );
+
+    expect(facing).toEqual({ x: -1, y: 0 });
+  });
+});
+
 describe('recoilAtElapsed', () => {
   it('comeca no release e retorna suavemente a zero', () => {
     expect(recoilAtElapsed(49, 50)).toBe(0);
@@ -40,6 +67,19 @@ describe('recoilAtElapsed', () => {
 });
 
 describe('EntityPresentation', () => {
+  it('apresenta walk na direção do deslocamento quando o facing da entidade está zerado', () => {
+    const presentation = new EntityPresentation();
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 0, y: 0 } };
+    const state = { tick: 0 };
+    const base = { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 };
+
+    const presented = presentation.animationFor(entity as never, state as never, base as never, 1_000);
+
+    expect(presented.anim).toBe('walk');
+    expect(presented.facingX).toBe(-1);
+    expect(presented.facingY).toBe(0);
+  });
+
   it('avanca recoil entre renders mesmo quando o tick nao muda', () => {
     const presentation = new EntityPresentation();
     const entity = actionEntity('prospector', 'shoot');
