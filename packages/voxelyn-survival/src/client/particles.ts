@@ -11,9 +11,10 @@
 // explosao, so a desenha. Duas maquinas no co-op recebem o mesmo evento e
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
+import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
-export type ParticleKind = 'ember' | 'gas' | 'debris' | 'spark';
+export type ParticleKind = 'ember' | 'gas' | 'debris' | 'spark' | 'rubble' | 'crystalShard';
 
 type Particle = {
   x: number; // tile
@@ -33,6 +34,10 @@ const RAMP: Record<ParticleKind, string[]> = {
   gas: ['#a8e63c', '#2f6b4f', '#1f3d33'],
   debris: ['#46566e', '#2e3a4d', '#1d2430'],
   spark: ['#e8f1ff', '#7ab8ff', '#2e3a4d'],
+  // Materiais de bloco: os cacos saem da MESMA paleta com que o bloco foi
+  // renderizado, senao o entulho nao parece feito da pedra que acabou de cair.
+  rubble: ['#6e4a33', '#46566e', '#2e3a4d'],
+  crystalShard: ['#59f2c2', '#2f6b4f', '#1f3d33'],
 };
 
 /**
@@ -117,6 +122,17 @@ export class VoxelParticles {
             this.burst(cx, cy, 'spark', n(2), 1.6, 2.6, 240, cell);
           }
           break;
+        case 'break': {
+          // O bloco se desfaz no PROPRIO material. O evento carrega qual era,
+          // porque quando ele chega a grade ja mudou e o cliente nao teria mais
+          // como saber o que caiu ali.
+          const kind: ParticleKind = ev.solid === SOLID_CRYSTAL ? 'crystalShard' : 'rubble';
+          // Poucos cacos POR bloco de proposito: uma explosao derruba dezenas
+          // de celulas de uma vez, e 12 cacos em cada uma comeria o orcamento
+          // inteiro — o entulho expulsaria as brasas da propria explosao.
+          this.burst(ev.x, ev.y, kind, n(6), 1.6, 1.5, 620, 7);
+          break;
+        }
         case 'death':
           // Acompanha o desabamento do sprite: a criatura vira materia.
           this.burst(ev.x, ev.y, 'debris', n(9), 1.5, 1.3, 560, ev.entity);

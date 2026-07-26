@@ -6,6 +6,7 @@ import {
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_NONE,
+  SOLID_ROCK,
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
@@ -101,6 +102,38 @@ describe('reacoes sistemicas', () => {
 
     expect(events.some((e) => e.t === 'discharge')).toBe(true);
     expect(enemy.hp).toBeLessThan(hpBefore);
+  });
+
+  // O cliente desfaz o bloco no material dele, e quando o evento chega a grade
+  // ja mudou — sem `solid` no evento nao ha como saber o que caiu ali.
+  it('anuncia o solido que caiu, com o material', () => {
+    const state = createRun({ seed: 11 });
+    const w = state.config.width;
+    clearArea(state, 20, 20, 30, 26);
+    state.solid[23 * w + 22] = SOLID_FRAGILE;
+    state.solid[23 * w + 24] = SOLID_CRYSTAL;
+
+    const events: SemanticEvent[] = [];
+    expect(breakSolid(state, 22, 23, events)).toBe(true);
+    expect(breakSolid(state, 24, 23, events)).toBe(true);
+
+    const breaks = events.filter((e) => e.t === 'break') as Array<
+      Extract<SemanticEvent, { t: 'break' }>
+    >;
+    expect(breaks.map((b) => b.solid)).toEqual([SOLID_FRAGILE, SOLID_CRYSTAL]);
+    // Coordenada no CENTRO da celula: os cacos saem do meio do bloco, nao do
+    // canto, senao o entulho nasce deslocado meio tile.
+    expect(breaks[0]).toMatchObject({ x: 22.5, y: 23.5 });
+  });
+
+  it('nao anuncia quebra quando nada foi destruido', () => {
+    const state = createRun({ seed: 12 });
+    const w = state.config.width;
+    clearArea(state, 40, 40, 46, 46);
+    state.solid[43 * w + 43] = SOLID_ROCK;
+    const events: SemanticEvent[] = [];
+    expect(breakSolid(state, 43, 43, events)).toBe(false);
+    expect(events.some((e) => e.t === 'break')).toBe(false);
   });
 
   it('explosao rompe rocha fragil e abre caminho', () => {

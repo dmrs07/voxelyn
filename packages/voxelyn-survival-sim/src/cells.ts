@@ -110,9 +110,11 @@ export const explodeAt = (
         state.solid[i] = SOLID_NONE;
         state.surface[i] = SURF_SCORCHED;
         markDirty(state, x, y);
+        events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid: SOLID_FRAGILE });
       } else if (state.solid[i] === SOLID_CRYSTAL) {
         state.solid[i] = SOLID_NONE;
         markDirty(state, x, y);
+        events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid: SOLID_CRYSTAL });
         dischargeAt(state, x, y, events);
       } else if (state.solid[i] === SOLID_NONE) {
         igniteCell(state, i, events);
@@ -227,11 +229,13 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
     state.solid[i] = SOLID_NONE;
     state.surface[i] = SURF_SCORCHED;
     markDirty(state, x, y);
+    events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     return true;
   }
   if (solid === SOLID_CRYSTAL) {
     state.solid[i] = SOLID_NONE;
     markDirty(state, x, y);
+    events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     dischargeAt(state, x, y, events);
     return true;
   }

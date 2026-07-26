@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { VoxelParticles } from '../client/particles';
+import { SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
 const explosion = (x = 10, y = 10, radius = 3): SemanticEvent => ({ t: 'explosion', x, y, radius });
@@ -95,6 +96,32 @@ describe('particulas voxel', () => {
     expect(items.length).toBeGreaterThan(3);
     const spots = new Set(items.map((it) => `${it.x.toFixed(3)},${it.y.toFixed(3)}`));
     expect(spots.size).toBeGreaterThan(1);
+  });
+
+  // O evento carrega o material porque quando ele chega a grade ja mudou: o
+  // cliente nao teria mais como saber o que havia naquela celula.
+  it('desfaz o bloco no proprio material', () => {
+    const pedra = new VoxelParticles();
+    const cristal = new VoxelParticles();
+    pedra.ingest([{ t: 'break', x: 4.5, y: 4.5, solid: SOLID_FRAGILE }], 96, 1);
+    cristal.ingest([{ t: 'break', x: 4.5, y: 4.5, solid: SOLID_CRYSTAL }], 96, 1);
+    const kinds = (p: VoxelParticles) =>
+      new Set((p as unknown as { items: Array<{ kind: string }> }).items.map((i) => i.kind));
+    expect(kinds(pedra)).toEqual(new Set(['rubble']));
+    expect(kinds(cristal)).toEqual(new Set(['crystalShard']));
+  });
+
+  it('desmorona rasteiro, nao explode para cima', () => {
+    const quebra = new VoxelParticles();
+    const estouro = new VoxelParticles();
+    quebra.ingest([{ t: 'break', x: 4.5, y: 4.5, solid: SOLID_FRAGILE }], 96, 1);
+    estouro.ingest([explosion(4.5, 4.5)], 96, 1);
+    const topo = (p: VoxelParticles) => {
+      for (let i = 0; i < 10; i++) p.step(33);
+      const items = (p as unknown as { items: Array<{ z: number }> }).items;
+      return items.length ? Math.max(...items.map((it) => it.z)) : 0;
+    };
+    expect(topo(quebra)).toBeLessThan(topo(estouro));
   });
 
   it('ignora eventos que nao geram materia', () => {

@@ -40,6 +40,42 @@ const hash2 = (x, y, seed) => {
   return (h ^ (h >>> 16)) >>> 0;
 };
 
+const hash3d = (x, y, z, seed) => {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h ^ (h >>> 16)) >>> 0;
+};
+
+/**
+ * Material de UM voxel do bloco.
+ *
+ * A primeira versao decidia material por COLUNA e so no voxel do topo, entao as
+ * faces laterais saiam em cor unica: uma tampa texturizada sobre uma parede
+ * lisa. Um bloco de verdade e o mesmo material por dentro e por fora, e o veio
+ * que aparece no topo tem de continuar descendo pela lateral.
+ *
+ * Aqui a textura e VOLUMETRICA: o material depende de (x, y, z), entao qualquer
+ * face que o bloco exponha — topo, lateral, ou a face nova aberta quando o
+ * vizinho e destruido — mostra a mesma pedra malhada.
+ */
+const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
+  const h = hash3d(cx, cy, cz, variant + 1);
+  // Malha de pedra: manchas mais escuras espalhadas pelo volume inteiro.
+  const base = h % 5 === 0 ? 'rockDeep' : 'rock';
+  const surface = cz === top;
+  if (kind === 'fragile') {
+    // Rocha rachada: ferrugem aflora em manchas, mais densa perto da superficie.
+    if ((h >>> 3) % (surface ? 4 : 7) === 0) return 'rust';
+  } else if (kind === 'ore') {
+    // O veio ATRAVESSA o bloco em vez de ficar pintado no topo.
+    if ((h >>> 3) % (surface ? 4 : 6) === 0) return 'loot';
+    if ((h >>> 6) % 6 === 0) return 'rust';
+  } else if (kind === 'crystal') {
+    if ((h >>> 3) % (surface ? 5 : 8) === 0) return 'biolum';
+  }
+  return base;
+};
+
 /**
  * Um bloco e uma coluna de voxels por celula da grade 8x8. O topo e irregular:
  * e essa irregularidade que faz a pedra ler como agregado e nao como uma tampa
@@ -62,23 +98,21 @@ const blockModel = (kind, variant) => {
       // sao a mesma rocha com inclusoes diferentes, e as inclusoes (ferrugem,
       // veio metalico, cristal) ja separam os quatro a distancia. Dar corpos
       // mais escuros aos tipos especiais so apagava as faces laterais.
-      const base = 'rock';
-      let cap = null;
-      if (kind === 'fragile') {
-        if ((h >>> 3) % 4 === 0) cap = 'rust'; // fragmentos soltos
-      } else if (kind === 'ore') {
-        if ((h >>> 3) % 4 === 0) cap = 'loot'; // veio metalico
-        else if ((h >>> 5) % 5 === 0) cap = 'rust';
-      } else if (kind === 'crystal') {
-        if ((h >>> 3) % 5 === 0) cap = 'biolum';
+      //
+      // A coluna vira uma sequencia de voxels com material proprio, e trechos
+      // vizinhos do mesmo material sao fundidos numa caixa so — a textura fica
+      // volumetrica sem multiplicar o numero de caixas a rasterizar.
+      let runMat = null;
+      let runStart = 0;
+      for (let cz = 0; cz < height; cz++) {
+        const mat = voxelMaterial(cx, cy, cz, kind, variant, height - 1);
+        if (mat !== runMat) {
+          if (runMat) boxes.push(box(x, y, runStart, 1, 1, cz - runStart, runMat));
+          runMat = mat;
+          runStart = cz;
+        }
       }
-
-      if (cap) {
-        boxes.push(box(x, y, 0, 1, 1, height - 1, base));
-        boxes.push(box(x, y, height - 1, 1, 1, 1, cap));
-      } else {
-        boxes.push(box(x, y, 0, 1, 1, height, base));
-      }
+      boxes.push(box(x, y, runStart, 1, 1, height - runStart, runMat));
 
       // Cristal cresce ACIMA da superficie: e o unico bloco com silhueta
       // propria, para o jogador reconhecer de longe o que vale minerar.
