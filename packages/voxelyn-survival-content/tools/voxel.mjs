@@ -47,20 +47,18 @@ export const VOX = { tileW: 4, tileH: 2, zStep: 2 };
 const KEY_BIAS = 64;
 
 /**
- * Rotacao de base aplicada antes da direcao pedida.
+ * Rotacao do modelo para cada direcao isometrica autorada.
  *
- * Na projecao 2:1 a camera enxerga as faces +x e +y (as de maior x+y, que o
- * algoritmo do pintor desenha por ultimo). Os modelos, porem, sao autorados com
- * a FRENTE em -y — visor, placa peitoral, nucleo, fenda dos olhos, garganta
- * acida. Sem esta rotacao os seis personagens apareciam de costas em 'dr', que
- * e justamente a direcao em que o personagem anda PARA a camera, e todo detalhe
- * de frente vazava apenas 3px pela aresta do topo. Era por isso que o nucleo do
- * guardiao e o olho do bomber simplesmente nao existiam na tela.
+ * Os modelos sao escritos com a FRENTE em -y. Na projecao do jogo, os vetores
+ * de mundo correspondem a: +x=dr, +y=dl, -y=ur e -x=ul. Uma soma constante de
+ * rotacao nao representa essa ordem (ur/ul ficam trocados e outras direcoes
+ * apontam para o quadrante vizinho), que fazia os personagens parecerem andar
+ * como Curupira.
  *
- * Girar aqui, e nao nos modelos, mantem os modelos legiveis: quem autora pensa
- * em "a frente e -y" e nao precisa saber para onde a camera olha.
+ * Cada indice continua seguindo o contrato publico de renderVoxels:
+ * 0=dr, 1=dl, 2=ur, 3=ul.
  */
-const FACING_OFFSET = 2;
+const DIRECTION_ROTATION = [1, 2, 0, 3];
 
 const rot = (x, y, r) => {
   if (r === 1) return [-y, x];
@@ -111,9 +109,11 @@ const cube = (g, sx, sy, ramp) => {
  * @param dirIndex 0=dr, 1=dl, 2=ur, 3=ul (rotacoes do mesmo modelo)
  */
 export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
+  const rotation = DIRECTION_ROTATION[dirIndex];
+  if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
   const g = grid(w, h);
   const commands = [];
-  for (const v of shellVoxels(boxes, (dirIndex + FACING_OFFSET) % 4)) {
+  for (const v of shellVoxels(boxes, rotation)) {
     const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
     commands.push({
       key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0),
