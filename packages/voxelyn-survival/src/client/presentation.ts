@@ -42,6 +42,23 @@ const actionElapsedMs = (action: ActionIntent, tick: number): number =>
   Math.max(0, ((tick - action.startTick) / TICK_HZ) * 1000);
 
 /**
+ * Resolve a direção visual de locomoção sem cair no DR implícito de
+ * `dirFromFacing(0, 0)`. Durante walk, o deslocamento observado é a fonte de
+ * verdade; fora dele, preservamos o facing autoritativo da entidade.
+ */
+export const locomotionFacing = (
+  base: EntityAnimState,
+  fallbackX: number,
+  fallbackY: number
+): { x: number; y: number } => {
+  const hasMoveFacing = Math.hypot(base.moveFacingX, base.moveFacingY) > 0.001;
+  if (base.anim === 'walk' && hasMoveFacing) {
+    return { x: base.moveFacingX, y: base.moveFacingY };
+  }
+  return { x: fallbackX, y: fallbackY };
+};
+
+/**
  * Recoil visual curto e desacoplado da simulação. Ele nasce no release do
  * ataque e volta rapidamente a zero usando ease-out quadrático.
  */
@@ -61,15 +78,15 @@ const layeredPlayerAnimation = (
 ): LayeredPlayerAnimation => {
   const releaseMs = Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000);
   const walking = base.anim === 'walk';
-  const hasMoveFacing = Math.hypot(base.moveFacingX, base.moveFacingY) > 0.001;
+  const lowerFacing = locomotionFacing(base, entity.facing.x, entity.facing.y);
 
   return {
     kind: 'layered-player',
     lower: {
       animation: walking ? 'walk' : 'idle',
       elapsedMs: nowMs - base.animStartMs,
-      facingX: walking && hasMoveFacing ? base.moveFacingX : entity.facing.x,
-      facingY: walking && hasMoveFacing ? base.moveFacingY : entity.facing.y,
+      facingX: lowerFacing.x,
+      facingY: lowerFacing.y,
     },
     upper: {
       animation: actionAnimation(action.action),
@@ -227,11 +244,12 @@ export class EntityPresentation {
       this.actionVisualClocks.delete(entity.id);
     }
 
+    const facing = locomotionFacing(base, entity.facing.x, entity.facing.y);
     return {
       anim: base.anim,
       elapsedMs: nowMs - base.animStartMs,
-      facingX: entity.facing.x,
-      facingY: entity.facing.y,
+      facingX: facing.x,
+      facingY: facing.y,
     };
   }
 
