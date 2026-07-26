@@ -27,14 +27,19 @@ const actionEntity = (archetype: string, kind: string) => ({
 });
 
 describe('locomotionFacing', () => {
-  it('usa a direção real do deslocamento durante walk, sem cair em DR', () => {
+  it.each([
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ])('usa a direção real do deslocamento (%s, %s) durante walk, sem cair em DR', (moveX, moveY) => {
     const facing = locomotionFacing(
-      { ...baseAnim('walk'), moveFacingX: 0, moveFacingY: -1 } as never,
+      { ...baseAnim('walk'), moveFacingX: moveX, moveFacingY: moveY } as never,
       0,
       0
     );
 
-    expect(facing).toEqual({ x: 0, y: -1 });
+    expect(facing).toEqual({ x: moveX, y: moveY });
   });
 
   it('preserva o facing autoritativo fora da caminhada', () => {
