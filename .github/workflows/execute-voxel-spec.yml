@@ -41,7 +41,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Regenerate normalized character atlases
-        run: pnpm --filter @voxelyn/survival-content generate
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/voxel-validation.log
 
       - name: Persist regenerated atlases
         run: |
@@ -60,7 +62,7 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          pnpm build:survival 2>&1 | tee /tmp/voxel-validation.log
+          pnpm build:survival 2>&1 | tee -a /tmp/voxel-validation.log
 
       - name: Validate and test survival packages
         id: tests
