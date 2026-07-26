@@ -10,6 +10,8 @@ import {
 } from '@voxelyn/survival-content';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
+import playerLowerManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.json';
+import playerUpperManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.json';
 import stalkerManifest from '@voxelyn/survival-content/assets/atlases/enemy-stalker.json';
 import spitterManifest from '@voxelyn/survival-content/assets/atlases/enemy-spitter.json';
 import bomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.json';
@@ -20,6 +22,8 @@ import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-b
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
+import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
+import playerUpperUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
 import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.png?url';
 import bomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.png?url';
@@ -29,9 +33,29 @@ import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 
+export type SpriteAnimationLayer = {
+  animation: string;
+  elapsedMs: number;
+  facingX: number;
+  facingY: number;
+};
+
+export type LayeredPlayerAnimation = {
+  kind: 'layered-player';
+  lower: SpriteAnimationLayer;
+  upper: SpriteAnimationLayer;
+  /** Intensidade normalizada de 0 a 1; desloca o tronco contra a mira. */
+  recoil: number;
+};
+
+export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
+
+type Tint = { color: string; alpha: number };
 type Loaded = { manifest: SpriteManifestEntry; image: HTMLImageElement; ready: boolean; failed: boolean };
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
+  { manifest: playerLowerManifest as unknown as SpriteManifestEntry, url: playerLowerUrl },
+  { manifest: playerUpperManifest as unknown as SpriteManifestEntry, url: playerUpperUrl },
   { manifest: stalkerManifest as unknown as SpriteManifestEntry, url: stalkerUrl },
   { manifest: spitterManifest as unknown as SpriteManifestEntry, url: spitterUrl },
   { manifest: bomberManifest as unknown as SpriteManifestEntry, url: bomberUrl },
@@ -101,6 +125,27 @@ export class TerrainBank {
   }
 }
 
+const PLAYER_LOWER_ID = 'layer-player-prospector-lower';
+const PLAYER_UPPER_ID = 'layer-player-prospector-upper';
+const WALK_HIP_BOB = [0, -1, -1, 0, 0, -1];
+
+export const recoilScreenOffset = (
+  facingX: number,
+  facingY: number,
+  recoil: number,
+  zoom: number
+): { x: number; y: number } => {
+  const worldLength = Math.hypot(facingX, facingY) || 1;
+  const screenX = (facingX - facingY) / worldLength;
+  const screenY = (facingX + facingY) / (worldLength * 2);
+  const screenLength = Math.hypot(screenX, screenY) || 1;
+  const distance = Math.max(0, Math.min(1, recoil)) * 2.25 * zoom;
+  return {
+    x: -(screenX / screenLength) * distance,
+    y: -(screenY / screenLength) * distance,
+  };
+};
+
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
   private tintBuffer: HTMLCanvasElement | null = null;
@@ -137,6 +182,86 @@ export class SpriteBank {
   drawEntity(
     ctx: CanvasRenderingContext2D,
     archetype: string,
+    animation: SpriteAnimationSelection,
+    facingX: number,
+    facingY: number,
+    elapsedMs: number,
+    footX: number,
+    footY: number,
+    zoom: number,
+    tint?: Tint
+  ): boolean {
+    if (typeof animation !== 'string' && archetype === 'prospector') {
+      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint)) return true;
+      // Os atlas de camada ainda podem estar carregando. O atlas completo mantém
+      // o personagem visível e usa a ação do tronco como fallback temporário.
+      facingX = animation.upper.facingX;
+      facingY = animation.upper.facingY;
+      elapsedMs = animation.upper.elapsedMs;
+      animation = animation.upper.animation;
+    }
+
+    if (typeof animation !== 'string') animation = animation.upper.animation;
+    const loaded = this.spriteForArchetype(archetype);
+    if (!loaded) return false;
+    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint);
+    return true;
+  }
+
+  private drawLayeredPlayer(
+    ctx: CanvasRenderingContext2D,
+    animation: LayeredPlayerAnimation,
+    footX: number,
+    footY: number,
+    zoom: number,
+    tint?: Tint
+  ): boolean {
+    const lower = this.get(PLAYER_LOWER_ID);
+    const upper = this.get(PLAYER_UPPER_ID);
+    if (!lower || !upper) return false;
+
+    this.drawLoadedFrame(
+      ctx,
+      lower,
+      animation.lower.animation,
+      animation.lower.facingX,
+      animation.lower.facingY,
+      animation.lower.elapsedMs,
+      footX,
+      footY,
+      zoom,
+      tint
+    );
+
+    const lowerFrame = frameAtTime(lower.manifest, animation.lower.animation, animation.lower.elapsedMs);
+    const hipBob = animation.lower.animation === 'walk'
+      ? WALK_HIP_BOB[lowerFrame % WALK_HIP_BOB.length] * zoom
+      : 0;
+    const recoil = recoilScreenOffset(
+      animation.upper.facingX,
+      animation.upper.facingY,
+      animation.recoil,
+      zoom
+    );
+
+    this.drawLoadedFrame(
+      ctx,
+      upper,
+      animation.upper.animation,
+      animation.upper.facingX,
+      animation.upper.facingY,
+      animation.upper.elapsedMs,
+      footX + recoil.x,
+      footY + hipBob + recoil.y,
+      zoom,
+      tint
+    );
+    return true;
+  }
+
+  private drawLoadedFrame(
+    ctx: CanvasRenderingContext2D,
+    loaded: Loaded,
     animation: string,
     facingX: number,
     facingY: number,
@@ -144,10 +269,8 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: { color: string; alpha: number }
-  ): boolean {
-    const loaded = this.spriteForArchetype(archetype);
-    if (!loaded) return false;
+    tint?: Tint
+  ): void {
     const { manifest, image } = loaded;
     const fallbackAnimation = animation === 'special' && !manifest.animations.special ? 'attack' : animation;
     const useAnimation = manifest.animations[fallbackAnimation] ? fallbackAnimation : 'idle';
@@ -180,7 +303,6 @@ export class SpriteBank {
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
     }
     ctx.restore();
-    return true;
   }
 
   private tintedFrame(
@@ -188,7 +310,7 @@ export class SpriteBank {
     rect: { sx: number; sy: number; sw: number; sh: number },
     width: number,
     height: number,
-    tint: { color: string; alpha: number }
+    tint: Tint
   ): HTMLCanvasElement {
     if (!this.tintBuffer) this.tintBuffer = document.createElement('canvas');
     const buffer = this.tintBuffer;
@@ -239,6 +361,8 @@ export class SpriteBank {
   }
 }
 
+const MOVEMENT_HOLD_MS = 120;
+
 export type EntityAnimState = {
   anim: string;
   animStartMs: number;
@@ -246,6 +370,9 @@ export type EntityAnimState = {
   lastY: number;
   lastHp: number;
   hitUntilMs: number;
+  movingUntilMs: number;
+  moveFacingX: number;
+  moveFacingY: number;
 };
 
 export const deriveAnim = (
@@ -263,11 +390,23 @@ export const deriveAnim = (
     lastY: y,
     lastHp: hp,
     hitUntilMs: 0,
+    movingUntilMs: 0,
+    moveFacingX: 0,
+    moveFacingY: 0,
   };
-  const moved = Math.hypot(x - state.lastX, y - state.lastY) > 0.004;
+  const dx = x - state.lastX;
+  const dy = y - state.lastY;
+  const distance = Math.hypot(dx, dy);
+  const moved = distance > 0.004;
+  if (moved) {
+    state.movingUntilMs = nowMs + MOVEMENT_HOLD_MS;
+    state.moveFacingX = dx / distance;
+    state.moveFacingY = dy / distance;
+  }
+  const moving = moved || nowMs < state.movingUntilMs;
   const tookDamage = hp < state.lastHp - 0.01;
   if (tookDamage) state.hitUntilMs = nowMs + 180;
-  const next = !alive ? 'die' : nowMs < state.hitUntilMs ? 'hit' : moved ? 'walk' : 'idle';
+  const next = !alive ? 'die' : nowMs < state.hitUntilMs ? 'hit' : moving ? 'walk' : 'idle';
   if (next !== state.anim) {
     state.anim = next;
     state.animStartMs = nowMs;

@@ -13,6 +13,7 @@ import {
   blockBounds,
   buildTerrainFrames,
 } from './terrain.mjs';
+import { PLAYER_LAYER_SPECS } from './player-layers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, '../assets/atlases');
@@ -59,11 +60,22 @@ const buildEntity = (spec) => {
     }
   }
 
+  // Camadas que precisam se combinar podem fornecer frames completos apenas
+  // como referência de alinhamento. A união é calculada sobre referência +
+  // camada, mas somente os frames da camada são escritos no atlas final.
+  const fitReference = typeof spec.fitReference === 'function' ? spec.fitReference() : [];
+
   // FX mantem o canvas autorado: seu movimento radial usa de proposito os 16x16
   // inteiros. Sheets de personagem preservam a margem de 2px da Art Bible.
   let frames;
   try {
-    frames = spec.id.startsWith('fx-') ? raw : fitSpriteToMargin(raw, 2);
+    if (spec.id.startsWith('fx-')) {
+      frames = raw;
+    } else if (fitReference.length > 0) {
+      frames = fitSpriteToMargin([...fitReference, ...raw], 2).slice(fitReference.length);
+    } else {
+      frames = fitSpriteToMargin(raw, 2);
+    }
   } catch (err) {
     throw new Error(`${spec.id}: ${err.message}`);
   }
@@ -152,15 +164,15 @@ const buildTerrain = () => {
   return { id: 'terrain-blocks', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
 };
 
-const results = ENTITY_SPECS.map(buildEntity);
+const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS].map(buildEntity);
 // O terreno fica FORA do index de sprites: nao tem animacao, direcao nem
 // frameMap, e o validador de sprites tentaria le-lo como personagem.
 const terrainResult = buildTerrain();
 const index = {
-  version: 2,
-  generated: 'deterministic-code-v2',
+  version: 3,
+  generated: 'deterministic-code-v3-layered-player',
   ids: results.map((r) => r.id),
 };
 writeFileSync(resolve(OUT, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
 console.log('atlases gerados:');
-for (const r of [...results, terrainResult]) console.log(`  ${r.id.padEnd(24)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);
+for (const r of [...results, terrainResult]) console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);
