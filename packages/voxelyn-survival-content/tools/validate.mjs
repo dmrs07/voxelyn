@@ -9,7 +9,7 @@ import { ANIM_ORDER } from './entities.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
 const CANONICAL = {
-  'player-prospector': [24, 32],
+  'player-prospector': [32, 40],
   'enemy-stalker': [24, 24],
   'enemy-spitter': [24, 24],
   'enemy-spore-bomber': [24, 24],

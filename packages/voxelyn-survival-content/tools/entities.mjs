@@ -1,3 +1,4 @@
+import { box, renderVoxels } from './voxel.mjs';
 import {
   facetEllipse,
   fillDiamond,
@@ -129,15 +130,58 @@ const drawProspector = (dir, pose = {}) => {
   return g;
 };
 
-const prospectorFrame = (dir, anim, f) => {
-  if (anim === 'idle') return drawProspector(dir, { bob: [0, 0, -1, 0][f] });
-  if (anim === 'walk') return drawProspector(dir, { bob: bob6[f], phase: walkPhase[f] });
-  if (anim === 'attack') return drawProspector(dir, { attack: [0, 1, 2, 0][f] });
-  if (anim === 'hit') return drawProspector(dir, { hit: [1, 0][f] });
-  if (anim === 'downed') return drawProspector(dir, { downed: f + 1 });
-  if (anim === 'revive') return drawProspector(dir, { revive: f + 1 });
-  return drawProspector(dir, { death: f });
+// ---------------------------------------------------------------------------
+// player-prospector 32x40 — MODELO VOXEL
+//
+// Este e o primeiro personagem migrado do desenho 2D para o rasterizador voxel.
+// As quatro direcoes sao rotacoes do mesmo modelo, entao nao podem divergir
+// entre si como acontecia quando cada uma era redesenhada a mao.
+// ---------------------------------------------------------------------------
+const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
+
+/** Modelo 3D do prospector para uma animacao/frame. Eixos: x leste, y sul, z cima. */
+const prospectorModel = (anim, f) => {
+  const bob = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
+  const st = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  const sw = anim === 'attack' ? [0, 0, 1, 2][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // morte e abatimento derrubam o corpo: o torso desce e as pernas recolhem
+  const fall = anim === 'die' ? Math.min(5, f) : anim === 'downed' ? 5 : 0;
+  const rise = anim === 'revive' ? Math.min(5, 5 - f) : 0;
+  const drop = Math.max(fall, rise);
+  const y0 = -bob + flinch + drop;
+
+  const b = [];
+  const legZ = Math.max(0, 5 - drop);
+  // botas + pernas
+  b.push(box(-2, -1, Math.max(0, st), 2, 2, 1, 'rust'));
+  b.push(box(1, -1, Math.max(0, -st), 2, 2, 1, 'rust'));
+  b.push(box(-2, -1, 1 + Math.max(0, st), 2, 2, Math.max(1, legZ - 1), 'rockDeep'));
+  b.push(box(1, -1, 1 + Math.max(0, -st), 2, 2, Math.max(1, legZ - 1), 'rockDeep'));
+  // cinto
+  b.push(box(-2, -1, 5 - y0, 5, 2, 1, 'loot'));
+  // torso: peitoral na frente, modulo fungico nas costas
+  b.push(box(-2, -1, 6 - y0, 5, 2, 4, 'rock'));
+  b.push(box(-2, -2, 6 - y0, 5, 1, 4, 'rust'));
+  b.push(box(-1, 1, 7 - y0, 3, 1, 3, 'fungus'));
+  b.push(box(-1, 2, 8 - y0, 3, 1, 1, 'biolum'));
+  // ombreiras: largura maxima da silhueta
+  b.push(box(-3, -1, 9 - y0, 1, 2, 1, 'rock'));
+  b.push(box(3, -1, 9 - y0, 1, 2, 1, 'rock'));
+  // pescoco + capacete estreito + visor + lanterna
+  b.push(box(-1, -1, 10 - y0, 3, 2, 1, 'rockDeep'));
+  b.push(box(-1, -1, 11 - y0, 3, 3, 2, 'bone'));
+  b.push(box(-1, -2, 11 - y0, 3, 1, 1, 'biolum'));
+  b.push(box(0, -2, 13 - y0, 1, 1, 1, 'loot'));
+  // bracos + picareta
+  b.push(box(-3, -1, 6 - y0, 1, 2, 3, 'rock'));
+  b.push(box(3, -1, 6 - y0 + sw, 1, 2, 3, 'rock'));
+  b.push(box(3, -2, 4 - y0 + sw * 3, 1, 1, 3, 'loot'));
+  return b;
 };
+
+const prospectorFrame = (dir, anim, f) =>
+  renderVoxels(prospectorModel(anim, f), DIR_INDEX[dir], 32, 40, 14, 34);
 
 // ---------------------------------------------------------------------------
 // enemy-stalker 24x24
@@ -462,7 +506,7 @@ const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, 
 });
 
 export const ENTITY_SPECS = [
-  base('player-prospector', 24, 32, 12, 30, { w: 0.68, h: 1 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
+  base('player-prospector', 32, 40, 16, 38, { w: 0.68, h: 1 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
     ...living,
     downed: { frames: 4, fps: 6, loop: true },
     revive: { frames: 6, fps: 8, loop: false },

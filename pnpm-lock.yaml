@@ -181,6 +181,10 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.0.9)
 
   packages/voxelyn-survival-content:
+    dependencies:
+      '@voxelyn/core':
+        specifier: workspace:*
+        version: link:../voxelyn-core
     devDependencies:
       pngjs:
         specifier: ^7.0.0
