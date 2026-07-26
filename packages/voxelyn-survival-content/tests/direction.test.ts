@@ -42,4 +42,8 @@ describe('direcoes voxel isometricas', () => {
     expect(centroids[3].x).toBeLessThan(anchor); // ul: esquerda/cima
     expect(centroids[3].y).toBeLessThan(anchor);
   });
+
+  it('rejeita indices fora do contrato dr/dl/ur/ul', () => {
+    expect(() => renderVoxels([], 4, 16, 16, 8, 8)).toThrow(/direcao voxel invalida/);
+  });
 });
