@@ -63,7 +63,8 @@ describe('recoilScreenOffset', () => {
   });
 
   it('limita a intensidade normalizada', () => {
-    expect(recoilScreenOffset(1, 0, -1, 2)).toEqual({ x: -0, y: -0 });
+    const zero = recoilScreenOffset(1, 0, -1, 2);
+    expect(Math.hypot(zero.x, zero.y)).toBe(0);
     expect(recoilScreenOffset(1, 0, 2, 2)).toEqual(recoilScreenOffset(1, 0, 1, 2));
   });
 });
