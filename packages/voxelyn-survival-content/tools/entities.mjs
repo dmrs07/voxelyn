@@ -1,4 +1,4 @@
-import { box, renderVoxels } from './voxel.mjs';
+import { box, collapse, renderVoxels } from './voxel.mjs';
 import {
   facetEllipse,
   fillDiamond,
@@ -47,6 +47,14 @@ const scatter = (g, cx, cy, phase, names, spreadX, spreadY) => {
 // ---------------------------------------------------------------------------
 const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
 
+/**
+ * Progresso da morte, de 0 (corpo ainda inteiro, no frame do golpe) a 1 (so
+ * destrocos). `living.die` tem 5 frames; o primeiro fica intacto de proposito
+ * para o jogador ver QUAL pose morreu antes de o corpo se desfazer.
+ */
+const DIE_FRAMES = 5;
+const dieT = (f) => Math.min(1, Math.max(0, f) / (DIE_FRAMES - 1));
+
 /** Prospector de pe. `y0` desloca o corpo (bob, recuo de dano). */
 const prospectorStanding = ({ bob = 0, st = 0, sw = 0, lean = 0, crouch = 0 } = {}) => {
   const b = [];
@@ -56,10 +64,10 @@ const prospectorStanding = ({ bob = 0, st = 0, sw = 0, lean = 0, crouch = 0 } = 
   const legH = Math.max(1, 3 - c);
   const up = bob - c;
   // botas + pernas
-  b.push(box(-2, -1 + lean, Math.max(0, st), 2, 2, 1, 'rust'));
-  b.push(box(1, -1 + lean, Math.max(0, -st), 2, 2, 1, 'rust'));
-  b.push(box(-2, -1 + lean, 1 + Math.max(0, st), 2, 2, legH, 'rockDeep'));
-  b.push(box(1, -1 + lean, 1 + Math.max(0, -st), 2, 2, legH, 'rockDeep'));
+  b.push(box(-2, -1, Math.max(0, st), 2, 2, 1, 'rust'));
+  b.push(box(1, -1, Math.max(0, -st), 2, 2, 1, 'rust'));
+  b.push(box(-2, -1, 1 + Math.max(0, st), 2, 2, legH, 'rockDeep'));
+  b.push(box(1, -1, 1 + Math.max(0, -st), 2, 2, legH, 'rockDeep'));
   // cinto
   b.push(box(-2, -1 + lean, 5 + up, 5, 2, 1, 'loot'));
   // torso: peitoral na frente, modulo fungico nas costas
@@ -70,11 +78,10 @@ const prospectorStanding = ({ bob = 0, st = 0, sw = 0, lean = 0, crouch = 0 } = 
   // ombreiras
   b.push(box(-3, -1 + lean, 9 + up, 1, 2, 1, 'rock'));
   b.push(box(3, -1 + lean, 9 + up, 1, 2, 1, 'rock'));
-  // pescoco + capacete + visor + lanterna
-  b.push(box(-1, -1 + lean * 2, 10 + up, 3, 2, 1, 'rockDeep'));
-  b.push(box(-1, -1 + lean * 2, 11 + up, 3, 3, 2, 'bone'));
-  b.push(box(-1, -2 + lean * 2, 11 + up, 3, 1, 1, 'biolum'));
-  b.push(box(0, -2 + lean * 2, 13 + up, 1, 1, 1, 'loot'));
+  // capacete assentado nos ombros + visor + lanterna
+  b.push(box(-1, -1 + lean * 2, 10 + up, 3, 3, 2, 'bone'));
+  b.push(box(-1, -2 + lean * 2, 10 + up, 3, 1, 1, 'biolum'));
+  b.push(box(0, -2 + lean * 2, 11 + up, 1, 1, 1, 'loot'));
   // bracos + picareta
   b.push(box(-3, -1 + lean, 6 + up, 1, 2, 3, 'rock'));
   b.push(box(3, -1 + lean, 6 + up + sw, 1, 2, 3, 'rock'));
@@ -89,27 +96,32 @@ const prospectorStanding = ({ bob = 0, st = 0, sw = 0, lean = 0, crouch = 0 } = 
  * O modulo fungico e o visor ficam virados para cima, funcionando como farol.
  */
 const prospectorProne = ({ breath = 0, settle = 0 } = {}) => {
-  const z = settle;
+  // +1: deitado, a diagonal do corpo alcanca mais para a frente que os pes da
+  // pose em pe e furava a base do frame. Um voxel acima alinha as duas bases.
+  const z = settle + 1;
   const b = [];
-  // pernas dobradas para fora
-  b.push(box(-3, 2, z, 2, 2, 2, 'rockDeep'));
-  b.push(box(1, 2, z, 2, 2, 2, 'rockDeep'));
-  b.push(box(-3, 4, z, 2, 1, 1, 'rust'));
-  b.push(box(1, 4, z, 2, 1, 1, 'rust'));
-  // torso deitado, peitoral virado para cima
-  b.push(box(-2, -1, z, 5, 3, 2, 'rock'));
-  b.push(box(-2, -1, z + 2, 5, 3, 1, 'rust'));
-  b.push(box(-2, 2, z, 5, 1, 1, 'loot'));
-  // modulo fungico brilhando para cima: farol de revive
-  b.push(box(-1, 0, z + 3 + breath, 3, 1, 1, 'biolum'));
+  // O corpo fica ENCOLHIDO e centrado no MESMO eixo da pose em pe. Na projecao
+  // isometrica largura e profundidade somam na mesma diagonal, entao bracos
+  // abertos e pernas estendidas jogavam o sprite para fora do frame de 32px, e
+  // um corpo autorado mais a frente empurrava a UNIAO das poses para fora
+  // mesmo com cada pose cabendo sozinha. Recolhido tambem le melhor: alguem
+  // incapacitado, nao um cadaver largado.
   // capacete no chao, visor para cima
-  b.push(box(-1, -3, z, 3, 2, 2, 'bone'));
-  b.push(box(-1, -3, z + 2, 3, 2, 1, 'biolum'));
-  // bracos abertos
-  b.push(box(-5, 0, z, 2, 2, 1, 'rock'));
-  b.push(box(3, 0, z, 2, 2, 1, 'rock'));
+  b.push(box(-1, -4, z, 3, 2, 2, 'bone'));
+  b.push(box(-1, -4, z + 2, 3, 2, 1, 'biolum'));
+  // torso deitado, peitoral virado para cima
+  b.push(box(-2, -2, z, 5, 3, 2, 'rock'));
+  b.push(box(-2, -2, z + 2, 5, 3, 1, 'rust'));
+  // modulo fungico brilhando para cima: farol de revive
+  b.push(box(-1, -1, z + 3 + breath, 3, 1, 1, 'biolum'));
+  // joelhos dobrados contra o tronco
+  b.push(box(-2, 1, z, 2, 2, 2, 'rockDeep'));
+  b.push(box(1, 1, z, 2, 2, 2, 'rockDeep'));
+  // bracos junto ao corpo
+  b.push(box(-3, -2, z, 1, 2, 1, 'rock'));
+  b.push(box(3, -2, z, 1, 2, 1, 'rock'));
   // picareta caida ao lado
-  b.push(box(4, 2, z, 1, 3, 1, 'loot'));
+  b.push(box(3, 1, z, 1, 2, 1, 'loot'));
   return b;
 };
 
@@ -146,26 +158,24 @@ const prospectorFrame = (dir, anim, f) =>
 // ---------------------------------------------------------------------------
 const stalkerModel = (anim, f) => {
   const gait = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
-  const lunge = anim === 'attack' ? [0, -1, 2, 1][f % 4] : 0;
+  const lunge = anim === 'attack' ? [0, -1, 1, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const fall = anim === 'die' ? Math.min(3, f) : 0;
-  const z = -fall;
   const b = [];
   // quatro patas finas, alternando aos pares
-  b.push(box(-3, -2, Math.max(0, gait), 1, 1, 3 + z, 'blood'));
-  b.push(box(2, 1, Math.max(0, gait), 1, 1, 3 + z, 'blood'));
-  b.push(box(-3, 1, Math.max(0, -gait), 1, 1, 3 + z, 'blood'));
-  b.push(box(2, -2, Math.max(0, -gait), 1, 1, 3 + z, 'blood'));
+  b.push(box(-3, -2, Math.max(0, gait), 1, 1, 3, 'blood'));
+  b.push(box(2, 1, Math.max(0, gait), 1, 1, 3, 'blood'));
+  b.push(box(-3, 1, Math.max(0, -gait), 1, 1, 3, 'blood'));
+  b.push(box(2, -2, Math.max(0, -gait), 1, 1, 3, 'blood'));
   // corpo baixo e comprido: silhueta horizontal, oposta a do prospector
-  b.push(box(-2, -2, 3 + z, 4, 4, 2, 'blood'));
-  b.push(box(-2, -2, 5 + z, 4, 3, 1, 'rust'));
+  b.push(box(-2, -2, 3, 4, 4, 2, 'blood'));
+  b.push(box(-2, -2, 5, 4, 3, 1, 'rust'));
   // cabeca projetada a frente
-  b.push(box(-1, -3 - lunge, 3 + z + flinch, 2, 1, 2, 'blood'));
-  b.push(box(-1, -4 - lunge, 4 + z + flinch, 2, 1, 1, 'biolum'));
+  b.push(box(-1, -3 - lunge, 3 + flinch, 2, 1, 2, 'blood'));
+  b.push(box(-1, -4 - lunge, 4 + flinch, 2, 1, 1, 'biolum'));
   // lamina mineral em UM lado so: assimetria e a marca da especie
-  b.push(box(3, -1 - lunge, 4 + z, 1, 1, 2, 'bone'));
-  b.push(box(3, -2 - lunge, 5 + z, 1, 1, 1, 'bone'));
-  return b;
+  b.push(box(3, -1 - lunge, 4, 1, 1, 2, 'bone'));
+  b.push(box(3, -2 - lunge, 5, 1, 1, 1, 'bone'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const stalkerFrame = (dir, anim, f) => renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
 
@@ -176,8 +186,7 @@ const spitterModel = (anim, f) => {
   const hop = anim === 'walk' ? [0, 1, 2, 1, 0, 0][f % 6] : 0;
   const spit = anim === 'attack' ? [0, 1, 2, 0][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const fall = anim === 'die' ? Math.min(3, f) : 0;
-  const z = hop - fall - flinch;
+  const z = hop - flinch;
   const b = [];
   // patas dobradas e ABERTAS para fora: leitura de anfibio agachado, e o corpo
   // fica erguido do chao em vez de virar um bloco apoiado
@@ -196,7 +205,7 @@ const spitterModel = (anim, f) => {
   b.push(box(2, -1, 5 + z, 1, 1, 1, 'fungus'));
   b.push(box(-2, -1, 6 + z, 1, 1, 1, 'biolum'));
   b.push(box(2, -1, 6 + z, 1, 1, 1, 'biolum'));
-  return b;
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const spitterFrame = (dir, anim, f) => renderVoxels(spitterModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
 
@@ -206,10 +215,9 @@ const spitterFrame = (dir, anim, f) => renderVoxels(spitterModel(anim, f), DIR_I
 const bomberModel = (anim, f) => {
   const drift = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const fall = anim === 'die' ? Math.min(3, f) : 0;
   // `special` e o telegraph da explosao: o pod incha frame a frame
-  const swell = anim === 'special' ? Math.min(3, f) : anim === 'attack' ? [0, 1, 1, 0][f % 4] : 0;
-  const z = -fall - flinch + drift;
+  const swell = anim === 'special' ? Math.min(2, f) : anim === 'attack' ? [0, 1, 1, 0][f % 4] : 0;
+  const z = -flinch + drift;
   const b = [];
   // pes curtos: a criatura pende, nao caminha
   b.push(box(-2, -1, 0, 2, 2, 1, 'fungusDeep'));
@@ -222,8 +230,8 @@ const bomberModel = (anim, f) => {
   // olho unico fundo na sombra do capuz
   b.push(box(0, -3, 4 + z, 1, 1, 2, 'biolum'));
   // pod de esporos: massa grande atras, cresce ate estourar
-  b.push(box(-2 - swell, 2, 2 + z, 5 + swell * 2, 2, 4 + swell, 'acid'));
-  return b;
+  b.push(box(-3, 2, 2 + z, 5 + swell, 2, 4 + swell, 'acid'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
 
@@ -234,8 +242,7 @@ const bruiserModel = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
   const slam = anim === 'attack' ? [0, 0, 3, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const fall = anim === 'die' ? Math.min(5, f) : 0;
-  const up = -fall - flinch;
+  const up = -flinch;
   const b = [];
   // pernas grossas e curtas
   b.push(box(-3, -1, Math.max(0, step), 3, 3, 4, 'rockDeep'));
@@ -254,7 +261,7 @@ const bruiserModel = (anim, f) => {
   // bracos que descem ate perto do chao, subindo no golpe
   b.push(box(-6, -1, 6 + up + slam, 2, 2, 5, 'rock'));
   b.push(box(5, -1, 6 + up + slam, 2, 2, 5, 'rock'));
-  return b;
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 48, 56, 22, 50);
 
@@ -265,28 +272,40 @@ const guardianModel = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
   const swing = anim === 'attack' ? [0, 1, 3, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const fall = anim === 'die' ? Math.min(6, f) : 0;
   // `special` = invocacao: o nucleo se abre e o corpo se ergue
-  const call = anim === 'special' ? [0, 1, 2, 1][f % 4] : 0;
-  const up = -fall - flinch + call;
+  const call = anim === 'special' ? [0, 1, 1, 1][f % 4] : 0;
+  const up = -flinch + call;
   const b = [];
   // O bruiser e largo e agachado; o guardian tem de ser COLUNAR e alto, senao
   // vira so uma escala do bruiser — o que a spec proibe explicitamente.
-  b.push(box(-2, -1, Math.max(0, step), 2, 3, 8, 'rockDeep'));
-  b.push(box(1, -1, Math.max(0, -step), 2, 3, 8, 'rockDeep'));
+  //
+  // A primeira versao errava por CONTRASTE, nao por proporcao: antebracos e
+  // mascara eram ambos 'bone', encostados no tronco, e as tres pecas fundiam
+  // numa laje unica. Agora o corpo e escuro, os bracos sao de tom medio e so as
+  // placas de ombro e a mascara sao palidas — e ha um vao real entre braco e
+  // tronco, para a silhueta ter buracos por onde o fundo aparece.
+  b.push(box(-2, -1, Math.max(0, step), 2, 3, 7, 'rockDeep'));
+  b.push(box(1, -1, Math.max(0, -step), 2, 3, 7, 'rockDeep'));
   // torso estreito e alto
-  b.push(box(-2, -2, 8 + up, 5, 4, 8, 'rockDeep'));
-  // nucleo eletrico: fenda VERTICAL alta, abrindo no special
-  b.push(box(-1, -3, 9 + up, 3, 1, 6 + call, 'electric'));
-  // ombros modestos: a largura vem dos bracos, nao do tronco
-  b.push(box(-3, -2, 16 + up, 7, 4, 2, 'rock'));
-  // mascara palida larga cobrindo toda a cabeca
-  b.push(box(-3, -2, 18 + up, 7, 4, 3, 'bone'));
-  b.push(box(-2, -3, 19 + up, 5, 1, 1, 'electric'));
-  // antebracos enormes PENDURADOS longe do tronco, quase ate o chao
-  b.push(box(-6, -1, 4 + up + swing, 3, 3, 10, 'bone'));
-  b.push(box(4, -1, 4 + up + swing, 3, 3, 10, 'bone'));
-  return b;
+  b.push(box(-2, -2, 7 + up, 5, 4, 7, 'rockDeep'));
+  // nucleo eletrico: fenda VERTICAL alta, abrindo no special. Sai 1 voxel a
+  // frente do peito para nao ser engolido pela face escura do tronco.
+  b.push(box(-1, -4, 8 + up, 3, 2, 5 + call, 'electric'));
+  // placas de ombro palidas, mais largas que o tronco
+  b.push(box(-4, -2, 14 + up, 9, 4, 2, 'bone'));
+  // recuo escuro sob a mascara: separa a cabeca dos ombros
+  b.push(box(-1, -2, 16 + up, 3, 4, 1, 'rockDeep'));
+  // mascara palida ESTREITA — cabeca, nao tampa
+  b.push(box(-2, -2, 17 + up, 5, 4, 3, 'bone'));
+  // fenda dos olhos, atravessando a mascara
+  b.push(box(-2, -3, 18 + up, 5, 1, 1, 'electric'));
+  // antebracos enormes PENDURADOS, com vao de 1 voxel ate as placas de ombro
+  b.push(box(-7, -1, 3 + up + swing, 3, 3, 10, 'rock'));
+  b.push(box(5, -1, 3 + up + swing, 3, 3, 10, 'rock'));
+  // punhos palidos: a massa que desce no golpe tem de ser lida a distancia
+  b.push(box(-7, -1, 3 + up + swing, 3, 3, 2, 'bone'));
+  b.push(box(5, -1, 3 + up + swing, 3, 3, 2, 'bone'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 48, 56, 22, 50);
 

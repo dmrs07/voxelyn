@@ -46,6 +46,22 @@ export const VOX = { tileW: 4, tileH: 2, zStep: 2 };
 // sao autorados em torno da origem (pes no centro), logo precisam deste offset.
 const KEY_BIAS = 64;
 
+/**
+ * Rotacao de base aplicada antes da direcao pedida.
+ *
+ * Na projecao 2:1 a camera enxerga as faces +x e +y (as de maior x+y, que o
+ * algoritmo do pintor desenha por ultimo). Os modelos, porem, sao autorados com
+ * a FRENTE em -y — visor, placa peitoral, nucleo, fenda dos olhos, garganta
+ * acida. Sem esta rotacao os seis personagens apareciam de costas em 'dr', que
+ * e justamente a direcao em que o personagem anda PARA a camera, e todo detalhe
+ * de frente vazava apenas 3px pela aresta do topo. Era por isso que o nucleo do
+ * guardiao e o olho do bomber simplesmente nao existiam na tela.
+ *
+ * Girar aqui, e nao nos modelos, mantem os modelos legiveis: quem autora pensa
+ * em "a frente e -y" e nao precisa saber para onde a camera olha.
+ */
+const FACING_OFFSET = 2;
+
 const rot = (x, y, r) => {
   if (r === 1) return [-y, x];
   if (r === 2) return [-x, -y];
@@ -97,7 +113,7 @@ const cube = (g, sx, sy, ramp) => {
 export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
   const g = grid(w, h);
   const commands = [];
-  for (const v of shellVoxels(boxes, dirIndex)) {
+  for (const v of shellVoxels(boxes, (dirIndex + FACING_OFFSET) % 4)) {
     const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
     commands.push({
       key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0),
@@ -107,6 +123,114 @@ export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
   sortDrawCommands(commands); // ordem do pintor: fundo -> frente
   for (const c of commands) c.draw();
   return g;
+};
+
+/**
+ * Hash estavel de uma posicao. Mesma caixa -> mesmo destino, em toda direcao e
+ * em toda regeracao do atlas: os destrocos nao podem "tremer" entre as quatro
+ * direcoes autoradas nem mudar quando o gerador roda de novo.
+ */
+const hash3 = (x, y, z) => {
+  let h = (x * 73856093) ^ (y * 19349663) ^ (z * 83492791);
+  h ^= h >>> 13;
+  return h >>> 0;
+};
+
+/** Parte uma caixa em pedacos de no maximo `size` voxels por eixo. */
+const fragment = (b, size) => {
+  const out = [];
+  for (let ox = 0; ox < b.w; ox += size) {
+    for (let oy = 0; oy < b.d; oy += size) {
+      for (let oz = 0; oz < b.h; oz += size) {
+        out.push({
+          x: b.x + ox,
+          y: b.y + oy,
+          z: b.z + oz,
+          w: Math.min(size, b.w - ox),
+          d: Math.min(size, b.d - oy),
+          h: Math.min(size, b.h - oz),
+          mat: b.mat,
+        });
+      }
+    }
+  }
+  return out;
+};
+
+/**
+ * Desmancha um modelo num monte de destrocos, com `t` indo de 0 (corpo intacto)
+ * a 1 (so restam cacos assentados no chao).
+ *
+ * Por que existe: a morte de todo inimigo era `z -= fall`, ou seja, o corpo
+ * inteiro afundava no chao com a silhueta intacta — some, mas nao MORRE, e o
+ * jogador nao ve o golpe que matou surtir efeito. Aqui o corpo se parte: cada
+ * caixa se afasta do eixo, perde altura e assenta, deixando um monte do proprio
+ * material da criatura. Em um jogo cujo mundo e feito de celulas, uma criatura
+ * tem de virar materia quando morre.
+ *
+ * O monte CONTRAI em vez de espalhar: os cacos sao puxados para o eixo do corpo
+ * e so entao recebem um tremor de 1 voxel. Espalhar para fora era a primeira
+ * ideia e estava errada duas vezes — encostava nas bordas do frame (o
+ * fitToMargin reescalaria os ultimos quadros e o sprite pularia de tamanho no
+ * meio da animacao) e contradizia a propria leitura de desabamento, em que os
+ * restos ocupam MENOS espaco que a criatura de pe, nao mais.
+ */
+export const collapse = (boxes, t) => {
+  if (t <= 0) return boxes;
+  const k = Math.min(1, t);
+  // Sem quebrar as caixas, cada volume so encolhia inteiro e a leitura era de um
+  // corpo DERRETENDO, nao desabando: o ultimo frame saia uma laje macica em vez
+  // de cacos. Partir em pedacos de 2 voxels da ao monte as falhas e as arestas
+  // soltas que fazem ler como entulho.
+  const pieces = boxes.flatMap((b) => fragment(b, 2));
+  // Extensao do corpo intacto. O tremor e preso dentro dela para o monte nunca
+  // ficar MAIOR que a criatura de pe: num modelo estreito a contracao nao
+  // recupera espaco suficiente e um unico caco sacudido para fora ja estouraria
+  // o frame — que e exatamente o caso que o gerador nao pode reescalar.
+  const limit = boxes.reduce(
+    (a, b) => ({
+      minX: Math.min(a.minX, b.x),
+      maxX: Math.max(a.maxX, b.x + b.w - 1),
+      minY: Math.min(a.minY, b.y),
+      maxY: Math.max(a.maxY, b.y + b.d - 1),
+    }),
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+  );
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const out = [];
+  for (const b of pieces) {
+    const h = hash3(b.x, b.y, b.z);
+    // Parte do material some conforme desaba, senao o monte final teria o mesmo
+    // volume da criatura de pe. Nunca passa de 3/8 para o monte nao evaporar.
+    if ((h >>> 4) % 8 < Math.round(k * 3)) continue;
+    const jitterX = (h & 1) - ((h >>> 1) & 1); // -1, 0 ou 1
+    const jitterY = ((h >>> 2) & 1) - ((h >>> 3) & 1);
+    // Contrai o CENTRO da caixa, nao a origem: encolher `b.x` deslocava as
+    // caixas largas para o lado em vez de traze-las para o eixo, e o monte
+    // acabava mais largo que a criatura de pe justamente onde ela era grossa.
+    const halfW = (b.w - 1) / 2;
+    const halfD = (b.d - 1) / 2;
+    out.push({
+      x: clamp(
+        Math.round((b.x + halfW) * (1 - k * 0.5) + jitterX * k - halfW),
+        limit.minX,
+        limit.maxX - b.w + 1
+      ),
+      y: clamp(
+        Math.round((b.y + halfD) * (1 - k * 0.5) + jitterY * k - halfD),
+        limit.minY,
+        limit.maxY - b.d + 1
+      ),
+      // assenta: o que estava alto cai mais, entao o monte fica baixo
+      z: Math.round(b.z * (1 - k)),
+      w: b.w,
+      d: b.d,
+      // caixas altas viram lascas; nunca menos de 1 voxel, senao o caco some
+      h: Math.max(1, Math.round(b.h * (1 - k * 0.7))),
+      mat: b.mat,
+    });
+  }
+  return out;
 };
 
 /**

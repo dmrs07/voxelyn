@@ -181,6 +181,63 @@ export const fitToMargin = (src, margin = 2) => {
   return out;
 };
 
+/**
+ * Enquadra TODOS os frames de um sprite com UM unico deslocamento comum.
+ *
+ * Por que nao `fitToMargin` por frame: normalizar cada frame isoladamente
+ * recentraliza em X e alinha a base em Y a cada quadro, ou seja, apaga
+ * exatamente a informacao que a animacao carrega. Uma pose que agacha voltava
+ * de imediato para a linha do chao; o corpo desabando na morte era reerguido
+ * frame a frame; a lamina assimetrica do stalker, ao se estender, empurrava a
+ * criatura inteira para o lado. Pior: quando uma pose passava da area segura,
+ * o frame era REESCALADO em silencio e o personagem mudava de tamanho no meio
+ * da animacao. A spec pede ancora estavel e ausencia de jitter — as duas coisas
+ * sao impossiveis com normalizacao por frame.
+ *
+ * Aqui a caixa e a uniao de todos os frames, entao o deslocamento e o mesmo
+ * para todos e o movimento autorado sobrevive. Se a uniao nao couber, isto
+ * LANCA em vez de reescalar: um modelo grande demais e um bug a corrigir no
+ * modelo, nao algo a esconder encolhendo o sprite.
+ */
+export const fitSpriteToMargin = (frames, margin = 2) => {
+  const boxes = frames.map(boundingBox).filter(Boolean);
+  if (boxes.length === 0) return frames;
+  const union = boxes.reduce((a, b) => ({
+    minX: Math.min(a.minX, b.minX),
+    minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY),
+  }));
+
+  const { w, h } = frames[0];
+  const contentWidth = union.maxX - union.minX + 1;
+  const contentHeight = union.maxY - union.minY + 1;
+  if (contentWidth > w - margin * 2 || contentHeight > h - margin * 2) {
+    throw new Error(
+      `conteudo ${contentWidth}x${contentHeight} nao cabe em ${w}x${h} com margem ${margin}`
+    );
+  }
+
+  const dx = margin + Math.floor((w - margin * 2 - contentWidth) / 2) - union.minX;
+  const dy = h - margin - contentHeight - union.minY;
+  if (dx === 0 && dy === 0) return frames;
+
+  return frames.map((src) => {
+    const out = grid(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const si = (y * w + x) * 4;
+        if (src.buf[si + 3] === 0) continue;
+        const ty = y + dy;
+        const tx = x + dx;
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+        out.buf.set(src.buf.subarray(si, si + 4), (ty * w + tx) * 4);
+      }
+    }
+    return out;
+  });
+};
+
 export const blitToAtlas = (atlas, src, col, row = 0) => {
   const ox = col * src.w;
   const oy = row * src.h;
