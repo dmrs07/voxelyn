@@ -28,6 +28,11 @@ type ActionIntent = {
   dy: number;
 };
 
+type ActionVisualClock = {
+  startTick: number;
+  startedMs: number;
+};
+
 const actionAnimation = (action: EntityActionKind): string => {
   if (action === 'detonate' || action === 'charge' || action === 'pulse') return 'special';
   return 'attack';
@@ -51,10 +56,9 @@ const layeredPlayerAnimation = (
   entity: Entity,
   base: EntityAnimState,
   action: ActionIntent,
-  tick: number,
+  upperElapsedMs: number,
   nowMs: number
 ): LayeredPlayerAnimation => {
-  const upperElapsedMs = actionElapsedMs(action, tick);
   const releaseMs = Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000);
   const walking = base.anim === 'walk';
   const hasMoveFacing = Math.hypot(base.moveFacingX, base.moveFacingY) > 0.001;
@@ -80,12 +84,14 @@ const layeredPlayerAnimation = (
 /** Client-side visual state that never feeds back into the authoritative simulation. */
 export class EntityPresentation {
   private readonly actions = new Map<number, ActionIntent>();
+  private readonly actionVisualClocks = new Map<number, ActionVisualClock>();
   private readonly downedAt = new Map<number, number>();
   private readonly reviveUntil = new Map<number, { startMs: number; endMs: number }>();
   private readonly tombstonesById = new Map<number, DeathTombstone>();
 
   reset(): void {
     this.actions.clear();
+    this.actionVisualClocks.clear();
     this.downedAt.clear();
     this.reviveUntil.clear();
     this.tombstonesById.clear();
@@ -102,6 +108,10 @@ export class EntityPresentation {
           dx: event.dx,
           dy: event.dy,
         });
+        // Uma nova ação com outro startTick receberá um relógio novo na primeira
+        // renderização, ancorado ao elapsed autoritativo daquele instante.
+        const clock = this.actionVisualClocks.get(event.entity);
+        if (clock && clock.startTick !== event.startTick) this.actionVisualClocks.delete(event.entity);
       } else if (event.t === 'player_down') {
         this.downedAt.set(event.slot + 1, nowMs);
       } else if (event.t === 'revive') {
@@ -110,6 +120,7 @@ export class EntityPresentation {
         this.reviveUntil.set(id, { startMs: nowMs, endMs: nowMs + 750 });
       } else if (event.t === 'death') {
         this.actions.delete(event.entity);
+        this.actionVisualClocks.delete(event.entity);
         this.downedAt.delete(event.entity);
         this.reviveUntil.delete(event.entity);
         this.tombstonesById.set(event.entity, {
@@ -124,6 +135,18 @@ export class EntityPresentation {
         });
       }
     }
+  }
+
+  private visualActionElapsed(entityId: number, action: ActionIntent, tick: number, nowMs: number): number {
+    const authoritativeElapsed = actionElapsedMs(action, tick);
+    let clock = this.actionVisualClocks.get(entityId);
+    if (!clock || clock.startTick !== action.startTick) {
+      clock = { startTick: action.startTick, startedMs: nowMs - authoritativeElapsed };
+      this.actionVisualClocks.set(entityId, clock);
+    }
+    // O tick continua como piso autoritativo, enquanto nowMs avança a pose e o
+    // recoil nos frames intermediários de renderização.
+    return Math.max(authoritativeElapsed, nowMs - clock.startedMs);
   }
 
   animationFor(
@@ -148,9 +171,9 @@ export class EntityPresentation {
     }
     this.downedAt.delete(entity.id);
 
-    // Estados que alteram a silhueta inteira interrompem a composição em
-    // camadas. O ataque continua registrado e pode reaparecer após o hit.
-    if (base.anim === 'hit' || base.anim === 'die') {
+    // Morte sempre substitui a silhueta inteira. Hit só interrompe a composição
+    // do Prospector; inimigos mantêm telegraphs de ações que a sim não cancelou.
+    if (base.anim === 'die') {
       return {
         anim: base.anim,
         elapsedMs: nowMs - base.animStartMs,
@@ -173,10 +196,19 @@ export class EntityPresentation {
       : eventIntent;
     if (action) {
       if (state.tick <= action.endTick) {
-        const elapsedMs = actionElapsedMs(action, state.tick);
+        if (entity.archetype === 'prospector' && base.anim === 'hit') {
+          return {
+            anim: 'hit',
+            elapsedMs: nowMs - base.animStartMs,
+            facingX: entity.facing.x,
+            facingY: entity.facing.y,
+          };
+        }
+
+        const elapsedMs = this.visualActionElapsed(entity.id, action, state.tick, nowMs);
         if (entity.archetype === 'prospector') {
           return {
-            anim: layeredPlayerAnimation(entity, base, action, state.tick, nowMs),
+            anim: layeredPlayerAnimation(entity, base, action, elapsedMs, nowMs),
             elapsedMs,
             facingX: action.dx,
             facingY: action.dy,
@@ -190,6 +222,9 @@ export class EntityPresentation {
         };
       }
       this.actions.delete(entity.id);
+      this.actionVisualClocks.delete(entity.id);
+    } else {
+      this.actionVisualClocks.delete(entity.id);
     }
 
     return {
