@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ALLOWED_HEX, COLORS } from './lib.mjs';
 import { ANIM_ORDER } from './entities.mjs';
 import { lightFactor } from './terrain.mjs';
+import { SURFACE_KINDS } from './surfaces.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
@@ -160,21 +161,7 @@ export const validateTerrain = () => {
   if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('terrain-blocks: originX fora do frame');
   if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('terrain-blocks: originY fora do frame');
 
-  // Toda cor tem de ser uma cor da paleta mestra escurecida por um dos fatores
-  // assados. Assim uma cor inventada a mao nao entra sem passar pelo gerador.
-  const derived = new Set();
-  for (let level = 0; level < m.lightLevels; level++) {
-    // Importado do gerador, nao copiado: uma formula duplicada aqui deixaria a
-    // validacao passar em silencio depois de mudarem os niveis de luz.
-    const f = lightFactor(level);
-    for (const [r, g, b] of Object.values(COLORS)) {
-      derived.add(toHex(
-        Math.max(0, Math.min(255, Math.round(r * f))),
-        Math.max(0, Math.min(255, Math.round(g * f))),
-        Math.max(0, Math.min(255, Math.round(b * f)))
-      ));
-    }
-  }
+  const derived = bakedPalette(m.lightLevels);
   const seen = new Set();
   for (let i = 0; i < png.width * png.height; i++) {
     const alpha = png.data[i * 4 + 3];
@@ -198,6 +185,92 @@ export const validateTerrain = () => {
   return [...new Set(errors)];
 };
 
+/**
+ * Cores derivadas: toda cor assada tem de ser uma cor da paleta mestra
+ * multiplicada por um dos fatores de luz. Assim uma cor inventada a mao nao
+ * entra num atlas sem passar pelo gerador.
+ */
+const bakedPalette = (lightLevels) => {
+  const derived = new Set();
+  for (let level = 0; level < lightLevels; level++) {
+    // Importado do gerador, nao copiado: uma formula duplicada aqui deixaria a
+    // validacao passar em silencio depois de mudarem os niveis de luz.
+    const f = lightFactor(level);
+    for (const [r, g, b] of Object.values(COLORS)) {
+      derived.add(toHex(
+        Math.max(0, Math.min(255, Math.round(r * f))),
+        Math.max(0, Math.min(255, Math.round(g * f))),
+        Math.max(0, Math.min(255, Math.round(b * f)))
+      ));
+    }
+  }
+  return derived;
+};
+
+/**
+ * O atlas de crostas de chao segue as regras do terreno mais uma: o numero de
+ * quadros varia POR TIPO, entao a contagem total nao sai de uma multiplicacao.
+ * O manifest tem de declarar exatamente os tipos que o gerador conhece — um
+ * `frames` divergente nao quebraria nada de forma visivel, so faria o cliente
+ * recortar o frame do tipo vizinho e pintar o chao com o material errado.
+ */
+export const validateSurfaces = () => {
+  const errors = [];
+  const jsonPath = resolve(DIR, 'surface-tiles.json');
+  if (!existsSync(jsonPath)) return ['surface-tiles: manifest ausente'];
+  const m = JSON.parse(readFileSync(jsonPath, 'utf8'));
+  const pngPath = resolve(DIR, m.atlas);
+  if (!existsSync(pngPath)) return [`surface-tiles: atlas ${m.atlas} ausente`];
+  const png = PNG.sync.read(readFileSync(pngPath));
+
+  if (m.kinds.length !== SURFACE_KINDS.length) {
+    errors.push(`surface-tiles: ${m.kinds.length} tipos declarados, gerador tem ${SURFACE_KINDS.length}`);
+  }
+  m.kinds.forEach((kind, i) => {
+    const spec = SURFACE_KINDS[i];
+    if (!spec) return;
+    if (kind.name !== spec.name) errors.push(`surface-tiles: tipo ${i} e ${kind.name}, esperado ${spec.name}`);
+    if (kind.frames !== spec.frames) errors.push(`surface-tiles: ${kind.name} declara ${kind.frames} quadros, gerador faz ${spec.frames}`);
+    if (kind.frames > 1 && !(kind.frameMs > 0)) errors.push(`surface-tiles: ${kind.name} anima sem frameMs`);
+  });
+
+  const total = m.kinds.reduce((sum, k) => sum + k.frames * m.variants * m.lightLevels, 0);
+  const expectedW = Math.min(total, m.columns) * m.frameWidth;
+  const expectedH = Math.ceil(total / m.columns) * m.frameHeight;
+  if (png.width !== expectedW) errors.push(`surface-tiles: largura ${png.width} != ${expectedW}`);
+  if (png.height !== expectedH) errors.push(`surface-tiles: altura ${png.height} != ${expectedH}`);
+  if (png.width > MAX_ATLAS_WIDTH) errors.push(`surface-tiles: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('surface-tiles: PNG excede 512 KiB');
+  if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('surface-tiles: originX fora do frame');
+  if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('surface-tiles: originY fora do frame');
+
+  const derived = bakedPalette(m.lightLevels);
+  const seen = new Set();
+  for (let i = 0; i < png.width * png.height; i++) {
+    const alpha = png.data[i * 4 + 3];
+    // O ponto do atlas inteiro: o gas antigo era um `rgba()` translucido, e a
+    // troca foi por ocupacao esparsa de voxels opacos. Um pixel semitransparente
+    // aqui significa que o alpha voltou por alguma porta.
+    if (alpha !== 0 && alpha !== 255) { errors.push(`surface-tiles: alpha parcial (${alpha})`); break; }
+    if (alpha === 255) seen.add(toHex(png.data[i * 4], png.data[i * 4 + 1], png.data[i * 4 + 2]));
+  }
+  for (const hex of seen) if (!derived.has(hex)) errors.push(`surface-tiles: cor ${hex} nao deriva da paleta mestra`);
+
+  // Cada frame tem de ter conteudo: uma crosta vazia vira buraco no chao.
+  for (let index = 0; index < total; index++) {
+    const x0 = (index % m.columns) * m.frameWidth;
+    const y0 = Math.floor(index / m.columns) * m.frameHeight;
+    let opaque = 0;
+    for (let y = 0; y < m.frameHeight && opaque === 0; y++) {
+      for (let x = 0; x < m.frameWidth; x++) {
+        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) { opaque++; break; }
+      }
+    }
+    if (opaque === 0) errors.push(`surface-tiles: frame ${index} vazio`);
+  }
+  return [...new Set(errors)];
+};
+
 export const listIds = () => JSON.parse(readFileSync(resolve(DIR, 'index.json'), 'utf8')).ids;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -205,16 +278,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let totalErrors = 0;
   let totalBytes = 0;
   let decodedBytes = 0;
-  const terrainErrs = validateTerrain();
-  totalErrors += terrainErrs.length;
-  if (terrainErrs.length === 0) console.log('  OK terrain-blocks');
-  else for (const e of terrainErrs) console.error(`  FAIL ${e}`);
-  {
-    const tp = resolve(DIR, 'terrain-blocks.png');
-    if (existsSync(tp)) {
-      totalBytes += statSync(tp).size;
-      const tpng = PNG.sync.read(readFileSync(tp));
-      decodedBytes += tpng.width * tpng.height * 4;
+  // Terreno e chao ficam FORA do index de sprites: nao tem animacao por
+  // direcao, nem frameMap, e o validador de personagem tentaria le-los assim.
+  for (const [id, run] of [['terrain-blocks', validateTerrain], ['surface-tiles', validateSurfaces]]) {
+    const errs = run();
+    totalErrors += errs.length;
+    if (errs.length === 0) console.log(`  OK ${id}`);
+    else for (const e of errs) console.error(`  FAIL ${e}`);
+    const path = resolve(DIR, `${id}.png`);
+    if (existsSync(path)) {
+      totalBytes += statSync(path).size;
+      const decoded = PNG.sync.read(readFileSync(path));
+      decodedBytes += decoded.width * decoded.height * 4;
     }
   }
   for (const id of ids) {

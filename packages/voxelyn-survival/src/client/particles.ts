@@ -11,12 +11,22 @@
 // explosao, so a desenha. Duas maquinas no co-op recebem o mesmo evento e
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
-import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import { ABILITY_RADIUS, SOLID_CRYSTAL } from '@voxelyn/survival-sim';
 import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
-export type ParticleKind = 'ember' | 'gas' | 'debris' | 'spark' | 'rubble' | 'crystalShard' | 'acidDrip' | 'oreChip';
+export type ParticleKind =
+  | 'ember'
+  | 'gas'
+  | 'debris'
+  | 'spark'
+  | 'rubble'
+  | 'crystalShard'
+  | 'acidDrip'
+  | 'oreChip'
+  | 'shock'
+  | 'ash';
 
 type Particle = {
   x: number; // tile
@@ -50,6 +60,13 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // Corrosao pinga; lasca de minerio salta.
   acidDrip: ['#a8e63c', '#2f6b4f', '#1f3d33'],
   oreChip: ['#ffd166', '#6e4a33', '#2e3a4d'],
+  // Frente de choque: o topo quase branco e o que a separa da brasa comum a
+  // distancia, e a distancia e onde ela importa — e ela que desenha ate onde o
+  // estrago chega.
+  shock: ['#e8f1ff', '#ffd166', '#ff7a2f'],
+  // Fumaca: um passo de valor acima do fundo, nunca mais. Ela existe para dar
+  // duracao a explosao depois que o clarao passa, nao para tapar a tela.
+  ash: ['#2e3a4d', '#1d2430', '#0b0e14'],
 };
 
 /**
@@ -140,6 +157,47 @@ export class VoxelParticles {
   }
 
   /**
+   * Frente de choque: anel de voxels rasteiros que chega ao raio REAL do evento
+   * no instante em que se apaga.
+   *
+   * Substitui uma elipse tracada com `ctx.stroke` — a ultima linha 2D de um jogo
+   * feito de cubos, e logo no efeito que o jogador mais olha. Mas o motivo nao e
+   * so de acabamento: a explosao antiga so lancava brasas do centro com
+   * velocidade solta, e nada na tela dizia ATE ONDE ela machucava. Aqui a
+   * velocidade e derivada do raio e da vida, entao a materia para exatamente na
+   * borda do estrago e o jogador aprende o alcance vendo, sem numero nem manual.
+   *
+   * Os angulos sao distribuidos por igual e so entao sacudidos: sorteando cada
+   * um, o anel sai com buracos e aglomerados e deixa de ler como uma frente.
+   */
+  private ring(
+    x: number,
+    y: number,
+    kind: ParticleKind,
+    count: number,
+    radius: number,
+    life: number,
+    salt: number
+  ): void {
+    const rnd = seeded(eventSeed(x, y, salt));
+    const speed = radius / (life / 1000);
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (rnd() - 0.5) * 0.3;
+      const mag = speed * (0.88 + rnd() * 0.24);
+      this.push({
+        x, y,
+        z: 0.06 + rnd() * 0.1,
+        vx: Math.cos(angle) * mag,
+        vy: Math.sin(angle) * mag,
+        vz: 0,
+        life,
+        maxLife: life,
+        kind,
+      });
+    }
+  }
+
+  /**
    * Traduz eventos autoritativos em particulas. `scale` vem da qualidade: no
    * preset baixo o mesmo evento gera menos materia, nunca eventos diferentes.
    */
@@ -148,12 +206,28 @@ export class VoxelParticles {
     for (const ev of events) {
       switch (ev.t) {
         case 'explosion':
-          // Duas camadas: brasa que sobe rapido e entulho que sai rasteiro.
-          this.burst(ev.x, ev.y, 'ember', n(14), 2.4 * ev.radius * 0.4, 2.2, 520, 1);
-          this.burst(ev.x, ev.y, 'debris', n(10), 3.0 * ev.radius * 0.4, 1.1, 700, 2);
+          // Quatro camadas com papeis distintos, e nao quatro variacoes da mesma
+          // coisa: a frente diz ATE ONDE, a brasa e o entulho dizem QUE forca, e
+          // a fumaca segura a leitura no lugar depois que as tres apagam. So com
+          // as duas do meio a explosao acendia e sumia no mesmo quadro.
+          this.ring(ev.x, ev.y, 'shock', Math.max(8, n(18)), ev.radius, 300, 1);
+          this.burst(ev.x, ev.y, 'ember', n(14), 2.4 * ev.radius * 0.4, 2.2, 520, 2);
+          this.burst(ev.x, ev.y, 'debris', n(10), 3.0 * ev.radius * 0.4, 1.1, 700, 3);
+          this.burst(ev.x, ev.y, 'ash', n(7), 0.7, 1.4, 1500, 4);
+          break;
+        case 'pulse':
+          // Pulso cinetico: mesma frente, sem fogo. O que ele empurra e ar.
+          // O raio vem da constante da simulacao, nao de um numero copiado: a
+          // frente promete um alcance ao jogador, e uma copia que envelhece
+          // transforma essa promessa em mentira no primeiro ajuste de balanco.
+          this.ring(ev.x, ev.y, 'spark', Math.max(6, n(14)), ABILITY_RADIUS, 260, 5);
           break;
         case 'ignite':
-          this.burst(ev.x, ev.y, 'ember', n(4), 0.5, 1.6, 420, 3);
+          // Sais distintos por evento, mesmo entre eventos de tipos diferentes:
+          // uma explosao ACENDE as celulas que alcanca, entao explosao e ignicao
+          // caem no mesmo ponto no mesmo instante, e com o mesmo sal sairiam com
+          // o mesmo sorteio — a brasa da ignicao nasceria colada na da explosao.
+          this.burst(ev.x, ev.y, 'ember', n(4), 0.5, 1.6, 420, 31);
           break;
         case 'discharge':
           for (const cell of ev.cells.slice(0, Math.max(4, n(16)))) {
@@ -187,7 +261,7 @@ export class VoxelParticles {
           this.burst(ev.x, ev.y, 'debris', n(9), 1.5, 1.3, 560, ev.entity);
           break;
         case 'overheat':
-          this.burst(ev.x, ev.y, 'ember', n(6), 1.0, 2.0, 380, 4);
+          this.burst(ev.x, ev.y, 'ember', n(6), 1.0, 2.0, 380, 37);
           break;
         default:
           break;
@@ -233,6 +307,15 @@ export class VoxelParticles {
 
   step(dtMs: number): void {
     const dt = Math.min(64, dtMs) / 1000;
+    // Arrasto POR SEGUNDO, elevado ao tempo do passo.
+    //
+    // Multiplicar por 0.97 uma vez por quadro amarrava o alcance a taxa do
+    // monitor pela porta dos fundos: o passo de tempo ja vinha do relogio, mas o
+    // amortecimento continuava contando QUADROS, entao a 120Hz a mesma brasa
+    // recebia o dobro de multiplicacoes no mesmo tempo real e parava na metade
+    // da distancia. Com a potencia, o percurso e o mesmo em qualquer taxa.
+    const drag = Math.pow(0.97, dt * 60);
+    const gasDrag = Math.pow(0.985, dt * 60);
     const out: Particle[] = [];
     for (const p of this.items) {
       p.life -= dtMs;
@@ -240,15 +323,22 @@ export class VoxelParticles {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.z += p.vz * dt;
-      // Brasa e entulho caem; gas sobe e desacelera, nunca cai.
-      if (p.kind === 'gas') {
-        p.vz *= 0.985;
+      if (p.kind === 'shock') {
+        // A frente de choque nao cai nem freia: ela tem um destino — a borda do
+        // estrago — e qualquer arrasto a faria parar aquem dele, ensinando ao
+        // jogador um alcance menor do que o que a simulacao aplica.
+        out.push(p);
+        continue;
+      }
+      // Brasa e entulho caem; gas e fumaca sobem e desaceleram, nunca caem.
+      if (p.kind === 'gas' || p.kind === 'ash') {
+        p.vz *= gasDrag;
       } else {
         p.vz -= 5.5 * dt;
         if (p.z < 0) { p.z = 0; p.vz = -p.vz * 0.28; p.vx *= 0.6; p.vy *= 0.6; }
       }
-      p.vx *= 0.97;
-      p.vy *= 0.97;
+      p.vx *= drag;
+      p.vy *= drag;
       out.push(p);
     }
     this.items = out;
@@ -277,7 +367,11 @@ export class VoxelParticles {
       const life = Math.max(0, Math.min(1, p.life / p.maxLife));
       ctx.globalAlpha = 0.35 + life * 0.65;
       const py = sy - p.z * tileH * zoom;
-      drawVoxel(ctx, sx, py, base * (0.45 + life * 0.55), RAMP[p.kind]);
+      // A fumaca CRESCE enquanto se apaga; todo o resto encolhe. Materia quente
+      // ou solida perde massa ao esfriar e ao assentar, fumaca se dilui — usar a
+      // mesma curva para os dois faria a fumaca ler como mais uma brasa.
+      const size = p.kind === 'ash' ? 0.6 + (1 - life) * 0.9 : 0.45 + life * 0.55;
+      drawVoxel(ctx, sx, py, base * size, RAMP[p.kind]);
     }
     ctx.globalAlpha = 1;
     ctx.restore();

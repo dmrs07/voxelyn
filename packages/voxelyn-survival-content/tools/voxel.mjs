@@ -22,6 +22,12 @@ import { grid, set } from './lib.mjs';
 export const RAMPS = {
   rock: ['rockLight', 'rock', 'rockShadow'],
   rockDeep: ['rock', 'rockShadow', 'dark'],
+  // Chao e queimado: rampas proprias porque o piso tem de ficar ao menos dois
+  // passos de valor ABAIXO de qualquer coisa viva em cima dele (art bible §6).
+  // Reaproveitar `rock` clareava o chao inteiro e apagava a silhueta das
+  // criaturas justamente onde elas andam.
+  floor: ['rockShadow', 'dark', 'dark'],
+  scorch: ['dark', 'dark', 'dark'],
   rust: ['bone', 'rust', 'rockShadow'],
   bone: ['bone', 'rust', 'rockShadow'],
   fungus: ['fungusLight', 'fungus', 'fungusDark'],
@@ -59,6 +65,21 @@ const KEY_BIAS = 64;
  * 0=dr, 1=dl, 2=ur, 3=ul.
  */
 const DIRECTION_ROTATION = [1, 2, 0, 3];
+
+/**
+ * Indice de direcao cuja rotacao e a identidade.
+ *
+ * Cenario — bloco de terreno e crosta de chao — nao tem frente, entao passar
+ * qualquer direcao "parece" dar no mesmo. Nao da: com rotacao, as coordenadas
+ * autoradas deixam de ser as coordenadas projetadas, e qualquer calculo de
+ * extensao feito sobre o modelo CRU passa a mentir sobre o frame. Era o que
+ * acontecia com o atlas de blocos: `blockBounds()` media sem rotacionar,
+ * `buildTerrainFrames()` rasterizava com rotacao de 90 graus, e o bloco saia
+ * 2px a direita do que o manifest declarava — recortado na borda do frame e
+ * desalinhado do chao. Derivado da tabela, e nao escrito na mao, para continuar
+ * valendo se a ordem das direcoes mudar.
+ */
+export const DIR_UNROTATED = DIRECTION_ROTATION.indexOf(0);
 
 const rot = (x, y, r) => {
   if (r === 1) return [-y, x];

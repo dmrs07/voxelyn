@@ -165,6 +165,126 @@ describe('particulas voxel', () => {
     expect(topo(rapido)).toBeCloseTo(topo(lento), 1);
   });
 
+  // O passo de tempo ja vinha do relogio, mas o ARRASTO continuava contando
+  // QUADROS: `vx *= 0.97` uma vez por quadro da quatro vezes mais
+  // multiplicacoes a 240Hz do que a 60Hz no mesmo tempo real, e a mesma brasa
+  // parava bem antes num monitor rapido. Nesta janela o erro era de 22%.
+  //
+  // A tolerancia e relativa e nao zero porque sobra o erro proprio da
+  // integracao em passos discretos — a posicao anda com a velocidade do inicio
+  // do passo, e o quique no chao cai em instantes diferentes. Sao ~2%; qualquer
+  // volta ao arrasto por quadro passa de 20% e cai aqui.
+  it('percorre a mesma distancia horizontal em qualquer taxa de quadros', () => {
+    const alcance = (dt: number, passos: number) => {
+      const p = new VoxelParticles();
+      p.ingest([explosion(10, 10, 3)], 96, 1);
+      for (let i = 0; i < passos; i++) p.step(dt);
+      const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+      const solta = items.filter((i) => i.kind === 'debris');
+      return Math.max(...solta.map((i) => Math.hypot(i.x - 10, i.y - 10)));
+    };
+    const rapido = alcance(8, 24);
+    const lento = alcance(32, 6);
+    expect(Math.abs(rapido - lento) / lento).toBeLessThan(0.05);
+  });
+
+  // A frente de choque e a unica coisa na tela que diz ATE ONDE a explosao
+  // machuca. Se ela parar aquem do raio, ensina um alcance menor do que o que a
+  // simulacao aplica, e o jogador morre num lugar que a tela chamou de seguro.
+  it('leva a frente de choque ao raio real do estouro', () => {
+    for (const radius of [1.5, 2.4, 5]) {
+      const p = new VoxelParticles();
+      p.ingest([explosion(20, 20, radius)], 96, 1);
+      // Um pouco alem da vida do anel, para pegar a posicao final.
+      for (let i = 0; i < 12; i++) p.step(28);
+      const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+      const shock = items.filter((it) => it.kind === 'shock');
+      // O anel ja expirou; o que se mede e onde ele chegou no ultimo passo vivo.
+      expect(shock.length).toBe(0);
+
+      const vivo = new VoxelParticles();
+      vivo.ingest([explosion(20, 20, radius)], 96, 1);
+      for (let i = 0; i < 10; i++) vivo.step(29);
+      const frente = (vivo as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items
+        .filter((it) => it.kind === 'shock')
+        .map((it) => Math.hypot(it.x - 20, it.y - 20));
+      expect(frente.length).toBeGreaterThan(0);
+      for (const d of frente) {
+        expect(d).toBeGreaterThan(radius * 0.75);
+        expect(d).toBeLessThanOrEqual(radius * 1.15);
+      }
+    }
+  });
+
+  it('distribui a frente em volta do estouro, sem buracos', () => {
+    const p = new VoxelParticles();
+    p.ingest([explosion(20, 20, 3)], 96, 1);
+    p.step(100);
+    const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+    const quadrantes = new Set(
+      items
+        .filter((it) => it.kind === 'shock')
+        .map((it) => `${it.x >= 20 ? 'l' : 'o'}${it.y >= 20 ? 's' : 'n'}`)
+    );
+    expect(quadrantes.size).toBe(4);
+  });
+
+  // A frente promete uma distancia; arrasto ou gravidade a fariam parar antes.
+  it('nao deixa a frente de choque cair nem frear', () => {
+    const p = new VoxelParticles();
+    p.ingest([explosion(20, 20, 3)], 96, 1);
+    const shock = () =>
+      (p as unknown as { items: Array<{ z: number; vx: number; kind: string }> }).items.filter(
+        (it) => it.kind === 'shock'
+      );
+    const antes = shock().map((it) => ({ z: it.z, vx: it.vx }));
+    p.step(90);
+    shock().forEach((it, i) => {
+      expect(it.z).toBeCloseTo(antes[i].z, 6);
+      expect(it.vx).toBeCloseTo(antes[i].vx, 6);
+    });
+  });
+
+  it('mantem o anel legivel mesmo no preset mais baixo', () => {
+    const baixo = new VoxelParticles();
+    baixo.ingest([explosion(20, 20, 3)], 96, 0.2);
+    const items = (baixo as unknown as { items: Array<{ kind: string }> }).items;
+    expect(items.filter((i) => i.kind === 'shock').length).toBeGreaterThanOrEqual(8);
+  });
+
+  // A explosao acendia e sumia no mesmo instante: brasa e entulho duram meio
+  // segundo. A fumaca e o que segura a leitura no lugar depois do clarao.
+  it('deixa fumaca subindo depois que a brasa apaga', () => {
+    const p = new VoxelParticles();
+    p.ingest([explosion(20, 20, 3)], 96, 1);
+    for (let i = 0; i < 25; i++) p.step(33);
+    const items = (p as unknown as { items: Array<{ kind: string; z: number }> }).items;
+    const ash = items.filter((i) => i.kind === 'ash');
+    expect(ash.length).toBeGreaterThan(0);
+    expect(items.some((i) => i.kind === 'ember')).toBe(false);
+    for (const a of ash) expect(a.z).toBeGreaterThan(0);
+  });
+
+  it('o pulso cinetico lanca frente sem fogo', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'pulse', x: 8, y: 8 }], 96, 1);
+    const kinds = new Set(
+      (p as unknown as { items: Array<{ kind: string }> }).items.map((i) => i.kind)
+    );
+    expect(kinds).toEqual(new Set(['spark']));
+  });
+
+  // A explosao ACENDE as celulas que alcanca, entao explosao e ignicao caem no
+  // mesmo ponto no mesmo quadro. Com o mesmo sal, a brasa da ignicao nasceria
+  // colada na da explosao, com posicao e velocidade identicas.
+  it('nao repete o sorteio entre eventos coincidentes', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'ignite', x: 12, y: 12 }, { t: 'overheat', x: 12, y: 12 }], 96, 1);
+    const items = (p as unknown as { items: Array<{ x: number; y: number; vx: number; vz: number }> }).items;
+    const assinaturas = new Set(items.map((i) => `${i.vx.toFixed(6)},${i.vz.toFixed(6)}`));
+    expect(assinaturas.size).toBe(items.length);
+  });
+
   it('ignora eventos que nao geram materia', () => {
     const p = new VoxelParticles();
     p.ingest([{ t: 'message', text: 'oi' }, { t: 'extracted', withCore: true }], 96, 1);

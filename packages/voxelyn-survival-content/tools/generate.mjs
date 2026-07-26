@@ -13,6 +13,7 @@ import {
   blockBounds,
   buildTerrainFrames,
 } from './terrain.mjs';
+import { SURFACE_KINDS, buildSurfaceFrames, surfaceBounds } from './surfaces.mjs';
 import { PLAYER_LAYER_SPECS } from './player-layers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -164,10 +165,56 @@ const buildTerrain = () => {
   return { id: 'terrain-blocks', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
 };
 
+/**
+ * Atlas de crostas de chao. Mesmo formato do terreno com um eixo a mais — o
+ * quadro de animacao — e com o numero de quadros variando POR TIPO, entao o
+ * indice do primeiro frame de cada tipo nao sai de uma multiplicacao: e a soma
+ * dos tipos anteriores, que o runtime recalcula em `surfaceOffsets`.
+ */
+const buildSurfaces = () => {
+  const bounds = surfaceBounds();
+  const frameWidth = bounds.w;
+  const frameHeight = bounds.h;
+  const frames = buildSurfaceFrames(frameWidth, frameHeight, -bounds.minX, -bounds.minY);
+  const columns = Math.min(frames.length, Math.floor(MAX_TEXTURE / frameWidth));
+  const rows = Math.ceil(frames.length / columns);
+  const atlas = grid(columns * frameWidth, rows * frameHeight);
+  const palette = new Set();
+  frames.forEach((frame, i) => {
+    if (isEmpty(frame)) throw new Error(`surface-tiles: frame ${i} vazio`);
+    for (const hex of colorsUsed(frame)) palette.add(hex);
+    blitToAtlas(atlas, frame, i % columns, Math.floor(i / columns));
+  });
+
+  const png = new PNG({ width: atlas.w, height: atlas.h });
+  png.data = Buffer.from(atlas.buf);
+  const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
+  writeFileSync(resolve(OUT, 'surface-tiles.png'), pngBytes);
+
+  const manifest = {
+    id: 'surface-tiles',
+    version: 1,
+    atlas: 'surface-tiles.png',
+    frameWidth,
+    frameHeight,
+    columns,
+    originX: -bounds.minX,
+    originY: -bounds.minY,
+    kinds: SURFACE_KINDS,
+    variants: VARIANTS,
+    lightLevels: LIGHT_LEVELS,
+    paletteColors: [...palette].sort(),
+    generation: { tool: 'procedural voxel raster (tools/surfaces.mjs)', seedOrRef: 'deterministic-code-v1' },
+  };
+  writeFileSync(resolve(OUT, 'surface-tiles.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  return { id: 'surface-tiles', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
+};
+
 const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS].map(buildEntity);
 // O terreno fica FORA do index de sprites: nao tem animacao, direcao nem
 // frameMap, e o validador de sprites tentaria le-lo como personagem.
 const terrainResult = buildTerrain();
+const surfaceResult = buildSurfaces();
 const index = {
   version: 3,
   generated: 'deterministic-code-v3-layered-player',
@@ -175,4 +222,4 @@ const index = {
 };
 writeFileSync(resolve(OUT, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
 console.log('atlases gerados:');
-for (const r of [...results, terrainResult]) console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);
+for (const r of [...results, terrainResult, surfaceResult]) console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);

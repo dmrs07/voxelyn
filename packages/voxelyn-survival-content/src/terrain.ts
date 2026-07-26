@@ -48,6 +48,12 @@ export const resolveBlock = (
   };
 };
 
-/** Converte brilho continuo [0,1] no nivel assado mais proximo. */
-export const lightLevelFor = (manifest: TerrainManifest, brightness: number): number =>
+/**
+ * Converte brilho continuo [0,1] no nivel assado mais proximo.
+ *
+ * Aceita qualquer manifest que declare niveis de luz, e nao so o de blocos: o
+ * atlas de chao assa os MESMOS niveis, e uma segunda copia desta conta e
+ * exatamente como o piso e a parede acabariam escurecendo em escalas diferentes.
+ */
+export const lightLevelFor = (manifest: { lightLevels: number }, brightness: number): number =>
   Math.max(0, Math.min(manifest.lightLevels - 1, Math.round(brightness * (manifest.lightLevels - 1))));

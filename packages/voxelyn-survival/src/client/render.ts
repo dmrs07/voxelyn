@@ -12,17 +12,21 @@ import {
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_GAS,
+  SURF_NONE,
   SURF_SCORCHED,
+  ABILITY_RADIUS,
   HEAT_MAX,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
-import { SpriteBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
+import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
 import { VoxelParticles, frameDeltaMs } from './particles';
 import { ProjectileView } from './projectiles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
+import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
+import { drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 
 /**
@@ -39,6 +43,34 @@ const TERRAIN_KIND_INDEX: Record<number, number> = {
   [SOLID_ORE_SPENT]: 5,
   [SOLID_CRYSTAL_DULL]: 6,
   [SOLID_ORE_CHIPPED]: 7,
+};
+
+/**
+ * SURF_* -> indice em SURFACE_KINDS do atlas de chao. Pela mesma razao da tabela
+ * acima: a cadeia de ifs que existia aqui tratava tres dos seis casos e deixava
+ * os outros caindo no ramo da rocha nua sem que nada acusasse.
+ */
+const SURFACE_KIND_INDEX: Record<number, number> = {
+  [SURF_NONE]: 0,
+  [SURF_FUNGAL]: 1,
+  [SURF_BIOFLUID]: 2,
+  [SURF_GAS]: 3,
+  [SURF_FIRE]: 4,
+  [SURF_SCORCHED]: 5,
+};
+
+/**
+ * Cor de recuo por superficie, para quando o atlas ainda nao carregou ou falhou.
+ *
+ * Nao e a arte: e o minimo para o jogador nao pisar num gas invisivel enquanto a
+ * imagem nao chega. A arte de verdade e o voxel do atlas.
+ */
+const SURFACE_FALLBACK: Record<number, string> = {
+  [SURF_FUNGAL]: '#1f3d33',
+  [SURF_BIOFLUID]: '#2f6b4f',
+  [SURF_GAS]: '#4d6b1c',
+  [SURF_FIRE]: '#ff7a2f',
+  [SURF_SCORCHED]: '#0b0e14',
 };
 
 export const TILE_W = 32;
@@ -65,21 +97,35 @@ const PAL = {
   player: '#e8f1ff',
 };
 
+/**
+ * O `spark` que existia aqui saiu junto com a descarga: eram duas linhas
+ * tracadas com `Math.random()` a cada quadro, e a descarga agora e voxel — sobre
+ * a poca, na grade, e a partir das mesmas celulas que o evento carrega.
+ *
+ * O `ring` sobreviveu porque nao e materia: e o contorno curto de esquiva e de
+ * morte, feedback de leitura imediata sobre a propria entidade. Explosao e pulso
+ * — os dois casos em que o anel representava MATERIA sendo lancada — passaram a
+ * ser voxels de verdade em VoxelParticles.ring.
+ */
 export type Fx =
   | { kind: 'ring'; x: number; y: number; r: number; maxR: number; color: string; life: number; maxLife: number }
-  | { kind: 'spark'; x: number; y: number; life: number; maxLife: number }
   | { kind: 'text'; x: number; y: number; text: string; color: string; life: number; maxLife: number };
 
 export type CameraShake = { power: number; until: number };
+
+/** Faces da carga eletrica que corre pela poca: topo quase branco sobre azul. */
+const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   zoom = 2;
   fxList: Fx[] = [];
+  flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
   messages: Array<{ text: string; until: number }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
+  readonly surfaces = new SurfaceBank();
   readonly particles = new VoxelParticles();
   readonly projectileView = new ProjectileView();
   /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
@@ -95,6 +141,7 @@ export class SurvivalRenderer {
     this.ctx = ctx;
     this.sprites.load();
     this.terrain.load();
+    this.surfaces.load();
   }
 
   setQuality(level: QualityLevel): void {
@@ -130,6 +177,10 @@ export class SurvivalRenderer {
     this.localPlayerId = id;
   }
 
+  private addFlash(x: number, y: number, r: number, power: number, nowMs: number, durationMs: number): void {
+    addFlash(this.flashes, { x, y, r, power, startedMs: nowMs, durationMs });
+  }
+
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     this.presentation.ingest(events, nowMs);
     // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
@@ -139,12 +190,27 @@ export class SurvivalRenderer {
     for (const ev of events) {
       switch (ev.t) {
         case 'explosion':
-          this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.2, maxR: ev.radius, color: PAL.fire, life: 320, maxLife: 320 });
+          // O anel tracado que estava aqui virou materia voxel em
+          // VoxelParticles.ring; o que sobra e a luz, que particula nenhuma
+          // fornece — sem ela a explosao continua sendo desenhada sobre o preto.
+          // O raio da luz passa do raio do estrago de proposito: o que ilumina
+          // uma explosao nao e a bola de fogo, e o que ela revela em volta.
+          this.addFlash(ev.x, ev.y, ev.radius * 2.6, 1, nowMs, 260);
           this.shake = { power: 5, until: nowMs + 220 };
           break;
         case 'discharge':
-          for (const cell of ev.cells.slice(0, 40)) {
-            this.fxList.push({ kind: 'spark', x: (cell % this.worldWidth) + 0.5, y: Math.floor(cell / this.worldWidth) + 0.5, life: 260, maxLife: 260 });
+          // Uma luz so para a descarga inteira, no meio dela: uma por celula
+          // seriam dezenas de luzes num quadro, e `brightness()` custa por luz
+          // vezes celula visivel. O clarao azul e a informacao; a posicao exata
+          // de cada carga ja esta desenhada no chao.
+          if (ev.cells.length > 0) {
+            let cx = 0;
+            let cy = 0;
+            for (const cell of ev.cells) {
+              cx += (cell % this.worldWidth) + 0.5;
+              cy += Math.floor(cell / this.worldWidth) + 0.5;
+            }
+            this.addFlash(cx / ev.cells.length, cy / ev.cells.length, 5.5, 0.95, nowMs, 200);
           }
           break;
         case 'hit':
@@ -163,7 +229,7 @@ export class SurvivalRenderer {
           this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.9, color: PAL.blood, life: 260, maxLife: 260 });
           break;
         case 'pulse':
-          this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.2, maxR: 2.6, color: PAL.electric, life: 260, maxLife: 260 });
+          this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200);
           break;
         case 'dodge':
           this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.6, color: PAL.player, life: 180, maxLife: 180 });
@@ -227,6 +293,16 @@ export class SurvivalRenderer {
       { x: player.x, y: player.y, r: 8.5, power: 1 },
     ];
     if (!state.coreTaken) lights.push({ x: state.corePos.x + 0.5, y: state.corePos.y + 0.5, r: 6, power: 0.9 });
+
+    // Clarões de explosao, descarga e pulso. Entram FORA do `if
+    // (quality.dynamicLights)`: no preset baixo o jogo abre mao das luzes
+    // permanentes de fogo e cristal, que sao ambientacao, mas nao da luz que
+    // revela o que acabou de detonar ao lado do jogador — sao poucas, duram
+    // fracao de segundo, e sem elas o preset baixo esconderia o perigo.
+    this.flashes = pruneFlashes(this.flashes, nowMs);
+    for (const f of this.flashes) {
+      lights.push({ x: f.x, y: f.y, r: f.r, power: flashPower(f, nowMs) });
+    }
 
     const range = Math.ceil((vw / z / TILE_W) + (vh / z / TILE_H)) + 4;
     const px = Math.floor(player.x);
@@ -292,30 +368,18 @@ export class SurvivalRenderer {
         const [sx, sy] = toScreen(x + 0.5, y + 0.5);
         if (sx < -40 || sx > vw + 40 || sy < -40 || sy > vh + 40) continue;
 
+        // Crosta voxel pre-renderizada: um drawImage no lugar do losango de cor
+        // chapada mais o remendo translucido que vinha por cima dele. Gas, poca
+        // e fogo eram as ultimas superficies do jogo pintadas com alpha, num
+        // mundo que e facetado e de alpha binario em todo o resto.
         const surf = state.surface[i];
-        let base = PAL.rockShadow;
-        if (surf === SURF_FUNGAL) base = PAL.fungusDark;
-        else if (surf === SURF_BIOFLUID) base = PAL.fungus;
-        else if (surf === SURF_SCORCHED) base = '#151516';
-        diamond(sx, sy, shade(base, 0.35 + b * 0.75));
-
-        if (surf === SURF_FUNGAL && b > 0.25) {
-          ctx.fillStyle = shade(PAL.fungusLight, b * 0.7);
-          const dotSeed = (x * 7 + y * 13) % 5;
-          ctx.fillRect(sx - 3 * z + dotSeed * z, sy - z, z, z);
-        }
-        if (surf === SURF_BIOFLUID) {
-          ctx.fillStyle = shade(PAL.biolum, 0.25 + b * 0.4);
-          ctx.fillRect(sx - z * 2, sy - z * 0.5, z * 4, z);
-        }
-        if (surf === SURF_FIRE) {
-          const flick = 0.7 + 0.3 * Math.sin(nowMs * 0.02 + x * 3 + y * 5);
-          diamond(sx, sy, shade(PAL.fire, flick));
+        const surfKind = SURFACE_KIND_INDEX[surf] ?? 0;
+        if (!this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
+          diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
         }
         if (surf === SURF_GAS) {
-          diamond(sx, sy, `rgba(168, 230, 60, ${0.16 + 0.1 * Math.sin(nowMs * 0.004 + x + y)})`);
-          // A mancha no chao diz ONDE o gas esta; os motes subindo dizem que
-          // ele esta VIVO e para onde vai. Sem eles o gas era so uma textura.
+          // A crosta no chao diz ONDE o gas esta; os motes subindo dizem que ele
+          // esta VIVO e para onde vai. Sem eles o gas era so uma textura.
           this.particles.emitGas(x + 0.5, y + 0.5, nowMs, this.quality.maxFx / PRESETS.high.maxFx);
         }
         // marcadores de objetivo
@@ -329,12 +393,24 @@ export class SurvivalRenderer {
       }
     }
 
-    // cargas eletricas por cima do chao
+    // Cargas eletricas por cima do chao.
+    //
+    // Eram um losango translucido cintilando com `Math.random()` por quadro.
+    // Dois problemas alem do alpha: o cintilar corria na taxa do MONITOR, entao
+    // a 120Hz virava um chuvisco e a 30Hz um piscar lento; e, sendo sorteado por
+    // cliente, os dois jogadores de uma sala viam a mesma poca eletrificada de
+    // formas diferentes. Agora sao voxels sobre a poca, com a fase vinda da
+    // POSICAO e do relogio — mesma celula, mesmo instante, mesma imagem nas duas
+    // maquinas, e a mesma cadencia em qualquer taxa de quadros.
     for (const c of state.charges) {
       const cx = c.idx % w;
       const cy = Math.floor(c.idx / w);
       const [sx, sy] = toScreen(cx + 0.5, cy + 0.5);
-      diamond(sx, sy, `rgba(122, 184, 255, ${0.35 + 0.3 * Math.random()})`);
+      if (sx < -40 || sx > vw + 40 || sy < -40 || sy > vh + 40) continue;
+      const phase = ((cx * 7 + cy * 13) % 5) / 5;
+      const arc = Math.sin(nowMs * 0.018 + phase * Math.PI * 2);
+      if (arc < -0.2) continue; // a corrente corre em pulsos, nao acesa sem parar
+      drawVoxel(ctx, sx, sy - (2 + arc * 2) * z, 3.5 * z, CHARGE_RAMP);
     }
 
     // passo 2: paredes + entidades + projeteis, ordenados por profundidade
@@ -657,16 +733,6 @@ export class SurvivalRenderer {
         ctx.lineWidth = z * 1.5;
         ctx.beginPath();
         ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      } else if (fx.kind === 'spark') {
-        const [sx, sy] = toScreen(fx.x, fx.y);
-        ctx.strokeStyle = PAL.electric;
-        ctx.globalAlpha = 1 - t;
-        ctx.lineWidth = z * 0.8;
-        ctx.beginPath();
-        ctx.moveTo(sx - 4 * z, sy - 4 * z + 8 * z * Math.random());
-        ctx.lineTo(sx + 4 * z, sy - 4 * z + 8 * z * Math.random());
         ctx.stroke();
         ctx.globalAlpha = 1;
       } else {
