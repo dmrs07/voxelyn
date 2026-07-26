@@ -19,7 +19,9 @@ import {
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
-import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
+import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
+  PropBank,
+} from './sprites';
 import { VoxelParticles, frameDeltaMs } from './particles';
 import { ProjectileView } from './projectiles';
 import { EntityPresentation } from './presentation';
@@ -126,6 +128,7 @@ export class SurvivalRenderer {
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly surfaces = new SurfaceBank();
+  readonly props = new PropBank();
   readonly particles = new VoxelParticles();
   readonly projectileView = new ProjectileView();
   /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
@@ -142,6 +145,7 @@ export class SurvivalRenderer {
     this.sprites.load();
     this.terrain.load();
     this.surfaces.load();
+    this.props.load();
   }
 
   setQuality(level: QualityLevel): void {
@@ -382,14 +386,11 @@ export class SurvivalRenderer {
           // esta VIVO e para onde vai. Sem eles o gas era so uma textura.
           this.particles.emitGas(x + 0.5, y + 0.5, nowMs, this.quality.maxFx / PRESETS.high.maxFx);
         }
-        // marcadores de objetivo
-        if (x === state.corePos.x && y === state.corePos.y && !state.coreTaken) {
-          const pulse = 0.6 + 0.4 * Math.sin(nowMs * 0.006);
-          diamond(sx, sy - 3 * z, shade(PAL.biolum, pulse));
-        }
-        if (x === state.entry.x && y === state.entry.y) {
-          diamond(sx, sy, shade(PAL.loot, 0.3 + brightness(x, y) * 0.5));
-        }
+        // Os marcadores de objetivo NAO saem mais aqui: viraram objetos com
+        // volume e entram na fila ordenada por profundidade, junto das paredes
+        // e das criaturas. Desenhados no passo de chao, um pedestal alto seria
+        // coberto por qualquer parede a frente dele — inclusive a parede que o
+        // jogador esta contornando para chegar ate ele.
       }
     }
 
@@ -416,6 +417,42 @@ export class SurvivalRenderer {
     // passo 2: paredes + entidades + projeteis, ordenados por profundidade
     type DrawItem = { depth: number; draw: () => void };
     const items: DrawItem[] = [];
+
+    // Objetivos como OBJETOS, na fila de profundidade.
+    //
+    // O Nucleo e a coisa mais importante do mapa e era um losango chapado
+    // pulsando 3px acima do chao — menor que qualquer parede em volta dele.
+    // Agora e um monumento voxel, e por isso tem de ser ordenado com o resto:
+    // desenhado no passo de chao, um pedestal alto ficaria por baixo de toda
+    // parede a frente, inclusive a que o jogador esta contornando para chegar
+    // ate ele.
+    {
+      const [csx, csy] = toScreen(state.corePos.x + 0.5, state.corePos.y + 0.5);
+      if (csx > -80 && csx < vw + 80 && csy > -100 && csy < vh + 100) {
+        items.push({
+          depth: state.corePos.x + state.corePos.y,
+          draw: () => {
+            const name = state.coreTaken ? 'coreTaken' : 'core';
+            if (this.props.draw(ctx, name, nowMs, csx, csy, z)) return;
+            // Fallback enquanto o atlas nao carregou.
+            const pulse = 0.6 + 0.4 * Math.sin(nowMs * 0.006);
+            ctx.fillStyle = state.coreTaken ? PAL.rockShadow : shade(PAL.biolum, pulse);
+            ctx.fillRect(csx - 4 * z, csy - 10 * z, 8 * z, 10 * z);
+          },
+        });
+      }
+      const [esx, esy] = toScreen(state.entry.x + 0.5, state.entry.y + 0.5);
+      if (esx > -80 && esx < vw + 80 && esy > -100 && esy < vh + 100) {
+        items.push({
+          depth: state.entry.x + state.entry.y,
+          draw: () => {
+            if (this.props.draw(ctx, 'extraction', nowMs, esx, esy, z)) return;
+            ctx.fillStyle = shade(PAL.loot, 0.3 + brightness(state.entry.x, state.entry.y) * 0.5);
+            ctx.fillRect(esx - 4 * z, esy - 2 * z, 8 * z, 4 * z);
+          },
+        });
+      }
+    }
 
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {

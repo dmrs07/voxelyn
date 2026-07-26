@@ -7,6 +7,7 @@ import { ALLOWED_HEX, COLORS } from './lib.mjs';
 import { ANIM_ORDER } from './entities.mjs';
 import { lightFactor } from './terrain.mjs';
 import { SURFACE_KINDS } from './surfaces.mjs';
+import { PROP_KINDS } from './props.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
@@ -273,6 +274,65 @@ export const validateSurfaces = () => {
 
 export const listIds = () => JSON.parse(readFileSync(resolve(DIR, 'index.json'), 'utf8')).ids;
 
+/**
+ * O atlas de objetos de mundo nao tem variante nem nivel de luz: sao pecas
+ * unicas e autoluminosas. O que precisa valer e que o manifest concorde com o
+ * gerador quadro a quadro, e que nenhum quadro saia vazio — um Nucleo invisivel
+ * deixaria a run sem objetivo visivel e sem nenhum erro na tela.
+ */
+export const validateProps = () => {
+  const errors = [];
+  const jsonPath = resolve(DIR, 'world-props.json');
+  if (!existsSync(jsonPath)) return ['world-props: manifest ausente'];
+  const m = JSON.parse(readFileSync(jsonPath, 'utf8'));
+  const pngPath = resolve(DIR, m.atlas);
+  if (!existsSync(pngPath)) return [`world-props: atlas ${m.atlas} ausente`];
+  const png = PNG.sync.read(readFileSync(pngPath));
+
+  if (m.kinds.length !== PROP_KINDS.length) {
+    errors.push(`world-props: ${m.kinds.length} tipos declarados, gerador tem ${PROP_KINDS.length}`);
+  }
+  m.kinds.forEach((kind, i) => {
+    const spec = PROP_KINDS[i];
+    if (!spec) return;
+    if (kind.name !== spec.name) errors.push(`world-props: tipo ${i} e ${kind.name}, esperado ${spec.name}`);
+    if (kind.frames !== spec.frames) errors.push(`world-props: ${kind.name} declara ${kind.frames} quadros, gerador faz ${spec.frames}`);
+    if (kind.frames > 1 && !(kind.frameMs > 0)) errors.push(`world-props: ${kind.name} anima sem frameMs`);
+  });
+
+  const total = m.kinds.reduce((sum, k) => sum + k.frames, 0);
+  const expectedW = Math.min(total, m.columns) * m.frameWidth;
+  const expectedH = Math.ceil(total / m.columns) * m.frameHeight;
+  if (png.width !== expectedW) errors.push(`world-props: largura ${png.width} != ${expectedW}`);
+  if (png.height !== expectedH) errors.push(`world-props: altura ${png.height} != ${expectedH}`);
+  if (png.width > MAX_ATLAS_WIDTH) errors.push(`world-props: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('world-props: PNG excede 512 KiB');
+  if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('world-props: originX fora do frame');
+  if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('world-props: originY fora do frame');
+
+  const seen = new Set();
+  for (let i = 0; i < png.width * png.height; i++) {
+    const alpha = png.data[i * 4 + 3];
+    if (alpha !== 0 && alpha !== 255) { errors.push(`world-props: alpha parcial (${alpha})`); break; }
+    if (alpha === 255) seen.add(toHex(png.data[i * 4], png.data[i * 4 + 1], png.data[i * 4 + 2]));
+  }
+  // Autoluminoso: as cores saem da paleta mestra SEM escurecimento assado.
+  for (const hex of seen) if (!ALLOWED_HEX.has(hex)) errors.push(`world-props: cor ${hex} fora da paleta mestra`);
+
+  for (let index = 0; index < total; index++) {
+    const x0 = (index % m.columns) * m.frameWidth;
+    const y0 = Math.floor(index / m.columns) * m.frameHeight;
+    let opaque = 0;
+    for (let y = 0; y < m.frameHeight && opaque === 0; y++) {
+      for (let x = 0; x < m.frameWidth; x++) {
+        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) { opaque++; break; }
+      }
+    }
+    if (opaque === 0) errors.push(`world-props: frame ${index} vazio`);
+  }
+  return [...new Set(errors)];
+};
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const ids = listIds();
   let totalErrors = 0;
@@ -280,7 +340,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let decodedBytes = 0;
   // Terreno e chao ficam FORA do index de sprites: nao tem animacao por
   // direcao, nem frameMap, e o validador de personagem tentaria le-los assim.
-  for (const [id, run] of [['terrain-blocks', validateTerrain], ['surface-tiles', validateSurfaces]]) {
+  for (const [id, run] of [['terrain-blocks', validateTerrain], ['surface-tiles', validateSurfaces], ['world-props', validateProps]]) {
     const errs = run();
     totalErrors += errs.length;
     if (errs.length === 0) console.log(`  OK ${id}`);

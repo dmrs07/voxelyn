@@ -10,6 +10,11 @@ import {
   variantAt,
   type SpriteManifestEntry,
   type SurfaceManifest,
+  propFrameAt,
+  propKindIndex,
+  propOffsets,
+  resolveProp,
+  type PropManifest,
   type TerrainManifest,
 } from '@voxelyn/survival-content';
 
@@ -25,6 +30,7 @@ import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
+import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
@@ -38,6 +44,7 @@ import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
+import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
 
 export type SpriteAnimationLayer = {
   animation: string;
@@ -187,6 +194,61 @@ export class SurfaceBank {
       surfaceFrameAt(m, kindIndex, x, y, nowMs),
       lightLevelFor(m, brightness)
     );
+    const dx = screenX - m.originX * zoom;
+    const dy = screenY + zoom - m.originY * zoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
+      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+    return true;
+  }
+}
+
+/**
+ * Banco de objetos de mundo: Nucleo e plataforma de extracao.
+ *
+ * Separado do banco de chao porque o eixo de variacao e outro — nao ha variante
+ * nem nivel de luz, so o quadro de animacao — e porque estas pecas sao
+ * desenhadas ACIMA do chao, na fila ordenada por profundidade, e nao no passo
+ * de piso.
+ */
+export class PropBank {
+  private readonly manifest = propManifest as unknown as PropManifest;
+  private readonly offsets = propOffsets(propManifest as unknown as PropManifest);
+  private readonly image = new Image();
+  private ready = false;
+
+  load(): void {
+    this.image.onload = () => { this.ready = true; };
+    this.image.onerror = () => {
+      console.warn('[props] atlas failed to load; using flat markers');
+    };
+    this.image.src = propUrl;
+  }
+
+  indexOf(name: string): number {
+    return propKindIndex(this.manifest, name);
+  }
+
+  /**
+   * Desenha uma peca com a BASE no centro do tile (sx, sy).
+   *
+   * Mesma conta de ancora do chao e do bloco: os tres modelos sao autorados no
+   * mesmo espaco com a origem no voxel (0,0,0). Repetir a conta e o que faz o
+   * pedestal assentar exatamente sobre o piso, sem costura nem flutuacao.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    name: string,
+    nowMs: number,
+    screenX: number,
+    screenY: number,
+    zoom: number
+  ): boolean {
+    if (!this.ready) return false;
+    const kindIndex = this.indexOf(name);
+    if (kindIndex < 0) return false;
+    const m = this.manifest;
+    const rect = resolveProp(m, this.offsets, kindIndex, propFrameAt(m, kindIndex, nowMs));
     const dx = screenX - m.originX * zoom;
     const dy = screenY + zoom - m.originY * zoom;
     ctx.imageSmoothingEnabled = false;

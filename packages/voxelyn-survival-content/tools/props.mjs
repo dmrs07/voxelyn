@@ -1,0 +1,166 @@
+// Atlas de objetos de mundo: o Nucleo do Veio e a plataforma de extracao.
+//
+// Por que existe: o Nucleo e O objetivo da run — a tela inteira diz "ENCONTRE O
+// NUCLEO" — e era desenhado como UM losango de cor chapada com o brilho
+// oscilando, flutuando 3px acima do chao. A coisa mais importante do mapa era o
+// unico elemento sem forma nenhuma, menor que qualquer parede em volta dela.
+// Depois que bloco, chao, criatura e projetil viraram voxel, ele ficou sendo
+// literalmente a mancha de cor no meio de um mundo solido.
+//
+// Um objetivo tem de ser lido de longe, antes de estar na tela inteira: por
+// isso e ALTO. Altura e o unico eixo que a projecao isometrica nao encurta com
+// a distancia, e e o que faz o jogador virar a camera e ir ate la.
+import { box, DIR_UNROTATED, renderVoxels, VOX } from './voxel.mjs';
+
+/**
+ * Tipos e suas animacoes ASSADAS.
+ *
+ * O nucleo pulsa devagar: e um farol, nao um alarme. A cadencia lenta tambem o
+ * separa do fogo (110ms) e do gas (300ms) que podem estar na mesma tela — se
+ * tudo pulsasse junto, nada chamaria atencao.
+ */
+export const PROP_KINDS = [
+  { name: 'core', frames: 6, frameMs: 190 },
+  { name: 'coreTaken', frames: 1, frameMs: 0 },
+  { name: 'extraction', frames: 4, frameMs: 240 },
+];
+
+/** Meia-largura da base, em voxels. */
+const HALF = 5;
+
+const ring = (boxes, z, inset, h, mat) => {
+  const a = -HALF + inset;
+  const b = HALF - inset - 1;
+  for (let x = a; x <= b; x++) {
+    for (let y = a; y <= b; y++) {
+      if (x !== a && x !== b && y !== a && y !== b) continue;
+      boxes.push(box(x, y, z, 1, 1, h, mat));
+    }
+  }
+};
+
+/**
+ * O Nucleo: pedestal de rocha, quatro contrafortes minerais e o cristal
+ * suspenso entre eles.
+ *
+ * `phase` percorre 0..1 no ciclo da animacao. O cristal sobe e desce e engorda
+ * junto — so mudar de cor devolveria o problema original, um brilho piscando
+ * sem volume.
+ */
+const coreModel = (phase, taken) => {
+  const boxes = [];
+  const bob = Math.round(Math.sin(phase * Math.PI * 2) * 1.5);
+  const swell = Math.sin(phase * Math.PI * 2) > 0.4 ? 1 : 0;
+
+  // Pedestal em tres degraus: a base larga e o que da peso ao objeto.
+  ring(boxes, 0, 0, 2, 'rockDeep');
+  ring(boxes, 2, 1, 2, 'rock');
+  ring(boxes, 4, 2, 1, 'bone');
+
+  // Quatro contrafortes nos cantos, subindo e afinando. Sao eles que levam o
+  // olho de baixo para cima ate o cristal.
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const cx = sx * (HALF - 2);
+    const cy = sy * (HALF - 2);
+    boxes.push(box(cx, cy, 5, 1, 1, 7, 'bone'));
+    boxes.push(box(cx - sx, cy - sy, 12, 1, 1, 4, 'bone'));
+    boxes.push(box(cx - sx, cy - sy, 16, 1, 1, 1, taken ? 'rust' : 'loot'));
+  }
+
+  if (taken) {
+    // Berco vazio: os contrafortes continuam de pe e o encaixe fica a mostra.
+    // O parceiro de co-op precisa saber, de longe, que alguem ja pegou.
+    ring(boxes, 5, 2, 1, 'rockDeep');
+    return boxes;
+  }
+
+  // O cristal, suspenso no meio dos contrafortes.
+  //
+  // Empilhado em aneis que abrem e fecham — estreito embaixo, largo no meio,
+  // estreito em cima. A primeira versao era uma caixa com um ressalto por cima,
+  // e o ressalto achatava tudo: lia como uma MESA verde flutuando, e ainda
+  // escondia a ponta clara atras dele. Gema precisa de facetas, nao de tampo.
+  const z = 9 + bob;
+  const layers = [0, 1, 1 + swell, 1, 0];
+  layers.forEach((r, k) => {
+    boxes.push(box(-r, -r, z + k, r * 2 + 1, r * 2 + 1, 1, 'biolum'));
+  });
+  // Ponta clara acima de tudo: o ponto mais alto do mapa, e o unico voxel
+  // branco da cena — e o que o olho encontra primeiro varrendo a tela.
+  boxes.push(box(0, 0, z + layers.length, 1, 1, 1, 'player'));
+  // Lascas orbitando, defasadas do corpo para o conjunto nao subir em bloco.
+  const orbit = Math.round(Math.sin(phase * Math.PI * 2 + Math.PI) * 1.5);
+  for (const [ox, oy] of [[-4, 0], [4, 0], [0, -4], [0, 4]]) {
+    boxes.push(box(ox, oy, 10 + orbit, 1, 1, 1, 'biolum'));
+  }
+  return boxes;
+};
+
+/**
+ * A plataforma de extracao. Deliberadamente BAIXA e larga, o oposto do Nucleo:
+ * os dois marcadores nao podem competir. Um chama para ir buscar, o outro diz
+ * onde sair — confundir os dois custa a run.
+ */
+const extractionModel = (phase) => {
+  const boxes = [];
+  ring(boxes, 0, 0, 1, 'rust');
+  ring(boxes, 0, 1, 1, 'rockDeep');
+  // Marcas de guia acendendo em sequencia, apontando para dentro.
+  const lit = Math.floor(phase * 4) % 4;
+  const marks = [[-HALF + 1, 0], [HALF - 2, 0], [0, -HALF + 1], [0, HALF - 2]];
+  marks.forEach(([x, y], i) => {
+    boxes.push(box(x, y, 1, 1, 1, 1, i === lit ? 'loot' : 'rust'));
+  });
+  return boxes;
+};
+
+export const propModel = (kind, frame) => {
+  const spec = PROP_KINDS.find((k) => k.name === kind);
+  const phase = spec.frames > 1 ? frame / spec.frames : 0;
+  if (kind === 'core') return coreModel(phase, false);
+  if (kind === 'coreTaken') return coreModel(0, true);
+  return extractionModel(phase);
+};
+
+/**
+ * Extensao projetada. Mede SEM rotacao, igual ao rasterizador — foi o
+ * desalinhamento de 2px do atlas de blocos que ensinou a nao divergir aqui.
+ */
+export const propBounds = () => {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const kind of PROP_KINDS) {
+    for (let frame = 0; frame < kind.frames; frame++) {
+      for (const b of propModel(kind.name, frame)) {
+        for (const z of [b.z, b.z + b.h - 1]) {
+          for (const [x, y] of [[b.x, b.y], [b.x + b.w - 1, b.y + b.d - 1]]) {
+            const sx = (x - y) * (VOX.tileW / 2);
+            const sy = (x + y) * (VOX.tileH / 2) - z * VOX.zStep;
+            minX = Math.min(minX, sx);
+            maxX = Math.max(maxX, sx + VOX.tileW - 1);
+            minY = Math.min(minY, sy - 2);
+            maxY = Math.max(maxY, sy + VOX.zStep - 1);
+          }
+        }
+      }
+    }
+  }
+  return { minX, maxX, minY, maxY, w: maxX - minX + 1, h: maxY - minY + 1 };
+};
+
+/**
+ * Renderiza todos os quadros. Sem niveis de luz: o Nucleo emite a propria luz e
+ * a plataforma e um marcador de objetivo — os dois tem de ser legiveis mesmo no
+ * canto mais escuro do mapa, que e justamente onde a geracao costuma po-los.
+ */
+export const buildPropFrames = (frameW, frameH, anchorX, anchorY) => {
+  const frames = [];
+  for (const kind of PROP_KINDS) {
+    for (let frame = 0; frame < kind.frames; frame++) {
+      frames.push(renderVoxels(propModel(kind.name, frame), DIR_UNROTATED, frameW, frameH, anchorX, anchorY));
+    }
+  }
+  return frames;
+};
