@@ -78,6 +78,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/tests/**/*.test.ts'],
+    // Inclui tanto suites centrais em src/tests quanto testes colocalizados
+    // junto do modulo (por exemplo client/presentation.test.ts).
+    include: ['src/**/*.test.ts'],
   },
 });
