@@ -3,8 +3,9 @@ import { PNG } from 'pngjs';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ALLOWED_HEX } from './lib.mjs';
+import { ALLOWED_HEX, COLORS } from './lib.mjs';
 import { ANIM_ORDER } from './entities.mjs';
+import { lightFactor } from './terrain.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
@@ -134,6 +135,69 @@ export const validateManifest = (id) => {
   return [...new Set(errors)];
 };
 
+/**
+ * O atlas de terreno tem regras proprias: os niveis de luz sao assados, entao as
+ * cores NAO sao a paleta mestra pura — sao multiplos dela. O que precisa valer e
+ * que toda cor derive de uma cor da paleta por um dos fatores de luz assados, e
+ * que o atlas caiba na textura.
+ */
+export const validateTerrain = () => {
+  const errors = [];
+  const jsonPath = resolve(DIR, 'terrain-blocks.json');
+  if (!existsSync(jsonPath)) return ['terrain-blocks: manifest ausente'];
+  const m = JSON.parse(readFileSync(jsonPath, 'utf8'));
+  const pngPath = resolve(DIR, m.atlas);
+  if (!existsSync(pngPath)) return [`terrain-blocks: atlas ${m.atlas} ausente`];
+  const png = PNG.sync.read(readFileSync(pngPath));
+
+  const total = m.kinds.length * m.variants * m.lightLevels;
+  const expectedW = Math.min(total, m.columns) * m.frameWidth;
+  const expectedH = Math.ceil(total / m.columns) * m.frameHeight;
+  if (png.width !== expectedW) errors.push(`terrain-blocks: largura ${png.width} != ${expectedW}`);
+  if (png.height !== expectedH) errors.push(`terrain-blocks: altura ${png.height} != ${expectedH}`);
+  if (png.width > MAX_ATLAS_WIDTH) errors.push(`terrain-blocks: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('terrain-blocks: PNG excede 512 KiB');
+  if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('terrain-blocks: originX fora do frame');
+  if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('terrain-blocks: originY fora do frame');
+
+  // Toda cor tem de ser uma cor da paleta mestra escurecida por um dos fatores
+  // assados. Assim uma cor inventada a mao nao entra sem passar pelo gerador.
+  const derived = new Set();
+  for (let level = 0; level < m.lightLevels; level++) {
+    // Importado do gerador, nao copiado: uma formula duplicada aqui deixaria a
+    // validacao passar em silencio depois de mudarem os niveis de luz.
+    const f = lightFactor(level);
+    for (const [r, g, b] of Object.values(COLORS)) {
+      derived.add(toHex(
+        Math.max(0, Math.min(255, Math.round(r * f))),
+        Math.max(0, Math.min(255, Math.round(g * f))),
+        Math.max(0, Math.min(255, Math.round(b * f)))
+      ));
+    }
+  }
+  const seen = new Set();
+  for (let i = 0; i < png.width * png.height; i++) {
+    const alpha = png.data[i * 4 + 3];
+    if (alpha !== 0 && alpha !== 255) { errors.push(`terrain-blocks: alpha parcial (${alpha})`); break; }
+    if (alpha === 255) seen.add(toHex(png.data[i * 4], png.data[i * 4 + 1], png.data[i * 4 + 2]));
+  }
+  for (const hex of seen) if (!derived.has(hex)) errors.push(`terrain-blocks: cor ${hex} nao deriva da paleta mestra`);
+
+  // Cada frame tem de ter conteudo: um bloco vazio vira buraco no cenario.
+  for (let index = 0; index < total; index++) {
+    const x0 = (index % m.columns) * m.frameWidth;
+    const y0 = Math.floor(index / m.columns) * m.frameHeight;
+    let opaque = 0;
+    for (let y = 0; y < m.frameHeight && opaque === 0; y++) {
+      for (let x = 0; x < m.frameWidth; x++) {
+        if (png.data[((y0 + y) * png.width + x0 + x) * 4 + 3] !== 0) { opaque++; break; }
+      }
+    }
+    if (opaque === 0) errors.push(`terrain-blocks: frame ${index} vazio`);
+  }
+  return [...new Set(errors)];
+};
+
 export const listIds = () => JSON.parse(readFileSync(resolve(DIR, 'index.json'), 'utf8')).ids;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -141,6 +205,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let totalErrors = 0;
   let totalBytes = 0;
   let decodedBytes = 0;
+  const terrainErrs = validateTerrain();
+  totalErrors += terrainErrs.length;
+  if (terrainErrs.length === 0) console.log('  OK terrain-blocks');
+  else for (const e of terrainErrs) console.error(`  FAIL ${e}`);
+  {
+    const tp = resolve(DIR, 'terrain-blocks.png');
+    if (existsSync(tp)) {
+      totalBytes += statSync(tp).size;
+      const tpng = PNG.sync.read(readFileSync(tp));
+      decodedBytes += tpng.width * tpng.height * 4;
+    }
+  }
   for (const id of ids) {
     const errs = validateManifest(id);
     totalErrors += errs.length;

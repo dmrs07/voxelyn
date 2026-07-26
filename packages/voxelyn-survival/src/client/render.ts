@@ -12,7 +12,7 @@ import {
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
-import { SpriteBank, deriveAnim, type EntityAnimState } from './sprites';
+import { SpriteBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
@@ -56,6 +56,7 @@ export class SurvivalRenderer {
   shake: CameraShake = { power: 0, until: 0 };
   messages: Array<{ text: string; until: number }> = [];
   readonly sprites = new SpriteBank();
+  readonly terrain = new TerrainBank();
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -66,6 +67,7 @@ export class SurvivalRenderer {
     if (!ctx) throw new Error('Canvas 2D indisponivel');
     this.ctx = ctx;
     this.sprites.load();
+    this.terrain.load();
   }
 
   setQuality(level: QualityLevel): void {
@@ -315,6 +317,13 @@ export class SurvivalRenderer {
         items.push({
           depth: x + y,
           draw: () => {
+            // Bloco voxel pre-renderizado. Um drawImage substitui os tres fills
+            // de poligono; o caminho de poligono abaixo continua como fallback
+            // para quando o atlas ainda nao carregou ou falhou.
+            const kindIndex =
+              solid === SOLID_FRAGILE ? 1 : solid === SOLID_ORE ? 2 : solid === SOLID_CRYSTAL ? 3 : 0;
+            if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
+
             const hw = (TILE_W / 2) * z;
             const hh = (TILE_H / 2) * z;
             const wh = WALL_H * z;

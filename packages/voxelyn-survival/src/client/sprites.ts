@@ -2,7 +2,11 @@ import {
   dirFromFacing,
   frameAtTime,
   resolveFrame,
+  lightLevelFor,
+  resolveBlock,
+  variantAt,
   type SpriteManifestEntry,
+  type TerrainManifest,
 } from '@voxelyn/survival-content';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
@@ -13,6 +17,7 @@ import bruiserManifest from '@voxelyn/survival-content/assets/atlases/enemy-brui
 import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-guardian.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
+import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
@@ -22,6 +27,7 @@ import bruiserUrl from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.p
 import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
+import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 
 type Loaded = { manifest: SpriteManifestEntry; image: HTMLImageElement; ready: boolean; failed: boolean };
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
@@ -43,6 +49,57 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
   bruiser: 'enemy-bruiser',
   guardian: 'enemy-guardian',
 };
+
+/**
+ * Banco de blocos de terreno. Separado do SpriteBank porque o eixo de variacao e
+ * outro: aqui nao ha animacao nem direcao, so tipo, variante de superficie e
+ * nivel de luz — tudo pre-renderizado.
+ */
+export class TerrainBank {
+  private readonly manifest = terrainManifest as unknown as TerrainManifest;
+  private readonly image = new Image();
+  private ready = false;
+
+  load(): void {
+    this.image.onload = () => { this.ready = true; };
+    this.image.onerror = () => {
+      console.warn('[terrain] atlas failed to load; using flat blocks');
+    };
+    this.image.src = terrainUrl;
+  }
+
+  get kinds(): string[] { return this.manifest.kinds; }
+  get variants(): number { return this.manifest.variants; }
+
+  /**
+   * Desenha um bloco com o centro do tile em (sx, sy) no plano do chao.
+   *
+   * A ancora vem do manifest (originX/originY), entao mexer no modelo voxel nao
+   * desalinha o terreno: o gerador recalcula e o cliente segue junto.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    kindIndex: number,
+    x: number,
+    y: number,
+    brightness: number,
+    screenX: number,
+    screenY: number,
+    zoom: number
+  ): boolean {
+    if (!this.ready) return false;
+    const m = this.manifest;
+    const rect = resolveBlock(m, kindIndex, variantAt(x, y, m.variants), lightLevelFor(m, brightness));
+    // A origem do modelo cai meio voxel adiante do centro do tile nos dois
+    // eixos, o que na projecao 2:1 e 1px para baixo e 0 na horizontal.
+    const dx = screenX - m.originX * zoom;
+    const dy = screenY + zoom - m.originY * zoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
+      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+    return true;
+  }
+}
 
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
