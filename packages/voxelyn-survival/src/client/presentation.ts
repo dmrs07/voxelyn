@@ -1,8 +1,8 @@
 import { TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
-import type { EntityAnimState } from './sprites';
+import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
 
 export type PresentedAnimation = {
-  anim: string;
+  anim: SpriteAnimationSelection;
   elapsedMs: number;
   facingX: number;
   facingY: number;
@@ -31,6 +31,50 @@ type ActionIntent = {
 const actionAnimation = (action: EntityActionKind): string => {
   if (action === 'detonate' || action === 'charge' || action === 'pulse') return 'special';
   return 'attack';
+};
+
+const actionElapsedMs = (action: ActionIntent, tick: number): number =>
+  Math.max(0, ((tick - action.startTick) / TICK_HZ) * 1000);
+
+/**
+ * Recoil visual curto e desacoplado da simulação. Ele nasce no release do
+ * ataque e volta rapidamente a zero usando ease-out quadrático.
+ */
+export const recoilAtElapsed = (elapsedMs: number, releaseMs: number, durationMs = 120): number => {
+  const age = elapsedMs - releaseMs;
+  if (age < 0 || age >= durationMs) return 0;
+  const t = age / durationMs;
+  return (1 - t) * (1 - t);
+};
+
+const layeredPlayerAnimation = (
+  entity: Entity,
+  base: EntityAnimState,
+  action: ActionIntent,
+  tick: number,
+  nowMs: number
+): LayeredPlayerAnimation => {
+  const upperElapsedMs = actionElapsedMs(action, tick);
+  const releaseMs = Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000);
+  const walking = base.anim === 'walk';
+  const hasMoveFacing = Math.hypot(base.moveFacingX, base.moveFacingY) > 0.001;
+
+  return {
+    kind: 'layered-player',
+    lower: {
+      animation: walking ? 'walk' : 'idle',
+      elapsedMs: nowMs - base.animStartMs,
+      facingX: walking && hasMoveFacing ? base.moveFacingX : entity.facing.x,
+      facingY: walking && hasMoveFacing ? base.moveFacingY : entity.facing.y,
+    },
+    upper: {
+      animation: actionAnimation(action.action),
+      elapsedMs: upperElapsedMs,
+      facingX: action.dx,
+      facingY: action.dy,
+    },
+    recoil: recoilAtElapsed(upperElapsedMs, releaseMs),
+  };
 };
 
 /** Client-side visual state that never feeds back into the authoritative simulation. */
@@ -104,9 +148,20 @@ export class EntityPresentation {
     }
     this.downedAt.delete(entity.id);
 
+    // Estados que alteram a silhueta inteira interrompem a composição em
+    // camadas. O ataque continua registrado e pode reaparecer após o hit.
+    if (base.anim === 'hit' || base.anim === 'die') {
+      return {
+        anim: base.anim,
+        elapsedMs: nowMs - base.animStartMs,
+        facingX: entity.facing.x,
+        facingY: entity.facing.y,
+      };
+    }
+
     const authoritative = entity.action;
     const eventIntent = this.actions.get(entity.id);
-    const action = authoritative
+    const action: ActionIntent | undefined = authoritative
       ? {
           action: authoritative.kind,
           startTick: authoritative.startedAt,
@@ -118,7 +173,15 @@ export class EntityPresentation {
       : eventIntent;
     if (action) {
       if (state.tick <= action.endTick) {
-        const elapsedMs = Math.max(0, ((state.tick - action.startTick) / TICK_HZ) * 1000);
+        const elapsedMs = actionElapsedMs(action, state.tick);
+        if (entity.archetype === 'prospector') {
+          return {
+            anim: layeredPlayerAnimation(entity, base, action, state.tick, nowMs),
+            elapsedMs,
+            facingX: action.dx,
+            facingY: action.dy,
+          };
+        }
         return {
           anim: actionAnimation(action.action),
           elapsedMs,
