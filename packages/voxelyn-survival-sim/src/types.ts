@@ -97,6 +97,20 @@ export type SemanticEvent =
   | { t: 'hit'; x: number; y: number; amount: number; target: number }
   | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
   | { t: 'explosion'; x: number; y: number; radius: number }
+  /**
+   * Um solido deixou de existir. Carrega QUAL material caiu para o cliente
+   * poder desfazer o bloco no material certo; sem isso ele teria de adivinhar
+   * pela grade, e a grade ja mudou quando o evento chega.
+   */
+  | { t: 'break'; x: number; y: number; solid: number }
+  /**
+   * Material cedendo por corrosao, sem ainda ter caido. O ESTADO em si viaja
+   * pelo diff de chunk (o cliente ve o bloco enfraquecido no grid); este evento
+   * so marca o instante, para o cliente cuspir respingo no lugar certo.
+   */
+  | { t: 'corrode'; x: number; y: number; solid: number }
+  /** Lasca arrancada de um veio de minerio por impacto cinetico. */
+  | { t: 'chip'; x: number; y: number }
   | { t: 'discharge'; cells: number[] }
   | { t: 'ignite'; x: number; y: number }
   | { t: 'shot'; x: number; y: number; dx: number; dy: number; owner: number }

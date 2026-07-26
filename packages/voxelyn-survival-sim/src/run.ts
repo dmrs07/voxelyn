@@ -41,7 +41,8 @@ import {
   WORLD_H,
   WORLD_W,
 } from './constants.js';
-import { breakSolid, dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
+import { dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
+import { impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
   damageEntity,
@@ -520,15 +521,25 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       }
       const i = cy * w + cx;
 
-      // impacto em solido
+      const cls = projectileClass(proj);
+
+      // impacto em solido: cada material reage a classe do projetil (ver
+      // materials.ts). Antes disso, qualquer tiro quebrava frágil e cristal do
+      // mesmo jeito e rocha e minerio eram indistinguiveis.
       if (state.solid[i] !== SOLID_NONE) {
         if (proj.explosive && !proj.hostile) {
           explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events);
           dead = true;
           break;
         }
-        const broke = breakSolid(state, cx, cy, events);
-        if (!(broke && proj.piercing)) dead = true;
+        const { stop, broke } = impactSolid(state, cx, cy, cls, events);
+        if (stop && !(broke && proj.piercing)) dead = true;
+        break;
+      }
+
+      // reacao com a superficie da celula aberta em que o projetil esta
+      if (impactSurface(state, cx, cy, cls, events)) {
+        dead = true;
         break;
       }
 
@@ -587,6 +598,16 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       }
     }
 
+    if (dead && proj.leavesBiofluid) {
+      // O cuspe so deixava poca quando o TTL EXPIRAVA: acertou parede, chao ou
+      // alvo, evaporava sem deixar nada. Era metade da mecanica — o spitter e
+      // um agente que muda o terreno, e mudar terreno era justamente o que ele
+      // nao fazia quando de fato acertava alguma coisa.
+      const i = cellIndexAt(state, proj.x, proj.y);
+      if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+        setSurface(state, i, SURF_BIOFLUID, 0);
+      }
+    }
     if (!dead) survivors.push(proj);
   }
   state.projectiles = survivors;

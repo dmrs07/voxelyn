@@ -1,8 +1,13 @@
 import {
   SOLID_CRYSTAL,
+  SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SOLID_ROCK,
   SOLID_ORE,
+  SOLID_ORE_CHIPPED,
+  SOLID_ORE_SPENT,
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
@@ -12,11 +17,29 @@ import {
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
-import { SpriteBank, deriveAnim, type EntityAnimState } from './sprites';
+import { SpriteBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
+import { VoxelParticles, frameDeltaMs } from './particles';
+import { ProjectileView } from './projectiles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { drawVoxelEntity } from './voxel-fallback';
+
+/**
+ * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
+ * de cadeia de ternarios: com oito materiais a cadeia vira uma linha ilegivel e
+ * um material novo passa despercebido.
+ */
+const TERRAIN_KIND_INDEX: Record<number, number> = {
+  [SOLID_ROCK]: 0,
+  [SOLID_FRAGILE]: 1,
+  [SOLID_ORE]: 2,
+  [SOLID_CRYSTAL]: 3,
+  [SOLID_FRAGILE_WEAK]: 4,
+  [SOLID_ORE_SPENT]: 5,
+  [SOLID_CRYSTAL_DULL]: 6,
+  [SOLID_ORE_CHIPPED]: 7,
+};
 
 export const TILE_W = 32;
 export const TILE_H = 16;
@@ -56,6 +79,11 @@ export class SurvivalRenderer {
   shake: CameraShake = { power: 0, until: 0 };
   messages: Array<{ text: string; until: number }> = [];
   readonly sprites = new SpriteBank();
+  readonly terrain = new TerrainBank();
+  readonly particles = new VoxelParticles();
+  readonly projectileView = new ProjectileView();
+  /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
+  private lastFrameMs = 0;
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -66,6 +94,7 @@ export class SurvivalRenderer {
     if (!ctx) throw new Error('Canvas 2D indisponivel');
     this.ctx = ctx;
     this.sprites.load();
+    this.terrain.load();
   }
 
   setQuality(level: QualityLevel): void {
@@ -103,6 +132,10 @@ export class SurvivalRenderer {
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     this.presentation.ingest(events, nowMs);
+    // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
+    // O cliente nunca decide que houve explosao — so a desenha.
+    this.particles.budget = this.quality.maxFx * 2;
+    this.particles.ingest(events, this.worldWidth, this.quality.maxFx / PRESETS.high.maxFx);
     for (const ev of events) {
       switch (ev.t) {
         case 'explosion':
@@ -208,6 +241,9 @@ export class SurvivalRenderer {
         for (let x = x0; x <= x1; x++) {
           const i = y * w + x;
           if (state.surface[i] === SURF_FIRE) lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
+          // Apenas o cristal VIVO ilumina. Opacado pelo acido ele continua na
+          // tela com a mesma silhueta, mas o mapa escurece — que e exatamente a
+          // perda que o jogador tem de sentir.
           else if (state.solid[i] === SOLID_CRYSTAL) lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
         }
       }
@@ -278,6 +314,9 @@ export class SurvivalRenderer {
         }
         if (surf === SURF_GAS) {
           diamond(sx, sy, `rgba(168, 230, 60, ${0.16 + 0.1 * Math.sin(nowMs * 0.004 + x + y)})`);
+          // A mancha no chao diz ONDE o gas esta; os motes subindo dizem que
+          // ele esta VIVO e para onde vai. Sem eles o gas era so uma textura.
+          this.particles.emitGas(x + 0.5, y + 0.5, nowMs, this.quality.maxFx / PRESETS.high.maxFx);
         }
         // marcadores de objetivo
         if (x === state.corePos.x && y === state.corePos.y && !state.coreTaken) {
@@ -315,13 +354,41 @@ export class SurvivalRenderer {
         items.push({
           depth: x + y,
           draw: () => {
+            // Bloco voxel pre-renderizado. Um drawImage substitui os tres fills
+            // de poligono; o caminho de poligono abaixo continua como fallback
+            // para quando o atlas ainda nao carregou ou falhou.
+            // Espelha BLOCK_KINDS do atlas de terreno, na ordem em que o
+            // gerador empacota os tipos.
+            const kindIndex = TERRAIN_KIND_INDEX[solid] ?? 0;
+            if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
+
             const hw = (TILE_W / 2) * z;
             const hh = (TILE_H / 2) * z;
             const wh = WALL_H * z;
             let top = PAL.rockLight;
             let left = PAL.rock;
             let right = PAL.rockShadow;
-            if (solid === SOLID_FRAGILE) {
+            // Os estados corroidos precisam se distinguir TAMBEM no fallback:
+            // se o atlas falhar de vez, um bloco enfraquecido apareceria como
+            // rocha comum para sempre, e cair sem aviso e exatamente o que o
+            // design proibe.
+            if (solid === SOLID_FRAGILE_WEAK) {
+              top = '#6e4a33';
+              left = '#4a3122';
+              right = '#2f1f16';
+            } else if (solid === SOLID_ORE_CHIPPED) {
+              top = '#8a6a3a';
+              left = '#5c452a';
+              right = '#3a2b1c';
+            } else if (solid === SOLID_ORE_SPENT) {
+              top = '#3a3f44';
+              left = '#2a2e33';
+              right = '#1c1f23';
+            } else if (solid === SOLID_CRYSTAL_DULL) {
+              top = '#2f6b4f';
+              left = '#1f3d33';
+              right = '#152721';
+            } else if (solid === SOLID_FRAGILE) {
               top = '#5a5346';
               left = '#463f35';
               right = '#332e27';
@@ -552,19 +619,14 @@ export class SurvivalRenderer {
       });
     }
 
+    // Direcao de voo vem do quadro anterior; o protocolo so carrega posicao e
+    // a direcao serve apenas para inclinar o rastro, que e cosmetico.
+    this.projectileView.sync(state.projectiles, nowMs);
     for (const proj of state.projectiles) {
       items.push({
         depth: proj.x + proj.y,
         draw: () => {
-          const [sx, sy] = toScreen(proj.x, proj.y);
-          // sprite biolum para tiros do jogador; cuspe inimigo permanece vetorial (acido)
-          const drew = !proj.hostile && this.sprites.drawBolt(ctx, sx, sy - 6 * z, nowMs, Math.max(1, Math.round(z)));
-          if (!drew) {
-            ctx.fillStyle = proj.hostile ? PAL.acid : PAL.biolum;
-            ctx.beginPath();
-            ctx.arc(sx, sy - 6 * z, Math.max(2, 2.2 * z), 0, Math.PI * 2);
-            ctx.fill();
-          }
+          this.projectileView.draw(ctx, proj, toScreen, z, TILE_H);
         },
       });
     }
@@ -573,7 +635,17 @@ export class SurvivalRenderer {
     for (const item of items) item.draw();
 
     // FX
-    const dtFx = 16.7;
+    // Vem do relogio, nao de um 16.7 fixo: em rAF o passo fixo amarrava a vida
+    // e a fisica dos efeitos a taxa do monitor, e a 120Hz tudo durava metade do
+    // tempo e percorria metade da distancia. Vale para os FX antigos tambem —
+    // eles ja tinham a duracao expressa em ms, so nao a respeitavam.
+    const dtFx = frameDeltaMs(this.lastFrameMs, nowMs);
+    this.lastFrameMs = nowMs;
+    // As particulas voxel entram DEPOIS das paredes e entidades, com ordem do
+    // pintor propria: brasa e gas sao volume no ar, tem de passar por cima do
+    // chao e do bloco, mas continuam atras do HUD.
+    this.particles.step(dtFx);
+    this.particles.draw(ctx, toScreen, z, TILE_H);
     this.fxList = this.fxList.filter((fx) => (fx.life -= dtFx) > 0);
     for (const fx of this.fxList) {
       const t = 1 - fx.life / fx.maxLife;

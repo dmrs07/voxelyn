@@ -6,6 +6,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blitToAtlas, colorsUsed, fitSpriteToMargin, grid, isEmpty } from './lib.mjs';
 import { ANIM_ORDER, ENTITY_SPECS } from './entities.mjs';
+import {
+  BLOCK_KINDS,
+  LIGHT_LEVELS,
+  VARIANTS,
+  blockBounds,
+  buildTerrainFrames,
+} from './terrain.mjs';
 import { PLAYER_LAYER_SPECS } from './player-layers.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -110,7 +117,57 @@ const buildEntity = (spec) => {
   return { id: spec.id, cols: totalCols, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
 };
 
+/**
+ * Atlas de blocos de terreno. Sem animacao e sem direcao: o que varia e o tipo,
+ * a variante de superficie e o nivel de luz, tudo assado. O cliente escolhe o
+ * frame por indice e faz UM drawImage, em vez dos tres fills de poligono que
+ * deixavam o cenario chapado ao lado de personagens facetados.
+ */
+const buildTerrain = () => {
+  const bounds = blockBounds();
+  const frameWidth = bounds.w;
+  const frameHeight = bounds.h;
+  const frames = buildTerrainFrames(frameWidth, frameHeight, -bounds.minX, -bounds.minY);
+  const columns = Math.min(frames.length, Math.floor(MAX_TEXTURE / frameWidth));
+  const rows = Math.ceil(frames.length / columns);
+  const atlas = grid(columns * frameWidth, rows * frameHeight);
+  const palette = new Set();
+  frames.forEach((frame, i) => {
+    if (isEmpty(frame)) throw new Error(`terrain-blocks: frame ${i} vazio`);
+    for (const hex of colorsUsed(frame)) palette.add(hex);
+    blitToAtlas(atlas, frame, i % columns, Math.floor(i / columns));
+  });
+
+  const png = new PNG({ width: atlas.w, height: atlas.h });
+  png.data = Buffer.from(atlas.buf);
+  const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
+  writeFileSync(resolve(OUT, 'terrain-blocks.png'), pngBytes);
+
+  const manifest = {
+    id: 'terrain-blocks',
+    version: 1,
+    atlas: 'terrain-blocks.png',
+    frameWidth,
+    frameHeight,
+    columns,
+    // Pixel do frame onde cai a origem do modelo (voxel 0,0,0). O cliente
+    // ancora o blit por aqui, entao mudar o modelo nao desalinha o terreno.
+    originX: -bounds.minX,
+    originY: -bounds.minY,
+    kinds: BLOCK_KINDS,
+    variants: VARIANTS,
+    lightLevels: LIGHT_LEVELS,
+    paletteColors: [...palette].sort(),
+    generation: { tool: 'procedural voxel raster (tools/terrain.mjs)', seedOrRef: 'deterministic-code-v1' },
+  };
+  writeFileSync(resolve(OUT, 'terrain-blocks.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  return { id: 'terrain-blocks', cols: frames.length, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
+};
+
 const results = [...ENTITY_SPECS, ...PLAYER_LAYER_SPECS].map(buildEntity);
+// O terreno fica FORA do index de sprites: nao tem animacao, direcao nem
+// frameMap, e o validador de sprites tentaria le-lo como personagem.
+const terrainResult = buildTerrain();
 const index = {
   version: 3,
   generated: 'deterministic-code-v3-layered-player',
@@ -118,4 +175,4 @@ const index = {
 };
 writeFileSync(resolve(OUT, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
 console.log('atlases gerados:');
-for (const r of results) console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);
+for (const r of [...results, terrainResult]) console.log(`  ${r.id.padEnd(32)} ${r.width}x${r.height} (${r.cols} frames, ${r.bytes} bytes)`);
