@@ -14,6 +14,7 @@ import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './in
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, TerrainBank, deriveAnim, type EntityAnimState } from './sprites';
 import { VoxelParticles, frameDeltaMs } from './particles';
+import { ProjectileView } from './projectiles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
@@ -59,6 +60,7 @@ export class SurvivalRenderer {
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly particles = new VoxelParticles();
+  readonly projectileView = new ProjectileView();
   /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
   private lastFrameMs = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -572,19 +574,14 @@ export class SurvivalRenderer {
       });
     }
 
+    // Direcao de voo vem do quadro anterior; o protocolo so carrega posicao e
+    // a direcao serve apenas para inclinar o rastro, que e cosmetico.
+    this.projectileView.sync(state.projectiles, nowMs);
     for (const proj of state.projectiles) {
       items.push({
         depth: proj.x + proj.y,
         draw: () => {
-          const [sx, sy] = toScreen(proj.x, proj.y);
-          // sprite biolum para tiros do jogador; cuspe inimigo permanece vetorial (acido)
-          const drew = !proj.hostile && this.sprites.drawBolt(ctx, sx, sy - 6 * z, nowMs, Math.max(1, Math.round(z)));
-          if (!drew) {
-            ctx.fillStyle = proj.hostile ? PAL.acid : PAL.biolum;
-            ctx.beginPath();
-            ctx.arc(sx, sy - 6 * z, Math.max(2, 2.2 * z), 0, Math.PI * 2);
-            ctx.fill();
-          }
+          this.projectileView.draw(ctx, proj, toScreen, z, TILE_H);
         },
       });
     }

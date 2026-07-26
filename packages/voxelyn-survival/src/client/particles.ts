@@ -12,6 +12,8 @@
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
 import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import type { FaceRamp } from './voxel-draw';
+import { drawVoxel } from './voxel-draw';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
 export type ParticleKind = 'ember' | 'gas' | 'debris' | 'spark' | 'rubble' | 'crystalShard';
@@ -28,8 +30,15 @@ type Particle = {
   kind: ParticleKind;
 };
 
-/** Cores por tipo, em ordem do mais quente/novo ao mais frio/velho. */
-const RAMP: Record<ParticleKind, string[]> = {
+/**
+ * Rampa de faces por tipo: [topo, esquerda, direita].
+ *
+ * Antes era uma lista de cores por idade e a particula saia num retangulo
+ * chapado. Agora as tres entradas sao as tres FACES do voxel, entao a materia
+ * no ar tem o mesmo volume facetado que o bloco e a criatura — o retangulo liso
+ * denunciava o truque justamente nos momentos de maior atencao, a explosao.
+ */
+const RAMP: Record<ParticleKind, FaceRamp> = {
   ember: ['#ffd166', '#ff7a2f', '#d93b4c'],
   gas: ['#a8e63c', '#2f6b4f', '#1f3d33'],
   debris: ['#46566e', '#2e3a4d', '#1d2430'],
@@ -246,17 +255,19 @@ export class VoxelParticles {
     if (this.items.length === 0) return;
     // Ordem do pintor, igual ao resto da cena: o que esta atras desenha antes.
     const sorted = [...this.items].sort((a, b) => a.x + a.y - (b.x + b.y) || a.z - b.z);
-    const vw = Math.max(1, Math.round(4 * zoom));
-    const vh = Math.max(1, Math.round(2 * zoom));
+    // A particula encolhe com a idade em vez de trocar de cor: com as tres
+    // entradas da rampa agora ocupadas pelas FACES do voxel, o esmaecer passou
+    // a ser tamanho e alpha, que e o que faz brasa parecer brasa apagando.
+    const base = 4 * zoom;
     ctx.save();
     for (const p of sorted) {
       const [sx, sy] = project(p.x, p.y);
-      const ramp = RAMP[p.kind];
-      const t = 1 - p.life / p.maxLife;
-      ctx.fillStyle = ramp[Math.min(ramp.length - 1, Math.floor(t * ramp.length))];
+      const life = Math.max(0, Math.min(1, p.life / p.maxLife));
+      ctx.globalAlpha = 0.35 + life * 0.65;
       const py = sy - p.z * tileH * zoom;
-      ctx.fillRect(Math.round(sx - vw / 2), Math.round(py - vh / 2), vw, vh);
+      drawVoxel(ctx, sx, py, base * (0.45 + life * 0.55), RAMP[p.kind]);
     }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 }
