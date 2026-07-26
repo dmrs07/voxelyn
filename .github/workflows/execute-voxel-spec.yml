@@ -40,10 +40,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build voxel generator dependency
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/voxel-validation.log
+
       - name: Regenerate normalized character atlases
         run: |
           set -o pipefail
-          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/voxel-validation.log
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/voxel-validation.log
 
       - name: Persist regenerated atlases
         run: |
