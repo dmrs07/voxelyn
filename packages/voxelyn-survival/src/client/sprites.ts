@@ -182,6 +182,8 @@ export class SpriteBank {
   }
 }
 
+const MOVEMENT_HOLD_MS = 120;
+
 export type EntityAnimState = {
   anim: string;
   animStartMs: number;
@@ -189,6 +191,7 @@ export type EntityAnimState = {
   lastY: number;
   lastHp: number;
   hitUntilMs: number;
+  movingUntilMs: number;
 };
 
 export const deriveAnim = (
@@ -206,11 +209,14 @@ export const deriveAnim = (
     lastY: y,
     lastHp: hp,
     hitUntilMs: 0,
+    movingUntilMs: 0,
   };
   const moved = Math.hypot(x - state.lastX, y - state.lastY) > 0.004;
+  if (moved) state.movingUntilMs = nowMs + MOVEMENT_HOLD_MS;
+  const moving = moved || nowMs < state.movingUntilMs;
   const tookDamage = hp < state.lastHp - 0.01;
   if (tookDamage) state.hitUntilMs = nowMs + 180;
-  const next = !alive ? 'die' : nowMs < state.hitUntilMs ? 'hit' : moved ? 'walk' : 'idle';
+  const next = !alive ? 'die' : nowMs < state.hitUntilMs ? 'hit' : moving ? 'walk' : 'idle';
   if (next !== state.anim) {
     state.anim = next;
     state.animStartMs = nowMs;
