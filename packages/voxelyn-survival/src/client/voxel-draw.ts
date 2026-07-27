@@ -38,23 +38,24 @@ export type GasPuffLobe = {
  * de expirar. Aqui essa vida vira forma: o nucleo abre, dois lobulos se separam
  * e a materia perde opacidade. O item continua contando como UMA particula no
  * budget; apenas a silhueta deixa de ser um cubo amarelo solitario.
+ *
+ * A orientacao vem de `visualSeed`, criado uma vez no nascimento do mote. Nunca
+ * vem de `sx`/`sy`: essas coordenadas mudam quando o gas sobe e quando a camera
+ * se move, o que espelhava os lobulos entre frames e fazia a nuvem cintilar.
  */
 export const gasPuffLobes = (
   sx: number,
   sy: number,
   size: number,
-  sourceAlpha: number
+  sourceAlpha: number,
+  visualSeed: number
 ): GasPuffLobe[] => {
   const life = Math.max(0, Math.min(1, (sourceAlpha - 0.35) / 0.65));
   const age = 1 - life;
   const fadeIn = Math.min(1, 0.25 + age * 5);
   const puffAlpha = fadeIn * Math.pow(life, 0.72);
   const expanded = size * (0.92 + age * 1.15);
-
-  // A orientacao vem da posicao projetada, portanto e deterministica entre
-  // clientes, mas varia entre motes vizinhos para nao formar uma fileira.
-  const seed = (Math.imul(Math.round(sx), 73856093) ^ Math.imul(Math.round(sy), 19349663)) >>> 0;
-  const side = (seed & 1) === 0 ? -1 : 1;
+  const side = (visualSeed & 1) === 0 ? -1 : 1;
   const spread = expanded * (0.18 + age * 0.34);
   const lift = expanded * (0.18 + age * 0.42);
 
@@ -110,7 +111,8 @@ export const drawVoxel = (
   sx: number,
   sy: number,
   size: number,
-  ramp: FaceRamp
+  ramp: FaceRamp,
+  visualSeed = 0
 ): void => {
   if (!isGasRamp(ramp)) {
     drawFacetedVoxel(ctx, sx, sy, size, ramp);
@@ -119,7 +121,7 @@ export const drawVoxel = (
 
   const sourceAlpha = ctx.globalAlpha;
   ctx.save();
-  for (const lobe of gasPuffLobes(sx, sy, size, sourceAlpha)) {
+  for (const lobe of gasPuffLobes(sx, sy, size, sourceAlpha, visualSeed)) {
     ctx.globalAlpha = sourceAlpha * lobe.alpha;
     drawFacetedVoxel(ctx, lobe.x, lobe.y, lobe.size, ramp);
   }
