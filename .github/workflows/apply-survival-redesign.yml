@@ -1,0 +1,71 @@
+name: Apply Survival Redesign
+
+on:
+  push:
+    branches:
+      - feat/survival-salvage-modules
+    paths:
+      - .github/patches/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: survival-redesign-apply
+  cancel-in-progress: false
+
+jobs:
+  apply-test-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/survival-salvage-modules
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply logical slices
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for patch in .github/patches/*.patch; do
+            git apply --index "$patch"
+            case "$(basename "$patch")" in
+              01-*) message="feat(survival): add temporary modules and salvage simulation" ;;
+              02-*) message="feat(survival): synchronize per-player choices and world flags" ;;
+              03-*) message="feat(survival-ui): add salvage props, reward choice and module HUD" ;;
+              *) message="feat(survival): apply redesign slice" ;;
+            esac
+            git commit -m "$message"
+          done
+
+      - name: Generate content atlases
+        run: pnpm --filter @voxelyn/survival-content generate
+
+      - name: Test Survival workspace
+        run: pnpm test:survival
+
+      - name: Commit generated assets and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add packages/voxelyn-survival-content/assets/atlases/world-props.json \
+                  packages/voxelyn-survival-content/assets/atlases/world-props.png \
+                  packages/voxelyn-survival-content/assets/atlases/index.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(survival-content): regenerate salvage prop atlas"
+          fi
+          git rm -r .github/patches
+          git rm .github/workflows/materialize-survival-worktree.yml
+          git rm .github/workflows/apply-survival-redesign.yml
+          git commit -m "chore: remove temporary survival workflows"
+          git push origin HEAD:feat/survival-salvage-modules
