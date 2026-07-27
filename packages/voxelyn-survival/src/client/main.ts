@@ -100,6 +100,7 @@ const runSolo = (): void => {
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
+  let queuedChoice: 0 | 1 | null = null;
 
   const gate = new RestartGate(RESTART_ARM_MS);
 
@@ -111,20 +112,6 @@ const runSolo = (): void => {
     accumulator += delta;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-
-    if (state.phase === 'choice' && state.pendingChoice) {
-      renderer.render(state, 1, input.state, now);
-      const regions = renderer.renderChoice(state.pendingChoice, vw, vh);
-      const choice = input.consumeChoiceTap(regions);
-      if (choice !== null) {
-        const cmd = { ...input.snapshot(playerScreen()), choose: choice };
-        const result = stepRun(state, [cmd]);
-        renderer.ingestEvents(result.events, now);
-      }
-      accumulator = 0;
-      requestAnimationFrame(frame);
-      return;
-    }
 
     if (state.phase !== 'running') {
       const { drain, armed } = gate.frame(now, true);
@@ -142,17 +129,27 @@ const runSolo = (): void => {
 
     while (accumulator >= TICK_MS) {
       const cmd = input.snapshot(playerScreen());
+      if (queuedChoice !== null) {
+        cmd.choose = queuedChoice;
+        queuedChoice = null;
+      }
       const result = stepRun(state, [cmd]);
       renderer.ingestEvents(result.events, now);
       haptics(result.events);
       accumulator -= TICK_MS;
       if (state.phase !== 'running') break;
     }
-    // durante a run a fila de toques nao tem consumidor: drena todo frame
-    if (gate.frame(now, false).drain) input.clearPendingUiInput();
+    const pendingChoice = state.playerExtra.pendingModuleChoice;
+    // Toques comuns sao drenados; durante uma escolha, a fila pertence aos cards.
+    if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     const alpha = accumulator / TICK_MS;
     renderer.render(state, alpha, input.state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
+    if (pendingChoice) {
+      const regions = renderer.renderChoice(state, vw, vh, input.state);
+      const choice = input.consumeChoiceTap(regions);
+      if (choice !== null) queuedChoice = choice;
+    }
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -182,6 +179,7 @@ const runOnline = (url: string): void => {
   let reconnectAt = 0;
   let fatal = false; // erro sem retry (versao incompativel, URL invalida)
   const gate = new RestartGate(RESTART_ARM_MS);
+  let queuedChoice: 0 | 1 | null = null;
 
   // NetClient PERSISTENTE entre reconexoes: preserva resumeToken e a sequencia
   // de comandos. Se recriado a cada retry, o cliente enviaria seqs baixas que o
@@ -241,15 +239,25 @@ const runOnline = (url: string): void => {
       setBanner(null);
       renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
       const cmd = input.snapshot(playerScreen());
+      if (queuedChoice !== null) {
+        cmd.choose = queuedChoice;
+        queuedChoice = null;
+      }
       net.setCommand(cmd);
       net.pump(now);
       const state = net.sampleRenderState(now);
       if (state) {
-        const terminal = state.phase !== 'running' && state.phase !== 'choice';
+        const terminal = state.phase !== 'running';
         renderer.render(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
+        const pendingChoice = state.playerExtra.pendingModuleChoice;
+        if (pendingChoice) {
+          const regions = renderer.renderChoice(state, window.innerWidth, window.innerHeight, input.state);
+          const choice = input.consumeChoiceTap(regions);
+          if (choice !== null) queuedChoice = choice;
+        }
         const { drain, armed } = gate.frame(now, terminal);
-        if (drain) input.clearPendingUiInput();
+        if (drain && !pendingChoice) input.clearPendingUiInput();
         if (terminal) {
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o

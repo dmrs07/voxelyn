@@ -23,6 +23,11 @@ export const PROP_KINDS = [
   { name: 'core', frames: 6, frameMs: 190 },
   { name: 'coreTaken', frames: 1, frameMs: 0 },
   { name: 'extraction', frames: 4, frameMs: 240 },
+  { name: 'salvageTerminalIdle', frames: 2, frameMs: 420 },
+  { name: 'salvageTerminalScanning', frames: 4, frameMs: 120 },
+  { name: 'salvageTerminalComplete', frames: 2, frameMs: 300 },
+  { name: 'salvageCache', frames: 1, frameMs: 0 },
+  { name: 'salvageCacheOpened', frames: 1, frameMs: 0 },
 ];
 
 /** Meia-largura da base, em voxels. */
@@ -114,12 +119,51 @@ const extractionModel = (phase) => {
   return boxes;
 };
 
+
+/** Terminal alto, com antena e tela pequena: tecnico sem competir com o Nucleo. */
+const salvageTerminalModel = (phase, state) => {
+  const boxes = [];
+  boxes.push(box(-3, -2, 0, 6, 4, 2, 'rockDeep'));
+  boxes.push(box(-2, -1, 2, 4, 3, 9, 'rock'));
+  boxes.push(box(-2, -2, 7, 4, 1, 4, 'bone'));
+  const scanning = state === 'scanning';
+  const complete = state === 'complete';
+  const lit = complete || (scanning && Math.floor(phase * 4) % 2 === 0);
+  boxes.push(box(-1, -3, 8, 2, 1, 2, lit ? 'biolum' : 'rust'));
+  boxes.push(box(0, 0, 11, 1, 1, 5, 'bone'));
+  boxes.push(box(-2, 0, 15, 5, 1, 1, scanning ? 'loot' : complete ? 'biolum' : 'rust'));
+  if (scanning) {
+    const sweep = Math.floor(phase * 4) - 2;
+    boxes.push(box(sweep, 1, 13, 1, 1, 1, 'loot'));
+  }
+  return boxes;
+};
+
+/** Cofre baixo e compacto. O amarelo e selo/acento, nao o volume inteiro. */
+const salvageCacheModel = (opened) => {
+  const boxes = [];
+  boxes.push(box(-4, -3, 0, 8, 6, 2, 'rockDeep'));
+  boxes.push(box(-3, -2, 2, 6, 4, opened ? 2 : 4, 'rock'));
+  boxes.push(box(-3, -3, opened ? 2 : 5, 6, 1, 1, opened ? 'rust' : 'loot'));
+  boxes.push(box(-1, -3, 3, 2, 1, 2, opened ? 'rockDeep' : 'bone'));
+  if (opened) {
+    boxes.push(box(-3, 1, 5, 6, 1, 1, 'rockDeep'));
+    boxes.push(box(-2, 2, 6, 4, 1, 1, 'rust'));
+  }
+  return boxes;
+};
+
 export const propModel = (kind, frame) => {
   const spec = PROP_KINDS.find((k) => k.name === kind);
   const phase = spec.frames > 1 ? frame / spec.frames : 0;
   if (kind === 'core') return coreModel(phase, false);
   if (kind === 'coreTaken') return coreModel(0, true);
-  return extractionModel(phase);
+  if (kind === 'extraction') return extractionModel(phase);
+  if (kind === 'salvageTerminalIdle') return salvageTerminalModel(phase, 'idle');
+  if (kind === 'salvageTerminalScanning') return salvageTerminalModel(phase, 'scanning');
+  if (kind === 'salvageTerminalComplete') return salvageTerminalModel(phase, 'complete');
+  if (kind === 'salvageCache') return salvageCacheModel(false);
+  return salvageCacheModel(true);
 };
 
 /**
