@@ -104,6 +104,112 @@ const overSlab = (variant, seed, fn) => {
   }
 };
 
+const GAS_MIN_Z = 4;
+const GAS_MAX_Z = 6;
+const GAS_PUFFS = 3;
+const GAS_WINDS = [
+  [1, 0],
+  [1, 1],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+];
+
+/**
+ * Escolhe tres centros de sopro por ranking, em vez de sortear cada coluna.
+ *
+ * A escolha independente fazia a massa oscilar entre poucos e muitos cubos de
+ * um quadro para outro: a celula piscava e, num campo inteiro, a distribuicao
+ * uniforme virava ruido. O ranking mantem a massa previsivel, enquanto o hash
+ * ainda muda posicao, vento e fase entre as variantes.
+ */
+const gasAnchors = (variant) => {
+  const candidates = [];
+  // Margem de dois voxels: cada sopro pode derivar e abrir uma lateral sem sair
+  // do losango da celula.
+  for (let cx = 2; cx <= 5; cx++) {
+    for (let cy = 2; cy <= 5; cy++) {
+      candidates.push({ cx, cy, h: hash3d(cx, cy, 43, variant) });
+    }
+  }
+  candidates.sort((a, b) => a.h - b.h);
+
+  // Tenta primeiro centros bem separados. O relaxamento so existe para tornar a
+  // funcao total se a grade mudar no futuro; com 8x8 ela fecha em distancia 3.
+  for (const minDistance of [4, 3, 2, 0]) {
+    const picked = [];
+    for (const candidate of candidates) {
+      const farEnough = picked.every(
+        (other) => Math.abs(candidate.cx - other.cx) + Math.abs(candidate.cy - other.cy) >= minDistance
+      );
+      if (!farEnough) continue;
+      picked.push(candidate);
+      if (picked.length === GAS_PUFFS) return picked;
+    }
+  }
+  return candidates.slice(0, GAS_PUFFS);
+};
+
+/**
+ * Nuvem assada como tres SOPROS com ciclo de vida, nao pontos independentes.
+ *
+ * Cada sopro nasce baixo, ganha ombro, sobe e se desfaz. As fases 2/3 derivam um
+ * voxel no vento proprio do sopro. Com tres fases defasadas, a massa total fica
+ * entre 8 e 10 voxels em todos os quadros: suficiente para formar volume, mas
+ * ainda com muito chao visivel entre os aglomerados.
+ */
+const gasCloud = (variant, frame) => {
+  const half = SURFACE_COLS / 2;
+  const occupied = new Set();
+  const boxes = [];
+
+  const add = (cx, cy, z) => {
+    if (cx < 0 || cx >= SURFACE_COLS || cy < 0 || cy >= SURFACE_COLS) return;
+    if (z < GAS_MIN_Z || z > GAS_MAX_Z) return;
+    const key = `${cx},${cy},${z}`;
+    if (occupied.has(key)) return;
+    occupied.add(key);
+    boxes.push(box(cx - half, cy - half, z, 1, 1, 1, 'sulfur'));
+  };
+
+  gasAnchors(variant).forEach((anchor, index) => {
+    const phase = (frame + index + variant) % 4;
+    const windIndex = (anchor.h >>> 4) % GAS_WINDS.length;
+    const [windX, windY] = GAS_WINDS[windIndex];
+    const [sideX, sideY] = GAS_WINDS[(windIndex + 2) % GAS_WINDS.length];
+    const drift = phase >= 2 ? 1 : 0;
+    const cx = anchor.cx + windX * drift;
+    const cy = anchor.cy + windY * drift;
+
+    if (phase === 0) {
+      // Condensando: uma coluna curta, ainda compacta.
+      add(cx, cy, 4);
+      add(cx, cy, 5);
+    } else if (phase === 1) {
+      // Respirando: aparece um ombro lateral, formando massa e nao uma corrente.
+      add(cx, cy, 4);
+      add(cx, cy, 5);
+      add(cx + sideX, cy + sideY, 5);
+    } else if (phase === 2) {
+      // Subindo: nucleo alto, ombro e um mote que se desprende no vento.
+      add(cx, cy, 5);
+      add(cx, cy, 6);
+      add(cx + sideX, cy + sideY, 5);
+      add(cx + windX, cy + windY, 6);
+    } else {
+      // Dissipando: perde a base, abre no topo e prepara o vazio do renascimento.
+      add(cx, cy, 5);
+      add(cx, cy, 6);
+      add(cx + sideX, cy + sideY, 6);
+    }
+  });
+
+  return boxes;
+};
+
 /**
  * Modelo de um tipo num quadro de animacao.
  *
@@ -185,36 +291,9 @@ export const surfaceModel = (kind, variant, frame) => {
   }
 
   if (kind === 'gas') {
-    const boxes = slab(variant, 'floor', 'rockDeep');
-    overSlab(variant, 43, ({ cx, cy, x, y, h }) => {
-      // Ocupacao esparsa: e ISTO que substitui o alpha. A nuvem e opaca cubinho
-      // a cubinho, e o chao aparece pelos vaos entre eles.
-      //
-      // A densidade e a coisa mais delicada do arquivo, e a conta que importa
-      // nao e a fracao de colunas: e a AREA projetada. Um cubo ocupa 4x6 px na
-      // tela e a celula inteira tem 256 px de losango, entao um quinto das 64
-      // colunas ja da doze cubos — cobertura acima de 100%, e a nuvem vira um
-      // tapete opaco que esconde o chao. Uma em treze deixa cerca de cinco
-      // cubos separados por vazio, e e o vazio entre eles que faz o volume ler
-      // como gas em vez de superficie.
-      if ((cx * 3 + cy * 5 + frame * 2) % 13 !== 0) return;
-      // PAIRA, com ar visivel entre a nuvem e o chao.
-      //
-      // Comecava em z=1 — a altura do proprio topo da laje — entao metade dos
-      // cubos nascia dentro do piso e a nuvem se espalhava rente a ele. O
-      // resultado lia como poca, e melhor do que a poca lia. Gas nao encosta no
-      // chao: sobe. Comecando em 4, sobram dois voxels de ar vazio sob ele, e e
-      // esse vao que diz que a materia esta no ar.
-      //
-      // O teto tambem importa, e por um motivo que nao e estetico: a crosta de
-      // chao e desenhada no passo de piso, ANTES da fila ordenada por
-      // profundidade. Tudo que ela levanta acima do plano do chao passa por
-      // tras das paredes, mesmo o que esta na frente delas. Ficando na faixa da
-      // chama — que ja vive com isso — o gas nao piora um artefato que existe.
-      const z = 4 + ((h >>> 5) % 2) + (frame % 2);
-      boxes.push(box(x, y, z, 1, 1, 1, 'sulfur'));
-    });
-    return boxes;
+    // A laje continua irregular; a NUVEM, ao contrario da antiga mascara por
+    // coluna, e uma composicao de poucos volumes com vazios internos.
+    return [...slab(variant, 'floor', 'rockDeep'), ...gasCloud(variant, frame)];
   }
 
   if (kind === 'fire') {
