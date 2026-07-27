@@ -257,14 +257,14 @@ export class GameRoom {
     const { events } = stepRun(this.state, cmds);
     // A intencao corrente persiste entre ticks (o cliente envia a ~25 Hz, o
     // servidor roda a 20 Hz), mas campos de BORDA nao podem persistir: um
-    // cliente suspenso logo apos enviar consume:true gastaria um consumivel
+    // cliente suspenso logo apos enviar purge:true gastaria uma Celula de Purga
     // por tick ate zerar o inventario. Zera as bordas depois de aplicadas —
     // reativa-las exige uma nova mensagem do cliente.
     for (const slot of this.slots) {
       slot.command.dodge = false;
       slot.command.ability = false;
       slot.command.interact = false;
-      slot.command.consume = false;
+      slot.command.purge = false;
       slot.command.choose = null;
     }
     const chunkDiffs = this.tracker.diff(this.state);
@@ -343,8 +343,16 @@ export class GameRoom {
     return {
       slot,
       heat: round3(e.heat),
-      consumables: e.consumables,
-      modifiers: [...e.modifiers],
+      purgeCells: e.purgeCells,
+      activeModules: e.activeModules.map((module) => ({
+        id: module.id,
+        lifetime: { ...module.lifetime },
+      })),
+      pendingModuleChoice: e.pendingModuleChoice ? {
+        sourceSiteId: e.pendingModuleChoice.sourceSiteId,
+        options: [...e.pendingModuleChoice.options] as [typeof e.pendingModuleChoice.options[0], typeof e.pendingModuleChoice.options[1]],
+        createdAtTick: e.pendingModuleChoice.createdAtTick,
+      } : null,
       hasCore: e.hasCore,
       downed: e.downed,
       aimX: round3(e.aim.x),
@@ -355,15 +363,20 @@ export class GameRoom {
 
   /** Flags de mundo consumivel (baus/nucleo/guardiao) que o cliente nao infere. */
   private worldFlags(): WorldFlags {
-    const openedCaches: number[] = [];
-    for (let i = 0; i < this.state.caches.length; i++) {
-      if (this.state.caches[i].opened) openedCaches.push(i);
-    }
-    return { openedCaches, coreTaken: this.state.coreTaken, guardianAwake: this.state.guardianAwake };
+    return {
+      salvageSites: this.state.salvageSites.map((site) => ({
+        terminalState: site.terminalState,
+        scanEndsAt: site.scanEndsAt,
+        cacheRevealed: site.cacheRevealed,
+        cacheOpened: site.cacheOpened,
+      })),
+      coreTaken: this.state.coreTaken,
+      guardianAwake: this.state.guardianAwake,
+    };
   }
 
   private static worldSig(w: WorldFlags): string {
-    return `${w.openedCaches.join(',')}|${w.coreTaken ? 1 : 0}|${w.guardianAwake ? 1 : 0}`;
+    return JSON.stringify(w);
   }
 
   private projectileSnapshots(): ProjectileSnapshot[] {
@@ -373,6 +386,7 @@ export class GameRoom {
       y: round3(p.y),
       hostile: p.hostile,
       kind: p.kind,
+      armed: Boolean(p.modules?.explosive && p.distanceTravelled >= p.modules.explosive.armAfterDistance),
     }));
   }
 
@@ -421,6 +435,8 @@ export class GameRoom {
       seed: this.seed,
       chunkDiffs,
       entities: this.entitySnapshots(),
+      projectiles: this.projectileSnapshots(),
+      you: this.viewerState(slot?.slot ?? 0),
       world,
       authHash: hashAuthoritativeState(this.state),
     };

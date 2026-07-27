@@ -41,7 +41,7 @@ export const validatePlayerCommand = (raw: unknown): ValidationResult<PlayerComm
     ability: isBool(c.ability) ? c.ability : false,
     dodge: isBool(c.dodge) ? c.dodge : false,
     interact: isBool(c.interact) ? c.interact : false,
-    consume: isBool(c.consume) ? c.consume : false,
+    purge: isBool(c.purge) ? c.purge : false,
     choose: validChoose ? ((choose ?? null) as 0 | 1 | null) : null,
   };
   return { ok: true, value };
