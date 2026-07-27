@@ -7,10 +7,12 @@ on:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: survival-redesign-apply
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   apply-test-push:
@@ -20,6 +22,11 @@ jobs:
         with:
           ref: feat/survival-salvage-modules
           fetch-depth: 0
+
+      - name: Report validation start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment 48 --repo dmrs07/voxelyn --body "🔎 Guarded Survival validation started for \`${GITHUB_SHA::12}\`. Source commits will only be pushed after atlas generation and the complete Survival test suite pass."
 
       - uses: actions/setup-node@v4
         with:
@@ -77,3 +84,15 @@ jobs:
           git rm .github/workflows/apply-survival-redesign.yml
           git commit -m "chore: remove temporary survival workflows"
           git push origin HEAD:feat/survival-salvage-modules
+
+      - name: Report validation failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment 48 --repo dmrs07/voxelyn --body "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`. No source implementation was pushed; inspect this run's failed step before retrying."
+
+      - name: Report validation success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed. Atlas generation and the complete \`pnpm test:survival\` suite succeeded; the logical source commits are now on this PR."
