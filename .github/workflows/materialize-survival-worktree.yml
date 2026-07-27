@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for prefix in 01-sim 02-protocol-server 03-ui-content 04-fixes; do
+          for prefix in 01-sim 02-protocol-server 03-ui-content; do
             cat .github/patches/${prefix}.*.part > "/tmp/${prefix}.patch.gz.b64"
             case "$prefix" in
               01-sim)
@@ -61,16 +61,50 @@ jobs:
                 expected="eda0ca30411e0e7982c3af3ebe0dcbdf359352e4083280aaa7b36c0345fe059d"
                 message="feat(survival-ui): add salvage props, reward choice and module HUD"
                 ;;
-              04-fixes)
-                expected="2a464dc28349e83b70b8dc414f0241ea3e62bb47e6bd2b51c3ac88bf5d11f61c"
-                message="fix(survival): isolate reactive fixtures and dedupe discharge events"
-                ;;
             esac
             echo "$expected  /tmp/${prefix}.patch.gz.b64" | sha256sum --check
             base64 --decode "/tmp/${prefix}.patch.gz.b64" | gzip --decompress > "/tmp/${prefix}.patch"
             git apply --index "/tmp/${prefix}.patch"
             git commit -m "$message"
           done
+
+      - name: Apply deterministic reaction corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          cells_path = Path('packages/voxelyn-survival-sim/src/cells.ts')
+          cells = cells_path.read_text()
+          event = "  events.push({ t: 'discharge', cells, ...origin });"
+          duplicate = f"{event}\n{event}"
+          if duplicate in cells:
+              cells = cells.replace(duplicate, event, 1)
+              cells_path.write_text(cells)
+          elif cells.count(event) != 1:
+              raise SystemExit('Unexpected discharge event shape in cells.ts')
+
+          reactions_path = Path('packages/voxelyn-survival-sim/tests/reactions.test.ts')
+          reactions = reactions_path.read_text()
+          vent_filter = "  state.vents = state.vents.filter((vent) => vent.x < x0 || vent.x > x1 || vent.y < y0 || vent.y > y1);"
+          if vent_filter not in reactions:
+              needle = "  }\n};\n\nconst tickCells"
+              replacement = (
+                  "  }\n"
+                  "  // Um cenário controlado não pode receber emissões de vents gerados pela seed.\n"
+                  f"{vent_filter}\n"
+                  "};\n\nconst tickCells"
+              )
+              if needle not in reactions:
+                  raise SystemExit('Unexpected clearArea shape in reactions.test.ts')
+              reactions = reactions.replace(needle, replacement, 1)
+              reactions_path.write_text(reactions)
+          PY
+          git add packages/voxelyn-survival-sim/src/cells.ts packages/voxelyn-survival-sim/tests/reactions.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(survival): isolate reactive fixtures and dedupe discharge events"
+          fi
 
       - name: Build core for content tools
         shell: bash
