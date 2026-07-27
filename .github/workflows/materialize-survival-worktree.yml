@@ -69,10 +69,16 @@ jobs:
           done
 
       - name: Generate content atlases
-        run: pnpm --filter @voxelyn/survival-content generate
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/generate.log
 
       - name: Test Survival workspace
-        run: pnpm test:survival
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test:survival 2>&1 | tee /tmp/test.log
 
       - name: Commit generated assets and cleanup
         shell: bash
@@ -95,7 +101,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment 48 --repo dmrs07/voxelyn --body "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
+          {
+            echo "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
+            echo
+            echo '```text'
+            if [[ -f /tmp/test.log ]]; then
+              tail -n 80 /tmp/test.log
+            elif [[ -f /tmp/generate.log ]]; then
+              tail -n 80 /tmp/generate.log
+            else
+              echo "Failure occurred before command output was captured."
+            fi
+            echo '```'
+          } > /tmp/failure.md
+          gh pr comment 48 --repo dmrs07/voxelyn --body-file /tmp/failure.md
 
       - name: Report validation success
         if: success()
