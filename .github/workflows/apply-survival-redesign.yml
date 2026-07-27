@@ -38,13 +38,23 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for prefix in 01-sim 02-protocol-server 03-ui-content; do
             cat .github/patches/${prefix}.*.part > "/tmp/${prefix}.patch.gz.b64"
+            case "$prefix" in
+              01-sim)
+                expected="2c7afa3fc6300b73b8c714968eef35b8b05aedb34e492df0b643d67ce23c3f60"
+                message="feat(survival): add temporary modules and salvage simulation"
+                ;;
+              02-protocol-server)
+                expected="fc26e4978d5ff097b4ab640bd0ebeab4c64331ad7bfc695f9b0fa7d21b25b4f9"
+                message="feat(survival): synchronize per-player choices and world flags"
+                ;;
+              03-ui-content)
+                expected="eda0ca30411e0e7982c3af3ebe0dcbdf359352e4083280aaa7b36c0345fe059d"
+                message="feat(survival-ui): add salvage props, reward choice and module HUD"
+                ;;
+            esac
+            echo "$expected  /tmp/${prefix}.patch.gz.b64" | sha256sum --check
             base64 --decode "/tmp/${prefix}.patch.gz.b64" | gzip --decompress > "/tmp/${prefix}.patch"
             git apply --index "/tmp/${prefix}.patch"
-            case "$prefix" in
-              01-sim) message="feat(survival): add temporary modules and salvage simulation" ;;
-              02-protocol-server) message="feat(survival): synchronize per-player choices and world flags" ;;
-              03-ui-content) message="feat(survival-ui): add salvage props, reward choice and module HUD" ;;
-            esac
             git commit -m "$message"
           done
 
