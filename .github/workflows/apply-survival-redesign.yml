@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - feat/survival-salvage-modules
-    paths:
-      - .github/patches/READY
 
 permissions:
   contents: write
