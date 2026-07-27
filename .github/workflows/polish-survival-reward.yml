@@ -1,0 +1,350 @@
+name: Polish Survival Reward Presentation
+
+on:
+  push:
+    branches:
+      - feat/survival-salvage-modules
+
+permissions:
+  contents: write
+
+concurrency:
+  group: survival-reward-polish
+  cancel-in-progress: true
+
+jobs:
+  polish-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/survival-salvage-modules
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply reward presentation polish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: Path, old: str, new: str) -> None:
+              text = path.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'Expected fragment not found in {path}: {old[:120]!r}')
+              path.write_text(text.replace(old, new, 1))
+
+          layout = Path('packages/voxelyn-survival/src/client/module-layout.ts')
+          replace_once(
+              layout,
+              "export type SafeInsets = { top: number; right: number; bottom: number; left: number };\n\n",
+              "export type SafeInsets = { top: number; right: number; bottom: number; left: number };\n"
+              "export type Point = { x: number; y: number };\n"
+              "export type RewardFlightSample = Point & { progress: number };\n\n"
+              "/** Curva deterministica de um cartucho recuperado ate o inventario da HUD. */\n"
+              "export const rewardFlightPosition = (\n"
+              "  from: Point,\n"
+              "  to: Point,\n"
+              "  elapsedMs: number,\n"
+              "  durationMs: number\n"
+              "): RewardFlightSample => {\n"
+              "  const progress = Math.max(0, Math.min(1, elapsedMs / Math.max(1, durationMs)));\n"
+              "  const eased = 1 - (1 - progress) ** 3;\n"
+              "  const arc = Math.sin(Math.PI * progress) * Math.min(64, 22 + Math.abs(to.y - from.y) * 0.14);\n"
+              "  return {\n"
+              "    x: from.x + (to.x - from.x) * eased,\n"
+              "    y: from.y + (to.y - from.y) * eased - arc,\n"
+              "    progress,\n"
+              "  };\n"
+              "};\n\n"
+          )
+
+          layout_test = Path('packages/voxelyn-survival/src/tests/module-layout.test.ts')
+          replace_once(
+              layout_test,
+              "import { moduleChoiceLayout } from '../client/module-layout';",
+              "import { moduleChoiceLayout, rewardFlightPosition } from '../client/module-layout';"
+          )
+          if "describe('trajetoria visual da Celula de Purga'" not in layout_test.read_text():
+              with layout_test.open('a') as f:
+                  f.write("\n\ndescribe('trajetoria visual da Celula de Purga', () => {\n")
+                  f.write("  it('parte do cofre, faz um arco e termina exatamente na HUD', () => {\n")
+                  f.write("    const from = { x: 320, y: 420 };\n")
+                  f.write("    const to = { x: 28, y: 54 };\n")
+                  f.write("    expect(rewardFlightPosition(from, to, 0, 650)).toEqual({ ...from, progress: 0 });\n")
+                  f.write("    const middle = rewardFlightPosition(from, to, 325, 650);\n")
+                  f.write("    expect(middle.progress).toBe(0.5);\n")
+                  f.write("    expect(middle.y).toBeLessThan(from.y + (to.y - from.y) * 0.875);\n")
+                  f.write("    expect(rewardFlightPosition(from, to, 900, 650)).toEqual({ ...to, progress: 1 });\n")
+                  f.write("  });\n")
+                  f.write("});\n")
+
+          input_path = Path('packages/voxelyn-survival/src/client/input.ts')
+          replace_once(
+              input_path,
+              "  /**\n   * Descarta intencoes de UI pendentes (toques e a tecla R).",
+              "  /** Descarta uma escolha prematura durante a sequencia visual da recompensa. */\n"
+              "  clearPendingChoiceInput(): void {\n"
+              "    this.queuedChoice = null;\n"
+              "    this.state.tapQueue.length = 0;\n"
+              "  }\n\n"
+              "  /**\n   * Descarta intencoes de UI pendentes (toques e a tecla R)."
+          )
+
+          render = Path('packages/voxelyn-survival/src/client/render.ts')
+          replace_once(
+              render,
+              "import { moduleChoiceLayout, type Rect } from './module-layout';",
+              "import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';"
+          )
+          replace_once(
+              render,
+              "};\n\nconst wrapMeasuredText = (",
+              "};\n\n"
+              "const drawPurgeCellGlyph = (\n"
+              "  ctx: CanvasRenderingContext2D,\n"
+              "  cx: number,\n"
+              "  cy: number,\n"
+              "  size: number,\n"
+              "  color: string\n"
+              "): void => {\n"
+              "  const u = Math.max(1, Math.floor(size / 8));\n"
+              "  ctx.fillStyle = 'rgba(11,14,20,0.92)';\n"
+              "  ctx.fillRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);\n"
+              "  ctx.strokeStyle = color;\n"
+              "  ctx.lineWidth = Math.max(1, u);\n"
+              "  ctx.strokeRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);\n"
+              "  ctx.fillStyle = color;\n"
+              "  ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, u);\n"
+              "  ctx.fillRect(cx - u, cy, 2 * u, 3 * u);\n"
+              "  ctx.fillStyle = PAL.player;\n"
+              "  ctx.fillRect(cx - u, cy - 3 * u, 2 * u, u);\n"
+              "};\n\n"
+              "const wrapMeasuredText = ("
+          )
+          replace_once(
+              render,
+              "  messages: Array<{ text: string; until: number }> = [];",
+              "  messages: Array<{ text: string; startsAt?: number; until: number }> = [];"
+          )
+          replace_once(
+              render,
+              "  private readonly modulePulseUntil = new Map<ModuleId, number>();\n  quality: QualityPreset = PRESETS.high;",
+              "  private readonly modulePulseUntil = new Map<ModuleId, number>();\n"
+              "  private safeArea: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };\n"
+              "  private pendingRewardOrigin: { slot: number; x: number; y: number } | null = null;\n"
+              "  private rewardFlight: {\n"
+              "    worldX: number;\n"
+              "    worldY: number;\n"
+              "    startedAt: number;\n"
+              "    durationMs: number;\n"
+              "    startScreen?: { x: number; y: number };\n"
+              "  } | null = null;\n"
+              "  private choiceRevealAt = 0;\n"
+              "  private purgePulseUntil = 0;\n"
+              "  quality: QualityPreset = PRESETS.high;"
+          )
+          replace_once(
+              render,
+              "  setQuality(level: QualityLevel): void {\n    this.quality = PRESETS[level];\n    this.resize();\n  }\n",
+              "  setQuality(level: QualityLevel): void {\n"
+              "    this.quality = PRESETS[level];\n"
+              "    this.resize();\n"
+              "  }\n\n"
+              "  setSafeArea(safeArea: SafeInsets): void {\n"
+              "    this.safeArea = { ...safeArea };\n"
+              "  }\n\n"
+              "  isChoiceRevealReady(nowMs: number): boolean {\n"
+              "    return nowMs >= this.choiceRevealAt;\n"
+              "  }\n"
+          )
+          replace_once(
+              render,
+              "        case 'salvage_cache_opened':\n"
+              "          this.messages.push({ text: 'COFRE RECUPERADO', until: nowMs + 2200 });\n"
+              "          this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);\n"
+              "          break;\n"
+              "        case 'purge_cell_acquired':\n"
+              "          if (ev.slot === this.localPlayerId - 1) {\n"
+              "            this.messages.push({ text: '+1 CÉLULA DE PURGA', until: nowMs + 2400 });\n"
+              "          }\n"
+              "          break;",
+              "        case 'salvage_cache_opened':\n"
+              "          this.messages.push({ text: 'COFRE RECUPERADO', until: nowMs + 2200 });\n"
+              "          this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);\n"
+              "          if (ev.slot === this.localPlayerId - 1) {\n"
+              "            this.pendingRewardOrigin = { slot: ev.slot, x: ev.x + 0.5, y: ev.y + 0.5 };\n"
+              "            this.choiceRevealAt = Math.max(this.choiceRevealAt, nowMs + 920);\n"
+              "          }\n"
+              "          break;\n"
+              "        case 'purge_cell_acquired':\n"
+              "          if (ev.slot === this.localPlayerId - 1) {\n"
+              "            const startsAt = nowMs + 220;\n"
+              "            this.messages.push({ text: '+1 CÉLULA DE PURGA', startsAt, until: startsAt + 2200 });\n"
+              "            if (this.pendingRewardOrigin?.slot === ev.slot) {\n"
+              "              this.rewardFlight = {\n"
+              "                worldX: this.pendingRewardOrigin.x,\n"
+              "                worldY: this.pendingRewardOrigin.y,\n"
+              "                startedAt: startsAt,\n"
+              "                durationMs: 650,\n"
+              "              };\n"
+              "              this.pendingRewardOrigin = null;\n"
+              "            }\n"
+              "            this.choiceRevealAt = Math.max(this.choiceRevealAt, startsAt + 700);\n"
+              "          }\n"
+              "          break;"
+          )
+          replace_once(
+              render,
+              "    this.renderHud(state, input, nowMs, vw, vh);\n  }\n\n  private renderHud(",
+              "    this.renderRewardFlight(toScreen, nowMs);\n"
+              "    this.renderHud(state, input, nowMs, vw, vh);\n"
+              "  }\n\n"
+              "  private renderRewardFlight(\n"
+              "    toScreen: (x: number, y: number) => [number, number],\n"
+              "    nowMs: number\n"
+              "  ): void {\n"
+              "    const flight = this.rewardFlight;\n"
+              "    if (!flight || nowMs < flight.startedAt) return;\n"
+              "    if (!flight.startScreen) {\n"
+              "      const [x, y] = toScreen(flight.worldX, flight.worldY);\n"
+              "      flight.startScreen = { x, y };\n"
+              "    }\n"
+              "    const target = { x: this.safeArea.left + 22, y: this.safeArea.top + 53 };\n"
+              "    const sample = rewardFlightPosition(\n"
+              "      flight.startScreen,\n"
+              "      target,\n"
+              "      nowMs - flight.startedAt,\n"
+              "      flight.durationMs\n"
+              "    );\n"
+              "    if (sample.progress >= 1) {\n"
+              "      this.rewardFlight = null;\n"
+              "      this.purgePulseUntil = nowMs + 420;\n"
+              "      return;\n"
+              "    }\n"
+              "    const ctx = this.ctx;\n"
+              "    ctx.save();\n"
+              "    ctx.globalAlpha = Math.min(1, (1 - sample.progress) * 1.7 + 0.25);\n"
+              "    ctx.translate(sample.x, sample.y);\n"
+              "    ctx.rotate((1 - sample.progress) * 0.35);\n"
+              "    drawPurgeCellGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 4, PAL.biolum);\n"
+              "    ctx.restore();\n"
+              "  }\n\n"
+              "  private renderHud("
+          )
+          replace_once(
+              render,
+              "    const safeTop = 10;\n    const safeLeft = 12;",
+              "    const safeTop = this.safeArea.top + 10;\n    const safeLeft = this.safeArea.left + 12;"
+          )
+          replace_once(
+              render,
+              "    ctx.font = 'bold 12px monospace';\n"
+              "    ctx.textAlign = 'left';\n"
+              "    ctx.fillStyle = PAL.bone;\n"
+              "    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft, safeTop + 43);\n"
+              "    this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw);",
+              "    const purgePulse = nowMs < this.purgePulseUntil;\n"
+              "    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;\n"
+              "    ctx.textAlign = 'left';\n"
+              "    ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;\n"
+              "    drawPurgeCellGlyph(ctx, safeLeft + 7, safeTop + 39, purgePulse ? 15 : 13, ctx.fillStyle as string);\n"
+              "    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 18, safeTop + 43);\n"
+              "    this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw - this.safeArea.right);"
+          )
+          replace_once(
+              render,
+              "    this.messages = this.messages.filter((m) => m.until > nowMs);\n"
+              "    ctx.textAlign = 'center';\n"
+              "    let my = vh * 0.2;\n"
+              "    for (const m of this.messages.slice(-3)) {",
+              "    this.messages = this.messages.filter((m) => m.until > nowMs);\n"
+              "    const visibleMessages = this.messages.filter((m) => (m.startsAt ?? 0) <= nowMs);\n"
+              "    ctx.textAlign = 'center';\n"
+              "    let my = Math.max(this.safeArea.top + 28, vh * 0.2);\n"
+              "    for (const m of visibleMessages.slice(-3)) {"
+          )
+          replace_once(
+              render,
+              "    const cards = moduleChoiceLayout(vw, vh, { top: 0, right: 0, bottom: 0, left: 0 }, reserveTouch);",
+              "    const cards = moduleChoiceLayout(vw, vh, this.safeArea, reserveTouch);"
+          )
+
+          main = Path('packages/voxelyn-survival/src/client/main.ts')
+          replace_once(
+              main,
+              "const resize = (): void => {\n  renderer.resize();\n  input.layoutButtons(window.innerWidth, window.innerHeight, readSafeArea());\n};",
+              "const resize = (): void => {\n"
+              "  const safeArea = readSafeArea();\n"
+              "  renderer.setSafeArea(safeArea);\n"
+              "  renderer.resize();\n"
+              "  input.layoutButtons(window.innerWidth, window.innerHeight, safeArea);\n"
+              "};"
+          )
+          replace_once(
+              main,
+              "    if (pendingChoice) {\n"
+              "      const regions = renderer.renderChoice(state, vw, vh, input.state);\n"
+              "      const choice = input.consumeChoiceTap(regions);\n"
+              "      if (choice !== null) queuedChoice = choice;\n"
+              "    }",
+              "    if (pendingChoice && renderer.isChoiceRevealReady(now)) {\n"
+              "      const regions = renderer.renderChoice(state, vw, vh, input.state);\n"
+              "      const choice = input.consumeChoiceTap(regions);\n"
+              "      if (choice !== null) queuedChoice = choice;\n"
+              "    } else if (pendingChoice) {\n"
+              "      input.clearPendingChoiceInput();\n"
+              "    }"
+          )
+          replace_once(
+              main,
+              "        if (pendingChoice) {\n"
+              "          const regions = renderer.renderChoice(state, window.innerWidth, window.innerHeight, input.state);\n"
+              "          const choice = input.consumeChoiceTap(regions);\n"
+              "          if (choice !== null) queuedChoice = choice;\n"
+              "        }",
+              "        if (pendingChoice && renderer.isChoiceRevealReady(now)) {\n"
+              "          const regions = renderer.renderChoice(state, window.innerWidth, window.innerHeight, input.state);\n"
+              "          const choice = input.consumeChoiceTap(regions);\n"
+              "          if (choice !== null) queuedChoice = choice;\n"
+              "        } else if (pendingChoice) {\n"
+              "          input.clearPendingChoiceInput();\n"
+              "        }"
+          )
+          PY
+
+      - name: Build and test client polish
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/polish.log
+          pnpm --filter @voxelyn/survival-sim build 2>&1 | tee -a /tmp/polish.log
+          pnpm --filter @voxelyn/survival-protocol build 2>&1 | tee -a /tmp/polish.log
+          pnpm --filter @voxelyn/survival test 2>&1 | tee -a /tmp/polish.log
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/polish.log
+
+      - name: Commit client polish and remove workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/voxelyn-survival/src/client/module-layout.ts \
+                  packages/voxelyn-survival/src/client/input.ts \
+                  packages/voxelyn-survival/src/client/render.ts \
+                  packages/voxelyn-survival/src/client/main.ts \
+                  packages/voxelyn-survival/src/tests/module-layout.test.ts
+          git commit -m "feat(survival-ui): animate purge cell reward reveal"
+          git rm .github/workflows/polish-survival-reward.yml
+          git commit -m "chore: remove temporary reward polish workflow"
+          git push origin HEAD:feat/survival-salvage-modules
