@@ -22,6 +22,13 @@ jobs:
         with:
           ref: feat/survival-salvage-modules
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
       - name: Materialize simulation slice
         shell: bash
         run: |
@@ -50,15 +57,32 @@ jobs:
           path.write_text(text)
           PY
 
-      - name: Publish test tail
+      - name: Run remaining cases separately
+        shell: bash
+        run: |
+          set +e
+          cd packages/voxelyn-survival-sim
+          : > /tmp/inspection.log
+          for pattern in \
+            'comando duplicado e idempotente' \
+            'terminal revela apenas o cofre associado' \
+            'cofre concede exatamente uma Celula de Purga'; do
+            echo "=== $pattern ===" | tee -a /tmp/inspection.log
+            timeout 25s pnpm exec vitest run tests/salvage-modules.test.ts -t "$pattern" --reporter=verbose 2>&1 | tee -a /tmp/inspection.log
+            code=${PIPESTATUS[0]}
+            echo "exit=$code" | tee -a /tmp/inspection.log
+          done
+          exit 0
+
+      - name: Publish isolated results
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            echo 'Materialized `salvage-modules.test.ts` tail:'
+            echo 'Isolated remaining salvage tests:'
             echo
-            echo '```ts'
-            nl -ba packages/voxelyn-survival-sim/tests/salvage-modules.test.ts | tail -n 180
+            echo '```text'
+            sed -E $'s/\x1B\[[0-9;]*[mK]//g' /tmp/inspection.log | tail -n 220
             echo '```'
           } > /tmp/inspection.md
           gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097223897 -F body=@/tmp/inspection.md
