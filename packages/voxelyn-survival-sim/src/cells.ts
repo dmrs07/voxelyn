@@ -93,9 +93,10 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
   const surf = state.surface[i];
   if (surf === SURF_FUNGAL) return heatFungalCell(state, i, false);
   if (surf === SURF_FUNGAL_HEATED) {
-    setSurface(state, i, SURF_FIRE, FUNGAL_FIRE_FUEL_TICKS);
-    announceIgnite(state, i, events);
-    return true;
+    // Uma nova fonte de calor acelera a secagem, mas nao ignora a umidade que
+    // ainda resta. A transicao para fogo continua pertencendo ao relogio de
+    // stepCells, garantindo que o aviso fumegante nunca seja pulado.
+    return heatFungalCell(state, i, true);
   }
   if (surf === SURF_GAS) {
     setSurface(state, i, SURF_FIRE, GAS_FLASH_TICKS);
