@@ -142,6 +142,15 @@ export const BRUISER_HURL_DAMAGE = 22;
 /** Raio de busca, em celulas, do bloco que ele arranca para usar como municao. */
 export const BRUISER_HURL_REACH = 3;
 
+/**
+ * De quantos em quantos ticks o guardiao recalcula a rota.
+ *
+ * Meio segundo: o alvo anda no maximo ~2 tiles nesse intervalo, e a busca e a
+ * coisa mais cara que a simulacao faz por criatura. Recalcular a cada tick
+ * gastaria vinte vezes mais para mudar quase nada na rota.
+ */
+export const GUARDIAN_PATH_INTERVAL_TICKS = 10;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;

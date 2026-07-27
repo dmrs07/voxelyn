@@ -176,6 +176,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
     coreTaken: false,
     guardianAwake: false,
     guardianSummoned: false,
+    guardianPath: [],
+    guardianPathAt: -1000,
     leftEntryZone: false,
     players,
     playerExtras,

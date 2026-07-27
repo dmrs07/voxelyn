@@ -12,6 +12,7 @@ import {
   BRUISER_HURL_REACH,
   BRUISER_HURL_SPEED,
   BRUISER_HURL_WINDUP_TICKS,
+  GUARDIAN_PATH_INTERVAL_TICKS,
   EXPLOSION_DAMAGE,
   SOLID_NONE,
   SPORE_LIFE_TICKS,
@@ -23,6 +24,7 @@ import {
   TICK_HZ,
 } from './constants.js';
 import { breakSolid, canRip, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
+import { findPath, hasLineOfSight } from './pathing.js';
 import type {
   Entity,
   EntityActionKind,
@@ -358,6 +360,75 @@ export const findRippable = (state: SurvivalState, ent: Entity): { x: number; y:
   return best;
 };
 
+/**
+ * Direcao de perseguicao do guardiao, contornando ou arrombando o que houver.
+ *
+ * Com linha de visao livre ele vai reto, e nem chega a pensar: buscar caminho a
+ * cada tick para um alvo que esta a vista seria gasto puro, e a rota em grade
+ * ainda daria um andar quadriculado onde o certo e a diagonal.
+ *
+ * Bloqueado, ele segue a rota de menor custo — que pode passar POR DENTRO de uma
+ * parede quebravel quando o desvio livre e longo demais. A rota e recalculada em
+ * intervalos e nao a cada tick: o alvo se move pouco entre um calculo e outro, e
+ * a busca e a coisa mais cara que a simulacao faz por criatura.
+ */
+const guardianSteering = (
+  state: SurvivalState,
+  enemy: Entity,
+  targetX: number,
+  targetY: number,
+  events: SemanticEvent[]
+): Vec2 => {
+  if (hasLineOfSight(state, enemy.x, enemy.y, targetX, targetY)) {
+    state.guardianPath = [];
+    return normalized(targetX - enemy.x, targetY - enemy.y);
+  }
+
+  const w = state.config.width;
+  const ex = Math.floor(enemy.x);
+  const ey = Math.floor(enemy.y);
+  const stale = state.tick - state.guardianPathAt >= GUARDIAN_PATH_INTERVAL_TICKS;
+  if (stale || state.guardianPath.length === 0) {
+    state.guardianPath = findPath(state, ex, ey, Math.floor(targetX), Math.floor(targetY));
+    state.guardianPathAt = state.tick;
+  }
+
+  // Consome os passos ja alcancados. Sem isto ele fica mirando a celula em que
+  // ja esta e trava no lugar.
+  while (state.guardianPath.length > 0 && state.guardianPath[0] === ey * w + ex) {
+    state.guardianPath.shift();
+  }
+  if (state.guardianPath.length === 0) {
+    // Sem rota dentro do orcamento: volta a empurrar na direcao do alvo. Pior,
+    // mas nunca imovel — um chefe parado e o fim da luta.
+    return normalized(targetX - enemy.x, targetY - enemy.y);
+  }
+
+  const next = state.guardianPath[0];
+  const nx = next % w;
+  const ny = (next / w) | 0;
+  // Parede no proximo passo: a rota ja pagou o preco de atravessa-la, entao ele
+  // ABRE em vez de tropecar. E o que transforma "preso atras de uma pedra" em
+  // "vem vindo, e a pedra nao vai adiantar".
+  //
+  // E abre BRECHA, nao porta. O guardiao tem raio 0,68 — corpo de quase um tile
+  // e meio — e a colisao amostra os quatro cantos dele: num vao de uma celula so
+  // os cantos ainda caem na pedra dos lados, e ele fica encostado no buraco que
+  // acabou de fazer. Medido, foi exatamente o que aconteceu: parede quebrada,
+  // caminho vazio e o chefe parado a 1,7 tile dela pelo resto da luta. As
+  // vizinhas PERPENDICULARES ao passo sao o que da largura ao vao.
+  if (state.solid[ny * w + nx] !== SOLID_NONE) {
+    const alongX = Math.abs(nx - ex) >= Math.abs(ny - ey);
+    for (const [ox, oy] of alongX ? [[0, 0], [0, -1], [0, 1]] : [[0, 0], [-1, 0], [1, 0]]) {
+      const bx = nx + ox;
+      const by = ny + oy;
+      if (state.solid[by * w + bx] === SOLID_NONE) continue;
+      if (!breakSolid(state, bx, by, events)) ripSolid(state, bx, by, events);
+    }
+  }
+  return normalized(nx + 0.5 - enemy.x, ny + 0.5 - enemy.y);
+};
+
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   for (const enemy of state.enemies) {
@@ -368,9 +439,14 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     const player = nearestTarget(state, enemy.x, enemy.y);
     const dist = player ? distTo(enemy, player) : Infinity;
+    // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
+    // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
+    const guardianHunting = enemy.archetype === 'guardian' && state.guardianAwake;
     const aggro =
       player !== null &&
-      (dist <= def.aggroRange + (enemy.elite ? 3 : 0) || state.tick < enemy.alertedUntil);
+      (guardianHunting ||
+        dist <= def.aggroRange + (enemy.elite ? 3 : 0) ||
+        state.tick < enemy.alertedUntil);
 
     if (enemy.archetype === 'guardian' && !state.guardianAwake) {
       // O alerta TAMBEM acorda. Sem isto, `aggro` ficava verdadeiro por dano mas
@@ -392,6 +468,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       const toward = normalized(player.x - enemy.x, player.y - enemy.y);
       dirX = toward.x;
       dirY = toward.y;
+      if (enemy.archetype === 'guardian') {
+        const steer = guardianSteering(state, enemy, player.x, player.y, events);
+        dirX = steer.x;
+        dirY = steer.y;
+      }
 
       if (enemy.archetype === 'bomber' && dist < 2.05) {
         startAction(state, enemy, 'detonate', toward, 12, 4, events, player.id);

@@ -163,6 +163,16 @@ export type SurvivalState = {
   coreTaken: boolean;
   guardianAwake: boolean;
   guardianSummoned: boolean;
+  /**
+   * Rota atual do guardiao, em indices de celula, e o tick em que foi calculada.
+   *
+   * Vive no estado e nao na entidade porque e DERIVADO: da para recalcular a
+   * qualquer momento a partir da grade, entao nao entra no hash autoritativo nem
+   * precisa viajar num snapshot. O cliente so desenha; quem persegue e o
+   * servidor.
+   */
+  guardianPath: number[];
+  guardianPathAt: number;
   leftEntryZone: boolean;
   players: Entity[];
   playerExtras: PlayerExtra[];
