@@ -32,7 +32,7 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
 
-      - name: Extract and apply corrected polish script
+      - name: Apply polish script and fix numeric endpoint assertion
         shell: bash
         run: |
           set -euo pipefail
@@ -44,19 +44,25 @@ jobs:
           marker = "          python <<'PY'\n"
           start = workflow.index(marker) + len(marker)
           end = workflow.index("\n          PY\n", start)
-          script = dedent(workflow[start:end])
-          old = '    f.write("    expect(rewardFlightPosition(from, to, 900, 650)).toEqual({ ...to, progress: 1 });\\n")'
-          new = (
-              '    f.write("    const end = rewardFlightPosition(from, to, 900, 650);\\n")\n'
-              '    f.write("    expect(end.x).toBeCloseTo(to.x);\\n")\n'
-              '    f.write("    expect(end.y).toBeCloseTo(to.y);\\n")\n'
-              '    f.write("    expect(end.progress).toBe(1);\\n")'
-          )
-          if old not in script:
-              raise SystemExit('Expected exact endpoint assertion not found in polish script')
-          Path('/tmp/polish.py').write_text(script.replace(old, new, 1))
+          Path('/tmp/polish.py').write_text(dedent(workflow[start:end]))
           PY
           python /tmp/polish.py
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('packages/voxelyn-survival/src/tests/module-layout.test.ts')
+          text = path.read_text()
+          old = "    expect(rewardFlightPosition(from, to, 900, 650)).toEqual({ ...to, progress: 1 });"
+          new = (
+              "    const end = rewardFlightPosition(from, to, 900, 650);\n"
+              "    expect(end.x).toBeCloseTo(to.x);\n"
+              "    expect(end.y).toBeCloseTo(to.y);\n"
+              "    expect(end.progress).toBe(1);"
+          )
+          if old not in text:
+              raise SystemExit('Generated endpoint assertion was not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
 
       - name: Build and test corrected client polish
         shell: bash
