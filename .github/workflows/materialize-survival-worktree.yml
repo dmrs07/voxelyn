@@ -31,7 +31,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment 48 --repo dmrs07/voxelyn --body "🔎 Guarded Survival validation started for \`${GITHUB_SHA::12}\`: ${RUN_URL}"
+          printf '🔎 Guarded Survival validation started for `%s`: %s\n' "${GITHUB_SHA::12}" "$RUN_URL" > /tmp/status.md
+          gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097222729 -F body=@/tmp/status.md
 
       - uses: actions/setup-node@v4
         with:
@@ -224,7 +225,7 @@ jobs:
             fi
             echo '```'
           } > /tmp/failure.md
-          gh pr comment 48 --repo dmrs07/voxelyn --body-file /tmp/failure.md
+          gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097222729 -F body=@/tmp/failure.md
 
       - name: Report validation success
         if: success()
@@ -232,4 +233,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed: ${RUN_URL}. Atlas generation and all Survival package suites succeeded; the logical source commits are now on this PR."
+          printf '✅ Guarded Survival validation passed: %s. Atlas generation and all Survival package suites succeeded; the logical source commits are now on this PR.\n' "$RUN_URL" > /tmp/status.md
+          gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097222729 -F body=@/tmp/status.md
