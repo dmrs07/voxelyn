@@ -5,6 +5,12 @@ export default defineConfig({
     environment: 'node',
     // src/ tambem: manifest.test.ts vive junto do codigo que testa e ficava
     // fora do include, entao nunca rodava.
-    include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    // .mjs tambem: os testes de geometria alcancam `tools/*.mjs`, que e
+    // JavaScript puro e fica de proposito fora de `src/` — e portanto fora do
+    // `tsc` que compila o pacote.
+    include: [
+      'tests/**/*.test.{ts,mjs}',
+      'src/**/*.test.ts',
+    ],
   },
 });

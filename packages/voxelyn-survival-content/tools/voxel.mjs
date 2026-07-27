@@ -34,6 +34,23 @@ export const RAMPS = {
   fungusDeep: ['fungus', 'fungusDark', 'dark'],
   biolum: ['biolum', 'fungusLight', 'fungus'],
   acid: ['acid', 'fungusLight', 'fungus'],
+  /**
+   * Lamina de biofluido: topo ESCURO com as laterais quase pretas.
+   *
+   * Liquido parado le por profundidade, nao por matiz — uma lamina de verde
+   * medio uniforme e indistinguivel de um tapete de fungo, que e exatamente o
+   * que a poca parecia. O brilho vem de voxels `biolum` avulsos no mesmo plano,
+   * entao a poca e escura com faiscas, e nao verde por igual.
+   */
+  pool: ['fungusDark', 'dark', 'dark'],
+  /**
+   * Gas sulfuroso: crosta amarela sobre corpo esverdeado.
+   *
+   * O gas era `acid` puro — verde-limao — e a paleta nao tem amarelo de enxofre.
+   * Combinando `loot` no topo com `acid` na lateral a leitura vira amarelo
+   * esverdeado, que e o enxofre, e separa o gas do fungo e da poca de uma vez.
+   */
+  sulfur: ['loot', 'acid', 'fungusDark'],
   fire: ['loot', 'fire', 'blood'],
   blood: ['blood', 'rust', 'dark'],
   electric: ['electric', 'rockLight', 'rock'],

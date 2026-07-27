@@ -104,6 +104,112 @@ const overSlab = (variant, seed, fn) => {
   }
 };
 
+const GAS_MIN_Z = 4;
+const GAS_MAX_Z = 6;
+const GAS_PUFFS = 3;
+const GAS_WINDS = [
+  [1, 0],
+  [1, 1],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+];
+
+/**
+ * Escolhe tres centros de sopro por ranking, em vez de sortear cada coluna.
+ *
+ * A escolha independente fazia a massa oscilar entre poucos e muitos cubos de
+ * um quadro para outro: a celula piscava e, num campo inteiro, a distribuicao
+ * uniforme virava ruido. O ranking mantem a massa previsivel, enquanto o hash
+ * ainda muda posicao, vento e fase entre as variantes.
+ */
+const gasAnchors = (variant) => {
+  const candidates = [];
+  // Margem de dois voxels: cada sopro pode derivar e abrir uma lateral sem sair
+  // do losango da celula.
+  for (let cx = 2; cx <= 5; cx++) {
+    for (let cy = 2; cy <= 5; cy++) {
+      candidates.push({ cx, cy, h: hash3d(cx, cy, 43, variant) });
+    }
+  }
+  candidates.sort((a, b) => a.h - b.h);
+
+  // Tenta primeiro centros bem separados. O relaxamento so existe para tornar a
+  // funcao total se a grade mudar no futuro; com 8x8 ela fecha em distancia 3.
+  for (const minDistance of [4, 3, 2, 0]) {
+    const picked = [];
+    for (const candidate of candidates) {
+      const farEnough = picked.every(
+        (other) => Math.abs(candidate.cx - other.cx) + Math.abs(candidate.cy - other.cy) >= minDistance
+      );
+      if (!farEnough) continue;
+      picked.push(candidate);
+      if (picked.length === GAS_PUFFS) return picked;
+    }
+  }
+  return candidates.slice(0, GAS_PUFFS);
+};
+
+/**
+ * Nuvem assada como tres SOPROS com ciclo de vida, nao pontos independentes.
+ *
+ * Cada sopro nasce baixo, ganha ombro, sobe e se desfaz. As fases 2/3 derivam um
+ * voxel no vento proprio do sopro. Com tres fases defasadas, a massa total fica
+ * entre 8 e 10 voxels em todos os quadros: suficiente para formar volume, mas
+ * ainda com muito chao visivel entre os aglomerados.
+ */
+const gasCloud = (variant, frame) => {
+  const half = SURFACE_COLS / 2;
+  const occupied = new Set();
+  const boxes = [];
+
+  const add = (cx, cy, z) => {
+    if (cx < 0 || cx >= SURFACE_COLS || cy < 0 || cy >= SURFACE_COLS) return;
+    if (z < GAS_MIN_Z || z > GAS_MAX_Z) return;
+    const key = `${cx},${cy},${z}`;
+    if (occupied.has(key)) return;
+    occupied.add(key);
+    boxes.push(box(cx - half, cy - half, z, 1, 1, 1, 'sulfur'));
+  };
+
+  gasAnchors(variant).forEach((anchor, index) => {
+    const phase = (frame + index + variant) % 4;
+    const windIndex = (anchor.h >>> 4) % GAS_WINDS.length;
+    const [windX, windY] = GAS_WINDS[windIndex];
+    const [sideX, sideY] = GAS_WINDS[(windIndex + 2) % GAS_WINDS.length];
+    const drift = phase >= 2 ? 1 : 0;
+    const cx = anchor.cx + windX * drift;
+    const cy = anchor.cy + windY * drift;
+
+    if (phase === 0) {
+      // Condensando: uma coluna curta, ainda compacta.
+      add(cx, cy, 4);
+      add(cx, cy, 5);
+    } else if (phase === 1) {
+      // Respirando: aparece um ombro lateral, formando massa e nao uma corrente.
+      add(cx, cy, 4);
+      add(cx, cy, 5);
+      add(cx + sideX, cy + sideY, 5);
+    } else if (phase === 2) {
+      // Subindo: nucleo alto, ombro e um mote que se desprende no vento.
+      add(cx, cy, 5);
+      add(cx, cy, 6);
+      add(cx + sideX, cy + sideY, 5);
+      add(cx + windX, cy + windY, 6);
+    } else {
+      // Dissipando: perde a base, abre no topo e prepara o vazio do renascimento.
+      add(cx, cy, 5);
+      add(cx, cy, 6);
+      add(cx + sideX, cy + sideY, 6);
+    }
+  });
+
+  return boxes;
+};
+
 /**
  * Modelo de um tipo num quadro de animacao.
  *
@@ -114,7 +220,7 @@ const overSlab = (variant, seed, fn) => {
  * Se as duas tivessem o mesmo relevo, a unica diferenca seria matiz, e matiz e
  * exatamente o que se perde na penumbra em que o jogo se passa.
  */
-const surfaceModel = (kind, variant, frame) => {
+export const surfaceModel = (kind, variant, frame) => {
   if (kind === 'bare') return slab(variant, 'floor', 'rockDeep');
   if (kind === 'scorched') {
     const boxes = slab(variant, 'scorch', 'floor');
@@ -139,38 +245,55 @@ const surfaceModel = (kind, variant, frame) => {
   }
 
   if (kind === 'biofluid') {
-    const boxes = slab(variant, 'floor', 'rockDeep');
-    overSlab(variant, 29, ({ cx, cy, x, y, h }) => {
-      // Uma camada UNICA e num z UNICO, acima de qualquer saliencia da laje:
-      // liquido assenta e nivela. Empilhar o brilho num voxel a mais, que foi a
-      // primeira tentativa, devolvia relevo a poca e ela voltava a ler como
-      // musgo — a diferenca entre poca e tapete de fungo e planura, nao matiz.
-      // Por isso o brilho troca de MATERIAL no mesmo plano em vez de subir.
-      const band = (cx + cy * 2 + frame) % 7;
-      const lit = band === 0 || (band === 3 && h % 3 === 0);
-      boxes.push(box(x, y, 2, 1, 1, 1, lit ? 'biolum' : 'fungusDeep'));
-    });
+    // A poca e o UNICO tipo que nao usa a laje irregular, e a excecao e o
+    // ponto todo: liquido acha nivel. A laje comum sobe um voxel em um quarto
+    // das colunas, e uma lamina assentada sobre ela herdava esse cascalho —
+    // saia um tapete rugoso da cor errada, nao uma poca. Aqui o leito e plano
+    // por construcao, e o que quebra a superficie sao poucas pedras inteiras.
+    //
+    // O erro anterior era tratar "detalhe" como sinonimo de "textura". Fungo,
+    // gas e fogo leem por serem RECORTADOS; liquido le pelo oposto — pela
+    // ausencia de recorte. Faisca coluna a coluna, orla em toda pedra e faixa
+    // com degrau juntos viraram ruido, e ruido e exatamente o que um liquido
+    // parado nao tem.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let cx = 0; cx < SURFACE_COLS; cx++) {
+      for (let cy = 0; cy < SURFACE_COLS; cy++) {
+        const x = cx - half;
+        const y = cy - half;
+        const h = hash3d(cx, cy, 29, variant);
+        boxes.push(box(x, y, 0, 1, 1, 1, 'floor'));
+        // Pedra emergindo — duas por celula, e clara. E ela que da escala e
+        // prova que ha NIVEL: sem nada furando a lamina, um plano liso e
+        // indistinguivel de uma laje pintada de verde.
+        //
+        // Os dois numeros aqui foram medidos, nao chutados. Na densidade da
+        // laje comum (uma coluna em dezesseis) sao quatro ilhas por celula e o
+        // olho volta a ler cascalho molhado; e em `rockDeep`, escura como a
+        // propria poca, cada ilha lia como buraco em vez de pedra. Clara e
+        // rara, cada uma vira um acidente que se nota.
+        if ((h & 31) === 0) {
+          boxes.push(box(x, y, 1, 1, 1, 2, 'rock'));
+          continue;
+        }
+        // Reflexo em FAIXA, nao em pontos soltos: o olho nao liga faiscas
+        // isoladas numa superficie, liga uma linha. Em projecao isometrica a
+        // linha de cx+cy constante corre na horizontal da tela, que e a
+        // direcao em que um reflexo de fato aparece. Modulo 8 — a largura da
+        // grade — para a faixa atravessar a fronteira entre celulas vizinhas
+        // em vez de quebrar nela.
+        const band = (cx + cy + frame * 2) % 8;
+        boxes.push(box(x, y, 1, 1, 1, 1, band === 0 ? 'biolum' : 'pool'));
+      }
+    }
     return boxes;
   }
 
   if (kind === 'gas') {
-    const boxes = slab(variant, 'floor', 'rockDeep');
-    overSlab(variant, 43, ({ cx, cy, x, y, h }) => {
-      // Ocupacao esparsa: e ISTO que substitui o alpha. A nuvem e opaca cubinho
-      // a cubinho, e o chao aparece pelos vaos entre eles.
-      //
-      // A densidade e a coisa mais delicada do arquivo. Perto da metade das
-      // colunas, os cubos se encostam na projecao e a nuvem vira um TAPETE
-      // verde: opaco, chapado, e sem nenhuma leitura de que ha ar ali. Em torno
-      // de um quinto eles ficam separados o bastante para o chao aparecer entre
-      // eles, que e o que faz o volume ler como gas.
-      if ((cx * 3 + cy * 5 + frame * 2) % 11 > 1) return;
-      // Espalhado em altura, e nao colado numa camada: o gas ocupa o AR sobre a
-      // celula, e os motes que o cliente emite sobem a partir daqui.
-      const z = 1 + ((h >>> 5) % 3) + (frame % 2);
-      boxes.push(box(x, y, z, 1, 1, 1, 'acid'));
-    });
-    return boxes;
+    // A laje continua irregular; a NUVEM, ao contrario da antiga mascara por
+    // coluna, e uma composicao de poucos volumes com vazios internos.
+    return [...slab(variant, 'floor', 'rockDeep'), ...gasCloud(variant, frame)];
   }
 
   if (kind === 'fire') {
