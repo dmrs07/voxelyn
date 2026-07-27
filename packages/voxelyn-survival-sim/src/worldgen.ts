@@ -13,12 +13,14 @@ import {
 } from './constants.js';
 import type { Vec2 } from './types.js';
 
+export type GeneratedSalvageSite = { id: number; tier: 1 | 2 | 3; terminal: Vec2; cache: Vec2 };
+
 export type GeneratedWorld = {
   solid: Uint8Array;
   surface: Uint8Array;
   entry: Vec2;
   corePos: Vec2;
-  cachePositions: Vec2[];
+  salvageSites: GeneratedSalvageSite[];
   ventPositions: Vec2[];
   enemySpawns: Vec2[];
   openCells: number[];
@@ -247,26 +249,79 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
     return null;
   };
 
-  const cachePositions: Vec2[] = [];
-  for (let c = 0; c < 4; c++) {
-    const p = pickOpenFar(14, 10, cachePositions);
-    if (p) cachePositions.push(p);
+  const maxPath = distFromEntry[idx(w, corePos.x, corePos.y)];
+  const reserved: Vec2[] = [entry, corePos];
+  const bands: Array<{ min: number; max: number; tier: 1 | 2 | 3; optional?: boolean }> = [
+    { min: 0.20, max: 0.35, tier: 1 },
+    { min: 0.40, max: 0.60, tier: 1 },
+    { min: 0.65, max: 0.80, tier: 2 },
+    { min: 0.82, max: 0.95, tier: 3, optional: true },
+  ];
+
+  const chooseBandCell = (minRatio: number, maxRatio: number, taken: Vec2[]): Vec2 | null => {
+    const candidates = openArr.filter((cell) => {
+      const d = distFromEntry[cell];
+      if (d < Math.ceil(maxPath * minRatio) || d > Math.floor(maxPath * maxRatio)) return false;
+      const x = cell % w;
+      const y = Math.floor(cell / w);
+      if (Math.hypot(x - entry.x, y - entry.y) < 7) return false;
+      if (Math.hypot(x - corePos.x, y - corePos.y) < 6) return false;
+      return taken.every((p) => (p.x - x) ** 2 + (p.y - y) ** 2 >= 9 * 9);
+    });
+    if (candidates.length === 0) return null;
+    const cell = candidates[rng.nextInt(candidates.length)];
+    return { x: cell % w, y: Math.floor(cell / w) };
+  };
+
+  const chooseCacheForTerminal = (terminal: Vec2, taken: Vec2[]): Vec2 | null => {
+    const terminalDist = distFromEntry[idx(w, terminal.x, terminal.y)];
+    const candidates = openArr.filter((cell) => {
+      const x = cell % w;
+      const y = Math.floor(cell / w);
+      const path = distFromEntry[cell];
+      const euclideanSq = (x - terminal.x) ** 2 + (y - terminal.y) ** 2;
+      if (path < terminalDist + 3 || path > terminalDist + Math.max(8, Math.floor(maxPath * 0.12))) return false;
+      if (euclideanSq < 5 * 5 || euclideanSq > 15 * 15) return false;
+      if (Math.hypot(x - corePos.x, y - corePos.y) < 5) return false;
+      return taken.every((p) => (p.x - x) ** 2 + (p.y - y) ** 2 >= 6 * 6);
+    });
+    if (candidates.length === 0) return null;
+    const cell = candidates[rng.nextInt(candidates.length)];
+    return { x: cell % w, y: Math.floor(cell / w) };
+  };
+
+  const salvageSites: GeneratedSalvageSite[] = [];
+  for (let siteId = 0; siteId < bands.length; siteId++) {
+    const band = bands[siteId];
+    const terminal = chooseBandCell(band.min, band.max, reserved);
+    if (!terminal) {
+      if (band.optional) continue;
+      return null;
+    }
+    const cache = chooseCacheForTerminal(terminal, [...reserved, terminal]);
+    if (!cache) {
+      if (band.optional) continue;
+      return null;
+    }
+    salvageSites.push({ id: siteId, tier: band.tier, terminal, cache });
+    reserved.push(terminal, cache);
   }
+  if (salvageSites.length < 3) return null;
 
   const ventPositions: Vec2[] = [];
   for (let v = 0; v < 6; v++) {
-    const p = pickOpenFar(10, 8, [...ventPositions, ...cachePositions]);
+    const p = pickOpenFar(10, 8, [...ventPositions, ...reserved]);
     if (p) ventPositions.push(p);
   }
 
   const enemySpawns: Vec2[] = [];
   for (let e = 0; e < 22; e++) {
-    const p = pickOpenFar(12, 3, enemySpawns);
+    const p = pickOpenFar(12, 3, [...enemySpawns, ...reserved]);
     if (p) enemySpawns.push(p);
   }
   if (enemySpawns.length < 10) return null;
 
-  return { solid, surface, entry, corePos, cachePositions, ventPositions, enemySpawns, openCells };
+  return { solid, surface, entry, corePos, salvageSites, ventPositions, enemySpawns, openCells };
 };
 
 /** Geracao deterministica com retentativas limitadas (seed derivada) ate mapa solucionavel. */

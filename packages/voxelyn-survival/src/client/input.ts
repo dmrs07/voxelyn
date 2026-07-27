@@ -2,7 +2,7 @@ import type { PlayerCommand, Vec2 } from '@voxelyn/survival-sim';
 import { emptyCommand } from '@voxelyn/survival-sim';
 
 export type TouchButton = {
-  id: 'dodge' | 'ability' | 'consume' | 'interact';
+  id: 'dodge' | 'ability' | 'purge' | 'interact';
   cx: number;
   cy: number;
   r: number;
@@ -59,7 +59,7 @@ export class SurvivalInput {
   private mouse = { x: 0, y: 0, down: false };
   private queuedDodge = false;
   private queuedInteract = false;
-  private queuedConsume = false;
+  private queuedPurge = false;
   private queuedAbility = false;
   private queuedChoice: 0 | 1 | null = null;
   private queuedRestart = false;
@@ -118,7 +118,7 @@ export class SurvivalInput {
         r: r * 0.92,
         pressed: false,
       },
-      { id: 'consume', cx: aimX, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.82, r: r * 0.88, pressed: false },
+      { id: 'purge', cx: aimX, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.82, r: r * 0.88, pressed: false },
       {
         id: 'interact',
         cx: aimX + AIM_JOYSTICK_RADIUS * 0.7,
@@ -137,7 +137,7 @@ export class SurvivalInput {
       this.state.actionPressSeq.dodge += 1;
     }
     if (k === 'e') this.queuedInteract = true;
-    if (k === 'f') this.queuedConsume = true;
+    if (k === 'f') this.queuedPurge = true;
     if (k === 'q' || k === 'shift') {
       this.queuedAbility = true;
       this.state.actionPressSeq.ability += 1;
@@ -182,7 +182,7 @@ export class SurvivalInput {
           this.queuedAbility = true;
           this.state.actionPressSeq.ability += 1;
         }
-        if (btn.id === 'consume') this.queuedConsume = true;
+        if (btn.id === 'purge') this.queuedPurge = true;
         if (btn.id === 'interact') this.queuedInteract = true;
         return;
       }
@@ -285,6 +285,12 @@ export class SurvivalInput {
     return null;
   }
 
+  /** Descarta uma escolha prematura durante a sequencia visual da recompensa. */
+  clearPendingChoiceInput(): void {
+    this.queuedChoice = null;
+    this.state.tapQueue.length = 0;
+  }
+
   /**
    * Descarta intencoes de UI pendentes (toques e a tecla R). A fila de toques
    * so existe para UI (menu de escolha, tela de fim); durante a run ninguem a
@@ -357,11 +363,11 @@ export class SurvivalInput {
 
     cmd.dodge = this.queuedDodge;
     cmd.interact = this.queuedInteract;
-    cmd.consume = this.queuedConsume;
+    cmd.purge = this.queuedPurge;
     cmd.ability = this.queuedAbility;
     this.queuedDodge = false;
     this.queuedInteract = false;
-    this.queuedConsume = false;
+    this.queuedPurge = false;
     this.queuedAbility = false;
 
     return cmd;

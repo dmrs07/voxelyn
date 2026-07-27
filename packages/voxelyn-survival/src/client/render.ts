@@ -20,7 +20,7 @@ import {
   HEAT_MAX,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
-import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
@@ -33,6 +33,8 @@ import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
 import { drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
+import { modulePresentation } from './module-presentation';
+import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -166,13 +168,111 @@ export const GAS_ALPHA = 192 / 255;
 /** Faces da carga eletrica que corre pela poca: topo quase branco sobre azul. */
 const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 
+
+const drawModuleGlyph = (
+  ctx: CanvasRenderingContext2D,
+  id: ModuleId,
+  cx: number,
+  cy: number,
+  size: number,
+  color: string
+): void => {
+  const u = Math.max(1, Math.floor(size / 8));
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, u);
+  if (id === 'piercing') {
+    ctx.fillRect(cx - 4 * u, cy - u, 7 * u, 2 * u);
+    ctx.beginPath();
+    ctx.moveTo(cx + 4 * u, cy);
+    ctx.lineTo(cx + u, cy - 3 * u);
+    ctx.lineTo(cx + u, cy + 3 * u);
+    ctx.fill();
+  } else if (id === 'conductive') {
+    ctx.beginPath();
+    ctx.moveTo(cx - u, cy - 4 * u);
+    ctx.lineTo(cx + 2 * u, cy - u);
+    ctx.lineTo(cx, cy - u);
+    ctx.lineTo(cx + u, cy + 4 * u);
+    ctx.lineTo(cx - 3 * u, cy + u);
+    ctx.lineTo(cx - u, cy + u);
+    ctx.closePath();
+    ctx.fill();
+  } else if (id === 'explosive') {
+    ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, 4 * u);
+    for (const [dx, dy] of [[0,-5],[0,5],[-5,0],[5,0],[-4,-4],[4,-4],[-4,4],[4,4]]) {
+      ctx.fillRect(cx + dx * u - u / 2, cy + dy * u - u / 2, u, u);
+    }
+  } else if (id === 'siphon') {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3 * u, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(cx - u, cy - 4 * u, 2 * u, 8 * u);
+    ctx.fillRect(cx - 4 * u, cy - u, 8 * u, 2 * u);
+  } else if (id === 'ricochet') {
+    ctx.beginPath();
+    ctx.moveTo(cx - 4 * u, cy + 3 * u);
+    ctx.lineTo(cx, cy - 2 * u);
+    ctx.lineTo(cx + 4 * u, cy + 2 * u);
+    ctx.stroke();
+    ctx.fillRect(cx + 2 * u, cy, 3 * u, u);
+  } else {
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4 * u, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2 * u, Math.PI * 0.25, Math.PI * 1.75);
+    ctx.stroke();
+  }
+};
+
+const drawPurgeCellGlyph = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+  color: string
+): void => {
+  const u = Math.max(1, Math.floor(size / 8));
+  ctx.fillStyle = 'rgba(11,14,20,0.92)';
+  ctx.fillRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, u);
+  ctx.strokeRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
+  ctx.fillStyle = color;
+  ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, u);
+  ctx.fillRect(cx - u, cy, 2 * u, 3 * u);
+  ctx.fillStyle = PAL.player;
+  ctx.fillRect(cx - u, cy - 3 * u, 2 * u, u);
+};
+
+const wrapMeasuredText = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] => {
+  const lines: string[] = [];
+  let current = '';
+  for (const word of text.split(/\s+/)) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && ctx.measureText(candidate).width > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+};
+
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   zoom = 2;
   fxList: Fx[] = [];
   flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
-  messages: Array<{ text: string; until: number }> = [];
+  messages: Array<{ text: string; startsAt?: number; until: number }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly surfaces = new SurfaceBank();
@@ -197,6 +297,18 @@ export class SurvivalRenderer {
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
+  private readonly modulePulseUntil = new Map<ModuleId, number>();
+  private safeArea: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  private pendingRewardOrigin: { slot: number; x: number; y: number } | null = null;
+  private rewardFlight: {
+    worldX: number;
+    worldY: number;
+    startedAt: number;
+    durationMs: number;
+    startScreen?: { x: number; y: number };
+  } | null = null;
+  private choiceRevealAt = 0;
+  private purgePulseUntil = 0;
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -212,6 +324,14 @@ export class SurvivalRenderer {
   setQuality(level: QualityLevel): void {
     this.quality = PRESETS[level];
     this.resize();
+  }
+
+  setSafeArea(safeArea: SafeInsets): void {
+    this.safeArea = { ...safeArea };
+  }
+
+  isChoiceRevealReady(nowMs: number): boolean {
+    return nowMs >= this.choiceRevealAt;
   }
 
   private animFor(id: number, x: number, y: number, hp: number, alive: boolean, nowMs: number): EntityAnimState {
@@ -324,6 +444,39 @@ export class SurvivalRenderer {
         case 'guardian_awake':
           this.messages.push({ text: 'O GUARDIAO DESPERTOU', until: nowMs + 3000 });
           this.shake = { power: 6, until: nowMs + 500 };
+          break;
+        case 'module_charge_consumed':
+          this.modulePulseUntil.set(ev.module, nowMs + 260);
+          break;
+        case 'module_expired':
+          this.messages.push({ text: `${modulePresentation(ev.module).label} DESATIVADO`, until: nowMs + 1800 });
+          break;
+        case 'salvage_cache_opened':
+          this.messages.push({ text: 'COFRE RECUPERADO', until: nowMs + 2200 });
+          this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);
+          if (ev.slot === this.localPlayerId - 1) {
+            this.pendingRewardOrigin = { slot: ev.slot, x: ev.x + 0.5, y: ev.y + 0.5 };
+            this.choiceRevealAt = Math.max(this.choiceRevealAt, nowMs + 920);
+          }
+          break;
+        case 'purge_cell_acquired':
+          if (ev.slot === this.localPlayerId - 1) {
+            const startsAt = nowMs + 220;
+            this.messages.push({ text: '+1 CÉLULA DE PURGA', startsAt, until: startsAt + 2200 });
+            if (this.pendingRewardOrigin?.slot === ev.slot) {
+              this.rewardFlight = {
+                worldX: this.pendingRewardOrigin.x,
+                worldY: this.pendingRewardOrigin.y,
+                startedAt: startsAt,
+                durationMs: 650,
+              };
+              this.pendingRewardOrigin = null;
+            }
+            this.choiceRevealAt = Math.max(this.choiceRevealAt, startsAt + 700);
+          }
+          break;
+        case 'terminal_scan_complete':
+          this.messages.push({ text: 'VARREDURA CONCLUÍDA — COFRE REVELADO', until: nowMs + 2800 });
           break;
         case 'overheat':
           this.messages.push({ text: 'SUPERAQUECIMENTO!', until: nowMs + 1600 });
@@ -646,19 +799,40 @@ export class SurvivalRenderer {
       }
     }
 
-    // caches
-    for (const cache of state.caches) {
-      if (cache.opened) continue;
-      const b = brightness(cache.x, cache.y);
-      if (b <= 0.05) continue;
-      const [sx, sy] = toScreen(cache.x + 0.5, cache.y + 0.5);
+    // Sites de salvamento: terminal sempre visivel; cofre apenas depois da varredura.
+    for (const site of state.salvageSites) {
+      const tb = brightness(site.terminal.x, site.terminal.y);
+      if (tb > 0.05) {
+        const [tsx, tsy] = toScreen(site.terminal.x + 0.5, site.terminal.y + 0.5);
+        items.push({
+          depth: site.terminal.x + site.terminal.y,
+          draw: () => {
+            const prop = site.terminalState === 'scanning'
+              ? 'salvageTerminalScanning'
+              : site.terminalState === 'complete'
+                ? 'salvageTerminalComplete'
+                : 'salvageTerminalIdle';
+            if (this.props.draw(ctx, prop, nowMs, tsx, tsy, z)) return;
+            ctx.fillStyle = shade(PAL.rockLight, 0.45 + tb * 0.45);
+            ctx.fillRect(tsx - 4 * z, tsy - 12 * z, 8 * z, 12 * z);
+            ctx.fillStyle = site.terminalState === 'scanning' ? PAL.loot : site.terminalState === 'complete' ? PAL.biolum : PAL.rock;
+            ctx.fillRect(tsx - 2 * z, tsy - 9 * z, 4 * z, 4 * z);
+          },
+        });
+      }
+      if (!site.cacheRevealed) continue;
+      const cb = brightness(site.cache.x, site.cache.y);
+      if (cb <= 0.05) continue;
+      const [csx, csy] = toScreen(site.cache.x + 0.5, site.cache.y + 0.5);
       items.push({
-        depth: cache.x + cache.y,
+        depth: site.cache.x + site.cache.y,
         draw: () => {
-          ctx.fillStyle = shade(PAL.loot, 0.4 + b * 0.6);
-          ctx.fillRect(sx - 4 * z, sy - 6 * z, 8 * z, 6 * z);
-          ctx.fillStyle = shade('#8a6a2f', 0.4 + b * 0.5);
-          ctx.fillRect(sx - 4 * z, sy - 2 * z, 8 * z, 2 * z);
+          const prop = site.cacheOpened ? 'salvageCacheOpened' : 'salvageCache';
+          if (this.props.draw(ctx, prop, nowMs, csx, csy, z)) return;
+          ctx.fillStyle = shade(PAL.rock, 0.5 + cb * 0.4);
+          ctx.fillRect(csx - 5 * z, csy - 5 * z, 10 * z, 5 * z);
+          ctx.fillStyle = site.cacheOpened ? PAL.rockShadow : PAL.loot;
+          ctx.fillRect(csx - 3 * z, csy - 4 * z, 6 * z, 2 * z);
         },
       });
     }
@@ -914,14 +1088,46 @@ export class SurvivalRenderer {
       }
     }
 
+    this.renderRewardFlight(toScreen, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
+  }
+
+  private renderRewardFlight(
+    toScreen: (x: number, y: number) => [number, number],
+    nowMs: number
+  ): void {
+    const flight = this.rewardFlight;
+    if (!flight || nowMs < flight.startedAt) return;
+    if (!flight.startScreen) {
+      const [x, y] = toScreen(flight.worldX, flight.worldY);
+      flight.startScreen = { x, y };
+    }
+    const target = { x: this.safeArea.left + 22, y: this.safeArea.top + 53 };
+    const sample = rewardFlightPosition(
+      flight.startScreen,
+      target,
+      nowMs - flight.startedAt,
+      flight.durationMs
+    );
+    if (sample.progress >= 1) {
+      this.rewardFlight = null;
+      this.purgePulseUntil = nowMs + 420;
+      return;
+    }
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1 - sample.progress) * 1.7 + 0.25);
+    ctx.translate(sample.x, sample.y);
+    ctx.rotate((1 - sample.progress) * 0.35);
+    drawPurgeCellGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 4, PAL.biolum);
+    ctx.restore();
   }
 
   private renderHud(state: SurvivalState, input: InputState, nowMs: number, vw: number, vh: number): void {
     const ctx = this.ctx;
     const extra = state.playerExtra;
-    const safeTop = 10;
-    const safeLeft = 12;
+    const safeTop = this.safeArea.top + 10;
+    const safeLeft = this.safeArea.left + 12;
 
     // HP
     const barW = Math.min(220, vw * 0.3);
@@ -944,24 +1150,42 @@ export class SurvivalRenderer {
     ctx.fillStyle = PAL.acid;
     ctx.fillRect(0, 0, vw * state.contamination, 3);
 
-    // consumiveis + modificadores + objetivo
-    ctx.font = 'bold 12px monospace';
+    // Celulas de Purga + modulos temporarios.
+    const purgePulse = nowMs < this.purgePulseUntil;
+    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;
     ctx.textAlign = 'left';
-    ctx.fillStyle = PAL.bone;
-    ctx.fillText(`Frascos ${extra.consumables}  |  ${extra.modifiers.map((m) => m.toUpperCase().slice(0, 4)).join(' ') || 'sem modificadores'}`, safeLeft, safeTop + 42);
+    ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
+    drawPurgeCellGlyph(ctx, safeLeft + 7, safeTop + 39, purgePulse ? 15 : 13, ctx.fillStyle as string);
+    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 18, safeTop + 43);
+    this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw - this.safeArea.right);
     ctx.fillStyle = PAL.loot;
     const objective = extra.hasCore
       ? 'VOLTE PARA A ENTRADA'
       : state.coreTaken
         ? 'EXTRAIA NA ENTRADA'
-        : 'ENCONTRE O NUCLEO';
-    ctx.fillText(objective, safeLeft, safeTop + 58);
+        : 'ENCONTRE O NÚCLEO';
+    ctx.fillText(objective, safeLeft, safeTop + 100);
+    const revealed = state.salvageSites
+      .filter((site) => site.cacheRevealed && !site.cacheOpened)
+      .sort((a, b) => {
+        const da = Math.hypot(a.cache.x + 0.5 - state.player.x, a.cache.y + 0.5 - state.player.y);
+        const db = Math.hypot(b.cache.x + 0.5 - state.player.x, b.cache.y + 0.5 - state.player.y);
+        return da - db;
+      })[0];
+    if (revealed) {
+      const dx = revealed.cache.x + 0.5 - state.player.x;
+      const dy = revealed.cache.y + 0.5 - state.player.y;
+      const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'LESTE' : 'OESTE') : (dy > 0 ? 'SUL' : 'NORTE');
+      ctx.fillStyle = PAL.biolum;
+      ctx.fillText(`COFRE: ${direction} · ~${Math.round(Math.hypot(dx, dy))}m`, safeLeft, safeTop + 116);
+    }
 
     // mensagens centrais
     this.messages = this.messages.filter((m) => m.until > nowMs);
+    const visibleMessages = this.messages.filter((m) => (m.startsAt ?? 0) <= nowMs);
     ctx.textAlign = 'center';
-    let my = vh * 0.2;
-    for (const m of this.messages.slice(-3)) {
+    let my = Math.max(this.safeArea.top + 28, vh * 0.2);
+    for (const m of visibleMessages.slice(-3)) {
       ctx.font = 'bold 14px monospace';
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       const tw = ctx.measureText(m.text).width;
@@ -1053,57 +1277,113 @@ export class SurvivalRenderer {
     }
   }
 
-  /** Overlay da escolha de modificador; retorna regioes clicaveis. */
-  renderChoice(options: [string, string], vw: number, vh: number): Array<{ x: number; y: number; w: number; h: number }> {
+  private renderModuleHud(
+    modules: readonly ActiveModule[],
+    tick: number,
+    nowMs: number,
+    x: number,
+    y: number,
+    viewportWidth: number
+  ): void {
     const ctx = this.ctx;
-    ctx.fillStyle = 'rgba(11,14,20,0.82)';
+    const size = 30;
+    const gap = 7;
+    let cursor = x;
+    for (const module of modules) {
+      if (cursor + size > viewportWidth - 12) break;
+      const pulse = (this.modulePulseUntil.get(module.id) ?? 0) > nowMs;
+      const scale = pulse ? 1.12 : 1;
+      const drawSize = size * scale;
+      const cx = cursor + size / 2;
+      const cy = y + size / 2;
+      ctx.fillStyle = 'rgba(11,14,20,0.72)';
+      ctx.fillRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
+      ctx.strokeStyle = PAL.player;
+      ctx.lineWidth = pulse ? 2.5 : 1.5;
+      ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
+      drawModuleGlyph(ctx, module.id, cx, cy, 14, PAL.biolum);
+
+      let fraction = 1;
+      let label = '';
+      if (module.lifetime.kind === 'charges') {
+        fraction = module.lifetime.maximum > 0 ? module.lifetime.remaining / module.lifetime.maximum : 0;
+        label = String(module.lifetime.remaining);
+      } else {
+        const total = Math.max(1, module.lifetime.expiresAtTick - module.lifetime.acquiredAtTick);
+        fraction = Math.max(0, (module.lifetime.expiresAtTick - tick) / total);
+        label = `${Math.max(0, Math.ceil((module.lifetime.expiresAtTick - tick) / 20))}s`;
+      }
+      ctx.strokeStyle = fraction <= 0.2 ? PAL.loot : PAL.biolum;
+      ctx.lineWidth = fraction <= 0.2 ? 3 : 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, size / 2 + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
+      ctx.stroke();
+      ctx.fillStyle = PAL.bone;
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(label, cursor + size - 2, y + size - 2);
+      cursor += size + gap;
+    }
+  }
+
+  /** Painel nao-bloqueante de escolha privada do jogador local. */
+  renderChoice(
+    state: SurvivalState,
+    vw: number,
+    vh: number,
+    input?: InputState
+  ): Array<{ x: number; y: number; w: number; h: number }> {
+    const pending = state.playerExtra.pendingModuleChoice;
+    if (!pending) return [];
+    const ctx = this.ctx;
+    const reserveTouch = input?.usingTouch ? Math.min(190, vh * 0.28) : 0;
+    const cards = moduleChoiceLayout(vw, vh, this.safeArea, reserveTouch);
+
+    ctx.fillStyle = 'rgba(11,14,20,0.38)';
     ctx.fillRect(0, 0, vw, vh);
     ctx.fillStyle = PAL.loot;
-    ctx.font = 'bold 18px monospace';
+    ctx.font = 'bold 17px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('CACHE ABERTO - ESCOLHA UM MODIFICADOR', vw / 2, vh * 0.24);
+    ctx.fillText('DADOS DE MÓDULO ENCONTRADOS', vw / 2, Math.max(30, cards[0].y - 38));
 
-    const DESCRIPTIONS: Record<string, string> = {
-      piercing: 'PERFURANTE: atravessa inimigos e rompe rocha fragil',
-      conductive: 'CONDUTOR: +dano em alvos molhados; descarrega pocas',
-      explosive: 'EXPLOSIVO: area ao impactar; perigoso de perto',
-      siphon: 'SIFAO: rouba vida a cada acerto',
-    };
-
-    const cardW = Math.min(340, vw * 0.42);
-    const cardH = Math.min(150, vh * 0.32);
-    const gap = vw * 0.04;
-    const regions: Array<{ x: number; y: number; w: number; h: number }> = [];
-    options.forEach((opt, i) => {
-      const x = vw / 2 - cardW - gap / 2 + i * (cardW + gap);
-      const y = vh * 0.34;
-      regions.push({ x, y, w: cardW, h: cardH });
-      ctx.fillStyle = 'rgba(46,58,77,0.9)';
-      ctx.fillRect(x, y, cardW, cardH);
-      ctx.strokeStyle = PAL.loot;
+    pending.options.forEach((id, index) => {
+      const card: Rect = cards[index];
+      const presentation = modulePresentation(id);
+      const active = state.playerExtra.activeModules.some((module) => module.id === id);
+      ctx.fillStyle = 'rgba(24,31,43,0.94)';
+      ctx.fillRect(card.x, card.y, card.w, card.h);
+      ctx.strokeStyle = presentation.risk === 'volatile' ? PAL.fire : PAL.loot;
       ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, cardW, cardH);
+      ctx.strokeRect(card.x, card.y, card.w, card.h);
+
+      const iconX = card.x + 38;
+      const iconY = card.y + 42;
+      ctx.fillStyle = 'rgba(46,58,77,0.9)';
+      ctx.fillRect(iconX - 24, iconY - 24, 48, 48);
+      drawModuleGlyph(ctx, id, iconX, iconY, 22, PAL.biolum);
+
+      ctx.textAlign = 'left';
       ctx.fillStyle = PAL.player;
-      ctx.font = 'bold 16px monospace';
-      ctx.fillText(`[${i + 1}] ${opt.toUpperCase()}`, x + cardW / 2, y + 34);
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(`[${index + 1}] ${presentation.label}`, card.x + 72, card.y + 30);
+      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = PAL.loot;
+      ctx.fillText(active ? `RECARGA · ${presentation.lifetimeLabel}` : presentation.lifetimeLabel, card.x + 72, card.y + 49);
+      if (presentation.risk === 'volatile') {
+        ctx.fillStyle = PAL.fire;
+        ctx.fillText('VOLÁTIL', card.x + 72, card.y + 65);
+      }
+
       ctx.fillStyle = PAL.bone;
       ctx.font = '11px monospace';
-      const desc = DESCRIPTIONS[opt] ?? opt;
-      // quebra simples em duas linhas
-      const words = desc.split(' ');
-      let line = '';
-      let ly = y + 64;
-      for (const word of words) {
-        if ((line + word).length > 34) {
-          ctx.fillText(line, x + cardW / 2, ly);
-          ly += 16;
-          line = '';
-        }
-        line += `${word} `;
+      const lines = wrapMeasuredText(ctx, presentation.shortDescription, card.w - 28);
+      let lineY = Math.max(card.y + 88, iconY + 38);
+      for (const line of lines.slice(0, 4)) {
+        ctx.fillText(line, card.x + 14, lineY);
+        lineY += 15;
       }
-      if (line) ctx.fillText(line, x + cardW / 2, ly);
     });
-    return regions;
+    return cards;
   }
 
   renderEnd(state: SurvivalState, vw: number, vh: number): void {

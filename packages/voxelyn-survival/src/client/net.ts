@@ -4,7 +4,6 @@ import {
   hashStaticWorld,
   type Entity,
   type EnemyArchetype,
-  type ModifierId,
   type PlayerCommand,
   type Projectile,
   type SemanticEvent,
@@ -18,6 +17,7 @@ import {
   type EntitySnapshot,
   type ProjectileSnapshot,
   type ServerMessage,
+  type ViewerState,
   type WorldFlags,
 } from '@voxelyn/survival-protocol';
 
@@ -55,7 +55,7 @@ export class NetClient {
 
   private prev: FrameEntities | null = null;
   private curr: FrameEntities | null = null;
-  private viewer: { heat: number; consumables: number; modifiers: string[]; hasCore: boolean; downed: boolean; aimX: number; aimY: number; overheated: boolean } | null = null;
+  private viewer: ViewerState | null = null;
 
   constructor(private readonly send: (raw: string) => void) {}
 
@@ -105,7 +105,7 @@ export class NetClient {
     acc.dodge = acc.dodge || cmd.dodge;
     acc.ability = acc.ability || cmd.ability;
     acc.interact = acc.interact || cmd.interact;
-    acc.consume = acc.consume || cmd.consume;
+    acc.purge = acc.purge || cmd.purge;
     if (cmd.choose !== null) acc.choose = cmd.choose;
   }
 
@@ -120,7 +120,7 @@ export class NetClient {
     this.command.dodge = false;
     this.command.ability = false;
     this.command.interact = false;
-    this.command.consume = false;
+    this.command.purge = false;
     this.command.choose = null;
   }
 
@@ -172,7 +172,8 @@ export class NetClient {
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
         this.divergedAt = 0; // mundo reconstruido: zera o anti-repeticao
         this.applyWorld(msg.world);
-        this.ingestFrame(msg.entities, [], msg.serverTick, nowMs);
+        this.viewer = msg.you;
+        this.ingestFrame(msg.entities, msg.projectiles, msg.serverTick, nowMs);
         break;
       }
       case 'snapshot': {
@@ -187,16 +188,7 @@ export class NetClient {
           this.state.tick = msg.serverTick;
         }
         if (msg.you) {
-          this.viewer = {
-            heat: msg.you.heat,
-            consumables: msg.you.consumables,
-            modifiers: msg.you.modifiers,
-            hasCore: msg.you.hasCore,
-            downed: msg.you.downed,
-            aimX: msg.you.aimX,
-            aimY: msg.you.aimY,
-            overheated: msg.you.overheated,
-          };
+          this.viewer = msg.you;
         }
         if (msg.events.length > 0) {
           this.events.push(...msg.events);
@@ -227,8 +219,15 @@ export class NetClient {
   private applyWorld(world: WorldFlags): void {
     const state = this.state;
     if (!state) return;
-    const opened = new Set(world.openedCaches);
-    for (let i = 0; i < state.caches.length; i++) state.caches[i].opened = opened.has(i);
+    for (let i = 0; i < state.salvageSites.length; i++) {
+      const flags = world.salvageSites[i];
+      if (!flags) continue;
+      const site = state.salvageSites[i];
+      site.terminalState = flags.terminalState;
+      site.scanEndsAt = flags.scanEndsAt;
+      site.cacheRevealed = flags.cacheRevealed;
+      site.cacheOpened = flags.cacheOpened;
+    }
     state.coreTaken = world.coreTaken;
     state.guardianAwake = world.guardianAwake;
   }
@@ -334,10 +333,10 @@ export class NetClient {
         y: p.y,
         vx: 0,
         vy: 0,
+        kind: p.kind,
         damage: 0,
-        piercing: false,
-        conductive: false,
-        explosive: false,
+        modules: p.armed ? { explosive: { armAfterDistance: 0 } } : undefined,
+        distanceTravelled: p.armed ? 1 : 0,
         hostile: p.hostile,
         leavesBiofluid: false,
         ttl: 1,
@@ -348,8 +347,16 @@ export class NetClient {
     if (this.viewer) {
       const ex = state.playerExtras[this.slot];
       ex.heat = this.viewer.heat;
-      ex.consumables = this.viewer.consumables;
-      ex.modifiers = this.viewer.modifiers as ModifierId[];
+      ex.purgeCells = this.viewer.purgeCells;
+      ex.activeModules = this.viewer.activeModules.map((module) => ({
+        id: module.id,
+        lifetime: { ...module.lifetime },
+      }));
+      ex.pendingModuleChoice = this.viewer.pendingModuleChoice ? {
+        sourceSiteId: this.viewer.pendingModuleChoice.sourceSiteId,
+        options: [...this.viewer.pendingModuleChoice.options] as [typeof this.viewer.pendingModuleChoice.options[0], typeof this.viewer.pendingModuleChoice.options[1]],
+        createdAtTick: this.viewer.pendingModuleChoice.createdAtTick,
+      } : null;
       ex.hasCore = this.viewer.hasCore;
       ex.downed = this.viewer.downed;
       ex.aim.x = this.viewer.aimX;

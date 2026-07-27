@@ -1,13 +1,13 @@
 import dodgeIconUrl from '@phosphor-icons/core/bold/person-simple-run-bold.svg?url';
 import abilityIconUrl from '@phosphor-icons/core/bold/lightning-bold.svg?url';
-import consumeIconUrl from '@phosphor-icons/core/bold/flask-bold.svg?url';
+import purgeIconUrl from '@phosphor-icons/core/bold/battery-charging-bold.svg?url';
 import interactIconUrl from '@phosphor-icons/core/bold/hand-tap-bold.svg?url';
 import type { TouchButton } from './input';
 
 const ICON_URLS: Record<TouchButton['id'], string> = {
   dodge: dodgeIconUrl,
   ability: abilityIconUrl,
-  consume: consumeIconUrl,
+  purge: purgeIconUrl,
   interact: interactIconUrl,
 };
 

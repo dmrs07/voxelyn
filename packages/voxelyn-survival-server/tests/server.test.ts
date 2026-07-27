@@ -77,13 +77,13 @@ describe('servidor autoritativo de co-op', () => {
     room.state.players[0].hp = 40;
 
     // mensagem forjada afirmando hp/dano/itens/kills
-    h.cmd('A', 1, { ...move(0, 0), hp: 9999, maxHp: 9999, damage: 9999, killed: [10, 11], consumables: 99, modifiers: ['siphon', 'explosive'] });
+    h.cmd('A', 1, { ...move(0, 0), hp: 9999, maxHp: 9999, damage: 9999, killed: [10, 11], purgeCells: 99, activeModules: ['siphon', 'explosive'] });
     h.tick(3);
 
     const p = room.state.players[0];
     expect(p.hp).toBeLessThanOrEqual(40); // nunca subiu para 9999
-    expect(h.server.roomForClient('A')!.state.playerExtras[0].consumables).toBe(1);
-    expect(h.server.roomForClient('A')!.state.playerExtras[0].modifiers).toEqual([]);
+    expect(h.server.roomForClient('A')!.state.playerExtras[0].purgeCells).toBe(1);
+    expect(h.server.roomForClient('A')!.state.playerExtras[0].activeModules).toEqual([]);
   });
 
   it('deduplicacao: comando com seq repetida e ignorado', () => {
@@ -436,7 +436,7 @@ describe('servidor autoritativo de co-op', () => {
     expect(room.state.phase).toBe('extracted'); // antes: preso para sempre
   });
 
-  it('quem ocupa um slot aposentado NAO herda upgrades, frascos nem o nucleo', () => {
+  it('quem ocupa um slot aposentado NAO herda modulos, Celulas de Purga nem o nucleo', () => {
     const h = new Harness();
     h.connect('A');
     h.connect('B');
@@ -447,8 +447,11 @@ describe('servidor autoritativo de co-op', () => {
     const room = h.server.roomForClient('A')!;
     // B acumula progresso e sai com o nucleo
     const be = room.state.playerExtras[1];
-    be.modifiers = ['piercing', 'explosive'];
-    be.consumables = 4;
+    be.activeModules = [
+      { id: 'piercing', lifetime: { kind: 'charges', remaining: 5, maximum: 12 } },
+      { id: 'explosive', lifetime: { kind: 'charges', remaining: 2, maximum: 6 } },
+    ];
+    be.purgeCells = 4;
     be.hasCore = true;
     room.state.coreTaken = true;
 
@@ -457,7 +460,7 @@ describe('servidor autoritativo de co-op', () => {
 
     // ao aposentar, o progresso do antigo dono e descartado na hora
     expect(be.hasCore).toBe(false);
-    expect(be.modifiers).toEqual([]);
+    expect(be.activeModules).toEqual([]);
     // o nucleo saiu com quem abandonou: volta ao mundo em vez de sumir da run
     expect(room.state.coreTaken).toBe(false);
 
@@ -466,8 +469,8 @@ describe('servidor autoritativo de co-op', () => {
     h.hello('C');
     h.tick(1);
     const ce = room.state.playerExtras[1];
-    expect(ce.modifiers).toEqual([]);
-    expect(ce.consumables).toBe(1);
+    expect(ce.activeModules).toEqual([]);
+    expect(ce.purgeCells).toBe(1);
     expect(ce.hasCore).toBe(false);
   });
 
@@ -512,12 +515,13 @@ describe('servidor autoritativo de co-op', () => {
     if (wb?.t !== 'welcome') throw new Error('sem welcome');
 
     const room = h.server.roomForClient('A')!;
+    h.disconnect('B');
+    h.tick(40); // blip curto, bem dentro do grace
+
+    // Isola o invariante de reconnect do dano autoritativo que pode ocorrer offline.
     room.state.players[1].x = room.state.entry.x + 18;
     room.state.players[1].y = room.state.entry.y + 12;
     room.state.players[1].hp = 40;
-
-    h.disconnect('B');
-    h.tick(40); // blip curto, bem dentro do grace
     h.connect('B2');
     h.hello('B2', wb.resumeToken);
     h.tick(1);
@@ -550,23 +554,23 @@ describe('servidor autoritativo de co-op', () => {
     expect(seen.size).toBe(80); // nenhuma colisao/repeticao entre execucoes
   });
 
-  it('comandos de borda valem um tick: consume nao drena o inventario', () => {
+  it('comandos de borda valem um tick: purge nao drena o inventario', () => {
     const h = new Harness();
     h.connect('A');
     h.hello('A');
     h.drain('A');
 
     const room = h.server.roomForClient('A')!;
-    // varios frascos: com 1 so, drenar-por-tick e gastar-uma-vez dariam 0 igual
-    room.state.playerExtras[0].consumables = 5;
+    // varias Celulas de Purga: com 1 so, drenar-por-tick e gastar-uma-vez dariam 0 igual
+    room.state.playerExtras[0].purgeCells = 5;
     room.state.players[0].hp = 10; // ferido, senao o consumo pode ser ignorado
 
-    // cliente envia consume:true e depois "congela" (suspenso / conexao travada)
-    h.cmd('A', 1, { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, consume: true });
+    // cliente envia purge:true e depois "congela" (suspenso / conexao travada)
+    h.cmd('A', 1, { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, purge: true });
     h.tick(30); // 30 ticks sem nova mensagem
 
-    // antes: gastava um frasco por tick, zerando o inventario em 5 ticks
-    expect(room.state.playerExtras[0].consumables).toBe(4);
+    // antes: gastava uma celula por tick, zerando o inventario em 5 ticks
+    expect(room.state.playerExtras[0].purgeCells).toBe(4);
   });
 
   it('abrir um bau propaga WorldFlags uma vez e depois so no full_resync', () => {
@@ -579,12 +583,14 @@ describe('servidor autoritativo de co-op', () => {
     h.drain('A');
 
     const room = h.server.roomForClient('A')!;
-    room.state.caches[0].opened = true;
+    room.state.salvageSites[0].terminalState = 'complete';
+    room.state.salvageSites[0].cacheRevealed = true;
+    room.state.salvageSites[0].cacheOpened = true;
     h.tick(1);
     const first = h.drain('A').filter((m) => m.t === 'snapshot');
     const withWorld = first.find((s) => s.t === 'snapshot' && s.world);
     expect(withWorld).toBeDefined();
-    if (withWorld?.t === 'snapshot') expect(withWorld.world!.openedCaches).toContain(0);
+    if (withWorld?.t === 'snapshot') expect(withWorld.world!.salvageSites[0].cacheOpened).toBe(true);
 
     // sem novas mudancas, as flags nao viajam de novo (delta, nao estado por tick)
     h.tick(10);
@@ -596,6 +602,7 @@ describe('servidor autoritativo de co-op', () => {
     h.tick(25);
     const resync = h.drain('A').find((m) => m.t === 'full_resync');
     expect(resync).toBeDefined();
-    if (resync?.t === 'full_resync') expect(resync.world.openedCaches).toContain(0);
+    if (resync?.t === 'full_resync') expect(resync.world.salvageSites[0].cacheOpened).toBe(true);
+      expect(resync.you.pendingModuleChoice).toBeNull();
   });
 });

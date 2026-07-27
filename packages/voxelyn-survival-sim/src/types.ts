@@ -9,9 +9,20 @@ export type RunConfig = {
   playerCount?: number;
 };
 
-export type RunPhase = 'running' | 'choice' | 'dead' | 'extracted' | 'extracted_with_core';
+export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
 export type EnemyArchetype = 'stalker' | 'bruiser' | 'spitter' | 'bomber' | 'guardian';
-export type ModifierId = 'piercing' | 'conductive' | 'explosive' | 'siphon';
+export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
+export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
+export type ModuleLifetime =
+  | { kind: 'charges'; remaining: number; maximum: number }
+  | { kind: 'timer'; acquiredAtTick: number; expiresAtTick: number };
+export type ActiveModule = { id: ModuleId; lifetime: ModuleLifetime };
+export type EffectOrigin = { source: 'player' | 'enemy' | 'environment'; owner?: number };
+export type PendingModuleChoice = {
+  sourceSiteId: number;
+  options: [ModuleId, ModuleId];
+  createdAtTick: number;
+};
 
 export type EntityActionKind =
   | 'player_shot'
@@ -73,8 +84,9 @@ export type PlayerExtra = {
   iframesUntil: number;
   dodgeCooldownUntil: number;
   abilityCooldownUntil: number;
-  consumables: number;
-  modifiers: ModifierId[];
+  purgeCells: number;
+  activeModules: ActiveModule[];
+  pendingModuleChoice: PendingModuleChoice | null;
   hasCore: boolean;
   dodgeDir: Vec2;
   downed: boolean;
@@ -90,7 +102,23 @@ export type PlayerExtra = {
  * rampa acida — um bloco de rocha arrancado da parede aparecia como cusparada.
  * As flags dizem o que o projetil FAZ; isto diz o que ele E.
  */
-export type ProjectileKind = 'bolt' | 'spit' | 'rock';
+export type ProjectileKind = 'bolt' | 'spit' | 'rock' | 'return_disc';
+
+export type ProjectileModules = {
+  piercing?: true;
+  conductive?: true;
+  siphon?: true;
+  explosive?: { armAfterDistance: number };
+  ricochet?: { remainingBounces: number };
+};
+
+export type DiscState = {
+  phase: 'outbound' | 'returning';
+  travelled: number;
+  maxDistance: number;
+  outboundHits: number[];
+  returnHits: number[];
+};
 
 export type Projectile = {
   kind: ProjectileKind;
@@ -101,9 +129,9 @@ export type Projectile = {
   vx: number;
   vy: number;
   damage: number;
-  piercing: boolean;
-  conductive: boolean;
-  explosive: boolean;
+  modules?: ProjectileModules;
+  distanceTravelled: number;
+  disc?: DiscState;
   hostile: boolean;
   leavesBiofluid: boolean;
   ttl: number;
@@ -112,14 +140,24 @@ export type Projectile = {
   heatedSurfaceCells?: number[];
 };
 
-export type Cache = { x: number; y: number; opened: boolean; options: [ModifierId, ModifierId] | null };
+export type SalvageSite = {
+  id: number;
+  tier: 1 | 2 | 3;
+  terminal: Vec2;
+  cache: Vec2;
+  terminalState: 'inactive' | 'scanning' | 'complete';
+  scanEndsAt: number;
+  cacheRevealed: boolean;
+  cacheOpened: boolean;
+  openedBySlot: number | null;
+};
 export type Vent = { x: number; y: number; nextEmitAt: number };
 
 export type SemanticEvent =
   | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
   | { t: 'hit'; x: number; y: number; amount: number; target: number }
   | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
-  | { t: 'explosion'; x: number; y: number; radius: number }
+  | { t: 'explosion'; x: number; y: number; radius: number; source: 'player' | 'enemy' | 'environment'; owner?: number }
   /**
    * Um solido deixou de existir. Carrega QUAL material caiu para o cliente
    * poder desfazer o bloco no material certo; sem isso ele teria de adivinhar
@@ -134,14 +172,21 @@ export type SemanticEvent =
   | { t: 'corrode'; x: number; y: number; solid: number }
   /** Lasca arrancada de um veio de minerio por impacto cinetico. */
   | { t: 'chip'; x: number; y: number }
-  | { t: 'discharge'; cells: number[] }
+  | { t: 'discharge'; cells: number[]; source: 'player' | 'enemy' | 'environment'; owner?: number }
   | { t: 'ignite'; x: number; y: number }
   | { t: 'shot'; x: number; y: number; dx: number; dy: number; owner: number }
   | { t: 'dodge'; x: number; y: number }
   | { t: 'pulse'; x: number; y: number }
   | { t: 'pickup_core'; x: number; y: number }
-  | { t: 'cache_open'; x: number; y: number }
-  | { t: 'consume'; x: number; y: number }
+  | { t: 'terminal_activated'; siteId: number; x: number; y: number; completesAtTick: number }
+  | { t: 'terminal_scan_complete'; siteId: number; x: number; y: number }
+  | { t: 'salvage_cache_revealed'; siteId: number; x: number; y: number }
+  | { t: 'salvage_cache_opened'; siteId: number; slot: number; x: number; y: number }
+  | { t: 'purge_cell_acquired'; slot: number; amount: number }
+  | { t: 'purge_cell_used'; slot: number; x: number; y: number }
+  | { t: 'module_selected'; slot: number; module: ModuleId; sourceSiteId: number; recharged: boolean }
+  | { t: 'module_charge_consumed'; slot: number; module: ModuleId; remaining: number; maximum: number }
+  | { t: 'module_expired'; slot: number; module: ModuleId }
   | { t: 'overheat'; x: number; y: number }
   | { t: 'guardian_awake' }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
@@ -156,7 +201,7 @@ export type PlayerCommand = {
   ability: boolean;
   dodge: boolean;
   interact: boolean;
-  consume: boolean;
+  purge: boolean;
   choose: 0 | 1 | null;
 };
 
@@ -194,10 +239,9 @@ export type SurvivalState = {
   playerExtra: PlayerExtra;
   enemies: Entity[];
   projectiles: Projectile[];
-  caches: Cache[];
+  salvageSites: SalvageSite[];
   vents: Vent[];
   charges: Array<{ idx: number; until: number }>;
-  pendingChoice: [ModifierId, ModifierId] | null;
   contamination: number;
   contaminationWaves: number;
   nextEntityId: number;

@@ -40,20 +40,19 @@ const world = (seed: number): SurvivalState => {
 const at = (state: SurvivalState, x: number, y: number): number => y * state.config.width + x;
 
 const proj = (over: Partial<Projectile>): Projectile => ({
-  id: 1, owner: 1, x: 0, y: 0, vx: 1, vy: 0, damage: 1,
-  piercing: false, conductive: false, explosive: false, hostile: false,
-  leavesBiofluid: false, ttl: 10, ...over,
+  kind: 'bolt', id: 1, owner: 1, x: 0, y: 0, vx: 1, vy: 0, damage: 1,
+  distanceTravelled: 0, hostile: false, leavesBiofluid: false, ttl: 10, ...over,
 });
 
 describe('classe do projetil', () => {
   it('sai dos modificadores da run, com precedencia fixa', () => {
     expect(projectileClass(proj({}))).toBe('kinetic');
-    expect(projectileClass(proj({ conductive: true }))).toBe('energy');
-    expect(projectileClass(proj({ explosive: true }))).toBe('thermal');
+    expect(projectileClass(proj({ modules: { conductive: true } }))).toBe('energy');
+    expect(projectileClass(proj({ modules: { explosive: { armAfterDistance: 0 } } }))).toBe('thermal');
     expect(projectileClass(proj({ leavesBiofluid: true, hostile: true }))).toBe('bio');
     // Sem ordem fixa, o mesmo tiro reagiria diferente conforme a ordem de
     // leitura das flags — e o determinismo iria junto.
-    expect(projectileClass(proj({ conductive: true, explosive: true }))).toBe('thermal');
+    expect(projectileClass(proj({ modules: { conductive: true, explosive: { armAfterDistance: 0 } } }))).toBe('thermal');
   });
 });
 

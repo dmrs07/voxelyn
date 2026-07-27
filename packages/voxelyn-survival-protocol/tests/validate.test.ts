@@ -40,7 +40,7 @@ describe('validacao de comando (cliente nao pode afirmar fatos)', () => {
       expect(res.value.ability).toBe(false);
       // nenhuma propriedade fora de PlayerCommand sobrevive
       expect(Object.keys(res.value).sort()).toEqual(
-        ['ability', 'aim', 'choose', 'consume', 'dodge', 'fire', 'interact', 'move'].sort()
+        ['ability', 'aim', 'choose', 'dodge', 'fire', 'interact', 'move', 'purge'].sort()
       );
     }
   });
@@ -112,7 +112,9 @@ describe('limites de payload: ingresso vs egresso', () => {
         surface: Array.from({ length: 256 }, () => 0),
       })),
       entities: [],
-      world: { openedCaches: [], coreTaken: false, guardianAwake: false },
+      projectiles: [],
+      you: { slot: 0, heat: 0, purgeCells: 1, activeModules: [], pendingModuleChoice: null, hasCore: false, downed: false, aimX: 1, aimY: 0, overheated: false },
+      world: { salvageSites: [], coreTaken: false, guardianAwake: false },
       authHash: 'deadbeef',
     } as never);
     expect(big.length).toBeGreaterThan(LIMITS.maxClientMessageBytes);

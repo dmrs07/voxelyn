@@ -1,0 +1,194 @@
+import { RNG } from '@voxelyn/core';
+import type {
+  ActiveModule,
+  ModuleId,
+  ModuleTag,
+  PendingModuleChoice,
+  PlayerExtra,
+  SemanticEvent,
+} from './types.js';
+
+export type ModuleDefinition = {
+  id: ModuleId;
+  lifetime: 'charges' | 'timer';
+  defaultCharges?: number;
+  durationTicks?: number;
+  tier: 1 | 2 | 3;
+  tags: readonly ModuleTag[];
+};
+
+export const MODULE_DEFINITIONS: Record<ModuleId, ModuleDefinition> = {
+  piercing: {
+    id: 'piercing',
+    lifetime: 'charges',
+    defaultCharges: 12,
+    tier: 1,
+    tags: ['projectile', 'safe'],
+  },
+  siphon: {
+    id: 'siphon',
+    lifetime: 'charges',
+    defaultCharges: 12,
+    tier: 1,
+    tags: ['utility', 'safe'],
+  },
+  ricochet: {
+    id: 'ricochet',
+    lifetime: 'charges',
+    defaultCharges: 10,
+    tier: 1,
+    tags: ['projectile', 'safe'],
+  },
+  conductive: {
+    id: 'conductive',
+    lifetime: 'charges',
+    defaultCharges: 6,
+    tier: 2,
+    tags: ['projectile', 'utility', 'safe'],
+  },
+  explosive: {
+    id: 'explosive',
+    lifetime: 'charges',
+    defaultCharges: 6,
+    tier: 3,
+    tags: ['projectile', 'volatile'],
+  },
+  return_disc: {
+    id: 'return_disc',
+    lifetime: 'charges',
+    defaultCharges: 5,
+    tier: 3,
+    tags: ['projectile', 'defensive', 'safe'],
+  },
+};
+
+export const moduleDefinition = (id: ModuleId): ModuleDefinition => MODULE_DEFINITIONS[id];
+
+export const activeModule = (extra: PlayerExtra, id: ModuleId): ActiveModule | undefined =>
+  extra.activeModules.find((module) => module.id === id);
+
+export const moduleHasCapacity = (extra: PlayerExtra, id: ModuleId, tick: number): boolean => {
+  const module = activeModule(extra, id);
+  if (!module) return false;
+  if (module.lifetime.kind === 'charges') return module.lifetime.remaining > 0;
+  return tick < module.lifetime.expiresAtTick;
+};
+
+const createModule = (id: ModuleId, tick: number): ActiveModule => {
+  const def = moduleDefinition(id);
+  if (def.lifetime === 'timer') {
+    const duration = def.durationTicks ?? 0;
+    return {
+      id,
+      lifetime: { kind: 'timer', acquiredAtTick: tick, expiresAtTick: tick + duration },
+    };
+  }
+  const maximum = def.defaultCharges ?? 1;
+  return { id, lifetime: { kind: 'charges', remaining: maximum, maximum } };
+};
+
+/** Grants a module or refreshes the existing instance to its configured maximum. */
+export const grantOrRechargeModule = (extra: PlayerExtra, id: ModuleId, tick: number): ActiveModule => {
+  const existing = activeModule(extra, id);
+  const fresh = createModule(id, tick);
+  if (!existing) {
+    extra.activeModules.push(fresh);
+    extra.activeModules.sort((a, b) => a.id.localeCompare(b.id));
+    return fresh;
+  }
+  existing.lifetime = fresh.lifetime;
+  return existing;
+};
+
+/**
+ * Consumes one charge only when the requested mechanic actually procs.
+ * Returns false when the module is missing/expired, preventing free late procs
+ * from multiple projectiles sharing the last charge.
+ */
+export const consumeModuleCharge = (
+  extra: PlayerExtra,
+  id: ModuleId,
+  slot: number,
+  events: SemanticEvent[]
+): boolean => {
+  const index = extra.activeModules.findIndex((module) => module.id === id);
+  if (index < 0) return false;
+  const module = extra.activeModules[index];
+  if (module.lifetime.kind !== 'charges' || module.lifetime.remaining <= 0) return false;
+  module.lifetime.remaining--;
+  events.push({
+    t: 'module_charge_consumed',
+    slot,
+    module: id,
+    remaining: module.lifetime.remaining,
+    maximum: module.lifetime.maximum,
+  });
+  if (module.lifetime.remaining === 0) {
+    extra.activeModules.splice(index, 1);
+    events.push({ t: 'module_expired', slot, module: id });
+  }
+  return true;
+};
+
+export const expireTimedModules = (
+  extra: PlayerExtra,
+  tick: number,
+  slot: number,
+  events: SemanticEvent[]
+): void => {
+  for (let i = extra.activeModules.length - 1; i >= 0; i--) {
+    const module = extra.activeModules[i];
+    if (module.lifetime.kind === 'timer' && tick >= module.lifetime.expiresAtTick) {
+      extra.activeModules.splice(i, 1);
+      events.push({ t: 'module_expired', slot, module: module.id });
+    }
+  }
+};
+
+const tierPool = (tier: 1 | 2 | 3): ModuleId[] => {
+  const allowed = Math.min(3, tier);
+  return (Object.keys(MODULE_DEFINITIONS) as ModuleId[])
+    .filter((id) => MODULE_DEFINITIONS[id].tier <= allowed)
+    .sort();
+};
+
+const isFull = (extra: PlayerExtra, id: ModuleId, tick: number): boolean => {
+  const module = activeModule(extra, id);
+  if (!module) return false;
+  if (module.lifetime.kind === 'timer') {
+    const def = moduleDefinition(id);
+    return module.lifetime.expiresAtTick - tick >= (def.durationTicks ?? 0);
+  }
+  return module.lifetime.remaining >= module.lifetime.maximum;
+};
+
+/**
+ * Finite deterministic selection: no reroll loops. The seeded offset rotates a
+ * sorted pool, then the first valid safe option and first compatible companion
+ * are selected. Full modules are deprioritized but remain a bounded fallback.
+ */
+export const rollModuleChoice = (
+  seed: number,
+  siteId: number,
+  tier: 1 | 2 | 3,
+  extra: PlayerExtra,
+  tick: number
+): PendingModuleChoice['options'] => {
+  const rng = new RNG((seed ^ Math.imul(siteId + 1, 0x9e3779b9)) >>> 0 || 1);
+  const base = tierPool(tier);
+  const offset = rng.nextInt(base.length);
+  const rotated = [...base.slice(offset), ...base.slice(0, offset)];
+  const preferred = rotated.filter((id) => !isFull(extra, id, tick));
+  const candidates = preferred.length >= 2 ? preferred : rotated;
+
+  const safe = candidates.find((id) => !MODULE_DEFINITIONS[id].tags.includes('volatile')) ?? candidates[0];
+  const companion = candidates.find((id) => {
+    if (id === safe) return false;
+    if (MODULE_DEFINITIONS[safe].tags.includes('volatile')) {
+      return !MODULE_DEFINITIONS[id].tags.includes('volatile');
+    }
+    return true;
+  }) ?? rotated.find((id) => id !== safe) ?? safe;
+
+  return [safe, companion];
+};

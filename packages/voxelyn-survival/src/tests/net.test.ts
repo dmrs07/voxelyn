@@ -86,7 +86,7 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     }
   });
 
-  it('o HUD do viewer reflete o estado autoritativo (heat/consumiveis)', () => {
+  it('o HUD do viewer reflete heat, Celulas de Purga e modulos', () => {
     const loop = new Loop();
     const a = loop.connect('A');
     a.connect();
@@ -99,7 +99,7 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     });
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.playerExtras[0].heat).toBeGreaterThan(0); // disparos aqueceram
-    expect(view.playerExtras[0].consumables).toBe(1);
+    expect(view.playerExtras[0].purgeCells).toBe(1);
   });
 
   it('reconnect por resume token restaura o cliente ao mesmo slot', () => {
@@ -162,21 +162,23 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(view.playerExtras[1].joined).toBe(false);
   });
 
-  it('bau aberto no servidor deixa de ser desenhado no cliente', () => {
+  it('cofre aberto no servidor deixa de ser desenhado no cliente', () => {
     const loop = new Loop();
     const a = loop.connect('A');
     a.connect();
     loop.advance(3);
 
     const room = loop.server.roomForClient('A')!;
-    expect(a.sampleRenderState(loop['now'] as number)!.caches[0].opened).toBe(false);
+    expect(a.sampleRenderState(loop['now'] as number)!.salvageSites[0].cacheOpened).toBe(false);
 
-    room.state.caches[0].opened = true;
+    room.state.salvageSites[0].terminalState = 'complete';
+    room.state.salvageSites[0].cacheRevealed = true;
+    room.state.salvageSites[0].cacheOpened = true;
     room.state.coreTaken = true;
     loop.advance(3);
 
     const view = a.sampleRenderState(loop['now'] as number)!;
-    expect(view.caches[0].opened).toBe(true); // antes: crate desenhada para sempre
+    expect(view.salvageSites[0].cacheOpened).toBe(true); // antes: crate desenhada para sempre
     expect(view.coreTaken).toBe(true);
   });
 
@@ -290,9 +292,9 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     loop.advance(3);
 
     const room = loop.server.roomForClient('A')!;
-    room.state.playerExtras[0].consumables = 5;
+    room.state.playerExtras[0].purgeCells = 5;
     room.state.players[0].hp = 10;
-    const before = room.state.playerExtras[0].consumables;
+    const before = room.state.playerExtras[0].purgeCells;
 
     const idle = (): PlayerCommand => {
       const c = emptyCommand();
@@ -306,9 +308,9 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     a.pump(T);
 
     // frame com a borda cai DENTRO da janela: pump nao transmite
-    const withConsume = idle();
-    withConsume.consume = true;
-    a.setCommand(withConsume);
+    const withPurge = idle();
+    withPurge.purge = true;
+    a.setCommand(withPurge);
     a.pump(T + 10);
 
     // frame seguinte sem borda; antes ele sobrescrevia o comando e o uso sumia
@@ -317,7 +319,7 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     loop.tick();
     loop.tick();
 
-    expect(room.state.playerExtras[0].consumables).toBe(before - 1);
+    expect(room.state.playerExtras[0].purgeCells).toBe(before - 1);
   });
 
   it('resetSession descarta token e estado: o proximo hello entra em sala nova', () => {

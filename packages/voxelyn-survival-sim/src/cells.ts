@@ -29,7 +29,7 @@ import {
   VENT_BASE_INTERVAL_TICKS,
 } from './constants.js';
 import { chunkOf } from './worldgen.js';
-import type { SemanticEvent, SurvivalState } from './types.js';
+import type { EffectOrigin, SemanticEvent, SurvivalState } from './types.js';
 
 const W = (state: SurvivalState): number => state.config.width;
 const H = (state: SurvivalState): number => state.config.height;
@@ -167,20 +167,29 @@ export const floodFrom = (
 };
 
 /** Planta carga temporaria nas celulas dadas e anuncia a descarga. */
-export const chargeCells = (state: SurvivalState, cells: number[], events: SemanticEvent[]): void => {
+export const chargeCells = (
+  state: SurvivalState,
+  cells: number[],
+  events: SemanticEvent[],
+  origin: EffectOrigin = { source: 'environment' }
+): void => {
   if (cells.length === 0) return;
   for (const i of cells) {
     state.charges.push({ idx: i, until: state.tick + DISCHARGE_TICKS });
   }
-  events.push({ t: 'discharge', cells });
+  events.push({ t: 'discharge', cells, ...origin });
 };
 
-export const dischargeAt = (state: SurvivalState, sx: number, sy: number, events: SemanticEvent[]): void => {
-  chargeCells(
-    state,
-    floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => state.surface[i] === SURF_BIOFLUID),
-    events
-  );
+export const dischargeAt = (
+  state: SurvivalState,
+  sx: number,
+  sy: number,
+  events: SemanticEvent[],
+  origin: EffectOrigin = { source: 'environment' }
+): boolean => {
+  const cells = floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => state.surface[i] === SURF_BIOFLUID);
+  chargeCells(state, cells, events, origin);
+  return cells.length > 0;
 };
 
 export const explodeAt = (
@@ -188,11 +197,12 @@ export const explodeAt = (
   ex: number,
   ey: number,
   radius: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
+  origin: EffectOrigin = { source: 'environment' }
 ): void => {
   const w = W(state);
   const h = H(state);
-  events.push({ t: 'explosion', x: ex, y: ey, radius });
+  events.push({ t: 'explosion', x: ex, y: ey, radius, ...origin });
   const r = Math.ceil(radius);
   for (let y = Math.max(0, Math.floor(ey) - r); y <= Math.min(h - 1, Math.floor(ey) + r); y++) {
     for (let x = Math.max(0, Math.floor(ex) - r); x <= Math.min(w - 1, Math.floor(ex) + r); x++) {

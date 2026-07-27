@@ -13,8 +13,8 @@ const manifest = manifestJson as unknown as PropManifest;
 const offsets = propOffsets(manifest);
 
 describe('atlas de objetos de mundo', () => {
-  it('declara os tres objetivos que o cliente pede pelo nome', () => {
-    for (const name of ['core', 'coreTaken', 'extraction']) {
+  it('declara todos os objetivos e estados de salvamento pedidos pelo cliente', () => {
+    for (const name of ['core', 'coreTaken', 'extraction', 'salvageTerminalIdle', 'salvageTerminalScanning', 'salvageTerminalComplete', 'salvageCache', 'salvageCacheOpened']) {
       expect(propKindIndex(manifest, name), name).toBeGreaterThanOrEqual(0);
     }
     expect(propKindIndex(manifest, 'inexistente')).toBe(-1);

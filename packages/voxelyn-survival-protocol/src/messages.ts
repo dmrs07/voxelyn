@@ -1,5 +1,13 @@
-import type { ProjectileKind } from '@voxelyn/survival-sim';
-import type { EntityActionKind, EntityActionPhase, PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';
+import type {
+  ActiveModule,
+  EntityActionKind,
+  EntityActionPhase,
+  PendingModuleChoice,
+  PlayerCommand,
+  ProjectileKind,
+  RunPhase,
+  SemanticEvent,
+} from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
 import type { ChunkDiff } from './chunk-diff.js';
 
@@ -91,8 +99,9 @@ export type EntitySnapshot = {
 export type ViewerState = {
   slot: number;
   heat: number;
-  consumables: number;
-  modifiers: string[];
+  purgeCells: number;
+  activeModules: ActiveModule[];
+  pendingModuleChoice: PendingModuleChoice | null;
   hasCore: boolean;
   downed: boolean;
   aimX: number;
@@ -112,6 +121,7 @@ export type ProjectileSnapshot = {
   y: number;
   hostile: boolean;
   kind: ProjectileKind;
+  armed: boolean;
 };
 
 /**
@@ -121,8 +131,15 @@ export type ProjectileSnapshot = {
  * o renderer desenha para sempre um bau ja aberto ou um nucleo ja retirado.
  * Poucos bytes: enviado no full_resync e nos snapshots apenas quando muda.
  */
+export type SalvageSiteFlags = {
+  terminalState: 'inactive' | 'scanning' | 'complete';
+  scanEndsAt: number;
+  cacheRevealed: boolean;
+  cacheOpened: boolean;
+};
+
 export type WorldFlags = {
-  openedCaches: number[]; // indices em state.caches
+  salvageSites: SalvageSiteFlags[];
   coreTaken: boolean;
   guardianAwake: boolean;
 };
@@ -177,6 +194,8 @@ export type ServerFullResync = {
   // versoes de chunk + celulas completas por chunk (via chunk-diff sobre baseline vazia)
   chunkDiffs: ChunkDiff[];
   entities: EntitySnapshot[];
+  projectiles: ProjectileSnapshot[];
+  you: ViewerState;
   // sempre presente: e a base que reconecta/late-join sincroniza de uma vez
   world: WorldFlags;
   authHash: string;

@@ -19,7 +19,9 @@ export type ProjectileLike = {
   y: number;
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
-  kind?: 'bolt' | 'spit' | 'rock';
+  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc';
+  modules?: { explosive?: { armAfterDistance: number } };
+  distanceTravelled?: number;
 };
 
 /** Estilhaco mineral do jogador contra cuspe acido do inimigo. */
@@ -34,6 +36,8 @@ const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
  * Com a rampa hostil generica, o bloco aparecia como cusparada de acido.
  */
 const ROCK_RAMP: FaceRamp = ['#46566e', '#2e3a4d', '#1d2430'];
+const DISC_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
+const ARMED_RAMP: FaceRamp = ['#ffd166', '#ff7a3d', '#7a2f2f'];
 
 /** Altura de voo, em tiles. O bastante para a sombra se separar do corpo. */
 const FLIGHT_HEIGHT = 0.55;
@@ -98,11 +102,13 @@ export class ProjectileView {
   ): void {
     const [sx, sy] = project(projectile.x, projectile.y);
     const rock = projectile.kind === 'rock';
-    const ramp = rock ? ROCK_RAMP : projectile.hostile ? HOSTILE_RAMP : PLAYER_RAMP;
+    const disc = projectile.kind === 'return_disc';
+    const armed = Boolean(projectile.modules?.explosive && (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance);
+    const ramp = rock ? ROCK_RAMP : disc ? DISC_RAMP : armed ? ARMED_RAMP : projectile.hostile ? HOSTILE_RAMP : PLAYER_RAMP;
     const lift = FLIGHT_HEIGHT * tileH * zoom;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
-    const size = VOXEL_PX * zoom * (rock ? 1.9 : 1);
+    const size = VOXEL_PX * zoom * (rock ? 1.9 : disc ? 1.45 : 1);
     const track = this.tracks.get(projectile.id);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao
@@ -118,6 +124,14 @@ export class ProjectileView {
     // algo que evapora enquanto voa.
     if (rock) {
       drawVoxel(ctx, sx, sy - lift, size, ramp);
+      return;
+    }
+    if (disc) {
+      drawVoxel(ctx, sx - size * 0.45, sy - lift, size * 0.7, ramp);
+      drawVoxel(ctx, sx + size * 0.2, sy - lift, size * 0.7, ramp);
+      ctx.strokeStyle = '#e8f1ff';
+      ctx.lineWidth = Math.max(1, zoom);
+      ctx.strokeRect(sx - size * 0.7, sy - lift - size * 0.45, size * 1.4, size * 0.7);
       return;
     }
 

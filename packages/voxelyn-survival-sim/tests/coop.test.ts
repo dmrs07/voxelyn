@@ -34,6 +34,7 @@ describe('co-op: multiplayer na simulacao', () => {
     const p2 = state.players[1];
     const hpBefore = p2.hp;
     state.projectiles.push({
+      kind: 'spit',
       id: 999,
       owner: 100,
       x: p2.x,
@@ -41,9 +42,7 @@ describe('co-op: multiplayer na simulacao', () => {
       vx: 1,
       vy: 0,
       damage: 9,
-      piercing: false,
-      conductive: false,
-      explosive: false,
+      distanceTravelled: 0,
       hostile: true,
       leavesBiofluid: false,
       ttl: 5,
@@ -93,17 +92,20 @@ describe('co-op: multiplayer na simulacao', () => {
     expect(state.contaminationWaves).toBe(1);
   });
 
-  it('sala co-op (playerCount=2) nunca pausa em choice, mesmo com 1 slot em jogo', () => {
+  it('sala co-op mantem a escolha privada pendente sem pausar ou autoconceder', () => {
     const state = createRun({ seed: 33, playerCount: 2 });
-    state.playerExtras[1].joined = false; // online solo: parceiro ausente
-    const cache = state.caches[0];
-    state.players[0].x = cache.x + 0.5;
-    state.players[0].y = cache.y + 0.5;
+    state.playerExtras[1].joined = false;
+    const site = state.salvageSites[0];
+    site.terminalState = 'complete';
+    site.cacheRevealed = true;
+    state.players[0].x = site.cache.x + 0.5;
+    state.players[0].y = site.cache.y + 0.5;
     const interact = emptyCommand();
     interact.interact = true;
     stepRun(state, [interact, emptyCommand()]);
-    expect(state.phase).toBe('running'); // nunca trava em 'choice'
-    expect(state.playerExtras[0].modifiers.length).toBe(1);
+    expect(state.phase).toBe('running');
+    expect(state.playerExtras[0].activeModules).toEqual([]);
+    expect(state.playerExtras[0].pendingModuleChoice).not.toBeNull();
   });
 
   it('determinismo co-op: mesma seed e mesmos comandos por slot geram o mesmo hash', () => {
@@ -180,17 +182,25 @@ describe('co-op: multiplayer na simulacao', () => {
     expect(state.playerExtras[0].downed).toBe(false);
   });
 
-  it('cache no co-op concede modificador na hora, sem pausar a sim', () => {
+  it('cada slot resolve apenas a propria escolha no co-op', () => {
     const state = createRun({ seed: 7, playerCount: 2 });
-    const cache = state.caches[0];
-    state.players[0].x = cache.x + 0.5;
-    state.players[0].y = cache.y + 0.5;
+    const site = state.salvageSites[0];
+    site.terminalState = 'complete';
+    site.cacheRevealed = true;
+    state.players[0].x = site.cache.x + 0.5;
+    state.players[0].y = site.cache.y + 0.5;
     const interact = emptyCommand();
     interact.interact = true;
     stepRun(state, [interact, emptyCommand()]);
-    expect(state.phase).toBe('running'); // nunca entra em 'choice'
-    expect(state.playerExtras[0].modifiers.length).toBe(1);
-    expect(cache.opened).toBe(true);
+    expect(state.playerExtras[0].pendingModuleChoice).not.toBeNull();
+    expect(state.playerExtras[1].pendingModuleChoice).toBeNull();
+    const choose = emptyCommand();
+    choose.choose = 0;
+    stepRun(state, [emptyCommand(), choose]);
+    expect(state.playerExtras[1].activeModules).toEqual([]);
+    stepRun(state, [choose, emptyCommand()]);
+    expect(state.playerExtras[0].activeModules).toHaveLength(1);
+    expect(site.cacheOpened).toBe(true);
   });
 
   it('extracao coletiva exige todos os players de pe na saida', () => {
