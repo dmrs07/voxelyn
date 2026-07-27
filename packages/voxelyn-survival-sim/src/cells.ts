@@ -5,7 +5,10 @@ import {
   DISCHARGE_TICKS,
   FIRE_FUEL_TICKS,
   FIRE_SPREAD_BIOFLUID,
-  FIRE_SPREAD_FUNGAL,
+  FUNGAL_FIRE_FUEL_TICKS,
+  FUNGAL_HEAT_IMPACT_TICKS,
+  FUNGAL_HEAT_TICKS,
+  GAS_FLASH_TICKS,
   GAS_LIFE_TICKS,
   GAS_SPREAD_CHANCE,
   SOLID_CRYSTAL,
@@ -13,12 +16,15 @@ import {
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SPORE_BURN_TICKS,
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
   SURF_SCORCHED,
+  SURF_SPORES,
   VENT_BASE_INTERVAL_TICKS,
 } from './constants.js';
 import { chunkOf } from './worldgen.js';
@@ -31,21 +37,80 @@ export const markDirty = (state: SurvivalState, x: number, y: number): void => {
   state.chunkVersion[chunkOf(x, y, W(state))]++;
 };
 
+const isReactiveSurface = (kind: number): boolean =>
+  kind === SURF_FIRE || kind === SURF_GAS || kind === SURF_SPORES || kind === SURF_FUNGAL_HEATED;
+
 export const setSurface = (state: SurvivalState, i: number, kind: number, timer: number): void => {
   state.surface[i] = kind;
   state.surfaceTimer[i] = timer;
   const x = i % W(state);
   const y = (i - x) / W(state);
   markDirty(state, x, y);
-  if (kind === SURF_FIRE || kind === SURF_GAS) state.reactionQueue.push(i);
+  if (isReactiveSurface(kind)) state.reactionQueue.push(i);
 };
 
+const announceIgnite = (state: SurvivalState, i: number, events: SemanticEvent[]): void => {
+  const x = i % W(state);
+  events.push({ t: 'ignite', x, y: (i - x) / W(state) });
+};
+
+/**
+ * Comeca ou acelera a secagem do tapete fungico.
+ *
+ * O fungo e biomassa umida: calor nao o troca por fogo no mesmo instante. O
+ * estado intermediario viaja pelo grid, portanto o cliente mostra a colonia
+ * fumegando antes da chama aparecer. `directHeat` representa um novo impacto
+ * termico; proximidade de fogo apenas inicia a secagem e deixa o relogio correr.
+ */
+export const heatFungalCell = (
+  state: SurvivalState,
+  i: number,
+  directHeat = false
+): boolean => {
+  const surf = state.surface[i];
+  if (surf === SURF_FUNGAL) {
+    const timer = Math.max(CELL_STEP_INTERVAL, FUNGAL_HEAT_TICKS - (directHeat ? FUNGAL_HEAT_IMPACT_TICKS : 0));
+    setSurface(state, i, SURF_FUNGAL_HEATED, timer);
+    return true;
+  }
+  if (surf === SURF_FUNGAL_HEATED && directHeat) {
+    state.surfaceTimer[i] = Math.max(CELL_STEP_INTERVAL, state.surfaceTimer[i] - FUNGAL_HEAT_IMPACT_TICKS);
+    return true;
+  }
+  return surf === SURF_FUNGAL_HEATED;
+};
+
+/**
+ * Aplica uma fonte de chama a uma superficie.
+ *
+ * Cada materia tem sua propria assinatura:
+ * - fungo umido apenas entra em secagem;
+ * - gas vira um flash curtissimo;
+ * - esporos queimam/esterilizam sem explodir;
+ * - biofluido usa a combustao normal.
+ */
 export const igniteCell = (state: SurvivalState, i: number, events: SemanticEvent[]): boolean => {
   const surf = state.surface[i];
-  if (surf === SURF_FUNGAL || surf === SURF_BIOFLUID || surf === SURF_GAS) {
+  if (surf === SURF_FUNGAL) return heatFungalCell(state, i, false);
+  if (surf === SURF_FUNGAL_HEATED) {
+    // Uma nova fonte de calor acelera a secagem, mas nao ignora a umidade que
+    // ainda resta. A transicao para fogo continua pertencendo ao relogio de
+    // stepCells, garantindo que o aviso fumegante nunca seja pulado.
+    return heatFungalCell(state, i, true);
+  }
+  if (surf === SURF_GAS) {
+    setSurface(state, i, SURF_FIRE, GAS_FLASH_TICKS);
+    announceIgnite(state, i, events);
+    return true;
+  }
+  if (surf === SURF_SPORES) {
+    setSurface(state, i, SURF_FIRE, SPORE_BURN_TICKS);
+    announceIgnite(state, i, events);
+    return true;
+  }
+  if (surf === SURF_BIOFLUID) {
     setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
-    const x = i % W(state);
-    events.push({ t: 'ignite', x, y: (i - x) / W(state) });
+    announceIgnite(state, i, events);
     return true;
   }
   return false;
@@ -150,12 +215,13 @@ export const explodeAt = (
  * Passo celular: processa fila deterministica de celulas reagindo com orcamento fixo.
  * Excedente fica na fila para o proximo passo (degrada latencia, nunca o determinismo).
  */
-export const stepCells = (state: SurvivalState, _events: SemanticEvent[]): void => {
+export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void => {
   if (state.tick % CELL_STEP_INTERVAL !== 0) return;
   const w = W(state);
   const h = H(state);
 
-  // ventos de esporos emitem gas periodicamente (intensificam com contaminacao)
+  // Respiradouros minerais emitem o gas sulfurico periodicamente. A nuvem de
+  // esporos e outra materia e nasce exclusivamente do Spore Bomber.
   for (const vent of state.vents) {
     if (state.tick >= vent.nextEmitAt) {
       const interval = Math.max(50, VENT_BASE_INTERVAL_TICKS * (1 - state.contamination * 0.6));
@@ -188,24 +254,48 @@ export const stepCells = (state: SurvivalState, _events: SemanticEvent[]): void 
     const y = (i - x) / w;
 
     if (kind === SURF_FIRE) {
-      // espalhar para vizinhos inflamaveis
+      // Cada vizinho recebe a reacao do proprio material. O fungo nao vira chama
+      // aqui: apenas inicia a secagem. Gas e esporos queimam com timers curtos.
       const neighbors = [i - 1, i + 1, i - w, i + w];
       const valid = [x > 0, x < w - 1, y > 0, y < h - 1];
       for (let k = 0; k < 4; k++) {
         if (!valid[k]) continue;
         const ni = neighbors[k];
         const nsurf = state.surface[ni];
-        if (nsurf === SURF_GAS) {
-          setSurface(state, ni, SURF_FIRE, FIRE_FUEL_TICKS);
-        } else if (nsurf === SURF_FUNGAL && state.rng.nextFloat01() < FIRE_SPREAD_FUNGAL) {
-          setSurface(state, ni, SURF_FIRE, FIRE_FUEL_TICKS);
+        if (nsurf === SURF_GAS || nsurf === SURF_SPORES) {
+          igniteCell(state, ni, events);
+        } else if (nsurf === SURF_FUNGAL) {
+          heatFungalCell(state, ni, false);
         } else if (nsurf === SURF_BIOFLUID && state.rng.nextFloat01() < FIRE_SPREAD_BIOFLUID) {
-          setSurface(state, ni, SURF_FIRE, FIRE_FUEL_TICKS);
+          igniteCell(state, ni, events);
         }
       }
       const t = state.surfaceTimer[i];
       if (t <= CELL_STEP_INTERVAL) {
         state.surface[i] = SURF_SCORCHED;
+        state.surfaceTimer[i] = 0;
+        markDirty(state, x, y);
+      } else {
+        state.surfaceTimer[i] = t - CELL_STEP_INTERVAL;
+        pushNext(i);
+      }
+    } else if (kind === SURF_FUNGAL_HEATED) {
+      // A umidade precisa sair antes da ignicao. O estado visual permanece
+      // fungico/fumegante durante toda a contagem, em vez de surgir fogo do nada.
+      const t = state.surfaceTimer[i];
+      if (t <= CELL_STEP_INTERVAL) {
+        setSurface(state, i, SURF_FIRE, FUNGAL_FIRE_FUEL_TICKS);
+        announceIgnite(state, i, events);
+        pushNext(i);
+      } else {
+        state.surfaceTimer[i] = t - CELL_STEP_INTERVAL;
+        pushNext(i);
+      }
+    } else if (kind === SURF_SPORES) {
+      // Nuvem localizada: nao se multiplica como gas; apenas paira e se desfaz.
+      const t = state.surfaceTimer[i];
+      if (t <= CELL_STEP_INTERVAL) {
+        state.surface[i] = SURF_NONE;
         state.surfaceTimer[i] = 0;
         markDirty(state, x, y);
       } else {

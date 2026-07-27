@@ -19,6 +19,7 @@ import type { SemanticEvent } from '@voxelyn/survival-sim';
 export type ParticleKind =
   | 'ember'
   | 'gas'
+  | 'sporeCloud'
   | 'debris'
   | 'spark'
   | 'rubble'
@@ -73,6 +74,8 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // diferentes empilhadas na mesma celula. O limao continua sendo o acido do
   // cuspidor logo abaixo, que e outra coisa e deve continuar parecendo outra.
   gas: ['#ffd166', '#a8e63c', '#1f3d33'],
+  // Nuvem organica: compartilha a familia do fungo, nunca a rampa sulfurica.
+  sporeCloud: ['#66c28a', '#2f6b4f', '#1f3d33'],
   debris: ['#46566e', '#2e3a4d', '#1d2430'],
   spark: ['#e8f1ff', '#7ab8ff', '#2e3a4d'],
   // Materiais de bloco: os cacos saem da MESMA paleta com que o bloco foi
@@ -164,6 +167,8 @@ export class VoxelParticles {
    * celulas do mundo, entao nao cresce sem teto.
    */
   private readonly lastGasBucket = new Map<number, number>();
+  private readonly lastSporeBucket = new Map<number, number>();
+  private readonly lastFungalSmokeBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
@@ -172,6 +177,8 @@ export class VoxelParticles {
   clear(): void {
     this.items.length = 0;
     this.lastGasBucket.clear();
+    this.lastSporeBucket.clear();
+    this.lastFungalSmokeBucket.clear();
   }
 
   private push(p: Particle): void {
@@ -376,6 +383,54 @@ export class VoxelParticles {
     });
   }
 
+  /** Esporos organicos: deriva mais larga, subida baixa e vida mais longa. */
+  emitSpores(x: number, y: number, nowMs: number, scale: number): void {
+    const phase = (Math.imul(x | 0, 12582917) ^ Math.imul(y | 0, 4256249)) >>> 0;
+    const bucket = (nowMs / 260) | 0;
+    const every = Math.max(1, Math.round(3 / scale));
+    if (bucket % every !== phase % every) return;
+    const cell = ((x | 0) << 16) | (y | 0);
+    if (this.lastSporeBucket.get(cell) === bucket) return;
+    this.lastSporeBucket.set(cell, bucket);
+
+    const rnd = seeded(eventSeed(x, y, phase ^ Math.imul(bucket, 1597334677)));
+    this.push({
+      x: x + rnd() * 0.95 - 0.475,
+      y: y + rnd() * 0.95 - 0.475,
+      z: 0.12 + rnd() * 0.18,
+      vx: (rnd() - 0.5) * 0.24,
+      vy: (rnd() - 0.5) * 0.24,
+      vz: 0.22 + rnd() * 0.22,
+      life: 1250,
+      maxLife: 1250,
+      kind: 'sporeCloud',
+    });
+  }
+
+  /** Fungo aquecido: fumaca rara e baixa, nunca chama antes do timer autoritativo. */
+  emitFungalSmoke(x: number, y: number, nowMs: number, scale: number): void {
+    const phase = (Math.imul(x | 0, 19349663) ^ Math.imul(y | 0, 83492791)) >>> 0;
+    const bucket = (nowMs / 420) | 0;
+    const every = Math.max(1, Math.round(4 / scale));
+    if (bucket % every !== phase % every) return;
+    const cell = ((x | 0) << 16) | (y | 0);
+    if (this.lastFungalSmokeBucket.get(cell) === bucket) return;
+    this.lastFungalSmokeBucket.set(cell, bucket);
+
+    const rnd = seeded(eventSeed(x, y, phase ^ Math.imul(bucket, 2246822519)));
+    this.push({
+      x: x + rnd() * 0.6 - 0.3,
+      y: y + rnd() * 0.6 - 0.3,
+      z: 0.08,
+      vx: (rnd() - 0.5) * 0.08,
+      vy: (rnd() - 0.5) * 0.08,
+      vz: 0.18 + rnd() * 0.12,
+      life: 900,
+      maxLife: 900,
+      kind: 'ash',
+    });
+  }
+
   step(dtMs: number): void {
     const dt = Math.min(64, dtMs) / 1000;
     // A frente balistica anda pelo tempo REAL decorrido, sem o teto de 64ms.
@@ -419,7 +474,7 @@ export class VoxelParticles {
       p.y += p.vy * dt;
       p.z += p.vz * dt;
       // Brasa e entulho caem; gas e fumaca sobem e desaceleram, nunca caem.
-      if (p.kind === 'gas' || p.kind === 'ash') {
+      if (p.kind === 'gas' || p.kind === 'sporeCloud' || p.kind === 'ash') {
         p.vz *= gasDrag;
       } else {
         p.vz -= 5.5 * dt;

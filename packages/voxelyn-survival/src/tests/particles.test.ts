@@ -149,6 +149,21 @@ describe('particulas voxel', () => {
     expect(items.filter((i) => i.kind !== 'gas').length).toBeGreaterThan(0);
   });
 
+  it('emite esporos verdes separados do gas e com deriva propria', () => {
+    const p = new VoxelParticles();
+    for (let ms = 0; ms < 5000 && p.count === 0; ms += 130) p.emitSpores(6.5, 8.5, ms, 1);
+    const items = (p as unknown as { items: Array<{ kind: string; vx: number; vy: number }> }).items;
+    expect(items.some((i) => i.kind === 'sporeCloud')).toBe(true);
+    expect(items.some((i) => Math.abs(i.vx) + Math.abs(i.vy) > 0)).toBe(true);
+  });
+
+  it('fumaca do fungo aquecido nao cria gas nem esporos', () => {
+    const p = new VoxelParticles();
+    for (let ms = 0; ms < 6000 && p.count === 0; ms += 210) p.emitFungalSmoke(4.5, 4.5, ms, 1);
+    const kinds = new Set((p as unknown as { items: Array<{ kind: string }> }).items.map((i) => i.kind));
+    expect(kinds).toEqual(new Set(['ash']));
+  });
+
   // Fisica igual em qualquer taxa de atualizacao: 12 passos de 8ms tem de levar
   // a particula ao mesmo lugar que 3 passos de 32ms.
   it('avanca igual a 60Hz e a 120Hz para o mesmo tempo real', () => {

@@ -87,6 +87,8 @@ export type Projectile = {
   leavesBiofluid: boolean;
   ttl: number;
   hits?: number[];
+  /** Celulas fungicas que este projetil ja aqueceu; evita duplicar o mesmo impacto nos subpassos. */
+  heatedSurfaceCells?: number[];
 };
 
 export type Cache = { x: number; y: number; opened: boolean; options: [ModifierId, ModifierId] | null };
