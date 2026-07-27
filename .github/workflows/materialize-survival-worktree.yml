@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/survival-salvage-modules
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
