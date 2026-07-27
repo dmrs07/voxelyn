@@ -146,14 +146,38 @@ jobs:
               protocol_test_path.write_text(protocol_test)
           elif new_keys not in protocol_test:
               raise SystemExit('Unexpected PlayerCommand key expectation in protocol test')
+
+          server_test_path = Path('packages/voxelyn-survival-server/tests/server.test.ts')
+          server_test = server_test_path.read_text()
+          old_reconnect_fixture = (
+              "    room.state.players[1].x = room.state.entry.x + 18;\n"
+              "    room.state.players[1].y = room.state.entry.y + 12;\n"
+              "    room.state.players[1].hp = 40;\n\n"
+              "    h.disconnect('B');\n"
+              "    h.tick(40); // blip curto, bem dentro do grace"
+          )
+          new_reconnect_fixture = (
+              "    h.disconnect('B');\n"
+              "    h.tick(40); // blip curto, bem dentro do grace\n\n"
+              "    // Isola o invariante de reconnect do dano autoritativo que pode ocorrer offline.\n"
+              "    room.state.players[1].x = room.state.entry.x + 18;\n"
+              "    room.state.players[1].y = room.state.entry.y + 12;\n"
+              "    room.state.players[1].hp = 40;"
+          )
+          if old_reconnect_fixture in server_test:
+              server_test = server_test.replace(old_reconnect_fixture, new_reconnect_fixture, 1)
+              server_test_path.write_text(server_test)
+          elif new_reconnect_fixture not in server_test:
+              raise SystemExit('Unexpected reconnect preservation fixture in server test')
           PY
           git add \
             packages/voxelyn-survival-sim/src/cells.ts \
             packages/voxelyn-survival-sim/tests/reactions.test.ts \
             packages/voxelyn-survival-sim/tests/salvage-modules.test.ts \
-            packages/voxelyn-survival-protocol/tests/validate.test.ts
+            packages/voxelyn-survival-protocol/tests/validate.test.ts \
+            packages/voxelyn-survival-server/tests/server.test.ts
           if ! git diff --cached --quiet; then
-            git commit -m "fix(survival): align deterministic fixtures and purge protocol contract"
+            git commit -m "fix(survival): isolate deterministic fixtures and protocol invariants"
           fi
 
       - name: Build dependency graph
