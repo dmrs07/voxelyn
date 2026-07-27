@@ -30,7 +30,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment 48 --repo dmrs07/voxelyn --body "🔎 Guarded Survival validation started for \`${GITHUB_SHA::12}\`: ${RUN_URL}"
+        run: |
+          gh pr comment 48 --repo dmrs07/voxelyn --body "🔎 Guarded Survival validation started for \`${GITHUB_SHA::12}\`: ${RUN_URL}"
 
       - uses: actions/setup-node@v4
         with:
@@ -85,8 +86,7 @@ jobs:
           fi
           git rm -r .github/patches
           git rm .github/workflows/materialize-survival-worktree.yml
-          git rm .github/workflows/apply-survival-redesign.yml
-          git commit -m "chore: remove temporary survival workflows"
+          git commit -m "chore: remove temporary survival workflow"
           git push origin HEAD:feat/survival-salvage-modules
 
       - name: Report validation failure
@@ -94,11 +94,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment 48 --repo dmrs07/voxelyn --body "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
+        run: |
+          gh pr comment 48 --repo dmrs07/voxelyn --body "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
 
       - name: Report validation success
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed: ${RUN_URL}. Atlas generation and the complete \`pnpm test:survival\` suite succeeded; the logical source commits are now on this PR."
+        run: |
+          gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed: ${RUN_URL}. Atlas generation and the complete \`pnpm test:survival\` suite succeeded; the logical source commits are now on this PR."
