@@ -3,6 +3,10 @@ import {
   BUDGET_REACTING_CELLS,
   CELL_STEP_INTERVAL,
   FIRE_FUEL_TICKS,
+  FUNGAL_FIRE_FUEL_TICKS,
+  FUNGAL_HEAT_TICKS,
+  GAS_FLASH_TICKS,
+  SPORE_LIFE_TICKS,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_NONE,
@@ -10,11 +14,14 @@ import {
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
+  SURF_SCORCHED,
+  SURF_SPORES,
 } from '../src/constants';
 import { breakSolid, explodeAt, setSurface, stepCells } from '../src/cells';
-import { spawnEnemy } from '../src/entities';
+import { damageEntity, spawnEnemy } from '../src/entities';
 import { createRun, resolveChainedEvents } from '../src/run';
 import type { SemanticEvent, SurvivalState } from '../src/types';
 
@@ -38,49 +45,61 @@ const tickCells = (state: SurvivalState, events: SemanticEvent[], steps: number)
 };
 
 describe('reacoes sistemicas', () => {
-  it('fogo se propaga pela vegetacao fungica e a consome', () => {
+  it('fungo umido seca antes de pegar fogo e queima por mais tempo', () => {
     const state = createRun({ seed: 7 });
     const w = state.config.width;
-    clearArea(state, 40, 40, 60, 60);
-    for (let y = 45; y <= 55; y++) {
-      for (let x = 45; x <= 55; x++) {
-        state.surface[y * w + x] = SURF_FUNGAL;
-      }
-    }
+    clearArea(state, 46, 46, 54, 54);
+    const fungal = 50 * w + 51;
+    state.surface[fungal] = SURF_FUNGAL;
     const events: SemanticEvent[] = [];
     setSurface(state, 50 * w + 50, SURF_FIRE, FIRE_FUEL_TICKS);
 
-    tickCells(state, events, 40);
+    tickCells(state, events, 1);
+    expect(state.surface[fungal]).toBe(SURF_FUNGAL_HEATED);
+    expect(state.surfaceTimer[fungal]).toBe(FUNGAL_HEAT_TICKS);
 
-    let _fungalLeft = 0;
-    let scorchedOrFire = 0;
-    for (let y = 45; y <= 55; y++) {
-      for (let x = 45; x <= 55; x++) {
-        const surf = state.surface[y * w + x];
-        if (surf === SURF_FUNGAL) _fungalLeft++;
-        else scorchedOrFire++;
-      }
-    }
-    expect(scorchedOrFire).toBeGreaterThan(30); // a queimada se espalhou de verdade
+    tickCells(state, events, Math.floor(FUNGAL_HEAT_TICKS / CELL_STEP_INTERVAL) - 1);
+    expect(state.surface[fungal]).toBe(SURF_FUNGAL_HEATED);
+    tickCells(state, events, 1);
+    expect(state.surface[fungal]).toBe(SURF_FIRE);
+    expect(state.surfaceTimer[fungal]).toBe(FUNGAL_FIRE_FUEL_TICKS);
   });
 
-  it('gas de esporos inflama instantaneamente em contato com fogo', () => {
+  it('gas sulfurico acende em cadeia e some num flash curto', () => {
     const state = createRun({ seed: 7 });
     const w = state.config.width;
     clearArea(state, 20, 20, 30, 30);
-    for (let x = 22; x <= 28; x++) state.surface[25 * w + x] = SURF_GAS;
-    for (let x = 22; x <= 28; x++) state.surfaceTimer[25 * w + x] = 200;
-    for (let x = 22; x <= 28; x++) state.reactionQueue.push(25 * w + x);
+    for (let x = 22; x <= 28; x++) setSurface(state, 25 * w + x, SURF_GAS, 200);
 
     const events: SemanticEvent[] = [];
     setSurface(state, 25 * w + 21, SURF_FIRE, FIRE_FUEL_TICKS);
-    tickCells(state, events, 10);
+    tickCells(state, events, 1);
+    expect(state.surface[25 * w + 22]).toBe(SURF_FIRE);
+    expect(state.surfaceTimer[25 * w + 22]).toBe(GAS_FLASH_TICKS);
 
-    let fireCount = 0;
-    for (let x = 22; x <= 28; x++) {
-      if (state.surface[25 * w + x] === SURF_FIRE) fireCount++;
+    tickCells(state, events, Math.ceil(GAS_FLASH_TICKS / CELL_STEP_INTERVAL) + 1);
+    expect(state.surface[25 * w + 22]).toBe(SURF_SCORCHED);
+  });
+
+  it('esporos do bomber sao uma nuvem propria, localizada e temporaria', () => {
+    const state = createRun({ seed: 8 });
+    const w = state.config.width;
+    clearArea(state, 36, 36, 44, 44);
+    const bomber = spawnEnemy(state, 'bomber', 40, 40, false);
+    const events: SemanticEvent[] = [];
+    damageEntity(state, bomber, bomber.hp, events);
+
+    const cloud = [];
+    for (let y = 39; y <= 41; y++) for (let x = 39; x <= 41; x++) {
+      const surf = state.surface[y * w + x];
+      if (surf === SURF_SPORES) cloud.push(y * w + x);
+      expect(surf).not.toBe(SURF_GAS);
     }
-    expect(fireCount).toBeGreaterThanOrEqual(5); // corrente de gas virou corrente de fogo
+    expect(cloud.length).toBeGreaterThan(0);
+    expect(cloud.every((i) => state.surfaceTimer[i] === SPORE_LIFE_TICKS)).toBe(true);
+
+    tickCells(state, events, Math.ceil(SPORE_LIFE_TICKS / CELL_STEP_INTERVAL) + 1);
+    expect(cloud.every((i) => state.surface[i] === SURF_NONE)).toBe(true);
   });
 
   it('cristal quebrado descarrega pela poca de biofluido conectada e fere quem esta nela', () => {

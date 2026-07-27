@@ -19,6 +19,7 @@ import {
   EXTRACT_RADIUS,
   FIRE_DAMAGE_PER_TICK,
   GAS_DAMAGE_PER_TICK,
+  SPORE_DAMAGE_PER_TICK,
   HEAT_DECAY_PER_TICK,
   HEAT_MAX,
   HEAT_PER_SHOT,
@@ -37,6 +38,7 @@ import {
   SURF_FIRE,
   SURF_GAS,
   SURF_NONE,
+  SURF_SPORES,
   TICK_HZ,
   WORLD_H,
   WORLD_W,
@@ -238,8 +240,11 @@ const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void =
     if (surf === SURF_FIRE) {
       damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events);
     } else if (surf === SURF_GAS && ent.kind === 'player') {
-      // esporos afetam o prospector (criaturas do Veio sao imunes)
+      // Gas sulfuroso e toxico; criaturas do Veio sao imunes ao proprio ambiente.
       damageEntity(state, ent, GAS_DAMAGE_PER_TICK, events);
+    } else if (surf === SURF_SPORES && ent.kind === 'player') {
+      // Esporos do bomber sao organicos e irritantes, mas nao volateis/explosivos.
+      damageEntity(state, ent, SPORE_DAMAGE_PER_TICK, events);
     }
   }
 };
@@ -398,7 +403,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         const dy = y + 0.5 - player.y;
         if (dx * dx + dy * dy > ABILITY_RADIUS * ABILITY_RADIUS) continue;
         const i = y * w + x;
-        if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_GAS) {
+        if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
           setSurface(state, i, SURF_NONE, 0);
         }
       }
@@ -416,7 +421,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       for (let x = px - CONSUMABLE_PURGE_RADIUS; x <= px + CONSUMABLE_PURGE_RADIUS; x++) {
         if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
         const i = y * w + x;
-        if (state.surface[i] === SURF_GAS) setSurface(state, i, SURF_NONE, 0);
+        if (state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
+          setSurface(state, i, SURF_NONE, 0);
+        }
       }
     }
     events.push({ t: 'consume', x: player.x, y: player.y });

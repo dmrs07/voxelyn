@@ -11,9 +11,11 @@ import {
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
   SURF_SCORCHED,
+  SURF_SPORES,
   ABILITY_RADIUS,
   HEAT_MAX,
 } from '@voxelyn/survival-sim';
@@ -60,6 +62,8 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_GAS]: 3,
   [SURF_FIRE]: 4,
   [SURF_SCORCHED]: 5,
+  [SURF_SPORES]: 6,
+  [SURF_FUNGAL_HEATED]: 7,
 };
 
 /**
@@ -76,6 +80,8 @@ const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_GAS]: '#a8e63c',
   [SURF_FIRE]: '#ff7a2f',
   [SURF_SCORCHED]: '#0b0e14',
+  [SURF_SPORES]: '#66c28a',
+  [SURF_FUNGAL_HEATED]: '#6e4a33',
 };
 
 export const TILE_W = 32;
@@ -432,10 +438,16 @@ export class SurvivalRenderer {
         if (!this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
         }
+        const ambientScale = this.quality.maxFx / PRESETS.high.maxFx;
         if (surf === SURF_GAS) {
-          // A crosta no chao diz ONDE o gas esta; os motes subindo dizem que ele
-          // esta VIVO e para onde vai. Sem eles o gas era so uma textura.
-          this.particles.emitGas(x + 0.5, y + 0.5, nowMs, this.quality.maxFx / PRESETS.high.maxFx);
+          // Gas sulfurico: sopros amarelos que abrem enquanto sobem.
+          this.particles.emitGas(x + 0.5, y + 0.5, nowMs, ambientScale);
+        } else if (surf === SURF_SPORES) {
+          // Esporos: graos verdes com deriva lateral, sem a silhueta de puff do gas.
+          this.particles.emitSpores(x + 0.5, y + 0.5, nowMs, ambientScale);
+        } else if (surf === SURF_FUNGAL_HEATED) {
+          // Aviso da secagem: pouca fumaca escura antes de surgir qualquer chama.
+          this.particles.emitFungalSmoke(x + 0.5, y + 0.5, nowMs, ambientScale);
         }
         // Os marcadores de objetivo NAO saem mais aqui: viraram objetos com
         // volume e entram na fila ordenada por profundidade, junto das paredes

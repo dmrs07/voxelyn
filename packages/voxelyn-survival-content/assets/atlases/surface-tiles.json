@@ -3,10 +3,10 @@
   "version": 1,
   "atlas": "surface-tiles.png",
   "frameWidth": 32,
-  "frameHeight": 28,
+  "frameHeight": 29,
   "columns": 128,
   "originX": 14,
-  "originY": 20,
+  "originY": 21,
   "kinds": [
     {
       "name": "bare",
@@ -37,6 +37,16 @@
       "name": "scorched",
       "frames": 1,
       "frameMs": 0
+    },
+    {
+      "name": "spores",
+      "frames": 4,
+      "frameMs": 360
+    },
+    {
+      "name": "fungal-heated",
+      "frames": 2,
+      "frameMs": 240
     }
   ],
   "variants": 3,

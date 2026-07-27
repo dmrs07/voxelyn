@@ -12,9 +12,11 @@ import {
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
   SURF_SCORCHED,
+  SURF_SPORES,
 } from '../src/constants';
 import { impactSolid, impactSurface, projectileClass } from '../src/materials';
 import { createRun } from '../src/run';
@@ -218,14 +220,28 @@ describe('superficies reagem por classe de projetil', () => {
     }
   });
 
-  it('calor acende fungo e biofluido', () => {
-    for (const surf of [SURF_FUNGAL, SURF_BIOFLUID]) {
-      const state = world(17);
-      const i = at(state, 30, 30);
-      state.surface[i] = surf;
-      impactSurface(state, 30, 30, 'thermal', []);
-      expect(state.surface[i]).toBe(SURF_FIRE);
-    }
+  it('calor seca o fungo antes da chama, mas acende biofluido na hora', () => {
+    const fungal = world(17);
+    const fi = at(fungal, 30, 30);
+    fungal.surface[fi] = SURF_FUNGAL;
+    impactSurface(fungal, 30, 30, 'thermal', []);
+    expect(fungal.surface[fi]).toBe(SURF_FUNGAL_HEATED);
+
+    const fluid = world(17);
+    const bi = at(fluid, 30, 30);
+    fluid.surface[bi] = SURF_BIOFLUID;
+    impactSurface(fluid, 30, 30, 'thermal', []);
+    expect(fluid.surface[bi]).toBe(SURF_FIRE);
+  });
+
+  it('calor esteriliza esporos sem produzir explosao', () => {
+    const state = world(21);
+    const i = at(state, 30, 30);
+    state.surface[i] = SURF_SPORES;
+    const events: SemanticEvent[] = [];
+    expect(impactSurface(state, 30, 30, 'thermal', events)).toBe(false);
+    expect(state.surface[i]).toBe(SURF_FIRE);
+    expect(events.some((e) => e.t === 'explosion')).toBe(false);
   });
 
   it('acido apaga fogo e reidrata cinza', () => {
