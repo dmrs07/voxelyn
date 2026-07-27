@@ -27,9 +27,6 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply projectile heat deduplication
-        run: node scripts/apply-projectile-heat-dedup.mjs
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,15 +50,15 @@ jobs:
           set -o pipefail
           pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Persist review fix and regenerated atlases
+      - name: Persist regenerated atlases
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/voxelyn-survival-sim/src/run.ts packages/voxelyn-survival-sim/src/types.ts packages/voxelyn-survival-content/assets/atlases
+          git add packages/voxelyn-survival-content/assets/atlases
           if git diff --cached --quiet; then
-            echo "Sources and atlases already up to date."
+            echo "Atlases already up to date."
           else
-            git commit -m "fix(sim): deduplicate projectile fungal heat [skip voxel]"
+            git commit -m "fix(content): regenerate normalized voxel atlases [skip voxel]"
             git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
           fi
 
