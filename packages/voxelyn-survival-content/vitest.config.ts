@@ -8,6 +8,9 @@ export default defineConfig({
     // .mjs tambem: os testes de geometria alcancam `tools/*.mjs`, que e
     // JavaScript puro e fica de proposito fora de `src/` — e portanto fora do
     // `tsc` que compila o pacote.
-    include: ['tests/**/*.test.{ts,mjs}', 'src/**/*.test.ts'],
+    include: [
+      'tests/**/*.test.{ts,mjs}',
+      'src/**/*.test.ts',
+    ],
   },
 });
