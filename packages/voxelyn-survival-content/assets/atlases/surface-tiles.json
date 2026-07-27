@@ -3,10 +3,10 @@
   "version": 1,
   "atlas": "surface-tiles.png",
   "frameWidth": 32,
-  "frameHeight": 28,
+  "frameHeight": 30,
   "columns": 128,
   "originX": 14,
-  "originY": 20,
+  "originY": 22,
   "kinds": [
     {
       "name": "bare",
