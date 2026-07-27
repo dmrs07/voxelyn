@@ -92,6 +92,56 @@ export const HEAT_DECAY_PER_TICK = 1.15;
 export const OVERHEAT_LOCK_TICKS = 36;
 export const OVERHEAT_SELF_DAMAGE = 6;
 
+/**
+ * Quanto tempo um inimigo caça depois de levar dano, independente da distancia.
+ *
+ * Quatro segundos e o bastante para ele SAIR do lugar e vir na sua direcao —
+ * um bruiser a 2.3 tiles/s anda ~9 tiles nesse tempo, mais que o proprio raio
+ * de aggro. Nao e infinito de proposito: quem atira e foge continua conseguindo
+ * quebrar o contato, so nao de graça.
+ */
+export const ALERT_TICKS = 4 * TICK_HZ;
+
+/**
+ * Arremesso de bloco do bruiser.
+ *
+ * Ele era o unico inimigo sem NENHUMA resposta a distancia, andando a metade da
+ * velocidade do jogador: contra alguem que recua ele simplesmente nunca
+ * encostava. O arremesso existe para isso, e o windup e longo porque a ameaca
+ * tem de ser vista e evitada — a promessa do jogo e morrer por decisao
+ * arriscada, nunca por algo que nao deu para ler.
+ */
+export const BRUISER_HURL_WINDUP_TICKS = 16; // ~0,8 s de telegrafo
+export const BRUISER_HURL_COOLDOWN_TICKS = 70; // ~3,5 s
+export const BRUISER_HURL_MIN_RANGE = 2.6;
+export const BRUISER_HURL_MAX_RANGE = 9;
+/**
+ * Velocidade da pedra: quase o DOBRO da do jogador (4,6).
+ *
+ * A primeira tentativa foi 6 — "mais lento que o cuspe, da para desviar" — e
+ * media zero acerto contra quem foge em linha reta: a 6 contra 4,6 a pedra se
+ * aproxima 1,4 tile/s e nunca chega. Contra alvo em fuga, projetil so ameaca se
+ * for claramente mais rapido que o alvo. O que torna o arremesso justo nao e a
+ * lentidao da pedra, e o telegrafo de 0,8 s antes dela sair.
+ */
+export const BRUISER_HURL_SPEED = 9;
+/**
+ * Distancia que a pedra voa, em tiles — deliberadamente MAIOR que o alcance em
+ * que o arremesso e decidido.
+ *
+ * Derivar o alcance de voo do alcance de decisao (9) parecia obvio e nao
+ * funcionava: durante os 0,8 s de telegrafo um jogador em fuga corre quase 4
+ * tiles, entao no instante do lancamento ele ja esta ALEM do alcance de
+ * decisao. Medido, a pedra morria a meio caminho e o arremesso acertava zero
+ * contra quem simplesmente segurava o botao de andar para tras. O excedente e a
+ * margem para alvo em movimento.
+ */
+export const BRUISER_HURL_FLIGHT_TILES = 20;
+export const BRUISER_HURL_DAMAGE = 22;
+/** Vida do bruiser: ver ARCHETYPES. 95 dava 1,7 s de vida — um arremesso so. */
+/** Raio de busca, em celulas, do bloco que ele arranca para usar como municao. */
+export const BRUISER_HURL_REACH = 3;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;

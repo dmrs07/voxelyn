@@ -99,6 +99,7 @@ const makePlayer = (slot: number, x: number, y: number): Entity => ({
   contactReadyAt: 0,
   rangedReadyAt: 0,
   stunnedUntil: 0,
+  alertedUntil: 0,
   facing: { x: 1, y: 0 },
   slot,
 });

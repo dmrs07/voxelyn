@@ -20,6 +20,7 @@ export type EntityActionKind =
   | 'charge'
   | 'detonate'
   | 'slam'
+  | 'hurl'
   | 'pulse';
 export type EntityActionPhase = 'windup' | 'release' | 'recovery';
 export type EntityAction = {
@@ -49,6 +50,15 @@ export type Entity = {
   contactReadyAt: number;
   rangedReadyAt: number;
   stunnedUntil: number;
+  /**
+   * Ate quando este inimigo continua caçando por ter LEVADO DANO.
+   *
+   * Sem isto o aggro era so distancia, recalculado a cada tick — entao dava para
+   * matar qualquer coisa de fora do raio dela sem que ela reagisse. Com alcance
+   * de tiro de 18 tiles contra raios de aggro de 7 a 9, isso nao era um caso de
+   * borda: era o jeito normal de lutar.
+   */
+  alertedUntil: number;
   facing: Vec2;
   action?: EntityAction;
   slot?: number;

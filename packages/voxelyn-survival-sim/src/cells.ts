@@ -16,6 +16,7 @@ import {
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SOLID_ROCK,
   SPORE_BURN_TICKS,
   SURF_BIOFLUID,
   SURF_FIRE,
@@ -360,4 +361,36 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
     return true;
   }
   return false;
+};
+
+/**
+ * Arranca uma celula de parede COMUM, para virar municao do bruiser.
+ *
+ * Separado de `breakSolid` de proposito, e as duas diferencas sao intencionais:
+ *
+ * - `breakSolid` nao quebra rocha — so fragil e cristal. Arrancar a parede e
+ *   exatamente o que o bruiser faz de especial, entao precisa passar por cima
+ *   dessa regra sem afrouxa-la para todo o resto do jogo.
+ * - MINERIO e CRISTAL ficam de fora. Minerio e recurso do jogador e cristal e
+ *   luz e descarga; deixar um inimigo apagar qualquer um dos dois de graca
+ *   tiraria do jogador coisas que ele foi ate ali buscar, sem que ele pudesse
+ *   sequer disputar.
+ *
+ * A celula vira chao nu, e nao queimado: nada foi incinerado ali, foi levado.
+ *
+ * A BORDA do mapa tambem fica de fora, e isso apareceu num teste e nao no
+ * papel: com o jogador nascendo perto da parede externa, o bruiser arrancava o
+ * proprio limite do mundo. Nada quebrava — `isSolidAt` trata fora do mapa como
+ * solido — mas abria um buraco na moldura da sala, que e cenario e nao arena.
+ */
+export const ripSolid = (state: SurvivalState, x: number, y: number, events: SemanticEvent[]): boolean => {
+  const w = W(state);
+  if (x <= 0 || y <= 0 || x >= w - 1 || y >= state.config.height - 1) return false;
+  const i = y * w + x;
+  const solid = state.solid[i];
+  if (solid !== SOLID_ROCK && solid !== SOLID_FRAGILE && solid !== SOLID_FRAGILE_WEAK) return false;
+  state.solid[i] = SOLID_NONE;
+  markDirty(state, x, y);
+  events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
+  return true;
 };

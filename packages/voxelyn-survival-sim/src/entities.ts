@@ -1,5 +1,17 @@
 import {
+  ALERT_TICKS,
+  SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
+  SOLID_ROCK,
   BIOFLUID_SLOW,
+  BRUISER_HURL_COOLDOWN_TICKS,
+  BRUISER_HURL_DAMAGE,
+  BRUISER_HURL_FLIGHT_TILES,
+  BRUISER_HURL_MAX_RANGE,
+  BRUISER_HURL_MIN_RANGE,
+  BRUISER_HURL_REACH,
+  BRUISER_HURL_SPEED,
+  BRUISER_HURL_WINDUP_TICKS,
   EXPLOSION_DAMAGE,
   SOLID_NONE,
   SPORE_LIFE_TICKS,
@@ -10,7 +22,7 @@ import {
   SURF_SPORES,
   TICK_HZ,
 } from './constants.js';
-import { breakSolid, explodeAt, igniteCell, setSurface } from './cells.js';
+import { breakSolid, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
 import type {
   Entity,
   EntityActionKind,
@@ -31,7 +43,11 @@ export type ArchetypeDef = {
 
 export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   stalker: { hp: 26, speed: 5.2, radius: 0.32, contactDamage: 8, contactCooldown: 10, aggroRange: 9 },
-  bruiser: { hp: 95, speed: 2.3, radius: 0.46, contactDamage: 18, contactCooldown: 16, aggroRange: 7 },
+  // 160 e nao 95: com 95 ele morria em 1,7 s de fogo sustentado, o que dava
+  // tempo para exatamente UM arremesso — a mecanica nova mal existia. Aqui vida
+  // e o portao de quantas vezes ela acontece, e nao um jeito de alongar uma luta
+  // inofensiva (que e por que o guardiao NAO ganha vida).
+  bruiser: { hp: 160, speed: 2.3, radius: 0.46, contactDamage: 18, contactCooldown: 16, aggroRange: 7 },
   spitter: { hp: 30, speed: 2.8, radius: 0.34, contactDamage: 6, contactCooldown: 14, aggroRange: 9 },
   bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
   guardian: { hp: 420, speed: 2.1, radius: 0.68, contactDamage: 24, contactCooldown: 14, aggroRange: 7 },
@@ -116,6 +132,11 @@ export const damageEntity = (
     return;
   }
   ent.hp -= amount;
+  // Levar dano ACORDA. Antes o aggro era so distancia, recalculada a cada tick,
+  // entao um inimigo baleado de fora do proprio raio continuava perambulando ao
+  // acaso enquanto morria. Com alcance de tiro de 18 tiles contra raios de 7 a
+  // 9, atirar de longe nao era uma tatica esperta: era a ausencia de jogo.
+  ent.alertedUntil = state.tick + ALERT_TICKS;
   events.push({ t: 'hit', x: ent.x, y: ent.y, amount, target: ent.id });
   if (ent.hp > 0) return;
   ent.hp = 0;
@@ -161,6 +182,7 @@ export const spawnEnemy = (
     contactReadyAt: 0,
     rangedReadyAt: 0,
     stunnedUntil: 0,
+    alertedUntil: 0,
     facing: { x: 1, y: 0 },
   };
   state.enemies.push(enemy);
@@ -258,6 +280,25 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     if (distTo(enemy, target) < enemy.radius + target.radius + 0.45) {
       damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1), events);
     }
+  } else if (action.kind === 'hurl') {
+    state.projectiles.push({
+      id: state.nextEntityId++,
+      owner: enemy.id,
+      x: enemy.x,
+      y: enemy.y,
+      vx: action.direction.x * BRUISER_HURL_SPEED,
+      vy: action.direction.y * BRUISER_HURL_SPEED,
+      damage: BRUISER_HURL_DAMAGE,
+      piercing: false,
+      conductive: false,
+      explosive: false,
+      hostile: true,
+      // Pedra nao deixa poca: quem suja o chao e o cuspidor, e as duas ameacas
+      // tem de continuar querendo dizer coisas diferentes.
+      leavesBiofluid: false,
+      ttl: Math.ceil((BRUISER_HURL_FLIGHT_TILES / BRUISER_HURL_SPEED) * TICK_HZ),
+    });
+    events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: action.direction.x, dy: action.direction.y, owner: enemy.id });
   } else if (action.kind === 'charge') {
     enemy.vx = action.direction.x * 7;
     enemy.vy = action.direction.y * 7;
@@ -281,6 +322,36 @@ const advanceAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   return true;
 };
 
+/**
+ * Celula de parede mais proxima que o bruiser consegue arrancar, ou null.
+ *
+ * A varredura e em ordem FIXA e escolhe pela menor distancia, com a ordem de
+ * iteracao como desempate: a simulacao e deterministica e duas maquinas da
+ * mesma sala precisam arrancar exatamente o mesmo bloco. Um sorteio aqui
+ * divergiria o mundo entre os dois jogadores.
+ */
+const findRippable = (state: SurvivalState, ent: Entity): { x: number; y: number } | null => {
+  const ex = Math.floor(ent.x);
+  const ey = Math.floor(ent.y);
+  let best: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+  for (let dy = -BRUISER_HURL_REACH; dy <= BRUISER_HURL_REACH; dy++) {
+    for (let dx = -BRUISER_HURL_REACH; dx <= BRUISER_HURL_REACH; dx++) {
+      const x = ex + dx;
+      const y = ey + dy;
+      if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
+      const solid = state.solid[y * state.config.width + x];
+      if (solid !== SOLID_ROCK && solid !== SOLID_FRAGILE && solid !== SOLID_FRAGILE_WEAK) continue;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+};
+
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   for (const enemy of state.enemies) {
@@ -291,7 +362,9 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     const player = nearestTarget(state, enemy.x, enemy.y);
     const dist = player ? distTo(enemy, player) : Infinity;
-    const aggro = player !== null && dist <= def.aggroRange + (enemy.elite ? 3 : 0);
+    const aggro =
+      player !== null &&
+      (dist <= def.aggroRange + (enemy.elite ? 3 : 0) || state.tick < enemy.alertedUntil);
 
     if (enemy.archetype === 'guardian' && !state.guardianAwake) {
       if (state.coreTaken || dist < 7) {
@@ -312,6 +385,28 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       if (enemy.archetype === 'bomber' && dist < 2.05) {
         startAction(state, enemy, 'detonate', toward, 12, 4, events, player.id);
         continue;
+      }
+
+      // Bruiser: arranca a parede e joga.
+      //
+      // Ele era o unico sem NENHUMA resposta a distancia, a metade da velocidade
+      // do jogador — contra quem recua, nunca encostava, e mais HP so alongaria
+      // a mesma luta inofensiva. A municao sai do MUNDO: o bloco arrancado some
+      // da arena, entao a cobertura de quem esta atras dela pode virar o proprio
+      // projetil que vem. Sem parede ao alcance ele nao tem o que jogar e volta
+      // a ser o perseguidor lento — em sala aberta a ameaca dele e outra.
+      if (
+        enemy.archetype === 'bruiser' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist >= BRUISER_HURL_MIN_RANGE &&
+        dist <= BRUISER_HURL_MAX_RANGE
+      ) {
+        const ammo = findRippable(state, enemy);
+        if (ammo && ripSolid(state, ammo.x, ammo.y, events)) {
+          enemy.rangedReadyAt = state.tick + BRUISER_HURL_COOLDOWN_TICKS;
+          startAction(state, enemy, 'hurl', toward, BRUISER_HURL_WINDUP_TICKS, 6, events, player.id);
+          continue;
+        }
       }
 
       if ((enemy.archetype === 'spitter' || enemy.archetype === 'guardian') && state.tick >= enemy.rangedReadyAt) {
