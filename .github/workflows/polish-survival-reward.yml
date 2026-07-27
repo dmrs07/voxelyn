@@ -1,3 +1,4 @@
+# One-shot guarded client polish; the workflow removes itself after validation.
 name: Polish Survival Reward Presentation
 
 on:
