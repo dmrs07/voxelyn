@@ -5,8 +5,8 @@
 //   hashes deterministicos (cliente e servidor precisam concordar para prever/interpolar).
 // - CONTENT_VERSION muda quando itens/criaturas/materiais mudam (pool de conteudo).
 export const PROTOCOL_VERSION = 4;
-export const SIMULATION_VERSION = 3;
-export const CONTENT_VERSION = 3;
+export const SIMULATION_VERSION = 4;
+export const CONTENT_VERSION = 4;
 
 export type VersionTriple = {
   protocolVersion: number;
