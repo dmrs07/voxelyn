@@ -1,5 +1,21 @@
 import {
+  ALERT_TICKS,
+  SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
+  SOLID_ROCK,
   BIOFLUID_SLOW,
+  BRUISER_HURL_COOLDOWN_TICKS,
+  BRUISER_HURL_DAMAGE,
+  BRUISER_HURL_FLIGHT_TILES,
+  BRUISER_HURL_MAX_RANGE,
+  BRUISER_HURL_MIN_RANGE,
+  BRUISER_HURL_REACH,
+  BRUISER_HURL_SPEED,
+  BRUISER_HURL_WINDUP_TICKS,
+  GUARDIAN_ARENA_EXITS,
+  GUARDIAN_ARENA_RADIUS,
+  GUARDIAN_PATH_INTERVAL_TICKS,
+  GUARDIAN_SUMMON_COUNT,
   EXPLOSION_DAMAGE,
   SOLID_NONE,
   SPORE_LIFE_TICKS,
@@ -10,7 +26,8 @@ import {
   SURF_SPORES,
   TICK_HZ,
 } from './constants.js';
-import { breakSolid, explodeAt, igniteCell, setSurface } from './cells.js';
+import { breakSolid, canRip, closeArena, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
+import { findPath, hasLineOfSight } from './pathing.js';
 import type {
   Entity,
   EntityActionKind,
@@ -31,7 +48,11 @@ export type ArchetypeDef = {
 
 export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   stalker: { hp: 26, speed: 5.2, radius: 0.32, contactDamage: 8, contactCooldown: 10, aggroRange: 9 },
-  bruiser: { hp: 95, speed: 2.3, radius: 0.46, contactDamage: 18, contactCooldown: 16, aggroRange: 7 },
+  // 160 e nao 95: com 95 ele morria em 1,7 s de fogo sustentado, o que dava
+  // tempo para exatamente UM arremesso — a mecanica nova mal existia. Aqui vida
+  // e o portao de quantas vezes ela acontece, e nao um jeito de alongar uma luta
+  // inofensiva (que e por que o guardiao NAO ganha vida).
+  bruiser: { hp: 160, speed: 2.3, radius: 0.46, contactDamage: 18, contactCooldown: 16, aggroRange: 7 },
   spitter: { hp: 30, speed: 2.8, radius: 0.34, contactDamage: 6, contactCooldown: 14, aggroRange: 9 },
   bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
   guardian: { hp: 420, speed: 2.1, radius: 0.68, contactDamage: 24, contactCooldown: 14, aggroRange: 7 },
@@ -116,6 +137,11 @@ export const damageEntity = (
     return;
   }
   ent.hp -= amount;
+  // Levar dano ACORDA. Antes o aggro era so distancia, recalculada a cada tick,
+  // entao um inimigo baleado de fora do proprio raio continuava perambulando ao
+  // acaso enquanto morria. Com alcance de tiro de 18 tiles contra raios de 7 a
+  // 9, atirar de longe nao era uma tatica esperta: era a ausencia de jogo.
+  ent.alertedUntil = state.tick + ALERT_TICKS;
   events.push({ t: 'hit', x: ent.x, y: ent.y, amount, target: ent.id });
   if (ent.hp > 0) return;
   ent.hp = 0;
@@ -161,6 +187,7 @@ export const spawnEnemy = (
     contactReadyAt: 0,
     rangedReadyAt: 0,
     stunnedUntil: 0,
+    alertedUntil: 0,
     facing: { x: 1, y: 0 },
   };
   state.enemies.push(enemy);
@@ -258,6 +285,25 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     if (distTo(enemy, target) < enemy.radius + target.radius + 0.45) {
       damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1), events);
     }
+  } else if (action.kind === 'hurl') {
+    state.projectiles.push({
+      id: state.nextEntityId++,
+      owner: enemy.id,
+      x: enemy.x,
+      y: enemy.y,
+      vx: action.direction.x * BRUISER_HURL_SPEED,
+      vy: action.direction.y * BRUISER_HURL_SPEED,
+      damage: BRUISER_HURL_DAMAGE,
+      piercing: false,
+      conductive: false,
+      explosive: false,
+      hostile: true,
+      // Pedra nao deixa poca: quem suja o chao e o cuspidor, e as duas ameacas
+      // tem de continuar querendo dizer coisas diferentes.
+      leavesBiofluid: false,
+      ttl: Math.ceil((BRUISER_HURL_FLIGHT_TILES / BRUISER_HURL_SPEED) * TICK_HZ),
+    });
+    events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: action.direction.x, dy: action.direction.y, owner: enemy.id });
   } else if (action.kind === 'charge') {
     enemy.vx = action.direction.x * 7;
     enemy.vy = action.direction.y * 7;
@@ -281,6 +327,111 @@ const advanceAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   return true;
 };
 
+/**
+ * Celula de parede mais proxima que o bruiser consegue arrancar, ou null.
+ *
+ * A varredura e em ordem FIXA e escolhe pela menor distancia, com a ordem de
+ * iteracao como desempate: a simulacao e deterministica e duas maquinas da
+ * mesma sala precisam arrancar exatamente o mesmo bloco. Um sorteio aqui
+ * divergiria o mundo entre os dois jogadores.
+ */
+export const findRippable = (state: SurvivalState, ent: Entity): { x: number; y: number } | null => {
+  const ex = Math.floor(ent.x);
+  const ey = Math.floor(ent.y);
+  let best: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+  for (let dy = -BRUISER_HURL_REACH; dy <= BRUISER_HURL_REACH; dy++) {
+    for (let dx = -BRUISER_HURL_REACH; dx <= BRUISER_HURL_REACH; dx++) {
+      const x = ex + dx;
+      const y = ey + dy;
+      if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
+      // MESMO criterio de `ripSolid`, e nao uma copia dele.
+      //
+      // A copia existia e discordava do original em um detalhe: a borda do mapa
+      // parece arrancavel pelo tipo do bloco, mas `ripSolid` a recusa. Perto da
+      // moldura o bruiser escolhia a borda por ser a mais proxima, tomava um
+      // `false`, e escolhia a MESMA celula no tick seguinte — travado para
+      // sempre, com paredes validas a dois passos de distancia.
+      if (!canRip(state, x, y)) continue;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+};
+
+/**
+ * Direcao de perseguicao do guardiao, contornando ou arrombando o que houver.
+ *
+ * Com linha de visao livre ele vai reto, e nem chega a pensar: buscar caminho a
+ * cada tick para um alvo que esta a vista seria gasto puro, e a rota em grade
+ * ainda daria um andar quadriculado onde o certo e a diagonal.
+ *
+ * Bloqueado, ele segue a rota de menor custo — que pode passar POR DENTRO de uma
+ * parede quebravel quando o desvio livre e longo demais. A rota e recalculada em
+ * intervalos e nao a cada tick: o alvo se move pouco entre um calculo e outro, e
+ * a busca e a coisa mais cara que a simulacao faz por criatura.
+ */
+const guardianSteering = (
+  state: SurvivalState,
+  enemy: Entity,
+  targetX: number,
+  targetY: number,
+  events: SemanticEvent[]
+): Vec2 => {
+  if (hasLineOfSight(state, enemy.x, enemy.y, targetX, targetY)) {
+    state.guardianPath = [];
+    return normalized(targetX - enemy.x, targetY - enemy.y);
+  }
+
+  const w = state.config.width;
+  const ex = Math.floor(enemy.x);
+  const ey = Math.floor(enemy.y);
+  const stale = state.tick - state.guardianPathAt >= GUARDIAN_PATH_INTERVAL_TICKS;
+  if (stale || state.guardianPath.length === 0) {
+    state.guardianPath = findPath(state, ex, ey, Math.floor(targetX), Math.floor(targetY));
+    state.guardianPathAt = state.tick;
+  }
+
+  // Consome os passos ja alcancados. Sem isto ele fica mirando a celula em que
+  // ja esta e trava no lugar.
+  while (state.guardianPath.length > 0 && state.guardianPath[0] === ey * w + ex) {
+    state.guardianPath.shift();
+  }
+  if (state.guardianPath.length === 0) {
+    // Sem rota dentro do orcamento: volta a empurrar na direcao do alvo. Pior,
+    // mas nunca imovel — um chefe parado e o fim da luta.
+    return normalized(targetX - enemy.x, targetY - enemy.y);
+  }
+
+  const next = state.guardianPath[0];
+  const nx = next % w;
+  const ny = (next / w) | 0;
+  // Parede no proximo passo: a rota ja pagou o preco de atravessa-la, entao ele
+  // ABRE em vez de tropecar. E o que transforma "preso atras de uma pedra" em
+  // "vem vindo, e a pedra nao vai adiantar".
+  //
+  // E abre BRECHA, nao porta. O guardiao tem raio 0,68 — corpo de quase um tile
+  // e meio — e a colisao amostra os quatro cantos dele: num vao de uma celula so
+  // os cantos ainda caem na pedra dos lados, e ele fica encostado no buraco que
+  // acabou de fazer. Medido, foi exatamente o que aconteceu: parede quebrada,
+  // caminho vazio e o chefe parado a 1,7 tile dela pelo resto da luta. As
+  // vizinhas PERPENDICULARES ao passo sao o que da largura ao vao.
+  if (state.solid[ny * w + nx] !== SOLID_NONE) {
+    const alongX = Math.abs(nx - ex) >= Math.abs(ny - ey);
+    for (const [ox, oy] of alongX ? [[0, 0], [0, -1], [0, 1]] : [[0, 0], [-1, 0], [1, 0]]) {
+      const bx = nx + ox;
+      const by = ny + oy;
+      if (state.solid[by * w + bx] === SOLID_NONE) continue;
+      if (!breakSolid(state, bx, by, events)) ripSolid(state, bx, by, events);
+    }
+  }
+  return normalized(nx + 0.5 - enemy.x, ny + 0.5 - enemy.y);
+};
+
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   for (const enemy of state.enemies) {
@@ -291,10 +442,22 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     const player = nearestTarget(state, enemy.x, enemy.y);
     const dist = player ? distTo(enemy, player) : Infinity;
-    const aggro = player !== null && dist <= def.aggroRange + (enemy.elite ? 3 : 0);
+    // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
+    // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
+    const guardianHunting = enemy.archetype === 'guardian' && state.guardianAwake;
+    const aggro =
+      player !== null &&
+      (guardianHunting ||
+        dist <= def.aggroRange + (enemy.elite ? 3 : 0) ||
+        state.tick < enemy.alertedUntil);
 
     if (enemy.archetype === 'guardian' && !state.guardianAwake) {
-      if (state.coreTaken || dist < 7) {
+      // O alerta TAMBEM acorda. Sem isto, `aggro` ficava verdadeiro por dano mas
+      // o portao logo abaixo devolvia `continue`: o chefe levava tiro de 8 tiles
+      // sem se mexer, cada tiro renovando um alerta que nao servia para nada.
+      // Era exatamente a morte sem retaliacao que o aggro por dano existe para
+      // impedir, preservada no unico inimigo em que ela mais doi.
+      if (state.coreTaken || dist < 7 || state.tick < enemy.alertedUntil) {
         state.guardianAwake = true;
         events.push({ t: 'guardian_awake' });
       } else continue;
@@ -308,10 +471,37 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       const toward = normalized(player.x - enemy.x, player.y - enemy.y);
       dirX = toward.x;
       dirY = toward.y;
+      if (enemy.archetype === 'guardian') {
+        const steer = guardianSteering(state, enemy, player.x, player.y, events);
+        dirX = steer.x;
+        dirY = steer.y;
+      }
 
       if (enemy.archetype === 'bomber' && dist < 2.05) {
         startAction(state, enemy, 'detonate', toward, 12, 4, events, player.id);
         continue;
+      }
+
+      // Bruiser: arranca a parede e joga.
+      //
+      // Ele era o unico sem NENHUMA resposta a distancia, a metade da velocidade
+      // do jogador — contra quem recua, nunca encostava, e mais HP so alongaria
+      // a mesma luta inofensiva. A municao sai do MUNDO: o bloco arrancado some
+      // da arena, entao a cobertura de quem esta atras dela pode virar o proprio
+      // projetil que vem. Sem parede ao alcance ele nao tem o que jogar e volta
+      // a ser o perseguidor lento — em sala aberta a ameaca dele e outra.
+      if (
+        enemy.archetype === 'bruiser' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist >= BRUISER_HURL_MIN_RANGE &&
+        dist <= BRUISER_HURL_MAX_RANGE
+      ) {
+        const ammo = findRippable(state, enemy);
+        if (ammo && ripSolid(state, ammo.x, ammo.y, events)) {
+          enemy.rangedReadyAt = state.tick + BRUISER_HURL_COOLDOWN_TICKS;
+          startAction(state, enemy, 'hurl', toward, BRUISER_HURL_WINDUP_TICKS, 6, events, player.id);
+          continue;
+        }
       }
 
       if ((enemy.archetype === 'spitter' || enemy.archetype === 'guardian') && state.tick >= enemy.rangedReadyAt) {
@@ -392,10 +582,49 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
   }
 
   const guardian = state.enemies.find((e) => e.archetype === 'guardian');
-  if (guardian && guardian.alive && guardian.hp < guardian.maxHp * 0.5 && !state.guardianSummoned) {
+  if (!guardian || !guardian.alive) return;
+  const enraged = guardian.hp < guardian.maxHp * 0.5;
+
+  if (enraged && !state.guardianSummoned) {
     state.guardianSummoned = true;
-    spawnEnemy(state, 'stalker', Math.floor(guardian.x) - 2, Math.floor(guardian.y), false);
-    spawnEnemy(state, 'stalker', Math.floor(guardian.x) + 2, Math.floor(guardian.y), false);
+    // Em anel, e nao dois dos lados: saindo todos da mesma linha, o jogador
+    // resolvia os quatro com um recuo so.
+    const around = [
+      [-2, 0],
+      [2, 0],
+      [0, -2],
+      [0, 2],
+    ];
+    for (let k = 0; k < GUARDIAN_SUMMON_COUNT; k++) {
+      const [dx, dy] = around[k % around.length];
+      spawnEnemy(state, 'stalker', Math.floor(guardian.x) + dx, Math.floor(guardian.y) + dy, false);
+    }
+  }
+
+  // O cerco espera o jogador estar DENTRO do raio.
+  //
+  // Fechado em volta do guardiao com o jogador longe, o efeito seria o oposto do
+  // pretendido: trancaria o chefe e libertaria quem devia estar preso. Por isso
+  // e uma tentativa por tick enquanto ele estiver enfurecido, e nao um evento
+  // unico no instante em que a vida cruza a metade.
+  if (enraged && !state.arenaClosed) {
+    const near = state.players.find(
+      (p) =>
+        p.alive &&
+        !state.playerExtras[p.slot ?? 0].downed &&
+        Math.max(Math.abs(p.x - guardian.x), Math.abs(p.y - guardian.y)) < GUARDIAN_ARENA_RADIUS - 1
+    );
+    if (near) {
+      const placed = closeArena(
+        state,
+        Math.floor(guardian.x),
+        Math.floor(guardian.y),
+        GUARDIAN_ARENA_RADIUS,
+        GUARDIAN_ARENA_EXITS,
+        events
+      );
+      if (placed > 0) state.arenaClosed = true;
+    }
   }
 };
 

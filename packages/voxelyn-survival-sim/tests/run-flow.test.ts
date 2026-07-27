@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GUARDIAN_SUMMON_COUNT } from '../src/constants';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { spawnEnemy } from '../src/entities';
 import type { SurvivalState } from '../src/types';
@@ -142,7 +143,11 @@ describe('guardiao: invocacao de 50%', () => {
 
     // antes: o stalker de id maior fazia a sim achar que ja tinha invocado
     expect(state.guardianSummoned).toBe(true);
-    expect(state.enemies.filter((e) => e.archetype === 'stalker').length).toBe(stalkersBefore + 2);
+    // Derivado da constante, e nao um numero fixo: o tamanho da matilha e uma
+    // decisao de balanceamento e vai mudar de novo.
+    expect(state.enemies.filter((e) => e.archetype === 'stalker').length).toBe(
+      stalkersBefore + GUARDIAN_SUMMON_COUNT
+    );
   });
 
   it('invoca uma unica vez, mesmo com o guardiao muito tempo abaixo de 50%', () => {

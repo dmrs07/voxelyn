@@ -99,6 +99,7 @@ const makePlayer = (slot: number, x: number, y: number): Entity => ({
   contactReadyAt: 0,
   rangedReadyAt: 0,
   stunnedUntil: 0,
+  alertedUntil: 0,
   facing: { x: 1, y: 0 },
   slot,
 });
@@ -175,6 +176,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
     coreTaken: false,
     guardianAwake: false,
     guardianSummoned: false,
+    arenaClosed: false,
+    guardianPath: [],
+    guardianPathAt: -1000,
     leftEntryZone: false,
     players,
     playerExtras,

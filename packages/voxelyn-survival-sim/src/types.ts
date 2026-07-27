@@ -20,6 +20,7 @@ export type EntityActionKind =
   | 'charge'
   | 'detonate'
   | 'slam'
+  | 'hurl'
   | 'pulse';
 export type EntityActionPhase = 'windup' | 'release' | 'recovery';
 export type EntityAction = {
@@ -49,6 +50,15 @@ export type Entity = {
   contactReadyAt: number;
   rangedReadyAt: number;
   stunnedUntil: number;
+  /**
+   * Ate quando este inimigo continua caçando por ter LEVADO DANO.
+   *
+   * Sem isto o aggro era so distancia, recalculado a cada tick — entao dava para
+   * matar qualquer coisa de fora do raio dela sem que ela reagisse. Com alcance
+   * de tiro de 18 tiles contra raios de aggro de 7 a 9, isso nao era um caso de
+   * borda: era o jeito normal de lutar.
+   */
+  alertedUntil: number;
   facing: Vec2;
   action?: EntityAction;
   slot?: number;
@@ -153,6 +163,19 @@ export type SurvivalState = {
   coreTaken: boolean;
   guardianAwake: boolean;
   guardianSummoned: boolean;
+  /**
+   * Rota atual do guardiao, em indices de celula, e o tick em que foi calculada.
+   *
+   * Vive no estado e nao na entidade porque e DERIVADO: da para recalcular a
+   * qualquer momento a partir da grade, entao nao entra no hash autoritativo nem
+   * precisa viajar num snapshot. O cliente so desenha; quem persegue e o
+   * servidor.
+   */
+  /** A arena ja foi lacrada? Separado de `guardianSummoned` porque o cerco pode
+   * ter de esperar o jogador entrar no raio, enquanto os invocados saem na hora. */
+  arenaClosed: boolean;
+  guardianPath: number[];
+  guardianPathAt: number;
   leftEntryZone: boolean;
   players: Entity[];
   playerExtras: PlayerExtra[];

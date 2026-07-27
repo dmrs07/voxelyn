@@ -16,6 +16,7 @@ import {
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SOLID_ROCK,
   SPORE_BURN_TICKS,
   SURF_BIOFLUID,
   SURF_FIRE,
@@ -360,4 +361,116 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
     return true;
   }
   return false;
+};
+
+/**
+ * Arranca uma celula de parede COMUM, para virar municao do bruiser.
+ *
+ * Separado de `breakSolid` de proposito, e as duas diferencas sao intencionais:
+ *
+ * - `breakSolid` nao quebra rocha — so fragil e cristal. Arrancar a parede e
+ *   exatamente o que o bruiser faz de especial, entao precisa passar por cima
+ *   dessa regra sem afrouxa-la para todo o resto do jogo.
+ * - MINERIO e CRISTAL ficam de fora. Minerio e recurso do jogador e cristal e
+ *   luz e descarga; deixar um inimigo apagar qualquer um dos dois de graca
+ *   tiraria do jogador coisas que ele foi ate ali buscar, sem que ele pudesse
+ *   sequer disputar.
+ *
+ * A celula vira chao nu, e nao queimado: nada foi incinerado ali, foi levado.
+ *
+ * A BORDA do mapa tambem fica de fora, e isso apareceu num teste e nao no
+ * papel: com o jogador nascendo perto da parede externa, o bruiser arrancava o
+ * proprio limite do mundo. Nada quebrava — `isSolidAt` trata fora do mapa como
+ * solido — mas abria um buraco na moldura da sala, que e cenario e nao arena.
+ */
+export const canRip = (state: SurvivalState, x: number, y: number): boolean => {
+  const w = W(state);
+  if (x <= 0 || y <= 0 || x >= w - 1 || y >= state.config.height - 1) return false;
+  const solid = state.solid[y * w + x];
+  return solid === SOLID_ROCK || solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK;
+};
+
+export const ripSolid = (state: SurvivalState, x: number, y: number, events: SemanticEvent[]): boolean => {
+  const w = W(state);
+  if (!canRip(state, x, y)) return false;
+  const i = y * w + x;
+  const solid = state.solid[i];
+  state.solid[i] = SOLID_NONE;
+  markDirty(state, x, y);
+  events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
+  return true;
+};
+
+/**
+ * Lacra uma arena quadrada em volta do guardiao, com poucas saidas quebraveis.
+ *
+ * Existe porque perseguir nao basta. Mesmo caçando com busca de caminho, o
+ * guardiao anda 2,1 contra os 4,6 do jogador: em corredor aberto da para vencer
+ * a luta andando para tras e atirando, sem nunca decidir nada. A arena tira essa
+ * saida — e, com ela, a luta passa a ser sobre POSICAO dentro de um espaco, que
+ * e onde os invocados importam.
+ *
+ * O anel e ROCHA porque rocha nao cede a tiro nenhum (`impactSolid` devolve
+ * `broke: false` para as quatro classes de projetil). Fosse fragil, o jogador
+ * abriria a parede em qualquer ponto e a arena nao teria sentido.
+ *
+ * As saidas sao FRAGIL, poucas e sorteadas: existe rota de fuga, mas ela custa
+ * tiros e tempo, e e nesse tempo que o guardiao e os invocados cobram. Um cerco
+ * sem saida nenhuma nao seria dificuldade, seria uma sentenca — e o jogo promete
+ * morte por decisao arriscada, nao por falta de opcao.
+ *
+ * So converte celula VAZIA: minerio, cristal e rocha ja existentes ficam como
+ * estao, senao o cerco apagaria recurso e luz que o jogador foi ali buscar. E
+ * pula celula ocupada por alguem, que viraria entidade presa dentro de pedra.
+ */
+export const closeArena = (
+  state: SurvivalState,
+  cx: number,
+  cy: number,
+  radius: number,
+  exits: number,
+  events: SemanticEvent[]
+): number => {
+  const w = W(state);
+  const h = state.config.height;
+  const occupied = new Set<number>();
+  for (const e of [...state.players, ...state.enemies]) {
+    if (!e.alive) continue;
+    occupied.add(Math.floor(e.y) * w + Math.floor(e.x));
+  }
+  // Nucleo e extracao nunca viram parede: sao os dois objetivos da run.
+  occupied.add(state.corePos.y * w + state.corePos.x);
+  occupied.add(state.entry.y * w + state.entry.x);
+
+  const ring: number[] = [];
+  for (let y = cy - radius; y <= cy + radius; y++) {
+    for (let x = cx - radius; x <= cx + radius; x++) {
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== radius) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      if (occupied.has(i)) continue;
+      ring.push(i);
+    }
+  }
+  if (ring.length === 0) return 0;
+
+  // Saidas sorteadas com a RNG da simulacao, e nao com `Math.random`: as duas
+  // maquinas de uma sala de co-op precisam abrir a parede nos mesmos pontos.
+  const doors = new Set<number>();
+  const wanted = Math.min(exits, ring.length);
+  for (let k = 0; k < wanted; k++) {
+    // Espalha as tentativas pelo anel: sorteio livre agrupa as saidas num canto
+    // com frequencia alta, e duas saidas coladas valem por uma.
+    const span = Math.floor(ring.length / wanted);
+    const base = k * span;
+    doors.add(ring[base + state.rng.nextInt(Math.max(1, span))]);
+  }
+
+  for (const i of ring) {
+    state.solid[i] = doors.has(i) ? SOLID_FRAGILE : SOLID_ROCK;
+    markDirty(state, i % w, Math.floor(i / w));
+  }
+  events.push({ t: 'message', text: 'O Veio se fecha. Abra caminho ou lute.' });
+  return ring.length;
 };
