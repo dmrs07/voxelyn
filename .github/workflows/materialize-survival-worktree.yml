@@ -104,25 +104,64 @@ jobs:
 
           salvage_path = Path('packages/voxelyn-survival-sim/tests/salvage-modules.test.ts')
           salvage = salvage_path.read_text()
-          spawn_line = "    const enemy = spawnEnemy(state, 'bruiser', state.player.x + 0.2, state.player.y, false);"
-          isolated_fixture = (
-              f"{spawn_line}\n"
+
+          siphon_spawn = "    const enemy = spawnEnemy(state, 'bruiser', state.player.x + 0.2, state.player.y, false);"
+          siphon_fixture = (
+              f"{siphon_spawn}\n"
               "    enemy.x = state.player.x + 0.2;\n"
               "    enemy.y = state.player.y;\n"
               "    enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
           )
           if "enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;" not in salvage:
-              if spawn_line not in salvage:
+              if siphon_spawn not in salvage:
                   raise SystemExit('Unexpected siphon fixture shape in salvage-modules.test.ts')
-              salvage = salvage.replace(spawn_line, isolated_fixture, 1)
-              salvage_path.write_text(salvage)
+              salvage = salvage.replace(siphon_spawn, siphon_fixture, 1)
+
+          explosive_before = "    spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);"
+          explosive_before_fixture = (
+              "    const beforeEnemy = spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);\n"
+              "    beforeEnemy.x = before.player.x;\n"
+              "    beforeEnemy.y = before.player.y;\n"
+              "    beforeEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
+          )
+          if "beforeEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;" not in salvage:
+              if explosive_before not in salvage:
+                  raise SystemExit('Unexpected pre-arm explosive fixture shape')
+              salvage = salvage.replace(explosive_before, explosive_before_fixture, 1)
+
+          explosive_armed = "    spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);"
+          explosive_armed_fixture = (
+              "    const armedEnemy = spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);\n"
+              "    armedEnemy.x = armed.player.x;\n"
+              "    armedEnemy.y = armed.player.y;\n"
+              "    armedEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
+          )
+          if "armedEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;" not in salvage:
+              if explosive_armed not in salvage:
+                  raise SystemExit('Unexpected armed explosive fixture shape')
+              salvage = salvage.replace(explosive_armed, explosive_armed_fixture, 1)
+
+          terminal_loop = "    while (state.tick < first.scanEndsAt) stepRun(state, [emptyCommand()]);"
+          terminal_fixture = (
+              "    while (state.tick < first.scanEndsAt) {\n"
+              "      state.enemies = [];\n"
+              "      state.player.hp = state.player.maxHp;\n"
+              "      stepRun(state, [emptyCommand()]);\n"
+              "    }"
+          )
+          if "state.player.hp = state.player.maxHp;" not in salvage:
+              if terminal_loop not in salvage:
+                  raise SystemExit('Unexpected terminal scan loop shape')
+              salvage = salvage.replace(terminal_loop, terminal_fixture, 1)
+
+          salvage_path.write_text(salvage)
           PY
           git add \
             packages/voxelyn-survival-sim/src/cells.ts \
             packages/voxelyn-survival-sim/tests/reactions.test.ts \
             packages/voxelyn-survival-sim/tests/salvage-modules.test.ts
           if ! git diff --cached --quiet; then
-            git commit -m "fix(survival): isolate module and reaction fixtures"
+            git commit -m "fix(survival): isolate module, scan and reaction fixtures"
           fi
 
       - name: Build core for content tools
