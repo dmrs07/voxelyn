@@ -1,4 +1,4 @@
-name: Materialize Survival Worktree
+name: Apply Survival Redesign
 
 on:
   push:
@@ -9,19 +9,96 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: survival-redesign-apply
+  cancel-in-progress: true
 
 jobs:
-  archive:
+  apply-test-push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Remove git metadata
-        run: rm -rf .git
-      - name: Upload worktree
-        uses: actions/upload-artifact@v4
         with:
-          name: voxelyn-worktree
-          path: .
-          include-hidden-files: true
-          retention-days: 1
+          ref: feat/survival-salvage-modules
+          fetch-depth: 0
+
+      - name: Report validation start
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment 48 --repo dmrs07/voxelyn --body "🔎 Guarded Survival validation started for \`${GITHUB_SHA::12}\`: ${RUN_URL}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply logical slices
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for prefix in 01-sim 02-protocol-server 03-ui-content; do
+            cat .github/patches/${prefix}.*.part > "/tmp/${prefix}.patch.gz.b64"
+            case "$prefix" in
+              01-sim)
+                expected="2c7afa3fc6300b73b8c714968eef35b8b05aedb34e492df0b643d67ce23c3f60"
+                message="feat(survival): add temporary modules and salvage simulation"
+                ;;
+              02-protocol-server)
+                expected="fc26e4978d5ff097b4ab640bd0ebeab4c64331ad7bfc695f9b0fa7d21b25b4f9"
+                message="feat(survival): synchronize per-player choices and world flags"
+                ;;
+              03-ui-content)
+                expected="eda0ca30411e0e7982c3af3ebe0dcbdf359352e4083280aaa7b36c0345fe059d"
+                message="feat(survival-ui): add salvage props, reward choice and module HUD"
+                ;;
+            esac
+            echo "$expected  /tmp/${prefix}.patch.gz.b64" | sha256sum --check
+            base64 --decode "/tmp/${prefix}.patch.gz.b64" | gzip --decompress > "/tmp/${prefix}.patch"
+            git apply --index "/tmp/${prefix}.patch"
+            git commit -m "$message"
+          done
+
+      - name: Generate content atlases
+        run: pnpm --filter @voxelyn/survival-content generate
+
+      - name: Test Survival workspace
+        run: pnpm test:survival
+
+      - name: Commit generated assets and cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add packages/voxelyn-survival-content/assets/atlases/world-props.json \
+                  packages/voxelyn-survival-content/assets/atlases/world-props.png \
+                  packages/voxelyn-survival-content/assets/atlases/index.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(survival-content): regenerate salvage prop atlas"
+          fi
+          git rm -r .github/patches
+          git rm .github/workflows/materialize-survival-worktree.yml
+          git rm .github/workflows/apply-survival-redesign.yml
+          git commit -m "chore: remove temporary survival workflows"
+          git push origin HEAD:feat/survival-salvage-modules
+
+      - name: Report validation failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment 48 --repo dmrs07/voxelyn --body "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
+
+      - name: Report validation success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed: ${RUN_URL}. Atlas generation and the complete \`pnpm test:survival\` suite succeeded; the logical source commits are now on this PR."
