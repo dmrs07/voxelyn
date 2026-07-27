@@ -4,7 +4,7 @@
   "atlas": "world-props.png",
   "frameWidth": 44,
   "frameHeight": 52,
-  "columns": 11,
+  "columns": 21,
   "originX": 20,
   "originY": 40,
   "kinds": [
@@ -22,6 +22,31 @@
       "name": "extraction",
       "frames": 4,
       "frameMs": 240
+    },
+    {
+      "name": "salvageTerminalIdle",
+      "frames": 2,
+      "frameMs": 420
+    },
+    {
+      "name": "salvageTerminalScanning",
+      "frames": 4,
+      "frameMs": 120
+    },
+    {
+      "name": "salvageTerminalComplete",
+      "frames": 2,
+      "frameMs": 300
+    },
+    {
+      "name": "salvageCache",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "salvageCacheOpened",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "paletteColors": [
