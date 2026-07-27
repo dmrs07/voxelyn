@@ -125,6 +125,9 @@ describe('modulos temporarios', () => {
     clearArena(state);
     grantOrRechargeModule(state.playerExtra, 'siphon', state.tick);
     const enemy = spawnEnemy(state, 'bruiser', state.player.x + 0.2, state.player.y, false);
+    enemy.x = state.player.x + 0.2;
+    enemy.y = state.player.y;
+    enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;
 
     state.projectiles = [bolt(state, { modules: { siphon: true } })];
     stepRun(state, [emptyCommand()]);
@@ -142,7 +145,10 @@ describe('modulos temporarios', () => {
   it('explosive funciona como bolt antes de armar e explode depois da distancia definida', () => {
     const before = createRun({ seed: 104 });
     clearArena(before);
-    spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);
+    const beforeEnemy = spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);
+    beforeEnemy.x = before.player.x;
+    beforeEnemy.y = before.player.y;
+    beforeEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;
     before.projectiles = [bolt(before, {
       modules: { explosive: { armAfterDistance: EXPLOSIVE_ARM_DISTANCE } },
       distanceTravelled: EXPLOSIVE_ARM_DISTANCE - 0.1,
@@ -152,7 +158,10 @@ describe('modulos temporarios', () => {
 
     const armed = createRun({ seed: 105 });
     clearArena(armed);
-    spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);
+    const armedEnemy = spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);
+    armedEnemy.x = armed.player.x;
+    armedEnemy.y = armed.player.y;
+    armedEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;
     armed.projectiles = [bolt(armed, {
       modules: { explosive: { armAfterDistance: EXPLOSIVE_ARM_DISTANCE } },
       distanceTravelled: EXPLOSIVE_ARM_DISTANCE,
@@ -261,7 +270,11 @@ describe('escolha por jogador e salvamento', () => {
     expect(first.terminalState).toBe('scanning');
     expect(state.salvageSites.slice(1).every((site) => !site.cacheRevealed)).toBe(true);
 
-    while (state.tick < first.scanEndsAt) stepRun(state, [emptyCommand()]);
+    while (state.tick < first.scanEndsAt) {
+      state.enemies = [];
+      state.player.hp = state.player.maxHp;
+      stepRun(state, [emptyCommand()]);
+    }
     expect(first.terminalState).toBe('complete');
     expect(first.cacheRevealed).toBe(true);
     expect(state.salvageSites.slice(1).every((site) => !site.cacheRevealed)).toBe(true);

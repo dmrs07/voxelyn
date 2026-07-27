@@ -515,12 +515,13 @@ describe('servidor autoritativo de co-op', () => {
     if (wb?.t !== 'welcome') throw new Error('sem welcome');
 
     const room = h.server.roomForClient('A')!;
+    h.disconnect('B');
+    h.tick(40); // blip curto, bem dentro do grace
+
+    // Isola o invariante de reconnect do dano autoritativo que pode ocorrer offline.
     room.state.players[1].x = room.state.entry.x + 18;
     room.state.players[1].y = room.state.entry.y + 12;
     room.state.players[1].hp = 40;
-
-    h.disconnect('B');
-    h.tick(40); // blip curto, bem dentro do grace
     h.connect('B2');
     h.hello('B2', wb.resumeToken);
     h.tick(1);

@@ -35,6 +35,8 @@ const clearArea = (state: SurvivalState, x0: number, y0: number, x1: number, y1:
       state.surfaceTimer[y * w + x] = 0;
     }
   }
+  // Um cenário controlado não pode receber emissões de vents gerados pela seed.
+  state.vents = state.vents.filter((vent) => vent.x < x0 || vent.x > x1 || vent.y < y0 || vent.y > y1);
 };
 
 const tickCells = (state: SurvivalState, events: SemanticEvent[], steps: number): void => {

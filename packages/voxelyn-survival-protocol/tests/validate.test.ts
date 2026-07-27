@@ -40,7 +40,7 @@ describe('validacao de comando (cliente nao pode afirmar fatos)', () => {
       expect(res.value.ability).toBe(false);
       // nenhuma propriedade fora de PlayerCommand sobrevive
       expect(Object.keys(res.value).sort()).toEqual(
-        ['ability', 'aim', 'choose', 'consume', 'dodge', 'fire', 'interact', 'move'].sort()
+        ['ability', 'aim', 'choose', 'dodge', 'fire', 'interact', 'move', 'purge'].sort()
       );
     }
   });
