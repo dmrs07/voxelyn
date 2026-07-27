@@ -1,12 +1,9 @@
-name: Apply Survival Redesign
+name: Finalize Survival Redesign
 
 on:
   push:
     branches:
       - feat/survival-salvage-modules
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -14,12 +11,13 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: survival-redesign-apply
+  group: survival-redesign-finalize
   cancel-in-progress: true
 
 jobs:
-  apply-test-push:
+  validate-and-publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +29,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          printf '🔎 Guarded Survival validation started for `%s`: %s\n' "${GITHUB_SHA::12}" "$RUN_URL" > /tmp/status.md
+          printf '🔎 Final Survival validation started for `%s`: %s\n' "${GITHUB_SHA::12}" "$RUN_URL" > /tmp/status.md
           gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097222729 -F body=@/tmp/status.md
 
       - uses: actions/setup-node@v4
@@ -69,7 +67,7 @@ jobs:
             git commit -m "$message"
           done
 
-      - name: Apply deterministic fixture corrections
+      - name: Apply deterministic corrections
         shell: bash
         run: |
           set -euo pipefail
@@ -104,56 +102,39 @@ jobs:
 
           salvage_path = Path('packages/voxelyn-survival-sim/tests/salvage-modules.test.ts')
           salvage = salvage_path.read_text()
-
-          siphon_spawn = "    const enemy = spawnEnemy(state, 'bruiser', state.player.x + 0.2, state.player.y, false);"
-          siphon_fixture = (
-              f"{siphon_spawn}\n"
-              "    enemy.x = state.player.x + 0.2;\n"
-              "    enemy.y = state.player.y;\n"
-              "    enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
-          )
-          if "enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;" not in salvage:
-              if siphon_spawn not in salvage:
-                  raise SystemExit('Unexpected siphon fixture shape in salvage-modules.test.ts')
-              salvage = salvage.replace(siphon_spawn, siphon_fixture, 1)
-
-          explosive_before = "    spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);"
-          explosive_before_fixture = (
-              "    const beforeEnemy = spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);\n"
-              "    beforeEnemy.x = before.player.x;\n"
-              "    beforeEnemy.y = before.player.y;\n"
-              "    beforeEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
-          )
-          if "beforeEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;" not in salvage:
-              if explosive_before not in salvage:
-                  raise SystemExit('Unexpected pre-arm explosive fixture shape')
-              salvage = salvage.replace(explosive_before, explosive_before_fixture, 1)
-
-          explosive_armed = "    spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);"
-          explosive_armed_fixture = (
-              "    const armedEnemy = spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);\n"
-              "    armedEnemy.x = armed.player.x;\n"
-              "    armedEnemy.y = armed.player.y;\n"
-              "    armedEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
-          )
-          if "armedEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;" not in salvage:
-              if explosive_armed not in salvage:
-                  raise SystemExit('Unexpected armed explosive fixture shape')
-              salvage = salvage.replace(explosive_armed, explosive_armed_fixture, 1)
-
-          terminal_loop = "    while (state.tick < first.scanEndsAt) stepRun(state, [emptyCommand()]);"
-          terminal_fixture = (
-              "    while (state.tick < first.scanEndsAt) {\n"
-              "      state.enemies = [];\n"
-              "      state.player.hp = state.player.maxHp;\n"
-              "      stepRun(state, [emptyCommand()]);\n"
-              "    }"
-          )
-          if "state.player.hp = state.player.maxHp;" not in salvage:
-              if terminal_loop not in salvage:
-                  raise SystemExit('Unexpected terminal scan loop shape')
-              salvage = salvage.replace(terminal_loop, terminal_fixture, 1)
-
+          replacements = {
+              "    const enemy = spawnEnemy(state, 'bruiser', state.player.x + 0.2, state.player.y, false);": (
+                  "    const enemy = spawnEnemy(state, 'bruiser', state.player.x + 0.2, state.player.y, false);\n"
+                  "    enemy.x = state.player.x + 0.2;\n"
+                  "    enemy.y = state.player.y;\n"
+                  "    enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
+              ),
+              "    spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);": (
+                  "    const beforeEnemy = spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);\n"
+                  "    beforeEnemy.x = before.player.x;\n"
+                  "    beforeEnemy.y = before.player.y;\n"
+                  "    beforeEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
+              ),
+              "    spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);": (
+                  "    const armedEnemy = spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);\n"
+                  "    armedEnemy.x = armed.player.x;\n"
+                  "    armedEnemy.y = armed.player.y;\n"
+                  "    armedEnemy.stunnedUntil = Number.MAX_SAFE_INTEGER;"
+              ),
+              "    while (state.tick < first.scanEndsAt) stepRun(state, [emptyCommand()]);": (
+                  "    while (state.tick < first.scanEndsAt) {\n"
+                  "      state.enemies = [];\n"
+                  "      state.player.hp = state.player.maxHp;\n"
+                  "      stepRun(state, [emptyCommand()]);\n"
+                  "    }"
+              ),
+          }
+          for old, new in replacements.items():
+              if new in salvage:
+                  continue
+              if old not in salvage:
+                  raise SystemExit(f'Unexpected salvage fixture shape: {old}')
+              salvage = salvage.replace(old, new, 1)
           salvage_path.write_text(salvage)
           PY
           git add \
@@ -161,74 +142,61 @@ jobs:
             packages/voxelyn-survival-sim/tests/reactions.test.ts \
             packages/voxelyn-survival-sim/tests/salvage-modules.test.ts
           if ! git diff --cached --quiet; then
-            git commit -m "fix(survival): isolate module, scan and reaction fixtures"
+            git commit -m "fix(survival): isolate deterministic module and reaction fixtures"
           fi
 
-      - name: Build core for content tools
+      - name: Build dependency graph
         shell: bash
         run: |
           set -o pipefail
-          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/build.log
+          {
+            pnpm --filter @voxelyn/core build
+            pnpm --filter @voxelyn/survival-sim build
+            pnpm --filter @voxelyn/survival-protocol build
+            pnpm --filter @voxelyn/survival-content generate
+            pnpm --filter @voxelyn/survival-content validate
+            pnpm --filter @voxelyn/survival-content build
+            pnpm --filter @voxelyn/survival-server build
+            pnpm --filter @voxelyn/survival build:offline-check
+          } 2>&1 | tee /tmp/build.log
 
-      - name: Generate content atlases
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/generate.log
-
-      - name: Diagnose salvage module tests
-        timeout-minutes: 5
-        shell: bash
-        env:
-          NO_COLOR: '1'
-          FORCE_COLOR: '0'
-        run: |
-          set -o pipefail
-          cd packages/voxelyn-survival-sim
-          echo 'tests/salvage-modules.test.ts' > /tmp/test-sim-current
-          timeout 120s pnpm exec vitest run tests/salvage-modules.test.ts --reporter=verbose 2>&1 | tee /tmp/test-sim.log
-
-      - name: Test remaining simulation files
-        timeout-minutes: 15
+      - name: Test simulation files
         shell: bash
         run: |
           set -euo pipefail
           cd packages/voxelyn-survival-sim
-          mapfile -t files < <(find tests -maxdepth 1 -name '*.test.ts' ! -name 'salvage-modules.test.ts' | sort)
-          for file in "${files[@]}"; do
+          : > /tmp/test-sim.log
+          for file in tests/*.test.ts; do
             echo "$file" > /tmp/test-sim-current
-            timeout 90s pnpm exec vitest run "$file" --reporter=verbose 2>&1 | tee /tmp/test-sim.log
+            echo "=== $file ===" | tee -a /tmp/test-sim.log
+            timeout 90s pnpm exec vitest run "$file" --reporter=verbose 2>&1 | tee -a /tmp/test-sim.log
           done
 
       - name: Test protocol
-        timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
           pnpm --filter @voxelyn/survival-protocol test 2>&1 | tee /tmp/test-protocol.log
 
       - name: Test content pipeline
-        timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
           pnpm --filter @voxelyn/survival-content test 2>&1 | tee /tmp/test-content.log
 
       - name: Test server and co-op
-        timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
           pnpm --filter @voxelyn/survival-server test 2>&1 | tee /tmp/test-server.log
 
-      - name: Test client and layout
-        timeout-minutes: 10
+      - name: Test client and layouts
         shell: bash
         run: |
           set -o pipefail
           pnpm --filter @voxelyn/survival test 2>&1 | tee /tmp/test-client.log
 
-      - name: Commit generated assets and cleanup
+      - name: Publish logical commits
         shell: bash
         run: |
           set -euo pipefail
@@ -240,7 +208,9 @@ jobs:
           fi
           git rm -r .github/patches
           git rm .github/workflows/materialize-survival-worktree.yml
-          git commit -m "chore: remove temporary survival workflow"
+          git rm .github/workflows/inspect-salvage-test.yml
+          git commit -m "chore: remove temporary survival validation scaffolding"
+          git status --short
           git push origin HEAD:feat/survival-salvage-modules
 
       - name: Report validation failure
@@ -250,21 +220,21 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
-            echo "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
+            echo "❌ Final Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was published by this run."
             if [[ -f /tmp/test-sim-current ]]; then
-              echo "Arquivo corrente: \`$(cat /tmp/test-sim-current)\`."
+              echo "Simulation file: \`$(cat /tmp/test-sim-current)\`."
             fi
             echo
             echo '```text'
             selected=""
-            for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
+            for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/build.log; do
               if [[ -f "$file" ]]; then
                 selected="$file"
                 break
               fi
             done
             if [[ -n "$selected" ]]; then
-              sed -E $'s/\x1B\[[0-9;]*[mK]//g' "$selected" | tail -n 140
+              sed -E $'s/\x1B\[[0-9;]*[mK]//g' "$selected" | tail -n 180
             else
               echo "Failure occurred before command output was captured."
             fi
@@ -278,5 +248,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          printf '✅ Guarded Survival validation passed: %s. Atlas generation and all Survival package suites succeeded; the logical source commits are now on this PR.\n' "$RUN_URL" > /tmp/status.md
+          {
+            echo "✅ Final Survival validation passed: ${RUN_URL}"
+            echo
+            echo "All Survival builds, atlas validation, package tests and the offline client build succeeded. Logical source commits are now published on the PR branch."
+          } > /tmp/status.md
           gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097222729 -F body=@/tmp/status.md
