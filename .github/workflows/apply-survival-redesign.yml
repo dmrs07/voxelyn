@@ -5,7 +5,7 @@ on:
     branches:
       - feat/survival-salvage-modules
     paths:
-      - .github/patches/**
+      - .github/patches/READY
 
 permissions:
   contents: write
@@ -26,7 +26,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
@@ -37,9 +36,11 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for patch in .github/patches/*.patch; do
+          for packed in .github/patches/*.patch.gz.b64; do
+            patch="/tmp/$(basename "${packed%.gz.b64}")"
+            base64 --decode "$packed" | gzip --decompress > "$patch"
             git apply --index "$patch"
-            case "$(basename "$patch")" in
+            case "$(basename "$packed")" in
               01-*) message="feat(survival): add temporary modules and salvage simulation" ;;
               02-*) message="feat(survival): synchronize per-player choices and world flags" ;;
               03-*) message="feat(survival-ui): add salvage props, reward choice and module HUD" ;;
