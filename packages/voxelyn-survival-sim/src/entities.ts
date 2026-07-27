@@ -12,7 +12,10 @@ import {
   BRUISER_HURL_REACH,
   BRUISER_HURL_SPEED,
   BRUISER_HURL_WINDUP_TICKS,
+  GUARDIAN_ARENA_EXITS,
+  GUARDIAN_ARENA_RADIUS,
   GUARDIAN_PATH_INTERVAL_TICKS,
+  GUARDIAN_SUMMON_COUNT,
   EXPLOSION_DAMAGE,
   SOLID_NONE,
   SPORE_LIFE_TICKS,
@@ -23,7 +26,7 @@ import {
   SURF_SPORES,
   TICK_HZ,
 } from './constants.js';
-import { breakSolid, canRip, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, closeArena, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import type {
   Entity,
@@ -579,10 +582,49 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
   }
 
   const guardian = state.enemies.find((e) => e.archetype === 'guardian');
-  if (guardian && guardian.alive && guardian.hp < guardian.maxHp * 0.5 && !state.guardianSummoned) {
+  if (!guardian || !guardian.alive) return;
+  const enraged = guardian.hp < guardian.maxHp * 0.5;
+
+  if (enraged && !state.guardianSummoned) {
     state.guardianSummoned = true;
-    spawnEnemy(state, 'stalker', Math.floor(guardian.x) - 2, Math.floor(guardian.y), false);
-    spawnEnemy(state, 'stalker', Math.floor(guardian.x) + 2, Math.floor(guardian.y), false);
+    // Em anel, e nao dois dos lados: saindo todos da mesma linha, o jogador
+    // resolvia os quatro com um recuo so.
+    const around = [
+      [-2, 0],
+      [2, 0],
+      [0, -2],
+      [0, 2],
+    ];
+    for (let k = 0; k < GUARDIAN_SUMMON_COUNT; k++) {
+      const [dx, dy] = around[k % around.length];
+      spawnEnemy(state, 'stalker', Math.floor(guardian.x) + dx, Math.floor(guardian.y) + dy, false);
+    }
+  }
+
+  // O cerco espera o jogador estar DENTRO do raio.
+  //
+  // Fechado em volta do guardiao com o jogador longe, o efeito seria o oposto do
+  // pretendido: trancaria o chefe e libertaria quem devia estar preso. Por isso
+  // e uma tentativa por tick enquanto ele estiver enfurecido, e nao um evento
+  // unico no instante em que a vida cruza a metade.
+  if (enraged && !state.arenaClosed) {
+    const near = state.players.find(
+      (p) =>
+        p.alive &&
+        !state.playerExtras[p.slot ?? 0].downed &&
+        Math.max(Math.abs(p.x - guardian.x), Math.abs(p.y - guardian.y)) < GUARDIAN_ARENA_RADIUS - 1
+    );
+    if (near) {
+      const placed = closeArena(
+        state,
+        Math.floor(guardian.x),
+        Math.floor(guardian.y),
+        GUARDIAN_ARENA_RADIUS,
+        GUARDIAN_ARENA_EXITS,
+        events
+      );
+      if (placed > 0) state.arenaClosed = true;
+    }
   }
 };
 

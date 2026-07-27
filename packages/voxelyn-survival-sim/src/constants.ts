@@ -151,6 +151,22 @@ export const BRUISER_HURL_REACH = 3;
  */
 export const GUARDIAN_PATH_INTERVAL_TICKS = 10;
 
+/**
+ * Cerco da segunda fase do guardiao.
+ *
+ * Raio 7 da uma sala de 15x15: espaco para desviar e usar o terreno, e pouco
+ * para vencer andando para tras. As saidas sao poucas de proposito — elas
+ * existem para que haja escolha ("abro caminho ou encaro?"), nao para que fugir
+ * seja o plano obvio.
+ *
+ * Quatro invocados e nao dois porque o stalker anda a 5,2 contra os 4,6 do
+ * jogador: dentro de um espaco fechado, sao eles que punem quem fica so
+ * circulando. O guardiao segura o centro; eles cobram a orbita.
+ */
+export const GUARDIAN_ARENA_RADIUS = 7;
+export const GUARDIAN_ARENA_EXITS = 2;
+export const GUARDIAN_SUMMON_COUNT = 4;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;

@@ -171,6 +171,9 @@ export type SurvivalState = {
    * precisa viajar num snapshot. O cliente so desenha; quem persegue e o
    * servidor.
    */
+  /** A arena ja foi lacrada? Separado de `guardianSummoned` porque o cerco pode
+   * ter de esperar o jogador entrar no raio, enquanto os invocados saem na hora. */
+  arenaClosed: boolean;
   guardianPath: number[];
   guardianPathAt: number;
   leftEntryZone: boolean;
