@@ -80,12 +80,17 @@ jobs:
           set -o pipefail
           pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/generate.log
 
-      - name: Test simulation
-        timeout-minutes: 10
+      - name: Test simulation files
+        timeout-minutes: 15
         shell: bash
         run: |
-          set -o pipefail
-          pnpm --filter @voxelyn/survival-sim test 2>&1 | tee /tmp/test-sim.log
+          set -euo pipefail
+          : > /tmp/test-sim.log
+          cd packages/voxelyn-survival-sim
+          for file in tests/*.test.ts; do
+            echo "=== $file ===" | tee -a /tmp/test-sim.log
+            timeout 90s pnpm exec vitest run "$file" --reporter=verbose 2>&1 | tee -a /tmp/test-sim.log
+          done
 
       - name: Test protocol
         timeout-minutes: 10
@@ -142,7 +147,7 @@ jobs:
             echo '```text'
             for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
               if [[ -f "$file" ]]; then
-                tail -n 100 "$file"
+                tail -n 140 "$file"
                 break
               fi
             done
