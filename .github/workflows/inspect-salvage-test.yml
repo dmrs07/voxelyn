@@ -60,32 +60,49 @@ jobs:
       - name: Build core
         run: pnpm --filter @voxelyn/core build
 
-      - name: Run remaining cases separately
+      - name: Bisect test interference
         shell: bash
         run: |
           set +e
           cd packages/voxelyn-survival-sim
           : > /tmp/inspection.log
-          for pattern in \
-            'comando duplicado e idempotente' \
-            'terminal revela apenas o cofre associado' \
-            'cofre concede exatamente uma Celula de Purga'; do
-            echo "=== $pattern ===" | tee -a /tmp/inspection.log
-            timeout 25s pnpm exec vitest run tests/salvage-modules.test.ts -t "$pattern" --reporter=verbose 2>&1 | tee -a /tmp/inspection.log
+          declare -a labels=(
+            'module block only'
+            'salvage block only'
+            'module block plus duplicate choice'
+            'entire file'
+          )
+          declare -a args=(
+            "-t modulos\\ temporarios"
+            "-t escolha\\ por\\ jogador\\ e\\ salvamento"
+            "-t 'modulos temporarios|comando duplicado'"
+            ""
+          )
+          for i in 0 1 2 3; do
+            echo "=== ${labels[$i]} ===" | tee -a /tmp/inspection.log
+            command="pnpm exec vitest run tests/salvage-modules.test.ts ${args[$i]} --reporter=verbose"
+            timeout 25s bash -lc "$command" 2>&1 | tee -a /tmp/inspection.log
             code=${PIPESTATUS[0]}
             echo "exit=$code" | tee -a /tmp/inspection.log
           done
           exit 0
 
-      - name: Publish isolated results
+      - name: Publish bisection
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            echo 'Isolated remaining salvage tests:'
+            echo 'Salvage test bisection:'
             echo
             echo '```text'
-            sed -E $'s/\x1B\[[0-9;]*[mK]//g' /tmp/inspection.log | tail -n 220
+            sed -E $'s/\x1B\[[0-9;]*[mK]//g' /tmp/inspection.log | tail -n 280
             echo '```'
+            echo
+            echo '<details><summary>Test imports and helpers</summary>'
+            echo
+            echo '```ts'
+            nl -ba packages/voxelyn-survival-sim/tests/salvage-modules.test.ts | head -n 123
+            echo '```'
+            echo '</details>'
           } > /tmp/inspection.md
           gh api --method PATCH repos/dmrs07/voxelyn/issues/comments/5097223897 -F body=@/tmp/inspection.md
