@@ -57,6 +57,9 @@ jobs:
           path.write_text(text)
           PY
 
+      - name: Build core
+        run: pnpm --filter @voxelyn/core build
+
       - name: Run remaining cases separately
         shell: bash
         run: |
