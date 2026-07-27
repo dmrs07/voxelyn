@@ -23,12 +23,19 @@ export const SOLID_CRYSTAL_DULL = 7; // cristal opaco: nao emite luz nem descarr
 export const SOLID_ORE_CHIPPED = 8; // veio ja lascado, a um golpe de esgotar
 
 // Camada de superficie (o que cobre o chao de uma celula aberta).
+//
+// Os IDs antigos permanecem estaveis porque viajam nos diffs de chunk. Os dois
+// estados novos entram no fim:
+// - SPORES e a nuvem organica deixada pelo Spore Bomber;
+// - FUNGAL_HEATED e o tapete umido secando/fumegando antes de pegar fogo.
 export const SURF_NONE = 0;
 export const SURF_FUNGAL = 1;
 export const SURF_BIOFLUID = 2;
 export const SURF_GAS = 3;
 export const SURF_FIRE = 4;
 export const SURF_SCORCHED = 5;
+export const SURF_SPORES = 6;
+export const SURF_FUNGAL_HEATED = 7;
 
 // Orcamentos por tick (degradacao previsivel via fila deterministica).
 export const BUDGET_REACTING_CELLS = 4096;
@@ -41,10 +48,25 @@ export const CELL_STEP_INTERVAL = 3;
 
 export const FIRE_FUEL_TICKS = 46;
 export const FIRE_DAMAGE_PER_TICK = 2.2;
+
+// Fungo e biomassa umida: primeiro seca/fumega, depois queima por mais tempo.
+export const FUNGAL_HEAT_TICKS = 36; // ~1,8 s ate a ignicao a 20 Hz
+export const FUNGAL_HEAT_IMPACT_TICKS = 12; // calor direto acelera a secagem
+export const FUNGAL_FIRE_FUEL_TICKS = 72; // ~3,6 s de combustao lenta
+
+// Gas sulfurico: permanece no ambiente, mas ao acender vira apenas um flash
+// curto. A explosao direta continua sendo tratada por impactSurface.
 export const GAS_LIFE_TICKS = 220;
 export const GAS_DAMAGE_PER_TICK = 0.55;
 export const GAS_SPREAD_CHANCE = 0.14;
-export const FIRE_SPREAD_FUNGAL = 0.4;
+export const GAS_FLASH_TICKS = 8; // ~0,4 s antes de sumir
+
+// Esporos: nuvem organica localizada do bomber. Machuca, nao difunde como gas e
+// desaparece sozinha; fogo a esteriliza numa combustao curta, sem explosao.
+export const SPORE_LIFE_TICKS = 180;
+export const SPORE_DAMAGE_PER_TICK = 0.55;
+export const SPORE_BURN_TICKS = 18;
+
 export const FIRE_SPREAD_BIOFLUID = 0.85;
 export const BIOFLUID_SLOW = 0.55;
 export const DISCHARGE_DAMAGE = 26;
