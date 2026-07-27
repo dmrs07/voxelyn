@@ -265,6 +265,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   if (action.kind === 'ranged') {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     state.projectiles.push({
+      kind: 'spit',
       id: state.nextEntityId++,
       owner: enemy.id,
       x: enemy.x,
@@ -287,6 +288,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     }
   } else if (action.kind === 'hurl') {
     state.projectiles.push({
+      kind: 'rock',
       id: state.nextEntityId++,
       owner: enemy.id,
       x: enemy.x,
