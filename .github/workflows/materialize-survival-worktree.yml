@@ -136,13 +136,24 @@ jobs:
                   raise SystemExit(f'Unexpected salvage fixture shape: {old}')
               salvage = salvage.replace(old, new, 1)
           salvage_path.write_text(salvage)
+
+          protocol_test_path = Path('packages/voxelyn-survival-protocol/tests/validate.test.ts')
+          protocol_test = protocol_test_path.read_text()
+          old_keys = "['ability', 'aim', 'choose', 'consume', 'dodge', 'fire', 'interact', 'move']"
+          new_keys = "['ability', 'aim', 'choose', 'dodge', 'fire', 'interact', 'move', 'purge']"
+          if old_keys in protocol_test:
+              protocol_test = protocol_test.replace(old_keys, new_keys, 1)
+              protocol_test_path.write_text(protocol_test)
+          elif new_keys not in protocol_test:
+              raise SystemExit('Unexpected PlayerCommand key expectation in protocol test')
           PY
           git add \
             packages/voxelyn-survival-sim/src/cells.ts \
             packages/voxelyn-survival-sim/tests/reactions.test.ts \
-            packages/voxelyn-survival-sim/tests/salvage-modules.test.ts
+            packages/voxelyn-survival-sim/tests/salvage-modules.test.ts \
+            packages/voxelyn-survival-protocol/tests/validate.test.ts
           if ! git diff --cached --quiet; then
-            git commit -m "fix(survival): isolate deterministic module and reaction fixtures"
+            git commit -m "fix(survival): align deterministic fixtures and purge protocol contract"
           fi
 
       - name: Build dependency graph
