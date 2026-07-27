@@ -150,7 +150,8 @@ jobs:
           for file in "${files[@]}"; do
             echo "$file" > /tmp/test-sim-current
             echo "=== $file ===" > /tmp/test-sim.log
-            timeout 90s pnpm exec vitest run "$file" --reporter=verbose 2>&1 | tee -a /tmp/test-sim.log
+            rm -f /tmp/test-sim.json
+            timeout 90s pnpm exec vitest run "$file" --reporter=json --outputFile=/tmp/test-sim.json 2>&1 | tee -a /tmp/test-sim.log
           done
 
       - name: Test protocol
@@ -209,19 +210,30 @@ jobs:
             fi
             echo
             echo '```text'
-            selected=""
-            for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
-              if [[ -f "$file" ]]; then
-                selected="$file"
-                break
-              fi
-            done
-            if [[ "$selected" == "/tmp/test-sim.log" ]]; then
-              grep -E '×|→|AssertionError|Expected|Received|❯|expected |toBe|toEqual|toBeCloseTo|Test Files|Tests ' "$selected" | tail -n 60 || tail -n 80 "$selected"
-            elif [[ -n "$selected" ]]; then
-              tail -n 100 "$selected"
+            if [[ -f /tmp/test-sim.json ]]; then
+              python <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/test-sim.json').read_text())
+          failures = []
+          for result in data.get('testResults', []):
+              for assertion in result.get('assertionResults', []):
+                  if assertion.get('status') != 'failed':
+                      continue
+                  failures.append(' > '.join(assertion.get('ancestorTitles', []) + [assertion.get('title', '')]))
+                  failures.extend(assertion.get('failureMessages', []))
+          print('\n'.join(failures) if failures else json.dumps(data, indent=2)[:12000])
+          PY
             else
-              echo "Failure occurred before command output was captured."
+              selected=""
+              for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
+                if [[ -f "$file" ]]; then
+                  selected="$file"
+                  break
+                fi
+              done
+              [[ -n "$selected" ]] && tail -n 100 "$selected" || echo "Failure occurred before command output was captured."
             fi
             echo '```'
           } > /tmp/failure.md
