@@ -36,6 +36,8 @@ import {
   SOLID_NONE,
   SURF_BIOFLUID,
   SURF_FIRE,
+  SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
   SURF_SPORES,
@@ -544,10 +546,26 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         break;
       }
 
-      // reacao com a superficie da celula aberta em que o projetil esta
-      if (impactSurface(state, cx, cy, cls, events)) {
-        dead = true;
-        break;
+      // Reacao com a superficie da celula aberta em que o projetil esta.
+      //
+      // Os dois subpassos anti-tunelamento podem visitar a mesma celula no mesmo
+      // tick, e um projetil lento pode permanecer nela em ticks seguintes. Para
+      // fungo termico isso representa UM impacto fisico, nao uma nova fonte de
+      // calor a cada amostra de colisao. A identidade fica no proprio projetil,
+      // por celula, preservando novos impactos quando ele realmente avanca.
+      const surfaceBeforeImpact = state.surface[i];
+      const heatsFungal =
+        cls === 'thermal' &&
+        (surfaceBeforeImpact === SURF_FUNGAL || surfaceBeforeImpact === SURF_FUNGAL_HEATED);
+      const alreadyHeatedHere = heatsFungal && proj.heatedSurfaceCells?.includes(i);
+
+      if (!alreadyHeatedHere) {
+        const consumedBySurface = impactSurface(state, cx, cy, cls, events);
+        if (heatsFungal) (proj.heatedSurfaceCells ??= []).push(i);
+        if (consumedBySurface) {
+          dead = true;
+          break;
+        }
       }
 
       // projetil condutivo tocando poca dispara descarga
