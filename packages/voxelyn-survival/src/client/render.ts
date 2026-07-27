@@ -141,6 +141,28 @@ export type Fx =
 
 export type CameraShake = { power: number; until: number };
 
+/**
+ * Opacidade do gas, num dos QUATRO niveis que a art bible permite.
+ *
+ * A regra (art bible §2) e alpha binario 0 ou 255 em tudo, com uma excecao
+ * nomeada para efeitos — gases e luz — que podem usar 64, 128, 192 ou 255. O
+ * gas cai exatamente nessa excecao, mas os niveis sao QUANTIZADOS: nao vale
+ * qualquer fracao. O valor esta escrito como `192 / 255` de proposito, para o
+ * numero permitido ficar visivel na propria expressao em vez de virar um
+ * decimal solto que ninguem consegue conferir de cabeca.
+ *
+ * 192 e nao 128 porque o gas MACHUCA: ele tem de ser lido como perigo em menos
+ * de 200 ms, sobre pedra escura e na penumbra em que o jogo se passa. Na metade
+ * da escala ele se confunde com o proprio chao justamente nas celulas mal
+ * iluminadas, que sao as que o jogador atravessa correndo.
+ *
+ * O alfa e aplicado no DESENHO, nao assado no PNG. Isso mantem o atlas com
+ * alpha binario — util porque a mesma peca serve a outros usos — mas tem um
+ * custo que vale registrar: o validador de sprites NAO ve este numero, entao
+ * nada aqui e verificado automaticamente contra a regra acima.
+ */
+export const GAS_ALPHA = 192 / 255;
+
 /** Faces da carga eletrica que corre pela poca: topo quase branco sobre azul. */
 const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 
@@ -434,7 +456,12 @@ export class SurvivalRenderer {
         // e fogo eram as ultimas superficies do jogo pintadas com alpha, num
         // mundo que e facetado e de alpha binario em todo o resto.
         const surf = state.surface[i];
-        const surfKind = SURFACE_KIND_INDEX[surf] ?? 0;
+        // O gas NAO e desenhado aqui: o penacho e alto, e tudo que este passo
+        // levanta acima do plano do chao passa por tras das paredes, mesmo o que
+        // esta na frente delas — celula de gas encostada em parede tinha o
+        // penacho engolido por ela. O chao dessas celulas sai como rocha nua e o
+        // gas entra na fila ordenada, mais abaixo.
+        const surfKind = surf === SURF_GAS ? 0 : (SURFACE_KIND_INDEX[surf] ?? 0);
         if (!this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
         }
@@ -808,6 +835,46 @@ export class SurvivalRenderer {
           this.projectileView.draw(ctx, proj, toScreen, z, TILE_H);
         },
       });
+    }
+
+    // Gas: alto demais para o passo de chao, e por ULTIMO na fila.
+    //
+    // Desenhado no piso, ele saia ANTES de toda parede, entao a parede vizinha
+    // passava por cima do penacho e o gas encostado nela sumia dentro dela.
+    // Aqui ele entra com a MESMA profundidade das paredes e criaturas, `x + y`,
+    // e passa a ser ocultado so pelo que esta de fato na frente dele.
+    //
+    // Por ultimo porque `sort` e estavel: empate de profundidade preserva a
+    // ordem de insercao, e empate acontece toda vez que uma parede esta na
+    // diagonal exata de uma celula de gas. Empilhado antes, o gas perderia esses
+    // empates e continuaria sumindo em bem menos lugares — o pior jeito de um
+    // defeito voltar, porque parece corrigido. Das duas leituras ambiguas, ver o
+    // gas e a segura: ele machuca.
+    //
+    // O alfa e a outra razao de estar aqui: a peca de gas nao carrega laje,
+    // entao da para deixa-la translucida sem deixar o CHAO translucido junto.
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_GAS) continue;
+        const b = brightness(x, y);
+        if (b <= 0.045) continue;
+        const [sx, sy] = toScreen(x + 0.5, y + 0.5);
+        if (sx < -60 || sx > vw + 60 || sy < -80 || sy > vh + 60) continue;
+        items.push({
+          depth: x + y,
+          draw: () => {
+            ctx.save();
+            ctx.globalAlpha = GAS_ALPHA;
+            if (!this.surfaces.draw(ctx, SURFACE_KIND_INDEX[SURF_GAS], x, y, b, nowMs, sx, sy, z)) {
+              // Sem o atlas, o gas tem de continuar VISIVEL: ele machuca.
+              ctx.fillStyle = shade(SURFACE_FALLBACK[SURF_GAS], 0.35 + b * 0.75);
+              ctx.fillRect(sx - 3 * z, sy - 10 * z, 6 * z, 10 * z);
+            }
+            ctx.restore();
+          },
+        });
+      }
     }
 
     items.sort((a, b) => a.depth - b.depth);

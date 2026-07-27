@@ -3,10 +3,10 @@
   "version": 1,
   "atlas": "surface-tiles.png",
   "frameWidth": 32,
-  "frameHeight": 29,
+  "frameHeight": 38,
   "columns": 128,
   "originX": 14,
-  "originY": 21,
+  "originY": 30,
   "kinds": [
     {
       "name": "bare",
@@ -25,8 +25,8 @@
     },
     {
       "name": "gas",
-      "frames": 4,
-      "frameMs": 300
+      "frames": 6,
+      "frameMs": 240
     },
     {
       "name": "fire",

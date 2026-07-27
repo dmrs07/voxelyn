@@ -15,7 +15,7 @@
 // atlas, nunca geometria. Estes olham geometria.
 import { describe, expect, it } from 'vitest';
 import { surfaceModel, SURFACE_COLS, SURFACE_KINDS } from '../tools/surfaces.mjs';
-import { RAMPS } from '../tools/voxel.mjs';
+import { DIR_UNROTATED, RAMPS, renderVoxels } from '../tools/voxel.mjs';
 import { COLORS } from '../tools/lib.mjs';
 import { VARIANTS } from '../tools/terrain.mjs';
 
@@ -45,31 +45,165 @@ const occupancy = (boxes) => {
 
 const isLiquid = (b) => b.mat === 'pool' || b.mat === 'biolum';
 
-describe('modelo de gas', () => {
-  const GROUND_TOP = 1; // topo da laje: base em z=0 e saliencia em z=1
+const voxelKey = (b) => `${b.x},${b.y},${b.z}`;
 
-  // O defeito original: `z = 1 + ...`, ou seja, comecando DENTRO do topo da
-  // laje. A nuvem se espalhava rente ao chao e o jogador lia poca.
-  it('paira, com ar visivel entre a nuvem e o chao', () => {
+/** Voxels da nuvem, ja desdobrados: uma caixa de duas alturas conta por dois. */
+const cloudVoxels = (boxes) => {
+  const out = [];
+  for (const b of boxes) {
+    if (b.mat !== 'sulfur') continue;
+    for (let dz = 0; dz < b.h; dz++) out.push({ x: b.x, y: b.y, z: b.z + dz });
+  }
+  return out;
+};
+
+/**
+ * Area que a nuvem tapa, em % do losango da celula, pelo rasterizador REAL.
+ *
+ * 8 colunas x 4 px de largura por 8 x 2 px de profundidade, dividido por dois:
+ * o losango de uma celula tem 256 px. Medir no rasterizador e nao por
+ * estimativa importa porque a sobreposicao entre cubos vizinhos e justamente o
+ * que a conta por contagem erra.
+ */
+const CELL_DIAMOND_PX = ((SURFACE_COLS * 4) * (SURFACE_COLS * 2)) / 2;
+const cloudCoverage = (boxes) => {
+  const g = renderVoxels(boxes.filter((b) => b.mat === 'sulfur'), DIR_UNROTATED, 64, 64, 32, 48);
+  let px = 0;
+  for (let i = 3; i < g.buf.length; i += 4) if (g.buf[i] !== 0) px++;
+  return (100 * px) / CELL_DIAMOND_PX;
+};
+
+
+describe('modelo de gas', () => {
+  const HAZE_FLOOR = 4; // piso da bruma: dois voxels de ar acima da laje
+  const GAS_FRAMES = SURFACE_KINDS.find((k) => k.name === 'gas').frames;
+  const cloudOf = (variant, frame) => cloudVoxels(surfaceModel('gas', variant, frame));
+  /** Variantes que levantam penacho: as que passam da faixa da bruma. */
+  const plumeVariants = () => {
+    const out = [];
+    for (let v = 0; v < VARIANTS; v++) {
+      let tall = false;
+      for (let f = 0; f < GAS_FRAMES; f++) if (cloudOf(v, f).some((b) => b.z > 5)) tall = true;
+      if (tall) out.push(v);
+    }
+    return out;
+  };
+
+  // A regra mais importante do arquivo, e a unica que e de REGRA DE JOGO e nao
+  // de estetica: gas machuca, e o jogo promete que a morte venha de decisao
+  // arriscada e nunca do que nao dava para ver. Uma celula que fica vazia num
+  // quadro do ciclo e um perigo que pisca para fora da tela.
+  it('nunca deixa a celula sem materia em nenhum quadro', () => {
     everyFrame('gas', (boxes, where) => {
-      const cloud = boxes.filter((b) => b.mat === 'sulfur');
-      expect(cloud.length, where).toBeGreaterThan(0);
-      for (const b of cloud) {
-        expect(b.z, `${where}: cubo em z=${b.z}`).toBeGreaterThanOrEqual(GROUND_TOP + 2);
-      }
+      expect(cloudVoxels(boxes).length, where).toBeGreaterThanOrEqual(5);
     });
   });
 
-  // A conta que importa nao e a fracao de colunas, e a AREA projetada: um cubo
-  // ocupa 4x6 px e o losango da celula tem 256 px, entao um quinto das 64
-  // colunas ja passa de 100% de cobertura e a nuvem vira um tapete opaco. Sem
-  // vao entre os cubos nao ha leitura de volume — so uma superficie a mais.
-  it('fica esparso o bastante para o chao aparecer entre os cubos', () => {
+  // O defeito de origem: a nuvem nascia em z=1, a altura do proprio topo da
+  // laje, e se deitava no chao — lia como poca, e melhor do que a poca lia.
+  it('mantem a bruma no ar, com vao visivel ate o chao', () => {
+    for (let v = 0; v < VARIANTS; v++) {
+      if (plumeVariants().includes(v)) continue; // o penacho e enraizado de proposito
+      for (let f = 0; f < GAS_FRAMES; f++) {
+        for (const b of cloudOf(v, f)) {
+          expect(b.z, `gas v${v} f${f} em z=${b.z}`).toBeGreaterThanOrEqual(HAZE_FLOOR);
+        }
+      }
+    }
+  });
+
+  // Um atlas de tiles nao desenha UMA peca: desenha a mesma peca em toda celula
+  // que a simulacao marcar. Penacho em todas elas fecha o campo numa parede
+  // verde opaca — renderizado e conferido — e esconder o que esta atras e pior
+  // do que feio num jogo que promete perigo visivel. Uma variante em tres.
+  it('levanta penacho em parte das celulas, e nao em todas', () => {
+    const tall = plumeVariants();
+    expect(tall.length).toBe(1);
+    expect(tall.length).toBeLessThan(VARIANTS);
+  });
+
+  // A silhueta da referencia e um PE fino que abre numa CABECA lobulada. Se a
+  // largura nao crescer com a altura nao ha cabeca, e sem faixa alta estreita
+  // nao ha pe: e so um amontoado alto.
+  it('da ao penacho um pe estreito e uma cabeca larga', () => {
+    const v = plumeVariants()[0];
+    let sawShape = false;
+    for (let f = 0; f < GAS_FRAMES; f++) {
+      const cloud = cloudOf(v, f);
+      const stem = new Set(cloud.filter((b) => b.z <= 5).map((b) => `${b.x},${b.y}`)).size;
+      const head = new Set(cloud.filter((b) => b.z >= 7).map((b) => `${b.x},${b.y}`)).size;
+      if (head > stem && stem > 0) sawShape = true;
+    }
+    expect(sawShape, 'nenhum quadro tem cabeca mais larga que o pe').toBe(true);
+    // E ele tem de ser ALTO: a silhueta pedida e a altura.
+    const span = Math.max(
+      ...Array.from({ length: GAS_FRAMES }, (_, f) => {
+        const zs = cloudOf(v, f).map((b) => b.z);
+        return Math.max(...zs) - Math.min(...zs);
+      })
+    );
+    expect(span).toBeGreaterThanOrEqual(6);
+  });
+
+  // Contar cubos mede a coisa errada: o que fecha o chao e a AREA PROJETADA, e
+  // ela nao e proporcional a contagem — cubos agrupados se tapam uns aos
+  // outros. Aqui a area sai do rasterizador de verdade. So vale para a bruma:
+  // o penacho sobe ACIMA do proprio losango, entao a maior parte dos pixels
+  // dele nao esta tapando o chao da celula, e a fracao passaria de 100% sem
+  // querer dizer nada.
+  it('nao deixa a bruma tapar o chao', () => {
+    for (let v = 0; v < VARIANTS; v++) {
+      if (plumeVariants().includes(v)) continue;
+      for (let f = 0; f < GAS_FRAMES; f++) {
+        const cov = cloudCoverage(surfaceModel('gas', v, f));
+        expect(cov, `gas v${v} f${f}`).toBeLessThanOrEqual(55);
+        expect(cov, `gas v${v} f${f}`).toBeGreaterThan(4);
+      }
+    }
+  });
+
+  // Decidir cada coluna independentemente das vizinhas so produz ruido
+  // uniforme. A regra de resto que havia antes era o oposto do agrupamento: com
+  // passo 3 e 5 sobre modulo 11, duas colunas vizinhas NUNCA caiam juntas na
+  // selecao — agrupamento zero, medido.
+  it('se agrupa, em vez de pontilhar o ar', () => {
     everyFrame('gas', (boxes, where) => {
-      const cloud = boxes.filter((b) => b.mat === 'sulfur').length;
-      expect(cloud, where).toBeLessThanOrEqual(8);
-      expect(cloud, where).toBeGreaterThanOrEqual(3);
+      const cloud = cloudVoxels(boxes);
+      const near = cloud.filter((a) =>
+        cloud.some((b) => b !== a && Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1)
+      );
+      expect(near.length, `${where}: nenhum cubo encosta em outro`).toBeGreaterThan(0);
     });
+  });
+
+  // Animacao boa preserva parte da massa para o olho acompanhar e muda o
+  // bastante para sugerir deriva. Trocar tudo vira cintilacao — e era o que
+  // acontecia: acumulando um passo de deriva por estagio, a sobreposicao entre
+  // dois quadros chegava a ZERO e a celula inteira teleportava.
+  it('deriva entre quadros sem piscar a celula inteira', () => {
+    for (let v = 0; v < VARIANTS; v++) {
+      const frames = Array.from(
+        { length: GAS_FRAMES },
+        (_, f) => new Set(cloudOf(v, f).map(voxelKey))
+      );
+      for (let f = 0; f < frames.length; f++) {
+        const current = frames[f];
+        const next = frames[(f + 1) % frames.length];
+        const overlap = [...current].filter((k) => next.has(k)).length;
+        expect(overlap, `gas v${v} f${f}`).toBeGreaterThan(0);
+        expect(overlap, `gas v${v} f${f}`).toBeLessThan(current.size);
+      }
+    }
+  });
+
+  // O campo escolhe variantes pela posicao. Se todas tiverem a mesma forma, a
+  // repeticao de tiles uniformiza a densidade e a nuvem vira padrao.
+  it('muda a estrutura entre variantes', () => {
+    for (let f = 0; f < GAS_FRAMES; f++) {
+      const signatures = new Set();
+      for (let v = 0; v < VARIANTS; v++) signatures.add(cloudOf(v, f).map(voxelKey).sort().join('|'));
+      expect(signatures.size, `gas f${f}`).toBe(VARIANTS);
+    }
   });
 
   // Enxofre e AMARELO. A paleta mestra nao tem amarelo puro, e o gas usava
