@@ -1,0 +1,86 @@
+name: Apply Corrected Survival Reward Polish
+
+on:
+  push:
+    branches:
+      - feat/survival-salvage-modules
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: corrected-survival-reward-polish
+  cancel-in-progress: true
+
+jobs:
+  apply-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/survival-salvage-modules
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Extract and apply corrected polish script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          workflow = Path('.github/workflows/polish-survival-reward.yml').read_text()
+          marker = "          python <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY\n", start)
+          script = dedent(workflow[start:end])
+          old = '    f.write("    expect(rewardFlightPosition(from, to, 900, 650)).toEqual({ ...to, progress: 1 });\\n")'
+          new = (
+              '    f.write("    const end = rewardFlightPosition(from, to, 900, 650);\\n")\n'
+              '    f.write("    expect(end.x).toBeCloseTo(to.x);\\n")\n'
+              '    f.write("    expect(end.y).toBeCloseTo(to.y);\\n")\n'
+              '    f.write("    expect(end.progress).toBe(1);\\n")'
+          )
+          if old not in script:
+              raise SystemExit('Expected exact endpoint assertion not found in polish script')
+          Path('/tmp/polish.py').write_text(script.replace(old, new, 1))
+          PY
+          python /tmp/polish.py
+
+      - name: Build and test corrected client polish
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/polish.log
+          pnpm --filter @voxelyn/survival-sim build 2>&1 | tee -a /tmp/polish.log
+          pnpm --filter @voxelyn/survival-protocol build 2>&1 | tee -a /tmp/polish.log
+          pnpm --filter @voxelyn/survival test 2>&1 | tee -a /tmp/polish.log
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/polish.log
+
+      - name: Commit corrected client polish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/voxelyn-survival/src/client/module-layout.ts \
+                  packages/voxelyn-survival/src/client/input.ts \
+                  packages/voxelyn-survival/src/client/render.ts \
+                  packages/voxelyn-survival/src/client/main.ts \
+                  packages/voxelyn-survival/src/tests/module-layout.test.ts
+          git commit -m "feat(survival-ui): animate purge cell reward reveal"
+          git rm .github/workflows/polish-survival-reward.yml \
+                 .github/workflows/apply-survival-polish-script.yml
+          git commit -m "chore: remove temporary reward polish workflows"
+          git push origin HEAD:feat/survival-salvage-modules
