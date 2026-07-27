@@ -33,4 +33,14 @@ describe('gas particle rendering', () => {
   it('mantem a forma deterministica para a mesma posicao', () => {
     expect(gasPuffLobes(23, 41, 6, 0.65)).toEqual(gasPuffLobes(23, 41, 6, 0.65));
   });
+
+  it('alterna a abertura lateral entre motes vizinhos sem usar aleatoriedade', () => {
+    const left = gasPuffLobes(22, 41, 6, 0.65);
+    const right = gasPuffLobes(23, 41, 6, 0.65);
+    const leftDirection = Math.sign(left[1].x - left[0].x);
+    const rightDirection = Math.sign(right[1].x - right[0].x);
+
+    expect(leftDirection).not.toBe(0);
+    expect(rightDirection).toBe(-leftDirection);
+  });
 });
