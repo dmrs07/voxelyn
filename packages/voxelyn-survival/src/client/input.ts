@@ -285,6 +285,12 @@ export class SurvivalInput {
     return null;
   }
 
+  /** Descarta uma escolha prematura durante a sequencia visual da recompensa. */
+  clearPendingChoiceInput(): void {
+    this.queuedChoice = null;
+    this.state.tapQueue.length = 0;
+  }
+
   /**
    * Descarta intencoes de UI pendentes (toques e a tecla R). A fila de toques
    * so existe para UI (menu de escolha, tela de fim); durante a run ninguem a

@@ -34,7 +34,7 @@ import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
 import { drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
-import { moduleChoiceLayout, type Rect } from './module-layout';
+import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -226,6 +226,26 @@ const drawModuleGlyph = (
   }
 };
 
+const drawPurgeCellGlyph = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+  color: string
+): void => {
+  const u = Math.max(1, Math.floor(size / 8));
+  ctx.fillStyle = 'rgba(11,14,20,0.92)';
+  ctx.fillRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, u);
+  ctx.strokeRect(cx - 3 * u, cy - 4 * u, 6 * u, 8 * u);
+  ctx.fillStyle = color;
+  ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, u);
+  ctx.fillRect(cx - u, cy, 2 * u, 3 * u);
+  ctx.fillStyle = PAL.player;
+  ctx.fillRect(cx - u, cy - 3 * u, 2 * u, u);
+};
+
 const wrapMeasuredText = (
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -252,7 +272,7 @@ export class SurvivalRenderer {
   fxList: Fx[] = [];
   flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
-  messages: Array<{ text: string; until: number }> = [];
+  messages: Array<{ text: string; startsAt?: number; until: number }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
   readonly surfaces = new SurfaceBank();
@@ -278,6 +298,17 @@ export class SurvivalRenderer {
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
   private readonly modulePulseUntil = new Map<ModuleId, number>();
+  private safeArea: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  private pendingRewardOrigin: { slot: number; x: number; y: number } | null = null;
+  private rewardFlight: {
+    worldX: number;
+    worldY: number;
+    startedAt: number;
+    durationMs: number;
+    startScreen?: { x: number; y: number };
+  } | null = null;
+  private choiceRevealAt = 0;
+  private purgePulseUntil = 0;
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -293,6 +324,14 @@ export class SurvivalRenderer {
   setQuality(level: QualityLevel): void {
     this.quality = PRESETS[level];
     this.resize();
+  }
+
+  setSafeArea(safeArea: SafeInsets): void {
+    this.safeArea = { ...safeArea };
+  }
+
+  isChoiceRevealReady(nowMs: number): boolean {
+    return nowMs >= this.choiceRevealAt;
   }
 
   private animFor(id: number, x: number, y: number, hp: number, alive: boolean, nowMs: number): EntityAnimState {
@@ -415,10 +454,25 @@ export class SurvivalRenderer {
         case 'salvage_cache_opened':
           this.messages.push({ text: 'COFRE RECUPERADO', until: nowMs + 2200 });
           this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);
+          if (ev.slot === this.localPlayerId - 1) {
+            this.pendingRewardOrigin = { slot: ev.slot, x: ev.x + 0.5, y: ev.y + 0.5 };
+            this.choiceRevealAt = Math.max(this.choiceRevealAt, nowMs + 920);
+          }
           break;
         case 'purge_cell_acquired':
           if (ev.slot === this.localPlayerId - 1) {
-            this.messages.push({ text: '+1 CÉLULA DE PURGA', until: nowMs + 2400 });
+            const startsAt = nowMs + 220;
+            this.messages.push({ text: '+1 CÉLULA DE PURGA', startsAt, until: startsAt + 2200 });
+            if (this.pendingRewardOrigin?.slot === ev.slot) {
+              this.rewardFlight = {
+                worldX: this.pendingRewardOrigin.x,
+                worldY: this.pendingRewardOrigin.y,
+                startedAt: startsAt,
+                durationMs: 650,
+              };
+              this.pendingRewardOrigin = null;
+            }
+            this.choiceRevealAt = Math.max(this.choiceRevealAt, startsAt + 700);
           }
           break;
         case 'terminal_scan_complete':
@@ -1034,14 +1088,46 @@ export class SurvivalRenderer {
       }
     }
 
+    this.renderRewardFlight(toScreen, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
+  }
+
+  private renderRewardFlight(
+    toScreen: (x: number, y: number) => [number, number],
+    nowMs: number
+  ): void {
+    const flight = this.rewardFlight;
+    if (!flight || nowMs < flight.startedAt) return;
+    if (!flight.startScreen) {
+      const [x, y] = toScreen(flight.worldX, flight.worldY);
+      flight.startScreen = { x, y };
+    }
+    const target = { x: this.safeArea.left + 22, y: this.safeArea.top + 53 };
+    const sample = rewardFlightPosition(
+      flight.startScreen,
+      target,
+      nowMs - flight.startedAt,
+      flight.durationMs
+    );
+    if (sample.progress >= 1) {
+      this.rewardFlight = null;
+      this.purgePulseUntil = nowMs + 420;
+      return;
+    }
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1 - sample.progress) * 1.7 + 0.25);
+    ctx.translate(sample.x, sample.y);
+    ctx.rotate((1 - sample.progress) * 0.35);
+    drawPurgeCellGlyph(ctx, 0, 0, 18 + Math.sin(sample.progress * Math.PI) * 4, PAL.biolum);
+    ctx.restore();
   }
 
   private renderHud(state: SurvivalState, input: InputState, nowMs: number, vw: number, vh: number): void {
     const ctx = this.ctx;
     const extra = state.playerExtra;
-    const safeTop = 10;
-    const safeLeft = 12;
+    const safeTop = this.safeArea.top + 10;
+    const safeLeft = this.safeArea.left + 12;
 
     // HP
     const barW = Math.min(220, vw * 0.3);
@@ -1065,11 +1151,13 @@ export class SurvivalRenderer {
     ctx.fillRect(0, 0, vw * state.contamination, 3);
 
     // Celulas de Purga + modulos temporarios.
-    ctx.font = 'bold 12px monospace';
+    const purgePulse = nowMs < this.purgePulseUntil;
+    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;
     ctx.textAlign = 'left';
-    ctx.fillStyle = PAL.bone;
-    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft, safeTop + 43);
-    this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw);
+    ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
+    drawPurgeCellGlyph(ctx, safeLeft + 7, safeTop + 39, purgePulse ? 15 : 13, ctx.fillStyle as string);
+    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 18, safeTop + 43);
+    this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw - this.safeArea.right);
     ctx.fillStyle = PAL.loot;
     const objective = extra.hasCore
       ? 'VOLTE PARA A ENTRADA'
@@ -1094,9 +1182,10 @@ export class SurvivalRenderer {
 
     // mensagens centrais
     this.messages = this.messages.filter((m) => m.until > nowMs);
+    const visibleMessages = this.messages.filter((m) => (m.startsAt ?? 0) <= nowMs);
     ctx.textAlign = 'center';
-    let my = vh * 0.2;
-    for (const m of this.messages.slice(-3)) {
+    let my = Math.max(this.safeArea.top + 28, vh * 0.2);
+    for (const m of visibleMessages.slice(-3)) {
       ctx.font = 'bold 14px monospace';
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       const tw = ctx.measureText(m.text).width;
@@ -1248,7 +1337,7 @@ export class SurvivalRenderer {
     if (!pending) return [];
     const ctx = this.ctx;
     const reserveTouch = input?.usingTouch ? Math.min(190, vh * 0.28) : 0;
-    const cards = moduleChoiceLayout(vw, vh, { top: 0, right: 0, bottom: 0, left: 0 }, reserveTouch);
+    const cards = moduleChoiceLayout(vw, vh, this.safeArea, reserveTouch);
 
     ctx.fillStyle = 'rgba(11,14,20,0.38)';
     ctx.fillRect(0, 0, vw, vh);

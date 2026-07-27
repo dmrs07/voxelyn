@@ -1,5 +1,24 @@
 export type Rect = { x: number; y: number; w: number; h: number };
 export type SafeInsets = { top: number; right: number; bottom: number; left: number };
+export type Point = { x: number; y: number };
+export type RewardFlightSample = Point & { progress: number };
+
+/** Curva deterministica de um cartucho recuperado ate o inventario da HUD. */
+export const rewardFlightPosition = (
+  from: Point,
+  to: Point,
+  elapsedMs: number,
+  durationMs: number
+): RewardFlightSample => {
+  const progress = Math.max(0, Math.min(1, elapsedMs / Math.max(1, durationMs)));
+  const eased = 1 - (1 - progress) ** 3;
+  const arc = Math.sin(Math.PI * progress) * Math.min(64, 22 + Math.abs(to.y - from.y) * 0.14);
+  return {
+    x: from.x + (to.x - from.x) * eased,
+    y: from.y + (to.y - from.y) * eased - arc,
+    progress,
+  };
+};
 
 export const moduleChoiceLayout = (
   viewportWidth: number,

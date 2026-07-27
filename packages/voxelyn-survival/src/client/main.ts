@@ -43,8 +43,10 @@ const readSafeArea = (): TouchSafeArea => ({
 });
 
 const resize = (): void => {
+  const safeArea = readSafeArea();
+  renderer.setSafeArea(safeArea);
   renderer.resize();
-  input.layoutButtons(window.innerWidth, window.innerHeight, readSafeArea());
+  input.layoutButtons(window.innerWidth, window.innerHeight, safeArea);
 };
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
@@ -145,10 +147,12 @@ const runSolo = (): void => {
     const alpha = accumulator / TICK_MS;
     renderer.render(state, alpha, input.state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
-    if (pendingChoice) {
+    if (pendingChoice && renderer.isChoiceRevealReady(now)) {
       const regions = renderer.renderChoice(state, vw, vh, input.state);
       const choice = input.consumeChoiceTap(regions);
       if (choice !== null) queuedChoice = choice;
+    } else if (pendingChoice) {
+      input.clearPendingChoiceInput();
     }
     requestAnimationFrame(frame);
   };
@@ -251,10 +255,12 @@ const runOnline = (url: string): void => {
         renderer.render(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
         const pendingChoice = state.playerExtra.pendingModuleChoice;
-        if (pendingChoice) {
+        if (pendingChoice && renderer.isChoiceRevealReady(now)) {
           const regions = renderer.renderChoice(state, window.innerWidth, window.innerHeight, input.state);
           const choice = input.consumeChoiceTap(regions);
           if (choice !== null) queuedChoice = choice;
+        } else if (pendingChoice) {
+          input.clearPendingChoiceInput();
         }
         const { drain, armed } = gate.frame(now, terminal);
         if (drain && !pendingChoice) input.clearPendingUiInput();
