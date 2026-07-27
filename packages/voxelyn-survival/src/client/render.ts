@@ -142,17 +142,26 @@ export type Fx =
 export type CameraShake = { power: number; until: number };
 
 /**
- * Opacidade do gas.
+ * Opacidade do gas, num dos QUATRO niveis que a art bible permite.
  *
- * Nao vai mais baixo do que isto porque o gas MACHUCA: ele tem de ser lido como
- * perigo em menos de 200 ms, sobre pedra escura e na penumbra em que o jogo se
- * passa. Abaixo de dois tercos ele comeca a se confundir com o proprio chao
- * justamente nas celulas mal iluminadas, que sao as que o jogador atravessa
- * correndo. E o alfa fica no DESENHO, e nao assado no atlas: o contrato dos
- * atlas continua sendo alfa binario (art bible §2), e um PNG com meio-tom nao
- * passaria no validador.
+ * A regra (art bible §2) e alpha binario 0 ou 255 em tudo, com uma excecao
+ * nomeada para efeitos — gases e luz — que podem usar 64, 128, 192 ou 255. O
+ * gas cai exatamente nessa excecao, mas os niveis sao QUANTIZADOS: nao vale
+ * qualquer fracao. O valor esta escrito como `192 / 255` de proposito, para o
+ * numero permitido ficar visivel na propria expressao em vez de virar um
+ * decimal solto que ninguem consegue conferir de cabeca.
+ *
+ * 192 e nao 128 porque o gas MACHUCA: ele tem de ser lido como perigo em menos
+ * de 200 ms, sobre pedra escura e na penumbra em que o jogo se passa. Na metade
+ * da escala ele se confunde com o proprio chao justamente nas celulas mal
+ * iluminadas, que sao as que o jogador atravessa correndo.
+ *
+ * O alfa e aplicado no DESENHO, nao assado no PNG. Isso mantem o atlas com
+ * alpha binario — util porque a mesma peca serve a outros usos — mas tem um
+ * custo que vale registrar: o validador de sprites NAO ve este numero, entao
+ * nada aqui e verificado automaticamente contra a regra acima.
  */
-const GAS_ALPHA = 0.68;
+export const GAS_ALPHA = 192 / 255;
 
 /** Faces da carga eletrica que corre pela poca: topo quase branco sobre azul. */
 const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
