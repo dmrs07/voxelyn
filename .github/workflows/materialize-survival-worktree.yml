@@ -80,11 +80,40 @@ jobs:
           set -o pipefail
           pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/generate.log
 
-      - name: Test Survival workspace
+      - name: Test simulation
+        timeout-minutes: 10
         shell: bash
         run: |
           set -o pipefail
-          pnpm test:survival 2>&1 | tee /tmp/test.log
+          pnpm --filter @voxelyn/survival-sim test 2>&1 | tee /tmp/test-sim.log
+
+      - name: Test protocol
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-protocol test 2>&1 | tee /tmp/test-protocol.log
+
+      - name: Test content pipeline
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-content test 2>&1 | tee /tmp/test-content.log
+
+      - name: Test server and co-op
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-server test 2>&1 | tee /tmp/test-server.log
+
+      - name: Test client and layout
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival test 2>&1 | tee /tmp/test-client.log
 
       - name: Commit generated assets and cleanup
         shell: bash
@@ -111,15 +140,12 @@ jobs:
             echo "❌ Guarded Survival validation failed for \`${GITHUB_SHA::12}\`: ${RUN_URL}. No source implementation was pushed."
             echo
             echo '```text'
-            if [[ -f /tmp/test.log ]]; then
-              tail -n 80 /tmp/test.log
-            elif [[ -f /tmp/generate.log ]]; then
-              tail -n 80 /tmp/generate.log
-            elif [[ -f /tmp/build.log ]]; then
-              tail -n 80 /tmp/build.log
-            else
-              echo "Failure occurred before command output was captured."
-            fi
+            for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
+              if [[ -f "$file" ]]; then
+                tail -n 100 "$file"
+                break
+              fi
+            done
             echo '```'
           } > /tmp/failure.md
           gh pr comment 48 --repo dmrs07/voxelyn --body-file /tmp/failure.md
@@ -130,4 +156,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed: ${RUN_URL}. Atlas generation and the complete \`pnpm test:survival\` suite succeeded; the logical source commits are now on this PR."
+          gh pr comment 48 --repo dmrs07/voxelyn --body "✅ Guarded Survival validation passed: ${RUN_URL}. Atlas generation and all Survival package suites succeeded; the logical source commits are now on this PR."
