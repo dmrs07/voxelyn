@@ -50,6 +50,62 @@ describe('worldgen', () => {
     }
   });
 
+
+
+  it('distribui sites em bandas progressivas por distancia de caminho', () => {
+    const bands = [[0.2, 0.35], [0.4, 0.6], [0.65, 0.8], [0.82, 0.95]] as const;
+    for (const seed of SEEDS) {
+      const world = generateWorld(seed, WORLD_W, WORLD_H);
+      const distance = new Int32Array(WORLD_W * WORLD_H).fill(-1);
+      const start = world.entry.y * WORLD_W + world.entry.x;
+      const queue = [start];
+      distance[start] = 0;
+      for (let head = 0; head < queue.length; head++) {
+        const current = queue[head];
+        const x = current % WORLD_W;
+        const y = Math.floor(current / WORLD_W);
+        for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+          if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) continue;
+          const next = ny * WORLD_W + nx;
+          if (distance[next] >= 0 || world.solid[next] !== SOLID_NONE) continue;
+          distance[next] = distance[current] + 1;
+          queue.push(next);
+        }
+      }
+      const coreDistance = distance[world.corePos.y * WORLD_W + world.corePos.x];
+      expect(world.salvageSites.length).toBeGreaterThanOrEqual(3);
+      world.salvageSites.forEach((site, index) => {
+        const ratio = distance[site.terminal.y * WORLD_W + site.terminal.x] / coreDistance;
+        expect(ratio, `seed ${seed}, site ${index}`).toBeGreaterThanOrEqual(bands[index][0]);
+        expect(ratio, `seed ${seed}, site ${index}`).toBeLessThanOrEqual(bands[index][1]);
+        expect(distance[site.cache.y * WORLD_W + site.cache.x]).toBeGreaterThanOrEqual(0);
+      });
+    }
+  });
+
+  it('nao sobrepoe terminais/cofres e reproduz os mesmos sites pela seed', () => {
+    for (const seed of SEEDS) {
+      const a = generateWorld(seed, WORLD_W, WORLD_H);
+      const b = generateWorld(seed, WORLD_W, WORLD_H);
+      expect(a.salvageSites).toEqual(b.salvageSites);
+      const positions = a.salvageSites.flatMap((site) => [
+        `${site.terminal.x},${site.terminal.y}`,
+        `${site.cache.x},${site.cache.y}`,
+      ]);
+      expect(new Set(positions).size).toBe(positions.length);
+      for (const site of a.salvageSites) {
+        expect(Math.hypot(site.terminal.x - a.entry.x, site.terminal.y - a.entry.y)).toBeGreaterThan(8);
+        expect(Math.hypot(site.cache.x - a.corePos.x, site.cache.y - a.corePos.y)).toBeGreaterThan(5);
+      }
+    }
+  });
+
+  it('mantem centenas de seeds validas com pelo menos tres sites', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const world = generateWorld(seed, WORLD_W, WORLD_H);
+      expect(world.salvageSites.length, `seed ${seed}`).toBeGreaterThanOrEqual(3);
+    }
+  });
   it('mesma seed produz o mesmo mundo (determinismo da geracao)', () => {
     const a = generateWorld(1337, WORLD_W, WORLD_H);
     const b = generateWorld(1337, WORLD_W, WORLD_H);
@@ -58,6 +114,7 @@ describe('worldgen', () => {
     expect(a.entry).toEqual(b.entry);
     expect(a.corePos).toEqual(b.corePos);
     expect(a.enemySpawns).toEqual(b.enemySpawns);
+    expect(a.salvageSites).toEqual(b.salvageSites);
   });
 });
 

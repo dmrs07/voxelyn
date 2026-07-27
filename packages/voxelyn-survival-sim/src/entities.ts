@@ -157,7 +157,7 @@ export const damageEntity = (
     tick: state.tick,
   });
   if (ent.archetype === 'bomber') {
-    explodeAt(state, ent.x, ent.y, 1.8, events);
+    explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
     addBomberSpores(state, ent);
   }
 };
@@ -273,9 +273,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       vx: action.direction.x * 7,
       vy: action.direction.y * 7,
       damage: enemy.archetype === 'guardian' ? 14 : 9,
-      piercing: false,
-      conductive: false,
-      explosive: false,
+      distanceTravelled: 0,
       hostile: true,
       leavesBiofluid: true,
       ttl: Math.ceil(((def.aggroRange + 4) / 7) * TICK_HZ),
@@ -296,9 +294,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       vx: action.direction.x * BRUISER_HURL_SPEED,
       vy: action.direction.y * BRUISER_HURL_SPEED,
       damage: BRUISER_HURL_DAMAGE,
-      piercing: false,
-      conductive: false,
-      explosive: false,
+      distanceTravelled: 0,
       hostile: true,
       // Pedra nao deixa poca: quem suja o chao e o cuspidor, e as duas ameacas
       // tem de continuar querendo dizer coisas diferentes.
@@ -635,14 +631,16 @@ export const applyExplosionDamage = (
   ex: number,
   ey: number,
   radius: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
+  playerDamageScale = 1
 ): void => {
   const joined = state.players.filter((p) => state.playerExtras[p.slot ?? 0].joined);
   for (const ent of [...joined, ...state.enemies]) {
     if (!ent.alive) continue;
     const d = Math.hypot(ent.x - ex, ent.y - ey);
     if (d <= radius + ent.radius) {
-      damageEntity(state, ent, EXPLOSION_DAMAGE * Math.max(0.35, 1 - d / (radius + 0.001)), events);
+      const scale = ent.kind === 'player' ? playerDamageScale : 1;
+      damageEntity(state, ent, EXPLOSION_DAMAGE * Math.max(0.35, 1 - d / (radius + 0.001)) * scale, events);
     }
   }
 };

@@ -42,7 +42,7 @@ import {
   markDirty,
   setSurface,
 } from './cells.js';
-import type { Projectile, SemanticEvent, SurvivalState } from './types.js';
+import type { EffectOrigin, Projectile, SemanticEvent, SurvivalState } from './types.js';
 
 export type ProjectileClass = 'kinetic' | 'energy' | 'thermal' | 'bio';
 
@@ -54,10 +54,10 @@ export type ProjectileClass = 'kinetic' | 'energy' | 'thermal' | 'bio';
  * ordem em que as flags fossem lidas — o que quebraria o determinismo.
  * Termico vence energia, energia vence cinetico.
  */
-export const projectileClass = (p: Projectile): ProjectileClass => {
+export const projectileClass = (p: Projectile, conductiveEnabled = true): ProjectileClass => {
   if (p.leavesBiofluid) return 'bio';
-  if (p.explosive) return 'thermal';
-  if (p.conductive) return 'energy';
+  if (p.modules?.explosive && p.distanceTravelled >= p.modules.explosive.armAfterDistance) return 'thermal';
+  if (p.modules?.conductive && conductiveEnabled) return 'energy';
   return 'kinetic';
 };
 
@@ -101,7 +101,8 @@ export const impactSolid = (
   cx: number,
   cy: number,
   cls: ProjectileClass,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
+  origin: EffectOrigin = { source: 'environment' }
 ): SolidImpact => {
   const w = W(state);
   const i = cy * w + cx;
@@ -114,7 +115,7 @@ export const impactSolid = (
       if (cls === 'energy') {
         // A rocha nao cede, mas conduz para fora: a carga sai pelas celulas
         // abertas coladas nela. Atirar numa parede vira uma armadilha curta.
-        chargeCells(state, openNeighbours(state, [i]), events);
+        chargeCells(state, openNeighbours(state, [i]), events, origin);
       } else if (cls === 'bio') {
         // O acido escorre pela parede e se acumula no pe dela.
         for (const open of openNeighbours(state, [i])) {
@@ -170,7 +171,7 @@ export const impactSolid = (
           BUDGET_VEIN_CELLS,
           (n) => state.solid[n] === SOLID_ORE || state.solid[n] === SOLID_ORE_CHIPPED
         );
-        chargeCells(state, openNeighbours(state, vein), events);
+        chargeCells(state, openNeighbours(state, vein), events, origin);
         return { stop: true, broke: false };
       }
       if (cls === 'thermal') {
@@ -249,7 +250,8 @@ export const impactSurface = (
   cx: number,
   cy: number,
   cls: ProjectileClass,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
+  origin: EffectOrigin = { source: 'environment' }
 ): boolean => {
   const i = cy * W(state) + cx;
   const surface = state.surface[i];
@@ -258,7 +260,7 @@ export const impactSurface = (
     // Gas sulfurico e a materia volatil: faisca ou calor o consome no mesmo
     // impacto e produz a explosao. Esporos nao entram neste ramo.
     setSurface(state, i, SURF_NONE, 0);
-    explodeAt(state, cx + 0.5, cy + 0.5, 2.4, events);
+    explodeAt(state, cx + 0.5, cy + 0.5, 2.4, events, origin);
     return true;
   }
 

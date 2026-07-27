@@ -7,8 +7,8 @@ import {
   BOLT_COOLDOWN_TICKS,
   BOLT_DAMAGE,
   BOLT_SPEED,
-  CONSUMABLE_HEAL,
-  CONSUMABLE_PURGE_RADIUS,
+  PURGE_CELL_HEAL,
+  PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
   DISCHARGE_DAMAGE,
   DODGE_COOLDOWN_TICKS,
@@ -16,6 +16,7 @@ import {
   DODGE_SPEED,
   DODGE_TICKS,
   EXPLOSION_RADIUS,
+  EXPLOSIVE_ARM_DISTANCE,
   EXTRACT_RADIUS,
   FIRE_DAMAGE_PER_TICK,
   GAS_DAMAGE_PER_TICK,
@@ -28,10 +29,14 @@ import {
   OVERHEAT_LOCK_TICKS,
   OVERHEAT_SELF_DAMAGE,
   PLAYER_HP,
+  PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
   PLAYER_RADIUS,
   PLAYER_SPEED,
   REVIVE_HP_FRACTION,
   REVIVE_RADIUS,
+  RETURN_DISC_MAX_DISTANCE,
+  RETURN_DISC_SPEED,
+  SALVAGE_SCAN_TICKS,
   RUN_SEED_MIX,
   SOLID_NONE,
   SURF_BIOFLUID,
@@ -56,10 +61,17 @@ import {
   updateEnemies,
 } from './entities.js';
 import { generateWorld } from './worldgen.js';
+import {
+  activeModule,
+  consumeModuleCharge,
+  expireTimedModules,
+  grantOrRechargeModule,
+  moduleHasCapacity,
+  rollModuleChoice,
+} from './modules.js';
 import type {
   Entity,
   EnemyArchetype,
-  ModifierId,
   PlayerCommand,
   PlayerExtra,
   RunConfig,
@@ -69,7 +81,6 @@ import type {
   SurvivalState,
 } from './types.js';
 
-const MODIFIER_POOL: ModifierId[] = ['piercing', 'conductive', 'explosive', 'siphon'];
 
 export const emptyCommand = (): PlayerCommand => ({
   move: { x: 0, y: 0 },
@@ -78,7 +89,7 @@ export const emptyCommand = (): PlayerCommand => ({
   ability: false,
   dodge: false,
   interact: false,
-  consume: false,
+  purge: false,
   choose: null,
 });
 
@@ -113,8 +124,9 @@ const makeExtra = (): PlayerExtra => ({
   iframesUntil: 0,
   dodgeCooldownUntil: 0,
   abilityCooldownUntil: 0,
-  consumables: 1,
-  modifiers: [],
+  purgeCells: 1,
+  activeModules: [],
+  pendingModuleChoice: null,
   hasCore: false,
   dodgeDir: { x: 1, y: 0 },
   downed: false,
@@ -129,8 +141,9 @@ const makeExtra = (): PlayerExtra => ({
  * os frascos nem a posse do nucleo de quem saiu.
  */
 export const resetPlayerProgress = (extra: PlayerExtra): void => {
-  extra.modifiers = [];
-  extra.consumables = 1;
+  extra.activeModules = [];
+  extra.pendingModuleChoice = null;
+  extra.purgeCells = 1;
   extra.hasCore = false;
   extra.heat = 0;
   extra.overheatedUntil = 0;
@@ -186,10 +199,16 @@ export const createRun = (config: RunConfig): SurvivalState => {
     playerExtra: playerExtras[0],
     enemies: [],
     projectiles: [],
-    caches: world.cachePositions.map((p) => ({ x: p.x, y: p.y, opened: false, options: null })),
+    salvageSites: world.salvageSites.map((site) => ({
+      ...site,
+      terminalState: 'inactive' as const,
+      scanEndsAt: 0,
+      cacheRevealed: false,
+      cacheOpened: false,
+      openedBySlot: null,
+    })),
     vents: world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 })),
     charges: [],
-    pendingChoice: null,
     contamination: 0,
     contaminationWaves: 0,
     // reserva todos os ids de player (1..playerCount) antes dos inimigos, para
@@ -263,39 +282,49 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       const cells = new Set(ev.cells);
       for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
-        if (cells.has(cellIndexAt(state, ent.x, ent.y))) {
-          damageEntity(state, ent, DISCHARGE_DAMAGE, events);
-        }
+        if (!cells.has(cellIndexAt(state, ent.x, ent.y))) continue;
+        const scale = ev.source === 'player' && ent.kind === 'player'
+          ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE
+          : 1;
+        damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events);
       }
     } else if (ev.t === 'explosion') {
-      applyExplosionDamage(state, ev.x, ev.y, ev.radius, events);
+      applyExplosionDamage(
+        state,
+        ev.x,
+        ev.y,
+        ev.radius,
+        events,
+        ev.source === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1
+      );
     }
   }
-};
-
-const grantModifier = (extra: PlayerExtra, picked: ModifierId): void => {
-  if (!extra.modifiers.includes(picked)) extra.modifiers.push(picked);
-};
-
-const rollTwoModifiers = (state: SurvivalState): [ModifierId, ModifierId] => {
-  const first = MODIFIER_POOL[state.rng.nextInt(MODIFIER_POOL.length)];
-  let second = MODIFIER_POOL[state.rng.nextInt(MODIFIER_POOL.length)];
-  while (second === first) second = MODIFIER_POOL[state.rng.nextInt(MODIFIER_POOL.length)];
-  return [first, second];
 };
 
 const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, events: SemanticEvent[]): void => {
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const dt = 1 / TICK_HZ;
-  // Modo da SALA (nao quantos entraram): uma sala online (playerCount>1) nunca
-  // pausa em 'choice' — o protocolo nao transporta pendingChoice e o cliente
-  // online nao renderiza o menu, entao pausar travaria o jogador. Solo local
-  // (playerCount===1) mantem o menu de escolha.
   const coop = state.config.playerCount > 1;
 
   // slots nao reivindicados, abatidos e mortos nao agem
   if (!extra.joined || !player.alive || extra.downed) return;
+
+  // Escolha privada do slot: idempotente e nao pausa movimento/simulacao.
+  if (cmd.choose !== null && extra.pendingModuleChoice) {
+    const pending = extra.pendingModuleChoice;
+    const picked = pending.options[cmd.choose];
+    const recharged = Boolean(activeModule(extra, picked));
+    grantOrRechargeModule(extra, picked, state.tick);
+    extra.pendingModuleChoice = null;
+    events.push({
+      t: 'module_selected',
+      slot,
+      module: picked,
+      sourceSiteId: pending.sourceSiteId,
+      recharged,
+    });
+  }
 
   // mira
   const aimLen = Math.hypot(cmd.aim.x, cmd.aim.y);
@@ -351,22 +380,61 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   ) {
     extra.nextShotAt = state.tick + BOLT_COOLDOWN_TICKS;
     extra.heat += HEAT_PER_SHOT;
-    state.projectiles.push({
-      kind: 'bolt',
-      id: state.nextEntityId++,
-      owner: player.id,
-      x: player.x + extra.aim.x * 0.4,
-      y: player.y + extra.aim.y * 0.4,
-      vx: extra.aim.x * BOLT_SPEED,
-      vy: extra.aim.y * BOLT_SPEED,
-      damage: BOLT_DAMAGE,
-      piercing: extra.modifiers.includes('piercing'),
-      conductive: extra.modifiers.includes('conductive'),
-      explosive: extra.modifiers.includes('explosive'),
-      hostile: false,
-      leavesBiofluid: false,
-      ttl: Math.ceil(TICK_HZ * 1.4),
-    });
+
+    const launchDisc = moduleHasCapacity(extra, 'return_disc', state.tick) &&
+      consumeModuleCharge(extra, 'return_disc', slot, events);
+    if (launchDisc) {
+      state.projectiles.push({
+        kind: 'return_disc',
+        id: state.nextEntityId++,
+        owner: player.id,
+        x: player.x + extra.aim.x * 0.45,
+        y: player.y + extra.aim.y * 0.45,
+        vx: extra.aim.x * RETURN_DISC_SPEED,
+        vy: extra.aim.y * RETURN_DISC_SPEED,
+        damage: BOLT_DAMAGE * 0.85,
+        distanceTravelled: 0,
+        disc: {
+          phase: 'outbound',
+          travelled: 0,
+          maxDistance: RETURN_DISC_MAX_DISTANCE,
+          outboundHits: [],
+          returnHits: [],
+        },
+        hostile: false,
+        leavesBiofluid: false,
+        ttl: Math.ceil(TICK_HZ * 3),
+      });
+    } else {
+      const modules: NonNullable<SurvivalState['projectiles'][number]['modules']> = {};
+      if (moduleHasCapacity(extra, 'piercing', state.tick) && consumeModuleCharge(extra, 'piercing', slot, events)) {
+        modules.piercing = true;
+      }
+      if (moduleHasCapacity(extra, 'explosive', state.tick) && consumeModuleCharge(extra, 'explosive', slot, events)) {
+        modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
+      }
+      if (moduleHasCapacity(extra, 'ricochet', state.tick) && consumeModuleCharge(extra, 'ricochet', slot, events)) {
+        modules.ricochet = { remainingBounces: 1 };
+      }
+      if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
+      if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
+
+      state.projectiles.push({
+        kind: 'bolt',
+        id: state.nextEntityId++,
+        owner: player.id,
+        x: player.x + extra.aim.x * 0.4,
+        y: player.y + extra.aim.y * 0.4,
+        vx: extra.aim.x * BOLT_SPEED,
+        vy: extra.aim.y * BOLT_SPEED,
+        damage: BOLT_DAMAGE,
+        modules: Object.keys(modules).length > 0 ? modules : undefined,
+        distanceTravelled: 0,
+        hostile: false,
+        leavesBiofluid: false,
+        ttl: Math.ceil(TICK_HZ * 1.4),
+      });
+    }
     events.push({
       t: 'action_start', entity: player.id, action: 'player_shot', x: player.x, y: player.y,
       dx: extra.aim.x, dy: extra.aim.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 7,
@@ -417,15 +485,15 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     }
   }
 
-  // consumivel: frasco purgante
-  if (cmd.consume && extra.consumables > 0) {
-    extra.consumables--;
-    player.hp = Math.min(player.maxHp, player.hp + CONSUMABLE_HEAL);
+  // Celula de Purga: cartucho interno de cura e descontaminacao.
+  if (cmd.purge && extra.purgeCells > 0) {
+    extra.purgeCells--;
+    player.hp = Math.min(player.maxHp, player.hp + PURGE_CELL_HEAL);
     const w = state.config.width;
     const px = Math.floor(player.x);
     const py = Math.floor(player.y);
-    for (let y = py - CONSUMABLE_PURGE_RADIUS; y <= py + CONSUMABLE_PURGE_RADIUS; y++) {
-      for (let x = px - CONSUMABLE_PURGE_RADIUS; x <= px + CONSUMABLE_PURGE_RADIUS; x++) {
+    for (let y = py - PURGE_CELL_RADIUS; y <= py + PURGE_CELL_RADIUS; y++) {
+      for (let x = px - PURGE_CELL_RADIUS; x <= px + PURGE_CELL_RADIUS; x++) {
         if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
         const i = y * w + x;
         if (state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
@@ -433,10 +501,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         }
       }
     }
-    events.push({ t: 'consume', x: player.x, y: player.y });
+    events.push({ t: 'purge_cell_used', slot, x: player.x, y: player.y });
   }
 
-  // interagir: revive parceiro > nucleo > cache > extracao
+  // interagir: revive parceiro > nucleo > terminal/cofre > extracao
   if (cmd.interact) {
     // co-op: reviver parceiro abatido proximo tem prioridade
     if (coop) {
@@ -464,23 +532,51 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       events.push({ t: 'message', text: 'Nucleo extraido. O Veio despertou - volte para a entrada!' });
       return;
     }
-    for (const cache of state.caches) {
-      if (cache.opened) continue;
-      const d = Math.hypot(player.x - (cache.x + 0.5), player.y - (cache.y + 0.5));
-      if (d < 1.3) {
-        cache.opened = true;
-        extra.consumables++;
-        const options = rollTwoModifiers(state);
-        cache.options = options;
-        events.push({ t: 'cache_open', x: cache.x, y: cache.y });
-        if (coop) {
-          // co-op nao pausa a sim autoritativa: concede o primeiro modificador ao abridor
-          grantModifier(extra, options[0]);
-          events.push({ t: 'message', text: `Modificador acoplado: ${options[0]}.` });
-        } else {
-          state.pendingChoice = options;
-          state.phase = 'choice';
+    for (const site of state.salvageSites) {
+      const terminalDistance = Math.hypot(
+        player.x - (site.terminal.x + 0.5),
+        player.y - (site.terminal.y + 0.5)
+      );
+      if (site.terminalState === 'inactive' && terminalDistance < 1.45) {
+        site.terminalState = 'scanning';
+        site.scanEndsAt = state.tick + SALVAGE_SCAN_TICKS;
+        events.push({
+          t: 'terminal_activated',
+          siteId: site.id,
+          x: site.terminal.x,
+          y: site.terminal.y,
+          completesAtTick: site.scanEndsAt,
+        });
+        const offsets = [[-3, 0], [3, 0], [0, -3], [0, 3], [-2, -2], [2, 2]] as const;
+        let spawned = 0;
+        for (let i = 0; i < offsets.length && spawned < 2 + site.tier; i++) {
+          const [dx, dy] = offsets[(i + site.id) % offsets.length];
+          const x = site.terminal.x + dx;
+          const y = site.terminal.y + dy;
+          if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1) continue;
+          if (state.solid[y * state.config.width + x] !== SOLID_NONE) continue;
+          spawnEnemy(state, spawned === 0 && site.tier > 1 ? 'spitter' : 'stalker', x, y, false);
+          spawned++;
         }
+        return;
+      }
+
+      const cacheDistance = Math.hypot(
+        player.x - (site.cache.x + 0.5),
+        player.y - (site.cache.y + 0.5)
+      );
+      if (site.cacheRevealed && !site.cacheOpened && cacheDistance < 1.35) {
+        site.cacheOpened = true;
+        site.openedBySlot = slot;
+        extra.purgeCells++;
+        const options = rollModuleChoice(state.config.seed, site.id, site.tier, extra, state.tick);
+        extra.pendingModuleChoice = {
+          sourceSiteId: site.id,
+          options,
+          createdAtTick: state.tick,
+        };
+        events.push({ t: 'salvage_cache_opened', siteId: site.id, slot, x: site.cache.x, y: site.cache.y });
+        events.push({ t: 'purge_cell_acquired', slot, amount: 1 });
         return;
       }
     }
@@ -513,7 +609,6 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
     let dead = false;
     proj.ttl--;
     if (proj.ttl <= 0) {
-      // cuspe inimigo que cai no chao deixa poca
       if (proj.leavesBiofluid) {
         const i = cellIndexAt(state, proj.x, proj.y);
         if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
@@ -523,41 +618,105 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       continue;
     }
 
-    // 2 sub-passos anti-tunelamento
+    const owner = state.players.find((player) => player.id === proj.owner);
+    const ownerSlot = owner?.slot;
+    const ownerExtra = ownerSlot === undefined ? undefined : state.playerExtras[ownerSlot];
+    const origin = proj.hostile
+      ? { source: 'enemy' as const, owner: proj.owner }
+      : owner
+        ? { source: 'player' as const, owner: proj.owner }
+        : { source: 'environment' as const };
+
+    // Return Disc follows the owner's current position on the return leg.
+    if (proj.disc?.phase === 'returning') {
+      if (!owner || !ownerExtra?.joined || !owner.alive) continue;
+      const dx = owner.x - proj.x;
+      const dy = owner.y - proj.y;
+      const length = Math.hypot(dx, dy);
+      if (length < owner.radius + 0.35) continue;
+      proj.vx = (dx / Math.max(length, 0.001)) * RETURN_DISC_SPEED;
+      proj.vy = (dy / Math.max(length, 0.001)) * RETURN_DISC_SPEED;
+    }
+
+    // 2 sub-passos anti-tunelamento.
     for (let sub = 0; sub < 2 && !dead; sub++) {
-      proj.x += proj.vx * dt * 0.5;
-      proj.y += proj.vy * dt * 0.5;
+      const prevX = proj.x;
+      const prevY = proj.y;
+      const stepX = proj.vx * dt * 0.5;
+      const stepY = proj.vy * dt * 0.5;
+      proj.x += stepX;
+      proj.y += stepY;
+      const travelled = Math.hypot(stepX, stepY);
+      proj.distanceTravelled += travelled;
+      if (proj.disc?.phase === 'outbound') {
+        proj.disc.travelled += travelled;
+        if (proj.disc.travelled >= proj.disc.maxDistance) {
+          proj.disc.phase = 'returning';
+        }
+      }
+
       const cx = Math.floor(proj.x);
       const cy = Math.floor(proj.y);
       if (cx < 0 || cy < 0 || cx >= w || cy >= state.config.height) {
+        if (proj.disc?.phase === 'outbound') {
+          proj.x = prevX;
+          proj.y = prevY;
+          proj.disc.phase = 'returning';
+          break;
+        }
         dead = true;
         break;
       }
       const i = cy * w + cx;
+      const explosiveArmed = Boolean(
+        proj.modules?.explosive && proj.distanceTravelled >= proj.modules.explosive.armAfterDistance
+      );
+      const conductiveReady = Boolean(
+        proj.modules?.conductive && ownerExtra && moduleHasCapacity(ownerExtra, 'conductive', state.tick)
+      );
+      const cls = projectileClass(proj, conductiveReady);
 
-      const cls = projectileClass(proj);
-
-      // impacto em solido: cada material reage a classe do projetil (ver
-      // materials.ts). Antes disso, qualquer tiro quebrava frágil e cristal do
-      // mesmo jeito e rocha e minerio eram indistinguiveis.
       if (state.solid[i] !== SOLID_NONE) {
-        if (proj.explosive && !proj.hostile) {
-          explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events);
+        if (proj.disc) {
+          proj.x = prevX;
+          proj.y = prevY;
+          proj.disc.phase = 'returning';
+          break;
+        }
+
+        if (proj.modules?.ricochet && proj.modules.ricochet.remainingBounces > 0) {
+          const enteredX = Math.floor(prevX) !== cx;
+          const enteredY = Math.floor(prevY) !== cy;
+          if (enteredX) proj.vx *= -1;
+          if (enteredY) proj.vy *= -1;
+          if (!enteredX && !enteredY) {
+            if (Math.abs(proj.vx) >= Math.abs(proj.vy)) proj.vx *= -1;
+            else proj.vy *= -1;
+          }
+          proj.x = prevX;
+          proj.y = prevY;
+          proj.modules.ricochet.remainingBounces--;
+          break;
+        }
+
+        if (explosiveArmed && !proj.hostile) {
+          explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
           dead = true;
           break;
         }
-        const { stop, broke } = impactSolid(state, cx, cy, cls, events);
-        if (stop && !(broke && proj.piercing)) dead = true;
+
+        const eventStart = events.length;
+        const { stop, broke } = impactSolid(state, cx, cy, cls, events, origin);
+        if (
+          conductiveReady && ownerExtra && ownerSlot !== undefined &&
+          events.slice(eventStart).some((event) => event.t === 'discharge')
+        ) {
+          consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
+        }
+        if (stop && !(broke && proj.modules?.piercing)) dead = true;
         break;
       }
 
-      // Reacao com a superficie da celula aberta em que o projetil esta.
-      //
-      // Os dois subpassos anti-tunelamento podem visitar a mesma celula no mesmo
-      // tick, e um projetil lento pode permanecer nela em ticks seguintes. Para
-      // fungo termico isso representa UM impacto fisico, nao uma nova fonte de
-      // calor a cada amostra de colisao. A identidade fica no proprio projetil,
-      // por celula, preservando novos impactos quando ele realmente avanca.
       const surfaceBeforeImpact = state.surface[i];
       const heatsFungal =
         cls === 'thermal' &&
@@ -565,7 +724,14 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       const alreadyHeatedHere = heatsFungal && proj.heatedSurfaceCells?.includes(i);
 
       if (!alreadyHeatedHere) {
-        const consumedBySurface = impactSurface(state, cx, cy, cls, events);
+        const eventStart = events.length;
+        const consumedBySurface = impactSurface(state, cx, cy, cls, events, origin);
+        if (
+          conductiveReady && ownerExtra && ownerSlot !== undefined &&
+          events.slice(eventStart).some((event) => event.t === 'discharge')
+        ) {
+          consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
+        }
         if (heatsFungal) (proj.heatedSurfaceCells ??= []).push(i);
         if (consumedBySurface) {
           dead = true;
@@ -573,20 +739,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         }
       }
 
-      // projetil condutivo tocando poca dispara descarga
-      if (proj.conductive && !proj.hostile && state.surface[i] === SURF_BIOFLUID) {
-        dischargeAt(state, cx, cy, events);
+      if (
+        conductiveReady && ownerExtra && ownerSlot !== undefined &&
+        state.surface[i] === SURF_BIOFLUID &&
+        consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
+      ) {
+        dischargeAt(state, cx, cy, events, origin);
         dead = true;
         break;
       }
 
-      // impacto em entidades
       if (proj.hostile) {
-        for (const p of state.players) {
-          const pe = state.playerExtras[p.slot ?? 0];
-          if (!pe.joined || !p.alive || pe.downed) continue;
-          if (Math.hypot(p.x - proj.x, p.y - proj.y) < p.radius + 0.2) {
-            damageEntity(state, p, proj.damage, events);
+        for (const player of state.players) {
+          const extra = state.playerExtras[player.slot ?? 0];
+          if (!extra.joined || !player.alive || extra.downed) continue;
+          if (Math.hypot(player.x - proj.x, player.y - proj.y) < player.radius + 0.2) {
+            damageEntity(state, player, proj.damage, events);
             if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
               setSurface(state, i, SURF_BIOFLUID, 0);
             }
@@ -598,49 +766,78 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       } else {
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
-          if (proj.hits?.includes(enemy.id)) continue; // ja atravessado
-          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) < enemy.radius + 0.2) {
-            let dmg = proj.damage;
-            const enemyCell = cellIndexAt(state, enemy.x, enemy.y);
-            if (proj.conductive && state.surface[enemyCell] === SURF_BIOFLUID) {
-              dmg *= 1.6;
-              dischargeAt(state, Math.floor(enemy.x), Math.floor(enemy.y), events);
-            }
-            damageEntity(state, enemy, dmg, events);
-            // sifao cura o dono do projetil
-            const owner = state.players.find((p) => p.id === proj.owner);
-            if (owner && state.playerExtras[owner.slot ?? 0].modifiers.includes('siphon')) {
-              owner.hp = Math.min(owner.maxHp, owner.hp + 2);
-            }
-            if (proj.explosive) {
-              explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events);
-            }
-            if (proj.piercing && !proj.explosive) {
-              // sobrevive ao acerto: registra o alvo para nao reacertar nos
-              // substeps seguintes enquanto atravessa o mesmo inimigo
-              (proj.hits ??= []).push(enemy.id);
-            } else {
-              dead = true;
-            }
-            break;
+          const discHits = proj.disc
+            ? (proj.disc.phase === 'outbound' ? proj.disc.outboundHits : proj.disc.returnHits)
+            : undefined;
+          if (discHits?.includes(enemy.id) || proj.hits?.includes(enemy.id)) continue;
+          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + 0.2) continue;
+
+          let damage = proj.damage;
+          const enemyCell = cellIndexAt(state, enemy.x, enemy.y);
+          if (
+            proj.modules?.conductive && ownerExtra && ownerSlot !== undefined &&
+            state.surface[enemyCell] === SURF_BIOFLUID &&
+            moduleHasCapacity(ownerExtra, 'conductive', state.tick) &&
+            consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
+          ) {
+            damage *= 1.6;
+            dischargeAt(state, Math.floor(enemy.x), Math.floor(enemy.y), events, origin);
           }
+          damageEntity(state, enemy, damage, events);
+
+          if (
+            proj.modules?.siphon && owner && ownerExtra && ownerSlot !== undefined &&
+            owner.hp < owner.maxHp && moduleHasCapacity(ownerExtra, 'siphon', state.tick) &&
+            consumeModuleCharge(ownerExtra, 'siphon', ownerSlot, events)
+          ) {
+            owner.hp = Math.min(owner.maxHp, owner.hp + 2);
+          }
+
+          if (explosiveArmed) {
+            explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
+            dead = true;
+          } else if (proj.disc) {
+            discHits?.push(enemy.id);
+          } else if (proj.modules?.piercing) {
+            (proj.hits ??= []).push(enemy.id);
+          } else {
+            dead = true;
+          }
+          break;
         }
       }
     }
 
     if (dead && proj.leavesBiofluid) {
-      // O cuspe so deixava poca quando o TTL EXPIRAVA: acertou parede, chao ou
-      // alvo, evaporava sem deixar nada. Era metade da mecanica — o spitter e
-      // um agente que muda o terreno, e mudar terreno era justamente o que ele
-      // nao fazia quando de fato acertava alguma coisa.
       const i = cellIndexAt(state, proj.x, proj.y);
-      if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+      if (i >= 0 && i < state.solid.length && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
         setSurface(state, i, SURF_BIOFLUID, 0);
       }
     }
     if (!dead) survivors.push(proj);
   }
   state.projectiles = survivors;
+};
+
+
+const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void => {
+  for (const site of state.salvageSites) {
+    if (site.terminalState !== 'scanning' || state.tick < site.scanEndsAt) continue;
+    site.terminalState = 'complete';
+    site.cacheRevealed = true;
+    events.push({
+      t: 'terminal_scan_complete',
+      siteId: site.id,
+      x: site.terminal.x,
+      y: site.terminal.y,
+    });
+    events.push({
+      t: 'salvage_cache_revealed',
+      siteId: site.id,
+      x: site.cache.x,
+      y: site.cache.y,
+    });
+  }
 };
 
 /** Ondas de pressao por contaminacao (thresholds unicos). */
@@ -685,6 +882,8 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
   const p = state.players[slot];
   const e = state.playerExtras[slot];
   p.alive = false;
+  e.activeModules = [];
+  e.pendingModuleChoice = null;
   if (e.hasCore) {
     e.hasCore = false;
     state.coreTaken = false; // volta ao pedestal, recuperavel pelo parceiro
@@ -748,30 +947,19 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
     return { state, events };
   }
 
-  // fase de escolha existe apenas no solo (co-op nao pausa a sim)
-  if (state.phase === 'choice') {
-    const cmd = commands[0] ?? emptyCommand();
-    if (cmd.choose !== null && state.pendingChoice) {
-      grantModifier(state.playerExtras[0], state.pendingChoice[cmd.choose]);
-      const picked = state.pendingChoice[cmd.choose];
-      state.pendingChoice = null;
-      state.phase = 'running';
-      events.push({ t: 'message', text: `Modificador acoplado: ${picked}.` });
-    }
-    return { state, events };
-  }
-
   state.tick++;
 
   for (let slot = 0; slot < state.players.length; slot++) {
+    expireTimedModules(state.playerExtras[slot], state.tick, slot, events);
     stepPlayer(state, slot, commands[slot] ?? emptyCommand(), events);
-    // interacao pode disparar fase terminal (solo choice/extracao)
     if (state.phase !== 'running') {
       resolveChainedEvents(state, events);
+      resolveDownedAndDeaths(state, events);
       return { state, events };
     }
   }
 
+  stepSalvageSites(state, events);
   stepProjectiles(state, events);
   updateEnemies(state, events);
   stepCells(state, events);
@@ -827,24 +1015,56 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     h ^= (v >>> 24) & 0xff;
     h = Math.imul(h, 0x01000193);
   };
+  const mixString = (value: string): void => {
+    mix(value.length);
+    for (let i = 0; i < value.length; i++) mix(value.charCodeAt(i));
+  };
 
   mix(state.tick);
-  mix(state.phase.length);
-  mix(state.phase.charCodeAt(0));
+  mixString(state.phase);
   for (let i = 0; i < state.solid.length; i++) mix(state.solid[i] | (state.surface[i] << 8));
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
     const e = state.playerExtras[slot];
-    if (!e.joined) continue; // slots reservados nao influenciam o hash
+    if (!e.joined) continue;
+    mix(slot);
     mix(Math.round(p.x * 1000));
     mix(Math.round(p.y * 1000));
     mix(Math.round(p.hp * 100));
     mix(p.alive ? 1 : 0);
     mix(e.downed ? 1 : 0);
     mix(Math.round(e.heat * 100));
-    mix(e.consumables);
-    mix(e.modifiers.length);
-    for (const m of e.modifiers) mix(m.charCodeAt(0));
+    mix(e.purgeCells);
+    mix(e.activeModules.length);
+    for (const module of e.activeModules) {
+      mixString(module.id);
+      mixString(module.lifetime.kind);
+      if (module.lifetime.kind === 'charges') {
+        mix(module.lifetime.remaining);
+        mix(module.lifetime.maximum);
+      } else {
+        mix(module.lifetime.acquiredAtTick);
+        mix(module.lifetime.expiresAtTick);
+      }
+    }
+    if (e.pendingModuleChoice) {
+      mix(1);
+      mix(e.pendingModuleChoice.sourceSiteId);
+      mix(e.pendingModuleChoice.createdAtTick);
+      mixString(e.pendingModuleChoice.options[0]);
+      mixString(e.pendingModuleChoice.options[1]);
+    } else {
+      mix(0);
+    }
+  }
+  for (const site of state.salvageSites) {
+    mix(site.id);
+    mix(site.tier);
+    mixString(site.terminalState);
+    mix(site.scanEndsAt);
+    mix(site.cacheRevealed ? 1 : 0);
+    mix(site.cacheOpened ? 1 : 0);
+    mix(site.openedBySlot ?? -1);
   }
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));
@@ -857,8 +1077,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(enemy.hp * 100));
     mix(enemy.alive ? 1 : 0);
     if (enemy.action) {
-      mix(enemy.action.kind.length);
-      mix(enemy.action.kind.charCodeAt(0));
+      mixString(enemy.action.kind);
       mix(enemy.action.startedAt);
       mix(enemy.action.releaseAt);
       mix(enemy.action.endsAt);
@@ -868,8 +1087,27 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   }
   for (const proj of state.projectiles) {
     mix(proj.id);
+    mixString(proj.kind);
+    mix(proj.owner);
     mix(Math.round(proj.x * 1000));
     mix(Math.round(proj.y * 1000));
+    mix(Math.round(proj.vx * 1000));
+    mix(Math.round(proj.vy * 1000));
+    mix(Math.round(proj.distanceTravelled * 1000));
+    mix(proj.ttl);
+    mix(proj.modules?.piercing ? 1 : 0);
+    mix(proj.modules?.conductive ? 1 : 0);
+    mix(proj.modules?.siphon ? 1 : 0);
+    mix(proj.modules?.explosive ? Math.round(proj.modules.explosive.armAfterDistance * 1000) : 0);
+    mix(proj.modules?.ricochet?.remainingBounces ?? 0);
+    if (proj.disc) {
+      mixString(proj.disc.phase);
+      mix(Math.round(proj.disc.travelled * 1000));
+      mix(proj.disc.outboundHits.length);
+      for (const id of proj.disc.outboundHits) mix(id);
+      mix(proj.disc.returnHits.length);
+      for (const id of proj.disc.returnHits) mix(id);
+    }
   }
   return (h >>> 0).toString(16).padStart(8, '0');
 };

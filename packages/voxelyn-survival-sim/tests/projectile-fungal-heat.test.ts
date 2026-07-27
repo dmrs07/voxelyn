@@ -11,6 +11,7 @@ import { createRun } from '../src/run';
 import type { Projectile } from '../src/types';
 
 const thermalProjectile = (x: number, y: number): Projectile => ({
+  kind: 'bolt',
   id: 999,
   owner: 1,
   x,
@@ -18,9 +19,8 @@ const thermalProjectile = (x: number, y: number): Projectile => ({
   vx: 0,
   vy: 0,
   damage: 1,
-  piercing: false,
-  conductive: false,
-  explosive: true,
+  modules: { explosive: { armAfterDistance: 0 } },
+  distanceTravelled: 1,
   hostile: false,
   leavesBiofluid: false,
   ttl: 20,

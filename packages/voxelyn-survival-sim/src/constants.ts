@@ -175,11 +175,16 @@ export const ABILITY_COOLDOWN_TICKS = 120; // pulso cinetico
 export const ABILITY_RADIUS = 2.6;
 export const ABILITY_KNOCKBACK = 3.2;
 
-export const CONSUMABLE_HEAL = 18;
-export const CONSUMABLE_PURGE_RADIUS = 3;
+export const PURGE_CELL_HEAL = 18;
+export const PURGE_CELL_RADIUS = 3;
 
 export const EXPLOSION_RADIUS = 2.4;
 export const EXPLOSION_DAMAGE = 42;
+export const PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE = 0.35;
+export const EXPLOSIVE_ARM_DISTANCE = 2.25;
+export const RETURN_DISC_MAX_DISTANCE = 8;
+export const RETURN_DISC_SPEED = 11;
+export const SALVAGE_SCAN_TICKS = 6 * TICK_HZ;
 
 export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.0
 export const VENT_BASE_INTERVAL_TICKS = 160;

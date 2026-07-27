@@ -29,3 +29,5 @@ export {
   chargeCells,
 } from './cells.js';
 export { impactSolid, impactSurface, projectileClass, type ProjectileClass, type SolidImpact } from './materials.js';
+
+export { MODULE_DEFINITIONS, moduleDefinition, activeModule, moduleHasCapacity, grantOrRechargeModule, consumeModuleCharge, expireTimedModules, rollModuleChoice } from './modules.js';

@@ -66,32 +66,31 @@ describe('fluxo da run', () => {
     expect(state.phase).toBe('extracted_with_core');
   });
 
-  it('cache abre uma unica vez e a escolha aplica exatamente um modificador', () => {
+  it('cofre abre uma unica vez e a escolha privada aplica exatamente um modulo', () => {
     const state = createRun({ seed: 11 });
-    const cache = state.caches[0];
-    state.player.x = cache.x + 0.5;
-    state.player.y = cache.y + 0.5;
+    const site = state.salvageSites[0];
+    site.terminalState = 'complete';
+    site.cacheRevealed = true;
+    state.player.x = site.cache.x + 0.5;
+    state.player.y = site.cache.y + 0.5;
 
     const interact = emptyCommand();
     interact.interact = true;
     stepRun(state, [interact]);
-    expect(state.phase).toBe('choice');
-    expect(state.pendingChoice).not.toBeNull();
-    expect(cache.opened).toBe(true);
-    const consumablesAfterOpen = state.playerExtra.consumables;
+    expect(state.phase).toBe('running');
+    expect(state.playerExtra.pendingModuleChoice).not.toBeNull();
+    expect(site.cacheOpened).toBe(true);
+    const purgeCellsAfterOpen = state.playerExtra.purgeCells;
 
-    // escolher a opcao 0
     const choose = emptyCommand();
     choose.choose = 0;
     stepRun(state, [choose]);
     expect(state.phase).toBe('running');
-    expect(state.playerExtra.modifiers.length).toBe(1);
+    expect(state.playerExtra.activeModules.length).toBe(1);
 
-    // reinteragir com o mesmo cache nao duplica loot (inventario idempotente)
     stepRun(state, [interact]);
-    expect(state.phase).not.toBe('choice');
-    expect(state.playerExtra.consumables).toBe(consumablesAfterOpen);
-    expect(state.playerExtra.modifiers.length).toBe(1);
+    expect(state.playerExtra.purgeCells).toBe(purgeCellsAfterOpen);
+    expect(state.playerExtra.activeModules.length).toBe(1);
   });
 
   it('o guardiao existe, esta vivo e proximo do nucleo', () => {
@@ -172,6 +171,7 @@ describe('projetil perfurante', () => {
 
     // bolt perfurante vindo da esquerda, atravessando o alvo
     state.projectiles.push({
+      kind: 'bolt',
       id: 9001,
       owner: state.player.id,
       x: target.x - 1.2,
@@ -179,9 +179,8 @@ describe('projetil perfurante', () => {
       vx: 13,
       vy: 0,
       damage: 10,
-      piercing: true,
-      conductive: false,
-      explosive: false,
+      modules: { piercing: true },
+      distanceTravelled: 0,
       hostile: false,
       leavesBiofluid: false,
       ttl: 30,
@@ -204,6 +203,7 @@ describe('projetil perfurante', () => {
     const hp2 = second.hp;
 
     state.projectiles.push({
+      kind: 'bolt',
       id: 9002,
       owner: state.player.id,
       x: first.x - 1.2,
@@ -211,9 +211,8 @@ describe('projetil perfurante', () => {
       vx: 13,
       vy: 0,
       damage: 10,
-      piercing: true,
-      conductive: false,
-      explosive: false,
+      modules: { piercing: true },
+      distanceTravelled: 0,
       hostile: false,
       leavesBiofluid: false,
       ttl: 30,
