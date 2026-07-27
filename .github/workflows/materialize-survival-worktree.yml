@@ -142,7 +142,11 @@ jobs:
         run: |
           set -euo pipefail
           cd packages/voxelyn-survival-sim
-          for file in tests/*.test.ts; do
+          mapfile -t remaining < <(find tests -maxdepth 1 -name '*.test.ts' \
+            ! -name 'salvage-modules.test.ts' \
+            ! -name 'new-projectiles.test.ts' | sort)
+          files=(tests/salvage-modules.test.ts tests/new-projectiles.test.ts "${remaining[@]}")
+          for file in "${files[@]}"; do
             echo "$file" > /tmp/test-sim-current
             echo "=== $file ===" > /tmp/test-sim.log
             timeout 90s pnpm exec vitest run "$file" --reporter=verbose 2>&1 | tee -a /tmp/test-sim.log
@@ -204,12 +208,20 @@ jobs:
             fi
             echo
             echo '```text'
+            selected=""
             for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
               if [[ -f "$file" ]]; then
-                tail -n 100 "$file"
+                selected="$file"
                 break
               fi
             done
+            if [[ "$selected" == "/tmp/test-sim.log" ]]; then
+              grep -E '×|→|AssertionError|Expected|Received|❯|expected |toBe|toEqual|toBeCloseTo|Test Files|Tests ' "$selected" | tail -n 60 || tail -n 80 "$selected"
+            elif [[ -n "$selected" ]]; then
+              tail -n 100 "$selected"
+            else
+              echo "Failure occurred before command output was captured."
+            fi
             echo '```'
           } > /tmp/failure.md
           gh pr comment 48 --repo dmrs07/voxelyn --body-file /tmp/failure.md
