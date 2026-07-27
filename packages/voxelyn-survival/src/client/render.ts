@@ -71,7 +71,9 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
 const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_FUNGAL]: '#1f3d33',
   [SURF_BIOFLUID]: '#2f6b4f',
-  [SURF_GAS]: '#4d6b1c',
+  // Amarelo-esverdeado, e da paleta mestra: o oliva anterior nao existia nela e
+  // apontava para o lado errado agora que a crosta de gas e enxofre.
+  [SURF_GAS]: '#a8e63c',
   [SURF_FIRE]: '#ff7a2f',
   [SURF_SCORCHED]: '#0b0e14',
 };

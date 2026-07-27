@@ -63,7 +63,11 @@ type Particle = {
  */
 const RAMP: Record<ParticleKind, FaceRamp> = {
   ember: ['#ffd166', '#ff7a2f', '#d93b4c'],
-  gas: ['#a8e63c', '#2f6b4f', '#1f3d33'],
+  // Enxofre, e nao mais verde-limao: o mote sobe DE DENTRO da crosta de gas, e
+  // a crosta virou amarela. Verde sobre amarelo lia como duas materias
+  // diferentes empilhadas na mesma celula. O limao continua sendo o acido do
+  // cuspidor logo abaixo, que e outra coisa e deve continuar parecendo outra.
+  gas: ['#ffd166', '#a8e63c', '#1f3d33'],
   debris: ['#46566e', '#2e3a4d', '#1d2430'],
   spark: ['#e8f1ff', '#7ab8ff', '#2e3a4d'],
   // Materiais de bloco: os cacos saem da MESMA paleta com que o bloco foi

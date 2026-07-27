@@ -114,7 +114,7 @@ const overSlab = (variant, seed, fn) => {
  * Se as duas tivessem o mesmo relevo, a unica diferenca seria matiz, e matiz e
  * exatamente o que se perde na penumbra em que o jogo se passa.
  */
-const surfaceModel = (kind, variant, frame) => {
+export const surfaceModel = (kind, variant, frame) => {
   if (kind === 'bare') return slab(variant, 'floor', 'rockDeep');
   if (kind === 'scorched') {
     const boxes = slab(variant, 'scorch', 'floor');
@@ -139,17 +139,48 @@ const surfaceModel = (kind, variant, frame) => {
   }
 
   if (kind === 'biofluid') {
-    const boxes = slab(variant, 'floor', 'rockDeep');
-    overSlab(variant, 29, ({ cx, cy, x, y, h }) => {
-      // Uma camada UNICA e num z UNICO, acima de qualquer saliencia da laje:
-      // liquido assenta e nivela. Empilhar o brilho num voxel a mais, que foi a
-      // primeira tentativa, devolvia relevo a poca e ela voltava a ler como
-      // musgo — a diferenca entre poca e tapete de fungo e planura, nao matiz.
-      // Por isso o brilho troca de MATERIAL no mesmo plano em vez de subir.
-      const band = (cx + cy * 2 + frame) % 7;
-      const lit = band === 0 || (band === 3 && h % 3 === 0);
-      boxes.push(box(x, y, 2, 1, 1, 1, lit ? 'biolum' : 'fungusDeep'));
-    });
+    // A poca e o UNICO tipo que nao usa a laje irregular, e a excecao e o
+    // ponto todo: liquido acha nivel. A laje comum sobe um voxel em um quarto
+    // das colunas, e uma lamina assentada sobre ela herdava esse cascalho —
+    // saia um tapete rugoso da cor errada, nao uma poca. Aqui o leito e plano
+    // por construcao, e o que quebra a superficie sao poucas pedras inteiras.
+    //
+    // O erro anterior era tratar "detalhe" como sinonimo de "textura". Fungo,
+    // gas e fogo leem por serem RECORTADOS; liquido le pelo oposto — pela
+    // ausencia de recorte. Faisca coluna a coluna, orla em toda pedra e faixa
+    // com degrau juntos viraram ruido, e ruido e exatamente o que um liquido
+    // parado nao tem.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let cx = 0; cx < SURFACE_COLS; cx++) {
+      for (let cy = 0; cy < SURFACE_COLS; cy++) {
+        const x = cx - half;
+        const y = cy - half;
+        const h = hash3d(cx, cy, 29, variant);
+        boxes.push(box(x, y, 0, 1, 1, 1, 'floor'));
+        // Pedra emergindo — duas por celula, e clara. E ela que da escala e
+        // prova que ha NIVEL: sem nada furando a lamina, um plano liso e
+        // indistinguivel de uma laje pintada de verde.
+        //
+        // Os dois numeros aqui foram medidos, nao chutados. Na densidade da
+        // laje comum (uma coluna em dezesseis) sao quatro ilhas por celula e o
+        // olho volta a ler cascalho molhado; e em `rockDeep`, escura como a
+        // propria poca, cada ilha lia como buraco em vez de pedra. Clara e
+        // rara, cada uma vira um acidente que se nota.
+        if ((h & 31) === 0) {
+          boxes.push(box(x, y, 1, 1, 1, 2, 'rock'));
+          continue;
+        }
+        // Reflexo em FAIXA, nao em pontos soltos: o olho nao liga faiscas
+        // isoladas numa superficie, liga uma linha. Em projecao isometrica a
+        // linha de cx+cy constante corre na horizontal da tela, que e a
+        // direcao em que um reflexo de fato aparece. Modulo 8 — a largura da
+        // grade — para a faixa atravessar a fronteira entre celulas vizinhas
+        // em vez de quebrar nela.
+        const band = (cx + cy + frame * 2) % 8;
+        boxes.push(box(x, y, 1, 1, 1, 1, band === 0 ? 'biolum' : 'pool'));
+      }
+    }
     return boxes;
   }
 
@@ -159,16 +190,29 @@ const surfaceModel = (kind, variant, frame) => {
       // Ocupacao esparsa: e ISTO que substitui o alpha. A nuvem e opaca cubinho
       // a cubinho, e o chao aparece pelos vaos entre eles.
       //
-      // A densidade e a coisa mais delicada do arquivo. Perto da metade das
-      // colunas, os cubos se encostam na projecao e a nuvem vira um TAPETE
-      // verde: opaco, chapado, e sem nenhuma leitura de que ha ar ali. Em torno
-      // de um quinto eles ficam separados o bastante para o chao aparecer entre
-      // eles, que e o que faz o volume ler como gas.
-      if ((cx * 3 + cy * 5 + frame * 2) % 11 > 1) return;
-      // Espalhado em altura, e nao colado numa camada: o gas ocupa o AR sobre a
-      // celula, e os motes que o cliente emite sobem a partir daqui.
-      const z = 1 + ((h >>> 5) % 3) + (frame % 2);
-      boxes.push(box(x, y, z, 1, 1, 1, 'acid'));
+      // A densidade e a coisa mais delicada do arquivo, e a conta que importa
+      // nao e a fracao de colunas: e a AREA projetada. Um cubo ocupa 4x6 px na
+      // tela e a celula inteira tem 256 px de losango, entao um quinto das 64
+      // colunas ja da doze cubos — cobertura acima de 100%, e a nuvem vira um
+      // tapete opaco que esconde o chao. Uma em treze deixa cerca de cinco
+      // cubos separados por vazio, e e o vazio entre eles que faz o volume ler
+      // como gas em vez de superficie.
+      if ((cx * 3 + cy * 5 + frame * 2) % 13 !== 0) return;
+      // PAIRA, com ar visivel entre a nuvem e o chao.
+      //
+      // Comecava em z=1 — a altura do proprio topo da laje — entao metade dos
+      // cubos nascia dentro do piso e a nuvem se espalhava rente a ele. O
+      // resultado lia como poca, e melhor do que a poca lia. Gas nao encosta no
+      // chao: sobe. Comecando em 4, sobram dois voxels de ar vazio sob ele, e e
+      // esse vao que diz que a materia esta no ar.
+      //
+      // O teto tambem importa, e por um motivo que nao e estetico: a crosta de
+      // chao e desenhada no passo de piso, ANTES da fila ordenada por
+      // profundidade. Tudo que ela levanta acima do plano do chao passa por
+      // tras das paredes, mesmo o que esta na frente delas. Ficando na faixa da
+      // chama — que ja vive com isso — o gas nao piora um artefato que existe.
+      const z = 4 + ((h >>> 5) % 2) + (frame % 2);
+      boxes.push(box(x, y, z, 1, 1, 1, 'sulfur'));
     });
     return boxes;
   }
