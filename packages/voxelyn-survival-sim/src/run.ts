@@ -352,6 +352,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     extra.nextShotAt = state.tick + BOLT_COOLDOWN_TICKS;
     extra.heat += HEAT_PER_SHOT;
     state.projectiles.push({
+      kind: 'bolt',
       id: state.nextEntityId++,
       owner: player.id,
       x: player.x + extra.aim.x * 0.4,

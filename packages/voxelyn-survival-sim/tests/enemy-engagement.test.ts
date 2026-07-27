@@ -97,6 +97,10 @@ describe('bruiser arremessa bloco', () => {
     expect(thrown.length, 'o bruiser nao lancou nada').toBeGreaterThan(0);
     // Pedra nao suja o chao: quem deixa poca e o cuspidor.
     expect(thrown.some((p) => p.leavesBiofluid)).toBe(false);
+    // E se identifica como PEDRA. As flags dizem o que o projetil faz; sem um
+    // campo dizendo o que ele E, pedra e cuspe sao os dois apenas `hostile` e o
+    // cliente desenhava o bloco arrancado da parede como cusparada de acido.
+    expect(thrown.every((p) => p.kind === 'rock'), 'o bloco nao se identifica como pedra').toBe(true);
   });
 
   // Sem parede ao alcance ele nao tem o que jogar. Isso e proposital: em sala
@@ -273,5 +277,20 @@ describe('achados da revisao', () => {
     if (!pick) return;
     expect(canRip(state, pick.x, pick.y), `escolheu ${pick.x},${pick.y}, que ripSolid recusa`).toBe(true);
     expect(pick.x, 'escolheu a borda do mapa').toBeGreaterThan(0);
+  });
+});
+
+describe('identidade dos projeteis', () => {
+  // Cada arremessador declara o que lanca. Sem isso o cliente so tem `hostile`,
+  // e uma pedra de 22 de dano chega com a mesma cara de um cuspe de 9.
+  it('separa tiro do jogador, cuspe e pedra', () => {
+    const state = createRun({ seed: 81 });
+    const cmd = emptyCommand();
+    cmd.fire = true;
+    cmd.aim = { x: 1, y: 0 };
+    stepRun(state, [cmd]);
+    const mine = state.projectiles.filter((p) => !p.hostile);
+    expect(mine.length, 'o jogador nao atirou').toBeGreaterThan(0);
+    expect(mine.every((p) => p.kind === 'bolt')).toBe(true);
   });
 });

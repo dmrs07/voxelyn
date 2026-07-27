@@ -18,11 +18,22 @@ export type ProjectileLike = {
   x: number;
   y: number;
   hostile: boolean;
+  /** Ausente em estados antigos: cai para o comportamento anterior. */
+  kind?: 'bolt' | 'spit' | 'rock';
 };
 
 /** Estilhaco mineral do jogador contra cuspe acido do inimigo. */
 const PLAYER_RAMP: FaceRamp = ['#e8f1ff', '#59f2c2', '#2f6b4f'];
 const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
+/**
+ * Pedra do bruiser: a MESMA rampa dos blocos de terreno.
+ *
+ * Ela nao e "um projetil cinza", e um PEDACO DA PAREDE — foi arrancado da arena
+ * um segundo antes. Usar a rampa do terreno e o que fecha essa leitura: o
+ * jogador reconhece o material voando porque acabou de ve-lo sair do lugar.
+ * Com a rampa hostil generica, o bloco aparecia como cusparada de acido.
+ */
+const ROCK_RAMP: FaceRamp = ['#46566e', '#2e3a4d', '#1d2430'];
 
 /** Altura de voo, em tiles. O bastante para a sombra se separar do corpo. */
 const FLIGHT_HEIGHT = 0.55;
@@ -86,15 +97,29 @@ export class ProjectileView {
     tileH: number
   ): void {
     const [sx, sy] = project(projectile.x, projectile.y);
-    const ramp = projectile.hostile ? HOSTILE_RAMP : PLAYER_RAMP;
+    const rock = projectile.kind === 'rock';
+    const ramp = rock ? ROCK_RAMP : projectile.hostile ? HOSTILE_RAMP : PLAYER_RAMP;
     const lift = FLIGHT_HEIGHT * tileH * zoom;
-    const size = VOXEL_PX * zoom;
+    // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
+    // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
+    const size = VOXEL_PX * zoom * (rock ? 1.9 : 1);
     const track = this.tracks.get(projectile.id);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao
     // isometrica subir na tela e afastar-se sao o mesmo deslocamento de pixel,
     // entao sem sombra um projetil alto e indistinguivel de um projetil longe.
-    drawGroundShadow(ctx, sx, sy, 3 * zoom);
+    // Sombra proporcional ao corpo: um bloco projeta mais sombra que um cuspe,
+    // e e por ela que a massa se le enquanto ele ainda esta longe.
+    drawGroundShadow(ctx, sx, sy, (rock ? 5 : 3) * zoom);
+
+    // Pedra nao deixa rastro nem se parte em estilhaco: e um corpo solido e
+    // unico. O rastro existe para materia que se desfaz no ar — cuspe e
+    // estilhaco de energia —, e desenha-lo aqui daria a um bloco a aparencia de
+    // algo que evapora enquanto voa.
+    if (rock) {
+      drawVoxel(ctx, sx, sy - lift, size, ramp);
+      return;
+    }
 
     // Rastro atras do corpo, ao longo da direcao de voo.
     if (track && (track.dx !== 0 || track.dy !== 0)) {

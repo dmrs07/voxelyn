@@ -367,7 +367,13 @@ export class GameRoom {
   }
 
   private projectileSnapshots(): ProjectileSnapshot[] {
-    return this.state.projectiles.map((p) => ({ id: p.id, x: round3(p.x), y: round3(p.y), hostile: p.hostile }));
+    return this.state.projectiles.map((p) => ({
+      id: p.id,
+      x: round3(p.x),
+      y: round3(p.y),
+      hostile: p.hostile,
+      kind: p.kind,
+    }));
   }
 
   buildSnapshot(
