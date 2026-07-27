@@ -22,7 +22,7 @@ import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
-import { VoxelParticles, frameDeltaMs } from './particles';
+import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
 import { ProjectileView } from './projectiles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
@@ -133,6 +133,17 @@ export class SurvivalRenderer {
   readonly projectileView = new ProjectileView();
   /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
   private lastFrameMs = 0;
+  /**
+   * Arquetipo de cada entidade viva, para o respingo do acerto saber de que
+   * materia o alvo e feito.
+   *
+   * O evento `hit` carrega so `target`, e `ingestEvents` roda fora do render,
+   * sem acesso ao estado — daí o mapa. Fica no maximo um quadro desatualizado,
+   * o que e irrelevante para escolher a cor de um caco, e nao custa nada:
+   * atualizar um Map ja existente por entidade visivel e ruido perto do resto
+   * do laco.
+   */
+  private readonly archetypeById = new Map<number, string>();
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -218,6 +229,15 @@ export class SurvivalRenderer {
           }
           break;
         case 'hit':
+          // Respingo na materia do alvo. Descritivo: diz o que foi atingido,
+          // nao que este tiro e o counter deste bicho (ver HIT_MATERIAL).
+          this.particles.hit(
+            ev.x,
+            ev.y,
+            hitMaterialOf(this.archetypeById.get(ev.target)),
+            ev.amount,
+            this.quality.maxFx / PRESETS.high.maxFx
+          );
           this.fxList.push({
             kind: 'text',
             x: ev.x,
@@ -590,7 +610,10 @@ export class SurvivalRenderer {
 
     const spriteZoom = Math.max(1, Math.round(z));
 
+    this.archetypeById.clear();
+    for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
     for (const enemy of state.enemies) {
+      this.archetypeById.set(enemy.id, enemy.archetype);
       if (!enemy.alive) continue;
       const b = brightness(enemy.x, enemy.y);
       if (b <= 0.05) continue;

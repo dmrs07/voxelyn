@@ -26,7 +26,10 @@ export type ParticleKind =
   | 'acidDrip'
   | 'oreChip'
   | 'shock'
-  | 'ash';
+  | 'ash'
+  | 'chitin'
+  | 'spore'
+  | 'stone';
 
 type Particle = {
   x: number; // tile
@@ -67,7 +70,37 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   // Fumaca: um passo de valor acima do fundo, nunca mais. Ela existe para dar
   // duracao a explosao depois que o clarao passa, nao para tapar a tela.
   ash: ['#2e3a4d', '#1d2430', '#0b0e14'],
+  // Materia de criatura, para o respingo do acerto.
+  chitin: ['#d93b4c', '#6e4a33', '#2e3a4d'],
+  spore: ['#66c28a', '#2f6b4f', '#1f3d33'],
+  stone: ['#b8a98f', '#46566e', '#2e3a4d'],
 };
+
+/**
+ * De que materia cada criatura e feita, para o respingo do acerto.
+ *
+ * DESCRITIVO, nao prescritivo: diz o que foi ATINGIDO, nunca que aquele tipo de
+ * tiro e o counter daquele bicho. A distincao importa e nao e detalhe — os
+ * inimigos tem pontos fracos DESENHADOS (o nucleo eletrico exposto do bruiser,
+ * a vagem que incha no bomber) que a simulacao ainda ignora. Um respingo que
+ * insinuasse fraqueza ensinaria uma licao falsa: o jogador testaria e
+ * descobriria que era decoracao. Num jogo que promete ser dificil mas legivel,
+ * isso e pior do que o acerto generico que havia antes.
+ *
+ * Sai do arquetipo, que o cliente ja recebe no snapshot — nenhum dado novo no
+ * protocolo, nenhuma mudanca na simulacao.
+ */
+const HIT_MATERIAL: Record<string, ParticleKind> = {
+  stalker: 'chitin',
+  spitter: 'spore',
+  bomber: 'spore',
+  bruiser: 'stone',
+  guardian: 'stone',
+  prospector: 'stone',
+};
+
+export const hitMaterialOf = (archetype: string | undefined): ParticleKind =>
+  (archetype !== undefined && HIT_MATERIAL[archetype]) || 'debris';
 
 /**
  * PRNG barata semeada por evento. Nao precisa da qualidade da RNG da simulacao
@@ -267,6 +300,19 @@ export class VoxelParticles {
           break;
       }
     }
+  }
+
+  /**
+   * Respingo de um acerto, na materia da criatura atingida.
+   *
+   * Curto e pequeno de proposito: acontece muitas vezes por segundo e nao pode
+   * competir com explosao nem com morte, que sao os momentos que o jogador
+   * precisa mesmo ler. `amount` so modula a quantidade — um golpe forte solta
+   * mais materia, sem virar outro efeito.
+   */
+  hit(x: number, y: number, kind: ParticleKind, amount: number, scale: number): void {
+    const n = Math.max(1, Math.round(Math.min(5, 1 + amount / 8) * scale));
+    this.burst(x, y, kind, n, 1.1, 1.2, 300, 17);
   }
 
   /** Emissao contínua do gas parado no mundo — a ameaca tem de ser VISTA. */

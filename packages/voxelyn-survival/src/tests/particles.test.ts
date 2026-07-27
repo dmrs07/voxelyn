@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs } from '../client/particles';
+import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs, hitMaterialOf } from '../client/particles';
 import { SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
@@ -283,6 +283,51 @@ describe('particulas voxel', () => {
     const items = (p as unknown as { items: Array<{ x: number; y: number; vx: number; vz: number }> }).items;
     const assinaturas = new Set(items.map((i) => `${i.vx.toFixed(6)},${i.vz.toFixed(6)}`));
     expect(assinaturas.size).toBe(items.length);
+  });
+
+  // O respingo diz o que foi ATINGIDO, nunca que aquele tiro e o counter
+  // daquele bicho: os inimigos tem pontos fracos desenhados que a simulacao
+  // ainda ignora, e insinuar fraqueza inexistente ensinaria uma licao falsa.
+  it('escolhe a materia do respingo pelo arquetipo do alvo', () => {
+    expect(hitMaterialOf('stalker')).toBe('chitin');
+    expect(hitMaterialOf('spitter')).toBe('spore');
+    expect(hitMaterialOf('bomber')).toBe('spore');
+    expect(hitMaterialOf('bruiser')).toBe('stone');
+    expect(hitMaterialOf('guardian')).toBe('stone');
+    // Alvo desconhecido nao pode explodir nem sumir: cai num generico.
+    expect(hitMaterialOf('inexistente')).toBe('debris');
+    expect(hitMaterialOf(undefined)).toBe('debris');
+  });
+
+  it('solta so a materia pedida no respingo', () => {
+    const p = new VoxelParticles();
+    p.hit(10, 10, 'chitin', 12, 1);
+    const items = (p as unknown as { items: Array<{ kind: string }> }).items;
+    expect(items.length).toBeGreaterThan(0);
+    expect(new Set(items.map((i) => i.kind))).toEqual(new Set(['chitin']));
+  });
+
+  // O acerto acontece muitas vezes por segundo. Se competisse com a explosao,
+  // comeria o orcamento e apagaria o efeito que o jogador PRECISA ler.
+  it('mantem o respingo menor que uma explosao, mesmo em golpe forte', () => {
+    const golpe = new VoxelParticles();
+    const estouro = new VoxelParticles();
+    golpe.hit(10, 10, 'stone', 999, 1);
+    estouro.ingest([explosion(10, 10)], 96, 1);
+    expect(golpe.count).toBeGreaterThan(0);
+    expect(golpe.count).toBeLessThan(estouro.count);
+  });
+
+  it('escala o respingo com o dano e com a qualidade', () => {
+    const fraco = new VoxelParticles();
+    const forte = new VoxelParticles();
+    const baixo = new VoxelParticles();
+    fraco.hit(10, 10, 'stone', 2, 1);
+    forte.hit(10, 10, 'stone', 40, 1);
+    baixo.hit(10, 10, 'stone', 40, 0.2);
+    expect(forte.count).toBeGreaterThan(fraco.count);
+    expect(baixo.count).toBeGreaterThan(0);
+    expect(baixo.count).toBeLessThan(forte.count);
   });
 
   it('ignora eventos que nao geram materia', () => {
