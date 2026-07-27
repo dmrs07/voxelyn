@@ -42,6 +42,11 @@ type Particle = {
   maxLife: number;
   kind: ParticleKind;
   /**
+   * Identidade visual imutavel. O gas usa para escolher de que lado seus lobulos
+   * abrem sem depender da posicao projetada, que muda com a camera e a subida.
+   */
+  visualSeed?: number;
+  /**
    * Frente que PROMETE um alcance: nao freia, nao cai, e anda pelo tempo real
    * decorrido.
    *
@@ -353,10 +358,10 @@ export class VoxelParticles {
     if (this.lastGasBucket.get(cell) === bucket) return;
     this.lastGasBucket.set(cell, bucket);
 
-    // A semente inclui o INSTANTE, nao so a celula: com semente fixa por celula
-    // todo mote nascia no mesmo ponto e o gas subia em fila indiana, uma linha
-    // vertical em vez de uma coluna que se abre.
-    const rnd = seeded(eventSeed(x, y, phase ^ Math.imul(bucket, 2654435761)));
+    // A mesma semente que distribui o nascimento tambem vira a identidade visual
+    // imutavel do puff. A posicao e a camera mudam; esta identidade nao.
+    const visualSeed = eventSeed(x, y, phase ^ Math.imul(bucket, 2654435761));
+    const rnd = seeded(visualSeed);
     this.push({
       x: x + rnd() * 0.9 - 0.45,
       y: y + rnd() * 0.9 - 0.45,
@@ -367,6 +372,7 @@ export class VoxelParticles {
       life: 900,
       maxLife: 900,
       kind: 'gas',
+      visualSeed,
     });
   }
 
@@ -453,7 +459,7 @@ export class VoxelParticles {
       // ou solida perde massa ao esfriar e ao assentar, fumaca se dilui — usar a
       // mesma curva para os dois faria a fumaca ler como mais uma brasa.
       const size = p.kind === 'ash' ? 0.6 + (1 - life) * 0.9 : 0.45 + life * 0.55;
-      drawVoxel(ctx, sx, py, base * size, RAMP[p.kind]);
+      drawVoxel(ctx, sx, py, base * size, RAMP[p.kind], p.visualSeed);
     }
     ctx.globalAlpha = 1;
     ctx.restore();
