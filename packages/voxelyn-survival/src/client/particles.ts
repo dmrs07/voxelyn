@@ -41,6 +41,16 @@ type Particle = {
   life: number;
   maxLife: number;
   kind: ParticleKind;
+  /**
+   * Frente que PROMETE um alcance: nao freia, nao cai, e anda pelo tempo real
+   * decorrido.
+   *
+   * E propriedade da particula, nao do tipo. Amarrar isto ao `kind` foi o erro:
+   * so `shock` era isento, entao o anel do pulso — que e `spark` porque o pulso
+   * nao tem fogo — freava e caia, e parava a 79% do raio que a simulacao
+   * aplica. A cor da frente e a fisica dela sao decisoes independentes.
+   */
+  ballistic?: boolean;
 };
 
 /**
@@ -216,7 +226,11 @@ export class VoxelParticles {
     const speed = radius / (life / 1000);
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + (rnd() - 0.5) * 0.3;
-      const mag = speed * (0.88 + rnd() * 0.24);
+      // O tremor so tira velocidade, nunca acrescenta: a frente e um
+      // INDICADOR de alcance, e a particula mais externa nao pode passar do
+      // raio real. Prometer menos que a simulacao entrega e seguro; prometer
+      // mais mata o jogador que confiou na borda que viu.
+      const mag = speed * (0.82 + rnd() * 0.18);
       this.push({
         x, y,
         z: 0.06 + rnd() * 0.1,
@@ -226,6 +240,7 @@ export class VoxelParticles {
         life,
         maxLife: life,
         kind,
+        ballistic: true,
       });
     }
   }
@@ -353,6 +368,15 @@ export class VoxelParticles {
 
   step(dtMs: number): void {
     const dt = Math.min(64, dtMs) / 1000;
+    // A frente balistica anda pelo tempo REAL decorrido, sem o teto de 64ms.
+    //
+    // O teto existe para uma aba que volta do segundo plano nao teleportar
+    // brasas — mas a vida sempre foi descontada pelo `dtMs` inteiro, entao
+    // aplicar o teto ao movimento fazia a frente gastar vida sem andar. Num
+    // aparelho a 10 quadros por segundo a frente da explosao sumia a 47% do
+    // raio, ensinando ao jogador um alcance quase metade do que machuca. Aqui
+    // movimento e vida consomem o MESMO intervalo, entao a posicao e sempre
+    // raio x (tempo decorrido / vida), em qualquer taxa de quadros.
     // Arrasto POR SEGUNDO, elevado ao tempo do passo.
     //
     // Multiplicar por 0.97 uma vez por quadro amarrava o alcance a taxa do
@@ -364,18 +388,26 @@ export class VoxelParticles {
     const gasDrag = Math.pow(0.985, dt * 60);
     const out: Particle[] = [];
     for (const p of this.items) {
+      if (p.ballistic) {
+        // A frente sobrevive ao quadro em que COMPLETA o percurso.
+        //
+        // Abatendo-a antes de mover, como o caminho comum faz, o ultimo passo
+        // era descartado e ela nunca chegava a ser DESENHADA na borda: a 10
+        // quadros por segundo o jogador via no maximo 74% do raio. E o quadro
+        // final que ensina o alcance, entao ele precisa existir.
+        if (p.life <= 0) continue;
+        const lived = Math.min(dtMs, p.life) / 1000;
+        p.x += p.vx * lived;
+        p.y += p.vy * lived;
+        p.life -= dtMs;
+        out.push(p);
+        continue;
+      }
       p.life -= dtMs;
       if (p.life <= 0) continue;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.z += p.vz * dt;
-      if (p.kind === 'shock') {
-        // A frente de choque nao cai nem freia: ela tem um destino — a borda do
-        // estrago — e qualquer arrasto a faria parar aquem dele, ensinando ao
-        // jogador um alcance menor do que o que a simulacao aplica.
-        out.push(p);
-        continue;
-      }
       // Brasa e entulho caem; gas e fumaca sobem e desaceleram, nunca caem.
       if (p.kind === 'gas' || p.kind === 'ash') {
         p.vz *= gasDrag;

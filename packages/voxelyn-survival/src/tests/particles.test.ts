@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs, hitMaterialOf } from '../client/particles';
-import { SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
+import { ABILITY_RADIUS, SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
 const explosion = (x = 10, y = 10, radius = 3): SemanticEvent => ({ t: 'explosion', x, y, radius });
@@ -328,6 +328,53 @@ describe('particulas voxel', () => {
     expect(forte.count).toBeGreaterThan(fraco.count);
     expect(baixo.count).toBeGreaterThan(0);
     expect(baixo.count).toBeLessThan(forte.count);
+  });
+
+  // A frente PROMETE um alcance ao jogador. Se ela para antes, ele aprende um
+  // raio menor do que o que machuca; se passa, aprende um maior e morre
+  // confiando na borda que viu.
+  const alcance = (p: VoxelParticles, kind: string, cx: number, cy: number): number => {
+    const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+    const m = items.filter((i) => i.kind === kind);
+    return m.length ? Math.max(...m.map((i) => Math.hypot(i.x - cx, i.y - cy))) : 0;
+  };
+  const varrer = (p: VoxelParticles, kind: string, dt: number): number => {
+    let best = 0;
+    for (let i = 0; i < 80; i++) {
+      p.step(dt);
+      best = Math.max(best, alcance(p, kind, 50, 50));
+    }
+    return best;
+  };
+
+  it('a frente da explosao chega a borda do estrago, sem passar dela', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    const r = varrer(p, 'shock', 16.7);
+    expect(r).toBeGreaterThan(3 * 0.9);
+    expect(r).toBeLessThanOrEqual(3);
+  });
+
+  // O anel do pulso e `spark` porque o pulso nao tem fogo. Quando "ser
+  // balistico" dependia do KIND, ele freava e caia como brasa comum e parava a
+  // 79% do raio — a cor da frente decidindo a fisica dela.
+  it('a frente do pulso chega ao raio da habilidade', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'pulse', x: 50, y: 50 }], 96, 1);
+    const r = varrer(p, 'spark', 16.7);
+    expect(r).toBeGreaterThan(ABILITY_RADIUS * 0.9);
+    expect(r).toBeLessThanOrEqual(ABILITY_RADIUS);
+  });
+
+  // A vida sempre foi descontada pelo dtMs inteiro, mas o movimento levava o
+  // teto de 64ms: num aparelho a 10 quadros por segundo a frente gastava vida
+  // sem andar e sumia a 47% do raio.
+  it('chega ao mesmo lugar a 10 e a 60 quadros por segundo', () => {
+    const rapido = new VoxelParticles();
+    const lento = new VoxelParticles();
+    rapido.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    lento.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    expect(varrer(lento, 'shock', 100)).toBeCloseTo(varrer(rapido, 'shock', 16.7), 1);
   });
 
   it('ignora eventos que nao geram materia', () => {
