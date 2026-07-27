@@ -26,11 +26,22 @@ import {
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
   SURF_SCORCHED,
+  SURF_SPORES,
 } from './constants.js';
-import { breakSolid, chargeCells, explodeAt, floodFrom, igniteCell, markDirty, setSurface } from './cells.js';
+import {
+  breakSolid,
+  chargeCells,
+  explodeAt,
+  floodFrom,
+  heatFungalCell,
+  igniteCell,
+  markDirty,
+  setSurface,
+} from './cells.js';
 import type { Projectile, SemanticEvent, SurvivalState } from './types.js';
 
 export type ProjectileClass = 'kinetic' | 'energy' | 'thermal' | 'bio';
@@ -244,15 +255,22 @@ export const impactSurface = (
   const surface = state.surface[i];
 
   if (surface === SURF_GAS && (cls === 'energy' || cls === 'thermal')) {
-    // O gas so causava dano por contato. Detonar transforma uma nuvem passiva
-    // numa decisao de posicionamento — para os dois lados, porque o cuspe do
-    // spitter tambem atravessa nuvem.
+    // Gas sulfurico e a materia volatil: faisca ou calor o consome no mesmo
+    // impacto e produz a explosao. Esporos nao entram neste ramo.
     setSurface(state, i, SURF_NONE, 0);
     explodeAt(state, cx + 0.5, cy + 0.5, 2.4, events);
     return true;
   }
 
-  if (surface === SURF_FUNGAL && cls === 'thermal') {
+  if ((surface === SURF_FUNGAL || surface === SURF_FUNGAL_HEATED) && cls === 'thermal') {
+    // Biomassa umida nao vira fogo no frame do impacto. O primeiro toque cria o
+    // estado fumegante; impactos adicionais apenas aceleram a secagem.
+    heatFungalCell(state, i, true);
+    return false;
+  }
+
+  if (surface === SURF_SPORES && cls === 'thermal') {
+    // A nuvem organica e esterilizada por calor, mas nao detona como gas.
     igniteCell(state, i, events);
     return false;
   }
@@ -266,7 +284,9 @@ export const impactSurface = (
     // O acido do spitter ALIMENTA o fungo: a colonia avanca para as celulas
     // limpas em volta. E o inimigo trabalhando a favor do mundo, nao so contra
     // o jogador — o terreno piora mesmo quando o tiro erra.
-    if (surface === SURF_FUNGAL) {
+    if (surface === SURF_FUNGAL || surface === SURF_FUNGAL_HEATED) {
+      // Acido reidrata uma colonia que estava secando.
+      if (surface === SURF_FUNGAL_HEATED) setSurface(state, i, SURF_FUNGAL, 0);
       const w = W(state);
       const h = state.config.height;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
