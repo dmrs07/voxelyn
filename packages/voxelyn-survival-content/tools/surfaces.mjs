@@ -37,7 +37,7 @@ export const SURFACE_KINDS = [
   { name: 'bare', frames: 1, frameMs: 0 },
   { name: 'fungal', frames: 2, frameMs: 520 },
   { name: 'biofluid', frames: 4, frameMs: 260 },
-  { name: 'gas', frames: 4, frameMs: 300 },
+  { name: 'gas', frames: 6, frameMs: 240 },
   { name: 'fire', frames: 4, frameMs: 110 },
   { name: 'scorched', frames: 1, frameMs: 0 },
   { name: 'spores', frames: 4, frameMs: 360 },
@@ -90,6 +90,277 @@ const overSlab = (variant, seed, fn) => {
       });
     }
   }
+};
+
+/**
+ * O gas tem DUAS camadas, e a razao e de leitura, nao de enfeite.
+ *
+ * A referencia de penacho e uma peca UNICA: pe fino subindo para uma cabeca
+ * lobulada, dramatica porque esta sozinha contra o fundo. Um atlas de tiles nao
+ * desenha uma peca — desenha a MESMA peca em toda celula que a simulacao marcar
+ * como gas. Repetido celula a celula, o penacho vira mato: renderizado, um campo
+ * de gas com penacho em toda celula fecha numa parede verde opaca que esconde o
+ * que esta atras. Num jogo que promete que a morte venha de decisao arriscada e
+ * nunca do que nao dava para ver, isso e pior do que feio.
+ *
+ * Entao: TODA celula de gas tem a bruma baixa — esparsa, na altura de antes, e e
+ * ela que marca o perigo e mantem o chao visivel. E so UMA das tres variantes
+ * solta penacho. Como o cliente escolhe a variante pela posicao, cerca de um
+ * terco das celulas levanta uma coluna, e o campo le como bruma de enxofre com
+ * penachos subindo dela — que e a linguagem da referencia, num arranjo que
+ * continua jogavel.
+ */
+const GAS_HAZE_FLOOR = 4;
+const GAS_HAZE_CEIL = 5;
+
+/**
+ * Estagios da bruma, do nascimento a dissipacao.
+ *
+ * `count` e o numero EXATO de colunas: sortear cada uma com probabilidade caindo
+ * com a distancia — a formulacao obvia — deixava a variancia dominar a media, e
+ * a massa medida oscilava entre 2 e 10 voxels por celula. Numa animacao curta
+ * isso nao le como dissipacao, le como PISCA.
+ *
+ * `core` sao as primeiras colunas do ranking, e sobem DOIS voxels: em projecao
+ * isometrica a altura e a unica coisa que separa um monte de uma fileira.
+ */
+const GAS_HAZE_STAGES = [
+  { count: 2, core: 1, base: GAS_HAZE_FLOOR, lift: 0 },
+  { count: 3, core: 2, base: GAS_HAZE_FLOOR, lift: 0 },
+  { count: 3, core: 2, base: GAS_HAZE_FLOOR, lift: 0 },
+  { count: 2, core: 2, base: GAS_HAZE_FLOOR, lift: 1 },
+  { count: 2, core: 1, base: GAS_HAZE_FLOOR, lift: 1 },
+  { count: 1, core: 1, base: GAS_HAZE_FLOOR, lift: 1 },
+];
+
+/**
+ * Raio unico para TODOS os estagios.
+ *
+ * Ele era por estagio, e isso quebrava calado a propriedade que faz a animacao
+ * ser crescimento: com raios diferentes, o conjunto de colunas candidatas muda,
+ * a ordem do ranking muda junto, e o estagio seguinte pode escolher colunas
+ * completamente outras. Medido, havia transicao de quadro com sobreposicao ZERO
+ * — a celula inteira trocava de lugar de um quadro para o outro. Com raio fixo,
+ * os estagios sao subconjuntos ANINHADOS da mesma lista ordenada: o sopro so
+ * pode crescer de dentro para fora e se recolher pelo mesmo caminho.
+ */
+const GAS_HAZE_RADIUS = 2;
+
+/**
+ * Peso da distancia na disputa por uma vaga na bruma.
+ *
+ * As colunas do raio sao ordenadas por `hash + distancia * este peso` e as
+ * primeiras `count` vencem. Baixo demais e a bruma sai espalhada sem miolo; alto
+ * demais e a distancia decide sozinha e sai um losango solido, liso e sem os
+ * vazios internos que deixam ver atraves. No meio, o centro quase sempre ganha,
+ * mas uma coluna de borda com hash baixo rouba a vaga de uma central com hash
+ * alto — e essa troca abre buraco no miolo e esfarrapa a borda de graca.
+ */
+const GAS_DIST_WEIGHT = 260;
+
+/** Dois sopros de bruma por celula, sempre em estagios opostos do ciclo. */
+const GAS_HAZE_PUFFS = 2;
+
+/**
+ * Faixa vertical do penacho.
+ *
+ * O pe comeca em 2 e nao encosta na laje: nascendo em z=1 — a altura do proprio
+ * topo do piso — metade dos cubos nasceria DENTRO dele e a materia se deitaria
+ * no chao, lendo como poca, que foi o defeito que originou todo este trabalho.
+ *
+ * O teto e caro: a crosta e desenhada no passo de piso, ANTES da fila ordenada
+ * por profundidade, entao tudo que ela levanta passa por TRAS das paredes mesmo
+ * estando na frente delas. A bruma cabe em dois niveis justamente para nao
+ * agravar isso; o penacho nao cabe, porque sem altura nao ha pe nem cabeca — a
+ * silhueta pedida E a altura. Fica restrito a uma variante em tres, entao o
+ * artefato aparece em poucas celulas em vez de em todas.
+ */
+const GAS_BASE = 2;
+const GAS_TOP = 12;
+
+/**
+ * Estagios do penacho, do fiapo ao que sobrou dele.
+ *
+ * `stem` e a faixa do pe (nula quando ele ja se desprendeu), `headZ` a altura do
+ * centro da cabeca, `lobes` quantos bulbos a compoem e `spread` o quanto se
+ * afastam. A cabeca sobe e se abre, o pe se consome de baixo para cima, e no fim
+ * so restam bulbos soltos la em cima — que e o ciclo da referencia.
+ */
+const GAS_PLUME_STAGES = [
+  { stem: [GAS_BASE, 4], headZ: 5, lobes: 1, spread: 0, mass: 3 },
+  { stem: [GAS_BASE, 5], headZ: 7, lobes: 2, spread: 1, mass: 3 },
+  { stem: [GAS_BASE, 6], headZ: 8, lobes: 3, spread: 1, mass: 4 },
+  { stem: [GAS_BASE + 1, 7], headZ: 9, lobes: 3, spread: 2, mass: 4 },
+  { stem: [GAS_BASE + 3, 8], headZ: 10, lobes: 3, spread: 2, mass: 3 },
+  { stem: null, headZ: 11, lobes: 2, spread: 2, mass: 2 },
+];
+
+/** Variante que levanta penacho. As outras duas ficam so na bruma. */
+const GAS_PLUME_VARIANT = 2;
+
+/** Bruma baixa: sopros com ciclo de vida, presentes em toda celula de gas. */
+const gasHaze = (variant, frame, put) => {
+  for (let p = 0; p < GAS_HAZE_PUFFS; p++) {
+    const seed = hash3d(p * 5 + 1, p * 3 + 2, 0, variant);
+    const stage = (frame + p * 3) % GAS_HAZE_STAGES.length;
+    const { count, core, base, lift } = GAS_HAZE_STAGES[stage];
+    const radius = GAS_HAZE_RADIUS;
+    // Deriva de UM passo, na metade de cima do ciclo. Acumulando um passo por
+    // estagio, o sopro andava varias colunas e voltava de uma vez ao reiniciar:
+    // medida, a sobreposicao entre quadros consecutivos chegava a ZERO e a
+    // celula inteira teleportava.
+    // A deriva NAO pode acontecer na volta do laco. Ela valia para todo estagio
+    // a partir do terceiro, entao no ultimo quadro o sopro estava deslocado e no
+    // primeiro voltava — um salto que, somado a troca de forma, zerava a
+    // sobreposicao entre o ultimo quadro e o primeiro.
+    const driftX = ((seed >>> 8) % 3) - 1;
+    const driftY = ((seed >>> 11) % 3) - 1;
+    const step = stage === 3 || stage === 4 ? 1 : 0;
+    const ox = (seed % SURFACE_COLS) + driftX * step;
+    const oy = ((seed >>> 4) % SURFACE_COLS) + driftY * step;
+
+    const candidates = [];
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        // Distancia em losango, e nao em quadrado: e a forma da propria celula
+        // isometrica, entao o sopro sai redondo na TELA.
+        const d = Math.abs(dx) + Math.abs(dy);
+        if (d > radius) continue;
+        candidates.push({
+          dx,
+          dy,
+          // O ranking NAO depende do estagio, e e isso que torna a animacao um
+          // crescimento: com o estagio na semente, cada quadro re-sorteava a
+          // forma inteira e o sopro era substituido em vez de crescer.
+          rank: (hash3d(ox + dx, oy + dy, p * 13, variant) % 1000) + d * GAS_DIST_WEIGHT,
+        });
+      }
+    }
+    // Desempate por posicao: `sort` so e estavel dentro de uma implementacao, e
+    // este atlas precisa sair identico byte a byte em qualquer maquina.
+    candidates.sort((a, b) => a.rank - b.rank || a.dx - b.dx || a.dy - b.dy);
+
+    // Cresce CONECTADO: depois do miolo entra sempre a melhor coluna que ENCOSTA
+    // no que ja foi escolhido. Pegar as `count` melhores direto nao garante
+    // nada — nos estagios de duas colunas as duas melhores caiam em pontas
+    // opostas e o sopro saia como dois pontos soltos.
+    const chosen = [candidates[0]];
+    while (chosen.length < count && chosen.length < candidates.length) {
+      const next =
+        candidates.find(
+          (c) =>
+            !chosen.includes(c) &&
+            chosen.some((s) => Math.abs(c.dx - s.dx) + Math.abs(c.dy - s.dy) === 1)
+        ) ?? candidates.find((c) => !chosen.includes(c));
+      if (!next) break;
+      chosen.push(next);
+    }
+
+    chosen.forEach((c, i) => {
+      if (i < core) {
+        put(ox + c.dx, oy + c.dy, base);
+        put(ox + c.dx, oy + c.dy, base + 1);
+        return;
+      }
+      put(ox + c.dx, oy + c.dy, Math.min(GAS_HAZE_CEIL, base + lift));
+    });
+  }
+};
+
+/**
+ * Penacho: pe fino subindo para uma cabeca lobulada. UM por celula.
+ *
+ * Um so, e nao dois, porque o ciclo passa por um estagio quase vazio e a
+ * tentacao e defasar um segundo penacho para cobrir esse vao. Nao e preciso: a
+ * bruma ja esta em toda celula e ja e ela que garante que o perigo nunca some
+ * da tela. Com dois, medido, o campo voltava a fechar numa massa continua — o
+ * penacho custa altura E area, e duas colunas por celula gastam as duas.
+ */
+const gasPlume = (variant, frame, put) => {
+  {
+    const p = 0;
+    const seed = hash3d(p * 9 + 3, p * 7 + 5, 1, variant);
+    const stage = frame % GAS_PLUME_STAGES.length;
+    const { stem, headZ, lobes, spread, mass } = GAS_PLUME_STAGES[stage];
+    const ox = seed % SURFACE_COLS;
+    const oy = (seed >>> 4) % SURFACE_COLS;
+    // O eixo nao e uma reta vertical: um pe perfeitamente reto le como poste;
+    // inclinado, le como algo que sobe empurrado pelo ar.
+    const leanX = ((seed >>> 8) % 3) - 1;
+    const leanY = ((seed >>> 11) % 3) - 1;
+    const axis = (z) => [
+      ox + Math.floor((leanX * (z - GAS_BASE)) / 4),
+      oy + Math.floor((leanY * (z - GAS_BASE)) / 4),
+    ];
+
+    if (stem) {
+      for (let z = stem[0]; z <= stem[1]; z++) {
+        const [sx, sy] = axis(z);
+        put(sx, sy, z);
+        // Fiapo lateral esparso: o pe ondula em vez de ser uma coluna de um
+        // voxel do inicio ao fim.
+        if (hash3d(sx, sy, z, seed) % 3 === 0) put(sx + leanX, sy, z);
+      }
+    }
+
+    const [hx, hy] = axis(headZ);
+    for (let i = 0; i < lobes; i++) {
+      const h = hash3d(i * 7 + 1, headZ, i, seed);
+      const ang = (h % 4) + i;
+      const dist = i === 0 ? 0 : spread;
+      const cx = hx + Math.round(Math.cos((ang * Math.PI) / 2) * dist);
+      const cy = hy + Math.round(Math.sin((ang * Math.PI) / 2) * dist);
+      const cz = headZ + ((h >>> 5) % 2) - (i === 0 ? 0 : 1);
+      // Bulbo: centro mais os vizinhos melhor ranqueados, e uma tampa em cima.
+      // O ranking esfarrapa a borda — um bulbo cheio sairia um losango liso, que
+      // le como cristal e nao como gas.
+      put(cx, cy, cz);
+      const around = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]
+        .map(([dx, dy], k) => ({ dx, dy, rank: hash3d(cx + dx, cy + dy, cz, seed + i * 31 + k) % 1000 }))
+        .sort((a, b) => a.rank - b.rank || a.dx - b.dx || a.dy - b.dy);
+      for (let k = 0; k < Math.min(mass, around.length); k++) {
+        put(cx + around[k].dx, cy + around[k].dy, cz);
+      }
+      // Tampa: sem ela o bulbo e uma placa horizontal. E a altura que
+      // transforma um disco num volume.
+      if (mass >= 3) put(cx, cy, cz + 1);
+    }
+  }
+};
+
+const gasModel = (variant, frame) => {
+  const half = SURFACE_COLS / 2;
+  const wrap = (v) => ((v % SURFACE_COLS) + SURFACE_COLS) % SURFACE_COLS;
+  // O tile de gas NAO traz a laje, e e o unico assim.
+  //
+  // Ela vinha embutida como em todo tipo, o que obrigava o gas a ser desenhado
+  // no passo de piso — e ali ele e desenhado ANTES da fila ordenada por
+  // profundidade, entao toda celula de gas encostada numa parede tinha o
+  // penacho engolido por ela, mesmo estando na frente. Sem laje, o gas vira uma
+  // peca solta que o cliente pode pos na fila ordenada, no lugar certo, e ainda
+  // desenhar com alfa proprio sem deixar o CHAO translucido junto. O piso das
+  // celulas de gas passa a ser o tipo `bare`.
+  const boxes = [];
+  const taken = new Set();
+  // As colunas dao a volta na grade em vez de serem cortadas na borda. Recortar
+  // obrigaria a manter os centros no miolo da celula, e um campo viraria uma
+  // GRADE de penachos centralizados — a regularidade que a nuvem nao pode ter.
+  const put = (cx, cy, z) => {
+    if (z < GAS_BASE || z > GAS_TOP) return;
+    const key = `${wrap(cx)},${wrap(cy)},${z}`;
+    if (taken.has(key)) return;
+    taken.add(key);
+    boxes.push(box(wrap(cx) - half, wrap(cy) - half, z, 1, 1, 1, 'sulfur'));
+  };
+
+  gasHaze(variant, frame, put);
+  if (variant % VARIANTS === GAS_PLUME_VARIANT) gasPlume(variant, frame, put);
+  return boxes;
 };
 
 /** Modelo de um tipo num quadro de animacao. */
@@ -153,16 +424,7 @@ export const surfaceModel = (kind, variant, frame) => {
     return boxes;
   }
 
-  if (kind === 'gas') {
-    const boxes = slab(variant, 'floor', 'rockDeep');
-    overSlab(variant, 43, ({ cx, cy, x, y, h }) => {
-      // Gas sulfurico: poucos cubos amarelos, altos e separados por vazio.
-      if ((cx * 3 + cy * 5 + frame * 2) % 13 !== 0) return;
-      const z = 4 + ((h >>> 5) % 2) + (frame % 2);
-      boxes.push(box(x, y, z, 1, 1, 1, 'sulfur'));
-    });
-    return boxes;
-  }
+  if (kind === 'gas') return gasModel(variant, frame);
 
   if (kind === 'spores') {
     const boxes = slab(variant, 'floor', 'rockDeep');
