@@ -383,12 +383,18 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
  * proprio limite do mundo. Nada quebrava — `isSolidAt` trata fora do mapa como
  * solido — mas abria um buraco na moldura da sala, que e cenario e nao arena.
  */
-export const ripSolid = (state: SurvivalState, x: number, y: number, events: SemanticEvent[]): boolean => {
+export const canRip = (state: SurvivalState, x: number, y: number): boolean => {
   const w = W(state);
   if (x <= 0 || y <= 0 || x >= w - 1 || y >= state.config.height - 1) return false;
+  const solid = state.solid[y * w + x];
+  return solid === SOLID_ROCK || solid === SOLID_FRAGILE || solid === SOLID_FRAGILE_WEAK;
+};
+
+export const ripSolid = (state: SurvivalState, x: number, y: number, events: SemanticEvent[]): boolean => {
+  const w = W(state);
+  if (!canRip(state, x, y)) return false;
   const i = y * w + x;
   const solid = state.solid[i];
-  if (solid !== SOLID_ROCK && solid !== SOLID_FRAGILE && solid !== SOLID_FRAGILE_WEAK) return false;
   state.solid[i] = SOLID_NONE;
   markDirty(state, x, y);
   events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });

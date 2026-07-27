@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy } from '../src/entities';
-import { ripSolid } from '../src/cells';
+import { damageEntity, findRippable, spawnEnemy } from '../src/entities';
+import { canRip, ripSolid } from '../src/cells';
 import {
   BRUISER_HURL_WINDUP_TICKS,
   SOLID_CRYSTAL,
@@ -211,5 +211,67 @@ describe('o bruiser contra quem recua', () => {
 
   it('deixa passar quem sai da linha do arremesso', () => {
     expect(fleeing(true), 'desviar nao adiantou nada').toBe(0);
+  });
+});
+
+describe('achados da revisao', () => {
+  // O alerta tornava `aggro` verdadeiro, mas o portao de sono do guardiao
+  // devolvia `continue` mesmo assim: o chefe levava tiro de longe sem se mexer,
+  // e cada tiro renovava um alerta que nao servia para nada. Era a morte sem
+  // retaliacao que o aggro por dano existe para impedir, preservada justamente
+  // no inimigo em que ela mais doi.
+  it('acorda o guardiao quando ele leva dano de longe', () => {
+    const state = createRun({ seed: 41 });
+    const guardian = state.enemies.find((e) => e.archetype === 'guardian');
+    expect(guardian).toBeDefined();
+    if (!guardian) return;
+    // Bem alem dos 7 tiles do portao de sono.
+    guardian.x = state.player.x + 15;
+    guardian.y = state.player.y;
+    expect(state.guardianAwake).toBe(false);
+
+    damageEntity(state, guardian, 5, []);
+    stepIdle(state, 2);
+
+    expect(state.guardianAwake, 'continuou dormindo levando tiro').toBe(true);
+  });
+
+  // `findRippable` escolhia pelo tipo do bloco e `ripSolid` recusava a borda:
+  // perto da moldura o bruiser escolhia a borda por ser a mais proxima, tomava
+  // um `false` e escolhia a MESMA celula no tick seguinte — travado para sempre,
+  // com parede valida a dois passos.
+  // `findRippable` escolhia pelo tipo do bloco e `ripSolid` recusava a borda: as
+  // duas funcoes discordavam. Perto da moldura o bruiser escolhia a borda por
+  // ser a mais proxima, tomava um `false` e reescolhia a MESMA celula no tick
+  // seguinte, desperdicando a chance com parede valida a dois passos.
+  //
+  // O teste e do INVARIANTE e nao de um cenario de jogo de proposito: eu tentei
+  // reproduzir um travamento observavel e nao consegui, porque o bruiser anda e
+  // sai de perto da borda em poucos ticks. O defeito e real e passageiro — e a
+  // forma dele e "quem escolhe discorda de quem executa", que e o que se afirma
+  // aqui e o que nao volta sem o teste acusar.
+  it('nunca escolhe municao que ripSolid recusaria', () => {
+    const state = createRun({ seed: 42 });
+    const w = state.config.width;
+    for (let y = 1; y <= 10; y++) {
+      for (let x = 1; x <= 10; x++) {
+        state.solid[y * w + x] = SOLID_NONE;
+        state.surface[y * w + x] = 0;
+      }
+    }
+    // Borda arrancavel pelo TIPO, colada a posicao do bruiser, e parede interior
+    // valida mais longe.
+    for (let y = 3; y <= 7; y++) state.solid[y * w + 0] = SOLID_ROCK;
+    state.solid[5 * w + 3] = SOLID_ROCK;
+
+    const bruiser = spawnEnemy(state, 'bruiser', 1, 5, false);
+    expect(bruiser).not.toBeNull();
+    if (!bruiser) return;
+
+    const pick = findRippable(state, bruiser);
+    expect(pick, 'nao achou municao nenhuma').not.toBeNull();
+    if (!pick) return;
+    expect(canRip(state, pick.x, pick.y), `escolheu ${pick.x},${pick.y}, que ripSolid recusa`).toBe(true);
+    expect(pick.x, 'escolheu a borda do mapa').toBeGreaterThan(0);
   });
 });

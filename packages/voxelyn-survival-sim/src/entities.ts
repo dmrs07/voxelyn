@@ -22,7 +22,7 @@ import {
   SURF_SPORES,
   TICK_HZ,
 } from './constants.js';
-import { breakSolid, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
 import type {
   Entity,
   EntityActionKind,
@@ -330,7 +330,7 @@ const advanceAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
  * mesma sala precisam arrancar exatamente o mesmo bloco. Um sorteio aqui
  * divergiria o mundo entre os dois jogadores.
  */
-const findRippable = (state: SurvivalState, ent: Entity): { x: number; y: number } | null => {
+export const findRippable = (state: SurvivalState, ent: Entity): { x: number; y: number } | null => {
   const ex = Math.floor(ent.x);
   const ey = Math.floor(ent.y);
   let best: { x: number; y: number } | null = null;
@@ -340,8 +340,14 @@ const findRippable = (state: SurvivalState, ent: Entity): { x: number; y: number
       const x = ex + dx;
       const y = ey + dy;
       if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
-      const solid = state.solid[y * state.config.width + x];
-      if (solid !== SOLID_ROCK && solid !== SOLID_FRAGILE && solid !== SOLID_FRAGILE_WEAK) continue;
+      // MESMO criterio de `ripSolid`, e nao uma copia dele.
+      //
+      // A copia existia e discordava do original em um detalhe: a borda do mapa
+      // parece arrancavel pelo tipo do bloco, mas `ripSolid` a recusa. Perto da
+      // moldura o bruiser escolhia a borda por ser a mais proxima, tomava um
+      // `false`, e escolhia a MESMA celula no tick seguinte — travado para
+      // sempre, com paredes validas a dois passos de distancia.
+      if (!canRip(state, x, y)) continue;
       const d = dx * dx + dy * dy;
       if (d < bestDist) {
         bestDist = d;
@@ -367,7 +373,12 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       (dist <= def.aggroRange + (enemy.elite ? 3 : 0) || state.tick < enemy.alertedUntil);
 
     if (enemy.archetype === 'guardian' && !state.guardianAwake) {
-      if (state.coreTaken || dist < 7) {
+      // O alerta TAMBEM acorda. Sem isto, `aggro` ficava verdadeiro por dano mas
+      // o portao logo abaixo devolvia `continue`: o chefe levava tiro de 8 tiles
+      // sem se mexer, cada tiro renovando um alerta que nao servia para nada.
+      // Era exatamente a morte sem retaliacao que o aggro por dano existe para
+      // impedir, preservada no unico inimigo em que ela mais doi.
+      if (state.coreTaken || dist < 7 || state.tick < enemy.alertedUntil) {
         state.guardianAwake = true;
         events.push({ t: 'guardian_awake' });
       } else continue;
