@@ -137,21 +137,28 @@ jobs:
           set -o pipefail
           pnpm --filter @voxelyn/survival-content generate 2>&1 | tee /tmp/generate.log
 
-      - name: Test simulation files
+      - name: Diagnose salvage module tests
+        timeout-minutes: 5
+        shell: bash
+        env:
+          NO_COLOR: '1'
+          FORCE_COLOR: '0'
+        run: |
+          set -o pipefail
+          cd packages/voxelyn-survival-sim
+          echo 'tests/salvage-modules.test.ts' > /tmp/test-sim-current
+          timeout 120s pnpm exec vitest run tests/salvage-modules.test.ts --reporter=verbose 2>&1 | tee /tmp/test-sim.log
+
+      - name: Test remaining simulation files
         timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
           cd packages/voxelyn-survival-sim
-          mapfile -t remaining < <(find tests -maxdepth 1 -name '*.test.ts' \
-            ! -name 'salvage-modules.test.ts' \
-            ! -name 'new-projectiles.test.ts' | sort)
-          files=(tests/salvage-modules.test.ts tests/new-projectiles.test.ts "${remaining[@]}")
+          mapfile -t files < <(find tests -maxdepth 1 -name '*.test.ts' ! -name 'salvage-modules.test.ts' | sort)
           for file in "${files[@]}"; do
             echo "$file" > /tmp/test-sim-current
-            echo "=== $file ===" > /tmp/test-sim.log
-            rm -f /tmp/test-sim.json
-            timeout 90s pnpm exec vitest run "$file" --reporter=json --outputFile=/tmp/test-sim.json 2>&1 | tee -a /tmp/test-sim.log
+            timeout 90s pnpm exec vitest run "$file" --reporter=verbose 2>&1 | tee /tmp/test-sim.log
           done
 
       - name: Test protocol
@@ -210,30 +217,17 @@ jobs:
             fi
             echo
             echo '```text'
-            if [[ -f /tmp/test-sim.json ]]; then
-              python <<'PY'
-          import json
-          from pathlib import Path
-
-          data = json.loads(Path('/tmp/test-sim.json').read_text())
-          failures = []
-          for result in data.get('testResults', []):
-              for assertion in result.get('assertionResults', []):
-                  if assertion.get('status') != 'failed':
-                      continue
-                  failures.append(' > '.join(assertion.get('ancestorTitles', []) + [assertion.get('title', '')]))
-                  failures.extend(assertion.get('failureMessages', []))
-          print('\n'.join(failures) if failures else json.dumps(data, indent=2)[:12000])
-          PY
+            selected=""
+            for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
+              if [[ -f "$file" ]]; then
+                selected="$file"
+                break
+              fi
+            done
+            if [[ -n "$selected" ]]; then
+              sed -E $'s/\x1B\[[0-9;]*[mK]//g' "$selected" | tail -n 140
             else
-              selected=""
-              for file in /tmp/test-client.log /tmp/test-server.log /tmp/test-content.log /tmp/test-protocol.log /tmp/test-sim.log /tmp/generate.log /tmp/build.log; do
-                if [[ -f "$file" ]]; then
-                  selected="$file"
-                  break
-                fi
-              done
-              [[ -n "$selected" ]] && tail -n 100 "$selected" || echo "Failure occurred before command output was captured."
+              echo "Failure occurred before command output was captured."
             fi
             echo '```'
           } > /tmp/failure.md
