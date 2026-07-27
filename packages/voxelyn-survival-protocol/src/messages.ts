@@ -1,3 +1,4 @@
+import type { ProjectileKind } from '@voxelyn/survival-sim';
 import type { EntityActionKind, EntityActionPhase, PlayerCommand, RunPhase, SemanticEvent } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
 import type { ChunkDiff } from './chunk-diff.js';
@@ -99,11 +100,18 @@ export type ViewerState = {
   overheated: boolean;
 };
 
+/**
+ * `kind` viaja porque nao da para inferi-lo: pedra e cuspe sao os dois
+ * `hostile`, e sem ele o cliente desenha os dois iguais. Sao poucos projeteis
+ * vivos por vez, entao o custo por tick e desprezivel perto de errar o que o
+ * jogador ve vindo na direcao dele.
+ */
 export type ProjectileSnapshot = {
   id: number;
   x: number;
   y: number;
   hostile: boolean;
+  kind: ProjectileKind;
 };
 
 /**

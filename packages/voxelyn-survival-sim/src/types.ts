@@ -82,7 +82,18 @@ export type PlayerExtra = {
   joined: boolean;
 };
 
+/**
+ * Que COISA e o projetil, para o cliente saber desenha-lo.
+ *
+ * Nao da para inferir isso das flags: a pedra do bruiser e o cuspe do spitter
+ * sao os dois `hostile` e mais nada, entao o cliente desenhava os dois com a
+ * rampa acida — um bloco de rocha arrancado da parede aparecia como cusparada.
+ * As flags dizem o que o projetil FAZ; isto diz o que ele E.
+ */
+export type ProjectileKind = 'bolt' | 'spit' | 'rock';
+
 export type Projectile = {
+  kind: ProjectileKind;
   id: number;
   owner: number;
   x: number;
