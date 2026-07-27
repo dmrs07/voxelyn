@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for prefix in 01-sim 02-protocol-server 03-ui-content; do
+          for prefix in 01-sim 02-protocol-server 03-ui-content 04-fixes; do
             cat .github/patches/${prefix}.*.part > "/tmp/${prefix}.patch.gz.b64"
             case "$prefix" in
               01-sim)
@@ -60,6 +60,10 @@ jobs:
               03-ui-content)
                 expected="eda0ca30411e0e7982c3af3ebe0dcbdf359352e4083280aaa7b36c0345fe059d"
                 message="feat(survival-ui): add salvage props, reward choice and module HUD"
+                ;;
+              04-fixes)
+                expected="2a464dc28349e83b70b8dc414f0241ea3e62bb47e6bd2b51c3ac88bf5d11f61c"
+                message="fix(survival): isolate reactive fixtures and dedupe discharge events"
                 ;;
             esac
             echo "$expected  /tmp/${prefix}.patch.gz.b64" | sha256sum --check
