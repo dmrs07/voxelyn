@@ -13,7 +13,7 @@
 // A geometria vem do mesmo @voxelyn/core que os personagens usam, entao bloco e
 // criatura compartilham projecao, ordem do pintor e tamanho de voxel: um voxel
 // de terreno tem exatamente o tamanho de um voxel de bicho.
-import { box, renderVoxels, VOX } from './voxel.mjs';
+import { box, DIR_UNROTATED, renderVoxels, VOX } from './voxel.mjs';
 import { COLORS, grid } from './lib.mjs';
 
 // Um tile logico tem 32px de largura na tela; com 4px por voxel, sao 8 voxels
@@ -153,7 +153,7 @@ const blockModel = (kind, variant) => {
 };
 
 /** Multiplica o brilho de uma grade ja rasterizada. */
-const dim = (g, f) => {
+export const dim = (g, f) => {
   const out = grid(g.w, g.h);
   for (let i = 0; i < g.w * g.h; i++) {
     const a = g.buf[i * 4 + 3];
@@ -173,7 +173,11 @@ export const buildTerrainFrames = (frameW, frameH, anchorX, anchorY) => {
   const frames = [];
   for (const kind of BLOCK_KINDS) {
     for (let variant = 0; variant < VARIANTS; variant++) {
-      const lit = renderVoxels(blockModel(kind, variant), 0, frameW, frameH, anchorX, anchorY);
+      // Sem rotacao: `blockBounds()` mede o modelo cru, entao rasterizar
+      // rotacionado deslocava o bloco 2px para a direita do que o manifest
+      // declarava — a coluna da ponta era cortada pela borda do frame e o bloco
+      // nao assentava sobre o proprio tile.
+      const lit = renderVoxels(blockModel(kind, variant), DIR_UNROTATED, frameW, frameH, anchorX, anchorY);
       for (let level = 0; level < LIGHT_LEVELS; level++) frames.push(dim(lit, lightFactor(level)));
     }
   }

@@ -3,3 +3,5 @@
 // pelo cliente via ?url / import de JSON.
 export * from './manifest';
 export * from './terrain';
+export * from './surfaces';
+export * from './props';

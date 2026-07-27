@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs } from '../client/particles';
-import { SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
+import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs, hitMaterialOf } from '../client/particles';
+import { ABILITY_RADIUS, SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
 const explosion = (x = 10, y = 10, radius = 3): SemanticEvent => ({ t: 'explosion', x, y, radius });
@@ -163,6 +163,218 @@ describe('particulas voxel', () => {
       return items.length ? Math.max(...items.map((i) => i.z)) : 0;
     };
     expect(topo(rapido)).toBeCloseTo(topo(lento), 1);
+  });
+
+  // O passo de tempo ja vinha do relogio, mas o ARRASTO continuava contando
+  // QUADROS: `vx *= 0.97` uma vez por quadro da quatro vezes mais
+  // multiplicacoes a 240Hz do que a 60Hz no mesmo tempo real, e a mesma brasa
+  // parava bem antes num monitor rapido. Nesta janela o erro era de 22%.
+  //
+  // A tolerancia e relativa e nao zero porque sobra o erro proprio da
+  // integracao em passos discretos — a posicao anda com a velocidade do inicio
+  // do passo, e o quique no chao cai em instantes diferentes. Sao ~2%; qualquer
+  // volta ao arrasto por quadro passa de 20% e cai aqui.
+  it('percorre a mesma distancia horizontal em qualquer taxa de quadros', () => {
+    const alcance = (dt: number, passos: number) => {
+      const p = new VoxelParticles();
+      p.ingest([explosion(10, 10, 3)], 96, 1);
+      for (let i = 0; i < passos; i++) p.step(dt);
+      const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+      const solta = items.filter((i) => i.kind === 'debris');
+      return Math.max(...solta.map((i) => Math.hypot(i.x - 10, i.y - 10)));
+    };
+    const rapido = alcance(8, 24);
+    const lento = alcance(32, 6);
+    expect(Math.abs(rapido - lento) / lento).toBeLessThan(0.05);
+  });
+
+  // A frente de choque e a unica coisa na tela que diz ATE ONDE a explosao
+  // machuca. Se ela parar aquem do raio, ensina um alcance menor do que o que a
+  // simulacao aplica, e o jogador morre num lugar que a tela chamou de seguro.
+  it('leva a frente de choque ao raio real do estouro', () => {
+    for (const radius of [1.5, 2.4, 5]) {
+      const p = new VoxelParticles();
+      p.ingest([explosion(20, 20, radius)], 96, 1);
+      // Um pouco alem da vida do anel, para pegar a posicao final.
+      for (let i = 0; i < 12; i++) p.step(28);
+      const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+      const shock = items.filter((it) => it.kind === 'shock');
+      // O anel ja expirou; o que se mede e onde ele chegou no ultimo passo vivo.
+      expect(shock.length).toBe(0);
+
+      const vivo = new VoxelParticles();
+      vivo.ingest([explosion(20, 20, radius)], 96, 1);
+      for (let i = 0; i < 10; i++) vivo.step(29);
+      const frente = (vivo as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items
+        .filter((it) => it.kind === 'shock')
+        .map((it) => Math.hypot(it.x - 20, it.y - 20));
+      expect(frente.length).toBeGreaterThan(0);
+      for (const d of frente) {
+        expect(d).toBeGreaterThan(radius * 0.75);
+        expect(d).toBeLessThanOrEqual(radius * 1.15);
+      }
+    }
+  });
+
+  it('distribui a frente em volta do estouro, sem buracos', () => {
+    const p = new VoxelParticles();
+    p.ingest([explosion(20, 20, 3)], 96, 1);
+    p.step(100);
+    const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+    const quadrantes = new Set(
+      items
+        .filter((it) => it.kind === 'shock')
+        .map((it) => `${it.x >= 20 ? 'l' : 'o'}${it.y >= 20 ? 's' : 'n'}`)
+    );
+    expect(quadrantes.size).toBe(4);
+  });
+
+  // A frente promete uma distancia; arrasto ou gravidade a fariam parar antes.
+  it('nao deixa a frente de choque cair nem frear', () => {
+    const p = new VoxelParticles();
+    p.ingest([explosion(20, 20, 3)], 96, 1);
+    const shock = () =>
+      (p as unknown as { items: Array<{ z: number; vx: number; kind: string }> }).items.filter(
+        (it) => it.kind === 'shock'
+      );
+    const antes = shock().map((it) => ({ z: it.z, vx: it.vx }));
+    p.step(90);
+    shock().forEach((it, i) => {
+      expect(it.z).toBeCloseTo(antes[i].z, 6);
+      expect(it.vx).toBeCloseTo(antes[i].vx, 6);
+    });
+  });
+
+  it('mantem o anel legivel mesmo no preset mais baixo', () => {
+    const baixo = new VoxelParticles();
+    baixo.ingest([explosion(20, 20, 3)], 96, 0.2);
+    const items = (baixo as unknown as { items: Array<{ kind: string }> }).items;
+    expect(items.filter((i) => i.kind === 'shock').length).toBeGreaterThanOrEqual(8);
+  });
+
+  // A explosao acendia e sumia no mesmo instante: brasa e entulho duram meio
+  // segundo. A fumaca e o que segura a leitura no lugar depois do clarao.
+  it('deixa fumaca subindo depois que a brasa apaga', () => {
+    const p = new VoxelParticles();
+    p.ingest([explosion(20, 20, 3)], 96, 1);
+    for (let i = 0; i < 25; i++) p.step(33);
+    const items = (p as unknown as { items: Array<{ kind: string; z: number }> }).items;
+    const ash = items.filter((i) => i.kind === 'ash');
+    expect(ash.length).toBeGreaterThan(0);
+    expect(items.some((i) => i.kind === 'ember')).toBe(false);
+    for (const a of ash) expect(a.z).toBeGreaterThan(0);
+  });
+
+  it('o pulso cinetico lanca frente sem fogo', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'pulse', x: 8, y: 8 }], 96, 1);
+    const kinds = new Set(
+      (p as unknown as { items: Array<{ kind: string }> }).items.map((i) => i.kind)
+    );
+    expect(kinds).toEqual(new Set(['spark']));
+  });
+
+  // A explosao ACENDE as celulas que alcanca, entao explosao e ignicao caem no
+  // mesmo ponto no mesmo quadro. Com o mesmo sal, a brasa da ignicao nasceria
+  // colada na da explosao, com posicao e velocidade identicas.
+  it('nao repete o sorteio entre eventos coincidentes', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'ignite', x: 12, y: 12 }, { t: 'overheat', x: 12, y: 12 }], 96, 1);
+    const items = (p as unknown as { items: Array<{ x: number; y: number; vx: number; vz: number }> }).items;
+    const assinaturas = new Set(items.map((i) => `${i.vx.toFixed(6)},${i.vz.toFixed(6)}`));
+    expect(assinaturas.size).toBe(items.length);
+  });
+
+  // O respingo diz o que foi ATINGIDO, nunca que aquele tiro e o counter
+  // daquele bicho: os inimigos tem pontos fracos desenhados que a simulacao
+  // ainda ignora, e insinuar fraqueza inexistente ensinaria uma licao falsa.
+  it('escolhe a materia do respingo pelo arquetipo do alvo', () => {
+    expect(hitMaterialOf('stalker')).toBe('chitin');
+    expect(hitMaterialOf('spitter')).toBe('spore');
+    expect(hitMaterialOf('bomber')).toBe('spore');
+    expect(hitMaterialOf('bruiser')).toBe('stone');
+    expect(hitMaterialOf('guardian')).toBe('stone');
+    // Alvo desconhecido nao pode explodir nem sumir: cai num generico.
+    expect(hitMaterialOf('inexistente')).toBe('debris');
+    expect(hitMaterialOf(undefined)).toBe('debris');
+  });
+
+  it('solta so a materia pedida no respingo', () => {
+    const p = new VoxelParticles();
+    p.hit(10, 10, 'chitin', 12, 1);
+    const items = (p as unknown as { items: Array<{ kind: string }> }).items;
+    expect(items.length).toBeGreaterThan(0);
+    expect(new Set(items.map((i) => i.kind))).toEqual(new Set(['chitin']));
+  });
+
+  // O acerto acontece muitas vezes por segundo. Se competisse com a explosao,
+  // comeria o orcamento e apagaria o efeito que o jogador PRECISA ler.
+  it('mantem o respingo menor que uma explosao, mesmo em golpe forte', () => {
+    const golpe = new VoxelParticles();
+    const estouro = new VoxelParticles();
+    golpe.hit(10, 10, 'stone', 999, 1);
+    estouro.ingest([explosion(10, 10)], 96, 1);
+    expect(golpe.count).toBeGreaterThan(0);
+    expect(golpe.count).toBeLessThan(estouro.count);
+  });
+
+  it('escala o respingo com o dano e com a qualidade', () => {
+    const fraco = new VoxelParticles();
+    const forte = new VoxelParticles();
+    const baixo = new VoxelParticles();
+    fraco.hit(10, 10, 'stone', 2, 1);
+    forte.hit(10, 10, 'stone', 40, 1);
+    baixo.hit(10, 10, 'stone', 40, 0.2);
+    expect(forte.count).toBeGreaterThan(fraco.count);
+    expect(baixo.count).toBeGreaterThan(0);
+    expect(baixo.count).toBeLessThan(forte.count);
+  });
+
+  // A frente PROMETE um alcance ao jogador. Se ela para antes, ele aprende um
+  // raio menor do que o que machuca; se passa, aprende um maior e morre
+  // confiando na borda que viu.
+  const alcance = (p: VoxelParticles, kind: string, cx: number, cy: number): number => {
+    const items = (p as unknown as { items: Array<{ x: number; y: number; kind: string }> }).items;
+    const m = items.filter((i) => i.kind === kind);
+    return m.length ? Math.max(...m.map((i) => Math.hypot(i.x - cx, i.y - cy))) : 0;
+  };
+  const varrer = (p: VoxelParticles, kind: string, dt: number): number => {
+    let best = 0;
+    for (let i = 0; i < 80; i++) {
+      p.step(dt);
+      best = Math.max(best, alcance(p, kind, 50, 50));
+    }
+    return best;
+  };
+
+  it('a frente da explosao chega a borda do estrago, sem passar dela', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    const r = varrer(p, 'shock', 16.7);
+    expect(r).toBeGreaterThan(3 * 0.9);
+    expect(r).toBeLessThanOrEqual(3);
+  });
+
+  // O anel do pulso e `spark` porque o pulso nao tem fogo. Quando "ser
+  // balistico" dependia do KIND, ele freava e caia como brasa comum e parava a
+  // 79% do raio — a cor da frente decidindo a fisica dela.
+  it('a frente do pulso chega ao raio da habilidade', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'pulse', x: 50, y: 50 }], 96, 1);
+    const r = varrer(p, 'spark', 16.7);
+    expect(r).toBeGreaterThan(ABILITY_RADIUS * 0.9);
+    expect(r).toBeLessThanOrEqual(ABILITY_RADIUS);
+  });
+
+  // A vida sempre foi descontada pelo dtMs inteiro, mas o movimento levava o
+  // teto de 64ms: num aparelho a 10 quadros por segundo a frente gastava vida
+  // sem andar e sumia a 47% do raio.
+  it('chega ao mesmo lugar a 10 e a 60 quadros por segundo', () => {
+    const rapido = new VoxelParticles();
+    const lento = new VoxelParticles();
+    rapido.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    lento.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    expect(varrer(lento, 'shock', 100)).toBeCloseTo(varrer(rapido, 'shock', 16.7), 1);
   });
 
   it('ignora eventos que nao geram materia', () => {

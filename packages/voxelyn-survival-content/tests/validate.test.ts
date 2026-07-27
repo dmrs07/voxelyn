@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error - ferramenta JS sem tipos
-import { listIds, validateManifest } from '../tools/validate.mjs';
+import { listIds, validateManifest, validateSurfaces, validateTerrain } from '../tools/validate.mjs';
 import { FIRST_PACK_IDS, resolveFrame, dirFromFacing, type SpriteManifestEntry } from '../src/manifest';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,6 +16,19 @@ describe('validacao automatizada de sprites', () => {
     expect(ids.sort()).toEqual([...FIRST_PACK_IDS].sort());
     for (const id of ids) {
       const errors: string[] = validateManifest(id);
+      expect(errors, `${id}:\n${errors.join('\n')}`).toEqual([]);
+    }
+  });
+
+  // Terreno e chao ficam fora do `index.json` de sprites — nao tem animacao por
+  // direcao nem frameMap — entao passariam despercebidos por `listIds()`. Sao
+  // justamente os dois atlases assados a partir do codigo do gerador, os que
+  // dessincronizam em silencio se alguem mexer no modelo e nao regerar.
+  it('os atlases de cenario passam nas proprias regras', () => {
+    for (const [id, errors] of [
+      ['terrain-blocks', validateTerrain() as string[]],
+      ['surface-tiles', validateSurfaces() as string[]],
+    ] as Array<[string, string[]]>) {
       expect(errors, `${id}:\n${errors.join('\n')}`).toEqual([]);
     }
   });

@@ -4,8 +4,17 @@ import {
   resolveFrame,
   lightLevelFor,
   resolveBlock,
+  resolveSurface,
+  surfaceFrameAt,
+  surfaceOffsets,
   variantAt,
   type SpriteManifestEntry,
+  type SurfaceManifest,
+  propFrameAt,
+  propKindIndex,
+  propOffsets,
+  resolveProp,
+  type PropManifest,
   type TerrainManifest,
 } from '@voxelyn/survival-content';
 
@@ -20,6 +29,8 @@ import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-gua
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
+import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
+import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
 
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
@@ -32,6 +43,8 @@ import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
+import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
+import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
 
 export type SpriteAnimationLayer = {
   animation: string;
@@ -116,6 +129,126 @@ export class TerrainBank {
     const rect = resolveBlock(m, kindIndex, variantAt(x, y, m.variants), lightLevelFor(m, brightness));
     // A origem do modelo cai meio voxel adiante do centro do tile nos dois
     // eixos, o que na projecao 2:1 e 1px para baixo e 0 na horizontal.
+    const dx = screenX - m.originX * zoom;
+    const dy = screenY + zoom - m.originY * zoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
+      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+    return true;
+  }
+}
+
+/**
+ * Banco de crostas de chao. Irmao do TerrainBank e separado dele pelo mesmo
+ * motivo que ele e separado do SpriteBank: o eixo de variacao e outro. Aqui ha
+ * quadro de animacao, e o numero de quadros muda por tipo.
+ *
+ * O que este banco substitui: um `fill` de losango de cor chapada por celula,
+ * mais um segundo losango com `rgba()` por cima quando havia gas ou fogo. Uma
+ * chamada de `drawImage` no lugar de duas de path — o chao voxel custa MENOS
+ * por frame que o chao chapado que ele substitui.
+ */
+export class SurfaceBank {
+  private readonly manifest = surfaceManifest as unknown as SurfaceManifest;
+  private readonly offsets = surfaceOffsets(surfaceManifest as unknown as SurfaceManifest);
+  private readonly image = new Image();
+  private ready = false;
+
+  load(): void {
+    this.image.onload = () => { this.ready = true; };
+    this.image.onerror = () => {
+      console.warn('[surfaces] atlas failed to load; using flat floor');
+    };
+    this.image.src = surfaceUrl;
+  }
+
+  get kinds(): string[] { return this.manifest.kinds.map((k) => k.name); }
+
+  /**
+   * Desenha a crosta de uma celula com o centro do tile em (sx, sy).
+   *
+   * A ancora e IDENTICA a do bloco de terreno de proposito: os dois modelos sao
+   * autorados no mesmo espaco, com a origem no voxel (0,0,0), entao repetir a
+   * conta faz a camada z=0 do chao cair exatamente onde cai a base da parede.
+   * Qualquer ajuste proprio aqui abriria uma costura de um pixel entre o piso e
+   * o bloco em cima dele — visivel, e em toda celula da borda de toda sala.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    kindIndex: number,
+    x: number,
+    y: number,
+    brightness: number,
+    nowMs: number,
+    screenX: number,
+    screenY: number,
+    zoom: number
+  ): boolean {
+    if (!this.ready) return false;
+    const m = this.manifest;
+    const rect = resolveSurface(
+      m,
+      this.offsets,
+      kindIndex,
+      variantAt(x, y, m.variants),
+      surfaceFrameAt(m, kindIndex, x, y, nowMs),
+      lightLevelFor(m, brightness)
+    );
+    const dx = screenX - m.originX * zoom;
+    const dy = screenY + zoom - m.originY * zoom;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
+      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+    return true;
+  }
+}
+
+/**
+ * Banco de objetos de mundo: Nucleo e plataforma de extracao.
+ *
+ * Separado do banco de chao porque o eixo de variacao e outro — nao ha variante
+ * nem nivel de luz, so o quadro de animacao — e porque estas pecas sao
+ * desenhadas ACIMA do chao, na fila ordenada por profundidade, e nao no passo
+ * de piso.
+ */
+export class PropBank {
+  private readonly manifest = propManifest as unknown as PropManifest;
+  private readonly offsets = propOffsets(propManifest as unknown as PropManifest);
+  private readonly image = new Image();
+  private ready = false;
+
+  load(): void {
+    this.image.onload = () => { this.ready = true; };
+    this.image.onerror = () => {
+      console.warn('[props] atlas failed to load; using flat markers');
+    };
+    this.image.src = propUrl;
+  }
+
+  indexOf(name: string): number {
+    return propKindIndex(this.manifest, name);
+  }
+
+  /**
+   * Desenha uma peca com a BASE no centro do tile (sx, sy).
+   *
+   * Mesma conta de ancora do chao e do bloco: os tres modelos sao autorados no
+   * mesmo espaco com a origem no voxel (0,0,0). Repetir a conta e o que faz o
+   * pedestal assentar exatamente sobre o piso, sem costura nem flutuacao.
+   */
+  draw(
+    ctx: CanvasRenderingContext2D,
+    name: string,
+    nowMs: number,
+    screenX: number,
+    screenY: number,
+    zoom: number
+  ): boolean {
+    if (!this.ready) return false;
+    const kindIndex = this.indexOf(name);
+    if (kindIndex < 0) return false;
+    const m = this.manifest;
+    const rect = resolveProp(m, this.offsets, kindIndex, propFrameAt(m, kindIndex, nowMs));
     const dx = screenX - m.originX * zoom;
     const dy = screenY + zoom - m.originY * zoom;
     ctx.imageSmoothingEnabled = false;

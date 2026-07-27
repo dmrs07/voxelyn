@@ -1,0 +1,44 @@
+{
+  "id": "world-props",
+  "version": 1,
+  "atlas": "world-props.png",
+  "frameWidth": 44,
+  "frameHeight": 52,
+  "columns": 11,
+  "originX": 20,
+  "originY": 40,
+  "kinds": [
+    {
+      "name": "core",
+      "frames": 6,
+      "frameMs": 190
+    },
+    {
+      "name": "coreTaken",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "extraction",
+      "frames": 4,
+      "frameMs": 240
+    }
+  ],
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#2f6b4f",
+    "#46566e",
+    "#59f2c2",
+    "#66c28a",
+    "#6e4a33",
+    "#b8a98f",
+    "#e8f1ff",
+    "#ffd166"
+  ],
+  "generation": {
+    "tool": "procedural voxel raster (tools/props.mjs)",
+    "seedOrRef": "deterministic-code-v1"
+  }
+}
