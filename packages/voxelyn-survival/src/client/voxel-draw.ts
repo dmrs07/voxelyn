@@ -18,13 +18,64 @@
 /** Rampa de faces: [topo, esquerda, direita]. */
 export type FaceRamp = readonly [string, string, string];
 
+/** Rampa exclusiva dos motes de gas. Esporo usa outra rampa e nao entra aqui. */
+const GAS_RAMP: FaceRamp = ['#ffd166', '#a8e63c', '#1f3d33'];
+
+export const isGasRamp = (ramp: FaceRamp): boolean =>
+  ramp[0] === GAS_RAMP[0] && ramp[1] === GAS_RAMP[1] && ramp[2] === GAS_RAMP[2];
+
+export type GasPuffLobe = {
+  x: number;
+  y: number;
+  size: number;
+  alpha: number;
+};
+
 /**
- * Desenha um voxel com a BASE centrada em (sx, sy).
+ * Geometria visual de um mote de gas.
  *
- * `size` e a largura do voxel em pixels; a proporcao 2:1 do resto do jogo da a
- * altura do topo e das laterais a partir dela.
+ * `VoxelParticles.draw` ja codifica a vida no alpha: 1 quando nasce e 0.35 perto
+ * de expirar. Aqui essa vida vira forma: o nucleo abre, dois lobulos se separam
+ * e a materia perde opacidade. O item continua contando como UMA particula no
+ * budget; apenas a silhueta deixa de ser um cubo amarelo solitario.
  */
-export const drawVoxel = (
+export const gasPuffLobes = (
+  sx: number,
+  sy: number,
+  size: number,
+  sourceAlpha: number
+): GasPuffLobe[] => {
+  const life = Math.max(0, Math.min(1, (sourceAlpha - 0.35) / 0.65));
+  const age = 1 - life;
+  const fadeIn = Math.min(1, 0.25 + age * 5);
+  const puffAlpha = fadeIn * Math.pow(life, 0.72);
+  const expanded = size * (0.92 + age * 1.15);
+
+  // A orientacao vem da posicao projetada, portanto e deterministica entre
+  // clientes, mas varia entre motes vizinhos para nao formar uma fileira.
+  const seed = (Math.imul(Math.round(sx), 73856093) ^ Math.imul(Math.round(sy), 19349663)) >>> 0;
+  const side = (seed & 1) === 0 ? -1 : 1;
+  const spread = expanded * (0.18 + age * 0.34);
+  const lift = expanded * (0.18 + age * 0.42);
+
+  return [
+    { x: sx, y: sy, size: expanded, alpha: puffAlpha },
+    {
+      x: sx + side * spread,
+      y: sy - lift * 0.55,
+      size: expanded * 0.72,
+      alpha: puffAlpha * 0.7,
+    },
+    {
+      x: sx - side * spread * 0.72,
+      y: sy - lift,
+      size: expanded * 0.54,
+      alpha: puffAlpha * 0.46,
+    },
+  ];
+};
+
+const drawFacetedVoxel = (
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
@@ -46,6 +97,33 @@ export const drawVoxel = (
   // faceta, e precisa vencer as laterais na borda.
   ctx.fillStyle = ramp[0];
   ctx.fillRect(x, y - top, w, top);
+};
+
+/**
+ * Desenha um voxel com a BASE centrada em (sx, sy).
+ *
+ * `size` e a largura do voxel em pixels; a proporcao 2:1 do resto do jogo da a
+ * altura do topo e das laterais a partir dela.
+ */
+export const drawVoxel = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  ramp: FaceRamp
+): void => {
+  if (!isGasRamp(ramp)) {
+    drawFacetedVoxel(ctx, sx, sy, size, ramp);
+    return;
+  }
+
+  const sourceAlpha = ctx.globalAlpha;
+  ctx.save();
+  for (const lobe of gasPuffLobes(sx, sy, size, sourceAlpha)) {
+    ctx.globalAlpha = sourceAlpha * lobe.alpha;
+    drawFacetedVoxel(ctx, lobe.x, lobe.y, lobe.size, ramp);
+  }
+  ctx.restore();
 };
 
 /**
