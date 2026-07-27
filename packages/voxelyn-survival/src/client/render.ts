@@ -23,6 +23,7 @@ import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
+import { DAMAGE_FAN, damageAlpha, damageScale, drawDamageNumber } from './damage-text';
 import { ProjectileView } from './projectiles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
@@ -111,7 +112,24 @@ const PAL = {
  */
 export type Fx =
   | { kind: 'ring'; x: number; y: number; r: number; maxR: number; color: string; life: number; maxLife: number }
-  | { kind: 'text'; x: number; y: number; text: string; color: string; life: number; maxLife: number };
+  | {
+      kind: 'text';
+      x: number;
+      y: number;
+      text: string;
+      color: string;
+      life: number;
+      maxLife: number;
+      /**
+       * Deslocamento lateral em tiles, para acertos seguidos no mesmo alvo nao
+       * empilharem no mesmo pixel. Sem ele, uma rajada em cima de um inimigo
+       * desenha cinco numeros exatamente sobrepostos e o resultado nao e um
+       * numero grande — e um borrao que nao se le.
+       */
+      offsetX: number;
+      /** Escala do texto: golpe forte, numero maior. */
+      scale: number;
+    };
 
 export type CameraShake = { power: number; until: number };
 
@@ -144,6 +162,8 @@ export class SurvivalRenderer {
    * do laco.
    */
   private readonly archetypeById = new Map<number, string>();
+  /** Proxima posicao do leque de numeros de dano. */
+  private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
@@ -238,12 +258,21 @@ export class SurvivalRenderer {
             ev.amount,
             this.quality.maxFx / PRESETS.high.maxFx
           );
+          // O numero abre em leque a partir do ponto do golpe. A fase vem do
+          // relogio e do alvo, nao de um sorteio: dois acertos no mesmo tick no
+          // mesmo alvo ainda precisam cair em lugares diferentes, e o mesmo
+          // acerto tem de sair igual nas duas maquinas de uma sala.
+          this.damageFanIndex = (this.damageFanIndex + 1) % DAMAGE_FAN.length;
           this.fxList.push({
             kind: 'text',
             x: ev.x,
             y: ev.y,
             text: `${Math.round(ev.amount)}`,
-            color: ev.target === this.localPlayerId ? PAL.blood : PAL.bone,
+            offsetX: DAMAGE_FAN[this.damageFanIndex],
+            // Dano forte le maior. A raiz achata o crescimento: linear, um
+            // golpe de 40 sairia sete vezes maior que um de 6 e taparia a tela.
+            scale: damageScale(ev.amount),
+            color: ev.target === this.localPlayerId ? PAL.blood : PAL.player,
             life: 550,
             maxLife: 550,
           });
@@ -796,13 +825,11 @@ export class SurvivalRenderer {
         ctx.stroke();
         ctx.globalAlpha = 1;
       } else {
-        const [sx, sy] = toScreen(fx.x, fx.y);
-        ctx.fillStyle = fx.color;
-        ctx.globalAlpha = 1 - t;
-        ctx.font = `bold ${Math.round(6 * z)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText(fx.text, sx, sy - 14 * z - t * 10 * z);
-        ctx.globalAlpha = 1;
+        const [sx, sy] = toScreen(fx.x + fx.offsetX, fx.y);
+        // O numero segura opaco na primeira metade e so entao some. Desvanecer
+        // desde o quadro zero — como fazia — gasta em transparencia justamente
+        // o instante em que o jogador esta olhando para o golpe.
+        drawDamageNumber(ctx, fx.text, sx, sy - 16 * z - t * 12 * z, fx.color, fx.scale, damageAlpha(t), z);
       }
     }
 
