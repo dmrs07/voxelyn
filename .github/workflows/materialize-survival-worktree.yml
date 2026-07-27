@@ -68,6 +68,12 @@ jobs:
             git commit -m "$message"
           done
 
+      - name: Build core for content tools
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/build.log
+
       - name: Generate content atlases
         shell: bash
         run: |
@@ -109,6 +115,8 @@ jobs:
               tail -n 80 /tmp/test.log
             elif [[ -f /tmp/generate.log ]]; then
               tail -n 80 /tmp/generate.log
+            elif [[ -f /tmp/build.log ]]; then
+              tail -n 80 /tmp/build.log
             else
               echo "Failure occurred before command output was captured."
             fi
