@@ -1,13 +1,13 @@
 import {
   BIOFLUID_SLOW,
   EXPLOSION_DAMAGE,
-  GAS_LIFE_TICKS,
   SOLID_NONE,
+  SPORE_LIFE_TICKS,
   SURF_BIOFLUID,
   SURF_FIRE,
   SURF_FUNGAL,
-  SURF_GAS,
   SURF_NONE,
+  SURF_SPORES,
   TICK_HZ,
 } from './constants.js';
 import { breakSolid, explodeAt, igniteCell, setSurface } from './cells.js';
@@ -84,7 +84,8 @@ export const cellUnder = (state: SurvivalState, ent: Entity): number =>
 export const surfaceSpeedMul = (state: SurvivalState, ent: Entity): number =>
   state.surface[cellUnder(state, ent)] === SURF_BIOFLUID ? BIOFLUID_SLOW : 1;
 
-const addBomberGas = (state: SurvivalState, ent: Entity): void => {
+/** Nuvem organica localizada deixada pela ruptura do Spore Bomber. */
+const addBomberSpores = (state: SurvivalState, ent: Entity): void => {
   const cx = Math.floor(ent.x);
   const cy = Math.floor(ent.y);
   for (let dy = -1; dy <= 1; dy++) {
@@ -93,7 +94,9 @@ const addBomberGas = (state: SurvivalState, ent: Entity): void => {
       const y = cy + dy;
       if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
       const i = y * state.config.width + x;
-      if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) setSurface(state, i, SURF_GAS, GAS_LIFE_TICKS);
+      if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+        setSurface(state, i, SURF_SPORES, SPORE_LIFE_TICKS);
+      }
     }
   }
 };
@@ -129,7 +132,7 @@ export const damageEntity = (
   });
   if (ent.archetype === 'bomber') {
     explodeAt(state, ent.x, ent.y, 1.8, events);
-    addBomberGas(state, ent);
+    addBomberSpores(state, ent);
   }
 };
 
