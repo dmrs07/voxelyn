@@ -123,6 +123,15 @@ describe('EntityPresentation', () => {
     expect(recovered.anim).toBe('walk');
   });
 
+  it('preserva o telegraph quando o snapshot ainda mantem a acao autoritativa durante o stun', () => {
+    const presentation = new EntityPresentation();
+    const entity = { ...actionEntity('bomber', 'detonate'), stunnedUntil: 20 };
+    const presented = presentation.animationFor(
+      entity as never, { tick: 5 } as never, baseAnim('idle') as never, 250
+    );
+    expect(presented.anim).toBe('special');
+  });
+
   it('permite que hit interrompa somente a composicao do prospector', () => {
     const presentation = new EntityPresentation();
     const entity = actionEntity('prospector', 'shoot');
