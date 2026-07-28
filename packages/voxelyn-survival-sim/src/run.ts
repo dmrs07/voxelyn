@@ -53,7 +53,7 @@ import {
   WORLD_W,
 } from './constants.js';
 import { dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
-import { impactSolid, impactSurface, projectileClass } from './materials.js';
+import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
   damageEntity,
@@ -76,8 +76,10 @@ import {
 import type {
   Entity,
   EnemyArchetype,
+  ModuleId,
   PlayerCommand,
   PlayerExtra,
+  Projectile,
   RunConfig,
   SemanticEvent,
   StepResult,
@@ -404,9 +406,22 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     extra.nextShotAt = state.tick + BOLT_COOLDOWN_TICKS;
     extra.heat += HEAT_PER_SHOT;
 
-    const launchDisc = moduleHasCapacity(extra, 'return_disc', state.tick) &&
-      consumeModuleCharge(extra, 'return_disc', slot, events);
-    if (launchDisc) {
+    // O disparo apenas ARMA os modulos ativos; nenhuma carga e debitada aqui.
+    // Cobrar no gatilho punia o tiro que errava tudo — e, pior, obrigava o
+    // Return Disc a ser um caminho alternativo (`if disco else bolt`), o que
+    // fazia ele engolir em silencio todos os outros modulos equipados. Aqui ele
+    // e so mais uma flag: decide o VEICULO, e o resto viaja junto.
+    const modules: NonNullable<SurvivalState['projectiles'][number]['modules']> = {};
+    if (moduleHasCapacity(extra, 'piercing', state.tick)) modules.piercing = true;
+    if (moduleHasCapacity(extra, 'explosive', state.tick)) {
+      modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
+    }
+    if (moduleHasCapacity(extra, 'ricochet', state.tick)) modules.ricochet = { remainingBounces: 1 };
+    if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
+    if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
+    const armed = Object.keys(modules).length > 0 ? modules : undefined;
+
+    if (moduleHasCapacity(extra, 'return_disc', state.tick)) {
       state.projectiles.push({
         kind: 'return_disc',
         id: state.nextEntityId++,
@@ -416,6 +431,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         vx: extra.aim.x * RETURN_DISC_SPEED,
         vy: extra.aim.y * RETURN_DISC_SPEED,
         damage: BOLT_DAMAGE * 0.85,
+        modules: armed,
         distanceTravelled: 0,
         disc: {
           phase: 'outbound',
@@ -429,19 +445,6 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         ttl: Math.ceil(TICK_HZ * 3),
       });
     } else {
-      const modules: NonNullable<SurvivalState['projectiles'][number]['modules']> = {};
-      if (moduleHasCapacity(extra, 'piercing', state.tick) && consumeModuleCharge(extra, 'piercing', slot, events)) {
-        modules.piercing = true;
-      }
-      if (moduleHasCapacity(extra, 'explosive', state.tick) && consumeModuleCharge(extra, 'explosive', slot, events)) {
-        modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
-      }
-      if (moduleHasCapacity(extra, 'ricochet', state.tick) && consumeModuleCharge(extra, 'ricochet', slot, events)) {
-        modules.ricochet = { remainingBounces: 1 };
-      }
-      if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
-      if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
-
       state.projectiles.push({
         kind: 'bolt',
         id: state.nextEntityId++,
@@ -451,7 +454,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         vx: extra.aim.x * BOLT_SPEED,
         vy: extra.aim.y * BOLT_SPEED,
         damage: BOLT_DAMAGE,
-        modules: Object.keys(modules).length > 0 ? modules : undefined,
+        modules: armed,
         distanceTravelled: 0,
         hostile: false,
         leavesBiofluid: false,
@@ -623,6 +626,77 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   }
 };
 
+/**
+ * Cobra uma carga do modulo porque o efeito dele ACONTECEU agora.
+ *
+ * O disparo apenas arma; quem paga e o proc. Cobrar no gatilho fazia o jogador
+ * gastar Piercing num tiro que saiu pela porta e Explosive num tiro que nao
+ * encostou em nada — o custo vinha antes de existir beneficio. Falso quando o
+ * modulo nao esta ativo ou ficou sem carga entre o disparo e este instante, e
+ * ai o efeito simplesmente nao ocorre.
+ */
+const procModule = (
+  state: SurvivalState,
+  extra: PlayerExtra | undefined,
+  slot: number | undefined,
+  id: ModuleId,
+  events: SemanticEvent[]
+): boolean => {
+  if (!extra || slot === undefined) return false;
+  if (!moduleHasCapacity(extra, id, state.tick)) return false;
+  // Modulo por tempo vale enquanto durar: nao ha carga a debitar.
+  if (activeModule(extra, id)?.lifetime.kind === 'timer') return true;
+  return consumeModuleCharge(extra, id, slot, events);
+};
+
+/** O projetil ainda tem rebote sobrando neste voo? */
+const canBounce = (proj: Projectile): boolean => (proj.modules?.ricochet?.remainingBounces ?? 0) > 0;
+
+/**
+ * O disco iniciou a volta — e AQUI que o Return Disc entrega o que promete, e
+ * portanto e aqui que ele cobra. Um disco que explodiu na ida nunca voltou, e
+ * nao deve ser cobrado por isso.
+ *
+ * A volta acontece mesmo se a carga acabou nesse meio-tempo: o disco ja esta em
+ * voo e some-lo no ar seria confuso. A folga cai a favor do jogador.
+ */
+const beginDiscReturn = (
+  state: SurvivalState,
+  proj: Projectile,
+  extra: PlayerExtra | undefined,
+  slot: number | undefined,
+  events: SemanticEvent[]
+): void => {
+  if (!proj.disc || proj.disc.phase === 'returning') return;
+  proj.disc.phase = 'returning';
+  procModule(state, extra, slot, 'return_disc', events);
+};
+
+/**
+ * Reflete o projetil na face por onde ele ENTROU na celula solida e devolve-o a
+ * posicao anterior.
+ *
+ * Quem chama isto tem de chamar DEPOIS de `impactSolid`. Testar o rebote antes
+ * fazia do Ricochet um desligador silencioso da escavacao: a primeira parede de
+ * cada tiro saia intacta, porque o projetil ja tinha voltado antes de o
+ * material poder reagir. Destruir terreno e mecanica central, e um modulo de
+ * tier 1 anunciado como "seguro" nao pode desligar isso sem avisar.
+ */
+const bounceOffSolid = (proj: Projectile, prevX: number, prevY: number, cx: number, cy: number): void => {
+  const enteredX = Math.floor(prevX) !== cx;
+  const enteredY = Math.floor(prevY) !== cy;
+  if (enteredX) proj.vx *= -1;
+  if (enteredY) proj.vy *= -1;
+  if (!enteredX && !enteredY) {
+    if (Math.abs(proj.vx) >= Math.abs(proj.vy)) proj.vx *= -1;
+    else proj.vy *= -1;
+  }
+  proj.x = prevX;
+  proj.y = prevY;
+  const ricochet = proj.modules?.ricochet;
+  if (ricochet) ricochet.remainingBounces--;
+};
+
 const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   const w = state.config.width;
@@ -674,7 +748,7 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       if (proj.disc?.phase === 'outbound') {
         proj.disc.travelled += travelled;
         if (proj.disc.travelled >= proj.disc.maxDistance) {
-          proj.disc.phase = 'returning';
+          beginDiscReturn(state, proj, ownerExtra, ownerSlot, events);
         }
       }
 
@@ -684,47 +758,39 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         if (proj.disc?.phase === 'outbound') {
           proj.x = prevX;
           proj.y = prevY;
-          proj.disc.phase = 'returning';
+          beginDiscReturn(state, proj, ownerExtra, ownerSlot, events);
           break;
         }
         dead = true;
         break;
       }
       const i = cy * w + cx;
-      const explosiveArmed = Boolean(
-        proj.modules?.explosive && proj.distanceTravelled >= proj.modules.explosive.armAfterDistance
-      );
+      // Um tiro cuja carga acabou em pleno voo continua com a FLAG, mas nao pode
+      // mais detonar. As duas capacidades tem de chegar em `projectileClass`
+      // junto com a flag, senao o material reage a um fogo que nunca vem — e no
+      // caso do gas sulfurico isso rendia uma explosao inteira de graca, porque
+      // a ignicao nao passa pelo ponto que cobra o modulo.
+      const explosiveArmed =
+        explosiveArmedByDistance(proj) &&
+        Boolean(ownerExtra && moduleHasCapacity(ownerExtra, 'explosive', state.tick));
       const conductiveReady = Boolean(
         proj.modules?.conductive && ownerExtra && moduleHasCapacity(ownerExtra, 'conductive', state.tick)
       );
-      const cls = projectileClass(proj, conductiveReady);
+      const cls = projectileClass(proj, conductiveReady, explosiveArmed);
 
       if (state.solid[i] !== SOLID_NONE) {
+        // Explosive vem ANTES do disco: quem equipa os dois troca o retorno por
+        // uma detonacao, e essa e a escolha — nao um dos dois sumindo em silencio.
+        if (explosiveArmed && !proj.hostile && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
+          explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
+          dead = true;
+          break;
+        }
+
         if (proj.disc) {
           proj.x = prevX;
           proj.y = prevY;
-          proj.disc.phase = 'returning';
-          break;
-        }
-
-        if (proj.modules?.ricochet && proj.modules.ricochet.remainingBounces > 0) {
-          const enteredX = Math.floor(prevX) !== cx;
-          const enteredY = Math.floor(prevY) !== cy;
-          if (enteredX) proj.vx *= -1;
-          if (enteredY) proj.vy *= -1;
-          if (!enteredX && !enteredY) {
-            if (Math.abs(proj.vx) >= Math.abs(proj.vy)) proj.vx *= -1;
-            else proj.vy *= -1;
-          }
-          proj.x = prevX;
-          proj.y = prevY;
-          proj.modules.ricochet.remainingBounces--;
-          break;
-        }
-
-        if (explosiveArmed && !proj.hostile) {
-          explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
-          dead = true;
+          beginDiscReturn(state, proj, ownerExtra, ownerSlot, events);
           break;
         }
 
@@ -736,7 +802,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         ) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
         }
-        if (stop && !(broke && proj.modules?.piercing)) dead = true;
+        if (stop) {
+          const pierces =
+            broke &&
+            Boolean(proj.modules?.piercing) &&
+            procModule(state, ownerExtra, ownerSlot, 'piercing', events);
+          if (!pierces) {
+            // O rebote so acontece no que NAO cedeu. Se a parede quebrou,
+            // refletir seria refletir num buraco recem-aberto — e o tiro ja fez
+            // o que tinha a fazer ali.
+            if (!broke && canBounce(proj) && procModule(state, ownerExtra, ownerSlot, 'ricochet', events)) {
+              bounceOffSolid(proj, prevX, prevY, cx, cy);
+              break;
+            }
+            dead = true;
+          }
+        }
         break;
       }
 
@@ -836,12 +917,14 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             owner.hp = Math.min(owner.maxHp, owner.hp + 2);
           }
 
-          if (explosiveArmed) {
+          if (explosiveArmed && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
             explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
             dead = true;
           } else if (proj.disc) {
+            // O disco ja atravessa por natureza. Piercing nao e cobrado aqui
+            // porque nao ha nada que ele acrescente a este veiculo.
             discHits?.push(enemy.id);
-          } else if (proj.modules?.piercing) {
+          } else if (proj.modules?.piercing && procModule(state, ownerExtra, ownerSlot, 'piercing', events)) {
             (proj.hits ??= []).push(enemy.id);
           } else {
             dead = true;

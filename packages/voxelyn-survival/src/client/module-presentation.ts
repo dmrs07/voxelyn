@@ -47,13 +47,19 @@ const LABELS: Record<ModuleId, Omit<ModulePresentation, 'lifetimeLabel'>> = {
   },
 };
 
+/**
+ * O que a carga CONTA. Nenhum modulo cobra o disparo: a carga sai quando o
+ * efeito acontece, entao o rotulo tem de nomear o efeito, e nao o gatilho.
+ * `piercing` e `ricochet` diziam "DISPAROS" quando ainda cobravam no gatilho —
+ * manter isso agora seria mentir sobre o que o jogador esta gastando.
+ */
 const PROC_LABELS: Record<ModuleId, string> = {
-  piercing: 'DISPAROS',
+  piercing: 'TRAVESSIAS',
   conductive: 'DESCARGAS',
   explosive: 'EXPLOSÕES',
   siphon: 'DRENAGENS',
-  ricochet: 'DISPAROS',
-  return_disc: 'ARREMESSOS',
+  ricochet: 'REBOTES',
+  return_disc: 'RETORNOS',
 };
 
 export const modulePresentation = (id: ModuleId): ModulePresentation => {

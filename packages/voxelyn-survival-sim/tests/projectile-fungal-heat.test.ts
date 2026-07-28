@@ -8,6 +8,7 @@ import {
 } from '../src/constants';
 import { emptyCommand, stepRun } from '../src/run';
 import { createRun } from '../src/run';
+import { grantOrRechargeModule } from '../src/modules';
 import type { Projectile } from '../src/types';
 
 const thermalProjectile = (x: number, y: number): Projectile => ({
@@ -31,6 +32,9 @@ describe('aquecimento fungico por projetil', () => {
     const state = createRun({ seed: 81 });
     state.vents = [];
     state.enemies = [];
+    // O dono precisa ter o modulo: a flag no projetil sozinha nao classifica
+    // mais como termico, senao um tiro sem carga aqueceria fungo de graca.
+    grantOrRechargeModule(state.playerExtra, 'explosive', state.tick);
 
     const x = 30;
     const y = 30;
@@ -55,6 +59,7 @@ describe('aquecimento fungico por projetil', () => {
     const state = createRun({ seed: 82 });
     state.vents = [];
     state.enemies = [];
+    grantOrRechargeModule(state.playerExtra, 'explosive', state.tick);
 
     const ax = 30;
     const bx = 31;

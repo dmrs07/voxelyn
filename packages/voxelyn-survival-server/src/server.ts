@@ -200,7 +200,10 @@ export class SurvivalServer {
       case 'resync': {
         if (!conn.room) return [];
         const slot = conn.room.slotForClient(clientId);
-        if (slot && this.tickCount - slot.lastResyncTick < RESYNC_COOLDOWN_TICKS) {
+        // Sem slot nao ha o que ressincronizar: mandar ~290 KB de mundo para
+        // um socket que nao joga e so superficie de abuso.
+        if (!slot) return [];
+        if (this.tickCount - slot.lastResyncTick < RESYNC_COOLDOWN_TICKS) {
           // dentro do cooldown: marca pendente e serve no tick em que expirar
           slot.needsFullResync = true;
           return [];
@@ -234,8 +237,9 @@ export class SurvivalServer {
     }
     // NAO marca as WorldFlags como enviadas aqui: se este resync se perder, o
     // cliente ficaria sem elas para sempre. Deixa o proximo snapshot reenviar
-    // (sao poucos bytes) em vez de otimizar um caminho de recuperacao.
-    return { clientId, msg: room.buildFullResync() };
+    // (sao poucos bytes) em vez de otimizar um caminho de recuperacao. O slot
+    // ainda viaja: e ele que define de quem e o `you`.
+    return { clientId, msg: room.buildFullResync(slot) };
   }
 
   /** Avanca todas as salas ativas um tick e retorna snapshots para clientes conectados. */

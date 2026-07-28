@@ -186,7 +186,14 @@ export const PURGE_CELL_RADIUS = 3;
 
 export const EXPLOSION_RADIUS = 2.4;
 export const EXPLOSION_DAMAGE = 42;
-export const PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE = 0.35;
+/**
+ * Quanto do proprio estrago o jogador leva de volta. Era 0.35 — um desconto de
+ * 65% que tirava o risco justamente de onde ele devia estar: detonar uma nuvem
+ * de enxofre colado na parede era quase de graca, e "o mundo e o inimigo
+ * principal" nao sobrevive a isso. Metade do desconto, metade do dano: o numero
+ * agora e legivel de cabeca no meio da luta.
+ */
+export const PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE = 0.5;
 export const EXPLOSIVE_ARM_DISTANCE = 2.25;
 export const RETURN_DISC_MAX_DISTANCE = 8;
 export const RETURN_DISC_SPEED = 11;
