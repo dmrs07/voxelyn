@@ -17,7 +17,14 @@ export {
 } from './run.js';
 export { generateWorld, floodOpen, chunkOf, cellIdx } from './worldgen.js';
 export {
+  descend,
+  isFinalSector,
+  populateSector,
+  sectorSeed,
+} from './sectors.js';
+export {
   TARGET_EXTRACTION_TICKS,
+  TARGET_SECTOR_TICKS,
   addDamageTenths,
   buildSummary,
   emptyStats,

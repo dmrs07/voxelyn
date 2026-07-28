@@ -39,6 +39,8 @@ import {
   RETURN_DISC_MAX_DISTANCE,
   RETURN_DISC_SPEED,
   SALVAGE_SCAN_TICKS,
+  CONTAMINATION_SECTOR_SCALE,
+  SECTOR_COUNT,
   RUN_SEED_MIX,
   SOLID_NONE,
   SURF_BIOFLUID,
@@ -66,6 +68,7 @@ import {
 } from './entities.js';
 import { generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
+import { descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
 import {
   activeModule,
   consumeModuleCharge,
@@ -174,7 +177,12 @@ export const createRun = (config: RunConfig): SurvivalState => {
   const width = config.width ?? WORLD_W;
   const height = config.height ?? WORLD_H;
   const playerCount = Math.max(1, Math.min(MAX_PLAYERS, config.playerCount ?? 1));
-  const world = generateWorld((config.seed ^ RUN_SEED_MIX) >>> 0, width, height);
+  const sector = Math.max(1, Math.min(SECTOR_COUNT, config.sector ?? 1));
+  // A seed de CADA setor sai da mesma derivacao. Usar a formula antiga so para
+  // o primeiro faria o setor de abertura ser o unico fora do esquema, e a
+  // derivacao e o que garante que uma seed compartilhada reproduza a descida
+  // inteira, nao so o comeco.
+  const world = generateWorld(sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector), width, height);
   const rng = new RNG((config.seed * 0x85ebca6b + 0xc2b2ae35) >>> 0 || 1);
 
   // posicoes de spawn proximas a entrada (deterministicas, sem sobrepor)
@@ -190,10 +198,12 @@ export const createRun = (config: RunConfig): SurvivalState => {
   }
 
   const state: SurvivalState = {
-    config: { seed: config.seed, width, height, playerCount },
+    config: { seed: config.seed, width, height, playerCount, sector },
     rng,
     tick: 0,
     phase: 'running',
+    sector,
+    sectorStartedAt: 0,
     solid: world.solid,
     surface: world.surface,
     surfaceTimer: new Uint16Array(width * height),
@@ -234,14 +244,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
     summary: null,
   };
 
-  // popular inimigos: mistura deterministica, um elite no meio da lista
-  const mix: EnemyArchetype[] = ['stalker', 'stalker', 'spitter', 'bruiser', 'stalker', 'spitter', 'bomber', 'bruiser', 'bomber', 'stalker'];
-  const eliteIndex = Math.floor(world.enemySpawns.length / 2);
-  world.enemySpawns.forEach((p, i) => {
-    spawnEnemy(state, mix[i % mix.length], p.x, p.y, i === eliteIndex);
-  });
-  // Posicao reservada pelo worldgen com folga para o corpo grande do Guardian.
-  spawnEnemy(state, 'guardian', world.guardianSpawn.x, world.guardianSpawn.y, false);
+  // A composicao e o Guardiao dependem do setor; ver sectors.ts. A posicao do
+  // Guardiao ja vem reservada pelo worldgen com folga para o corpo grande.
+  populateSector(state, world.enemySpawns, world.guardianSpawn);
 
   return state;
 };
@@ -577,8 +582,27 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       }
     }
 
+    // O mesmo ponto significa coisas diferentes conforme a profundidade: nos
+    // setores anteriores ao ultimo ele e o POCO, e no ultimo e o nucleo.
     const distCore = Math.hypot(player.x - (state.corePos.x + 0.5), player.y - (state.corePos.y + 0.5));
-    if (!state.coreTaken && distCore < 1.6) {
+    if (!isFinalSector(state.sector) && distCore < 1.6) {
+      // Descida COLETIVA, pela mesma razao da extracao: um parceiro deixado
+      // para tras num mapa que deixou de existir nao teria como ser resgatado.
+      const standing = standingPlayers(state);
+      const allNear = standing.every(
+        (p) => Math.hypot(p.x - (state.corePos.x + 0.5), p.y - (state.corePos.y + 0.5)) <= EXTRACT_RADIUS
+      );
+      const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
+      if (anyDowned) {
+        events.push({ t: 'message', text: 'Revele o parceiro abatido antes de descer.' });
+      } else if (!allNear) {
+        events.push({ t: 'message', text: 'Aguarde todos no poco para descer.' });
+      } else {
+        descend(state, events);
+      }
+      return;
+    }
+    if (isFinalSector(state.sector) && !state.coreTaken && distCore < 1.6) {
       state.coreTaken = true;
       extra.hasCore = true;
       events.push({ t: 'pickup_core', x: player.x, y: player.y });
@@ -1005,7 +1029,14 @@ const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void =
 
 /** Ondas de pressao por contaminacao (thresholds unicos). */
 const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void => {
-  state.contamination = Math.min(1, state.contamination + CONTAMINATION_PER_TICK * (state.coreTaken ? 2.2 : 1));
+  // O ritmo cresce com a profundidade E com o nucleo na mao. A profundidade e
+  // o que impede o poco de virar botao de reset; o nucleo e a cobranca do
+  // caminho de volta.
+  const sectorScale = 1 + (state.sector - 1) * CONTAMINATION_SECTOR_SCALE;
+  state.contamination = Math.min(
+    1,
+    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coreTaken ? 2.2 : 1)
+  );
   const thresholds: Array<[number, number]> = [
     [0.35, 2],
     [0.6, 3],
@@ -1283,6 +1314,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(site.cacheOpened ? 1 : 0);
     mix(site.openedBySlot ?? -1);
   }
+  mix(state.sector);
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));
   mix(state.contaminationWaves);

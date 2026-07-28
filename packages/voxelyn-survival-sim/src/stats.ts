@@ -19,14 +19,17 @@ import {
   type RunSummary,
   type SurvivalState,
 } from './types.js';
-import { TICK_HZ } from './constants.js';
+import { SECTOR_COUNT, TICK_HZ } from './constants.js';
 
 /**
  * Tempo, em ticks, abaixo do qual a terceira estrela e concedida.
  *
- * Oito minutos contra os ~14 que a contaminacao leva para saturar. O numero e
- * uma aposta de design explicita: a terceira estrela tem de exigir que o
- * jogador ABRA MAO de alguma coisa — um site de salvage a mais, um modulo
+ * Derivado do numero de setores (4 min cada) e nao um numero solto: a run
+ * mudou de um mapa para tres encadeados, e um alvo fixo passaria a significar
+ * coisas diferentes se SECTOR_COUNT mudasse.
+ *
+ * O numero e uma aposta de design explicita: a terceira estrela tem de exigir
+ * que o jogador ABRA MAO de alguma coisa — um site de salvage a mais, um modulo
  * melhor, a rota segura — porque e exatamente a tensao que a spec chama de
  * "extrair agora ou arriscar" (secao 1). Um alvo folgado premiaria a run que
  * pega tudo, que e a run sem decisao.
@@ -34,7 +37,8 @@ import { TICK_HZ } from './constants.js';
  * Precisa de calibragem por playtest; e o unico numero deste arquivo que se
  * espera mexer.
  */
-export const TARGET_EXTRACTION_TICKS = 8 * 60 * TICK_HZ;
+export const TARGET_SECTOR_TICKS = 4 * 60 * TICK_HZ;
+export const TARGET_EXTRACTION_TICKS = TARGET_SECTOR_TICKS * SECTOR_COUNT;
 
 export const emptyStats = (): RunStats => ({
   shotsFired: 0,

@@ -199,6 +199,34 @@ export const RETURN_DISC_MAX_DISTANCE = 8;
 export const RETURN_DISC_SPEED = 11;
 export const SALVAGE_SCAN_TICKS = 6 * TICK_HZ;
 
+/**
+ * Quantos setores uma descida atravessa.
+ *
+ * Tres e o menor numero que produz um ARCO em vez de uma linha: um setor para
+ * aprender o Veio do dia, um para se equipar sabendo o que enfrenta, e um para
+ * o Guardiao. Com dois, o meio nao existe e o jogo vira tutorial seguido de
+ * chefe. Com quatro, o terceiro repete o segundo — a run so fica mais longa, e
+ * a promessa e de 12 a 20 minutos.
+ *
+ * Os setores 1..N-1 nao tem nucleo nem Guardiao: o objetivo neles e o POCO, e a
+ * pergunta e "exploro mais ou desco agora". Apenas o ultimo tem o nucleo, o
+ * Guardiao, e a viagem de volta ate a entrada.
+ */
+export const SECTOR_COUNT = 3;
+
+/**
+ * Quanto a contaminacao acelera a cada setor.
+ *
+ * Ela ATRAVESSA os setores em vez de zerar, e cresce mais rapido a cada
+ * descida. Sem isso, descer seria puro ganho e a decisao de explorar mais nao
+ * teria custo nenhum — a pressao tem de vir junto com a profundidade, senao o
+ * arco e so mapa novo.
+ */
+export const CONTAMINATION_SECTOR_SCALE = 0.45;
+
+/** Contaminacao herdada ao descer, como fracao do que havia no setor anterior. */
+export const CONTAMINATION_CARRYOVER = 0.6;
+
 export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.0
 export const VENT_BASE_INTERVAL_TICKS = 160;
 

@@ -7,6 +7,17 @@ export type RunConfig = {
   width?: number;
   height?: number;
   playerCount?: number;
+  /**
+   * Setor em que a run COMECA. Padrao 1.
+   *
+   * Existe porque a run deixou de ser um mapa e virou tres encadeados, e sem
+   * isto nao ha como construir o estado do setor 3 diretamente. Dois
+   * consumidores reais dependem disso: um cliente que reconecta no meio de uma
+   * run de co-op precisa reconstruir o mundo do setor em que a sala esta, e
+   * testar o Guardiao exigiria dirigir a run inteira ate ele antes de qualquer
+   * asserção sobre a arena.
+   */
+  sector?: number;
 };
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
@@ -297,6 +308,8 @@ export type SemanticEvent =
   | { t: 'module_expired'; slot: number; module: ModuleId }
   | { t: 'overheat'; x: number; y: number }
   | { t: 'guardian_awake' }
+  /** O mundo inteiro foi trocado: o cliente precisa redesenhar do zero. */
+  | { t: 'sector_entered'; sector: number; final: boolean }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }
@@ -318,6 +331,19 @@ export type SurvivalState = {
   rng: RNG;
   tick: number;
   phase: RunPhase;
+  /**
+   * Setor atual da descida, de 1 a SECTOR_COUNT.
+   *
+   * Nos setores anteriores ao ultimo, `corePos` marca o POCO de descida e nao
+   * ha Guardiao nem nucleo; alcanca-lo troca o mundo inteiro por um novo em vez
+   * de terminar a run. E a mesma posicao reaproveitada de proposito: o worldgen
+   * ja garante que ela seja alcancavel a partir da entrada, que e exatamente a
+   * garantia que o poco precisa. Gerar um segundo ponto especial exigiria
+   * repetir essa prova para ele.
+   */
+  sector: number;
+  /** Tick em que o setor atual comecou; o cronometro da run continua global. */
+  sectorStartedAt: number;
   solid: Uint8Array;
   surface: Uint8Array;
   surfaceTimer: Uint16Array;

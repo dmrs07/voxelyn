@@ -18,6 +18,8 @@ import {
   SURF_SPORES,
   ABILITY_RADIUS,
   HEAT_MAX,
+  SECTOR_COUNT,
+  isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
@@ -1189,12 +1191,23 @@ export class SurvivalRenderer {
     drawPurgeCellGlyph(ctx, safeLeft + 7, safeTop + 39, purgePulse ? 15 : 13, ctx.fillStyle as string);
     ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 18, safeTop + 43);
     this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw - this.safeArea.right);
+    // Profundidade. E a unica coisa na tela que diz onde a run esta no arco:
+    // sem ela, tres setores parecem tres mapas soltos em vez de uma descida.
+    ctx.fillStyle = PAL.rockLight;
+    ctx.font = '11px monospace';
+    ctx.fillText(`SETOR ${state.sector}/${SECTOR_COUNT}`, safeLeft, safeTop + 86);
+
     ctx.fillStyle = PAL.loot;
-    const objective = extra.hasCore
-      ? 'VOLTE PARA A ENTRADA'
-      : state.coreTaken
-        ? 'EXTRAIA NA ENTRADA'
-        : 'ENCONTRE O NÚCLEO';
+    ctx.font = 'bold 12px monospace';
+    // O objetivo depende da PROFUNDIDADE: nos setores anteriores ao ultimo o
+    // ponto marcado e o poco, e mandar procurar o nucleo ali seria mentira.
+    const objective = !isFinalSector(state.sector)
+      ? 'DESÇA PELO POÇO'
+      : extra.hasCore
+        ? 'VOLTE PARA A ENTRADA'
+        : state.coreTaken
+          ? 'EXTRAIA NA ENTRADA'
+          : 'ENCONTRE O NÚCLEO';
     ctx.fillText(objective, safeLeft, safeTop + 100);
     const revealed = state.salvageSites
       .filter((site) => site.cacheRevealed && !site.cacheOpened)

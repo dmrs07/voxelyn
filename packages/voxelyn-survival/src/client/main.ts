@@ -19,6 +19,7 @@ import { audio } from './audio';
 import { applyRun, loadRecords, saveRecords, type Records } from './records';
 import { renderRecordsPanel } from './records-panel';
 import { formatSeed, parseSeed } from './run-summary';
+import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -33,6 +34,7 @@ const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 const volumeInput = document.getElementById('volume') as HTMLInputElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
+const roomInput = document.getElementById('room') as HTMLInputElement;
 const recordsOverlay = document.getElementById('records') as HTMLDivElement;
 const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 
@@ -288,7 +290,7 @@ const defaultServerUrl = (): string => {
   return `${proto}://${location.hostname || 'localhost'}:8080`;
 };
 
-const runOnline = (url: string): void => {
+const runOnline = (url: string, roomCode: string | null): void => {
   let ws: WebSocket | null = null;
   let running = true;
   let lastTime = performance.now();
@@ -308,6 +310,9 @@ const runOnline = (url: string): void => {
   const net = new NetClient((raw) => {
     if (ws?.readyState === WebSocket.OPEN) ws.send(raw);
   });
+  // Sobrevive as reconexoes: a primeira queda de rede jogaria o jogador numa
+  // sala qualquer, longe do parceiro, se o codigo vivesse so nesta chamada.
+  net.roomCode = roomCode;
   net.onEvents = (events) => {
     const now = performance.now();
     renderer.ingestEvents(events, now);
@@ -359,7 +364,11 @@ const runOnline = (url: string): void => {
     lastTime = now;
 
     if (net.status === 'online') {
-      setBanner(null);
+      // O codigo so aparece enquanto o parceiro NAO chegou: depois disso ele e
+      // ruido permanente na tela, e a informacao que importa passa a ser o
+      // jogo. Enquanto se joga sozinho, ele e a unica forma de convidar.
+      const waiting = net.playerCount() < 2;
+      setBanner(waiting && net.activeRoomCode ? `Sala ${net.activeRoomCode} — aguardando parceiro` : null);
       renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
       audio.setLocalPlayerId(net.slot + 1);
       const cmd = input.snapshot(playerScreen());
@@ -446,11 +455,17 @@ const startSolo = (): void => {
   runSolo();
 };
 const startOnline = (): void => {
+  const code = normalizeRoomCode(roomInput.value);
+  if (code !== '' && !isValidRoomCode(code)) {
+    setBanner(`Código de sala inválido: ${code}`);
+    setTimeout(() => setBanner(null), 2400);
+    return;
+  }
   audio.unlock();
   audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
-  runOnline(serverInput.value.trim() || defaultServerUrl());
+  runOnline(serverInput.value.trim() || defaultServerUrl(), code || null);
 };
 
 // Rede de seguranca para o auto-start por query e para browsers que exigem um
@@ -498,9 +513,12 @@ document.getElementById('btn-records-close')?.addEventListener('click', () => {
   audio.ui();
 });
 
-// auto-start por query (?online=1)
+// auto-start por query (?online=1). ?room=XYZ transforma o convite num LINK,
+// que e como as pessoas realmente compartilham: quem recebe entra direto.
 const params = new URLSearchParams(location.search);
-if (params.get('online') === '1') startOnline();
+const roomParam = params.get('room');
+if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
+if (roomParam || params.get('online') === '1') startOnline();
 else if (params.get('solo') === '1') startSolo();
 
 // PWA: registra o service worker (app shell offline para o solo)

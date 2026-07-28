@@ -66,14 +66,25 @@ export type Slot = {
 export class GameRoom {
   readonly state: SurvivalState;
   readonly slots: Slot[] = [];
-  readonly mapHash: string;
-  private readonly tracker: ChunkTracker;
+  /**
+   * Hash do mundo estatico ATUAL. Nao e readonly porque a descida troca o mapa
+   * inteiro; ver a reavaliacao em `step`.
+   */
+  mapHash: string;
+  /**
+   * Ligado quando o mundo muda de forma NAO-incremental (descida de setor).
+   * O servidor consome a flag e reenvia o mundo completo a todos os slots.
+   */
+  worldReplaced = false;
+  private tracker: ChunkTracker;
   private prevAliveEnemies = new Set<number>();
 
   constructor(
     readonly id: string,
     readonly seed: number,
-    readonly maxPlayers: number
+    readonly maxPlayers: number,
+    /** Codigo de convite desta sala. Ver room-code.ts no protocolo. */
+    readonly code: string = ''
   ) {
     this.state = createRun({ seed, playerCount: maxPlayers });
     // nenhum avatar entra na sim ate que um cliente reivindique o slot
@@ -254,7 +265,37 @@ export class GameRoom {
       }
       cmds[s] = slot.command;
     }
+    const sectorBefore = this.state.sector;
     const { events } = stepRun(this.state, cmds);
+
+    // A descida troca o MUNDO ESTATICO inteiro. Duas coisas ficariam velhas em
+    // silencio se nao fossem refeitas aqui:
+    //
+    // - `mapHash`, que o cliente usa para conferir que gerou o mesmo mapa. Com
+    //   o hash do setor anterior, todo cliente que entrasse depois da descida
+    //   seria acusado de divergencia estando certo.
+    // - a linha de base do ChunkTracker, que descreve o mundo ANTERIOR. Sem
+    //   re-semear, o diff do tick seguinte seria calculado contra o mapa errado
+    //   e cada cliente receberia uma colcha de retalhos dos dois setores.
+    //
+    // O resync integral vai junto: descer nao e uma mudanca incremental, e
+    // tentar exprimi-la como diff custaria mais bytes que o mundo inteiro.
+    const descended = this.state.sector !== sectorBefore;
+    if (descended) {
+      this.mapHash = hashStaticWorld(this.state);
+      this.tracker = new ChunkTracker(this.state.config.width, this.state.config.height);
+      this.tracker.seed(this.state);
+      this.prevAliveEnemies = new Set();
+      this.worldReplaced = true;
+      for (const slot of this.slots) {
+        slot.needsFullResync = true;
+        // Passa por cima do cooldown de resync. Ele existe para conter cliente
+        // que PEDE resync em loop; esta troca foi decidida pelo servidor, e
+        // segurar o mundo novo por um cooldown deixaria o jogador andando num
+        // mapa que nao existe mais.
+        slot.lastResyncTick = Number.NEGATIVE_INFINITY;
+      }
+    }
     // A intencao corrente persiste entre ticks (o cliente envia a ~25 Hz, o
     // servidor roda a 20 Hz), mas campos de BORDA nao podem persistir: um
     // cliente suspenso logo apos enviar purge:true gastaria uma Celula de Purga
@@ -447,6 +488,7 @@ export class GameRoom {
       t: 'full_resync',
       serverTick: this.state.tick,
       seed: this.seed,
+      sector: this.state.sector,
       chunkDiffs,
       entities: this.entitySnapshots(),
       projectiles: this.projectileSnapshots(),

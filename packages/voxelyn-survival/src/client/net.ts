@@ -59,10 +59,61 @@ export class NetClient {
 
   constructor(private readonly send: (raw: string) => void) {}
 
+  /**
+   * Regera o mundo estatico local para outro setor, preservando a conexao.
+   *
+   * O `SurvivalState` do cliente e so um espelho renderavel: recria-lo aqui e
+   * seguro porque nada de autoritativo vive nele — posicoes, vida e flags
+   * chegam do servidor no mesmo resync que disparou esta chamada.
+   */
+  private rebuildWorld(sector: number): void {
+    const current = this.state;
+    if (!current) return;
+    const next = createRun({
+      seed: current.config.seed,
+      sector,
+      playerCount: current.config.playerCount,
+      width: current.config.width,
+      height: current.config.height,
+    });
+    this.mirror = new ClientWorldMirror(
+      current.config.width,
+      current.config.height,
+      next.solid,
+      next.surface
+    );
+    next.solid = this.mirror.solid;
+    next.surface = this.mirror.surface;
+    // O resultado da run e da RUN, nao do setor: preserva-lo evita que a tela
+    // de resultado pisque em branco se um resync chegar depois do fim.
+    next.summary = current.summary;
+    this.state = next;
+  }
+
+  /**
+   * Codigo da sala a que este cliente quer se juntar. Null = matchmaking aberto.
+   *
+   * Campo e nao parametro de `connect` porque a reconexao automatica chama
+   * `connect` sozinha, de dentro do `onclose` do socket, sem acesso ao que o
+   * jogador digitou no menu. Se o codigo nao sobrevivesse aqui, a primeira
+   * queda de rede jogaria o jogador numa sala qualquer, longe do parceiro.
+   */
+  roomCode: string | null = null;
+
+  /** Codigo da sala em que este cliente ESTA, informado pelo servidor. */
+  activeRoomCode: string | null = null;
+
   /** Inicia (ou reinicia) o handshake. Passe o resumeToken para reconectar. */
   connect(resumeToken?: string): void {
     this.status = resumeToken ? 'reconnecting' : 'connecting';
-    this.send(encodeMessage({ t: 'hello', versions: CURRENT_VERSIONS, resumeToken }));
+    this.send(
+      encodeMessage({
+        t: 'hello',
+        versions: CURRENT_VERSIONS,
+        resumeToken,
+        ...(this.roomCode ? { roomCode: this.roomCode } : {}),
+      })
+    );
   }
 
   markOffline(): void {
@@ -83,6 +134,7 @@ export class NetClient {
     this.viewer = null;
     this.command = null;
     this.events.length = 0;
+    this.activeRoomCode = null;
     this.status = 'offline';
   }
 
@@ -124,6 +176,14 @@ export class NetClient {
     this.command.choose = null;
   }
 
+  /** Quantos jogadores o servidor esta reportando neste instante. */
+  playerCount(): number {
+    if (!this.curr) return 0;
+    let count = 0;
+    for (const snap of this.curr.entities.values()) if (snap.kind === 'player') count++;
+    return count;
+  }
+
   requestResync(reason = 'client'): void {
     this.send(encodeMessage({ t: 'resync', reason }));
   }
@@ -153,7 +213,17 @@ export class NetClient {
       case 'welcome': {
         this.resumeToken = msg.resumeToken;
         this.slot = msg.playerId - 1;
-        this.state = createRun({ seed: msg.seed, playerCount: 2, width: msg.worldWidth, height: msg.worldHeight });
+        this.activeRoomCode = msg.roomCode;
+        // `sector` e obrigatorio na geracao local: com tres setores por run, a
+        // seed sozinha deixou de identificar um mundo. Entrar numa sala ja no
+        // setor 2 gerando o mapa do setor 1 produziria divergencia imediata.
+        this.state = createRun({
+          seed: msg.seed,
+          sector: msg.sector,
+          playerCount: 2,
+          width: msg.worldWidth,
+          height: msg.worldHeight,
+        });
         this.mirror = new ClientWorldMirror(msg.worldWidth, msg.worldHeight, this.state.solid, this.state.surface);
         // o renderer le as arrays do state; aponta-as para o espelho
         this.state.solid = this.mirror.solid;
@@ -169,6 +239,10 @@ export class NetClient {
         break;
       }
       case 'full_resync': {
+        // Um resync pode chegar porque a sala DESCEU: nesse caso o mundo
+        // estatico local pertence ao setor anterior e precisa ser regerado.
+        // Aplicar os diffs sobre o espelho velho costuraria os dois mapas.
+        if (this.state && msg.sector !== this.state.sector) this.rebuildWorld(msg.sector);
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
         this.divergedAt = 0; // mundo reconstruido: zera o anti-repeticao
         this.applyWorld(msg.world);

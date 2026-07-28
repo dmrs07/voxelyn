@@ -71,6 +71,11 @@ export const validateClientMessage = (raw: unknown): ValidationResult<ClientMess
         },
         resumeToken: typeof m.resumeToken === 'string' ? m.resumeToken.slice(0, 128) : undefined,
         displayName: typeof m.displayName === 'string' ? m.displayName.slice(0, 32) : undefined,
+        // O corte no comprimento e antes da normalizacao de proposito: a
+        // validacao aqui e anti-abuso sobre entrada nao confiavel, e quem
+        // decide se o codigo VALE e o servidor, com as regras de room-code.ts.
+        // Este limite so garante que nao chegue uma string de um megabyte.
+        roomCode: typeof m.roomCode === 'string' ? m.roomCode.slice(0, 16) : undefined,
       };
       return { ok: true, value: hello };
     }

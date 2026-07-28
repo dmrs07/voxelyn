@@ -4,6 +4,9 @@ import {
   RateLimiter,
   checkProtocolVersion,
   decodeClientMessage,
+  generateRoomCode,
+  isValidRoomCode,
+  normalizeRoomCode,
   validateClientMessage,
   type ServerMessage,
 } from '@voxelyn/survival-protocol';
@@ -117,19 +120,52 @@ export class SurvivalServer {
     }
   }
 
+  private newRoom(code: string): GameRoom {
+    const seed = (this.baseSeed + this.seedCounter++ * 0x9e3779b9) >>> 0;
+    const room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers, code);
+    this.rooms.push(room);
+    this.log({ ev: 'room_open', room: room.id, seed, code });
+    return room;
+  }
+
+  /** Codigo livre entre as salas existentes. Ver room-code.ts. */
+  private freshCode(): string {
+    // 28^4 combinacoes contra um punhado de salas simultaneas: a colisao e rara
+    // o bastante para que algumas tentativas bastem, e o teto evita laco
+    // infinito no caso patologico de o gerador injetado ser constante.
+    for (let attempt = 0; attempt < 32; attempt++) {
+      const code = generateRoomCode();
+      if (!this.rooms.some((r) => r.code === code)) return code;
+    }
+    return generateRoomCode();
+  }
+
   private openRoom(): GameRoom {
     // so reaproveita sala com capacidade livre E pelo menos um cliente ativo:
     // uma sala reservada/abandonada nunca e pareada com um cliente novo.
-    let room = this.rooms.find(
+    const room = this.rooms.find(
       (r) => r.hasOpenSlot() && r.state.phase === 'running' && r.connectedCount() > 0
     );
-    if (!room) {
-      const seed = (this.baseSeed + this.seedCounter++ * 0x9e3779b9) >>> 0;
-      room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers);
-      this.rooms.push(room);
-      this.log({ ev: 'room_open', room: room.id, seed });
-    }
-    return room;
+    return room ?? this.newRoom(this.freshCode());
+  }
+
+  /**
+   * Sala de um codigo, criando-a se ainda nao existir.
+   *
+   * Criar sob demanda e o que faz o convite funcionar nos DOIS sentidos: quem
+   * combinou o codigo antes pode entrar primeiro, sem que exista um "dono" que
+   * precise chegar antes. Sem isso, o segundo jogador receberia "sala nao
+   * encontrada" toda vez que fosse o mais rapido dos dois.
+   */
+  private roomByCode(code: string): GameRoom | { error: string } {
+    const existing = this.rooms.find((r) => r.code === code);
+    if (!existing) return this.newRoom(code);
+    // Sala existente so aceita quem cabe. Uma sala cheia ou ja terminada nao
+    // vira sala nova com o mesmo codigo: isso separaria em silencio duas
+    // pessoas que digitaram o mesmo codigo achando que se encontrariam.
+    if (existing.state.phase !== 'running') return { error: 'essa sala ja terminou a descida' };
+    if (!existing.hasOpenSlot()) return { error: 'sala cheia' };
+    return existing;
   }
 
   /** Processa uma mensagem crua de um cliente; retorna respostas imediatas. */
@@ -176,7 +212,18 @@ export class SurvivalServer {
           return [{ clientId, msg: { t: 'reject', reason: 'resume token invalido' } }];
         }
 
-        const room = this.openRoom();
+        let room: GameRoom;
+        if (msg.roomCode !== undefined) {
+          const code = normalizeRoomCode(msg.roomCode);
+          if (!isValidRoomCode(code)) {
+            return [{ clientId, msg: { t: 'reject', reason: `codigo de sala invalido: ${code}` } }];
+          }
+          const found = this.roomByCode(code);
+          if ('error' in found) return [{ clientId, msg: { t: 'reject', reason: found.error } }];
+          room = found;
+        } else {
+          room = this.openRoom();
+        }
         const slot = room.attach(clientId);
         if (!slot) return [{ clientId, msg: { t: 'reject', reason: 'sala cheia' } }];
         conn.room = room;
@@ -222,7 +269,9 @@ export class SurvivalServer {
       versions: CURRENT_VERSIONS,
       playerId: slot + 1,
       resumeToken,
+      roomCode: room.code,
       seed: room.seed,
+      sector: room.state.sector,
       worldWidth: room.width,
       worldHeight: room.height,
       mapHash: room.mapHash,
@@ -279,6 +328,14 @@ export class SurvivalServer {
     }
     for (const id of dead) this.removeConnection(id);
     return dead;
+  }
+
+  /**
+   * Sala de um codigo, se existir. Ferramenta de teste e de diagnostico
+   * operacional; o caminho de entrada e sempre `hello`.
+   */
+  roomForCode(code: string): GameRoom | undefined {
+    return this.rooms.find((r) => r.code === code);
   }
 
   roomCount(): number {
