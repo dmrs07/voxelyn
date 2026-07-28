@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { GUARDIAN_SUMMON_COUNT } from '../src/constants';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { spawnEnemy } from '../src/entities';
+import { grantOrRechargeModule } from '../src/modules';
 import type { SurvivalState } from '../src/types';
 
 const stepIdle = (state: SurvivalState, ticks: number): void => {
@@ -197,6 +198,7 @@ describe('projetil perfurante', () => {
     const state = createRun({ seed: 777, playerCount: 1 });
     state.enemies = [];
     state.projectiles = [];
+    grantOrRechargeModule(state.playerExtra, 'piercing', state.tick);
     const first = spawnEnemy(state, 'bruiser', 40, 40, false);
     const second = spawnEnemy(state, 'bruiser', 43, 40, false);
     const hp1 = first.hp;

@@ -76,24 +76,41 @@ describe('modulos temporarios', () => {
     expect(charges(state, 'piercing')).toBe(12);
   });
 
-  it('piercing expira exatamente depois de 12 disparos criados', () => {
+  // O disparo apenas arma. Cobrar no gatilho fazia o jogador pagar por um tiro
+  // que saiu pela porta e nunca perfurou nada.
+  it('piercing nao cobra o disparo, e sim cada travessia', () => {
     const state = createRun({ seed: 101 });
     clearArena(state);
     grantOrRechargeModule(state.playerExtra, 'piercing', state.tick);
-    let consumed = 0;
-    for (let tick = 0; tick < BOLT_COOLDOWN_TICKS * 20 && state.playerExtra.activeModules.length > 0; tick++) {
+
+    for (let shot = 0; shot < 10; shot++) {
       const command = emptyCommand();
       command.fire = true;
       command.aim = { x: 1, y: 0 };
       const result = stepRun(state, [command]);
-      consumed += result.events.filter((event) => event.t === 'module_charge_consumed' && event.module === 'piercing').length;
-      // Isola o teste do limite global de projeteis; a carga ja foi consumida no spawn.
+      expect(result.events.some((event) => event.t === 'module_charge_consumed')).toBe(false);
       state.projectiles = [];
       state.playerExtra.heat = 0;
       state.playerExtra.overheatedUntil = 0;
+      state.playerExtra.nextShotAt = 0;
     }
-    expect(consumed).toBe(12);
-    expect(charges(state, 'piercing')).toBeNull();
+    expect(charges(state, 'piercing')).toBe(12);
+
+    // um unico tiro atravessando dois inimigos: duas cargas, nao uma nem tres
+    for (const dx of [1, 3]) {
+      const enemy = spawnEnemy(state, 'bruiser', state.player.x + dx, state.player.y, false);
+      enemy.x = state.player.x + dx;
+      enemy.y = state.player.y;
+      enemy.stunnedUntil = Number.MAX_SAFE_INTEGER;
+    }
+    state.projectiles = [bolt(state, { vx: 13, damage: 5, modules: { piercing: true } })];
+    let consumed = 0;
+    for (let tick = 0; tick < 8 && state.projectiles.length > 0; tick++) {
+      consumed += stepRun(state, [emptyCommand()]).events
+        .filter((event) => event.t === 'module_charge_consumed' && event.module === 'piercing').length;
+    }
+    expect(consumed).toBe(2);
+    expect(charges(state, 'piercing')).toBe(10);
   });
 
   it('conductive nao consome em tiro comum e consome apenas ao produzir descarga', () => {
@@ -184,6 +201,7 @@ describe('modulos temporarios', () => {
   it('explosive funciona como bolt antes de armar e explode depois da distancia definida', () => {
     const before = createRun({ seed: 104 });
     clearArena(before);
+    grantOrRechargeModule(before.playerExtra, 'explosive', before.tick);
     const beforeEnemy = spawnEnemy(before, 'bruiser', before.player.x, before.player.y, false);
     beforeEnemy.x = before.player.x;
     beforeEnemy.y = before.player.y;
@@ -197,6 +215,7 @@ describe('modulos temporarios', () => {
 
     const armed = createRun({ seed: 105 });
     clearArena(armed);
+    grantOrRechargeModule(armed.playerExtra, 'explosive', armed.tick);
     const armedEnemy = spawnEnemy(armed, 'bruiser', armed.player.x, armed.player.y, false);
     armedEnemy.x = armed.player.x;
     armedEnemy.y = armed.player.y;
@@ -209,7 +228,7 @@ describe('modulos temporarios', () => {
     expect(detonated.events.some((event) => event.t === 'explosion' && event.source === 'player')).toBe(true);
   });
 
-  it('friendly damage de modulo usa 35%, enquanto efeitos ambientais mantem dano integral', () => {
+  it('friendly damage de modulo e escalado, enquanto efeitos ambientais mantem dano integral', () => {
     const playerState = createRun({ seed: 106, playerCount: 2 });
     clearArena(playerState);
     playerState.players[1].x = playerState.player.x;
