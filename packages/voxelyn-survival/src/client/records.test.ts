@@ -1,0 +1,124 @@
+import { describe, expect, it } from 'vitest';
+import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION } from '@voxelyn/survival-sim';
+import type { RunPhase, RunSummary } from '@voxelyn/survival-sim';
+import { HISTORY_LIMIT, applyRun, emptyRecords, hasDiscovery } from './records';
+
+const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
+  seed: 1,
+  phase: 'dead' as RunPhase,
+  ticks: 1000,
+  contamination: 0.3,
+  deathCause: { kind: 'fire' },
+  stats: {
+    shotsFired: 10,
+    kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0 },
+    damageTakenTenths: 100,
+    damageDealtTenths: 200,
+    solidsDestroyed: 3,
+    salvageCompleted: 1,
+    modulesAcquired: 1,
+    purgeCellsUsed: 0,
+    timesDowned: 0,
+    revivesGiven: 0,
+    discoveries: 0,
+  },
+  stars: 0,
+  targetTicks: 9600,
+  ...over,
+});
+
+describe('registro entre runs', () => {
+  it('conta morte e extracao em baldes separados', () => {
+    let rec = emptyRecords();
+    rec = applyRun(rec, summary({ phase: 'dead' }));
+    rec = applyRun(rec, summary({ phase: 'extracted', stars: 1 }));
+    rec = applyRun(rec, summary({ phase: 'extracted_with_core', stars: 2 }));
+    expect(rec.totals.runs).toBe(3);
+    expect(rec.totals.deaths).toBe(1);
+    expect(rec.totals.extractions).toBe(2);
+    expect(rec.totals.extractionsWithCore).toBe(1);
+  });
+
+  it('guarda o MENOR tempo de extracao com nucleo', () => {
+    let rec = emptyRecords();
+    rec = applyRun(rec, summary({ phase: 'extracted_with_core', ticks: 9000, stars: 2 }));
+    expect(rec.best.fastestCoreTicks).toBe(9000);
+    rec = applyRun(rec, summary({ phase: 'extracted_with_core', ticks: 12000, stars: 2 }));
+    expect(rec.best.fastestCoreTicks).toBe(9000); // pior nao substitui
+    rec = applyRun(rec, summary({ phase: 'extracted_with_core', ticks: 7000, stars: 3 }));
+    expect(rec.best.fastestCoreTicks).toBe(7000);
+  });
+
+  // Sobrevivencia so conta em run que terminou em MORTE: uma extracao de 20 min
+  // nao e um recorde de resistencia, e deixar as duas no mesmo balde faria o
+  // numero premiar quem enrolou antes de sair.
+  it('so registra sobrevivencia em runs que terminaram em morte', () => {
+    let rec = emptyRecords();
+    rec = applyRun(rec, summary({ phase: 'extracted', ticks: 99999, stars: 1 }));
+    expect(rec.best.longestSurvivalTicks).toBe(0);
+    rec = applyRun(rec, summary({ phase: 'dead', ticks: 500 }));
+    expect(rec.best.longestSurvivalTicks).toBe(500);
+  });
+
+  it('a melhor nota nunca regride', () => {
+    let rec = emptyRecords();
+    rec = applyRun(rec, summary({ phase: 'extracted_with_core', stars: 3 }));
+    rec = applyRun(rec, summary({ phase: 'dead', stars: 0 }));
+    expect(rec.best.stars).toBe(3);
+  });
+
+  it('acumula abates por arquetipo no bestiario', () => {
+    let rec = emptyRecords();
+    const kills = { stalker: 3, bruiser: 1, spitter: 0, bomber: 0, guardian: 0 };
+    rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
+    rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
+    expect(rec.bestiary.stalker?.killed).toBe(6);
+    expect(rec.bestiary.bruiser?.killed).toBe(2);
+    // Arquetipo nunca abatido continua ausente: o bestiario e o que voce
+    // enfrentou, nao a lista completa do jogo.
+    expect(rec.bestiary.guardian).toBeUndefined();
+    expect(rec.totals.kills).toBe(8);
+  });
+
+  it('descobertas sao acumulativas e nunca se perdem', () => {
+    let rec = emptyRecords();
+    rec = applyRun(
+      rec,
+      summary({ stats: { ...summary().stats, discoveries: DISCOVERY_FIRE_SPREAD } }),
+    );
+    rec = applyRun(
+      rec,
+      summary({ stats: { ...summary().stats, discoveries: DISCOVERY_GAS_IGNITION } }),
+    );
+    expect(hasDiscovery(rec, DISCOVERY_FIRE_SPREAD)).toBe(true);
+    expect(hasDiscovery(rec, DISCOVERY_GAS_IGNITION)).toBe(true);
+    // Uma run sem descoberta nenhuma nao apaga as anteriores.
+    rec = applyRun(rec, summary());
+    expect(hasDiscovery(rec, DISCOVERY_FIRE_SPREAD)).toBe(true);
+  });
+
+  it('registra seed dominada apenas com tres estrelas, sem repetir', () => {
+    let rec = emptyRecords();
+    rec = applyRun(rec, summary({ seed: 42, stars: 2, phase: 'extracted_with_core' }));
+    expect(rec.masteredSeeds).toEqual([]);
+    rec = applyRun(rec, summary({ seed: 42, stars: 3, phase: 'extracted_with_core' }));
+    rec = applyRun(rec, summary({ seed: 42, stars: 3, phase: 'extracted_with_core' }));
+    expect(rec.masteredSeeds).toEqual([42]);
+  });
+
+  it('mantem o historico no teto, mais novo primeiro', () => {
+    let rec = emptyRecords();
+    for (let i = 0; i < HISTORY_LIMIT + 5; i++) rec = applyRun(rec, summary({ seed: i }));
+    expect(rec.history).toHaveLength(HISTORY_LIMIT);
+    expect(rec.history[0].seed).toBe(HISTORY_LIMIT + 4);
+  });
+
+  // applyRun e pura porque este e o unico lugar do cliente em que um bug
+  // silencioso custaria dado do jogador.
+  it('nao muta o registro recebido', () => {
+    const rec = emptyRecords();
+    const snapshot = JSON.stringify(rec);
+    applyRun(rec, summary({ stars: 3, phase: 'extracted_with_core', seed: 7 }));
+    expect(JSON.stringify(rec)).toBe(snapshot);
+  });
+});

@@ -6,6 +6,7 @@ import type {
   PlayerCommand,
   ProjectileKind,
   RunPhase,
+  RunSummary,
   SemanticEvent,
 } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
@@ -186,6 +187,20 @@ export type ServerSnapshot = {
   you?: ViewerState;
   // hash autoritativo periodico para deteccao de divergencia
   authHash?: string;
+  /**
+   * Resultado congelado da run. Enviado somente nos snapshots em que a fase e
+   * terminal, e nunca antes.
+   *
+   * Precisa viajar porque o cliente online NAO simula: ele espelha entidades e
+   * chunks, e nada nesse espelho produz contagem de abates, causa de morte ou
+   * estrelas. Sem este campo, a tela de resultado do co-op ficaria vazia
+   * enquanto a do solo mostra tudo — e o leaderboard nao teria de onde ler o
+   * que aconteceu.
+   *
+   * Opcional para nao custar bytes nos milhares de snapshots de uma run em
+   * andamento, que sao 99,9% deles.
+   */
+  summary?: RunSummary;
 };
 
 /** Reenvio completo do mundo quando ha divergencia irrecuperavel. */

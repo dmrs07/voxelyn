@@ -32,6 +32,8 @@ import {
   SURF_SCORCHED,
   SURF_SPORES,
 } from './constants.js';
+import { markDiscovery } from './stats.js';
+import { DISCOVERY_ORE_CHAIN } from './types.js';
 import {
   breakSolid,
   chargeCells,
@@ -187,6 +189,9 @@ export const impactSolid = (
           (n) => state.solid[n] === SOLID_ORE || state.solid[n] === SOLID_ORE_CHIPPED
         );
         chargeCells(state, openNeighbours(state, vein), events, origin);
+        // So conta como descoberta quando o veio REALMENTE conduziu a algum
+        // lugar. Uma pedrinha de minerio isolada nao ensina que minerio e fiacao.
+        if (vein.length > 1) markDiscovery(state.stats, DISCOVERY_ORE_CHAIN);
         return { stop: true, broke: false };
       }
       if (cls === 'thermal') {

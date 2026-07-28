@@ -4,8 +4,8 @@
 // - SIMULATION_VERSION muda quando a logica autoritativa muda de forma que altera
 //   hashes deterministicos (cliente e servidor precisam concordar para prever/interpolar).
 // - CONTENT_VERSION muda quando itens/criaturas/materiais mudam (pool de conteudo).
-export const PROTOCOL_VERSION = 8;
-export const SIMULATION_VERSION = 9;
+export const PROTOCOL_VERSION = 9;
+export const SIMULATION_VERSION = 10;
 export const CONTENT_VERSION = 7;
 
 export type VersionTriple = {

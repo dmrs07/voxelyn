@@ -16,6 +16,9 @@ import {
   type QualityLevel,
 } from './settings';
 import { audio } from './audio';
+import { applyRun, loadRecords, saveRecords, type Records } from './records';
+import { renderRecordsPanel } from './records-panel';
+import { formatSeed, parseSeed } from './run-summary';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -29,6 +32,9 @@ const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 const volumeInput = document.getElementById('volume') as HTMLInputElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
+const seedInput = document.getElementById('seed') as HTMLInputElement;
+const recordsOverlay = document.getElementById('records') as HTMLDivElement;
+const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 
 const renderer = new SurvivalRenderer(canvas);
 const input = new SurvivalInput(canvas);
@@ -135,6 +141,28 @@ window.addEventListener('keydown', (ev) => {
   setTimeout(() => setBanner(null), 1200);
 });
 
+// ---------------------------------------------------------------------------
+// Memoria entre runs
+// ---------------------------------------------------------------------------
+let records: Records = loadRecords();
+
+/**
+ * Registra uma run terminada, UMA VEZ.
+ *
+ * O guard por identidade do sumario e o que impede a run de ser contada a cada
+ * quadro: a fase terminal persiste, o loop continua desenhando, e sem ele o
+ * historico ganharia sessenta copias por segundo da mesma morte.
+ */
+let recordedSummary: unknown = null;
+/** Seed fixada pelo jogador no menu, ou null para sortear a cada descida. */
+let forcedSeed: number | null = null;
+const recordRun = (state: SurvivalState): void => {
+  if (!state.summary || state.summary === recordedSummary) return;
+  recordedSummary = state.summary;
+  records = applyRun(records, state.summary);
+  saveRecords(records);
+};
+
 const haptics = (events: SemanticEvent[]): void => {
   if (!('vibrate' in navigator)) return;
   for (const e of events) {
@@ -163,11 +191,20 @@ const applyAdaptiveQuality = (dt: number): void => {
 // ---------------------------------------------------------------------------
 let stopLoop: (() => void) | null = null;
 
+/**
+ * Seed da proxima descida.
+ *
+ * Uma seed digitada vale para a run inteira, INCLUSIVE os reinicios: a razao de
+ * o campo existir e alguem colar a seed de outra pessoa e tentar a mesma
+ * descida, e sortear uma nova ao morrer destruiria exatamente esse uso.
+ */
+const nextSeed = (): number => forcedSeed ?? ((Date.now() ^ 0x5f3759df) >>> 0);
+
 const runSolo = (): void => {
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
   audio.reset();
-  let state: SurvivalState = createRun({ seed: (Date.now() ^ 0x5f3759df) >>> 0 });
+  let state: SurvivalState = createRun({ seed: nextSeed() });
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -185,14 +222,16 @@ const runSolo = (): void => {
     const vh = window.innerHeight;
 
     if (state.phase !== 'running') {
+      recordRun(state);
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
       renderer.render(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
-        state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
+        state = createRun({ seed: nextSeed() });
         audio.reset();
+        recordedSummary = null;
         gate.reset();
       }
       accumulator = 0;
@@ -348,6 +387,7 @@ const runOnline = (url: string): void => {
         const { drain, armed } = gate.frame(now, terminal);
         if (drain && !pendingChoice) input.clearPendingUiInput();
         if (terminal) {
+          recordRun(state);
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
@@ -355,6 +395,7 @@ const runOnline = (url: string): void => {
           if (armed && (input.hasTap() || input.consumeRestartKey())) {
             gate.reset();
             audio.reset();
+            recordedSummary = null;
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
@@ -422,6 +463,40 @@ for (const evt of ['pointerdown', 'keydown'] as const) {
 document.getElementById('btn-solo')?.addEventListener('click', startSolo);
 document.getElementById('btn-online')?.addEventListener('click', startOnline);
 serverInput.placeholder = defaultServerUrl();
+
+// ---------------------------------------------------------------------------
+// Seed e registro
+// ---------------------------------------------------------------------------
+const syncSeedFromInput = (): void => {
+  forcedSeed = parseSeed(seedInput.value);
+  // Normaliza para hex assim que a seed e aceita: o campo passa a mostrar
+  // exatamente o texto que a tela de fim imprime, que e o que se compartilha.
+  if (forcedSeed !== null) seedInput.value = formatSeed(forcedSeed);
+};
+seedInput.addEventListener('change', syncSeedFromInput);
+
+// ?seed= permite mandar um link para a mesma descida, nao so o numero.
+const seedParam = new URLSearchParams(location.search).get('seed');
+if (seedParam) {
+  seedInput.value = seedParam;
+  syncSeedFromInput();
+}
+
+// O menu SAI enquanto o registro esta aberto. As duas overlays usam o mesmo
+// fundo a 92% de opacidade, entao empilhadas o titulo "VOXELYN SURVIVAL"
+// aparecia atras de "REGISTRO" — legivel o bastante para parecer defeito.
+document.getElementById('btn-records')?.addEventListener('click', () => {
+  renderRecordsPanel(recordsBody, records);
+  menu.classList.add('hidden');
+  recordsOverlay.classList.remove('hidden');
+  audio.unlock();
+  audio.ui();
+});
+document.getElementById('btn-records-close')?.addEventListener('click', () => {
+  recordsOverlay.classList.add('hidden');
+  menu.classList.remove('hidden');
+  audio.ui();
+});
 
 // auto-start por query (?online=1)
 const params = new URLSearchParams(location.search);

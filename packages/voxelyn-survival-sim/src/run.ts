@@ -65,6 +65,7 @@ import {
   updateEnemies,
 } from './entities.js';
 import { generateWorld } from './worldgen.js';
+import { buildSummary, emptyStats, markDiscovery } from './stats.js';
 import {
   activeModule,
   consumeModuleCharge,
@@ -73,7 +74,12 @@ import {
   moduleHasCapacity,
   rollModuleChoice,
 } from './modules.js';
+import {
+  DISCOVERY_DISCHARGE_POOL,
+  DISCOVERY_SELF_HARM,
+} from './types.js';
 import type {
+  DamageCause,
   Entity,
   EnemyArchetype,
   ModuleId,
@@ -138,6 +144,7 @@ const makeExtra = (): PlayerExtra => ({
   downed: false,
   bleedoutAt: 0,
   joined: true, // default seguro: solo/local ja esta em jogo
+  lastDamage: null,
 });
 
 /**
@@ -160,6 +167,7 @@ export const resetPlayerProgress = (extra: PlayerExtra): void => {
   extra.abilityCooldownUntil = 0;
   extra.aim = { x: 1, y: 0 };
   extra.dodgeDir = { x: 1, y: 0 };
+  extra.lastDamage = null;
 };
 
 export const createRun = (config: RunConfig): SurvivalState => {
@@ -222,6 +230,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
     // que nenhum inimigo colida com um id de player nos snapshots por id
     nextEntityId: playerCount + 1,
     reactionQueue: [],
+    stats: emptyStats(),
+    summary: null,
   };
 
   // popular inimigos: mistura deterministica, um elite no meio da lista
@@ -270,13 +280,13 @@ const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void =
     if (!ent.alive) continue;
     const surf = state.surface[cellIndexAt(state, ent.x, ent.y)];
     if (surf === SURF_FIRE) {
-      damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events);
+      damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events, { kind: 'fire' });
     } else if (surf === SURF_GAS && ent.kind === 'player') {
       // Gas sulfuroso e toxico; criaturas do Veio sao imunes ao proprio ambiente.
-      damageEntity(state, ent, GAS_DAMAGE_PER_TICK, events);
+      damageEntity(state, ent, GAS_DAMAGE_PER_TICK, events, { kind: 'gas' });
     } else if (surf === SURF_SPORES && ent.kind === 'player') {
       // Esporos do bomber sao organicos e irritantes, mas nao volateis/explosivos.
-      damageEntity(state, ent, SPORE_DAMAGE_PER_TICK, events);
+      damageEntity(state, ent, SPORE_DAMAGE_PER_TICK, events, { kind: 'spores' });
     }
   }
 };
@@ -293,11 +303,20 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         const scale = ev.source === 'player' && ent.kind === 'player'
           ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE
           : 1;
-        damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events);
+        damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events, {
+          kind: 'discharge',
+          source: ev.source,
+        });
         if (ev.source === 'player' && ent.kind === 'enemy' && !isStoneEnemy(ent)) {
           stunEntity(state, ent, CONDUCTIVE_STUN_TICKS);
         }
+        // Eletrificar a poca em que voce mesmo esta e a licao numero um do
+        // material condutivo, e ela so ensina se for registrada.
+        if (ev.source === 'player' && ent.kind === 'player') {
+          markDiscovery(state.stats, DISCOVERY_SELF_HARM);
+        }
       }
+      if (ev.cells.length > 1) markDiscovery(state.stats, DISCOVERY_DISCHARGE_POOL);
     } else if (ev.t === 'explosion') {
       applyExplosionDamage(
         state,
@@ -305,7 +324,8 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         ev.y,
         ev.radius,
         events,
-        ev.source === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1
+        ev.source === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1,
+        ev.source
       );
     }
   }
@@ -337,6 +357,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     const recharged = Boolean(activeModule(extra, picked));
     grantOrRechargeModule(extra, picked, state.tick);
     extra.pendingModuleChoice = null;
+    // So conta modulo NOVO. Recarga e a mesma peca ganhando cargas de volta, e
+    // somar as duas faria "modulos adquiridos" premiar quem repetiu a escolha.
+    if (!recharged) state.stats.modulesAcquired += 1;
     events.push({
       t: 'module_selected',
       slot,
@@ -466,10 +489,12 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       dx: extra.aim.x, dy: extra.aim.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 7,
     });
     events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y, owner: player.id });
+    state.stats.shotsFired += 1;
     if (extra.heat >= HEAT_MAX) {
       extra.overheatedUntil = state.tick + OVERHEAT_LOCK_TICKS;
       extra.heat = HEAT_MAX * 0.55;
-      damageEntity(state, player, OVERHEAT_SELF_DAMAGE, events);
+      damageEntity(state, player, OVERHEAT_SELF_DAMAGE, events, { kind: 'overheat' });
+      markDiscovery(state.stats, DISCOVERY_SELF_HARM);
       events.push({ t: 'overheat', x: player.x, y: player.y });
     }
   }
@@ -528,6 +553,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       }
     }
     events.push({ t: 'purge_cell_used', slot, x: player.x, y: player.y });
+    state.stats.purgeCellsUsed += 1;
   }
 
   // interagir: revive parceiro > nucleo > terminal/cofre > extracao
@@ -544,6 +570,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           oe.bleedoutAt = 0;
           op.hp = Math.max(1, Math.floor(op.maxHp * REVIVE_HP_FRACTION));
           events.push({ t: 'revive', x: op.x, y: op.y, slot: other, tick: state.tick });
+          state.stats.revivesGiven += 1;
           events.push({ t: 'message', text: `Parceiro revivido.` });
           return;
         }
@@ -860,7 +887,16 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           const projectileRadius = proj.radius ?? 0.2;
           if (Math.hypot(player.x - proj.x, player.y - proj.y) < player.radius + projectileRadius) {
             const vulnerable = extra.iframesUntil <= state.tick;
-            damageEntity(state, player, proj.damage, events);
+            // O dono do projetil pode ja ter morrido antes de a pedra chegar —
+            // o telegrafo dura 0,8 s e o voo, mais. Sem o dono, o arquetipo sai
+            // do proprio projetil: `rock` so existe vindo do bruiser.
+            const shooter = state.enemies.find((e) => e.id === proj.owner);
+            damageEntity(state, player, proj.damage, events, {
+              kind: 'enemy_projectile',
+              archetype: (shooter?.archetype as EnemyArchetype) ?? (proj.kind === 'rock' ? 'bruiser' : 'spitter'),
+              elite: shooter?.elite ?? false,
+              projectile: proj.kind,
+            });
             if (proj.kind === 'rock' && vulnerable) {
               stunEntity(state, player, BRUISER_ROCK_STUN_TICKS);
             }
@@ -907,7 +943,7 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           if (conductiveTriggered && !isStoneEnemy(enemy)) {
             stunEntity(state, enemy, CONDUCTIVE_STUN_TICKS);
           }
-          damageEntity(state, enemy, damage, events);
+          damageEntity(state, enemy, damage, events, { kind: 'player_shot' });
 
           if (
             proj.modules?.siphon && owner && ownerExtra && ownerSlot !== undefined &&
@@ -951,6 +987,7 @@ const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void =
     if (site.terminalState !== 'scanning' || state.tick < site.scanEndsAt) continue;
     site.terminalState = 'complete';
     site.cacheRevealed = true;
+    state.stats.salvageCompleted += 1;
     events.push({
       t: 'terminal_scan_complete',
       siteId: site.id,
@@ -1030,6 +1067,10 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
     if (e.downed) {
       // abatido morre ao esgotar o tempo de sangramento
       if (state.tick >= e.bleedoutAt) {
+        // Sangrar ate o fim SOBRESCREVE a causa: o que matou nao foi o golpe que
+        // derrubou, foi os vinte segundos sem ninguem chegar. Sao licoes
+        // diferentes e o co-op depende de distingui-las.
+        e.lastDamage = { cause: { kind: 'bleedout' }, tick: state.tick };
         killPlayer(state, slot, events);
       }
       continue;
@@ -1044,6 +1085,7 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
         // co-op: entra em estado abatido, revivel pelo parceiro
         e.downed = true;
         e.bleedoutAt = state.tick + BLEEDOUT_TICKS;
+        state.stats.timesDowned += 1;
         events.push({
           t: 'player_down', slot, x: p.x, y: p.y,
           facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
@@ -1066,6 +1108,36 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
   }
 };
 
+/**
+ * A causa que a tela de fim deve mostrar quando a run acaba em morte.
+ *
+ * No co-op ha duas causas possiveis e a pergunta "o que acabou com a run" tem
+ * uma resposta so: a do ULTIMO a cair, porque foi ela que encerrou a partida. O
+ * primeiro a morrer nao terminou nada — o parceiro ainda estava de pe.
+ */
+const runEndingCause = (state: SurvivalState): DamageCause => {
+  let latest: { cause: DamageCause; tick: number } | null = null;
+  for (let slot = 0; slot < state.players.length; slot++) {
+    const last = state.playerExtras[slot].lastDamage;
+    if (!state.playerExtras[slot].joined || !last) continue;
+    if (!latest || last.tick > latest.tick) latest = last;
+  }
+  return latest?.cause ?? { kind: 'unknown' };
+};
+
+/**
+ * Congela o sumario no PRIMEIRO tick em que a run deixa de estar correndo.
+ *
+ * A guarda `summary === null` e o ponto todo. `stepRun` tem dois caminhos de
+ * saida e a extracao termina a run no meio do laco de jogadores, entao sem ela
+ * o sumario seria reconstruido em ticks subsequentes — e a tela de resultado
+ * mostraria numeros mudando enquanto o jogador os le.
+ */
+const finalizeRun = (state: SurvivalState): void => {
+  if (state.phase === 'running' || state.summary !== null) return;
+  state.summary = buildSummary(state, state.phase === 'dead' ? runEndingCause(state) : null);
+};
+
 export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]): StepResult => {
   const events: SemanticEvent[] = [];
 
@@ -1081,6 +1153,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
     if (state.phase !== 'running') {
       resolveChainedEvents(state, events);
       resolveDownedAndDeaths(state, events);
+      finalizeRun(state);
       return { state, events };
     }
   }
@@ -1093,6 +1166,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepContamination(state, events);
   resolveChainedEvents(state, events);
   resolveDownedAndDeaths(state, events);
+  finalizeRun(state);
 
   return { state, events };
 };
@@ -1127,6 +1201,22 @@ export const createSnapshot = (state: SurvivalState, viewerId?: string): Surviva
     contamination: state.contamination,
   };
 };
+
+/**
+ * Ordem FIXA dos arquetipos no hash.
+ *
+ * `Object.keys` teria funcionado por acidente e quebrado em silencio: a ordem de
+ * iteracao de um objeto depende da ordem de INSERCAO, e basta alguem reordenar
+ * o literal em `emptyStats` para dois builds do mesmo codigo produzirem hashes
+ * diferentes — divergencia de co-op sem nenhuma mudanca de comportamento.
+ */
+const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
+  'stalker',
+  'bruiser',
+  'spitter',
+  'bomber',
+  'guardian',
+];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
 export const hashAuthoritativeState = (state: SurvivalState): string => {
@@ -1196,6 +1286,24 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));
   mix(state.contaminationWaves);
+  // Contadores entram no hash apesar de nao afetarem a simulacao.
+  //
+  // Poderiam ficar de fora — nada aqui realimenta o mundo. Entram porque o
+  // leaderboard verifica runs re-simulando o log de comandos e comparando
+  // hashes: fora do hash, um resultado com os mesmos movimentos mas contagens
+  // diferentes passaria pela verificacao. Sao inteiros exatamente para poderem
+  // entrar; ver `addDamageTenths`.
+  mix(state.stats.shotsFired);
+  mix(state.stats.damageTakenTenths);
+  mix(state.stats.damageDealtTenths);
+  mix(state.stats.solidsDestroyed);
+  mix(state.stats.salvageCompleted);
+  mix(state.stats.modulesAcquired);
+  mix(state.stats.purgeCellsUsed);
+  mix(state.stats.timesDowned);
+  mix(state.stats.revivesGiven);
+  mix(state.stats.discoveries);
+  for (const archetype of HASHED_ARCHETYPES) mix(state.stats.kills[archetype]);
   mix(state.guardianSummoned ? 1 : 0);
   mix(state.arenaClosed ? 1 : 0);
   mix(state.arenaBarrierCells.length);

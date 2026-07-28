@@ -24,6 +24,103 @@ export type PendingModuleChoice = {
   createdAtTick: number;
 };
 
+/**
+ * O QUE machucou. Autoritativo, produzido pela simulacao.
+ *
+ * Existe por causa do invariante de design "morte que ensina" (secao 15 da
+ * spec): uma tela de fim que so diz "O VEIO TE CONSUMIU" nao ensina nada, e a
+ * diferenca entre um jogador que volta e um que fecha a aba costuma ser saber
+ * o que o matou. Tres mortes que hoje sao indistinguiveis viram licoes
+ * distintas: o gas que VOCE acendeu, a poca que VOCE eletrificou, e o bruiser
+ * que voce nao ouviu.
+ *
+ * Vive na sim e nao no cliente porque so a sim sabe. Reconstruir a causa a
+ * partir dos eventos seria adivinhacao: `hit` diz quanto doeu, nunca de onde
+ * veio, e o ultimo `hit` antes da morte pode ser o respingo de fogo e nao a
+ * pedra que tirou 22.
+ *
+ * `source` em explosao e descarga e o campo que carrega a licao inteira:
+ * `{ kind: 'explosion', source: 'player' }` significa "voce se explodiu", que e
+ * uma morte de decisao — exatamente o tipo que o design quer que aconteca.
+ */
+export type DamageCause =
+  | { kind: 'player_shot' }
+  | { kind: 'enemy_contact'; archetype: EnemyArchetype; elite: boolean }
+  | { kind: 'enemy_projectile'; archetype: EnemyArchetype; elite: boolean; projectile: ProjectileKind }
+  | { kind: 'fire' }
+  | { kind: 'gas' }
+  | { kind: 'spores' }
+  | { kind: 'discharge'; source: EffectOrigin['source'] }
+  | { kind: 'explosion'; source: EffectOrigin['source'] }
+  | { kind: 'overheat' }
+  | { kind: 'bleedout' }
+  /** Ultimo recurso: nenhum caminho de dano deveria chegar aqui. */
+  | { kind: 'unknown' };
+
+/**
+ * Contadores da run. Puramente descritivos: nada aqui realimenta a simulacao.
+ *
+ * Sao inteiros de proposito — entram no hash autoritativo, e float acumulado em
+ * ordens diferentes diverge entre maquinas. `damageTaken` e `damageDealt`
+ * guardam decimos arredondados pelo mesmo motivo.
+ */
+export type RunStats = {
+  shotsFired: number;
+  /** Mortes por arquetipo. Alimenta o bestiario do cliente. */
+  kills: Record<EnemyArchetype, number>;
+  /** Decimos de dano; dividir por 10 para exibir. */
+  damageTakenTenths: number;
+  damageDealtTenths: number;
+  /** Solidos destruidos pelo jogador ou por reacoes que ele causou. */
+  solidsDestroyed: number;
+  /** Terminais de salvage concluidos. */
+  salvageCompleted: number;
+  modulesAcquired: number;
+  purgeCellsUsed: number;
+  /** Quantas vezes o jogador ficou abatido (co-op). */
+  timesDowned: number;
+  revivesGiven: number;
+  /**
+   * Reacoes sistemicas testemunhadas, para o codex do cliente.
+   *
+   * Bitmask e nao lista porque entra no hash: um Set nao tem ordem estavel
+   * entre maquinas e um array cresceria sem teto.
+   */
+  discoveries: number;
+};
+
+/** Bits de `RunStats.discoveries`. Cada um e uma licao que o mundo ensinou. */
+export const DISCOVERY_FIRE_SPREAD = 1 << 0;
+export const DISCOVERY_DISCHARGE_POOL = 1 << 1;
+export const DISCOVERY_GAS_IGNITION = 1 << 2;
+export const DISCOVERY_FRAGILE_BREACH = 1 << 3;
+export const DISCOVERY_SELF_HARM = 1 << 4;
+export const DISCOVERY_ORE_CHAIN = 1 << 5;
+export const DISCOVERY_GUARDIAN_FELLED = 1 << 6;
+export const DISCOVERY_CORE_TAKEN = 1 << 7;
+
+/**
+ * O resultado congelado de uma run. Construido uma vez, quando a run termina.
+ *
+ * Congelado e nao derivado sob demanda porque `state` continua sendo o objeto
+ * vivo depois do fim (o cliente ainda o desenha na tela de resultado), e um
+ * sumario recalculado a cada quadro daria numeros que mudam enquanto o jogador
+ * os le.
+ */
+export type RunSummary = {
+  seed: number;
+  phase: RunPhase;
+  ticks: number;
+  /** Contaminacao final, 0..1. */
+  contamination: number;
+  /** Nulo quando a run terminou em extracao. */
+  deathCause: DamageCause | null;
+  stats: RunStats;
+  stars: 0 | 1 | 2 | 3;
+  /** Tempo, em ticks, abaixo do qual a terceira estrela e concedida. */
+  targetTicks: number;
+};
+
 export type EntityActionKind =
   | 'player_shot'
   | 'ranged'
@@ -92,6 +189,15 @@ export type PlayerExtra = {
   downed: boolean;
   bleedoutAt: number;
   joined: boolean;
+  /**
+   * O que machucou este jogador por ultimo, e quando.
+   *
+   * Guardado no momento do dano e nao no momento da morte porque no instante da
+   * morte a informacao ja se perdeu: `resolveDownedAndDeaths` roda depois, ve
+   * apenas `hp <= 0`, e nao tem como saber se foram os 22 da pedra ou os 2,2
+   * do fogo que estavam por baixo.
+   */
+  lastDamage: { cause: DamageCause; tick: number } | null;
 };
 
 /**
@@ -250,6 +356,9 @@ export type SurvivalState = {
   contaminationWaves: number;
   nextEntityId: number;
   reactionQueue: number[];
+  stats: RunStats;
+  /** Preenchido uma unica vez, no tick em que a run termina. */
+  summary: RunSummary | null;
 };
 
 export type StepResult = { state: SurvivalState; events: SemanticEvent[] };

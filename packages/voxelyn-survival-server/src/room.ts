@@ -421,6 +421,11 @@ export class GameRoom {
     if (this.state.tick % HASH_INTERVAL_TICKS === 0) {
       snap.authHash = hashAuthoritativeState(this.state);
     }
+    // O resultado viaja em TODO snapshot de uma sala terminada, e nao uma vez
+    // so: quem reconecta depois do fim da run, ou entra atrasado no ultimo
+    // segundo, tambem tem de ver a tela de resultado. O custo e nulo na
+    // pratica — uma sala terminal nao gera mais nada.
+    if (this.state.summary) snap.summary = this.state.summary;
     return snap;
   }
 

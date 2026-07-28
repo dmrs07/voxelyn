@@ -28,6 +28,8 @@ import {
   SURF_SPORES,
   VENT_BASE_INTERVAL_TICKS,
 } from './constants.js';
+import { markDiscovery } from './stats.js';
+import { DISCOVERY_FIRE_SPREAD, DISCOVERY_FRAGILE_BREACH, DISCOVERY_GAS_IGNITION } from './types.js';
 import { chunkOf } from './worldgen.js';
 import type { EffectOrigin, SemanticEvent, SurvivalState } from './types.js';
 
@@ -101,6 +103,7 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
   }
   if (surf === SURF_GAS) {
     setSurface(state, i, SURF_FIRE, GAS_FLASH_TICKS);
+    markDiscovery(state.stats, DISCOVERY_GAS_IGNITION);
     announceIgnite(state, i, events);
     return true;
   }
@@ -279,6 +282,7 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
           heatFungalCell(state, ni, false);
         } else if (nsurf === SURF_BIOFLUID && state.rng.nextFloat01() < FIRE_SPREAD_BIOFLUID) {
           igniteCell(state, ni, events);
+          markDiscovery(state.stats, DISCOVERY_FIRE_SPREAD);
         }
       }
       const t = state.surfaceTimer[i];
@@ -353,12 +357,15 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
     state.solid[i] = SOLID_NONE;
     state.surface[i] = SURF_SCORCHED;
     markDirty(state, x, y);
+    state.stats.solidsDestroyed += 1;
+    markDiscovery(state.stats, DISCOVERY_FRAGILE_BREACH);
     events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     return true;
   }
   if (solid === SOLID_CRYSTAL) {
     state.solid[i] = SOLID_NONE;
     markDirty(state, x, y);
+    state.stats.solidsDestroyed += 1;
     events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     dischargeAt(state, x, y, events);
     return true;
@@ -367,6 +374,7 @@ export const breakSolid = (state: SurvivalState, x: number, y: number, events: S
     // Quebra, mas sem descarga: a energia dele ja foi embora com o acido.
     state.solid[i] = SOLID_NONE;
     markDirty(state, x, y);
+    state.stats.solidsDestroyed += 1;
     events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     return true;
   }

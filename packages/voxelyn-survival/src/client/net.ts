@@ -188,6 +188,11 @@ export class NetClient {
           this.state.phase = msg.phase;
           this.state.contamination = msg.contamination;
           this.state.tick = msg.serverTick;
+          // O cliente online nao simula: contagem de abates, causa de morte e
+          // estrelas so existem porque o servidor as manda. Nunca sobrescreve
+          // com undefined — snapshots de sala em andamento omitem o campo, e
+          // apaga-lo limparia o resultado logo depois de ele chegar.
+          if (msg.summary) this.state.summary = msg.summary;
         }
         if (msg.you) {
           this.viewer = msg.you;
