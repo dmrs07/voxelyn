@@ -108,6 +108,30 @@ describe('EntityPresentation', () => {
     expect(presented.anim).toBe('special');
   });
 
+  it('cancela imediatamente um telegraph visual armazenado quando a entidade e atordoada', () => {
+    const presentation = new EntityPresentation();
+    presentation.ingest([{
+      t: 'action_start', entity: 10, action: 'hurl', x: 0, y: 0, dx: 1, dy: 0,
+      startTick: 0, releaseTick: 16, endTick: 24,
+    }] as never, 0);
+    const entity = { id: 10, archetype: 'bruiser', facing: { x: 1, y: 0 }, stunnedUntil: 20 };
+    const stunned = presentation.animationFor(entity as never, { tick: 5 } as never, baseAnim('walk') as never, 250);
+    expect(stunned.anim).toBe('idle');
+    const recovered = presentation.animationFor(
+      { ...entity, stunnedUntil: 20 } as never, { tick: 20 } as never, baseAnim('walk') as never, 1_000
+    );
+    expect(recovered.anim).toBe('walk');
+  });
+
+  it('preserva o telegraph quando o snapshot ainda mantem a acao autoritativa durante o stun', () => {
+    const presentation = new EntityPresentation();
+    const entity = { ...actionEntity('bomber', 'detonate'), stunnedUntil: 20 };
+    const presented = presentation.animationFor(
+      entity as never, { tick: 5 } as never, baseAnim('idle') as never, 250
+    );
+    expect(presented.anim).toBe('special');
+  });
+
   it('permite que hit interrompa somente a composicao do prospector', () => {
     const presentation = new EntityPresentation();
     const entity = actionEntity('prospector', 'shoot');

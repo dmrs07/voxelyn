@@ -16,7 +16,7 @@ const CANONICAL = {
   'enemy-stalker': [32, 32],
   'enemy-spitter': [32, 32],
   'enemy-spore-bomber': [32, 32],
-  'enemy-bruiser': [48, 56],
+  'enemy-bruiser': [48, 68],
   'enemy-guardian': [48, 56],
   'fx-projectile-bolt': [16, 16],
   'fx-impact-burst': [16, 16],

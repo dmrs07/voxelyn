@@ -297,6 +297,7 @@ export class GameRoom {
         downed: this.state.playerExtras[i].downed,
         facingX: round3(this.state.playerExtras[i].aim.x),
         facingY: round3(this.state.playerExtras[i].aim.y),
+        stunnedUntil: p.stunnedUntil,
         action: p.action ? {
           kind: p.action.kind,
           phase: p.action.phase,
@@ -323,6 +324,7 @@ export class GameRoom {
         elite: e.elite,
         facingX: round3(e.facing.x),
         facingY: round3(e.facing.y),
+        stunnedUntil: e.stunnedUntil,
         action: e.action ? {
           kind: e.action.kind,
           phase: e.action.phase,

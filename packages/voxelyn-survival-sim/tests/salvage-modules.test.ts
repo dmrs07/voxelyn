@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOLT_COOLDOWN_TICKS,
+  CONDUCTIVE_STUN_TICKS,
   DISCHARGE_DAMAGE,
   EXPLOSIVE_ARM_DISTANCE,
   PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
@@ -118,6 +119,44 @@ describe('modulos temporarios', () => {
 
     expect(result.events.some((event) => event.t === 'discharge' && event.source === 'player')).toBe(true);
     expect(charges(state, 'conductive')).toBe(5);
+  });
+
+  it('conductive consome no acerto direto e atordoa apenas inimigos nao petreos', () => {
+    const organic = createRun({ seed: 1021 });
+    clearArena(organic);
+    grantOrRechargeModule(organic.playerExtra, 'conductive', organic.tick);
+    const stalker = spawnEnemy(organic, 'stalker', organic.player.x, organic.player.y, false);
+    stalker.x = organic.player.x;
+    stalker.y = organic.player.y;
+    organic.projectiles = [bolt(organic, { modules: { conductive: true } })];
+    stepRun(organic, [emptyCommand()]);
+    expect(stalker.stunnedUntil - organic.tick).toBe(CONDUCTIVE_STUN_TICKS);
+    expect(charges(organic, 'conductive')).toBe(5);
+
+    const chained = createRun({ seed: 10215 });
+    clearArena(chained);
+    const ci = Math.floor(chained.player.y) * chained.config.width + Math.floor(chained.player.x);
+    chained.surface[ci] = SURF_BIOFLUID;
+    const chainedStalker = spawnEnemy(chained, 'stalker', chained.player.x, chained.player.y, false);
+    chainedStalker.x = chained.player.x;
+    chainedStalker.y = chained.player.y;
+    const dischargeEvents: SemanticEvent[] = [];
+    dischargeAt(chained, Math.floor(chained.player.x), Math.floor(chained.player.y), dischargeEvents, {
+      source: 'player', owner: chained.player.id,
+    });
+    resolveChainedEvents(chained, dischargeEvents);
+    expect(chainedStalker.stunnedUntil - chained.tick).toBe(CONDUCTIVE_STUN_TICKS);
+
+    const stone = createRun({ seed: 1022 });
+    clearArena(stone);
+    grantOrRechargeModule(stone.playerExtra, 'conductive', stone.tick);
+    const bruiser = spawnEnemy(stone, 'bruiser', stone.player.x, stone.player.y, false);
+    bruiser.x = stone.player.x;
+    bruiser.y = stone.player.y;
+    stone.projectiles = [bolt(stone, { modules: { conductive: true } })];
+    stepRun(stone, [emptyCommand()]);
+    expect(bruiser.stunnedUntil).toBe(0);
+    expect(charges(stone, 'conductive')).toBe(6);
   });
 
   it('siphon so consome quando um inimigo e atingido e a cura e aplicada', () => {

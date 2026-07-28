@@ -43,6 +43,8 @@ const ARMED_RAMP: FaceRamp = ['#ffd166', '#ff7a3d', '#7a2f2f'];
 const FLIGHT_HEIGHT = 0.55;
 /** Largura de um voxel do mundo em pixels, no zoom 1 (igual ao atlas). */
 const VOXEL_PX = 4;
+/** Bloco voador quase ocupa a largura visual de um tile, como o bloco arrancado. */
+export const ROCK_PROJECTILE_SCALE = 2.8;
 const TRAIL_LENGTH = 3;
 
 type Track = { x: number; y: number; dx: number; dy: number; seenAt: number };
@@ -108,7 +110,7 @@ export class ProjectileView {
     const lift = FLIGHT_HEIGHT * tileH * zoom;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
-    const size = VOXEL_PX * zoom * (rock ? 1.9 : disc ? 1.45 : 1);
+    const size = VOXEL_PX * zoom * (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : 1);
     const track = this.tracks.get(projectile.id);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao
@@ -116,7 +118,7 @@ export class ProjectileView {
     // entao sem sombra um projetil alto e indistinguivel de um projetil longe.
     // Sombra proporcional ao corpo: um bloco projeta mais sombra que um cuspe,
     // e e por ela que a massa se le enquanto ele ainda esta longe.
-    drawGroundShadow(ctx, sx, sy, (rock ? 5 : 3) * zoom);
+    drawGroundShadow(ctx, sx, sy, (rock ? 7 : 3) * zoom);
 
     // Pedra nao deixa rastro nem se parte em estilhaco: e um corpo solido e
     // unico. O rastro existe para materia que se desfaz no ar — cuspe e

@@ -168,6 +168,24 @@ export const GAS_ALPHA = 192 / 255;
 /** Faces da carga eletrica que corre pela poca: topo quase branco sobre azul. */
 const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 
+/** Posicoes puras dos dois arcos de stun; mesma entidade/tick, mesma leitura em todo cliente. */
+export const stunIndicatorOffsets = (entityId: number, tick: number): readonly [number, number][] => {
+  const phase = ((tick + entityId * 3) % 8) * (Math.PI / 4);
+  return [
+    [Math.cos(phase), Math.sin(phase) * 0.45],
+    [Math.cos(phase + Math.PI), Math.sin(phase + Math.PI) * 0.45],
+  ];
+};
+
+const drawStunIndicator = (
+  ctx: CanvasRenderingContext2D, sx: number, sy: number, size: number, z: number, entityId: number, tick: number
+): void => {
+  const lift = size * 2.25 + 6 * z;
+  for (const [ox, oy] of stunIndicatorOffsets(entityId, tick)) {
+    drawVoxel(ctx, sx + ox * size * 0.75, sy - lift + oy * size, Math.max(2, 2.6 * z), CHARGE_RAMP);
+  }
+};
+
 
 const drawModuleGlyph = (
   ctx: CanvasRenderingContext2D,
@@ -893,6 +911,9 @@ export class SurvivalRenderer {
               nowMs,
             });
           }
+          if (enemy.stunnedUntil > state.tick) {
+            drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
+          }
           if (enemy.elite && drew) {
             ctx.strokeStyle = PAL.fire;
             ctx.lineWidth = z;
@@ -949,6 +970,9 @@ export class SurvivalRenderer {
                 allyTint: !isLocal,
               });
             }
+          }
+          if (pl.stunnedUntil > state.tick) {
+            drawStunIndicator(ctx, psx, psy, size, z, pl.id, state.tick);
           }
           drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
 

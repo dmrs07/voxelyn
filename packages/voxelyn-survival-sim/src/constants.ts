@@ -71,6 +71,8 @@ export const FIRE_SPREAD_BIOFLUID = 0.85;
 export const BIOFLUID_SLOW = 0.55;
 export const DISCHARGE_DAMAGE = 26;
 export const DISCHARGE_TICKS = 6;
+/** Controle direto do Conductive em alvos organicos: 1,2 s a 20 Hz. */
+export const CONDUCTIVE_STUN_TICKS = Math.round(1.2 * TICK_HZ);
 
 // Propagacao por material solido. Orcamentos separados do biofluido porque um
 // veio de minerio atravessa a sala inteira e nao pode custar um tick.
@@ -138,6 +140,10 @@ export const BRUISER_HURL_SPEED = 9;
  */
 export const BRUISER_HURL_FLIGHT_TILES = 20;
 export const BRUISER_HURL_DAMAGE = 22;
+/** Corpo fisico do bloco arremessado, maior que cuspe/bolt. */
+export const BRUISER_ROCK_RADIUS = 0.46;
+/** A pancada interrompe o Prospector por 1,2 s. */
+export const BRUISER_ROCK_STUN_TICKS = Math.round(1.2 * TICK_HZ);
 /** Vida do bruiser: ver ARCHETYPES. 95 dava 1,7 s de vida — um arremesso so. */
 /** Raio de busca, em celulas, do bloco que ele arranca para usar como municao. */
 export const BRUISER_HURL_REACH = 3;

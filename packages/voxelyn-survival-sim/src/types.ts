@@ -129,6 +129,8 @@ export type Projectile = {
   vx: number;
   vy: number;
   damage: number;
+  /** Raio de colisao autoritativo; projeteis pequenos usam o fallback historico. */
+  radius?: number;
   modules?: ProjectileModules;
   distanceTravelled: number;
   disc?: DiscState;

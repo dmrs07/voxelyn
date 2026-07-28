@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, findRippable, spawnEnemy } from '../src/entities';
+import { damageEntity, findRippable, interceptDirection, spawnEnemy } from '../src/entities';
 import { canRip, ripSolid } from '../src/cells';
 import {
   BRUISER_HURL_WINDUP_TICKS,
+  BRUISER_ROCK_RADIUS,
+  BRUISER_ROCK_STUN_TICKS,
   SOLID_CRYSTAL,
   SOLID_NONE,
   SOLID_ORE,
@@ -101,6 +103,41 @@ describe('bruiser arremessa bloco', () => {
     // campo dizendo o que ele E, pedra e cuspe sao os dois apenas `hostile` e o
     // cliente desenhava o bloco arrancado da parede como cusparada de acido.
     expect(thrown.every((p) => p.kind === 'rock'), 'o bloco nao se identifica como pedra').toBe(true);
+    expect(thrown.every((p) => p.radius === BRUISER_ROCK_RADIUS), 'colisao ainda usa calibre de cuspe').toBe(true);
+  });
+
+  it('recalcula a mira no release e adianta um alvo em movimento', () => {
+    const state = createRun({ seed: 230 });
+    const target = state.player;
+    target.x = 20;
+    target.y = 20;
+    target.vx = 0;
+    target.vy = 4.6;
+    const direction = interceptDirection(26, 20, target, 9, 20 / 9);
+    expect(direction.x).toBeLessThan(0);
+    expect(direction.y, 'mirou na posicao antiga, sem antecipar o strafe').toBeGreaterThan(0.25);
+  });
+
+  it('a pedra quebra no impacto e atordoa o Prospector por 1,2 s', () => {
+    const state = createRun({ seed: 231 });
+    clearArena(state, 6);
+    state.enemies.forEach((enemy) => { enemy.alive = false; });
+    const owner = spawnEnemy(state, 'bruiser', Math.floor(state.player.x) + 3, Math.floor(state.player.y), false);
+    state.projectiles = [{
+      kind: 'rock', id: state.nextEntityId++, owner: owner.id,
+      x: state.player.x + state.player.radius + BRUISER_ROCK_RADIUS - 0.02, y: state.player.y,
+      vx: 0, vy: 0, damage: 1, radius: BRUISER_ROCK_RADIUS, distanceTravelled: 0,
+      hostile: true, leavesBiofluid: false, ttl: 10,
+    }];
+    stepRun(state, [emptyCommand()]);
+    expect(state.projectiles).toHaveLength(0);
+    expect(state.player.stunnedUntil - state.tick).toBe(BRUISER_ROCK_STUN_TICKS);
+
+    const beforeX = state.player.x;
+    const move = emptyCommand();
+    move.move = { x: 1, y: 0 };
+    stepRun(state, [move]);
+    expect(state.player.x, 'jogador se moveu enquanto atordoado').toBe(beforeX);
   });
 
   // Sem parede ao alcance ele nao tem o que jogar. Isso e proposital: em sala

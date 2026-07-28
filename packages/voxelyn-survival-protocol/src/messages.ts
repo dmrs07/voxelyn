@@ -92,6 +92,8 @@ export type EntitySnapshot = {
   downed?: boolean; // players abatidos
   facingX?: number;
   facingY?: number;
+  /** Tick autoritativo ate o qual a entidade permanece atordoada. */
+  stunnedUntil?: number;
   action?: EntityActionSnapshot;
 };
 

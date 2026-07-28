@@ -23,6 +23,12 @@ describe('voxel character manifests', () => {
       }
     }
   });
+  it('inclui o telegraph especial do Bruiser com espaco vertical para a pedra', () => {
+    const manifest = bruiser as unknown as SpriteManifestEntry;
+    expect(manifest.animations.special).toMatchObject({ frames: 8, loop: false });
+    expect(manifest.frameHeight).toBeGreaterThan(56);
+  });
+
   it('maps cardinal vectors to four distinct isometric facings', () => {
     expect(new Set([[1, 0], [0, 1], [-1, 0], [0, -1]].map(([x, y]) => dirFromFacing(x, y))).size).toBe(4);
   });

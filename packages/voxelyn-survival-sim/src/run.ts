@@ -7,6 +7,8 @@ import {
   BOLT_COOLDOWN_TICKS,
   BOLT_DAMAGE,
   BOLT_SPEED,
+  BRUISER_ROCK_STUN_TICKS,
+  CONDUCTIVE_STUN_TICKS,
   PURGE_CELL_HEAL,
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
@@ -56,7 +58,9 @@ import {
   applyExplosionDamage,
   damageEntity,
   moveEntity,
+  isStoneEnemy,
   spawnEnemy,
+  stunEntity,
   surfaceSpeedMul,
   updateEnemies,
 } from './entities.js';
@@ -288,6 +292,9 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
           ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE
           : 1;
         damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events);
+        if (ev.source === 'player' && ent.kind === 'enemy' && !isStoneEnemy(ent)) {
+          stunEntity(state, ent, CONDUCTIVE_STUN_TICKS);
+        }
       }
     } else if (ev.t === 'explosion') {
       applyExplosionDamage(
@@ -310,6 +317,16 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
   // slots nao reivindicados, abatidos e mortos nao agem
   if (!extra.joined || !player.alive || extra.downed) return;
+
+  // Pedra do Bruiser interrompe movimento e todas as acoes. Timers do mundo e
+  // dos modulos continuam correndo; o stun nao pausa a simulacao.
+  if (player.stunnedUntil > state.tick) {
+    player.vx = 0;
+    player.vy = 0;
+    extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
+    extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK);
+    return;
+  }
 
   // Escolha privada do slot: idempotente e nao pausa movimento/simulacao.
   if (cmd.choose !== null && extra.pendingModuleChoice) {
@@ -349,7 +366,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     events.push({ t: 'dodge', x: player.x, y: player.y });
   }
 
-  // movimento
+  // movimento. `vx/vy` guarda deslocamento REAL para a mira preditiva do
+  // Bruiser, em vez de assumir que o comando atravessou uma parede.
+  const beforeMoveX = player.x;
+  const beforeMoveY = player.y;
   if (state.tick < extra.dodgeUntil) {
     moveEntity(state, player, extra.dodgeDir.x * DODGE_SPEED * dt, extra.dodgeDir.y * DODGE_SPEED * dt);
   } else {
@@ -362,6 +382,8 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       moveEntity(state, player, nx * speed * dt, ny * speed * dt);
     }
   }
+  player.vx = (player.x - beforeMoveX) / dt;
+  player.vy = (player.y - beforeMoveY) / dt;
 
   // extracao so libera depois de deixar a zona de entrada uma vez
   if (!state.leftEntryZone) {
@@ -754,8 +776,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         for (const player of state.players) {
           const extra = state.playerExtras[player.slot ?? 0];
           if (!extra.joined || !player.alive || extra.downed) continue;
-          if (Math.hypot(player.x - proj.x, player.y - proj.y) < player.radius + 0.2) {
+          const projectileRadius = proj.radius ?? 0.2;
+          if (Math.hypot(player.x - proj.x, player.y - proj.y) < player.radius + projectileRadius) {
+            const vulnerable = extra.iframesUntil <= state.tick;
             damageEntity(state, player, proj.damage, events);
+            if (proj.kind === 'rock' && vulnerable) {
+              stunEntity(state, player, BRUISER_ROCK_STUN_TICKS);
+            }
             if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
               setSurface(state, i, SURF_BIOFLUID, 0);
             }
@@ -771,18 +798,33 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             ? (proj.disc.phase === 'outbound' ? proj.disc.outboundHits : proj.disc.returnHits)
             : undefined;
           if (discHits?.includes(enemy.id) || proj.hits?.includes(enemy.id)) continue;
-          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + 0.2) continue;
+          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2)) continue;
 
           let damage = proj.damage;
           const enemyCell = cellIndexAt(state, enemy.x, enemy.y);
-          if (
+          let conductiveTriggered = false;
+          const conductiveAvailable = Boolean(
             proj.modules?.conductive && ownerExtra && ownerSlot !== undefined &&
+            moduleHasCapacity(ownerExtra, 'conductive', state.tick)
+          );
+          if (
+            conductiveAvailable && ownerExtra && ownerSlot !== undefined &&
             state.surface[enemyCell] === SURF_BIOFLUID &&
-            moduleHasCapacity(ownerExtra, 'conductive', state.tick) &&
             consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
           ) {
+            conductiveTriggered = true;
             damage *= 1.6;
             dischargeAt(state, Math.floor(enemy.x), Math.floor(enemy.y), events, origin);
+          }
+          if (
+            conductiveAvailable && !conductiveTriggered && !isStoneEnemy(enemy) &&
+            ownerExtra && ownerSlot !== undefined &&
+            consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
+          ) {
+            conductiveTriggered = true;
+          }
+          if (conductiveTriggered && !isStoneEnemy(enemy)) {
+            stunEntity(state, enemy, CONDUCTIVE_STUN_TICKS);
           }
           damageEntity(state, enemy, damage, events);
 
@@ -1032,6 +1074,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(p.x * 1000));
     mix(Math.round(p.y * 1000));
     mix(Math.round(p.hp * 100));
+    mix(p.stunnedUntil);
     mix(p.alive ? 1 : 0);
     mix(e.downed ? 1 : 0);
     mix(Math.round(e.heat * 100));
@@ -1079,6 +1122,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(enemy.x * 1000));
     mix(Math.round(enemy.y * 1000));
     mix(Math.round(enemy.hp * 100));
+    mix(enemy.stunnedUntil);
     mix(enemy.alive ? 1 : 0);
     if (enemy.action) {
       mixString(enemy.action.kind);

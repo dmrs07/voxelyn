@@ -12,6 +12,7 @@ import {
   BRUISER_HURL_REACH,
   BRUISER_HURL_SPEED,
   BRUISER_HURL_WINDUP_TICKS,
+  BRUISER_ROCK_RADIUS,
   GUARDIAN_ARENA_EXITS,
   GUARDIAN_ARENA_RADIUS,
   GUARDIAN_PATH_INTERVAL_TICKS,
@@ -206,6 +207,59 @@ const normalized = (x: number, y: number): Vec2 => {
   return { x: x / len, y: y / len };
 };
 
+/** Bruiser e Guardian sao corpos minerais; eletricidade causa dano, nao paralisia. */
+export const isStoneEnemy = (enemy: Entity): boolean =>
+  enemy.archetype === 'bruiser' || enemy.archetype === 'guardian';
+
+/** Aplica controle autoritativo e interrompe a acao corrente do alvo. */
+export const stunEntity = (state: SurvivalState, entity: Entity, durationTicks: number): void => {
+  entity.stunnedUntil = Math.max(entity.stunnedUntil, state.tick + durationTicks);
+  entity.vx = 0;
+  entity.vy = 0;
+  if (entity.kind === 'enemy') {
+    entity.action = undefined;
+  } else {
+    const extra = state.playerExtras[entity.slot ?? 0];
+    extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
+  }
+};
+
+/**
+ * Mira de interceptacao sem homing: resolve uma unica vez no release e depois a
+ * pedra segue reta. Usa a velocidade REAL observada do alvo, limitada pelo tempo
+ * maximo de voo, para continuar desviavel lateralmente.
+ */
+export const interceptDirection = (
+  sourceX: number,
+  sourceY: number,
+  target: Entity,
+  projectileSpeed: number,
+  maxLeadSeconds: number
+): Vec2 => {
+  const rx = target.x - sourceX;
+  const ry = target.y - sourceY;
+  const vx = target.vx;
+  const vy = target.vy;
+  const a = vx * vx + vy * vy - projectileSpeed * projectileSpeed;
+  const b = 2 * (rx * vx + ry * vy);
+  const c = rx * rx + ry * ry;
+  let time = 0;
+  if (Math.abs(a) < 1e-6) {
+    if (Math.abs(b) > 1e-6) time = -c / b;
+  } else {
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant >= 0) {
+      const root = Math.sqrt(discriminant);
+      const t1 = (-b - root) / (2 * a);
+      const t2 = (-b + root) / (2 * a);
+      const candidates = [t1, t2].filter((t) => t > 0);
+      if (candidates.length > 0) time = Math.min(...candidates);
+    }
+  }
+  const lead = Math.max(0, Math.min(maxLeadSeconds, time));
+  return normalized(rx + vx * lead, ry + vy * lead);
+};
+
 const nearestTarget = (state: SurvivalState, x: number, y: number): Entity | null => {
   let best: Entity | null = null;
   let bestD = Infinity;
@@ -291,6 +345,16 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1), events);
     }
   } else if (action.kind === 'hurl') {
+    if (target) {
+      action.direction = interceptDirection(
+        enemy.x,
+        enemy.y,
+        target,
+        BRUISER_HURL_SPEED,
+        BRUISER_HURL_FLIGHT_TILES / BRUISER_HURL_SPEED
+      );
+      enemy.facing = { ...action.direction };
+    }
     state.projectiles.push({
       kind: 'rock',
       id: state.nextEntityId++,
@@ -300,6 +364,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       vx: action.direction.x * BRUISER_HURL_SPEED,
       vy: action.direction.y * BRUISER_HURL_SPEED,
       damage: BRUISER_HURL_DAMAGE,
+      radius: BRUISER_ROCK_RADIUS,
       distanceTravelled: 0,
       hostile: true,
       // Pedra nao deixa poca: quem suja o chao e o cuspidor, e as duas ameacas
