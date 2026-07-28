@@ -1,0 +1,182 @@
+name: Polish Networked Stun Feedback
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bruiser-stun-feedback
+  cancel-in-progress: true
+
+jobs:
+  apply-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/bruiser-gorilla-conductive-stun
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply stun synchronization and presentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'Expected fragment not found in {path}: {old[:180]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          version = 'packages/voxelyn-survival-protocol/src/version.ts'
+          replace_once(version, 'export const PROTOCOL_VERSION = 6;', 'export const PROTOCOL_VERSION = 7;')
+
+          messages = 'packages/voxelyn-survival-protocol/src/messages.ts'
+          replace_once(
+              messages,
+              "  facingY?: number;\n  action?: EntityActionSnapshot;",
+              "  facingY?: number;\n  /** Tick autoritativo ate o qual a entidade permanece atordoada. */\n  stunnedUntil?: number;\n  action?: EntityActionSnapshot;"
+          )
+
+          room = 'packages/voxelyn-survival-server/src/room.ts'
+          replace_once(
+              room,
+              "        facingY: round3(this.state.playerExtras[i].aim.y),\n        action: p.action ? {",
+              "        facingY: round3(this.state.playerExtras[i].aim.y),\n        stunnedUntil: p.stunnedUntil,\n        action: p.action ? {"
+          )
+          replace_once(
+              room,
+              "        facingY: round3(e.facing.y),\n        action: e.action ? {",
+              "        facingY: round3(e.facing.y),\n        stunnedUntil: e.stunnedUntil,\n        action: e.action ? {"
+          )
+
+          net = 'packages/voxelyn-survival/src/client/net.ts'
+          replace_once(
+              net,
+              "          pl.facing.y = snap.facingY ?? pl.facing.y;\n          state.playerExtras[slot].downed = snap.downed ?? false;",
+              "          pl.facing.y = snap.facingY ?? pl.facing.y;\n          pl.stunnedUntil = snap.stunnedUntil ?? 0;\n          state.playerExtras[slot].downed = snap.downed ?? false;"
+          )
+          replace_once(
+              net,
+              "          stunnedUntil: 0,\n          facing: { x: snap.facingX ?? 1, y: snap.facingY ?? 0 },",
+              "          stunnedUntil: snap.stunnedUntil ?? 0,\n          facing: { x: snap.facingX ?? 1, y: snap.facingY ?? 0 },"
+          )
+
+          render = 'packages/voxelyn-survival/src/client/render.ts'
+          replace_once(
+              render,
+              "const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];\n\n",
+              "const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];\n\n"
+              "/** Posicoes puras dos dois arcos de stun; mesma entidade/tick, mesma leitura em todo cliente. */\n"
+              "export const stunIndicatorOffsets = (entityId: number, tick: number): readonly [number, number][] => {\n"
+              "  const phase = ((tick + entityId * 3) % 8) * (Math.PI / 4);\n"
+              "  return [\n"
+              "    [Math.cos(phase), Math.sin(phase) * 0.45],\n"
+              "    [Math.cos(phase + Math.PI), Math.sin(phase + Math.PI) * 0.45],\n"
+              "  ];\n"
+              "};\n\n"
+              "const drawStunIndicator = (\n"
+              "  ctx: CanvasRenderingContext2D, sx: number, sy: number, size: number, z: number, entityId: number, tick: number\n"
+              "): void => {\n"
+              "  const lift = size * 2.25 + 6 * z;\n"
+              "  for (const [ox, oy] of stunIndicatorOffsets(entityId, tick)) {\n"
+              "    drawVoxel(ctx, sx + ox * size * 0.75, sy - lift + oy * size, Math.max(2, 2.6 * z), CHARGE_RAMP);\n"
+              "  }\n"
+              "};\n\n"
+          )
+          replace_once(
+              render,
+              "          if (enemy.elite && drew) {\n            ctx.strokeStyle = PAL.fire;",
+              "          if (enemy.stunnedUntil > state.tick) {\n            drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);\n          }\n          if (enemy.elite && drew) {\n            ctx.strokeStyle = PAL.fire;"
+          )
+          replace_once(
+              render,
+              "          drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);\n\n          // marcador de abatido",
+              "          if (pl.stunnedUntil > state.tick) {\n            drawStunIndicator(ctx, psx, psy, size, z, pl.id, state.tick);\n          }\n          drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);\n\n          // marcador de abatido"
+          )
+
+          net_test = 'packages/voxelyn-survival/src/tests/net.test.ts'
+          replace_once(
+              net_test,
+              "  it('reconnect por resume token restaura o cliente ao mesmo slot', () => {",
+              "  it('espelha o stun autoritativo de players e inimigos no cliente online', () => {\n"
+              "    const loop = new Loop();\n"
+              "    const a = loop.connect('A');\n"
+              "    a.connect();\n"
+              "    loop.advance(3);\n"
+              "    const room = loop.server.roomForClient('A')!;\n"
+              "    const enemy = room.state.enemies.find((candidate) => candidate.alive)!;\n"
+              "    room.state.players[0].stunnedUntil = room.state.tick + 24;\n"
+              "    enemy.stunnedUntil = room.state.tick + 18;\n"
+              "    loop.advance(1);\n"
+              "    const view = a.sampleRenderState(loop['now'] as number)!;\n"
+              "    expect(view.players[0].stunnedUntil).toBe(room.state.players[0].stunnedUntil);\n"
+              "    expect(view.enemies.find((candidate) => candidate.id === enemy.id)?.stunnedUntil).toBe(enemy.stunnedUntil);\n"
+              "  });\n\n"
+              "  it('reconnect por resume token restaura o cliente ao mesmo slot', () => {"
+          )
+
+          presentation_test = Path('packages/voxelyn-survival/src/tests/stun-presentation.test.ts')
+          presentation_test.write_text("""import { describe, expect, it } from 'vitest';
+          import { stunIndicatorOffsets } from '../client/render';
+
+          describe('indicador visual de stun', () => {
+            it('e deterministico por entidade e tick', () => {
+              expect(stunIndicatorOffsets(7, 42)).toEqual(stunIndicatorOffsets(7, 42));
+              expect(stunIndicatorOffsets(7, 42)).not.toEqual(stunIndicatorOffsets(7, 43));
+            });
+
+            it('mantem dois arcos em lados opostos', () => {
+              const [a, b] = stunIndicatorOffsets(3, 11);
+              expect(a[0] + b[0]).toBeCloseTo(0);
+              expect(a[1] + b[1]).toBeCloseTo(0);
+            });
+          });
+          """.replace('          ', ''))
+          PY
+          git add packages/voxelyn-survival-protocol \
+                  packages/voxelyn-survival-server/src/room.ts \
+                  packages/voxelyn-survival/src
+          git diff --cached --check
+
+      - name: Build and test integrated stun feedback
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build
+          pnpm --filter @voxelyn/survival-sim build
+          pnpm --filter @voxelyn/survival-protocol build
+          pnpm --filter @voxelyn/survival-server build
+          pnpm --filter @voxelyn/survival test
+          pnpm --filter @voxelyn/survival-protocol test
+          pnpm --filter @voxelyn/survival-server test
+          pnpm --filter @voxelyn/survival build:offline-check
+
+      - name: Commit source and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(survival): synchronize and visualize stun state'
+          git rm .github/workflows/polish-stun-feedback.yml
+          git commit -m 'chore: remove temporary stun validation workflow'
+          git push origin HEAD:feat/bruiser-gorilla-conductive-stun
