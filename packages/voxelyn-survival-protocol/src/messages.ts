@@ -197,7 +197,12 @@ export type ServerFullResync = {
   chunkDiffs: ChunkDiff[];
   entities: EntitySnapshot[];
   projectiles: ProjectileSnapshot[];
-  you: ViewerState;
+  /**
+   * Estado privado de QUEM pediu o resync — nulo quando o pedido nao veio de um
+   * slot. Nao ha default seguro aqui: cair no slot 0 entregava a um cliente o
+   * calor, as Celulas de Purga, os modulos e a escolha pendente do parceiro.
+   */
+  you: ViewerState | null;
   // sempre presente: e a base que reconecta/late-join sincroniza de uma vez
   world: WorldFlags;
   authHash: string;

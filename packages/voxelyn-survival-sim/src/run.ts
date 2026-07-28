@@ -78,6 +78,7 @@ import type {
   EnemyArchetype,
   PlayerCommand,
   PlayerExtra,
+  Projectile,
   RunConfig,
   SemanticEvent,
   StepResult,
@@ -623,6 +624,33 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   }
 };
 
+/**
+ * Reflete o projetil na face por onde ele ENTROU na celula solida e devolve-o a
+ * posicao anterior. Falso quando nao ha rebote disponivel.
+ *
+ * Quem chama isto tem de chamar DEPOIS de `impactSolid`. Testar o rebote antes
+ * fazia do Ricochet um desligador silencioso da escavacao: a primeira parede de
+ * cada tiro saia intacta, porque o projetil ja tinha voltado antes de o
+ * material poder reagir. Destruir terreno e mecanica central, e um modulo de
+ * tier 1 anunciado como "seguro" nao pode desligar isso sem avisar.
+ */
+const bounceOffSolid = (proj: Projectile, prevX: number, prevY: number, cx: number, cy: number): boolean => {
+  const ricochet = proj.modules?.ricochet;
+  if (!ricochet || ricochet.remainingBounces <= 0) return false;
+  const enteredX = Math.floor(prevX) !== cx;
+  const enteredY = Math.floor(prevY) !== cy;
+  if (enteredX) proj.vx *= -1;
+  if (enteredY) proj.vy *= -1;
+  if (!enteredX && !enteredY) {
+    if (Math.abs(proj.vx) >= Math.abs(proj.vy)) proj.vx *= -1;
+    else proj.vy *= -1;
+  }
+  proj.x = prevX;
+  proj.y = prevY;
+  ricochet.remainingBounces--;
+  return true;
+};
+
 const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   const w = state.config.width;
@@ -707,21 +735,6 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           break;
         }
 
-        if (proj.modules?.ricochet && proj.modules.ricochet.remainingBounces > 0) {
-          const enteredX = Math.floor(prevX) !== cx;
-          const enteredY = Math.floor(prevY) !== cy;
-          if (enteredX) proj.vx *= -1;
-          if (enteredY) proj.vy *= -1;
-          if (!enteredX && !enteredY) {
-            if (Math.abs(proj.vx) >= Math.abs(proj.vy)) proj.vx *= -1;
-            else proj.vy *= -1;
-          }
-          proj.x = prevX;
-          proj.y = prevY;
-          proj.modules.ricochet.remainingBounces--;
-          break;
-        }
-
         if (explosiveArmed && !proj.hostile) {
           explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
           dead = true;
@@ -736,7 +749,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         ) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
         }
-        if (stop && !(broke && proj.modules?.piercing)) dead = true;
+        if (stop && !(broke && proj.modules?.piercing)) {
+          // O rebote so acontece no que NAO cedeu. Se a parede quebrou, refletir
+          // seria refletir num buraco recem-aberto — e o tiro ja fez o que tinha
+          // a fazer ali.
+          if (!broke && bounceOffSolid(proj, prevX, prevY, cx, cy)) break;
+          dead = true;
+        }
         break;
       }
 

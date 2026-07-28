@@ -424,13 +424,20 @@ export class GameRoom {
     return snap;
   }
 
-  /** Reenvio completo do mundo para um cliente (join/reconnect/divergencia). */
-  buildFullResync(slot?: Slot): ServerFullResync {
+  /**
+   * Reenvio completo do mundo para um cliente (join/reconnect/divergencia).
+   *
+   * `slot` identifica o DESTINATARIO e decide de quem e o `you`; quem quiser
+   * tambem dar as WorldFlags por entregues pede isso separadamente. Os dois
+   * eram o mesmo parametro, e como o caminho normal de resync omitia o slot de
+   * proposito (para nao dar as flags por entregues se a mensagem se perdesse),
+   * todo cliente recebia o estado privado do slot 0.
+   */
+  buildFullResync(slot: Slot | null, markWorldFlagsSent = false): ServerFullResync {
     const throwaway = new ChunkTracker(this.width, this.height);
     const chunkDiffs = throwaway.fullSnapshot(this.state);
     const world = this.worldFlags();
-    // o resync ja carrega as flags: evita reenvia-las no snapshot seguinte
-    if (slot) slot.lastWorldSig = GameRoom.worldSig(world);
+    if (slot && markWorldFlagsSent) slot.lastWorldSig = GameRoom.worldSig(world);
     return {
       t: 'full_resync',
       serverTick: this.state.tick,
@@ -438,7 +445,7 @@ export class GameRoom {
       chunkDiffs,
       entities: this.entitySnapshots(),
       projectiles: this.projectileSnapshots(),
-      you: this.viewerState(slot?.slot ?? 0),
+      you: slot ? this.viewerState(slot.slot) : null,
       world,
       authHash: hashAuthoritativeState(this.state),
     };

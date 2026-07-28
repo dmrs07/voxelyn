@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RETURN_DISC_MAX_DISTANCE, RETURN_DISC_SPEED, SOLID_NONE, SOLID_ROCK, SURF_NONE } from '../src/constants';
+import { RETURN_DISC_MAX_DISTANCE, RETURN_DISC_SPEED, SOLID_FRAGILE, SOLID_NONE, SOLID_ROCK, SURF_NONE } from '../src/constants';
 import { spawnEnemy } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import type { Projectile, SurvivalState } from '../src/types';
@@ -53,6 +53,48 @@ describe('Ricochet Lens', () => {
 
     for (let i = 0; i < 20 && state.projectiles.length > 0; i++) stepRun(state, [emptyCommand()]);
     expect(state.projectiles).toHaveLength(0);
+  });
+
+  // Regressao: o rebote era testado ANTES de `impactSolid`, entao a primeira
+  // parede de cada tiro nunca chegava a reagir. Um modulo tier 1 anunciado como
+  // seguro desligava a escavacao por 10 disparos, sem dizer.
+  it('a parede fragil ainda cede ao tiro que vai ricochetear', () => {
+    const wallSolidAfterShot = (modules: Projectile['modules']): number => {
+      const state = createRun({ seed: 307 });
+      clearArena(state);
+      const wall = 40 * state.config.width + 44;
+      state.solid[wall] = SOLID_FRAGILE;
+      state.projectiles = [projectile(state, { x: 40.2, modules })];
+      for (let i = 0; i < 8; i++) stepRun(state, [emptyCommand()]);
+      return state.solid[wall];
+    };
+
+    expect(wallSolidAfterShot(undefined)).toBe(SOLID_NONE);
+    expect(wallSolidAfterShot({ ricochet: { remainingBounces: 1 } })).toBe(SOLID_NONE);
+  });
+
+  it('nao gasta o rebote no que cedeu: a carga sobra para a proxima parede firme', () => {
+    const state = createRun({ seed: 311 });
+    clearArena(state);
+    const fragile = 40 * state.config.width + 44;
+    const rock = 40 * state.config.width + 47;
+    state.solid[fragile] = SOLID_FRAGILE;
+    state.solid[rock] = SOLID_ROCK;
+    // piercing para o tiro sobreviver a fragil e chegar na rocha no mesmo voo
+    state.projectiles = [projectile(state, {
+      x: 40.2,
+      modules: { piercing: true, ricochet: { remainingBounces: 1 } },
+    })];
+
+    // 14 ticks: tempo de quebrar a fragil (~t6), rebater na rocha (~t11) e
+    // ainda estar voltando, sem chegar na borda limpa da arena.
+    for (let i = 0; i < 14 && state.projectiles.length > 0; i++) stepRun(state, [emptyCommand()]);
+    expect(state.solid[fragile]).toBe(SOLID_NONE); // a fragil cedeu
+    expect(state.solid[rock]).toBe(SOLID_ROCK); // a rocha aguentou
+    // o rebote nao foi consumido na fragil: sobrou para a rocha, e o tiro voltou
+    expect(state.projectiles).toHaveLength(1);
+    expect(state.projectiles[0].modules?.ricochet?.remainingBounces).toBe(0);
+    expect(state.projectiles[0].vx).toBeLessThan(0);
   });
 });
 

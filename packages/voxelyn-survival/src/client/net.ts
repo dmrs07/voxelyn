@@ -172,7 +172,9 @@ export class NetClient {
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
         this.divergedAt = 0; // mundo reconstruido: zera o anti-repeticao
         this.applyWorld(msg.world);
-        this.viewer = msg.you;
+        // Nulo quando o servidor nao soube a quem o resync pertencia: e melhor
+        // manter o ultimo ViewerState conhecido do que adotar o de outro slot.
+        if (msg.you) this.viewer = msg.you;
         this.ingestFrame(msg.entities, msg.projectiles, msg.serverTick, nowMs);
         break;
       }

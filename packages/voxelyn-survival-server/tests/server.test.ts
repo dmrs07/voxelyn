@@ -177,6 +177,69 @@ describe('servidor autoritativo de co-op', () => {
     }
   });
 
+  // Regressao: `you` caia no slot 0 quando o resync nao recebia o slot — e o
+  // caminho normal de resync omitia o slot DE PROPOSITO, para nao dar as
+  // WorldFlags por entregues. Todo cliente recebia o calor, as Celulas de
+  // Purga, os modulos e a escolha pendente do parceiro.
+  it('full_resync entrega o ViewerState de quem pediu, nunca o do slot 0', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    h.tick(5);
+    h.drain('A');
+
+    const room = h.server.roomForClient('A')!;
+    room.state.playerExtras[0].purgeCells = 9;
+    room.state.playerExtras[0].pendingModuleChoice = {
+      sourceSiteId: 2,
+      options: ['explosive', 'siphon'],
+      createdAtTick: room.state.tick,
+    };
+
+    h.connect('B');
+    h.hello('B');
+    const full = h.drain('B').find((m) => m.t === 'full_resync');
+    expect(full?.t).toBe('full_resync');
+    if (full?.t !== 'full_resync') return;
+    expect(full.you?.slot).toBe(1);
+    expect(full.you?.purgeCells).toBe(1); // o seu, nao os 9 do parceiro
+    expect(full.you?.pendingModuleChoice).toBeNull();
+  });
+
+  // O slot agora viaja para o buildFullResync (e quem define o `you`), mas ele
+  // NAO pode dar as WorldFlags por entregues: se este resync se perder, o
+  // cliente ficaria sem elas para sempre.
+  it('resync nao marca as WorldFlags como entregues: o snapshot seguinte reenvia', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    h.tick(25); // passa o cooldown de resync, e o mundo inicial ja foi entregue
+    h.drain('A');
+
+    const room = h.server.roomForClient('A')!;
+    room.state.coreTaken = true;
+    h.send('A', { t: 'resync', reason: 'divergencia' });
+    h.tick(1);
+    const msgs = h.drain('A');
+    const full = msgs.find((m) => m.t === 'full_resync');
+    expect(full?.t).toBe('full_resync');
+    if (full?.t === 'full_resync') expect(full.world.coreTaken).toBe(true);
+    // mesmo assim o snapshot logo depois repete as flags
+    expect(msgs.some((m) => m.t === 'snapshot' && m.world?.coreTaken === true)).toBe(true);
+  });
+
+  it('pedido de resync de um socket sem slot nao gera um mundo inteiro', () => {
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    h.tick(2);
+    h.drain('A');
+    const room = h.server.roomForClient('A')!;
+    for (const slot of room.slots) slot.clientId = null; // socket perdeu o slot
+    h.send('A', { t: 'resync', reason: 'sem slot' });
+    expect(h.drain('A').filter((m) => m.t === 'full_resync')).toHaveLength(0);
+  });
+
   it('dois clientes completam a run: extracao coletiva via intents validados', () => {
     const h = new Harness();
     h.connect('A');
