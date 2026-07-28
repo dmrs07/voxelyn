@@ -1,4 +1,4 @@
-name: Validate Bruiser Combat Slice
+name: Diagnose Bruiser Patch Transport
 
 on:
   pull_request:
@@ -6,77 +6,60 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: bruiser-gorilla-conductive-stun
   cancel-in-progress: true
 
 jobs:
-  validate-publish:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feat/bruiser-gorilla-conductive-stun
           fetch-depth: 0
+          show-progress: false
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile
-
-      - name: Apply guarded implementation patch
+      - name: Reconstruct and diagnose patch
+        id: diagnose
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          part0=$(wc -c < .github/patches/bruiser.patch.b64.part00)
+          part1=$(wc -c < .github/patches/bruiser.patch.b64.part01)
           cat .github/patches/bruiser.patch.b64.part00 \
               .github/patches/bruiser.patch.b64.part01 \
             | base64 --decode > /tmp/bruiser.patch
-          echo '4ff4606b03b654e22550b3ef842007b5f6c5f96e04e63f3829d061b47b41ac36  /tmp/bruiser.patch' \
-            | sha256sum --check
-          git apply --index /tmp/bruiser.patch
-          git diff --cached --check
-
-      - name: Build packages and regenerate atlas
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-sim build 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-protocol build 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-content validate 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-content build 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-server build 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/bruiser-validation.log
-
-      - name: Run complete Survival test suites
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm --filter @voxelyn/survival-sim test 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-protocol test 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-content test 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival-server test 2>&1 | tee -a /tmp/bruiser-validation.log
-          pnpm --filter @voxelyn/survival test 2>&1 | tee -a /tmp/bruiser-validation.log
-
-      - name: Publish validated implementation and clean transport
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add packages/voxelyn-survival-sim \
-                  packages/voxelyn-survival-protocol \
-                  packages/voxelyn-survival-content \
-                  packages/voxelyn-survival
-          git commit -m 'feat(survival): add predictive gorilla Bruiser hurl'
-          git rm .github/patches/bruiser.patch.b64.part00 \
-                 .github/patches/bruiser.patch.b64.part01 \
-                 .github/workflows/export-bruiser-worktree.yml
-          git commit -m 'chore: remove temporary Bruiser validation transport'
-          git push origin HEAD:feat/bruiser-gorilla-conductive-stun
+          decode_status=$?
+          decoded=$(wc -c < /tmp/bruiser.patch)
+          sha=$(sha256sum /tmp/bruiser.patch | cut -d' ' -f1)
+          apply_output=$(git apply --check /tmp/bruiser.patch 2>&1)
+          apply_status=$?
+          {
+            echo '## Bruiser patch transport diagnostic'
+            echo
+            echo "- part00 bytes: \`$part0\` (expected \`18000\`)"
+            echo "- part01 bytes: \`$part1\` (expected \`16560\`)"
+            echo "- decoded bytes: \`$decoded\` (expected \`25919\`)"
+            echo "- decoded SHA-256: \`$sha\`"
+            echo "- expected SHA-256: \`4ff4606b03b654e22550b3ef842007b5f6c5f96e04e63f3829d061b47b41ac36\`"
+            echo "- base64 status: \`$decode_status\`"
+            echo "- git apply status: \`$apply_status\`"
+            if [ -n "$apply_output" ]; then
+              echo
+              echo '```text'
+              printf '%s\n' "$apply_output"
+              echo '```'
+            fi
+          } > /tmp/diagnostic.md
+          cat /tmp/diagnostic.md
+          gh pr comment 51 --body-file /tmp/diagnostic.md
+          test "$decode_status" -eq 0
+          test "$sha" = '4ff4606b03b654e22550b3ef842007b5f6c5f96e04e63f3829d061b47b41ac36'
+          test "$apply_status" -eq 0
+        env:
+          GH_TOKEN: ${{ github.token }}
