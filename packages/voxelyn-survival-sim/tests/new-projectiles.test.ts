@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { RETURN_DISC_MAX_DISTANCE, RETURN_DISC_SPEED, SOLID_FRAGILE, SOLID_NONE, SOLID_ROCK, SURF_NONE } from '../src/constants';
+import {
+  EXPLOSIVE_ARM_DISTANCE,
+  RETURN_DISC_MAX_DISTANCE,
+  RETURN_DISC_SPEED,
+  SOLID_FRAGILE,
+  SOLID_NONE,
+  SOLID_ROCK,
+  SURF_GAS,
+  SURF_NONE,
+} from '../src/constants';
 import { spawnEnemy } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { grantOrRechargeModule } from '../src/modules';
@@ -169,6 +178,38 @@ describe('modulos empilham no mesmo tiro', () => {
     const after = state.playerExtra.activeModules.map((m) =>
       m.lifetime.kind === 'charges' ? m.lifetime.remaining : -1);
     expect(after).toEqual(before);
+  });
+
+  // A flag no projetil diz o que ele FOI ARMADO para fazer, nao o que ainda PODE
+  // fazer. Com a capacidade fora de `projectileClass`, um tiro cuja carga acabou
+  // em pleno voo continuava valendo como termico: acendia uma nuvem de enxofre e
+  // produzia uma explosao inteira de graca, porque a ignicao de gas nao passa
+  // pelo ponto que cobra o modulo.
+  it('bolt com a flag de explosive mas sem carga nao reage como termico', () => {
+    const state = createRun({ seed: 330 });
+    clearArena(state);
+    expect(state.playerExtra.activeModules).toHaveLength(0); // a carga acabou
+    const gasCell = 40 * state.config.width + 41;
+    state.surface[gasCell] = SURF_GAS;
+    state.projectiles = [projectile(state, {
+      modules: { explosive: { armAfterDistance: EXPLOSIVE_ARM_DISTANCE } },
+      distanceTravelled: EXPLOSIVE_ARM_DISTANCE + 1,
+    })];
+
+    const result = stepRun(state, [emptyCommand()]);
+    expect(result.events.some((event) => event.t === 'explosion')).toBe(false);
+    expect(state.surface[gasCell]).toBe(SURF_GAS); // a nuvem continua la
+
+    // com o modulo em maos, o MESMO tiro acende: o que muda e a carga, nao a flag
+    const armed = createRun({ seed: 330 });
+    clearArena(armed);
+    grantOrRechargeModule(armed.playerExtra, 'explosive', armed.tick);
+    armed.surface[gasCell] = SURF_GAS;
+    armed.projectiles = [projectile(armed, {
+      modules: { explosive: { armAfterDistance: EXPLOSIVE_ARM_DISTANCE } },
+      distanceTravelled: EXPLOSIVE_ARM_DISTANCE + 1,
+    })];
+    expect(stepRun(armed, [emptyCommand()]).events.some((event) => event.t === 'explosion')).toBe(true);
   });
 
   it('o Return Disc cobra na volta, nao no lancamento', () => {

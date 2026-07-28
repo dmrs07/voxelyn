@@ -53,7 +53,7 @@ import {
   WORLD_W,
 } from './constants.js';
 import { dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
-import { impactSolid, impactSurface, projectileClass } from './materials.js';
+import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
   damageEntity,
@@ -765,19 +765,18 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         break;
       }
       const i = cy * w + cx;
-      // A capacidade entra aqui, e nao so no ponto da explosao, para que
-      // `projectileClass` nao trate como termico um tiro que nao tem mais carga
-      // para detonar — o material reagiria a um fogo que nunca vem.
-      const explosiveArmed = Boolean(
-        proj.modules?.explosive &&
-          proj.distanceTravelled >= proj.modules.explosive.armAfterDistance &&
-          ownerExtra &&
-          moduleHasCapacity(ownerExtra, 'explosive', state.tick)
-      );
+      // Um tiro cuja carga acabou em pleno voo continua com a FLAG, mas nao pode
+      // mais detonar. As duas capacidades tem de chegar em `projectileClass`
+      // junto com a flag, senao o material reage a um fogo que nunca vem — e no
+      // caso do gas sulfurico isso rendia uma explosao inteira de graca, porque
+      // a ignicao nao passa pelo ponto que cobra o modulo.
+      const explosiveArmed =
+        explosiveArmedByDistance(proj) &&
+        Boolean(ownerExtra && moduleHasCapacity(ownerExtra, 'explosive', state.tick));
       const conductiveReady = Boolean(
         proj.modules?.conductive && ownerExtra && moduleHasCapacity(ownerExtra, 'conductive', state.tick)
       );
-      const cls = projectileClass(proj, conductiveReady);
+      const cls = projectileClass(proj, conductiveReady, explosiveArmed);
 
       if (state.solid[i] !== SOLID_NONE) {
         // Explosive vem ANTES do disco: quem equipa os dois troca o retorno por

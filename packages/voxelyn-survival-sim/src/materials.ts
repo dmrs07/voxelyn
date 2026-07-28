@@ -46,6 +46,10 @@ import type { EffectOrigin, Projectile, SemanticEvent, SurvivalState } from './t
 
 export type ProjectileClass = 'kinetic' | 'energy' | 'thermal' | 'bio';
 
+/** O projetil ja andou o bastante para o Explosive armar? */
+export const explosiveArmedByDistance = (p: Projectile): boolean =>
+  Boolean(p.modules?.explosive && p.distanceTravelled >= p.modules.explosive.armAfterDistance);
+
 /**
  * Classe efetiva de um projetil.
  *
@@ -53,10 +57,21 @@ export type ProjectileClass = 'kinetic' | 'energy' | 'thermal' | 'bio';
  * modificador, e sem uma ordem fixa o mesmo tiro reagiria diferente conforme a
  * ordem em que as flags fossem lidas — o que quebraria o determinismo.
  * Termico vence energia, energia vence cinetico.
+ *
+ * As duas flags de habilitacao existem porque a flag no projetil diz o que ele
+ * FOI ARMADO para fazer, e nao o que ele ainda PODE fazer: o dono pode ter
+ * ficado sem carga enquanto o tiro voava. Sem elas, um bolt sem carga continuava
+ * valendo como termico e acendia uma nuvem de enxofre — uma explosao inteira,
+ * de graca e sem debitar nada, porque a ignicao de gas nao passa pelo ponto que
+ * cobra o modulo. Quem chama e obrigado a resolver a capacidade e passar aqui.
  */
-export const projectileClass = (p: Projectile, conductiveEnabled = true): ProjectileClass => {
+export const projectileClass = (
+  p: Projectile,
+  conductiveEnabled = true,
+  explosiveEnabled = true
+): ProjectileClass => {
   if (p.leavesBiofluid) return 'bio';
-  if (p.modules?.explosive && p.distanceTravelled >= p.modules.explosive.armAfterDistance) return 'thermal';
+  if (explosiveEnabled && explosiveArmedByDistance(p)) return 'thermal';
   if (p.modules?.conductive && conductiveEnabled) return 'energy';
   return 'kinetic';
 };
