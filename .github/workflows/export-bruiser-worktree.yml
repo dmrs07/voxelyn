@@ -60,25 +60,25 @@ jobs:
         shell: bash
         run: |
           set +e
+          status=0
+          run_step() {
+            local label="$1"
+            shift
+            echo "### $label"
+            "$@"
+            status=$?
+            return "$status"
+          }
           {
-            echo '### core build'
-            pnpm --filter @voxelyn/core build || exit $?
-            echo '### simulation build'
-            pnpm --filter @voxelyn/survival-sim build || exit $?
-            echo '### protocol build'
-            pnpm --filter @voxelyn/survival-protocol build || exit $?
-            echo '### content generate'
-            pnpm --filter @voxelyn/survival-content generate || exit $?
-            echo '### content validate'
-            pnpm --filter @voxelyn/survival-content validate || exit $?
-            echo '### content build'
-            pnpm --filter @voxelyn/survival-content build || exit $?
-            echo '### server build'
-            pnpm --filter @voxelyn/survival-server build || exit $?
-            echo '### offline build'
-            pnpm --filter @voxelyn/survival build:offline-check || exit $?
+            run_step 'core build' pnpm --filter @voxelyn/core build || true
+            if [ "$status" -eq 0 ]; then run_step 'simulation build' pnpm --filter @voxelyn/survival-sim build || true; fi
+            if [ "$status" -eq 0 ]; then run_step 'protocol build' pnpm --filter @voxelyn/survival-protocol build || true; fi
+            if [ "$status" -eq 0 ]; then run_step 'content generate' pnpm --filter @voxelyn/survival-content generate || true; fi
+            if [ "$status" -eq 0 ]; then run_step 'content validate' pnpm --filter @voxelyn/survival-content validate || true; fi
+            if [ "$status" -eq 0 ]; then run_step 'content build' pnpm --filter @voxelyn/survival-content build || true; fi
+            if [ "$status" -eq 0 ]; then run_step 'server build' pnpm --filter @voxelyn/survival-server build || true; fi
+            if [ "$status" -eq 0 ]; then run_step 'offline build' pnpm --filter @voxelyn/survival build:offline-check || true; fi
           } > /tmp/bruiser-build.log 2>&1
-          status=$?
           {
             echo '## Bruiser build diagnostic'
             echo
