@@ -199,6 +199,20 @@ export class EntityPresentation {
       };
     }
 
+    // O stun cancela a ação autoritativa e também qualquer action_start que ainda
+    // esteja no cache visual. Sem isto, o cliente continuaria mostrando um
+    // telegraph cujo golpe/projétil já foi cancelado pelo servidor.
+    if (entity.stunnedUntil > state.tick) {
+      this.actions.delete(entity.id);
+      this.actionVisualClocks.delete(entity.id);
+      return {
+        anim: 'idle',
+        elapsedMs: 0,
+        facingX: entity.facing.x,
+        facingY: entity.facing.y,
+      };
+    }
+
     const authoritative = entity.action;
     const eventIntent = this.actions.get(entity.id);
     const action: ActionIntent | undefined = authoritative
