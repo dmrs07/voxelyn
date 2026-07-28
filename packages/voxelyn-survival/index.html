@@ -85,6 +85,20 @@
         border-color: #59f2c2;
         color: #59f2c2;
       }
+      button.compact {
+        min-width: 0;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      .sub.warn {
+        color: #7f8da3;
+        margin-top: -4px;
+      }
+      input[type='range'] {
+        padding: 0;
+        width: 110px;
+        accent-color: #59f2c2;
+      }
       button:active {
         background: #2e3a4d;
       }
@@ -138,7 +152,13 @@
           <option value="low">Baixa (30 FPS)</option>
         </select>
       </div>
-      <div class="sub">Toque para jogar · WASD/mouse no desktop · R reinicia</div>
+      <div class="row">
+        <label for="volume">Volume</label>
+        <input id="volume" type="range" min="0" max="100" step="1" />
+        <button id="btn-mute" class="compact primary">Som: ligado</button>
+      </div>
+      <div class="sub">Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia</div>
+      <div class="sub warn">Use fones: o som avisa o que a tela ainda não mostra.</div>
     </div>
 
     <div id="banner" class="hidden"></div>

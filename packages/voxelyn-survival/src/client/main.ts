@@ -6,7 +6,16 @@ import { SurvivalInput, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
 import { NetClient } from './net';
 import { RestartGate } from './restart';
-import { FpsGovernor, loadQuality, nextLowerQuality, saveQuality, type QualityLevel } from './settings';
+import {
+  FpsGovernor,
+  loadAudioSettings,
+  loadQuality,
+  nextLowerQuality,
+  saveAudioSettings,
+  saveQuality,
+  type QualityLevel,
+} from './settings';
+import { audio } from './audio';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -18,6 +27,8 @@ const menu = document.getElementById('menu') as HTMLDivElement;
 const banner = document.getElementById('banner') as HTMLDivElement;
 const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
+const volumeInput = document.getElementById('volume') as HTMLInputElement;
+const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 
 const renderer = new SurvivalRenderer(canvas);
 const input = new SurvivalInput(canvas);
@@ -68,6 +79,62 @@ const setBanner = (text: string | null): void => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Audio
+// ---------------------------------------------------------------------------
+// O contexto so nasce num gesto do usuario (ver AudioDirector.unlock). Os
+// controles do menu ajustam volume ANTES disso, entao o estado vive aqui e e
+// aplicado assim que o contexto existir.
+const audioSettings = loadAudioSettings();
+audio.setVolume(audioSettings.volume);
+audio.setMuted(audioSettings.muted);
+volumeInput.value = String(Math.round(audioSettings.volume * 100));
+
+const renderMuteLabel = (): void => {
+  muteButton.textContent = audioSettings.muted ? 'Som: desligado' : 'Som: ligado';
+  muteButton.classList.toggle('primary', !audioSettings.muted);
+};
+renderMuteLabel();
+
+const setMuted = (muted: boolean): void => {
+  audioSettings.muted = muted;
+  audio.setMuted(muted);
+  saveAudioSettings(audioSettings);
+  renderMuteLabel();
+};
+
+volumeInput.addEventListener('input', () => {
+  audioSettings.volume = Number(volumeInput.value) / 100;
+  audio.setVolume(audioSettings.volume);
+  saveAudioSettings(audioSettings);
+});
+
+muteButton.addEventListener('click', () => {
+  setMuted(!audioSettings.muted);
+  // Toca DEPOIS de religar: sem um som imediato, o botao nao da nenhum retorno
+  // e parece que nao fez nada.
+  if (!audioSettings.muted) {
+    audio.unlock();
+    audio.ui();
+  }
+});
+
+// A aba escondida nao pode continuar zumbindo: os leitos de ambiencia sao
+// continuos e sobreviveriam a troca de aplicativo no celular.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) audio.suspend();
+  else audio.resume();
+});
+
+/** Atalho M: mudo sem voltar ao menu. */
+window.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'm' && ev.key !== 'M') return;
+  setMuted(!audioSettings.muted);
+  if (!audioSettings.muted) audio.unlock();
+  setBanner(audioSettings.muted ? 'Som desligado' : 'Som ligado');
+  setTimeout(() => setBanner(null), 1200);
+});
+
 const haptics = (events: SemanticEvent[]): void => {
   if (!('vibrate' in navigator)) return;
   for (const e of events) {
@@ -98,6 +165,8 @@ let stopLoop: (() => void) | null = null;
 
 const runSolo = (): void => {
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
+  audio.setLocalPlayerId(1);
+  audio.reset();
   let state: SurvivalState = createRun({ seed: (Date.now() ^ 0x5f3759df) >>> 0 });
   let accumulator = 0;
   let lastTime = performance.now();
@@ -118,10 +187,12 @@ const runSolo = (): void => {
     if (state.phase !== 'running') {
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
+      audio.update(state, now);
       renderer.render(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
         state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
+        audio.reset();
         gate.reset();
       }
       accumulator = 0;
@@ -137,6 +208,7 @@ const runSolo = (): void => {
       }
       const result = stepRun(state, [cmd]);
       renderer.ingestEvents(result.events, now);
+      audio.ingest(result.events, now, state);
       haptics(result.events);
       accumulator -= TICK_MS;
       if (state.phase !== 'running') break;
@@ -145,6 +217,7 @@ const runSolo = (): void => {
     // Toques comuns sao drenados; durante uma escolha, a fila pertence aos cards.
     if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     const alpha = accumulator / TICK_MS;
+    audio.update(state, now);
     renderer.render(state, alpha, input.state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
@@ -184,6 +257,11 @@ const runOnline = (url: string): void => {
   let fatal = false; // erro sem retry (versao incompativel, URL invalida)
   const gate = new RestartGate(RESTART_ARM_MS);
   let queuedChoice: 0 | 1 | null = null;
+  // Ultimo estado amostrado, guardado para o audio posicionar o ouvinte.
+  // Os eventos chegam por `ws.onmessage`, fora do quadro, entao nao ha estado
+  // "atual" ali — usar o do quadro anterior erra a posicao do ouvinte em no
+  // maximo um quadro, que e menos que a resolucao do paneamento.
+  let lastState: SurvivalState | null = null;
 
   // NetClient PERSISTENTE entre reconexoes: preserva resumeToken e a sequencia
   // de comandos. Se recriado a cada retry, o cliente enviaria seqs baixas que o
@@ -192,7 +270,9 @@ const runOnline = (url: string): void => {
     if (ws?.readyState === WebSocket.OPEN) ws.send(raw);
   });
   net.onEvents = (events) => {
-    renderer.ingestEvents(events, performance.now());
+    const now = performance.now();
+    renderer.ingestEvents(events, now);
+    audio.ingest(events, now, lastState ?? undefined);
     haptics(events);
   };
   // Nem todo reject e recuperavel. Incompatibilidade de versao (o servidor
@@ -242,6 +322,7 @@ const runOnline = (url: string): void => {
     if (net.status === 'online') {
       setBanner(null);
       renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
+      audio.setLocalPlayerId(net.slot + 1);
       const cmd = input.snapshot(playerScreen());
       if (queuedChoice !== null) {
         cmd.choose = queuedChoice;
@@ -251,7 +332,9 @@ const runOnline = (url: string): void => {
       net.pump(now);
       const state = net.sampleRenderState(now);
       if (state) {
+        lastState = state;
         const terminal = state.phase !== 'running';
+        audio.update(state, now);
         renderer.render(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
         const pendingChoice = state.playerExtra.pendingModuleChoice;
@@ -271,6 +354,7 @@ const runOnline = (url: string): void => {
           // reabre o socket — o matchmaking so considera salas 'running'.
           if (armed && (input.hasTap() || input.consumeRestartKey())) {
             gate.reset();
+            audio.reset();
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
@@ -306,16 +390,34 @@ qualitySelect.addEventListener('change', () => {
   saveQuality(quality);
 });
 
+/**
+ * O clique que inicia a run e o gesto que destrava o audio.
+ *
+ * Este e o unico momento garantido: o auto-start por query (?solo=1) NAO conta
+ * como gesto, entao naquele caminho o contexto so nasce no primeiro toque
+ * dentro do jogo — e por isso `unlock` tambem e chamado pelo input.
+ */
 const startSolo = (): void => {
+  audio.unlock();
+  audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
   runSolo();
 };
 const startOnline = (): void => {
+  audio.unlock();
+  audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
   runOnline(serverInput.value.trim() || defaultServerUrl());
 };
+
+// Rede de seguranca para o auto-start por query e para browsers que exigem um
+// gesto DENTRO do documento: qualquer primeiro toque/tecla destrava o audio.
+// `once` porque depois disso o unlock e responsabilidade do ciclo de vida.
+for (const evt of ['pointerdown', 'keydown'] as const) {
+  window.addEventListener(evt, () => audio.unlock(), { once: true, passive: true });
+}
 
 document.getElementById('btn-solo')?.addEventListener('click', startSolo);
 document.getElementById('btn-online')?.addEventListener('click', startOnline);
