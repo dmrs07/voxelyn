@@ -3,6 +3,8 @@ import { createRun, emptyCommand, stepRun } from '../src/run';
 import { GUARDIAN_ARENA_EXITS, GUARDIAN_ARENA_RADIUS, GUARDIAN_SUMMON_COUNT,
   SOLID_FRAGILE, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
 import { impactSolid } from '../src/materials';
+import { damageEntity } from '../src/entities';
+import { floodOpen } from '../src/worldgen';
 import type { SurvivalState } from '../src/types';
 
 /** Leva o guardiao a segunda fase com o jogador ao lado dele. */
@@ -141,6 +143,24 @@ describe('arena do guardiao', () => {
     const { broke } = impactSolid(state, exit % w, Math.floor(exit / w), 'kinetic', []);
     expect(broke, 'o tiro comum nao abre a saida').toBe(true);
     expect(state.solid[exit]).toBe(SOLID_NONE);
+  });
+
+  it('derruba o cerco ao morrer e restaura o caminho ate o nucleo', () => {
+    const { state } = enrage(78);
+    const guardian = state.enemies.find((e) => e.archetype === 'guardian');
+    expect(guardian).toBeDefined();
+    if (!guardian) return;
+    const barriers = [...state.arenaBarrierCells];
+    expect(barriers.length, 'o cerco nao registrou seus blocos').toBeGreaterThan(0);
+    const events = [];
+    damageEntity(state, guardian, guardian.hp, events);
+    expect(state.arenaClosed).toBe(false);
+    expect(state.arenaBarrierCells).toEqual([]);
+    for (const cell of barriers) expect(state.solid[cell]).toBe(SOLID_NONE);
+    const startX = Math.floor(state.player.x);
+    const startY = Math.floor(state.player.y);
+    const reachable = floodOpen(state.solid, state.config.width, state.config.height, startX, startY);
+    expect(reachable.has(state.corePos.y * state.config.width + state.corePos.x), 'nucleo segue inacessivel').toBe(true);
   });
 
   it('fecha uma vez so', () => {

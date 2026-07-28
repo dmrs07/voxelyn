@@ -190,6 +190,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     guardianAwake: false,
     guardianSummoned: false,
     arenaClosed: false,
+    arenaBarrierCells: [],
     guardianPath: [],
     guardianPathAt: -1000,
     leftEntryZone: false,
@@ -223,8 +224,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
   world.enemySpawns.forEach((p, i) => {
     spawnEnemy(state, mix[i % mix.length], p.x, p.y, i === eliteIndex);
   });
-  // guardiao ao lado do nucleo
-  spawnEnemy(state, 'guardian', world.corePos.x + 1, world.corePos.y + 1, false);
+  // Posicao reservada pelo worldgen com folga para o corpo grande do Guardian.
+  spawnEnemy(state, 'guardian', world.guardianSpawn.x, world.guardianSpawn.y, false);
 
   return state;
 };
@@ -1070,6 +1071,9 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(Math.round(state.contamination * 100000));
   mix(state.contaminationWaves);
   mix(state.guardianSummoned ? 1 : 0);
+  mix(state.arenaClosed ? 1 : 0);
+  mix(state.arenaBarrierCells.length);
+  for (const cell of state.arenaBarrierCells) mix(cell);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

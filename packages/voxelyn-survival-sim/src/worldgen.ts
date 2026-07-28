@@ -20,6 +20,7 @@ export type GeneratedWorld = {
   surface: Uint8Array;
   entry: Vec2;
   corePos: Vec2;
+  guardianSpawn: Vec2;
   salvageSites: GeneratedSalvageSite[];
   ventPositions: Vec2[];
   enemySpawns: Vec2[];
@@ -173,6 +174,35 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
   const isOpen = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;
 
+  // O Guardian ocupa quase 1,5 tile de diametro. Centro aberto nao basta:
+  // os quatro cantos do corpo tambem precisam cair em chao livre. Uma
+  // vizinhanca 3x3 aberta e uma garantia simples, deterministica e mais
+  // forte que a colisao real de raio 0,68.
+  const hasGuardianClearance = (x: number, y: number): boolean => {
+    if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) return false;
+    for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        if (!isOpen(x + ox, y + oy)) return false;
+      }
+    }
+    return true;
+  };
+  const guardianOffsets = [
+    [3, 0], [-3, 0], [0, 3], [0, -3],
+    [2, 2], [-2, 2], [2, -2], [-2, -2],
+  ] as const;
+  let guardianSpawn: Vec2 | null = null;
+  for (const [dx, dy] of guardianOffsets) {
+    const x = corePos.x + dx;
+    const y = corePos.y + dy;
+    if (!hasGuardianClearance(x, y)) continue;
+    guardianSpawn = { x, y };
+    break;
+  }
+  // Esta tentativa de mapa nao oferece uma arena fisicamente valida.
+  // A geracao limitada tentara outra seed derivada em vez de criar um boss preso.
+  if (!guardianSpawn) return null;
+
   // 4) decorar paredes adjacentes a areas abertas: minerio, rocha fragil, cristais
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
@@ -227,6 +257,12 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
       surface[idx(w, x, y)] = SURF_NONE;
     }
   }
+  // O boss tambem nao nasce sobre fungo, biofluido ou outro hazard.
+  for (let y = guardianSpawn.y - 1; y <= guardianSpawn.y + 1; y++) {
+    for (let x = guardianSpawn.x - 1; x <= guardianSpawn.x + 1; x++) {
+      surface[idx(w, x, y)] = SURF_NONE;
+    }
+  }
 
   // 6) pontos de interesse sobre celulas abertas e distantes da entrada
   const pickOpenFar = (minDist: number, minGap: number, taken: Vec2[]): Vec2 | null => {
@@ -250,7 +286,7 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
   };
 
   const maxPath = distFromEntry[idx(w, corePos.x, corePos.y)];
-  const reserved: Vec2[] = [entry, corePos];
+  const reserved: Vec2[] = [entry, corePos, guardianSpawn];
   const bands: Array<{ min: number; max: number; tier: 1 | 2 | 3; optional?: boolean }> = [
     { min: 0.20, max: 0.35, tier: 1 },
     { min: 0.40, max: 0.60, tier: 1 },
@@ -321,7 +357,7 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
   }
   if (enemySpawns.length < 10) return null;
 
-  return { solid, surface, entry, corePos, salvageSites, ventPositions, enemySpawns, openCells };
+  return { solid, surface, entry, corePos, guardianSpawn, salvageSites, ventPositions, enemySpawns, openCells };
 };
 
 /** Geracao deterministica com retentativas limitadas (seed derivada) ate mapa solucionavel. */

@@ -464,6 +464,7 @@ export const closeArena = (
     }
   }
   if (ring.length === 0) return 0;
+  state.arenaBarrierCells = [];
 
   // Saidas sorteadas com a RNG da simulacao, e nao com `Math.random`: as duas
   // maquinas de uma sala de co-op precisam abrir a parede nos mesmos pontos.
@@ -479,8 +480,29 @@ export const closeArena = (
 
   for (const i of ring) {
     state.solid[i] = doors.has(i) ? SOLID_FRAGILE : SOLID_ROCK;
+    state.arenaBarrierCells.push(i);
     markDirty(state, i % w, Math.floor(i / w));
   }
   events.push({ t: 'message', text: 'O Veio se fecha. Abra caminho ou lute.' });
   return ring.length;
+};
+
+/** Remove somente os blocos criados pelo cerco; terreno original permanece intacto. */
+export const openArena = (state: SurvivalState, events: SemanticEvent[]): number => {
+  const w = W(state);
+  let removed = 0;
+  for (const i of state.arenaBarrierCells) {
+    const solid = state.solid[i];
+    if (solid === SOLID_NONE) continue;
+    state.solid[i] = SOLID_NONE;
+    const x = i % w;
+    const y = Math.floor(i / w);
+    markDirty(state, x, y);
+    events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
+    removed++;
+  }
+  state.arenaBarrierCells = [];
+  state.arenaClosed = false;
+  if (removed > 0) events.push({ t: 'message', text: 'O cerco desaba com o Guardian.' });
+  return removed;
 };

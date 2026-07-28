@@ -26,7 +26,7 @@ import {
   SURF_SPORES,
   TICK_HZ,
 } from './constants.js';
-import { breakSolid, canRip, closeArena, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, closeArena, explodeAt, igniteCell, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import type {
   Entity,
@@ -159,6 +159,12 @@ export const damageEntity = (
   if (ent.archetype === 'bomber') {
     explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
     addBomberSpores(state, ent);
+  }
+  if (ent.archetype === 'guardian') {
+    // A parede e uma fase da luta, nao uma alteracao permanente do mapa.
+    // Derruba-la aqui garante acesso ao nucleo mesmo se o cerco fechou
+    // com o Guardian ja afastado do pedestal.
+    openArena(state, events);
   }
 };
 

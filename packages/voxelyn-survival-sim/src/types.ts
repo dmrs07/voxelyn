@@ -230,6 +230,8 @@ export type SurvivalState = {
   /** A arena ja foi lacrada? Separado de `guardianSummoned` porque o cerco pode
    * ter de esperar o jogador entrar no raio, enquanto os invocados saem na hora. */
   arenaClosed: boolean;
+  /** Celulas vazias convertidas pelo cerco; removidas quando o Guardian morre. */
+  arenaBarrierCells: number[];
   guardianPath: number[];
   guardianPathAt: number;
   leftEntryZone: boolean;

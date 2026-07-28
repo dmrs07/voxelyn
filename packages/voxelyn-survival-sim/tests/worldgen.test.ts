@@ -100,6 +100,23 @@ describe('worldgen', () => {
     }
   });
 
+  it('reserva spawn do Guardian sem sobrepor nenhum canto do corpo a paredes', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const state = createRun({ seed });
+      const guardian = state.enemies.find((e) => e.archetype === 'guardian');
+      expect(guardian, `seed ${seed}: sem Guardian`).toBeDefined();
+      if (!guardian) continue;
+      for (const dx of [-guardian.radius, guardian.radius]) {
+        for (const dy of [-guardian.radius, guardian.radius]) {
+          const x = Math.floor(guardian.x + dx);
+          const y = Math.floor(guardian.y + dy);
+          expect(state.solid[y * state.config.width + x], `seed ${seed}: Guardian sobre parede em ${x},${y}`).toBe(SOLID_NONE);
+        }
+      }
+      expect(Math.hypot(guardian.x - (state.corePos.x + 0.5), guardian.y - (state.corePos.y + 0.5))).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it('mantem centenas de seeds validas com pelo menos tres sites', () => {
     for (let seed = 1; seed <= 100; seed++) {
       const world = generateWorld(seed, WORLD_W, WORLD_H);
@@ -113,6 +130,7 @@ describe('worldgen', () => {
     expect(Buffer.from(a.surface).equals(Buffer.from(b.surface))).toBe(true);
     expect(a.entry).toEqual(b.entry);
     expect(a.corePos).toEqual(b.corePos);
+    expect(a.guardianSpawn).toEqual(b.guardianSpawn);
     expect(a.enemySpawns).toEqual(b.enemySpawns);
     expect(a.salvageSites).toEqual(b.salvageSites);
   });
