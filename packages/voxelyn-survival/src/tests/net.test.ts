@@ -102,6 +102,21 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     expect(view.playerExtras[0].purgeCells).toBe(1);
   });
 
+  it('espelha o stun autoritativo de players e inimigos no cliente online', () => {
+    const loop = new Loop();
+    const a = loop.connect('A');
+    a.connect();
+    loop.advance(3);
+    const room = loop.server.roomForClient('A')!;
+    const enemy = room.state.enemies.find((candidate) => candidate.alive)!;
+    room.state.players[0].stunnedUntil = room.state.tick + 24;
+    enemy.stunnedUntil = room.state.tick + 18;
+    loop.advance(1);
+    const view = a.sampleRenderState(loop['now'] as number)!;
+    expect(view.players[0].stunnedUntil).toBe(room.state.players[0].stunnedUntil);
+    expect(view.enemies.find((candidate) => candidate.id === enemy.id)?.stunnedUntil).toBe(enemy.stunnedUntil);
+  });
+
   it('reconnect por resume token restaura o cliente ao mesmo slot', () => {
     const loop = new Loop();
     const a = loop.connect('A');

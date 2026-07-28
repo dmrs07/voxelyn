@@ -279,6 +279,7 @@ export class NetClient {
           pl.alive = snap.alive;
           pl.facing.x = snap.facingX ?? pl.facing.x;
           pl.facing.y = snap.facingY ?? pl.facing.y;
+          pl.stunnedUntil = snap.stunnedUntil ?? 0;
           state.playerExtras[slot].downed = snap.downed ?? false;
           pl.action = snap.action ? {
             kind: snap.action.kind,
@@ -308,7 +309,7 @@ export class NetClient {
           nextActionAt: 0,
           contactReadyAt: 0,
           rangedReadyAt: 0,
-          stunnedUntil: 0,
+          stunnedUntil: snap.stunnedUntil ?? 0,
           facing: { x: snap.facingX ?? 1, y: snap.facingY ?? 0 },
           action: snap.action ? {
             kind: snap.action.kind,
