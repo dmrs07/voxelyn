@@ -1,0 +1,122 @@
+name: Fix Authoritative Stun Telegraphs
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bruiser-authoritative-stun-telegraph
+  cancel-in-progress: true
+
+jobs:
+  apply-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/bruiser-gorilla-conductive-stun
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Preserve authoritative actions during stun
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'Expected fragment not found in {path}: {old[:180]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          presentation = 'packages/voxelyn-survival/src/client/presentation.ts'
+          replace_once(
+              presentation,
+              "    // O stun cancela a ação autoritativa e também qualquer action_start que ainda\n"
+              "    // esteja no cache visual. Sem isto, o cliente continuaria mostrando um\n"
+              "    // telegraph cujo golpe/projétil já foi cancelado pelo servidor.\n"
+              "    if (entity.stunnedUntil > state.tick) {\n"
+              "      this.actions.delete(entity.id);\n"
+              "      this.actionVisualClocks.delete(entity.id);\n"
+              "      return {\n"
+              "        anim: 'idle',\n"
+              "        elapsedMs: 0,\n"
+              "        facingX: entity.facing.x,\n"
+              "        facingY: entity.facing.y,\n"
+              "      };\n"
+              "    }\n\n"
+              "    const authoritative = entity.action;\n"
+              "    const eventIntent = this.actions.get(entity.id);",
+              "    const authoritative = entity.action;\n"
+              "    // Alguns controles, como Conductive, cancelam a ação na simulação; outros\n"
+              "    // estados de stun legados podem preservá-la. Só apaga o intent visual quando\n"
+              "    // o snapshot confirma que a ação autoritativa realmente desapareceu.\n"
+              "    if (entity.stunnedUntil > state.tick && !authoritative) {\n"
+              "      this.actions.delete(entity.id);\n"
+              "      this.actionVisualClocks.delete(entity.id);\n"
+              "      return {\n"
+              "        anim: 'idle',\n"
+              "        elapsedMs: 0,\n"
+              "        facingX: entity.facing.x,\n"
+              "        facingY: entity.facing.y,\n"
+              "      };\n"
+              "    }\n\n"
+              "    const eventIntent = this.actions.get(entity.id);"
+          )
+
+          test = 'packages/voxelyn-survival/src/client/presentation.test.ts'
+          replace_once(
+              test,
+              "  it('permite que hit interrompa somente a composicao do prospector', () => {",
+              "  it('preserva o telegraph quando o snapshot ainda mantem a acao autoritativa durante o stun', () => {\n"
+              "    const presentation = new EntityPresentation();\n"
+              "    const entity = { ...actionEntity('bomber', 'detonate'), stunnedUntil: 20 };\n"
+              "    const presented = presentation.animationFor(\n"
+              "      entity as never, { tick: 5 } as never, baseAnim('idle') as never, 250\n"
+              "    );\n"
+              "    expect(presented.anim).toBe('special');\n"
+              "  });\n\n"
+              "  it('permite que hit interrompa somente a composicao do prospector', () => {"
+          )
+          PY
+          git add packages/voxelyn-survival/src/client/presentation.ts \
+                  packages/voxelyn-survival/src/client/presentation.test.ts
+          git diff --cached --check
+
+      - name: Test presentation and offline build
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build
+          pnpm --filter @voxelyn/survival-sim build
+          pnpm --filter @voxelyn/survival-protocol build
+          pnpm --filter @voxelyn/survival test
+          pnpm --filter @voxelyn/survival build:offline-check
+
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(survival-ui): preserve authoritative telegraphs during stun'
+          git rm .github/workflows/fix-authoritative-stun-telegraph.yml
+          git commit -m 'chore: remove temporary telegraph validation workflow'
+          git push origin HEAD:feat/bruiser-gorilla-conductive-stun
