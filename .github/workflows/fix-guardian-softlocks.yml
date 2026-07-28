@@ -1,0 +1,318 @@
+name: Fix Guardian Softlocks
+
+on:
+  push:
+    branches:
+      - feat/survival-salvage-modules
+
+permissions:
+  contents: write
+
+concurrency:
+  group: guardian-softlock-fix
+  cancel-in-progress: true
+
+jobs:
+  fix-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/survival-salvage-modules
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply Guardian progression fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'Expected fragment not found in {path}: {old[:160]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          types = 'packages/voxelyn-survival-sim/src/types.ts'
+          replace_once(
+              types,
+              "  arenaClosed: boolean;\n  guardianPath: number[];",
+              "  arenaClosed: boolean;\n"
+              "  /** Celulas vazias convertidas pelo cerco; removidas quando o Guardian morre. */\n"
+              "  arenaBarrierCells: number[];\n"
+              "  guardianPath: number[];"
+          )
+
+          worldgen = 'packages/voxelyn-survival-sim/src/worldgen.ts'
+          replace_once(
+              worldgen,
+              "  corePos: Vec2;\n  salvageSites: GeneratedSalvageSite[];",
+              "  corePos: Vec2;\n  guardianSpawn: Vec2;\n  salvageSites: GeneratedSalvageSite[];"
+          )
+          replace_once(
+              worldgen,
+              "  const isOpen = (x: number, y: number): boolean =>\n"
+              "    x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;\n",
+              "  const isOpen = (x: number, y: number): boolean =>\n"
+              "    x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;\n\n"
+              "  // O Guardian ocupa quase 1,5 tile de diametro. Centro aberto nao basta:\n"
+              "  // os quatro cantos do corpo tambem precisam cair em chao livre. Uma\n"
+              "  // vizinhanca 3x3 aberta e uma garantia simples, deterministica e mais\n"
+              "  // forte que a colisao real de raio 0,68.\n"
+              "  const hasGuardianClearance = (x: number, y: number): boolean => {\n"
+              "    if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) return false;\n"
+              "    for (let oy = -1; oy <= 1; oy++) {\n"
+              "      for (let ox = -1; ox <= 1; ox++) {\n"
+              "        if (!isOpen(x + ox, y + oy)) return false;\n"
+              "      }\n"
+              "    }\n"
+              "    return true;\n"
+              "  };\n"
+              "  const guardianOffsets = [\n"
+              "    [3, 0], [-3, 0], [0, 3], [0, -3],\n"
+              "    [2, 2], [-2, 2], [2, -2], [-2, -2],\n"
+              "  ] as const;\n"
+              "  let guardianSpawn: Vec2 | null = null;\n"
+              "  for (const [dx, dy] of guardianOffsets) {\n"
+              "    const x = corePos.x + dx;\n"
+              "    const y = corePos.y + dy;\n"
+              "    if (!hasGuardianClearance(x, y)) continue;\n"
+              "    guardianSpawn = { x, y };\n"
+              "    break;\n"
+              "  }\n"
+              "  // Esta tentativa de mapa nao oferece uma arena fisicamente valida.\n"
+              "  // A geracao limitada tentara outra seed derivada em vez de criar um boss preso.\n"
+              "  if (!guardianSpawn) return null;\n"
+          )
+          replace_once(
+              worldgen,
+              "  // pedestal do nucleo limpo\n"
+              "  for (let y = corePos.y - 1; y <= corePos.y + 1; y++) {\n"
+              "    for (let x = corePos.x - 1; x <= corePos.x + 1; x++) {\n"
+              "      if (x < 0 || y < 0 || x >= w || y >= h) continue;\n"
+              "      surface[idx(w, x, y)] = SURF_NONE;\n"
+              "    }\n"
+              "  }\n",
+              "  // pedestal do nucleo limpo\n"
+              "  for (let y = corePos.y - 1; y <= corePos.y + 1; y++) {\n"
+              "    for (let x = corePos.x - 1; x <= corePos.x + 1; x++) {\n"
+              "      if (x < 0 || y < 0 || x >= w || y >= h) continue;\n"
+              "      surface[idx(w, x, y)] = SURF_NONE;\n"
+              "    }\n"
+              "  }\n"
+              "  // O boss tambem nao nasce sobre fungo, biofluido ou outro hazard.\n"
+              "  for (let y = guardianSpawn.y - 1; y <= guardianSpawn.y + 1; y++) {\n"
+              "    for (let x = guardianSpawn.x - 1; x <= guardianSpawn.x + 1; x++) {\n"
+              "      surface[idx(w, x, y)] = SURF_NONE;\n"
+              "    }\n"
+              "  }\n"
+          )
+          replace_once(
+              worldgen,
+              "  const reserved: Vec2[] = [entry, corePos];",
+              "  const reserved: Vec2[] = [entry, corePos, guardianSpawn];"
+          )
+          replace_once(
+              worldgen,
+              "  return { solid, surface, entry, corePos, salvageSites, ventPositions, enemySpawns, openCells };",
+              "  return { solid, surface, entry, corePos, guardianSpawn, salvageSites, ventPositions, enemySpawns, openCells };"
+          )
+
+          run = 'packages/voxelyn-survival-sim/src/run.ts'
+          replace_once(
+              run,
+              "    arenaClosed: false,\n    guardianPath: [],",
+              "    arenaClosed: false,\n    arenaBarrierCells: [],\n    guardianPath: [],"
+          )
+          replace_once(
+              run,
+              "  // guardiao ao lado do nucleo\n  spawnEnemy(state, 'guardian', world.corePos.x + 1, world.corePos.y + 1, false);",
+              "  // Posicao reservada pelo worldgen com folga para o corpo grande do Guardian.\n"
+              "  spawnEnemy(state, 'guardian', world.guardianSpawn.x, world.guardianSpawn.y, false);"
+          )
+          replace_once(
+              run,
+              "  mix(state.guardianSummoned ? 1 : 0);\n  for (const enemy of state.enemies) {",
+              "  mix(state.guardianSummoned ? 1 : 0);\n"
+              "  mix(state.arenaClosed ? 1 : 0);\n"
+              "  mix(state.arenaBarrierCells.length);\n"
+              "  for (const cell of state.arenaBarrierCells) mix(cell);\n"
+              "  for (const enemy of state.enemies) {"
+          )
+
+          cells = 'packages/voxelyn-survival-sim/src/cells.ts'
+          replace_once(
+              cells,
+              "  if (ring.length === 0) return 0;\n\n  // Saidas sorteadas",
+              "  if (ring.length === 0) return 0;\n"
+              "  state.arenaBarrierCells = [];\n\n"
+              "  // Saidas sorteadas"
+          )
+          replace_once(
+              cells,
+              "  for (const i of ring) {\n"
+              "    state.solid[i] = doors.has(i) ? SOLID_FRAGILE : SOLID_ROCK;\n"
+              "    markDirty(state, i % w, Math.floor(i / w));\n"
+              "  }",
+              "  for (const i of ring) {\n"
+              "    state.solid[i] = doors.has(i) ? SOLID_FRAGILE : SOLID_ROCK;\n"
+              "    state.arenaBarrierCells.push(i);\n"
+              "    markDirty(state, i % w, Math.floor(i / w));\n"
+              "  }"
+          )
+          replace_once(
+              cells,
+              "  events.push({ t: 'message', text: 'O Veio se fecha. Abra caminho ou lute.' });\n"
+              "  return ring.length;\n"
+              "};\n",
+              "  events.push({ t: 'message', text: 'O Veio se fecha. Abra caminho ou lute.' });\n"
+              "  return ring.length;\n"
+              "};\n\n"
+              "/** Remove somente os blocos criados pelo cerco; terreno original permanece intacto. */\n"
+              "export const openArena = (state: SurvivalState, events: SemanticEvent[]): number => {\n"
+              "  const w = W(state);\n"
+              "  let removed = 0;\n"
+              "  for (const i of state.arenaBarrierCells) {\n"
+              "    const solid = state.solid[i];\n"
+              "    if (solid === SOLID_NONE) continue;\n"
+              "    state.solid[i] = SOLID_NONE;\n"
+              "    const x = i % w;\n"
+              "    const y = Math.floor(i / w);\n"
+              "    markDirty(state, x, y);\n"
+              "    events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });\n"
+              "    removed++;\n"
+              "  }\n"
+              "  state.arenaBarrierCells = [];\n"
+              "  state.arenaClosed = false;\n"
+              "  if (removed > 0) events.push({ t: 'message', text: 'O cerco desaba com o Guardian.' });\n"
+              "  return removed;\n"
+              "};\n"
+          )
+
+          entities = 'packages/voxelyn-survival-sim/src/entities.ts'
+          replace_once(
+              entities,
+              "import { breakSolid, canRip, closeArena, explodeAt, igniteCell, ripSolid, setSurface } from './cells.js';",
+              "import { breakSolid, canRip, closeArena, explodeAt, igniteCell, openArena, ripSolid, setSurface } from './cells.js';"
+          )
+          replace_once(
+              entities,
+              "  if (ent.archetype === 'bomber') {\n"
+              "    explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });\n"
+              "    addBomberSpores(state, ent);\n"
+              "  }\n",
+              "  if (ent.archetype === 'bomber') {\n"
+              "    explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });\n"
+              "    addBomberSpores(state, ent);\n"
+              "  }\n"
+              "  if (ent.archetype === 'guardian') {\n"
+              "    // A parede e uma fase da luta, nao uma alteracao permanente do mapa.\n"
+              "    // Derruba-la aqui garante acesso ao nucleo mesmo se o cerco fechou\n"
+              "    // com o Guardian ja afastado do pedestal.\n"
+              "    openArena(state, events);\n"
+              "  }\n"
+          )
+
+          guardian_test = 'packages/voxelyn-survival-sim/tests/guardian-arena.test.ts'
+          replace_once(
+              guardian_test,
+              "import { impactSolid } from '../src/materials';",
+              "import { impactSolid } from '../src/materials';\n"
+              "import { damageEntity } from '../src/entities';\n"
+              "import { floodOpen } from '../src/worldgen';"
+          )
+          replace_once(
+              guardian_test,
+              "  it('fecha uma vez so', () => {",
+              "  it('derruba o cerco ao morrer e restaura o caminho ate o nucleo', () => {\n"
+              "    const { state } = enrage(78);\n"
+              "    const guardian = state.enemies.find((e) => e.archetype === 'guardian');\n"
+              "    expect(guardian).toBeDefined();\n"
+              "    if (!guardian) return;\n"
+              "    const barriers = [...state.arenaBarrierCells];\n"
+              "    expect(barriers.length, 'o cerco nao registrou seus blocos').toBeGreaterThan(0);\n"
+              "    const events = [];\n"
+              "    damageEntity(state, guardian, guardian.hp, events);\n"
+              "    expect(state.arenaClosed).toBe(false);\n"
+              "    expect(state.arenaBarrierCells).toEqual([]);\n"
+              "    for (const cell of barriers) expect(state.solid[cell]).toBe(SOLID_NONE);\n"
+              "    const startX = Math.floor(state.player.x);\n"
+              "    const startY = Math.floor(state.player.y);\n"
+              "    const reachable = floodOpen(state.solid, state.config.width, state.config.height, startX, startY);\n"
+              "    expect(reachable.has(state.corePos.y * state.config.width + state.corePos.x), 'nucleo segue inacessivel').toBe(true);\n"
+              "  });\n\n"
+              "  it('fecha uma vez so', () => {"
+          )
+
+          worldgen_test = 'packages/voxelyn-survival-sim/tests/worldgen.test.ts'
+          replace_once(
+              worldgen_test,
+              "  it('mantem centenas de seeds validas com pelo menos tres sites', () => {",
+              "  it('reserva spawn do Guardian sem sobrepor nenhum canto do corpo a paredes', () => {\n"
+              "    for (let seed = 1; seed <= 100; seed++) {\n"
+              "      const state = createRun({ seed });\n"
+              "      const guardian = state.enemies.find((e) => e.archetype === 'guardian');\n"
+              "      expect(guardian, `seed ${seed}: sem Guardian`).toBeDefined();\n"
+              "      if (!guardian) continue;\n"
+              "      for (const dx of [-guardian.radius, guardian.radius]) {\n"
+              "        for (const dy of [-guardian.radius, guardian.radius]) {\n"
+              "          const x = Math.floor(guardian.x + dx);\n"
+              "          const y = Math.floor(guardian.y + dy);\n"
+              "          expect(state.solid[y * state.config.width + x], `seed ${seed}: Guardian sobre parede em ${x},${y}`).toBe(SOLID_NONE);\n"
+              "        }\n"
+              "      }\n"
+              "      expect(Math.hypot(guardian.x - (state.corePos.x + 0.5), guardian.y - (state.corePos.y + 0.5))).toBeGreaterThanOrEqual(2);\n"
+              "    }\n"
+              "  });\n\n"
+              "  it('mantem centenas de seeds validas com pelo menos tres sites', () => {"
+          )
+          replace_once(
+              worldgen_test,
+              "    expect(a.corePos).toEqual(b.corePos);\n    expect(a.enemySpawns).toEqual(b.enemySpawns);",
+              "    expect(a.corePos).toEqual(b.corePos);\n"
+              "    expect(a.guardianSpawn).toEqual(b.guardianSpawn);\n"
+              "    expect(a.enemySpawns).toEqual(b.enemySpawns);"
+          )
+          PY
+
+      - name: Build and test Guardian fixes
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build
+          pnpm --filter @voxelyn/survival-sim build
+          pnpm --filter @voxelyn/survival-sim test
+          pnpm --filter @voxelyn/survival-protocol build
+          pnpm --filter @voxelyn/survival-server build
+          pnpm --filter @voxelyn/survival test
+          pnpm --filter @voxelyn/survival build:offline-check
+
+      - name: Commit fixes and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/voxelyn-survival-sim/src/types.ts \
+                  packages/voxelyn-survival-sim/src/worldgen.ts \
+                  packages/voxelyn-survival-sim/src/run.ts \
+                  packages/voxelyn-survival-sim/src/cells.ts \
+                  packages/voxelyn-survival-sim/src/entities.ts \
+                  packages/voxelyn-survival-sim/tests/guardian-arena.test.ts \
+                  packages/voxelyn-survival-sim/tests/worldgen.test.ts
+          git commit -m "fix(survival): prevent Guardian arena and spawn softlocks"
+          git rm .github/workflows/fix-guardian-softlocks.yml
+          git commit -m "chore: remove temporary Guardian validation workflow"
+          git push origin HEAD:feat/survival-salvage-modules
