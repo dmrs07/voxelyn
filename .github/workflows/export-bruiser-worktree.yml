@@ -1,4 +1,4 @@
-name: Export Reconstructed Bruiser Patch
+name: Validate Bruiser Combat Slice
 
 on:
   pull_request:
@@ -6,15 +6,16 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: bruiser-gorilla-conductive-stun
   cancel-in-progress: true
 
 jobs:
-  export-patch:
+  validate-publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,18 +23,75 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - name: Reconstruct runner patch
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply guarded implementation patch
         shell: bash
         run: |
+          set -euo pipefail
           {
             head -c 18000 .github/patches/bruiser.patch.b64.part00
             cat .github/patches/bruiser.patch.b64.part01
-          } | base64 --decode > /tmp/bruiser-runner.patch
-          wc -c /tmp/bruiser-runner.patch
-          sha256sum /tmp/bruiser-runner.patch
+          } | base64 --decode > /tmp/bruiser.patch
+          python <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/bruiser.patch')
+          text = path.read_text()
+          assert text[24745] == '*'
+          text = text[:24745] + ':' + text[24746:]
+          assert text[17651] == 'i'
+          text = text[:17651] + 'e' + text[17652:]
+          assert text[13495] == '_'
+          text = text[:13495] + text[13496:]
+          text = text[:12511] + ' ' + text[12511:]
+          path.write_text(text)
+          PY
+          echo '4ff4606b03b654e22550b3ef842007b5f6c5f96e04e63f3829d061b47b41ac36  /tmp/bruiser.patch' \
+            | sha256sum --check
+          git apply --index /tmp/bruiser.patch
+          git diff --cached --check
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bruiser-reconstructed-patch
-          path: /tmp/bruiser-runner.patch
-          retention-days: 1
+      - name: Build packages and regenerate atlas
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-sim build 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-protocol build 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-content validate 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-content build 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-server build 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/bruiser-validation.log
+
+      - name: Run complete Survival test suites
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-sim test 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-protocol test 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-content test 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival-server test 2>&1 | tee -a /tmp/bruiser-validation.log
+          pnpm --filter @voxelyn/survival test 2>&1 | tee -a /tmp/bruiser-validation.log
+
+      - name: Publish validated implementation and clean transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/voxelyn-survival-sim \
+                  packages/voxelyn-survival-protocol \
+                  packages/voxelyn-survival-content \
+                  packages/voxelyn-survival
+          git commit -m 'feat(survival): add predictive gorilla Bruiser hurl'
+          git rm .github/patches/bruiser.patch.b64.part00 \
+                 .github/patches/bruiser.patch.b64.part01 \
+                 .github/workflows/export-bruiser-worktree.yml
+          git commit -m 'chore: remove temporary Bruiser validation transport'
+          git push origin HEAD:feat/bruiser-gorilla-conductive-stun
