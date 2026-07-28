@@ -3,10 +3,10 @@
   "version": 2,
   "atlas": "enemy-bruiser.png",
   "frameWidth": 48,
-  "frameHeight": 56,
-  "columns": 84,
+  "frameHeight": 68,
+  "columns": 85,
   "anchorX": 24,
-  "anchorY": 54,
+  "anchorY": 66,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -63,6 +63,11 @@
       "frames": 5,
       "fps": 10,
       "loop": false
+    },
+    "special": {
+      "frames": 8,
+      "fps": 10,
+      "loop": false
     }
   },
   "frameMap": {
@@ -70,34 +75,38 @@
       "idle": 0,
       "walk": 4,
       "attack": 10,
-      "hit": 14,
-      "die": 16
+      "special": 14,
+      "hit": 22,
+      "die": 24
     },
     "dl": {
-      "idle": 21,
-      "walk": 25,
-      "attack": 31,
-      "hit": 35,
-      "die": 37
+      "idle": 29,
+      "walk": 33,
+      "attack": 39,
+      "special": 43,
+      "hit": 51,
+      "die": 53
     },
     "ur": {
-      "idle": 42,
-      "walk": 46,
-      "attack": 52,
-      "hit": 56,
-      "die": 58
+      "idle": 58,
+      "walk": 62,
+      "attack": 68,
+      "special": 72,
+      "hit": 80,
+      "die": 82
     },
     "ul": {
-      "idle": 63,
-      "walk": 67,
-      "attack": 73,
-      "hit": 77,
-      "die": 79
+      "idle": 87,
+      "walk": 91,
+      "attack": 97,
+      "special": 101,
+      "hit": 109,
+      "die": 111
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric compact geode bruiser, broad shoulders, pale rock plates and electric core",
+    "prompt": "voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core",
     "seedOrRef": "deterministic-code-v2"
   }
 }

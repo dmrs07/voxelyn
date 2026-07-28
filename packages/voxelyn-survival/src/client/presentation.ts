@@ -33,12 +33,8 @@ type ActionVisualClock = {
   startedMs: number;
 };
 
-const actionAnimation = (action: EntityActionKind): string => {
-  if (action === 'detonate' || action === 'charge' || action === 'pulse') return 'special';
-  // `hurl` fica em `attack` de proposito: quem arremessa e o bruiser, e a folha
-  // dele nao tem `special` — so idle/walk/attack/hit/die. Promover o arremesso a
-  // `special` pareceria mais certo e daria FALLBACK, que e uma animacao pior do
-  // que a de ataque que ele de fato tem.
+export const actionAnimation = (action: EntityActionKind): string => {
+  if (action === 'detonate' || action === 'charge' || action === 'pulse' || action === 'hurl') return 'special';
   return 'attack';
 };
 

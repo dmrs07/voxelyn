@@ -242,7 +242,13 @@ const bruiserModel = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
   const slam = anim === 'attack' ? [0, 0, 3, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const up = -flinch;
+  // `special` e o arremesso-gorila: agacha, ergue o bloco acima da cabeca,
+  // segura dois frames para leitura e termina sem a pedra no follow-through.
+  const hurlLift = anim === 'special' ? [0, 3, 6, 9, 12, 12, 12, 7][f % 8] : 0;
+  const hurlHold = anim === 'special' && f >= 2 && f <= 6;
+  const hurlThrow = anim === 'special' && f >= 7;
+  const crouch = anim === 'special' ? [2, 2, 1, 0, 0, 0, 0, 1][f % 8] : 0;
+  const up = -flinch - crouch;
   const b = [];
   // pernas grossas e curtas
   b.push(box(-3, -1, Math.max(0, step), 3, 3, 4, 'rockDeep'));
@@ -258,12 +264,19 @@ const bruiserModel = (anim, f) => {
   // cabeca pequena e afundada entre os ombros
   b.push(box(-1, -1, 12 + up, 3, 2, 2, 'rockDeep'));
   b.push(box(-1, -2, 13 + up, 3, 1, 1, 'biolum'));
-  // bracos que descem ate perto do chao, subindo no golpe
-  b.push(box(-6, -1, 6 + up + slam, 2, 2, 5, 'rock'));
-  b.push(box(5, -1, 6 + up + slam, 2, 2, 5, 'rock'));
+  // bracos longos de gorila. No special, sobem juntos sustentando a pedra.
+  const armRaise = anim === 'special' ? Math.min(10, hurlLift) : slam;
+  b.push(box(-6, -1, 6 + up + armRaise, 2, 2, 5, 'rock'));
+  b.push(box(5, -1, 6 + up + armRaise, 2, 2, 5, 'rock'));
+  if (anim === 'special' && !hurlThrow) {
+    const rockZ = 5 + hurlLift;
+    // O volume converge com um bloco real do terreno, sem ocupar o frame inteiro.
+    b.push(box(-3, -2, rockZ, 7, 5, 4, hurlHold ? 'rock' : 'rockDeep'));
+    b.push(box(-2, -3, rockZ + 2, 5, 1, 2, 'rock'));
+  }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 48, 56, 22, 50);
+const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 48, 68, 22, 62);
 
 // ---------------------------------------------------------------------------
 // enemy-guardian 48x56 — titan mineral, antebracos enormes, mascara, nucleo
@@ -366,7 +379,10 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod'),
-  base('enemy-bruiser', 48, 56, 24, 54, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, bruiserFrame, 'voxel-isometric compact geode bruiser, broad shoulders, pale rock plates and electric core'),
+  base('enemy-bruiser', 48, 68, 24, 66, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 8, fps: 10, loop: false },
+  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core'),
   base('enemy-guardian', 48, 56, 24, 54, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
