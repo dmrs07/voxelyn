@@ -1,0 +1,26 @@
+name: Export Bruiser Worktree
+
+on:
+  push:
+    branches:
+      - feat/bruiser-gorilla-conductive-stun
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/bruiser-gorilla-conductive-stun
+          fetch-depth: 0
+      - name: Pack source worktree
+        run: |
+          git archive --format=zip --output=/tmp/voxelyn-bruiser-worktree.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voxelyn-bruiser-worktree
+          path: /tmp/voxelyn-bruiser-worktree.zip
+          retention-days: 1
