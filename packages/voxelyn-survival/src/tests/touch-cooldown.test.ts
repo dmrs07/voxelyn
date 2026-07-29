@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cooldownRemainingFraction, resolveCooldownReadyAt } from '../client/cooldown-overlay';
 import {
   AIM_JOYSTICK_RADIUS,
+  AIM_STICK_ACTIVATION_SCALE,
   MOVE_JOYSTICK_RADIUS,
   TOUCH_BUTTON_HIT_SCALE,
   deactivateTouchControls,
@@ -102,7 +103,9 @@ describe('touch safe-area layout', () => {
       const a = input.state.buttons[i]!;
       const aHit = a.r * TOUCH_BUTTON_HIT_SCALE;
       const distanceFromAim = Math.hypot(a.cx - aim.originX, a.cy - aim.originY);
-      expect(distanceFromAim).toBeGreaterThanOrEqual(AIM_JOYSTICK_RADIUS + aHit + 10);
+      expect(distanceFromAim).toBeGreaterThanOrEqual(
+        AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE + aHit + 10
+      );
 
       for (let j = i + 1; j < input.state.buttons.length; j++) {
         const b = input.state.buttons[j]!;
@@ -110,6 +113,20 @@ describe('touch safe-area layout', () => {
           (aHit + b.r * TOUCH_BUTTON_HIT_SCALE);
         expect(gap).toBeGreaterThanOrEqual(10);
       }
+    }
+  });
+
+  it('mantem botoes fora da zona real da mira em landscape estreito', () => {
+    const input = new SurvivalInput({} as HTMLCanvasElement);
+    input.layoutButtons(568, 320);
+
+    const aim = input.state.aimTouch;
+    const activationRadius = AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
+    for (const button of input.state.buttons) {
+      const buttonHitRadius = button.r * TOUCH_BUTTON_HIT_SCALE;
+      const gap = Math.hypot(button.cx - aim.originX, button.cy - aim.originY) -
+        (activationRadius + buttonHitRadius);
+      expect(gap).toBeGreaterThanOrEqual(10);
     }
   });
 });

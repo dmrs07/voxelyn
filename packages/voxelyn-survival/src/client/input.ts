@@ -35,7 +35,8 @@ export type InputState = {
 export const MOVE_JOYSTICK_RADIUS = 60;
 export const AIM_JOYSTICK_RADIUS = 60;
 export const TOUCH_BUTTON_HIT_SCALE = 1.08;
-const STICK_ACTIVATION_SCALE = 1.55;
+const MOVE_STICK_ACTIVATION_SCALE = 1.55;
+export const AIM_STICK_ACTIVATION_SCALE = 1.45;
 const MOVE_DEAD_ZONE = 0.08;
 const AIM_DEAD_ZONE = 0.12;
 
@@ -111,6 +112,7 @@ export class SurvivalInput {
     const moveY = height - MOVE_JOYSTICK_RADIUS - safeBottom;
     const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
     const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
+    const aimActivationRadius = AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
 
     // Os dois controles ficam ancorados: a pele visual e a area de toque sempre
     // representam o mesmo lugar, em vez de o movimento nascer sob qualquer toque.
@@ -124,8 +126,8 @@ export class SurvivalInput {
     const hitRadius = r * TOUCH_BUTTON_HIT_SCALE;
     const gap = Math.max(14, Math.min(18, height * 0.04));
     const step = hitRadius * 2 + gap;
-    const actionY = aimY - AIM_JOYSTICK_RADIUS - hitRadius - gap;
-    const dodgeX = aimX - AIM_JOYSTICK_RADIUS - hitRadius - gap;
+    const actionY = aimY - aimActivationRadius - hitRadius - gap;
+    const dodgeX = aimX - aimActivationRadius - hitRadius - gap;
 
     this.state.buttons = [
       { id: 'dodge', cx: dodgeX, cy: aimY, r, pressed: false },
@@ -195,7 +197,7 @@ export class SurvivalInput {
 
       const move = this.state.joystick;
       const inMoveZone =
-        Math.hypot(x - move.originX, y - move.originY) <= MOVE_JOYSTICK_RADIUS * STICK_ACTIVATION_SCALE;
+        Math.hypot(x - move.originX, y - move.originY) <= MOVE_JOYSTICK_RADIUS * MOVE_STICK_ACTIVATION_SCALE;
       if (inMoveZone && !move.active) {
         move.active = true;
         move.pointerId = e.pointerId;
@@ -204,7 +206,9 @@ export class SurvivalInput {
       }
 
       const aim = this.state.aimTouch;
-      const inAimZone = Math.hypot(x - aim.originX, y - aim.originY) <= AIM_JOYSTICK_RADIUS * 1.65;
+      const inAimZone =
+        Math.hypot(x - aim.originX, y - aim.originY) <=
+        AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
       if (inAimZone && !aim.active) {
         aim.active = true;
         aim.pointerId = e.pointerId;
