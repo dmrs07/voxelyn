@@ -38,7 +38,16 @@ export type EnemyArchetype =
    * deixando rastro de fogo, o que encolhe a arena sozinho e reage com tudo o
    * que ja existe no chao.
    */
-  | 'fungal_horse';
+  | 'fungal_horse'
+  /**
+   * Empoverished Miner: uma PESSOA, nao um bicho. Passivo por padrao.
+   *
+   * A reacao dele a voce nao e sorteada: sai do CALOR da sua arma quando ele te
+   * nota. Frio, ele te ignora; morno, foge; quente, ataca. O sorteio era a
+   * versao obvia e violava o invariante do jogo — dano sem sinal. Assim o
+   * jogador decide que encontro vai ter, com um medidor que ja esta no HUD.
+   */
+  | 'miner';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -109,6 +118,23 @@ export type RunStats = {
   timesDowned: number;
   revivesGiven: number;
   /**
+   * Lascas de minerio arrancadas — a "cota".
+   *
+   * Opcional por design: ninguem e obrigado a minerar. Quem minera compra
+   * escolha de modulo com isso, e desempata no ranking. Uma cota obrigatoria
+   * viraria imposto sobre o tempo, e o tempo ja e cobrado pela terceira estrela.
+   */
+  oreCollected: number;
+  /**
+   * Mineradores PASSIVOS mortos.
+   *
+   * Nao muda numero nenhum da run, de proposito. O prospector e um robo sem
+   * compasso moral e o jogo nao vai puni-lo com dano nem com pontuacao por isso
+   * — ia soar como uma moral que a ficcao nega. Ele so ANOTA, e mostra anotado
+   * no fim. A mancha e o registro, nao a penalidade.
+   */
+  innocentsKilled: number;
+  /**
    * Reacoes sistemicas testemunhadas, para o codex do cliente.
    *
    * Bitmask e nao lista porque entra no hash: um Set nao tem ordem estavel
@@ -128,6 +154,9 @@ export const DISCOVERY_GUARDIAN_FELLED = 1 << 6;
 export const DISCOVERY_CORE_TAKEN = 1 << 7;
 export const DISCOVERY_BISHOP_FELLED = 1 << 8;
 export const DISCOVERY_HORSE_FELLED = 1 << 9;
+export const DISCOVERY_MINER_FLED = 1 << 10;
+export const DISCOVERY_MINER_ENRAGED = 1 << 11;
+export const DISCOVERY_ORE_QUOTA = 1 << 12;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -200,7 +229,21 @@ export type Entity = {
   facing: Vec2;
   action?: EntityAction;
   slot?: number;
+  /**
+   * Postura do Empoverished Miner. Ver MINER_MOOD_*.
+   *
+   * Vive na entidade e viaja no snapshot porque o cliente precisa DESENHAR a
+   * diferenca — olhos vermelhos fumegando raiva sao a unica coisa que avisa que
+   * aquele humano parado virou uma ameaca. Derivar no cliente exigiria repetir a
+   * regra de calor la, e as duas copias divergiriam no primeiro ajuste.
+   */
+  mood?: number;
 };
+
+/** Postura do Miner. Ele nasce PASSIVO; o calor da sua arma decide o resto. */
+export const MINER_MOOD_PASSIVE = 0;
+export const MINER_MOOD_FLEEING = 1;
+export const MINER_MOOD_ENRAGED = 2;
 
 export type PlayerExtra = {
   aim: Vec2;
@@ -310,6 +353,15 @@ export type SemanticEvent =
   | { t: 'corrode'; x: number; y: number; solid: number }
   /** Lasca arrancada de um veio de minerio por impacto cinetico. */
   | { t: 'chip'; x: number; y: number }
+  /**
+   * O Miner levantou a cabeca e decidiu. Carrega a postura porque o cliente
+   * precisa reagir NO INSTANTE — som e particula de raiva sao o aviso de que
+   * aquele humano parado virou uma ameaca, e reconstruir isso de `mood` no
+   * snapshot chegaria um tick depois e sem saber que foi a transicao.
+   */
+  | { t: 'miner_mood'; entity: number; x: number; y: number; mood: number }
+  /** Minerio entrou na cota. `total` para o HUD nao ter de somar por conta. */
+  | { t: 'ore_gained'; x: number; y: number; amount: number; total: number }
   | { t: 'discharge'; cells: number[]; source: 'player' | 'enemy' | 'environment'; owner?: number }
   | { t: 'ignite'; x: number; y: number }
   /**
@@ -413,6 +465,14 @@ export type SurvivalState = {
   contaminationWaves: number;
   nextEntityId: number;
   reactionQueue: number[];
+  /**
+   * Quantas escolhas de modulo a cota de minerio ja pagou.
+   *
+   * Contador de PAGAMENTOS, e nao um limiar. Sem ele, `oreCollected` acima do
+   * multiplo pagaria de novo a cada tick enquanto o jogador nao escolhesse, e um
+   * veio grande viraria modulo infinito.
+   */
+  oreModulesPaid: number;
   stats: RunStats;
   /** Preenchido uma unica vez, no tick em que a run termina. */
   summary: RunSummary | null;

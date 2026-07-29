@@ -3,7 +3,8 @@ import { FALLBACK_FRAME_MS, VoxelParticles, frameDeltaMs, hitMaterialOf } from '
 import { ABILITY_RADIUS, SOLID_CRYSTAL, SOLID_FRAGILE } from '@voxelyn/survival-sim';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
 
-const explosion = (x = 10, y = 10, radius = 3): SemanticEvent => ({ t: 'explosion', x, y, radius });
+const explosion = (x = 10, y = 10, radius = 3): SemanticEvent =>
+  ({ t: 'explosion', x, y, radius, source: 'environment' });
 
 describe('particulas voxel', () => {
   it('nasce de evento autoritativo, nunca por conta propria', () => {
@@ -364,7 +365,7 @@ describe('particulas voxel', () => {
 
   it('a frente da explosao chega a borda do estrago, sem passar dela', () => {
     const p = new VoxelParticles();
-    p.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    p.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3, source: 'environment' }], 96, 1);
     const r = varrer(p, 'shock', 16.7);
     expect(r).toBeGreaterThan(3 * 0.9);
     expect(r).toBeLessThanOrEqual(3);
@@ -399,8 +400,8 @@ describe('particulas voxel', () => {
   it('chega ao mesmo lugar a 10 e a 60 quadros por segundo', () => {
     const rapido = new VoxelParticles();
     const lento = new VoxelParticles();
-    rapido.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
-    lento.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3 }], 96, 1);
+    rapido.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3, source: 'environment' }], 96, 1);
+    lento.ingest([{ t: 'explosion', x: 50, y: 50, radius: 3, source: 'environment' }], 96, 1);
     expect(varrer(lento, 'shock', 100)).toBeCloseTo(varrer(rapido, 'shock', 16.7), 1);
   });
 

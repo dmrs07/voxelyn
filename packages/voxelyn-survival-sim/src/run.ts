@@ -38,6 +38,7 @@ import {
   REVIVE_RADIUS,
   RETURN_DISC_MAX_DISTANCE,
   RETURN_DISC_SPEED,
+  ORE_PER_MODULE,
   SALVAGE_SCAN_TICKS,
   CONTAMINATION_SECTOR_SCALE,
   SECTOR_COUNT,
@@ -79,6 +80,7 @@ import {
 } from './modules.js';
 import {
   DISCOVERY_DISCHARGE_POOL,
+  DISCOVERY_ORE_QUOTA,
   DISCOVERY_SELF_HARM,
 } from './types.js';
 import type {
@@ -240,6 +242,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     // que nenhum inimigo colida com um id de player nos snapshots por id
     nextEntityId: playerCount + 1,
     reactionQueue: [],
+    oreModulesPaid: 0,
     stats: emptyStats(),
     summary: null,
   };
@@ -1169,6 +1172,37 @@ const finalizeRun = (state: SurvivalState): void => {
   state.summary = buildSummary(state, state.phase === 'dead' ? runEndingCause(state) : null);
 };
 
+/**
+ * A cota paga em ESCOLHA DE MODULO — a mesma moeda com que o salvage paga risco.
+ *
+ * Era a peca que faltava do minerio: o prospector e um robo de mineracao que nao
+ * minerava, e "pontos no fim" nao e beneficio, e placar. Pagando com a moeda que
+ * o jogo ja usa, as duas atividades ficam COMPARAVEIS dentro da run — vale mais
+ * abrir aquele terminal ou arrancar aquele veio? — em vez de a mineracao virar
+ * uma economia paralela com regras proprias.
+ *
+ * `sourceSiteId` negativo separa a oferta da cota das ofertas de salvage no
+ * `rollModuleChoice`, que semeia por site: reusar um id de site faria a escolha
+ * paga em minerio sair identica a de um cofre que o jogador ja abriu.
+ *
+ * Roda depois dos inimigos porque o drop do miner morto entra na mesma contagem:
+ * o minerio que ele carregava conta como cota no mesmo tick em que ele cai.
+ */
+const payOreQuota = (state: SurvivalState, events: SemanticEvent[]): void => {
+  const earned = Math.floor(state.stats.oreCollected / ORE_PER_MODULE);
+  if (earned <= state.oreModulesPaid) return;
+  state.oreModulesPaid = earned;
+  markDiscovery(state.stats, DISCOVERY_ORE_QUOTA);
+  // Uma escolha por jogador de pe. No co-op a cota e do time — quem carrega a
+  // picareta e quem cobre nao deveriam ser pagos de forma diferente por isso.
+  for (const player of standingPlayers(state)) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (extra.pendingModuleChoice) continue;
+    const options = rollModuleChoice(state.config.seed, -earned, 2, extra, state.tick);
+    extra.pendingModuleChoice = { sourceSiteId: -earned, options, createdAtTick: state.tick };
+  }
+};
+
 export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]): StepResult => {
   const events: SemanticEvent[] = [];
 
@@ -1195,6 +1229,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepCells(state, events);
   applyCellHazards(state, events);
   stepContamination(state, events);
+  payOreQuota(state, events);
   resolveChainedEvents(state, events);
   resolveDownedAndDeaths(state, events);
   finalizeRun(state);
@@ -1251,6 +1286,7 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   // mudaria o hash de toda run existente sem mudar comportamento nenhum.
   'bishop',
   'fungal_horse',
+  'miner',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -1338,6 +1374,8 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.stats.purgeCellsUsed);
   mix(state.stats.timesDowned);
   mix(state.stats.revivesGiven);
+  mix(state.stats.oreCollected);
+  mix(state.stats.innocentsKilled);
   mix(state.stats.discoveries);
   for (const archetype of HASHED_ARCHETYPES) mix(state.stats.kills[archetype]);
   mix(state.guardianSummoned ? 1 : 0);

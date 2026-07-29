@@ -368,6 +368,7 @@ export class GameRoom {
         facingX: round3(e.facing.x),
         facingY: round3(e.facing.y),
         stunnedUntil: e.stunnedUntil,
+        mood: e.mood,
         action: e.action ? {
           kind: e.action.kind,
           phase: e.action.phase,

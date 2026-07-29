@@ -27,9 +27,12 @@ import {
   CONTAMINATION_CARRYOVER,
   HORSE_SPAWN_CHANCE,
   MAX_ENEMIES,
+  MINER_ORE_SEARCH,
+  MINER_PER_SECTOR,
   RUN_SEED_MIX,
   SECTOR_COUNT,
   SOLID_NONE,
+  SOLID_ORE,
 } from './constants.js';
 import { spawnEnemy } from './entities.js';
 import { generateWorld } from './worldgen.js';
@@ -117,6 +120,48 @@ export const populateSector = (
   }
   if (isFinalSector(state.sector)) {
     spawnEnemy(state, 'guardian', guardian.x, guardian.y, false);
+  }
+  populateMiners(state, spawns);
+};
+
+/**
+ * Mineradores nascem PERTO DE MINERIO, e nao em pontos de spawn de inimigo.
+ *
+ * O lugar e a caracterizacao: eles estao ali porque estao trabalhando o veio, e
+ * e por isso que o robo da mineradora vai encontra-los. Espalha-los pelos mesmos
+ * pontos que os bichos os transformaria em mais um inimigo que por acaso nao
+ * ataca — o encontro so significa alguma coisa acontecendo ONDE voce foi buscar
+ * o que eles ja estavam tirando.
+ *
+ * A varredura anda pelos pontos de spawn em ordem fixa e procura minerio na
+ * vizinhanca de cada um, com a ordem de iteracao como desempate. Deterministica
+ * pelo mesmo motivo de sempre: as duas maquinas de uma sala de co-op precisam
+ * colocar os mineradores nas MESMAS celulas.
+ */
+const populateMiners = (state: SurvivalState, spawns: readonly { x: number; y: number }[]): void => {
+  const w = state.config.width;
+  let placed = 0;
+  for (const spawn of spawns) {
+    if (placed >= MINER_PER_SECTOR || state.enemies.length >= MAX_ENEMIES) return;
+    let found: { x: number; y: number } | null = null;
+    for (let dy = -MINER_ORE_SEARCH; dy <= MINER_ORE_SEARCH && !found; dy++) {
+      for (let dx = -MINER_ORE_SEARCH; dx <= MINER_ORE_SEARCH && !found; dx++) {
+        const x = spawn.x + dx;
+        const y = spawn.y + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        if (state.solid[y * w + x] !== SOLID_ORE) continue;
+        // O veio e solido: ele fica ao LADO dele, num chao livre, nao dentro.
+        for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (state.solid[(y + oy) * w + (x + ox)] === SOLID_NONE) {
+            found = { x: x + ox, y: y + oy };
+            break;
+          }
+        }
+      }
+    }
+    if (!found) continue;
+    spawnEnemy(state, 'miner', found.x, found.y, false);
+    placed++;
   }
 };
 

@@ -288,6 +288,24 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // porque tudo o mais e alguma coisa terminando. Uma glissando ascendente nao
   // precisa ser aprendida: contra um vocabulario inteiro de quedas, ela le como
   // "isto esta voltando" antes de o jogador saber o que e o som.
+  // Grito humano. Serra denteada subindo, curta e crua — deliberadamente a voz
+  // mais FEIA do banco: nada mais no jogo grita, e o desconforto e o ponto.
+  minerRage: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sawtooth', from: 210, to: 430, peak: 0.4, decay: 0.34, attack: 0.01 });
+    tone(ctx, out, t0 + 0.04, { type: 'square', from: 320, to: 250, peak: 0.16, decay: 0.28 });
+    burst(ctx, out, t0, noise, { peak: 0.2, decay: 0.2, type: 'bandpass', from: 1400, to: 600, q: 1.2 });
+  },
+  // Fuga: sopro curto que DESCE e se afasta. Sem tom definido — quem foge nao
+  // esta anunciando nada, so foi visto.
+  minerFlee: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.3, decay: 0.3, type: 'bandpass', from: 900, to: 260, q: 0.9 });
+    tone(ctx, out, t0, { type: 'triangle', from: 300, to: 170, peak: 0.14, decay: 0.24 });
+  },
+  // Minerio na cota: clique curto e metalico, no registro alto onde nada mais
+  // do jogo toca. E um recibo, nao um evento — tem de sumir sob o combate.
+  oreGained: (ctx, out, t0) => {
+    tone(ctx, out, t0, { type: 'square', from: 1180, to: 1560, peak: 0.14, decay: 0.09, attack: 0.002 });
+  },
   bishopHeal: (ctx, out, t0) => {
     tone(ctx, out, t0, { type: 'sine', from: 320, to: 620, peak: 0.3, decay: 0.26, attack: 0.03 });
     tone(ctx, out, t0 + 0.02, { type: 'triangle', from: 480, to: 930, peak: 0.14, decay: 0.22, attack: 0.03 });

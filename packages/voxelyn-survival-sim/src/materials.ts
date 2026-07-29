@@ -215,7 +215,13 @@ export const impactSolid = (
       // mas e finito — sem limite uma parede de minerio seria fonte infinita.
       state.solid[i] = solid === SOLID_ORE ? SOLID_ORE_CHIPPED : SOLID_ORE_SPENT;
       markDirty(state, cx, cy);
+      // A lasca entra na COTA. O minerio ja saia do grid ha muito tempo e nao
+      // ia para lugar nenhum: o prospector e um robo de mineracao que nao
+      // minerava. Contar aqui, no unico ponto onde a materia realmente e
+      // consumida, garante que a cota nao possa ser inflada por outro caminho.
+      state.stats.oreCollected += 1;
       events.push({ t: 'chip', ...at });
+      events.push({ t: 'ore_gained', ...at, amount: 1, total: state.stats.oreCollected });
       return { stop: true, broke: false };
     }
 

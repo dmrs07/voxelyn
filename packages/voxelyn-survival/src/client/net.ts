@@ -378,6 +378,11 @@ export class NetClient {
           id: snap.id,
           kind: 'enemy',
           archetype: snap.archetype as EnemyArchetype,
+          mood: snap.mood,
+          // O espelho do cliente nao simula: `alertedUntil` so existe aqui para
+          // satisfazer o tipo compartilhado com a sim. Zero e o valor honesto —
+          // quem decide aggro e o servidor, e este campo nunca e lido no cliente.
+          alertedUntil: 0,
           x: pos.x,
           y: pos.y,
           vx: 0,

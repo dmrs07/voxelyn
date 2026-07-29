@@ -18,6 +18,9 @@ const ARCHETYPE_NAMES: Record<EnemyArchetype, string> = {
   spitter: 'Cuspidor',
   bomber: 'Portador de Esporos',
   bruiser: 'Britador',
+  fungal_horse: 'Corcel',
+  bishop: 'Bispo',
+  miner: 'Mineiro',
   guardian: 'Guardião',
 };
 

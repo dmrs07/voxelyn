@@ -32,6 +32,9 @@ export type VoiceId =
   | 'death'
   | 'deathGuardian'
   | 'bishopHeal'
+  | 'minerFlee'
+  | 'minerRage'
+  | 'oreGained'
   // --- mundo --------------------------------------------------------------
   | 'explosion'
   | 'discharge'
@@ -136,6 +139,14 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // orcamento seria perder a pergunta da luta. `minIntervalMs` de 180 casa com o
   // evento a cada 4 ticks (200 ms): passa todos sem virar zumbido continuo.
   bishopHeal: { priority: 8, gain: 0.4, minIntervalMs: 180, spatial: true },
+  // O grito do mineiro tem prioridade de TELEGRAFO (9), e nao de dano: ele e o
+  // aviso de que um alvo que estava NEUTRO deixou de estar. Perde-lo no
+  // orcamento seria perder a unica coisa que separa "havia alguem ali" de
+  // "alguem esta vindo".
+  minerRage: { priority: 9, gain: 0.75, minIntervalMs: 0, spatial: true },
+  minerFlee: { priority: 5, gain: 0.45, minIntervalMs: 0, spatial: true },
+  // Recibo, e nao evento: baixo e agudo, para sumir sob o combate.
+  oreGained: { priority: 3, gain: 0.28, minIntervalMs: 90, spatial: true },
 
   explosion: { priority: 8, gain: 0.75, minIntervalMs: 70, spatial: true },
   discharge: { priority: 7, gain: 0.6, minIntervalMs: 110, spatial: true },

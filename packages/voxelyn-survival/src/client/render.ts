@@ -10,6 +10,7 @@ import {
   SOLID_ORE_SPENT,
   SURF_BIOFLUID,
   SURF_FIRE,
+  MINER_MOOD_ENRAGED,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
   SURF_GAS,
@@ -966,9 +967,14 @@ export class SurvivalRenderer {
               // debaixo do bispo e um dado que ele TEM. Mandar um booleano por
               // inimigo por tick para dizer o que o mapa ja diz seria pagar
               // banda por uma leitura local.
+              // Dois usos, uma bandeira: "esta criatura esta ACESA agora". No
+              // bispo e a cura vindo do chao; no mineiro e a raiva. Sao a mesma
+              // pergunta de desenho — acender ou nao a luz emissiva — e separar
+              // em dois parametros so duplicaria o `if` do outro lado.
               charged:
-                enemy.archetype === 'bishop' &&
-                state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] === SURF_FUNGAL,
+                (enemy.archetype === 'bishop' &&
+                  state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] === SURF_FUNGAL) ||
+                (enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED),
             });
           }
           if (enemy.stunnedUntil > state.tick) {

@@ -19,7 +19,7 @@ const base: RunSummary = {
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 20,
-    kills: { stalker: 2, bruiser: 1, spitter: 0, bomber: 0, guardian: 0 },
+    kills: { stalker: 2, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 },
     damageTakenTenths: 875,
     damageDealtTenths: 4000,
     solidsDestroyed: 12,
@@ -28,6 +28,8 @@ const base: RunSummary = {
     purgeCellsUsed: 1,
     timesDowned: 0,
     revivesGiven: 0,
+    oreCollected: 0,
+    innocentsKilled: 0,
     discoveries: 0,
   },
   stars: 0,

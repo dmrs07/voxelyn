@@ -11,7 +11,7 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 10,
-    kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0 },
+    kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 },
     damageTakenTenths: 100,
     damageDealtTenths: 200,
     solidsDestroyed: 3,
@@ -20,6 +20,8 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
     purgeCellsUsed: 0,
     timesDowned: 0,
     revivesGiven: 0,
+    oreCollected: 0,
+    innocentsKilled: 0,
     discoveries: 0,
   },
   stars: 0,
@@ -69,7 +71,7 @@ describe('registro entre runs', () => {
 
   it('acumula abates por arquetipo no bestiario', () => {
     let rec = emptyRecords();
-    const kills = { stalker: 3, bruiser: 1, spitter: 0, bomber: 0, guardian: 0 };
+    const kills = { stalker: 3, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 };
     rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
     rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
     expect(rec.bestiary.stalker?.killed).toBe(6);

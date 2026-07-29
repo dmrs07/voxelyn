@@ -267,6 +267,27 @@ export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEnt
       break;
     }
 
+    case 'miner': {
+      // Humano, e a silhueta tem de dizer isso ANTES de qualquer mecanica: dois
+      // membros, tronco estreito, cabeca no lugar de cabeca. E o unico corpo do
+      // bestiario com a mesma leitura do prospector — e e a coisa mais importante
+      // do desenho, porque o encontro inteiro depende de o jogador reconhecer
+      // que ali esta alguem, e nao mais um bicho.
+      const rage = charged ? 0.6 + Math.sin(nowMs * 0.02) * 0.4 : 0;
+      limb(ctx, sx - size * 0.2, baseY, size * 0.2, size * 0.5, PAL.rockShadow, light);
+      limb(ctx, sx + size * 0.14, baseY, size * 0.2, size * 0.5, PAL.rockShadow, light);
+      block(ctx, sx, baseY - size * 0.4, size * 0.72, size * 0.42, size * 0.72, PAL.rust, light);
+      block(ctx, sx, baseY - size * 1.06, size * 0.5, size * 0.34, size * 0.36, PAL.bone, light);
+      // Picareta: e ela que diz que ele estava TRABALHANDO, nao esperando voce.
+      block(ctx, sx + size * 0.46, baseY - size * 0.5, size * 0.12, size * 0.12, size * 0.95, PAL.rust, light);
+      block(ctx, sx + size * 0.46, baseY - size * 1.4, size * 0.42, size * 0.14, size * 0.12, PAL.rockLight, light);
+      // Olhos: apagados enquanto ele te ignora, em brasa quando decidiu que voce
+      // e a empresa que o deixou aqui embaixo.
+      emissive(ctx, sx + size * 0.1, baseY - size * 1.16, size * 0.1, charged ? shade(PAL.blood, rage) : PAL.rockShadow);
+      emissive(ctx, sx - size * 0.08, baseY - size * 1.16, size * 0.09, charged ? shade(PAL.fire, rage) : PAL.rockShadow);
+      break;
+    }
+
     case 'fungal_horse': {
       // A unica silhueta HORIZONTAL do bestiario.
       //

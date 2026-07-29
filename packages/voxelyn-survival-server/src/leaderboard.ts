@@ -24,6 +24,14 @@ export type LeaderboardEntry = {
   phase: string;
   mode: LeaderboardMode;
   kills: number;
+  /**
+   * Minerio da run. Desempata entre estrelas e tempo iguais.
+   *
+   * `not null default 0` no banco em vez de nulavel: bancos que ja existiam
+   * ganham zero, que e a resposta correta — aquelas runs foram jogadas quando
+   * minerio nao existia, e nao "com minerio desconhecido".
+   */
+  ore: number;
   createdAt: string;
 };
 
@@ -65,8 +73,17 @@ export const isLeaderboardEligible = (summary: RunSummary): boolean =>
  * comecou. Empate desempata pelo mais antigo: quem chegou primeiro fica na
  * frente, e o ranking nao se reordena sozinho quando ninguem melhorou nada.
  */
+/**
+ * Mais estrelas, menos tempo, mais MINERIO, e por fim quem chegou antes.
+ *
+ * O minerio entra DEPOIS do tempo, e nao antes, de proposito. Ele nao pode virar
+ * um objetivo que compete com a corrida — a terceira estrela ja e "a segunda com
+ * pressa", e minerar custa tempo. Como desempate ele so decide entre duas runs
+ * que ja empataram no que o jogo cobra, e ai a pergunta "quem tirou mais do
+ * Veio?" e a unica que sobra, alem de ser a que a ficcao faria.
+ */
 export const compareEntries = (a: LeaderboardEntry, b: LeaderboardEntry): number =>
-  b.stars - a.stars || a.ticks - b.ticks || a.id - b.id;
+  b.stars - a.stars || a.ticks - b.ticks || b.ore - a.ore || a.id - b.id;
 
 export const DEFAULT_LIMIT = 25;
 export const MAX_LIMIT = 100;
@@ -96,6 +113,7 @@ export class MemoryLeaderboard implements LeaderboardStore {
       phase: input.summary.phase,
       mode: input.mode,
       kills: totalKills(input.summary),
+      ore: input.summary.stats.oreCollected,
       createdAt: new Date().toISOString(),
     };
     this.rows.push(entry);
@@ -144,15 +162,27 @@ create table if not exists leaderboard_entries (
   phase       text        not null,
   mode        text        not null,
   kills       integer     not null,
+  ore         integer     not null default 0,
   digest      text        unique,
   created_at  timestamptz not null default now()
 );
--- Indice que serve a consulta do ranking: a ordenacao inteira sai do indice,
--- sem sort em memoria, tanto no placar global quanto no de uma seed.
-create index if not exists leaderboard_rank_idx
-  on leaderboard_entries (stars desc, ticks asc, id asc);
-create index if not exists leaderboard_seed_idx
-  on leaderboard_entries (seed, stars desc, ticks asc, id asc);
+-- CREATE TABLE IF NOT EXISTS nao altera uma tabela que ja existe, e a que roda em
+-- producao foi criada antes de o minerio existir. Sem esta linha o deploy subiria
+-- limpo e o insert quebraria no primeiro placar enviado — o pior tipo de falha,
+-- porque nada no boot a denuncia. ADD COLUMN IF NOT EXISTS mantem o boot
+-- idempotente, que e o que permite o schema continuar morando aqui em vez de num
+-- sistema de migracao que ainda nao se justifica.
+alter table leaderboard_entries add column if not exists ore integer not null default 0;
+-- Indices com nome NOVO, e nao os antigos.
+--
+-- CREATE INDEX IF NOT EXISTS olha o NOME, nao as colunas: reusar o nome antigo
+-- deixaria o indice velho intacto em producao e silenciosamente fora de ordem
+-- com o ORDER BY. O indice tem de casar com compareEntries — um que discorde
+-- devolve as linhas certas na ordem errada.
+create index if not exists leaderboard_rank_ore_idx
+  on leaderboard_entries (stars desc, ticks asc, ore desc, id asc);
+create index if not exists leaderboard_seed_ore_idx
+  on leaderboard_entries (seed, stars desc, ticks asc, ore desc, id asc);
 `;
 
 const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
@@ -166,6 +196,7 @@ const rowToEntry = (row: Record<string, unknown>): LeaderboardEntry => ({
   phase: String(row.phase),
   mode: String(row.mode) as LeaderboardMode,
   kills: Number(row.kills),
+  ore: Number(row.ore ?? 0),
   createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
 });
 
@@ -199,8 +230,8 @@ export class PostgresLeaderboard implements LeaderboardStore {
     // entre o "ja existe?" e o insert. O indice unico e a unica barreira que
     // nao tem janela.
     const result = await this.pool.query(
-      `insert into leaderboard_entries (name, seed, stars, ticks, phase, mode, kills, digest)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)
+      `insert into leaderboard_entries (name, seed, stars, ticks, phase, mode, kills, ore, digest)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        on conflict (digest) do nothing
        returning *`,
       [
@@ -211,6 +242,7 @@ export class PostgresLeaderboard implements LeaderboardStore {
         input.summary.phase,
         input.mode,
         totalKills(input.summary),
+        input.summary.stats.oreCollected,
         input.digest,
       ],
     );
@@ -234,7 +266,7 @@ export class PostgresLeaderboard implements LeaderboardStore {
     const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : '';
     const result = await this.pool.query(
       `select * from leaderboard_entries ${where}
-       order by stars desc, ticks asc, id asc
+       order by stars desc, ticks asc, ore desc, id asc
        limit $${values.length}`,
       values,
     );

@@ -133,6 +133,14 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     case 'heal':
       return [{ voice: 'bishopHeal', x: ev.x, y: ev.y, scale: 1 }];
 
+    // Duas vozes bem diferentes para a MESMA transicao, porque o que o jogador
+    // precisa saber e qual das duas aconteceu — e ele precisa saber sem olhar.
+    case 'miner_mood':
+      return [{ voice: ev.mood === 2 ? 'minerRage' : 'minerFlee', x: ev.x, y: ev.y, scale: 1 }];
+
+    case 'ore_gained':
+      return [{ voice: 'oreGained', x: ev.x, y: ev.y, scale: Math.min(1.3, 0.7 + ev.amount / 10) }];
+
     case 'explosion':
       // Explosao maior soa maior, mas com teto: o raio do modulo explosivo e
       // fixo, entao a variacao aqui e pequena de proposito.

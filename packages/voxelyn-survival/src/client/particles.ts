@@ -127,6 +127,9 @@ const HIT_MATERIAL: Record<string, ParticleKind> = {
   // e nao lasca de pedra. E o mesmo detalhe que ja dizia ao jogador que o
   // prospector e feito de outra coisa.
   bishop: 'spore',
+  // O mineiro e uma PESSOA. Sangue, e nao esporo nem pedra — e o unico respingo
+  // do jogo que deveria incomodar, e e de proposito.
+  miner: 'chitin',
   fungal_horse: 'spore',
   prospector: 'stone',
 };
@@ -317,6 +320,18 @@ export class VoxelParticles {
           // e o jogador teria de comparar a barra com a memoria dela para
           // perceber que nao esta progredindo. Aqui ele VE de onde vem.
           this.burst(ev.x, ev.y, 'mycelium', n(5), 0.55, 2.4, 780, ev.entity);
+          break;
+        case 'ore_gained':
+          // Lasca dourada saltando. Fica no MESMO tipo do `chip` que ja existia:
+          // e a mesma materia saindo da mesma parede, e dar a ela um visual
+          // proprio faria parecer que sao dois acontecimentos.
+          this.burst(ev.x, ev.y, 'oreChip', n(3), 1.5, 1.8, 420, 41);
+          break;
+        case 'miner_mood':
+          // So o enfurecido levanta particula. A fuga ja e legivel pelo corpo
+          // saindo de perto, e uma nuvem em cima de quem foge apagaria a leitura
+          // que importa: para ONDE ele foi.
+          if (ev.mood === 2) this.burst(ev.x, ev.y, 'ember', n(6), 1.1, 2.0, 520, ev.entity);
           break;
         case 'discharge':
           for (const cell of ev.cells.slice(0, Math.max(4, n(16)))) {
