@@ -14,7 +14,7 @@ const replaceExact = (path, before, after) => {
 
 replaceExact(
   'package.json',
-  `"build:survival": "node scripts/apply-mobile-hud-dual-stick.mjs && pnpm --filter @voxelyn/survival-server... build && pnpm --filter @voxelyn/survival... build"`,
+  `"build:survival": "node scripts/fix-mobile-hud-transporter.mjs && node scripts/apply-mobile-hud-dual-stick.mjs && pnpm --filter @voxelyn/survival-server... build && pnpm --filter @voxelyn/survival... build"`,
   `"build:survival": "pnpm --filter @voxelyn/survival-server... build && pnpm --filter @voxelyn/survival... build"`,
 );
 replaceExact(
@@ -23,6 +23,7 @@ replaceExact(
   `"build:offline-check": "vite build && node scripts/check-precache.mjs"`,
 );
 
+rmSync('scripts/fix-mobile-hud-transporter.mjs');
 rmSync('scripts/apply-mobile-hud-dual-stick.mjs');
 rmSync('scripts/finalize-mobile-hud-dual-stick.mjs');
 
