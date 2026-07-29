@@ -43,6 +43,7 @@ import {
   describeOutcome,
   formatSeed,
   nextStarHint,
+  reputationNote,
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
@@ -1631,6 +1632,7 @@ export class SurvivalRenderer {
     const lines = summaryLines(summary);
     const half = Math.ceil(lines.length / 2);
     const hint = nextStarHint(summary);
+    const record = reputationNote(summary);
 
     // Altura do bloco medida ANTES de desenhar, para centralizar de verdade.
     //
@@ -1644,6 +1646,7 @@ export class SurvivalRenderer {
       unit * (cause.lesson ? 1.35 : 0) + // licao
       unit * 2 + // respiro antes dos numeros
       half * unit * 1.25 + // numeros
+      (record ? unit * 1.45 : 0) +
       (hint ? unit * 1.45 : 0) +
       unit * 1.5 + // seed
       unit * 1.6; // chamada de reinicio
@@ -1705,6 +1708,16 @@ export class SurvivalRenderer {
     }
     ctx.textAlign = 'center';
     y += half * unit * 1.25;
+
+    // O registro vem ANTES da dica de estrela e em vermelho: ele nao e um
+    // conselho de como jogar melhor, e a unica linha desta tela que so constata.
+    if (record) {
+      y += unit * 0.6;
+      ctx.fillStyle = PAL.blood;
+      ctx.font = statFont;
+      ctx.fillText(record, vw / 2, y);
+      y += unit * 0.85;
+    }
 
     if (hint) {
       y += unit * 0.6;

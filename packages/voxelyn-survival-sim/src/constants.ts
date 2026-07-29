@@ -374,8 +374,15 @@ export const RUN_SEED_MIX = 0x9e3779b9;
  * e seguranca contra recurso.
  */
 export const MINER_NOTICE_RANGE = 7;
-/** Calor acima do qual ele entende que voce e uma ameaca. HEAT_MAX e 100. */
-export const MINER_RAGE_HEAT = 55;
+/**
+ * Calor acima do qual ele entende que voce e uma ameaca. HEAT_MAX e 100.
+ *
+ * Dois tercos da barra, e nao pouco mais da metade. A 55 o limiar caia dentro do
+ * calor de um combate curto qualquer, e a rota "chegar frio" sumia na pratica —
+ * o jogador chegava enfurecendo sem ter escolhido isso, que e o oposto do ponto.
+ * Em 66,6 e preciso ter atirado com vontade para cruza-lo.
+ */
+export const MINER_RAGE_HEAT = 66.6;
 /** Abaixo disto ele nem levanta a cabeca. */
 export const MINER_FEAR_HEAT = 8;
 export const MINER_HP = 34;
