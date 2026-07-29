@@ -21,6 +21,8 @@ export type WsOptions = ServerOptions & {
   allowedOrigins?: string[]; // CORS/origem restrita para wss
   /** URL do Postgres. Ausente = ranking em memoria (dev e testes). */
   databaseUrl?: string;
+  /** Quantos proxies imediatamente a frente da aplicacao podem definir XFF. */
+  trustedProxyHops?: number;
 };
 
 /**
@@ -63,6 +65,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       store,
       log,
       allowedOrigins: opts.allowedOrigins,
+      trustedProxyHops: opts.trustedProxyHops,
     });
   });
 
