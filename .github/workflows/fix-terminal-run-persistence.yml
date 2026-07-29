@@ -1,0 +1,301 @@
+name: Fix Terminal Run Persistence
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr-53-terminal-run-persistence
+  cancel-in-progress: true
+
+jobs:
+  apply-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/voxelyn-survival-brainstorm-nk0gdw
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply terminal result invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = 1) -> None:
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              assert actual == count, f'{path}: expected {count} matches, found {actual}'
+              p.write_text(text.replace(old, new, count))
+
+          records = 'packages/voxelyn-survival/src/client/records.ts'
+          replace(
+              records,
+              "export const HISTORY_LIMIT = 20;\n",
+              "export const HISTORY_LIMIT = 20;\n\n"
+              "/** Identidade estavel de uma run terminal, inclusive apos JSON/WebSocket. */\n"
+              "export const runSummaryIdentity = (summary: RunSummary): string =>\n"
+              "  `${summary.seed}:${summary.phase}:${summary.ticks}`;\n",
+          )
+
+          main = 'packages/voxelyn-survival/src/client/main.ts'
+          replace(
+              main,
+              "import { applyRun, loadRecords, saveRecords, type Records } from './records';",
+              "import { applyRun, loadRecords, runSummaryIdentity, saveRecords, type Records } from './records';",
+          )
+          replace(
+              main,
+              " * O guard por identidade do sumario e o que impede a run de ser contada a cada\n"
+              " * quadro: a fase terminal persiste, o loop continua desenhando, e sem ele o\n"
+              " * historico ganharia sessenta copias por segundo da mesma morte.\n"
+              " */\n"
+              "let recordedSummary: unknown = null;",
+              " * O guard usa campos congelados do sumario, e nao identidade de objeto: no\n"
+              " * online cada snapshot desserializa uma nova copia da mesma run terminal.\n"
+              " */\n"
+              "let recordedSummaryKey: string | null = null;",
+          )
+          replace(
+              main,
+              "const recordRun = (state: SurvivalState): void => {\n"
+              "  if (!state.summary || state.summary === recordedSummary) return;\n"
+              "  recordedSummary = state.summary;\n"
+              "  records = applyRun(records, state.summary);\n"
+              "  saveRecords(records);\n"
+              "};",
+              "const recordRun = (state: SurvivalState): void => {\n"
+              "  if (!state.summary) return;\n"
+              "  const key = runSummaryIdentity(state.summary);\n"
+              "  if (key === recordedSummaryKey) return;\n"
+              "  recordedSummaryKey = key;\n"
+              "  records = applyRun(records, state.summary);\n"
+              "  saveRecords(records);\n"
+              "};",
+          )
+          replace(main, 'recordedSummary = null;', 'recordedSummaryKey = null;', count=2)
+
+          leaderboard = 'packages/voxelyn-survival-server/src/leaderboard.ts'
+          replace(
+              leaderboard,
+              "const totalKills = (summary: RunSummary): number =>\n"
+              "  Object.values(summary.stats.kills).reduce((a, b) => a + b, 0);",
+              "const totalKills = (summary: RunSummary): number =>\n"
+              "  Object.values(summary.stats.kills).reduce((a, b) => a + b, 0);\n\n"
+              "/** Apenas runs extraidas sao elegiveis; derrotas nunca entram no placar. */\n"
+              "export const isLeaderboardEligible = (summary: RunSummary): boolean => summary.phase !== 'dead';",
+          )
+          replace(
+              leaderboard,
+              "  async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {\n"
+              "    if (input.digest && this.digests.has(input.digest)) return null;",
+              "  async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {\n"
+              "    if (!isLeaderboardEligible(input.summary)) return null;\n"
+              "    if (input.digest && this.digests.has(input.digest)) return null;",
+              count=1,
+          )
+          replace(
+              leaderboard,
+              "      .filter(\n"
+              "        (r) =>\n"
+              "          (query.seed === undefined || r.seed === query.seed) &&\n"
+              "          (query.mode === undefined || r.mode === query.mode),\n"
+              "      )",
+              "      .filter(\n"
+              "        (r) =>\n"
+              "          r.phase !== 'dead' &&\n"
+              "          (query.seed === undefined || r.seed === query.seed) &&\n"
+              "          (query.mode === undefined || r.mode === query.mode),\n"
+              "      )",
+          )
+          replace(
+              leaderboard,
+              "  async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {\n"
+              "    // `on conflict do nothing` faz a deduplicacao no BANCO e nao na aplicacao:",
+              "  async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {\n"
+              "    if (!isLeaderboardEligible(input.summary)) return null;\n"
+              "    // `on conflict do nothing` faz a deduplicacao no BANCO e nao na aplicacao:",
+          )
+          replace(
+              leaderboard,
+              "  async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {\n"
+              "    const conditions: string[] = [];",
+              "  async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {\n"
+              "    // Tambem oculta linhas antigas gravadas antes desta invariante.\n"
+              "    const conditions: string[] = [`phase <> 'dead'`];",
+          )
+          replace(
+              leaderboard,
+              "    const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : '';",
+              "    const where = `where ${conditions.join(' and ')}`;",
+          )
+
+          ws = 'packages/voxelyn-survival-server/src/ws.ts'
+          replace(
+              ws,
+              "      if (!summary || !leaderboardStore) return;",
+              "      if (!summary || summary.phase === 'dead' || !leaderboardStore) return;",
+          )
+
+          server = 'packages/voxelyn-survival-server/src/server.ts'
+          replace(
+              server,
+              "      const terminal =\n"
+              "        room.state.phase === 'dead' ||\n"
+              "        room.state.phase === 'extracted' ||\n"
+              "        room.state.phase === 'extracted_with_core';\n"
+              "      // Dispara UMA vez por sala. A fase terminal persiste e o loop continua\n"
+              "      // rodando ate a sala expirar; sem a marca, o mesmo resultado entraria no\n"
+              "      // ranking vinte vezes por segundo.\n"
+              "      if (terminal && !room.resultReported && room.state.summary) {\n"
+              "        room.resultReported = true;\n"
+              "        this.onRunFinished?.(room);\n"
+              "      }\n"
+              "      // salas terminadas nao avancam a sim, mas ainda podem emitir um snapshot final\n"
+              "      const { events, chunkDiffs, removed } = terminal\n"
+              "        ? { events: [], chunkDiffs: [], removed: [] }\n"
+              "        : room.step();",
+              "      const wasTerminal = room.state.phase !== 'running';\n"
+              "      // Salas ja terminadas nao avancam; salas correndo podem terminar NESTE passo.\n"
+              "      const { events, chunkDiffs, removed } = wasTerminal\n"
+              "        ? { events: [], chunkDiffs: [], removed: [] }\n"
+              "        : room.step();\n"
+              "      const terminal = room.state.phase !== 'running';\n"
+              "      // Reporta no MESMO tick que congelou o sumario, antes do snapshot final.\n"
+              "      // Assim o ultimo socket pode fechar logo apos recebe-lo sem perder o resultado.\n"
+              "      if (terminal && !room.resultReported && room.state.summary) {\n"
+              "        room.resultReported = true;\n"
+              "        this.onRunFinished?.(room);\n"
+              "      }",
+          )
+
+          records_test = 'packages/voxelyn-survival/src/client/records.test.ts'
+          replace(
+              records_test,
+              "import { HISTORY_LIMIT, applyRun, emptyRecords, hasDiscovery } from './records';",
+              "import { HISTORY_LIMIT, applyRun, emptyRecords, hasDiscovery, runSummaryIdentity } from './records';",
+          )
+          replace(
+              records_test,
+              "  // applyRun e pura porque este e o unico lugar do cliente em que um bug\n"
+              "  // silencioso custaria dado do jogador.",
+              "  it('mantem a identidade da run atraves de desserializacoes de snapshots', () => {\n"
+              "    const original = summary({ seed: 42, phase: 'extracted', ticks: 777 });\n"
+              "    const copy = JSON.parse(JSON.stringify(original)) as RunSummary;\n"
+              "    expect(copy).not.toBe(original);\n"
+              "    expect(runSummaryIdentity(copy)).toBe(runSummaryIdentity(original));\n"
+              "    expect(runSummaryIdentity({ ...copy, ticks: 778 })).not.toBe(runSummaryIdentity(original));\n"
+              "  });\n\n"
+              "  // applyRun e pura porque este e o unico lugar do cliente em que um bug\n"
+              "  // silencioso custaria dado do jogador.",
+          )
+
+          leaderboard_test = 'packages/voxelyn-survival-server/tests/leaderboard.test.ts'
+          replace(
+              leaderboard_test,
+              "import { MemoryLeaderboard, compareEntries, type LeaderboardEntry } from '../src/leaderboard';",
+              "import { MemoryLeaderboard, compareEntries, isLeaderboardEligible, type LeaderboardEntry } from '../src/leaderboard';",
+          )
+          replace(
+              leaderboard_test,
+              "  it('runs de co-op nao deduplicam entre si', async () => {",
+              "  it('recusa derrotas e nunca as devolve no ranking', async () => {\n"
+              "    const store = new MemoryLeaderboard();\n"
+              "    const dead = summary({ phase: 'dead', stars: 0, deathCause: { kind: 'fire' } });\n"
+              "    expect(isLeaderboardEligible(dead)).toBe(false);\n"
+              "    expect(await store.submit({ name: 'derrota', mode: 'coop', summary: dead, digest: null })).toBeNull();\n"
+              "    await store.submit({ name: 'extracao', mode: 'coop', summary: summary(), digest: null });\n"
+              "    expect((await store.top({})).map((entry) => entry.name)).toEqual(['extracao']);\n"
+              "  });\n\n"
+              "  it('runs de co-op nao deduplicam entre si', async () => {",
+          )
+
+          Path('packages/voxelyn-survival-server/tests/run-finished.test.ts').write_text("""import { describe, expect, it } from 'vitest';
+import { CURRENT_VERSIONS, type ServerMessage } from '@voxelyn/survival-protocol';
+import { SurvivalServer } from '../src/server';
+import type { GameRoom } from '../src/room';
+
+describe('resultado terminal da sala', () => {
+  it('reporta no mesmo tick do snapshot final e apenas uma vez', () => {
+    const finished: GameRoom[] = [];
+    const server = new SurvivalServer({
+      maxPlayersPerRoom: 1,
+      baseSeed: 123,
+      onRunFinished: (room) => finished.push(room),
+    });
+    server.addConnection('a', 0);
+    server.handleMessage(
+      'a',
+      JSON.stringify({ t: 'hello', versions: CURRENT_VERSIONS }),
+      0,
+    );
+    const room = server.roomForClient('a');
+    expect(room).not.toBeNull();
+
+    // A morte e o sumario nascem dentro de room.step(), neste server.tick().
+    room!.state.players[0].hp = 0;
+    const outbound = server.tick();
+
+    expect(room!.state.phase).toBe('dead');
+    expect(room!.state.summary).not.toBeNull();
+    expect(finished).toEqual([room]);
+    expect(room!.resultReported).toBe(true);
+    const finalSnapshot = outbound
+      .map((item) => item.msg)
+      .find((msg): msg is Extract<ServerMessage, { t: 'snapshot' }> => msg.t === 'snapshot');
+    expect(finalSnapshot?.phase).toBe('dead');
+
+    // Simula o ultimo cliente fechando assim que recebeu o snapshot terminal.
+    server.removeConnection('a');
+    expect(server.roomCount()).toBe(0);
+    server.tick();
+    expect(finished).toHaveLength(1);
+  });
+});
+""")
+          PY
+          git diff --check
+
+      - name: Build and test client/server persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @voxelyn/survival-server build
+          pnpm --filter @voxelyn/survival-server test
+          pnpm --filter @voxelyn/survival build:offline-check
+          pnpm --filter @voxelyn/survival test
+
+      - name: Publish validated fixes and clean workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/voxelyn-survival/src/client/main.ts \
+                  packages/voxelyn-survival/src/client/records.ts \
+                  packages/voxelyn-survival/src/client/records.test.ts \
+                  packages/voxelyn-survival-server/src/server.ts \
+                  packages/voxelyn-survival-server/src/ws.ts \
+                  packages/voxelyn-survival-server/src/leaderboard.ts \
+                  packages/voxelyn-survival-server/tests/leaderboard.test.ts \
+                  packages/voxelyn-survival-server/tests/run-finished.test.ts
+          git commit -m 'fix(survival): persist terminal runs exactly once'
+          git rm .github/workflows/fix-terminal-run-persistence.yml
+          git commit -m 'chore: remove temporary terminal result workflow'
+          git push origin HEAD:claude/voxelyn-survival-brainstorm-nk0gdw
