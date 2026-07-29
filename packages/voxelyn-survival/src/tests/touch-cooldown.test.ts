@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cooldownRemainingFraction, resolveCooldownReadyAt } from '../client/cooldown-overlay';
+import { moduleHudMetrics } from '../client/render';
 import {
   AIM_JOYSTICK_RADIUS,
   AIM_STICK_ACTIVATION_SCALE,
@@ -128,5 +129,15 @@ describe('touch safe-area layout', () => {
         (activationRadius + buttonHitRadius);
       expect(gap).toBeGreaterThanOrEqual(10);
     }
+  });
+
+  it('mantem os seis modulos visiveis no painel de 568px', () => {
+    // panelW=230 e padding horizontal de 12px em cada lado: 206px uteis.
+    const availableWidth = 206;
+    const metrics = moduleHudMetrics(6, availableWidth);
+    const occupied = metrics.size * 6 + metrics.gap * 5;
+
+    expect(metrics.size).toBeGreaterThanOrEqual(24);
+    expect(occupied).toBeLessThanOrEqual(availableWidth);
   });
 });

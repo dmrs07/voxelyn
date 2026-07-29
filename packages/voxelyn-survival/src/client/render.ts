@@ -100,6 +100,23 @@ export const TILE_W = 32;
 export const TILE_H = 16;
 const WALL_H = 14;
 
+export type ModuleHudMetrics = { size: number; gap: number };
+
+/** Mantem todos os modulos visiveis dentro da largura compacta do painel. */
+export const moduleHudMetrics = (count: number, availableWidth: number): ModuleHudMetrics => {
+  const normalizedCount = Math.max(0, Math.floor(count));
+  if (normalizedCount <= 0) return { size: 30, gap: 7 };
+  if (normalizedCount === 1) return { size: Math.max(24, Math.min(30, availableWidth)), gap: 0 };
+
+  const baseGap = 7;
+  const size = Math.max(24, Math.min(30, Math.floor(
+    (availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount
+  )));
+  const remaining = Math.max(0, availableWidth - size * normalizedCount);
+  const gap = Math.max(3, Math.min(baseGap, remaining / (normalizedCount - 1)));
+  return { size, gap };
+};
+
 // Paleta da art bible (docs/art/voxelyn-survival-art-bible.md)
 const PAL = {
   dark: '#0b0e14',
@@ -1475,8 +1492,8 @@ export class SurvivalRenderer {
     viewportWidth: number
   ): void {
     const ctx = this.ctx;
-    const size = 30;
-    const gap = 7;
+    const availableWidth = Math.max(0, viewportWidth - 12 - x);
+    const { size, gap } = moduleHudMetrics(modules.length, availableWidth);
     let cursor = x;
     for (const module of modules) {
       if (cursor + size > viewportWidth - 12) break;
@@ -1490,7 +1507,7 @@ export class SurvivalRenderer {
       ctx.strokeStyle = PAL.player;
       ctx.lineWidth = pulse ? 2.5 : 1.5;
       ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      drawModuleGlyph(ctx, module.id, cx, cy, 14, PAL.biolum);
+      drawModuleGlyph(ctx, module.id, cx, cy, size * 0.47, PAL.biolum);
 
       let fraction = 1;
       let label = '';
@@ -1508,7 +1525,7 @@ export class SurvivalRenderer {
       ctx.arc(cx, cy, size / 2 + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
       ctx.stroke();
       ctx.fillStyle = PAL.bone;
-      ctx.font = 'bold 9px monospace';
+      ctx.font = `bold ${Math.max(8, Math.round(size * 0.3))}px monospace`;
       ctx.textAlign = 'right';
       ctx.fillText(label, cursor + size - 2, y + size - 2);
       cursor += size + gap;
