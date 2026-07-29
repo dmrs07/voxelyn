@@ -3,10 +3,13 @@ import { createRun, emptyCommand, stepRun, type PlayerCommand } from '@voxelyn/s
 import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
 import { verifySoloRun } from '../src/replay';
 
+/** Guarda contra loop infinito, com folga. Ver nota em `leaderboard.test.ts`. */
+const MAX_FIXTURE_TICKS = 12_000;
+
 const completedRun = (seed: number): PlayerCommand[] => {
   const state = createRun({ seed, playerCount: 1 });
   const commands: PlayerCommand[] = [];
-  for (let t = 0; t < 4000 && state.phase === 'running'; t++) {
+  for (let t = 0; t < MAX_FIXTURE_TICKS && state.phase === 'running'; t++) {
     const command = quantizeCommand({
       ...emptyCommand(),
       move: { x: Math.sin(t / 40), y: Math.cos(t / 37) },

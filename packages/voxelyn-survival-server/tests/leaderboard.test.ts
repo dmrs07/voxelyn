@@ -20,10 +20,26 @@ import { MemoryLeaderboard, compareEntries, isLeaderboardEligible, type Leaderbo
  * testar o replay — gravar um comando e simular outro esconderia exatamente o
  * bug que a quantizacao na captura existe para evitar.
  */
+/**
+ * Teto de ticks: guarda contra loop infinito, e NAO um botao de dificuldade.
+ *
+ * Ele estava em 4000, que era justo o bastante para a run de fixture morrer — e
+ * por isso quebrou quando a simulacao mudou. Corrigir o excedente de velocidade
+ * do inimigo em parede (ele andava a 114% da propria velocidade ao raspar) fez o
+ * jogador de fixture, que se debate em circulos, sobreviver ate a extracao em
+ * 5688 ticks em vez de morrer antes de 4000.
+ *
+ * Doze mil e folga deliberada. O que estes testes provam e que o servidor chega
+ * ao mesmo sumario que o cliente; terminar e pre-requisito, nao o assunto. Um
+ * teto apertado transforma qualquer ajuste de balanceamento em falha de
+ * leaderboard, que e o pior lugar possivel para descobrir isso.
+ */
+const MAX_FIXTURE_TICKS = 12_000;
+
 const playAndLog = (seed: number, drive: (tick: number) => Partial<PlayerCommand>) => {
   const state = createRun({ seed, playerCount: 1 });
   const log: PlayerCommand[] = [];
-  for (let t = 0; t < 4000 && state.phase === 'running'; t++) {
+  for (let t = 0; t < MAX_FIXTURE_TICKS && state.phase === 'running'; t++) {
     const cmd = quantizeCommand({ ...emptyCommand(), ...drive(t) });
     log.push(cmd);
     stepRun(state, [cmd]);

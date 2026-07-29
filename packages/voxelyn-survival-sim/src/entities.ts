@@ -1104,6 +1104,16 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
 
     if (Math.hypot(enemy.vx, enemy.vy) > 0.05) {
+      // Movimento por VELOCIDADE (perambular, impulso de investida, empurrao)
+      // tambem tem de atualizar o rumo.
+      //
+      // So o movimento por `dirX/dirY` atualizava, entao um inimigo perambulando
+      // andava para um lado com o sprite virado para outro. O cliente compensava
+      // isso adivinhando o rumo pelo deslocamento OBSERVADO — e a adivinhacao
+      // quebra exatamente quando a colisao zera um dos eixos, porque ai o
+      // deslocamento aponta para um quadrante que a criatura nunca escolheu.
+      // Com o rumo correto na simulacao, o cliente nao precisa adivinhar.
+      enemy.facing = normalized(enemy.vx, enemy.vy);
       const moved = moveEntity(state, enemy, enemy.vx * dt, enemy.vy * dt);
       if (moved.blockCell && crushesWalls(enemy)) {
         breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
@@ -1147,9 +1157,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       const moved = moveEntity(state, enemy, dirX * speed * dt, dirY * speed * dt);
       if (moved.blockCell && crushesWalls(enemy)) {
         breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
-      } else if ((moved.blockedX || moved.blockedY) && aggro) {
-        moveEntity(state, enemy, (moved.blockedX ? 0 : dirX) * speed * dt * 0.6, (moved.blockedY ? 0 : dirY) * speed * dt * 0.6);
       }
+      // NAO existe mais um segundo empurrao no eixo livre quando o outro trava.
+      //
+      // Ele existia para "ajudar o inimigo a nao grudar na parede", e era
+      // desnecessario: `moveEntity` ja resolve os eixos em separado, entao o eixo
+      // livre SEMPRE anda inteiro e o deslizamento ja acontecia sozinho. O que o
+      // empurrao extra fazia era somar 60% por cima do que ja tinha andado.
+      //
+      // Medido: um spitter colado numa parede, perseguindo em diagonal, andava a
+      // 114% da propria velocidade. Raspar parede era mais rapido que correr em
+      // campo aberto — o mesmo tipo de erro que o jogador reportou no movimento
+      // dele, do outro lado da tela.
     }
 
     if (enemy.elite) {

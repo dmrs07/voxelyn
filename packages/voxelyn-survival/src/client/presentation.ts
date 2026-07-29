@@ -258,7 +258,23 @@ export class EntityPresentation {
       this.actionVisualClocks.delete(entity.id);
     }
 
-    const facing = locomotionFacing(base, entity.facing.x, entity.facing.y);
+    // O rumo OBSERVADO so vale para o Prospector.
+    //
+    // `entity.facing` do jogador e a MIRA, nao o andar: sem derivar o rumo do
+    // deslocamento, ele caminharia de lado com as pernas apontando para onde
+    // atira. Para inimigos e o contrario — `facing` ja E a direcao de locomocao
+    // que a simulacao escolheu, e o deslocamento observado e uma versao PIOR
+    // dela: a colisao zera um eixo ao raspar parede, e o rumo derivado salta para
+    // um quadrante isometrico vizinho por alguns quadros e volta.
+    //
+    // Medido no Miner, que e quem mais vive colado em parede: o rumo alternava
+    // entre (0,94, -0,33) e (0,-1) exato — `dr` e `ur` — e o sprite girava no
+    // proprio eixo. Nao era animacao nem interpolacao; era o cliente discordando
+    // da simulacao sobre para onde a criatura estava virada.
+    const facing =
+      entity.archetype === 'prospector'
+        ? locomotionFacing(base, entity.facing.x, entity.facing.y)
+        : { x: entity.facing.x, y: entity.facing.y };
     return {
       anim: base.anim,
       elapsedMs: nowMs - base.animStartMs,

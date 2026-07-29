@@ -608,8 +608,24 @@ const minerModel = (anim, f) => {
   const headZ = 13 + up + alert;
   b.push(box(-1, -2 + lean, headZ, 3, 3, 3, 'rust'));
   b.push(box(-1, -3 + lean, headZ + 1, 3, 1, 2, 'bone'));
-  // Optica: um unico ponto, mais fraco que o visor do prospector. Piscando.
-  b.push(box(0, -4 + lean, headZ + 1, 1, 1, 1, f % 2 === 0 ? 'biolum' : 'fungus'));
+  // Optica: um unico ponto, mais fraco que o visor do prospector. GUTTERING, e
+  // nao piscando.
+  //
+  // A primeira versao alternava a cor por paridade de frame (`f % 2`), o que na
+  // pratica era um estroboscopio: medido no atlas, o ponto ia de 6 pixels de
+  // biolum a ZERO em frames alternados — 3 Hz no `idle` e 5 Hz no `walk`, no
+  // grupo de pixels mais claro de um corpo inteiramente escuro. Era a unica troca
+  // de cor por frame do gerador todo, e o sprite lia como se estivesse falhando.
+  //
+  // Um voxel de 1x1x1 na projecao nao e um pixel: sao ~6. Meio ciclo apagado num
+  // aglomerado desses domina a leitura do bicho.
+  //
+  // A ficha pede "optics flicker", e flicker de lampada velha e MAIORITARIAMENTE
+  // aceso com quedas curtas. Um frame em quatro apagado da isso: ~170 ms de queda
+  // a cada 670 ms, que le como falha de contato e nao como pisca-pisca. O modulo
+  // 4 vale para todas as animacoes — nenhuma tem menos de 4 frames alem de `hit`,
+  // que dura dois e nao precisa de flicker nenhum.
+  b.push(box(0, -4 + lean, headZ + 1, 1, 1, 1, f % 4 === 3 ? 'fungus' : 'biolum'));
   // Lanterna de mineracao no ombro, guttering. E o unico calor do modelo.
   b.push(box(-3, -3 + lean, headZ, 2, 2, 2, 'loot'));
   b.push(box(-3, -4 + lean, headZ + 1, 1, 1, 1, 'fire'));

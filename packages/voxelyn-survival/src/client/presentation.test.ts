@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { dirFromFacing } from '@voxelyn/survival-content';
 import { EntityPresentation, locomotionFacing, recoilAtElapsed } from './presentation';
 
 const baseAnim = (anim: string, animStartMs = 0) => ({
@@ -140,5 +141,56 @@ describe('EntityPresentation', () => {
     const presented = presentation.animationFor(entity as never, state as never, baseAnim('hit', 900) as never, 1_000);
 
     expect(presented.anim).toBe('hit');
+  });
+
+  /**
+   * O bug reportado como "o Miner fica em flicker": raspando parede, o sprite
+   * girava no proprio eixo.
+   *
+   * Nao era animacao. Era o cliente discordando da simulacao sobre o rumo. Um
+   * inimigo em diagonal encostado numa parede tem um eixo do deslocamento ZERADO
+   * pela colisao, e so o outro sobra. O rumo derivado do deslocamento observado
+   * salta para (0,-1) — quadrante isometrico `ur` — enquanto o rumo autoritativo
+   * segue em (0,94, -0,33), que e `dr`. Alguns quadros de cada lado, ida e volta:
+   * pião.
+   *
+   * A sequencia abaixo e a que foi capturada instrumentando o render de verdade
+   * num navegador, com o Miner fugindo por um tunel. O que o teste cobra e o que
+   * o jogador ve: UM quadrante, do primeiro ao ultimo quadro.
+   */
+  it('nao gira inimigo no proprio eixo quando a colisao zera um eixo do deslocamento', () => {
+    const presentation = new EntityPresentation();
+    const heading = { x: 0.94, y: -0.33 };
+    // Cada item e o deslocamento OBSERVADO num quadro: os `0,-1` sao os quadros
+    // em que a parede comeu o avanco em x.
+    const observed = [
+      [0.94, -0.33], [0, -1], [0, -1], [0.94, -0.33], [0, -1], [0.93, -0.36], [0, -1], [0.94, -0.33],
+    ] as const;
+
+    const dirs = observed.map(([mx, my], i) => {
+      const presented = presentation.animationFor(
+        { id: 10, archetype: 'miner', facing: heading, stunnedUntil: 0 } as never,
+        { tick: i } as never,
+        { ...baseAnim('walk'), moveFacingX: mx, moveFacingY: my } as never,
+        1_000 + i * 50
+      );
+      return dirFromFacing(presented.facingX, presented.facingY);
+    });
+
+    expect(new Set(dirs).size).toBe(1);
+    expect(dirs[0]).toBe(dirFromFacing(heading.x, heading.y));
+  });
+
+  it('ainda deriva o rumo do prospector do deslocamento, porque o facing dele e a mira', () => {
+    const presentation = new EntityPresentation();
+    // Atirando para +x enquanto anda para -x: as pernas tem de seguir o andar.
+    const presented = presentation.animationFor(
+      { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 } as never,
+      { tick: 0 } as never,
+      { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 } as never,
+      1_000
+    );
+
+    expect(presented.facingX).toBe(-1);
   });
 });

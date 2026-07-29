@@ -20,27 +20,34 @@ import {
 let handle: WsServerHandle;
 let base: string;
 
-beforeAll(async () => {
-  handle = createWsServer({ port: 0, host: '127.0.0.1', baseSeed: 31337 });
-  await handle.ready; // store do ranking pronto (memoria, sem DATABASE_URL)
+const bootServer = async (): Promise<{ handle: WsServerHandle; base: string }> => {
+  const booted = createWsServer({ port: 0, host: '127.0.0.1', baseSeed: 31337 });
+  await booted.ready; // store do ranking pronto (memoria, sem DATABASE_URL)
   await new Promise<void>((resolve) => {
-    if (handle.http.listening) return resolve();
-    handle.http.once('listening', () => resolve());
+    if (booted.http.listening) return resolve();
+    booted.http.once('listening', () => resolve());
   });
-  const addr = handle.http.address();
+  const addr = booted.http.address();
   const port = typeof addr === 'object' && addr ? addr.port : 0;
-  base = `http://127.0.0.1:${port}`;
+  return { handle: booted, base: `http://127.0.0.1:${port}` };
+};
+
+beforeAll(async () => {
+  ({ handle, base } = await bootServer());
 });
 
 afterAll(async () => {
   await handle.close();
 });
 
+/** Guarda contra loop infinito, com folga. Ver nota em `leaderboard.test.ts`. */
+const MAX_FIXTURE_TICKS = 12_000;
+
 /** Joga uma run solo pelo mesmo caminho do cliente e devolve o log. */
 const playRun = (seed: number) => {
   const state = createRun({ seed, playerCount: 1 });
   const log: PlayerCommand[] = [];
-  for (let t = 0; t < 4000 && state.phase === 'running'; t++) {
+  for (let t = 0; t < MAX_FIXTURE_TICKS && state.phase === 'running'; t++) {
     const cmd = quantizeCommand({
       ...emptyCommand(),
       move: { x: Math.sin(t / 40), y: Math.cos(t / 37) },
@@ -54,12 +61,14 @@ const playRun = (seed: number) => {
   return { state, base64: toBase64(encodeCommandLog(log)) };
 };
 
-const post = (body: unknown): Promise<Response> =>
-  fetch(`${base}/leaderboard`, {
+const postTo = (target: string, body: unknown): Promise<Response> =>
+  fetch(`${target}/leaderboard`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
+
+const post = (body: unknown): Promise<Response> => postTo(base, body);
 
 const requestWithForwarding = (forwardedFor: string): IncomingMessage =>
   ({
@@ -147,24 +156,64 @@ describe('POST /leaderboard', () => {
     expect([413, 422]).toContain(res.status);
   });
 
+  /**
+   * Servidor PROPRIO, e nao o compartilhado, por uma razao aritmetica: os testes
+   * acima gastam as seis submissoes por janela que `SUBMIT_MAX_PER_WINDOW`
+   * permite por origem, e o limite e checado ANTES de ler o corpo — inclusive nos
+   * que terminam em 400 e 422. A setima submissao desta suite recebe 429, faca o
+   * que fizer. Um limiter novo nasce com o handler novo.
+   *
+   * Este teste vinha passando VAZIO: ele abria com `if (phase === 'running')
+   * return`, e a run de fixture nao terminava dentro do teto de ticks antigo.
+   * Nunca chegou a mandar nada. Nao ha mais escape — se a fixture nao terminar,
+   * o teste falha em vez de se calar.
+   */
   it('nunca aceita um resultado vindo do cliente', async () => {
-    const played = playRun(555);
-    if (played.state.phase === 'running') return;
-    // Manda estrelas e tempo mentirosos JUNTO com um log honesto de run curta.
-    const res = await post({
-      seed: 555,
-      log: played.base64,
-      name: 'trapaceiro',
-      stars: 3,
-      ticks: 1,
-      summary: { stars: 3, ticks: 1 },
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { summary: { stars: number; ticks: number } };
-    // Os campos forjados sao simplesmente ignorados: o que volta e o que a
-    // simulacao produziu.
-    expect(body.summary.ticks).toBe(played.state.tick);
-    expect(body.summary.stars).toBe(played.state.summary!.stars);
+    const isolated = await bootServer();
+    try {
+      const played = playRun(555);
+      expect(played.state.phase, 'a run de fixture precisa terminar').not.toBe('running');
+      // Manda estrelas e tempo mentirosos JUNTO com um log honesto.
+      const res = await postTo(isolated.base, {
+        seed: 555,
+        log: played.base64,
+        name: 'trapaceiro',
+        stars: 3,
+        ticks: 1,
+        summary: { stars: 3, ticks: 1 },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { summary: { stars: number; ticks: number } };
+      // Os campos forjados sao simplesmente ignorados: o que volta e o que a
+      // simulacao produziu.
+      expect(body.summary.ticks).toBe(played.state.tick);
+      expect(body.summary.stars).toBe(played.state.summary!.stars);
+    } finally {
+      await isolated.handle.close();
+    }
+  });
+
+  /**
+   * O limite por origem, pelo caminho HTTP de verdade.
+   *
+   * A classe tem teste de unidade acima, mas nada provava que o servidor a
+   * consultava — e o descuido nao e teorico: foi exatamente um 429 inesperado
+   * nesta suite que revelou o teste vazio acima. Aqui o 429 e a afirmacao, e nao
+   * o acidente.
+   */
+  it('corta a submissao acima do teto por janela', async () => {
+    const isolated = await bootServer();
+    try {
+      const body = { seed: 1, log: toBase64(encodeCommandLog([])), name: 'x' };
+      for (let i = 0; i < SUBMIT_MAX_PER_WINDOW; i++) {
+        // 422 (log nao termina a run) ja prova que passou do limite: o limite
+        // responde antes de o corpo ser lido.
+        expect((await postTo(isolated.base, body)).status).toBe(422);
+      }
+      expect((await postTo(isolated.base, body)).status).toBe(429);
+    } finally {
+      await isolated.handle.close();
+    }
   });
 });
 
