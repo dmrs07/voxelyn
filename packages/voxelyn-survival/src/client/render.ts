@@ -44,6 +44,7 @@ import {
   nextStarHint,
   summaryLines,
 } from './run-summary';
+import { objectiveLightSpec, objectivePropName } from './objective-prop';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -551,11 +552,21 @@ export class SurvivalRenderer {
       (isoY(x, y) - camY) * z + vh / 2 + shakeY,
     ];
 
-    // luzes dinamicas visiveis (fogo, cristais, descargas, nucleo)
+    // Luzes dinamicas visiveis. `corePos` e o poco nos setores intermediarios
+    // e o Nucleo apenas no final; cada marcador recebe intensidade propria.
+    const objectiveName = objectivePropName(state.sector, state.coreTaken);
     const lights: Array<{ x: number; y: number; r: number; power: number }> = [
       { x: player.x, y: player.y, r: 8.5, power: 1 },
     ];
-    if (!state.coreTaken) lights.push({ x: state.corePos.x + 0.5, y: state.corePos.y + 0.5, r: 6, power: 0.9 });
+    const objectiveLight = objectiveLightSpec(state.sector, state.coreTaken);
+    if (objectiveLight) {
+      lights.push({
+        x: state.corePos.x + 0.5,
+        y: state.corePos.y + 0.5,
+        r: objectiveLight.radius,
+        power: objectiveLight.power,
+      });
+    }
 
     // Clarões de explosao, descarga e pulso. Entram FORA do `if
     // (quality.dynamicLights)`: no preset baixo o jogo abre mao das luzes
@@ -688,25 +699,40 @@ export class SurvivalRenderer {
     type DrawItem = { depth: number; draw: () => void };
     const items: DrawItem[] = [];
 
-    // Objetivos como OBJETOS, na fila de profundidade.
-    //
-    // O Nucleo e a coisa mais importante do mapa e era um losango chapado
-    // pulsando 3px acima do chao — menor que qualquer parede em volta dele.
-    // Agora e um monumento voxel, e por isso tem de ser ordenado com o resto:
-    // desenhado no passo de chao, um pedestal alto ficaria por baixo de toda
-    // parede a frente, inclusive a que o jogador esta contornando para chegar
-    // ate ele.
+    // Objetivos como OBJETOS, na fila de profundidade. O mesmo ponto logico
+    // representa o poco nos setores intermediarios e o Nucleo no setor final,
+    // mas cada um tem silhueta propria. Ambos precisam entrar nesta fila porque
+    // levantam volume acima do piso e devem respeitar paredes e entidades.
     {
       const [csx, csy] = toScreen(state.corePos.x + 0.5, state.corePos.y + 0.5);
       if (csx > -80 && csx < vw + 80 && csy > -100 && csy < vh + 100) {
         items.push({
           depth: state.corePos.x + state.corePos.y,
           draw: () => {
-            const name = state.coreTaken ? 'coreTaken' : 'core';
-            if (this.props.draw(ctx, name, nowMs, csx, csy, z)) return;
-            // Fallback enquanto o atlas nao carregou.
+            if (this.props.draw(ctx, objectiveName, nowMs, csx, csy, z)) return;
+
+            // Fallback enquanto o atlas nao carregou. Mesmo no caminho de erro o
+            // poco nao pode voltar a parecer o cristal que ele substituiu.
+            if (objectiveName === 'descent') {
+              const step = Math.floor(nowMs / 170) % 6;
+              const platformRadius = step < 2 ? 3 : step < 4 ? 2 : 1;
+              const sink = Math.min(4, step);
+              ctx.fillStyle = PAL.rockShadow;
+              ctx.fillRect(csx - 7 * z, csy - 3 * z, 14 * z, 5 * z);
+              ctx.fillStyle = PAL.rust;
+              ctx.fillRect(csx - 6 * z, csy - 4 * z, 12 * z, z);
+              ctx.fillStyle = step < 2 ? PAL.loot : shade(PAL.rust, 0.8);
+              ctx.fillRect(
+                csx - platformRadius * z,
+                csy - (6 - sink) * z,
+                platformRadius * 2 * z,
+                Math.max(1, z),
+              );
+              return;
+            }
+
             const pulse = 0.6 + 0.4 * Math.sin(nowMs * 0.006);
-            ctx.fillStyle = state.coreTaken ? PAL.rockShadow : shade(PAL.biolum, pulse);
+            ctx.fillStyle = objectiveName === 'coreTaken' ? PAL.rockShadow : shade(PAL.biolum, pulse);
             ctx.fillRect(csx - 4 * z, csy - 10 * z, 8 * z, 10 * z);
           },
         });
