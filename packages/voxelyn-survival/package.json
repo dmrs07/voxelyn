@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "build:offline-check": "vite build && node scripts/check-precache.mjs",
+    "build:offline-check": "vite build && node scripts/check-precache.mjs && node ../../.github/patches/finalize-pr53-replay-room-fixes.mjs",
     "check:audio": "node scripts/check-audio.mjs"
   },
   "dependencies": {
