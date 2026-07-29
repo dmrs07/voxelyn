@@ -71,10 +71,13 @@ const packFlags = (cmd: PlayerCommand): number => {
   return flags;
 };
 
-const unpackFlags = (
-  flags: number,
-): Pick<PlayerCommand, 'fire' | 'ability' | 'dodge' | 'interact' | 'purge' | 'choose'> => {
+type CommandFlags = Pick<PlayerCommand, 'fire' | 'ability' | 'dodge' | 'interact' | 'purge' | 'choose'>;
+
+const unpackFlags = (flags: number): CommandFlags | null => {
   const choose = (flags >> CHOOSE_SHIFT) & 0b11;
+  // 0b11 e reservado: converter para `choose: 2` deixaria um replay hostil
+  // indexar uma opcao inexistente durante a re-simulacao.
+  if (choose === 0b11) return null;
   return {
     fire: (flags & FLAG_FIRE) !== 0,
     ability: (flags & FLAG_ABILITY) !== 0,
@@ -165,11 +168,13 @@ export const decodeCommandLog = (data: Uint8Array, maxCommands: number): PlayerC
     const ax = (data[p + 4] << 24) >> 24;
     const ay = (data[p + 5] << 24) >> 24;
     const flags = data[p + 6];
+    const unpacked = unpackFlags(flags);
+    if (!unpacked) return null;
     for (let k = 0; k < run; k++) {
       out.push({
         move: { x: dq(mx), y: dq(my) },
         aim: { x: dq(ax), y: dq(ay) },
-        ...unpackFlags(flags),
+        ...unpacked,
       });
     }
   }
