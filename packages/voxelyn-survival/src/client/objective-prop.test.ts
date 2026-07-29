@@ -12,8 +12,10 @@ describe('marcador de objetivo por setor', () => {
   });
 
   it('reserva core e coreTaken para o setor final', () => {
-    expect(objectivePropName(SECTOR_COUNT, false)).toBe('core');
-    expect(objectivePropName(SECTOR_COUNT, true)).toBe('coreTaken');
+    for (const sector of [SECTOR_COUNT, SECTOR_COUNT + 1]) {
+      expect(objectivePropName(sector, false)).toBe('core');
+      expect(objectivePropName(sector, true)).toBe('coreTaken');
+    }
   });
 
   it('mantem o poco legivel sem dar a ele o farol forte do Nucleo', () => {
