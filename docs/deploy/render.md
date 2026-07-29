@@ -14,7 +14,7 @@ o ranking; ele não torna as salas distribuídas.
 
 - Conta no Render com acesso ao repositório `dmrs07/voxelyn`.
 - Node 22 / pnpm 10. A raiz declara `packageManager` e limita `engines.node` à
-  série 22; o Render instala as dependências antes de executar o `buildCommand`.
+  série 22; o próprio `buildCommand` ativa o Corepack e instala o lockfile congelado.
 
 ## Passo a passo
 
@@ -116,18 +116,24 @@ degradam a sensação.
 - O **solo** e a **PWA** continuam utilizáveis mesmo com o server fora do ar
   (app shell em cache; o menu "Descer sozinho" não depende de rede).
 
-## Verificação local (equivalente ao ambiente Render)
+## Verificação local (equivalente ao Blueprint)
 
 ```sh
-# servidor (equivale ao startCommand do blueprint)
-pnpm --filter @voxelyn/survival-sim build \
-  && pnpm --filter @voxelyn/survival-protocol build \
-  && pnpm --filter @voxelyn/survival-server build
-PORT=8080 ALLOWED_ORIGINS="http://localhost:4180" \
+corepack enable
+pnpm install --frozen-lockfile
+
+# servidor: mesma cadeia de build e start do Web Service
+pnpm --filter @voxelyn/survival-server... build
+PORT=8080 \
+ALLOWED_ORIGINS="http://localhost:4180" \
+DATABASE_URL="postgresql://voxelyn:voxelyn@localhost:5432/voxelyn" \
   node packages/voxelyn-survival-server/dist/bin/serve.js
 
-# cliente (equivale ao buildCommand + staticPublishPath)
-VITE_SERVER_URL="ws://localhost:8080" pnpm --filter @voxelyn/survival build
+# cliente: mesmo buildCommand e staticPublishPath do Static Site
+VITE_SERVER_URL="ws://localhost:8080" pnpm --filter @voxelyn/survival... build
 pnpm --filter @voxelyn/survival preview --port 4180
 # abra http://localhost:4180 e escolha "Co-op online" em duas abas
 ```
+
+Para desenvolvimento sem Postgres, omita `DATABASE_URL`; o servidor usa o store
+em memória e mantém todas as rotas e partidas funcionais.
