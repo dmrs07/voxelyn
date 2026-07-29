@@ -12,7 +12,7 @@
 // pronta para o dia em que a fonte deixar de ser local.
 
 import type { RunSummary } from '@voxelyn/survival-sim';
-import { BESTIARY_NAMES, BESTIARY_ORDER, DISCOVERIES, hasDiscovery, type Records } from './records';
+import { BESTIARY_FILES, BESTIARY_NAMES, BESTIARY_ORDER, DISCOVERIES, hasDiscovery, type Records } from './records';
 import { describeCause, formatDuration, formatSeed } from './run-summary';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
@@ -74,16 +74,34 @@ export const renderRecordsPanel = (host: HTMLElement, records: Records): void =>
     ['Seeds dominadas', String(records.masteredSeeds.length)],
   ]);
 
-  section(host, 'BESTIÁRIO');
-  definitions(
-    host,
-    BESTIARY_ORDER.map((archetype): [string, string] => {
-      const entry = records.bestiary[archetype];
-      // Nome oculto ate o primeiro abate: o bestiario e um registro do que voce
-      // enfrentou, e listar tudo de saida transforma descoberta em checklist.
-      return entry ? [BESTIARY_NAMES[archetype], String(entry.killed)] : ['???', '—'];
-    }),
-  );
+  // "REGISTRO DE ATIVOS", e nao "BESTIÁRIO".
+  //
+  // Quem escreve esta pagina e a empresa, e a empresa nao catalogaria povos como
+  // fauna nem admitiria que sao povos. A designacao corporativa vem primeiro,
+  // porque e o que o relatorio considera o nome de verdade; o nome que o JOGADOR
+  // aprendeu vem embaixo, entre parenteses, como uma nota de campo que alguem
+  // acrescentou a mao.
+  //
+  // A distancia entre as duas linhas e o efeito inteiro. O jogo nao diz ao
+  // jogador o que sentir sobre isso — so mostra o que foi arquivado.
+  section(host, 'REGISTRO DE ATIVOS');
+  for (const archetype of BESTIARY_ORDER) {
+    const entry = records.bestiary[archetype];
+    // Oculto ate o primeiro abate: o registro e do que VOCE enfrentou, e listar
+    // tudo de saida transforma descoberta em checklist.
+    if (!entry) {
+      host.appendChild(el('div', 'locked', '— — —'));
+      host.appendChild(el('span', 'lesson', 'sem ocorrência registrada'));
+      continue;
+    }
+    const file = BESTIARY_FILES[archetype];
+    const row = el('div', 'found');
+    row.appendChild(el('span', undefined, file.code));
+    row.appendChild(el('span', 'tally', `×${entry.killed}`));
+    host.appendChild(row);
+    host.appendChild(el('span', 'lesson', file.note));
+    host.appendChild(el('span', 'field-note', `campo: ${BESTIARY_NAMES[archetype]}`));
+  }
 
   section(host, 'DESCOBERTAS');
   for (const discovery of DISCOVERIES) {

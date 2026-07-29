@@ -323,6 +323,21 @@ export const HORSE_TRAIL_DELAY_TICKS = 4;
  * dois sao os dois lados normais disso.
  */
 export const HORSE_SPAWN_CHANCE = 0.34;
+/**
+ * Quanto ele consegue virar por tick, em RADIANOS.
+ *
+ * Todo o resto do bestiario aponta para o jogador e anda naquela direcao no
+ * mesmo tick, sem inercia — aceitavel num bicho pequeno e ilegivel num
+ * quadrupede de 2 tiles, que lia como sprite sendo arrastado e nao como corpo
+ * correndo. Virando aos poucos ele descreve um ARCO, e o arco e o que da ao
+ * jogador a chance de sair pelo lado de dentro da curva: o contra-jogo natural
+ * de qualquer coisa que carrega.
+ *
+ * 0,12 rad/tick sao ~137 graus por segundo, entao dar meia-volta custa 1,3 s.
+ * Mais rapido e ele volta a girar no lugar; mais lento e ele nunca alcanca
+ * ninguem entre uma investida e outra.
+ */
+export const HORSE_TURN_RATE = 0.12;
 
 export const ENEMY_MIN_SPAWN_DIST = 12;
 export const GUARDIAN_HP = 420;
@@ -335,3 +350,71 @@ export const REVIVE_HP_FRACTION = 0.35;
 export const EXTRACT_RADIUS = 3;
 
 export const RUN_SEED_MIX = 0x9e3779b9;
+
+/**
+ * Empoverished Miner.
+ *
+ * O gatilho da reacao dele e o CALOR DA SUA ARMA, e nao um sorteio.
+ *
+ * O sorteio era a versao obvia da ideia e violava o invariante que sustenta o
+ * jogo inteiro: o jogador nunca leva dano sem sinal. Um humano parado que as
+ * vezes vira uma ameaca sem nada mudar no mundo e exatamente isso — e pior,
+ * ensina o jogador a matar todo mundo por precaucao, que apaga o encontro.
+ *
+ * Com o calor, a decisao volta para quem joga, lida num medidor que ja esta no
+ * HUD desde sempre:
+ *
+ *   frio   → ele te ignora. Passar sem incidente e possivel, e e uma escolha.
+ *   morno  → ele foge. Perseguir rende o minerio dele.
+ *   quente → ele ataca. Uma maquina em brasa entrando na mina dele, e ele sabe
+ *            para que empresa ela trabalha.
+ *
+ * Note que a rota MAIS lucrativa exige esfriar antes de chegar perto — o que
+ * significa parar de atirar num setor hostil. E a mesma troca de sempre: tempo
+ * e seguranca contra recurso.
+ */
+export const MINER_NOTICE_RANGE = 7;
+/**
+ * Calor acima do qual ele entende que voce e uma ameaca. HEAT_MAX e 100.
+ *
+ * Dois tercos da barra, e nao pouco mais da metade. A 55 o limiar caia dentro do
+ * calor de um combate curto qualquer, e a rota "chegar frio" sumia na pratica —
+ * o jogador chegava enfurecendo sem ter escolhido isso, que e o oposto do ponto.
+ * Em 66,6 e preciso ter atirado com vontade para cruza-lo.
+ */
+export const MINER_RAGE_HEAT = 66.6;
+/** Abaixo disto ele nem levanta a cabeca. */
+export const MINER_FEAR_HEAT = 8;
+export const MINER_HP = 34;
+export const MINER_FLEE_SPEED = 4.9;
+export const MINER_RAGE_SPEED = 3.6;
+/**
+ * Cleave de picareta: circular em volta DELE, e nao um golpe direcional.
+ *
+ * Circular porque a resposta certa e RECUAR, nao circular por tras. Um golpe
+ * frontal ensinaria a orbitar, que e o que o jogador ja faz com todo o resto —
+ * o miner enfurecido existe para punir quem entra em cima.
+ */
+export const MINER_CLEAVE_RADIUS = 2.3;
+export const MINER_CLEAVE_DAMAGE = 19;
+export const MINER_CLEAVE_WINDUP_TICKS = 14;
+export const MINER_CLEAVE_COOLDOWN_TICKS = 40;
+/** Minerio que ele carrega, e que voce leva se o matar hostil. */
+export const MINER_ORE_DROP = 6;
+/** Quantos mineradores por setor, no maximo. */
+export const MINER_PER_SECTOR = 3;
+/** Distancia minima de um no de minerio para ele nascer ali. */
+export const MINER_ORE_SEARCH = 6;
+
+/**
+ * Lascas de minerio por recompensa de modulo.
+ *
+ * A cota precisava de um BENEFICIO concreto, e nao de um numero bonito no fim.
+ * Modulo e a moeda que o jogo ja usa para pagar risco (salvage), entao pagar
+ * mineracao com a mesma moeda mantem as duas atividades comparaveis: vale mais
+ * a pena abrir aquele terminal ou arrancar aquele veio?
+ *
+ * 14 e cerca de dois veios inteiros. Baixo demais e minerar vira a estrategia
+ * unica; alto demais e ninguem chega la dentro do tempo-alvo.
+ */
+export const ORE_PER_MODULE = 14;

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import type { EnemyArchetype } from '@voxelyn/survival-sim';
 import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION } from '@voxelyn/survival-sim';
 import type { RunPhase, RunSummary } from '@voxelyn/survival-sim';
-import { HISTORY_LIMIT, applyRun, applyRunOnce, emptyRecords, hasDiscovery } from './records';
+import {
+  BESTIARY_FILES,
+  BESTIARY_NAMES,
+  BESTIARY_ORDER,
+  HISTORY_LIMIT,
+  applyRun,
+  applyRunOnce,
+  emptyRecords,
+  hasDiscovery,
+} from './records';
 
 const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   seed: 1,
@@ -11,7 +21,7 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 10,
-    kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0 },
+    kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 },
     damageTakenTenths: 100,
     damageDealtTenths: 200,
     solidsDestroyed: 3,
@@ -20,6 +30,8 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
     purgeCellsUsed: 0,
     timesDowned: 0,
     revivesGiven: 0,
+    oreCollected: 0,
+    innocentsKilled: 0,
     discoveries: 0,
   },
   stars: 0,
@@ -69,7 +81,7 @@ describe('registro entre runs', () => {
 
   it('acumula abates por arquetipo no bestiario', () => {
     let rec = emptyRecords();
-    const kills = { stalker: 3, bruiser: 1, spitter: 0, bomber: 0, guardian: 0 };
+    const kills = { stalker: 3, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 };
     rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
     rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
     expect(rec.bestiary.stalker?.killed).toBe(6);
@@ -134,5 +146,29 @@ describe('registro entre runs', () => {
     const snapshot = JSON.stringify(rec);
     applyRun(rec, summary({ stars: 3, phase: 'extracted_with_core', seed: 7 }));
     expect(JSON.stringify(rec)).toBe(snapshot);
+  });
+});
+
+describe('registro de ativos', () => {
+  // Mesma guarda de `todo arquetipo tem definicao e contador` no lado da sim:
+  // um arquetipo novo sem ficha nao quebra o typecheck do Record — quebra a
+  // pagina, em runtime, so para quem ja matou aquele bicho.
+  it('todo arquetipo tem ficha, e a ordem do painel cobre todos', () => {
+    for (const archetype of Object.keys(BESTIARY_NAMES) as EnemyArchetype[]) {
+      expect(BESTIARY_FILES[archetype], archetype).toBeDefined();
+      expect(BESTIARY_FILES[archetype].code.length).toBeGreaterThan(0);
+      expect(BESTIARY_FILES[archetype].note.length).toBeGreaterThan(0);
+    }
+    expect([...BESTIARY_ORDER].sort()).toEqual(Object.keys(BESTIARY_NAMES).sort());
+  });
+
+  // A voz e a da EMPRESA, e a empresa nao chama ninguem de povo. Se um dia
+  // alguem suavizar isso, o texto deixa de fazer o trabalho que faz.
+  it('a ficha do mineiro nega que ele seja alguem', () => {
+    expect(BESTIARY_FILES.miner.code).toBe('PESSOAL NÃO AUTORIZADO');
+    expect(BESTIARY_FILES.miner.note).toContain('Sem valor de recuperação');
+    // E o nome que o JOGADOR aprendeu continua existindo, em outro campo: e a
+    // distancia entre os dois que faz a pagina significar alguma coisa.
+    expect(BESTIARY_NAMES.miner).toBe('Minerador Empobrecido');
   });
 });

@@ -31,7 +31,11 @@ export type VoiceId =
   | 'hitPlayer'
   | 'death'
   | 'deathGuardian'
+  | 'deathMiner'
   | 'bishopHeal'
+  | 'minerFlee'
+  | 'minerRage'
+  | 'oreGained'
   // --- mundo --------------------------------------------------------------
   | 'explosion'
   | 'discharge'
@@ -130,12 +134,28 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   hitPlayer: { priority: 8, gain: 0.55, minIntervalMs: 70, spatial: false },
   death: { priority: 5, gain: 0.4, minIntervalMs: 60, spatial: true },
   deathGuardian: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+  // Prioridade 7 contra os 5 do `death` comum, e espacial.
+  //
+  // Sete e alto para uma morte que nao e a sua, e o motivo e estreito: esta e a
+  // unica morte do jogo que o jogador pode ter causado sem precisar. Perde-la no
+  // orcamento durante um tiroteio seria justamente apaga-la na situacao em que
+  // ela mais tem o que dizer. Espacial porque importa DE ONDE veio — voce
+  // atirou naquela direcao de proposito.
+  deathMiner: { priority: 7, gain: 0.6, minIntervalMs: 0, spatial: true },
   // Prioridade 8: acima de "dei dano", abaixo de telegrafo. E a unica voz de
   // dano-que-nao-e-meu com prioridade alta, e por um motivo estreito — ela nao
   // descreve um impacto, descreve que os impactos nao estao valendo. Perde-la no
   // orcamento seria perder a pergunta da luta. `minIntervalMs` de 180 casa com o
   // evento a cada 4 ticks (200 ms): passa todos sem virar zumbido continuo.
   bishopHeal: { priority: 8, gain: 0.4, minIntervalMs: 180, spatial: true },
+  // O grito do mineiro tem prioridade de TELEGRAFO (9), e nao de dano: ele e o
+  // aviso de que um alvo que estava NEUTRO deixou de estar. Perde-lo no
+  // orcamento seria perder a unica coisa que separa "havia alguem ali" de
+  // "alguem esta vindo".
+  minerRage: { priority: 9, gain: 0.75, minIntervalMs: 0, spatial: true },
+  minerFlee: { priority: 5, gain: 0.45, minIntervalMs: 0, spatial: true },
+  // Recibo, e nao evento: baixo e agudo, para sumir sob o combate.
+  oreGained: { priority: 3, gain: 0.28, minIntervalMs: 90, spatial: true },
 
   explosion: { priority: 8, gain: 0.75, minIntervalMs: 70, spatial: true },
   discharge: { priority: 7, gain: 0.6, minIntervalMs: 110, spatial: true },

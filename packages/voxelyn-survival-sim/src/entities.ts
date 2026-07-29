@@ -13,6 +13,17 @@ import {
   BRUISER_HURL_SPEED,
   BRUISER_HURL_WINDUP_TICKS,
   BRUISER_ROCK_RADIUS,
+  MINER_CLEAVE_COOLDOWN_TICKS,
+  MINER_CLEAVE_DAMAGE,
+  MINER_CLEAVE_RADIUS,
+  MINER_CLEAVE_WINDUP_TICKS,
+  MINER_FEAR_HEAT,
+  MINER_FLEE_SPEED,
+  MINER_HP,
+  MINER_NOTICE_RANGE,
+  MINER_ORE_DROP,
+  MINER_RAGE_HEAT,
+  MINER_RAGE_SPEED,
   BISHOP_FUNGAL_SEARCH,
   BISHOP_HP,
   BISHOP_NOVA_COOLDOWN_TICKS,
@@ -30,6 +41,7 @@ import {
   HORSE_CHARGE_WINDUP_TICKS,
   HORSE_HP,
   HORSE_TRAIL_DELAY_TICKS,
+  HORSE_TURN_RATE,
   HORSE_TRAIL_FUEL_TICKS,
   GUARDIAN_ARENA_EXITS,
   GUARDIAN_ARENA_RADIUS,
@@ -47,7 +59,14 @@ import {
 } from './constants.js';
 import { breakSolid, canRip, closeArena, explodeAt, igniteCell, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
-import { addDamageTenths, recordKill } from './stats.js';
+import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
+import {
+  DISCOVERY_MINER_ENRAGED,
+  DISCOVERY_MINER_FLED,
+  MINER_MOOD_ENRAGED,
+  MINER_MOOD_FLEEING,
+  MINER_MOOD_PASSIVE,
+} from './types.js';
 import type {
   DamageCause,
   EffectOrigin,
@@ -87,6 +106,9 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // cavalo que espera o jogador entrar num raio pequeno nunca teria distancia
   // para investir, e a investida e o bicho inteiro.
   fungal_horse: { hp: HORSE_HP, speed: 4.4, radius: 0.44, contactDamage: 14, contactCooldown: 12, aggroRange: 13 },
+  // Vida BAIXA e sem bonus nenhum: ele nao e um desafio de combate, e uma
+  // DECISAO. Quem decidir mata-lo consegue, sempre — o custo nunca foi a luta.
+  miner: { hp: MINER_HP, speed: MINER_RAGE_SPEED, radius: 0.32, contactDamage: 6, contactCooldown: 18, aggroRange: MINER_NOTICE_RANGE },
 };
 
 export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean => {
@@ -223,6 +245,26 @@ export const damageEntity = (
     explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
     addBomberSpores(state, ent);
   }
+  if (ent.archetype === 'miner') {
+    if (ent.mood === MINER_MOOD_PASSIVE) {
+      // Passivo morto NAO dropa. Nao e punicao — e a ausencia de recompensa.
+      //
+      // Dropar seria transformar "matar todo mundo por precaucao" na jogada
+      // otima e apagar o encontro inteiro: por que arriscar aproximar-se frio se
+      // a bala rende o mesmo? Sem drop, a violencia gratuita custa municao,
+      // calor e tempo, e devolve so a anotacao.
+      state.stats.innocentsKilled += 1;
+    } else {
+      state.stats.oreCollected += MINER_ORE_DROP;
+      events.push({
+        t: 'ore_gained',
+        x: ent.x,
+        y: ent.y,
+        amount: MINER_ORE_DROP,
+        total: state.stats.oreCollected,
+      });
+    }
+  }
   if (ent.archetype === 'guardian') {
     // A parede e uma fase da luta, nao uma alteracao permanente do mapa.
     // Derruba-la aqui garante acesso ao nucleo mesmo se o cerco fechou
@@ -258,6 +300,9 @@ export const spawnEnemy = (
     stunnedUntil: 0,
     alertedUntil: 0,
     facing: { x: 1, y: 0 },
+    // Todo miner nasce PASSIVO. A postura nao e sorteada no spawn: ela e
+    // decidida no instante em que ele te nota, pelo calor da sua arma.
+    ...(archetype === 'miner' ? { mood: MINER_MOOD_PASSIVE } : {}),
   };
   state.enemies.push(enemy);
   return enemy;
@@ -466,6 +511,23 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     if (enemy.archetype === 'fungal_horse') return;
     enemy.vx = action.direction.x * 7;
     enemy.vy = action.direction.y * 7;
+  } else if (action.kind === 'slam' && enemy.archetype === 'miner') {
+    // Cleave de picareta: CIRCULAR em volta dele, e nao um golpe direcional.
+    //
+    // Circular porque a resposta certa e RECUAR. Um golpe frontal ensinaria a
+    // orbitar por tras, que e o que o jogador ja faz com todo o resto do
+    // bestiario — o miner enfurecido existe justamente para punir quem entra em
+    // cima confiando nisso.
+    for (const victim of state.players) {
+      if (!victim.alive || !state.playerExtras[victim.slot ?? 0].joined) continue;
+      if (distTo(enemy, victim) > MINER_CLEAVE_RADIUS) continue;
+      damageEntity(state, victim, MINER_CLEAVE_DAMAGE, events, {
+        kind: 'enemy_contact',
+        archetype: 'miner',
+        elite: enemy.elite,
+      });
+    }
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MINER_CLEAVE_RADIUS });
   } else if (action.kind === 'slam' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     if (distTo(enemy, target) < 2.1) {
@@ -652,6 +714,48 @@ const nearestFungal = (state: SurvivalState, ent: Entity): { x: number; y: numbe
 };
 
 /**
+ * O calor da arma do jogador mais proximo, ou -1 se ninguem esta perto.
+ *
+ * Do jogador de pe MAIS PROXIMO, e nao do maior calor da sala: quem se
+ * aproxima e quem o miner esta olhando. No co-op isso significa que um parceiro
+ * frio pode chegar perto enquanto o outro fica queimando la atras — e essa
+ * divisao de tarefas e um plano legitimo, nao uma brecha.
+ */
+const approachingHeat = (state: SurvivalState, ent: Entity): number => {
+  const player = nearestTarget(state, ent.x, ent.y);
+  if (!player || distTo(ent, player) > MINER_NOTICE_RANGE) return -1;
+  if (!hasLineOfSight(state, ent.x, ent.y, player.x, player.y)) return -1;
+  return state.playerExtras[player.slot ?? 0].heat;
+};
+
+/**
+ * Decide a postura do Miner quando ele te NOTA, e congela a decisao.
+ *
+ * Congelar importa: se a postura seguisse o calor tick a tick, o miner
+ * oscilaria entre fugir e atacar enquanto a arma esfria, e o jogador veria um
+ * NPC epiletico em vez de uma reacao. O calor decide UMA vez, no instante em que
+ * ele levanta a cabeca — depois disso o encontro ja e o que e.
+ */
+const settleMinerMood = (state: SurvivalState, ent: Entity, events: SemanticEvent[]): void => {
+  if (ent.mood !== MINER_MOOD_PASSIVE) return;
+  const heat = approachingHeat(state, ent);
+  if (heat < 0) return;
+  if (heat >= MINER_RAGE_HEAT) {
+    ent.mood = MINER_MOOD_ENRAGED;
+    markDiscovery(state.stats, DISCOVERY_MINER_ENRAGED);
+    events.push({ t: 'miner_mood', entity: ent.id, x: ent.x, y: ent.y, mood: MINER_MOOD_ENRAGED });
+    return;
+  }
+  if (heat >= MINER_FEAR_HEAT) {
+    ent.mood = MINER_MOOD_FLEEING;
+    markDiscovery(state.stats, DISCOVERY_MINER_FLED);
+    events.push({ t: 'miner_mood', entity: ent.id, x: ent.x, y: ent.y, mood: MINER_MOOD_FLEEING });
+  }
+  // Arma fria: ele nao faz nada, e continua nao fazendo nada. Este e o unico
+  // inimigo do jogo que o jogador pode simplesmente deixar em paz.
+};
+
+/**
  * Supernova Fungica: dano em 360 graus e o tapete REPLANTADO em volta dele.
  *
  * A parte que importa e a segunda. Sem replantar, queimar a arena resolvia a
@@ -770,6 +874,55 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     const player = nearestTarget(state, enemy.x, enemy.y);
     const dist = player ? distTo(enemy, player) : Infinity;
+
+    // O MINER e o unico inimigo que decide o que fazer com voce a partir do que
+    // VOCE trouxe, e nao da distancia. Sai do fluxo comum inteiro: passivo, ele
+    // simplesmente nao participa da simulacao de combate.
+    if (enemy.archetype === 'miner') {
+      settleMinerMood(state, enemy, events);
+      if (enemy.mood === MINER_MOOD_PASSIVE || !player) continue;
+
+      if (enemy.mood === MINER_MOOD_FLEEING) {
+        // Foge do jogador mais proximo, na velocidade dele: perseguir custa
+        // tempo de verdade, que e o preco do minerio que ele carrega.
+        const away = normalized(enemy.x - player.x, enemy.y - player.y);
+        enemy.facing = { ...away };
+        const fled = moveEntity(
+          state,
+          enemy,
+          away.x * MINER_FLEE_SPEED * dt * surfaceSpeedMul(state, enemy),
+          away.y * MINER_FLEE_SPEED * dt * surfaceSpeedMul(state, enemy)
+        );
+        // Encurralado, ele desliza pela parede em vez de travar de frente para
+        // ela. Um NPC preso num canto vibrando le como bug, e nao como medo.
+        if (fled.blockedX || fled.blockedY) {
+          moveEntity(
+            state,
+            enemy,
+            (fled.blockedX ? -away.y : 0) * MINER_FLEE_SPEED * dt,
+            (fled.blockedY ? -away.x : 0) * MINER_FLEE_SPEED * dt
+          );
+        }
+        continue;
+      }
+
+      // Enfurecido: vem para cima e golpeia em area. Sem ataque a distancia e
+      // sem quebrar parede — ele e um humano com uma picareta, nao um chefe.
+      const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+      enemy.facing = { ...toward };
+      if (dist < MINER_CLEAVE_RADIUS && state.tick >= enemy.contactReadyAt) {
+        enemy.contactReadyAt = state.tick + MINER_CLEAVE_COOLDOWN_TICKS;
+        startAction(state, enemy, 'slam', toward, MINER_CLEAVE_WINDUP_TICKS, 8, events, player.id);
+        continue;
+      }
+      moveEntity(
+        state,
+        enemy,
+        toward.x * MINER_RAGE_SPEED * dt * surfaceSpeedMul(state, enemy),
+        toward.y * MINER_RAGE_SPEED * dt * surfaceSpeedMul(state, enemy)
+      );
+      continue;
+    }
     // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
     // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
     const guardianHunting = enemy.archetype === 'guardian' && state.guardianAwake;
@@ -951,6 +1104,35 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       }
       enemy.vx *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
       enemy.vy *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
+    }
+
+    // O cavalo NAO vira no lugar.
+    //
+    // Todos os outros inimigos apontam para o jogador e andam naquela direcao no
+    // mesmo tick. Num bicho de 2 tiles isso le como sprite sendo arrastado, e nao
+    // como corpo correndo — e foi exatamente o que apareceu na primeira versao.
+    // Fechando a curva aos poucos ele descreve um ARCO, que e o que da ao jogador
+    // a chance de sair pelo lado de dentro dela.
+    //
+    // Vale so fora da investida: a investida ja congela a direcao no windup, e
+    // suavizar por cima disso faria o cavalo desviar do proprio telegrafo.
+    // Gira por ANGULO, e nao interpolando os dois vetores.
+    //
+    // Misturar `facing` com o alvo e normalizar parecia equivalente e nao e: com
+    // os dois exatamente opostos, a mistura continua no MESMO eixo e a
+    // normalizacao devolve o vetor original. O cavalo simplesmente nao virava —
+    // e so quando quem estava atras dele era o jogador, que e o caso em que a
+    // curva importa. Limitar o passo angular nao tem esse ponto cego.
+    if (enemy.archetype === 'fungal_horse' && (dirX !== 0 || dirY !== 0)) {
+      const current = Math.atan2(enemy.facing.y, enemy.facing.x);
+      let delta = Math.atan2(dirY, dirX) - current;
+      // Para o menor lado. Sem isto, virar de +170 para -170 graus daria a volta
+      // inteira por fora em vez dos 20 graus que realmente separam os dois.
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      const stepped = current + Math.max(-HORSE_TURN_RATE, Math.min(HORSE_TURN_RATE, delta));
+      dirX = Math.cos(stepped);
+      dirY = Math.sin(stepped);
     }
 
     if (dirX !== 0 || dirY !== 0) {

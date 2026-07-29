@@ -18,6 +18,9 @@ import {
   DISCOVERY_FRAGILE_BREACH,
   DISCOVERY_GAS_IGNITION,
   DISCOVERY_BISHOP_FELLED,
+  DISCOVERY_MINER_ENRAGED,
+  DISCOVERY_MINER_FLED,
+  DISCOVERY_ORE_QUOTA,
   DISCOVERY_GUARDIAN_FELLED,
   DISCOVERY_HORSE_FELLED,
   DISCOVERY_ORE_CHAIN,
@@ -233,6 +236,21 @@ export const DISCOVERIES: readonly Discovery[] = [
     lesson: 'Toda reação atinge você igual. A build mais forte é a mais perigosa de carregar.',
   },
   {
+    bit: DISCOVERY_MINER_FLED,
+    title: 'Ele corre de você',
+    lesson: 'Arma morna e o mineiro foge — e leva o minério dele junto. Alcançá-lo custa tempo.',
+  },
+  {
+    bit: DISCOVERY_MINER_ENRAGED,
+    title: 'Ele sabe o que você é',
+    lesson: 'Chegue em brasa e a picareta vem em círculo. Recuar responde; orbitar, não.',
+  },
+  {
+    bit: DISCOVERY_ORE_QUOTA,
+    title: 'A empresa paga por tonelada',
+    lesson: 'Minério acumulado vira escolha de módulo. Cavar é uma rota, não um enfeite.',
+  },
+  {
     bit: DISCOVERY_HORSE_FELLED,
     title: 'O rastro fica',
     lesson: 'A investida atravessa a sala e deixa fogo onde passou. Pedra no caminho a encerra.',
@@ -263,6 +281,7 @@ export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'spitter',
   'bomber',
   'bruiser',
+  'miner',
   'fungal_horse',
   'bishop',
   'guardian',
@@ -273,7 +292,64 @@ export const BESTIARY_NAMES: Record<EnemyArchetype, string> = {
   spitter: 'Cuspidor',
   bomber: 'Portador de Esporos',
   bruiser: 'Britador',
+  miner: 'Minerador Empobrecido',
   fungal_horse: 'Corcel Fúngico',
   bishop: 'Bispo do Veio',
   guardian: 'Guardião do Núcleo',
+};
+
+/**
+ * A ficha corporativa de cada arquetipo.
+ *
+ * O bestiario era uma lista de nomes e contagens — a voz de um naturalista
+ * catalogando fauna. Isso contradiz a ficcao que o resto do jogo estabeleceu: o
+ * Veio e habitado por CIVILIZACOES pos-cataclisma que protegem o que sobrou, e o
+ * prospector e um robo de uma mineradora enviado para levar o que e delas.
+ *
+ * Entao quem escreve o bestiario e a empresa, e a empresa nao chama ninguem de
+ * povo. A voz e a de um relatorio de recuperacao de ativos: designacao, custo,
+ * autorizacao. E ela vai ficando mais tensa conforme desce — no comeco e zoologia
+ * de rotina, e no fim precisa de tres negacoes para nao admitir o obvio ("a
+ * existencia de arreios nao implica operador").
+ *
+ * O texto NAO diz ao jogador o que sentir. Ele so mostra o que a empresa
+ * registrou, e deixa a distancia entre isso e o que o jogador viu fazer o
+ * trabalho. Quem ouviu a morte do mineiro ja sabe que "sem valor de recuperacao"
+ * e uma frase sobre a empresa, e nao sobre ele.
+ */
+export type BestiaryFile = { code: string; note: string };
+
+export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
+  stalker: {
+    code: 'ESPÉCIME QUIT-04',
+    note: 'Fauna de túnel. Agressiva por instinto, não por organização. Custo de remoção desprezível.',
+  },
+  spitter: {
+    code: 'ESPÉCIME FUNG-11',
+    note: 'Secreção corrosiva sem valor industrial confirmado. Programa de amostragem descontinuado.',
+  },
+  bomber: {
+    code: 'ESPÉCIME FUNG-23',
+    note: 'Vetor de esporos. Ruptura espontânea documentada em 100% dos encontros registrados.',
+  },
+  bruiser: {
+    code: 'ESPÉCIME MIN-07',
+    note: 'Massa mineral animada. Reclassificado de "maquinário extraviado" após o terceiro relatório.',
+  },
+  miner: {
+    code: 'PESSOAL NÃO AUTORIZADO',
+    note: 'Ocupação irregular do sítio. Sem valor de recuperação.',
+  },
+  fungal_horse: {
+    code: 'ATIVO HOSTIL EQ-02',
+    note: 'Quadrúpede adaptado. A presença de arreios não implica operador.',
+  },
+  bishop: {
+    code: 'ATIVO HOSTIL EQ-09',
+    note: 'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',
+  },
+  guardian: {
+    code: 'ANOMALIA TERMINAL',
+    note: 'Impede o acesso ao núcleo. Nenhuma outra propriedade é relevante para esta operação.',
+  },
 };

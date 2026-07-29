@@ -429,66 +429,187 @@ const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_IND
 // modelo, e ela aponta para onde ele vai correr.
 // ---------------------------------------------------------------------------
 const horseModel = (anim, f) => {
-  const gait = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  // Perna anima por BALANCO (y), nao so por levantamento (z).
+  //
+  // A primeira versao so levantava a pata 2 voxels e as patas somiam atras do
+  // corpo: metade dos frames do ciclo saia identica e o bicho parecia PLANAR.
+  // Nesta projecao isometrica, deslocar no eixo do corpo le muito mais do que
+  // subir — o balanco e o que faz a passada existir.
   const bite = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   // `special` = Investida Flamejante. Os tres primeiros frames EMPINAM (o
   // telegrafo de 1,3 s que o jogador tem de ler); os tres ultimos abaixam a
-  // crista e esticam o corpo — a corrida propriamente dita.
+  // crista, esticam o corpo e GALOPAM.
   const rear = anim === 'special' ? [1, 3, 4, 0, 0, 0][f % 6] : 0;
   const dash = anim === 'special' ? [0, 0, 0, 2, 3, 2][f % 6] : 0;
+  const galloping = anim === 'special' && f % 6 >= 3;
+
+  // Passada de dois tempos em diagonal: o par dianteira-esquerda +
+  // traseira-direita anda junto, depois o outro par. O ciclo anterior levantava
+  // as quatro pelo mesmo contador e ele pulava como coelho.
+  const SWING = [-2, -1, 1, 2, 1, -1];
+  const LIFT = [0, 1, 2, 1, 0, 0];
+  const walking = anim === 'walk';
+  const phaseA = f % 6;
+  const phaseB = (f + 3) % 6;
+
+  // No galope as QUATRO patas trabalham juntas: dianteiras esticam para a
+  // frente enquanto as traseiras jogam para tras, e depois o corpo se recolhe.
+  // E o que separa "correndo" de "o mesmo cavalo mais adiante".
+  const GALLOP_SWING = [3, 0, -2];
+  const GALLOP_LIFT = [3, 0, 2];
+  const gi = galloping ? (f % 6) - 3 : 0;
+
+  const bob = walking ? [0, 1, 1, 0, 1, 1][f % 6] : galloping ? [2, 0, 1][gi] : 0;
+  const up = bob - flinch;
   const b = [];
 
-  // Quatro patas com casco fendido. As dianteiras sobem no empinar.
-  b.push(box(-6, -2, Math.max(0, gait), 2, 2, 5, 'rockDeep'));
-  b.push(box(-6, 1, Math.max(0, -gait), 2, 2, 5, 'rockDeep'));
-  b.push(box(4, -2, Math.max(0, -gait) + rear, 2, 2, 5, 'rockDeep'));
-  b.push(box(4, 1, Math.max(0, gait) + rear, 2, 2, 5, 'rockDeep'));
-  // Cascos: o unico ponto do corpo que toca o chao, e de onde o alcatrao sai.
-  b.push(box(-6, -2, Math.max(0, gait), 2, 2, 1, 'loot'));
-  b.push(box(4, -2, Math.max(0, -gait) + rear, 2, 2, 1, 'loot'));
+  // Quatro patas com casco fendido. As DIANTEIRAS (y negativo) sobem no
+  // empinar; as traseiras ficam plantadas, que e o que faz a pose ler como
+  // empinar e nao como pulo.
+  const legs = [
+    [-2, -4, true, phaseA],
+    [1, -4, true, phaseB],
+    [-2, 3, false, phaseB],
+    [1, 3, false, phaseA],
+  ];
+  for (const [lx, ly, front, phase] of legs) {
+    let sy = ly;
+    let lift = 0;
+    if (walking) {
+      sy += SWING[phase] * (front ? -1 : 1);
+      lift = LIFT[phase];
+    } else if (galloping) {
+      sy += GALLOP_SWING[gi] * (front ? -1 : 1);
+      lift = GALLOP_LIFT[gi];
+    } else if (front) {
+      lift = rear * 2;
+    }
+    b.push(box(lx, sy, lift, 2, 2, 5, 'rockDeep'));
+    // Casco: o unico ponto do corpo que toca o chao, e de onde o alcatrao sai.
+    b.push(box(lx, sy, lift, 2, 2, 1, 'loot'));
+  }
 
-  // Tronco longo e baixo. Ele INCLINA no empinar e se estica na corrida.
-  b.push(box(-6, -2, 5 - flinch, 12, 5, 4 + Math.floor(rear / 2), 'rust'));
+  // Tronco longo e baixo, deitado no eixo y — a FRENTE do modelo e -y, que e o
+  // que o rasterizador rotaciona. Autorar o comprimento em x deixava o cavalo
+  // 90 graus fora de fase com a propria direcao: ele corria de lado.
+  b.push(box(-2, -5, 5 + up, 4, 11, 4 + rear, 'rust'));
+  // Garupa mais alta que a cernelha, como bicho de carga.
+  b.push(box(-2, 4, 8 + up, 4, 3, 3, 'rust'));
+  // Cauda de hifas caindo atras.
+  b.push(box(-1, 7, 6 + up, 2, 2, 4, 'rockDeep'));
+
   // Placas de armadura fungica SEPARADAS, e nao uma laje corrida.
   //
-  // A laje era o desenho obvio e reproduzia exatamente o erro que a silhueta de
-  // fallback ja tinha cometido: um retangulo claro e continuo sobre quatro apoios
-  // le como TAMPO DE MESA, nao como lombo. Placas discretas com vao entre elas
-  // devolvem a leitura de dorso — e ainda batem com a referencia, que descreve
-  // "shelf fungi", cogumelos de prateleira, que crescem em placas soltas.
-  for (const px of [-4, -1, 2]) {
-    b.push(box(px, -2, 9 - flinch + Math.floor(rear / 2), 2, 5, 1, 'bone'));
+  // A laje era o desenho obvio e reproduzia o erro que a silhueta de fallback ja
+  // tinha cometido: um retangulo claro e continuo sobre quatro apoios le como
+  // TAMPO DE MESA, nao como lombo. Placas discretas com vao entre elas devolvem
+  // a leitura de dorso — e ainda batem com a referencia, que descreve "shelf
+  // fungi", cogumelos de prateleira, que crescem em placas soltas.
+  for (const py of [-4, -1, 2]) {
+    b.push(box(-2, py, 9 + up + rear, 4, 2, 1, 'bone'));
   }
-  // Garupa mais alta que a cernelha, como bicho de carga.
-  b.push(box(-7, -2, 8 - flinch, 3, 5, 3, 'rust'));
-  // Cauda de hifas caindo atras.
-  b.push(box(-9, -1, 6 - flinch, 2, 3, 4, 'rockDeep'));
 
   // Pescoco inclinado para a frente e focinho BAIXO: para onde ele vai correr
   // esta escrito na direcao em que a cabeca aponta.
-  const neckZ = 9 - flinch + rear;
-  b.push(box(4, -2, neckZ, 3, 4, 4 - dash, 'rust'));
-  b.push(box(6, -2, neckZ + 3 - dash - bite, 4, 4, 3, 'rust'));
-  b.push(box(8, -2, neckZ + 2 - dash - bite, 3, 4, 2, 'rockDeep'));
-  // Olho de brasa, unico e frontal.
-  b.push(box(8, -3, neckZ + 3 - dash - bite, 1, 1, 1, 'fire'));
+  const neckZ = 9 + up + rear * 2;
+  b.push(box(-2, -7, neckZ - 1, 4, 3, 4 - dash, 'rust'));
+  b.push(box(-2, -9, neckZ + 2 - dash - bite, 4, 3, 3, 'rust'));
+  b.push(box(-2, -11, neckZ + 1 - dash - bite, 4, 3, 2, 'rockDeep'));
+  // Olhos de brasa, um de cada lado do focinho.
+  b.push(box(-2, -10, neckZ + 3 - dash - bite, 1, 1, 1, 'fire'));
+  b.push(box(1, -10, neckZ + 3 - dash - bite, 1, 1, 1, 'fire'));
 
-  // Crina de brasa: sobe do lombo ate a crista, entre a cabeca e a garupa.
-  // Na corrida ela se ABAIXA junto com a crista, e e o que faz os dois ultimos
+  // Crina de brasa correndo do cachaco ate a garupa. Fica ATRAS da cabeca,
+  // nunca por cima: coberta pela crina, a cabeca sumia dentro do fogo e o bicho
+  // perdia o unico ponto que diz para onde ele esta virado.
+  //
+  // Na corrida ela se ABAIXA junto com a crista, e e o que faz os tres ultimos
   // frames lerem como velocidade e nao como o mesmo cavalo mais para a frente.
-  const crest = neckZ + 4 - dash;
-  // Fica ATRAS da cabeca, nunca por cima dela: coberta pela crina, a cabeca
-  // sumia dentro do fogo e o bicho perdia o unico ponto que diz para onde ele
-  // esta virado.
-  b.push(box(3, -1, crest, 3, 2, 2 + rear, 'fire'));
-  b.push(box(0, -1, crest - 1, 3, 2, 2, 'fire'));
-  b.push(box(-3, -1, crest - 2, 3, 2, 1, 'loot'));
-  b.push(box(-6, -1, crest - 3, 2, 2, 1, 'loot'));
+  const crest = neckZ + 3 - dash;
+  b.push(box(-1, -6, crest, 2, 2, 2 + rear, 'fire'));
+  b.push(box(-1, -4, crest - 1, 2, 3, 2, 'fire'));
+  b.push(box(-1, -1, crest - 2, 2, 3, 1, 'loot'));
+  b.push(box(-1, 2, crest - 3, 2, 2, 1, 'loot'));
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 64, 64, 32, 58);
+const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 68, 72, 34, 66);
+
+// ---------------------------------------------------------------------------
+// enemy-miner 40x48 — a unica PESSOA do bestiario
+//
+// A silhueta tem uma tarefa acima de todas: ler como gente antes de ler como
+// inimigo. Ela e a unica do bestiario construida com a mesma gramatica do
+// prospector — duas pernas, tronco estreito, cabeca no topo — e isso e
+// deliberado. O encontro inteiro depende de o jogador reconhecer, a distancia,
+// que ali esta alguem; se ele so descobrir isso quando o corpo cair, a decisao
+// que o encontro existe para oferecer ja passou.
+//
+// Curvado, e nao ereto. O prospector e uma maquina: prumo, ombros quadrados,
+// visor aceso. Este e um corpo que passa o dia dobrado sobre uma picareta, e a
+// diferenca de postura entre os dois diz mais sobre a ficcao do que qualquer
+// linha de texto do bestiario.
+//
+// Sem lanterna. O prospector carrega luz porque a empresa a pagou.
+// ---------------------------------------------------------------------------
+const minerModel = (anim, f) => {
+  const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  const breathe = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // `attack` = o cleave: a picareta descreve um circulo em volta dele. Os quatro
+  // frames sao ERGUER, girar, girar, recolher — e o giro tem de passar por tras,
+  // senao o golpe le como frontal e o desenho mente sobre o alcance.
+  const swing = anim === 'attack' ? [0, 1, 2, 3][f % 4] : -1;
+  const up = breathe - flinch;
+  const b = [];
+
+  // Pernas e botas gastas.
+  b.push(box(-2, -1, Math.max(0, step), 2, 2, 4, 'rockDeep'));
+  b.push(box(1, -1, Math.max(0, -step), 2, 2, 4, 'rockDeep'));
+  b.push(box(-2, -1, Math.max(0, step), 2, 2, 1, 'rust'));
+  b.push(box(1, -1, Math.max(0, -step), 2, 2, 1, 'rust'));
+
+  // Tronco INCLINADO para a frente, e ombros um degrau abaixo do que estariam
+  // num corpo ereto: e a curvatura que separa este corpo do prospector.
+  const lean = 1;
+  b.push(box(-2, -1 + lean, 4 + up, 5, 3, 4, 'rust'));
+  // Trapo por cima: uma faixa palida atravessando o peito, o unico claro do
+  // corpo, para o olho achar o tronco antes de achar a picareta.
+  b.push(box(-2, -2 + lean, 6 + up, 5, 1, 2, 'bone'));
+  b.push(box(-3, -1 + lean, 7 + up, 7, 3, 1, 'rockDeep'));
+
+  // Cabeca baixa, encaixada nos ombros. Capuz escuro, sem visor e sem luz.
+  b.push(box(-1, -1 + lean * 2, 8 + up, 3, 3, 3, 'rockDeep'));
+  b.push(box(-1, -2 + lean * 2, 9 + up, 3, 1, 2, 'rust'));
+  // Olhos: dois voxels escuros. NAO acendem no atlas — a raiva chega pelo tint
+  // vermelho que o renderer aplica sobre o sprite, porque um sheet de frames
+  // fixos nao sabe o humor da entidade.
+  b.push(box(-1, -3 + lean * 2, 10 + up, 1, 1, 1, 'rockDeep'));
+  b.push(box(1, -3 + lean * 2, 10 + up, 1, 1, 1, 'rockDeep'));
+
+  // A picareta. Fora do ataque ela fica caida ao lado, apoiada no chao — a
+  // postura de quem estava trabalhando, e nao esperando.
+  if (swing < 0) {
+    b.push(box(3, -1, 0, 1, 1, 9, 'rust'));
+    b.push(box(2, -1, 9, 3, 1, 1, 'bone'));
+  } else {
+    // O cabo gira em volta do corpo: frente -> lado -> tras -> lado.
+    const arc = [
+      [0, -4, 7], // erguida a frente
+      [4, -1, 6], // lado direito
+      [0, 3, 5], // POR TRAS: e este frame que promete o circulo
+      [-4, -1, 6], // lado esquerdo, recolhendo
+    ][swing];
+    b.push(box(arc[0], arc[1], arc[2] + up, 2, 2, 2, 'rust'));
+    b.push(box(arc[0], arc[1], arc[2] + 2 + up, 2, 2, 1, 'bone'));
+    // Braco esticado na direcao do cabo, para a picareta nao flutuar solta.
+    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 6 + up, 2, 2, 1, 'rust'));
+  }
+
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 40, 48, 20, 42);
 
 const boltFrame = (_dir, _anim, f) => {
   const g = grid(16, 16);
@@ -558,10 +679,11 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 6, fps: 9, loop: false },
   }, bishopFrame, 'voxel-isometric fungal cleric, tall flaring vestment, tall mitre, pastoral staff and hanging censer, mycelial roots at the hem'),
-  base('enemy-fungal-horse', 64, 64, 32, 58, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
+  base('enemy-fungal-horse', 68, 72, 34, 66, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates'),
+  base('enemy-miner', 40, 48, 20, 42, { w: 0.64, h: 0.95 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric impoverished human miner, hunched posture, ragged wrap, dark hood without lamp, pickaxe'),
   {
     id: 'fx-projectile-bolt', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },

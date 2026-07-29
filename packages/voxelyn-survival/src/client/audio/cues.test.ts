@@ -101,6 +101,23 @@ describe('traducao de evento para som', () => {
     expect(bicho[0].voice).toBe('death');
   });
 
+  // O mineiro tem voz propria pelo motivo INVERSO ao dos chefes: nao porque a
+  // morte dele encerra alguma coisa, mas porque ele e a unica pessoa do
+  // bestiario. No `death` generico o jogo diria que matar alguem que estava
+  // trabalhando soa igual a estourar um bomber.
+  it('a morte do mineiro nao soa como a de um bicho nem como a de um chefe', () => {
+    const death = (archetype: string, entity: number): SemanticEvent =>
+      ({ t: 'death', x: 0, y: 0, entity, archetype, facingX: 1, facingY: 0, tick: 10 });
+    const mineiro = cuesForEvent(death('miner', 7), ctx);
+    expect(mineiro[0].voice).toBe('deathMiner');
+    expect(mineiro[0].voice).not.toBe(cuesForEvent(death('stalker', 8), ctx)[0].voice);
+    expect(mineiro[0].voice).not.toBe(cuesForEvent(death('guardian', 9), ctx)[0].voice);
+    // Espacial e nao de interface: importa DE ONDE veio, porque voce atirou
+    // naquela direcao de proposito.
+    expect(VOICE_SPECS.deathMiner.spatial).toBe(true);
+    expect(VOICE_SPECS.deathMiner.priority).toBeGreaterThan(VOICE_SPECS.death.priority);
+  });
+
   // A descarga chega como lista de celulas; sem o centroide o som sairia na
   // origem do mapa, ou seja sempre no mesmo canto do estereo.
   it('posiciona a descarga no centro das celulas atingidas', () => {

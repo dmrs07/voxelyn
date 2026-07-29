@@ -18,6 +18,9 @@ const ARCHETYPE_NAMES: Record<EnemyArchetype, string> = {
   spitter: 'Cuspidor',
   bomber: 'Portador de Esporos',
   bruiser: 'Britador',
+  fungal_horse: 'Corcel',
+  bishop: 'Bispo',
+  miner: 'Mineiro',
   guardian: 'Guardião',
 };
 
@@ -130,7 +133,32 @@ export const summaryLines = (summary: RunSummary): SummaryLine[] => {
     { label: 'Dano/tiro', value: accuracy },
     { label: 'Salvage', value: String(stats.salvageCompleted) },
     { label: 'Módulos', value: String(stats.modulesAcquired) },
+    { label: 'Minério', value: String(stats.oreCollected) },
   ];
+};
+
+/**
+ * O registro corporativo: quantos mineradores passivos voce abateu.
+ *
+ * NAO e mais uma celula na grade de numeros, e a diferenca e o ponto inteiro.
+ * Ali ele viraria uma metrica entre outras — algo a otimizar, para cima ou para
+ * baixo. Como linha propria, em vermelho, com a voz da empresa, ele nao pede
+ * nada ao jogador: so registra, com a indiferenca exata de quem contabiliza
+ * perda de material e nao morte de gente.
+ *
+ * "sem valor de recuperacao" faz o trabalho todo. A empresa nao esta condenando
+ * ninguem; esta anotando que aquilo nao rendeu. E o jogador que decide se isso
+ * incomoda — o jogo nao vai decidir por ele, porque a ficcao diz que o
+ * prospector e um robo cumprindo ordens.
+ *
+ * Devolve null em zero: uma linha "0 civis" toda run transformaria a ausencia de
+ * violencia gratuita numa pontuacao, que e o mesmo erro pelo outro lado.
+ */
+export const reputationNote = (summary: RunSummary): string | null => {
+  const n = summary.stats.innocentsKilled;
+  if (n <= 0) return null;
+  const corpo = n === 1 ? '1 civil abatido' : `${n} civis abatidos`;
+  return `REGISTRO CORPORATIVO: ${corpo} — sem valor de recuperação.`;
 };
 
 export type OutcomeText = { title: string; color: 'blood' | 'loot' | 'biolum' };

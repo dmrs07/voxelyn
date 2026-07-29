@@ -105,6 +105,15 @@ export type EntitySnapshot = {
   /** Tick autoritativo ate o qual a entidade permanece atordoada. */
   stunnedUntil?: number;
   action?: EntityActionSnapshot;
+  /**
+   * Postura do Empoverished Miner (MINER_MOOD_*). Ausente nos demais.
+   *
+   * Viaja porque o cliente precisa DESENHAR a diferenca: olhos vermelhos
+   * fumegando raiva sao a unica coisa que avisa que aquele humano parado virou
+   * uma ameaca. Derivar no cliente exigiria repetir a regra de calor la, e as
+   * duas copias divergiriam no primeiro ajuste de balanco.
+   */
+  mood?: number;
 };
 
 /** Estado autoritativo privado do proprio viewer (HUD do jogador local). */

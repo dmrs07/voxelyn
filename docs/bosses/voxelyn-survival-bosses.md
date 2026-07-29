@@ -269,7 +269,13 @@ O `special` é a Investida Flamejante em duas metades: os três primeiros frames
 crista e esticam o corpo. Sem isso os frames de corrida seriam o mesmo cavalo só que
 mais adiante.
 
-Duas correções que só apareceram olhando o resultado:
+**O bug que mais custou:** o rasterizador assume **frente em −y** e rotaciona o modelo
+por direção. Eu autorei o Corcel com a cabeça em **+x** — ele ficava 90° fora de fase
+com a própria direção e corria de lado. A verificação virou parte do fluxo: renderizar
+as quatro direções com uma seta apontando para onde a entidade vai, e conferir que a
+cabeça segue a seta.
+
+Três correções que só apareceram olhando o resultado:
 
 1. **A crina é brasa, não fungo.** O rastro sai das patas, mas a fonte dele tem de
    estar visível no bicho **antes** de estar no chão — um cavalo verde deixando fogo
@@ -282,6 +288,24 @@ Duas correções que só apareceram olhando o resultado:
 
 E a crina fica **atrás** da cabeça, nunca por cima: coberta por ela, a cabeça sumia
 dentro do fogo e o bicho perdia o único ponto que diz para onde está virado.
+
+### Ele não vira no lugar
+
+Todo o resto do bestiário aponta para o jogador e anda naquela direção **no mesmo
+tick**. Aceitável num bicho pequeno, ilegível num quadrúpede de 2 tiles: lia como
+sprite sendo arrastado, não como corpo correndo.
+
+`HORSE_TURN_RATE` limita o giro a 0,12 rad/tick (~137°/s), então ele descreve um
+**arco** — e o arco é o que dá ao jogador a chance de sair pelo lado de dentro da
+curva, o contra-jogo natural de qualquer coisa que carrega. Vale só fora da investida:
+a investida já congela a direção no windup, e suavizar por cima disso faria o cavalo
+desviar do próprio telégrafo.
+
+A primeira implementação misturava `facing` com o alvo e normalizava — o que **parecia**
+equivalente e não é. Com os dois exatamente opostos, a mistura continua no mesmo eixo e
+a normalização devolve o vetor original: o cavalo simplesmente não virava, e só quando
+quem estava atrás dele era o jogador — o caso em que a curva importa. O teste
+`vira em arco, e nao no lugar` foi escrito antes da correção e pegou isso.
 
 ## 9. O que fica pendente
 

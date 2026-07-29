@@ -8,6 +8,7 @@ import {
   formatSeed,
   nextStarHint,
   parseSeed,
+  reputationNote,
   summaryLines,
 } from './run-summary';
 
@@ -19,7 +20,7 @@ const base: RunSummary = {
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 20,
-    kills: { stalker: 2, bruiser: 1, spitter: 0, bomber: 0, guardian: 0 },
+    kills: { stalker: 2, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 },
     damageTakenTenths: 875,
     damageDealtTenths: 4000,
     solidsDestroyed: 12,
@@ -28,6 +29,8 @@ const base: RunSummary = {
     purgeCellsUsed: 1,
     timesDowned: 0,
     revivesGiven: 0,
+    oreCollected: 0,
+    innocentsKilled: 0,
     discoveries: 0,
   },
   stars: 0,
@@ -176,5 +179,27 @@ describe('titulo do resultado', () => {
     );
     expect(new Set(desfechos.map((d) => d.title)).size).toBe(3);
     expect(new Set(desfechos.map((d) => d.color)).size).toBe(3);
+  });
+});
+
+describe('registro corporativo', () => {
+  it('nao aparece quando ninguem passivo caiu', () => {
+    expect(reputationNote(base)).toBeNull();
+  });
+
+  // Uma linha "0 civis" toda run transformaria a AUSENCIA de violencia gratuita
+  // numa pontuacao — o mesmo erro pelo outro lado.
+  it('aparece com a voz da empresa, e nao com a do jogo', () => {
+    const note = reputationNote({
+      ...base,
+      stats: { ...base.stats, innocentsKilled: 2 },
+    });
+    expect(note).toContain('2 civis abatidos');
+    expect(note).toContain('sem valor de recuperação');
+  });
+
+  it('concorda em numero no singular', () => {
+    const note = reputationNote({ ...base, stats: { ...base.stats, innocentsKilled: 1 } });
+    expect(note).toContain('1 civil abatido');
   });
 });

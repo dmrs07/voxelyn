@@ -1,12 +1,12 @@
 {
-  "id": "enemy-fungal-horse",
+  "id": "enemy-miner",
   "version": 2,
-  "atlas": "enemy-fungal-horse.png",
-  "frameWidth": 68,
-  "frameHeight": 72,
-  "columns": 60,
-  "anchorX": 34,
-  "anchorY": 66,
+  "atlas": "enemy-miner.png",
+  "frameWidth": 40,
+  "frameHeight": 48,
+  "columns": 84,
+  "anchorX": 20,
+  "anchorY": 42,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -16,12 +16,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 1.4,
+    "w": 0.64,
     "h": 0.95
   },
   "footprint": {
-    "w": 1.6,
-    "h": 1.2,
+    "w": 1,
+    "h": 1,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -31,10 +31,7 @@
     "#1d2430",
     "#2e3a4d",
     "#6e4a33",
-    "#b8a98f",
-    "#d93b4c",
-    "#ff7a2f",
-    "#ffd166"
+    "#b8a98f"
   ],
   "animations": {
     "idle": {
@@ -61,11 +58,6 @@
       "frames": 5,
       "fps": 10,
       "loop": false
-    },
-    "special": {
-      "frames": 6,
-      "fps": 10,
-      "loop": false
     }
   },
   "frameMap": {
@@ -73,38 +65,34 @@
       "idle": 0,
       "walk": 4,
       "attack": 10,
-      "special": 14,
-      "hit": 20,
-      "die": 22
+      "hit": 14,
+      "die": 16
     },
     "dl": {
-      "idle": 27,
-      "walk": 31,
-      "attack": 37,
-      "special": 41,
-      "hit": 47,
-      "die": 49
+      "idle": 21,
+      "walk": 25,
+      "attack": 31,
+      "hit": 35,
+      "die": 37
     },
     "ur": {
-      "idle": 54,
-      "walk": 58,
-      "attack": 64,
-      "special": 68,
-      "hit": 74,
-      "die": 76
+      "idle": 42,
+      "walk": 46,
+      "attack": 52,
+      "hit": 56,
+      "die": 58
     },
     "ul": {
-      "idle": 81,
-      "walk": 85,
-      "attack": 91,
-      "special": 95,
-      "hit": 101,
-      "die": 103
+      "idle": 63,
+      "walk": 67,
+      "attack": 73,
+      "hit": 77,
+      "die": 79
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates",
+    "prompt": "voxel-isometric impoverished human miner, hunched posture, ragged wrap, dark hood without lamp, pickaxe",
     "seedOrRef": "deterministic-code-v2"
   }
 }

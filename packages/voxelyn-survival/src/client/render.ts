@@ -10,6 +10,7 @@ import {
   SOLID_ORE_SPENT,
   SURF_BIOFLUID,
   SURF_FIRE,
+  MINER_MOOD_ENRAGED,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
   SURF_GAS,
@@ -42,6 +43,7 @@ import {
   describeOutcome,
   formatSeed,
   nextStarHint,
+  reputationNote,
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
@@ -949,7 +951,16 @@ export class SurvivalRenderer {
             sx,
             sy,
             spriteZoom,
-            enemy.elite ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 } : undefined
+            // Um sheet de frames fixos nao sabe o humor da entidade, e o
+            // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
+            // gancho de tint que ja existia para o elite serve exatamente para
+            // isso — e vermelho contra o laranja do elite mantem as duas
+            // marcacoes distinguiveis.
+            enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED
+              ? { color: 'rgba(217,59,76,0.45)', alpha: 0.45 }
+              : enemy.elite
+                ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
+                : undefined
           );
           if (!drew) {
             drawVoxelEntity(ctx, {
@@ -966,9 +977,14 @@ export class SurvivalRenderer {
               // debaixo do bispo e um dado que ele TEM. Mandar um booleano por
               // inimigo por tick para dizer o que o mapa ja diz seria pagar
               // banda por uma leitura local.
+              // Dois usos, uma bandeira: "esta criatura esta ACESA agora". No
+              // bispo e a cura vindo do chao; no mineiro e a raiva. Sao a mesma
+              // pergunta de desenho — acender ou nao a luz emissiva — e separar
+              // em dois parametros so duplicaria o `if` do outro lado.
               charged:
-                enemy.archetype === 'bishop' &&
-                state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] === SURF_FUNGAL,
+                (enemy.archetype === 'bishop' &&
+                  state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] === SURF_FUNGAL) ||
+                (enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED),
             });
           }
           if (enemy.stunnedUntil > state.tick) {
@@ -1625,6 +1641,7 @@ export class SurvivalRenderer {
     const lines = summaryLines(summary);
     const half = Math.ceil(lines.length / 2);
     const hint = nextStarHint(summary);
+    const record = reputationNote(summary);
 
     // Altura do bloco medida ANTES de desenhar, para centralizar de verdade.
     //
@@ -1638,6 +1655,7 @@ export class SurvivalRenderer {
       unit * (cause.lesson ? 1.35 : 0) + // licao
       unit * 2 + // respiro antes dos numeros
       half * unit * 1.25 + // numeros
+      (record ? unit * 1.45 : 0) +
       (hint ? unit * 1.45 : 0) +
       unit * 1.5 + // seed
       unit * 1.6; // chamada de reinicio
@@ -1699,6 +1717,16 @@ export class SurvivalRenderer {
     }
     ctx.textAlign = 'center';
     y += half * unit * 1.25;
+
+    // O registro vem ANTES da dica de estrela e em vermelho: ele nao e um
+    // conselho de como jogar melhor, e a unica linha desta tela que so constata.
+    if (record) {
+      y += unit * 0.6;
+      ctx.fillStyle = PAL.blood;
+      ctx.font = statFont;
+      ctx.fillText(record, vw / 2, y);
+      y += unit * 0.85;
+    }
 
     if (hint) {
       y += unit * 0.6;

@@ -260,6 +260,29 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     });
     tone(ctx, out, t0, { type: 'sawtooth', from: 260, to: 70, peak: 0.26, decay: 0.3 });
   },
+  // A unica morte HUMANA do jogo, e a voz mais CURTA do banco. Medido num
+  // OfflineAudioContext, som audivel ate cair abaixo de -40 dB:
+  //
+  //   deathMiner     189 ms
+  //   death          329 ms
+  //   deathGuardian  1770 ms
+  //
+  // A brevidade e o desenho. Todo o resto do banco toca e desvanece — a criatura
+  // cai, o som acompanha o corpo, a cauda cobre o instante seguinte. Aqui a
+  // cauda e o problema: uma morte que ressoa e uma morte estilizada, e o
+  // objetivo desta e o oposto. Ela para antes de o ouvido esperar e deixa
+  // silencio onde havia som, e o silencio faz o trabalho que nenhuma cauda faria.
+  //
+  // Duas parciais proximas em vez de uma so: batimento leve, que e o que separa
+  // voz de bipe. E nada abaixo de 280 Hz, porque grave e o registro dos chefes e
+  // das explosoes — um corpo pequeno nao pode soar como um evento grande.
+  deathMiner: (ctx, out, t0, noise) => {
+    // Sopro curtissimo de entrada: o ar saindo, antes de qualquer altura.
+    burst(ctx, out, t0, noise, { peak: 0.26, decay: 0.07, type: 'bandpass', from: 1100, to: 700, q: 1.4 });
+    tone(ctx, out, t0 + 0.01, { type: 'triangle', from: 340, to: 280, peak: 0.34, decay: 0.14, attack: 0.006 });
+    tone(ctx, out, t0 + 0.01, { type: 'triangle', from: 352, to: 286, peak: 0.2, decay: 0.13, attack: 0.006 });
+    // Sem terceira camada, sem grave, sem cauda. O corte E o desenho.
+  },
   // Fim de ato: acorde grave descendente, longo o bastante para durar mais que
   // o corpo caindo na tela.
   deathGuardian: (ctx, out, t0, noise) => {
@@ -288,6 +311,24 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // porque tudo o mais e alguma coisa terminando. Uma glissando ascendente nao
   // precisa ser aprendida: contra um vocabulario inteiro de quedas, ela le como
   // "isto esta voltando" antes de o jogador saber o que e o som.
+  // Grito humano. Serra denteada subindo, curta e crua — deliberadamente a voz
+  // mais FEIA do banco: nada mais no jogo grita, e o desconforto e o ponto.
+  minerRage: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sawtooth', from: 210, to: 430, peak: 0.4, decay: 0.34, attack: 0.01 });
+    tone(ctx, out, t0 + 0.04, { type: 'square', from: 320, to: 250, peak: 0.16, decay: 0.28 });
+    burst(ctx, out, t0, noise, { peak: 0.2, decay: 0.2, type: 'bandpass', from: 1400, to: 600, q: 1.2 });
+  },
+  // Fuga: sopro curto que DESCE e se afasta. Sem tom definido — quem foge nao
+  // esta anunciando nada, so foi visto.
+  minerFlee: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, { peak: 0.3, decay: 0.3, type: 'bandpass', from: 900, to: 260, q: 0.9 });
+    tone(ctx, out, t0, { type: 'triangle', from: 300, to: 170, peak: 0.14, decay: 0.24 });
+  },
+  // Minerio na cota: clique curto e metalico, no registro alto onde nada mais
+  // do jogo toca. E um recibo, nao um evento — tem de sumir sob o combate.
+  oreGained: (ctx, out, t0) => {
+    tone(ctx, out, t0, { type: 'square', from: 1180, to: 1560, peak: 0.14, decay: 0.09, attack: 0.002 });
+  },
   bishopHeal: (ctx, out, t0) => {
     tone(ctx, out, t0, { type: 'sine', from: 320, to: 620, peak: 0.3, decay: 0.26, attack: 0.03 });
     tone(ctx, out, t0 + 0.02, { type: 'triangle', from: 480, to: 930, peak: 0.14, decay: 0.22, attack: 0.03 });

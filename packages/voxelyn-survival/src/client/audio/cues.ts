@@ -122,6 +122,13 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // fim de um ato. Dar a ele um terceiro sting seria gastar uma voz nova
       // para dizer a mesma coisa, e o jogador nao precisa distinguir os dois
       // pelo som — ele acabou de passar cinco minutos olhando para o que caiu.
+      //
+      // O mineiro tem voz propria pelo motivo inverso ao dos chefes: nao porque
+      // a morte dele encerra alguma coisa, mas porque ele e a unica PESSOA do
+      // bestiario. Deixa-lo no `death` generico faria o jogo dizer que matar
+      // alguem que estava trabalhando soa igual a estourar um bomber — e tudo
+      // no encontro dele existe para dizer o contrario.
+      if (ev.archetype === 'miner') return [{ voice: 'deathMiner', x: ev.x, y: ev.y, scale: 1 }];
       return ev.archetype === 'guardian' || ev.archetype === 'bishop'
         ? [{ voice: 'deathGuardian', x: ev.x, y: ev.y, scale: 1 }]
         : [{ voice: 'death', x: ev.x, y: ev.y, scale: 1 }];
@@ -132,6 +139,14 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     // regra. Com som, ele ouve o chao trabalhando contra ele enquanto atira.
     case 'heal':
       return [{ voice: 'bishopHeal', x: ev.x, y: ev.y, scale: 1 }];
+
+    // Duas vozes bem diferentes para a MESMA transicao, porque o que o jogador
+    // precisa saber e qual das duas aconteceu — e ele precisa saber sem olhar.
+    case 'miner_mood':
+      return [{ voice: ev.mood === 2 ? 'minerRage' : 'minerFlee', x: ev.x, y: ev.y, scale: 1 }];
+
+    case 'ore_gained':
+      return [{ voice: 'oreGained', x: ev.x, y: ev.y, scale: Math.min(1.3, 0.7 + ev.amount / 10) }];
 
     case 'explosion':
       // Explosao maior soa maior, mas com teto: o raio do modulo explosivo e
