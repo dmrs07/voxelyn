@@ -5,6 +5,7 @@
 // cliente nao autenticado E gasta CPU proporcional a ele. Todo controle deste
 // arquivo existe por causa disso, e nao por formalidade.
 
+import { isIP } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { LeaderboardMode, LeaderboardStore } from './leaderboard.js';
 import { MAX_REPLAY_BYTES, replayDigest, sanitizeName, verifySoloRun } from './replay.js';
@@ -21,16 +22,124 @@ import { MAX_REPLAY_BYTES, replayDigest, sanitizeName, verifySoloRun } from './r
  */
 const MAX_CONCURRENT_VERIFICATIONS = 1;
 
-/** Janela e teto de submissoes por IP. */
-const SUBMIT_WINDOW_MS = 60_000;
-const SUBMIT_MAX_PER_WINDOW = 6;
+/** Janela, teto e retencao das submissoes por origem. */
+export const SUBMIT_WINDOW_MS = 60_000;
+export const SUBMIT_MAX_PER_WINDOW = 6;
+export const BUCKET_IDLE_TTL_MS = 5 * SUBMIT_WINDOW_MS;
+const BUCKET_SWEEP_INTERVAL_MS = SUBMIT_WINDOW_MS;
+const MAX_RATE_LIMIT_BUCKETS = 10_000;
 
-type Bucket = { count: number; resetAt: number };
+type Bucket = { count: number; resetAt: number; lastSeenAt: number };
+
+export type SubmissionRateLimiterOptions = {
+  windowMs?: number;
+  maxPerWindow?: number;
+  idleTtlMs?: number;
+  sweepIntervalMs?: number;
+  maxBuckets?: number;
+};
+
+/**
+ * Limite em memoria com coleta de origens inativas e teto defensivo.
+ *
+ * Sem a coleta, um fluxo de IPs legitimos — ou uma chave de origem mal
+ * configurada — deixaria uma entrada permanente por visitante ate o processo
+ * reiniciar. Ao atingir o teto depois da varredura, falha fechado.
+ */
+export class SubmissionRateLimiter {
+  private readonly buckets = new Map<string, Bucket>();
+  private readonly windowMs: number;
+  private readonly maxPerWindow: number;
+  private readonly idleTtlMs: number;
+  private readonly sweepIntervalMs: number;
+  private readonly maxBuckets: number;
+  private nextSweepAt = 0;
+
+  constructor(options: SubmissionRateLimiterOptions = {}) {
+    this.windowMs = options.windowMs ?? SUBMIT_WINDOW_MS;
+    this.maxPerWindow = options.maxPerWindow ?? SUBMIT_MAX_PER_WINDOW;
+    this.idleTtlMs = options.idleTtlMs ?? BUCKET_IDLE_TTL_MS;
+    this.sweepIntervalMs = options.sweepIntervalMs ?? BUCKET_SWEEP_INTERVAL_MS;
+    this.maxBuckets = options.maxBuckets ?? MAX_RATE_LIMIT_BUCKETS;
+  }
+
+  private sweep(now: number): void {
+    for (const [key, bucket] of this.buckets) {
+      if (now - bucket.lastSeenAt >= this.idleTtlMs) this.buckets.delete(key);
+    }
+    this.nextSweepAt = now + this.sweepIntervalMs;
+  }
+
+  check(key: string, now: number): boolean {
+    if (now >= this.nextSweepAt) this.sweep(now);
+
+    let bucket = this.buckets.get(key);
+    if (!bucket) {
+      if (this.buckets.size >= this.maxBuckets) {
+        this.sweep(now);
+        if (this.buckets.size >= this.maxBuckets) return true;
+      }
+      bucket = { count: 1, resetAt: now + this.windowMs, lastSeenAt: now };
+      this.buckets.set(key, bucket);
+      return false;
+    }
+
+    bucket.lastSeenAt = now;
+    if (now >= bucket.resetAt) {
+      bucket.count = 1;
+      bucket.resetAt = now + this.windowMs;
+      return false;
+    }
+    bucket.count += 1;
+    return bucket.count > this.maxPerWindow;
+  }
+
+  /** Apenas para regressao/diagnostico; nao faz parte do protocolo HTTP. */
+  size(): number {
+    return this.buckets.size;
+  }
+}
 
 export type LeaderboardHttpOptions = {
   store: LeaderboardStore;
   log: (line: Record<string, unknown>) => void;
   allowedOrigins?: string[];
+  /** Quantos proxies imediatamente a frente da aplicacao sao confiaveis. */
+  trustedProxyHops?: number;
+};
+
+const canonicalIp = (raw: string | undefined): string | null => {
+  if (!raw) return null;
+  let value = raw.trim().replace(/^"|"$/g, '');
+  if (value.startsWith('[')) {
+    const closing = value.indexOf(']');
+    if (closing > 0) value = value.slice(1, closing);
+  }
+  if (value.startsWith('::ffff:')) value = value.slice('::ffff:'.length);
+  return isIP(value) > 0 ? value : null;
+};
+
+/**
+ * Chave de origem baseada somente em saltos de proxy explicitamente confiados.
+ *
+ * O array X-Forwarded-For e percorrido DA DIREITA para a esquerda: cada proxy
+ * confiavel acrescenta o peer que recebeu. Valores que o cliente prependa a
+ * esquerda nunca mudam a chave enquanto o numero de saltos confiaveis for o
+ * mesmo. Sem configuracao de proxy, o header inteiro e ignorado.
+ */
+export const requestRateLimitKey = (req: IncomingMessage, trustedProxyHops = 0): string => {
+  const socketAddress = canonicalIp(req.socket.remoteAddress) ?? 'desconhecido';
+  const hops = Math.max(0, Math.floor(trustedProxyHops));
+  if (hops === 0) return socketAddress;
+
+  const header = req.headers['x-forwarded-for'];
+  const raw = Array.isArray(header) ? header.join(',') : header;
+  const chain = raw
+    ?.split(',')
+    .map((part) => canonicalIp(part))
+    .filter((part): part is string => part !== null);
+  if (!chain || chain.length < hops) return socketAddress;
+  return chain[chain.length - hops] ?? socketAddress;
 };
 
 const readBody = (req: IncomingMessage, limit: number): Promise<string | null> =>
@@ -65,18 +174,8 @@ const readBody = (req: IncomingMessage, limit: number): Promise<string | null> =
   });
 
 export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
-  const buckets = new Map<string, Bucket>();
+  const limiter = new SubmissionRateLimiter();
   let running = 0;
-
-  const rateLimited = (ip: string, now: number): boolean => {
-    const bucket = buckets.get(ip);
-    if (!bucket || now >= bucket.resetAt) {
-      buckets.set(ip, { count: 1, resetAt: now + SUBMIT_WINDOW_MS });
-      return false;
-    }
-    bucket.count += 1;
-    return bucket.count > SUBMIT_MAX_PER_WINDOW;
-  };
 
   const cors = (req: IncomingMessage, res: ServerResponse): void => {
     const origin = req.headers.origin;
@@ -128,12 +227,8 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
       return true;
     }
 
-    const ip =
-      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
-      req.socket.remoteAddress ??
-      'desconhecido';
-
-    if (rateLimited(ip, Date.now())) {
+    const ip = requestRateLimitKey(req, opts.trustedProxyHops);
+    if (limiter.check(ip, Date.now())) {
       json(res, 429, { error: 'muitas submissoes; tente de novo em um minuto' });
       return true;
     }
