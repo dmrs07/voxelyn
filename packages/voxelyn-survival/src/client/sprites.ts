@@ -28,6 +28,7 @@ import bruiserManifest from '@voxelyn/survival-content/assets/atlases/enemy-brui
 import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-guardian.json';
 import bishopManifest from '@voxelyn/survival-content/assets/atlases/enemy-bishop.json';
 import horseManifest from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.json';
+import minerManifest from '@voxelyn/survival-content/assets/atlases/enemy-miner.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
@@ -44,6 +45,7 @@ import bruiserUrl from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.p
 import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian.png?url';
 import bishopUrl from '@voxelyn/survival-content/assets/atlases/enemy-bishop.png?url';
 import horseUrl from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.png?url';
+import minerUrl from '@voxelyn/survival-content/assets/atlases/enemy-miner.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
@@ -80,6 +82,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: guardianManifest as unknown as SpriteManifestEntry, url: guardianUrl },
   { manifest: bishopManifest as unknown as SpriteManifestEntry, url: bishopUrl },
   { manifest: horseManifest as unknown as SpriteManifestEntry, url: horseUrl },
+  { manifest: minerManifest as unknown as SpriteManifestEntry, url: minerUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
 ];
@@ -93,6 +96,7 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
   guardian: 'enemy-guardian',
   bishop: 'enemy-bishop',
   fungal_horse: 'enemy-fungal-horse',
+  miner: 'enemy-miner',
 };
 
 /**

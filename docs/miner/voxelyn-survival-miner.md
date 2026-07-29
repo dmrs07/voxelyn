@@ -178,7 +178,61 @@ pode ter causado **sem precisar**. Perdê-la no orçamento durante um tiroteio s
 apagá-la justamente na situação em que ela mais tem o que dizer. Espacial porque
 importa **de onde** veio — você atirou naquela direção de propósito.
 
-## 9. O que fica em aberto
+## 9. O bestiário é escrito pela empresa
+
+O registro era uma lista de nomes e contagens — a voz de um naturalista
+catalogando fauna. Isso contradiz a ficção que o resto do jogo estabeleceu: o
+Veio é habitado por **civilizações** que protegem o que sobrou, e o Prospector é
+um robô de uma mineradora enviado para levar o que é delas.
+
+Então quem escreve o registro é a empresa, e a empresa não chama ninguém de povo.
+A seção virou **REGISTRO DE ATIVOS**, e cada entrada tem três linhas:
+
+```
+PESSOAL NÃO AUTORIZADO                                    ×3
+Ocupação irregular do sítio. Sem valor de recuperação.
+  campo: Minerador Empobrecido
+```
+
+A designação corporativa vem **primeiro**, porque é o que o relatório considera o
+nome de verdade. O nome que o **jogador** aprendeu vem embaixo, recuado e em
+itálico, como uma nota de campo que alguém acrescentou à mão. A distância entre as
+duas linhas é o efeito inteiro.
+
+O texto nunca diz ao jogador o que sentir. Ele só mostra o que foi arquivado — e
+quem ouviu a morte do mineiro já sabe que *"sem valor de recuperação"* é uma frase
+sobre a empresa, não sobre ele. É a mesma frase da tela de fim, de propósito: os
+dois lugares em que o jogo fala com a voz de quem o construiu dizem a mesma coisa.
+
+A voz também **se desgasta** conforme a lista desce. Começa como zoologia de
+rotina (`ESPÉCIME QUIT-04`, "fauna de túnel") e no fim precisa de negações para não
+admitir o óbvio:
+
+- *"Reclassificado de «maquinário extraviado» após o terceiro relatório."*
+- *"A presença de arreios não implica operador."*
+- *"A alegação de estrutura religiosa permanece não corroborada."*
+
+O jogador viu a mitra, a congregação e os arreios. O relatório está mentindo com
+o vocabulário de quem não pode ser processado por isso.
+
+### O sprite do Miner
+
+`enemy-miner`, 40×48. A silhueta tem uma tarefa acima de todas: **ler como gente
+antes de ler como inimigo**. É a única do bestiário construída com a mesma
+gramática do Prospector — duas pernas, tronco estreito, cabeça no topo — e isso é
+deliberado. Se o jogador só descobrir que ali estava alguém quando o corpo cair, a
+decisão que o encontro existe para oferecer já passou.
+
+**Curvado**, e não ereto. O Prospector é uma máquina: prumo, ombros quadrados,
+visor aceso. Este é um corpo que passa o dia dobrado sobre uma picareta, e a
+diferença de postura entre os dois diz mais do que qualquer linha do bestiário. E
+sem lanterna — o Prospector carrega luz porque a empresa a pagou.
+
+A fúria não cabe no atlas: um sheet de frames fixos não sabe o humor da entidade.
+Ela chega pelo gancho de **tint** que já existia para o elite, em vermelho contra o
+laranja dele, para as duas marcações continuarem distinguíveis.
+
+## 10. O que fica em aberto
 
 - `MINER_RAGE_HEAT = 66,6` (de 100) — dois terços da barra. Começou em 55, o que
   caía dentro do calor de um combate curto qualquer: o jogador chegava

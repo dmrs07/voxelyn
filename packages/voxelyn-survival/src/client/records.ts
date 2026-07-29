@@ -297,3 +297,59 @@ export const BESTIARY_NAMES: Record<EnemyArchetype, string> = {
   bishop: 'Bispo do Veio',
   guardian: 'Guardião do Núcleo',
 };
+
+/**
+ * A ficha corporativa de cada arquetipo.
+ *
+ * O bestiario era uma lista de nomes e contagens — a voz de um naturalista
+ * catalogando fauna. Isso contradiz a ficcao que o resto do jogo estabeleceu: o
+ * Veio e habitado por CIVILIZACOES pos-cataclisma que protegem o que sobrou, e o
+ * prospector e um robo de uma mineradora enviado para levar o que e delas.
+ *
+ * Entao quem escreve o bestiario e a empresa, e a empresa nao chama ninguem de
+ * povo. A voz e a de um relatorio de recuperacao de ativos: designacao, custo,
+ * autorizacao. E ela vai ficando mais tensa conforme desce — no comeco e zoologia
+ * de rotina, e no fim precisa de tres negacoes para nao admitir o obvio ("a
+ * existencia de arreios nao implica operador").
+ *
+ * O texto NAO diz ao jogador o que sentir. Ele so mostra o que a empresa
+ * registrou, e deixa a distancia entre isso e o que o jogador viu fazer o
+ * trabalho. Quem ouviu a morte do mineiro ja sabe que "sem valor de recuperacao"
+ * e uma frase sobre a empresa, e nao sobre ele.
+ */
+export type BestiaryFile = { code: string; note: string };
+
+export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
+  stalker: {
+    code: 'ESPÉCIME QUIT-04',
+    note: 'Fauna de túnel. Agressiva por instinto, não por organização. Custo de remoção desprezível.',
+  },
+  spitter: {
+    code: 'ESPÉCIME FUNG-11',
+    note: 'Secreção corrosiva sem valor industrial confirmado. Programa de amostragem descontinuado.',
+  },
+  bomber: {
+    code: 'ESPÉCIME FUNG-23',
+    note: 'Vetor de esporos. Ruptura espontânea documentada em 100% dos encontros registrados.',
+  },
+  bruiser: {
+    code: 'ESPÉCIME MIN-07',
+    note: 'Massa mineral animada. Reclassificado de "maquinário extraviado" após o terceiro relatório.',
+  },
+  miner: {
+    code: 'PESSOAL NÃO AUTORIZADO',
+    note: 'Ocupação irregular do sítio. Sem valor de recuperação.',
+  },
+  fungal_horse: {
+    code: 'ATIVO HOSTIL EQ-02',
+    note: 'Quadrúpede adaptado. A presença de arreios não implica operador.',
+  },
+  bishop: {
+    code: 'ATIVO HOSTIL EQ-09',
+    note: 'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',
+  },
+  guardian: {
+    code: 'ANOMALIA TERMINAL',
+    note: 'Impede o acesso ao núcleo. Nenhuma outra propriedade é relevante para esta operação.',
+  },
+};

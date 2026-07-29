@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import type { EnemyArchetype } from '@voxelyn/survival-sim';
 import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION } from '@voxelyn/survival-sim';
 import type { RunPhase, RunSummary } from '@voxelyn/survival-sim';
-import { HISTORY_LIMIT, applyRun, applyRunOnce, emptyRecords, hasDiscovery } from './records';
+import {
+  BESTIARY_FILES,
+  BESTIARY_NAMES,
+  BESTIARY_ORDER,
+  HISTORY_LIMIT,
+  applyRun,
+  applyRunOnce,
+  emptyRecords,
+  hasDiscovery,
+} from './records';
 
 const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   seed: 1,
@@ -136,5 +146,29 @@ describe('registro entre runs', () => {
     const snapshot = JSON.stringify(rec);
     applyRun(rec, summary({ stars: 3, phase: 'extracted_with_core', seed: 7 }));
     expect(JSON.stringify(rec)).toBe(snapshot);
+  });
+});
+
+describe('registro de ativos', () => {
+  // Mesma guarda de `todo arquetipo tem definicao e contador` no lado da sim:
+  // um arquetipo novo sem ficha nao quebra o typecheck do Record — quebra a
+  // pagina, em runtime, so para quem ja matou aquele bicho.
+  it('todo arquetipo tem ficha, e a ordem do painel cobre todos', () => {
+    for (const archetype of Object.keys(BESTIARY_NAMES) as EnemyArchetype[]) {
+      expect(BESTIARY_FILES[archetype], archetype).toBeDefined();
+      expect(BESTIARY_FILES[archetype].code.length).toBeGreaterThan(0);
+      expect(BESTIARY_FILES[archetype].note.length).toBeGreaterThan(0);
+    }
+    expect([...BESTIARY_ORDER].sort()).toEqual(Object.keys(BESTIARY_NAMES).sort());
+  });
+
+  // A voz e a da EMPRESA, e a empresa nao chama ninguem de povo. Se um dia
+  // alguem suavizar isso, o texto deixa de fazer o trabalho que faz.
+  it('a ficha do mineiro nega que ele seja alguem', () => {
+    expect(BESTIARY_FILES.miner.code).toBe('PESSOAL NÃO AUTORIZADO');
+    expect(BESTIARY_FILES.miner.note).toContain('Sem valor de recuperação');
+    // E o nome que o JOGADOR aprendeu continua existindo, em outro campo: e a
+    // distancia entre os dois que faz a pagina significar alguma coisa.
+    expect(BESTIARY_NAMES.miner).toBe('Minerador Empobrecido');
   });
 });

@@ -951,7 +951,16 @@ export class SurvivalRenderer {
             sx,
             sy,
             spriteZoom,
-            enemy.elite ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 } : undefined
+            // Um sheet de frames fixos nao sabe o humor da entidade, e o
+            // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
+            // gancho de tint que ja existia para o elite serve exatamente para
+            // isso — e vermelho contra o laranja do elite mantem as duas
+            // marcacoes distinguiveis.
+            enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED
+              ? { color: 'rgba(217,59,76,0.45)', alpha: 0.45 }
+              : enemy.elite
+                ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
+                : undefined
           );
           if (!drew) {
             drawVoxelEntity(ctx, {

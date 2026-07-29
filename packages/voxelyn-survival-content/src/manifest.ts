@@ -102,6 +102,7 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-guardian',
   'enemy-bishop',
   'enemy-fungal-horse',
+  'enemy-miner',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [

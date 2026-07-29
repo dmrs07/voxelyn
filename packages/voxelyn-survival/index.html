@@ -143,6 +143,23 @@
       }
       .panel .found {
         color: #e8f1ff;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      /* A contagem e um numero de inventario, nao um trofeu: mesmo peso do
+         resto da linha, alinhada a direita como numa planilha. */
+      .panel .tally {
+        color: #7f8da3;
+        flex: none;
+      }
+      /* O nome que o JOGADOR aprendeu, anotado a mao sobre o relatorio. Recuado
+         e menor: no arquivo da empresa ele e marginalia. */
+      .panel .field-note {
+        display: block;
+        color: #46566e;
+        font-style: italic;
+        margin: -4px 0 10px 12px;
       }
       button:active {
         background: #2e3a4d;

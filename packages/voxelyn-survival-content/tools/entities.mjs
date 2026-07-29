@@ -536,6 +536,81 @@ const horseModel = (anim, f) => {
 };
 const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 68, 72, 34, 66);
 
+// ---------------------------------------------------------------------------
+// enemy-miner 40x48 — a unica PESSOA do bestiario
+//
+// A silhueta tem uma tarefa acima de todas: ler como gente antes de ler como
+// inimigo. Ela e a unica do bestiario construida com a mesma gramatica do
+// prospector — duas pernas, tronco estreito, cabeca no topo — e isso e
+// deliberado. O encontro inteiro depende de o jogador reconhecer, a distancia,
+// que ali esta alguem; se ele so descobrir isso quando o corpo cair, a decisao
+// que o encontro existe para oferecer ja passou.
+//
+// Curvado, e nao ereto. O prospector e uma maquina: prumo, ombros quadrados,
+// visor aceso. Este e um corpo que passa o dia dobrado sobre uma picareta, e a
+// diferenca de postura entre os dois diz mais sobre a ficcao do que qualquer
+// linha de texto do bestiario.
+//
+// Sem lanterna. O prospector carrega luz porque a empresa a pagou.
+// ---------------------------------------------------------------------------
+const minerModel = (anim, f) => {
+  const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  const breathe = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // `attack` = o cleave: a picareta descreve um circulo em volta dele. Os quatro
+  // frames sao ERGUER, girar, girar, recolher — e o giro tem de passar por tras,
+  // senao o golpe le como frontal e o desenho mente sobre o alcance.
+  const swing = anim === 'attack' ? [0, 1, 2, 3][f % 4] : -1;
+  const up = breathe - flinch;
+  const b = [];
+
+  // Pernas e botas gastas.
+  b.push(box(-2, -1, Math.max(0, step), 2, 2, 4, 'rockDeep'));
+  b.push(box(1, -1, Math.max(0, -step), 2, 2, 4, 'rockDeep'));
+  b.push(box(-2, -1, Math.max(0, step), 2, 2, 1, 'rust'));
+  b.push(box(1, -1, Math.max(0, -step), 2, 2, 1, 'rust'));
+
+  // Tronco INCLINADO para a frente, e ombros um degrau abaixo do que estariam
+  // num corpo ereto: e a curvatura que separa este corpo do prospector.
+  const lean = 1;
+  b.push(box(-2, -1 + lean, 4 + up, 5, 3, 4, 'rust'));
+  // Trapo por cima: uma faixa palida atravessando o peito, o unico claro do
+  // corpo, para o olho achar o tronco antes de achar a picareta.
+  b.push(box(-2, -2 + lean, 6 + up, 5, 1, 2, 'bone'));
+  b.push(box(-3, -1 + lean, 7 + up, 7, 3, 1, 'rockDeep'));
+
+  // Cabeca baixa, encaixada nos ombros. Capuz escuro, sem visor e sem luz.
+  b.push(box(-1, -1 + lean * 2, 8 + up, 3, 3, 3, 'rockDeep'));
+  b.push(box(-1, -2 + lean * 2, 9 + up, 3, 1, 2, 'rust'));
+  // Olhos: dois voxels escuros. NAO acendem no atlas — a raiva chega pelo tint
+  // vermelho que o renderer aplica sobre o sprite, porque um sheet de frames
+  // fixos nao sabe o humor da entidade.
+  b.push(box(-1, -3 + lean * 2, 10 + up, 1, 1, 1, 'rockDeep'));
+  b.push(box(1, -3 + lean * 2, 10 + up, 1, 1, 1, 'rockDeep'));
+
+  // A picareta. Fora do ataque ela fica caida ao lado, apoiada no chao — a
+  // postura de quem estava trabalhando, e nao esperando.
+  if (swing < 0) {
+    b.push(box(3, -1, 0, 1, 1, 9, 'rust'));
+    b.push(box(2, -1, 9, 3, 1, 1, 'bone'));
+  } else {
+    // O cabo gira em volta do corpo: frente -> lado -> tras -> lado.
+    const arc = [
+      [0, -4, 7], // erguida a frente
+      [4, -1, 6], // lado direito
+      [0, 3, 5], // POR TRAS: e este frame que promete o circulo
+      [-4, -1, 6], // lado esquerdo, recolhendo
+    ][swing];
+    b.push(box(arc[0], arc[1], arc[2] + up, 2, 2, 2, 'rust'));
+    b.push(box(arc[0], arc[1], arc[2] + 2 + up, 2, 2, 1, 'bone'));
+    // Braco esticado na direcao do cabo, para a picareta nao flutuar solta.
+    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 6 + up, 2, 2, 1, 'rust'));
+  }
+
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 40, 48, 20, 42);
+
 const boltFrame = (_dir, _anim, f) => {
   const g = grid(16, 16);
   fillDiamond(g, 8, 8, 3, 3, 'biolum');
@@ -608,6 +683,7 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates'),
+  base('enemy-miner', 40, 48, 20, 42, { w: 0.64, h: 0.95 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric impoverished human miner, hunched posture, ragged wrap, dark hood without lamp, pickaxe'),
   {
     id: 'fx-projectile-bolt', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },
