@@ -1,4 +1,9 @@
-import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
+import {
+  createServer,
+  type IncomingMessage,
+  type Server as HttpServer,
+  type ServerResponse,
+} from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { LIMITS, encodeMessage } from '@voxelyn/survival-protocol';
 import { TICK_MS } from '@voxelyn/survival-sim';
@@ -50,7 +55,10 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       void leaderboardStore
         .submit({ name: `sala ${room.code}`, mode: 'coop', summary, digest: null })
         .catch((err: unknown) =>
-          log({ ev: 'leaderboard_submit_failed', error: err instanceof Error ? err.message : String(err) })
+          log({
+            ev: 'leaderboard_submit_failed',
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
     },
   });
@@ -59,8 +67,10 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   let draining = false;
 
   let telemetryStore: TelemetryStore | null = null;
-  let handleLeaderboard: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
-  let handleTelemetry: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
+  let handleLeaderboard: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
+    null;
+  let handleTelemetry: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
+    null;
 
   // A conexao com o banco e assincrona; o servidor NAO espera por ela para
   // aceitar jogo. Ate o store existir, as rotas de ranking respondem 503 e o
@@ -128,7 +138,13 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     }
     if (req.url === '/healthz') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, rooms: survival.roomCount(), conns: survival.connectionCount() }));
+      res.end(
+        JSON.stringify({
+          ok: true,
+          rooms: survival.roomCount(),
+          conns: survival.connectionCount(),
+        }),
+      );
       return;
     }
     if (req.url === '/readyz') {
@@ -211,7 +227,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
             leaderboardStore?.close() ?? Promise.resolve(),
             telemetryStore?.close() ?? Promise.resolve(),
           ]).then(() => resolve());
-        })
+        }),
       );
     });
 

@@ -1,4 +1,6 @@
+import type { IncomingMessage } from 'node:http';
 import { describe, expect, it } from 'vitest';
+import { requestRateLimitKey } from '../src/leaderboard-http';
 import {
   IMMEDIATE_RESTART_MS,
   MemoryTelemetry,
@@ -168,5 +170,26 @@ describe('store de memoria', () => {
     const store = new MemoryTelemetry(10);
     for (let i = 0; i < 50; i++) await store.record(ev({ ticks: i }));
     expect((await store.digest(1000)).runs).toBe(10);
+  });
+});
+
+describe('limite por origem', () => {
+  // A telemetria tinha o MESMO bug que a revisao corrigiu no ranking: ler o
+  // primeiro elemento de X-Forwarded-For da ao cliente um limite novo a cada
+  // requisicao, porque ele pode prepender valores a vontade. A correcao mora
+  // num lugar so, e este teste garante que a telemetria realmente a usa.
+  it('nao confia em X-Forwarded-For prependado pelo cliente', () => {
+    const req = (xff: string) =>
+      ({
+        headers: { 'x-forwarded-for': xff },
+        socket: { remoteAddress: '10.0.0.9' },
+      }) as unknown as IncomingMessage;
+
+    // Com um salto confiavel, a origem e o ULTIMO da lista (o proxy), e nao o
+    // primeiro (que o cliente escolheu).
+    expect(requestRateLimitKey(req('203.0.113.1, 198.51.100.77'), 1)).toBe('198.51.100.77');
+    expect(requestRateLimitKey(req('203.0.113.99, 198.51.100.77'), 1)).toBe('198.51.100.77');
+    // Sem proxy declarado, o cabecalho e ignorado por inteiro.
+    expect(requestRateLimitKey(req('203.0.113.1, 198.51.100.77'), 0)).toBe('10.0.0.9');
   });
 });

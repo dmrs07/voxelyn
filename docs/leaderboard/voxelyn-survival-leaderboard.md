@@ -222,7 +222,16 @@ diferentes**, o evento de abandono — justamente o mais valioso — nunca teria
 nada denunciaria isso, porque telemetria que falha é telemetria calada. O tipo do Blob é
 `text/plain` por causa disso; o servidor não lê content-type, só faz `JSON.parse` do corpo.
 
-## 7. Cobertura de verificação
+## 7. Limite por origem
+
+A telemetria **reusa** `SubmissionRateLimiter` e `requestRateLimitKey` do ranking, em vez
+de reimplementar. Não é economia de código: ler o primeiro elemento de `X-Forwarded-For`
+dá ao cliente um limite novo a cada requisição, porque ele pode **prepender** valores à
+vontade. O bug era idêntico nos dois endpoints, então a correção mora num lugar só — e o
+limitador compartilhado ainda coleta origens ociosas, sem o que um fluxo de visitantes
+legítimos deixaria uma entrada permanente por IP até o processo reiniciar.
+
+## 8. Cobertura de verificação
 
 - **Abandono: verificado ponta a ponta**, 4/4, no caminho que importa em celular
   (`visibilitychange` quando o app vai para o fundo). Foi ele que achou o bug do §6.
