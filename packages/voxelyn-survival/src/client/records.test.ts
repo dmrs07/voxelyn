@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION } from '@voxelyn/survival-sim';
 import type { RunPhase, RunSummary } from '@voxelyn/survival-sim';
-import { HISTORY_LIMIT, applyRun, emptyRecords, hasDiscovery } from './records';
+import { HISTORY_LIMIT, applyRun, applyRunOnce, emptyRecords, hasDiscovery } from './records';
 
 const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   seed: 1,
@@ -111,6 +111,20 @@ describe('registro entre runs', () => {
     for (let i = 0; i < HISTORY_LIMIT + 5; i++) rec = applyRun(rec, summary({ seed: i }));
     expect(rec.history).toHaveLength(HISTORY_LIMIT);
     expect(rec.history[0].seed).toBe(HISTORY_LIMIT + 4);
+  });
+
+  it('deduplica copias JSON da mesma run, mas aceita uma nova run apos reset', () => {
+    const original = summary({ seed: 42, phase: 'extracted', ticks: 777, stars: 1 });
+    const copy = JSON.parse(JSON.stringify(original)) as RunSummary;
+    const first = applyRunOnce(emptyRecords(), original, null);
+    const duplicate = applyRunOnce(first.records, copy, first.identity);
+    expect(duplicate.applied).toBe(false);
+    expect(duplicate.records.totals.runs).toBe(1);
+
+    // Reiniciar limpa a identidade da tela; a mesma seed/resultado pode ser jogada de novo.
+    const nextRun = applyRunOnce(duplicate.records, copy, null);
+    expect(nextRun.applied).toBe(true);
+    expect(nextRun.records.totals.runs).toBe(2);
   });
 
   // applyRun e pura porque este e o unico lugar do cliente em que um bug

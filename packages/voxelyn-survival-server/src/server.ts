@@ -311,21 +311,18 @@ export class SurvivalServer {
     this.tickCount += 1;
     this.sweepRooms(); // expira salas abandonadas antes de simular
     for (const room of this.rooms) {
-      const terminal =
-        room.state.phase === 'dead' ||
-        room.state.phase === 'extracted' ||
-        room.state.phase === 'extracted_with_core';
-      // Dispara UMA vez por sala. A fase terminal persiste e o loop continua
-      // rodando ate a sala expirar; sem a marca, o mesmo resultado entraria no
-      // ranking vinte vezes por segundo.
+      const wasTerminal = room.state.phase !== 'running';
+      // Salas ja terminadas nao avancam; salas correndo podem terminar NESTE passo.
+      const { events, chunkDiffs, removed } = wasTerminal
+        ? { events: [], chunkDiffs: [], removed: [] }
+        : room.step();
+      const terminal = room.state.phase !== 'running';
+      // Reporta no MESMO tick que congelou o sumario, antes do snapshot final.
+      // Assim o ultimo socket pode fechar logo apos recebe-lo sem perder o resultado.
       if (terminal && !room.resultReported && room.state.summary) {
         room.resultReported = true;
         this.onRunFinished?.(room);
       }
-      // salas terminadas nao avancam a sim, mas ainda podem emitir um snapshot final
-      const { events, chunkDiffs, removed } = terminal
-        ? { events: [], chunkDiffs: [], removed: [] }
-        : room.step();
       for (const slot of room.slots) {
         if (slot.clientId === null) continue;
         if (slot.needsFullResync) {

@@ -18,7 +18,7 @@ import {
   type QualityLevel,
 } from './settings';
 import { audio } from './audio';
-import { applyRun, loadRecords, saveRecords, type Records } from './records';
+import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
 import { renderRecordsPanel } from './records-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
@@ -158,19 +158,20 @@ let records: Records = loadRecords();
 /**
  * Registra uma run terminada, UMA VEZ.
  *
- * O guard por identidade do sumario e o que impede a run de ser contada a cada
- * quadro: a fase terminal persiste, o loop continua desenhando, e sem ele o
- * historico ganharia sessenta copias por segundo da mesma morte.
+ * A identidade usa campos congelados, nao referencia do objeto: no online cada
+ * snapshot desserializa uma nova copia da mesma run terminal.
  */
-let recordedSummary: unknown = null;
+let recordedSummaryKey: string | null = null;
 /** A run corrente ja foi enviada para verificacao? */
 let submitted = false;
 /** Seed fixada pelo jogador no menu, ou null para sortear a cada descida. */
 let forcedSeed: number | null = null;
 const recordRun = (state: SurvivalState): void => {
-  if (!state.summary || state.summary === recordedSummary) return;
-  recordedSummary = state.summary;
-  records = applyRun(records, state.summary);
+  if (!state.summary) return;
+  const result = applyRunOnce(records, state.summary, recordedSummaryKey);
+  recordedSummaryKey = result.identity;
+  if (!result.applied) return;
+  records = result.records;
   saveRecords(records);
 };
 
@@ -282,7 +283,7 @@ const runSolo = (): void => {
         recorder.start(nextRunSeed);
         state = createRun({ seed: nextRunSeed });
         audio.reset();
-        recordedSummary = null;
+        recordedSummaryKey = null;
         submitted = false;
         gate.reset();
       }

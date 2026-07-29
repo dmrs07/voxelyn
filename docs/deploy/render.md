@@ -1,13 +1,14 @@
 # Deploy no Render — Voxelyn Survival (alpha)
 
-Blueprint: [`render.yaml`](../../render.yaml). Dois serviços:
+Blueprint: [`render.yaml`](../../render.yaml). Três recursos:
 
 - **voxelyn-survival-server** — Web Service Node (HTTP + WebSocket autoritativo).
 - **voxelyn-survival-client** — Static Site (PWA).
+- **voxelyn-leaderboard** — Render Postgres, usado somente pelo ranking.
 
-Durante o alpha o servidor roda em **instância única** (o estado das salas é em
-memória; sem Postgres nem Key Value). Não escale horizontalmente ainda — dois
-processos não compartilham salas.
+Durante o alpha o servidor roda em **instância única**: o estado das salas continua
+em memória e dois processos não compartilhariam partidas. O Postgres persiste apenas
+o ranking; ele não torna as salas distribuídas.
 
 ## Pré-requisitos
 
@@ -18,7 +19,7 @@ processos não compartilham salas.
 ## Passo a passo
 
 1. **New → Blueprint** no Render e selecione o repositório. O Render lê
-   `render.yaml` e cria os dois serviços.
+   `render.yaml` e cria o Web Service, o Static Site e o banco Postgres.
 2. Primeiro deploy do **server**. Após ficar `live`, copie a URL pública
    (ex.: `https://voxelyn-survival-server.onrender.com`).
 3. Configure as variáveis de ambiente (marcadas `sync: false`, pedidas na UI):
@@ -38,6 +39,7 @@ processos não compartilham salas.
 | server | `PORT` | injetada pelo Render | runtime (bind `0.0.0.0:$PORT`) |
 | server | `ALLOWED_ORIGINS` | `https://…client.onrender.com` | runtime |
 | server | `NODE_VERSION` | `22.22.0` | build |
+| server | `DATABASE_URL` | injetada por `fromDatabase.connectionString` | runtime |
 | client | `NODE_VERSION` | `22.22.0` | build |
 | client | `VITE_SERVER_URL` | `wss://…server.onrender.com` | **build-time** |
 
@@ -46,17 +48,18 @@ campo "Servidor" no menu. Útil para testar contra outro backend sem rebuild.
 
 ## Build no Render
 
-O Render já executa a instalação de dependências com pnpm antes do comando de
-build. Por isso o blueprint chama somente os scripts necessários:
+O checkout do Render é limpo. Os dois recursos executam explicitamente a mesma
+preparação declarada no Blueprint e falham alto se o lockfile estiver defasado:
 
 ```sh
-pnpm --filter @voxelyn/survival-server... build
-pnpm --filter @voxelyn/survival... build
+corepack enable
+pnpm install --frozen-lockfile
+pnpm --filter @voxelyn/survival-server... build # servidor
+pnpm --filter @voxelyn/survival... build        # cliente
 ```
 
-Não execute `corepack enable` no `buildCommand`: no ambiente do Render ele pode
-tentar recriar links em `/usr/bin`, que é somente leitura. Também não é
-necessário repetir `pnpm install` dentro do comando de build.
+Mantenha esta seção sincronizada com `render.yaml`; não dependa de uma instalação
+implícita fora do `buildCommand`.
 
 ## Health checks
 
@@ -73,7 +76,7 @@ No deploy ou restart, o Render envia `SIGTERM`. O server:
 1. marca `/readyz` como `503` (para de receber novas conexões);
 2. para o loop de tick;
 3. fecha os WebSockets com código `1001` (server shutdown);
-4. encerra HTTP e sai com código 0.
+4. encerra HTTP, fecha o pool do ranking e sai com código 0.
 
 Clientes detectam o fechamento e entram em **reconnect** por resume token; ao
 subir a nova versão, reanexam à mesma sala se ela ainda existir. Como o estado é
@@ -104,8 +107,10 @@ degradam a sensação.
 
 ## Limites do alpha (não fazer ainda)
 
-- Sem Postgres (não há persistência real) nem Render Key Value (não há múltiplas
-  instâncias/matchmaking distribuído).
+- O Postgres persiste somente o ranking. Não há Render Key Value nem múltiplas
+  instâncias/matchmaking distribuído.
+- O plano gratuito do Postgres é adequado ao alpha, mas expira após 30 dias. Para
+  ranking persistente em produção, altere o banco para um plano pago antes disso.
 - Instância única de server. Escalar exige mover o estado de salas para fora do
   processo — fora do escopo do alpha.
 - O **solo** e a **PWA** continuam utilizáveis mesmo com o server fora do ar

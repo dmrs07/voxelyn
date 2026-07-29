@@ -37,7 +37,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     // resultado ja e autoritativo no instante em que nasce.
     onRunFinished: (room) => {
       const summary = room.state.summary;
-      if (!summary || !leaderboardStore) return;
+      if (!summary || summary.phase === 'dead' || !leaderboardStore) return;
       // Sala de um jogador so no online continua sendo 'coop' de modo: o que
       // separa os dois rankings nao e quantas pessoas jogaram, e QUEM simulou.
       void leaderboardStore

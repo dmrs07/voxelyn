@@ -82,6 +82,7 @@ services:
 # versao de schema para migrar.
 databases:
   - name: voxelyn-leaderboard
+    region: virginia
     plan: free
     databaseName: voxelyn
     user: voxelyn

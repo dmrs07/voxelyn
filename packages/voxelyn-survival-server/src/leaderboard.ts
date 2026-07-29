@@ -52,6 +52,10 @@ export interface LeaderboardStore {
 const totalKills = (summary: RunSummary): number =>
   Object.values(summary.stats.kills).reduce((a, b) => a + b, 0);
 
+/** Only successful extractions are eligible for either leaderboard mode. */
+export const isLeaderboardEligible = (summary: RunSummary): boolean =>
+  summary.phase === 'extracted' || summary.phase === 'extracted_with_core';
+
 /**
  * A ordenacao do ranking, num lugar so.
  *
@@ -80,6 +84,7 @@ export class MemoryLeaderboard implements LeaderboardStore {
   private nextId = 1;
 
   async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {
+    if (!isLeaderboardEligible(input.summary)) return null;
     if (input.digest && this.digests.has(input.digest)) return null;
     if (input.digest) this.digests.add(input.digest);
     const entry: LeaderboardEntry = {
@@ -101,6 +106,7 @@ export class MemoryLeaderboard implements LeaderboardStore {
     return this.rows
       .filter(
         (r) =>
+          r.phase !== 'dead' &&
           (query.seed === undefined || r.seed === query.seed) &&
           (query.mode === undefined || r.mode === query.mode),
       )
@@ -187,6 +193,7 @@ export class PostgresLeaderboard implements LeaderboardStore {
   }
 
   async submit(input: SubmitInput): Promise<LeaderboardEntry | null> {
+    if (!isLeaderboardEligible(input.summary)) return null;
     // `on conflict do nothing` faz a deduplicacao no BANCO e nao na aplicacao:
     // duas instancias, ou dois POSTs simultaneos do mesmo cliente, correriam
     // entre o "ja existe?" e o insert. O indice unico e a unica barreira que
@@ -212,7 +219,8 @@ export class PostgresLeaderboard implements LeaderboardStore {
   }
 
   async top(query: LeaderboardQuery): Promise<LeaderboardEntry[]> {
-    const conditions: string[] = [];
+    // Hide legacy failed rows that may have been stored before eligibility was enforced.
+    const conditions: string[] = [`phase <> 'dead'`];
     const values: unknown[] = [];
     if (query.seed !== undefined) {
       values.push(query.seed);

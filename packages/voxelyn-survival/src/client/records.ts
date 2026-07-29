@@ -121,6 +121,27 @@ export const saveRecords = (records: Records): void => {
  * custaria dado do jogador — e uma funcao pura pode ser testada com o historico
  * inteiro sem tocar em localStorage.
  */
+/** Stable across JSON/WebSocket copies of the same frozen terminal run. */
+export const runSummaryIdentity = (summary: RunSummary): string =>
+  `${summary.seed}:${summary.phase}:${summary.ticks}`;
+
+export type ApplyRunOnceResult = {
+  records: Records;
+  identity: string;
+  applied: boolean;
+};
+
+/** Pure idempotency boundary used by the online and solo result screens. */
+export const applyRunOnce = (
+  records: Records,
+  summary: RunSummary,
+  previousIdentity: string | null,
+): ApplyRunOnceResult => {
+  const identity = runSummaryIdentity(summary);
+  if (identity === previousIdentity) return { records, identity, applied: false };
+  return { records: applyRun(records, summary), identity, applied: true };
+};
+
 export const applyRun = (records: Records, summary: RunSummary): Records => {
   const next: Records = {
     ...records,
