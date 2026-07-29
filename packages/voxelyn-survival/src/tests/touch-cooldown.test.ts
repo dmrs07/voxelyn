@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { cooldownRemainingFraction, resolveCooldownReadyAt } from '../client/cooldown-overlay';
-import { deactivateTouchControls, SurvivalInput } from '../client/input';
+import { moduleHudMetrics } from '../client/render';
+import {
+  AIM_JOYSTICK_RADIUS,
+  AIM_STICK_ACTIVATION_SCALE,
+  MOVE_JOYSTICK_RADIUS,
+  TOUCH_BUTTON_HIT_SCALE,
+  deactivateTouchControls,
+  SurvivalInput,
+} from '../client/input';
 
 describe('touch cooldown reveal', () => {
   it('moves from fully covered to fully revealed', () => {
@@ -72,5 +80,64 @@ describe('touch safe-area layout', () => {
       expect(button.cx + button.r).toBeLessThanOrEqual(width - safeRight);
       expect(button.cy + button.r).toBeLessThanOrEqual(height - safeBottom);
     }
+  });
+
+  it('ancora sticks simetricos e separa todas as hitboxes de acao', () => {
+    const input = new SurvivalInput({} as HTMLCanvasElement);
+    const width = 844;
+    const height = 390;
+    const safeLeft = 28;
+    const safeRight = 44;
+    const safeBottom = 21;
+
+    input.layoutButtons(width, height, { left: safeLeft, right: safeRight, bottom: safeBottom });
+
+    const move = input.state.joystick;
+    const aim = input.state.aimTouch;
+    expect(move.originX - MOVE_JOYSTICK_RADIUS).toBeGreaterThanOrEqual(safeLeft);
+    expect(aim.originX + AIM_JOYSTICK_RADIUS).toBeLessThanOrEqual(width - safeRight);
+    expect(move.originY).toBe(aim.originY);
+    expect(move.originX).toBeLessThan(width / 2);
+    expect(aim.originX).toBeGreaterThan(width / 2);
+
+    for (let i = 0; i < input.state.buttons.length; i++) {
+      const a = input.state.buttons[i]!;
+      const aHit = a.r * TOUCH_BUTTON_HIT_SCALE;
+      const distanceFromAim = Math.hypot(a.cx - aim.originX, a.cy - aim.originY);
+      expect(distanceFromAim).toBeGreaterThanOrEqual(
+        AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE + aHit + 10
+      );
+
+      for (let j = i + 1; j < input.state.buttons.length; j++) {
+        const b = input.state.buttons[j]!;
+        const gap = Math.hypot(a.cx - b.cx, a.cy - b.cy) -
+          (aHit + b.r * TOUCH_BUTTON_HIT_SCALE);
+        expect(gap).toBeGreaterThanOrEqual(10);
+      }
+    }
+  });
+
+  it('mantem botoes fora da zona real da mira em landscape estreito', () => {
+    const input = new SurvivalInput({} as HTMLCanvasElement);
+    input.layoutButtons(568, 320);
+
+    const aim = input.state.aimTouch;
+    const activationRadius = AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
+    for (const button of input.state.buttons) {
+      const buttonHitRadius = button.r * TOUCH_BUTTON_HIT_SCALE;
+      const gap = Math.hypot(button.cx - aim.originX, button.cy - aim.originY) -
+        (activationRadius + buttonHitRadius);
+      expect(gap).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('mantem os seis modulos visiveis no painel de 568px', () => {
+    // panelW=230 e padding horizontal de 12px em cada lado: 206px uteis.
+    const availableWidth = 206;
+    const metrics = moduleHudMetrics(6, availableWidth);
+    const occupied = metrics.size * 6 + metrics.gap * 5;
+
+    expect(metrics.size).toBeGreaterThanOrEqual(24);
+    expect(occupied).toBeLessThanOrEqual(availableWidth);
   });
 });
