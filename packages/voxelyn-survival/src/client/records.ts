@@ -17,7 +17,9 @@ import {
   DISCOVERY_FIRE_SPREAD,
   DISCOVERY_FRAGILE_BREACH,
   DISCOVERY_GAS_IGNITION,
+  DISCOVERY_BISHOP_FELLED,
   DISCOVERY_GUARDIAN_FELLED,
+  DISCOVERY_HORSE_FELLED,
   DISCOVERY_ORE_CHAIN,
   DISCOVERY_SELF_HARM,
 } from '@voxelyn/survival-sim';
@@ -231,6 +233,16 @@ export const DISCOVERIES: readonly Discovery[] = [
     lesson: 'Toda reação atinge você igual. A build mais forte é a mais perigosa de carregar.',
   },
   {
+    bit: DISCOVERY_HORSE_FELLED,
+    title: 'O rastro fica',
+    lesson: 'A investida atravessa a sala e deixa fogo onde passou. Pedra no caminho a encerra.',
+  },
+  {
+    bit: DISCOVERY_BISHOP_FELLED,
+    title: 'Ele se cura do chão',
+    lesson: 'Sobre fungo vivo o Bispo regenera mais do que você tira. Aquecer o tapete já corta a cura.',
+  },
+  {
     bit: DISCOVERY_GUARDIAN_FELLED,
     title: 'O Guardião cai',
     lesson: 'Ele sela a arena na metade da vida e chama companhia. O cerco desaba com ele.',
@@ -251,6 +263,8 @@ export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'spitter',
   'bomber',
   'bruiser',
+  'fungal_horse',
+  'bishop',
   'guardian',
 ];
 
@@ -259,5 +273,7 @@ export const BESTIARY_NAMES: Record<EnemyArchetype, string> = {
   spitter: 'Cuspidor',
   bomber: 'Portador de Esporos',
   bruiser: 'Britador',
+  fungal_horse: 'Corcel Fúngico',
+  bishop: 'Bispo do Veio',
   guardian: 'Guardião do Núcleo',
 };

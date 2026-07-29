@@ -163,6 +163,31 @@
         padding: 8px;
         font-family: inherit;
       }
+      .menu-actions {
+        margin-top: 4px;
+      }
+      #invite {
+        position: fixed;
+        top: calc(6px + env(safe-area-inset-top));
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(17, 21, 29, 0.94);
+        border: 1px solid #2e3a4d;
+        color: #b8a98f;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        z-index: 15;
+      }
+      #invite-code {
+        color: #59f2c2;
+        letter-spacing: 3px;
+        font-weight: bold;
+        font-size: 15px;
+      }
       #banner {
         position: fixed;
         top: calc(6px + env(safe-area-inset-top));
@@ -180,19 +205,48 @@
   <body>
     <canvas id="game"></canvas>
 
+    <!--
+      Tela de titulo: cinco decisoes, nada mais.
+
+      O que saiu daqui — qualidade, volume, nome, telemetria — nao e menos
+      importante, e menos FREQUENTE: sao coisas que se ajustam uma vez e nunca
+      mais. Deixa-las na primeira tela custava a atencao de quem so quer jogar,
+      toda vez, em favor de quem ja resolveu aquilo.
+
+      Seed e URL de servidor sairam por outro motivo: nao sao funcionalidades de
+      jogador, sao ferramentas de desenvolvimento. Vivem atras de ?dev=1.
+    -->
     <div id="menu" class="overlay">
       <h1>VOXELYN SURVIVAL</h1>
       <div class="sub">o Veio está vivo — sobreviva</div>
-      <button id="btn-solo" class="primary">Descer sozinho</button>
-      <button id="btn-online">Co-op online (2 jogadores)</button>
+      <button id="btn-solo" class="primary">Descer</button>
+      <button id="btn-online">Co-op online</button>
       <div class="row">
         <label for="room">Sala</label>
         <input id="room" size="6" maxlength="9" placeholder="código" />
-        <span class="sub" id="room-hint">vazio = qualquer sala</span>
+        <span class="sub">vazio = qualquer sala</span>
       </div>
-      <div class="row">
+      <div class="row menu-actions">
+        <button id="btn-options" class="compact">Opções</button>
+        <button id="btn-records" class="compact">Registro</button>
+        <button id="btn-rank" class="compact">Ranking</button>
+      </div>
+      <!-- Ferramentas de desenvolvimento: so aparecem com ?dev=1. -->
+      <div id="dev-tools" class="row hidden">
+        <label for="seed">Seed</label>
+        <input id="seed" size="12" placeholder="aleatória" />
         <label for="server">Servidor</label>
-        <input id="server" size="22" placeholder="auto" />
+        <input id="server" size="18" placeholder="auto" />
+      </div>
+      <div class="sub">Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia</div>
+      <div class="sub warn">Use fones: o som avisa o que a tela ainda não mostra.</div>
+    </div>
+
+    <div id="options" class="overlay hidden">
+      <h1>OPÇÕES</h1>
+      <div class="row">
+        <label for="name">Nome</label>
+        <input id="name" size="14" maxlength="18" placeholder="anônimo" />
       </div>
       <div class="row">
         <label for="quality">Qualidade</label>
@@ -208,17 +262,10 @@
         <button id="btn-mute" class="compact primary">Som: ligado</button>
       </div>
       <div class="row">
-        <label for="seed">Seed</label>
-        <input id="seed" size="12" placeholder="aleatória" />
-        <button id="btn-records" class="compact">Registro</button>
+        <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
       </div>
-      <div class="row">
-        <label for="name">Nome</label>
-        <input id="name" size="12" maxlength="18" placeholder="anônimo" />
-        <button id="btn-rank" class="compact">Ranking</button>
-      </div>
-      <div class="sub">Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia</div>
-      <div class="sub warn">Use fones: o som avisa o que a tela ainda não mostra.</div>
+      <div class="sub">dados anônimos de sessão, sem identificação</div>
+      <button id="btn-options-close" class="primary">Voltar</button>
     </div>
 
     <div id="records" class="overlay hidden">
@@ -231,6 +278,15 @@
       <h1>RANKING</h1>
       <div id="rank-body" class="panel"></div>
       <button id="btn-rank-close" class="primary">Voltar</button>
+    </div>
+
+    <!--
+      Convite. Fica FORA do banner de propósito: o banner e transitorio e some
+      sozinho, e o convite precisa continuar la ate alguem entrar.
+    -->
+    <div id="invite" class="hidden">
+      <span id="invite-code"></span>
+      <button id="btn-invite" class="compact">Copiar convite</button>
     </div>
 
     <div id="banner" class="hidden"></div>

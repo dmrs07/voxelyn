@@ -144,3 +144,99 @@ extração antecipada é intencional (spec §1: *"a extração antecipada sempre
 custa a recompensa maior"*) e o preço está correto — 1 estrela. Mas vale registrar que o
 primeiro degrau hoje é quase gratuito, e que ★★☆ e ★★★ carregam sozinhas toda a
 progressão.
+
+---
+
+# Telemetria de diversão
+
+Documento no mesmo arquivo porque compartilha o encanamento — e **não** os dados.
+
+## 1. A unidade de diversão é a sessão, não a run
+
+Quase toda telemetria de jogo erra isso. Um jogador que morre cinco vezes seguidas e
+continua está se divertindo; um que extrai uma vez e fecha a aba não está. "Taxa de
+vitória" e "duração média de run" não distinguem os dois.
+
+Por isso os dois campos mais importantes não descrevem a run:
+
+- **`runIndex`** — a quantas descidas desta sentada;
+- **`msSincePreviousRun`** — quanto silêncio houve entre o fim da anterior e o início desta.
+
+Deles sai a métrica principal: **fração de runs seguidas por outra em menos de 30 s**. É
+o gate da Fase 1 da spec (*"vontade clara de jogar de novo"*) virado número.
+
+E **abandono não é morte**. Morrer é o jogo funcionando; fechar a aba no meio é o jogo
+perdendo alguém. Somar os dois no mesmo balde é o erro que faz um jogo difícil parecer
+saudável enquanto sangra jogador.
+
+## 2. O que o digest responde
+
+| Campo | Pergunta |
+| --- | --- |
+| `immediateRestartRate` | Dá vontade de jogar de novo? |
+| `abandonRate` | O jogo está entediando no meio? |
+| `sectorReach` | Onde a run quebra? (funil acumulado) |
+| `starHistogram` | **Calibra `TARGET_SECTOR_TICKS` sem chute.** |
+| `deathCauses` | O que mata — e se ensina |
+| `medianTicks` por desfecho | Quanto dura cada tipo de fim |
+
+## 3. Este dado NÃO é verificado
+
+O ranking re-simula tudo. A telemetria **não pode**: ela precisa registrar mortes e
+abandonos, que são a maioria das runs, e re-simular todas custaria mais CPU que o jogo.
+
+Aceitável para diagnóstico, inaceitável para competição — e por isso as duas coisas moram
+em **tabelas diferentes**. A separação não é organização, é barreira: ninguém promove
+telemetria a placar por engano, e limpar o placar não apaga o histórico de análise.
+
+Entrada é **saneada, não recusada**: um cliente que mande `ticks: 1e12` vira o teto, e não
+um buraco no histograma.
+
+## 4. Privacidade
+
+Sessão anônima em **`sessionStorage`** — morre com a aba. Agrupa runs de uma sentada; não
+rastreia ninguém entre visitas. Sem nome, sem id persistente, sem PII. Custa a métrica de
+retenção entre dias (a que menos importa agora) e evita ter de pedir consentimento para o
+que hoje é diagnóstico interno. Opt-out visível no menu.
+
+A leitura do digest exige `TELEMETRY_TOKEN`; sem ele a rota responde **404**, não 403 — uma
+rota que se anuncia como protegida convida a tentativa.
+
+## 5. Três regras do cliente
+
+1. **Nunca fala com o jogador.** Sem banner, sem erro, sem retry visível.
+2. **Nunca bloqueia.** Offline é o caminho normal — o solo funciona sem rede.
+3. **Nunca identifica ninguém.**
+
+Servidor indisponível responde **204**, não 503: o cliente não deve reagir de forma
+nenhuma. Telemetria que atrapalha o jogo deixou de ser diagnóstico.
+
+## 6. O bug que só o browser pegou
+
+O beacon de abandono era enviado como `Blob` com `type: 'application/json'`. Isso tira a
+requisição da lista segura de CORS e **exige preflight** — e `sendBeacon` não sabe fazer
+preflight. O navegador descartava em silêncio.
+
+Como em produção o cliente (Static Site) e o servidor (Web Service) são **origens
+diferentes**, o evento de abandono — justamente o mais valioso — nunca teria chegado, e
+nada denunciaria isso, porque telemetria que falha é telemetria calada. O tipo do Blob é
+`text/plain` por causa disso; o servidor não lê content-type, só faz `JSON.parse` do corpo.
+
+## 7. Limite por origem
+
+A telemetria **reusa** `SubmissionRateLimiter` e `requestRateLimitKey` do ranking, em vez
+de reimplementar. Não é economia de código: ler o primeiro elemento de `X-Forwarded-For`
+dá ao cliente um limite novo a cada requisição, porque ele pode **prepender** valores à
+vontade. O bug era idêntico nos dois endpoints, então a correção mora num lugar só — e o
+limitador compartilhado ainda coleta origens ociosas, sem o que um fluxo de visitantes
+legítimos deixaria uma entrada permanente por IP até o processo reiniciar.
+
+## 8. Cobertura de verificação
+
+- **Abandono: verificado ponta a ponta**, 4/4, no caminho que importa em celular
+  (`visibilitychange` quando o app vai para o fundo). Foi ele que achou o bug do §6.
+- **Término normal: verificado por testes de unidade** e pelo fato de estar ligado na mesma
+  linha de `recordRun` e `submitSoloRun`, ambos já verificados em browser. Usa `fetch`
+  comum — o caminho sem sutileza.
+- Um bot de browser **não consegue completar uma run** (não morre vagando e não navega de
+  volta à extração com precisão), então essa ponta continua sem cobertura E2E.

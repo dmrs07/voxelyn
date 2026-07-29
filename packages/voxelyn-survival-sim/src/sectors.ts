@@ -22,8 +22,10 @@
 // campo. Escrever o que muda e menor e diz o que realmente acontece.
 
 import {
+  BISHOP_SECTOR,
   CHUNK,
   CONTAMINATION_CARRYOVER,
+  HORSE_SPAWN_CHANCE,
   MAX_ENEMIES,
   RUN_SEED_MIX,
   SECTOR_COUNT,
@@ -82,9 +84,36 @@ export const populateSector = (
   // Um elite por setor, no meio da lista: cedo demais e o jogador ainda nao tem
   // com o que responder, tarde demais e ele ja passou pelo setor.
   const eliteIndex = Math.floor(spawns.length / 2);
-  const budget = Math.min(spawns.length, MAX_ENEMIES - (isFinalSector(state.sector) ? 1 : 0));
+  const bossHere = state.sector === BISHOP_SECTOR || isFinalSector(state.sector);
+  const budget = Math.min(spawns.length, MAX_ENEMIES - (bossHere ? 1 : 0));
+
+  // O Cavalo OCUPA a vaga do elite em vez de somar um inimigo.
+  //
+  // Somar seria inflar a contagem do setor num sorteio, e a densidade e a coisa
+  // que menos deveria variar por sorte: o mesmo mapa ficaria facil ou apertado
+  // sem nada visivel explicando a diferenca. Ocupando a vaga, o que o sorteio
+  // decide e QUAL e a ameaca de destaque daquele setor — um bicho reforcado ou
+  // um cavalo que redesenha o chao — e nao quantas existem.
+  //
+  // A tirada vem de `state.rng`, o mesmo gerador da run: o setor 2 da seed X tem
+  // cavalo para todo mundo que jogar a seed X, senao o replay do leaderboard
+  // divergiria do que o jogador viveu.
+  const horseHere = state.rng.nextFloat01() < HORSE_SPAWN_CHANCE;
   for (let i = 0; i < budget; i++) {
+    if (i === eliteIndex && horseHere) {
+      // Nao entra como `elite`: elite acende o fungo sob os proprios pes, e o
+      // cavalo ficaria cercado do fogo que so a investida dele devia acender.
+      spawnEnemy(state, 'fungal_horse', spawns[i].x, spawns[i].y, false);
+      continue;
+    }
     spawnEnemy(state, mix[i % mix.length], spawns[i].x, spawns[i].y, i === eliteIndex);
+  }
+
+  // O Bispo ocupa o mesmo ponto que o Guardiao ocuparia — a camara que a geracao
+  // reserva para um chefe. Nao ha sala nova: o setor 2 ja tinha o espaco vazio, e
+  // o que faltava era alguem la dentro.
+  if (state.sector === BISHOP_SECTOR) {
+    spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
   }
   if (isFinalSector(state.sector)) {
     spawnEnemy(state, 'guardian', guardian.x, guardian.y, false);

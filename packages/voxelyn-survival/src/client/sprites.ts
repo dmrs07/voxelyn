@@ -26,6 +26,8 @@ import spitterManifest from '@voxelyn/survival-content/assets/atlases/enemy-spit
 import bomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.json';
 import bruiserManifest from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.json';
 import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-guardian.json';
+import bishopManifest from '@voxelyn/survival-content/assets/atlases/enemy-bishop.json';
+import horseManifest from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
@@ -40,6 +42,8 @@ import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.p
 import bomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.png?url';
 import bruiserUrl from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.png?url';
 import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian.png?url';
+import bishopUrl from '@voxelyn/survival-content/assets/atlases/enemy-bishop.png?url';
+import horseUrl from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
@@ -74,6 +78,8 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: bomberManifest as unknown as SpriteManifestEntry, url: bomberUrl },
   { manifest: bruiserManifest as unknown as SpriteManifestEntry, url: bruiserUrl },
   { manifest: guardianManifest as unknown as SpriteManifestEntry, url: guardianUrl },
+  { manifest: bishopManifest as unknown as SpriteManifestEntry, url: bishopUrl },
+  { manifest: horseManifest as unknown as SpriteManifestEntry, url: horseUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
 ];
@@ -85,6 +91,8 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
   bomber: 'enemy-spore-bomber',
   bruiser: 'enemy-bruiser',
   guardian: 'enemy-guardian',
+  bishop: 'enemy-bishop',
+  fungal_horse: 'enemy-fungal-horse',
 };
 
 /**

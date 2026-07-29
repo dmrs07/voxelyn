@@ -323,6 +323,173 @@ const guardianModel = (anim, f) => {
 const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 48, 56, 22, 50);
 
 
+// ---------------------------------------------------------------------------
+// enemy-bishop 56x76 — clerigo fungico: torre de manto, mitra, baculo, raizes
+//
+// O unico inimigo do jogo que e uma PESSOA, e o desenho tem de dizer isso antes
+// de qualquer mecanica. Os outros cinco sao fauna: silhueta de bicho, membros,
+// postura. O bispo e arquitetura vestida — base larga que se abre no chao,
+// tronco que estreita, mitra fina no alto. A leitura pretendida e a de uma
+// catedral pequena andando, porque a ameaca dele nao e alcancar o jogador: e
+// ESTAR onde esta, plugado no tapete que o alimenta.
+//
+// Por que nao verde: o fungo do chao ja e verde. Um chefe da mesma cor do piso
+// que o cura desaparece exatamente no lugar onde o jogador mais precisa
+// enxerga-lo. Osso, ferrugem e ouro sao o oposto do tapete e continuam dentro
+// da paleta mestra.
+//
+// As raizes usam `electric` e nao uma cor nova. A paleta mestra e validada e nao
+// tem roxo; inventar um para um inimigo so criaria uma cor que existe em um
+// sprite do jogo inteiro — e o azul-branco ja le como energia percorrendo o
+// chao, que e o que as raizes sao.
+// ---------------------------------------------------------------------------
+const BISHOP_ROOTS = [
+  [-6, -4], [-5, 2], [-3, -5], [-2, 4], [2, -5], [3, 4], [5, -3], [6, 1],
+  [-7, 0], [7, -1], [-4, 5], [4, -6],
+];
+
+const bishopModel = (anim, f) => {
+  const sway = anim === 'walk' ? [0, 1, 1, 0, 0, 1][f % 6] : 0;
+  const breathe = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const raise = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
+  // `special` = Supernova Fungica: ele SE ERGUE e o manto se abre antes do
+  // estouro. O crescimento e o telegrafo, e nao um efeito posterior.
+  const nova = anim === 'special' ? [0, 1, 2, 3, 3, 2][f % 6] : 0;
+  const up = breathe - flinch + nova;
+  const b = [];
+
+  // Raizes de micelio no chao, saindo de baixo do manto. Desenhadas primeiro
+  // para ficarem sob tudo. Sao IDENTIDADE, nao sinal: quem avisa que a cura esta
+  // acontecendo AGORA e a particula que sobe (evento `heal`), porque um sprite de
+  // frames fixos nao sabe o que o chao debaixo dele e.
+  for (const [rx, ry] of BISHOP_ROOTS) {
+    if (nova === 0 && (rx + ry) % 3 === 0) continue; // esparsas em repouso
+    b.push(box(rx, ry, 0, 1, 1, 1, 'electric'));
+  }
+
+  // Manto em tres degraus que estreitam para cima. A base e o volume MAIOR do
+  // bicho: e ela que diz "isto esta enraizado" sem precisar de animacao.
+  //
+  // A altura total foi comprimida depois de ver o resultado ao lado do Guardiao:
+  // o bispo saia MAIS ALTO que o chefe final, e escala e hierarquia — um chefe de
+  // setor 2 maior que o do setor 3 promete uma ordem que o jogo nao cumpre. O
+  // contraste com o Guardiao continua existindo, mas por FORMA (torre estreita
+  // contra massa larga) e nao por tamanho.
+  b.push(box(-5, -4, 0, 11, 9, 3, 'rockDeep'));
+  b.push(box(-4, -3, 3, 9, 7, 4, 'rust'));
+  b.push(box(-3, -3, 7, 7, 6, 5 + nova, 'bone'));
+  // Estola vertical dourada descendo pelo centro do manto: e o que faz o olho
+  // subir ate a mitra em vez de parar no volume maior.
+  b.push(box(-1, -5, 4, 3, 1, 10 + nova, 'loot'));
+  // Recuo escuro sob o peito: separa o tronco do manto em vez de deixar a torre
+  // virar um bloco unico.
+  b.push(box(-2, -4, 12 + nova, 5, 5, 4, 'rust'));
+
+  // Bracos abertos. Sao os dois unicos volumes assimetricos do modelo e existem
+  // para a silhueta nao fechar num trapezio perfeito.
+  b.push(box(-6, -3, 10 + up + raise, 2, 4, 5, 'rust'));
+  b.push(box(4, -3, 10 + up + raise, 2, 4, 5, 'rust'));
+  // Turibulo pendurado a esquerda, com brasa viva.
+  b.push(box(-7, -2, 6 + up + raise, 3, 3, 3, 'loot'));
+  b.push(box(-6, -1, 4 + up + raise, 1, 1, 2, 'fire'));
+  // Baculo a direita, AFASTADO do corpo: colado, ele e a mitra liam como duas
+  // torres gemeas e o bicho parecia ter duas cabecas. O vao entre os dois e o que
+  // faz um ser cajado e o outro ser mitra.
+  b.push(box(7, -2, 2, 1, 1, 21 + sway, 'loot'));
+  b.push(box(6, -2, 21 + sway, 3, 1, 1, 'loot'));
+  b.push(box(7, -2, 22 + sway, 1, 1, 2, 'electric'));
+
+  // Gola alta e cabeca pequena: a mitra so le como mitra se a cabeca sob ela
+  // for menor que ela.
+  b.push(box(-4, -3, 16 + up, 9, 6, 2, 'bone'));
+  b.push(box(-1, -3, 18 + up, 3, 4, 2, 'rust'));
+  b.push(box(-1, -4, 18 + up, 3, 1, 1, 'electric'));
+  // Mitra: dois degraus estreitando ate a ponta.
+  b.push(box(-2, -3, 20 + up, 5, 5, 3, 'bone'));
+  b.push(box(-1, -2, 23 + up, 3, 3, 3, 'bone'));
+  b.push(box(0, -2, 26 + up, 1, 2, 2, 'loot'));
+
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 56, 76, 28, 70);
+
+// ---------------------------------------------------------------------------
+// enemy-fungal-horse 64x48 — Corcel: o unico quadrupede HORIZONTAL do bestiario
+//
+// Todo o resto do jogo se le como coluna. A leitura de "isto vai atravessar a
+// sala" nao depende de reconhecer um cavalo: depende de ser a unica coisa mais
+// larga do que alta, com quatro apoios e um pescoco caido a frente. O vao entre
+// as pernas e o que separa um quadrupede de uma mesa — foi exatamente o que a
+// primeira silhueta de fallback errou, e ela lia como mobilia.
+//
+// A crina e BRASA, e nao fungo. O rastro sai das patas, mas a fonte dele tem de
+// estar visivel no bicho antes de estar no chao — um cavalo verde deixando fogo
+// para tras nao explica de onde o fogo veio. Ela e tambem a unica luz quente do
+// modelo, e ela aponta para onde ele vai correr.
+// ---------------------------------------------------------------------------
+const horseModel = (anim, f) => {
+  const gait = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  const bite = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // `special` = Investida Flamejante. Os tres primeiros frames EMPINAM (o
+  // telegrafo de 1,3 s que o jogador tem de ler); os tres ultimos abaixam a
+  // crista e esticam o corpo — a corrida propriamente dita.
+  const rear = anim === 'special' ? [1, 3, 4, 0, 0, 0][f % 6] : 0;
+  const dash = anim === 'special' ? [0, 0, 0, 2, 3, 2][f % 6] : 0;
+  const b = [];
+
+  // Quatro patas com casco fendido. As dianteiras sobem no empinar.
+  b.push(box(-6, -2, Math.max(0, gait), 2, 2, 5, 'rockDeep'));
+  b.push(box(-6, 1, Math.max(0, -gait), 2, 2, 5, 'rockDeep'));
+  b.push(box(4, -2, Math.max(0, -gait) + rear, 2, 2, 5, 'rockDeep'));
+  b.push(box(4, 1, Math.max(0, gait) + rear, 2, 2, 5, 'rockDeep'));
+  // Cascos: o unico ponto do corpo que toca o chao, e de onde o alcatrao sai.
+  b.push(box(-6, -2, Math.max(0, gait), 2, 2, 1, 'loot'));
+  b.push(box(4, -2, Math.max(0, -gait) + rear, 2, 2, 1, 'loot'));
+
+  // Tronco longo e baixo. Ele INCLINA no empinar e se estica na corrida.
+  b.push(box(-6, -2, 5 - flinch, 12, 5, 4 + Math.floor(rear / 2), 'rust'));
+  // Placas de armadura fungica SEPARADAS, e nao uma laje corrida.
+  //
+  // A laje era o desenho obvio e reproduzia exatamente o erro que a silhueta de
+  // fallback ja tinha cometido: um retangulo claro e continuo sobre quatro apoios
+  // le como TAMPO DE MESA, nao como lombo. Placas discretas com vao entre elas
+  // devolvem a leitura de dorso — e ainda batem com a referencia, que descreve
+  // "shelf fungi", cogumelos de prateleira, que crescem em placas soltas.
+  for (const px of [-4, -1, 2]) {
+    b.push(box(px, -2, 9 - flinch + Math.floor(rear / 2), 2, 5, 1, 'bone'));
+  }
+  // Garupa mais alta que a cernelha, como bicho de carga.
+  b.push(box(-7, -2, 8 - flinch, 3, 5, 3, 'rust'));
+  // Cauda de hifas caindo atras.
+  b.push(box(-9, -1, 6 - flinch, 2, 3, 4, 'rockDeep'));
+
+  // Pescoco inclinado para a frente e focinho BAIXO: para onde ele vai correr
+  // esta escrito na direcao em que a cabeca aponta.
+  const neckZ = 9 - flinch + rear;
+  b.push(box(4, -2, neckZ, 3, 4, 4 - dash, 'rust'));
+  b.push(box(6, -2, neckZ + 3 - dash - bite, 4, 4, 3, 'rust'));
+  b.push(box(8, -2, neckZ + 2 - dash - bite, 3, 4, 2, 'rockDeep'));
+  // Olho de brasa, unico e frontal.
+  b.push(box(8, -3, neckZ + 3 - dash - bite, 1, 1, 1, 'fire'));
+
+  // Crina de brasa: sobe do lombo ate a crista, entre a cabeca e a garupa.
+  // Na corrida ela se ABAIXA junto com a crista, e e o que faz os dois ultimos
+  // frames lerem como velocidade e nao como o mesmo cavalo mais para a frente.
+  const crest = neckZ + 4 - dash;
+  // Fica ATRAS da cabeca, nunca por cima dela: coberta pela crina, a cabeca
+  // sumia dentro do fogo e o bicho perdia o unico ponto que diz para onde ele
+  // esta virado.
+  b.push(box(3, -1, crest, 3, 2, 2 + rear, 'fire'));
+  b.push(box(0, -1, crest - 1, 3, 2, 2, 'fire'));
+  b.push(box(-3, -1, crest - 2, 3, 2, 1, 'loot'));
+  b.push(box(-6, -1, crest - 3, 2, 2, 1, 'loot'));
+
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 64, 64, 32, 58);
+
 const boltFrame = (_dir, _anim, f) => {
   const g = grid(16, 16);
   fillDiamond(g, 8, 8, 3, 3, 'biolum');
@@ -387,6 +554,14 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 4, fps: 10, loop: false },
   }, guardianFrame, 'voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core'),
+  base('enemy-bishop', 56, 76, 28, 74, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 6, fps: 9, loop: false },
+  }, bishopFrame, 'voxel-isometric fungal cleric, tall flaring vestment, tall mitre, pastoral staff and hanging censer, mycelial roots at the hem'),
+  base('enemy-fungal-horse', 64, 64, 32, 58, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 6, fps: 10, loop: false },
+  }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates'),
   {
     id: 'fx-projectile-bolt', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },

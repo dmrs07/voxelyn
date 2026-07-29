@@ -24,6 +24,8 @@ import { formatSeed, parseSeed } from './run-summary';
 import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
 import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
+import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
+import { inviteUrlFrom } from './invite';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -40,8 +42,14 @@ const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
 const roomInput = document.getElementById('room') as HTMLInputElement;
 const nameInput = document.getElementById('name') as HTMLInputElement;
+const telemetryButton = document.getElementById('btn-telemetry') as HTMLButtonElement;
 const rankOverlay = document.getElementById('rank') as HTMLDivElement;
 const rankBody = document.getElementById('rank-body') as HTMLDivElement;
+const optionsOverlay = document.getElementById('options') as HTMLDivElement;
+const devTools = document.getElementById('dev-tools') as HTMLDivElement;
+const inviteBar = document.getElementById('invite') as HTMLDivElement;
+const inviteCode = document.getElementById('invite-code') as HTMLSpanElement;
+const inviteButton = document.getElementById('btn-invite') as HTMLButtonElement;
 const recordsOverlay = document.getElementById('records') as HTMLDivElement;
 const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 
@@ -78,7 +86,10 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 resize();
 
-const playerScreen = (): { x: number; y: number } => ({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+const playerScreen = (): { x: number; y: number } => ({
+  x: window.innerWidth / 2,
+  y: window.innerHeight / 2,
+});
 
 /** Devolve o jogador ao menu (erro sem retry: URL invalida, versao incompativel). */
 const backToMenu = (): void => {
@@ -202,6 +213,51 @@ const submitSoloRun = (state: SurvivalState): void => {
   });
 };
 
+// ---------------------------------------------------------------------------
+// Convite de co-op
+// ---------------------------------------------------------------------------
+
+let currentInvite: string | null = null;
+
+const showInvite = (code: string | null): void => {
+  if (code === currentInvite) return;
+  currentInvite = code;
+  if (!code) {
+    inviteBar.classList.add('hidden');
+    return;
+  }
+  inviteCode.textContent = code;
+  inviteBar.classList.remove('hidden');
+};
+
+inviteButton.addEventListener('click', () => {
+  if (!currentInvite) return;
+  const url = inviteUrlFrom(location.href, currentInvite);
+  const done = (texto: string): void => {
+    inviteButton.textContent = texto;
+    setTimeout(() => {
+      inviteButton.textContent = 'Copiar convite';
+    }, 1800);
+  };
+  // `navigator.share` primeiro porque no celular ele abre a folha nativa e
+  // manda direto para o WhatsApp, que e como o convite de fato viaja. No
+  // desktop ele quase nunca existe, e a area de transferencia e o certo.
+  if (typeof navigator.share === 'function') {
+    void navigator
+      .share({ title: 'Voxelyn Survival', text: `Desce comigo — sala ${currentInvite}`, url })
+      .then(() => done('Enviado'))
+      .catch(() => {
+        /* o jogador cancelou a folha de compartilhamento: nao e erro */
+      });
+    return;
+  }
+  void navigator.clipboard
+    ?.writeText(url)
+    .then(() => done('Copiado!'))
+    .catch(() => done('Copie da barra'));
+  audio.ui();
+});
+
 const haptics = (events: SemanticEvent[]): void => {
   if (!('vibrate' in navigator)) return;
   for (const e of events) {
@@ -237,9 +293,28 @@ let stopLoop: (() => void) | null = null;
  * o campo existir e alguem colar a seed de outra pessoa e tentar a mesma
  * descida, e sortear uma nova ao morrer destruiria exatamente esse uso.
  */
-const nextSeed = (): number => forcedSeed ?? ((Date.now() ^ 0x5f3759df) >>> 0);
+const nextSeed = (): number => forcedSeed ?? (Date.now() ^ 0x5f3759df) >>> 0;
 
 const recorder = new RunRecorder();
+const telemetry = new TelemetrySession(
+  () => serverInput.value.trim() || defaultServerUrl(),
+  () => quality,
+);
+/** Estado vivo da run corrente, para o evento de abandono saber onde ela parou. */
+let liveRun: SurvivalState | null = null;
+
+// Aba fechada com a run em andamento. `pagehide` e nao `beforeunload`: este
+// ultimo nao dispara de forma confiavel em Safari movel, que e metade do
+// publico de um PWA.
+const reportAbandon = (): void => {
+  const state = liveRun;
+  if (!state || state.phase !== 'running' || state.tick < 20) return;
+  telemetry.abandon(state.sector, state.tick, state.contamination);
+};
+window.addEventListener('pagehide', reportAbandon);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) reportAbandon();
+});
 let playerName = loadPlayerName();
 nameInput.value = playerName;
 nameInput.addEventListener('change', () => {
@@ -253,7 +328,9 @@ const runSolo = (): void => {
   audio.reset();
   const seed = nextSeed();
   recorder.start(seed);
+  telemetry.begin();
   let state: SurvivalState = createRun({ seed });
+  liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -273,6 +350,7 @@ const runSolo = (): void => {
     if (state.phase !== 'running') {
       recordRun(state);
       submitSoloRun(state);
+      if (state.summary) telemetry.finish(state.summary, state.sector);
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
@@ -281,7 +359,9 @@ const runSolo = (): void => {
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
         const nextRunSeed = nextSeed();
         recorder.start(nextRunSeed);
+        telemetry.begin();
         state = createRun({ seed: nextRunSeed });
+        liveRun = state;
         audio.reset();
         recordedSummaryKey = null;
         submitted = false;
@@ -404,7 +484,8 @@ const runOnline = (url: string, roomCode: string | null): void => {
       return;
     }
     ws.onopen = () => net.connect(net.resumeToken ?? undefined);
-    ws.onmessage = (ev) => net.receive(typeof ev.data === 'string' ? ev.data : '', performance.now());
+    ws.onmessage = (ev) =>
+      net.receive(typeof ev.data === 'string' ? ev.data : '', performance.now());
     ws.onclose = () => {
       net.markOffline();
       if (running && !fatal) reconnectAt = performance.now() + 1500;
@@ -423,8 +504,11 @@ const runOnline = (url: string, roomCode: string | null): void => {
       // O codigo so aparece enquanto o parceiro NAO chegou: depois disso ele e
       // ruido permanente na tela, e a informacao que importa passa a ser o
       // jogo. Enquanto se joga sozinho, ele e a unica forma de convidar.
-      const waiting = net.playerCount() < 2;
-      setBanner(waiting && net.activeRoomCode ? `Sala ${net.activeRoomCode} — aguardando parceiro` : null);
+      // O convite so existe enquanto ha vaga: depois que o parceiro entra ele
+      // vira ruido permanente na tela, e a informacao que importa passa a ser o
+      // jogo.
+      showInvite(net.playerCount() < 2 ? net.activeRoomCode : null);
+      setBanner(null);
       renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
       audio.setLocalPlayerId(net.slot + 1);
       const cmd = input.snapshot(playerScreen());
@@ -437,13 +521,19 @@ const runOnline = (url: string, roomCode: string | null): void => {
       const state = net.sampleRenderState(now);
       if (state) {
         lastState = state;
+        liveRun = state;
         const terminal = state.phase !== 'running';
         audio.update(state, now);
         renderer.render(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
         const pendingChoice = state.playerExtra.pendingModuleChoice;
         if (pendingChoice && renderer.isChoiceRevealReady(now)) {
-          const regions = renderer.renderChoice(state, window.innerWidth, window.innerHeight, input.state);
+          const regions = renderer.renderChoice(
+            state,
+            window.innerWidth,
+            window.innerHeight,
+            input.state,
+          );
           const choice = input.consumeChoiceTap(regions);
           if (choice !== null) queuedChoice = choice;
         } else if (pendingChoice) {
@@ -453,6 +543,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
         if (drain && !pendingChoice) input.clearPendingUiInput();
         if (terminal) {
           recordRun(state);
+          if (state.summary) telemetry.finish(state.summary, state.sector);
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
@@ -483,6 +574,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
   requestAnimationFrame(frame);
   stopLoop = () => {
     running = false;
+    showInvite(null);
     ws?.close();
   };
 };
@@ -556,28 +648,56 @@ if (seedParam) {
 // O menu SAI enquanto o registro esta aberto. As duas overlays usam o mesmo
 // fundo a 92% de opacidade, entao empilhadas o titulo "VOXELYN SURVIVAL"
 // aparecia atras de "REGISTRO" — legivel o bastante para parecer defeito.
-document.getElementById('btn-records')?.addEventListener('click', () => {
-  renderRecordsPanel(recordsBody, records);
+// As overlays sao mutuamente exclusivas: empilhadas, o fundo a 92% deixa o
+// titulo da de tras aparecer atras do da frente e le como defeito.
+const openOverlay = (overlay: HTMLDivElement): void => {
   menu.classList.add('hidden');
-  recordsOverlay.classList.remove('hidden');
+  overlay.classList.remove('hidden');
   audio.unlock();
   audio.ui();
-});
-document.getElementById('btn-records-close')?.addEventListener('click', () => {
-  recordsOverlay.classList.add('hidden');
+};
+const closeOverlay = (overlay: HTMLDivElement): void => {
+  overlay.classList.add('hidden');
   menu.classList.remove('hidden');
   audio.ui();
+};
+
+document.getElementById('btn-records')?.addEventListener('click', () => {
+  renderRecordsPanel(recordsBody, records);
+  openOverlay(recordsOverlay);
 });
+document
+  .getElementById('btn-records-close')
+  ?.addEventListener('click', () => closeOverlay(recordsOverlay));
+
+const renderTelemetryLabel = (): void => {
+  telemetryButton.textContent = isOptedOut() ? 'Telemetria: desligada' : 'Telemetria: ligada';
+  telemetryButton.classList.toggle('primary', !isOptedOut());
+};
+renderTelemetryLabel();
+telemetryButton.addEventListener('click', () => {
+  setOptedOut(!isOptedOut());
+  renderTelemetryLabel();
+  audio.ui();
+});
+
+document
+  .getElementById('btn-options')
+  ?.addEventListener('click', () => openOverlay(optionsOverlay));
+document
+  .getElementById('btn-options-close')
+  ?.addEventListener('click', () => closeOverlay(optionsOverlay));
 
 document.getElementById('btn-rank')?.addEventListener('click', () => {
   // Abre com estado de carregamento em vez de esperar a rede: um botao que nao
   // responde por dois segundos le como travado, e o solo funciona offline —
   // este painel pode legitimamente nunca carregar.
-  renderRankPanel(rankBody, { entries: [], emptyReason: 'carregando…', seed: forcedSeed ?? undefined });
-  menu.classList.add('hidden');
-  rankOverlay.classList.remove('hidden');
-  audio.unlock();
-  audio.ui();
+  renderRankPanel(rankBody, {
+    entries: [],
+    emptyReason: 'carregando…',
+    seed: forcedSeed ?? undefined,
+  });
+  openOverlay(rankOverlay);
   const url = serverInput.value.trim() || defaultServerUrl();
   void fetchLeaderboard(url, { seed: forcedSeed ?? undefined, limit: 25 }).then((entries) => {
     if (rankOverlay.classList.contains('hidden')) return; // jogador ja fechou
@@ -588,11 +708,20 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
     });
   });
 });
-document.getElementById('btn-rank-close')?.addEventListener('click', () => {
-  rankOverlay.classList.add('hidden');
-  menu.classList.remove('hidden');
-  audio.ui();
-});
+document
+  .getElementById('btn-rank-close')
+  ?.addEventListener('click', () => closeOverlay(rankOverlay));
+
+/**
+ * Ferramentas de desenvolvimento atras de ?dev=1.
+ *
+ * Seed e URL de servidor NAO sao funcionalidades de jogador: uma exige entender
+ * geracao procedural e a outra exige saber que existe um servidor. Numa tela de
+ * titulo elas so gastam a atencao de quem quer jogar.
+ */
+if (new URLSearchParams(location.search).get('dev') === '1') {
+  devTools.classList.remove('hidden');
+}
 
 // auto-start por query (?online=1). ?room=XYZ transforma o convite num LINK,
 // que e como as pessoas realmente compartilham: quem recebe entra direto.

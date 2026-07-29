@@ -11,7 +11,7 @@
 // explosao, so a desenha. Duas maquinas no co-op recebem o mesmo evento e
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
-import { ABILITY_RADIUS, SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
 import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
@@ -30,7 +30,8 @@ export type ParticleKind =
   | 'ash'
   | 'chitin'
   | 'spore'
-  | 'stone';
+  | 'stone'
+  | 'mycelium';
 
 type Particle = {
   x: number; // tile
@@ -96,6 +97,10 @@ const RAMP: Record<ParticleKind, FaceRamp> = {
   chitin: ['#d93b4c', '#6e4a33', '#2e3a4d'],
   spore: ['#66c28a', '#2f6b4f', '#1f3d33'],
   stone: ['#b8a98f', '#46566e', '#2e3a4d'],
+  // Micelio: a energia do chao SUBINDO pelo manto do bispo. Azul-branco por
+  // cima de verde — nao e materia arrancada dele, e materia entrando nele, e
+  // por isso e a unica das tres rampas de criatura que nao tem pedra no fundo.
+  mycelium: ['#7ab8ff', '#59f2c2', '#2f6b4f'],
 };
 
 /**
@@ -118,6 +123,11 @@ const HIT_MATERIAL: Record<string, ParticleKind> = {
   bomber: 'spore',
   bruiser: 'stone',
   guardian: 'stone',
+  // Bispo e Cavalo sao biomassa, nao mineral: quem os acerta vê esporo saltando,
+  // e nao lasca de pedra. E o mesmo detalhe que ja dizia ao jogador que o
+  // prospector e feito de outra coisa.
+  bishop: 'spore',
+  fungal_horse: 'spore',
   prospector: 'stone',
 };
 
@@ -284,7 +294,11 @@ export class VoxelParticles {
           // O raio vem da constante da simulacao, nao de um numero copiado: a
           // frente promete um alcance ao jogador, e uma copia que envelhece
           // transforma essa promessa em mentira no primeiro ajuste de balanco.
-          this.ring(ev.x, ev.y, 'spark', Math.max(6, n(14)), ABILITY_RADIUS, 260, 5);
+          // O raio vem do EVENTO, e nao mais da constante da habilidade do
+          // jogador. Passou a haver uma segunda fonte de pulso com alcance
+          // diferente — a Supernova do bispo — e desenhar a frente do jogador em
+          // volta do bispo prometeria 3,2 tiles onde o dano chega a 5,5.
+          this.ring(ev.x, ev.y, 'spark', Math.max(6, n(14)), ev.radius, 260, 5);
           break;
         case 'ignite':
           // Sais distintos por evento, mesmo entre eventos de tipos diferentes:
@@ -292,6 +306,17 @@ export class VoxelParticles {
           // caem no mesmo ponto no mesmo instante, e com o mesmo sal sairiam com
           // o mesmo sorteio — a brasa da ignicao nasceria colada na da explosao.
           this.burst(ev.x, ev.y, 'ember', n(4), 0.5, 1.6, 420, 31);
+          break;
+        case 'heal':
+          // SOBE. Todo o resto do sistema cai — brasa, entulho, caco, respingo —
+          // porque tudo o mais e materia sendo arrancada de alguma coisa. Aqui e
+          // o contrario: e o chao devolvendo vida ao bispo, e a direcao sozinha
+          // conta isso sem legenda nenhuma.
+          //
+          // Sem particula, a cura so existia no numero da barra de vida e no som,
+          // e o jogador teria de comparar a barra com a memoria dela para
+          // perceber que nao esta progredindo. Aqui ele VE de onde vem.
+          this.burst(ev.x, ev.y, 'mycelium', n(5), 0.55, 2.4, 780, ev.entity);
           break;
         case 'discharge':
           for (const cell of ev.cells.slice(0, Math.max(4, n(16)))) {
@@ -474,7 +499,7 @@ export class VoxelParticles {
       p.y += p.vy * dt;
       p.z += p.vz * dt;
       // Brasa e entulho caem; gas e fumaca sobem e desaceleram, nunca caem.
-      if (p.kind === 'gas' || p.kind === 'sporeCloud' || p.kind === 'ash') {
+      if (p.kind === 'gas' || p.kind === 'sporeCloud' || p.kind === 'ash' || p.kind === 'mycelium') {
         p.vz *= gasDrag;
       } else {
         p.vz -= 5.5 * dt;

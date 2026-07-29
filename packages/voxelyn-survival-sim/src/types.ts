@@ -21,7 +21,24 @@ export type RunConfig = {
 };
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
-export type EnemyArchetype = 'stalker' | 'bruiser' | 'spitter' | 'bomber' | 'guardian';
+export type EnemyArchetype =
+  | 'stalker'
+  | 'bruiser'
+  | 'spitter'
+  | 'bomber'
+  | 'guardian'
+  /**
+   * Bispo: chefe do setor 2. Regenera em pe sobre chao fungico, e o contra e
+   * queimar a arena. A identidade dele nao e o ataque, e o TERRENO — ele
+   * transforma a luta num problema de material, que e a identidade do jogo.
+   */
+  | 'bishop'
+  /**
+   * Cavalo Fungico: elite MOVEL, sorteado em qualquer setor. Investida longa
+   * deixando rastro de fogo, o que encolhe a arena sozinho e reage com tudo o
+   * que ja existe no chao.
+   */
+  | 'fungal_horse';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -109,6 +126,8 @@ export const DISCOVERY_SELF_HARM = 1 << 4;
 export const DISCOVERY_ORE_CHAIN = 1 << 5;
 export const DISCOVERY_GUARDIAN_FELLED = 1 << 6;
 export const DISCOVERY_CORE_TAKEN = 1 << 7;
+export const DISCOVERY_BISHOP_FELLED = 1 << 8;
+export const DISCOVERY_HORSE_FELLED = 1 << 9;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -293,9 +312,21 @@ export type SemanticEvent =
   | { t: 'chip'; x: number; y: number }
   | { t: 'discharge'; cells: number[]; source: 'player' | 'enemy' | 'environment'; owner?: number }
   | { t: 'ignite'; x: number; y: number }
+  /**
+   * Alguem recuperou vida. Existe para o Bispo poder ser LIDO: sem um evento, a
+   * regeneracao dele seria uma barra que sobe sozinha e o jogador nunca
+   * descobriria que o chao e a causa.
+   */
+  | { t: 'heal'; x: number; y: number; entity: number; amount: number }
   | { t: 'shot'; x: number; y: number; dx: number; dy: number; owner: number }
   | { t: 'dodge'; x: number; y: number }
-  | { t: 'pulse'; x: number; y: number }
+  /**
+   * Frente circular sem fogo. Carrega o RAIO porque agora tem duas fontes com
+   * alcances diferentes — o pulso cinetico do jogador e a Supernova do bispo — e
+   * o cliente desenha uma frente que promete ate onde o efeito chega. Um raio
+   * constante copiado no cliente viraria mentira no primeiro ajuste de balanco.
+   */
+  | { t: 'pulse'; x: number; y: number; radius: number }
   | { t: 'pickup_core'; x: number; y: number }
   | { t: 'terminal_activated'; siteId: number; x: number; y: number; completesAtTick: number }
   | { t: 'terminal_scan_complete'; siteId: number; x: number; y: number }

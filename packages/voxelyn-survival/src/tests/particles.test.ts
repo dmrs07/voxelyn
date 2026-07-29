@@ -282,7 +282,7 @@ describe('particulas voxel', () => {
 
   it('o pulso cinetico lanca frente sem fogo', () => {
     const p = new VoxelParticles();
-    p.ingest([{ t: 'pulse', x: 8, y: 8 }], 96, 1);
+    p.ingest([{ t: 'pulse', x: 8, y: 8, radius: ABILITY_RADIUS }], 96, 1);
     const kinds = new Set(
       (p as unknown as { items: Array<{ kind: string }> }).items.map((i) => i.kind)
     );
@@ -375,10 +375,22 @@ describe('particulas voxel', () => {
   // 79% do raio — a cor da frente decidindo a fisica dela.
   it('a frente do pulso chega ao raio da habilidade', () => {
     const p = new VoxelParticles();
-    p.ingest([{ t: 'pulse', x: 50, y: 50 }], 96, 1);
+    p.ingest([{ t: 'pulse', x: 50, y: 50, radius: ABILITY_RADIUS }], 96, 1);
     const r = varrer(p, 'spark', 16.7);
     expect(r).toBeGreaterThan(ABILITY_RADIUS * 0.9);
     expect(r).toBeLessThanOrEqual(ABILITY_RADIUS);
+  });
+
+  // O raio passou a viajar NO EVENTO porque ha duas fontes de pulso com alcances
+  // diferentes: a habilidade do jogador e a Supernova do bispo. Com a constante
+  // do jogador fixa no cliente, a frente da Supernova prometeria 3,2 tiles onde
+  // o dano chega a 5,5 — e a frente existe justamente para nao mentir sobre isso.
+  it('a frente segue o raio do evento, e nao a constante do jogador', () => {
+    const largo = new VoxelParticles();
+    largo.ingest([{ t: 'pulse', x: 50, y: 50, radius: ABILITY_RADIUS * 2 }], 96, 1);
+    const r = varrer(largo, 'spark', 16.7);
+    expect(r).toBeGreaterThan(ABILITY_RADIUS * 1.8);
+    expect(r).toBeLessThanOrEqual(ABILITY_RADIUS * 2);
   });
 
   // A vida sempre foi descontada pelo dtMs inteiro, mas o movimento levava o

@@ -13,6 +13,11 @@ const PAL = {
   fire: '#ff7a2f',
   blood: '#d93b4c',
   electric: '#7ab8ff',
+  // Faltava aqui e existe na paleta mestra do gerador de atlas. O fallback e o
+  // atlas desenham o MESMO bicho: uma cor presente num e ausente no outro
+  // obrigaria a inventar um substituto, e o jogador veria o bispo mudar de cor
+  // conforme o sprite carregou ou nao.
+  loot: '#ffd166',
   player: '#e8f1ff',
 };
 
@@ -26,6 +31,15 @@ type VoxelEntityOptions = {
   elite: boolean;
   nowMs: number;
   allyTint?: boolean;
+  /**
+   * A criatura esta sendo alimentada pelo chao neste instante.
+   *
+   * Existe por um inimigo so — o bispo — e mesmo assim vale o parametro. A cura
+   * dele e a informacao que decide a luta, e sem ela desenhada o jogador so
+   * descobre que nao esta progredindo comparando a barra de vida com a memoria
+   * do que ela era ha dez segundos. Com as raizes acesas, ele VE de onde vem.
+   */
+  charged?: boolean;
 };
 
 const shade = (hex: string, factor: number): string => {
@@ -111,7 +125,7 @@ const limb = (
  * and unique silhouettes instead of the previous flat ellipse.
  */
 export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEntityOptions): void => {
-  const { sx, sy, z, radius, brightness, archetype, elite, nowMs, allyTint } = options;
+  const { sx, sy, z, radius, brightness, archetype, elite, nowMs, allyTint, charged } = options;
   const size = radius * 32 * 0.9 * z;
   const light = Math.max(0.35, Math.min(1.15, 0.5 + brightness * 0.7));
   const bob = Math.round(Math.sin(nowMs * 0.006 + sx * 0.01) * Math.max(1, z * 0.6));
@@ -197,6 +211,93 @@ export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEnt
       emissive(ctx, sx, baseY - size * 1.25, size * 0.34, PAL.blood);
       emissive(ctx, sx, baseY - size * 1.25, size * 0.14, PAL.player);
       emissive(ctx, sx + size * 0.24, baseY - size * 2.04, size * 0.11, PAL.acid);
+      break;
+    }
+
+    case 'bishop': {
+      // Uma TORRE, nao um corpo: base larga que se abre no chao, tronco que
+      // estreita, mitra fina no alto. A silhueta e a de uma catedral pequena, e e
+      // proposital — o bispo nao ameaca por alcancar o jogador, ameaca por ESTAR
+      // onde esta. Ler como arquitetura diz isso antes de qualquer mecanica.
+      //
+      // Osso e ouro seco, e nao verde. O verde ja e o fungo do chao; um chefe da
+      // mesma cor do piso que o alimenta desaparece exatamente no lugar onde o
+      // jogador mais precisa enxerga-lo.
+      const bloom = 0.55 + Math.sin(nowMs * 0.005) * 0.45;
+
+      // Raizes de micelio: o manto esta PLUGADO no chao.
+      //
+      // Desenhadas primeiro para ficarem por baixo de tudo, espalhadas em volta
+      // da base. Acendem forte so quando ele esta se curando de verdade — e o
+      // unico jeito de a resposta "queime o chao" chegar ao jogador enquanto ele
+      // ainda esta atirando, e nao depois, olhando para uma barra que nao desce.
+      const rootGlow = charged ? bloom : 0.22;
+      for (const [rx, ry, rs] of [
+        [-1.35, 0.16, 0.2], [-0.85, 0.3, 0.16], [-0.4, 0.12, 0.13],
+        [0.45, 0.28, 0.15], [0.95, 0.14, 0.19], [1.4, 0.3, 0.16],
+        [-1.05, -0.06, 0.12], [1.15, -0.04, 0.13],
+      ]) {
+        emissive(ctx, sx + size * rx, baseY + size * ry, size * rs, shade(PAL.electric, rootGlow));
+      }
+
+      // Manto: tres degraus que estreitam para cima.
+      block(ctx, sx, baseY, size * 2.05, size * 1.05, size * 0.5, PAL.rockShadow, light);
+      block(ctx, sx, baseY - size * 0.46, size * 1.62, size * 0.88, size * 0.75, PAL.rust, light);
+      block(ctx, sx, baseY - size * 1.18, size * 1.12, size * 0.66, size * 0.72, PAL.bone, light);
+      // Estola vertical descendo pelo centro: e ela que faz o olho subir ate a
+      // mitra em vez de parar no volume maior.
+      block(ctx, sx, baseY - size * 0.52, size * 0.3, size * 0.2, size * 1.3, PAL.loot, light);
+
+      // Bracos abertos: o turibulo pendurado de um lado, o baculo do outro. Sao
+      // os dois unicos volumes assimetricos, e existem para a silhueta nao virar
+      // um trapezio perfeito.
+      block(ctx, sx - size * 0.92, baseY - size * 1.46, size * 0.24, size * 0.2, size * 0.34, PAL.bone, light);
+      block(ctx, sx - size * 1.0, baseY - size * 0.62, size * 0.34, size * 0.26, size * 0.3, PAL.loot, light);
+      emissive(ctx, sx - size * 1.0, baseY - size * 0.78, size * 0.14, shade(PAL.fire, bloom));
+      block(ctx, sx + size * 1.02, baseY - size * 0.4, size * 0.16, size * 0.14, size * 2.1, PAL.loot, light);
+      emissive(ctx, sx + size * 1.02, baseY - size * 2.6, size * 0.22, shade(PAL.electric, bloom));
+
+      // Cabeca pequena e mitra alta: o unico volume claro no topo, para o olho
+      // achar onde mirar sem contar blocos.
+      block(ctx, sx, baseY - size * 1.88, size * 0.42, size * 0.32, size * 0.34, PAL.bone, light);
+      block(ctx, sx, baseY - size * 2.22, size * 0.52, size * 0.36, size * 0.5, PAL.bone, light);
+      block(ctx, sx, baseY - size * 2.72, size * 0.26, size * 0.2, size * 0.34, PAL.bone, light);
+      emissive(ctx, sx + size * 0.1, baseY - size * 1.98, size * 0.11, PAL.electric);
+      emissive(ctx, sx, baseY - size * 2.5, size * 0.13, shade(PAL.loot, bloom));
+      break;
+    }
+
+    case 'fungal_horse': {
+      // A unica silhueta HORIZONTAL do bestiario.
+      //
+      // Todo o resto do jogo se le como coluna. A leitura de "isto vai atravessar
+      // a sala" nao depende de reconhecer um cavalo — depende de ser a unica
+      // coisa mais larga do que alta, com quatro apoios e um pescoco caido a
+      // frente. Corpo baixo e pernas LONGAS: o vao embaixo e o que separa um
+      // quadrupede de uma mesa.
+      const ember = 0.6 + Math.sin(nowMs * 0.017) * 0.4;
+      for (const [lx, ly] of [[-0.92, 0], [-0.52, -0.04], [0.58, -0.04], [0.98, 0]]) {
+        limb(ctx, sx + size * lx, baseY + size * ly, size * 0.2, size * 0.86, PAL.rockShadow, light);
+      }
+      // Tronco longo e baixo.
+      block(ctx, sx, baseY - size * 0.84, size * 2.15, size * 0.62, size * 0.56, PAL.rust, light);
+      // Garupa mais alta que a cernelha, como bicho de carga.
+      block(ctx, sx - size * 0.82, baseY - size * 1.32, size * 0.66, size * 0.5, size * 0.34, PAL.rust, light);
+      // Crina de BRASA correndo pelo lombo. Nao e fungo: o rastro sai das patas,
+      // mas a fonte dele tem de estar visivel no bicho antes de estar no chao —
+      // um cavalo verde deixando fogo para tras nao explica de onde o fogo veio.
+      block(ctx, sx - size * 0.2, baseY - size * 1.4, size * 1.15, size * 0.24, size * 0.22, PAL.fire, light);
+      // Pescoco inclinado para a frente e focinho baixo: para onde ele vai correr
+      // esta escrito na direcao em que a cabeca aponta.
+      block(ctx, sx + size * 0.9, baseY - size * 1.32, size * 0.34, size * 0.3, size * 0.52, PAL.rust, light);
+      block(ctx, sx + size * 1.24, baseY - size * 1.5, size * 0.56, size * 0.3, size * 0.34, PAL.rock, light);
+      // Olhos de brasa: a unica luz quente do bicho, e ela mira o jogador.
+      emissive(ctx, sx + size * 1.38, baseY - size * 1.66, size * 0.13, PAL.fire);
+      emissive(ctx, sx + size * 1.2, baseY - size * 1.6, size * 0.11, PAL.fire);
+      // Fagulhas na crina: o fogo ja esta nele antes de estar no chao.
+      emissive(ctx, sx - size * 0.5, baseY - size * 1.52, size * 0.13, shade(PAL.fire, ember));
+      emissive(ctx, sx + size * 0.12, baseY - size * 1.5, size * 0.11, shade(PAL.loot, ember));
+      emissive(ctx, sx - size * 1.02, baseY - size * 1.44, size * 0.12, shade(PAL.loot, ember));
       break;
     }
 

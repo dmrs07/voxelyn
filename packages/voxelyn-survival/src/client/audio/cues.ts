@@ -117,9 +117,21 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // O guardiao ganha voz propria porque a morte dele e o fim de um ato, nao
       // mais um bicho caindo. Reaproveitar `death` com ganho maior nao resolve:
       // o que muda nao e o volume, e o que o som DIZ.
-      return ev.archetype === 'guardian'
+      //
+      // O bispo divide a voz com o guardiao porque divide o PAPEL: os dois sao o
+      // fim de um ato. Dar a ele um terceiro sting seria gastar uma voz nova
+      // para dizer a mesma coisa, e o jogador nao precisa distinguir os dois
+      // pelo som — ele acabou de passar cinco minutos olhando para o que caiu.
+      return ev.archetype === 'guardian' || ev.archetype === 'bishop'
         ? [{ voice: 'deathGuardian', x: ev.x, y: ev.y, scale: 1 }]
         : [{ voice: 'death', x: ev.x, y: ev.y, scale: 1 }];
+
+    // A cura do bispo E a informacao da luta. Sem som, o jogador so descobre que
+    // nao esta progredindo comparando a barra de vida com a memoria do que ela
+    // era ha dez segundos — que e a forma mais lenta possivel de aprender uma
+    // regra. Com som, ele ouve o chao trabalhando contra ele enquanto atira.
+    case 'heal':
+      return [{ voice: 'bishopHeal', x: ev.x, y: ev.y, scale: 1 }];
 
     case 'explosion':
       // Explosao maior soa maior, mas com teto: o raio do modulo explosivo e
