@@ -16,6 +16,17 @@ import { GameRoom } from './room.js';
 export type Outbound = { clientId: string; msg: ServerMessage };
 
 /**
+ * Chamado quando uma sala termina a run.
+ *
+ * O gancho existe para o ranking. Runs de co-op nao passam por re-simulacao e
+ * nao precisam: elas foram simuladas AQUI, por este processo, a partir de
+ * intencoes validadas. O resultado ja e autoritativo no instante em que nasce —
+ * pedir ao cliente para reenviar um log seria pedir de volta o que o servidor
+ * acabou de calcular.
+ */
+export type RunFinishedHook = (room: GameRoom) => void;
+
+/**
  * Carencia antes de expirar uma sala sem clientes conectados (em ticks de 20 Hz).
  * Generosa o bastante para cobrir reconexao por resume token (~90s).
  */
@@ -34,6 +45,7 @@ export type ServerOptions = {
   maxPlayersPerRoom?: number;
   baseSeed?: number;
   logger?: (line: Record<string, unknown>) => void;
+  onRunFinished?: RunFinishedHook;
 };
 
 type Conn = {
@@ -59,6 +71,7 @@ export class SurvivalServer {
   private readonly maxPlayers: number;
   private readonly baseSeed: number;
   private readonly log: (line: Record<string, unknown>) => void;
+  private readonly onRunFinished: RunFinishedHook | null;
 
   constructor(opts: ServerOptions = {}) {
     // A sim clampa createRun a MAX_PLAYERS; se a sala aceitasse mais, o cliente
@@ -67,6 +80,7 @@ export class SurvivalServer {
     this.maxPlayers = Math.max(1, Math.min(MAX_PLAYERS, opts.maxPlayersPerRoom ?? 2));
     this.baseSeed = opts.baseSeed ?? 0x5c0ffee;
     this.log = opts.logger ?? (() => {});
+    this.onRunFinished = opts.onRunFinished ?? null;
   }
 
   addConnection(clientId: string, nowMs = 0): void {
@@ -301,6 +315,13 @@ export class SurvivalServer {
         room.state.phase === 'dead' ||
         room.state.phase === 'extracted' ||
         room.state.phase === 'extracted_with_core';
+      // Dispara UMA vez por sala. A fase terminal persiste e o loop continua
+      // rodando ate a sala expirar; sem a marca, o mesmo resultado entraria no
+      // ranking vinte vezes por segundo.
+      if (terminal && !room.resultReported && room.state.summary) {
+        room.resultReported = true;
+        this.onRunFinished?.(room);
+      }
       // salas terminadas nao avancam a sim, mas ainda podem emitir um snapshot final
       const { events, chunkDiffs, removed } = terminal
         ? { events: [], chunkDiffs: [], removed: [] }

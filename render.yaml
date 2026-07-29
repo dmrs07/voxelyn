@@ -14,7 +14,7 @@ services:
     runtime: node
     plan: starter
     region: virginia # US East: menor RTT para o Brasil que a costa oeste (Render nao tem regiao BR)
-    numInstances: 1 # alpha: instancia unica (salas em memoria, sem KV/Postgres)
+    numInstances: 1 # alpha: instancia unica (salas em memoria; o Postgres guarda so o ranking)
     # O buildCommand roda num checkout LIMPO: sem instalar, o tsc nao acha
     # sequer typescript/vitest e o build morre. --frozen-lockfile falha alto se
     # o lockfile estiver defasado, em vez de resolver silenciosamente outra arvore.
@@ -31,6 +31,12 @@ services:
       # CORS: origem do Static Site (preencher com a URL publica do cliente)
       - key: ALLOWED_ORIGINS
         sync: false
+      # Ranking. AUSENTE = ranking em memoria e o jogo funciona igual: a
+      # indisponibilidade do banco nunca vira indisponibilidade do jogo.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: voxelyn-leaderboard
+          property: connectionString
       # PORT e injetada pelo Render; o servidor faz bind em 0.0.0.0:$PORT
 
   # ---------------------------------------------------------------------------
@@ -63,3 +69,19 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+# -----------------------------------------------------------------------------
+# Banco do ranking
+# -----------------------------------------------------------------------------
+# Guarda APENAS o placar. O estado das salas continua em memoria: uma run em
+# andamento nao sobrevive a um restart, e nao deve — ela e efemera por design
+# (permadeath), e persisti-la exigiria serializar o mundo inteiro a cada tick.
+#
+# O schema e criado pelo proprio servidor no boot (`create table if not
+# exists`). Uma migracao dedicada so se justifica quando houver a segunda
+# versao de schema para migrar.
+databases:
+  - name: voxelyn-leaderboard
+    plan: free
+    databaseName: voxelyn
+    user: voxelyn

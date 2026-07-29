@@ -89,8 +89,19 @@ export const describeCause = (cause: DamageCause | null): CauseText => {
         lesson: 'O calor sobe a cada tiro e o apito sobe junto. Solte o gatilho antes do topo.',
       };
     case 'bleedout':
+      // NAO diz "sangrou".
+      //
+      // O identificador interno e `bleedout` (termo de genero para o relogio do
+      // abatido, anterior a este codigo), mas o texto que o jogador le nao pode
+      // herdar dele uma afirmacao sobre a MATERIA do Prospector. Nada na art
+      // bible diz que ele e organico — ela o descreve como humanoide de traje,
+      // com lampada e tanque — e "sangrou" fecharia essa porta numa string de
+      // UI, que e o pior lugar possivel para decidir lore.
+      //
+      // "Apagou" funciona para carne, maquina ou traje selado, e diz a mesma
+      // coisa: o tempo acabou antes de alguem chegar.
       return {
-        headline: 'Você sangrou até o fim',
+        headline: 'Você se apagou no escuro',
         lesson: 'Abatido dura 20 s. Caia perto do parceiro, não no meio da sala.',
       };
     case 'player_shot':

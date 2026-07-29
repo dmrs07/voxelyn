@@ -3,10 +3,15 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { LIMITS, encodeMessage } from '@voxelyn/survival-protocol';
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { SurvivalServer, type ServerOptions } from './server.js';
+import { createLeaderboard, type LeaderboardStore } from './leaderboard.js';
+import { createLeaderboardHandler } from './leaderboard-http.js';
 
 export type WsServerHandle = {
   http: HttpServer;
   survival: SurvivalServer;
+  /** Pronto quando o store do ranking terminou de conectar. */
+  ready: Promise<void>;
+  leaderboard: () => LeaderboardStore | null;
   close: () => Promise<void>;
 };
 
@@ -14,6 +19,8 @@ export type WsOptions = ServerOptions & {
   port?: number;
   host?: string;
   allowedOrigins?: string[]; // CORS/origem restrita para wss
+  /** URL do Postgres. Ausente = ranking em memoria (dev e testes). */
+  databaseUrl?: string;
 };
 
 /**
@@ -21,12 +28,60 @@ export type WsOptions = ServerOptions & {
  * autoritativo a 20 Hz e transporta as mensagens do SurvivalServer.
  */
 export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
-  const survival = new SurvivalServer(opts);
+  let leaderboardStore: LeaderboardStore | null = null;
+
+  const survival = new SurvivalServer({
+    ...opts,
+    // Runs de co-op nao passam por re-simulacao e nao precisam: elas foram
+    // simuladas por ESTE processo a partir de intencoes validadas, e o
+    // resultado ja e autoritativo no instante em que nasce.
+    onRunFinished: (room) => {
+      const summary = room.state.summary;
+      if (!summary || !leaderboardStore) return;
+      // Sala de um jogador so no online continua sendo 'coop' de modo: o que
+      // separa os dois rankings nao e quantas pessoas jogaram, e QUEM simulou.
+      void leaderboardStore
+        .submit({ name: `sala ${room.code}`, mode: 'coop', summary, digest: null })
+        .catch((err: unknown) =>
+          log({ ev: 'leaderboard_submit_failed', error: err instanceof Error ? err.message : String(err) })
+        );
+    },
+  });
   const log = opts.logger ?? ((line) => console.log(JSON.stringify(line)));
   let ready = true;
   let draining = false;
 
+  let handleLeaderboard: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
+
+  // A conexao com o banco e assincrona; o servidor NAO espera por ela para
+  // aceitar jogo. Ate o store existir, as rotas de ranking respondem 503 e o
+  // resto do jogo funciona normalmente — indisponibilidade do ranking nao pode
+  // virar indisponibilidade do jogo.
+  const leaderboardReady = createLeaderboard(opts.databaseUrl ?? process.env.DATABASE_URL, log).then((store) => {
+    leaderboardStore = store;
+    handleLeaderboard = createLeaderboardHandler({
+      store,
+      log,
+      allowedOrigins: opts.allowedOrigins,
+    });
+  });
+
   const http = createServer((req: IncomingMessage, res: ServerResponse) => {
+    if (req.url?.startsWith('/leaderboard')) {
+      if (!handleLeaderboard) {
+        res.writeHead(503, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'ranking ainda inicializando' }));
+        return;
+      }
+      void handleLeaderboard(req, res).catch((err: unknown) => {
+        log({ ev: 'leaderboard_error', error: err instanceof Error ? err.message : String(err) });
+        if (!res.headersSent) {
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'erro interno' }));
+        }
+      });
+      return;
+    }
     if (req.url === '/healthz') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true, rooms: survival.roomCount(), conns: survival.connectionCount() }));
@@ -106,8 +161,12 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       ready = false;
       clearInterval(loop);
       for (const ws of sockets.values()) ws.close(1001, 'server shutdown');
-      wss.close(() => http.close(() => resolve()));
+      wss.close(() =>
+        http.close(() => {
+          void (leaderboardStore?.close() ?? Promise.resolve()).then(() => resolve());
+        })
+      );
     });
 
-  return { http, survival, close };
+  return { http, survival, ready: leaderboardReady, leaderboard: () => leaderboardStore, close };
 };

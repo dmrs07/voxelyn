@@ -9,7 +9,9 @@ import { RestartGate } from './restart';
 import {
   FpsGovernor,
   loadAudioSettings,
+  loadPlayerName,
   loadQuality,
+  savePlayerName,
   nextLowerQuality,
   saveAudioSettings,
   saveQuality,
@@ -20,6 +22,8 @@ import { applyRun, loadRecords, saveRecords, type Records } from './records';
 import { renderRecordsPanel } from './records-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
+import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
+import { renderRankPanel } from './rank-panel';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -35,6 +39,9 @@ const volumeInput = document.getElementById('volume') as HTMLInputElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
 const roomInput = document.getElementById('room') as HTMLInputElement;
+const nameInput = document.getElementById('name') as HTMLInputElement;
+const rankOverlay = document.getElementById('rank') as HTMLDivElement;
+const rankBody = document.getElementById('rank-body') as HTMLDivElement;
 const recordsOverlay = document.getElementById('records') as HTMLDivElement;
 const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 
@@ -156,6 +163,8 @@ let records: Records = loadRecords();
  * historico ganharia sessenta copias por segundo da mesma morte.
  */
 let recordedSummary: unknown = null;
+/** A run corrente ja foi enviada para verificacao? */
+let submitted = false;
 /** Seed fixada pelo jogador no menu, ou null para sortear a cada descida. */
 let forcedSeed: number | null = null;
 const recordRun = (state: SurvivalState): void => {
@@ -163,6 +172,33 @@ const recordRun = (state: SurvivalState): void => {
   recordedSummary = state.summary;
   records = applyRun(records, state.summary);
   saveRecords(records);
+};
+
+/**
+ * Envia a run solo para verificacao no servidor.
+ *
+ * So runs que EXTRAIRAM sobem. Morte nao vai ao ranking: o placar ordena por
+ * estrelas e tempo, e uma run de zero estrela nao tem posicao — mandaria
+ * dezenas de replays por sessao para o servidor re-simular sem nada a mostrar
+ * no fim.
+ *
+ * Falhar aqui e silencioso de proposito. O solo funciona offline (e o PWA
+ * existe justamente para isso); transformar "sem rede" em erro na tela puniria
+ * o modo de jogo principal por uma funcionalidade acessoria.
+ */
+const submitSoloRun = (state: SurvivalState): void => {
+  if (submitted || !state.summary || state.summary.phase === 'dead') return;
+  submitted = true;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  void submitRun(url, recorder, playerName).then((outcome) => {
+    if (!outcome.ok) {
+      // Sem banner: o jogador esta lendo a tela de resultado.
+      console.info('[leaderboard] nao enviado:', outcome.reason);
+      return;
+    }
+    setBanner(outcome.duplicate ? 'Run já registrada' : 'Run verificada e registrada');
+    setTimeout(() => setBanner(null), 2600);
+  });
 };
 
 const haptics = (events: SemanticEvent[]): void => {
@@ -202,11 +238,21 @@ let stopLoop: (() => void) | null = null;
  */
 const nextSeed = (): number => forcedSeed ?? ((Date.now() ^ 0x5f3759df) >>> 0);
 
+const recorder = new RunRecorder();
+let playerName = loadPlayerName();
+nameInput.value = playerName;
+nameInput.addEventListener('change', () => {
+  playerName = nameInput.value.trim();
+  savePlayerName(playerName);
+});
+
 const runSolo = (): void => {
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
   audio.reset();
-  let state: SurvivalState = createRun({ seed: nextSeed() });
+  const seed = nextSeed();
+  recorder.start(seed);
+  let state: SurvivalState = createRun({ seed });
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -225,15 +271,19 @@ const runSolo = (): void => {
 
     if (state.phase !== 'running') {
       recordRun(state);
+      submitSoloRun(state);
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
       renderer.render(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
-        state = createRun({ seed: nextSeed() });
+        const nextRunSeed = nextSeed();
+        recorder.start(nextRunSeed);
+        state = createRun({ seed: nextRunSeed });
         audio.reset();
         recordedSummary = null;
+        submitted = false;
         gate.reset();
       }
       accumulator = 0;
@@ -242,11 +292,16 @@ const runSolo = (): void => {
     }
 
     while (accumulator >= TICK_MS) {
-      const cmd = input.snapshot(playerScreen());
+      const raw = input.snapshot(playerScreen());
       if (queuedChoice !== null) {
-        cmd.choose = queuedChoice;
+        raw.choose = queuedChoice;
         queuedChoice = null;
       }
+      // O recorder fica NO CAMINHO, e nao ao lado: `capture` devolve o comando
+      // quantizado, e e esse que a simulacao recebe. Gravar de um lado e
+      // simular de outro produziria um log que, re-simulado no servidor,
+      // diverge do que o jogador viveu — e a run honesta voltaria recusada.
+      const cmd = recorder.capture(raw);
       const result = stepRun(state, [cmd]);
       renderer.ingestEvents(result.events, now);
       audio.ingest(result.events, now, state);
@@ -509,6 +564,31 @@ document.getElementById('btn-records')?.addEventListener('click', () => {
 });
 document.getElementById('btn-records-close')?.addEventListener('click', () => {
   recordsOverlay.classList.add('hidden');
+  menu.classList.remove('hidden');
+  audio.ui();
+});
+
+document.getElementById('btn-rank')?.addEventListener('click', () => {
+  // Abre com estado de carregamento em vez de esperar a rede: um botao que nao
+  // responde por dois segundos le como travado, e o solo funciona offline —
+  // este painel pode legitimamente nunca carregar.
+  renderRankPanel(rankBody, { entries: [], emptyReason: 'carregando…', seed: forcedSeed ?? undefined });
+  menu.classList.add('hidden');
+  rankOverlay.classList.remove('hidden');
+  audio.unlock();
+  audio.ui();
+  const url = serverInput.value.trim() || defaultServerUrl();
+  void fetchLeaderboard(url, { seed: forcedSeed ?? undefined, limit: 25 }).then((entries) => {
+    if (rankOverlay.classList.contains('hidden')) return; // jogador ja fechou
+    renderRankPanel(rankBody, {
+      entries,
+      seed: forcedSeed ?? undefined,
+      emptyReason: 'ninguém extraiu ainda — ou o servidor está fora do ar',
+    });
+  });
+});
+document.getElementById('btn-rank-close')?.addEventListener('click', () => {
+  rankOverlay.classList.add('hidden');
   menu.classList.remove('hidden');
   audio.ui();
 });

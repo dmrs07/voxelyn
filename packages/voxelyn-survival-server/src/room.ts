@@ -76,6 +76,8 @@ export class GameRoom {
    * O servidor consome a flag e reenvia o mundo completo a todos os slots.
    */
   worldReplaced = false;
+  /** O resultado desta sala ja foi entregue ao ranking? */
+  resultReported = false;
   private tracker: ChunkTracker;
   private prevAliveEnemies = new Set<number>();
 

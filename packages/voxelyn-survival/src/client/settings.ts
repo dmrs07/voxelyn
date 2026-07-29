@@ -90,6 +90,36 @@ export const saveAudioSettings = (settings: AudioSettings): void => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Identidade no ranking
+// ---------------------------------------------------------------------------
+
+const NAME_KEY = 'voxelyn.name';
+
+/**
+ * Nome exibido no ranking. Puramente cosmetico e sem conta.
+ *
+ * Sem login de proposito: um jogo web de sessao curta que pede cadastro antes
+ * de deixar jogar perde o jogador na primeira tela. A consequencia aceita e que
+ * nomes nao sao unicos nem reivindicaveis — o que o ranking prova nao e QUEM
+ * jogou, e que a run aconteceu (o servidor a re-simulou).
+ */
+export const loadPlayerName = (): string => {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+export const savePlayerName = (name: string): void => {
+  try {
+    localStorage.setItem(NAME_KEY, name.slice(0, 18));
+  } catch {
+    /* ignora */
+  }
+};
+
 /** Proximo nivel mais leve, ou null se ja no minimo. */
 export const nextLowerQuality = (level: QualityLevel): QualityLevel | null => {
   const i = ORDER.indexOf(level);

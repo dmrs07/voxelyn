@@ -212,6 +212,11 @@
         <input id="seed" size="12" placeholder="aleatória" />
         <button id="btn-records" class="compact">Registro</button>
       </div>
+      <div class="row">
+        <label for="name">Nome</label>
+        <input id="name" size="12" maxlength="18" placeholder="anônimo" />
+        <button id="btn-rank" class="compact">Ranking</button>
+      </div>
       <div class="sub">Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia</div>
       <div class="sub warn">Use fones: o som avisa o que a tela ainda não mostra.</div>
     </div>
@@ -220,6 +225,12 @@
       <h1>REGISTRO</h1>
       <div id="records-body" class="panel"></div>
       <button id="btn-records-close" class="primary">Voltar</button>
+    </div>
+
+    <div id="rank" class="overlay hidden">
+      <h1>RANKING</h1>
+      <div id="rank-body" class="panel"></div>
+      <button id="btn-rank-close" class="primary">Voltar</button>
     </div>
 
     <div id="banner" class="hidden"></div>
