@@ -7,8 +7,23 @@ grid, reagia a eletricidade, virava fiação — e não ia para lugar nenhum. E 
 o bestiário era fauna: nenhum encontro em que a pergunta fosse outra coisa além
 de "como eu mato isto".
 
-O Miner resolve os dois de uma vez. Ele é a **única pessoa** do jogo, e o que
-ele carrega é o recurso que faltava ter destino.
+O Miner resolve os dois de uma vez.
+
+### O que ele é (e o que eu escrevi antes que estava errado)
+
+Ele **não é uma pessoa**. É um **autômato de extração abandonado** — uma unidade
+de manutenção da grade, deixada para trás quando os veios desabaram, ainda
+cumprindo a ordem que ninguém cancelou. É da mesma família do Prospector.
+
+A primeira versão deste documento, e o código todo com ela, afirmava o contrário:
+*"a única pessoa do bestiário"*, sangue como respingo, *"a única morte humana do
+jogo"*, `PESSOAL NÃO AUTORIZADO`, `civis abatidos`, e uma silhueta autorada de
+propósito com a gramática de gente. Tudo isso foi corrigido de uma vez, porque
+metade certa e metade errada deixaria o jogo dizendo duas coisas incompatíveis.
+
+O encontro fica **mais forte** assim: você não está matando um coitado, está
+matando o seu antecessor. E a frase que a empresa arquiva sobre ele — *"sem valor
+de recuperação"* — passa a ser uma previsão sobre o Prospector.
 
 ## 2. O gatilho é o CALOR DA SUA ARMA, não um sorteio
 
@@ -29,6 +44,11 @@ desde sempre:
 | morno (`8–66,6`) | **foge** | tempo, para alcançá-lo e pegar o minério |
 | quente (`≥ 66,6`) | **ataca** | vida, num cleave circular |
 
+O gatilho é **físico, não emocional**: o corpo dele está saturado de minério
+reativo e o cabeamento ainda conduz corrente da grade. Calor em excesso
+**sobrecarrega** o circuito. Ele não fica com raiva de você; ele entra em falha
+perto de você, e a falha dele é violenta.
+
 A rota mais lucrativa é a do meio, e ela **exige parar de atirar** num setor
 hostil antes de chegar perto. É a mesma troca de sempre: tempo e segurança
 contra recurso.
@@ -40,6 +60,11 @@ atacar enquanto a arma esfria — um NPC epilético em vez de uma reação. O ca
 decide **uma vez**, no instante em que ele levanta a cabeça. Depois disso o
 encontro já é o que é.
 
+*"It raises its head only to decide"* — e isso saiu de graça na animação: no
+`idle` a cabeça fica baixa, batendo a picareta no chão; ela sobe em `walk` e
+`attack`, os dois estados que só existem depois de ele ter decidido alguma coisa
+a seu respeito. A seleção de animação já é por movimento.
+
 ### O cleave é circular
 
 Circular porque a resposta certa é **recuar**. Um golpe frontal ensinaria a
@@ -48,7 +73,11 @@ Miner enfurecido existe justamente para punir quem entra em cima confiando nisso
 
 ## 3. Matar o passivo: sem drop, e anotado
 
-O Miner passivo morto **não dropa nada** e soma em `stats.innocentsKilled`.
+O Miner passivo destruído **não dropa nada** e soma em `stats.innocentsKilled`.
+
+> O nome do campo continuou `innocentsKilled` depois de o Miner deixar de ser
+> humano, porque o que ele conta não mudou: alguma coisa que não ia fazer nada
+> com você, e que você destruiu assim mesmo.
 
 Não é punição — é a **ausência de recompensa**, e a distinção importa. Dropar
 transformaria "matar todo mundo por precaução" na jogada ótima e apagaria o
@@ -63,7 +92,7 @@ fim. **A mancha é o registro, não a penalidade.**
 ### Como ele aparece na tela de fim
 
 ```
-REGISTRO CORPORATIVO: 3 civis abatidos — sem valor de recuperação.
+REGISTRO CORPORATIVO: 3 unidades inativas destruídas — sem valor de recuperação.
 ```
 
 **Não** é mais uma célula na grade de números, e a diferença é o ponto inteiro.
@@ -72,9 +101,13 @@ baixo. Como linha própria, em vermelho, com a voz da empresa, ele não pede nad
 ao jogador: só registra, com a indiferença exata de quem contabiliza perda de
 material e não morte de gente.
 
-*"sem valor de recuperação"* faz o trabalho todo. A empresa não está condenando
-ninguém; está anotando que aquilo não rendeu. Quem decide se isso incomoda é o
-jogador.
+*"sem valor de recuperação"* faz o trabalho todo, e faz um trabalho **diferente**
+agora que o Miner é um autômato: a empresa está falando de uma máquina que **ela
+mesma abandonou**, ainda cumprindo a ordem que ninguém cancelou, e a única coisa
+que ela anota é que não sobrou nada aproveitável.
+
+O Prospector é da mesma geração. A frase é sobre a empresa — e é uma previsão
+sobre o jogador. O jogo não diz nada disso; só mostra a linha.
 
 Some em zero. Uma linha "0 civis" toda run transformaria a **ausência** de
 violência gratuita numa pontuação, que é o mesmo erro pelo outro lado.
@@ -159,18 +192,26 @@ som audível até cair abaixo de −40 dB:
 
 | Voz | Duração |
 | --- | --- |
-| `deathMiner` | **189 ms** |
+| `deathMiner` | **150 ms** |
 | `death` (bicho) | 329 ms |
 | `deathGuardian` (fim de ato) | 1770 ms |
 
 A brevidade é o desenho. Todo o resto do banco toca e desvanece — a criatura cai,
 o som acompanha o corpo, a cauda cobre o instante seguinte. Aqui a cauda é o
 problema: uma morte que ressoa é uma morte **estilizada**, e o objetivo desta é o
-oposto. Ela para antes de o ouvido esperar e deixa silêncio onde havia som.
+oposto.
 
-Duas parciais próximas em vez de uma só, para dar batimento — é o que separa voz
-de bipe. E nada abaixo de 280 Hz: grave é o registro dos chefes e das explosões, e
-um corpo pequeno não pode soar como um evento grande.
+A forma sobreviveu à troca de ficção, e vale registrar por quê. Ela foi escrita
+quando o Miner era humano, com o argumento *"esta morte não pode ressoar"*. O
+argumento estava certo **pelo motivo errado**: não é a humanidade que pede o
+corte, é o fato de que **isto não é um evento**. Um autômato que para não tem
+agonia nem queda dramática — a corrente cessa, e o que sobra é o silêncio de uma
+coisa que estava zumbindo há décadas.
+
+O que mudou foi o timbre: saiu a parcial dupla batendo (que era voz) e entrou a
+queda de corrente — um estalo elétrico e uma descida curta que morre sem cauda.
+
+Nada abaixo de 190 Hz: grave é o registro dos chefes e das explosões.
 
 Prioridade 7 contra os 5 do `death` comum, e espacial. Sete é alto para uma morte
 que não é a sua, e o motivo é estreito: esta é a única morte do jogo que o jogador
@@ -189,8 +230,9 @@ Então quem escreve o registro é a empresa, e a empresa não chama ninguém de 
 A seção virou **REGISTRO DE ATIVOS**, e cada entrada tem três linhas:
 
 ```
-PESSOAL NÃO AUTORIZADO                                    ×3
-Ocupação irregular do sítio. Sem valor de recuperação.
+UNIDADE EX-016                                            ×3
+Extratora da geração anterior. Operação após o encerramento
+do contrato não foi autorizada. Sem valor de recuperação.
   campo: Minerador Empobrecido
 ```
 
@@ -200,8 +242,10 @@ itálico, como uma nota de campo que alguém acrescentou à mão. A distância e
 duas linhas é o efeito inteiro.
 
 O texto nunca diz ao jogador o que sentir. Ele só mostra o que foi arquivado — e
-quem ouviu a morte do mineiro já sabe que *"sem valor de recuperação"* é uma frase
-sobre a empresa, não sobre ele. É a mesma frase da tela de fim, de propósito: os
+a ficha do Miner é a mais reveladora das oito, porque nela a empresa não está
+negando a natureza de outra coisa: está negando **responsabilidade pela própria
+máquina**. *"Operação após o encerramento do contrato não foi autorizada"* culpa o
+autômato por continuar trabalhando depois de ter sido abandonado. É a mesma frase da tela de fim, de propósito: os
 dois lugares em que o jogo fala com a voz de quem o construiu dizem a mesma coisa.
 
 A voz também **se desgasta** conforme a lista desce. Começa como zoologia de
@@ -217,16 +261,25 @@ o vocabulário de quem não pode ser processado por isso.
 
 ### O sprite do Miner
 
-`enemy-miner`, 40×48. A silhueta tem uma tarefa acima de todas: **ler como gente
-antes de ler como inimigo**. É a única do bestiário construída com a mesma
-gramática do Prospector — duas pernas, tronco estreito, cabeça no topo — e isso é
-deliberado. Se o jogador só descobrir que ali estava alguém quando o corpo cair, a
-decisão que o encontro existe para oferecer já passou.
+`enemy-miner`, 48×60 — **maior que o bruiser**, e a única criatura do jogo que
+passa dos 2 m sem ser um chefe.
 
-**Curvado**, e não ereto. O Prospector é uma máquina: prumo, ombros quadrados,
-visor aceso. Este é um corpo que passa o dia dobrado sobre uma picareta, e a
-diferença de postura entre os dois diz mais do que qualquer linha do bestiário. E
-sem lanterna — o Prospector carrega luz porque a empresa a pagou.
+A silhueta usa a gramática do **Prospector degradada**, e não a de gente: mesmo
+plano de corpo, mesma lanterna, mesma ferramenta, só que grande demais, curvado
+sob a própria carga, com o cabeamento para fora e o minério reativo crescido por
+dentro. O jogador não deve pensar *"coitado"*. Deve pensar *"isto aqui é o que
+sobra de mim"*.
+
+Três voxels contam a história e são os únicos claros do modelo: a lanterna acesa,
+a placa facial rachada e as veias condutoras. O resto é ferrugem sobre ferrugem.
+
+Corpo grande (raio 0,46) com vida baixa (34) é deliberado e diz o que ele é: uma
+máquina de carga que nunca foi construída para lutar. Subir a vida junto com o
+tamanho transformaria a decisão num orçamento de munição, que é outra coisa.
+
+E o respingo do acerto é **`stone`, o mesmo do Prospector** — a coisa mais
+importante daquela tabela. Nenhuma linha de texto diz ao jogador que os dois são
+da mesma família; o respingo diz, toda vez.
 
 A fúria não cabe no atlas: um sheet de frames fixos não sabe o humor da entidade.
 Ela chega pelo gancho de **tint** que já existia para o elite, em vermelho contra o

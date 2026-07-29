@@ -194,12 +194,12 @@ describe('registro corporativo', () => {
       ...base,
       stats: { ...base.stats, innocentsKilled: 2 },
     });
-    expect(note).toContain('2 civis abatidos');
+    expect(note).toContain('2 unidades inativas destruídas');
     expect(note).toContain('sem valor de recuperação');
   });
 
   it('concorda em numero no singular', () => {
     const note = reputationNote({ ...base, stats: { ...base.stats, innocentsKilled: 1 } });
-    expect(note).toContain('1 civil abatido');
+    expect(note).toContain('1 unidade inativa destruída');
   });
 });

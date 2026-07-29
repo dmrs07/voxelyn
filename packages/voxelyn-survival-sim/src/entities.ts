@@ -106,9 +106,14 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // cavalo que espera o jogador entrar num raio pequeno nunca teria distancia
   // para investir, e a investida e o bicho inteiro.
   fungal_horse: { hp: HORSE_HP, speed: 4.4, radius: 0.44, contactDamage: 14, contactCooldown: 12, aggroRange: 13 },
-  // Vida BAIXA e sem bonus nenhum: ele nao e um desafio de combate, e uma
-  // DECISAO. Quem decidir mata-lo consegue, sempre — o custo nunca foi a luta.
-  miner: { hp: MINER_HP, speed: MINER_RAGE_SPEED, radius: 0.32, contactDamage: 6, contactCooldown: 18, aggroRange: MINER_NOTICE_RANGE },
+  // Corpo GRANDE (raio 0,46, entre o bruiser e o guardiao) e vida BAIXA.
+  //
+  // A combinacao e deliberada e diz o que ele e: uma maquina de carga de 2,5 m
+  // que nunca foi construida para lutar. Ele nao e um desafio de combate, e uma
+  // DECISAO — quem decidir destrui-lo consegue, sempre, e o custo nunca foi a
+  // luta. Subir a vida junto com o tamanho transformaria a decisao num
+  // orcamento de municao, que e outra coisa.
+  miner: { hp: MINER_HP, speed: MINER_RAGE_SPEED, radius: 0.46, contactDamage: 6, contactCooldown: 18, aggroRange: MINER_NOTICE_RANGE },
 };
 
 export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean => {
@@ -883,8 +888,9 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       if (enemy.mood === MINER_MOOD_PASSIVE || !player) continue;
 
       if (enemy.mood === MINER_MOOD_FLEEING) {
-        // Foge do jogador mais proximo, na velocidade dele: perseguir custa
-        // tempo de verdade, que e o preco do minerio que ele carrega.
+        // Larga a carga e recua pelos tuneis, na velocidade do jogador:
+        // perseguir custa tempo de verdade, que e o preco do minerio que ele
+        // estava levando para uma grade que nao existe mais.
         const away = normalized(enemy.x - player.x, enemy.y - player.y);
         enemy.facing = { ...away };
         const fled = moveEntity(

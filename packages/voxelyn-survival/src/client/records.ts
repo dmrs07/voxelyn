@@ -237,13 +237,13 @@ export const DISCOVERIES: readonly Discovery[] = [
   },
   {
     bit: DISCOVERY_MINER_FLED,
-    title: 'Ele corre de você',
-    lesson: 'Arma morna e o mineiro foge — e leva o minério dele junto. Alcançá-lo custa tempo.',
+    title: 'Ele larga a carga',
+    lesson: 'Arma morna e o mineiro recua pelos túneis — e deixa o que carregava. Alcançá-lo custa tempo.',
   },
   {
     bit: DISCOVERY_MINER_ENRAGED,
-    title: 'Ele sabe o que você é',
-    lesson: 'Chegue em brasa e a picareta vem em círculo. Recuar responde; orbitar, não.',
+    title: 'O calor sobrecarrega',
+    lesson: 'Chegue em brasa e o circuito dele falha: picareta em círculo. Recuar responde; orbitar, não.',
   },
   {
     bit: DISCOVERY_ORE_QUOTA,
@@ -337,8 +337,8 @@ export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
     note: 'Massa mineral animada. Reclassificado de "maquinário extraviado" após o terceiro relatório.',
   },
   miner: {
-    code: 'PESSOAL NÃO AUTORIZADO',
-    note: 'Ocupação irregular do sítio. Sem valor de recuperação.',
+    code: 'UNIDADE EX-016',
+    note: 'Extratora da geração anterior. Operação após o encerramento do contrato não foi autorizada. Sem valor de recuperação.',
   },
   fungal_horse: {
     code: 'ATIVO HOSTIL EQ-02',

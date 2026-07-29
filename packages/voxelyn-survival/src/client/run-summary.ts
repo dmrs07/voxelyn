@@ -138,26 +138,28 @@ export const summaryLines = (summary: RunSummary): SummaryLine[] => {
 };
 
 /**
- * O registro corporativo: quantos mineradores passivos voce abateu.
+ * O registro corporativo: quantas unidades passivas voce destruiu.
  *
  * NAO e mais uma celula na grade de numeros, e a diferenca e o ponto inteiro.
  * Ali ele viraria uma metrica entre outras — algo a otimizar, para cima ou para
  * baixo. Como linha propria, em vermelho, com a voz da empresa, ele nao pede
- * nada ao jogador: so registra, com a indiferenca exata de quem contabiliza
- * perda de material e nao morte de gente.
+ * nada ao jogador: so registra.
  *
- * "sem valor de recuperacao" faz o trabalho todo. A empresa nao esta condenando
- * ninguem; esta anotando que aquilo nao rendeu. E o jogador que decide se isso
- * incomoda — o jogo nao vai decidir por ele, porque a ficcao diz que o
- * prospector e um robo cumprindo ordens.
+ * "sem valor de recuperacao" faz o trabalho todo, e faz um trabalho DIFERENTE
+ * agora que o mineiro e um automato: a empresa esta falando de uma maquina que
+ * ela mesma abandonou, ainda cumprindo a ordem que ninguem cancelou, e a unica
+ * coisa que ela anota e que nao sobrou nada aproveitavel. O prospector e da
+ * mesma geracao. A frase e sobre a empresa, e e uma previsao sobre o jogador.
  *
- * Devolve null em zero: uma linha "0 civis" toda run transformaria a ausencia de
- * violencia gratuita numa pontuacao, que e o mesmo erro pelo outro lado.
+ * O jogo nao diz nada disso. So mostra a linha.
+ *
+ * Devolve null em zero: uma linha "0 unidades" toda run transformaria a ausencia
+ * de violencia gratuita numa pontuacao, que e o mesmo erro pelo outro lado.
  */
 export const reputationNote = (summary: RunSummary): string | null => {
   const n = summary.stats.innocentsKilled;
   if (n <= 0) return null;
-  const corpo = n === 1 ? '1 civil abatido' : `${n} civis abatidos`;
+  const corpo = n === 1 ? '1 unidade inativa destruída' : `${n} unidades inativas destruídas`;
   return `REGISTRO CORPORATIVO: ${corpo} — sem valor de recuperação.`;
 };
 

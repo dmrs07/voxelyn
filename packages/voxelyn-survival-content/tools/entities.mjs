@@ -537,79 +537,109 @@ const horseModel = (anim, f) => {
 const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 68, 72, 34, 66);
 
 // ---------------------------------------------------------------------------
-// enemy-miner 40x48 — a unica PESSOA do bestiario
+// enemy-miner 48x60 — automato de extracao abandonado
 //
-// A silhueta tem uma tarefa acima de todas: ler como gente antes de ler como
-// inimigo. Ela e a unica do bestiario construida com a mesma gramatica do
-// prospector — duas pernas, tronco estreito, cabeca no topo — e isso e
-// deliberado. O encontro inteiro depende de o jogador reconhecer, a distancia,
-// que ali esta alguem; se ele so descobrir isso quando o corpo cair, a decisao
-// que o encontro existe para oferecer ja passou.
+// NAO e uma pessoa. Foi uma unidade de manutencao e extracao da grade, deixada
+// para tras quando os veios desabaram, e continua cumprindo a ordem que ninguem
+// cancelou. E da mesma familia do prospector — e essa e a leitura que a silhueta
+// precisa entregar antes de qualquer outra.
 //
-// Curvado, e nao ereto. O prospector e uma maquina: prumo, ombros quadrados,
-// visor aceso. Este e um corpo que passa o dia dobrado sobre uma picareta, e a
-// diferenca de postura entre os dois diz mais sobre a ficcao do que qualquer
-// linha de texto do bestiario.
+// Por isso ele NAO usa a gramatica de gente. Usa a do prospector, degradada:
+// mesmo plano de corpo, mesma lanterna, mesma ferramenta — so que grande demais,
+// curvado sob a propria carga, com o cabeamento para fora e o minerio reativo
+// crescido por dentro. O jogador nao deve pensar "coitado". Deve pensar "isto
+// aqui e o que sobra de mim".
 //
-// Sem lanterna. O prospector carrega luz porque a empresa a pagou.
+// Tres voxels contam a historia toda e sao os unicos claros do modelo: a
+// lanterna acesa, a placa facial rachada e as veias condutoras. O resto e
+// ferrugem sobre ferrugem.
+//
+// "It raises its head only to decide": no `idle` a cabeca fica BAIXA, batendo a
+// picareta no chao. Ela sobe em `walk` e `attack` — os dois estados que so
+// existem depois de ele ter decidido alguma coisa a seu respeito. A selecao de
+// animacao ja e por movimento, entao a leitura sai de graca.
 // ---------------------------------------------------------------------------
 const minerModel = (anim, f) => {
   const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
-  const breathe = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  // `attack` = o cleave: a picareta descreve um circulo em volta dele. Os quatro
-  // frames sao ERGUER, girar, girar, recolher — e o giro tem de passar por tras,
-  // senao o golpe le como frontal e o desenho mente sobre o alcance.
+  // Batida da picareta no chao, so em repouso: ele esta trabalhando.
+  const toil = anim === 'idle' ? [0, 1, 2, 1][f % 4] : 0;
+  // O cleave: a picareta descreve um circulo. Os quatro frames sao erguer,
+  // girar, PASSAR POR TRAS, recolher — o terceiro e o que promete o circulo.
   const swing = anim === 'attack' ? [0, 1, 2, 3][f % 4] : -1;
-  const up = breathe - flinch;
+  // A cabeca sobe assim que ele deixa de estar so trabalhando.
+  const alert = anim === 'idle' ? 0 : 2;
+  const up = -flinch;
   const b = [];
 
-  // Pernas e botas gastas.
-  b.push(box(-2, -1, Math.max(0, step), 2, 2, 4, 'rockDeep'));
-  b.push(box(1, -1, Math.max(0, -step), 2, 2, 4, 'rockDeep'));
-  b.push(box(-2, -1, Math.max(0, step), 2, 2, 1, 'rust'));
-  b.push(box(1, -1, Math.max(0, -step), 2, 2, 1, 'rust'));
+  // Pernas longas e segmentadas, com pe largo: ele e alto e pesado, e o vao
+  // entre as pernas e o que impede a silhueta de virar um bloco.
+  for (const [lx, phase] of [[-3, step], [1, -step]]) {
+    b.push(box(lx, -1, Math.max(0, phase), 2, 2, 1, 'rockDeep'));
+    b.push(box(lx, -1, 1 + Math.max(0, phase), 2, 2, 4, 'rust'));
+    b.push(box(lx, -1, 5 + Math.max(0, phase), 2, 2, 3, 'rockDeep'));
+  }
 
-  // Tronco INCLINADO para a frente, e ombros um degrau abaixo do que estariam
-  // num corpo ereto: e a curvatura que separa este corpo do prospector.
+  // Tronco INCLINADO para a frente, sob a carga. A inclinacao e o que sobrou da
+  // funcao dele: carregar minerio de um lado para o outro ate a grade acabar.
   const lean = 1;
-  b.push(box(-2, -1 + lean, 4 + up, 5, 3, 4, 'rust'));
-  // Trapo por cima: uma faixa palida atravessando o peito, o unico claro do
-  // corpo, para o olho achar o tronco antes de achar a picareta.
-  b.push(box(-2, -2 + lean, 6 + up, 5, 1, 2, 'bone'));
-  b.push(box(-3, -1 + lean, 7 + up, 7, 3, 1, 'rockDeep'));
+  b.push(box(-3, -1 + lean, 8 + up, 6, 4, 5, 'rust'));
+  // Tremonha nas costas: o compartimento de carga, ainda cheio.
+  b.push(box(-2, 3 + lean, 10 + up, 4, 2, 4, 'rockDeep'));
+  b.push(box(-2, 3 + lean, 14 + up, 4, 2, 1, 'loot'));
+  // Cabeamento exposto descendo do tronco. Azul: a corrente da grade que ainda
+  // passa por ele, e que o calor faz sobrecarregar.
+  b.push(box(-4, 1 + lean, 9 + up, 1, 1, 4, 'electric'));
+  b.push(box(3, 2 + lean, 10 + up, 1, 1, 3, 'electric'));
+  // Veio reativo crescido POR DENTRO do peito: mineral virando fiacao.
+  b.push(box(-1, -2 + lean, 10 + up, 2, 1, 2, 'electric'));
 
-  // Cabeca baixa, encaixada nos ombros. Capuz escuro, sem visor e sem luz.
-  b.push(box(-1, -1 + lean * 2, 8 + up, 3, 3, 3, 'rockDeep'));
-  b.push(box(-1, -2 + lean * 2, 9 + up, 3, 1, 2, 'rust'));
-  // Olhos: dois voxels escuros. NAO acendem no atlas — a raiva chega pelo tint
-  // vermelho que o renderer aplica sobre o sprite, porque um sheet de frames
-  // fixos nao sabe o humor da entidade.
-  b.push(box(-1, -3 + lean * 2, 10 + up, 1, 1, 1, 'rockDeep'));
-  b.push(box(1, -3 + lean * 2, 10 + up, 1, 1, 1, 'rockDeep'));
+  // Bracos longos, DESCENDO ate quase o chao. Sao eles que dizem "isto nao e
+  // gente": proporcao errada de proposito.
+  //
+  // Comecam abaixo da base do tronco (z 3 contra z 8) porque, comecando na
+  // altura do ombro, eles ficavam inteiramente dentro da silhueta do tronco na
+  // projecao isometrica e o bicho saia sem bracos. O que separa os dois volumes
+  // aqui nao e a cor — e o braco existir onde o tronco nao esta.
+  b.push(box(-5, 0 + lean, 3, 2, 2, 9 + up, 'rockDeep'));
+  b.push(box(4, 0 + lean, 3, 2, 2, 9 + up, 'rockDeep'));
 
-  // A picareta. Fora do ataque ela fica caida ao lado, apoiada no chao — a
-  // postura de quem estava trabalhando, e nao esperando.
+  // Cabeca baixa e a frente, com placa facial rachada. `alert` a levanta.
+  const headZ = 13 + up + alert;
+  b.push(box(-1, -2 + lean, headZ, 3, 3, 3, 'rust'));
+  b.push(box(-1, -3 + lean, headZ + 1, 3, 1, 2, 'bone'));
+  // Optica: um unico ponto, mais fraco que o visor do prospector. Piscando.
+  b.push(box(0, -4 + lean, headZ + 1, 1, 1, 1, f % 2 === 0 ? 'biolum' : 'fungus'));
+  // Lanterna de mineracao no ombro, guttering. E o unico calor do modelo.
+  b.push(box(-3, -3 + lean, headZ, 2, 2, 2, 'loot'));
+  b.push(box(-3, -4 + lean, headZ + 1, 1, 1, 1, 'fire'));
+
+  // A picareta. Em repouso ela BATE NO CHAO — ele nao esta esperando voce.
   if (swing < 0) {
-    b.push(box(3, -1, 0, 1, 1, 9, 'rust'));
-    b.push(box(2, -1, 9, 3, 1, 1, 'bone'));
+    // Encostada no braco direito e MERGULHANDO no chao a frente dele, e nao de
+    // pe ao lado: solta, ela lia como um poste plantado no chao ao lado de um
+    // corpo, e a leitura "ele esta trabalhando" e o que faz o encontro
+    // significar alguma coisa antes de o jogador decidir qualquer coisa.
+    b.push(box(4, -4, 1 + toil, 2, 2, 8 - toil, 'rust'));
+    b.push(box(3, -5, 0 + toil, 3, 2, 1, 'bone'));
+    b.push(box(3, -5, 0 + toil, 1, 1, 1, 'electric'));
   } else {
-    // O cabo gira em volta do corpo: frente -> lado -> tras -> lado.
     const arc = [
-      [0, -4, 7], // erguida a frente
-      [4, -1, 6], // lado direito
-      [0, 3, 5], // POR TRAS: e este frame que promete o circulo
-      [-4, -1, 6], // lado esquerdo, recolhendo
+      [0, -6, 11], // erguida a frente
+      [6, -1, 10], // lado direito
+      [0, 5, 9], // POR TRAS: e este frame que promete o circulo
+      [-6, -1, 10], // lado esquerdo, recolhendo
     ][swing];
     b.push(box(arc[0], arc[1], arc[2] + up, 2, 2, 2, 'rust'));
     b.push(box(arc[0], arc[1], arc[2] + 2 + up, 2, 2, 1, 'bone'));
-    // Braco esticado na direcao do cabo, para a picareta nao flutuar solta.
-    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 6 + up, 2, 2, 1, 'rust'));
+    // Corrente residual no fio da lamina: ela crepita quando ele gira.
+    b.push(box(arc[0], arc[1], arc[2] + 3 + up, 1, 1, 1, 'electric'));
+    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 9 + up, 2, 2, 1, 'rockDeep'));
   }
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 40, 48, 20, 42);
+const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 48, 60, 24, 54);
 
 const boltFrame = (_dir, _anim, f) => {
   const g = grid(16, 16);
@@ -683,7 +713,7 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates'),
-  base('enemy-miner', 40, 48, 20, 42, { w: 0.64, h: 0.95 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric impoverished human miner, hunched posture, ragged wrap, dark hood without lamp, pickaxe'),
+  base('enemy-miner', 48, 60, 24, 54, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
   {
     id: 'fx-projectile-bolt', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },
