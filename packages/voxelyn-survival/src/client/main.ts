@@ -460,7 +460,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
           if (armed && (input.hasTap() || input.consumeRestartKey())) {
             gate.reset();
             audio.reset();
-            recordedSummary = null;
+            recordedSummaryKey = null;
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
