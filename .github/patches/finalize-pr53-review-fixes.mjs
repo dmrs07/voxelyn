@@ -1,5 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// pnpm executes this script with cwd at packages/voxelyn-survival.
+process.chdir(fileURLToPath(new URL('../../', import.meta.url)));
 
 const rootPath = 'package.json';
 const root = JSON.parse(readFileSync(rootPath, 'utf8'));
