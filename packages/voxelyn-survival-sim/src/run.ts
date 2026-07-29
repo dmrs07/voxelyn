@@ -511,7 +511,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
       dx: player.facing.x, dy: player.facing.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
     });
-    events.push({ t: 'pulse', x: player.x, y: player.y });
+    events.push({ t: 'pulse', x: player.x, y: player.y, radius: ABILITY_RADIUS });
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
       const dx = enemy.x - player.x;
@@ -1247,6 +1247,10 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'spitter',
   'bomber',
   'guardian',
+  // Novos entram no FIM, nunca no meio: inserir 'bishop' antes de 'guardian'
+  // mudaria o hash de toda run existente sem mudar comportamento nenhum.
+  'bishop',
+  'fungal_horse',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */

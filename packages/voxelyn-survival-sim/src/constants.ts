@@ -230,6 +230,100 @@ export const CONTAMINATION_CARRYOVER = 0.6;
 export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.0
 export const VENT_BASE_INTERVAL_TICKS = 160;
 
+/**
+ * Bispo — chefe do setor 2.
+ *
+ * A cura NAO e um recurso que ele gasta: e uma propriedade do lugar onde ele
+ * pisa. Isso muda a pergunta da luta de "quanto dano por segundo eu faco" para
+ * "de que chao eu o tiro", e usa fungo, fogo e propagacao que ja existem, sem
+ * mecanica nova nenhuma.
+ */
+/**
+ * Setor do Bispo.
+ *
+ * O 2 e o unico lugar onde ele cabe. No 1 o jogador ainda nao tem modulo nenhum
+ * e a resposta correta (queimar o chao) depende de ferramentas que ele ainda vai
+ * achar; no 3 ele dividiria a cena com o Guardiao e a run teria dois chefes
+ * seguidos sem respiro entre eles. O meio da descida e onde a run precisava de
+ * um evento — era o setor sem nada de proprio.
+ */
+export const BISHOP_SECTOR = 2;
+export const BISHOP_HP = 260;
+/**
+ * Cura por tick sobre fungo. A 20 Hz sao 24 de vida por segundo.
+ *
+ * Deliberadamente ACIMA do dano sustentado do tiro base (14 por bolt a cada 5
+ * ticks = 56/s, menos o tempo de mira e o calor). Em cima do fungo ele nao e
+ * dificil de matar: e IMPOSSIVEL de matar por atrito. Tirar a cura tem de ser
+ * uma decisao, nao uma otimizacao.
+ */
+export const BISHOP_REGEN_PER_TICK = 1.2;
+/** Abaixo desta fracao de vida ele ABANDONA a perseguicao e busca fungo. */
+export const BISHOP_RETREAT_HP_FRACTION = 0.72;
+/** Ate onde ele procura chao fungico, em tiles. */
+export const BISHOP_FUNGAL_SEARCH = 14;
+
+/**
+ * Supernova Fungica — a assinatura do Bispo.
+ *
+ * O que ela faz de verdade nao e o dano: e REPLANTAR o tapete. Sem ela, queimar
+ * a arena resolvia a luta de uma vez e o resto era formalidade; com ela, o chao
+ * volta e a pergunta "de que piso eu o tiro" precisa ser respondida de novo. E o
+ * que transforma um truque numa luta.
+ *
+ * So dispara com ele FERIDO e SEM fungo por perto — e a resposta dele a ter
+ * perdido o chao, e nao mais um golpe no rodizio. Assim o jogador vive a
+ * sequencia inteira como causa e efeito: queimei, ele fugiu, nao achou nada,
+ * plantou.
+ */
+export const BISHOP_NOVA_RADIUS = 5.5;
+export const BISHOP_NOVA_DAMAGE = 16;
+export const BISHOP_NOVA_WINDUP_TICKS = 30;
+export const BISHOP_NOVA_COOLDOWN_TICKS = 420;
+/** Vida do tapete replantado. Longo: ele precisa durar a luta, nao um segundo. */
+export const BISHOP_NOVA_FUNGAL_TICKS = 6000;
+
+/**
+ * Cavalo Fungico — elite movel.
+ *
+ * O rastro e a mecanica; a investida e so o jeito de deposita-lo. Ele nao mata
+ * pelo impacto, mata por ir tirando espaco da sala.
+ */
+export const HORSE_HP = 110;
+export const HORSE_CHARGE_SPEED = 10.5;
+/**
+ * Telegrafo de 1,3 s — o mais longo do jogo.
+ *
+ * A investida cruza a sala inteira e deixa fogo permanente atras: e a unica
+ * acao que muda o MAPA. Uma ameaca que altera o terreno tem de ser vista com
+ * folga, senao o jogador perde a rota sem nunca ter tido a chance de escolher.
+ */
+export const HORSE_CHARGE_WINDUP_TICKS = 26;
+export const HORSE_CHARGE_TICKS = 22;
+export const HORSE_CHARGE_COOLDOWN_TICKS = 110;
+export const HORSE_CHARGE_MIN_RANGE = 4;
+export const HORSE_CHARGE_MAX_RANGE = 16;
+/** Combustivel do rastro em chao sem material proprio, em ticks. */
+export const HORSE_TRAIL_FUEL_TICKS = 40;
+/**
+ * De quantos ticks o fogo fica ATRAS do cavalo.
+ *
+ * Sem atraso, o rastro nasce sob as patas e quem foi rocado ja esta em chamas
+ * antes de ver o que aconteceu. Com atraso, o cavalo passa, o jogador ve o
+ * caminho que ele fez, e so entao o fogo sobe — da um instante para sair.
+ */
+export const HORSE_TRAIL_DELAY_TICKS = 4;
+/**
+ * Chance de a vaga de elite do setor ser um Cavalo.
+ *
+ * Nem raro nem garantido, de proposito. Garantido viraria mobilia — o jogador
+ * deixa de ler a sala e passa a esperar o cavalo. Raro demais e conteudo que a
+ * maioria das runs nunca ve, e um encontro que ninguem encontra nao ensina nada.
+ * Perto de um terco, a run media de tres setores tem um; nao ter nenhum e ter
+ * dois sao os dois lados normais disso.
+ */
+export const HORSE_SPAWN_CHANCE = 0.34;
+
 export const ENEMY_MIN_SPAWN_DIST = 12;
 export const GUARDIAN_HP = 420;
 

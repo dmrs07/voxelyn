@@ -10,8 +10,10 @@
 //    golpe; nenhum dos dois sobrevive a uma reconexao no meio da run.
 
 import {
+  DISCOVERY_BISHOP_FELLED,
   DISCOVERY_CORE_TAKEN,
   DISCOVERY_GUARDIAN_FELLED,
+  DISCOVERY_HORSE_FELLED,
   type DamageCause,
   type EnemyArchetype,
   type RunPhase,
@@ -42,7 +44,7 @@ export const TARGET_EXTRACTION_TICKS = TARGET_SECTOR_TICKS * SECTOR_COUNT;
 
 export const emptyStats = (): RunStats => ({
   shotsFired: 0,
-  kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0 },
+  kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0 },
   damageTakenTenths: 0,
   damageDealtTenths: 0,
   solidsDestroyed: 0,
@@ -70,6 +72,8 @@ export const addDamageTenths = (current: number, amount: number): number =>
 export const recordKill = (stats: RunStats, archetype: EnemyArchetype): void => {
   stats.kills[archetype] += 1;
   if (archetype === 'guardian') stats.discoveries |= DISCOVERY_GUARDIAN_FELLED;
+  if (archetype === 'bishop') stats.discoveries |= DISCOVERY_BISHOP_FELLED;
+  if (archetype === 'fungal_horse') stats.discoveries |= DISCOVERY_HORSE_FELLED;
 };
 
 export const markDiscovery = (stats: RunStats, bit: number): void => {

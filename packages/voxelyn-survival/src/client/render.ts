@@ -918,6 +918,14 @@ export class SurvivalRenderer {
               archetype: enemy.archetype,
               elite: enemy.elite,
               nowMs,
+              // Amostra a superficie sob o bicho em vez de esperar um campo no
+              // snapshot: o cliente online ja espelha os chunks, entao o chao
+              // debaixo do bispo e um dado que ele TEM. Mandar um booleano por
+              // inimigo por tick para dizer o que o mapa ja diz seria pagar
+              // banda por uma leitura local.
+              charged:
+                enemy.archetype === 'bishop' &&
+                state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] === SURF_FUNGAL,
             });
           }
           if (enemy.stunnedUntil > state.tick) {

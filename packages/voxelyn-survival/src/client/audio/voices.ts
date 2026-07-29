@@ -31,6 +31,7 @@ export type VoiceId =
   | 'hitPlayer'
   | 'death'
   | 'deathGuardian'
+  | 'bishopHeal'
   // --- mundo --------------------------------------------------------------
   | 'explosion'
   | 'discharge'
@@ -129,6 +130,12 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   hitPlayer: { priority: 8, gain: 0.55, minIntervalMs: 70, spatial: false },
   death: { priority: 5, gain: 0.4, minIntervalMs: 60, spatial: true },
   deathGuardian: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+  // Prioridade 8: acima de "dei dano", abaixo de telegrafo. E a unica voz de
+  // dano-que-nao-e-meu com prioridade alta, e por um motivo estreito — ela nao
+  // descreve um impacto, descreve que os impactos nao estao valendo. Perde-la no
+  // orcamento seria perder a pergunta da luta. `minIntervalMs` de 180 casa com o
+  // evento a cada 4 ticks (200 ms): passa todos sem virar zumbido continuo.
+  bishopHeal: { priority: 8, gain: 0.4, minIntervalMs: 180, spatial: true },
 
   explosion: { priority: 8, gain: 0.75, minIntervalMs: 70, spatial: true },
   discharge: { priority: 7, gain: 0.6, minIntervalMs: 110, spatial: true },

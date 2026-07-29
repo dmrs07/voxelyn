@@ -282,6 +282,17 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     burst(ctx, out, t0, noise, { peak: 0.35, decay: 1.1, type: 'lowpass', from: 900, to: 120 });
   },
 
+  // Cura do bispo: a unica voz do jogo que SOBE.
+  //
+  // Todo o resto do banco desce em frequencia — tiro, impacto, morte, quebra —
+  // porque tudo o mais e alguma coisa terminando. Uma glissando ascendente nao
+  // precisa ser aprendida: contra um vocabulario inteiro de quedas, ela le como
+  // "isto esta voltando" antes de o jogador saber o que e o som.
+  bishopHeal: (ctx, out, t0) => {
+    tone(ctx, out, t0, { type: 'sine', from: 320, to: 620, peak: 0.3, decay: 0.26, attack: 0.03 });
+    tone(ctx, out, t0 + 0.02, { type: 'triangle', from: 480, to: 930, peak: 0.14, decay: 0.22, attack: 0.03 });
+  },
+
   // --- mundo --------------------------------------------------------------
   explosion: (ctx, out, t0, noise) => {
     tone(ctx, out, t0, { type: 'sine', from: 150, to: 34, peak: 0.85, decay: 0.55 });

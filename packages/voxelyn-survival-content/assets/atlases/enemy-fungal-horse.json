@@ -1,0 +1,110 @@
+{
+  "id": "enemy-fungal-horse",
+  "version": 2,
+  "atlas": "enemy-fungal-horse.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 64,
+  "anchorX": 32,
+  "anchorY": 58,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.4,
+    "h": 0.95
+  },
+  "footprint": {
+    "w": 1.6,
+    "h": 1.2,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#6e4a33",
+    "#b8a98f",
+    "#d93b4c",
+    "#ff7a2f",
+    "#ffd166"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    },
+    "special": {
+      "frames": 6,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "special": 14,
+      "hit": 20,
+      "die": 22
+    },
+    "dl": {
+      "idle": 27,
+      "walk": 31,
+      "attack": 37,
+      "special": 41,
+      "hit": 47,
+      "die": 49
+    },
+    "ur": {
+      "idle": 54,
+      "walk": 58,
+      "attack": 64,
+      "special": 68,
+      "hit": 74,
+      "die": 76
+    },
+    "ul": {
+      "idle": 81,
+      "walk": 85,
+      "attack": 91,
+      "special": 95,
+      "hit": 101,
+      "die": 103
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

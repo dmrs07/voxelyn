@@ -13,6 +13,24 @@ import {
   BRUISER_HURL_SPEED,
   BRUISER_HURL_WINDUP_TICKS,
   BRUISER_ROCK_RADIUS,
+  BISHOP_FUNGAL_SEARCH,
+  BISHOP_HP,
+  BISHOP_NOVA_COOLDOWN_TICKS,
+  BISHOP_NOVA_DAMAGE,
+  BISHOP_NOVA_FUNGAL_TICKS,
+  BISHOP_NOVA_RADIUS,
+  BISHOP_NOVA_WINDUP_TICKS,
+  BISHOP_REGEN_PER_TICK,
+  BISHOP_RETREAT_HP_FRACTION,
+  HORSE_CHARGE_COOLDOWN_TICKS,
+  HORSE_CHARGE_MAX_RANGE,
+  HORSE_CHARGE_MIN_RANGE,
+  HORSE_CHARGE_SPEED,
+  HORSE_CHARGE_TICKS,
+  HORSE_CHARGE_WINDUP_TICKS,
+  HORSE_HP,
+  HORSE_TRAIL_DELAY_TICKS,
+  HORSE_TRAIL_FUEL_TICKS,
   GUARDIAN_ARENA_EXITS,
   GUARDIAN_ARENA_RADIUS,
   GUARDIAN_PATH_INTERVAL_TICKS,
@@ -60,6 +78,15 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   spitter: { hp: 30, speed: 2.8, radius: 0.34, contactDamage: 6, contactCooldown: 14, aggroRange: 9 },
   bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
   guardian: { hp: 420, speed: 2.1, radius: 0.68, contactDamage: 24, contactCooldown: 14, aggroRange: 7 },
+  // Vida MENOR que a do guardiao de proposito. A dificuldade do bispo nao mora
+  // na barra: em cima do fungo ele se cura mais rapido do que se leva dano, e
+  // fora dele cai depressa. Somar vida grande a cura seria cobrar as duas coisas
+  // pelo mesmo problema e transformar a luta em espera.
+  bishop: { hp: BISHOP_HP, speed: 2.6, radius: 0.6, contactDamage: 20, contactCooldown: 14, aggroRange: 10 },
+  // Alcance de aggro alto e velocidade alta porque a ameaca dele e CHEGAR: um
+  // cavalo que espera o jogador entrar num raio pequeno nunca teria distancia
+  // para investir, e a investida e o bicho inteiro.
+  fungal_horse: { hp: HORSE_HP, speed: 4.4, radius: 0.44, contactDamage: 14, contactCooldown: 12, aggroRange: 13 },
 };
 
 export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean => {
@@ -242,6 +269,19 @@ const normalized = (x: number, y: number): Vec2 => {
   return { x: x / len, y: y / len };
 };
 
+/**
+ * Corpos grandes o bastante para ABRIR caminho em vez de contornar.
+ *
+ * O bispo entra na lista sem ganhar a busca de rota do guardiao: chefe preso e
+ * chefe morto, mas a rota do guardiao mora em `state.guardianPath`, um campo
+ * unico. Compartilha-lo daria dois chefes disputando o mesmo array — inofensivo
+ * hoje, porque um e do setor 2 e o outro do 3, e uma bomba armada no dia em que
+ * isso deixar de ser verdade. Empurrar e quebrar resolve o mesmo problema sem
+ * inventar um acoplamento com prazo de validade.
+ */
+const crushesWalls = (enemy: Entity): boolean =>
+  enemy.archetype === 'bruiser' || enemy.archetype === 'guardian' || enemy.archetype === 'bishop';
+
 /** Bruiser e Guardian sao corpos minerais; eletricidade causa dano, nao paralisia. */
 export const isStoneEnemy = (enemy: Entity): boolean =>
   enemy.archetype === 'bruiser' || enemy.archetype === 'guardian';
@@ -353,6 +393,10 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     ? null
     : state.players.find((p) => p.id === action.target && p.alive && !state.playerExtras[p.slot ?? 0].downed) ?? null;
 
+  if (action.kind === 'pulse') {
+    bishopNova(state, enemy, events);
+    return;
+  }
   if (action.kind === 'detonate') {
     // O bomber se mata; a explosao que sai disso e que machuca o jogador, e ela
     // carrega a propria causa (`explosion`/`enemy`) em explodeAt.
@@ -369,7 +413,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       y: enemy.y,
       vx: action.direction.x * 7,
       vy: action.direction.y * 7,
-      damage: enemy.archetype === 'guardian' ? 14 : 9,
+      damage: enemy.archetype === 'guardian' ? 14 : enemy.archetype === 'bishop' ? 12 : 9,
       distanceTravelled: 0,
       hostile: true,
       leavesBiofluid: true,
@@ -415,6 +459,11 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     });
     events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: action.direction.x, dy: action.direction.y, owner: enemy.id });
   } else if (action.kind === 'charge') {
+    // O cavalo NAO recebe impulso aqui. A investida dele e conduzida tick a tick
+    // por `horseChargeStride`, que precisa da posicao exata de cada passo para
+    // acender o rastro; somar velocidade solta por cima daria dois movimentos no
+    // mesmo tick e o fogo sairia desalinhado do caminho percorrido.
+    if (enemy.archetype === 'fungal_horse') return;
     enemy.vx = action.direction.x * 7;
     enemy.vy = action.direction.y * 7;
   } else if (action.kind === 'slam' && target) {
@@ -548,11 +597,174 @@ const guardianSteering = (
   return normalized(nx + 0.5 - enemy.x, ny + 0.5 - enemy.y);
 };
 
+/**
+ * O Bispo se cura do chao, e nao de si mesmo.
+ *
+ * Em cima de fungo VIVO ele regenera acima do que o tiro base sustenta, entao
+ * atrito nao o mata: a luta e resolvida mudando o piso, nao a barra de vida.
+ *
+ * Fungo AQUECIDO (fumegando, antes de virar fogo) ja nao cura. O detalhe e o
+ * ponto inteiro do encontro: o jogador ve a cura parar no instante em que
+ * encosta calor, e nao quatro segundos depois quando a chama finalmente sobe.
+ * Se a recompensa so viesse com o fogo, a licao chegaria tarde demais para ser
+ * lida como consequencia da propria acao.
+ */
+const bishopRegen = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): boolean => {
+  if (state.surface[cellUnder(state, enemy)] !== SURF_FUNGAL) return false;
+  if (enemy.hp >= enemy.maxHp) return true;
+  enemy.hp = Math.min(enemy.maxHp, enemy.hp + BISHOP_REGEN_PER_TICK);
+  // Um evento a cada quatro ticks, e nao a cada tick: a 20 Hz o barramento
+  // semantico levaria 20 curas por segundo so deste inimigo, e o mixer de audio
+  // gastaria o orcamento de vozes inteiro num som que se le igual em 5 Hz.
+  if (state.tick % 4 === 0) {
+    events.push({ t: 'heal', x: enemy.x, y: enemy.y, entity: enemy.id, amount: BISHOP_REGEN_PER_TICK * 4 });
+  }
+  return true;
+};
+
+/**
+ * Celula de fungo vivo mais proxima, ou null.
+ *
+ * Varredura em ordem fixa com a menor distancia vencendo e a ordem de iteracao
+ * como desempate, pelo mesmo motivo de `findRippable`: duas maquinas da mesma
+ * sala precisam mandar o bispo para o MESMO tapete.
+ */
+const nearestFungal = (state: SurvivalState, ent: Entity): { x: number; y: number } | null => {
+  const w = state.config.width;
+  const ex = Math.floor(ent.x);
+  const ey = Math.floor(ent.y);
+  let best: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+  for (let dy = -BISHOP_FUNGAL_SEARCH; dy <= BISHOP_FUNGAL_SEARCH; dy++) {
+    for (let dx = -BISHOP_FUNGAL_SEARCH; dx <= BISHOP_FUNGAL_SEARCH; dx++) {
+      const x = ex + dx;
+      const y = ey + dy;
+      if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+      if (state.surface[y * w + x] !== SURF_FUNGAL) continue;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) {
+        bestDist = d;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+};
+
+/**
+ * Supernova Fungica: dano em 360 graus e o tapete REPLANTADO em volta dele.
+ *
+ * A parte que importa e a segunda. Sem replantar, queimar a arena resolvia a
+ * luta de uma vez — o jogador aprendia a resposta certa e o resto do encontro
+ * virava formalidade. Com o replantio, a resposta certa continua certa e passa a
+ * ter de ser REPETIDA, que e a diferenca entre um truque e uma luta.
+ *
+ * Nao planta sobre solido nem sobre fogo vivo: plantar dentro da chama apagaria
+ * o incendio que o jogador acabou de acender, e transformaria a acao dele em
+ * nada. O fungo cresce onde o fogo ja passou, e nao por cima dele.
+ */
+const bishopNova = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = Math.ceil(BISHOP_NOVA_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > BISHOP_NOVA_RADIUS * BISHOP_NOVA_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_FUNGAL) continue;
+      setSurface(state, i, SURF_FUNGAL, BISHOP_NOVA_FUNGAL_TICKS);
+    }
+  }
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > BISHOP_NOVA_RADIUS) continue;
+    damageEntity(state, player, BISHOP_NOVA_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'bishop',
+      elite: enemy.elite,
+    });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: BISHOP_NOVA_RADIUS });
+};
+
+/**
+ * Uma passada da investida do Cavalo: move, atropela e deixa rastro.
+ *
+ * Mora fora de `releaseAction` porque a investida do cavalo dura DEZENAS de
+ * ticks, e nao um instante. As outras acoes resolvem tudo no release — a pedra
+ * sai, o golpe acerta ou nao — e por isso `advanceAction` pode devolver `true` e
+ * a criatura ficar parada na recuperacao. Aqui a recuperacao E a acao.
+ *
+ * O rastro nasce ATRAS, e sem guardar historico: a posicao de onde o fogo sobe e
+ * a posicao atual menos a direcao vezes o atraso. Guardar as celulas visitadas
+ * daria o mesmo resultado e acrescentaria um campo por inimigo ao estado
+ * autoritativo — que e sincronizado, hasheado e reenviado a cada resync.
+ */
+const horseChargeStride = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const action = enemy.action;
+  if (!action || action.kind !== 'charge' || action.phase === 'windup') return;
+
+  const dt = 1 / TICK_HZ;
+  const step = HORSE_CHARGE_SPEED * dt;
+  enemy.facing = { ...action.direction };
+  const moved = moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
+
+  // Bater na pedra ENCERRA a investida. E o unico contra-jogo posicional que o
+  // cavalo oferece: quem entende o telegrafo poe uma parede no caminho e ganha o
+  // cooldown inteiro de graca. Continuar raspando na parede ate o tempo acabar
+  // tiraria a recompensa de ter lido a ameaca.
+  if (moved.blockedX || moved.blockedY) {
+    enemy.action = undefined;
+    enemy.vx = 0;
+    enemy.vy = 0;
+    return;
+  }
+
+  const victim = nearestTarget(state, enemy.x, enemy.y);
+  if (victim && state.tick >= enemy.contactReadyAt && distTo(enemy, victim) < enemy.radius + victim.radius + 0.35) {
+    enemy.contactReadyAt = state.tick + ARCHETYPES.fungal_horse.contactCooldown;
+    damageEntity(state, victim, ARCHETYPES.fungal_horse.contactDamage * (enemy.elite ? 1.4 : 1), events, {
+      kind: 'enemy_contact',
+      archetype: 'fungal_horse',
+      elite: enemy.elite,
+    });
+  }
+
+  const trailX = Math.floor(enemy.x - action.direction.x * step * HORSE_TRAIL_DELAY_TICKS);
+  const trailY = Math.floor(enemy.y - action.direction.y * step * HORSE_TRAIL_DELAY_TICKS);
+  if (trailX < 0 || trailY < 0 || trailX >= state.config.width || trailY >= state.config.height) return;
+  const i = trailY * state.config.width + trailX;
+  if (state.solid[i] !== SOLID_NONE) return;
+  // `igniteCell` primeiro: cada materia tem a propria resposta ao calor (o fungo
+  // seca antes de pegar, o gas da flash, o esporo esteriliza), e o cavalo nao
+  // tem por que ser a excecao que atropela essa tabela. So quando o chao nao tem
+  // resposta propria — rocha nua — o rastro traz o proprio combustivel.
+  if (!igniteCell(state, i, events)) {
+    if (state.surface[i] === SURF_NONE) {
+      setSurface(state, i, SURF_FIRE, HORSE_TRAIL_FUEL_TICKS);
+      events.push({ t: 'ignite', x: trailX, y: trailY });
+    }
+  }
+};
+
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
-    if (advanceAction(state, enemy, events)) continue;
+    // A cura do bispo roda ANTES do portao de acao, e nao dentro do ramo de IA.
+    // Ela e uma propriedade do chao, nao uma decisao dele: suspende-la durante
+    // cada golpe ou cada atordoamento ensinaria ao jogador uma janela que nao
+    // existe — "acertei na hora certa" em vez de "ele estava no lugar errado".
+    const onFungus = enemy.archetype === 'bishop' && bishopRegen(state, enemy, events);
+    if (advanceAction(state, enemy, events)) {
+      if (enemy.alive && enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
+      continue;
+    }
     if (enemy.stunnedUntil > state.tick) continue;
 
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
@@ -593,6 +805,58 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         dirY = steer.y;
       }
 
+      // O TELL do bispo.
+      //
+      // Ferido, ele abandona a perseguicao e corre para o tapete de fungo mais
+      // proximo — e la se cura mais rapido do que o tiro base tira. O contra-jogo
+      // nao esta escrito em lugar nenhum: esta no fato de o proprio chefe apontar
+      // para o que o mantem vivo toda vez que ele se machuca. Queimar a arena e a
+      // conclusao que o jogador tira sozinho depois de ve-lo fugir duas vezes.
+      //
+      // Sem fungo ao alcance ele nao tem para onde ir e volta a perseguir: a
+      // arena queimada nao o deixa acuado num canto, so o deixa mortal.
+      const retreating =
+        enemy.archetype === 'bishop' &&
+        !onFungus &&
+        enemy.hp < enemy.maxHp * BISHOP_RETREAT_HP_FRACTION;
+      if (retreating) {
+        const refuge = nearestFungal(state, enemy);
+        if (refuge) {
+          const flee = normalized(refuge.x + 0.5 - enemy.x, refuge.y + 0.5 - enemy.y);
+          dirX = flee.x;
+          dirY = flee.y;
+        } else if (state.tick >= enemy.nextActionAt) {
+          // Ferido e SEM refugio: e aqui, e so aqui, que a Supernova sai.
+          //
+          // Nao e mais um golpe no rodizio — e a resposta dele a ter perdido o
+          // chao. O jogador vive a sequencia inteira como causa e efeito: queimei
+          // o tapete, ele fugiu, nao achou nada, e replantou. Se disparasse por
+          // cooldown, o replantio seria um evento que acontece COM o jogador;
+          // assim e um evento que ele provocou.
+          enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
+          startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
+          continue;
+        }
+      }
+
+      // A investida exige LINHA DE VISAO na hora de comecar.
+      //
+      // A direcao congela no windup e nao se corrige mais — e o que torna o
+      // telegrafo de 1,3 s uma informacao util em vez de um aviso de algo
+      // inevitavel. Sem a checagem, o cavalo dispararia contra uma parede que
+      // esta entre os dois e a acao inteira viraria ruido.
+      if (
+        enemy.archetype === 'fungal_horse' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist >= HORSE_CHARGE_MIN_RANGE &&
+        dist <= HORSE_CHARGE_MAX_RANGE &&
+        hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
+      ) {
+        enemy.rangedReadyAt = state.tick + HORSE_CHARGE_COOLDOWN_TICKS;
+        startAction(state, enemy, 'charge', toward, HORSE_CHARGE_WINDUP_TICKS, HORSE_CHARGE_TICKS, events, player.id);
+        continue;
+      }
+
       if (enemy.archetype === 'bomber' && dist < 2.05) {
         startAction(state, enemy, 'detonate', toward, 12, 4, events, player.id);
         continue;
@@ -620,11 +884,19 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         }
       }
 
-      if ((enemy.archetype === 'spitter' || enemy.archetype === 'guardian') && state.tick >= enemy.rangedReadyAt) {
-        const rangedDistance = enemy.archetype === 'guardian' ? 6.5 : 5.5;
+      // Bispo em fuga NAO para para cuspir. Uma acao a distancia no meio da
+      // retirada apagaria o tell: ele pareceria estar manobrando, e nao correndo
+      // para um lugar especifico.
+      if (
+        (enemy.archetype === 'spitter' ||
+          enemy.archetype === 'guardian' ||
+          (enemy.archetype === 'bishop' && !retreating)) &&
+        state.tick >= enemy.rangedReadyAt
+      ) {
+        const rangedDistance = enemy.archetype === 'spitter' ? 5.5 : 6.5;
         if (dist <= rangedDistance) {
-          const windup = enemy.archetype === 'guardian' ? 10 : 6;
-          enemy.rangedReadyAt = state.tick + (enemy.archetype === 'guardian' ? 44 : 56);
+          const windup = enemy.archetype === 'spitter' ? 6 : 10;
+          enemy.rangedReadyAt = state.tick + (enemy.archetype === 'spitter' ? 56 : 44);
           startAction(state, enemy, 'ranged', toward, windup, 5, events, player.id);
           continue;
         }
@@ -632,9 +904,10 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
       const contactRange = enemy.radius + player.radius + 0.18;
       if (dist < contactRange && state.tick >= enemy.contactReadyAt && enemy.archetype !== 'bomber') {
-        const windup = enemy.archetype === 'guardian' ? 7 : enemy.archetype === 'bruiser' ? 5 : 3;
+        const heavy = enemy.archetype === 'guardian' || enemy.archetype === 'bishop';
+        const windup = heavy ? 7 : enemy.archetype === 'bruiser' ? 5 : 3;
         enemy.contactReadyAt = state.tick + def.contactCooldown;
-        startAction(state, enemy, enemy.archetype === 'guardian' ? 'slam' : 'contact', toward, windup, 4, events, player.id);
+        startAction(state, enemy, heavy ? 'slam' : 'contact', toward, windup, 4, events, player.id);
         continue;
       }
 
@@ -673,7 +946,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
     if (Math.hypot(enemy.vx, enemy.vy) > 0.05) {
       const moved = moveEntity(state, enemy, enemy.vx * dt, enemy.vy * dt);
-      if (moved.blockCell && (enemy.archetype === 'bruiser' || enemy.archetype === 'guardian')) {
+      if (moved.blockCell && crushesWalls(enemy)) {
         breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
       }
       enemy.vx *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
@@ -684,7 +957,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       enemy.facing.x = dirX;
       enemy.facing.y = dirY;
       const moved = moveEntity(state, enemy, dirX * speed * dt, dirY * speed * dt);
-      if (moved.blockCell && (enemy.archetype === 'bruiser' || enemy.archetype === 'guardian')) {
+      if (moved.blockCell && crushesWalls(enemy)) {
         breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
       } else if ((moved.blockedX || moved.blockedY) && aggro) {
         moveEntity(state, enemy, (moved.blockedX ? 0 : dirX) * speed * dt * 0.6, (moved.blockedY ? 0 : dirY) * speed * dt * 0.6);
