@@ -24,6 +24,7 @@ import { formatSeed, parseSeed } from './run-summary';
 import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
 import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
+import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -40,6 +41,7 @@ const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
 const roomInput = document.getElementById('room') as HTMLInputElement;
 const nameInput = document.getElementById('name') as HTMLInputElement;
+const telemetryButton = document.getElementById('btn-telemetry') as HTMLButtonElement;
 const rankOverlay = document.getElementById('rank') as HTMLDivElement;
 const rankBody = document.getElementById('rank-body') as HTMLDivElement;
 const recordsOverlay = document.getElementById('records') as HTMLDivElement;
@@ -240,6 +242,25 @@ let stopLoop: (() => void) | null = null;
 const nextSeed = (): number => forcedSeed ?? ((Date.now() ^ 0x5f3759df) >>> 0);
 
 const recorder = new RunRecorder();
+const telemetry = new TelemetrySession(
+  () => serverInput.value.trim() || defaultServerUrl(),
+  () => quality
+);
+/** Estado vivo da run corrente, para o evento de abandono saber onde ela parou. */
+let liveRun: SurvivalState | null = null;
+
+// Aba fechada com a run em andamento. `pagehide` e nao `beforeunload`: este
+// ultimo nao dispara de forma confiavel em Safari movel, que e metade do
+// publico de um PWA.
+const reportAbandon = (): void => {
+  const state = liveRun;
+  if (!state || state.phase !== 'running' || state.tick < 20) return;
+  telemetry.abandon(state.sector, state.tick, state.contamination);
+};
+window.addEventListener('pagehide', reportAbandon);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) reportAbandon();
+});
 let playerName = loadPlayerName();
 nameInput.value = playerName;
 nameInput.addEventListener('change', () => {
@@ -253,7 +274,9 @@ const runSolo = (): void => {
   audio.reset();
   const seed = nextSeed();
   recorder.start(seed);
+  telemetry.begin();
   let state: SurvivalState = createRun({ seed });
+  liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -273,6 +296,7 @@ const runSolo = (): void => {
     if (state.phase !== 'running') {
       recordRun(state);
       submitSoloRun(state);
+      if (state.summary) telemetry.finish(state.summary, state.sector);
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
@@ -281,7 +305,9 @@ const runSolo = (): void => {
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
         const nextRunSeed = nextSeed();
         recorder.start(nextRunSeed);
+        telemetry.begin();
         state = createRun({ seed: nextRunSeed });
+        liveRun = state;
         audio.reset();
         recordedSummaryKey = null;
         submitted = false;
@@ -437,6 +463,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
       const state = net.sampleRenderState(now);
       if (state) {
         lastState = state;
+        liveRun = state;
         const terminal = state.phase !== 'running';
         audio.update(state, now);
         renderer.render(state, 1, input.state, now);
@@ -453,6 +480,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
         if (drain && !pendingChoice) input.clearPendingUiInput();
         if (terminal) {
           recordRun(state);
+          if (state.summary) telemetry.finish(state.summary, state.sector);
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
@@ -566,6 +594,17 @@ document.getElementById('btn-records')?.addEventListener('click', () => {
 document.getElementById('btn-records-close')?.addEventListener('click', () => {
   recordsOverlay.classList.add('hidden');
   menu.classList.remove('hidden');
+  audio.ui();
+});
+
+const renderTelemetryLabel = (): void => {
+  telemetryButton.textContent = isOptedOut() ? 'Telemetria: desligada' : 'Telemetria: ligada';
+  telemetryButton.classList.toggle('primary', !isOptedOut());
+};
+renderTelemetryLabel();
+telemetryButton.addEventListener('click', () => {
+  setOptedOut(!isOptedOut());
+  renderTelemetryLabel();
   audio.ui();
 });
 

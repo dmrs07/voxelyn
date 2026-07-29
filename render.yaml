@@ -41,6 +41,12 @@ services:
         fromDatabase:
           name: voxelyn-leaderboard
           property: connectionString
+      # Leitura do digest de telemetria. AUSENTE = rota de leitura fechada
+      # (404), que e o padrao seguro: taxa de abandono e funil de setor sao
+      # diagnostico interno, nao informacao publica. A ESCRITA continua aberta,
+      # porque precisa ser.
+      - key: TELEMETRY_TOKEN
+        generateValue: true
       # PORT e injetada pelo Render; o servidor faz bind em 0.0.0.0:$PORT
 
   # ---------------------------------------------------------------------------

@@ -5,13 +5,16 @@ import { TICK_MS } from '@voxelyn/survival-sim';
 import { SurvivalServer, type ServerOptions } from './server.js';
 import { createLeaderboard, type LeaderboardStore } from './leaderboard.js';
 import { createLeaderboardHandler } from './leaderboard-http.js';
+import { createTelemetry, type TelemetryStore } from './telemetry.js';
+import { createTelemetryHandler } from './telemetry-http.js';
 
 export type WsServerHandle = {
   http: HttpServer;
   survival: SurvivalServer;
-  /** Pronto quando o store do ranking terminou de conectar. */
+  /** Pronto quando os stores de ranking e telemetria terminaram de conectar. */
   ready: Promise<void>;
   leaderboard: () => LeaderboardStore | null;
+  telemetry: () => TelemetryStore | null;
   close: () => Promise<void>;
 };
 
@@ -19,10 +22,12 @@ export type WsOptions = ServerOptions & {
   port?: number;
   host?: string;
   allowedOrigins?: string[]; // CORS/origem restrita para wss
-  /** URL do Postgres. Ausente = ranking em memoria (dev e testes). */
+  /** URL do Postgres. Ausente = ranking e telemetria em memoria (dev e testes). */
   databaseUrl?: string;
   /** Quantos proxies imediatamente a frente da aplicacao podem definir XFF. */
   trustedProxyHops?: number;
+  /** Token de leitura do digest de telemetria. Ausente = leitura fechada. */
+  telemetryToken?: string;
 };
 
 /**
@@ -53,23 +58,59 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   let ready = true;
   let draining = false;
 
+  let telemetryStore: TelemetryStore | null = null;
   let handleLeaderboard: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
+  let handleTelemetry: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null = null;
 
   // A conexao com o banco e assincrona; o servidor NAO espera por ela para
   // aceitar jogo. Ate o store existir, as rotas de ranking respondem 503 e o
   // resto do jogo funciona normalmente — indisponibilidade do ranking nao pode
   // virar indisponibilidade do jogo.
-  const leaderboardReady = createLeaderboard(opts.databaseUrl ?? process.env.DATABASE_URL, log).then((store) => {
-    leaderboardStore = store;
-    handleLeaderboard = createLeaderboardHandler({
-      store,
-      log,
-      allowedOrigins: opts.allowedOrigins,
-      trustedProxyHops: opts.trustedProxyHops,
-    });
-  });
+  const databaseUrl = opts.databaseUrl ?? process.env.DATABASE_URL;
+  const leaderboardReady = Promise.all([
+    createLeaderboard(databaseUrl, log).then((store) => {
+      leaderboardStore = store;
+      handleLeaderboard = createLeaderboardHandler({
+        store,
+        log,
+        allowedOrigins: opts.allowedOrigins,
+        trustedProxyHops: opts.trustedProxyHops,
+      });
+    }),
+    createTelemetry(databaseUrl, log).then((store) => {
+      telemetryStore = store;
+      handleTelemetry = createTelemetryHandler({
+        store,
+        log,
+        allowedOrigins: opts.allowedOrigins,
+        // MESMA contagem de saltos confiaveis do ranking: a telemetria tem o
+        // proprio limite por origem e herdaria a mesma falha de confiar num
+        // X-Forwarded-For que o cliente pode prepender.
+        trustedProxyHops: opts.trustedProxyHops,
+        digestToken: opts.telemetryToken ?? process.env.TELEMETRY_TOKEN,
+      });
+    }),
+  ]).then(() => undefined);
 
   const http = createServer((req: IncomingMessage, res: ServerResponse) => {
+    if (req.url?.startsWith('/telemetry')) {
+      // Telemetria indisponivel responde 204 e nao 503: o cliente nao deve
+      // reagir, nem com retry nem com aviso. Diagnostico que atrapalha o jogo
+      // deixou de ser diagnostico.
+      if (!handleTelemetry) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      void handleTelemetry(req, res).catch((err: unknown) => {
+        log({ ev: 'telemetry_error', error: err instanceof Error ? err.message : String(err) });
+        if (!res.headersSent) {
+          res.writeHead(204);
+          res.end();
+        }
+      });
+      return;
+    }
     if (req.url?.startsWith('/leaderboard')) {
       if (!handleLeaderboard) {
         res.writeHead(503, { 'content-type': 'application/json' });
@@ -166,10 +207,20 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       for (const ws of sockets.values()) ws.close(1001, 'server shutdown');
       wss.close(() =>
         http.close(() => {
-          void (leaderboardStore?.close() ?? Promise.resolve()).then(() => resolve());
+          void Promise.all([
+            leaderboardStore?.close() ?? Promise.resolve(),
+            telemetryStore?.close() ?? Promise.resolve(),
+          ]).then(() => resolve());
         })
       );
     });
 
-  return { http, survival, ready: leaderboardReady, leaderboard: () => leaderboardStore, close };
+  return {
+    http,
+    survival,
+    ready: leaderboardReady,
+    leaderboard: () => leaderboardStore,
+    telemetry: () => telemetryStore,
+    close,
+  };
 };
