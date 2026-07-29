@@ -260,6 +260,29 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     });
     tone(ctx, out, t0, { type: 'sawtooth', from: 260, to: 70, peak: 0.26, decay: 0.3 });
   },
+  // A unica morte HUMANA do jogo, e a voz mais CURTA do banco. Medido num
+  // OfflineAudioContext, som audivel ate cair abaixo de -40 dB:
+  //
+  //   deathMiner     189 ms
+  //   death          329 ms
+  //   deathGuardian  1770 ms
+  //
+  // A brevidade e o desenho. Todo o resto do banco toca e desvanece — a criatura
+  // cai, o som acompanha o corpo, a cauda cobre o instante seguinte. Aqui a
+  // cauda e o problema: uma morte que ressoa e uma morte estilizada, e o
+  // objetivo desta e o oposto. Ela para antes de o ouvido esperar e deixa
+  // silencio onde havia som, e o silencio faz o trabalho que nenhuma cauda faria.
+  //
+  // Duas parciais proximas em vez de uma so: batimento leve, que e o que separa
+  // voz de bipe. E nada abaixo de 280 Hz, porque grave e o registro dos chefes e
+  // das explosoes — um corpo pequeno nao pode soar como um evento grande.
+  deathMiner: (ctx, out, t0, noise) => {
+    // Sopro curtissimo de entrada: o ar saindo, antes de qualquer altura.
+    burst(ctx, out, t0, noise, { peak: 0.26, decay: 0.07, type: 'bandpass', from: 1100, to: 700, q: 1.4 });
+    tone(ctx, out, t0 + 0.01, { type: 'triangle', from: 340, to: 280, peak: 0.34, decay: 0.14, attack: 0.006 });
+    tone(ctx, out, t0 + 0.01, { type: 'triangle', from: 352, to: 286, peak: 0.2, decay: 0.13, attack: 0.006 });
+    // Sem terceira camada, sem grave, sem cauda. O corte E o desenho.
+  },
   // Fim de ato: acorde grave descendente, longo o bastante para durar mais que
   // o corpo caindo na tela.
   deathGuardian: (ctx, out, t0, noise) => {

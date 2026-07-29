@@ -26,8 +26,8 @@ desde sempre:
 | Calor | O que ele faz | O que isso te custa |
 | --- | --- | --- |
 | frio (`< 8`) | te ignora | nada — e você passa sem incidente |
-| morno (`8–55`) | **foge** | tempo, para alcançá-lo e pegar o minério |
-| quente (`≥ 55`) | **ataca** | vida, num cleave circular |
+| morno (`8–66,6`) | **foge** | tempo, para alcançá-lo e pegar o minério |
+| quente (`≥ 66,6`) | **ataca** | vida, num cleave circular |
 
 A rota mais lucrativa é a do meio, e ela **exige parar de atirar** num setor
 hostil antes de chegar perto. É a mesma troca de sempre: tempo e segurança
@@ -59,6 +59,25 @@ E é **só** a anotação. Nada de dano, nada de pontuação, nada de penalidade
 Prospector é um robô sem compasso moral e o jogo não vai puni-lo por isso — ia
 soar como uma moral que a própria ficção nega. Ele anota, e mostra anotado no
 fim. **A mancha é o registro, não a penalidade.**
+
+### Como ele aparece na tela de fim
+
+```
+REGISTRO CORPORATIVO: 3 civis abatidos — sem valor de recuperação.
+```
+
+**Não** é mais uma célula na grade de números, e a diferença é o ponto inteiro.
+Ali ele viraria uma métrica entre outras — algo a otimizar, para cima ou para
+baixo. Como linha própria, em vermelho, com a voz da empresa, ele não pede nada
+ao jogador: só registra, com a indiferença exata de quem contabiliza perda de
+material e não morte de gente.
+
+*"sem valor de recuperação"* faz o trabalho todo. A empresa não está condenando
+ninguém; está anotando que aquilo não rendeu. Quem decide se isso incomoda é o
+jogador.
+
+Some em zero. Uma linha "0 civis" toda run transformaria a **ausência** de
+violência gratuita numa pontuação, que é o mesmo erro pelo outro lado.
 
 ## 4. A cota tem de ter um benefício
 
@@ -133,11 +152,38 @@ pacote da simulação, e por isso três erros de tipo introduzidos no PR anterio
 despercebidos por um PR inteiro — build verde, testes verdes, tipos quebrados.
 Agora os cinco pacotes são checados.
 
-## 8. O que fica em aberto
+## 8. A morte dele soa diferente
 
-- `MINER_RAGE_HEAT = 55` (de 100) é uma aposta. Se o calor típico de combate
-  ficar acima disso o tempo todo, a rota "chegar frio" some na prática e o Miner
-  vira só mais um inimigo. É calibragem de playtest.
+`deathMiner` é a voz mais **curta** do banco. Medido em `OfflineAudioContext`,
+som audível até cair abaixo de −40 dB:
+
+| Voz | Duração |
+| --- | --- |
+| `deathMiner` | **189 ms** |
+| `death` (bicho) | 329 ms |
+| `deathGuardian` (fim de ato) | 1770 ms |
+
+A brevidade é o desenho. Todo o resto do banco toca e desvanece — a criatura cai,
+o som acompanha o corpo, a cauda cobre o instante seguinte. Aqui a cauda é o
+problema: uma morte que ressoa é uma morte **estilizada**, e o objetivo desta é o
+oposto. Ela para antes de o ouvido esperar e deixa silêncio onde havia som.
+
+Duas parciais próximas em vez de uma só, para dar batimento — é o que separa voz
+de bipe. E nada abaixo de 280 Hz: grave é o registro dos chefes e das explosões, e
+um corpo pequeno não pode soar como um evento grande.
+
+Prioridade 7 contra os 5 do `death` comum, e espacial. Sete é alto para uma morte
+que não é a sua, e o motivo é estreito: esta é a única morte do jogo que o jogador
+pode ter causado **sem precisar**. Perdê-la no orçamento durante um tiroteio seria
+apagá-la justamente na situação em que ela mais tem o que dizer. Espacial porque
+importa **de onde** veio — você atirou naquela direção de propósito.
+
+## 9. O que fica em aberto
+
+- `MINER_RAGE_HEAT = 66,6` (de 100) — dois terços da barra. Começou em 55, o que
+  caía dentro do calor de um combate curto qualquer: o jogador chegava
+  enfurecendo sem ter escolhido isso, que é o oposto do ponto. Continua sendo
+  calibragem de playtest.
 - O Miner não tem atlas; cai no `drawVoxelEntity`, com silhueta humana própria
   (dois membros, tronco estreito, picareta) e olhos que só acendem quando ele se
   enfurece.

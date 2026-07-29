@@ -31,6 +31,7 @@ export type VoiceId =
   | 'hitPlayer'
   | 'death'
   | 'deathGuardian'
+  | 'deathMiner'
   | 'bishopHeal'
   | 'minerFlee'
   | 'minerRage'
@@ -133,6 +134,14 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   hitPlayer: { priority: 8, gain: 0.55, minIntervalMs: 70, spatial: false },
   death: { priority: 5, gain: 0.4, minIntervalMs: 60, spatial: true },
   deathGuardian: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
+  // Prioridade 7 contra os 5 do `death` comum, e espacial.
+  //
+  // Sete e alto para uma morte que nao e a sua, e o motivo e estreito: esta e a
+  // unica morte do jogo que o jogador pode ter causado sem precisar. Perde-la no
+  // orcamento durante um tiroteio seria justamente apaga-la na situacao em que
+  // ela mais tem o que dizer. Espacial porque importa DE ONDE veio — voce
+  // atirou naquela direcao de proposito.
+  deathMiner: { priority: 7, gain: 0.6, minIntervalMs: 0, spatial: true },
   // Prioridade 8: acima de "dei dano", abaixo de telegrafo. E a unica voz de
   // dano-que-nao-e-meu com prioridade alta, e por um motivo estreito — ela nao
   // descreve um impacto, descreve que os impactos nao estao valendo. Perde-la no

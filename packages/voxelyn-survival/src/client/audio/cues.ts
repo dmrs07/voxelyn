@@ -122,6 +122,13 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       // fim de um ato. Dar a ele um terceiro sting seria gastar uma voz nova
       // para dizer a mesma coisa, e o jogador nao precisa distinguir os dois
       // pelo som — ele acabou de passar cinco minutos olhando para o que caiu.
+      //
+      // O mineiro tem voz propria pelo motivo inverso ao dos chefes: nao porque
+      // a morte dele encerra alguma coisa, mas porque ele e a unica PESSOA do
+      // bestiario. Deixa-lo no `death` generico faria o jogo dizer que matar
+      // alguem que estava trabalhando soa igual a estourar um bomber — e tudo
+      // no encontro dele existe para dizer o contrario.
+      if (ev.archetype === 'miner') return [{ voice: 'deathMiner', x: ev.x, y: ev.y, scale: 1 }];
       return ev.archetype === 'guardian' || ev.archetype === 'bishop'
         ? [{ voice: 'deathGuardian', x: ev.x, y: ev.y, scale: 1 }]
         : [{ voice: 'death', x: ev.x, y: ev.y, scale: 1 }];
