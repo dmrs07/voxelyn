@@ -16,6 +16,22 @@ export {
   nearestStandingPlayer,
 } from './run.js';
 export { generateWorld, floodOpen, chunkOf, cellIdx } from './worldgen.js';
+export {
+  descend,
+  isFinalSector,
+  populateSector,
+  sectorSeed,
+} from './sectors.js';
+export {
+  TARGET_EXTRACTION_TICKS,
+  TARGET_SECTOR_TICKS,
+  addDamageTenths,
+  buildSummary,
+  emptyStats,
+  markDiscovery,
+  recordKill,
+  starsFor,
+} from './stats.js';
 export { ARCHETYPES, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
 export {
   explodeAt,

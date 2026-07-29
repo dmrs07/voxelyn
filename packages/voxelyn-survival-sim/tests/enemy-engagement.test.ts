@@ -10,6 +10,7 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ROCK,
+  SECTOR_COUNT,
 } from '../src/constants';
 import type { SurvivalState } from '../src/types';
 
@@ -262,7 +263,7 @@ describe('achados da revisao', () => {
   // retaliacao que o aggro por dano existe para impedir, preservada justamente
   // no inimigo em que ela mais doi.
   it('acorda o guardiao quando ele leva dano de longe', () => {
-    const state = createRun({ seed: 41 });
+    const state = createRun({ seed: 41, sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     if (!guardian) return;

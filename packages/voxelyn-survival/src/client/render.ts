@@ -18,6 +18,8 @@ import {
   SURF_SPORES,
   ABILITY_RADIUS,
   HEAT_MAX,
+  SECTOR_COUNT,
+  isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
@@ -35,6 +37,13 @@ import { drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
+import {
+  describeCause,
+  describeOutcome,
+  formatSeed,
+  nextStarHint,
+  summaryLines,
+} from './run-summary';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -1182,12 +1191,23 @@ export class SurvivalRenderer {
     drawPurgeCellGlyph(ctx, safeLeft + 7, safeTop + 39, purgePulse ? 15 : 13, ctx.fillStyle as string);
     ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 18, safeTop + 43);
     this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw - this.safeArea.right);
+    // Profundidade. E a unica coisa na tela que diz onde a run esta no arco:
+    // sem ela, tres setores parecem tres mapas soltos em vez de uma descida.
+    ctx.fillStyle = PAL.rockLight;
+    ctx.font = '11px monospace';
+    ctx.fillText(`SETOR ${state.sector}/${SECTOR_COUNT}`, safeLeft, safeTop + 86);
+
     ctx.fillStyle = PAL.loot;
-    const objective = extra.hasCore
-      ? 'VOLTE PARA A ENTRADA'
-      : state.coreTaken
-        ? 'EXTRAIA NA ENTRADA'
-        : 'ENCONTRE O NÚCLEO';
+    ctx.font = 'bold 12px monospace';
+    // O objetivo depende da PROFUNDIDADE: nos setores anteriores ao ultimo o
+    // ponto marcado e o poco, e mandar procurar o nucleo ali seria mentira.
+    const objective = !isFinalSector(state.sector)
+      ? 'DESÇA PELO POÇO'
+      : extra.hasCore
+        ? 'VOLTE PARA A ENTRADA'
+        : state.coreTaken
+          ? 'EXTRAIA NA ENTRADA'
+          : 'ENCONTRE O NÚCLEO';
     ctx.fillText(objective, safeLeft, safeTop + 100);
     const revealed = state.salvageSites
       .filter((site) => site.cacheRevealed && !site.cacheOpened)
@@ -1410,27 +1430,129 @@ export class SurvivalRenderer {
     return cards;
   }
 
+  /**
+   * Tela de resultado.
+   *
+   * Desenha o SUMARIO congelado, nunca o estado vivo: `state` continua sendo o
+   * objeto real depois do fim da run, e ler a contaminacao dele aqui daria um
+   * numero mudando enquanto o jogador o le.
+   *
+   * A ordem vertical e a ordem de leitura, e ela e deliberada:
+   *   1. o que aconteceu (titulo + estrelas)
+   *   2. POR QUE aconteceu (causa + licao) -- a razao de a tela existir
+   *   3. o que voce fez (numeros)
+   *   4. o que falta para a proxima estrela
+   *   5. a seed, para repetir esta mesma descida
+   */
   renderEnd(state: SurvivalState, vw: number, vh: number): void {
+    const summary = state.summary;
+    if (!summary) return;
     const ctx = this.ctx;
-    const config: Record<string, { title: string; color: string; sub: string }> = {
-      dead: { title: 'O VEIO TE CONSUMIU', color: PAL.blood, sub: 'A morte e permanente. Cada run e um novo Veio.' },
-      extracted: { title: 'EXTRAIDO SEM O NUCLEO', color: PAL.loot, sub: 'Voce sobreviveu... mas voltou de maos vazias.' },
-      extracted_with_core: { title: 'NUCLEO EXTRAIDO!', color: PAL.biolum, sub: 'Voce venceu o Veio - desta vez.' },
-    };
-    const c = config[state.phase];
-    if (!c) return;
-    ctx.fillStyle = 'rgba(11,14,20,0.8)';
+    const outcome = describeOutcome(summary);
+    const colors = { blood: PAL.blood, loot: PAL.loot, biolum: PAL.biolum } as const;
+
+    ctx.fillStyle = 'rgba(11,14,20,0.88)';
     ctx.fillRect(0, 0, vw, vh);
     ctx.textAlign = 'center';
-    ctx.fillStyle = c.color;
-    ctx.font = 'bold 26px monospace';
-    ctx.fillText(c.title, vw / 2, vh * 0.42);
-    ctx.fillStyle = PAL.bone;
-    ctx.font = '13px monospace';
-    ctx.fillText(c.sub, vw / 2, vh * 0.5);
-    ctx.fillText(`Sobreviveu ${Math.floor(state.tick / 20)}s  |  contaminacao ${(state.contamination * 100).toFixed(0)}%`, vw / 2, vh * 0.56);
+
+    // Escala tipografica derivada da altura: a tela tem de caber num celular em
+    // landscape (390 de altura) sem cortar a linha da licao, que e a util.
+    const unit = Math.max(10, Math.min(20, vh / 24));
+
+    const cause = describeCause(summary.deathCause);
+    const lines = summaryLines(summary);
+    const half = Math.ceil(lines.length / 2);
+    const hint = nextStarHint(summary);
+
+    // Altura do bloco medida ANTES de desenhar, para centralizar de verdade.
+    //
+    // Comecar num percentual fixo da altura (era 0.14) parece funcionar e nao
+    // funciona: o bloco cresce e encolhe com a causa, com a licao e com a dica
+    // de estrela, entao um topo fixo deixa a tela de morte colada no topo e a
+    // de extracao com um vao embaixo. Centralizar exige saber o total.
+    const blockHeight =
+      unit * 2 + // titulo
+      unit * 2.1 + // estrelas
+      unit * (cause.lesson ? 1.35 : 0) + // licao
+      unit * 2 + // respiro antes dos numeros
+      half * unit * 1.25 + // numeros
+      (hint ? unit * 1.45 : 0) +
+      unit * 1.5 + // seed
+      unit * 1.6; // chamada de reinicio
+    let y = Math.max(unit * 1.6, (vh - blockHeight) / 2);
+
+    ctx.fillStyle = colors[outcome.color];
+    ctx.font = `bold ${Math.round(unit * 1.7)}px monospace`;
+    ctx.fillText(outcome.title, vw / 2, y);
+
+    y += unit * 2;
+    ctx.font = `${Math.round(unit * 1.9)}px monospace`;
+    ctx.fillStyle = PAL.loot;
+    const filled = '★'.repeat(summary.stars);
+    const empty = '☆'.repeat(3 - summary.stars);
+    ctx.fillText(filled + empty, vw / 2, y);
+
+    // Causa e licao: o motivo de esta tela existir.
+    y += unit * 2.1;
     ctx.fillStyle = PAL.player;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillText('Toque ou pressione R para descer novamente', vw / 2, vh * 0.66);
+    ctx.font = `bold ${Math.round(unit)}px monospace`;
+    ctx.fillText(cause.headline, vw / 2, y);
+    if (cause.lesson) {
+      y += unit * 1.35;
+      ctx.fillStyle = PAL.bone;
+      ctx.font = `${Math.round(unit * 0.85)}px monospace`;
+      ctx.fillText(cause.lesson, vw / 2, y);
+    }
+
+    // Numeros em duas colunas: uma coluna unica de oito linhas nao cabe em
+    // landscape de celular.
+    //
+    // A largura da coluna e MEDIDA, nao chutada. Um valor fixo em `unit` colidia
+    // rotulo com numero exatamente nas linhas mais longas ("Contaminação 62%"
+    // saia como "Contamina62%o") — e sao justamente as que o jogador procura.
+    y += unit * 2;
+    const statFont = `${Math.round(unit * 0.85)}px monospace`;
+    ctx.font = statFont;
+    let labelW = 0;
+    let valueW = 0;
+    for (const line of lines) {
+      labelW = Math.max(labelW, ctx.measureText(line.label).width);
+      valueW = Math.max(valueW, ctx.measureText(line.value).width);
+    }
+    const colW = labelW + valueW + unit * 1.2; // folga entre rotulo e numero
+    const gap = unit * 1.6;
+    const startX = vw / 2 - (colW * 2 + gap) / 2;
+    const colX = [startX, startX + colW + gap];
+
+    for (let i = 0; i < lines.length; i++) {
+      const col = i < half ? 0 : 1;
+      const row = i < half ? i : i - half;
+      const lineY = y + row * unit * 1.25;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = PAL.bone;
+      ctx.fillText(lines[i].label, colX[col], lineY);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = PAL.player;
+      ctx.fillText(lines[i].value, colX[col] + colW, lineY);
+    }
+    ctx.textAlign = 'center';
+    y += half * unit * 1.25;
+
+    if (hint) {
+      y += unit * 0.6;
+      ctx.fillStyle = PAL.loot;
+      ctx.font = statFont;
+      ctx.fillText(hint, vw / 2, y);
+    }
+
+    y += unit * 1.5;
+    ctx.fillStyle = PAL.rockLight;
+    ctx.font = `${Math.round(unit * 0.8)}px monospace`;
+    ctx.fillText(`seed ${formatSeed(summary.seed)}`, vw / 2, y);
+
+    y += unit * 1.6;
+    ctx.fillStyle = PAL.player;
+    ctx.font = `bold ${Math.round(unit * 0.95)}px monospace`;
+    ctx.fillText('Toque ou pressione R para descer de novo', vw / 2, y);
   }
 }

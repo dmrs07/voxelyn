@@ -5,6 +5,7 @@ import {
   SURF_NONE,
   WORLD_H,
   WORLD_W,
+  SECTOR_COUNT,
 } from '../src/constants';
 import { chunkOf, floodOpen, generateWorld } from '../src/worldgen';
 import { createRun } from '../src/run';
@@ -102,7 +103,9 @@ describe('worldgen', () => {
 
   it('reserva spawn do Guardian sem sobrepor nenhum canto do corpo a paredes', () => {
     for (let seed = 1; seed <= 100; seed++) {
-      const state = createRun({ seed });
+      // O Guardiao so existe no setor final; a reserva de espaco para o corpo
+      // dele e feita pelo worldgen em TODO setor, mas so ali ela e ocupada.
+      const state = createRun({ seed, sector: SECTOR_COUNT });
       const guardian = state.enemies.find((e) => e.archetype === 'guardian');
       expect(guardian, `seed ${seed}: sem Guardian`).toBeDefined();
       if (!guardian) continue;

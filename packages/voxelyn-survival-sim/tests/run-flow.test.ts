@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GUARDIAN_SUMMON_COUNT } from '../src/constants';
+import { GUARDIAN_SUMMON_COUNT, SECTOR_COUNT, SOLID_NONE } from '../src/constants';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { spawnEnemy } from '../src/entities';
 import { grantOrRechargeModule } from '../src/modules';
@@ -47,7 +47,8 @@ describe('fluxo da run', () => {
   });
 
   it('pegar o nucleo e extrair encerra como "extracted_with_core"', () => {
-    const state = createRun({ seed: 11 });
+    // Setor final: e o unico com nucleo. Nos anteriores o mesmo ponto e o poco.
+    const state = createRun({ seed: 11, sector: SECTOR_COUNT });
     // teleporta o jogador ao pedestal (atalho de teste; interacao é autoritativa)
     state.player.x = state.corePos.x + 0.5;
     state.player.y = state.corePos.y + 0.5;
@@ -95,7 +96,7 @@ describe('fluxo da run', () => {
   });
 
   it('o guardiao existe, esta vivo e proximo do nucleo', () => {
-    const state = createRun({ seed: 11 });
+    const state = createRun({ seed: 11, sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     expect(guardian!.alive).toBe(true);
@@ -123,7 +124,7 @@ describe('fluxo da run', () => {
 
 describe('guardiao: invocacao de 50%', () => {
   it('nao e bloqueada por um stalker spawnado antes (id maior que o do guardiao)', () => {
-    const state = createRun({ seed: 4242, playerCount: 1 });
+    const state = createRun({ seed: 4242, playerCount: 1, sector: SECTOR_COUNT });
     // acorda o guardiao e o coloca abaixo de 50%
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian, 'seed sem guardiao').toBeDefined();
@@ -151,7 +152,7 @@ describe('guardiao: invocacao de 50%', () => {
   });
 
   it('invoca uma unica vez, mesmo com o guardiao muito tempo abaixo de 50%', () => {
-    const state = createRun({ seed: 4242, playerCount: 1 });
+    const state = createRun({ seed: 4242, playerCount: 1, sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
     state.guardianAwake = true;
     guardian.hp = guardian.maxHp * 0.3;
@@ -162,11 +163,27 @@ describe('guardiao: invocacao de 50%', () => {
   });
 });
 
+/**
+ * Abre um corredor horizontal de celulas.
+ *
+ * Os testes de projetil fixam coordenadas e ate aqui davam sorte de o mapa ser
+ * aberto ali. Isso amarrava o teste ao DESENHO do mundo: qualquer mudanca de
+ * worldgen (ou da seed derivada de setor) fazia o bolt bater em rocha e o teste
+ * falhar por um motivo que nao tem nada a ver com perfuracao.
+ */
+const clearRow = (state: SurvivalState, x0: number, x1: number, y: number): void => {
+  const w = state.config.width;
+  for (let x = x0; x <= x1; x++) {
+    for (let dy = -1; dy <= 1; dy++) state.solid[(y + dy) * w + x] = SOLID_NONE;
+  }
+};
+
 describe('projetil perfurante', () => {
   it('atinge cada inimigo uma unica vez ao atravessa-lo', () => {
     const state = createRun({ seed: 777, playerCount: 1 });
     state.enemies = [];
     state.projectiles = [];
+    clearRow(state, 36, 48, 40);
     const target = spawnEnemy(state, 'bruiser', 40, 40, false);
     const hpBefore = target.hp;
 
@@ -199,6 +216,7 @@ describe('projetil perfurante', () => {
     state.enemies = [];
     state.projectiles = [];
     grantOrRechargeModule(state.playerExtra, 'piercing', state.tick);
+    clearRow(state, 36, 48, 40);
     const first = spawnEnemy(state, 'bruiser', 40, 40, false);
     const second = spawnEnemy(state, 'bruiser', 43, 40, false);
     const hp1 = first.hp;

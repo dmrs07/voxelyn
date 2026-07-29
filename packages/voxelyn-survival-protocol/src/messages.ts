@@ -6,6 +6,7 @@ import type {
   PlayerCommand,
   ProjectileKind,
   RunPhase,
+  RunSummary,
   SemanticEvent,
 } from '@voxelyn/survival-sim';
 import type { VersionTriple } from './version.js';
@@ -41,6 +42,15 @@ export type ClientHello = {
   versions: VersionTriple;
   resumeToken?: string; // reconexao
   displayName?: string;
+  /**
+   * Codigo da sala a que este cliente quer se juntar.
+   *
+   * Ausente = matchmaking aberto (o comportamento antigo: primeira sala com
+   * vaga). Presente = so entra NAQUELA sala; se ela nao existir, o servidor a
+   * cria com esse codigo, para que o convite funcione mesmo quando quem
+   * convidou ainda nao entrou.
+   */
+  roomCode?: string;
 };
 
 export type ClientCommand = {
@@ -151,7 +161,18 @@ export type ServerWelcome = {
   versions: VersionTriple;
   playerId: number;
   resumeToken: string;
+  /** Codigo desta sala, para o jogador poder convidar alguem. */
+  roomCode: string;
   seed: number;
+  /**
+   * Setor em que a sala esta AGORA.
+   *
+   * O cliente gera o mundo estatico localmente a partir da seed; com tres
+   * setores por run, a seed sozinha deixou de bastar. Quem entra atrasado numa
+   * sala ja no setor 2 geraria o mapa do setor 1 e receberia diffs de chunk
+   * que nao casam com nada — divergencia imediata a cada entrada tardia.
+   */
+  sector: number;
   worldWidth: number;
   worldHeight: number;
   // hash do estado estatico inicial gerado localmente pelo cliente (validacao)
@@ -186,6 +207,20 @@ export type ServerSnapshot = {
   you?: ViewerState;
   // hash autoritativo periodico para deteccao de divergencia
   authHash?: string;
+  /**
+   * Resultado congelado da run. Enviado somente nos snapshots em que a fase e
+   * terminal, e nunca antes.
+   *
+   * Precisa viajar porque o cliente online NAO simula: ele espelha entidades e
+   * chunks, e nada nesse espelho produz contagem de abates, causa de morte ou
+   * estrelas. Sem este campo, a tela de resultado do co-op ficaria vazia
+   * enquanto a do solo mostra tudo — e o leaderboard nao teria de onde ler o
+   * que aconteceu.
+   *
+   * Opcional para nao custar bytes nos milhares de snapshots de uma run em
+   * andamento, que sao 99,9% deles.
+   */
+  summary?: RunSummary;
 };
 
 /** Reenvio completo do mundo quando ha divergencia irrecuperavel. */
@@ -193,6 +228,8 @@ export type ServerFullResync = {
   t: 'full_resync';
   serverTick: number;
   seed: number;
+  /** Setor do mundo que este resync descreve; ver ServerWelcome.sector. */
+  sector: number;
   // versoes de chunk + celulas completas por chunk (via chunk-diff sobre baseline vazia)
   chunkDiffs: ChunkDiff[];
   entities: EntitySnapshot[];

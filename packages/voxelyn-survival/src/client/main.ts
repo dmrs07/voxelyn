@@ -6,7 +6,24 @@ import { SurvivalInput, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
 import { NetClient } from './net';
 import { RestartGate } from './restart';
-import { FpsGovernor, loadQuality, nextLowerQuality, saveQuality, type QualityLevel } from './settings';
+import {
+  FpsGovernor,
+  loadAudioSettings,
+  loadPlayerName,
+  loadQuality,
+  savePlayerName,
+  nextLowerQuality,
+  saveAudioSettings,
+  saveQuality,
+  type QualityLevel,
+} from './settings';
+import { audio } from './audio';
+import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
+import { renderRecordsPanel } from './records-panel';
+import { formatSeed, parseSeed } from './run-summary';
+import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
+import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
+import { renderRankPanel } from './rank-panel';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -18,6 +35,15 @@ const menu = document.getElementById('menu') as HTMLDivElement;
 const banner = document.getElementById('banner') as HTMLDivElement;
 const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
+const volumeInput = document.getElementById('volume') as HTMLInputElement;
+const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
+const seedInput = document.getElementById('seed') as HTMLInputElement;
+const roomInput = document.getElementById('room') as HTMLInputElement;
+const nameInput = document.getElementById('name') as HTMLInputElement;
+const rankOverlay = document.getElementById('rank') as HTMLDivElement;
+const rankBody = document.getElementById('rank-body') as HTMLDivElement;
+const recordsOverlay = document.getElementById('records') as HTMLDivElement;
+const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 
 const renderer = new SurvivalRenderer(canvas);
 const input = new SurvivalInput(canvas);
@@ -68,6 +94,114 @@ const setBanner = (text: string | null): void => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Audio
+// ---------------------------------------------------------------------------
+// O contexto so nasce num gesto do usuario (ver AudioDirector.unlock). Os
+// controles do menu ajustam volume ANTES disso, entao o estado vive aqui e e
+// aplicado assim que o contexto existir.
+const audioSettings = loadAudioSettings();
+audio.setVolume(audioSettings.volume);
+audio.setMuted(audioSettings.muted);
+volumeInput.value = String(Math.round(audioSettings.volume * 100));
+
+const renderMuteLabel = (): void => {
+  muteButton.textContent = audioSettings.muted ? 'Som: desligado' : 'Som: ligado';
+  muteButton.classList.toggle('primary', !audioSettings.muted);
+};
+renderMuteLabel();
+
+const setMuted = (muted: boolean): void => {
+  audioSettings.muted = muted;
+  audio.setMuted(muted);
+  saveAudioSettings(audioSettings);
+  renderMuteLabel();
+};
+
+volumeInput.addEventListener('input', () => {
+  audioSettings.volume = Number(volumeInput.value) / 100;
+  audio.setVolume(audioSettings.volume);
+  saveAudioSettings(audioSettings);
+});
+
+muteButton.addEventListener('click', () => {
+  setMuted(!audioSettings.muted);
+  // Toca DEPOIS de religar: sem um som imediato, o botao nao da nenhum retorno
+  // e parece que nao fez nada.
+  if (!audioSettings.muted) {
+    audio.unlock();
+    audio.ui();
+  }
+});
+
+// A aba escondida nao pode continuar zumbindo: os leitos de ambiencia sao
+// continuos e sobreviveriam a troca de aplicativo no celular.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) audio.suspend();
+  else audio.resume();
+});
+
+/** Atalho M: mudo sem voltar ao menu. */
+window.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'm' && ev.key !== 'M') return;
+  setMuted(!audioSettings.muted);
+  if (!audioSettings.muted) audio.unlock();
+  setBanner(audioSettings.muted ? 'Som desligado' : 'Som ligado');
+  setTimeout(() => setBanner(null), 1200);
+});
+
+// ---------------------------------------------------------------------------
+// Memoria entre runs
+// ---------------------------------------------------------------------------
+let records: Records = loadRecords();
+
+/**
+ * Registra uma run terminada, UMA VEZ.
+ *
+ * A identidade usa campos congelados, nao referencia do objeto: no online cada
+ * snapshot desserializa uma nova copia da mesma run terminal.
+ */
+let recordedSummaryKey: string | null = null;
+/** A run corrente ja foi enviada para verificacao? */
+let submitted = false;
+/** Seed fixada pelo jogador no menu, ou null para sortear a cada descida. */
+let forcedSeed: number | null = null;
+const recordRun = (state: SurvivalState): void => {
+  if (!state.summary) return;
+  const result = applyRunOnce(records, state.summary, recordedSummaryKey);
+  recordedSummaryKey = result.identity;
+  if (!result.applied) return;
+  records = result.records;
+  saveRecords(records);
+};
+
+/**
+ * Envia a run solo para verificacao no servidor.
+ *
+ * So runs que EXTRAIRAM sobem. Morte nao vai ao ranking: o placar ordena por
+ * estrelas e tempo, e uma run de zero estrela nao tem posicao — mandaria
+ * dezenas de replays por sessao para o servidor re-simular sem nada a mostrar
+ * no fim.
+ *
+ * Falhar aqui e silencioso de proposito. O solo funciona offline (e o PWA
+ * existe justamente para isso); transformar "sem rede" em erro na tela puniria
+ * o modo de jogo principal por uma funcionalidade acessoria.
+ */
+const submitSoloRun = (state: SurvivalState): void => {
+  if (submitted || !state.summary || state.summary.phase === 'dead') return;
+  submitted = true;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  void submitRun(url, recorder, playerName).then((outcome) => {
+    if (!outcome.ok) {
+      // Sem banner: o jogador esta lendo a tela de resultado.
+      console.info('[leaderboard] nao enviado:', outcome.reason);
+      return;
+    }
+    setBanner(outcome.duplicate ? 'Run já registrada' : 'Run verificada e registrada');
+    setTimeout(() => setBanner(null), 2600);
+  });
+};
+
 const haptics = (events: SemanticEvent[]): void => {
   if (!('vibrate' in navigator)) return;
   for (const e of events) {
@@ -96,9 +230,30 @@ const applyAdaptiveQuality = (dt: number): void => {
 // ---------------------------------------------------------------------------
 let stopLoop: (() => void) | null = null;
 
+/**
+ * Seed da proxima descida.
+ *
+ * Uma seed digitada vale para a run inteira, INCLUSIVE os reinicios: a razao de
+ * o campo existir e alguem colar a seed de outra pessoa e tentar a mesma
+ * descida, e sortear uma nova ao morrer destruiria exatamente esse uso.
+ */
+const nextSeed = (): number => forcedSeed ?? ((Date.now() ^ 0x5f3759df) >>> 0);
+
+const recorder = new RunRecorder();
+let playerName = loadPlayerName();
+nameInput.value = playerName;
+nameInput.addEventListener('change', () => {
+  playerName = nameInput.value.trim();
+  savePlayerName(playerName);
+});
+
 const runSolo = (): void => {
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
-  let state: SurvivalState = createRun({ seed: (Date.now() ^ 0x5f3759df) >>> 0 });
+  audio.setLocalPlayerId(1);
+  audio.reset();
+  const seed = nextSeed();
+  recorder.start(seed);
+  let state: SurvivalState = createRun({ seed });
   let accumulator = 0;
   let lastTime = performance.now();
   let running = true;
@@ -116,12 +271,20 @@ const runSolo = (): void => {
     const vh = window.innerHeight;
 
     if (state.phase !== 'running') {
+      recordRun(state);
+      submitSoloRun(state);
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
+      audio.update(state, now);
       renderer.render(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
-        state = createRun({ seed: (Date.now() ^ 0x51ed270b) >>> 0 });
+        const nextRunSeed = nextSeed();
+        recorder.start(nextRunSeed);
+        state = createRun({ seed: nextRunSeed });
+        audio.reset();
+        recordedSummaryKey = null;
+        submitted = false;
         gate.reset();
       }
       accumulator = 0;
@@ -130,13 +293,19 @@ const runSolo = (): void => {
     }
 
     while (accumulator >= TICK_MS) {
-      const cmd = input.snapshot(playerScreen());
+      const raw = input.snapshot(playerScreen());
       if (queuedChoice !== null) {
-        cmd.choose = queuedChoice;
+        raw.choose = queuedChoice;
         queuedChoice = null;
       }
+      // O recorder fica NO CAMINHO, e nao ao lado: `capture` devolve o comando
+      // quantizado, e e esse que a simulacao recebe. Gravar de um lado e
+      // simular de outro produziria um log que, re-simulado no servidor,
+      // diverge do que o jogador viveu — e a run honesta voltaria recusada.
+      const cmd = recorder.capture(raw);
       const result = stepRun(state, [cmd]);
       renderer.ingestEvents(result.events, now);
+      audio.ingest(result.events, now, state);
       haptics(result.events);
       accumulator -= TICK_MS;
       if (state.phase !== 'running') break;
@@ -145,6 +314,7 @@ const runSolo = (): void => {
     // Toques comuns sao drenados; durante uma escolha, a fila pertence aos cards.
     if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     const alpha = accumulator / TICK_MS;
+    audio.update(state, now);
     renderer.render(state, alpha, input.state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
@@ -176,7 +346,7 @@ const defaultServerUrl = (): string => {
   return `${proto}://${location.hostname || 'localhost'}:8080`;
 };
 
-const runOnline = (url: string): void => {
+const runOnline = (url: string, roomCode: string | null): void => {
   let ws: WebSocket | null = null;
   let running = true;
   let lastTime = performance.now();
@@ -184,6 +354,11 @@ const runOnline = (url: string): void => {
   let fatal = false; // erro sem retry (versao incompativel, URL invalida)
   const gate = new RestartGate(RESTART_ARM_MS);
   let queuedChoice: 0 | 1 | null = null;
+  // Ultimo estado amostrado, guardado para o audio posicionar o ouvinte.
+  // Os eventos chegam por `ws.onmessage`, fora do quadro, entao nao ha estado
+  // "atual" ali — usar o do quadro anterior erra a posicao do ouvinte em no
+  // maximo um quadro, que e menos que a resolucao do paneamento.
+  let lastState: SurvivalState | null = null;
 
   // NetClient PERSISTENTE entre reconexoes: preserva resumeToken e a sequencia
   // de comandos. Se recriado a cada retry, o cliente enviaria seqs baixas que o
@@ -191,8 +366,13 @@ const runOnline = (url: string): void => {
   const net = new NetClient((raw) => {
     if (ws?.readyState === WebSocket.OPEN) ws.send(raw);
   });
+  // Sobrevive as reconexoes: a primeira queda de rede jogaria o jogador numa
+  // sala qualquer, longe do parceiro, se o codigo vivesse so nesta chamada.
+  net.roomCode = roomCode;
   net.onEvents = (events) => {
-    renderer.ingestEvents(events, performance.now());
+    const now = performance.now();
+    renderer.ingestEvents(events, now);
+    audio.ingest(events, now, lastState ?? undefined);
     haptics(events);
   };
   // Nem todo reject e recuperavel. Incompatibilidade de versao (o servidor
@@ -240,8 +420,13 @@ const runOnline = (url: string): void => {
     lastTime = now;
 
     if (net.status === 'online') {
-      setBanner(null);
+      // O codigo so aparece enquanto o parceiro NAO chegou: depois disso ele e
+      // ruido permanente na tela, e a informacao que importa passa a ser o
+      // jogo. Enquanto se joga sozinho, ele e a unica forma de convidar.
+      const waiting = net.playerCount() < 2;
+      setBanner(waiting && net.activeRoomCode ? `Sala ${net.activeRoomCode} — aguardando parceiro` : null);
       renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
+      audio.setLocalPlayerId(net.slot + 1);
       const cmd = input.snapshot(playerScreen());
       if (queuedChoice !== null) {
         cmd.choose = queuedChoice;
@@ -251,7 +436,9 @@ const runOnline = (url: string): void => {
       net.pump(now);
       const state = net.sampleRenderState(now);
       if (state) {
+        lastState = state;
         const terminal = state.phase !== 'running';
+        audio.update(state, now);
         renderer.render(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
         const pendingChoice = state.playerExtra.pendingModuleChoice;
@@ -265,12 +452,15 @@ const runOnline = (url: string): void => {
         const { drain, armed } = gate.frame(now, terminal);
         if (drain && !pendingChoice) input.clearPendingUiInput();
         if (terminal) {
+          recordRun(state);
           renderer.renderEnd(state, window.innerWidth, window.innerHeight);
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
           // reabre o socket — o matchmaking so considera salas 'running'.
           if (armed && (input.hasTap() || input.consumeRestartKey())) {
             gate.reset();
+            audio.reset();
+            recordedSummaryKey = null;
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
@@ -306,24 +496,110 @@ qualitySelect.addEventListener('change', () => {
   saveQuality(quality);
 });
 
+/**
+ * O clique que inicia a run e o gesto que destrava o audio.
+ *
+ * Este e o unico momento garantido: o auto-start por query (?solo=1) NAO conta
+ * como gesto, entao naquele caminho o contexto so nasce no primeiro toque
+ * dentro do jogo — e por isso `unlock` tambem e chamado pelo input.
+ */
 const startSolo = (): void => {
+  audio.unlock();
+  audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
   runSolo();
 };
 const startOnline = (): void => {
+  const code = normalizeRoomCode(roomInput.value);
+  if (code !== '' && !isValidRoomCode(code)) {
+    setBanner(`Código de sala inválido: ${code}`);
+    setTimeout(() => setBanner(null), 2400);
+    return;
+  }
+  audio.unlock();
+  audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
-  runOnline(serverInput.value.trim() || defaultServerUrl());
+  runOnline(serverInput.value.trim() || defaultServerUrl(), code || null);
 };
+
+// Rede de seguranca para o auto-start por query e para browsers que exigem um
+// gesto DENTRO do documento: qualquer primeiro toque/tecla destrava o audio.
+// `once` porque depois disso o unlock e responsabilidade do ciclo de vida.
+for (const evt of ['pointerdown', 'keydown'] as const) {
+  window.addEventListener(evt, () => audio.unlock(), { once: true, passive: true });
+}
 
 document.getElementById('btn-solo')?.addEventListener('click', startSolo);
 document.getElementById('btn-online')?.addEventListener('click', startOnline);
 serverInput.placeholder = defaultServerUrl();
 
-// auto-start por query (?online=1)
+// ---------------------------------------------------------------------------
+// Seed e registro
+// ---------------------------------------------------------------------------
+const syncSeedFromInput = (): void => {
+  forcedSeed = parseSeed(seedInput.value);
+  // Normaliza para hex assim que a seed e aceita: o campo passa a mostrar
+  // exatamente o texto que a tela de fim imprime, que e o que se compartilha.
+  if (forcedSeed !== null) seedInput.value = formatSeed(forcedSeed);
+};
+seedInput.addEventListener('change', syncSeedFromInput);
+
+// ?seed= permite mandar um link para a mesma descida, nao so o numero.
+const seedParam = new URLSearchParams(location.search).get('seed');
+if (seedParam) {
+  seedInput.value = seedParam;
+  syncSeedFromInput();
+}
+
+// O menu SAI enquanto o registro esta aberto. As duas overlays usam o mesmo
+// fundo a 92% de opacidade, entao empilhadas o titulo "VOXELYN SURVIVAL"
+// aparecia atras de "REGISTRO" — legivel o bastante para parecer defeito.
+document.getElementById('btn-records')?.addEventListener('click', () => {
+  renderRecordsPanel(recordsBody, records);
+  menu.classList.add('hidden');
+  recordsOverlay.classList.remove('hidden');
+  audio.unlock();
+  audio.ui();
+});
+document.getElementById('btn-records-close')?.addEventListener('click', () => {
+  recordsOverlay.classList.add('hidden');
+  menu.classList.remove('hidden');
+  audio.ui();
+});
+
+document.getElementById('btn-rank')?.addEventListener('click', () => {
+  // Abre com estado de carregamento em vez de esperar a rede: um botao que nao
+  // responde por dois segundos le como travado, e o solo funciona offline —
+  // este painel pode legitimamente nunca carregar.
+  renderRankPanel(rankBody, { entries: [], emptyReason: 'carregando…', seed: forcedSeed ?? undefined });
+  menu.classList.add('hidden');
+  rankOverlay.classList.remove('hidden');
+  audio.unlock();
+  audio.ui();
+  const url = serverInput.value.trim() || defaultServerUrl();
+  void fetchLeaderboard(url, { seed: forcedSeed ?? undefined, limit: 25 }).then((entries) => {
+    if (rankOverlay.classList.contains('hidden')) return; // jogador ja fechou
+    renderRankPanel(rankBody, {
+      entries,
+      seed: forcedSeed ?? undefined,
+      emptyReason: 'ninguém extraiu ainda — ou o servidor está fora do ar',
+    });
+  });
+});
+document.getElementById('btn-rank-close')?.addEventListener('click', () => {
+  rankOverlay.classList.add('hidden');
+  menu.classList.remove('hidden');
+  audio.ui();
+});
+
+// auto-start por query (?online=1). ?room=XYZ transforma o convite num LINK,
+// que e como as pessoas realmente compartilham: quem recebe entra direto.
 const params = new URLSearchParams(location.search);
-if (params.get('online') === '1') startOnline();
+const roomParam = params.get('room');
+if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
+if (roomParam || params.get('online') === '1') startOnline();
 else if (params.get('solo') === '1') startSolo();
 
 // PWA: registra o service worker (app shell offline para o solo)

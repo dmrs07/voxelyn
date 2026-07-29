@@ -29,7 +29,10 @@ import {
 } from './constants.js';
 import { breakSolid, canRip, closeArena, explodeAt, igniteCell, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
+import { addDamageTenths, recordKill } from './stats.js';
 import type {
+  DamageCause,
+  EffectOrigin,
   Entity,
   EntityActionKind,
   EnemyArchetype,
@@ -127,15 +130,46 @@ export const damageEntity = (
   state: SurvivalState,
   ent: Entity,
   amount: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
+  /**
+   * O que causou este dano.
+   *
+   * Opcional na assinatura e nunca opcional na pratica: o padrao `unknown`
+   * existe para nao obrigar cada teste a inventar uma causa, e todo caminho de
+   * dano de producao passa a sua. Uma morte que chegue ao jogador como
+   * "unknown" e um bug de contabilidade, nao um estado esperado.
+   */
+  cause: DamageCause = { kind: 'unknown' }
 ): void => {
   if (!ent.alive) return;
   if (ent.kind === 'player') {
     const extra = state.playerExtras[ent.slot ?? 0];
     if (extra.iframesUntil > state.tick || extra.downed) return;
     ent.hp = Math.max(0, ent.hp - amount);
+    // Registrado AQUI e nao na morte: quando `resolveDownedAndDeaths` roda, ele
+    // so ve `hp <= 0` e nao tem como saber se foram os 22 da pedra ou os 2,2 do
+    // fogo por baixo.
+    extra.lastDamage = { cause, tick: state.tick };
+    state.stats.damageTakenTenths = addDamageTenths(state.stats.damageTakenTenths, amount);
     events.push({ t: 'hit', x: ent.x, y: ent.y, amount, target: ent.id });
     return;
+  }
+  // Dano CAUSADO conta so o que e ATRIBUIVEL ao jogador, por lista fechada.
+  //
+  // A alternativa era contar tudo menos o que veio de inimigo, e ela inflava o
+  // numero em silencio: fogo ambiente consumindo um bicho num canto do mapa, um
+  // bomber explodindo em cima de um stalker, a descarga de um cristal que o
+  // guardiao quebrou — nada disso e feito do jogador, e tudo isso somaria.
+  // `Math.min(amount, ent.hp)` corta o excedente do golpe fatal: 14 de dano num
+  // alvo com 3 de vida sao 3 de dano causado, nao 14.
+  const attributable =
+    cause.kind === 'player_shot' ||
+    ((cause.kind === 'explosion' || cause.kind === 'discharge') && cause.source === 'player');
+  if (attributable) {
+    state.stats.damageDealtTenths = addDamageTenths(
+      state.stats.damageDealtTenths,
+      Math.min(amount, ent.hp)
+    );
   }
   ent.hp -= amount;
   // Levar dano ACORDA. Antes o aggro era so distancia, recalculada a cada tick,
@@ -147,6 +181,7 @@ export const damageEntity = (
   if (ent.hp > 0) return;
   ent.hp = 0;
   ent.alive = false;
+  recordKill(state.stats, ent.archetype as EnemyArchetype);
   events.push({
     t: 'death',
     x: ent.x,
@@ -319,7 +354,9 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     : state.players.find((p) => p.id === action.target && p.alive && !state.playerExtras[p.slot ?? 0].downed) ?? null;
 
   if (action.kind === 'detonate') {
-    damageEntity(state, enemy, enemy.hp, events);
+    // O bomber se mata; a explosao que sai disso e que machuca o jogador, e ela
+    // carrega a propria causa (`explosion`/`enemy`) em explodeAt.
+    damageEntity(state, enemy, enemy.hp, events, { kind: 'explosion', source: 'enemy' });
     return;
   }
   if (action.kind === 'ranged') {
@@ -342,7 +379,11 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   } else if (action.kind === 'contact' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     if (distTo(enemy, target) < enemy.radius + target.radius + 0.45) {
-      damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1), events);
+      damageEntity(state, target, def.contactDamage * (enemy.elite ? 1.4 : 1), events, {
+        kind: 'enemy_contact',
+        archetype: enemy.archetype as EnemyArchetype,
+        elite: enemy.elite,
+      });
     }
   } else if (action.kind === 'hurl') {
     if (target) {
@@ -378,7 +419,13 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     enemy.vy = action.direction.y * 7;
   } else if (action.kind === 'slam' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
-    if (distTo(enemy, target) < 2.1) damageEntity(state, target, def.contactDamage * 1.2, events);
+    if (distTo(enemy, target) < 2.1) {
+      damageEntity(state, target, def.contactDamage * 1.2, events, {
+        kind: 'enemy_contact',
+        archetype: enemy.archetype as EnemyArchetype,
+        elite: enemy.elite,
+      });
+    }
   }
 };
 
@@ -703,7 +750,16 @@ export const applyExplosionDamage = (
   ey: number,
   radius: number,
   events: SemanticEvent[],
-  playerDamageScale = 1
+  playerDamageScale = 1,
+  /**
+   * De quem foi a explosao.
+   *
+   * E a informacao mais valiosa de toda a tabela de causas: morrer da propria
+   * detonacao num corredor fechado e a morte de DECISAO que o design quer que
+   * aconteca, e sem este campo ela chegaria ao jogador indistinguivel de um
+   * bomber que ele nunca viu.
+   */
+  source: EffectOrigin['source'] = 'environment'
 ): void => {
   const joined = state.players.filter((p) => state.playerExtras[p.slot ?? 0].joined);
   for (const ent of [...joined, ...state.enemies]) {
@@ -711,7 +767,13 @@ export const applyExplosionDamage = (
     const d = Math.hypot(ent.x - ex, ent.y - ey);
     if (d <= radius + ent.radius) {
       const scale = ent.kind === 'player' ? playerDamageScale : 1;
-      damageEntity(state, ent, EXPLOSION_DAMAGE * Math.max(0.35, 1 - d / (radius + 0.001)) * scale, events);
+      damageEntity(
+        state,
+        ent,
+        EXPLOSION_DAMAGE * Math.max(0.35, 1 - d / (radius + 0.001)) * scale,
+        events,
+        { kind: 'explosion', source }
+      );
     }
   }
 };

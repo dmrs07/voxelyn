@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { GUARDIAN_ARENA_EXITS, GUARDIAN_ARENA_RADIUS, GUARDIAN_SUMMON_COUNT,
+import { GUARDIAN_ARENA_EXITS, GUARDIAN_ARENA_RADIUS, GUARDIAN_SUMMON_COUNT, SECTOR_COUNT,
   SOLID_FRAGILE, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
 import { impactSolid } from '../src/materials';
 import { damageEntity } from '../src/entities';
@@ -9,7 +9,7 @@ import type { SurvivalState } from '../src/types';
 
 /** Leva o guardiao a segunda fase com o jogador ao lado dele. */
 const enrage = (seed: number): { state: SurvivalState; gx: number; gy: number } => {
-  const state = createRun({ seed });
+  const state = createRun({ seed, sector: SECTOR_COUNT });
   const w = state.config.width;
   const g = state.enemies.find((e) => e.archetype === 'guardian');
   if (!g) throw new Error('sem guardiao');
@@ -101,7 +101,7 @@ describe('arena do guardiao', () => {
   // Trancar o chefe e libertar quem devia estar preso seria o oposto do
   // pretendido.
   it('espera o jogador entrar no raio antes de fechar', () => {
-    const state = createRun({ seed: 74 });
+    const state = createRun({ seed: 74, sector: SECTOR_COUNT });
     const g = state.enemies.find((e) => e.archetype === 'guardian');
     if (!g) return;
     state.guardianAwake = true;
@@ -116,7 +116,7 @@ describe('arena do guardiao', () => {
 
   // Minerio e recurso do jogador: o cerco nao pode apaga-lo.
   it('nao converte minerio em parede de arena', () => {
-    const state = createRun({ seed: 75 });
+    const state = createRun({ seed: 75, sector: SECTOR_COUNT });
     const w = state.config.width;
     const g = state.enemies.find((e) => e.archetype === 'guardian');
     if (!g) return;

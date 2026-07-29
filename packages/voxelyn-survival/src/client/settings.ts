@@ -39,6 +39,87 @@ export const saveQuality = (level: QualityLevel): void => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Audio
+// ---------------------------------------------------------------------------
+
+export type AudioSettings = {
+  /** Volume mestre, 0..1. */
+  volume: number;
+  muted: boolean;
+};
+
+/**
+ * Padrao COM som ligado.
+ *
+ * A tentacao e comecar mudo "para nao assustar", e seria um erro: o audio aqui
+ * carrega telegrafo de perigo, entao um jogador que nunca abre as opcoes jogaria
+ * a versao sem metade da informacao de combate e concluiria que o jogo e
+ * injusto. Volume abaixo de 1 e a concessao: alto o bastante para informar,
+ * baixo o bastante para nao assustar quem esta de fone.
+ */
+const AUDIO_DEFAULTS: AudioSettings = { volume: 0.8, muted: false };
+const AUDIO_KEY = 'voxelyn.audio';
+
+export const loadAudioSettings = (): AudioSettings => {
+  try {
+    const raw = localStorage.getItem(AUDIO_KEY);
+    if (!raw) return { ...AUDIO_DEFAULTS };
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return { ...AUDIO_DEFAULTS };
+    const obj = parsed as Partial<AudioSettings>;
+    return {
+      volume:
+        typeof obj.volume === 'number' && Number.isFinite(obj.volume)
+          ? Math.max(0, Math.min(1, obj.volume))
+          : AUDIO_DEFAULTS.volume,
+      muted: obj.muted === true,
+    };
+  } catch {
+    // JSON corrompido ou storage bloqueado (modo privativo): o jogo tem de
+    // iniciar mesmo assim, com o padrao.
+    return { ...AUDIO_DEFAULTS };
+  }
+};
+
+export const saveAudioSettings = (settings: AudioSettings): void => {
+  try {
+    localStorage.setItem(AUDIO_KEY, JSON.stringify(settings));
+  } catch {
+    /* ignora */
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Identidade no ranking
+// ---------------------------------------------------------------------------
+
+const NAME_KEY = 'voxelyn.name';
+
+/**
+ * Nome exibido no ranking. Puramente cosmetico e sem conta.
+ *
+ * Sem login de proposito: um jogo web de sessao curta que pede cadastro antes
+ * de deixar jogar perde o jogador na primeira tela. A consequencia aceita e que
+ * nomes nao sao unicos nem reivindicaveis — o que o ranking prova nao e QUEM
+ * jogou, e que a run aconteceu (o servidor a re-simulou).
+ */
+export const loadPlayerName = (): string => {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+export const savePlayerName = (name: string): void => {
+  try {
+    localStorage.setItem(NAME_KEY, name.slice(0, 18));
+  } catch {
+    /* ignora */
+  }
+};
+
 /** Proximo nivel mais leve, ou null se ja no minimo. */
 export const nextLowerQuality = (level: QualityLevel): QualityLevel | null => {
   const i = ORDER.indexOf(level);

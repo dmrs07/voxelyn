@@ -4,6 +4,9 @@ import {
   RateLimiter,
   checkProtocolVersion,
   decodeClientMessage,
+  generateRoomCode,
+  isValidRoomCode,
+  normalizeRoomCode,
   validateClientMessage,
   type ServerMessage,
 } from '@voxelyn/survival-protocol';
@@ -13,10 +16,21 @@ import { GameRoom } from './room.js';
 export type Outbound = { clientId: string; msg: ServerMessage };
 
 /**
+ * Chamado quando uma sala termina a run.
+ *
+ * O gancho existe para o ranking. Runs de co-op nao passam por re-simulacao e
+ * nao precisam: elas foram simuladas AQUI, por este processo, a partir de
+ * intencoes validadas. O resultado ja e autoritativo no instante em que nasce —
+ * pedir ao cliente para reenviar um log seria pedir de volta o que o servidor
+ * acabou de calcular.
+ */
+export type RunFinishedHook = (room: GameRoom) => void;
+
+/**
  * Carencia antes de expirar uma sala sem clientes conectados (em ticks de 20 Hz).
  * Generosa o bastante para cobrir reconexao por resume token (~90s).
  */
-const ABANDON_GRACE_TICKS = 20 * 90;
+export const ABANDON_GRACE_TICKS = 20 * 90;
 
 /**
  * Intervalo minimo entre full_resyncs para um mesmo cliente. Cada resync
@@ -31,6 +45,7 @@ export type ServerOptions = {
   maxPlayersPerRoom?: number;
   baseSeed?: number;
   logger?: (line: Record<string, unknown>) => void;
+  onRunFinished?: RunFinishedHook;
 };
 
 type Conn = {
@@ -56,6 +71,7 @@ export class SurvivalServer {
   private readonly maxPlayers: number;
   private readonly baseSeed: number;
   private readonly log: (line: Record<string, unknown>) => void;
+  private readonly onRunFinished: RunFinishedHook | null;
 
   constructor(opts: ServerOptions = {}) {
     // A sim clampa createRun a MAX_PLAYERS; se a sala aceitasse mais, o cliente
@@ -64,6 +80,7 @@ export class SurvivalServer {
     this.maxPlayers = Math.max(1, Math.min(MAX_PLAYERS, opts.maxPlayersPerRoom ?? 2));
     this.baseSeed = opts.baseSeed ?? 0x5c0ffee;
     this.log = opts.logger ?? (() => {});
+    this.onRunFinished = opts.onRunFinished ?? null;
   }
 
   addConnection(clientId: string, nowMs = 0): void {
@@ -75,7 +92,8 @@ export class SurvivalServer {
     if (conn?.room) {
       conn.room.detach(clientId);
       this.log({ ev: 'disconnect', clientId, room: conn.room.id });
-      this.reapRoom(conn.room);
+      // Inclusive salas terminais ficam disponiveis para resume token durante o
+      // grace. O snapshot final pode ter se perdido antes deste close.
     }
     this.conns.delete(clientId);
   }
@@ -85,14 +103,6 @@ export class SurvivalServer {
     if (idx >= 0) {
       this.rooms.splice(idx, 1);
       this.log({ ev: 'room_close', room: room.id, reason });
-    }
-  }
-
-  private reapRoom(room: GameRoom): void {
-    // sala sem clientes e ja finalizada -> descarta na hora; salas 'running'
-    // abandonadas expiram pela varredura periodica (sweepRooms).
-    if (room.connectedCount() === 0 && room.state.phase !== 'running') {
-      this.dropRoom(room, 'finished_and_empty');
     }
   }
 
@@ -117,19 +127,52 @@ export class SurvivalServer {
     }
   }
 
+  private newRoom(code: string): GameRoom {
+    const seed = (this.baseSeed + this.seedCounter++ * 0x9e3779b9) >>> 0;
+    const room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers, code);
+    this.rooms.push(room);
+    this.log({ ev: 'room_open', room: room.id, seed, code });
+    return room;
+  }
+
+  /** Codigo livre entre as salas existentes. Ver room-code.ts. */
+  private freshCode(): string {
+    // 28^4 combinacoes contra um punhado de salas simultaneas: a colisao e rara
+    // o bastante para que algumas tentativas bastem, e o teto evita laco
+    // infinito no caso patologico de o gerador injetado ser constante.
+    for (let attempt = 0; attempt < 32; attempt++) {
+      const code = generateRoomCode();
+      if (!this.rooms.some((r) => r.code === code)) return code;
+    }
+    return generateRoomCode();
+  }
+
   private openRoom(): GameRoom {
     // so reaproveita sala com capacidade livre E pelo menos um cliente ativo:
     // uma sala reservada/abandonada nunca e pareada com um cliente novo.
-    let room = this.rooms.find(
+    const room = this.rooms.find(
       (r) => r.hasOpenSlot() && r.state.phase === 'running' && r.connectedCount() > 0
     );
-    if (!room) {
-      const seed = (this.baseSeed + this.seedCounter++ * 0x9e3779b9) >>> 0;
-      room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers);
-      this.rooms.push(room);
-      this.log({ ev: 'room_open', room: room.id, seed });
-    }
-    return room;
+    return room ?? this.newRoom(this.freshCode());
+  }
+
+  /**
+   * Sala de um codigo, criando-a se ainda nao existir.
+   *
+   * Criar sob demanda e o que faz o convite funcionar nos DOIS sentidos: quem
+   * combinou o codigo antes pode entrar primeiro, sem que exista um "dono" que
+   * precise chegar antes. Sem isso, o segundo jogador receberia "sala nao
+   * encontrada" toda vez que fosse o mais rapido dos dois.
+   */
+  private roomByCode(code: string): GameRoom | { error: string } {
+    const existing = this.rooms.find((r) => r.code === code);
+    if (!existing) return this.newRoom(code);
+    // Sala existente so aceita quem cabe. Uma sala cheia ou ja terminada nao
+    // vira sala nova com o mesmo codigo: isso separaria em silencio duas
+    // pessoas que digitaram o mesmo codigo achando que se encontrariam.
+    if (existing.state.phase !== 'running') return { error: 'essa sala ja terminou a descida' };
+    if (!existing.hasOpenSlot()) return { error: 'sala cheia' };
+    return existing;
   }
 
   /** Processa uma mensagem crua de um cliente; retorna respostas imediatas. */
@@ -176,7 +219,18 @@ export class SurvivalServer {
           return [{ clientId, msg: { t: 'reject', reason: 'resume token invalido' } }];
         }
 
-        const room = this.openRoom();
+        let room: GameRoom;
+        if (msg.roomCode !== undefined) {
+          const code = normalizeRoomCode(msg.roomCode);
+          if (!isValidRoomCode(code)) {
+            return [{ clientId, msg: { t: 'reject', reason: `codigo de sala invalido: ${code}` } }];
+          }
+          const found = this.roomByCode(code);
+          if ('error' in found) return [{ clientId, msg: { t: 'reject', reason: found.error } }];
+          room = found;
+        } else {
+          room = this.openRoom();
+        }
         const slot = room.attach(clientId);
         if (!slot) return [{ clientId, msg: { t: 'reject', reason: 'sala cheia' } }];
         conn.room = room;
@@ -222,7 +276,9 @@ export class SurvivalServer {
       versions: CURRENT_VERSIONS,
       playerId: slot + 1,
       resumeToken,
+      roomCode: room.code,
       seed: room.seed,
+      sector: room.state.sector,
       worldWidth: room.width,
       worldHeight: room.height,
       mapHash: room.mapHash,
@@ -248,14 +304,18 @@ export class SurvivalServer {
     this.tickCount += 1;
     this.sweepRooms(); // expira salas abandonadas antes de simular
     for (const room of this.rooms) {
-      const terminal =
-        room.state.phase === 'dead' ||
-        room.state.phase === 'extracted' ||
-        room.state.phase === 'extracted_with_core';
-      // salas terminadas nao avancam a sim, mas ainda podem emitir um snapshot final
-      const { events, chunkDiffs, removed } = terminal
+      const wasTerminal = room.state.phase !== 'running';
+      // Salas ja terminadas nao avancam; salas correndo podem terminar NESTE passo.
+      const { events, chunkDiffs, removed } = wasTerminal
         ? { events: [], chunkDiffs: [], removed: [] }
         : room.step();
+      const terminal = room.state.phase !== 'running';
+      // Reporta no MESMO tick que congelou o sumario, antes do snapshot final.
+      // Assim o ultimo socket pode fechar logo apos recebe-lo sem perder o resultado.
+      if (terminal && !room.resultReported && room.state.summary) {
+        room.resultReported = true;
+        this.onRunFinished?.(room);
+      }
       for (const slot of room.slots) {
         if (slot.clientId === null) continue;
         if (slot.needsFullResync) {
@@ -279,6 +339,14 @@ export class SurvivalServer {
     }
     for (const id of dead) this.removeConnection(id);
     return dead;
+  }
+
+  /**
+   * Sala de um codigo, se existir. Ferramenta de teste e de diagnostico
+   * operacional; o caminho de entrada e sempre `hello`.
+   */
+  roomForCode(code: string): GameRoom | undefined {
+    return this.rooms.find((r) => r.code === code);
   }
 
   roomCount(): number {

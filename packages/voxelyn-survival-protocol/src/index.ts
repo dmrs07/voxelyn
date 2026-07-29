@@ -6,3 +6,5 @@ export * from './version.js';
 export * from './messages.js';
 export * from './validate.js';
 export * from './chunk-diff.js';
+export * from './room-code.js';
+export * from './command-log.js';
