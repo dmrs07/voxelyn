@@ -61,6 +61,9 @@ export type ReplayResult =
  * o digest so identifica duas representacoes da mesma run verificada.
  */
 export const replayDigest = (seed: number, canonicalLog: Uint8Array): string => {
+  if (!(canonicalLog instanceof Uint8Array)) {
+    throw new TypeError('replayDigest exige bytes canonicos');
+  }
   let h = 0x811c9dc5;
   const mix = (v: number): void => {
     h ^= v & 0xff;

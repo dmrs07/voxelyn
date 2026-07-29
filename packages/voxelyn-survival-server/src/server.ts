@@ -30,7 +30,7 @@ export type RunFinishedHook = (room: GameRoom) => void;
  * Carencia antes de expirar uma sala sem clientes conectados (em ticks de 20 Hz).
  * Generosa o bastante para cobrir reconexao por resume token (~90s).
  */
-const ABANDON_GRACE_TICKS = 20 * 90;
+export const ABANDON_GRACE_TICKS = 20 * 90;
 
 /**
  * Intervalo minimo entre full_resyncs para um mesmo cliente. Cada resync
@@ -92,7 +92,8 @@ export class SurvivalServer {
     if (conn?.room) {
       conn.room.detach(clientId);
       this.log({ ev: 'disconnect', clientId, room: conn.room.id });
-      this.reapRoom(conn.room);
+      // Inclusive salas terminais ficam disponiveis para resume token durante o
+      // grace. O snapshot final pode ter se perdido antes deste close.
     }
     this.conns.delete(clientId);
   }
@@ -102,14 +103,6 @@ export class SurvivalServer {
     if (idx >= 0) {
       this.rooms.splice(idx, 1);
       this.log({ ev: 'room_close', room: room.id, reason });
-    }
-  }
-
-  private reapRoom(room: GameRoom): void {
-    // sala sem clientes e ja finalizada -> descarta na hora; salas 'running'
-    // abandonadas expiram pela varredura periodica (sweepRooms).
-    if (room.connectedCount() === 0 && room.state.phase !== 'running') {
-      this.dropRoom(room, 'finished_and_empty');
     }
   }
 

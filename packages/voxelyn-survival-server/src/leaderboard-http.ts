@@ -8,7 +8,7 @@
 import { isIP } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { LeaderboardMode, LeaderboardStore } from './leaderboard.js';
-import { MAX_REPLAY_BYTES, replayDigest, sanitizeName, verifySoloRun } from './replay.js';
+import { MAX_REPLAY_BYTES, sanitizeName, verifySoloRun } from './replay.js';
 
 /**
  * Verificacoes de replay simultaneas.
@@ -273,7 +273,7 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
         return true;
       }
 
-      const digest = replayDigest(seed, log);
+      const digest = verdict.digest;
       const entry = await opts.store.submit({
         name,
         mode: 'solo',
