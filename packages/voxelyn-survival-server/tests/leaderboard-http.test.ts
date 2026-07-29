@@ -1,7 +1,13 @@
+import type { IncomingMessage } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun, type PlayerCommand } from '@voxelyn/survival-sim';
 import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
 import { createWsServer, type WsServerHandle } from '../src/ws';
+import {
+  SubmissionRateLimiter,
+  requestRateLimitKey,
+  SUBMIT_MAX_PER_WINDOW,
+} from '../src/leaderboard-http';
 
 /**
  * Sobe o servidor DE VERDADE numa porta efemera.
@@ -54,6 +60,48 @@ const post = (body: unknown): Promise<Response> =>
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
+
+const requestWithForwarding = (forwardedFor: string): IncomingMessage =>
+  ({
+    headers: { 'x-forwarded-for': forwardedFor },
+    socket: { remoteAddress: '10.0.0.9' },
+  }) as unknown as IncomingMessage;
+
+describe('rate limit de replay', () => {
+  it('ignora valores prependados pelo cliente e limita pela origem do salto confiavel', () => {
+    const limiter = new SubmissionRateLimiter();
+    for (let i = 0; i < SUBMIT_MAX_PER_WINDOW; i++) {
+      const key = requestRateLimitKey(
+        requestWithForwarding(`203.0.113.${i + 1}, 198.51.100.77`),
+        1,
+      );
+      expect(key).toBe('198.51.100.77');
+      expect(limiter.check(key, 1_000 + i)).toBe(false);
+    }
+    const rotatedAgain = requestRateLimitKey(
+      requestWithForwarding('192.0.2.250, 198.51.100.77'),
+      1,
+    );
+    expect(limiter.check(rotatedAgain, 2_000)).toBe(true);
+  });
+
+  it('ignora X-Forwarded-For quando nenhum proxy foi explicitamente confiado', () => {
+    const req = requestWithForwarding('203.0.113.50, 198.51.100.77');
+    expect(requestRateLimitKey(req, 0)).toBe('10.0.0.9');
+  });
+
+  it('remove buckets ociosos e nao cresce para sempre', () => {
+    const limiter = new SubmissionRateLimiter({
+      idleTtlMs: 100,
+      sweepIntervalMs: 10,
+      maxBuckets: 10,
+    });
+    expect(limiter.check('antigo', 0)).toBe(false);
+    expect(limiter.size()).toBe(1);
+    expect(limiter.check('novo', 101)).toBe(false);
+    expect(limiter.size()).toBe(1);
+  });
+});
 
 describe('POST /leaderboard', () => {
   it('verifica uma run real e devolve o sumario que o servidor derivou', async () => {
