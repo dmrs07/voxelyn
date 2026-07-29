@@ -93,6 +93,12 @@ describe('robustez contra entrada hostil', () => {
     expect(decodeCommandLog(bad, 100)).toBeNull();
   });
 
+  it('recusa os bits reservados 0b11 do campo choose', () => {
+    const bad = encodeCommandLog([quantizeCommand(cmd())]);
+    bad[2 + COMMAND_BYTES - 1] = 0b11 << 5;
+    expect(decodeCommandLog(bad, 100)).toBeNull();
+  });
+
   // Sem o teto, um unico bloco declarando 65535 repeticoes forcaria a alocacao
   // de milhoes de objetos antes de qualquer outra checagem.
   it('recusa log que estoura o teto de comandos', () => {
