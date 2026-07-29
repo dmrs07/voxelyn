@@ -34,7 +34,7 @@ import {
   type PlayerCommand,
   type RunSummary,
 } from '@voxelyn/survival-sim';
-import { decodeCommandLog, fromBase64 } from '@voxelyn/survival-protocol';
+import { decodeCommandLog, encodeCommandLog, fromBase64 } from '@voxelyn/survival-protocol';
 
 /**
  * Teto de ticks de uma submissao. 30 minutos a 20 Hz.
@@ -50,8 +50,29 @@ export const MAX_REPLAY_TICKS = 30 * 60 * TICK_HZ;
 export const MAX_REPLAY_BYTES = 512 * 1024;
 
 export type ReplayResult =
-  | { ok: true; summary: RunSummary; authHash: string; ticks: number }
+  | { ok: true; summary: RunSummary; authHash: string; ticks: number; digest: string }
   | { ok: false; reason: string };
+
+/**
+ * Digest estavel de uma sequencia CANONICA de comandos, para deduplicar reenvios.
+ *
+ * FNV-1a sobre seed + bytes RLE produzidos pelo encoder oficial. Nao e
+ * criptografico e nao precisa ser: o resultado e autoritativamente re-simulado;
+ * o digest so identifica duas representacoes da mesma run verificada.
+ */
+export const replayDigest = (seed: number, canonicalLog: Uint8Array): string => {
+  let h = 0x811c9dc5;
+  const mix = (v: number): void => {
+    h ^= v & 0xff;
+    h = Math.imul(h, 0x01000193);
+  };
+  mix(seed & 0xff);
+  mix((seed >>> 8) & 0xff);
+  mix((seed >>> 16) & 0xff);
+  mix((seed >>> 24) & 0xff);
+  for (const byte of canonicalLog) mix(byte);
+  return (h >>> 0).toString(16).padStart(8, '0');
+};
 
 /**
  * Re-simula uma submissao e devolve o resultado AUTORITATIVO.
@@ -78,13 +99,15 @@ export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => 
 
   const state = createRun({ seed, playerCount: 1 });
   const buffer: PlayerCommand[] = [emptyCommand()];
+  let consumedTicks = 0;
 
   for (let i = 0; i < commands.length; i++) {
     buffer[0] = commands[i];
     stepRun(state, buffer);
-    // Para no instante em que a run acaba. Comandos DEPOIS do fim nao sao erro
-    // — o cliente grava por quadro e a run termina no meio de um tick —, mas
-    // simula-los seria trabalho puro: `stepRun` retorna cedo em fase terminal.
+    consumedTicks = i + 1;
+    // Para no instante em que a run acaba. O cliente pode ter capturado comandos
+    // adicionais antes de observar a fase terminal; eles NAO participam da run
+    // e, portanto, tampouco participam da identidade usada no leaderboard.
     if (state.phase !== 'running') break;
   }
 
@@ -97,33 +120,19 @@ export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => 
     return { ok: false, reason: 'run terminou sem sumario' };
   }
 
+  // Re-encoda SOMENTE o prefixo que a simulacao consumiu. Isso normaliza:
+  // - blocos RLE diferentes que expandem para os mesmos comandos;
+  // - padding Base64 alternativo;
+  // - qualquer cauda valida anexada depois do tick terminal.
+  const canonicalLog = encodeCommandLog(commands.slice(0, consumedTicks));
+
   return {
     ok: true,
     summary: state.summary,
     authHash: hashAuthoritativeState(state),
     ticks: state.tick,
+    digest: replayDigest(seed, canonicalLog),
   };
-};
-
-/**
- * Digest estavel de uma submissao, para deduplicar reenvios.
- *
- * FNV-1a sobre seed + log. Nao e criptografico e nao precisa ser: ele nao
- * protege contra nada, so impede que o mesmo replay entre duas vezes no ranking
- * porque a rede caiu depois do POST e o cliente reenviou.
- */
-export const replayDigest = (seed: number, logBase64: string): string => {
-  let h = 0x811c9dc5;
-  const mix = (v: number): void => {
-    h ^= v & 0xff;
-    h = Math.imul(h, 0x01000193);
-  };
-  mix(seed & 0xff);
-  mix((seed >>> 8) & 0xff);
-  mix((seed >>> 16) & 0xff);
-  mix((seed >>> 24) & 0xff);
-  for (let i = 0; i < logBase64.length; i++) mix(logBase64.charCodeAt(i));
-  return (h >>> 0).toString(16).padStart(8, '0');
 };
 
 /**
