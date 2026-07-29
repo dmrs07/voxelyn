@@ -429,20 +429,38 @@ const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_IND
 // modelo, e ela aponta para onde ele vai correr.
 // ---------------------------------------------------------------------------
 const horseModel = (anim, f) => {
-  // Batida de dois tempos em diagonal, como cavalo de verdade: o par
-  // dianteira-esquerda + traseira-direita sobe junto, depois o outro par. O
-  // ciclo anterior levantava as quatro pelo mesmo `gait`, e o bicho andava como
-  // se estivesse pulando de coelhinho.
-  const beatA = anim === 'walk' ? [0, 2, 1, 0, 0, 0][f % 6] : 0;
-  const beatB = anim === 'walk' ? [0, 0, 0, 0, 2, 1][f % 6] : 0;
-  const bob = anim === 'walk' ? [0, 1, 1, 0, 1, 1][f % 6] : 0;
+  // Perna anima por BALANCO (y), nao so por levantamento (z).
+  //
+  // A primeira versao so levantava a pata 2 voxels e as patas somiam atras do
+  // corpo: metade dos frames do ciclo saia identica e o bicho parecia PLANAR.
+  // Nesta projecao isometrica, deslocar no eixo do corpo le muito mais do que
+  // subir — o balanco e o que faz a passada existir.
   const bite = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   // `special` = Investida Flamejante. Os tres primeiros frames EMPINAM (o
   // telegrafo de 1,3 s que o jogador tem de ler); os tres ultimos abaixam a
-  // crista e esticam o corpo — a corrida propriamente dita.
+  // crista, esticam o corpo e GALOPAM.
   const rear = anim === 'special' ? [1, 3, 4, 0, 0, 0][f % 6] : 0;
   const dash = anim === 'special' ? [0, 0, 0, 2, 3, 2][f % 6] : 0;
+  const galloping = anim === 'special' && f % 6 >= 3;
+
+  // Passada de dois tempos em diagonal: o par dianteira-esquerda +
+  // traseira-direita anda junto, depois o outro par. O ciclo anterior levantava
+  // as quatro pelo mesmo contador e ele pulava como coelho.
+  const SWING = [-2, -1, 1, 2, 1, -1];
+  const LIFT = [0, 1, 2, 1, 0, 0];
+  const walking = anim === 'walk';
+  const phaseA = f % 6;
+  const phaseB = (f + 3) % 6;
+
+  // No galope as QUATRO patas trabalham juntas: dianteiras esticam para a
+  // frente enquanto as traseiras jogam para tras, e depois o corpo se recolhe.
+  // E o que separa "correndo" de "o mesmo cavalo mais adiante".
+  const GALLOP_SWING = [3, 0, -2];
+  const GALLOP_LIFT = [3, 0, 2];
+  const gi = galloping ? (f % 6) - 3 : 0;
+
+  const bob = walking ? [0, 1, 1, 0, 1, 1][f % 6] : galloping ? [2, 0, 1][gi] : 0;
   const up = bob - flinch;
   const b = [];
 
@@ -450,15 +468,26 @@ const horseModel = (anim, f) => {
   // empinar; as traseiras ficam plantadas, que e o que faz a pose ler como
   // empinar e nao como pulo.
   const legs = [
-    [-2, -4, beatA + rear * 2],
-    [1, -4, beatB + rear * 2],
-    [-2, 3, beatB],
-    [1, 3, beatA],
+    [-2, -4, true, phaseA],
+    [1, -4, true, phaseB],
+    [-2, 3, false, phaseB],
+    [1, 3, false, phaseA],
   ];
-  for (const [lx, ly, lift] of legs) {
-    b.push(box(lx, ly, lift, 2, 2, 5, 'rockDeep'));
+  for (const [lx, ly, front, phase] of legs) {
+    let sy = ly;
+    let lift = 0;
+    if (walking) {
+      sy += SWING[phase] * (front ? -1 : 1);
+      lift = LIFT[phase];
+    } else if (galloping) {
+      sy += GALLOP_SWING[gi] * (front ? -1 : 1);
+      lift = GALLOP_LIFT[gi];
+    } else if (front) {
+      lift = rear * 2;
+    }
+    b.push(box(lx, sy, lift, 2, 2, 5, 'rockDeep'));
     // Casco: o unico ponto do corpo que toca o chao, e de onde o alcatrao sai.
-    b.push(box(lx, ly, lift, 2, 2, 1, 'loot'));
+    b.push(box(lx, sy, lift, 2, 2, 1, 'loot'));
   }
 
   // Tronco longo e baixo, deitado no eixo y — a FRENTE do modelo e -y, que e o
