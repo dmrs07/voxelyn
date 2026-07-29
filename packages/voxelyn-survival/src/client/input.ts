@@ -32,8 +32,11 @@ export type InputState = {
   tapQueue: Array<{ x: number; y: number }>;
 };
 
-export const MOVE_JOYSTICK_RADIUS = 56;
+export const MOVE_JOYSTICK_RADIUS = 60;
 export const AIM_JOYSTICK_RADIUS = 60;
+export const TOUCH_BUTTON_HIT_SCALE = 1.08;
+const STICK_ACTIVATION_SCALE = 1.55;
+const MOVE_DEAD_ZONE = 0.08;
 const AIM_DEAD_ZONE = 0.12;
 
 /** Cancela qualquer ponteiro touch ainda ativo ao selecionar mouse/trackpad. */
@@ -51,8 +54,9 @@ export const deactivateTouchControls = (state: InputState): void => {
 };
 
 /**
- * Entrada mobile-first: joystick virtual de movimento a esquerda, joystick fixo
- * de mira/auto-fire a direita e quatro acoes acima da mira. Teclado+mouse no desktop.
+ * Entrada mobile-first: joystick fixo de movimento a esquerda, joystick fixo
+ * de mira/auto-fire a direita e quatro acoes separadas acima da mira.
+ * Teclado+mouse continuam sendo a modalidade desktop.
  */
 export class SurvivalInput {
   private readonly keys: Record<string, boolean> = {};
@@ -96,36 +100,38 @@ export class SurvivalInput {
   layoutButtons(
     width: number,
     height: number,
-    safeArea: Pick<TouchSafeArea, 'right' | 'bottom'> = { right: 0, bottom: 0 }
+    safeArea: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>> = {}
   ): void {
     const r = Math.max(24, Math.min(34, height * 0.066));
-    const safeRight = Math.max(16, width * 0.025) + Math.max(0, safeArea.right);
-    const safeBottom = Math.max(14, height * 0.035) + Math.max(0, safeArea.bottom);
+    const horizontalInset = Math.max(18, width * 0.025);
+    const safeLeft = horizontalInset + Math.max(0, safeArea.left ?? 0);
+    const safeRight = horizontalInset + Math.max(0, safeArea.right ?? 0);
+    const safeBottom = Math.max(14, height * 0.035) + Math.max(0, safeArea.bottom ?? 0);
+    const moveX = MOVE_JOYSTICK_RADIUS + safeLeft;
+    const moveY = height - MOVE_JOYSTICK_RADIUS - safeBottom;
     const aimX = width - AIM_JOYSTICK_RADIUS - safeRight;
     const aimY = height - AIM_JOYSTICK_RADIUS - safeBottom;
 
-    // A origem permanece fixa inclusive enquanto o dedo esta fora do controle.
+    // Os dois controles ficam ancorados: a pele visual e a area de toque sempre
+    // representam o mesmo lugar, em vez de o movimento nascer sob qualquer toque.
+    this.state.joystick.originX = moveX;
+    this.state.joystick.originY = moveY;
     this.state.aimTouch.originX = aimX;
     this.state.aimTouch.originY = aimY;
 
-    // Acoes em arco acima/esquerda do joystick de tiro, dentro da safe area real.
+    // Hit targets continuam grandes, mas nunca se sobrepoem. O espaco real entre
+    // eles e o que impede um polegar de acionar a acao vizinha por acidente.
+    const hitRadius = r * TOUCH_BUTTON_HIT_SCALE;
+    const gap = Math.max(14, Math.min(18, height * 0.04));
+    const step = hitRadius * 2 + gap;
+    const actionY = aimY - AIM_JOYSTICK_RADIUS - hitRadius - gap;
+    const dodgeX = aimX - AIM_JOYSTICK_RADIUS - hitRadius - gap;
+
     this.state.buttons = [
-      { id: 'dodge', cx: aimX - AIM_JOYSTICK_RADIUS - r * 0.8, cy: aimY + r * 0.25, r, pressed: false },
-      {
-        id: 'ability',
-        cx: aimX - AIM_JOYSTICK_RADIUS * 0.72,
-        cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.58,
-        r: r * 0.92,
-        pressed: false,
-      },
-      { id: 'purge', cx: aimX, cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.82, r: r * 0.88, pressed: false },
-      {
-        id: 'interact',
-        cx: aimX + AIM_JOYSTICK_RADIUS * 0.7,
-        cy: aimY - AIM_JOYSTICK_RADIUS - r * 0.52,
-        r: r * 0.86,
-        pressed: false,
-      },
+      { id: 'dodge', cx: dodgeX, cy: aimY, r, pressed: false },
+      { id: 'ability', cx: aimX - step * 2, cy: actionY, r, pressed: false },
+      { id: 'purge', cx: aimX - step, cy: actionY, r, pressed: false },
+      { id: 'interact', cx: aimX, cy: actionY, r, pressed: false },
     ];
   }
 
@@ -156,7 +162,7 @@ export class SurvivalInput {
 
   private buttonAt(x: number, y: number): TouchButton | null {
     for (const b of this.state.buttons) {
-      if (Math.hypot(x - b.cx, y - b.cy) <= b.r * 1.25) return b;
+      if (Math.hypot(x - b.cx, y - b.cy) <= b.r * TOUCH_BUTTON_HIT_SCALE) return b;
     }
     return null;
   }
@@ -187,8 +193,13 @@ export class SurvivalInput {
         return;
       }
 
-      if (x < window.innerWidth * 0.48 && !this.state.joystick.active) {
-        this.state.joystick = { active: true, originX: x, originY: y, dx: 0, dy: 0, pointerId: e.pointerId };
+      const move = this.state.joystick;
+      const inMoveZone =
+        Math.hypot(x - move.originX, y - move.originY) <= MOVE_JOYSTICK_RADIUS * STICK_ACTIVATION_SCALE;
+      if (inMoveZone && !move.active) {
+        move.active = true;
+        move.pointerId = e.pointerId;
+        this.updateMoveTouch(x, y);
         return;
       }
 
@@ -208,6 +219,23 @@ export class SurvivalInput {
       this.state.tapQueue.push({ x, y });
     }
   };
+
+  private updateMoveTouch(x: number, y: number): void {
+    const move = this.state.joystick;
+    const dx = x - move.originX;
+    const dy = y - move.originY;
+    const len = Math.hypot(dx, dy);
+    const clamp = Math.min(1, len / MOVE_JOYSTICK_RADIUS);
+
+    if (clamp <= MOVE_DEAD_ZONE || len <= 2) {
+      move.dx = 0;
+      move.dy = 0;
+      return;
+    }
+
+    move.dx = (dx / len) * clamp;
+    move.dy = (dy / len) * clamp;
+  }
 
   private updateAimTouch(x: number, y: number): void {
     const aim = this.state.aimTouch;
@@ -229,14 +257,7 @@ export class SurvivalInput {
   private readonly onPointerMove = (e: PointerEvent): void => {
     if (e.pointerType === 'touch') {
       if (this.state.joystick.active && e.pointerId === this.state.joystick.pointerId) {
-        const dx = e.clientX - this.state.joystick.originX;
-        const dy = e.clientY - this.state.joystick.originY;
-        const len = Math.hypot(dx, dy);
-        const clamp = Math.min(1, len / MOVE_JOYSTICK_RADIUS);
-        if (len > 2) {
-          this.state.joystick.dx = (dx / len) * clamp;
-          this.state.joystick.dy = (dy / len) * clamp;
-        }
+        this.updateMoveTouch(e.clientX, e.clientY);
       } else if (this.state.aimTouch.active && e.pointerId === this.state.aimTouch.pointerId) {
         this.updateAimTouch(e.clientX, e.clientY);
       }

@@ -1017,7 +1017,10 @@ export class SurvivalRenderer {
           if (pl.stunnedUntil > state.tick) {
             drawStunIndicator(ctx, psx, psy, size, z, pl.id, state.tick);
           }
-          drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
+          // O Prospector local ja tem HP numerico na HUD fixa. Repetir a barra
+          // sobre a propria cabeca cobre animacao e mira; o parceiro ainda precisa
+          // dela para coordenacao de revive no co-op.
+          if (!isLocal) drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
 
           // marcador de abatido (precisa de revive)
           if (ex.downed) {
@@ -1169,7 +1172,7 @@ export class SurvivalRenderer {
       const [x, y] = toScreen(flight.worldX, flight.worldY);
       flight.startScreen = { x, y };
     }
-    const target = { x: this.safeArea.left + 22, y: this.safeArea.top + 53 };
+    const target = { x: this.safeArea.left + 30, y: this.safeArea.top + 67 };
     const sample = rewardFlightPosition(
       flight.startScreen,
       target,
@@ -1195,54 +1198,14 @@ export class SurvivalRenderer {
     const extra = state.playerExtra;
     const safeTop = this.safeArea.top + 10;
     const safeLeft = this.safeArea.left + 12;
+    ctx.textBaseline = 'alphabetic';
 
-    // HP
-    const barW = Math.min(220, vw * 0.3);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(safeLeft, safeTop, barW, 14);
-    const hpFrac = Math.max(0, state.player.hp / state.player.maxHp);
-    ctx.fillStyle = hpFrac > 0.35 ? PAL.fungusLight : PAL.blood;
-    ctx.fillRect(safeLeft + 1, safeTop + 1, (barW - 2) * hpFrac, 12);
-
-    // calor
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(safeLeft, safeTop + 18, barW, 8);
-    const heatFrac = Math.min(1, extra.heat / HEAT_MAX);
-    ctx.fillStyle = state.tick < extra.overheatedUntil ? PAL.blood : PAL.fire;
-    ctx.fillRect(safeLeft + 1, safeTop + 19, (barW - 2) * heatFrac, 6);
-
-    // contaminacao (topo, fina)
+    // Contaminacao continua sendo a unica faixa presa ao topo inteiro.
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(0, 0, vw, 3);
     ctx.fillStyle = PAL.acid;
     ctx.fillRect(0, 0, vw * state.contamination, 3);
 
-    // Celulas de Purga + modulos temporarios.
-    const purgePulse = nowMs < this.purgePulseUntil;
-    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
-    drawPurgeCellGlyph(ctx, safeLeft + 7, safeTop + 39, purgePulse ? 15 : 13, ctx.fillStyle as string);
-    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 18, safeTop + 43);
-    this.renderModuleHud(extra.activeModules, state.tick, nowMs, safeLeft, safeTop + 58, vw - this.safeArea.right);
-    // Profundidade. E a unica coisa na tela que diz onde a run esta no arco:
-    // sem ela, tres setores parecem tres mapas soltos em vez de uma descida.
-    ctx.fillStyle = PAL.rockLight;
-    ctx.font = '11px monospace';
-    ctx.fillText(`SETOR ${state.sector}/${SECTOR_COUNT}`, safeLeft, safeTop + 86);
-
-    ctx.fillStyle = PAL.loot;
-    ctx.font = 'bold 12px monospace';
-    // O objetivo depende da PROFUNDIDADE: nos setores anteriores ao ultimo o
-    // ponto marcado e o poco, e mandar procurar o nucleo ali seria mentira.
-    const objective = !isFinalSector(state.sector)
-      ? 'DESÇA PELO POÇO'
-      : extra.hasCore
-        ? 'VOLTE PARA A ENTRADA'
-        : state.coreTaken
-          ? 'EXTRAIA NA ENTRADA'
-          : 'ENCONTRE O NÚCLEO';
-    ctx.fillText(objective, safeLeft, safeTop + 100);
     const revealed = state.salvageSites
       .filter((site) => site.cacheRevealed && !site.cacheOpened)
       .sort((a, b) => {
@@ -1250,12 +1213,126 @@ export class SurvivalRenderer {
         const db = Math.hypot(b.cache.x + 0.5 - state.player.x, b.cache.y + 0.5 - state.player.y);
         return da - db;
       })[0];
+
+    const hasModules = extra.activeModules.length > 0;
+    const panelW = Math.min(300, Math.max(230, vw * 0.34));
+    const moduleY = safeTop + 68;
+    const sectorY = safeTop + (hasModules ? 112 : 84);
+    const objectiveY = sectorY + 18;
+    const cacheY = objectiveY + 17;
+    const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
+
+    const roundedPanel = (x: number, y: number, w: number, h: number, radius: number): void => {
+      const r = Math.min(radius, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    };
+
+    roundedPanel(safeLeft, safeTop, panelW, panelH, 12);
+    ctx.fillStyle = 'rgba(11,14,20,0.78)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(232,241,255,0.32)';
+    ctx.lineWidth = 1.25;
+    ctx.stroke();
+
+    // Coracao voxel + HP numerico: a vida do jogador vive somente aqui.
+    const heartX = safeLeft + 20;
+    const heartY = safeTop + 21;
+    ctx.fillStyle = state.player.hp / state.player.maxHp > 0.35 ? PAL.fungusLight : PAL.blood;
+    ctx.fillRect(heartX - 8, heartY - 7, 6, 6);
+    ctx.fillRect(heartX + 2, heartY - 7, 6, 6);
+    ctx.fillRect(heartX - 10, heartY - 3, 20, 7);
+    ctx.fillRect(heartX - 6, heartY + 4, 12, 4);
+    ctx.fillRect(heartX - 2, heartY + 8, 4, 4);
+
+    const hpFrac = Math.max(0, Math.min(1, state.player.hp / state.player.maxHp));
+    const hpBarX = safeLeft + 42;
+    const hpBarY = safeTop + 14;
+    const hpBarW = panelW - 54;
+    const hpBarH = 14;
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.fillRect(hpBarX, hpBarY, hpBarW, hpBarH);
+    ctx.fillStyle = hpFrac > 0.35 ? PAL.fungusLight : PAL.blood;
+    ctx.fillRect(hpBarX + 1, hpBarY + 1, (hpBarW - 2) * hpFrac, hpBarH - 2);
+    ctx.strokeStyle = 'rgba(232,241,255,0.24)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(hpBarX, hpBarY, hpBarW, hpBarH);
+    ctx.fillStyle = PAL.player;
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(
+      `${Math.max(0, Math.ceil(state.player.hp))} / ${Math.ceil(state.player.maxHp)}`,
+      hpBarX + hpBarW - 5,
+      hpBarY + 11
+    );
+
+    // Calor permanece legivel, mas como trilho secundario dentro do mesmo painel.
+    const heatFrac = Math.min(1, extra.heat / HEAT_MAX);
+    ctx.fillStyle = 'rgba(0,0,0,0.58)';
+    ctx.fillRect(hpBarX, safeTop + 32, hpBarW, 4);
+    ctx.fillStyle = state.tick < extra.overheatedUntil ? PAL.blood : PAL.fire;
+    ctx.fillRect(hpBarX, safeTop + 32, hpBarW * heatFrac, 4);
+
+    ctx.strokeStyle = 'rgba(232,241,255,0.17)';
+    ctx.beginPath();
+    ctx.moveTo(safeLeft + 12, safeTop + 43);
+    ctx.lineTo(safeLeft + panelW - 12, safeTop + 43);
+    ctx.stroke();
+
+    const purgePulse = nowMs < this.purgePulseUntil;
+    const purgeY = safeTop + 57;
+    ctx.font = `bold ${purgePulse ? 13 : 12}px monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
+    drawPurgeCellGlyph(ctx, safeLeft + 18, purgeY, purgePulse ? 15 : 13, ctx.fillStyle as string);
+    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 34, purgeY + 4);
+
+    if (hasModules) {
+      this.renderModuleHud(
+        extra.activeModules, state.tick, nowMs, safeLeft + 12, moduleY, safeLeft + panelW
+      );
+    }
+
+    const lowerDividerY = safeTop + (hasModules ? 104 : 75);
+    ctx.strokeStyle = 'rgba(232,241,255,0.17)';
+    ctx.beginPath();
+    ctx.moveTo(safeLeft + 12, lowerDividerY);
+    ctx.lineTo(safeLeft + panelW - 12, lowerDividerY);
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = PAL.rockLight;
+    ctx.font = '11px monospace';
+    ctx.fillText(`SETOR ${state.sector}/${SECTOR_COUNT}`, safeLeft + 12, sectorY);
+
+    ctx.fillStyle = PAL.loot;
+    ctx.font = 'bold 12px monospace';
+    const objective = !isFinalSector(state.sector)
+      ? 'DESÇA PELO POÇO'
+      : extra.hasCore
+        ? 'VOLTE PARA A ENTRADA'
+        : state.coreTaken
+          ? 'EXTRAIA NA ENTRADA'
+          : 'ENCONTRE O NÚCLEO';
+    ctx.fillText(objective, safeLeft + 12, objectiveY);
+
     if (revealed) {
       const dx = revealed.cache.x + 0.5 - state.player.x;
       const dy = revealed.cache.y + 0.5 - state.player.y;
-      const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'LESTE' : 'OESTE') : (dy > 0 ? 'SUL' : 'NORTE');
+      const direction = Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? 'LESTE' : 'OESTE')
+        : (dy > 0 ? 'SUL' : 'NORTE');
       ctx.fillStyle = PAL.biolum;
-      ctx.fillText(`COFRE: ${direction} · ~${Math.round(Math.hypot(dx, dy))}m`, safeLeft, safeTop + 116);
+      ctx.fillText(`COFRE: ${direction} · ~${Math.round(Math.hypot(dx, dy))}m`, safeLeft + 12, cacheY);
     }
 
     // mensagens centrais
@@ -1273,75 +1350,109 @@ export class SurvivalRenderer {
       my += 26;
     }
 
-    // controles touch: movimento livre a esquerda, mira fixa 360 graus a direita.
+    // Controles touch: mesma pele nos dois lados; esquerda move, direita mira
+    // e atira. O reticulo e a unica diferenca semantica necessaria.
     if (input.usingTouch) {
-      if (input.joystick.active) {
-        ctx.fillStyle = 'rgba(11,14,20,0.28)';
+      const drawJoystick = (
+        stick: InputState['joystick'] | InputState['aimTouch'],
+        radius: number,
+        shooting: boolean
+      ): void => {
+        const accent = shooting ? PAL.biolum : PAL.player;
+        const activeAlpha = stick.active ? 0.76 : 0.42;
+        const travel = radius * 0.55;
+        const knobX = stick.originX + (stick.active ? stick.dx * travel : 0);
+        const knobY = stick.originY + (stick.active ? stick.dy * travel : 0);
+        const knobR = radius * 0.36;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(11,14,20,0.42)';
         ctx.beginPath();
-        ctx.arc(input.joystick.originX, input.joystick.originY, MOVE_JOYSTICK_RADIUS, 0, Math.PI * 2);
+        ctx.arc(stick.originX, stick.originY, radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(232,241,255,0.3)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(232,241,255,${stick.active ? 0.62 : 0.38})`;
+        ctx.lineWidth = stick.active ? 2.2 : 1.6;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(232,241,255,0.38)';
+
         ctx.beginPath();
-        ctx.arc(
-          input.joystick.originX + input.joystick.dx * MOVE_JOYSTICK_RADIUS,
-          input.joystick.originY + input.joystick.dy * MOVE_JOYSTICK_RADIUS,
-          22,
-          0,
-          Math.PI * 2
-        );
+        ctx.arc(stick.originX, stick.originY, radius * 0.84, 0, Math.PI * 2);
+        ctx.strokeStyle = shooting
+          ? `rgba(89,242,194,${stick.active ? 0.45 : 0.22})`
+          : `rgba(232,241,255,${stick.active ? 0.35 : 0.18})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Quatro marcas direcionais fazem a base parecer um controle, nao um botao.
+        ctx.fillStyle = `rgba(232,241,255,${stick.active ? 0.45 : 0.24})`;
+        for (let i = 0; i < 4; i++) {
+          ctx.save();
+          ctx.translate(stick.originX, stick.originY);
+          ctx.rotate(i * Math.PI / 2);
+          ctx.beginPath();
+          ctx.moveTo(0, -radius * 0.76);
+          ctx.lineTo(-4, -radius * 0.66);
+          ctx.lineTo(4, -radius * 0.66);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.fillStyle = shooting
+          ? `rgba(89,242,194,${stick.active ? 0.28 : 0.12})`
+          : `rgba(232,241,255,${stick.active ? 0.24 : 0.12})`;
+        ctx.beginPath();
+        ctx.arc(knobX, knobY, knobR, 0, Math.PI * 2);
         ctx.fill();
-      }
+        ctx.strokeStyle = accent;
+        ctx.globalAlpha = activeAlpha;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
 
-      const aim = input.aimTouch;
-      ctx.fillStyle = aim.active ? 'rgba(89,242,194,0.13)' : 'rgba(11,14,20,0.34)';
-      ctx.beginPath();
-      ctx.arc(aim.originX, aim.originY, AIM_JOYSTICK_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = aim.active ? 'rgba(89,242,194,0.62)' : 'rgba(232,241,255,0.3)';
-      ctx.lineWidth = aim.active ? 2.4 : 1.8;
-      ctx.stroke();
+        if (shooting) {
+          const reticle = knobR * 0.48;
+          ctx.strokeStyle = `rgba(89,242,194,${stick.active ? 0.9 : 0.58})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(knobX, knobY, reticle * 0.58, 0, Math.PI * 2);
+          ctx.moveTo(knobX - reticle, knobY);
+          ctx.lineTo(knobX - reticle * 0.35, knobY);
+          ctx.moveTo(knobX + reticle * 0.35, knobY);
+          ctx.lineTo(knobX + reticle, knobY);
+          ctx.moveTo(knobX, knobY - reticle);
+          ctx.lineTo(knobX, knobY - reticle * 0.35);
+          ctx.moveTo(knobX, knobY + reticle * 0.35);
+          ctx.lineTo(knobX, knobY + reticle);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = `rgba(232,241,255,${stick.active ? 0.72 : 0.4})`;
+          ctx.beginPath();
+          ctx.arc(knobX, knobY, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      };
 
-      // Reticula discreta comunica que este controle mira e atira.
-      ctx.strokeStyle = aim.active ? 'rgba(89,242,194,0.72)' : 'rgba(232,241,255,0.28)';
-      ctx.lineWidth = 1.4;
-      const mark = AIM_JOYSTICK_RADIUS * 0.22;
-      ctx.beginPath();
-      ctx.moveTo(aim.originX - mark, aim.originY);
-      ctx.lineTo(aim.originX + mark, aim.originY);
-      ctx.moveTo(aim.originX, aim.originY - mark);
-      ctx.lineTo(aim.originX, aim.originY + mark);
-      ctx.stroke();
-
-      ctx.fillStyle = aim.active ? 'rgba(89,242,194,0.52)' : 'rgba(232,241,255,0.26)';
-      ctx.beginPath();
-      ctx.arc(
-        aim.originX + aim.dx * AIM_JOYSTICK_RADIUS,
-        aim.originY + aim.dy * AIM_JOYSTICK_RADIUS,
-        23,
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-      ctx.strokeStyle = aim.active ? PAL.biolum : 'rgba(232,241,255,0.38)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      drawJoystick(input.joystick, MOVE_JOYSTICK_RADIUS, false);
+      drawJoystick(input.aimTouch, AIM_JOYSTICK_RADIUS, true);
 
       for (const b of input.buttons) {
-        ctx.fillStyle = b.pressed ? 'rgba(255,209,102,0.5)' : 'rgba(11,14,20,0.48)';
+        ctx.fillStyle = b.pressed ? 'rgba(255,209,102,0.5)' : 'rgba(11,14,20,0.52)';
         ctx.beginPath();
         ctx.arc(b.cx, b.cy, b.r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = b.pressed ? PAL.loot : 'rgba(232,241,255,0.44)';
-        ctx.lineWidth = b.pressed ? 2 : 1.5;
+        ctx.strokeStyle = b.pressed ? PAL.loot : 'rgba(232,241,255,0.5)';
+        ctx.lineWidth = b.pressed ? 2.2 : 1.5;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(b.cx, b.cy, b.r * 0.82, 0, Math.PI * 2);
+        ctx.strokeStyle = b.pressed ? 'rgba(255,209,102,0.5)' : 'rgba(232,241,255,0.16)';
+        ctx.lineWidth = 1;
         ctx.stroke();
 
-        const iconColor = b.pressed ? PAL.loot : 'rgba(232,241,255,0.88)';
+        const iconColor = b.pressed ? PAL.loot : 'rgba(232,241,255,0.9)';
         const drewIcon = this.touchIcons.draw(ctx, b.id, b.cx, b.cy, b.r * 1.05, iconColor);
         if (!drewIcon) {
-          // Primeiro frame antes do SVG carregar: placeholder geometrico, nunca sigla textual.
           ctx.fillStyle = iconColor;
           ctx.beginPath();
           ctx.moveTo(b.cx, b.cy - b.r * 0.28);
