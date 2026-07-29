@@ -28,6 +28,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: '22.22.0'
+      # O Web Service recebe trafego por um salto de proxy confiavel do Render.
+      # O rate limiter percorre X-Forwarded-For da direita e ignora prefixos do cliente.
+      - key: TRUST_PROXY_HOPS
+        value: '1'
       # CORS: origem do Static Site (preencher com a URL publica do cliente)
       - key: ALLOWED_ORIGINS
         sync: false
