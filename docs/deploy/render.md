@@ -39,9 +39,16 @@ o ranking; ele não torna as salas distribuídas.
 | server | `PORT` | injetada pelo Render | runtime (bind `0.0.0.0:$PORT`) |
 | server | `ALLOWED_ORIGINS` | `https://…client.onrender.com` | runtime |
 | server | `NODE_VERSION` | `22.22.0` | build |
+| server | `TRUST_PROXY_HOPS` | `1` | runtime |
 | server | `DATABASE_URL` | injetada por `fromDatabase.connectionString` | runtime |
 | client | `NODE_VERSION` | `22.22.0` | build |
 | client | `VITE_SERVER_URL` | `wss://…server.onrender.com` | **build-time** |
+
+`TRUST_PROXY_HOPS=1` declara somente o balanceador imediatamente à frente do Web
+Service como confiável. O rate limiter lê `X-Forwarded-For` da direita para a
+esquerda; valores que o cliente prependa ao header não mudam sua chave. Fora do
+Render, mantenha `0` ou omita a variável: nesse caso o servidor ignora o header e
+usa `socket.remoteAddress`.
 
 O client também aceita override em runtime: `?server=wss://host` na URL, ou o
 campo "Servidor" no menu. Útil para testar contra outro backend sem rebuild.
@@ -109,6 +116,8 @@ degradam a sensação.
 
 - O Postgres persiste somente o ranking. Não há Render Key Value nem múltiplas
   instâncias/matchmaking distribuído.
+- O rate limit é local à instância. Isso é coerente com `numInstances: 1`; antes
+  de escalar, mova também os buckets para um store distribuído.
 - O plano gratuito do Postgres é adequado ao alpha, mas expira após 30 dias. Para
   ranking persistente em produção, altere o banco para um plano pago antes disso.
 - Instância única de server. Escalar exige mover o estado de salas para fora do
@@ -126,6 +135,7 @@ pnpm install --frozen-lockfile
 pnpm --filter @voxelyn/survival-server... build
 PORT=8080 \
 ALLOWED_ORIGINS="http://localhost:4180" \
+TRUST_PROXY_HOPS=0 \
 DATABASE_URL="postgresql://voxelyn:voxelyn@localhost:5432/voxelyn" \
   node packages/voxelyn-survival-server/dist/bin/serve.js
 
