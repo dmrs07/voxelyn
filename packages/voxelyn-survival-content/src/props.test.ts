@@ -14,7 +14,7 @@ const offsets = propOffsets(manifest);
 
 describe('atlas de objetos de mundo', () => {
   it('declara todos os objetivos e estados de salvamento pedidos pelo cliente', () => {
-    for (const name of ['core', 'coreTaken', 'extraction', 'salvageTerminalIdle', 'salvageTerminalScanning', 'salvageTerminalComplete', 'salvageCache', 'salvageCacheOpened']) {
+    for (const name of ['core', 'coreTaken', 'descent', 'extraction', 'salvageTerminalIdle', 'salvageTerminalScanning', 'salvageTerminalComplete', 'salvageCache', 'salvageCacheOpened']) {
       expect(propKindIndex(manifest, name), name).toBeGreaterThanOrEqual(0);
     }
     expect(propKindIndex(manifest, 'inexistente')).toBe(-1);
@@ -54,6 +54,16 @@ describe('atlas de objetos de mundo', () => {
     expect(seen.size).toBe(kind.frames);
     // Ciclo fechado: o quadro seguinte ao ultimo e o primeiro de novo.
     expect(propFrameAt(manifest, k, kind.frames * kind.frameMs)).toBe(propFrameAt(manifest, k, 0));
+  });
+
+  it('percorre todos os estagios da descida antes de reiniciar o elevador', () => {
+    const k = propKindIndex(manifest, 'descent');
+    const kind = manifest.kinds[k];
+    expect(kind.frames).toBe(6);
+    const seen = new Set<number>();
+    for (let i = 0; i < kind.frames; i++) seen.add(propFrameAt(manifest, k, i * kind.frameMs));
+    expect(seen.size).toBe(kind.frames);
+    expect(propFrameAt(manifest, k, kind.frames * kind.frameMs)).toBe(0);
   });
 
   it('mantem o objeto estatico no quadro zero em qualquer instante', () => {

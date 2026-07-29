@@ -1,4 +1,4 @@
-// Atlas de objetos de mundo: o Nucleo do Veio e a plataforma de extracao.
+// Atlas de objetos de mundo: o Nucleo do Veio, o poco de descida e a plataforma de extracao.
 //
 // Por que existe: o Nucleo e O objetivo da run — a tela inteira diz "ENCONTRE O
 // NUCLEO" — e era desenhado como UM losango de cor chapada com o brilho
@@ -18,10 +18,15 @@ import { box, DIR_UNROTATED, renderVoxels, VOX } from './voxel.mjs';
  * O nucleo pulsa devagar: e um farol, nao um alarme. A cadencia lenta tambem o
  * separa do fogo (110ms) e do gas (300ms) que podem estar na mesma tela — se
  * tudo pulsasse junto, nada chamaria atencao.
+ *
+ * A descida e mais mecanica: uma plataforma some para dentro do poco em seis
+ * passos. O ciclo e curto o bastante para o sentido vertical ser percebido de
+ * relance, mas nao tao rapido a ponto de parecer uma armadilha pulsando.
  */
 export const PROP_KINDS = [
   { name: 'core', frames: 6, frameMs: 190 },
   { name: 'coreTaken', frames: 1, frameMs: 0 },
+  { name: 'descent', frames: 6, frameMs: 170 },
   { name: 'extraction', frames: 4, frameMs: 240 },
   { name: 'salvageTerminalIdle', frames: 2, frameMs: 420 },
   { name: 'salvageTerminalScanning', frames: 4, frameMs: 120 },
@@ -102,6 +107,71 @@ const coreModel = (phase, taken) => {
 };
 
 /**
+ * Estado puro da plataforma dentro do poco.
+ *
+ * A plataforma perde altura E area ao descer. Em isometria, apenas baixar `z`
+ * poderia parecer que a peca andou para a frente; encolher junto fornece a pista
+ * de profundidade que faz o olho entender que ela esta indo para baixo.
+ */
+export const descentPlatformState = (frame) => {
+  const step = ((Math.floor(frame) % 6) + 6) % 6;
+  const radius = step < 2 ? 2 : step < 4 ? 1 : 0;
+  return {
+    step,
+    radius,
+    z: Math.max(1, 5 - step),
+    material: step < 2 ? 'loot' : step < 4 ? 'rust' : 'rock',
+  };
+};
+
+/**
+ * O transporte entre setores: boca de poco reforcada e plataforma descendente.
+ *
+ * Ele e deliberadamente BAIXO. O Nucleo continua sendo o farol vertical da run;
+ * o poco precisa dizer "entre aqui e va para baixo", nao competir por majestade.
+ * O centro escuro permanece aparente em todos os quadros, enquanto a plataforma
+ * encolhe e baixa e quatro luzes-guia caminham da borda para o miolo.
+ */
+const descentModel = (frame) => {
+  const boxes = [];
+  const platform = descentPlatformState(frame);
+
+  // Boca larga e mecanica: rocha estrutural por fora, metal gasto por dentro.
+  ring(boxes, 0, 0, 2, 'rockDeep');
+  ring(boxes, 2, 1, 1, 'rust');
+  ring(boxes, 1, 2, 1, 'bone');
+
+  // Fundo opaco: sem esta placa o centro transparente mostraria o piso comum e
+  // o poco seria lido como apenas mais um aro de decoracao.
+  boxes.push(box(-2, -2, 0, 5, 5, 1, 'rockDeep'));
+
+  // Quatro trilhos curtos seguram a silhueta de elevador sem criar outra torre.
+  for (const [x, y] of [[-4, -4], [3, -4], [-4, 3], [3, 3]]) {
+    boxes.push(box(x, y, 2, 1, 1, 4, 'rust'));
+    boxes.push(box(x, y, 6, 1, 1, 1, 'bone'));
+  }
+
+  // Plataforma/cabine vista de cima. Tamanho e altura sao os dois sinais de
+  // afastamento; o amarelo some cedo e vira ferrugem/sombra no fundo.
+  const size = platform.radius * 2 + 1;
+  boxes.push(box(-platform.radius, -platform.radius, platform.z, size, size, 1, platform.material));
+  if (platform.radius > 0) {
+    boxes.push(box(-platform.radius, 0, platform.z + 1, size, 1, 1, 'bone'));
+    boxes.push(box(0, -platform.radius, platform.z + 1, 1, size, 1, 'bone'));
+  }
+
+  // Luzes de guia se movem da borda para o centro acompanhando a cabine. Uma
+  // cruz convergente e lida como direcao; quatro pontos piscando seriam ruido.
+  const guideInset = Math.min(3, 1 + Math.floor(platform.step / 2));
+  const guide = HALF - guideInset - 1;
+  for (const [x, y] of [[-guide, 0], [guide, 0], [0, -guide], [0, guide]]) {
+    boxes.push(box(x, y, 3 - Math.min(2, Math.floor(platform.step / 2)), 1, 1, 1, 'loot'));
+  }
+
+  return boxes;
+};
+
+/**
  * A plataforma de extracao. Deliberadamente BAIXA e larga, o oposto do Nucleo:
  * os dois marcadores nao podem competir. Um chama para ir buscar, o outro diz
  * onde sair — confundir os dois custa a run.
@@ -118,7 +188,6 @@ const extractionModel = (phase) => {
   });
   return boxes;
 };
-
 
 /** Terminal alto, com antena e tela pequena: tecnico sem competir com o Nucleo. */
 const salvageTerminalModel = (phase, state) => {
@@ -155,9 +224,11 @@ const salvageCacheModel = (opened) => {
 
 export const propModel = (kind, frame) => {
   const spec = PROP_KINDS.find((k) => k.name === kind);
+  if (!spec) throw new Error(`prop desconhecido: ${kind}`);
   const phase = spec.frames > 1 ? frame / spec.frames : 0;
   if (kind === 'core') return coreModel(phase, false);
   if (kind === 'coreTaken') return coreModel(0, true);
+  if (kind === 'descent') return descentModel(frame);
   if (kind === 'extraction') return extractionModel(phase);
   if (kind === 'salvageTerminalIdle') return salvageTerminalModel(phase, 'idle');
   if (kind === 'salvageTerminalScanning') return salvageTerminalModel(phase, 'scanning');
@@ -195,9 +266,8 @@ export const propBounds = () => {
 };
 
 /**
- * Renderiza todos os quadros. Sem niveis de luz: o Nucleo emite a propria luz e
- * a plataforma e um marcador de objetivo — os dois tem de ser legiveis mesmo no
- * canto mais escuro do mapa, que e justamente onde a geracao costuma po-los.
+ * Renderiza todos os quadros. Sem niveis de luz: os objetivos emitem a propria
+ * luz e precisam ser legiveis mesmo no canto escuro onde a geracao os coloca.
  */
 export const buildPropFrames = (frameW, frameH, anchorX, anchorY) => {
   const frames = [];

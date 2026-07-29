@@ -4,7 +4,7 @@
   "atlas": "world-props.png",
   "frameWidth": 44,
   "frameHeight": 52,
-  "columns": 21,
+  "columns": 27,
   "originX": 20,
   "originY": 40,
   "kinds": [
@@ -17,6 +17,11 @@
       "name": "coreTaken",
       "frames": 1,
       "frameMs": 0
+    },
+    {
+      "name": "descent",
+      "frames": 6,
+      "frameMs": 170
     },
     {
       "name": "extraction",
