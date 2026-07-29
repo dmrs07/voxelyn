@@ -348,6 +348,25 @@ describe('Cavalo Fungico', () => {
     expect(horse.rangedReadyAt).toBeGreaterThan(state.tick);
   });
 
+  // Todos os outros inimigos apontam para o jogador e andam naquela direcao no
+  // mesmo tick. Num quadrupede de 2 tiles isso le como sprite sendo arrastado, e
+  // nao como corpo correndo.
+  it('vira em arco, e nao no lugar', () => {
+    const state = createRun({ seed: 54 });
+    const horse = spawnHorseFacing(state, 8);
+    // Cabeca apontando para o lado OPOSTO ao jogador (que esta em -x).
+    horse.facing = { x: 1, y: 0 };
+    // Fora da janela de investida: aqui interessa a perseguicao, nao a corrida.
+    horse.rangedReadyAt = state.tick + 10_000;
+
+    stepRun(state, [emptyCommand()]);
+    const afterOne = horse.facing.x;
+    expect(afterOne, 'virou 180 graus num unico tick').toBeGreaterThan(0.5);
+
+    stepIdle(state, 20);
+    expect(horse.facing.x, 'nunca completou a curva').toBeLessThan(0);
+  });
+
   it('aparece pela seed, e nao pelo relogio', () => {
     const a = archetypesOf(createRun({ seed: 771, sector: 1 }));
     const b = archetypesOf(createRun({ seed: 771, sector: 1 }));

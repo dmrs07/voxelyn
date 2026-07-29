@@ -30,6 +30,7 @@ import {
   HORSE_CHARGE_WINDUP_TICKS,
   HORSE_HP,
   HORSE_TRAIL_DELAY_TICKS,
+  HORSE_TURN_RATE,
   HORSE_TRAIL_FUEL_TICKS,
   GUARDIAN_ARENA_EXITS,
   GUARDIAN_ARENA_RADIUS,
@@ -951,6 +952,35 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       }
       enemy.vx *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
       enemy.vy *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
+    }
+
+    // O cavalo NAO vira no lugar.
+    //
+    // Todos os outros inimigos apontam para o jogador e andam naquela direcao no
+    // mesmo tick. Num bicho de 2 tiles isso le como sprite sendo arrastado, e nao
+    // como corpo correndo — e foi exatamente o que apareceu na primeira versao.
+    // Fechando a curva aos poucos ele descreve um ARCO, que e o que da ao jogador
+    // a chance de sair pelo lado de dentro dela.
+    //
+    // Vale so fora da investida: a investida ja congela a direcao no windup, e
+    // suavizar por cima disso faria o cavalo desviar do proprio telegrafo.
+    // Gira por ANGULO, e nao interpolando os dois vetores.
+    //
+    // Misturar `facing` com o alvo e normalizar parecia equivalente e nao e: com
+    // os dois exatamente opostos, a mistura continua no MESMO eixo e a
+    // normalizacao devolve o vetor original. O cavalo simplesmente nao virava —
+    // e so quando quem estava atras dele era o jogador, que e o caso em que a
+    // curva importa. Limitar o passo angular nao tem esse ponto cego.
+    if (enemy.archetype === 'fungal_horse' && (dirX !== 0 || dirY !== 0)) {
+      const current = Math.atan2(enemy.facing.y, enemy.facing.x);
+      let delta = Math.atan2(dirY, dirX) - current;
+      // Para o menor lado. Sem isto, virar de +170 para -170 graus daria a volta
+      // inteira por fora em vez dos 20 graus que realmente separam os dois.
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      const stepped = current + Math.max(-HORSE_TURN_RATE, Math.min(HORSE_TURN_RATE, delta));
+      dirX = Math.cos(stepped);
+      dirY = Math.sin(stepped);
     }
 
     if (dirX !== 0 || dirY !== 0) {

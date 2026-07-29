@@ -323,6 +323,21 @@ export const HORSE_TRAIL_DELAY_TICKS = 4;
  * dois sao os dois lados normais disso.
  */
 export const HORSE_SPAWN_CHANCE = 0.34;
+/**
+ * Quanto ele consegue virar por tick, em RADIANOS.
+ *
+ * Todo o resto do bestiario aponta para o jogador e anda naquela direcao no
+ * mesmo tick, sem inercia — aceitavel num bicho pequeno e ilegivel num
+ * quadrupede de 2 tiles, que lia como sprite sendo arrastado e nao como corpo
+ * correndo. Virando aos poucos ele descreve um ARCO, e o arco e o que da ao
+ * jogador a chance de sair pelo lado de dentro da curva: o contra-jogo natural
+ * de qualquer coisa que carrega.
+ *
+ * 0,12 rad/tick sao ~137 graus por segundo, entao dar meia-volta custa 1,3 s.
+ * Mais rapido e ele volta a girar no lugar; mais lento e ele nunca alcanca
+ * ninguem entre uma investida e outra.
+ */
+export const HORSE_TURN_RATE = 0.12;
 
 export const ENEMY_MIN_SPAWN_DIST = 12;
 export const GUARDIAN_HP = 420;
