@@ -19,6 +19,37 @@ replaceExact(
 );
 
 replaceExact(
+  'packages/voxelyn-survival-server/src/replay.ts',
+  `export const replayDigest = (seed: number, canonicalLog: Uint8Array): string => {
+  let h = 0x811c9dc5;`,
+  `export const replayDigest = (seed: number, canonicalLog: Uint8Array): string => {
+  if (!(canonicalLog instanceof Uint8Array)) {
+    throw new TypeError('replayDigest exige bytes canonicos');
+  }
+  let h = 0x811c9dc5;`,
+);
+replaceExact(
+  'packages/voxelyn-survival-server/tests/leaderboard.test.ts',
+  `describe('digest de replay', () => {
+  it('e estavel e distingue submissoes', () => {
+    expect(replayDigest(1, 'abc')).toBe(replayDigest(1, 'abc'));
+    expect(replayDigest(1, 'abc')).not.toBe(replayDigest(2, 'abc'));
+    expect(replayDigest(1, 'abc')).not.toBe(replayDigest(1, 'abd'));
+  });
+});`,
+  `describe('digest de replay', () => {
+  it('e estavel e distingue bytes canonicos', () => {
+    const abc = Uint8Array.from([97, 98, 99]);
+    const abd = Uint8Array.from([97, 98, 100]);
+    expect(replayDigest(1, abc)).toBe(replayDigest(1, abc));
+    expect(replayDigest(1, abc)).not.toBe(replayDigest(2, abc));
+    expect(replayDigest(1, abc)).not.toBe(replayDigest(1, abd));
+    expect(() => replayDigest(1, 'abc' as never)).toThrow('bytes canonicos');
+  });
+});`,
+);
+
+replaceExact(
   'packages/voxelyn-survival-server/src/server.ts',
   `const ABANDON_GRACE_TICKS = 20 * 90;`,
   `export const ABANDON_GRACE_TICKS = 20 * 90;`,
@@ -29,7 +60,7 @@ replaceExact(
       this.reapRoom(conn.room);`,
   `      this.log({ ev: 'disconnect', clientId, room: conn.room.id });
       // Inclusive salas terminais ficam disponiveis para resume token durante o
-      // grace. O snapshot final pode ter se perdido antes deste close.` ,
+      // grace. O snapshot final pode ter se perdido antes deste close.`,
 );
 replaceExact(
   'packages/voxelyn-survival-server/src/server.ts',
