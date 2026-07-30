@@ -40,8 +40,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build core dependency
-        run: pnpm --filter @voxelyn/core build
+      - name: Build typed dependencies
+        run: pnpm --filter @voxelyn/survival-server... build
 
       - name: Apply projectile-cause integrity fix
         run: python .github/scripts/death-echo-review-fixes.py capsules
