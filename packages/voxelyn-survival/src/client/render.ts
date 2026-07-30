@@ -47,6 +47,8 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
+import { deathEchoReadout, deathEchoReadoutRegion } from './death-echo-presentation';
+import type { PlacedDeathEcho } from './death-echoes';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -313,6 +315,9 @@ const wrapMeasuredText = (
   return lines;
 };
 
+export const deathEchoBodyAlpha = (light: number): number =>
+  light <= 0.05 ? 0 : Math.min(1, 0.15 + Math.max(0, light) * 0.85);
+
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   zoom = 2;
@@ -356,6 +361,7 @@ export class SurvivalRenderer {
   } | null = null;
   private choiceRevealAt = 0;
   private purgePulseUntil = 0;
+  private deathEchoes: readonly PlacedDeathEcho[] = [];
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -375,6 +381,10 @@ export class SurvivalRenderer {
 
   setSafeArea(safeArea: SafeInsets): void {
     this.safeArea = { ...safeArea };
+  }
+
+  setDeathEchoes(echoes: readonly PlacedDeathEcho[]): void {
+    this.deathEchoes = echoes;
   }
 
   isChoiceRevealReady(nowMs: number): boolean {
@@ -926,6 +936,16 @@ export class SurvivalRenderer {
 
     const spriteZoom = Math.max(1, Math.round(z));
 
+    for (const echo of this.deathEchoes) {
+      const [esx, esy] = toScreen(echo.x, echo.y);
+      if (esx < -80 || esx > vw + 80 || esy < -100 || esy > vh + 80) continue;
+      const bodyAlpha = deathEchoBodyAlpha(brightness(echo.x, echo.y));
+      items.push({
+        depth: echo.x + echo.y,
+        draw: () => this.drawDeathEchoBody(echo, esx, esy, z, spriteZoom, nowMs, bodyAlpha),
+      });
+    }
+
     this.archetypeById.clear();
     for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
     for (const enemy of state.enemies) {
@@ -1193,6 +1213,147 @@ export class SurvivalRenderer {
 
     this.renderRewardFlight(toScreen, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
+    this.renderDeathEchoReadout(state, vw, vh);
+  }
+
+  private drawDeathEchoBody(
+    echo: PlacedDeathEcho,
+    sx: number,
+    sy: number,
+    z: number,
+    spriteZoom: number,
+    nowMs: number,
+    bodyAlpha: number,
+  ): void {
+    const ctx = this.ctx;
+    if (bodyAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = bodyAlpha;
+      const size = 0.34 * TILE_W * 0.9 * z;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const drew = this.sprites.drawEntity(
+        ctx,
+        'prospector',
+        'die',
+        echo.facingX,
+        echo.facingY,
+        10_000,
+        sx,
+        sy,
+        spriteZoom,
+        { color: 'rgba(110,74,51,0.62)', alpha: 0.62 },
+      );
+      if (!drew) {
+        ctx.fillStyle = PAL.rust;
+        ctx.fillRect(sx - 9 * z, sy - 5 * z, 16 * z, 4 * z);
+        ctx.fillStyle = PAL.rockShadow;
+        ctx.fillRect(sx - 6 * z, sy - 8 * z, 7 * z, 4 * z);
+        ctx.fillStyle = PAL.player;
+        ctx.fillRect(sx - 5 * z, sy - 7 * z, 2 * z, z);
+      }
+      ctx.restore();
+    }
+
+    // A caixa-preta continua emissiva: ela pode denunciar que há algo no escuro,
+    // mas não revela a silhueta inteira nem atravessa a regra de iluminação.
+    const pulse = Math.sin(nowMs * 0.008 + echo.cell * 0.17) > -0.2;
+    ctx.fillStyle = pulse ? PAL.biolum : PAL.rockShadow;
+    ctx.fillRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
+    ctx.strokeStyle = PAL.dark;
+    ctx.lineWidth = Math.max(1, z * 0.6);
+    ctx.strokeRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
+  }
+
+  private renderDeathEchoReadout(state: SurvivalState, vw: number, vh: number): void {
+    const echo = this.deathEchoes
+      .map((candidate) => ({
+        candidate,
+        distance: Math.hypot(state.player.x - candidate.x, state.player.y - candidate.y),
+      }))
+      .filter(({ distance }) => distance <= 4)
+      .sort((a, b) => a.distance - b.distance)[0]?.candidate;
+    if (!echo) return;
+
+    const extra = state.playerExtra;
+    const safeTop = this.safeArea.top + 10;
+    const safeLeft = this.safeArea.left + 12;
+    const revealed = state.salvageSites
+      .filter((site) => site.cacheRevealed && !site.cacheOpened)
+      .sort((a, b) => {
+        const da = Math.hypot(a.cache.x + 0.5 - state.player.x, a.cache.y + 0.5 - state.player.y);
+        const db = Math.hypot(b.cache.x + 0.5 - state.player.x, b.cache.y + 0.5 - state.player.y);
+        return da - db;
+      })[0];
+    const hasModules = extra.activeModules.length > 0;
+    const panelW = Math.min(300, Math.max(230, vw * 0.34));
+    const sectorY = safeTop + (hasModules ? 112 : 84);
+    const objectiveY = sectorY + 18;
+    const cacheY = objectiveY + 17;
+    const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
+    const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
+      x: safeLeft,
+      y: safeTop,
+      width: panelW,
+      height: panelH,
+    });
+    if (!region) return;
+
+    const ctx = this.ctx;
+    const readout = deathEchoReadout(echo);
+    const titleSize = 10;
+    const bodySize = 12;
+    const lineHeight = bodySize + 4;
+    ctx.font = `bold ${bodySize}px monospace`;
+
+    const words = readout.headline.toUpperCase().split(/\s+/);
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (current && ctx.measureText(candidate).width > region.maxWidth - 24) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) lines.push(current);
+
+    const minimumWidth = Math.min(190, region.maxWidth);
+    const boxWidth = Math.min(
+      region.maxWidth,
+      Math.max(minimumWidth, ...lines.map((line) => ctx.measureText(line).width + 24)),
+    );
+    const boxHeight = 20 + titleSize + lines.length * lineHeight;
+    if (boxHeight > region.maxHeight) return;
+    const x = region.align === 'right'
+      ? region.x + region.maxWidth - boxWidth
+      : region.x + (region.maxWidth - boxWidth) / 2;
+    const y = region.y;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(11,14,20,0.94)';
+    ctx.fillRect(x, y, boxWidth, boxHeight);
+    ctx.strokeStyle = PAL.biolum;
+    ctx.lineWidth = 1.25;
+    ctx.strokeRect(x, y, boxWidth, boxHeight);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = PAL.biolum;
+    ctx.font = `bold ${titleSize}px monospace`;
+    ctx.fillText(readout.title, x + 12, y + 8);
+    ctx.fillStyle = PAL.player;
+    ctx.font = `bold ${bodySize}px monospace`;
+    lines.forEach((line, index) =>
+      ctx.fillText(line, x + 12, y + 14 + titleSize + index * lineHeight),
+    );
+    ctx.fillStyle = echo.projection === 'exact' ? PAL.blood : PAL.rust;
+    ctx.fillRect(x, y + boxHeight - 3, boxWidth, 3);
+    ctx.restore();
   }
 
   private renderRewardFlight(
