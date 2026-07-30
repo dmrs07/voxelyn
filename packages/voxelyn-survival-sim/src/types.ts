@@ -253,6 +253,33 @@ export const MINER_MOOD_PASSIVE = 0;
 export const MINER_MOOD_FLEEING = 1;
 export const MINER_MOOD_ENRAGED = 2;
 
+/**
+ * O que o Veio observou o jogador provocar.
+ *
+ * Quatro reacoes, e nao uma por evento do jogo: a oferta do poco precisa
+ * distinguir ESTILOS, e um registro fino demais devolveria sempre a habilidade do
+ * ultimo acidente em vez da do habito.
+ */
+export type ResonanceKind = 'fire' | 'current' | 'blast' | 'kinetic';
+
+export type ResonanceTally = Record<ResonanceKind, number>;
+
+export type AbilityId = 'pulse' | 'flamethrower' | 'seeker' | 'arc';
+
+/**
+ * Um Eco demonstrando uma habilidade ao lado do poco.
+ *
+ * Nao e uma entidade: nao colide, nao toma dano e nao aparece na lista de
+ * inimigos. E uma oferta com posicao — o jogador anda ate ela e aperta usar.
+ */
+export type WellOffer = {
+  ability: AbilityId;
+  x: number;
+  y: number;
+  /** Slot que levou esta habilidade, ou null. A oferta some quando alguem pega. */
+  takenBy: number | null;
+};
+
 export type PlayerExtra = {
   aim: Vec2;
   heat: number;
@@ -279,6 +306,16 @@ export type PlayerExtra = {
    * do fogo que estavam por baixo.
    */
   lastDamage: { cause: DamageCause; tick: number } | null;
+  /** A habilidade equipada. Comeca em `pulse` e so muda no poco. */
+  ability: AbilityId;
+  /**
+   * Reacoes provocadas NESTE setor.
+   *
+   * Zera na descida: a oferta do poco descreve como o jogador jogou o setor que
+   * acabou de atravessar, e nao a run inteira. Sem o reset, o setor 3 ofereceria
+   * o estilo do setor 1.
+   */
+  resonance: ResonanceTally;
 };
 
 /**
@@ -289,7 +326,7 @@ export type PlayerExtra = {
  * rampa acida — um bloco de rocha arrancado da parede aparecia como cusparada.
  * As flags dizem o que o projetil FAZ; isto diz o que ele E.
  */
-export type ProjectileKind = 'bolt' | 'spit' | 'rock' | 'return_disc';
+export type ProjectileKind = 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker';
 
 export type ProjectileModules = {
   piercing?: true;
@@ -387,6 +424,13 @@ export type SemanticEvent =
    * constante copiado no cliente viraria mentira no primeiro ajuste de balanco.
    */
   | { t: 'pulse'; x: number; y: number; radius: number }
+  /** Cone de chamas do lanca-chamas. `dx`/`dy` sao a direcao, `arc` a meia-abertura. */
+  | { t: 'flame_cone'; x: number; y: number; dx: number; dy: number; range: number; arc: number }
+  /** Um salto do arco condutivo, ja resolvido: o cliente so desenha a linha. */
+  | { t: 'arc_chain'; hops: Array<{ x: number; y: number }> }
+  /** Os Ecos do poco apareceram com o que demonstrar. */
+  | { t: 'well_offers'; sector: number; abilities: AbilityId[] }
+  | { t: 'ability_taken'; slot: number; ability: AbilityId; x: number; y: number }
   | { t: 'pickup_core'; x: number; y: number }
   | { t: 'terminal_activated'; siteId: number; x: number; y: number; completesAtTick: number }
   | { t: 'terminal_scan_complete'; siteId: number; x: number; y: number }
@@ -467,6 +511,14 @@ export type SurvivalState = {
   enemies: Entity[];
   projectiles: Projectile[];
   salvageSites: SalvageSite[];
+  /**
+   * Ofertas de habilidade ao lado do poco, congeladas na primeira chegada.
+   *
+   * Vazio ate o jogador chegar perto, e vazio para sempre no setor final — la o
+   * ponto e o nucleo do Guardiao, e parar para escolher habilidade no meio da
+   * arena seria o pior lugar possivel para um menu.
+   */
+  wellOffers: WellOffer[];
   vents: Vent[];
   charges: Array<{ idx: number; until: number }>;
   contamination: number;

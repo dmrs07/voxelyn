@@ -240,29 +240,43 @@ describe('agrupamento por camara, antes do teto de corpos', () => {
   });
 });
 
-describe('contrato coletivo', () => {
-  it('deriva a mesma seed do calendário, sem guardar nada', () => {
-    const morning = deathEchoContract(new Date('2026-07-30T06:00:00Z'));
-    const night = deathEchoContract(new Date('2026-07-30T23:59:00Z'));
-    expect(morning.id).toBe('2026-07-30');
-    expect(morning.seed).toBe(night.seed);
-    expect(morning.label).toContain('30-07');
-    expect(morning.label).toMatch(/VEIO [A-Z]+$/);
-    // Dia seguinte é outro veio.
-    expect(deathEchoContract(new Date('2026-07-31T06:00:00Z')).seed).not.toBe(morning.seed);
+describe('Desafio Semanal', () => {
+  it('é semanal por padrão, e o mapa dura a semana inteira', () => {
+    // Um desafio diário troca de mapa antes de a comunidade formar memória sobre
+    // ele: as primeiras cápsulas de hoje só existem depois que alguém morreu hoje.
+    const monday = deathEchoContract(new Date('2026-07-27T06:00:00Z'));
+    const friday = deathEchoContract(new Date('2026-07-31T23:00:00Z'));
+    expect(monday.cadence).toBe('weekly');
+    expect(monday.id).toMatch(/^2026-W\d{2}$/);
+    expect(friday.seed).toBe(monday.seed);
+    expect(deathEchoContract(new Date('2026-08-04T06:00:00Z')).seed).not.toBe(monday.seed);
   });
 
-  it('usa UTC, para o contrato ser o mesmo no mundo todo', () => {
+  it('se anuncia como evento de comunidade, não como ordem de serviço', () => {
+    // A empresa emite contratos; a comunidade joga desafios. O rótulo é a única
+    // parte que o jogador lê, e é ela que precisa dizer "isto está acontecendo
+    // agora, com todo mundo".
+    const weekly = deathEchoContract(new Date('2026-07-30T12:00:00Z'));
+    expect(weekly.label).toMatch(/^DESAFIO SEMANAL \d{2} — VEIO [A-Z]+$/);
+    expect(weekly.label).not.toContain('CONTRATO');
+    const daily = deathEchoContract(new Date('2026-07-30T12:00:00Z'), 'daily');
+    expect(daily.label).toMatch(/^DESAFIO DIÁRIO 30-07 — VEIO [A-Z]+$/);
+  });
+
+  it('usa UTC, para o desafio ser o mesmo no mundo todo', () => {
     // Mesmo instante, dois fusos: a resposta não pode depender de onde se joga.
     const instant = new Date('2026-07-30T02:00:00Z');
-    expect(deathEchoContract(instant).id).toBe('2026-07-30');
-    expect(deathEchoContract(new Date(instant.toISOString())).id).toBe('2026-07-30');
+    expect(deathEchoContract(instant, 'daily').id).toBe('2026-07-30');
+    expect(deathEchoContract(new Date(instant.toISOString()), 'daily').id).toBe('2026-07-30');
   });
 
-  it('abre e fecha uma janela de um dia', () => {
+  it('abre na segunda e fecha na segunda seguinte', () => {
     const contract = deathEchoContract(new Date('2026-07-30T15:00:00Z'));
-    expect(contract.opensAt).toBe('2026-07-30T00:00:00.000Z');
-    expect(contract.closesAt).toBe('2026-07-31T00:00:00.000Z');
+    expect(contract.opensAt).toBe('2026-07-27T00:00:00.000Z');
+    expect(contract.closesAt).toBe('2026-08-03T00:00:00.000Z');
+    const daily = deathEchoContract(new Date('2026-07-30T15:00:00Z'), 'daily');
+    expect(daily.opensAt).toBe('2026-07-30T00:00:00.000Z');
+    expect(daily.closesAt).toBe('2026-07-31T00:00:00.000Z');
   });
 
   it('conta a semana ISO sem pular a virada de ano', () => {
@@ -270,9 +284,6 @@ describe('contrato coletivo', () => {
     // da MESMA semana. Uma regra caseira erraria exatamente aqui.
     expect(contractWeekKey(new Date('2026-12-31T12:00:00Z'))).toBe('2026-W53');
     expect(contractWeekKey(new Date('2027-01-01T12:00:00Z'))).toBe('2026-W53');
-    const weekly = deathEchoContract(new Date('2026-07-30T12:00:00Z'), 'weekly');
-    expect(weekly.id).toMatch(/^2026-W\d{2}$/);
-    expect(weekly.label).toContain('SEMANA');
   });
 
   it('recalcula a seed em vez de confiar na que o servidor anunciou', () => {
@@ -280,23 +291,25 @@ describe('contrato coletivo', () => {
     // anunciar o id de hoje com a seed de ontem, e todo mundo naquele contrato
     // jogaria mapas diferentes achando que jogava o mesmo.
     const parsed = parseDeathEchoContract({
-      id: '2026-07-30',
-      cadence: 'daily',
+      id: '2026-W31',
+      cadence: 'weekly',
       seed: 12345,
       label: 'MENTIRA',
-      opensAt: '2026-07-30T00:00:00.000Z',
-      closesAt: '2026-07-31T00:00:00.000Z',
+      opensAt: '2026-07-27T00:00:00.000Z',
+      closesAt: '2026-08-03T00:00:00.000Z',
       ranked: true,
     });
-    expect(parsed?.seed).toBe(contractSeed('2026-07-30'));
+    expect(parsed?.seed).toBe(contractSeed('2026-W31'));
     expect(parsed?.seed).not.toBe(12345);
-    expect(parsed?.label).toContain('30-07');
+    expect(parsed?.label).toContain('DESAFIO SEMANAL 31');
   });
 
   it('descarta anúncio malformado', () => {
-    expect(parseDeathEchoContract({ id: 'ontem' })).toBeNull();
-    expect(parseDeathEchoContract({ id: '2026-07-30', opensAt: 'x', closesAt: 'y' })).toBeNull();
-    expect(parseDeathEchoContract({ id: '2026-W99', cadence: 'daily' })).toBeNull();
+    expect(parseDeathEchoContract({ id: 'semana passada' })).toBeNull();
+    expect(parseDeathEchoContract({ id: '2026-W31', opensAt: 'x', closesAt: 'y' })).toBeNull();
+    // Cadência e formato do id têm de casar: um id diário anunciado como semanal
+    // produziria outra seed e, portanto, outro mapa.
+    expect(parseDeathEchoContract({ id: '2026-07-30', cadence: 'weekly' })).toBeNull();
     expect(parseDeathEchoContract(null)).toBeNull();
   });
 

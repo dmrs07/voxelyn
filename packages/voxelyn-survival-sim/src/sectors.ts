@@ -34,6 +34,7 @@ import {
   SOLID_NONE,
   SOLID_ORE,
 } from './constants.js';
+import { emptyResonance } from './abilities.js';
 import { spawnEnemy } from './entities.js';
 import { generateWorld } from './worldgen.js';
 import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
@@ -212,6 +213,12 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
     cacheOpened: false,
     openedBySlot: null,
   }));
+
+  // Os Ecos do poco ficaram no mapa antigo, e a ressonancia descrevia o setor que
+  // acabou de ser trocado. Levar qualquer um dos dois adiante faria o poco do
+  // setor 2 oferecer o estilo com que o jogador atravessou o setor 1.
+  state.wellOffers = [];
+  for (const extra of state.playerExtras) extra.resonance = emptyResonance();
 
   state.guardianAwake = false;
   state.guardianSummoned = false;

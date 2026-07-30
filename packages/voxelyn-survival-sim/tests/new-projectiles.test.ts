@@ -11,7 +11,7 @@ import {
 } from '../src/constants';
 import { spawnEnemy } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { grantOrRechargeModule } from '../src/modules';
+import { MODULE_DEFINITIONS, grantOrRechargeModule } from '../src/modules';
 import type { Projectile, SurvivalState } from '../src/types';
 
 const clearArena = (state: SurvivalState): void => {
@@ -224,13 +224,14 @@ describe('modulos empilham no mesmo tiro', () => {
     stepRun(state, [fire()]);
     const disc = state.projectiles.find((p) => p.kind === 'return_disc');
     expect(disc?.disc?.phase).toBe('outbound');
-    expect(remaining()).toBe(5); // lancado de graca
+    const maximum = MODULE_DEFINITIONS.return_disc.defaultCharges ?? 0;
+    expect(remaining()).toBe(maximum); // lancado de graca
 
     for (let tick = 0; tick < 40 && disc?.disc?.phase === 'outbound'; tick++) {
       stepRun(state, [emptyCommand()]);
     }
     expect(disc?.disc?.phase).toBe('returning');
-    expect(remaining()).toBe(4); // a carga saiu quando ele de fato voltou
+    expect(remaining()).toBe(maximum - 1); // a carga saiu quando ele de fato voltou
   });
 });
 

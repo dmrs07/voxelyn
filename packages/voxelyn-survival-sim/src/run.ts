@@ -1,14 +1,19 @@
 import { RNG } from '@voxelyn/core';
 import {
-  ABILITY_COOLDOWN_TICKS,
-  ABILITY_KNOCKBACK,
-  ABILITY_RADIUS,
   BLEEDOUT_TICKS,
   BOLT_COOLDOWN_TICKS,
   BOLT_DAMAGE,
   BOLT_SPEED,
   BRUISER_ROCK_STUN_TICKS,
   CONDUCTIVE_STUN_TICKS,
+  FIRE_FUEL_TICKS,
+  FLAMETHROWER_DAMAGE,
+  SEEKER_BLAST_RADIUS,
+  SEEKER_SPEED,
+  SEEKER_TURN_RATE,
+  WELL_OFFER_REACH,
+  WELL_OFFER_REVEAL,
+  WELL_OFFER_SPREAD,
   PURGE_CELL_HEAL,
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
@@ -48,6 +53,7 @@ import {
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
+  SURF_SCORCHED,
   SURF_GAS,
   SURF_NONE,
   SURF_SPORES,
@@ -55,7 +61,15 @@ import {
   WORLD_H,
   WORLD_W,
 } from './constants.js';
-import { dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
+import {
+  ABILITY_SHAPE,
+  STARTING_ABILITY,
+  abilityDefinition,
+  emptyResonance,
+  recordResonance,
+  resonanceOffers,
+} from './abilities.js';
+import { dischargeAt, explodeAt, igniteCell, setSurface, stepCells } from './cells.js';
 import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
@@ -91,6 +105,7 @@ import type {
   PlayerCommand,
   PlayerExtra,
   Projectile,
+  ResonanceKind,
   RunConfig,
   SemanticEvent,
   StepResult,
@@ -150,6 +165,8 @@ const makeExtra = (): PlayerExtra => ({
   bleedoutAt: 0,
   joined: true, // default seguro: solo/local ja esta em jogo
   lastDamage: null,
+  ability: STARTING_ABILITY,
+  resonance: emptyResonance(),
 });
 
 /**
@@ -173,6 +190,8 @@ export const resetPlayerProgress = (extra: PlayerExtra): void => {
   extra.aim = { x: 1, y: 0 };
   extra.dodgeDir = { x: 1, y: 0 };
   extra.lastDamage = null;
+  extra.ability = STARTING_ABILITY;
+  extra.resonance = emptyResonance();
 };
 
 export const createRun = (config: RunConfig): SurvivalState => {
@@ -226,6 +245,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     playerExtra: playerExtras[0],
     enemies: [],
     projectiles: [],
+    wellOffers: [],
     salvageSites: world.salvageSites.map((site) => ({
       ...site,
       terminalState: 'inactive' as const,
@@ -304,6 +324,11 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
   for (let i = 0; i < events.length && i < 512; i++) {
     const ev = events[i];
     if (ev.t === 'discharge') {
+      // Credita a DESCARGA, e nao o atordoamento de quem por acaso estava na poca:
+      // eletrificar biofluido vazio continua sendo o jogador escolhendo resolver as
+      // coisas com corrente, e quem quebra cristal para abrir caminho tambem esta
+      // usando corrente. Preso ao stun, o registro so contaria com bicho em cima.
+      if (ev.source === 'player') recordPlayerResonance(state, ev.owner, 'current');
       const cells = new Set(ev.cells);
       for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
@@ -326,6 +351,7 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       }
       if (ev.cells.length > 1) markDiscovery(state.stats, DISCOVERY_DISCHARGE_POOL);
     } else if (ev.t === 'explosion') {
+      if (ev.source === 'player') recordPlayerResonance(state, ev.owner, 'blast');
       applyExplosionDamage(
         state,
         ev.x,
@@ -337,6 +363,263 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       );
     }
   }
+};
+
+/**
+ * Executa a habilidade equipada do slot.
+ *
+ * Um `switch` exaustivo, e nao um mapa de callbacks: cada habilidade precisa do
+ * estado inteiro e de `events`, entao um callback nao economizaria nada e
+ * esconderia, atras de indirecao, exatamente o codigo que alguem abre este
+ * arquivo para ler.
+ *
+ * Nenhuma delas cobra recurso alem do cooldown. Habilidade que consome carga
+ * seria um segundo modulo, e o poco ja resolve a escassez pelo outro lado: voce
+ * so tem UMA, e trocar custa abrir mao da que estava funcionando.
+ */
+/**
+ * Credita uma reacao ao jogador que a causou.
+ *
+ * Passa pelo `owner` do evento em vez de pelo slot que estava mirando: quem
+ * acendeu a poca pode ja ter morrido, e a reacao continua sendo dele. Ignora
+ * silenciosamente owner que nao e jogador — inimigo tambem detona e eletrifica, e
+ * isso nao ensina nada sobre como ESTE Prospector joga.
+ */
+const recordPlayerResonance = (
+  state: SurvivalState,
+  owner: number | undefined,
+  kind: ResonanceKind,
+): void => {
+  if (owner === undefined) return;
+  const slot = state.players.findIndex((p) => p.id === owner);
+  if (slot < 0) return;
+  recordResonance(state.playerExtras[slot].resonance, kind);
+};
+
+const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
+  const player = state.players[slot];
+  const extra = state.playerExtras[slot];
+  const aimLength = Math.hypot(extra.aim.x, extra.aim.y) || 1;
+  const dx = extra.aim.x / aimLength;
+  const dy = extra.aim.y / aimLength;
+
+  events.push({
+    t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
+    dx, dy, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
+  });
+
+  switch (extra.ability) {
+    case 'pulse': {
+      const { radius, knockback } = ABILITY_SHAPE.pulse;
+      events.push({ t: 'pulse', x: player.x, y: player.y, radius });
+      for (const enemy of state.enemies) {
+        if (!enemy.alive) continue;
+        const ex = enemy.x - player.x;
+        const ey = enemy.y - player.y;
+        const d = Math.hypot(ex, ey);
+        if (d <= radius && d > 0.001) {
+          enemy.vx += (ex / d) * knockback * TICK_HZ * 0.25;
+          enemy.vy += (ey / d) * knockback * TICK_HZ * 0.25;
+          enemy.stunnedUntil = state.tick + 6;
+          recordResonance(extra.resonance, 'kinetic');
+        }
+      }
+      const w = state.config.width;
+      const r = Math.ceil(radius);
+      const px = Math.floor(player.x);
+      const py = Math.floor(player.y);
+      for (let y = py - r; y <= py + r; y++) {
+        for (let x = px - r; x <= px + r; x++) {
+          if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+          const ox = x + 0.5 - player.x;
+          const oy = y + 0.5 - player.y;
+          if (ox * ox + oy * oy > radius * radius) continue;
+          const i = y * w + x;
+          if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
+            setSurface(state, i, SURF_NONE, 0);
+            recordResonance(extra.resonance, 'kinetic');
+          }
+        }
+      }
+      return;
+    }
+
+    case 'flamethrower': {
+      const { range, arc } = ABILITY_SHAPE.flamethrower;
+      events.push({ t: 'flame_cone', x: player.x, y: player.y, dx, dy, range, arc });
+      // Dano e chao sao resolvidos pela MESMA varredura de celulas: o cone acende
+      // o que atravessa, e o fogo que fica e o que continua matando depois. Sem
+      // isso o lanca-chamas seria um tiro largo com nome bonito.
+      const w = state.config.width;
+      const h = state.config.height;
+      const r = Math.ceil(range);
+      const px = Math.floor(player.x);
+      const py = Math.floor(player.y);
+      for (let y = py - r; y <= py + r; y++) {
+        for (let x = px - r; x <= px + r; x++) {
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const ox = x + 0.5 - player.x;
+          const oy = y + 0.5 - player.y;
+          const d = Math.hypot(ox, oy);
+          if (d > range || d < 0.001) continue;
+          // Dentro do cone: o produto escalar com a mira normalizada da o cosseno
+          // do angulo, e comparar cossenos evita um `atan2` por celula.
+          if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
+          const i = y * w + x;
+          if (state.solid[i] !== SOLID_NONE) continue;
+          // O cone NAO acende materia por conta propria: ele pede a `igniteCell`,
+          // como toda outra fonte de chama do jogo. Escrever `SURF_FIRE` direto
+          // pulava as regras do material — fungo umido saltava para fogo sem
+          // passar pelo estado fumegante que AVISA, gas recebia o combustivel
+          // longo em vez do flash curto, e nem o evento de ignicao nem a
+          // descoberta aconteciam. Uma habilidade nova que ensina outra fisica
+          // para o mesmo material e pior do que uma habilidade que falta.
+          const ignited = igniteCell(state, i, events);
+          if (!ignited) {
+            // Chao nu nao tem o que "pegar" fogo: ali a chama do sopro fica por
+            // conta propria. Qualquer superficie com materia pertence a
+            // `igniteCell`, inclusive quando ela decide nao acender nada.
+            const bare = state.surface[i];
+            if (bare === SURF_NONE || bare === SURF_SCORCHED || bare === SURF_FIRE) {
+              setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
+            }
+          }
+          // Credita pelo RESULTADO, e nao pela intencao: fungo que so comecou a
+          // secar ainda e o jogador provocando combustao, e celula que a
+          // `igniteCell` recusou nao e.
+          const after = state.surface[i];
+          if (after === SURF_FIRE || after === SURF_FUNGAL_HEATED) {
+            recordResonance(extra.resonance, 'fire');
+          }
+        }
+      }
+      for (const enemy of state.enemies) {
+        if (!enemy.alive) continue;
+        const ox = enemy.x - player.x;
+        const oy = enemy.y - player.y;
+        const d = Math.hypot(ox, oy);
+        if (d > range || d < 0.001) continue;
+        if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
+        damageEntity(state, enemy, FLAMETHROWER_DAMAGE, events);
+        recordResonance(extra.resonance, 'fire');
+      }
+      return;
+    }
+
+    case 'seeker': {
+      const { damage, speed, ttl } = ABILITY_SHAPE.seeker;
+      state.projectiles.push({
+        kind: 'seeker',
+        id: state.nextEntityId++,
+        owner: player.id,
+        x: player.x + dx * 0.5,
+        y: player.y + dy * 0.5,
+        vx: dx * speed,
+        vy: dy * speed,
+        damage,
+        radius: 0.32,
+        distanceTravelled: 0,
+        hostile: false,
+        leavesBiofluid: false,
+        ttl,
+      });
+      events.push({ t: 'shot', x: player.x, y: player.y, dx, dy, owner: player.id });
+      return;
+    }
+
+    case 'arc': {
+      const { range, damage, maxTargets } = ABILITY_SHAPE.arc;
+      // Salta do jogador para o inimigo vivo mais proximo, e dali para o proximo.
+      // NAO precisa de poca: o arco condutivo e o que o modulo `conductive`
+      // ensinou a fazer sem chao molhado, e essa e a diferenca que justifica ele
+      // existir ao lado do modulo.
+      const hops: Array<{ x: number; y: number }> = [{ x: player.x, y: player.y }];
+      const struck = new Set<number>();
+      let fromX = player.x;
+      let fromY = player.y;
+      for (let hop = 0; hop < maxTargets; hop++) {
+        let best: Entity | null = null;
+        let bestDistance = range;
+        for (const enemy of state.enemies) {
+          if (!enemy.alive || struck.has(enemy.id)) continue;
+          const d = Math.hypot(enemy.x - fromX, enemy.y - fromY);
+          if (d < bestDistance) {
+            best = enemy;
+            bestDistance = d;
+          }
+        }
+        if (!best) break;
+        struck.add(best.id);
+        hops.push({ x: best.x, y: best.y });
+        damageEntity(state, best, damage, events);
+        // Mesma regra do modulo condutivo: pedra nao conduz. Duplicar a excecao
+        // aqui seria criar uma segunda verdade sobre o Britador.
+        if (!isStoneEnemy(best)) stunEntity(state, best, CONDUCTIVE_STUN_TICKS);
+        recordResonance(extra.resonance, 'current');
+        fromX = best.x;
+        fromY = best.y;
+      }
+      if (hops.length > 1) events.push({ t: 'arc_chain', hops });
+      return;
+    }
+  }
+};
+
+/**
+ * Acorda os Ecos do poco na primeira vez que alguem chega perto.
+ *
+ * Congela a oferta. Recalcular a cada tick faria os dois Ecos trocarem de
+ * habilidade enquanto o jogador anda entre eles — e a ressonancia MUDA enquanto
+ * ele anda, porque andar ate o poco tambem provoca reacoes.
+ *
+ * Nao acontece no setor final: la o ponto e o nucleo do Guardiao, e parar para
+ * escolher habilidade no meio da arena seria o pior lugar possivel para um menu.
+ */
+const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void => {
+  if (state.wellOffers.length > 0 || isFinalSector(state.sector)) return;
+  const wellX = state.corePos.x + 0.5;
+  const wellY = state.corePos.y + 0.5;
+  // O MAIS PROXIMO, e nao o ultimo iterado. Guardar a ultima ocorrencia fazia o
+  // slot de numero mais alto ganhar sempre que os dois estivessem no alcance no
+  // mesmo tick — a oferta descrevia o estilo do parceiro que ficou para tras por
+  // causa da ordem do laco. Empate exato mantem o slot menor, que e deterministico.
+  let nearest: number | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (let slot = 0; slot < state.players.length; slot++) {
+    const p = state.players[slot];
+    if (!state.playerExtras[slot].joined || !p.alive) continue;
+    const distance = Math.hypot(p.x - wellX, p.y - wellY);
+    if (distance > WELL_OFFER_REVEAL) continue;
+    if (nearest === null || distance < nearestDistance) {
+      nearest = slot;
+      nearestDistance = distance;
+    }
+  }
+  if (nearest === null) return;
+
+  // A oferta le a ressonancia de quem CHEGOU. No co-op os dois jogaram o mesmo
+  // setor de formas diferentes, e escolher a de um deles e mais honesto do que
+  // somar as duas: uma media de estilos nao descreve estilo nenhum.
+  const offers = resonanceOffers(
+    state.playerExtras[nearest].resonance,
+    state.playerExtras[nearest].ability,
+    state.config.seed,
+    state.sector,
+  );
+  if (offers.length === 0) return;
+
+  state.wellOffers = offers.map((ability, index) => {
+    // Um de cada lado do poco, no eixo que a entrada nao usa. Ficar EM CIMA do
+    // poco faria o jogador pegar habilidade ao tentar descer.
+    const side = index === 0 ? -1 : 1;
+    return {
+      ability,
+      x: wellX + side * WELL_OFFER_SPREAD,
+      y: wellY + side * WELL_OFFER_SPREAD * 0.5,
+      takenBy: null,
+    };
+  });
+  events.push({ t: 'well_offers', sector: state.sector, abilities: offers });
 };
 
 const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, events: SemanticEvent[]): void => {
@@ -509,39 +792,8 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
   // habilidade: pulso cinetico (empurra criaturas, apaga fogo, dissipa gas)
   if (cmd.ability && state.tick >= extra.abilityCooldownUntil) {
-    extra.abilityCooldownUntil = state.tick + ABILITY_COOLDOWN_TICKS;
-    events.push({
-      t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
-      dx: player.facing.x, dy: player.facing.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
-    });
-    events.push({ t: 'pulse', x: player.x, y: player.y, radius: ABILITY_RADIUS });
-    for (const enemy of state.enemies) {
-      if (!enemy.alive) continue;
-      const dx = enemy.x - player.x;
-      const dy = enemy.y - player.y;
-      const d = Math.hypot(dx, dy);
-      if (d <= ABILITY_RADIUS && d > 0.001) {
-        enemy.vx += (dx / d) * ABILITY_KNOCKBACK * TICK_HZ * 0.25;
-        enemy.vy += (dy / d) * ABILITY_KNOCKBACK * TICK_HZ * 0.25;
-        enemy.stunnedUntil = state.tick + 6;
-      }
-    }
-    const w = state.config.width;
-    const r = Math.ceil(ABILITY_RADIUS);
-    const px = Math.floor(player.x);
-    const py = Math.floor(player.y);
-    for (let y = py - r; y <= py + r; y++) {
-      for (let x = px - r; x <= px + r; x++) {
-        if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
-        const dx = x + 0.5 - player.x;
-        const dy = y + 0.5 - player.y;
-        if (dx * dx + dy * dy > ABILITY_RADIUS * ABILITY_RADIUS) continue;
-        const i = y * w + x;
-        if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
-          setSurface(state, i, SURF_NONE, 0);
-        }
-      }
-    }
+    extra.abilityCooldownUntil = state.tick + abilityDefinition(extra.ability).cooldownTicks;
+    castAbility(state, slot, events);
   }
 
   // Celula de Purga: cartucho interno de cura e descontaminacao.
@@ -583,6 +835,26 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           return;
         }
       }
+    }
+
+    // Pegar a habilidade que um Eco demonstra tem prioridade sobre descer: os dois
+    // acontecem ao lado do poco, e quem apertou usar em cima de um Eco quis o Eco.
+    // Sem esta ordem, chegar perto do poco tornaria impossivel aceitar a oferta.
+    for (const offer of state.wellOffers) {
+      if (offer.takenBy !== null) continue;
+      if (Math.hypot(player.x - offer.x, player.y - offer.y) > WELL_OFFER_REACH) continue;
+      offer.takenBy = slot;
+      extra.ability = offer.ability;
+      // O cooldown zera na troca. Herdar o cooldown da habilidade antiga puniria
+      // justamente quem acabou de usar a que tinha para chegar vivo ate aqui.
+      extra.abilityCooldownUntil = state.tick;
+      // As outras ofertas somem: a escolha e UMA, e um Eco que continua ali
+      // depois de voce escolher convida a voltar e trocar de novo.
+      for (const other of state.wellOffers) {
+        if (other.takenBy === null) other.takenBy = slot;
+      }
+      events.push({ t: 'ability_taken', slot, ability: offer.ability, x: offer.x, y: offer.y });
+      return;
     }
 
     // O mesmo ponto significa coisas diferentes conforme a profundidade: nos
@@ -778,6 +1050,39 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         ? { source: 'player' as const, owner: proj.owner }
         : { source: 'environment' as const };
 
+    // O missil rastreador CORRIGE o rumo, e nao aponta.
+    //
+    // A correcao e limitada por tick, e e isso que o impede de ser infalivel:
+    // contra um alvo que muda de direcao ele erra a curva e passa reto. Acertar
+    // exige atirar quando o inimigo esta comprometido — que e a decisao que a
+    // habilidade cobra em troca do dano alto.
+    if (proj.kind === 'seeker') {
+      let target: Entity | null = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (const enemy of state.enemies) {
+        if (!enemy.alive) continue;
+        const d = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
+        if (d < bestDistance) {
+          target = enemy;
+          bestDistance = d;
+        }
+      }
+      if (target) {
+        const desired = Math.atan2(target.y - proj.y, target.x - proj.x);
+        const current = Math.atan2(proj.vy, proj.vx);
+        // Diferenca angular normalizada para [-pi, pi]: sem isso o missil daria a
+        // volta pelo lado longo sempre que a curva cruzasse +-180 graus.
+        let delta = desired - current;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        const turn = Math.max(-SEEKER_TURN_RATE, Math.min(SEEKER_TURN_RATE, delta));
+        const heading = current + turn;
+        const speed = Math.hypot(proj.vx, proj.vy) || SEEKER_SPEED;
+        proj.vx = Math.cos(heading) * speed;
+        proj.vy = Math.sin(heading) * speed;
+      }
+    }
+
     // Return Disc follows the owner's current position on the return leg.
     if (proj.disc?.phase === 'returning') {
       if (!owner || !ownerExtra?.joined || !owner.alive) continue;
@@ -850,11 +1155,17 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
         const eventStart = events.length;
         const { stop, broke } = impactSolid(state, cx, cy, cls, events, origin);
-        if (
-          conductiveReady && ownerExtra && ownerSlot !== undefined &&
-          events.slice(eventStart).some((event) => event.t === 'discharge')
-        ) {
+        const dischargedHere = events.slice(eventStart).some((event) => event.t === 'discharge');
+        if (conductiveReady && ownerExtra && ownerSlot !== undefined && dischargedHere) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
+        }
+        // Quebrar cristal dentro de uma poca E o jogador usando corrente, mesmo
+        // que a descarga em si nasca com `source: 'environment'`. Aquela origem
+        // existe para o ESCALONAMENTO DE DANO — cristal quebrado fere o proprio
+        // Prospector sem o desconto de fogo amigo, que e a licao do material —, e
+        // reaproveita-la como autoria diria que ninguem provocou nada.
+        if (dischargedHere && origin.source === 'player') {
+          recordPlayerResonance(state, origin.owner, 'current');
         }
         if (stop) {
           const pierces =
@@ -883,7 +1194,25 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
       if (!alreadyHeatedHere) {
         const eventStart = events.length;
+        const surfaceBeforeShot = state.surface[i];
         const consumedBySurface = impactSurface(state, cx, cy, cls, events, origin);
+        // Fogo tem de ser GANHAVEL com o kit basico. Se so o proprio lanca-chamas
+        // registrasse chama, ninguem sem lanca-chamas acumularia ressonancia de
+        // fogo — e o poco jamais ofereceria a habilidade a quem passou o setor
+        // inteiro secando fungo e tocando fogo com o bolt comum.
+        //
+        // Olha o CHAO e nao um evento: o fungo aquecido so vira chama varios ticks
+        // depois, em `stepCells`, longe de qualquer coisa que saiba quem atirou.
+        // O instante em que o material muda de estado e o unico em que a autoria
+        // ainda existe.
+        const surfaceAfterShot = state.surface[i];
+        if (
+          origin.source === 'player' &&
+          surfaceAfterShot !== surfaceBeforeShot &&
+          (surfaceAfterShot === SURF_FIRE || surfaceAfterShot === SURF_FUNGAL_HEATED)
+        ) {
+          recordPlayerResonance(state, origin.owner, 'fire');
+        }
         if (
           conductiveReady && ownerExtra && ownerSlot !== undefined &&
           events.slice(eventStart).some((event) => event.t === 'discharge')
@@ -980,7 +1309,19 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             owner.hp = Math.min(owner.maxHp, owner.hp + 2);
           }
 
-          if (explosiveArmed && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
+          // Detonar um Portador conta como estouro para quem o abateu, mesmo que
+          // a explosao em si nasca com `source: 'enemy'`. O que a ressonancia
+          // registra e a DECISAO do jogador — ele escolheu matar aquilo de perto.
+          if (enemy.archetype === 'bomber' && !enemy.alive) {
+            recordPlayerResonance(state, proj.owner, 'blast');
+          }
+          if (proj.kind === 'seeker') {
+            // O missil detona no alvo. O raio e pequeno — ele e uma resposta a UM
+            // inimigo, nao uma segunda granada — e a explosao herda o `origin` do
+            // jogador, entao ela machuca quem atirou tambem se ele estiver colado.
+            explodeAt(state, proj.x, proj.y, SEEKER_BLAST_RADIUS, events, origin);
+            dead = true;
+          } else if (explosiveArmed && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
             explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
             dead = true;
           } else if (proj.disc) {
@@ -1223,6 +1564,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
     }
   }
 
+  revealWellOffers(state, events);
   stepSalvageSites(state, events);
   stepProjectiles(state, events);
   updateEnemies(state, events);
@@ -1309,6 +1651,15 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
 
   mix(state.tick);
   mixString(state.phase);
+  // As ofertas do poco sao estado autoritativo: elas decidem o que pode ser
+  // pego, e uma simulacao que as revelou noutro tick oferece outra coisa.
+  mix(state.wellOffers.length);
+  for (const offer of state.wellOffers) {
+    mixString(offer.ability);
+    mix(Math.round(offer.x * 1000));
+    mix(Math.round(offer.y * 1000));
+    mix(offer.takenBy === null ? -1 : offer.takenBy);
+  }
   for (let i = 0; i < state.solid.length; i++) mix(state.solid[i] | (state.surface[i] << 8));
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
@@ -1323,6 +1674,14 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(e.downed ? 1 : 0);
     mix(Math.round(e.heat * 100));
     mix(e.purgeCells);
+    // A habilidade equipada MUDA o resultado da run, entao ela e estado
+    // autoritativo: duas simulacoes que discordam de qual habilidade o slot
+    // carrega divergem no primeiro uso, e o replay tem de acusar isso.
+    mixString(e.ability);
+    mix(e.resonance.fire);
+    mix(e.resonance.current);
+    mix(e.resonance.blast);
+    mix(e.resonance.kinetic);
     mix(e.activeModules.length);
     for (const module of e.activeModules) {
       mixString(module.id);

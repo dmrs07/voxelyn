@@ -1,4 +1,5 @@
 import type {
+  AbilityId,
   ActiveModule,
   EntityActionKind,
   EntityActionPhase,
@@ -159,10 +160,33 @@ export type SalvageSiteFlags = {
   cacheOpened: boolean;
 };
 
+/**
+ * Um Eco da Ressonancia do Poco, no wire.
+ *
+ * Precisa viajar porque o cliente online NAO simula. As ofertas nascem do tally
+ * de ressonancia do servidor — que o cliente nem espelha —, entao nao ha nada no
+ * espelho dele de onde deduzi-las. Sem este campo o co-op emitia `well_offers` e
+ * o jogador nao via Eco nenhum: nem onde escolher, nem o que escolher.
+ *
+ * `takenBy` e nao um booleano: o renderer esconde a oferta ja levada, e no co-op
+ * saber QUEM levou e o que permite dizer ao parceiro que a escolha foi feita.
+ */
+export type WellOfferFlags = {
+  ability: AbilityId;
+  x: number;
+  y: number;
+  takenBy: number | null;
+};
+
 export type WorldFlags = {
   salvageSites: SalvageSiteFlags[];
   coreTaken: boolean;
   guardianAwake: boolean;
+  /**
+   * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
+   * lista vazia e o resto do mundo continua funcionando.
+   */
+  wellOffers?: WellOfferFlags[];
 };
 
 export type ServerWelcome = {

@@ -283,10 +283,12 @@ describe('orcamento de re-simulacao', () => {
   });
 });
 
-describe('endpoint do contrato', () => {
-  it('anuncia um contrato deterministico por dia', () => {
+describe('endpoint do desafio', () => {
+  it('anuncia um desafio semanal deterministico', () => {
     const contract = deathEchoContract(new Date('2026-07-30T10:00:00Z'));
-    expect(contract.id).toBe('2026-07-30');
+    expect(contract.id).toBe('2026-W31');
+    expect(contract.cadence).toBe('weekly');
+    expect(contract.label).toContain('DESAFIO SEMANAL');
     expect(contract.ranked).toBe(true);
   });
 });

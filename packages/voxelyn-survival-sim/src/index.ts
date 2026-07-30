@@ -46,4 +46,14 @@ export {
 } from './cells.js';
 export { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass, type ProjectileClass, type SolidImpact } from './materials.js';
 
+export {
+  ABILITY_DEFINITIONS,
+  ABILITY_SHAPE,
+  STARTING_ABILITY,
+  abilityDefinition,
+  emptyResonance,
+  recordResonance,
+  resonanceOffers,
+  type AbilityDefinition,
+} from './abilities.js';
 export { MODULE_DEFINITIONS, moduleDefinition, activeModule, moduleHasCapacity, grantOrRechargeModule, consumeModuleCharge, expireTimedModules, rollModuleChoice } from './modules.js';
