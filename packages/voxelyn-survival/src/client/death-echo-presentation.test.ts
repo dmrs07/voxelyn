@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CONTENT_VERSION, SIMULATION_VERSION } from '@voxelyn/survival-protocol';
-import { SurvivalRenderer } from './render';
+import { SurvivalRenderer, deathEchoBodyAlpha } from './render';
 import {
   DeathEchoController,
   deathEchoReadout,
@@ -75,5 +75,12 @@ describe('apresentação do eco', () => {
 
   it('prefere não mostrar a cobrir o HUD numa viewport curta', () => {
     expect(deathEchoReadoutRegion(320, 140, safeArea, hud)).toBeNull();
+  });
+
+  it('não revela a carcaça fora da luz, mas escala sua opacidade quando iluminada', () => {
+    expect(deathEchoBodyAlpha(0.04)).toBe(0);
+    expect(deathEchoBodyAlpha(0.2)).toBeGreaterThan(0);
+    expect(deathEchoBodyAlpha(0.2)).toBeLessThan(deathEchoBodyAlpha(0.8));
+    expect(deathEchoBodyAlpha(1)).toBe(1);
   });
 });

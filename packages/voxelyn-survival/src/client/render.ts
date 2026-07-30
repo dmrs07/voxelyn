@@ -315,6 +315,9 @@ const wrapMeasuredText = (
   return lines;
 };
 
+export const deathEchoBodyAlpha = (light: number): number =>
+  light <= 0.05 ? 0 : Math.min(1, 0.15 + Math.max(0, light) * 0.85);
+
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   zoom = 2;
@@ -936,9 +939,10 @@ export class SurvivalRenderer {
     for (const echo of this.deathEchoes) {
       const [esx, esy] = toScreen(echo.x, echo.y);
       if (esx < -80 || esx > vw + 80 || esy < -100 || esy > vh + 80) continue;
+      const bodyAlpha = deathEchoBodyAlpha(brightness(echo.x, echo.y));
       items.push({
         depth: echo.x + echo.y,
-        draw: () => this.drawDeathEchoBody(echo, esx, esy, z, spriteZoom, nowMs),
+        draw: () => this.drawDeathEchoBody(echo, esx, esy, z, spriteZoom, nowMs, bodyAlpha),
       });
     }
 
@@ -1219,35 +1223,43 @@ export class SurvivalRenderer {
     z: number,
     spriteZoom: number,
     nowMs: number,
+    bodyAlpha: number,
   ): void {
     const ctx = this.ctx;
-    const size = 0.34 * TILE_W * 0.9 * z;
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.beginPath();
-    ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (bodyAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = bodyAlpha;
+      const size = 0.34 * TILE_W * 0.9 * z;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-    const drew = this.sprites.drawEntity(
-      ctx,
-      'prospector',
-      'die',
-      echo.facingX,
-      echo.facingY,
-      10_000,
-      sx,
-      sy,
-      spriteZoom,
-      { color: 'rgba(110,74,51,0.62)', alpha: 0.62 },
-    );
-    if (!drew) {
-      ctx.fillStyle = PAL.rust;
-      ctx.fillRect(sx - 9 * z, sy - 5 * z, 16 * z, 4 * z);
-      ctx.fillStyle = PAL.rockShadow;
-      ctx.fillRect(sx - 6 * z, sy - 8 * z, 7 * z, 4 * z);
-      ctx.fillStyle = PAL.player;
-      ctx.fillRect(sx - 5 * z, sy - 7 * z, 2 * z, z);
+      const drew = this.sprites.drawEntity(
+        ctx,
+        'prospector',
+        'die',
+        echo.facingX,
+        echo.facingY,
+        10_000,
+        sx,
+        sy,
+        spriteZoom,
+        { color: 'rgba(110,74,51,0.62)', alpha: 0.62 },
+      );
+      if (!drew) {
+        ctx.fillStyle = PAL.rust;
+        ctx.fillRect(sx - 9 * z, sy - 5 * z, 16 * z, 4 * z);
+        ctx.fillStyle = PAL.rockShadow;
+        ctx.fillRect(sx - 6 * z, sy - 8 * z, 7 * z, 4 * z);
+        ctx.fillStyle = PAL.player;
+        ctx.fillRect(sx - 5 * z, sy - 7 * z, 2 * z, z);
+      }
+      ctx.restore();
     }
 
+    // A caixa-preta continua emissiva: ela pode denunciar que há algo no escuro,
+    // mas não revela a silhueta inteira nem atravessa a regra de iluminação.
     const pulse = Math.sin(nowMs * 0.008 + echo.cell * 0.17) > -0.2;
     ctx.fillStyle = pulse ? PAL.biolum : PAL.rockShadow;
     ctx.fillRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
