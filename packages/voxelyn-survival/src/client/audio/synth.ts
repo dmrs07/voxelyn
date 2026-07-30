@@ -260,27 +260,29 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
     });
     tone(ctx, out, t0, { type: 'sawtooth', from: 260, to: 70, peak: 0.26, decay: 0.3 });
   },
-  // A unica morte HUMANA do jogo, e a voz mais CURTA do banco. Medido num
+  // Uma maquina PARANDO, e a voz mais curta do banco. Medido num
   // OfflineAudioContext, som audivel ate cair abaixo de -40 dB:
   //
-  //   deathMiner     189 ms
-  //   death          329 ms
+  //   deathMiner     ~190 ms
+  //   death           329 ms
   //   deathGuardian  1770 ms
   //
-  // A brevidade e o desenho. Todo o resto do banco toca e desvanece — a criatura
-  // cai, o som acompanha o corpo, a cauda cobre o instante seguinte. Aqui a
-  // cauda e o problema: uma morte que ressoa e uma morte estilizada, e o
-  // objetivo desta e o oposto. Ela para antes de o ouvido esperar e deixa
-  // silencio onde havia som, e o silencio faz o trabalho que nenhuma cauda faria.
+  // A forma sobreviveu a uma troca de ficcao, e vale registrar por que. Ela foi
+  // escrita quando o mineiro era humano, com o argumento "esta morte nao pode
+  // ressoar". O argumento estava certo pelo motivo errado: nao e a humanidade
+  // que pede o corte, e o fato de que ISTO NAO E UM EVENTO. Um automato que para
+  // nao tem agonia nem queda dramatica — a corrente cessa, e o que sobra e o
+  // silencio de uma coisa que estava zumbindo ha decadas.
   //
-  // Duas parciais proximas em vez de uma so: batimento leve, que e o que separa
-  // voz de bipe. E nada abaixo de 280 Hz, porque grave e o registro dos chefes e
-  // das explosoes — um corpo pequeno nao pode soar como um evento grande.
+  // O que mudou foi o timbre: saiu a parcial dupla batendo (que era voz) e
+  // entrou a queda de corrente. Um estalo eletrico e uma descida curta que morre
+  // sem cauda, no registro medio — nada de grave, que e dos chefes.
   deathMiner: (ctx, out, t0, noise) => {
-    // Sopro curtissimo de entrada: o ar saindo, antes de qualquer altura.
-    burst(ctx, out, t0, noise, { peak: 0.26, decay: 0.07, type: 'bandpass', from: 1100, to: 700, q: 1.4 });
-    tone(ctx, out, t0 + 0.01, { type: 'triangle', from: 340, to: 280, peak: 0.34, decay: 0.14, attack: 0.006 });
-    tone(ctx, out, t0 + 0.01, { type: 'triangle', from: 352, to: 286, peak: 0.2, decay: 0.13, attack: 0.006 });
+    // O corte da corrente: banda estreita e alta, quase instantanea.
+    burst(ctx, out, t0, noise, { peak: 0.3, decay: 0.05, type: 'bandpass', from: 2600, to: 1400, q: 3 });
+    // A queda: o zumbido perdendo tensao. Desce e para, sem chegar ao chao.
+    tone(ctx, out, t0, { type: 'square', from: 420, to: 190, peak: 0.26, decay: 0.13, attack: 0.004 });
+    tone(ctx, out, t0 + 0.02, { type: 'sawtooth', from: 300, to: 210, peak: 0.1, decay: 0.1 });
     // Sem terceira camada, sem grave, sem cauda. O corte E o desenho.
   },
   // Fim de ato: acorde grave descendente, longo o bastante para durar mais que

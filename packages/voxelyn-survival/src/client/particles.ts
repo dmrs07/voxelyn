@@ -127,9 +127,11 @@ const HIT_MATERIAL: Record<string, ParticleKind> = {
   // e nao lasca de pedra. E o mesmo detalhe que ja dizia ao jogador que o
   // prospector e feito de outra coisa.
   bishop: 'spore',
-  // O mineiro e uma PESSOA. Sangue, e nao esporo nem pedra — e o unico respingo
-  // do jogo que deveria incomodar, e e de proposito.
-  miner: 'chitin',
+  // O mineiro solta a MESMA materia que o prospector, e isso e a coisa mais
+  // importante desta tabela. Os dois sao automatos da mesma familia; quem acerta
+  // um ve exatamente o que veria acertando o outro. Nenhuma linha de texto diz
+  // isso ao jogador — o respingo diz, toda vez.
+  miner: 'stone',
   fungal_horse: 'spore',
   prospector: 'stone',
 };

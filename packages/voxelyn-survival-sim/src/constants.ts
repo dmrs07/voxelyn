@@ -352,22 +352,27 @@ export const EXTRACT_RADIUS = 3;
 export const RUN_SEED_MIX = 0x9e3779b9;
 
 /**
- * Empoverished Miner.
+ * Empoverished Miner — automato de extracao abandonado.
  *
  * O gatilho da reacao dele e o CALOR DA SUA ARMA, e nao um sorteio.
  *
+ * E fisico, e nao emocional: o corpo dele esta saturado de minerio reativo e o
+ * cabeamento ainda conduz corrente da grade. Calor em excesso SOBRECARREGA o
+ * circuito. Ele nao fica com raiva de voce; ele entra em falha perto de voce, e
+ * a falha dele e violenta.
+ *
  * O sorteio era a versao obvia da ideia e violava o invariante que sustenta o
- * jogo inteiro: o jogador nunca leva dano sem sinal. Um humano parado que as
- * vezes vira uma ameaca sem nada mudar no mundo e exatamente isso — e pior,
- * ensina o jogador a matar todo mundo por precaucao, que apaga o encontro.
+ * jogo inteiro: o jogador nunca leva dano sem sinal. Uma coisa parada que as
+ * vezes vira ameaca sem nada mudar no mundo e exatamente isso — e pior, ensina
+ * o jogador a destruir tudo por precaucao, que apaga o encontro.
  *
  * Com o calor, a decisao volta para quem joga, lida num medidor que ja esta no
  * HUD desde sempre:
  *
  *   frio   → ele te ignora. Passar sem incidente e possivel, e e uma escolha.
  *   morno  → ele foge. Perseguir rende o minerio dele.
- *   quente → ele ataca. Uma maquina em brasa entrando na mina dele, e ele sabe
- *            para que empresa ela trabalha.
+ *   quente → ele ataca. Nao por escolha: a corrente que ainda o alimenta nao
+ *            suporta o calor que voce trouxe.
  *
  * Note que a rota MAIS lucrativa exige esfriar antes de chegar perto — o que
  * significa parar de atirar num setor hostil. E a mesma troca de sempre: tempo
@@ -399,7 +404,7 @@ export const MINER_CLEAVE_RADIUS = 2.3;
 export const MINER_CLEAVE_DAMAGE = 19;
 export const MINER_CLEAVE_WINDUP_TICKS = 14;
 export const MINER_CLEAVE_COOLDOWN_TICKS = 40;
-/** Minerio que ele carrega, e que voce leva se o matar hostil. */
+/** A carga que ele ainda estava transportando, e que voce leva se o destruir. */
 export const MINER_ORE_DROP = 6;
 /** Quantos mineradores por setor, no maximo. */
 export const MINER_PER_SECTOR = 3;

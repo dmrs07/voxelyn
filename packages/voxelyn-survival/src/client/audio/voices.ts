@@ -137,8 +137,8 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // Prioridade 7 contra os 5 do `death` comum, e espacial.
   //
   // Sete e alto para uma morte que nao e a sua, e o motivo e estreito: esta e a
-  // unica morte do jogo que o jogador pode ter causado sem precisar. Perde-la no
-  // orcamento durante um tiroteio seria justamente apaga-la na situacao em que
+  // unica do jogo que o jogador pode ter causado SEM PRECISAR. Perde-la no
+  // orcamento durante um tiroteio seria apaga-la justamente na situacao em que
   // ela mais tem o que dizer. Espacial porque importa DE ONDE veio — voce
   // atirou naquela direcao de proposito.
   deathMiner: { priority: 7, gain: 0.6, minIntervalMs: 0, spatial: true },

@@ -40,12 +40,16 @@ export type EnemyArchetype =
    */
   | 'fungal_horse'
   /**
-   * Empoverished Miner: uma PESSOA, nao um bicho. Passivo por padrao.
+   * Empoverished Miner: um AUTOMATO de extracao abandonado. Passivo por padrao.
    *
-   * A reacao dele a voce nao e sorteada: sai do CALOR da sua arma quando ele te
-   * nota. Frio, ele te ignora; morno, foge; quente, ataca. O sorteio era a
-   * versao obvia e violava o invariante do jogo — dano sem sinal. Assim o
-   * jogador decide que encontro vai ter, com um medidor que ja esta no HUD.
+   * Foi uma unidade de manutencao da grade, deixada para tras quando os veios
+   * desabaram, e continua cumprindo a ordem que ninguem cancelou. E da mesma
+   * familia do prospector — e essa e a leitura que o encontro inteiro carrega:
+   * o jogador nao esta matando um coitado, esta matando o proprio antecessor.
+   *
+   * A reacao dele nao e sorteada: sai do CALOR da sua arma quando ele levanta a
+   * cabeca. Frio, te ignora; morno, foge; quente, sobrecarrega e ataca. O
+   * sorteio era a versao obvia e violava o invariante do jogo — dano sem sinal.
    */
   | 'miner';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
@@ -126,12 +130,16 @@ export type RunStats = {
    */
   oreCollected: number;
   /**
-   * Mineradores PASSIVOS mortos.
+   * Mineradores PASSIVOS destruidos — unidades que nao tinham reagido a voce.
    *
    * Nao muda numero nenhum da run, de proposito. O prospector e um robo sem
    * compasso moral e o jogo nao vai puni-lo com dano nem com pontuacao por isso
    * — ia soar como uma moral que a ficcao nega. Ele so ANOTA, e mostra anotado
    * no fim. A mancha e o registro, nao a penalidade.
+   *
+   * O nome do campo continua sendo `innocentsKilled` depois de o mineiro deixar
+   * de ser humano porque o que ele conta nao mudou: alguma coisa que nao ia
+   * fazer nada com voce, e que voce destruiu assim mesmo.
    */
   innocentsKilled: number;
   /**

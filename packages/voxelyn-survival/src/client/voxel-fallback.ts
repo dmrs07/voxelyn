@@ -268,23 +268,34 @@ export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEnt
     }
 
     case 'miner': {
-      // Humano, e a silhueta tem de dizer isso ANTES de qualquer mecanica: dois
-      // membros, tronco estreito, cabeca no lugar de cabeca. E o unico corpo do
-      // bestiario com a mesma leitura do prospector — e e a coisa mais importante
-      // do desenho, porque o encontro inteiro depende de o jogador reconhecer
-      // que ali esta alguem, e nao mais um bicho.
-      const rage = charged ? 0.6 + Math.sin(nowMs * 0.02) * 0.4 : 0;
-      limb(ctx, sx - size * 0.2, baseY, size * 0.2, size * 0.5, PAL.rockShadow, light);
-      limb(ctx, sx + size * 0.14, baseY, size * 0.2, size * 0.5, PAL.rockShadow, light);
-      block(ctx, sx, baseY - size * 0.4, size * 0.72, size * 0.42, size * 0.72, PAL.rust, light);
-      block(ctx, sx, baseY - size * 1.06, size * 0.5, size * 0.34, size * 0.36, PAL.bone, light);
-      // Picareta: e ela que diz que ele estava TRABALHANDO, nao esperando voce.
-      block(ctx, sx + size * 0.46, baseY - size * 0.5, size * 0.12, size * 0.12, size * 0.95, PAL.rust, light);
-      block(ctx, sx + size * 0.46, baseY - size * 1.4, size * 0.42, size * 0.14, size * 0.12, PAL.rockLight, light);
-      // Olhos: apagados enquanto ele te ignora, em brasa quando decidiu que voce
-      // e a empresa que o deixou aqui embaixo.
-      emissive(ctx, sx + size * 0.1, baseY - size * 1.16, size * 0.1, charged ? shade(PAL.blood, rage) : PAL.rockShadow);
-      emissive(ctx, sx - size * 0.08, baseY - size * 1.16, size * 0.09, charged ? shade(PAL.fire, rage) : PAL.rockShadow);
+      // Automato de carga abandonado: alto, curvado, bracos longos.
+      //
+      // A gramatica e a do PROSPECTOR degradada, e nao a de gente — mesmo plano
+      // de corpo, mesma lanterna, mesma ferramenta, so que grande demais e
+      // corroido. O jogador nao deve pensar "coitado"; deve pensar "isto aqui e
+      // o que sobra de mim".
+      const overload = charged ? 0.6 + Math.sin(nowMs * 0.02) * 0.4 : 0.35;
+      limb(ctx, sx - size * 0.26, baseY, size * 0.24, size * 0.62, PAL.rockShadow, light);
+      limb(ctx, sx + size * 0.18, baseY, size * 0.24, size * 0.62, PAL.rockShadow, light);
+      block(ctx, sx, baseY - size * 0.55, size * 0.98, size * 0.55, size * 0.78, PAL.rust, light);
+      // Tremonha nas costas: ainda cheia, ainda a caminho de lugar nenhum.
+      block(ctx, sx - size * 0.3, baseY - size * 1.22, size * 0.6, size * 0.3, size * 0.5, PAL.rockShadow, light);
+      // Bracos longos, descendo alem do tronco.
+      limb(ctx, sx - size * 0.62, baseY - size * 0.1, size * 0.2, size * 0.95, PAL.rockShadow, light);
+      limb(ctx, sx + size * 0.58, baseY - size * 0.1, size * 0.2, size * 0.95, PAL.rockShadow, light);
+      // Cabeca baixa, placa facial rachada.
+      block(ctx, sx + size * 0.12, baseY - size * 1.3, size * 0.46, size * 0.34, size * 0.34, PAL.rust, light);
+      block(ctx, sx + size * 0.12, baseY - size * 1.5, size * 0.34, size * 0.2, size * 0.12, PAL.bone, light);
+      // Picareta mergulhada no chao: ele estava trabalhando, nao esperando.
+      block(ctx, sx + size * 0.7, baseY - size * 0.35, size * 0.14, size * 0.14, size * 0.9, PAL.rust, light);
+      block(ctx, sx + size * 0.7, baseY - size * 0.2, size * 0.4, size * 0.14, size * 0.1, PAL.bone, light);
+      // Cabeamento e optica. O azul e a corrente da grade que ainda passa por
+      // ele; ele acende quando o calor a sobrecarrega.
+      emissive(ctx, sx - size * 0.42, baseY - size * 0.75, size * 0.12, shade(PAL.electric, overload));
+      emissive(ctx, sx + size * 0.3, baseY - size * 0.95, size * 0.1, shade(PAL.electric, overload));
+      emissive(ctx, sx + size * 0.22, baseY - size * 1.42, size * 0.1, charged ? PAL.blood : PAL.biolum);
+      // Lanterna: a unica luz quente, fraca e vacilante.
+      emissive(ctx, sx - size * 0.26, baseY - size * 1.36, size * 0.13, PAL.fire);
       break;
     }
 

@@ -127,8 +127,8 @@ export const populateSector = (
 /**
  * Mineradores nascem PERTO DE MINERIO, e nao em pontos de spawn de inimigo.
  *
- * O lugar e a caracterizacao: eles estao ali porque estao trabalhando o veio, e
- * e por isso que o robo da mineradora vai encontra-los. Espalha-los pelos mesmos
+ * O lugar e a caracterizacao: eles ainda estao trabalhando o veio, decadas
+ * depois de a grade que os mandou ter parado de responder. Espalha-los pelos mesmos
  * pontos que os bichos os transformaria em mais um inimigo que por acaso nao
  * ataca — o encontro so significa alguma coisa acontecendo ONDE voce foi buscar
  * o que eles ja estavam tirando.

@@ -55,6 +55,39 @@ export const deactivateTouchControls = (state: InputState): void => {
 };
 
 /**
+ * Deflexao de TELA -> direcao de MUNDO, preservando a MAGNITUDE.
+ *
+ * A conversao isometrica `{x: mx + 2my, y: 2my - mx}` da a direcao certa e o
+ * comprimento errado: ela estica o eixo vertical da tela por 2, entao o mesmo
+ * empurrao de stick produz vetores de mundo de comprimentos diferentes conforme
+ * a direcao. Mandar isso cru para a simulacao delegava o problema ao clamp de
+ * la (`min(1, |move|)`), e o clamp so salva o caso de deflexao MAXIMA.
+ *
+ * Medido, antes da correcao: meio-stick para a direita dava 70,7% da velocidade,
+ * meio-stick para cima dava 100%. No teclado nunca apareceu porque teclado e
+ * sempre deflexao maxima — o bug morava inteiro no analogico, que e o controle da
+ * plataforma que o jogo mira.
+ *
+ * A correcao separa as duas coisas que estavam misturadas: a DIRECAO sai da
+ * conversao isometrica e e normalizada; a MAGNITUDE sai do quanto o jogador
+ * empurrou, e nada mais. `min(1, ...)` continua aqui porque o teclado diagonal
+ * produz comprimento raiz de 2 e "andar mais rapido na diagonal" e exatamente o
+ * que nao pode acontecer.
+ *
+ * Nao mexe na velocidade de MUNDO por direcao — ela ja era constante nas oito, e
+ * tem de continuar: uma velocidade que varia com o rumo faria um perseguidor
+ * ganhar ou perder terreno conforme para onde voce olha.
+ */
+export const screenToWorldMove = (mx: number, my: number): Vec2 => {
+  const magnitude = Math.min(1, Math.hypot(mx, my));
+  if (magnitude <= 0) return { x: 0, y: 0 };
+  const wx = mx + my * 2;
+  const wy = my * 2 - mx;
+  const length = Math.hypot(wx, wy) || 1;
+  return { x: (wx / length) * magnitude, y: (wy / length) * magnitude };
+};
+
+/**
  * Entrada mobile-first: joystick fixo de movimento a esquerda, joystick fixo
  * de mira/auto-fire a direita e quatro acoes separadas acima da mira.
  * Teclado+mouse continuam sendo a modalidade desktop.
@@ -364,10 +397,7 @@ export class SurvivalInput {
       mx = this.state.joystick.dx;
       my = this.state.joystick.dy;
     }
-    // conversao tela->mundo isometrico (45 graus)
-    if (mx !== 0 || my !== 0) {
-      cmd.move = { x: mx + my * 2, y: my * 2 - mx };
-    }
+    cmd.move = screenToWorldMove(mx, my);
 
     // mira: vetor contido no joystick direito, sem depender da posicao do personagem.
     if (

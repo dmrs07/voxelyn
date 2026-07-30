@@ -2,11 +2,11 @@
   "id": "enemy-miner",
   "version": 2,
   "atlas": "enemy-miner.png",
-  "frameWidth": 40,
-  "frameHeight": 48,
+  "frameWidth": 48,
+  "frameHeight": 60,
   "columns": 84,
-  "anchorX": 20,
-  "anchorY": 42,
+  "anchorX": 24,
+  "anchorY": 54,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -16,12 +16,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 0.64,
-    "h": 0.95
+    "w": 0.92,
+    "h": 1.5
   },
   "footprint": {
-    "w": 1,
-    "h": 1,
+    "w": 1.25,
+    "h": 1.25,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -29,9 +29,18 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
+    "#1f3d33",
     "#2e3a4d",
+    "#2f6b4f",
+    "#46566e",
+    "#59f2c2",
+    "#66c28a",
     "#6e4a33",
-    "#b8a98f"
+    "#7ab8ff",
+    "#b8a98f",
+    "#d93b4c",
+    "#ff7a2f",
+    "#ffd166"
   ],
   "animations": {
     "idle": {
@@ -92,7 +101,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric impoverished human miner, hunched posture, ragged wrap, dark hood without lamp, pickaxe",
+    "prompt": "voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe",
     "seedOrRef": "deterministic-code-v2"
   }
 }

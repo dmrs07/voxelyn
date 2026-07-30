@@ -162,10 +162,12 @@ describe('registro de ativos', () => {
     expect([...BESTIARY_ORDER].sort()).toEqual(Object.keys(BESTIARY_NAMES).sort());
   });
 
-  // A voz e a da EMPRESA, e a empresa nao chama ninguem de povo. Se um dia
-  // alguem suavizar isso, o texto deixa de fazer o trabalho que faz.
-  it('a ficha do mineiro nega que ele seja alguem', () => {
-    expect(BESTIARY_FILES.miner.code).toBe('PESSOAL NÃO AUTORIZADO');
+  // A voz e a da EMPRESA, e a empresa nao assume o que abandonou: ela registra
+  // a unidade como operando fora de contrato, e nao como deixada para tras. Se
+  // um dia alguem suavizar isso, o texto deixa de fazer o trabalho que faz.
+  it('a ficha do mineiro empurra a culpa para a maquina', () => {
+    expect(BESTIARY_FILES.miner.code).toBe('UNIDADE EX-016');
+    expect(BESTIARY_FILES.miner.note).toContain('não foi autorizada');
     expect(BESTIARY_FILES.miner.note).toContain('Sem valor de recuperação');
     // E o nome que o JOGADOR aprendeu continua existindo, em outro campo: e a
     // distancia entre os dois que faz a pagina significar alguma coisa.
