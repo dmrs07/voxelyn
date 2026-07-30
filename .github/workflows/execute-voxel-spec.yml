@@ -62,7 +62,18 @@ jobs:
           git commit -m "fix(survival): validate enemy projectile death causes"
 
       - name: Apply responsive readout fix
-        run: python .github/scripts/death-echo-review-fixes.py layout
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/death-echo-review-fixes.py')
+          text = path.read_text()
+          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)"
+          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.DOTALL)"
+          if text.count(old) != 1:
+              raise SystemExit('regex helper marker changed')
+          path.write_text(text.replace(old, new))
+          PY
+          python .github/scripts/death-echo-review-fixes.py layout
 
       - name: Validate final product state
         run: |
