@@ -1,5 +1,17 @@
 import { TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
+import { FacingHysteresis } from './facing';
 import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
+
+/**
+ * Camadas de rumo que uma entidade desenha ao mesmo tempo. As pernas seguem o
+ * andar, o tronco segue a mira: cada uma precisa da propria histerese, senao a
+ * de baixo puxaria a de cima para o quadrante dela.
+ */
+const FACING_BODY = 0;
+const FACING_UPPER = 1;
+
+/** Resolve o rumo de uma camada em um vetor estavel de quadrante. */
+type FacingResolver = (layer: number, x: number, y: number) => { x: number; y: number };
 
 export type PresentedAnimation = {
   anim: SpriteAnimationSelection;
@@ -74,11 +86,14 @@ const layeredPlayerAnimation = (
   base: EntityAnimState,
   action: ActionIntent,
   upperElapsedMs: number,
-  nowMs: number
+  nowMs: number,
+  facing: FacingResolver
 ): LayeredPlayerAnimation => {
   const releaseMs = Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000);
   const walking = base.anim === 'walk';
-  const lowerFacing = locomotionFacing(base, entity.facing.x, entity.facing.y);
+  const raw = locomotionFacing(base, entity.facing.x, entity.facing.y);
+  const lowerFacing = facing(FACING_BODY, raw.x, raw.y);
+  const upperFacing = facing(FACING_UPPER, action.dx, action.dy);
 
   return {
     kind: 'layered-player',
@@ -91,8 +106,8 @@ const layeredPlayerAnimation = (
     upper: {
       animation: actionAnimation(action.action),
       elapsedMs: upperElapsedMs,
-      facingX: action.dx,
-      facingY: action.dy,
+      facingX: upperFacing.x,
+      facingY: upperFacing.y,
     },
     recoil: recoilAtElapsed(upperElapsedMs, releaseMs),
   };
@@ -105,6 +120,7 @@ export class EntityPresentation {
   private readonly downedAt = new Map<number, number>();
   private readonly reviveUntil = new Map<number, { startMs: number; endMs: number }>();
   private readonly tombstonesById = new Map<number, DeathTombstone>();
+  private readonly facingHysteresis = new FacingHysteresis();
 
   reset(): void {
     this.actions.clear();
@@ -112,6 +128,19 @@ export class EntityPresentation {
     this.downedAt.clear();
     this.reviveUntil.clear();
     this.tombstonesById.clear();
+    this.facingHysteresis.clear();
+  }
+
+  /**
+   * Rumo ESTAVEL de uma camada desta entidade.
+   *
+   * Toda saida de `animationFor` passa por aqui de proposito: o quadrante do
+   * sprite tem de ser decidido num lugar so. Fosse aplicado apenas no caminho
+   * que hoje pisca, a proxima pose a nascer entraria sem protecao — e o rumo
+   * cru continuaria vazando para o desenho quando a entidade trocasse de pose.
+   */
+  private facingFor(entity: Entity, layer: number, x: number, y: number, nowMs: number): { x: number; y: number } {
+    return this.facingHysteresis.resolve(entity.id * 2 + layer, x, y, nowMs);
   }
 
   ingest(events: readonly SemanticEvent[], nowMs: number): void {
@@ -140,6 +169,8 @@ export class EntityPresentation {
         this.actionVisualClocks.delete(event.entity);
         this.downedAt.delete(event.entity);
         this.reviveUntil.delete(event.entity);
+        this.facingHysteresis.forget(event.entity * 2 + FACING_BODY);
+        this.facingHysteresis.forget(event.entity * 2 + FACING_UPPER);
         this.tombstonesById.set(event.entity, {
           entity: event.entity,
           archetype: event.archetype,
@@ -173,10 +204,19 @@ export class EntityPresentation {
     nowMs: number,
     downed = false
   ): PresentedAnimation {
+    // Resolvido no ponto de SAIDA, nunca antes: cada camada so pode ser gravada
+    // uma vez por quadro, com o vetor que de fato vai ser desenhado. Resolver o
+    // rumo da mira aqui em cima e o do andar la embaixo faria as duas fontes
+    // disputarem a mesma memoria de quadrante, quadro sim, quadro nao.
+    const facing: FacingResolver = (layer, x, y) => this.facingFor(entity, layer, x, y, nowMs);
+    const bodyFacing = (): { x: number; y: number } =>
+      facing(FACING_BODY, entity.facing.x, entity.facing.y);
+
     const revive = this.reviveUntil.get(entity.id);
     if (revive) {
       if (nowMs < revive.endMs) {
-        return { anim: 'revive', elapsedMs: nowMs - revive.startMs, facingX: entity.facing.x, facingY: entity.facing.y };
+        const aim = bodyFacing();
+        return { anim: 'revive', elapsedMs: nowMs - revive.startMs, facingX: aim.x, facingY: aim.y };
       }
       this.reviveUntil.delete(entity.id);
     }
@@ -184,18 +224,20 @@ export class EntityPresentation {
     if (downed) {
       const start = this.downedAt.get(entity.id) ?? nowMs;
       this.downedAt.set(entity.id, start);
-      return { anim: 'downed', elapsedMs: nowMs - start, facingX: entity.facing.x, facingY: entity.facing.y };
+      const aim = bodyFacing();
+      return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
     }
     this.downedAt.delete(entity.id);
 
     // Morte sempre substitui a silhueta inteira. Hit só interrompe a composição
     // do Prospector; inimigos mantêm telegraphs de ações que a sim não cancelou.
     if (base.anim === 'die') {
+      const aim = bodyFacing();
       return {
         anim: base.anim,
         elapsedMs: nowMs - base.animStartMs,
-        facingX: entity.facing.x,
-        facingY: entity.facing.y,
+        facingX: aim.x,
+        facingY: aim.y,
       };
     }
 
@@ -206,11 +248,12 @@ export class EntityPresentation {
     if (entity.stunnedUntil > state.tick && !authoritative) {
       this.actions.delete(entity.id);
       this.actionVisualClocks.delete(entity.id);
+      const aim = bodyFacing();
       return {
         anim: 'idle',
         elapsedMs: 0,
-        facingX: entity.facing.x,
-        facingY: entity.facing.y,
+        facingX: aim.x,
+        facingY: aim.y,
       };
     }
 
@@ -228,28 +271,35 @@ export class EntityPresentation {
     if (action) {
       if (state.tick <= action.endTick) {
         if (entity.archetype === 'prospector' && base.anim === 'hit') {
+          const aim = bodyFacing();
           return {
             anim: 'hit',
             elapsedMs: nowMs - base.animStartMs,
-            facingX: entity.facing.x,
-            facingY: entity.facing.y,
+            facingX: aim.x,
+            facingY: aim.y,
           };
         }
 
         const elapsedMs = this.visualActionElapsed(entity.id, action, state.tick, nowMs);
         if (entity.archetype === 'prospector') {
+          // A composicao ja estabiliza as duas camadas por dentro; o rumo solto
+          // que sai aqui e o do TRONCO, e reaproveita a mesma memoria dela.
+          const layered = layeredPlayerAnimation(entity, base, action, elapsedMs, nowMs, facing);
           return {
-            anim: layeredPlayerAnimation(entity, base, action, elapsedMs, nowMs),
+            anim: layered,
             elapsedMs,
-            facingX: action.dx,
-            facingY: action.dy,
+            facingX: layered.upper.facingX,
+            facingY: layered.upper.facingY,
           };
         }
+        // Inimigo desenha a acao com o corpo inteiro: a direcao dela E o rumo do
+        // corpo, e por isso divide a memoria de quadrante com a locomocao.
+        const aim = facing(FACING_BODY, action.dx, action.dy);
         return {
           anim: actionAnimation(action.action),
           elapsedMs,
-          facingX: action.dx,
-          facingY: action.dy,
+          facingX: aim.x,
+          facingY: aim.y,
         };
       }
       this.actions.delete(entity.id);
@@ -271,15 +321,16 @@ export class EntityPresentation {
     // entre (0,94, -0,33) e (0,-1) exato — `dr` e `ur` — e o sprite girava no
     // proprio eixo. Nao era animacao nem interpolacao; era o cliente discordando
     // da simulacao sobre para onde a criatura estava virada.
-    const facing =
+    const raw =
       entity.archetype === 'prospector'
         ? locomotionFacing(base, entity.facing.x, entity.facing.y)
         : { x: entity.facing.x, y: entity.facing.y };
+    const heading = facing(FACING_BODY, raw.x, raw.y);
     return {
       anim: base.anim,
       elapsedMs: nowMs - base.animStartMs,
-      facingX: facing.x,
-      facingY: facing.y,
+      facingX: heading.x,
+      facingY: heading.y,
     };
   }
 
@@ -287,6 +338,9 @@ export class EntityPresentation {
     for (const [id, tombstone] of this.tombstonesById) {
       if (nowMs >= tombstone.expiresMs) this.tombstonesById.delete(id);
     }
+    // Chamado uma vez por quadro pelo renderer: e a batida natural para expulsar
+    // do mapa de histerese os ids que sumiram do mundo sem evento de morte.
+    this.facingHysteresis.sweep(nowMs);
     return [...this.tombstonesById.values()];
   }
 }
