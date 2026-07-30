@@ -9,13 +9,18 @@ import {
 } from '@voxelyn/survival-sim';
 import {
   DEATH_ECHO_HISTORY_LIMIT,
+  DEATH_ECHO_TRACE_SAMPLES,
   applyDeathEchoOnce,
   captureDeathEcho,
+  deathEchoTraceDuration,
   decodeDeathEchoRecords,
+  decodeDeathEchoTracePoint,
   emptyDeathEchoRecords,
+  encodeDeathEchoTrace,
   projectDeathEchoes,
   type DeathEchoCapsule,
   type DeathEchoRecords,
+  type DeathEchoTraceSample,
 } from './death-echoes';
 
 const finishDead = (state: SurvivalState, cause: DamageCause = { kind: 'fire' }): SurvivalState => {
@@ -178,6 +183,74 @@ describe('cápsula de morte local', () => {
     }
     expect(records.echoes).toHaveLength(DEATH_ECHO_HISTORY_LIMIT);
     expect(records.echoes[0].sourceSeed).toBe(DEATH_ECHO_HISTORY_LIMIT + 5);
+  });
+});
+
+describe('rastro dos últimos segundos', () => {
+  const walk = (count: number, firing = false): DeathEchoTraceSample[] =>
+    Array.from({ length: count }, (_, i) => ({
+      x: 20 + i * 0.25,
+      y: 30,
+      aimX: 1,
+      aimY: 0,
+      firing: firing && i % 2 === 0,
+    }));
+
+  it('não guarda rastro de uma morte curta demais para contar algo', () => {
+    expect(encodeDeathEchoTrace([], 20, 30)).toBeNull();
+    expect(encodeDeathEchoTrace(walk(1), 20, 30)).toBeNull();
+    expect(encodeDeathEchoTrace(walk(2), 20, 30)).not.toBeNull();
+  });
+
+  it('mantém apenas a janela final e devolve os pontos ao mundo', () => {
+    const samples = walk(DEATH_ECHO_TRACE_SAMPLES + 10, true);
+    const last = samples[samples.length - 1];
+    const trace = encodeDeathEchoTrace(samples, last.x, last.y);
+    if (!trace) throw new Error('rastro não codificado');
+    expect(trace.dx).toHaveLength(DEATH_ECHO_TRACE_SAMPLES);
+    expect(deathEchoTraceDuration(trace)).toBe(DEATH_ECHO_TRACE_SAMPLES * trace.stepMs);
+
+    const head = decodeDeathEchoTracePoint(trace, trace.dx.length - 1, last.x, last.y);
+    expect(head?.x).toBeCloseTo(last.x, 1);
+    expect(head?.y).toBeCloseTo(last.y, 1);
+    expect(head?.aimX).toBeCloseTo(1, 5);
+    expect(head?.firing).toBe(last.firing);
+    // A quantização é grosseira de propósito, mas o trajeto tem de continuar
+    // sendo um trajeto: o primeiro ponto fica atrás do último.
+    const tail = decodeDeathEchoTracePoint(trace, 0, last.x, last.y);
+    expect(tail?.x).toBeLessThan(head?.x ?? 0);
+    expect(decodeDeathEchoTracePoint(trace, trace.dx.length, last.x, last.y)).toBeNull();
+  });
+
+  it('viaja com a cápsula e sobrevive ao storage', () => {
+    const state = finishDead(createRun({ seed: 0x5150 }));
+    const samples = walk(6, true).map((sample) => ({
+      ...sample,
+      x: state.player.x + sample.x - 20,
+      y: state.player.y,
+    }));
+    const echo = captureDeathEcho(state, 'with-trace', samples);
+    expect(echo?.finalTrace?.dx).toHaveLength(6);
+
+    const decoded = decodeDeathEchoRecords(JSON.stringify(recordOf([echo as DeathEchoCapsule])));
+    expect(decoded.echoes[0].finalTrace?.dx).toEqual(echo?.finalTrace?.dx);
+    expect(decoded.echoes[0].finalTrace?.aim).toEqual(echo?.finalTrace?.aim);
+  });
+
+  it('descarta um rastro corrompido sem perder a carcaça, que é a parte que ensina', () => {
+    const state = finishDead(createRun({ seed: 0x5151 }));
+    const echo = captureDeathEcho(state, 'broken-trace', walk(5));
+    if (!echo) throw new Error('eco não capturado');
+    const decoded = decodeDeathEchoRecords(JSON.stringify(recordOf([
+      { ...echo, id: 'mismatched-lengths', finalTrace: { ...echo.finalTrace, dy: [1] } },
+      { ...echo, id: 'out-of-range', finalTrace: { ...echo.finalTrace, aim: [99, 0, 0, 0, 0] } },
+      { ...echo, id: 'not-an-object', finalTrace: 7 },
+    ] as unknown as DeathEchoCapsule[])));
+    expect(decoded.echoes).toHaveLength(3);
+    for (const entry of decoded.echoes) {
+      expect(entry.finalTrace).toBeUndefined();
+      expect(entry.cause).toEqual(echo.cause);
+    }
   });
 });
 

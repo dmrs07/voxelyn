@@ -1,22 +1,44 @@
 // Controller client-side dos Ecos do Veio.
 //
-// Esta camada guarda memória local e projeta carcaças, mas não participa da
-// simulação. O renderer recebe apenas uma lista imutável de apresentação.
+// Esta camada guarda memória local, projeta carcaças e decide o que está PAREADO
+// com a caixa-preta. Ela não participa da simulação: o renderer recebe apenas um
+// quadro imutável de apresentação.
+//
+// O pareamento observa o botão usar sem consumi-lo. O comando continua indo
+// inteiro para a simulação — se o eco roubasse o `interact`, a run gravada
+// deixaria de ser a run jogada, e o replay do servidor voltaria divergente por
+// causa de um painel de texto.
 
 import type { SurvivalState } from '@voxelyn/survival-sim';
 import { describeCause } from './run-summary';
+import { carcassVariant, deathEchoDesignation } from './death-echo-carcass';
 import {
+  DEATH_ECHO_TRACE_SAMPLES,
+  DEATH_ECHO_TRACE_STEP_MS,
   applyDeathEchoOnce,
   loadDeathEchoRecords,
   projectDeathEchoes,
   saveDeathEchoRecords,
   type DeathEchoRecords,
+  type DeathEchoTraceSample,
   type PlacedDeathEcho,
 } from './death-echoes';
 
+/** Distância em que o botão usar abre a transmissão. */
+export const DEATH_ECHO_PAIR_RADIUS = 1.7;
+/**
+ * Distância em que a transmissão cai sozinha.
+ *
+ * Maior que o raio de pareamento de propósito: sair da caixa-preta por um passo
+ * lateral fecharia o painel no meio da leitura.
+ */
+export const DEATH_ECHO_LINK_RADIUS = 3.4;
+
 export type DeathEchoReadout = {
   title: string;
+  condition: string;
   headline: string;
+  lesson: string;
 };
 
 export type DeathEchoReadoutRegion = {
@@ -28,15 +50,37 @@ export type DeathEchoReadoutRegion = {
   placement: 'side' | 'below';
 };
 
+/** Transmissão aberta: o eco e o instante em que o jogador pareou com ele. */
+export type DeathEchoLink = {
+  echo: PlacedDeathEcho;
+  openedAtMs: number;
+};
+
+export type DeathEchoFrame = {
+  echoes: readonly PlacedDeathEcho[];
+  /** Ao alcance do botão usar, transmissão ainda fechada. */
+  prompt: PlacedDeathEcho | null;
+  paired: DeathEchoLink | null;
+};
+
+export const emptyDeathEchoFrame = (): DeathEchoFrame => ({
+  echoes: [],
+  prompt: null,
+  paired: null,
+});
+
 type Insets = { top: number; right: number; bottom: number; left: number };
 type PanelRect = { x: number; y: number; width: number; height: number };
 
 export const deathEchoReadout = (echo: PlacedDeathEcho): DeathEchoReadout => {
-  const serialParts = echo.id.split(':');
-  const serial = serialParts[serialParts.length - 1] ?? '---';
+  const cause = describeCause(echo.cause);
   return {
-    title: `CAIXA-PRETA ${serial.padStart(3, '0')}`,
-    headline: describeCause(echo.cause).headline,
+    title: deathEchoDesignation(echo.id),
+    // Laudo do corpo, não da run: é a linha que amarra o texto ao que o jogador
+    // está vendo no chão.
+    condition: `CARCAÇA ${carcassVariant(echo.cause).condition}`,
+    headline: cause.headline,
+    lesson: cause.lesson,
   };
 };
 
@@ -88,18 +132,83 @@ export const deathEchoReadoutRegion = (
   };
 };
 
+/**
+ * Janela deslizante dos últimos segundos do Prospector local.
+ *
+ * Amostrada pelo RELÓGIO e não pelo quadro: em rAF a 120Hz o mesmo buffer
+ * guardaria metade do tempo, e a reprodução holográfica duraria metade em
+ * monitores rápidos.
+ */
+class DeathEchoTraceRecorder {
+  private samples: DeathEchoTraceSample[] = [];
+  private nextSampleAtMs = 0;
+
+  reset(): void {
+    this.samples = [];
+    this.nextSampleAtMs = 0;
+  }
+
+  observe(state: SurvivalState, nowMs: number): void {
+    // Só a run solo produz cápsula, e só ela produz rastro. No co-op a posição é
+    // deste cliente mas a causa é da sala: unir os dois inventaria uma morte.
+    if (state.config.playerCount !== 1 || state.phase !== 'running') return;
+    if (nowMs < this.nextSampleAtMs) return;
+    this.nextSampleAtMs = nowMs + DEATH_ECHO_TRACE_STEP_MS;
+    const extra = state.playerExtra;
+    this.samples.push({
+      x: state.player.x,
+      y: state.player.y,
+      aimX: extra.aim.x,
+      aimY: extra.aim.y,
+      // `nextShotAt` no futuro significa "acabou de disparar": é o único sinal
+      // de gatilho que o estado carrega depois que o tiro já saiu.
+      firing: extra.nextShotAt > state.tick,
+    });
+    if (this.samples.length > DEATH_ECHO_TRACE_SAMPLES) {
+      this.samples.splice(0, this.samples.length - DEATH_ECHO_TRACE_SAMPLES);
+    }
+  }
+
+  window(): readonly DeathEchoTraceSample[] {
+    return this.samples;
+  }
+}
+
 export class DeathEchoController {
   private recordedIdentity: string | null = null;
   private terminal = false;
   private projectionKey = '';
   private placed: readonly PlacedDeathEcho[] = [];
+  private readonly trace = new DeathEchoTraceRecorder();
+  private pairedId: string | null = null;
+  private pairedAtMs = 0;
+  private interactPending = false;
 
   constructor(private records: DeathEchoRecords = loadDeathEchoRecords()) {}
 
-  sync(state: SurvivalState): readonly PlacedDeathEcho[] {
+  /**
+   * O jogador apertou usar neste tick.
+   *
+   * Chamado com o MESMO comando que a simulação recebeu, depois de ele ter sido
+   * submetido. Vários ticks num quadro colapsam num único pedido: o painel é
+   * alternado uma vez por quadro, nunca duas.
+   */
+  pressInteract(): void {
+    this.interactPending = true;
+  }
+
+  sync(state: SurvivalState, nowMs: number): DeathEchoFrame {
+    const requested = this.interactPending;
+    this.interactPending = false;
+
     if (state.phase !== 'running') {
       if (!this.terminal && state.phase === 'dead') {
-        const result = applyDeathEchoOnce(this.records, state, this.recordedIdentity);
+        const result = applyDeathEchoOnce(
+          this.records,
+          state,
+          this.recordedIdentity,
+          this.trace.window(),
+        );
         this.recordedIdentity = result.identity;
         if (result.applied) {
           this.records = result.records;
@@ -109,13 +218,16 @@ export class DeathEchoController {
       this.terminal = true;
       this.projectionKey = '';
       this.placed = [];
-      return this.placed;
+      this.pairedId = null;
+      return emptyDeathEchoFrame();
     }
 
     if (this.terminal) {
       this.recordedIdentity = null;
       this.terminal = false;
+      this.trace.reset();
     }
+    this.trace.observe(state, nowMs);
 
     const key = [
       state.config.seed,
@@ -127,7 +239,52 @@ export class DeathEchoController {
     if (key !== this.projectionKey) {
       this.projectionKey = key;
       this.placed = projectDeathEchoes(state, this.records);
+      // A descida troca o mundo inteiro: um vínculo com a carcaça do setor
+      // anterior sobreviveria apontando para um corpo que não existe mais.
+      this.pairedId = null;
     }
-    return this.placed;
+
+    return this.resolveLink(state, nowMs, requested);
+  }
+
+  private resolveLink(
+    state: SurvivalState,
+    nowMs: number,
+    requested: boolean,
+  ): DeathEchoFrame {
+    const distanceTo = (echo: PlacedDeathEcho): number =>
+      Math.hypot(state.player.x - echo.x, state.player.y - echo.y);
+
+    let paired = this.placed.find((echo) => echo.id === this.pairedId) ?? null;
+    if (paired && distanceTo(paired) > DEATH_ECHO_LINK_RADIUS) {
+      paired = null;
+      this.pairedId = null;
+    }
+
+    let nearest: PlacedDeathEcho | null = null;
+    let nearestDistance = DEATH_ECHO_PAIR_RADIUS;
+    for (const echo of this.placed) {
+      const distance = distanceTo(echo);
+      if (distance > nearestDistance) continue;
+      nearest = echo;
+      nearestDistance = distance;
+    }
+
+    if (requested) {
+      if (paired) {
+        paired = null;
+        this.pairedId = null;
+      } else if (nearest) {
+        paired = nearest;
+        this.pairedId = nearest.id;
+        this.pairedAtMs = nowMs;
+      }
+    }
+
+    return {
+      echoes: this.placed,
+      prompt: paired ? null : nearest,
+      paired: paired ? { echo: paired, openedAtMs: this.pairedAtMs } : null,
+    };
   }
 }
