@@ -62,7 +62,7 @@ const renderState = (
   inputState: Parameters<SurvivalRenderer['render']>[2],
   nowMs: number,
 ): void => {
-  renderer.setDeathEchoes(deathEchoes.sync(state));
+  renderer.setDeathEchoes(deathEchoes.sync(state, nowMs));
   renderer.render(state, alpha, inputState, nowMs);
 };
 const input = new SurvivalInput(canvas);
@@ -394,6 +394,10 @@ const runSolo = (): void => {
       // simular de outro produziria um log que, re-simulado no servidor,
       // diverge do que o jogador viveu — e a run honesta voltaria recusada.
       const cmd = recorder.capture(raw);
+      // O eco OBSERVA o comando; nao o consome. O `interact` segue inteiro para
+      // a simulacao — parear com uma caixa-preta nao pode custar ao jogador o
+      // revive, a descida ou a extracao que ele pediu no mesmo aperto.
+      if (cmd.interact) deathEchoes.pressInteract();
       const result = stepRun(state, [cmd]);
       renderer.ingestEvents(result.events, now);
       audio.ingest(result.events, now, state);
@@ -527,6 +531,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
         cmd.choose = queuedChoice;
         queuedChoice = null;
       }
+      if (cmd.interact) deathEchoes.pressInteract();
       net.setCommand(cmd);
       net.pump(now);
       const state = net.sampleRenderState(now);

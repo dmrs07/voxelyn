@@ -23,6 +23,47 @@ const SCHEMA = 1;
 export const DEATH_ECHO_HISTORY_LIMIT = 24;
 export const DEATH_ECHOES_PER_SECTOR = 1;
 
+/** Intervalo entre amostras do rastro final. */
+export const DEATH_ECHO_TRACE_STEP_MS = 120;
+/** Teto de amostras guardadas: ~2,9 s, os "últimos segundos" da spec. */
+export const DEATH_ECHO_TRACE_SAMPLES = 24;
+/** Sem dois pontos não há trajetória, só um ponto parado. */
+const DEATH_ECHO_TRACE_MIN_SAMPLES = 2;
+/** Quantização espacial do rastro: oitavos de tile, em int8. */
+const TRACE_UNITS_PER_TILE = 8;
+const TRACE_MAX_OFFSET = 127;
+
+/**
+ * Uma amostra crua do Prospector vivo, antes de virar storage.
+ *
+ * O controller coleta isto quadro a quadro; só a morte transforma a janela
+ * corrente em `DeathEchoTrace`.
+ */
+export type DeathEchoTraceSample = {
+  x: number;
+  y: number;
+  aimX: number;
+  aimY: number;
+  firing: boolean;
+};
+
+/**
+ * Os últimos segundos, comprimidos.
+ *
+ * Deslocamentos são relativos à célula da morte e cabem em int8; a mira vira
+ * octante. É deliberadamente grosseiro: a reprodução tem de contar uma história
+ * curta, não reproduzir a luta — e o storage é `localStorage`, compartilhado com
+ * o histórico de runs.
+ */
+export type DeathEchoTrace = {
+  stepMs: number;
+  /** Deslocamento em oitavos de tile a partir da célula da morte. */
+  dx: number[];
+  dy: number[];
+  /** Octante da mira (0..7), somado a 8 quando havia disparo em curso. */
+  aim: number[];
+};
+
 export type DeathEchoCapsule = {
   id: string;
   sourceSeed: number;
@@ -44,6 +85,8 @@ export type DeathEchoCapsule = {
   facingY: number;
   cause: DamageCause;
   ticks: number;
+  /** Ausente em storage legado e em mortes curtas demais para contar algo. */
+  finalTrace?: DeathEchoTrace;
 };
 
 export type DeathEchoRecords = {
@@ -140,6 +183,42 @@ const isDamageCause = (value: unknown): value is DamageCause => {
   }
 };
 
+const int8Array = (value: unknown, length: number): number[] | null => {
+  if (!Array.isArray(value) || value.length !== length) return null;
+  const out: number[] = [];
+  for (const entry of value) {
+    const integer = finiteInt(entry, -TRACE_MAX_OFFSET - 1, TRACE_MAX_OFFSET);
+    if (integer === null) return null;
+    out.push(integer);
+  }
+  return out;
+};
+
+/**
+ * O rastro é OPCIONAL, e por isso a validação devolve o eco sem ele em vez de
+ * descartar o eco inteiro: um replay corrompido não pode custar a carcaça, que é
+ * a parte que ensina.
+ */
+const parseTrace = (value: unknown): DeathEchoTrace | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Partial<DeathEchoTrace>;
+  const stepMs = finiteInt(raw.stepMs, 16, 1000);
+  if (stepMs === null || !Array.isArray(raw.dx)) return null;
+  const length = raw.dx.length;
+  if (length < DEATH_ECHO_TRACE_MIN_SAMPLES || length > DEATH_ECHO_TRACE_SAMPLES) return null;
+  const dx = int8Array(raw.dx, length);
+  const dy = int8Array(raw.dy, length);
+  if (!dx || !dy) return null;
+  if (!Array.isArray(raw.aim) || raw.aim.length !== length) return null;
+  const aim: number[] = [];
+  for (const entry of raw.aim) {
+    const octant = finiteInt(entry, 0, 15);
+    if (octant === null) return null;
+    aim.push(octant);
+  }
+  return { stepMs, dx, dy, aim };
+};
+
 const parseCapsule = (value: unknown): DeathEchoCapsule | null => {
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Partial<DeathEchoCapsule>;
@@ -165,7 +244,9 @@ const parseCapsule = (value: unknown): DeathEchoCapsule | null => {
     typeof raw.nearOre !== 'boolean' || typeof raw.facingX !== 'number' ||
     !Number.isFinite(raw.facingX) || typeof raw.facingY !== 'number' || !Number.isFinite(raw.facingY)
   ) return null;
+  const finalTrace = raw.finalTrace === undefined ? null : parseTrace(raw.finalTrace);
   return {
+    ...(finalTrace ? { finalTrace } : {}),
     id: raw.id,
     sourceSeed,
     sourceSimulationVersion,
@@ -314,7 +395,77 @@ const progressAt = (state: SurvivalState, x: number, y: number): number => {
   return Math.max(0, Math.min(255, Math.round((here / denominator) * 255)));
 };
 
-export const captureDeathEcho = (state: SurvivalState, id: string): DeathEchoCapsule | null => {
+const octantOf = (x: number, y: number): number => {
+  if (x === 0 && y === 0) return 0;
+  return ((Math.round(Math.atan2(y, x) / (Math.PI / 4)) % 8) + 8) % 8;
+};
+
+const quantizeOffset = (value: number): number =>
+  Math.max(
+    -TRACE_MAX_OFFSET,
+    Math.min(TRACE_MAX_OFFSET, Math.round(value * TRACE_UNITS_PER_TILE)),
+  );
+
+/**
+ * Fecha a janela corrente de amostras num rastro guardável.
+ *
+ * Devolve `null` quando a janela é curta demais: uma morte de dois quadros não
+ * tem história para contar, e a spec já exclui mortes muito curtas do pool.
+ */
+export const encodeDeathEchoTrace = (
+  samples: readonly DeathEchoTraceSample[],
+  originX: number,
+  originY: number,
+  stepMs: number = DEATH_ECHO_TRACE_STEP_MS,
+): DeathEchoTrace | null => {
+  const window = samples.slice(-DEATH_ECHO_TRACE_SAMPLES);
+  if (window.length < DEATH_ECHO_TRACE_MIN_SAMPLES) return null;
+  return {
+    stepMs,
+    dx: window.map((sample) => quantizeOffset(sample.x - originX)),
+    dy: window.map((sample) => quantizeOffset(sample.y - originY)),
+    aim: window.map(
+      (sample) => octantOf(sample.aimX, sample.aimY) + (sample.firing ? 8 : 0),
+    ),
+  };
+};
+
+export type DeathEchoTracePoint = {
+  x: number;
+  y: number;
+  aimX: number;
+  aimY: number;
+  firing: boolean;
+};
+
+/** Duração total da reprodução, em ms. */
+export const deathEchoTraceDuration = (trace: DeathEchoTrace): number =>
+  trace.dx.length * trace.stepMs;
+
+/** Devolve a amostra `index` de volta ao mundo, ancorada na carcaça. */
+export const decodeDeathEchoTracePoint = (
+  trace: DeathEchoTrace,
+  index: number,
+  originX: number,
+  originY: number,
+): DeathEchoTracePoint | null => {
+  if (index < 0 || index >= trace.dx.length) return null;
+  const code = trace.aim[index];
+  const angle = (code & 7) * (Math.PI / 4);
+  return {
+    x: originX + trace.dx[index] / TRACE_UNITS_PER_TILE,
+    y: originY + trace.dy[index] / TRACE_UNITS_PER_TILE,
+    aimX: Math.cos(angle),
+    aimY: Math.sin(angle),
+    firing: (code & 8) !== 0,
+  };
+};
+
+export const captureDeathEcho = (
+  state: SurvivalState,
+  id: string,
+  trace: readonly DeathEchoTraceSample[] = [],
+): DeathEchoCapsule | null => {
   if (
     state.config.playerCount !== 1 ||
     state.phase !== 'dead' ||
@@ -326,7 +477,9 @@ export const captureDeathEcho = (state: SurvivalState, id: string): DeathEchoCap
   const sourceX = Math.max(0, Math.min(width - 1, Math.floor(state.player.x)));
   const sourceY = Math.max(0, Math.min(height - 1, Math.floor(state.player.y)));
   const index = cellIndex(width, sourceX, sourceY);
+  const finalTrace = encodeDeathEchoTrace(trace, sourceX + 0.5, sourceY + 0.5);
   return {
+    ...(finalTrace ? { finalTrace } : {}),
     id,
     sourceSeed: state.config.seed >>> 0,
     sourceSimulationVersion: SIMULATION_VERSION,
@@ -351,13 +504,14 @@ export const applyDeathEchoOnce = (
   records: DeathEchoRecords,
   state: SurvivalState,
   previousIdentity: string | null,
+  trace: readonly DeathEchoTraceSample[] = [],
 ): ApplyDeathEchoOnceResult => {
   if (state.phase !== 'dead' || !state.summary) {
     return { records, identity: previousIdentity, applied: false, echo: null };
   }
   const identity = deathEchoRunIdentity(state.summary);
   if (identity === previousIdentity) return { records, identity, applied: false, echo: null };
-  const echo = captureDeathEcho(state, `${identity}:${records.nextSerial}`);
+  const echo = captureDeathEcho(state, `${identity}:${records.nextSerial}`, trace);
   if (!echo) return { records, identity, applied: false, echo: null };
   return {
     identity,

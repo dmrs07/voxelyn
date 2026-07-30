@@ -47,8 +47,18 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
-import { deathEchoReadout, deathEchoReadoutRegion } from './death-echo-presentation';
-import type { PlacedDeathEcho } from './death-echoes';
+import {
+  deathEchoReadout,
+  deathEchoReadoutRegion,
+  emptyDeathEchoFrame,
+  type DeathEchoFrame,
+} from './death-echo-presentation';
+import { carcassVariant } from './death-echo-carcass';
+import {
+  deathEchoTraceDuration,
+  decodeDeathEchoTracePoint,
+  type PlacedDeathEcho,
+} from './death-echoes';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -217,6 +227,36 @@ const drawStunIndicator = (
   }
 };
 
+/**
+ * O visor do parceiro: a luz que sobra dele quando o corpo apaga.
+ *
+ * Desenhado SEMPRE, iluminado ou nao. Sob a luz ele e um acento que separa o
+ * parceiro do jogador local num relance; no breu ele e o unico sinal, e por isso
+ * o halo cresce quando a luz cai — a `allyVisorGlow` faz essa conta.
+ */
+const drawAllyVisor = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  light: number
+): void => {
+  const glow = allyVisorGlow(light);
+  const cy = sy - size * 1.55;
+  const breath = 0.72 + Math.sin(nowMs * 0.004) * 0.14;
+  ctx.save();
+  ctx.globalAlpha = breath * (0.32 + (1 - allyBodyAlpha(light)) * 0.34);
+  ctx.fillStyle = PAL.biolum;
+  ctx.beginPath();
+  ctx.ellipse(sx, cy, size * glow, size * glow * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = PAL.biolum;
+  const visor = Math.max(2, size * 0.34);
+  ctx.fillRect(Math.round(sx - visor / 2), Math.round(cy - visor / 2), visor, Math.max(2, visor * 0.6));
+};
 
 const drawModuleGlyph = (
   ctx: CanvasRenderingContext2D,
@@ -318,6 +358,29 @@ const wrapMeasuredText = (
 export const deathEchoBodyAlpha = (light: number): number =>
   light <= 0.05 ? 0 : Math.min(1, 0.15 + Math.max(0, light) * 0.85);
 
+/**
+ * Quanto do PARCEIRO a luz do mundo revela.
+ *
+ * Antes ele era desenhado inteiro, com brilho fixo, atravessando o escuro que
+ * esconde todo o resto — o co-op enxergava mais mapa do que o solo pela simples
+ * presença de um segundo corpo. Agora o corpo obedece à mesma regra das paredes
+ * e das criaturas, e o que sobra no escuro é o visor: uma luz que diz ONDE o
+ * parceiro está sem dizer o que há em volta dele.
+ */
+export const allyBodyAlpha = (light: number): number => {
+  const visible = (light - 0.16) / 0.4;
+  return Math.max(0, Math.min(1, visible));
+};
+
+/**
+ * O tamanho do halo do visor, em múltiplos do corpo.
+ *
+ * Cresce conforme a luz some: iluminado, o visor é um detalhe do sprite; no
+ * breu, é a única marca do parceiro e precisa ser encontrável de longe.
+ */
+export const allyVisorGlow = (light: number): number =>
+  1.6 - allyBodyAlpha(light) * 0.75;
+
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   zoom = 2;
@@ -361,7 +424,7 @@ export class SurvivalRenderer {
   } | null = null;
   private choiceRevealAt = 0;
   private purgePulseUntil = 0;
-  private deathEchoes: readonly PlacedDeathEcho[] = [];
+  private deathEchoes: DeathEchoFrame = emptyDeathEchoFrame();
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -383,8 +446,8 @@ export class SurvivalRenderer {
     this.safeArea = { ...safeArea };
   }
 
-  setDeathEchoes(echoes: readonly PlacedDeathEcho[]): void {
-    this.deathEchoes = echoes;
+  setDeathEchoes(frame: DeathEchoFrame): void {
+    this.deathEchoes = frame;
   }
 
   isChoiceRevealReady(nowMs: number): boolean {
@@ -936,7 +999,8 @@ export class SurvivalRenderer {
 
     const spriteZoom = Math.max(1, Math.round(z));
 
-    for (const echo of this.deathEchoes) {
+    const pairedEcho = this.deathEchoes.paired;
+    for (const echo of this.deathEchoes.echoes) {
       const [esx, esy] = toScreen(echo.x, echo.y);
       if (esx < -80 || esx > vw + 80 || esy < -100 || esy > vh + 80) continue;
       const bodyAlpha = deathEchoBodyAlpha(brightness(echo.x, echo.y));
@@ -944,6 +1008,21 @@ export class SurvivalRenderer {
         depth: echo.x + echo.y,
         draw: () => this.drawDeathEchoBody(echo, esx, esy, z, spriteZoom, nowMs, bodyAlpha),
       });
+      if (pairedEcho?.echo.id === echo.id) {
+        // O holograma entra como item PRÓPRIO, meio tile à frente da carcaça: ele
+        // ocupa o espaço em volta do corpo, e enfileirado junto seria cortado
+        // pela mesma parede que esconde o corpo.
+        items.push({
+          depth: echo.x + echo.y + 0.5,
+          draw: () => this.drawDeathEchoTrace(pairedEcho, toScreen, z, nowMs),
+        });
+      }
+      if (this.deathEchoes.prompt?.id === echo.id) {
+        items.push({
+          depth: echo.x + echo.y + 0.5,
+          draw: () => this.drawDeathEchoPrompt(esx, esy, z, nowMs),
+        });
+      }
     }
 
     this.archetypeById.clear();
@@ -1037,43 +1116,61 @@ export class SurvivalRenderer {
         draw: () => {
           const [psx, psy] = toScreen(pl.x, pl.y);
           const size = pl.radius * TILE_W * 0.9 * z;
-          drawShadow(psx, psy, size);
+          // O jogador local NUNCA some: a camera esta nele, e um Prospector
+          // invisivel no proprio centro da tela e um jogo quebrado, nao uma
+          // caverna escura. O parceiro obedece a luz como todo o resto do mundo.
+          const allyLight = isLocal ? 1 : brightness(pl.x, pl.y);
+          const bodyAlpha = isLocal ? 1 : allyBodyAlpha(allyLight);
           const flick = isLocal && ex.iframesUntil > state.tick && state.tick % 2 === 0;
-          if (!flick) {
-            const drew = this.sprites.drawEntity(
-              ctx,
-              'prospector',
-              presented.anim,
-              presented.facingX,
-              presented.facingY,
-              presented.elapsedMs,
-              psx,
-              psy,
-              spriteZoom,
-              // parceiro (nao-local) recebe leve tint frio para diferenciar
-              isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }
-            );
-            if (!drew) {
-              drawVoxelEntity(ctx, {
-                sx: psx,
-                sy: psy,
-                z,
-                radius: pl.radius,
-                brightness: 1,
-                archetype: 'prospector',
-                elite: false,
-                nowMs,
-                allyTint: !isLocal,
-              });
+          if (bodyAlpha > 0) {
+            ctx.save();
+            ctx.globalAlpha = bodyAlpha;
+            drawShadow(psx, psy, size);
+            if (!flick) {
+              const drew = this.sprites.drawEntity(
+                ctx,
+                'prospector',
+                presented.anim,
+                presented.facingX,
+                presented.facingY,
+                presented.elapsedMs,
+                psx,
+                psy,
+                spriteZoom,
+                // parceiro (nao-local) recebe leve tint frio para diferenciar
+                isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }
+              );
+              if (!drew) {
+                drawVoxelEntity(ctx, {
+                  sx: psx,
+                  sy: psy,
+                  z,
+                  radius: pl.radius,
+                  brightness: isLocal ? 1 : allyLight,
+                  archetype: 'prospector',
+                  elite: false,
+                  nowMs,
+                  allyTint: !isLocal,
+                });
+              }
             }
+            ctx.restore();
           }
+          // O visor do parceiro atravessa o escuro sozinho. E a mesma regra do
+          // farol da caixa-preta: a fog of war revela LUZES, nao silhuetas —
+          // saber onde o parceiro esta nunca deveria custar enxergar a sala
+          // inteira em volta dele.
+          if (!isLocal) drawAllyVisor(ctx, psx, psy, size, z, nowMs, allyLight);
           if (pl.stunnedUntil > state.tick) {
             drawStunIndicator(ctx, psx, psy, size, z, pl.id, state.tick);
           }
           // O Prospector local ja tem HP numerico na HUD fixa. Repetir a barra
           // sobre a propria cabeca cobre animacao e mira; o parceiro ainda precisa
-          // dela para coordenacao de revive no co-op.
-          if (!isLocal) drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
+          // dela para coordenacao de revive no co-op — mas so quando ha corpo
+          // para ela medir. No breu ela seria uma barra flutuando no nada.
+          if (!isLocal && bodyAlpha > 0) {
+            drawHealthBar(psx, psy - size * 2.4 - 5 * z, size, pl.hp / pl.maxHp);
+          }
 
           // marcador de abatido (precisa de revive)
           if (ex.downed) {
@@ -1226,6 +1323,7 @@ export class SurvivalRenderer {
     bodyAlpha: number,
   ): void {
     const ctx = this.ctx;
+    const variant = carcassVariant(echo.cause);
     if (bodyAlpha > 0) {
       ctx.save();
       ctx.globalAlpha = bodyAlpha;
@@ -1234,6 +1332,16 @@ export class SurvivalRenderer {
       ctx.beginPath();
       ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      // Os cacos ficam no plano do chão, sob o corpo, e por isso vêm antes dele.
+      // São o que a morte espalhou: brasa, placa arrancada, fungo, pedra.
+      for (const piece of variant.debris) {
+        const px = sx + (piece.dx - piece.dy) * (TILE_W / 2) * z;
+        const py = sy + (piece.dx + piece.dy) * (TILE_H / 2) * z;
+        const side = Math.max(1, piece.size * TILE_W * z * 0.5);
+        ctx.fillStyle = piece.color;
+        ctx.fillRect(Math.round(px - side / 2), Math.round(py - side / 2), side, side);
+      }
 
       const drew = this.sprites.drawEntity(
         ctx,
@@ -1245,10 +1353,10 @@ export class SurvivalRenderer {
         sx,
         sy,
         spriteZoom,
-        { color: 'rgba(110,74,51,0.62)', alpha: 0.62 },
+        variant.tint,
       );
       if (!drew) {
-        ctx.fillStyle = PAL.rust;
+        ctx.fillStyle = variant.shell;
         ctx.fillRect(sx - 9 * z, sy - 5 * z, 16 * z, 4 * z);
         ctx.fillStyle = PAL.rockShadow;
         ctx.fillRect(sx - 6 * z, sy - 8 * z, 7 * z, 4 * z);
@@ -1258,25 +1366,152 @@ export class SurvivalRenderer {
       ctx.restore();
     }
 
-    // A caixa-preta continua emissiva: ela pode denunciar que há algo no escuro,
-    // mas não revela a silhueta inteira nem atravessa a regra de iluminação.
-    const pulse = Math.sin(nowMs * 0.008 + echo.cell * 0.17) > -0.2;
-    ctx.fillStyle = pulse ? PAL.biolum : PAL.rockShadow;
-    ctx.fillRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
+    // O farol da caixa-preta é a ÚNICA coisa que atravessa o escuro.
+    //
+    // Ele denuncia que há algo ali sem revelar o quê: a silhueta, os cacos e a
+    // causa continuam presos à luz do mundo. A cor não muda com o tipo de morte
+    // de propósito — um farol que dissesse "aqui alguém queimou" transformaria a
+    // escuridão num mapa de causas, e a caixa-preta existe para ser LIDA de
+    // perto, pareando.
+    const pulse = Math.sin(nowMs * 0.008 + echo.cell * 0.17);
+    const lit = pulse > -0.2;
+    const bx = sx + 2 * z;
+    const by = sy - 7 * z;
+    if (lit) {
+      ctx.save();
+      ctx.globalAlpha = 0.18 + Math.max(0, pulse) * 0.22;
+      ctx.fillStyle = PAL.biolum;
+      ctx.beginPath();
+      ctx.ellipse(bx + 1.5 * z, by + 1.5 * z, 7 * z, 7 * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = lit ? PAL.biolum : PAL.rockShadow;
+    ctx.fillRect(bx, by, 3 * z, 3 * z);
     ctx.strokeStyle = PAL.dark;
     ctx.lineWidth = Math.max(1, z * 0.6);
-    ctx.strokeRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
+    ctx.strokeRect(bx, by, 3 * z, 3 * z);
   }
 
+  /** O convite a parear: aparece no escuro, porque é instrução e não matéria. */
+  private drawDeathEchoPrompt(sx: number, sy: number, z: number, nowMs: number): void {
+    const ctx = this.ctx;
+    const label = 'USAR — PAREAR CAIXA-PRETA';
+    ctx.save();
+    ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(label).width + 10 * z;
+    const height = 11 * z;
+    const top = sy - 24 * z;
+    ctx.globalAlpha = 0.82 + Math.sin(nowMs * 0.006) * 0.18;
+    ctx.fillStyle = 'rgba(11,14,20,0.9)';
+    ctx.fillRect(sx - width / 2, top, width, height);
+    ctx.strokeStyle = PAL.biolum;
+    ctx.lineWidth = Math.max(1, z * 0.5);
+    ctx.strokeRect(sx - width / 2, top, width, height);
+    ctx.fillStyle = PAL.biolum;
+    ctx.fillText(label, sx, top + height / 2);
+    ctx.restore();
+  }
+
+  /**
+   * A reprodução holográfica dos últimos segundos.
+   *
+   * Curta, estilizada e incompleta por decisão: ela conta para onde o Prospector
+   * corria, para onde mirava e em que instante o gatilho esteve apertado. Não
+   * desenha o inimigo — a cápsula guarda a CAUSA, não a posição de quem matou, e
+   * inventar essa posição seria ensinar uma geometria que nunca existiu.
+   *
+   * O trajeto é relativo à carcaça, então num eco reprojetado ele pode atravessar
+   * uma parede que não existia no mapa original. Isso é aceitável e é parte do
+   * ponto: o holograma é uma TRANSMISSÃO de outro lugar, não um fantasma preso à
+   * geometria daqui. Corrigi-lo contra as paredes atuais custaria um pathfinding
+   * por quadro para forjar um trajeto que ninguém percorreu.
+   */
+  private drawDeathEchoTrace(
+    link: { echo: PlacedDeathEcho; openedAtMs: number },
+    toScreen: (x: number, y: number) => [number, number],
+    z: number,
+    nowMs: number,
+  ): void {
+    const trace = link.echo.finalTrace;
+    if (!trace) return;
+    const duration = deathEchoTraceDuration(trace);
+    if (duration <= 0) return;
+    const elapsed = Math.max(0, nowMs - link.openedAtMs) % duration;
+    const head = Math.min(trace.dx.length - 1, Math.floor(elapsed / trace.stepMs));
+    const ctx = this.ctx;
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // O caminho inteiro fica fraco no fundo: é o contorno da fuga, e ler o
+    // trajeto todo de uma vez é o que transforma um corpo num acontecimento.
+    ctx.strokeStyle = PAL.biolum;
+    ctx.globalAlpha = 0.22;
+    ctx.lineWidth = Math.max(1, z * 0.7);
+    ctx.beginPath();
+    for (let i = 0; i < trace.dx.length; i++) {
+      const point = decodeDeathEchoTracePoint(trace, i, link.echo.x, link.echo.y);
+      if (!point) continue;
+      const [px, py] = toScreen(point.x, point.y);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // Cada disparo marca o chão de onde saiu. Três ou quatro marcas dizem
+    // "ele estava atirando enquanto recuava" sem uma linha de texto.
+    for (let i = 0; i <= head; i++) {
+      const point = decodeDeathEchoTracePoint(trace, i, link.echo.x, link.echo.y);
+      if (!point?.firing) continue;
+      const [px, py] = toScreen(point.x, point.y);
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = PAL.electric;
+      ctx.fillRect(Math.round(px - z), Math.round(py - 10 * z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+    }
+
+    const current = decodeDeathEchoTracePoint(trace, head, link.echo.x, link.echo.y);
+    if (!current) {
+      ctx.restore();
+      return;
+    }
+    const [hx, hy] = toScreen(current.x, current.y);
+    // A sombra do Prospector: silhueta chapada, sem sprite. Ela não é o corpo —
+    // é a transmissão de um corpo que já não está ali.
+    ctx.globalAlpha = 0.34 + Math.sin(nowMs * 0.01) * 0.06;
+    ctx.fillStyle = PAL.biolum;
+    ctx.fillRect(Math.round(hx - 3 * z), Math.round(hy - 16 * z), Math.max(2, 6 * z), Math.max(2, 16 * z));
+    ctx.fillRect(Math.round(hx - 4 * z), Math.round(hy - 21 * z), Math.max(2, 8 * z), Math.max(2, 5 * z));
+
+    // Para onde ele estava mirando no instante que a reprodução alcançou.
+    const aimLength = Math.hypot(current.aimX, current.aimY) || 1;
+    const ax = ((current.aimX - current.aimY) / aimLength) * 18 * z;
+    const ay = ((current.aimX + current.aimY) / aimLength) * 9 * z;
+    ctx.globalAlpha = current.firing ? 0.75 : 0.35;
+    ctx.strokeStyle = current.firing ? PAL.electric : PAL.biolum;
+    ctx.lineWidth = Math.max(1, z * (current.firing ? 1 : 0.7));
+    ctx.beginPath();
+    ctx.moveTo(hx + ax * 0.35, hy - 10 * z + ay * 0.35);
+    ctx.lineTo(hx + ax, hy - 10 * z + ay);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * O laudo da caixa-preta, aberto pelo botão usar.
+   *
+   * Antes ele acendia por proximidade: passar perto de um corpo despejava texto
+   * na tela sem que o jogador tivesse pedido nada. Agora a transmissão é um ATO —
+   * o mesmo botão que abre terminal e cofre abre a caixa-preta —, e é esse ato
+   * que as etapas seguintes (recuperar módulo, pagar contaminação) vão custar.
+   */
   private renderDeathEchoReadout(state: SurvivalState, vw: number, vh: number): void {
-    const echo = this.deathEchoes
-      .map((candidate) => ({
-        candidate,
-        distance: Math.hypot(state.player.x - candidate.x, state.player.y - candidate.y),
-      }))
-      .filter(({ distance }) => distance <= 4)
-      .sort((a, b) => a.distance - b.distance)[0]?.candidate;
-    if (!echo) return;
+    const link = this.deathEchoes.paired;
+    if (!link) return;
+    const echo = link.echo;
 
     const extra = state.playerExtra;
     const safeTop = this.safeArea.top + 10;
@@ -1305,31 +1540,35 @@ export class SurvivalRenderer {
     const ctx = this.ctx;
     const readout = deathEchoReadout(echo);
     const titleSize = 10;
+    const conditionSize = 9;
     const bodySize = 12;
+    const lessonSize = 10;
     const lineHeight = bodySize + 4;
+    const lessonHeight = lessonSize + 3;
+    const textWidth = region.maxWidth - 24;
+
     ctx.font = `bold ${bodySize}px monospace`;
+    const lines = wrapMeasuredText(ctx, readout.headline.toUpperCase(), textWidth);
+    ctx.font = `${lessonSize}px monospace`;
+    // A lição é o que a caixa-preta tem de melhor a oferecer, mas é também a
+    // parte mais longa: numa viewport curta ela sai antes do resto, em vez de o
+    // painel inteiro desaparecer.
+    const lessonLines = readout.lesson
+      ? wrapMeasuredText(ctx, readout.lesson, textWidth)
+      : [];
 
-    const words = readout.headline.toUpperCase().split(/\s+/);
-    const lines: string[] = [];
-    let current = '';
-    for (const word of words) {
-      const candidate = current ? `${current} ${word}` : word;
-      if (current && ctx.measureText(candidate).width > region.maxWidth - 24) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = candidate;
-      }
-    }
-    if (current) lines.push(current);
-
+    ctx.font = `bold ${bodySize}px monospace`;
     const minimumWidth = Math.min(190, region.maxWidth);
     const boxWidth = Math.min(
       region.maxWidth,
       Math.max(minimumWidth, ...lines.map((line) => ctx.measureText(line).width + 24)),
     );
-    const boxHeight = 20 + titleSize + lines.length * lineHeight;
+    const headerHeight = 20 + titleSize + conditionSize + 4;
+    const boxHeight = headerHeight + lines.length * lineHeight;
     if (boxHeight > region.maxHeight) return;
+    const withLesson = boxHeight + 6 + lessonLines.length * lessonHeight;
+    const showLesson = lessonLines.length > 0 && withLesson <= region.maxHeight;
+    const totalHeight = showLesson ? withLesson : boxHeight;
     const x = region.align === 'right'
       ? region.x + region.maxWidth - boxWidth
       : region.x + (region.maxWidth - boxWidth) / 2;
@@ -1337,22 +1576,34 @@ export class SurvivalRenderer {
 
     ctx.save();
     ctx.fillStyle = 'rgba(11,14,20,0.94)';
-    ctx.fillRect(x, y, boxWidth, boxHeight);
+    ctx.fillRect(x, y, boxWidth, totalHeight);
     ctx.strokeStyle = PAL.biolum;
     ctx.lineWidth = 1.25;
-    ctx.strokeRect(x, y, boxWidth, boxHeight);
+    ctx.strokeRect(x, y, boxWidth, totalHeight);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = PAL.biolum;
     ctx.font = `bold ${titleSize}px monospace`;
     ctx.fillText(readout.title, x + 12, y + 8);
+    ctx.fillStyle = PAL.rust;
+    ctx.font = `${conditionSize}px monospace`;
+    ctx.fillText(readout.condition, x + 12, y + 10 + titleSize);
     ctx.fillStyle = PAL.player;
     ctx.font = `bold ${bodySize}px monospace`;
+    const bodyTop = y + 14 + titleSize + conditionSize;
     lines.forEach((line, index) =>
-      ctx.fillText(line, x + 12, y + 14 + titleSize + index * lineHeight),
+      ctx.fillText(line, x + 12, bodyTop + index * lineHeight),
     );
+    if (showLesson) {
+      ctx.fillStyle = PAL.bone;
+      ctx.font = `${lessonSize}px monospace`;
+      const lessonTop = bodyTop + lines.length * lineHeight + 6;
+      lessonLines.forEach((line, index) =>
+        ctx.fillText(line, x + 12, lessonTop + index * lessonHeight),
+      );
+    }
     ctx.fillStyle = echo.projection === 'exact' ? PAL.blood : PAL.rust;
-    ctx.fillRect(x, y + boxHeight - 3, boxWidth, 3);
+    ctx.fillRect(x, y + totalHeight - 3, boxWidth, 3);
     ctx.restore();
   }
 
