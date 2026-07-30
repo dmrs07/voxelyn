@@ -25,36 +25,21 @@ def replace_regex_once(path: Path, pattern: str, replacement: str) -> None:
 
 def apply_capsule_fixes() -> None:
     echoes_path = ROOT / "packages/voxelyn-survival/src/client/death-echoes.ts"
-
-    replace_once(
-        echoes_path,
-        "} from '@voxelyn/survival-sim';\n",
-        "} from '@voxelyn/survival-sim';\nimport { CONTENT_VERSION, SIMULATION_VERSION } from '@voxelyn/survival-protocol';\n",
-    )
-    replace_once(
-        echoes_path,
-        "const KEY = 'voxelyn.death-echoes.v1';\nconst SCHEMA = 1;",
-        "const KEY = 'voxelyn.death-echoes.v2';\nconst SCHEMA = 2;",
-    )
-    replace_once(
-        echoes_path,
-        "  sourceSeed: number;\n  sector: number;",
-        "  sourceSeed: number;\n  /** Worldgen/sim versions that produced the original coordinate. */\n  sourceSimulationVersion: number;\n  sourceContentVersion: number;\n  sector: number;",
-    )
     replace_once(
         echoes_path,
         "const isProjectileKind = (value: unknown): value is ProjectileKind =>\n  typeof value === 'string' && PROJECTILE_KINDS.has(value as ProjectileKind);\n",
-        "const isProjectileKind = (value: unknown): value is ProjectileKind =>\n  typeof value === 'string' && PROJECTILE_KINDS.has(value as ProjectileKind);\n\n"
+        "const isProjectileKind = (value: unknown): value is ProjectileKind =>\n"
+        "  typeof value === 'string' && PROJECTILE_KINDS.has(value as ProjectileKind);\n\n"
+        "// Matriz fechada do que a simulação realmente consegue disparar. `bolt` e\n"
+        "// `return_disc` pertencem ao jogador; aceitar qualquer união válida aqui\n"
+        "// permitiria que storage adulterado fabricasse uma lição de morte.\n"
         "const HOSTILE_PROJECTILES_BY_ARCHETYPE: Partial<Record<EnemyArchetype, ReadonlySet<ProjectileKind>>> = {\n"
         "  bruiser: new Set(['rock']),\n"
         "  spitter: new Set(['spit']),\n"
         "  guardian: new Set(['spit']),\n"
         "  bishop: new Set(['spit']),\n"
         "};\n"
-        "const isValidEnemyProjectileCause = (\n"
-        "  archetype: unknown,\n"
-        "  projectile: unknown,\n"
-        "): archetype is EnemyArchetype => {\n"
+        "const isValidEnemyProjectileCause = (archetype: unknown, projectile: unknown): boolean => {\n"
         "  if (!isEnemyArchetype(archetype) || !isProjectileKind(projectile)) return false;\n"
         "  return HOSTILE_PROJECTILES_BY_ARCHETYPE[archetype]?.has(projectile) ?? false;\n"
         "};\n",
@@ -68,59 +53,8 @@ def apply_capsule_fixes() -> None:
         "        typeof cause.elite === 'boolean'\n"
         "      );",
     )
-    replace_once(
-        echoes_path,
-        "  const sourceSeed = finiteInt(raw.sourceSeed, 0, 0xffffffff);\n  const sector = finiteInt(raw.sector, 1, 32);",
-        "  const sourceSeed = finiteInt(raw.sourceSeed, 0, 0xffffffff);\n"
-        "  const sourceSimulationVersion = finiteInt(raw.sourceSimulationVersion, 0, 0x7fffffff);\n"
-        "  const sourceContentVersion = finiteInt(raw.sourceContentVersion, 0, 0x7fffffff);\n"
-        "  const sector = finiteInt(raw.sector, 1, 32);",
-    )
-    replace_once(
-        echoes_path,
-        "    sourceSeed === null || sector === null || sourceWidth === null || sourceHeight === null ||\n",
-        "    sourceSeed === null || sourceSimulationVersion === null || sourceContentVersion === null ||\n"
-        "    sector === null || sourceWidth === null || sourceHeight === null ||\n",
-    )
-    replace_once(
-        echoes_path,
-        "    sourceSeed,\n    sector,",
-        "    sourceSeed,\n    sourceSimulationVersion,\n    sourceContentVersion,\n    sector,",
-    )
-    replace_once(
-        echoes_path,
-        "    sourceSeed: state.config.seed >>> 0,\n    sector: state.sector,",
-        "    sourceSeed: state.config.seed >>> 0,\n"
-        "    sourceSimulationVersion: SIMULATION_VERSION,\n"
-        "    sourceContentVersion: CONTENT_VERSION,\n"
-        "    sector: state.sector,",
-    )
-    replace_once(
-        echoes_path,
-        "    echo.sourceSeed === (state.config.seed >>> 0) && echo.sourceWidth === width && echo.sourceHeight === height &&\n",
-        "    echo.sourceSeed === (state.config.seed >>> 0) &&\n"
-        "    echo.sourceSimulationVersion === SIMULATION_VERSION &&\n"
-        "    echo.sourceContentVersion === CONTENT_VERSION &&\n"
-        "    echo.sourceWidth === width && echo.sourceHeight === height &&\n",
-    )
 
     tests_path = ROOT / "packages/voxelyn-survival/src/client/death-echoes.test.ts"
-    replace_once(
-        tests_path,
-        "} from '@voxelyn/survival-sim';\n",
-        "} from '@voxelyn/survival-sim';\nimport { CONTENT_VERSION, SIMULATION_VERSION } from '@voxelyn/survival-protocol';\n",
-    )
-    tests = tests_path.read_text().replace("  schema: 1,", "  schema: 2,")
-    tests = tests.replace("      schema: 1,", "      schema: 2,")
-    tests_path.write_text(tests)
-    replace_once(
-        tests_path,
-        "    expect(echo?.sourceSeed).toBe(0x1234abcd);\n    expect(echo?.sector).toBe(1);",
-        "    expect(echo?.sourceSeed).toBe(0x1234abcd);\n"
-        "    expect(echo?.sourceSimulationVersion).toBe(SIMULATION_VERSION);\n"
-        "    expect(echo?.sourceContentVersion).toBe(CONTENT_VERSION);\n"
-        "    expect(echo?.sector).toBe(1);",
-    )
     replace_once(
         tests_path,
         "        { ...echo, id: 'bad-archetype', cause: { kind: 'enemy_contact', archetype: 'bogus', elite: false } },\n",
@@ -150,7 +84,7 @@ def apply_capsule_fixes() -> None:
         "      { kind: 'enemy_projectile', archetype: 'bruiser', elite: false, projectile: 'rock' },\n"
         "    ];\n"
         "    const decoded = decodeDeathEchoRecords(JSON.stringify({\n"
-        "      schema: 2,\n"
+        "      schema: 1,\n"
         "      nextSerial: 5,\n"
         "      echoes: validCauses.map((cause, index) => ({ ...echo, id: `valid-${index}`, cause })),\n"
         "    }));\n"
@@ -406,7 +340,6 @@ describe('apresentação do eco', () => {
       })[0];
     const hasModules = extra.activeModules.length > 0;
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
-    const moduleY = safeTop + 68;
     const sectorY = safeTop + (hasModules ? 112 : 84);
     const objectiveY = sectorY + 18;
     const cacheY = objectiveY + 17;
