@@ -43,30 +43,30 @@ jobs:
       - name: Build core dependency
         run: pnpm --filter @voxelyn/core build
 
-      - name: Apply capsule integrity fixes
+      - name: Apply projectile-cause integrity fix
         run: python .github/scripts/death-echo-review-fixes.py capsules
 
-      - name: Validate capsule commit
+      - name: Validate projectile-cause commit
         run: |
-          pnpm exec tsc -p packages/voxelyn-survival/tsconfig.json
+          pnpm --filter @voxelyn/survival exec tsc -p tsconfig.json
           pnpm test:survival
           git diff --check
 
-      - name: Commit capsule integrity fixes
+      - name: Commit projectile-cause integrity fix
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
             packages/voxelyn-survival/src/client/death-echoes.ts \
             packages/voxelyn-survival/src/client/death-echoes.test.ts
-          git commit -m "fix(survival): version and validate death echo capsules"
+          git commit -m "fix(survival): validate enemy projectile death causes"
 
       - name: Apply responsive readout fix
         run: python .github/scripts/death-echo-review-fixes.py layout
 
       - name: Validate final product state
         run: |
-          pnpm exec tsc -p packages/voxelyn-survival/tsconfig.json
+          pnpm --filter @voxelyn/survival exec tsc -p tsconfig.json
           pnpm build:survival
           pnpm test:survival
           pnpm --filter @voxelyn/survival build:offline-check
