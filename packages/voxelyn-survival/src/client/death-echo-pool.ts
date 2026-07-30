@@ -36,6 +36,19 @@ export type DeathEchoPoolQuery = {
 };
 
 /**
+ * A consulta do pool para a run corrente.
+ *
+ * Recebe o contrato QUE ESTA RUN ESTÁ JOGANDO, nunca o que o servidor anunciou.
+ * Confundir os dois fazia toda run comum com servidor alcançável cair no ramo
+ * filtrado por seed: o pool geral nunca era consultado, e quem nunca tocou no
+ * contrato recebia apenas as cápsulas daquele mapa.
+ */
+export const deathEchoPoolQuery = (
+  sector: number,
+  contract: { seed: number } | null,
+): DeathEchoPoolQuery => (contract ? { sector, seed: contract.seed } : { sector });
+
+/**
  * Busca uma amostra do pool.
  *
  * Devolve lista vazia em qualquer falha — rede, status, corpo inválido. O

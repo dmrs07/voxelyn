@@ -11,11 +11,11 @@ import {
   DEATH_ECHO_CLUSTER_RADIUS,
   SIMULATION_VERSION,
   buildDeathEchoCapsule,
-  clusterDeathEchoes,
   contractSeed,
   contractWeekKey,
   deathEchoContract,
   deathEchoTopology,
+  groupDeathEchoesByChamber,
   parseDeathEchoCapsule,
   parseDeathEchoContract,
   projectDeathEchoes,
@@ -146,40 +146,97 @@ describe('cápsula compartilhada', () => {
   });
 });
 
-describe('agrupamento de mortes vizinhas', () => {
+describe('agrupamento por camara, antes do teto de corpos', () => {
+  /** Cápsulas do MESMO mundo, como o contrato de seed compartilhada produz. */
+  const sameWorld = (state: SurvivalState, cell: { x: number; y: number }, id: string) =>
+    buildDeathEchoCapsule(state, {
+      id,
+      x: cell.x + 0.5,
+      y: cell.y + 0.5,
+      facingX: 1,
+      facingY: 0,
+      cause: { kind: 'fire' },
+      ticks: 1500,
+    });
+
   it('colapsa a mesma câmara num corpo que conta quantas foram', () => {
-    const clustered = clusterDeathEchoes([
-      placed({ id: 'a', x: 20, y: 20 }),
-      placed({ id: 'b', x: 21, y: 21 }),
-      placed({ id: 'c', x: 22, y: 20 }),
-      placed({ id: 'far', x: 60, y: 60 }),
+    const state = createRun({ seed: 0xc0c0 });
+    const base = safeOpenCell(state);
+    const grouped = groupDeathEchoesByChamber(state, [
+      sameWorld(state, base, 'a'),
+      sameWorld(state, { x: base.x + 1, y: base.y + 1 }, 'b'),
+      sameWorld(state, { x: base.x + 2, y: base.y }, 'c'),
+      sameWorld(state, { x: base.x + 40, y: base.y }, 'longe'),
     ]);
-    expect(clustered).toHaveLength(2);
-    expect(clustered[0].id).toBe('a');
-    expect(clustered[0].lost).toBe(3);
-    expect(clustered[1].lost).toBe(1);
+    expect(grouped).toHaveLength(2);
+    expect(grouped[0].id).toBe('a');
+    expect(grouped[0].lost).toBe(3);
+    expect(grouped[1].lost).toBe(1);
+  });
+
+  it('conta a amostra INTEIRA, e não o que sobrou do teto de corpos', () => {
+    // O defeito que a ordem corrige: com o teto aplicado antes, vinte cápsulas da
+    // mesma câmara viravam quatro corpos anunciando no máximo quatro perdas, e as
+    // dezesseis restantes eram descartadas sem nunca serem contadas.
+    const state = createRun({ seed: 0xd0d0 });
+    const base = safeOpenCell(state);
+    const capsules = Array.from({ length: 20 }, (_, i) =>
+      sameWorld(state, { x: base.x + (i % 3), y: base.y + Math.floor(i / 10) }, `e${i}`),
+    );
+    const grouped = groupDeathEchoesByChamber(state, capsules);
+    expect(grouped).toHaveLength(1);
+    const list = projectDeathEchoes(state, grouped, 4);
+    expect(list).toHaveLength(1);
+    expect(list[0].lost).toBe(20);
   });
 
   it('mantém o corpo de uma morte REAL como sobrevivente, sem inventar centro', () => {
-    const first = placed({ id: 'real', x: 30, y: 30, cause: { kind: 'spores' } });
-    const clustered = clusterDeathEchoes([first, placed({ id: 'other', x: 31, y: 30 })]);
-    expect(clustered[0].x).toBe(first.x);
-    expect(clustered[0].y).toBe(first.y);
-    expect(clustered[0].cause).toEqual(first.cause);
-  });
-
-  it('não altera a lista original', () => {
-    const original = placed({ id: 'a', x: 5, y: 5 });
-    clusterDeathEchoes([original, placed({ id: 'b', x: 6, y: 5 })]);
-    expect(original.lost).toBe(1);
-  });
-
-  it('trata como distantes corpos além do raio da câmara', () => {
-    const clustered = clusterDeathEchoes([
-      placed({ id: 'a', x: 0, y: 0 }),
-      placed({ id: 'b', x: DEATH_ECHO_CLUSTER_RADIUS + 1, y: 0 }),
+    const state = createRun({ seed: 0xe0e0 });
+    const base = safeOpenCell(state);
+    const first = sameWorld(state, base, 'real');
+    const grouped = groupDeathEchoesByChamber(state, [
+      first,
+      sameWorld(state, { x: base.x + 1, y: base.y }, 'outro'),
     ]);
-    expect(clustered).toHaveLength(2);
+    expect(grouped[0].sourceX).toBe(first.sourceX);
+    expect(grouped[0].sourceY).toBe(first.sourceY);
+    expect(grouped[0].cause).toEqual(first.cause);
+  });
+
+  it('não altera as cápsulas recebidas', () => {
+    const state = createRun({ seed: 0xf0f0 });
+    const base = safeOpenCell(state);
+    const original = sameWorld(state, base, 'a');
+    groupDeathEchoesByChamber(state, [
+      original,
+      sameWorld(state, { x: base.x + 1, y: base.y }, 'b'),
+    ]);
+    expect('lost' in original).toBe(false);
+  });
+
+  it('trata como distantes cápsulas além do raio da câmara', () => {
+    const state = createRun({ seed: 0xabab });
+    const base = safeOpenCell(state);
+    const grouped = groupDeathEchoesByChamber(state, [
+      sameWorld(state, base, 'a'),
+      sameWorld(state, { x: base.x + DEATH_ECHO_CLUSTER_RADIUS + 1, y: base.y }, 'b'),
+    ]);
+    expect(grouped).toHaveLength(2);
+  });
+
+  it('nunca agrupa cápsulas de outro mundo, cujas células não se comparam', () => {
+    // Duas seeds diferentes têm células de origem sem relação; aproximá-las por
+    // coordenada seria comparar endereços de cidades diferentes.
+    const source = createRun({ seed: 0x1111 });
+    const other = createRun({ seed: 0x2222 });
+    const cell = safeOpenCell(source);
+    const alien = sameWorld(other, safeOpenCell(other), 'alien');
+    const grouped = groupDeathEchoesByChamber(source, [
+      sameWorld(source, cell, 'meu'),
+      { ...alien, sourceX: cell.x, sourceY: cell.y },
+    ]);
+    expect(grouped).toHaveLength(2);
+    expect(grouped[1].lost).toBeUndefined();
   });
 });
 

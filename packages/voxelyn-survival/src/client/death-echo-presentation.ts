@@ -13,7 +13,6 @@ import type { SurvivalState } from '@voxelyn/survival-sim';
 import {
   DEATH_ECHO_TRACE_SAMPLES,
   DEATH_ECHO_TRACE_STEP_MS,
-  clusterDeathEchoes,
   type DeathEchoCapsule,
   type DeathEchoTraceSample,
   type PlacedDeathEcho,
@@ -290,11 +289,9 @@ export class DeathEchoController {
     const key = `${worldKey}:${this.records.nextSerial}:${this.pool.length}`;
     if (key !== this.projectionKey) {
       this.projectionKey = key;
-      // Agrupa DEPOIS de projetar: no contrato de seed compartilhada as cápsulas
-      // voltam à coordenada real e a mesma câmara letal acumula dezenas delas.
-      this.placed = clusterDeathEchoes(
-        projectSectorEchoes(state, this.records.echoes, this.pool),
-      );
+      // O agrupamento por câmara acontece DENTRO de `projectSectorEchoes`, antes do
+      // teto de corpos — ver o comentário lá.
+      this.placed = projectSectorEchoes(state, this.records.echoes, this.pool);
       // A descida troca o mundo inteiro: um vínculo com a carcaça do setor
       // anterior sobreviveria apontando para um corpo que não existe mais.
       this.pairedId = null;

@@ -7,9 +7,10 @@
 //
 // A diferença em relação ao ranking é o volume esperado. Ranking recebe só runs
 // que EXTRAÍRAM; o pool receberia toda morte de todo jogador, que é a maioria
-// esmagadora das runs. Por isso existe a fração determinística: o pool não precisa
-// de todas as mortes, precisa de uma amostra — e re-simular todas seria pagar CPU
-// autoritativa para guardar cápsulas que ninguém veria.
+// esmagadora das runs. Por isso existe a fração determinística — mas ela guarda
+// STORAGE, não CPU. O que protege a CPU é o limite por origem mais o orçamento de
+// uma re-simulação concorrente, e é assim que tem de ser: ver o comentário de
+// `isDeathEchoSampled`.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { deathEchoContract, deathEchoHash } from '@voxelyn/survival-protocol';
@@ -23,16 +24,25 @@ import {
 } from './http-util.js';
 
 /**
- * Uma em quantas mortes é aceita para verificação.
+ * Uma em quantas mortes verificadas entra no pool.
  *
- * A spec já previa isso: "apenas uma amostra pode ser transmitida e validada". O
- * portão é barato e roda ANTES da re-simulação, que é a única parte caríssima.
+ * A spec pedia "apenas uma amostra pode ser transmitida e validada", e a primeira
+ * versão disto rodava ANTES da re-simulação, sobre o comprimento e o começo do
+ * Base64 cru. Aquilo era grátis de burlar: o cliente anexava blocos de comando
+ * válidos DEPOIS do tick terminal até cair num comprimento que passasse. A
+ * re-simulação para no tick terminal e a canonicalização apaga a cauda, então
+ * todas as variantes davam a mesma morte e o mesmo digest — o portão decidia
+ * sobre bytes que não faziam parte da run.
  *
- * Ele é derivado de seed + log, então não é escolha do cliente. Um cliente que
- * quisesse forçar aceitação teria de mudar o log — e um log diferente é uma run
- * diferente, que precisa mesmo assim re-simular até uma morte real. Variações de
- * padding não ajudam: o digest de dedupe vem do log CANÔNICO, então todas elas
- * colapsam na mesma entrada.
+ * Agora ele decide sobre o DIGEST CANÔNICO, depois da verificação. A cauda não
+ * muda o digest, então a fração deixa de ser esterçável de graça.
+ *
+ * O que ele NÃO é: proteção de CPU. Qualquer portão que o cliente consiga calcular
+ * é moído por um cliente que simule localmente — e todo cliente simula, é a mesma
+ * simulação. A CPU é protegida pelo limite por origem e pelo orçamento de uma
+ * re-simulação concorrente, que não dependem de nada que o cliente escolha. Fingir
+ * o contrário custaria a três quartos das mortes honestas a chance de virar
+ * carcaça, em troca de uma barreira que se atravessa com padding.
  */
 export const DEATH_ECHO_ACCEPT_ONE_IN = 4;
 
@@ -56,9 +66,14 @@ const avalanche = (hash: number): number => {
   return h >>> 0;
 };
 
-export const isDeathEchoSampled = (seed: number, logBase64: string): boolean =>
-  avalanche(deathEchoHash(`${seed >>> 0}:${logBase64.length}:${logBase64.slice(0, 64)}`)) %
-    DEATH_ECHO_ACCEPT_ONE_IN === 0;
+/**
+ * A run verificada entrou na amostra?
+ *
+ * Recebe o digest canônico — a identidade da run re-simulada — e não o corpo da
+ * requisição. Mudar a resposta exige mudar a run de verdade.
+ */
+export const isDeathEchoSampled = (digest: string): boolean =>
+  avalanche(deathEchoHash(`voxelyn.echo.sample:${digest}`)) % DEATH_ECHO_ACCEPT_ONE_IN === 0;
 
 export type DeathEchoHttpOptions = {
   store: DeathEchoStore;
@@ -170,15 +185,6 @@ export const createDeathEchoHandler = (opts: DeathEchoHttpOptions) => {
     const seed = Number(payload.seed);
     const logBase64 = typeof payload.log === 'string' ? payload.log : '';
 
-    // A fração vem ANTES do orçamento de CPU e antes da re-simulação: recusar por
-    // amostragem é a resposta mais barata que existe, e ela não é um erro. `200`
-    // com `accepted: false` porque o cliente não deve tentar de novo nem avisar o
-    // jogador — a run dele está inteira, ela apenas não foi sorteada.
-    if (!isDeathEchoSampled(seed, logBase64)) {
-      json(res, 200, { accepted: false, reason: 'fora da amostra' });
-      return true;
-    }
-
     if (!opts.budget.claim()) {
       json(res, 503, { error: 'verificacao ocupada; tente de novo' });
       return true;
@@ -190,6 +196,15 @@ export const createDeathEchoHandler = (opts: DeathEchoHttpOptions) => {
       if (!verdict.ok) {
         opts.log({ ev: 'echo_rejected', ip, seed, reason: verdict.reason, ms: elapsed });
         json(res, 422, { error: verdict.reason });
+        return true;
+      }
+      // A fração decide DEPOIS da verificação, sobre a identidade da run. Recusar
+      // aqui não é erro: a run do jogador está inteira, ela apenas não foi
+      // sorteada, e por isso `200` com `accepted: false` — o cliente não deve
+      // tentar de novo nem avisar ninguém.
+      if (!isDeathEchoSampled(verdict.digest)) {
+        opts.log({ ev: 'echo_unsampled', ip, seed, ms: elapsed });
+        json(res, 200, { accepted: false, reason: 'fora da amostra' });
         return true;
       }
       const stored = await opts.store.record({

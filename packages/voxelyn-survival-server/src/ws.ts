@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   createServer,
   type IncomingMessage,
@@ -51,6 +52,19 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   // permitiria dois replays concorrentes e o dobro de engasgo na simulacao.
   const verificationBudget = createVerificationBudget();
 
+  /**
+   * Nonce desta instancia, para a identidade de uma morte de co-op ser unica.
+   *
+   * Sala, setor, tick e slot NAO bastam. `seedCounter` volta a zero em cada boot e
+   * `baseSeed` e o mesmo, entao a primeira sala depois de dois deploys recebe a
+   * mesma seed; um jogador parado morre de contaminacao no mesmo tick e no mesmo
+   * slot, e a segunda morte — legitima — bate na restricao de unicidade e
+   * desaparece do pool. Duas instancias com a mesma baseSeed tem o problema
+   * identico. O nonce torna a identidade unica por processo sem precisar de estado
+   * persistido.
+   */
+  const instanceNonce = randomBytes(6).toString('hex');
+
   const survival = new SurvivalServer({
     ...opts,
     // Runs de co-op nao passam por re-simulacao e nao precisam: elas foram
@@ -75,10 +89,12 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     // setor 1 na entrada do setor 3.
     onPlayerDeath: (room, death) => {
       if (!deathEchoStore) return;
+      // Anonimo por construcao: nonce da instancia, sala, setor, tick e slot. Nada
+      // aqui identifica uma pessoa, e o serial que o jogador le sai deste id.
+      const identity =
+        `coop:${instanceNonce}:${room.seed}:${death.sector}:${death.tick}:${death.slot}`;
       const capsule = buildDeathEchoCapsule(room.state, {
-        // Anonimo por construcao: sala, setor, tick e slot. Nada aqui identifica
-        // uma pessoa, e o serial que o jogador le e derivado deste id.
-        id: `coop:${room.seed}:${death.sector}:${death.tick}:${death.slot}`,
+        id: identity,
         x: death.x,
         y: death.y,
         facingX: death.facingX,
@@ -92,11 +108,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         // cliente nao consegue provar sozinho.
       });
       void deathEchoStore
-        .record({
-          capsule,
-          origin: 'coop',
-          sourceDigest: `coop:${room.seed}:${death.sector}:${death.tick}:${death.slot}`,
-        })
+        .record({ capsule, origin: 'coop', sourceDigest: identity })
         .catch((err: unknown) =>
           log({
             ev: 'death_echo_record_failed',

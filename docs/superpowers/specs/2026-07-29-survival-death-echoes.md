@@ -117,9 +117,13 @@ O rastro do solo também sai da re-simulação, e é autoritativo de graça: a s
 
 ### Fração determinística
 
-Re-simular toda morte de todo jogador seria pagar CPU autoritativa para guardar cápsulas que ninguém veria: o ranking recebe só quem extraiu, o pool receberia a maioria esmagadora das runs. Um portão barato aceita uma em quatro, derivado de seed + log, e roda ANTES da re-simulação.
+Uma em quatro mortes verificadas entra no pool. O ranking recebe só quem extraiu; o pool receberia a maioria esmagadora das runs, e a spec já pedia uma amostra em vez de todas.
 
-Não é escolha do cliente: mudar o log é mudar a run, que precisa mesmo assim re-simular até uma morte real, e variações de padding colapsam no mesmo digest canônico de dedupe. O hash usa o finalizador do murmur3 sobre o FNV-1a — sem ele, `% 4` lê os bits baixos do FNV, que distribuem mal, e a taxa de amostragem passaria a depender do formato do log.
+O portão decide sobre o **digest canônico**, depois da verificação. A primeira versão decidia antes, sobre o comprimento e o começo do Base64 cru, e era grátis de burlar: bastava anexar blocos de comando válidos depois do tick terminal até cair num comprimento que passasse. A re-simulação para no tick terminal e a canonicalização apaga a cauda, então todas as variantes davam a mesma morte e o mesmo digest — o portão decidia sobre bytes que não faziam parte da run.
+
+A fração guarda **storage, não CPU**. Qualquer portão que o cliente consiga calcular é moído por um cliente que simule localmente, e todo cliente simula — é a mesma simulação. A CPU é protegida pelo limite por origem e pelo orçamento de uma re-simulação concorrente, que não dependem de nada que o cliente escolha. Fingir o contrário custaria a três quartos das mortes honestas a chance de virar carcaça, em troca de uma barreira que se atravessa com padding.
+
+O hash usa o finalizador do murmur3 sobre o FNV-1a — sem ele, `% 4` lê os bits baixos do FNV, que distribuem mal, e a taxa medida ia de 11% a 31% conforme a entrada.
 
 ### Armazenamento
 
@@ -128,6 +132,8 @@ Tabela `death_echoes`, SEPARADA do leaderboard e da telemetria. O repositório j
 Colunas explícitas em vez do `topology_signature` empacotado que o esboço previa: custam o mesmo e permitem responder no console do banco as perguntas que a operação faz — em que profundidade as pessoas morrem, quantas mortes em biofluido — sem decodificar um inteiro à mão. `seed`, dimensões, célula e direção não são opcionais: sem elas a cápsula não pode ser reconstruída, e sem seed o contrato coletivo perde a coordenada real.
 
 Deduplicação pela run de origem, no banco e não na aplicação: duas instâncias ou dois POSTs simultâneos correriam entre o "já existe?" e o insert, e o índice único é a única barreira sem janela.
+
+A identidade de uma morte de co-op carrega um nonce da INSTÂNCIA. Sala, setor, tick e slot não bastam: `seedCounter` volta a zero em cada boot e `baseSeed` é o mesmo, então a primeira sala depois de dois deploys recebe a mesma seed, um jogador parado morre de contaminação no mesmo tick e no mesmo slot, e a segunda morte — legítima — bate na restrição de unicidade e desaparece do pool. Duas instâncias com a mesma `baseSeed` têm o problema idêntico.
 
 A amostra devolve os MENOS manifestados primeiro. Não é aleatória: aleatório concentraria exposição por azar e tornaria a amostra irreprodutível em teste. Menos manifestado primeiro espalha a exposição sozinho e caminha para a expiração — depois de manifestado algumas vezes o eco sai do pool, porque uma carcaça que reaparece indefinidamente deixa de ser ocorrência e vira mobília.
 
@@ -139,7 +145,9 @@ O orçamento de re-simulação é UM para o processo inteiro, compartilhado com 
 
 ### Mesclagem no cliente
 
-A memória local vem sempre PRIMEIRO na disputa pelas células do setor: a run em que o jogador morreu ontem diz mais a ele do que a de um estranho. O pool preenche as sombras restantes, até quatro corpos por setor (um interativo mais três sombras). Duplicatas por id são removidas — o pool pode devolver a cápsula que este mesmo cliente enviou, e o próprio corpo aparecendo duas vezes leria como defeito.
+A memória local vem sempre PRIMEIRO na disputa pelas células do setor: a run em que o jogador morreu ontem diz mais a ele do que a de um estranho. O pool preenche o resto, até quatro corpos por setor. Duplicatas por id são removidas — o pool pode devolver a cápsula que este mesmo cliente enviou, e o próprio corpo aparecendo duas vezes leria como defeito.
+
+**Todos os quatro corpos são auditáveis.** A spec §7 fala de "um eco interativo por setor", e esse limite pertence à RECUPERAÇÃO de módulo (Etapa 4), que muda a run: dois módulos herdados por setor seria economia, não arqueologia. Auditar não custa nada — não concede recurso, não alerta ninguém, não entra no hash — e uma carcaça que ignora o botão usar, parada ao lado de outra que responde e sem nenhuma diferença visível, lê como defeito. O que §7 protege de fato é o número de CORPOS, e esse teto é respeitado.
 
 O pool chega por HTTP DEPOIS do tick zero, e isso é seguro precisamente porque eco é apresentação: não entra em `SurvivalState`, no hash nem no replay. Uma cápsula que atrasou aparece um pouco depois no chão e nada mais acontece. No dia em que um eco der módulo, este caminho deixa de servir.
 
@@ -155,11 +163,17 @@ O cliente NÃO confia na seed anunciada: recebe o id e recalcula. Um servidor co
 
 Dentro do contrato o pool é consultado POR SEED. É isso que devolve as cápsulas daquele mapa exato, e elas projetam como `exact` porque seed, dimensões e versões correspondem: a experiência muda de "alguém morreu numa situação parecida com esta" para "alguém morreu exatamente aqui".
 
+O contrato ANUNCIADO e o contrato EM VIGOR nesta run são coisas separadas. O primeiro é o cartaz na parede; só o segundo estreita a consulta. Enquanto eram a mesma variável, toda descida comum com servidor alcançável caía no ramo filtrado por seed — o pool geral nunca era consultado, e quem nunca tocou no contrato recebia apenas as cápsulas daquele mapa. A modalidade é declarada por quem INICIA a run, nunca herdada do que o servidor anunciou.
+
 ### Agrupamento
 
 Com coordenadas reais e todo mundo no mesmo mapa, a mesma câmara letal acumula dezenas de cápsulas — e cinquenta carcaças no mesmo lugar deixam de ser aviso e viram cemitério. Mortes dentro de seis tiles colapsam num corpo que conta quantas foram.
 
-O sobrevivente do agrupamento é o PRIMEIRO da lista, não uma média: um corpo inventado no centro de massa não morreu em lugar nenhum. Ele passa a representar as outras, e o painel diz "causa predominante" em vez de "a causa", porque a causa narrada continua sendo a de uma morte real.
+**O agrupamento roda ANTES da projeção**, e a ordem é o ponto inteiro. Agrupar depois significaria agrupar o que sobrou do teto de corpos: vinte cápsulas da mesma câmara viravam quatro corpos, o sobrevivente anunciava no máximo quatro perdas, e as dezesseis descartadas nunca eram contadas. Pior, as que disputavam a mesma célula exata perdiam a disputa e eram espalhadas para células topológicas sem relação nenhuma — o contrato produzia corpos em lugares onde ninguém morreu. Agrupando antes, o teto passa a valer para CÂMARAS, que é o que "no máximo quatro corpos por setor" sempre quis dizer.
+
+Só agrupa o que veio do mesmo mundo. Duas cápsulas de seeds diferentes têm células de origem sem relação, e aproximá-las por coordenada seria comparar endereços de cidades diferentes.
+
+O sobrevivente é o PRIMEIRO da lista, não uma média: um corpo inventado no centro de massa não morreu em lugar nenhum. Ele passa a representar as outras, e o painel diz "causa predominante" em vez de "a causa", porque a causa narrada continua sendo a de uma morte real.
 
 ### Ranqueado significa informativo
 

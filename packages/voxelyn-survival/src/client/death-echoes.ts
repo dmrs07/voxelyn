@@ -15,6 +15,7 @@ import {
   DEATH_ECHOES_PER_SECTOR,
   DEATH_ECHO_SHADOWS_PER_SECTOR,
   buildDeathEchoCapsule,
+  groupDeathEchoesByChamber,
   parseDeathEchoCapsule,
   projectDeathEchoes,
   type DeathEchoCapsule,
@@ -154,11 +155,21 @@ export const applyDeathEchoOnce = (
 };
 
 /**
- * Teto total de corpos por setor: um interativo mais as sombras visuais.
+ * Teto total de corpos por setor: o eco de recuperação mais as sombras visuais.
  *
  * Vem da spec §7, e o número é pequeno de propósito. Encontrar um eco tem de
  * continuar parecendo uma ocorrência; um mapa que sempre tem quatro carcaças
  * ensina que carcaça é decoração.
+ *
+ * TODOS os quatro corpos são AUDITÁVEIS. A spec fala de "um eco interativo por
+ * setor", e esse limite existe para a RECUPERAÇÃO de módulo (Etapa 4), que muda a
+ * run: dois módulos herdados por setor seria economia, não arqueologia. Auditar não
+ * custa nada — não concede recurso, não alerta ninguém, não entra no hash — e uma
+ * carcaça que ignora o botão usar, parada ao lado de outra que responde e sem
+ * nenhuma diferença visível, lê como defeito. Quando a recuperação existir, ela é
+ * que será exclusiva de um corpo por setor.
+ *
+ * O que §7 protege de fato é o número de CORPOS, e isso é respeitado aqui.
  */
 export const DEATH_ECHOES_VISIBLE_PER_SECTOR =
   DEATH_ECHOES_PER_SECTOR + DEATH_ECHO_SHADOWS_PER_SECTOR;
@@ -188,9 +199,21 @@ export const mergeDeathEchoSources = (
   return merged;
 };
 
+/**
+ * Os corpos deste setor: mescla as fontes, agrupa por câmara e só então projeta.
+ *
+ * O agrupamento vem ANTES do teto porque o teto conta CORPOS, e vinte mortes na
+ * mesma câmara do contrato são um corpo. Agrupar depois faria o teto descartar
+ * dezesseis delas antes de alguém as contar.
+ */
 export const projectSectorEchoes = (
   state: SurvivalState,
   local: readonly DeathEchoCapsule[],
   pool: readonly DeathEchoCapsule[],
   limit: number = DEATH_ECHOES_VISIBLE_PER_SECTOR,
-): PlacedDeathEcho[] => projectDeathEchoes(state, mergeDeathEchoSources(local, pool), limit);
+): PlacedDeathEcho[] =>
+  projectDeathEchoes(
+    state,
+    groupDeathEchoesByChamber(state, mergeDeathEchoSources(local, pool)),
+    limit,
+  );

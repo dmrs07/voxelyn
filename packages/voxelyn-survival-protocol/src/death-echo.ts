@@ -100,6 +100,14 @@ export type DeathEchoCapsule = {
 
 export type DeathEchoProjection = 'exact' | 'topological';
 
+/**
+ * Uma cápsula candidata à projeção, possivelmente já representando várias mortes.
+ *
+ * `lost` ausente significa uma. Ele é preenchido por `groupDeathEchoesByChamber`,
+ * que roda ANTES da projeção — ver o comentário lá para o porquê da ordem.
+ */
+export type DeathEchoCandidate = DeathEchoCapsule & { lost?: number };
+
 export type PlacedDeathEcho = DeathEchoCapsule & {
   x: number;
   y: number;
@@ -599,24 +607,35 @@ const validCandidate = (
 /** Pontuação acima disto é pior que ausência. */
 const MAX_ACCEPTABLE_SCORE = 72;
 
+/**
+ * A cápsula veio do MESMO mundo que este estado gerou?
+ *
+ * Só nesse caso a coordenada original ainda significa algo. Versões diferentes de
+ * simulação ou conteúdo produzem outro mapa a partir da mesma seed, e reusar a
+ * célula ali seria afirmar uma relação espacial que nunca existiu.
+ */
+const sharesWorld = (state: SurvivalState, echo: DeathEchoCapsule): boolean =>
+  echo.sourceSeed === (state.config.seed >>> 0) &&
+  echo.sourceSimulationVersion === SIMULATION_VERSION &&
+  echo.sourceContentVersion === CONTENT_VERSION &&
+  echo.sourceWidth === state.config.width &&
+  echo.sourceHeight === state.config.height;
+
 const placeOne = (
   state: SurvivalState,
-  echo: DeathEchoCapsule,
+  echo: DeathEchoCandidate,
   taken: ReadonlySet<number>,
 ): PlacedDeathEcho | null => {
   const width = state.config.width;
   const height = state.config.height;
+  const lost = echo.lost ?? 1;
   const distance = distanceField(state.solid, width, height, state.entry.x, state.entry.y);
   let fallbackMax = 0;
   for (const value of distance) fallbackMax = Math.max(fallbackMax, value);
   const objectiveDistance = distance[cellIndex(width, state.corePos.x, state.corePos.y)];
 
   if (
-    echo.sourceSeed === (state.config.seed >>> 0) &&
-    echo.sourceSimulationVersion === SIMULATION_VERSION &&
-    echo.sourceContentVersion === CONTENT_VERSION &&
-    echo.sourceWidth === width &&
-    echo.sourceHeight === height &&
+    sharesWorld(state, echo) &&
     validCandidate(state, distance, echo.sourceX, echo.sourceY) &&
     !taken.has(cellIndex(width, echo.sourceX, echo.sourceY))
   ) {
@@ -626,7 +645,7 @@ const placeOne = (
       y: echo.sourceY + 0.5,
       cell: cellIndex(width, echo.sourceX, echo.sourceY),
       projection: 'exact',
-      lost: 1,
+      lost,
     };
   }
 
@@ -655,7 +674,7 @@ const placeOne = (
     y: Math.floor(bestCell / width) + 0.5,
     cell: bestCell,
     projection: 'topological',
-    lost: 1,
+    lost,
   };
 };
 
@@ -671,7 +690,7 @@ const placeOne = (
  */
 export const projectDeathEchoes = (
   state: SurvivalState,
-  echoes: readonly DeathEchoCapsule[],
+  echoes: readonly DeathEchoCandidate[],
   limit: number = DEATH_ECHOES_PER_SECTOR,
 ): PlacedDeathEcho[] => {
   if (limit <= 0) return [];
@@ -696,32 +715,59 @@ export const projectDeathEchoes = (
 export const DEATH_ECHO_CLUSTER_RADIUS = 6;
 
 /**
- * Colapsa mortes vizinhas num único corpo que conta quantas foram.
+ * Colapsa mortes da mesma câmara num único corpo que conta quantas foram.
  *
  * Existe para o contrato de seed compartilhada. Ali as coordenadas são reais e
  * todo mundo joga o mesmo mapa, então a mesma câmara letal acumula dezenas de
  * cápsulas — e cinquenta carcaças no mesmo lugar deixam de ser um aviso e viram
  * um cemitério, que é ruído.
  *
- * O sobrevivente do agrupamento é o PRIMEIRO da lista, não uma média: um corpo
- * inventado no centro de massa não morreu em lugar nenhum. Ele passa a
- * representar as outras mortes, e a causa que o painel narra continua sendo a
- * causa autoritativa de uma morte real.
+ * RODA ANTES DA PROJEÇÃO, e a ordem é o ponto inteiro. Agrupar depois significaria
+ * agrupar o que sobrou do teto de corpos: vinte cápsulas da mesma câmara viravam
+ * quatro corpos, o sobrevivente anunciava no máximo quatro perdas, e as dezesseis
+ * descartadas nunca eram contadas. Pior, as que disputavam a MESMA célula exata
+ * perdiam a disputa e eram espalhadas para células topológicas sem relação
+ * nenhuma — o contrato produzia corpos em lugares onde ninguém morreu.
+ *
+ * Agrupando antes, o teto passa a valer para CÂMARAS e não para cápsulas, que é o
+ * que "no máximo quatro corpos por setor" sempre quis dizer.
+ *
+ * Só agrupa o que veio do MESMO mundo. Duas cápsulas de seeds diferentes têm
+ * células de origem sem relação, e aproximá-las por coordenada seria comparar
+ * endereços de cidades diferentes.
+ *
+ * O sobrevivente é o PRIMEIRO da lista, não uma média: um corpo inventado no
+ * centro de massa não morreu em lugar nenhum. Ele passa a representar as outras
+ * mortes, e a causa que o painel narra continua sendo a causa autoritativa de uma
+ * morte real — por isso o texto diz "predominante".
  */
-export const clusterDeathEchoes = (
-  placed: readonly PlacedDeathEcho[],
+export const groupDeathEchoesByChamber = (
+  state: SurvivalState,
+  capsules: readonly DeathEchoCapsule[],
   radius: number = DEATH_ECHO_CLUSTER_RADIUS,
-): PlacedDeathEcho[] => {
-  const clusters: PlacedDeathEcho[] = [];
-  for (const echo of placed) {
-    const host = clusters.find(
-      (candidate) => squaredDistance(candidate.x, candidate.y, echo.x, echo.y) <= radius ** 2,
-    );
-    if (host) {
-      host.lost += echo.lost;
+): DeathEchoCandidate[] => {
+  const out: DeathEchoCandidate[] = [];
+  const chambers: DeathEchoCandidate[] = [];
+  for (const capsule of capsules) {
+    if (!sharesWorld(state, capsule)) {
+      out.push(capsule);
       continue;
     }
-    clusters.push({ ...echo });
+    const host = chambers.find(
+      (candidate) =>
+        squaredDistance(candidate.sourceX, candidate.sourceY, capsule.sourceX, capsule.sourceY) <=
+        radius ** 2,
+    );
+    if (host) {
+      host.lost = (host.lost ?? 1) + 1;
+      continue;
+    }
+    // A MESMA referência entra nas duas listas: `chambers` é o índice de busca e
+    // `out` preserva a ordem de prioridade, então incrementar `lost` no host
+    // atualiza o candidato que será projetado.
+    const chamber: DeathEchoCandidate = { ...capsule, lost: 1 };
+    chambers.push(chamber);
+    out.push(chamber);
   }
-  return clusters;
+  return out;
 };

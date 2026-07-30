@@ -6,6 +6,7 @@ import { SurvivalInput, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
 import { DeathEchoController } from './death-echo-presentation';
 import {
+  deathEchoPoolQuery,
   fetchDeathEchoContract,
   fetchDeathEchoPool,
   submitDeathEcho,
@@ -63,14 +64,23 @@ const contractButton = document.getElementById('btn-contract') as HTMLButtonElem
 const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
 
 /**
- * Contrato coletivo em vigor nesta sessao, quando o jogador entrou em um.
+ * O contrato que a companhia ANUNCIOU, se houver servidor.
  *
- * Null significa run normal: seed sorteada e ecos reprojetados topologicamente.
- * Preenchido significa a seed publicada pela companhia — o mesmo mapa de todo
- * mundo — e o pool consultado por seed, o que devolve as capsulas a coordenada
- * real.
+ * Existir nao significa estar jogando nele: este e o cartaz na parede, e serve
+ * apenas para o botao do menu ter um rotulo e uma seed para oferecer.
  */
-let activeContract: DeathEchoContract | null = null;
+let advertisedContract: DeathEchoContract | null = null;
+
+/**
+ * O contrato que ESTA run esta jogando, ou null.
+ *
+ * Precisa ser separado do anunciado. Enquanto eram a mesma variavel, qualquer run
+ * comum com servidor alcancavel entrava no ramo filtrado por seed de `requestPool`
+ * — o pool geral nunca era consultado, e o jogador que nunca tocou no contrato
+ * recebia apenas as capsulas daquele mapa. Escrito so por quem inicia a run, ele
+ * nao pode ficar preso a um contrato antigo depois de o jogador trocar a seed.
+ */
+let contractRun: DeathEchoContract | null = null;
 
 const renderer = new SurvivalRenderer(canvas);
 const deathEchoes = new DeathEchoController();
@@ -87,12 +97,9 @@ const requestPool = (state: SurvivalState): void => {
   if (key === poolRequestKey) return;
   poolRequestKey = key;
   const url = serverInput.value.trim() || defaultServerUrl();
-  void fetchDeathEchoPool(url, {
-    sector: state.sector,
-    // Dentro do contrato a consulta e POR SEED: e o que devolve as capsulas
-    // daquele mapa exato e faz as cordenadas voltarem a ser reais.
-    ...(activeContract ? { seed: activeContract.seed } : {}),
-  }).then((pool) => {
+  // `contractRun`, nunca `advertisedContract`: um contrato no cartaz nao decide a
+  // modalidade da run que esta rodando.
+  void fetchDeathEchoPool(url, deathEchoPoolQuery(state.sector, contractRun)).then((pool) => {
     // A run pode ter descido enquanto a resposta viajava. Sem esta guarda, o pool
     // do setor 1 chegaria depois e projetaria carcacas no setor 2.
     if (`${state.config.seed}:${state.sector}` !== key) return;
@@ -689,7 +696,11 @@ qualitySelect.addEventListener('change', () => {
  * como gesto, entao naquele caminho o contexto so nasce no primeiro toque
  * dentro do jogo — e por isso `unlock` tambem e chamado pelo input.
  */
-const startSolo = (): void => {
+const startSolo = (contract: DeathEchoContract | null = null): void => {
+  // A modalidade e declarada por quem INICIA a run, e nao herdada do que o
+  // servidor anunciou: descer normalmente sempre significa pool geral, mesmo com
+  // um contrato aberto na tela.
+  contractRun = contract;
   audio.unlock();
   audio.ui();
   menu.classList.add('hidden');
@@ -703,6 +714,7 @@ const startOnline = (): void => {
     setTimeout(() => setBanner(null), 2400);
     return;
   }
+  contractRun = null;
   audio.unlock();
   audio.ui();
   menu.classList.add('hidden');
@@ -729,15 +741,18 @@ for (const evt of ['pointerdown', 'keydown'] as const) {
  * contrato e tentar o MESMO mapa de novo depois de morrer nele.
  */
 const startContract = (): void => {
-  if (!activeContract) return;
-  forcedSeed = activeContract.seed;
-  seedInput.value = formatSeed(activeContract.seed);
-  setBanner(activeContract.label);
+  const contract = advertisedContract;
+  if (!contract) return;
+  forcedSeed = contract.seed;
+  seedInput.value = formatSeed(contract.seed);
+  setBanner(contract.label);
   setTimeout(() => setBanner(null), 3200);
-  startSolo();
+  startSolo(contract);
 };
 
-document.getElementById('btn-solo')?.addEventListener('click', startSolo);
+// `() => startSolo()` e nao `startSolo`: o handler receberia o MouseEvent como
+// primeiro argumento e o contrato passaria a ser um evento de clique.
+document.getElementById('btn-solo')?.addEventListener('click', () => startSolo());
 document.getElementById('btn-online')?.addEventListener('click', startOnline);
 contractButton.addEventListener('click', startContract);
 serverInput.placeholder = defaultServerUrl();
@@ -752,7 +767,7 @@ serverInput.placeholder = defaultServerUrl();
  */
 void fetchDeathEchoContract(serverInput.value.trim() || defaultServerUrl()).then((contract) => {
   if (!contract) return;
-  activeContract = contract;
+  advertisedContract = contract;
   contractLabel.textContent = contract.label;
   contractButton.classList.remove('hidden');
   contractLabel.classList.remove('hidden');

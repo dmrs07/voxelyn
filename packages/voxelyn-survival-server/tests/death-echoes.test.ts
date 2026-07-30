@@ -7,7 +7,13 @@ import {
   type DeathEchoCapsule,
 } from '@voxelyn/survival-protocol';
 import { createRun, emptyCommand, stepRun, type PlayerCommand } from '@voxelyn/survival-sim';
-import { encodeCommandLog, quantizeCommand, toBase64 } from '@voxelyn/survival-protocol';
+import {
+  decodeCommandLog,
+  encodeCommandLog,
+  fromBase64,
+  quantizeCommand,
+  toBase64,
+} from '@voxelyn/survival-protocol';
 import {
   DEATH_ECHO_MAX_MANIFESTS,
   DEATH_ECHO_MIN_TICKS,
@@ -100,22 +106,46 @@ describe('pool de ecos em memoria', () => {
 });
 
 describe('fracao deterministica de aceitacao', () => {
-  it('nao e escolha do cliente e aceita uma fracao das mortes', () => {
+  it('aceita aproximadamente uma em quatro runs verificadas', () => {
     let accepted = 0;
     const total = 400;
     for (let i = 0; i < total; i++) {
-      if (isDeathEchoSampled(i, `log-${i}`)) accepted += 1;
+      if (isDeathEchoSampled((i * 0x9e3779b9 >>> 0).toString(16))) accepted += 1;
     }
-    // Aproximadamente 1 em DEATH_ECHO_ACCEPT_ONE_IN. A folga e estreita de
-    // proposito: e ela que denuncia um hash cujos bits baixos nao espalham, que foi
-    // exatamente o defeito que o finalizador do murmur3 existe para corrigir.
+    // A folga e estreita de proposito: e ela que denuncia um hash cujos bits baixos
+    // nao espalham, que foi exatamente o defeito que o finalizador do murmur3
+    // existe para corrigir.
     const expected = total / DEATH_ECHO_ACCEPT_ONE_IN;
     expect(accepted).toBeGreaterThan(expected * 0.65);
     expect(accepted).toBeLessThan(expected * 1.35);
   });
 
-  it('e estavel para o mesmo par seed+log', () => {
-    expect(isDeathEchoSampled(9, 'AAAA')).toBe(isDeathEchoSampled(9, 'AAAA'));
+  it('e estavel para o mesmo digest', () => {
+    expect(isDeathEchoSampled('deadbeef')).toBe(isDeathEchoSampled('deadbeef'));
+  });
+
+  it('nao muda com cauda anexada depois do tick terminal', () => {
+    // O defeito que a primeira versao tinha: o portao lia o comprimento do Base64
+    // cru, e o cliente anexava blocos validos pos-terminais ate cair num
+    // comprimento que passasse. A re-simulacao para no tick terminal e a
+    // canonicalizacao apaga a cauda, entao todas as variantes chegam ao MESMO
+    // digest — e o portao decide sobre o digest.
+    const fixture = suicideLog(0x51ee0);
+    const clean = verifySoloDeath(fixture.seed, fixture.log);
+    const padded = verifySoloDeath(
+      fixture.seed,
+      toBase64(
+        encodeCommandLog([
+          ...(decodeCommandLog(fromBase64(fixture.log) as Uint8Array, 30 * 60 * 20) ?? []),
+          ...Array.from({ length: 40 }, () => quantizeCommand({ ...emptyCommand(), dodge: true })),
+        ]),
+      ),
+    );
+    expect(clean.ok).toBe(true);
+    expect(padded.ok).toBe(true);
+    if (!clean.ok || !padded.ok) return;
+    expect(padded.digest).toBe(clean.digest);
+    expect(isDeathEchoSampled(padded.digest)).toBe(isDeathEchoSampled(clean.digest));
   });
 });
 

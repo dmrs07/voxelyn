@@ -19,11 +19,14 @@ import {
 } from './death-echo-presentation';
 import { carcassVariant, deathEchoDesignation } from './death-echo-carcass';
 import {
+  DEATH_ECHOES_VISIBLE_PER_SECTOR,
   captureDeathEcho,
   emptyDeathEchoRecords,
+  mergeDeathEchoSources,
   type DeathEchoCapsule,
   type PlacedDeathEcho,
 } from './death-echoes';
+import { deathEchoPoolQuery } from './death-echo-pool';
 
 const echo = (over: Partial<PlacedDeathEcho> = {}): PlacedDeathEcho => ({
   id: '42:dead:1234:7',
@@ -97,6 +100,60 @@ const capsuleFrom = (seed: number, cause: DamageCause = { kind: 'fire' }): Death
   if (!capsule) throw new Error('fixture sem cápsula');
   return capsule;
 };
+
+/**
+ * Células seguras e distantes umas das outras, para cada corpo virar uma CÂMARA.
+ *
+ * Sem a distância mínima o agrupamento por câmara colapsaria os corpos num só, que
+ * é o comportamento correto e não o que estes testes querem exercitar.
+ */
+const safeCellsApart = (
+  state: SurvivalState,
+  count: number,
+  minDistance: number,
+): Array<{ x: number; y: number }> => {
+  const width = state.config.width;
+  const found: Array<{ x: number; y: number }> = [];
+  for (let y = 0; y < state.config.height && found.length < count; y++) {
+    for (let x = 0; x < width && found.length < count; x++) {
+      if (state.solid[y * width + x] !== SOLID_NONE) continue;
+      if (squaredDistance(x, y, state.entry.x, state.entry.y) < 9 ** 2) continue;
+      if (squaredDistance(x, y, state.corePos.x, state.corePos.y) < 8 ** 2) continue;
+      if (state.salvageSites.some((site) =>
+        squaredDistance(x, y, site.terminal.x, site.terminal.y) < 5 ** 2 ||
+        squaredDistance(x, y, site.cache.x, site.cache.y) < 5 ** 2
+      )) continue;
+      if (state.enemies.some((enemy) => squaredDistance(x, y, enemy.x, enemy.y) < 4 ** 2)) continue;
+      if (found.some((cell) => squaredDistance(cell.x, cell.y, x, y) < minDistance ** 2)) continue;
+      found.push({ x, y });
+    }
+  }
+  if (found.length < count) throw new Error(`fixture achou ${found.length} de ${count} camaras`);
+  return found;
+};
+
+/** Cápsulas do MESMO mundo do estado: projetam na coordenada real, como no contrato. */
+const chambersOf = (state: SurvivalState, count: number): DeathEchoCapsule[] =>
+  safeCellsApart(state, count, 14).map((cell, index) => {
+    const source = createRun({ seed: state.config.seed });
+    source.player.x = cell.x + 0.5;
+    source.player.y = cell.y + 0.5;
+    source.phase = 'dead';
+    source.player.alive = false;
+    source.summary = {
+      seed: state.config.seed,
+      phase: 'dead',
+      ticks: 1500 + index,
+      contamination: 0,
+      deathCause: { kind: 'fire' },
+      stats: { ...source.stats, kills: { ...source.stats.kills } },
+      stars: 0,
+      targetTicks: 9600,
+    };
+    const capsule = captureDeathEcho(source, `camara-${index}`);
+    if (!capsule) throw new Error('fixture sem cápsula');
+    return capsule;
+  });
 
 /** Uma run com exatamente um eco projetado e o jogador longe dele. */
 const runWithEcho = (): { state: SurvivalState; controller: DeathEchoController; placed: PlacedDeathEcho } => {
@@ -277,6 +334,52 @@ describe('pareamento pelo botão usar', () => {
     state.phase = 'extracted';
     const terminal = controller.sync(state, 100);
     expect(terminal).toEqual(emptyDeathEchoFrame());
+  });
+});
+
+describe('pool comunitario no cliente', () => {
+  it('so filtra por seed quando a run ESTA num contrato', () => {
+    // O contrato anunciado é um cartaz na parede. Confundi-lo com a modalidade da
+    // run fazia toda descida comum consultar o pool por seed, e o pool geral —
+    // mortes de mapas que este jogador nunca viu — nunca era pedido.
+    expect(deathEchoPoolQuery(2, null)).toEqual({ sector: 2 });
+    expect(deathEchoPoolQuery(2, { seed: 777 })).toEqual({ sector: 2, seed: 777 });
+  });
+
+  it('dá prioridade à memória local sobre o pool e remove o próprio corpo repetido', () => {
+    const mine = capsuleFrom(0x01020304);
+    const alheio = { ...mine, id: 'de-outra-pessoa' };
+    const merged = mergeDeathEchoSources([mine], [alheio, mine]);
+    // A run em que o jogador morreu ontem diz mais a ele do que a de um estranho.
+    expect(merged.map((e) => e.id)).toEqual([mine.id, 'de-outra-pessoa']);
+  });
+
+  it('mantém todos os corpos auditáveis, sem prompt morto ao lado de um que responde', () => {
+    // A spec fala de "um eco interativo por setor", e esse limite é da RECUPERAÇÃO
+    // de módulo (Etapa 4), que muda a run. Auditar não custa nada, e uma carcaça
+    // que ignora o botão usar — parada ao lado de outra que responde, sem nenhuma
+    // diferença visível — leria como defeito.
+    const state = createRun({ seed: 0xa0b0c0d0 });
+    const controller = new DeathEchoController(emptyDeathEchoRecords());
+    controller.setPool(chambersOf(state, 3));
+    const frame = controller.sync(state, 0);
+    expect(frame.echoes).toHaveLength(3);
+    for (const body of frame.echoes) {
+      standAt(state, body.x, body.y);
+      controller.pressInteract();
+      expect(controller.sync(state, 100).paired?.echo.id).toBe(body.id);
+      controller.pressInteract();
+      controller.sync(state, 200);
+    }
+  });
+
+  it('respeita o teto de corpos por setor mesmo com o pool cheio', () => {
+    const state = createRun({ seed: 0xbeef00 });
+    const controller = new DeathEchoController(emptyDeathEchoRecords());
+    // Dez câmaras distintas do próprio mapa: todas projetariam na coordenada real,
+    // então é o teto — e não a falta de célula — que tem de limitar.
+    controller.setPool(chambersOf(state, 10));
+    expect(controller.sync(state, 0).echoes).toHaveLength(DEATH_ECHOES_VISIBLE_PER_SECTOR);
   });
 });
 
