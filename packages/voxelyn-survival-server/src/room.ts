@@ -418,6 +418,15 @@ export class GameRoom {
       })),
       coreTaken: this.state.coreTaken,
       guardianAwake: this.state.guardianAwake,
+      // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
+      // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto
+      // inteiro, entao aparecer e ser levado disparam o envio sozinhos.
+      wellOffers: this.state.wellOffers.map((offer) => ({
+        ability: offer.ability,
+        x: round3(offer.x),
+        y: round3(offer.y),
+        takenBy: offer.takenBy,
+      })),
     };
   }
 

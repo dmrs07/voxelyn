@@ -80,6 +80,24 @@ Prospector sem o desconto de fogo amigo, que é a lição do material. Reaprovei
 como autoria diria que ninguém provocou nada, então o crédito é dado no ponto onde
 o tiro do jogador causou a descarga.
 
+## Co-op
+
+As ofertas viajam nas `WorldFlags`, junto de cofres abertos e núcleo retirado. O
+cliente online **não simula**: elas nascem do tally de ressonância do servidor, que
+ele nem espelha, então não há nada no espelho dele de onde deduzi-las. Sem viajar,
+o co-op emitia `well_offers` e o jogador não via Eco nenhum — nem onde escolher,
+nem o quê. O `full_resync` também as carrega, para quem cai perto do poço voltar
+enxergando a escolha que ainda está lá.
+
+O cliente **substitui a lista inteira** em vez de casar por índice: as ofertas não
+têm identidade estável entre setores — nascem no poço e somem na descida —, e um
+merge posicional deixaria um Eco do setor anterior no mapa novo.
+
+A oferta lê a ressonância de quem está **mais perto** do poço. No co-op os dois
+jogaram o mesmo setor de formas diferentes, e escolher a de um deles é mais honesto
+do que somar as duas: uma média de estilos não descreve estilo nenhum. Empate exato
+mantém o slot menor, que é determinístico.
+
 ## O poço
 
 Os Ecos acordam quando alguém chega a `WELL_OFFER_REVEAL` do poço, e a oferta é
@@ -115,6 +133,13 @@ usos é o que impede cada uma de virar a arma primária.
 superfície saem da mesma varredura: a chama que fica é o que continua matando
 depois, e sem ela seria um tiro largo com nome bonito. Vale em corredor, e vira
 armadilha no próprio recuo.
+
+O cone **não acende matéria por conta própria**: ele pede a `igniteCell`, como toda
+outra fonte de chama do jogo. Fungo úmido passa pelo estado fumegante que avisa,
+gás recebe o flash curto do próprio material, e o evento de ignição acontece.
+Escrever `SURF_FIRE` direto pulava tudo isso — uma habilidade nova que ensina outra
+física para o mesmo material é pior do que uma habilidade que falta. Só chão nu
+recebe a chama diretamente, porque ali não há o que "pegar" fogo.
 
 **Lança Rastreadora** — um míssil, dano alto, curva lenta. Um só, e não uma salva,
 porque a habilidade tem de ser uma decisão e não um segundo gatilho. A correção é

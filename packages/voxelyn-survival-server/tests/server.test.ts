@@ -155,6 +155,35 @@ describe('servidor autoritativo de co-op', () => {
     expect(room.slots[1].clientId).toBe('B2');
   });
 
+  it('sincroniza os Ecos do poco para o cliente online, que nao simula', () => {
+    // O cliente online NAO simula: as ofertas nascem do tally de ressonancia do
+    // servidor, que ele nem espelha. Sem viajar, o co-op emitia `well_offers` e o
+    // jogador nao via Eco nenhum — nem onde escolher, nem o que escolher.
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const room = h.server.roomForClient('A');
+    if (!room) throw new Error('sala nao criada');
+    h.drain('A');
+
+    room.state.playerExtra.resonance.fire = 30;
+    room.state.player.x = room.state.corePos.x + 0.5 + 1;
+    room.state.player.y = room.state.corePos.y + 0.5;
+    h.tick();
+    expect(room.state.wellOffers.length).toBeGreaterThan(0);
+
+    const snapshot = h.drain('A')
+      .find((m): m is Extract<ServerMessage, { t: 'snapshot' }> => m.t === 'snapshot');
+    expect(snapshot?.world?.wellOffers).toHaveLength(room.state.wellOffers.length);
+    expect(snapshot?.world?.wellOffers?.[0].ability).toBe(room.state.wellOffers[0].ability);
+    expect(snapshot?.world?.wellOffers?.[0].takenBy).toBeNull();
+
+    // Reconexao tambem: o full_resync tem de trazer as ofertas, senao quem cai
+    // perto do poco volta sem enxergar a escolha que ainda esta la.
+    const full = room.buildFullResync(room.slots[0]);
+    expect(full.world.wellOffers).toHaveLength(room.state.wellOffers.length);
+  });
+
   it('resync reconstroi o mundo de um cliente divergente', () => {
     const h = new Harness();
     h.connect('A');

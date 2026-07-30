@@ -311,6 +311,18 @@ export class NetClient {
     }
     state.coreTaken = world.coreTaken;
     state.guardianAwake = world.guardianAwake;
+    // Substitui a lista inteira em vez de casar por indice: as ofertas nao tem
+    // identidade estavel entre setores — elas nascem no poco e somem na descida —,
+    // e um merge posicional deixaria um Eco do setor anterior no mapa novo.
+    //
+    // Servidor antigo nao manda o campo: lista vazia mantem o resto do mundo
+    // funcionando, e o pior que acontece e o co-op nao mostrar Eco nenhum.
+    state.wellOffers = (world.wellOffers ?? []).map((offer) => ({
+      ability: offer.ability,
+      x: offer.x,
+      y: offer.y,
+      takenBy: offer.takenBy,
+    }));
   }
 
   private ingestFrame(entities: EntitySnapshot[], projectiles: ProjectileSnapshot[], tick: number, nowMs: number): void {

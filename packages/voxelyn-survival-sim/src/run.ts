@@ -53,6 +53,7 @@ import {
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
+  SURF_SCORCHED,
   SURF_GAS,
   SURF_NONE,
   SURF_SPORES,
@@ -68,7 +69,7 @@ import {
   recordResonance,
   resonanceOffers,
 } from './abilities.js';
-import { dischargeAt, explodeAt, setSurface, stepCells } from './cells.js';
+import { dischargeAt, explodeAt, igniteCell, setSurface, stepCells } from './cells.js';
 import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
@@ -466,8 +467,30 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
           if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
           const i = y * w + x;
           if (state.solid[i] !== SOLID_NONE) continue;
-          setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
-          recordResonance(extra.resonance, 'fire');
+          // O cone NAO acende materia por conta propria: ele pede a `igniteCell`,
+          // como toda outra fonte de chama do jogo. Escrever `SURF_FIRE` direto
+          // pulava as regras do material — fungo umido saltava para fogo sem
+          // passar pelo estado fumegante que AVISA, gas recebia o combustivel
+          // longo em vez do flash curto, e nem o evento de ignicao nem a
+          // descoberta aconteciam. Uma habilidade nova que ensina outra fisica
+          // para o mesmo material e pior do que uma habilidade que falta.
+          const ignited = igniteCell(state, i, events);
+          if (!ignited) {
+            // Chao nu nao tem o que "pegar" fogo: ali a chama do sopro fica por
+            // conta propria. Qualquer superficie com materia pertence a
+            // `igniteCell`, inclusive quando ela decide nao acender nada.
+            const bare = state.surface[i];
+            if (bare === SURF_NONE || bare === SURF_SCORCHED || bare === SURF_FIRE) {
+              setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
+            }
+          }
+          // Credita pelo RESULTADO, e nao pela intencao: fungo que so comecou a
+          // secar ainda e o jogador provocando combustao, e celula que a
+          // `igniteCell` recusou nao e.
+          const after = state.surface[i];
+          if (after === SURF_FIRE || after === SURF_FUNGAL_HEATED) {
+            recordResonance(extra.resonance, 'fire');
+          }
         }
       }
       for (const enemy of state.enemies) {
@@ -556,11 +579,21 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   if (state.wellOffers.length > 0 || isFinalSector(state.sector)) return;
   const wellX = state.corePos.x + 0.5;
   const wellY = state.corePos.y + 0.5;
+  // O MAIS PROXIMO, e nao o ultimo iterado. Guardar a ultima ocorrencia fazia o
+  // slot de numero mais alto ganhar sempre que os dois estivessem no alcance no
+  // mesmo tick — a oferta descrevia o estilo do parceiro que ficou para tras por
+  // causa da ordem do laco. Empate exato mantem o slot menor, que e deterministico.
   let nearest: number | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
   for (let slot = 0; slot < state.players.length; slot++) {
     const p = state.players[slot];
     if (!state.playerExtras[slot].joined || !p.alive) continue;
-    if (Math.hypot(p.x - wellX, p.y - wellY) <= WELL_OFFER_REVEAL) nearest = slot;
+    const distance = Math.hypot(p.x - wellX, p.y - wellY);
+    if (distance > WELL_OFFER_REVEAL) continue;
+    if (nearest === null || distance < nearestDistance) {
+      nearest = slot;
+      nearestDistance = distance;
+    }
   }
   if (nearest === null) return;
 

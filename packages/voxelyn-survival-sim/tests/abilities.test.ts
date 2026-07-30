@@ -6,8 +6,11 @@ import {
   SOLID_CRYSTAL,
   SOLID_NONE,
   SURF_BIOFLUID,
+  GAS_FLASH_TICKS,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_FUNGAL_HEATED,
+  SURF_GAS,
   SURF_NONE,
   WELL_OFFER_REACH,
   WELL_OFFER_REVEAL,
@@ -95,6 +98,34 @@ describe('habilidades', () => {
     const back = Math.floor(state.player.y) * w + Math.floor(state.player.x - 2);
     expect(state.surface[front]).toBe(SURF_FIRE);
     expect(state.surface[back]).toBe(SURF_NONE);
+  });
+
+  it('o cone respeita a ignicao por material em vez de escrever fogo direto', () => {
+    // Uma habilidade nova que ensina outra fisica para o mesmo material e pior do
+    // que uma habilidade que falta: fungo umido tem de passar pelo estado
+    // fumegante que AVISA, e gas tem de dar o flash curto e nao o combustivel
+    // longo do chao nu.
+    const state = createRun({ seed: 0xc0e0 });
+    clearArena(state);
+    state.playerExtra.ability = 'flamethrower';
+    const w = state.config.width;
+    const row = Math.floor(state.player.y) * w;
+    const fungal = row + Math.floor(state.player.x + 1);
+    const gas = row + Math.floor(state.player.x + 2);
+    const bare = row + Math.floor(state.player.x + 3);
+    state.surface[fungal] = SURF_FUNGAL;
+    state.surface[gas] = SURF_GAS;
+
+    cast(state, { x: 1, y: 0 });
+
+    // Fungo umido NAO salta para fogo: ele comeca a secar, e o aviso sobrevive.
+    expect(state.surface[fungal]).toBe(SURF_FUNGAL_HEATED);
+    // Gas queima com o flash curto do proprio material.
+    expect(state.surface[gas]).toBe(SURF_FIRE);
+    expect(state.surfaceTimer[gas]).toBeLessThanOrEqual(GAS_FLASH_TICKS);
+    // Chao nu continua recebendo a chama do sopro, que e o que a habilidade faz.
+    expect(state.surface[bare]).toBe(SURF_FIRE);
+    expect(state.surfaceTimer[bare]).toBeGreaterThan(GAS_FLASH_TICKS);
   });
 
   it('o lanca-chamas nao atravessa alem do alcance', () => {
@@ -210,6 +241,27 @@ describe('ressonancia do poco', () => {
     state.playerExtra.resonance.blast = 999;
     stepRun(state, [emptyCommand()]);
     expect(state.wellOffers.map((offer) => offer.ability)).toEqual(frozen);
+  });
+
+  it('le a ressonancia de quem esta MAIS PERTO, e nao do ultimo slot', () => {
+    // Guardar a ultima ocorrencia fazia o slot de numero mais alto ganhar sempre
+    // que os dois estivessem no alcance no mesmo tick: a oferta descrevia o estilo
+    // do parceiro que ficou para tras, por causa da ordem do laco.
+    const state = createRun({ seed: 0x0ffe6, playerCount: 2 });
+    const wellX = state.corePos.x + 0.5;
+    const wellY = state.corePos.y + 0.5;
+
+    // Slot 0 chega ao poco tendo incendiado; slot 1 fica longe, tendo detonado.
+    state.playerExtras[0].resonance.fire = 30;
+    state.playerExtras[1].resonance.blast = 30;
+    state.players[0].x = wellX + 1;
+    state.players[0].y = wellY;
+    state.players[1].x = wellX + WELL_OFFER_REVEAL - 0.5;
+    state.players[1].y = wellY;
+
+    stepRun(state, [emptyCommand(), emptyCommand()]);
+    expect(state.wellOffers.length).toBeGreaterThan(0);
+    expect(state.wellOffers[0].ability).toBe('flamethrower');
   });
 
   it('nao interrompe o setor final com uma escolha no meio da arena', () => {
