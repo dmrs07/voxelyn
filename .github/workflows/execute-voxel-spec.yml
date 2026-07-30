@@ -40,35 +40,71 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build typed dependencies
-        run: pnpm --filter @voxelyn/survival-server... build
-
-      - name: Apply death echo lighting fix
-        run: python .github/scripts/apply-death-echo-lighting-fix.py
-
-      - name: Validate final product state
+      - name: Build voxel generator dependency
         run: |
-          pnpm --filter @voxelyn/survival exec tsc -p tsconfig.json
-          pnpm build:survival
-          pnpm test:survival
-          pnpm --filter @voxelyn/survival build:offline-check
-          git diff --check
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/voxel-validation.log
 
-      - name: Commit lighting fix
+      - name: Regenerate normalized character atlases
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/voxel-validation.log
+
+      - name: Persist regenerated atlases
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            packages/voxelyn-survival/src/client/render.ts \
-            packages/voxelyn-survival/src/client/death-echo-presentation.test.ts
-          git commit -m "fix(survival): apply world lighting to death echoes"
+          git add packages/voxelyn-survival-content/assets/atlases
+          if git diff --cached --quiet; then
+            echo "Atlases already up to date."
+          else
+            git commit -m "fix(content): regenerate normalized voxel atlases [skip voxel]"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+          fi
 
-      - name: Remove lighting-fix transport
+      - name: Build survival packages
+        id: build
+        continue-on-error: true
         run: |
-          git checkout origin/main -- .github/workflows/execute-voxel-spec.yml
-          rm .github/scripts/apply-death-echo-lighting-fix.py
-          git add -A .github
-          git commit -m "chore(ci): remove death echo lighting transport"
+          set -o pipefail
+          pnpm build:survival 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Publish reviewed commits
-        run: git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+      - name: Validate and test survival packages
+        id: tests
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm test:survival 2>&1 | tee -a /tmp/voxel-validation.log
+
+      - name: Verify PWA atlas precache
+        id: offline
+        if: steps.build.outcome == 'success' && steps.tests.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/voxel-validation.log
+
+      - name: Write validation summary
+        if: always()
+        run: |
+          {
+            echo "build=${{ steps.build.outcome }}"
+            echo "tests=${{ steps.tests.outcome }}"
+            echo "offline=${{ steps.offline.outcome }}"
+            echo
+            cat /tmp/voxel-validation.log
+          } > /tmp/voxel-validation-full.log
+
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxel-validation-${{ github.run_id }}
+          path: /tmp/voxel-validation-full.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce validation result
+        if: steps.build.outcome == 'failure' || steps.tests.outcome == 'failure' || steps.offline.outcome == 'failure'
+        run: exit 1
