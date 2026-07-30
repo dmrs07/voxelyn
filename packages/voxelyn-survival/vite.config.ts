@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 import { readFileSync, writeFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -12,6 +13,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * em cache sem o JS do jogo e o solo offline nao inicia no primeiro uso.
  * Os nomes so existem apos o bundle, por isso a lista e escrita aqui e nao no
  * arquivo em public/.
+ *
+ * Junto vai um id de build. O navegador so instala um SW novo quando o sw.js
+ * muda byte a byte; se um deploy alterar apenas o index.html (nenhum hash de
+ * asset muda), o sw.js sairia identico e o shell precacheado ficaria congelado
+ * na versao anterior por tempo indefinido. O id tambem nomeia o cache, o que
+ * faz cada build descartar o cache do build anterior no activate.
  */
 const precacheManifest = (): Plugin => ({
   name: 'voxelyn-precache-manifest',
@@ -30,7 +37,21 @@ const precacheManifest = (): Plugin => ({
     } catch {
       return; // sem SW no output: nada a injetar
     }
-    const header = `self.__VOXELYN_PRECACHE__ = ${JSON.stringify(assets)};\n`;
+    // Cobre os hashes dos assets E o conteudo do HTML emitido: qualquer um dos
+    // dois mudando produz um sw.js diferente, que e o gatilho do update.
+    const digest = createHash('sha256');
+    for (const name of assets) digest.update(name);
+    for (const [name, chunk] of Object.entries(bundle)) {
+      if (!name.endsWith('.html')) continue;
+      const source = 'source' in chunk ? chunk.source : '';
+      digest.update(typeof source === 'string' ? source : Buffer.from(source));
+    }
+    const build = digest.digest('hex').slice(0, 12);
+    // A linha do precache precisa continuar sendo a PRIMEIRA:
+    // scripts/check-precache.mjs ancora nela com `^`.
+    const header =
+      `self.__VOXELYN_PRECACHE__ = ${JSON.stringify(assets)};\n` +
+      `self.__VOXELYN_BUILD__ = ${JSON.stringify(build)};\n`;
     writeFileSync(swPath, header + sw);
   },
 });
