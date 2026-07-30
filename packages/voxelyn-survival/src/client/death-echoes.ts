@@ -99,6 +99,20 @@ const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>
 const isProjectileKind = (value: unknown): value is ProjectileKind =>
   typeof value === 'string' && PROJECTILE_KINDS.has(value as ProjectileKind);
 
+// Matriz fechada do que a simulação realmente consegue disparar. `bolt` e
+// `return_disc` pertencem ao jogador; aceitar qualquer união válida aqui
+// permitiria que storage adulterado fabricasse uma lição de morte.
+const HOSTILE_PROJECTILES_BY_ARCHETYPE: Partial<Record<EnemyArchetype, ReadonlySet<ProjectileKind>>> = {
+  bruiser: new Set(['rock']),
+  spitter: new Set(['spit']),
+  guardian: new Set(['spit']),
+  bishop: new Set(['spit']),
+};
+const isValidEnemyProjectileCause = (archetype: unknown, projectile: unknown): boolean => {
+  if (!isEnemyArchetype(archetype) || !isProjectileKind(projectile)) return false;
+  return HOSTILE_PROJECTILES_BY_ARCHETYPE[archetype]?.has(projectile) ?? false;
+};
+
 const isDamageCause = (value: unknown): value is DamageCause => {
   if (typeof value !== 'object' || value === null) return false;
   const cause = value as Record<string, unknown>;
@@ -118,9 +132,8 @@ const isDamageCause = (value: unknown): value is DamageCause => {
       return isEnemyArchetype(cause.archetype) && typeof cause.elite === 'boolean';
     case 'enemy_projectile':
       return (
-        isEnemyArchetype(cause.archetype) &&
-        typeof cause.elite === 'boolean' &&
-        isProjectileKind(cause.projectile)
+        isValidEnemyProjectileCause(cause.archetype, cause.projectile) &&
+        typeof cause.elite === 'boolean'
       );
     default:
       return false;

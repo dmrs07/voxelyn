@@ -130,6 +130,16 @@ describe('cápsula de morte local', () => {
         { ...echo, id: 'bad-archetype', cause: { kind: 'enemy_contact', archetype: 'bogus', elite: false } },
         {
           ...echo,
+          id: 'player-bolt-as-enemy',
+          cause: { kind: 'enemy_projectile', archetype: 'stalker', elite: false, projectile: 'bolt' },
+        },
+        {
+          ...echo,
+          id: 'wrong-rock-shooter',
+          cause: { kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'rock' },
+        },
+        {
+          ...echo,
           id: 'bad-projectile',
           cause: { kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'laser' },
         },
@@ -139,6 +149,24 @@ describe('cápsula de morte local', () => {
     expect(decoded.echoes).toHaveLength(1);
     expect(decoded.echoes[0].id).toBe('ok');
     expect(decoded.nextSerial).toBe(7);
+  });
+
+  it('aceita somente combinações de projétil que a simulação pode emitir', () => {
+    const state = finishDead(createRun({ seed: 10 }));
+    const echo = captureDeathEcho(state, 'base');
+    if (!echo) throw new Error('eco não capturado');
+    const validCauses: DamageCause[] = [
+      { kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'spit' },
+      { kind: 'enemy_projectile', archetype: 'guardian', elite: false, projectile: 'spit' },
+      { kind: 'enemy_projectile', archetype: 'bishop', elite: false, projectile: 'spit' },
+      { kind: 'enemy_projectile', archetype: 'bruiser', elite: false, projectile: 'rock' },
+    ];
+    const decoded = decodeDeathEchoRecords(JSON.stringify({
+      schema: 1,
+      nextSerial: 5,
+      echoes: validCauses.map((cause, index) => ({ ...echo, id: `valid-${index}`, cause })),
+    }));
+    expect(decoded.echoes).toHaveLength(validCauses.length);
   });
 
   it('mantém somente o teto de mortes recentes', () => {
