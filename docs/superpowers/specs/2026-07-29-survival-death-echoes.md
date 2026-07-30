@@ -20,7 +20,7 @@ O sistema preserva a **posição narrativa** da morte, não apenas a coordenada.
 
 ### Registro
 
-Ao terminar uma run em morte, o cliente salva uma cápsula separada de `voxelyn.records`:
+Ao terminar uma run **solo** em morte, o cliente salva uma cápsula separada de `voxelyn.records`:
 
 - identidade estável da run;
 - seed e setor;
@@ -33,6 +33,8 @@ Ao terminar uma run em morte, o cliente salva uma cápsula separada de `voxelyn.
 - tick terminal.
 
 O histórico é limitado e tolera storage ausente ou corrompido.
+
+O co-op fica fora desta etapa por uma razão de verdade narrativa, não de conveniência: o `RunSummary` atual registra a causa que encerrou a **sala**, mas não associa causa, posição e direção por slot. Usar a posição do jogador local com a causa do último parceiro a cair fabricaria um acontecimento que não ocorreu. A etapa comunitária deve persistir esses campos juntos no servidor.
 
 ### Projeção
 
@@ -66,7 +68,7 @@ Nenhuma candidata aceitável significa nenhum eco.
 
 Somente ecos provenientes de simulação autoritativa podem entrar no pool:
 
-- co-op: o servidor já simulou a run;
+- co-op: o servidor já simulou a run e pode associar causa e corpo corretos;
 - solo: apenas depois de re-simular o command log.
 
 O servidor armazena cápsulas sem PII e entrega uma amostra limitada. O cliente continua reprojetando-as localmente enquanto forem visuais.
@@ -105,7 +107,7 @@ Este PR deve fechar a Etapa 1 antes de avançar:
 1. cápsula, storage e deduplicação puros, com testes;
 2. projeção topológica determinística, com testes de reservas e fallback;
 3. render da carcaça e leitura por proximidade;
-4. integração solo e online local, sem protocolo novo;
+4. captura local solo, sem protocolo novo;
 5. build, suítes Survival, offline check e revisão Codex limpa.
 
 As Etapas 2–4 ficam explicitamente fora do diff enquanto a experiência visual local não estiver provada.
