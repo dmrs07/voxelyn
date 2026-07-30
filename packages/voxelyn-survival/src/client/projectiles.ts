@@ -19,7 +19,7 @@ export type ProjectileLike = {
   y: number;
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
-  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc';
+  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker';
   modules?: { explosive?: { armAfterDistance: number } };
   distanceTravelled?: number;
 };
@@ -27,6 +27,9 @@ export type ProjectileLike = {
 /** Estilhaco mineral do jogador contra cuspe acido do inimigo. */
 const PLAYER_RAMP: FaceRamp = ['#e8f1ff', '#59f2c2', '#2f6b4f'];
 const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
+/** Missil rastreador: casco frio na frente, chama quente atras. */
+const SEEKER_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
+const SEEKER_FLAME_RAMP: FaceRamp = ['#ffd166', '#ff7a2f', '#6e4a33'];
 /**
  * Pedra do bruiser: a MESMA rampa dos blocos de terreno.
  *
@@ -105,12 +108,20 @@ export class ProjectileView {
     const [sx, sy] = project(projectile.x, projectile.y);
     const rock = projectile.kind === 'rock';
     const disc = projectile.kind === 'return_disc';
+    // O missil e um corpo, nao uma faisca: ele precisa ler como algo que voce
+    // lancou e que ainda esta no ar procurando alguem.
+    const seeker = projectile.kind === 'seeker';
     const armed = Boolean(projectile.modules?.explosive && (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance);
-    const ramp = rock ? ROCK_RAMP : disc ? DISC_RAMP : armed ? ARMED_RAMP : projectile.hostile ? HOSTILE_RAMP : PLAYER_RAMP;
+    const ramp = rock ? ROCK_RAMP
+      : disc ? DISC_RAMP
+      : seeker ? SEEKER_RAMP
+      : armed ? ARMED_RAMP
+      : projectile.hostile ? HOSTILE_RAMP
+      : PLAYER_RAMP;
     const lift = FLIGHT_HEIGHT * tileH * zoom;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
-    const size = VOXEL_PX * zoom * (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : 1);
+    const size = VOXEL_PX * zoom * (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : 1);
     const track = this.tracks.get(projectile.id);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao
@@ -118,7 +129,7 @@ export class ProjectileView {
     // entao sem sombra um projetil alto e indistinguivel de um projetil longe.
     // Sombra proporcional ao corpo: um bloco projeta mais sombra que um cuspe,
     // e e por ela que a massa se le enquanto ele ainda esta longe.
-    drawGroundShadow(ctx, sx, sy, (rock ? 7 : 3) * zoom);
+    drawGroundShadow(ctx, sx, sy, (rock ? 7 : seeker ? 5 : 3) * zoom);
 
     // Pedra nao deixa rastro nem se parte em estilhaco: e um corpo solido e
     // unico. O rastro existe para materia que se desfaz no ar — cuspe e
@@ -126,6 +137,22 @@ export class ProjectileView {
     // algo que evapora enquanto voa.
     if (rock) {
       drawVoxel(ctx, sx, sy - lift, size, ramp);
+      return;
+    }
+    if (seeker) {
+      // Corpo unico com a chama atras, e a chama aponta para TRAS do voo: e ela
+      // que denuncia a curva enquanto o missil corrige o rumo, que e a unica
+      // coisa que o jogador precisa conseguir ler nele.
+      drawVoxel(ctx, sx, sy - lift, size, ramp);
+      if (track) {
+        drawVoxel(
+          ctx,
+          sx - track.dx * size * 0.9,
+          sy - lift - track.dy * size * 0.45,
+          size * 0.55,
+          SEEKER_FLAME_RAMP,
+        );
+      }
       return;
     }
     if (disc) {

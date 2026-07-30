@@ -20,10 +20,11 @@ import {
   ABILITY_RADIUS,
   HEAT_MAX,
   SECTOR_COUNT,
+  WELL_OFFER_REACH,
   isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
-import type { ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { AbilityId, ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
@@ -37,6 +38,7 @@ import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
 import { drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
+import { abilityPresentation } from './ability-presentation';
 import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
 import {
   describeCause,
@@ -554,6 +556,52 @@ export class SurvivalRenderer {
         case 'pulse':
           this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200);
           break;
+        case 'flame_cone': {
+          // O cone e desenhado como uma frente que ANDA: brasas nascem ao longo
+          // do alcance, e nao um leque estatico. A chama que fica no chao ja e
+          // superficie de verdade e se desenha sozinha — isto e so o sopro.
+          this.addFlash(ev.x, ev.y, ev.range, 0.9, nowMs, 260);
+          const steps = Math.max(3, Math.round(ev.range * 2));
+          for (let i = 1; i <= steps; i++) {
+            const reach = (ev.range * i) / steps;
+            const spread = Math.tan(ev.arc) * reach;
+            for (const side of [-1, 0, 1]) {
+              this.particles.emitGas(
+                ev.x + ev.dx * reach - ev.dy * spread * side * 0.6,
+                ev.y + ev.dy * reach + ev.dx * spread * side * 0.6,
+                nowMs,
+                0.6,
+              );
+            }
+          }
+          this.shake = { power: 2, until: nowMs + 140 };
+          break;
+        }
+        case 'arc_chain': {
+          // Um anel curto em cada salto. A LINHA entre eles nao e desenhada: o
+          // arco ja resolveu tudo num tick, e um raio persistente prometeria uma
+          // duracao que a simulacao nao tem.
+          for (const hop of ev.hops) {
+            this.fxList.push({
+              kind: 'ring', x: hop.x, y: hop.y, r: 0.1, maxR: 0.8,
+              color: PAL.electric, life: 220, maxLife: 220,
+            });
+          }
+          break;
+        }
+        case 'well_offers':
+          this.messages.push({
+            text: 'O VEIO RESSOA - DOIS ECOS DEMONSTRAM',
+            until: nowMs + 3400,
+          });
+          break;
+        case 'ability_taken':
+          this.addFlash(ev.x, ev.y, 3, 0.9, nowMs, 320);
+          this.messages.push({
+            text: `${abilityPresentation(ev.ability).label} ASSIMILADO`,
+            until: nowMs + 2600,
+          });
+          break;
         case 'dodge':
           this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.6, color: PAL.player, life: 180, maxLife: 180 });
           break;
@@ -999,6 +1047,21 @@ export class SurvivalRenderer {
 
     const spriteZoom = Math.max(1, Math.round(z));
 
+    // Os Ecos da Ressonancia do Poco. Entram na fila ordenada como qualquer
+    // corpo: eles ocupam espaco no mundo, e um Eco desenhado por cima da parede
+    // que o esconde deixaria de parecer que esta LA.
+    for (const offer of state.wellOffers) {
+      if (offer.takenBy !== null) continue;
+      const [osx, osy] = toScreen(offer.x, offer.y);
+      if (osx < -80 || osx > vw + 80 || osy < -100 || osy > vh + 80) continue;
+      const reachable =
+        Math.hypot(state.player.x - offer.x, state.player.y - offer.y) <= WELL_OFFER_REACH;
+      items.push({
+        depth: offer.x + offer.y,
+        draw: () => this.drawWellOffer(offer, osx, osy, z, spriteZoom, nowMs, reachable),
+      });
+    }
+
     const pairedEcho = this.deathEchoes.paired;
     for (const echo of this.deathEchoes.echoes) {
       const [esx, esy] = toScreen(echo.x, echo.y);
@@ -1391,6 +1454,70 @@ export class SurvivalRenderer {
     ctx.strokeStyle = PAL.dark;
     ctx.lineWidth = Math.max(1, z * 0.6);
     ctx.strokeRect(bx, by, 3 * z, 3 * z);
+  }
+
+  /**
+   * Um Eco demonstrando uma habilidade ao lado do poço.
+   *
+   * Silhueta translúcida na cor da habilidade, e não um baú: o que o jogador
+   * precisa entender antes de chegar perto é que aquilo é ALGUÉM mostrando algo,
+   * e que há dois. A cor faz a comparação acontecer de longe — antes de ele
+   * escolher a que estava mais perto por acaso.
+   *
+   * O rótulo aparece SEMPRE, mesmo no escuro. Ele é instrução, e a regra de "a
+   * fog of war revela luzes, não silhuetas" protege informação sobre o mundo —
+   * uma oferta que o jogo está fazendo ao jogador não é informação sobre o mundo.
+   */
+  private drawWellOffer(
+    offer: { ability: AbilityId; x: number; y: number },
+    sx: number,
+    sy: number,
+    z: number,
+    spriteZoom: number,
+    nowMs: number,
+    reachable: boolean,
+  ): void {
+    const ctx = this.ctx;
+    const presentation = abilityPresentation(offer.ability);
+    const breath = 0.55 + Math.sin(nowMs * 0.005 + offer.x) * 0.15;
+
+    ctx.save();
+    ctx.globalAlpha = breath * 0.5;
+    ctx.fillStyle = presentation.color;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, 10 * z, 5 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.5 + breath * 0.25;
+    const drew = this.sprites.drawEntity(
+      ctx, 'prospector', 'idle', 0, 1, nowMs, sx, sy, spriteZoom,
+      { color: presentation.color, alpha: 0.7 },
+    );
+    if (!drew) {
+      ctx.fillStyle = presentation.color;
+      ctx.fillRect(sx - 3 * z, sy - 16 * z, Math.max(2, 6 * z), Math.max(2, 16 * z));
+      ctx.fillRect(sx - 4 * z, sy - 21 * z, Math.max(2, 8 * z), Math.max(2, 5 * z));
+    }
+    ctx.restore();
+
+    const label = reachable ? `USAR — ${presentation.label}` : presentation.label;
+    ctx.save();
+    ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(label).width + 10 * z;
+    const height = 11 * z;
+    const top = sy - 30 * z;
+    ctx.fillStyle = 'rgba(11,14,20,0.9)';
+    ctx.fillRect(sx - width / 2, top, width, height);
+    ctx.strokeStyle = presentation.color;
+    ctx.lineWidth = Math.max(1, z * (reachable ? 0.9 : 0.5));
+    ctx.strokeRect(sx - width / 2, top, width, height);
+    ctx.fillStyle = presentation.color;
+    ctx.fillText(label, sx, top + height / 2);
+    ctx.restore();
   }
 
   /** O convite a parear: aparece no escuro, porque é instrução e não matéria. */

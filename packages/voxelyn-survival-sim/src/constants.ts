@@ -179,6 +179,60 @@ export const BOLT_COOLDOWN_TICKS = 5;
 
 export const ABILITY_COOLDOWN_TICKS = 120; // pulso cinetico
 export const ABILITY_RADIUS = 2.6;
+
+// ---------------------------------------------------------------------------
+// Habilidades da Ressonancia do Poco
+// ---------------------------------------------------------------------------
+// Todas com cooldown MAIOR que o do pulso. O pulso e a habilidade inicial e
+// tambem a mais fraca: ele empurra e limpa gas, mas nao mata. As outras matam, e
+// por isso a janela entre usos e o que impede cada uma de virar a arma primaria.
+//
+// A regra de balanceamento que rege as tres: nenhuma delas pode ser melhor que o
+// tiro comum em DPS sustentado. Elas resolvem SITUACOES — o grupo colado, o alvo
+// que fugiu, a poca cheia de bicho —, e o custo de resolver e nao ter a resposta
+// pronta de novo pelos proximos seis a nove segundos.
+
+/** Cone de chamas: curto, largo e deixa fogo no chao. */
+export const FLAMETHROWER_COOLDOWN_TICKS = 160; // 8 s
+export const FLAMETHROWER_RANGE = 4.2;
+/** Meia-abertura do cone, em radianos. ~35 graus para cada lado. */
+export const FLAMETHROWER_ARC = 0.61;
+export const FLAMETHROWER_DAMAGE = 9;
+
+/**
+ * Missil rastreador: UM, com dano alto e curva lenta.
+ *
+ * Um so, e nao uma salva, porque a habilidade tem de ser uma DECISAO e nao um
+ * segundo gatilho. A curva lenta e o que a impede de ser infalivel: contra um
+ * alvo que se move de lado ele erra, e acertar exige atirar quando o inimigo esta
+ * comprometido com uma direcao.
+ */
+export const SEEKER_COOLDOWN_TICKS = 180; // 9 s
+export const SEEKER_DAMAGE = 46;
+export const SEEKER_SPEED = 7.5;
+export const SEEKER_TTL = 70;
+/** Quanto o missil consegue corrigir por tick, em radianos. */
+export const SEEKER_TURN_RATE = 0.16;
+export const SEEKER_BLAST_RADIUS = 1.6;
+
+/** Arco condutivo: salta entre inimigos proximos, sem precisar de poca. */
+export const ARC_COOLDOWN_TICKS = 140; // 7 s
+export const ARC_DAMAGE = 16;
+export const ARC_CHAIN_RANGE = 4.5;
+export const ARC_MAX_TARGETS = 4;
+
+/**
+ * Distancia em que um Eco do poco revela a oferta, e em que ela pode ser pega.
+ *
+ * REVELAR e maior que PEGAR de proposito: o jogador tem de VER os dois Ecos e
+ * poder comparar antes de chegar em qualquer um deles. Se a revelacao acontecesse
+ * ao alcance de pegar, ele descobriria a segunda opcao depois de ja ter tomado a
+ * primeira.
+ */
+export const WELL_OFFER_REVEAL = 7.5;
+export const WELL_OFFER_REACH = 1.4;
+/** Quao longe do poco os dois Ecos ficam, um de cada lado. */
+export const WELL_OFFER_SPREAD = 2.4;
 export const ABILITY_KNOCKBACK = 3.2;
 
 export const PURGE_CELL_HEAL = 18;
