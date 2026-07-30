@@ -16,6 +16,7 @@ import {
   type RunSummary,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
+import { CONTENT_VERSION, SIMULATION_VERSION } from '@voxelyn/survival-protocol';
 
 const KEY = 'voxelyn.death-echoes.v1';
 const SCHEMA = 1;
@@ -25,6 +26,9 @@ export const DEATH_ECHOES_PER_SECTOR = 1;
 export type DeathEchoCapsule = {
   id: string;
   sourceSeed: number;
+  /** Versões que produziram a topologia original. Ausentes em storage legado = 0. */
+  sourceSimulationVersion: number;
+  sourceContentVersion: number;
   sector: number;
   sourceWidth: number;
   sourceHeight: number;
@@ -129,6 +133,8 @@ const parseCapsule = (value: unknown): DeathEchoCapsule | null => {
   if (typeof raw.id !== 'string' || raw.id.length === 0 || raw.id.length > 96) return null;
   if (!isDamageCause(raw.cause)) return null;
   const sourceSeed = finiteInt(raw.sourceSeed, 0, 0xffffffff);
+  const sourceSimulationVersion = finiteInt(raw.sourceSimulationVersion ?? 0, 0, 0x7fffffff);
+  const sourceContentVersion = finiteInt(raw.sourceContentVersion ?? 0, 0, 0x7fffffff);
   const sector = finiteInt(raw.sector, 1, 32);
   const sourceWidth = finiteInt(raw.sourceWidth, 1, 4096);
   const sourceHeight = finiteInt(raw.sourceHeight, 1, 4096);
@@ -139,7 +145,8 @@ const parseCapsule = (value: unknown): DeathEchoCapsule | null => {
   const surface = finiteInt(raw.surface, 0, 255);
   const ticks = finiteInt(raw.ticks, 0, 0x7fffffff);
   if (
-    sourceSeed === null || sector === null || sourceWidth === null || sourceHeight === null ||
+    sourceSeed === null || sourceSimulationVersion === null || sourceContentVersion === null ||
+    sector === null || sourceWidth === null || sourceHeight === null ||
     sourceX === null || sourceY === null || progressQ === null || openness === null ||
     surface === null || ticks === null || sourceX >= sourceWidth || sourceY >= sourceHeight ||
     typeof raw.nearOre !== 'boolean' || typeof raw.facingX !== 'number' ||
@@ -148,6 +155,8 @@ const parseCapsule = (value: unknown): DeathEchoCapsule | null => {
   return {
     id: raw.id,
     sourceSeed,
+    sourceSimulationVersion,
+    sourceContentVersion,
     sector,
     sourceWidth,
     sourceHeight,
@@ -307,6 +316,8 @@ export const captureDeathEcho = (state: SurvivalState, id: string): DeathEchoCap
   return {
     id,
     sourceSeed: state.config.seed >>> 0,
+    sourceSimulationVersion: SIMULATION_VERSION,
+    sourceContentVersion: CONTENT_VERSION,
     sector: state.sector,
     sourceWidth: width,
     sourceHeight: height,
@@ -412,7 +423,11 @@ const placeOne = (state: SurvivalState, echo: DeathEchoCapsule): PlacedDeathEcho
   const objectiveDistance = distance[cellIndex(width, state.corePos.x, state.corePos.y)];
 
   if (
-    echo.sourceSeed === (state.config.seed >>> 0) && echo.sourceWidth === width && echo.sourceHeight === height &&
+    echo.sourceSeed === (state.config.seed >>> 0) &&
+    echo.sourceSimulationVersion === SIMULATION_VERSION &&
+    echo.sourceContentVersion === CONTENT_VERSION &&
+    echo.sourceWidth === width &&
+    echo.sourceHeight === height &&
     validCandidate(state, distance, echo.sourceX, echo.sourceY)
   ) {
     return {

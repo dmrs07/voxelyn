@@ -10,6 +10,8 @@ import { emptyDeathEchoRecords, type PlacedDeathEcho } from './death-echoes';
 const echo = (over: Partial<PlacedDeathEcho> = {}): PlacedDeathEcho => ({
   id: '42:dead:1234:7',
   sourceSeed: 42,
+  sourceSimulationVersion: 0,
+  sourceContentVersion: 0,
   sector: 2,
   sourceWidth: 96,
   sourceHeight: 96,

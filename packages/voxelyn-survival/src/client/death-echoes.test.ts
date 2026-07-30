@@ -170,6 +170,25 @@ describe('projeção topológica', () => {
     expect(placed[0].cell).toBe(cell.y * fresh.config.width + cell.x);
   });
 
+  it('não chama de exata uma coordenada produzida por outra versão do worldgen', () => {
+    const source = createRun({ seed: 0x22223333 });
+    const cell = safeOpenCell(source);
+    source.player.x = cell.x + 0.5;
+    source.player.y = cell.y + 0.5;
+    finishDead(source);
+    const echo = captureDeathEcho(source, 'stale-version');
+    if (!echo) throw new Error('eco não capturado');
+
+    const stale = {
+      ...echo,
+      sourceSimulationVersion: Math.max(0, echo.sourceSimulationVersion - 1),
+    };
+    const fresh = createRun({ seed: source.config.seed });
+    const placed = projectDeathEchoes(fresh, recordOf([stale]));
+    expect(placed).toHaveLength(1);
+    expect(placed[0].projection).toBe('topological');
+  });
+
   it('reprojeta deterministicamente em outra seed e respeita áreas reservadas', () => {
     const source = createRun({ seed: 0x01020304 });
     const sourceCell = safeOpenCell(source);

@@ -54,6 +54,10 @@ As candidatas recebem uma pontuação por:
 - proximidade de minério;
 - desempate determinístico por seed, eco e índice da célula.
 
+A coordenada original só pode ser reutilizada quando seed, dimensões, `SIMULATION_VERSION`
+e `CONTENT_VERSION` ainda correspondem. Storage legado ou uma versão anterior continua
+válido para reprojeção topológica, mas nunca recebe a classificação `exact`.
+
 Nenhuma candidata aceitável significa nenhum eco.
 
 ### Apresentação
