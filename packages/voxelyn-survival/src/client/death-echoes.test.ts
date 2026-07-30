@@ -85,6 +85,20 @@ describe('cápsula de morte local', () => {
     expect(echo?.facingX).toBe(-1);
   });
 
+  it('não inventa causa local no co-op a partir da morte que encerrou a sala', () => {
+    const state = finishDead(createRun({ seed: 0xdecafbad, playerCount: 2 }), {
+      kind: 'enemy_contact',
+      archetype: 'guardian',
+      elite: false,
+    });
+    // `summary.deathCause` descreve o fim da RUN. Sem causa por slot no wire, não
+    // há prova de que ela pertence à posição de `state.player` deste cliente.
+    expect(captureDeathEcho(state, 'ambiguous-coop')).toBeNull();
+    const result = applyDeathEchoOnce(emptyDeathEchoRecords(), state, null);
+    expect(result.applied).toBe(false);
+    expect(result.records.echoes).toEqual([]);
+  });
+
   it('deduplica snapshots terminais, mas aceita a mesma run depois do reset', () => {
     const state = finishDead(createRun({ seed: 42 }));
     const first = applyDeathEchoOnce(emptyDeathEchoRecords(), state, null);
@@ -101,7 +115,7 @@ describe('cápsula de morte local', () => {
     expect(replayedAfterReset.records.echoes[0].id).not.toBe(replayedAfterReset.records.echoes[1].id);
   });
 
-  it('descarta schema desconhecido e entradas corrompidas sem impedir o jogo', () => {
+  it('descarta schema, causa ou entrada corrompida sem impedir o jogo', () => {
     expect(decodeDeathEchoRecords('{')).toEqual(emptyDeathEchoRecords());
     expect(decodeDeathEchoRecords(JSON.stringify({ schema: 99, echoes: [] }))).toEqual(emptyDeathEchoRecords());
 
@@ -110,7 +124,11 @@ describe('cápsula de morte local', () => {
     const decoded = decodeDeathEchoRecords(JSON.stringify({
       schema: 1,
       nextSerial: 7,
-      echoes: [echo, { id: '', cause: null }],
+      echoes: [
+        echo,
+        { ...echo, id: 'bad-source', cause: { kind: 'explosion', source: 'somewhere' } },
+        { id: '', cause: null },
+      ],
     }));
     expect(decoded.echoes).toHaveLength(1);
     expect(decoded.echoes[0].id).toBe('ok');
