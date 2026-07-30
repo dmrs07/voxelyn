@@ -67,11 +67,19 @@ jobs:
           from pathlib import Path
           path = Path('.github/scripts/death-echo-review-fixes.py')
           text = path.read_text()
-          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)"
-          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.DOTALL)"
-          if text.count(old) != 1:
-              raise SystemExit('regex helper marker changed')
-          path.write_text(text.replace(old, new))
+          replacements = {
+              "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)":
+                  "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.DOTALL)",
+              "  if (availableWidth < 140 || belowY >= safeBottom) return null;\n":
+                  "  const availableHeight = safeBottom - belowY;\n  if (availableWidth < 140 || availableHeight < 46) return null;\n",
+              "    maxHeight: safeBottom - belowY,\n":
+                  "    maxHeight: availableHeight,\n",
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'layout transport marker changed: {old!r}')
+              text = text.replace(old, new)
+          path.write_text(text)
           PY
           python .github/scripts/death-echo-review-fixes.py layout
 
