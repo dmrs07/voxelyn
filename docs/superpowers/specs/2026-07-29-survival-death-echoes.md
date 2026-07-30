@@ -153,9 +153,13 @@ O pool chega por HTTP DEPOIS do tick zero, e isso é seguro precisamente porque 
 
 O pool é pedido uma vez por setor, porque a resposta CONTA uma manifestação de cada cápsula devolvida: refazer o pedido a cada quadro queimaria o pool inteiro em segundos.
 
-## Etapa 3 — contrato de seed compartilhada
+## Etapa 3 — Desafio Semanal (seed compartilhada)
 
-Uma seed diária ou semanal produz os mesmos três setores para todos. A implementação inteira é fixar `forcedSeed`: não há mundo persistido, servidor de terreno nem estado compartilhado, porque a run já era reproduzível por um número e os três setores já derivavam dele. Publicar o número basta — e é essa economia que faz o contrato valer a pena.
+**Dois nomes, de propósito.** No código e no wire ele é um `contract`, porque é isso que a companhia emite — a mesma voz de «Unidade de Prospecção 7B-119». Para o jogador ele é o **DESAFIO SEMANAL**, porque o que ele precisa entender ao bater o olho no menu é que existe um evento de comunidade acontecendo agora, e não que recebeu mais uma ordem de serviço. A empresa emite contratos; a comunidade joga desafios.
+
+A cadência padrão é **semanal**. Um desafio diário troca de mapa antes de a comunidade formar memória sobre ele: as primeiras cápsulas de hoje só existem depois que alguém morreu hoje, e à noite o mapa some. Uma semana dá tempo de o chão encher de gente — que é a experiência inteira do modo — e transforma "eu também morri ali" numa conversa que dura mais que um dia. A cadência diária continua disponível em `?cadence=daily` para operação e teste.
+
+Uma seed semanal (ou diária) produz os mesmos três setores para todos. A implementação inteira é fixar `forcedSeed`: não há mundo persistido, servidor de terreno nem estado compartilhado, porque a run já era reproduzível por um número e os três setores já derivavam dele. Publicar o número basta — e é essa economia que faz o contrato valer a pena.
 
 O id e a seed vêm do CALENDÁRIO, em UTC, e não são sorteados nem guardados. Duas instâncias do servidor, um cliente offline e um teste chegam ao mesmo contrato para o mesmo instante sem trocar uma palavra, e um contrato que dependesse de uma linha no banco morreria com ela. A cadência semanal usa semana ISO-8601 completa: uma regra caseira pularia ou repetiria na virada de ano, que é justamente quando alguém está olhando.
 

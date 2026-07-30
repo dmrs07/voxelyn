@@ -17,46 +17,74 @@ export type ModuleDefinition = {
   tags: readonly ModuleTag[];
 };
 
+/**
+ * QUANTAS CARGAS UM MÓDULO VALE.
+ *
+ * O jogo dispara a `BOLT_COOLDOWN_TICKS = 5` num tick de 20 Hz: quatro tiros por
+ * segundo. Com os números antigos — 12, 10, 6, 5 — um módulo acabava em menos de
+ * dez segundos de combate sustentado. O jogador escolhia entre dois módulos no
+ * terminal, via o ícone acender, e antes de terminar a sala ele já tinha sumido.
+ * Isso não é economia de recurso: é um brinde que não dá tempo de virar decisão.
+ *
+ * A régua nova conta PROCS, e um proc vale mais quanto mais forte for o efeito:
+ *
+ * - tier 1 (perfura, drena, rebate): ~80 a 100. São multiplicadores pequenos do
+ *   tiro comum, e o módulo tem de durar a sala inteira para o jogador sentir a
+ *   diferença que escolheu;
+ * - tier 2 (descarga): ~55. Cada proc eletrifica uma poça inteira e mata grupos;
+ * - tier 3 (explosão, disco): 40 e 55. Explosão é a única coisa do arsenal que
+ *   mata o próprio Prospector, e disco é uma ARMA inteira, não um modificador —
+ *   ambos valem mais por uso e por isso duram menos usos.
+ *
+ * Nenhum deles cobra o gatilho: a carga sai quando o efeito acontece (ver
+ * `procModule`). Então "80 travessias" é bem mais do que 80 tiros — é 80 tiros
+ * que ACERTARAM algo que valia perfurar.
+ *
+ * Um número alto demais tem custo simétrico ao baixo: se o módulo nunca acaba,
+ * o segundo terminal deixa de ser uma decisão e vira coleta. Estes valores foram
+ * escolhidos para o módulo atravessar um setor e MORRER dentro do seguinte, de
+ * modo que recarregar o que já se tem continue competindo com pegar outro.
+ */
 export const MODULE_DEFINITIONS: Record<ModuleId, ModuleDefinition> = {
   piercing: {
     id: 'piercing',
     lifetime: 'charges',
-    defaultCharges: 12,
+    defaultCharges: 100,
     tier: 1,
     tags: ['projectile', 'safe'],
   },
   siphon: {
     id: 'siphon',
     lifetime: 'charges',
-    defaultCharges: 12,
+    defaultCharges: 80,
     tier: 1,
     tags: ['utility', 'safe'],
   },
   ricochet: {
     id: 'ricochet',
     lifetime: 'charges',
-    defaultCharges: 10,
+    defaultCharges: 80,
     tier: 1,
     tags: ['projectile', 'safe'],
   },
   conductive: {
     id: 'conductive',
     lifetime: 'charges',
-    defaultCharges: 6,
+    defaultCharges: 55,
     tier: 2,
     tags: ['projectile', 'utility', 'safe'],
   },
   explosive: {
     id: 'explosive',
     lifetime: 'charges',
-    defaultCharges: 6,
+    defaultCharges: 40,
     tier: 3,
     tags: ['projectile', 'volatile'],
   },
   return_disc: {
     id: 'return_disc',
     lifetime: 'charges',
-    defaultCharges: 5,
+    defaultCharges: 55,
     tier: 3,
     tags: ['projectile', 'defensive', 'safe'],
   },

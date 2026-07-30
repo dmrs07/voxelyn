@@ -11,7 +11,7 @@ import {
 } from '../src/constants';
 import { dischargeAt, explodeAt } from '../src/cells';
 import { spawnEnemy } from '../src/entities';
-import { grantOrRechargeModule } from '../src/modules';
+import { MODULE_DEFINITIONS, grantOrRechargeModule } from '../src/modules';
 import {
   createRun,
   emptyCommand,
@@ -57,6 +57,16 @@ const bolt = (state: SurvivalState, overrides: Partial<Projectile> = {}): Projec
   ...overrides,
 });
 
+/**
+ * O maximo configurado do modulo.
+ *
+ * Os testes abaixo verificam QUANDO uma carga sai, nunca quanto o modulo vale.
+ * Fixar 12 ou 6 no `expect` amarrava a regressao ao balanceamento: rebalancear
+ * quebrava seis testes que nao tinham nada a dizer sobre o assunto.
+ */
+const full = (id: keyof typeof MODULE_DEFINITIONS): number =>
+  MODULE_DEFINITIONS[id].defaultCharges ?? 0;
+
 const charges = (state: SurvivalState, id: string): number | null => {
   const module = state.playerExtra.activeModules.find((active) => active.id === id);
   if (!module || module.lifetime.kind !== 'charges') return null;
@@ -73,7 +83,7 @@ describe('modulos temporarios', () => {
     grantOrRechargeModule(state.playerExtra, 'piercing', state.tick + 10);
 
     expect(state.playerExtra.activeModules).toHaveLength(1);
-    expect(charges(state, 'piercing')).toBe(12);
+    expect(charges(state, 'piercing')).toBe(full('piercing'));
   });
 
   // O disparo apenas arma. Cobrar no gatilho fazia o jogador pagar por um tiro
@@ -94,7 +104,7 @@ describe('modulos temporarios', () => {
       state.playerExtra.overheatedUntil = 0;
       state.playerExtra.nextShotAt = 0;
     }
-    expect(charges(state, 'piercing')).toBe(12);
+    expect(charges(state, 'piercing')).toBe(full('piercing'));
 
     // um unico tiro atravessando dois inimigos: duas cargas, nao uma nem tres
     for (const dx of [1, 3]) {
@@ -110,7 +120,7 @@ describe('modulos temporarios', () => {
         .filter((event) => event.t === 'module_charge_consumed' && event.module === 'piercing').length;
     }
     expect(consumed).toBe(2);
-    expect(charges(state, 'piercing')).toBe(10);
+    expect(charges(state, 'piercing')).toBe(full('piercing') - 2);
   });
 
   it('conductive nao consome em tiro comum e consome apenas ao produzir descarga', () => {
@@ -123,7 +133,7 @@ describe('modulos temporarios', () => {
     plain.aim = { x: 1, y: 0 };
     stepRun(state, [plain]);
     for (let i = 0; i < 4; i++) stepRun(state, [emptyCommand()]);
-    expect(charges(state, 'conductive')).toBe(6);
+    expect(charges(state, 'conductive')).toBe(full('conductive'));
 
     state.projectiles = [bolt(state, {
       x: state.player.x + 1,
@@ -135,7 +145,7 @@ describe('modulos temporarios', () => {
     const result = stepRun(state, [emptyCommand()]);
 
     expect(result.events.some((event) => event.t === 'discharge' && event.source === 'player')).toBe(true);
-    expect(charges(state, 'conductive')).toBe(5);
+    expect(charges(state, 'conductive')).toBe(full('conductive') - 1);
   });
 
   it('conductive consome no acerto direto e atordoa apenas inimigos nao petreos', () => {
@@ -148,7 +158,7 @@ describe('modulos temporarios', () => {
     organic.projectiles = [bolt(organic, { modules: { conductive: true } })];
     stepRun(organic, [emptyCommand()]);
     expect(stalker.stunnedUntil - organic.tick).toBe(CONDUCTIVE_STUN_TICKS);
-    expect(charges(organic, 'conductive')).toBe(5);
+    expect(charges(organic, 'conductive')).toBe(full('conductive') - 1);
 
     const chained = createRun({ seed: 10215 });
     clearArena(chained);
@@ -173,7 +183,7 @@ describe('modulos temporarios', () => {
     stone.projectiles = [bolt(stone, { modules: { conductive: true } })];
     stepRun(stone, [emptyCommand()]);
     expect(bruiser.stunnedUntil).toBe(0);
-    expect(charges(stone, 'conductive')).toBe(6);
+    expect(charges(stone, 'conductive')).toBe(full('conductive'));
   });
 
   it('siphon so consome quando um inimigo e atingido e a cura e aplicada', () => {
@@ -187,7 +197,7 @@ describe('modulos temporarios', () => {
 
     state.projectiles = [bolt(state, { modules: { siphon: true } })];
     stepRun(state, [emptyCommand()]);
-    expect(charges(state, 'siphon')).toBe(12); // HP cheio: nenhum proc desperdicado
+    expect(charges(state, 'siphon')).toBe(full('siphon')); // HP cheio: nenhum proc desperdicado
 
     enemy.alive = true;
     enemy.hp = enemy.maxHp;
@@ -195,7 +205,7 @@ describe('modulos temporarios', () => {
     state.projectiles = [bolt(state, { modules: { siphon: true } })];
     stepRun(state, [emptyCommand()]);
     expect(state.player.hp).toBe(state.player.maxHp - 3);
-    expect(charges(state, 'siphon')).toBe(11);
+    expect(charges(state, 'siphon')).toBe(full('siphon') - 1);
   });
 
   it('explosive funciona como bolt antes de armar e explode depois da distancia definida', () => {

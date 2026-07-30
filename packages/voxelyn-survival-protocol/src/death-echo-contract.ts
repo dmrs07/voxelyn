@@ -1,4 +1,11 @@
-// O contrato coletivo: uma seed que a companhia publica para todos.
+// O Desafio Semanal: uma seed que a companhia publica para todos.
+//
+// DOIS NOMES, de propósito. No código e no wire ele é um `contract`, porque é
+// isso que a companhia emite — a mesma voz de «Unidade de Prospecção 7B-119».
+// Para o jogador ele é o DESAFIO SEMANAL, porque o que ele precisa entender ao
+// bater o olho no menu é que existe um evento de comunidade acontecendo agora, e
+// não que recebeu mais uma ordem de serviço. A empresa emite contratos; a
+// comunidade joga desafios.
 //
 // A ideia inteira depende de algo que o Voxelyn já tinha e que não custa nada
 // aqui: uma run é reproduzível por um único número, e os três setores derivam
@@ -72,7 +79,9 @@ export const contractWeekKey = (at: Date): string => {
  * Nomes de veio, na voz da companhia.
  *
  * Letra grega porque a empresa numera depósitos, não os batiza: é o mesmo
- * registro desumanizante de «Unidade de Prospecção 7B-119».
+ * registro desumanizante de «Unidade de Prospecção 7B-119». Ele sobrevive no
+ * rótulo do desafio para o evento continuar soando como um lugar real do Veio, e
+ * não como um modo de jogo.
  */
 const VEIN_NAMES = [
   'KAPPA',
@@ -100,10 +109,10 @@ const contractLabel = (id: string, cadence: DeathEchoContractCadence): string =>
   const vein = VEIN_NAMES[deathEchoHash(id) % VEIN_NAMES.length];
   if (cadence === 'weekly') {
     const [, week] = id.split('-W');
-    return `CONTRATO COLETIVO SEMANA ${week ?? '--'} — VEIO ${vein}`;
+    return `DESAFIO SEMANAL ${week ?? '--'} — VEIO ${vein}`;
   }
   const [, month, day] = id.split('-');
-  return `CONTRATO COLETIVO ${day ?? '--'}-${month ?? '--'} — VEIO ${vein}`;
+  return `DESAFIO DIÁRIO ${day ?? '--'}-${month ?? '--'} — VEIO ${vein}`;
 };
 
 const dailyWindow = (at: Date): { opensAt: Date; closesAt: Date } => {
@@ -117,10 +126,18 @@ const weeklyWindow = (at: Date): { opensAt: Date; closesAt: Date } => {
   return { opensAt: monday, closesAt: new Date(monday.getTime() + 7 * MS_PER_DAY) };
 };
 
-/** O contrato vigente num instante. Função pura do calendário. */
+/**
+ * O desafio vigente num instante. Função pura do calendário.
+ *
+ * SEMANAL por padrão. Um desafio diário troca de mapa antes de a comunidade
+ * conseguir formar memória sobre ele: as primeiras cápsulas de hoje só existem
+ * depois que alguém morreu hoje, e à noite o mapa some. Uma semana dá tempo de o
+ * chão encher de gente — que é a experiência inteira do modo — e transforma "eu
+ * também morri ali" numa conversa que dura mais que um dia.
+ */
 export const deathEchoContract = (
   at: Date,
-  cadence: DeathEchoContractCadence = 'daily',
+  cadence: DeathEchoContractCadence = 'weekly',
 ): DeathEchoContract => {
   const id = cadence === 'weekly' ? contractWeekKey(at) : contractDayKey(at);
   const { opensAt, closesAt } = cadence === 'weekly' ? weeklyWindow(at) : dailyWindow(at);
@@ -149,7 +166,7 @@ export const parseDeathEchoContract = (value: unknown): DeathEchoContract | null
   if (typeof value !== 'object' || value === null) return null;
   const raw = value as Partial<DeathEchoContract>;
   if (typeof raw.id !== 'string') return null;
-  const cadence: DeathEchoContractCadence = raw.cadence === 'weekly' ? 'weekly' : 'daily';
+  const cadence: DeathEchoContractCadence = raw.cadence === 'daily' ? 'daily' : 'weekly';
   const id = cadence === 'weekly'
     ? /^\d{4}-W\d{2}$/.exec(raw.id)?.[0]
     : /^\d{4}-\d{2}-\d{2}$/.exec(raw.id)?.[0];

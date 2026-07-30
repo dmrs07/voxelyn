@@ -123,7 +123,8 @@ export const createDeathEchoHandler = (opts: DeathEchoHttpOptions) => {
         json(res, 405, { error: 'metodo nao suportado' });
         return true;
       }
-      const cadence = url.searchParams.get('cadence') === 'weekly' ? 'weekly' : 'daily';
+      // Semanal por padrão; `?cadence=daily` continua disponível para operação.
+      const cadence = url.searchParams.get('cadence') === 'daily' ? 'daily' : 'weekly';
       json(res, 200, { contract: deathEchoContract(now(), cadence) });
       return true;
     }
