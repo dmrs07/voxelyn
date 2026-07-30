@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { SurvivalRenderer } from './render';
 import {
+  DeathEchoController,
   deathEchoReadout,
-  installDeathEchoPresentation,
 } from './death-echo-presentation';
-import type { PlacedDeathEcho } from './death-echoes';
+import { emptyDeathEchoRecords, type PlacedDeathEcho } from './death-echoes';
 
 const echo = (over: Partial<PlacedDeathEcho> = {}): PlacedDeathEcho => ({
   id: '42:dead:1234:7',
@@ -39,10 +40,15 @@ describe('apresentação do eco', () => {
     expect(`${readout.title} ${readout.headline}`).not.toContain('42');
   });
 
-  it('instala o decorador uma única vez', () => {
-    installDeathEchoPresentation();
-    const renderAfterFirstInstall = SurvivalRenderer.prototype.render;
-    installDeathEchoPresentation();
-    expect(SurvivalRenderer.prototype.render).toBe(renderAfterFirstInstall);
+  it('mantém memória e projeção num controller separado da simulação', () => {
+    const controller = new DeathEchoController(emptyDeathEchoRecords());
+    expect(controller).toBeInstanceOf(DeathEchoController);
+    expect(typeof SurvivalRenderer.prototype.setDeathEchoes).toBe('function');
+  });
+
+  it('usa main.ts como entrypoint canônico, sem bootstrap de monkey patch', () => {
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+    expect(html).toContain('./src/client/main.ts');
+    expect(html).not.toContain('death-echo-entry');
   });
 });

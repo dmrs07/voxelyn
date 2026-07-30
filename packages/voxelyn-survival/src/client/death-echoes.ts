@@ -11,6 +11,8 @@ import {
   SOLID_ORE_CHIPPED,
   SURF_NONE,
   type DamageCause,
+  type EnemyArchetype,
+  type ProjectileKind,
   type RunSummary,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -77,6 +79,22 @@ const finiteInt = (value: unknown, min: number, max: number): number | null => {
 const isEffectSource = (value: unknown): value is 'player' | 'enemy' | 'environment' =>
   value === 'player' || value === 'enemy' || value === 'environment';
 
+const ENEMY_ARCHETYPES = new Set<EnemyArchetype>([
+  'stalker',
+  'bruiser',
+  'spitter',
+  'bomber',
+  'guardian',
+  'bishop',
+  'fungal_horse',
+  'miner',
+]);
+const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc']);
+const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>
+  typeof value === 'string' && ENEMY_ARCHETYPES.has(value as EnemyArchetype);
+const isProjectileKind = (value: unknown): value is ProjectileKind =>
+  typeof value === 'string' && PROJECTILE_KINDS.has(value as ProjectileKind);
+
 const isDamageCause = (value: unknown): value is DamageCause => {
   if (typeof value !== 'object' || value === null) return false;
   const cause = value as Record<string, unknown>;
@@ -93,9 +111,13 @@ const isDamageCause = (value: unknown): value is DamageCause => {
     case 'explosion':
       return isEffectSource(cause.source);
     case 'enemy_contact':
-      return typeof cause.archetype === 'string' && typeof cause.elite === 'boolean';
+      return isEnemyArchetype(cause.archetype) && typeof cause.elite === 'boolean';
     case 'enemy_projectile':
-      return typeof cause.archetype === 'string' && typeof cause.elite === 'boolean' && typeof cause.projectile === 'string';
+      return (
+        isEnemyArchetype(cause.archetype) &&
+        typeof cause.elite === 'boolean' &&
+        isProjectileKind(cause.projectile)
+      );
     default:
       return false;
   }

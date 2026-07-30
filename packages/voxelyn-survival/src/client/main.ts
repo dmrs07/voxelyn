@@ -4,6 +4,7 @@ import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
+import { DeathEchoController } from './death-echo-presentation';
 import { NetClient } from './net';
 import { RestartGate } from './restart';
 import {
@@ -54,6 +55,16 @@ const recordsOverlay = document.getElementById('records') as HTMLDivElement;
 const recordsBody = document.getElementById('records-body') as HTMLDivElement;
 
 const renderer = new SurvivalRenderer(canvas);
+const deathEchoes = new DeathEchoController();
+const renderState = (
+  state: SurvivalState,
+  alpha: number,
+  inputState: Parameters<SurvivalRenderer['render']>[2],
+  nowMs: number,
+): void => {
+  renderer.setDeathEchoes(deathEchoes.sync(state));
+  renderer.render(state, alpha, inputState, nowMs);
+};
 const input = new SurvivalInput(canvas);
 const cooldownOverlay = new TouchCooldownOverlay(canvas);
 input.attach();
@@ -354,7 +365,7 @@ const runSolo = (): void => {
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
-      renderer.render(state, 1, input.state, now);
+      renderState(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
       if (armed && (input.hasTap() || input.consumeRestartKey())) {
         const nextRunSeed = nextSeed();
@@ -395,7 +406,7 @@ const runSolo = (): void => {
     if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     const alpha = accumulator / TICK_MS;
     audio.update(state, now);
-    renderer.render(state, alpha, input.state, now);
+    renderState(state, alpha, input.state, now);
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
       const regions = renderer.renderChoice(state, vw, vh, input.state);
@@ -524,7 +535,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
         liveRun = state;
         const terminal = state.phase !== 'running';
         audio.update(state, now);
-        renderer.render(state, 1, input.state, now);
+        renderState(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
         const pendingChoice = state.playerExtra.pendingModuleChoice;
         if (pendingChoice && renderer.isChoiceRevealReady(now)) {

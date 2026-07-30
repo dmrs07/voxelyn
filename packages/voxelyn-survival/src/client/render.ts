@@ -47,6 +47,8 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
+import { deathEchoReadout } from './death-echo-presentation';
+import type { PlacedDeathEcho } from './death-echoes';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -356,6 +358,7 @@ export class SurvivalRenderer {
   } | null = null;
   private choiceRevealAt = 0;
   private purgePulseUntil = 0;
+  private deathEchoes: readonly PlacedDeathEcho[] = [];
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -375,6 +378,10 @@ export class SurvivalRenderer {
 
   setSafeArea(safeArea: SafeInsets): void {
     this.safeArea = { ...safeArea };
+  }
+
+  setDeathEchoes(echoes: readonly PlacedDeathEcho[]): void {
+    this.deathEchoes = echoes;
   }
 
   isChoiceRevealReady(nowMs: number): boolean {
@@ -926,6 +933,15 @@ export class SurvivalRenderer {
 
     const spriteZoom = Math.max(1, Math.round(z));
 
+    for (const echo of this.deathEchoes) {
+      const [esx, esy] = toScreen(echo.x, echo.y);
+      if (esx < -80 || esx > vw + 80 || esy < -100 || esy > vh + 80) continue;
+      items.push({
+        depth: echo.x + echo.y,
+        draw: () => this.drawDeathEchoBody(echo, esx, esy, z, spriteZoom, nowMs),
+      });
+    }
+
     this.archetypeById.clear();
     for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
     for (const enemy of state.enemies) {
@@ -1193,6 +1209,115 @@ export class SurvivalRenderer {
 
     this.renderRewardFlight(toScreen, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
+    this.renderDeathEchoReadout(state, vw, vh);
+  }
+
+  private drawDeathEchoBody(
+    echo: PlacedDeathEcho,
+    sx: number,
+    sy: number,
+    z: number,
+    spriteZoom: number,
+    nowMs: number,
+  ): void {
+    const ctx = this.ctx;
+    const size = 0.34 * TILE_W * 0.9 * z;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const drew = this.sprites.drawEntity(
+      ctx,
+      'prospector',
+      'die',
+      echo.facingX,
+      echo.facingY,
+      10_000,
+      sx,
+      sy,
+      spriteZoom,
+      { color: 'rgba(110,74,51,0.62)', alpha: 0.62 },
+    );
+    if (!drew) {
+      ctx.fillStyle = PAL.rust;
+      ctx.fillRect(sx - 9 * z, sy - 5 * z, 16 * z, 4 * z);
+      ctx.fillStyle = PAL.rockShadow;
+      ctx.fillRect(sx - 6 * z, sy - 8 * z, 7 * z, 4 * z);
+      ctx.fillStyle = PAL.player;
+      ctx.fillRect(sx - 5 * z, sy - 7 * z, 2 * z, z);
+    }
+
+    const pulse = Math.sin(nowMs * 0.008 + echo.cell * 0.17) > -0.2;
+    ctx.fillStyle = pulse ? PAL.biolum : PAL.rockShadow;
+    ctx.fillRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
+    ctx.strokeStyle = PAL.dark;
+    ctx.lineWidth = Math.max(1, z * 0.6);
+    ctx.strokeRect(sx + 2 * z, sy - 7 * z, 3 * z, 3 * z);
+  }
+
+  private renderDeathEchoReadout(state: SurvivalState, vw: number, vh: number): void {
+    const echo = this.deathEchoes
+      .map((candidate) => ({
+        candidate,
+        distance: Math.hypot(state.player.x - candidate.x, state.player.y - candidate.y),
+      }))
+      .filter(({ distance }) => distance <= 4)
+      .sort((a, b) => a.distance - b.distance)[0]?.candidate;
+    if (!echo) return;
+
+    const ctx = this.ctx;
+    const readout = deathEchoReadout(echo);
+    const left = this.safeArea.left + 14;
+    const right = this.safeArea.right + 14;
+    const top = this.safeArea.top + 14;
+    const maxWidth = Math.min(360, Math.max(180, vw - left - right));
+    const titleSize = 10;
+    const bodySize = 12;
+    const lineHeight = bodySize + 4;
+    ctx.font = `bold ${bodySize}px monospace`;
+
+    const words = readout.headline.toUpperCase().split(/\s+/);
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (current && ctx.measureText(candidate).width > maxWidth - 24) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) lines.push(current);
+
+    const boxWidth = Math.min(
+      maxWidth,
+      Math.max(190, ...lines.map((line) => ctx.measureText(line).width + 24)),
+    );
+    const boxHeight = 20 + titleSize + lines.length * lineHeight;
+    const x = Math.max(left, vw - right - boxWidth);
+    const y = Math.max(top, Math.min(vh - this.safeArea.bottom - boxHeight - 14, top));
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(11,14,20,0.94)';
+    ctx.fillRect(x, y, boxWidth, boxHeight);
+    ctx.strokeStyle = PAL.biolum;
+    ctx.lineWidth = 1.25;
+    ctx.strokeRect(x, y, boxWidth, boxHeight);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = PAL.biolum;
+    ctx.font = `bold ${titleSize}px monospace`;
+    ctx.fillText(readout.title, x + 12, y + 8);
+    ctx.fillStyle = PAL.player;
+    ctx.font = `bold ${bodySize}px monospace`;
+    lines.forEach((line, index) =>
+      ctx.fillText(line, x + 12, y + 14 + titleSize + index * lineHeight),
+    );
+    ctx.fillStyle = echo.projection === 'exact' ? PAL.blood : PAL.rust;
+    ctx.fillRect(x, y + boxHeight - 3, boxWidth, 3);
+    ctx.restore();
   }
 
   private renderRewardFlight(

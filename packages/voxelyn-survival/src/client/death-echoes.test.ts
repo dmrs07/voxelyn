@@ -127,6 +127,12 @@ describe('cápsula de morte local', () => {
       echoes: [
         echo,
         { ...echo, id: 'bad-source', cause: { kind: 'explosion', source: 'somewhere' } },
+        { ...echo, id: 'bad-archetype', cause: { kind: 'enemy_contact', archetype: 'bogus', elite: false } },
+        {
+          ...echo,
+          id: 'bad-projectile',
+          cause: { kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'laser' },
+        },
         { id: '', cause: null },
       ],
     }));
