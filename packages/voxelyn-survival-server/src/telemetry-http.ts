@@ -12,7 +12,7 @@
 // histograma.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { SubmissionRateLimiter, requestRateLimitKey } from './leaderboard-http.js';
+import { SubmissionRateLimiter, readJsonBody, requestRateLimitKey } from './http-util.js';
 import type { RunOutcome, TelemetryEvent, TelemetryStore } from './telemetry.js';
 
 /** Corpo maximo. Um evento cabe em ~400 bytes; o resto e margem. */
@@ -56,29 +56,6 @@ const clampInt = (value: unknown, min: number, max: number, fallback = 0): numbe
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, Math.round(n)));
 };
-
-const readBody = (req: IncomingMessage, limit: number): Promise<string | null> =>
-  new Promise((resolve) => {
-    let size = 0;
-    let overflowed = false;
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => {
-      if (overflowed) return;
-      size += chunk.length;
-      if (size > limit) {
-        overflowed = true;
-        chunks.length = 0;
-        req.pause();
-        resolve(null);
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      if (!overflowed) resolve(Buffer.concat(chunks).toString('utf8'));
-    });
-    req.on('error', () => resolve(null));
-  });
 
 /**
  * Converte corpo cru em evento, com todo campo dentro de faixa.
@@ -187,7 +164,7 @@ export const createTelemetryHandler = (opts: TelemetryHttpOptions) => {
       return true;
     }
 
-    const rawBody = await readBody(req, MAX_BODY_BYTES);
+    const rawBody = await readJsonBody(req, MAX_BODY_BYTES);
     if (rawBody === null) {
       res.setHeader('connection', 'close');
       res.writeHead(413);

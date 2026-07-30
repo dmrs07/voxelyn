@@ -7,7 +7,7 @@ import {
   SubmissionRateLimiter,
   requestRateLimitKey,
   SUBMIT_MAX_PER_WINDOW,
-} from '../src/leaderboard-http';
+} from '../src/http-util';
 
 /**
  * Sobe o servidor DE VERDADE numa porta efemera.

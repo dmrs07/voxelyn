@@ -8,19 +8,21 @@ import {
   type SurvivalState,
 } from '@voxelyn/survival-sim';
 import {
-  DEATH_ECHO_HISTORY_LIMIT,
   DEATH_ECHO_TRACE_SAMPLES,
-  applyDeathEchoOnce,
-  captureDeathEcho,
   deathEchoTraceDuration,
-  decodeDeathEchoRecords,
   decodeDeathEchoTracePoint,
-  emptyDeathEchoRecords,
   encodeDeathEchoTrace,
   projectDeathEchoes,
+  type DeathEchoTraceSample,
+} from '@voxelyn/survival-protocol';
+import {
+  DEATH_ECHO_HISTORY_LIMIT,
+  applyDeathEchoOnce,
+  captureDeathEcho,
+  decodeDeathEchoRecords,
+  emptyDeathEchoRecords,
   type DeathEchoCapsule,
   type DeathEchoRecords,
-  type DeathEchoTraceSample,
 } from './death-echoes';
 
 const finishDead = (state: SurvivalState, cause: DamageCause = { kind: 'fire' }): SurvivalState => {
@@ -265,7 +267,7 @@ describe('projeção topológica', () => {
     if (!echo) throw new Error('eco não capturado');
 
     const fresh = createRun({ seed: state.config.seed });
-    const placed = projectDeathEchoes(fresh, recordOf([echo]));
+    const placed = projectDeathEchoes(fresh, [echo]);
     expect(placed).toHaveLength(1);
     expect(placed[0].projection).toBe('exact');
     expect(placed[0].cell).toBe(cell.y * fresh.config.width + cell.x);
@@ -285,7 +287,7 @@ describe('projeção topológica', () => {
       sourceSimulationVersion: Math.max(0, echo.sourceSimulationVersion - 1),
     };
     const fresh = createRun({ seed: source.config.seed });
-    const placed = projectDeathEchoes(fresh, recordOf([stale]));
+    const placed = projectDeathEchoes(fresh, [stale]);
     expect(placed).toHaveLength(1);
     expect(placed[0].projection).toBe('topological');
   });
@@ -300,8 +302,8 @@ describe('projeção topológica', () => {
     if (!echo) throw new Error('eco não capturado');
 
     const target = createRun({ seed: 0xa0b0c0d0 });
-    const first = projectDeathEchoes(target, recordOf([echo]));
-    const second = projectDeathEchoes(target, recordOf([echo]));
+    const first = projectDeathEchoes(target, [echo]);
+    const second = projectDeathEchoes(target, [echo]);
     expect(first).toEqual(second);
     expect(first).toHaveLength(1);
     expect(first[0].projection).toBe('topological');
@@ -324,6 +326,6 @@ describe('projeção topológica', () => {
     const target = createRun({ seed: 8 });
     target.solid.fill(SOLID_ROCK);
     target.solid[target.entry.y * target.config.width + target.entry.x] = SOLID_NONE;
-    expect(projectDeathEchoes(target, recordOf([echo]))).toEqual([]);
+    expect(projectDeathEchoes(target, [echo])).toEqual([]);
   });
 });

@@ -58,7 +58,7 @@ import {
   deathEchoTraceDuration,
   decodeDeathEchoTracePoint,
   type PlacedDeathEcho,
-} from './death-echoes';
+} from '@voxelyn/survival-protocol';
 
 /**
  * SOLID_* -> indice em BLOCK_KINDS do atlas de terreno. Tabela explicita em vez
@@ -1545,10 +1545,24 @@ export class SurvivalRenderer {
     const lessonSize = 10;
     const lineHeight = bodySize + 4;
     const lessonHeight = lessonSize + 3;
-    const textWidth = region.maxWidth - 24;
 
+    // A LARGURA VEM PRIMEIRO, e o texto é quebrado contra ela.
+    //
+    // Quebrar contra `region.maxWidth` e depois dimensionar a caixa pela manchete
+    // — que é curta — produzia linhas de lição medidas para 360 px dentro de um
+    // painel de 190 px: a lição vazava a borda e podia sair da safe area. A ordem
+    // correta é decidir a caixa e só então quebrar tudo o que vai dentro dela.
     ctx.font = `bold ${bodySize}px monospace`;
-    const lines = wrapMeasuredText(ctx, readout.headline.toUpperCase(), textWidth);
+    const headlineText = readout.headline.toUpperCase();
+    const headlineNatural = wrapMeasuredText(ctx, headlineText, region.maxWidth - 24);
+    const minimumWidth = Math.min(190, region.maxWidth);
+    const boxWidth = Math.min(
+      region.maxWidth,
+      Math.max(minimumWidth, ...headlineNatural.map((line) => ctx.measureText(line).width + 24)),
+    );
+    const textWidth = boxWidth - 24;
+    const lines = wrapMeasuredText(ctx, headlineText, textWidth);
+
     ctx.font = `${lessonSize}px monospace`;
     // A lição é o que a caixa-preta tem de melhor a oferecer, mas é também a
     // parte mais longa: numa viewport curta ela sai antes do resto, em vez de o
@@ -1556,15 +1570,13 @@ export class SurvivalRenderer {
     const lessonLines = readout.lesson
       ? wrapMeasuredText(ctx, readout.lesson, textWidth)
       : [];
+    const aggregateLines = readout.aggregate
+      ? wrapMeasuredText(ctx, readout.aggregate, textWidth)
+      : [];
 
-    ctx.font = `bold ${bodySize}px monospace`;
-    const minimumWidth = Math.min(190, region.maxWidth);
-    const boxWidth = Math.min(
-      region.maxWidth,
-      Math.max(minimumWidth, ...lines.map((line) => ctx.measureText(line).width + 24)),
-    );
     const headerHeight = 20 + titleSize + conditionSize + 4;
-    const boxHeight = headerHeight + lines.length * lineHeight;
+    const boxHeight =
+      headerHeight + aggregateLines.length * lessonHeight + lines.length * lineHeight;
     if (boxHeight > region.maxHeight) return;
     const withLesson = boxHeight + 6 + lessonLines.length * lessonHeight;
     const showLesson = lessonLines.length > 0 && withLesson <= region.maxHeight;
@@ -1588,9 +1600,19 @@ export class SurvivalRenderer {
     ctx.fillStyle = PAL.rust;
     ctx.font = `${conditionSize}px monospace`;
     ctx.fillText(readout.condition, x + 12, y + 10 + titleSize);
+    let bodyTop = y + 14 + titleSize + conditionSize;
+    if (aggregateLines.length > 0) {
+      // A escala da câmara vem ANTES da causa: "dezessete unidades" muda o que a
+      // frase seguinte significa, e lida depois ela seria só um rodapé.
+      ctx.fillStyle = PAL.blood;
+      ctx.font = `${lessonSize}px monospace`;
+      aggregateLines.forEach((line, index) =>
+        ctx.fillText(line, x + 12, bodyTop + index * lessonHeight),
+      );
+      bodyTop += aggregateLines.length * lessonHeight;
+    }
     ctx.fillStyle = PAL.player;
     ctx.font = `bold ${bodySize}px monospace`;
-    const bodyTop = y + 14 + titleSize + conditionSize;
     lines.forEach((line, index) =>
       ctx.fillText(line, x + 12, bodyTop + index * lineHeight),
     );

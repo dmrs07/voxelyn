@@ -5,6 +5,13 @@ import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
 import { DeathEchoController } from './death-echo-presentation';
+import {
+  deathEchoPoolQuery,
+  fetchDeathEchoContract,
+  fetchDeathEchoPool,
+  submitDeathEcho,
+} from './death-echo-pool';
+import type { DeathEchoContract } from '@voxelyn/survival-protocol';
 import { NetClient } from './net';
 import { RestartGate } from './restart';
 import {
@@ -53,15 +60,59 @@ const inviteCode = document.getElementById('invite-code') as HTMLSpanElement;
 const inviteButton = document.getElementById('btn-invite') as HTMLButtonElement;
 const recordsOverlay = document.getElementById('records') as HTMLDivElement;
 const recordsBody = document.getElementById('records-body') as HTMLDivElement;
+const contractButton = document.getElementById('btn-contract') as HTMLButtonElement;
+const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
+
+/**
+ * O contrato que a companhia ANUNCIOU, se houver servidor.
+ *
+ * Existir nao significa estar jogando nele: este e o cartaz na parede, e serve
+ * apenas para o botao do menu ter um rotulo e uma seed para oferecer.
+ */
+let advertisedContract: DeathEchoContract | null = null;
+
+/**
+ * O contrato que ESTA run esta jogando, ou null.
+ *
+ * Precisa ser separado do anunciado. Enquanto eram a mesma variavel, qualquer run
+ * comum com servidor alcancavel entrava no ramo filtrado por seed de `requestPool`
+ * — o pool geral nunca era consultado, e o jogador que nunca tocou no contrato
+ * recebia apenas as capsulas daquele mapa. Escrito so por quem inicia a run, ele
+ * nao pode ficar preso a um contrato antigo depois de o jogador trocar a seed.
+ */
+let contractRun: DeathEchoContract | null = null;
 
 const renderer = new SurvivalRenderer(canvas);
 const deathEchoes = new DeathEchoController();
+/**
+ * Setor cujo pool ja foi pedido nesta run.
+ *
+ * O pool e buscado por SETOR porque a projecao e por setor, e uma vez por setor
+ * porque a resposta conta uma manifestacao de cada capsula devolvida: refazer o
+ * pedido a cada quadro queimaria o pool inteiro em segundos.
+ */
+let poolRequestKey = '';
+const requestPool = (state: SurvivalState): void => {
+  const key = `${state.config.seed}:${state.sector}`;
+  if (key === poolRequestKey) return;
+  poolRequestKey = key;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  // `contractRun`, nunca `advertisedContract`: um contrato no cartaz nao decide a
+  // modalidade da run que esta rodando.
+  void fetchDeathEchoPool(url, deathEchoPoolQuery(state.sector, contractRun)).then((pool) => {
+    // A run pode ter descido enquanto a resposta viajava. Sem esta guarda, o pool
+    // do setor 1 chegaria depois e projetaria carcacas no setor 2.
+    if (`${state.config.seed}:${state.sector}` !== key) return;
+    if (pool.length > 0) deathEchoes.setPool(pool);
+  });
+};
 const renderState = (
   state: SurvivalState,
   alpha: number,
   inputState: Parameters<SurvivalRenderer['render']>[2],
   nowMs: number,
 ): void => {
+  if (state.phase === 'running') requestPool(state);
   renderer.setDeathEchoes(deathEchoes.sync(state, nowMs));
   renderer.render(state, alpha, inputState, nowMs);
 };
@@ -224,6 +275,34 @@ const submitSoloRun = (state: SurvivalState): void => {
   });
 };
 
+/** A run corrente ja ofereceu a propria morte ao pool? */
+let echoSubmitted = false;
+
+/**
+ * Oferece a propria morte ao pool comunitario.
+ *
+ * Manda seed e log — nunca a capsula. O servidor re-simula, descobre sozinho onde
+ * e de que o Prospector morreu, e so entao guarda. Ver `death-echo-pool.ts`.
+ *
+ * O espelho exato de `submitSoloRun`: la sobem as runs que EXTRAIRAM, aqui as que
+ * MORRERAM. Juntas cobrem todo desfecho sem que nenhuma das duas rotas receba
+ * trabalho que nao lhe serve.
+ *
+ * Silencioso em qualquer falha, e silencioso tambem no sucesso: o jogador esta
+ * lendo a tela de resultado da propria morte, e um aviso de "carcaca publicada"
+ * ali seria a companhia falando por cima do luto. O corpo dele aparecer no mapa de
+ * um estranho e a recompensa; ela nao precisa de notificacao.
+ */
+const submitDeathToPool = (state: SurvivalState): void => {
+  if (echoSubmitted || state.config.playerCount !== 1) return;
+  if (state.phase !== 'dead' || !recorder.submittable) return;
+  echoSubmitted = true;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  void submitDeathEcho(url, recorder.recordedSeed, recorder.encode()).then((outcome) => {
+    if (!outcome.ok) console.info('[echoes] nao enviado:', outcome.reason);
+  });
+};
+
 // ---------------------------------------------------------------------------
 // Convite de co-op
 // ---------------------------------------------------------------------------
@@ -339,6 +418,8 @@ const runSolo = (): void => {
   audio.reset();
   const seed = nextSeed();
   recorder.start(seed);
+  echoSubmitted = false;
+  poolRequestKey = '';
   telemetry.begin();
   let state: SurvivalState = createRun({ seed });
   liveRun = state;
@@ -361,6 +442,7 @@ const runSolo = (): void => {
     if (state.phase !== 'running') {
       recordRun(state);
       submitSoloRun(state);
+      submitDeathToPool(state);
       if (state.summary) telemetry.finish(state.summary, state.sector);
       const { drain, armed } = gate.frame(now, true);
       if (drain) input.clearPendingUiInput();
@@ -376,6 +458,8 @@ const runSolo = (): void => {
         audio.reset();
         recordedSummaryKey = null;
         submitted = false;
+        echoSubmitted = false;
+        poolRequestKey = '';
         gate.reset();
       }
       accumulator = 0;
@@ -568,6 +652,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
             gate.reset();
             audio.reset();
             recordedSummaryKey = null;
+            poolRequestKey = '';
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
@@ -611,7 +696,11 @@ qualitySelect.addEventListener('change', () => {
  * como gesto, entao naquele caminho o contexto so nasce no primeiro toque
  * dentro do jogo — e por isso `unlock` tambem e chamado pelo input.
  */
-const startSolo = (): void => {
+const startSolo = (contract: DeathEchoContract | null = null): void => {
+  // A modalidade e declarada por quem INICIA a run, e nao herdada do que o
+  // servidor anunciou: descer normalmente sempre significa pool geral, mesmo com
+  // um contrato aberto na tela.
+  contractRun = contract;
   audio.unlock();
   audio.ui();
   menu.classList.add('hidden');
@@ -625,6 +714,7 @@ const startOnline = (): void => {
     setTimeout(() => setBanner(null), 2400);
     return;
   }
+  contractRun = null;
   audio.unlock();
   audio.ui();
   menu.classList.add('hidden');
@@ -639,9 +729,49 @@ for (const evt of ['pointerdown', 'keydown'] as const) {
   window.addEventListener(evt, () => audio.unlock(), { once: true, passive: true });
 }
 
-document.getElementById('btn-solo')?.addEventListener('click', startSolo);
+/**
+ * Descer no contrato coletivo: a mesma seed que todo mundo recebeu hoje.
+ *
+ * Fixa `forcedSeed`, e isso e a implementacao inteira do "mesmo mapa para todos".
+ * Nao ha mundo persistido, servidor de terreno nem estado compartilhado — a run e
+ * reproduzivel por um numero, e os tres setores derivam dele. Publicar o numero
+ * basta.
+ *
+ * A seed sobrevive aos reinicios, como qualquer seed fixada: a razao de existir um
+ * contrato e tentar o MESMO mapa de novo depois de morrer nele.
+ */
+const startContract = (): void => {
+  const contract = advertisedContract;
+  if (!contract) return;
+  forcedSeed = contract.seed;
+  seedInput.value = formatSeed(contract.seed);
+  setBanner(contract.label);
+  setTimeout(() => setBanner(null), 3200);
+  startSolo(contract);
+};
+
+// `() => startSolo()` e nao `startSolo`: o handler receberia o MouseEvent como
+// primeiro argumento e o contrato passaria a ser um evento de clique.
+document.getElementById('btn-solo')?.addEventListener('click', () => startSolo());
 document.getElementById('btn-online')?.addEventListener('click', startOnline);
+contractButton.addEventListener('click', startContract);
 serverInput.placeholder = defaultServerUrl();
+
+/**
+ * Anuncia o contrato do dia, se houver servidor.
+ *
+ * O botao nasce escondido e so aparece quando um contrato responde: sem pool, ele
+ * prometeria uma experiencia comunitaria — pisar onde outros morreram — que o
+ * cliente sozinho nao entrega. Falha em silencio, como todo o resto do caminho de
+ * rede: o jogo principal e offline.
+ */
+void fetchDeathEchoContract(serverInput.value.trim() || defaultServerUrl()).then((contract) => {
+  if (!contract) return;
+  advertisedContract = contract;
+  contractLabel.textContent = contract.label;
+  contractButton.classList.remove('hidden');
+  contractLabel.classList.remove('hidden');
+});
 
 // ---------------------------------------------------------------------------
 // Seed e registro

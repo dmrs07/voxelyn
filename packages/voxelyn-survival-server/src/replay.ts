@@ -31,10 +31,21 @@ import {
   hashAuthoritativeState,
   stepRun,
   TICK_HZ,
+  TICK_MS,
   type PlayerCommand,
   type RunSummary,
+  type SurvivalState,
 } from '@voxelyn/survival-sim';
-import { decodeCommandLog, encodeCommandLog, fromBase64 } from '@voxelyn/survival-protocol';
+import {
+  DEATH_ECHO_TRACE_SAMPLES,
+  DEATH_ECHO_TRACE_STEP_MS,
+  buildDeathEchoCapsule,
+  decodeCommandLog,
+  encodeCommandLog,
+  fromBase64,
+  type DeathEchoCapsule,
+  type DeathEchoTraceSample,
+} from '@voxelyn/survival-protocol';
 
 /**
  * Teto de ticks de uma submissao. 30 minutos a 20 Hz.
@@ -78,14 +89,33 @@ export const replayDigest = (seed: number, canonicalLog: Uint8Array): string => 
 };
 
 /**
- * Re-simula uma submissao e devolve o resultado AUTORITATIVO.
+ * Quantos ticks separam duas amostras do rastro final.
+ *
+ * O cliente amostra pelo relógio, a 120 ms. O servidor amostra por TICK, porque
+ * na re-simulação não existe relógio de quadro — e por isso o passo real do
+ * rastro reconstruído aqui é `ticks × TICK_MS`, que viaja dentro da própria
+ * cápsula. O consumidor lê `stepMs` da cápsula e não presume nenhum dos dois.
+ */
+const TRACE_TICKS_PER_SAMPLE = Math.max(1, Math.round(DEATH_ECHO_TRACE_STEP_MS / TICK_MS));
+const TRACE_STEP_MS_RESIMULATED = TRACE_TICKS_PER_SAMPLE * TICK_MS;
+
+type Resimulation =
+  | { ok: true; state: SurvivalState; canonicalLog: Uint8Array; trace: DeathEchoTraceSample[] }
+  | { ok: false; reason: string };
+
+/**
+ * O laco de re-simulacao, num lugar so.
  *
  * As checagens estao em ordem de custo crescente de proposito: tamanho do
  * texto antes de decodificar base64, tamanho dos bytes antes de expandir o
  * RLE, contagem de comandos antes de simular. Um log hostil e recusado no
  * degrau mais barato que o denuncia.
+ *
+ * A janela do rastro e colhida DURANTE a simulacao porque ela so existe durante
+ * a simulacao: depois do ultimo tick, as posicoes intermediarias sumiram. Custa
+ * uma amostra a cada dois ticks num buffer de 24 — nada perto de um `stepRun`.
  */
-export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => {
+const resimulate = (seed: number, logBase64: string): Resimulation => {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
     return { ok: false, reason: 'seed invalida' };
   }
@@ -102,12 +132,33 @@ export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => 
 
   const state = createRun({ seed, playerCount: 1 });
   const buffer: PlayerCommand[] = [emptyCommand()];
+  const trace: DeathEchoTraceSample[] = [];
   let consumedTicks = 0;
+  /** Setor em que as amostras correntes foram colhidas. */
+  let traceSector = state.sector;
 
   for (let i = 0; i < commands.length; i++) {
     buffer[0] = commands[i];
     stepRun(state, buffer);
     consumedTicks = i + 1;
+    // A descida troca o mundo mantendo a run: amostras do setor anterior
+    // codificadas contra a celula da morte nova produziriam um rastro que salta
+    // de um mapa para o outro.
+    if (state.sector !== traceSector) {
+      traceSector = state.sector;
+      trace.length = 0;
+    }
+    if (state.tick % TRACE_TICKS_PER_SAMPLE === 0) {
+      const extra = state.playerExtra;
+      trace.push({
+        x: state.player.x,
+        y: state.player.y,
+        aimX: extra.aim.x,
+        aimY: extra.aim.y,
+        firing: extra.nextShotAt > state.tick,
+      });
+      if (trace.length > DEATH_ECHO_TRACE_SAMPLES) trace.shift();
+    }
     // Para no instante em que a run acaba. O cliente pode ter capturado comandos
     // adicionais antes de observar a fase terminal; eles NAO participam da run
     // e, portanto, tampouco participam da identidade usada no leaderboard.
@@ -123,19 +174,79 @@ export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => 
     return { ok: false, reason: 'run terminou sem sumario' };
   }
 
-  // Re-encoda SOMENTE o prefixo que a simulacao consumiu. Isso normaliza:
-  // - blocos RLE diferentes que expandem para os mesmos comandos;
-  // - padding Base64 alternativo;
-  // - qualquer cauda valida anexada depois do tick terminal.
-  const canonicalLog = encodeCommandLog(commands.slice(0, consumedTicks));
-
   return {
     ok: true,
-    summary: state.summary,
-    authHash: hashAuthoritativeState(state),
-    ticks: state.tick,
-    digest: replayDigest(seed, canonicalLog),
+    state,
+    trace,
+    // Re-encoda SOMENTE o prefixo que a simulacao consumiu. Isso normaliza:
+    // - blocos RLE diferentes que expandem para os mesmos comandos;
+    // - padding Base64 alternativo;
+    // - qualquer cauda valida anexada depois do tick terminal.
+    canonicalLog: encodeCommandLog(commands.slice(0, consumedTicks)),
   };
+};
+
+/** Re-simula uma submissao e devolve o resultado AUTORITATIVO. */
+export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => {
+  const run = resimulate(seed, logBase64);
+  if (!run.ok) return run;
+  const summary = run.state.summary;
+  if (!summary) return { ok: false, reason: 'run terminou sem sumario' };
+  return {
+    ok: true,
+    summary,
+    authHash: hashAuthoritativeState(run.state),
+    ticks: run.state.tick,
+    digest: replayDigest(seed, run.canonicalLog),
+  };
+};
+
+export type DeathEchoReplayResult =
+  | { ok: true; capsule: DeathEchoCapsule; digest: string }
+  | { ok: false; reason: string };
+
+/**
+ * Re-simula um log e constroi a capsula da morte que ele produziu.
+ *
+ * Esta e a unica porta pela qual uma morte SOLO entra no pool comunitario, e ela
+ * existe para manter a mesma regra do leaderboard: o cliente manda a seed e o que
+ * pressionou; o servidor descobre sozinho onde e de que o Prospector morreu. Nao
+ * ha campo de posicao, de causa nem de topologia para preencher — logo nao ha o
+ * que mentir. Uma capsula enviada pronta seria uma afirmacao do cliente sobre o
+ * mundo, e o pool perderia para sempre o direito de conceder qualquer coisa.
+ *
+ * O rastro tambem sai daqui, e nao do cliente: reconstruido pela re-simulacao ele
+ * e autoritativo de graca, porque a simulacao ja teve de percorrer aqueles ticks.
+ *
+ * O id e derivado do digest — anonimo por construcao. Nenhum nome de jogador
+ * atravessa esta funcao.
+ */
+export const verifySoloDeath = (seed: number, logBase64: string): DeathEchoReplayResult => {
+  const run = resimulate(seed, logBase64);
+  if (!run.ok) return run;
+  const state = run.state;
+  if (state.phase !== 'dead') {
+    return { ok: false, reason: 'a run nao terminou em morte' };
+  }
+  const cause = state.summary?.deathCause;
+  if (!cause) return { ok: false, reason: 'morte sem causa autoritativa' };
+
+  const digest = replayDigest(seed, run.canonicalLog);
+  const capsule = buildDeathEchoCapsule(state, {
+    id: `pool:${digest}:${state.sector}`,
+    x: state.player.x,
+    y: state.player.y,
+    facingX: state.player.facing.x,
+    facingY: state.player.facing.y,
+    cause,
+    ticks: state.tick,
+    trace: run.trace,
+  });
+  // O passo do rastro re-simulado vem do TICK, nao do relogio de quadro do
+  // cliente. Corrigi-lo aqui em vez de no encoder mantem `encodeDeathEchoTrace`
+  // com um unico default e deixa a excecao onde ela nasce.
+  if (capsule.finalTrace) capsule.finalTrace.stepMs = TRACE_STEP_MS_RESIMULATED;
+  return { ok: true, capsule, digest };
 };
 
 /**
