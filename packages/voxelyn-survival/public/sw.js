@@ -1,9 +1,14 @@
 // Service worker do Voxelyn Survival.
 // Estrategia: app shell em cache para a experiencia SOLO offline. As chamadas
 // de rede (WebSocket) nao passam pelo SW; o online exige conexao, o solo nao.
-const CACHE = 'voxelyn-survival-v1';
 
-// Lista de precache injetada no build (vite.config.ts -> precacheManifest()).
+// Injetados no build (vite.config.ts -> precacheManifest()).
+// BUILD muda a cada bundle: e o que garante que um deploy novo instale um SW
+// novo mesmo quando so o index.html mudou.
+const BUILD = self.__VOXELYN_BUILD__ ?? 'dev';
+const CACHE = `voxelyn-survival-${BUILD}`;
+
+// Lista de precache injetada no build.
 // PRECISA conter os bundles com hash e os atlases de sprite: o SW so e
 // registrado no window.load, ou seja, DEPOIS de o navegador ja ter buscado
 // esses arquivos. Como o worker recem-ativado nunca ve aqueles fetches, sem
@@ -12,80 +17,137 @@ const CACHE = 'voxelyn-survival-v1';
 // Em dev (sem build) a lista fica vazia e o shell abaixo basta.
 const BUILD_ASSETS = self.__VOXELYN_PRECACHE__ ?? [];
 
-// OBRIGATORIOS: sem qualquer um destes o solo offline nao inicia. Se um deles
-// falhar, o install TEM de falhar — engolir a falha ativaria um worker com
-// cache parcial, e o index em cache apontaria para um bundle que nao existe.
-// Falhando, o worker anterior (com cache completo) continua no ar.
-const REQUIRED = ['./', './index.html', ...BUILD_ASSETS];
+// Teto de espera pela rede numa navegacao. Um celular com sinal ruim nao
+// devolve erro: ele PENDURA o fetch por dezenas de segundos, e o launcher do
+// PWA fica numa tela preta que o usuario le como "nao abriu". O shell em cache
+// e do mesmo build que a rede entregaria, entao esperar mais nao compra nada.
+const NAV_TIMEOUT_MS = 3000;
+
+// OBRIGATORIOS: sem qualquer um destes o solo offline nao inicia.
+// O shell HTML e buscado com 'reload' porque o cache HTTP do navegador pode
+// devolver um index.html anterior, e gravar ESSE index junto dos bundles NOVOS
+// deixa o cache internamente inconsistente — o proximo lancamento offline pede
+// um arquivo com hash que nunca foi armazenado e abre em branco.
+const SHELL = ['./', './index.html'];
 // OPCIONAIS: cosmeticos/metadados. Um icone ausente nao pode derrubar o install.
 const OPTIONAL = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE)
-      .then(async (c) => {
-        // addAll e atomico e rejeita se qualquer entrada falhar: e exatamente o
-        // que queremos para os obrigatorios.
-        await c.addAll(REQUIRED);
-        await Promise.all(OPTIONAL.map((u) => c.add(u).catch(() => undefined)));
-      })
-      .then(() => self.skipWaiting())
+    (async () => {
+      const cache = await caches.open(CACHE);
+      // addAll e atomico e rejeita se qualquer entrada falhar: e exatamente o
+      // que queremos para os obrigatorios. Se um deles falhar, o install TEM de
+      // falhar — engolir a falha ativaria um worker com cache parcial. Falhando,
+      // o worker anterior (com cache completo) continua no ar.
+      await cache.addAll([
+        ...SHELL.map((url) => new Request(url, { cache: 'reload' })),
+        ...BUILD_ASSETS,
+      ]);
+      await Promise.all(OPTIONAL.map((url) => cache.add(url).catch(() => undefined)));
+      await self.skipWaiting();
+    })(),
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    (async () => {
+      // Um cache por build. Sem isso os bundles de todo deploy anterior ficam
+      // para sempre no aparelho, e o navegador acaba despejando a ORIGEM inteira
+      // por pressao de quota — o PWA volta a depender da rede sem nenhum aviso.
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith('voxelyn-survival-') && key !== CACHE)
+          .map((key) => caches.delete(key)),
+      );
+      await self.clients.claim();
+    })(),
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // nunca intercepta cross-origin
-
-  // network-first para navegacao (pega updates), cache como fallback offline
-  if (req.mode === 'navigate') {
-    // A raiz e o shell do JOGO. Guardar toda navegacao sob './' faria uma visita
-    // a sprites.html (o visualizador interno) substituir esse shell, e o proximo
-    // lancamento offline abriria o visualizador em vez do jogo. Cada navegacao
-    // e cacheada pela propria URL; './' so e atualizado pela propria raiz.
-    const isRoot = url.pathname === '/' || url.pathname.endsWith('/index.html');
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) {
-            const byUrl = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, byUrl));
-            if (isRoot) {
-              const asRoot = res.clone();
-              caches.open(CACHE).then((c) => c.put('./', asRoot));
-            }
-          }
-          return res;
-        })
-        .catch(() =>
-          caches
-            .match(req)
-            .then((r) => r || (isRoot ? caches.match('./').then((x) => x || caches.match('./index.html')) : undefined))
-        )
+/** Resolve com `null` (em vez de pendurar) quando a rede passa de `ms`. */
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
     );
-    return;
+  });
+}
+
+/**
+ * Navegacao: rede primeiro (com teto de tempo), cache como rede de seguranca.
+ *
+ * O shell da RAIZ nunca e regravado em runtime. Quem grava e so o install, que
+ * grava index e bundles de uma vez — esse par e sempre coerente. Uma gravacao em
+ * runtime viria do worker ANTIGO (o novo ainda esta instalando) e colocaria o
+ * index NOVO ao lado dos bundles VELHOS; se o install seguinte nao terminasse —
+ * usuario fecha o app, sinal cai — o proximo lancamento offline abriria um index
+ * apontando para arquivos que nao estao no cache. E a origem mais provavel de um
+ * PWA que abre umas vezes e outras nao.
+ */
+async function handleNavigate(request) {
+  const cache = await caches.open(CACHE);
+  const url = new URL(request.url);
+  const isRoot = url.pathname === '/' || url.pathname.endsWith('/index.html');
+
+  try {
+    const response = await withTimeout(fetch(request), NAV_TIMEOUT_MS);
+    // `!ok` tambem cai para o cache: durante um deploy, atras de um portal
+    // captivo ou num 5xx do host, devolver a pagina de erro do servidor apaga a
+    // tela do jogo mesmo havendo um shell perfeito guardado aqui.
+    if (response && response.ok) {
+      // sprites.html (o visualizador interno) e cacheado pela propria URL, nunca
+      // por cima da raiz: se compartilhassem chave, uma visita ao visualizador
+      // faria o lancamento offline seguinte abrir ele no lugar do jogo.
+      if (!isRoot) {
+        const copy = response.clone();
+        void cache.put(request, copy).catch(() => undefined);
+      }
+      return response;
+    }
+  } catch {
+    /* rede indisponivel: o cache abaixo resolve */
   }
 
-  // cache-first para assets do shell (offline solo)
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res.ok && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
-        return res;
-      });
+  return (
+    (await cache.match(request)) ??
+    (await cache.match(request, { ignoreSearch: true })) ??
+    (await cache.match('./index.html')) ??
+    (await cache.match('./')) ??
+    new Response('Offline e sem app shell em cache.', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     })
   );
+}
+
+/** Assets do shell: cache primeiro (solo offline), rede so no que faltar. */
+async function handleAsset(request) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok && response.type === 'basic') {
+    const copy = response.clone();
+    void cache.put(request, copy).catch(() => undefined);
+  }
+  return response;
+}
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  if (new URL(request.url).origin !== self.location.origin) return; // nunca intercepta cross-origin
+
+  event.respondWith(request.mode === 'navigate' ? handleNavigate(request) : handleAsset(request));
 });

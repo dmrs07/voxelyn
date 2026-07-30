@@ -112,6 +112,30 @@ próxima disponível e reavalie — o slice usa interpolação e tolerâncias de
 (sem rollback netcode), então latências moderadas são aceitáveis, mas picos altos
 degradam a sensação.
 
+## PWA instalado: o lançamento não pode depender da rede
+
+Um PWA que "às vezes abre e às vezes não" quase sempre é o service worker
+esperando a rede. As garantias que sustentam o contrário estão em
+`packages/voxelyn-survival/public/sw.js` (cobertas por `src/client/sw.test.ts`):
+
+- **Teto de 3 s na navegação.** Celular com sinal ruim não devolve erro — ele
+  pendura o `fetch`. Passado o teto, o shell sai do cache.
+- **Resposta `!ok` também cai para o cache.** Janela de deploy, 5xx do host ou
+  portal captivo não podem apagar a tela do jogo havendo shell guardado.
+- **A raiz só é gravada no `install`,** que grava index e bundles atomicamente.
+  Gravar a navegação em runtime colocaria o index novo ao lado dos bundles
+  velhos e quebraria o lançamento offline seguinte.
+- **Um cache por build** (`__VOXELYN_BUILD__`, derivado dos hashes dos assets e
+  do HTML emitido). Isso faz cada deploy instalar um SW novo mesmo quando só o
+  HTML mudou, e descarta o cache anterior em vez de acumular deploys até o
+  navegador despejar a origem por quota.
+- **Headers**: `/sw.js`, `/` e `/index.html` com `no-cache` (ver `render.yaml`).
+  Os bundles em `/assets/` têm hash no nome e podem ser cacheados à vontade.
+
+Ao investigar um relato, peça: versão do build, se estava online, e o resultado
+de `caches.keys()` no DevTools remoto — mais de um `voxelyn-survival-*` indica
+um `activate` que não rodou.
+
 ## Limites do alpha (não fazer ainda)
 
 - O Postgres persiste somente o ranking. Não há Render Key Value nem múltiplas

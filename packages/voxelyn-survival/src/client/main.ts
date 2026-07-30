@@ -883,5 +883,10 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {
       /* PWA opcional; o jogo funciona sem SW */
     });
+    // O cache do shell passa de 1 MB com os atlases. Sob pressao de armazenamento
+    // o navegador despeja a origem inteira sem avisar, e o app instalado volta a
+    // depender da rede para abrir. Pedir persistencia e o unico jeito de sair
+    // dessa fila; um "nao" nao muda nada e nao vale um aviso ao jogador.
+    void navigator.storage?.persist?.().catch(() => undefined);
   });
 }

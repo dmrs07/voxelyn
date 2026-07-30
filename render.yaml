@@ -71,6 +71,16 @@ services:
       - path: /sw.js
         name: Cache-Control
         value: no-cache
+      # O shell HTML nao pode ficar preso no cache HTTP do aparelho: ele aponta
+      # para bundles com hash, e um index velho servido junto de um deploy novo
+      # pede arquivos que ja nao existem — a tela abre em branco. Os bundles em
+      # /assets/ sao imutaveis pelo hash e seguem com o cache padrao do Render.
+      - path: /
+        name: Cache-Control
+        value: no-cache
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
