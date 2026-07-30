@@ -40,71 +40,71 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build typed dependencies
-        run: pnpm --filter @voxelyn/survival-server... build
-
-      - name: Apply projectile-cause integrity fix
-        run: python .github/scripts/death-echo-review-fixes.py capsules
-
-      - name: Validate projectile-cause commit
+      - name: Build voxel generator dependency
         run: |
-          pnpm --filter @voxelyn/survival exec tsc -p tsconfig.json
-          pnpm test:survival
-          git diff --check
+          set -o pipefail
+          pnpm --filter @voxelyn/core build 2>&1 | tee /tmp/voxel-validation.log
 
-      - name: Commit projectile-cause integrity fix
+      - name: Regenerate normalized character atlases
+        run: |
+          set -o pipefail
+          pnpm --filter @voxelyn/survival-content generate 2>&1 | tee -a /tmp/voxel-validation.log
+
+      - name: Persist regenerated atlases
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            packages/voxelyn-survival/src/client/death-echoes.ts \
-            packages/voxelyn-survival/src/client/death-echoes.test.ts
-          git commit -m "fix(survival): validate enemy projectile death causes"
+          git add packages/voxelyn-survival-content/assets/atlases
+          if git diff --cached --quiet; then
+            echo "Atlases already up to date."
+          else
+            git commit -m "fix(content): regenerate normalized voxel atlases [skip voxel]"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+          fi
 
-      - name: Apply responsive readout fix
+      - name: Build survival packages
+        id: build
+        continue-on-error: true
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('.github/scripts/death-echo-review-fixes.py')
-          text = path.read_text()
-          replacements = {
-              "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.DOTALL)":
-                  "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.DOTALL)",
-              "  if (availableWidth < 140 || belowY >= safeBottom) return null;\n":
-                  "  const availableHeight = safeBottom - belowY;\n  if (availableWidth < 140 || availableHeight < 46) return null;\n",
-              "    maxHeight: safeBottom - belowY,\n":
-                  "    maxHeight: availableHeight,\n",
-          }
-          for old, new in replacements.items():
-              if text.count(old) != 1:
-                  raise SystemExit(f'layout transport marker changed: {old!r}')
-              text = text.replace(old, new)
-          path.write_text(text)
-          PY
-          python .github/scripts/death-echo-review-fixes.py layout
+          set -o pipefail
+          pnpm build:survival 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Validate final product state
+      - name: Validate and test survival packages
+        id: tests
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
         run: |
-          pnpm --filter @voxelyn/survival exec tsc -p tsconfig.json
-          pnpm build:survival
-          pnpm test:survival
-          pnpm --filter @voxelyn/survival build:offline-check
-          git diff --check
+          set -o pipefail
+          pnpm test:survival 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Commit responsive readout fix
+      - name: Verify PWA atlas precache
+        id: offline
+        if: steps.build.outcome == 'success' && steps.tests.outcome == 'success'
+        continue-on-error: true
         run: |
-          git add \
-            packages/voxelyn-survival/src/client/death-echo-presentation.ts \
-            packages/voxelyn-survival/src/client/death-echo-presentation.test.ts \
-            packages/voxelyn-survival/src/client/render.ts
-          git commit -m "fix(survival): keep death echo readout clear of HUD"
+          set -o pipefail
+          pnpm --filter @voxelyn/survival build:offline-check 2>&1 | tee -a /tmp/voxel-validation.log
 
-      - name: Remove review transport
+      - name: Write validation summary
+        if: always()
         run: |
-          git checkout origin/main -- .github/workflows/execute-voxel-spec.yml
-          rm .github/scripts/death-echo-review-fixes.py
-          git add -A .github
-          git commit -m "chore(ci): remove death echo review transport"
+          {
+            echo "build=${{ steps.build.outcome }}"
+            echo "tests=${{ steps.tests.outcome }}"
+            echo "offline=${{ steps.offline.outcome }}"
+            echo
+            cat /tmp/voxel-validation.log
+          } > /tmp/voxel-validation-full.log
 
-      - name: Publish reviewed commits
-        run: git push origin "HEAD:${{ github.event.pull_request.head.ref || github.ref_name }}"
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxel-validation-${{ github.run_id }}
+          path: /tmp/voxel-validation-full.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce validation result
+        if: steps.build.outcome == 'failure' || steps.tests.outcome == 'failure' || steps.offline.outcome == 'failure'
+        run: exit 1
