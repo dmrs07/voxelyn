@@ -5,13 +5,16 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { LIMITS, encodeMessage } from '@voxelyn/survival-protocol';
+import { LIMITS, buildDeathEchoCapsule, encodeMessage } from '@voxelyn/survival-protocol';
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { SurvivalServer, type ServerOptions } from './server.js';
 import { createLeaderboard, type LeaderboardStore } from './leaderboard.js';
 import { createLeaderboardHandler } from './leaderboard-http.js';
 import { createTelemetry, type TelemetryStore } from './telemetry.js';
 import { createTelemetryHandler } from './telemetry-http.js';
+import { createDeathEchoStore, type DeathEchoStore } from './death-echoes.js';
+import { createDeathEchoHandler } from './death-echoes-http.js';
+import { createVerificationBudget } from './http-util.js';
 
 export type WsServerHandle = {
   http: HttpServer;
@@ -20,6 +23,7 @@ export type WsServerHandle = {
   ready: Promise<void>;
   leaderboard: () => LeaderboardStore | null;
   telemetry: () => TelemetryStore | null;
+  deathEchoes: () => DeathEchoStore | null;
   close: () => Promise<void>;
 };
 
@@ -41,6 +45,11 @@ export type WsOptions = ServerOptions & {
  */
 export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   let leaderboardStore: LeaderboardStore | null = null;
+  let deathEchoStore: DeathEchoStore | null = null;
+  // UM orcamento de re-simulacao para o processo inteiro. Ranking e pool disputam
+  // o mesmo event loop que roda o tick autoritativo a 20 Hz; um contador por rota
+  // permitiria dois replays concorrentes e o dobro de engasgo na simulacao.
+  const verificationBudget = createVerificationBudget();
 
   const survival = new SurvivalServer({
     ...opts,
@@ -61,6 +70,40 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
           }),
         );
     },
+    // Capturado no MESMO tick da morte, e nao no fim da run: `descend` reposiciona
+    // inclusive os mortos, e uma captura tardia colocaria o corpo de quem morreu no
+    // setor 1 na entrada do setor 3.
+    onPlayerDeath: (room, death) => {
+      if (!deathEchoStore) return;
+      const capsule = buildDeathEchoCapsule(room.state, {
+        // Anonimo por construcao: sala, setor, tick e slot. Nada aqui identifica
+        // uma pessoa, e o serial que o jogador le e derivado deste id.
+        id: `coop:${room.seed}:${death.sector}:${death.tick}:${death.slot}`,
+        x: death.x,
+        y: death.y,
+        facingX: death.facingX,
+        facingY: death.facingY,
+        cause: death.cause,
+        ticks: death.tick,
+        // Sem rastro no co-op. Reconstrui-lo exigiria amostrar a posicao de cada
+        // slot a cada dois ticks dentro do laco autoritativo, e o holograma nao
+        // vale custo no caminho que roda a 20 Hz para todas as salas. O que o
+        // co-op contribui e a associacao causa<->posicao, que e a parte que o
+        // cliente nao consegue provar sozinho.
+      });
+      void deathEchoStore
+        .record({
+          capsule,
+          origin: 'coop',
+          sourceDigest: `coop:${room.seed}:${death.sector}:${death.tick}:${death.slot}`,
+        })
+        .catch((err: unknown) =>
+          log({
+            ev: 'death_echo_record_failed',
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+    },
   });
   const log = opts.logger ?? ((line) => console.log(JSON.stringify(line)));
   let ready = true;
@@ -71,6 +114,9 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     null;
   let handleTelemetry: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
     null;
+  let handleDeathEchoes:
+    | ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>)
+    | null = null;
 
   // A conexao com o banco e assincrona; o servidor NAO espera por ela para
   // aceitar jogo. Ate o store existir, as rotas de ranking respondem 503 e o
@@ -85,6 +131,17 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         log,
         allowedOrigins: opts.allowedOrigins,
         trustedProxyHops: opts.trustedProxyHops,
+        budget: verificationBudget,
+      });
+    }),
+    createDeathEchoStore(databaseUrl, log).then((store) => {
+      deathEchoStore = store;
+      handleDeathEchoes = createDeathEchoHandler({
+        store,
+        log,
+        allowedOrigins: opts.allowedOrigins,
+        trustedProxyHops: opts.trustedProxyHops,
+        budget: verificationBudget,
       });
     }),
     createTelemetry(databaseUrl, log).then((store) => {
@@ -117,6 +174,24 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         if (!res.headersSent) {
           res.writeHead(204);
           res.end();
+        }
+      });
+      return;
+    }
+    if (req.url?.startsWith('/echoes')) {
+      // Pool indisponivel responde 503 como o ranking, e nao 204: o cliente TEM
+      // um caminho de retry sensato (a proxima descida) e trata lista vazia como
+      // estado normal, entao vale dizer a verdade sobre o servidor.
+      if (!handleDeathEchoes) {
+        res.writeHead(503, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'pool de ecos ainda inicializando' }));
+        return;
+      }
+      void handleDeathEchoes(req, res).catch((err: unknown) => {
+        log({ ev: 'death_echo_error', error: err instanceof Error ? err.message : String(err) });
+        if (!res.headersSent) {
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'erro interno' }));
         }
       });
       return;
@@ -226,6 +301,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
           void Promise.all([
             leaderboardStore?.close() ?? Promise.resolve(),
             telemetryStore?.close() ?? Promise.resolve(),
+            deathEchoStore?.close() ?? Promise.resolve(),
           ]).then(() => resolve());
         }),
       );
@@ -237,6 +313,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     ready: leaderboardReady,
     leaderboard: () => leaderboardStore,
     telemetry: () => telemetryStore,
+    deathEchoes: () => deathEchoStore,
     close,
   };
 };

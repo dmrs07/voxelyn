@@ -5,10 +5,16 @@
 // cliente nao autenticado E gasta CPU proporcional a ele. Todo controle deste
 // arquivo existe por causa disso, e nao por formalidade.
 
-import { isIP } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { LeaderboardMode, LeaderboardStore } from './leaderboard.js';
 import { MAX_REPLAY_BYTES, sanitizeName, verifySoloRun } from './replay.js';
+import {
+  SubmissionRateLimiter,
+  createVerificationBudget,
+  readJsonBody,
+  requestRateLimitKey,
+  type VerificationBudget,
+} from './http-util.js';
 
 /**
  * Verificacoes de replay simultaneas.
@@ -19,86 +25,11 @@ import { MAX_REPLAY_BYTES, sanitizeName, verifySoloRun } from './replay.js';
  * as paraleliza — e engasgariam a simulacao de quem esta jogando. Excedentes
  * sao RECUSADOS com 503, e nao enfileirados: uma fila daria ao atacante uma
  * forma barata de acumular trabalho pendente.
- */
-const MAX_CONCURRENT_VERIFICATIONS = 1;
-
-/** Janela, teto e retencao das submissoes por origem. */
-export const SUBMIT_WINDOW_MS = 60_000;
-export const SUBMIT_MAX_PER_WINDOW = 6;
-export const BUCKET_IDLE_TTL_MS = 5 * SUBMIT_WINDOW_MS;
-const BUCKET_SWEEP_INTERVAL_MS = SUBMIT_WINDOW_MS;
-const MAX_RATE_LIMIT_BUCKETS = 10_000;
-
-type Bucket = { count: number; resetAt: number; lastSeenAt: number };
-
-export type SubmissionRateLimiterOptions = {
-  windowMs?: number;
-  maxPerWindow?: number;
-  idleTtlMs?: number;
-  sweepIntervalMs?: number;
-  maxBuckets?: number;
-};
-
-/**
- * Limite em memoria com coleta de origens inativas e teto defensivo.
  *
- * Sem a coleta, um fluxo de IPs legitimos — ou uma chave de origem mal
- * configurada — deixaria uma entrada permanente por visitante ate o processo
- * reiniciar. Ao atingir o teto depois da varredura, falha fechado.
+ * O orcamento e COMPARTILHADO com o pool de ecos, que re-simula pelo mesmo
+ * motivo e disputa o mesmo event loop. Dois orcamentos de um significariam dois
+ * replays concorrentes, que e exatamente o que este limite existe para impedir.
  */
-export class SubmissionRateLimiter {
-  private readonly buckets = new Map<string, Bucket>();
-  private readonly windowMs: number;
-  private readonly maxPerWindow: number;
-  private readonly idleTtlMs: number;
-  private readonly sweepIntervalMs: number;
-  private readonly maxBuckets: number;
-  private nextSweepAt = 0;
-
-  constructor(options: SubmissionRateLimiterOptions = {}) {
-    this.windowMs = options.windowMs ?? SUBMIT_WINDOW_MS;
-    this.maxPerWindow = options.maxPerWindow ?? SUBMIT_MAX_PER_WINDOW;
-    this.idleTtlMs = options.idleTtlMs ?? BUCKET_IDLE_TTL_MS;
-    this.sweepIntervalMs = options.sweepIntervalMs ?? BUCKET_SWEEP_INTERVAL_MS;
-    this.maxBuckets = options.maxBuckets ?? MAX_RATE_LIMIT_BUCKETS;
-  }
-
-  private sweep(now: number): void {
-    for (const [key, bucket] of this.buckets) {
-      if (now - bucket.lastSeenAt >= this.idleTtlMs) this.buckets.delete(key);
-    }
-    this.nextSweepAt = now + this.sweepIntervalMs;
-  }
-
-  check(key: string, now: number): boolean {
-    if (now >= this.nextSweepAt) this.sweep(now);
-
-    let bucket = this.buckets.get(key);
-    if (!bucket) {
-      if (this.buckets.size >= this.maxBuckets) {
-        this.sweep(now);
-        if (this.buckets.size >= this.maxBuckets) return true;
-      }
-      bucket = { count: 1, resetAt: now + this.windowMs, lastSeenAt: now };
-      this.buckets.set(key, bucket);
-      return false;
-    }
-
-    bucket.lastSeenAt = now;
-    if (now >= bucket.resetAt) {
-      bucket.count = 1;
-      bucket.resetAt = now + this.windowMs;
-      return false;
-    }
-    bucket.count += 1;
-    return bucket.count > this.maxPerWindow;
-  }
-
-  /** Apenas para regressao/diagnostico; nao faz parte do protocolo HTTP. */
-  size(): number {
-    return this.buckets.size;
-  }
-}
 
 export type LeaderboardHttpOptions = {
   store: LeaderboardStore;
@@ -106,76 +37,13 @@ export type LeaderboardHttpOptions = {
   allowedOrigins?: string[];
   /** Quantos proxies imediatamente a frente da aplicacao sao confiaveis. */
   trustedProxyHops?: number;
+  /** Orcamento de re-simulacao, compartilhado com o pool de ecos. */
+  budget?: VerificationBudget;
 };
-
-const canonicalIp = (raw: string | undefined): string | null => {
-  if (!raw) return null;
-  let value = raw.trim().replace(/^"|"$/g, '');
-  if (value.startsWith('[')) {
-    const closing = value.indexOf(']');
-    if (closing > 0) value = value.slice(1, closing);
-  }
-  if (value.startsWith('::ffff:')) value = value.slice('::ffff:'.length);
-  return isIP(value) > 0 ? value : null;
-};
-
-/**
- * Chave de origem baseada somente em saltos de proxy explicitamente confiados.
- *
- * O array X-Forwarded-For e percorrido DA DIREITA para a esquerda: cada proxy
- * confiavel acrescenta o peer que recebeu. Valores que o cliente prependa a
- * esquerda nunca mudam a chave enquanto o numero de saltos confiaveis for o
- * mesmo. Sem configuracao de proxy, o header inteiro e ignorado.
- */
-export const requestRateLimitKey = (req: IncomingMessage, trustedProxyHops = 0): string => {
-  const socketAddress = canonicalIp(req.socket.remoteAddress) ?? 'desconhecido';
-  const hops = Math.max(0, Math.floor(trustedProxyHops));
-  if (hops === 0) return socketAddress;
-
-  const header = req.headers['x-forwarded-for'];
-  const raw = Array.isArray(header) ? header.join(',') : header;
-  const chain = raw
-    ?.split(',')
-    .map((part) => canonicalIp(part))
-    .filter((part): part is string => part !== null);
-  if (!chain || chain.length < hops) return socketAddress;
-  return chain[chain.length - hops] ?? socketAddress;
-};
-
-const readBody = (req: IncomingMessage, limit: number): Promise<string | null> =>
-  new Promise((resolve) => {
-    let size = 0;
-    let overflowed = false;
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => {
-      if (overflowed) return;
-      size += chunk.length;
-      // Para de acumular ASSIM QUE estoura, em vez de bufferizar tudo e
-      // conferir no fim: conferir no fim significa ter aceitado o corpo inteiro
-      // na memoria, que e o que o limite existe para impedir.
-      //
-      // `pause()` e nao `destroy()`: destruir aqui fecha o socket antes de o
-      // 413 sair, e o cliente ve "erro de rede" em vez da recusa — sem saber
-      // que basta mandar menos. O pause aplica contrapressao de TCP, o handler
-      // responde, e so entao a conexao e encerrada.
-      if (size > limit) {
-        overflowed = true;
-        chunks.length = 0;
-        req.pause();
-        resolve(null);
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      if (!overflowed) resolve(Buffer.concat(chunks).toString('utf8'));
-    });
-    req.on('error', () => resolve(null));
-  });
 
 export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
   const limiter = new SubmissionRateLimiter();
-  let running = 0;
+  const budget = opts.budget ?? createVerificationBudget();
 
   const cors = (req: IncomingMessage, res: ServerResponse): void => {
     const origin = req.headers.origin;
@@ -232,13 +100,15 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
       json(res, 429, { error: 'muitas submissoes; tente de novo em um minuto' });
       return true;
     }
-    if (running >= MAX_CONCURRENT_VERIFICATIONS) {
+    // Recusa ANTES de ler o corpo: ler meio megabyte para descartar em seguida e
+    // exatamente o trabalho que o limite existe para evitar.
+    if (budget.busy()) {
       json(res, 503, { error: 'verificacao ocupada; tente de novo' });
       return true;
     }
 
     // Margem sobre o teto do log para o resto do JSON (nome, seed, aspas).
-    const raw = await readBody(req, MAX_REPLAY_BYTES + 4096);
+    const raw = await readJsonBody(req, MAX_REPLAY_BYTES + 4096);
     if (raw === null) {
       // `connection: close` porque nao vamos ler o resto do corpo; manter a
       // conexao viva deixaria o pipeline HTTP dessincronizado.
@@ -260,7 +130,12 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
     const log = typeof payload.log === 'string' ? payload.log : '';
     const name = sanitizeName(payload.name);
 
-    running += 1;
+    // A reserva fica COLADA ao `try`: entre `busy()` e aqui houve leitura de corpo
+    // e parse, e cada retorno antecipado dali teria de lembrar de liberar a vaga.
+    if (!budget.claim()) {
+      json(res, 503, { error: 'verificacao ocupada; tente de novo' });
+      return true;
+    }
     try {
       const started = Date.now();
       // O resultado sai DAQUI, nao do corpo da requisicao. Nao ha campo de
@@ -298,7 +173,7 @@ export const createLeaderboardHandler = (opts: LeaderboardHttpOptions) => {
       });
       return true;
     } finally {
-      running -= 1;
+      budget.release();
     }
   };
 };

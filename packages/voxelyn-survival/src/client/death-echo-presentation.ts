@@ -10,18 +10,22 @@
 // causa de um painel de texto.
 
 import type { SurvivalState } from '@voxelyn/survival-sim';
-import { describeCause } from './run-summary';
-import { carcassVariant, deathEchoDesignation } from './death-echo-carcass';
 import {
   DEATH_ECHO_TRACE_SAMPLES,
   DEATH_ECHO_TRACE_STEP_MS,
-  applyDeathEchoOnce,
-  loadDeathEchoRecords,
-  projectDeathEchoes,
-  saveDeathEchoRecords,
-  type DeathEchoRecords,
+  clusterDeathEchoes,
+  type DeathEchoCapsule,
   type DeathEchoTraceSample,
   type PlacedDeathEcho,
+} from '@voxelyn/survival-protocol';
+import { describeCause } from './run-summary';
+import { carcassVariant, deathEchoDesignation } from './death-echo-carcass';
+import {
+  applyDeathEchoOnce,
+  loadDeathEchoRecords,
+  projectSectorEchoes,
+  saveDeathEchoRecords,
+  type DeathEchoRecords,
 } from './death-echoes';
 
 /** Distância em que o botão usar abre a transmissão. */
@@ -39,6 +43,8 @@ export type DeathEchoReadout = {
   condition: string;
   headline: string;
   lesson: string;
+  /** Presente somente quando o corpo representa mais de uma morte. */
+  aggregate: string | null;
 };
 
 export type DeathEchoReadoutRegion = {
@@ -81,6 +87,12 @@ export const deathEchoReadout = (echo: PlacedDeathEcho): DeathEchoReadout => {
     condition: `CARCAÇA ${carcassVariant(echo.cause).condition}`,
     headline: cause.headline,
     lesson: cause.lesson,
+    // Um corpo que representa muitos vira a estatística da câmara. A causa
+    // narrada continua sendo a de UMA morte real — a do corpo que sobreviveu ao
+    // agrupamento —, então o texto diz "predominante" e não "a causa".
+    aggregate: echo.lost > 1
+      ? `${echo.lost} UNIDADES PERDIDAS NESTA CÂMARA — CAUSA PREDOMINANTE ABAIXO`
+      : null,
   };
 };
 
@@ -178,11 +190,15 @@ export class DeathEchoController {
   private recordedIdentity: string | null = null;
   private terminal = false;
   private projectionKey = '';
+  private worldKey = '';
   private placed: readonly PlacedDeathEcho[] = [];
   private readonly trace = new DeathEchoTraceRecorder();
+  private pool: readonly DeathEchoCapsule[] = [];
   private pairedId: string | null = null;
   private pairedAtMs = 0;
   private interactPending = false;
+  /** A última cápsula gravada, para quem quiser publicá-la no pool. */
+  private lastCaptured: DeathEchoCapsule | null = null;
 
   constructor(private records: DeathEchoRecords = loadDeathEchoRecords()) {}
 
@@ -195,6 +211,26 @@ export class DeathEchoController {
    */
   pressInteract(): void {
     this.interactPending = true;
+  }
+
+  /**
+   * Entrega o pool comunitário.
+   *
+   * Chega por HTTP, depois do começo da run, e isso é seguro precisamente porque
+   * eco é apresentação: ele não entra em `SurvivalState`, no hash nem no replay.
+   * Uma cápsula que atrasou aparece um pouco depois no chão e nada mais acontece.
+   * No dia em que um eco der módulo, este caminho deixa de servir — aí o pool tem
+   * de ser escolhido antes do tick zero, num manifesto imutável.
+   */
+  setPool(pool: readonly DeathEchoCapsule[]): void {
+    this.pool = pool;
+    // Força reprojeção no próximo quadro: o pool novo tem de disputar as células.
+    this.projectionKey = '';
+  }
+
+  /** A cápsula da morte mais recente deste cliente, ou null. */
+  capturedEcho(): DeathEchoCapsule | null {
+    return this.lastCaptured;
   }
 
   sync(state: SurvivalState, nowMs: number): DeathEchoFrame {
@@ -212,6 +248,7 @@ export class DeathEchoController {
         this.recordedIdentity = result.identity;
         if (result.applied) {
           this.records = result.records;
+          this.lastCaptured = result.echo;
           saveDeathEchoRecords(this.records);
         }
       }
@@ -227,18 +264,37 @@ export class DeathEchoController {
       this.terminal = false;
       this.trace.reset();
     }
-    this.trace.observe(state, nowMs);
 
-    const key = [
+    // O MUNDO trocou, não só a projeção.
+    //
+    // `descend` teleporta o Prospector para a entrada de um mapa recém-gerado
+    // mantendo a fase em `running`. Sem zerar o rastro aqui, morrer nos ~2,9 s
+    // seguintes gravaria uma janela com coordenadas dos DOIS setores; codificadas
+    // em relação à célula da morte nova, elas produziriam um holograma que salta
+    // de um mapa para o outro e não descreve encontro nenhum.
+    //
+    // A chave é só o mundo: `nextSerial` também muda a projeção, mas trocar de
+    // cápsula guardada não desloca o Prospector e não pode custar o rastro dele.
+    const worldKey = [
       state.config.seed,
       state.sector,
       state.config.width,
       state.config.height,
-      this.records.nextSerial,
     ].join(':');
+    if (worldKey !== this.worldKey) {
+      this.worldKey = worldKey;
+      this.trace.reset();
+    }
+    this.trace.observe(state, nowMs);
+
+    const key = `${worldKey}:${this.records.nextSerial}:${this.pool.length}`;
     if (key !== this.projectionKey) {
       this.projectionKey = key;
-      this.placed = projectDeathEchoes(state, this.records);
+      // Agrupa DEPOIS de projetar: no contrato de seed compartilhada as cápsulas
+      // voltam à coordenada real e a mesma câmara letal acumula dezenas delas.
+      this.placed = clusterDeathEchoes(
+        projectSectorEchoes(state, this.records.echoes, this.pool),
+      );
       // A descida troca o mundo inteiro: um vínculo com a carcaça do setor
       // anterior sobreviveria apontando para um corpo que não existe mais.
       this.pairedId = null;

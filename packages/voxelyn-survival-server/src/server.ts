@@ -10,7 +10,7 @@ import {
   validateClientMessage,
   type ServerMessage,
 } from '@voxelyn/survival-protocol';
-import { MAX_PLAYERS } from '@voxelyn/survival-sim';
+import { MAX_PLAYERS, type DamageCause, type SemanticEvent } from '@voxelyn/survival-sim';
 import { GameRoom } from './room.js';
 
 export type Outbound = { clientId: string; msg: ServerMessage };
@@ -25,6 +25,36 @@ export type Outbound = { clientId: string; msg: ServerMessage };
  * acabou de calcular.
  */
 export type RunFinishedHook = (room: GameRoom) => void;
+
+/**
+ * Uma morte de Prospector, com a causa JÁ ASSOCIADA à posição.
+ *
+ * É esta associação que o cliente não consegue fazer no co-op e que o servidor
+ * faz de graça: `summary.deathCause` descreve a causa que encerrou a SALA, mas
+ * `playerExtras[slot].lastDamage` descreve o que matou ESTE Prospector. Casar a
+ * posição local com a causa da sala fabricaria uma morte que não aconteceu — e é
+ * por isso que a captura comunitária esperou até existir servidor.
+ */
+export type PlayerDeath = {
+  slot: number;
+  x: number;
+  y: number;
+  facingX: number;
+  facingY: number;
+  tick: number;
+  sector: number;
+  cause: DamageCause;
+};
+
+/**
+ * Chamado no MESMO tick em que um Prospector morre, e não no fim da run.
+ *
+ * A diferença importa: `descend` reposiciona TODOS os jogadores na entrada do
+ * mapa novo, inclusive os mortos. Uma captura no fim da run leria, para quem
+ * morreu no setor 1, a coordenada da entrada do setor 3 — um corpo colocado onde
+ * ninguém morreu, com a topologia de um mapa que a pessoa nunca viu.
+ */
+export type PlayerDeathHook = (room: GameRoom, death: PlayerDeath) => void;
 
 /**
  * Carencia antes de expirar uma sala sem clientes conectados (em ticks de 20 Hz).
@@ -46,6 +76,7 @@ export type ServerOptions = {
   baseSeed?: number;
   logger?: (line: Record<string, unknown>) => void;
   onRunFinished?: RunFinishedHook;
+  onPlayerDeath?: PlayerDeathHook;
 };
 
 type Conn = {
@@ -72,6 +103,7 @@ export class SurvivalServer {
   private readonly baseSeed: number;
   private readonly log: (line: Record<string, unknown>) => void;
   private readonly onRunFinished: RunFinishedHook | null;
+  private readonly onPlayerDeath: PlayerDeathHook | null;
 
   constructor(opts: ServerOptions = {}) {
     // A sim clampa createRun a MAX_PLAYERS; se a sala aceitasse mais, o cliente
@@ -81,6 +113,7 @@ export class SurvivalServer {
     this.baseSeed = opts.baseSeed ?? 0x5c0ffee;
     this.log = opts.logger ?? (() => {});
     this.onRunFinished = opts.onRunFinished ?? null;
+    this.onPlayerDeath = opts.onPlayerDeath ?? null;
   }
 
   addConnection(clientId: string, nowMs = 0): void {
@@ -309,6 +342,7 @@ export class SurvivalServer {
       const { events, chunkDiffs, removed } = wasTerminal
         ? { events: [], chunkDiffs: [], removed: [] }
         : room.step();
+      if (this.onPlayerDeath) this.reportDeaths(room, events);
       const terminal = room.state.phase !== 'running';
       // Reporta no MESMO tick que congelou o sumario, antes do snapshot final.
       // Assim o ultimo socket pode fechar logo apos recebe-lo sem perder o resultado.
@@ -329,6 +363,38 @@ export class SurvivalServer {
       }
     }
     return out;
+  }
+
+  /**
+   * Traduz eventos de morte em mortes de Prospector, com causa por slot.
+   *
+   * O evento carrega o ID da entidade, e o slot e descoberto pela lista de
+   * jogadores em vez de por `id - 1`: a aritmetica funciona hoje e viraria um bug
+   * silencioso no dia em que a numeracao mudar — um corpo atribuido ao parceiro,
+   * com a causa do parceiro.
+   *
+   * Sem `lastDamage` nao ha captura. Preferir ausencia a inventar `unknown`: uma
+   * carcaca que nao sabe do que morreu nao ensina nada e ainda ocupa a unica vaga
+   * do setor.
+   */
+  private reportDeaths(room: GameRoom, events: SemanticEvent[]): void {
+    for (const ev of events) {
+      if (ev.t !== 'death' || ev.archetype !== 'prospector') continue;
+      const slot = room.state.players.findIndex((p) => p.id === ev.entity);
+      if (slot < 0) continue;
+      const cause = room.state.playerExtras[slot]?.lastDamage?.cause;
+      if (!cause) continue;
+      this.onPlayerDeath?.(room, {
+        slot,
+        x: ev.x,
+        y: ev.y,
+        facingX: ev.facingX,
+        facingY: ev.facingY,
+        tick: ev.tick,
+        sector: room.state.sector,
+        cause,
+      });
+    }
   }
 
   /** Desconexoes por heartbeat expirado. */

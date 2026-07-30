@@ -47,6 +47,7 @@ const echo = (over: Partial<PlacedDeathEcho> = {}): PlacedDeathEcho => ({
   y: 38.5,
   cell: 3673,
   projection: 'topological',
+  lost: 1,
   ...over,
 });
 
