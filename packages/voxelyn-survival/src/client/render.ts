@@ -47,7 +47,7 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
-import { deathEchoReadout } from './death-echo-presentation';
+import { deathEchoReadout, deathEchoReadoutRegion } from './death-echo-presentation';
 import type { PlacedDeathEcho } from './death-echoes';
 
 /**
@@ -1266,12 +1266,32 @@ export class SurvivalRenderer {
       .sort((a, b) => a.distance - b.distance)[0]?.candidate;
     if (!echo) return;
 
+    const extra = state.playerExtra;
+    const safeTop = this.safeArea.top + 10;
+    const safeLeft = this.safeArea.left + 12;
+    const revealed = state.salvageSites
+      .filter((site) => site.cacheRevealed && !site.cacheOpened)
+      .sort((a, b) => {
+        const da = Math.hypot(a.cache.x + 0.5 - state.player.x, a.cache.y + 0.5 - state.player.y);
+        const db = Math.hypot(b.cache.x + 0.5 - state.player.x, b.cache.y + 0.5 - state.player.y);
+        return da - db;
+      })[0];
+    const hasModules = extra.activeModules.length > 0;
+    const panelW = Math.min(300, Math.max(230, vw * 0.34));
+    const sectorY = safeTop + (hasModules ? 112 : 84);
+    const objectiveY = sectorY + 18;
+    const cacheY = objectiveY + 17;
+    const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
+    const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
+      x: safeLeft,
+      y: safeTop,
+      width: panelW,
+      height: panelH,
+    });
+    if (!region) return;
+
     const ctx = this.ctx;
     const readout = deathEchoReadout(echo);
-    const left = this.safeArea.left + 14;
-    const right = this.safeArea.right + 14;
-    const top = this.safeArea.top + 14;
-    const maxWidth = Math.min(360, Math.max(180, vw - left - right));
     const titleSize = 10;
     const bodySize = 12;
     const lineHeight = bodySize + 4;
@@ -1282,7 +1302,7 @@ export class SurvivalRenderer {
     let current = '';
     for (const word of words) {
       const candidate = current ? `${current} ${word}` : word;
-      if (current && ctx.measureText(candidate).width > maxWidth - 24) {
+      if (current && ctx.measureText(candidate).width > region.maxWidth - 24) {
         lines.push(current);
         current = word;
       } else {
@@ -1291,13 +1311,17 @@ export class SurvivalRenderer {
     }
     if (current) lines.push(current);
 
+    const minimumWidth = Math.min(190, region.maxWidth);
     const boxWidth = Math.min(
-      maxWidth,
-      Math.max(190, ...lines.map((line) => ctx.measureText(line).width + 24)),
+      region.maxWidth,
+      Math.max(minimumWidth, ...lines.map((line) => ctx.measureText(line).width + 24)),
     );
     const boxHeight = 20 + titleSize + lines.length * lineHeight;
-    const x = Math.max(left, vw - right - boxWidth);
-    const y = Math.max(top, Math.min(vh - this.safeArea.bottom - boxHeight - 14, top));
+    if (boxHeight > region.maxHeight) return;
+    const x = region.align === 'right'
+      ? region.x + region.maxWidth - boxWidth
+      : region.x + (region.maxWidth - boxWidth) / 2;
+    const y = region.y;
 
     ctx.save();
     ctx.fillStyle = 'rgba(11,14,20,0.94)';

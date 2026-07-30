@@ -19,12 +19,72 @@ export type DeathEchoReadout = {
   headline: string;
 };
 
+export type DeathEchoReadoutRegion = {
+  x: number;
+  y: number;
+  maxWidth: number;
+  maxHeight: number;
+  align: 'right' | 'center';
+  placement: 'side' | 'below';
+};
+
+type Insets = { top: number; right: number; bottom: number; left: number };
+type PanelRect = { x: number; y: number; width: number; height: number };
+
 export const deathEchoReadout = (echo: PlacedDeathEcho): DeathEchoReadout => {
   const serialParts = echo.id.split(':');
   const serial = serialParts[serialParts.length - 1] ?? '---';
   return {
     title: `CAIXA-PRETA ${serial.padStart(3, '0')}`,
     headline: describeCause(echo.cause).headline,
+  };
+};
+
+/**
+ * Reserva o retângulo do HUD antes de posicionar a caixa-preta.
+ *
+ * Em telas largas ela fica ao lado do painel. Em retrato estreito, desce para
+ * baixo dele. Se nem ali houver espaço legível, o readout não é desenhado —
+ * esconder informação opcional é melhor do que cobrir HP, calor ou objetivo.
+ */
+export const deathEchoReadoutRegion = (
+  viewportWidth: number,
+  viewportHeight: number,
+  safeArea: Insets,
+  hud: PanelRect,
+): DeathEchoReadoutRegion | null => {
+  const margin = 14;
+  const gap = 12;
+  const safeLeft = safeArea.left + margin;
+  const safeRight = viewportWidth - safeArea.right - margin;
+  const safeTop = safeArea.top + margin;
+  const safeBottom = viewportHeight - safeArea.bottom - margin;
+  if (safeRight <= safeLeft || safeBottom <= safeTop) return null;
+
+  const sideX = Math.max(safeLeft, hud.x + hud.width + gap);
+  const sideWidth = safeRight - sideX;
+  if (sideWidth >= 180) {
+    return {
+      x: sideX,
+      y: safeTop,
+      maxWidth: Math.min(360, sideWidth),
+      maxHeight: safeBottom - safeTop,
+      align: 'right',
+      placement: 'side',
+    };
+  }
+
+  const belowY = Math.max(safeTop, hud.y + hud.height + gap);
+  const availableWidth = safeRight - safeLeft;
+  const availableHeight = safeBottom - belowY;
+  if (availableWidth < 140 || availableHeight < 46) return null;
+  return {
+    x: safeLeft,
+    y: belowY,
+    maxWidth: Math.min(360, availableWidth),
+    maxHeight: availableHeight,
+    align: 'center',
+    placement: 'below',
   };
 };
 
