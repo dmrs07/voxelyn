@@ -34,10 +34,14 @@ export type DeathEchoReadout = {
   headline: string;
 };
 
-export const deathEchoReadout = (echo: PlacedDeathEcho): DeathEchoReadout => ({
-  title: `CAIXA-PRETA ${echo.id.split(':').at(-1)?.padStart(3, '0') ?? '---'}`,
-  headline: describeCause(echo.cause).headline,
-});
+export const deathEchoReadout = (echo: PlacedDeathEcho): DeathEchoReadout => {
+  const serialParts = echo.id.split(':');
+  const serial = serialParts[serialParts.length - 1] ?? '---';
+  return {
+    title: `CAIXA-PRETA ${serial.padStart(3, '0')}`,
+    headline: describeCause(echo.cause).headline,
+  };
+};
 
 const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
   const lines: string[] = [];
@@ -218,7 +222,8 @@ class DeathEchoPresentationRuntime {
   }
 }
 
-type RendererPrototype = SurvivalRenderer & {
+type RendererPrototype = {
+  render: SurvivalRenderer['render'];
   renderHud: (state: SurvivalState, input: InputState, nowMs: number, vw: number, vh: number) => void;
   [INSTALLED]?: boolean;
 };
@@ -235,12 +240,13 @@ const runtimeFor = (renderer: SurvivalRenderer): DeathEchoPresentationRuntime =>
 
 /** Instala uma única vez, antes de `main.ts` construir o renderer. */
 export const installDeathEchoPresentation = (): void => {
-  const prototype = SurvivalRenderer.prototype as RendererPrototype;
+  const prototype = SurvivalRenderer.prototype as unknown as RendererPrototype;
   if (prototype[INSTALLED]) return;
   prototype[INSTALLED] = true;
 
   const originalRender = prototype.render;
   prototype.render = function renderWithDeathEchoes(
+    this: SurvivalRenderer,
     state: SurvivalState,
     alpha: number,
     input: InputState,
@@ -252,6 +258,7 @@ export const installDeathEchoPresentation = (): void => {
 
   const originalHud = prototype.renderHud;
   prototype.renderHud = function renderHudWithDeathEchoes(
+    this: SurvivalRenderer,
     state: SurvivalState,
     input: InputState,
     nowMs: number,
