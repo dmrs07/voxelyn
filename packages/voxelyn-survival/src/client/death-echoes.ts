@@ -74,9 +74,31 @@ const finiteInt = (value: unknown, min: number, max: number): number | null => {
   return integer;
 };
 
+const isEffectSource = (value: unknown): value is 'player' | 'enemy' | 'environment' =>
+  value === 'player' || value === 'enemy' || value === 'environment';
+
 const isDamageCause = (value: unknown): value is DamageCause => {
   if (typeof value !== 'object' || value === null) return false;
-  return typeof (value as { kind?: unknown }).kind === 'string';
+  const cause = value as Record<string, unknown>;
+  switch (cause.kind) {
+    case 'player_shot':
+    case 'fire':
+    case 'gas':
+    case 'spores':
+    case 'overheat':
+    case 'bleedout':
+    case 'unknown':
+      return true;
+    case 'discharge':
+    case 'explosion':
+      return isEffectSource(cause.source);
+    case 'enemy_contact':
+      return typeof cause.archetype === 'string' && typeof cause.elite === 'boolean';
+    case 'enemy_projectile':
+      return typeof cause.archetype === 'string' && typeof cause.elite === 'boolean' && typeof cause.projectile === 'string';
+    default:
+      return false;
+  }
 };
 
 const parseCapsule = (value: unknown): DeathEchoCapsule | null => {
@@ -249,7 +271,12 @@ const progressAt = (state: SurvivalState, x: number, y: number): number => {
 };
 
 export const captureDeathEcho = (state: SurvivalState, id: string): DeathEchoCapsule | null => {
-  if (state.phase !== 'dead' || !state.summary || !state.summary.deathCause) return null;
+  if (
+    state.config.playerCount !== 1 ||
+    state.phase !== 'dead' ||
+    !state.summary ||
+    !state.summary.deathCause
+  ) return null;
   const width = state.config.width;
   const height = state.config.height;
   const sourceX = Math.max(0, Math.min(width - 1, Math.floor(state.player.x)));
