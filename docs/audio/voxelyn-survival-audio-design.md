@@ -110,7 +110,7 @@ interpolados a cada quadro:
 | --- | --- | --- |
 | `fire` | células `SURF_FIRE` (+ `FUNGAL_HEATED` a meio peso) num raio de 14 | incêndio por perto, inclusive fora da tela |
 | `gas` | células `SURF_GAS` / `SURF_SPORES` | sala contaminada adiante |
-| `heat` | `playerExtra.heat` | **quanto falta** para o travamento — sobe de altura, não só de volume |
+| `heat` | `playerExtra.heat` acima de 50% | **quanto falta** para o travamento — tique metálico que acelera de 2,2 a 14 Hz |
 | `dread` | `state.contamination` | o relógio da run, audível sem HUD |
 | `threat` | inimigos vivos no raio | densidade de pressão |
 
@@ -118,6 +118,30 @@ A interpolação **sobe mais rápido do que desce** (τ 180 ms vs 900 ms): perig
 tem de ser imediato, perigo sumindo pode relaxar devagar. A constante é em tempo, não em
 quadros — o jogo rebaixa para 30 FPS sozinho sob carga, e a ambiência não pode mudar de
 comportamento exatamente nos momentos de mais ação.
+
+**Contínuo não é constante.** `fire` e `gas` se calam sozinhos porque o mundo os apaga, mas
+o calor da arma nunca zera enquanto o jogador atira — por isso `heat` é o único leito com
+limiar próprio (`HEAT_WARN_AT`, 50%). Sem ele o aviso soava em todo combate, e um som que
+nunca cala não é ouvido como aviso: o ouvido o adota como piso da cena. O limiar cai onde a
+informação ainda é acionável — a `HEAT_PER_SHOT` 9 sobram uns cinco tiros — e coincide com
+o calor devolvido depois de um travamento (`HEAT_MAX * 0.55`), então sair da trava devolve
+um tique lento em vez de silêncio.
+
+A urgência vira **taxa**, não altura: para saber que um tom subiu é preciso lembrar de onde
+ele estava, mas um tique acelerando se lê no próprio instante. A batida aperta sozinha
+quando a taxa sobe (40 ms a 2,2 Hz, 6 ms a 14 Hz) porque a janela é sempre a mesma fração
+do período. A mesma fronteira aparece na tela: a barra de calor do HUD tem uma marca no
+limiar e pulsa acima dele, para o silêncio abaixo de 50% ser lido como um limite e não
+como sorte.
+
+A batida sai de uma **porta formatada por WaveShaper** sobre um LFO, não de nós criados por
+tique: o leito continua vivendo a run inteira, sem agendamento por quadro. O formatador não
+tem memória — enxerga só a amplitude instantânea —, e a senoide visita cada valor abaixo do
+pico duas vezes por ciclo. Por isso a curva é **monótona**: assim as duas travessias somam
+uma batida só (subida = ataque, descida = queda), em vez de duas. Uma curva com envelope
+completo dobraria a taxa anunciada, e uma rampa `sawtooth` — que resolveria a contagem e
+ainda deixaria a batida assimétrica — reabre a porta no próprio salto, com um fantasma
+medido a −8,6 dB.
 
 ## 6. Ciclo de vida
 

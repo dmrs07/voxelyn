@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { createRun, HEAT_MAX, SURF_FIRE, SURF_GAS, SURF_NONE } from '@voxelyn/survival-sim';
+import {
+  createRun,
+  HEAT_MAX,
+  HEAT_PER_SHOT,
+  SURF_FIRE,
+  SURF_GAS,
+  SURF_NONE,
+} from '@voxelyn/survival-sim';
 import type { SurvivalState } from '@voxelyn/survival-sim';
 import {
   AMBIENCE_RADIUS,
   FALL_TAU_MS,
+  HEAT_WARN_AT,
   RISE_TAU_MS,
   SILENT_AMBIENCE,
   approachLevels,
+  heatWarning,
   sampleAmbience,
 } from './ambience';
 
@@ -78,10 +87,24 @@ describe('amostragem de ambiencia', () => {
     expect(sampleAmbience(state, 1).gas).toBeGreaterThan(0);
   });
 
-  it('le o calor do jogador local, normalizado', () => {
+  // O ponto do limiar: um tiro avulso nao pode acender aviso nenhum. Era o que
+  // acontecia antes, e um aviso que soa em todo combate deixa de ser um aviso.
+  it('nao avisa nada em calor de combate normal', () => {
     const state = fresh();
-    state.playerExtra.heat = HEAT_MAX / 2;
-    expect(sampleAmbience(state, 1).heat).toBeCloseTo(0.5, 5);
+    state.playerExtra.heat = HEAT_PER_SHOT; // um tiro
+    expect(sampleAmbience(state, 1).heat).toBe(0);
+    state.playerExtra.heat = HEAT_MAX * HEAT_WARN_AT;
+    expect(sampleAmbience(state, 1).heat).toBe(0);
+  });
+
+  it('le o calor do jogador local acima do limiar, e satura', () => {
+    const state = fresh();
+    state.playerExtra.heat = HEAT_MAX * (HEAT_WARN_AT + (1 - HEAT_WARN_AT) / 2);
+    const meio = sampleAmbience(state, 1).heat;
+    expect(meio).toBeGreaterThan(0);
+    expect(meio).toBeLessThan(1);
+    state.playerExtra.heat = HEAT_MAX;
+    expect(sampleAmbience(state, 1).heat).toBeCloseTo(1, 5);
     state.playerExtra.heat = HEAT_MAX * 3;
     expect(sampleAmbience(state, 1).heat).toBe(1);
   });
@@ -110,6 +133,40 @@ describe('amostragem de ambiencia', () => {
     state.player.x = state.config.width - 1;
     state.player.y = state.config.height - 1;
     expect(() => sampleAmbience(state, 1)).not.toThrow();
+  });
+});
+
+describe('limiar do aviso de calor', () => {
+  it('cala abaixo do limiar e nunca passa de 1', () => {
+    expect(heatWarning(0)).toBe(0);
+    expect(heatWarning(HEAT_WARN_AT)).toBe(0);
+    expect(heatWarning(HEAT_WARN_AT - 0.01)).toBe(0);
+    expect(heatWarning(1)).toBeCloseTo(1, 5);
+    expect(heatWarning(4)).toBe(1);
+  });
+
+  it('cresce sem voltar atras', () => {
+    let anterior = -1;
+    for (let heat = HEAT_WARN_AT; heat <= 1; heat += 0.02) {
+      const atual = heatWarning(heat);
+      expect(atual).toBeGreaterThanOrEqual(anterior);
+      anterior = atual;
+    }
+  });
+
+  // A primeira batida tem de nascer audivel. Com rampa linear o inicio da faixa
+  // util sairia perto de zero e o aviso so existiria de fato nos ultimos tiros,
+  // tarde demais para mudar a decisao de quem esta com o gatilho preso.
+  it('o primeiro tique ja e audivel', () => {
+    const primeiroPasso = (HEAT_PER_SHOT / HEAT_MAX) / (1 - HEAT_WARN_AT);
+    expect(heatWarning(HEAT_WARN_AT + HEAT_PER_SHOT / HEAT_MAX)).toBeGreaterThan(primeiroPasso);
+  });
+
+  // Depois de um travamento a simulacao devolve o calor a `HEAT_MAX * 0.55`. A
+  // arma continua quente, e o tique tem de continuar — silencio ali ensinaria
+  // que sair da trava zera o risco, que e o oposto do que acontece.
+  it('continua avisando logo depois de um travamento', () => {
+    expect(heatWarning(0.55)).toBeGreaterThan(0);
   });
 });
 
