@@ -126,9 +126,22 @@ describe('detecção de língua', () => {
  *
  * Sem isto o sistema decai por adição — o próximo botão nasce com o texto
  * embutido, ninguém percebe, e a versão em inglês fica com uma frase em
- * português no meio. A varredura é grosseira de propósito (procura letra
- * acentuada em literal), porque o texto do jogo é em português e acento é o
- * traço que o distingue de identificador, chave de catálogo e nome de classe.
+ * português no meio.
+ *
+ * São DUAS varreduras, e a primeira existe porque a segunda não bastou.
+ *
+ * Procurar letra acentuada é barato e pega quase tudo, já que o texto-fonte é
+ * português. Mas "quase" foi o bastante para deixar passar um toast inteiro:
+ * `O VEIO RESSOA - DOIS ECOS DEMONSTRAM` é português sem um único acento, e a
+ * varredura o leu como se fosse uma constante técnica. Acento é traço de
+ * ORTOGRAFIA, e a pergunta que interessa é outra — por onde o texto SAI.
+ *
+ * Daí a varredura por SUMIDOURO: nos pontos em que uma string vira pixel na
+ * tela (`fillText`, `textContent`, `setBanner`, o `text:` de um toast, os
+ * campos de apresentação), o literal só é aceito se for vazio ou uma chave que
+ * existe no catálogo. Prosa tem espaço e maiúscula; chave é minúscula pontuada.
+ * A regra não depende de como a frase se escreve, e por isso não tem como uma
+ * língua sem acento — ou uma frase em português que não usa nenhum — escapar.
  */
 describe('nenhum texto de jogador fora do catálogo', () => {
   const IGNORADOS = new Set(['i18n', 'sprite-viewer.ts']);
@@ -146,15 +159,52 @@ describe('nenhum texto de jogador fora do catálogo', () => {
   const semComentarios = (source: string): string =>
     source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
-  it.each(arquivos(CLIENT_DIR).map((f) => [f.slice(REPO_ROOT.length + 1), f]))(
-    '%s',
-    (_nome, caminho) => {
-      const code = semComentarios(readFileSync(caminho, 'utf8'));
-      const literais = code.match(/(['"`])(?:(?!\1)[^\\]|\\.)*\1/g) ?? [];
-      const soltos = literais.filter((literal) => /[áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ]/.test(literal));
-      expect(soltos).toEqual([]);
-    },
-  );
+  const ARQUIVOS = arquivos(CLIENT_DIR).map((f) => [f.slice(REPO_ROOT.length + 1), f]);
+
+  /**
+   * Por onde uma string vira pixel. Cada entrada casa até a aspa de abertura;
+   * o literal seguinte é o que precisa ser chave.
+   */
+  const SUMIDOUROS = [
+    /\bfillText\(\s*(['"`])/g,
+    /\bstrokeText\(\s*(['"`])/g,
+    /\bsetBanner\(\s*(['"`])/g,
+    /\btextContent\s*=\s*(['"`])/g,
+    /\b(?:text|label|headline|lesson|hint|origin|condition|title|note|code|proc|aggregate|emptyReason|description|shortDescription)\s*:\s*(['"`])/g,
+  ];
+
+  const CHAVES = new Set(Object.keys(PT_BR));
+
+  it.each(ARQUIVOS)('%s — sem literal acentuado', (_nome, caminho) => {
+    const code = semComentarios(readFileSync(caminho, 'utf8'));
+    const literais = code.match(/(['"`])(?:(?!\1)[^\\]|\\.)*\1/g) ?? [];
+    const soltos = literais.filter((literal) => /[áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ]/.test(literal));
+    expect(soltos).toEqual([]);
+  });
+
+  it.each(ARQUIVOS)('%s — todo sumidouro de texto recebe chave', (_nome, caminho) => {
+    const code = semComentarios(readFileSync(caminho, 'utf8'));
+    const soltos: string[] = [];
+    for (const sumidouro of SUMIDOUROS) {
+      for (const match of code.matchAll(sumidouro)) {
+        const aspa = match[1];
+        const inicio = match.index + match[0].length;
+        const fim = code.indexOf(aspa, inicio);
+        if (fim === -1) continue;
+        const valor = code.slice(inicio, fim);
+        // Vazio limpa o nó; chave conhecida resolve no catálogo.
+        if (valor === '' || CHAVES.has(valor)) continue;
+        // Sem LETRA nenhuma fora das interpolações não há língua: o `!` do alerta,
+        // o `12` do cooldown, o `40 / 100` da barra de vida. Um número não se
+        // traduz, e a regra é essa e não uma lista de exceções — a lista teria de
+        // crescer a cada novo indicador numérico, e alguém acabaria pendurando
+        // uma frase nela.
+        if (!/\p{L}/u.test(valor.replace(/\$\{[^}]*\}/g, ''))) continue;
+        soltos.push(`${match[0].trim()}${valor}${aspa}`);
+      }
+    }
+    expect(soltos).toEqual([]);
+  });
 
   it('o HTML carrega chaves, e não frases', () => {
     const html = readFileSync(join(REPO_ROOT, 'index.html'), 'utf8');

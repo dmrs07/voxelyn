@@ -736,10 +736,7 @@ export class SurvivalRenderer {
           break;
         }
         case 'well_offers':
-          this.messages.push({
-            text: 'O VEIO RESSOA - DOIS ECOS DEMONSTRAM',
-            until: nowMs + 3400,
-          });
+          this.messages.push({ text: t('toast.well.resonance'), until: nowMs + 3400 });
           break;
         case 'ability_taken':
           this.addFlash(ev.x, ev.y, 3, 0.9, nowMs, 320);

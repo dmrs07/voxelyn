@@ -336,6 +336,7 @@ export const PT_BR = {
   'toast.purgeCell': '+1 CÉLULA DE PURGA',
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',
   'toast.overheat': 'SUPERAQUECIMENTO!',
+  'toast.well.resonance': 'O VEIO RESSOA — DOIS ECOS DEMONSTRAM',
 
   // Mensagens emitidas pela simulação (chegam como chave, nunca como texto)
   'sim.partnerRevived': 'Parceiro revivido.',

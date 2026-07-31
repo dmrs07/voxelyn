@@ -4,7 +4,13 @@
 // - SIMULATION_VERSION muda quando a logica autoritativa muda de forma que altera
 //   hashes deterministicos (cliente e servidor precisam concordar para prever/interpolar).
 // - CONTENT_VERSION muda quando itens/criaturas/materiais mudam (pool de conteudo).
-export const PROTOCOL_VERSION = 10;
+// 11: eventos `message` passam a viajar como CHAVE de catalogo (`key`) e nao
+// como frase pronta (`text`). E quebra de wire nos dois sentidos: um cliente
+// novo contra servidor antigo leria `key` ausente e mostraria o aviso em
+// branco, e um cliente antigo contra servidor novo procuraria `text`. Sem o
+// bump, o handshake aceitaria os dois pares e o defeito apareceria como um
+// aviso vazio no meio do co-op, em vez de uma recusa explicita na conexao.
+export const PROTOCOL_VERSION = 11;
 // 13: investida do guardian passa a andar no release, rastro do cavalo espera o
 // atraso, cota de minerio vira contador por jogador, mineradores nao empilham
 // mais na mesma celula e a morte do minerador exige autoria do jogador. Tudo

@@ -332,6 +332,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'toast.purgeCell': '+1 PURGE CELL',
   'toast.scan.complete': 'SCAN COMPLETE — CACHE REVEALED',
   'toast.overheat': 'OVERHEAT!',
+  'toast.well.resonance': 'THE VEIN RESONATES — TWO ECHOES DEMONSTRATE',
 
   // Messages emitted by the simulation (they arrive as a key, never as text)
   'sim.partnerRevived': 'Partner revived.',
