@@ -18,6 +18,7 @@ import {
   type PlacedDeathEcho,
 } from '@voxelyn/survival-protocol';
 import { describeCause } from './run-summary';
+import { t } from './i18n';
 import { carcassVariant, deathEchoDesignation } from './death-echo-carcass';
 import {
   applyDeathEchoOnce,
@@ -83,15 +84,13 @@ export const deathEchoReadout = (echo: PlacedDeathEcho): DeathEchoReadout => {
     title: deathEchoDesignation(echo.id),
     // Laudo do corpo, não da run: é a linha que amarra o texto ao que o jogador
     // está vendo no chão.
-    condition: `CARCAÇA ${carcassVariant(echo.cause).condition}`,
+    condition: t('echo.carcass', { condition: t(carcassVariant(echo.cause).condition) }),
     headline: cause.headline,
     lesson: cause.lesson,
     // Um corpo que representa muitos vira a estatística da câmara. A causa
     // narrada continua sendo a de UMA morte real — a do corpo que sobreviveu ao
     // agrupamento —, então o texto diz "predominante" e não "a causa".
-    aggregate: echo.lost > 1
-      ? `${echo.lost} UNIDADES PERDIDAS NESTA CÂMARA — CAUSA PREDOMINANTE ABAIXO`
-      : null,
+    aggregate: echo.lost > 1 ? t('echo.aggregate', { count: echo.lost }) : null,
   };
 };
 
@@ -300,11 +299,7 @@ export class DeathEchoController {
     return this.resolveLink(state, nowMs, requested);
   }
 
-  private resolveLink(
-    state: SurvivalState,
-    nowMs: number,
-    requested: boolean,
-  ): DeathEchoFrame {
+  private resolveLink(state: SurvivalState, nowMs: number, requested: boolean): DeathEchoFrame {
     const distanceTo = (echo: PlacedDeathEcho): number =>
       Math.hypot(state.player.x - echo.x, state.player.y - echo.y);
 

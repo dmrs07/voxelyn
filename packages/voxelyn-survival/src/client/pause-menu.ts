@@ -1,6 +1,7 @@
 import { aurixPlateHtml } from './aurix';
 import { isEditingText } from './input';
 import { HoldToOpen, PAUSE_HOLD_MS, isInPauseZone } from './pause';
+import { t } from './i18n';
 
 /**
  * O menu de campo: a unica porta de saida de uma run em andamento.
@@ -190,18 +191,29 @@ export class PauseMenu {
     return this.open || this.confirming;
   }
 
+  /**
+   * Reescreve o que este menu monta por codigo: a linha de estado e o rotulo do
+   * abandono.
+   *
+   * Separado de `openMenu` porque os dois textos tambem envelhecem SEM
+   * reabertura — a troca de idioma acontece dentro deste menu, no bloco de
+   * opcoes que ele hospeda, e sem isto o jogador trocaria de lingua e veria a
+   * frase anterior no botao que ele esta prestes a apertar.
+   */
+  refreshLabels(): void {
+    this.statusLine.textContent = this.host.status();
+    this.abandonButton.textContent = t(this.host.runTerminal() ? 'pause.leave' : 'pause.abandon');
+  }
+
   openMenu(): void {
     if (this.open || this.confirming) return;
     this.open = true;
     this.cancelHold();
-    this.statusLine.textContent = this.host.status();
+    this.refreshLabels();
     // O aviso so aparece quando e verdade. No solo o mundo REALMENTE parou, e
     // avisar do contrario ali ensinaria o jogador a nao acreditar no aviso
     // justamente no modo em que ele importa.
     this.coopWarning.classList.toggle('hidden', this.host.freezesWorld());
-    this.abandonButton.textContent = this.host.runTerminal()
-      ? 'Sair para o terminal'
-      : 'Abandonar contrato';
     this.overlay.classList.remove('hidden');
     this.host.ui();
     this.host.onOpen();

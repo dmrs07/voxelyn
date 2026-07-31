@@ -92,7 +92,19 @@ export const fetchDeathEchoContract = async (
 
 export type DeathEchoSubmitOutcome =
   | { ok: true; accepted: boolean }
-  | { ok: false; reason: string };
+  | {
+      ok: false;
+      /**
+       * Código de diagnóstico, em ASCII, NUNCA texto de jogador.
+       *
+       * Este caminho falha em silêncio de propósito (o solo funciona offline) e
+       * a razão só chega ao `console`. Escrevê-la em português a colocaria na
+       * mesma categoria do texto que o catálogo governa, e um dia alguém a
+       * mostraria numa tela — traduzida pela metade. Código estável também é o
+       * que se consegue procurar num relatório de erro.
+       */
+      reason: string;
+    };
 
 /**
  * Publica a própria morte para o pool.
@@ -109,17 +121,17 @@ export const submitDeathEcho = async (
   seed: number,
   logBase64: string,
 ): Promise<DeathEchoSubmitOutcome> => {
-  if (!logBase64) return { ok: false, reason: 'sem gravação' };
+  if (!logBase64) return { ok: false, reason: 'no-recording' };
   try {
     const res = await fetch(`${httpBase(serverUrl)}/echoes`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ seed: seed >>> 0, log: logBase64 }),
     });
-    if (!res.ok) return { ok: false, reason: `servidor respondeu ${res.status}` };
+    if (!res.ok) return { ok: false, reason: `server-${res.status}` };
     const body = (await res.json()) as { accepted?: unknown };
     return { ok: true, accepted: body.accepted === true };
   } catch (err) {
-    return { ok: false, reason: err instanceof Error ? err.message : 'falha de rede' };
+    return { ok: false, reason: err instanceof Error ? err.message : 'network-error' };
   }
 };

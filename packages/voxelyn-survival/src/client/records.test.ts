@@ -4,7 +4,7 @@ import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION } from '@voxelyn/survival
 import type { RunPhase, RunSummary } from '@voxelyn/survival-sim';
 import {
   BESTIARY_FILES,
-  BESTIARY_NAMES,
+  BESTIARY_NAME_KEYS,
   BESTIARY_ORDER,
   HISTORY_LIMIT,
   applyRun,
@@ -12,6 +12,7 @@ import {
   emptyRecords,
   hasDiscovery,
 } from './records';
+import { t } from './i18n';
 
 const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   seed: 1,
@@ -154,23 +155,26 @@ describe('registro de ativos', () => {
   // um arquetipo novo sem ficha nao quebra o typecheck do Record — quebra a
   // pagina, em runtime, so para quem ja matou aquele bicho.
   it('todo arquetipo tem ficha, e a ordem do painel cobre todos', () => {
-    for (const archetype of Object.keys(BESTIARY_NAMES) as EnemyArchetype[]) {
+    for (const archetype of Object.keys(BESTIARY_NAME_KEYS) as EnemyArchetype[]) {
       expect(BESTIARY_FILES[archetype], archetype).toBeDefined();
-      expect(BESTIARY_FILES[archetype].code.length).toBeGreaterThan(0);
-      expect(BESTIARY_FILES[archetype].note.length).toBeGreaterThan(0);
+      // Pelo texto RESOLVIDO, e nao pela chave: uma chave existente apontando
+      // para uma entrada vazia no catalogo passaria numa checagem de chave e
+      // deixaria a ficha em branco na tela.
+      expect(t(BESTIARY_FILES[archetype].code).length).toBeGreaterThan(0);
+      expect(t(BESTIARY_FILES[archetype].note).length).toBeGreaterThan(0);
     }
-    expect([...BESTIARY_ORDER].sort()).toEqual(Object.keys(BESTIARY_NAMES).sort());
+    expect([...BESTIARY_ORDER].sort()).toEqual(Object.keys(BESTIARY_NAME_KEYS).sort());
   });
 
   // A voz e a da EMPRESA, e a empresa nao assume o que abandonou: ela registra
   // a unidade como operando fora de contrato, e nao como deixada para tras. Se
   // um dia alguem suavizar isso, o texto deixa de fazer o trabalho que faz.
   it('a ficha do mineiro empurra a culpa para a maquina', () => {
-    expect(BESTIARY_FILES.miner.code).toBe('UNIDADE EX-016');
-    expect(BESTIARY_FILES.miner.note).toContain('não foi autorizada');
-    expect(BESTIARY_FILES.miner.note).toContain('Sem valor de recuperação');
+    expect(t(BESTIARY_FILES.miner.code)).toBe('UNIDADE EX-016');
+    expect(t(BESTIARY_FILES.miner.note)).toContain('não foi autorizada');
+    expect(t(BESTIARY_FILES.miner.note)).toContain('Sem valor de recuperação');
     // E o nome que o JOGADOR aprendeu continua existindo, em outro campo: e a
     // distancia entre os dois que faz a pagina significar alguma coisa.
-    expect(BESTIARY_NAMES.miner).toBe('Minerador Empobrecido');
+    expect(t(BESTIARY_NAME_KEYS.miner)).toBe('Minerador Empobrecido');
   });
 });

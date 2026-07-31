@@ -146,7 +146,7 @@ describe('traducao de evento para som', () => {
   });
 
   it('nao inventa som para mensagem de texto', () => {
-    expect(cuesForEvent({ t: 'message', text: 'oi' }, ctx)).toEqual([]);
+    expect(cuesForEvent({ t: 'message', key: 'sim.partnerRevived' }, ctx)).toEqual([]);
   });
 
   it('preserva a ordem de chegada ao traduzir uma leva', () => {

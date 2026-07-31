@@ -27,6 +27,7 @@ import {
   DISCOVERY_SELF_HARM,
 } from '@voxelyn/survival-sim';
 import type { EnemyArchetype, RunSummary } from '@voxelyn/survival-sim';
+import type { MessageKey } from './i18n';
 
 const KEY = 'voxelyn.records';
 /**
@@ -195,7 +196,15 @@ export const applyRun = (records: Records, summary: RunSummary): Records => {
 // Apresentacao das descobertas
 // ---------------------------------------------------------------------------
 
-export type Discovery = { bit: number; title: string; lesson: string };
+/**
+ * Uma descoberta do codex.
+ *
+ * Guarda CHAVES, e nao frases. O painel resolve o texto no momento de desenhar,
+ * porque a lista e uma constante de modulo — avaliada uma vez, no import — e
+ * congelar a lingua ali deixaria o registro em portugues para sempre para quem
+ * trocasse de idioma depois de abrir o jogo.
+ */
+export type Discovery = { bit: number; title: MessageKey; lesson: MessageKey };
 
 /**
  * O codex. A ordem e de aprendizado, nao de valor do bit.
@@ -207,68 +216,68 @@ export type Discovery = { bit: number; title: string; lesson: string };
 export const DISCOVERIES: readonly Discovery[] = [
   {
     bit: DISCOVERY_FIRE_SPREAD,
-    title: 'Fogo caminha',
-    lesson: 'Biofluido conduz chama de célula em célula. Uma poça é um rastilho.',
+    title: 'discovery.fireSpread.title',
+    lesson: 'discovery.fireSpread.lesson',
   },
   {
     bit: DISCOVERY_GAS_IGNITION,
-    title: 'O gás não espera',
-    lesson: 'Gás sulfúrico acende ao primeiro contato com fogo. Sala fechada é câmara.',
+    title: 'discovery.gasIgnition.title',
+    lesson: 'discovery.gasIgnition.lesson',
   },
   {
     bit: DISCOVERY_DISCHARGE_POOL,
-    title: 'A poça inteira é o alvo',
-    lesson: 'Descarga percorre todo o biofluido conectado — e não pergunta quem está nele.',
+    title: 'discovery.dischargePool.title',
+    lesson: 'discovery.dischargePool.lesson',
   },
   {
     bit: DISCOVERY_ORE_CHAIN,
-    title: 'Minério é fiação',
-    lesson: 'Um veio carrega a carga até o outro lado da parede e a solta nas aberturas.',
+    title: 'discovery.oreChain.title',
+    lesson: 'discovery.oreChain.lesson',
   },
   {
     bit: DISCOVERY_FRAGILE_BREACH,
-    title: 'Nem toda parede é parede',
-    lesson: 'Rocha frágil cede a explosão e perfuração. Rotas existem onde não parecia haver.',
+    title: 'discovery.fragileBreach.title',
+    lesson: 'discovery.fragileBreach.lesson',
   },
   {
     bit: DISCOVERY_SELF_HARM,
-    title: 'O Veio não escolhe lados',
-    lesson: 'Toda reação atinge você igual. A build mais forte é a mais perigosa de carregar.',
+    title: 'discovery.selfHarm.title',
+    lesson: 'discovery.selfHarm.lesson',
   },
   {
     bit: DISCOVERY_MINER_FLED,
-    title: 'Ele larga a carga',
-    lesson: 'Arma morna e o mineiro recua pelos túneis — e deixa o que carregava. Alcançá-lo custa tempo.',
+    title: 'discovery.minerFled.title',
+    lesson: 'discovery.minerFled.lesson',
   },
   {
     bit: DISCOVERY_MINER_ENRAGED,
-    title: 'O calor sobrecarrega',
-    lesson: 'Chegue em brasa e o circuito dele falha: picareta em círculo. Recuar responde; orbitar, não.',
+    title: 'discovery.minerEnraged.title',
+    lesson: 'discovery.minerEnraged.lesson',
   },
   {
     bit: DISCOVERY_ORE_QUOTA,
-    title: 'A empresa paga por tonelada',
-    lesson: 'Minério acumulado vira escolha de módulo. Cavar é uma rota, não um enfeite.',
+    title: 'discovery.oreQuota.title',
+    lesson: 'discovery.oreQuota.lesson',
   },
   {
     bit: DISCOVERY_HORSE_FELLED,
-    title: 'O rastro fica',
-    lesson: 'A investida atravessa a sala e deixa fogo onde passou. Pedra no caminho a encerra.',
+    title: 'discovery.horseFelled.title',
+    lesson: 'discovery.horseFelled.lesson',
   },
   {
     bit: DISCOVERY_BISHOP_FELLED,
-    title: 'Ele se cura do chão',
-    lesson: 'Sobre fungo vivo o Bispo regenera mais do que você tira. Aquecer o tapete já corta a cura.',
+    title: 'discovery.bishopFelled.title',
+    lesson: 'discovery.bishopFelled.lesson',
   },
   {
     bit: DISCOVERY_GUARDIAN_FELLED,
-    title: 'O Guardião cai',
-    lesson: 'Ele sela a arena na metade da vida e chama companhia. O cerco desaba com ele.',
+    title: 'discovery.guardianFelled.title',
+    lesson: 'discovery.guardianFelled.lesson',
   },
   {
     bit: DISCOVERY_CORE_TAKEN,
-    title: 'O núcleo é só metade',
-    lesson: 'Pegá-lo dobra o ritmo da contaminação. A saída é a outra metade.',
+    title: 'discovery.coreTaken.title',
+    lesson: 'discovery.coreTaken.lesson',
   },
 ];
 
@@ -287,15 +296,16 @@ export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'guardian',
 ];
 
-export const BESTIARY_NAMES: Record<EnemyArchetype, string> = {
-  stalker: 'Espreitador',
-  spitter: 'Cuspidor',
-  bomber: 'Portador de Esporos',
-  bruiser: 'Britador',
-  miner: 'Minerador Empobrecido',
-  fungal_horse: 'Corcel Fúngico',
-  bishop: 'Bispo do Veio',
-  guardian: 'Guardião do Núcleo',
+/** O nome que o JOGADOR aprendeu em campo — a marginalia do relatorio. */
+export const BESTIARY_NAME_KEYS: Record<EnemyArchetype, MessageKey> = {
+  stalker: 'bestiary.name.stalker',
+  spitter: 'bestiary.name.spitter',
+  bomber: 'bestiary.name.bomber',
+  bruiser: 'bestiary.name.bruiser',
+  miner: 'bestiary.name.miner',
+  fungal_horse: 'bestiary.name.fungal_horse',
+  bishop: 'bestiary.name.bishop',
+  guardian: 'bestiary.name.guardian',
 };
 
 /**
@@ -317,39 +327,15 @@ export const BESTIARY_NAMES: Record<EnemyArchetype, string> = {
  * trabalho. Quem ouviu a morte do mineiro ja sabe que "sem valor de recuperacao"
  * e uma frase sobre a empresa, e nao sobre ele.
  */
-export type BestiaryFile = { code: string; note: string };
+export type BestiaryFile = { code: MessageKey; note: MessageKey };
 
 export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
-  stalker: {
-    code: 'ESPÉCIME QUIT-04',
-    note: 'Fauna de túnel. Agressiva por instinto, não por organização. Custo de remoção desprezível.',
-  },
-  spitter: {
-    code: 'ESPÉCIME FUNG-11',
-    note: 'Secreção corrosiva sem valor industrial confirmado. Programa de amostragem descontinuado.',
-  },
-  bomber: {
-    code: 'ESPÉCIME FUNG-23',
-    note: 'Vetor de esporos. Ruptura espontânea documentada em 100% dos encontros registrados.',
-  },
-  bruiser: {
-    code: 'ESPÉCIME MIN-07',
-    note: 'Massa mineral animada. Reclassificado de "maquinário extraviado" após o terceiro relatório.',
-  },
-  miner: {
-    code: 'UNIDADE EX-016',
-    note: 'Extratora da geração anterior. Operação após o encerramento do contrato não foi autorizada. Sem valor de recuperação.',
-  },
-  fungal_horse: {
-    code: 'ATIVO HOSTIL EQ-02',
-    note: 'Quadrúpede adaptado. A presença de arreios não implica operador.',
-  },
-  bishop: {
-    code: 'ATIVO HOSTIL EQ-09',
-    note: 'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',
-  },
-  guardian: {
-    code: 'ANOMALIA TERMINAL',
-    note: 'Impede o acesso ao núcleo. Nenhuma outra propriedade é relevante para esta operação.',
-  },
+  stalker: { code: 'bestiary.code.stalker', note: 'bestiary.note.stalker' },
+  spitter: { code: 'bestiary.code.spitter', note: 'bestiary.note.spitter' },
+  bomber: { code: 'bestiary.code.bomber', note: 'bestiary.note.bomber' },
+  bruiser: { code: 'bestiary.code.bruiser', note: 'bestiary.note.bruiser' },
+  miner: { code: 'bestiary.code.miner', note: 'bestiary.note.miner' },
+  fungal_horse: { code: 'bestiary.code.fungal_horse', note: 'bestiary.note.fungal_horse' },
+  bishop: { code: 'bestiary.code.bishop', note: 'bestiary.note.bishop' },
+  guardian: { code: 'bestiary.code.guardian', note: 'bestiary.note.guardian' },
 };

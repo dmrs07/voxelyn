@@ -491,7 +491,7 @@ export const closeArena = (
     state.arenaBarrierCells.push(i);
     markDirty(state, i % w, Math.floor(i / w));
   }
-  events.push({ t: 'message', text: 'O Veio se fecha. Abra caminho ou lute.' });
+  events.push({ t: 'message', key: 'sim.arenaSealed' });
   return ring.length;
 };
 
@@ -511,6 +511,6 @@ export const openArena = (state: SurvivalState, events: SemanticEvent[]): number
   }
   state.arenaBarrierCells = [];
   state.arenaClosed = false;
-  if (removed > 0) events.push({ t: 'message', text: 'O cerco desaba com o Guardian.' });
+  if (removed > 0) events.push({ t: 'message', key: 'sim.siegeCollapsed' });
   return removed;
 };

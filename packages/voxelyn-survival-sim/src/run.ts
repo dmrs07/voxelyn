@@ -834,7 +834,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           op.hp = Math.max(1, Math.floor(op.maxHp * REVIVE_HP_FRACTION));
           events.push({ t: 'revive', x: op.x, y: op.y, slot: other, tick: state.tick });
           state.stats.revivesGiven += 1;
-          events.push({ t: 'message', text: `Parceiro revivido.` });
+          events.push({ t: 'message', key: 'sim.partnerRevived' });
           return;
         }
       }
@@ -872,9 +872,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       );
       const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
       if (anyDowned) {
-        events.push({ t: 'message', text: 'Revele o parceiro abatido antes de descer.' });
+        events.push({ t: 'message', key: 'sim.reviveBeforeDescend' });
       } else if (!allNear) {
-        events.push({ t: 'message', text: 'Aguarde todos no poco para descer.' });
+        events.push({ t: 'message', key: 'sim.waitAtShaft' });
       } else {
         descend(state, events);
       }
@@ -884,7 +884,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       state.coreTaken = true;
       extra.hasCore = true;
       events.push({ t: 'pickup_core', x: player.x, y: player.y });
-      events.push({ t: 'message', text: 'Nucleo extraido. O Veio despertou - volte para a entrada!' });
+      events.push({ t: 'message', key: 'sim.coreTaken' });
       return;
     }
     for (const site of state.salvageSites) {
@@ -947,9 +947,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         state.phase = withCore ? 'extracted_with_core' : 'extracted';
         events.push({ t: 'extracted', withCore });
       } else if (anyDowned) {
-        events.push({ t: 'message', text: 'Revele o parceiro abatido antes de extrair.' });
+        events.push({ t: 'message', key: 'sim.reviveBeforeExtract' });
       } else {
-        events.push({ t: 'message', text: 'Aguarde todos na saida para extrair.' });
+        events.push({ t: 'message', key: 'sim.waitAtExit' });
       }
     }
   }
@@ -1411,7 +1411,7 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
     // ali seria apagado e a onda dispararia repetidamente.
     if (state.contamination >= level && state.contaminationWaves <= w) {
       state.contaminationWaves = w + 1;
-      events.push({ t: 'message', text: 'O Veio se agita - a contaminacao aumenta.' });
+      events.push({ t: 'message', key: 'sim.contaminationRising' });
       let spawned = 0;
       for (let attempt = 0; attempt < 80 && spawned < count; attempt++) {
         const x = state.rng.nextInt(state.config.width);
@@ -1444,7 +1444,7 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
   if (e.hasCore) {
     e.hasCore = false;
     state.coreTaken = false; // volta ao pedestal, recuperavel pelo parceiro
-    events.push({ t: 'message', text: 'O nucleo caiu com o portador.' });
+    events.push({ t: 'message', key: 'sim.coreDropped' });
   }
   events.push({
     t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector',

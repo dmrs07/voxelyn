@@ -8,6 +8,7 @@
 
 import { formatDuration, formatSeed } from './run-summary';
 import type { RankEntry } from './run-recorder';
+import { t } from './i18n';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
   const node = document.createElement(tag);
@@ -33,12 +34,12 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     el(
       'h2',
       undefined,
-      view.seed === undefined ? 'MELHORES DESCIDAS' : `SEED ${formatSeed(view.seed)}`,
+      view.seed === undefined ? t('rank.best') : t('rank.seed', { seed: formatSeed(view.seed) }),
     ),
   );
 
   if (view.entries.length === 0) {
-    host.appendChild(el('div', 'locked', view.emptyReason ?? 'ninguém extraiu ainda'));
+    host.appendChild(el('div', 'locked', view.emptyReason ?? t('rank.empty')));
     return;
   }
 
@@ -46,17 +47,17 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
   view.entries.forEach((entry, index) => {
     // A posicao entra no rotulo, e nao numa coluna propria: o painel ja e
     // estreito no celular, e uma terceira coluna espremeria o nome.
-    dl.appendChild(el('dt', undefined, `${index + 1}. ${stars(entry.stars)} ${entry.name}`));
+    dl.appendChild(
+      el(
+        'dt',
+        undefined,
+        t('rank.entry', { position: index + 1, stars: stars(entry.stars), name: entry.name }),
+      ),
+    );
     dl.appendChild(el('dd', undefined, formatDuration(entry.ticks)));
   });
   host.appendChild(dl);
 
-  host.appendChild(el('h2', undefined, 'COMO ENTRAR'));
-  host.appendChild(
-    el(
-      'span',
-      'lesson',
-      'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu.',
-    ),
-  );
+  host.appendChild(el('h2', undefined, t('rank.how')));
+  host.appendChild(el('span', 'lesson', t('rank.how.text')));
 };
