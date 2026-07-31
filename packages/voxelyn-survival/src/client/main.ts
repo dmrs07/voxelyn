@@ -1,5 +1,5 @@
 import { TICK_MS } from '@voxelyn/survival-sim';
-import { createRun, stepRun } from '@voxelyn/survival-sim';
+import { createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, type TouchSafeArea } from './input';
@@ -34,6 +34,7 @@ import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
+import { PauseMenu } from './pause-menu';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -60,6 +61,9 @@ const inviteCode = document.getElementById('invite-code') as HTMLSpanElement;
 const inviteButton = document.getElementById('btn-invite') as HTMLButtonElement;
 const recordsOverlay = document.getElementById('records') as HTMLDivElement;
 const recordsBody = document.getElementById('records-body') as HTMLDivElement;
+const optionsControls = document.getElementById('options-controls') as HTMLDivElement;
+const optionsSlot = document.getElementById('options-slot') as HTMLDivElement;
+const pauseOptionsSlot = document.getElementById('pause-options-slot') as HTMLDivElement;
 const contractButton = document.getElementById('btn-contract') as HTMLButtonElement;
 const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
 
@@ -303,6 +307,26 @@ const submitDeathToPool = (state: SurvivalState): void => {
   });
 };
 
+/**
+ * Zera as travas de "ja enviei esta run" antes de uma descida nova.
+ *
+ * Todas elas sao travas de idempotencia: a fase terminal persiste e o loop
+ * continua desenhando, entao sem elas o mesmo fim viraria sessenta envios por
+ * segundo. O preco e que elas precisam ser destravadas em algum lugar — e o
+ * lugar so pode ser o inicio da run.
+ *
+ * Antes do menu de campo, a unica volta ao menu principal era recarregar a
+ * pagina, e o modulo inteiro nascia limpo: a limpeza acontecia de graca e a
+ * falta dela era invisivel. Com uma porta de saida real, `submitted` sobrevivia
+ * a volta ao menu e a PROXIMA extracao nunca chegava ao ranking.
+ */
+const resetRunTracking = (): void => {
+  recordedSummaryKey = null;
+  submitted = false;
+  echoSubmitted = false;
+  poolRequestKey = '';
+};
+
 // ---------------------------------------------------------------------------
 // Convite de co-op
 // ---------------------------------------------------------------------------
@@ -393,6 +417,16 @@ const telemetry = new TelemetrySession(
 /** Estado vivo da run corrente, para o evento de abandono saber onde ela parou. */
 let liveRun: SurvivalState | null = null;
 
+/**
+ * Ha uma descida em curso — mesmo que ainda nao exista estado nenhum.
+ *
+ * Separado de `liveRun` por causa do co-op: entre pedir a sala e o primeiro
+ * snapshot chegar existe uma janela de "Conectando…" que, com servidor fora do
+ * ar, nunca termina. Amarrar o menu de campo a `liveRun` deixaria justamente
+ * essa tela — a unica em que o jogador precisa de uma saida — sem saida.
+ */
+let runInProgress = false;
+
 // Aba fechada com a run em andamento. `pagehide` e nao `beforeunload`: este
 // ultimo nao dispara de forma confiavel em Safari movel, que e metade do
 // publico de um PWA.
@@ -412,14 +446,144 @@ nameInput.addEventListener('change', () => {
   savePlayerName(playerName);
 });
 
+// ---------------------------------------------------------------------------
+// Menu de campo (pausa)
+// ---------------------------------------------------------------------------
+
+/**
+ * O mundo esta congelado?
+ *
+ * Verdade apenas no solo, e a diferenca e estrutural, nao uma opcao: no co-op a
+ * simulacao roda no servidor, para os dois jogadores, e nada que este cliente
+ * faca pode paralisa-la. Prometer pausa la seria mentir para o jogador no exato
+ * momento em que ele para de olhar para a tela.
+ */
+let paused = false;
+
+/** Move o bloco unico de opcoes para a tela que esta abrindo. */
+const mountOptions = (slot: HTMLDivElement): void => {
+  slot.appendChild(optionsControls);
+};
+
+/**
+ * Encerra a run corrente e devolve o jogador a tela de titulo.
+ *
+ * O evento de abandono e o MESMO que a aba fechada dispara, e de proposito:
+ * para a telemetria as duas coisas sao a mesma perda — alguem que desceu e nao
+ * chegou ao fim. `TelemetrySession.abandon` ja e idempotente por run, entao sair
+ * pelo menu depois de a aba ter ficado escondida nao conta duas vezes.
+ */
+const abandonRun = (): void => {
+  const state = liveRun;
+  if (state && state.phase === 'running' && state.tick >= 20) {
+    telemetry.abandon(state.sector, state.tick, state.contamination);
+  }
+  stopLoop?.();
+  stopLoop = null;
+  liveRun = null;
+  runInProgress = false;
+  paused = false;
+  // A fila de toques e a tecla R ficam cheias do que o jogador apertou durante a
+  // run. Sem drenar, o primeiro `hasTap` da PROXIMA descida encontra lixo desta.
+  input.clearPendingUiInput();
+  mountOptions(optionsSlot);
+  showInvite(null);
+  setBanner(null);
+  audio.reset();
+  menu.classList.remove('hidden');
+};
+
+/** Solo congela; co-op nao. Lido pelo menu ANTES de `onOpen`, entao nao pode depender de `paused`. */
+const soloRun = (): boolean => liveRun !== null && liveRun.config.playerCount === 1;
+
+const pauseMenu = new PauseMenu(canvas, {
+  runActive: () => runInProgress,
+  runTerminal: () => liveRun !== null && liveRun.phase !== 'running',
+  freezesWorld: soloRun,
+  status: () => {
+    const state = liveRun;
+    if (!state) return 'sem sinal do setor — conexão pendente';
+    if (state.phase !== 'running') return 'contrato encerrado — sem descida ativa';
+    const contamination = Math.round(state.contamination * 100);
+    return `Setor ${state.sector} · contaminação ${contamination}% · contrato em aberto`;
+  },
+  onOpen: () => {
+    // No solo a pausa e real e o loop congela; no co-op ela e so a overlay, e o
+    // comando enviado ao servidor vira neutro (o Prospector para de andar e de
+    // atirar, como se o jogador tivesse tirado as maos — que foi o que ele fez).
+    //
+    // Na tela de FIM nada congela, nem no solo: e ali que a run e gravada,
+    // enviada ao ranking e oferecida ao pool de carcacas, tudo uma vez so e tudo
+    // dentro do quadro. Congelar o quadro nesse instante seguraria os tres
+    // envios ate o jogador fechar o menu — e o abandono a partir dali os
+    // perderia de vez. O que precisa ser barrado la nao e o tempo, e o R do
+    // teclado, que atravessa a overlay.
+    paused = soloRun() && liveRun?.phase === 'running';
+    mountOptions(pauseOptionsSlot);
+    // O jogador achou o menu: a dica cumpriu a funcao e sai de cena em vez de
+    // ficar explicando por cima do que ela ensinou a abrir.
+    clearHint();
+  },
+  onClose: () => {
+    paused = false;
+    mountOptions(optionsSlot);
+    // Esquiva/habilidade apertadas com o menu aberto nao podem sair quando ele
+    // fechar: o teclado continua chegando por cima da overlay, e o jogador
+    // veria o personagem gastar o dash sozinho ao retomar.
+    input.clearQueuedActions();
+    input.clearPendingUiInput();
+  },
+  onAbandon: abandonRun,
+  ui: () => audio.ui(),
+});
+pauseMenu.attach();
+
+/**
+ * A dica, uma vez na vida.
+ *
+ * Um gesto sem affordance precisa ser dito pelo menos uma vez, e exatamente uma:
+ * repetir a cada descida transformaria a dica no proprio ruido de tela que a
+ * decisao de nao ter botao existe para evitar. Fica atras de um banner livre —
+ * "Conectando…" do co-op tem prioridade sobre ela.
+ */
+const HINT_KEY = 'voxelyn.pausehint';
+/** Timer da dica no ar, para que abrir o menu possa aposenta-la na hora. */
+let hintTimer: ReturnType<typeof setTimeout> | null = null;
+
+const clearHint = (): void => {
+  if (hintTimer === null) return;
+  clearTimeout(hintTimer);
+  hintTimer = null;
+  setBanner(null);
+};
+
+const hintOnce = (): void => {
+  try {
+    if (localStorage.getItem(HINT_KEY) === '1') return;
+  } catch {
+    return; // sem storage nao ha "uma vez": melhor nunca do que toda vez
+  }
+  setTimeout(() => {
+    // Um banner ocupado tem prioridade: "Conectando…" e informacao que o
+    // jogador esta esperando, e a dica pode ficar para a proxima descida.
+    if (!runInProgress || pauseMenu.isOpen || !banner.classList.contains('hidden')) return;
+    try {
+      localStorage.setItem(HINT_KEY, '1');
+    } catch {
+      /* ignora */
+    }
+    setBanner('ESC ou segure no topo da tela para o menu');
+    hintTimer = setTimeout(clearHint, 4000);
+  }, 1600);
+};
+
 const runSolo = (): void => {
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
   audio.reset();
   const seed = nextSeed();
   recorder.start(seed);
-  echoSubmitted = false;
-  poolRequestKey = '';
+  resetRunTracking();
   telemetry.begin();
   let state: SurvivalState = createRun({ seed });
   liveRun = state;
@@ -432,6 +596,19 @@ const runSolo = (): void => {
 
   const frame = (now: number): void => {
     if (!running) return;
+    // Pausa de verdade: o relogio anda com o quadro, mas o acumulador nao recebe
+    // nada, entao nenhum tick e simulado e nenhum e devido ao retomar. Mover
+    // `lastTime` aqui e o que impede o mundo de compensar a pausa inteira de uma
+    // vez — sem isso, um menu aberto por trinta segundos devolveria o jogador no
+    // meio de um enxame que se moveu enquanto ele lia o volume.
+    //
+    // O quadro tambem nao e redesenhado: o canvas guarda a ultima imagem, que e
+    // exatamente o mundo congelado que a overlay quer ter atras de si.
+    if (paused) {
+      lastTime = now;
+      requestAnimationFrame(frame);
+      return;
+    }
     const delta = Math.min(120, now - lastTime);
     applyAdaptiveQuality(delta);
     lastTime = now;
@@ -449,17 +626,18 @@ const runSolo = (): void => {
       audio.update(state, now);
       renderState(state, 1, input.state, now);
       renderer.renderEnd(state, vw, vh);
-      if (armed && (input.hasTap() || input.consumeRestartKey())) {
+      // `!pauseMenu.isOpen` barra o R do teclado, que chega por cima da overlay:
+      // sem ele, quem abrisse o menu na tela de fim para sair veria a run
+      // reiniciar por baixo do proprio menu. Os TOQUES ja param sozinhos — a
+      // overlay engole o pointerdown antes de o canvas ve-lo.
+      if (!pauseMenu.isOpen && armed && (input.hasTap() || input.consumeRestartKey())) {
         const nextRunSeed = nextSeed();
         recorder.start(nextRunSeed);
         telemetry.begin();
         state = createRun({ seed: nextRunSeed });
         liveRun = state;
         audio.reset();
-        recordedSummaryKey = null;
-        submitted = false;
-        echoSubmitted = false;
-        poolRequestKey = '';
+        resetRunTracking();
         gate.reset();
       }
       accumulator = 0;
@@ -526,6 +704,7 @@ const defaultServerUrl = (): string => {
 };
 
 const runOnline = (url: string, roomCode: string | null): void => {
+  resetRunTracking();
   let ws: WebSocket | null = null;
   let running = true;
   let lastTime = performance.now();
@@ -610,7 +789,14 @@ const runOnline = (url: string, roomCode: string | null): void => {
       setBanner(null);
       renderer.setLocalPlayerId(net.slot + 1); // co-op: slot 1 tem id 2
       audio.setLocalPlayerId(net.slot + 1);
-      const cmd = input.snapshot(playerScreen());
+      // Com o menu de campo aberto o comando vira NEUTRO, e o loop de rede
+      // continua bombeando. As duas coisas sao obrigatorias e por motivos
+      // opostos: parar de bombear derrubaria a sessao por timeout e deixaria o
+      // parceiro sozinho num mundo que nao para, e mandar o comando real faria
+      // o Prospector continuar andando e atirando enquanto o dono dele mexe no
+      // volume. Neutro e a unica leitura honesta de "tirei as maos".
+      const menuOpen = pauseMenu.isOpen;
+      const cmd = menuOpen ? emptyCommand() : input.snapshot(playerScreen());
       if (queuedChoice !== null) {
         cmd.choose = queuedChoice;
         queuedChoice = null;
@@ -634,7 +820,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
             window.innerHeight,
             input.state,
           );
-          const choice = input.consumeChoiceTap(regions);
+          const choice = menuOpen ? null : input.consumeChoiceTap(regions);
           if (choice !== null) queuedChoice = choice;
         } else if (pendingChoice) {
           input.clearPendingChoiceInput();
@@ -648,11 +834,14 @@ const runOnline = (url: string, roomCode: string | null): void => {
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
           // reabre o socket — o matchmaking so considera salas 'running'.
-          if (armed && (input.hasTap() || input.consumeRestartKey())) {
+          //
+          // `menuOpen` barra o R do teclado, que chega por cima da overlay: sem
+          // ele, quem abrisse o menu na tela de fim para sair veria a run
+          // reiniciar por baixo do proprio menu.
+          if (!menuOpen && armed && (input.hasTap() || input.consumeRestartKey())) {
             gate.reset();
             audio.reset();
-            recordedSummaryKey = null;
-            poolRequestKey = '';
+            resetRunTracking();
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
@@ -705,7 +894,10 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
   audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
+  runInProgress = true;
+  pauseMenu.armHistory();
   runSolo();
+  hintOnce();
 };
 const startOnline = (): void => {
   const code = normalizeRoomCode(roomInput.value);
@@ -719,7 +911,10 @@ const startOnline = (): void => {
   audio.ui();
   menu.classList.add('hidden');
   stopLoop?.();
+  runInProgress = true;
+  pauseMenu.armHistory();
   runOnline(serverInput.value.trim() || defaultServerUrl(), code || null);
+  hintOnce();
 };
 
 // Rede de seguranca para o auto-start por query e para browsers que exigem um
@@ -827,9 +1022,13 @@ telemetryButton.addEventListener('click', () => {
   audio.ui();
 });
 
-document
-  .getElementById('btn-options')
-  ?.addEventListener('click', () => openOverlay(optionsOverlay));
+document.getElementById('btn-options')?.addEventListener('click', () => {
+  // O bloco pode estar montado no menu de campo (a run anterior foi abandonada
+  // por ali). Trazer de volta antes de abrir e o que garante que a tela de
+  // opcoes nunca apareca vazia.
+  mountOptions(optionsSlot);
+  openOverlay(optionsOverlay);
+});
 document
   .getElementById('btn-options-close')
   ?.addEventListener('click', () => closeOverlay(optionsOverlay));

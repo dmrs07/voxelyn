@@ -394,6 +394,24 @@ export class SurvivalInput {
     this.queuedRestart = false;
   }
 
+  /**
+   * Descarta acoes de uso unico ainda engatilhadas (esquiva, habilidade, purga,
+   * interacao).
+   *
+   * Elas ficam travadas ate a proxima `snapshot`, que e o certo durante a run —
+   * um aperto no meio de um tick nao pode se perder. Mas com o menu de campo
+   * aberto ninguem chama `snapshot`, e o teclado continua chegando por cima da
+   * overlay: sem este dreno, o espaco apertado por engano enquanto se mexe no
+   * volume sairia como um dash no instante em que o menu fecha.
+   */
+  clearQueuedActions(): void {
+    this.queuedDodge = false;
+    this.queuedInteract = false;
+    this.queuedPurge = false;
+    this.queuedAbility = false;
+    this.queuedChoice = null;
+  }
+
   hasTap(): boolean {
     if (this.state.tapQueue.length > 0) {
       this.state.tapQueue.length = 0;
