@@ -105,6 +105,18 @@ const GLOW_SPREAD = 2;
 const GLOW_ALPHA = 0.55;
 
 /**
+ * Opacidade do halo, dada a opacidade que o desenho ja herdou.
+ *
+ * ESCALA, nunca substitui. Quem chama ja atenuou o sprite por um motivo — o
+ * parceiro obedecendo a luz da caverna, o eco de morte se apagando, a oferta do
+ * poco translucida — e um halo em opacidade fixa acende o visor sobre um corpo
+ * que quase nao esta la. No eco de morte era mais que feio: ele reserva a luz
+ * que atravessa o escuro para o farol proprio, e o halo do sprite furava a
+ * regra.
+ */
+export const glowAlpha = (inherited: number): number => inherited * GLOW_ALPHA;
+
+/**
  * Apaga tudo que NAO emite luz, no lugar, e devolve quantos pixels sobraram.
  *
  * Comparacao EXATA contra a paleta mestra, e nao por proximidade: os atlas de
@@ -690,9 +702,11 @@ export class SpriteBank {
   ): void {
     const glow = loaded.glow;
     if (!this.bloom || !glow) return;
+    const inherited = ctx.globalAlpha;
+    if (inherited <= 0) return;
     const grow = GLOW_SPREAD * zoom;
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = GLOW_ALPHA;
+    ctx.globalAlpha = glowAlpha(inherited);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(
       glow,
@@ -700,7 +714,7 @@ export class SpriteBank {
       dx - grow, dy - grow, dw + grow * 2, dh + grow * 2
     );
     ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = inherited;
     ctx.imageSmoothingEnabled = false;
   }
 

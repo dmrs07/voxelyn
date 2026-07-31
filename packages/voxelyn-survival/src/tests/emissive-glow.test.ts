@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMISSIVE_HEX } from '@voxelyn/survival-content';
-import { keepEmissivePixels } from '../client/sprites';
+import { glowAlpha, keepEmissivePixels } from '../client/sprites';
 
 /**
  * A outra metade deste contrato vive no pacote de conteudo, que e quem possui os
@@ -54,5 +54,33 @@ describe('mascara de emissivos', () => {
       0x2e, 0x3a, 0x4d, 255,
     );
     expect(keepEmissivePixels(data, EMISSIVE_HEX)).toBe(0);
+  });
+});
+
+/**
+ * O halo herda a transparencia do corpo que ele acende.
+ *
+ * A atenuacao de um sprite nunca e decoracao: o parceiro escurece porque a
+ * caverna esta escura ali, o eco de morte se apaga porque esta acabando, a
+ * oferta do poco e translucida porque ainda nao foi tomada. Um halo em
+ * opacidade fixa contradiz as tres — o visor fica aceso sobre um corpo que quase
+ * nao esta na tela, e no eco de morte fura a regra de que so o farol proprio
+ * atravessa o escuro.
+ */
+describe('opacidade do halo', () => {
+  it('escala a opacidade herdada em vez de substitui-la', () => {
+    const full = glowAlpha(1);
+    expect(glowAlpha(0.2)).toBeCloseTo(full * 0.2, 6);
+    expect(glowAlpha(0.5)).toBeCloseTo(full * 0.5, 6);
+  });
+
+  it('nunca acende mais do que o corpo que o gerou', () => {
+    for (const inherited of [0, 0.05, 0.3, 0.75, 1]) {
+      expect(glowAlpha(inherited)).toBeLessThanOrEqual(inherited);
+    }
+  });
+
+  it('some junto com o corpo, e nao depois dele', () => {
+    expect(glowAlpha(0)).toBe(0);
   });
 });

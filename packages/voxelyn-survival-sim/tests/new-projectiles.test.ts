@@ -11,7 +11,7 @@ import {
 } from '../src/constants';
 import { spawnEnemy } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { MODULE_DEFINITIONS, grantOrRechargeModule } from '../src/modules';
+import { MODULE_DEFINITIONS, consumeModuleCharge, grantOrRechargeModule, liveProjectileModules } from '../src/modules';
 import type { Projectile, SurvivalState } from '../src/types';
 
 const clearArena = (state: SurvivalState): void => {
@@ -321,5 +321,81 @@ describe('Return Disc', () => {
     state.player.alive = false;
     stepRun(state, [emptyCommand()]);
     expect(state.projectiles).toHaveLength(0);
+  });
+});
+
+/**
+ * A FORMA do projetil e uma promessa sobre o proximo impacto: o dardo diz que
+ * perfura, a bola diz que volta de algum lugar, o halo diz que detona. Quem
+ * desenha lendo `proj.modules` cru promete pelo que o tiro CARREGA, e nao pelo
+ * que ele ainda consegue disparar — e os dois deixam de coincidir no instante em
+ * que o dono gasta a ultima carga com o tiro ainda no ar.
+ */
+describe('modulos vivos de um projetil', () => {
+  const extraOf = (state: SurvivalState) => state.playerExtra;
+
+  it('mantem o modulo enquanto ha carga', () => {
+    const state = createRun({ seed: 907 });
+    grantOrRechargeModule(extraOf(state), 'piercing', state.tick);
+    const modules = { piercing: true as const };
+    // Mesmo objeto de volta: o caminho de desenho nao aloca por quadro.
+    expect(liveProjectileModules(modules, extraOf(state), state.tick)).toBe(modules);
+  });
+
+  it('apaga o modulo que ficou sem carga com o tiro no ar', () => {
+    const state = createRun({ seed: 908 });
+    grantOrRechargeModule(extraOf(state), 'piercing', state.tick);
+    const charges = MODULE_DEFINITIONS.piercing.defaultCharges ?? 1;
+    for (let i = 0; i < charges; i++) {
+      consumeModuleCharge(extraOf(state), 'piercing', 0, []);
+    }
+    const live = liveProjectileModules({ piercing: true as const }, extraOf(state), state.tick);
+    expect(live?.piercing).toBeUndefined();
+  });
+
+  it('nao mexe nos modulos que ainda tem carga', () => {
+    const state = createRun({ seed: 909 });
+    grantOrRechargeModule(extraOf(state), 'ricochet', state.tick);
+    const charges = MODULE_DEFINITIONS.piercing.defaultCharges ?? 1;
+    grantOrRechargeModule(extraOf(state), 'piercing', state.tick);
+    for (let i = 0; i < charges; i++) {
+      consumeModuleCharge(extraOf(state), 'piercing', 0, []);
+    }
+    const live = liveProjectileModules(
+      { piercing: true as const, ricochet: { remainingBounces: 1 } },
+      extraOf(state),
+      state.tick
+    );
+    expect(live?.piercing).toBeUndefined();
+    expect(live?.ricochet).toEqual({ remainingBounces: 1 });
+  });
+
+  /**
+   * Sem o dono a vista — projetil hostil, ou parceiro cujas cargas so o servidor
+   * conhece — nao ha o que conferir. Apagar aqui seria apagar um modulo que
+   * existe, so porque a lista local esta vazia.
+   */
+  it('nao apaga nada quando as cargas do dono nao estao a vista', () => {
+    const modules = { piercing: true as const };
+    expect(liveProjectileModules(modules, undefined, 0)).toBe(modules);
+  });
+
+  /**
+   * Deriva, nao apaga a marca no projetil: recuperar o modulo antes do impacto
+   * devolve o efeito, e `procModule` confere de novo la. Limpar `proj.modules`
+   * tiraria isso do jogo por causa de um problema de desenho.
+   */
+  it('volta a valer se o dono recuperar o modulo antes do impacto', () => {
+    const state = createRun({ seed: 910 });
+    grantOrRechargeModule(extraOf(state), 'piercing', state.tick);
+    const charges = MODULE_DEFINITIONS.piercing.defaultCharges ?? 1;
+    for (let i = 0; i < charges; i++) {
+      consumeModuleCharge(extraOf(state), 'piercing', 0, []);
+    }
+    const modules = { piercing: true as const };
+    expect(liveProjectileModules(modules, extraOf(state), state.tick)?.piercing).toBeUndefined();
+
+    grantOrRechargeModule(extraOf(state), 'piercing', state.tick);
+    expect(liveProjectileModules(modules, extraOf(state), state.tick)).toBe(modules);
   });
 });

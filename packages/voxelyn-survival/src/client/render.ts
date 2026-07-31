@@ -20,6 +20,7 @@ import {
   ABILITY_RADIUS,
   HEAT_MAX,
   RICOCHET_BOUNCES,
+  liveProjectileModules,
   moduleHasCapacity,
   SECTOR_COUNT,
   WELL_OFFER_REACH,
@@ -1444,10 +1445,19 @@ export class SurvivalRenderer {
     // a direcao serve apenas para inclinar o rastro, que e cosmetico.
     this.projectileView.sync(state.projectiles, nowMs);
     for (const proj of state.projectiles) {
+      // So os projeteis DESTE jogador passam pelo filtro de cargas. As cargas
+      // dele o cliente conhece nos dois modos — em co-op elas vem no `you` do
+      // snapshot. As do parceiro nao: ali o servidor ja mandou a marca corrigida,
+      // e conferir de novo com uma lista vazia apagaria modulos que existem.
+      const mine = proj.owner === player.id;
+      const modules = mine
+        ? liveProjectileModules(proj.modules, state.playerExtras[player.slot ?? 0], state.tick)
+        : proj.modules;
+      const view = modules === proj.modules ? proj : { ...proj, modules };
       items.push({
         depth: proj.x + proj.y,
         draw: () => {
-          this.projectileView.draw(ctx, proj, toScreen, z, TILE_H);
+          this.projectileView.draw(ctx, view, toScreen, z, TILE_H);
         },
       });
     }

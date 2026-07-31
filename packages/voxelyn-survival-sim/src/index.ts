@@ -56,4 +56,4 @@ export {
   resonanceOffers,
   type AbilityDefinition,
 } from './abilities.js';
-export { MODULE_DEFINITIONS, moduleDefinition, activeModule, moduleHasCapacity, grantOrRechargeModule, consumeModuleCharge, expireTimedModules, rollModuleChoice } from './modules.js';
+export { MODULE_DEFINITIONS, moduleDefinition, activeModule, moduleHasCapacity, liveProjectileModules, grantOrRechargeModule, consumeModuleCharge, expireTimedModules, rollModuleChoice } from './modules.js';
