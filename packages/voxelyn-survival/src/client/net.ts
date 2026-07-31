@@ -40,17 +40,21 @@ type FrameEntities = {
  * caso normal em TCP, que entrega em rajada depois de qualquer atraso) davam um
  * intervalo de poucos milissegundos, a interpolacao terminava no primeiro quadro
  * de render e o personagem SALTAVA um tick inteiro de uma vez; o intervalo
- * seguinte, longo, deixava ele parado. Medido aqui com 10-90 ms de jitter: 367
- * de 379 quadros com deslocamento ZERO e o resto em saltos de 0,23 tile. E o
- * "teleporte" relatado, e tambem a origem do segundo flicker — parado por mais
- * de 120 ms, `deriveAnim` desiste do walk e as pernas viram para a mira.
+ * seguinte, longo, deixava ele parado. Medido com 10-90 ms de jitter: 367 de 379
+ * quadros com deslocamento ZERO e o resto em saltos de 0,23 tile.
  *
- * Dois ticks (100 ms) e o suficiente para cobrir um atraso de um quadro inteiro
- * sem esvaziar o buffer. O custo e 100 ms de atraso visual sobre um cliente que
- * ja nao faz predicao — pagar isso para trocar teleporte por movimento continuo
- * e o negocio certo.
+ * O tamanho e MEDIDO, nao fixo, porque ele se paga em pontaria. Todo tick de
+ * colchao e um tick a mais de defasagem entre onde o inimigo esta desenhado e
+ * onde o servidor vai resolver o tiro — quem mira no que ve, mira atras. Uma
+ * conexao boa nao deve pagar o preco de uma ruim: o colchao acompanha o pico de
+ * atraso observado, com folga, e desce sozinho quando a rede acalma.
  */
-const INTERP_DELAY_TICKS = 2;
+const MIN_INTERP_DELAY_TICKS = 1;
+const MAX_INTERP_DELAY_TICKS = 3;
+/** Folga sobre o pico de atraso medido: meio tick nao se sente, e cobre o arredondamento. */
+const INTERP_HEADROOM_TICKS = 0.6;
+/** Quao rapido o pico medido de atraso e esquecido quando a rede melhora. */
+const JITTER_DECAY = 0.02;
 
 /** Quadros guardados (0,6 s a 20 Hz): cobre a rajada mais longa que vale seguir. */
 const MAX_BUFFERED_FRAMES = 12;
@@ -112,6 +116,12 @@ export class NetClient {
   private renderTick: number | null = null;
   /** Ritmo MEDIDO do servidor, em ticks por milissegundo local. */
   private tickRate = 1 / TICK_MS;
+  /**
+   * Pico recente de atraso de chegada, em ticks. Comeca em um tick inteiro para
+   * a run nascer com colchao — descobrir que a rede e boa custa segundos, e
+   * gaguejar nos primeiros deles seria pior que meio tick de defasagem.
+   */
+  private jitterTicks = 1;
   private lastSampleMs: number | null = null;
   private viewer: ViewerState | null = null;
 
@@ -405,7 +415,7 @@ export class NetClient {
         // recente e o autoritativo.
         this.frames.pop();
       } else {
-        this.trackTickRate(tick - newest.tick, nowMs - newest.recvMs);
+        this.trackArrival(tick - newest.tick, nowMs - newest.recvMs);
       }
     }
     this.frames.push({ tick, recvMs: nowMs, entities: map, projectiles });
@@ -413,18 +423,34 @@ export class NetClient {
   }
 
   /**
-   * Mede quantos ticks de servidor cabem num milissegundo local.
+   * Aprende com a chegada de um quadro: o RITMO do servidor e o ATRASO da rede.
    *
-   * Uma unica chegada nao diz nada — o jitter esta todo dentro dela —, mas a
-   * media longa converge para a razao real entre os dois relogios, que e o que a
-   * linha de render precisa para nao fugir nem ficar para tras do servidor.
+   * Ritmo: uma unica chegada nao diz nada — o jitter esta todo dentro dela —,
+   * mas a media longa converge para a razao real entre os dois relogios, que e o
+   * que a linha de render precisa para nao fugir nem ficar para tras.
+   *
+   * Atraso: o quanto este quadro chegou depois do que a cadencia media previa. E
+   * o pico dele, e nao a media, que dimensiona o colchao — o colchao existe
+   * exatamente para o pior caso recente. Sobe na hora, desce devagar.
    */
-  private trackTickRate(tickDelta: number, elapsedMs: number): void {
+  private trackArrival(tickDelta: number, elapsedMs: number): void {
     if (elapsedMs <= 0 || tickDelta <= 0) return;
     const observed = tickDelta / elapsedMs;
     // Amostra absurda (aba suspensa, relogio corrigido) nao entra na media.
     if (observed < 0.25 / TICK_MS || observed > 4 / TICK_MS) return;
+    const late = elapsedMs * this.tickRate - tickDelta;
+    this.jitterTicks = late > this.jitterTicks
+      ? late
+      : this.jitterTicks + (late - this.jitterTicks) * JITTER_DECAY;
     this.tickRate += (observed - this.tickRate) * RATE_SMOOTHING;
+  }
+
+  /** Colchao de interpolacao deste instante, em ticks. Ver MIN/MAX_INTERP_DELAY_TICKS. */
+  private get interpDelayTicks(): number {
+    return Math.max(
+      MIN_INTERP_DELAY_TICKS,
+      Math.min(MAX_INTERP_DELAY_TICKS, INTERP_HEADROOM_TICKS + this.jitterTicks)
+    );
   }
 
   /**
@@ -476,11 +502,12 @@ export class NetClient {
       : Math.min(MAX_FRAME_MS, Math.max(0, nowMs - this.lastSampleMs));
     this.lastSampleMs = nowMs;
 
-    const error = newestTick - (this.renderTick ?? newestTick) - INTERP_DELAY_TICKS;
+    const delay = this.interpDelayTicks;
+    const error = newestTick - (this.renderTick ?? newestTick) - delay;
     if (this.renderTick === null || Math.abs(error) > PLAYOUT_RESYNC_TICKS) {
       // Primeiro quadro, ou distancia grande demais para fechar andando: a aba
       // ficou em segundo plano, a run trocou de sala, a conexao voltou.
-      this.renderTick = newestTick - INTERP_DELAY_TICKS;
+      this.renderTick = newestTick - delay;
     } else {
       const correction = Math.max(-PLAYOUT_RATE_LIMIT, Math.min(PLAYOUT_RATE_LIMIT, error * PLAYOUT_GAIN));
       this.renderTick += elapsedMs * this.tickRate * (1 + correction);
@@ -619,8 +646,21 @@ export class NetClient {
       } : null;
       ex.hasCore = this.viewer.hasCore;
       ex.downed = this.viewer.downed;
-      ex.aim.x = this.viewer.aimX;
-      ex.aim.y = this.viewer.aimY;
+      // A MIRA vem do proprio aparelho, nao do eco do servidor.
+      //
+      // Tudo mais neste bloco e estado que so o servidor conhece — calor, cargas,
+      // Nucleo. A mira nao: ela E a entrada deste jogador, e o `you` do snapshot
+      // so devolve o que ele mesmo mandou, uma ida e volta atras. Desenhar o eco
+      // fazia o retículo arrastar atras do cursor no co-op e responder na hora no
+      // solo, com o mesmo controle — a sensacao de "a mira demora a calibrar".
+      //
+      // Isto NAO adianta o tiro: quem dispara continua sendo o servidor, com a
+      // mira que chegou nele. O que muda e a mira desenhada parar de mentir
+      // sobre para onde o jogador esta apontando AGORA.
+      const localAim = this.command?.aim;
+      const aiming = localAim ? Math.hypot(localAim.x, localAim.y) > 0.01 : false;
+      ex.aim.x = aiming && localAim ? localAim.x : this.viewer.aimX;
+      ex.aim.y = aiming && localAim ? localAim.y : this.viewer.aimY;
       ex.overheatedUntil = this.viewer.overheated ? state.tick + 1 : 0;
     }
 

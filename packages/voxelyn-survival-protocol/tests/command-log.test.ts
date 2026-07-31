@@ -29,12 +29,48 @@ describe('quantizacao', () => {
     expect(decoded[0]).toEqual(original);
   });
 
-  it('preserva o extremo dos eixos', () => {
-    const q = quantizeCommand(cmd({ move: { x: 1, y: -1 }, aim: { x: -1, y: 1 } }));
+  it('preserva o extremo dos eixos do movimento', () => {
+    const q = quantizeCommand(cmd({ move: { x: 1, y: -1 } }));
     expect(q.move.x).toBe(1);
     expect(q.move.y).toBe(-1);
+  });
+
+  it('preserva um eixo de mira que ja cabe na faixa', () => {
+    const q = quantizeCommand(cmd({ aim: { x: -1, y: 0 } }));
     expect(q.aim.x).toBe(-1);
-    expect(q.aim.y).toBe(1);
+    expect(q.aim.y).toBe(0);
+  });
+
+  /**
+   * O defeito que custou a pontaria do jogo.
+   *
+   * `q` satura cada eixo em ±1 — o cabecalho deste arquivo sempre presumiu que a
+   * mira chegava unitaria, mas nada garantia isso. O cliente mandava a diferenca
+   * em PIXELS entre o cursor e o centro da tela, na casa das centenas: os dois
+   * eixos batiam no teto juntos e o vetor inteiro colapsava numa das quatro
+   * diagonais. Varrendo o cursor em volta do personagem, 360 rumos viravam
+   * QUATRO, e o tiro so saia em quatro direcoes de tela.
+   *
+   * A magnitude nao tem dono aqui: a simulacao normaliza a mira de qualquer
+   * forma. O que o codec precisa entregar intacto e o RUMO.
+   */
+  it('preserva o rumo da mira mesmo com o vetor fora de escala', () => {
+    for (let deg = 0; deg < 360; deg += 7) {
+      const rad = (deg * Math.PI) / 180;
+      const direction = { x: Math.cos(rad), y: Math.sin(rad) };
+      for (const scale of [1, 7, 300, 12_000]) {
+        const q = quantizeCommand(cmd({ aim: { x: direction.x * scale, y: direction.y * scale } }));
+        const cross = q.aim.x * direction.y - q.aim.y * direction.x;
+        const dot = q.aim.x * direction.x + q.aim.y * direction.y;
+        const error = Math.abs((Math.atan2(cross, dot) * 180) / Math.PI);
+        expect(error, `${deg} graus x${scale}`).toBeLessThan(0.4);
+      }
+    }
+  });
+
+  it('continua idempotente com a mira fora de escala', () => {
+    const once = quantizeCommand(cmd({ aim: { x: 431, y: -298 } }));
+    expect(quantizeCommand(once)).toEqual(once);
   });
 
   it('nao explode com valores nao finitos vindos de input quebrado', () => {

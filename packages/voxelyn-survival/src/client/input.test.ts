@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { screenToWorldMove } from './input';
+import { quantizeCommand } from '@voxelyn/survival-protocol';
+import { emptyCommand } from '@voxelyn/survival-sim';
+import { screenToWorldAim, screenToWorldMove } from './input';
 
 const len = (v: { x: number; y: number }): number => Math.hypot(v.x, v.y);
 
@@ -64,5 +66,73 @@ describe('conversao tela -> mundo do movimento', () => {
     const wd = toScreen(screenToWorldMove(1, -1));
     expect(wd.x).toBeGreaterThan(0);
     expect(wd.y).toBeLessThan(0); // W+D: cima-direita
+  });
+});
+
+/**
+ * Rumo de TELA de um vetor de mundo, em graus.
+ *
+ * A projecao e 2:1 — `isoX = (x-y)*16`, `isoY = (x+y)*8` no renderer —, e o
+ * fator de 2 nao pode ser omitido: sem ele o angulo medido nao e o que o jogador
+ * ve, e o teste passaria a cobrar a conta errada.
+ */
+const screenAngleOf = (v: { x: number; y: number }): number =>
+  (Math.atan2((v.x + v.y) * 8, (v.x - v.y) * 16) * 180) / Math.PI;
+
+const angleError = (a: number, b: number): number => {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+};
+
+describe('conversao tela -> mundo da mira', () => {
+  it('devolve sempre um rumo unitario', () => {
+    for (let deg = 0; deg < 360; deg += 7) {
+      const rad = (deg * Math.PI) / 180;
+      for (const distance of [3, 60, 400, 1200]) {
+        const aim = screenToWorldAim(Math.cos(rad) * distance, Math.sin(rad) * distance);
+        expect(len(aim), `${deg} graus a ${distance}px`).toBeCloseTo(1, 6);
+      }
+    }
+  });
+
+  it('aponta exatamente para onde o cursor esta na tela', () => {
+    for (let deg = 0; deg < 360; deg += 7) {
+      const rad = (deg * Math.PI) / 180;
+      const aim = screenToWorldAim(Math.cos(rad) * 300, Math.sin(rad) * 300);
+      // O rumo de tela do vetor de mundo tem de ser o mesmo do cursor.
+      expect(angleError(screenAngleOf(aim), deg), `${deg} graus`).toBeLessThan(1e-6);
+    }
+  });
+
+  it('cursor em cima do personagem nao vira mira', () => {
+    expect(screenToWorldAim(0, 0)).toEqual({ x: 0, y: 0 });
+  });
+
+  /**
+   * O defeito que estava em producao, no ponto exato onde ele doia.
+   *
+   * No solo o comando e QUANTIZADO antes de entrar na simulacao (e o que torna o
+   * replay do ranking exato). `q` satura cada eixo em ±1, e a mira que chegava
+   * ali era a diferenca em pixels entre o cursor e o centro da tela — centenas.
+   * Os dois eixos saturavam juntos e o vetor colapsava numa diagonal: varrendo o
+   * cursor em volta do personagem, os 360 rumos possiveis viravam QUATRO, com
+   * erro medio de 26,3 graus e maximo de 63.
+   *
+   * Depois da correcao: 0,13 grau de erro medio e 0,54 no pior caso. O que sobra
+   * e o passo do proprio codec — 1/127 de um vetor unitario, esticado pela
+   * projecao 2:1 perto da horizontal da tela. Meio grau a 300 px do personagem e
+   * menos de tres pixels; o limite abaixo cobra que o erro fique nessa ordem, e
+   * nao nas dezenas de graus de antes.
+   */
+  it('sobrevive a quantizacao do log de comandos', () => {
+    let worst = 0;
+    for (let deg = 0; deg < 360; deg += 3) {
+      const rad = (deg * Math.PI) / 180;
+      const cmd = emptyCommand();
+      cmd.aim = screenToWorldAim(Math.cos(rad) * 300, Math.sin(rad) * 300);
+      const simulated = quantizeCommand(cmd);
+      worst = Math.max(worst, angleError(screenAngleOf(simulated.aim), deg));
+    }
+    expect(worst).toBeLessThan(0.6);
   });
 });

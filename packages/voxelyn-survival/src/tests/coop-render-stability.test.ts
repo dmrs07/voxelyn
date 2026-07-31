@@ -43,6 +43,11 @@ class JitteryLoop {
     });
   }
 
+  /** Tick autoritativo da sala neste instante. */
+  get serverTick(): number {
+    return this.server.roomForClient('A')?.state.tick ?? 0;
+  }
+
   /** PRNG deterministico: um teste de jitter que sorteia de verdade nao repete falha. */
   private random(): number {
     this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
@@ -189,5 +194,64 @@ describe('estabilidade do render co-op', () => {
     // Congelamento e o outro lado do salto: uns poucos quadros parados sao o
     // buffer esvaziando num pico, uma maioria deles e o defeito de volta.
     expect(stalled).toBeLessThan(moving.length * 0.2);
+  });
+});
+
+/**
+ * O colchao de interpolacao se paga em PONTARIA.
+ *
+ * Cada tick de atraso e um tick a mais entre onde o inimigo esta desenhado e
+ * onde o servidor vai resolver o tiro: quem mira no que ve, mira atras. Por isso
+ * o colchao e medido em vez de fixo — uma conexao boa nao pode pagar o preco de
+ * uma ruim. O que se cobra aqui e a regulagem funcionando nas duas pontas: piso
+ * de um tick sempre (senao o primeiro atraso congela o mundo) e crescimento so
+ * quando a rede de fato exige.
+ */
+/**
+ * Distancia, em ticks, entre o quadro ALVO da interpolacao e o ultimo tick que o
+ * servidor simulou.
+ *
+ * E uma leitura POR BAIXO do colchao: o alvo e o mais novo dos dois quadros que
+ * cercam o instante desenhado, entao ele fica ate um tick a frente do instante
+ * de verdade. Serve exatamente para o que se cobra aqui — comparar um colchao
+ * com o outro e provar que ele regula —, e nao para afirmar o valor absoluto.
+ */
+const measureTargetLagTicks = (loop: JitteryLoop, frames: number): number => {
+  let total = 0;
+  let samples = 0;
+  for (let f = 0; f < frames; f++) {
+    loop.frame();
+    const state = loop.client.sampleRenderState(loop.now);
+    if (!state || !state.playerExtras[0].joined) continue;
+    // Depois da metade: as primeiras amostras sao a estimativa se assentando.
+    if (f > frames / 2) {
+      total += loop.serverTick - state.tick;
+      samples++;
+    }
+  }
+  return samples === 0 ? Number.NaN : total / samples;
+};
+
+describe('colchao de interpolacao', () => {
+  it('desce ate o piso quando a rede e limpa', () => {
+    const loop = new JitteryLoop(0);
+    loop.client.connect();
+    // No piso (um tick), o alvo da interpolacao e o proprio quadro mais novo.
+    expect(measureTargetLagTicks(loop, 600)).toBeLessThan(1);
+  });
+
+  it('cresce quando a chegada dos quadros e irregular', () => {
+    const clean = new JitteryLoop(0);
+    clean.client.connect();
+    const cleanLag = measureTargetLagTicks(clean, 600);
+
+    const rough = new JitteryLoop(150);
+    rough.client.connect();
+    const roughLag = measureTargetLagTicks(rough, 600);
+
+    expect(roughLag).toBeGreaterThan(cleanLag + 0.5);
+    // E nunca sem teto: um colchao que cresce sem limite viraria atraso de
+    // controle disfarcado de suavidade.
+    expect(roughLag).toBeLessThan(4);
   });
 });
