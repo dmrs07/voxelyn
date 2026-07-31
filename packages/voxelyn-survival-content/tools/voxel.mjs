@@ -436,20 +436,71 @@ const shadedRamp = (solid, v) => {
   return changed ? out : v.ramp;
 };
 
-/** Desenha um cubo isometrico com as tres faces visiveis. */
-const cube = (g, sx, sy, ramp) => {
-  const [top, left, right] = ramp;
+/**
+ * Pixels de um cubo isometrico, relativos a origem dele: `[dx, dy, face]`, com
+ * a face indexando a rampa em [topo, esquerda, direita].
+ *
+ * Tabela, e nao codigo solto dentro do desenho, porque a MEDIDA de profundidade
+ * entre camadas precisa contar exatamente os pixels que o rasterizador pinta.
+ * Duas listas separadas responderiam sobre um cubo que ninguem desenha.
+ */
+const CUBE_CELLS = (() => {
   // topo: losango afunilado, o que da a leitura de faceta
-  set(g, sx + 1, sy - 2, top);
-  set(g, sx + 2, sy - 2, top);
-  for (let i = 0; i < 4; i++) set(g, sx + i, sy - 1, top);
+  const cells = [[1, -2, 0], [2, -2, 0]];
+  for (let i = 0; i < 4; i++) cells.push([i, -1, 0]);
   // laterais
   for (let i = 0; i < VOX.zStep; i++) {
-    set(g, sx + 0, sy + i, left);
-    set(g, sx + 1, sy + i, left);
-    set(g, sx + 2, sy + i, right);
-    set(g, sx + 3, sy + i, right);
+    cells.push([0, i, 1], [1, i, 1], [2, i, 2], [3, i, 2]);
   }
+  return cells;
+})();
+
+/** Desenha um cubo isometrico com as tres faces visiveis. */
+const cube = (g, sx, sy, ramp) => {
+  for (const [dx, dy, face] of CUBE_CELLS) set(g, sx + dx, sy + dy, ramp[face]);
+};
+
+/** Maior chave do pintor que cada pixel recebe de um conjunto de caixas. */
+const topKeyByPixel = (boxes, rotation) => {
+  const byPixel = new Map();
+  for (const v of shellVoxels(boxes, rotation)) {
+    const key = makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0);
+    const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
+    for (const [dx, dy] of CUBE_CELLS) {
+      const pixel = `${Math.round(sx) + dx},${Math.round(sy) + dy}`;
+      const seen = byPixel.get(pixel);
+      if (seen === undefined || seen < key) byPixel.set(pixel, key);
+    }
+  }
+  return byPixel;
+};
+
+/**
+ * Disputa de profundidade entre duas partes do MESMO modelo, numa direcao.
+ *
+ * Existe porque partes que viram atlas separados perdem a ordem do pintor: nela
+ * cada voxel se resolve contra os outros, enquanto entre dois atlas so ha a
+ * ordem das duas chamadas de desenho. Esta funcao responde qual das duas ordens
+ * o modelo pede, contando os pixels em que as partes se sobrepoem — o mesmo
+ * criterio que o rasterizador usaria se as desenhasse juntas.
+ *
+ * `disputed` sozinho ja e informacao: zero significa que as partes nao se tocam
+ * na tela e que a ordem entre elas nao importa nessa direcao.
+ */
+export const layerDepthDispute = (aBoxes, bBoxes, dirIndex) => {
+  const rotation = DIRECTION_ROTATION[dirIndex];
+  if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
+  const a = topKeyByPixel(aBoxes, rotation);
+  const b = topKeyByPixel(bBoxes, rotation);
+  let disputed = 0;
+  let aInFront = 0;
+  for (const [pixel, aKey] of a) {
+    const bKey = b.get(pixel);
+    if (bKey === undefined) continue;
+    disputed++;
+    if (aKey > bKey) aInFront++;
+  }
+  return { disputed, aInFront };
 };
 
 /**

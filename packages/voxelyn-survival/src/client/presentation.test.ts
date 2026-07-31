@@ -202,9 +202,9 @@ describe('EntityPresentation', () => {
 
   it('ainda deriva o rumo do prospector do deslocamento, porque o facing dele e a mira', () => {
     const presentation = new EntityPresentation();
-    // Atirando para +x enquanto anda para -x: as pernas tem de seguir o andar e
-    // o tronco tem de continuar apontado para a mira. Sao as duas metades do
-    // mesmo requisito, e so a composicao consegue entregar as duas.
+    // Andando para -x com a mira em +x, sem atirar: o corpo INTEIRO segue o
+    // andar. A mira de mouse muda de quadrante o tempo todo, e um tronco preso a
+    // ela deixava o bot torcido em quase todo quadro de caminhada.
     const presented = presentation.animationFor(
       { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 } as never,
       { tick: 0 } as never,
@@ -215,7 +215,76 @@ describe('EntityPresentation', () => {
     expect(typeof presented.anim).toBe('object');
     if (typeof presented.anim === 'object') {
       expect(presented.anim.lower.facingX).toBe(-1);
-      expect(presented.anim.upper.facingX).toBe(1);
+      expect(presented.anim.upper.facingX).toBe(-1);
+    }
+  });
+
+  it('so entrega o tronco a mira quando ela vira tiro', () => {
+    const presentation = new EntityPresentation();
+    const walkingWest = { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 };
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
+    const firing = {
+      ...entity,
+      action: { kind: 'shoot', startedAt: 0, releaseAt: 1, endsAt: 7, direction: { x: 1, y: 0 } },
+    };
+
+    const shot = presentation.animationFor(
+      firing as never, { tick: 0 } as never, walkingWest as never, 1_000
+    );
+    // Disparo: pernas no andar, tronco no cano. As duas metades do mesmo quadro.
+    expect(typeof shot.anim).toBe('object');
+    if (typeof shot.anim === 'object') {
+      expect(shot.anim.lower.facingX).toBe(-1);
+      expect(shot.anim.upper.facingX).toBe(1);
+    }
+
+    // Acabada a acao, o tronco volta para as pernas em vez de ficar torcido.
+    const after = presentation.animationFor(
+      entity as never, { tick: 20 } as never, walkingWest as never, 2_000
+    );
+    expect(typeof after.anim).toBe('object');
+    if (typeof after.anim === 'object') {
+      expect(after.anim.upper.facingX).toBe(-1);
+    }
+  });
+
+  /**
+   * Andar EM CIMA da fronteira de quadrante — que e onde W, A, S e D sozinhos
+   * caem — e o caso em que as duas camadas mais podem discordar: cada uma tem a
+   * propria histerese, e no fio da fronteira cada memoria segura o quadrante que
+   * ja estava desenhado. Se o tronco resolvesse o rumo do andar por conta
+   * propria, o bot subiria a tela com as pernas num quadrante e o tronco no
+   * vizinho, torcido enquanto a tecla estivesse presa.
+   */
+  it('nao torce o corpo ao andar em cima da fronteira depois de atirar para outro lado', () => {
+    const presentation = new EntityPresentation();
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
+    // Tiro para +x enquanto anda para -x: as duas camadas ficam em quadrantes
+    // diferentes, que e o estado de onde a torcao nasceria.
+    presentation.animationFor(
+      {
+        ...entity,
+        action: { kind: 'player_shot', startedAt: 0, releaseAt: 0, endsAt: 7, direction: { x: 1, y: 0 } },
+      } as never,
+      { tick: 0 } as never,
+      { ...baseAnim('walk'), moveFacingX: -1, moveFacingY: 0 } as never,
+      1_000
+    );
+
+    // Agora sobe a tela: em coordenadas de mundo, o vetor que cai exatamente
+    // sobre a fronteira entre `ul` e `ur`.
+    const up = -Math.SQRT1_2;
+    const presented = presentation.animationFor(
+      entity as never,
+      { tick: 20 } as never,
+      { ...baseAnim('walk'), moveFacingX: up, moveFacingY: up } as never,
+      2_000
+    );
+
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      const { lower, upper } = presented.anim;
+      expect(dirFromFacing(upper.facingX, upper.facingY)).toBe(dirFromFacing(lower.facingX, lower.facingY));
     }
   });
 });

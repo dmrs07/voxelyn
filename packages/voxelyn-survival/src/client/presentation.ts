@@ -4,8 +4,9 @@ import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection 
 
 /**
  * Camadas de rumo que uma entidade desenha ao mesmo tempo. As pernas seguem o
- * andar, o tronco segue a mira: cada uma precisa da propria histerese, senao a
- * de baixo puxaria a de cima para o quadrante dela.
+ * andar; o tronco segue o TIRO, e so enquanto ele dura. Cada uma precisa da
+ * propria histerese nesse intervalo, senao a de baixo puxaria a de cima para o
+ * quadrante dela no meio do disparo.
  */
 const FACING_BODY = 0;
 const FACING_UPPER = 1;
@@ -128,12 +129,24 @@ const layeredPlayerAnimation = (
   const walking = base.anim === 'walk';
   const raw = locomotionFacing(base, entity.facing.x, entity.facing.y);
   const lowerFacing = facing(FACING_BODY, raw.x, raw.y);
-  // Em repouso o rumo do tronco e a MIRA, que e o que `entity.facing` guarda no
-  // jogador. O tronco nunca segue as pernas: quem anda de costas continua
-  // apontando a arma para onde o cursor esta.
-  const upperFacing = action
-    ? facing(FACING_UPPER, action.dx, action.dy)
-    : facing(FACING_UPPER, entity.facing.x, entity.facing.y);
+  // Fora do disparo o tronco acompanha as PERNAS.
+  //
+  // Ele ja seguiu a mira o tempo todo, e o corpo saia torcido a cada quadro em
+  // que o cursor estava num quadrante e o andar em outro — o que, com mira de
+  // mouse, e quase sempre. A mira so precisa mandar no tronco quando ela vira
+  // TIRO: e o disparo que o jogador precisa ver alinhado com o cano, e ele tem
+  // direcao propria (`action.dx/dy`), medida no instante em que a acao comecou.
+  //
+  // Em repouso `locomotionFacing` ja devolve `entity.facing` — a mira —, entao
+  // parado o bot continua encarando para onde vai atirar.
+  //
+  // Fora do tiro o tronco COPIA o rumo ja estabilizado das pernas, em vez de
+  // resolver o mesmo vetor de novo na histerese dele. As duas camadas guardam
+  // quadrantes separados de proposito, e resolver duas vezes deixaria as duas
+  // memorias decidirem sozinhas em cima da fronteira — que e exatamente onde
+  // W, A, S e D sozinhos caem. O bot andaria para cima com as pernas em `ul` e o
+  // tronco em `ur`, torcido, e ficaria assim enquanto a tecla estivesse presa.
+  const upperFacing = action ? facing(FACING_UPPER, action.dx, action.dy) : lowerFacing;
 
   return {
     kind: 'layered-player',
