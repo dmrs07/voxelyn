@@ -324,7 +324,7 @@ const bishopModel = (anim, f) => {
   // mitra. A separacao entre este degrau e o de baixo, que agora usam o mesmo
   // material, sai da sombra de contato — que e exatamente para isso que ela
   // existe.
-  b.push(box(-3, -3, 7, 7, 6, 5 + nova, 'rust'));
+  b.push(box(-3, -3, 7, 7, 6, 5 + nova, 'bone'));
   // Estola vertical dourada descendo pelo centro do manto: e o que faz o olho
   // subir ate a mitra em vez de parar no volume maior.
   b.push(box(-1, -5, 4, 3, 1, 10 + nova, 'loot'));

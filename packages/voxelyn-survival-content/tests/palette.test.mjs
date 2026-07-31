@@ -13,7 +13,7 @@ const L = (name) => {
  * nao de estetica. Estao nomeadas para que incluir uma nova seja uma decisao
  * consciente em vez de um teste que afrouxa sozinho.
  */
-const STEEP_BY_DESIGN = {
+const SURFACE_RAMPS = {
   // O piso tem de ficar ao menos dois passos de valor abaixo de qualquer coisa
   // viva em cima dele (art bible §6), senao a silhueta das criaturas some
   // justamente onde elas andam.
@@ -22,11 +22,34 @@ const STEEP_BY_DESIGN = {
   pool: 'liquido le por profundidade, nao por matiz',
   // A crosta de gas precisa gritar perigo em menos de 200ms sobre pedra escura.
   sulfur: 'gas tem de ser lido como ameaca a distancia',
-  // Metal polido reflete o topo com forca e cai rapido nas laterais; e esse
-  // contraste que faz ouro parecer ouro em vez de tinta amarela.
-  loot: 'ouro e especular',
 };
-const MAX_RAMP_GAP = 34;
+
+/**
+ * Amplitude MINIMA de um material de criatura, em pontos de luminancia.
+ *
+ * Esta e a invariante que protege o contraste facetado, que e a identidade
+ * visual do jogo — e ela existe porque a perda ja aconteceu. Ao introduzir os
+ * degraus intermediarios, a primeira versao os usou para trocar as PONTAS das
+ * rampas em vez do meio: os passos ficaram curtos e bonitos na planilha, e os
+ * personagens perderam de 23% a 56% de amplitude. `player` caiu de 63 pontos
+ * para 27. Ficaram uniformes e mortos.
+ *
+ * O numero e o piso do que havia antes da paleta crescer, arredondado para
+ * baixo: nenhum material de criatura pode sair mais chapado do que ja era.
+ */
+const MIN_CREATURE_RANGE = 30;
+
+/**
+ * Fracao maxima da amplitude que um unico passo pode ocupar.
+ *
+ * O complemento da regra acima, e a que responde ao pedido original: com um
+ * salto de 51 pontos numa rampa de 69, `loot` gastava tres quartos da escala num
+ * degrau so — e era isso que lia como "topo claro colado num corpo escuro". Com
+ * tres faces nao da para ter passo curto E amplitude larga (dividir 53 em dois
+ * passos da 26 em cada), entao o que se cobra nao e passo pequeno em absoluto: e
+ * que nenhum passo engula a rampa.
+ */
+const MAX_STEP_SHARE = 0.65;
 
 describe('paleta mestra', () => {
   it('cada rampa usa so cores da paleta', () => {
@@ -36,13 +59,31 @@ describe('paleta mestra', () => {
     }
   });
 
-  it('as tres faces de um material sao degraus proximos em valor', () => {
+  /**
+   * Materiais que EMITEM. Ficam de fora da regra do passo porque a queda abrupta
+   * neles esta certa: uma fonte de luz tem nucleo claro e cai rapido, e nao a
+   * gradacao suave de uma superficie iluminada de fora. `biolum` e `acid`
+   * gastariam dois tercos da escala no ultimo degrau — e e assim que um brilho
+   * se comporta.
+   */
+  const emissiveMaterial = (ramp) => EMISSIVE.has(ramp[0]);
+
+  it('nenhum passo engole a rampa', () => {
     for (const [mat, ramp] of Object.entries(RAMPS)) {
-      if (mat in STEEP_BY_DESIGN) continue;
-      const gaps = [L(ramp[0]) - L(ramp[1]), L(ramp[1]) - L(ramp[2])];
-      for (const gap of gaps) {
-        expect(gap, `${mat} ${ramp.join('>')}`).toBeLessThanOrEqual(MAX_RAMP_GAP);
+      if (mat in SURFACE_RAMPS || emissiveMaterial(ramp)) continue;
+      const range = L(ramp[0]) - L(ramp[2]);
+      if (range === 0) continue; // materiais chapados de proposito
+      const steps = [L(ramp[0]) - L(ramp[1]), L(ramp[1]) - L(ramp[2])];
+      for (const step of steps) {
+        expect(step / range, `${mat} ${ramp.join('>')}`).toBeLessThanOrEqual(MAX_STEP_SHARE);
       }
+    }
+  });
+
+  it('preserva a amplitude dos materiais de criatura', () => {
+    for (const mat of ['rust', 'bone', 'fungus', 'biolum', 'acid', 'electric', 'loot', 'player', 'blood']) {
+      const ramp = RAMPS[mat];
+      expect(L(ramp[0]) - L(ramp[2]), `${mat} ${ramp.join('>')}`).toBeGreaterThanOrEqual(MIN_CREATURE_RANGE);
     }
   });
 

@@ -29,32 +29,35 @@ export const RAMPS = {
   floor: ['rockShadow', 'dark', 'dark'],
   scorch: ['dark', 'dark', 'dark'],
   /**
-   * METAL e OSSO: as duas rampas que mais mudaram, e onde a licao esta.
+   * METAL e OSSO. O intermediario entra no MEIO, e nunca nas pontas.
    *
-   * `rust` ia de osso (67) direto para ferrugem (31) — 35 pontos de luminancia
-   * entre duas faces do MESMO voxel. A peca lia como um topo claro colado num
-   * corpo escuro, e nao como um volume de latao.
+   * `rust` ia de osso (67) direto para ferrugem (31): 35 pontos de luminancia
+   * entre duas faces do MESMO voxel, sem nada no caminho.
    *
-   * Espacar nao basta: a ANCORA importa tanto quanto o espacamento. A primeira
-   * correcao foi so distribuir por igual mantendo o topo em osso (67/50/31).
-   * Ficou uniforme e ERRADO — o jogo se passa numa caverna escura, o salto grande
-   * estava fazendo o trabalho de manter a massa escura, e sem ele toda peca de
-   * metal subiu um terco em valor. O Bispo virou uma torre de arenito clara, mais
-   * brilhante que o proprio jogador. Aqui a rampa e uniforme E baixa, e o topo
-   * passar a ser latao em vez de osso ainda resolve de quebra o velho problema da
-   * face de topo quase branca em todo volume horizontal grande.
+   * A primeira correcao trocou as PONTAS pelos meios-tons (brass/rust/rockShadow)
+   * e foi um erro caro: os passos ficaram curtos, mas a amplitude do material caiu
+   * um terco, e com ela o contraste facetado que e a identidade visual do jogo. O
+   * mesmo aconteceu com todos: `player` perdeu 56% de amplitude, `fungus` 33%.
+   * Uniforme e sem contraste e pior do que contrastado com salto.
    *
-   * E as duas deixam de ser a MESMA rampa, o que eram antes por descuido: latao
-   * e o metal quente do chassi, dos cascos e da picareta; osso e a peca palida —
-   * mascara, chifre, garra, mitra. Duas materias que o jogo trata como diferentes
-   * nao podem sair do rasterizador identicas.
+   * Com tres faces so, passo curto e amplitude larga sao objetivos opostos —
+   * dividir 53 pontos em dois passos da 26 em cada, e nao ha o que discutir. O
+   * que a paleta nova permite e o intermediario cair no MEIO exato desses 53:
+   * mesmo topo, mesma base, e o degrau do meio no lugar certo. Os passos caem de
+   * 35/17 para 21/32 sem custar um ponto de amplitude.
+   *
+   * (Os cinco passos por material continuam existindo, mas nas ESCADAS de sombra
+   * e realce, que e onde ha resolucao para eles: um voxel de latao pode sair em
+   * chalk, bone, brass, rust ou rockShadow conforme a geometria. A rampa tem tres
+   * entradas porque o rasterizador desenha tres faces por voxel — isso e
+   * estrutural, nao uma escolha de paleta.)
    */
-  rust: ['brass', 'rust', 'rockShadow'],
-  bone: ['bone', 'brass', 'rust'],
-  fungus: ['fungusLight', 'moss', 'fungus'],
+  rust: ['bone', 'brass', 'rockShadow'],
+  bone: ['bone', 'brass', 'rockShadow'],
+  fungus: ['fungusLight', 'moss', 'fungusDark'],
   fungusDeep: ['fungus', 'fungusDark', 'dark'],
-  biolum: ['biolum', 'fungusLight', 'moss'],
-  acid: ['acid', 'fungusLight', 'moss'],
+  biolum: ['biolum', 'fungusLight', 'fungus'],
+  acid: ['acid', 'fungusLight', 'fungus'],
   /**
    * Lamina de biofluido: topo ESCURO com as laterais quase pretas.
    *
@@ -91,20 +94,17 @@ export const RAMPS = {
    * faces emitem, entao a lente acende inteira em qualquer direcao.
    */
   lamp: ['beam', 'amber', 'fire'],
-  blood: ['blood', 'rust', 'rockShadow'],
-  electric: ['electric', 'mist', 'rockLight'],
+  blood: ['blood', 'char', 'dark'],
+  electric: ['electric', 'mist', 'rock'],
   /**
-   * Ouro: a unica rampa que fica de proposito mais inclinada que as outras.
+   * Ouro: a rampa de maior amplitude do jogo, e continua sendo.
    *
-   * Espacada por igual (83/67/50) ela fica correta e errada ao mesmo tempo — o
-   * baculo do Bispo virava uma coluna palida, a peca mais chamativa de um chefe
-   * cuja leitura nao e o baculo. Metal polido nao se comporta como superficie
-   * fosca: reflete o topo com forca e cai rapido nas laterais, e e esse contraste
-   * que faz ouro parecer ouro em vez de tinta amarela. Sai de 51 pontos de salto
-   * para 33, que e a melhora sem perder a materia.
+   * Metal polido reflete o topo com forca e cai rapido nas laterais — e esse
+   * contraste que faz ouro parecer ouro em vez de tinta amarela. O intermediario
+   * corta o salto de 51 pontos ao meio sem encolher os 69 de amplitude.
    */
-  loot: ['loot', 'brass', 'rust'],
-  player: ['player', 'chalk', 'bone'],
+  loot: ['loot', 'brass', 'rockShadow'],
+  player: ['player', 'bone', 'rust'],
 };
 
 /**
@@ -127,7 +127,8 @@ export const SHADOW_OF = {
   chalk: 'bone',
   bone: 'brass',
   brass: 'rust',
-  rust: 'rockShadow',
+  rust: 'char',
+  char: 'dark',
   // fria
   mist: 'rockLight',
   rockLight: 'rock',
@@ -145,7 +146,7 @@ export const SHADOW_OF = {
   loot: 'bone',
   amber: 'fire',
   fire: 'blood',
-  blood: 'rust',
+  blood: 'char',
   electric: 'mist',
   dark: 'dark',
 };
@@ -164,6 +165,7 @@ export const SHADOW_OF = {
  */
 export const LIGHT_OF = {
   // quente/neutra
+  char: 'rust',
   rust: 'brass',
   brass: 'bone',
   bone: 'chalk',
