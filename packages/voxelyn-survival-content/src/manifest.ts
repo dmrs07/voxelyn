@@ -135,10 +135,18 @@ export const FIRST_PACK_IDS = [
  *
  * Ouro (`loot`) e branco (`player`) NAO estao aqui: sao materiais, nao fontes.
  * Casco, fivela, minerio e o baculo do Bispo sao de ouro, e um baculo que brilha
- * promete uma mecanica que nao existe. O que precisa mesmo brilhar e autorado em
- * `fire`, cuja face de topo ja e dourada.
+ * promete uma mecanica que nao existe. O que precisa mesmo emitir tem material
+ * proprio — `amber` para brasa e `beam` para lampada acesa —, e e por eles que o
+ * farol do Prospector acende sem arrastar todo o ouro do jogo junto.
  */
-export const EMISSIVE_HEX = ['#59f2c2', '#7ab8ff', '#ff7a2f', '#a8e63c'] as const;
+export const EMISSIVE_HEX = [
+  '#59f2c2', // biolum
+  '#7ab8ff', // electric
+  '#ff7a2f', // fire
+  '#a8e63c', // acid
+  '#ffa63f', // amber
+  '#ffe9b8', // beam
+] as const;
 
 /**
  * Distancia que o Prospector percorre num ciclo completo de caminhada, em tiles.

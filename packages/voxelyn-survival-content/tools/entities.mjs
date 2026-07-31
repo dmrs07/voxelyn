@@ -311,7 +311,20 @@ const bishopModel = (anim, f) => {
   // contra massa larga) e nao por tamanho.
   b.push(box(-5, -4, 0, 11, 9, 3, 'rockDeep'));
   b.push(box(-4, -3, 3, 9, 7, 4, 'rust'));
-  b.push(box(-3, -3, 7, 7, 6, 5 + nova, 'bone'));
+  // O degrau de cima do manto e FERRUGEM, e nao osso.
+  //
+  // Osso e o material mais palido do jogo, e este e o maior volume do bicho: com
+  // as rampas espacadas por igual, ele passou a ler como uma torre de arenito
+  // clara — a coisa mais brilhante da tela, competindo com o proprio jogador
+  // numa caverna escura. Antes o material se salvava por acidente, porque a
+  // rampa dele caia 35 pontos entre o topo e a lateral e o volume saia escuro
+  // apesar da cor.
+  //
+  // O palido continua no bicho, concentrado onde o olho deve parar: gola e
+  // mitra. A separacao entre este degrau e o de baixo, que agora usam o mesmo
+  // material, sai da sombra de contato — que e exatamente para isso que ela
+  // existe.
+  b.push(box(-3, -3, 7, 7, 6, 5 + nova, 'rust'));
   // Estola vertical dourada descendo pelo centro do manto: e o que faz o olho
   // subir ate a mitra em vez de parar no volume maior.
   b.push(box(-1, -5, 4, 3, 1, 10 + nova, 'loot'));

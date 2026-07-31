@@ -233,13 +233,13 @@ export const prospectorParts = ({
   // jogador localiza no breu antes de localizar o corpo. Num bot simetrico o
   // rumo dependeria do corpo todo; com o farol de um lado so, basta ele.
   //
-  // A lente e `fire` e nao `loot`: a rampa do fogo ja tem o dourado no topo, e o
-  // material esta na lista de EMISSIVOS — ou seja, ele nao escurece dentro da
-  // carcaca e ganha halo no runtime. Em `loot` o farol seria ouro, o material de
-  // que sao feitos casco e fivela, e a peca que o bot usa para enxergar no escuro
-  // acenderia menos que o minerio no chao.
+  // A lente usa o material `lamp`, que existe para isto: branco quente sobre
+  // brasa, tres faces emissivas. Nem `loot`, que e OURO — o farol nao emitiria e
+  // acenderia menos que o cascalho no chao — nem `fire`, que e CHAMA: um farol
+  // tatico nao queima, e a cor que desenha incendio no chao nao pode desenhar o
+  // equipamento que ilumina o caminho.
   upper.push(box(-2, -3 + lean * 2, head, 1, 2, 2, 'rockDeep'));
-  upper.push(box(-2, -4 + lean * 2, head, 1, 1, 2, 'fire'));
+  upper.push(box(-2, -4 + lean * 2, head, 1, 1, 2, 'lamp'));
 
   // CRAVADOR DE ESTILHACOS, montado no hardpoint direito.
   //

@@ -29,13 +29,14 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
-    "#2f6b4f",
+    "#479a68",
     "#59f2c2",
     "#66c28a",
     "#6e4a33",
+    "#937e61",
     "#b8a98f",
-    "#d93b4c",
-    "#ff7a2f"
+    "#d5cdba",
+    "#d93b4c"
   ],
   "animations": {
     "idle": {

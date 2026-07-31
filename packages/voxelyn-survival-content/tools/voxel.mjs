@@ -28,12 +28,33 @@ export const RAMPS = {
   // criaturas justamente onde elas andam.
   floor: ['rockShadow', 'dark', 'dark'],
   scorch: ['dark', 'dark', 'dark'],
-  rust: ['bone', 'rust', 'rockShadow'],
-  bone: ['bone', 'rust', 'rockShadow'],
-  fungus: ['fungusLight', 'fungus', 'fungusDark'],
+  /**
+   * METAL e OSSO: as duas rampas que mais mudaram, e onde a licao esta.
+   *
+   * `rust` ia de osso (67) direto para ferrugem (31) — 35 pontos de luminancia
+   * entre duas faces do MESMO voxel. A peca lia como um topo claro colado num
+   * corpo escuro, e nao como um volume de latao.
+   *
+   * Espacar nao basta: a ANCORA importa tanto quanto o espacamento. A primeira
+   * correcao foi so distribuir por igual mantendo o topo em osso (67/50/31).
+   * Ficou uniforme e ERRADO — o jogo se passa numa caverna escura, o salto grande
+   * estava fazendo o trabalho de manter a massa escura, e sem ele toda peca de
+   * metal subiu um terco em valor. O Bispo virou uma torre de arenito clara, mais
+   * brilhante que o proprio jogador. Aqui a rampa e uniforme E baixa, e o topo
+   * passar a ser latao em vez de osso ainda resolve de quebra o velho problema da
+   * face de topo quase branca em todo volume horizontal grande.
+   *
+   * E as duas deixam de ser a MESMA rampa, o que eram antes por descuido: latao
+   * e o metal quente do chassi, dos cascos e da picareta; osso e a peca palida —
+   * mascara, chifre, garra, mitra. Duas materias que o jogo trata como diferentes
+   * nao podem sair do rasterizador identicas.
+   */
+  rust: ['brass', 'rust', 'rockShadow'],
+  bone: ['bone', 'brass', 'rust'],
+  fungus: ['fungusLight', 'moss', 'fungus'],
   fungusDeep: ['fungus', 'fungusDark', 'dark'],
-  biolum: ['biolum', 'fungusLight', 'fungus'],
-  acid: ['acid', 'fungusLight', 'fungus'],
+  biolum: ['biolum', 'fungusLight', 'moss'],
+  acid: ['acid', 'fungusLight', 'moss'],
   /**
    * Lamina de biofluido: topo ESCURO com as laterais quase pretas.
    *
@@ -51,19 +72,47 @@ export const RAMPS = {
    * esverdeado, que e o enxofre, e separa o gas do fungo e da poca de uma vez.
    */
   sulfur: ['loot', 'acid', 'fungusDark'],
-  fire: ['loot', 'fire', 'blood'],
-  blood: ['blood', 'rust', 'dark'],
-  electric: ['electric', 'rockLight', 'rock'],
-  loot: ['loot', 'rust', 'rockShadow'],
-  player: ['player', 'bone', 'rust'],
+  // Chama: sem ouro no topo. Ouro e minerio, e o topo de uma chama nao e feito
+  // do mesmo material que o chao onde ela queima — alem de o ouro nao emitir, o
+  // que deixava a face mais visivel do fogo fora do halo.
+  fire: ['amber', 'fire', 'blood'],
+  /**
+   * FAROL. Lampada acesa: nem ouro, nem chama.
+   *
+   * Existe porque nao havia material para "luz branca quente" e as duas
+   * tentativas de improvisar erraram. Em `loot` o farol era OURO — o material de
+   * que sao feitos casco, fivela e minerio —, entao a peca que o bot usa para
+   * enxergar no escuro nao emitia e acendia menos que o cascalho no chao. Em
+   * `fire` ele emitia, mas passava a ser CHAMA: um farol tatico nao queima, e a
+   * mesma cor que desenha incendio no chao nao pode desenhar o equipamento que
+   * ilumina o caminho.
+   *
+   * A rampa sobe pelos degraus novos — branco quente, brasa, chama — e as tres
+   * faces emitem, entao a lente acende inteira em qualquer direcao.
+   */
+  lamp: ['beam', 'amber', 'fire'],
+  blood: ['blood', 'rust', 'rockShadow'],
+  electric: ['electric', 'mist', 'rockLight'],
+  /**
+   * Ouro: a unica rampa que fica de proposito mais inclinada que as outras.
+   *
+   * Espacada por igual (83/67/50) ela fica correta e errada ao mesmo tempo — o
+   * baculo do Bispo virava uma coluna palida, a peca mais chamativa de um chefe
+   * cuja leitura nao e o baculo. Metal polido nao se comporta como superficie
+   * fosca: reflete o topo com forca e cai rapido nas laterais, e e esse contraste
+   * que faz ouro parecer ouro em vez de tinta amarela. Sai de 51 pontos de salto
+   * para 33, que e a melhora sem perder a materia.
+   */
+  loot: ['loot', 'brass', 'rust'],
+  player: ['player', 'chalk', 'bone'],
 };
 
 /**
  * SOMBRA de cada cor da paleta mestra: um passo abaixo, dentro da propria paleta.
  *
- * A oclusao de ambiente nao pode multiplicar canal. A Art Bible fixa dezesseis
- * cores e o validador rejeita qualquer pixel fora delas — escurecer aqui e
- * ESCOLHER a proxima cor da escada, e nao calcular uma. Cada entrada e o vizinho
+ * A oclusao de ambiente nao pode multiplicar canal: a Art Bible fixa a paleta e
+ * o validador rejeita qualquer pixel fora dela. Escurecer aqui e ESCOLHER a
+ * proxima cor da escada, e nao calcular uma. Cada entrada e o vizinho
  * mais escuro plausivel dentro da mesma familia, e a escada termina em `dark`,
  * que e sombra de si mesma.
  *
@@ -72,22 +121,32 @@ export const RAMPS = {
  * Com uma escada por familia, ela teria dois destinos e a sombra de uma peca
  * dependeria de qual material a citou primeiro.
  */
-const SHADOW_OF = {
-  player: 'bone',
-  bone: 'rust',
+export const SHADOW_OF = {
+  // quente/neutra
+  player: 'chalk',
+  chalk: 'bone',
+  bone: 'brass',
+  brass: 'rust',
+  rust: 'rockShadow',
+  // fria
+  mist: 'rockLight',
   rockLight: 'rock',
   rock: 'rockShadow',
   rockShadow: 'dark',
-  rust: 'rockShadow',
-  loot: 'rust',
-  fire: 'blood',
-  blood: 'rust',
+  // verde
   biolum: 'fungusLight',
-  fungusLight: 'fungus',
+  fungusLight: 'moss',
+  moss: 'fungus',
   fungus: 'fungusDark',
   fungusDark: 'dark',
-  acid: 'fungus',
-  electric: 'rockLight',
+  acid: 'fungusLight',
+  // quente viva
+  beam: 'amber',
+  loot: 'bone',
+  amber: 'fire',
+  fire: 'blood',
+  blood: 'rust',
+  electric: 'mist',
   dark: 'dark',
 };
 
@@ -99,39 +158,48 @@ const SHADOW_OF = {
  * lado e o escuro do outro pertencerem a MESMA escada; misturar familias na
  * subida daria brilho de outra cor, que a esta escala vira sujeira.
  *
- * O topo da escada e onde a paleta acaba. `player` e o branco e nao tem acima;
- * `biolum` ja e o verde mais claro. Nesses casos a cor fica onde esta, e o
- * realce simplesmente nao acontece — melhor nao acontecer do que saltar de
- * familia.
+ * Com os degraus intermediarios da paleta a subida deixou de ter buracos: de
+ * ferrugem a branco sao agora cinco passos curtos (rust, brass, bone, chalk,
+ * player) no lugar dos tres saltos que existiam antes.
  */
-const LIGHT_OF = {
-  rust: 'bone',
+export const LIGHT_OF = {
+  // quente/neutra
+  rust: 'brass',
+  brass: 'bone',
+  bone: 'chalk',
+  chalk: 'player',
+  // fria
   rockShadow: 'rock',
   rock: 'rockLight',
+  rockLight: 'mist',
+  mist: 'chalk',
   dark: 'rockShadow',
+  // verde
   fungusDark: 'fungus',
-  fungus: 'fungusLight',
-  blood: 'fire',
-  // TETO da escada. Estas cores ficam onde estao, e o realce simplesmente nao
-  // acontece nelas.
-  //
-  // Nao e porque falta cor acima: `bone` tem `player` acima e `loot` tambem. E
-  // que o degrau ali e grande demais em valor E em matiz — de um tan quente para
-  // um branco azulado —, e uma quina de um voxel nesse contraste nao le como
-  // aresta viva, le como respingo. Medido no Bispo, cujo manto inteiro e `bone`:
-  // as quinas viravam pontinhos brancos espalhados pelos degraus, como neve.
-  //
-  // Os tons ja claros (`rockLight`, `fungusLight`) param pelo mesmo motivo: o
-  // proximo passo cruzaria para a familia de outro material.
-  bone: 'bone',
-  loot: 'loot',
-  rockLight: 'rockLight',
+  fungus: 'moss',
+  moss: 'fungusLight',
+  /**
+   * TETO da escada. Aqui o realce simplesmente nao acontece.
+   *
+   * A regra nao e "acabou a paleta" — e que o passo seguinte cruzaria para uma
+   * cor EMISSIVA, e uma quina iluminada de metal comum nao pode virar fonte de
+   * luz: ela ganharia halo no runtime e prometeria uma mecanica que nao existe.
+   * `fungusLight` pararia em biolum, `blood` em fire, `loot` em beam.
+   *
+   * Os proprios emissivos param por serem emissivos: material emissivo nao
+   * recebe nem sombra nem realce, entao estas entradas so existem para a tabela
+   * ser total.
+   */
   fungusLight: 'fungusLight',
+  blood: 'blood',
+  loot: 'loot',
+  player: 'player',
   acid: 'acid',
   biolum: 'biolum',
   electric: 'electric',
   fire: 'fire',
-  player: 'player',
+  amber: 'amber',
+  beam: 'beam',
 };
 
 /**
@@ -146,7 +214,7 @@ const LIGHT_OF = {
  * materiais, e casco ou placa no fundo de uma junta deve escurecer como
  * qualquer outra superficie.
  */
-export const EMISSIVE = new Set(['biolum', 'electric', 'fire', 'acid']);
+export const EMISSIVE = new Set(['biolum', 'electric', 'fire', 'acid', 'amber', 'beam']);
 
 /** Caixa de voxels. Eixos: x = leste, y = sul, z = cima; origem entre os pes. */
 export const box = (x, y, z, w, d, h, mat) => ({ x, y, z, w, d, h, mat });
