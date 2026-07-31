@@ -16,6 +16,7 @@ import {
   resolveProp,
   type PropManifest,
   type TerrainManifest,
+  EMISSIVE_HEX,
 } from '@voxelyn/survival-content';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
@@ -80,7 +81,94 @@ export type LayeredPlayerAnimation = {
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
 
 type Tint = { color: string; alpha: number };
-type Loaded = { manifest: SpriteManifestEntry; image: HTMLImageElement; ready: boolean; failed: boolean };
+type Loaded = {
+  manifest: SpriteManifestEntry;
+  image: HTMLImageElement;
+  ready: boolean;
+  failed: boolean;
+  /** Halo: so os pixels emissivos do atlas, em meia resolucao. Ver `emissiveMask`. */
+  glow: HTMLCanvasElement | null;
+};
+
+/**
+ * Divisor de resolucao da mascara de halo.
+ *
+ * Meia resolucao nao e economia cega, e a forma certa do dado: o halo E borrado.
+ * Guardar a mascara em resolucao cheia gastaria quatro vezes a memoria para
+ * depois jogar a nitidez fora no desenho — e a ampliacao de volta, com
+ * suavizacao ligada, e exatamente o borrao que se quer, de graca e sem filtro
+ * por quadro.
+ */
+const GLOW_SCALE = 2;
+/** Quanto o halo transborda a silhueta, em pixels de atlas. */
+const GLOW_SPREAD = 2;
+const GLOW_ALPHA = 0.55;
+
+/**
+ * Apaga tudo que NAO emite luz, no lugar, e devolve quantos pixels sobraram.
+ *
+ * Comparacao EXATA contra a paleta mestra, e nao por proximidade: os atlas de
+ * personagem sao validados com alpha binario e cores exatas da paleta, entao um
+ * limiar de aproximacao so criaria falso positivo em cima de uma garantia que ja
+ * existe. (Terreno e chao ficam de fora do halo justamente por nao terem essa
+ * garantia — as cores deles sao multiplicadas por niveis de luz assados, e um
+ * cristal a meia luz nao bate com nenhum hex da paleta.)
+ *
+ * Separada do canvas de proposito: e a unica parte com decisao, e assim ela e
+ * testavel sem DOM.
+ */
+export const keepEmissivePixels = (
+  rgba: Uint8ClampedArray,
+  emissive: readonly string[]
+): number => {
+  const wanted = new Set(emissive.map((hex) => parseInt(hex.slice(1), 16)));
+  let kept = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+    if (rgba[i + 3] !== 0 && wanted.has(key)) {
+      kept++;
+      continue;
+    }
+    rgba[i + 3] = 0;
+  }
+  return kept;
+};
+
+/**
+ * Mascara com os pixels emissivos de um atlas, em meia resolucao.
+ *
+ * Devolve `null` quando nao ha um unico pixel emissivo, e ai o desenho pula o
+ * halo inteiro em vez de compor uma imagem vazia por criatura por quadro.
+ */
+export const emissiveMask = (
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  emissive: readonly string[]
+): HTMLCanvasElement | null => {
+  if (width <= 0 || height <= 0) return null;
+  const full = document.createElement('canvas');
+  full.width = width;
+  full.height = height;
+  const fctx = full.getContext('2d', { willReadFrequently: true });
+  if (!fctx) return null;
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(source, 0, 0);
+
+  const frame = fctx.getImageData(0, 0, width, height);
+  if (keepEmissivePixels(frame.data, emissive) === 0) return null;
+  fctx.putImageData(frame, 0, 0);
+
+  const half = document.createElement('canvas');
+  half.width = Math.max(1, Math.floor(width / GLOW_SCALE));
+  half.height = Math.max(1, Math.floor(height / GLOW_SCALE));
+  const hctx = half.getContext('2d');
+  if (!hctx) return null;
+  hctx.imageSmoothingEnabled = true;
+  hctx.drawImage(full, 0, 0, half.width, half.height);
+  return half;
+};
+
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
   { manifest: playerLowerManifest as unknown as SpriteManifestEntry, url: playerLowerUrl },
@@ -373,12 +461,30 @@ export const recoilScreenOffset = (
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
   private tintBuffer: HTMLCanvasElement | null = null;
+  /**
+   * Halo ligado. Vem do preset de qualidade e nao de uma constante: e o unico
+   * efeito desta classe que e puro enfeite, entao e o primeiro a sair quando o
+   * aparelho nao esta dando conta.
+   */
+  bloom = true;
 
   load(): void {
     for (const { manifest, url } of SOURCES) {
       const image = new Image();
-      const entry: Loaded = { manifest, image, ready: false, failed: false };
-      image.onload = () => { entry.ready = true; };
+      const entry: Loaded = { manifest, image, ready: false, failed: false, glow: null };
+      image.onload = () => {
+        entry.ready = true;
+        // A mascara e construida UMA vez, no load, e nunca por quadro. Ler pixel
+        // de um atlas de meio milhao deles em tempo de jogo seria travar o
+        // quadro; aqui acontece atras da tela de carregamento.
+        try {
+          entry.glow = emissiveMask(image, image.naturalWidth, image.naturalHeight, EMISSIVE_HEX);
+        } catch {
+          // Canvas bloqueado (contexto perdido, aba em segundo plano no load):
+          // o jogo segue sem halo, que e cosmetico.
+          entry.glow = null;
+        }
+      };
       image.onerror = () => {
         entry.failed = true;
         console.warn(`[sprites] atlas failed to load; using fallback: ${manifest.id}`);
@@ -551,10 +657,51 @@ export class SpriteBank {
       ctx.translate(-footX, 0);
       const flippedX = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, flippedX, dy, dw, dh);
+      this.drawGlow(ctx, loaded, rect, flippedX, dy, dw, dh, zoom);
     } else {
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
+      this.drawGlow(ctx, loaded, rect, dx, dy, dw, dh, zoom);
     }
     ctx.restore();
+  }
+
+  /**
+   * Halo aditivo sobre os pixels emissivos do quadro.
+   *
+   * UM drawImage, sem filtro e sem leitura de pixel: a mascara ja esta pronta
+   * desde o load, e o borrao sai da ampliacao dela de meia resolucao de volta ao
+   * tamanho do sprite, com suavizacao ligada. Cresce alguns pixels alem da
+   * silhueta para o brilho transbordar a peca, que e o que separa "uma luz" de
+   * "um pixel claro".
+   *
+   * Sai DENTRO do `save/restore` do desenho principal, e logo depois dele, para
+   * herdar o mesmo espelhamento — sem isso o halo do visor de um sprite virado
+   * ficaria do lado oposto da cabeca.
+   */
+  private drawGlow(
+    ctx: CanvasRenderingContext2D,
+    loaded: Loaded,
+    rect: { sx: number; sy: number; sw: number; sh: number },
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number,
+    zoom: number
+  ): void {
+    const glow = loaded.glow;
+    if (!this.bloom || !glow) return;
+    const grow = GLOW_SPREAD * zoom;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = GLOW_ALPHA;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      glow,
+      rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,
+      dx - grow, dy - grow, dw + grow * 2, dh + grow * 2
+    );
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = false;
   }
 
   private tintedFrame(

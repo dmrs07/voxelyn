@@ -479,6 +479,10 @@ export class SurvivalRenderer {
 
   setQuality(level: QualityLevel): void {
     this.quality = PRESETS[level];
+    // O halo dos emissivos e o primeiro enfeite a sair quando o aparelho nao
+    // esta dando conta: e o unico efeito do banco de sprites que nao conta nada
+    // ao jogador. O rebaixamento automatico do FpsGovernor passa por aqui.
+    this.sprites.bloom = this.quality.bloom;
     this.resize();
   }
 

@@ -122,6 +122,25 @@ export const FIRST_PACK_IDS = [
 ] as const;
 
 /**
+ * Cores da paleta mestra que EMITEM luz.
+ *
+ * Fonte unica, consumida por dois lados que nao podem discordar. O rasterizador
+ * usa para isentar essas cores da oclusao de ambiente — escurecer uma luz no
+ * fundo de uma fresta apagaria justamente o ponto que o jogador usa para achar a
+ * criatura no breu. O cliente usa para saber quais pixels do atlas recebem halo.
+ *
+ * Divergindo as duas listas, um material ficaria isento de sombra sem brilhar,
+ * ou brilharia recebendo sombra — e nenhum dos dois erros apareceria em teste,
+ * so no escuro.
+ *
+ * Ouro (`loot`) e branco (`player`) NAO estao aqui: sao materiais, nao fontes.
+ * Casco, fivela, minerio e o baculo do Bispo sao de ouro, e um baculo que brilha
+ * promete uma mecanica que nao existe. O que precisa mesmo brilhar e autorado em
+ * `fire`, cuja face de topo ja e dourada.
+ */
+export const EMISSIVE_HEX = ['#59f2c2', '#7ab8ff', '#ff7a2f', '#a8e63c'] as const;
+
+/**
  * Distancia que o Prospector percorre num ciclo completo de caminhada, em tiles.
  *
  * Este e o CONTRATO entre a animacao e a simulacao, e existe porque as duas

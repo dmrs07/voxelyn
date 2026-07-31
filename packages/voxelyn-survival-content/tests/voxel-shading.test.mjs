@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ambientOcclusionSteps, box, renderVoxels } from '../tools/voxel.mjs';
+import { ambientOcclusionSteps, box, isLitCorner, renderVoxels } from '../tools/voxel.mjs';
 
 /** Predicado de ocupacao a partir de uma lista de celulas solidas. */
 const occupancy = (cells) => {
@@ -126,5 +126,66 @@ describe('oclusao de ambiente', () => {
     // Mesma placa, mesmo pilar: so muda o material.
     expect(shadowedPixels(PLATE('sulfur'), TOUCHING)).toBeGreaterThan(0);
     expect(shadowedPixels(PLATE('biolum'), TOUCHING)).toBe(0);
+  });
+});
+
+/**
+ * O complemento da oclusao: a quina que a luz principal pega.
+ *
+ * Sem ele, uma superficie grande e plana continua sendo UM tom chapado do topo
+ * ao fim, por mais bem sombreadas que estejam as juntas em volta — a sombra
+ * costura volumes, mas nao devolve aresta viva a um volume sozinho.
+ */
+describe('realce de quina', () => {
+  const solidAt = (cells) => {
+    const set = new Set(cells.map(([x, y, z]) => `${x},${y},${z}`));
+    return (x, y, z) => set.has(`${x},${y},${z}`);
+  };
+
+  it('acende so a quina virada para a luz', () => {
+    // A key light vem do topo-esquerda. Na projecao, diminuir x ou y sobe na
+    // tela: as duas direcoes viradas para a luz sao -x e -y.
+    const alone = solidAt([[0, 0, 0]]);
+    expect(isLitCorner(alone, 0, 0, 0)).toBe(true);
+  });
+
+  it('exige as DUAS ausencias, e nao uma', () => {
+    // Com uma so, todo voxel da borda de toda superficie plana acenderia — o
+    // resultado nao e bisel, e um contorno claro em volta de cada volume, que le
+    // como adesivo recortado.
+    expect(isLitCorner(solidAt([[0, 0, 0], [-1, 0, 0]]), 0, 0, 0)).toBe(false);
+    expect(isLitCorner(solidAt([[0, 0, 0], [0, -1, 0]]), 0, 0, 0)).toBe(false);
+  });
+
+  it('nao acende face de topo coberta', () => {
+    expect(isLitCorner(solidAt([[0, 0, 0], [0, 0, 1]]), 0, 0, 0)).toBe(false);
+  });
+
+  it('ignora vizinho do lado oposto a luz', () => {
+    // +x e +y descem na tela: nao tem nada a ver com a quina iluminada.
+    expect(isLitCorner(solidAt([[0, 0, 0], [1, 0, 0], [0, 1, 0]]), 0, 0, 0)).toBe(true);
+  });
+
+  it('leva o realce ate o raster', () => {
+    // Um degrau de `rock` sobre uma placa: o topo do degrau tem quina exposta e
+    // ganha `rockLight`, que nao aparece em lugar nenhum de uma placa lisa.
+    const plate = [box(-3, -3, 0, 7, 7, 1, 'rockDeep')];
+    const step = [box(-1, -1, 1, 3, 3, 1, 'rockDeep')];
+    expect(shadowedPixels(plate, step)).toBeGreaterThan(0);
+  });
+
+  /**
+   * Um degrau de `bone` NAO ganha realce: o proximo passo acima seria `player`,
+   * um branco azulado, e uma quina de um voxel nesse contraste le como respingo.
+   * Medido no Bispo, cujo manto inteiro e `bone` — as quinas viravam pontinhos
+   * brancos espalhados pelos degraus, como neve.
+   */
+  it('nao acende as cores em que o degrau acima seria grande demais', () => {
+    const isSolid = solidAt([[0, 0, 0]]);
+    expect(isLitCorner(isSolid, 0, 0, 0)).toBe(true);
+
+    const boneStep = [box(-1, -1, 1, 3, 3, 1, 'bone')];
+    // A quina existe, mas `bone` e teto da escada de luz: o raster nao muda.
+    expect(shadowedPixels([box(-3, -3, 0, 7, 7, 1, 'scorch')], boneStep)).toBe(0);
   });
 });

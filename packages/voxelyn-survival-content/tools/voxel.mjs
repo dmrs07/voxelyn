@@ -92,6 +92,49 @@ const SHADOW_OF = {
 };
 
 /**
+ * LUZ de cada cor: um passo acima, pelo caminho inverso da sombra.
+ *
+ * Existe pelo mesmo motivo que `SHADOW_OF`, e nao e a inversa dela por acidente
+ * — e a inversa dela de proposito. Uma aresta so le como aresta se o claro de um
+ * lado e o escuro do outro pertencerem a MESMA escada; misturar familias na
+ * subida daria brilho de outra cor, que a esta escala vira sujeira.
+ *
+ * O topo da escada e onde a paleta acaba. `player` e o branco e nao tem acima;
+ * `biolum` ja e o verde mais claro. Nesses casos a cor fica onde esta, e o
+ * realce simplesmente nao acontece — melhor nao acontecer do que saltar de
+ * familia.
+ */
+const LIGHT_OF = {
+  rust: 'bone',
+  rockShadow: 'rock',
+  rock: 'rockLight',
+  dark: 'rockShadow',
+  fungusDark: 'fungus',
+  fungus: 'fungusLight',
+  blood: 'fire',
+  // TETO da escada. Estas cores ficam onde estao, e o realce simplesmente nao
+  // acontece nelas.
+  //
+  // Nao e porque falta cor acima: `bone` tem `player` acima e `loot` tambem. E
+  // que o degrau ali e grande demais em valor E em matiz — de um tan quente para
+  // um branco azulado —, e uma quina de um voxel nesse contraste nao le como
+  // aresta viva, le como respingo. Medido no Bispo, cujo manto inteiro e `bone`:
+  // as quinas viravam pontinhos brancos espalhados pelos degraus, como neve.
+  //
+  // Os tons ja claros (`rockLight`, `fungusLight`) param pelo mesmo motivo: o
+  // proximo passo cruzaria para a familia de outro material.
+  bone: 'bone',
+  loot: 'loot',
+  rockLight: 'rockLight',
+  fungusLight: 'fungusLight',
+  acid: 'acid',
+  biolum: 'biolum',
+  electric: 'electric',
+  fire: 'fire',
+  player: 'player',
+};
+
+/**
  * Cores que EMITEM luz e por isso nao recebem oclusao.
  *
  * Visor, nucleo, brasa e corrente sao fonte, nao superficie: escurece-los no
@@ -103,7 +146,7 @@ const SHADOW_OF = {
  * materiais, e casco ou placa no fundo de uma junta deve escurecer como
  * qualquer outra superficie.
  */
-const EMISSIVE = new Set(['biolum', 'electric', 'fire', 'acid']);
+export const EMISSIVE = new Set(['biolum', 'electric', 'fire', 'acid']);
 
 /** Caixa de voxels. Eixos: x = leste, y = sul, z = cima; origem entre os pes. */
 export const box = (x, y, z, w, d, h, mat) => ({ x, y, z, w, d, h, mat });
@@ -258,22 +301,47 @@ export const ambientOcclusionSteps = (isSolid, x, y, z, face) => {
   return count >= 6 ? 2 : count >= 3 ? 1 : 0;
 };
 
-const shadowed = (name, steps) => {
+const stepped = (table, name, steps) => {
   let out = name;
-  for (let i = 0; i < steps; i++) out = SHADOW_OF[out] ?? out;
+  for (let i = 0; i < steps; i++) out = table[out] ?? out;
   return out;
 };
 
 /**
- * Rampa de um voxel ja com a oclusao aplicada, face a face.
+ * A face de topo esta na QUINA que a luz principal pega?
  *
- * O que isto compra: sem ela, dois volumes que se encontram formam uma junta em
- * que as duas faces tem exatamente a mesma cor, e o olho nao encontra a aresta —
- * o modelo le como caixas empilhadas, e nao como um corpo. A sombra na fresta e
- * o que costura os volumes num objeto so, e e a diferenca de leitura mais barata
- * que este rasterizador consegue: nenhum voxel a mais, nenhuma cor nova.
+ * A key light da Art Bible vem do topo-esquerda. Na projecao, diminuir x ou y
+ * sobe na tela — sao essas as duas direcoes viradas para a luz. Uma face de topo
+ * sem vizinho em -x E sem vizinho em -y esta na quina exposta desse lado: e a
+ * aresta que um bisel de metal usinado devolveria em brilho.
+ *
+ * Exige as DUAS ausencias, e nao uma. Com uma so, todo voxel da borda de toda
+ * superficie plana acende — o resultado nao e bisel, e um contorno claro em
+ * volta de cada volume, que le como adesivo recortado e nao como luz. A quina
+ * dupla acontece em poucos voxels por peca, que e exatamente o que uma aresta
+ * viva deve ser.
  */
-const occludedRamp = (solid, v) => {
+export const isLitCorner = (isSolid, x, y, z) =>
+  !isSolid(x, y, z + 1) && !isSolid(x - 1, y, z) && !isSolid(x, y - 1, z);
+
+/**
+ * Rampa de um voxel com sombra e realce aplicados, face a face.
+ *
+ * Com as duas, cada material passa a cobrir CINCO passos de valor em vez dos
+ * tres tons fixos que a rampa declara: quina acesa, base, contato, fresta e
+ * fundo de fresta. Todos escolhidos dentro da paleta mestra — nenhuma cor nova,
+ * nenhum canal multiplicado.
+ *
+ * O que a sombra compra: dois volumes que se encontram formavam uma junta em que
+ * as duas faces tinham exatamente a mesma cor, e o olho nao achava a aresta — o
+ * modelo lia como caixas empilhadas, e nao como um corpo.
+ *
+ * O que o realce compra e o oposto e o complemento: sem ele, uma superficie
+ * grande e plana continua sendo UM tom chapado do topo ao fim, por mais bem
+ * sombreadas que estejam as juntas em volta. A quina acesa devolve a aresta viva
+ * que separa uma chapa de metal de um retangulo pintado.
+ */
+const shadedRamp = (solid, v) => {
   if (EMISSIVE.has(v.mat)) return v.ramp;
   const isSolid = (x, y, z) => solid.has(occupancyKey(x, y, z));
   let changed = false;
@@ -281,8 +349,19 @@ const occludedRamp = (solid, v) => {
   for (const [face, spec] of Object.entries(FACES)) {
     const steps = ambientOcclusionSteps(isSolid, v.x, v.y, v.z, face);
     if (steps === 0) continue;
-    out[spec.slot] = shadowed(v.ramp[spec.slot], steps);
+    out[spec.slot] = stepped(SHADOW_OF, v.ramp[spec.slot], steps);
     changed = true;
+  }
+  // O realce vem DEPOIS e so onde a sombra nao chegou: uma quina exposta nunca
+  // esta dentro de uma fresta, entao os dois nunca disputam a mesma face — mas
+  // deixar a ordem explicita evita que uma mudanca futura nos cortes crie um
+  // voxel que escurece e clareia no mesmo passe.
+  if (out[0] === v.ramp[0] && isLitCorner(isSolid, v.x, v.y, v.z)) {
+    const lit = stepped(LIGHT_OF, v.ramp[0], 1);
+    if (lit !== v.ramp[0]) {
+      out[0] = lit;
+      changed = true;
+    }
   }
   return changed ? out : v.ramp;
 };
@@ -319,7 +398,7 @@ export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
   const solid = solidVoxels(boxes, rotation);
   for (const v of shellVoxels(boxes, rotation)) {
     const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
-    const ramp = occludedRamp(solid, v);
+    const ramp = shadedRamp(solid, v);
     commands.push({
       key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0),
       draw: () => cube(g, Math.round(anchorX + sx), Math.round(anchorY + sy), ramp),
