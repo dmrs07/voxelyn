@@ -42,6 +42,7 @@ import {
   REVIVE_HP_FRACTION,
   REVIVE_RADIUS,
   RETURN_DISC_MAX_DISTANCE,
+  RICOCHET_BOUNCES,
   RETURN_DISC_SPEED,
   ORE_PER_MODULE,
   SALVAGE_SCAN_TICKS,
@@ -730,7 +731,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     if (moduleHasCapacity(extra, 'explosive', state.tick)) {
       modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
     }
-    if (moduleHasCapacity(extra, 'ricochet', state.tick)) modules.ricochet = { remainingBounces: 1 };
+    if (moduleHasCapacity(extra, 'ricochet', state.tick)) {
+      modules.ricochet = { remainingBounces: RICOCHET_BOUNCES };
+    }
     if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
     if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
     const armed = Object.keys(modules).length > 0 ? modules : undefined;

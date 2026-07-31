@@ -30,6 +30,21 @@ export type InputState = {
   actionPressSeq: { dodge: number; ability: number };
   usingTouch: boolean;
   tapQueue: Array<{ x: number; y: number }>;
+  /**
+   * O jogador esta MIRANDO agora — no toque, o manche direito saiu do repouso;
+   * no mouse, o gatilho esta apertado.
+   *
+   * Existe para a faixa de mira no chao. Ela precisa aparecer so quando ha
+   * intencao de atirar: desenhada o tempo todo, ela vira mobilia da tela, e o
+   * jogador para de ve-la exatamente no instante em que ela deveria informar
+   * alguma coisa. No toque isso e literal — o manche tem posicao de repouso, e
+   * fora dela nao ha mira nenhuma acontecendo.
+   *
+   * Sai daqui e nao de uma releitura do estado no renderer porque e a MESMA
+   * condicao que decide `cmd.fire`: separadas, faixa e tiro divergiriam no
+   * primeiro ajuste de zona morta.
+   */
+  aiming: boolean;
 };
 
 export const MOVE_JOYSTICK_RADIUS = 60;
@@ -141,6 +156,7 @@ export class SurvivalInput {
     actionPressSeq: { dodge: 0, ability: 0 },
     usingTouch: false,
     tapQueue: [],
+    aiming: false,
   };
 
   constructor(private readonly canvas: HTMLCanvasElement) {}
@@ -443,6 +459,11 @@ export class SurvivalInput {
       cmd.aim = screenToWorldAim(this.mouse.x - playerScreen.x, this.mouse.y - playerScreen.y);
       cmd.fire = this.mouse.down;
     }
+    // A faixa de mira segue o GATILHO, e nao o cursor. No toque o manche fora do
+    // repouso ja atira, entao as duas coisas coincidem; no mouse, o cursor esta
+    // sempre apontando para algum lugar e uma faixa permanente no chao seria
+    // ruido constante — quem tem cursor ja ve para onde mira sem ela.
+    this.state.aiming = cmd.fire;
 
     cmd.dodge = this.queuedDodge;
     cmd.interact = this.queuedInteract;

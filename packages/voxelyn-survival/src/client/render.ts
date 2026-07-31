@@ -19,6 +19,8 @@ import {
   SURF_SPORES,
   ABILITY_RADIUS,
   HEAT_MAX,
+  RICOCHET_BOUNCES,
+  moduleHasCapacity,
   SECTOR_COUNT,
   WELL_OFFER_REACH,
   isFinalSector,
@@ -200,12 +202,101 @@ export const AIM_LANE_LENGTH = 7;
 /** Passo do raycast da faixa, em tiles. Um quarto de tile nao pula parede. */
 const AIM_LANE_STEP = 0.25;
 
+/** Um trecho reto da faixa: comeco, fim e o rumo unitario entre os dois. */
+export type AimLaneLeg = {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  nx: number;
+  ny: number;
+  length: number;
+};
+
 /**
- * Ate onde a faixa de mira alcanca antes de bater em pedra.
+ * O trajeto que a faixa de mira desenha, ja com os rebotes.
  *
- * Pura e exportada para o teste poder conferir o caso que importa — a faixa
- * parando NA parede e nao atras dela — sem precisar de um canvas.
+ * Sem Ricochete a resposta e um trecho so, que para na primeira pedra. Com ele,
+ * a faixa segue ate o ULTIMO quique — que e a unica leitura util do modulo: um
+ * tiro que rebate so vale a pena se der para escolher a parede, e escolher a
+ * parede exige ver para onde ela devolve.
+ *
+ * A reflexao repete a da simulacao a letra (`bounceOffSolid`): espelha no eixo
+ * por onde o tiro ENTROU na celula solida e retoma da posicao anterior. Deduzir
+ * de outro jeito daria uma faixa que aponta para um lugar e um projetil que vai
+ * para outro, e uma previsao errada e pior do que nenhuma.
+ *
+ * O QUE ELA NAO PROMETE: a simulacao so rebate no que NAO cedeu — parede
+ * quebrada absorve o tiro em vez de devolve-lo. Prever isso exigiria saber a
+ * vida do material, e a faixa passaria a mentir de um jeito novo (apagar o
+ * quique num bloco que aguentou). Ela desenha a geometria do rebote supondo que
+ * a parede segura, que e o caso da rocha — a esmagadora maioria das paredes.
+ *
+ * Pura e exportada: o teste confere o angulo de saida sem precisar de canvas.
  */
+export const aimLanePath = (
+  originX: number,
+  originY: number,
+  dirX: number,
+  dirY: number,
+  isSolid: (x: number, y: number) => boolean,
+  bounces = 0,
+  maxLength = AIM_LANE_LENGTH
+): AimLaneLeg[] => {
+  const initial = Math.hypot(dirX, dirY);
+  if (initial < 1e-6) return [];
+
+  const legs: AimLaneLeg[] = [];
+  let x = originX;
+  let y = originY;
+  let nx = dirX / initial;
+  let ny = dirY / initial;
+  // O alcance e do TIRO, e nao de cada trecho: os rebotes repartem os mesmos
+  // sete tiles. Um tiro que rebate nao viaja mais longe por rebater.
+  let budget = maxLength;
+  let left = Math.max(0, Math.floor(bounces));
+
+  for (;;) {
+    let travelled = 0;
+    let hitX = 0;
+    let hitY = 0;
+    let blocked = false;
+    for (let d = AIM_LANE_STEP; d <= budget + 1e-9; d += AIM_LANE_STEP) {
+      const px = x + nx * d;
+      const py = y + ny * d;
+      if (isSolid(px, py)) {
+        blocked = true;
+        hitX = px;
+        hitY = py;
+        break;
+      }
+      travelled = d;
+    }
+
+    legs.push({ x0: x, y0: y, x1: x + nx * travelled, y1: y + ny * travelled, nx, ny, length: travelled });
+    budget -= travelled;
+    if (!blocked || left === 0 || budget <= AIM_LANE_STEP) break;
+
+    // Espelha no eixo por onde ENTROU na celula, exatamente como a simulacao.
+    const prevX = x + nx * travelled;
+    const prevY = y + ny * travelled;
+    const enteredX = Math.floor(prevX) !== Math.floor(hitX);
+    const enteredY = Math.floor(prevY) !== Math.floor(hitY);
+    if (enteredX) nx = -nx;
+    if (enteredY) ny = -ny;
+    if (!enteredX && !enteredY) {
+      if (Math.abs(nx) >= Math.abs(ny)) nx = -nx;
+      else ny = -ny;
+    }
+    x = prevX;
+    y = prevY;
+    left--;
+  }
+
+  return legs;
+};
+
+/** Ate onde a faixa alcanca em linha reta. Atalho para o caso sem rebote. */
 export const aimLaneReach = (
   originX: number,
   originY: number,
@@ -214,14 +305,8 @@ export const aimLaneReach = (
   isSolid: (x: number, y: number) => boolean,
   maxLength = AIM_LANE_LENGTH
 ): number => {
-  const length = Math.hypot(dirX, dirY);
-  if (length < 1e-6) return 0;
-  const nx = dirX / length;
-  const ny = dirY / length;
-  for (let d = AIM_LANE_STEP; d <= maxLength; d += AIM_LANE_STEP) {
-    if (isSolid(originX + nx * d, originY + ny * d)) return d - AIM_LANE_STEP;
-  }
-  return maxLength;
+  const [first] = aimLanePath(originX, originY, dirX, dirY, isSolid, 0, maxLength);
+  return first?.length ?? 0;
 };
 
 /**
@@ -890,7 +975,12 @@ export class SurvivalRenderer {
     // Desenhada junto com o jogador, ela passaria por cima da parede que a
     // interrompe, e a unica coisa que a faixa nao pode fazer e mentir sobre o
     // alcance.
-    if (player.alive && !state.playerExtras[player.slot ?? 0].downed) {
+    // So enquanto o jogador MIRA. No toque isso e o manche direito fora do
+    // repouso; no mouse, o gatilho apertado. Desenhada o tempo todo, a faixa
+    // vira mobilia da tela e para de ser vista justamente quando teria algo a
+    // dizer — e no toque ela mentia por omissao, prometendo uma mira que o
+    // manche em repouso nao esta fazendo.
+    if (input.aiming && player.alive && !state.playerExtras[player.slot ?? 0].downed) {
       this.drawAimLane(state, player, toScreen, z);
     }
 
@@ -1466,47 +1556,60 @@ export class SurvivalRenderer {
     z: number
   ): void {
     const ctx = this.ctx;
-    const aim = state.playerExtras[player.slot ?? 0].aim;
+    const extra = state.playerExtras[player.slot ?? 0];
+    const aim = extra.aim;
     const length = Math.hypot(aim.x, aim.y);
     if (length < 1e-6) return;
-    const nx = aim.x / length;
-    const ny = aim.y / length;
 
     const w = state.config.width;
     const height = state.config.height;
-    const reach = aimLaneReach(player.x, player.y, nx, ny, (x, y) => {
-      const cx = Math.floor(x);
-      const cy = Math.floor(y);
-      if (cx < 0 || cy < 0 || cx >= w || cy >= height) return true;
-      return state.solid[cy * w + cx] !== SOLID_NONE;
-    });
+    const legs = aimLanePath(
+      player.x,
+      player.y,
+      aim.x / length,
+      aim.y / length,
+      (x, y) => {
+        const cx = Math.floor(x);
+        const cy = Math.floor(y);
+        if (cx < 0 || cy < 0 || cx >= w || cy >= height) return true;
+        return state.solid[cy * w + cx] !== SOLID_NONE;
+      },
+      // Rebotes que o PROXIMO tiro vai ter de fato: o modulo equipado E com
+      // carga. Desenhar o quique de um Ricochete sem carga prometeria uma parede
+      // que o tiro nao vai usar.
+      moduleHasCapacity(extra, 'ricochet', state.tick) ? RICOCHET_BOUNCES : 0,
+    );
+    if (legs.length === 0) return;
+
     // Comeca na borda do corpo: sob os pes do proprio Prospector a faixa nao
     // informa nada e ainda suja a silhueta dele.
-    const start = Math.min(reach, player.radius + 0.15);
-    if (reach - start < 0.2) return;
+    const bodyGap = player.radius + 0.15;
+    const total = legs.reduce((sum, leg) => sum + leg.length, 0);
+    if (total - bodyGap < 0.2) return;
 
     const half = SMALL_PROJECTILE_RADIUS;
-    // Perpendicular no MUNDO. Projetada depois, ela vira a largura correta na
-    // tela em qualquer direcao.
-    const px = -ny * half;
-    const py = nx * half;
-
-    // Duas faixas encaixadas: o corredor cheio, fraco, e um miolo mais forte.
-    // O miolo e o que a vista pega de relance; o corredor e o que ela confere
-    // quando o jogador quer mesmo saber se o inimigo esta dentro.
-    const band = (widthScale: number, alpha: number, fade: number): void => {
+    /**
+     * Desenha um trecho reto do trajeto. `from`/`to` sao distancias medidas ao
+     * longo do trajeto INTEIRO, e nao deste trecho: e o que faz o desvanecimento
+     * atravessar o quique sem reiniciar, e portanto o que faz os dois trechos
+     * lerem como um tiro so em vez de duas faixas soltas.
+     */
+    const band = (leg: AimLaneLeg, from: number, widthScale: number, alpha: number): void => {
+      const px = -leg.ny * half * widthScale;
+      const py = leg.nx * half * widthScale;
       const steps = 6;
+      const begin = leg === legs[0] ? Math.min(leg.length, bodyGap) : 0;
+      if (leg.length - begin <= 0) return;
       for (let i = 0; i < steps; i++) {
-        const t0 = start + ((reach - start) * i) / steps;
-        const t1 = start + ((reach - start) * (i + 1)) / steps;
+        const t0 = begin + ((leg.length - begin) * i) / steps;
+        const t1 = begin + ((leg.length - begin) * (i + 1)) / steps;
         // Some para a frente: a faixa nao pode terminar num traco reto, que
         // leria como "o tiro para aqui" — e ele nao para.
-        const segmentAlpha = alpha * (1 - (i / steps) * fade);
-        const [ax, ay] = toScreen(player.x + nx * t0 + px * widthScale, player.y + ny * t0 + py * widthScale);
-        const [bx, by] = toScreen(player.x + nx * t1 + px * widthScale, player.y + ny * t1 + py * widthScale);
-        const [cx, cy] = toScreen(player.x + nx * t1 - px * widthScale, player.y + ny * t1 - py * widthScale);
-        const [dx, dy] = toScreen(player.x + nx * t0 - px * widthScale, player.y + ny * t0 - py * widthScale);
-        ctx.globalAlpha = segmentAlpha;
+        ctx.globalAlpha = alpha * (1 - ((from + t0) / total) * 0.85);
+        const [ax, ay] = toScreen(leg.x0 + leg.nx * t0 + px, leg.y0 + leg.ny * t0 + py);
+        const [bx, by] = toScreen(leg.x0 + leg.nx * t1 + px, leg.y0 + leg.ny * t1 + py);
+        const [cx, cy] = toScreen(leg.x0 + leg.nx * t1 - px, leg.y0 + leg.ny * t1 - py);
+        const [dx, dy] = toScreen(leg.x0 + leg.nx * t0 - px, leg.y0 + leg.ny * t0 - py);
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         ctx.lineTo(bx, by);
@@ -1517,21 +1620,53 @@ export class SurvivalRenderer {
       }
     };
 
+    // Duas faixas encaixadas: o corredor cheio, fraco, e um miolo mais forte.
+    // O miolo e o que a vista pega de relance; o corredor e o que ela confere
+    // quando o jogador quer mesmo saber se o inimigo esta dentro.
     ctx.save();
     ctx.fillStyle = PAL.biolum;
-    band(1, 0.22, 0.85);
-    band(0.34, 0.4, 0.85);
+    for (const [scale, alpha] of [[1, 0.22], [0.34, 0.4]] as const) {
+      let walked = 0;
+      for (const leg of legs) {
+        band(leg, walked, scale, alpha);
+        walked += leg.length;
+      }
+    }
     ctx.restore();
     ctx.globalAlpha = 1;
 
-    // Traco final atravessado na ponta: um alvo, e nao um fim de linha. Da a
-    // faixa um ponto de leitura para quem mira "aquela distancia".
-    const [tipLx, tipLy] = toScreen(player.x + nx * reach + px * 1.9, player.y + ny * reach + py * 1.9);
-    const [tipRx, tipRy] = toScreen(player.x + nx * reach - px * 1.9, player.y + ny * reach - py * 1.9);
+    const last = legs[legs.length - 1];
+    const tipPx = -last.ny * half;
+    const tipPy = last.nx * half;
+    const tipX = last.x1;
+    const tipY = last.y1;
+
     ctx.save();
-    ctx.globalAlpha = 0.5;
     ctx.strokeStyle = PAL.biolum;
     ctx.lineWidth = Math.max(1, z * 0.9);
+
+    // Marca do QUIQUE: um losango na parede onde o tiro vira. E o ponto que o
+    // jogador de fato escolhe quando usa Ricochete — a mira aponta para a
+    // parede, nao para o alvo — entao ele precisa de um alvo proprio.
+    ctx.globalAlpha = 0.7;
+    for (let i = 0; i < legs.length - 1; i++) {
+      const leg = legs[i];
+      const [kx, ky] = toScreen(leg.x1, leg.y1);
+      const r = Math.max(2, 3 * z);
+      ctx.beginPath();
+      ctx.moveTo(kx, ky - r * 0.5);
+      ctx.lineTo(kx + r, ky);
+      ctx.lineTo(kx, ky + r * 0.5);
+      ctx.lineTo(kx - r, ky);
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // Traco final atravessado na ponta: um alvo, e nao um fim de linha. Da a
+    // faixa um ponto de leitura para quem mira "aquela distancia".
+    ctx.globalAlpha = 0.5;
+    const [tipLx, tipLy] = toScreen(tipX + tipPx * 1.9, tipY + tipPy * 1.9);
+    const [tipRx, tipRy] = toScreen(tipX - tipPx * 1.9, tipY - tipPy * 1.9);
     ctx.beginPath();
     ctx.moveTo(tipLx, tipLy);
     ctx.lineTo(tipRx, tipRy);
