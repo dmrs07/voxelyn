@@ -56,6 +56,17 @@
         background: rgba(11, 14, 20, 0.92);
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         z-index: 10;
+        /* A overlay rola por DENTRO. O body nunca rola (`overflow: hidden`), e
+           sem isto tudo o que passa da altura simplesmente some da tela: em
+           paisagem de celular o que sumia era o botao de abandono — a unica
+           acao irreversivel do jogo, inalcancavel. */
+        overflow-y: auto;
+        /* `safe` e o que torna a rolagem util. Com o conteudo maior que a caixa,
+           centralizar transborda para os DOIS lados, e o que sai pelo topo fica
+           fora do alcance ate da barra de rolagem; `safe center` volta a alinhar
+           pelo inicio nesse caso e continua centralizando quando cabe. Navegador
+           sem suporte descarta a linha e mantem o `center` acima. */
+        justify-content: safe center;
       }
       .hidden {
         display: none !important;
@@ -289,6 +300,43 @@
         flex-direction: column;
         align-items: center;
         gap: 14px;
+      }
+
+      /* Paisagem de celular: ~360 px de altura para caber marca, titulo, o bloco
+         de opcoes inteiro e dois botoes. Encolher o cabecalho faz o conteudo
+         caber no caso comum; a rolagem da `.overlay` continua sendo a rede de
+         seguranca para fontes grandes e telas ainda menores. */
+      @media (max-height: 560px) {
+        .overlay {
+          gap: 8px;
+        }
+        #options-controls {
+          gap: 8px;
+        }
+        h1 {
+          font-size: clamp(15px, 4vw, 22px);
+        }
+        button {
+          padding: 8px 18px;
+        }
+        /* A placa vira FAIXA: a mesma marca, num terco da altura. */
+        .corp-plate {
+          flex-direction: row;
+          gap: 10px;
+          padding: 6px 14px;
+        }
+        .corp-mark {
+          width: 26px;
+          height: 26px;
+        }
+        /* O lema e a unica coisa da placa que nao carrega informacao: some
+           primeiro, e some sozinho. */
+        .corp-tagline {
+          display: none;
+        }
+        .panel {
+          max-height: 38vh;
+        }
       }
     </style>
   </head>

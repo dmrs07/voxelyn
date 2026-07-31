@@ -2,7 +2,7 @@ import { TICK_MS } from '@voxelyn/survival-sim';
 import { createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
-import { SurvivalInput, type TouchSafeArea } from './input';
+import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
 import { DeathEchoController } from './death-echo-presentation';
 import {
@@ -157,8 +157,21 @@ const playerScreen = (): { x: number; y: number } => ({
   y: window.innerHeight / 2,
 });
 
-/** Devolve o jogador ao menu (erro sem retry: URL invalida, versao incompativel). */
+/**
+ * Devolve o jogador ao menu (erro sem retry: URL invalida, versao incompativel).
+ *
+ * Reexibir o menu nao basta. A descida e ANUNCIADA antes de o socket existir —
+ * `runInProgress` de pe e a sentinela de historico empilhada —, e desfazer o
+ * anuncio e parte de desistir dela. Sem isso, o ESC (ou o botao voltar) na tela
+ * de titulo abre um menu de campo para uma run que nunca comecou, com direito a
+ * uma confirmacao de abandono prometendo perder um progresso inexistente.
+ */
 const backToMenu = (): void => {
+  runInProgress = false;
+  liveRun = null;
+  paused = false;
+  stopLoop = null;
+  pauseMenu.disarmHistory();
   menu.classList.remove('hidden');
 };
 
@@ -221,6 +234,7 @@ document.addEventListener('visibilitychange', () => {
 /** Atalho M: mudo sem voltar ao menu. */
 window.addEventListener('keydown', (ev) => {
   if (ev.key !== 'm' && ev.key !== 'M') return;
+  if (isEditingText(ev.target)) return; // "Marta" nao pode desligar o som
   setMuted(!audioSettings.muted);
   if (!audioSettings.muted) audio.unlock();
   setBanner(audioSettings.muted ? 'Som desligado' : 'Som ligado');
@@ -710,6 +724,8 @@ const runOnline = (url: string, roomCode: string | null): void => {
   let lastTime = performance.now();
   let reconnectAt = 0;
   let fatal = false; // erro sem retry (versao incompativel, URL invalida)
+  /** O socket nem chegou a nascer: nao ha loop a montar. */
+  let startupFailed = false;
   const gate = new RestartGate(RESTART_ARM_MS);
   let queuedChoice: 0 | 1 | null = null;
   // Ultimo estado amostrado, guardado para o audio posicionar o ouvinte.
@@ -757,6 +773,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
       ws = new WebSocket(url);
     } catch {
       fatal = true;
+      startupFailed = true;
       setBanner(`Endereco de servidor invalido: ${url}`);
       backToMenu();
       return;
@@ -771,6 +788,11 @@ const runOnline = (url: string, roomCode: string | null): void => {
     ws.onerror = () => ws?.close();
   };
   connect();
+  // URL malformada: `connect` ja devolveu o jogador ao menu de forma sincrona.
+  // Sem sair aqui, o quadro seria agendado assim mesmo e ficaria girando para
+  // sempre por tras da tela de titulo, so para reencontrar `fatal` a cada 16 ms
+  // — e `stopLoop` apontaria para um loop que o jogador nao esta jogando.
+  if (startupFailed) return;
 
   const frame = (now: number): void => {
     if (!running) return;

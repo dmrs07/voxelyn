@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isEditableTag } from '../client/input';
 import {
   HoldToOpen,
   PAUSE_HOLD_MS,
@@ -6,6 +7,27 @@ import {
   isInPauseZone,
   pauseZoneHeight,
 } from '../client/pause';
+
+describe('atalhos de teclado dentro de campos', () => {
+  it('campos de digitacao ficam de fora dos atalhos', () => {
+    // O nome do ranking agora e editavel NO MEIO DA RUN, pelo menu de campo.
+    // Sem esta lista, "Marta" desligava o som no M, "Rafael" engatilhava o
+    // reinicio no R, "Pedro" fechava o menu no P e o espaco nunca entrava.
+    expect(isEditableTag('INPUT')).toBe(true);
+    expect(isEditableTag('TEXTAREA')).toBe(true);
+    expect(isEditableTag('SELECT')).toBe(true); // as setas navegam as opcoes
+    expect(isEditableTag('DIV', true)).toBe(true); // contenteditable
+  });
+
+  it('o resto da pagina continua ouvindo os atalhos', () => {
+    // A guarda nao pode virar um "desliga tudo": durante a run o foco esta no
+    // body ou no canvas, e e ali que WASD, espaco e R precisam chegar.
+    expect(isEditableTag('BODY')).toBe(false);
+    expect(isEditableTag('CANVAS')).toBe(false);
+    expect(isEditableTag('BUTTON')).toBe(false); // o botao de mudo nao e campo
+    expect(isEditableTag('DIV')).toBe(false);
+  });
+});
 
 describe('faixa de topo: onde o toque longo vale', () => {
   it('cobre o topo da tela e nunca a metade de baixo', () => {

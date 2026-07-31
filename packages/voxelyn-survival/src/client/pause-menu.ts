@@ -1,4 +1,5 @@
 import { aurixPlateHtml } from './aurix';
+import { isEditingText } from './input';
 import { HoldToOpen, PAUSE_HOLD_MS, isInPauseZone } from './pause';
 
 /**
@@ -144,6 +145,10 @@ export class PauseMenu {
 
   private readonly onKeyDown = (ev: KeyboardEvent): void => {
     if (ev.key !== 'Escape' && ev.key !== 'p' && ev.key !== 'P') return;
+    // ESCAPE continua valendo dentro do campo de nome: fechar a tela e o que ele
+    // significa em qualquer lugar. O P, nao — ali ele e a letra P, e um jogador
+    // chamado "Pedro" veria o menu fechar e a run voltar na primeira letra.
+    if (ev.key !== 'Escape' && isEditingText(ev.target)) return;
     if (!this.host.runActive()) return;
     ev.preventDefault();
     if (this.confirming) this.cancelAbandon();
