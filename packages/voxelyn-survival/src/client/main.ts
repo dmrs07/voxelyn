@@ -12,7 +12,9 @@ import {
   submitDeathEcho,
 } from './death-echo-pool';
 import type { DeathEchoContract } from '@voxelyn/survival-protocol';
+import { LocalPlayout } from './local-playout';
 import { NetClient } from './net';
+import { TickEventQueue } from './playout';
 import { RestartGate } from './restart';
 import {
   FpsGovernor,
@@ -697,8 +699,30 @@ const runSolo = (): void => {
 
   const gate = new RestartGate(RESTART_ARM_MS);
 
+  // Mesma dupla do co-op, pelo mesmo motivo: o desenho fica um tick atras da
+  // simulacao para ter entre o que interpolar, e a narracao daquele tick espera
+  // a linha de render alcanca-lo. Disparar evento na hora do `stepRun` o poria a
+  // frente do mundo que o produziu — a explosao acenderia antes de a criatura
+  // chegar onde ela explodiu.
+  const playout = new LocalPlayout();
+  playout.capture(state);
+  /** Instante do quadro corrente: e quando o evento vira imagem e som. */
+  let frameNow = lastTime;
+  const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
+    renderer.ingestEvents(events, frameNow);
+    audio.ingest(events, frameNow, state);
+    haptics(events);
+  });
+  /** Recomeco de run: nada do mundo anterior sobrevive nem espera na fila. */
+  const rearm = (): void => {
+    playout.reset();
+    eventQueue.clear();
+    playout.capture(state);
+  };
+
   const frame = (now: number): void => {
     if (!running) return;
+    frameNow = now;
     // Pausa de verdade: o relogio anda com o quadro, mas o acumulador nao recebe
     // nada, entao nenhum tick e simulado e nenhum e devido ao retomar. Mover
     // `lastTime` aqui e o que impede o mundo de compensar a pausa inteira de uma
@@ -713,7 +737,7 @@ const runSolo = (): void => {
       // Este desenho e so a mesma cena com o texto na lingua nova.
       if (frozenFrameStale) {
         frozenFrameStale = false;
-        renderState(state, accumulator / TICK_MS, input.state, now);
+        renderState(playout.sample(state, accumulator / TICK_MS) ?? state, 1, input.state, now);
       }
       requestAnimationFrame(frame);
       return;
@@ -726,6 +750,11 @@ const runSolo = (): void => {
     const vh = window.innerHeight;
 
     if (state.phase !== 'running') {
+      // A linha de render parou de andar junto com a simulacao, entao o que
+      // sobrou na fila nunca seria alcancado. Solta tudo: sao as mortes e a
+      // explosao do ultimo tick, exatamente o que a tela de fim precisa ter
+      // acontecido atras dela.
+      eventQueue.flush(Number.POSITIVE_INFINITY);
       recordRun(state);
       submitSoloRun(state);
       submitDeathToPool(state);
@@ -745,6 +774,7 @@ const runSolo = (): void => {
         telemetry.begin();
         state = createRun({ seed: nextRunSeed });
         liveRun = state;
+        rearm();
         audio.reset();
         resetRunTracking();
         gate.reset();
@@ -770,9 +800,8 @@ const runSolo = (): void => {
       // revive, a descida ou a extracao que ele pediu no mesmo aperto.
       if (cmd.interact) deathEchoes.pressInteract();
       const result = stepRun(state, [cmd]);
-      renderer.ingestEvents(result.events, now);
-      audio.ingest(result.events, now, state);
-      haptics(result.events);
+      playout.capture(state);
+      eventQueue.push(state.tick, result.events);
       accumulator -= TICK_MS;
       if (state.phase !== 'running') break;
     }
@@ -780,9 +809,22 @@ const runSolo = (): void => {
     // Toques comuns sao drenados; durante uma escolha, a fila pertence aos cards.
     if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     const alpha = accumulator / TICK_MS;
-    audio.update(state, now);
-    renderState(state, alpha, input.state, now);
-    cooldownOverlay.render(state, input.state, state.tick + alpha, now);
+    // O que se desenha e o instante ENTRE os dois ultimos ticks; o que a
+    // simulacao guarda continua sendo `state`, e e nele que a escolha de modulo,
+    // o recorder e a telemetria continuam olhando — eles falam de decisao, e
+    // decisao acontece no tick, nao no quadro.
+    //
+    // A run que acaba DENTRO deste quadro e a excecao: nao ha instante
+    // intermediario que valha mostrar, e quem le o estado terminal aqui — o Eco
+    // que se grava, o sumario que se congela — tem de ler o de verdade, e nao um
+    // mundo meio tick atras dele.
+    const view = state.phase === 'running' ? (playout.sample(state, alpha) ?? state) : state;
+    // Depois da vista montada e antes de desenhar, como no co-op: quem ouve os
+    // eventos desenha FX em cima do mundo que acabou de ser preparado.
+    eventQueue.flush(view.tick);
+    audio.update(view, now);
+    renderState(view, 1, input.state, now);
+    cooldownOverlay.render(view, input.state, view.tick + alpha, now);
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
       const regions = renderer.renderChoice(state, vw, vh, input.state);
       const choice = input.consumeChoiceTap(regions);
