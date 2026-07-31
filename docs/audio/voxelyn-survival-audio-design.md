@@ -129,10 +129,19 @@ um tique lento em vez de silêncio.
 
 A urgência vira **taxa**, não altura: para saber que um tom subiu é preciso lembrar de onde
 ele estava, mas um tique acelerando se lê no próprio instante. A batida aperta sozinha
-quando a taxa sobe (71 ms a 2,2 Hz, 11 ms a 14 Hz) porque o ciclo útil é fração de
-amplitude da senoide moduladora, não de tempo. A mesma fronteira aparece na tela: a barra
-de calor do HUD tem uma marca no limiar e pulsa acima dele, para o silêncio abaixo de 50%
-ser lido como um limite e não como sorte.
+quando a taxa sobe (40 ms a 2,2 Hz, 6 ms a 14 Hz) porque a janela é sempre a mesma fração
+do período. A mesma fronteira aparece na tela: a barra de calor do HUD tem uma marca no
+limiar e pulsa acima dele, para o silêncio abaixo de 50% ser lido como um limite e não
+como sorte.
+
+A batida sai de uma **porta formatada por WaveShaper** sobre um LFO, não de nós criados por
+tique: o leito continua vivendo a run inteira, sem agendamento por quadro. O formatador não
+tem memória — enxerga só a amplitude instantânea —, e a senoide visita cada valor abaixo do
+pico duas vezes por ciclo. Por isso a curva é **monótona**: assim as duas travessias somam
+uma batida só (subida = ataque, descida = queda), em vez de duas. Uma curva com envelope
+completo dobraria a taxa anunciada, e uma rampa `sawtooth` — que resolveria a contagem e
+ainda deixaria a batida assimétrica — reabre a porta no próprio salto, com um fantasma
+medido a −8,6 dB.
 
 ## 6. Ciclo de vida
 

@@ -20,48 +20,58 @@ const TICK_RATE_MIN = 2.2;
 const TICK_RATE_MAX = 14;
 
 /**
- * Fracao do topo da senoide em que a porta do tique abre.
+ * Fatia do topo da senoide, em amplitude, em que a porta do tique abre.
  *
- * Fracao de AMPLITUDE, nao de tempo: a senoide desacelera perto do pico, entao
- * 0,06 de amplitude sao cerca de 10% do periodo. E o que faz a batida apertar
- * sozinha quando a taxa sobe — 71 ms de "toc" a 2,2 Hz, 11 ms de estalo seco a
- * 14 Hz — sem nenhum parametro extra para manter em sincronia com a taxa.
+ * O valor e pequeno porque a senoide se arrasta perto do pico: 0,022 de
+ * amplitude sao quase 9% do periodo. Como a janela e sempre a mesma fracao do
+ * periodo, a batida aperta sozinha quando a taxa sobe — 40 ms de "toc" a 2,2 Hz,
+ * 6 ms de estalo a 14 Hz — sem nenhum parametro extra para manter em sincronia.
  */
-const TICK_DUTY = 0.06;
+const TICK_DUTY = 0.022;
 
 /**
- * Envelope de uma batida, sobre 0..1 da janela aberta.
+ * Meia batida, sobre 0..1 da subida da janela. MONOTONA, e este e o ponto.
  *
- * Ataque curto e queda quadratica: e o que separa um tique de um tremolo. Um
- * envelope simetrico soaria como o leito antigo ondulando, so que mais lento.
- * Comeca e termina em zero de proposito — a porta vem DEPOIS do filtro, entao
- * nao ha nada adiante para arredondar um degrau que sobrasse aqui.
+ * O formatador nao tem memoria: enxerga so a amplitude instantanea, e a senoide
+ * visita cada valor abaixo do pico duas vezes por ciclo, subindo e descendo. Um
+ * envelope completo escrito na curva era portanto percorrido duas vezes — o
+ * leito entregava um PAR de batidas por ciclo, o dobro da taxa anunciada, com a
+ * segunda ainda por cima invertida no tempo.
+ *
+ * Com uma curva que so cresce, as duas travessias se somam em UMA batida: a
+ * subida desenha o ataque, a descida desenha a queda, e o pico cai no apice da
+ * senoide. Uma batida por ciclo, que e o que a taxa promete.
+ *
+ * Uma rampa (`sawtooth`) resolveria o mesmo e ainda deixaria a batida assimetrica,
+ * mas o salto dela atravessa a faixa inteira em poucas amostras e reabre a porta
+ * de passagem: medido, um fantasma a -8,6 dB da batida, uma vez por ciclo. Um
+ * clique fixo e pior que a simetria, entao fica a senoide.
+ *
+ * Expoente acima de 1 para contrariar a lentidao da senoide no apice, que sem
+ * isso acharia o topo do envelope e daria um pulso arredondado em vez de batida.
  */
-const tickEnvelope = (t: number): number => {
-  if (t <= 0 || t >= 1) return 0;
-  const ATTACK = 0.18;
-  if (t < ATTACK) return (1 - Math.cos((Math.PI * t) / ATTACK)) / 2;
-  const decay = 1 - (t - ATTACK) / (1 - ATTACK);
-  return decay * decay;
+const tickRise = (u: number): number => {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  return Math.pow(u, 1.8);
 };
 
 /**
  * Curva do formatador: amplitude do LFO (-1..1) para abertura da porta (0..1).
  *
  * Tabela grande porque so `TICK_DUTY` dela e usada — com 1024 pontos, a batida
- * inteira caberia em uns sessenta, e o ataque em uma dezena. Os degraus da
- * tabela chegariam ao alto-falante como estalo em cima do tique. E memoria de
- * uma vez so, na criacao do leito.
+ * inteira caberia em uma dezena, e os degraus chegariam ao alto-falante como
+ * estalo em cima do tique. E memoria de uma vez so, na criacao do leito.
  */
 const tickCurve = (): Float32Array<ArrayBuffer> => {
-  const n = 8192;
+  const n = 16384;
   // Buffer explicito: `new Float32Array(n)` sai como `ArrayBufferLike`, e
   // `WaveShaperNode.curve` so aceita um respaldado por `ArrayBuffer`.
   const curve = new Float32Array(new ArrayBuffer(n * Float32Array.BYTES_PER_ELEMENT));
   const opensAt = 1 - 2 * TICK_DUTY;
   for (let i = 0; i < n; i++) {
     const x = (i / (n - 1)) * 2 - 1;
-    curve[i] = tickEnvelope((x - opensAt) / (2 * TICK_DUTY));
+    curve[i] = tickRise((x - opensAt) / (2 * TICK_DUTY));
   }
   return curve;
 };
@@ -172,6 +182,9 @@ export class AmbienceBus {
       const gate = ctx.createGain();
       gate.gain.value = 0;
       const rate = ctx.createOscillator();
+      // Senoide, com a curva monotona de `tickRise` cuidando de haver uma unica
+      // batida por ciclo. Onda sem salto e sem canto: nao ha ringing de banda
+      // limitada para a porta deixar passar.
       rate.type = 'sine';
       rate.frequency.value = TICK_RATE_MIN;
       // O formatador recorta a senoide numa batida curta. Ligar o LFO direto na
