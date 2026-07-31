@@ -108,6 +108,10 @@ export const CHARACTER_SPRITE_IDS = [
 export const PLAYER_LAYER_SPRITE_IDS = [
   'layer-player-prospector-lower',
   'layer-player-prospector-upper',
+  // A arma e camada propria porque precisa mudar de cor sozinha: o calor do cano
+  // e uma mecanica da simulacao, e pinta-lo exige um atlas que nao carregue
+  // nenhum pixel do corpo junto.
+  'layer-player-prospector-gun',
 ] as const;
 
 export const FIRST_PACK_IDS = [

@@ -20,10 +20,19 @@ const attackFlash = [false, true, false, false];
  * As pernas e o restante do corpo são autorados no mesmo sistema de coordenadas
  * e rasterizados com a mesma referência de enquadramento. Isso permite ao
  * runtime combinar locomoção e ataque sem uma emenda que salta entre frames.
+ *
+ * A ARMA sai numa camada própria pela mesma razão que o tronco saiu das pernas:
+ * ela precisa mudar de cor sozinha. O calor é uma mecânica que já existe na
+ * simulação — cada tiro aquece, o excesso trava o gatilho e machuca — e até aqui
+ * ela só aparecia numa barrinha do HUD. Uma camada isolada deixa o runtime
+ * pintar o metal do frio ao incandescente sem tocar no resto do corpo, que é o
+ * único jeito de o jogador ler o próprio calor olhando para o personagem em vez
+ * de para a interface.
  */
 const prospectorStandingLayers = ({ bob = 0, stride = 0, kick = 0, flash = false } = {}) => {
   const lower = [];
   const upper = [];
+  const gun = [];
 
   // botas + pernas
   lower.push(box(-2, -1, Math.max(0, stride), 2, 2, 1, 'rust'));
@@ -70,13 +79,13 @@ const prospectorStandingLayers = ({ bob = 0, stride = 0, kick = 0, flash = false
   const gunY = -1 + kick;
   // receptor palido, atravessado na altura do peito: a barra que quebra a
   // silhueta e diz "isto e uma ferramenta", nao um braco
-  upper.push(box(2, gunY - 2, 7 + bob, 2, 3, 1, 'bone'));
+  gun.push(box(2, gunY - 2, 7 + bob, 2, 3, 1, 'bone'));
   // camara de energia: um unico voxel, no ponto onde o cano encontra o corpo
-  upper.push(box(2, gunY - 1, 8 + bob, 1, 1, 1, 'biolum'));
+  gun.push(box(2, gunY - 1, 8 + bob, 1, 1, 1, 'biolum'));
   // boca do cano, escura em repouso e acesa no frame do disparo
-  upper.push(box(2, gunY - 3, 7 + bob, 1, 1, 1, flash ? 'loot' : 'rust'));
+  gun.push(box(2, gunY - 3, 7 + bob, 1, 1, 1, flash ? 'loot' : 'rust'));
 
-  return { lower, upper };
+  return { lower, upper, gun };
 };
 
 const poseFor = (anim, frame) => {
@@ -109,7 +118,14 @@ const fitReference = () => {
     for (const [anim, count] of animations) {
       for (let frame = 0; frame < count; frame++) {
         const pose = poseFor(anim, frame);
-        frames.push(renderVoxels([...pose.lower, ...pose.upper], DIR_INDEX[dir], FRAME_WIDTH, FRAME_HEIGHT, 14, 34));
+        frames.push(renderVoxels(
+          [...pose.lower, ...pose.upper, ...pose.gun],
+          DIR_INDEX[dir],
+          FRAME_WIDTH,
+          FRAME_HEIGHT,
+          14,
+          34
+        ));
       }
     }
   }
@@ -152,5 +168,16 @@ export const PLAYER_LAYER_SPECS = [
     },
     (dir, anim, frame) => renderPart(dir, anim, frame, 'upper'),
     'upper-body aim and attack layer for the voxel-isometric prospector'
+  ),
+  // Mesmas animações do tronco, quadro a quadro: a arma acompanha o coice, e
+  // qualquer divergência de contagem faria o cano descolar do braço no disparo.
+  baseLayer(
+    'layer-player-prospector-gun',
+    {
+      idle: { frames: 4, fps: 6, loop: true },
+      attack: { frames: 4, fps: 12, loop: false },
+    },
+    (dir, anim, frame) => renderPart(dir, anim, frame, 'gun'),
+    'shard driver weapon layer for the voxel-isometric prospector, tinted by barrel heat at runtime'
   ),
 ];

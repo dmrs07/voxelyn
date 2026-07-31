@@ -435,7 +435,23 @@ const horseModel = (anim, f) => {
   // corpo: metade dos frames do ciclo saia identica e o bicho parecia PLANAR.
   // Nesta projecao isometrica, deslocar no eixo do corpo le muito mais do que
   // subir — o balanco e o que faz a passada existir.
-  const bite = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
+  //
+  // ATAQUE BASICO: uma BOTADA, e nao um aceno de cabeca.
+  //
+  // O `bite` de dois voxels que existia aqui era invisivel em jogo — a cabeca
+  // descia meio pixel na tela e voltava. Um elite que investe atravessando a
+  // arena nao pode ter, no golpe curto, menos gesto do que um stalker. O ciclo
+  // agora tem os quatro tempos que um golpe precisa para ser lido: recolher
+  // (armar), estourar para a frente, sustentar o alcance maximo, recolher.
+  //
+  // `lunge` empurra o pescoco e a cabeca no eixo do corpo; `stomp` levanta as
+  // dianteiras no tempo de armar e as crava no chao no tempo do impacto. Os dois
+  // juntos sao o que faz o golpe pesar: a massa vai para a frente e para baixo.
+  const ATTACK_LUNGE = [-1, 2, 2, 0];
+  const ATTACK_STOMP = [2, 0, 0, 1];
+  const attacking = anim === 'attack';
+  const lunge = attacking ? ATTACK_LUNGE[f % 4] : 0;
+  const stomp = attacking ? ATTACK_STOMP[f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   // `special` = Investida Flamejante. Os tres primeiros frames EMPINAM (o
   // telegrafo de 1,3 s que o jogador tem de ler); os tres ultimos abaixam a
@@ -483,42 +499,124 @@ const horseModel = (anim, f) => {
       sy += GALLOP_SWING[gi] * (front ? -1 : 1);
       lift = GALLOP_LIFT[gi];
     } else if (front) {
-      lift = rear * 2;
+      // O empinar da investida e a botada do golpe curto usam as MESMAS patas
+      // dianteiras: as traseiras ficam plantadas nos dois casos, e e isso que
+      // faz o corpo girar em torno da garupa em vez de pular.
+      lift = rear * 2 + stomp;
     }
-    b.push(box(lx, sy, lift, 2, 2, 5, 'rockDeep'));
+    b.push(box(lx, sy, lift, 2, 2, 7, 'rockDeep'));
     // Casco: o unico ponto do corpo que toca o chao, e de onde o alcatrao sai.
     b.push(box(lx, sy, lift, 2, 2, 1, 'loot'));
   }
 
-  // Tronco longo e baixo, deitado no eixo y — a FRENTE do modelo e -y, que e o
-  // que o rasterizador rotaciona. Autorar o comprimento em x deixava o cavalo
-  // 90 graus fora de fase com a propria direcao: ele corria de lado.
-  b.push(box(-2, -5, 5 + up, 4, 11, 4 + rear, 'rust'));
-  // Garupa mais alta que a cernelha, como bicho de carga.
-  b.push(box(-2, 4, 8 + up, 4, 3, 3, 'rust'));
-  // Cauda de hifas caindo atras.
-  b.push(box(-1, 7, 6 + up, 2, 2, 4, 'rockDeep'));
-
-  // Placas de armadura fungica SEPARADAS, e nao uma laje corrida.
+  // TRONCO EM TRES MASSAS, e nao uma caixa unica.
   //
-  // A laje era o desenho obvio e reproduzia o erro que a silhueta de fallback ja
-  // tinha cometido: um retangulo claro e continuo sobre quatro apoios le como
-  // TAMPO DE MESA, nao como lombo. Placas discretas com vao entre elas devolvem
-  // a leitura de dorso — e ainda batem com a referencia, que descreve "shelf
-  // fungi", cogumelos de prateleira, que crescem em placas soltas.
-  for (const py of [-4, -1, 2]) {
-    b.push(box(-2, py, 9 + up + rear, 4, 2, 1, 'bone'));
+  // A caixa unica era o defeito estrutural do bicho, e nenhum detalhe na cabeca
+  // ia consertar: na projecao 2:1 um paralelepipedo de 11 voxels de comprimento
+  // com o topo todo na mesma altura projeta um plano claro continuo sobre quatro
+  // apoios. Isso e um TAMPO DE MESA. O modelo tinha placas separadas de osso
+  // justamente para evitar essa leitura, mas elas estavam DEITADAS no topo, o
+  // que so aumentava o tampo em area e em brilho.
+  //
+  // Um cavalo nao tem lombo reto: tem peitoral alto, barril fundo e garupa alta,
+  // com a linha do dorso descendo e subindo entre eles. Tres volumes de alturas
+  // diferentes quebram o plano em degraus, e degrau e o que a projecao consegue
+  // mostrar. As placas fungicas saem do topo e vao para os FLANCOS, onde
+  // cogumelo de prateleira cresce de verdade e onde nao viram tampo.
+  // O corpo e ESCURO. Esta e a decisao que resolve o bicho, e nao a forma.
+  //
+  // Toda caixa `rust` tem `bone` no topo — a rampa do material e [topo, esquerda,
+  // direita] = ['bone', 'rust', 'rockShadow'] — e na projecao 2:1 a face de topo
+  // e a maior e a mais clara de qualquer volume horizontal. Um tronco de 4x12
+  // voxels em `rust` projeta, portanto, um plano cor de osso do tamanho do bicho
+  // inteiro. Nenhuma quantidade de degraus na linha do dorso conserta isso: o que
+  // lia como tampo de mesa nao era o formato, era a COR do topo.
+  //
+  // Em `rockDeep` o topo e `rock`, dois passos abaixo. O corpo vira massa escura
+  // e sobram exatamente tres coisas claras no bicho — a crina de brasa, a mascara
+  // de osso e os cascos. Sao os tres pontos que a criatura precisa que voce leia:
+  // de onde vem o fogo, para onde ela esta virada, e onde ela pisa.
+  const backZ = 7 + up;
+  // Peitoral: a massa da frente, alta e funda. E ela que atinge primeiro.
+  b.push(box(-2, -5, backZ, 4, 4, 5 + rear, 'rockDeep'));
+  // Barril: mais baixo que o peitoral e que a garupa — este e o degrau.
+  b.push(box(-2, -1, backZ, 4, 4, 4 + rear, 'rockDeep'));
+  // Garupa alta, de bicho de carga, com o lombo subindo de novo atras.
+  b.push(box(-2, 3, backZ, 4, 4, 5 + rear, 'rockDeep'));
+  // Ventre baixo, fechando o vao entre as patas dianteiras e as traseiras.
+  b.push(box(-2, -5, backZ - 1, 4, 12, 1, 'rockDeep'));
+  // Cauda de hifas caindo atras.
+  b.push(box(-1, 7, backZ, 2, 2, 4, 'rockDeep'));
+
+  // Placas de fungo de prateleira nos FLANCOS: duas de cada lado, e so.
+  //
+  // Um voxel de largura cada, para a face de topo medir 4x2 pixels — pequena
+  // demais para virar plano. Deitadas no dorso, como estavam, elas eram o
+  // proprio tampo, so que mais claro que o resto; em fileira de tres viravam uma
+  // escada clara que competia com a cabeca. Duas bastam para dizer "cresce fungo
+  // nele" sem disputar a leitura com a unica coisa que precisa vencer, que e a
+  // mascara.
+  for (const py of [-4, 1]) {
+    b.push(box(-3, py, backZ + 1, 1, 2, 2, 'rust'));
+    b.push(box(2, py, backZ + 1, 1, 2, 2, 'rust'));
   }
 
-  // Pescoco inclinado para a frente e focinho BAIXO: para onde ele vai correr
-  // esta escrito na direcao em que a cabeca aponta.
-  const neckZ = 9 + up + rear * 2;
-  b.push(box(-2, -7, neckZ - 1, 4, 3, 4 - dash, 'rust'));
-  b.push(box(-2, -9, neckZ + 2 - dash - bite, 4, 3, 3, 'rust'));
-  b.push(box(-2, -11, neckZ + 1 - dash - bite, 4, 3, 2, 'rockDeep'));
-  // Olhos de brasa, um de cada lado do focinho.
-  b.push(box(-2, -10, neckZ + 3 - dash - bite, 1, 1, 1, 'fire'));
-  b.push(box(1, -10, neckZ + 3 - dash - bite, 1, 1, 1, 'fire'));
+  // CABECA-MASCARA. Angular, fechada, e a mesma ideia do cavalo de Troia: uma
+  // peca de guerra construida, nao um focinho de bicho.
+  //
+  // O que havia antes era um cavalo de DESENHO: tres caixas de larguras iguais
+  // empilhadas, olhos na frente da testa e nenhuma aresta. Numa silhueta lida a
+  // 32px, largura constante e o que produz cara redonda — a leitura de "fofo"
+  // nao vem do tamanho dos olhos, vem de a cabeca nao terminar em ponta.
+  //
+  // Tres coisas trocam essa leitura, e nenhuma delas e detalhe: o focinho
+  // AFUNILA em degraus ate um bico de um voxel; uma viseira de osso atravessa a
+  // testa e joga sombra sobre os olhos, que passam a ser fendas AFUNDADAS em vez
+  // de duas brasas na frente da cara; e dois chifres varridos para a frente saem
+  // da mascara, apontando para onde ele vai investir. A ponta e a promessa.
+  // O pescoco nasce no TOPO do peitoral e sobe, em vez de sair da altura do
+  // lombo e seguir reto para a frente. E a mudanca que mais devolve presenca: a
+  // cabeca passa a ficar acima da linha do dorso, e um bicho cuja cabeca esta
+  // acima do proprio lombo le como animal olhando para voce. Na mesma altura do
+  // lombo ele lia como movel. O corpo continua mais largo do que alto — a
+  // identidade horizontal e a distancia que ele cobre —, mas agora ha uma coluna
+  // na frente dela.
+  const neckZ = 12 + up + rear * 2;
+  // Pescoco em dois degraus que estreitam. Escuro inteiro: qualquer peca clara
+  // aqui encosta na mascara e as duas viram uma mancha so.
+  b.push(box(-2, -7 - lunge, neckZ - 2, 4, 3, 4 - dash, 'rockDeep'));
+  b.push(box(-1, -9 - lunge, neckZ + 1 - dash, 3, 3, 3, 'rockDeep'));
+
+  // Cranio ESTREITO — 3 voxels, contra os 4 do pescoco — e focinho afunilando em
+  // dois degraus ate um bico de 1. A cabeca so termina em ponta se cada degrau
+  // for mais estreito que o anterior; larguras iguais empilhadas dao focinho
+  // quadrado, que era o problema.
+  const headZ = neckZ + 1 - dash;
+  b.push(box(-1, -12 - lunge, headZ, 3, 3, 3, 'rockDeep'));
+  b.push(box(-1, -13 - lunge, headZ, 2, 1, 2, 'rockDeep'));
+  b.push(box(0, -14 - lunge, headZ, 1, 1, 1, 'rockDeep'));
+
+  // Testeira: uma FAIXA de osso de um voxel de altura atravessando a fronte, e
+  // nao um bloco. O bloco de 4x2x2 que estava aqui projetava um losango claro do
+  // tamanho da propria cabeca e, encostado nos chifres, fechava tudo num unico
+  // plano pálido — a cabeca virava uma tabua apontando para o lado. Uma faixa
+  // fina desenha a aresta da mascara em vez de substituir a cabeca por ela.
+  b.push(box(-1, -13 - lunge, headZ + 2, 3, 2, 1, 'bone'));
+  // Chapas de face, verticais, uma de cada lado: e o par delas que fecha a
+  // leitura de mascara, e de pe elas quase nao tem topo.
+  b.push(box(-1, -12 - lunge, headZ, 1, 2, 2, 'bone'));
+  b.push(box(1, -12 - lunge, headZ, 1, 2, 2, 'bone'));
+
+  // Olhos entre as chapas, sob a aba da testeira: duas fendas de brasa na sombra.
+  b.push(box(0, -13 - lunge, headZ + 1, 1, 1, 1, 'fire'));
+
+  // Chifres. Nascem DENTRO da largura do cranio e sobem antes de varrer para a
+  // frente: abertos para fora, como estavam, eles eram mais largos que a cabeca e
+  // a silhueta virava um T.
+  for (const hx of [-1, 1]) {
+    b.push(box(hx, -11 - lunge, headZ + 3, 1, 1, 2, 'bone'));
+    b.push(box(hx, -12 - lunge, headZ + 4, 1, 2, 1, 'bone'));
+  }
 
   // Crina de brasa correndo do cachaco ate a garupa. Fica ATRAS da cabeca,
   // nunca por cima: coberta pela crina, a cabeca sumia dentro do fogo e o bicho
@@ -526,15 +624,23 @@ const horseModel = (anim, f) => {
   //
   // Na corrida ela se ABAIXA junto com a crista, e e o que faz os tres ultimos
   // frames lerem como velocidade e nao como o mesmo cavalo mais para a frente.
+  // Estreita para UM voxel de largura e desce em degraus do topete ate a
+  // cernelha: crista, e nao cobertor. Com 2 voxels de largura deitados sobre o
+  // dorso inteiro ela era a maior area clara do bicho e roubava a leitura da
+  // cabeca — a fonte do fogo tem de estar visivel, nao dominar.
   const crest = neckZ + 3 - dash;
-  b.push(box(-1, -6, crest, 2, 2, 2 + rear, 'fire'));
-  b.push(box(-1, -4, crest - 1, 2, 3, 2, 'fire'));
-  b.push(box(-1, -1, crest - 2, 2, 3, 1, 'loot'));
-  b.push(box(-1, 2, crest - 3, 2, 2, 1, 'loot'));
+  b.push(box(-1, -8 - lunge, crest, 2, 2, 2 + rear, 'fire'));
+  b.push(box(-1, -6, crest - 1, 2, 2, 2, 'fire'));
+  b.push(box(0, -4, crest - 3, 1, 3, 2, 'loot'));
+  b.push(box(0, -1, crest - 5, 1, 2, 1, 'loot'));
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 68, 72, 34, 66);
+// 72x76 e nao mais 68x72: a mascara com chifres varridos para a frente estende a
+// diagonal do modelo, e o enquadramento tem de acompanhar. O ancoradouro segue a
+// mesma regra de antes (centro na largura, seis pixels acima da base), entao a
+// criatura continua assentando no mesmo ponto do chao.
+const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 80, 84, 40, 78);
 
 // ---------------------------------------------------------------------------
 // enemy-miner 48x60 — automato de extracao abandonado
@@ -725,7 +831,7 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 6, fps: 9, loop: false },
   }, bishopFrame, 'voxel-isometric fungal cleric, tall flaring vestment, tall mitre, pastoral staff and hanging censer, mycelial roots at the hem'),
-  base('enemy-fungal-horse', 68, 72, 34, 66, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
+  base('enemy-fungal-horse', 80, 84, 40, 78, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates'),

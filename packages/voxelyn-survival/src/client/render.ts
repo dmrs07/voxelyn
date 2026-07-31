@@ -30,7 +30,7 @@ import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
 } from './sprites';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
 import { DAMAGE_FAN, damageAlpha, damageScale, drawDamageNumber } from './damage-text';
-import { ProjectileView } from './projectiles';
+import { ProjectileView, SMALL_PROJECTILE_RADIUS } from './projectiles';
 import { EntityPresentation } from './presentation';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
@@ -185,6 +185,44 @@ export type Fx =
     };
 
 export type CameraShake = { power: number; until: number };
+
+/**
+ * Comprimento maximo da faixa de mira, em tiles.
+ *
+ * NAO e o alcance do tiro: o bolt viaja 13 tiles/s por 1,4 s, ou seja mais de 18
+ * tiles, e uma faixa desse tamanho atravessaria a tela inteira e viraria o
+ * elemento mais chamativo do jogo. Sete tiles cobrem a distancia em que o
+ * jogador de fato escolhe alvo e ainda mostram a parede que vai interromper o
+ * tiro. A faixa promete DIRECAO e LARGURA, nunca alcance — e por isso ela se
+ * apaga no fim em vez de terminar num traco reto, que leria como "para aqui".
+ */
+export const AIM_LANE_LENGTH = 7;
+/** Passo do raycast da faixa, em tiles. Um quarto de tile nao pula parede. */
+const AIM_LANE_STEP = 0.25;
+
+/**
+ * Ate onde a faixa de mira alcanca antes de bater em pedra.
+ *
+ * Pura e exportada para o teste poder conferir o caso que importa — a faixa
+ * parando NA parede e nao atras dela — sem precisar de um canvas.
+ */
+export const aimLaneReach = (
+  originX: number,
+  originY: number,
+  dirX: number,
+  dirY: number,
+  isSolid: (x: number, y: number) => boolean,
+  maxLength = AIM_LANE_LENGTH
+): number => {
+  const length = Math.hypot(dirX, dirY);
+  if (length < 1e-6) return 0;
+  const nx = dirX / length;
+  const ny = dirY / length;
+  for (let d = AIM_LANE_STEP; d <= maxLength; d += AIM_LANE_STEP) {
+    if (isSolid(originX + nx * d, originY + ny * d)) return d - AIM_LANE_STEP;
+  }
+  return maxLength;
+};
 
 /**
  * Opacidade do gas, num dos QUATRO niveis que a art bible permite.
@@ -835,6 +873,23 @@ export class SurvivalRenderer {
       drawVoxel(ctx, sx, sy - (2 + arc * 2) * z, 3.5 * z, CHARGE_RAMP);
     }
 
+    // FAIXA DE MIRA, no chao e sob tudo o que tem volume.
+    //
+    // O indicador anterior era um risco de 20px flutuando na altura do peito.
+    // Ele dizia o RUMO e mais nada — nem a largura do tiro, nem ate onde ele
+    // chega, nem se ha parede no caminho —, e por estar no ar competia com o
+    // proprio corpo do Prospector em vez de descrever o chao.
+    //
+    // A faixa e desenhada no plano do piso, com a largura EXATA do projetil, e
+    // para na primeira parede. Sai aqui, entre o passo de chao e a fila ordenada,
+    // porque e chao: qualquer parede ou criatura a frente dela tem de cobri-la.
+    // Desenhada junto com o jogador, ela passaria por cima da parede que a
+    // interrompe, e a unica coisa que a faixa nao pode fazer e mentir sobre o
+    // alcance.
+    if (player.alive && !state.playerExtras[player.slot ?? 0].downed) {
+      this.drawAimLane(state, player, toScreen, z);
+    }
+
     // passo 2: paredes + entidades + projeteis, ordenados por profundidade
     type DrawItem = { depth: number; draw: () => void };
     const items: DrawItem[] = [];
@@ -1174,11 +1229,31 @@ export class SurvivalRenderer {
       const isLocal = pl === player;
       const anim = this.animFor(pl.id, pl.x, pl.y, pl.hp, pl.alive, nowMs);
       const presented = this.presentation.animationFor(pl, state, anim, nowMs, ex.downed);
+      // Superaquecimento: o corpo TREME e o cano solta fumaca preta.
+      //
+      // O tremor e do corpo inteiro e nao da arma. Quem trava o gatilho e o
+      // Prospector, nao o cano — ele acabou de tomar dano do proprio tiro, e um
+      // sinal que morasse so na arma seria mais um enfeite dela. Poucos pixels,
+      // em fase de tempo real e nao de quadro: a 120Hz um tremor por quadro
+      // viraria chuvisco e a 30Hz um pulo.
+      const overheating = state.tick < ex.overheatedUntil;
+      const shakeX = overheating ? Math.sin(nowMs / 26 + slot) * 1.15 * z : 0;
+      const shakeY = overheating ? Math.sin(nowMs / 17 + slot * 2) * 0.7 * z : 0;
       items.push({
         depth: pl.x + pl.y,
         draw: () => {
-          const [psx, psy] = toScreen(pl.x, pl.y);
+          const [rawX, rawY] = toScreen(pl.x, pl.y);
+          const psx = rawX + shakeX;
+          const psy = rawY + shakeY;
           const size = pl.radius * TILE_W * 0.9 * z;
+          // A fumaca sai do OMBRO, na altura do cano, e nao dos pes: no chao ela
+          // se confundiria com a fumaca do fungo secando, que e outra coisa e
+          // significa outra coisa.
+          if (overheating) {
+            this.particles.emitOverheatSmoke(
+              slot, pl.x, pl.y, nowMs, this.quality.maxFx / PRESETS.high.maxFx
+            );
+          }
           // O jogador local NUNCA some: a camera esta nele, e um Prospector
           // invisivel no proprio centro da tela e um jogo quebrado, nao uma
           // caverna escura. O parceiro obedece a luz como todo o resto do mundo.
@@ -1243,19 +1318,8 @@ export class SurvivalRenderer {
             ctx.fillText('!', psx, psy - size * 2.6 - 8 * z);
           }
 
-          // indicador de mira: somente o player local
-          if (isLocal) {
-            const aim = ex.aim;
-            const alen = Math.hypot(aim.x, aim.y) || 1;
-            const axs = ((aim.x - aim.y) / alen) * 20 * z;
-            const ays = ((aim.x + aim.y) / alen) * 10 * z;
-            ctx.strokeStyle = 'rgba(232,241,255,0.5)';
-            ctx.lineWidth = z * 0.8;
-            ctx.beginPath();
-            ctx.moveTo(psx + axs * 0.4, psy - 8 * z + ays * 0.4);
-            ctx.lineTo(psx + axs, psy - 8 * z + ays);
-            ctx.stroke();
-          }
+          // O risco de mira que ficava aqui saiu: virou a faixa no chao,
+          // desenhada antes das paredes para poder ser coberta por elas.
         },
       });
     }
@@ -1374,6 +1438,102 @@ export class SurvivalRenderer {
     this.renderRewardFlight(toScreen, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
+  }
+
+  /**
+   * Faixa de mira no plano do chao, com a largura do projetil.
+   *
+   * A largura NAO e um valor escolhido para ficar bonito: e duas vezes o raio de
+   * colisao que a simulacao usa para o tiro. E essa a promessa que a faixa faz —
+   * "o que estiver dentro daqui e atingido" — e ela so vale se o numero for o
+   * mesmo dos dois lados. Por isso o raio vem importado de `projectiles`, e nao
+   * digitado aqui.
+   *
+   * O corredor e um quadrilatero de quatro cantos projetados, e nao um `lineTo`
+   * grosso: na projecao 2:1 uma linha de espessura constante em pixels tem
+   * larguras de MUNDO diferentes conforme a direcao — larga quando aponta para o
+   * norte, estreita quando aponta para leste. Projetar os cantos mantem a
+   * largura constante em tiles, que e a unica que significa alguma coisa.
+   */
+  private drawAimLane(
+    state: SurvivalState,
+    player: SurvivalState['player'],
+    toScreen: (x: number, y: number) => [number, number],
+    z: number
+  ): void {
+    const ctx = this.ctx;
+    const aim = state.playerExtras[player.slot ?? 0].aim;
+    const length = Math.hypot(aim.x, aim.y);
+    if (length < 1e-6) return;
+    const nx = aim.x / length;
+    const ny = aim.y / length;
+
+    const w = state.config.width;
+    const height = state.config.height;
+    const reach = aimLaneReach(player.x, player.y, nx, ny, (x, y) => {
+      const cx = Math.floor(x);
+      const cy = Math.floor(y);
+      if (cx < 0 || cy < 0 || cx >= w || cy >= height) return true;
+      return state.solid[cy * w + cx] !== SOLID_NONE;
+    });
+    // Comeca na borda do corpo: sob os pes do proprio Prospector a faixa nao
+    // informa nada e ainda suja a silhueta dele.
+    const start = Math.min(reach, player.radius + 0.15);
+    if (reach - start < 0.2) return;
+
+    const half = SMALL_PROJECTILE_RADIUS;
+    // Perpendicular no MUNDO. Projetada depois, ela vira a largura correta na
+    // tela em qualquer direcao.
+    const px = -ny * half;
+    const py = nx * half;
+
+    // Duas faixas encaixadas: o corredor cheio, fraco, e um miolo mais forte.
+    // O miolo e o que a vista pega de relance; o corredor e o que ela confere
+    // quando o jogador quer mesmo saber se o inimigo esta dentro.
+    const band = (widthScale: number, alpha: number, fade: number): void => {
+      const steps = 6;
+      for (let i = 0; i < steps; i++) {
+        const t0 = start + ((reach - start) * i) / steps;
+        const t1 = start + ((reach - start) * (i + 1)) / steps;
+        // Some para a frente: a faixa nao pode terminar num traco reto, que
+        // leria como "o tiro para aqui" — e ele nao para.
+        const segmentAlpha = alpha * (1 - (i / steps) * fade);
+        const [ax, ay] = toScreen(player.x + nx * t0 + px * widthScale, player.y + ny * t0 + py * widthScale);
+        const [bx, by] = toScreen(player.x + nx * t1 + px * widthScale, player.y + ny * t1 + py * widthScale);
+        const [cx, cy] = toScreen(player.x + nx * t1 - px * widthScale, player.y + ny * t1 - py * widthScale);
+        const [dx, dy] = toScreen(player.x + nx * t0 - px * widthScale, player.y + ny * t0 - py * widthScale);
+        ctx.globalAlpha = segmentAlpha;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(dx, dy);
+        ctx.closePath();
+        ctx.fill();
+      }
+    };
+
+    ctx.save();
+    ctx.fillStyle = PAL.biolum;
+    band(1, 0.22, 0.85);
+    band(0.34, 0.4, 0.85);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // Traco final atravessado na ponta: um alvo, e nao um fim de linha. Da a
+    // faixa um ponto de leitura para quem mira "aquela distancia".
+    const [tipLx, tipLy] = toScreen(player.x + nx * reach + px * 1.9, player.y + ny * reach + py * 1.9);
+    const [tipRx, tipRy] = toScreen(player.x + nx * reach - px * 1.9, player.y + ny * reach - py * 1.9);
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = PAL.biolum;
+    ctx.lineWidth = Math.max(1, z * 0.9);
+    ctx.beginPath();
+    ctx.moveTo(tipLx, tipLy);
+    ctx.lineTo(tipRx, tipRy);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   private drawDeathEchoBody(

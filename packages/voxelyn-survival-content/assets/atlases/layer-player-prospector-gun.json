@@ -1,0 +1,73 @@
+{
+  "id": "layer-player-prospector-gun",
+  "version": 3,
+  "atlas": "layer-player-prospector-gun.png",
+  "frameWidth": 32,
+  "frameHeight": 40,
+  "columns": 32,
+  "anchorX": 16,
+  "anchorY": 38,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.68,
+    "h": 1
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#1d2430",
+    "#2f6b4f",
+    "#59f2c2",
+    "#66c28a",
+    "#6e4a33",
+    "#b8a98f",
+    "#ffd166"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 4
+    },
+    "dl": {
+      "idle": 8,
+      "attack": 12
+    },
+    "ur": {
+      "idle": 16,
+      "attack": 20
+    },
+    "ul": {
+      "idle": 24,
+      "attack": 28
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "shard driver weapon layer for the voxel-isometric prospector, tinted by barrel heat at runtime",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

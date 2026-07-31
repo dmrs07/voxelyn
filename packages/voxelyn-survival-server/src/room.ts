@@ -442,6 +442,8 @@ export class GameRoom {
       hostile: p.hostile,
       kind: p.kind,
       armed: Boolean(p.modules?.explosive && p.distanceTravelled >= p.modules.explosive.armAfterDistance),
+      piercing: Boolean(p.modules?.piercing),
+      bouncy: (p.modules?.ricochet?.remainingBounces ?? 0) > 0,
     }));
   }
 

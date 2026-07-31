@@ -21,6 +21,7 @@ import {
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
 import playerLowerManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.json';
 import playerUpperManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.json';
+import playerGunManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.json';
 import stalkerManifest from '@voxelyn/survival-content/assets/atlases/enemy-stalker.json';
 import spitterManifest from '@voxelyn/survival-content/assets/atlases/enemy-spitter.json';
 import bomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.json';
@@ -38,6 +39,7 @@ import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.j
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
 import playerUpperUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.png?url';
+import playerGunUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
 import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.png?url';
 import bomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.png?url';
@@ -65,6 +67,14 @@ export type LayeredPlayerAnimation = {
   upper: SpriteAnimationLayer;
   /** Intensidade normalizada de 0 a 1; desloca o tronco contra a mira. */
   recoil: number;
+  /**
+   * Calor do cano, de 0 (frio) a 1 (no limite). Vem da simulacao, nao de uma
+   * contagem de tiros do cliente: o mesmo numero que trava o gatilho e que
+   * machuca o Prospector e o que pinta o metal.
+   */
+  heat: number;
+  /** Gatilho travado pelo superaquecimento: o cano esta incandescente e esfriando. */
+  overheated: boolean;
 };
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
@@ -75,6 +85,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
   { manifest: playerLowerManifest as unknown as SpriteManifestEntry, url: playerLowerUrl },
   { manifest: playerUpperManifest as unknown as SpriteManifestEntry, url: playerUpperUrl },
+  { manifest: playerGunManifest as unknown as SpriteManifestEntry, url: playerGunUrl },
   { manifest: stalkerManifest as unknown as SpriteManifestEntry, url: stalkerUrl },
   { manifest: spitterManifest as unknown as SpriteManifestEntry, url: spitterUrl },
   { manifest: bomberManifest as unknown as SpriteManifestEntry, url: bomberUrl },
@@ -272,7 +283,75 @@ export class PropBank {
 
 const PLAYER_LOWER_ID = 'layer-player-prospector-lower';
 const PLAYER_UPPER_ID = 'layer-player-prospector-upper';
+const PLAYER_GUN_ID = 'layer-player-prospector-gun';
 const WALK_HIP_BOB = [0, -1, -1, 0, 0, -1];
+
+/**
+ * Rampa de calor do cano, em cores da paleta mestra.
+ *
+ * Metal quente nao passa de frio a branco de uma vez: rubesce primeiro, abre em
+ * laranja e so entao clareia. As paradas abaixo sao exatamente essa ordem, e sao
+ * as MESMAS cores do fogo do mundo — o cano quente pertence a mesma fisica que a
+ * chama no chao, e nao a um efeito de interface.
+ */
+const HEAT_RAMP: readonly (readonly [number, readonly [number, number, number]])[] = [
+  [0.00, [0xd9, 0x3b, 0x4c]], // blood: o primeiro rubor
+  [0.55, [0xff, 0x7a, 0x2f]], // fire
+  [1.00, [0xff, 0xd1, 0x66]], // loot
+];
+/** Branco-quente: so o superaquecimento chega aqui. */
+const INCANDESCENT: readonly [number, number, number] = [0xe8, 0xf1, 0xff];
+
+/**
+ * Abaixo disto o cano fica com a propria cor.
+ *
+ * Existe porque calor residual e permanente: o decaimento por tick nunca chega a
+ * zero enquanto o jogador atira de vez em quando, e sem um piso o Prospector
+ * andaria com a arma eternamente rosada. O primeiro rubor tem de significar
+ * "voce esta gastando o cano", nao "o cano existe".
+ */
+const HEAT_VISIBLE_AT = 0.18;
+/**
+ * Teto de opacidade fora do superaquecimento.
+ *
+ * O tint e chapado: em alpha 1 o cano perde as tres faces e vira um borrao de
+ * uma cor so. Guardar o alpha 1 para o superaquecimento e o que faz ele LER como
+ * um estado diferente, e nao como mais um passo da mesma rampa.
+ */
+const HEAT_MAX_ALPHA = 0.88;
+
+const mixChannel = (a: number, b: number, t: number): number => Math.round(a + (b - a) * t);
+const rgb = (c: readonly [number, number, number]): string => `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+
+/**
+ * Cor e opacidade do cano para um dado calor. Pura: o mesmo calor pinta o mesmo
+ * metal em qualquer maquina, e o teste pode conferir a rampa sem um canvas.
+ */
+export const gunHeatTint = (heat: number, overheated: boolean): Tint | undefined => {
+  const t = Math.max(0, Math.min(1, heat));
+  // Superaquecido, o cano nao mede mais nada: esta no branco, e a partir daqui
+  // o unico movimento e para baixo. Nao pulsa — piscar aqui competiria com o
+  // tremor do corpo, que e o sinal que diz ao jogador que o gatilho travou.
+  if (overheated) return { color: rgb(INCANDESCENT), alpha: 1 };
+  if (t < HEAT_VISIBLE_AT) return undefined;
+
+  const eased = (t - HEAT_VISIBLE_AT) / (1 - HEAT_VISIBLE_AT);
+  let color = HEAT_RAMP[HEAT_RAMP.length - 1][1];
+  for (let i = 1; i < HEAT_RAMP.length; i++) {
+    const [stopAt, stopColor] = HEAT_RAMP[i];
+    if (eased > stopAt) continue;
+    const [prevAt, prevColor] = HEAT_RAMP[i - 1];
+    const span = stopAt - prevAt || 1;
+    const k = (eased - prevAt) / span;
+    color = [
+      mixChannel(prevColor[0], stopColor[0], k),
+      mixChannel(prevColor[1], stopColor[1], k),
+      mixChannel(prevColor[2], stopColor[2], k),
+    ];
+    break;
+  }
+  return { color: rgb(color), alpha: HEAT_MAX_ALPHA * (0.35 + eased * 0.65) };
+};
 
 export const recoilScreenOffset = (
   facingX: number,
@@ -363,7 +442,11 @@ export class SpriteBank {
   ): boolean {
     const lower = this.get(PLAYER_LOWER_ID);
     const upper = this.get(PLAYER_UPPER_ID);
-    if (!lower || !upper) return false;
+    // A arma vive numa camada propria e o tronco nao a desenha mais. Sem os tres
+    // atlas o Prospector sairia desarmado, entao a composicao inteira cede a vez
+    // para o sheet completo em vez de entregar meio personagem.
+    const gun = this.get(PLAYER_GUN_ID);
+    if (!lower || !upper || !gun) return false;
 
     this.drawLoadedFrame(
       ctx,
@@ -389,6 +472,8 @@ export class SpriteBank {
       zoom
     );
 
+    const upperX = footX + recoil.x;
+    const upperY = footY + hipBob + recoil.y;
     this.drawLoadedFrame(
       ctx,
       upper,
@@ -396,10 +481,32 @@ export class SpriteBank {
       animation.upper.facingX,
       animation.upper.facingY,
       animation.upper.elapsedMs,
-      footX + recoil.x,
-      footY + hipBob + recoil.y,
+      upperX,
+      upperY,
       zoom,
       tint
+    );
+
+    // A arma acompanha o tronco quadro a quadro e recebe o MESMO deslocamento de
+    // coice: ela e a peca que recua, e resolver o coice so no tronco faria o cano
+    // deslizar para dentro do peito no disparo.
+    //
+    // O calor tem prioridade sobre o tint de aliado. O tint frio do parceiro
+    // existe para separar dois Prospectors iguais na tela; o calor conta um
+    // estado que machuca, e nenhum deles precisa ser lido ao mesmo tempo — o
+    // parceiro remoto nao transmite calor, entao na pratica os dois nunca
+    // disputam o mesmo cano.
+    this.drawLoadedFrame(
+      ctx,
+      gun,
+      animation.upper.animation,
+      animation.upper.facingX,
+      animation.upper.facingY,
+      animation.upper.elapsedMs,
+      upperX,
+      upperY,
+      zoom,
+      gunHeatTint(animation.heat, animation.overheated) ?? tint
     );
     return true;
   }

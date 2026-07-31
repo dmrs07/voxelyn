@@ -1146,6 +1146,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           break;
         }
 
+        // O disco NA VOLTA atravessa terreno.
+        //
+        // Ele deixou de mirar uma direcao e passou a mirar uma PESSOA: a cada
+        // tick o rumo e recalculado para a posicao do dono. Devolve-lo a celula
+        // anterior quando encosta em pedra, como faz a ida, cria um laco fechado
+        // — recalcula o rumo para o dono, anda para dentro da parede, volta para
+        // onde estava, recalcula de novo — e o disco fica cravado na parede pelos
+        // tres segundos inteiros de TTL antes de sumir. Basta o jogador recuar
+        // uma esquina depois de arremessar, que e o uso normal da arma.
+        //
+        // Nao ha o que colidir na volta: o disco ja gastou a carga, ja cobrou o
+        // modulo e nao machuca terreno em nenhuma das duas pernas. Deixa-lo
+        // atravessar e o comportamento que a ferramenta promete — ela VOLTA — e o
+        // unico que nao mente para quem contou com isso.
+        if (proj.disc?.phase === 'returning') continue;
+
         if (proj.disc) {
           proj.x = prevX;
           proj.y = prevY;

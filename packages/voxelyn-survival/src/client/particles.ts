@@ -184,6 +184,16 @@ export class VoxelParticles {
   private readonly lastGasBucket = new Map<number, number>();
   private readonly lastSporeBucket = new Map<number, number>();
   private readonly lastFungalSmokeBucket = new Map<number, number>();
+  /**
+   * Ultimo bucket do cano superaquecido, por SLOT de jogador.
+   *
+   * Os outros emissores contínuos são chaveados pela célula, porque o gás e o
+   * fungo não saem do lugar. O Prospector sai: chaveada por posição, a trava
+   * abriria a cada passo dentro do mesmo bucket e a fumaça voltaria a nascer por
+   * quadro. O slot é a identidade que de fato não muda durante o travamento, e
+   * limita o mapa ao número de jogadores.
+   */
+  private readonly lastOverheatBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
@@ -194,6 +204,7 @@ export class VoxelParticles {
     this.lastGasBucket.clear();
     this.lastSporeBucket.clear();
     this.lastFungalSmokeBucket.clear();
+    this.lastOverheatBucket.clear();
   }
 
   private push(p: Particle): void {
@@ -471,6 +482,40 @@ export class VoxelParticles {
       maxLife: 900,
       kind: 'ash',
     });
+  }
+
+  /**
+   * Cano superaquecido: fumaca preta saindo do proprio Prospector.
+   *
+   * Ritmo por BUCKET de tempo real, como o gas e a fumaca do fungo, e nao por
+   * quadro: emitir a cada frame amarraria a densidade da fumaca a taxa do
+   * monitor — a 120Hz o jogador sumiria dentro da propria nuvem e a 30Hz ela
+   * mal apareceria. O bucket e curto (140ms) porque o travamento tambem e: a
+   * fumaca precisa nascer densa e acabar junto com ele.
+   *
+   * Nasce ACIMA do chao (`z`) porque o cano esta na altura do peito, e o que
+   * separa esta fumaca da do fungo secando e exatamente de onde ela sai.
+   */
+  emitOverheatSmoke(slot: number, x: number, y: number, nowMs: number, scale: number): void {
+    const bucket = (nowMs / 140) | 0;
+    if (this.lastOverheatBucket.get(slot) === bucket) return;
+    this.lastOverheatBucket.set(slot, bucket);
+
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2654435761) ^ (slot + 1)));
+    const count = Math.max(1, Math.round(2 * scale));
+    for (let i = 0; i < count; i++) {
+      this.push({
+        x: x + rnd() * 0.4 - 0.2,
+        y: y + rnd() * 0.4 - 0.2,
+        z: 0.55 + rnd() * 0.2,
+        vx: (rnd() - 0.5) * 0.35,
+        vy: (rnd() - 0.5) * 0.35,
+        vz: 0.5 + rnd() * 0.35,
+        life: 620,
+        maxLife: 620,
+        kind: 'ash',
+      });
+    }
   }
 
   step(dtMs: number): void {

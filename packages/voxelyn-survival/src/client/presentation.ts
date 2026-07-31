@@ -1,4 +1,4 @@
-import { TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
+import { HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
 import { FacingHysteresis } from './facing';
 import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
 
@@ -81,19 +81,59 @@ export const recoilAtElapsed = (elapsedMs: number, releaseMs: number, durationMs
   return (1 - t) * (1 - t);
 };
 
+/**
+ * Calor do cano deste Prospector, normalizado.
+ *
+ * Sai do MESMO campo que trava o gatilho na simulacao. Um contador proprio no
+ * cliente — "quantos tiros saíram" — divergiria do que a mecanica faz na
+ * primeira vez que o decaimento por tick nao batesse com a taxa de quadros, e o
+ * jogador aprenderia a ler um cano que mente sobre quando vai travar.
+ *
+ * O parceiro remoto nao transmite calor no snapshot: `heat` fica em 0 e a arma
+ * dele sai fria. E o silencio certo — inventar calor para o outro seria desenhar
+ * um estado que ninguem mediu.
+ */
+const gunHeatOf = (entity: Entity, state: SurvivalState): { heat: number; overheated: boolean } => {
+  const slot = entity.slot;
+  const extra = slot === undefined ? undefined : state.playerExtras?.[slot];
+  if (!extra) return { heat: 0, overheated: false };
+  return {
+    heat: Math.max(0, Math.min(1, extra.heat / HEAT_MAX)),
+    overheated: state.tick < extra.overheatedUntil,
+  };
+};
+
+/**
+ * Composicao do Prospector: pernas, tronco e arma como camadas independentes.
+ *
+ * `action` ausente e o repouso — o tronco fica em `idle` apontado para a mira e
+ * nao ha coice. Ele existe porque a composicao deixou de ser o caminho do tiro e
+ * passou a ser o caminho PADRAO: enquanto so o disparo era composto, o
+ * Prospector trocava de modelo toda vez que parava de atirar (o sheet completo
+ * ainda carrega a picareta antiga), e o cano quente sumia da tela junto — o
+ * calor dura segundos, a janela da acao dura sete ticks.
+ */
 const layeredPlayerAnimation = (
   entity: Entity,
   base: EntityAnimState,
-  action: ActionIntent,
+  action: ActionIntent | null,
   upperElapsedMs: number,
   nowMs: number,
-  facing: FacingResolver
+  facing: FacingResolver,
+  gun: { heat: number; overheated: boolean }
 ): LayeredPlayerAnimation => {
-  const releaseMs = Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000);
+  const releaseMs = action
+    ? Math.max(0, ((action.releaseTick - action.startTick) / TICK_HZ) * 1000)
+    : 0;
   const walking = base.anim === 'walk';
   const raw = locomotionFacing(base, entity.facing.x, entity.facing.y);
   const lowerFacing = facing(FACING_BODY, raw.x, raw.y);
-  const upperFacing = facing(FACING_UPPER, action.dx, action.dy);
+  // Em repouso o rumo do tronco e a MIRA, que e o que `entity.facing` guarda no
+  // jogador. O tronco nunca segue as pernas: quem anda de costas continua
+  // apontando a arma para onde o cursor esta.
+  const upperFacing = action
+    ? facing(FACING_UPPER, action.dx, action.dy)
+    : facing(FACING_UPPER, entity.facing.x, entity.facing.y);
 
   return {
     kind: 'layered-player',
@@ -104,12 +144,14 @@ const layeredPlayerAnimation = (
       facingY: lowerFacing.y,
     },
     upper: {
-      animation: actionAnimation(action.action),
+      animation: action ? actionAnimation(action.action) : 'idle',
       elapsedMs: upperElapsedMs,
       facingX: upperFacing.x,
       facingY: upperFacing.y,
     },
-    recoil: recoilAtElapsed(upperElapsedMs, releaseMs),
+    recoil: action ? recoilAtElapsed(upperElapsedMs, releaseMs) : 0,
+    heat: gun.heat,
+    overheated: gun.overheated,
   };
 };
 
@@ -282,9 +324,11 @@ export class EntityPresentation {
 
         const elapsedMs = this.visualActionElapsed(entity.id, action, state.tick, nowMs);
         if (entity.archetype === 'prospector') {
-          // A composicao ja estabiliza as duas camadas por dentro; o rumo solto
+          // A composicao ja estabiliza as tres camadas por dentro; o rumo solto
           // que sai aqui e o do TRONCO, e reaproveita a mesma memoria dela.
-          const layered = layeredPlayerAnimation(entity, base, action, elapsedMs, nowMs, facing);
+          const layered = layeredPlayerAnimation(
+            entity, base, action, elapsedMs, nowMs, facing, gunHeatOf(entity, state)
+          );
           return {
             anim: layered,
             elapsedMs,
@@ -326,6 +370,25 @@ export class EntityPresentation {
         ? locomotionFacing(base, entity.facing.x, entity.facing.y)
         : { x: entity.facing.x, y: entity.facing.y };
     const heading = facing(FACING_BODY, raw.x, raw.y);
+
+    // Repouso e caminhada do Prospector tambem saem COMPOSTOS. Os dois estados
+    // existem nas camadas, e usar o sheet completo neles trocava o modelo do
+    // personagem por outro — o completo ainda carrega a picareta que a arma
+    // substituiu — toda vez que o jogador soltava o gatilho. `hit`, `die`,
+    // `downed` e `revive` continuam vindo do sheet completo: sao as poses que as
+    // camadas nao autoram, e a troca ali e coberta pelo proprio evento.
+    if (entity.archetype === 'prospector' && (base.anim === 'idle' || base.anim === 'walk')) {
+      const layered = layeredPlayerAnimation(
+        entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunHeatOf(entity, state)
+      );
+      return {
+        anim: layered,
+        elapsedMs: layered.upper.elapsedMs,
+        facingX: layered.upper.facingX,
+        facingY: layered.upper.facingY,
+      };
+    }
+
     return {
       anim: base.anim,
       elapsedMs: nowMs - base.animStartMs,
