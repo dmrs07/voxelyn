@@ -15,6 +15,57 @@ import type { AmbienceLevels } from './ambience';
 /** Constante de suavizacao dos ganhos, em segundos. */
 const GLIDE = 0.12;
 
+/** Batidas por segundo do aviso de calor, do primeiro tique ao travamento. */
+const TICK_RATE_MIN = 2.2;
+const TICK_RATE_MAX = 14;
+
+/**
+ * Fracao do topo da senoide em que a porta do tique abre.
+ *
+ * Fracao de AMPLITUDE, nao de tempo: a senoide desacelera perto do pico, entao
+ * 0,06 de amplitude sao cerca de 10% do periodo. E o que faz a batida apertar
+ * sozinha quando a taxa sobe — 71 ms de "toc" a 2,2 Hz, 11 ms de estalo seco a
+ * 14 Hz — sem nenhum parametro extra para manter em sincronia com a taxa.
+ */
+const TICK_DUTY = 0.06;
+
+/**
+ * Envelope de uma batida, sobre 0..1 da janela aberta.
+ *
+ * Ataque curto e queda quadratica: e o que separa um tique de um tremolo. Um
+ * envelope simetrico soaria como o leito antigo ondulando, so que mais lento.
+ * Comeca e termina em zero de proposito — a porta vem DEPOIS do filtro, entao
+ * nao ha nada adiante para arredondar um degrau que sobrasse aqui.
+ */
+const tickEnvelope = (t: number): number => {
+  if (t <= 0 || t >= 1) return 0;
+  const ATTACK = 0.18;
+  if (t < ATTACK) return (1 - Math.cos((Math.PI * t) / ATTACK)) / 2;
+  const decay = 1 - (t - ATTACK) / (1 - ATTACK);
+  return decay * decay;
+};
+
+/**
+ * Curva do formatador: amplitude do LFO (-1..1) para abertura da porta (0..1).
+ *
+ * Tabela grande porque so `TICK_DUTY` dela e usada — com 1024 pontos, a batida
+ * inteira caberia em uns sessenta, e o ataque em uma dezena. Os degraus da
+ * tabela chegariam ao alto-falante como estalo em cima do tique. E memoria de
+ * uma vez so, na criacao do leito.
+ */
+const tickCurve = (): Float32Array<ArrayBuffer> => {
+  const n = 8192;
+  // Buffer explicito: `new Float32Array(n)` sai como `ArrayBufferLike`, e
+  // `WaveShaperNode.curve` so aceita um respaldado por `ArrayBuffer`.
+  const curve = new Float32Array(new ArrayBuffer(n * Float32Array.BYTES_PER_ELEMENT));
+  const opensAt = 1 - 2 * TICK_DUTY;
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = tickEnvelope((x - opensAt) / (2 * TICK_DUTY));
+  }
+  return curve;
+};
+
 type Bed = {
   gain: GainNode;
   /** Ganho maximo do leito quando o nivel esta em 1. */
@@ -91,28 +142,69 @@ export class AmbienceBus {
       this.beds.set('gas', { gain, ceiling: 0.17 });
     }
 
-    // Calor: apito que SOBE de altura com o nivel. Volume sozinho nao serviria
-    // — o jogador precisa saber a que distancia esta do travamento, e isso e
-    // uma escala continua, nao um alarme binario que so dispara no fim.
+    // Calor: tique metalico que ACELERA rumo ao travamento — e silencio antes
+    // do limiar.
+    //
+    // Era um dente-de-serra deslizando de 320 a 940 Hz, e o problema nunca foi o
+    // volume. Primeiro, nao tinha limiar: com `HEAT_PER_SHOT` 9 contra
+    // decaimento 1,15 por tick, qualquer combate o mantinha aceso, e o jogador
+    // aprendia a ignora-lo justamente porque ele nunca calava. Segundo, o
+    // timbre: um dente-de-serra com glissando entre 300 e 900 Hz mora na banda
+    // mais cansativa que existe, e e a MESMA banda do tiro e do impacto. Os
+    // outros leitos passam por baixo da mixagem (ruido, sub); este disputava
+    // espaco com ela.
+    //
+    // Tique corrige os dois. Intermitente cansa muito menos que sustentado, e a
+    // urgencia vira TAXA em vez de altura. Taxa e a grandeza certa porque se le
+    // sem referencia: para saber que um tom subiu e preciso lembrar de onde ele
+    // estava, mas um tique acelerando e obvio no proprio instante em que soa.
     {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.value = 320;
+      const src = loop();
       const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 1400;
+      filter.type = 'bandpass';
+      filter.frequency.value = 1500;
+      // Q alto: ruido de banda larga daria um "ch" de vapor, nao metal batendo.
+      filter.Q.value = 7;
+
+      // A batida nasce de uma PORTA, nao de nos criados por tique. Agendar um
+      // envelope por batida a 14 Hz seria voltar exatamente ao custo que este
+      // arquivo existe para evitar, e ainda amarraria o som ao ritmo do quadro.
+      const gate = ctx.createGain();
+      gate.gain.value = 0;
+      const rate = ctx.createOscillator();
+      rate.type = 'sine';
+      rate.frequency.value = TICK_RATE_MIN;
+      // O formatador recorta a senoide numa batida curta. Ligar o LFO direto na
+      // porta daria tremolo — o som ondularia sem nunca calar, que e de novo um
+      // leito continuo, so que disfarcado.
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = tickCurve();
+      rate.connect(shaper).connect(gate.gain);
+      rate.start(t0);
+      this.sources.push(rate);
+
       const gain = ctx.createGain();
       gain.gain.value = 0;
-      osc.connect(filter).connect(gain).connect(out);
-      osc.start(t0);
-      this.sources.push(osc);
+      src.connect(filter).connect(gate).connect(gain).connect(out);
+      src.start(t0);
       this.beds.set('heat', {
         gain,
-        // Teto baixo: isto toca junto de tudo o mais e nunca pode competir com
-        // um telegrafo. Ele informa por PRESENCA e por altura, nao por volume.
-        ceiling: 0.1,
+        // Teto acima do leito antigo, energia media bem abaixo: o ciclo util e
+        // de poucos por cento, entao o pico pode ser alto sem que o aviso pese
+        // na mixagem. Ele continua informando por presenca e por taxa.
+        ceiling: 0.34,
         modulate: (level, now) => {
-          osc.frequency.setTargetAtTime(320 + level * 620, now, GLIDE);
+          rate.frequency.setTargetAtTime(
+            TICK_RATE_MIN + level * (TICK_RATE_MAX - TICK_RATE_MIN),
+            now,
+            GLIDE,
+          );
+          // O metal tambem esquenta: a banda sobe junto com a taxa, e as
+          // ultimas batidas antes do travamento saem mais duras que as
+          // primeiras. Sozinha a taxa ja bastaria; isto e o que faz as duas
+          // pontas da escala soarem como coisas diferentes, e nao como a mesma
+          // batida em velocidades diferentes.
+          filter.frequency.setTargetAtTime(1500 + level * 1300, now, GLIDE);
         },
       });
     }

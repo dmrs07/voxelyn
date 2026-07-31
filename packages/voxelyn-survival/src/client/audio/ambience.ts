@@ -5,6 +5,11 @@
 // sala em que ele entrou esta cheia de gas, ou que o calor da arma esta a dois
 // tiros do travamento. Nada disso e um instante; nada disso cabe num evento.
 //
+// Continuo nao quer dizer constante. Um leito que nunca cala nao informa nada: o
+// ouvido o adota como piso da cena e para de registra-lo. Fogo e gas se calam
+// sozinhos porque o mundo os apaga; o calor da arma nao se apaga nunca de todo,
+// e por isso e o unico leito que precisa de um limiar proprio.
+//
 // Tudo aqui e amostragem do estado autoritativo, nunca decisao: a ambiencia le
 // a grade e o jogador local, e devolve numeros de 0 a 1. Quem transforma isso
 // em som e o synth, e quem suaviza a transicao e o barramento — um nivel que
@@ -24,7 +29,7 @@ export type AmbienceLevels = {
   fire: number;
   /** Gas e esporos por perto: sibilo toxico. */
   gas: number;
-  /** Calor da arma do jogador local: apito que sobe ate o travamento. */
+  /** Aviso de travamento da arma local: tique que acelera. Zero antes do limiar. */
   heat: number;
   /** Contaminacao da run: zumbido grave que cresce a run inteira. */
   dread: number;
@@ -56,6 +61,41 @@ const FIRE_SATURATION = 20;
 const GAS_SATURATION = 34;
 /** Inimigos vivos no raio que saturam a pulsacao de ameaca. */
 const THREAT_SATURATION = 5;
+
+/**
+ * Fracao de calor abaixo da qual a arma nao faz som nenhum.
+ *
+ * O leito de calor era o unico que tocava o tempo todo. `HEAT_PER_SHOT` e 9 e o
+ * decaimento e 1,15 por tick: um unico tiro deixava o som aceso por oito ticks,
+ * e fogo sustentado o deixava aceso indefinidamente. Um aviso que soa em todo
+ * combate nao avisa nada — vira o som do jogo, o ouvido aprende a filtra-lo, e
+ * quando o travamento enfim se aproxima ele nao se destaca de coisa alguma.
+ *
+ * Meio tanque e o ponto certo porque e onde a informacao ainda e acionavel: a
+ * `HEAT_PER_SHOT` 9 sobram cerca de cinco tiros ate travar, tempo de soltar o
+ * gatilho. E tambem e onde o calor cai depois de um travamento (`HEAT_MAX *
+ * 0.55`, em run.ts), entao sair da trava devolve um tique lento em vez de
+ * silencio — o que e verdade, a arma continua quente.
+ *
+ * O HUD le esta mesma constante para marcar e pulsar a barra de calor. As duas
+ * fronteiras TEM de ser a mesma: se o audio calasse num ponto que a tela nao
+ * mostra, o jogador leria o silencio como sorte, e nao como um limite que ele
+ * pode aprender a usar.
+ */
+export const HEAT_WARN_AT = 0.5;
+
+/**
+ * Fracao de calor para intensidade do aviso, 0..1. Pura, testavel sem browser.
+ *
+ * Expoente abaixo de 1 para o primeiro tique ja nascer audivel. Com rampa linear
+ * o inicio da faixa util sairia perto de zero, e o aviso so passaria a existir
+ * de fato nos ultimos tiros — tarde demais para mudar a decisao de quem atira.
+ */
+export const heatWarning = (heatFrac: number): number => {
+  if (heatFrac <= HEAT_WARN_AT) return 0;
+  const t = Math.min(1, (heatFrac - HEAT_WARN_AT) / (1 - HEAT_WARN_AT));
+  return Math.pow(t, 0.6);
+};
 
 /** Le a grade e o estado e devolve os niveis-alvo de cada leito. */
 export const sampleAmbience = (state: SurvivalState, listenerId: number): AmbienceLevels => {
@@ -108,7 +148,7 @@ export const sampleAmbience = (state: SurvivalState, listenerId: number): Ambien
   return {
     fire: Math.min(1, fireCells / FIRE_SATURATION),
     gas: Math.min(1, gasCells / GAS_SATURATION),
-    heat: extra ? Math.min(1, extra.heat / HEAT_MAX) : 0,
+    heat: extra ? heatWarning(extra.heat / HEAT_MAX) : 0,
     dread: Math.min(1, state.contamination),
     threat: Math.min(1, threatCount / THREAT_SATURATION),
   };

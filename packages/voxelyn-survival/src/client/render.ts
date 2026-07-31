@@ -35,6 +35,7 @@ import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
 import { DAMAGE_FAN, damageAlpha, damageScale, drawDamageNumber } from './damage-text';
 import { ProjectileView, SMALL_PROJECTILE_RADIUS } from './projectiles';
 import { EntityPresentation } from './presentation';
+import { HEAT_WARN_AT } from './audio/ambience';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
@@ -2197,10 +2198,23 @@ export class SurvivalRenderer {
 
     // Calor permanece legivel, mas como trilho secundario dentro do mesmo painel.
     const heatFrac = Math.min(1, extra.heat / HEAT_MAX);
+    const overheated = state.tick < extra.overheatedUntil;
     ctx.fillStyle = 'rgba(0,0,0,0.58)';
     ctx.fillRect(hpBarX, safeTop + 32, hpBarW, 4);
-    ctx.fillStyle = state.tick < extra.overheatedUntil ? PAL.blood : PAL.fire;
+    // Acima do limiar a barra PULSA, na mesma fronteira em que o tique de aviso
+    // comeca a soar. Sem isso as duas leituras contariam historias diferentes: o
+    // audio calaria num ponto que a barra nao mostra, e o jogador atribuiria o
+    // silencio a sorte em vez de a um limite que ele pode aprender.
+    const warning = !overheated && heatFrac > HEAT_WARN_AT;
+    ctx.globalAlpha = warning ? 0.72 + 0.28 * Math.sin(nowMs / 90) : 1;
+    ctx.fillStyle = overheated ? PAL.blood : PAL.fire;
     ctx.fillRect(hpBarX, safeTop + 32, hpBarW * heatFrac, 4);
+    ctx.globalAlpha = 1;
+    // A marca do limiar fica visivel com o trilho VAZIO. Ela e o que informa que
+    // existe um ponto de virada antes de o jogador chegar nele — depois de
+    // atingido, quem avisa ja e o tique.
+    ctx.fillStyle = 'rgba(232,241,255,0.45)';
+    ctx.fillRect(hpBarX + Math.round(hpBarW * HEAT_WARN_AT), safeTop + 31, 1, 6);
 
     ctx.strokeStyle = 'rgba(232,241,255,0.17)';
     ctx.beginPath();
