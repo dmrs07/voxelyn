@@ -16,11 +16,13 @@ import {
   resolveProp,
   type PropManifest,
   type TerrainManifest,
+  EMISSIVE_HEX,
 } from '@voxelyn/survival-content';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
 import playerLowerManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.json';
 import playerUpperManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.json';
+import playerGunManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.json';
 import stalkerManifest from '@voxelyn/survival-content/assets/atlases/enemy-stalker.json';
 import spitterManifest from '@voxelyn/survival-content/assets/atlases/enemy-spitter.json';
 import bomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.json';
@@ -38,6 +40,7 @@ import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.j
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import playerLowerUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.png?url';
 import playerUpperUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.png?url';
+import playerGunUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
 import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.png?url';
 import bomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.png?url';
@@ -65,16 +68,124 @@ export type LayeredPlayerAnimation = {
   upper: SpriteAnimationLayer;
   /** Intensidade normalizada de 0 a 1; desloca o tronco contra a mira. */
   recoil: number;
+  /**
+   * Calor do cano, de 0 (frio) a 1 (no limite). Vem da simulacao, nao de uma
+   * contagem de tiros do cliente: o mesmo numero que trava o gatilho e que
+   * machuca o Prospector e o que pinta o metal.
+   */
+  heat: number;
+  /** Gatilho travado pelo superaquecimento: o cano esta incandescente e esfriando. */
+  overheated: boolean;
 };
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
 
 type Tint = { color: string; alpha: number };
-type Loaded = { manifest: SpriteManifestEntry; image: HTMLImageElement; ready: boolean; failed: boolean };
+type Loaded = {
+  manifest: SpriteManifestEntry;
+  image: HTMLImageElement;
+  ready: boolean;
+  failed: boolean;
+  /** Halo: so os pixels emissivos do atlas, em meia resolucao. Ver `emissiveMask`. */
+  glow: HTMLCanvasElement | null;
+};
+
+/**
+ * Divisor de resolucao da mascara de halo.
+ *
+ * Meia resolucao nao e economia cega, e a forma certa do dado: o halo E borrado.
+ * Guardar a mascara em resolucao cheia gastaria quatro vezes a memoria para
+ * depois jogar a nitidez fora no desenho — e a ampliacao de volta, com
+ * suavizacao ligada, e exatamente o borrao que se quer, de graca e sem filtro
+ * por quadro.
+ */
+const GLOW_SCALE = 2;
+/** Quanto o halo transborda a silhueta, em pixels de atlas. */
+const GLOW_SPREAD = 2;
+const GLOW_ALPHA = 0.55;
+
+/**
+ * Opacidade do halo, dada a opacidade que o desenho ja herdou.
+ *
+ * ESCALA, nunca substitui. Quem chama ja atenuou o sprite por um motivo — o
+ * parceiro obedecendo a luz da caverna, o eco de morte se apagando, a oferta do
+ * poco translucida — e um halo em opacidade fixa acende o visor sobre um corpo
+ * que quase nao esta la. No eco de morte era mais que feio: ele reserva a luz
+ * que atravessa o escuro para o farol proprio, e o halo do sprite furava a
+ * regra.
+ */
+export const glowAlpha = (inherited: number): number => inherited * GLOW_ALPHA;
+
+/**
+ * Apaga tudo que NAO emite luz, no lugar, e devolve quantos pixels sobraram.
+ *
+ * Comparacao EXATA contra a paleta mestra, e nao por proximidade: os atlas de
+ * personagem sao validados com alpha binario e cores exatas da paleta, entao um
+ * limiar de aproximacao so criaria falso positivo em cima de uma garantia que ja
+ * existe. (Terreno e chao ficam de fora do halo justamente por nao terem essa
+ * garantia — as cores deles sao multiplicadas por niveis de luz assados, e um
+ * cristal a meia luz nao bate com nenhum hex da paleta.)
+ *
+ * Separada do canvas de proposito: e a unica parte com decisao, e assim ela e
+ * testavel sem DOM.
+ */
+export const keepEmissivePixels = (
+  rgba: Uint8ClampedArray,
+  emissive: readonly string[]
+): number => {
+  const wanted = new Set(emissive.map((hex) => parseInt(hex.slice(1), 16)));
+  let kept = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    const key = (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+    if (rgba[i + 3] !== 0 && wanted.has(key)) {
+      kept++;
+      continue;
+    }
+    rgba[i + 3] = 0;
+  }
+  return kept;
+};
+
+/**
+ * Mascara com os pixels emissivos de um atlas, em meia resolucao.
+ *
+ * Devolve `null` quando nao ha um unico pixel emissivo, e ai o desenho pula o
+ * halo inteiro em vez de compor uma imagem vazia por criatura por quadro.
+ */
+export const emissiveMask = (
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  emissive: readonly string[]
+): HTMLCanvasElement | null => {
+  if (width <= 0 || height <= 0) return null;
+  const full = document.createElement('canvas');
+  full.width = width;
+  full.height = height;
+  const fctx = full.getContext('2d', { willReadFrequently: true });
+  if (!fctx) return null;
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(source, 0, 0);
+
+  const frame = fctx.getImageData(0, 0, width, height);
+  if (keepEmissivePixels(frame.data, emissive) === 0) return null;
+  fctx.putImageData(frame, 0, 0);
+
+  const half = document.createElement('canvas');
+  half.width = Math.max(1, Math.floor(width / GLOW_SCALE));
+  half.height = Math.max(1, Math.floor(height / GLOW_SCALE));
+  const hctx = half.getContext('2d');
+  if (!hctx) return null;
+  hctx.imageSmoothingEnabled = true;
+  hctx.drawImage(full, 0, 0, half.width, half.height);
+  return half;
+};
+
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
   { manifest: playerLowerManifest as unknown as SpriteManifestEntry, url: playerLowerUrl },
   { manifest: playerUpperManifest as unknown as SpriteManifestEntry, url: playerUpperUrl },
+  { manifest: playerGunManifest as unknown as SpriteManifestEntry, url: playerGunUrl },
   { manifest: stalkerManifest as unknown as SpriteManifestEntry, url: stalkerUrl },
   { manifest: spitterManifest as unknown as SpriteManifestEntry, url: spitterUrl },
   { manifest: bomberManifest as unknown as SpriteManifestEntry, url: bomberUrl },
@@ -272,7 +383,75 @@ export class PropBank {
 
 const PLAYER_LOWER_ID = 'layer-player-prospector-lower';
 const PLAYER_UPPER_ID = 'layer-player-prospector-upper';
+const PLAYER_GUN_ID = 'layer-player-prospector-gun';
 const WALK_HIP_BOB = [0, -1, -1, 0, 0, -1];
+
+/**
+ * Rampa de calor do cano, em cores da paleta mestra.
+ *
+ * Metal quente nao passa de frio a branco de uma vez: rubesce primeiro, abre em
+ * laranja e so entao clareia. As paradas abaixo sao exatamente essa ordem, e sao
+ * as MESMAS cores do fogo do mundo — o cano quente pertence a mesma fisica que a
+ * chama no chao, e nao a um efeito de interface.
+ */
+const HEAT_RAMP: readonly (readonly [number, readonly [number, number, number]])[] = [
+  [0.00, [0xd9, 0x3b, 0x4c]], // blood: o primeiro rubor
+  [0.55, [0xff, 0x7a, 0x2f]], // fire
+  [1.00, [0xff, 0xd1, 0x66]], // loot
+];
+/** Branco-quente: so o superaquecimento chega aqui. */
+const INCANDESCENT: readonly [number, number, number] = [0xe8, 0xf1, 0xff];
+
+/**
+ * Abaixo disto o cano fica com a propria cor.
+ *
+ * Existe porque calor residual e permanente: o decaimento por tick nunca chega a
+ * zero enquanto o jogador atira de vez em quando, e sem um piso o Prospector
+ * andaria com a arma eternamente rosada. O primeiro rubor tem de significar
+ * "voce esta gastando o cano", nao "o cano existe".
+ */
+const HEAT_VISIBLE_AT = 0.18;
+/**
+ * Teto de opacidade fora do superaquecimento.
+ *
+ * O tint e chapado: em alpha 1 o cano perde as tres faces e vira um borrao de
+ * uma cor so. Guardar o alpha 1 para o superaquecimento e o que faz ele LER como
+ * um estado diferente, e nao como mais um passo da mesma rampa.
+ */
+const HEAT_MAX_ALPHA = 0.88;
+
+const mixChannel = (a: number, b: number, t: number): number => Math.round(a + (b - a) * t);
+const rgb = (c: readonly [number, number, number]): string => `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+
+/**
+ * Cor e opacidade do cano para um dado calor. Pura: o mesmo calor pinta o mesmo
+ * metal em qualquer maquina, e o teste pode conferir a rampa sem um canvas.
+ */
+export const gunHeatTint = (heat: number, overheated: boolean): Tint | undefined => {
+  const t = Math.max(0, Math.min(1, heat));
+  // Superaquecido, o cano nao mede mais nada: esta no branco, e a partir daqui
+  // o unico movimento e para baixo. Nao pulsa — piscar aqui competiria com o
+  // tremor do corpo, que e o sinal que diz ao jogador que o gatilho travou.
+  if (overheated) return { color: rgb(INCANDESCENT), alpha: 1 };
+  if (t < HEAT_VISIBLE_AT) return undefined;
+
+  const eased = (t - HEAT_VISIBLE_AT) / (1 - HEAT_VISIBLE_AT);
+  let color = HEAT_RAMP[HEAT_RAMP.length - 1][1];
+  for (let i = 1; i < HEAT_RAMP.length; i++) {
+    const [stopAt, stopColor] = HEAT_RAMP[i];
+    if (eased > stopAt) continue;
+    const [prevAt, prevColor] = HEAT_RAMP[i - 1];
+    const span = stopAt - prevAt || 1;
+    const k = (eased - prevAt) / span;
+    color = [
+      mixChannel(prevColor[0], stopColor[0], k),
+      mixChannel(prevColor[1], stopColor[1], k),
+      mixChannel(prevColor[2], stopColor[2], k),
+    ];
+    break;
+  }
+  return { color: rgb(color), alpha: HEAT_MAX_ALPHA * (0.35 + eased * 0.65) };
+};
 
 export const recoilScreenOffset = (
   facingX: number,
@@ -294,12 +473,30 @@ export const recoilScreenOffset = (
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
   private tintBuffer: HTMLCanvasElement | null = null;
+  /**
+   * Halo ligado. Vem do preset de qualidade e nao de uma constante: e o unico
+   * efeito desta classe que e puro enfeite, entao e o primeiro a sair quando o
+   * aparelho nao esta dando conta.
+   */
+  bloom = true;
 
   load(): void {
     for (const { manifest, url } of SOURCES) {
       const image = new Image();
-      const entry: Loaded = { manifest, image, ready: false, failed: false };
-      image.onload = () => { entry.ready = true; };
+      const entry: Loaded = { manifest, image, ready: false, failed: false, glow: null };
+      image.onload = () => {
+        entry.ready = true;
+        // A mascara e construida UMA vez, no load, e nunca por quadro. Ler pixel
+        // de um atlas de meio milhao deles em tempo de jogo seria travar o
+        // quadro; aqui acontece atras da tela de carregamento.
+        try {
+          entry.glow = emissiveMask(image, image.naturalWidth, image.naturalHeight, EMISSIVE_HEX);
+        } catch {
+          // Canvas bloqueado (contexto perdido, aba em segundo plano no load):
+          // o jogo segue sem halo, que e cosmetico.
+          entry.glow = null;
+        }
+      };
       image.onerror = () => {
         entry.failed = true;
         console.warn(`[sprites] atlas failed to load; using fallback: ${manifest.id}`);
@@ -363,7 +560,11 @@ export class SpriteBank {
   ): boolean {
     const lower = this.get(PLAYER_LOWER_ID);
     const upper = this.get(PLAYER_UPPER_ID);
-    if (!lower || !upper) return false;
+    // A arma vive numa camada propria e o tronco nao a desenha mais. Sem os tres
+    // atlas o Prospector sairia desarmado, entao a composicao inteira cede a vez
+    // para o sheet completo em vez de entregar meio personagem.
+    const gun = this.get(PLAYER_GUN_ID);
+    if (!lower || !upper || !gun) return false;
 
     this.drawLoadedFrame(
       ctx,
@@ -389,6 +590,8 @@ export class SpriteBank {
       zoom
     );
 
+    const upperX = footX + recoil.x;
+    const upperY = footY + hipBob + recoil.y;
     this.drawLoadedFrame(
       ctx,
       upper,
@@ -396,10 +599,32 @@ export class SpriteBank {
       animation.upper.facingX,
       animation.upper.facingY,
       animation.upper.elapsedMs,
-      footX + recoil.x,
-      footY + hipBob + recoil.y,
+      upperX,
+      upperY,
       zoom,
       tint
+    );
+
+    // A arma acompanha o tronco quadro a quadro e recebe o MESMO deslocamento de
+    // coice: ela e a peca que recua, e resolver o coice so no tronco faria o cano
+    // deslizar para dentro do peito no disparo.
+    //
+    // O calor tem prioridade sobre o tint de aliado. O tint frio do parceiro
+    // existe para separar dois Prospectors iguais na tela; o calor conta um
+    // estado que machuca, e nenhum deles precisa ser lido ao mesmo tempo — o
+    // parceiro remoto nao transmite calor, entao na pratica os dois nunca
+    // disputam o mesmo cano.
+    this.drawLoadedFrame(
+      ctx,
+      gun,
+      animation.upper.animation,
+      animation.upper.facingX,
+      animation.upper.facingY,
+      animation.upper.elapsedMs,
+      upperX,
+      upperY,
+      zoom,
+      gunHeatTint(animation.heat, animation.overheated) ?? tint
     );
     return true;
   }
@@ -444,10 +669,53 @@ export class SpriteBank {
       ctx.translate(-footX, 0);
       const flippedX = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, flippedX, dy, dw, dh);
+      this.drawGlow(ctx, loaded, rect, flippedX, dy, dw, dh, zoom);
     } else {
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
+      this.drawGlow(ctx, loaded, rect, dx, dy, dw, dh, zoom);
     }
     ctx.restore();
+  }
+
+  /**
+   * Halo aditivo sobre os pixels emissivos do quadro.
+   *
+   * UM drawImage, sem filtro e sem leitura de pixel: a mascara ja esta pronta
+   * desde o load, e o borrao sai da ampliacao dela de meia resolucao de volta ao
+   * tamanho do sprite, com suavizacao ligada. Cresce alguns pixels alem da
+   * silhueta para o brilho transbordar a peca, que e o que separa "uma luz" de
+   * "um pixel claro".
+   *
+   * Sai DENTRO do `save/restore` do desenho principal, e logo depois dele, para
+   * herdar o mesmo espelhamento — sem isso o halo do visor de um sprite virado
+   * ficaria do lado oposto da cabeca.
+   */
+  private drawGlow(
+    ctx: CanvasRenderingContext2D,
+    loaded: Loaded,
+    rect: { sx: number; sy: number; sw: number; sh: number },
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number,
+    zoom: number
+  ): void {
+    const glow = loaded.glow;
+    if (!this.bloom || !glow) return;
+    const inherited = ctx.globalAlpha;
+    if (inherited <= 0) return;
+    const grow = GLOW_SPREAD * zoom;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = glowAlpha(inherited);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      glow,
+      rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,
+      dx - grow, dy - grow, dw + grow * 2, dh + grow * 2
+    );
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = inherited;
+    ctx.imageSmoothingEnabled = false;
   }
 
   private tintedFrame(

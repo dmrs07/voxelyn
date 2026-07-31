@@ -12,7 +12,11 @@ import { PROP_KINDS } from './props.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
 const CANONICAL = {
-  'player-prospector': [32, 40],
+  // O bot PX e mais largo e mais alto que o mineiro de macacao que ele
+  // substitui: chassi de 280 kg e uma passada que joga o pe tres voxels a frente
+  // do corpo. Continua abaixo do Miner (48x60), que e o Prospector degradado e
+  // grande demais — se os dois medissem o mesmo, a leitura do encontro se perde.
+  'player-prospector': [44, 56],
   'enemy-stalker': [32, 32],
   'enemy-spitter': [32, 32],
   'enemy-spore-bomber': [32, 32],
@@ -22,6 +26,21 @@ const CANONICAL = {
   'fx-impact-burst': [16, 16],
 };
 const REQUIRED_LIVING = ['idle', 'walk', 'attack', 'hit', 'die'];
+/**
+ * Teto de cores por atlas, incluindo o contorno.
+ *
+ * Era 16, o tamanho da paleta mestra de entao. A paleta cresceu para 22 ao
+ * ganhar seis degraus intermediarios — meios-tons que fecham vaos de ate 51
+ * pontos de luminancia dentro de uma mesma rampa —, e manter o teto em 16
+ * proibiria justamente o uso daqueles degraus: o Prospector e o Miner passam de
+ * 16 sem nenhuma cor nova de MATERIA, so com os meios-tons das cores que eles ja
+ * usavam.
+ *
+ * 20 e nao 22 de proposito. O teto existe para impedir que uma peca sozinha
+ * gaste a paleta inteira, e isso continua valendo — o que ele nao pode e ser
+ * apertado a ponto de tornar a propria escala de valor inutilizavel.
+ */
+const MAX_ATLAS_COLORS = 20;
 const MAX_ATLAS_WIDTH = 4096;
 const MAX_PNG_BYTES = 512 * 1024;
 const MAX_TOTAL_PNG_BYTES = 2.5 * 1024 * 1024;
@@ -103,7 +122,9 @@ export const validateManifest = (id) => {
       if (!ALLOWED_HEX.has(hex)) errors.push(`${id}: cor ${hex} fora da paleta mestra`);
     }
   }
-  if (atlasColors.size > 16) errors.push(`${id}: usa ${atlasColors.size} cores; máximo é 16 incluindo outline`);
+  if (atlasColors.size > MAX_ATLAS_COLORS) {
+    errors.push(`${id}: usa ${atlasColors.size} cores; máximo é ${MAX_ATLAS_COLORS} incluindo outline`);
+  }
   for (const hex of atlasColors) if (!m.paletteColors.includes(hex)) errors.push(`${id}: cor ${hex} não declarada`);
   for (const hex of m.paletteColors) if (!atlasColors.has(hex)) errors.push(`${id}: cor declarada ${hex} não usada`);
 

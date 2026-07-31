@@ -135,15 +135,28 @@ export const drawVoxelEntity = (ctx: CanvasRenderingContext2D, options: VoxelEnt
   ctx.imageSmoothingEnabled = false;
 
   switch (archetype) {
+    // Bot PX: chassi largo de latao, cabeca escura e baixa SEM pescoco, pernas
+    // digitigradas e um unico ponto quente no farol. O recuo nao tem os detalhes
+    // do atlas, mas nao pode contradizer a silhueta dele — este desenho aparece
+    // no primeiro quadro de toda partida, antes de o atlas chegar, e um
+    // personagem que troca de forma ao carregar le como defeito.
     case 'prospector': {
       const accent = allyTint ? PAL.biolum : PAL.player;
-      limb(ctx, sx - size * 0.24, baseY, size * 0.24, size * 0.55, PAL.rockShadow, light);
-      limb(ctx, sx + size * 0.16, baseY, size * 0.24, size * 0.55, PAL.rockShadow, light);
-      block(ctx, sx, baseY - size * 0.42, size * 0.92, size * 0.5, size * 0.86, PAL.rock, light);
-      block(ctx, sx - size * 0.42, baseY - size * 0.65, size * 0.28, size * 0.24, size * 0.55, PAL.fungusDark, light);
-      block(ctx, sx, baseY - size * 1.28, size * 0.72, size * 0.45, size * 0.48, PAL.rockLight, light);
-      emissive(ctx, sx + size * 0.24, baseY - size * 1.54, size * 0.16, accent);
-      block(ctx, sx + size * 0.52, baseY - size * 0.66, size * 0.55, size * 0.18, size * 0.18, PAL.rockShadow, light);
+      // Pernas afastadas, com o vao entre elas: e o vao que separa bipede de
+      // pedestal, e ele some se as duas encostarem.
+      limb(ctx, sx - size * 0.42, baseY, size * 0.26, size * 0.5, PAL.rockShadow, light);
+      limb(ctx, sx + size * 0.16, baseY, size * 0.26, size * 0.5, PAL.rockShadow, light);
+      // Chassi de latao, o volume dominante, com a chapa de topo escura.
+      block(ctx, sx, baseY - size * 0.5, size * 1.05, size * 0.55, size * 0.72, PAL.rust, light);
+      block(ctx, sx, baseY - size * 1.16, size * 1.05, size * 0.55, size * 0.16, PAL.rock, light);
+      // Modulo traseiro e nucleo: as duas marcas que dizem "plataforma modular".
+      block(ctx, sx + size * 0.5, baseY - size * 0.72, size * 0.34, size * 0.3, size * 0.6, PAL.rockShadow, light);
+      emissive(ctx, sx - size * 0.06, baseY - size * 0.78, size * 0.14, PAL.biolum);
+      // Cabeca escura, mais estreita que o chassi, com o visor cyan.
+      block(ctx, sx, baseY - size * 1.32, size * 0.62, size * 0.42, size * 0.34, PAL.rock, light);
+      emissive(ctx, sx - size * 0.04, baseY - size * 1.5, size * 0.18, accent);
+      // Farol tatico, so de um lado: o ponto que o jogador acha no breu.
+      emissive(ctx, sx - size * 0.42, baseY - size * 1.44, size * 0.13, PAL.loot);
       break;
     }
 

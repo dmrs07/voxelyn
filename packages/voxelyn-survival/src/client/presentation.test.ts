@@ -76,9 +76,28 @@ describe('EntityPresentation', () => {
 
     const presented = presentation.animationFor(entity as never, state as never, base as never, 1_000);
 
-    expect(presented.anim).toBe('walk');
-    expect(presented.facingX).toBe(-1);
-    expect(presented.facingY).toBe(0);
+    // O Prospector caminha COMPOSTO, e nao pelo sheet completo: o sheet ainda
+    // carrega a picareta que a arma substituiu, e alternar entre os dois trocava
+    // o modelo do personagem toda vez que ele soltava o gatilho.
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      expect(presented.anim.lower.animation).toBe('walk');
+      expect(presented.anim.lower.facingX).toBe(-1);
+      expect(presented.anim.lower.facingY).toBe(0);
+      expect(presented.anim.recoil).toBe(0);
+    }
+  });
+
+  it('mantem hit, die e revive no sheet completo, que sao as poses que as camadas nao autoram', () => {
+    const presentation = new EntityPresentation();
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
+
+    for (const pose of ['hit', 'die']) {
+      const presented = presentation.animationFor(
+        entity as never, { tick: 0 } as never, baseAnim(pose) as never, 1_000
+      );
+      expect(presented.anim).toBe(pose);
+    }
   });
 
   it('avanca recoil entre renders mesmo quando o tick nao muda', () => {
@@ -183,7 +202,9 @@ describe('EntityPresentation', () => {
 
   it('ainda deriva o rumo do prospector do deslocamento, porque o facing dele e a mira', () => {
     const presentation = new EntityPresentation();
-    // Atirando para +x enquanto anda para -x: as pernas tem de seguir o andar.
+    // Atirando para +x enquanto anda para -x: as pernas tem de seguir o andar e
+    // o tronco tem de continuar apontado para a mira. Sao as duas metades do
+    // mesmo requisito, e so a composicao consegue entregar as duas.
     const presented = presentation.animationFor(
       { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 } as never,
       { tick: 0 } as never,
@@ -191,6 +212,10 @@ describe('EntityPresentation', () => {
       1_000
     );
 
-    expect(presented.facingX).toBe(-1);
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      expect(presented.anim.lower.facingX).toBe(-1);
+      expect(presented.anim.upper.facingX).toBe(1);
+    }
   });
 });

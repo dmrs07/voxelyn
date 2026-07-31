@@ -108,6 +108,10 @@ export const CHARACTER_SPRITE_IDS = [
 export const PLAYER_LAYER_SPRITE_IDS = [
   'layer-player-prospector-lower',
   'layer-player-prospector-upper',
+  // A arma e camada propria porque precisa mudar de cor sozinha: o calor do cano
+  // e uma mecanica da simulacao, e pinta-lo exige um atlas que nao carregue
+  // nenhum pixel do corpo junto.
+  'layer-player-prospector-gun',
 ] as const;
 
 export const FIRST_PACK_IDS = [
@@ -116,3 +120,47 @@ export const FIRST_PACK_IDS = [
   'fx-projectile-bolt',
   'fx-impact-burst',
 ] as const;
+
+/**
+ * Cores da paleta mestra que EMITEM luz.
+ *
+ * Fonte unica, consumida por dois lados que nao podem discordar. O rasterizador
+ * usa para isentar essas cores da oclusao de ambiente — escurecer uma luz no
+ * fundo de uma fresta apagaria justamente o ponto que o jogador usa para achar a
+ * criatura no breu. O cliente usa para saber quais pixels do atlas recebem halo.
+ *
+ * Divergindo as duas listas, um material ficaria isento de sombra sem brilhar,
+ * ou brilharia recebendo sombra — e nenhum dos dois erros apareceria em teste,
+ * so no escuro.
+ *
+ * Ouro (`loot`) e branco (`player`) NAO estao aqui: sao materiais, nao fontes.
+ * Casco, fivela, minerio e o baculo do Bispo sao de ouro, e um baculo que brilha
+ * promete uma mecanica que nao existe. O que precisa mesmo emitir tem material
+ * proprio — `amber` para brasa e `beam` para lampada acesa —, e e por eles que o
+ * farol do Prospector acende sem arrastar todo o ouro do jogo junto.
+ */
+export const EMISSIVE_HEX = [
+  '#59f2c2', // biolum
+  '#7ab8ff', // electric
+  '#ff7a2f', // fire
+  '#a8e63c', // acid
+  '#ffa63f', // amber
+  '#ffe9b8', // beam
+] as const;
+
+/**
+ * Distancia que o Prospector percorre num ciclo completo de caminhada, em tiles.
+ *
+ * Este e o CONTRATO entre a animacao e a simulacao, e existe porque as duas
+ * vivem em pacotes que nao se enxergam: o pipeline de arte so depende de
+ * `@voxelyn/core`, e inverter essa dependencia para ler `PLAYER_SPEED` acoplaria
+ * a geracao de sprites ao balanceamento.
+ *
+ * O ciclo tem de durar exatamente o tempo que o personagem leva para cobrir esta
+ * distancia. Fora disso o pe patina — para a frente se a animacao for lenta
+ * demais, para tras se for rapida demais. O valor sai da passada AUTORADA no
+ * gerador (`tools/prospector.mjs`), e ha um teste de cada lado: um conferindo
+ * que o gerador continua autorando esta passada, e outro conferindo que o `fps`
+ * assado no atlas casa com a velocidade real do jogador.
+ */
+export const PROSPECTOR_WALK_CYCLE_TILES = 1.5;

@@ -220,3 +220,38 @@ export const rollModuleChoice = (
 
   return [safe, companion];
 };
+
+/**
+ * Os modulos que este projetil ainda consegue DISPARAR, e nao os que ele
+ * carrega.
+ *
+ * O disparo grava a intencao no projetil (`proj.modules`) e quem paga e o proc,
+ * la no impacto. Entre um e outro o dono pode ficar sem carga: `procModule`
+ * recusa, mas o registro no projetil continua dizendo que sim. Quem desenha
+ * lendo esse registro promete um dardo que ja nao perfura e uma bola que ja nao
+ * rebate — e a forma do projetil e justamente o que diz ao jogador o que vai
+ * acontecer no proximo instante.
+ *
+ * Deriva em vez de limpar a marca no projetil de proposito: recuperar o modulo
+ * antes do impacto devolve o efeito, e apagar a marca tiraria isso do jogo por
+ * causa de um problema de desenho.
+ *
+ * Devolve o MESMO objeto quando nada caducou, que e o caso normal: assim o
+ * caminho quente nao aloca por quadro.
+ */
+export const liveProjectileModules = <T extends { piercing?: true; ricochet?: unknown; explosive?: unknown }>(
+  modules: T | undefined,
+  extra: PlayerExtra | undefined,
+  tick: number
+): T | undefined => {
+  if (!modules) return undefined;
+  // Sem o dono a vista (projetil hostil, ou parceiro cujas cargas so o servidor
+  // conhece) nao ha o que conferir: quem produziu a marca ja e a fonte certa.
+  if (!extra) return modules;
+  const ids = ['piercing', 'ricochet', 'explosive'] as const;
+  const stale = ids.filter((id) => modules[id] !== undefined && !moduleHasCapacity(extra, id, tick));
+  if (stale.length === 0) return modules;
+  const live = { ...modules };
+  for (const id of stale) delete live[id];
+  return live;
+};

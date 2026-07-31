@@ -494,7 +494,18 @@ export class NetClient {
           vy: 0,
           kind: p.kind,
           damage: 0,
-          modules: p.armed ? { explosive: { armAfterDistance: 0 } } : undefined,
+          // Reconstroi so o que o DESENHO consulta. Nao e o estado do modulo: as
+          // cargas, o alcance de armar e os rebotes restantes vivem no servidor,
+          // e copia-los pela metade aqui criaria uma segunda fonte de verdade
+          // sobre uma mecanica que o cliente nem simula.
+          modules:
+            p.armed || p.piercing || p.bouncy
+              ? {
+                  ...(p.armed ? { explosive: { armAfterDistance: 0 } } : {}),
+                  ...(p.piercing ? { piercing: true as const } : {}),
+                  ...(p.bouncy ? { ricochet: { remainingBounces: 1 } } : {}),
+                }
+              : undefined,
           distanceTravelled: p.armed ? 1 : 0,
           hostile: p.hostile,
           leavesBiofluid: false,

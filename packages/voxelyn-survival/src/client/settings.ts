@@ -10,12 +10,23 @@ export type QualityPreset = {
   dynamicLights: boolean; // luzes de fogo/cristais/descarga
   shakeScale: number; // 0..1
   targetFps: number;
+  /**
+   * Halo aditivo sobre os pixels emissivos do sprite (visor, nucleo, brasa).
+   *
+   * Custa UM drawImage a mais por criatura desenhada, de uma mascara em meia
+   * resolucao — nao ha leitura de pixel nem filtro por quadro. Mesmo assim sai
+   * no preset baixo: e o unico efeito da lista que e puro enfeite. Ele nao conta
+   * nada que o jogador precise saber, e num aparelho que ja esta no minimo cada
+   * drawImage por criatura por quadro e um que poderia ser gasto em nao perder
+   * quadro.
+   */
+  bloom: boolean;
 };
 
 export const PRESETS: Record<QualityLevel, QualityPreset> = {
-  high: { level: 'high', maxDpr: 2, maxFx: 120, dynamicLights: true, shakeScale: 1, targetFps: 60 },
-  medium: { level: 'medium', maxDpr: 1.5, maxFx: 60, dynamicLights: true, shakeScale: 0.7, targetFps: 45 },
-  low: { level: 'low', maxDpr: 1, maxFx: 24, dynamicLights: false, shakeScale: 0.4, targetFps: 30 },
+  high: { level: 'high', maxDpr: 2, maxFx: 120, dynamicLights: true, shakeScale: 1, targetFps: 60, bloom: true },
+  medium: { level: 'medium', maxDpr: 1.5, maxFx: 60, dynamicLights: true, shakeScale: 0.7, targetFps: 45, bloom: true },
+  low: { level: 'low', maxDpr: 1, maxFx: 24, dynamicLights: false, shakeScale: 0.4, targetFps: 30, bloom: false },
 };
 
 const KEY = 'voxelyn.quality';

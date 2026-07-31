@@ -1,17 +1,55 @@
 // Paleta mestra da Art Bible e helpers determinísticos de rasterização.
+//
+// DEGRAUS INTERMEDIARIOS
+// ----------------------
+// As dezesseis cores originais tinham buracos grandes na escala de valor, e o
+// rasterizador tropecava neles duas vezes: a rampa de um material saltava 35
+// pontos de luminancia entre a face de topo e a lateral (o `loot` saltava 51), e
+// a escada de sombra/realce so podia andar nesses mesmos passos — um voxel de
+// latao em fresta caia de osso direto para ferrugem, e uma quina iluminada
+// pulava de osso para branco azulado, que lia como respingo e nao como aresta.
+//
+// Os seis degraus abaixo existem so para fechar esses vaos. Nenhum deles
+// introduz materia nova no jogo: sao os meios-tons que ja estavam implicitos
+// entre cores que a paleta ja tinha, e cada um foi escolhido pela luminancia que
+// faltava, nao pelo matiz.
+//
+// Eles servem para PREENCHER entre as ancoras de uma rampa, nunca para
+// substitui-las. A primeira tentativa fez o contrario — trocou o topo e a base
+// das rampas pelos meios-tons — e o resultado foi perder de 23% a 56% da
+// amplitude de cada material: os personagens ficaram uniformes e sem o contraste
+// facetado que e a identidade do jogo. A luminancia de cada degrau abaixo esta
+// calculada para cair no MEIO da rampa que ele preenche, e nao perto de uma das
+// pontas.
 export const COLORS = {
   dark: [11, 14, 20],
   rockShadow: [29, 36, 48],
   rock: [46, 58, 77],
   rockLight: [70, 86, 110],
+  /** Entre rockLight (33) e player (94): o cinza-azulado claro que faltava. */
+  mist: [123, 139, 163],
+  /** Entre dark (5) e rust (31): o marrom carbonizado. Fecha o unico vao que
+   *  sobrava na familia quente — sem ele a sombra do latao caia em `rockShadow`,
+   *  que e AZUL, e toda fresta de metal esfriava de matiz ao escurecer. */
+  char: [61, 42, 34],
   rust: [110, 74, 51],
+  /** Entre rust (31) e bone (67): o meio-tom do latao, o vao maior da paleta. */
+  brass: [138, 113, 84],
   bone: [184, 169, 143],
+  /** Entre bone (67) e player (94): branco quente, sem virar branco azulado. */
+  chalk: [213, 205, 186],
   fungusDark: [31, 61, 51],
   fungus: [47, 107, 79],
+  /** Entre fungusDark (21) e fungusLight (67). */
+  moss: [63, 138, 94],
   fungusLight: [102, 194, 138],
   biolum: [89, 242, 194],
   acid: [168, 230, 60],
   fire: [255, 122, 47],
+  /** Entre fire (57) e loot (83): a brasa alaranjada. EMISSIVA. */
+  amber: [255, 166, 63],
+  /** Acima de amber: o branco quente de uma lampada acesa. EMISSIVA. */
+  beam: [255, 233, 184],
   blood: [217, 59, 76],
   electric: [122, 184, 255],
   loot: [255, 209, 102],

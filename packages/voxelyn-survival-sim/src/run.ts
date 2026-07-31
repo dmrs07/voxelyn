@@ -42,6 +42,7 @@ import {
   REVIVE_HP_FRACTION,
   REVIVE_RADIUS,
   RETURN_DISC_MAX_DISTANCE,
+  RICOCHET_BOUNCES,
   RETURN_DISC_SPEED,
   ORE_PER_MODULE,
   SALVAGE_SCAN_TICKS,
@@ -730,7 +731,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     if (moduleHasCapacity(extra, 'explosive', state.tick)) {
       modules.explosive = { armAfterDistance: EXPLOSIVE_ARM_DISTANCE };
     }
-    if (moduleHasCapacity(extra, 'ricochet', state.tick)) modules.ricochet = { remainingBounces: 1 };
+    if (moduleHasCapacity(extra, 'ricochet', state.tick)) {
+      modules.ricochet = { remainingBounces: RICOCHET_BOUNCES };
+    }
     if (moduleHasCapacity(extra, 'conductive', state.tick)) modules.conductive = true;
     if (moduleHasCapacity(extra, 'siphon', state.tick)) modules.siphon = true;
     const armed = Object.keys(modules).length > 0 ? modules : undefined;
@@ -1145,6 +1148,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           dead = true;
           break;
         }
+
+        // O disco NA VOLTA atravessa terreno.
+        //
+        // Ele deixou de mirar uma direcao e passou a mirar uma PESSOA: a cada
+        // tick o rumo e recalculado para a posicao do dono. Devolve-lo a celula
+        // anterior quando encosta em pedra, como faz a ida, cria um laco fechado
+        // — recalcula o rumo para o dono, anda para dentro da parede, volta para
+        // onde estava, recalcula de novo — e o disco fica cravado na parede pelos
+        // tres segundos inteiros de TTL antes de sumir. Basta o jogador recuar
+        // uma esquina depois de arremessar, que e o uso normal da arma.
+        //
+        // Nao ha o que colidir na volta: o disco ja gastou a carga, ja cobrou o
+        // modulo e nao machuca terreno em nenhuma das duas pernas. Deixa-lo
+        // atravessar e o comportamento que a ferramenta promete — ela VOLTA — e o
+        // unico que nao mente para quem contou com isso.
+        if (proj.disc?.phase === 'returning') continue;
 
         if (proj.disc) {
           proj.x = prevX;

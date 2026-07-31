@@ -144,6 +144,21 @@ export type ProjectileSnapshot = {
   hostile: boolean;
   kind: ProjectileKind;
   armed: boolean;
+  /**
+   * Modulos que mudam a FORMA do projetil, e por isso precisam viajar.
+   *
+   * `armed` ja estava aqui pela mesma razao: o explosivo troca a cor do corpo
+   * quando arma, e o cliente nao tem como saber a distancia percorrida. Piercing
+   * e ricochet agora fazem o mesmo com a geometria — dardo alongado com ponta de
+   * seta, e bola redonda — e o desenho tem de dizer o que o tiro vai fazer ANTES
+   * de ele acertar, senao a informacao chega tarde demais para valer alguma
+   * coisa. Dois booleanos por projetil vivo, com no maximo alguns em voo.
+   *
+   * Opcionais: um servidor mais velho simplesmente nao os manda, e o cliente cai
+   * no corpo padrao em vez de quebrar.
+   */
+  piercing?: boolean;
+  bouncy?: boolean;
 };
 
 /**

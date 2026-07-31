@@ -4,6 +4,7 @@ import {
   emptyCommand,
   hashAuthoritativeState,
   hashStaticWorld,
+  liveProjectileModules,
   resetPlayerProgress,
   stepRun,
   type PlayerCommand,
@@ -435,14 +436,26 @@ export class GameRoom {
   }
 
   private projectileSnapshots(): ProjectileSnapshot[] {
-    return this.state.projectiles.map((p) => ({
-      id: p.id,
-      x: round3(p.x),
-      y: round3(p.y),
-      hostile: p.hostile,
-      kind: p.kind,
-      armed: Boolean(p.modules?.explosive && p.distanceTravelled >= p.modules.explosive.armAfterDistance),
-    }));
+    return this.state.projectiles.map((p) => {
+      // O que o projetil ainda CONSEGUE disparar, e nao o que ele carrega. Um
+      // tiro que gastou a ultima carga de Perfuracao continua marcado como
+      // perfurante ate morrer, e o cliente desenharia um dardo que ja nao
+      // atravessa nada — a forma do projetil e o que promete ao jogador o que
+      // vem no proximo impacto.
+      const owner = this.state.players.find((player) => player.id === p.owner);
+      const extra = owner?.slot === undefined ? undefined : this.state.playerExtras[owner.slot];
+      const modules = liveProjectileModules(p.modules, extra, this.state.tick);
+      return {
+        id: p.id,
+        x: round3(p.x),
+        y: round3(p.y),
+        hostile: p.hostile,
+        kind: p.kind,
+        armed: Boolean(modules?.explosive && p.distanceTravelled >= modules.explosive.armAfterDistance),
+        piercing: Boolean(modules?.piercing),
+        bouncy: (modules?.ricochet?.remainingBounces ?? 0) > 0,
+      };
+    });
   }
 
   buildSnapshot(

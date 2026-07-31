@@ -1,10 +1,10 @@
 {
-  "id": "layer-player-prospector-lower",
+  "id": "layer-player-prospector-gun",
   "version": 4,
-  "atlas": "layer-player-prospector-lower.png",
+  "atlas": "layer-player-prospector-gun.png",
   "frameWidth": 44,
   "frameHeight": 56,
-  "columns": 40,
+  "columns": 32,
   "anchorX": 22,
   "anchorY": 54,
   "directions": 4,
@@ -27,14 +27,14 @@
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
-    "#0b0e14",
     "#1d2430",
-    "#2e3a4d",
-    "#46566e",
-    "#6e4a33",
+    "#2f6b4f",
+    "#59f2c2",
+    "#66c28a",
     "#8a7154",
     "#b8a98f",
-    "#d5cdba"
+    "#d5cdba",
+    "#ffd166"
   ],
   "animations": {
     "idle": {
@@ -42,33 +42,33 @@
       "fps": 6,
       "loop": true
     },
-    "walk": {
-      "frames": 6,
-      "fps": 18.4,
-      "loop": true
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
     }
   },
   "frameMap": {
     "dr": {
       "idle": 0,
-      "walk": 4
+      "attack": 4
     },
     "dl": {
-      "idle": 10,
-      "walk": 14
+      "idle": 8,
+      "attack": 12
     },
     "ur": {
-      "idle": 20,
-      "walk": 24
+      "idle": 16,
+      "attack": 20
     },
     "ul": {
-      "idle": 30,
-      "walk": 34
+      "idle": 24,
+      "attack": 28
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "digitigrade locomotion layer for the Aurix PX prospector bot",
+    "prompt": "shard driver weapon layer for the Aurix PX prospector bot, tinted by barrel heat at runtime",
     "seedOrRef": "deterministic-code-v2"
   }
 }

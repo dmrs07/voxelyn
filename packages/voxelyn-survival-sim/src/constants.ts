@@ -249,6 +249,15 @@ export const EXPLOSION_DAMAGE = 42;
  */
 export const PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE = 0.5;
 export const EXPLOSIVE_ARM_DISTANCE = 2.25;
+/**
+ * Rebotes que a Lente de Ricochete concede a um tiro.
+ *
+ * Constante e nao literal porque agora tem DOIS leitores que precisam concordar:
+ * a simulacao, que arma o projetil, e a faixa de mira do cliente, que desenha o
+ * trajeto ate o ultimo quique. Uma faixa que prometesse dois rebotes num tiro de
+ * um seria pior do que faixa nenhuma.
+ */
+export const RICOCHET_BOUNCES = 1;
 export const RETURN_DISC_MAX_DISTANCE = 8;
 export const RETURN_DISC_SPEED = 11;
 export const SALVAGE_SCAN_TICKS = 6 * TICK_HZ;
