@@ -85,7 +85,7 @@ describe('co-op: multiplayer na simulacao', () => {
     for (let t = 0; t < 200; t++) {
       const res = stepRun(state, [emptyCommand()]);
       waveMessages += res.events.filter(
-        (e) => e.t === 'message' && e.text.includes('contaminacao')
+        (e) => e.t === 'message' && e.key === 'sim.contaminationRising'
       ).length;
     }
     expect(waveMessages).toBe(1); // antes: repetia a cada poucos ticks

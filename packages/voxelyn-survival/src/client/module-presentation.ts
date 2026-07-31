@@ -1,4 +1,5 @@
 import { MODULE_DEFINITIONS, type ModuleId } from '@voxelyn/survival-sim';
+import { t, type MessageKey } from './i18n';
 
 export type ModulePresentation = {
   label: string;
@@ -8,64 +9,89 @@ export type ModulePresentation = {
   lifetimeLabel: string;
 };
 
-const LABELS: Record<ModuleId, Omit<ModulePresentation, 'lifetimeLabel'>> = {
+/**
+ * O que e do modulo e nao muda com a lingua: icone e risco.
+ *
+ * Rotulo e descricao saem do catalogo, e por isso este mapa guarda CHAVES em
+ * vez de frases — a tabela e uma constante de modulo, avaliada uma vez no
+ * import, e um texto resolvido aqui ficaria congelado na lingua com que o jogo
+ * abriu. Os cards de escolha sao redesenhados a cada quadro; resolver ali custa
+ * uma busca em objeto e mantem a troca de idioma valendo no meio da run.
+ */
+type ModuleStatic = {
+  label: MessageKey;
+  description: MessageKey;
+  proc: MessageKey;
+  icon: string;
+  risk: 'safe' | 'volatile';
+};
+
+const MODULES: Record<ModuleId, ModuleStatic> = {
   piercing: {
-    label: 'PIERCING',
-    shortDescription: 'Perfura alvos sem repetir dano durante a travessia.',
+    label: 'module.piercing.label',
+    description: 'module.piercing.description',
+    proc: 'module.piercing.proc',
     icon: 'modulePiercing',
     risk: 'safe',
   },
   conductive: {
-    label: 'CONDUCTIVE',
-    shortDescription: 'Descarrega biofluido e materiais conectados.',
+    label: 'module.conductive.label',
+    description: 'module.conductive.description',
+    proc: 'module.conductive.proc',
     icon: 'moduleConductive',
     risk: 'safe',
   },
   explosive: {
-    label: 'EXPLOSIVE',
-    shortDescription: 'Detona impactos armados em uma área. Perigoso a curta distância.',
+    label: 'module.explosive.label',
+    description: 'module.explosive.description',
+    proc: 'module.explosive.proc',
     icon: 'moduleExplosive',
     risk: 'volatile',
   },
   siphon: {
-    label: 'SIPHON',
-    shortDescription: 'Recupera 2 HP quando um acerto útil é drenado.',
+    label: 'module.siphon.label',
+    description: 'module.siphon.description',
+    proc: 'module.siphon.proc',
     icon: 'moduleSiphon',
     risk: 'safe',
   },
   ricochet: {
-    label: 'RICOCHET LENS',
-    shortDescription: 'Faz o bolt rebater uma vez em uma superfície sólida.',
+    label: 'module.ricochet.label',
+    description: 'module.ricochet.description',
+    proc: 'module.ricochet.proc',
     icon: 'moduleRicochet',
     risk: 'safe',
   },
   return_disc: {
-    label: 'RETURN DISC',
-    shortDescription: 'Causa dano na ida e retorna perseguindo o Prospector.',
+    label: 'module.return_disc.label',
+    description: 'module.return_disc.description',
+    proc: 'module.return_disc.proc',
     icon: 'moduleReturnDisc',
     risk: 'safe',
   },
 };
 
 /**
- * O que a carga CONTA. Nenhum modulo cobra o disparo: a carga sai quando o
- * efeito acontece, entao o rotulo tem de nomear o efeito, e nao o gatilho.
- * `piercing` e `ricochet` diziam "DISPAROS" quando ainda cobravam no gatilho —
- * manter isso agora seria mentir sobre o que o jogador esta gastando.
+ * O rotulo da carga CONTA o efeito, nao o gatilho. Nenhum modulo cobra o
+ * disparo: a carga sai quando o efeito acontece. `piercing` e `ricochet` diziam
+ * "DISPAROS" quando ainda cobravam no gatilho — manter isso agora seria mentir
+ * sobre o que o jogador esta gastando, em qualquer lingua.
  */
-const PROC_LABELS: Record<ModuleId, string> = {
-  piercing: 'TRAVESSIAS',
-  conductive: 'DESCARGAS',
-  explosive: 'EXPLOSÕES',
-  siphon: 'DRENAGENS',
-  ricochet: 'REBOTES',
-  return_disc: 'RETORNOS',
-};
-
 export const modulePresentation = (id: ModuleId): ModulePresentation => {
   const def = MODULE_DEFINITIONS[id];
-  const lifetimeLabel = def.lifetime === 'charges'
-    ? `${def.defaultCharges ?? 0} ${PROC_LABELS[id]}`
-    : `${Math.round((def.durationTicks ?? 0) / 20)}s`;
-  return { ...LABELS[id], lifetimeLabel };
+  const module = MODULES[id];
+  const lifetimeLabel =
+    def.lifetime === 'charges'
+      ? t('module.lifetime.charges', {
+          count: def.defaultCharges ?? 0,
+          proc: t(module.proc),
+        })
+      : t('module.lifetime.duration', { seconds: Math.round((def.durationTicks ?? 0) / 20) });
+  return {
+    label: t(module.label),
+    shortDescription: t(module.description),
+    icon: module.icon,
+    risk: module.risk,
+    lifetimeLabel,
+  };
 };

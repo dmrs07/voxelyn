@@ -73,7 +73,10 @@ export class RunRecorder {
   }
 }
 
-export type SubmitOutcome = { ok: true; duplicate: boolean } | { ok: false; reason: string };
+export type SubmitOutcome =
+  | { ok: true; duplicate: boolean }
+  /** `reason` é código de diagnóstico em ASCII — ver `DeathEchoSubmitOutcome`. */
+  | { ok: false; reason: string };
 
 /**
  * Envia a gravacao para verificacao.
@@ -87,7 +90,7 @@ export const submitRun = async (
   recorder: RunRecorder,
   name: string,
 ): Promise<SubmitOutcome> => {
-  if (!recorder.submittable) return { ok: false, reason: 'run longa demais para verificar' };
+  if (!recorder.submittable) return { ok: false, reason: 'run-too-long' };
   // O endpoint e HTTP; a URL de jogo e WebSocket.
   const base = serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
   try {
@@ -98,7 +101,7 @@ export const submitRun = async (
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, reason: body.error ?? `servidor respondeu ${res.status}` };
+      return { ok: false, reason: body.error ?? `server-${res.status}` };
     }
     const body = (await res.json()) as { duplicate?: boolean };
     return { ok: true, duplicate: body.duplicate === true };
@@ -106,7 +109,7 @@ export const submitRun = async (
     // Offline e o caso NORMAL aqui: o solo funciona sem rede, e o PWA existe
     // justamente para isso. Falhar em silencio seria pior que dizer que nao
     // deu, mas nao e erro de jogo.
-    return { ok: false, reason: err instanceof Error ? err.message : 'sem conexao' };
+    return { ok: false, reason: err instanceof Error ? err.message : 'network-error' };
   }
 };
 

@@ -52,6 +52,7 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
+import { t } from './i18n';
 import {
   deathEchoReadout,
   deathEchoReadoutRegion,
@@ -743,7 +744,7 @@ export class SurvivalRenderer {
         case 'ability_taken':
           this.addFlash(ev.x, ev.y, 3, 0.9, nowMs, 320);
           this.messages.push({
-            text: `${abilityPresentation(ev.ability).label} ASSIMILADO`,
+            text: t('toast.ability.assimilated', { ability: abilityPresentation(ev.ability).label }),
             until: nowMs + 2600,
           });
           break;
@@ -751,21 +752,24 @@ export class SurvivalRenderer {
           this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.6, color: PAL.player, life: 180, maxLife: 180 });
           break;
         case 'pickup_core':
-          this.messages.push({ text: 'NUCLEO EXTRAIDO - VOLTE PARA A ENTRADA!', until: nowMs + 4200 });
+          this.messages.push({ text: t('toast.core.taken'), until: nowMs + 4200 });
           this.shake = { power: 4, until: nowMs + 300 };
           break;
         case 'guardian_awake':
-          this.messages.push({ text: 'O GUARDIAO DESPERTOU', until: nowMs + 3000 });
+          this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
           this.shake = { power: 6, until: nowMs + 500 };
           break;
         case 'module_charge_consumed':
           this.modulePulseUntil.set(ev.module, nowMs + 260);
           break;
         case 'module_expired':
-          this.messages.push({ text: `${modulePresentation(ev.module).label} DESATIVADO`, until: nowMs + 1800 });
+          this.messages.push({
+            text: t('toast.module.expired', { module: modulePresentation(ev.module).label }),
+            until: nowMs + 1800,
+          });
           break;
         case 'salvage_cache_opened':
-          this.messages.push({ text: 'COFRE RECUPERADO', until: nowMs + 2200 });
+          this.messages.push({ text: t('toast.cache.opened'), until: nowMs + 2200 });
           this.addFlash(ev.x, ev.y, 4.5, 0.9, nowMs, 300);
           if (ev.slot === this.localPlayerId - 1) {
             this.pendingRewardOrigin = { slot: ev.slot, x: ev.x + 0.5, y: ev.y + 0.5 };
@@ -775,7 +779,7 @@ export class SurvivalRenderer {
         case 'purge_cell_acquired':
           if (ev.slot === this.localPlayerId - 1) {
             const startsAt = nowMs + 220;
-            this.messages.push({ text: '+1 CÉLULA DE PURGA', startsAt, until: startsAt + 2200 });
+            this.messages.push({ text: t('toast.purgeCell'), startsAt, until: startsAt + 2200 });
             if (this.pendingRewardOrigin?.slot === ev.slot) {
               this.rewardFlight = {
                 worldX: this.pendingRewardOrigin.x,
@@ -789,13 +793,16 @@ export class SurvivalRenderer {
           }
           break;
         case 'terminal_scan_complete':
-          this.messages.push({ text: 'VARREDURA CONCLUÍDA — COFRE REVELADO', until: nowMs + 2800 });
+          this.messages.push({ text: t('toast.scan.complete'), until: nowMs + 2800 });
           break;
         case 'overheat':
-          this.messages.push({ text: 'SUPERAQUECIMENTO!', until: nowMs + 1600 });
+          this.messages.push({ text: t('toast.overheat'), until: nowMs + 1600 });
           break;
         case 'message':
-          this.messages.push({ text: ev.text, until: nowMs + 3600 });
+          // A simulacao manda a CHAVE, nunca a frase: ela roda tambem no
+          // servidor (verificacao de replay), onde nao existe idioma de
+          // jogador. Traduzir e trabalho de quem desenha.
+          this.messages.push({ text: t(ev.key), until: nowMs + 3600 });
           break;
         default:
           break;
@@ -1828,7 +1835,9 @@ export class SurvivalRenderer {
     }
     ctx.restore();
 
-    const label = reachable ? `USAR — ${presentation.label}` : presentation.label;
+    const label = reachable
+      ? t('ability.offer.use', { ability: presentation.label })
+      : presentation.label;
     ctx.save();
     ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
     ctx.textAlign = 'center';
@@ -1849,7 +1858,7 @@ export class SurvivalRenderer {
   /** O convite a parear: aparece no escuro, porque é instrução e não matéria. */
   private drawDeathEchoPrompt(sx: number, sy: number, z: number, nowMs: number): void {
     const ctx = this.ctx;
-    const label = 'USAR — PAREAR CAIXA-PRETA';
+    const label = t('echo.prompt');
     ctx.save();
     ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
     ctx.textAlign = 'center';
@@ -2214,7 +2223,7 @@ export class SurvivalRenderer {
     ctx.textAlign = 'left';
     ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
     drawPurgeCellGlyph(ctx, safeLeft + 18, purgeY, purgePulse ? 15 : 13, ctx.fillStyle as string);
-    ctx.fillText(`CÉLULA DE PURGA ×${extra.purgeCells}`, safeLeft + 34, purgeY + 4);
+    ctx.fillText(t('hud.purgeCells', { count: extra.purgeCells }), safeLeft + 34, purgeY + 4);
 
     if (hasModules) {
       this.renderModuleHud(
@@ -2232,27 +2241,43 @@ export class SurvivalRenderer {
     ctx.textAlign = 'left';
     ctx.fillStyle = PAL.rockLight;
     ctx.font = '11px monospace';
-    ctx.fillText(`SETOR ${state.sector}/${SECTOR_COUNT}`, safeLeft + 12, sectorY);
+    ctx.fillText(
+      t('hud.sector', { sector: state.sector, total: SECTOR_COUNT }),
+      safeLeft + 12,
+      sectorY,
+    );
 
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 12px monospace';
-    const objective = !isFinalSector(state.sector)
-      ? 'DESÇA PELO POÇO'
-      : extra.hasCore
-        ? 'VOLTE PARA A ENTRADA'
-        : state.coreTaken
-          ? 'EXTRAIA NA ENTRADA'
-          : 'ENCONTRE O NÚCLEO';
+    const objective = t(
+      !isFinalSector(state.sector)
+        ? 'hud.objective.descend'
+        : extra.hasCore
+          ? 'hud.objective.returnWithCore'
+          : state.coreTaken
+            ? 'hud.objective.extract'
+            : 'hud.objective.findCore',
+    );
     ctx.fillText(objective, safeLeft + 12, objectiveY);
 
     if (revealed) {
       const dx = revealed.cache.x + 0.5 - state.player.x;
       const dy = revealed.cache.y + 0.5 - state.player.y;
-      const direction = Math.abs(dx) > Math.abs(dy)
-        ? (dx > 0 ? 'LESTE' : 'OESTE')
-        : (dy > 0 ? 'SUL' : 'NORTE');
+      const direction = t(
+        Math.abs(dx) > Math.abs(dy)
+          ? dx > 0
+            ? 'hud.direction.east'
+            : 'hud.direction.west'
+          : dy > 0
+            ? 'hud.direction.south'
+            : 'hud.direction.north',
+      );
       ctx.fillStyle = PAL.biolum;
-      ctx.fillText(`COFRE: ${direction} · ~${Math.round(Math.hypot(dx, dy))}m`, safeLeft + 12, cacheY);
+      ctx.fillText(
+        t('hud.cache', { direction, distance: Math.round(Math.hypot(dx, dy)) }),
+        safeLeft + 12,
+        cacheY,
+      );
     }
 
     // mensagens centrais
@@ -2453,7 +2478,7 @@ export class SurvivalRenderer {
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 17px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('DADOS DE MÓDULO ENCONTRADOS', vw / 2, Math.max(30, cards[0].y - 38));
+    ctx.fillText(t('choice.title'), vw / 2, Math.max(30, cards[0].y - 38));
 
     pending.options.forEach((id, index) => {
       const card: Rect = cards[index];
@@ -2474,13 +2499,23 @@ export class SurvivalRenderer {
       ctx.textAlign = 'left';
       ctx.fillStyle = PAL.player;
       ctx.font = 'bold 15px monospace';
-      ctx.fillText(`[${index + 1}] ${presentation.label}`, card.x + 72, card.y + 30);
+      ctx.fillText(
+        t('choice.card', { index: index + 1, label: presentation.label }),
+        card.x + 72,
+        card.y + 30,
+      );
       ctx.font = 'bold 10px monospace';
       ctx.fillStyle = PAL.loot;
-      ctx.fillText(active ? `RECARGA · ${presentation.lifetimeLabel}` : presentation.lifetimeLabel, card.x + 72, card.y + 49);
+      ctx.fillText(
+        active
+          ? t('choice.recharge', { lifetime: presentation.lifetimeLabel })
+          : presentation.lifetimeLabel,
+        card.x + 72,
+        card.y + 49,
+      );
       if (presentation.risk === 'volatile') {
         ctx.fillStyle = PAL.fire;
-        ctx.fillText('VOLÁTIL', card.x + 72, card.y + 65);
+        ctx.fillText(t('choice.volatile'), card.x + 72, card.y + 65);
       }
 
       ctx.fillStyle = PAL.bone;
@@ -2625,11 +2660,11 @@ export class SurvivalRenderer {
     y += unit * 1.5;
     ctx.fillStyle = PAL.rockLight;
     ctx.font = `${Math.round(unit * 0.8)}px monospace`;
-    ctx.fillText(`seed ${formatSeed(summary.seed)}`, vw / 2, y);
+    ctx.fillText(t('summary.seed', { seed: formatSeed(summary.seed) }), vw / 2, y);
 
     y += unit * 1.6;
     ctx.fillStyle = PAL.player;
     ctx.font = `bold ${Math.round(unit * 0.95)}px monospace`;
-    ctx.fillText('Toque ou pressione R para descer de novo', vw / 2, y);
+    ctx.fillText(t('summary.restart'), vw / 2, y);
   }
 }

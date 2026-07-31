@@ -1,0 +1,420 @@
+// O catálogo de origem. Toda string que o JOGADOR lê nasce aqui.
+//
+// pt-BR é a língua em que o jogo foi escrito, e por isso ela é a fonte da
+// verdade e não uma tradução como as outras: `MessageKey` é derivado deste
+// objeto, e é o compilador que cobra das demais localidades a cobertura de
+// 100% das chaves. Uma string nova esquecida em inglês não compila — que é a
+// única forma de a promessa "sem texto solto" sobreviver ao próximo commit.
+//
+// As chaves são hierárquicas por PONTO e agrupadas por tela, não por tipo de
+// widget: quem edita a tela de fim quer ler as linhas dela juntas, e não achar
+// "título" no meio de todos os títulos do jogo.
+//
+// Interpolação é `{nome}`. Nunca concatene traduções — a ordem das partes muda
+// entre línguas, e uma frase montada com `+` só funciona por acidente naquela
+// em que foi escrita.
+
+export const PT_BR = {
+  // ---------------------------------------------------------------------
+  // Marca e telas de menu
+  // ---------------------------------------------------------------------
+  'app.title': 'Voxelyn Survival',
+  'menu.title': 'VOXELYN SURVIVAL',
+  'menu.tagline': 'o Veio está vivo — sobreviva',
+  'menu.solo': 'Descer',
+  'menu.online': 'Co-op online',
+  'menu.contract': 'Desafio Semanal',
+  'menu.room.label': 'Sala',
+  'menu.room.placeholder': 'código',
+  'menu.room.hint': 'vazio = qualquer sala',
+  'menu.options': 'Opções',
+  'menu.records': 'Registro',
+  'menu.rank': 'Ranking',
+  'menu.dev.seed': 'Seed',
+  'menu.dev.seed.placeholder': 'aleatória',
+  'menu.dev.server': 'Servidor',
+  'menu.dev.server.placeholder': 'auto',
+  'menu.controls': 'Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia',
+  'menu.headphones': 'Use fones: o som avisa o que a tela ainda não mostra.',
+
+  'options.title': 'OPÇÕES',
+  'options.name': 'Nome',
+  'options.name.placeholder': 'anônimo',
+  'options.language': 'Idioma',
+  'options.quality': 'Qualidade',
+  'options.quality.high': 'Alta',
+  'options.quality.medium': 'Média',
+  'options.quality.low': 'Baixa (30 FPS)',
+  'options.volume': 'Volume',
+  'options.sound.on': 'Som: ligado',
+  'options.sound.off': 'Som: desligado',
+  'options.telemetry.on': 'Telemetria: ligada',
+  'options.telemetry.off': 'Telemetria: desligada',
+  'options.telemetry.note': 'dados anônimos de sessão, sem identificação',
+  'options.back': 'Voltar',
+
+  // ---------------------------------------------------------------------
+  // Menu de campo e abandono
+  // ---------------------------------------------------------------------
+  'pause.title': 'TERMINAL DE CAMPO',
+  'pause.coopWarning': 'No co-op o mundo não para — a descida continua enquanto você lê isto.',
+  'pause.resume': 'Retomar descida',
+  'pause.abandon': 'Abandonar contrato',
+  'pause.leave': 'Sair para o terminal',
+  'pause.status.noSignal': 'sem sinal do setor — conexão pendente',
+  'pause.status.closed': 'contrato encerrado — sem descida ativa',
+  'pause.status.running': 'Setor {sector} · contaminação {contamination}% · contrato em aberto',
+  'pause.hint': 'ESC ou segure no topo da tela para o menu',
+
+  'abandon.title': 'ABANDONAR CONTRATO?',
+  'abandon.notice': 'Registro de rescisão — leia antes de confirmar.',
+  'abandon.material': 'Material coletado neste setor',
+  'abandon.material.value': 'não creditado',
+  'abandon.progress': 'Progresso da descida',
+  'abandon.progress.value': 'perdido',
+  'abandon.rank': 'Posição no ranking',
+  'abandon.rank.value': 'nenhuma',
+  'abandon.unit': 'Unidade em campo',
+  'abandon.unit.value': 'baixa operacional',
+  'abandon.footnote': 'a companhia não registra o motivo.',
+  'abandon.cancel': 'Continuar a descida',
+  'abandon.confirm': 'Confirmar abandono',
+
+  // ---------------------------------------------------------------------
+  // Convite de co-op
+  // ---------------------------------------------------------------------
+  'invite.copy': 'Copiar convite',
+  'invite.shared': 'Enviado',
+  'invite.copied': 'Copiado!',
+  'invite.manual': 'Copie da barra',
+  'invite.shareText': 'Desce comigo — sala {room}',
+
+  // ---------------------------------------------------------------------
+  // Banners de sistema
+  // ---------------------------------------------------------------------
+  'banner.sound.on': 'Som ligado',
+  'banner.sound.off': 'Som desligado',
+  'banner.run.duplicate': 'Run já registrada',
+  'banner.run.verified': 'Run verificada e registrada',
+  'banner.quality.downgraded': 'Qualidade reduzida para {quality} (desempenho)',
+  'banner.room.invalid': 'Código de sala inválido: {code}',
+  'banner.connecting': 'Conectando…',
+  'banner.reconnecting': 'Reconectando…',
+  'banner.offline': 'Offline — tentando reconectar',
+  'banner.resync': 'Ressincronizando o mundo…',
+  'banner.session.expired': 'Sessão expirada — reconectando…',
+  'banner.version.mismatch': 'Versão incompatível ({field}) — recarregue a página.',
+  'banner.server.invalid': 'Endereço de servidor inválido: {url}',
+  'banner.restarting': 'Descendo de novo…',
+
+  // ---------------------------------------------------------------------
+  // Desafio da companhia (contrato)
+  // ---------------------------------------------------------------------
+  'contract.weekly': 'DESAFIO SEMANAL {period} — VEIO {vein}',
+  'contract.daily': 'DESAFIO DIÁRIO {period} — VEIO {vein}',
+
+  // ---------------------------------------------------------------------
+  // Painel Registro
+  // ---------------------------------------------------------------------
+  'records.title': 'REGISTRO',
+  'records.totals': 'TOTAIS',
+  'records.totals.runs': 'Descidas',
+  'records.totals.deaths': 'Mortes',
+  'records.totals.extractions': 'Extrações',
+  'records.totals.withCore': 'Com o núcleo',
+  'records.totals.kills': 'Abates',
+  'records.totals.time': 'Tempo no Veio',
+  'records.best': 'MELHORES',
+  'records.best.stars': 'Melhor nota',
+  'records.best.fastestCore': 'Núcleo mais rápido',
+  'records.best.longestSurvival': 'Maior sobrevivência',
+  'records.best.masteredSeeds': 'Seeds dominadas',
+  'records.assets': 'REGISTRO DE ATIVOS',
+  'records.assets.locked': '— — —',
+  'records.assets.noOccurrence': 'sem ocorrência registrada',
+  'records.assets.fieldName': 'campo: {name}',
+  'records.assets.tally': '×{count}',
+  'records.discoveries': 'DESCOBERTAS',
+  'records.discoveries.locked': 'ainda não aconteceu com você',
+  'records.history': 'ÚLTIMAS DESCIDAS',
+  'records.history.empty': 'nenhuma ainda',
+  'records.history.seed': 'seed {seed}',
+  'records.history.core': 'núcleo',
+  'records.history.extracted': 'saiu',
+
+  // ---------------------------------------------------------------------
+  // Painel Ranking
+  // ---------------------------------------------------------------------
+  'rank.title': 'RANKING',
+  'rank.best': 'MELHORES DESCIDAS',
+  'rank.seed': 'SEED {seed}',
+  'rank.empty': 'ninguém extraiu ainda',
+  'rank.empty.offline': 'ninguém extraiu ainda — ou o servidor está fora do ar',
+  'rank.loading': 'carregando…',
+  'rank.entry': '{position}. {stars} {name}',
+  'rank.how': 'COMO ENTRAR',
+  'rank.how.text':
+    'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu.',
+
+  // ---------------------------------------------------------------------
+  // Bestiário: designação corporativa e nome de campo
+  // ---------------------------------------------------------------------
+  'enemy.stalker': 'Espreitador',
+  'enemy.spitter': 'Cuspidor',
+  'enemy.bomber': 'Portador de Esporos',
+  'enemy.bruiser': 'Britador',
+  'enemy.miner': 'Mineiro',
+  'enemy.fungal_horse': 'Corcel',
+  'enemy.bishop': 'Bispo',
+  'enemy.guardian': 'Guardião',
+
+  'bestiary.name.stalker': 'Espreitador',
+  'bestiary.name.spitter': 'Cuspidor',
+  'bestiary.name.bomber': 'Portador de Esporos',
+  'bestiary.name.bruiser': 'Britador',
+  'bestiary.name.miner': 'Minerador Empobrecido',
+  'bestiary.name.fungal_horse': 'Corcel Fúngico',
+  'bestiary.name.bishop': 'Bispo do Veio',
+  'bestiary.name.guardian': 'Guardião do Núcleo',
+
+  'bestiary.code.stalker': 'ESPÉCIME QUIT-04',
+  'bestiary.note.stalker':
+    'Fauna de túnel. Agressiva por instinto, não por organização. Custo de remoção desprezível.',
+  'bestiary.code.spitter': 'ESPÉCIME FUNG-11',
+  'bestiary.note.spitter':
+    'Secreção corrosiva sem valor industrial confirmado. Programa de amostragem descontinuado.',
+  'bestiary.code.bomber': 'ESPÉCIME FUNG-23',
+  'bestiary.note.bomber':
+    'Vetor de esporos. Ruptura espontânea documentada em 100% dos encontros registrados.',
+  'bestiary.code.bruiser': 'ESPÉCIME MIN-07',
+  'bestiary.note.bruiser':
+    'Massa mineral animada. Reclassificado de "maquinário extraviado" após o terceiro relatório.',
+  'bestiary.code.miner': 'UNIDADE EX-016',
+  'bestiary.note.miner':
+    'Extratora da geração anterior. Operação após o encerramento do contrato não foi autorizada. Sem valor de recuperação.',
+  'bestiary.code.fungal_horse': 'ATIVO HOSTIL EQ-02',
+  'bestiary.note.fungal_horse': 'Quadrúpede adaptado. A presença de arreios não implica operador.',
+  'bestiary.code.bishop': 'ATIVO HOSTIL EQ-09',
+  'bestiary.note.bishop':
+    'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',
+  'bestiary.code.guardian': 'ANOMALIA TERMINAL',
+  'bestiary.note.guardian':
+    'Impede o acesso ao núcleo. Nenhuma outra propriedade é relevante para esta operação.',
+
+  // ---------------------------------------------------------------------
+  // Descobertas (codex)
+  // ---------------------------------------------------------------------
+  'discovery.fireSpread.title': 'Fogo caminha',
+  'discovery.fireSpread.lesson':
+    'Biofluido conduz chama de célula em célula. Uma poça é um rastilho.',
+  'discovery.gasIgnition.title': 'O gás não espera',
+  'discovery.gasIgnition.lesson':
+    'Gás sulfúrico acende ao primeiro contato com fogo. Sala fechada é câmara.',
+  'discovery.dischargePool.title': 'A poça inteira é o alvo',
+  'discovery.dischargePool.lesson':
+    'Descarga percorre todo o biofluido conectado — e não pergunta quem está nele.',
+  'discovery.oreChain.title': 'Minério é fiação',
+  'discovery.oreChain.lesson':
+    'Um veio carrega a carga até o outro lado da parede e a solta nas aberturas.',
+  'discovery.fragileBreach.title': 'Nem toda parede é parede',
+  'discovery.fragileBreach.lesson':
+    'Rocha frágil cede a explosão e perfuração. Rotas existem onde não parecia haver.',
+  'discovery.selfHarm.title': 'O Veio não escolhe lados',
+  'discovery.selfHarm.lesson':
+    'Toda reação atinge você igual. A build mais forte é a mais perigosa de carregar.',
+  'discovery.minerFled.title': 'Ele larga a carga',
+  'discovery.minerFled.lesson':
+    'Arma morna e o mineiro recua pelos túneis — e deixa o que carregava. Alcançá-lo custa tempo.',
+  'discovery.minerEnraged.title': 'O calor sobrecarrega',
+  'discovery.minerEnraged.lesson':
+    'Chegue em brasa e o circuito dele falha: picareta em círculo. Recuar responde; orbitar, não.',
+  'discovery.oreQuota.title': 'A empresa paga por tonelada',
+  'discovery.oreQuota.lesson':
+    'Minério acumulado vira escolha de módulo. Cavar é uma rota, não um enfeite.',
+  'discovery.horseFelled.title': 'O rastro fica',
+  'discovery.horseFelled.lesson':
+    'A investida atravessa a sala e deixa fogo onde passou. Pedra no caminho a encerra.',
+  'discovery.bishopFelled.title': 'Ele se cura do chão',
+  'discovery.bishopFelled.lesson':
+    'Sobre fungo vivo o Bispo regenera mais do que você tira. Aquecer o tapete já corta a cura.',
+  'discovery.guardianFelled.title': 'O Guardião cai',
+  'discovery.guardianFelled.lesson':
+    'Ele sela a arena na metade da vida e chama companhia. O cerco desaba com ele.',
+  'discovery.coreTaken.title': 'O núcleo é só metade',
+  'discovery.coreTaken.lesson': 'Pegá-lo dobra o ritmo da contaminação. A saída é a outra metade.',
+
+  // ---------------------------------------------------------------------
+  // Tela de fim: causa da morte e lição
+  // ---------------------------------------------------------------------
+  'summary.enemy.elite': '{name} mutado',
+  'summary.cause.none.headline': 'Você saiu inteiro',
+  'summary.cause.contact.headline': '{enemy} te alcançou',
+  'summary.cause.contact.lesson':
+    'Corpo a corpo é telegrafado. O som do windup chega antes do golpe.',
+  'summary.cause.projectile.headline': '{enemy} te acertou de longe',
+  'summary.cause.projectile.rock.lesson':
+    'O arremesso avisa por 0,8 s antes de sair. Quebre a linha de visão ou desvie de lado.',
+  'summary.cause.projectile.spit.lesson':
+    'Cuspe deixa poça de biofluido. Recuar em linha reta te mantém no caminho dela.',
+  'summary.cause.fire.headline': 'O fogo te consumiu',
+  'summary.cause.fire.lesson':
+    'Chama caminha por biofluido e fungo. O chão pega antes de você ver a chama.',
+  'summary.cause.gas.headline': 'O gás sulfúrico te dissolveu',
+  'summary.cause.gas.lesson': 'Gás se acumula em espaço fechado. O pulso cinético dissipa a nuvem.',
+  'summary.cause.spores.headline': 'Os esporos te tomaram',
+  'summary.cause.spores.lesson':
+    'A nuvem do Portador não se espalha, mas fica. Saia dela em vez de atravessá-la.',
+  'summary.cause.discharge.self.headline': 'Sua própria descarga te pegou',
+  'summary.cause.discharge.self.lesson':
+    'Condutivo percorre a poça inteira. Antes de eletrificar, olhe onde você pisa.',
+  'summary.cause.discharge.world.headline': 'Uma descarga te pegou na poça',
+  'summary.cause.discharge.world.lesson':
+    'Cristal quebrado eletrifica todo biofluido conectado. Poça é terreno hostil.',
+  'summary.cause.explosion.self.headline': 'Você se explodiu',
+  'summary.cause.explosion.self.lesson':
+    'O módulo explosivo arma a 2,25 tiles. Em corredor, ele volta para você.',
+  'summary.cause.explosion.world.headline': 'Uma explosão te alcançou',
+  'summary.cause.explosion.world.lesson':
+    'O Portador detona ao morrer. Matá-lo de perto é o mesmo que detoná-lo em você.',
+  'summary.cause.overheat.headline': 'Sua arma superaqueceu em você',
+  'summary.cause.overheat.lesson':
+    'O calor sobe a cada tiro e o apito sobe junto. Solte o gatilho antes do topo.',
+  'summary.cause.bleedout.headline': 'Você se apagou no escuro',
+  'summary.cause.bleedout.lesson':
+    'Abatido dura 20 s. Caia perto do parceiro, não no meio da sala.',
+  'summary.cause.unknown.headline': 'O Veio te consumiu',
+
+  // ---------------------------------------------------------------------
+  // Tela de fim: números, desfecho e próxima estrela
+  // ---------------------------------------------------------------------
+  'summary.stat.time': 'Tempo',
+  'summary.stat.contamination': 'Contaminação',
+  'summary.stat.kills': 'Abates',
+  'summary.stat.damageDealt': 'Dano causado',
+  'summary.stat.damageTaken': 'Dano sofrido',
+  'summary.stat.damagePerShot': 'Dano/tiro',
+  'summary.stat.salvage': 'Salvage',
+  'summary.stat.modules': 'Módulos',
+  'summary.stat.ore': 'Minério',
+  'summary.stat.none': '—',
+  'summary.outcome.core': 'NÚCLEO EXTRAÍDO',
+  'summary.outcome.extracted': 'EXTRAÍDO SEM O NÚCLEO',
+  'summary.outcome.dead': 'O VEIO TE CONSUMIU',
+  'summary.reputation.one':
+    'REGISTRO CORPORATIVO: 1 unidade inativa destruída — sem valor de recuperação.',
+  'summary.reputation.other':
+    'REGISTRO CORPORATIVO: {count} unidades inativas destruídas — sem valor de recuperação.',
+  'summary.nextStar.three': '★★★ exige o núcleo em {target} — você passou {over}.',
+  'summary.nextStar.two': '★★ exige sair com o núcleo do Guardião.',
+  'summary.nextStar.one': '★ exige alcançar a extração vivo.',
+  'summary.seed': 'seed {seed}',
+  'summary.restart': 'Toque ou pressione R para descer de novo',
+
+  // ---------------------------------------------------------------------
+  // HUD
+  // ---------------------------------------------------------------------
+  'hud.purgeCells': 'CÉLULA DE PURGA ×{count}',
+  'hud.sector': 'SETOR {sector}/{total}',
+  'hud.objective.descend': 'DESÇA PELO POÇO',
+  'hud.objective.returnWithCore': 'VOLTE PARA A ENTRADA',
+  'hud.objective.extract': 'EXTRAIA NA ENTRADA',
+  'hud.objective.findCore': 'ENCONTRE O NÚCLEO',
+  'hud.cache': 'COFRE: {direction} · ~{distance}m',
+  'hud.direction.east': 'LESTE',
+  'hud.direction.west': 'OESTE',
+  'hud.direction.south': 'SUL',
+  'hud.direction.north': 'NORTE',
+
+  // ---------------------------------------------------------------------
+  // Mensagens centrais da run
+  // ---------------------------------------------------------------------
+  'toast.ability.assimilated': '{ability} ASSIMILADO',
+  'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
+  'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
+  'toast.module.expired': '{module} DESATIVADO',
+  'toast.cache.opened': 'COFRE RECUPERADO',
+  'toast.purgeCell': '+1 CÉLULA DE PURGA',
+  'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',
+  'toast.overheat': 'SUPERAQUECIMENTO!',
+
+  // Mensagens emitidas pela simulação (chegam como chave, nunca como texto)
+  'sim.partnerRevived': 'Parceiro revivido.',
+  'sim.reviveBeforeDescend': 'Revele o parceiro abatido antes de descer.',
+  'sim.waitAtShaft': 'Aguarde todos no poço para descer.',
+  'sim.coreTaken': 'Núcleo extraído. O Veio despertou — volte para a entrada!',
+  'sim.reviveBeforeExtract': 'Revele o parceiro abatido antes de extrair.',
+  'sim.waitAtExit': 'Aguarde todos na saída para extrair.',
+  'sim.contaminationRising': 'O Veio se agita — a contaminação aumenta.',
+  'sim.coreDropped': 'O núcleo caiu com o portador.',
+  'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
+  'sim.siegeCollapsed': 'O cerco desaba com o Guardião.',
+
+  // ---------------------------------------------------------------------
+  // Escolha de módulos
+  // ---------------------------------------------------------------------
+  'choice.title': 'DADOS DE MÓDULO ENCONTRADOS',
+  'choice.card': '[{index}] {label}',
+  'choice.recharge': 'RECARGA · {lifetime}',
+  'choice.volatile': 'VOLÁTIL',
+
+  'module.piercing.label': 'PIERCING',
+  'module.piercing.description': 'Perfura alvos sem repetir dano durante a travessia.',
+  'module.piercing.proc': 'TRAVESSIAS',
+  'module.conductive.label': 'CONDUCTIVE',
+  'module.conductive.description': 'Descarrega biofluido e materiais conectados.',
+  'module.conductive.proc': 'DESCARGAS',
+  'module.explosive.label': 'EXPLOSIVE',
+  'module.explosive.description':
+    'Detona impactos armados em uma área. Perigoso a curta distância.',
+  'module.explosive.proc': 'EXPLOSÕES',
+  'module.siphon.label': 'SIPHON',
+  'module.siphon.description': 'Recupera 2 HP quando um acerto útil é drenado.',
+  'module.siphon.proc': 'DRENAGENS',
+  'module.ricochet.label': 'RICOCHET LENS',
+  'module.ricochet.description': 'Faz o bolt rebater uma vez em uma superfície sólida.',
+  'module.ricochet.proc': 'REBOTES',
+  'module.return_disc.label': 'RETURN DISC',
+  'module.return_disc.description': 'Causa dano na ida e retorna perseguindo o Prospector.',
+  'module.return_disc.proc': 'RETORNOS',
+  'module.lifetime.charges': '{count} {proc}',
+  'module.lifetime.duration': '{seconds}s',
+
+  // ---------------------------------------------------------------------
+  // Habilidades e ressonância
+  // ---------------------------------------------------------------------
+  'ability.pulse.label': 'PULSO CINÉTICO',
+  'ability.pulse.hint': 'Empurra e dissipa nuvem. É a saída quando algo já está colado em você.',
+  'ability.pulse.origin': 'Equipamento padrão de prospecção.',
+  'ability.flamethrower.label': 'SOPRO TÉRMICO',
+  'ability.flamethrower.hint':
+    'A chama FICA no chão. Vale em corredor, e vira armadilha no seu recuo.',
+  'ability.flamethrower.origin': 'O Veio ouviu você secar e queimar o que encontrou.',
+  'ability.seeker.label': 'LANÇA RASTREADORA',
+  'ability.seeker.hint':
+    'Um só, com curva lenta. Solte quando o alvo já se comprometeu com uma direção.',
+  'ability.seeker.origin': 'O Veio ouviu você detonar o que encontrou.',
+  'ability.arc.label': 'ARCO CONDUTIVO',
+  'ability.arc.hint': 'Salta entre corpos próximos e não precisa de poça. Grupo colado é o alvo.',
+  'ability.arc.origin': 'O Veio ouviu você eletrificar o que encontrou.',
+  'ability.offer.use': 'USAR — {ability}',
+
+  'resonance.fire': 'COMBUSTÃO',
+  'resonance.current': 'CORRENTE',
+  'resonance.blast': 'ESTOURO',
+  'resonance.kinetic': 'IMPACTO',
+
+  // ---------------------------------------------------------------------
+  // Ecos do Veio (caixa-preta)
+  // ---------------------------------------------------------------------
+  'echo.prompt': 'USAR — PAREAR CAIXA-PRETA',
+  'echo.designation': 'UNIDADE {serial}',
+  'echo.carcass': 'CARCAÇA {condition}',
+  'echo.aggregate': '{count} UNIDADES PERDIDAS NESTA CÂMARA — CAUSA PREDOMINANTE ABAIXO',
+  'echo.condition.scorched': 'CARBONIZADA',
+  'echo.condition.arced': 'FULMINADA',
+  'echo.condition.ruptured': 'ROMPIDA',
+  'echo.condition.crushed': 'ESMAGADA',
+  'echo.condition.dissolved': 'CORROÍDA',
+  'echo.condition.overgrown': 'COLONIZADA',
+  'echo.condition.intact': 'ÍNTEGRA',
+} as const;

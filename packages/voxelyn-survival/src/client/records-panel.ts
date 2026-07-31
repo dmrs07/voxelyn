@@ -12,7 +12,15 @@
 // pronta para o dia em que a fonte deixar de ser local.
 
 import type { RunSummary } from '@voxelyn/survival-sim';
-import { BESTIARY_FILES, BESTIARY_NAMES, BESTIARY_ORDER, DISCOVERIES, hasDiscovery, type Records } from './records';
+import {
+  BESTIARY_FILES,
+  BESTIARY_NAME_KEYS,
+  BESTIARY_ORDER,
+  DISCOVERIES,
+  hasDiscovery,
+  type Records,
+} from './records';
+import { t } from './i18n';
 import { describeCause, formatDuration, formatSeed } from './run-summary';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
@@ -42,9 +50,9 @@ const stars = (count: number): string => '★'.repeat(count) + '☆'.repeat(3 - 
 const historyLine = (run: RunSummary): string => {
   const outcome =
     run.phase === 'extracted_with_core'
-      ? 'núcleo'
+      ? t('records.history.core')
       : run.phase === 'extracted'
-        ? 'saiu'
+        ? t('records.history.extracted')
         : describeCause(run.deathCause).headline;
   return `${stars(run.stars)}  ${formatDuration(run.ticks)}  ${outcome}`;
 };
@@ -53,25 +61,27 @@ export const renderRecordsPanel = (host: HTMLElement, records: Records): void =>
   host.textContent = '';
   const { totals, best } = records;
 
-  section(host, 'TOTAIS');
+  section(host, t('records.totals'));
   definitions(host, [
-    ['Descidas', String(totals.runs)],
-    ['Mortes', String(totals.deaths)],
-    ['Extrações', String(totals.extractions)],
-    ['Com o núcleo', String(totals.extractionsWithCore)],
-    ['Abates', String(totals.kills)],
-    ['Tempo no Veio', formatDuration(totals.ticks)],
+    [t('records.totals.runs'), String(totals.runs)],
+    [t('records.totals.deaths'), String(totals.deaths)],
+    [t('records.totals.extractions'), String(totals.extractions)],
+    [t('records.totals.withCore'), String(totals.extractionsWithCore)],
+    [t('records.totals.kills'), String(totals.kills)],
+    [t('records.totals.time'), formatDuration(totals.ticks)],
   ]);
 
-  section(host, 'MELHORES');
+  section(host, t('records.best'));
   definitions(host, [
-    ['Melhor nota', stars(best.stars)],
+    [t('records.best.stars'), stars(best.stars)],
     [
-      'Núcleo mais rápido',
-      best.fastestCoreTicks === null ? '—' : formatDuration(best.fastestCoreTicks),
+      t('records.best.fastestCore'),
+      best.fastestCoreTicks === null
+        ? t('summary.stat.none')
+        : formatDuration(best.fastestCoreTicks),
     ],
-    ['Maior sobrevivência', formatDuration(best.longestSurvivalTicks)],
-    ['Seeds dominadas', String(records.masteredSeeds.length)],
+    [t('records.best.longestSurvival'), formatDuration(best.longestSurvivalTicks)],
+    [t('records.best.masteredSeeds'), String(records.masteredSeeds.length)],
   ]);
 
   // "REGISTRO DE ATIVOS", e nao "BESTIÁRIO".
@@ -84,43 +94,55 @@ export const renderRecordsPanel = (host: HTMLElement, records: Records): void =>
   //
   // A distancia entre as duas linhas e o efeito inteiro. O jogo nao diz ao
   // jogador o que sentir sobre isso — so mostra o que foi arquivado.
-  section(host, 'REGISTRO DE ATIVOS');
+  section(host, t('records.assets'));
   for (const archetype of BESTIARY_ORDER) {
     const entry = records.bestiary[archetype];
     // Oculto ate o primeiro abate: o registro e do que VOCE enfrentou, e listar
     // tudo de saida transforma descoberta em checklist.
     if (!entry) {
-      host.appendChild(el('div', 'locked', '— — —'));
-      host.appendChild(el('span', 'lesson', 'sem ocorrência registrada'));
+      host.appendChild(el('div', 'locked', t('records.assets.locked')));
+      host.appendChild(el('span', 'lesson', t('records.assets.noOccurrence')));
       continue;
     }
     const file = BESTIARY_FILES[archetype];
     const row = el('div', 'found');
-    row.appendChild(el('span', undefined, file.code));
-    row.appendChild(el('span', 'tally', `×${entry.killed}`));
+    row.appendChild(el('span', undefined, t(file.code)));
+    row.appendChild(el('span', 'tally', t('records.assets.tally', { count: entry.killed })));
     host.appendChild(row);
-    host.appendChild(el('span', 'lesson', file.note));
-    host.appendChild(el('span', 'field-note', `campo: ${BESTIARY_NAMES[archetype]}`));
-  }
-
-  section(host, 'DESCOBERTAS');
-  for (const discovery of DISCOVERIES) {
-    const found = hasDiscovery(records, discovery.bit);
-    const title = el('div', found ? 'found' : 'locked', found ? discovery.title : '— — —');
-    host.appendChild(title);
+    host.appendChild(el('span', 'lesson', t(file.note)));
     host.appendChild(
-      el('span', 'lesson', found ? discovery.lesson : 'ainda não aconteceu com você'),
+      el(
+        'span',
+        'field-note',
+        t('records.assets.fieldName', { name: t(BESTIARY_NAME_KEYS[archetype]) }),
+      ),
     );
   }
 
-  section(host, 'ÚLTIMAS DESCIDAS');
+  section(host, t('records.discoveries'));
+  for (const discovery of DISCOVERIES) {
+    const found = hasDiscovery(records, discovery.bit);
+    const title = el(
+      'div',
+      found ? 'found' : 'locked',
+      found ? t(discovery.title) : t('records.assets.locked'),
+    );
+    host.appendChild(title);
+    host.appendChild(
+      el('span', 'lesson', found ? t(discovery.lesson) : t('records.discoveries.locked')),
+    );
+  }
+
+  section(host, t('records.history'));
   if (records.history.length === 0) {
-    host.appendChild(el('div', 'locked', 'nenhuma ainda'));
+    host.appendChild(el('div', 'locked', t('records.history.empty')));
     return;
   }
   for (const run of records.history.slice(0, 8)) {
     const row = el('div', undefined, historyLine(run));
-    row.appendChild(el('span', 'lesson', `seed ${formatSeed(run.seed)}`));
+    row.appendChild(
+      el('span', 'lesson', t('records.history.seed', { seed: formatSeed(run.seed) })),
+    );
     host.appendChild(row);
   }
 };

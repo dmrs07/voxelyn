@@ -54,7 +54,8 @@
         justify-content: center;
         gap: 14px;
         background: rgba(11, 14, 20, 0.92);
-        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
         z-index: 10;
         /* A overlay rola por DENTRO. O body nunca rola (`overflow: hidden`), e
            sem isto tudo o que passa da altura simplesmente some da tela: em
@@ -250,7 +251,9 @@
         background: #0d0b08;
         border: 1px solid #57452a;
         /* borda dupla, como a placa gravada: a de dentro nasce da sombra */
-        box-shadow: inset 0 0 0 1px #0d0b08, inset 0 0 0 2px #2c2318;
+        box-shadow:
+          inset 0 0 0 1px #0d0b08,
+          inset 0 0 0 2px #2c2318;
         border-radius: 4px;
       }
       .corp-mark {
@@ -355,36 +358,40 @@
       jogador, sao ferramentas de desenvolvimento. Vivem atras de ?dev=1.
     -->
     <div id="menu" class="overlay">
-      <h1>VOXELYN SURVIVAL</h1>
-      <div class="sub">o Veio está vivo — sobreviva</div>
-      <button id="btn-solo" class="primary">Descer</button>
-      <button id="btn-online">Co-op online</button>
+      <h1 data-i18n="menu.title">VOXELYN SURVIVAL</h1>
+      <div class="sub" data-i18n="menu.tagline">o Veio está vivo — sobreviva</div>
+      <button id="btn-solo" class="primary" data-i18n="menu.solo">Descer</button>
+      <button id="btn-online" data-i18n="menu.online">Co-op online</button>
       <!--
         Desafio Semanal: a MESMA seed para todo mundo, publicada pela companhia.
         Escondido enquanto o servidor nao anuncia um — sem pool, o botao
         prometeria uma experiencia comunitaria que ele nao pode entregar.
       -->
-      <button id="btn-contract" class="hidden">Desafio Semanal</button>
+      <button id="btn-contract" class="hidden" data-i18n="menu.contract">Desafio Semanal</button>
       <div id="contract-label" class="sub hidden"></div>
       <div class="row">
-        <label for="room">Sala</label>
-        <input id="room" size="6" maxlength="9" placeholder="código" />
-        <span class="sub">vazio = qualquer sala</span>
+        <label for="room" data-i18n="menu.room.label">Sala</label>
+        <input id="room" size="6" maxlength="9" data-i18n-placeholder="menu.room.placeholder" />
+        <span class="sub" data-i18n="menu.room.hint">vazio = qualquer sala</span>
       </div>
       <div class="row menu-actions">
-        <button id="btn-options" class="compact">Opções</button>
-        <button id="btn-records" class="compact">Registro</button>
-        <button id="btn-rank" class="compact">Ranking</button>
+        <button id="btn-options" class="compact" data-i18n="menu.options">Opções</button>
+        <button id="btn-records" class="compact" data-i18n="menu.records">Registro</button>
+        <button id="btn-rank" class="compact" data-i18n="menu.rank">Ranking</button>
       </div>
       <!-- Ferramentas de desenvolvimento: so aparecem com ?dev=1. -->
       <div id="dev-tools" class="row hidden">
-        <label for="seed">Seed</label>
-        <input id="seed" size="12" placeholder="aleatória" />
-        <label for="server">Servidor</label>
-        <input id="server" size="18" placeholder="auto" />
+        <label for="seed" data-i18n="menu.dev.seed">Seed</label>
+        <input id="seed" size="12" data-i18n-placeholder="menu.dev.seed.placeholder" />
+        <label for="server" data-i18n="menu.dev.server">Servidor</label>
+        <input id="server" size="18" data-i18n-placeholder="menu.dev.server.placeholder" />
       </div>
-      <div class="sub">Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia</div>
-      <div class="sub warn">Use fones: o som avisa o que a tela ainda não mostra.</div>
+      <div class="sub" data-i18n="menu.controls">
+        Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia
+      </div>
+      <div class="sub warn" data-i18n="menu.headphones">
+        Use fones: o som avisa o que a tela ainda não mostra.
+      </div>
     </div>
 
     <!--
@@ -394,33 +401,52 @@
       o no nunca precisa de duas casas ao mesmo tempo.
     -->
     <div id="options" class="overlay hidden">
-      <h1>OPÇÕES</h1>
+      <h1 data-i18n="options.title">OPÇÕES</h1>
       <div id="options-slot">
         <div id="options-controls">
           <div class="row">
-            <label for="name">Nome</label>
-            <input id="name" size="14" maxlength="18" placeholder="anônimo" />
+            <label for="name" data-i18n="options.name">Nome</label>
+            <input
+              id="name"
+              size="14"
+              maxlength="18"
+              data-i18n-placeholder="options.name.placeholder"
+            />
+          </div>
+          <!--
+            O idioma vem PRIMEIRO entre os ajustes de sistema.
+
+            Quem precisa dele é justamente quem não está lendo o resto da tela:
+            deixá-lo no fim obrigaria a percorrer, em uma língua que não se lê,
+            tudo o que vem antes. As opções são carregadas uma vez na vida e a
+            ordem aqui não custa nada a quem já resolveu isso.
+          -->
+          <div class="row">
+            <label for="language" data-i18n="options.language">Idioma</label>
+            <select id="language"></select>
           </div>
           <div class="row">
-            <label for="quality">Qualidade</label>
+            <label for="quality" data-i18n="options.quality">Qualidade</label>
             <select id="quality">
-              <option value="high">Alta</option>
-              <option value="medium">Média</option>
-              <option value="low">Baixa (30 FPS)</option>
+              <option value="high" data-i18n="options.quality.high">Alta</option>
+              <option value="medium" data-i18n="options.quality.medium">Média</option>
+              <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
             </select>
           </div>
           <div class="row">
-            <label for="volume">Volume</label>
+            <label for="volume" data-i18n="options.volume">Volume</label>
             <input id="volume" type="range" min="0" max="100" step="1" />
             <button id="btn-mute" class="compact primary">Som: ligado</button>
           </div>
           <div class="row">
             <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
           </div>
-          <div class="sub">dados anônimos de sessão, sem identificação</div>
+          <div class="sub" data-i18n="options.telemetry.note">
+            dados anônimos de sessão, sem identificação
+          </div>
         </div>
       </div>
-      <button id="btn-options-close" class="primary">Voltar</button>
+      <button id="btn-options-close" class="primary" data-i18n="options.back">Voltar</button>
     </div>
 
     <!--
@@ -433,12 +459,14 @@
     -->
     <div id="pause" class="overlay hidden">
       <div id="pause-mark"></div>
-      <h1 class="corp">TERMINAL DE CAMPO</h1>
+      <h1 class="corp" data-i18n="pause.title">TERMINAL DE CAMPO</h1>
       <div id="pause-status" class="sub"></div>
-      <div id="pause-coop-warning" class="sub warn hidden">
+      <div id="pause-coop-warning" class="sub warn hidden" data-i18n="pause.coopWarning">
         No co-op o mundo não para — a descida continua enquanto você lê isto.
       </div>
-      <button id="btn-pause-resume" class="primary">Retomar descida</button>
+      <button id="btn-pause-resume" class="primary" data-i18n="pause.resume">
+        Retomar descida
+      </button>
       <div id="pause-options-slot"></div>
       <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
     </div>
@@ -451,29 +479,49 @@
     -->
     <div id="pause-confirm" class="overlay hidden">
       <div id="pause-confirm-mark"></div>
-      <h1 class="corp">ABANDONAR CONTRATO?</h1>
+      <h1 class="corp" data-i18n="abandon.title">ABANDONAR CONTRATO?</h1>
       <div class="panel">
-        <span class="lesson">Registro de rescisão — leia antes de confirmar.</span>
-        <div class="found"><span>Material coletado neste setor</span><span class="tally">não creditado</span></div>
-        <div class="found"><span>Progresso da descida</span><span class="tally">perdido</span></div>
-        <div class="found"><span>Posição no ranking</span><span class="tally">nenhuma</span></div>
-        <div class="found"><span>Unidade em campo</span><span class="tally">baixa operacional</span></div>
-        <span class="field-note">a companhia não registra o motivo.</span>
+        <span class="lesson" data-i18n="abandon.notice">
+          Registro de rescisão — leia antes de confirmar.
+        </span>
+        <div class="found">
+          <span data-i18n="abandon.material">Material coletado neste setor</span
+          ><span class="tally" data-i18n="abandon.material.value">não creditado</span>
+        </div>
+        <div class="found">
+          <span data-i18n="abandon.progress">Progresso da descida</span
+          ><span class="tally" data-i18n="abandon.progress.value">perdido</span>
+        </div>
+        <div class="found">
+          <span data-i18n="abandon.rank">Posição no ranking</span
+          ><span class="tally" data-i18n="abandon.rank.value">nenhuma</span>
+        </div>
+        <div class="found">
+          <span data-i18n="abandon.unit">Unidade em campo</span
+          ><span class="tally" data-i18n="abandon.unit.value">baixa operacional</span>
+        </div>
+        <span class="field-note" data-i18n="abandon.footnote">
+          a companhia não registra o motivo.
+        </span>
       </div>
-      <button id="btn-abandon-cancel" class="primary">Continuar a descida</button>
-      <button id="btn-abandon-confirm" class="danger">Confirmar abandono</button>
+      <button id="btn-abandon-cancel" class="primary" data-i18n="abandon.cancel">
+        Continuar a descida
+      </button>
+      <button id="btn-abandon-confirm" class="danger" data-i18n="abandon.confirm">
+        Confirmar abandono
+      </button>
     </div>
 
     <div id="records" class="overlay hidden">
-      <h1>REGISTRO</h1>
+      <h1 data-i18n="records.title">REGISTRO</h1>
       <div id="records-body" class="panel"></div>
-      <button id="btn-records-close" class="primary">Voltar</button>
+      <button id="btn-records-close" class="primary" data-i18n="options.back">Voltar</button>
     </div>
 
     <div id="rank" class="overlay hidden">
-      <h1>RANKING</h1>
+      <h1 data-i18n="rank.title">RANKING</h1>
       <div id="rank-body" class="panel"></div>
-      <button id="btn-rank-close" class="primary">Voltar</button>
+      <button id="btn-rank-close" class="primary" data-i18n="options.back">Voltar</button>
     </div>
 
     <!--
@@ -482,7 +530,7 @@
     -->
     <div id="invite" class="hidden">
       <span id="invite-code"></span>
-      <button id="btn-invite" class="compact">Copiar convite</button>
+      <button id="btn-invite" class="compact" data-i18n="invite.copy">Copiar convite</button>
     </div>
 
     <div id="banner" class="hidden"></div>

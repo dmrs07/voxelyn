@@ -11,6 +11,7 @@
 // corpo, e o renderer os converte com o zoom do quadro.
 
 import type { DamageCause } from '@voxelyn/survival-sim';
+import { t, type MessageKey } from './i18n';
 
 // Paleta da art bible (docs/art/voxelyn-survival-art-bible.md). Repetida aqui
 // pela mesma razão que em `voxel-fallback.ts`: este módulo desenha matéria e não
@@ -52,8 +53,10 @@ export type CarcassVariant = {
    * Estado do corpo na voz da empresa.
    *
    * Substantivo de laudo, nunca de luto: a companhia registra material perdido.
+   * Chave e nao frase: as variantes sao constantes de modulo e resolver o texto
+   * aqui congelaria a lingua da primeira carga do arquivo.
    */
-  condition: string;
+  condition: MessageKey;
   /** Tint sobre o frame de morte do Prospector. */
   tint: { color: string; alpha: number };
   /** Cor do casco quando o atlas não carregou e o corpo sai em blocos. */
@@ -63,7 +66,7 @@ export type CarcassVariant = {
 
 const scorched: CarcassVariant = {
   kind: 'scorched',
-  condition: 'CARBONIZADA',
+  condition: 'echo.condition.scorched',
   tint: { color: 'rgba(24,20,18,0.74)', alpha: 0.74 },
   shell: PAL.dark,
   debris: [
@@ -75,7 +78,7 @@ const scorched: CarcassVariant = {
 
 const arced: CarcassVariant = {
   kind: 'arced',
-  condition: 'FULMINADA',
+  condition: 'echo.condition.arced',
   tint: { color: 'rgba(122,184,255,0.55)', alpha: 0.55 },
   shell: PAL.rock,
   debris: [
@@ -87,7 +90,7 @@ const arced: CarcassVariant = {
 
 const ruptured: CarcassVariant = {
   kind: 'ruptured',
-  condition: 'ROMPIDA',
+  condition: 'echo.condition.ruptured',
   tint: { color: 'rgba(110,74,51,0.6)', alpha: 0.6 },
   shell: PAL.rust,
   debris: [
@@ -100,7 +103,7 @@ const ruptured: CarcassVariant = {
 
 const crushed: CarcassVariant = {
   kind: 'crushed',
-  condition: 'ESMAGADA',
+  condition: 'echo.condition.crushed',
   tint: { color: 'rgba(46,58,77,0.66)', alpha: 0.66 },
   shell: PAL.rockShadow,
   debris: [
@@ -111,7 +114,7 @@ const crushed: CarcassVariant = {
 
 const dissolved: CarcassVariant = {
   kind: 'dissolved',
-  condition: 'CORROÍDA',
+  condition: 'echo.condition.dissolved',
   tint: { color: 'rgba(168,230,60,0.5)', alpha: 0.5 },
   shell: PAL.fungus,
   debris: [
@@ -123,7 +126,7 @@ const dissolved: CarcassVariant = {
 
 const overgrown: CarcassVariant = {
   kind: 'overgrown',
-  condition: 'COLONIZADA',
+  condition: 'echo.condition.overgrown',
   tint: { color: 'rgba(102,194,138,0.52)', alpha: 0.52 },
   shell: PAL.fungus,
   debris: [
@@ -135,7 +138,7 @@ const overgrown: CarcassVariant = {
 
 const intact: CarcassVariant = {
   kind: 'intact',
-  condition: 'ÍNTEGRA',
+  condition: 'echo.condition.intact',
   tint: { color: 'rgba(110,74,51,0.62)', alpha: 0.62 },
   shell: PAL.rust,
   debris: [{ dx: 0.3, dy: 0.2, size: 0.12, color: PAL.rust }],
@@ -198,5 +201,5 @@ export const deathEchoDesignation = (echoId: string): string => {
   const digit = (hash % 9) + 1;
   const letter = DESIGNATION_LETTERS[(hash >>> 4) % DESIGNATION_LETTERS.length];
   const serial = 100 + ((hash >>> 8) % 900);
-  return `UNIDADE ${digit}${letter}-${serial}`;
+  return t('echo.designation', { serial: `${digit}${letter}-${serial}` });
 };

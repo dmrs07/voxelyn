@@ -105,14 +105,53 @@ const VEIN_NAMES = [
  */
 export const contractSeed = (id: string): number => deathEchoHash(`voxelyn.echo.contract:${id}`);
 
-const contractLabel = (id: string, cadence: DeathEchoContractCadence): string => {
+/**
+ * As PARTES do rótulo do desafio, sem uma frase montada.
+ *
+ * O rótulo é a única string do protocolo que o jogador lê, e por isso ele não
+ * pode nascer pronto aqui: o servidor não sabe em que idioma cada cliente está,
+ * e a ordem de "DESAFIO SEMANAL 31 — VEIO KAPPA" não é a mesma em toda língua.
+ * Quem monta a frase é o cliente, com a chave `contract.weekly`/`contract.daily`
+ * do catálogo dele; este módulo entrega o que é DADO — o período e o nome do
+ * veio — e nada além.
+ *
+ * O nome do veio não se traduz: KAPPA é um identificador de depósito no registro
+ * da companhia, como uma placa de patrimônio, e traduzi-lo seria traduzir um
+ * número de série.
+ */
+export type DeathEchoContractLabelParts = {
+  cadence: DeathEchoContractCadence;
+  /** Semana ISO (`31`) ou dia-mês (`30-07`), já formatado. */
+  period: string;
+  vein: string;
+};
+
+export const deathEchoContractLabelParts = (
+  id: string,
+  cadence: DeathEchoContractCadence,
+): DeathEchoContractLabelParts => {
   const vein = VEIN_NAMES[deathEchoHash(id) % VEIN_NAMES.length];
   if (cadence === 'weekly') {
     const [, week] = id.split('-W');
-    return `DESAFIO SEMANAL ${week ?? '--'} — VEIO ${vein}`;
+    return { cadence, period: week ?? '--', vein };
   }
   const [, month, day] = id.split('-');
-  return `DESAFIO DIÁRIO ${day ?? '--'}-${month ?? '--'} — VEIO ${vein}`;
+  return { cadence, period: `${day ?? '--'}-${month ?? '--'}`, vein };
+};
+
+/**
+ * O rótulo em português, que viaja no campo `label` do anúncio.
+ *
+ * Continua existindo por compatibilidade de wire: um cliente antigo — e o
+ * `parseDeathEchoContract` de qualquer versão — espera uma string ali. O cliente
+ * atual ignora este texto e remonta o rótulo no idioma do jogador a partir de
+ * `deathEchoContractLabelParts`.
+ */
+const contractLabel = (id: string, cadence: DeathEchoContractCadence): string => {
+  const { period, vein } = deathEchoContractLabelParts(id, cadence);
+  return cadence === 'weekly'
+    ? `DESAFIO SEMANAL ${period} — VEIO ${vein}`
+    : `DESAFIO DIÁRIO ${period} — VEIO ${vein}`;
 };
 
 const dailyWindow = (at: Date): { opensAt: Date; closesAt: Date } => {

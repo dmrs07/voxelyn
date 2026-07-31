@@ -457,7 +457,36 @@ export type SemanticEvent =
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }
-  | { t: 'message'; text: string };
+  /**
+   * Um aviso da simulacao ao jogador, identificado por CHAVE e nao por frase.
+   *
+   * A simulacao roda nos dois lados — cliente e servidor, este ultimo para
+   * re-verificar replays — e o servidor nao tem idioma de jogador para escolher.
+   * Uma frase pronta aqui obrigaria a simulacao a saber em que lingua a partida
+   * esta sendo jogada, o que e informacao de apresentacao vazando para dentro do
+   * modelo. A chave viaja no wire com o mesmo custo e e traduzida por quem
+   * desenha, no idioma daquele cliente.
+   */
+  | { t: 'message'; key: SimMessageKey };
+
+/**
+ * As mensagens que a simulacao sabe emitir.
+ *
+ * Uniao fechada de proposito: uma mensagem nova aqui quebra o catalogo do
+ * cliente na COMPILACAO, que e onde o texto faltando tem de aparecer — e nao na
+ * tela do jogador, como uma chave crua.
+ */
+export type SimMessageKey =
+  | 'sim.partnerRevived'
+  | 'sim.reviveBeforeDescend'
+  | 'sim.waitAtShaft'
+  | 'sim.coreTaken'
+  | 'sim.reviveBeforeExtract'
+  | 'sim.waitAtExit'
+  | 'sim.contaminationRising'
+  | 'sim.coreDropped'
+  | 'sim.arenaSealed'
+  | 'sim.siegeCollapsed';
 
 export type PlayerCommand = {
   move: Vec2;

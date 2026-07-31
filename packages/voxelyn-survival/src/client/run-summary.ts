@@ -9,19 +9,38 @@
 // Regra que rege todos os textos deste arquivo: a linha de licao fala do que o
 // jogador PODE fazer diferente, nunca do que ele fez de errado. "Detone longe
 // de paredes" ensina; "voce se explodiu" so informa.
+//
+// As frases moram no catalogo (`i18n/locales`), e o que sobra aqui e a ESCOLHA
+// de qual delas cabe a cada causa — que e a decisao de design de verdade.
+// Nenhuma funcao deste arquivo guarda texto em variavel: todas resolvem a
+// chave na hora da chamada, porque a tela de fim e redesenhada a cada quadro e
+// trocar de idioma no menu de campo tem de valer para ela tambem.
 
 import { TICK_HZ } from '@voxelyn/survival-sim';
 import type { DamageCause, EnemyArchetype, RunSummary } from '@voxelyn/survival-sim';
+import { t, tCount, type MessageKey } from './i18n';
 
-const ARCHETYPE_NAMES: Record<EnemyArchetype, string> = {
-  stalker: 'Espreitador',
-  spitter: 'Cuspidor',
-  bomber: 'Portador de Esporos',
-  bruiser: 'Britador',
-  fungal_horse: 'Corcel',
-  bishop: 'Bispo',
-  miner: 'Mineiro',
-  guardian: 'Guardião',
+const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
+  stalker: 'enemy.stalker',
+  spitter: 'enemy.spitter',
+  bomber: 'enemy.bomber',
+  bruiser: 'enemy.bruiser',
+  fungal_horse: 'enemy.fungal_horse',
+  bishop: 'enemy.bishop',
+  miner: 'enemy.miner',
+  guardian: 'enemy.guardian',
+};
+
+/**
+ * O nome do arquetipo, com a marca de elite quando ela existe.
+ *
+ * Passa por uma chave propria (`summary.enemy.elite`) em vez de colar um
+ * sufixo: em portugues o adjetivo vem depois do nome e em ingles vem antes, e
+ * um `name + ' mutado'` so funcionaria na lingua em que foi escrito.
+ */
+const enemyName = (archetype: EnemyArchetype, elite: boolean): string => {
+  const name = t(ARCHETYPE_KEYS[archetype]);
+  return elite ? t('summary.enemy.elite', { name }) : name;
 };
 
 export type CauseText = { headline: string; lesson: string };
@@ -35,61 +54,65 @@ export const formatDuration = (ticks: number): string => {
 };
 
 export const describeCause = (cause: DamageCause | null): CauseText => {
-  if (!cause) return { headline: 'Você saiu inteiro', lesson: '' };
+  if (!cause) return { headline: t('summary.cause.none.headline'), lesson: '' };
   switch (cause.kind) {
     case 'enemy_contact':
       return {
-        headline: `${ARCHETYPE_NAMES[cause.archetype]}${cause.elite ? ' mutado' : ''} te alcançou`,
-        lesson: 'Corpo a corpo é telegrafado. O som do windup chega antes do golpe.',
+        headline: t('summary.cause.contact.headline', {
+          enemy: enemyName(cause.archetype, cause.elite),
+        }),
+        lesson: t('summary.cause.contact.lesson'),
       };
     case 'enemy_projectile':
       return {
-        headline: `${ARCHETYPE_NAMES[cause.archetype]}${cause.elite ? ' mutado' : ''} te acertou de longe`,
-        lesson:
+        headline: t('summary.cause.projectile.headline', {
+          enemy: enemyName(cause.archetype, cause.elite),
+        }),
+        lesson: t(
           cause.projectile === 'rock'
-            ? 'O arremesso avisa por 0,8 s antes de sair. Quebre a linha de visão ou desvie de lado.'
-            : 'Cuspe deixa poça de biofluido. Recuar em linha reta te mantém no caminho dela.',
+            ? 'summary.cause.projectile.rock.lesson'
+            : 'summary.cause.projectile.spit.lesson',
+        ),
       };
     case 'fire':
       return {
-        headline: 'O fogo te consumiu',
-        lesson: 'Chama caminha por biofluido e fungo. O chão pega antes de você ver a chama.',
+        headline: t('summary.cause.fire.headline'),
+        lesson: t('summary.cause.fire.lesson'),
       };
     case 'gas':
       return {
-        headline: 'O gás sulfúrico te dissolveu',
-        lesson: 'Gás se acumula em espaço fechado. O pulso cinético dissipa a nuvem.',
+        headline: t('summary.cause.gas.headline'),
+        lesson: t('summary.cause.gas.lesson'),
       };
     case 'spores':
       return {
-        headline: 'Os esporos te tomaram',
-        lesson: 'A nuvem do Portador não se espalha, mas fica. Saia dela em vez de atravessá-la.',
+        headline: t('summary.cause.spores.headline'),
+        lesson: t('summary.cause.spores.lesson'),
       };
     case 'discharge':
       return cause.source === 'player'
         ? {
-            headline: 'Sua própria descarga te pegou',
-            lesson: 'Condutivo percorre a poça inteira. Antes de eletrificar, olhe onde você pisa.',
+            headline: t('summary.cause.discharge.self.headline'),
+            lesson: t('summary.cause.discharge.self.lesson'),
           }
         : {
-            headline: 'Uma descarga te pegou na poça',
-            lesson: 'Cristal quebrado eletrifica todo biofluido conectado. Poça é terreno hostil.',
+            headline: t('summary.cause.discharge.world.headline'),
+            lesson: t('summary.cause.discharge.world.lesson'),
           };
     case 'explosion':
       return cause.source === 'player'
         ? {
-            headline: 'Você se explodiu',
-            lesson: 'O módulo explosivo arma a 2,25 tiles. Em corredor, ele volta para você.',
+            headline: t('summary.cause.explosion.self.headline'),
+            lesson: t('summary.cause.explosion.self.lesson'),
           }
         : {
-            headline: 'Uma explosão te alcançou',
-            lesson:
-              'O Portador detona ao morrer. Matá-lo de perto é o mesmo que detoná-lo em você.',
+            headline: t('summary.cause.explosion.world.headline'),
+            lesson: t('summary.cause.explosion.world.lesson'),
           };
     case 'overheat':
       return {
-        headline: 'Sua arma superaqueceu em você',
-        lesson: 'O calor sobe a cada tiro e o apito sobe junto. Solte o gatilho antes do topo.',
+        headline: t('summary.cause.overheat.headline'),
+        lesson: t('summary.cause.overheat.lesson'),
       };
     case 'bleedout':
       // NAO diz "sangrou".
@@ -102,15 +125,17 @@ export const describeCause = (cause: DamageCause | null): CauseText => {
       // UI, que e o pior lugar possivel para decidir lore.
       //
       // "Apagou" funciona para carne, maquina ou traje selado, e diz a mesma
-      // coisa: o tempo acabou antes de alguem chegar.
+      // coisa: o tempo acabou antes de alguem chegar. A traducao carrega a
+      // mesma regra: nenhuma lingua pode escolher um verbo que decida do que
+      // ele e feito.
       return {
-        headline: 'Você se apagou no escuro',
-        lesson: 'Abatido dura 20 s. Caia perto do parceiro, não no meio da sala.',
+        headline: t('summary.cause.bleedout.headline'),
+        lesson: t('summary.cause.bleedout.lesson'),
       };
     case 'player_shot':
     case 'unknown':
     default:
-      return { headline: 'O Veio te consumiu', lesson: '' };
+      return { headline: t('summary.cause.unknown.headline'), lesson: '' };
   }
 };
 
@@ -123,17 +148,26 @@ export const summaryLines = (summary: RunSummary): SummaryLine[] => {
   const accuracy =
     stats.shotsFired > 0
       ? `${Math.round((stats.damageDealtTenths / 10 / stats.shotsFired) * 10) / 10}`
-      : '—';
+      : t('summary.stat.none');
   return [
-    { label: 'Tempo', value: formatDuration(summary.ticks) },
-    { label: 'Contaminação', value: `${Math.round(summary.contamination * 100)}%` },
-    { label: 'Abates', value: String(totalKills) },
-    { label: 'Dano causado', value: String(Math.round(stats.damageDealtTenths / 10)) },
-    { label: 'Dano sofrido', value: String(Math.round(stats.damageTakenTenths / 10)) },
-    { label: 'Dano/tiro', value: accuracy },
-    { label: 'Salvage', value: String(stats.salvageCompleted) },
-    { label: 'Módulos', value: String(stats.modulesAcquired) },
-    { label: 'Minério', value: String(stats.oreCollected) },
+    { label: t('summary.stat.time'), value: formatDuration(summary.ticks) },
+    {
+      label: t('summary.stat.contamination'),
+      value: `${Math.round(summary.contamination * 100)}%`,
+    },
+    { label: t('summary.stat.kills'), value: String(totalKills) },
+    {
+      label: t('summary.stat.damageDealt'),
+      value: String(Math.round(stats.damageDealtTenths / 10)),
+    },
+    {
+      label: t('summary.stat.damageTaken'),
+      value: String(Math.round(stats.damageTakenTenths / 10)),
+    },
+    { label: t('summary.stat.damagePerShot'), value: accuracy },
+    { label: t('summary.stat.salvage'), value: String(stats.salvageCompleted) },
+    { label: t('summary.stat.modules'), value: String(stats.modulesAcquired) },
+    { label: t('summary.stat.ore'), value: String(stats.oreCollected) },
   ];
 };
 
@@ -159,18 +193,22 @@ export const summaryLines = (summary: RunSummary): SummaryLine[] => {
 export const reputationNote = (summary: RunSummary): string | null => {
   const n = summary.stats.innocentsKilled;
   if (n <= 0) return null;
-  const corpo = n === 1 ? '1 unidade inativa destruída' : `${n} unidades inativas destruídas`;
-  return `REGISTRO CORPORATIVO: ${corpo} — sem valor de recuperação.`;
+  // A frase INTEIRA por chave, e nao "REGISTRO CORPORATIVO: " + contagem: o
+  // singular e o plural mudam mais do que a terminacao em varias linguas, e a
+  // voz da empresa depende da frase inteira caber numa linha so.
+  return tCount({ one: 'summary.reputation.one', other: 'summary.reputation.other' }, n);
 };
 
 export type OutcomeText = { title: string; color: 'blood' | 'loot' | 'biolum' };
 
 export const describeOutcome = (summary: RunSummary): OutcomeText => {
   if (summary.phase === 'extracted_with_core') {
-    return { title: 'NÚCLEO EXTRAÍDO', color: 'biolum' };
+    return { title: t('summary.outcome.core'), color: 'biolum' };
   }
-  if (summary.phase === 'extracted') return { title: 'EXTRAÍDO SEM O NÚCLEO', color: 'loot' };
-  return { title: 'O VEIO TE CONSUMIU', color: 'blood' };
+  if (summary.phase === 'extracted') {
+    return { title: t('summary.outcome.extracted'), color: 'loot' };
+  }
+  return { title: t('summary.outcome.dead'), color: 'blood' };
 };
 
 /**
@@ -184,10 +222,13 @@ export const nextStarHint = (summary: RunSummary): string | null => {
   if (summary.stars === 3) return null;
   if (summary.phase === 'extracted_with_core') {
     const over = summary.ticks - summary.targetTicks;
-    return `★★★ exige o núcleo em ${formatDuration(summary.targetTicks)} — você passou ${formatDuration(over)}.`;
+    return t('summary.nextStar.three', {
+      target: formatDuration(summary.targetTicks),
+      over: formatDuration(over),
+    });
   }
-  if (summary.phase === 'extracted') return '★★ exige sair com o núcleo do Guardião.';
-  return '★ exige alcançar a extração vivo.';
+  if (summary.phase === 'extracted') return t('summary.nextStar.two');
+  return t('summary.nextStar.one');
 };
 
 /** Seed em hexadecimal, o formato em que ela e compartilhada. */

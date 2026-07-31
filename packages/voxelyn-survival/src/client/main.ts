@@ -29,12 +29,27 @@ import { audio } from './audio';
 import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
 import { renderRecordsPanel } from './records-panel';
 import { formatSeed, parseSeed } from './run-summary';
-import { isValidRoomCode, normalizeRoomCode } from '@voxelyn/survival-protocol';
+import {
+  deathEchoContractLabelParts,
+  isValidRoomCode,
+  normalizeRoomCode,
+} from '@voxelyn/survival-protocol';
 import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
 import { PauseMenu } from './pause-menu';
+import {
+  LOCALES,
+  LOCALE_LABELS,
+  applyStaticTranslations,
+  getLocale,
+  onLocaleChange,
+  setLocale,
+  t,
+  type Locale,
+  type MessageKey,
+} from './i18n';
 
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
@@ -66,6 +81,46 @@ const optionsSlot = document.getElementById('options-slot') as HTMLDivElement;
 const pauseOptionsSlot = document.getElementById('pause-options-slot') as HTMLDivElement;
 const contractButton = document.getElementById('btn-contract') as HTMLButtonElement;
 const contractLabel = document.getElementById('contract-label') as HTMLDivElement;
+const languageSelect = document.getElementById('language') as HTMLSelectElement;
+
+// ---------------------------------------------------------------------------
+// Idioma
+// ---------------------------------------------------------------------------
+// A primeira coisa depois de achar os elementos, e antes de qualquer rotulo ser
+// escrito: as chamadas abaixo montam rotulos dinamicos (som, telemetria) e a
+// tela nao pode piscar em portugues antes de virar ingles.
+applyStaticTranslations();
+
+/**
+ * As opcoes do seletor, montadas por codigo.
+ *
+ * O HTML nao lista as linguas porque a lista e `LOCALES`, e duplica-la ali
+ * criaria a unica forma de erro que o resto do sistema torna impossivel: uma
+ * lingua no catalogo sem entrada no menu, ou o contrario.
+ */
+for (const locale of LOCALES) {
+  const option = document.createElement('option');
+  option.value = locale;
+  option.textContent = LOCALE_LABELS[locale];
+  languageSelect.appendChild(option);
+}
+languageSelect.value = getLocale();
+languageSelect.addEventListener('change', () => {
+  setLocale(languageSelect.value as Locale);
+  audio.ui();
+});
+
+/**
+ * Nome de cada nivel de qualidade, para o banner do redutor automatico.
+ *
+ * O banner imprimia o valor do enum (`medium`), que nao e portugues nem ingles
+ * — e um identificador de codigo que vazou para a tela.
+ */
+const QUALITY_KEYS: Record<QualityLevel, MessageKey> = {
+  high: 'options.quality.high',
+  medium: 'options.quality.medium',
+  low: 'options.quality.low',
+};
 
 /**
  * O contrato que a companhia ANUNCIOU, se houver servidor.
@@ -196,7 +251,7 @@ audio.setMuted(audioSettings.muted);
 volumeInput.value = String(Math.round(audioSettings.volume * 100));
 
 const renderMuteLabel = (): void => {
-  muteButton.textContent = audioSettings.muted ? 'Som: desligado' : 'Som: ligado';
+  muteButton.textContent = t(audioSettings.muted ? 'options.sound.off' : 'options.sound.on');
   muteButton.classList.toggle('primary', !audioSettings.muted);
 };
 renderMuteLabel();
@@ -237,7 +292,7 @@ window.addEventListener('keydown', (ev) => {
   if (isEditingText(ev.target)) return; // "Marta" nao pode desligar o som
   setMuted(!audioSettings.muted);
   if (!audioSettings.muted) audio.unlock();
-  setBanner(audioSettings.muted ? 'Som desligado' : 'Som ligado');
+  setBanner(t(audioSettings.muted ? 'banner.sound.off' : 'banner.sound.on'));
   setTimeout(() => setBanner(null), 1200);
 });
 
@@ -288,7 +343,7 @@ const submitSoloRun = (state: SurvivalState): void => {
       console.info('[leaderboard] nao enviado:', outcome.reason);
       return;
     }
-    setBanner(outcome.duplicate ? 'Run já registrada' : 'Run verificada e registrada');
+    setBanner(t(outcome.duplicate ? 'banner.run.duplicate' : 'banner.run.verified'));
     setTimeout(() => setBanner(null), 2600);
   });
 };
@@ -365,10 +420,10 @@ const showInvite = (code: string | null): void => {
 inviteButton.addEventListener('click', () => {
   if (!currentInvite) return;
   const url = inviteUrlFrom(location.href, currentInvite);
-  const done = (texto: string): void => {
-    inviteButton.textContent = texto;
+  const done = (key: MessageKey): void => {
+    inviteButton.textContent = t(key);
     setTimeout(() => {
-      inviteButton.textContent = 'Copiar convite';
+      inviteButton.textContent = t('invite.copy');
     }, 1800);
   };
   // `navigator.share` primeiro porque no celular ele abre a folha nativa e
@@ -376,8 +431,12 @@ inviteButton.addEventListener('click', () => {
   // desktop ele quase nunca existe, e a area de transferencia e o certo.
   if (typeof navigator.share === 'function') {
     void navigator
-      .share({ title: 'Voxelyn Survival', text: `Desce comigo — sala ${currentInvite}`, url })
-      .then(() => done('Enviado'))
+      .share({
+        title: t('app.title'),
+        text: t('invite.shareText', { room: currentInvite }),
+        url,
+      })
+      .then(() => done('invite.shared'))
       .catch(() => {
         /* o jogador cancelou a folha de compartilhamento: nao e erro */
       });
@@ -385,8 +444,8 @@ inviteButton.addEventListener('click', () => {
   }
   void navigator.clipboard
     ?.writeText(url)
-    .then(() => done('Copiado!'))
-    .catch(() => done('Copie da barra'));
+    .then(() => done('invite.copied'))
+    .catch(() => done('invite.manual'));
   audio.ui();
 });
 
@@ -407,7 +466,7 @@ const applyAdaptiveQuality = (dt: number): void => {
       renderer.setQuality(lower);
       saveQuality(lower);
       qualitySelect.value = lower;
-      setBanner(`Qualidade reduzida para ${lower} (desempenho)`);
+      setBanner(t('banner.quality.downgraded', { quality: t(QUALITY_KEYS[lower]) }));
       setTimeout(() => setBanner(null), 1800);
     }
   }
@@ -490,6 +549,18 @@ nameInput.addEventListener('change', () => {
  */
 let paused = false;
 
+/**
+ * O quadro congelado precisa ser redesenhado UMA vez.
+ *
+ * Com o mundo em pausa o loop nao desenha nada — o canvas guarda a ultima
+ * imagem, que e exatamente o mundo parado que a overlay quer ter atras de si. O
+ * problema e que o bloco de opcoes vive DENTRO do menu de campo: trocar de
+ * idioma ali muda o HUD desenhado no canvas, e a imagem guardada continua na
+ * lingua anterior ate o jogador retomar a descida. Um quadro a mais resolve, e
+ * so ele — redesenhar sempre desfaria a pausa.
+ */
+let frozenFrameStale = false;
+
 /** Move o bloco unico de opcoes para a tela que esta abrindo. */
 const mountOptions = (slot: HTMLDivElement): void => {
   slot.appendChild(optionsControls);
@@ -532,10 +603,12 @@ const pauseMenu = new PauseMenu(canvas, {
   freezesWorld: soloRun,
   status: () => {
     const state = liveRun;
-    if (!state) return 'sem sinal do setor — conexão pendente';
-    if (state.phase !== 'running') return 'contrato encerrado — sem descida ativa';
-    const contamination = Math.round(state.contamination * 100);
-    return `Setor ${state.sector} · contaminação ${contamination}% · contrato em aberto`;
+    if (!state) return t('pause.status.noSignal');
+    if (state.phase !== 'running') return t('pause.status.closed');
+    return t('pause.status.running', {
+      sector: state.sector,
+      contamination: Math.round(state.contamination * 100),
+    });
   },
   onOpen: () => {
     // No solo a pausa e real e o loop congela; no co-op ela e so a overlay, e o
@@ -602,7 +675,7 @@ const hintOnce = (): void => {
     } catch {
       /* ignora */
     }
-    setBanner('ESC ou segure no topo da tela para o menu');
+    setBanner(t('pause.hint'));
     hintTimer = setTimeout(clearHint, 4000);
   }, 1600);
 };
@@ -636,6 +709,12 @@ const runSolo = (): void => {
     // exatamente o mundo congelado que a overlay quer ter atras de si.
     if (paused) {
       lastTime = now;
+      // Sem avancar o acumulador: nenhum tick e simulado e nenhum fica devido.
+      // Este desenho e so a mesma cena com o texto na lingua nova.
+      if (frozenFrameStale) {
+        frozenFrameStale = false;
+        renderState(state, accumulator / TICK_MS, input.state, now);
+      }
       requestAnimationFrame(frame);
       return;
     }
@@ -782,17 +861,17 @@ const runOnline = (url: string, roomCode: string | null): void => {
   net.onReject = (reason, field) => {
     if (field) {
       fatal = true;
-      setBanner(`Versao incompativel (${field}) — recarregue a pagina.`);
+      setBanner(t('banner.version.mismatch', { field }));
       ws?.close();
       return;
     }
-    setBanner('Sessao expirada — reconectando…');
+    setBanner(t('banner.session.expired'));
     ws?.close();
   };
-  net.onDiverged = () => setBanner('Ressincronizando o mundo…');
+  net.onDiverged = () => setBanner(t('banner.resync'));
 
   const connect = (): void => {
-    setBanner(net.resumeToken ? 'Reconectando…' : 'Conectando…');
+    setBanner(t(net.resumeToken ? 'banner.reconnecting' : 'banner.connecting'));
     try {
       // URL malformada ou esquema nao-WebSocket lanca AQUI, de forma sincrona.
       // Sem tratar, o menu ja esta escondido e o loop ainda nao comecou: o
@@ -801,7 +880,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
     } catch {
       fatal = true;
       startupFailed = true;
-      setBanner(`Endereco de servidor invalido: ${url}`);
+      setBanner(t('banner.server.invalid', { url }));
       backToMenu();
       return;
     }
@@ -894,7 +973,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
             // Sala nova e run nova: mesmo `begin()` da entrada, pelo mesmo
             // motivo — e daqui que sai o intervalo ate o reinicio.
             telemetry.begin();
-            setBanner('Descendo de novo…');
+            setBanner(t('banner.restarting'));
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
           }
@@ -905,7 +984,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
         requestAnimationFrame(frame);
         return; // banner ja explica; nao insiste
       }
-      setBanner(net.status === 'reconnecting' ? 'Reconectando…' : 'Offline — tentando reconectar');
+      setBanner(t(net.status === 'reconnecting' ? 'banner.reconnecting' : 'banner.offline'));
       if (reconnectAt && now >= reconnectAt && (!ws || ws.readyState === WebSocket.CLOSED)) {
         reconnectAt = 0;
         connect();
@@ -954,7 +1033,7 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
 const startOnline = (): void => {
   const code = normalizeRoomCode(roomInput.value);
   if (code !== '' && !isValidRoomCode(code)) {
-    setBanner(`Código de sala inválido: ${code}`);
+    setBanner(t('banner.room.invalid', { code }));
     setTimeout(() => setBanner(null), 2400);
     return;
   }
@@ -987,12 +1066,27 @@ for (const evt of ['pointerdown', 'keydown'] as const) {
  * A seed sobrevive aos reinicios, como qualquer seed fixada: a razao de existir um
  * contrato e tentar o MESMO mapa de novo depois de morrer nele.
  */
+/**
+ * O rotulo do desafio no idioma do jogador.
+ *
+ * O campo `label` que vem do servidor e ignorado de proposito: ele nasce em
+ * portugues, do lado que nao sabe em que lingua este cliente esta. As PARTES —
+ * periodo e nome do veio — sao o dado, e a frase e remontada aqui.
+ */
+const contractText = (contract: DeathEchoContract): string => {
+  const parts = deathEchoContractLabelParts(contract.id, contract.cadence);
+  return t(parts.cadence === 'weekly' ? 'contract.weekly' : 'contract.daily', {
+    period: parts.period,
+    vein: parts.vein,
+  });
+};
+
 const startContract = (): void => {
   const contract = advertisedContract;
   if (!contract) return;
   forcedSeed = contract.seed;
   seedInput.value = formatSeed(contract.seed);
-  setBanner(contract.label);
+  setBanner(contractText(contract));
   setTimeout(() => setBanner(null), 3200);
   startSolo(contract);
 };
@@ -1015,7 +1109,7 @@ serverInput.placeholder = defaultServerUrl();
 void fetchDeathEchoContract(serverInput.value.trim() || defaultServerUrl()).then((contract) => {
   if (!contract) return;
   advertisedContract = contract;
-  contractLabel.textContent = contract.label;
+  contractLabel.textContent = contractText(contract);
   contractButton.classList.remove('hidden');
   contractLabel.classList.remove('hidden');
 });
@@ -1064,7 +1158,7 @@ document
   ?.addEventListener('click', () => closeOverlay(recordsOverlay));
 
 const renderTelemetryLabel = (): void => {
-  telemetryButton.textContent = isOptedOut() ? 'Telemetria: desligada' : 'Telemetria: ligada';
+  telemetryButton.textContent = t(isOptedOut() ? 'options.telemetry.off' : 'options.telemetry.on');
   telemetryButton.classList.toggle('primary', !isOptedOut());
 };
 renderTelemetryLabel();
@@ -1091,7 +1185,7 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
   // este painel pode legitimamente nunca carregar.
   renderRankPanel(rankBody, {
     entries: [],
-    emptyReason: 'carregando…',
+    emptyReason: t('rank.loading'),
     seed: forcedSeed ?? undefined,
   });
   openOverlay(rankOverlay);
@@ -1101,13 +1195,41 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
     renderRankPanel(rankBody, {
       entries,
       seed: forcedSeed ?? undefined,
-      emptyReason: 'ninguém extraiu ainda — ou o servidor está fora do ar',
+      emptyReason: t('rank.empty.offline'),
     });
   });
 });
 document
   .getElementById('btn-rank-close')
   ?.addEventListener('click', () => closeOverlay(rankOverlay));
+
+/**
+ * O que a troca de idioma NAO conserta sozinha.
+ *
+ * `applyStaticTranslations` cuida do HTML marcado e o canvas se resolve no
+ * quadro seguinte, porque ele e redesenhado inteiro. Sobra o DOM que foi
+ * escrito por codigo: rotulos de estado (som, telemetria), o painel aberto no
+ * momento e o rotulo do contrato anunciado. Sao poucos e explicitos de
+ * proposito — uma varredura generica reescreveria o que o jogador digitou.
+ */
+onLocaleChange(() => {
+  // O canvas se redesenha sozinho a cada quadro — exceto quando o mundo esta
+  // congelado, que e justamente o estado em que a troca de idioma acontece
+  // dentro de uma run.
+  frozenFrameStale = true;
+  renderMuteLabel();
+  renderTelemetryLabel();
+  languageSelect.value = getLocale();
+  if (advertisedContract) contractLabel.textContent = contractText(advertisedContract);
+  // Os paineis so sao remontados se estiverem ABERTOS: reconstruir o de
+  // ranking fechado descartaria as entradas que vieram da rede, e reabri-lo
+  // dispararia outra busca.
+  if (!recordsOverlay.classList.contains('hidden')) renderRecordsPanel(recordsBody, records);
+  // O menu de campo escreve o estado e o rotulo do abandono ao abrir; com ele
+  // aberto (e e de dentro dele que o idioma costuma ser trocado no meio de uma
+  // run) os dois ficariam na lingua anterior ate a proxima abertura.
+  pauseMenu.refreshLabels();
+});
 
 /**
  * Ferramentas de desenvolvimento atras de ?dev=1.
