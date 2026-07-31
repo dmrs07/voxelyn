@@ -1,6 +1,5 @@
 import {
   ARCHETYPES,
-  TICK_MS,
   createRun,
   hashStaticWorld,
   type Entity,
@@ -21,112 +20,16 @@ import {
   type ViewerState,
   type WorldFlags,
 } from '@voxelyn/survival-protocol';
+import { PlayoutClock, TickEventQueue } from './playout';
 
 export type NetStatus = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';
 
+/** A carga util de um quadro. O tick e o instante de chegada pertencem ao relogio. */
 type FrameEntities = {
-  tick: number;
-  recvMs: number;
   entities: Map<number, EntitySnapshot>;
   projectiles: ProjectileSnapshot[];
 };
 
-/**
- * Quantos ticks de servidor o render fica ATRAS do ultimo quadro recebido.
- *
- * Este e o colchao que absorve o jitter da rede. Sem ele — interpolando entre os
- * dois ultimos quadros pelo INTERVALO DE CHEGADA deles, como era antes — o
- * desenho ficava refem do relogio errado: dois snapshots que chegam colados (o
- * caso normal em TCP, que entrega em rajada depois de qualquer atraso) davam um
- * intervalo de poucos milissegundos, a interpolacao terminava no primeiro quadro
- * de render e o personagem SALTAVA um tick inteiro de uma vez; o intervalo
- * seguinte, longo, deixava ele parado. Medido com 10-90 ms de jitter: 367 de 379
- * quadros com deslocamento ZERO e o resto em saltos de 0,23 tile.
- *
- * O tamanho e MEDIDO, nao fixo, porque ele se paga em pontaria. Todo tick de
- * colchao e um tick a mais de defasagem entre onde o inimigo esta desenhado e
- * onde o servidor vai resolver o tiro — quem mira no que ve, mira atras. Uma
- * conexao boa nao deve pagar o preco de uma ruim: o colchao acompanha o pico de
- * atraso observado, com folga, e desce sozinho quando a rede acalma.
- */
-const MIN_INTERP_DELAY_TICKS = 1;
-const MAX_INTERP_DELAY_TICKS = 3;
-/**
- * Folga sobre o pior INTERVALO entre chegadas ja observado.
- *
- * O que o colchao precisa cobrir e o INTERVALO, nao o "atraso" de cada quadro.
- * No instante em que um quadro chega, a linha de render esta `delay` ticks atras
- * dele e vai andar sozinha ate o proximo chegar; se o proximo demora G ticks de
- * tempo, ela so nao alcanca o fim do buffer se `delay >= G`.
- *
- * Medir a lateness de cada quadro subdimensionava o colchao justamente no padrao
- * que mais aparece em TCP: dois snapshots colados a cada 100 ms. Ali cada quadro
- * chega "um tick depois" do anterior — lateness baixa —, mas o intervalo entre
- * PARES e de quase dois ticks, e era nele que a linha de render encostava.
- *
- * A folga cobre o proximo intervalo sair um pouco pior que o pior ja visto.
- */
-const INTERP_HEADROOM_TICKS = 0.35;
-/** Quao rapido o pior intervalo medido e esquecido quando a rede melhora. */
-const GAP_DECAY = 0.02;
-
-/** Quadros guardados (0,6 s a 20 Hz): cobre a rajada mais longa que vale seguir. */
-const MAX_BUFFERED_FRAMES = 12;
-
-/**
- * Quanto a linha de render acelera ou freia por tick de atraso fora do alvo.
- *
- * A linha de render nao pode ser `tick * TICK_MS` somado a um deslocamento fixo:
- * isso assume que o relogio do servidor e o do navegador andam na MESMA
- * velocidade, e eles nao andam. O laco do servidor e um `setInterval` que
- * escorrega sob carga — um tick de 20 Hz que na pratica leva 55 ms faz a linha de
- * render fugir para a frente e esvaziar o buffer em segundos, devolvendo
- * exatamente o congela-e-salta que este arquivo veio consertar.
- *
- * Entao a linha anda no ritmo MEDIDO das chegadas e usa este ganho so para
- * corrigir a FASE — a distancia ate o alvo de `INTERP_DELAY_TICKS`. Com o ritmo
- * certo, a correcao tende a zero e o atraso assenta no alvo.
- */
-const PLAYOUT_GAIN = 0.08;
-
-/** Teto da correcao de fase. 15% de diferenca de ritmo nao se ve; 50% se ve. */
-const PLAYOUT_RATE_LIMIT = 0.15;
-
-/** Erro grande demais para corrigir andando: reengata de uma vez (aba que voltou do fundo). */
-const PLAYOUT_RESYNC_TICKS = 8;
-
-/** Teto do passo de um quadro. Aba em segundo plano nao acumula meia hora de mundo. */
-const MAX_FRAME_MS = 250;
-
-/** Quanto peso cada medida tem na estimativa de ritmo do servidor. */
-const RATE_SMOOTHING = 0.05;
-
-/**
- * Janela minima para medir o ritmo do servidor.
- *
- * A medida NAO pode ser feita entre dois quadros vizinhos. Em TCP e comum a rede
- * soltar dois snapshots de 20 Hz colados a cada 100 ms; entre os dois membros do
- * par o tempo decorrido e zero — amostra imprestavel, descartada — e entre um par
- * e o proximo passa 100 ms com apenas UM tick de diferenca para o quadro que
- * ficou de baseline. Toda amostra aceita dizia entao 0,01 tick/ms, metade do
- * ritmo real, e a media convergia para a metade errada: a linha de render andava
- * a meia velocidade, o buffer a alcancava e o movimento voltava a congelar. Foi
- * medido: `tickRate` estacionava em 0,01000 e 62% dos quadros ficavam parados.
- *
- * Medir entre o quadro mais VELHO e o mais NOVO do buffer resolve na raiz: a
- * janela contem rajadas inteiras, entao os ticks que chegaram juntos contam
- * junto com o tempo que eles levaram para chegar.
- */
-const RATE_WINDOW_MS = 250;
-
-/**
- * Teto de grupos de eventos esperando a linha de render alcanca-los.
- *
- * Tres segundos a 20 Hz. So enche se ninguem estiver desenhando (aba em segundo
- * plano para o rAF); passando disso os mais velhos sao despachados na hora, para
- * a fila nao crescer sem limite nem engolir evento nenhum.
- */
-const MAX_PENDING_EVENT_FRAMES = 60;
 
 /**
  * Cliente de rede sem DOM: transporta intencoes e reconstroi um SurvivalState
@@ -151,20 +54,16 @@ export class NetClient {
   private lastSendMs = 0;
   private command: PlayerCommand | null = null;
 
-  /** Quadros recebidos, em ordem crescente de tick de servidor. */
-  private frames: FrameEntities[] = [];
-  /** Instante a desenhar, em ticks de servidor (fracionario). Null antes do 1o quadro. */
-  private renderTick: number | null = null;
-  /** Ritmo MEDIDO do servidor, em ticks por milissegundo local. */
-  private tickRate = 1 / TICK_MS;
   /**
-   * Pior intervalo recente entre chegadas, em ticks. Comeca no intervalo de uma
-   * rede perfeita (um tick) e sobe com a primeira irregularidade.
+   * QUANDO desenhar cada quadro. Ver `playout.ts`: este cliente cuida do
+   * protocolo e da montagem do mundo, o relogio cuida do tempo.
    */
-  private gapTicks = 1;
-  private lastSampleMs: number | null = null;
-  /** Eventos por tick, esperando a linha de render alcanca-los. Ver `queueEvents`. */
-  private pendingEvents: Array<{ tick: number; events: SemanticEvent[] }> = [];
+  private readonly playout = new PlayoutClock<FrameEntities>();
+  /** A narracao de cada tick, segurada ate a linha de render alcanca-la. */
+  private readonly eventQueue = new TickEventQueue<SemanticEvent>((events) => {
+    this.events.push(...events);
+    this.onEvents?.(events);
+  });
   private viewer: ViewerState | null = null;
 
   constructor(private readonly send: (raw: string) => void) {}
@@ -239,10 +138,7 @@ export class NetClient {
     this.resumeToken = null;
     this.state = null;
     this.mirror = null;
-    this.frames = [];
-    this.renderTick = null;
-    this.lastSampleMs = null;
-    this.pendingEvents = [];
+    this.resetPlayout();
     this.viewer = null;
     this.command = null;
     this.events.length = 0;
@@ -290,7 +186,7 @@ export class NetClient {
 
   /** Quantos jogadores o servidor esta reportando neste instante. */
   playerCount(): number {
-    const newest = this.frames[this.frames.length - 1];
+    const newest = this.playout.newest;
     if (!newest) return 0;
     let count = 0;
     for (const snap of newest.entities.values()) if (snap.kind === 'player') count++;
@@ -405,7 +301,7 @@ export class NetClient {
         if (msg.you) {
           this.viewer = msg.you;
         }
-        if (msg.events.length > 0) this.queueEvents(msg.serverTick, msg.events);
+        this.eventQueue.push(msg.serverTick, msg.events);
         break;
       }
       case 'reject':
@@ -456,50 +352,17 @@ export class NetClient {
     }));
   }
 
+  /**
+   * Entrega um quadro autoritativo ao relogio de exibicao.
+   *
+   * O mapa por id nasce aqui porque e forma de LEITURA do mundo — o resto do
+   * cliente procura entidade por id —, nao decisao de tempo.
+   */
   private ingestFrame(entities: EntitySnapshot[], projectiles: ProjectileSnapshot[], tick: number, nowMs: number): void {
     const map = new Map<number, EntitySnapshot>();
     for (const e of entities) map.set(e.id, e);
-    const newest = this.frames[this.frames.length - 1];
-    if (newest) {
-      if (tick < newest.tick) {
-        // O tick e o relogio da SALA. Ele so anda para tras quando a sala e
-        // outra (restart, matchmaking novo): o buffer inteiro pertence a um
-        // mundo que nao existe mais, e interpolar entre os dois costuraria dois
-        // jogos diferentes num mesmo quadro.
-        this.resetPlayout();
-      } else if (tick === newest.tick) {
-        // Mesmo tick reenviado (full_resync coalescido com o snapshot): o mais
-        // recente e o autoritativo.
-        this.frames.pop();
-      } else {
-        this.trackArrival(tick - newest.tick, nowMs - newest.recvMs);
-      }
-    }
-    this.frames.push({ tick, recvMs: nowMs, entities: map, projectiles });
-    if (this.frames.length > MAX_BUFFERED_FRAMES) this.frames.shift();
-    this.trackTickRate();
-  }
-
-  /**
-   * Aprende com a chegada de um quadro: o RITMO do servidor e o ATRASO da rede.
-   *
-   * Ritmo: uma unica chegada nao diz nada — o jitter esta todo dentro dela —,
-   * mas a media longa converge para a razao real entre os dois relogios, que e o
-   * que a linha de render precisa para nao fugir nem ficar para tras.
-   *
-   * Atraso: o quanto este quadro chegou depois do que a cadencia media previa. E
-   * o pico dele, e nao a media, que dimensiona o colchao — o colchao existe
-   * exatamente para o pior caso recente. Sobe na hora, desce devagar.
-   */
-  private trackArrival(tickDelta: number, elapsedMs: number): void {
-    if (elapsedMs <= 0 || tickDelta <= 0) return;
-    // Intervalo desta chegada, em ticks de tempo. Quadros que vieram colados no
-    // anterior dao intervalo ~0 e nao levantam o pico — corretamente: quem chega
-    // junto nao deixou a linha de render sem dado nenhum.
-    const gap = elapsedMs * this.tickRate;
-    this.gapTicks = gap > this.gapTicks
-      ? gap
-      : this.gapTicks + (gap - this.gapTicks) * GAP_DECAY;
+    // Linha do tempo reiniciada (sala nova): a narracao guardada e daquele mundo.
+    if (this.playout.ingest(tick, nowMs, { entities: map, projectiles })) this.eventQueue.clear();
   }
 
   /**
@@ -511,140 +374,14 @@ export class NetClient {
    * fumaca e estrondo em coordenadas que agora significam outra coisa.
    */
   private resetPlayout(): void {
-    this.frames.length = 0;
-    this.renderTick = null;
-    this.pendingEvents.length = 0;
-  }
-
-  /**
-   * Reestima o ritmo do servidor sobre a JANELA INTEIRA do buffer.
-   *
-   * Ver RATE_WINDOW_MS: medir entre quadros vizinhos e o que a rajada de TCP
-   * envenena. Aqui os extremos da janela e que mandam, e uma rajada dentro dela
-   * contribui com os ticks dela e com o tempo dela, nas duas pontas da divisao.
-   */
-  private trackTickRate(): void {
-    const oldest = this.frames[0];
-    const newest = this.frames[this.frames.length - 1];
-    if (!oldest || !newest) return;
-    const spanMs = newest.recvMs - oldest.recvMs;
-    const spanTicks = newest.tick - oldest.tick;
-    if (spanMs < RATE_WINDOW_MS || spanTicks <= 0) return;
-    const observed = spanTicks / spanMs;
-    // Amostra absurda (aba suspensa, relogio corrigido) nao entra na media.
-    if (observed < 0.25 / TICK_MS || observed > 4 / TICK_MS) return;
-    this.tickRate += (observed - this.tickRate) * RATE_SMOOTHING;
-  }
-
-  /**
-   * Guarda os eventos de um tick ate a linha de render chegar nele.
-   *
-   * Eventos sao a NARRACAO do que aconteceu num tick: telegraph de ataque, morte,
-   * explosao, som, vibracao. Dispara-los na chegada, como era antes, os punha a
-   * frente do mundo que os produziu — o corpo e desenhado com o atraso do colchao
-   * de interpolacao, entao a explosao acendia antes de a criatura chegar onde ela
-   * explodiu, e o relogio visual da acao ja nascia adiantado. Enfileirar aqui e
-   * despachar em `sampleRenderState` poe as duas coisas na MESMA linha do tempo.
-   */
-  private queueEvents(tick: number, events: SemanticEvent[]): void {
-    this.pendingEvents.push({ tick, events });
-    // Ninguem desenhando (aba em segundo plano): despacha os mais velhos em vez
-    // de guardar sem limite. Nada e descartado — so deixa de esperar.
-    while (this.pendingEvents.length > MAX_PENDING_EVENT_FRAMES) {
-      this.dispatchEvents(this.pendingEvents.shift()!.events);
-    }
-  }
-
-  private dispatchEvents(events: SemanticEvent[]): void {
-    this.events.push(...events);
-    this.onEvents?.(events);
-  }
-
-  /** Solta tudo que a linha de render ja alcancou, em ordem de tick. */
-  private flushEvents(renderedTick: number): void {
-    while (this.pendingEvents.length > 0 && this.pendingEvents[0].tick <= renderedTick) {
-      this.dispatchEvents(this.pendingEvents.shift()!.events);
-    }
-  }
-
-  /** Colchao de interpolacao deste instante, em ticks. Ver MIN/MAX_INTERP_DELAY_TICKS. */
-  private get interpDelayTicks(): number {
-    return Math.max(
-      MIN_INTERP_DELAY_TICKS,
-      Math.min(MAX_INTERP_DELAY_TICKS, INTERP_HEADROOM_TICKS + this.gapTicks)
-    );
-  }
-
-  /**
-   * Os dois quadros que cercam o instante a desenhar, e onde entre eles cair.
-   *
-   * O instante alvo vem do RELOGIO, nao da chegada dos pacotes: `nowMs` traduzido
-   * para a linha do tempo do servidor e recuado `INTERP_DELAY_TICKS`. E isso que
-   * faz o movimento avancar a mesma fracao de tick a cada quadro de render,
-   * independentemente de os snapshots chegarem colados ou espacados.
-   *
-   * Fora do intervalo coberto pelo buffer nao ha o que interpolar: adiante dele o
-   * mundo simplesmente ainda nao chegou (segura o ultimo quadro em vez de
-   * extrapolar para uma posicao que o servidor nunca confirmou), atras dele o
-   * cliente ficou dormente e o certo e reengatar no quadro mais velho que tem.
-   */
-  private sampleFrames(nowMs: number): { from: FrameEntities; to: FrameEntities; alpha: number } | null {
-    const frames = this.frames;
-    if (frames.length === 0) return null;
-    const newest = frames[frames.length - 1];
-    const oldest = frames[0];
-    const targetTick = this.advancePlayout(nowMs, oldest.tick, newest.tick);
-
-    if (frames.length === 1 || targetTick >= newest.tick) return { from: newest, to: newest, alpha: 1 };
-    if (targetTick <= oldest.tick) return { from: oldest, to: oldest, alpha: 1 };
-
-    for (let i = frames.length - 1; i > 0; i--) {
-      const from = frames[i - 1];
-      if (targetTick < from.tick) continue;
-      const to = frames[i];
-      const span = to.tick - from.tick;
-      const alpha = span <= 0 ? 1 : (targetTick - from.tick) / span;
-      return { from, to, alpha: Math.max(0, Math.min(1, alpha)) };
-    }
-    return { from: oldest, to: frames[1], alpha: 1 };
-  }
-
-  /**
-   * Avanca a linha de render deste quadro e devolve o instante a desenhar.
-   *
-   * O alvo e ficar `INTERP_DELAY_TICKS` atras do ultimo quadro recebido. Perto
-   * demais, o proximo atraso de rede deixa o mundo sem para onde interpolar e
-   * ele congela; longe demais, o jogo inteiro responde tarde sem ganhar nada. A
-   * correcao e sempre um ajuste de RITMO, nunca um salto — um salto e o defeito,
-   * nao o conserto.
-   */
-  private advancePlayout(nowMs: number, oldestTick: number, newestTick: number): number {
-    const elapsedMs = this.lastSampleMs === null
-      ? 0
-      : Math.min(MAX_FRAME_MS, Math.max(0, nowMs - this.lastSampleMs));
-    this.lastSampleMs = nowMs;
-
-    const delay = this.interpDelayTicks;
-    const error = newestTick - (this.renderTick ?? newestTick) - delay;
-    if (this.renderTick === null || Math.abs(error) > PLAYOUT_RESYNC_TICKS) {
-      // Primeiro quadro, ou distancia grande demais para fechar andando: a aba
-      // ficou em segundo plano, a run trocou de sala, a conexao voltou.
-      this.renderTick = newestTick - delay;
-    } else {
-      const correction = Math.max(-PLAYOUT_RATE_LIMIT, Math.min(PLAYOUT_RATE_LIMIT, error * PLAYOUT_GAIN));
-      this.renderTick += elapsedMs * this.tickRate * (1 + correction);
-    }
-
-    // Nunca adiante do que chegou (extrapolar e inventar posicao que o servidor
-    // nao confirmou), nunca atras do que o buffer ainda guarda.
-    this.renderTick = Math.max(oldestTick, Math.min(newestTick, this.renderTick));
-    return this.renderTick;
+    this.playout.reset();
+    this.eventQueue.clear();
   }
 
   /** Reconstroi o SurvivalState renderavel com posicoes interpoladas em nowMs. */
   sampleRenderState(nowMs: number): SurvivalState | null {
     const state = this.state;
-    const sample = this.sampleFrames(nowMs);
+    const sample = this.playout.sample(nowMs);
     if (!state || !sample) return null;
     const { from, to, alpha } = sample;
 
@@ -654,7 +391,7 @@ export class NetClient {
     // antes de o corpo dela chegar ao ponto onde morreu, e um telegraph de ataque
     // acenderia antes do tick que o disparou. O que ja aconteceu na linha de
     // render e o que `from` conta; o resto ainda nao aconteceu.
-    state.tick = from.tick;
+    state.tick = sample.tick;
     const interpolated = from !== to && alpha > 0;
     const lerpPos = (id: number, cx: number, cy: number): { x: number; y: number } => {
       const target = interpolated ? to.entities.get(id) : undefined;
@@ -806,7 +543,7 @@ export class NetClient {
     state.playerExtra = state.playerExtras[this.slot] ?? state.playerExtras[0];
     // Por ultimo, com o mundo deste quadro ja montado: quem ouve os eventos
     // desenha FX e toca som em cima do estado que acabou de ser preparado.
-    this.flushEvents(from.tick);
+    this.eventQueue.flush(sample.tick);
     return state;
   }
 
