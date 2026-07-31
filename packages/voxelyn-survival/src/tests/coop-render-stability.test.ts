@@ -507,3 +507,56 @@ describe('coerencia entre estado e posicao', () => {
     expect(checked).toBeGreaterThan(30);
   });
 });
+
+/**
+ * Descer troca o MUNDO INTEIRO, e o buffer de quadros nao sobrevive a isso.
+ *
+ * O relogio da sala NAO reinicia na descida — `descend` incrementa o setor e
+ * segue contando os ticks —, entao a unica guarda que o buffer tinha (tick
+ * andando para tras) nunca dispara. O que sobra no buffer sao quadros do setor
+ * anterior: criaturas que nao existem mais e o Prospector no poco do mapa velho.
+ * Com a linha de render um tick e meio atras, ela interpola do poco antigo ate a
+ * entrada do mapa novo — o personagem atravessa a tela deslizando por cima de um
+ * mapa onde aquele caminho nao existe.
+ *
+ * Descida e um CORTE. Um quadro de salto e o corte; varios sao um defeito.
+ */
+describe('descida de setor', () => {
+  it('nao interpola o Prospector de um setor para o outro', () => {
+    const loop = new JitteryLoop(0);
+    loop.client.connect();
+    for (let f = 0; f < 30; f++) loop.frame();
+
+    const room = loop.server.roomForClient('A')!;
+    const sectorBefore = room.state.sector;
+    // Poe o Prospector em cima do poco e manda descer: o caminho ate la nao
+    // interessa ao que se mede aqui, e percorre-lo tornaria o teste refem da
+    // geracao do mapa.
+    room.state.players[0].x = room.state.corePos.x + 0.5;
+    room.state.players[0].y = room.state.corePos.y + 0.5;
+
+    const steps: number[] = [];
+    let last: { x: number; y: number } | null = null;
+    for (let f = 0; f < 60; f++) {
+      loop.frame();
+      const cmd = emptyCommand();
+      cmd.interact = f < 3; // um aperto so; o resto e observar
+      loop.client.setCommand(cmd);
+      loop.client.pump(loop.now);
+      const state = loop.client.sampleRenderState(loop.now);
+      if (!state || !state.playerExtras[0].joined) continue;
+      const player = state.players[0];
+      if (last) steps.push(Math.hypot(player.x - last.x, player.y - last.y));
+      last = { x: player.x, y: player.y };
+    }
+
+    expect(room.state.sector).toBe(sectorBefore + 1);
+    // Andando, um quadro de render cobre no maximo ~0,08 tile. Um terco de tile
+    // num quadro so pode ser costura entre os dois setores — e o corte da descida
+    // e UM quadro, nao varios. Medido sem a correcao, com o poco e a entrada do
+    // setor seguinte a tres tiles um do outro: tres quadros seguidos deslizando
+    // um tile cada.
+    const jumps = steps.filter((s) => s > 0.3).length;
+    expect(jumps).toBeLessThanOrEqual(1);
+  });
+});

@@ -341,6 +341,11 @@ export class NetClient {
         // o renderer le as arrays do state; aponta-as para o espelho
         this.state.solid = this.mirror.solid;
         this.state.surface = this.mirror.surface;
+        // Mundo recem-criado: nada do que estava bufferizado descreve ele. Vale
+        // para o primeiro handshake (onde o buffer ja esta vazio) e, sobretudo,
+        // para a RECONEXAO — a sala pode ter descido enquanto o socket estava
+        // caido, e ai os quadros guardados sao de outro setor.
+        this.resetPlayout();
         this.status = 'online';
         // O mundo estatico e gerado LOCALMENTE pela seed; se o hash nao bate
         // com o do servidor (versao de geracao diferente, por exemplo), todo o
@@ -355,7 +360,20 @@ export class NetClient {
         // Um resync pode chegar porque a sala DESCEU: nesse caso o mundo
         // estatico local pertence ao setor anterior e precisa ser regerado.
         // Aplicar os diffs sobre o espelho velho costuraria os dois mapas.
-        if (this.state && msg.sector !== this.state.sector) this.rebuildWorld(msg.sector);
+        if (this.state && msg.sector !== this.state.sector) {
+          this.rebuildWorld(msg.sector);
+          // E o buffer de quadros costuraria os dois SETORES, pelo mesmo motivo.
+          //
+          // O relogio da sala nao reinicia na descida — `descend` incrementa o
+          // setor e segue contando os ticks —, entao a guarda de tick andando
+          // para tras nunca dispara aqui. O que ficava no buffer eram quadros de
+          // um mundo que deixou de existir: criaturas que nao estao mais la e o
+          // Prospector no poco do mapa velho. Com a linha de render um tick e
+          // meio atras, ela interpolava do poco antigo ate a entrada do mapa
+          // novo, e o personagem atravessava a tela deslizando por cima de um
+          // mapa onde aquele caminho nao existe. Descer e um CORTE.
+          this.resetPlayout();
+        }
         if (this.mirror) this.mirror.apply(msg.chunkDiffs);
         this.divergedAt = 0; // mundo reconstruido: zera o anti-repeticao
         this.applyWorld(msg.world);
@@ -447,11 +465,8 @@ export class NetClient {
         // O tick e o relogio da SALA. Ele so anda para tras quando a sala e
         // outra (restart, matchmaking novo): o buffer inteiro pertence a um
         // mundo que nao existe mais, e interpolar entre os dois costuraria dois
-        // jogos diferentes num mesmo quadro. Os eventos ainda na fila sao daquele
-        // mundo tambem, e o tick deles nao significa nada nesta sala.
-        this.frames.length = 0;
-        this.renderTick = null;
-        this.pendingEvents.length = 0;
+        // jogos diferentes num mesmo quadro.
+        this.resetPlayout();
       } else if (tick === newest.tick) {
         // Mesmo tick reenviado (full_resync coalescido com o snapshot): o mais
         // recente e o autoritativo.
@@ -485,6 +500,20 @@ export class NetClient {
     this.gapTicks = gap > this.gapTicks
       ? gap
       : this.gapTicks + (gap - this.gapTicks) * GAP_DECAY;
+  }
+
+  /**
+   * Esquece o mundo bufferizado: quadros, linha de render e eventos na fila.
+   *
+   * Chamado quando o que esta guardado deixa de descrever o mundo em que o
+   * jogador esta — sala nova ou setor novo. Os eventos vao junto de proposito:
+   * eles narram um mapa que nao existe mais, e solta-los depois do corte poria
+   * fumaca e estrondo em coordenadas que agora significam outra coisa.
+   */
+  private resetPlayout(): void {
+    this.frames.length = 0;
+    this.renderTick = null;
+    this.pendingEvents.length = 0;
   }
 
   /**
