@@ -1,6 +1,6 @@
 {
   "id": "enemy-spore-bomber",
-  "version": 2,
+  "version": 3,
   "atlas": "enemy-spore-bomber.png",
   "frameWidth": 32,
   "frameHeight": 32,

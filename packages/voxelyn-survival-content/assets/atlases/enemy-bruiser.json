@@ -1,6 +1,6 @@
 {
   "id": "enemy-bruiser",
-  "version": 2,
+  "version": 3,
   "atlas": "enemy-bruiser.png",
   "frameWidth": 48,
   "frameHeight": 68,

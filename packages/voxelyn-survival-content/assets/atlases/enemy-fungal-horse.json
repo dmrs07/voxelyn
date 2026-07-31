@@ -1,6 +1,6 @@
 {
   "id": "enemy-fungal-horse",
-  "version": 2,
+  "version": 3,
   "atlas": "enemy-fungal-horse.png",
   "frameWidth": 80,
   "frameHeight": 84,

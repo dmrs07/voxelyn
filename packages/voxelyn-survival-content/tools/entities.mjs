@@ -93,6 +93,10 @@ const stalkerModel = (anim, f) => {
   const gait = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
   const lunge = anim === 'attack' ? [0, -1, 1, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // Idle vivo: o dorso INCHA para cima e assenta — respiracao de predador
+  // agachado. Cresce em altura em vez de subir inteiro, porque as patas ficam
+  // plantadas e um corpo que sobe descolado delas viraria um bicho flutuando.
+  const breath = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
   const b = [];
   // quatro patas finas, alternando aos pares
   b.push(box(-3, -2, Math.max(0, gait), 1, 1, 3, 'blood'));
@@ -100,8 +104,8 @@ const stalkerModel = (anim, f) => {
   b.push(box(-3, 1, Math.max(0, -gait), 1, 1, 3, 'blood'));
   b.push(box(2, -2, Math.max(0, -gait), 1, 1, 3, 'blood'));
   // corpo baixo e comprido: silhueta horizontal, oposta a do prospector
-  b.push(box(-2, -2, 3, 4, 4, 2, 'blood'));
-  b.push(box(-2, -2, 5, 4, 3, 1, 'rust'));
+  b.push(box(-2, -2, 3, 4, 4, 2 + breath, 'blood'));
+  b.push(box(-2, -2, 5 + breath, 4, 3, 1, 'rust'));
   // cabeca projetada a frente
   b.push(box(-1, -3 - lunge, 3 + flinch, 2, 1, 2, 'blood'));
   b.push(box(-1, -4 - lunge, 4 + flinch, 2, 1, 1, 'biolum'));
@@ -119,6 +123,10 @@ const spitterModel = (anim, f) => {
   const hop = anim === 'walk' ? [0, 1, 2, 1, 0, 0][f % 6] : 0;
   const spit = anim === 'attack' ? [0, 1, 2, 0][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // Idle vivo: a bolsa de acido PULSA — respiracao de anfibio pelo saco
+  // vocal. Amplitude 1 contra as 2 do telegraph de ataque, para o pulso de
+  // repouso nunca ser confundido com o aviso de disparo.
+  const pulse = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
   const z = hop - flinch;
   const b = [];
   // patas dobradas e ABERTAS para fora: leitura de anfibio agachado, e o corpo
@@ -132,7 +140,7 @@ const spitterModel = (anim, f) => {
   // corpo achatado e largo, suspenso entre as patas
   b.push(box(-3, -2, 3 + z, 7, 5, 2, 'fungus'));
   // garganta acida: incha para a FRENTE antes do disparo (telegraph)
-  b.push(box(-1, -3 - spit, 3 + z, 3, 1 + spit, 2, 'acid'));
+  b.push(box(-1, -3 - spit - pulse, 3 + z, 3, 1 + spit + pulse, 2, 'acid'));
   // olhos bulbosos em haste, acima da linha das costas
   b.push(box(-2, -1, 5 + z, 1, 1, 1, 'fungus'));
   b.push(box(2, -1, 5 + z, 1, 1, 1, 'fungus'));
@@ -150,6 +158,10 @@ const bomberModel = (anim, f) => {
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   // `special` e o telegraph da explosao: o pod incha frame a frame
   const swell = anim === 'special' ? Math.min(2, f) : anim === 'attack' ? [0, 1, 1, 0][f % 4] : 0;
+  // Idle vivo: o pod respira SO em altura. O telegraph cresce nos dois eixos e
+  // com amplitude maior — a carga viva se mexe, mas a expansao que anuncia a
+  // explosao continua inconfundivel.
+  const pulse = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
   const z = -flinch + drift;
   const b = [];
   // pes curtos: a criatura pende, nao caminha
@@ -163,7 +175,7 @@ const bomberModel = (anim, f) => {
   // olho unico fundo na sombra do capuz
   b.push(box(0, -3, 4 + z, 1, 1, 2, 'biolum'));
   // pod de esporos: massa grande atras, cresce ate estourar
-  b.push(box(-3, 2, 2 + z, 5 + swell, 2, 4 + swell, 'acid'));
+  b.push(box(-3, 2, 2 + z, 5 + swell, 2, 4 + swell + pulse, 'acid'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
@@ -181,6 +193,10 @@ const bruiserModel = (anim, f) => {
   const hurlHold = anim === 'special' && f >= 2 && f <= 6;
   const hurlThrow = anim === 'special' && f >= 7;
   const crouch = anim === 'special' ? [2, 2, 1, 0, 0, 0, 0, 1][f % 8] : 0;
+  // Idle vivo: ombros e bracos SOBEM juntos e caem — respiracao de gorila. A
+  // cabeca fica parada de proposito: afundada entre os ombros, ela subir junto
+  // abriria um vao entre ela e o torso.
+  const heave = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
   const up = -flinch - crouch;
   const b = [];
   // pernas grossas e curtas
@@ -190,8 +206,8 @@ const bruiserModel = (anim, f) => {
   b.push(box(-3, -2, 4 + up, 6, 4, 4, 'rockDeep'));
   b.push(box(-4, -2, 8 + up, 8, 4, 4, 'rock'));
   // placas palidas nos ombros: a leitura de "geodo"
-  b.push(box(-5, -2, 10 + up, 2, 4, 3, 'bone'));
-  b.push(box(4, -2, 10 + up, 2, 4, 3, 'bone'));
+  b.push(box(-5, -2, 10 + up + heave, 2, 4, 3, 'bone'));
+  b.push(box(4, -2, 10 + up + heave, 2, 4, 3, 'bone'));
   // nucleo eletrico exposto no peito
   b.push(box(-1, -3, 9 + up, 3, 1, 3, 'electric'));
   // cabeca pequena e afundada entre os ombros
@@ -199,8 +215,8 @@ const bruiserModel = (anim, f) => {
   b.push(box(-1, -2, 13 + up, 3, 1, 1, 'biolum'));
   // bracos longos de gorila. No special, sobem juntos sustentando a pedra.
   const armRaise = anim === 'special' ? Math.min(10, hurlLift) : slam;
-  b.push(box(-6, -1, 6 + up + armRaise, 2, 2, 5, 'rock'));
-  b.push(box(5, -1, 6 + up + armRaise, 2, 2, 5, 'rock'));
+  b.push(box(-6, -1, 6 + up + armRaise + heave, 2, 2, 5, 'rock'));
+  b.push(box(5, -1, 6 + up + armRaise + heave, 2, 2, 5, 'rock'));
   if (anim === 'special' && !hurlThrow) {
     const rockZ = 5 + hurlLift;
     // O volume converge com um bloco real do terreno, sem ocupar o frame inteiro.
@@ -220,6 +236,10 @@ const guardianModel = (anim, f) => {
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   // `special` = invocacao: o nucleo se abre e o corpo se ergue
   const call = anim === 'special' ? [0, 1, 1, 1][f % 4] : 0;
+  // Idle vivo: os antebracos pendurados sobem 1 voxel e o nucleo se alonga
+  // junto — um titan respira devagar, e quase nada dele se move alem da massa
+  // que ja esta solta do corpo.
+  const breath = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
   const up = -flinch + call;
   const b = [];
   // O bruiser e largo e agachado; o guardian tem de ser COLUNAR e alto, senao
@@ -236,7 +256,7 @@ const guardianModel = (anim, f) => {
   b.push(box(-2, -2, 7 + up, 5, 4, 7, 'rockDeep'));
   // nucleo eletrico: fenda VERTICAL alta, abrindo no special. Sai 1 voxel a
   // frente do peito para nao ser engolido pela face escura do tronco.
-  b.push(box(-1, -4, 8 + up, 3, 2, 5 + call, 'electric'));
+  b.push(box(-1, -4, 8 + up, 3, 2, 5 + call + breath, 'electric'));
   // placas de ombro palidas, mais largas que o tronco
   b.push(box(-4, -2, 14 + up, 9, 4, 2, 'bone'));
   // recuo escuro sob a mascara: separa a cabeca dos ombros
@@ -246,11 +266,11 @@ const guardianModel = (anim, f) => {
   // fenda dos olhos, atravessando a mascara
   b.push(box(-2, -3, 18 + up, 5, 1, 1, 'electric'));
   // antebracos enormes PENDURADOS, com vao de 1 voxel ate as placas de ombro
-  b.push(box(-7, -1, 3 + up + swing, 3, 3, 10, 'rock'));
-  b.push(box(5, -1, 3 + up + swing, 3, 3, 10, 'rock'));
+  b.push(box(-7, -1, 3 + up + swing + breath, 3, 3, 10, 'rock'));
+  b.push(box(5, -1, 3 + up + swing + breath, 3, 3, 10, 'rock'));
   // punhos palidos: a massa que desce no golpe tem de ser lida a distancia
-  b.push(box(-7, -1, 3 + up + swing, 3, 3, 2, 'bone'));
-  b.push(box(5, -1, 3 + up + swing, 3, 3, 2, 'bone'));
+  b.push(box(-7, -1, 3 + up + swing + breath, 3, 3, 2, 'bone'));
+  b.push(box(5, -1, 3 + up + swing + breath, 3, 3, 2, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 48, 56, 22, 50);
@@ -405,6 +425,12 @@ const horseModel = (anim, f) => {
   const rear = anim === 'special' ? [1, 3, 4, 0, 0, 0][f % 6] : 0;
   const dash = anim === 'special' ? [0, 0, 0, 2, 3, 2][f % 6] : 0;
   const galloping = anim === 'special' && f % 6 >= 3;
+  // Idle vivo: a cabeca MERGULHA um voxel e volta — o aceno de um animal
+  // pastando/farejando — e o rabo de hifas balanca no contratempo. O corpo
+  // fica parado: e a unica silhueta horizontal do jogo, e um bob no barril
+  // leria como o bicho quicando no lugar.
+  const graze = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
+  const swish = anim === 'idle' ? [0, 1, 0, -1][f % 4] : 0;
 
   // Passada de dois tempos em diagonal: o par dianteira-esquerda +
   // traseira-direita anda junto, depois o outro par. O ciclo anterior levantava
@@ -492,7 +518,7 @@ const horseModel = (anim, f) => {
   // Ventre baixo, fechando o vao entre as patas dianteiras e as traseiras.
   b.push(box(-2, -5, backZ - 1, 4, 12, 1, 'rockDeep'));
   // Cauda de hifas caindo atras.
-  b.push(box(-1, 7, backZ, 2, 2, 4, 'rockDeep'));
+  b.push(box(-1 + swish, 7, backZ, 2, 2, 4, 'rockDeep'));
 
   // Placas de fungo de prateleira nos FLANCOS: duas de cada lado, e so.
   //
@@ -527,7 +553,7 @@ const horseModel = (anim, f) => {
   // lombo ele lia como movel. O corpo continua mais largo do que alto — a
   // identidade horizontal e a distancia que ele cobre —, mas agora ha uma coluna
   // na frente dela.
-  const neckZ = 12 + up + rear * 2;
+  const neckZ = 12 + up + rear * 2 - graze;
   // Pescoco em dois degraus que estreitam. Escuro inteiro: qualquer peca clara
   // aqui encosta na mascara e as duas viram uma mancha so.
   b.push(box(-2, -7 - lunge, neckZ - 2, 4, 3, 4 - dash, 'rockDeep'));
@@ -736,9 +762,12 @@ const living = {
   hit: { frames: 2, fps: 12, loop: false },
   die: { frames: 5, fps: 10, loop: false },
 };
-const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt) => ({
+// `version` sobe junto com qualquer mudanca de pixel no atlas (production spec
+// §13): os seis inimigos que ganharam idle vivo estao em 3; quem nao mudou
+// continua em 2.
+const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt, version = 2) => ({
   id,
-  version: 2,
+  version,
   frameWidth,
   frameHeight,
   anchorX,
@@ -773,20 +802,20 @@ export const ENTITY_SPECS = [
     prospectorFrame,
     'voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm'
   ),
-  base('enemy-stalker', 32, 32, 16, 30, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions'),
-  base('enemy-spitter', 32, 32, 16, 30, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents'),
+  base('enemy-stalker', 32, 32, 16, 30, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 3),
+  base('enemy-spitter', 32, 32, 16, 30, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 3),
   base('enemy-spore-bomber', 32, 32, 16, 30, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
-  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod'),
+  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 3),
   base('enemy-bruiser', 48, 68, 24, 66, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
-  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core'),
+  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 3),
   base('enemy-guardian', 48, 56, 24, 54, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
-  }, guardianFrame, 'voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core'),
+  }, guardianFrame, 'voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core', 3),
   base('enemy-bishop', 56, 76, 28, 74, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 9, loop: false },
@@ -794,7 +823,7 @@ export const ENTITY_SPECS = [
   base('enemy-fungal-horse', 80, 84, 40, 78, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
-  }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates'),
+  }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates', 3),
   base('enemy-miner', 48, 60, 24, 54, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
   {
     id: 'fx-projectile-bolt', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
