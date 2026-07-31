@@ -292,6 +292,15 @@ export type PlayerExtra = {
   purgeCells: number;
   activeModules: ActiveModule[];
   pendingModuleChoice: PendingModuleChoice | null;
+  /**
+   * Ate qual limiar da cota de minerio ESTE slot ja foi pago.
+   *
+   * Por jogador, e nao por run, porque so quem recebeu a escolha na mao foi
+   * pago. Um contador unico so sabia que o limiar tinha sido alcancado; quem
+   * estivesse com uma escolha aberta na hora era pulado e nunca mais cobrado,
+   * e minerar durante um cofre aberto custava o modulo inteiro em silencio.
+   */
+  oreModulesPaid: number;
   hasCore: boolean;
   dodgeDir: Vec2;
   downed: boolean;
@@ -525,14 +534,6 @@ export type SurvivalState = {
   contaminationWaves: number;
   nextEntityId: number;
   reactionQueue: number[];
-  /**
-   * Quantas escolhas de modulo a cota de minerio ja pagou.
-   *
-   * Contador de PAGAMENTOS, e nao um limiar. Sem ele, `oreCollected` acima do
-   * multiplo pagaria de novo a cada tick enquanto o jogador nao escolhesse, e um
-   * veio grande viraria modulo infinito.
-   */
-  oreModulesPaid: number;
   stats: RunStats;
   /** Preenchido uma unica vez, no tick em que a run termina. */
   summary: RunSummary | null;

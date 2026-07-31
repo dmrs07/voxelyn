@@ -160,6 +160,7 @@ const makeExtra = (): PlayerExtra => ({
   purgeCells: 1,
   activeModules: [],
   pendingModuleChoice: null,
+  oreModulesPaid: 0,
   hasCore: false,
   dodgeDir: { x: 1, y: 0 },
   downed: false,
@@ -263,7 +264,6 @@ export const createRun = (config: RunConfig): SurvivalState => {
     // que nenhum inimigo colida com um id de player nos snapshots por id
     nextEntityId: playerCount + 1,
     reactionQueue: [],
-    oreModulesPaid: 0,
     stats: emptyStats(),
     summary: null,
   };
@@ -1547,19 +1547,33 @@ const finalizeRun = (state: SurvivalState): void => {
  *
  * Roda depois dos inimigos porque o drop do miner morto entra na mesma contagem:
  * o minerio que ele carregava conta como cota no mesmo tick em que ele cai.
+ *
+ * O limiar so e dado por PAGO quando a escolha correspondente chega a mao de
+ * quem a merece. Marcar o pagamento na hora em que a contagem cruza o multiplo
+ * parecia equivalente e nao era: quem tivesse um cofre aberto naquele instante
+ * era pulado logo abaixo, e o contador ja adiantado fazia `earned <= pago`
+ * barrar a oferta para sempre. Minerar durante uma escolha pendente — que e
+ * exatamente o que se faz enquanto se decide — apagava o modulo em silencio.
  */
 const payOreQuota = (state: SurvivalState, events: SemanticEvent[]): void => {
   const earned = Math.floor(state.stats.oreCollected / ORE_PER_MODULE);
-  if (earned <= state.oreModulesPaid) return;
-  state.oreModulesPaid = earned;
-  markDiscovery(state.stats, DISCOVERY_ORE_QUOTA);
+  if (earned <= 0) return;
   // Uma escolha por jogador de pe. No co-op a cota e do time — quem carrega a
   // picareta e quem cobre nao deveriam ser pagos de forma diferente por isso.
   for (const player of standingPlayers(state)) {
     const extra = state.playerExtras[player.slot ?? 0];
+    if (extra.oreModulesPaid >= earned) continue;
+    // O slot de escolha e unico: enquanto o anterior nao for resolvido o limiar
+    // continua DEVENDO, e o proximo tick tenta de novo.
     if (extra.pendingModuleChoice) continue;
-    const options = rollModuleChoice(state.config.seed, -earned, 2, extra, state.tick);
-    extra.pendingModuleChoice = { sourceSiteId: -earned, options, createdAtTick: state.tick };
+    // Um limiar por vez, e nao um salto ate `earned`. Quem cruzou dois multiplos
+    // com um cofre aberto recebe os dois, um apos o outro — a alternativa
+    // colapsava os dois numa oferta so e comia a diferenca.
+    const threshold = extra.oreModulesPaid + 1;
+    const options = rollModuleChoice(state.config.seed, -threshold, 2, extra, state.tick);
+    extra.pendingModuleChoice = { sourceSiteId: -threshold, options, createdAtTick: state.tick };
+    extra.oreModulesPaid = threshold;
+    markDiscovery(state.stats, DISCOVERY_ORE_QUOTA);
   }
 };
 

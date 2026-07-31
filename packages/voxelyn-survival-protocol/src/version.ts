@@ -5,8 +5,14 @@
 //   hashes deterministicos (cliente e servidor precisam concordar para prever/interpolar).
 // - CONTENT_VERSION muda quando itens/criaturas/materiais mudam (pool de conteudo).
 export const PROTOCOL_VERSION = 10;
-export const SIMULATION_VERSION = 12;
-export const CONTENT_VERSION = 8;
+// 13: investida do guardian passa a andar no release, rastro do cavalo espera o
+// atraso, cota de minerio vira contador por jogador, mineradores nao empilham
+// mais na mesma celula e a morte do minerador exige autoria do jogador. Tudo
+// isso muda o hash autoritativo e a populacao semeada dos setores.
+export const SIMULATION_VERSION = 13;
+// 9: a plataforma do poco de descida ganhou os seis quadros distintos que o
+// ciclo sempre prometeu (os dois ultimos eram identicos).
+export const CONTENT_VERSION = 9;
 
 export type VersionTriple = {
   protocolVersion: number;

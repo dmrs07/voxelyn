@@ -250,7 +250,20 @@ export const damageEntity = (
     explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
     addBomberSpores(state, ent);
   }
-  if (ent.archetype === 'miner') {
+  // O MINER e o unico corpo do bestiario cuja morte vira JULGAMENTO, e por isso
+  // e o unico que precisa saber QUEM o matou.
+  //
+  // O humor sozinho nao basta. Um bomber explodindo em cima do veio, ou o fogo
+  // que o proprio minerador acendeu ao raspar fungo, matam gente sem que o
+  // jogador tenha apertado nada — e a tela de fim anotava aquilo como civil
+  // abatido por ele. Pelo mesmo caminho, um minerado hostil consumido pelo
+  // ambiente pagava minerio que ninguem foi buscar.
+  //
+  // `attributable` e a MESMA lista fechada que ja decide dano causado, algumas
+  // linhas acima: nao existe motivo para "o que conta como acao do jogador" ter
+  // duas definicoes no mesmo arquivo. Sem autoria, a morte simplesmente nao
+  // rende nada — nem anotacao, nem carga.
+  if (ent.archetype === 'miner' && attributable) {
     if (ent.mood === MINER_MOOD_PASSIVE) {
       // Passivo morto NAO dropa. Nao e punicao — e a ausencia de recompensa.
       //
@@ -844,6 +857,17 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
     });
   }
 
+  // O rastro so comeca depois que a investida ANDOU o atraso inteiro.
+  //
+  // Subtrair sempre a distancia cheia supoe que ela ja foi percorrida, e nas
+  // primeiras passadas ela nao foi: a primeira, de 0,525 tile, mira cerca de
+  // 1,575 tile ATRAS do ponto de partida — chao do outro lado da origem, onde o
+  // cavalo nunca esteve. Toda investida acendia fogo pelas costas de onde
+  // comecou, o que apagava a leitura do rastro como caminho percorrido e podia
+  // queimar o jogador que tinha recuado na direcao certa.
+  const strides = state.tick - action.releaseAt;
+  if (strides < HORSE_TRAIL_DELAY_TICKS) return;
+
   const trailX = Math.floor(enemy.x - action.direction.x * step * HORSE_TRAIL_DELAY_TICKS);
   const trailY = Math.floor(enemy.y - action.direction.y * step * HORSE_TRAIL_DELAY_TICKS);
   if (trailX < 0 || trailY < 0 || trailX >= state.config.width || trailY >= state.config.height) return;
@@ -861,6 +885,48 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
   }
 };
 
+/**
+ * Gasta a velocidade SOLTA de um inimigo — perambular, impulso de investida,
+ * empurrao — e a amortece um pouco.
+ *
+ * Existe como funcao propria porque tem DOIS chamadores que nao se parecem: o
+ * fluxo normal de IA e a janela de recuperacao de uma acao autoritativa. O
+ * impulso da investida do guardian nasce no `release` e antes ficava preso ali,
+ * porque `advanceAction` devolve `true` ate `endsAt` e o `continue` pulava o
+ * unico lugar que consumia `vx/vy`. O telegrafo terminava com o bicho parado e a
+ * investida so saia oito ticks depois — o jogador lia o aviso e era acertado
+ * pelo golpe que ja tinha esquivado.
+ *
+ * `updateFacing` e false quando quem chama tem um rumo melhor que a velocidade:
+ * durante uma acao o rumo esta congelado no telegrafo de proposito, e o cavalo em
+ * perseguicao acumula a curva dele por angulo.
+ */
+const driftByVelocity = (
+  state: SurvivalState,
+  enemy: Entity,
+  dt: number,
+  events: SemanticEvent[],
+  updateFacing: boolean,
+): void => {
+  if (Math.hypot(enemy.vx, enemy.vy) <= 0.05) return;
+  // Movimento por VELOCIDADE tambem tem de atualizar o rumo.
+  //
+  // So o movimento por `dirX/dirY` atualizava, entao um inimigo perambulando
+  // andava para um lado com o sprite virado para outro. O cliente compensava
+  // isso adivinhando o rumo pelo deslocamento OBSERVADO — e a adivinhacao
+  // quebra exatamente quando a colisao zera um dos eixos, porque ai o
+  // deslocamento aponta para um quadrante que a criatura nunca escolheu.
+  // Com o rumo correto na simulacao, o cliente nao precisa adivinhar.
+  if (updateFacing) enemy.facing = normalized(enemy.vx, enemy.vy);
+  const moved = moveEntity(state, enemy, enemy.vx * dt, enemy.vy * dt);
+  if (moved.blockCell && crushesWalls(enemy)) {
+    breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
+  }
+  const decay = enemy.archetype === 'guardian' ? 0.92 : 0.82;
+  enemy.vx *= decay;
+  enemy.vy *= decay;
+};
+
 export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   for (const enemy of state.enemies) {
@@ -871,7 +937,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // existe — "acertei na hora certa" em vez de "ele estava no lugar errado".
     const onFungus = enemy.archetype === 'bishop' && bishopRegen(state, enemy, events);
     if (advanceAction(state, enemy, events)) {
-      if (enemy.alive && enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
+      if (!enemy.alive) continue;
+      // O cavalo e conduzido passo a passo por `horseChargeStride`; todo o resto
+      // gasta aqui o impulso que o `release` deixou — ver `driftByVelocity`.
+      if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
+      else driftByVelocity(state, enemy, dt, events, false);
       continue;
     }
     if (enemy.stunnedUntil > state.tick) continue;
@@ -1103,24 +1173,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       enemy.vy = Math.sin(angle) * def.speed * 0.35;
     }
 
-    if (Math.hypot(enemy.vx, enemy.vy) > 0.05) {
-      // Movimento por VELOCIDADE (perambular, impulso de investida, empurrao)
-      // tambem tem de atualizar o rumo.
-      //
-      // So o movimento por `dirX/dirY` atualizava, entao um inimigo perambulando
-      // andava para um lado com o sprite virado para outro. O cliente compensava
-      // isso adivinhando o rumo pelo deslocamento OBSERVADO — e a adivinhacao
-      // quebra exatamente quando a colisao zera um dos eixos, porque ai o
-      // deslocamento aponta para um quadrante que a criatura nunca escolheu.
-      // Com o rumo correto na simulacao, o cliente nao precisa adivinhar.
-      enemy.facing = normalized(enemy.vx, enemy.vy);
-      const moved = moveEntity(state, enemy, enemy.vx * dt, enemy.vy * dt);
-      if (moved.blockCell && crushesWalls(enemy)) {
-        breakSolid(state, moved.blockCell.x, moved.blockCell.y, events);
-      }
-      enemy.vx *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
-      enemy.vy *= enemy.archetype === 'guardian' ? 0.92 : 0.82;
-    }
+    // O cavalo em perseguicao NAO tem o rumo sobrescrito pela velocidade residual.
+    //
+    // O rumo dele e um acumulador: a curva abaixo soma um passo de
+    // `HORSE_TURN_RATE` por tick em cima de `enemy.facing`, e e essa soma que
+    // descreve o arco. Enquanto sobra velocidade de perambular ou de um empurrao,
+    // reescrever `facing` pela velocidade jogava o acumulador de volta ao ponto de
+    // partida todo tick — o cavalo repetia eternamente o mesmo primeiro passo de
+    // curva e so comecava a virar de verdade quando a residual caia abaixo do
+    // limiar, uma dezena de ticks depois. Quem estava sendo perseguido via o
+    // bicho correr reto por uma tangente que ele nunca escolheu.
+    const horseSteering = enemy.archetype === 'fungal_horse' && (dirX !== 0 || dirY !== 0);
+    driftByVelocity(state, enemy, dt, events, !horseSteering);
 
     // O cavalo NAO vira no lugar.
     //

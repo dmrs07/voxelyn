@@ -82,8 +82,22 @@ export class TouchCooldownOverlay {
   render(state: SurvivalState, input: InputState, tick: number, nowMs: number): void {
     // Cada createRun/welcome produz uma nova identidade de estado. Isso cobre
     // reinícios e matchmaking em salas cujo tick pode ser maior que o anterior.
+    //
+    // A troca de estado descarta a PREDIÇÃO antiga sem engolir o toque novo.
+    //
+    // No online, `runOnline` consome e envia o comando antes de chegar aqui: uma
+    // esquiva apertada entre o welcome e o primeiro quadro renderizado já virou
+    // comando aceito pelo servidor. Sincronizar a sequência de toques nesse
+    // instante fazia `pressChanged` nascer falso, e — como o snapshot online não
+    // carrega os cooldowns privados — aquela ação ficava para sempre sem radial.
+    // O jogador via o botão pronto enquanto o servidor o considerava em recarga.
+    //
+    // Na PRIMEIRA renderização a sincronia continua certa: aí não há sessão
+    // anterior, e a sequência já acumulada vem de antes de existir uma run.
     if (state !== this.lastState) {
-      this.reset(input);
+      const firstEver = this.lastState === null;
+      this.clearPrediction();
+      if (firstEver) this.syncPressSequences(input);
       this.lastState = state;
     }
 
@@ -151,10 +165,15 @@ export class TouchCooldownOverlay {
     this.seenPressSeq.ability = input.actionPressSeq.ability;
   }
 
-  private reset(input: InputState): void {
+  /** Descarta radiais, pulsos e predições — sem tocar nas sequências de toque. */
+  private clearPrediction(): void {
     this.cooling.clear();
     this.readyPulseUntil.clear();
     this.predictedReadyAt.clear();
+  }
+
+  private reset(input: InputState): void {
+    this.clearPrediction();
     this.syncPressSequences(input);
   }
 

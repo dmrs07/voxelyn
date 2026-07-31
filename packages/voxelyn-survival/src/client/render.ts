@@ -612,6 +612,23 @@ export class SurvivalRenderer {
     this.localPlayerId = id;
   }
 
+  /**
+   * Esquece tudo o que a run ANTERIOR deixou na apresentacao.
+   *
+   * O renderer e um singleton e os ids de entidade recomecam do zero a cada run,
+   * entao sem esta chamada a intencao de acao guardada para o id 7 do mundo que
+   * acabou e aplicada ao id 7 do mundo novo. Como o `endTick` velho pode estar
+   * centenas de ticks a frente do tick zero da run nova, o inimigo recem-nascido
+   * aparecia executando um ataque que ninguem comecou, virado para um alvo que
+   * nao existe, e ficava assim por muitos segundos.
+   *
+   * Vale para o solo e para o online pelo mesmo motivo: `createRun` e
+   * `NetClient.resetSession` produzem os dois um mundo novo com ids reciclados.
+   */
+  resetRunPresentation(): void {
+    this.presentation.reset();
+  }
+
   private addFlash(x: number, y: number, r: number, power: number, nowMs: number, durationMs: number): void {
     addFlash(this.flashes, { x, y, r, power, startedMs: nowMs, durationMs });
   }

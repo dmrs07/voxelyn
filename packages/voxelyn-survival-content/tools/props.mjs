@@ -112,6 +112,13 @@ const coreModel = (phase, taken) => {
  * A plataforma perde altura E area ao descer. Em isometria, apenas baixar `z`
  * poderia parecer que a peca andou para a frente; encolher junto fornece a pista
  * de profundidade que faz o olho entender que ela esta indo para baixo.
+ *
+ * A descida ocupa os SEIS passos, um por quadro. Antes ela partia de 5 e era
+ * grampeada em 1, entao os dois ultimos quadros davam exatamente a mesma altura,
+ * o mesmo raio e o mesmo material: o ciclo de seis quadros tinha cinco imagens e
+ * a cabine parecia travar no fundo antes de reaparecer no topo. Comecando em 6 a
+ * altura cai um degrau por quadro e o piso 1 e alcancado no ultimo, sem grampo —
+ * z=0 e proibido porque a placa opaca do fundo do poco ocupa essa camada.
  */
 export const descentPlatformState = (frame) => {
   const step = ((Math.floor(frame) % 6) + 6) % 6;
@@ -119,7 +126,7 @@ export const descentPlatformState = (frame) => {
   return {
     step,
     radius,
-    z: Math.max(1, 5 - step),
+    z: 6 - step,
     material: step < 2 ? 'loot' : step < 4 ? 'rust' : 'rock',
   };
 };
