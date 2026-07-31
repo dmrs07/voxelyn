@@ -114,6 +114,31 @@ export const PLAYER_LAYER_SPRITE_IDS = [
   'layer-player-prospector-gun',
 ] as const;
 
+/**
+ * Direcoes em que a ARMA fica ATRAS do tronco.
+ *
+ * Separar a arma numa camada custou a profundidade entre ela e o corpo: dentro
+ * de um mesmo modelo o rasterizador ordena voxel a voxel pela chave do pintor,
+ * mas entre dois atlas so existe a ordem em que o cliente desenha os dois. Com a
+ * arma sempre por cima, o cravador aparecia colado no peito nas tres direcoes em
+ * que ele esta do lado OPOSTO ao da camera — atravessando o chassi que deveria
+ * escondê-lo.
+ *
+ * A lista nao e opiniao: ela e a maioria dos pixels disputados entre as duas
+ * camadas na ordem de profundidade do modelo INTEIRO, e o teste do pacote de
+ * conteudo recalcula isso a partir dos voxels a cada rodada. Mexeu na montagem
+ * da arma ou na rotacao das direcoes, o teste diz qual direcao trocou de lado.
+ *
+ * `dr` fica de fora com folga pequena — nessa direcao a arma esta na quina do
+ * corpo, meio a frente e meio atras, e nenhuma das duas ordens acerta tudo. Fora
+ * dela o veredito e quase unanime (85% a 100% dos pixels).
+ */
+export const PLAYER_GUN_BEHIND_DIRS: readonly string[] = ['dl', 'ur', 'ul'];
+
+/** A arma deste rumo e desenhada antes do tronco, para o chassi ocultá-la. */
+export const gunBehindUpper = (facingX: number, facingY: number): boolean =>
+  PLAYER_GUN_BEHIND_DIRS.includes(dirFromFacing(facingX, facingY));
+
 export const FIRST_PACK_IDS = [
   ...CHARACTER_SPRITE_IDS,
   ...PLAYER_LAYER_SPRITE_IDS,
@@ -164,3 +189,29 @@ export const EMISSIVE_HEX = [
  * assado no atlas casa com a velocidade real do jogador.
  */
 export const PROSPECTOR_WALK_CYCLE_TILES = 1.5;
+
+/**
+ * Altura da BOCA DO CANO, em tiles de mundo.
+ *
+ * O tiro do jogador saia da mesma altura que o cuspe de um bicho rasteiro —
+ * meio tile, na barriga do bot — e por isso nascia atravessando o proprio
+ * chassi em vez de sair da arma. A altura de voo do estilhaco e puramente
+ * visual (a colisao acontece no plano do chao), entao ela pode e deve ser a
+ * altura de onde a peca esta montada no modelo.
+ *
+ * Um tile tem oito voxels de lado e a boca do cano esta montada a dez voxels do
+ * chao. O teste do pacote de conteudo acha essa boca sozinho — e o voxel da arma
+ * que troca de material quando o clarao acende — e recalcula a altura a partir
+ * dela, entao mover o hardpoint no modelo cobra o numero aqui.
+ */
+export const PROSPECTOR_MUZZLE_HEIGHT_TILES = 10 / 8;
+
+/**
+ * Quadro de `attack` em que a arma CUSPE.
+ *
+ * O clarao existe em UM quadro do atlas — um clarao que durasse a animacao
+ * inteira viraria lanterna — e e neste quadro que a luz do disparo bate no
+ * corpo. Publicado aqui para o cliente acender a armadura exatamente enquanto o
+ * cano acende, e nao por um cronometro proprio que sairia de fase com a arte.
+ */
+export const PROSPECTOR_MUZZLE_FLASH_FRAME = 1;

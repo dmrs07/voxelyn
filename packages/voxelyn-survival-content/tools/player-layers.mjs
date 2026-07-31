@@ -19,7 +19,9 @@ const idleBob = [0, 0, 1, 0];
 // Coice: parado, recua fundo no disparo, volta. O clarao so existe no frame
 // em que a arma cospe — um clarao que dura a animacao inteira vira lanterna.
 const attackKick = [0, 2, 1, 0];
-const attackFlash = [false, true, false, false];
+/** Quadros de `attack` em que a boca do cano acende. */
+export const ATTACK_FLASH = [false, true, false, false];
+const attackFlash = ATTACK_FLASH;
 
 /**
  * Cadencia da caminhada, casada com a velocidade do Prospector na simulacao.
@@ -38,7 +40,15 @@ const attackFlash = [false, true, false, false];
 const PLAYER_SPEED_TILES_PER_SECOND = 4.6;
 const WALK_FPS = walkFps(PLAYER_SPEED_TILES_PER_SECOND);
 
-const poseFor = (anim, frame) => {
+/** Quadros de cada animacao das camadas, para quem precisa varrer as poses. */
+export const LAYER_POSE_FRAMES = {
+  idle: idleBob.length,
+  walk: WALK_FRAMES,
+  attack: attackKick.length,
+};
+
+/** Pose exata que cada quadro do atlas de camadas assa. */
+export const poseFor = (anim, frame) => {
   if (anim === 'walk') return prospectorParts({ swing: WALK_SWING[frame % WALK_FRAMES] });
   if (anim === 'attack') {
     return prospectorParts({

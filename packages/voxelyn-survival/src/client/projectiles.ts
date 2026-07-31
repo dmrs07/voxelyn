@@ -10,6 +10,7 @@
 // declarada, com sombra no chao logo abaixo — a sombra e o que torna a altura
 // legivel — e um rastro curto que mostra para onde ele vai.
 
+import { PROSPECTOR_MUZZLE_HEIGHT_TILES } from '@voxelyn/survival-content';
 import type { FaceRamp } from './voxel-draw';
 import { drawGroundShadow, drawVoxel } from './voxel-draw';
 
@@ -67,6 +68,21 @@ export const SMALL_PROJECTILE_RADIUS = 0.2;
 
 /** Altura de voo, em tiles. O bastante para a sombra se separar do corpo. */
 const FLIGHT_HEIGHT = 0.55;
+/**
+ * Altura de voo do que sai da ARMA DO JOGADOR.
+ *
+ * Meio tile e a altura de quem cospe do chao — e o cuspe do Spitter e a rocha do
+ * Bruiser saem mesmo dali. O Prospector nao: a arma dele esta montada no
+ * hardpoint direito, a um tile e um quarto do chao, e o estilhaco nascia
+ * atravessando a propria barriga do bot antes de aparecer na frente dele.
+ *
+ * O numero vem do MODELO (`PROSPECTOR_MUZZLE_HEIGHT_TILES`), medido nos voxels
+ * da boca do cano: subir o tiro a olho ate "parecer certo" descolaria de novo no
+ * dia em que a arma mudasse de lugar no chassi. A altura e so visual — a colisao
+ * continua acontecendo no plano do chao, e a sombra continua marcando onde ele
+ * de fato passa.
+ */
+const MUZZLE_FLIGHT_HEIGHT = PROSPECTOR_MUZZLE_HEIGHT_TILES;
 /** Largura de um voxel do mundo em pixels, no zoom 1 (igual ao atlas). */
 const VOXEL_PX = 4;
 /** Bloco voador quase ocupa a largura visual de um tile, como o bloco arrancado. */
@@ -315,7 +331,9 @@ export class ProjectileView {
       : armed ? ARMED_RAMP
       : projectile.hostile ? HOSTILE_RAMP
       : PLAYER_RAMP;
-    const lift = FLIGHT_HEIGHT * tileH * zoom;
+    // Tudo o que nao e hostil saiu da arma do Prospector — estilhaco, disco e
+    // missil —, e por isso parte da altura do cano.
+    const lift = (projectile.hostile ? FLIGHT_HEIGHT : MUZZLE_FLIGHT_HEIGHT) * tileH * zoom;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
     const size = VOXEL_PX * zoom * (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : 1);

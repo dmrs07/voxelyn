@@ -64,3 +64,51 @@ describe('rastreio de projeteis', () => {
     expect(tracks(view).get(2)!.dx).toBeCloseTo(-1);
   });
 });
+
+/**
+ * Canvas de mentira que so anota onde as coisas foram desenhadas. O que este
+ * teste mede e ALTURA, e altura aqui e a distancia entre o corpo do projetil e a
+ * sombra dele no chao — nao ha pixel nenhum a conferir.
+ */
+const recordingCtx = (): { ctx: CanvasRenderingContext2D; bodies: number[]; shadows: number[] } => {
+  const bodies: number[] = [];
+  const shadows: number[] = [];
+  const ctx = {
+    globalAlpha: 1,
+    fillStyle: '',
+    fillRect: (_x: number, y: number) => { bodies.push(y); },
+    beginPath: () => {},
+    fill: () => {},
+    arc: () => {},
+    ellipse: (_x: number, y: number) => { shadows.push(y); },
+    save: () => {},
+    restore: () => {},
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, bodies, shadows };
+};
+
+describe('altura de voo', () => {
+  const TILE_H = 16;
+  const project = (x: number, y: number): [number, number] => [x * 32, y * TILE_H];
+
+  const flightHeight = (hostile: boolean): number => {
+    const view = new ProjectileView();
+    const proj: ProjectileLike = { id: 1, x: 4, y: 4, hostile, kind: hostile ? 'spit' : 'bolt' };
+    view.sync([proj], 0);
+    const { ctx, bodies, shadows } = recordingCtx();
+    view.draw(ctx, proj, project, 1, TILE_H);
+    // A sombra fica no chao e o corpo, acima dela: a diferenca E a altura.
+    return (Math.min(...shadows) - Math.min(...bodies)) / TILE_H;
+  };
+
+  it('faz o tiro do jogador sair na altura do cano, e nao da barriga', () => {
+    // A arma esta montada a mais de um tile do chao; meio tile era a altura de
+    // quem cospe do chao.
+    expect(flightHeight(false)).toBeGreaterThan(1);
+  });
+
+  it('mantem o cuspe do inimigo rente ao chao', () => {
+    expect(flightHeight(true)).toBeLessThan(1);
+    expect(flightHeight(true)).toBeLessThan(flightHeight(false));
+  });
+});

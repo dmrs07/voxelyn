@@ -1,5 +1,7 @@
 import {
   dirFromFacing,
+  gunBehindUpper,
+  PROSPECTOR_MUZZLE_FLASH_FRAME,
   frameAtTime,
   resolveFrame,
   lightLevelFor,
@@ -403,6 +405,18 @@ const HEAT_RAMP: readonly (readonly [number, readonly [number, number, number]])
 const INCANDESCENT: readonly [number, number, number] = [0xe8, 0xf1, 0xff];
 
 /**
+ * Luz do disparo batendo no corpo.
+ *
+ * Mesmo dourado (`loot`) do voxel que acende na boca do cano — e a MESMA luz, e
+ * dar a ela outra cor faria o corpo parecer iluminado por uma segunda fonte que
+ * nao existe na cena.
+ *
+ * Alpha baixo de proposito: o tint e chapado, e um clarao forte apagaria as
+ * faces do chassi por um quadro, trocando "a luz bateu nele" por "ele piscou".
+ */
+const MUZZLE_LIGHT: Tint = { color: 'rgb(255, 209, 102)', alpha: 0.26 };
+
+/**
  * Abaixo disto o cano fica com a propria cor.
  *
  * Existe porque calor residual e permanente: o decaimento por tick nunca chega a
@@ -566,6 +580,25 @@ export class SpriteBank {
     const gun = this.get(PLAYER_GUN_ID);
     if (!lower || !upper || !gun) return false;
 
+    // LUZ DO DISPARO na armadura.
+    //
+    // O clarao ja existia como tres voxels acesos na boca do cano, e parava ali:
+    // uma fonte de luz a um palmo de um chassi de latao nao acendia um pixel
+    // dele. Aqui o corpo inteiro recebe o mesmo dourado do clarao enquanto ele
+    // dura — pernas junto, porque a luz desce.
+    //
+    // O quadro vem do ATLAS, e nao de um cronometro proprio: `frameAtTime` diz
+    // qual quadro de `attack` esta na tela agora, e a arte diz qual deles cospe.
+    // Qualquer relogio paralelo sairia de fase com o desenho do cano no dia em
+    // que o `fps` da animacao mudasse.
+    const firing = animation.upper.animation === 'attack';
+    const muzzleLit =
+      firing &&
+      frameAtTime(gun.manifest, 'attack', animation.upper.elapsedMs) === PROSPECTOR_MUZZLE_FLASH_FRAME;
+    // Enquanto acende, a luz manda no corpo: ela e mais forte que o tint frio que
+    // separa um parceiro do outro, e dura um quadro.
+    const bodyTint = muzzleLit ? MUZZLE_LIGHT : tint;
+
     this.drawLoadedFrame(
       ctx,
       lower,
@@ -576,7 +609,7 @@ export class SpriteBank {
       footX,
       footY,
       zoom,
-      tint
+      bodyTint
     );
 
     const lowerFrame = frameAtTime(lower.manifest, animation.lower.animation, animation.lower.elapsedMs);
@@ -592,18 +625,20 @@ export class SpriteBank {
 
     const upperX = footX + recoil.x;
     const upperY = footY + hipBob + recoil.y;
-    this.drawLoadedFrame(
-      ctx,
-      upper,
-      animation.upper.animation,
-      animation.upper.facingX,
-      animation.upper.facingY,
-      animation.upper.elapsedMs,
-      upperX,
-      upperY,
-      zoom,
-      tint
-    );
+    const drawUpper = (): void => {
+      this.drawLoadedFrame(
+        ctx,
+        upper,
+        animation.upper.animation,
+        animation.upper.facingX,
+        animation.upper.facingY,
+        animation.upper.elapsedMs,
+        upperX,
+        upperY,
+        zoom,
+        bodyTint
+      );
+    };
 
     // A arma acompanha o tronco quadro a quadro e recebe o MESMO deslocamento de
     // coice: ela e a peca que recua, e resolver o coice so no tronco faria o cano
@@ -614,18 +649,32 @@ export class SpriteBank {
     // estado que machuca, e nenhum deles precisa ser lido ao mesmo tempo — o
     // parceiro remoto nao transmite calor, entao na pratica os dois nunca
     // disputam o mesmo cano.
-    this.drawLoadedFrame(
-      ctx,
-      gun,
-      animation.upper.animation,
-      animation.upper.facingX,
-      animation.upper.facingY,
-      animation.upper.elapsedMs,
-      upperX,
-      upperY,
-      zoom,
-      gunHeatTint(animation.heat, animation.overheated) ?? tint
-    );
+    const drawGun = (): void => {
+      this.drawLoadedFrame(
+        ctx,
+        gun,
+        animation.upper.animation,
+        animation.upper.facingX,
+        animation.upper.facingY,
+        animation.upper.elapsedMs,
+        upperX,
+        upperY,
+        zoom,
+        gunHeatTint(animation.heat, animation.overheated) ?? tint
+      );
+    };
+
+    // Profundidade entre tronco e arma. Dentro de um modelo so, o rasterizador
+    // resolveria isso voxel a voxel; entre dois atlas o unico controle e a ORDEM
+    // das duas chamadas, e a arma por cima em toda direcao a fazia flutuar sobre
+    // o peito nos rumos em que o chassi deveria comê-la.
+    if (gunBehindUpper(animation.upper.facingX, animation.upper.facingY)) {
+      drawGun();
+      drawUpper();
+    } else {
+      drawUpper();
+      drawGun();
+    }
     return true;
   }
 
