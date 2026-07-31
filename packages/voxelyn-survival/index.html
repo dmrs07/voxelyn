@@ -56,6 +56,17 @@
         background: rgba(11, 14, 20, 0.92);
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         z-index: 10;
+        /* A overlay rola por DENTRO. O body nunca rola (`overflow: hidden`), e
+           sem isto tudo o que passa da altura simplesmente some da tela: em
+           paisagem de celular o que sumia era o botao de abandono — a unica
+           acao irreversivel do jogo, inalcancavel. */
+        overflow-y: auto;
+        /* `safe` e o que torna a rolagem util. Com o conteudo maior que a caixa,
+           centralizar transborda para os DOIS lados, e o que sai pelo topo fica
+           fora do alcance ate da barra de rolagem; `safe center` volta a alinhar
+           pelo inicio nesse caso e continua centralizando quando cabe. Navegador
+           sem suporte descarta a linha e mantem o `center` acima. */
+        justify-content: safe center;
       }
       .hidden {
         display: none !important;
@@ -215,7 +226,117 @@
         padding: 6px 14px;
         border-radius: 6px;
         font-size: 12px;
-        z-index: 20;
+        /* Acima de TUDO, inclusive das overlays modais. O banner e aviso de
+           sistema — "Reconectando…", "Código de sala inválido" —, e atras de um
+           fundo a 92% ele aparecia esmaecido a ponto de parecer defeito,
+           justamente nas telas em que a mensagem e a informacao que falta. */
+        z-index: 40;
+      }
+
+      /* ------------------------------------------------------------------
+         Aurix Dynamics.
+
+         A companhia usa OURO, e o jogo usa menta (#59f2c2). Nao e decoracao:
+         a menta e a voz do sistema falando com o jogador (títulos, botao que
+         avanca, codigo de convite), e o ouro e a companhia falando POR CIMA
+         dela. Onde a placa aparece, quem esta na tela e a Aurix.
+         ------------------------------------------------------------------ */
+      .corp-plate {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 14px 26px 12px;
+        background: #0d0b08;
+        border: 1px solid #57452a;
+        /* borda dupla, como a placa gravada: a de dentro nasce da sombra */
+        box-shadow: inset 0 0 0 1px #0d0b08, inset 0 0 0 2px #2c2318;
+        border-radius: 4px;
+      }
+      .corp-mark {
+        width: 54px;
+        height: 54px;
+        display: block;
+      }
+      .corp-name {
+        color: #c9a25e;
+        font-size: 12px;
+        letter-spacing: 5px;
+        text-indent: 5px; /* compensa o espaco extra depois da ultima letra */
+      }
+      .corp-tagline {
+        color: #7d6540;
+        font-size: 9px;
+        letter-spacing: 2px;
+        text-indent: 2px;
+      }
+      h1.corp {
+        color: #c9a25e;
+      }
+      .sub.corp {
+        color: #7d6540;
+      }
+      /* O abandono e a unica acao irreversivel do jogo: ela nao pode parecer
+         com "Voltar". Vermelho, e nunca a primeira da coluna. */
+      button.danger {
+        border-color: #7e2b35;
+        color: #ff8a94;
+      }
+      button.danger:active {
+        background: #3a1218;
+      }
+      /* Acima do banner (20) e do convite (15): o menu de campo e modal, e
+         nada da run pode ficar por cima dele. */
+      #pause,
+      #pause-confirm {
+        z-index: 30;
+      }
+      /* Os controles de opcoes sao UM bloco so, movido entre a tela de opcoes e
+         o menu de campo (ver `mountOptions` em main.ts). Duplicar o HTML
+         duplicaria a sincronizacao de estado, e as duas copias divergiriam na
+         primeira mudanca. */
+      #options-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+
+      /* Paisagem de celular: ~360 px de altura para caber marca, titulo, o bloco
+         de opcoes inteiro e dois botoes. Encolher o cabecalho faz o conteudo
+         caber no caso comum; a rolagem da `.overlay` continua sendo a rede de
+         seguranca para fontes grandes e telas ainda menores. */
+      @media (max-height: 560px) {
+        .overlay {
+          gap: 8px;
+        }
+        #options-controls {
+          gap: 8px;
+        }
+        h1 {
+          font-size: clamp(15px, 4vw, 22px);
+        }
+        button {
+          padding: 8px 18px;
+        }
+        /* A placa vira FAIXA: a mesma marca, num terco da altura. */
+        .corp-plate {
+          flex-direction: row;
+          gap: 10px;
+          padding: 6px 14px;
+        }
+        .corp-mark {
+          width: 26px;
+          height: 26px;
+        }
+        /* O lema e a unica coisa da placa que nao carrega informacao: some
+           primeiro, e some sozinho. */
+        .corp-tagline {
+          display: none;
+        }
+        .panel {
+          max-height: 38vh;
+        }
       }
     </style>
   </head>
@@ -266,30 +387,81 @@
       <div class="sub warn">Use fones: o som avisa o que a tela ainda não mostra.</div>
     </div>
 
+    <!--
+      As mesmas opcoes servem a tela de titulo e ao menu de campo, e por isso
+      elas existem UMA vez so: `#options-controls` e movido de um slot para o
+      outro conforme a tela que abre. As duas nunca estao abertas juntas, entao
+      o no nunca precisa de duas casas ao mesmo tempo.
+    -->
     <div id="options" class="overlay hidden">
       <h1>OPÇÕES</h1>
-      <div class="row">
-        <label for="name">Nome</label>
-        <input id="name" size="14" maxlength="18" placeholder="anônimo" />
+      <div id="options-slot">
+        <div id="options-controls">
+          <div class="row">
+            <label for="name">Nome</label>
+            <input id="name" size="14" maxlength="18" placeholder="anônimo" />
+          </div>
+          <div class="row">
+            <label for="quality">Qualidade</label>
+            <select id="quality">
+              <option value="high">Alta</option>
+              <option value="medium">Média</option>
+              <option value="low">Baixa (30 FPS)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="volume">Volume</label>
+            <input id="volume" type="range" min="0" max="100" step="1" />
+            <button id="btn-mute" class="compact primary">Som: ligado</button>
+          </div>
+          <div class="row">
+            <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
+          </div>
+          <div class="sub">dados anônimos de sessão, sem identificação</div>
+        </div>
       </div>
-      <div class="row">
-        <label for="quality">Qualidade</label>
-        <select id="quality">
-          <option value="high">Alta</option>
-          <option value="medium">Média</option>
-          <option value="low">Baixa (30 FPS)</option>
-        </select>
-      </div>
-      <div class="row">
-        <label for="volume">Volume</label>
-        <input id="volume" type="range" min="0" max="100" step="1" />
-        <button id="btn-mute" class="compact primary">Som: ligado</button>
-      </div>
-      <div class="row">
-        <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
-      </div>
-      <div class="sub">dados anônimos de sessão, sem identificação</div>
       <button id="btn-options-close" class="primary">Voltar</button>
+    </div>
+
+    <!--
+      Menu de campo: a porta de saida de uma run em andamento.
+
+      Nao ha botao para ele na tela. Abre por ESC/P, pelo botao VOLTAR do
+      celular ou por toque longo na faixa de topo — o porque de cada um esta em
+      `pause.ts`. A tela de titulo tem espaco de sobra para um botao; a tela de
+      jogo nao tem nenhum, e o menu e a coisa menos frequente da sessao.
+    -->
+    <div id="pause" class="overlay hidden">
+      <div id="pause-mark"></div>
+      <h1 class="corp">TERMINAL DE CAMPO</h1>
+      <div id="pause-status" class="sub"></div>
+      <div id="pause-coop-warning" class="sub warn hidden">
+        No co-op o mundo não para — a descida continua enquanto você lê isto.
+      </div>
+      <button id="btn-pause-resume" class="primary">Retomar descida</button>
+      <div id="pause-options-slot"></div>
+      <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
+    </div>
+
+    <!--
+      A confirmacao. A pergunta e feita na voz da companhia, e nao na do jogo:
+      quem cobra o contrato e a Aurix, e e ela quem lista o que se perde.
+      "Continuar a descida" vem primeiro e e o botao primario de proposito — o
+      caminho barato tem de ser o de NAO perder a run.
+    -->
+    <div id="pause-confirm" class="overlay hidden">
+      <div id="pause-confirm-mark"></div>
+      <h1 class="corp">ABANDONAR CONTRATO?</h1>
+      <div class="panel">
+        <span class="lesson">Registro de rescisão — leia antes de confirmar.</span>
+        <div class="found"><span>Material coletado neste setor</span><span class="tally">não creditado</span></div>
+        <div class="found"><span>Progresso da descida</span><span class="tally">perdido</span></div>
+        <div class="found"><span>Posição no ranking</span><span class="tally">nenhuma</span></div>
+        <div class="found"><span>Unidade em campo</span><span class="tally">baixa operacional</span></div>
+        <span class="field-note">a companhia não registra o motivo.</span>
+      </div>
+      <button id="btn-abandon-cancel" class="primary">Continuar a descida</button>
+      <button id="btn-abandon-confirm" class="danger">Confirmar abandono</button>
     </div>
 
     <div id="records" class="overlay hidden">

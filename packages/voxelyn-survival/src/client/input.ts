@@ -40,6 +40,35 @@ export const AIM_STICK_ACTIVATION_SCALE = 1.45;
 const MOVE_DEAD_ZONE = 0.08;
 const AIM_DEAD_ZONE = 0.12;
 
+/**
+ * Este elemento recebe digitacao?
+ *
+ * A decisao vive separada do DOM (como em `restart.ts` e `pause.ts`) porque a
+ * LISTA e a parte que erra com o tempo: quem adicionar um campo novo precisa de
+ * um teste que reclame, e nao de um jogo que silencie o som quando o jogador se
+ * chama Marta.
+ */
+export const isEditableTag = (tagName: string, contentEditable = false): boolean =>
+  tagName === 'INPUT' ||
+  tagName === 'TEXTAREA' ||
+  // `select` entra pelo mesmo motivo que os campos de texto: as setas navegam as
+  // opcoes, e o `preventDefault` do movimento as roubava do teclado.
+  tagName === 'SELECT' ||
+  contentEditable;
+
+/**
+ * A tecla foi digitada DENTRO de um campo?
+ *
+ * Os atalhos do jogo escutam a janela inteira, e isso funcionou enquanto o unico
+ * campo de texto — o nome do ranking — vivia numa tela de titulo que nunca esta
+ * aberta junto com o jogo. Com as opcoes disponiveis no meio da run, o mesmo
+ * listener passa a receber cada letra que o jogador digita: "Marta" silenciava o
+ * som no M, "Rafael" engatilhava o reinicio no R e o espaco, com
+ * `preventDefault`, nunca chegava a entrar no nome.
+ */
+export const isEditingText = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement && isEditableTag(target.tagName, target.isContentEditable);
+
 /** Cancela qualquer ponteiro touch ainda ativo ao selecionar mouse/trackpad. */
 export const deactivateTouchControls = (state: InputState): void => {
   state.usingTouch = false;
@@ -203,6 +232,10 @@ export class SurvivalInput {
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
+    // Digitar num campo nao e jogar. `onKeyUp` NAO tem a mesma guarda de
+    // proposito: ele so limpa teclas, e limpar de mais e sempre seguro —
+    // deixar uma tecla presa porque o foco mudou no meio do aperto nao e.
+    if (isEditingText(e.target)) return;
     const k = e.key.toLowerCase();
     this.keys[k] = true;
     if (k === ' ') {
@@ -392,6 +425,24 @@ export class SurvivalInput {
   clearPendingUiInput(): void {
     this.state.tapQueue.length = 0;
     this.queuedRestart = false;
+  }
+
+  /**
+   * Descarta acoes de uso unico ainda engatilhadas (esquiva, habilidade, purga,
+   * interacao).
+   *
+   * Elas ficam travadas ate a proxima `snapshot`, que e o certo durante a run —
+   * um aperto no meio de um tick nao pode se perder. Mas com o menu de campo
+   * aberto ninguem chama `snapshot`, e o teclado continua chegando por cima da
+   * overlay: sem este dreno, o espaco apertado por engano enquanto se mexe no
+   * volume sairia como um dash no instante em que o menu fecha.
+   */
+  clearQueuedActions(): void {
+    this.queuedDodge = false;
+    this.queuedInteract = false;
+    this.queuedPurge = false;
+    this.queuedAbility = false;
+    this.queuedChoice = null;
   }
 
   hasTap(): boolean {
