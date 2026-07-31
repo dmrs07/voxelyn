@@ -2,7 +2,10 @@ import type {
   Entity,
   PlayerExtra,
   Projectile,
+  SalvageSite,
   SurvivalState,
+  Vec2,
+  WellOffer,
 } from '@voxelyn/survival-sim';
 
 /**
@@ -29,11 +32,43 @@ import type {
  */
 
 /**
+ * A grade do retrato, em buffers reaproveitados.
+ *
+ * A grade tambem tem de andar na linha de render, e nao na da simulacao: o
+ * bloco minerado desaparece no tick em que a picareta o quebra, mas o estalo e
+ * a poeira sao um evento, e evento agora espera a linha chegar nele. Servida do
+ * presente, a pedra sumia ate um tick ANTES do proprio efeito de quebra — o
+ * jogador via o buraco e so depois ouvia o golpe que o abriu.
+ *
+ * Copia por `set` em buffer proprio, e nao array novo: sao dois vetores de
+ * `width * height` por tick, e alocar isso 20 vezes por segundo para descartar
+ * na seguinte e trabalho para o coletor sem nada em troca.
+ */
+class GridBuffer {
+  solid = new Uint8Array(0);
+  surface = new Uint8Array(0);
+
+  /** Realoca so quando a descida troca o mundo por um de outro tamanho. */
+  copyFrom(state: SurvivalState): void {
+    if (this.solid.length !== state.solid.length) this.solid = new Uint8Array(state.solid.length);
+    if (this.surface.length !== state.surface.length) {
+      this.surface = new Uint8Array(state.surface.length);
+    }
+    this.solid.set(state.solid);
+    this.surface.set(state.surface);
+  }
+}
+
+/**
  * Um retrato do que se desenha num tick.
  *
- * Guarda COPIA e nao referencia: `stepRun` muta as entidades no lugar, entao um
- * retrato por referencia seria sempre igual ao presente e a interpolacao entre
- * dois deles nao teria de onde sair.
+ * Guarda COPIA e nao referencia: `stepRun` muta o mundo e as entidades no
+ * lugar, entao um retrato por referencia seria sempre igual ao presente e a
+ * interpolacao entre dois deles nao teria de onde sair.
+ *
+ * Os campos sao exatamente os que o desenho consulta e que mudam por tick. O
+ * que nao muda — configuracao, semente — segue vindo do estado vivo, porque
+ * copiar o que ninguem escreve so custa.
  */
 type Pose = {
   tick: number;
@@ -45,6 +80,14 @@ type Pose = {
   playerExtras: PlayerExtra[];
   enemies: Entity[];
   projectiles: Projectile[];
+  grid: GridBuffer;
+  entry: Vec2;
+  corePos: Vec2;
+  coreTaken: boolean;
+  contamination: number;
+  charges: Array<{ idx: number; until: number }>;
+  salvageSites: SalvageSite[];
+  wellOffers: WellOffer[];
 };
 
 /**
@@ -72,21 +115,38 @@ const cloneExtra = (pe: PlayerExtra): PlayerExtra => ({
   resonance: { ...pe.resonance },
 });
 
-const capturePose = (state: SurvivalState): Pose => ({
-  tick: state.tick,
-  sector: state.sector,
-  playerIndex: Math.max(0, state.players.indexOf(state.player)),
-  players: state.players.map(cloneEntity),
-  playerExtras: state.playerExtras.map(cloneExtra),
-  enemies: state.enemies.map(cloneEntity),
-  projectiles: state.projectiles.map((p) => ({ ...p })),
-});
+const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
+  grid.copyFrom(state);
+  return {
+    tick: state.tick,
+    sector: state.sector,
+    playerIndex: Math.max(0, state.players.indexOf(state.player)),
+    players: state.players.map(cloneEntity),
+    playerExtras: state.playerExtras.map(cloneExtra),
+    enemies: state.enemies.map(cloneEntity),
+    projectiles: state.projectiles.map((p) => ({ ...p })),
+    grid,
+    entry: { x: state.entry.x, y: state.entry.y },
+    corePos: { x: state.corePos.x, y: state.corePos.y },
+    coreTaken: state.coreTaken,
+    contamination: state.contamination,
+    charges: state.charges.map((c) => ({ ...c })),
+    salvageSites: state.salvageSites.map((s) => ({ ...s })),
+    wellOffers: state.wellOffers.map((o) => ({ ...o })),
+  };
+};
 
 export class LocalPlayout {
   /** O retrato ja alcancado pela linha de render. */
   private from: Pose | null = null;
   /** O retrato para onde os corpos estao a caminho. */
   private to: Pose | null = null;
+  /**
+   * Duas grades alternadas. Vivem no maximo dois retratos, entao a que o retrato
+   * novo sobrescreve e sempre a do que acabou de cair fora.
+   */
+  private readonly grids = [new GridBuffer(), new GridBuffer()];
+  private nextGrid = 0;
 
   /** Esquece tudo: o que estava guardado nao descreve mais o mundo do jogador. */
   reset(): void {
@@ -104,7 +164,8 @@ export class LocalPlayout {
    * que anda para tras no co-op: linha do tempo nova, buffer velho sem valor.
    */
   capture(state: SurvivalState): void {
-    const pose = capturePose(state);
+    const pose = capturePose(state, this.grids[this.nextGrid]);
+    this.nextGrid ^= 1;
     if (this.to && this.to.sector !== pose.sector) {
       this.from = null;
       this.to = pose;
@@ -162,6 +223,20 @@ export class LocalPlayout {
     return {
       ...state,
       tick: from.tick,
+      sector: from.sector,
+      // O mundo tambem vem do retrato alcancado. Servido do presente, ele
+      // mostraria a pedra ja quebrada e o bau ja aberto ate um tick antes do
+      // efeito e da narracao que contam a quebra e a abertura — os eventos
+      // esperam a linha de render, e o mundo tem de esperar com eles.
+      solid: from.grid.solid,
+      surface: from.grid.surface,
+      entry: from.entry,
+      corePos: from.corePos,
+      coreTaken: from.coreTaken,
+      contamination: from.contamination,
+      charges: from.charges,
+      salvageSites: from.salvageSites,
+      wellOffers: from.wellOffers,
       players,
       playerExtras: from.playerExtras,
       player: players[from.playerIndex] ?? players[0] ?? state.player,

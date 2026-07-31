@@ -200,6 +200,68 @@ describe('LocalPlayout: estado discreto e descontinuidade', () => {
   });
 
   /**
+   * O mundo tambem anda na linha de render. O efeito de quebra e um evento, e
+   * evento espera a linha chegar nele; servida do presente, a pedra sumiria ate
+   * um tick ANTES do proprio estalo que a quebrou.
+   */
+  it('a pedra quebrada no tick seguinte continua inteira ate a linha chegar nele', () => {
+    const state = createRun({ seed: 99 });
+    const playout = new LocalPlayout();
+    const idx = state.solid.findIndex((v) => v !== 0);
+    expect(idx).toBeGreaterThanOrEqual(0);
+
+    playout.capture(state);
+    state.tick += 1;
+    state.solid[idx] = 0;
+    playout.capture(state);
+
+    expect(playout.sample(state, 0.5)!.solid[idx]).not.toBe(0);
+
+    // Um tick depois a linha alcanca a quebra e o buraco aparece.
+    state.tick += 1;
+    playout.capture(state);
+    expect(playout.sample(state, 0.5)!.solid[idx]).toBe(0);
+  });
+
+  /**
+   * As duas grades se alternam, e o retrato novo sobrescreve a do que caiu fora.
+   * Se ela sobrescrevesse a do retrato ALCANCADO, o mundo desenhado saltaria
+   * para o presente sem que a linha de render tivesse chegado nele.
+   */
+  it('a grade do retrato alcancado sobrevive ao retrato seguinte', () => {
+    const state = createRun({ seed: 99 });
+    const playout = new LocalPlayout();
+    const solids = [...state.solid.keys()].filter((i) => state.solid[i] !== 0);
+    const [first, second] = solids;
+
+    playout.capture(state);
+    state.tick += 1;
+    state.solid[first] = 0;
+    playout.capture(state);
+    state.tick += 1;
+    state.solid[second] = 0;
+    playout.capture(state);
+
+    const view = playout.sample(state, 0.5)!;
+    expect(view.solid[first]).toBe(0); // ja alcancado
+    expect(view.solid[second]).not.toBe(0); // ainda a caminho
+  });
+
+  it('o bau aberto no tick seguinte so abre quando a linha chega nele', () => {
+    const state = createRun({ seed: 99 });
+    const playout = new LocalPlayout();
+    expect(state.salvageSites.length).toBeGreaterThan(0);
+    state.salvageSites[0].cacheOpened = false;
+
+    playout.capture(state);
+    state.tick += 1;
+    state.salvageSites[0].cacheOpened = true;
+    playout.capture(state);
+
+    expect(playout.sample(state, 0.5)!.salvageSites[0].cacheOpened).toBe(false);
+  });
+
+  /**
    * A descida troca o mundo inteiro sob os mesmos ids. Interpolar entre os dois
    * arrastaria o Prospector do poco ate a entrada do setor novo por cima de um
    * terreno que o retrato anterior nao descreve.

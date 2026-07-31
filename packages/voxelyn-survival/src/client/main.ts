@@ -163,7 +163,14 @@ const requestPool = (state: SurvivalState): void => {
   void fetchDeathEchoPool(url, deathEchoPoolQuery(state.sector, contractRun)).then((pool) => {
     // A run pode ter descido enquanto a resposta viajava. Sem esta guarda, o pool
     // do setor 1 chegaria depois e projetaria carcacas no setor 2.
-    if (`${state.config.seed}:${state.sector}` !== key) return;
+    //
+    // A pergunta e feita a `liveRun` e nao ao estado que veio no argumento: o
+    // solo desenha de uma VISTA, que e um objeto novo por quadro com o setor
+    // congelado dentro dele. Perguntar a ela onde a run esta agora e perguntar
+    // ao retrato de um quadro que ja passou — a resposta seria sempre "no mesmo
+    // setor de quando eu pedi", e a guarda nunca fecharia.
+    const live = liveRun;
+    if (!live || `${live.config.seed}:${live.sector}` !== key) return;
     if (pool.length > 0) deathEchoes.setPool(pool);
   });
 };
@@ -805,14 +812,11 @@ const runSolo = (): void => {
       accumulator -= TICK_MS;
       if (state.phase !== 'running') break;
     }
-    const pendingChoice = state.playerExtra.pendingModuleChoice;
-    // Toques comuns sao drenados; durante uma escolha, a fila pertence aos cards.
-    if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     const alpha = accumulator / TICK_MS;
     // O que se desenha e o instante ENTRE os dois ultimos ticks; o que a
-    // simulacao guarda continua sendo `state`, e e nele que a escolha de modulo,
-    // o recorder e a telemetria continuam olhando — eles falam de decisao, e
-    // decisao acontece no tick, nao no quadro.
+    // simulacao guarda continua sendo `state`, e e nele que o recorder e a
+    // telemetria continuam olhando — eles falam de decisao, e decisao acontece
+    // no tick, nao no quadro.
     //
     // A run que acaba DENTRO deste quadro e a excecao: nao ha instante
     // intermediario que valha mostrar, e quem le o estado terminal aqui — o Eco
@@ -822,11 +826,26 @@ const runSolo = (): void => {
     // Depois da vista montada e antes de desenhar, como no co-op: quem ouve os
     // eventos desenha FX em cima do mundo que acabou de ser preparado.
     eventQueue.flush(view.tick);
+    // A escolha vem da VISTA, e nao do estado vivo: quem atrasa a revelacao dos
+    // cards e o `salvage_cache_opened`, que agora espera a linha de render. Lida
+    // do presente, a escolha existiria um tick antes do evento que a anuncia —
+    // os cards apareceriam por um quadro com a revelacao ainda zerada, sumiriam
+    // quando o evento finalmente pedisse os 920 ms de espera, e um toque rapido
+    // escolheria um modulo naquela brecha.
+    const pendingChoice = view.playerExtra.pendingModuleChoice;
+    // Toques comuns sao drenados; durante uma escolha, a fila pertence aos cards.
+    if (!pendingChoice && gate.frame(now, false).drain) input.clearPendingUiInput();
     audio.update(view, now);
     renderState(view, 1, input.state, now);
-    cooldownOverlay.render(view, input.state, view.tick + alpha, now);
+    // O anel de cooldown fica no estado VIVO de proposito, e por dois motivos.
+    // Ele responde "posso arrancar AGORA?", que e pergunta da linha do input e
+    // nao da do desenho; e ele guarda predicao entre quadros comparando a
+    // IDENTIDADE do estado para detectar run nova — servido de uma vista, que e
+    // objeto novo a cada quadro, ele se daria por reiniciado sempre e o pulso de
+    // pronto nunca chegaria a acontecer.
+    cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
-      const regions = renderer.renderChoice(state, vw, vh, input.state);
+      const regions = renderer.renderChoice(view, vw, vh, input.state);
       const choice = input.consumeChoiceTap(regions);
       if (choice !== null) queuedChoice = choice;
     } else if (pendingChoice) {
