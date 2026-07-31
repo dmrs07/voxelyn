@@ -58,6 +58,53 @@ export const RAMPS = {
   player: ['player', 'bone', 'rust'],
 };
 
+/**
+ * SOMBRA de cada cor da paleta mestra: um passo abaixo, dentro da propria paleta.
+ *
+ * A oclusao de ambiente nao pode multiplicar canal. A Art Bible fixa dezesseis
+ * cores e o validador rejeita qualquer pixel fora delas — escurecer aqui e
+ * ESCOLHER a proxima cor da escada, e nao calcular uma. Cada entrada e o vizinho
+ * mais escuro plausivel dentro da mesma familia, e a escada termina em `dark`,
+ * que e sombra de si mesma.
+ *
+ * Uma tabela unica em vez de uma escada por material porque a mesma cor aparece
+ * em rampas diferentes: `rust` e o meio-tom do latao e tambem a base do fogo.
+ * Com uma escada por familia, ela teria dois destinos e a sombra de uma peca
+ * dependeria de qual material a citou primeiro.
+ */
+const SHADOW_OF = {
+  player: 'bone',
+  bone: 'rust',
+  rockLight: 'rock',
+  rock: 'rockShadow',
+  rockShadow: 'dark',
+  rust: 'rockShadow',
+  loot: 'rust',
+  fire: 'blood',
+  blood: 'rust',
+  biolum: 'fungusLight',
+  fungusLight: 'fungus',
+  fungus: 'fungusDark',
+  fungusDark: 'dark',
+  acid: 'fungus',
+  electric: 'rockLight',
+  dark: 'dark',
+};
+
+/**
+ * Cores que EMITEM luz e por isso nao recebem oclusao.
+ *
+ * Visor, nucleo, brasa e corrente sao fonte, nao superficie: escurece-los no
+ * fundo de uma fresta seria apagar justamente os pontos que o jogador usa para
+ * localizar a criatura no breu — e a fresta e onde eles costumam estar, porque
+ * uma luz encaixada no corpo e o desenho normal deles.
+ *
+ * `loot` e `player` ficam de fora desta lista de proposito: sao ouro e branco,
+ * materiais, e casco ou placa no fundo de uma junta deve escurecer como
+ * qualquer outra superficie.
+ */
+const EMISSIVE = new Set(['biolum', 'electric', 'fire', 'acid']);
+
 /** Caixa de voxels. Eixos: x = leste, y = sul, z = cima; origem entre os pes. */
 export const box = (x, y, z, w, d, h, mat) => ({ x, y, z, w, d, h, mat });
 
@@ -118,12 +165,126 @@ const shellVoxels = (boxes, r) => {
             dx > 0 && dx < b.w - 1 && dy > 0 && dy < b.d - 1 && dz > 0 && dz < b.h - 1;
           if (interior) continue;
           const [x, y] = rot(b.x + dx, b.y + dy, r);
-          out.push({ x, y, z: b.z + dz, ramp });
+          out.push({ x, y, z: b.z + dz, ramp, mat: b.mat });
         }
       }
     }
   }
   return out;
+};
+
+const occupancyKey = (x, y, z) => `${x},${y},${z}`;
+
+/**
+ * Ocupacao do modelo INTEIRO, incluindo os voxels internos que a casca descarta.
+ *
+ * A casca serve para desenhar; para medir oclusao ela mentiria. O voxel logo
+ * atras de uma face de casca costuma ser interno, e um conjunto so de casca o
+ * daria como vazio — a face acharia que esta exposta ao ar livre exatamente onde
+ * ha materia macica encostada nela.
+ */
+const solidVoxels = (boxes, r) => {
+  const solid = new Set();
+  for (const b of boxes) {
+    for (let dx = 0; dx < b.w; dx++) {
+      for (let dy = 0; dy < b.d; dy++) {
+        for (let dz = 0; dz < b.h; dz++) {
+          const [x, y] = rot(b.x + dx, b.y + dy, r);
+          solid.add(occupancyKey(x, y, b.z + dz));
+        }
+      }
+    }
+  }
+  return solid;
+};
+
+/**
+ * As tres faces que a projecao 2:1 mostra, com a normal de cada uma e os dois
+ * eixos do plano dela.
+ *
+ * A correspondencia nao e arbitraria e vale a pena estar escrita: um vizinho em
+ * +x projeta em `sx + 2`, ou seja, sobre as duas colunas da DIREITA do cubo;
+ * um vizinho em +y projeta em `sx - 2`, sobre as duas da ESQUERDA; e um vizinho
+ * em +z projeta duas linhas acima, sobre o topo. Dai `right` ser a face +x,
+ * `left` ser a +y e `top` ser a +z — a mesma ordem em que `RAMPS` declara as
+ * cores.
+ */
+const FACES = {
+  top: { slot: 0, n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
+  left: { slot: 1, n: [0, 1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+  right: { slot: 2, n: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1] },
+};
+
+/**
+ * Quantos passos de sombra uma face recebe. PURA, e exportada para teste.
+ *
+ * `isSolid(x, y, z)` diz se ha materia numa celula; `face` e uma das tres que a
+ * projecao mostra. A funcao mede quanto a face esta metida numa fresta contando
+ * os OITO vizinhos da celula vazia a frente dela — quatro pelas arestas e quatro
+ * pelas quinas. So as arestas deixaria a quina interna de dois volumes que se
+ * encontram em L exatamente tao clara quanto a face aberta ao lado dela, que e
+ * justamente onde a sombra faz falta.
+ *
+ * Dois niveis, e nao um gradiente: a face lateral de um voxel mede 2x2 pixels e
+ * a de topo 4x3. Nao ha area para uma rampa continua, e o que a escala consegue
+ * mostrar e a diferenca entre superficie aberta, contato e fundo de fresta.
+ *
+ * Os cortes saem da geometria, e nao do gosto. Uma face aberta de uma caixa de
+ * lados retos conta ZERO: os oito vizinhos da celula a frente dela estao todos
+ * fora da caixa, entao um volume isolado nao ganha sombra nenhuma e nada do que
+ * ja funcionava escurece. Uma parede subindo encostada ao lado da face ocupa
+ * exatamente TRES daqueles oito — e por isso o primeiro corte e tres, e nao
+ * quatro: em quatro, a sombra de contato ao pe de toda junta simplesmente nunca
+ * acontecia, que foi o resultado da primeira tentativa. Uma quina interna, com
+ * parede em dois lados, da cinco; uma fresta com parede dos dois lados da seis,
+ * e e ai que entra o segundo passo.
+ */
+export const ambientOcclusionSteps = (isSolid, x, y, z, face) => {
+  const spec = FACES[face];
+  if (!spec) throw new Error(`face desconhecida: ${face}`);
+  const [nx, ny, nz] = spec.n;
+  const [ux, uy, uz] = spec.u;
+  const [vx, vy, vz] = spec.v;
+  const ax = x + nx;
+  const ay = y + ny;
+  const az = z + nz;
+  let count = 0;
+  for (let a = -1; a <= 1; a++) {
+    for (let b = -1; b <= 1; b++) {
+      if (a === 0 && b === 0) continue;
+      if (isSolid(ax + ux * a + vx * b, ay + uy * a + vy * b, az + uz * a + vz * b)) count++;
+    }
+  }
+  return count >= 6 ? 2 : count >= 3 ? 1 : 0;
+};
+
+const shadowed = (name, steps) => {
+  let out = name;
+  for (let i = 0; i < steps; i++) out = SHADOW_OF[out] ?? out;
+  return out;
+};
+
+/**
+ * Rampa de um voxel ja com a oclusao aplicada, face a face.
+ *
+ * O que isto compra: sem ela, dois volumes que se encontram formam uma junta em
+ * que as duas faces tem exatamente a mesma cor, e o olho nao encontra a aresta —
+ * o modelo le como caixas empilhadas, e nao como um corpo. A sombra na fresta e
+ * o que costura os volumes num objeto so, e e a diferenca de leitura mais barata
+ * que este rasterizador consegue: nenhum voxel a mais, nenhuma cor nova.
+ */
+const occludedRamp = (solid, v) => {
+  if (EMISSIVE.has(v.mat)) return v.ramp;
+  const isSolid = (x, y, z) => solid.has(occupancyKey(x, y, z));
+  let changed = false;
+  const out = [v.ramp[0], v.ramp[1], v.ramp[2]];
+  for (const [face, spec] of Object.entries(FACES)) {
+    const steps = ambientOcclusionSteps(isSolid, v.x, v.y, v.z, face);
+    if (steps === 0) continue;
+    out[spec.slot] = shadowed(v.ramp[spec.slot], steps);
+    changed = true;
+  }
+  return changed ? out : v.ramp;
 };
 
 /** Desenha um cubo isometrico com as tres faces visiveis. */
@@ -151,11 +312,17 @@ export const renderVoxels = (boxes, dirIndex, w, h, anchorX, anchorY) => {
   if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
   const g = grid(w, h);
   const commands = [];
+  // A ocupacao e medida no modelo ROTACIONADO. A rotacao e de 90 graus, entao
+  // preserva a grade e a vizinhanca continua sendo a dos eixos — mas as faces
+  // visiveis sao sempre +x, +y e +z na TELA, e nao no modelo autorado. Medir
+  // antes de rotacionar sombrearia a face errada em tres das quatro direcoes.
+  const solid = solidVoxels(boxes, rotation);
   for (const v of shellVoxels(boxes, rotation)) {
     const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
+    const ramp = occludedRamp(solid, v);
     commands.push({
       key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z, 0),
-      draw: () => cube(g, Math.round(anchorX + sx), Math.round(anchorY + sy), v.ramp),
+      draw: () => cube(g, Math.round(anchorX + sx), Math.round(anchorY + sy), ramp),
     });
   }
   sortDrawCommands(commands); // ordem do pintor: fundo -> frente
