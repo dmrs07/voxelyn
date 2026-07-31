@@ -189,12 +189,35 @@ describe('cota de minerio', () => {
     const { state } = encounter(13, 0);
     state.stats.oreCollected = ORE_PER_MODULE;
     stepIdle(state, 1);
-    expect(state.oreModulesPaid).toBe(1);
+    expect(state.playerExtra.oreModulesPaid).toBe(1);
     stepIdle(state, 30);
-    expect(state.oreModulesPaid).toBe(1);
-    state.stats.oreCollected = ORE_PER_MODULE * 2;
+    expect(state.playerExtra.oreModulesPaid).toBe(1);
+  });
+
+  // A regressao que o contador unico escondia: quem minera com um cofre aberto
+  // cruzava o limiar, era pulado por ja ter escolha pendente, e o contador
+  // adiantado barrava a oferta para sempre. O limiar tem de continuar DEVENDO ate
+  // chegar a mao de alguem.
+  it('nao perde a cota cruzada enquanto uma escolha esta aberta', () => {
+    const { state } = encounter(14, 0);
+    state.stats.oreCollected = ORE_PER_MODULE;
     stepIdle(state, 1);
-    expect(state.oreModulesPaid).toBe(2);
+    const first = state.playerExtra.pendingModuleChoice;
+    expect(first).not.toBeNull();
+    expect(state.playerExtra.oreModulesPaid).toBe(1);
+
+    // Minera o segundo limiar SEM ter resolvido o primeiro.
+    state.stats.oreCollected = ORE_PER_MODULE * 2;
+    stepIdle(state, 5);
+    expect(state.playerExtra.oreModulesPaid).toBe(1);
+    expect(state.playerExtra.pendingModuleChoice).toBe(first);
+
+    // Resolvida a primeira, a segunda aparece — em vez de sumir.
+    stepRun(state, [{ ...emptyCommand(), choose: 0 }]);
+    stepIdle(state, 1);
+    expect(state.playerExtra.oreModulesPaid).toBe(2);
+    expect(state.playerExtra.pendingModuleChoice).not.toBeNull();
+    expect(state.playerExtra.pendingModuleChoice).not.toBe(first);
   });
 });
 

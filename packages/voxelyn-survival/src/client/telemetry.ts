@@ -76,18 +76,43 @@ export class TelemetrySession {
   private runIndex = 0;
   /** Instante em que a run ANTERIOR terminou. */
   private lastRunEndedAt: number | null = null;
-  /** Guarda contra enviar a mesma run duas vezes (o loop desenha em repeticao). */
-  private reported: unknown = null;
+  /**
+   * Quanto tempo o jogador levou para comecar ESTA run depois de a anterior
+   * acabar. Medido em `begin()` e guardado ate o evento sair.
+   */
+  private pendingGap: number | null = null;
+  /**
+   * Esta run ja emitiu o evento terminal dela?
+   *
+   * Um booleano por run, e nao a identidade do sumario. Comparar com o objeto
+   * de sumario so protegia contra `finish` repetido: um `abandon` anterior
+   * gravava um marcador diferente, a comparacao dava falso e a MESMA run saia
+   * duas vezes — uma como abandonada, outra como terminada. Contagem de runs e
+   * taxa de abandono inflavam juntas, e nada denunciava.
+   */
+  private terminalReported = false;
 
   constructor(
     private readonly serverUrl: () => string,
     private readonly quality: () => string,
   ) {}
 
-  /** Chamado ao iniciar uma run. */
+  /**
+   * Chamado ao iniciar uma run.
+   *
+   * O intervalo desde a run anterior e capturado AQUI, e nao no fim.
+   *
+   * Medido no fim, ele somava a duracao da propria run: reiniciar em 4 segundos
+   * e jogar dois minutos registrava 124 segundos e classificava o reinicio como
+   * "nao imediato". Isso corrompia exatamente `immediateRestartRate`, que e a
+   * metrica que este objeto existe para produzir — a que responde se houve
+   * vontade de jogar de novo. A vontade acontece no instante em que se aperta
+   * comecar, e e la que ela tem de ser cronometrada.
+   */
   begin(): void {
     this.runIndex += 1;
-    this.reported = null;
+    this.terminalReported = false;
+    this.pendingGap = this.lastRunEndedAt === null ? null : Date.now() - this.lastRunEndedAt;
   }
 
   /**
@@ -96,11 +121,11 @@ export class TelemetrySession {
    * eventos por segundo.
    */
   finish(summary: RunSummary, sector: number): void {
-    if (this.reported === summary) return;
-    this.reported = summary;
-    const now = Date.now();
-    const gap = this.lastRunEndedAt === null ? null : now - this.lastRunEndedAt;
-    this.lastRunEndedAt = now;
+    if (this.terminalReported) return;
+    this.terminalReported = true;
+    const gap = this.pendingGap;
+    this.pendingGap = null;
+    this.lastRunEndedAt = Date.now();
     this.send(
       {
         outcome: summary.phase as RunOutcome,
@@ -130,8 +155,11 @@ export class TelemetrySession {
    * o erro que faz um jogo dificil parecer saudavel enquanto sangra jogador.
    */
   abandon(sector: number, ticks: number, contamination: number): void {
-    if (this.reported === 'abandoned') return;
-    this.reported = 'abandoned';
+    if (this.terminalReported) return;
+    this.terminalReported = true;
+    const gap = this.pendingGap;
+    this.pendingGap = null;
+    this.lastRunEndedAt = Date.now();
     this.send(
       {
         outcome: 'abandoned',
@@ -148,7 +176,7 @@ export class TelemetrySession {
         modulesAcquired: 0,
         discoveries: 0,
       },
-      this.lastRunEndedAt === null ? null : Date.now() - this.lastRunEndedAt,
+      gap,
       true,
     );
   }

@@ -142,6 +142,18 @@ export const populateSector = (
 const populateMiners = (state: SurvivalState, spawns: readonly { x: number; y: number }[]): void => {
   const w = state.config.width;
   let placed = 0;
+  // Uma celula so recebe UM minerador.
+  //
+  // Duas janelas de busca vizinhas enxergam o mesmo veio e, varrendo na mesma
+  // ordem fixa, escolhem a mesma celula ao lado dele — no setor 1 com semente 9
+  // os dois nasciam exatamente em `78.5,82.5`. Empilhados, eles desenham e andam
+  // como um corpo so, e o jogador so descobre o segundo quando o primeiro morre e
+  // sobra vida onde nao devia haver mais nada. A reserva e um `Set` local e nao um
+  // campo de estado: ela vale durante a povoacao e nao existe depois dela.
+  const taken = new Set<number>();
+  for (const enemy of state.enemies) {
+    if (enemy.alive) taken.add(Math.floor(enemy.y) * w + Math.floor(enemy.x));
+  }
   for (const spawn of spawns) {
     if (placed >= MINER_PER_SECTOR || state.enemies.length >= MAX_ENEMIES) return;
     let found: { x: number; y: number } | null = null;
@@ -153,14 +165,18 @@ const populateMiners = (state: SurvivalState, spawns: readonly { x: number; y: n
         if (state.solid[y * w + x] !== SOLID_ORE) continue;
         // O veio e solido: ele fica ao LADO dele, num chao livre, nao dentro.
         for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          if (state.solid[(y + oy) * w + (x + ox)] === SOLID_NONE) {
-            found = { x: x + ox, y: y + oy };
-            break;
-          }
+          const fx = x + ox;
+          const fy = y + oy;
+          const i = fy * w + fx;
+          if (state.solid[i] !== SOLID_NONE) continue;
+          if (taken.has(i)) continue;
+          found = { x: fx, y: fy };
+          break;
         }
       }
     }
     if (!found) continue;
+    taken.add(found.y * w + found.x);
     spawnEnemy(state, 'miner', found.x, found.y, false);
     placed++;
   }

@@ -339,6 +339,10 @@ const resetRunTracking = (): void => {
   submitted = false;
   echoSubmitted = false;
   poolRequestKey = '';
+  // A apresentacao e do mesmo tipo de estado: nasce da run e nao pode atravessar
+  // para a proxima, porque os ids de entidade sao reciclados. Ver
+  // `resetRunPresentation`.
+  renderer.resetRunPresentation();
 };
 
 // ---------------------------------------------------------------------------
@@ -444,15 +448,27 @@ let runInProgress = false;
 // Aba fechada com a run em andamento. `pagehide` e nao `beforeunload`: este
 // ultimo nao dispara de forma confiavel em Safari movel, que e metade do
 // publico de um PWA.
+//
+// E `pagehide` SOZINHO, sem `visibilitychange`.
+//
+// Trocar de aba, atender uma ligacao ou olhar uma notificacao esconde o
+// documento e devolve o jogador segundos depois — nao e abandono, e uma pausa.
+// Reportar em `visibilitychange` transformava cada uma dessas idas em uma run
+// perdida no funil, e a run continuava viva para terminar de verdade mais tarde
+// e emitir o SEGUNDO evento terminal dela. As duas metricas que mais importam
+// aqui, contagem de runs e taxa de abandono, subiam juntas por um motivo que nao
+// tem nada a ver com o jogo.
+//
+// `pagehide` cobre o que realmente interessa: ele dispara ao descarregar E ao
+// entrar no bfcache, que e por onde o navegador movel de fato leva a pagina
+// embora. O que fica de fora e a aba escondida que o sistema mata sem aviso, e
+// perder esse caso e mais barato que inventar abandono a cada troca de app.
 const reportAbandon = (): void => {
   const state = liveRun;
   if (!state || state.phase !== 'running' || state.tick < 20) return;
   telemetry.abandon(state.sector, state.tick, state.contamination);
 };
 window.addEventListener('pagehide', reportAbandon);
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) reportAbandon();
-});
 let playerName = loadPlayerName();
 nameInput.value = playerName;
 nameInput.addEventListener('change', () => {
@@ -719,6 +735,17 @@ const defaultServerUrl = (): string => {
 
 const runOnline = (url: string, roomCode: string | null): void => {
   resetRunTracking();
+  // O co-op tem de abrir a run na telemetria igual ao solo.
+  //
+  // O caminho online so chamava `finish()`. Sem o `begin()` correspondente, todo
+  // evento saia com `runIndex = 0` — que o servidor grampeia em 1 em silencio —
+  // entao a decima run online era indistinguivel da primeira e o intervalo entre
+  // runs nunca era medido. A sessao inteira aparecia como uma unica partida.
+  //
+  // Aqui e nao dentro do socket de proposito: `connect()` e reexecutado a cada
+  // reconexao, e reconectar na MESMA sala e a mesma run. Este ponto e a entrada
+  // numa sala nova, que e o que abre uma run de verdade.
+  telemetry.begin();
   let ws: WebSocket | null = null;
   let running = true;
   let lastTime = performance.now();
@@ -864,6 +891,9 @@ const runOnline = (url: string, roomCode: string | null): void => {
             gate.reset();
             audio.reset();
             resetRunTracking();
+            // Sala nova e run nova: mesmo `begin()` da entrada, pelo mesmo
+            // motivo — e daqui que sai o intervalo ate o reinicio.
+            telemetry.begin();
             setBanner('Descendo de novo…');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
