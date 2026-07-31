@@ -44,21 +44,45 @@ const q = (v: number): number => {
 const dq = (v: number): number => v / 127;
 
 /**
+ * Reduz a mira ao RUMO dela antes de quantizar.
+ *
+ * `q` satura em ±1, entao um vetor maior que isso perde a direcao junto com a
+ * escala: os dois eixos batem no teto e o que sobra e a diagonal do quadrante.
+ * O cabecalho deste arquivo sempre presumiu um vetor unitario ("1/127 de um
+ * vetor unitario e muito menor que a largura de um pixel na mira") — mas nada
+ * garantia isso, e um produtor que mandasse a mira em pixels de tela via o tiro
+ * colapsar em quatro rumos. Nao ha perda: a simulacao normaliza a mira de
+ * qualquer forma, entao a magnitude nunca significou nada aqui.
+ *
+ * `move` NAO passa por isto: ali a magnitude e o quanto o analogico foi
+ * empurrado, e normalizar transformaria meio-stick em corrida.
+ */
+const aimDirection = (x: number, y: number): { x: number; y: number } => {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: 0, y: 0 };
+  const length = Math.hypot(x, y);
+  if (length <= 1) return { x, y };
+  return { x: x / length, y: y / length };
+};
+
+/**
  * Devolve o comando como ele sera gravado e reproduzido.
  *
  * O cliente DEVE passar o resultado disto para a propria simulacao. Ver o
  * cabecalho do arquivo: e o que torna o replay exato.
  */
-export const quantizeCommand = (cmd: PlayerCommand): PlayerCommand => ({
-  move: { x: dq(q(cmd.move.x)), y: dq(q(cmd.move.y)) },
-  aim: { x: dq(q(cmd.aim.x)), y: dq(q(cmd.aim.y)) },
-  fire: cmd.fire,
-  ability: cmd.ability,
-  dodge: cmd.dodge,
-  interact: cmd.interact,
-  purge: cmd.purge,
-  choose: cmd.choose,
-});
+export const quantizeCommand = (cmd: PlayerCommand): PlayerCommand => {
+  const aim = aimDirection(cmd.aim.x, cmd.aim.y);
+  return {
+    move: { x: dq(q(cmd.move.x)), y: dq(q(cmd.move.y)) },
+    aim: { x: dq(q(aim.x)), y: dq(q(aim.y)) },
+    fire: cmd.fire,
+    ability: cmd.ability,
+    dodge: cmd.dodge,
+    interact: cmd.interact,
+    purge: cmd.purge,
+    choose: cmd.choose,
+  };
+};
 
 const packFlags = (cmd: PlayerCommand): number => {
   let flags = 0;

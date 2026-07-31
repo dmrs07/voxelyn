@@ -111,7 +111,10 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     const enemy = room.state.enemies.find((candidate) => candidate.alive)!;
     room.state.players[0].stunnedUntil = room.state.tick + 24;
     enemy.stunnedUntil = room.state.tick + 18;
-    loop.advance(1);
+    // Mais que um tick porque o render corre atrasado de proposito (ver
+    // INTERP_DELAY_TICKS): o quadro desenhado e o de dois ticks atras, e uma
+    // mudanca so aparece nele quando a linha de render alcanca o tick dela.
+    loop.advance(1 + 3);
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.players[0].stunnedUntil).toBe(room.state.players[0].stunnedUntil);
     expect(view.enemies.find((candidate) => candidate.id === enemy.id)?.stunnedUntil).toBe(enemy.stunnedUntil);

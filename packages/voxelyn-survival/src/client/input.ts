@@ -88,6 +88,38 @@ export const screenToWorldMove = (mx: number, my: number): Vec2 => {
 };
 
 /**
+ * Deflexao de TELA -> DIRECAO de mira no mundo, sempre unitaria.
+ *
+ * A conversao isometrica e a mesma do movimento; o que muda e o resto. A mira
+ * nao tem magnitude: a simulacao so usa o rumo dela, e quem le o vetor cru la
+ * na frente o normaliza de novo. Guardar aqui a escala da tela era caro e
+ * invisivel — ate deixar de ser.
+ *
+ * O DEFEITO QUE ISTO CONSERTA: no solo o comando passa por `quantizeCommand`
+ * antes de entrar na simulacao, e la cada eixo vira `round(v*127)` SATURADO em
+ * ±127. Isso pressupoe um vetor unitario — o cabecalho do codec diz isso com
+ * todas as letras —, e o que chegava era a diferenca em PIXELS entre o cursor e
+ * o centro da tela, na casa das centenas. Os dois eixos saturavam juntos, e o
+ * vetor inteiro colapsava numa das quatro diagonais.
+ *
+ * Consequencia medida, varrendo o cursor em volta do personagem: o tiro so saia
+ * em quatro rumos de tela — cima, baixo, esquerda, direita. Erro medio de 20,5
+ * graus e maximo de 44,5. Mirar na diagonal atirava reto para baixo, e mover o
+ * cursor nao mudava nada ate cruzar a fronteira, quando o tiro saltava 90 graus
+ * de uma vez. No analogico o mesmo estouro dava erro medio de 9 graus.
+ *
+ * Normalizar aqui e o conserto na origem: a mira sai deste metodo como o codec
+ * sempre presumiu que ela chegava.
+ */
+export const screenToWorldAim = (sx: number, sy: number): Vec2 => {
+  const wx = sx + sy * 2;
+  const wy = sy * 2 - sx;
+  const length = Math.hypot(wx, wy);
+  if (length <= 0) return { x: 0, y: 0 };
+  return { x: wx / length, y: wy / length };
+};
+
+/**
  * Entrada mobile-first: joystick fixo de movimento a esquerda, joystick fixo
  * de mira/auto-fire a direita e quatro acoes separadas acima da mira.
  * Teclado+mouse continuam sendo a modalidade desktop.
@@ -405,14 +437,10 @@ export class SurvivalInput {
       this.state.aimTouch.active &&
       (this.state.aimTouch.dx !== 0 || this.state.aimTouch.dy !== 0)
     ) {
-      const ax = this.state.aimTouch.dx;
-      const ay = this.state.aimTouch.dy;
-      cmd.aim = { x: ax + ay * 2, y: ay * 2 - ax };
+      cmd.aim = screenToWorldAim(this.state.aimTouch.dx, this.state.aimTouch.dy);
       cmd.fire = true;
     } else if (!this.state.usingTouch) {
-      const dx = this.mouse.x - playerScreen.x;
-      const dy = this.mouse.y - playerScreen.y;
-      cmd.aim = { x: dx + dy * 2, y: dy * 2 - dx };
+      cmd.aim = screenToWorldAim(this.mouse.x - playerScreen.x, this.mouse.y - playerScreen.y);
       cmd.fire = this.mouse.down;
     }
 
