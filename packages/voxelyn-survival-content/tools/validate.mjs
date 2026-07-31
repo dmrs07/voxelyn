@@ -12,7 +12,11 @@ import { PROP_KINDS } from './props.mjs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = resolve(__dirname, '../assets/atlases');
 const CANONICAL = {
-  'player-prospector': [32, 40],
+  // O bot PX e mais largo e mais alto que o mineiro de macacao que ele
+  // substitui: chassi de 280 kg e uma passada que joga o pe tres voxels a frente
+  // do corpo. Continua abaixo do Miner (48x60), que e o Prospector degradado e
+  // grande demais — se os dois medissem o mesmo, a leitura do encontro se perde.
+  'player-prospector': [44, 56],
   'enemy-stalker': [32, 32],
   'enemy-spitter': [32, 32],
   'enemy-spore-bomber': [32, 32],

@@ -1,12 +1,12 @@
 {
   "id": "layer-player-prospector-lower",
-  "version": 3,
+  "version": 4,
   "atlas": "layer-player-prospector-lower.png",
-  "frameWidth": 32,
-  "frameHeight": 40,
+  "frameWidth": 44,
+  "frameHeight": 56,
   "columns": 40,
-  "anchorX": 16,
-  "anchorY": 38,
+  "anchorX": 22,
+  "anchorY": 54,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -30,7 +30,8 @@
     "#0b0e14",
     "#1d2430",
     "#2e3a4d",
-    "#6e4a33"
+    "#6e4a33",
+    "#b8a98f"
   ],
   "animations": {
     "idle": {
@@ -40,7 +41,7 @@
     },
     "walk": {
       "frames": 6,
-      "fps": 10,
+      "fps": 18.4,
       "loop": true
     }
   },
@@ -64,7 +65,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "lower-body locomotion layer for the voxel-isometric prospector",
+    "prompt": "digitigrade locomotion layer for the Aurix PX prospector bot",
     "seedOrRef": "deterministic-code-v2"
   }
 }

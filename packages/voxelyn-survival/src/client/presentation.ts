@@ -108,10 +108,10 @@ const gunHeatOf = (entity: Entity, state: SurvivalState): { heat: number; overhe
  *
  * `action` ausente e o repouso — o tronco fica em `idle` apontado para a mira e
  * nao ha coice. Ele existe porque a composicao deixou de ser o caminho do tiro e
- * passou a ser o caminho PADRAO: enquanto so o disparo era composto, o
- * Prospector trocava de modelo toda vez que parava de atirar (o sheet completo
- * ainda carrega a picareta antiga), e o cano quente sumia da tela junto — o
- * calor dura segundos, a janela da acao dura sete ticks.
+ * passou a ser o caminho PADRAO: enquanto so o disparo era composto, o cano
+ * quente sumia da tela assim que o jogador soltava o gatilho, e o calor dura
+ * segundos contra os sete ticks da janela da acao. So a composicao separa a arma
+ * do corpo, e sem ela nao ha o que pintar.
  */
 const layeredPlayerAnimation = (
   entity: Entity,
@@ -371,12 +371,17 @@ export class EntityPresentation {
         : { x: entity.facing.x, y: entity.facing.y };
     const heading = facing(FACING_BODY, raw.x, raw.y);
 
-    // Repouso e caminhada do Prospector tambem saem COMPOSTOS. Os dois estados
-    // existem nas camadas, e usar o sheet completo neles trocava o modelo do
-    // personagem por outro — o completo ainda carrega a picareta que a arma
-    // substituiu — toda vez que o jogador soltava o gatilho. `hit`, `die`,
-    // `downed` e `revive` continuam vindo do sheet completo: sao as poses que as
-    // camadas nao autoram, e a troca ali e coberta pelo proprio evento.
+    // Repouso e caminhada do Prospector tambem saem COMPOSTOS.
+    //
+    // O sheet completo desenha o corpo inteiro numa peca so, entao nele a arma
+    // nao existe separada e nao ha o que pintar de quente. Como o calor decai em
+    // segundos e a janela da acao dura sete ticks, compor apenas durante o tiro
+    // fazia o cano incandescente sumir no instante em que o jogador soltava o
+    // gatilho — justamente quando ele quer conferir quanto ainda pode atirar.
+    //
+    // `hit`, `die`, `downed` e `revive` continuam vindo do sheet completo: sao as
+    // poses que as camadas nao autoram, e nas quatro o jogador tem coisa mais
+    // urgente para ler do que a temperatura da arma.
     if (entity.archetype === 'prospector' && (base.anim === 'idle' || base.anim === 'walk')) {
       const layered = layeredPlayerAnimation(
         entity, base, null, nowMs - base.animStartMs, nowMs, facing, gunHeatOf(entity, state)

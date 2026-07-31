@@ -2,11 +2,11 @@
   "id": "player-prospector",
   "version": 2,
   "atlas": "player-prospector.png",
-  "frameWidth": 32,
-  "frameHeight": 40,
-  "columns": 124,
-  "anchorX": 16,
-  "anchorY": 38,
+  "frameWidth": 44,
+  "frameHeight": 56,
+  "columns": 93,
+  "anchorX": 22,
+  "anchorY": 54,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -29,14 +29,15 @@
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
-    "#1f3d33",
     "#2e3a4d",
     "#2f6b4f",
     "#46566e",
     "#59f2c2",
     "#66c28a",
     "#6e4a33",
+    "#7ab8ff",
     "#b8a98f",
+    "#e8f1ff",
     "#ffd166"
   ],
   "animations": {
@@ -47,7 +48,7 @@
     },
     "walk": {
       "frames": 6,
-      "fps": 10,
+      "fps": 18.4,
       "loop": true
     },
     "attack": {
@@ -116,7 +117,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric underground prospector, pale mining helmet, cyan visor, asymmetric tool ring and fungal back module",
+    "prompt": "voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm",
     "seedOrRef": "deterministic-code-v2"
   }
 }

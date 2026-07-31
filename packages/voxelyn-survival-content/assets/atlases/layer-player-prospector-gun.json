@@ -1,12 +1,12 @@
 {
   "id": "layer-player-prospector-gun",
-  "version": 3,
+  "version": 4,
   "atlas": "layer-player-prospector-gun.png",
-  "frameWidth": 32,
-  "frameHeight": 40,
+  "frameWidth": 44,
+  "frameHeight": 56,
   "columns": 32,
-  "anchorX": 16,
-  "anchorY": 38,
+  "anchorX": 22,
+  "anchorY": 54,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -67,7 +67,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "shard driver weapon layer for the voxel-isometric prospector, tinted by barrel heat at runtime",
+    "prompt": "shard driver weapon layer for the Aurix PX prospector bot, tinted by barrel heat at runtime",
     "seedOrRef": "deterministic-code-v2"
   }
 }

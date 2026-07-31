@@ -120,3 +120,20 @@ export const FIRST_PACK_IDS = [
   'fx-projectile-bolt',
   'fx-impact-burst',
 ] as const;
+
+/**
+ * Distancia que o Prospector percorre num ciclo completo de caminhada, em tiles.
+ *
+ * Este e o CONTRATO entre a animacao e a simulacao, e existe porque as duas
+ * vivem em pacotes que nao se enxergam: o pipeline de arte so depende de
+ * `@voxelyn/core`, e inverter essa dependencia para ler `PLAYER_SPEED` acoplaria
+ * a geracao de sprites ao balanceamento.
+ *
+ * O ciclo tem de durar exatamente o tempo que o personagem leva para cobrir esta
+ * distancia. Fora disso o pe patina — para a frente se a animacao for lenta
+ * demais, para tras se for rapida demais. O valor sai da passada AUTORADA no
+ * gerador (`tools/prospector.mjs`), e ha um teste de cada lado: um conferindo
+ * que o gerador continua autorando esta passada, e outro conferindo que o `fps`
+ * assado no atlas casa com a velocidade real do jogador.
+ */
+export const PROSPECTOR_WALK_CYCLE_TILES = 1.5;

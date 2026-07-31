@@ -1,49 +1,39 @@
 import { box, collapse, renderVoxels } from './voxel.mjs';
 import {
-  facetEllipse,
-  fillDiamond,
-  fillEllipse,
-  fillRect,
-  grid,
-  line,
-  outlineWith,
-  set,
-  thickLine,
-} from './lib.mjs';
+  ANCHOR_X as PROSPECTOR_ANCHOR_X,
+  ANCHOR_Y as PROSPECTOR_ANCHOR_Y,
+  FRAME_HEIGHT as PROSPECTOR_FRAME_HEIGHT,
+  FRAME_WIDTH as PROSPECTOR_FRAME_WIDTH,
+  RENDER_ANCHOR_X as PROSPECTOR_RENDER_ANCHOR_X,
+  RENDER_ANCHOR_Y as PROSPECTOR_RENDER_ANCHOR_Y,
+  WALK_FRAMES,
+  WALK_SWING,
+  prospectorParts,
+  prospectorProne,
+} from './prospector.mjs';
+// Restos do desenhador 2D que os modelos voxel substituiram — `limb`, `scatter`,
+// `dirInfo`, as tabelas de fase e os ajudantes de elipse — sairam junto com o
+// ultimo personagem que ainda os usava. Continuavam importados e definidos sem
+// nenhuma chamada, e o lint do repositorio ja os acusava.
+import { fillDiamond, grid, outlineWith, set } from './lib.mjs';
 
 export const ANIM_ORDER = ['idle', 'walk', 'attack', 'special', 'hit', 'downed', 'revive', 'die', 'fly', 'burst'];
 const DIRS = ['dr', 'dl', 'ur', 'ul'];
-const dirInfo = (dir) => ({
-  front: dir === 'dr' || dir === 'dl',
-  side: dir === 'dr' || dir === 'ur' ? 1 : -1,
-  back: dir === 'ur' || dir === 'ul',
-});
-const bob6 = [0, -1, -1, 0, 0, -1];
-const walkPhase = [0, 1, 2, 0, 2, 1];
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-
-const limb = (g, x0, y0, x1, y1, name = 'rockShadow', width = 1) => {
-  thickLine(g, x0, y0, x1, y1, width, name);
-  set(g, x1, y1, 'rockLight');
-};
-
-const scatter = (g, cx, cy, phase, names, spreadX, spreadY) => {
-  const offsets = [[-5, 0], [-3, -3], [0, 1], [3, -2], [5, 1], [-1, -5], [2, 4], [-5, 4]];
-  const count = clamp(2 + phase * 2, 2, offsets.length);
-  for (let i = 0; i < count; i++) {
-    const [ox, oy] = offsets[i];
-    const x = cx + Math.round((ox * spreadX * phase) / 4);
-    const y = cy + Math.round((oy * spreadY * phase) / 4);
-    fillRect(g, x, y, i % 3 === 0 ? 2 : 1, i % 2 === 0 ? 2 : 1, names[i % names.length]);
-  }
-};
 
 // ---------------------------------------------------------------------------
-// player-prospector 32x40 — MODELO VOXEL
+// player-prospector — SHEET COMPLETO do bot PX
 //
-// Este e o primeiro personagem migrado do desenho 2D para o rasterizador voxel.
-// As quatro direcoes sao rotacoes do mesmo modelo, entao nao podem divergir
-// entre si como acontecia quando cada uma era redesenhada a mao.
+// O modelo vive em `prospector.mjs` e e o MESMO das tres camadas de runtime.
+// Este arquivo so escolhe a pose de cada quadro e concatena as partes.
+//
+// Antes o corpo estava escrito duas vezes, aqui e la, e os dois ja tinham
+// divergido: este carregava uma picareta e as camadas carregavam a arma que a
+// substituiu. O jogador via o personagem trocar de modelo toda vez que soltava
+// o gatilho, porque a composicao so valia durante a acao de tiro.
+//
+// O sheet completo continua existindo pelas poses que as camadas nao autoram —
+// `hit`, `die`, `downed` e `revive` —, e por ser o caminho de recuo enquanto os
+// tres atlas de camada nao carregaram.
 // ---------------------------------------------------------------------------
 const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
 
@@ -55,103 +45,46 @@ const DIR_INDEX = { dr: 0, dl: 1, ur: 2, ul: 3 };
 const DIE_FRAMES = 5;
 const dieT = (f) => Math.min(1, Math.max(0, f) / (DIE_FRAMES - 1));
 
-/** Prospector de pe. `y0` desloca o corpo (bob, recuo de dano). */
-const prospectorStanding = ({ bob = 0, st = 0, sw = 0, lean = 0, crouch = 0 } = {}) => {
-  const b = [];
-  // `crouch` encurta as pernas E baixa todo o resto na mesma medida: sem isso
-  // o tronco descola das pernas nos frames de queda e de revive.
-  const c = Math.max(0, Math.min(3, crouch));
-  const legH = Math.max(1, 3 - c);
-  const up = bob - c;
-  // botas + pernas
-  b.push(box(-2, -1, Math.max(0, st), 2, 2, 1, 'rust'));
-  b.push(box(1, -1, Math.max(0, -st), 2, 2, 1, 'rust'));
-  b.push(box(-2, -1, 1 + Math.max(0, st), 2, 2, legH, 'rockDeep'));
-  b.push(box(1, -1, 1 + Math.max(0, -st), 2, 2, legH, 'rockDeep'));
-  // cinto
-  b.push(box(-2, -1 + lean, 5 + up, 5, 2, 1, 'loot'));
-  // torso: peitoral na frente, modulo fungico nas costas
-  b.push(box(-2, -1 + lean, 6 + up, 5, 2, 4, 'rock'));
-  b.push(box(-2, -2 + lean, 6 + up, 5, 1, 4, 'rust'));
-  b.push(box(-1, 1 + lean, 7 + up, 3, 1, 3, 'fungus'));
-  b.push(box(-1, 2 + lean, 8 + up, 3, 1, 1, 'biolum'));
-  // ombreiras
-  b.push(box(-3, -1 + lean, 9 + up, 1, 2, 1, 'rock'));
-  b.push(box(3, -1 + lean, 9 + up, 1, 2, 1, 'rock'));
-  // capacete assentado nos ombros + visor + lanterna
-  b.push(box(-1, -1 + lean * 2, 10 + up, 3, 3, 2, 'bone'));
-  b.push(box(-1, -2 + lean * 2, 10 + up, 3, 1, 1, 'biolum'));
-  b.push(box(0, -2 + lean * 2, 11 + up, 1, 1, 1, 'loot'));
-  // bracos + picareta
-  b.push(box(-3, -1 + lean, 6 + up, 1, 2, 3, 'rock'));
-  b.push(box(3, -1 + lean, 6 + up + sw, 1, 2, 3, 'rock'));
-  b.push(box(3, -2 + lean, 4 + up + sw * 3, 1, 1, 3, 'loot'));
-  return b;
-};
-
-/**
- * Prospector CAIDO, de costas no chao. Silhueta horizontal — em co-op este e
- * o estado que o parceiro precisa reconhecer de longe para vir reanimar, entao
- * ele nao pode parecer so uma versao baixinha da pose em pe.
- * O modulo fungico e o visor ficam virados para cima, funcionando como farol.
- */
-const prospectorProne = ({ breath = 0, settle = 0 } = {}) => {
-  // +1: deitado, a diagonal do corpo alcanca mais para a frente que os pes da
-  // pose em pe e furava a base do frame. Um voxel acima alinha as duas bases.
-  const z = settle + 1;
-  const b = [];
-  // O corpo fica ENCOLHIDO e centrado no MESMO eixo da pose em pe. Na projecao
-  // isometrica largura e profundidade somam na mesma diagonal, entao bracos
-  // abertos e pernas estendidas jogavam o sprite para fora do frame de 32px, e
-  // um corpo autorado mais a frente empurrava a UNIAO das poses para fora
-  // mesmo com cada pose cabendo sozinha. Recolhido tambem le melhor: alguem
-  // incapacitado, nao um cadaver largado.
-  // capacete no chao, visor para cima
-  b.push(box(-1, -4, z, 3, 2, 2, 'bone'));
-  b.push(box(-1, -4, z + 2, 3, 2, 1, 'biolum'));
-  // torso deitado, peitoral virado para cima
-  b.push(box(-2, -2, z, 5, 3, 2, 'rock'));
-  b.push(box(-2, -2, z + 2, 5, 3, 1, 'rust'));
-  // modulo fungico brilhando para cima: farol de revive
-  b.push(box(-1, -1, z + 3 + breath, 3, 1, 1, 'biolum'));
-  // joelhos dobrados contra o tronco
-  b.push(box(-2, 1, z, 2, 2, 2, 'rockDeep'));
-  b.push(box(1, 1, z, 2, 2, 2, 'rockDeep'));
-  // bracos junto ao corpo
-  b.push(box(-3, -2, z, 1, 2, 1, 'rock'));
-  b.push(box(3, -2, z, 1, 2, 1, 'rock'));
-  // picareta caida ao lado
-  b.push(box(3, 1, z, 1, 2, 1, 'loot'));
-  return b;
+/** Corpo inteiro numa pose: as tres camadas empilhadas na ordem de montagem. */
+const prospectorStanding = (pose) => {
+  const parts = prospectorParts(pose);
+  return [...parts.lower, ...parts.upper, ...parts.gun];
 };
 
 /** Modelo 3D do prospector para uma animacao/frame. */
 const prospectorModel = (anim, f) => {
   if (anim === 'idle') return prospectorStanding({ bob: [0, 0, 1, 0][f % 4] });
-  if (anim === 'walk') return prospectorStanding({ st: [0, 1, 2, 1, 0, -1][f % 6] });
-  if (anim === 'attack') return prospectorStanding({ sw: [0, 0, 1, 2][f % 4] });
+  if (anim === 'walk') return prospectorStanding({ swing: WALK_SWING[f % WALK_FRAMES] });
+  if (anim === 'attack') return prospectorStanding({ kick: [0, 2, 1, 0][f % 4], flash: f % 4 === 1 });
   // dano: recuo real do tronco e da cabeca, nao um pixel de bob
   if (anim === 'hit') return prospectorStanding({ lean: [1, 0][f % 2], bob: [1, 0][f % 2] });
   // queda: dois frames tombando, depois o corpo ja no chao assentando
   if (anim === 'die') {
-    if (f === 0) return prospectorStanding({ lean: 1, crouch: 1 });
-    if (f === 1) return prospectorStanding({ lean: 2, crouch: 3 });
+    if (f === 0) return prospectorStanding({ lean: 1, crouch: 2 });
+    if (f === 1) return prospectorStanding({ lean: 2, crouch: 4 });
     return prospectorProne({ settle: Math.max(0, 4 - f) });
   }
-  // abatido: respira devagar, com o farol pulsando
+  // abatido: o farol e o nucleo pulsam devagar
   if (anim === 'downed') return prospectorProne({ breath: [0, 0, 1, 0][f % 4] });
   // revive: espelha a queda — sobe do chao ate ficar de pe
   if (anim === 'revive') {
     if (f <= 2) return prospectorProne({ settle: f });
-    if (f === 3) return prospectorStanding({ lean: 2, crouch: 3 });
-    if (f === 4) return prospectorStanding({ lean: 1, crouch: 1 });
+    if (f === 3) return prospectorStanding({ lean: 2, crouch: 4 });
+    if (f === 4) return prospectorStanding({ lean: 1, crouch: 2 });
     return prospectorStanding({});
   }
   return prospectorStanding({});
 };
 
 const prospectorFrame = (dir, anim, f) =>
-  renderVoxels(prospectorModel(anim, f), DIR_INDEX[dir], 32, 40, 14, 34);
+  renderVoxels(
+    prospectorModel(anim, f),
+    DIR_INDEX[dir],
+    PROSPECTOR_FRAME_WIDTH,
+    PROSPECTOR_FRAME_HEIGHT,
+    PROSPECTOR_RENDER_ANCHOR_X,
+    PROSPECTOR_RENDER_ANCHOR_Y
+  );
 
 // ---------------------------------------------------------------------------
 // enemy-stalker 32x32 — predador baixo e comprido, quitina, lamina mineral
@@ -808,11 +741,25 @@ const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, 
 });
 
 export const ENTITY_SPECS = [
-  base('player-prospector', 32, 40, 16, 38, { w: 0.68, h: 1 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
-    ...living,
-    downed: { frames: 4, fps: 6, loop: true },
-    revive: { frames: 6, fps: 8, loop: false },
-  }, prospectorFrame, 'voxel-isometric underground prospector, pale mining helmet, cyan visor, asymmetric tool ring and fungal back module'),
+  base(
+    'player-prospector',
+    PROSPECTOR_FRAME_WIDTH,
+    PROSPECTOR_FRAME_HEIGHT,
+    PROSPECTOR_ANCHOR_X,
+    PROSPECTOR_ANCHOR_Y,
+    { w: 0.68, h: 1 },
+    { w: 1, h: 1, offsetX: 0, offsetY: 0 },
+    {
+      ...living,
+      // A caminhada do sheet completo usa a MESMA contagem de quadros das
+      // camadas; a cadencia sai do mesmo calculo, no manifest da camada de baixo.
+      walk: { frames: WALK_FRAMES, fps: 18.4, loop: true },
+      downed: { frames: 4, fps: 6, loop: true },
+      revive: { frames: 6, fps: 8, loop: false },
+    },
+    prospectorFrame,
+    'voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm'
+  ),
   base('enemy-stalker', 32, 32, 16, 30, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions'),
   base('enemy-spitter', 32, 32, 16, 30, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents'),
   base('enemy-spore-bomber', 32, 32, 16, 30, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {

@@ -1,12 +1,12 @@
 {
   "id": "layer-player-prospector-upper",
-  "version": 3,
+  "version": 4,
   "atlas": "layer-player-prospector-upper.png",
-  "frameWidth": 32,
-  "frameHeight": 40,
+  "frameWidth": 44,
+  "frameHeight": 56,
   "columns": 32,
-  "anchorX": 16,
-  "anchorY": 38,
+  "anchorX": 22,
+  "anchorY": 54,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -27,16 +27,17 @@
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
+    "#0b0e14",
     "#1d2430",
-    "#1f3d33",
     "#2e3a4d",
     "#2f6b4f",
     "#46566e",
     "#59f2c2",
     "#66c28a",
     "#6e4a33",
+    "#7ab8ff",
     "#b8a98f",
-    "#ffd166"
+    "#e8f1ff"
   ],
   "animations": {
     "idle": {
@@ -70,7 +71,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "upper-body aim and attack layer for the voxel-isometric prospector",
+    "prompt": "chassis, back hardpoint and sensor head layer for the Aurix PX prospector bot",
     "seedOrRef": "deterministic-code-v2"
   }
 }
