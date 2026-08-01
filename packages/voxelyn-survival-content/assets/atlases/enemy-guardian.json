@@ -1,6 +1,6 @@
 {
   "id": "enemy-guardian",
-  "version": 4,
+  "version": 5,
   "atlas": "enemy-guardian.png",
   "frameWidth": 96,
   "frameHeight": 112,
@@ -106,7 +106,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core",
+    "prompt": "voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with mushroom spire towers, round diffuse electric core, stubby armored crawler legs and dominion claws",
     "seedOrRef": "deterministic-code-v2"
   }
 }

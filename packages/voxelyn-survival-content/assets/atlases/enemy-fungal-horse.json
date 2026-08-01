@@ -1,6 +1,6 @@
 {
   "id": "enemy-fungal-horse",
-  "version": 4,
+  "version": 5,
   "atlas": "enemy-fungal-horse.png",
   "frameWidth": 160,
   "frameHeight": 168,
@@ -108,7 +108,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates",
+    "prompt": "voxel-isometric fungal warhorse, long low body, ember mane crest and burning tail tip, split hooves, draped organic plate barding with gold flank medallions, crested war mask",
     "seedOrRef": "deterministic-code-v2"
   }
 }
