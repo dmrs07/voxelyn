@@ -29,6 +29,11 @@ const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
   bishop: 'enemy.bishop',
   miner: 'enemy.miner',
   guardian: 'enemy.guardian',
+  resonant: 'enemy.resonant',
+  mud_lamprey: 'enemy.mud_lamprey',
+  bellows: 'enemy.bellows',
+  scoriac: 'enemy.scoriac',
+  frost_wraith: 'enemy.frost_wraith',
 };
 
 /**

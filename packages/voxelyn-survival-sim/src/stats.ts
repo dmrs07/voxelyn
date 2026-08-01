@@ -44,7 +44,10 @@ export const TARGET_EXTRACTION_TICKS = TARGET_SECTOR_TICKS * SECTOR_COUNT;
 
 export const emptyStats = (): RunStats => ({
   shotsFired: 0,
-  kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0 },
+  kills: {
+    stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0,
+    resonant: 0, mud_lamprey: 0, bellows: 0, scoriac: 0, frost_wraith: 0,
+  },
   damageTakenTenths: 0,
   damageDealtTenths: 0,
   solidsDestroyed: 0,

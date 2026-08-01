@@ -35,11 +35,12 @@ import {
   SURF_FUNGAL,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
-import { setSurface } from './cells.js';
-import { spawnEnemy } from './entities.js';
+import { isConductiveSurface, setSurface } from './cells.js';
+import { SIGNATURE_OF_STRATUM, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
 import { generateWorld } from './worldgen.js';
-import type { SemanticEvent, SurvivalState } from './types.js';
+import { SURF_ICE } from './constants.js';
+import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
 
 /**
  * Seed do setor N a partir da seed da run.
@@ -84,6 +85,40 @@ const plantBishopPocket = (state: SurvivalState, cx: number, cy: number): void =
   }
 };
 
+/**
+ * Onde a assinatura realmente nasce: espreitadores sao realocados para a
+ * celula do proprio elemento (agua/gelo) mais proxima do ponto sorteado, numa
+ * varredura em anel deterministica. Sem elemento ao alcance, ficam no ponto
+ * original — expostos, que e um encontro valido, so nao o ideal.
+ */
+const signatureHome = (
+  state: SurvivalState,
+  signature: EnemyArchetype,
+  x: number,
+  y: number,
+): { x: number; y: number } => {
+  const wantsWater = signature === 'mud_lamprey';
+  const wantsIce = signature === 'frost_wraith';
+  if (!wantsWater && !wantsIce) return { x, y };
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let r = 0; r <= 10; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx <= 0 || ny <= 0 || nx >= w - 1 || ny >= h - 1) continue;
+        const i = ny * w + nx;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        if (wantsWater && isConductiveSurface(state.surface[i])) return { x: nx, y: ny };
+        if (wantsIce && state.surface[i] === SURF_ICE) return { x: nx, y: ny };
+      }
+    }
+  }
+  return { x, y };
+};
+
 /** Popula inimigos e o Guardiao (se houver) do setor. */
 export const populateSector = (
   state: SurvivalState,
@@ -116,11 +151,25 @@ export const populateSector = (
   // nunca a quantidade de sorteios, senao a mesma seed produziria runs
   // diferentes conforme a linhagem consumisse a RNG em ordens distintas.
   const horseHere = state.rng.nextFloat01() < horseChanceFor(biome, HORSE_SPAWN_CHANCE);
+
+  // O inimigo de ASSINATURA do estrato ocupa uma vaga comum — nunca soma. Um
+  // por setor, no primeiro terco da lista: cedo o bastante para ensinar a regra
+  // do bioma enquanto ela ainda decide a travessia. Espreitadores nascem DENTRO
+  // do proprio elemento: uma lampreia em chao seco nao e um encontro, e um
+  // peixe fora d'agua.
+  const signature = SIGNATURE_OF_STRATUM[state.stratum] as EnemyArchetype | undefined;
+  const signatureIndex = signature ? Math.floor(spawns.length / 3) : -1;
+
   for (let i = 0; i < budget; i++) {
     if (i === eliteIndex && horseHere) {
       // Nao entra como `elite`: elite acende o fungo sob os proprios pes, e o
       // cavalo ficaria cercado do fogo que so a investida dele devia acender.
       spawnEnemy(state, 'fungal_horse', spawns[i].x, spawns[i].y, false);
+      continue;
+    }
+    if (signature && i === signatureIndex && i !== eliteIndex) {
+      const home = signatureHome(state, signature, spawns[i].x, spawns[i].y);
+      spawnEnemy(state, signature, home.x, home.y, false);
       continue;
     }
     spawnEnemy(state, mix[i % mix.length], spawns[i].x, spawns[i].y, i === eliteIndex);

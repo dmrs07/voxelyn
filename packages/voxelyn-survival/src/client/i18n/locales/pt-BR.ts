@@ -167,6 +167,11 @@ export const PT_BR = {
   'enemy.fungal_horse': 'Corcel',
   'enemy.bishop': 'Bispo',
   'enemy.guardian': 'Guardião',
+  'enemy.resonant': 'Ressonante',
+  'enemy.mud_lamprey': 'Lampreia',
+  'enemy.bellows': 'Fole',
+  'enemy.scoriac': 'Escoriáceo',
+  'enemy.frost_wraith': 'Espectro',
 
   'bestiary.name.stalker': 'Espreitador',
   'bestiary.name.spitter': 'Cuspidor',
@@ -174,6 +179,11 @@ export const PT_BR = {
   'bestiary.name.bruiser': 'Britador',
   'bestiary.name.miner': 'Minerador Empobrecido',
   'bestiary.name.fungal_horse': 'Corcel Fúngico',
+  'bestiary.name.resonant': 'Ressonante',
+  'bestiary.name.mud_lamprey': 'Lampreia de Lodo',
+  'bestiary.name.bellows': 'Fole',
+  'bestiary.name.scoriac': 'Escoriáceo',
+  'bestiary.name.frost_wraith': 'Espectro de Geada',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
 
@@ -194,6 +204,21 @@ export const PT_BR = {
     'Extratora da geração anterior. Operação após o encerramento do contrato não foi autorizada. Sem valor de recuperação.',
   'bestiary.code.fungal_horse': 'ATIVO HOSTIL EQ-02',
   'bestiary.note.fungal_horse': 'Quadrúpede adaptado. A presença de arreios não implica operador.',
+  'bestiary.code.resonant': 'ESPÉCIME CRIST-01',
+  'bestiary.note.resonant':
+    'Induz descarga em formações cristalinas próximas. Perda de material catalogável atribuída ao espécime, não ao protocolo de extração.',
+  'bestiary.code.mud_lamprey': 'ESPÉCIME AQU-03',
+  'bestiary.note.mud_lamprey':
+    'Predador lacustre. Ataques ocorrem exclusivamente a partir da lâmina d’água. Drenagem preventiva excede o orçamento do setor.',
+  'bestiary.code.bellows': 'ESPÉCIME SULF-08',
+  'bestiary.note.bellows':
+    'Redistribui gases do estrato por respiração. Utilidade como equipamento de ventilação avaliada e arquivada.',
+  'bestiary.code.scoriac': 'ESPÉCIME VULC-05',
+  'bestiary.note.scoriac':
+    'Carapaça refratária de escória. Vulnerável após exposição térmica — condição que também o torna consideravelmente pior.',
+  'bestiary.code.frost_wraith': 'ESPÉCIME GLAC-02',
+  'bestiary.note.frost_wraith':
+    'Desloca-se sob a lâmina de gelo. Relatos de "assombração" refletem baixa visibilidade, não fenômeno anômalo.',
   'bestiary.code.bishop': 'ATIVO HOSTIL EQ-09',
   'bestiary.note.bishop':
     'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',

@@ -103,6 +103,12 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-bishop',
   'enemy-fungal-horse',
   'enemy-miner',
+  // Bestiario de assinatura: um por estrato (leva 3 do sistema de biomas).
+  'enemy-resonant',
+  'enemy-mud-lamprey',
+  'enemy-bellows',
+  'enemy-scoriac',
+  'enemy-frost-wraith',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [

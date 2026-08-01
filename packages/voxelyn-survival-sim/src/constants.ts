@@ -128,6 +128,72 @@ export const COAL_FIRE_FUEL_TICKS = 110;
  * conducao e de rota — e nao uma edicao permanente do mapa.
  */
 export const ICE_REFREEZE_TICKS = 280;
+
+// ---------------------------------------------------------------------------
+// Bestiario de assinatura: um inimigo por estrato, manipulando a REGRA do bioma
+// ---------------------------------------------------------------------------
+// A regra que rege os cinco: nenhum deles inventa mecanica nova. Cada um opera
+// uma alavanca que o estrato ja tem — cristal que descarrega, agua que conduz,
+// gas que ocupa espaco, brasa que aquece, gelo que derrete. Uma criatura de
+// gelo que so desse "dano de gelo" seria uma skin; uma que usa o lago como
+// cobertura pertence ao lugar.
+
+/**
+ * Ressonante (Catedral Prismatica): nao atira no jogador. Ele VIBRA, e a
+ * vibracao arma os cristais em volta — cada um descarrega pelas aberturas
+ * coladas nele. O contra-jogo e decidir QUAIS cristais quebrar antes, onde
+ * enfrenta-lo, ou usar a propria cadeia contra ele.
+ */
+export const RESONANT_PULSE_RADIUS = 4.5;
+/** Telegrafo LONGO (1,2 s): a area do pulso e grande e muda conforme a sala. */
+export const RESONANT_WINDUP_TICKS = 24;
+export const RESONANT_COOLDOWN_TICKS = 150;
+/** Cristais armados por pulso, no maximo. Orcamento, como toda propagacao. */
+export const RESONANT_CRYSTAL_BUDGET = 12;
+
+/**
+ * Lampreia de Lodo (Aquifero Negro): submersa enquanto nao ataca — o cliente
+ * desenha a ondulacao, nao o corpo. Ela so se move POR liquido; o bote curto e
+ * telegrafado e a unica hora em que sai da agua. Corrente na agua a atordoa
+ * (regra generica de descarga), mas a descarga percorre a poca inteira.
+ */
+export const LAMPREY_LUNGE_RANGE = 3.4;
+export const LAMPREY_LUNGE_WINDUP_TICKS = 14; // a agua "se abre" por 0,7 s
+export const LAMPREY_LUNGE_COOLDOWN_TICKS = 64;
+
+/**
+ * Fole (Fenda Sulfurosa): respira o ambiente. Na fase de inspirar, remove gas
+ * num raio em volta; na de expelir, sopra uma linha de gas na direcao OPOSTA
+ * ao jogador. Deixa-lo vivo por alguns segundos limpa a passagem que voce
+ * quer — e contamina a que voce ia usar depois.
+ */
+export const BELLOWS_BREATH_RADIUS = 3;
+export const BELLOWS_CYCLE_TICKS = 100; // 5 s inspirando, 5 s expelindo
+export const BELLOWS_BREATH_INTERVAL_TICKS = 12;
+export const BELLOWS_INHALE_PER_BREATH = 4;
+export const BELLOWS_EXHALE_LENGTH = 6;
+
+/**
+ * Escoriaceo (Fornalha Abissal): carapaca resfriada reduz TODO dano enquanto
+ * frio. Pisar em brasa ou fogo abre a couraça: vulneravel — e mais rapido e
+ * agressivo — por alguns segundos. A pergunta e do jogador: quanto risco
+ * termico aceitar para torna-lo vulneravel?
+ */
+export const SCORIAC_ARMOR_SCALE = 0.45;
+export const SCORIAC_HOT_TICKS = 160; // ~8 s de couraça aberta
+export const SCORIAC_HOT_SPEED_SCALE = 1.45;
+
+/**
+ * Espectro de Geada (Cripta Glacial): move-se SOB o gelo — rapido, raso,
+ * dificil de ler fora da lamina — e emerge num bote telegrafado. Derreter o
+ * lago tira a cobertura dele: exposto, e um corpo palido e lento na agua que
+ * voce acabou de tornar condutiva.
+ */
+export const WRAITH_LUNGE_RANGE = 3.2;
+export const WRAITH_LUNGE_WINDUP_TICKS = 12;
+export const WRAITH_LUNGE_COOLDOWN_TICKS = 70;
+/** Sob o gelo ele desliza mais rapido do que qualquer coisa anda. */
+export const WRAITH_UNDER_ICE_SPEED_SCALE = 1.35;
 export const DISCHARGE_DAMAGE = 26;
 export const DISCHARGE_TICKS = 6;
 /** Controle direto do Conductive em alvos organicos: 1,2 s a 20 Hz. */

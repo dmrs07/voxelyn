@@ -33,6 +33,11 @@ import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-gua
 import bishopManifest from '@voxelyn/survival-content/assets/atlases/enemy-bishop.json';
 import horseManifest from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.json';
 import minerManifest from '@voxelyn/survival-content/assets/atlases/enemy-miner.json';
+import resonantManifest from '@voxelyn/survival-content/assets/atlases/enemy-resonant.json';
+import lampreyManifest from '@voxelyn/survival-content/assets/atlases/enemy-mud-lamprey.json';
+import bellowsManifest from '@voxelyn/survival-content/assets/atlases/enemy-bellows.json';
+import scoriacManifest from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.json';
+import wraithManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
@@ -51,6 +56,11 @@ import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian
 import bishopUrl from '@voxelyn/survival-content/assets/atlases/enemy-bishop.png?url';
 import horseUrl from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.png?url';
 import minerUrl from '@voxelyn/survival-content/assets/atlases/enemy-miner.png?url';
+import resonantUrl from '@voxelyn/survival-content/assets/atlases/enemy-resonant.png?url';
+import lampreyUrl from '@voxelyn/survival-content/assets/atlases/enemy-mud-lamprey.png?url';
+import bellowsUrl from '@voxelyn/survival-content/assets/atlases/enemy-bellows.png?url';
+import scoriacUrl from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.png?url';
+import wraithUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
@@ -208,6 +218,11 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: bishopManifest as unknown as SpriteManifestEntry, url: bishopUrl },
   { manifest: horseManifest as unknown as SpriteManifestEntry, url: horseUrl },
   { manifest: minerManifest as unknown as SpriteManifestEntry, url: minerUrl },
+  { manifest: resonantManifest as unknown as SpriteManifestEntry, url: resonantUrl },
+  { manifest: lampreyManifest as unknown as SpriteManifestEntry, url: lampreyUrl },
+  { manifest: bellowsManifest as unknown as SpriteManifestEntry, url: bellowsUrl },
+  { manifest: scoriacManifest as unknown as SpriteManifestEntry, url: scoriacUrl },
+  { manifest: wraithManifest as unknown as SpriteManifestEntry, url: wraithUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
 ];
@@ -222,6 +237,11 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
   bishop: 'enemy-bishop',
   fungal_horse: 'enemy-fungal-horse',
   miner: 'enemy-miner',
+  resonant: 'enemy-resonant',
+  mud_lamprey: 'enemy-mud-lamprey',
+  bellows: 'enemy-bellows',
+  scoriac: 'enemy-scoriac',
+  frost_wraith: 'enemy-frost-wraith',
 };
 
 /**

@@ -164,6 +164,11 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.fungal_horse': 'Steed',
   'enemy.bishop': 'Bishop',
   'enemy.guardian': 'Guardian',
+  'enemy.resonant': 'Resonant',
+  'enemy.mud_lamprey': 'Lamprey',
+  'enemy.bellows': 'Bellows',
+  'enemy.scoriac': 'Scoriac',
+  'enemy.frost_wraith': 'Wraith',
 
   'bestiary.name.stalker': 'Stalker',
   'bestiary.name.spitter': 'Spitter',
@@ -171,6 +176,11 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.bruiser': 'Crusher',
   'bestiary.name.miner': 'Impoverished Miner',
   'bestiary.name.fungal_horse': 'Fungal Steed',
+  'bestiary.name.resonant': 'Resonant',
+  'bestiary.name.mud_lamprey': 'Mud Lamprey',
+  'bestiary.name.bellows': 'Bellows',
+  'bestiary.name.scoriac': 'Scoriac',
+  'bestiary.name.frost_wraith': 'Frost Wraith',
   'bestiary.name.bishop': 'Bishop of the Vein',
   'bestiary.name.guardian': 'Guardian of the Core',
 
@@ -192,6 +202,21 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.code.fungal_horse': 'HOSTILE ASSET EQ-02',
   'bestiary.note.fungal_horse':
     'Adapted quadruped. The presence of a harness does not imply an operator.',
+  'bestiary.code.resonant': 'SPECIMEN CRYST-01',
+  'bestiary.note.resonant':
+    'Induces discharge in nearby crystal formations. Loss of catalogable material attributed to the specimen, not to extraction protocol.',
+  'bestiary.code.mud_lamprey': 'SPECIMEN AQU-03',
+  'bestiary.note.mud_lamprey':
+    'Lacustrine predator. Attacks occur exclusively from beneath the waterline. Preventive drainage exceeds sector budget.',
+  'bestiary.code.bellows': 'SPECIMEN SULF-08',
+  'bestiary.note.bellows':
+    'Redistributes stratum gases through respiration. Utility as ventilation equipment evaluated and shelved.',
+  'bestiary.code.scoriac': 'SPECIMEN VULC-05',
+  'bestiary.note.scoriac':
+    'Refractory slag carapace. Vulnerable after thermal exposure — a condition that also makes it considerably worse.',
+  'bestiary.code.frost_wraith': 'SPECIMEN GLAC-02',
+  'bestiary.note.frost_wraith':
+    'Travels beneath the ice sheet. Reports of "haunting" reflect poor visibility, not anomalous phenomena.',
   'bestiary.code.bishop': 'HOSTILE ASSET EQ-09',
   'bestiary.note.bishop':
     'Ceremonial figure. The claim of religious structure remains uncorroborated.',

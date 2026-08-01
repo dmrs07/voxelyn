@@ -292,6 +292,12 @@ export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'bruiser',
   'miner',
   'fungal_horse',
+  // Assinaturas de estrato, na ordem das levas de bioma.
+  'resonant',
+  'mud_lamprey',
+  'bellows',
+  'scoriac',
+  'frost_wraith',
   'bishop',
   'guardian',
 ];
@@ -304,6 +310,11 @@ export const BESTIARY_NAME_KEYS: Record<EnemyArchetype, MessageKey> = {
   bruiser: 'bestiary.name.bruiser',
   miner: 'bestiary.name.miner',
   fungal_horse: 'bestiary.name.fungal_horse',
+  resonant: 'bestiary.name.resonant',
+  mud_lamprey: 'bestiary.name.mud_lamprey',
+  bellows: 'bestiary.name.bellows',
+  scoriac: 'bestiary.name.scoriac',
+  frost_wraith: 'bestiary.name.frost_wraith',
   bishop: 'bestiary.name.bishop',
   guardian: 'bestiary.name.guardian',
 };
@@ -336,6 +347,11 @@ export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
   bruiser: { code: 'bestiary.code.bruiser', note: 'bestiary.note.bruiser' },
   miner: { code: 'bestiary.code.miner', note: 'bestiary.note.miner' },
   fungal_horse: { code: 'bestiary.code.fungal_horse', note: 'bestiary.note.fungal_horse' },
+  resonant: { code: 'bestiary.code.resonant', note: 'bestiary.note.resonant' },
+  mud_lamprey: { code: 'bestiary.code.mud_lamprey', note: 'bestiary.note.mud_lamprey' },
+  bellows: { code: 'bestiary.code.bellows', note: 'bestiary.note.bellows' },
+  scoriac: { code: 'bestiary.code.scoriac', note: 'bestiary.note.scoriac' },
+  frost_wraith: { code: 'bestiary.code.frost_wraith', note: 'bestiary.note.frost_wraith' },
   bishop: { code: 'bestiary.code.bishop', note: 'bestiary.note.bishop' },
   guardian: { code: 'bestiary.code.guardian', note: 'bestiary.note.guardian' },
 };

@@ -146,6 +146,11 @@ const ENEMY_ARCHETYPES = new Set<EnemyArchetype>([
   'bishop',
   'fungal_horse',
   'miner',
+  'resonant',
+  'mud_lamprey',
+  'bellows',
+  'scoriac',
+  'frost_wraith',
 ]);
 const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc']);
 const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>

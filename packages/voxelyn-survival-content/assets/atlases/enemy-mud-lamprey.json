@@ -1,0 +1,106 @@
+{
+  "id": "enemy-mud-lamprey",
+  "version": 1,
+  "atlas": "enemy-mud-lamprey.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 64,
+  "anchorX": 32,
+  "anchorY": 60,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.8,
+    "h": 0.6
+  },
+  "footprint": {
+    "w": 1,
+    "h": 1,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#1f3d33",
+    "#2f6b4f",
+    "#3d2a22",
+    "#3f8a5e",
+    "#59f2c2",
+    "#66c28a",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "hit": 14,
+      "die": 16
+    },
+    "dl": {
+      "idle": 21,
+      "walk": 25,
+      "attack": 31,
+      "hit": 35,
+      "die": 37
+    },
+    "ur": {
+      "idle": 42,
+      "walk": 46,
+      "attack": 52,
+      "hit": 56,
+      "die": 58
+    },
+    "ul": {
+      "idle": 63,
+      "walk": 67,
+      "attack": 73,
+      "hit": 77,
+      "die": 79
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

@@ -1,8 +1,8 @@
 # Voxelyn Survival — Estratos, Ocupações e Linhagens
 
 Data: 2026-08-01
-Status: primeira E segunda levas implementadas; terceira etapa (bestiário de
-assinatura) especificada abaixo
+Status: três levas implementadas — estratos/ocupações/linhagens, segunda leva
+de estratos, e o bestiário de assinatura. Restam os itens de "trabalho futuro".
 
 ## A decisão que rege tudo
 
@@ -151,19 +151,47 @@ Cripta profunda):
   mudança de inércia sobre gelo ficou de fora de propósito (mexe em controle,
   dodge e determinismo).
 
-## Terceira etapa (especificada, não implementada)
+## Terceira etapa (implementada): bestiário de assinatura
 
-- **Bestiário de assinatura** (um por estrato, manipulando a regra do bioma):
-  **Ressonante** (arma cristais próximos), **Lampreia de Lodo** (submersa,
-  ondulação telegráfica), **Fole** (inspira gás de uma região e expele em
-  outra), **Escoriáceo** (carapaça fria resistente; aquecido, vulnerável e
-  mais agressivo), **Espectro de Geada** (move-se sob o gelo deixando trilha
-  de rachaduras).
+Um inimigo por estrato, e a regra que rege os cinco: **cada um manipula a
+alavanca que o bioma já tem** — nenhum traz mecânica nova. Cada assinatura
+ocupa uma vaga comum da contagem do setor (nunca soma), no primeiro terço da
+lista de spawns; espreitadores nascem dentro do próprio elemento.
+
+- **Ressonante** (`resonant`, Catedral): não atira. Vibra (telegrafo de 1,2 s)
+  e ARMA os cristais num raio — cada um descarrega pelas aberturas coladas
+  nele, com dano/stun da regra genérica de descarga. Sala esvaziada de cristal
+  = bicho desarmado (e o pulso nem dispara).
+- **Lampreia de Lodo** (`mud_lamprey`, Aquífero): submersa enquanto não ataca
+  (`mood` viaja no snapshot; o cliente desenha ondulação). Só se move POR
+  líquido; bote curto telegrafado é a única saída da água. Eletrificar a poça
+  a atordoa — e percorre a poça inteira.
+- **Fole** (`bellows`, Fenda): respira em fases de relógio (tick + id, sem
+  RNG): inspira gás num raio, expele em linha na direção OPOSTA ao jogador.
+  Deixá-lo vivo limpa a passagem desejada; a de trás contamina.
+- **Escoriáceo** (`scoriac`, Fornalha): couraça fria corta todo dano a 45%
+  (no funil único de dano). Pisar em brasa/fogo abre a couraça por ~8 s:
+  vulnerável e 45% mais rápido. `rangedReadyAt` reusado como "quente até".
+- **Espectro de Geada** (`frost_wraith`, Cripta): desliza SOB o gelo (35% mais
+  rápido), emerge num bote telegrafado. Derreter o lago tira a cobertura: um
+  corpo lento na água condutiva que o jogador acabou de criar.
+
+Basalto e Sílica não têm assinatura por decisão: o basalto é a referência, e a
+identidade da Sílica é o próprio terreno que cede.
+
+Conteúdo: 5 atlases voxel novos (idle/walk/attack/hit/die × 4 direções,
+materiais existentes da paleta), bestiário corporativo (fichas pt/en),
+partículas por matéria, ecos de morte no protocolo.
+
+## Trabalho futuro
+
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
   drenar uma região e inundar outra no Aquífero.
 - **Inércia sobre gelo** na Cripta, quando o estrato tiver provado a rota
   derreter/recongelar.
 - **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
+- Trilha de rachaduras do Espectro e ondulação da Lampreia como apresentação
+  dedicada no cliente (hoje a leitura vem da postura `mood` + superfície).
 
 ## Ressonância favorecida por bioma (referência de tuning)
 

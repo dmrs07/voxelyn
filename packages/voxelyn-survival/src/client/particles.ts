@@ -134,6 +134,14 @@ const HIT_MATERIAL: Record<string, ParticleKind> = {
   miner: 'stone',
   fungal_horse: 'spore',
   prospector: 'stone',
+  // Assinaturas: o respingo diz de que materia cada uma e feita. Ressonante e
+  // Escoriaceo sao mineral; Espectro e gelo (lasca como pedra); Lampreia e
+  // Fole sao biomassa.
+  resonant: 'stone',
+  scoriac: 'stone',
+  frost_wraith: 'stone',
+  mud_lamprey: 'spore',
+  bellows: 'spore',
 };
 
 export const hitMaterialOf = (archetype: string | undefined): ParticleKind =>

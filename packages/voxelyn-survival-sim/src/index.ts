@@ -43,7 +43,7 @@ export {
   recordKill,
   starsFor,
 } from './stats.js';
-export { ARCHETYPES, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
+export { ARCHETYPES, SIGNATURE_OF_STRATUM, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
 export {
   explodeAt,
   dischargeAt,

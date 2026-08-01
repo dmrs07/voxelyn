@@ -58,16 +58,46 @@ import {
   SURF_NONE,
   SURF_SPORES,
   TICK_HZ,
+  BELLOWS_BREATH_INTERVAL_TICKS,
+  BELLOWS_BREATH_RADIUS,
+  BELLOWS_CYCLE_TICKS,
+  BELLOWS_EXHALE_LENGTH,
+  BELLOWS_INHALE_PER_BREATH,
+  GAS_LIFE_TICKS,
+  LAMPREY_LUNGE_COOLDOWN_TICKS,
+  LAMPREY_LUNGE_RANGE,
+  LAMPREY_LUNGE_WINDUP_TICKS,
+  RESONANT_COOLDOWN_TICKS,
+  RESONANT_CRYSTAL_BUDGET,
+  RESONANT_PULSE_RADIUS,
+  RESONANT_WINDUP_TICKS,
+  SCORIAC_ARMOR_SCALE,
+  SCORIAC_HOT_SPEED_SCALE,
+  SCORIAC_HOT_TICKS,
+  SOLID_CRYSTAL,
+  SURF_EMBER,
+  SURF_GAS,
+  SURF_ICE,
+  WRAITH_LUNGE_COOLDOWN_TICKS,
+  WRAITH_LUNGE_RANGE,
+  WRAITH_LUNGE_WINDUP_TICKS,
+  WRAITH_UNDER_ICE_SPEED_SCALE,
 } from './constants.js';
-import { breakSolid, canRip, closeArena, explodeAt, igniteCell, openArena, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
+  BELLOWS_EXHALING,
+  BELLOWS_INHALING,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
+  LURKER_EXPOSED,
+  LURKER_HIDDEN,
   MINER_MOOD_ENRAGED,
   MINER_MOOD_FLEEING,
   MINER_MOOD_PASSIVE,
+  SCORIAC_COOL,
+  SCORIAC_HOT,
 } from './types.js';
 import type {
   DamageCause,
@@ -116,6 +146,32 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // luta. Subir a vida junto com o tamanho transformaria a decisao num
   // orcamento de municao, que e outra coisa.
   miner: { hp: MINER_HP, speed: MINER_RAGE_SPEED, radius: 0.46, contactDamage: 6, contactCooldown: 18, aggroRange: MINER_NOTICE_RANGE },
+  // ------------------------------------------------------------------------
+  // Bestiario de assinatura (um por estrato; ver constants.ts).
+  // ------------------------------------------------------------------------
+  // Lento e parrudo de proposito: a ameaca dele nao e alcancar ninguem, e o
+  // ESPACO que os cristais armados negam. Matar e facil; matar DE PERTO, entre
+  // cristais carregando, e a decisao.
+  resonant: { hp: 95, speed: 1.6, radius: 0.44, contactDamage: 10, contactCooldown: 16, aggroRange: 10 },
+  // Rapida NA AGUA (a lentidao da agua nao vale para ela — e o elemento dela).
+  // Vida baixa: a defesa e nao estar visivel, nao ser um saco de pancada.
+  mud_lamprey: { hp: 55, speed: 3.6, radius: 0.4, contactDamage: 16, contactCooldown: 14, aggroRange: 11 },
+  // Corpo largo, quase parado: ele e um orgao do bioma, nao um cacador. O
+  // perigo dele e ONDE o gas passa a estar, nunca a perseguicao.
+  bellows: { hp: 80, speed: 1.7, radius: 0.5, contactDamage: 10, contactCooldown: 16, aggroRange: 9 },
+  // Vida media com couraça que corta mais da metade do dano: frio, ele demora
+  // como um bruiser; quente, morre rapido — e corre atras da troca.
+  scoriac: { hp: 130, speed: 2.4, radius: 0.44, contactDamage: 16, contactCooldown: 14, aggroRange: 8 },
+  frost_wraith: { hp: 48, speed: 3.8, radius: 0.36, contactDamage: 14, contactCooldown: 12, aggroRange: 11 },
+};
+
+/** O inimigo de assinatura de cada estrato, ou null (basalto e silica). */
+export const SIGNATURE_OF_STRATUM: Partial<Record<string, EnemyArchetype>> = {
+  prismatic: 'resonant',
+  aquifer: 'mud_lamprey',
+  sulfur: 'bellows',
+  furnace: 'scoriac',
+  glacial: 'frost_wraith',
 };
 
 export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean => {
@@ -222,6 +278,13 @@ export const damageEntity = (
   // guardiao quebrou — nada disso e feito do jogador, e tudo isso somaria.
   // `Math.min(amount, ent.hp)` corta o excedente do golpe fatal: 14 de dano num
   // alvo com 3 de vida sao 3 de dano causado, nao 14.
+  // A couraça do Escoriaceo reduz TODO dano enquanto fria — inclusive fogo,
+  // de proposito: fogo nao o mata mais rapido, fogo o ABRE (o calor poe a
+  // postura em HOT e ai o dano entra inteiro). A reducao vive aqui, no unico
+  // funil de dano, para nenhum caminho novo esquecer dela.
+  if (ent.archetype === 'scoriac' && ent.mood !== SCORIAC_HOT) {
+    amount *= SCORIAC_ARMOR_SCALE;
+  }
   const attributable =
     cause.kind === 'player_shot' ||
     ((cause.kind === 'explosion' || cause.kind === 'discharge') && cause.source === 'player');
@@ -327,6 +390,10 @@ export const spawnEnemy = (
     // Todo miner nasce PASSIVO. A postura nao e sorteada no spawn: ela e
     // decidida no instante em que ele te nota, pelo calor da sua arma.
     ...(archetype === 'miner' ? { mood: MINER_MOOD_PASSIVE } : {}),
+    // Assinaturas nascem na postura de repouso do proprio elemento.
+    ...(archetype === 'mud_lamprey' || archetype === 'frost_wraith' ? { mood: LURKER_HIDDEN } : {}),
+    ...(archetype === 'scoriac' ? { mood: SCORIAC_COOL } : {}),
+    ...(archetype === 'bellows' ? { mood: BELLOWS_INHALING } : {}),
   };
   state.enemies.push(enemy);
   return enemy;
@@ -463,7 +530,8 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     : state.players.find((p) => p.id === action.target && p.alive && !state.playerExtras[p.slot ?? 0].downed) ?? null;
 
   if (action.kind === 'pulse') {
-    bishopNova(state, enemy, events);
+    if (enemy.archetype === 'resonant') resonantPulse(state, enemy, events);
+    else bishopNova(state, enemy, events);
     return;
   }
   if (action.kind === 'detonate') {
@@ -821,6 +889,238 @@ const bishopNova = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]
 };
 
 /**
+ * O pulso do Ressonante: arma os cristais em volta e cada um DESCARREGA pelas
+ * aberturas coladas nele.
+ *
+ * Ele nao ataca o jogador; ele opera a regra da Catedral. A carga sai de
+ * `chargeCells` com origem de inimigo, entao o dano e o mesmo de qualquer
+ * descarga (26) — inclusive contra OUTROS inimigos parados no lugar errado, de
+ * proposito: a cadeia e do mundo, nao dele. O orcamento de cristais e a
+ * varredura em ordem fixa mantem o custo e o determinismo previsiveis.
+ *
+ * O contra-jogo mora no que o pulso NAO faz: cristal quebrado antes do pulso e
+ * um cristal que nao arma. Preservar a sala e proteger a luz; esvazia-la e
+ * desarmar o bicho.
+ */
+const resonantPulse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = Math.ceil(RESONANT_PULSE_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  const charged = new Set<number>();
+  let armed = 0;
+  for (let dy = -r; dy <= r && armed < RESONANT_CRYSTAL_BUDGET; dy++) {
+    for (let dx = -r; dx <= r && armed < RESONANT_CRYSTAL_BUDGET; dx++) {
+      if (dx * dx + dy * dy > RESONANT_PULSE_RADIUS * RESONANT_PULSE_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_CRYSTAL) continue;
+      armed++;
+      for (const n of [i - 1, i + 1, i - w, i + w]) {
+        if (state.solid[n] === SOLID_NONE) charged.add(n);
+      }
+    }
+  }
+  if (charged.size > 0) {
+    chargeCells(state, [...charged], events, { source: 'enemy', owner: enemy.id });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: RESONANT_PULSE_RADIUS });
+};
+
+/**
+ * Passo dos ESPREITADORES: Lampreia de Lodo (agua) e Espectro de Geada (gelo).
+ *
+ * O padrao e um so e o elemento muda: escondido dentro da propria lamina, o
+ * corpo nao aparece — o cliente desenha a ondulacao/rachadura pela postura — e
+ * o movimento so aceita passos que CONTINUEM dentro do elemento. O bote e a
+ * unica saida, e e telegrafado. Nenhum dos dois e "um stalker invisivel": a
+ * postura viaja no snapshot e a posicao e sempre legivel pela superficie.
+ *
+ * O contra-jogo e territorial, nao de mira: eletrificar a agua atordoa a
+ * Lampreia (regra generica de descarga); derreter o gelo tira a cobertura do
+ * Espectro e o deixa lento na agua que o proprio jogador tornou condutiva.
+ */
+const lurkerStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dist: number,
+  dt: number,
+  events: SemanticEvent[]
+): void => {
+  const isLamprey = enemy.archetype === 'mud_lamprey';
+  const w = state.config.width;
+  const inElement = (i: number): boolean =>
+    i >= 0 && i < state.surface.length &&
+    (isLamprey ? isConductiveSurface(state.surface[i]) : state.surface[i] === SURF_ICE);
+
+  const hidden = inElement(cellUnder(state, enemy));
+  enemy.mood = hidden ? LURKER_HIDDEN : LURKER_EXPOSED;
+  if (!player) return;
+
+  const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
+  if (dist > def.aggroRange && state.tick >= enemy.alertedUntil) return;
+
+  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  enemy.facing = { ...toward };
+
+  const range = isLamprey ? LAMPREY_LUNGE_RANGE : WRAITH_LUNGE_RANGE;
+  if (
+    dist < range &&
+    state.tick >= enemy.contactReadyAt &&
+    hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
+  ) {
+    enemy.contactReadyAt =
+      state.tick + (isLamprey ? LAMPREY_LUNGE_COOLDOWN_TICKS : WRAITH_LUNGE_COOLDOWN_TICKS);
+    // O bote expoe ANTES de sair: o windup inteiro acontece com o corpo
+    // visivel — a agua "se abre", o gelo racha — e e essa a janela de reacao.
+    enemy.mood = LURKER_EXPOSED;
+    startAction(
+      state,
+      enemy,
+      'charge',
+      toward,
+      isLamprey ? LAMPREY_LUNGE_WINDUP_TICKS : WRAITH_LUNGE_WINDUP_TICKS,
+      8,
+      events,
+      player.id
+    );
+    return;
+  }
+
+  // Dentro do elemento a lamina nao retarda (e o meio DELE); o Espectro ainda
+  // desliza mais rapido que qualquer coisa anda. Fora, valem as regras de
+  // superficie de todo mundo — a agua que cobre a Lampreia e a mesma que
+  // atola o Espectro desabrigado.
+  const speed = hidden
+    ? def.speed * (isLamprey ? 1 : WRAITH_UNDER_ICE_SPEED_SCALE)
+    : def.speed * 0.8 * surfaceSpeedMul(state, enemy);
+  const stepX = toward.x * speed * dt;
+  const stepY = toward.y * speed * dt;
+
+  if (hidden) {
+    // So anda por onde o elemento continua. Na borda, desliza pelos eixos; sem
+    // caminho molhado/congelado, guarda a margem — que e exatamente a leitura
+    // que o jogador precisa ter dele.
+    const stays = (mx: number, my: number): boolean =>
+      inElement(Math.floor(enemy.y + my) * w + Math.floor(enemy.x + mx));
+    if (stays(stepX, stepY)) moveEntity(state, enemy, stepX, stepY);
+    else if (stays(stepX, 0)) moveEntity(state, enemy, stepX, 0);
+    else if (stays(0, stepY)) moveEntity(state, enemy, 0, stepY);
+  } else {
+    moveEntity(state, enemy, stepX, stepY);
+  }
+};
+
+/**
+ * Passo do FOLE: ele respira o ambiente da Fenda.
+ *
+ * Fase de inspirar: remove gas num raio em volta, algumas celulas por folego,
+ * varredura em ordem fixa. Fase de expelir: sopra uma linha de gas na direcao
+ * OPOSTA ao jogador. As duas juntas produzem a decisao que o define: as vezes
+ * vale deixa-lo vivo por alguns segundos para que limpe a passagem desejada —
+ * sabendo que a rota de tras esta sendo contaminada enquanto isso.
+ *
+ * A fase sai do RELOGIO (tick + id), nao de sorteio: as duas maquinas de uma
+ * sala de co-op veem o mesmo folego, e a RNG da run nao anda por causa dele.
+ */
+const bellowsStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dist: number,
+  dt: number,
+  events: SemanticEvent[]
+): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const phase = Math.floor((state.tick + enemy.id * 37) / BELLOWS_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? BELLOWS_INHALING : BELLOWS_EXHALING;
+
+  if (state.tick >= enemy.nextActionAt) {
+    enemy.nextActionAt = state.tick + BELLOWS_BREATH_INTERVAL_TICKS;
+    if (enemy.mood === BELLOWS_INHALING) {
+      const r = BELLOWS_BREATH_RADIUS;
+      const cx = Math.floor(enemy.x);
+      const cy = Math.floor(enemy.y);
+      let inhaled = 0;
+      for (let dy = -r; dy <= r && inhaled < BELLOWS_INHALE_PER_BREATH; dy++) {
+        for (let dx = -r; dx <= r && inhaled < BELLOWS_INHALE_PER_BREATH; dx++) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const i = y * w + x;
+          if (state.surface[i] !== SURF_GAS) continue;
+          setSurface(state, i, SURF_NONE, 0);
+          inhaled++;
+        }
+      }
+    } else {
+      const dir = player ? normalized(enemy.x - player.x, enemy.y - player.y) : enemy.facing;
+      for (let step = 1; step <= BELLOWS_EXHALE_LENGTH; step++) {
+        const x = Math.floor(enemy.x + dir.x * step);
+        const y = Math.floor(enemy.y + dir.y * step);
+        if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE) break;
+        if (state.surface[i] === SURF_NONE) setSurface(state, i, SURF_GAS, GAS_LIFE_TICKS);
+      }
+    }
+  }
+
+  if (!player) return;
+  const def = ARCHETYPES.bellows;
+  if (dist > def.aggroRange && state.tick >= enemy.alertedUntil) return;
+  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  enemy.facing = { ...toward };
+  const contactRange = enemy.radius + player.radius + 0.18;
+  if (dist < contactRange && state.tick >= enemy.contactReadyAt) {
+    enemy.contactReadyAt = state.tick + def.contactCooldown;
+    startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
+    return;
+  }
+  const speed = def.speed * surfaceSpeedMul(state, enemy);
+  moveEntity(state, enemy, toward.x * speed * dt, toward.y * speed * dt);
+};
+
+/**
+ * Postura termica do Escoriaceo, decidida pelo CHAO e nao por sorteio.
+ *
+ * `rangedReadyAt` guarda o "quente ate": ele e o unico campo de relogio ocioso
+ * num inimigo sem ataque a distancia, e um campo novo na entidade entraria no
+ * snapshot e no resync por causa de um unico arquetipo.
+ */
+/** Ha algum cristal no raio do pulso? Varredura com saida cedo. */
+const hasCrystalNear = (state: SurvivalState, enemy: Entity): boolean => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = Math.ceil(RESONANT_PULSE_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > RESONANT_PULSE_RADIUS * RESONANT_PULSE_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      if (state.solid[y * w + x] === SOLID_CRYSTAL) return true;
+    }
+  }
+  return false;
+};
+
+const settleScoriacHeat = (state: SurvivalState, enemy: Entity): void => {
+  const surf = state.surface[cellUnder(state, enemy)];
+  if (surf === SURF_EMBER || surf === SURF_FIRE) {
+    enemy.rangedReadyAt = state.tick + SCORIAC_HOT_TICKS;
+  }
+  enemy.mood = state.tick < enemy.rangedReadyAt ? SCORIAC_HOT : SCORIAC_COOL;
+};
+
+/**
  * Uma passada da investida do Cavalo: move, atropela e deixa rastro.
  *
  * Mora fora de `releaseAction` porque a investida do cavalo dura DEZENAS de
@@ -1005,6 +1305,19 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       );
       continue;
     }
+    // Espreitadores e Fole tem fluxo proprio, como o Miner: o comportamento
+    // deles nao e "perseguir e bater", e o fluxo comum so os deformaria.
+    if (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') {
+      lurkerStep(state, enemy, player, dist, dt, events);
+      continue;
+    }
+    if (enemy.archetype === 'bellows') {
+      bellowsStep(state, enemy, player, dist, dt, events);
+      continue;
+    }
+    // O Escoriaceo usa o fluxo comum; so a postura termica e propria.
+    if (enemy.archetype === 'scoriac') settleScoriacHeat(state, enemy);
+
     // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
     // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
     const guardianHunting = enemy.archetype === 'guardian' && state.guardianAwake;
@@ -1028,7 +1341,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
     let dirX = 0;
     let dirY = 0;
-    const speed = def.speed * (enemy.elite ? 1.12 : 1) * surfaceSpeedMul(state, enemy);
+    const speed =
+      def.speed *
+      (enemy.elite ? 1.12 : 1) *
+      surfaceSpeedMul(state, enemy) *
+      (enemy.archetype === 'scoriac' && enemy.mood === SCORIAC_HOT ? SCORIAC_HOT_SPEED_SCALE : 1);
 
     if (aggro && player) {
       const toward = normalized(player.x - enemy.x, player.y - enemy.y);
@@ -1094,6 +1411,20 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
       if (enemy.archetype === 'bomber' && dist < 2.05) {
         startAction(state, enemy, 'detonate', toward, 12, 4, events, player.id);
+        continue;
+      }
+
+      // Ressonante: com o jogador no alcance da vibracao e cristal por perto,
+      // ele arma a sala. Sem cristal em volta ele e so um corpo lento — a sala
+      // esvaziada E o contra-jogo, entao a checagem tem de ser real.
+      if (
+        enemy.archetype === 'resonant' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist <= RESONANT_PULSE_RADIUS + 1.5 &&
+        hasCrystalNear(state, enemy)
+      ) {
+        enemy.rangedReadyAt = state.tick + RESONANT_COOLDOWN_TICKS;
+        startAction(state, enemy, 'pulse', toward, RESONANT_WINDUP_TICKS, 8, events, player.id);
         continue;
       }
 

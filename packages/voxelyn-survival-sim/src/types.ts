@@ -52,7 +52,17 @@ export type EnemyArchetype =
    * cabeca. Frio, te ignora; morno, foge; quente, sobrecarrega e ataca. O
    * sorteio era a versao obvia e violava o invariante do jogo — dano sem sinal.
    */
-  | 'miner';
+  | 'miner'
+  /**
+   * Bestiario de assinatura: um por estrato, e cada um manipula a REGRA do
+   * proprio bioma em vez de trazer uma nova. Ver constants.ts, secao
+   * "Bestiario de assinatura", para o desenho de cada um.
+   */
+  | 'resonant'
+  | 'mud_lamprey'
+  | 'bellows'
+  | 'scoriac'
+  | 'frost_wraith';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -253,6 +263,23 @@ export type Entity = {
 export const MINER_MOOD_PASSIVE = 0;
 export const MINER_MOOD_FLEEING = 1;
 export const MINER_MOOD_ENRAGED = 2;
+
+/**
+ * Postura dos espreitadores (Lampreia e Espectro): dentro do proprio elemento
+ * (submersa / sob o gelo) ou exposto. O cliente desenha a diferenca — a
+ * ondulacao no lugar do corpo e a razao de o campo viajar no snapshot, pela
+ * mesma logica do humor do Miner.
+ */
+export const LURKER_HIDDEN = 0;
+export const LURKER_EXPOSED = 1;
+
+/** Postura do Escoriaceo: couraça fria fechada, ou aberta pelo calor. */
+export const SCORIAC_COOL = 0;
+export const SCORIAC_HOT = 1;
+
+/** Fase do Fole: inspirando (limpa gas em volta) ou expelindo (sopra linha). */
+export const BELLOWS_INHALING = 0;
+export const BELLOWS_EXHALING = 1;
 
 /**
  * O que o Veio observou o jogador provocar.
