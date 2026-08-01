@@ -51,6 +51,8 @@ import {
   SOLID_NONE,
   SPORE_LIFE_TICKS,
   SURF_BIOFLUID,
+  SURF_WATER,
+  WATER_SLOW,
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_NONE,
@@ -160,8 +162,12 @@ export const moveEntity = (
 export const cellUnder = (state: SurvivalState, ent: Entity): number =>
   Math.floor(ent.y) * state.config.width + Math.floor(ent.x);
 
-export const surfaceSpeedMul = (state: SurvivalState, ent: Entity): number =>
-  state.surface[cellUnder(state, ent)] === SURF_BIOFLUID ? BIOFLUID_SLOW : 1;
+export const surfaceSpeedMul = (state: SurvivalState, ent: Entity): number => {
+  const surf = state.surface[cellUnder(state, ent)];
+  if (surf === SURF_BIOFLUID) return BIOFLUID_SLOW;
+  if (surf === SURF_WATER) return WATER_SLOW;
+  return 1;
+};
 
 /** Nuvem organica localizada deixada pela ruptura do Spore Bomber. */
 const addBomberSpores = (state: SurvivalState, ent: Entity): void => {

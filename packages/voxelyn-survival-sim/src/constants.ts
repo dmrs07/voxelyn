@@ -36,6 +36,14 @@ export const SURF_FIRE = 4;
 export const SURF_SCORCHED = 5;
 export const SURF_SPORES = 6;
 export const SURF_FUNGAL_HEATED = 7;
+// A agua do Aquifero Negro. Entra no fim pela mesma regra dos dois acima: os
+// IDs viajam nos diffs de chunk e nao podem mudar de significado.
+//
+// Nao e biofluido azul: a agua e PERMANENTE (timer 0), nao queima nunca, APAGA
+// fogo encostado nela e conduz descarga como o biofluido. E a versao estatica
+// do bioma flooded — superficie que divide o chao em ilhas e areas rasas, sem
+// exigir pressao, volume nem correnteza.
+export const SURF_WATER = 8;
 
 // Orcamentos por tick (degradacao previsivel via fila deterministica).
 export const BUDGET_REACTING_CELLS = 4096;
@@ -69,6 +77,14 @@ export const SPORE_BURN_TICKS = 18;
 
 export const FIRE_SPREAD_BIOFLUID = 0.85;
 export const BIOFLUID_SLOW = 0.55;
+/**
+ * Lentidao na agua: mais leve que no biofluido de proposito. O biofluido e
+ * lodo — pisar nele e um erro que cobra caro. A agua e TERRENO: metade do
+ * Aquifero e ela, e a 0,55 atravessar o proprio bioma viraria castigo passivo.
+ * A 0,72 a agua cobra o bastante para a rota seca valer a pena sem transformar
+ * o setor inteiro numa marcha.
+ */
+export const WATER_SLOW = 0.72;
 export const DISCHARGE_DAMAGE = 26;
 export const DISCHARGE_TICKS = 6;
 /** Controle direto do Conductive em alvos organicos: 1,2 s a 20 Hz. */

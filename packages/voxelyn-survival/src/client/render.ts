@@ -17,6 +17,7 @@ import {
   SURF_NONE,
   SURF_SCORCHED,
   SURF_SPORES,
+  SURF_WATER,
   ABILITY_RADIUS,
   HEAT_MAX,
   RICOCHET_BOUNCES,
@@ -27,7 +28,7 @@ import {
   isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
-import type { AbilityId, ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { AbilityId, ActiveModule, ModuleId, OccupationId, SemanticEvent, StratumId, SurvivalState } from '@voxelyn/survival-sim';
 import { ATLAS_SCALE, SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
@@ -97,6 +98,7 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_SCORCHED]: 5,
   [SURF_SPORES]: 6,
   [SURF_FUNGAL_HEATED]: 7,
+  [SURF_WATER]: 8,
 };
 
 /**
@@ -115,6 +117,35 @@ const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_SCORCHED]: '#0b0e14',
   [SURF_SPORES]: '#66c28a',
   [SURF_FUNGAL_HEATED]: '#6e4a33',
+  // Azul da familia da rocha: a agua e escura com reflexos frios, e o verde
+  // continua reservado ao biofluido.
+  [SURF_WATER]: '#2e3a4d',
+};
+
+/**
+ * Nomes dos estratos e ocupacoes, por chave de catalogo.
+ *
+ * Tabelas explicitas em vez de `t('biome.' + id)`: a concatenacao passaria no
+ * runtime e escaparia do tipo `MessageKey` — uma chave nova sem traducao so
+ * apareceria na tela do jogador, como texto cru. Assim, um estrato novo sem
+ * entrada aqui quebra a COMPILACAO, que e onde o esquecimento deve doer.
+ */
+const STRATUM_LABEL_KEY = {
+  basalt: 'biome.stratum.basalt',
+  prismatic: 'biome.stratum.prismatic',
+  aquifer: 'biome.stratum.aquifer',
+} as const satisfies Record<StratumId, string>;
+
+const OCCUPATION_LABEL_KEY = {
+  mycelial: 'biome.occupation.mycelial',
+  aurix: 'biome.occupation.aurix',
+} as const satisfies Record<Exclude<OccupationId, 'none'>, string>;
+
+/** "CATEDRAL PRISMÁTICA · CICATRIZ AURIX", ou so o estrato quando limpa. */
+export const biomeLabel = (stratum: StratumId, occupation: OccupationId): string => {
+  const base = t(STRATUM_LABEL_KEY[stratum]);
+  if (occupation === 'none') return base;
+  return `${base} · ${t(OCCUPATION_LABEL_KEY[occupation])}`;
 };
 
 export const TILE_W = 32;
@@ -752,6 +783,17 @@ export class SurvivalRenderer {
         case 'pickup_core':
           this.messages.push({ text: t('toast.core.taken'), until: nowMs + 4200 });
           this.shake = { power: 4, until: nowMs + 300 };
+          break;
+        case 'sector_entered':
+          // A chegada anuncia ONDE o jogador entrou, nao so o numero: o bioma
+          // muda o modo de atravessar o setor, e o nome e o primeiro aviso.
+          this.messages.push({
+            text: t('toast.sector.entered', {
+              sector: ev.sector,
+              biome: biomeLabel(ev.stratum, ev.occupation),
+            }),
+            until: nowMs + 3400,
+          });
           break;
         case 'guardian_awake':
           this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
@@ -1520,7 +1562,10 @@ export class SurvivalRenderer {
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const i = y * w + x;
-        if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_BIOFLUID) continue;
+        // A agua do Aquifero pinga como a poca: goteiras sao a assinatura
+        // sonora e visual do estrato, e o efeito ja e deterministico por celula.
+        const dripSurf = state.surface[i];
+        if (state.solid[i] !== SOLID_NONE || (dripSurf !== SURF_BIOFLUID && dripSurf !== SURF_WATER)) continue;
         const seed = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263)) >>> 0;
         if (seed % 5 !== 0) continue; // so parte das celulas pinga
         if (brightness(x, y) <= 0.05) continue;
@@ -2095,7 +2140,8 @@ export class SurvivalRenderer {
     const hasModules = extra.activeModules.length > 0;
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
     const sectorY = safeTop + (hasModules ? 112 : 84);
-    const objectiveY = sectorY + 18;
+    const biomeY = sectorY + 14;
+    const objectiveY = biomeY + 18;
     const cacheY = objectiveY + 17;
     const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
     const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
@@ -2254,7 +2300,8 @@ export class SurvivalRenderer {
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
     const moduleY = safeTop + 68;
     const sectorY = safeTop + (hasModules ? 112 : 84);
-    const objectiveY = sectorY + 18;
+    const biomeY = sectorY + 14;
+    const objectiveY = biomeY + 18;
     const cacheY = objectiveY + 17;
     const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
 
@@ -2366,6 +2413,13 @@ export class SurvivalRenderer {
       safeLeft + 12,
       sectorY,
     );
+
+    // O estrato/ocupacao logo abaixo do numero: menor e mais apagado, porque e
+    // contexto e nao objetivo. Fonte 9px para o nome composto mais longo
+    // ("CATEDRAL PRISMÁTICA · MATRIZ MICELIAL") caber no painel compacto.
+    ctx.fillStyle = PAL.bone;
+    ctx.font = '9px monospace';
+    ctx.fillText(biomeLabel(state.stratum, state.occupation), safeLeft + 12, biomeY);
 
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 12px monospace';

@@ -68,6 +68,15 @@ export const RAMPS = {
    */
   pool: ['fungusDark', 'dark', 'dark'],
   /**
+   * Agua do Aquifero Negro: a mesma logica de leitura da poca — liquido parado
+   * le por profundidade — mas na familia AZUL da rocha, nunca na verde do
+   * fungo. O topo e `rock` (azul-acinzentado) para a lamina se separar do
+   * leito escuro; o brilho vem de voxels `electric` avulsos, entao a agua e
+   * escura com reflexos frios, e o biofluido continua sendo o unico liquido
+   * verde do jogo.
+   */
+  water: ['rock', 'rockShadow', 'dark'],
+  /**
    * Gas sulfuroso: crosta amarela sobre corpo esverdeado.
    *
    * O gas era `acid` puro — verde-limao — e a paleta nao tem amarelo de enxofre.

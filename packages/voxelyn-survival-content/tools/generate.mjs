@@ -201,9 +201,9 @@ const buildSurfaces = () => {
 
   const manifest = {
     id: 'surface-tiles',
-    // 3: crostas reautoradas coluna a coluna FINA — cascalho, tapete, lamina
-    // com bolhas, chamas e graos por voxel fino; gas em aglomerados roidos.
-    version: 3,
+    // 4: entra a agua do Aquifero Negro (SURF_WATER) — lamina azul com
+    // ondulacao em faixa e minerais emergentes, no fim da lista de tipos.
+    version: 4,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,

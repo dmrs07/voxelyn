@@ -26,6 +26,7 @@ import {
   SURF_NONE,
   SURF_SCORCHED,
   SURF_SPORES,
+  SURF_WATER,
   VENT_BASE_INTERVAL_TICKS,
 } from './constants.js';
 import { markDiscovery } from './stats.js';
@@ -42,6 +43,17 @@ export const markDirty = (state: SurvivalState, x: number, y: number): void => {
 
 const isReactiveSurface = (kind: number): boolean =>
   kind === SURF_FIRE || kind === SURF_GAS || kind === SURF_SPORES || kind === SURF_FUNGAL_HEATED;
+
+/**
+ * Superficies que conduzem descarga eletrica.
+ *
+ * Biofluido e agua conduzem JUNTOS: uma poca de lodo encostada num lago faz a
+ * carga atravessar os dois. E deliberado — a conducao territorial do Aquifero
+ * so funciona se o jogador puder ler "liquido conectado = circuito", sem
+ * decorar excecoes por materia.
+ */
+export const isConductiveSurface = (kind: number): boolean =>
+  kind === SURF_BIOFLUID || kind === SURF_WATER;
 
 export const setSurface = (state: SurvivalState, i: number, kind: number, timer: number): void => {
   state.surface[i] = kind;
@@ -190,7 +202,7 @@ export const dischargeAt = (
   events: SemanticEvent[],
   origin: EffectOrigin = { source: 'environment' }
 ): boolean => {
-  const cells = floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => state.surface[i] === SURF_BIOFLUID);
+  const cells = floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => isConductiveSurface(state.surface[i]));
   chargeCells(state, cells, events, origin);
   return cells.length > 0;
 };
@@ -272,6 +284,20 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
       // aqui: apenas inicia a secagem. Gas e esporos queimam com timers curtos.
       const neighbors = [i - 1, i + 1, i - w, i + w];
       const valid = [x > 0, x < w - 1, y > 0, y < h - 1];
+      // Agua APAGA fogo encostado nela, antes de ele espalhar qualquer coisa.
+      // E a regra que faz o Aquifero ler como anti-termico sem tabela nova: a
+      // margem de um lago e uma fronteira que o fogo nao atravessa nem
+      // contorna queimando. Vira cinza, nao nada — o jogador ve ONDE apagou.
+      let doused = false;
+      for (let k = 0; k < 4 && !doused; k++) {
+        if (valid[k] && state.surface[neighbors[k]] === SURF_WATER) doused = true;
+      }
+      if (doused) {
+        state.surface[i] = SURF_SCORCHED;
+        state.surfaceTimer[i] = 0;
+        markDirty(state, x, y);
+        continue;
+      }
       for (let k = 0; k < 4; k++) {
         if (!valid[k]) continue;
         const ni = neighbors[k];

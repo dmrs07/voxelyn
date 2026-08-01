@@ -325,6 +325,13 @@ export const PT_BR = {
   'hud.direction.south': 'SUL',
   'hud.direction.north': 'NORTE',
 
+  // Estratos e ocupações do Veio (a gramática de biomas da descida)
+  'biome.stratum.basalt': 'GALERIAS DE BASALTO',
+  'biome.stratum.prismatic': 'CATEDRAL PRISMÁTICA',
+  'biome.stratum.aquifer': 'AQUÍFERO NEGRO',
+  'biome.occupation.mycelial': 'MATRIZ MICELIAL',
+  'biome.occupation.aurix': 'CICATRIZ AURIX',
+
   // ---------------------------------------------------------------------
   // Mensagens centrais da run
   // ---------------------------------------------------------------------
@@ -337,6 +344,7 @@ export const PT_BR = {
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',
   'toast.overheat': 'SUPERAQUECIMENTO!',
   'toast.well.resonance': 'O VEIO RESSOA — DOIS ECOS DEMONSTRAM',
+  'toast.sector.entered': 'SETOR {sector} — {biome}',
 
   // Mensagens emitidas pela simulação (chegam como chave, nunca como texto)
   'sim.partnerRevived': 'Parceiro revivido.',

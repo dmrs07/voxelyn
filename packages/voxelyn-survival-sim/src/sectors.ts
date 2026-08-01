@@ -28,16 +28,18 @@ import {
   HORSE_SPAWN_CHANCE,
   MAX_ENEMIES,
   MINER_ORE_SEARCH,
-  MINER_PER_SECTOR,
   RUN_SEED_MIX,
   SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ORE,
+  SURF_FUNGAL,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
+import { setSurface } from './cells.js';
 import { spawnEnemy } from './entities.js';
+import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
 import { generateWorld } from './worldgen.js';
-import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
+import type { SemanticEvent, SurvivalState } from './types.js';
 
 /**
  * Seed do setor N a partir da seed da run.
@@ -55,28 +57,32 @@ export const sectorSeed = (runSeed: number, sector: number): number =>
 export const isFinalSector = (sector: number): boolean => sector >= SECTOR_COUNT;
 
 /**
- * Mistura de inimigos do setor.
+ * Bolso micelial do Bispo: a colonia que tomou a camara do chefe.
  *
- * A composicao endurece com a profundidade em vez de so aumentar a contagem:
- * mais bruisers e bombers, menos stalkers soltos. Subir o numero de bichos
- * iguais alonga a luta; trocar QUAIS bichos muda o problema.
+ * Existe porque o Bispo continua no setor 2 em QUALQUER estrato — a luta dele
+ * e um problema de terreno (tirar o chao fungico de baixo dele), e uma
+ * Catedral Prismatica sem fungo faria a mecanica inteira da luta simplesmente
+ * nao existir. Em vez de obrigar o setor 2 a ser fungico, a arena vira um
+ * BOLSO: um disco de tapete garantido em volta do ponto do chefe, plantado
+ * sobre o que quer que o estrato tenha posto ali (inclusive agua — a colonia
+ * cresceu por cima). E a gramatica de "bolso" da spec: um encontro autoral
+ * dentro de um estrato qualquer.
  */
-const SECTOR_MIX: readonly EnemyArchetype[][] = [
-  ['stalker', 'stalker', 'spitter', 'stalker', 'bomber', 'spitter', 'stalker', 'bomber'],
-  ['stalker', 'spitter', 'bruiser', 'stalker', 'bomber', 'spitter', 'bruiser', 'stalker'],
-  [
-    'stalker',
-    'stalker',
-    'spitter',
-    'bruiser',
-    'stalker',
-    'spitter',
-    'bomber',
-    'bruiser',
-    'bomber',
-    'stalker',
-  ],
-];
+const BISHOP_POCKET_RADIUS = 4;
+const plantBishopPocket = (state: SurvivalState, cx: number, cy: number): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let y = Math.max(1, cy - BISHOP_POCKET_RADIUS); y <= Math.min(h - 2, cy + BISHOP_POCKET_RADIUS); y++) {
+    for (let x = Math.max(1, cx - BISHOP_POCKET_RADIUS); x <= Math.min(w - 2, cx + BISHOP_POCKET_RADIUS); x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      if (dx * dx + dy * dy > BISHOP_POCKET_RADIUS * BISHOP_POCKET_RADIUS) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      setSurface(state, i, SURF_FUNGAL, 0);
+    }
+  }
+};
 
 /** Popula inimigos e o Guardiao (se houver) do setor. */
 export const populateSector = (
@@ -84,7 +90,11 @@ export const populateSector = (
   spawns: readonly { x: number; y: number }[],
   guardian: { x: number; y: number },
 ): void => {
-  const mix = SECTOR_MIX[Math.min(state.sector, SECTOR_MIX.length) - 1];
+  // A mistura sai do BIOMA, nao mais de uma tabela por numero de setor: o
+  // aquifero e anfibio, o prismatico e mineral, o micelio traz o proprio
+  // ecossistema. A profundidade continua endurecendo a composicao la dentro.
+  const biome = { stratum: state.stratum, occupation: state.occupation, lineage: state.lineage };
+  const mix = biomeMix(biome, state.sector);
   // Um elite por setor, no meio da lista: cedo demais e o jogador ainda nao tem
   // com o que responder, tarde demais e ele ja passou pelo setor.
   const eliteIndex = Math.floor(spawns.length / 2);
@@ -102,7 +112,10 @@ export const populateSector = (
   // A tirada vem de `state.rng`, o mesmo gerador da run: o setor 2 da seed X tem
   // cavalo para todo mundo que jogar a seed X, senao o replay do leaderboard
   // divergiria do que o jogador viveu.
-  const horseHere = state.rng.nextFloat01() < HORSE_SPAWN_CHANCE;
+  // SEMPRE uma tirada, qualquer que seja o bioma: a ocupacao muda o LIMIAR e
+  // nunca a quantidade de sorteios, senao a mesma seed produziria runs
+  // diferentes conforme a linhagem consumisse a RNG em ordens distintas.
+  const horseHere = state.rng.nextFloat01() < horseChanceFor(biome, HORSE_SPAWN_CHANCE);
   for (let i = 0; i < budget; i++) {
     if (i === eliteIndex && horseHere) {
       // Nao entra como `elite`: elite acende o fungo sob os proprios pes, e o
@@ -117,12 +130,13 @@ export const populateSector = (
   // reserva para um chefe. Nao ha sala nova: o setor 2 ja tinha o espaco vazio, e
   // o que faltava era alguem la dentro.
   if (state.sector === BISHOP_SECTOR) {
+    plantBishopPocket(state, guardian.x, guardian.y);
     spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
   }
   if (isFinalSector(state.sector)) {
     spawnEnemy(state, 'guardian', guardian.x, guardian.y, false);
   }
-  populateMiners(state, spawns);
+  populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
 };
 
 /**
@@ -139,7 +153,11 @@ export const populateSector = (
  * pelo mesmo motivo de sempre: as duas maquinas de uma sala de co-op precisam
  * colocar os mineradores nas MESMAS celulas.
  */
-const populateMiners = (state: SurvivalState, spawns: readonly { x: number; y: number }[]): void => {
+const populateMiners = (
+  state: SurvivalState,
+  spawns: readonly { x: number; y: number }[],
+  cap: number,
+): void => {
   const w = state.config.width;
   let placed = 0;
   // Uma celula so recebe UM minerador.
@@ -155,7 +173,7 @@ const populateMiners = (state: SurvivalState, spawns: readonly { x: number; y: n
     if (enemy.alive) taken.add(Math.floor(enemy.y) * w + Math.floor(enemy.x));
   }
   for (const spawn of spawns) {
-    if (placed >= MINER_PER_SECTOR || state.enemies.length >= MAX_ENEMIES) return;
+    if (placed >= cap || state.enemies.length >= MAX_ENEMIES) return;
     let found: { x: number; y: number } | null = null;
     for (let dy = -MINER_ORE_SEARCH; dy <= MINER_ORE_SEARCH && !found; dy++) {
       for (let dx = -MINER_ORE_SEARCH; dx <= MINER_ORE_SEARCH && !found; dx++) {
@@ -197,11 +215,17 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
 
   // Mesma mistura de createRun: o setor 2 gerado ao descer tem de ser IDENTICO
   // ao setor 2 construido por `createRun({ sector: 2 })`, senao um cliente que
-  // reconstroi o mundo ao reconectar veria outro mapa.
+  // reconstroi o mundo ao reconectar veria outro mapa. O bioma sai da MESMA
+  // derivacao pura da seed, pela mesma razao.
+  const biome = sectorBiome(state.config.seed, state.sector);
+  state.stratum = biome.stratum;
+  state.occupation = biome.occupation;
+  state.lineage = biome.lineage;
   const world = generateWorld(
     sectorSeed((state.config.seed ^ RUN_SEED_MIX) >>> 0, state.sector),
     width,
     height,
+    biomeProfile(biome, state.sector),
   );
 
   state.solid = world.solid;
@@ -280,7 +304,13 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   }
 
   populateSector(state, world.enemySpawns, world.guardianSpawn);
-  events.push({ t: 'sector_entered', sector: state.sector, final: isFinalSector(state.sector) });
+  events.push({
+    t: 'sector_entered',
+    sector: state.sector,
+    final: isFinalSector(state.sector),
+    stratum: state.stratum,
+    occupation: state.occupation,
+  });
 };
 
 /** Celula do poco/nucleo esta livre? Usado so por testes e diagnostico. */

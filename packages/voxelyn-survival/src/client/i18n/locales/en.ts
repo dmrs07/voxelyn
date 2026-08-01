@@ -321,6 +321,13 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'hud.direction.south': 'SOUTH',
   'hud.direction.north': 'NORTH',
 
+  // Strata and occupations of the Vein (the descent's biome grammar)
+  'biome.stratum.basalt': 'BASALT GALLERIES',
+  'biome.stratum.prismatic': 'PRISMATIC CATHEDRAL',
+  'biome.stratum.aquifer': 'BLACK AQUIFER',
+  'biome.occupation.mycelial': 'MYCELIAL MATRIX',
+  'biome.occupation.aurix': 'AURIX SCAR',
+
   // ---------------------------------------------------------------------
   // Run toasts
   // ---------------------------------------------------------------------
@@ -333,6 +340,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'toast.scan.complete': 'SCAN COMPLETE — CACHE REVEALED',
   'toast.overheat': 'OVERHEAT!',
   'toast.well.resonance': 'THE VEIN RESONATES — TWO ECHOES DEMONSTRATE',
+  'toast.sector.entered': 'SECTOR {sector} — {biome}',
 
   // Messages emitted by the simulation (they arrive as a key, never as text)
   'sim.partnerRevived': 'Partner revived.',

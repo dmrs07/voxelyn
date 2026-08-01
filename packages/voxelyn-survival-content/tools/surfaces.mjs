@@ -51,6 +51,10 @@ export const SURFACE_KINDS = [
   { name: 'scorched', frames: 1, frameMs: 0 },
   { name: 'spores', frames: 4, frameMs: 360 },
   { name: 'fungal-heated', frames: 2, frameMs: 240 },
+  // Agua do Aquifero Negro (SURF_WATER = 8). Entra no fim pela regra de sempre:
+  // os IDs viajam nos diffs de chunk e nao podem mudar de significado. Mais
+  // lenta que o biofluido: agua parada ondula, nao borbulha.
+  { name: 'water', frames: 4, frameMs: 340 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -455,6 +459,35 @@ export const surfaceModel = (kind, variant, frame) => {
         // Bolha: acende dois quadros do ciclo e estoura.
         const bubble = h % 21 === 0 && ((h >>> 6) + frame) % 4 < 2;
         boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, bubble || band === 0 ? 'biolum' : 'pool'));
+      }
+    }
+    return boxes;
+  }
+
+  if (kind === 'water') {
+    // A mesma construcao da poca — leito plano, filme de meio voxel, reflexo em
+    // faixa — com DUAS diferencas de leitura: a familia de cor e a azul da
+    // rocha (agua nunca compartilha matiz com o fungo), e a ondulacao substitui
+    // as bolhas. Agua parada nao ferve; ela ondula. A faixa `electric` anda com
+    // o frame e uma segunda faixa defasada cruza na outra diagonal, entao o
+    // lago inteiro parece respirar sem nenhum ponto piscando.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 41, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        if (h % 97 === 0) {
+          // Mineral azulado emergindo: a "ilha" que da escala ao lago.
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 1.5, 'rock'));
+          continue;
+        }
+        const band = (fx + fy + frame * 2) % FINE_COLS;
+        const cross = (fx - fy + FINE_COLS * 4 - frame * 3) % Math.floor(FINE_COLS / 2);
+        const glint = band === 0 || (cross === 0 && (h & 3) === 0);
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, glint ? 'electric' : 'water'));
       }
     }
     return boxes;

@@ -1,4 +1,5 @@
 import type { RNG } from '@voxelyn/core';
+import type { LineageId, OccupationId, StratumId } from './strata.js';
 
 export type Vec2 = { x: number; y: number };
 
@@ -452,8 +453,15 @@ export type SemanticEvent =
   | { t: 'module_expired'; slot: number; module: ModuleId }
   | { t: 'overheat'; x: number; y: number }
   | { t: 'guardian_awake' }
-  /** O mundo inteiro foi trocado: o cliente precisa redesenhar do zero. */
-  | { t: 'sector_entered'; sector: number; final: boolean }
+  /**
+   * O mundo inteiro foi trocado: o cliente precisa redesenhar do zero.
+   *
+   * Carrega o BIOMA porque o setor deixou de ser so um numero: o anuncio de
+   * chegada mostra "AQUIFERO NEGRO · MATRIZ MICELIAL", e derivar isso no
+   * cliente exigiria repetir a derivacao de linhagem la — duas copias que
+   * divergiriam no primeiro ajuste de tabela.
+   */
+  | { t: 'sector_entered'; sector: number; final: boolean; stratum: StratumId; occupation: OccupationId }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }
@@ -517,6 +525,18 @@ export type SurvivalState = {
   sector: number;
   /** Tick em que o setor atual comecou; o cronometro da run continua global. */
   sectorStartedAt: number;
+  /**
+   * O bioma do setor atual: estrato geologico + ocupacao + linhagem da run.
+   *
+   * DERIVADO da seed (ver strata.ts), entao nao entra no hash autoritativo nem
+   * viaja em snapshot: qualquer maquina que conheca a seed e o setor chega ao
+   * mesmo bioma. Vive no estado porque o cliente desenha com ele (paleta,
+   * anuncio do setor) e a simulacao compoe a fauna a partir dele — recalcular
+   * a cada uso espalharia a derivacao por todo consumidor.
+   */
+  stratum: StratumId;
+  occupation: OccupationId;
+  lineage: LineageId;
   solid: Uint8Array;
   surface: Uint8Array;
   surfaceTimer: Uint16Array;
