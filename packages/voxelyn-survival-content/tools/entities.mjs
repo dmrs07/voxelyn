@@ -309,9 +309,23 @@ const bruiserModel = (anim, f) => {
 
   if (anim === 'special' && !hurlThrow) {
     const rockZ = 5 + hurlLift;
-    // O volume converge com um bloco real do terreno, sem ocupar o frame inteiro.
-    b.push(box(-3, -2, rockZ, 7, 5, 4, hurlHold ? 'rock' : 'rockDeep'));
+    // A MESMA pedra que voa (ProjectileView): corpo de rocha com TAMPA palida
+    // de osso — a pedra-placa dos ombros do proprio Britador. O bloco erguido
+    // e o projetil tem de ser um objeto so, senao o telegraph ensina uma coisa
+    // e o voo cobra outra.
+    b.push(box(-3, -2, rockZ, 7, 5, 3.5, hurlHold ? 'rock' : 'rockDeep'));
+    b.push(box(-3, -2, rockZ + 3.5, 7, 5, 0.5, 'bone'));
     b.push(box(-2, -3, rockZ + 2, 5, 1, 2, 'rock'));
+    // A CARGA aparece na pausa em tensao: faiscas eletricas de meio-passo
+    // crepitando no bloco durante o hold — a corrente do nucleo-geodo subindo
+    // pela pedra e o mesmo azul que vai orbitar o projetil. O telegraph deixa
+    // de ser so "pedra no alto" e passa a ser "pedra ARMANDO".
+    if (hurlHold) {
+      b.push(box(-3.5, -1.5, rockZ + 1, 0.5, 0.5, 1, 'electric'));
+      b.push(box(4, -1, rockZ + 2, 0.5, 0.5, 1, 'electric'));
+      b.push(box(0, -3.5, rockZ + 2.5, 0.5, 0.5, 0.5, 'electric'));
+      b.push(box(-1, -2.5, rockZ + 4, 1, 0.5, 0.5, 'electric'));
+    }
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
@@ -1077,7 +1091,7 @@ export const ENTITY_SPECS = [
   base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
-  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 5),
+  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 6),
   base('enemy-guardian', 112, 128, 56, 124, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
