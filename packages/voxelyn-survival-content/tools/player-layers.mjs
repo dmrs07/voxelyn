@@ -102,8 +102,8 @@ const fitReference = () => {
 
 const baseLayer = (id, animations, draw, prompt) => ({
   id,
-  // 6: passe de detalhamento em meio-passo sobre a grade subdividida.
-  version: 6,
+  // 7: coxa e jarrete passam a acompanhar metade da passada (fim do patinar).
+  version: 7,
   frameWidth: FRAME_WIDTH,
   frameHeight: FRAME_HEIGHT,
   anchorX: ANCHOR_X,

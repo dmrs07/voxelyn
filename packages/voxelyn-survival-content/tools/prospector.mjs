@@ -120,6 +120,12 @@ export const walkFps = (tilesPerSecond) =>
 const leg = (lx, swing) => {
   const b = [];
   const s = Math.round(swing);
+  // A COXA ACOMPANHA METADE DA PASSADA. Antes so pe e canela transladavam e
+  // coxa/jarrete ficavam cravados no lugar: a perna nao GIRAVA em torno do
+  // quadril, deslizava por baixo dele, e o bot lia como se patinasse. Uma
+  // caixa nao cisalha; a rotacao e aproximada em degraus — quadril fixo, coxa
+  // superior parada, coxa inferior e jarrete a meio caminho do pe.
+  const h = s * 0.5;
   // Pe longo e chato, com garras palidas na ponta. Sao as garras que dizem que
   // ele AGARRA terreno, e nao que ele calca bota.
   b.push(box(lx, -2 + s, 0, 2, 3, 1, 'rockDeep'));
@@ -133,14 +139,17 @@ const leg = (lx, swing) => {
   // mecanismo articulado e nao como coluna dobrada.
   b.push(box(lx + 0.5, -1.5 + s, 1, 1, 0.5, 2, 'bone'));
   // Jarrete: a junta que dobra ao contrario, um degrau atras da canela.
-  b.push(box(lx, 1, 3, 2, 2, 1, 'rust'));
+  // Acompanha a coxa inferior — e a junta entre os dois segmentos que giram.
+  b.push(box(lx, 1 + h, 3, 2, 2, 1, 'rust'));
   // Pino da junta: um rebite de ouro MEIO-PASSO SALIENTE na face frontal do
   // jarrete. Saliente, e nao rente: um voxel fino embutido na casca fica com a
   // unica face exposta virada para fora do quadrante visivel e a ordem do
   // pintor o enterra — applique de detalhe fino se projeta da face.
-  b.push(box(lx + 0.5, 0.5, 3.5, 1, 0.5, 0.5, 'loot'));
-  // Coxa subindo PARA A FRENTE ate o quadril.
-  b.push(box(lx, 0, 4, 2, 2, 2, 'rust'));
+  b.push(box(lx + 0.5, 0.5 + h, 3.5, 1, 0.5, 0.5, 'loot'));
+  // Coxa em DOIS degraus: a metade de baixo inclina com a passada, a de cima
+  // fica presa ao quadril — e o degrau entre elas que desenha a rotacao.
+  b.push(box(lx, 0 + h, 4, 2, 2, 1, 'rust'));
+  b.push(box(lx, 0, 5, 2, 2, 1, 'rust'));
   return b;
 };
 

@@ -1381,10 +1381,33 @@ export class SurvivalRenderer {
           const allyLight = isLocal ? 1 : brightness(pl.x, pl.y);
           const bodyAlpha = isLocal ? 1 : allyBodyAlpha(allyLight);
           const flick = isLocal && ex.iframesUntil > state.tick && state.tick % 2 === 0;
+          // ESQUIVA COM PROPULSAO: durante o dash o corpo se PROSTRA no rumo do
+          // deslocamento — inclinado e levemente agachado, como quem esta sendo
+          // empurrado pelos foguetes do hardpoint — e os bocais traseiros cospem
+          // brasas. A sombra fica fora da inclinacao: ela pertence ao chao.
+          const dashing = state.tick < ex.dodgeUntil;
+          if (dashing) {
+            this.particles.emitDashJets(
+              slot, pl.x, pl.y, ex.dodgeDir.x, ex.dodgeDir.y, nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx
+            );
+          }
           if (bodyAlpha > 0) {
             ctx.save();
             ctx.globalAlpha = bodyAlpha;
             drawShadow(psx, psy, size);
+            if (dashing) {
+              // Rumo da esquiva em coordenadas de TELA (projecao 2:1),
+              // renormalizado — e ele que diz para que lado o corpo tomba.
+              const ddx = ex.dodgeDir.x - ex.dodgeDir.y;
+              const ddy = (ex.dodgeDir.x + ex.dodgeDir.y) * 0.5;
+              const dlen = Math.hypot(ddx, ddy) || 1;
+              // Gira em torno dos PES: o apoio nao sai do lugar, o tronco tomba.
+              ctx.translate(psx + (ddx / dlen) * 2 * z, psy);
+              ctx.rotate((ddx / dlen) * 0.22);
+              ctx.scale(1, 0.92);
+              ctx.translate(-psx, -psy);
+            }
             if (!flick) {
               const drew = this.sprites.drawEntity(
                 ctx,
