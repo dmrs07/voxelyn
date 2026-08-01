@@ -19,7 +19,10 @@ export const PROTOCOL_VERSION = 11;
 // no minuto tres. (O protocolo em si nao muda: o envelope das mensagens e o
 // mesmo, e os campos novos de `sector_entered` viajam dentro de um evento cujo
 // par de versoes de sim ja garante que ambos os lados conhecem.)
-export const SIMULATION_VERSION = 14;
+// 15: a Lampreia vira bando (tres por setor de Aquifero) e as vagas de
+// assinatura passam a ser derivadas do orcamento real do setor — a populacao
+// semeada muda, entao peers em versoes mistas divergiriam no spawn.
+export const SIMULATION_VERSION = 15;
 // 10: crostas novas no atlas de chao (agua, fissura incandescente, gelo) e os
 // cinco atlases do bestiario de assinatura.
 export const CONTENT_VERSION = 10;

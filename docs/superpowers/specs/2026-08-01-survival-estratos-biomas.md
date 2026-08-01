@@ -183,6 +183,22 @@ Conteúdo: 5 atlases voxel novos (idle/walk/attack/hit/die × 4 direções,
 materiais existentes da paleta), bestiário corporativo (fichas pt/en),
 partículas por matéria, ecos de morte no protocolo.
 
+## Quarta etapa (implementada): leitura de lugar
+
+Feedback direto de playtest ("caí no Aquífero e demorei a perceber — parece o
+mesmo lugar, só tem água de diferente"):
+
+- **Véu de paleta por estrato**: uma luz ambiente por bioma (composição
+  `overlay`, alfa baixo) sobre mundo e criaturas, sob partículas/HUD — azul
+  profundo no Aquífero, quente na Fornalha, gélido na Cripta, violeta na
+  Catedral, sulfuroso na Fenda, pálido na Sílica. O **basalto não tem véu**:
+  as Galerias são o mapa original, e a ausência é a referência que faz os
+  outros lerem como "outro lugar". Custo: um fillRect por quadro.
+- **Lampreia como fauna** (`SIGNATURE_PACK`): três por setor de Aquífero,
+  espalhadas pela lista de spawns — com uma, o setor tinha um lago perigoso e
+  dezenas de lagos que eram só cenário. Continuam ocupando vagas comuns da
+  contagem. As demais assinaturas seguem sendo encontro único.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;

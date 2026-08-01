@@ -162,6 +162,52 @@ export const biomeLabel = (stratum: StratumId, occupation: OccupationId): string
   return `${base} · ${t(OCCUPATION_LABEL_KEY[occupation])}`;
 };
 
+/**
+ * O VEU de cor de cada estrato: a luz ambiente que faz um setor parecer OUTRO
+ * LUGAR no primeiro relance, antes de qualquer materia no chao.
+ *
+ * Veio direto de playtest: o Aquifero inteiro lia como "a caverna de sempre,
+ * so que com agua", porque as paredes — a maior parte dos pixels da tela — sao
+ * o mesmo atlas em todo estrato. Multiplicar o atlas de terreno por estrato
+ * custaria sete vezes o orcamento de textura; um veu em tela cheia custa UM
+ * fillRect por quadro e muda a leitura do setor inteiro.
+ *
+ * Regras:
+ * - `basalt` NAO tem veu. As Galerias sao o mapa original, e a promessa de
+ *   preservacao vale para os pixels tambem — e um veu ausente e a referencia
+ *   contra a qual os outros leem como "outro lugar".
+ * - Alfa baixo e composicao `overlay` de proposito: o veu desloca o MATIZ sem
+ *   comer contraste. Telegrafo, gas e fogo continuam legiveis por baixo — a
+ *   promessa "morte sempre anunciada" nao pode ser paga em atmosfera.
+ * - Aplicado sobre mundo e entidades, ANTES de particulas, numeros de dano e
+ *   HUD: aviso e interface ficam nitidos por cima da atmosfera.
+ */
+const BIOME_VEIL = {
+  basalt: null,
+  prismatic: { color: '#8f7aff', alpha: 0.11 },
+  aquifer: { color: '#1e5a8a', alpha: 0.2 },
+  sulfur: { color: '#a8e63c', alpha: 0.11 },
+  furnace: { color: '#ff7a2f', alpha: 0.13 },
+  silica: { color: '#b8a98f', alpha: 0.14 },
+  glacial: { color: '#9fc2e8', alpha: 0.17 },
+} as const satisfies Record<StratumId, { color: string; alpha: number } | null>;
+
+const drawBiomeVeil = (
+  ctx: CanvasRenderingContext2D,
+  stratum: StratumId,
+  vw: number,
+  vh: number
+): void => {
+  const veil = BIOME_VEIL[stratum];
+  if (!veil) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = veil.alpha;
+  ctx.fillStyle = veil.color;
+  ctx.fillRect(0, 0, vw, vh);
+  ctx.restore();
+};
+
 export const TILE_W = 32;
 export const TILE_H = 16;
 const WALL_H = 14;
@@ -1712,6 +1758,10 @@ export class SurvivalRenderer {
 
     items.sort((a, b) => a.depth - b.depth);
     for (const item of items) item.draw();
+
+    // A luz ambiente do estrato entra AQUI: por cima do mundo e das criaturas,
+    // por baixo de particulas, numeros de dano e HUD.
+    drawBiomeVeil(ctx, state.stratum, vw, vh);
 
     // FX
     // Vem do relogio, nao de um 16.7 fixo: em rAF o passo fixo amarrava a vida

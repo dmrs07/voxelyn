@@ -52,18 +52,21 @@ const arena = (seed: number): SurvivalState => {
 };
 
 describe('spawn por estrato', () => {
-  it('cada estrato com assinatura recebe exatamente UMA, dentro da contagem normal', () => {
-    const cases: Array<{ lineage: string; sector: number; archetype: string }> = [
-      { lineage: 'mineral', sector: 2, archetype: 'resonant' },
-      { lineage: 'hydric', sector: 2, archetype: 'mud_lamprey' },
-      { lineage: 'thermal', sector: 2, archetype: 'bellows' },
-      { lineage: 'thermal', sector: 3, archetype: 'scoriac' },
-      { lineage: 'cryo', sector: 2, archetype: 'frost_wraith' },
+  it('cada estrato recebe as assinaturas do proprio bando, dentro da contagem normal', () => {
+    // Padrao: UMA (encontro autoral). A Lampreia e fauna: TRES, espalhadas —
+    // veio de playtest: com uma, o Aquifero tinha um lago perigoso e dezenas de
+    // lagos que eram so cenario.
+    const cases: Array<{ lineage: string; sector: number; archetype: string; count: number }> = [
+      { lineage: 'mineral', sector: 2, archetype: 'resonant', count: 1 },
+      { lineage: 'hydric', sector: 2, archetype: 'mud_lamprey', count: 3 },
+      { lineage: 'thermal', sector: 2, archetype: 'bellows', count: 1 },
+      { lineage: 'thermal', sector: 3, archetype: 'scoriac', count: 1 },
+      { lineage: 'cryo', sector: 2, archetype: 'frost_wraith', count: 1 },
     ];
     for (const c of cases) {
       const state = createRun({ seed: seedWithLineage(c.lineage), sector: c.sector });
       const found = state.enemies.filter((e) => e.archetype === c.archetype);
-      expect(found.length, `${c.lineage} s${c.sector}: ${c.archetype}`).toBe(1);
+      expect(found.length, `${c.lineage} s${c.sector}: ${c.archetype}`).toBe(c.count);
     }
   });
 
