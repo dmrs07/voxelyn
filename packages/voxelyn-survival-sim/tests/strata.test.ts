@@ -11,21 +11,26 @@
 import { describe, expect, it } from 'vitest';
 import {
   BISHOP_SECTOR,
+  ICE_REFREEZE_TICKS,
   SECTOR_COUNT,
   SOLID_CRYSTAL,
+  SOLID_FRAGILE,
   SOLID_NONE,
+  SURF_EMBER,
   SURF_FIRE,
   SURF_FUNGAL,
+  SURF_ICE,
   SURF_NONE,
   SURF_SCORCHED,
   SURF_WATER,
+  VENT_CYCLE_TICKS,
   WATER_SLOW,
   WORLD_H,
   WORLD_W,
 } from '../src/constants';
 import { dischargeAt, igniteCell, setSurface, stepCells } from '../src/cells';
 import { surfaceSpeedMul } from '../src/entities';
-import { createRun } from '../src/run';
+import { createRun, emptyCommand, stepRun } from '../src/run';
 import { descend } from '../src/sectors';
 import { biomeMix, biomeProfile, lineageOf, sectorBiome } from '../src/strata';
 import { DEFAULT_PROFILE, generateWorld } from '../src/worldgen';
@@ -107,7 +112,7 @@ describe('perfis por estrato', () => {
     // O bioma original do jogo esta preservado como tipo proprio: Galerias de
     // Basalto sem ocupacao SAO o mapa antigo. Nenhuma linhagem pode tempera-lo
     // — variacao de basalto e trabalho das ocupacoes.
-    for (const lineage of ['hydric', 'mineral', 'industrial'] as const) {
+    for (const lineage of ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'] as const) {
       for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
         const clean: SectorBiome = { stratum: 'basalt', occupation: 'none', lineage };
         expect(biomeProfile(clean, sector), `${lineage} s${sector}`).toEqual(DEFAULT_PROFILE);
@@ -232,9 +237,172 @@ describe('agua do Aquifero Negro', () => {
   });
 });
 
+describe('segunda leva: linhagens termica, arida e crio', () => {
+  it('as trilhas novas seguem a tabela da spec', () => {
+    const thermal = seedWithLineage('thermal');
+    expect(sectorBiome(thermal, 2).stratum).toBe('sulfur');
+    expect(sectorBiome(thermal, 3).stratum).toBe('furnace');
+    const arid = seedWithLineage('arid');
+    expect(sectorBiome(arid, 2).stratum).toBe('silica');
+    expect(sectorBiome(arid, 3).stratum).toBe('furnace');
+    const cryo = seedWithLineage('cryo');
+    expect(sectorBiome(cryo, 2).stratum).toBe('glacial');
+    expect(sectorBiome(cryo, 3).stratum).toBe('glacial');
+  });
+
+  it('a Fornalha nunca recebe colonia micelial: a intrusao vira Aurix', () => {
+    for (let seed = 1; seed < 4096; seed++) {
+      for (let sector = 2; sector <= SECTOR_COUNT; sector++) {
+        const biome = sectorBiome(seed, sector);
+        if (biome.stratum === 'furnace') expect(biome.occupation).not.toBe('mycelial');
+      }
+    }
+  });
+
+  it('cada estrato novo muda a materia do setor', () => {
+    const count = (arr: Uint8Array, kind: number): number =>
+      arr.reduce((n, s) => n + (s === kind ? 1 : 0), 0);
+    const mk = (stratum: 'sulfur' | 'furnace' | 'silica' | 'glacial', lineage: 'thermal' | 'arid' | 'cryo') =>
+      generateWorld(42, WORLD_W, WORLD_H, biomeProfile({ stratum, occupation: 'none', lineage }, 2));
+    const dry = generateWorld(42, WORLD_W, WORLD_H);
+
+    // Glacial: lagos congelados.
+    expect(count(mk('glacial', 'cryo').surface, SURF_ICE)).toBeGreaterThan(60);
+    // Fornalha: fissuras incandescentes e campos de carvao.
+    const furnace = mk('furnace', 'thermal');
+    expect(count(furnace.surface, SURF_EMBER)).toBeGreaterThan(30);
+    expect(count(furnace.surface, SURF_SCORCHED)).toBeGreaterThan(30);
+    // Fenda: muito mais respiradouros que o basalto.
+    expect(mk('sulfur', 'thermal').ventPositions.length).toBeGreaterThan(dry.ventPositions.length);
+    // Silica: bem mais parede fragil.
+    expect(count(mk('silica', 'arid').solid, SOLID_FRAGILE)).toBeGreaterThan(
+      count(dry.solid, SOLID_FRAGILE) * 1.2,
+    );
+  });
+});
+
+describe('ventilacao da Fenda Sulfurosa', () => {
+  const ventState = (): SurvivalState => {
+    const state = createRun({ seed: 21 });
+    state.stratum = 'sulfur';
+    for (let y = 28; y <= 32; y++) {
+      for (let x = 28; x <= 32; x++) {
+        state.solid[at(state, x, y)] = SOLID_NONE;
+        state.surface[at(state, x, y)] = SURF_NONE;
+      }
+    }
+    state.vents = [{ x: 30, y: 30, nextEmitAt: 0 }];
+    return state;
+  };
+
+  it('a fonte emite na janela dela e dorme na oposta', () => {
+    // fase de (30,30) = (30*7 + 30*13) % 2 = 0: ativa nas janelas pares.
+    const active = ventState();
+    active.tick = 0;
+    stepCells(active, []);
+    expect(active.surface[at(active, 30, 30)]).not.toBe(SURF_NONE);
+
+    const dormant = ventState();
+    // Janela impar mais proxima, alinhada ao passo celular.
+    dormant.tick = VENT_CYCLE_TICKS + (3 - (VENT_CYCLE_TICKS % 3)) % 3;
+    stepCells(dormant, []);
+    expect(dormant.surface[at(dormant, 30, 30)]).toBe(SURF_NONE);
+  });
+
+  it('fora da Fenda, o respiradouro ignora o ciclo (comportamento historico)', () => {
+    const state = ventState();
+    state.stratum = 'basalt';
+    state.tick = VENT_CYCLE_TICKS + (3 - (VENT_CYCLE_TICKS % 3)) % 3; // janela "dormente"
+    stepCells(state, []);
+    expect(state.surface[at(state, 30, 30)]).not.toBe(SURF_NONE);
+  });
+});
+
+describe('fissuras da Fornalha Abissal', () => {
+  it('em cima da brasa, o calor da arma dissipa devagar — e nao ha dano', () => {
+    const onEmber = createRun({ seed: 22 });
+    const cold = createRun({ seed: 22 });
+    for (const state of [onEmber, cold]) {
+      const px = Math.floor(state.player.x);
+      const py = Math.floor(state.player.y);
+      state.playerExtra.heat = 60;
+      if (state === onEmber) setSurface(state, at(state, px, py), SURF_EMBER, 0);
+    }
+    for (let t = 0; t < 10; t++) {
+      stepRun(onEmber, [emptyCommand()]);
+      stepRun(cold, [emptyCommand()]);
+    }
+    expect(onEmber.playerExtra.heat).toBeGreaterThan(cold.playerExtra.heat);
+    expect(onEmber.player.hp).toBe(onEmber.player.maxHp);
+  });
+
+  it('o chao queimado e CARVAO na Fornalha: acende persistente — e so la', () => {
+    const furnace = createRun({ seed: 23 });
+    furnace.stratum = 'furnace';
+    const i = at(furnace, 30, 30);
+    furnace.solid[i] = SOLID_NONE;
+    furnace.surface[i] = SURF_SCORCHED;
+    expect(igniteCell(furnace, i, [])).toBe(true);
+    expect(furnace.surface[i]).toBe(SURF_FIRE);
+
+    const basalt = createRun({ seed: 23 });
+    const j = at(basalt, 30, 30);
+    basalt.solid[j] = SOLID_NONE;
+    basalt.surface[j] = SURF_SCORCHED;
+    expect(igniteCell(basalt, j, [])).toBe(false);
+    expect(basalt.surface[j]).toBe(SURF_SCORCHED);
+  });
+});
+
+describe('gelo da Cripta Glacial', () => {
+  const frozen = (seed: number): SurvivalState => {
+    const state = createRun({ seed });
+    for (let y = 20; y <= 26; y++) {
+      for (let x = 20; x <= 40; x++) {
+        state.solid[at(state, x, y)] = SOLID_NONE;
+        state.surface[at(state, x, y)] = SURF_NONE;
+      }
+    }
+    for (let x = 22; x <= 34; x++) setSurface(state, at(state, x, 23), SURF_ICE, 0);
+    return state;
+  };
+
+  it('gelo nao conduz; derretido vira agua condutiva; e recongela sozinho', () => {
+    const state = frozen(24);
+    // Congelado: a descarga nao encontra circuito.
+    expect(dischargeAt(state, 25, 23, [])).toBe(false);
+
+    // Calor derrete: agua com relogio de recongelamento.
+    const i = at(state, 25, 23);
+    expect(igniteCell(state, i, [])).toBe(false);
+    expect(state.surface[i]).toBe(SURF_WATER);
+    expect(state.surfaceTimer[i]).toBe(ICE_REFREEZE_TICKS);
+    expect(dischargeAt(state, 25, 23, [])).toBe(true);
+
+    // A janela fecha: depois do relogio, gelo de novo.
+    for (let t = 0; t <= ICE_REFREEZE_TICKS + 6 && state.surface[i] === SURF_WATER; t += 1) {
+      state.tick += 1;
+      stepCells(state, []);
+    }
+    expect(state.surface[i]).toBe(SURF_ICE);
+  });
+
+  it('fogo encostado no gelo o derrete — e a agua nova apaga o proprio fogo', () => {
+    const state = frozen(25);
+    const fireCell = at(state, 25, 22); // colado na faixa de gelo
+    setSurface(state, fireCell, SURF_FIRE, 400);
+    for (let t = 0; t < 24 && state.surface[fireCell] === SURF_FIRE; t++) {
+      state.tick += 1;
+      stepCells(state, []);
+    }
+    expect(state.surface[at(state, 25, 23)]).toBe(SURF_WATER);
+    expect(state.surface[fireCell]).toBe(SURF_SCORCHED);
+  });
+});
+
 describe('bolso micelial do Bispo', () => {
   it('a arena do setor 2 tem tapete fungico em QUALQUER linhagem', () => {
-    for (const lineage of ['hydric', 'mineral', 'industrial'] as const) {
+    for (const lineage of ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'] as const) {
       const seed = seedWithLineage(lineage);
       const state = createRun({ seed, sector: BISHOP_SECTOR });
       const bishop = state.enemies.find((e) => e.archetype === 'bishop');

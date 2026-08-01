@@ -329,6 +329,10 @@ export const PT_BR = {
   'biome.stratum.basalt': 'GALERIAS DE BASALTO',
   'biome.stratum.prismatic': 'CATEDRAL PRISMÁTICA',
   'biome.stratum.aquifer': 'AQUÍFERO NEGRO',
+  'biome.stratum.sulfur': 'FENDA SULFUROSA',
+  'biome.stratum.furnace': 'FORNALHA ABISSAL',
+  'biome.stratum.silica': 'SUMIDOUROS DE SÍLICA',
+  'biome.stratum.glacial': 'CRIPTA GLACIAL',
   'biome.occupation.mycelial': 'MATRIZ MICELIAL',
   'biome.occupation.aurix': 'CICATRIZ AURIX',
 

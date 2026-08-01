@@ -2,8 +2,10 @@ import {
   BUDGET_DISCHARGE_CELLS,
   BUDGET_REACTING_CELLS,
   CELL_STEP_INTERVAL,
+  COAL_FIRE_FUEL_TICKS,
   DISCHARGE_TICKS,
   FIRE_FUEL_TICKS,
+  ICE_REFREEZE_TICKS,
   FIRE_SPREAD_BIOFLUID,
   FUNGAL_FIRE_FUEL_TICKS,
   FUNGAL_HEAT_IMPACT_TICKS,
@@ -24,10 +26,12 @@ import {
   SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
+  SURF_ICE,
   SURF_SCORCHED,
   SURF_SPORES,
   SURF_WATER,
   VENT_BASE_INTERVAL_TICKS,
+  VENT_CYCLE_TICKS,
 } from './constants.js';
 import { markDiscovery } from './stats.js';
 import { DISCOVERY_FIRE_SPREAD, DISCOVERY_FRAGILE_BREACH, DISCOVERY_GAS_IGNITION } from './types.js';
@@ -61,7 +65,16 @@ export const setSurface = (state: SurvivalState, i: number, kind: number, timer:
   const x = i % W(state);
   const y = (i - x) / W(state);
   markDirty(state, x, y);
-  if (isReactiveSurface(kind)) state.reactionQueue.push(i);
+  // Agua COM timer e agua derretida de gelo: entra na fila para recongelar.
+  // Agua nativa (timer 0) continua inerte, como toda superficie permanente.
+  if (isReactiveSurface(kind) || (kind === SURF_WATER && timer > 0)) state.reactionQueue.push(i);
+};
+
+/** Derrete uma celula de gelo em agua condutiva que vai recongelar sozinha. */
+export const meltIce = (state: SurvivalState, i: number): boolean => {
+  if (state.surface[i] !== SURF_ICE) return false;
+  setSurface(state, i, SURF_WATER, ICE_REFREEZE_TICKS);
+  return true;
 };
 
 const announceIgnite = (state: SurvivalState, i: number, events: SemanticEvent[]): void => {
@@ -126,6 +139,20 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
   }
   if (surf === SURF_BIOFLUID) {
     setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
+    announceIgnite(state, i, events);
+    return true;
+  }
+  if (surf === SURF_ICE) {
+    // Calor nao acende gelo: derrete. A agua que sobra e condutiva e vai
+    // recongelar — quem derreteu abriu uma janela, nao editou o mapa.
+    meltIce(state, i);
+    return false;
+  }
+  if (surf === SURF_SCORCHED && state.stratum === 'furnace') {
+    // Na Fornalha o chao queimado e CARVAO, nao cinza esteril: explosao ou
+    // chama o acende em combustao persistente. So la — em qualquer outro
+    // estrato a cinza continua sendo o fim do fogo, nunca o recomeco.
+    setSurface(state, i, SURF_FIRE, COAL_FIRE_FUEL_TICKS);
     announceIgnite(state, i, events);
     return true;
   }
@@ -249,6 +276,16 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
   // Respiradouros minerais emitem o gas sulfurico periodicamente. A nuvem de
   // esporos e outra materia e nasce exclusivamente do Spore Bomber.
   for (const vent of state.vents) {
+    // VENTILACAO da Fenda Sulfurosa: cada fonte alterna janelas ativas e
+    // dormentes, com fase pela POSICAO — metade das camaras respira enquanto a
+    // outra enche, e a rota muda com o relogio. A fase vem da posicao (e nunca
+    // de sorteio) para as duas maquinas de uma sala concordarem sem trocar um
+    // byte. Nos demais estratos o comportamento historico fica intacto.
+    if (state.stratum === 'sulfur') {
+      const phase = (vent.x * 7 + vent.y * 13) % 2;
+      const window = Math.floor(state.tick / VENT_CYCLE_TICKS) % 2;
+      if (window !== phase) continue;
+    }
     if (state.tick >= vent.nextEmitAt) {
       const interval = Math.max(50, VENT_BASE_INTERVAL_TICKS * (1 - state.contamination * 0.6));
       vent.nextEmitAt = state.tick + Math.floor(interval);
@@ -309,6 +346,11 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
         } else if (nsurf === SURF_BIOFLUID && state.rng.nextFloat01() < FIRE_SPREAD_BIOFLUID) {
           igniteCell(state, ni, events);
           markDiscovery(state.stats, DISCOVERY_FIRE_SPREAD);
+        } else if (nsurf === SURF_ICE) {
+          // Fogo derrete o gelo vizinho — e a agua que nasce disso apaga este
+          // mesmo fogo no proximo passo. A troca e deliberada: derreter uma
+          // ponte custa a chama que a derreteu.
+          meltIce(state, ni);
         }
       }
       const t = state.surfaceTimer[i];
@@ -339,6 +381,16 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
         state.surface[i] = SURF_NONE;
         state.surfaceTimer[i] = 0;
         markDirty(state, x, y);
+      } else {
+        state.surfaceTimer[i] = t - CELL_STEP_INTERVAL;
+        pushNext(i);
+      }
+    } else if (kind === SURF_WATER) {
+      // So agua DERRETIDA chega aqui (timer > 0): a contagem regressiva do
+      // recongelamento. Expirou, vira gelo de novo — a janela fechou.
+      const t = state.surfaceTimer[i];
+      if (t <= CELL_STEP_INTERVAL) {
+        setSurface(state, i, SURF_ICE, 0);
       } else {
         state.surfaceTimer[i] = t - CELL_STEP_INTERVAL;
         pushNext(i);

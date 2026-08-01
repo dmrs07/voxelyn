@@ -1,6 +1,6 @@
 {
   "id": "surface-tiles",
-  "version": 4,
+  "version": 5,
   "atlas": "surface-tiles.png",
   "frameWidth": 64,
   "frameHeight": 76,
@@ -52,6 +52,16 @@
       "name": "water",
       "frames": 4,
       "frameMs": 340
+    },
+    {
+      "name": "ember",
+      "frames": 4,
+      "frameMs": 260
+    },
+    {
+      "name": "ice",
+      "frames": 2,
+      "frameMs": 760
     }
   ],
   "variants": 3,

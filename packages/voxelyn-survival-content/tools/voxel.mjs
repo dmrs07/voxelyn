@@ -77,6 +77,14 @@ export const RAMPS = {
    */
   water: ['rock', 'rockShadow', 'dark'],
   /**
+   * Gelo da Cripta Glacial: a lamina mais CLARA do chao, na familia fria.
+   * Topo `mist` (o cinza-azulado palido) sobre laterais de rocha — le como
+   * placa solida e leitosa, o oposto da agua escura que ele vira ao derreter.
+   * Nao emite: gelo nao brilha, ele reflete — os brilhos sao voxels `electric`
+   * avulsos no proprio modelo.
+   */
+  ice: ['mist', 'rockLight', 'rockShadow'],
+  /**
    * Gas sulfuroso: crosta amarela sobre corpo esverdeado.
    *
    * O gas era `acid` puro — verde-limao — e a paleta nao tem amarelo de enxofre.

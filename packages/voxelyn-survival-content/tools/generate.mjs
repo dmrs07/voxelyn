@@ -201,9 +201,9 @@ const buildSurfaces = () => {
 
   const manifest = {
     id: 'surface-tiles',
-    // 4: entra a agua do Aquifero Negro (SURF_WATER) — lamina azul com
-    // ondulacao em faixa e minerais emergentes, no fim da lista de tipos.
-    version: 4,
+    // 5: segunda leva de estratos — fissura incandescente da Fornalha
+    // (SURF_EMBER) e gelo da Cripta Glacial (SURF_ICE), no fim da lista.
+    version: 5,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,

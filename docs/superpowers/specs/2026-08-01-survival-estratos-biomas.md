@@ -1,7 +1,8 @@
-# Voxelyn Survival — Estratos, Ocupações e Linhagens (primeira leva)
+# Voxelyn Survival — Estratos, Ocupações e Linhagens
 
 Data: 2026-08-01
-Status: implementado (primeira leva); segunda leva especificada abaixo
+Status: primeira E segunda levas implementadas; terceira etapa (bestiário de
+assinatura) especificada abaixo
 
 ## A decisão que rege tudo
 
@@ -33,10 +34,10 @@ vez de somar.
 | Flooded    | Aquífero Negro                                 | 1ª ✅   |
 | —          | Catedral Prismática (cristal já existente)     | 1ª ✅   |
 | —          | Cicatriz Aurix (como OCUPAÇÃO)                 | 1ª ✅ (parcial) |
-| Toxic      | Fenda Sulfurosa                                | 2ª      |
-| Volcanic   | Fornalha Abissal                               | 2ª      |
-| Desert     | Sumidouros de Sílica                           | 2ª      |
-| Frozen     | Cripta Glacial                                 | 2ª      |
+| Toxic      | Fenda Sulfurosa                                | 2ª ✅   |
+| Volcanic   | Fornalha Abissal                               | 2ª ✅   |
+| Desert     | Sumidouros de Sílica                           | 2ª ✅   |
+| Frozen     | Cripta Glacial                                 | 2ª ✅ (sem inércia) |
 | Surface    | Ruptura à Superfície (evento raro, não setor)  | futuro  |
 
 ## O que foi implementado
@@ -120,22 +121,48 @@ ser fúngico.
 - **Determinismo**: bioma derivado por hash puro; toda variação de RNG mantém
   a contagem de tiradas invariante por bioma.
 
-## Segunda leva (especificada, não implementada)
+## Segunda leva (implementada)
 
-- **Fenda Sulfurosa** (toxic): ventilação — fontes de gás em ciclos, Pulso
-  abre janelas, fogo elimina gás com ignição perigosa. Assinatura: **Fole**
-  (inspira gás de uma região e expele em outra).
-- **Fornalha Abissal** (volcanic): calor como pressão territorial localizada
-  (fissuras desaceleram a dissipação da arma, nunca punição passiva global).
-  Assinatura: **Escoriáceo** (carapaça fria resistente; aquecido, vulnerável e
-  mais agressivo).
-- **Sumidouros de Sílica** (desert) e **Cripta Glacial** (frozen — derreter e
-  recongelar rotas; caro: mexe em inércia, dodge e determinismo).
-- **Assinaturas da primeira leva**: Ressonante (arma cristais próximos),
-  Lampreia de Lodo (submersa, ondulação telegráfica). Entram quando cada
-  estrato tiver telemetria de uso.
+Novos estratos com três linhagens novas — **térmica** (Basalto → Fenda
+Sulfurosa → Fornalha Abissal), **árida** (Basalto → Sumidouros de Sílica →
+Fornalha, a sílica vitrificando rumo ao calor) e **crio** (Basalto → Cripta →
+Cripta profunda):
+
+- **Fenda Sulfurosa** (`sulfur`): a identidade é a **ventilação**. 14
+  respiradouros (vs 6), e cada fonte alterna janelas ativas/dormentes de 10 s
+  (`VENT_CYCLE_TICKS`), com fase pela posição — metade das câmaras respira
+  enquanto a outra enche, e a rota muda com o relógio. Paredes corroídas de
+  dentro para fora (frágil 0.65). Fora da Fenda, os respiradouros mantêm o
+  comportamento histórico.
+- **Fornalha Abissal** (`furnace`): calor como **pressão territorial
+  localizada**, nunca punição passiva. Fissuras incandescentes (`SURF_EMBER`)
+  não causam dano: em cima delas a arma dissipa calor a 35% — a barra do HUD é
+  o custo. O chão queimado lá é **carvão**: explosão ou chama o acende em fogo
+  persistente (110 ticks), e só lá — em outros estratos cinza segue estéril.
+  Não recebe colônia micelial (intrusão vira Aurix: refrigeração abandonada).
+- **Sumidouros de Sílica** (`silica`): rocha esbranquiçada que cede — quase
+  toda parede fina é frágil (0.78). Atravessar abrindo buracos é a identidade;
+  o risco é abrir o flanco errado. Fauna de emboscada (stalkers).
+- **Cripta Glacial** (`glacial`): o primeiro corte barato do frozen. Gelo
+  (`SURF_ICE`) não conduz nem retarda; **fogo o derrete em água condutiva**
+  que **recongela sozinha** (~14 s). O recongelamento é propriedade da água
+  derretida, não do estrato — derreter uma ponte abre uma janela, não edita o
+  mapa. Fogo que derrete gelo é apagado pela própria água que criou. A
+  mudança de inércia sobre gelo ficou de fora de propósito (mexe em controle,
+  dodge e determinismo).
+
+## Terceira etapa (especificada, não implementada)
+
+- **Bestiário de assinatura** (um por estrato, manipulando a regra do bioma):
+  **Ressonante** (arma cristais próximos), **Lampreia de Lodo** (submersa,
+  ondulação telegráfica), **Fole** (inspira gás de uma região e expele em
+  outra), **Escoriáceo** (carapaça fria resistente; aquecido, vulnerável e
+  mais agressivo), **Espectro de Geada** (move-se sob o gelo deixando trilha
+  de rachaduras).
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
   drenar uma região e inundar outra no Aquífero.
+- **Inércia sobre gelo** na Cripta, quando o estrato tiver provado a rota
+  derreter/recongelar.
 - **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
 
 ## Ressonância favorecida por bioma (referência de tuning)
@@ -146,3 +173,7 @@ ser fúngico.
 | Prismático | Corrente, explosão e ricochete    |
 | Aquífero   | Corrente e cinética               |
 | Micelial   | Fogo e explosão                   |
+| Sulfuroso  | Fogo, explosão e cinética         |
+| Fornalha   | Fogo e explosão                   |
+| Sílica     | Cinética e explosão               |
+| Glacial    | Fogo, corrente e cinética         |

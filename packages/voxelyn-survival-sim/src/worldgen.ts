@@ -7,8 +7,11 @@ import {
   SOLID_ORE,
   SOLID_ROCK,
   SURF_BIOFLUID,
+  SURF_EMBER,
   SURF_FUNGAL,
+  SURF_ICE,
   SURF_NONE,
+  SURF_SCORCHED,
   SURF_WATER,
   WORLD_W,
 } from './constants.js';
@@ -47,6 +50,14 @@ export type WorldgenProfile = {
   biofluidBlobs: SurfaceBlobSpec;
   /** Lagos do Aquifero Negro. Zero em todo estrato seco. */
   waterBlobs: SurfaceBlobSpec;
+  /** Lagos congelados da Cripta Glacial. */
+  iceBlobs: SurfaceBlobSpec;
+  /** Fissuras incandescentes da Fornalha Abissal. */
+  emberBlobs: SurfaceBlobSpec;
+  /** Campos de carvao da Fornalha (SURF_SCORCHED que acende la). */
+  coalBlobs: SurfaceBlobSpec;
+  /** Quantos respiradouros de gas o setor tenta posicionar. */
+  ventCount: number;
   /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
   minerCap: number;
 };
@@ -60,6 +71,10 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
   biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
   waterBlobs: { count: 0, rMin: 0, rMax: 0 },
+  iceBlobs: { count: 0, rMin: 0, rMax: 0 },
+  emberBlobs: { count: 0, rMin: 0, rMax: 0 },
+  coalBlobs: { count: 0, rMin: 0, rMax: 0 },
+  ventCount: 6,
   minerCap: 3,
 };
 
@@ -324,6 +339,9 @@ const generateAttempt = (
   // nas MARGENS dele, nunca por cima. Com count 0 nada e sorteado, entao o
   // basalto historico consome exatamente a mesma sequencia de RNG de sempre.
   blobSurface(SURF_WATER, profile.waterBlobs.count, profile.waterBlobs.rMin, profile.waterBlobs.rMax);
+  blobSurface(SURF_ICE, profile.iceBlobs.count, profile.iceBlobs.rMin, profile.iceBlobs.rMax);
+  blobSurface(SURF_EMBER, profile.emberBlobs.count, profile.emberBlobs.rMin, profile.emberBlobs.rMax);
+  blobSurface(SURF_SCORCHED, profile.coalBlobs.count, profile.coalBlobs.rMin, profile.coalBlobs.rMax);
   blobSurface(SURF_FUNGAL, profile.fungalBlobs.count, profile.fungalBlobs.rMin, profile.fungalBlobs.rMax);
   blobSurface(SURF_BIOFLUID, profile.biofluidBlobs.count, profile.biofluidBlobs.rMin, profile.biofluidBlobs.rMax);
 
@@ -429,7 +447,7 @@ const generateAttempt = (
   if (salvageSites.length < 3) return null;
 
   const ventPositions: Vec2[] = [];
-  for (let v = 0; v < 6; v++) {
+  for (let v = 0; v < profile.ventCount; v++) {
     const p = pickOpenFar(10, 8, [...ventPositions, ...reserved]);
     if (p) ventPositions.push(p);
   }

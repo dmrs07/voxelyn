@@ -44,6 +44,13 @@ export const SURF_FUNGAL_HEATED = 7;
 // do bioma flooded — superficie que divide o chao em ilhas e areas rasas, sem
 // exigir pressao, volume nem correnteza.
 export const SURF_WATER = 8;
+// Fissura incandescente da Fornalha Abissal. Nao machuca: e PRESSAO — em cima
+// dela a arma dissipa calor devagar. Dano passivo por pisar seria punicao sem
+// decisao; o que a fissura cobra e a barra de calor, que ja esta no HUD.
+export const SURF_EMBER = 9;
+// Gelo da Cripta Glacial. Nao conduz (isolante); fogo o derrete em agua
+// condutiva, e a agua derretida recongela sozinha depois de um tempo.
+export const SURF_ICE = 10;
 
 // Orcamentos por tick (degradacao previsivel via fila deterministica).
 export const BUDGET_REACTING_CELLS = 4096;
@@ -85,6 +92,42 @@ export const BIOFLUID_SLOW = 0.55;
  * o setor inteiro numa marcha.
  */
 export const WATER_SLOW = 0.72;
+
+// ---------------------------------------------------------------------------
+// Segunda leva de estratos: Fenda Sulfurosa, Fornalha Abissal, Cripta Glacial
+// ---------------------------------------------------------------------------
+/**
+ * Ciclo dos respiradouros na Fenda Sulfurosa, em ticks (10 s por janela).
+ *
+ * A identidade do estrato e a VENTILACAO: as fontes ligam e desligam em
+ * janelas alternadas por posicao, entao metade das camaras esta sempre
+ * respiravel e a rota muda com o relogio. So vale no estrato sulfuroso — nos
+ * outros, os respiradouros continuam com o comportamento historico.
+ */
+export const VENT_CYCLE_TICKS = 200;
+/**
+ * Quanto da dissipacao de calor sobra em cima de uma fissura incandescente.
+ *
+ * O erro seria a barra subir sozinha no bioma inteiro — punicao passiva. O
+ * calor e LOCALIZADO e visivel: pisar na fissura nao machuca, mas segura o
+ * calor da arma, e a decisao de lutar ali dentro e do jogador.
+ */
+export const EMBER_HEAT_DECAY_SCALE = 0.35;
+/**
+ * Combustao do carvao da Fornalha. O chao queimado la nao e cinza esteril, e
+ * CARVAO: uma fonte de calor (explosao, chama) o acende em fogo persistente —
+ * mais que o dobro do combustivel do biofluido.
+ */
+export const COAL_FIRE_FUEL_TICKS = 110;
+/**
+ * Quanto tempo a agua derretida fica liquida antes de recongelar (~14 s).
+ *
+ * O recongelamento e propriedade da AGUA DERRETIDA, nao do estrato: gelo que
+ * virou agua volta a ser gelo em qualquer lugar, e a agua nativa do Aquifero
+ * (timer 0) nunca congela. Assim derreter uma ponte e abrir uma JANELA — de
+ * conducao e de rota — e nao uma edicao permanente do mapa.
+ */
+export const ICE_REFREEZE_TICKS = 280;
 export const DISCHARGE_DAMAGE = 26;
 export const DISCHARGE_TICKS = 6;
 /** Controle direto do Conductive em alvos organicos: 1,2 s a 20 Hz. */

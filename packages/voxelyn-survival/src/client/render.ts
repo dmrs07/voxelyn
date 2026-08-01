@@ -18,6 +18,8 @@ import {
   SURF_SCORCHED,
   SURF_SPORES,
   SURF_WATER,
+  SURF_EMBER,
+  SURF_ICE,
   ABILITY_RADIUS,
   HEAT_MAX,
   RICOCHET_BOUNCES,
@@ -99,6 +101,8 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_SPORES]: 6,
   [SURF_FUNGAL_HEATED]: 7,
   [SURF_WATER]: 8,
+  [SURF_EMBER]: 9,
+  [SURF_ICE]: 10,
 };
 
 /**
@@ -120,6 +124,11 @@ const SURFACE_FALLBACK: Record<number, string> = {
   // Azul da familia da rocha: a agua e escura com reflexos frios, e o verde
   // continua reservado ao biofluido.
   [SURF_WATER]: '#2e3a4d',
+  // Brasa: laranja queimado, distinto do fogo vivo — perigo termico visivel
+  // mesmo sem o atlas.
+  [SURF_EMBER]: '#b3541e',
+  // Gelo: o cinza-azulado palido da paleta (mist).
+  [SURF_ICE]: '#7b8ba3',
 };
 
 /**
@@ -134,6 +143,10 @@ const STRATUM_LABEL_KEY = {
   basalt: 'biome.stratum.basalt',
   prismatic: 'biome.stratum.prismatic',
   aquifer: 'biome.stratum.aquifer',
+  sulfur: 'biome.stratum.sulfur',
+  furnace: 'biome.stratum.furnace',
+  silica: 'biome.stratum.silica',
+  glacial: 'biome.stratum.glacial',
 } as const satisfies Record<StratumId, string>;
 
 const OCCUPATION_LABEL_KEY = {

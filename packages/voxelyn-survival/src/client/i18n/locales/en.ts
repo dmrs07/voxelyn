@@ -325,6 +325,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'biome.stratum.basalt': 'BASALT GALLERIES',
   'biome.stratum.prismatic': 'PRISMATIC CATHEDRAL',
   'biome.stratum.aquifer': 'BLACK AQUIFER',
+  'biome.stratum.sulfur': 'SULFUROUS RIFT',
+  'biome.stratum.furnace': 'ABYSSAL FURNACE',
+  'biome.stratum.silica': 'SILICA SINKHOLES',
+  'biome.stratum.glacial': 'GLACIAL CRYPT',
   'biome.occupation.mycelial': 'MYCELIAL MATRIX',
   'biome.occupation.aurix': 'AURIX SCAR',
 

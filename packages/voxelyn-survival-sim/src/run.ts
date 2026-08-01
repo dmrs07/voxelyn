@@ -51,6 +51,8 @@ import {
   RUN_SEED_MIX,
   SOLID_NONE,
   SURF_BIOFLUID,
+  SURF_EMBER,
+  EMBER_HEAT_DECAY_SCALE,
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
@@ -720,8 +722,11 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     if (distFromEntry > 4) state.leftEntryZone = true;
   }
 
-  // calor decai
-  extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK);
+  // Calor decai — DEVAGAR em cima de uma fissura incandescente da Fornalha.
+  // A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
+  // sair dela e a decisao que devolve a dissipacao normal.
+  const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
+  extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1));
 
   // disparo principal
   if (

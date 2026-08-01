@@ -41,12 +41,29 @@ import type { WorldgenProfile } from './worldgen.js';
  *   fluidos: agua ESTATICA e condutiva dividindo o chao em ilhas secas e
  *   areas rasas. A identidade e a CONDUCAO TERRITORIAL.
  *
- * Fenda Sulfurosa, Fornalha Abissal, Sumidouros de Silica e Cripta Glacial
- * pertencem a segunda leva: exigem estados ambientais novos (ciclos de gas,
- * calor localizado, gelo que muda inercia) e entram quando estes tres
- * estiverem provados.
+ * Segunda leva (interpretacoes subterraneas dos biomas de referencia):
+ *
+ * - `sulfur`: Fenda Sulfurosa — o toxic com parte da linguagem do volcanic.
+ *   Corredores comprimidos ligando camaras cheias de gas ("pulmoes"); a
+ *   identidade e a VENTILACAO: as fontes ligam e desligam em ciclos.
+ * - `furnace`: Fornalha Abissal — o volcanic. Fissuras incandescentes seguram
+ *   o calor da arma (pressao territorial, nunca punicao passiva) e o chao
+ *   queimado e CARVAO que acende em fogo persistente.
+ * - `silica`: Sumidouros de Silica — o desert reinterpretado: rocha
+ *   esbranquicada que cede, quase tudo fragil, pouco a segurar o teto.
+ * - `glacial`: Cripta Glacial — o frozen no primeiro corte barato: gelo que
+ *   derrete em agua condutiva e recongela, sem mexer em inercia (essa parte e
+ *   cara — controle, dodge e determinismo — e fica para quando o estrato
+ *   tiver provado a rota derreter/recongelar).
  */
-export type StratumId = 'basalt' | 'prismatic' | 'aquifer';
+export type StratumId =
+  | 'basalt'
+  | 'prismatic'
+  | 'aquifer'
+  | 'sulfur'
+  | 'furnace'
+  | 'silica'
+  | 'glacial';
 
 /**
  * O que tomou conta do estrato.
@@ -61,7 +78,7 @@ export type StratumId = 'basalt' | 'prismatic' | 'aquifer';
 export type OccupationId = 'none' | 'mycelial' | 'aurix';
 
 /** A historia geologica que os tres setores de uma run contam juntos. */
-export type LineageId = 'hydric' | 'mineral' | 'industrial';
+export type LineageId = 'hydric' | 'mineral' | 'industrial' | 'thermal' | 'arid' | 'cryo';
 
 export type SectorBiome = {
   stratum: StratumId;
@@ -81,8 +98,14 @@ export type SectorBiome = {
  *   natureza vai dando lugar aos restos da operacao; o fim e uma estacao de
  *   bombeamento sobre o aquifero que ela nao segurou.
  *
- * A linhagem termica (Sulfurosa -> Fornalha) entra na segunda leva junto com
- * os proprios estratos.
+ * Segunda leva:
+ *
+ * - termica: Basalto Fraturado -> Fenda Sulfurosa -> Fornalha Abissal. A
+ *   temperatura, os gases e a instabilidade crescem com a descida.
+ * - arida: Basalto -> Sumidouros de Silica -> Fornalha Abissal. A silica
+ *   vitrifica rumo ao calor: dois caminhos chegam a Fornalha.
+ * - crio: Basalto -> Cripta Glacial -> Cripta profunda. O gelo domina e a
+ *   profundidade adensa as pontes e lagos congelados.
  */
 const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation: OccupationId }>> = {
   hydric: [
@@ -100,9 +123,31 @@ const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation
     { stratum: 'basalt', occupation: 'aurix' },
     { stratum: 'aquifer', occupation: 'aurix' },
   ],
+  thermal: [
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'sulfur', occupation: 'none' },
+    { stratum: 'furnace', occupation: 'none' },
+  ],
+  arid: [
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'silica', occupation: 'none' },
+    { stratum: 'furnace', occupation: 'none' },
+  ],
+  cryo: [
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'glacial', occupation: 'none' },
+    { stratum: 'glacial', occupation: 'none' },
+  ],
 };
 
-const LINEAGE_ORDER: readonly LineageId[] = ['hydric', 'mineral', 'industrial'];
+const LINEAGE_ORDER: readonly LineageId[] = [
+  'hydric',
+  'mineral',
+  'industrial',
+  'thermal',
+  'arid',
+  'cryo',
+];
 
 /**
  * Hash inteiro puro, no mesmo espirito de `sectorSeed`. NAO usa a RNG da run:
@@ -136,6 +181,10 @@ export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
     if (roll < 30) occupation = 'mycelial';
     else if (roll < 45) occupation = 'aurix';
   }
+  // A Fornalha nao recebe colonia micelial: biomassa umida nao coloniza chao
+  // incandescente. A intrusao vira Aurix — os sistemas de refrigeracao
+  // abandonados sao exatamente o que a operacao deixaria num estrato assim.
+  if (occupation === 'mycelial' && base.stratum === 'furnace') occupation = 'aurix';
   return { stratum: base.stratum, occupation, lineage };
 };
 
@@ -166,6 +215,10 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
     biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
     waterBlobs: { count: 0, rMin: 0, rMax: 0 },
+    iceBlobs: { count: 0, rMin: 0, rMax: 0 },
+    emberBlobs: { count: 0, rMin: 0, rMax: 0 },
+    coalBlobs: { count: 0, rMin: 0, rMax: 0 },
+    ventCount: 6,
     minerCap: MINER_PER_SECTOR,
   };
 
@@ -186,6 +239,49 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     profile.fungalBlobs = { count: 14, rMin: 2, rMax: 3 };
     profile.crystalChance = 0.05;
     profile.fragileThinChance = 0.45;
+  } else if (biome.stratum === 'sulfur') {
+    // Pulmoes subterraneos: MUITO mais respiradouros, paredes corroidas de
+    // dentro para fora (fragil alto) e quase nada de vida umida. O gas em si
+    // continua sendo o SURF_GAS de sempre — o que muda e a densidade de fontes
+    // e o ciclo de ventilacao (stepCells).
+    profile.ventCount = 14;
+    profile.fragileThinChance = 0.65;
+    profile.oreChance = 0.06;
+    profile.crystalChance = 0.02;
+    profile.fungalBlobs = { count: 6, rMin: 1, rMax: 2 };
+    profile.biofluidBlobs = { count: 4, rMin: 1, rMax: 2 };
+  } else if (biome.stratum === 'furnace') {
+    // Fissuras incandescentes e campos de carvao. Seco: nada de biofluido, e o
+    // fungo nao sobrevive. Menos respiradouros — o perigo daqui e termico.
+    profile.emberBlobs = { count: 10 + depth * 3, rMin: 2, rMax: 4 };
+    profile.coalBlobs = { count: 14, rMin: 2, rMax: 4 };
+    profile.ventCount = 4;
+    profile.fragileThinChance = 0.5;
+    profile.oreChance = 0.08;
+    profile.crystalChance = 0.02;
+    profile.fungalBlobs = { count: 4, rMin: 1, rMax: 2 };
+    profile.biofluidBlobs = { count: 0, rMin: 0, rMax: 0 };
+  } else if (biome.stratum === 'silica') {
+    // Sumidouros: rocha esbranquicada que cede. Quase toda parede fina e
+    // fragil — atravessar abrindo buracos e a identidade, e o risco e abrir o
+    // flanco errado. Pobre em tudo o mais.
+    profile.fragileThinChance = 0.78;
+    profile.oreChance = 0.05;
+    profile.crystalChance = 0.02;
+    profile.ventCount = 4;
+    profile.fungalBlobs = { count: 5, rMin: 1, rMax: 2 };
+    profile.biofluidBlobs = { count: 2, rMin: 1, rMax: 2 };
+  } else if (biome.stratum === 'glacial') {
+    // Lagos congelados e cristais de geada. O gelo nao conduz nem retarda; o
+    // jogo do estrato e DERRETER a rota certa (agua condutiva) e correr antes
+    // do recongelamento.
+    profile.iceBlobs = { count: 14 + depth * 3, rMin: 3, rMax: 5 };
+    profile.crystalChance = 0.07;
+    profile.fragileThinChance = 0.4;
+    profile.oreChance = 0.06;
+    profile.ventCount = 2;
+    profile.fungalBlobs = { count: 4, rMin: 1, rMax: 2 };
+    profile.biofluidBlobs = { count: 0, rMin: 0, rMax: 0 };
   }
 
   if (biome.occupation === 'mycelial') {
@@ -235,6 +331,19 @@ export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArch
       depth <= 1
         ? ['spitter', 'stalker', 'spitter', 'stalker', 'bomber', 'spitter', 'stalker', 'bomber']
         : ['spitter', 'stalker', 'spitter', 'bomber', 'stalker', 'spitter', 'bomber', 'bruiser', 'spitter', 'stalker'];
+  } else if (biome.stratum === 'sulfur') {
+    // Afinidade alta de spitter e bomber (a tabela da spec); bruisers bloqueiam
+    // as passagens respiraveis.
+    mix = ['spitter', 'bomber', 'bruiser', 'spitter', 'stalker', 'bomber', 'bruiser', 'spitter', 'bomber', 'stalker'];
+  } else if (biome.stratum === 'furnace') {
+    // Corpos minerais e portadores: o que sobrevive ao calor.
+    mix = ['bruiser', 'bomber', 'bruiser', 'stalker', 'bomber', 'bruiser', 'bomber', 'bruiser', 'stalker', 'bomber'];
+  } else if (biome.stratum === 'silica') {
+    // Emboscada: stalkers atras de paredes que qualquer tiro abre.
+    mix = ['stalker', 'spitter', 'stalker', 'bruiser', 'stalker', 'spitter', 'bomber', 'stalker'];
+  } else if (biome.stratum === 'glacial') {
+    // Stalker e bruiser, como a tabela da spec: a cripta e silenciosa e dura.
+    mix = ['stalker', 'bruiser', 'stalker', 'bruiser', 'stalker', 'spitter', 'bruiser', 'stalker', 'bruiser', 'stalker'];
   } else {
     // Basalto: a mistura historica por setor, intocada.
     mix =

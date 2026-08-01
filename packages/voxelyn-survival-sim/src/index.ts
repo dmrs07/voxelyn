@@ -49,6 +49,7 @@ export {
   dischargeAt,
   igniteCell,
   isConductiveSurface,
+  meltIce,
   heatFungalCell,
   breakSolid,
   setSurface,
