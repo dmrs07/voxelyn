@@ -1,6 +1,6 @@
 {
   "id": "world-props",
-  "version": 1,
+  "version": 2,
   "atlas": "world-props.png",
   "frameWidth": 84,
   "frameHeight": 100,

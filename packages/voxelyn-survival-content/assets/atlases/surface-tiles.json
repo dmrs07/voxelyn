@@ -1,6 +1,6 @@
 {
   "id": "surface-tiles",
-  "version": 1,
+  "version": 2,
   "atlas": "surface-tiles.png",
   "frameWidth": 64,
   "frameHeight": 76,

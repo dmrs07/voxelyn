@@ -152,7 +152,9 @@ const buildTerrain = () => {
 
   const manifest = {
     id: 'terrain-blocks',
-    version: 1,
+    // 2: grade voxel subdividida (MODEL_SCALE) — malha volumetrica por voxel
+    // fino, frame dobrado. A versao sobe com o PNG (Art Bible §9).
+    version: 2,
     atlas: 'terrain-blocks.png',
     frameWidth,
     frameHeight,
@@ -199,7 +201,8 @@ const buildSurfaces = () => {
 
   const manifest = {
     id: 'surface-tiles',
-    version: 1,
+    // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
+    version: 2,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
@@ -250,7 +253,8 @@ const buildProps = () => {
 
   const manifest = {
     id: 'world-props',
-    version: 1,
+    // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
+    version: 2,
     atlas: 'world-props.png',
     frameWidth,
     frameHeight,
