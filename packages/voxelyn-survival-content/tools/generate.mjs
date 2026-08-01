@@ -67,16 +67,21 @@ const buildEntity = (spec) => {
   // camada, mas somente os frames da camada são escritos no atlas final.
   const fitReference = typeof spec.fitReference === 'function' ? spec.fitReference() : [];
 
-  // FX mantem o canvas autorado: seu movimento radial usa de proposito os 16x16
-  // inteiros. Sheets de personagem preservam a margem de 2px da Art Bible.
+  // FX mantem o canvas autorado: seu movimento radial usa de proposito o frame
+  // inteiro. Sheets de personagem preservam a margem de 2px da Art Bible. A
+  // margem NAO escala com MODEL_SCALE: ela e uma guarda absoluta contra recorte
+  // na borda do frame, nao uma medida de mundo — e a grade fina projeta ate 2px
+  // alem do dobro em cada lado (as diagonais finas caem ENTRE as grossas),
+  // entao dobrar a margem estouraria justamente os sprites mais apertados.
+  const margin = 2;
   let frames;
   try {
     if (spec.id.startsWith('fx-')) {
       frames = raw;
     } else if (fitReference.length > 0) {
-      frames = fitSpriteToMargin([...fitReference, ...raw], 2).slice(fitReference.length);
+      frames = fitSpriteToMargin([...fitReference, ...raw], margin).slice(fitReference.length);
     } else {
-      frames = fitSpriteToMargin(raw, 2);
+      frames = fitSpriteToMargin(raw, margin);
     }
   } catch (err) {
     throw new Error(`${spec.id}: ${err.message}`);
@@ -147,7 +152,9 @@ const buildTerrain = () => {
 
   const manifest = {
     id: 'terrain-blocks',
-    version: 1,
+    // 2: grade voxel subdividida (MODEL_SCALE) — malha volumetrica por voxel
+    // fino, frame dobrado. A versao sobe com o PNG (Art Bible §9).
+    version: 2,
     atlas: 'terrain-blocks.png',
     frameWidth,
     frameHeight,
@@ -194,7 +201,8 @@ const buildSurfaces = () => {
 
   const manifest = {
     id: 'surface-tiles',
-    version: 1,
+    // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
+    version: 2,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
@@ -245,7 +253,8 @@ const buildProps = () => {
 
   const manifest = {
     id: 'world-props',
-    version: 1,
+    // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
+    version: 2,
     atlas: 'world-props.png',
     frameWidth,
     frameHeight,

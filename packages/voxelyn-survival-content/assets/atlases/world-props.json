@@ -1,12 +1,12 @@
 {
   "id": "world-props",
-  "version": 1,
+  "version": 2,
   "atlas": "world-props.png",
-  "frameWidth": 44,
-  "frameHeight": 52,
+  "frameWidth": 84,
+  "frameHeight": 100,
   "columns": 27,
-  "originX": 20,
-  "originY": 40,
+  "originX": 40,
+  "originY": 78,
   "kinds": [
     {
       "name": "core",

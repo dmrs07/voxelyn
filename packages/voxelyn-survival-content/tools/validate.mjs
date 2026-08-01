@@ -14,16 +14,21 @@ const DIR = resolve(__dirname, '../assets/atlases');
 const CANONICAL = {
   // O bot PX e mais largo e mais alto que o mineiro de macacao que ele
   // substitui: chassi de 280 kg e uma passada que joga o pe tres voxels a frente
-  // do corpo. Continua abaixo do Miner (48x60), que e o Prospector degradado e
+  // do corpo. Continua abaixo do Miner (96x120), que e o Prospector degradado e
   // grande demais — se os dois medissem o mesmo, a leitura do encontro se perde.
-  'player-prospector': [44, 56],
-  'enemy-stalker': [32, 32],
-  'enemy-spitter': [32, 32],
-  'enemy-spore-bomber': [32, 32],
-  'enemy-bruiser': [48, 68],
-  'enemy-guardian': [48, 56],
-  'fx-projectile-bolt': [16, 16],
-  'fx-impact-burst': [16, 16],
+  //
+  // Todos os canvases DOBRARAM com a subdivisao da grade voxel (MODEL_SCALE):
+  // mesma proporcao entre entidades e com o tile, o dobro de pixels de detalhe.
+  'player-prospector': [88, 112],
+  'enemy-stalker': [64, 64],
+  'enemy-spitter': [64, 64],
+  'enemy-spore-bomber': [64, 64],
+  'enemy-bruiser': [96, 136],
+  // O chefe final tem o unico canvas 112x128 do bestiario: a hierarquia de
+  // tamanho sobre o Britador e contrato, nao acidente.
+  'enemy-guardian': [112, 128],
+  'fx-projectile-bolt': [32, 32],
+  'fx-impact-burst': [32, 32],
 };
 const REQUIRED_LIVING = ['idle', 'walk', 'attack', 'hit', 'die'];
 /**
@@ -42,9 +47,17 @@ const REQUIRED_LIVING = ['idle', 'walk', 'attack', 'hit', 'die'];
  */
 const MAX_ATLAS_COLORS = 20;
 const MAX_ATLAS_WIDTH = 4096;
-const MAX_PNG_BYTES = 512 * 1024;
-const MAX_TOTAL_PNG_BYTES = 2.5 * 1024 * 1024;
-const MAX_DECODED_BYTES = 24 * 1024 * 1024;
+/**
+ * Orcamentos revisados junto com a subdivisao da grade (MODEL_SCALE): a area
+ * de todo atlas quadruplicou, entao os tetos antigos (512 KiB por PNG, 2,5 MiB
+ * de transferencia, 24 MiB de RGBA) passariam a rejeitar o pacote inteiro por
+ * definicao. Os novos valores dao ~2x de folga sobre o pacote medido no dia da
+ * mudanca (maior PNG 675 KiB, total ~3,1 MiB, RGBA ~68 MiB) — apertados o
+ * bastante para um atlas fora da curva continuar sendo barrado.
+ */
+const MAX_PNG_BYTES = 1024 * 1024;
+const MAX_TOTAL_PNG_BYTES = 6 * 1024 * 1024;
+const MAX_DECODED_BYTES = 96 * 1024 * 1024;
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 const framePixels = (png, m, index) => {
@@ -147,9 +160,10 @@ export const validateManifest = (id) => {
           errors.push(`${id}: conteúdo toca borda em ${dir}/${anim}/${f}`);
         }
         if (previousBox && ['idle', 'walk', 'hit'].includes(anim)) {
+          // 6px de atlas = os mesmos 3px logicos de antes da subdivisao.
           const cx = (box.minX + box.maxX) / 2;
           const pcx = (previousBox.minX + previousBox.maxX) / 2;
-          if (Math.abs(cx - pcx) > 3) errors.push(`${id}: jitter horizontal >3px em ${dir}/${anim}/${f}`);
+          if (Math.abs(cx - pcx) > 6) errors.push(`${id}: jitter horizontal >6px em ${dir}/${anim}/${f}`);
         }
         previousBox = box;
       }

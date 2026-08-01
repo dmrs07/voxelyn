@@ -223,11 +223,36 @@ export const box = (x, y, z, w, d, h, mat) => ({ x, y, z, w, d, h, mat });
 
 // Um voxel na projecao 2:1: 4px de largura, 2px de topo, 2px de lateral.
 // tileW/tileH/zStep sao os parametros que projectIso() do core espera.
+//
+// 4/2/2 e o MINIMO da grade de pixel isometrica 2:1: o passo horizontal e
+// tileW/2 e o vertical e tileH/2, entao qualquer cubo menor projetaria em
+// coordenadas fracionarias e o arredondamento abriria furos entre vizinhos.
+// Ganhar resolucao nao passa por encolher o cubo — passa por subdividir o
+// MODELO (MODEL_SCALE) e dobrar o canvas.
 export const VOX = { tileW: 4, tileH: 2, zStep: 2 };
+
+/**
+ * Subdivisao da grade: cada unidade AUTORADA vira 2x2x2 voxels finos.
+ *
+ * Por que existe: o detalhe dos personagens estava travado no voxel de 4px —
+ * um tile logico tinha 8 voxels de diagonal e nenhuma superficie tinha textura
+ * mais fina que isso. Subdividir o modelo dobra a resolucao de TUDO que o
+ * rasterizador calcula por voxel (oclusao, quina acesa, desabamento da morte,
+ * malha volumetrica do terreno) sem tocar na projecao nem nos modelos: as
+ * caixas continuam autoradas na unidade antiga, e meio-passo (0.5) passa a ser
+ * a unidade nova de detalhe fino.
+ *
+ * O preco e explicito e pago junto: canvas e ancora dos sprites DOBRAM, o
+ * atlas quadruplica em area e o cliente desenha tudo com metade do zoom para o
+ * mundo continuar do mesmo tamanho na tela (ATLAS_SCALE, no runtime).
+ */
+export const MODEL_SCALE = 2;
+const fine = (v) => Math.round(v * MODEL_SCALE);
 
 // makeDrawKey desloca bits, entao exige coordenadas nao-negativas. Os modelos
 // sao autorados em torno da origem (pes no centro), logo precisam deste offset.
-const KEY_BIAS = 64;
+// Em unidades FINAS o alcance dobrou, e o bias acompanha.
+const KEY_BIAS = 128;
 
 /**
  * Rotacao do modelo para cada direcao isometrica autorada.
@@ -265,20 +290,33 @@ const rot = (x, y, r) => {
   return [x, y];
 };
 
-/** Expande caixas em voxels, descartando os internos (nunca visiveis). */
+/**
+ * Expande caixas em voxels FINOS, descartando os internos (nunca visiveis).
+ *
+ * A subdivisao acontece aqui, e nao nos modelos: uma caixa autorada de 1x1x1
+ * vira 2x2x2 voxels finos, cada um com oclusao, quina e ordem do pintor
+ * proprias. Coordenadas e tamanhos fracionarios (meio-passo) arredondam para a
+ * grade fina — e o meio-passo que da aos modelos a resolucao nova.
+ */
 const shellVoxels = (boxes, r) => {
   const out = [];
   for (const b of boxes) {
     const ramp = RAMPS[b.mat];
     if (!ramp) throw new Error(`material sem rampa: ${b.mat}`);
-    for (let dx = 0; dx < b.w; dx++) {
-      for (let dy = 0; dy < b.d; dy++) {
-        for (let dz = 0; dz < b.h; dz++) {
+    const x0 = fine(b.x);
+    const y0 = fine(b.y);
+    const z0 = fine(b.z);
+    const w = Math.max(1, fine(b.w));
+    const d = Math.max(1, fine(b.d));
+    const h = Math.max(1, fine(b.h));
+    for (let dx = 0; dx < w; dx++) {
+      for (let dy = 0; dy < d; dy++) {
+        for (let dz = 0; dz < h; dz++) {
           const interior =
-            dx > 0 && dx < b.w - 1 && dy > 0 && dy < b.d - 1 && dz > 0 && dz < b.h - 1;
+            dx > 0 && dx < w - 1 && dy > 0 && dy < d - 1 && dz > 0 && dz < h - 1;
           if (interior) continue;
-          const [x, y] = rot(b.x + dx, b.y + dy, r);
-          out.push({ x, y, z: b.z + dz, ramp, mat: b.mat });
+          const [x, y] = rot(x0 + dx, y0 + dy, r);
+          out.push({ x, y, z: z0 + dz, ramp, mat: b.mat });
         }
       }
     }
@@ -299,11 +337,17 @@ const occupancyKey = (x, y, z) => `${x},${y},${z}`;
 const solidVoxels = (boxes, r) => {
   const solid = new Set();
   for (const b of boxes) {
-    for (let dx = 0; dx < b.w; dx++) {
-      for (let dy = 0; dy < b.d; dy++) {
-        for (let dz = 0; dz < b.h; dz++) {
-          const [x, y] = rot(b.x + dx, b.y + dy, r);
-          solid.add(occupancyKey(x, y, b.z + dz));
+    const x0 = fine(b.x);
+    const y0 = fine(b.y);
+    const z0 = fine(b.z);
+    const w = Math.max(1, fine(b.w));
+    const d = Math.max(1, fine(b.d));
+    const h = Math.max(1, fine(b.h));
+    for (let dx = 0; dx < w; dx++) {
+      for (let dy = 0; dy < d; dy++) {
+        for (let dz = 0; dz < h; dz++) {
+          const [x, y] = rot(x0 + dx, y0 + dy, r);
+          solid.add(occupancyKey(x, y, z0 + dz));
         }
       }
     }
@@ -635,6 +679,29 @@ export const collapse = (boxes, t) => {
       mat: b.mat,
     });
   }
+  return out;
+};
+
+/**
+ * Extensao projetada do modelo SEM rotacao, em pixels de atlas (grade fina).
+ *
+ * Terreno, crostas e props mediam isso cada um por conta propria, projetando a
+ * coordenada AUTORADA direto — o que quebrou junto com MODEL_SCALE, porque a
+ * unidade autorada passou a projetar o dobro de pixels. Medir sobre
+ * shellVoxels garante que a conta ve exatamente os voxels que o rasterizador
+ * pinta, na mesma grade.
+ */
+export const modelBounds = (boxes, acc) => {
+  const out = acc ?? { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+  for (const v of shellVoxels(boxes, 0)) {
+    const { sx, sy } = projectIso(v.x, v.y, v.z, VOX.tileW, VOX.tileH, VOX.zStep);
+    out.minX = Math.min(out.minX, sx);
+    out.maxX = Math.max(out.maxX, sx + VOX.tileW - 1);
+    out.minY = Math.min(out.minY, sy - 2);
+    out.maxY = Math.max(out.maxY, sy + VOX.zStep - 1);
+  }
+  out.w = out.maxX - out.minX + 1;
+  out.h = out.maxY - out.minY + 1;
   return out;
 };
 

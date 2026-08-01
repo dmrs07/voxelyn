@@ -1,12 +1,12 @@
 {
   "id": "fx-impact-burst",
-  "version": 2,
+  "version": 3,
   "atlas": "fx-impact-burst.png",
-  "frameWidth": 16,
-  "frameHeight": 16,
+  "frameWidth": 32,
+  "frameHeight": 32,
   "columns": 5,
-  "anchorX": 8,
-  "anchorY": 8,
+  "anchorX": 16,
+  "anchorY": 16,
   "directions": 1,
   "authoredDirs": [
     "n"

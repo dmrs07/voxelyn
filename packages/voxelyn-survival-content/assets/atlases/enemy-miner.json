@@ -1,12 +1,12 @@
 {
   "id": "enemy-miner",
-  "version": 2,
+  "version": 4,
   "atlas": "enemy-miner.png",
-  "frameWidth": 48,
-  "frameHeight": 60,
-  "columns": 84,
-  "anchorX": 24,
-  "anchorY": 54,
+  "frameWidth": 96,
+  "frameHeight": 120,
+  "columns": 42,
+  "anchorX": 48,
+  "anchorY": 108,
   "directions": 4,
   "authoredDirs": [
     "dr",

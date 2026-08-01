@@ -1,4 +1,14 @@
-# Voxelyn Survival — Art Bible v1
+# Voxelyn Survival — Art Bible v2
+
+> **v2 — grade voxel subdividida.** Cada unidade autorada dos modelos passou a
+> render 2×2×2 voxels finos (`MODEL_SCALE = 2` no pipeline de conteúdo), então
+> todo atlas tem o **dobro da resolução para o mesmo tamanho de mundo**: os
+> canvases e âncoras dobraram em pixels de atlas, e o cliente desenha tudo com
+> `zoom / ATLAS_SCALE` — no zoom típico de 2×, cada pixel de atlas cai em 1
+> pixel de tela. As medidas LÓGICAS (tile de 32×16, proporções entre entidades,
+> hitboxes e footprints em tiles) não mudaram. Orçamentos de §2 revisados junto:
+> PNG ≤ 1 MiB por atlas, ≤ 6 MiB no pacote, RGBA decodificado ≤ 96 MiB
+> (validados em `tools/validate.mjs`).
 
 Direção artística obrigatória para todos os assets do Voxelyn Survival. Nenhum sprite entra no
 jogo sem obedecer a este documento e passar pela validação automatizada
@@ -25,17 +35,19 @@ imagens borradas/semi-realistas, personagens com perspectivas diferentes entre s
 
 | Parâmetro | Valor |
 | --- | --- |
-| Resolução-base de trabalho | 1 texel = 1 px lógico; render com zoom inteiro (2×, 3×, 4×) |
-| Tile lógico | 32×16 px (losango isométrico 2:1) |
-| Altura de parede/andar | 16 px por nível de altura |
+| Grade voxel | 1 unidade autorada = 2×2×2 voxels finos (`MODEL_SCALE = 2`); voxel fino = 4×2 px na projeção; meio-passo (0.5) é a unidade de detalhe fino |
+| Resolução de atlas | 2 px de atlas por px lógico (`ATLAS_SCALE = 2`); no zoom 2× do jogo o desenho é 1:1 |
+| Tile lógico | 32×16 px lógicos (losango isométrico 2:1) = 64×32 px de atlas |
+| Altura de parede/andar | 14 px lógicos (7 unidades autoradas) |
 | Perspectiva | Isométrica 2:1 (dimétrica), câmera fixa, sem rotação |
-| Personagem padrão (humanoide) | 24×32 px de canvas; corpo ocupa ~16×24 px; cabeça ≤ 1/3 da altura |
-| Criatura pequena | 24×24 px |
-| Criatura grande (bruiser/guardian) | 40×48 px |
-| Props | 32×32 px (footprint 1 tile) ou 64×48 px (2×2 tiles) |
-| Projéteis/impactos | 16×16 px |
-| Profundidade de cor | Paleta indexada; máx. 16 cores por sprite (fora sombra/outline) |
-| Transparência | Alpha binário: 0 ou 255. **Nenhum pixel semitransparente** exceto em efeitos (gases, luz), que permitem alpha em 4 níveis (64/128/192/255) |
+| Personagem padrão (Prospector) | 88×112 px de atlas |
+| Criatura pequena (stalker/spitter/bomber) | 64×64 px de atlas |
+| Criatura grande (bruiser) | 96×136 px de atlas |
+| Chefe final (guardian) | 112×128 px de atlas — o único canvas desta classe; a hierarquia de tamanho sobre o bruiser é contrato |
+| Elites e chefes (miner/corcel/bispo) | 96×120 / 160×168 / 112×124 px de atlas |
+| Projéteis/impactos | 32×32 px de atlas |
+| Profundidade de cor | Paleta indexada; máx. 20 cores por atlas incluindo outline (`tools/validate.mjs`) |
+| Transparência | Alpha binário: 0 ou 255 em TODO atlas; efeitos translúcidos vivem em sistemas de FX de runtime, nunca no atlas |
 
 ## 3. Anchors e footprint
 

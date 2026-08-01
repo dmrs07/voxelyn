@@ -13,13 +13,17 @@
 // A geometria vem do mesmo @voxelyn/core que os personagens usam, entao bloco e
 // criatura compartilham projecao, ordem do pintor e tamanho de voxel: um voxel
 // de terreno tem exatamente o tamanho de um voxel de bicho.
-import { box, DIR_UNROTATED, renderVoxels, VOX } from './voxel.mjs';
+import { box, DIR_UNROTATED, MODEL_SCALE, modelBounds, renderVoxels } from './voxel.mjs';
 import { COLORS, grid } from './lib.mjs';
 
-// Um tile logico tem 32px de largura na tela; com 4px por voxel, sao 8 voxels
-// na diagonal. A altura de parede de 14px equivale a 7 voxels de 2px.
+// Um tile logico tem 8 unidades AUTORADAS na diagonal e 7 de parede — isso nao
+// mudou. Com a grade subdividida (MODEL_SCALE), cada unidade vira 2 voxels
+// finos: o bloco e construido coluna a coluna FINA, entao malha, veios e o
+// serrilhado do topo ganham o dobro de frequencia, e o frame dobra em pixels.
 export const BLOCK_COLS = 8;
 export const BLOCK_HEIGHT = 7;
+const FINE_COLS = BLOCK_COLS * MODEL_SCALE;
+const FINE_HEIGHT = BLOCK_HEIGHT * MODEL_SCALE;
 
 /** Niveis de luz assados no atlas, substituindo o sombreamento por face. */
 export const LIGHT_LEVELS = 8;
@@ -105,22 +109,24 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
 };
 
 /**
- * Um bloco e uma coluna de voxels por celula da grade 8x8. O topo e irregular:
- * e essa irregularidade que faz a pedra ler como agregado e nao como uma tampa
- * lisa. As inclusoes (veios, cristais, ferrugem) so aparecem no voxel do topo,
- * onde a luz bate.
+ * Um bloco e uma coluna de voxels por celula da grade FINA 16x16. O topo e
+ * irregular em dois degraus de meio-passo: e essa irregularidade que faz a
+ * pedra ler como agregado e nao como uma tampa lisa. A malha e as inclusoes
+ * (veios, cristais, ferrugem) sao sorteadas por voxel FINO, entao a textura
+ * volumetrica tem o dobro da frequencia da grade autorada.
  */
 const blockModel = (kind, variant) => {
   const boxes = [];
+  const F = MODEL_SCALE;
   const half = BLOCK_COLS / 2;
-  for (let cx = 0; cx < BLOCK_COLS; cx++) {
-    for (let cy = 0; cy < BLOCK_COLS; cy++) {
+  for (let cx = 0; cx < FINE_COLS; cx++) {
+    for (let cy = 0; cy < FINE_COLS; cy++) {
       const h = hash2(cx, cy, variant + 1);
-      // -1, 0 ou +0: o topo desce um voxel em parte das colunas
-      const drop = (h & 7) < 3 ? 1 : 0;
-      const height = BLOCK_HEIGHT - drop;
-      const x = cx - half;
-      const y = cy - half;
+      // topo serrilhado: desce 0, 1 ou 2 voxels finos por coluna
+      const drop = (h & 7) < 2 ? 2 : (h & 7) < 4 ? 1 : 0;
+      const height = FINE_HEIGHT - drop;
+      const x = cx / F - half;
+      const y = cy / F - half;
 
       // Todos os tipos partilham o MESMO corpo de pedra: no mundo do jogo eles
       // sao a mesma rocha com inclusoes diferentes, e as inclusoes (ferrugem,
@@ -135,17 +141,19 @@ const blockModel = (kind, variant) => {
       for (let cz = 0; cz < height; cz++) {
         const mat = voxelMaterial(cx, cy, cz, kind, variant, height - 1);
         if (mat !== runMat) {
-          if (runMat) boxes.push(box(x, y, runStart, 1, 1, cz - runStart, runMat));
+          if (runMat) boxes.push(box(x, y, runStart / F, 1 / F, 1 / F, (cz - runStart) / F, runMat));
           runMat = mat;
           runStart = cz;
         }
       }
-      boxes.push(box(x, y, runStart, 1, 1, height - runStart, runMat));
+      boxes.push(box(x, y, runStart / F, 1 / F, 1 / F, (height - runStart) / F, runMat));
 
       // Cristal cresce ACIMA da superficie: e o unico bloco com silhueta
-      // propria, para o jogador reconhecer de longe o que vale minerar.
+      // propria, para o jogador reconhecer de longe o que vale minerar. Na
+      // grade fina as agulhas tem metade da largura e o dobro da contagem por
+      // area — mesma presenca, grao mais fino.
       if ((kind === 'crystal' || kind === 'crystalDull') && (h >>> 8) % 9 === 0) {
-        boxes.push(box(x, y, height, 1, 1, 2, kind === 'crystal' ? 'biolum' : 'fungusDeep'));
+        boxes.push(box(x, y, height / F, 1 / F, 1 / F, 2, kind === 'crystal' ? 'biolum' : 'fungusDeep'));
       }
     }
   }
@@ -184,27 +192,20 @@ export const buildTerrainFrames = (frameW, frameH, anchorX, anchorY) => {
   return frames;
 };
 
-/** Extensao projetada de um bloco, para dimensionar o frame e a ancora. */
+/**
+ * Extensao projetada de um bloco, para dimensionar o frame e a ancora. Medida
+ * por modelBounds — a MESMA grade fina que o rasterizador pinta — em vez de
+ * projetar a coordenada autorada a mao, que mentiria por um fator de
+ * MODEL_SCALE.
+ */
 export const blockBounds = () => {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let acc;
   for (const kind of BLOCK_KINDS) {
     for (let variant = 0; variant < VARIANTS; variant++) {
-      for (const b of blockModel(kind, variant)) {
-        for (const [x, y, z] of [
-          [b.x, b.y, b.z],
-          [b.x, b.y, b.z + b.h - 1],
-        ]) {
-          const sx = (x - y) * (VOX.tileW / 2);
-          const sy = (x + y) * (VOX.tileH / 2) - z * VOX.zStep;
-          minX = Math.min(minX, sx);
-          maxX = Math.max(maxX, sx + VOX.tileW - 1);
-          minY = Math.min(minY, sy - 2);
-          maxY = Math.max(maxY, sy + VOX.zStep - 1);
-        }
-      }
+      acc = modelBounds(blockModel(kind, variant), acc);
     }
   }
-  return { minX, maxX, minY, maxY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  return acc;
 };
 
 export const TERRAIN_COLORS = COLORS;

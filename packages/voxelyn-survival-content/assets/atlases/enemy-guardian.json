@@ -1,12 +1,12 @@
 {
   "id": "enemy-guardian",
-  "version": 2,
+  "version": 6,
   "atlas": "enemy-guardian.png",
-  "frameWidth": 48,
-  "frameHeight": 56,
-  "columns": 85,
-  "anchorX": 24,
-  "anchorY": 54,
+  "frameWidth": 112,
+  "frameHeight": 128,
+  "columns": 36,
+  "anchorX": 56,
+  "anchorY": 124,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -30,14 +30,14 @@
     "#0b0e14",
     "#1d2430",
     "#2e3a4d",
-    "#3d2a22",
     "#46566e",
     "#6e4a33",
     "#7ab8ff",
     "#7b8ba3",
     "#8a7154",
     "#b8a98f",
-    "#d5cdba"
+    "#d5cdba",
+    "#ffd166"
   ],
   "animations": {
     "idle": {
@@ -107,7 +107,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core",
+    "prompt": "voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with seven mushroom spire towers and gold finial, round diffuse electric core with radial cracks, six armored crawler legs, twin dominion claws, stalactite fringe",
     "seedOrRef": "deterministic-code-v2"
   }
 }

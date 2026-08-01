@@ -28,7 +28,7 @@ import {
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type { AbilityId, ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
-import { SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
+import { ATLAS_SCALE, SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
@@ -1217,7 +1217,11 @@ export class SurvivalRenderer {
       ctx.fillRect(sx - size, topY, size * 2 * hpFrac, 2.4 * z);
     };
 
-    const spriteZoom = Math.max(1, Math.round(z));
+    // Atlases na grade fina (ATLAS_SCALE): no zoom tipico de 2x o sprite e
+    // desenhado 1:1 — cada pixel de atlas num pixel de tela — que e onde o
+    // detalhe dobrado aparece. Continua inteiro e >= 1 pelo mesmo motivo de
+    // sempre: fracao de pixel borra o sprite inteiro.
+    const spriteZoom = Math.max(1, Math.round(z / ATLAS_SCALE));
 
     // Os Ecos da Ressonancia do Poco. Entram na fila ordenada como qualquer
     // corpo: eles ocupam espaco no mundo, e um Eco desenhado por cima da parede

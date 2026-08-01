@@ -10,7 +10,7 @@
 // Um objetivo tem de ser lido de longe, antes de estar na tela inteira: por
 // isso e ALTO. Altura e o unico eixo que a projecao isometrica nao encurta com
 // a distancia, e e o que faz o jogador virar a camera e ir ate la.
-import { box, DIR_UNROTATED, renderVoxels, VOX } from './voxel.mjs';
+import { box, DIR_UNROTATED, modelBounds, renderVoxels } from './voxel.mjs';
 
 /**
  * Tipos e suas animacoes ASSADAS.
@@ -249,27 +249,13 @@ export const propModel = (kind, frame) => {
  * desalinhamento de 2px do atlas de blocos que ensinou a nao divergir aqui.
  */
 export const propBounds = () => {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
+  let acc;
   for (const kind of PROP_KINDS) {
     for (let frame = 0; frame < kind.frames; frame++) {
-      for (const b of propModel(kind.name, frame)) {
-        for (const z of [b.z, b.z + b.h - 1]) {
-          for (const [x, y] of [[b.x, b.y], [b.x + b.w - 1, b.y + b.d - 1]]) {
-            const sx = (x - y) * (VOX.tileW / 2);
-            const sy = (x + y) * (VOX.tileH / 2) - z * VOX.zStep;
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx + VOX.tileW - 1);
-            minY = Math.min(minY, sy - 2);
-            maxY = Math.max(maxY, sy + VOX.zStep - 1);
-          }
-        }
-      }
+      acc = modelBounds(propModel(kind.name, frame), acc);
     }
   }
-  return { minX, maxX, minY, maxY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  return acc;
 };
 
 /**

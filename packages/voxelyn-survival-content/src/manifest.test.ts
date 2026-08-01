@@ -43,12 +43,20 @@ describe('voxel character manifests', () => {
       manifest.authoredDirs.length *
       Object.values(manifest.animations).reduce((sum, def) => sum + def.frames, 0);
     expect(manifest.columns).toBeLessThan(totalFrames); // ou seja: mais de uma linha
-    // 'ul'/'attack' comeca exatamente na virada de linha.
-    expect(resolveFrame(manifest, 'attack', 'ul', 0)).toMatchObject({ sx: 0, sy: manifest.frameHeight });
-    expect(resolveFrame(manifest, 'attack', 'ul', 1)).toMatchObject({
-      sx: manifest.frameWidth,
-      sy: manifest.frameHeight,
-    });
+    // 'ul'/'attack' vive alem da primeira linha em qualquer canvas que o
+    // guardiao ja teve. O bug historico devolvia sy=0 com sx alem da imagem;
+    // o que o teste fixa e a PROPRIEDADE, nao a coordenada: o recorte desce de
+    // linha e continua dentro da largura real do atlas.
+    const columns = manifest.columns ?? totalFrames;
+    const first = resolveFrame(manifest, 'attack', 'ul', 0);
+    const second = resolveFrame(manifest, 'attack', 'ul', 1);
+    for (const rect of [first, second]) {
+      expect(rect.sy).toBeGreaterThanOrEqual(manifest.frameHeight);
+      expect(rect.sy % manifest.frameHeight).toBe(0);
+      expect(rect.sx + rect.sw).toBeLessThanOrEqual(columns * manifest.frameWidth);
+    }
+    // E continuam sendo quadros consecutivos, nao o mesmo recorte duas vezes.
+    expect(second.sx !== first.sx || second.sy !== first.sy).toBe(true);
   });
 
   it('keeps every frame inside its atlas width', () => {

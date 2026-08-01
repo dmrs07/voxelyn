@@ -102,7 +102,8 @@ const fitReference = () => {
 
 const baseLayer = (id, animations, draw, prompt) => ({
   id,
-  version: 4,
+  // 6: passe de detalhamento em meio-passo sobre a grade subdividida.
+  version: 6,
   frameWidth: FRAME_WIDTH,
   frameHeight: FRAME_HEIGHT,
   anchorX: ANCHOR_X,
