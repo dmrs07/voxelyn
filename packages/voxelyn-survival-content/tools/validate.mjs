@@ -24,7 +24,9 @@ const CANONICAL = {
   'enemy-spitter': [64, 64],
   'enemy-spore-bomber': [64, 64],
   'enemy-bruiser': [96, 136],
-  'enemy-guardian': [96, 112],
+  // O chefe final tem o unico canvas 112x128 do bestiario: a hierarquia de
+  // tamanho sobre o Britador e contrato, nao acidente.
+  'enemy-guardian': [112, 128],
   'fx-projectile-bolt': [32, 32],
   'fx-impact-burst': [32, 32],
 };

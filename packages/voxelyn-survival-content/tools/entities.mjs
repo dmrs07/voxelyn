@@ -340,63 +340,92 @@ const guardianModel = (anim, f) => {
   const up = -flinch + call;
   const b = [];
 
-  // Patas-coluna: quatro tocos blindados rastejando sob a saia. Aparecem no
+  // HIERARQUIA DE CHEFE: o Guardiao tem de ser maior E mais complexo que o
+  // Britador em toda medida que o olho pega — o canvas dele e o unico 112x128
+  // do bestiario, o maciço e mais largo que o gorila de punhos plantados, o
+  // cume sobe mais alto que qualquer outra silhueta, e a contagem de pecas
+  // (seis patas, sete torres, franja, garras de duas unhas) nao existe em
+  // nenhum inimigo menor.
+
+  // Patas-coluna: SEIS tocos blindados rastejando sob a saia. Aparecem no
   // vao entre a base e o chao — a cidadela nao flutua, ela RASTEJA.
-  b.push(box(-6.5, -2, Math.max(0, step), 2.5, 3, 3, 'rockDeep'));
-  b.push(box(-2, -2.5, Math.max(0, -step), 2.5, 3.5, 3, 'rockDeep'));
-  b.push(box(1.5, -2.5, Math.max(0, step), 2.5, 3.5, 3, 'rockDeep'));
-  b.push(box(4.5, -2, Math.max(0, -step), 2.5, 3, 3, 'rockDeep'));
+  b.push(box(-7, -2, Math.max(0, step), 2.5, 3, 3, 'rockDeep'));
+  b.push(box(-4, -2.5, Math.max(0, -step), 2.5, 3.5, 3, 'rockDeep'));
+  b.push(box(-1, -2, Math.max(0, step), 2, 3, 3, 'rockDeep'));
+  b.push(box(1, -2.5, Math.max(0, -step), 2.5, 3.5, 3, 'rockDeep'));
+  b.push(box(4, -2, Math.max(0, step), 2.5, 3, 3, 'rockDeep'));
+  b.push(box(6.5, -2.5, Math.max(0, -step), 2, 3, 3, 'rockDeep'));
 
-  // O macico: quatro andares que estreitam para cima. Alturas escuras e medias
-  // alternadas, para cada andar ler como estrato e nao como caixa empilhada.
-  b.push(box(-7, -2, 2 + up, 14, 5, 3, 'rockDeep'));
-  b.push(box(-6, -1.5, 5 + up, 12, 4.5, 3, 'rock'));
-  b.push(box(-4.5, -1, 8 + up, 9, 4, 3, 'rockDeep'));
-  b.push(box(-3, -0.5, 11 + up, 6, 3.5, 2, 'rock'));
+  // O macico: CINCO andares que estreitam para cima, escuro e medio
+  // alternados, para cada andar ler como estrato e nao como caixa empilhada.
+  b.push(box(-8.5, -2.5, 2 + up, 17, 6, 3, 'rockDeep'));
+  b.push(box(-7.5, -2, 5 + up, 15, 5.5, 3, 'rock'));
+  b.push(box(-6, -1.5, 8 + up, 12, 5, 3, 'rockDeep'));
+  b.push(box(-4.5, -1, 11 + up, 9, 4, 3, 'rock'));
+  b.push(box(-3, -0.5, 14 + up, 6, 3.5, 2, 'rockDeep'));
 
-  // Escleroticos: placas palidas de meio-passo aflorando nas encostas, e duas
-  // manchas de oxido escorrendo de baixo das torres.
-  b.push(box(-5.5, -2.5, 5.5 + up, 2, 0.5, 1.5, 'bone'));
-  b.push(box(3, -2.5, 6 + up, 2, 0.5, 1.5, 'bone'));
-  b.push(box(-3.5, -2, 9 + up, 1.5, 0.5, 1.5, 'bone'));
-  b.push(box(1.5, -2, 8.5 + up, 2, 0.5, 1, 'bone'));
-  b.push(box(-1, -1.5, 10.5 + up, 1, 0.5, 1.5, 'rust'));
-  b.push(box(-4.5, -2, 7.5 + up, 1, 0.5, 1, 'rust'));
+  // Franja de estalactites pendurada na borda dianteira da base: a rocha
+  // escorreu e congelou. E o tipo de ruido de contorno que so um chefe tem
+  // orcamento de silhueta para carregar.
+  for (const fx of [-7, -4.5, -2, 0.5, 3, 5.5]) {
+    b.push(box(fx, -3, 1.5 + up, 0.5, 0.5, 1, 'rockDeep'));
+  }
+
+  // Escleroticos: placas palidas aflorando nas encostas, e oxido escorrendo
+  // de baixo das torres — mais numerosos que em qualquer inimigo menor.
+  b.push(box(-6.5, -3, 5.5 + up, 2, 0.5, 1.5, 'bone'));
+  b.push(box(4, -3, 6 + up, 2, 0.5, 1.5, 'bone'));
+  b.push(box(-4.5, -2.5, 9 + up, 1.5, 0.5, 1.5, 'bone'));
+  b.push(box(2.5, -2.5, 8.5 + up, 2, 0.5, 1, 'bone'));
+  b.push(box(-2, -1.5, 12 + up, 1.5, 0.5, 1, 'bone'));
+  b.push(box(-1, -1, 14.5 + up, 1, 0.5, 1.5, 'rust'));
+  b.push(box(-5.5, -2.5, 7.5 + up, 1, 0.5, 1, 'rust'));
+  b.push(box(3.5, -2, 11.5 + up, 1, 0.5, 1, 'rust'));
 
   // NUCLEO redondo e difuso, alto na face da montanha: tres lajes emissivas
-  // empilhadas com larguras alternadas — e o degrade de largura que da a
-  // leitura de esfera brilhando atraves da pedra. Dilata no special e respira
-  // no idle. E o unico foco saturado do bicho inteiro.
-  b.push(box(-2, -2.5, 6 + up, 4, 1, 4 + call + breath, 'electric'));
-  b.push(box(-1.5, -3, 6.5 + up, 3, 0.5, 3 + call + breath, 'electric'));
-  b.push(box(-2.5, -2, 7 + up, 5, 0.5, 2 + call, 'electric'));
+  // com larguras alternadas — o degrade de largura da a leitura de esfera
+  // brilhando atraves da pedra — e QUATRO rachaduras radiais de meio-passo
+  // conduzindo a luz pela rocha. Dilata no special, respira no idle, e e o
+  // unico foco saturado do bicho inteiro.
+  b.push(box(-2.5, -3, 7 + up, 5, 1, 5 + call + breath, 'electric'));
+  b.push(box(-2, -3.5, 7.5 + up, 4, 0.5, 4 + call + breath, 'electric'));
+  b.push(box(-3, -2.5, 8.5 + up, 6, 0.5, 2.5 + call, 'electric'));
+  b.push(box(-0.5, -3, 12.5 + up, 1, 0.5, 1, 'electric'));
+  b.push(box(-0.5, -3, 5.5 + up, 1, 0.5, 1, 'electric'));
+  b.push(box(-4.5, -3, 9 + up, 1.5, 0.5, 0.5, 'electric'));
+  b.push(box(3, -3, 9.5 + up, 1.5, 0.5, 0.5, 'electric'));
 
-  // TORRES-COGUMELO no cume: cinco agulhas de oxido com chapeu palido, as das
-  // bordas mais baixas. Sao a coroa da cidadela — a silhueta de chefe final
-  // que nenhum outro inimigo pode ter.
+  // TORRES-COGUMELO no cume: SETE agulhas de oxido com chapeu palido, subindo
+  // para o pinaculo central — que carrega um remate dourado. E a coroa da
+  // cidadela: a silhueta mais alta do jogo, e so dele.
   const spires = [
-    [-5, 0.5, 9, 3],
-    [-2.5, 0, 11, 4],
-    [0, 0.5, 13, 4],
-    [2.5, 0, 11, 3.5],
-    [5, 0.5, 9, 3],
+    [-7, 0.5, 7, 2.5],
+    [-5.5, 0, 9, 3],
+    [-3.5, 0.5, 12, 4],
+    [-1, 0, 15, 5],
+    [1.5, 0.5, 13, 4],
+    [4, 0, 10, 3.5],
+    [6, 0.5, 7.5, 2.5],
   ];
   for (const [sx, sy, zb, h] of spires) {
     b.push(box(sx, sy, zb + up, 1, 1, h, 'rust'));
     b.push(box(sx - 0.5, sy - 0.5, zb + h + up, 2, 2, 1, 'bone'));
   }
+  b.push(box(-1, 0, 21 + up, 0.5, 0.5, 1, 'loot'));
 
-  // GARRAS DE DOMINIO: dois bracos-toco blindados na frente da base, com unhas
-  // palidas. Sobem no swing do attack — a varrida que sela o espaco — e
-  // respiram no idle.
-  b.push(box(-7.5, -3, 2 + up + swing + breath, 2.5, 2.5, 3, 'rock'));
-  b.push(box(5, -3, 2 + up + swing + breath, 2.5, 2.5, 3, 'rock'));
-  b.push(box(-7, -3.5, 2 + up + swing + breath, 1.5, 0.5, 1, 'bone'));
-  b.push(box(5.5, -3.5, 2 + up + swing + breath, 1.5, 0.5, 1, 'bone'));
+  // GARRAS DE DOMINIO: dois bracos-toco blindados na frente da base, cada um
+  // com DUAS unhas palidas. Sobem no swing do attack — a varrida que sela o
+  // espaco — e respiram no idle.
+  b.push(box(-8.5, -3.5, 2 + up + swing + breath, 3, 2.5, 3.5, 'rock'));
+  b.push(box(5.5, -3.5, 2 + up + swing + breath, 3, 2.5, 3.5, 'rock'));
+  b.push(box(-8, -4, 2 + up + swing + breath, 1, 0.5, 1, 'bone'));
+  b.push(box(-6.5, -4, 2 + up + swing + breath, 1, 0.5, 1, 'bone'));
+  b.push(box(6, -4, 2 + up + swing + breath, 1, 0.5, 1, 'bone'));
+  b.push(box(7.5, -4, 2 + up + swing + breath, 1, 0.5, 1, 'bone'));
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 96, 112, 44, 100);
+const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 112, 128, 52, 116);
 
 
 // ---------------------------------------------------------------------------
@@ -1019,10 +1048,10 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 8, fps: 10, loop: false },
   }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 5),
-  base('enemy-guardian', 96, 112, 48, 108, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
+  base('enemy-guardian', 112, 128, 56, 124, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
-  }, guardianFrame, 'voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with mushroom spire towers, round diffuse electric core, stubby armored crawler legs and dominion claws', 5),
+  }, guardianFrame, 'voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with seven mushroom spire towers and gold finial, round diffuse electric core with radial cracks, six armored crawler legs, twin dominion claws, stalactite fringe', 6),
   base('enemy-bishop', 112, 152, 56, 148, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 9, loop: false },

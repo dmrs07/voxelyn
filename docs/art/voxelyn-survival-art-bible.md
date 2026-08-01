@@ -42,7 +42,8 @@ imagens borradas/semi-realistas, personagens com perspectivas diferentes entre s
 | Perspectiva | Isométrica 2:1 (dimétrica), câmera fixa, sem rotação |
 | Personagem padrão (Prospector) | 88×112 px de atlas |
 | Criatura pequena (stalker/spitter/bomber) | 64×64 px de atlas |
-| Criatura grande (bruiser/guardian) | 96×136 / 96×112 px de atlas |
+| Criatura grande (bruiser) | 96×136 px de atlas |
+| Chefe final (guardian) | 112×128 px de atlas — o único canvas desta classe; a hierarquia de tamanho sobre o bruiser é contrato |
 | Elites e chefes (miner/corcel/bispo) | 96×120 / 160×168 / 112×152 px de atlas |
 | Projéteis/impactos | 32×32 px de atlas |
 | Profundidade de cor | Paleta indexada; máx. 20 cores por atlas incluindo outline (`tools/validate.mjs`) |
