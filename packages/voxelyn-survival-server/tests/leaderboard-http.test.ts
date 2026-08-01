@@ -114,10 +114,14 @@ describe('rate limit de replay', () => {
 
 describe('POST /leaderboard', () => {
   it('verifica uma run real e devolve o sumario que o servidor derivou', async () => {
-    const played = playRun(4242);
+    // Seed escolhida porque o bot senoidal EXTRAI nela sob a geracao atual —
+    // `duplicate: false` exige elegibilidade, e elegivel e so quem extraiu. A
+    // seed anterior (4242) extraia no mapa antigo; a gramatica basaltica mudou
+    // o entorno da entrada e o bot passou a morrer la.
+    const played = playRun(1);
     expect(played.state.phase).not.toBe('running');
 
-    const res = await post({ seed: 4242, log: played.base64, name: 'Dani' });
+    const res = await post({ seed: 1, log: played.base64, name: 'Dani' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { summary: { stars: number; ticks: number }; duplicate: boolean };
 

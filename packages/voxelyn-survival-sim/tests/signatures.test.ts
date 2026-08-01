@@ -52,18 +52,21 @@ const arena = (seed: number): SurvivalState => {
 };
 
 describe('spawn por estrato', () => {
-  it('cada estrato com assinatura recebe exatamente UMA, dentro da contagem normal', () => {
-    const cases: Array<{ lineage: string; sector: number; archetype: string }> = [
-      { lineage: 'mineral', sector: 2, archetype: 'resonant' },
-      { lineage: 'hydric', sector: 2, archetype: 'mud_lamprey' },
-      { lineage: 'thermal', sector: 2, archetype: 'bellows' },
-      { lineage: 'thermal', sector: 3, archetype: 'scoriac' },
-      { lineage: 'cryo', sector: 2, archetype: 'frost_wraith' },
+  it('cada estrato recebe as assinaturas do proprio bando, dentro da contagem normal', () => {
+    // Padrao: UMA (encontro autoral). A Lampreia e fauna: TRES, espalhadas —
+    // veio de playtest: com uma, o Aquifero tinha um lago perigoso e dezenas de
+    // lagos que eram so cenario.
+    const cases: Array<{ lineage: string; sector: number; archetype: string; count: number }> = [
+      { lineage: 'mineral', sector: 2, archetype: 'resonant', count: 1 },
+      { lineage: 'hydric', sector: 2, archetype: 'mud_lamprey', count: 3 },
+      { lineage: 'thermal', sector: 2, archetype: 'bellows', count: 1 },
+      { lineage: 'thermal', sector: 3, archetype: 'scoriac', count: 1 },
+      { lineage: 'cryo', sector: 2, archetype: 'frost_wraith', count: 1 },
     ];
     for (const c of cases) {
       const state = createRun({ seed: seedWithLineage(c.lineage), sector: c.sector });
       const found = state.enemies.filter((e) => e.archetype === c.archetype);
-      expect(found.length, `${c.lineage} s${c.sector}: ${c.archetype}`).toBe(1);
+      expect(found.length, `${c.lineage} s${c.sector}: ${c.archetype}`).toBe(c.count);
     }
   });
 
@@ -78,15 +81,21 @@ describe('spawn por estrato', () => {
     }
   });
 
-  it('a lampreia nasce NA agua quando ha agua ao alcance', () => {
+  it('o bando de lampreias nasce majoritariamente NA agua', () => {
+    // Cada lampreia tenta ancorar no lago mais proximo do proprio ponto de
+    // spawn (varredura de raio 10). Uma que caia longe de qualquer agua fica
+    // exposta — encontro valido, so nao o ideal —, entao o contrato e da
+    // MAIORIA do bando, nao de cada individuo.
     const seed = seedWithLineage('hydric');
     const state = createRun({ seed, sector: 2 });
-    const lamprey = state.enemies.find((e) => e.archetype === 'mud_lamprey');
-    expect(lamprey).toBeDefined();
-    if (!lamprey) return;
-    const i = at(state, Math.floor(lamprey.x), Math.floor(lamprey.y));
-    // Agua ou biofluido: o elemento condutivo dela.
-    expect([SURF_WATER].includes(state.surface[i]) || state.surface[i] === 2).toBe(true);
+    const lampreys = state.enemies.filter((e) => e.archetype === 'mud_lamprey');
+    expect(lampreys.length).toBe(3);
+    const wet = lampreys.filter((l) => {
+      const i = at(state, Math.floor(l.x), Math.floor(l.y));
+      // Agua ou biofluido: o elemento condutivo dela.
+      return state.surface[i] === SURF_WATER || state.surface[i] === 2;
+    });
+    expect(wet.length).toBeGreaterThanOrEqual(2);
   });
 });
 

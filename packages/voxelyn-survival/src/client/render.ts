@@ -57,6 +57,8 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
+import { placeDecor, propStillValid, type DecorativeProp } from './decor';
+import { drawDecorProp } from './decor-draw';
 import { t } from './i18n';
 import {
   deathEchoReadout,
@@ -86,6 +88,29 @@ const TERRAIN_KIND_INDEX: Record<number, number> = {
   [SOLID_CRYSTAL_DULL]: 6,
   [SOLID_ORE_CHIPPED]: 7,
 };
+
+/**
+ * A PELE da rocha comum por estrato: indices 8..13 do atlas de terreno.
+ *
+ * So a rocha comum troca de pele — fragil, minerio e cristal sao linguagem
+ * mecanica e ficam identicos em todo bioma. O basalto usa o indice 0
+ * historico: as Galerias sao o mapa original ate no pixel. A simulacao nao
+ * sabe disto (SOLID_ROCK continua um ID so); e leitura de LUGAR, e lugar e
+ * apresentacao.
+ */
+const STRATUM_ROCK_KIND = {
+  basalt: 0,
+  prismatic: 8,
+  aquifer: 9,
+  sulfur: 10,
+  furnace: 11,
+  silica: 12,
+  glacial: 13,
+} as const satisfies Record<StratumId, number>;
+
+/** Indice do bloco no atlas, dado o solido e o estrato do setor. */
+export const terrainKindIndexFor = (solid: number, stratum: StratumId): number =>
+  solid === SOLID_ROCK ? STRATUM_ROCK_KIND[stratum] : (TERRAIN_KIND_INDEX[solid] ?? 0);
 
 /**
  * SURF_* -> indice em SURFACE_KINDS do atlas de chao. Pela mesma razao da tabela
@@ -160,6 +185,52 @@ export const biomeLabel = (stratum: StratumId, occupation: OccupationId): string
   const base = t(STRATUM_LABEL_KEY[stratum]);
   if (occupation === 'none') return base;
   return `${base} · ${t(OCCUPATION_LABEL_KEY[occupation])}`;
+};
+
+/**
+ * O VEU de cor de cada estrato: a luz ambiente que faz um setor parecer OUTRO
+ * LUGAR no primeiro relance, antes de qualquer materia no chao.
+ *
+ * Veio direto de playtest: o Aquifero inteiro lia como "a caverna de sempre,
+ * so que com agua", porque as paredes — a maior parte dos pixels da tela — sao
+ * o mesmo atlas em todo estrato. Multiplicar o atlas de terreno por estrato
+ * custaria sete vezes o orcamento de textura; um veu em tela cheia custa UM
+ * fillRect por quadro e muda a leitura do setor inteiro.
+ *
+ * Regras:
+ * - `basalt` NAO tem veu. As Galerias sao o mapa original, e a promessa de
+ *   preservacao vale para os pixels tambem — e um veu ausente e a referencia
+ *   contra a qual os outros leem como "outro lugar".
+ * - Alfa baixo e composicao `overlay` de proposito: o veu desloca o MATIZ sem
+ *   comer contraste. Telegrafo, gas e fogo continuam legiveis por baixo — a
+ *   promessa "morte sempre anunciada" nao pode ser paga em atmosfera.
+ * - Aplicado sobre mundo e entidades, ANTES de particulas, numeros de dano e
+ *   HUD: aviso e interface ficam nitidos por cima da atmosfera.
+ */
+const BIOME_VEIL = {
+  basalt: null,
+  prismatic: { color: '#8f7aff', alpha: 0.11 },
+  aquifer: { color: '#1e5a8a', alpha: 0.2 },
+  sulfur: { color: '#a8e63c', alpha: 0.11 },
+  furnace: { color: '#ff7a2f', alpha: 0.13 },
+  silica: { color: '#b8a98f', alpha: 0.14 },
+  glacial: { color: '#9fc2e8', alpha: 0.17 },
+} as const satisfies Record<StratumId, { color: string; alpha: number } | null>;
+
+const drawBiomeVeil = (
+  ctx: CanvasRenderingContext2D,
+  stratum: StratumId,
+  vw: number,
+  vh: number
+): void => {
+  const veil = BIOME_VEIL[stratum];
+  if (!veil) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = veil.alpha;
+  ctx.fillStyle = veil.color;
+  ctx.fillRect(0, 0, vw, vh);
+  ctx.restore();
 };
 
 export const TILE_W = 32;
@@ -630,6 +701,9 @@ export class SurvivalRenderer {
    * do laco.
    */
   private readonly archetypeById = new Map<number, string>();
+  /** Decoracao do setor atual, derivada por seed. Ver decor.ts. */
+  private decor: DecorativeProp[] = [];
+  private decorKey = '';
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -1185,8 +1259,9 @@ export class SurvivalRenderer {
             // de poligono; o caminho de poligono abaixo continua como fallback
             // para quando o atlas ainda nao carregou ou falhou.
             // Espelha BLOCK_KINDS do atlas de terreno, na ordem em que o
-            // gerador empacota os tipos.
-            const kindIndex = TERRAIN_KIND_INDEX[solid] ?? 0;
+            // gerador empacota os tipos — com a rocha comum trocando de pele
+            // pelo estrato do setor.
+            const kindIndex = terrainKindIndexFor(solid, state.stratum);
             if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
 
             const hw = (TILE_W / 2) * z;
@@ -1368,6 +1443,28 @@ export class SurvivalRenderer {
           draw: () => this.drawDeathEchoPrompt(esx, esy, z, nowMs),
         });
       }
+    }
+
+    // DECORACAO: derivada e cacheada por setor. Nao vive no estado — e a
+    // camada que explica onde o jogador esta sem tocar na simulacao, e
+    // qualquer cliente reconstroi a mesma lista a partir da seed.
+    const decorKey = `${state.config.seed}:${state.sector}:${state.stratum}`;
+    if (this.decorKey !== decorKey) {
+      this.decorKey = decorKey;
+      this.decor = placeDecor(state);
+    }
+    for (const prop of this.decor) {
+      const db = brightness(prop.x + 0.5, prop.y + 0.5);
+      if (db <= 0.05) continue;
+      const [dsx, dsy] = toScreen(prop.x + 0.5, prop.y + 0.5);
+      if (dsx < -60 || dsx > vw + 60 || dsy < -60 || dsy > vh + 60) continue;
+      // O mundo muda por baixo do enfeite: parede arrancada, fogo passando.
+      // Um prop invalido simplesmente nao e desenhado neste quadro.
+      if (!propStillValid(state, prop)) continue;
+      items.push({
+        depth: prop.x + prop.y,
+        draw: () => drawDecorProp(ctx, prop, dsx, dsy, z, nowMs),
+      });
     }
 
     this.archetypeById.clear();
@@ -1712,6 +1809,10 @@ export class SurvivalRenderer {
 
     items.sort((a, b) => a.depth - b.depth);
     for (const item of items) item.draw();
+
+    // A luz ambiente do estrato entra AQUI: por cima do mundo e das criaturas,
+    // por baixo de particulas, numeros de dano e HUD.
+    drawBiomeVeil(ctx, state.stratum, vw, vh);
 
     // FX
     // Vem do relogio, nao de um 16.7 fixo: em rAF o passo fixo amarrava a vida

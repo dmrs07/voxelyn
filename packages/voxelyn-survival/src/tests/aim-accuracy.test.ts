@@ -67,7 +67,12 @@ describe('pontaria: o tiro sai para onde o cursor aponta', () => {
     expect(headings.size).toBe(CURSOR_ANGLES.length);
   });
 
-  it('co-op — o servidor atira no rumo que o cliente mandou', () => {
+  // Timeout proprio: cada angulo constroi servidor + cliente do zero, e cada
+  // construcao gera o MUNDO duas vezes (autoritativo e espelho) — sao ~144
+  // worldgens por rodada. O gerador ficou legitimamente mais caro com o
+  // sistema de biomas (gramatica de saloes, decoracao por estrato), e este
+  // teste mede PONTARIA, nao o preco do worldgen.
+  it('co-op — o servidor atira no rumo que o cliente mandou', { timeout: 20_000 }, () => {
     let worst = 0;
     for (const deg of CURSOR_ANGLES) {
       const server = new SurvivalServer({ maxPlayersPerRoom: 2, baseSeed: 5150 });

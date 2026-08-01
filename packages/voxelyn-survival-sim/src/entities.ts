@@ -174,6 +174,20 @@ export const SIGNATURE_OF_STRATUM: Partial<Record<string, EnemyArchetype>> = {
   glacial: 'frost_wraith',
 };
 
+/**
+ * Quantas assinaturas o setor recebe. Padrao: UMA — um encontro autoral.
+ *
+ * A Lampreia e a excecao, e veio de playtest: com uma por setor, o Aquifero
+ * inteiro tinha UM lago perigoso e todos os outros eram cenario — o jogador
+ * atravessava a agua sem nunca aprender a regra dela. Tres lampreias
+ * espalhadas transformam "aquele lago tem o bicho" em "agua e territorio
+ * DELA", que e a leitura que o estrato promete. Continuam ocupando vagas
+ * comuns da contagem: a densidade do setor nao muda.
+ */
+export const SIGNATURE_PACK: Partial<Record<EnemyArchetype, number>> = {
+  mud_lamprey: 3,
+};
+
 export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean => {
   const cx = Math.floor(x);
   const cy = Math.floor(y);

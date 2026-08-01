@@ -183,6 +183,112 @@ Conteúdo: 5 atlases voxel novos (idle/walk/attack/hit/die × 4 direções,
 materiais existentes da paleta), bestiário corporativo (fichas pt/en),
 partículas por matéria, ecos de morte no protocolo.
 
+## Quarta etapa (implementada): leitura de lugar
+
+Feedback direto de playtest ("caí no Aquífero e demorei a perceber — parece o
+mesmo lugar, só tem água de diferente"):
+
+- **Véu de paleta por estrato**: uma luz ambiente por bioma (composição
+  `overlay`, alfa baixo) sobre mundo e criaturas, sob partículas/HUD — azul
+  profundo no Aquífero, quente na Fornalha, gélido na Cripta, violeta na
+  Catedral, sulfuroso na Fenda, pálido na Sílica. O **basalto não tem véu**:
+  as Galerias são o mapa original, e a ausência é a referência que faz os
+  outros lerem como "outro lugar". Custo: um fillRect por quadro.
+- **Lampreia como fauna** (`SIGNATURE_PACK`): três por setor de Aquífero,
+  espalhadas pela lista de spawns — com uma, o setor tinha um lago perigoso e
+  dezenas de lagos que eram só cenário. Continuam ocupando vagas comuns da
+  contagem. As demais assinaturas seguem sendo encontro único.
+
+## Quinta etapa (implementada): a rocha e a arquitetura do lugar
+
+- **Paredes por estrato** (terrain-blocks v3): a rocha COMUM ganha seis peles —
+  grãos de cristal na Catedral, pedra encharcada com limo no Aquífero, rocha
+  esbranquiçada com crosta sulfurosa na Fenda, basalto negro com veios de
+  brasa na Fornalha, arenito estratificado na Sílica, capa de gelo na Cripta.
+  Frágil, minério e cristal continuam **universais**: são linguagem mecânica
+  (o que cede, o que rende, o que conduz) e precisam ler idênticos em todo
+  bioma. O basalto usa o índice histórico: o mapa original até no pixel. A
+  simulação não sabe disso — `SOLID_ROCK` continua um ID só.
+- **Estruturas de salão** (`WorldgenProfile.halls`): carimbadas após o
+  autômato e antes das provas de alcançabilidade (toda garantia do gerador
+  vale para elas; salão inalcançável é selado pela regra normal de bolsões):
+  - `radial` (Catedral): rotunda com corredores em leque e **pilares de
+    cristal** — cobertura, luz e munição do Ressonante ao mesmo tempo;
+  - `lungs` (Fenda): câmaras bojudas ligadas por gargantas — o lugar que dá
+    sentido ao ciclo dos respiradouros;
+  - `canyon` (Fornalha): fissuras compridas dividindo as salas;
+  - `basins` (Aquífero): bacias largas que **nascem cheias d'água** — a
+    geografia e a matéria chegam juntas;
+  - `sinkholes` (Sílica): poços circulares com **borda frágil**;
+  - `lakes` (Cripta): lagos ovais congelados — o território do Espectro.
+  Basalto: `none`, o labirinto orgânico histórico intocado.
+
+## Sexta etapa (implementada): a strata determina a arquitetura
+
+Redefinição formalizada: **a strata determina a arquitetura da caverna; a
+ocupação determina o que tomou conta dela.** A regra de qualidade que rege as
+gramáticas: *trocar a paleta inteira por cinza não pode apagar a identidade —
+a forma dos salões e corredores tem de dizer onde o jogador está.*
+
+Gramáticas espaciais (`WorldgenProfile.halls`), carimbadas após o autômato e
+antes das provas de alcançabilidade:
+
+| Strata | Gramática | Salões e corredores |
+| --- | --- | --- |
+| Basáltica | `columns` | Anfiteatro cercado de colunas, floresta de pilares, fissura entre dois espaços. Pesado e tectônico. |
+| Prismática | `radial` | Rotunda com raios e pilares de cristal, **geodo** (casca cristalina voltada pra dentro), **câmara espelhada**, corredores angulares segmentados em 90°. Angular: cresceu, não foi erodida. |
+| Cárstica (Aquífero) | `karst` | Cúpula calcária, cisternas que nascem cheias, colunata, túneis **sinuosos** de walker com persistência direcional que alargam e estreitam. Dissolvido pela água — o oposto visual da Catedral. |
+| Sedimentar (Sílica) | `terraced` | Galerias estratificadas mais largas que altas, **corredores paralelos separados por parede fina frágil** (o frágil como seam estrutural legível), sumidouros de borda frágil. Horizontal e laminado. |
+| Sulfurosa | `lungs` | Pulmões em cadeia, gargantas. |
+| Fornalha | `canyon` | Cânions com blocos desabados no leito. |
+| Cripta | `lakes` | Lagos ovais congelados + túneis suaves de walker. |
+
+**Mudança de contrato do basalto** (pedido em playtest): a gramática basáltica
+também evolui — o basalto ganha salões. O que continua intocável: o autômato
+como base e as **matérias** (nada de água/brasa/gelo nele; variação de matéria
+segue sendo trabalho das ocupações). O invariante passou de bytes para
+identidade; `generateWorld()` sem perfil continua sendo o histórico puro.
+
+Traduções do doc de design: *Estrato Sedimentar* = Sumidouros de Sílica
+(a parede em camadas já era arenito); *Cárstico* = Aquífero Negro; *Estrato
+Ferrífero* = trabalho futuro (naturalmente pareado com a Cicatriz Aurix).
+
+## Sétima etapa (implementada): props decorativos
+
+A divisão de trabalho do mundo, completa: **a strata define a formação; os
+materiais definem o que reage; os props explicam onde o jogador está, o que
+aconteceu ali e qual é a escala do Veio.**
+
+Camada `client/decor.ts` + `decor-draw.ts` — puramente visual e DERIVADA:
+
+- Um prop não ocupa célula autoritativa, não bloqueia, não conduz, não morre.
+  Não entra em `solid`, `surface`, pathfinding, hash nem snapshot. Qualquer
+  cliente reconstrói a mesma decoração de `(seed, setor, strata)` com PRNG
+  próprio — o co-op vê o mesmo cenário sem o servidor transmitir um objeto.
+- **Zonas proibidas inegociáveis**: raio da entrada, do poço/núcleo, de
+  terminais e cofres, dos respiradouros e da posição de chefe. Decoração
+  nunca compete com informação.
+- **Regras anti-mentira** (testadas): baixo/estreito/quebrado — nunca parece
+  bloquear; cristal decorativo usa a família fria (nada do biolum reativo);
+  caixa Aurix sem ouro nem halo de coletável; fumarola decorativa apagada;
+  nada sobre superfície reativa ou elemento. `propStillValid` re-checa a
+  âncora a cada quadro: parede arrancada ou fogo por baixo → o prop some em
+  vez de mentir.
+- **Kits da primeira entrega** (20 arquétipos × variantes procedurais):
+  coluna tombada/entulho/lasca (basalto), leque/estilhaços (Catedral),
+  estalagmite/bacia/cascata petrificada (carste), pilha de lâminas/placa
+  (sedimentar), cone de fumarola/monte de enxofre (Fenda), escória/cinza
+  (Fornalha), agulha de gelo/pedra gelada (Cripta), cogumelo que respira +
+  puffball **sobre o tapete** (Micélio), caixa + escora (Aurix).
+- Desenho em runtime com o primitivo `drawVoxel` (zero atlas novo); animação
+  (respiração do cogumelo) derivada de relógio local + variant, nunca da RNG
+  autoritativa. Entram na fila de profundidade do pintor.
+
+Futuro da camada: props de teto (estalactites com translucidez perto do
+jogador), landmarks monumentais ancorados nos centros dos salões carimbados,
+composição landmark/ritmo/micro por tipo de sala, kit Aurix de infraestrutura
+(passarelas, trilhos, broca monumental).
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
@@ -190,6 +296,17 @@ partículas por matéria, ecos de morte no protocolo.
 - **Inércia sobre gelo** na Cripta, quando o estrato tiver provado a rota
   derreter/recongelar.
 - **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
+- **Estrato Ferrífero**: formação natural de ferro/magnetita — veio principal,
+  nós magnéticos, condução por parede, Miners e Aurix densos ("o lugar que
+  justificou a operação").
+- **Morfologia de borda** (silhueta escalonada da sedimentar, pontas
+  prismáticas no contorno): kit visual de borda por strata no renderer.
+- **Salas funcionais com variantes por strata** (poço, arena do Bispo, arena
+  do Guardião trocando de forma mantendo a função) e **Aurix adaptada ao
+  substrato** (escoras no sedimento, passarelas no aquífero, isoladores no
+  cristal, dutos na fenda).
+- **Fratura por camada** na sedimentar (quebrar uma célula frágil enfraquece
+  vizinhas da mesma faixa; minério em seams lineares).
 - Trilha de rachaduras do Espectro e ondulação da Lampreia como apresentação
   dedicada no cliente (hoje a leitura vem da postura `mood` + superfície).
 

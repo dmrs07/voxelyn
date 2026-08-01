@@ -48,6 +48,21 @@ export const BLOCK_KINDS = [
   'oreSpent',
   'crystalDull',
   'oreChipped',
+  // -----------------------------------------------------------------------
+  // ROCHA POR ESTRATO. Entram no fim: os oito indices historicos nao mudam.
+  //
+  // So a rocha COMUM ganha pele por bioma. Fragil, minerio e cristal ficam
+  // universais de proposito — sao linguagem MECANICA (o que cede, o que rende,
+  // o que conduz), e o jogador precisa reconhece-los identicos em qualquer
+  // estrato. A parede comum e o unico solido que e so lugar, entao e o unico
+  // que pode dizer ONDE voce esta.
+  // -----------------------------------------------------------------------
+  'rockPrismatic',
+  'rockAquifer',
+  'rockSulfur',
+  'rockFurnace',
+  'rockSilica',
+  'rockGlacial',
 ];
 
 const hash2 = (x, y, seed) => {
@@ -104,6 +119,42 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
     // Opaco: mesma FORMA de cristal, nenhuma luz. A silhueta continua dizendo
     // "aqui havia cristal", que e a informacao que o jogador precisa.
     if ((h >>> 3) % (surface ? 5 : 8) === 0) return 'fungusDeep';
+  } else if (kind === 'rockPrismatic') {
+    // Catedral: a rocha e atravessada por graos de cristal vivo. Mais densos
+    // que o cristal-recurso NUNCA — o veio minerauvel continua inconfundivel.
+    if ((h >>> 3) % (surface ? 9 : 12) === 0) return 'electric';
+    if ((h >>> 6) % 10 === 0) return 'ice';
+  } else if (kind === 'rockAquifer') {
+    // Aquifero: pedra ENCHARCADA. Corpo mais escuro, escorrimentos de limo e
+    // gotas de condensacao palida.
+    if (h % 3 === 0) return 'rockDeep';
+    if ((h >>> 3) % (surface ? 6 : 10) === 0) return 'fungusDeep';
+    if ((h >>> 6) % 14 === 0) return 'ice';
+  } else if (kind === 'rockSulfur') {
+    // Fenda: rocha esbranquicada corroida de dentro para fora, com bolsoes de
+    // crosta sulfurosa aflorando.
+    if (h % 3 !== 0) return 'bone';
+    if ((h >>> 3) % (surface ? 5 : 8) === 0) return 'loot';
+    if ((h >>> 6) % 9 === 0) return 'acid';
+  } else if (kind === 'rockFurnace') {
+    // Fornalha: basalto quase negro rachado por veios de calor. As fissuras
+    // sao FINAS e volumetricas — descem pela lateral como no minerio.
+    if (h % 4 === 0) return 'scorch';
+    if ((h >>> 3) % (surface ? 8 : 11) === 0) return 'fire';
+    if ((h >>> 6) % 13 === 0) return 'blood';
+  } else if (kind === 'rockSilica') {
+    // Sumidouros: arenito palido em CAMADAS — o material muda por faixa de
+    // altura, entao a lateral do bloco mostra a estratificacao.
+    const band = Math.floor(cz / 3) % 3;
+    if (band === 1 && (h & 3) !== 0) return 'bone';
+    if (band === 2 && (h & 7) === 0) return 'rust';
+    if ((h >>> 6) % 11 === 0) return 'bone';
+  } else if (kind === 'rockGlacial') {
+    // Cripta: rocha com CAPA de gelo — os voxels do topo congelam, e placas de
+    // geada descem pelas faces.
+    if (cz >= top - 2) return 'ice';
+    if ((h >>> 3) % 9 === 0) return 'ice';
+    if ((h >>> 6) % 12 === 0) return 'ice';
   }
   return base;
 };

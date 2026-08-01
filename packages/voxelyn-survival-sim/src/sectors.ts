@@ -36,7 +36,7 @@ import {
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
 import { isConductiveSurface, setSurface } from './cells.js';
-import { SIGNATURE_OF_STRATUM, spawnEnemy } from './entities.js';
+import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
 import { generateWorld } from './worldgen.js';
 import { SURF_ICE } from './constants.js';
@@ -152,13 +152,22 @@ export const populateSector = (
   // diferentes conforme a linhagem consumisse a RNG em ordens distintas.
   const horseHere = state.rng.nextFloat01() < horseChanceFor(biome, HORSE_SPAWN_CHANCE);
 
-  // O inimigo de ASSINATURA do estrato ocupa uma vaga comum — nunca soma. Um
-  // por setor, no primeiro terco da lista: cedo o bastante para ensinar a regra
-  // do bioma enquanto ela ainda decide a travessia. Espreitadores nascem DENTRO
-  // do proprio elemento: uma lampreia em chao seco nao e um encontro, e um
-  // peixe fora d'agua.
+  // O inimigo de ASSINATURA do estrato ocupa vagas comuns — nunca soma. O
+  // padrao e UM por setor (encontro autoral); a Lampreia vem em bando (ver
+  // SIGNATURE_PACK), espalhada pela lista para os lagos do setor inteiro
+  // pertencerem a ela. Espreitadores nascem DENTRO do proprio elemento: uma
+  // lampreia em chao seco nao e um encontro, e um peixe fora d'agua.
   const signature = SIGNATURE_OF_STRATUM[state.stratum] as EnemyArchetype | undefined;
-  const signatureIndex = signature ? Math.floor(spawns.length / 3) : -1;
+  const signatureIndices = new Set<number>();
+  if (signature) {
+    const pack = SIGNATURE_PACK[signature] ?? 1;
+    for (let k = 1; k <= pack; k++) {
+      let idx = Math.floor((budget * k) / (pack + 1));
+      // A vaga do elite tem dono; a assinatura desliza uma casa em vez de sumir.
+      if (idx === eliteIndex) idx = idx + 1 < budget ? idx + 1 : Math.max(0, idx - 1);
+      signatureIndices.add(idx);
+    }
+  }
 
   for (let i = 0; i < budget; i++) {
     if (i === eliteIndex && horseHere) {
@@ -167,7 +176,7 @@ export const populateSector = (
       spawnEnemy(state, 'fungal_horse', spawns[i].x, spawns[i].y, false);
       continue;
     }
-    if (signature && i === signatureIndex && i !== eliteIndex) {
+    if (signature && signatureIndices.has(i) && i !== eliteIndex) {
       const home = signatureHome(state, signature, spawns[i].x, spawns[i].y);
       spawnEnemy(state, signature, home.x, home.y, false);
       continue;

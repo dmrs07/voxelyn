@@ -108,26 +108,49 @@ describe('perfis por estrato', () => {
   const prismatic: SectorBiome = { stratum: 'prismatic', occupation: 'none', lineage: 'mineral' };
   const aquifer: SectorBiome = { stratum: 'aquifer', occupation: 'none', lineage: 'hydric' };
 
-  it('basalto limpo e EXATAMENTE o perfil historico, em qualquer linhagem e setor', () => {
-    // O bioma original do jogo esta preservado como tipo proprio: Galerias de
-    // Basalto sem ocupacao SAO o mapa antigo. Nenhuma linhagem pode tempera-lo
-    // — variacao de basalto e trabalho das ocupacoes.
+  it('basalto limpo preserva as MATERIAS historicas em qualquer linhagem e setor', () => {
+    // O contrato do basalto evoluiu de bytes para IDENTIDADE (pedido de
+    // playtest: a gramatica basaltica ganha anfiteatros, florestas de pilares
+    // e fissuras). O que continua intocavel: o automato como base, e as
+    // materias — nada de agua, brasa, gelo ou nervura de cristal nele.
+    // Variacao de materia no basalto segue sendo trabalho das ocupacoes.
     for (const lineage of ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'] as const) {
       for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
         const clean: SectorBiome = { stratum: 'basalt', occupation: 'none', lineage };
-        expect(biomeProfile(clean, sector), `${lineage} s${sector}`).toEqual(DEFAULT_PROFILE);
+        const profile = biomeProfile(clean, sector);
+        expect({ ...profile, halls: 'none' }, `${lineage} s${sector}`).toEqual(DEFAULT_PROFILE);
+        expect(profile.halls, `${lineage} s${sector}`).toBe('columns');
       }
     }
-    expect(biomeProfile(basalt, 1)).toEqual(DEFAULT_PROFILE);
   });
 
-  it('o mundo do basalto limpo e byte a byte o mundo historico', () => {
+  it('o basalto continua sem NENHUM elemento de outro estrato no chao', () => {
     for (const seed of SEEDS.slice(0, 4)) {
-      const historic = generateWorld(seed, WORLD_W, WORLD_H);
-      const viaProfile = generateWorld(seed, WORLD_W, WORLD_H, biomeProfile(basalt, 1));
-      expect(Array.from(viaProfile.solid)).toEqual(Array.from(historic.solid));
-      expect(Array.from(viaProfile.surface)).toEqual(Array.from(historic.surface));
+      const world = generateWorld(seed, WORLD_W, WORLD_H, biomeProfile(basalt, 1));
+      const count = (kind: number): number =>
+        world.surface.reduce((n, s) => n + (s === kind ? 1 : 0), 0);
+      expect(count(SURF_WATER)).toBe(0);
+      expect(count(SURF_ICE)).toBe(0);
+      expect(count(SURF_EMBER)).toBe(0);
     }
+  });
+
+  it('a gramatica basaltica deixa pilares de ROCHA soltos nos saloes', () => {
+    let seedsWithPillars = 0;
+    for (const seed of SEEDS.slice(0, 4)) {
+      const world = generateWorld(seed, WORLD_W, WORLD_H, biomeProfile(basalt, 1));
+      let pillars = 0;
+      for (let y = 1; y < WORLD_H - 1; y++) {
+        for (let x = 1; x < WORLD_W - 1; x++) {
+          if (world.solid[y * WORLD_W + x] !== 1) continue; // SOLID_ROCK
+          const around = [world.solid[y * WORLD_W + x - 1], world.solid[y * WORLD_W + x + 1],
+            world.solid[(y - 1) * WORLD_W + x], world.solid[(y + 1) * WORLD_W + x]];
+          if (around.every((s) => s === SOLID_NONE)) pillars++;
+        }
+      }
+      if (pillars > 0) seedsWithPillars++;
+    }
+    expect(seedsWithPillars).toBeGreaterThanOrEqual(3);
   });
 
   it('o aquifero tem lagos; o basalto seco nao tem nenhum', () => {
@@ -149,6 +172,73 @@ describe('perfis por estrato', () => {
       const gallery = generateWorld(seed, WORLD_W, WORLD_H);
       expect(crystalCount(cathedral.solid)).toBeGreaterThan(crystalCount(gallery.solid) * 2);
     }
+  });
+
+  it('cada estrato tem a propria estrutura de salao; o basalto nao tem nenhuma', () => {
+    const halls = (stratum: SectorBiome['stratum'], lineage: SectorBiome['lineage']): string =>
+      biomeProfile({ stratum, occupation: 'none', lineage }, 2).halls;
+    expect(halls('basalt', 'mineral')).toBe('columns');
+    expect(halls('prismatic', 'mineral')).toBe('radial');
+    expect(halls('aquifer', 'hydric')).toBe('karst');
+    expect(halls('sulfur', 'thermal')).toBe('lungs');
+    expect(halls('furnace', 'thermal')).toBe('canyon');
+    expect(halls('silica', 'arid')).toBe('terraced');
+    expect(halls('glacial', 'cryo')).toBe('lakes');
+  });
+
+  it('a rotunda da Catedral deixa pilares de cristal soltos no salao', () => {
+    // Pilar solto = cristal com os quatro vizinhos abertos: so a rotunda produz
+    // isso (a decoracao de parede poe cristal COLADO em rocha). Seeds fixas:
+    // o teste e deterministico, nao estatistico.
+    let seedsWithPillars = 0;
+    for (const seed of SEEDS.slice(0, 4)) {
+      const world = generateWorld(seed, WORLD_W, WORLD_H, biomeProfile(prismatic, 2));
+      let pillars = 0;
+      for (let y = 1; y < WORLD_H - 1; y++) {
+        for (let x = 1; x < WORLD_W - 1; x++) {
+          if (world.solid[y * WORLD_W + x] !== SOLID_CRYSTAL) continue;
+          const open = [world.solid[y * WORLD_W + x - 1], world.solid[y * WORLD_W + x + 1],
+            world.solid[(y - 1) * WORLD_W + x], world.solid[(y + 1) * WORLD_W + x]];
+          if (open.every((s) => s === SOLID_NONE)) pillars++;
+        }
+      }
+      if (pillars > 0) seedsWithPillars++;
+    }
+    // Uma rotunda pode calhar de ser selada pelo fechamento de bolsoes; nas
+    // quatro seeds fixas, a maioria tem de sobreviver conectada.
+    expect(seedsWithPillars).toBeGreaterThanOrEqual(3);
+  });
+
+  it('as bacias do Aquifero nascem cheias: existe um lago CONECTADO grande', () => {
+    const seed = seedWithLineage('hydric');
+    const state = createRun({ seed, sector: 2 });
+    const w = state.config.width;
+    const h = state.config.height;
+    const seen = new Set<number>();
+    let largest = 0;
+    for (let i = 0; i < state.surface.length; i++) {
+      if (state.surface[i] !== SURF_WATER || seen.has(i)) continue;
+      let size = 0;
+      const stack = [i];
+      seen.add(i);
+      while (stack.length > 0) {
+        const cur = stack.pop() as number;
+        size++;
+        const cx = cur % w;
+        const cy = (cur - cx) / w;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const ni = ny * w + nx;
+          if (seen.has(ni) || state.surface[ni] !== SURF_WATER) continue;
+          seen.add(ni);
+          stack.push(ni);
+        }
+      }
+      largest = Math.max(largest, size);
+    }
+    expect(largest).toBeGreaterThanOrEqual(25);
   });
 
   it('todo estrato continua gerando mapa solucionavel com nucleo alcancavel', () => {
