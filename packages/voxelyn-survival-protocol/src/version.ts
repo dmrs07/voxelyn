@@ -11,14 +11,18 @@
 // bump, o handshake aceitaria os dois pares e o defeito apareceria como um
 // aviso vazio no meio do co-op, em vez de uma recusa explicita na conexao.
 export const PROTOCOL_VERSION = 11;
-// 13: investida do guardian passa a andar no release, rastro do cavalo espera o
-// atraso, cota de minerio vira contador por jogador, mineradores nao empilham
-// mais na mesma celula e a morte do minerador exige autoria do jogador. Tudo
-// isso muda o hash autoritativo e a populacao semeada dos setores.
-export const SIMULATION_VERSION = 13;
-// 9: a plataforma do poco de descida ganhou os seis quadros distintos que o
-// ciclo sempre prometeu (os dois ultimos eram identicos).
-export const CONTENT_VERSION = 9;
+// 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
+// dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
+// celula; cinco arquetipos de assinatura entram na simulacao e no hash de
+// kills. Dois peers em versoes diferentes gerariam MUNDOS diferentes da mesma
+// seed — a recusa tem de acontecer no handshake, nao como divergencia de hash
+// no minuto tres. (O protocolo em si nao muda: o envelope das mensagens e o
+// mesmo, e os campos novos de `sector_entered` viajam dentro de um evento cujo
+// par de versoes de sim ja garante que ambos os lados conhecem.)
+export const SIMULATION_VERSION = 14;
+// 10: crostas novas no atlas de chao (agua, fissura incandescente, gelo) e os
+// cinco atlases do bestiario de assinatura.
+export const CONTENT_VERSION = 10;
 
 export type VersionTriple = {
   protocolVersion: number;

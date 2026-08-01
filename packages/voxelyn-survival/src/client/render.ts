@@ -20,6 +20,7 @@ import {
   SURF_WATER,
   SURF_EMBER,
   SURF_ICE,
+  LURKER_HIDDEN,
   ABILITY_RADIUS,
   HEAT_MAX,
   RICOCHET_BOUNCES,
@@ -396,6 +397,56 @@ const drawStunIndicator = (
   const lift = size * 2.25 + 6 * z;
   for (const [ox, oy] of stunIndicatorOffsets(entityId, tick)) {
     drawVoxel(ctx, sx + ox * size * 0.75, sy - lift + oy * size, Math.max(2, 2.6 * z), CHARGE_RAMP);
+  }
+};
+
+/**
+ * A perturbacao de superficie de um espreitador oculto (Lampreia sob a agua,
+ * Espectro sob o gelo). E TUDO o que aparece dele enquanto `mood` diz
+ * escondido: a promessa dos dois biomas e que a posicao se le pela lamina, e
+ * nao pelo corpo.
+ *
+ * Na agua, aneis concentricos que nascem no centro e se dissipam — a ondulacao
+ * que a spec descreve. No gelo, rachaduras curtas irradiando, pulsando de leve.
+ * Fase e geometria saem do id e do relogio, nunca de sorteio: as duas maquinas
+ * de uma sala de co-op desenham a mesma perturbacao no mesmo lugar.
+ */
+const drawLurkerDisturbance = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  entityId: number,
+  inWater: boolean
+): void => {
+  const seed = (Math.imul(entityId, 2654435761) >>> 0) % 1000;
+  if (inWater) {
+    // Dois aneis defasados meio ciclo: sempre ha um visivel, nenhum pisca.
+    for (const offset of [0, 0.5]) {
+      const phase = ((nowMs / 900 + seed / 1000 + offset) % 1 + 1) % 1;
+      const r = size * (0.5 + phase * 1.6);
+      ctx.strokeStyle = `rgba(122,184,255,${(0.4 * (1 - phase)).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, z);
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    return;
+  }
+  // Gelo: tres rachaduras curtas em leque, comprimento respirando devagar.
+  const breath = 0.75 + 0.25 * Math.sin(nowMs / 480 + seed);
+  ctx.strokeStyle = 'rgba(123,139,163,0.55)';
+  ctx.lineWidth = Math.max(1, z);
+  for (let c = 0; c < 3; c++) {
+    const angle = ((seed + c * 331) % 628) / 100; // 0..2π deterministico
+    const len = size * (1 + c * 0.35) * breath;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    // Achata no eixo Y: a rachadura vive na lamina isometrica, nao de pe.
+    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len * 0.5);
+    ctx.stroke();
   }
 };
 
@@ -1328,11 +1379,28 @@ export class SurvivalRenderer {
       if (b <= 0.05) continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
+      // Espreitador DENTRO do elemento: o corpo nao aparece. A simulacao ja
+      // manda a postura em `mood` (e por isso ela viaja no snapshot); desenhar
+      // o sprite inteiro aqui apagaria a mecanica de ocultacao do Aquifero e
+      // da Cripta — o jogador veria a posicao exata em vez da ONDULACAO que o
+      // bioma promete. Fica so a perturbacao da superficie, sem sombra e sem
+      // barra de vida; o indicador de atordoamento continua, porque levar a
+      // descarga e exatamente o momento em que a leitura tem de ser clara.
+      const lurkerHidden =
+        (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
+        enemy.mood === LURKER_HIDDEN;
       items.push({
         depth: enemy.x + enemy.y,
         draw: () => {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
+          if (lurkerHidden) {
+            drawLurkerDisturbance(ctx, sx, sy, size, z, nowMs, enemy.id, enemy.archetype === 'mud_lamprey');
+            if (enemy.stunnedUntil > state.tick) {
+              drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
+            }
+            return;
+          }
           drawShadow(sx, sy, size);
           const drew = this.sprites.drawEntity(
             ctx,

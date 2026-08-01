@@ -1679,6 +1679,15 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'bishop',
   'fungal_horse',
   'miner',
+  // Bestiario de assinatura, no fim pela mesma regra. Sem eles aqui, duas runs
+  // com resultados diferentes contra assinaturas produziriam o MESMO hash de
+  // verificacao — o contador apareceria no sumario sem estar coberto pelo
+  // replay do leaderboard.
+  'resonant',
+  'mud_lamprey',
+  'bellows',
+  'scoriac',
+  'frost_wraith',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
