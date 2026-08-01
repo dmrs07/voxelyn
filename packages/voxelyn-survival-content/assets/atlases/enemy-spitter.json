@@ -1,6 +1,6 @@
 {
   "id": "enemy-spitter",
-  "version": 5,
+  "version": 6,
   "atlas": "enemy-spitter.png",
   "frameWidth": 64,
   "frameHeight": 64,

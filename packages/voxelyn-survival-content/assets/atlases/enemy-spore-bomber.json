@@ -1,6 +1,6 @@
 {
   "id": "enemy-spore-bomber",
-  "version": 5,
+  "version": 6,
   "atlas": "enemy-spore-bomber.png",
   "frameWidth": 64,
   "frameHeight": 64,
@@ -28,17 +28,12 @@
   "palette": "veio-fungico.v01",
   "paletteColors": [
     "#0b0e14",
-    "#1d2430",
     "#1f3d33",
     "#2f6b4f",
     "#3f8a5e",
     "#59f2c2",
     "#66c28a",
-    "#6e4a33",
-    "#8a7154",
-    "#a8e63c",
-    "#b8a98f",
-    "#d5cdba"
+    "#a8e63c"
   ],
   "animations": {
     "idle": {

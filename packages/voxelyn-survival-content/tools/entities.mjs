@@ -91,70 +91,46 @@ const prospectorFrame = (dir, anim, f) =>
 // ---------------------------------------------------------------------------
 const stalkerModel = (anim, f) => {
   const gait = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
-  // ATAQUE pela leitura da ficha: "a compressao frontal antes do salto". O
-  // primeiro tempo COMPRIME (corpo baixa, patas recolhem), o segundo estoura
-  // para a frente, o terceiro sustenta, o quarto recolhe.
-  const crouchA = anim === 'attack' ? [0, 1, 0, 0][f % 4] : 0;
-  const lunge = anim === 'attack' ? [0, -1, 2, 1][f % 4] : 0;
+  const lunge = anim === 'attack' ? [0, -1, 1, 1][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   // Idle vivo: o dorso INCHA para cima e assenta — respiracao de predador
-  // agachado.
+  // agachado. Cresce em altura em vez de subir inteiro, porque as patas ficam
+  // plantadas e um corpo que sobe descolado delas viraria um bicho flutuando.
   const breath = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
-  const bodyZ = 3 - crouchA;
   const b = [];
-
-  // A LEITURA DA FICHA (concept QUIT-04): um ARACNIDEO de tunel. Carapaca
-  // abaulada de quitina escura com placas de oxido, patas-foice ARQUEADAS
-  // abertas para os lados, cacho de olhos-sensores frios na frente baixa. O
-  // vermelho deixa de ser o corpo: a ficha o reserva a "fluido de dano" — ele
-  // sobrevive nas juntas e no fio da lamina, como sangue da presa anterior.
-
-  // PATAS-FOICE: tres pares arqueados — segmento superior saindo do corpo em
-  // diagonal e agulha fina descendo ate o chao. O vao sob o arco e o que faz
-  // a silhueta ler como aranha e nao como mesa.
-  for (const [side, sy, phase] of [
-    [-1, -2, 1], [-1, 0, -1], [-1, 1.5, 1],
-    [1, -2, -1], [1, 0, 1], [1, 1.5, -1],
-  ]) {
-    const lift = Math.max(0, gait * phase) - crouchA * 0.5;
-    const ux = side < 0 ? -3 : 2;
-    const nx = side < 0 ? -4 : 3.5;
-    b.push(box(ux, sy, bodyZ + 0.5 + lift * 0.5, 1.5, 1, 1, 'rust'));
-    b.push(box(nx, sy, Math.max(0, lift), 0.5, 0.5, bodyZ + 1, 'rockDeep'));
-  }
-
-  // CARAPACA abaulada: base escura de quitina, domo de placas de oxido por
-  // cima e crista palida na linha do dorso — o abaulado sai dos tres degraus.
-  b.push(box(-2.5, -2, bodyZ, 5, 4.5, 1.5 + breath, 'rockDeep'));
-  b.push(box(-2, -1.5, bodyZ + 1.5 + breath, 4, 3.5, 1, 'rust'));
-  b.push(box(-1, -1, bodyZ + 2.5 + breath, 2, 2.5, 0.5, 'bone'));
-  // Bandas de segmentacao da carapaca, recuadas das bordas.
-  b.push(box(-1.5, -0.5, bodyZ + 2 + breath, 3, 0.5, 0.5, 'rockDeep'));
-  b.push(box(-1.5, 1, bodyZ + 2 + breath, 3, 0.5, 0.5, 'rockDeep'));
-  // Fluido de dano nas juntas: dois pontos vermelhos de meio-passo — a unica
-  // presenca do vermelho, como a ficha manda.
-  b.push(box(-3, -1.5, bodyZ + 0.5, 0.5, 0.5, 0.5, 'blood'));
-  b.push(box(2.5, 0.5, bodyZ + 0.5, 0.5, 0.5, 0.5, 'blood'));
-
-  // CABECA baixa projetada a frente, com CACHO de olhos-sensores: tres pontos
-  // bioluminescentes em alturas alternadas — "olhos frios", plural.
-  b.push(box(-1, -3 - lunge, bodyZ + flinch, 2, 1, 1.5, 'rockDeep'));
-  b.push(box(-1, -3.5 - lunge, bodyZ + 1 + flinch, 0.5, 0.5, 0.5, 'biolum'));
-  b.push(box(-0.5, -3.5 - lunge, bodyZ + 0.5 + flinch, 0.5, 0.5, 0.5, 'biolum'));
-  b.push(box(0.5, -3.5 - lunge, bodyZ + 1 + flinch, 0.5, 0.5, 0.5, 'biolum'));
-  // Mandibulas palidas abertas sob o cacho.
-  b.push(box(-1, -3.5 - lunge, bodyZ - 0.5 + flinch, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(0.5, -3.5 - lunge, bodyZ - 0.5 + flinch, 0.5, 0.5, 0.5, 'bone'));
-
-  // LAMINA mineral em UM lado so: a assimetria continua sendo a marca da
-  // especie (e o que proibe flip). Arqueada como as patas, maior que todas.
-  b.push(box(2.5, -1 - lunge, bodyZ + 1, 1, 1, 2, 'bone'));
-  b.push(box(2.5, -2 - lunge, bodyZ + 2, 1, 1, 1, 'bone'));
-  b.push(box(2.5, -2.5 - lunge, bodyZ + 2.5, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(2.5, -1.5 - lunge, bodyZ + 1.5, 0.5, 0.5, 0.5, 'bone'));
-  // Fio da lamina com fluido: o vermelho da ultima presa.
-  b.push(box(3, -2 - lunge, bodyZ + 2, 0.5, 0.5, 0.5, 'blood'));
-
+  // quatro patas finas, alternando aos pares
+  b.push(box(-3, -2, Math.max(0, gait), 1, 1, 3, 'blood'));
+  b.push(box(2, 1, Math.max(0, gait), 1, 1, 3, 'blood'));
+  b.push(box(-3, 1, Math.max(0, -gait), 1, 1, 3, 'blood'));
+  b.push(box(2, -2, Math.max(0, -gait), 1, 1, 3, 'blood'));
+  // corpo baixo e comprido: silhueta horizontal, oposta a do prospector
+  b.push(box(-2, -2, 3, 4, 4, 2 + breath, 'blood'));
+  b.push(box(-2, -2, 5 + breath, 4, 3, 1, 'rust'));
+  // DETALHE FINO — segmentacao da carapaca: duas bandas de quitina vermelha
+  // atravessando a placa dorsal em meio-passo saliente. Mais estreitas que a
+  // placa de proposito: banda de largura total pintava o dorso de listras e
+  // roubava a placa; recuada meio passo de cada borda ela le como articulacao
+  // POR BAIXO da placa aparecendo nas juntas.
+  b.push(box(-1.5, -1, 5.5 + breath, 3, 0.5, 0.5, 'blood'));
+  b.push(box(-1.5, 0.5, 5.5 + breath, 3, 0.5, 0.5, 'blood'));
+  // Espinhos dorsais: tres nubs de meio-passo na linha do dorso, crescendo
+  // para tras — leitura de predador eriçado ja na silhueta.
+  b.push(box(-0.5, -1.5, 6 + breath, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(0, 0, 6 + breath, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(-0.5, 1.5, 5.5 + breath, 0.5, 0.5, 0.5, 'rust'));
+  // cabeca projetada a frente
+  b.push(box(-1, -3 - lunge, 3 + flinch, 2, 1, 2, 'blood'));
+  b.push(box(-1, -4 - lunge, 4 + flinch, 2, 1, 1, 'biolum'));
+  // Mandibulas: dois dentes palidos de meio-passo sob a cabeca, abertos. A boca
+  // e para onde o olho vai quando o bicho corre na sua direcao.
+  b.push(box(-1, -3.5 - lunge, 3 + flinch, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(0.5, -3.5 - lunge, 3 + flinch, 0.5, 0.5, 0.5, 'bone'));
+  // lamina mineral em UM lado so: assimetria e a marca da especie
+  b.push(box(3, -1 - lunge, 4, 1, 1, 2, 'bone'));
+  b.push(box(3, -2 - lunge, 5, 1, 1, 1, 'bone'));
+  // Serrilha da lamina: dois dentes de meio-passo no fio dianteiro.
+  b.push(box(3, -2.5 - lunge, 5.5, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(3, -1.5 - lunge, 4.5, 0.5, 0.5, 0.5, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const stalkerFrame = (dir, anim, f) => renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
@@ -182,23 +158,20 @@ const spitterModel = (anim, f) => {
   b.push(box(3, -2, 2 + z, 1, 5, 1, 'fungusDeep'));
   // corpo achatado e largo, suspenso entre as patas
   b.push(box(-3, -2, 3 + z, 7, 5, 2, 'fungus'));
-  // A LEITURA DA FICHA (concept FUNG-11): o dorso e um JARDIM DE COGUMELOS —
-  // nao verrugas soltas, mas cachos de chapeu sobre haste brotando do lombo em
-  // alturas variadas, com um broto-sensor aceso. As hastes ficam ABAIXO da
-  // linha dos olhos para o telegraph continuar vencendo.
-  for (const [mx, my, mh] of [[-2.5, -1, 1], [-0.5, 0.5, 1.5], [1.5, -0.5, 0.5], [0.5, 1.5, 1]]) {
-    b.push(box(mx, my, 5 + z, 0.5, 0.5, mh, 'fungusDeep'));
-    b.push(box(mx - 0.5, my - 0.5, 5 + z + mh, 1.5, 1.5, 0.5, 'fungus'));
-  }
-  // Broto-sensor: um alfinete aceso no meio do jardim.
-  b.push(box(-1.5, 1, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
-  b.push(box(-1.5, 1, 5.5 + z, 0.5, 0.5, 0.5, 'biolum'));
-  // BOCA LARGA: a fenda escura atravessando a frente do corpo, sob a garganta.
-  // O anfibio da ficha e quase todo boca — sem ela o corpo era so um bloco.
-  b.push(box(-2.5, -2.5, 3.5 + z, 5.5, 0.5, 0.5, 'fungusDeep'));
+  // DETALHE FINO — verrugas dorsais: bossas de meio-passo espalhadas pelo
+  // lombo, em fungo escuro. Pele de anfibio e textura, nao superficie lisa; as
+  // bossas ficam ABAIXO da linha dos olhos para nao disputar com eles.
+  b.push(box(-2.5, -1, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(-0.5, 0.5, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(1.5, -0.5, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(0.5, 1.5, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
   // Pintas do flanco: duas manchas escuras salientes na face dianteira.
   b.push(box(-2.5, -2.5, 4.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
   b.push(box(2, -2.5, 4.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  // BOCA LARGA (o unico legado da tentativa de redesign que ficou): a fenda
+  // escura atravessando a frente do corpo, sob a garganta. O anfibio e quase
+  // todo boca, e sem ela o corpo lia como bloco.
+  b.push(box(-2.5, -2.5, 3.5 + z, 5.5, 0.5, 0.5, 'fungusDeep'));
   // garganta acida: incha para a FRENTE antes do disparo (telegraph)
   b.push(box(-1, -3 - spit - pulse, 3 + z, 3, 1 + spit + pulse, 2, 'acid'));
   // olhos bulbosos em haste, acima da linha das costas
@@ -216,54 +189,39 @@ const spitterFrame = (dir, anim, f) => renderVoxels(spitterModel(anim, f), DIR_I
 const bomberModel = (anim, f) => {
   const drift = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  // `special` e o telegraph da explosao: a camara de esporos incha frame a
-  // frame, agora no CENTRO do corpo — "o saco cresce e pulsa antes da ruptura".
+  // `special` e o telegraph da explosao: o pod incha frame a frame
   const swell = anim === 'special' ? Math.min(2, f) : anim === 'attack' ? [0, 1, 1, 0][f % 4] : 0;
-  // Idle vivo: a camara respira SO em altura; o telegraph cresce nos tres
-  // eixos e continua inconfundivel.
+  // Idle vivo: o pod respira SO em altura. O telegraph cresce nos dois eixos e
+  // com amplitude maior — a carga viva se mexe, mas a expansao que anuncia a
+  // explosao continua inconfundivel.
   const pulse = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
   const z = -flinch + drift;
   const b = [];
-
-  // A LEITURA DA FICHA (concept FUNG-23): um COGUMELO-AMANITA ambulante. O
-  // chapeu largo domina a silhueta — mais largo que o corpo, com aba
-  // pendurada, pintas palidas e guelras por baixo —, a camara de esporos e uma
-  // barriga redonda NO CENTRO (nao um pod atras), e as pernas sao raizes
-  // sensoriais finas. O olho unico continua espiando sob a aba: e a
-  // identidade de jogo que sobrevive ao redesign.
-
-  // Raizes-pernas: cinco tocos finos, irregulares de proposito.
-  b.push(box(-2.5, -1.5, 0, 0.5, 1, 1.5, 'fungusDeep'));
-  b.push(box(-1, -1, 0, 0.5, 1, 1.5, 'fungusDeep'));
-  b.push(box(0.5, -1.5, 0, 0.5, 1, 1.5, 'fungusDeep'));
-  b.push(box(2, -1, 0, 0.5, 1, 1.5, 'fungusDeep'));
-  b.push(box(-0.5, 1.5, 0, 0.5, 1, 1.5, 'fungusDeep'));
-
-  // CAMARA DE ESPOROS: a barriga redonda central. E ela que incha no telegraph
-  // e respira no idle — a leitura de perigo mora no centro do bicho.
-  b.push(box(-2 - swell * 0.5, -2 - swell * 0.5, 1 + z, 4 + swell, 4 + swell, 3 + swell + pulse, 'acid'));
-
-  // CHAPEU-AMANITA: aba larga pendurada (mais larga que o corpo), domo e
-  // coroa. A aba e o que faz a silhueta ler como cogumelo a 200 ms. O chapeu
-  // CAVALGA a camara (swell + pulse): sem isso a respiracao do idle crescia
-  // por dentro da aba e sumia — foi o teste de idle vivo que pegou.
-  const cap = z + swell + pulse;
-  b.push(box(-3.5, -3, 4.5 + cap, 7, 6, 1, 'fungusDeep'));
-  b.push(box(-2.5, -2, 5.5 + cap, 5, 4.5, 1, 'fungus'));
-  b.push(box(-1.5, -1, 6.5 + cap, 3, 3, 1, 'fungusDeep'));
-  // Pintas palidas do chapeu, em meio-passo — amanita, nao capuz liso.
-  b.push(box(-2.5, -3.5, 4.5 + cap, 1, 0.5, 0.5, 'bone'));
-  b.push(box(0.5, -3.5, 5 + cap, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(-1, -2.5, 6 + cap, 1, 0.5, 0.5, 'bone'));
-  b.push(box(2, -3, 5 + cap, 0.5, 0.5, 0.5, 'bone'));
-  // Guelras sob a borda da aba: tres lamelas claras penduradas.
-  b.push(box(-3, -2.5, 4 + cap, 0.5, 0.5, 0.5, 'fungus'));
-  b.push(box(-0.5, -3, 4 + cap, 0.5, 0.5, 0.5, 'fungus'));
-  b.push(box(2.5, -2.5, 4 + cap, 0.5, 0.5, 0.5, 'fungus'));
-
-  // Olho unico espiando na sombra entre a aba e a camara.
-  b.push(box(0, -3, 3.5 + z + (swell + pulse) * 0.5, 1, 0.5, 1, 'biolum'));
-
+  // pes curtos: a criatura pende, nao caminha
+  b.push(box(-2, -1, 0, 2, 2, 1, 'fungusDeep'));
+  b.push(box(1, -1, 0, 2, 2, 1, 'fungusDeep'));
+  // capuz CONICO alto: silhueta pontuda, oposta ao spitter achatado
+  b.push(box(-3, -2, 1 + z, 7, 4, 2, 'fungusDeep'));
+  b.push(box(-2, -2, 3 + z, 5, 4, 2, 'fungusDeep'));
+  b.push(box(-1, -1, 5 + z, 3, 3, 2, 'fungusDeep'));
+  b.push(box(0, -1, 7 + z, 1, 2, 1, 'fungusDeep'));
+  // DETALHE FINO — lamelas do capuz: escamas claras de meio-passo penduradas
+  // na borda de cada degrau, alternadas. Capuz de fungo e feito de prateleiras
+  // que crescem umas sobre as outras, e sao as lamelas que contam isso.
+  b.push(box(-2.5, -2.5, 2 + z, 0.5, 0.5, 1, 'fungus'));
+  b.push(box(1, -2.5, 1.5 + z, 0.5, 0.5, 1, 'fungus'));
+  b.push(box(-1.5, -2.5, 4 + z, 0.5, 0.5, 0.5, 'fungus'));
+  b.push(box(0.5, -1.5, 6 + z, 0.5, 0.5, 0.5, 'fungus'));
+  // olho unico fundo na sombra do capuz
+  b.push(box(0, -3, 4 + z, 1, 1, 2, 'biolum'));
+  // pod de esporos: massa grande atras, cresce ate estourar
+  b.push(box(-3, 2, 2 + z, 5 + swell, 2, 4 + swell + pulse, 'acid'));
+  // Poros do pod: tres pontos escuros de meio-passo na face externa da
+  // capsula — os furos por onde o esporo vai sair. Ficam na face de tras, longe
+  // do telegraph, e nao crescem com ele: sao textura, nao sinal.
+  b.push(box(-2, 4, 3 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(-0.5, 4, 4.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(1, 4, 3.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
@@ -1096,12 +1054,12 @@ export const ENTITY_SPECS = [
     prospectorFrame,
     'voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm'
   ),
-  base('enemy-stalker', 64, 64, 32, 60, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 5),
-  base('enemy-spitter', 64, 64, 32, 60, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 5),
+  base('enemy-stalker', 64, 64, 32, 60, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 6),
+  base('enemy-spitter', 64, 64, 32, 60, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 6),
   base('enemy-spore-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
-  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 5),
+  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 6),
   base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
