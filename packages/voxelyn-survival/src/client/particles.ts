@@ -194,6 +194,7 @@ export class VoxelParticles {
    * limita o mapa ao número de jogadores.
    */
   private readonly lastOverheatBucket = new Map<number, number>();
+  private readonly lastDashJetBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
 
@@ -514,6 +515,50 @@ export class VoxelParticles {
         life: 620,
         maxLife: 620,
         kind: 'ash',
+      });
+    }
+  }
+
+  /**
+   * Foguetes da esquiva: brasas jorrando do hardpoint traseiro enquanto o
+   * Prospector e propulsionado.
+   *
+   * O jato nasce ATRAS do bot (oposto ao rumo da esquiva), na altura do modulo
+   * dorsal, e a velocidade das brasas continua empurrando para tras — e o
+   * rastro delas que anima os foguetes, sem nenhum sprite novo. Bucket CURTO
+   * (45ms): a esquiva dura poucos ticks e o jato tem de ler como fluxo
+   * continuo, nao como tres brasas soltas.
+   */
+  emitDashJets(
+    slot: number,
+    x: number,
+    y: number,
+    dirX: number,
+    dirY: number,
+    nowMs: number,
+    scale: number
+  ): void {
+    const bucket = (nowMs / 45) | 0;
+    if (this.lastDashJetBucket.get(slot) === bucket) return;
+    this.lastDashJetBucket.set(slot, bucket);
+
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 374761393) ^ (slot + 7)));
+    const count = Math.max(1, Math.round(3 * scale));
+    for (let i = 0; i < count; i++) {
+      // Dois bocais, um de cada lado do modulo: o offset perpendicular alterna.
+      const side = i % 2 === 0 ? 0.14 : -0.14;
+      const px = -dirY * side;
+      const py = dirX * side;
+      this.push({
+        x: x - dirX * 0.35 + px + (rnd() - 0.5) * 0.08,
+        y: y - dirY * 0.35 + py + (rnd() - 0.5) * 0.08,
+        z: 0.65 + rnd() * 0.15,
+        vx: -dirX * (2.2 + rnd() * 0.8),
+        vy: -dirY * (2.2 + rnd() * 0.8),
+        vz: 0.15 + rnd() * 0.25,
+        life: 240 + rnd() * 120,
+        maxLife: 360,
+        kind: 'ember',
       });
     }
   }

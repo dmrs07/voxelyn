@@ -260,6 +260,70 @@ const drawPiercingDart = (
   ctx.fill();
 };
 
+/**
+ * CUSPE: uma gota de gosma, nao um projetil de bala.
+ *
+ * O cuspe compartilhava o corpo facetado do estilhaco do jogador — dois voxels
+ * apontados, leitura de municao. Secrecao nao tem faceta: e uma GOTA que
+ * balanca em voo, com globulos grudados girando em volta e pingos se
+ * desgarrando por baixo. Tudo redondo de proposito: no mundo facetado, a curva
+ * e o que separa fluido de materia — a mesma regra do disco e da bola de
+ * ricochete.
+ *
+ * A fase vem da DISTANCIA percorrida, nao do relogio: a gota balanca porque
+ * voa, e para de balancar quando o mundo pausa.
+ */
+const drawSpitGlob = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  phase: number,
+  ramp: FaceRamp
+): void => {
+  const wob = Math.sin(phase * 9);
+  const rx = size * (0.95 + 0.14 * wob);
+  const ry = size * (0.78 - 0.1 * wob);
+
+  // Globulos grudados, girando devagar com o voo — a gosma nao e uma esfera
+  // limpa, e uma massa que se reorganiza no ar.
+  ctx.fillStyle = ramp[1];
+  for (const offset of [0, Math.PI * 0.9]) {
+    const angle = phase * 5 + offset;
+    const gx = sx + Math.cos(angle) * rx * 0.75;
+    const gy = sy + Math.sin(angle) * ry * 0.8;
+    const gr = size * (0.28 + 0.08 * Math.sin(phase * 7 + offset));
+    ctx.beginPath();
+    ctx.ellipse(gx, gy, gr, gr * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Corpo principal: gota achatada com a MESMA key light das faces voxel —
+  // sombra embaixo, meio-tom, brilho no alto-esquerda.
+  ctx.fillStyle = ramp[2];
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = ramp[1];
+  ctx.beginPath();
+  ctx.ellipse(sx - rx * 0.12, sy - ry * 0.16, rx * 0.78, ry * 0.74, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = ramp[0];
+  ctx.beginPath();
+  ctx.ellipse(sx - rx * 0.28, sy - ry * 0.3, rx * 0.38, ry * 0.34, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pingo desgarrado caindo rumo a sombra: nasce sob a gota, desce e recomeca.
+  // E ele que diz "isto escorre" — e escorrer e o que a poca no impacto promete.
+  const drop = (phase * 1.6) % 1;
+  ctx.globalAlpha = 0.85 * (1 - drop);
+  ctx.fillStyle = ramp[1];
+  ctx.beginPath();
+  ctx.ellipse(sx + rx * 0.2 * wob, sy + ry + drop * size * 1.6, size * 0.16, size * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+};
+
 export class ProjectileView {
   private readonly tracks = new Map<number, Track>();
 
@@ -381,6 +445,27 @@ export class ProjectileView {
     // formas: e ele que conta de onde o tiro veio, e no ricochete e a unica
     // coisa que ainda conta isso depois do rebote.
     const heading = track && (track.dx !== 0 || track.dy !== 0) ? track : null;
+
+    if (projectile.kind === 'spit') {
+      // Rastro de RESPINGOS redondos, nao de voxels facetados: gotinhas que a
+      // massa perdeu no caminho, encolhendo e sumindo.
+      if (heading) {
+        for (let i = 3; i >= 1; i--) {
+          const [tx, ty] = project(
+            projectile.x - heading.dx * i * 0.26,
+            projectile.y - heading.dy * i * 0.26
+          );
+          ctx.globalAlpha = 0.45 - i * 0.11;
+          ctx.fillStyle = HOSTILE_RAMP[1];
+          ctx.beginPath();
+          ctx.ellipse(tx, ty - lift, size * (0.5 - i * 0.1), size * (0.4 - i * 0.08), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      drawSpitGlob(ctx, sx, sy - lift, size, track?.travelled ?? 0, ramp);
+      return;
+    }
     if (heading) {
       for (let i = TRAIL_LENGTH; i >= 1; i--) {
         const back = i * 0.3;

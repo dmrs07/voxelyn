@@ -15,16 +15,25 @@
 // Cada tipo e um tile de chao COMPLETO, com o substrato de rocha embutido: o
 // cliente faz UM drawImage por celula, no lugar de um fill de losango mais os
 // remendos por cima. Nao ha custo novo por frame — ha menos.
-import { box, DIR_UNROTATED, modelBounds, renderVoxels } from './voxel.mjs';
+import { box, DIR_UNROTATED, MODEL_SCALE, modelBounds, renderVoxels } from './voxel.mjs';
 import { dim, LIGHT_LEVELS, lightFactor, VARIANTS } from './terrain.mjs';
 import { COLORS } from './lib.mjs';
 
 /**
- * A crosta usa a MESMA grade 8x8 de colunas do bloco: um voxel de chao tem
- * exatamente o tamanho de um voxel de parede, senao o piso e o bloco em cima
- * dele parecem feitos em escalas diferentes.
+ * A crosta usa a MESMA grade 8x8 de colunas AUTORADAS do bloco: um voxel de
+ * chao tem exatamente o tamanho de um voxel de parede, senao o piso e o bloco
+ * em cima dele parecem feitos em escalas diferentes.
+ *
+ * Com a grade subdividida (MODEL_SCALE), a laje e as materias em cima dela sao
+ * construidas coluna a coluna FINA (16x16 por tile) — cascalho, tapete, lamina,
+ * chama e graos sorteados por voxel fino, como o terreno ja faz. O gas e a
+ * excecao deliberada: o algoritmo de sopros continua raciocinando na grade
+ * autorada (os contratos de forma, deriva e cobertura vivem nela) e cada cubo
+ * escolhido vira um aglomerado fino ROIDO na hora de virar caixa.
  */
 export const SURFACE_COLS = 8;
+const F = MODEL_SCALE;
+const FINE_COLS = SURFACE_COLS * F;
 
 /**
  * Tipos na ordem em que o cliente os indexa (espelha SURF_* da simulacao, com o
@@ -54,39 +63,43 @@ const hash3d = (x, y, z, seed) => {
   return (h ^ (h >>> 16)) >>> 0;
 };
 
-/** Laje de rocha sob toda crosta, com relevo de um voxel em parte das colunas. */
+/**
+ * Laje de rocha sob toda crosta, com relevo de MEIO voxel em parte das colunas
+ * finas. O topo continua na mesma altura autorada (as entidades assentam onde
+ * sempre assentaram); o que dobra e a frequencia do cascalho.
+ */
 const slab = (variant, mat, bumpMat) => {
   const boxes = [];
   const half = SURFACE_COLS / 2;
-  for (let cx = 0; cx < SURFACE_COLS; cx++) {
-    for (let cy = 0; cy < SURFACE_COLS; cy++) {
-      const h = hash3d(cx, cy, 0, variant);
-      const x = cx - half;
-      const y = cy - half;
-      // Cerca de um quinto das colunas sobe um voxel: cascalho, nao azulejo.
+  for (let fx = 0; fx < FINE_COLS; fx++) {
+    for (let fy = 0; fy < FINE_COLS; fy++) {
+      const h = hash3d(fx, fy, 0, variant);
+      const x = fx / F - half;
+      const y = fy / F - half;
+      // Cerca de um quinto das colunas sobe meio voxel: cascalho, nao azulejo.
       const bump = (h & 7) < 2;
-      boxes.push(box(x, y, 0, 1, 1, 1, (h >>> 3) % 7 === 0 ? bumpMat : mat));
-      if (bump) boxes.push(box(x, y, 1, 1, 1, 1, bumpMat));
+      boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, (h >>> 3) % 7 === 0 ? bumpMat : mat));
+      if (bump) boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, bumpMat));
     }
   }
   return boxes;
 };
 
-/** Altura da laje numa coluna, para a materia de cima assentar sobre ela. */
-const slabTop = (cx, cy, variant) => ((hash3d(cx, cy, 0, variant) & 7) < 2 ? 2 : 1);
+/** Altura da laje numa coluna fina, para a materia de cima assentar sobre ela. */
+const slabTop = (fx, fy, variant) => ((hash3d(fx, fy, 0, variant) & 7) < 2 ? 1.5 : 1);
 
-/** Percorre as colunas da grade entregando posicao, topo da laje e hash. */
+/** Percorre as colunas FINAS da grade entregando posicao, topo da laje e hash. */
 const overSlab = (variant, seed, fn) => {
   const half = SURFACE_COLS / 2;
-  for (let cx = 0; cx < SURFACE_COLS; cx++) {
-    for (let cy = 0; cy < SURFACE_COLS; cy++) {
+  for (let fx = 0; fx < FINE_COLS; fx++) {
+    for (let fy = 0; fy < FINE_COLS; fy++) {
       fn({
-        cx,
-        cy,
-        x: cx - half,
-        y: cy - half,
-        top: slabTop(cx, cy, variant),
-        h: hash3d(cx, cy, seed, variant),
+        cx: fx,
+        cy: fy,
+        x: fx / F - half,
+        y: fy / F - half,
+        top: slabTop(fx, fy, variant),
+        h: hash3d(fx, fy, seed, variant),
       });
     }
   }
@@ -355,7 +368,22 @@ const gasModel = (variant, frame) => {
     const key = `${wrap(cx)},${wrap(cy)},${z}`;
     if (taken.has(key)) return;
     taken.add(key);
-    boxes.push(box(wrap(cx) - half, wrap(cy) - half, z, 1, 1, 1, 'sulfur'));
+    // Grade fina: o cubo autorado que o algoritmo escolheu vira um aglomerado
+    // 2x2x2 de voxels finos com ~1/5 deles roidos por hash. O sopro continua
+    // raciocinando na grade grossa — os contratos de forma, deriva e cobertura
+    // vivem nela —, mas a borda que o jogador ve fica esfarrapada no grao novo,
+    // que e a diferenca entre gas e cristal.
+    const bx = wrap(cx) - half;
+    const by = wrap(cy) - half;
+    for (let sx = 0; sx < F; sx++) {
+      for (let sy = 0; sy < F; sy++) {
+        for (let sz = 0; sz < F; sz++) {
+          const eaten = hash3d(wrap(cx) * F + sx, wrap(cy) * F + sy, z * F + sz, variant + 101) % 5 === 0;
+          if (eaten) continue;
+          boxes.push(box(bx + sx / F, by + sy / F, z + sz / F, 1 / F, 1 / F, 1 / F, 'sulfur'));
+        }
+      }
+    }
   };
 
   gasHaze(variant, frame, put);
@@ -371,7 +399,7 @@ export const surfaceModel = (kind, variant, frame) => {
     const boxes = slab(variant, 'scorch', 'floor');
     // Cinza com brasa apagando: pouquissimas e so onde a laje ja e alta.
     overSlab(variant, 91, ({ x, y, top, h }) => {
-      if (top === 2 && h % 11 === 0) boxes.push(box(x, y, top, 1, 1, 1, 'rust'));
+      if (top === 1.5 && h % 11 === 0) boxes.push(box(x, y, top, 1 / F, 1 / F, 0.5, 'rust'));
     });
     return boxes;
   }
@@ -380,9 +408,9 @@ export const surfaceModel = (kind, variant, frame) => {
     const boxes = slab(variant, 'floor', 'rockDeep');
     overSlab(variant, 17, ({ x, y, top, h }) => {
       if (h % 8 === 0) return; // falhas no tapete: o chao aparece por baixo
-      boxes.push(box(x, y, top, 1, 1, 1, 'fungusDeep'));
+      boxes.push(box(x, y, top, 1 / F, 1 / F, 0.5, 'fungusDeep'));
       // Pontos vivos pulsam devagar; a massa continua baixa, um tapete umido.
-      if ((h >>> 4) % 9 === (frame % 2) * 3) boxes.push(box(x, y, top + 1, 1, 1, 1, 'fungus'));
+      if ((h >>> 4) % 9 === (frame % 2) * 3) boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, 'fungus'));
     });
     return boxes;
   }
@@ -394,9 +422,9 @@ export const surfaceModel = (kind, variant, frame) => {
       // Mesma silhueta do fungo, mas sem o verde vivo uniforme: a colonia esta
       // secando. Rust/scorch aparecem em ilhas, nunca como chama antecipada.
       const dry = ((h >>> 3) + frame) % 5 === 0;
-      boxes.push(box(x, y, top, 1, 1, 1, dry ? 'rust' : 'fungusDeep'));
+      boxes.push(box(x, y, top, 1 / F, 1 / F, 0.5, dry ? 'rust' : 'fungusDeep'));
       if ((h >>> 6) % 13 === frame * 4) {
-        boxes.push(box(x, y, top + 1, 1, 1, 1, dry ? 'rust' : 'fungus'));
+        boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, dry ? 'rust' : 'fungus'));
       }
     });
     return boxes;
@@ -404,21 +432,29 @@ export const surfaceModel = (kind, variant, frame) => {
 
   if (kind === 'biofluid') {
     // Liquido acha nivel. O leito e plano e poucas pedras claras emergem dele.
+    // Na grade fina a lamina e um FILME de meio voxel — liquido e raso — com o
+    // reflexo em faixa fina e BOLHAS estourando na propria superficie: pontos
+    // de biolum que acendem por dois quadros e somem, sorteados por coluna
+    // fina. As bolhas vivem NO nivel da lamina de proposito — o contrato "o
+    // liquido acha um nivel unico" e testado, e bolha e superficie, nao espuma
+    // flutuando.
     const boxes = [];
     const half = SURFACE_COLS / 2;
-    for (let cx = 0; cx < SURFACE_COLS; cx++) {
-      for (let cy = 0; cy < SURFACE_COLS; cy++) {
-        const x = cx - half;
-        const y = cy - half;
-        const h = hash3d(cx, cy, 29, variant);
-        boxes.push(box(x, y, 0, 1, 1, 1, 'floor'));
-        if ((h & 31) === 0) {
-          boxes.push(box(x, y, 1, 1, 1, 2, 'rock'));
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 29, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        if (h % 89 === 0) {
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 1.5, 'rock'));
           continue;
         }
-        // Reflexo em faixa horizontal na projecao, nao pontos aleatorios.
-        const band = (cx + cy + frame * 2) % 8;
-        boxes.push(box(x, y, 1, 1, 1, 1, band === 0 ? 'biolum' : 'pool'));
+        // Reflexo em faixa fina na diagonal da projecao, nao pontos aleatorios.
+        const band = (fx + fy + frame * 2) % FINE_COLS;
+        // Bolha: acende dois quadros do ciclo e estoura.
+        const bubble = h % 21 === 0 && ((h >>> 6) + frame) % 4 < 2;
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, bubble || band === 0 ? 'biolum' : 'pool'));
       }
     }
     return boxes;
@@ -431,13 +467,15 @@ export const surfaceModel = (kind, variant, frame) => {
     overSlab(variant, 73, ({ cx, cy, x, y, h }) => {
       // Esporos sao graos organicos em suspensao, nao tapete e nao enxofre. A
       // nuvem fica mais baixa e lateral que o gas, com pequenos pares que o olho
-      // agrupa como uma massa verde liberada pelo bomber.
-      const phase = (cx * 5 + cy * 3 + frame * 2 + (h >>> 8)) % 17;
+      // agrupa como uma massa verde liberada pelo bomber. Grao FINO: um esporo
+      // e o menor solido do jogo, e o modulo alto compensa a grade com quatro
+      // vezes mais colunas — a nuvem continua com a mesma massa contada.
+      const phase = (cx * 5 + cy * 3 + frame * 2 + (h >>> 8)) % 59;
       if (phase > 1) return;
-      const z = 3 + ((h >>> 5) % 3);
-      boxes.push(box(x, y, z, 1, 1, 1, phase === 0 ? 'fungus' : 'fungusDeep'));
-      if (phase === 0 && z < 6 && ((h >>> 3) & 1) === 0) {
-        boxes.push(box(x, y, z + 1, 1, 1, 1, 'fungus'));
+      const z = 3 + ((h >>> 5) % 5) * 0.5;
+      boxes.push(box(x, y, z, 1 / F, 1 / F, 0.5, phase === 0 ? 'fungus' : 'fungusDeep'));
+      if (phase === 0 && z < 5 && ((h >>> 3) & 1) === 0) {
+        boxes.push(box(x, y, z + 0.5, 1 / F, 1 / F, 0.5, 'fungus'));
       }
     });
     return boxes;
@@ -445,13 +483,16 @@ export const surfaceModel = (kind, variant, frame) => {
 
   if (kind === 'fire') {
     // A chama queima o que esta embaixo: a laje ja e a cinza que vai sobrar.
+    // Linguas FINAS de meio voxel, mais numerosas que as antigas na mesma massa
+    // total: fogo e a materia que mais ganha com o grao novo, porque lingua de
+    // chama e exatamente o que nao pode ser um cubo gordo.
     const boxes = slab(variant, 'scorch', 'floor');
     overSlab(variant, 61, ({ cx, cy, x, y, h }) => {
       const phase = (cx * 2 + cy * 3 + frame) % 7;
       if (phase > 1) return;
       const core = h % 4 === 0;
-      if (core) boxes.push(box(x, y, 1, 1, 1, 1, 'blood'));
-      boxes.push(box(x, y, core ? 2 : 1, 1, 1, 1 + ((h >>> 6) % 3), 'fire'));
+      if (core) boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, 'blood'));
+      boxes.push(box(x, y, core ? 1.5 : 1, 1 / F, 1 / F, 0.5 + ((h >>> 6) % 3) * 0.5, 'fire'));
     });
     return boxes;
   }

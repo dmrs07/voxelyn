@@ -84,7 +84,10 @@ describe('modelo de gas', () => {
     const out = [];
     for (let v = 0; v < VARIANTS; v++) {
       let tall = false;
-      for (let f = 0; f < GAS_FRAMES; f++) if (cloudOf(v, f).some((b) => b.z > 5)) tall = true;
+      // Na grade fina a bruma tem sub-voxels ate z 5.5 (o cubo autorado do teto
+      // dela abre em meios-passos); o que separa penacho de bruma passa a ser a
+      // faixa ACIMA disso.
+      for (let f = 0; f < GAS_FRAMES; f++) if (cloudOf(v, f).some((b) => b.z >= 6.5) ) tall = true;
       if (tall) out.push(v);
     }
     return out;

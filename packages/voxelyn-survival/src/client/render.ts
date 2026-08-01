@@ -1381,10 +1381,33 @@ export class SurvivalRenderer {
           const allyLight = isLocal ? 1 : brightness(pl.x, pl.y);
           const bodyAlpha = isLocal ? 1 : allyBodyAlpha(allyLight);
           const flick = isLocal && ex.iframesUntil > state.tick && state.tick % 2 === 0;
+          // ESQUIVA COM PROPULSAO: durante o dash o corpo se PROSTRA no rumo do
+          // deslocamento — inclinado e levemente agachado, como quem esta sendo
+          // empurrado pelos foguetes do hardpoint — e os bocais traseiros cospem
+          // brasas. A sombra fica fora da inclinacao: ela pertence ao chao.
+          const dashing = state.tick < ex.dodgeUntil;
+          if (dashing) {
+            this.particles.emitDashJets(
+              slot, pl.x, pl.y, ex.dodgeDir.x, ex.dodgeDir.y, nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx
+            );
+          }
           if (bodyAlpha > 0) {
             ctx.save();
             ctx.globalAlpha = bodyAlpha;
             drawShadow(psx, psy, size);
+            if (dashing) {
+              // Rumo da esquiva em coordenadas de TELA (projecao 2:1),
+              // renormalizado — e ele que diz para que lado o corpo tomba.
+              const ddx = ex.dodgeDir.x - ex.dodgeDir.y;
+              const ddy = (ex.dodgeDir.x + ex.dodgeDir.y) * 0.5;
+              const dlen = Math.hypot(ddx, ddy) || 1;
+              // Gira em torno dos PES: o apoio nao sai do lugar, o tronco tomba.
+              ctx.translate(psx + (ddx / dlen) * 2 * z, psy);
+              ctx.rotate((ddx / dlen) * 0.22);
+              ctx.scale(1, 0.92);
+              ctx.translate(-psx, -psy);
+            }
             if (!flick) {
               const drew = this.sprites.drawEntity(
                 ctx,
@@ -1486,6 +1509,30 @@ export class SurvivalRenderer {
           this.projectileView.draw(ctx, view, toScreen, z, TILE_H);
         },
       });
+    }
+
+    // GOTEJAMENTO DA POCA: goticulas de biofluido caem do teto da caverna
+    // sobre a lamina e abrem ondulacoes concentricas. Deterministico por
+    // celula e relogio — nenhum estado, nenhuma particula: a queda, o respingo
+    // e os aneis saem da fase do ciclo, e cada celula pingante tem ciclo e
+    // ponto proprios (hash). Entra na fila ordenada porque a gota cai ALTO e
+    // precisa ser ocultada por paredes como qualquer corpo.
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_BIOFLUID) continue;
+        const seed = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263)) >>> 0;
+        if (seed % 5 !== 0) continue; // so parte das celulas pinga
+        if (brightness(x, y) <= 0.05) continue;
+        const [sx, sy] = toScreen(x + 0.5, y + 0.5);
+        if (sx < -40 || sx > vw + 40 || sy < -80 || sy > vh + 40) continue;
+        const cycle = 2200 + (seed % 1400);
+        const phase = ((nowMs + (seed % 100000)) % cycle) / cycle;
+        items.push({
+          depth: x + y,
+          draw: () => this.drawPoolDrip(ctx, sx, sy, z, phase, seed),
+        });
+      }
     }
 
     // Gas: alto demais para o passo de chao, e por ULTIMO na fila.
@@ -1708,6 +1755,64 @@ export class SurvivalRenderer {
     ctx.lineTo(tipRx, tipRy);
     ctx.stroke();
     ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Uma goticula do teto sobre a poca: queda, respingo e ondulacoes.
+   *
+   * A fase [0,1) percorre o ciclo inteiro: ate 0.3 a gota CAI (acelerando, como
+   * gota cai), dai ate 0.85 os aneis abrem na lamina enquanto o respingo salta
+   * e assenta, e o resto do ciclo e silencio — pingo de caverna nao e metronomo.
+   * O ponto de impacto sai do hash da celula, fora do centro, para duas celulas
+   * vizinhas nao pingarem em pontos espelhados.
+   */
+  private drawPoolDrip(
+    ctx: CanvasRenderingContext2D,
+    sx: number,
+    sy: number,
+    z: number,
+    phase: number,
+    seed: number
+  ): void {
+    const jx = sx + ((((seed >>> 3) % 33) - 16) / 33) * TILE_W * 0.6 * z;
+    const jy = sy + ((((seed >>> 9) % 33) - 16) / 33) * TILE_H * 0.5 * z;
+    const FALL_END = 0.3;
+    const RIPPLE_END = 0.85;
+    if (phase < FALL_END) {
+      const t = phase / FALL_END;
+      const drop = t * t; // queda livre: comeca lenta, chega rapida
+      const yPos = jy - 2.4 * WALL_H * z * (1 - drop);
+      ctx.fillStyle = PAL.biolum;
+      // fio fino se alongando: a gota estica conforme ganha velocidade
+      ctx.globalAlpha = 0.4 + drop * 0.5;
+      ctx.fillRect(jx - z * 0.5, yPos - (2 + drop * 3) * z, z, (2 + drop * 3) * z);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    if (phase >= RIPPLE_END) return;
+    const t = (phase - FALL_END) / (RIPPLE_END - FALL_END);
+    // Dois aneis concentricos defasados, achatados na proporcao do losango.
+    ctx.strokeStyle = PAL.biolum;
+    ctx.lineWidth = Math.max(1, z * 0.8);
+    for (const [delay, gain] of [[0, 0.55], [0.3, 0.35]] as const) {
+      const tt = (t - delay) / (1 - delay);
+      if (tt <= 0 || tt >= 1) continue;
+      ctx.globalAlpha = (1 - tt) * gain;
+      ctx.beginPath();
+      ctx.ellipse(jx, jy, tt * TILE_W * 0.34 * z, tt * TILE_H * 0.34 * z, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Respingo do impacto: duas goticulas saltando e recaindo no primeiro
+    // quarto da fase de ondulacao.
+    if (t < 0.28) {
+      const st = t / 0.28;
+      const hop = Math.sin(st * Math.PI);
+      ctx.fillStyle = PAL.biolum;
+      ctx.globalAlpha = 0.85 * (1 - st * 0.6);
+      ctx.fillRect(jx - 1.6 * z, jy - hop * 3.2 * z - z, z, z);
+      ctx.fillRect(jx + 0.8 * z, jy - hop * 2.2 * z - z, z, z);
+    }
     ctx.globalAlpha = 1;
   }
 
