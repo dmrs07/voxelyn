@@ -819,31 +819,11 @@ export class SpriteBank {
     return buffer;
   }
 
-  drawBolt(ctx: CanvasRenderingContext2D, sx: number, sy: number, elapsedMs: number, zoom: number): boolean {
-    const loaded = this.get('fx-projectile-bolt');
-    if (!loaded) return false;
-    const { manifest, image } = loaded;
-    const frame = frameAtTime(manifest, 'fly', elapsedMs);
-    const rect = resolveFrame(manifest, 'fly', 'n', frame);
-    const dw = manifest.frameWidth * zoom;
-    const dh = manifest.frameHeight * zoom;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, sx - dw / 2, sy - dh / 2, dw, dh);
-    return true;
-  }
-
-  drawImpact(ctx: CanvasRenderingContext2D, sx: number, sy: number, progress: number, zoom: number): boolean {
-    const loaded = this.get('fx-impact-burst');
-    if (!loaded) return false;
-    const { manifest, image } = loaded;
-    const frame = Math.min(manifest.animations.burst.frames - 1, Math.floor(progress * manifest.animations.burst.frames));
-    const rect = resolveFrame(manifest, 'burst', 'n', frame);
-    const dw = manifest.frameWidth * zoom;
-    const dh = manifest.frameHeight * zoom;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(image, rect.sx, rect.sy, rect.sw, rect.sh, sx - dw / 2, sy - dh / 2, dw, dh);
-    return true;
-  }
+  // `drawBolt` e `drawImpact` moravam aqui e ninguem os chamava: o tiro em jogo
+  // e desenhado como voxels reais (ProjectileView) e o impacto por particulas,
+  // desde a troca documentada em projectiles.ts. Os atlas fx-* continuam no
+  // banco — viewer, precache e validador dependem deles — mas a API de desenho
+  // morta saiu junto do redesign nativo dos FX na grade fina.
 }
 
 const MOVEMENT_HOLD_MS = 120;
