@@ -29,6 +29,7 @@ import {
   SURF_FUNGAL_HEATED,
   SURF_GAS,
   SURF_NONE,
+  SURF_ICE,
   SURF_SCORCHED,
   SURF_SPORES,
 } from './constants.js';
@@ -304,6 +305,13 @@ export const impactSurface = (
   }
 
   if (surface === SURF_BIOFLUID && cls === 'thermal') {
+    igniteCell(state, i, events);
+    return false;
+  }
+
+  if (surface === SURF_ICE && cls === 'thermal') {
+    // Projetil termico derrete a lamina por onde passa: um rastro de agua
+    // condutiva que vai recongelar. igniteCell ja sabe derreter.
     igniteCell(state, i, events);
     return false;
   }

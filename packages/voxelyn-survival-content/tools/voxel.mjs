@@ -68,6 +68,23 @@ export const RAMPS = {
    */
   pool: ['fungusDark', 'dark', 'dark'],
   /**
+   * Agua do Aquifero Negro: a mesma logica de leitura da poca — liquido parado
+   * le por profundidade — mas na familia AZUL da rocha, nunca na verde do
+   * fungo. O topo e `rock` (azul-acinzentado) para a lamina se separar do
+   * leito escuro; o brilho vem de voxels `electric` avulsos, entao a agua e
+   * escura com reflexos frios, e o biofluido continua sendo o unico liquido
+   * verde do jogo.
+   */
+  water: ['rock', 'rockShadow', 'dark'],
+  /**
+   * Gelo da Cripta Glacial: a lamina mais CLARA do chao, na familia fria.
+   * Topo `mist` (o cinza-azulado palido) sobre laterais de rocha — le como
+   * placa solida e leitosa, o oposto da agua escura que ele vira ao derreter.
+   * Nao emite: gelo nao brilha, ele reflete — os brilhos sao voxels `electric`
+   * avulsos no proprio modelo.
+   */
+  ice: ['mist', 'rockLight', 'rockShadow'],
+  /**
    * Gas sulfuroso: crosta amarela sobre corpo esverdeado.
    *
    * O gas era `acid` puro — verde-limao — e a paleta nao tem amarelo de enxofre.

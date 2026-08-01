@@ -15,7 +15,18 @@ export {
   joinedPlayers,
   nearestStandingPlayer,
 } from './run.js';
-export { generateWorld, floodOpen, chunkOf, cellIdx } from './worldgen.js';
+export { generateWorld, floodOpen, chunkOf, cellIdx, DEFAULT_PROFILE, type WorldgenProfile, type SurfaceBlobSpec } from './worldgen.js';
+export {
+  biomeMix,
+  biomeProfile,
+  horseChanceFor,
+  lineageOf,
+  sectorBiome,
+  type LineageId,
+  type OccupationId,
+  type SectorBiome,
+  type StratumId,
+} from './strata.js';
 export {
   descend,
   isFinalSector,
@@ -32,11 +43,13 @@ export {
   recordKill,
   starsFor,
 } from './stats.js';
-export { ARCHETYPES, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
+export { ARCHETYPES, SIGNATURE_OF_STRATUM, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
 export {
   explodeAt,
   dischargeAt,
   igniteCell,
+  isConductiveSurface,
+  meltIce,
   heatFungalCell,
   breakSolid,
   setSurface,

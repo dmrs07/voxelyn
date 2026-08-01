@@ -17,6 +17,10 @@ import {
   SURF_NONE,
   SURF_SCORCHED,
   SURF_SPORES,
+  SURF_WATER,
+  SURF_EMBER,
+  SURF_ICE,
+  LURKER_HIDDEN,
   ABILITY_RADIUS,
   HEAT_MAX,
   RICOCHET_BOUNCES,
@@ -27,7 +31,7 @@ import {
   isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
-import type { AbilityId, ActiveModule, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { AbilityId, ActiveModule, ModuleId, OccupationId, SemanticEvent, StratumId, SurvivalState } from '@voxelyn/survival-sim';
 import { ATLAS_SCALE, SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
   PropBank,
 } from './sprites';
@@ -97,6 +101,9 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_SCORCHED]: 5,
   [SURF_SPORES]: 6,
   [SURF_FUNGAL_HEATED]: 7,
+  [SURF_WATER]: 8,
+  [SURF_EMBER]: 9,
+  [SURF_ICE]: 10,
 };
 
 /**
@@ -115,6 +122,44 @@ const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_SCORCHED]: '#0b0e14',
   [SURF_SPORES]: '#66c28a',
   [SURF_FUNGAL_HEATED]: '#6e4a33',
+  // Azul da familia da rocha: a agua e escura com reflexos frios, e o verde
+  // continua reservado ao biofluido.
+  [SURF_WATER]: '#2e3a4d',
+  // Brasa: laranja queimado, distinto do fogo vivo — perigo termico visivel
+  // mesmo sem o atlas.
+  [SURF_EMBER]: '#b3541e',
+  // Gelo: o cinza-azulado palido da paleta (mist).
+  [SURF_ICE]: '#7b8ba3',
+};
+
+/**
+ * Nomes dos estratos e ocupacoes, por chave de catalogo.
+ *
+ * Tabelas explicitas em vez de `t('biome.' + id)`: a concatenacao passaria no
+ * runtime e escaparia do tipo `MessageKey` — uma chave nova sem traducao so
+ * apareceria na tela do jogador, como texto cru. Assim, um estrato novo sem
+ * entrada aqui quebra a COMPILACAO, que e onde o esquecimento deve doer.
+ */
+const STRATUM_LABEL_KEY = {
+  basalt: 'biome.stratum.basalt',
+  prismatic: 'biome.stratum.prismatic',
+  aquifer: 'biome.stratum.aquifer',
+  sulfur: 'biome.stratum.sulfur',
+  furnace: 'biome.stratum.furnace',
+  silica: 'biome.stratum.silica',
+  glacial: 'biome.stratum.glacial',
+} as const satisfies Record<StratumId, string>;
+
+const OCCUPATION_LABEL_KEY = {
+  mycelial: 'biome.occupation.mycelial',
+  aurix: 'biome.occupation.aurix',
+} as const satisfies Record<Exclude<OccupationId, 'none'>, string>;
+
+/** "CATEDRAL PRISMÁTICA · CICATRIZ AURIX", ou so o estrato quando limpa. */
+export const biomeLabel = (stratum: StratumId, occupation: OccupationId): string => {
+  const base = t(STRATUM_LABEL_KEY[stratum]);
+  if (occupation === 'none') return base;
+  return `${base} · ${t(OCCUPATION_LABEL_KEY[occupation])}`;
 };
 
 export const TILE_W = 32;
@@ -352,6 +397,56 @@ const drawStunIndicator = (
   const lift = size * 2.25 + 6 * z;
   for (const [ox, oy] of stunIndicatorOffsets(entityId, tick)) {
     drawVoxel(ctx, sx + ox * size * 0.75, sy - lift + oy * size, Math.max(2, 2.6 * z), CHARGE_RAMP);
+  }
+};
+
+/**
+ * A perturbacao de superficie de um espreitador oculto (Lampreia sob a agua,
+ * Espectro sob o gelo). E TUDO o que aparece dele enquanto `mood` diz
+ * escondido: a promessa dos dois biomas e que a posicao se le pela lamina, e
+ * nao pelo corpo.
+ *
+ * Na agua, aneis concentricos que nascem no centro e se dissipam — a ondulacao
+ * que a spec descreve. No gelo, rachaduras curtas irradiando, pulsando de leve.
+ * Fase e geometria saem do id e do relogio, nunca de sorteio: as duas maquinas
+ * de uma sala de co-op desenham a mesma perturbacao no mesmo lugar.
+ */
+const drawLurkerDisturbance = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  nowMs: number,
+  entityId: number,
+  inWater: boolean
+): void => {
+  const seed = (Math.imul(entityId, 2654435761) >>> 0) % 1000;
+  if (inWater) {
+    // Dois aneis defasados meio ciclo: sempre ha um visivel, nenhum pisca.
+    for (const offset of [0, 0.5]) {
+      const phase = ((nowMs / 900 + seed / 1000 + offset) % 1 + 1) % 1;
+      const r = size * (0.5 + phase * 1.6);
+      ctx.strokeStyle = `rgba(122,184,255,${(0.4 * (1 - phase)).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, z);
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    return;
+  }
+  // Gelo: tres rachaduras curtas em leque, comprimento respirando devagar.
+  const breath = 0.75 + 0.25 * Math.sin(nowMs / 480 + seed);
+  ctx.strokeStyle = 'rgba(123,139,163,0.55)';
+  ctx.lineWidth = Math.max(1, z);
+  for (let c = 0; c < 3; c++) {
+    const angle = ((seed + c * 331) % 628) / 100; // 0..2π deterministico
+    const len = size * (1 + c * 0.35) * breath;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    // Achata no eixo Y: a rachadura vive na lamina isometrica, nao de pe.
+    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len * 0.5);
+    ctx.stroke();
   }
 };
 
@@ -752,6 +847,17 @@ export class SurvivalRenderer {
         case 'pickup_core':
           this.messages.push({ text: t('toast.core.taken'), until: nowMs + 4200 });
           this.shake = { power: 4, until: nowMs + 300 };
+          break;
+        case 'sector_entered':
+          // A chegada anuncia ONDE o jogador entrou, nao so o numero: o bioma
+          // muda o modo de atravessar o setor, e o nome e o primeiro aviso.
+          this.messages.push({
+            text: t('toast.sector.entered', {
+              sector: ev.sector,
+              biome: biomeLabel(ev.stratum, ev.occupation),
+            }),
+            until: nowMs + 3400,
+          });
           break;
         case 'guardian_awake':
           this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
@@ -1273,11 +1379,28 @@ export class SurvivalRenderer {
       if (b <= 0.05) continue;
       const anim = this.animFor(enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alive, nowMs);
       const presented = this.presentation.animationFor(enemy, state, anim, nowMs);
+      // Espreitador DENTRO do elemento: o corpo nao aparece. A simulacao ja
+      // manda a postura em `mood` (e por isso ela viaja no snapshot); desenhar
+      // o sprite inteiro aqui apagaria a mecanica de ocultacao do Aquifero e
+      // da Cripta — o jogador veria a posicao exata em vez da ONDULACAO que o
+      // bioma promete. Fica so a perturbacao da superficie, sem sombra e sem
+      // barra de vida; o indicador de atordoamento continua, porque levar a
+      // descarga e exatamente o momento em que a leitura tem de ser clara.
+      const lurkerHidden =
+        (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
+        enemy.mood === LURKER_HIDDEN;
       items.push({
         depth: enemy.x + enemy.y,
         draw: () => {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
+          if (lurkerHidden) {
+            drawLurkerDisturbance(ctx, sx, sy, size, z, nowMs, enemy.id, enemy.archetype === 'mud_lamprey');
+            if (enemy.stunnedUntil > state.tick) {
+              drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
+            }
+            return;
+          }
           drawShadow(sx, sy, size);
           const drew = this.sprites.drawEntity(
             ctx,
@@ -1520,7 +1643,10 @@ export class SurvivalRenderer {
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const i = y * w + x;
-        if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_BIOFLUID) continue;
+        // A agua do Aquifero pinga como a poca: goteiras sao a assinatura
+        // sonora e visual do estrato, e o efeito ja e deterministico por celula.
+        const dripSurf = state.surface[i];
+        if (state.solid[i] !== SOLID_NONE || (dripSurf !== SURF_BIOFLUID && dripSurf !== SURF_WATER)) continue;
         const seed = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263)) >>> 0;
         if (seed % 5 !== 0) continue; // so parte das celulas pinga
         if (brightness(x, y) <= 0.05) continue;
@@ -2115,7 +2241,8 @@ export class SurvivalRenderer {
     const hasModules = extra.activeModules.length > 0;
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
     const sectorY = safeTop + (hasModules ? 112 : 84);
-    const objectiveY = sectorY + 18;
+    const biomeY = sectorY + 14;
+    const objectiveY = biomeY + 18;
     const cacheY = objectiveY + 17;
     const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
     const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
@@ -2274,7 +2401,8 @@ export class SurvivalRenderer {
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
     const moduleY = safeTop + 68;
     const sectorY = safeTop + (hasModules ? 112 : 84);
-    const objectiveY = sectorY + 18;
+    const biomeY = sectorY + 14;
+    const objectiveY = biomeY + 18;
     const cacheY = objectiveY + 17;
     const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
 
@@ -2386,6 +2514,13 @@ export class SurvivalRenderer {
       safeLeft + 12,
       sectorY,
     );
+
+    // O estrato/ocupacao logo abaixo do numero: menor e mais apagado, porque e
+    // contexto e nao objetivo. Fonte 9px para o nome composto mais longo
+    // ("CATEDRAL PRISMÁTICA · MATRIZ MICELIAL") caber no painel compacto.
+    ctx.fillStyle = PAL.bone;
+    ctx.font = '9px monospace';
+    ctx.fillText(biomeLabel(state.stratum, state.occupation), safeLeft + 12, biomeY);
 
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 12px monospace';

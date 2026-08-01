@@ -15,6 +15,9 @@ describe('contrato visual das materias organicas e volateis', () => {
       'scorched',
       'spores',
       'fungal-heated',
+      'water',
+      'ember',
+      'ice',
     ]);
   });
 

@@ -201,9 +201,9 @@ const buildSurfaces = () => {
 
   const manifest = {
     id: 'surface-tiles',
-    // 3: crostas reautoradas coluna a coluna FINA — cascalho, tapete, lamina
-    // com bolhas, chamas e graos por voxel fino; gas em aglomerados roidos.
-    version: 3,
+    // 5: segunda leva de estratos — fissura incandescente da Fornalha
+    // (SURF_EMBER) e gelo da Cripta Glacial (SURF_ICE), no fim da lista.
+    version: 5,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,

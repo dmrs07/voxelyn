@@ -167,6 +167,11 @@ export const PT_BR = {
   'enemy.fungal_horse': 'Corcel',
   'enemy.bishop': 'Bispo',
   'enemy.guardian': 'Guardião',
+  'enemy.resonant': 'Ressonante',
+  'enemy.mud_lamprey': 'Lampreia',
+  'enemy.bellows': 'Fole',
+  'enemy.scoriac': 'Escoriáceo',
+  'enemy.frost_wraith': 'Espectro',
 
   'bestiary.name.stalker': 'Espreitador',
   'bestiary.name.spitter': 'Cuspidor',
@@ -174,6 +179,11 @@ export const PT_BR = {
   'bestiary.name.bruiser': 'Britador',
   'bestiary.name.miner': 'Minerador Empobrecido',
   'bestiary.name.fungal_horse': 'Corcel Fúngico',
+  'bestiary.name.resonant': 'Ressonante',
+  'bestiary.name.mud_lamprey': 'Lampreia de Lodo',
+  'bestiary.name.bellows': 'Fole',
+  'bestiary.name.scoriac': 'Escoriáceo',
+  'bestiary.name.frost_wraith': 'Espectro de Geada',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
 
@@ -194,6 +204,21 @@ export const PT_BR = {
     'Extratora da geração anterior. Operação após o encerramento do contrato não foi autorizada. Sem valor de recuperação.',
   'bestiary.code.fungal_horse': 'ATIVO HOSTIL EQ-02',
   'bestiary.note.fungal_horse': 'Quadrúpede adaptado. A presença de arreios não implica operador.',
+  'bestiary.code.resonant': 'ESPÉCIME CRIST-01',
+  'bestiary.note.resonant':
+    'Induz descarga em formações cristalinas próximas. Perda de material catalogável atribuída ao espécime, não ao protocolo de extração.',
+  'bestiary.code.mud_lamprey': 'ESPÉCIME AQU-03',
+  'bestiary.note.mud_lamprey':
+    'Predador lacustre. Ataques ocorrem exclusivamente a partir da lâmina d’água. Drenagem preventiva excede o orçamento do setor.',
+  'bestiary.code.bellows': 'ESPÉCIME SULF-08',
+  'bestiary.note.bellows':
+    'Redistribui gases do estrato por respiração. Utilidade como equipamento de ventilação avaliada e arquivada.',
+  'bestiary.code.scoriac': 'ESPÉCIME VULC-05',
+  'bestiary.note.scoriac':
+    'Carapaça refratária de escória. Vulnerável após exposição térmica — condição que também o torna consideravelmente pior.',
+  'bestiary.code.frost_wraith': 'ESPÉCIME GLAC-02',
+  'bestiary.note.frost_wraith':
+    'Desloca-se sob a lâmina de gelo. Relatos de "assombração" refletem baixa visibilidade, não fenômeno anômalo.',
   'bestiary.code.bishop': 'ATIVO HOSTIL EQ-09',
   'bestiary.note.bishop':
     'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',
@@ -325,6 +350,17 @@ export const PT_BR = {
   'hud.direction.south': 'SUL',
   'hud.direction.north': 'NORTE',
 
+  // Estratos e ocupações do Veio (a gramática de biomas da descida)
+  'biome.stratum.basalt': 'GALERIAS DE BASALTO',
+  'biome.stratum.prismatic': 'CATEDRAL PRISMÁTICA',
+  'biome.stratum.aquifer': 'AQUÍFERO NEGRO',
+  'biome.stratum.sulfur': 'FENDA SULFUROSA',
+  'biome.stratum.furnace': 'FORNALHA ABISSAL',
+  'biome.stratum.silica': 'SUMIDOUROS DE SÍLICA',
+  'biome.stratum.glacial': 'CRIPTA GLACIAL',
+  'biome.occupation.mycelial': 'MATRIZ MICELIAL',
+  'biome.occupation.aurix': 'CICATRIZ AURIX',
+
   // ---------------------------------------------------------------------
   // Mensagens centrais da run
   // ---------------------------------------------------------------------
@@ -337,6 +373,7 @@ export const PT_BR = {
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',
   'toast.overheat': 'SUPERAQUECIMENTO!',
   'toast.well.resonance': 'O VEIO RESSOA — DOIS ECOS DEMONSTRAM',
+  'toast.sector.entered': 'SETOR {sector} — {biome}',
 
   // Mensagens emitidas pela simulação (chegam como chave, nunca como texto)
   'sim.partnerRevived': 'Parceiro revivido.',

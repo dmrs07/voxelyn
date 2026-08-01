@@ -54,8 +54,14 @@ const MAX_ATLAS_WIDTH = 4096;
  * definicao. Os novos valores dao ~2x de folga sobre o pacote medido no dia da
  * mudanca (maior PNG 675 KiB, total ~3,1 MiB, RGBA ~68 MiB) — apertados o
  * bastante para um atlas fora da curva continuar sendo barrado.
+ *
+ * Segunda revisao (estratos, leva 2): o atlas de crostas ganhou tres materias
+ * de mundo — agua, fissura incandescente e gelo — e foi de 28 para 34 quadros
+ * autorados (1,18 MiB). Mesmo criterio de sempre: teto novo com folga curta
+ * sobre o medido (~25%), porque crescer por materia nova e o caminho esperado
+ * do jogo, e um atlas 50% acima da curva continua sendo um erro a barrar.
  */
-const MAX_PNG_BYTES = 1024 * 1024;
+const MAX_PNG_BYTES = 1536 * 1024;
 const MAX_TOTAL_PNG_BYTES = 6 * 1024 * 1024;
 const MAX_DECODED_BYTES = 96 * 1024 * 1024;
 
@@ -97,7 +103,7 @@ export const validateManifest = (id) => {
   if (png.width !== expectedW) errors.push(`${id}: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`${id}: altura ${png.height} != ${expectedH}`);
   if (png.width > MAX_ATLAS_WIDTH) errors.push(`${id}: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push(`${id}: PNG excede 512 KiB`);
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push(`${id}: PNG excede o teto de 1,5 MiB`);
   if (!(m.anchorX >= 0 && m.anchorX < m.frameWidth)) errors.push(`${id}: anchorX fora do frame`);
   if (!(m.anchorY >= 0 && m.anchorY < m.frameHeight)) errors.push(`${id}: anchorY fora do frame`);
   if (!m.footprint || !['w', 'h', 'offsetX', 'offsetY'].every((k) => Number.isFinite(m.footprint[k]))) {
@@ -193,7 +199,7 @@ export const validateTerrain = () => {
   if (png.width !== expectedW) errors.push(`terrain-blocks: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`terrain-blocks: altura ${png.height} != ${expectedH}`);
   if (png.width > MAX_ATLAS_WIDTH) errors.push(`terrain-blocks: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('terrain-blocks: PNG excede 512 KiB');
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('terrain-blocks: PNG excede o teto de 1,5 MiB');
   if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('terrain-blocks: originX fora do frame');
   if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('terrain-blocks: originY fora do frame');
 
@@ -276,7 +282,7 @@ export const validateSurfaces = () => {
   if (png.width !== expectedW) errors.push(`surface-tiles: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`surface-tiles: altura ${png.height} != ${expectedH}`);
   if (png.width > MAX_ATLAS_WIDTH) errors.push(`surface-tiles: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('surface-tiles: PNG excede 512 KiB');
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('surface-tiles: PNG excede o teto de 1,5 MiB');
   if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('surface-tiles: originX fora do frame');
   if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('surface-tiles: originY fora do frame');
 
@@ -341,7 +347,7 @@ export const validateProps = () => {
   if (png.width !== expectedW) errors.push(`world-props: largura ${png.width} != ${expectedW}`);
   if (png.height !== expectedH) errors.push(`world-props: altura ${png.height} != ${expectedH}`);
   if (png.width > MAX_ATLAS_WIDTH) errors.push(`world-props: largura ${png.width} excede ${MAX_ATLAS_WIDTH}`);
-  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('world-props: PNG excede 512 KiB');
+  if (statSync(pngPath).size > MAX_PNG_BYTES) errors.push('world-props: PNG excede o teto de 1,5 MiB');
   if (!(m.originX >= 0 && m.originX < m.frameWidth)) errors.push('world-props: originX fora do frame');
   if (!(m.originY >= 0 && m.originY < m.frameHeight)) errors.push('world-props: originY fora do frame');
 

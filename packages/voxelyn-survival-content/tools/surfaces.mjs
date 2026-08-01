@@ -51,6 +51,15 @@ export const SURFACE_KINDS = [
   { name: 'scorched', frames: 1, frameMs: 0 },
   { name: 'spores', frames: 4, frameMs: 360 },
   { name: 'fungal-heated', frames: 2, frameMs: 240 },
+  // Agua do Aquifero Negro (SURF_WATER = 8). Entra no fim pela regra de sempre:
+  // os IDs viajam nos diffs de chunk e nao podem mudar de significado. Mais
+  // lenta que o biofluido: agua parada ondula, nao borbulha.
+  { name: 'water', frames: 4, frameMs: 340 },
+  // Fissura incandescente da Fornalha Abissal (SURF_EMBER = 9): pulsa devagar,
+  // como rocha respirando calor — nao e chama, e o chao rachado por baixo.
+  { name: 'ember', frames: 4, frameMs: 260 },
+  // Gelo da Cripta Glacial (SURF_ICE = 10): quase estatico; so o reflexo anda.
+  { name: 'ice', frames: 2, frameMs: 760 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -455,6 +464,88 @@ export const surfaceModel = (kind, variant, frame) => {
         // Bolha: acende dois quadros do ciclo e estoura.
         const bubble = h % 21 === 0 && ((h >>> 6) + frame) % 4 < 2;
         boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, bubble || band === 0 ? 'biolum' : 'pool'));
+      }
+    }
+    return boxes;
+  }
+
+  if (kind === 'water') {
+    // A mesma construcao da poca — leito plano, filme de meio voxel, reflexo em
+    // faixa — com DUAS diferencas de leitura: a familia de cor e a azul da
+    // rocha (agua nunca compartilha matiz com o fungo), e a ondulacao substitui
+    // as bolhas. Agua parada nao ferve; ela ondula. A faixa `electric` anda com
+    // o frame e uma segunda faixa defasada cruza na outra diagonal, entao o
+    // lago inteiro parece respirar sem nenhum ponto piscando.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 41, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        if (h % 97 === 0) {
+          // Mineral azulado emergindo: a "ilha" que da escala ao lago.
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 1.5, 'rock'));
+          continue;
+        }
+        const band = (fx + fy + frame * 2) % FINE_COLS;
+        const cross = (fx - fy + FINE_COLS * 4 - frame * 3) % Math.floor(FINE_COLS / 2);
+        const glint = band === 0 || (cross === 0 && (h & 3) === 0);
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, glint ? 'electric' : 'water'));
+      }
+    }
+    return boxes;
+  }
+
+  if (kind === 'ember') {
+    // A laje ja e a rocha escura da Fornalha; as FISSURAS correm por ela como
+    // veios finos incandescentes. O trajeto sai de um hash por coluna — duas
+    // diagonais quebradas por celula — e o PULSO e o quadro: o miolo alterna
+    // entre brasa (`fire`) e nucleo saturado (`amber`, emissivo), com pontas
+    // `blood` esfriando. Nada levanta acima de meio voxel: fissura e chao, nao
+    // chama — a leitura de perigo vem da luz, nunca da silhueta.
+    const boxes = slab(variant, 'scorch', 'floor');
+    overSlab(variant, 131, ({ cx, cy, x, y, top, h }) => {
+      // Duas linhas quebradas por celula: colunas cuja distancia a diagonal
+      // (com um zigue por hash) e zero. Espessura de UMA coluna fina.
+      const wob = (h >>> 7) % 2;
+      const onVeinA = (cx + cy + wob) % Math.floor(FINE_COLS / 2) === 0;
+      const onVeinB = (cx - cy + FINE_COLS * 2 + wob) % Math.floor(FINE_COLS / 2) === 3;
+      if (!onVeinA && !onVeinB) return;
+      if (h % 5 === 0) return; // falhas: a fissura e tracejada, nao um trilho
+      // O pulso alterna brasa viva (`fire`, cujo topo emissivo e o amber) e
+      // pontas esfriando (`blood`). No pico, o veio incha meio voxel — a
+      // fissura respira sem nunca virar chama.
+      const hot = ((h >>> 4) + frame) % 4;
+      boxes.push(box(x, y, top, 1 / F, 1 / F, 0.5, hot === 3 ? 'blood' : 'fire'));
+      if (hot === 0) boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, 'fire'));
+    });
+    return boxes;
+  }
+
+  if (kind === 'ice') {
+    // Placa leitosa que acha nivel, como os liquidos — mas SOLIDA: o filme tem
+    // um voxel inteiro de altura e quase nenhum movimento. As rachaduras sao
+    // colunas `rock` afundadas meio voxel; o reflexo e uma faixa `electric`
+    // que anda UM passo entre os dois quadros, devagar como convem a uma
+    // superficie que nao flui.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 53, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        // Rachadura: fica meio voxel abaixo do topo da placa.
+        if (h % 43 === 0) {
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, 'rock'));
+          continue;
+        }
+        const band = (fx + fy + frame) % FINE_COLS;
+        const sparkle = band === 0 && (h & 7) === 0;
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, sparkle ? 'electric' : 'ice'));
       }
     }
     return boxes;

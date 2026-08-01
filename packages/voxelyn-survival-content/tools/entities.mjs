@@ -973,11 +973,181 @@ const minerModel = (anim, f) => {
 };
 const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 96, 120, 48, 108);
 
+// ---------------------------------------------------------------------------
+// BESTIARIO DE ASSINATURA — um inimigo por estrato, e cada silhueta diz qual
+// alavanca do bioma ele opera: o Ressonante e cristal, a Lampreia e lodo, o
+// Fole e um orgao de ar, o Escoriaceo e escoria com nucleo vivo, o Espectro e
+// gelo palido. Nenhum introduz material novo: as rampas ja existem.
+// ---------------------------------------------------------------------------
+
+// enemy-resonant 64x64 — nodulo mineral lento coroado de cristais vivos.
+// A leitura que importa: os CRISTAIS sao a arma, nao o corpo. No idle eles
+// pulsam devagar; no attack (o pulso que arma a sala) eles crescem e acendem.
+const resonantModel = (anim, f) => {
+  const gait = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
+  const hum = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
+  const surge = anim === 'attack' ? [1, 2, 3, 1][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  // Dois cotos de rocha como pes: ele mal anda, e a marcha e um balanco.
+  b.push(box(-2, -1, Math.max(0, gait), 2, 2, 2, 'rockDeep'));
+  b.push(box(1, -1, Math.max(0, -gait), 2, 2, 2, 'rockDeep'));
+  // Corpo: um nodulo de rocha escura, mais largo que alto.
+  b.push(box(-3 + flinch, -2, 2, 6, 4, 3, 'rock'));
+  b.push(box(-2 + flinch, -2, 5, 4, 3, 1, 'rockDeep'));
+  // Fissuras de energia no flanco: o nucleo aparece pelas juntas.
+  b.push(box(-3 + flinch, 0, 3, 0.5, 1, 1, 'electric'));
+  b.push(box(2.5 + flinch, -1, 3.5, 0.5, 1, 0.5, 'electric'));
+  // A coroa de cristais: tres lascas que pulsam (idle) e crescem (attack).
+  const spike = hum + surge;
+  b.push(box(-2, -1, 6, 1, 1, 2 + spike, 'electric'));
+  b.push(box(0, 0, 6, 1, 1, 3 + spike, 'electric'));
+  b.push(box(1.5, -1.5, 6, 1, 1, 2 + Math.max(0, spike - 1), 'electric'));
+  // No pico do pulso, um anel baixo de estilhacos ao redor do corpo.
+  if (surge >= 2) {
+    b.push(box(-4, -1, 2, 1, 1, 1, 'electric'));
+    b.push(box(3, -1, 2, 1, 1, 1, 'electric'));
+    b.push(box(0, -3.5, 2, 1, 1, 1, 'electric'));
+    b.push(box(0, 2.5, 2, 1, 1, 1, 'electric'));
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const resonantFrame = (dir, anim, f) => renderVoxels(resonantModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
+// enemy-mud-lamprey 64x64 — serpente de lodo, baixa e comprida, ondulando.
+// Quase todo o tempo de jogo ela esta SUBMERSA (o cliente desenha ondulacao,
+// nao este sprite); este corpo aparece no bote e quando encalha — entao a
+// silhueta precisa dizer na hora "aquilo que morava na agua".
+const mudLampreyModel = (anim, f) => {
+  const lunge = anim === 'attack' ? [0, 0.5, 1.5, 1][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // A ondulacao NUNCA para: e um corpo de agua mesmo fora dela. No idle a fase
+  // anda devagar; na caminhada, com o passo.
+  const b = [];
+  for (let s = 0; s < 5; s++) {
+    // Onda discreta em meia-grade: anda com o frame na caminhada e respira
+    // devagar no idle (a lampreia nunca fica rigida — e um corpo de agua).
+    const phase =
+      anim === 'walk'
+        ? Math.round(Math.sin((s + f) * 1.1)) * 0.5
+        : anim === 'idle'
+          ? ((s + f) % 2) * 0.5
+          : (s % 2) * 0.5;
+    const x = -3 + s * 1.3 + (s >= 3 ? lunge : 0);
+    const height = s === 4 ? 2.5 : 2;
+    b.push(box(x, -1 + phase, 0.5 + flinch * 0.3, 1.3, 2, height, 'pool'));
+    // Barbatana dorsal serrilhada: meia lamina por segmento.
+    b.push(box(x + 0.2, -0.5 + phase, 0.5 + height, 0.8, 1, 0.5, 'fungusDeep'));
+  }
+  // Cabeca: boca circular de lampreia — um anel claro com o miolo escuro.
+  const hx = 2 + lunge;
+  b.push(box(hx, -1.5, 0.5, 1.6, 3, 2.8, 'pool'));
+  b.push(box(hx + 1.2, -1, 1, 0.6, 2, 1.8, 'bone'));
+  b.push(box(hx + 1.5, -0.5, 1.4, 0.4, 1, 1, 'blood'));
+  // Olhos bioluminescentes: o unico brilho — e o que a ondulacao promete.
+  b.push(box(hx + 0.4, -1.6, 2.8, 0.6, 0.6, 0.6, 'biolum'));
+  b.push(box(hx + 0.4, 1, 2.8, 0.6, 0.6, 0.6, 'biolum'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const mudLampreyFrame = (dir, anim, f) => renderVoxels(mudLampreyModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
+// enemy-bellows 64x64 — o Fole: um saco de ar com costelas de osso.
+// O ciclo inteiro do bicho e RESPIRACAO, entao o idle e a mecanica: o saco
+// infla e murcha. No attack ele se espreme — e o sopro que contamina a rota.
+const bellowsModel = (anim, f) => {
+  const breath = anim === 'idle' || anim === 'walk' ? [0, 1, 2, 1][f % 4] : 0;
+  const squeeze = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const gait = anim === 'walk' ? [0, 1, 0, -1, 0, 1][f % 6] : 0;
+  const b = [];
+  // Pes atarracados de ferrugem: ele mal sai do lugar.
+  b.push(box(-2.5, -1, Math.max(0, gait), 2, 2, 1.5, 'rust'));
+  b.push(box(0.5, -1, Math.max(0, -gait), 2, 2, 1.5, 'rust'));
+  // O saco: largo quando cheio, espremido e baixo no sopro.
+  const sw = 6 + breath - squeeze * 1.5;
+  const sh = 4 + breath - squeeze;
+  b.push(box(-sw / 2 + flinch, -2, 1.5, sw, 4, sh, 'sulfur'));
+  // Costelas de osso vergadas por cima do saco: a gaiola que o espreme.
+  for (let r = 0; r < 3; r++) {
+    b.push(box(-sw / 2 + 0.5 + r * (sw / 3), -2.2, 1.5, 0.8, 4.4, sh + 0.5, 'bone'));
+  }
+  // Boca-valvula frontal; no sopro, um jato de grao sulfuroso sai dela.
+  b.push(box(sw / 2 - 0.5 + flinch, -0.8, 2.5, 1.2, 1.6, 1.6, 'rust'));
+  if (squeeze >= 1) {
+    for (let p = 0; p < 1 + squeeze; p++) {
+      b.push(box(sw / 2 + 0.8 + p * 1, -0.6 + (p % 2) * 0.8, 2.5 + p * 0.4, 0.8, 0.8, 0.8, 'acid'));
+    }
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const bellowsFrame = (dir, anim, f) => renderVoxels(bellowsModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
+// enemy-scoriac 64x64 — besouro de escoria: placas frias por fora, brasa viva
+// por dentro. A MECANICA esta na silhueta: as placas escondem o nucleo; o
+// attack (e o estado quente) as abre e o fogo aparece pelas frestas.
+const scoriacModel = (anim, f) => {
+  const gait = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
+  const open = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
+  // Idle vivo: as placas SOBEM meio voxel e assentam — o nucleo respira calor
+  // por baixo da couraça, e a fresta que pisca e o aviso do que ha dentro.
+  const vent = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  // Seis patas curtas, aos pares. `rockDeep`, e nao `scorch`: a rampa do
+  // carvao e toda escura e sumia contra o chao da Fornalha — a silhueta
+  // precisa existir ANTES de o jogador ler o nucleo.
+  for (let s = -1; s <= 1; s++) {
+    b.push(box(s * 2 - 0.5, -2.5, Math.max(0, s % 2 === 0 ? gait : -gait), 1, 1, 2, 'rockDeep'));
+    b.push(box(s * 2 - 0.5, 1.5, Math.max(0, s % 2 === 0 ? -gait : gait), 1, 1, 2, 'rockDeep'));
+  }
+  // O nucleo de brasa: SEMPRE presente, visivel pelo vao entre as placas.
+  b.push(box(-2.5 + flinch, -1.5, 2, 5, 3, 2, 'fire'));
+  // Placas dorsais de escoria: duas metades que se afastam quando ele abre.
+  // Rocha escura com a borda carbonizada — o scorch entra como DETALHE, nunca
+  // como a placa inteira.
+  b.push(box(-3 - open + flinch, -2, 3.5 + vent, 3, 4, 1.5, 'rockDeep'));
+  b.push(box(0.5 + open + flinch, -2, 3.5 + vent, 3, 4, 1.5, 'rockDeep'));
+  b.push(box(-3 - open + flinch, -2, 5 + vent, 1, 4, 0.5, 'scorch'));
+  b.push(box(2.5 + open + flinch, -2, 5 + vent, 1, 4, 0.5, 'scorch'));
+  // Placa frontal menor: a "testa" que ele abaixa para investir.
+  b.push(box(-1 + flinch, -2.6, 2.5, 2, 1, 1.5, 'rockDeep'));
+  // Fresta dorsal: com as placas abertas, uma crista de brasa sobe no vao.
+  if (open >= 1) b.push(box(-0.5 + flinch, -1, 4, 1, 2, 1 + open * 0.5, 'fire'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const scoriacFrame = (dir, anim, f) => renderVoxels(scoriacModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
+// enemy-frost-wraith 64x64 — o Espectro de Geada: um risco palido e raso.
+// Ele passa o jogo SOB o gelo (o cliente desenha a trilha de rachaduras);
+// este corpo e o bote e o encalhe — um peixe-lamina de gelo leitoso.
+const frostWraithModel = (anim, f) => {
+  const rise = anim === 'attack' ? [0, 1, 3, 2][f % 4] : 0;
+  const glide =
+    anim === 'walk' ? [0, 0.5, 1, 0.5, 0, -0.5][f % 6] : anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  // Corpo raso e comprido, afinando para tras: quatro segmentos de gelo.
+  for (let s = 0; s < 4; s++) {
+    const x = -4 + s * 2;
+    const d = 3 - s * 0.5;
+    b.push(box(x, -d / 2 + glide * (s % 2 === 0 ? 0.4 : -0.4), 0.5 + rise * (s >= 2 ? 0.6 : 0.2) + flinch * 0.3, 2, d, 1.5, 'ice'));
+  }
+  // Nadadeira dorsal translucida — a lamina que corta o gelo por baixo.
+  b.push(box(-1, -0.4, 2 + rise * 0.6, 3, 0.8, 1.5 + rise * 0.5, 'ice'));
+  // Cabeca em cunha, com dois olhos de corrente: o unico ponto que brilha.
+  b.push(box(3.4, -1.2 + glide * 0.3, 0.8 + rise, 2, 2.4, 1.6, 'ice'));
+  b.push(box(4.6, -1.2 + glide * 0.3, 1.8 + rise, 0.6, 0.6, 0.6, 'electric'));
+  b.push(box(4.6, 0.6 + glide * 0.3, 1.8 + rise, 0.6, 0.6, 0.6, 'electric'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const frostWraithFrame = (dir, anim, f) => renderVoxels(frostWraithModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
 // FX AUTORADOS NATIVOS na resolucao fina (32x32). Ate a subdivisao da grade
 // eles eram desenhos de 16x16 dobrados por vizinho-mais-proximo — pixels
 // gordos de 2x2 fingindo resolucao. Redesenhados no grao real: o estilhaco
 // ganha faceta sombreada, halo que cintila e DUAS faiscas orbitando; o impacto
 // vira fragmentacao com estilhacos alongados e anel residual apagando.
+// (O `upscale2x` que dobrava os antigos saiu junto com eles.)
 const boltFrame = (_dir, _anim, f) => {
   const g = grid(32, 32);
   // Nucleo facetado: tres losangos deslocados para o alto-esquerda — a mesma
@@ -1105,6 +1275,13 @@ export const ENTITY_SPECS = [
     special: { frames: 6, fps: 10, loop: false },
   }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane crest and burning tail tip, split hooves, draped organic plate barding with gold flank medallions, crested war mask', 5),
   base('enemy-miner', 96, 120, 48, 108, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
+  // Bestiario de assinatura (um por estrato). `version` nasce em 1: sao os
+  // primeiros pixels destes atlases.
+  base('enemy-resonant', 64, 64, 32, 60, { w: 0.88, h: 0.9 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, resonantFrame, 'voxel-isometric slow mineral node crowned with living electric crystals, dark rock body with glowing seams', 1),
+  base('enemy-mud-lamprey', 64, 64, 32, 60, { w: 0.8, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, mudLampreyFrame, 'voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes', 1),
+  base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 1),
+  base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 1),
+  base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 1),
   {
     id: 'fx-projectile-bolt', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },

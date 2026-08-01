@@ -51,6 +51,8 @@ import {
   RUN_SEED_MIX,
   SOLID_NONE,
   SURF_BIOFLUID,
+  SURF_EMBER,
+  EMBER_HEAT_DECAY_SCALE,
   SURF_FIRE,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
@@ -70,7 +72,7 @@ import {
   recordResonance,
   resonanceOffers,
 } from './abilities.js';
-import { dischargeAt, explodeAt, igniteCell, setSurface, stepCells } from './cells.js';
+import { dischargeAt, explodeAt, igniteCell, isConductiveSurface, setSurface, stepCells } from './cells.js';
 import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
@@ -85,6 +87,7 @@ import {
 import { generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
 import { descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
+import { biomeProfile, sectorBiome } from './strata.js';
 import {
   activeModule,
   consumeModuleCharge,
@@ -205,7 +208,15 @@ export const createRun = (config: RunConfig): SurvivalState => {
   // o primeiro faria o setor de abertura ser o unico fora do esquema, e a
   // derivacao e o que garante que uma seed compartilhada reproduza a descida
   // inteira, nao so o comeco.
-  const world = generateWorld(sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector), width, height);
+  // O bioma sai de derivacao PURA da seed (strata.ts): reconectar no setor N
+  // reconstroi o mesmo estrato e a mesma ocupacao sem consumir a RNG da run.
+  const biome = sectorBiome(config.seed, sector);
+  const world = generateWorld(
+    sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector),
+    width,
+    height,
+    biomeProfile(biome, sector),
+  );
   const rng = new RNG((config.seed * 0x85ebca6b + 0xc2b2ae35) >>> 0 || 1);
 
   // posicoes de spawn proximas a entrada (deterministicas, sem sobrepor)
@@ -227,6 +238,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
     phase: 'running',
     sector,
     sectorStartedAt: 0,
+    stratum: biome.stratum,
+    occupation: biome.occupation,
+    lineage: biome.lineage,
     solid: world.solid,
     surface: world.surface,
     surfaceTimer: new Uint16Array(width * height),
@@ -708,8 +722,11 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     if (distFromEntry > 4) state.leftEntryZone = true;
   }
 
-  // calor decai
-  extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK);
+  // Calor decai — DEVAGAR em cima de uma fissura incandescente da Fornalha.
+  // A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
+  // sair dela e a decisao que devolve a dissipacao normal.
+  const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
+  extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1));
 
   // disparo principal
   if (
@@ -1247,7 +1264,7 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
       if (
         conductiveReady && ownerExtra && ownerSlot !== undefined &&
-        state.surface[i] === SURF_BIOFLUID &&
+        isConductiveSurface(state.surface[i]) &&
         consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
       ) {
         dischargeAt(state, cx, cy, events, origin);
@@ -1301,7 +1318,7 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           );
           if (
             conductiveAvailable && ownerExtra && ownerSlot !== undefined &&
-            state.surface[enemyCell] === SURF_BIOFLUID &&
+            isConductiveSurface(state.surface[enemyCell]) &&
             consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
           ) {
             conductiveTriggered = true;
@@ -1662,6 +1679,15 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'bishop',
   'fungal_horse',
   'miner',
+  // Bestiario de assinatura, no fim pela mesma regra. Sem eles aqui, duas runs
+  // com resultados diferentes contra assinaturas produziriam o MESMO hash de
+  // verificacao — o contador apareceria no sumario sem estar coberto pelo
+  // replay do leaderboard.
+  'resonant',
+  'mud_lamprey',
+  'bellows',
+  'scoriac',
+  'frost_wraith',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */

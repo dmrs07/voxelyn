@@ -7,13 +7,76 @@ import {
   SOLID_ORE,
   SOLID_ROCK,
   SURF_BIOFLUID,
+  SURF_EMBER,
   SURF_FUNGAL,
+  SURF_ICE,
   SURF_NONE,
+  SURF_SCORCHED,
+  SURF_WATER,
   WORLD_W,
 } from './constants.js';
 import type { Vec2 } from './types.js';
 
 export type GeneratedSalvageSite = { id: number; tier: 1 | 2 | 3; terminal: Vec2; cache: Vec2 };
+
+export type SurfaceBlobSpec = { count: number; rMin: number; rMax: number };
+
+/**
+ * O que um ESTRATO muda na geracao. Ver strata.ts para quem constroi isto.
+ *
+ * O worldgen continua dono da TOPOLOGIA (ruido, automato, alcancabilidade,
+ * bandas de salvage): ela e a parte provada do gerador e a que garante mapa
+ * solucionavel. O perfil so muda MATERIA — que solido decora as paredes, que
+ * superficie cobre o chao — porque materia e o que os estratos da primeira
+ * leva realmente variam. Quando um estrato precisar de topologia propria
+ * (a organizacao radial da Catedral, os pulmoes da Fenda Sulfurosa), o campo
+ * novo entra aqui com um default que preserve o comportamento historico.
+ */
+export type WorldgenProfile = {
+  /** Chance de parede FINA (aberta dos dois lados) virar rocha fragil. */
+  fragileThinChance: number;
+  /** Chance de parede exposta virar veio de minerio. */
+  oreChance: number;
+  /** Chance de parede exposta virar cristal (avaliada depois do minerio). */
+  crystalChance: number;
+  /**
+   * Nervuras de cristal: caminhadas retas que atravessam a rocha convertendo
+   * celulas solidas em cristal. Sao a arquitetura da Catedral Prismatica —
+   * laminas continuas que conduzem ressonancia de uma sala a outra, em vez do
+   * cristal pontual que a decoracao de parede produz.
+   */
+  crystalVeins: number;
+  fungalBlobs: SurfaceBlobSpec;
+  biofluidBlobs: SurfaceBlobSpec;
+  /** Lagos do Aquifero Negro. Zero em todo estrato seco. */
+  waterBlobs: SurfaceBlobSpec;
+  /** Lagos congelados da Cripta Glacial. */
+  iceBlobs: SurfaceBlobSpec;
+  /** Fissuras incandescentes da Fornalha Abissal. */
+  emberBlobs: SurfaceBlobSpec;
+  /** Campos de carvao da Fornalha (SURF_SCORCHED que acende la). */
+  coalBlobs: SurfaceBlobSpec;
+  /** Quantos respiradouros de gas o setor tenta posicionar. */
+  ventCount: number;
+  /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
+  minerCap: number;
+};
+
+/** O perfil historico: Galerias de Basalto. `generateWorld` sem perfil e ele. */
+export const DEFAULT_PROFILE: WorldgenProfile = {
+  fragileThinChance: 0.55,
+  oreChance: 0.07,
+  crystalChance: 0.03,
+  crystalVeins: 0,
+  fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
+  biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
+  waterBlobs: { count: 0, rMin: 0, rMax: 0 },
+  iceBlobs: { count: 0, rMin: 0, rMax: 0 },
+  emberBlobs: { count: 0, rMin: 0, rMax: 0 },
+  coalBlobs: { count: 0, rMin: 0, rMax: 0 },
+  ventCount: 6,
+  minerCap: 3,
+};
 
 export type GeneratedWorld = {
   solid: Uint8Array;
@@ -113,7 +176,12 @@ const carveBlob = (solid: Uint8Array, w: number, h: number, cx: number, cy: numb
   }
 };
 
-const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | null => {
+const generateAttempt = (
+  seed: number,
+  w: number,
+  h: number,
+  profile: WorldgenProfile
+): GeneratedWorld | null => {
   const rng = new RNG(seed >>> 0 || 1);
   const solid = new Uint8Array(w * h).fill(SOLID_ROCK);
   const surface = new Uint8Array(w * h).fill(SURF_NONE);
@@ -214,9 +282,35 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
       // parede fina (aberto dos dois lados) tem chance alta de ser fragil
       const thinH = isOpen(x - 1, y) && isOpen(x + 1, y);
       const thinV = isOpen(x, y - 1) && isOpen(x, y + 1);
-      if ((thinH || thinV) && roll < 0.55) solid[i] = SOLID_FRAGILE;
-      else if (roll < 0.07) solid[i] = SOLID_ORE;
-      else if (roll < 0.1) solid[i] = SOLID_CRYSTAL;
+      if ((thinH || thinV) && roll < profile.fragileThinChance) solid[i] = SOLID_FRAGILE;
+      else if (roll < profile.oreChance) solid[i] = SOLID_ORE;
+      else if (roll < profile.oreChance + profile.crystalChance) solid[i] = SOLID_CRYSTAL;
+    }
+  }
+
+  // 4b) nervuras de cristal (Catedral Prismatica): caminhadas retas que
+  // atravessam a rocha. Diferem da decoracao pontual em UMA propriedade que
+  // importa: sao CONTINUAS, entao a ressonancia (floodFrom sobre cristal)
+  // viaja por elas de sala em sala — e a lamina translucida que separa dois
+  // corredores e uma parede que o jogador pode escolher transformar em arma.
+  // Só rocha comum vira cristal: minerio e fragil ja tem papel proprio.
+  for (let vein = 0; vein < profile.crystalVeins; vein++) {
+    const cell = openCells[rng.nextInt(openCells.length)];
+    const anchor = { x: cell % w, y: Math.floor(cell / w) };
+    const angle = (rng.nextInt(8) * Math.PI) / 4;
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    const length = 8 + rng.nextInt(10);
+    let fx = anchor.x + 0.5;
+    let fy = anchor.y + 0.5;
+    for (let step = 0; step < length; step++) {
+      fx += dirX;
+      fy += dirY;
+      const x = Math.floor(fx);
+      const y = Math.floor(fy);
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
+      const i = idx(w, x, y);
+      if (solid[i] === SOLID_ROCK) solid[i] = SOLID_CRYSTAL;
     }
   }
 
@@ -240,8 +334,16 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
       }
     }
   };
-  blobSurface(SURF_FUNGAL, 26, 2, 4);
-  blobSurface(SURF_BIOFLUID, 12, 1, 3);
+  // Agua antes das outras materias: pintado-primeiro vence (as manchas checam
+  // SURF_NONE), e no Aquifero o lago e a geografia — fungo e biofluido crescem
+  // nas MARGENS dele, nunca por cima. Com count 0 nada e sorteado, entao o
+  // basalto historico consome exatamente a mesma sequencia de RNG de sempre.
+  blobSurface(SURF_WATER, profile.waterBlobs.count, profile.waterBlobs.rMin, profile.waterBlobs.rMax);
+  blobSurface(SURF_ICE, profile.iceBlobs.count, profile.iceBlobs.rMin, profile.iceBlobs.rMax);
+  blobSurface(SURF_EMBER, profile.emberBlobs.count, profile.emberBlobs.rMin, profile.emberBlobs.rMax);
+  blobSurface(SURF_SCORCHED, profile.coalBlobs.count, profile.coalBlobs.rMin, profile.coalBlobs.rMax);
+  blobSurface(SURF_FUNGAL, profile.fungalBlobs.count, profile.fungalBlobs.rMin, profile.fungalBlobs.rMax);
+  blobSurface(SURF_BIOFLUID, profile.biofluidBlobs.count, profile.biofluidBlobs.rMin, profile.biofluidBlobs.rMax);
 
   // area de entrada limpa (jogador nao nasce em material perigoso)
   for (let y = entry.y - 2; y <= entry.y + 2; y++) {
@@ -345,7 +447,7 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
   if (salvageSites.length < 3) return null;
 
   const ventPositions: Vec2[] = [];
-  for (let v = 0; v < 6; v++) {
+  for (let v = 0; v < profile.ventCount; v++) {
     const p = pickOpenFar(10, 8, [...ventPositions, ...reserved]);
     if (p) ventPositions.push(p);
   }
@@ -361,9 +463,14 @@ const generateAttempt = (seed: number, w: number, h: number): GeneratedWorld | n
 };
 
 /** Geracao deterministica com retentativas limitadas (seed derivada) ate mapa solucionavel. */
-export const generateWorld = (seed: number, w: number, h: number): GeneratedWorld => {
+export const generateWorld = (
+  seed: number,
+  w: number,
+  h: number,
+  profile: WorldgenProfile = DEFAULT_PROFILE
+): GeneratedWorld => {
   for (let attempt = 0; attempt < 16; attempt++) {
-    const result = generateAttempt((seed ^ (attempt * 0x85ebca6b)) >>> 0, w, h);
+    const result = generateAttempt((seed ^ (attempt * 0x85ebca6b)) >>> 0, w, h, profile);
     if (result) return result;
   }
   throw new Error(`generateWorld: nenhum mapa solucionavel para seed ${seed}`);
