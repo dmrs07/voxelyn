@@ -1,6 +1,6 @@
 {
   "id": "fx-impact-burst",
-  "version": 3,
+  "version": 4,
   "atlas": "fx-impact-burst.png",
   "frameWidth": 32,
   "frameHeight": 32,
@@ -24,8 +24,11 @@
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
+    "#2f6b4f",
     "#59f2c2",
-    "#e8f1ff"
+    "#7ab8ff",
+    "#e8f1ff",
+    "#ffe9b8"
   ],
   "animations": {
     "burst": {
@@ -41,7 +44,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "small cyan voxel impact ring",
+    "prompt": "fragmenting impact burst, elongated shards, fading inner ring",
     "seedOrRef": "deterministic-code-v2"
   }
 }

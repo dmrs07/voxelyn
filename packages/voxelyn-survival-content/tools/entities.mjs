@@ -309,9 +309,23 @@ const bruiserModel = (anim, f) => {
 
   if (anim === 'special' && !hurlThrow) {
     const rockZ = 5 + hurlLift;
-    // O volume converge com um bloco real do terreno, sem ocupar o frame inteiro.
-    b.push(box(-3, -2, rockZ, 7, 5, 4, hurlHold ? 'rock' : 'rockDeep'));
+    // A MESMA pedra que voa (ProjectileView): corpo de rocha com TAMPA palida
+    // de osso — a pedra-placa dos ombros do proprio Britador. O bloco erguido
+    // e o projetil tem de ser um objeto so, senao o telegraph ensina uma coisa
+    // e o voo cobra outra.
+    b.push(box(-3, -2, rockZ, 7, 5, 3.5, hurlHold ? 'rock' : 'rockDeep'));
+    b.push(box(-3, -2, rockZ + 3.5, 7, 5, 0.5, 'bone'));
     b.push(box(-2, -3, rockZ + 2, 5, 1, 2, 'rock'));
+    // A CARGA aparece na pausa em tensao: faiscas eletricas de meio-passo
+    // crepitando no bloco durante o hold — a corrente do nucleo-geodo subindo
+    // pela pedra e o mesmo azul que vai orbitar o projetil. O telegraph deixa
+    // de ser so "pedra no alto" e passa a ser "pedra ARMANDO".
+    if (hurlHold) {
+      b.push(box(-3.5, -1.5, rockZ + 1, 0.5, 0.5, 1, 'electric'));
+      b.push(box(4, -1, rockZ + 2, 0.5, 0.5, 1, 'electric'));
+      b.push(box(0, -3.5, rockZ + 2.5, 0.5, 0.5, 0.5, 'electric'));
+      b.push(box(-1, -2.5, rockZ + 4, 1, 0.5, 0.5, 'electric'));
+    }
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
@@ -1128,51 +1142,65 @@ const frostWraithModel = (anim, f) => {
 };
 const frostWraithFrame = (dir, anim, f) => renderVoxels(frostWraithModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
-/**
- * Upscale 2x vizinho-mais-proximo para os FX desenhados em 2D.
- *
- * Os FX nao passam pelo rasterizador voxel, entao MODEL_SCALE nao os alcanca —
- * mas o cliente desenha TODO atlas com o mesmo fator (ATLAS_SCALE), e um FX que
- * ficasse em 16x16 sairia com metade do tamanho de mundo. Dobrar por vizinho
- * preserva o desenho autorado pixel a pixel.
- */
-const upscale2x = (g) => {
-  const out = grid(g.w * 2, g.h * 2);
-  for (let y = 0; y < g.h; y++) {
-    for (let x = 0; x < g.w; x++) {
-      const src = (y * g.w + x) * 4;
-      if (g.buf[src + 3] === 0) continue;
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const dst = ((y * 2 + dy) * out.w + x * 2 + dx) * 4;
-          out.buf[dst] = g.buf[src];
-          out.buf[dst + 1] = g.buf[src + 1];
-          out.buf[dst + 2] = g.buf[src + 2];
-          out.buf[dst + 3] = g.buf[src + 3];
-        }
-      }
-    }
-  }
-  return out;
-};
-
+// FX AUTORADOS NATIVOS na resolucao fina (32x32). Ate a subdivisao da grade
+// eles eram desenhos de 16x16 dobrados por vizinho-mais-proximo — pixels
+// gordos de 2x2 fingindo resolucao. Redesenhados no grao real: o estilhaco
+// ganha faceta sombreada, halo que cintila e DUAS faiscas orbitando; o impacto
+// vira fragmentacao com estilhacos alongados e anel residual apagando.
+// (O `upscale2x` que dobrava os antigos saiu junto com eles.)
 const boltFrame = (_dir, _anim, f) => {
-  const g = grid(16, 16);
-  fillDiamond(g, 8, 8, 3, 3, 'biolum');
-  fillDiamond(g, 8, 8, 1, 1, 'player');
-  const pts = [[13, 8], [8, 13], [3, 8], [8, 3]];
-  const [x, y] = pts[f % 4];
-  set(g, x, y, 'electric');
+  const g = grid(32, 32);
+  // Nucleo facetado: tres losangos deslocados para o alto-esquerda — a mesma
+  // key light de todo volume do jogo, agora com resolucao para o degrade.
+  fillDiamond(g, 16, 16, 6, 6, 'fungus');
+  fillDiamond(g, 15, 15, 4, 4, 'biolum');
+  fillDiamond(g, 14, 14, 2, 2, 'player');
+  // Halo esparso cintilando: um terco dos pontos se apaga por quadro, em
+  // rodizio — energia respingando do nucleo, nao um aro fixo.
+  const halo = [[16, 6], [25, 11], [26, 16], [22, 24], [16, 26], [9, 23], [6, 16], [9, 9]];
+  halo.forEach(([hx, hy], i) => {
+    if ((i + f) % 3 === 0) return;
+    set(g, hx, hy, 'biolum');
+  });
+  // DUAS faiscas eletricas em orbita oposta, oito posicoes no ciclo de quatro
+  // quadros, com um rastro de um pixel na posicao anterior.
+  for (const off of [0, 4]) {
+    const step = (f + off) % 8;
+    const a = step * (Math.PI / 4);
+    const prev = a - Math.PI / 4;
+    set(g, 16 + Math.cos(a) * 10, 16 + Math.sin(a) * 10, 'electric');
+    set(g, 16 + Math.cos(prev) * 10, 16 + Math.sin(prev) * 10, 'mist');
+  }
   outlineWith(g, 'dark');
   return g;
 };
 const impactFrame = (_dir, _anim, f) => {
-  const g = grid(16, 16);
-  const r = 1 + f;
-  for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
-    set(g, 8 + Math.round(Math.cos(a) * r), 8 + Math.round(Math.sin(a) * r), f < 2 ? 'player' : 'biolum');
+  const g = grid(32, 32);
+  // Anel principal expandindo, com meio passo de giro por quadro para os
+  // estilhacos nao viajarem em trilhos retos.
+  const r = 3 + f * 2.5;
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI) / 8 + (f % 2) * (Math.PI / 16);
+    const mat = f < 1 ? 'player' : f < 3 ? 'biolum' : 'electric';
+    set(g, 16 + Math.cos(a) * r, 16 + Math.sin(a) * r, mat);
+    // Fragmento ALONGADO: um segundo pixel radial para fora em metade dos
+    // raios dos quadros medios — estilhaco voando, nao pontilhado.
+    if (f >= 1 && f <= 3 && i % 2 === 0) {
+      set(g, 16 + Math.cos(a) * (r + 2), 16 + Math.sin(a) * (r + 2), mat);
+    }
   }
-  if (f === 0) fillDiamond(g, 8, 8, 2, 2, 'player');
+  // Clarao do primeiro quadro: o momento do acerto e o mais claro do ciclo.
+  if (f === 0) {
+    fillDiamond(g, 16, 16, 4, 4, 'player');
+    fillDiamond(g, 16, 16, 2, 2, 'beam');
+  }
+  // Anel residual interno apagando atras da frente: a energia que ja passou.
+  if (f >= 2) {
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4 + Math.PI / 8;
+      set(g, 16 + Math.cos(a) * (r - 4), 16 + Math.sin(a) * (r - 4), 'fungus');
+    }
+  }
   return g;
 };
 
@@ -1233,7 +1261,7 @@ export const ENTITY_SPECS = [
   base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
-  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 5),
+  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 6),
   base('enemy-guardian', 112, 128, 56, 124, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
@@ -1255,19 +1283,17 @@ export const ENTITY_SPECS = [
   base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 1),
   base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 1),
   {
-    id: 'fx-projectile-bolt', version: 3, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
+    id: 'fx-projectile-bolt', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { fly: { frames: 4, fps: 16, loop: true } },
-    draw: (dir, anim, f) => upscale2x(boltFrame(dir, anim, f)),
-    prompt: 'small cyan voxel energy bolt',
+    animations: { fly: { frames: 4, fps: 16, loop: true } }, draw: boltFrame,
+    prompt: 'faceted cyan energy shard, shimmering halo, twin orbiting electric sparks',
   },
   {
-    id: 'fx-impact-burst', version: 3, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
+    id: 'fx-impact-burst', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0, h: 0 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { burst: { frames: 5, fps: 14, loop: false } },
-    draw: (dir, anim, f) => upscale2x(impactFrame(dir, anim, f)),
-    prompt: 'small cyan voxel impact ring',
+    animations: { burst: { frames: 5, fps: 14, loop: false } }, draw: impactFrame,
+    prompt: 'fragmenting impact burst, elongated shards, fading inner ring',
   },
 ];

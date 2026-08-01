@@ -36,14 +36,22 @@ const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
 const SEEKER_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 const SEEKER_FLAME_RAMP: FaceRamp = ['#ffd166', '#ff7a2f', '#6e4a33'];
 /**
- * Pedra do bruiser: a MESMA rampa dos blocos de terreno.
+ * Pedra do bruiser: pedra CARREGADA, nao pedra camuflada.
  *
- * Ela nao e "um projetil cinza", e um PEDACO DA PAREDE — foi arrancado da arena
- * um segundo antes. Usar a rampa do terreno e o que fecha essa leitura: o
- * jogador reconhece o material voando porque acabou de ve-lo sair do lugar.
- * Com a rampa hostil generica, o bloco aparecia como cusparada de acido.
+ * A primeira versao usava a rampa exata dos blocos de terreno, pela leitura
+ * "isto e um pedaco da parede" — e era, mas voando sobre um chao da MESMA
+ * rocha o bloco sumia no fundo, e o unico projetil pesado do jogo virava dano
+ * ilegivel. O jogo promete que a morte venha de decisao arriscada, nunca do
+ * que nao dava para ver: legibilidade vence pureza de material.
+ *
+ * A resposta continua sendo do mundo: o topo palido e a pedra-placa do
+ * proprio Britador (osso, o material dos ombros dele), e as faiscas eletricas
+ * que crepitam no bloco sao a corrente do nucleo-geodo que acabou de
+ * arranca-lo. Acento saturado = perigo, como manda a art bible.
  */
-const ROCK_RAMP: FaceRamp = ['#46566e', '#2e3a4d', '#1d2430'];
+const ROCK_RAMP: FaceRamp = ['#b8a98f', '#46566e', '#2e3a4d'];
+/** Crepitacao da pedra: a mesma eletricidade do nucleo do Britador. */
+const ROCK_SPARK = '#7ab8ff';
 /**
  * Disco de retorno: AMARELO, e nao mais azul-branco.
  *
@@ -410,12 +418,33 @@ export class ProjectileView {
     // e e por ela que a massa se le enquanto ele ainda esta longe.
     drawGroundShadow(ctx, sx, sy, (rock ? 7 : seeker ? 5 : disc ? 6 : 3) * zoom);
 
-    // Pedra nao deixa rastro nem se parte em estilhaco: e um corpo solido e
-    // unico. O rastro existe para materia que se desfaz no ar — cuspe e
-    // estilhaco de energia —, e desenha-lo aqui daria a um bloco a aparencia de
-    // algo que evapora enquanto voa.
+    // Pedra nao deixa rastro de energia nem se parte em estilhaco: e um corpo
+    // solido e unico. O que ela deixa e CASCALHO — pedrinhas escuras se
+    // soltando do bloco — e o que ela carrega e a crepitacao eletrica do
+    // nucleo que a arrancou: dois sinais que a fazem rastreavel contra um chao
+    // da mesma rocha, sem mentir sobre o material.
     if (rock) {
+      if (track && (track.dx !== 0 || track.dy !== 0)) {
+        for (let i = 2; i >= 1; i--) {
+          const [px, py] = project(projectile.x - track.dx * i * 0.22, projectile.y - track.dy * i * 0.22);
+          ctx.globalAlpha = 0.5 - i * 0.15;
+          drawVoxel(ctx, px, py - lift + i * zoom, size * 0.22, ramp);
+        }
+        ctx.globalAlpha = 1;
+      }
       drawVoxel(ctx, sx, sy - lift, size, ramp);
+      // Faiscas orbitando o bloco, em fase pela distancia percorrida: a
+      // corrente crepita enquanto ele voa e para quando o mundo para.
+      const spin = (track?.travelled ?? 0) * 5;
+      ctx.fillStyle = ROCK_SPARK;
+      for (let i = 0; i < 3; i++) {
+        const a = spin + i * 2.1;
+        const px = sx + Math.cos(a) * size * 0.62;
+        const py = sy - lift + Math.sin(a) * size * 0.45;
+        ctx.globalAlpha = 0.6 + 0.4 * Math.sin(spin * 1.7 + i);
+        ctx.fillRect(Math.round(px), Math.round(py), Math.max(1, zoom), Math.max(1, zoom));
+      }
+      ctx.globalAlpha = 1;
       return;
     }
     if (seeker) {

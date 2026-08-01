@@ -1,6 +1,6 @@
 {
   "id": "fx-projectile-bolt",
-  "version": 3,
+  "version": 4,
   "atlas": "fx-projectile-bolt.png",
   "frameWidth": 32,
   "frameHeight": 32,
@@ -25,8 +25,10 @@
   "palette": "veio-fungico.v01",
   "paletteColors": [
     "#0b0e14",
+    "#2f6b4f",
     "#59f2c2",
     "#7ab8ff",
+    "#7b8ba3",
     "#e8f1ff"
   ],
   "animations": {
@@ -43,7 +45,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "small cyan voxel energy bolt",
+    "prompt": "faceted cyan energy shard, shimmering halo, twin orbiting electric sparks",
     "seedOrRef": "deterministic-code-v2"
   }
 }

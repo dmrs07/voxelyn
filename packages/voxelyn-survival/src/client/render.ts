@@ -1586,9 +1586,18 @@ export class SurvivalRenderer {
         if (sx < -40 || sx > vw + 40 || sy < -80 || sy > vh + 40) continue;
         const cycle = 2200 + (seed % 1400);
         const phase = ((nowMs + (seed % 100000)) % cycle) / cycle;
+        // Celula cercada de poca por todos os lados pode abrir ondulacao larga
+        // — ela morre dentro do proprio liquido. Na borda, o anel e contido ao
+        // losango da celula: ondulacao subindo na rocha seca e agua mentindo.
+        const pool = (nx: number, ny: number): boolean => {
+          if (nx < 0 || ny < 0 || nx >= w || ny * w + nx >= state.solid.length) return false;
+          const ni = ny * w + nx;
+          return state.solid[ni] === SOLID_NONE && state.surface[ni] === SURF_BIOFLUID;
+        };
+        const enclosed = pool(x - 1, y) && pool(x + 1, y) && pool(x, y - 1) && pool(x, y + 1);
         items.push({
           depth: x + y,
-          draw: () => this.drawPoolDrip(ctx, sx, sy, z, phase, seed),
+          draw: () => this.drawPoolDrip(ctx, sx, sy, z, phase, seed, enclosed),
         });
       }
     }
@@ -1831,10 +1840,21 @@ export class SurvivalRenderer {
     sy: number,
     z: number,
     phase: number,
-    seed: number
+    seed: number,
+    enclosed: boolean
   ): void {
-    const jx = sx + ((((seed >>> 3) % 33) - 16) / 33) * TILE_W * 0.6 * z;
-    const jy = sy + ((((seed >>> 9) % 33) - 16) / 33) * TILE_H * 0.5 * z;
+    // Ponto de impacto contido no miolo do losango: perto da borda o anel
+    // teria de nascer ja cortado.
+    const jx = sx + ((((seed >>> 3) % 33) - 16) / 33) * TILE_W * 0.3 * z;
+    const jy = sy + ((((seed >>> 9) % 33) - 16) / 33) * TILE_H * 0.25 * z;
+    // Raio maximo do anel, em fracao da meia-celula. Cercada de poca, a
+    // ondulacao pode atravessar para as celulas vizinhas — e liquido continuo.
+    // Na borda, o teto vem da metrica do losango (|dx|/W + |dy|/H <= 1): o
+    // anel para ANTES da linha da agua, nunca sobe na rocha seca.
+    const half = TILE_W * 0.5 * z;
+    const halfH = TILE_H * 0.5 * z;
+    const offset = Math.abs(jx - sx) / half + Math.abs(jy - sy) / halfH;
+    const kMax = enclosed ? 0.85 : Math.max(0.16, 0.68 - offset);
     const FALL_END = 0.3;
     const RIPPLE_END = 0.85;
     if (phase < FALL_END) {
@@ -1858,7 +1878,7 @@ export class SurvivalRenderer {
       if (tt <= 0 || tt >= 1) continue;
       ctx.globalAlpha = (1 - tt) * gain;
       ctx.beginPath();
-      ctx.ellipse(jx, jy, tt * TILE_W * 0.34 * z, tt * TILE_H * 0.34 * z, 0, 0, Math.PI * 2);
+      ctx.ellipse(jx, jy, tt * kMax * half, tt * kMax * halfH, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     // Respingo do impacto: duas goticulas saltando e recaindo no primeiro
