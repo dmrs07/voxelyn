@@ -20,6 +20,7 @@
 //   - nada sobre superficie reativa ou elemento (fogo, gas, agua, gelo...):
 //     o chao que JOGA nunca e escondido por enfeite.
 import {
+  createRun,
   SOLID_NONE,
   SURF_FUNGAL,
   SURF_NONE,
@@ -128,7 +129,21 @@ const ATTEMPTS_PER_SLOT = 6;
  * entrada, do poco/nucleo, dos terminais e cofres, dos respiradouros nem da
  * posicao de chefe. Decoracao nunca compete com informacao.
  */
-export const placeDecor = (state: SurvivalState): DecorativeProp[] => {
+export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
+  // A colocacao le um mundo PRISTINO do setor, reconstruido da seed — nunca o
+  // estado vivo. O estado vivo ja pode ter paredes arrancadas e fungo queimado
+  // quando um cliente entra numa sala em andamento, e cada rejeicao diferente
+  // na amostragem deslocaria a sequencia do PRNG: dois clientes veriam
+  // cenarios diferentes da MESMA seed. Derivando do mundo de entrada do setor,
+  // a lista e identica em qualquer maquina, entre a qualquer momento; o mundo
+  // vivo so participa na validacao por quadro (`propStillValid`).
+  const state = createRun({
+    seed: live.config.seed,
+    sector: live.sector,
+    width: live.config.width,
+    height: live.config.height,
+    playerCount: 1,
+  });
   const w = state.config.width;
   const h = state.config.height;
   const rng = mulberry32(

@@ -22,6 +22,19 @@ describe('decoracao derivada', () => {
     expect(placeDecor(b)).toEqual(decorA);
   });
 
+  it('cliente que entra numa sala em andamento ve o MESMO cenario', () => {
+    // A colocacao deriva do mundo pristino do setor, nao do snapshot que
+    // chegou: um estado ja mutilado (paredes arrancadas, fungo queimado) nao
+    // pode deslocar a amostragem e divergir a decoracao entre os clientes.
+    const fresh = createRun({ seed: 77 });
+    const decorFresh = placeDecor(fresh);
+
+    const midRun = createRun({ seed: 77 });
+    for (let i = 0; i < midRun.solid.length; i += 7) midRun.solid[i] = SOLID_NONE;
+    for (let i = 0; i < midRun.surface.length; i += 5) midRun.surface[i] = 0;
+    expect(placeDecor(midRun)).toEqual(decorFresh);
+  });
+
   it('respeita todas as zonas proibidas do setor', () => {
     for (const seed of [3, 42, 1337]) {
       const state = createRun({ seed, sector: 2 });

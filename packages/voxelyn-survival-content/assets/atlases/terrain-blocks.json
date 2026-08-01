@@ -1,6 +1,6 @@
 {
   "id": "terrain-blocks",
-  "version": 2,
+  "version": 3,
   "atlas": "terrain-blocks.png",
   "frameWidth": 64,
   "frameHeight": 68,
