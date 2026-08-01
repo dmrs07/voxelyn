@@ -1,5 +1,6 @@
 import { resolveFrame, type SpriteManifestEntry } from '@voxelyn/survival-content';
 import { TILE_W } from './render';
+import { ATLAS_SCALE } from './sprites';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
 import stalkerManifest from '@voxelyn/survival-content/assets/atlases/enemy-stalker.json';
@@ -98,16 +99,19 @@ const draw = (now: number): void => {
       ctx.fillRect(manifest.anchorX * zoom - 1, manifest.anchorY * zoom - 1, 3, 3);
     }
     if (controls.hitbox()) {
+      // Hitbox e footprint sao medidas de MUNDO (tiles); o sprite esta na
+      // grade fina, onde um tile ocupa TILE_W * ATLAS_SCALE pixels de atlas.
+      const tilePx = TILE_W * ATLAS_SCALE * zoom;
       ctx.strokeStyle = 'rgba(217,59,76,0.9)';
       ctx.lineWidth = 1;
-      const hbw = manifest.hitbox.w * TILE_W * zoom;
-      const hbh = manifest.hitbox.h * TILE_W * 0.5 * zoom;
+      const hbw = manifest.hitbox.w * tilePx;
+      const hbh = manifest.hitbox.h * tilePx * 0.5;
       ctx.strokeRect(manifest.anchorX * zoom - hbw / 2, manifest.anchorY * zoom - hbh, hbw, hbh);
       ctx.strokeStyle = 'rgba(255,209,102,0.9)';
-      const fpw = manifest.footprint.w * TILE_W * zoom;
-      const fph = manifest.footprint.h * TILE_W * 0.5 * zoom;
-      const fpx = manifest.anchorX * zoom + manifest.footprint.offsetX * TILE_W * zoom;
-      const fpy = manifest.anchorY * zoom + manifest.footprint.offsetY * TILE_W * 0.5 * zoom;
+      const fpw = manifest.footprint.w * tilePx;
+      const fph = manifest.footprint.h * tilePx * 0.5;
+      const fpx = manifest.anchorX * zoom + manifest.footprint.offsetX * tilePx;
+      const fpy = manifest.anchorY * zoom + manifest.footprint.offsetY * tilePx * 0.5;
       ctx.strokeRect(fpx - fpw / 2, fpy - fph, fpw, fph);
     }
   }

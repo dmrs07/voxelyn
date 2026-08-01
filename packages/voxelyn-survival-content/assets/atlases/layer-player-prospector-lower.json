@@ -1,12 +1,12 @@
 {
   "id": "layer-player-prospector-lower",
-  "version": 4,
+  "version": 5,
   "atlas": "layer-player-prospector-lower.png",
-  "frameWidth": 44,
-  "frameHeight": 56,
+  "frameWidth": 88,
+  "frameHeight": 112,
   "columns": 40,
-  "anchorX": 22,
-  "anchorY": 54,
+  "anchorX": 44,
+  "anchorY": 108,
   "directions": 4,
   "authoredDirs": [
     "dr",

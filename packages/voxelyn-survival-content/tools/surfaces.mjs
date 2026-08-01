@@ -15,7 +15,7 @@
 // Cada tipo e um tile de chao COMPLETO, com o substrato de rocha embutido: o
 // cliente faz UM drawImage por celula, no lugar de um fill de losango mais os
 // remendos por cima. Nao ha custo novo por frame — ha menos.
-import { box, DIR_UNROTATED, renderVoxels, VOX } from './voxel.mjs';
+import { box, DIR_UNROTATED, modelBounds, renderVoxels } from './voxel.mjs';
 import { dim, LIGHT_LEVELS, lightFactor, VARIANTS } from './terrain.mjs';
 import { COLORS } from './lib.mjs';
 
@@ -459,29 +459,21 @@ export const surfaceModel = (kind, variant, frame) => {
   throw new Error(`tipo de superficie desconhecido: ${kind}`);
 };
 
-/** Extensao projetada de qualquer crosta, para dimensionar frame e ancora. */
+/**
+ * Extensao projetada de qualquer crosta, para dimensionar frame e ancora.
+ * Medida por modelBounds, na mesma grade fina que o rasterizador pinta —
+ * projetar a coordenada autorada a mao mentiria por um fator de MODEL_SCALE.
+ */
 export const surfaceBounds = () => {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
+  let acc;
   for (const kind of SURFACE_KINDS) {
     for (let variant = 0; variant < VARIANTS; variant++) {
       for (let frame = 0; frame < kind.frames; frame++) {
-        for (const b of surfaceModel(kind.name, variant, frame)) {
-          for (const z of [b.z, b.z + b.h - 1]) {
-            const sx = (b.x - b.y) * (VOX.tileW / 2);
-            const sy = (b.x + b.y) * (VOX.tileH / 2) - z * VOX.zStep;
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx + VOX.tileW - 1);
-            minY = Math.min(minY, sy - 2);
-            maxY = Math.max(maxY, sy + VOX.zStep - 1);
-          }
-        }
+        acc = modelBounds(surfaceModel(kind.name, variant, frame), acc);
       }
     }
   }
-  return { minX, maxX, minY, maxY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  return acc;
 };
 
 /**

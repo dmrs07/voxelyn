@@ -2,11 +2,11 @@
   "id": "surface-tiles",
   "version": 1,
   "atlas": "surface-tiles.png",
-  "frameWidth": 32,
-  "frameHeight": 38,
-  "columns": 128,
-  "originX": 14,
-  "originY": 30,
+  "frameWidth": 64,
+  "frameHeight": 76,
+  "columns": 64,
+  "originX": 30,
+  "originY": 60,
   "kinds": [
     {
       "name": "bare",

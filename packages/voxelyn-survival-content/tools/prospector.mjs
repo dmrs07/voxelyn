@@ -51,15 +51,23 @@ import { box } from './voxel.mjs';
  * degradado e grande demais, curvado sob a propria carga; se os dois medissem o
  * mesmo, a leitura do encontro inteiro se perderia.
  */
-export const FRAME_WIDTH = 44;
-export const FRAME_HEIGHT = 56;
-export const ANCHOR_X = 22;
-export const ANCHOR_Y = 54;
+// Dobrado junto com MODEL_SCALE: o modelo continua o mesmo, mas cada unidade
+// autorada projeta 2x2x2 voxels finos, entao o frame e a ancora medem o dobro
+// de pixels. O tamanho em MUNDO nao muda — o cliente desenha com metade do
+// zoom (ATLAS_SCALE) e o bot ocupa o mesmo tile de sempre.
+export const FRAME_WIDTH = 88;
+export const FRAME_HEIGHT = 112;
+export const ANCHOR_X = 44;
+export const ANCHOR_Y = 108;
 /** Origem de desenho do rasterizador; o enquadramento final vem do fitToMargin. */
-export const RENDER_ANCHOR_X = 20;
-export const RENDER_ANCHOR_Y = 50;
+export const RENDER_ANCHOR_X = 40;
+export const RENDER_ANCHOR_Y = 100;
 
-/** Voxels por tile do mundo: 4px de voxel contra 32px de tile. */
+/**
+ * Unidades AUTORADAS por tile do mundo: 8 continua valendo — a autoria nao
+ * mudou de escala. Em voxels finos um tile tem 16; quem converte passada em
+ * tiles (walkFps) trabalha na unidade autorada e nao ve a subdivisao.
+ */
 export const VOXELS_PER_TILE = 8;
 
 /**

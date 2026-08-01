@@ -149,6 +149,18 @@ export const keepEmissivePixels = (
 };
 
 /**
+ * Quantos pixels de ATLAS cabem num pixel logico do mundo.
+ *
+ * A grade voxel do gerador foi subdividida (MODEL_SCALE=2 no pipeline de
+ * conteudo): todo atlas — entidades, terreno, crostas, props e FX — tem o dobro
+ * da resolucao para o MESMO tamanho de mundo. O cliente converte na hora de
+ * desenhar: um sprite/bloco e desenhado com `zoom / ATLAS_SCALE`, entao no zoom
+ * tipico de 2x cada pixel de atlas cai em exatamente 1 pixel de tela — o dobro
+ * de detalhe visivel, sem mudar o tamanho de nada em jogo.
+ */
+export const ATLAS_SCALE = 2;
+
+/**
  * Mascara com os pixels emissivos de um atlas, em meia resolucao.
  *
  * Devolve `null` quando nao ha um unico pixel emissivo, e ai o desenho pula o
@@ -252,13 +264,16 @@ export class TerrainBank {
     if (!this.ready) return false;
     const m = this.manifest;
     const rect = resolveBlock(m, kindIndex, variantAt(x, y, m.variants), lightLevelFor(m, brightness));
-    // A origem do modelo cai meio voxel adiante do centro do tile nos dois
-    // eixos, o que na projecao 2:1 e 1px para baixo e 0 na horizontal.
-    const dx = screenX - m.originX * zoom;
-    const dy = screenY + zoom - m.originY * zoom;
+    // O atlas esta na grade fina: pixels de atlas viram tela por `s`, nao por
+    // `zoom`. A origem do modelo cai meio voxel AUTORADO adiante do centro do
+    // tile nos dois eixos — na projecao 2:1 isso e 1px logico para baixo, que
+    // na grade fina sao ATLAS_SCALE pixels de atlas.
+    const s = zoom / ATLAS_SCALE;
+    const dx = screenX - m.originX * s;
+    const dy = screenY + ATLAS_SCALE * s - m.originY * s;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+      dx, dy, m.frameWidth * s, m.frameHeight * s);
     return true;
   }
 }
@@ -319,11 +334,13 @@ export class SurfaceBank {
       surfaceFrameAt(m, kindIndex, x, y, nowMs),
       lightLevelFor(m, brightness)
     );
-    const dx = screenX - m.originX * zoom;
-    const dy = screenY + zoom - m.originY * zoom;
+    // Mesma conversao de grade fina do bloco: a ancora e identica de proposito.
+    const s = zoom / ATLAS_SCALE;
+    const dx = screenX - m.originX * s;
+    const dy = screenY + ATLAS_SCALE * s - m.originY * s;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+      dx, dy, m.frameWidth * s, m.frameHeight * s);
     return true;
   }
 }
@@ -374,11 +391,14 @@ export class PropBank {
     if (kindIndex < 0) return false;
     const m = this.manifest;
     const rect = resolveProp(m, this.offsets, kindIndex, propFrameAt(m, kindIndex, nowMs));
-    const dx = screenX - m.originX * zoom;
-    const dy = screenY + zoom - m.originY * zoom;
+    // Mesma conversao de grade fina do bloco e do chao: mesma ancora, de
+    // proposito, para o pedestal assentar sem costura.
+    const s = zoom / ATLAS_SCALE;
+    const dx = screenX - m.originX * s;
+    const dy = screenY + ATLAS_SCALE * s - m.originY * s;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * zoom, m.frameHeight * zoom);
+      dx, dy, m.frameWidth * s, m.frameHeight * s);
     return true;
   }
 }
@@ -386,7 +406,9 @@ export class PropBank {
 const PLAYER_LOWER_ID = 'layer-player-prospector-lower';
 const PLAYER_UPPER_ID = 'layer-player-prospector-upper';
 const PLAYER_GUN_ID = 'layer-player-prospector-gun';
-const WALK_HIP_BOB = [0, -1, -1, 0, 0, -1];
+// Em pixels de ATLAS (grade fina): -2 aqui sao os mesmos -1 logicos de antes
+// da subdivisao.
+const WALK_HIP_BOB = [0, -2, -2, 0, 0, -2];
 
 /**
  * Rampa de calor do cano, em cores da paleta mestra.
@@ -477,7 +499,8 @@ export const recoilScreenOffset = (
   const screenX = (facingX - facingY) / worldLength;
   const screenY = (facingX + facingY) / (worldLength * 2);
   const screenLength = Math.hypot(screenX, screenY) || 1;
-  const distance = Math.max(0, Math.min(1, recoil)) * 2.25 * zoom;
+  // 4.5 pixels de atlas na grade fina = os mesmos 2.25 logicos de sempre.
+  const distance = Math.max(0, Math.min(1, recoil)) * 4.5 * zoom;
   return {
     x: -(screenX / screenLength) * distance,
     y: -(screenY / screenLength) * distance,

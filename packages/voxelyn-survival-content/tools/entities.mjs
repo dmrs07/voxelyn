@@ -114,7 +114,7 @@ const stalkerModel = (anim, f) => {
   b.push(box(3, -2 - lunge, 5, 1, 1, 1, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const stalkerFrame = (dir, anim, f) => renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
+const stalkerFrame = (dir, anim, f) => renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // ---------------------------------------------------------------------------
 // enemy-spitter 32x32 — anfibio fungico bojudo, garganta acida, olhos em haste
@@ -148,7 +148,7 @@ const spitterModel = (anim, f) => {
   b.push(box(2, -1, 6 + z, 1, 1, 1, 'biolum'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const spitterFrame = (dir, anim, f) => renderVoxels(spitterModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
+const spitterFrame = (dir, anim, f) => renderVoxels(spitterModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // ---------------------------------------------------------------------------
 // enemy-spore-bomber 32x32 — encapuzado, olho unico, pod que incha antes de estourar
@@ -178,7 +178,7 @@ const bomberModel = (anim, f) => {
   b.push(box(-3, 2, 2 + z, 5 + swell, 2, 4 + swell + pulse, 'acid'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 32, 32, 14, 27);
+const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // ---------------------------------------------------------------------------
 // enemy-bruiser 48x56 — geodo de ombros largos, placas palidas, nucleo eletrico
@@ -225,7 +225,7 @@ const bruiserModel = (anim, f) => {
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 48, 68, 22, 62);
+const bruiserFrame = (dir, anim, f) => renderVoxels(bruiserModel(anim, f), DIR_INDEX[dir], 96, 136, 44, 124);
 
 // ---------------------------------------------------------------------------
 // enemy-guardian 48x56 — titan mineral, antebracos enormes, mascara, nucleo
@@ -273,7 +273,7 @@ const guardianModel = (anim, f) => {
   b.push(box(5, -1, 3 + up + swing + breath, 3, 3, 2, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 48, 56, 22, 50);
+const guardianFrame = (dir, anim, f) => renderVoxels(guardianModel(anim, f), DIR_INDEX[dir], 96, 112, 44, 100);
 
 
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ const bishopModel = (anim, f) => {
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 56, 76, 28, 70);
+const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 112, 152, 56, 140);
 
 // ---------------------------------------------------------------------------
 // enemy-fungal-horse 64x48 — Corcel: o unico quadrupede HORIZONTAL do bestiario
@@ -612,7 +612,7 @@ const horseModel = (anim, f) => {
 // diagonal do modelo, e o enquadramento tem de acompanhar. O ancoradouro segue a
 // mesma regra de antes (centro na largura, seis pixels acima da base), entao a
 // criatura continua assentando no mesmo ponto do chao.
-const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 80, 84, 40, 78);
+const horseFrame = (dir, anim, f) => renderVoxels(horseModel(anim, f), DIR_INDEX[dir], 160, 168, 80, 156);
 
 // ---------------------------------------------------------------------------
 // enemy-miner 48x60 — automato de extracao abandonado
@@ -733,7 +733,35 @@ const minerModel = (anim, f) => {
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 48, 60, 24, 54);
+const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX[dir], 96, 120, 48, 108);
+
+/**
+ * Upscale 2x vizinho-mais-proximo para os FX desenhados em 2D.
+ *
+ * Os FX nao passam pelo rasterizador voxel, entao MODEL_SCALE nao os alcanca —
+ * mas o cliente desenha TODO atlas com o mesmo fator (ATLAS_SCALE), e um FX que
+ * ficasse em 16x16 sairia com metade do tamanho de mundo. Dobrar por vizinho
+ * preserva o desenho autorado pixel a pixel.
+ */
+const upscale2x = (g) => {
+  const out = grid(g.w * 2, g.h * 2);
+  for (let y = 0; y < g.h; y++) {
+    for (let x = 0; x < g.w; x++) {
+      const src = (y * g.w + x) * 4;
+      if (g.buf[src + 3] === 0) continue;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const dst = ((y * 2 + dy) * out.w + x * 2 + dx) * 4;
+          out.buf[dst] = g.buf[src];
+          out.buf[dst + 1] = g.buf[src + 1];
+          out.buf[dst + 2] = g.buf[src + 2];
+          out.buf[dst + 3] = g.buf[src + 3];
+        }
+      }
+    }
+  }
+  return out;
+};
 
 const boltFrame = (_dir, _anim, f) => {
   const g = grid(16, 16);
@@ -763,9 +791,9 @@ const living = {
   die: { frames: 5, fps: 10, loop: false },
 };
 // `version` sobe junto com qualquer mudanca de pixel no atlas (production spec
-// §13): os seis inimigos que ganharam idle vivo estao em 3; quem nao mudou
-// continua em 2.
-const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt, version = 2) => ({
+// §13). A subdivisao da grade (MODEL_SCALE) redesenhou TODO atlas de entidade,
+// entao o piso agora e 3.
+const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt, version = 3) => ({
   id,
   version,
   frameWidth,
@@ -802,41 +830,43 @@ export const ENTITY_SPECS = [
     prospectorFrame,
     'voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm'
   ),
-  base('enemy-stalker', 32, 32, 16, 30, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 3),
-  base('enemy-spitter', 32, 32, 16, 30, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 3),
-  base('enemy-spore-bomber', 32, 32, 16, 30, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
+  base('enemy-stalker', 64, 64, 32, 60, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 3),
+  base('enemy-spitter', 64, 64, 32, 60, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 3),
+  base('enemy-spore-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 3),
-  base('enemy-bruiser', 48, 68, 24, 66, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
+  base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
   }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 3),
-  base('enemy-guardian', 48, 56, 24, 54, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
+  base('enemy-guardian', 96, 112, 48, 108, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
   }, guardianFrame, 'voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core', 3),
-  base('enemy-bishop', 56, 76, 28, 74, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
+  base('enemy-bishop', 112, 152, 56, 148, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 9, loop: false },
   }, bishopFrame, 'voxel-isometric fungal cleric, tall flaring vestment, tall mitre, pastoral staff and hanging censer, mycelial roots at the hem'),
-  base('enemy-fungal-horse', 80, 84, 40, 78, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
+  base('enemy-fungal-horse', 160, 168, 80, 156, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates', 3),
-  base('enemy-miner', 48, 60, 24, 54, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
+  base('enemy-miner', 96, 120, 48, 108, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
   {
-    id: 'fx-projectile-bolt', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
+    id: 'fx-projectile-bolt', version: 3, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { fly: { frames: 4, fps: 16, loop: true } }, draw: boltFrame,
+    animations: { fly: { frames: 4, fps: 16, loop: true } },
+    draw: (dir, anim, f) => upscale2x(boltFrame(dir, anim, f)),
     prompt: 'small cyan voxel energy bolt',
   },
   {
-    id: 'fx-impact-burst', version: 2, frameWidth: 16, frameHeight: 16, anchorX: 8, anchorY: 8,
+    id: 'fx-impact-burst', version: 3, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0, h: 0 },
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
-    animations: { burst: { frames: 5, fps: 14, loop: false } }, draw: impactFrame,
+    animations: { burst: { frames: 5, fps: 14, loop: false } },
+    draw: (dir, anim, f) => upscale2x(impactFrame(dir, anim, f)),
     prompt: 'small cyan voxel impact ring',
   },
 ];

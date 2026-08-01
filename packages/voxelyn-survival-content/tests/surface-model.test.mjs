@@ -15,7 +15,7 @@
 // atlas, nunca geometria. Estes olham geometria.
 import { describe, expect, it } from 'vitest';
 import { surfaceModel, SURFACE_COLS, SURFACE_KINDS } from '../tools/surfaces.mjs';
-import { DIR_UNROTATED, RAMPS, renderVoxels } from '../tools/voxel.mjs';
+import { DIR_UNROTATED, MODEL_SCALE, RAMPS, renderVoxels } from '../tools/voxel.mjs';
 import { COLORS } from '../tools/lib.mjs';
 import { VARIANTS } from '../tools/terrain.mjs';
 
@@ -60,14 +60,15 @@ const cloudVoxels = (boxes) => {
 /**
  * Area que a nuvem tapa, em % do losango da celula, pelo rasterizador REAL.
  *
- * 8 colunas x 4 px de largura por 8 x 2 px de profundidade, dividido por dois:
- * o losango de uma celula tem 256 px. Medir no rasterizador e nao por
- * estimativa importa porque a sobreposicao entre cubos vizinhos e justamente o
- * que a conta por contagem erra.
+ * Na grade fina (MODEL_SCALE), cada coluna autorada projeta 4*MODEL_SCALE px de
+ * largura por 2*MODEL_SCALE de profundidade: o losango de uma celula tem
+ * (8*8)*(16*4)/2 = 1024 px. Medir no rasterizador e nao por estimativa importa
+ * porque a sobreposicao entre cubos vizinhos e justamente o que a conta por
+ * contagem erra.
  */
-const CELL_DIAMOND_PX = ((SURFACE_COLS * 4) * (SURFACE_COLS * 2)) / 2;
+const CELL_DIAMOND_PX = ((SURFACE_COLS * 4 * MODEL_SCALE) * (SURFACE_COLS * 2 * MODEL_SCALE)) / 2;
 const cloudCoverage = (boxes) => {
-  const g = renderVoxels(boxes.filter((b) => b.mat === 'sulfur'), DIR_UNROTATED, 64, 64, 32, 48);
+  const g = renderVoxels(boxes.filter((b) => b.mat === 'sulfur'), DIR_UNROTATED, 128, 128, 64, 96);
   let px = 0;
   for (let i = 3; i < g.buf.length; i += 4) if (g.buf[i] !== 0) px++;
   return (100 * px) / CELL_DIAMOND_PX;
