@@ -201,8 +201,9 @@ const buildSurfaces = () => {
 
   const manifest = {
     id: 'surface-tiles',
-    // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
-    version: 2,
+    // 3: crostas reautoradas coluna a coluna FINA — cascalho, tapete, lamina
+    // com bolhas, chamas e graos por voxel fino; gas em aglomerados roidos.
+    version: 3,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
