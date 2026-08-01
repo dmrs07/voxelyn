@@ -57,6 +57,8 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
+import { placeDecor, propStillValid, type DecorativeProp } from './decor';
+import { drawDecorProp } from './decor-draw';
 import { t } from './i18n';
 import {
   deathEchoReadout,
@@ -699,6 +701,9 @@ export class SurvivalRenderer {
    * do laco.
    */
   private readonly archetypeById = new Map<number, string>();
+  /** Decoracao do setor atual, derivada por seed. Ver decor.ts. */
+  private decor: DecorativeProp[] = [];
+  private decorKey = '';
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -1438,6 +1443,28 @@ export class SurvivalRenderer {
           draw: () => this.drawDeathEchoPrompt(esx, esy, z, nowMs),
         });
       }
+    }
+
+    // DECORACAO: derivada e cacheada por setor. Nao vive no estado — e a
+    // camada que explica onde o jogador esta sem tocar na simulacao, e
+    // qualquer cliente reconstroi a mesma lista a partir da seed.
+    const decorKey = `${state.config.seed}:${state.sector}:${state.stratum}`;
+    if (this.decorKey !== decorKey) {
+      this.decorKey = decorKey;
+      this.decor = placeDecor(state);
+    }
+    for (const prop of this.decor) {
+      const db = brightness(prop.x + 0.5, prop.y + 0.5);
+      if (db <= 0.05) continue;
+      const [dsx, dsy] = toScreen(prop.x + 0.5, prop.y + 0.5);
+      if (dsx < -60 || dsx > vw + 60 || dsy < -60 || dsy > vh + 60) continue;
+      // O mundo muda por baixo do enfeite: parede arrancada, fogo passando.
+      // Um prop invalido simplesmente nao e desenhado neste quadro.
+      if (!propStillValid(state, prop)) continue;
+      items.push({
+        depth: prop.x + prop.y,
+        draw: () => drawDecorProp(ctx, prop, dsx, dsy, z, nowMs),
+      });
     }
 
     this.archetypeById.clear();

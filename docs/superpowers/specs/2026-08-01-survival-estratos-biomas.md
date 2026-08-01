@@ -253,6 +253,42 @@ Traduções do doc de design: *Estrato Sedimentar* = Sumidouros de Sílica
 (a parede em camadas já era arenito); *Cárstico* = Aquífero Negro; *Estrato
 Ferrífero* = trabalho futuro (naturalmente pareado com a Cicatriz Aurix).
 
+## Sétima etapa (implementada): props decorativos
+
+A divisão de trabalho do mundo, completa: **a strata define a formação; os
+materiais definem o que reage; os props explicam onde o jogador está, o que
+aconteceu ali e qual é a escala do Veio.**
+
+Camada `client/decor.ts` + `decor-draw.ts` — puramente visual e DERIVADA:
+
+- Um prop não ocupa célula autoritativa, não bloqueia, não conduz, não morre.
+  Não entra em `solid`, `surface`, pathfinding, hash nem snapshot. Qualquer
+  cliente reconstrói a mesma decoração de `(seed, setor, strata)` com PRNG
+  próprio — o co-op vê o mesmo cenário sem o servidor transmitir um objeto.
+- **Zonas proibidas inegociáveis**: raio da entrada, do poço/núcleo, de
+  terminais e cofres, dos respiradouros e da posição de chefe. Decoração
+  nunca compete com informação.
+- **Regras anti-mentira** (testadas): baixo/estreito/quebrado — nunca parece
+  bloquear; cristal decorativo usa a família fria (nada do biolum reativo);
+  caixa Aurix sem ouro nem halo de coletável; fumarola decorativa apagada;
+  nada sobre superfície reativa ou elemento. `propStillValid` re-checa a
+  âncora a cada quadro: parede arrancada ou fogo por baixo → o prop some em
+  vez de mentir.
+- **Kits da primeira entrega** (20 arquétipos × variantes procedurais):
+  coluna tombada/entulho/lasca (basalto), leque/estilhaços (Catedral),
+  estalagmite/bacia/cascata petrificada (carste), pilha de lâminas/placa
+  (sedimentar), cone de fumarola/monte de enxofre (Fenda), escória/cinza
+  (Fornalha), agulha de gelo/pedra gelada (Cripta), cogumelo que respira +
+  puffball **sobre o tapete** (Micélio), caixa + escora (Aurix).
+- Desenho em runtime com o primitivo `drawVoxel` (zero atlas novo); animação
+  (respiração do cogumelo) derivada de relógio local + variant, nunca da RNG
+  autoritativa. Entram na fila de profundidade do pintor.
+
+Futuro da camada: props de teto (estalactites com translucidez perto do
+jogador), landmarks monumentais ancorados nos centros dos salões carimbados,
+composição landmark/ritmo/micro por tipo de sala, kit Aurix de infraestrutura
+(passarelas, trilhos, broca monumental).
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
