@@ -19,13 +19,14 @@ export const PROTOCOL_VERSION = 11;
 // no minuto tres. (O protocolo em si nao muda: o envelope das mensagens e o
 // mesmo, e os campos novos de `sector_entered` viajam dentro de um evento cujo
 // par de versoes de sim ja garante que ambos os lados conhecem.)
-// 15: a Lampreia vira bando (tres por setor de Aquifero) e as vagas de
-// assinatura passam a ser derivadas do orcamento real do setor — a populacao
-// semeada muda, entao peers em versoes mistas divergiriam no spawn.
+// 15: a Lampreia vira bando (tres por setor de Aquifero), as vagas de
+// assinatura derivam do orcamento real do setor, e os estratos ganham
+// ESTRUTURAS DE SALAO no worldgen (rotunda, pulmoes, canions, bacias,
+// sumidouros, lagos) — a geracao semeada dos setores 2+ muda de novo.
 export const SIMULATION_VERSION = 15;
-// 10: crostas novas no atlas de chao (agua, fissura incandescente, gelo) e os
-// cinco atlases do bestiario de assinatura.
-export const CONTENT_VERSION = 10;
+// 11: rocha por estrato no atlas de terreno — seis peles novas da parede
+// comum, com fragil/minerio/cristal continuando universais.
+export const CONTENT_VERSION = 11;
 
 export type VersionTriple = {
   protocolVersion: number;

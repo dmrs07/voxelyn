@@ -88,6 +88,29 @@ const TERRAIN_KIND_INDEX: Record<number, number> = {
 };
 
 /**
+ * A PELE da rocha comum por estrato: indices 8..13 do atlas de terreno.
+ *
+ * So a rocha comum troca de pele — fragil, minerio e cristal sao linguagem
+ * mecanica e ficam identicos em todo bioma. O basalto usa o indice 0
+ * historico: as Galerias sao o mapa original ate no pixel. A simulacao nao
+ * sabe disto (SOLID_ROCK continua um ID so); e leitura de LUGAR, e lugar e
+ * apresentacao.
+ */
+const STRATUM_ROCK_KIND = {
+  basalt: 0,
+  prismatic: 8,
+  aquifer: 9,
+  sulfur: 10,
+  furnace: 11,
+  silica: 12,
+  glacial: 13,
+} as const satisfies Record<StratumId, number>;
+
+/** Indice do bloco no atlas, dado o solido e o estrato do setor. */
+export const terrainKindIndexFor = (solid: number, stratum: StratumId): number =>
+  solid === SOLID_ROCK ? STRATUM_ROCK_KIND[stratum] : (TERRAIN_KIND_INDEX[solid] ?? 0);
+
+/**
  * SURF_* -> indice em SURFACE_KINDS do atlas de chao. Pela mesma razao da tabela
  * acima: a cadeia de ifs que existia aqui tratava tres dos seis casos e deixava
  * os outros caindo no ramo da rocha nua sem que nada acusasse.
@@ -1231,8 +1254,9 @@ export class SurvivalRenderer {
             // de poligono; o caminho de poligono abaixo continua como fallback
             // para quando o atlas ainda nao carregou ou falhou.
             // Espelha BLOCK_KINDS do atlas de terreno, na ordem em que o
-            // gerador empacota os tipos.
-            const kindIndex = TERRAIN_KIND_INDEX[solid] ?? 0;
+            // gerador empacota os tipos — com a rocha comum trocando de pele
+            // pelo estrato do setor.
+            const kindIndex = terrainKindIndexFor(solid, state.stratum);
             if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
 
             const hw = (TILE_W / 2) * z;

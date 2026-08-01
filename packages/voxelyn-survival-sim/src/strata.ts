@@ -220,12 +220,14 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     coalBlobs: { count: 0, rMin: 0, rMax: 0 },
     ventCount: 6,
     minerCap: MINER_PER_SECTOR,
+    halls: 'none',
   };
 
   if (biome.stratum === 'prismatic') {
     // Nervuras atravessam paredes; a mancha organica recua. Salas com longas
     // linhas de tiro vem das nervuras abrindo lâminas, nao de topologia nova.
     profile.crystalChance = 0.1 + depth * 0.04;
+    profile.halls = 'radial';
     profile.crystalVeins = 6 + depth * 3;
     profile.oreChance = 0.05;
     profile.fragileThinChance = 0.45;
@@ -235,6 +237,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // Agua dividindo o chao em ilhas. Minerais azulados (cristal) marcam as
     // margens; o fungo gosta da umidade mesmo sem ocupacao.
     profile.waterBlobs = { count: 12 + depth * 4, rMin: 3, rMax: 6 };
+    profile.halls = 'basins';
     profile.biofluidBlobs = { count: 6, rMin: 1, rMax: 2 };
     profile.fungalBlobs = { count: 14, rMin: 2, rMax: 3 };
     profile.crystalChance = 0.05;
@@ -245,6 +248,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // continua sendo o SURF_GAS de sempre — o que muda e a densidade de fontes
     // e o ciclo de ventilacao (stepCells).
     profile.ventCount = 14;
+    profile.halls = 'lungs';
     profile.fragileThinChance = 0.65;
     profile.oreChance = 0.06;
     profile.crystalChance = 0.02;
@@ -254,6 +258,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // Fissuras incandescentes e campos de carvao. Seco: nada de biofluido, e o
     // fungo nao sobrevive. Menos respiradouros — o perigo daqui e termico.
     profile.emberBlobs = { count: 10 + depth * 3, rMin: 2, rMax: 4 };
+    profile.halls = 'canyon';
     profile.coalBlobs = { count: 14, rMin: 2, rMax: 4 };
     profile.ventCount = 4;
     profile.fragileThinChance = 0.5;
@@ -266,6 +271,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // fragil — atravessar abrindo buracos e a identidade, e o risco e abrir o
     // flanco errado. Pobre em tudo o mais.
     profile.fragileThinChance = 0.78;
+    profile.halls = 'sinkholes';
     profile.oreChance = 0.05;
     profile.crystalChance = 0.02;
     profile.ventCount = 4;
@@ -276,6 +282,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // jogo do estrato e DERRETER a rota certa (agua condutiva) e correr antes
     // do recongelamento.
     profile.iceBlobs = { count: 14 + depth * 3, rMin: 3, rMax: 5 };
+    profile.halls = 'lakes';
     profile.crystalChance = 0.07;
     profile.fragileThinChance = 0.4;
     profile.oreChance = 0.06;

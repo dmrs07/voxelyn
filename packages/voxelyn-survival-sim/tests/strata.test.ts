@@ -151,6 +151,73 @@ describe('perfis por estrato', () => {
     }
   });
 
+  it('cada estrato tem a propria estrutura de salao; o basalto nao tem nenhuma', () => {
+    const halls = (stratum: SectorBiome['stratum'], lineage: SectorBiome['lineage']): string =>
+      biomeProfile({ stratum, occupation: 'none', lineage }, 2).halls;
+    expect(halls('basalt', 'mineral')).toBe('none');
+    expect(halls('prismatic', 'mineral')).toBe('radial');
+    expect(halls('aquifer', 'hydric')).toBe('basins');
+    expect(halls('sulfur', 'thermal')).toBe('lungs');
+    expect(halls('furnace', 'thermal')).toBe('canyon');
+    expect(halls('silica', 'arid')).toBe('sinkholes');
+    expect(halls('glacial', 'cryo')).toBe('lakes');
+  });
+
+  it('a rotunda da Catedral deixa pilares de cristal soltos no salao', () => {
+    // Pilar solto = cristal com os quatro vizinhos abertos: so a rotunda produz
+    // isso (a decoracao de parede poe cristal COLADO em rocha). Seeds fixas:
+    // o teste e deterministico, nao estatistico.
+    let seedsWithPillars = 0;
+    for (const seed of SEEDS.slice(0, 4)) {
+      const world = generateWorld(seed, WORLD_W, WORLD_H, biomeProfile(prismatic, 2));
+      let pillars = 0;
+      for (let y = 1; y < WORLD_H - 1; y++) {
+        for (let x = 1; x < WORLD_W - 1; x++) {
+          if (world.solid[y * WORLD_W + x] !== SOLID_CRYSTAL) continue;
+          const open = [world.solid[y * WORLD_W + x - 1], world.solid[y * WORLD_W + x + 1],
+            world.solid[(y - 1) * WORLD_W + x], world.solid[(y + 1) * WORLD_W + x]];
+          if (open.every((s) => s === SOLID_NONE)) pillars++;
+        }
+      }
+      if (pillars > 0) seedsWithPillars++;
+    }
+    // Uma rotunda pode calhar de ser selada pelo fechamento de bolsoes; nas
+    // quatro seeds fixas, a maioria tem de sobreviver conectada.
+    expect(seedsWithPillars).toBeGreaterThanOrEqual(3);
+  });
+
+  it('as bacias do Aquifero nascem cheias: existe um lago CONECTADO grande', () => {
+    const seed = seedWithLineage('hydric');
+    const state = createRun({ seed, sector: 2 });
+    const w = state.config.width;
+    const h = state.config.height;
+    const seen = new Set<number>();
+    let largest = 0;
+    for (let i = 0; i < state.surface.length; i++) {
+      if (state.surface[i] !== SURF_WATER || seen.has(i)) continue;
+      let size = 0;
+      const stack = [i];
+      seen.add(i);
+      while (stack.length > 0) {
+        const cur = stack.pop() as number;
+        size++;
+        const cx = cur % w;
+        const cy = (cur - cx) / w;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const ni = ny * w + nx;
+          if (seen.has(ni) || state.surface[ni] !== SURF_WATER) continue;
+          seen.add(ni);
+          stack.push(ni);
+        }
+      }
+      largest = Math.max(largest, size);
+    }
+    expect(largest).toBeGreaterThanOrEqual(25);
+  });
+
   it('todo estrato continua gerando mapa solucionavel com nucleo alcancavel', () => {
     // A promessa central do worldgen nao pode depender do perfil: agua e
     // cristal mudam materia, nunca a prova de alcancabilidade.

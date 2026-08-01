@@ -60,6 +60,20 @@ export type WorldgenProfile = {
   ventCount: number;
   /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
   minerCap: number;
+  /**
+   * A ESTRUTURA DE SALAO do estrato, carimbada depois do automato e antes das
+   * provas de alcancabilidade — entao toda garantia do gerador continua
+   * valendo para ela. Cada estrato tem uma arquitetura, nao so uma materia:
+   *
+   * - `radial`: rotunda com corredores radiais e pilares de cristal (Catedral)
+   * - `lungs`: camaras bojudas ligadas por gargantas estreitas (Fenda)
+   * - `canyon`: fissuras compridas atravessando o mapa (Fornalha)
+   * - `basins`: bacias largas que nascem cheias d'agua (Aquifero)
+   * - `sinkholes`: pocos circulares com borda fragil (Silica)
+   * - `lakes`: lagos ovais congelados (Cripta)
+   * - `none`: o labirinto organico historico, intocado (Basalto)
+   */
+  halls: 'none' | 'radial' | 'lungs' | 'canyon' | 'basins' | 'sinkholes' | 'lakes';
 };
 
 /** O perfil historico: Galerias de Basalto. `generateWorld` sem perfil e ele. */
@@ -76,6 +90,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   coalBlobs: { count: 0, rMin: 0, rMax: 0 },
   ventCount: 6,
   minerCap: 3,
+  halls: 'none',
 };
 
 export type GeneratedWorld = {
@@ -176,6 +191,143 @@ const carveBlob = (solid: Uint8Array, w: number, h: number, cx: number, cy: numb
   }
 };
 
+/**
+ * Carimba a estrutura de salao do estrato sobre o labirinto do automato.
+ *
+ * Roda ANTES da escolha de entrada e das provas de alcancabilidade: um salao
+ * que o flood fill nao alcancar e selado de volta pela mesma regra que fecha
+ * qualquer bolsao — a garantia de mapa solucionavel nao ganha caso especial.
+ * So ABRE espaco (e converte parede em cristal/fragil); nunca fecha caminho.
+ *
+ * Devolve as celulas que devem NASCER com o elemento do estrato (agua nas
+ * bacias, gelo nos lagos): a geografia e a materia chegam juntas, em vez de a
+ * agua ser sorteada longe da bacia que existe para contê-la.
+ */
+const stampHalls = (
+  rng: RNG,
+  solid: Uint8Array,
+  w: number,
+  h: number,
+  halls: WorldgenProfile['halls'],
+): { fillCells: number[]; fillKind: number } => {
+  const fillCells: number[] = [];
+  let fillKind = SURF_NONE;
+  if (halls === 'none') return { fillCells, fillKind };
+
+  const center = (): Vec2 => ({
+    x: 12 + rng.nextInt(Math.max(1, w - 24)),
+    y: 12 + rng.nextInt(Math.max(1, h - 24)),
+  });
+  const carveLine = (x0: number, y0: number, angle: number, length: number, r: number): void => {
+    let fx = x0 + 0.5;
+    let fy = y0 + 0.5;
+    for (let step = 0; step < length; step++) {
+      fx += Math.cos(angle);
+      fy += Math.sin(angle);
+      carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), r);
+    }
+  };
+
+  if (halls === 'radial') {
+    // Rotunda central com corredores em leque. Os PILARES sao cristal: cobertura,
+    // luz e municao do Ressonante ao mesmo tempo — arquitetura que joga.
+    const c = center();
+    const radius = 7 + rng.nextInt(3);
+    carveBlob(solid, w, h, c.x, c.y, radius);
+    const spokes = 5;
+    const phase = rng.nextFloat01() * Math.PI * 2;
+    for (let k = 0; k < spokes; k++) {
+      carveLine(c.x, c.y, phase + (k * Math.PI * 2) / spokes, 12 + rng.nextInt(6), 1);
+    }
+    for (let k = 0; k < 6; k++) {
+      const a = phase + Math.PI / 6 + (k * Math.PI) / 3;
+      const px = Math.round(c.x + Math.cos(a) * (radius - 3));
+      const py = Math.round(c.y + Math.sin(a) * (radius - 3));
+      if (px > 1 && py > 1 && px < w - 2 && py < h - 2) solid[idx(w, px, py)] = SOLID_CRYSTAL;
+    }
+  } else if (halls === 'lungs') {
+    // Pulmoes: camaras bojudas em cadeia, ligadas por gargantas de 1 celula.
+    // E a topologia que da sentido ao ciclo dos respiradouros — a camara cheia
+    // e um LUGAR, e a garganta e a janela.
+    const start = center();
+    const angle = rng.nextFloat01() * Math.PI * 2;
+    let cx = start.x;
+    let cy = start.y;
+    const chambers = 4 + rng.nextInt(2);
+    for (let k = 0; k < chambers; k++) {
+      carveBlob(solid, w, h, cx, cy, 3 + rng.nextInt(3));
+      const jitter = (rng.nextFloat01() - 0.5) * 1.2;
+      const nx = cx + Math.cos(angle + jitter) * 8;
+      const ny = cy + Math.sin(angle + jitter) * 8;
+      carveLine(cx, cy, Math.atan2(ny - cy, nx - cx), 8, 0);
+      cx = Math.max(6, Math.min(w - 6, Math.round(nx)));
+      cy = Math.max(6, Math.min(h - 6, Math.round(ny)));
+    }
+  } else if (halls === 'canyon') {
+    // Fissuras compridas: as grandes linhas retas que dividem as salas da
+    // Fornalha e criam as pontes naturais entre elas.
+    for (let c = 0; c < 2; c++) {
+      const start = center();
+      const angle = rng.nextFloat01() * Math.PI * 2;
+      carveLine(start.x, start.y, angle, 22 + rng.nextInt(10), 1);
+    }
+  } else if (halls === 'basins') {
+    // Bacias largas que nascem CHEIAS: a agua do Aquifero mora aqui, nao num
+    // sorteio longe da geografia que existiria para contê-la.
+    for (let b = 0; b < 3; b++) {
+      const c = center();
+      const r = 5 + rng.nextInt(3);
+      carveBlob(solid, w, h, c.x, c.y, r);
+      const rf = r - 1;
+      for (let y = Math.max(1, c.y - rf); y <= Math.min(h - 2, c.y + rf); y++) {
+        for (let x = Math.max(1, c.x - rf); x <= Math.min(w - 2, c.x + rf); x++) {
+          const dx = x - c.x;
+          const dy = y - c.y;
+          if (dx * dx + dy * dy <= rf * rf) fillCells.push(idx(w, x, y));
+        }
+      }
+    }
+    fillKind = SURF_WATER;
+  } else if (halls === 'sinkholes') {
+    // Pocos circulares com a BORDA fragil: o chao que cede e a arquitetura da
+    // Silica — cada sumidouro e uma sala cuja parede inteira e uma decisao.
+    for (let s = 0; s < 4; s++) {
+      const c = center();
+      const r = 4 + rng.nextInt(3);
+      carveBlob(solid, w, h, c.x, c.y, r);
+      for (let y = Math.max(1, c.y - r - 1); y <= Math.min(h - 2, c.y + r + 1); y++) {
+        for (let x = Math.max(1, c.x - r - 1); x <= Math.min(w - 2, c.x + r + 1); x++) {
+          const dx = x - c.x;
+          const dy = y - c.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 > r * r && d2 <= (r + 1.5) * (r + 1.5) && solid[idx(w, x, y)] === SOLID_ROCK) {
+            solid[idx(w, x, y)] = SOLID_FRAGILE;
+          }
+        }
+      }
+    }
+  } else if (halls === 'lakes') {
+    // Lagos ovais congelados: as pontes de gelo sobre cavidades que a spec
+    // promete — e o territorio do Espectro.
+    for (let l = 0; l < 2 + rng.nextInt(2); l++) {
+      const c = center();
+      const rx = 6 + rng.nextInt(3);
+      const ry = 4 + rng.nextInt(2);
+      for (let y = Math.max(1, c.y - ry); y <= Math.min(h - 2, c.y + ry); y++) {
+        for (let x = Math.max(1, c.x - rx); x <= Math.min(w - 2, c.x + rx); x++) {
+          const nx = (x - c.x) / rx;
+          const ny = (y - c.y) / ry;
+          if (nx * nx + ny * ny > 1) continue;
+          solid[idx(w, x, y)] = SOLID_NONE;
+          if (nx * nx + ny * ny <= 0.82) fillCells.push(idx(w, x, y));
+        }
+      }
+    }
+    fillKind = SURF_ICE;
+  }
+  return { fillCells, fillKind };
+};
+
 const generateAttempt = (
   seed: number,
   w: number,
@@ -206,6 +358,11 @@ const generateAttempt = (
     }
     solid.set(next);
   }
+
+  // 2b) a estrutura de salao do estrato, sobre o labirinto do automato. Com
+  // `halls: 'none'` (basalto) nada roda e nenhuma tirada de RNG e consumida —
+  // o mapa historico continua byte a byte.
+  const hallFill = stampHalls(rng, solid, w, h, profile.halls);
 
   // 3) entrada perto da borda superior-esquerda, nucleo no ponto mais distante
   let entry: Vec2 | null = null;
@@ -334,6 +491,12 @@ const generateAttempt = (
       }
     }
   };
+  // O elemento dos SALOES entra primeiro de tudo: bacia nasce cheia d'agua,
+  // lago nasce congelado. A geografia e a materia chegam juntas.
+  for (const i of hallFill.fillCells) {
+    if (solid[i] === SOLID_NONE && surface[i] === SURF_NONE) surface[i] = hallFill.fillKind;
+  }
+
   // Agua antes das outras materias: pintado-primeiro vence (as manchas checam
   // SURF_NONE), e no Aquifero o lago e a geografia — fungo e biofluido crescem
   // nas MARGENS dele, nunca por cima. Com count 0 nada e sorteado, entao o

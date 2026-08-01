@@ -152,9 +152,10 @@ const buildTerrain = () => {
 
   const manifest = {
     id: 'terrain-blocks',
-    // 2: grade voxel subdividida (MODEL_SCALE) — malha volumetrica por voxel
-    // fino, frame dobrado. A versao sobe com o PNG (Art Bible §9).
-    version: 2,
+    // 3: rocha por ESTRATO — seis peles novas da parede comum no fim da lista
+    // (prismatica, aquifera, sulfurosa, fornalha, silica, glacial). Fragil,
+    // minerio e cristal continuam universais: sao linguagem mecanica.
+    version: 3,
     atlas: 'terrain-blocks.png',
     frameWidth,
     frameHeight,

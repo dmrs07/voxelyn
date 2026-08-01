@@ -199,6 +199,30 @@ mesmo lugar, só tem água de diferente"):
   dezenas de lagos que eram só cenário. Continuam ocupando vagas comuns da
   contagem. As demais assinaturas seguem sendo encontro único.
 
+## Quinta etapa (implementada): a rocha e a arquitetura do lugar
+
+- **Paredes por estrato** (terrain-blocks v3): a rocha COMUM ganha seis peles —
+  grãos de cristal na Catedral, pedra encharcada com limo no Aquífero, rocha
+  esbranquiçada com crosta sulfurosa na Fenda, basalto negro com veios de
+  brasa na Fornalha, arenito estratificado na Sílica, capa de gelo na Cripta.
+  Frágil, minério e cristal continuam **universais**: são linguagem mecânica
+  (o que cede, o que rende, o que conduz) e precisam ler idênticos em todo
+  bioma. O basalto usa o índice histórico: o mapa original até no pixel. A
+  simulação não sabe disso — `SOLID_ROCK` continua um ID só.
+- **Estruturas de salão** (`WorldgenProfile.halls`): carimbadas após o
+  autômato e antes das provas de alcançabilidade (toda garantia do gerador
+  vale para elas; salão inalcançável é selado pela regra normal de bolsões):
+  - `radial` (Catedral): rotunda com corredores em leque e **pilares de
+    cristal** — cobertura, luz e munição do Ressonante ao mesmo tempo;
+  - `lungs` (Fenda): câmaras bojudas ligadas por gargantas — o lugar que dá
+    sentido ao ciclo dos respiradouros;
+  - `canyon` (Fornalha): fissuras compridas dividindo as salas;
+  - `basins` (Aquífero): bacias largas que **nascem cheias d'água** — a
+    geografia e a matéria chegam juntas;
+  - `sinkholes` (Sílica): poços circulares com **borda frágil**;
+  - `lakes` (Cripta): lagos ovais congelados — o território do Espectro.
+  Basalto: `none`, o labirinto orgânico histórico intocado.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
