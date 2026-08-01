@@ -1,12 +1,12 @@
 {
   "id": "enemy-bishop",
-  "version": 4,
+  "version": 6,
   "atlas": "enemy-bishop.png",
   "frameWidth": 112,
-  "frameHeight": 152,
+  "frameHeight": 124,
   "columns": 36,
   "anchorX": 56,
-  "anchorY": 148,
+  "anchorY": 116,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -30,7 +30,6 @@
     "#0b0e14",
     "#1d2430",
     "#2e3a4d",
-    "#46566e",
     "#6e4a33",
     "#7ab8ff",
     "#7b8ba3",
@@ -39,6 +38,7 @@
     "#d5cdba",
     "#d93b4c",
     "#ff7a2f",
+    "#ffa63f",
     "#ffd166"
   ],
   "animations": {
@@ -109,7 +109,7 @@
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric fungal cleric, tall flaring vestment, tall mitre, pastoral staff and hanging censer, mycelial roots at the hem",
+    "prompt": "voxel-isometric fungal cleric, decaying root-curtain vestment with frayed hem, open blessing arms, halo-disc pastoral staff, hanging censer, chitinous three-pronged crown, mycelial roots and mushrooms at the hem",
     "seedOrRef": "deterministic-code-v2"
   }
 }

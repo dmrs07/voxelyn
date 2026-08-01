@@ -458,96 +458,108 @@ const bishopModel = (anim, f) => {
   const breathe = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
   const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
   const raise = anim === 'attack' ? [0, 1, 2, 1][f % 4] : 0;
-  // `special` = Supernova Fungica: ele SE ERGUE e o manto se abre antes do
+  // `special` = Supernova Fungica: ele SE ERGUE e a cortina ABRE antes do
   // estouro. O crescimento e o telegrafo, e nao um efeito posterior.
   const nova = anim === 'special' ? [0, 1, 2, 3, 3, 2][f % 6] : 0;
   const up = breathe - flinch + nova;
   const b = [];
 
-  // Raizes de micelio no chao, saindo de baixo do manto. Desenhadas primeiro
-  // para ficarem sob tudo. Sao IDENTIDADE, nao sinal: quem avisa que a cura esta
-  // acontecendo AGORA e a particula que sobe (evento `heal`), porque um sprite de
-  // frames fixos nao sabe o que o chao debaixo dele e.
+  // A LEITURA DA FICHA (concept EQ-09): o manto nao e uma torre de degraus —
+  // e uma CORTINA DE RAIZES em decomposicao que cai dos ombros e encontra o
+  // chao esfiapada, com bracos abertos em bencao, baculo de disco-aureola,
+  // coroa quitinosa e cogumelos brotando na bainha. E a altura fecha ABAIXO do
+  // pinaculo do Guardiao: chefe de setor 2 nao passa do chefe final — a
+  // hierarquia e por tamanho E por forma (cortina fina contra montanha).
+
+  // Raizes de micelio no chao, saindo de baixo da cortina. Desenhadas primeiro
+  // para ficarem sob tudo. Sao IDENTIDADE, nao sinal: quem avisa que a cura
+  // esta acontecendo AGORA e a particula do evento `heal`.
   for (const [rx, ry] of BISHOP_ROOTS) {
     if (nova === 0 && (rx + ry) % 3 === 0) continue; // esparsas em repouso
     b.push(box(rx, ry, 0, 1, 1, 1, 'electric'));
   }
 
-  // Manto em tres degraus que estreitam para cima. A base e o volume MAIOR do
-  // bicho: e ela que diz "isto esta enraizado" sem precisar de animacao.
-  //
-  // A altura total foi comprimida depois de ver o resultado ao lado do Guardiao:
-  // o bispo saia MAIS ALTO que o chefe final, e escala e hierarquia — um chefe de
-  // setor 2 maior que o do setor 3 promete uma ordem que o jogo nao cumpre. O
-  // contraste com o Guardiao continua existindo, mas por FORMA (torre estreita
-  // contra massa larga) e nao por tamanho.
-  b.push(box(-5, -4, 0, 11, 9, 3, 'rockDeep'));
-  // Pedras da barra do manto: tres cravos palidos de meio-passo ao longo da
-  // bainha frontal — o peso que mantem um manto de cerimonia no chao.
-  b.push(box(-3.5, -4.5, 1, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(-0.5, -4.5, 0.5, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(2.5, -4.5, 1, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(-4, -3, 3, 9, 7, 4, 'rust'));
-  // O degrau de cima do manto e FERRUGEM, e nao osso.
-  //
-  // Osso e o material mais palido do jogo, e este e o maior volume do bicho: com
-  // as rampas espacadas por igual, ele passou a ler como uma torre de arenito
-  // clara — a coisa mais brilhante da tela, competindo com o proprio jogador
-  // numa caverna escura. Antes o material se salvava por acidente, porque a
-  // rampa dele caia 35 pontos entre o topo e a lateral e o volume saia escuro
-  // apesar da cor.
-  //
-  // O palido continua no bicho, concentrado onde o olho deve parar: gola e
-  // mitra. A separacao entre este degrau e o de baixo, que agora usam o mesmo
-  // material, sai da sombra de contato — que e exatamente para isso que ela
-  // existe.
-  b.push(box(-3, -3, 7, 7, 6, 5 + nova, 'bone'));
-  // Estola vertical dourada descendo pelo centro do manto: e o que faz o olho
-  // subir ate a mitra em vez de parar no volume maior.
-  b.push(box(-1, -5, 4, 3, 1, 10 + nova, 'loot'));
-  // DETALHE FINO — bordado da estola: tracos de ferrugem de meio-passo
-  // cruzando a faixa dourada. Paramento tecido, nao chapa de ouro.
-  b.push(box(-0.5, -5.5, 6, 2, 0.5, 0.5, 'rust'));
-  b.push(box(-0.5, -5.5, 9, 2, 0.5, 0.5, 'rust'));
-  b.push(box(-0.5, -5.5, 12, 2, 0.5, 0.5, 'rust'));
-  // Recuo escuro sob o peito: separa o tronco do manto em vez de deixar a torre
-  // virar um bloco unico.
-  b.push(box(-2, -4, 12 + nova, 5, 5, 4, 'rust'));
+  // Cogumelos na bainha: brotos de meio-passo com chapeu palido, no arco onde
+  // a cortina toca o chao. Tres, e nao um tapete — o tapete e o chao do mapa.
+  for (const [mx, my] of [[-4.5, -4], [3.5, -4.5], [5, -2]]) {
+    b.push(box(mx, my, 0, 0.5, 0.5, 1, 'rust'));
+    b.push(box(mx - 0.5, my - 0.5, 1, 1, 1, 0.5, 'bone'));
+  }
 
-  // Bracos abertos. Sao os dois unicos volumes assimetricos do modelo e existem
-  // para a silhueta nao fechar num trapezio perfeito.
-  b.push(box(-6, -3, 10 + up + raise, 2, 4, 5, 'rust'));
-  b.push(box(4, -3, 10 + up + raise, 2, 4, 5, 'rust'));
-  // Turibulo pendurado a esquerda, com brasa viva.
-  b.push(box(-7, -2, 6 + up + raise, 3, 3, 3, 'loot'));
-  b.push(box(-6, -1, 4 + up + raise, 1, 1, 2, 'fire'));
-  // Corrente do turibulo: dois elos de meio-passo subindo ate a mao. Sem a
-  // corrente ele e uma caixa dourada flutuando ao lado do corpo.
-  b.push(box(-5.5, -1.5, 9.5 + up + raise, 0.5, 0.5, 0.5, 'loot'));
-  b.push(box(-6, -2, 10.5 + up + raise, 0.5, 0.5, 0.5, 'loot'));
-  // Baculo a direita, AFASTADO do corpo: colado, ele e a mitra liam como duas
-  // torres gemeas e o bicho parecia ter duas cabecas. O vao entre os dois e o que
-  // faz um ser cajado e o outro ser mitra.
-  b.push(box(7, -2, 2, 1, 1, 21 + sway, 'loot'));
-  b.push(box(6, -2, 21 + sway, 3, 1, 1, 'loot'));
-  b.push(box(7, -2, 22 + sway, 1, 1, 2, 'electric'));
+  // NUCLEO da batina: coluna escura solida por dentro da cortina. E ela que
+  // aparece nos vaos entre os fiapos — sombra sob o manto, nunca o fundo.
+  b.push(box(-3, -2.5, 1, 6, 5, 12, 'rockDeep'));
+  b.push(box(-2, -2, 13, 4, 4, 2, 'rust'));
 
-  // Gola alta e cabeca pequena: a mitra so le como mitra se a cabeca sob ela
-  // for menor que ela.
-  b.push(box(-4, -3, 16 + up, 9, 6, 2, 'bone'));
-  b.push(box(-1, -3, 18 + up, 3, 4, 2, 'rust'));
-  b.push(box(-1, -4, 18 + up, 3, 1, 1, 'electric'));
-  // Mitra: dois degraus estreitando ate a ponta.
-  b.push(box(-2, -3, 20 + up, 5, 5, 3, 'bone'));
-  // Friso dourado de meio-passo na base da mitra: a coroa da leitura clerical,
-  // no unico volume que pode carregar ouro sem disputar com a estola.
-  b.push(box(-2, -3.5, 20 + up, 5, 0.5, 0.5, 'loot'));
-  b.push(box(-1, -2, 23 + up, 3, 3, 3, 'bone'));
-  b.push(box(0, -2, 26 + up, 1, 2, 2, 'loot'));
+  // CORTINA DE RAIZES: fiapos verticais pendurados do ombro, alternando
+  // tecido em decomposicao (ferrugem) e micelio (osso), com bainhas em alturas
+  // VARIADAS — o esfiapado e a identidade. Na Supernova a cortina abre: cada
+  // fio desloca para fora junto com o corpo que se ergue.
+  const strands = [
+    [-4.5, -3, 1, 'rust'],
+    [-3.5, -3.5, 0, 'bone'],
+    [-2.5, -3.5, 2, 'rust'],
+    [-1.5, -4, 0, 'rust'],
+    [-0.5, -4, 1, 'bone'],
+    [0.5, -4, 0, 'rust'],
+    [1.5, -3.5, 2, 'bone'],
+    [2.5, -3.5, 0, 'rust'],
+    [3.5, -3, 1, 'rust'],
+    [-5, -1, 0, 'rust'],
+    [4.5, -1.5, 0, 'bone'],
+    [-5, 1.5, 1, 'rust'],
+    [4.5, 1, 0, 'rust'],
+  ];
+  for (const [sx0, sy0, zb, mat] of strands) {
+    const flare = nova * 0.5 * Math.sign(sx0 || 1);
+    b.push(box(sx0 + flare, sy0, zb, 1, 1, 13 - zb, mat));
+  }
+
+  // Estola dourada descendo pelo centro da cortina, com o MEDALHAO circular
+  // do peito por cima: e o que faz o olho subir ate a coroa.
+  b.push(box(-0.5, -4.5, 2.5, 1.5, 0.5, 9, 'loot'));
+  b.push(box(-1, -5, 10.5, 2, 0.5, 2, 'loot'));
+  b.push(box(-0.5, -5.5, 11, 1, 0.5, 1, 'electric'));
+
+  // BRACOS ABERTOS em bencao: mangas horizontais com fiapos pendurados.
+  // `raise` e a nova os erguem — o gesto do telegrafo e o proprio corpo.
+  b.push(box(-6.5, -2, 12 + up + raise, 3, 2, 1.5, 'rust'));
+  b.push(box(3.5, -2, 12 + up + raise, 3, 2, 1.5, 'rust'));
+  b.push(box(-6, -2, 9.5 + up + raise, 0.5, 1, 2.5, 'rust'));
+  b.push(box(-5, -2.5, 10 + up + raise, 0.5, 1, 2, 'bone'));
+  b.push(box(5, -2, 9.5 + up + raise, 0.5, 1, 2.5, 'rust'));
+  b.push(box(6, -2.5, 10.5 + up + raise, 0.5, 1, 1.5, 'bone'));
+
+  // Turibulo pendurado da mao esquerda, com brasa viva e corrente de elos.
+  b.push(box(-6.5, -1.5, 7 + up + raise, 2, 2, 2, 'loot'));
+  b.push(box(-6, -0.5, 5.5 + up + raise, 1, 1, 1.5, 'fire'));
+  b.push(box(-6, -1, 9.5 + up + raise, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(-5.5, -1, 10.5 + up + raise, 0.5, 0.5, 0.5, 'loot'));
+
+  // BACULO na mao direita, AFASTADO do corpo, com cabeca em DISCO-AUREOLA:
+  // um aro dourado vazado com o olho eletrico no centro — o simbolo da ficha,
+  // e o vao dentro do aro e o que o separa da coroa.
+  b.push(box(7, -1.5, 1, 0.5, 0.5, 16.5 + sway, 'loot'));
+  b.push(box(6.5, -1.5, 17.5 + sway, 2, 0.5, 0.5, 'loot'));
+  b.push(box(6.5, -1.5, 19.5 + sway, 2, 0.5, 0.5, 'loot'));
+  b.push(box(6, -1.5, 18 + sway, 0.5, 0.5, 1.5, 'loot'));
+  b.push(box(8, -1.5, 18 + sway, 0.5, 0.5, 1.5, 'loot'));
+  b.push(box(7, -1.5, 18.25 + sway, 0.5, 0.5, 1, 'electric'));
+
+  // GOLA, cabeca pequena e COROA QUITINOSA de tres pontas com remate dourado.
+  // A coroa e quem fecha a silhueta — e fecha ABAIXO do pinaculo do chefe.
+  b.push(box(-2.5, -2.5, 15 + up, 5, 5, 1, 'bone'));
+  b.push(box(-1, -2, 16 + up, 2, 3, 2, 'rust'));
+  b.push(box(-1, -2.5, 17 + up, 2, 0.5, 0.5, 'electric'));
+  b.push(box(-1.5, -2.5, 18 + up, 3, 4, 1, 'bone'));
+  b.push(box(-1.5, -2, 19 + up, 0.5, 1, 1, 'bone'));
+  b.push(box(0, -2.5, 19 + up, 0.5, 1, 1, 'bone'));
+  b.push(box(1, -2, 19 + up, 0.5, 1, 1, 'bone'));
+  b.push(box(0, -2, 20 + up, 0.5, 0.5, 0.5, 'loot'));
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 112, 152, 56, 140);
+const bishopFrame = (dir, anim, f) => renderVoxels(bishopModel(anim, f), DIR_INDEX[dir], 112, 124, 52, 108);
 
 // ---------------------------------------------------------------------------
 // enemy-fungal-horse 64x48 — Corcel: o unico quadrupede HORIZONTAL do bestiario
@@ -1052,10 +1064,10 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 4, fps: 10, loop: false },
   }, guardianFrame, 'voxel-isometric walking mountain-citadel boss, dark mineral massif crowned with seven mushroom spire towers and gold finial, round diffuse electric core with radial cracks, six armored crawler legs, twin dominion claws, stalactite fringe', 6),
-  base('enemy-bishop', 112, 152, 56, 148, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
+  base('enemy-bishop', 112, 124, 56, 116, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 9, loop: false },
-  }, bishopFrame, 'voxel-isometric fungal cleric, tall flaring vestment, tall mitre, pastoral staff and hanging censer, mycelial roots at the hem'),
+  }, bishopFrame, 'voxel-isometric fungal cleric, decaying root-curtain vestment with frayed hem, open blessing arms, halo-disc pastoral staff, hanging censer, chitinous three-pronged crown, mycelial roots and mushrooms at the hem', 6),
   base('enemy-fungal-horse', 160, 168, 80, 156, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
