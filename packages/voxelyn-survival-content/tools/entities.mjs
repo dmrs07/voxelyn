@@ -241,42 +241,68 @@ const bruiserModel = (anim, f) => {
   const heave = anim === 'idle' ? [0, 0, 1, 0][f % 4] : 0;
   const up = -flinch - crouch;
   const b = [];
-  // pernas grossas e curtas
-  b.push(box(-3, -1, Math.max(0, step), 3, 3, 4, 'rockDeep'));
-  b.push(box(1, -1, Math.max(0, -step), 3, 3, 4, 'rockDeep'));
-  // torso trapezoidal que alarga para cima
-  b.push(box(-3, -2, 4 + up, 6, 4, 4, 'rockDeep'));
-  b.push(box(-4, -2, 8 + up, 8, 4, 4, 'rock'));
-  // DETALHE FINO — rachaduras: duas fendas escuras de meio-passo salientes na
-  // face do torso claro. Geodo e pedra PARTIDA; as rachaduras apontam para o
-  // nucleo, que e onde a fratura comecou.
-  b.push(box(-3, -2.5, 8.5 + up, 0.5, 0.5, 2, 'rockDeep'));
-  b.push(box(2.5, -2.5, 9 + up, 0.5, 0.5, 1.5, 'rockDeep'));
-  // placas palidas nos ombros: a leitura de "geodo"
-  b.push(box(-5, -2, 10 + up + heave, 2, 4, 3, 'bone'));
-  b.push(box(4, -2, 10 + up + heave, 2, 4, 3, 'bone'));
-  // Lascas de cristal de meio-passo cravadas nas placas de ombro: o geodo
-  // aberto aparece nas bordas, nao so no peito. Emissivas de proposito — sao o
-  // mesmo mineral do nucleo.
-  b.push(box(-4.5, -2.5, 11 + up + heave, 0.5, 0.5, 1, 'electric'));
-  b.push(box(4.5, -2.5, 11.5 + up + heave, 0.5, 0.5, 1, 'electric'));
-  // nucleo eletrico exposto no peito
-  b.push(box(-1, -3, 9 + up, 3, 1, 3, 'electric'));
-  // Borda da fratura: aro palido de meio-passo acima e abaixo do nucleo — a
-  // pedra clara que se partiu para expor o mineral.
-  b.push(box(-1.5, -2.5, 8.5 + up, 4, 0.5, 0.5, 'bone'));
-  b.push(box(-1.5, -2.5, 12 + up, 4, 0.5, 0.5, 'bone'));
-  // cabeca pequena e afundada entre os ombros
-  b.push(box(-1, -1, 12 + up, 3, 2, 2, 'rockDeep'));
-  b.push(box(-1, -2, 13 + up, 3, 1, 1, 'biolum'));
-  // bracos longos de gorila. No special, sobem juntos sustentando a pedra.
+
+  // A LEITURA DA FICHA (concept MIN-07): um gorila de pedra AGACHADO. A
+  // silhueta e um morro largo — punhos-montanha palidos PLANTADOS NO CHAO nas
+  // duas pontas, corcunda dorsal palida no alto, e o centro escuro quase
+  // sumido entre eles, com o geodo aceso no peito. A versao anterior tinha
+  // bracos-palito pendurados e pernas a mostra: lia como robo caixote.
+
+  // Pernas curtas e escuras, meio ENGOLIDAS pelo corpo: quem anda por ele sao
+  // os nos dos dedos, e as pernas so aparecem no vao entre os punhos.
+  b.push(box(-2.5, -1, Math.max(0, step), 2, 3, 4, 'rockDeep'));
+  b.push(box(0.5, -1, Math.max(0, -step), 2, 3, 4, 'rockDeep'));
+
+  // Torso escuro estreitando para BAIXO: a massa do bicho fica em cima.
+  b.push(box(-2.5, -2, 3 + up, 5, 4, 3, 'rockDeep'));
+  b.push(box(-3, -2.5, 6 + up, 6, 5, 5, 'rockDeep'));
+
+  // NUCLEO-GEODO radial: o bloco emissivo no peito e quatro raios de
+  // meio-passo rachando a pedra em volta — "acentos eletricos pulsam
+  // continuamente em emissao" (detalhe critico da ficha). Os raios sao
+  // FINOS e curtos: rachadura conduzindo luz, nao um segundo nucleo.
+  b.push(box(-1.5, -3, 7.5 + up, 3, 1, 3, 'electric'));
+  b.push(box(-0.5, -3, 6.5 + up, 1, 0.5, 1, 'electric'));
+  b.push(box(-0.5, -3, 10.5 + up, 1, 0.5, 1, 'electric'));
+  b.push(box(-2.5, -3, 8.5 + up, 1, 0.5, 1, 'electric'));
+  b.push(box(1.5, -3, 8.5 + up, 1, 0.5, 1, 'electric'));
+
+  // COROA DORSAL palida: a corcunda de pedra clara que fecha o alto da
+  // silhueta, mais alta ATRAS — e ela que da o perfil de gorila. Calombos de
+  // meio-passo quebram o contorno reto em pedra empilhada.
+  b.push(box(-3.5, -1, 11 + up + heave, 7, 4, 3, 'bone'));
+  b.push(box(-2.5, 0, 14 + up + heave, 5, 3, 1.5, 'bone'));
+  b.push(box(-3, -1.5, 13.5 + up + heave, 1, 1, 1, 'bone'));
+  b.push(box(2, -0.5, 13.5 + up + heave, 1, 1, 1, 'bone'));
+  b.push(box(-0.5, 1.5, 15.5 + up + heave, 1, 1, 0.5, 'bone'));
+
+  // Cabeca MINUSCULA e escura, afundada na frente da coroa: o visor de fenda
+  // e o unico rosto que a ficha mostra — o Britador quase nao tem cabeca.
+  b.push(box(-1, -2, 11 + up, 2, 2, 1.5, 'rockDeep'));
+  b.push(box(-1, -2.5, 11.5 + up, 2, 0.5, 0.5, 'biolum'));
+
+  // BRACOS-MONTANHA: ombro alto colado na coroa, antebraco descendo por fora
+  // e punho ENORME plantado no chao. Sao a linha mais larga do bicho e o que a
+  // silhueta da ficha mostra primeiro. No walk os punhos alternam com as
+  // pernas (andar de nos dos dedos); no attack sobem e ESMAGAM; no special
+  // sobem juntos sustentando a pedra. Flinch e crouch movem o CORPO — punho
+  // plantado fica plantado, que e o que faz o bicho parecer ancorado no chao.
   const armRaise = anim === 'special' ? Math.min(10, hurlLift) : slam;
-  b.push(box(-6, -1, 6 + up + armRaise + heave, 2, 2, 5, 'rock'));
-  b.push(box(5, -1, 6 + up + armRaise + heave, 2, 2, 5, 'rock'));
-  // Nodoas de meio-passo nos punhos: pedra calejada onde o braco bate. Um nub
-  // palido por punho, na face de impacto.
-  b.push(box(-5.5, -1.5, 6.5 + up + armRaise + heave, 0.5, 0.5, 0.5, 'bone'));
-  b.push(box(5.5, -1.5, 6.5 + up + armRaise + heave, 0.5, 0.5, 0.5, 'bone'));
+  const fistL = armRaise + (anim === 'walk' ? Math.max(0, -step) : 0);
+  const fistR = armRaise + (anim === 'walk' ? Math.max(0, step) : 0);
+  for (const [side, fist] of [[-1, fistL], [1, fistR]]) {
+    const ox = side < 0 ? -6 : 3.5; // ombro
+    const fx = side < 0 ? -7.5 : 4.5; // punho
+    const ax = side < 0 ? -7 : 5; // antebraco
+    b.push(box(ox, -2, 8 + up + armRaise + heave, 2.5, 4, 4, 'bone'));
+    b.push(box(ax, -1.5, fist + 2 + heave, 2.5, 3.5, 7, 'bone'));
+    b.push(box(fx, -2, fist, 3, 4, 3, 'bone'));
+    // Sulcos dos dedos: duas fendas de pedra media na face frontal do punho —
+    // a mao fechada le como mao, nao como bloco.
+    b.push(box(fx + 0.5, -2.5, fist + 0.5, 0.5, 0.5, 2, 'rock'));
+    b.push(box(fx + 1.5, -2.5, fist + 0.5, 0.5, 0.5, 2, 'rock'));
+  }
+
   if (anim === 'special' && !hurlThrow) {
     const rockZ = 5 + hurlLift;
     // O volume converge com um bloco real do terreno, sem ocupar o frame inteiro.
@@ -960,7 +986,7 @@ export const ENTITY_SPECS = [
   base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
-  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 4),
+  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 5),
   base('enemy-guardian', 96, 112, 48, 108, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
