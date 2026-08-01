@@ -1,6 +1,6 @@
 {
   "id": "enemy-stalker",
-  "version": 3,
+  "version": 4,
   "atlas": "enemy-stalker.png",
   "frameWidth": 64,
   "frameHeight": 64,

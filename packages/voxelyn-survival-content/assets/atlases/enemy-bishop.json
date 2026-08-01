@@ -1,6 +1,6 @@
 {
   "id": "enemy-bishop",
-  "version": 3,
+  "version": 4,
   "atlas": "enemy-bishop.png",
   "frameWidth": 112,
   "frameHeight": 152,

@@ -102,8 +102,8 @@ const fitReference = () => {
 
 const baseLayer = (id, animations, draw, prompt) => ({
   id,
-  // 5: grade voxel subdividida (MODEL_SCALE) — frame e ancora dobraram.
-  version: 5,
+  // 6: passe de detalhamento em meio-passo sobre a grade subdividida.
+  version: 6,
   frameWidth: FRAME_WIDTH,
   frameHeight: FRAME_HEIGHT,
   anchorX: ANCHOR_X,

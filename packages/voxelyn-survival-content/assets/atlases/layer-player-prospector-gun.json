@@ -1,6 +1,6 @@
 {
   "id": "layer-player-prospector-gun",
-  "version": 5,
+  "version": 6,
   "atlas": "layer-player-prospector-gun.png",
   "frameWidth": 88,
   "frameHeight": 112,
@@ -27,10 +27,14 @@
   },
   "palette": "veio-fungico.v01",
   "paletteColors": [
+    "#0b0e14",
     "#1d2430",
+    "#2e3a4d",
     "#2f6b4f",
+    "#46566e",
     "#59f2c2",
     "#66c28a",
+    "#6e4a33",
     "#8a7154",
     "#b8a98f",
     "#d5cdba",

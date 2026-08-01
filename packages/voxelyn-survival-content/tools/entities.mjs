@@ -106,12 +106,31 @@ const stalkerModel = (anim, f) => {
   // corpo baixo e comprido: silhueta horizontal, oposta a do prospector
   b.push(box(-2, -2, 3, 4, 4, 2 + breath, 'blood'));
   b.push(box(-2, -2, 5 + breath, 4, 3, 1, 'rust'));
+  // DETALHE FINO — segmentacao da carapaca: duas bandas de quitina vermelha
+  // atravessando a placa dorsal em meio-passo saliente. Mais estreitas que a
+  // placa de proposito: banda de largura total pintava o dorso de listras e
+  // roubava a placa; recuada meio passo de cada borda ela le como articulacao
+  // POR BAIXO da placa aparecendo nas juntas.
+  b.push(box(-1.5, -1, 5.5 + breath, 3, 0.5, 0.5, 'blood'));
+  b.push(box(-1.5, 0.5, 5.5 + breath, 3, 0.5, 0.5, 'blood'));
+  // Espinhos dorsais: tres nubs de meio-passo na linha do dorso, crescendo
+  // para tras — leitura de predador eriçado ja na silhueta.
+  b.push(box(-0.5, -1.5, 6 + breath, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(0, 0, 6 + breath, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(-0.5, 1.5, 5.5 + breath, 0.5, 0.5, 0.5, 'rust'));
   // cabeca projetada a frente
   b.push(box(-1, -3 - lunge, 3 + flinch, 2, 1, 2, 'blood'));
   b.push(box(-1, -4 - lunge, 4 + flinch, 2, 1, 1, 'biolum'));
+  // Mandibulas: dois dentes palidos de meio-passo sob a cabeca, abertos. A boca
+  // e para onde o olho vai quando o bicho corre na sua direcao.
+  b.push(box(-1, -3.5 - lunge, 3 + flinch, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(0.5, -3.5 - lunge, 3 + flinch, 0.5, 0.5, 0.5, 'bone'));
   // lamina mineral em UM lado so: assimetria e a marca da especie
   b.push(box(3, -1 - lunge, 4, 1, 1, 2, 'bone'));
   b.push(box(3, -2 - lunge, 5, 1, 1, 1, 'bone'));
+  // Serrilha da lamina: dois dentes de meio-passo no fio dianteiro.
+  b.push(box(3, -2.5 - lunge, 5.5, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(3, -1.5 - lunge, 4.5, 0.5, 0.5, 0.5, 'bone'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const stalkerFrame = (dir, anim, f) => renderVoxels(stalkerModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
@@ -139,6 +158,16 @@ const spitterModel = (anim, f) => {
   b.push(box(3, -2, 2 + z, 1, 5, 1, 'fungusDeep'));
   // corpo achatado e largo, suspenso entre as patas
   b.push(box(-3, -2, 3 + z, 7, 5, 2, 'fungus'));
+  // DETALHE FINO — verrugas dorsais: bossas de meio-passo espalhadas pelo
+  // lombo, em fungo escuro. Pele de anfibio e textura, nao superficie lisa; as
+  // bossas ficam ABAIXO da linha dos olhos para nao disputar com eles.
+  b.push(box(-2.5, -1, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(-0.5, 0.5, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(1.5, -0.5, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(0.5, 1.5, 5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  // Pintas do flanco: duas manchas escuras salientes na face dianteira.
+  b.push(box(-2.5, -2.5, 3.5 + z, 0.5, 0.5, 1, 'fungusDeep'));
+  b.push(box(2, -2.5, 3.5 + z, 0.5, 0.5, 1, 'fungusDeep'));
   // garganta acida: incha para a FRENTE antes do disparo (telegraph)
   b.push(box(-1, -3 - spit - pulse, 3 + z, 3, 1 + spit + pulse, 2, 'acid'));
   // olhos bulbosos em haste, acima da linha das costas
@@ -172,10 +201,23 @@ const bomberModel = (anim, f) => {
   b.push(box(-2, -2, 3 + z, 5, 4, 2, 'fungusDeep'));
   b.push(box(-1, -1, 5 + z, 3, 3, 2, 'fungusDeep'));
   b.push(box(0, -1, 7 + z, 1, 2, 1, 'fungusDeep'));
+  // DETALHE FINO — lamelas do capuz: escamas claras de meio-passo penduradas
+  // na borda de cada degrau, alternadas. Capuz de fungo e feito de prateleiras
+  // que crescem umas sobre as outras, e sao as lamelas que contam isso.
+  b.push(box(-2.5, -2.5, 2 + z, 0.5, 0.5, 1, 'fungus'));
+  b.push(box(1, -2.5, 1.5 + z, 0.5, 0.5, 1, 'fungus'));
+  b.push(box(-1.5, -2.5, 4 + z, 0.5, 0.5, 0.5, 'fungus'));
+  b.push(box(0.5, -1.5, 6 + z, 0.5, 0.5, 0.5, 'fungus'));
   // olho unico fundo na sombra do capuz
   b.push(box(0, -3, 4 + z, 1, 1, 2, 'biolum'));
   // pod de esporos: massa grande atras, cresce ate estourar
   b.push(box(-3, 2, 2 + z, 5 + swell, 2, 4 + swell + pulse, 'acid'));
+  // Poros do pod: tres pontos escuros de meio-passo na face externa da
+  // capsula — os furos por onde o esporo vai sair. Ficam na face de tras, longe
+  // do telegraph, e nao crescem com ele: sao textura, nao sinal.
+  b.push(box(-2, 4, 3 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(-0.5, 4, 4.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
+  b.push(box(1, 4, 3.5 + z, 0.5, 0.5, 0.5, 'fungusDeep'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
 const bomberFrame = (dir, anim, f) => renderVoxels(bomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
@@ -205,11 +247,25 @@ const bruiserModel = (anim, f) => {
   // torso trapezoidal que alarga para cima
   b.push(box(-3, -2, 4 + up, 6, 4, 4, 'rockDeep'));
   b.push(box(-4, -2, 8 + up, 8, 4, 4, 'rock'));
+  // DETALHE FINO — rachaduras: duas fendas escuras de meio-passo salientes na
+  // face do torso claro. Geodo e pedra PARTIDA; as rachaduras apontam para o
+  // nucleo, que e onde a fratura comecou.
+  b.push(box(-3, -2.5, 8.5 + up, 0.5, 0.5, 2, 'rockDeep'));
+  b.push(box(2.5, -2.5, 9 + up, 0.5, 0.5, 1.5, 'rockDeep'));
   // placas palidas nos ombros: a leitura de "geodo"
   b.push(box(-5, -2, 10 + up + heave, 2, 4, 3, 'bone'));
   b.push(box(4, -2, 10 + up + heave, 2, 4, 3, 'bone'));
+  // Lascas de cristal de meio-passo cravadas nas placas de ombro: o geodo
+  // aberto aparece nas bordas, nao so no peito. Emissivas de proposito — sao o
+  // mesmo mineral do nucleo.
+  b.push(box(-4.5, -2.5, 11 + up + heave, 0.5, 0.5, 1, 'electric'));
+  b.push(box(4.5, -2.5, 11.5 + up + heave, 0.5, 0.5, 1, 'electric'));
   // nucleo eletrico exposto no peito
   b.push(box(-1, -3, 9 + up, 3, 1, 3, 'electric'));
+  // Borda da fratura: aro palido de meio-passo acima e abaixo do nucleo — a
+  // pedra clara que se partiu para expor o mineral.
+  b.push(box(-1.5, -2.5, 8.5 + up, 4, 0.5, 0.5, 'bone'));
+  b.push(box(-1.5, -2.5, 12 + up, 4, 0.5, 0.5, 'bone'));
   // cabeca pequena e afundada entre os ombros
   b.push(box(-1, -1, 12 + up, 3, 2, 2, 'rockDeep'));
   b.push(box(-1, -2, 13 + up, 3, 1, 1, 'biolum'));
@@ -217,6 +273,10 @@ const bruiserModel = (anim, f) => {
   const armRaise = anim === 'special' ? Math.min(10, hurlLift) : slam;
   b.push(box(-6, -1, 6 + up + armRaise + heave, 2, 2, 5, 'rock'));
   b.push(box(5, -1, 6 + up + armRaise + heave, 2, 2, 5, 'rock'));
+  // Nodoas de meio-passo nos punhos: pedra calejada onde o braco bate. Um nub
+  // palido por punho, na face de impacto.
+  b.push(box(-5.5, -1.5, 6.5 + up + armRaise + heave, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(5.5, -1.5, 6.5 + up + armRaise + heave, 0.5, 0.5, 0.5, 'bone'));
   if (anim === 'special' && !hurlThrow) {
     const rockZ = 5 + hurlLift;
     // O volume converge com um bloco real do terreno, sem ocupar o frame inteiro.
@@ -259,15 +319,31 @@ const guardianModel = (anim, f) => {
   b.push(box(-1, -4, 8 + up, 3, 2, 5 + call + breath, 'electric'));
   // placas de ombro palidas, mais largas que o tronco
   b.push(box(-4, -2, 14 + up, 9, 4, 2, 'bone'));
+  // DETALHE FINO — chanfro: friso de pedra media de meio-passo correndo a
+  // borda frontal das placas. A placa ganha espessura lida — chapa lavrada, e
+  // nao laje.
+  b.push(box(-4, -2.5, 15.5 + up, 9, 0.5, 0.5, 'rock'));
   // recuo escuro sob a mascara: separa a cabeca dos ombros
   b.push(box(-1, -2, 16 + up, 3, 4, 1, 'rockDeep'));
   // mascara palida ESTREITA — cabeca, nao tampa
   b.push(box(-2, -2, 17 + up, 5, 4, 3, 'bone'));
   // fenda dos olhos, atravessando a mascara
   b.push(box(-2, -3, 18 + up, 5, 1, 1, 'electric'));
+  // Sulcos rituais: duas lagrimas escuras de meio-passo descendo da fenda dos
+  // olhos pela face da mascara. Gravura, nao dano — e o unico ornamento que um
+  // titan de pedra carrega.
+  b.push(box(-1.5, -2.5, 17 + up, 0.5, 0.5, 1, 'rockDeep'));
+  b.push(box(1, -2.5, 17 + up, 0.5, 0.5, 1, 'rockDeep'));
   // antebracos enormes PENDURADOS, com vao de 1 voxel ate as placas de ombro
   b.push(box(-7, -1, 3 + up + swing + breath, 3, 3, 10, 'rock'));
   b.push(box(5, -1, 3 + up + swing + breath, 3, 3, 10, 'rock'));
+  // Estratos: duas vetas palidas de meio-passo atravessando a face externa de
+  // cada antebraco. Pedra empilhada por eras — e as linhas horizontais fazem a
+  // massa ler ainda mais alta.
+  b.push(box(-7.5, -0.5, 7 + up + swing + breath, 0.5, 2, 0.5, 'bone'));
+  b.push(box(-7.5, -0.5, 10 + up + swing + breath, 0.5, 2, 0.5, 'bone'));
+  b.push(box(8, -0.5, 7 + up + swing + breath, 0.5, 2, 0.5, 'bone'));
+  b.push(box(8, -0.5, 10 + up + swing + breath, 0.5, 2, 0.5, 'bone'));
   // punhos palidos: a massa que desce no golpe tem de ser lida a distancia
   b.push(box(-7, -1, 3 + up + swing + breath, 3, 3, 2, 'bone'));
   b.push(box(5, -1, 3 + up + swing + breath, 3, 3, 2, 'bone'));
@@ -330,6 +406,11 @@ const bishopModel = (anim, f) => {
   // contraste com o Guardiao continua existindo, mas por FORMA (torre estreita
   // contra massa larga) e nao por tamanho.
   b.push(box(-5, -4, 0, 11, 9, 3, 'rockDeep'));
+  // Pedras da barra do manto: tres cravos palidos de meio-passo ao longo da
+  // bainha frontal — o peso que mantem um manto de cerimonia no chao.
+  b.push(box(-3.5, -4.5, 1, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(-0.5, -4.5, 0.5, 0.5, 0.5, 0.5, 'bone'));
+  b.push(box(2.5, -4.5, 1, 0.5, 0.5, 0.5, 'bone'));
   b.push(box(-4, -3, 3, 9, 7, 4, 'rust'));
   // O degrau de cima do manto e FERRUGEM, e nao osso.
   //
@@ -348,6 +429,11 @@ const bishopModel = (anim, f) => {
   // Estola vertical dourada descendo pelo centro do manto: e o que faz o olho
   // subir ate a mitra em vez de parar no volume maior.
   b.push(box(-1, -5, 4, 3, 1, 10 + nova, 'loot'));
+  // DETALHE FINO — bordado da estola: tracos de ferrugem de meio-passo
+  // cruzando a faixa dourada. Paramento tecido, nao chapa de ouro.
+  b.push(box(-0.5, -5.5, 6, 2, 0.5, 0.5, 'rust'));
+  b.push(box(-0.5, -5.5, 9, 2, 0.5, 0.5, 'rust'));
+  b.push(box(-0.5, -5.5, 12, 2, 0.5, 0.5, 'rust'));
   // Recuo escuro sob o peito: separa o tronco do manto em vez de deixar a torre
   // virar um bloco unico.
   b.push(box(-2, -4, 12 + nova, 5, 5, 4, 'rust'));
@@ -359,6 +445,10 @@ const bishopModel = (anim, f) => {
   // Turibulo pendurado a esquerda, com brasa viva.
   b.push(box(-7, -2, 6 + up + raise, 3, 3, 3, 'loot'));
   b.push(box(-6, -1, 4 + up + raise, 1, 1, 2, 'fire'));
+  // Corrente do turibulo: dois elos de meio-passo subindo ate a mao. Sem a
+  // corrente ele e uma caixa dourada flutuando ao lado do corpo.
+  b.push(box(-5.5, -1.5, 9.5 + up + raise, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(-6, -2, 10.5 + up + raise, 0.5, 0.5, 0.5, 'loot'));
   // Baculo a direita, AFASTADO do corpo: colado, ele e a mitra liam como duas
   // torres gemeas e o bicho parecia ter duas cabecas. O vao entre os dois e o que
   // faz um ser cajado e o outro ser mitra.
@@ -373,6 +463,9 @@ const bishopModel = (anim, f) => {
   b.push(box(-1, -4, 18 + up, 3, 1, 1, 'electric'));
   // Mitra: dois degraus estreitando ate a ponta.
   b.push(box(-2, -3, 20 + up, 5, 5, 3, 'bone'));
+  // Friso dourado de meio-passo na base da mitra: a coroa da leitura clerical,
+  // no unico volume que pode carregar ouro sem disputar com a estola.
+  b.push(box(-2, -3.5, 20 + up, 5, 0.5, 0.5, 'loot'));
   b.push(box(-1, -2, 23 + up, 3, 3, 3, 'bone'));
   b.push(box(0, -2, 26 + up, 1, 2, 2, 'loot'));
 
@@ -511,8 +604,18 @@ const horseModel = (anim, f) => {
   const backZ = 7 + up;
   // Peitoral: a massa da frente, alta e funda. E ela que atinge primeiro.
   b.push(box(-2, -5, backZ, 4, 4, 5 + rear, 'rockDeep'));
+  // DETALHE FINO — ARREIOS. A ficha do bestiario diz "a presenca de arreios
+  // nao implica operador", entao os arreios tem de EXISTIR no bicho: peitoral
+  // de couro dourado atravessando o peito e barrigueira descendo pelos dois
+  // flancos do barril. Meio-passo saliente, sobre o corpo escuro — a unica
+  // linha "de civilizacao" numa criatura selvagem.
+  b.push(box(-2, -5.5, backZ + 3, 4, 0.5, 0.5, 'loot'));
   // Barril: mais baixo que o peitoral e que a garupa — este e o degrau.
   b.push(box(-2, -1, backZ, 4, 4, 4 + rear, 'rockDeep'));
+  // Barrigueira: desce os flancos e fecha por baixo do ventre.
+  b.push(box(-2.5, 0.5, backZ, 0.5, 0.5, 4 + rear, 'loot'));
+  b.push(box(2, 0.5, backZ, 0.5, 0.5, 4 + rear, 'loot'));
+  b.push(box(-2, 0.5, backZ - 1.5, 4, 0.5, 0.5, 'loot'));
   // Garupa alta, de bicho de carga, com o lombo subindo de novo atras.
   b.push(box(-2, 3, backZ, 4, 4, 5 + rear, 'rockDeep'));
   // Ventre baixo, fechando o vao entre as patas dianteiras e as traseiras.
@@ -578,6 +681,10 @@ const horseModel = (anim, f) => {
   // leitura de mascara, e de pe elas quase nao tem topo.
   b.push(box(-1, -12 - lunge, headZ, 1, 2, 2, 'bone'));
   b.push(box(1, -12 - lunge, headZ, 1, 2, 2, 'bone'));
+  // Rebites da mascara: um ponto escuro de meio-passo por chapa. Mascara
+  // MONTADA, peca de guerra — nao osso que cresceu ali.
+  b.push(box(-1.5, -11.5 - lunge, headZ + 0.5, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(2, -11.5 - lunge, headZ + 0.5, 0.5, 0.5, 0.5, 'rust'));
 
   // Olhos entre as chapas, sob a aba da testeira: duas fendas de brasa na sombra.
   b.push(box(0, -13 - lunge, headZ + 1, 1, 1, 1, 'fire'));
@@ -665,10 +772,20 @@ const minerModel = (anim, f) => {
   // Tremonha nas costas: o compartimento de carga, ainda cheio.
   b.push(box(-2, 3 + lean, 10 + up, 4, 2, 4, 'rockDeep'));
   b.push(box(-2, 3 + lean, 14 + up, 4, 2, 1, 'loot'));
+  // DETALHE FINO — minerio transbordando: tres torroes de meio-passo por cima
+  // da carga. A ordem que ninguem cancelou era ENCHER a tremonha, e ela esta
+  // alem da borda.
+  b.push(box(-1.5, 3.5 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(0, 4 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(1, 3.5 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
   // Cabeamento exposto descendo do tronco. Azul: a corrente da grade que ainda
   // passa por ele, e que o calor faz sobrecarregar.
   b.push(box(-4, 1 + lean, 9 + up, 1, 1, 4, 'electric'));
   b.push(box(3, 2 + lean, 10 + up, 1, 1, 3, 'electric'));
+  // Bracadeiras de meio-passo prendendo os cabos ao chassi: fiacao PRESA e
+  // manutencao; fiacao solta e abandono. A dele esta meio a meio.
+  b.push(box(-4.5, 1 + lean, 11 + up, 0.5, 1, 0.5, 'rust'));
+  b.push(box(4, 2 + lean, 11 + up, 0.5, 1, 0.5, 'rust'));
   // Veio reativo crescido POR DENTRO do peito: mineral virando fiacao.
   b.push(box(-1, -2 + lean, 10 + up, 2, 1, 2, 'electric'));
 
@@ -686,6 +803,10 @@ const minerModel = (anim, f) => {
   const headZ = 13 + up + alert;
   b.push(box(-1, -2 + lean, headZ, 3, 3, 3, 'rust'));
   b.push(box(-1, -3 + lean, headZ + 1, 3, 1, 2, 'bone'));
+  // A RACHADURA da placa facial: uma fissura escura de meio-passo cortando a
+  // chapa palida em diagonal de dois segmentos. E o unico rosto que ele tem.
+  b.push(box(0.5, -3.5 + lean, headZ + 2, 0.5, 0.5, 1, 'rust'));
+  b.push(box(0, -3.5 + lean, headZ + 1.5, 0.5, 0.5, 0.5, 'rust'));
   // Optica: um unico ponto, mais fraco que o visor do prospector. GUTTERING, e
   // nao piscando.
   //
@@ -793,7 +914,7 @@ const living = {
 // `version` sobe junto com qualquer mudanca de pixel no atlas (production spec
 // §13). A subdivisao da grade (MODEL_SCALE) redesenhou TODO atlas de entidade,
 // entao o piso agora e 3.
-const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt, version = 3) => ({
+const base = (id, frameWidth, frameHeight, anchorX, anchorY, hitbox, footprint, animations, draw, prompt, version = 4) => ({
   id,
   version,
   frameWidth,
@@ -830,20 +951,20 @@ export const ENTITY_SPECS = [
     prospectorFrame,
     'voxel-isometric modular mining bot, digitigrade legs, boxy industrial chassis, round tactical headlamp and cyan sensor visor, rear hardpoint module, conductive cabling, extraction claw arm'
   ),
-  base('enemy-stalker', 64, 64, 32, 60, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 3),
-  base('enemy-spitter', 64, 64, 32, 60, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 3),
+  base('enemy-stalker', 64, 64, 32, 60, { w: 0.64, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, stalkerFrame, 'voxel-isometric low red chitin predator with one mineral blade, four authored directions', 4),
+  base('enemy-spitter', 64, 64, 32, 60, { w: 0.68, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, spitterFrame, 'voxel-isometric fungal amphibian, bulb eyes, acid throat, restrained neon accents', 4),
   base('enemy-spore-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
-  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 3),
+  }, bomberFrame, 'voxel-isometric compact spore carrier, hooded silhouette, central eye and telegraphed explosive pod', 4),
   base('enemy-bruiser', 96, 136, 48, 132, { w: 0.92, h: 1.1 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 8, fps: 10, loop: false },
-  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 3),
+  }, bruiserFrame, 'voxel-isometric gorilla geode bruiser lifting a full stone block overhead, broad shoulders, pale rock plates and electric core', 4),
   base('enemy-guardian', 96, 112, 48, 108, { w: 1.36, h: 1.4 }, { w: 1.7, h: 1.7, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
-  }, guardianFrame, 'voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core', 3),
+  }, guardianFrame, 'voxel-isometric mineral titan, huge pale forearms, dark torso, mask and electric chest core', 4),
   base('enemy-bishop', 112, 152, 56, 148, { w: 1.2, h: 1.9 }, { w: 1.5, h: 1.5, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 9, loop: false },
@@ -851,7 +972,7 @@ export const ENTITY_SPECS = [
   base('enemy-fungal-horse', 160, 168, 80, 156, { w: 1.4, h: 0.95 }, { w: 1.6, h: 1.2, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 6, fps: 10, loop: false },
-  }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates', 3),
+  }, horseFrame, 'voxel-isometric fungal warhorse, long low body, ember mane and crest, split hooves, shelf-fungus armor plates', 4),
   base('enemy-miner', 96, 120, 48, 108, { w: 0.92, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, living, minerFrame, 'voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe'),
   {
     id: 'fx-projectile-bolt', version: 3, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,

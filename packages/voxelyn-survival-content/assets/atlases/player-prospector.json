@@ -1,6 +1,6 @@
 {
   "id": "player-prospector",
-  "version": 3,
+  "version": 4,
   "atlas": "player-prospector.png",
   "frameWidth": 88,
   "frameHeight": 112,

@@ -1,6 +1,6 @@
 {
   "id": "enemy-guardian",
-  "version": 3,
+  "version": 4,
   "atlas": "enemy-guardian.png",
   "frameWidth": 96,
   "frameHeight": 112,

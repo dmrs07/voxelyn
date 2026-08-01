@@ -128,8 +128,17 @@ const leg = (lx, swing) => {
   // inteira da perna: nenhuma criatura do bestiario dobra o joelho para tras, e
   // e o que se enxerga do bot antes de qualquer detalhe.
   b.push(box(lx, -1 + s, 1, 2, 2, 2, 'rockDeep'));
+  // Pistao hidraulico da ficha: haste palida de meio-passo saliente na frente
+  // da canela, acompanhando a passada. E o detalhe que faz a perna ler como
+  // mecanismo articulado e nao como coluna dobrada.
+  b.push(box(lx + 0.5, -1.5 + s, 1, 1, 0.5, 2, 'bone'));
   // Jarrete: a junta que dobra ao contrario, um degrau atras da canela.
   b.push(box(lx, 1, 3, 2, 2, 1, 'rust'));
+  // Pino da junta: um rebite de ouro MEIO-PASSO SALIENTE na face frontal do
+  // jarrete. Saliente, e nao rente: um voxel fino embutido na casca fica com a
+  // unica face exposta virada para fora do quadrante visivel e a ordem do
+  // pintor o enterra — applique de detalhe fino se projeta da face.
+  b.push(box(lx + 0.5, 0.5, 3.5, 1, 0.5, 0.5, 'loot'));
   // Coxa subindo PARA A FRENTE ate o quadril.
   b.push(box(lx, 0, 4, 2, 2, 2, 'rust'));
   return b;
@@ -190,14 +199,39 @@ export const prospectorParts = ({
   const chest = hip + 2;
   upper.push(box(-2, -2 + lean, chest, 5, 4, 4, 'rust'));
   upper.push(box(-2, -2 + lean, chest + 4, 5, 4, 1, 'rockDeep'));
-  // Nucleo de energia: faixa VERTICAL de cyan encaixada na frente do chassi,
-  // como as barras do reator na ficha. Vertical e nao um ponto porque e o que
-  // sobrevive a escala — um voxel isolado some contra o latao.
-  upper.push(box(0, -3 + lean, chest + 1, 1, 1, 3, 'biolum'));
+  // DETALHE DE MEIO-PASSO (grade fina). Tudo aqui e APPLIQUE: caixas de 0.5
+  // salientes um voxel fino para FORA da face que decoram. Rente a casca nao
+  // funciona — o voxel fino embutido fica com todas as faces visiveis cobertas
+  // por vizinhos solidos e a ordem do pintor o enterra.
+  //
+  // Venezianas de exaustao no flanco esquerdo do chassi: duas fendas escuras.
+  // Sao elas que fazem o latao ler como carcaca de maquina e nao como caixa
+  // pintada.
+  upper.push(box(-2.5, -1 + lean, chest + 1, 0.5, 2, 0.5, 'rockDeep'));
+  upper.push(box(-2.5, -1 + lean, chest + 2, 0.5, 2, 0.5, 'rockDeep'));
+  // Costura de chapa no flanco direito: uma junta vertical escura dividindo o
+  // flanco em dois paineis.
+  upper.push(box(3, -0.5 + lean, chest + 0.5, 0.5, 0.5, 3, 'rockDeep'));
+  // NUCLEO DE ENERGIA, como na ficha da Aurix (painel 2): um NICHO escuro
+  // embutido na frente do chassi com DUAS barras verticais de cyan dentro. Na
+  // grade grossa isso era impossivel — a barra unica de 1 voxel era o maximo
+  // que a escala sustentava; no meio-passo as duas barras tem 2px cada, com
+  // 2px de recesso escuro entre elas, e o reator le como reator.
+  // Curtas de proposito (2 voxels autorados): mais altas que isso elas sobem
+  // ate a sombra da cabeca e leem como tiras penduradas do visor, competindo
+  // com ele — o reator e um ORGAO no peito, nao um segundo rosto.
+  upper.push(box(-1, -2.5 + lean, chest + 0.5, 3, 0.5, 3, 'rockDeep'));
+  upper.push(box(-0.5, -3 + lean, chest + 1, 0.5, 0.5, 2, 'biolum'));
+  upper.push(box(0.5, -3 + lean, chest + 1, 0.5, 0.5, 2, 'biolum'));
 
   // HARDPOINT TRASEIRO: o modulo nas costas, com o indicador aceso. Menor que o
   // chassi de proposito — ele fecha a silhueta por tras sem disputar com ela.
   upper.push(box(-1, 2 + lean, chest + 1, 3, 2, 4, 'rockDeep'));
+  // Trilhos-padrao Aurix (ficha, painel 3): duas guias de meio-passo descendo a
+  // face externa do modulo. Sao os encaixes de carga modular — a razao de o
+  // modulo existir — e viram textura vertical que separa "hardpoint" de "caixa".
+  upper.push(box(-1, 4 + lean, chest + 1.5, 0.5, 0.5, 3, 'rust'));
+  upper.push(box(0.5, 4 + lean, chest + 1.5, 0.5, 0.5, 3, 'rust'));
   upper.push(box(1, 3 + lean, chest + 3, 1, 1, 1, 'biolum'));
   // Cabo condutivo saindo do modulo e descendo pelo flanco. UM, e nao dois: a
   // fiacao e assinatura, nao textura.
@@ -208,12 +242,21 @@ export const prospectorParts = ({
   const shoulder = chest + 3;
   upper.push(box(-3, -2 + lean, shoulder, 1, 4, 2, 'rust'));
   upper.push(box(3, -2 + lean, shoulder, 1, 4, 2, 'rust'));
+  // Rebites de meio-passo nas ombreiras: um por ombro, no canto da frente. E o
+  // que separa "chapa aparafusada" de "bloco da mesma cor".
+  upper.push(box(-3, -2.5 + lean, shoulder + 1.5, 0.5, 0.5, 0.5, 'bone'));
+  upper.push(box(3.5, -2.5 + lean, shoulder + 1.5, 0.5, 0.5, 0.5, 'bone'));
 
   // BRACO DE EXTRACAO, a esquerda: coluna escura descendo ate a altura do
   // quadril, com a garra palida na ponta. E o membro assimetrico do bot — do
   // outro lado fica a arma — e e o que a ficha chama de ferramenta multiuso.
   upper.push(box(-3, -1 + lean, chest - 1, 1, 2, 4, 'rockDeep'));
   upper.push(box(-3, -2 + lean, chest - 2, 1, 2, 1, 'bone'));
+  // Garra magnetica da ficha (painel 4): a mao termina em DOIS dedos de
+  // meio-passo abertos para baixo, com o vao entre eles. Antes a ferramenta era
+  // um toco palido; os dedos sao o que a torna uma garra que agarra.
+  upper.push(box(-3, -2 + lean, chest - 3, 0.5, 0.5, 1, 'bone'));
+  upper.push(box(-2.5, -0.5 + lean, chest - 3, 0.5, 0.5, 1, 'bone'));
   // Braco da arma, a direita: curto e recolhido, porque ele sustenta.
   upper.push(box(3, -1 + lean + kick, chest + 1, 1, 2, 3, 'rockDeep'));
 
@@ -257,6 +300,10 @@ export const prospectorParts = ({
   // do corpo em vez de girar — o giro seria invisivel neste tamanho.
   const gunY = -1 + kick;
   gun.push(box(2, gunY - 2 + lean, chest + 2, 2, 3, 1, 'bone'));
+  // Trilho superior escuro de meio-passo sobre o receptor palido: da a arma uma
+  // linha de mira e quebra o bloco unico em corpo + trilho, sem engordar a
+  // silhueta — o meio-passo sobe no vao entre a arma e a cabeca.
+  gun.push(box(2, gunY - 2 + lean, chest + 3, 2, 3, 0.5, 'rockDeep'));
   gun.push(box(2, gunY - 1 + lean, chest + 3, 1, 1, 1, 'biolum'));
   gun.push(box(2, gunY - 3 + lean, chest + 2, 1, 1, 1, flash ? 'loot' : 'rust'));
 

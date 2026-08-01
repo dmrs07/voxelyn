@@ -1,6 +1,6 @@
 {
   "id": "enemy-miner",
-  "version": 3,
+  "version": 4,
   "atlas": "enemy-miner.png",
   "frameWidth": 96,
   "frameHeight": 120,
