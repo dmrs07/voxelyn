@@ -223,7 +223,13 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     halls: 'none',
   };
 
-  if (biome.stratum === 'prismatic') {
+  // O basalto tambem tem gramatica ESPACIAL propria (anfiteatros, florestas
+  // de pilares, fissuras). O que ele preserva do mapa original sao o automato
+  // e as MATERIAS — nada de agua, brasa ou gelo nele; a variacao e trabalho
+  // das ocupacoes. A identidade sobrevive; os bytes evoluem.
+  if (biome.stratum === 'basalt') {
+    profile.halls = 'columns';
+  } else if (biome.stratum === 'prismatic') {
     // Nervuras atravessam paredes; a mancha organica recua. Salas com longas
     // linhas de tiro vem das nervuras abrindo lâminas, nao de topologia nova.
     profile.crystalChance = 0.1 + depth * 0.04;
@@ -237,7 +243,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // Agua dividindo o chao em ilhas. Minerais azulados (cristal) marcam as
     // margens; o fungo gosta da umidade mesmo sem ocupacao.
     profile.waterBlobs = { count: 12 + depth * 4, rMin: 3, rMax: 6 };
-    profile.halls = 'basins';
+    profile.halls = 'karst';
     profile.biofluidBlobs = { count: 6, rMin: 1, rMax: 2 };
     profile.fungalBlobs = { count: 14, rMin: 2, rMax: 3 };
     profile.crystalChance = 0.05;
@@ -271,7 +277,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // fragil — atravessar abrindo buracos e a identidade, e o risco e abrir o
     // flanco errado. Pobre em tudo o mais.
     profile.fragileThinChance = 0.78;
-    profile.halls = 'sinkholes';
+    profile.halls = 'terraced';
     profile.oreChance = 0.05;
     profile.crystalChance = 0.02;
     profile.ventCount = 4;

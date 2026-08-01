@@ -223,6 +223,36 @@ mesmo lugar, só tem água de diferente"):
   - `lakes` (Cripta): lagos ovais congelados — o território do Espectro.
   Basalto: `none`, o labirinto orgânico histórico intocado.
 
+## Sexta etapa (implementada): a strata determina a arquitetura
+
+Redefinição formalizada: **a strata determina a arquitetura da caverna; a
+ocupação determina o que tomou conta dela.** A regra de qualidade que rege as
+gramáticas: *trocar a paleta inteira por cinza não pode apagar a identidade —
+a forma dos salões e corredores tem de dizer onde o jogador está.*
+
+Gramáticas espaciais (`WorldgenProfile.halls`), carimbadas após o autômato e
+antes das provas de alcançabilidade:
+
+| Strata | Gramática | Salões e corredores |
+| --- | --- | --- |
+| Basáltica | `columns` | Anfiteatro cercado de colunas, floresta de pilares, fissura entre dois espaços. Pesado e tectônico. |
+| Prismática | `radial` | Rotunda com raios e pilares de cristal, **geodo** (casca cristalina voltada pra dentro), **câmara espelhada**, corredores angulares segmentados em 90°. Angular: cresceu, não foi erodida. |
+| Cárstica (Aquífero) | `karst` | Cúpula calcária, cisternas que nascem cheias, colunata, túneis **sinuosos** de walker com persistência direcional que alargam e estreitam. Dissolvido pela água — o oposto visual da Catedral. |
+| Sedimentar (Sílica) | `terraced` | Galerias estratificadas mais largas que altas, **corredores paralelos separados por parede fina frágil** (o frágil como seam estrutural legível), sumidouros de borda frágil. Horizontal e laminado. |
+| Sulfurosa | `lungs` | Pulmões em cadeia, gargantas. |
+| Fornalha | `canyon` | Cânions com blocos desabados no leito. |
+| Cripta | `lakes` | Lagos ovais congelados + túneis suaves de walker. |
+
+**Mudança de contrato do basalto** (pedido em playtest): a gramática basáltica
+também evolui — o basalto ganha salões. O que continua intocável: o autômato
+como base e as **matérias** (nada de água/brasa/gelo nele; variação de matéria
+segue sendo trabalho das ocupações). O invariante passou de bytes para
+identidade; `generateWorld()` sem perfil continua sendo o histórico puro.
+
+Traduções do doc de design: *Estrato Sedimentar* = Sumidouros de Sílica
+(a parede em camadas já era arenito); *Cárstico* = Aquífero Negro; *Estrato
+Ferrífero* = trabalho futuro (naturalmente pareado com a Cicatriz Aurix).
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
@@ -230,6 +260,17 @@ mesmo lugar, só tem água de diferente"):
 - **Inércia sobre gelo** na Cripta, quando o estrato tiver provado a rota
   derreter/recongelar.
 - **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
+- **Estrato Ferrífero**: formação natural de ferro/magnetita — veio principal,
+  nós magnéticos, condução por parede, Miners e Aurix densos ("o lugar que
+  justificou a operação").
+- **Morfologia de borda** (silhueta escalonada da sedimentar, pontas
+  prismáticas no contorno): kit visual de borda por strata no renderer.
+- **Salas funcionais com variantes por strata** (poço, arena do Bispo, arena
+  do Guardião trocando de forma mantendo a função) e **Aurix adaptada ao
+  substrato** (escoras no sedimento, passarelas no aquífero, isoladores no
+  cristal, dutos na fenda).
+- **Fratura por camada** na sedimentar (quebrar uma célula frágil enfraquece
+  vizinhas da mesma faixa; minério em seams lineares).
 - Trilha de rachaduras do Espectro e ondulação da Lampreia como apresentação
   dedicada no cliente (hoje a leitura vem da postura `mood` + superfície).
 

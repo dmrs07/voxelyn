@@ -81,15 +81,21 @@ describe('spawn por estrato', () => {
     }
   });
 
-  it('a lampreia nasce NA agua quando ha agua ao alcance', () => {
+  it('o bando de lampreias nasce majoritariamente NA agua', () => {
+    // Cada lampreia tenta ancorar no lago mais proximo do proprio ponto de
+    // spawn (varredura de raio 10). Uma que caia longe de qualquer agua fica
+    // exposta — encontro valido, so nao o ideal —, entao o contrato e da
+    // MAIORIA do bando, nao de cada individuo.
     const seed = seedWithLineage('hydric');
     const state = createRun({ seed, sector: 2 });
-    const lamprey = state.enemies.find((e) => e.archetype === 'mud_lamprey');
-    expect(lamprey).toBeDefined();
-    if (!lamprey) return;
-    const i = at(state, Math.floor(lamprey.x), Math.floor(lamprey.y));
-    // Agua ou biofluido: o elemento condutivo dela.
-    expect([SURF_WATER].includes(state.surface[i]) || state.surface[i] === 2).toBe(true);
+    const lampreys = state.enemies.filter((e) => e.archetype === 'mud_lamprey');
+    expect(lampreys.length).toBe(3);
+    const wet = lampreys.filter((l) => {
+      const i = at(state, Math.floor(l.x), Math.floor(l.y));
+      // Agua ou biofluido: o elemento condutivo dela.
+      return state.surface[i] === SURF_WATER || state.surface[i] === 2;
+    });
+    expect(wet.length).toBeGreaterThanOrEqual(2);
   });
 });
 

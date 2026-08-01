@@ -61,19 +61,27 @@ export type WorldgenProfile = {
   /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
   minerCap: number;
   /**
-   * A ESTRUTURA DE SALAO do estrato, carimbada depois do automato e antes das
+   * A GRAMATICA ESPACIAL do estrato, carimbada depois do automato e antes das
    * provas de alcancabilidade — entao toda garantia do gerador continua
-   * valendo para ela. Cada estrato tem uma arquitetura, nao so uma materia:
+   * valendo para ela. A regra de qualidade que rege as gramaticas: trocar a
+   * paleta inteira por cinza NAO pode apagar a identidade do estrato — a
+   * FORMA dos saloes e corredores tem de dizer onde o jogador esta.
    *
-   * - `radial`: rotunda com corredores radiais e pilares de cristal (Catedral)
-   * - `lungs`: camaras bojudas ligadas por gargantas estreitas (Fenda)
-   * - `canyon`: fissuras compridas atravessando o mapa (Fornalha)
-   * - `basins`: bacias largas que nascem cheias d'agua (Aquifero)
-   * - `sinkholes`: pocos circulares com borda fragil (Silica)
-   * - `lakes`: lagos ovais congelados (Cripta)
-   * - `none`: o labirinto organico historico, intocado (Basalto)
+   * - `columns`: anfiteatros com colunas, florestas de pilares e fissuras
+   *   (Basalto — o automato historico continua sendo a base)
+   * - `radial`: rotunda com raios, geodo de casca cristalina, camara
+   *   espelhada e corredores angulares segmentados (Catedral)
+   * - `lungs`: camaras bojudas em cadeia, alveolos e gargantas (Fenda)
+   * - `canyon`: fissuras compridas com blocos desabados (Fornalha)
+   * - `karst`: cupula calcaria, cisternas cheias, colunata e tuneis SINUOSOS
+   *   de walker com persistencia direcional (Aquifero)
+   * - `terraced`: galerias estratificadas mais largas que altas e corredores
+   *   PARALELOS separados por parede fina fragil, alem dos sumidouros
+   *   (Silica — o estrato sedimentar)
+   * - `lakes`: lagos ovais congelados e tuneis suaves (Cripta)
+   * - `none`: nenhuma marca; o labirinto do automato puro
    */
-  halls: 'none' | 'radial' | 'lungs' | 'canyon' | 'basins' | 'sinkholes' | 'lakes';
+  halls: 'none' | 'columns' | 'radial' | 'lungs' | 'canyon' | 'karst' | 'terraced' | 'lakes';
 };
 
 /** O perfil historico: Galerias de Basalto. `generateWorld` sem perfil e ele. */
@@ -227,10 +235,81 @@ const stampHalls = (
       carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), r);
     }
   };
+  /** Poe um pilar SOLIDO dentro de um salao. So dentro da moldura do mapa. */
+  const pillar = (x: number, y: number, mat: number): void => {
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2) solid[idx(w, x, y)] = mat;
+  };
+  /** Elipse aberta; devolve as celulas internas (para encher de elemento). */
+  const carveEllipse = (cx: number, cy: number, rx: number, ry: number, collect?: number[]): void => {
+    for (let y = Math.max(1, cy - ry); y <= Math.min(h - 2, cy + ry); y++) {
+      for (let x = Math.max(1, cx - rx); x <= Math.min(w - 2, cx + rx); x++) {
+        const nx = (x - cx) / rx;
+        const ny = (y - cy) / ry;
+        if (nx * nx + ny * ny > 1) continue;
+        solid[idx(w, x, y)] = SOLID_NONE;
+        if (collect && nx * nx + ny * ny <= 0.82) collect.push(idx(w, x, y));
+      }
+    }
+  };
+  /**
+   * Tunel de WALKER com persistencia direcional: o corredor carstico. Mantem o
+   * rumo na maior parte dos passos e vira aos poucos quando vira; a espessura
+   * respira entre 1 e 2 — o tunel se estreita e volta a abrir, como a agua
+   * dissolve.
+   */
+  const meander = (x0: number, y0: number, length: number): void => {
+    let angle = rng.nextFloat01() * Math.PI * 2;
+    let fx = x0 + 0.5;
+    let fy = y0 + 0.5;
+    for (let step = 0; step < length; step++) {
+      if (rng.nextFloat01() < 0.25) angle += (rng.nextFloat01() - 0.5) * 1.1;
+      fx += Math.cos(angle);
+      fy += Math.sin(angle);
+      if (fx < 4 || fy < 4 || fx > w - 4 || fy > h - 4) angle += Math.PI / 2;
+      carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), step % 5 < 3 ? 1 : 2);
+    }
+  };
 
-  if (halls === 'radial') {
-    // Rotunda central com corredores em leque. Os PILARES sao cristal: cobertura,
-    // luz e municao do Ressonante ao mesmo tempo — arquitetura que joga.
+  if (halls === 'columns') {
+    // BASALTO: pesado, tectonico, colunar. O automato continua sendo a base;
+    // a gramatica acrescenta os tres saloes da identidade.
+    // Anfiteatro: sala circular cercada por colunas — o combate orbita o centro.
+    {
+      const c = center();
+      const r = 6 + rng.nextInt(3);
+      carveBlob(solid, w, h, c.x, c.y, r);
+      const phase = rng.nextFloat01() * Math.PI * 2;
+      for (let k = 0; k < 7; k++) {
+        const a = phase + (k * Math.PI * 2) / 7;
+        pillar(Math.round(c.x + Math.cos(a) * (r - 2)), Math.round(c.y + Math.sin(a) * (r - 2)), SOLID_ROCK);
+      }
+    }
+    // Floresta de pilares: campo aberto interrompido por ilhas solidas —
+    // cobertura, ricochete e rota de perseguicao.
+    {
+      const c = center();
+      carveBlob(solid, w, h, c.x, c.y, 8 + rng.nextInt(2));
+      const islands = 6 + rng.nextInt(4);
+      for (let k = 0; k < islands; k++) {
+        const a = rng.nextFloat01() * Math.PI * 2;
+        const d = 2 + rng.nextInt(5);
+        pillar(Math.round(c.x + Math.cos(a) * d), Math.round(c.y + Math.sin(a) * d), SOLID_ROCK);
+      }
+    }
+    // Fissura: dois grandes espacos ligados por uma passagem estreita.
+    {
+      const a = center();
+      const angle = rng.nextFloat01() * Math.PI * 2;
+      const bx = Math.max(6, Math.min(w - 6, Math.round(a.x + Math.cos(angle) * 12)));
+      const by = Math.max(6, Math.min(h - 6, Math.round(a.y + Math.sin(angle) * 12)));
+      carveBlob(solid, w, h, a.x, a.y, 4 + rng.nextInt(2));
+      carveBlob(solid, w, h, bx, by, 4 + rng.nextInt(2));
+      carveLine(a.x, a.y, Math.atan2(by - a.y, bx - a.x), 12, 0);
+    }
+  } else if (halls === 'radial') {
+    // CATEDRAL: angular, luminosa, interconectada.
+    // Rotunda central com corredores em leque. Os PILARES sao cristal:
+    // cobertura, luz e municao do Ressonante ao mesmo tempo.
     const c = center();
     const radius = 7 + rng.nextInt(3);
     carveBlob(solid, w, h, c.x, c.y, radius);
@@ -241,9 +320,50 @@ const stampHalls = (
     }
     for (let k = 0; k < 6; k++) {
       const a = phase + Math.PI / 6 + (k * Math.PI) / 3;
-      const px = Math.round(c.x + Math.cos(a) * (radius - 3));
-      const py = Math.round(c.y + Math.sin(a) * (radius - 3));
-      if (px > 1 && py > 1 && px < w - 2 && py < h - 2) solid[idx(w, px, py)] = SOLID_CRYSTAL;
+      pillar(
+        Math.round(c.x + Math.cos(a) * (radius - 3)),
+        Math.round(c.y + Math.sin(a) * (radius - 3)),
+        SOLID_CRYSTAL,
+      );
+    }
+    // Geodo: camara circular cuja CASCA e cristal voltado para dentro. Abrir um
+    // geodo e entrar numa sala que e inteira feita da regra do bioma.
+    {
+      const g = center();
+      const r = 4 + rng.nextInt(2);
+      carveBlob(solid, w, h, g.x, g.y, r);
+      for (let y = Math.max(1, g.y - r - 1); y <= Math.min(h - 2, g.y + r + 1); y++) {
+        for (let x = Math.max(1, g.x - r - 1); x <= Math.min(w - 2, g.x + r + 1); x++) {
+          const d2 = (x - g.x) ** 2 + (y - g.y) ** 2;
+          if (d2 > r * r && d2 <= (r + 1.6) * (r + 1.6) && solid[idx(w, x, y)] === SOLID_ROCK) {
+            solid[idx(w, x, y)] = SOLID_CRYSTAL;
+          }
+        }
+      }
+    }
+    // Camara espelhada: o mesmo recorte carimbado duas vezes, em espelho — a
+    // quase-simetria que nenhuma erosao produz. E corredores ANGULARES: retas
+    // curtas com viradas de 90 graus, a assinatura de algo que cresceu.
+    {
+      const m = center();
+      for (let k = 0; k < 4; k++) {
+        const ox = rng.nextInt(6);
+        const oy = rng.nextInt(5) - 2;
+        const r = 1 + rng.nextInt(2);
+        carveBlob(solid, w, h, m.x - 2 - ox, m.y + oy, r);
+        carveBlob(solid, w, h, m.x + 2 + ox, m.y + oy, r);
+      }
+      let px = m.x;
+      let py = m.y;
+      let horizontal = rng.nextFloat01() < 0.5;
+      for (let seg = 0; seg < 4; seg++) {
+        const len = 5 + rng.nextInt(5);
+        const dir = rng.nextFloat01() < 0.5 ? -1 : 1;
+        carveLine(px, py, horizontal ? (dir < 0 ? Math.PI : 0) : (dir < 0 ? -Math.PI / 2 : Math.PI / 2), len, 0);
+        if (horizontal) px = Math.max(4, Math.min(w - 4, px + dir * len));
+        else py = Math.max(4, Math.min(h - 4, py + dir * len));
+        horizontal = !horizontal;
+      }
     }
   } else if (halls === 'lungs') {
     // Pulmoes: camaras bojudas em cadeia, ligadas por gargantas de 1 celula.
@@ -265,41 +385,85 @@ const stampHalls = (
     }
   } else if (halls === 'canyon') {
     // Fissuras compridas: as grandes linhas retas que dividem as salas da
-    // Fornalha e criam as pontes naturais entre elas.
+    // Fornalha e criam as pontes naturais entre elas. Blocos DESABADOS pontuam
+    // o leito — a camara que ja foi continua e hoje e escombro.
     for (let c = 0; c < 2; c++) {
       const start = center();
       const angle = rng.nextFloat01() * Math.PI * 2;
-      carveLine(start.x, start.y, angle, 22 + rng.nextInt(10), 1);
-    }
-  } else if (halls === 'basins') {
-    // Bacias largas que nascem CHEIAS: a agua do Aquifero mora aqui, nao num
-    // sorteio longe da geografia que existiria para contê-la.
-    for (let b = 0; b < 3; b++) {
-      const c = center();
-      const r = 5 + rng.nextInt(3);
-      carveBlob(solid, w, h, c.x, c.y, r);
-      const rf = r - 1;
-      for (let y = Math.max(1, c.y - rf); y <= Math.min(h - 2, c.y + rf); y++) {
-        for (let x = Math.max(1, c.x - rf); x <= Math.min(w - 2, c.x + rf); x++) {
-          const dx = x - c.x;
-          const dy = y - c.y;
-          if (dx * dx + dy * dy <= rf * rf) fillCells.push(idx(w, x, y));
-        }
+      const length = 22 + rng.nextInt(10);
+      carveLine(start.x, start.y, angle, length, 1);
+      for (let d = 0; d < 3; d++) {
+        const t = 4 + rng.nextInt(Math.max(1, length - 8));
+        pillar(
+          Math.round(start.x + Math.cos(angle) * t),
+          Math.round(start.y + Math.sin(angle) * t),
+          SOLID_ROCK,
+        );
       }
     }
+  } else if (halls === 'karst') {
+    // AQUIFERO CARSTICO: esculpido pela agua — arredondado, amplo, sinuoso. O
+    // oposto visual da Catedral: nada de quinas, tudo dissolvido.
+    // Cupula calcaria: sala grande e arredondada, quase sem obstrucao.
+    {
+      const c = center();
+      carveEllipse(c.x, c.y, 7 + rng.nextInt(3), 6 + rng.nextInt(2));
+    }
+    // Cisternas: bacias que nascem CHEIAS — a agua mora na geografia que
+    // existe para contê-la.
+    for (let b = 0; b < 2; b++) {
+      const c = center();
+      const r = 5 + rng.nextInt(3);
+      carveEllipse(c.x, c.y, r, Math.max(3, r - 1), fillCells);
+    }
+    // Colunata: salao alongado dividido por uma fileira de pilares naturais.
+    {
+      const c = center();
+      const horizontal = rng.nextFloat01() < 0.5;
+      const rx = horizontal ? 8 : 4;
+      const ry = horizontal ? 4 : 8;
+      carveEllipse(c.x, c.y, rx, ry);
+      for (let k = -2; k <= 2; k++) {
+        pillar(c.x + (horizontal ? k * 3 : 0), c.y + (horizontal ? 0 : k * 3), SOLID_ROCK);
+      }
+    }
+    // Tuneis sinuosos: o corredor carstico e um walker persistente que alarga
+    // e estreita — rotas circulares nascem de dois meandros que se cruzam.
+    for (let t = 0; t < 3; t++) {
+      const s = center();
+      meander(s.x, s.y, 24 + rng.nextInt(12));
+    }
     fillKind = SURF_WATER;
-  } else if (halls === 'sinkholes') {
-    // Pocos circulares com a BORDA fragil: o chao que cede e a arquitetura da
-    // Silica — cada sumidouro e uma sala cuja parede inteira e uma decisao.
-    for (let s = 0; s < 4; s++) {
+  } else if (halls === 'terraced') {
+    // SILICA SEDIMENTAR: laminada, escavavel, instavel. A gramatica e
+    // HORIZONTAL: galerias mais largas que altas, corredores paralelos, e o
+    // contorno escalonado vem das proprias camadas.
+    // Galerias estratificadas: salas alongadas na horizontal.
+    for (let g = 0; g < 2; g++) {
+      const c = center();
+      carveEllipse(c.x, c.y, 8 + rng.nextInt(4), 3 + rng.nextInt(2));
+    }
+    // Corredores PARALELOS separados por parede fina: a parede vira atalho
+    // destrutivel — o fragil aqui e um seam estrutural legivel, nao ruido.
+    {
+      const c = center();
+      const len = 14 + rng.nextInt(8);
+      carveLine(c.x, c.y, 0, len, 1);
+      carveLine(c.x, c.y + 4, 0, len, 1);
+      for (let x = c.x; x < Math.min(w - 2, c.x + len); x++) {
+        const i = idx(w, x, c.y + 2);
+        if (solid[i] === SOLID_ROCK) solid[i] = SOLID_FRAGILE;
+      }
+    }
+    // Sumidouros: pocos circulares com a BORDA fragil — a sala cuja parede
+    // inteira e uma decisao.
+    for (let s = 0; s < 3; s++) {
       const c = center();
       const r = 4 + rng.nextInt(3);
       carveBlob(solid, w, h, c.x, c.y, r);
       for (let y = Math.max(1, c.y - r - 1); y <= Math.min(h - 2, c.y + r + 1); y++) {
         for (let x = Math.max(1, c.x - r - 1); x <= Math.min(w - 2, c.x + r + 1); x++) {
-          const dx = x - c.x;
-          const dy = y - c.y;
-          const d2 = dx * dx + dy * dy;
+          const d2 = (x - c.x) ** 2 + (y - c.y) ** 2;
           if (d2 > r * r && d2 <= (r + 1.5) * (r + 1.5) && solid[idx(w, x, y)] === SOLID_ROCK) {
             solid[idx(w, x, y)] = SOLID_FRAGILE;
           }
@@ -307,21 +471,15 @@ const stampHalls = (
       }
     }
   } else if (halls === 'lakes') {
-    // Lagos ovais congelados: as pontes de gelo sobre cavidades que a spec
-    // promete — e o territorio do Espectro.
+    // CRIPTA: lagos ovais congelados — o territorio do Espectro — ligados por
+    // tuneis suaves de walker (gelo e agua tambem esculpem).
     for (let l = 0; l < 2 + rng.nextInt(2); l++) {
       const c = center();
-      const rx = 6 + rng.nextInt(3);
-      const ry = 4 + rng.nextInt(2);
-      for (let y = Math.max(1, c.y - ry); y <= Math.min(h - 2, c.y + ry); y++) {
-        for (let x = Math.max(1, c.x - rx); x <= Math.min(w - 2, c.x + rx); x++) {
-          const nx = (x - c.x) / rx;
-          const ny = (y - c.y) / ry;
-          if (nx * nx + ny * ny > 1) continue;
-          solid[idx(w, x, y)] = SOLID_NONE;
-          if (nx * nx + ny * ny <= 0.82) fillCells.push(idx(w, x, y));
-        }
-      }
+      carveEllipse(c.x, c.y, 6 + rng.nextInt(3), 4 + rng.nextInt(2), fillCells);
+    }
+    for (let t = 0; t < 2; t++) {
+      const s = center();
+      meander(s.x, s.y, 18 + rng.nextInt(8));
     }
     fillKind = SURF_ICE;
   }
