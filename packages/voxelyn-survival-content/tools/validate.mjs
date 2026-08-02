@@ -60,10 +60,21 @@ const MAX_ATLAS_WIDTH = 4096;
  * autorados (1,18 MiB). Mesmo criterio de sempre: teto novo com folga curta
  * sobre o medido (~25%), porque crescer por materia nova e o caminho esperado
  * do jogo, e um atlas 50% acima da curva continua sendo um erro a barrar.
+ *
+ * Terceira revisao (portais por bioma + fauna afinada): o world-props passou a
+ * carregar dez portais animados e o bestiario ganhou dois corpos (Bombardeiro
+ * de Enxofre e Coveiro). So o teto de RGBA se move, e ele so se moveu DEPOIS
+ * de o desperdicio ser pago: o Coveiro nascera num canvas de 96x120 herdado do
+ * Miner com 37px de margem morta no topo, e apertar o canvas ao conteudo real
+ * (72x88) devolveu 2,8 MiB — mais do que o proprio bicho custa agora. O teto
+ * sobe de 96 para 112 MiB sobre um pacote medido de ~98 MiB: folga de ~14%,
+ * mais curta que a das revisoes anteriores justamente porque o pacote esta
+ * grande. Um atlas fora da curva continua sendo barrado, e a proxima materia
+ * nova volta a exigir esta mesma conversa — que e o ponto do orcamento.
  */
 const MAX_PNG_BYTES = 1536 * 1024;
 const MAX_TOTAL_PNG_BYTES = 6 * 1024 * 1024;
-const MAX_DECODED_BYTES = 96 * 1024 * 1024;
+const MAX_DECODED_BYTES = 112 * 1024 * 1024;
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 const framePixels = (png, m, index) => {

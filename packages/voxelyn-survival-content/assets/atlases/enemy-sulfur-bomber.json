@@ -1,12 +1,12 @@
 {
-  "id": "enemy-miner",
-  "version": 4,
-  "atlas": "enemy-miner.png",
-  "frameWidth": 96,
-  "frameHeight": 120,
-  "columns": 42,
-  "anchorX": 48,
-  "anchorY": 108,
+  "id": "enemy-sulfur-bomber",
+  "version": 1,
+  "atlas": "enemy-sulfur-bomber.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 64,
+  "anchorX": 32,
+  "anchorY": 60,
   "directions": 4,
   "authoredDirs": [
     "dr",
@@ -16,12 +16,12 @@
   ],
   "flipPairs": {},
   "hitbox": {
-    "w": 0.92,
-    "h": 1.5
+    "w": 0.62,
+    "h": 0.72
   },
   "footprint": {
-    "w": 1.25,
-    "h": 1.25,
+    "w": 1,
+    "h": 1,
     "offsetX": 0,
     "offsetY": 0
   },
@@ -31,22 +31,17 @@
     "#1d2430",
     "#1f3d33",
     "#2e3a4d",
-    "#2f6b4f",
-    "#3f8a5e",
     "#46566e",
-    "#59f2c2",
     "#66c28a",
     "#6e4a33",
-    "#7ab8ff",
-    "#7b8ba3",
     "#8a7154",
+    "#a8e63c",
     "#b8a98f",
     "#d5cdba",
     "#d93b4c",
     "#ff7a2f",
     "#ffa63f",
-    "#ffd166",
-    "#ffe9b8"
+    "#ffd166"
   ],
   "animations": {
     "idle": {
@@ -73,6 +68,11 @@
       "frames": 5,
       "fps": 10,
       "loop": false
+    },
+    "special": {
+      "frames": 6,
+      "fps": 10,
+      "loop": false
     }
   },
   "frameMap": {
@@ -80,34 +80,38 @@
       "idle": 0,
       "walk": 4,
       "attack": 10,
-      "hit": 14,
-      "die": 16
+      "special": 14,
+      "hit": 20,
+      "die": 22
     },
     "dl": {
-      "idle": 21,
-      "walk": 25,
-      "attack": 31,
-      "hit": 35,
-      "die": 37
+      "idle": 27,
+      "walk": 31,
+      "attack": 37,
+      "special": 41,
+      "hit": 47,
+      "die": 49
     },
     "ur": {
-      "idle": 42,
-      "walk": 46,
-      "attack": 52,
-      "hit": 56,
-      "die": 58
+      "idle": 54,
+      "walk": 58,
+      "attack": 64,
+      "special": 68,
+      "hit": 74,
+      "die": 76
     },
     "ul": {
-      "idle": 63,
-      "walk": 67,
-      "attack": 73,
-      "hit": 77,
-      "die": 79
+      "idle": 81,
+      "walk": 85,
+      "attack": 91,
+      "special": 95,
+      "hit": 101,
+      "die": 103
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric abandoned mining automaton, hunched under its load, long arms, cracked faceplate, shoulder lamp, exposed conductive wiring, refitted pickaxe",
+    "prompt": "voxel-isometric hooded sulfur carrier, mineral crusted hood with yellow sulfur needles, ember eye, swelling sulfur gas bladder with rusted valves",
     "seedOrRef": "deterministic-code-v2"
   }
 }

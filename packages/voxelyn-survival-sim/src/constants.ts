@@ -247,6 +247,74 @@ export const WRAITH_LUNGE_WINDUP_TICKS = 12;
 export const WRAITH_LUNGE_COOLDOWN_TICKS = 70;
 /** Sob o gelo ele desliza mais rapido do que qualquer coisa anda. */
 export const WRAITH_UNDER_ICE_SPEED_SCALE = 1.35;
+
+/**
+ * Bombardeiro de Enxofre (Fenda Sulfurosa e Fornalha Abissal).
+ *
+ * O Spore Bomber e uma coisa MICELIAL: ele estoura numa nuvem de esporos
+ * organicos. Numa caverna de magma isso nao quer dizer nada — nao ha micelio
+ * ali para produzi-lo, e a nuvem verde no meio da brasa era o sinal mais
+ * fora de lugar do jogo. Esta e a mesma silhueta com a quimica do lugar: o
+ * corpo carrega enxofre condensado e, ao romper, larga GAS no lugar dos
+ * esporos.
+ *
+ * A diferenca nao e cosmetica, e a razao de ele existir: esporos so
+ * envenenam, gas EXPLODE. Matar um destes perto de brasa, fogo ou de uma
+ * fissura da Fornalha acende a nuvem inteira — a mesma regra de ignicao que
+ * o estrato ja cobra dos respiradouros. A recompensa por ler o terreno e
+ * matar longe do calor; o preco por nao ler e a sala pegando fogo.
+ */
+export const SULFUR_BOMBER_GAS_RADIUS = 2;
+export const SULFUR_BOMBER_GAS_LIFE_TICKS = 240;
+
+/**
+ * Coveiro (Estrato Ferrifero): o catador de sucata do Veio.
+ *
+ * Foi construido para recolher automatos quebrados — e nunca recebeu ordem de
+ * parar. O que ele faz com o jogador e o que fazia com carcaças: ATRAI pelo
+ * eletroima do braço e prensa. Ele e o unico corpo do bestiario que tira do
+ * jogador a coisa que o jogo inteiro assume dele — a posicao.
+ *
+ * O contra-jogo mora no telegrafo LONGO (1,1 s de eletroima carregando) e na
+ * geometria: o puxao respeita parede, entao quem quebra a linha de visao ou
+ * poe uma quina no caminho chega mais perto do que queria, mas nao no colo
+ * dele. Esquivar durante a carga tambem sai — o iframe do dodge nao anula o
+ * arrasto, mas os tiles ganhos, sim.
+ */
+/**
+ * O ALCANCE e o ARRASTO andam juntos, e a conta precisa de MARGEM:
+ *
+ *   PULL_RANGE - PULL_TILES + PULL_STEP <= SLAM_RANGE
+ *
+ * Sem relacao nenhuma, o combo nao fechava no PRIMEIRO CONTATO: com engate a
+ * 8,5 tiles e arrasto de 3,6, o alvo terminava a 4,9 do Coveiro contra uma
+ * prensa de 1,5 — os dois telegrafos gastos num golpe que nao podia acertar
+ * nem contra alguem parado, e como o aggro tambem valia 8,5 esse era o
+ * comportamento NORMAL do encontro.
+ *
+ * A primeira correcao fechou a conta com IGUALDADE EXATA (6,5 - 5 = 1,5) e
+ * isso ainda estava errado, por dois motivos que so aparecem no limite: a
+ * checagem da prensa e estrita (`dist < reach`), entao a borda exata nao
+ * acerta; e o arrasto anda em passos discretos de 0,2, entao em rumos
+ * oblicuos o acumulado para um epsilon ACIMA da conta ideal. Medido: a 30 e
+ * a 60 graus o alvo terminava a 1,5000...algo e a prensa passava batido.
+ *
+ * Agora sobra folga de um passo inteiro: 6,5 - 5,5 = 1,0 contra 1,5 de
+ * alcance. O puxao entrega o alvo DENTRO do golpe em qualquer rumo, e nao na
+ * borda dele.
+ */
+export const UNDERTAKER_PULL_RANGE = 6.5;
+export const UNDERTAKER_PULL_MIN_RANGE = 2.2; // colado, ele so prensa
+export const UNDERTAKER_PULL_WINDUP_TICKS = 22;
+export const UNDERTAKER_PULL_COOLDOWN_TICKS = 130;
+/** Quanto o eletroima arrasta, em tiles, se nada bloquear o caminho. */
+export const UNDERTAKER_PULL_TILES = 5.5;
+/** Passo do arrasto: a colisao e avaliada tile a tile, nunca em salto. */
+export const UNDERTAKER_PULL_STEP = 0.2;
+/** A prensa que vem logo depois do puxao — o "porradao". */
+export const UNDERTAKER_SLAM_DAMAGE = 26;
+export const UNDERTAKER_SLAM_WINDUP_TICKS = 14;
+export const UNDERTAKER_SLAM_RANGE = 1.5;
 export const DISCHARGE_DAMAGE = 26;
 export const DISCHARGE_TICKS = 6;
 /** Controle direto do Conductive em alvos organicos: 1,2 s a 20 Hz. */

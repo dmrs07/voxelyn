@@ -260,6 +260,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     coreTaken: false,
     guardianAwake: false,
     guardianSummoned: false,
+    bossesDown: 0,
     arenaClosed: false,
     arenaBarrierCells: [],
     guardianPath: [],
@@ -1492,7 +1493,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           // Detonar um Portador conta como estouro para quem o abateu, mesmo que
           // a explosao em si nasca com `source: 'enemy'`. O que a ressonancia
           // registra e a DECISAO do jogador — ele escolheu matar aquilo de perto.
-          if (enemy.archetype === 'bomber' && !enemy.alive) {
+          // Vale para os DOIS bombardeiros: a decisao do jogador e a mesma
+          // (matar aquilo de perto), e a Fenda e a Fornalha — onde so nasce o
+          // de enxofre — sao justamente biomas de afinidade com explosao.
+          if (
+            (enemy.archetype === 'bomber' || enemy.archetype === 'sulfur_bomber') &&
+            !enemy.alive
+          ) {
             recordPlayerResonance(state, proj.owner, 'blast');
           }
           if (proj.kind === 'seeker') {
@@ -1838,6 +1845,10 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'bellows',
   'scoriac',
   'frost_wraith',
+  // Fauna afinada por bioma, tambem no fim pela mesma regra de nunca
+  // reordenar o que ja existe.
+  'sulfur_bomber',
+  'undertaker',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -1947,6 +1958,9 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.stats.discoveries);
   for (const archetype of HASHED_ARCHETYPES) mix(state.stats.kills[archetype]);
   mix(state.guardianSummoned ? 1 : 0);
+  // Chefes abatidos: decide o que a SUBIDA vai (nao) repovoar, entao duas
+  // simulacoes que discordam disso divergem no primeiro retorno.
+  mix(state.bossesDown);
   mix(state.arenaClosed ? 1 : 0);
   mix(state.arenaBarrierCells.length);
   for (const cell of state.arenaBarrierCells) mix(cell);

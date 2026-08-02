@@ -96,6 +96,7 @@ const signatureHome = (
   signature: EnemyArchetype,
   x: number,
   y: number,
+  taken: Set<number>,
 ): { x: number; y: number } => {
   const wantsWater = signature === 'mud_lamprey';
   const wantsIce = signature === 'frost_wraith';
@@ -111,8 +112,21 @@ const signatureHome = (
         if (nx <= 0 || ny <= 0 || nx >= w - 1 || ny >= h - 1) continue;
         const i = ny * w + nx;
         if (state.solid[i] !== SOLID_NONE) continue;
-        if (wantsWater && isConductiveSurface(state.surface[i])) return { x: nx, y: ny };
-        if (wantsIce && state.surface[i] === SURF_ICE) return { x: nx, y: ny };
+        // Um lago so tem UM dono por celula. Sem esta reserva, dois membros do
+        // mesmo bando cujos pontos de spawn ficam perto convergem para a mesma
+        // agua (a varredura em anel e deterministica e escolhe sempre a mesma
+        // celula) e nascem EMPILHADOS: um sprite, uma hitbox, dois bichos
+        // atacando. Enquanto o pack era 1 isso nao podia acontecer; foi o
+        // bando que criou o caso.
+        if (taken.has(i)) continue;
+        if (wantsWater && isConductiveSurface(state.surface[i])) {
+          taken.add(i);
+          return { x: nx, y: ny };
+        }
+        if (wantsIce && state.surface[i] === SURF_ICE) {
+          taken.add(i);
+          return { x: nx, y: ny };
+        }
       }
     }
   }
@@ -159,6 +173,9 @@ export const populateSector = (
   // lampreia em chao seco nao e um encontro, e um peixe fora d'agua.
   const signature = SIGNATURE_OF_STRATUM[state.stratum] as EnemyArchetype | undefined;
   const signatureIndices = new Set<number>();
+  // Celulas de elemento ja entregues a um membro do bando. Local, como o
+  // `taken` de populateMiners: vale durante a povoacao e nao existe depois.
+  const signatureHomes = new Set<number>();
   if (signature) {
     const pack = SIGNATURE_PACK[signature] ?? 1;
     for (let k = 1; k <= pack; k++) {
@@ -177,7 +194,7 @@ export const populateSector = (
       continue;
     }
     if (signature && signatureIndices.has(i) && i !== eliteIndex) {
-      const home = signatureHome(state, signature, spawns[i].x, spawns[i].y);
+      const home = signatureHome(state, signature, spawns[i].x, spawns[i].y, signatureHomes);
       spawnEnemy(state, signature, home.x, home.y, false);
       continue;
     }
@@ -187,11 +204,18 @@ export const populateSector = (
   // O Bispo ocupa o mesmo ponto que o Guardiao ocuparia — a camara que a geracao
   // reserva para um chefe. Nao ha sala nova: o setor 2 ja tinha o espaco vazio, e
   // o que faltava era alguem la dentro.
+  //
+  // MAS chefe abatido nao volta. Na subida da extracao de retorno o setor e
+  // regenerado inteiro, e sem esta guarda o Bispo morto reaparecia na camara —
+  // a fauna repovoar e a pressao prometida, um chefe repovoar e uma conquista
+  // desmanchando. O BOLSO continua sendo plantado de qualquer jeito: a colonia
+  // e terreno, e ela nao morreu junto com quem reinava sobre ela.
+  const bossAlreadyDown = (state.bossesDown & (1 << state.sector)) !== 0;
   if (state.sector === BISHOP_SECTOR) {
     plantBishopPocket(state, guardian.x, guardian.y);
-    spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
+    if (!bossAlreadyDown) spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
   }
-  if (isFinalSector(state.sector)) {
+  if (isFinalSector(state.sector) && !bossAlreadyDown) {
     spawnEnemy(state, 'guardian', guardian.x, guardian.y, false);
   }
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
@@ -233,6 +257,10 @@ const populateMiners = (
   for (const spawn of spawns) {
     if (placed >= cap || state.enemies.length >= MAX_ENEMIES) return;
     let found: { x: number; y: number } | null = null;
+    // O VEIO que o pos ali. Guardado junto com a celula porque o encontro
+    // inteiro depende dele: um minerador de costas para a rocha e so um corpo
+    // parado no corredor.
+    let vein: { x: number; y: number } | null = null;
     for (let dy = -MINER_ORE_SEARCH; dy <= MINER_ORE_SEARCH && !found; dy++) {
       for (let dx = -MINER_ORE_SEARCH; dx <= MINER_ORE_SEARCH && !found; dx++) {
         const x = spawn.x + dx;
@@ -247,13 +275,25 @@ const populateMiners = (
           if (state.solid[i] !== SOLID_NONE) continue;
           if (taken.has(i)) continue;
           found = { x: fx, y: fy };
+          vein = { x, y };
           break;
         }
       }
     }
-    if (!found) continue;
+    if (!found || !vein) continue;
     taken.add(found.y * w + found.x);
-    spawnEnemy(state, 'miner', found.x, found.y, false);
+    const miner = spawnEnemy(state, 'miner', found.x, found.y, false);
+    // E ele nasce ENCARANDO o veio.
+    //
+    // O lugar ja dizia "ele ainda esta trabalhando o minerio", mas a POSTURA
+    // desmentia: todo miner nascia com o facing padrao (leste), entao metade
+    // deles picaretava o corredor vazio de costas para a rocha que motivou o
+    // proprio spawn. A animacao de repouso e a batida da picareta; virada
+    // para o nada, ela lia como um tique, e nao como trabalho.
+    //
+    // O veio e ortogonalmente adjacente (a busca acima so aceita vizinho de
+    // aresta), entao a direcao sai exata, sem normalizar.
+    miner.facing = { x: vein.x - found.x, y: vein.y - found.y };
     placed++;
   }
 };

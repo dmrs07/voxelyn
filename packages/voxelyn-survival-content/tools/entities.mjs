@@ -869,61 +869,102 @@ const minerModel = (anim, f) => {
   // O cleave: a picareta descreve um circulo. Os quatro frames sao erguer,
   // girar, PASSAR POR TRAS, recolher — o terceiro e o que promete o circulo.
   const swing = anim === 'attack' ? [0, 1, 2, 3][f % 4] : -1;
-  // A cabeca sobe assim que ele deixa de estar so trabalhando.
+  // A cabeca sobe assim que ele deixa de estar so trabalhando. E o gesto que a
+  // ficha descreve: "it raises its head only to decide".
   const alert = anim === 'idle' ? 0 : 2;
   const up = -flinch;
   const b = [];
 
-  // Pernas longas e segmentadas, com pe largo: ele e alto e pesado, e o vao
-  // entre as pernas e o que impede a silhueta de virar um bloco.
+  // REWORK guiado pela ficha de referencia (EX-016). O desenho anterior tinha
+  // todas as pecas certas — lampada, veias, tremonha, bracos longos, picareta —
+  // e mesmo assim lia como um amontoado de caixas. Duas tentativas ensinaram o
+  // porque, e as duas licoes estao aplicadas aqui:
+  //
+  // 1. NAO EXISTE VOLUME LARGO E BAIXO. Uma laje mostra so a face de topo na
+  //    isometrica, e essa face vira a maior mancha chapada da tela — foi o
+  //    "telhado" que a primeira versao do manto virou, cobrindo a cabeca.
+  //    Roupa aqui e feita de FIOS VERTICAIS, como a cortina do Bispo: fio
+  //    projeta lateral, e lateral desenha contorno em vez de mancha.
+  // 2. O CENTRO DO CORPO E CLARO, AS PONTAS SAO ESCURAS. A segunda versao fez
+  //    o contrario (tronco escuro, membros de latao) e o resultado foi pior: o
+  //    meio do bicho sumia no fundo e braco, perna e cabeca flutuavam como
+  //    pecas soltas. Uma figura precisa de UMA massa continua, e ela tem de
+  //    ser a mais clara — o resto pendura nela.
+  const lean = 1; // o tronco pende para a frente (-y), sob a carga
+
+  // PERNAS digitigradas e ESCURAS, encostadas no quadril: sem vao entre elas e
+  // o corpo, senao voltam a parecer postes plantados ao lado de um tronco.
   for (const [lx, phase] of [[-3, step], [1, -step]]) {
-    b.push(box(lx, -1, Math.max(0, phase), 2, 2, 1, 'rockDeep'));
-    b.push(box(lx, -1, 1 + Math.max(0, phase), 2, 2, 4, 'rust'));
-    b.push(box(lx, -1, 5 + Math.max(0, phase), 2, 2, 3, 'rockDeep'));
+    const lift = Math.max(0, phase);
+    b.push(box(lx, -0.5, lift, 2, 3, 1, 'rockDeep')); // pe comprido
+    b.push(box(lx, 0.5, 1 + lift, 2, 2, 4, 'rockDeep')); // canela (recuada)
+    b.push(box(lx, -0.5, 5 + lift, 2, 2, 4, 'rockDeep')); // coxa (avancada)
+    b.push(box(lx - 0.5, 0, 4.5 + lift, 3, 2, 1, 'rust')); // cinta do joelho
   }
 
-  // Tronco INCLINADO para a frente, sob a carga. A inclinacao e o que sobrou da
-  // funcao dele: carregar minerio de um lado para o outro ate a grade acabar.
-  const lean = 1;
-  b.push(box(-3, -1 + lean, 8 + up, 6, 4, 5, 'rust'));
-  // Tremonha nas costas: o compartimento de carga, ainda cheio.
-  b.push(box(-2, 3 + lean, 10 + up, 4, 2, 4, 'rockDeep'));
-  b.push(box(-2, 3 + lean, 14 + up, 4, 2, 1, 'loot'));
-  // DETALHE FINO — minerio transbordando: tres torroes de meio-passo por cima
-  // da carga. A ordem que ninguem cancelou era ENCHER a tremonha, e ela esta
-  // alem da borda.
-  b.push(box(-1.5, 3.5 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
-  b.push(box(0, 4 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
-  b.push(box(1, 3.5 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
-  // Cabeamento exposto descendo do tronco. Azul: a corrente da grade que ainda
-  // passa por ele, e que o calor faz sobrecarregar.
-  b.push(box(-4, 1 + lean, 9 + up, 1, 1, 4, 'electric'));
-  b.push(box(3, 2 + lean, 10 + up, 1, 1, 3, 'electric'));
-  // Bracadeiras de meio-passo prendendo os cabos ao chassi: fiacao PRESA e
-  // manutencao; fiacao solta e abandono. A dele esta meio a meio.
-  b.push(box(-4.5, 1 + lean, 11 + up, 0.5, 1, 0.5, 'rust'));
-  b.push(box(4, 2 + lean, 11 + up, 0.5, 1, 0.5, 'rust'));
-  // Veio reativo crescido POR DENTRO do peito: mineral virando fiacao.
-  b.push(box(-1, -2 + lean, 10 + up, 2, 1, 2, 'electric'));
+  // A COLUNA CLARA: quadril, tronco e pescoco em latao, contiguos. E a maior
+  // massa clara do modelo e a unica coisa que o olho precisa achar primeiro.
+  b.push(box(-3, -0.5, 9 + up, 6, 3, 2, 'rust')); // quadril
+  b.push(box(-2.5, -1 + lean, 11 + up, 5, 3, 6, 'rust')); // torso
+  // Veio reativo crescido POR DENTRO do peito: mineral virando fiacao. Fica no
+  // centro optico do bicho, sobre o latao — o unico azul do torso.
+  b.push(box(-1, -2 + lean, 13 + up, 2, 1, 2, 'electric'));
+  b.push(box(-1.5, -2 + lean, 15 + up, 0.5, 0.5, 0.5, 'electric'));
+  // Costura do chassi: uma faixa escura no peito, que quebra o latao sem
+  // apaga-lo (a caixa lisa e o que fazia o torso ler como caixote).
+  b.push(box(-2.5, -1.1 + lean, 14 + up, 5, 0.5, 1, 'rockDeep'));
 
-  // Bracos longos, DESCENDO ate quase o chao. Sao eles que dizem "isto nao e
-  // gente": proporcao errada de proposito.
-  //
-  // Comecam abaixo da base do tronco (z 3 contra z 8) porque, comecando na
-  // altura do ombro, eles ficavam inteiramente dentro da silhueta do tronco na
-  // projecao isometrica e o bicho saia sem bracos. O que separa os dois volumes
-  // aqui nao e a cor — e o braco existir onde o tronco nao esta.
-  b.push(box(-5, 0 + lean, 3, 2, 2, 9 + up, 'rockDeep'));
-  b.push(box(4, 0 + lean, 3, 2, 2, 9 + up, 'rockDeep'));
+  // TREMONHA nas costas: o compartimento de carga, ainda cheio. Estreita e
+  // atras do torso — sem a tampa dourada larga da versao antiga, que virava um
+  // chapeu amarelo por cima de tudo e roubava a leitura da cabeca.
+  b.push(box(-2, 2, 12 + up, 4, 2, 5, 'rockDeep'));
+  b.push(box(-1.5, 2.5, 17 + up, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(-0.5, 3, 17 + up, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(0.5, 2.5, 17.5 + up, 0.5, 0.5, 0.5, 'loot'));
 
-  // Cabeca baixa e a frente, com placa facial rachada. `alert` a levanta.
-  const headZ = 13 + up + alert;
-  b.push(box(-1, -2 + lean, headZ, 3, 3, 3, 'rust'));
-  b.push(box(-1, -3 + lean, headZ + 1, 3, 1, 2, 'bone'));
-  // A RACHADURA da placa facial: uma fissura escura de meio-passo cortando a
-  // chapa palida em diagonal de dois segmentos. E o unico rosto que ele tem.
-  b.push(box(0.5, -3.5 + lean, headZ + 2, 0.5, 0.5, 1, 'rust'));
-  b.push(box(0, -3.5 + lean, headZ + 1.5, 0.5, 0.5, 0.5, 'rust'));
+  // O MANTO: uma capa curta e ESCURA sobre os ombros, com fios caindo atras.
+  // Ele emoldura a coluna clara em vez de cobri-la — a frente do peito fica
+  // livre, que e onde moram a veia azul e o chassi.
+  b.push(box(-3.5, 0.5, 16 + up, 7, 3, 2, 'rockDeep')); // ombreira
+  const shroud = [
+    [-3.5, 1, 5, 'rockDeep'], [-2.5, 2.5, 8, 'scorch'], [-1.5, 3, 5, 'rockDeep'],
+    [-0.5, 3.5, 7, 'scorch'], [0.5, 3.5, 4, 'rockDeep'], [1.5, 3, 6, 'scorch'],
+    [2.5, 2.5, 4, 'rockDeep'], [3, 1, 7, 'scorch'],
+  ];
+  for (const [sx, sy, len, mat] of shroud) {
+    b.push(box(sx, sy, 16 - len + up, 1, 1, len, mat));
+  }
+
+  // CABEAMENTO EXPOSTO descendo do tronco, com bracadeiras. Azul: a corrente
+  // da grade que ainda passa por ele, e que o calor faz sobrecarregar.
+  b.push(box(-3.5, 0 + lean, 12 + up, 1, 1, 3, 'electric'));
+  b.push(box(3, 0.5 + lean, 13 + up, 1, 1, 2, 'electric'));
+  b.push(box(-4, 0 + lean, 14 + up, 0.5, 1, 0.5, 'rust'));
+  b.push(box(3.5, 0.5 + lean, 14 + up, 0.5, 1, 0.5, 'rust'));
+
+  // BRACOS longos e escuros, colados ao tronco, com a MAO no fim. Escuros
+  // porque a coluna clara ja e a figura: um braco de latao ao lado de um torso
+  // de latao devolveria a mancha unica que este rework existe para desfazer.
+  for (const [ax, side] of [[-4.5, -1], [3.5, 1]]) {
+    b.push(box(ax, 0 + lean, 13 + up, 1.5, 2, 4, 'rockDeep')); // braco
+    b.push(box(ax, 0 + lean, 6 + up, 1.5, 2, 7, 'rockDeep')); // antebraco
+    b.push(box(ax - 0.25, -0.5 + lean, 4 + up, 2, 3, 2, 'rust')); // mao
+    b.push(box(ax + (side < 0 ? 0 : 1), -1 + lean, 4 + up, 0.5, 0.5, 1.5, 'bone')); // garra
+  }
+
+  // CABECA: pequena, de latao, PROJETADA A FRENTE e para baixo, saindo do
+  // capuz. Ela e a ponta da coluna clara, e nao uma peca solta em cima dela.
+  const headZ = 17 + up + alert;
+  b.push(box(-1.25, -2.5 + lean, headZ, 2.5, 2.5, 2.5, 'rust'));
+  // Placa facial ESTREITA, encaixada na frente da calota. Larga (3 de vao,
+  // como era) ela virava uma aba horizontal atravessada no topo do bicho — o
+  // olho lia um chapeu, e os rebites da calota viravam dois olhos naquela
+  // aba. Rosto aqui e a fissura e a optica, e nada mais.
+  b.push(box(-1, -3.25 + lean, headZ + 0.5, 2, 0.75, 1.5, 'bone'));
+  // A RACHADURA da placa: fissura escura em diagonal de dois segmentos. E o
+  // unico rosto que ele tem.
+  b.push(box(0, -4 + lean, headZ + 2, 0.5, 0.5, 1, 'rust'));
+  b.push(box(-0.5, -4 + lean, headZ + 1.5, 0.5, 0.5, 0.5, 'rust'));
   // Optica: um unico ponto, mais fraco que o visor do prospector. GUTTERING, e
   // nao piscando.
   //
@@ -941,10 +982,16 @@ const minerModel = (anim, f) => {
   // a cada 670 ms, que le como falha de contato e nao como pisca-pisca. O modulo
   // 4 vale para todas as animacoes — nenhuma tem menos de 4 frames alem de `hit`,
   // que dura dois e nao precisa de flicker nenhum.
-  b.push(box(0, -4 + lean, headZ + 1, 1, 1, 1, f % 4 === 3 ? 'fungus' : 'biolum'));
-  // Lanterna de mineracao no ombro, guttering. E o unico calor do modelo.
-  b.push(box(-3, -3 + lean, headZ, 2, 2, 2, 'loot'));
-  b.push(box(-3, -4 + lean, headZ + 1, 1, 1, 1, 'fire'));
+  b.push(box(-0.5, -4 + lean, headZ + 1, 1, 1, 1, f % 4 === 3 ? 'fungus' : 'biolum'));
+  // Rebite unico na crista da calota: latao rebitado, e nao casca lisa. Um so,
+  // e fora do eixo — dois simetricos no alto liam como um par de olhos.
+  b.push(box(-0.75, -1.5 + lean, headZ + 2.5, 0.5, 0.5, 0.5, 'bone'));
+
+  // LAMPADA DE MINERACAO na lateral do capacete. E o unico calor do modelo e a
+  // coisa mais brilhante dele: `lamp` EMITE (rampa de luz branca quente), entao
+  // ela acende de verdade no escuro em vez de so ser amarela.
+  b.push(box(-3, -2.5 + lean, headZ + 1, 1.5, 2, 2, 'rust'));
+  b.push(box(-3.5, -3 + lean, headZ + 1.5, 1, 1, 1, 'lamp'));
 
   // A picareta. Em repouso ela BATE NO CHAO — ele nao esta esperando voce.
   if (swing < 0) {
@@ -952,21 +999,21 @@ const minerModel = (anim, f) => {
     // pe ao lado: solta, ela lia como um poste plantado no chao ao lado de um
     // corpo, e a leitura "ele esta trabalhando" e o que faz o encontro
     // significar alguma coisa antes de o jogador decidir qualquer coisa.
-    b.push(box(4, -4, 1 + toil, 2, 2, 8 - toil, 'rust'));
-    b.push(box(3, -5, 0 + toil, 3, 2, 1, 'bone'));
-    b.push(box(3, -5, 0 + toil, 1, 1, 1, 'electric'));
+    b.push(box(4, -4, 1 + toil, 1.5, 1.5, 9 - toil, 'rust'));
+    b.push(box(3.25, -4.75, 0 + toil, 2.5, 1.5, 1, 'bone'));
+    b.push(box(3.25, -4.75, 0 + toil, 1, 1, 1, 'electric'));
   } else {
     const arc = [
-      [0, -6, 11], // erguida a frente
-      [6, -1, 10], // lado direito
-      [0, 5, 9], // POR TRAS: e este frame que promete o circulo
-      [-6, -1, 10], // lado esquerdo, recolhendo
+      [0, -6, 14], // erguida a frente
+      [6, -1, 13], // lado direito
+      [0, 5, 12], // POR TRAS: e este frame que promete o circulo
+      [-6, -1, 13], // lado esquerdo, recolhendo
     ][swing];
     b.push(box(arc[0], arc[1], arc[2] + up, 2, 2, 2, 'rust'));
     b.push(box(arc[0], arc[1], arc[2] + 2 + up, 2, 2, 1, 'bone'));
     // Corrente residual no fio da lamina: ela crepita quando ele gira.
     b.push(box(arc[0], arc[1], arc[2] + 3 + up, 1, 1, 1, 'electric'));
-    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 9 + up, 2, 2, 1, 'rockDeep'));
+    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 13 + up, 2, 2, 1, 'rockDeep'));
   }
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;
@@ -1142,6 +1189,149 @@ const frostWraithModel = (anim, f) => {
 };
 const frostWraithFrame = (dir, anim, f) => renderVoxels(frostWraithModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
+// enemy-sulfur-bomber 64x64 — a MESMA silhueta do Spore Bomber, outra quimica.
+//
+// Igual de proposito: o jogador ja aprendeu a ler "encapuzado com pod atras =
+// vem correndo e estoura", e essa licao nao pode ser cobrada duas vezes. O que
+// muda e a MATERIA — capuz de osso mineral crostado em vez de fungo, pod de
+// enxofre em vez de esporo, e cristais de enxofre condensado onde o outro tem
+// lamelas. Quem ve isto sabe o que vem; o que ele precisa saber a mais e que a
+// nuvem que sobra PEGA FOGO, e a cor amarela e quem diz isso.
+const sulfurBomberModel = (anim, f) => {
+  const drift = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const swell = anim === 'special' ? Math.min(2, f) : anim === 'attack' ? [0, 1, 1, 0][f % 4] : 0;
+  const pulse = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
+  const z = -flinch + drift;
+  const b = [];
+  // Pes curtos de rocha crostada: ele tambem pende mais do que caminha.
+  b.push(box(-2, -1, 0, 2, 2, 1, 'rockDeep'));
+  b.push(box(1, -1, 0, 2, 2, 1, 'rockDeep'));
+  // Capuz conico ESCURO, com o cone afinando depressa.
+  //
+  // Duas tentativas erradas antes desta, e as duas ensinaram a mesma coisa
+  // sobre hierarquia. Na primeira o pod era grande demais e virava a silhueta
+  // (topo `loot`, o dourado de maior amplitude da paleta, contra um corpo que
+  // sumia no fundo). Na segunda o capuz virou OSSO para ganhar presenca — e
+  // ai corpo e pod ficaram os dois claros, sem nada separando um do outro: a
+  // criatura lia como uma escadaria de degraus bege.
+  //
+  // O Spore Bomber resolve isso ha muito tempo e a resposta e a dele: capuz
+  // ESCURO (a forma), acento CLARO (o pod). Aqui o escuro e mineral em vez de
+  // organico, que e justamente a troca que este bicho representa.
+  b.push(box(-3, -2, 1 + z, 6, 4, 2, 'rockDeep'));
+  b.push(box(-2, -1.5, 3 + z, 4, 3, 2, 'rockDeep'));
+  b.push(box(-1, -1, 5 + z, 2, 2, 2, 'rockDeep'));
+  b.push(box(-0.5, -0.5, 7 + z, 1, 1, 1, 'rust'));
+  // Onde o outro tem lamelas de fungo, este tem CROSTA: agulhas de enxofre
+  // condensado crescidas na borda de cada degrau.
+  b.push(box(-2.5, -2.5, 2 + z, 0.5, 0.5, 1, 'sulfur'));
+  b.push(box(1, -2.5, 1.5 + z, 0.5, 0.5, 1, 'sulfur'));
+  b.push(box(-1.5, -2.5, 4 + z, 0.5, 0.5, 0.5, 'sulfur'));
+  b.push(box(0.5, -1.5, 6 + z, 0.5, 0.5, 0.5, 'sulfur'));
+  // O olho: BRASA, e nao biolum. Ele nao e uma coisa viva do micelio — e um
+  // corpo mineral com calor dentro, como o nucleo do Escoriaceo (mesma rampa
+  // `fire`, mesma leitura: o que arde por dentro deste estrato).
+  b.push(box(0, -3, 4 + z, 1, 1, 1.5, 'fire'));
+  // O pod: a bolsa de gas, MENOR que o capuz e com o ombro chanfrado — ela
+  // acompanha o corpo em vez de engoli-lo. Cresce nos dois eixos no telegrafo,
+  // que continua sendo o unico momento em que ela manda na silhueta.
+  b.push(box(-2.5, 2, 2 + z, 4 + swell, 2, 3 + swell + pulse, 'sulfur'));
+  b.push(box(-2, 2.5, 5 + swell + pulse + z, 3 + swell, 1, 0.5, 'sulfur'));
+  // Valvulas de ferrugem no lugar dos poros: por onde o gas escapa.
+  b.push(box(-1.5, 3.5, 3 + z, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(0, 3.5, 4 + z, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(1, 3.5, 3 + z, 0.5, 0.5, 0.5, 'rust'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const sulfurBomberFrame = (dir, anim, f) => renderVoxels(sulfurBomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
+// enemy-undertaker 96x120 — o Coveiro: catador de sucata do Ferrifero.
+//
+// A silhueta tem de dizer as duas coisas que ele faz, e nesta ordem: o BRACO
+// DE ELETROIMA (o disco enorme de um lado, desproporcional, que e o unico
+// jeito de o jogador entender de longe o que o puxou) e as costas de carga —
+// a caçamba onde ele empilhava carcaças. O corpo e ferrugem industrial, da
+// mesma familia do Miner: os dois sao maquinario da Aurix que ninguem
+// desligou. A diferenca e que este ainda esta cumprindo a ordem com voce.
+const undertakerModel = (anim, f) => {
+  const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  // `special` e a carga do eletroima: as bobinas acendem e o campo aparece.
+  const charge = anim === 'special' ? Math.min(3, f) : 0;
+  // O ataque e a prensa: o braco pesado sobe e desce.
+  const slam = anim === 'attack' ? [0, 0, 4, 1][f % 4] : 0;
+  const idle = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  // O primeiro desenho era uma PILHA DE LAJES: caixas largas e baixas
+  // empilhadas, cada uma mais comprida que alta, e o resultado lia como
+  // mobilia — uma mesa com uma prancha por cima. A correcao e proporcao, nao
+  // detalhe: o corpo agora e ESTREITO e ALTO (6 de largura contra 15 de
+  // altura), e o unico volume horizontal do bicho e o braco que puxa.
+  //
+  // Pernas curtas e grossas, plantadas: ele nao corre, ele CHEGA.
+  for (const s of [-1, 1]) {
+    const lift = s > 0 ? Math.max(0, step) : Math.max(0, -step);
+    b.push(box(s * 1.5 - 1, -1, lift, 2, 2.5, 4, 'rockDeep'));
+    b.push(box(s * 1.5 - 1.5, -1.5, lift, 3, 3.5, 1, 'rust')); // o pe
+  }
+  // Torso alto e estreito, com a cintura marcada: o vulto e vertical.
+  b.push(box(-2, -1.5, 4 + idle - flinch, 4, 3.5, 3, 'rust'));
+  b.push(box(-2.5, -2, 7 + idle - flinch, 5, 4, 5, 'rust'));
+  // Costura industrial: uma faixa escura na altura do peito quebra o bloco.
+  b.push(box(-2.5, -2.1, 9 + idle - flinch, 5, 0.5, 1, 'rockDeep'));
+  // A CACAMBA nas costas: alta e encostada no dorso (nao uma bancada por
+  // cima). E a caçamba que conta o que ele faz — carregar carcaça.
+  b.push(box(-2, 2, 6 + idle, 4, 2, 7, 'rockDeep'));
+  b.push(box(-2, 2, 13 + idle, 4, 2, 0.5, 'bone'));
+  // Sucata espiando de dentro: dois cotos de osso, a carga que ele ja tem.
+  b.push(box(-1.5, 2.5, 13 + idle, 1, 1, 1.5, 'bone'));
+  b.push(box(0.5, 2.5, 13.5 + idle, 1, 1, 1, 'bone'));
+  // Cabeca pequena, afundada entre os ombros: ele nao olha, ele VARRE.
+  b.push(box(-1.5, -1.5, 12 + idle - flinch, 3, 3, 2.5, 'rockDeep'));
+  // A lente de varredura, larga e fina. Eletrica: e sensor, nao premio.
+  b.push(box(-1, -2, 13 + idle - flinch, 2, 0.5, 0.8, 'electric'));
+
+  // BRACO DE ELETROIMA (esquerda). A leitura inteira do bicho mora aqui,
+  // entao ele e desproporcional de proposito — e o disco fica EM PE, no plano
+  // vertical, com um vao no meio: um anel. Chapado e deitado (a primeira
+  // versao) projetava como uma prancha e nao dizia nada.
+  const armZ = 8 + idle - slam;
+  b.push(box(-3.5, -1, armZ, 2, 2, 2, 'rust')); // ombro
+  b.push(box(-5, -1, armZ - 1, 1.5, 2, 2, 'rust')); // antebraco
+  // O ANEL do eletroima: quatro segmentos em volta de um vao, no plano y-z.
+  //
+  // Compacto de proposito. A primeira versao esticava o braco ate x=-8,5 e o
+  // sprite passava de 80px de largura projetada — para um bicho de raio 0,5,
+  // que e o mesmo do Fole (canvas 64x64). O custo nao era so de memoria de
+  // textura: um corpo tao largo quanto o do Britador prometia uma ameaca de
+  // peso que o Coveiro nao e. O disco continua desproporcional em relacao ao
+  // RESTO DELE, que e o que faz a leitura — nao em relacao ao mundo.
+  const ringX = -6;
+  const ringZ = armZ - 3.5;
+  b.push(box(ringX, -2, ringZ + 4.5, 1.5, 4, 1, 'rockDeep')); // topo
+  b.push(box(ringX, -2, ringZ, 1.5, 4, 1, 'rockDeep')); // base
+  b.push(box(ringX, -2, ringZ + 1, 1.5, 1, 3.5, 'rockDeep')); // lado
+  b.push(box(ringX, 1, ringZ + 1, 1.5, 1, 3.5, 'rockDeep')); // lado
+  // Bobinas: acendem na carga. Apagadas sao osso; carregando viram corrente —
+  // o telegrafo em COR, no lugar exato de onde o puxao vai sair.
+  const coil = charge > 0 ? 'electric' : 'bone';
+  b.push(box(ringX - 0.5, -1.5, ringZ + 1.5, 0.5, 3, 0.5, coil));
+  b.push(box(ringX - 0.5, -1.5, ringZ + 3, 0.5, 3, 0.5, coil));
+  if (charge >= 2) {
+    // No auge da carga o campo se ve: o vao do anel acende.
+    b.push(box(ringX, -1, ringZ + 2, 1, 2, 1.5, 'electric'));
+  }
+
+  // BRACO DE PRENSA (direita): curto e pesado, com o bloco no punho. E ele
+  // que desce no `attack` — o "porradao" que o puxao existe para viabilizar.
+  b.push(box(2, -1, 8 + idle - slam * 0.5, 1.5, 2, 2, 'rust'));
+  b.push(box(2.5, -1.5, 5 + idle - slam, 2.5, 3, 3.5, 'rockDeep'));
+  b.push(box(2.5, -1.5, 4.5 + idle - slam, 2.5, 3, 0.5, 'bone'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const undertakerFrame = (dir, anim, f) => renderVoxels(undertakerModel(anim, f), DIR_INDEX[dir], 72, 88, 34, 78);
+
 // FX AUTORADOS NATIVOS na resolucao fina (32x32). Ate a subdivisao da grade
 // eles eram desenhos de 16x16 dobrados por vizinho-mais-proximo — pixels
 // gordos de 2x2 fingindo resolucao. Redesenhados no grao real: o estilhaco
@@ -1282,6 +1472,17 @@ export const ENTITY_SPECS = [
   base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 1),
   base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 1),
   base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 1),
+  // Fauna afinada por bioma. O de enxofre herda o `special` do Spore Bomber
+  // (mesmo telegrafo de pod inchando), e o Coveiro tem o proprio: a carga do
+  // eletroima, que e o aviso mais importante do bicho.
+  base('enemy-sulfur-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 6, fps: 10, loop: false },
+  }, sulfurBomberFrame, 'voxel-isometric hooded sulfur carrier, mineral crusted hood with yellow sulfur needles, ember eye, swelling sulfur gas bladder with rusted valves', 1),
+  base('enemy-undertaker', 72, 88, 34, 78, { w: 1, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 6, fps: 10, loop: false },
+  }, undertakerFrame, 'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens', 1),
   {
     id: 'fx-projectile-bolt', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },

@@ -473,6 +473,52 @@ aparecer; deixado quieto, o aviso expira no instante exato em que a linha
 de render cruza o `firingAt`. Campo opcional (precedente do `wellOffers`),
 sem mudança de protocolo.
 
+## Vigésima primeira etapa (implementada): fauna afinada por bioma
+
+Três correções que vieram do playtest, e as três são sobre a mesma coisa —
+o bestiário genérico contradizendo o bioma em que aparece.
+
+**Chefe abatido não repovoa.** A extração de retorno regenera o setor na
+subida, e o repovoamento carimbava o Bispo de volta na câmara: quem o matou
+para poder descer o encontrava inteiro na volta. Fauna comum repovoar é a
+pressão prometida; um chefe repovoar apaga uma conquista. `bossesDown`
+(máscara de bits por setor, no estado e no hash autoritativo) marca a
+câmara no instante da morte. O **bolso micelial continua plantado**: a
+colônia é terreno, e ela não morreu junto com quem reinava sobre ela.
+
+**Bandos de assinatura.** A regra antiga era "uma por setor" — um encontro
+autoral — com a Lampreia como exceção. O playtest disse dela o que dizia
+dos outros: um bicho por mapa é uma curiosidade, não a fauna do lugar.
+Agora cada estrato tem bando (`SIGNATURE_PACK`: Fole 3, Escoriáceo 3,
+Coveiro 3, Lampreia 3, Ressonante 2, Espectro 2), e o tamanho é a ameaça.
+Continuam ocupando **vagas comuns** do orçamento: a densidade do setor não
+muda, muda quem a preenche — onde antes entrava mais um stalker, entra o
+bicho que só existe ali.
+
+**Bombardeiro de Enxofre** (`sulfur_bomber`, Fenda e Fornalha). O Spore
+Bomber é uma coisa micelial: estoura numa nuvem de esporos orgânicos, e
+numa caverna de magma isso não quer dizer nada — não há micélio ali para
+produzi-la, e a nuvem verde no meio da brasa era o sinal mais fora de lugar
+do jogo. Mesma silhueta (a leitura "encapuzado com pod = corre e estoura"
+não pode ser cobrada duas vezes), química do lugar: capuz mineral escuro,
+agulhas de enxofre, olho de brasa, e o cadáver larga **gás** no lugar do
+esporo. A diferença não é cosmética — gás explode, esporo não: matar um
+destes perto de brasa acende a sala.
+
+**Coveiro** (`undertaker`, Ferrífero). Catador de sucata que nunca recebeu
+ordem de parar, e faz com o jogador o que fazia com carcaças: **atrai** com
+o eletroímã e prensa. É o único corpo do bestiário que tira do jogador a
+posição — a variável de que todo o resto do combate depende. Dois
+telegrafos e dois contra-jogos: o eletroímã exige **linha de visão** para
+engatar (uma quina protege) e carrega por 1,1 s com as bobinas acesas; o
+arrasto respeita colisão passo a passo (parede segura); e a prensa vem
+depois, com aviso próprio, ainda dando tempo de rolar.
+
+Custo de atlas: o Coveiro nasceu num canvas herdado do Miner (96×120) com
+37px de margem morta — apertá-lo ao conteúdo real (72×88) devolveu 2,8 MiB,
+mais do que o próprio bicho custa. Só depois disso o teto de RGBA do
+validador subiu (96 → 112 MiB), com folga de ~14% sobre o medido.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;

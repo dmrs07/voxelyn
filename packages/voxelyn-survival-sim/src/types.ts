@@ -62,7 +62,19 @@ export type EnemyArchetype =
   | 'mud_lamprey'
   | 'bellows'
   | 'scoriac'
-  | 'frost_wraith';
+  | 'frost_wraith'
+  /**
+   * Bombardeiro de Enxofre: a silhueta do Spore Bomber com a quimica do
+   * lugar. Estoura em GAS, nao em esporos — e gas, ao contrario de esporo,
+   * pega fogo. So nasce onde o enxofre existe (Fenda e Fornalha).
+   */
+  | 'sulfur_bomber'
+  /**
+   * Coveiro: catador de sucata do Ferrifero. ATRAI o jogador com o eletroima
+   * do braço e prensa. E o unico corpo do bestiario que tira do jogador a
+   * posicao — a variavel de que todo o resto do combate depende.
+   */
+  | 'undertaker';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -207,7 +219,9 @@ export type EntityActionKind =
   | 'detonate'
   | 'slam'
   | 'hurl'
-  | 'pulse';
+  | 'pulse'
+  /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
+  | 'haul';
 export type EntityActionPhase = 'windup' | 'release' | 'recovery';
 export type EntityAction = {
   kind: EntityActionKind;
@@ -614,6 +628,21 @@ export type SurvivalState = {
    * precisa viajar num snapshot. O cliente so desenha; quem persegue e o
    * servidor.
    */
+  /**
+   * MASCARA DE BITS dos setores cujo chefe ja caiu (bit N = setor N).
+   *
+   * Existe por causa da extracao de retorno: o mundo do setor e REGENERADO ao
+   * subir (mesma seed, fauna repovoada — o Veio nao ficou esperando), e o
+   * repovoamento carimbava o chefe de volta na camara. Quem matou o Bispo para
+   * descer o encontrava vivo na volta, e o feito mais caro da run desmanchava
+   * sozinho. Bicho comum repovoar e pressao; um CHEFE repovoar apaga uma
+   * conquista — sao coisas diferentes e so a segunda e um defeito.
+   *
+   * Mascara e nao um par de booleanos porque a regra e "por setor", nao "por
+   * arquetipo": o dia em que um estrato ganhar o proprio chefe, ele entra sem
+   * campo novo. Cabe folgado em 32 bits (SECTOR_COUNT e 3).
+   */
+  bossesDown: number;
   /** A arena ja foi lacrada? Separado de `guardianSummoned` porque o cerco pode
    * ter de esperar o jogador entrar no raio, enquanto os invocados saem na hora. */
   arenaClosed: boolean;

@@ -42,7 +42,21 @@ export const PROTOCOL_VERSION = 11;
 // portal de SUBIDA (ascend — mundo regenerado da mesma seed, fauna
 // repovoada, contaminacao sem alivio) e a vitoria so fecha na plataforma
 // do setor 1.
-export const SIMULATION_VERSION = 16;
+// 17: FAUNA AFINADA POR BIOMA e a memoria de chefe abatido.
+// - Chefe morto NAO repovoa: a extracao de retorno regenera o setor na
+//   subida, e o repovoamento carimbava o Bispo de volta na camara — a
+//   conquista mais cara da run desmanchando sozinha. `bossesDown` (mascara
+//   por setor) entra no estado e no hash autoritativo.
+// - Bandos de assinatura: cada estrato passa a receber VARIOS exemplares do
+//   proprio bicho (SIGNATURE_PACK), ocupando vagas comuns — a densidade nao
+//   muda, muda quem a preenche. A populacao semeada de todo setor 2+ muda.
+// - BOMBARDEIRO DE ENXOFRE: onde nao ha micelio (Fenda e Fornalha) o Spore
+//   Bomber some da mistura e entra o de enxofre, que estoura em GAS — e gas,
+//   ao contrario de esporo, pega fogo.
+// - COVEIRO: assinatura do Ferrifero. Eletroima com telegrafo longo ARRASTA
+//   o jogador (passo a passo, respeitando colisao) e a prensa vem em
+//   seguida. Primeiro corpo do bestiario que tira do jogador a posicao.
+export const SIMULATION_VERSION = 17;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -56,7 +70,12 @@ export const SIMULATION_VERSION = 16;
 // portal:<estrato|ocupacao> — todas com a mesma gramatica (boca escura +
 // cruz de luzes-guia convergentes) — e o poco SELADO (portal:sealed) da
 // extracao de retorno. O `descent` generico vira fallback.
-export const CONTENT_VERSION = 15;
+// 16: o POOL DE CRIATURAS muda — dois corpos novos no bestiario
+// (enemy-sulfur-bomber e enemy-undertaker, com atlas proprios) e o atlas do
+// Miner REFEITO. E exatamente o que este campo existe para marcar: sem o
+// bump, o conjunto de assets de antes e o de depois se declarariam a mesma
+// revisao de conteudo.
+export const CONTENT_VERSION = 16;
 
 export type VersionTriple = {
   protocolVersion: number;
