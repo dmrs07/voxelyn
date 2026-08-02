@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { SurvivalServer } from '@voxelyn/survival-server';
 import { CURRENT_VERSIONS } from '@voxelyn/survival-protocol';
-import { breakSolid, emptyCommand, type PlayerCommand } from '@voxelyn/survival-sim';
+import {
+  breakSolid,
+  CART_WINDUP_TICKS,
+  createRun,
+  emptyCommand,
+  lineageOf,
+  type PlayerCommand,
+  type RailTrack,
+} from '@voxelyn/survival-sim';
 import { NetClient } from '../client/net';
 
 /**
@@ -388,5 +396,59 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
 
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(['extracted', 'extracted_with_core']).toContain(view.phase);
+  });
+});
+
+describe('telegrafo do carrinho em co-op', () => {
+  // Os relogios dos trilhos NAO viajam nos WorldFlags: o espelho local nasce
+  // com firingAt = 0 e ficaria assim para sempre — o carrinho chegaria pelo
+  // snapshot de projeteis SEM aviso. O cliente rearma o relogio do espelho a
+  // partir do evento `cart_warning`, que ja cruza o fio com a geometria.
+  it('cart_warning rearma o firingAt do tramo espelhado', () => {
+    const seedIndustrial = (() => {
+      for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'industrial') return s;
+      throw new Error('nenhuma seed industrial');
+    })();
+    // Referencia local do mundo que o cliente vai gerar da mesma seed.
+    const reference = createRun({ seed: seedIndustrial, sector: 2, playerCount: 2 });
+    expect(reference.railTracks.length).toBeGreaterThan(0);
+
+    const client = new NetClient(() => {});
+    client.receive(JSON.stringify({
+      t: 'welcome',
+      versions: CURRENT_VERSIONS,
+      playerId: 1,
+      resumeToken: 'tk',
+      roomCode: 'SALA',
+      seed: seedIndustrial,
+      sector: 2,
+      worldWidth: reference.config.width,
+      worldHeight: reference.config.height,
+      mapHash: '', // vazio: pula a validacao de mapa neste teste de unidade
+    }));
+
+    const mirror = (client as unknown as { state: { railTracks: RailTrack[] } }).state;
+    const track = mirror.railTracks[0];
+    expect(track.firingAt).toBe(0);
+
+    client.receive(JSON.stringify({
+      t: 'snapshot',
+      serverTick: 400,
+      ackSeq: 0,
+      phase: 'running',
+      entities: [],
+      projectiles: [],
+      removedEntities: [],
+      chunkDiffs: [],
+      contamination: 0,
+      events: [{
+        t: 'cart_warning',
+        x: track.x, y: track.y, dx: track.dx, dy: track.dy, len: track.len,
+      }],
+    }));
+
+    // O aviso do espelho e TICK-based, como no solo: o renderer le
+    // state.railTracks e compara com o tick da linha de render.
+    expect(track.firingAt).toBe(400 + CART_WINDUP_TICKS);
   });
 });

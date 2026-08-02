@@ -12,6 +12,7 @@
 // a distancia, e e o que faz o jogador virar a camera e ir ate la.
 import { box, DIR_UNROTATED, modelBounds, renderVoxels } from './voxel.mjs';
 import { DECOR_PROP_KINDS, decorPropModel } from './decor-props.mjs';
+import { PORTAL_PROP_KINDS, portalModel } from './portal-props.mjs';
 
 /**
  * Tipos e suas animacoes ASSADAS.
@@ -38,6 +39,9 @@ export const PROP_KINDS = [
   // modelos estaticos em duas variantes, no fim para nao mover indices.
   // Ver decor-props.mjs — pedrinhas e cacos continuam em runtime.
   ...DECOR_PROP_KINDS,
+  // PORTAIS por bioma (portal:<chave>) + o poco selado da extracao de
+  // retorno. Ver portal-props.mjs — o `descent` acima vira fallback.
+  ...PORTAL_PROP_KINDS,
 ];
 
 /** Meia-largura da base, em voxels. */
@@ -238,6 +242,7 @@ export const propModel = (kind, frame) => {
   const spec = PROP_KINDS.find((k) => k.name === kind);
   if (!spec) throw new Error(`prop desconhecido: ${kind}`);
   if (kind.startsWith('decor:')) return decorPropModel(kind);
+  if (kind.startsWith('portal:')) return portalModel(kind, frame);
   const phase = spec.frames > 1 ? frame / spec.frames : 0;
   if (kind === 'core') return coreModel(phase, false);
   if (kind === 'coreTaken') return coreModel(0, true);

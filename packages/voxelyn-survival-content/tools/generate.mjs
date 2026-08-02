@@ -262,7 +262,10 @@ const buildProps = () => {
     // 3: props DECORATIVOS volumetricos (decor:<kind>:<variante>) no fim da
     // lista — fumarolas, monolitos, a broca e demais pecas com massa deixam
     // o desenho de runtime e viram modelos rasterizados de verdade.
-    version: 3,
+    // 4: PORTAIS por bioma (portal:<chave>, 10 chaves animadas) + o poco
+    // SELADO da extracao de retorno (portal:sealed) no fim da lista; o
+    // `descent` continua no atlas como fallback.
+    version: 4,
     atlas: 'world-props.png',
     frameWidth,
     frameHeight,

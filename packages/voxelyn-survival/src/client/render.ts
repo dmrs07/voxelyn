@@ -59,7 +59,12 @@ import {
   reputationNote,
   summaryLines,
 } from './run-summary';
-import { objectiveLightSpec, objectivePropName } from './objective-prop';
+import {
+  entryAtlasChain,
+  objectiveAtlasChain,
+  objectiveLightSpec,
+  objectivePropName,
+} from './objective-prop';
 import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
 import { CEILING_ALPHA, decorAtlasName, drawDecorProp } from './decor-draw';
 import { drawWallEdgeDetail } from './edge-detail';
@@ -1261,10 +1266,17 @@ export class SurvivalRenderer {
     {
       const [csx, csy] = toScreen(state.corePos.x + 0.5, state.corePos.y + 0.5);
       if (csx > -80 && csx < vw + 80 && csy > -100 && csy < vh + 100) {
+        // O poco fala o dialeto do bioma (portal:<chave>), com o `descent`
+        // generico segurando atlas antigos em cache; selado na subida.
+        const objectiveChain = objectiveAtlasChain(
+          state.sector, state.coreTaken, state.stratum, state.occupation,
+        );
         items.push({
           depth: state.corePos.x + state.corePos.y,
           draw: () => {
-            if (this.props.draw(ctx, objectiveName, nowMs, csx, csy, z)) return;
+            for (const name of objectiveChain) {
+              if (this.props.draw(ctx, name, nowMs, csx, csy, z)) return;
+            }
 
             // Fallback enquanto o atlas nao carregou. Mesmo no caminho de erro o
             // poco nao pode voltar a parecer o cristal que ele substituiu.
@@ -1294,10 +1306,17 @@ export class SurvivalRenderer {
       }
       const [esx, esy] = toScreen(state.entry.x + 0.5, state.entry.y + 0.5);
       if (esx > -80 && esx < vw + 80 && esy > -100 && esy < vh + 100) {
+        // Na subida com o Nucleo a entrada E o portal para o setor de cima:
+        // desenhar a plataforma chapada aqui esconderia o unico caminho.
+        const entryChain = entryAtlasChain(
+          state.sector, state.coreTaken, state.stratum, state.occupation,
+        );
         items.push({
           depth: state.entry.x + state.entry.y,
           draw: () => {
-            if (this.props.draw(ctx, 'extraction', nowMs, esx, esy, z)) return;
+            for (const name of entryChain) {
+              if (this.props.draw(ctx, name, nowMs, esx, esy, z)) return;
+            }
             ctx.fillStyle = shade(PAL.loot, 0.3 + brightness(state.entry.x, state.entry.y) * 0.5);
             ctx.fillRect(esx - 4 * z, esy - 2 * z, 8 * z, 4 * z);
           },
@@ -2892,14 +2911,18 @@ export class SurvivalRenderer {
 
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 12px monospace';
+    // Com o Nucleo pego a diretiva e a MESMA para os dois jogadores em
+    // qualquer setor: va a ENTRADA — subir (setor > 1) ou fechar o contrato
+    // (setor 1). Antes disso, o eixo e descer/achar o Nucleo. O texto que
+    // mandava "descer" durante a subida apontava para um poco selado.
     const objective = t(
-      !isFinalSector(state.sector)
-        ? 'hud.objective.descend'
-        : extra.hasCore
-          ? 'hud.objective.returnWithCore'
-          : state.coreTaken
-            ? 'hud.objective.extract'
-            : 'hud.objective.findCore',
+      state.coreTaken
+        ? state.sector > 1
+          ? 'hud.objective.ascend'
+          : 'hud.objective.extract'
+        : isFinalSector(state.sector)
+          ? 'hud.objective.findCore'
+          : 'hud.objective.descend',
     );
     ctx.fillText(objective, safeLeft + 12, objectiveY);
 
