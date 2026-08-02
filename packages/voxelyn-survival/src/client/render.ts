@@ -1573,7 +1573,7 @@ export class SurvivalRenderer {
         const inWater = enemy.archetype === 'mud_lamprey';
         let trail = this.lurkerTrails.get(enemy.id);
         if (!trail) {
-          trail = { ttlMs: trailTtlMs(inWater), points: [] };
+          trail = { ttlMs: trailTtlMs(inWater), inWater, points: [] };
           this.lurkerTrails.set(enemy.id, trail);
         }
         updateTrail(trail, enemy.x, enemy.y, nowMs);
@@ -1679,7 +1679,10 @@ export class SurvivalRenderer {
         this.lurkerTrails.delete(id);
         continue;
       }
-      const inWater = this.archetypeById.get(id) === 'mud_lamprey';
+      // O elemento vem do PROPRIO rastro: o bicho morto ja saiu do snapshot,
+      // e consultar o mapa de arquetipos aqui trocaria agua por gelo no
+      // meio do desbote.
+      const inWater = trail.inWater;
       for (const pt of trail.points) {
         if (brightness(pt.x, pt.y) <= 0.05) continue;
         const [tx, ty] = toScreen(pt.x, pt.y);

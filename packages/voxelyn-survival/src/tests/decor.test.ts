@@ -8,7 +8,7 @@
 // 3. HONESTIDADE: prop de chao so em celula aberta e sem materia reativa; o
 //    micelio so cresce sobre o proprio tapete; prop de borda tem parede viva.
 import { describe, expect, it } from 'vitest';
-import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SURF_FUNGAL, SURF_WATER } from '@voxelyn/survival-sim';
+import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SOLID_ROCK, SURF_FUNGAL, SURF_WATER } from '@voxelyn/survival-sim';
 import { placeDecor, propStillValid, sectorRupture, surfaceRuptureFor } from '../client/decor';
 
 describe('decoracao derivada', () => {
@@ -100,6 +100,9 @@ describe('decoracao derivada', () => {
       expect(all.filter((p) => p.kind === 'drill').length).toBeLessThanOrEqual(1);
       for (const mark of all) {
         sawLandmark = true;
+        // Pedestal so de rocha COMUM: monumento nunca cobre fragil, minerio
+        // nem cristal — os estagios deles sao informacao mecanica.
+        expect(state.solid[mark.y * state.config.width + mark.x]).toBe(SOLID_ROCK);
         // O pedestal fica a um anel curto de um centro de salao registrado
         // pela gramatica — o monumento marca o LUGAR, nao um sorteio.
         const near = state.hallCenters.some(

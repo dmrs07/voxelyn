@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { decayTrail, TRAIL_SPACING, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from '../client/lurker-trail';
 
-const fresh = (inWater: boolean): LurkerTrail => ({ ttlMs: trailTtlMs(inWater), points: [] });
+const fresh = (inWater: boolean): LurkerTrail => ({ ttlMs: trailTtlMs(inWater), inWater, points: [] });
 
 describe('rastro de espreitador', () => {
   it('pegada nova so quando ha deslocamento real', () => {

@@ -12,7 +12,13 @@
 // rastro — e nenhum byte novo viaja.
 export type TrailPoint = { x: number; y: number; at: number };
 
-export type LurkerTrail = { ttlMs: number; points: TrailPoint[] };
+/**
+ * `inWater` fica GRAVADO no rastro, nao derivado do bicho: um espreitador
+ * morto some do snapshot no mesmo tick, e um rastro orfao que consultasse a
+ * entidade trocaria de elemento no meio do desbote (ondulacao virando
+ * rachadura). O rastro e a memoria da LAMINA — ele sabe de que lamina e.
+ */
+export type LurkerTrail = { ttlMs: number; inWater: boolean; points: TrailPoint[] };
 
 /** Espacamento minimo entre pontos, em celulas: rastro e pegada, nao linha. */
 export const TRAIL_SPACING = 0.7;

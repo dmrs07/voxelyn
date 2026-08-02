@@ -22,6 +22,7 @@
 import {
   createRun,
   SOLID_NONE,
+  SOLID_ROCK,
   SURF_FUNGAL,
   SURF_NONE,
   SURF_SCORCHED,
@@ -430,7 +431,11 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
           const x = c.x + dx;
           const y = c.y + dy;
           if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
-          if (solid[idx(x, y)] === SOLID_NONE) continue;
+          // Pedestal so de rocha COMUM: fragil, minerio e cristal sao
+          // linguagem mecanica (o que cede, rende, conduz — e seus estagios
+          // lascado/opaco), e um monumento opaco em cima deles esconderia
+          // exatamente a informacao que precisa ficar visivel.
+          if (solid[idx(x, y)] !== SOLID_ROCK) continue;
           const visible = isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
           if (!visible || !allowed(x, y) || taken.has(idx(x, y))) continue;
           taken.add(idx(x, y));
