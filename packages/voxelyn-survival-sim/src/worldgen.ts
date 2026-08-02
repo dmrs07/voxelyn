@@ -46,6 +46,13 @@ export type WorldgenProfile = {
    * cristal pontual que a decoracao de parede produz.
    */
   crystalVeins: number;
+  /**
+   * Seams de minerio da sedimentar: caminhadas HORIZONTAIS que convertem
+   * rocha comum em veio ao longo de uma faixa. Na Silica o minerio segue a
+   * CAMADA — uma linha legivel na parede que recompensa minerar em fileira —
+   * em vez do salpico aleatorio da decoracao de parede. Zero fora dela.
+   */
+  oreSeams: number;
   fungalBlobs: SurfaceBlobSpec;
   biofluidBlobs: SurfaceBlobSpec;
   /** Lagos do Aquifero Negro. Zero em todo estrato seco. */
@@ -90,6 +97,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   oreChance: 0.07,
   crystalChance: 0.03,
   crystalVeins: 0,
+  oreSeams: 0,
   fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
   biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
   waterBlobs: { count: 0, rMin: 0, rMax: 0 },
@@ -654,6 +662,24 @@ const generateAttempt = (
       if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
       const i = idx(w, x, y);
       if (solid[i] === SOLID_ROCK) solid[i] = SOLID_CRYSTAL;
+    }
+  }
+
+  // 4c) seams de minerio (Silica sedimentar): a partir de uma celula aberta,
+  // a caminhada segue a FAIXA — so anda na horizontal — convertendo rocha
+  // comum em veio. O resultado e uma linha de minerio que desenha a camada na
+  // parede. Com count 0 (todo outro estrato) nada e sorteado.
+  for (let seam = 0; seam < profile.oreSeams; seam++) {
+    const cell = openCells[rng.nextInt(openCells.length)];
+    const y = Math.floor(cell / w);
+    const x0 = cell % w;
+    const dir = rng.nextFloat01() < 0.5 ? 1 : -1;
+    const length = 10 + rng.nextInt(8);
+    for (let s = 0; s < length; s++) {
+      const x = x0 + dir * s;
+      if (x <= 0 || x >= w - 1) break;
+      const j = idx(w, x, y);
+      if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
     }
   }
 

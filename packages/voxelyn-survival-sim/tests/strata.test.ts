@@ -15,7 +15,9 @@ import {
   SECTOR_COUNT,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SOLID_ORE,
   SURF_EMBER,
   SURF_FIRE,
   SURF_FUNGAL,
@@ -29,6 +31,7 @@ import {
   WORLD_W,
 } from '../src/constants';
 import { dischargeAt, igniteCell, setSurface, stepCells } from '../src/cells';
+import { impactSolid } from '../src/materials';
 import { surfaceSpeedMul } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { descend } from '../src/sectors';
@@ -471,6 +474,78 @@ describe('fissuras da Fornalha Abissal', () => {
     basalt.surface[j] = SURF_SCORCHED;
     expect(igniteCell(basalt, j, [])).toBe(false);
     expect(basalt.surface[j]).toBe(SURF_SCORCHED);
+  });
+});
+
+describe('fratura por camada da Silica', () => {
+  const seedArid = seedWithLineage('arid');
+
+  /** Monta a cruz de fragil em volta de (x,y) numa area interior do mapa. */
+  const plantFragileCross = (state: SurvivalState): { x: number; y: number } => {
+    const x = 30;
+    const y = 30;
+    const w = state.config.width;
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1]] as const) {
+      state.solid[(y + dy) * w + (x + dx)] = SOLID_FRAGILE;
+    }
+    return { x, y };
+  };
+
+  it('na Silica, quebrar fragil racha a FAIXA: vizinhos horizontais enfraquecem', () => {
+    const state = createRun({ seed: seedArid, sector: 2 });
+    expect(state.stratum).toBe('silica');
+    const { x, y } = plantFragileCross(state);
+    const w = state.config.width;
+    const events: SemanticEvent[] = [];
+    impactSolid(state, x, y, 'kinetic', events);
+    expect(state.solid[y * w + x]).toBe(SOLID_NONE);
+    // A camada e HORIZONTAL: os vizinhos da faixa caem para o estagio
+    // enfraquecido (avisados, nao derrubados)...
+    expect(state.solid[y * w + x + 1]).toBe(SOLID_FRAGILE_WEAK);
+    expect(state.solid[y * w + x - 1]).toBe(SOLID_FRAGILE_WEAK);
+    // ...e o vizinho VERTICAL (outra camada) nao sente nada.
+    expect(state.solid[(y + 1) * w + x]).toBe(SOLID_FRAGILE);
+  });
+
+  it('fora da Silica a mesma quebra nao propaga nada', () => {
+    const state = createRun({ seed: 1 });
+    expect(state.stratum).toBe('basalt');
+    const { x, y } = plantFragileCross(state);
+    const w = state.config.width;
+    const events: SemanticEvent[] = [];
+    impactSolid(state, x, y, 'kinetic', events);
+    expect(state.solid[y * w + x]).toBe(SOLID_NONE);
+    expect(state.solid[y * w + x + 1]).toBe(SOLID_FRAGILE);
+    expect(state.solid[y * w + x - 1]).toBe(SOLID_FRAGILE);
+  });
+
+  it('o minerio da Silica corre em seams: ha fileiras horizontais de veio', () => {
+    // Um seam legivel = >=4 celulas de minerio CONTIGUAS na mesma fileira.
+    // O salpico pontual (oreChance 0.04) nao produz isso com frequencia; o
+    // seam produz por construcao. Seeds aridas fixas (as 4 primeiras).
+    const aridSeeds: number[] = [];
+    for (let s = 1; s < 8192 && aridSeeds.length < 4; s++) {
+      if (lineageOf(s) === 'arid') aridSeeds.push(s);
+    }
+    let seedsWithSeam = 0;
+    for (const seed of aridSeeds) {
+      const state = createRun({ seed, sector: 2 });
+      expect(state.stratum).toBe('silica');
+      const w = state.config.width;
+      let found = false;
+      for (let y = 1; y < state.config.height - 1 && !found; y++) {
+        let run = 0;
+        for (let x = 1; x < w - 1; x++) {
+          run = state.solid[y * w + x] === SOLID_ORE ? run + 1 : 0;
+          if (run >= 4) {
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) seedsWithSeam++;
+    }
+    expect(seedsWithSeam).toBeGreaterThanOrEqual(2);
   });
 });
 
