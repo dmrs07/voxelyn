@@ -13,6 +13,7 @@ import {
   BISHOP_SECTOR,
   SECTOR_COUNT,
   SOLID_NONE,
+  SOLID_ORE,
   SOLID_ROCK,
   SURF_EMBER,
   SURF_FIRE,
@@ -240,6 +241,47 @@ describe('bando de assinatura', () => {
     const wraiths = state.enemies.filter((e) => e.archetype === 'frost_wraith');
     const spots = new Set(wraiths.map((e) => `${e.x},${e.y}`));
     expect(spots.size).toBe(wraiths.length);
+  });
+});
+
+describe('Minerador Empobrecido', () => {
+  it('nasce ENCARANDO o veio que o pos ali — e continua encarando', () => {
+    // O lugar dele ja dizia "ainda esta trabalhando o minerio" (ele nasce
+    // colado num veio), mas a postura desmentia: com o facing padrao, metade
+    // deles picaretava o corredor vazio de costas para a rocha. A animacao de
+    // repouso E a batida da picareta; virada para o nada, vira um tique.
+    let checked = 0;
+    for (const seed of [3, 9, 11, 42, 77]) {
+      const state = createRun({ seed });
+      const w = state.config.width;
+      for (const miner of state.enemies.filter((e) => e.archetype === 'miner')) {
+        const fx = Math.round(miner.facing.x);
+        const fy = Math.round(miner.facing.y);
+        // O facing aponta para um vizinho ORTOGONAL (o veio e adjacente).
+        expect(Math.abs(fx) + Math.abs(fy), 'facing nao e ortogonal').toBe(1);
+        const tx = Math.floor(miner.x) + fx;
+        const ty = Math.floor(miner.y) + fy;
+        expect(
+          state.solid[ty * w + tx],
+          `seed ${seed}: miner em ${miner.x},${miner.y} encara ${tx},${ty} que nao e minerio`,
+        ).toBe(SOLID_ORE);
+        checked++;
+      }
+    }
+    expect(checked, 'nenhum minerador nas seeds testadas').toBeGreaterThan(0);
+  });
+
+  it('a postura sobrevive ao tempo: passivo nao vira de costas sozinho', () => {
+    const state = createRun({ seed: 9 });
+    const miner = state.enemies.find((e) => e.archetype === 'miner');
+    expect(miner, 'seed sem minerador').toBeDefined();
+    const before = { ...miner!.facing };
+    // Longe do jogador, ele fica no proprio trabalho.
+    state.player.x = 4.5;
+    state.player.y = 4.5;
+    for (let t = 0; t < 200; t++) stepRun(state, [emptyCommand()]);
+    expect(miner!.facing.x).toBe(before.x);
+    expect(miner!.facing.y).toBe(before.y);
   });
 });
 

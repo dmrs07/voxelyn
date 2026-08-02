@@ -257,6 +257,10 @@ const populateMiners = (
   for (const spawn of spawns) {
     if (placed >= cap || state.enemies.length >= MAX_ENEMIES) return;
     let found: { x: number; y: number } | null = null;
+    // O VEIO que o pos ali. Guardado junto com a celula porque o encontro
+    // inteiro depende dele: um minerador de costas para a rocha e so um corpo
+    // parado no corredor.
+    let vein: { x: number; y: number } | null = null;
     for (let dy = -MINER_ORE_SEARCH; dy <= MINER_ORE_SEARCH && !found; dy++) {
       for (let dx = -MINER_ORE_SEARCH; dx <= MINER_ORE_SEARCH && !found; dx++) {
         const x = spawn.x + dx;
@@ -271,13 +275,25 @@ const populateMiners = (
           if (state.solid[i] !== SOLID_NONE) continue;
           if (taken.has(i)) continue;
           found = { x: fx, y: fy };
+          vein = { x, y };
           break;
         }
       }
     }
-    if (!found) continue;
+    if (!found || !vein) continue;
     taken.add(found.y * w + found.x);
-    spawnEnemy(state, 'miner', found.x, found.y, false);
+    const miner = spawnEnemy(state, 'miner', found.x, found.y, false);
+    // E ele nasce ENCARANDO o veio.
+    //
+    // O lugar ja dizia "ele ainda esta trabalhando o minerio", mas a POSTURA
+    // desmentia: todo miner nascia com o facing padrao (leste), entao metade
+    // deles picaretava o corredor vazio de costas para a rocha que motivou o
+    // proprio spawn. A animacao de repouso e a batida da picareta; virada
+    // para o nada, ela lia como um tique, e nao como trabalho.
+    //
+    // O veio e ortogonalmente adjacente (a busca acima so aceita vizinho de
+    // aresta), entao a direcao sai exata, sem normalizar.
+    miner.facing = { x: vein.x - found.x, y: vein.y - found.y };
     placed++;
   }
 };
