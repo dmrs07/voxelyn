@@ -282,27 +282,33 @@ export const SULFUR_BOMBER_GAS_LIFE_TICKS = 240;
  * arrasto, mas os tiles ganhos, sim.
  */
 /**
- * O ALCANCE e o ARRASTO andam juntos, e a conta e uma so:
+ * O ALCANCE e o ARRASTO andam juntos, e a conta precisa de MARGEM:
  *
- *   PULL_RANGE - PULL_TILES <= SLAM_RANGE
+ *   PULL_RANGE - PULL_TILES + PULL_STEP <= SLAM_RANGE
  *
- * Sem ela, o combo nao fecha justamente no PRIMEIRO CONTATO. Com o engate a
- * 8,5 tiles e o arrasto de 3,6, o alvo terminava a 4,9 do Coveiro — e a
- * prensa alcanca 1,5. Ele gastava os dois telegrafos num golpe que nao podia
- * acertar nem contra alguem parado, e como o aggro tambem valia 8,5 esse era
- * o comportamento NORMAL do encontro, nao um caso de borda.
+ * Sem relacao nenhuma, o combo nao fechava no PRIMEIRO CONTATO: com engate a
+ * 8,5 tiles e arrasto de 3,6, o alvo terminava a 4,9 do Coveiro contra uma
+ * prensa de 1,5 — os dois telegrafos gastos num golpe que nao podia acertar
+ * nem contra alguem parado, e como o aggro tambem valia 8,5 esse era o
+ * comportamento NORMAL do encontro.
  *
- * A correcao mantem a fantasia (o eletroima traz voce de longe) encurtando o
- * engate e alongando o arrasto: 6,5 - 5 = 1,5, exatamente o alcance da
- * prensa. No pior caso o puxao entrega o alvo na borda do golpe; em qualquer
- * distancia menor, dentro dele.
+ * A primeira correcao fechou a conta com IGUALDADE EXATA (6,5 - 5 = 1,5) e
+ * isso ainda estava errado, por dois motivos que so aparecem no limite: a
+ * checagem da prensa e estrita (`dist < reach`), entao a borda exata nao
+ * acerta; e o arrasto anda em passos discretos de 0,2, entao em rumos
+ * oblicuos o acumulado para um epsilon ACIMA da conta ideal. Medido: a 30 e
+ * a 60 graus o alvo terminava a 1,5000...algo e a prensa passava batido.
+ *
+ * Agora sobra folga de um passo inteiro: 6,5 - 5,5 = 1,0 contra 1,5 de
+ * alcance. O puxao entrega o alvo DENTRO do golpe em qualquer rumo, e nao na
+ * borda dele.
  */
 export const UNDERTAKER_PULL_RANGE = 6.5;
 export const UNDERTAKER_PULL_MIN_RANGE = 2.2; // colado, ele so prensa
 export const UNDERTAKER_PULL_WINDUP_TICKS = 22;
 export const UNDERTAKER_PULL_COOLDOWN_TICKS = 130;
 /** Quanto o eletroima arrasta, em tiles, se nada bloquear o caminho. */
-export const UNDERTAKER_PULL_TILES = 5;
+export const UNDERTAKER_PULL_TILES = 5.5;
 /** Passo do arrasto: a colisao e avaliada tile a tile, nunca em salto. */
 export const UNDERTAKER_PULL_STEP = 0.2;
 /** A prensa que vem logo depois do puxao — o "porradao". */

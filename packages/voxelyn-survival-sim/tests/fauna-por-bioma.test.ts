@@ -22,9 +22,11 @@ import {
   SURF_SPORES,
   UNDERTAKER_PULL_COOLDOWN_TICKS,
   UNDERTAKER_PULL_RANGE,
+  UNDERTAKER_PULL_STEP,
   UNDERTAKER_PULL_TILES,
   UNDERTAKER_PULL_WINDUP_TICKS,
   UNDERTAKER_SLAM_RANGE,
+  UNDERTAKER_SLAM_WINDUP_TICKS,
 } from '../src/constants';
 import { setSurface } from '../src/cells';
 import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
@@ -411,23 +413,32 @@ describe('Coveiro', () => {
     expect(Math.sign(undertaker.action!.direction.x)).toBe(Math.sign(toTargetX));
   });
 
-  it('do alcance MAXIMO, o puxao entrega o alvo dentro da prensa', () => {
-    // A conta que amarra os tres numeros: PULL_RANGE - PULL_TILES <= SLAM_RANGE.
-    // Sem ela o combo nao fechava no primeiro contato — engate a 8,5 com
-    // arrasto de 3,6 deixava o alvo a 4,9 de uma prensa que alcanca 1,5, e o
-    // Coveiro gastava os DOIS telegrafos num golpe impossivel contra alguem
-    // parado. Como o aggro vale o mesmo que o engate, esse era o encontro
-    // normal, e nao um caso de borda.
-    expect(UNDERTAKER_PULL_RANGE - UNDERTAKER_PULL_TILES).toBeLessThanOrEqual(UNDERTAKER_SLAM_RANGE);
+  it('do alcance MAXIMO, em qualquer rumo, a prensa CONECTA', () => {
+    // A conta precisa de MARGEM, e nao de igualdade: a checagem da prensa e
+    // estrita (`dist < reach`) e o arrasto anda em passos discretos, entao a
+    // borda exata nao acerta e rumos oblicuos param um epsilon acima dela.
+    expect(
+      UNDERTAKER_PULL_RANGE - UNDERTAKER_PULL_TILES + UNDERTAKER_PULL_STEP,
+      'sem folga de um passo entre o puxao e a prensa',
+    ).toBeLessThanOrEqual(UNDERTAKER_SLAM_RANGE);
 
-    const state = arena(21);
-    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
-    // Exatamente na borda do engate, e parado.
-    state.player.x = undertaker.x + UNDERTAKER_PULL_RANGE - 0.05;
-    state.player.y = undertaker.y;
-    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 2);
-    const after = Math.hypot(state.player.x - undertaker.x, state.player.y - undertaker.y);
-    expect(after, 'o puxao nao alcanca a propria prensa').toBeLessThanOrEqual(UNDERTAKER_SLAM_RANGE);
+    // E a prova FUNCIONAL, que e a que importa: o alvo parado na borda exata
+    // do engate tem de TOMAR DANO ao fim dos dois telegrafos. A versao
+    // anterior deste teste media so a distancia e ainda por cima punha o alvo
+    // 0,05 tile DENTRO do maximo — ou seja, foi escrita para passar, e por
+    // isso nao viu o combo falhando nos rumos oblicuos.
+    for (const deg of [0, 30, 45, 60, 90]) {
+      const state = arena(21);
+      state.enemies = [];
+      const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+      const a = (deg * Math.PI) / 180;
+      state.player.x = undertaker.x + Math.cos(a) * UNDERTAKER_PULL_RANGE;
+      state.player.y = undertaker.y + Math.sin(a) * UNDERTAKER_PULL_RANGE;
+      const hpBefore = state.player.hp;
+      // Windup do puxao + arrasto + windup da prensa, com folga.
+      runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + UNDERTAKER_SLAM_WINDUP_TICKS + 8);
+      expect(state.player.hp, `${deg} graus: a prensa nao conectou`).toBeLessThan(hpBefore);
+    }
   });
 
   it('so puxa de novo depois do descanso: nao e um cabo de guerra', () => {
