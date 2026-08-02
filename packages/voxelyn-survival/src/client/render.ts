@@ -22,8 +22,7 @@ import {
   SURF_ICE,
   SURF_RAIL,
   SURF_RAIL_V,
-  CART_WINDUP_TICKS,
-  TICK_HZ,
+  CANARY_DEAD_AT,
   LURKER_HIDDEN,
   ABILITY_RADIUS,
   HEAT_MAX,
@@ -764,8 +763,6 @@ export class SurvivalRenderer {
   private readonly lurkerTrails = new Map<number, LurkerTrail>();
   /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
   private rupture: { x: number; y: number } | null = null;
-  /** Telegrafos vivos da armadilha de carrinho (a LINHA que vai ser varrida). */
-  private cartWarnings: Array<{ x: number; y: number; dx: number; dy: number; len: number; untilMs: number }> = [];
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -872,16 +869,6 @@ export class SurvivalRenderer {
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     this.presentation.ingest(events, nowMs);
-    for (const ev of events) {
-      // O telegrafo da armadilha: guarda o tramo pelo tempo EXATO do aviso
-      // autoritativo — quando a luz apaga, o carrinho existe.
-      if (ev.t === 'cart_warning') {
-        this.cartWarnings.push({
-          x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, len: ev.len,
-          untilMs: nowMs + (CART_WINDUP_TICKS * 1000) / TICK_HZ,
-        });
-      }
-    }
     // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
     // O cliente nunca decide que houve explosao — so a desenha.
     this.particles.budget = this.quality.maxFx * 2;
@@ -1576,7 +1563,13 @@ export class SurvivalRenderer {
           // acima da base); o pendente de teto e modelado de ponta-cabeca
           // com a bica na ancora, entao sobe erguido — e translucido, com o
           // MESMO contrato de honestidade do caminho de runtime.
-          const atlasName = decorAtlasName(prop);
+          let atlasName = decorAtlasName(prop);
+          // O canario e MOSTRADOR: vivo/morto vem da contaminacao
+          // autoritativa (mesmo valor do HUD), nunca da variante sorteada —
+          // quando os passaros calam, o retorno ja esta caro.
+          if (prop.kind === 'canary_cage') {
+            atlasName = `decor:canary_cage:${state.contamination >= CANARY_DEAD_AT ? 1 : 0}`;
+          }
           if (atlasName) {
             const ceiling = prop.anchor === 'ceiling';
             const lift = prop.anchor === 'landmark' ? 14 * z : ceiling ? 10 * z : 0;
@@ -1915,7 +1908,15 @@ export class SurvivalRenderer {
           if (proj.kind === 'cart') {
             const [csx, csy] = toScreen(proj.x, proj.y);
             drawGroundShadow(ctx, csx, csy, 7 * z);
-            const horizontal = Math.abs(proj.vx) >= Math.abs(proj.vy);
+            // A orientacao vem do TRILHO sob o carrinho, nao da velocidade:
+            // o snapshot online reconstroi projeteis com vx/vy zerados, e um
+            // carrinho vertical desenhado deitado mentiria o rumo da linha.
+            const underCart =
+              state.surface[Math.floor(proj.y) * state.config.width + Math.floor(proj.x)];
+            const horizontal =
+              underCart === SURF_RAIL_V ? false :
+              underCart === SURF_RAIL ? true :
+              Math.abs(proj.vx) >= Math.abs(proj.vy);
             const wob = Math.sin(nowMs / 45) * z * 0.5;
             drawVoxel(ctx, csx - (horizontal ? 4 : 2) * z, csy + wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
             drawVoxel(ctx, csx + (horizontal ? 4 : 2) * z, csy - wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
@@ -2014,9 +2015,12 @@ export class SurvivalRenderer {
     // O TELEGRAFO DO CARRINHO: a linha inteira do tramo pulsa em laranja de
     // perigo durante o aviso. SOBRE o veu e SEM corte de luz: morte anunciada
     // nao negocia com a atmosfera nem com a escuridao — o aviso e a unica
-    // coisa que o jogador precisa ver naquele segundo.
-    this.cartWarnings = this.cartWarnings.filter((warn) => warn.untilMs > nowMs);
-    for (const warn of this.cartWarnings) {
+    // coisa que o jogador precisa ver naquele segundo. Derivado DIRETO do
+    // estado autoritativo (firingAt em ticks), nao de relogio de parede: a
+    // pausa congela ticks, e um aviso por performance.now() expiraria durante
+    // o menu e deixaria o carrinho chegar sem o telegrafo prometido.
+    for (const warn of state.railTracks) {
+      if (!(warn.firingAt > state.tick)) continue;
       const pulse = 0.3 + 0.4 * Math.abs(Math.sin(nowMs / 90));
       ctx.save();
       ctx.strokeStyle = `rgba(255, 122, 47, ${pulse.toFixed(3)})`;

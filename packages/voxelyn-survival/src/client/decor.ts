@@ -90,6 +90,9 @@ export type PropKind =
   // ...adaptada ao substrato: isolador ceramico (cristal), duto (gas/calor).
   | 'insulator'
   | 'duct'
+  // O medidor vivo: a gaiola cujo canario morre quando a contaminacao passa
+  // de CANARY_DEAD_AT — informacao, nao enfeite.
+  | 'canary_cage'
   // Teto das ocupacoes.
   | 'spore_veil'
   | 'cable_hook'
@@ -258,7 +261,7 @@ const OCCUPATION_KIT: Record<
   { edge: PropKind[]; micro: PropKind[]; ceiling: PropKind[] }
 > = {
   mycelial: { edge: ['mushroom'], micro: ['puffball'], ceiling: ['spore_veil'] },
-  aurix: { edge: ['crate', 'strut'], micro: ['walkway', 'rail'], ceiling: ['cable_hook'] },
+  aurix: { edge: ['crate', 'strut', 'canary_cage'], micro: ['walkway', 'rail'], ceiling: ['cable_hook'] },
 };
 
 /**

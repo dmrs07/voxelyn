@@ -152,7 +152,7 @@ const ENEMY_ARCHETYPES = new Set<EnemyArchetype>([
   'scoriac',
   'frost_wraith',
 ]);
-const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc']);
+const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc', 'cart']);
 const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>
   typeof value === 'string' && ENEMY_ARCHETYPES.has(value as EnemyArchetype);
 const isProjectileKind = (value: unknown): value is ProjectileKind =>
@@ -167,6 +167,9 @@ const HOSTILE_PROJECTILES_BY_ARCHETYPE: Partial<Record<EnemyArchetype, ReadonlyS
   spitter: new Set(['spit']),
   guardian: new Set(['spit']),
   bishop: new Set(['spit']),
+  // A armadilha de carrinho credita 'miner' (os automatos da operacao): a
+  // capsula de morte por atropelo tem de passar pela matriz fechada.
+  miner: new Set(['cart']),
 };
 const isValidEnemyProjectileCause = (archetype: unknown, projectile: unknown): boolean => {
   if (!isEnemyArchetype(archetype) || !isProjectileKind(projectile)) return false;

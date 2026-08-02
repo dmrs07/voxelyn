@@ -411,6 +411,26 @@ Depois do disparo o tramo descansa (`CART_COOLDOWN_TICKS`). Crostas no
 atlas de superfícies (v6), carrinho desenhado em runtime (orientação vem da
 velocidade). Viaja na `SIMULATION_VERSION` 16 e `CONTENT_VERSION` 14.
 
+## Décima nona etapa (implementada): a extração de retorno + canários
+
+Pegar o Núcleo é só metade do contrato. Com ele na mão: o **poço sela**
+(descer de novo não existe — `sim.wellSealedReturn`), a **entrada** de um
+setor profundo vira o portal de **subida** (`ascend`: o mundo regenera da
+mesma seed derivada — mesma geografia, mesmos trilhos — mas a fauna
+repovoou, os sites de salvage rearmaram e a ressonância acumulada FICA), e o
+grupo emerge no poço do setor de cima, atravessando tudo de novo ao
+contrário. A **vitória só fecha na plataforma do setor 1**. A contaminação
+não alivia na subida (descer alivia; subir é a conta chegando) e o ritmo
+2,2× do Núcleo continua. Sem o Núcleo, abandonar o contrato em qualquer
+profundidade segue valendo.
+
+**Gaiolas de canário** (kit Aurix): o medidor VIVO da contaminação — o
+canário no poleiro é o único amarelo permitido na decoração (amarelo como
+informação, não coletável); quando a contaminação passa de `CANARY_DEAD_AT`
+(0,5), todo canário do mundo cala no mesmo tick, lendo o mesmo valor
+autoritativo do HUD. Frames vivo/morto no atlas (`decor:canary_cage:0/1` —
+o eixo de "variante" aqui é o estado, de propósito).
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;

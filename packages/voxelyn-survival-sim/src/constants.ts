@@ -173,6 +173,15 @@ export const CART_RADIUS = 0.55;
 export const RAIL_TRACK_MIN = 8;
 export const RAIL_TRACK_MAX = 16;
 
+/**
+ * O CANARIO morre neste nivel de contaminacao. A gaiola e decoracao, mas o
+ * canario e MOSTRADOR: um medidor vivo espalhado pelo mundo, lendo o mesmo
+ * valor autoritativo que o HUD — quando os passaros calam, o retorno ja
+ * esta caro. O limiar mora na simulacao (e nao no cliente) porque e um fato
+ * do mundo: o mesmo canario morre no mesmo instante em toda maquina.
+ */
+export const CANARY_DEAD_AT = 0.5;
+
 // ---------------------------------------------------------------------------
 // Bestiario de assinatura: um inimigo por estrato, manipulando a REGRA do bioma
 // ---------------------------------------------------------------------------

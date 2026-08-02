@@ -96,7 +96,7 @@ import {
 } from './entities.js';
 import { generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
-import { descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
+import { ascend, descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
 import { biomeProfile, sectorBiome } from './strata.js';
 import {
   activeModule,
@@ -974,6 +974,12 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     // O mesmo ponto significa coisas diferentes conforme a profundidade: nos
     // setores anteriores ao ultimo ele e o POCO, e no ultimo e o nucleo.
     const distCore = Math.hypot(player.x - (state.corePos.x + 0.5), player.y - (state.corePos.y + 0.5));
+    if (state.coreTaken && !isFinalSector(state.sector) && distCore < 1.6) {
+      // Com o Nucleo na mao o poco SELOU: descer de novo nao existe. O
+      // caminho de volta sai por onde se entrou — a ENTRADA do setor.
+      events.push({ t: 'message', key: 'sim.wellSealedReturn' });
+      return;
+    }
     if (!isFinalSector(state.sector) && distCore < 1.6) {
       // Descida COLETIVA, pela mesma razao da extracao: um parceiro deixado
       // para tras num mapa que deixou de existir nao teria como ser resgatado.
@@ -1053,8 +1059,23 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         (p) => Math.hypot(p.x - (state.entry.x + 0.5), p.y - (state.entry.y + 0.5)) <= EXTRACT_RADIUS
       );
       const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
+      const withCore = state.playerExtras.some((e) => e.hasCore);
+      // Com o NUCLEO, a entrada de um setor profundo nao extrai: ela SOBE. O
+      // contrato so fecha na plataforma do setor 1 — cada setor tem de ser
+      // atravessado de novo, ao contrario, com a contaminacao cobrando o
+      // dobro. Sem o nucleo, abandonar o contrato continua possivel em
+      // qualquer profundidade, como sempre foi.
+      if (withCore && state.sector > 1) {
+        if (anyDowned) {
+          events.push({ t: 'message', key: 'sim.reviveBeforeExtract' });
+        } else if (!allAtEntry) {
+          events.push({ t: 'message', key: 'sim.waitAtExit' });
+        } else {
+          ascend(state, events);
+        }
+        return;
+      }
       if (allAtEntry && !anyDowned) {
-        const withCore = state.playerExtras.some((e) => e.hasCore);
         state.phase = withCore ? 'extracted_with_core' : 'extracted';
         events.push({ t: 'extracted', withCore });
       } else if (anyDowned) {

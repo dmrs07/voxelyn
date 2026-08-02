@@ -505,7 +505,15 @@ export type SemanticEvent =
    * cliente exigiria repetir a derivacao de linhagem la — duas copias que
    * divergiriam no primeiro ajuste de tabela.
    */
-  | { t: 'sector_entered'; sector: number; final: boolean; stratum: StratumId; occupation: OccupationId }
+  | {
+      t: 'sector_entered';
+      sector: number;
+      final: boolean;
+      stratum: StratumId;
+      occupation: OccupationId;
+      /** Presente (true) quando a chegada e do caminho de VOLTA. */
+      ascending?: true;
+    }
   /**
    * O TELEGRAFO da armadilha de carrinho: pisar num tramo armado anuncia o
    * carrinho CART_WINDUP_TICKS antes de ele existir. O evento carrega o tramo
@@ -540,6 +548,7 @@ export type SimMessageKey =
   | 'sim.reviveBeforeDescend'
   | 'sim.waitAtShaft'
   | 'sim.coreTaken'
+  | 'sim.wellSealedReturn'
   | 'sim.reviveBeforeExtract'
   | 'sim.waitAtExit'
   | 'sim.contaminationRising'

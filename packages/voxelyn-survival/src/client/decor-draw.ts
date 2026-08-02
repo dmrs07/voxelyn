@@ -99,6 +99,9 @@ const ATLAS_VOLUMETRIC: ReadonlySet<PropKind> = new Set<PropKind>([
   'sulfur_drip',
   'soot_fang',
   'icicle',
+  // Gaiola de canario: no atlas, mas o frame vivo/morto e escolhido pela
+  // CONTAMINACAO no render — nao pela variante sorteada.
+  'canary_cage',
 ]);
 
 /**
@@ -470,6 +473,13 @@ export const drawDecorProp = (
       drawVoxel(ctx, x - s(1.8), sy - s(0.6), s(1.8), RUST);
       drawVoxel(ctx, x + s(1.8), sy - s(0.2), s(1.8), RUST);
       drawVoxel(ctx, x + flip * s(4), sy - s(1), s(1.6), RUST);
+      return;
+    case 'canary_cage':
+      // Fallback sem atlas: a gaiola generica (sem passaro — o estado
+      // vivo/morto e do caminho de atlas, que le a contaminacao).
+      drawVoxel(ctx, x, sy, s(3.4), RUST);
+      drawVoxel(ctx, x, sy - s(2.6), s(2.4), RUST);
+      drawVoxel(ctx, x, sy - s(4.2), s(1.4), RUST);
       return;
     case 'insulator':
       // Isolador ceramico: discos empilhados ao pe da parede cristalina — a

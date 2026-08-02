@@ -432,6 +432,16 @@
       "name": "decor:icicle:1",
       "frames": 1,
       "frameMs": 0
+    },
+    {
+      "name": "decor:canary_cage:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:canary_cage:1",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "paletteColors": [

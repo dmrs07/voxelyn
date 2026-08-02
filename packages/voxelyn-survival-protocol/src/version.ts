@@ -37,7 +37,11 @@ export const PROTOCOL_VERSION = 11;
 // ARMADILHA DE CARRINHO: tramos SURF_RAIL/SURF_RAIL_V no worldgen da
 // operacao (Aurix/ferrifero), gatilho por pisada com telegrafo
 // (cart_warning) e o carrinho como projetil hostil (kind 'cart') que
-// atropela jogador E bicho sem morrer no impacto.
+// atropela jogador E bicho sem morrer no impacto. E a EXTRACAO DE
+// RETORNO: com o Nucleo o poco sela, a entrada de setor profundo vira
+// portal de SUBIDA (ascend — mundo regenerado da mesma seed, fauna
+// repovoada, contaminacao sem alivio) e a vitoria so fecha na plataforma
+// do setor 1.
 export const SIMULATION_VERSION = 16;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.

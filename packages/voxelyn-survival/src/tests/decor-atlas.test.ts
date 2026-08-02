@@ -18,7 +18,7 @@ const VOLUMETRIC: PropKind[] = [
   'walkway', 'rail', 'calcite_basin', 'crystal_fan', 'slab_pile',
   'fallen_plate', 'sulfur_mound', 'cinder_pile', 'frost_stone', 'lodestone',
   'ore_spur', 'hanging_spur', 'crystal_chandelier', 'stalactite',
-  'hanging_slab', 'sulfur_drip', 'soot_fang', 'icicle',
+  'hanging_slab', 'sulfur_drip', 'soot_fang', 'icicle', 'canary_cage',
 ];
 
 // Runtime por MERITO: pedrinhas/cacos (silhueta basta) e os pendentes que

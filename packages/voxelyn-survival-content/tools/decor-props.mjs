@@ -73,6 +73,10 @@ const VOLUMETRIC = [
   'sulfur_drip',
   'soot_fang',
   'icicle',
+  // A gaiola de canario: aqui o eixo de "variante" NAO e anti-carimbo — e o
+  // ESTADO. :0 = canario vivo, :1 = canario morto; o cliente escolhe o frame
+  // pela contaminacao autoritativa (CANARY_DEAD_AT), nao por sorteio.
+  'canary_cage',
 ];
 
 /** Kinds no formato do atlas de props: um frame estatico por variante. */
@@ -555,6 +559,25 @@ const modelOf = (kind, v) => {
       cone(boxes, [[0, 4, 'ice'], [1, 4, 'ice'], [2, 3, 'ice']]);
       cone(boxes, [[0, 3, 'ice'], [1, 2, 'ice']], s * 4, s);
       cone(boxes, [[0, 2 + v, 'ice']], -s * 3, s * 2);
+      break;
+    }
+    case 'canary_cage': {
+      // O medidor vivo da operacao. v=0: o canario no poleiro — o UNICO
+      // amarelo permitido na decoracao, porque aqui o amarelo e INFORMACAO
+      // (um passaro engaiolado nao le como coletavel). v=1: o poleiro vazio
+      // e o passaro caido na bandeja, sem um voxel de cor viva.
+      boxes.push(box(-2, -2, 0, 5, 5, 1, 'rockDeep')); // bandeja
+      for (const [bx, by] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+        boxes.push(box(bx, by, 1, 1, 1, 6, 'rust')); // barras
+      }
+      slab(boxes, 0, 0, 2, 7, 1, 'rust'); // tampa
+      boxes.push(box(0, 0, 8, 1, 1, 2, 'rust')); // argola
+      boxes.push(box(-2, 0, 3, 5, 1, 1, 'bone')); // poleiro
+      if (v === 0) {
+        boxes.push(box(0, 0, 4, 1, 1, 1, 'loot')); // o canario, cantando
+      } else {
+        boxes.push(box(1, 1, 1, 1, 1, 1, 'rust')); // o canario, calado
+      }
       break;
     }
     default:
