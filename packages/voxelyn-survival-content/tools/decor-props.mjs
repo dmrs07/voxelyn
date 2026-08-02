@@ -56,6 +56,64 @@ const layer = (boxes, r, z, h, mat) => {
   boxes.push(box(-r, -r, z, r * 2 + 1, r * 2 + 1, h, mat));
 };
 
+const hash3 = (x, y, z, seed) => {
+  let h =
+    Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 2147483647) ^ Math.imul(seed, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return (h ^ (h >>> 16)) >>> 0;
+};
+
+/**
+ * TEXTURA VOLUMETRICA, a mesma ideia dos blocos de terreno: o material de
+ * cada voxel depende de (x, y, z), entao qualquer face que o modelo exponha
+ * mostra a mesma materia malhada — sem isto as caixas grandes saem com faces
+ * CHAPADAS de um material so, e o prop volta a parecer papelao pintado.
+ * Cada material tem as proprias inclusoes: a rocha malha de rocha funda, o
+ * osso mancha de oxido, o gelo prende sedimento, a ferrugem descasca.
+ */
+const SPECKLE = {
+  rock: [['rockDeep', 5]],
+  rockDeep: [['rock', 6]],
+  bone: [['rust', 7]],
+  rust: [['rockDeep', 6], ['bone', 11]],
+  ice: [['rock', 9]],
+  fungus: [['fungusDeep', 5]],
+  fungusDeep: [['fungus', 7]],
+};
+
+const texture = (boxes, seed) => {
+  const out = [];
+  for (const b of boxes) {
+    const rules = SPECKLE[b.mat];
+    if (!rules) {
+      // Sem regra (scorch e afins): o material e DETALHE deliberado — a boca
+      // extinta da fumarola tem de continuar um buraco uniforme e escuro.
+      out.push(b);
+      continue;
+    }
+    for (let dz = 0; dz < b.h; dz++) {
+      for (let dy = 0; dy < b.d; dy++) {
+        for (let dx = 0; dx < b.w; dx++) {
+          const x = b.x + dx;
+          const y = b.y + dy;
+          const z = b.z + dz;
+          let roll = hash3(x, y, z, seed) >>> 3;
+          let mat = b.mat;
+          for (const [alt, mod] of rules) {
+            if (roll % mod === 0) {
+              mat = alt;
+              break;
+            }
+            roll >>>= 4;
+          }
+          out.push(box(x, y, z, 1, 1, 1, mat));
+        }
+      }
+    }
+  }
+  return out;
+};
+
 /** Cone: camadas quadradas encolhendo. `steps` = [[raio, altura, mat], ...]. */
 const cone = (boxes, steps) => {
   let z = 0;
@@ -271,8 +329,11 @@ const modelOf = (kind, v) => {
   return boxes;
 };
 
-/** Modelo pelo NOME de atlas (`decor:<kind>:<variante>`). */
+/** Modelo pelo NOME de atlas (`decor:<kind>:<variante>`), ja texturizado. */
 export const decorPropModel = (name) => {
   const [, kind, v] = name.split(':');
-  return modelOf(kind, Number(v));
+  // Seed por (kind, variante): a malha da variante 1 nao repete a da 0.
+  let seed = 0x811c9dc5 ^ Number(v);
+  for (let i = 0; i < kind.length; i++) seed = Math.imul(seed ^ kind.charCodeAt(i), 0x01000193);
+  return texture(modelOf(kind, Number(v)), seed >>> 0);
 };
