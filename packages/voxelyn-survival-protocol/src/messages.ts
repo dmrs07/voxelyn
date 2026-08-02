@@ -202,6 +202,15 @@ export type WorldFlags = {
    * lista vazia e o resto do mundo continua funcionando.
    */
   wellOffers?: WellOfferFlags[];
+  /**
+   * Relogios dos tramos de trilho, ALINHADOS POR INDICE com o `railTracks`
+   * que o cliente regenera da seed (a ordem do worldgen e deterministica).
+   * Sem eles o espelho nasce e VIVE com firingAt = 0: quem entra ou reconecta
+   * durante o aviso de 24 ticks receberia o carrinho sem telegrafo nenhum —
+   * o full_resync nao carrega eventos. Poucos bytes (ate 3 tramos por setor)
+   * e o `worldSig` ja dispara o envio sozinho quando um gatilho e pisado.
+   */
+  railTimers?: Array<{ readyAt: number; firingAt: number }>;
 };
 
 export type ServerWelcome = {

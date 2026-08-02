@@ -1,6 +1,5 @@
 import {
   ARCHETYPES,
-  CART_WINDUP_TICKS,
   createRun,
   hashStaticWorld,
   type Entity,
@@ -302,22 +301,11 @@ export class NetClient {
         if (msg.you) {
           this.viewer = msg.you;
         }
-        // O TELEGRAFO do carrinho em co-op. Os relogios dos trilhos nao
-        // viajam nos WorldFlags — o espelho local os teria eternamente em
-        // zero e o carrinho chegaria SEM aviso, so como projetil. O evento
-        // `cart_warning` ja cruza o fio com a geometria do tramo; rearmar o
-        // relogio do espelho aqui mantem um unico caminho de desenho (o
-        // renderer le `state.railTracks`) e continua em base de TICK, que e
-        // o que o fix da pausa cobrou. O serverTick do snapshot pode chegar
-        // um ou dois ticks depois do gatilho: o aviso encurta esse tanto,
-        // nunca alonga — o carrinho jamais chega antes do fim do telegrafo.
-        for (const ev of msg.events) {
-          if (ev.t !== 'cart_warning' || !this.state) continue;
-          const track = this.state.railTracks.find(
-            (tr) => tr.x === ev.x && tr.y === ev.y && tr.dx === ev.dx && tr.dy === ev.dy,
-          );
-          if (track) track.firingAt = msg.serverTick + CART_WINDUP_TICKS;
-        }
+        // (O telegrafo do carrinho NAO precisa de tratamento aqui: os
+        // relogios dos trilhos viajam nas WorldFlags — `railTimers` — que o
+        // applyWorld acima ja aplicou. Pisar num gatilho muda o worldSig e
+        // dispara o envio no proprio tick do aviso; e o full_resync sempre
+        // as carrega, entao quem entra NO MEIO do aviso tambem o ve.)
         this.eventQueue.push(msg.serverTick, msg.events);
         break;
       }
@@ -367,6 +355,19 @@ export class NetClient {
       y: offer.y,
       takenBy: offer.takenBy,
     }));
+    // Relogios dos trilhos, por indice: a geometria dos tramos vem da seed
+    // (mesma ordem deterministica do worldgen), so o TEMPO e autoritativo.
+    // E o que faz o telegrafo do carrinho existir online — inclusive para
+    // quem entra ou reconecta NO MEIO do aviso, porque o full_resync sempre
+    // carrega as WorldFlags. Servidor antigo nao manda o campo: fica tudo
+    // em zero, como antes.
+    const timers = world.railTimers;
+    if (timers) {
+      for (let i = 0; i < state.railTracks.length && i < timers.length; i++) {
+        state.railTracks[i].readyAt = timers[i].readyAt;
+        state.railTracks[i].firingAt = timers[i].firingAt;
+      }
+    }
   }
 
   /**

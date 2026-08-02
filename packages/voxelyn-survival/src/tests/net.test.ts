@@ -400,19 +400,20 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
 });
 
 describe('telegrafo do carrinho em co-op', () => {
-  // Os relogios dos trilhos NAO viajam nos WorldFlags: o espelho local nasce
-  // com firingAt = 0 e ficaria assim para sempre — o carrinho chegaria pelo
-  // snapshot de projeteis SEM aviso. O cliente rearma o relogio do espelho a
-  // partir do evento `cart_warning`, que ja cruza o fio com a geometria.
-  it('cart_warning rearma o firingAt do tramo espelhado', () => {
-    const seedIndustrial = (() => {
-      for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'industrial') return s;
-      throw new Error('nenhuma seed industrial');
-    })();
+  // Os relogios dos trilhos viajam nas WorldFlags (`railTimers`): a GEOMETRIA
+  // dos tramos o cliente regenera da seed, mas o TEMPO e estado de runtime —
+  // sem ele o espelho nasce (e vive) com firingAt = 0 e o carrinho chega pelo
+  // snapshot de projeteis SEM aviso. Como o full_resync sempre carrega as
+  // flags, quem entra ou reconecta NO MEIO do aviso tambem ve o telegrafo.
+  const seedIndustrial = (() => {
+    for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'industrial') return s;
+    throw new Error('nenhuma seed industrial');
+  })();
+
+  const connect = (): { client: NetClient; track: RailTrack } => {
     // Referencia local do mundo que o cliente vai gerar da mesma seed.
     const reference = createRun({ seed: seedIndustrial, sector: 2, playerCount: 2 });
     expect(reference.railTracks.length).toBeGreaterThan(0);
-
     const client = new NetClient(() => {});
     client.receive(JSON.stringify({
       t: 'welcome',
@@ -426,11 +427,21 @@ describe('telegrafo do carrinho em co-op', () => {
       worldHeight: reference.config.height,
       mapHash: '', // vazio: pula a validacao de mapa neste teste de unidade
     }));
-
     const mirror = (client as unknown as { state: { railTracks: RailTrack[] } }).state;
-    const track = mirror.railTracks[0];
-    expect(track.firingAt).toBe(0);
+    return { client, track: mirror.railTracks[0] };
+  };
 
+  const worldWith = (timers: Array<{ readyAt: number; firingAt: number }>) => ({
+    salvageSites: [],
+    coreTaken: false,
+    guardianAwake: false,
+    wellOffers: [],
+    railTimers: timers,
+  });
+
+  it('railTimers do snapshot rearmam o firingAt do tramo espelhado', () => {
+    const { client, track } = connect();
+    expect(track.firingAt).toBe(0);
     client.receive(JSON.stringify({
       t: 'snapshot',
       serverTick: 400,
@@ -441,14 +452,29 @@ describe('telegrafo do carrinho em co-op', () => {
       removedEntities: [],
       chunkDiffs: [],
       contamination: 0,
-      events: [{
-        t: 'cart_warning',
-        x: track.x, y: track.y, dx: track.dx, dy: track.dy, len: track.len,
-      }],
+      events: [],
+      world: worldWith([{ readyAt: 0, firingAt: 400 + CART_WINDUP_TICKS }]),
     }));
-
     // O aviso do espelho e TICK-based, como no solo: o renderer le
     // state.railTracks e compara com o tick da linha de render.
     expect(track.firingAt).toBe(400 + CART_WINDUP_TICKS);
+  });
+
+  it('reconexao NO MEIO do aviso recupera o telegrafo pelo full_resync', () => {
+    const { client, track } = connect();
+    client.receive(JSON.stringify({
+      t: 'full_resync',
+      serverTick: 410,
+      seed: seedIndustrial,
+      sector: 2,
+      chunkDiffs: [],
+      entities: [],
+      projectiles: [],
+      you: null,
+      world: worldWith([{ readyAt: 3, firingAt: 424 }]),
+      authHash: '',
+    }));
+    expect(track.firingAt).toBe(424);
+    expect(track.readyAt).toBe(3);
   });
 });
