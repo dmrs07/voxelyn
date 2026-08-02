@@ -507,6 +507,59 @@ describe('gelo da Cripta Glacial', () => {
     expect(state.surface[i]).toBe(SURF_ICE);
   });
 
+  it('no gelo ha inercia: soltar o direcional desliza; no chao seco, para', () => {
+    // Mesma pista, dois pisos. O empurrao e identico; a diferenca toda esta
+    // no que acontece DEPOIS de soltar o direcional.
+    const slideAfterRelease = (ice: boolean): number => {
+      const state = createRun({ seed: 5 });
+      const w = state.config.width;
+      const px = Math.floor(state.player.x);
+      const py = Math.floor(state.player.y);
+      // Pinta a pista sob e a frente do jogador (escrita direta de teste).
+      for (let y = py - 2; y <= py + 2; y++) {
+        for (let x = px - 2; x <= px + 8; x++) {
+          if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+          state.surface[y * w + x] = ice ? SURF_ICE : SURF_NONE;
+        }
+      }
+      const push = emptyCommand();
+      push.move = { x: 1, y: 0 };
+      for (let t = 0; t < 6; t++) stepRun(state, [push]);
+      const atRelease = state.player.x;
+      const idle = emptyCommand();
+      for (let t = 0; t < 10; t++) stepRun(state, [idle]);
+      return state.player.x - atRelease;
+    };
+    expect(slideAfterRelease(false)).toBeLessThan(0.03);
+    expect(slideAfterRelease(true)).toBeGreaterThan(0.2);
+  });
+
+  it('no gelo o rumo novo entra aos poucos: a curva atrasa em relacao ao chao seco', () => {
+    const turnLag = (ice: boolean): number => {
+      const state = createRun({ seed: 5 });
+      const w = state.config.width;
+      const px = Math.floor(state.player.x);
+      const py = Math.floor(state.player.y);
+      for (let y = py - 2; y <= py + 8; y++) {
+        for (let x = px - 2; x <= px + 8; x++) {
+          if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+          state.surface[y * w + x] = ice ? SURF_ICE : SURF_NONE;
+        }
+      }
+      const right = emptyCommand();
+      right.move = { x: 1, y: 0 };
+      for (let t = 0; t < 6; t++) stepRun(state, [right]);
+      const beforeTurn = state.player.x;
+      const down = emptyCommand();
+      down.move = { x: 0, y: 1 };
+      for (let t = 0; t < 4; t++) stepRun(state, [down]);
+      // Quanto o corpo AINDA avancou no rumo antigo depois de virar o comando.
+      return state.player.x - beforeTurn;
+    };
+    expect(turnLag(false)).toBeLessThan(0.02);
+    expect(turnLag(true)).toBeGreaterThan(0.12);
+  });
+
   it('fogo encostado no gelo o derrete — e a agua nova apaga o proprio fogo', () => {
     const state = frozen(25);
     const fireCell = at(state, 25, 22); // colado na faixa de gelo

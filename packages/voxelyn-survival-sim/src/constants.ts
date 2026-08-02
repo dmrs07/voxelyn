@@ -129,6 +129,17 @@ export const COAL_FIRE_FUEL_TICKS = 110;
  */
 export const ICE_REFREEZE_TICKS = 280;
 
+/**
+ * INERCIA DO GELO: por tick, quanto da velocidade ANTERIOR o Prospector
+ * mantem sobre a lamina — o rumo comandado entra so no complemento. A 0,82 e
+ * 20Hz, mudar de direcao leva ~0,4s para completar e soltar o direcional
+ * desliza ~0,7 celula: o gelo vira uma decisao de rota (velocidade nas retas,
+ * imprecisao nas curvas), nao um piso que so muda de cor. So o jogador tem
+ * inercia — o Espectro ja tem o proprio contrato com a lamina, e os demais
+ * bichos manteriam N flows de perseguicao para revisar de uma vez.
+ */
+export const ICE_GLIDE = 0.82;
+
 // ---------------------------------------------------------------------------
 // Bestiario de assinatura: um inimigo por estrato, manipulando a REGRA do bioma
 // ---------------------------------------------------------------------------

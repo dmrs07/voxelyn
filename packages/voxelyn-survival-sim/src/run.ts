@@ -54,6 +54,8 @@ import {
   SURF_EMBER,
   EMBER_HEAT_DECAY_SCALE,
   SURF_FIRE,
+  SURF_ICE,
+  ICE_GLIDE,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
   SURF_SCORCHED,
@@ -76,6 +78,7 @@ import { dischargeAt, explodeAt, igniteCell, isConductiveSurface, setSurface, st
 import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
 import {
   applyExplosionDamage,
+  cellUnder,
   damageEntity,
   moveEntity,
   isStoneEnemy,
@@ -704,6 +707,27 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   const beforeMoveY = player.y;
   if (state.tick < extra.dodgeUntil) {
     moveEntity(state, player, extra.dodgeDir.x * DODGE_SPEED * dt, extra.dodgeDir.y * DODGE_SPEED * dt);
+  } else if (state.surface[cellUnder(state, player)] === SURF_ICE) {
+    // INERCIA DO GELO: o pe nao morde a lamina. O rumo comandado entra aos
+    // poucos na velocidade real, e soltar o direcional NAO para na hora — o
+    // Prospector desliza ate o atrito residual vencer. `vx/vy` ja e o
+    // deslocamento REAL do tick anterior (pos-colisao), entao bater na parede
+    // zera o embalo sozinho, sem caso especial. Fora do gelo nada muda: o
+    // ramo historico abaixo segue byte a byte.
+    const moveLen = Math.hypot(cmd.move.x, cmd.move.y);
+    let desiredX = 0;
+    let desiredY = 0;
+    if (moveLen > 0.01) {
+      const clamped = Math.min(1, moveLen);
+      const speed = PLAYER_SPEED * surfaceSpeedMul(state, player);
+      desiredX = (cmd.move.x / moveLen) * clamped * speed;
+      desiredY = (cmd.move.y / moveLen) * clamped * speed;
+    }
+    const vx = player.vx * ICE_GLIDE + desiredX * (1 - ICE_GLIDE);
+    const vy = player.vy * ICE_GLIDE + desiredY * (1 - ICE_GLIDE);
+    // Abaixo do limiar o embalo morre de vez: deslizar para sempre por um
+    // epsilon de float seria a lamina mentindo que ainda ha movimento.
+    if (Math.hypot(vx, vy) > 0.02) moveEntity(state, player, vx * dt, vy * dt);
   } else {
     const moveLen = Math.hypot(cmd.move.x, cmd.move.y);
     if (moveLen > 0.01) {

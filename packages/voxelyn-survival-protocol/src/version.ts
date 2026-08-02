@@ -23,7 +23,11 @@ export const PROTOCOL_VERSION = 11;
 // assinatura derivam do orcamento real do setor, e os estratos ganham
 // ESTRUTURAS DE SALAO no worldgen (rotunda, pulmoes, canions, bacias,
 // sumidouros, lagos) — a geracao semeada dos setores 2+ muda de novo.
-export const SIMULATION_VERSION = 15;
+// 16: INERCIA DO GELO — sobre SURF_ICE o movimento do jogador carrega
+// embalo (ICE_GLIDE): o rumo novo entra aos poucos e soltar o direcional
+// desliza. Fora do gelo o passo e byte a byte o historico, mas dois peers
+// em versoes diferentes divergiriam na primeira pisada da Cripta.
+export const SIMULATION_VERSION = 16;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 export const CONTENT_VERSION = 11;
