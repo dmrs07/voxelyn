@@ -83,6 +83,9 @@ export type PropKind =
   // Infraestrutura Aurix: a operacao abandonada em escala de chao...
   | 'walkway'
   | 'rail'
+  // ...adaptada ao substrato: isolador ceramico (cristal), duto (gas/calor).
+  | 'insulator'
+  | 'duct'
   // Teto das ocupacoes.
   | 'spore_veil'
   | 'cable_hook'
@@ -194,6 +197,23 @@ const OCCUPATION_KIT: Record<
 > = {
   mycelial: { edge: ['mushroom'], micro: ['puffball'], ceiling: ['spore_veil'] },
   aurix: { edge: ['crate', 'strut'], micro: ['walkway', 'rail'], ceiling: ['cable_hook'] },
+};
+
+/**
+ * A Aurix ADAPTA a infraestrutura ao substrato — a mesma operacao deixa
+ * registros diferentes conforme onde fracassou: isoladores ceramicos contra o
+ * cristal condutor da Catedral, dutos na Fenda e na Fornalha (gas e
+ * refrigeracao), escoras dobradas no sedimento que cede, passarelas sobre o
+ * chao alagavel do Aquifero. O basalto fica com o kit base: ele E a
+ * referencia da operacao. Os kinds extras entram no sorteio de borda junto
+ * com caixa/escora — vies, nao substituicao.
+ */
+const AURIX_SUBSTRATE_EDGE: Partial<Record<StratumId, PropKind[]>> = {
+  prismatic: ['insulator', 'insulator'],
+  sulfur: ['duct'],
+  furnace: ['duct', 'duct'],
+  silica: ['strut'],
+  aquifer: ['walkway'],
 };
 
 /** Orcamento por setor. Ritmo estrutura; micro da acabamento sem dominar. */
@@ -405,7 +425,11 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
       state.occupation === 'mycelial'
         ? (x: number, y: number): boolean => isOpen(x, y) && surface[idx(x, y)] === SURF_FUNGAL
         : bareFloor;
-    for (let n = 0; n < OCCUPATION_EDGE_BUDGET; n++) tryPlace(occKit.edge, 'wall_base', occFloor);
+    const occEdge =
+      state.occupation === 'aurix'
+        ? [...occKit.edge, ...(AURIX_SUBSTRATE_EDGE[state.stratum] ?? [])]
+        : occKit.edge;
+    for (let n = 0; n < OCCUPATION_EDGE_BUDGET; n++) tryPlace(occEdge, 'wall_base', occFloor);
     for (let n = 0; n < OCCUPATION_MICRO_BUDGET; n++) tryPlace(occKit.micro, 'floor', occFloor);
     // O veu de esporos so pende sobre o tapete da colonia — teto e chao
     // contam a mesma historia. O gancho Aurix pende sobre o chao firme.

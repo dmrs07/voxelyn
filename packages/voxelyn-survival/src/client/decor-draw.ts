@@ -376,6 +376,21 @@ export const drawDecorProp = (
       drawVoxel(ctx, x + s(1.8), sy - s(0.2), s(1.8), RUST);
       drawVoxel(ctx, x + flip * s(4), sy - s(1), s(1.6), RUST);
       return;
+    case 'insulator':
+      // Isolador ceramico: discos empilhados ao pe da parede cristalina — a
+      // Aurix protegendo os circuitos DO cristal, nunca o contrario. Familia
+      // fria/ossea; nenhum pixel de biolum.
+      drawVoxel(ctx, x, sy, s(3.4), BONE);
+      drawVoxel(ctx, x, sy - s(2), s(2.6), MIST);
+      drawVoxel(ctx, x, sy - s(3.8), s(3), BONE);
+      return;
+    case 'duct':
+      // Duto rompido: dois segmentos e o cotovelo apontando para lugar
+      // nenhum — o gas que ele levava ja nao existe.
+      drawVoxel(ctx, x - s(2.2), sy, s(2.6), RUST);
+      drawVoxel(ctx, x + s(0.6), sy - s(0.4), s(2.6), RUST);
+      drawVoxel(ctx, x + s(2.6), sy - s(2.4), s(2.2), ROCK_DEEP);
+      return;
     default:
       return;
   }

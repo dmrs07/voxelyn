@@ -522,6 +522,68 @@ const stampHalls = (
   return { fillCells, fillKind, hallCenters };
 };
 
+/**
+ * A SALA FUNCIONAL do poco, com o sotaque do estrato.
+ *
+ * A FUNCAO nunca muda: o poco mora num disco aberto de raio 4, alcancavel, com
+ * o pedestal 3x3 limpo. O que muda e a moldura — colunas basalticas, pilares
+ * de cristal na Catedral, um fosso raso no Aquifero, a borda porosa da Fenda,
+ * escombros na Fornalha, o anel fragil da Silica, o lago congelado da Cripta.
+ * Offsets FIXOS, nenhuma tirada de RNG: o carimbo nao desloca sorteio nenhum,
+ * e as provas de alcancabilidade rodam DEPOIS dele — um pedestal que por
+ * absurdo selasse o poco reprovaria o mapa e a geracao tentaria outra seed.
+ */
+const stampCorePedestal = (
+  solid: Uint8Array,
+  surface: Uint8Array,
+  w: number,
+  h: number,
+  core: Vec2,
+  halls: WorldgenProfile['halls'],
+): void => {
+  const put = (dx: number, dy: number, mat: number): void => {
+    const x = core.x + dx;
+    const y = core.y + dy;
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
+      solid[idx(w, x, y)] = mat;
+    }
+  };
+  const paint = (dx: number, dy: number, surf: number): void => {
+    const x = core.x + dx;
+    const y = core.y + dy;
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
+      surface[idx(w, x, y)] = surf;
+    }
+  };
+  const RING = [
+    [3, 0], [-3, 0], [0, 3], [0, -3],
+    [2, 2], [2, -2], [-2, 2], [-2, -2],
+  ] as const;
+
+  if (halls === 'columns') {
+    // Anfiteatro do poco: colunas nas diagonais, corredores nos eixos.
+    for (const [dx, dy] of [[2, 2], [2, -2], [-2, 2], [-2, -2]] as const) put(dx, dy, SOLID_ROCK);
+  } else if (halls === 'radial') {
+    // Pilares de cristal nos eixos: cobertura, luz e municao do objetivo.
+    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]] as const) put(dx, dy, SOLID_CRYSTAL);
+  } else if (halls === 'karst') {
+    // Fosso raso: chegar ao poco atravessa a agua — a geografia cobra.
+    for (const [dx, dy] of RING) paint(dx, dy, SURF_WATER);
+  } else if (halls === 'lungs') {
+    // Borda porosa: duas celulas frageis — a camara do poco tambem respira.
+    for (const [dx, dy] of [[3, 0], [-3, 0]] as const) put(dx, dy, SOLID_FRAGILE);
+  } else if (halls === 'canyon') {
+    // Escombros: a camara que desabou em volta do que importava.
+    for (const [dx, dy] of [[3, 0], [-2, 2], [0, -3]] as const) put(dx, dy, SOLID_ROCK);
+  } else if (halls === 'terraced') {
+    // Anel fragil nos eixos: a parede em volta do poco e uma decisao.
+    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]] as const) put(dx, dy, SOLID_FRAGILE);
+  } else if (halls === 'lakes') {
+    // O poco no meio do lago congelado: a aproximacao final desliza.
+    for (const [dx, dy] of RING) paint(dx, dy, SURF_ICE);
+  }
+};
+
 const generateAttempt = (
   seed: number,
   w: number,
@@ -582,6 +644,9 @@ const generateAttempt = (
   const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
   if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
   carveBlob(solid, w, h, corePos.x, corePos.y, 4);
+  // A sala do poco ganha o sotaque do estrato ANTES do re-flood: toda prova
+  // de alcancabilidade abaixo ja enxerga a moldura carimbada.
+  stampCorePedestal(solid, surface, w, h, corePos, profile.halls);
 
   const openCells: number[] = [];
   const reOpen = floodOpen(solid, w, h, entry.x, entry.y);

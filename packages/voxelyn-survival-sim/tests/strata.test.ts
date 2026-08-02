@@ -34,7 +34,7 @@ import { dischargeAt, igniteCell, setSurface, stepCells } from '../src/cells';
 import { impactSolid } from '../src/materials';
 import { surfaceSpeedMul } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { descend } from '../src/sectors';
+import { descend, descentPointOpen } from '../src/sectors';
 import { biomeMix, biomeProfile, lineageOf, sectorBiome } from '../src/strata';
 import { DEFAULT_PROFILE, generateWorld } from '../src/worldgen';
 import type { SectorBiome, SemanticEvent, SurvivalState } from '../src/types';
@@ -240,6 +240,55 @@ describe('perfis por estrato', () => {
     const events: SemanticEvent[] = [];
     descend(live, events);
     expect(live.hallCenters).toEqual(createRun({ seed: 7, sector: 2 }).hallCenters);
+  });
+
+  it('o pedestal do poco tem o sotaque do estrato — e a funcao intacta', () => {
+    const ringOf = (state: SurvivalState): Array<{ x: number; y: number }> =>
+      [
+        [3, 0], [-3, 0], [0, 3], [0, -3],
+        [2, 2], [2, -2], [-2, 2], [-2, -2],
+      ].map(([dx, dy]) => ({ x: state.corePos.x + dx, y: state.corePos.y + dy }));
+
+    // Basalto: colunas nas diagonais do poco (o anfiteatro do objetivo).
+    const basalt = createRun({ seed: 1 });
+    let pillars = 0;
+    for (const [dx, dy] of [[2, 2], [2, -2], [-2, 2], [-2, -2]]) {
+      const x = basalt.corePos.x + dx;
+      const y = basalt.corePos.y + dy;
+      if (x <= 1 || y <= 1 || x >= basalt.config.width - 2 || y >= basalt.config.height - 2) continue;
+      if (basalt.solid[at(basalt, x, y)] !== SOLID_NONE) pillars++;
+    }
+    expect(pillars).toBeGreaterThanOrEqual(3);
+    expect(descentPointOpen(basalt)).toBe(true);
+
+    // Catedral: pilares de CRISTAL nos eixos.
+    const prismatic2 = createRun({ seed: seedWithLineage('mineral'), sector: 2 });
+    let crystal = 0;
+    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
+      const x = prismatic2.corePos.x + dx;
+      const y = prismatic2.corePos.y + dy;
+      if (x <= 1 || y <= 1 || x >= prismatic2.config.width - 2 || y >= prismatic2.config.height - 2) continue;
+      if (prismatic2.solid[at(prismatic2, x, y)] === SOLID_CRYSTAL) crystal++;
+    }
+    expect(crystal).toBeGreaterThanOrEqual(2);
+    expect(descentPointOpen(prismatic2)).toBe(true);
+
+    // Aquifero: fosso raso — agua no anel do poco. Setor 3: no setor 2 o
+    // bolso fungico do Bispo cobre a area do objetivo e engoliria o fosso.
+    const aquifer = createRun({ seed: seedWithLineage('hydric'), sector: 3 });
+    const wet = ringOf(aquifer).filter(
+      (p) => aquifer.surface[at(aquifer, p.x, p.y)] === SURF_WATER,
+    ).length;
+    // >=3 e nao >=8: um poco colado na borda do mapa perde parte do anel para
+    // os guards de moldura e para a limpeza do spawn do Guardiao.
+    expect(wet).toBeGreaterThanOrEqual(3);
+
+    // Cripta: o poco no meio do lago congelado (setor 3 pela mesma razao).
+    const glacial = createRun({ seed: seedWithLineage('cryo'), sector: 3 });
+    const icy = ringOf(glacial).filter(
+      (p) => glacial.surface[at(glacial, p.x, p.y)] === SURF_ICE,
+    ).length;
+    expect(icy).toBeGreaterThanOrEqual(3);
   });
 
   it('as bacias do Aquifero nascem cheias: existe um lago CONECTADO grande', () => {

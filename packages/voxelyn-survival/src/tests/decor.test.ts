@@ -218,6 +218,36 @@ describe('decoracao derivada', () => {
     ).toEqual([]);
   });
 
+  it('a Aurix adapta a infraestrutura ao substrato', () => {
+    // Catedral + Aurix => isoladores ceramicos entre os registros da borda.
+    const prismaticAurix = (() => {
+      for (let s = 1; s < 65536; s++) {
+        for (let sector = 2; sector <= 3; sector++) {
+          const b = sectorBiome(s, sector);
+          if (b.stratum === 'prismatic' && b.occupation === 'aurix') return { seed: s, sector };
+        }
+      }
+      throw new Error('nenhuma seed prismatic+aurix');
+    })();
+    const cathedral = createRun(prismaticAurix);
+    const kinds = new Set(placeDecor(cathedral).map((p) => p.kind));
+    expect(kinds.has('insulator')).toBe(true);
+
+    // Basalto + Aurix (linhagem industrial): o kit base, sem adaptacao — o
+    // isolador e resposta ao cristal, o duto e resposta ao gas/calor.
+    const basaltAurix = (() => {
+      for (let s = 1; s < 65536; s++) {
+        const b = sectorBiome(s, 2);
+        if (b.stratum === 'basalt' && b.occupation === 'aurix') return { seed: s, sector: 2 };
+      }
+      throw new Error('nenhuma seed basalt+aurix');
+    })();
+    const gallery = createRun(basaltAurix);
+    const baseKinds = new Set(placeDecor(gallery).map((p) => p.kind));
+    expect(baseKinds.has('insulator')).toBe(false);
+    expect(baseKinds.has('duct')).toBe(false);
+  });
+
   it('cogumelos so crescem sobre o tapete fungico', () => {
     // A derivacao PURA acha a seed micelial sem construir mundo nenhum;
     // createRun (caro) roda uma unica vez, na seed certa.
