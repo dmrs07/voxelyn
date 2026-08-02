@@ -319,7 +319,7 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent
   // medido ANTES de ela existir: brasa e fogo nao aceitam gas por cima (a
   // celula ja esta ocupada), entao procurar a faisca depois de pintar acharia
   // apenas as celulas que o gas nao pode ter tomado.
-  let heat = -1;
+  const heatCells: number[] = [];
   for (let dy = -r - 1; dy <= r + 1; dy++) {
     for (let dx = -r - 1; dx <= r + 1; dx++) {
       const x = cx + dx;
@@ -327,7 +327,7 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent
       if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
       const i = y * state.config.width + x;
       const surf = state.surface[i];
-      if (surf === SURF_EMBER || surf === SURF_FIRE) heat = i;
+      if (surf === SURF_EMBER || surf === SURF_FIRE) heatCells.push(i);
     }
   }
   for (let dy = -r; dy <= r; dy++) {
@@ -349,8 +349,22 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent
   // detona), e uma fissura de brasa nao propaga fogo sozinha para o gas que
   // apareceu no tick seguinte. A ignicao entra por uma celula so: o resto e a
   // propagacao normal do fogo, que ja existe e ja e orcada.
-  if (heat >= 0 && laid.length > 0) {
-    igniteCell(state, laid[0], events);
+  // A celula que acende tem de ser VIZINHA do calor, e nao a primeira que foi
+  // pintada. Uma parede pode partir a nuvem em duas bolsas: com a brasa ao sul
+  // e `laid[0]` ao norte, o fogo comecava do lado errado da rocha e a bolsa
+  // que realmente encostava no calor ficava intacta. Acender por adjacencia
+  // deixa a propagacao (que so anda por celulas conectadas) fazer o resto.
+  const w = state.config.width;
+  for (const gas of laid) {
+    const touchesHeat = heatCells.some((h) => {
+      const dx = Math.abs((gas % w) - (h % w));
+      const dy = Math.abs(Math.floor(gas / w) - Math.floor(h / w));
+      return dx <= 1 && dy <= 1;
+    });
+    if (touchesHeat) {
+      igniteCell(state, gas, events);
+      break;
+    }
   }
 };
 

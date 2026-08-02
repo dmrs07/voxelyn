@@ -153,6 +153,28 @@ describe('Bombardeiro de Enxofre', () => {
     expect(fire, 'gas pegou fogo sem faisca nenhuma').toBe(0);
   });
 
+  it('parede entre a brasa e a nuvem: acende a bolsa que ENCOSTA no calor', () => {
+    // Uma parede pode partir a nuvem em duas bolsas. Acender sempre a primeira
+    // celula pintada punha fogo do lado ERRADO da rocha — a bolsa que de fato
+    // tocava a brasa ficava intacta, e a propagacao (que so anda por celulas
+    // conectadas) nunca a alcancava.
+    const state = arena(11);
+    for (let x = 28; x <= 36; x++) state.solid[at(state, x, 24)] = SOLID_ROCK;
+    setSurface(state, at(state, 32, 28), SURF_EMBER, 600);
+    const bomber = spawnEnemy(state, 'sulfur_bomber', 32, 26, false);
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+
+    // O fogo tem de nascer ao SUL da parede, onde a brasa esta.
+    let fireSouth = 0;
+    let fireNorth = 0;
+    for (let x = 28; x <= 36; x++) {
+      for (let y = 25; y <= 29; y++) if (state.surface[at(state, x, y)] === SURF_FIRE) fireSouth++;
+      for (let y = 21; y <= 23; y++) if (state.surface[at(state, x, y)] === SURF_FIRE) fireNorth++;
+    }
+    expect(fireSouth, 'a bolsa encostada na brasa nao acendeu').toBeGreaterThan(0);
+    expect(fireNorth, 'fogo nasceu do lado errado da parede').toBe(0);
+  });
+
   it('o Spore Bomber continua deixando esporo: sao bichos diferentes', () => {
     const state = arena(11);
     const bomber = spawnEnemy(state, 'bomber', 32, 25, false);
@@ -164,6 +186,38 @@ describe('Bombardeiro de Enxofre', () => {
       }
     }
     expect(spores).toBeGreaterThan(0);
+  });
+});
+
+describe('bando de assinatura', () => {
+  it('ninguem nasce EMPILHADO: cada membro ganha a propria celula de elemento', () => {
+    // Bug que o proprio tamanho do bando criou: `signatureHome` puxa cada
+    // espreitador para o elemento mais proximo por uma varredura em anel
+    // deterministica, entao dois pontos de spawn vizinhos convergiam para a
+    // MESMA agua/gelo — um sprite, uma hitbox, dois bichos atacando. Com pack
+    // 1 era impossivel; com bando, virou o caso comum.
+    for (const c of [
+      { lineage: 'cryo', sector: 3 },
+      { lineage: 'cryo', sector: 2 },
+      { lineage: 'hydric', sector: 2 },
+      { lineage: 'hydric', sector: 3 },
+    ]) {
+      const state = createRun({ seed: seedWithLineage(c.lineage), sector: c.sector });
+      const seen = new Set<string>();
+      for (const e of state.enemies) {
+        if (e.archetype !== 'frost_wraith' && e.archetype !== 'mud_lamprey') continue;
+        const key = `${e.x},${e.y}`;
+        expect(seen.has(key), `${c.lineage} s${c.sector}: dois ${e.archetype} em ${key}`).toBe(false);
+        seen.add(key);
+      }
+    }
+  });
+
+  it('a seed do achado (1171, setor 3) tambem separa os Espectros', () => {
+    const state = createRun({ seed: 1171, sector: 3 });
+    const wraiths = state.enemies.filter((e) => e.archetype === 'frost_wraith');
+    const spots = new Set(wraiths.map((e) => `${e.x},${e.y}`));
+    expect(spots.size).toBe(wraiths.length);
   });
 });
 

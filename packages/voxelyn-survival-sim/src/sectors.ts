@@ -96,6 +96,7 @@ const signatureHome = (
   signature: EnemyArchetype,
   x: number,
   y: number,
+  taken: Set<number>,
 ): { x: number; y: number } => {
   const wantsWater = signature === 'mud_lamprey';
   const wantsIce = signature === 'frost_wraith';
@@ -111,8 +112,21 @@ const signatureHome = (
         if (nx <= 0 || ny <= 0 || nx >= w - 1 || ny >= h - 1) continue;
         const i = ny * w + nx;
         if (state.solid[i] !== SOLID_NONE) continue;
-        if (wantsWater && isConductiveSurface(state.surface[i])) return { x: nx, y: ny };
-        if (wantsIce && state.surface[i] === SURF_ICE) return { x: nx, y: ny };
+        // Um lago so tem UM dono por celula. Sem esta reserva, dois membros do
+        // mesmo bando cujos pontos de spawn ficam perto convergem para a mesma
+        // agua (a varredura em anel e deterministica e escolhe sempre a mesma
+        // celula) e nascem EMPILHADOS: um sprite, uma hitbox, dois bichos
+        // atacando. Enquanto o pack era 1 isso nao podia acontecer; foi o
+        // bando que criou o caso.
+        if (taken.has(i)) continue;
+        if (wantsWater && isConductiveSurface(state.surface[i])) {
+          taken.add(i);
+          return { x: nx, y: ny };
+        }
+        if (wantsIce && state.surface[i] === SURF_ICE) {
+          taken.add(i);
+          return { x: nx, y: ny };
+        }
       }
     }
   }
@@ -159,6 +173,9 @@ export const populateSector = (
   // lampreia em chao seco nao e um encontro, e um peixe fora d'agua.
   const signature = SIGNATURE_OF_STRATUM[state.stratum] as EnemyArchetype | undefined;
   const signatureIndices = new Set<number>();
+  // Celulas de elemento ja entregues a um membro do bando. Local, como o
+  // `taken` de populateMiners: vale durante a povoacao e nao existe depois.
+  const signatureHomes = new Set<number>();
   if (signature) {
     const pack = SIGNATURE_PACK[signature] ?? 1;
     for (let k = 1; k <= pack; k++) {
@@ -177,7 +194,7 @@ export const populateSector = (
       continue;
     }
     if (signature && signatureIndices.has(i) && i !== eliteIndex) {
-      const home = signatureHome(state, signature, spawns[i].x, spawns[i].y);
+      const home = signatureHome(state, signature, spawns[i].x, spawns[i].y, signatureHomes);
       spawnEnemy(state, signature, home.x, home.y, false);
       continue;
     }
