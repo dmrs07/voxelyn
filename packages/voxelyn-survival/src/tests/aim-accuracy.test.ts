@@ -33,7 +33,11 @@ const angleError = (a: number, b: number): number => {
 const CURSOR_ANGLES = Array.from({ length: 72 }, (_, i) => i * 5);
 
 describe('pontaria: o tiro sai para onde o cursor aponta', () => {
-  it('solo — o projetil segue o cursor em toda a volta', () => {
+  // Timeout proprio pela mesma razao do co-op abaixo: sao 72 createRun (um
+  // por angulo), e o worldgen ficou legitimamente mais caro com a gramatica
+  // de saloes, o pedestal do poco e os seams/nos de minerio. No runner do CI
+  // o teste passou de 5s — e ele mede PONTARIA, nao o preco do worldgen.
+  it('solo — o projetil segue o cursor em toda a volta', { timeout: 20_000 }, () => {
     let worst = 0;
     let total = 0;
     const headings = new Set<string>();
