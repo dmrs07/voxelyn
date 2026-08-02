@@ -60,6 +60,11 @@ export const SURFACE_KINDS = [
   { name: 'ember', frames: 4, frameMs: 260 },
   // Gelo da Cripta Glacial (SURF_ICE = 10): quase estatico; so o reflexo anda.
   { name: 'ice', frames: 2, frameMs: 760 },
+  // Trilhos da operacao (SURF_RAIL = 11 horizontal, SURF_RAIL_V = 12
+  // vertical): dormentes e dois frisos gastos. Estaticos — o que se move
+  // neles e o CARRINHO, e esse e um projetil, nao a crosta.
+  { name: 'rail', frames: 1, frameMs: 0 },
+  { name: 'rail-v', frames: 1, frameMs: 0 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -546,6 +551,35 @@ export const surfaceModel = (kind, variant, frame) => {
         const band = (fx + fy + frame) % FINE_COLS;
         const sparkle = band === 0 && (h & 7) === 0;
         boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, sparkle ? 'electric' : 'ice'));
+      }
+    }
+    return boxes;
+  }
+
+  if (kind === 'rail' || kind === 'rail-v') {
+    // Trilho da operacao: chao nu com DORMENTES atravessados e dois frisos
+    // `rust` continuos meio voxel acima. `rail` corre no eixo X do mundo;
+    // `rail-v` e o mesmo desenho girado — a fisica nao distingue, o olho sim.
+    // Falhas por hash nos frisos: linha morta, gasta, nao trilho novo.
+    const vertical = kind === 'rail-v';
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 61, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, h % 6 === 0 ? 'rockDeep' : 'floor'));
+        const along = vertical ? fy : fx;
+        const across = vertical ? fx : fy;
+        // Dormentes: faixas de osso atravessadas, com folga nas pontas.
+        if (along % 6 < 2 && across >= 2 && across <= FINE_COLS - 3 && h % 11 !== 0) {
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, 'bone'));
+        }
+        // Os dois frisos, por cima de tudo — gastos: falha 1 em 9.
+        if ((across === 4 || across === 11) && h % 9 !== 0) {
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, 'rust'));
+        }
       }
     }
     return boxes;

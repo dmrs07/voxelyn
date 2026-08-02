@@ -1,6 +1,8 @@
 import { RNG } from '@voxelyn/core';
 import {
   CHUNK,
+  RAIL_TRACK_MAX,
+  RAIL_TRACK_MIN,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_NONE,
@@ -11,6 +13,8 @@ import {
   SURF_FUNGAL,
   SURF_ICE,
   SURF_NONE,
+  SURF_RAIL,
+  SURF_RAIL_V,
   SURF_SCORCHED,
   SURF_WATER,
   WORLD_W,
@@ -71,6 +75,11 @@ export type WorldgenProfile = {
   coalBlobs: SurfaceBlobSpec;
   /** Quantos respiradouros de gas o setor tenta posicionar. */
   ventCount: number;
+  /**
+   * Tramos de TRILHO da armadilha de carrinho (SURF_RAIL). So a operacao os
+   * deixou: Aurix e o Ferrifero. Zero em todo estrato intocado.
+   */
+  railTracks: number;
   /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
   minerCap: number;
   /**
@@ -112,6 +121,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   emberBlobs: { count: 0, rMin: 0, rMax: 0 },
   coalBlobs: { count: 0, rMin: 0, rMax: 0 },
   ventCount: 6,
+  railTracks: 0,
   minerCap: 3,
   halls: 'none',
 };
@@ -126,6 +136,8 @@ export type GeneratedWorld = {
   ventPositions: Vec2[];
   enemySpawns: Vec2[];
   openCells: number[];
+  /** Tramos de trilho da armadilha de carrinho (origem, direcao, tamanho). */
+  railTracks: Array<{ x: number; y: number; dx: number; dy: number; len: number }>;
   /**
    * Centros dos SALOES que a gramatica espacial carimbou — o anfiteatro, a
    * rotunda, a cupula. E informacao de APRESENTACAO: a simulacao nao le isto
@@ -830,6 +842,34 @@ const generateAttempt = (
     }
   }
 
+  // 5b) TRILHOS da operacao: tramos retos sobre chao nu, longe da entrada e
+  // do poco. So marcam superficie (SURF_RAIL) — a topologia nao muda, e com
+  // count 0 nenhuma tirada de RNG acontece (todo estrato intocado).
+  const railTracks: GeneratedWorld['railTracks'] = [];
+  for (let t = 0; t < profile.railTracks; t++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const cell = openArr[rng.nextInt(openArr.length)];
+      const x0 = cell % w;
+      const y0 = Math.floor(cell / w);
+      const horizontal = rng.nextFloat01() < 0.5;
+      const dx = horizontal ? 1 : 0;
+      const dy = horizontal ? 0 : 1;
+      const fits = (x: number, y: number): boolean =>
+        x > 1 && y > 1 && x < w - 2 && y < h - 2 &&
+        solid[idx(w, x, y)] === SOLID_NONE &&
+        surface[idx(w, x, y)] === SURF_NONE &&
+        Math.hypot(x - entry.x, y - entry.y) > 6 &&
+        Math.hypot(x - corePos.x, y - corePos.y) > 6;
+      let len = 0;
+      while (len < RAIL_TRACK_MAX && fits(x0 + dx * len, y0 + dy * len)) len++;
+      if (len < RAIL_TRACK_MIN) continue;
+      const surf = dx === 1 ? SURF_RAIL : SURF_RAIL_V;
+      for (let k = 0; k < len; k++) surface[idx(w, x0 + dx * k, y0 + dy * k)] = surf;
+      railTracks.push({ x: x0, y: y0, dx, dy, len });
+      break;
+    }
+  }
+
   // 6) pontos de interesse sobre celulas abertas e distantes da entrada
   const pickOpenFar = (minDist: number, minGap: number, taken: Vec2[]): Vec2 | null => {
     for (let attempts = 0; attempts < 400; attempts++) {
@@ -933,6 +973,7 @@ const generateAttempt = (
     ventPositions,
     enemySpawns,
     openCells,
+    railTracks,
     hallCenters: hallFill.hallCenters,
   };
 };

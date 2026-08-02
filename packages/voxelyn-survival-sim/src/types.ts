@@ -363,7 +363,7 @@ export type PlayerExtra = {
  * rampa acida — um bloco de rocha arrancado da parede aparecia como cusparada.
  * As flags dizem o que o projetil FAZ; isto diz o que ele E.
  */
-export type ProjectileKind = 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker';
+export type ProjectileKind = 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart';
 
 export type ProjectileModules = {
   piercing?: true;
@@ -415,6 +415,23 @@ export type SalvageSite = {
   openedBySlot: number | null;
 };
 export type Vent = { x: number; y: number; nextEmitAt: number };
+
+/**
+ * Um tramo de trilho da armadilha de carrinho. Posicao/direcao/comprimento
+ * vem do worldgen (derivaveis da seed, como os vents); `readyAt`/`firingAt`
+ * sao o relogio da armadilha e `fromEnd` guarda de que ponta o carrinho vem
+ * (decidido no gatilho: o lado LONGE de quem pisou).
+ */
+export type RailTrack = {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  len: number;
+  readyAt: number;
+  firingAt: number;
+  fromEnd: 0 | 1;
+};
 
 export type SemanticEvent =
   | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
@@ -489,6 +506,13 @@ export type SemanticEvent =
    * divergiriam no primeiro ajuste de tabela.
    */
   | { t: 'sector_entered'; sector: number; final: boolean; stratum: StratumId; occupation: OccupationId }
+  /**
+   * O TELEGRAFO da armadilha de carrinho: pisar num tramo armado anuncia o
+   * carrinho CART_WINDUP_TICKS antes de ele existir. O evento carrega o tramo
+   * inteiro (origem, direcao, comprimento) para o cliente iluminar a LINHA —
+   * o aviso util nao e "algo vem ai", e "saia DESTA faixa".
+   */
+  | { t: 'cart_warning'; x: number; y: number; dx: number; dy: number; len: number }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }
@@ -605,6 +629,8 @@ export type SurvivalState = {
    */
   wellOffers: WellOffer[];
   vents: Vent[];
+  /** Tramos da armadilha de carrinho. Vazio fora da operacao (Aurix/ferric). */
+  railTracks: RailTrack[];
   /**
    * Centros dos saloes carimbados pela gramatica espacial do estrato.
    *

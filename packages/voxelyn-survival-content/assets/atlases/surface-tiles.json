@@ -1,6 +1,6 @@
 {
   "id": "surface-tiles",
-  "version": 5,
+  "version": 6,
   "atlas": "surface-tiles.png",
   "frameWidth": 64,
   "frameHeight": 76,
@@ -62,6 +62,16 @@
       "name": "ice",
       "frames": 2,
       "frameMs": 760
+    },
+    {
+      "name": "rail",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "rail-v",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "variants": 3,

@@ -394,6 +394,23 @@ pedrinhas/cacos (onde a silhueta basta) e do teto translúcido.
 toda-escura e não pode ser volume (só fresta); chapéu baixo achata o
 cogumelo em panqueca na projeção 2:1.
 
+## Décima oitava etapa (implementada): a armadilha de carrinho
+
+Os trilhos deixam de ser só decoração: a operação (Aurix e Ferrífero) deixa
+**tramos autoritativos** (`SURF_RAIL` 11 horizontal / `SURF_RAIL_V` 12
+vertical — ids próprios só pela crosta orientada; para a física são o mesmo
+trilho INERTE: não conduz, não queima, não retarda). Pisar num tramo armado
+dispara o telegrafo (`cart_warning`, 1,2 s — a linha inteira pulsa em
+laranja de perigo, sobre o véu e sem corte de luz: morte anunciada não
+negocia com a escuridão) e então um **carrinho de mineração** desgovernado
+atravessa o tramo vindo do lado LONGE de quem pisou. O carrinho é um
+projétil hostil comum (`kind: 'cart'`) com duas exceções: não morre ao
+atropelar (segue até a parede) e atropela INIMIGO também — física não
+escolhe lado, e a armadilha vira ferramenta de quem aprender a posicioná-la.
+Depois do disparo o tramo descansa (`CART_COOLDOWN_TICKS`). Crostas no
+atlas de superfícies (v6), carrinho desenhado em runtime (orientação vem da
+velocidade). Viaja na `SIMULATION_VERSION` 16 e `CONTENT_VERSION` 14.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;

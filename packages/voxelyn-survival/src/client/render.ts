@@ -20,6 +20,10 @@ import {
   SURF_WATER,
   SURF_EMBER,
   SURF_ICE,
+  SURF_RAIL,
+  SURF_RAIL_V,
+  CART_WINDUP_TICKS,
+  TICK_HZ,
   LURKER_HIDDEN,
   ABILITY_RADIUS,
   HEAT_MAX,
@@ -43,7 +47,7 @@ import { HEAT_WARN_AT } from './audio/ambience';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
-import { drawVoxel, type FaceRamp } from './voxel-draw';
+import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { abilityPresentation } from './ability-presentation';
@@ -132,6 +136,8 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_WATER]: 8,
   [SURF_EMBER]: 9,
   [SURF_ICE]: 10,
+  [SURF_RAIL]: 11,
+  [SURF_RAIL_V]: 12,
 };
 
 /**
@@ -158,6 +164,10 @@ const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_EMBER]: '#b3541e',
   // Gelo: o cinza-azulado palido da paleta (mist).
   [SURF_ICE]: '#7b8ba3',
+  // Trilho: ferrugem — o jogador precisa ver a LINHA mesmo sem atlas,
+  // porque pisar nela arma a armadilha.
+  [SURF_RAIL]: '#6e4a33',
+  [SURF_RAIL_V]: '#6e4a33',
 };
 
 /**
@@ -754,6 +764,8 @@ export class SurvivalRenderer {
   private readonly lurkerTrails = new Map<number, LurkerTrail>();
   /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
   private rupture: { x: number; y: number } | null = null;
+  /** Telegrafos vivos da armadilha de carrinho (a LINHA que vai ser varrida). */
+  private cartWarnings: Array<{ x: number; y: number; dx: number; dy: number; len: number; untilMs: number }> = [];
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -860,6 +872,16 @@ export class SurvivalRenderer {
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
     this.presentation.ingest(events, nowMs);
+    for (const ev of events) {
+      // O telegrafo da armadilha: guarda o tramo pelo tempo EXATO do aviso
+      // autoritativo — quando a luz apaga, o carrinho existe.
+      if (ev.t === 'cart_warning') {
+        this.cartWarnings.push({
+          x: ev.x, y: ev.y, dx: ev.dx, dy: ev.dy, len: ev.len,
+          untilMs: nowMs + (CART_WINDUP_TICKS * 1000) / TICK_HZ,
+        });
+      }
+    }
     // As particulas nascem dos MESMOS eventos autoritativos que os FX antigos.
     // O cliente nunca decide que houve explosao — so a desenha.
     this.particles.budget = this.quality.maxFx * 2;
@@ -1886,6 +1908,21 @@ export class SurvivalRenderer {
       items.push({
         depth: proj.x + proj.y,
         draw: () => {
+          // O CARRINHO nao e um tiro: e um corpo. Caixa de ferrugem sobre
+          // rodas escuras, com sombra — desenhado em runtime porque a
+          // orientacao vem da velocidade e o resto do jogo ja faz voxel vivo
+          // assim (particulas, projeteis).
+          if (proj.kind === 'cart') {
+            const [csx, csy] = toScreen(proj.x, proj.y);
+            drawGroundShadow(ctx, csx, csy, 7 * z);
+            const horizontal = Math.abs(proj.vx) >= Math.abs(proj.vy);
+            const wob = Math.sin(nowMs / 45) * z * 0.5;
+            drawVoxel(ctx, csx - (horizontal ? 4 : 2) * z, csy + wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
+            drawVoxel(ctx, csx + (horizontal ? 4 : 2) * z, csy - wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
+            drawVoxel(ctx, csx, csy - 3 * z + wob, 9 * z, ['#6e4a33', '#3d2a22', '#1d2430']);
+            drawVoxel(ctx, csx, csy - 6 * z + wob, 7 * z, ['#46566e', '#2e3a4d', '#1d2430']);
+            return;
+          }
           this.projectileView.draw(ctx, view, toScreen, z, TILE_H);
         },
       });
@@ -1973,6 +2010,34 @@ export class SurvivalRenderer {
     // A luz ambiente do estrato entra AQUI: por cima do mundo e das criaturas,
     // por baixo de particulas, numeros de dano e HUD.
     drawBiomeVeil(ctx, state.stratum, vw, vh);
+
+    // O TELEGRAFO DO CARRINHO: a linha inteira do tramo pulsa em laranja de
+    // perigo durante o aviso. SOBRE o veu e SEM corte de luz: morte anunciada
+    // nao negocia com a atmosfera nem com a escuridao — o aviso e a unica
+    // coisa que o jogador precisa ver naquele segundo.
+    this.cartWarnings = this.cartWarnings.filter((warn) => warn.untilMs > nowMs);
+    for (const warn of this.cartWarnings) {
+      const pulse = 0.3 + 0.4 * Math.abs(Math.sin(nowMs / 90));
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 122, 47, ${pulse.toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, z);
+      for (let k = 0; k < warn.len; k++) {
+        const wx = warn.x + warn.dx * k;
+        const wy = warn.y + warn.dy * k;
+        const [wsx, wsy] = toScreen(wx + 0.5, wy + 0.5);
+        if (wsx < -40 || wsx > vw + 40 || wsy < -40 || wsy > vh + 40) continue;
+        const hw = (TILE_W / 2) * z;
+        const hh = (TILE_H / 2) * z;
+        ctx.beginPath();
+        ctx.moveTo(wsx, wsy - hh);
+        ctx.lineTo(wsx + hw, wsy);
+        ctx.lineTo(wsx, wsy + hh);
+        ctx.lineTo(wsx - hw, wsy);
+        ctx.closePath();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // A RUPTURA A SUPERFICIE: no setor raro em que o teto rachou ate o ceu,
     // um feixe de luz de dia desce inclinado sobre o salao e abre uma poca

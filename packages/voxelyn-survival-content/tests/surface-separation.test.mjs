@@ -18,6 +18,8 @@ describe('contrato visual das materias organicas e volateis', () => {
       'water',
       'ember',
       'ice',
+      'rail',
+      'rail-v',
     ]);
   });
 

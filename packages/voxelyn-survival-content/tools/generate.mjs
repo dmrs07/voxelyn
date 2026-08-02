@@ -205,7 +205,9 @@ const buildSurfaces = () => {
     id: 'surface-tiles',
     // 5: segunda leva de estratos — fissura incandescente da Fornalha
     // (SURF_EMBER) e gelo da Cripta Glacial (SURF_ICE), no fim da lista.
-    version: 5,
+    // 6: trilhos da operacao (SURF_RAIL 11 horizontal, SURF_RAIL_V 12
+    // vertical) — a crosta da armadilha de carrinho.
+    version: 6,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,

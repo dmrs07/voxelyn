@@ -229,6 +229,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     emberBlobs: { count: 0, rMin: 0, rMax: 0 },
     coalBlobs: { count: 0, rMin: 0, rMax: 0 },
     ventCount: 6,
+    railTracks: 0,
     minerCap: MINER_PER_SECTOR,
     halls: 'none',
   };
@@ -303,6 +304,8 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     profile.oreChance = 0.12 + depth * 0.02;
     profile.oreSeams = 5;
     profile.oreKnots = 3;
+    // Os trilhos que levavam o minerio: a linha morreu, a armadilha ficou.
+    profile.railTracks = 3;
     profile.halls = 'canyon';
     profile.crystalChance = 0.02;
     profile.fragileThinChance = 0.45;
@@ -344,6 +347,8 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // max, nao atribuicao: o Ferrifero ja poe MINER_PER_SECTOR + 3 e a
     // cicatriz nao pode REBAIXAR a densidade do lugar que a justificou.
     profile.minerCap = Math.max(profile.minerCap, MINER_PER_SECTOR + 2);
+    // A cicatriz deixou trilhos onde quer que tenha operado.
+    profile.railTracks = Math.max(profile.railTracks, 2);
   }
 
   return profile;

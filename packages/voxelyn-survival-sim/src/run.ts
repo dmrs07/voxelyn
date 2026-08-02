@@ -56,6 +56,13 @@ import {
   SURF_FIRE,
   SURF_ICE,
   ICE_GLIDE,
+  SURF_RAIL,
+  SURF_RAIL_V,
+  CART_SPEED,
+  CART_DAMAGE,
+  CART_WINDUP_TICKS,
+  CART_COOLDOWN_TICKS,
+  CART_RADIUS,
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
   SURF_SCORCHED,
@@ -274,6 +281,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
       openedBySlot: null,
     })),
     vents: world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 })),
+    railTracks: world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const })),
     hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
@@ -320,6 +328,67 @@ export const nearestStandingPlayer = (state: SurvivalState, x: number, y: number
 
 const cellIndexAt = (state: SurvivalState, x: number, y: number): number =>
   Math.floor(y) * state.config.width + Math.floor(x);
+
+/**
+ * A ARMADILHA DE CARRINHO: pisar num tramo armado dispara o telegrafo; no
+ * fim do telegrafo um carrinho desgovernado atravessa o tramo vindo do lado
+ * LONGE de quem pisou. O carrinho e um projetil hostil comum (kind 'cart') —
+ * anda, colide com parede e entra no hash como qualquer outro — com duas
+ * excecoes no laco de projeteis: nao morre ao atropelar (segue ate o fim da
+ * linha) e atropela INIMIGO tambem, porque fisica nao escolhe lado.
+ */
+const stepRailCarts = (state: SurvivalState, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  for (const track of state.railTracks) {
+    if (track.firingAt > 0) {
+      if (state.tick >= track.firingAt) {
+        const tail = track.fromEnd === 1;
+        const sx = tail ? track.x + track.dx * (track.len - 1) : track.x;
+        const sy = tail ? track.y + track.dy * (track.len - 1) : track.y;
+        const dir = tail ? -1 : 1;
+        state.projectiles.push({
+          kind: 'cart',
+          id: state.nextEntityId++,
+          owner: -1,
+          x: sx + 0.5,
+          y: sy + 0.5,
+          vx: track.dx * dir * CART_SPEED,
+          vy: track.dy * dir * CART_SPEED,
+          damage: CART_DAMAGE,
+          radius: CART_RADIUS,
+          hostile: true,
+          leavesBiofluid: false,
+          distanceTravelled: 0,
+          // Ate o fim do tramo + folga; a parede no fim mata antes na pratica.
+          ttl: Math.ceil(((track.len + 2) / CART_SPEED) * TICK_HZ),
+          hits: [],
+        });
+        track.firingAt = 0;
+        track.readyAt = state.tick + CART_COOLDOWN_TICKS;
+      }
+      continue;
+    }
+    if (state.tick < track.readyAt) continue;
+    for (const player of standingPlayers(state)) {
+      const px = Math.floor(player.x);
+      const py = Math.floor(player.y);
+      const underfoot = state.surface[py * w + px];
+      if (underfoot !== SURF_RAIL && underfoot !== SURF_RAIL_V) continue;
+      const on =
+        track.dx === 1
+          ? py === track.y && px >= track.x && px < track.x + track.len
+          : px === track.x && py >= track.y && py < track.y + track.len;
+      if (!on) continue;
+      const along = track.dx === 1 ? px - track.x : py - track.y;
+      // O carrinho vem do lado LONGE: maximo de linha para atravessar — e de
+      // tempo de aviso util para quem pisou.
+      track.fromEnd = along * 2 < track.len ? 1 : 0;
+      track.firingAt = state.tick + CART_WINDUP_TICKS;
+      events.push({ t: 'cart_warning', x: track.x, y: track.y, dx: track.dx, dy: track.dy, len: track.len });
+      break;
+    }
+  }
+};
 
 const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void => {
   const targets = [...joinedPlayers(state), ...state.enemies];
@@ -1303,6 +1372,19 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           if (!extra.joined || !player.alive || extra.downed) continue;
           const projectileRadius = proj.radius ?? 0.2;
           if (Math.hypot(player.x - proj.x, player.y - proj.y) < player.radius + projectileRadius) {
+            // O CARRINHO atropela e SEGUE: nao morre no impacto (a linha
+            // continua ate a parede) e cada corpo so paga uma vez (hits).
+            if (proj.kind === 'cart') {
+              if (proj.hits?.includes(player.id)) continue;
+              proj.hits?.push(player.id);
+              damageEntity(state, player, proj.damage, events, {
+                kind: 'enemy_projectile',
+                archetype: 'miner',
+                elite: false,
+                projectile: proj.kind,
+              });
+              continue;
+            }
             const vulnerable = extra.iframesUntil <= state.tick;
             // O dono do projetil pode ja ter morrido antes de a pedra chegar —
             // o telegrafo dura 0,8 s e o voo, mais. Sem o dono, o arquetipo sai
@@ -1325,6 +1407,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           }
         }
         if (dead) break;
+        // Fisica nao escolhe lado: o carrinho atropela INIMIGO tambem — a
+        // armadilha da operacao vira ferramenta de quem aprender a posiciona-la.
+        if (proj.kind === 'cart') {
+          for (const enemy of state.enemies) {
+            if (!enemy.alive) continue;
+            if (proj.hits?.includes(enemy.id)) continue;
+            if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2)) continue;
+            proj.hits?.push(enemy.id);
+            damageEntity(state, enemy, proj.damage, events, {
+              kind: 'enemy_projectile',
+              archetype: 'miner',
+              elite: false,
+              projectile: proj.kind,
+            });
+          }
+        }
       } else {
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
@@ -1520,6 +1618,11 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
       if (hasStandingAlly) {
         // co-op: entra em estado abatido, revivel pelo parceiro
         e.downed = true;
+        // O corpo PARA ao cair: sem isto, vx/vy congelam com o valor do tick
+        // anterior e a inercia do gelo consumiria esse embalo velho segundos
+        // depois, no revive — o revivido deslizando sozinho na direcao antiga.
+        p.vx = 0;
+        p.vy = 0;
         e.bleedoutAt = state.tick + BLEEDOUT_TICKS;
         state.stats.timesDowned += 1;
         events.push({
@@ -1644,6 +1747,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepProjectiles(state, events);
   updateEnemies(state, events);
   stepCells(state, events);
+  stepRailCarts(state, events);
   applyCellHazards(state, events);
   stepContamination(state, events);
   payOreQuota(state, events);

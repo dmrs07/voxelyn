@@ -33,7 +33,11 @@ export const PROTOCOL_VERSION = 11;
 // Ainda em 16 (mesma leva, nunca lancada separada): o ESTRATO FERRIFERO —
 // a linhagem industrial re-trilhada (basalto -> ferrifero -> ferrifero),
 // seams + nos de minerio, minerCap alto e conducao por parede
-// (FERRIC_VEIN_SCALE) — e o pedestal do poco por estrato no worldgen.
+// (FERRIC_VEIN_SCALE) — e o pedestal do poco por estrato no worldgen. E a
+// ARMADILHA DE CARRINHO: tramos SURF_RAIL/SURF_RAIL_V no worldgen da
+// operacao (Aurix/ferrifero), gatilho por pisada com telegrafo
+// (cart_warning) e o carrinho como projetil hostil (kind 'cart') que
+// atropela jogador E bicho sem morrer no impacto.
 export const SIMULATION_VERSION = 16;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
@@ -42,7 +46,9 @@ export const SIMULATION_VERSION = 16;
 // 13: props decorativos VOLUMETRICOS viram modelos voxel no atlas
 // world-props (v3, kinds decor:<kind>:<variante>) — fumarolas, monolitos e
 // a broca deixam o desenho de runtime (que vira fallback).
-export const CONTENT_VERSION = 13;
+// 14: crostas dos TRILHOS da operacao (surface-tiles v6: rail e rail-v) —
+// o chao da armadilha de carrinho.
+export const CONTENT_VERSION = 14;
 
 export type VersionTriple = {
   protocolVersion: number;
