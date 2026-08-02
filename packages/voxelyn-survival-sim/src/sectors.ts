@@ -303,6 +303,8 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.charges = [];
   state.reactionQueue = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
+  state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
+  state.hallCenters = world.hallCenters;
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
@@ -368,6 +370,109 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
     final: isFinalSector(state.sector),
     stratum: state.stratum,
     occupation: state.occupation,
+  });
+};
+
+/**
+ * A SUBIDA do caminho de volta: com o Nucleo na mao, o contrato so fecha na
+ * plataforma do SETOR 1 — e cada setor tem de ser atravessado de novo, ao
+ * contrario: chega-se pelo POCO (por onde se desceu) e sai-se pela ENTRADA.
+ *
+ * O setor e regenerado da MESMA seed derivada da descida: o mapa e identico
+ * ao que o jogador atravessou (mesma geografia, mesmos trilhos), mas o Veio
+ * nao ficou esperando — a fauna repovoou, os sites de salvage rearmaram, e a
+ * contaminacao NAO alivia na subida (descer alivia; subir e a conta
+ * chegando). Populacao identica a de createRun({sector}) pela mesma razao de
+ * sempre: reconexao e replay reconstroem o mesmo mundo.
+ */
+export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
+  const width = state.config.width;
+  const height = state.config.height;
+  state.sector -= 1;
+  state.sectorStartedAt = state.tick;
+
+  const biome = sectorBiome(state.config.seed, state.sector);
+  state.stratum = biome.stratum;
+  state.occupation = biome.occupation;
+  state.lineage = biome.lineage;
+  const world = generateWorld(
+    sectorSeed((state.config.seed ^ RUN_SEED_MIX) >>> 0, state.sector),
+    width,
+    height,
+    biomeProfile(biome, state.sector),
+  );
+
+  state.solid = world.solid;
+  state.surface = world.surface;
+  state.surfaceTimer = new Uint16Array(width * height);
+  state.entry = world.entry;
+  state.corePos = world.corePos;
+  for (let i = 0; i < state.chunkVersion.length; i++) state.chunkVersion[i] += 1;
+
+  state.enemies = [];
+  state.projectiles = [];
+  state.charges = [];
+  state.reactionQueue = [];
+  state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
+  state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
+  state.hallCenters = world.hallCenters;
+  state.salvageSites = world.salvageSites.map((site) => ({
+    ...site,
+    terminalState: 'inactive' as const,
+    scanEndsAt: 0,
+    cacheRevealed: false,
+    cacheOpened: false,
+    openedBySlot: null,
+  }));
+
+  // Na subida o poco nao oferece nada — e a ressonancia acumulada FICA: o
+  // caminho de volta e a prova do estilo com que se desceu, nao um recomeco.
+  state.wellOffers = [];
+
+  state.guardianAwake = false;
+  state.guardianSummoned = false;
+  state.arenaClosed = false;
+  state.arenaBarrierCells = [];
+  state.guardianPath = [];
+  state.guardianPathAt = -1000;
+  // Os jogadores emergem no POCO, fundo do mapa: a zona de entrada ja esta
+  // longe, entao a saida (subir de novo, ou extrair no setor 1) nasce armada.
+  state.leftEntryZone = true;
+
+  const offsets = [
+    { x: 0.5, y: 0.5 },
+    { x: 1.5, y: 0.5 },
+  ];
+  for (let slot = 0; slot < state.players.length; slot++) {
+    const player = state.players[slot];
+    const extra = state.playerExtras[slot];
+    const offset = offsets[slot] ?? offsets[0];
+    player.x = world.corePos.x + offset.x;
+    player.y = world.corePos.y + offset.y;
+    player.vx = 0;
+    player.vy = 0;
+    player.stunnedUntil = 0;
+    player.alertedUntil = 0;
+    player.action = undefined;
+    if (extra.downed && player.alive) {
+      extra.downed = false;
+      player.hp = Math.max(player.hp, Math.floor(player.maxHp * 0.35));
+    }
+    extra.heat = 0;
+    extra.overheatedUntil = 0;
+    extra.dodgeUntil = 0;
+    extra.iframesUntil = 0;
+    extra.pendingModuleChoice = null;
+  }
+
+  populateSector(state, world.enemySpawns, world.guardianSpawn);
+  events.push({
+    t: 'sector_entered',
+    sector: state.sector,
+    final: isFinalSector(state.sector),
+    stratum: state.stratum,
+    occupation: state.occupation,
+    ascending: true,
   });
 };
 

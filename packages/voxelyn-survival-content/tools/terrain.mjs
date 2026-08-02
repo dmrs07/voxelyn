@@ -63,6 +63,7 @@ export const BLOCK_KINDS = [
   'rockFurnace',
   'rockSilica',
   'rockGlacial',
+  'rockFerric',
 ];
 
 const hash2 = (x, y, seed) => {
@@ -155,6 +156,15 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
     if (cz >= top - 2) return 'ice';
     if ((h >>> 3) % 9 === 0) return 'ice';
     if ((h >>> 6) % 12 === 0) return 'ice';
+  } else if (kind === 'rockFerric') {
+    // Ferrifero: pedra escura riscada de OXIDO em bandas horizontais — a
+    // ferrugem segue a camada, como o minerio do estrato. Sem 'loot': o ouro
+    // metalico e exclusivo do veio minerauvel, e a parede comum do lugar mais
+    // rico do Veio nao pode fingir que rende.
+    const band = Math.floor(cz / 2) % 3;
+    if (h % 3 === 0) return 'rockDeep';
+    if (band === 0 && (h >>> 3) % (surface ? 4 : 6) === 0) return 'rust';
+    if ((h >>> 6) % 12 === 0) return 'scorch';
   }
   return base;
 };

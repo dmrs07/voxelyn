@@ -358,6 +358,7 @@ export const PT_BR = {
   'biome.stratum.furnace': 'FORNALHA ABISSAL',
   'biome.stratum.silica': 'SUMIDOUROS DE SÍLICA',
   'biome.stratum.glacial': 'CRIPTA GLACIAL',
+  'biome.stratum.ferric': 'ESTRATO FERRÍFERO',
   'biome.occupation.mycelial': 'MATRIZ MICELIAL',
   'biome.occupation.aurix': 'CICATRIZ AURIX',
 
@@ -379,7 +380,8 @@ export const PT_BR = {
   'sim.partnerRevived': 'Parceiro revivido.',
   'sim.reviveBeforeDescend': 'Revele o parceiro abatido antes de descer.',
   'sim.waitAtShaft': 'Aguarde todos no poço para descer.',
-  'sim.coreTaken': 'Núcleo extraído. O Veio despertou — volte para a entrada!',
+  'sim.coreTaken': 'Núcleo extraído. O Veio despertou — volte à superfície, setor por setor!',
+  'sim.wellSealedReturn': 'O poço selou. A saída é por onde você entrou.',
   'sim.reviveBeforeExtract': 'Revele o parceiro abatido antes de extrair.',
   'sim.waitAtExit': 'Aguarde todos na saída para extrair.',
   'sim.contaminationRising': 'O Veio se agita — a contaminação aumenta.',

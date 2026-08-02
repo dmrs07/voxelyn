@@ -59,13 +59,17 @@ describe('fluxo da run', () => {
     expect(state.playerExtra.hasCore).toBe(true);
     expect(result.events.some((e) => e.t === 'pickup_core')).toBe(true);
 
+    // REGRA NOVA da extracao de retorno: com o Nucleo, a entrada do setor
+    // final nao extrai — SOBE. A vitoria mora na plataforma do setor 1
+    // (o contrato completo esta em return-extraction.test.ts).
     state.player.x = state.entry.x + 0.5;
     state.player.y = state.entry.y + 0.5;
     state.playerExtra.iframesUntil = state.tick + 10; // ignora dano de contato no teste
     const extract = emptyCommand();
     extract.interact = true;
     stepRun(state, [extract]);
-    expect(state.phase).toBe('extracted_with_core');
+    expect(state.phase).toBe('running');
+    expect(state.sector).toBe(SECTOR_COUNT - 1);
   });
 
   it('cofre abre uma unica vez e a escolha privada aplica exatamente um modulo', () => {

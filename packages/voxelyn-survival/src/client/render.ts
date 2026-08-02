@@ -20,6 +20,9 @@ import {
   SURF_WATER,
   SURF_EMBER,
   SURF_ICE,
+  SURF_RAIL,
+  SURF_RAIL_V,
+  CANARY_DEAD_AT,
   LURKER_HIDDEN,
   ABILITY_RADIUS,
   HEAT_MAX,
@@ -43,7 +46,7 @@ import { HEAT_WARN_AT } from './audio/ambience';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
-import { drawVoxel, type FaceRamp } from './voxel-draw';
+import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { abilityPresentation } from './ability-presentation';
@@ -57,8 +60,10 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
-import { placeDecor, propStillValid, type DecorativeProp } from './decor';
-import { drawDecorProp } from './decor-draw';
+import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
+import { CEILING_ALPHA, decorAtlasName, drawDecorProp } from './decor-draw';
+import { drawWallEdgeDetail } from './edge-detail';
+import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
 import { t } from './i18n';
 import {
   deathEchoReadout,
@@ -106,6 +111,7 @@ const STRATUM_ROCK_KIND = {
   furnace: 11,
   silica: 12,
   glacial: 13,
+  ferric: 14,
 } as const satisfies Record<StratumId, number>;
 
 /** Indice do bloco no atlas, dado o solido e o estrato do setor. */
@@ -129,6 +135,8 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_WATER]: 8,
   [SURF_EMBER]: 9,
   [SURF_ICE]: 10,
+  [SURF_RAIL]: 11,
+  [SURF_RAIL_V]: 12,
 };
 
 /**
@@ -155,6 +163,10 @@ const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_EMBER]: '#b3541e',
   // Gelo: o cinza-azulado palido da paleta (mist).
   [SURF_ICE]: '#7b8ba3',
+  // Trilho: ferrugem — o jogador precisa ver a LINHA mesmo sem atlas,
+  // porque pisar nela arma a armadilha.
+  [SURF_RAIL]: '#6e4a33',
+  [SURF_RAIL_V]: '#6e4a33',
 };
 
 /**
@@ -173,6 +185,7 @@ const STRATUM_LABEL_KEY = {
   furnace: 'biome.stratum.furnace',
   silica: 'biome.stratum.silica',
   glacial: 'biome.stratum.glacial',
+  ferric: 'biome.stratum.ferric',
 } as const satisfies Record<StratumId, string>;
 
 const OCCUPATION_LABEL_KEY = {
@@ -215,6 +228,8 @@ const BIOME_VEIL = {
   furnace: { color: '#ff7a2f', alpha: 0.13 },
   silica: { color: '#b8a98f', alpha: 0.14 },
   glacial: { color: '#9fc2e8', alpha: 0.17 },
+  // Ferrifero: oxido — quente e metalico, distinto do laranja vivo da Fornalha.
+  ferric: { color: '#b3541e', alpha: 0.12 },
 } as const satisfies Record<StratumId, { color: string; alpha: number } | null>;
 
 const drawBiomeVeil = (
@@ -522,6 +537,46 @@ const drawLurkerDisturbance = (
 };
 
 /**
+ * Uma PEGADA do rastro de espreitador (ver lurker-trail.ts): a versao que
+ * desbota da perturbacao viva. Na agua, um anel que se abre e dissipa; no
+ * gelo, duas rachaduras FIXAS que so perdem contraste — rachadura nao
+ * desfaz. A geometria sai da posicao quantizada da pegada: as duas maquinas
+ * de um co-op desenham o mesmo risco no mesmo lugar.
+ */
+const drawLurkerTrailPoint = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  age: number,
+  inWater: boolean
+): void => {
+  const fade = 1 - age;
+  if (fade <= 0) return;
+  if (inWater) {
+    const r = size * (0.45 + age * 1.3);
+    ctx.strokeStyle = `rgba(122,184,255,${(0.26 * fade).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, z * 0.8);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    return;
+  }
+  const seed = (Math.imul(Math.round(sx * 3) + Math.imul(Math.round(sy * 3), 131), 2654435761) >>> 0) % 628;
+  ctx.strokeStyle = `rgba(123,139,163,${(0.42 * fade).toFixed(3)})`;
+  ctx.lineWidth = Math.max(1, z * 0.8);
+  for (let c = 0; c < 2; c++) {
+    const angle = ((seed + c * 271) % 628) / 100;
+    const len = size * (0.7 + c * 0.35);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len * 0.5);
+    ctx.stroke();
+  }
+};
+
+/**
  * O visor do parceiro: a luz que sobra dele quando o corpo apaga.
  *
  * Desenhado SEMPRE, iluminado ou nao. Sob a luz ele e um acento que separa o
@@ -704,6 +759,10 @@ export class SurvivalRenderer {
   /** Decoracao do setor atual, derivada por seed. Ver decor.ts. */
   private decor: DecorativeProp[] = [];
   private decorKey = '';
+  /** Rastro dos espreitadores ocultos, por id. Ver lurker-trail.ts. */
+  private readonly lurkerTrails = new Map<number, LurkerTrail>();
+  /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
+  private rupture: { x: number; y: number } | null = null;
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -798,6 +857,10 @@ export class SurvivalRenderer {
    */
   resetRunPresentation(): void {
     this.presentation.reset();
+    // Run nova na MESMA seed/setor nao muda o decorKey — mas os rastros sao
+    // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
+    // pegadas velhas e as demais desenhariam orfas sobre a run nova.
+    this.lurkerTrails.clear();
   }
 
   private addFlash(x: number, y: number, r: number, power: number, nowMs: number, durationMs: number): void {
@@ -1252,6 +1315,13 @@ export class SurvivalRenderer {
         const [sx, sy] = toScreen(x + 0.5, y + 0.5);
         if (sx < -60 || sx > vw + 60 || sy < -60 || sy > vh + 80) continue;
 
+        // Morfologia de borda: SO a rocha comum (fragil/minerio/cristal sao
+        // linguagem mecanica e ficam universais) e SO no contorno — as faces
+        // que a projecao mostra sao +x (direita) e +y (esquerda).
+        const edgeRight = solid === SOLID_ROCK && x + 1 < w && state.solid[i + 1] === SOLID_NONE;
+        const edgeLeft =
+          solid === SOLID_ROCK && y + 1 < state.config.height && state.solid[i + w] === SOLID_NONE;
+
         items.push({
           depth: x + y,
           draw: () => {
@@ -1262,7 +1332,10 @@ export class SurvivalRenderer {
             // gerador empacota os tipos — com a rocha comum trocando de pele
             // pelo estrato do setor.
             const kindIndex = terrainKindIndexFor(solid, state.stratum);
-            if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
+            if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) {
+              drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
+              return;
+            }
 
             const hw = (TILE_W / 2) * z;
             const hh = (TILE_H / 2) * z;
@@ -1340,6 +1413,9 @@ export class SurvivalRenderer {
               ctx.lineTo(sx + hw * 0.15, sy - wh + hh * 0.3);
               ctx.stroke();
             }
+            // O contorno tambem existe no fallback: a identidade do estrato
+            // nao pode depender do atlas ter carregado.
+            drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
           },
         });
       }
@@ -1452,23 +1528,67 @@ export class SurvivalRenderer {
     if (this.decorKey !== decorKey) {
       this.decorKey = decorKey;
       this.decor = placeDecor(state);
+      // A fenda e escolhida contra o mundo PRISTINO (saloes selados nao
+      // contam) e cacheada com a decoracao: uma reconstrucao por setor.
+      this.rupture = sectorRupture(state);
+      // Mundo novo, lamina nova: rastros do setor anterior morreriam como
+      // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
+      this.lurkerTrails.clear();
     }
     for (const prop of this.decor) {
-      const db = brightness(prop.x + 0.5, prop.y + 0.5);
+      // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
+      // convencao do desenho de blocos), nao a do chao que nao existe ali.
+      const db =
+        prop.anchor === 'landmark' ? brightness(prop.x, prop.y) : brightness(prop.x + 0.5, prop.y + 0.5);
       if (db <= 0.05) continue;
       const [dsx, dsy] = toScreen(prop.x + 0.5, prop.y + 0.5);
-      if (dsx < -60 || dsx > vw + 60 || dsy < -60 || dsy > vh + 60) continue;
+      // Monumentos e formacoes de teto sobem varias alturas de parede; a
+      // margem vertical maior evita poda-los enquanto o topo ainda aparece.
+      const tall = prop.anchor === 'landmark' || prop.anchor === 'ceiling';
+      if (dsx < -60 || dsx > vw + 60 || dsy < (tall ? -140 : -60) || dsy > vh + 60) continue;
       // O mundo muda por baixo do enfeite: parede arrancada, fogo passando.
       // Um prop invalido simplesmente nao e desenhado neste quadro.
       if (!propStillValid(state, prop)) continue;
       items.push({
-        depth: prop.x + prop.y,
-        draw: () => drawDecorProp(ctx, prop, dsx, dsy, z, nowMs),
+        // Teto desenha DEPOIS do que anda na mesma celula: pende acima das
+        // criaturas, e a translucidez garante que nada fica escondido. O
+        // landmark compartilha a profundidade do pedestal — o sort estavel o
+        // desenha logo apos o proprio bloco.
+        depth: prop.x + prop.y + (prop.anchor === 'ceiling' ? 2 : 0),
+        draw: () => {
+          // Prop com massa vem do atlas (modelo voxel de verdade); o desenho
+          // de runtime fica como fallback de atlas nao carregado — e como o
+          // caminho unico dos micros e dos pendentes que balancam. O
+          // landmark ancora no TOPO do bloco pedestal (uma altura de parede
+          // acima da base); o pendente de teto e modelado de ponta-cabeca
+          // com a bica na ancora, entao sobe erguido — e translucido, com o
+          // MESMO contrato de honestidade do caminho de runtime.
+          let atlasName = decorAtlasName(prop);
+          // O canario e MOSTRADOR: vivo/morto vem da contaminacao
+          // autoritativa (mesmo valor do HUD), nunca da variante sorteada —
+          // quando os passaros calam, o retorno ja esta caro.
+          if (prop.kind === 'canary_cage') {
+            atlasName = `decor:canary_cage:${state.contamination >= CANARY_DEAD_AT ? 1 : 0}`;
+          }
+          if (atlasName) {
+            const ceiling = prop.anchor === 'ceiling';
+            const lift = prop.anchor === 'landmark' ? 14 * z : ceiling ? 10 * z : 0;
+            if (ceiling) {
+              ctx.save();
+              ctx.globalAlpha *= CEILING_ALPHA;
+            }
+            const drew = this.props.draw(ctx, atlasName, nowMs, dsx, dsy - lift, z);
+            if (ceiling) ctx.restore();
+            if (drew) return;
+          }
+          drawDecorProp(ctx, prop, dsx, dsy, z, nowMs);
+        },
       });
     }
 
     this.archetypeById.clear();
     for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
+    const trailUpdated = new Set<number>();
     for (const enemy of state.enemies) {
       this.archetypeById.set(enemy.id, enemy.archetype);
       if (!enemy.alive) continue;
@@ -1486,6 +1606,36 @@ export class SurvivalRenderer {
       const lurkerHidden =
         (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
         enemy.mood === LURKER_HIDDEN;
+      if (lurkerHidden) {
+        // O RASTRO: alem da perturbacao no lugar atual, a lamina lembra por
+        // onde o bicho passou — o espreitador vira um vetor legivel, nao um
+        // ponto. Ver lurker-trail.ts; tudo deriva de posicao + relogio.
+        const inWater = enemy.archetype === 'mud_lamprey';
+        let trail = this.lurkerTrails.get(enemy.id);
+        if (!trail) {
+          trail = { ttlMs: trailTtlMs(inWater), inWater, points: [] };
+          this.lurkerTrails.set(enemy.id, trail);
+        }
+        updateTrail(trail, enemy.x, enemy.y, nowMs);
+        trailUpdated.add(enemy.id);
+        const size = enemy.radius * TILE_W * 0.9 * z;
+        // A pegada mais nova E a posicao atual — la desenha a perturbacao
+        // viva; o rastro sao as anteriores, desbotando.
+        for (let p = 0; p < trail.points.length - 1; p++) {
+          const pt = trail.points[p];
+          // A pegada obedece a MESMA luz que tudo: um risco desenhado no
+          // escuro entregaria a rota do bicho por terreno que o jogador nao
+          // ve — stealth pago em iluminacao nao pode vazar pelo rastro.
+          if (brightness(pt.x, pt.y) <= 0.05) continue;
+          const [tx, ty] = toScreen(pt.x, pt.y);
+          if (tx < -60 || tx > vw + 60 || ty < -60 || ty > vh + 60) continue;
+          const age = trailAge(trail, pt, nowMs);
+          items.push({
+            depth: pt.x + pt.y - 0.25,
+            draw: () => drawLurkerTrailPoint(ctx, tx, ty, size, z, age, inWater),
+          });
+        }
+      }
       items.push({
         depth: enemy.x + enemy.y,
         draw: () => {
@@ -1558,6 +1708,31 @@ export class SurvivalRenderer {
           drawHealthBar(sx, sy - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
         },
       });
+    }
+
+    // Rastros orfaos (o bicho emergiu, morreu ou apagou): desbotam ate o fim
+    // e a entrada some — a lamina esquece no proprio ritmo, nunca de supetao.
+    for (const [id, trail] of this.lurkerTrails) {
+      if (trailUpdated.has(id)) continue;
+      decayTrail(trail, nowMs);
+      if (trail.points.length === 0) {
+        this.lurkerTrails.delete(id);
+        continue;
+      }
+      // O elemento vem do PROPRIO rastro: o bicho morto ja saiu do snapshot,
+      // e consultar o mapa de arquetipos aqui trocaria agua por gelo no
+      // meio do desbote.
+      const inWater = trail.inWater;
+      for (const pt of trail.points) {
+        if (brightness(pt.x, pt.y) <= 0.05) continue;
+        const [tx, ty] = toScreen(pt.x, pt.y);
+        if (tx < -60 || tx > vw + 60 || ty < -60 || ty > vh + 60) continue;
+        const age = trailAge(trail, pt, nowMs);
+        items.push({
+          depth: pt.x + pt.y - 0.25,
+          draw: () => drawLurkerTrailPoint(ctx, tx, ty, TILE_W * 0.35 * z, z, age, inWater),
+        });
+      }
     }
 
     // desenha TODOS os players (co-op): o parceiro precisa estar visivel para
@@ -1726,6 +1901,29 @@ export class SurvivalRenderer {
       items.push({
         depth: proj.x + proj.y,
         draw: () => {
+          // O CARRINHO nao e um tiro: e um corpo. Caixa de ferrugem sobre
+          // rodas escuras, com sombra — desenhado em runtime porque a
+          // orientacao vem da velocidade e o resto do jogo ja faz voxel vivo
+          // assim (particulas, projeteis).
+          if (proj.kind === 'cart') {
+            const [csx, csy] = toScreen(proj.x, proj.y);
+            drawGroundShadow(ctx, csx, csy, 7 * z);
+            // A orientacao vem do TRILHO sob o carrinho, nao da velocidade:
+            // o snapshot online reconstroi projeteis com vx/vy zerados, e um
+            // carrinho vertical desenhado deitado mentiria o rumo da linha.
+            const underCart =
+              state.surface[Math.floor(proj.y) * state.config.width + Math.floor(proj.x)];
+            const horizontal =
+              underCart === SURF_RAIL_V ? false :
+              underCart === SURF_RAIL ? true :
+              Math.abs(proj.vx) >= Math.abs(proj.vy);
+            const wob = Math.sin(nowMs / 45) * z * 0.5;
+            drawVoxel(ctx, csx - (horizontal ? 4 : 2) * z, csy + wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
+            drawVoxel(ctx, csx + (horizontal ? 4 : 2) * z, csy - wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
+            drawVoxel(ctx, csx, csy - 3 * z + wob, 9 * z, ['#6e4a33', '#3d2a22', '#1d2430']);
+            drawVoxel(ctx, csx, csy - 6 * z + wob, 7 * z, ['#46566e', '#2e3a4d', '#1d2430']);
+            return;
+          }
           this.projectileView.draw(ctx, view, toScreen, z, TILE_H);
         },
       });
@@ -1813,6 +2011,75 @@ export class SurvivalRenderer {
     // A luz ambiente do estrato entra AQUI: por cima do mundo e das criaturas,
     // por baixo de particulas, numeros de dano e HUD.
     drawBiomeVeil(ctx, state.stratum, vw, vh);
+
+    // O TELEGRAFO DO CARRINHO: a linha inteira do tramo pulsa em laranja de
+    // perigo durante o aviso. SOBRE o veu e SEM corte de luz: morte anunciada
+    // nao negocia com a atmosfera nem com a escuridao — o aviso e a unica
+    // coisa que o jogador precisa ver naquele segundo. Derivado DIRETO do
+    // estado autoritativo (firingAt em ticks), nao de relogio de parede: a
+    // pausa congela ticks, e um aviso por performance.now() expiraria durante
+    // o menu e deixaria o carrinho chegar sem o telegrafo prometido.
+    for (const warn of state.railTracks) {
+      if (!(warn.firingAt > state.tick)) continue;
+      const pulse = 0.3 + 0.4 * Math.abs(Math.sin(nowMs / 90));
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 122, 47, ${pulse.toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, z);
+      for (let k = 0; k < warn.len; k++) {
+        const wx = warn.x + warn.dx * k;
+        const wy = warn.y + warn.dy * k;
+        const [wsx, wsy] = toScreen(wx + 0.5, wy + 0.5);
+        if (wsx < -40 || wsx > vw + 40 || wsy < -40 || wsy > vh + 40) continue;
+        const hw = (TILE_W / 2) * z;
+        const hh = (TILE_H / 2) * z;
+        ctx.beginPath();
+        ctx.moveTo(wsx, wsy - hh);
+        ctx.lineTo(wsx + hw, wsy);
+        ctx.lineTo(wsx, wsy + hh);
+        ctx.lineTo(wsx - hw, wsy);
+        ctx.closePath();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // A RUPTURA A SUPERFICIE: no setor raro em que o teto rachou ate o ceu,
+    // um feixe de luz de dia desce inclinado sobre o salao e abre uma poca
+    // clara no chao. Sobre o veu (a luz vence a atmosfera), sob particulas e
+    // HUD. E ambiente, nao informacao: nada joga diferente debaixo dela —
+    // por isso o tom e quente-neutro, longe do telegrafo e do gas.
+    {
+      const rupture = this.rupture;
+      if (rupture) {
+        const [rx, ry] = toScreen(rupture.x + 0.5, rupture.y + 0.5);
+        if (rx > -180 && rx < vw + 180 && ry > -180 && ry < vh + 180) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          // O feixe desce INCLINADO, como luz por uma fenda — nunca um pilar
+          // vertical perfeito, que leria como efeito de habilidade.
+          const topX = rx + 42 * z;
+          const beam = ctx.createLinearGradient(topX, 0, rx, ry);
+          beam.addColorStop(0, 'rgba(255,244,214,0.15)');
+          beam.addColorStop(1, 'rgba(255,244,214,0.03)');
+          ctx.fillStyle = beam;
+          ctx.beginPath();
+          ctx.moveTo(topX - 24 * z, -8);
+          ctx.lineTo(topX + 24 * z, -8);
+          ctx.lineTo(rx + 46 * z, ry);
+          ctx.lineTo(rx - 46 * z, ry);
+          ctx.closePath();
+          ctx.fill();
+          const pool = ctx.createRadialGradient(rx, ry, 4 * z, rx, ry, 46 * z);
+          pool.addColorStop(0, 'rgba(255,244,214,0.13)');
+          pool.addColorStop(1, 'rgba(255,244,214,0)');
+          ctx.fillStyle = pool;
+          ctx.beginPath();
+          ctx.ellipse(rx, ry, 46 * z, 23 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
 
     // FX
     // Vem do relogio, nao de um 16.7 fixo: em rAF o passo fixo amarrava a vida

@@ -155,7 +155,8 @@ const buildTerrain = () => {
     // 3: rocha por ESTRATO — seis peles novas da parede comum no fim da lista
     // (prismatica, aquifera, sulfurosa, fornalha, silica, glacial). Fragil,
     // minerio e cristal continuam universais: sao linguagem mecanica.
-    version: 3,
+    // 4: a pele do Estrato FERRIFERO (rockFerric) entra no fim da lista.
+    version: 4,
     atlas: 'terrain-blocks.png',
     frameWidth,
     frameHeight,
@@ -204,7 +205,9 @@ const buildSurfaces = () => {
     id: 'surface-tiles',
     // 5: segunda leva de estratos — fissura incandescente da Fornalha
     // (SURF_EMBER) e gelo da Cripta Glacial (SURF_ICE), no fim da lista.
-    version: 5,
+    // 6: trilhos da operacao (SURF_RAIL 11 horizontal, SURF_RAIL_V 12
+    // vertical) — a crosta da armadilha de carrinho.
+    version: 6,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,
@@ -256,7 +259,10 @@ const buildProps = () => {
   const manifest = {
     id: 'world-props',
     // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
-    version: 2,
+    // 3: props DECORATIVOS volumetricos (decor:<kind>:<variante>) no fim da
+    // lista — fumarolas, monolitos, a broca e demais pecas com massa deixam
+    // o desenho de runtime e viram modelos rasterizados de verdade.
+    version: 3,
     atlas: 'world-props.png',
     frameWidth,
     frameHeight,

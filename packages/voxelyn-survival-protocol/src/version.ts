@@ -23,10 +23,36 @@ export const PROTOCOL_VERSION = 11;
 // assinatura derivam do orcamento real do setor, e os estratos ganham
 // ESTRUTURAS DE SALAO no worldgen (rotunda, pulmoes, canions, bacias,
 // sumidouros, lagos) — a geracao semeada dos setores 2+ muda de novo.
-export const SIMULATION_VERSION = 15;
+// 16: INERCIA DO GELO — sobre SURF_ICE o movimento do jogador carrega
+// embalo (ICE_GLIDE): o rumo novo entra aos poucos e soltar o direcional
+// desliza. Fora do gelo o passo e byte a byte o historico, mas dois peers
+// em versoes diferentes divergiriam na primeira pisada da Cripta. E a
+// SILICA ganha FRATURA POR CAMADA (quebrar fragil enfraquece os vizinhos
+// frageis da mesma faixa horizontal) + SEAMS de minerio no worldgen — a
+// geracao e a fisica dos setores sedimentares mudam juntas nesta versao.
+// Ainda em 16 (mesma leva, nunca lancada separada): o ESTRATO FERRIFERO —
+// a linhagem industrial re-trilhada (basalto -> ferrifero -> ferrifero),
+// seams + nos de minerio, minerCap alto e conducao por parede
+// (FERRIC_VEIN_SCALE) — e o pedestal do poco por estrato no worldgen. E a
+// ARMADILHA DE CARRINHO: tramos SURF_RAIL/SURF_RAIL_V no worldgen da
+// operacao (Aurix/ferrifero), gatilho por pisada com telegrafo
+// (cart_warning) e o carrinho como projetil hostil (kind 'cart') que
+// atropela jogador E bicho sem morrer no impacto. E a EXTRACAO DE
+// RETORNO: com o Nucleo o poco sela, a entrada de setor profundo vira
+// portal de SUBIDA (ascend — mundo regenerado da mesma seed, fauna
+// repovoada, contaminacao sem alivio) e a vitoria so fecha na plataforma
+// do setor 1.
+export const SIMULATION_VERSION = 16;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
-export const CONTENT_VERSION = 11;
+// 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
+// (terrain-blocks v4, kind rockFerric no fim da lista).
+// 13: props decorativos VOLUMETRICOS viram modelos voxel no atlas
+// world-props (v3, kinds decor:<kind>:<variante>) — fumarolas, monolitos e
+// a broca deixam o desenho de runtime (que vira fallback).
+// 14: crostas dos TRILHOS da operacao (surface-tiles v6: rail e rail-v) —
+// o chao da armadilha de carrinho.
+export const CONTENT_VERSION = 14;
 
 export type VersionTriple = {
   protocolVersion: number;

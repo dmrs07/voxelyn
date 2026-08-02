@@ -51,10 +51,9 @@ import type { WorldgenProfile } from './worldgen.js';
  *   queimado e CARVAO que acende em fogo persistente.
  * - `silica`: Sumidouros de Silica — o desert reinterpretado: rocha
  *   esbranquicada que cede, quase tudo fragil, pouco a segurar o teto.
- * - `glacial`: Cripta Glacial — o frozen no primeiro corte barato: gelo que
- *   derrete em agua condutiva e recongela, sem mexer em inercia (essa parte e
- *   cara — controle, dodge e determinismo — e fica para quando o estrato
- *   tiver provado a rota derreter/recongelar).
+ * - `glacial`: Cripta Glacial — gelo que derrete em agua condutiva e
+ *   recongela, e (desde SIMULATION_VERSION 16) com INERCIA: sobre a lamina o
+ *   Prospector desliza (ICE_GLIDE em run.ts).
  */
 export type StratumId =
   | 'basalt'
@@ -63,7 +62,14 @@ export type StratumId =
   | 'sulfur'
   | 'furnace'
   | 'silica'
-  | 'glacial';
+  | 'glacial'
+  /**
+   * Estrato Ferrifero: formacao natural de ferro e magnetita — o VEIO
+   * PRINCIPAL que justificou a operacao Aurix. Minerio em seams grossos e
+   * nos densos, paredes que CONDUZEM (a descarga viaja mais longe pelo veio
+   * conectado), e a maior densidade de Miners do Veio.
+   */
+  | 'ferric';
 
 /**
  * O que tomou conta do estrato.
@@ -102,6 +108,8 @@ export type SectorBiome = {
  *
  * - termica: Basalto Fraturado -> Fenda Sulfurosa -> Fornalha Abissal. A
  *   temperatura, os gases e a instabilidade crescem com a descida.
+ * - industrial: Basalto -> Ferrifero (Cicatriz) -> Ferrifero profundo. O
+ *   veio principal E a cicatriz: o lugar que justificou a operacao.
  * - arida: Basalto -> Sumidouros de Silica -> Fornalha Abissal. A silica
  *   vitrifica rumo ao calor: dois caminhos chegam a Fornalha.
  * - crio: Basalto -> Cripta Glacial -> Cripta profunda. O gelo domina e a
@@ -120,8 +128,8 @@ const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation
   ],
   industrial: [
     { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'basalt', occupation: 'aurix' },
-    { stratum: 'aquifer', occupation: 'aurix' },
+    { stratum: 'ferric', occupation: 'aurix' },
+    { stratum: 'ferric', occupation: 'aurix' },
   ],
   thermal: [
     { stratum: 'basalt', occupation: 'none' },
@@ -212,6 +220,8 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     oreChance: 0.07,
     crystalChance: 0.03,
     crystalVeins: 0,
+    oreSeams: 0,
+    oreKnots: 0,
     fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
     biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
     waterBlobs: { count: 0, rMin: 0, rMax: 0 },
@@ -219,6 +229,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     emberBlobs: { count: 0, rMin: 0, rMax: 0 },
     coalBlobs: { count: 0, rMin: 0, rMax: 0 },
     ventCount: 6,
+    railTracks: 0,
     minerCap: MINER_PER_SECTOR,
     halls: 'none',
   };
@@ -278,11 +289,30 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // flanco errado. Pobre em tudo o mais.
     profile.fragileThinChance = 0.78;
     profile.halls = 'terraced';
-    profile.oreChance = 0.05;
+    // O minerio da sedimentar segue a CAMADA: seams horizontais legiveis na
+    // parede, em vez de salpico — e a chance pontual cai para compensar.
+    profile.oreSeams = 3;
+    profile.oreChance = 0.04;
     profile.crystalChance = 0.02;
     profile.ventCount = 4;
     profile.fungalBlobs = { count: 5, rMin: 1, rMax: 2 };
     profile.biofluidBlobs = { count: 2, rMin: 1, rMax: 2 };
+  } else if (biome.stratum === 'ferric') {
+    // Ferrifero: o veio principal. Minerio em seams grossos e NOS densos, e a
+    // parede conectada conduz (FERRIC_VEIN_SCALE em materials.ts). Fissuras
+    // compridas de galeria industrial; quase nada de vida — ferro e trabalho.
+    profile.oreChance = 0.12 + depth * 0.02;
+    profile.oreSeams = 5;
+    profile.oreKnots = 3;
+    // Os trilhos que levavam o minerio: a linha morreu, a armadilha ficou.
+    profile.railTracks = 3;
+    profile.halls = 'canyon';
+    profile.crystalChance = 0.02;
+    profile.fragileThinChance = 0.45;
+    profile.ventCount = 5;
+    profile.minerCap = MINER_PER_SECTOR + 3;
+    profile.fungalBlobs = { count: 6, rMin: 1, rMax: 2 };
+    profile.biofluidBlobs = { count: 4, rMin: 1, rMax: 2 };
   } else if (biome.stratum === 'glacial') {
     // Lagos congelados e cristais de geada. O gelo nao conduz nem retarda; o
     // jogo do estrato e DERRETER a rota certa (agua condutiva) e correr antes
@@ -314,7 +344,11 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // (menos frageis) e mais automatos ainda cumprindo a cota.
     profile.oreChance = profile.oreChance + 0.05;
     profile.fragileThinChance = Math.max(0.3, profile.fragileThinChance - 0.15);
-    profile.minerCap = MINER_PER_SECTOR + 2;
+    // max, nao atribuicao: o Ferrifero ja poe MINER_PER_SECTOR + 3 e a
+    // cicatriz nao pode REBAIXAR a densidade do lugar que a justificou.
+    profile.minerCap = Math.max(profile.minerCap, MINER_PER_SECTOR + 2);
+    // A cicatriz deixou trilhos onde quer que tenha operado.
+    profile.railTracks = Math.max(profile.railTracks, 2);
   }
 
   return profile;
@@ -357,6 +391,10 @@ export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArch
   } else if (biome.stratum === 'glacial') {
     // Stalker e bruiser, como a tabela da spec: a cripta e silenciosa e dura.
     mix = ['stalker', 'bruiser', 'stalker', 'bruiser', 'stalker', 'spitter', 'bruiser', 'stalker', 'bruiser', 'stalker'];
+  } else if (biome.stratum === 'ferric') {
+    // O chao de fabrica do Veio: corpos minerais pesados guardando o minerio
+    // (a densidade de MINERS vem do minerCap do perfil, nao da mistura).
+    mix = ['bruiser', 'stalker', 'bruiser', 'spitter', 'bruiser', 'stalker', 'bomber', 'bruiser', 'stalker', 'bruiser'];
   } else {
     // Basalto: a mistura historica por setor, intocada.
     mix =

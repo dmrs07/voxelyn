@@ -284,31 +284,166 @@ Camada `client/decor.ts` + `decor-draw.ts` — puramente visual e DERIVADA:
   (respiração do cogumelo) derivada de relógio local + variant, nunca da RNG
   autoritativa. Entram na fila de profundidade do pintor.
 
-Futuro da camada: props de teto (estalactites com translucidez perto do
-jogador), landmarks monumentais ancorados nos centros dos salões carimbados,
-composição landmark/ritmo/micro por tipo de sala, kit Aurix de infraestrutura
-(passarelas, trilhos, broca monumental).
+## Oitava etapa (implementada): teto e landmarks
+
+A hierarquia de composição da camada de props fechou de ponta a ponta —
+landmark → ritmo → micro — e ganhou a dimensão vertical:
+
+- **Props de teto** (`anchor: 'ceiling'`): formações que PENDEM da rocha sobre
+  celulas abertas junto a uma parede viva — esporão basáltico, lustre frio da
+  Catedral, estalactite, laje sedimentar, escorrimento sulfuroso apagado,
+  presa de fuligem, sincelos, véu de esporos (só sobre o tapete da colônia) e
+  o cabo Aurix de gancho vazio. Desenhados ERGUIDOS e **translúcidos**
+  (alpha 0.58): o contrato de honestidade é que nada pendurado esconde o chão
+  que joga — a validade por quadro ignora a superfície de baixo (água/fogo
+  continuam visíveis e válidos) mas exige a parede de origem viva.
+- **Landmarks monumentais** (`anchor: 'landmark'`): um monumento por estrato
+  (monólito, grande prisma frio, estalagnato, arco de estratos, fumarola-mãe
+  extinta, ídolo de escória, obelisco gelado), no máximo DOIS por setor, com
+  espaçamento mínimo. São os únicos props altos e maciços — e por isso os
+  únicos ancorados em célula SÓLIDA: o pedestal bloqueia de verdade, então a
+  silhueta imensa nunca mente sobre colisão. Minerar o pedestal derruba o
+  monumento (`propStillValid`).
+- **`hallCenters` no worldgen**: a gramática espacial registra os centros dos
+  salões que já calculava (anfiteatro, rotunda, geodo, cúpula, colunata,
+  galerias, câmaras dos pulmões, meio das fissuras, lagos da Cripta). Zero
+  tirada de RNG a mais, zero byte de mapa mudado — puro registro, então sem
+  bump de `SIMULATION_VERSION`. O campo não entra no hash nem em snapshot; o
+  cliente lê do mundo pristino reconstruído e ancora os landmarks ali, em vez
+  de num sorteio sem significado. Salão selado pelas provas de alcançabilidade
+  simplesmente não oferece pedestal visível e é pulado.
+
+## Nona etapa (implementada): morfologia de borda + composição por sala
+
+- **Morfologia de borda** (`client/edge-detail.ts`): o detalhe que a parede
+  faz exatamente onde encontra o vazio — pontas frias no rim da Catedral,
+  lábio dissolvido do Aquífero, degraus laminados NA face exposta da Sílica,
+  crosta apagada da Fenda, dentes de fuligem da Fornalha, orla de geada da
+  Cripta. **Basalto: nada** (a ausência é a régua). Só a rocha comum recebe
+  morfologia — frágil/minério/cristal seguem linguagem mecânica universal —
+  e só no contorno (parede sem vizinho aberto não ganha detalhe). Voxels
+  determinísticos por índice de célula com portão de densidade (~60%),
+  cacheados por (estrato, variante, exposição) para não alocar por quadro;
+  famílias de cor da decoração (sem biolum/loot); desenhado também no
+  fallback sem atlas.
+- **Composição por sala** (decor): cada salão registrado em `hallCenters`
+  recebe um anel próprio de ritmo (6) e micro (4) num raio de 8 células,
+  enquanto o orçamento global de micro encolheu (40→32) — o salão é
+  mobiliado (landmark → ritmo → micro) e os corredores continuam rarefeitos.
+  Testado por contraste: densidade de props por célula aberta perto dos
+  salões > longe deles, em seeds fixas.
+
+## Décima etapa em diante (implementadas): o resto do backlog
+
+- **Kit Aurix de infraestrutura** (10ª): passarela caída com vão, trilho
+  sobre dormente, e a **broca-mãe** — landmark da OCUPAÇÃO, erguida num
+  salão que os monumentos do estrato deixaram livre, uma por setor.
+- **Rastros dedicados** (11ª, `client/lurker-trail.ts`): a Lampreia deixa
+  esteira de anéis que se dissolvem; o Espectro deixa rachaduras que não
+  desfazem, só perdem contraste (o gelo lembra ~2× o tempo da água).
+  Pegadas espaçadas por deslocamento real, zero sorteio, zero byte na rede;
+  rastros órfãos desbotam no próprio ritmo.
+- **Inércia sobre gelo** (12ª, `SIMULATION_VERSION` 16): sobre `SURF_ICE` o
+  movimento do jogador carrega embalo (`ICE_GLIDE` 0,82/tick) — rápido nas
+  retas, impreciso nas curvas, deslize ao soltar. Colisão mata o embalo via
+  `vx/vy` reais; fora do gelo o passo é byte a byte o histórico. Só o
+  jogador: o Espectro tem o próprio contrato com a lâmina.
+- **Fratura por camada na Sílica** (13ª): quebrar frágil racha os vizinhos
+  frágeis da MESMA faixa horizontal para o estágio enfraquecido (avisa, não
+  derruba; o vertical não sente). E o minério corre em **seams horizontais**
+  no worldgen (`oreSeams`), com a chance pontual reduzida.
+- **Sala funcional do poço por estrato** (14ª, `stampCorePedestal`): função
+  intacta (disco r4, alcançável, pedestal limpo), moldura com sotaque —
+  colunas basálticas, pilares de cristal, fosso raso, borda porosa,
+  escombros, anel frágil, lago congelado. Offsets fixos, zero RNG, antes das
+  provas de alcançabilidade. E a **Aurix adaptada ao substrato**: isoladores
+  no cristal, dutos na Fenda/Fornalha, escoras extra no sedimento,
+  passarelas no Aquífero.
+- **Estrato Ferrífero** (15ª): a linhagem industrial re-trilhada — Basalto →
+  Ferrífero (Cicatriz) → Ferrífero profundo, "o lugar que justificou a
+  operação". Minério em seams grossos + **nós** densos (`oreKnots`),
+  `minerCap` máximo do Veio, e **condução por parede**: no ferric o
+  orçamento do flood de veio triplica (`FERRIC_VEIN_SCALE`) e a descarga
+  viaja de sala em sala pelo seam. Pele de rocha própria (bandas de óxido,
+  sem ouro — `CONTENT_VERSION` 12, terrain v4), véu de óxido, mix
+  bruiser-pesado, kit de decor (magnetita, esporão de veio, núcleo-mãe) e
+  morfologia de borda (rebarbas de óxido).
+- **Ruptura à Superfície** (16ª, primeiro corte visual): ~1 em 6 setores
+  RASOS (1–2) rompe — feixe de luz de dia inclinado sobre um salão da
+  gramática, poça clara no chão, raízes da superfície pendendo pela fenda.
+  Evento **derivado** (hash de seed+setor+hallCenters), mesma fenda em
+  qualquer cliente, zero rede/RNG autoritativa, pura apresentação: nada
+  joga diferente debaixo da luz.
+
+Com isso a tabela de mapeamento original está coberta de ponta a ponta:
+todos os estratos (incl. Ferrífero), ocupações, assinaturas, gramáticas,
+paleta/paredes/contorno/decoração, e a Ruptura em corte visual.
+
+## Décima sétima etapa (implementada): props volumétricos no atlas
+
+Feedback de playtest: cubos de `drawVoxel` empilhados leem como painel de
+papelão em qualquer prop com massa (fumarola, broca, monólito). Os 20 kinds
+volumétricos — 11 de chão/borda + os 9 landmarks — viraram modelos `box()`
+rasterizados pelo pipeline de conteúdo (mesma projeção/âncora de blocos e
+criaturas) no atlas `world-props` v3, como kinds estáticos
+`decor:<kind>:<variante>` (2 variantes, contra o carimbo). O cliente desenha
+do atlas primeiro (`decorAtlasName` + `PropBank`); o desenho de runtime vira
+fallback de atlas não carregado e continua sendo o caminho único de
+pedrinhas/cacos (onde a silhueta basta) e do teto translúcido.
+`CONTENT_VERSION` 13. Lições re-aprendidas no preview: `scorch` é rampa
+toda-escura e não pode ser volume (só fresta); chapéu baixo achata o
+cogumelo em panqueca na projeção 2:1.
+
+## Décima oitava etapa (implementada): a armadilha de carrinho
+
+Os trilhos deixam de ser só decoração: a operação (Aurix e Ferrífero) deixa
+**tramos autoritativos** (`SURF_RAIL` 11 horizontal / `SURF_RAIL_V` 12
+vertical — ids próprios só pela crosta orientada; para a física são o mesmo
+trilho INERTE: não conduz, não queima, não retarda). Pisar num tramo armado
+dispara o telegrafo (`cart_warning`, 1,2 s — a linha inteira pulsa em
+laranja de perigo, sobre o véu e sem corte de luz: morte anunciada não
+negocia com a escuridão) e então um **carrinho de mineração** desgovernado
+atravessa o tramo vindo do lado LONGE de quem pisou. O carrinho é um
+projétil hostil comum (`kind: 'cart'`) com duas exceções: não morre ao
+atropelar (segue até a parede) e atropela INIMIGO também — física não
+escolhe lado, e a armadilha vira ferramenta de quem aprender a posicioná-la.
+Depois do disparo o tramo descansa (`CART_COOLDOWN_TICKS`). Crostas no
+atlas de superfícies (v6), carrinho desenhado em runtime (orientação vem da
+velocidade). Viaja na `SIMULATION_VERSION` 16 e `CONTENT_VERSION` 14.
+
+## Décima nona etapa (implementada): a extração de retorno + canários
+
+Pegar o Núcleo é só metade do contrato. Com ele na mão: o **poço sela**
+(descer de novo não existe — `sim.wellSealedReturn`), a **entrada** de um
+setor profundo vira o portal de **subida** (`ascend`: o mundo regenera da
+mesma seed derivada — mesma geografia, mesmos trilhos — mas a fauna
+repovoou, os sites de salvage rearmaram e a ressonância acumulada FICA), e o
+grupo emerge no poço do setor de cima, atravessando tudo de novo ao
+contrário. A **vitória só fecha na plataforma do setor 1**. A contaminação
+não alivia na subida (descer alivia; subir é a conta chegando) e o ritmo
+2,2× do Núcleo continua. Sem o Núcleo, abandonar o contrato em qualquer
+profundidade segue valendo.
+
+**Gaiolas de canário** (kit Aurix): o medidor VIVO da contaminação — o
+canário no poleiro é o único amarelo permitido na decoração (amarelo como
+informação, não coletável); quando a contaminação passa de `CANARY_DEAD_AT`
+(0,5), todo canário do mundo cala no mesmo tick, lendo o mesmo valor
+autoritativo do HUD. Frames vivo/morto no atlas (`decor:canary_cage:0/1` —
+o eixo de "variante" aqui é o estado, de propósito).
 
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
-  drenar uma região e inundar outra no Aquífero.
-- **Inércia sobre gelo** na Cripta, quando o estrato tiver provado a rota
-  derreter/recongelar.
-- **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
-- **Estrato Ferrífero**: formação natural de ferro/magnetita — veio principal,
-  nós magnéticos, condução por parede, Miners e Aurix densos ("o lugar que
-  justificou a operação").
-- **Morfologia de borda** (silhueta escalonada da sedimentar, pontas
-  prismáticas no contorno): kit visual de borda por strata no renderer.
-- **Salas funcionais com variantes por strata** (poço, arena do Bispo, arena
-  do Guardião trocando de forma mantendo a função) e **Aurix adaptada ao
-  substrato** (escoras no sedimento, passarelas no aquífero, isoladores no
-  cristal, dutos na fenda).
-- **Fratura por camada** na sedimentar (quebrar uma célula frágil enfraquece
-  vizinhas da mesma faixa; minério em seams lineares).
-- Trilha de rachaduras do Espectro e ondulação da Lampreia como apresentação
-  dedicada no cliente (hoje a leitura vem da postura `mood` + superfície).
+  drenar uma região e inundar outra no Aquífero. (Sistema de gameplay novo —
+  pede doc de design próprio antes de implementar.)
+- **Mecânica da Ruptura** (chuva que molha, raízes escaláveis, luz que cura
+  contaminação?): o corte atual é visual de propósito — o que ela FAZ
+  merece decisão de design, não improviso.
+- **Nós magnéticos ativos** no Ferrífero (desvio de projéteis): a versão
+  atual dos nós é geológica (concentração de veio); a versão ativa mexe em
+  balística e merece playtest próprio.
+- Variantes por estrato para as arenas do Bispo e do Guardião (o poço já
+  tem as suas).
 
 ## Ressonância favorecida por bioma (referência de tuning)
 

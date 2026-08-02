@@ -15,7 +15,9 @@ import {
   SECTOR_COUNT,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
+  SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  SOLID_ORE,
   SURF_EMBER,
   SURF_FIRE,
   SURF_FUNGAL,
@@ -29,9 +31,10 @@ import {
   WORLD_W,
 } from '../src/constants';
 import { dischargeAt, igniteCell, setSurface, stepCells } from '../src/cells';
+import { impactSolid } from '../src/materials';
 import { surfaceSpeedMul } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { descend } from '../src/sectors';
+import { descend, descentPointOpen } from '../src/sectors';
 import { biomeMix, biomeProfile, lineageOf, sectorBiome } from '../src/strata';
 import { DEFAULT_PROFILE, generateWorld } from '../src/worldgen';
 import type { SectorBiome, SemanticEvent, SurvivalState } from '../src/types';
@@ -184,6 +187,7 @@ describe('perfis por estrato', () => {
     expect(halls('furnace', 'thermal')).toBe('canyon');
     expect(halls('silica', 'arid')).toBe('terraced');
     expect(halls('glacial', 'cryo')).toBe('lakes');
+    expect(halls('ferric', 'industrial')).toBe('canyon');
   });
 
   it('a rotunda da Catedral deixa pilares de cristal soltos no salao', () => {
@@ -207,6 +211,85 @@ describe('perfis por estrato', () => {
     // Uma rotunda pode calhar de ser selada pelo fechamento de bolsoes; nas
     // quatro seeds fixas, a maioria tem de sobreviver conectada.
     expect(seedsWithPillars).toBeGreaterThanOrEqual(3);
+  });
+
+  it('a gramatica registra os centros dos saloes — sem mover um byte do mapa', () => {
+    // hallCenters e informacao de APRESENTACAO (ancora dos landmarks do
+    // cliente): registrar nao pode consumir RNG nem mudar celula nenhuma.
+    // O perfil historico puro (halls 'none') continua sem centro algum.
+    const pure = generateWorld(42, WORLD_W, WORLD_H, DEFAULT_PROFILE);
+    expect(pure.hallCenters).toEqual([]);
+
+    for (const seed of SEEDS.slice(0, 4)) {
+      // Todo estrato da primeira leva tem gramatica; os centros existem e
+      // moram dentro da moldura do mapa.
+      const state = createRun({ seed, sector: 2 });
+      expect(state.hallCenters.length).toBeGreaterThan(0);
+      for (const c of state.hallCenters) {
+        expect(c.x).toBeGreaterThan(1);
+        expect(c.y).toBeGreaterThan(1);
+        expect(c.x).toBeLessThan(WORLD_W - 1);
+        expect(c.y).toBeLessThan(WORLD_H - 1);
+      }
+      // Mesma seed, mesma lista: e a mesma derivacao pura do resto do mundo.
+      expect(createRun({ seed, sector: 2 }).hallCenters).toEqual(state.hallCenters);
+    }
+
+    // A descida ao vivo e a reconstrucao por createRun veem os MESMOS
+    // centros — a decoracao de quem reconecta ancora nos mesmos saloes.
+    const live = createRun({ seed: 7 });
+    const events: SemanticEvent[] = [];
+    descend(live, events);
+    expect(live.hallCenters).toEqual(createRun({ seed: 7, sector: 2 }).hallCenters);
+  });
+
+  it('o pedestal do poco tem o sotaque do estrato — e a funcao intacta', () => {
+    const ringOf = (state: SurvivalState): Array<{ x: number; y: number }> =>
+      [
+        [3, 0], [-3, 0], [0, 3], [0, -3],
+        [2, 2], [2, -2], [-2, 2], [-2, -2],
+      ].map(([dx, dy]) => ({ x: state.corePos.x + dx, y: state.corePos.y + dy }));
+
+    // Basalto: colunas nas diagonais do poco (o anfiteatro do objetivo).
+    const basalt = createRun({ seed: 1 });
+    let pillars = 0;
+    for (const [dx, dy] of [[2, 2], [2, -2], [-2, 2], [-2, -2]]) {
+      const x = basalt.corePos.x + dx;
+      const y = basalt.corePos.y + dy;
+      if (x <= 1 || y <= 1 || x >= basalt.config.width - 2 || y >= basalt.config.height - 2) continue;
+      if (basalt.solid[at(basalt, x, y)] !== SOLID_NONE) pillars++;
+    }
+    expect(pillars).toBeGreaterThanOrEqual(3);
+    expect(descentPointOpen(basalt)).toBe(true);
+
+    // Catedral: pilares de CRISTAL nos eixos.
+    const prismatic2 = createRun({ seed: seedWithLineage('mineral'), sector: 2 });
+    let crystal = 0;
+    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
+      const x = prismatic2.corePos.x + dx;
+      const y = prismatic2.corePos.y + dy;
+      if (x <= 1 || y <= 1 || x >= prismatic2.config.width - 2 || y >= prismatic2.config.height - 2) continue;
+      if (prismatic2.solid[at(prismatic2, x, y)] === SOLID_CRYSTAL) crystal++;
+    }
+    expect(crystal).toBeGreaterThanOrEqual(2);
+    expect(descentPointOpen(prismatic2)).toBe(true);
+
+    // Aquifero: fosso raso — agua no anel do poco. Setor 3: no setor 2 o
+    // bolso fungico do Bispo cobre a area do objetivo e engoliria o fosso.
+    const aquifer = createRun({ seed: seedWithLineage('hydric'), sector: 3 });
+    const wet = ringOf(aquifer).filter(
+      (p) => aquifer.surface[at(aquifer, p.x, p.y)] === SURF_WATER,
+    ).length;
+    // >=3 e nao >=8: um poco colado na borda do mapa perde parte do anel para
+    // os guards de moldura e para a limpeza do spawn do Guardiao.
+    expect(wet).toBeGreaterThanOrEqual(3);
+
+    // Cripta: o poco no meio do lago congelado (setor 3 pela mesma razao).
+    const glacial = createRun({ seed: seedWithLineage('cryo'), sector: 3 });
+    const icy = ringOf(glacial).filter(
+      (p) => glacial.surface[at(glacial, p.x, p.y)] === SURF_ICE,
+    ).length;
+    expect(icy).toBeGreaterThanOrEqual(3);
   });
 
   it('as bacias do Aquifero nascem cheias: existe um lago CONECTADO grande', () => {
@@ -444,6 +527,129 @@ describe('fissuras da Fornalha Abissal', () => {
   });
 });
 
+describe('fratura por camada da Silica', () => {
+  const seedArid = seedWithLineage('arid');
+
+  /** Monta a cruz de fragil em volta de (x,y) numa area interior do mapa. */
+  const plantFragileCross = (state: SurvivalState): { x: number; y: number } => {
+    const x = 30;
+    const y = 30;
+    const w = state.config.width;
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1]] as const) {
+      state.solid[(y + dy) * w + (x + dx)] = SOLID_FRAGILE;
+    }
+    return { x, y };
+  };
+
+  it('na Silica, quebrar fragil racha a FAIXA: vizinhos horizontais enfraquecem', () => {
+    const state = createRun({ seed: seedArid, sector: 2 });
+    expect(state.stratum).toBe('silica');
+    const { x, y } = plantFragileCross(state);
+    const w = state.config.width;
+    const events: SemanticEvent[] = [];
+    impactSolid(state, x, y, 'kinetic', events);
+    expect(state.solid[y * w + x]).toBe(SOLID_NONE);
+    // A camada e HORIZONTAL: os vizinhos da faixa caem para o estagio
+    // enfraquecido (avisados, nao derrubados)...
+    expect(state.solid[y * w + x + 1]).toBe(SOLID_FRAGILE_WEAK);
+    expect(state.solid[y * w + x - 1]).toBe(SOLID_FRAGILE_WEAK);
+    // ...e o vizinho VERTICAL (outra camada) nao sente nada.
+    expect(state.solid[(y + 1) * w + x]).toBe(SOLID_FRAGILE);
+  });
+
+  it('fora da Silica a mesma quebra nao propaga nada', () => {
+    const state = createRun({ seed: 1 });
+    expect(state.stratum).toBe('basalt');
+    const { x, y } = plantFragileCross(state);
+    const w = state.config.width;
+    const events: SemanticEvent[] = [];
+    impactSolid(state, x, y, 'kinetic', events);
+    expect(state.solid[y * w + x]).toBe(SOLID_NONE);
+    expect(state.solid[y * w + x + 1]).toBe(SOLID_FRAGILE);
+    expect(state.solid[y * w + x - 1]).toBe(SOLID_FRAGILE);
+  });
+
+  it('o minerio da Silica corre em seams: ha fileiras horizontais de veio', () => {
+    // Um seam legivel = >=4 celulas de minerio CONTIGUAS na mesma fileira.
+    // O salpico pontual (oreChance 0.04) nao produz isso com frequencia; o
+    // seam produz por construcao. Seeds aridas fixas (as 4 primeiras).
+    const aridSeeds: number[] = [];
+    for (let s = 1; s < 8192 && aridSeeds.length < 4; s++) {
+      if (lineageOf(s) === 'arid') aridSeeds.push(s);
+    }
+    let seedsWithSeam = 0;
+    for (const seed of aridSeeds) {
+      const state = createRun({ seed, sector: 2 });
+      expect(state.stratum).toBe('silica');
+      const w = state.config.width;
+      let found = false;
+      for (let y = 1; y < state.config.height - 1 && !found; y++) {
+        let run = 0;
+        for (let x = 1; x < w - 1; x++) {
+          run = state.solid[y * w + x] === SOLID_ORE ? run + 1 : 0;
+          if (run >= 4) {
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) seedsWithSeam++;
+    }
+    expect(seedsWithSeam).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('Estrato Ferrifero', () => {
+  const seedInd = seedWithLineage('industrial');
+
+  it('a linhagem industrial desce para o veio principal — e a cicatriz mora nele', () => {
+    expect(sectorBiome(seedInd, 2)).toEqual({
+      stratum: 'ferric',
+      occupation: 'aurix',
+      lineage: 'industrial',
+    });
+    expect(sectorBiome(seedInd, 3).stratum).toBe('ferric');
+  });
+
+  it('o ferrifero e denso: muito mais minerio e mais Miners que o basalto', () => {
+    const countOre = (state: SurvivalState): number => {
+      let n = 0;
+      for (let i = 0; i < state.solid.length; i++) {
+        if (state.solid[i] === SOLID_ORE) n++;
+      }
+      return n;
+    };
+    const basalt = createRun({ seed: seedInd, sector: 1 });
+    const ferric = createRun({ seed: seedInd, sector: 2 });
+    expect(ferric.stratum).toBe('ferric');
+    expect(countOre(ferric)).toBeGreaterThan(countOre(basalt) * 2);
+    const miners = (s: SurvivalState): number =>
+      s.enemies.filter((e) => e.archetype === 'miner').length;
+    expect(miners(ferric)).toBeGreaterThan(miners(basalt));
+  });
+
+  it('no ferrifero a PAREDE conduz: a descarga viaja o triplo pelo veio', () => {
+    // A mesma fiacao artificial nos dois estratos: um seam reto de minerio na
+    // fileira 50, com a fileira 49 aberta para receber a carga. So o
+    // orcamento muda (FERRIC_VEIN_SCALE) — e ele decide ate onde a energia
+    // chega.
+    const wire = (state: SurvivalState): boolean => {
+      const w = state.config.width;
+      for (let x = 8; x <= 92; x++) {
+        state.solid[50 * w + x] = SOLID_ORE;
+        state.solid[49 * w + x] = SOLID_NONE;
+        state.surface[49 * w + x] = SURF_NONE;
+      }
+      const events: SemanticEvent[] = [];
+      impactSolid(state, 10, 50, 'energy', events);
+      // A celula aberta sobre o veio, ~80 celulas adiante do impacto.
+      return state.charges.some((c) => c.idx === 49 * w + 88);
+    };
+    expect(wire(createRun({ seed: seedInd, sector: 2 }))).toBe(true);
+    expect(wire(createRun({ seed: seedInd, sector: 1 }))).toBe(false);
+  });
+});
+
 describe('gelo da Cripta Glacial', () => {
   const frozen = (seed: number): SurvivalState => {
     const state = createRun({ seed });
@@ -475,6 +681,59 @@ describe('gelo da Cripta Glacial', () => {
       stepCells(state, []);
     }
     expect(state.surface[i]).toBe(SURF_ICE);
+  });
+
+  it('no gelo ha inercia: soltar o direcional desliza; no chao seco, para', () => {
+    // Mesma pista, dois pisos. O empurrao e identico; a diferenca toda esta
+    // no que acontece DEPOIS de soltar o direcional.
+    const slideAfterRelease = (ice: boolean): number => {
+      const state = createRun({ seed: 5 });
+      const w = state.config.width;
+      const px = Math.floor(state.player.x);
+      const py = Math.floor(state.player.y);
+      // Pinta a pista sob e a frente do jogador (escrita direta de teste).
+      for (let y = py - 2; y <= py + 2; y++) {
+        for (let x = px - 2; x <= px + 8; x++) {
+          if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+          state.surface[y * w + x] = ice ? SURF_ICE : SURF_NONE;
+        }
+      }
+      const push = emptyCommand();
+      push.move = { x: 1, y: 0 };
+      for (let t = 0; t < 6; t++) stepRun(state, [push]);
+      const atRelease = state.player.x;
+      const idle = emptyCommand();
+      for (let t = 0; t < 10; t++) stepRun(state, [idle]);
+      return state.player.x - atRelease;
+    };
+    expect(slideAfterRelease(false)).toBeLessThan(0.03);
+    expect(slideAfterRelease(true)).toBeGreaterThan(0.2);
+  });
+
+  it('no gelo o rumo novo entra aos poucos: a curva atrasa em relacao ao chao seco', () => {
+    const turnLag = (ice: boolean): number => {
+      const state = createRun({ seed: 5 });
+      const w = state.config.width;
+      const px = Math.floor(state.player.x);
+      const py = Math.floor(state.player.y);
+      for (let y = py - 2; y <= py + 8; y++) {
+        for (let x = px - 2; x <= px + 8; x++) {
+          if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+          state.surface[y * w + x] = ice ? SURF_ICE : SURF_NONE;
+        }
+      }
+      const right = emptyCommand();
+      right.move = { x: 1, y: 0 };
+      for (let t = 0; t < 6; t++) stepRun(state, [right]);
+      const beforeTurn = state.player.x;
+      const down = emptyCommand();
+      down.move = { x: 0, y: 1 };
+      for (let t = 0; t < 4; t++) stepRun(state, [down]);
+      // Quanto o corpo AINDA avancou no rumo antigo depois de virar o comando.
+      return state.player.x - beforeTurn;
+    };
+    expect(turnLag(false)).toBeLessThan(0.02);
+    expect(turnLag(true)).toBeGreaterThan(0.12);
   });
 
   it('fogo encostado no gelo o derrete — e a agua nova apaga o proprio fogo', () => {

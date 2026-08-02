@@ -354,6 +354,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'biome.stratum.furnace': 'ABYSSAL FURNACE',
   'biome.stratum.silica': 'SILICA SINKHOLES',
   'biome.stratum.glacial': 'GLACIAL CRYPT',
+  'biome.stratum.ferric': 'FERRIC STRATUM',
   'biome.occupation.mycelial': 'MYCELIAL MATRIX',
   'biome.occupation.aurix': 'AURIX SCAR',
 
@@ -375,7 +376,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'sim.partnerRevived': 'Partner revived.',
   'sim.reviveBeforeDescend': 'Revive the downed partner before descending.',
   'sim.waitAtShaft': 'Wait for everyone at the shaft to descend.',
-  'sim.coreTaken': 'Core extracted. The Vein woke — return to the entrance!',
+  'sim.coreTaken': 'Core extracted. The Vein woke — climb back to the surface, sector by sector!',
+  'sim.wellSealedReturn': 'The shaft has sealed. The way out is the way you came in.',
   'sim.reviveBeforeExtract': 'Revive the downed partner before extracting.',
   'sim.waitAtExit': 'Wait for everyone at the exit to extract.',
   'sim.contaminationRising': 'The Vein stirs — contamination is rising.',

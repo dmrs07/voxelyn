@@ -14,6 +14,7 @@
 import {
   BUDGET_RESONANCE_CELLS,
   BUDGET_VEIN_CELLS,
+  FERRIC_VEIN_SCALE,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
@@ -165,7 +166,27 @@ export const impactSolid = (
         }
         return { stop: true, broke };
       }
-      return { stop: true, broke: breakSolid(state, cx, cy, events) };
+      {
+        const broke = breakSolid(state, cx, cy, events);
+        // FRATURA POR CAMADA (so na Silica sedimentar): a rocha fragil e uma
+        // LAMINA continua — quebrar uma celula racha as vizinhas frageis da
+        // MESMA faixa horizontal, que caem para o estagio enfraquecido. Nao
+        // derruba (o thermal ja faz isso em area): AVISA. O jogador aprende
+        // que na sedimentar a parede fina cede em fileira, e passa a abrir
+        // atalhos pela camada em vez de celula a celula.
+        if (broke && state.stratum === 'silica') {
+          for (const n of [i - 1, i + 1]) {
+            if (n < 0 || n >= state.solid.length) continue;
+            if (Math.floor(n / w) !== cy) continue;
+            if (state.solid[n] === SOLID_FRAGILE) {
+              state.solid[n] = SOLID_FRAGILE_WEAK;
+              markDirty(state, n % w, cy);
+              events.push({ t: 'corrode', x: (n % w) + 0.5, y: cy + 0.5, solid: SOLID_FRAGILE });
+            }
+          }
+        }
+        return { stop: true, broke };
+      }
     }
 
     case SOLID_FRAGILE_WEAK: {
@@ -181,12 +202,14 @@ export const impactSolid = (
     case SOLID_ORE_CHIPPED: {
       if (cls === 'energy') {
         // O veio e fiacao: a carga percorre o minerio conectado e sai nas
-        // aberturas do outro lado. E a razao de o minerio existir.
+        // aberturas do outro lado. E a razao de o minerio existir. No
+        // FERRIFERO a parede inteira e a fiacao: o orcamento triplica e a
+        // descarga viaja de sala em sala pelo seam.
         const vein = floodFrom(
           state,
           cx,
           cy,
-          BUDGET_VEIN_CELLS,
+          state.stratum === 'ferric' ? BUDGET_VEIN_CELLS * FERRIC_VEIN_SCALE : BUDGET_VEIN_CELLS,
           (n) => state.solid[n] === SOLID_ORE || state.solid[n] === SOLID_ORE_CHIPPED
         );
         chargeCells(state, openNeighbours(state, vein), events, origin);

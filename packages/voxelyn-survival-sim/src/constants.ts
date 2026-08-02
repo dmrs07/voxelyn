@@ -129,6 +129,59 @@ export const COAL_FIRE_FUEL_TICKS = 110;
  */
 export const ICE_REFREEZE_TICKS = 280;
 
+/**
+ * INERCIA DO GELO: por tick, quanto da velocidade ANTERIOR o Prospector
+ * mantem sobre a lamina — o rumo comandado entra so no complemento. A 0,82 e
+ * 20Hz, mudar de direcao leva ~0,4s para completar e soltar o direcional
+ * desliza ~0,7 celula: o gelo vira uma decisao de rota (velocidade nas retas,
+ * imprecisao nas curvas), nao um piso que so muda de cor. So o jogador tem
+ * inercia — o Espectro ja tem o proprio contrato com a lamina, e os demais
+ * bichos manteriam N flows de perseguicao para revisar de uma vez.
+ */
+export const ICE_GLIDE = 0.82;
+
+/**
+ * TRILHOS DA OPERACAO (SURF_RAIL, id 11 — append-only, como toda superficie).
+ *
+ * O trilho e superficie AUTORITATIVA, nao decoracao: um carrinho que machuca
+ * nao pode correr por cima de um enfeite que so o cliente ve. E INERTE para
+ * toda outra fisica — nao conduz, nao queima, nao retarda: o que ele faz e
+ * uma coisa so, e e a armadilha.
+ *
+ * A armadilha: pisar num tramo armado dispara o aviso (CART_WINDUP_TICKS de
+ * telegrafo — morte SEMPRE anunciada) e entao um carrinho de mineracao
+ * desgovernado atravessa o tramo vindo do lado LONGE do jogador, atropelando
+ * o que estiver na linha — jogador E bicho: fisica nao escolhe lado. Depois
+ * do disparo o tramo descansa (CART_COOLDOWN_TICKS): armadilha e pontuacao,
+ * nao metralhadora.
+ */
+export const SURF_RAIL = 11;
+/**
+ * O tramo VERTICAL usa id proprio so pela crosta: os frisos do atlas correm
+ * numa direcao, e um trilho vertical com crosta horizontal leria como
+ * escada. Para a fisica os dois sao o mesmo trilho inerte.
+ */
+export const SURF_RAIL_V = 12;
+/** Celulas/s do carrinho: mais rapido que o Prospector — sair da LINHA e a fuga. */
+export const CART_SPEED = 10;
+export const CART_DAMAGE = 24;
+/** Ticks entre o aviso e o carrinho: 1,2 s a 20 Hz — da para sair andando. */
+export const CART_WINDUP_TICKS = 24;
+export const CART_COOLDOWN_TICKS = 400;
+export const CART_RADIUS = 0.55;
+/** Tramo minimo/maximo, em celulas. Curto demais nao telegrafa nada. */
+export const RAIL_TRACK_MIN = 8;
+export const RAIL_TRACK_MAX = 16;
+
+/**
+ * O CANARIO morre neste nivel de contaminacao. A gaiola e decoracao, mas o
+ * canario e MOSTRADOR: um medidor vivo espalhado pelo mundo, lendo o mesmo
+ * valor autoritativo que o HUD — quando os passaros calam, o retorno ja
+ * esta caro. O limiar mora na simulacao (e nao no cliente) porque e um fato
+ * do mundo: o mesmo canario morre no mesmo instante em toda maquina.
+ */
+export const CANARY_DEAD_AT = 0.5;
+
 // ---------------------------------------------------------------------------
 // Bestiario de assinatura: um inimigo por estrato, manipulando a REGRA do bioma
 // ---------------------------------------------------------------------------
@@ -202,6 +255,14 @@ export const CONDUCTIVE_STUN_TICKS = Math.round(1.2 * TICK_HZ);
 // Propagacao por material solido. Orcamentos separados do biofluido porque um
 // veio de minerio atravessa a sala inteira e nao pode custar um tick.
 export const BUDGET_VEIN_CELLS = 64;
+
+/**
+ * CONDUCAO POR PAREDE do Estrato Ferrifero: la, o veio conectado nao e um
+ * fio — e a fiacao do lugar. O orcamento do flood triplica, entao a descarga
+ * que entra num seam atravessa o no de magnetita e sai DUAS salas adiante.
+ * So muda dentro do ferric: nos demais estratos o veio conduz como sempre.
+ */
+export const FERRIC_VEIN_SCALE = 3;
 export const BUDGET_RESONANCE_CELLS = 24;
 
 

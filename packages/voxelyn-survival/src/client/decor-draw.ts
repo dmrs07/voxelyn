@@ -13,7 +13,7 @@
 // - enxofre decorativo e APAGADO (terroso), sem o verde vivo do gas;
 // - nenhum vermelho de projetil, nenhuma brasa acesa.
 import { drawVoxel, type FaceRamp } from './voxel-draw';
-import type { DecorativeProp } from './decor';
+import type { DecorativeProp, PropKind } from './decor';
 
 const ROCK: FaceRamp = ['#46566e', '#2e3a4d', '#1d2430'];
 const ROCK_DEEP: FaceRamp = ['#2e3a4d', '#1d2430', '#0b0e14'];
@@ -25,11 +25,93 @@ const FUNGUS_DEEP: FaceRamp = ['#2f6b4f', '#1f3d33', '#0b0e14'];
 const SULFUR_DULL: FaceRamp = ['#8a7154', '#6e4a33', '#3d2a22'];
 const CHAR: FaceRamp = ['#3d2a22', '#1d2430', '#0b0e14'];
 
+/**
+ * As familias de cor da decoracao, exportadas para quem desenha ENFEITE fora
+ * deste arquivo (a morfologia de borda das paredes usa as mesmas). A regra
+ * anti-mentira viaja junto: nenhuma delas contem o biolum reativo, o ouro de
+ * loot, nem cor de fogo/projetil.
+ */
+export const DECOR_RAMPS = {
+  ROCK,
+  ROCK_DEEP,
+  BONE,
+  RUST,
+  MIST,
+  FUNGUS,
+  FUNGUS_DEEP,
+  SULFUR_DULL,
+  CHAR,
+} as const;
+
 const h32 = (v: number): number => {
   let x = Math.imul(v ^ 0x9e3779b9, 0x85ebca6b);
   x ^= x >>> 13;
   return (Math.imul(x, 0xc2b2ae35) ^ (x >>> 16)) >>> 0;
 };
+
+/**
+ * Os kinds com MASSA de verdade moram no atlas world-props como modelos voxel
+ * rasterizados (ver content/tools/decor-props.mjs): cubos empilhados em
+ * runtime leem como painel de papelao numa fumarola ou numa broca. Pedrinha,
+ * caco e monte continuam em runtime — neles a silhueta basta — e os props de
+ * TETO tambem (sao translucidos e pendem; o atlas ancora pela base).
+ */
+const ATLAS_VOLUMETRIC: ReadonlySet<PropKind> = new Set<PropKind>([
+  'fallen_column',
+  'stalagmite',
+  'flow_curtain',
+  'fumarole_cone',
+  'slag_block',
+  'ice_spike',
+  'crate',
+  'strut',
+  'insulator',
+  'duct',
+  'mushroom',
+  'monolith',
+  'great_prism',
+  'stalagnate',
+  'strata_arch',
+  'great_fumarole',
+  'slag_monolith',
+  'frost_obelisk',
+  'magnet_core',
+  'drill',
+  // Segunda varredura: medios de chao/borda + infra Aurix de piso.
+  'walkway',
+  'rail',
+  'calcite_basin',
+  'crystal_fan',
+  'slab_pile',
+  'fallen_plate',
+  'sulfur_mound',
+  'cinder_pile',
+  'frost_stone',
+  'lodestone',
+  'ore_spur',
+  // Pendentes MINERAIS de teto (modelados de ponta-cabeca no atlas). Os
+  // pendentes que BALANCAM por relogio (veu, cabo, raiz) ficam em runtime:
+  // frame estatico mataria a deriva que os faz parecer vivos.
+  'hanging_spur',
+  'crystal_chandelier',
+  'stalactite',
+  'hanging_slab',
+  'sulfur_drip',
+  'soot_fang',
+  'icicle',
+  // Gaiola de canario: no atlas, mas o frame vivo/morto e escolhido pela
+  // CONTAMINACAO no render — nao pela variante sorteada.
+  'canary_cage',
+]);
+
+/**
+ * Nome do frame no atlas de props para este prop — ou null para os kinds que
+ * (de proposito) continuam desenhados em runtime. A variante do modelo sai do
+ * mesmo `variant` sorteado na colocacao: deterministico e igual em qualquer
+ * maquina.
+ */
+export const decorAtlasName = (prop: DecorativeProp): string | null =>
+  ATLAS_VOLUMETRIC.has(prop.kind) ? `decor:${prop.kind}:${h32(prop.variant) & 1}` : null;
 
 /**
  * Desenha um prop na posicao de tela (sx, sy) da celula ancora.
@@ -39,6 +121,200 @@ const h32 = (v: number): number => {
  * variacao (tamanho, espelho, jitter) sai do `variant` sorteado na colocacao —
  * nunca de Math.random, senao o prop tremeria entre quadros.
  */
+/**
+ * Opacidade dos props de TETO. Eles pairam sobre a celula onde o jogo
+ * acontece; a translucidez e o contrato de honestidade — nada que pende do
+ * alto pode esconder um inimigo, um projetil ou a superficie que joga.
+ */
+export const CEILING_ALPHA = 0.58;
+
+/** Props de teto: desenhados ERGUIDOS (pendem da rocha) e sob alpha proprio. */
+const drawCeilingProp = (
+  ctx: CanvasRenderingContext2D,
+  prop: DecorativeProp,
+  x: number,
+  sy: number,
+  s: (px: number) => number,
+  flip: number,
+  v: number,
+  nowMs: number,
+): void => {
+  // A altura do "teto" na projecao: bem acima da cabeca das criaturas.
+  const top = sy - s(17);
+  switch (prop.kind) {
+    case 'hanging_spur':
+      // Esporao basaltico: dois dentes rombudos descendo.
+      drawVoxel(ctx, x, top, s(3.6), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(2.6), top + s(1.6), s(2.6), ROCK);
+      drawVoxel(ctx, x, top + s(3), s(2.2), ROCK_DEEP);
+      return;
+    case 'crystal_chandelier': {
+      // Lustre da Catedral: leque invertido na familia FRIA — decorativo,
+      // nunca o biolum pulsante do cristal reativo.
+      for (let k = 0; k < 3; k++) {
+        drawVoxel(ctx, x + flip * (k - 1) * s(2.4), top + Math.abs(k - 1) * s(1.4), s(2.4), MIST);
+      }
+      drawVoxel(ctx, x, top + s(3.2), s(1.6), MIST);
+      return;
+    }
+    case 'stalactite':
+      drawVoxel(ctx, x, top, s(3.6), BONE);
+      drawVoxel(ctx, x, top + s(2.4), s(2.6), BONE);
+      drawVoxel(ctx, x, top + s(4.4), s(1.6), BONE);
+      return;
+    case 'hanging_slab':
+      // Laje descolada do teto sedimentar, pendendo em diagonal.
+      drawVoxel(ctx, x, top, s(4.6), BONE);
+      drawVoxel(ctx, x + flip * s(2.4), top + s(2), s(3.4), RUST);
+      return;
+    case 'sulfur_drip':
+      // Escorrimento mineral APAGADO: crosta terrosa, nenhum verde de gas.
+      drawVoxel(ctx, x, top, s(3.4), SULFUR_DULL);
+      drawVoxel(ctx, x + flip * s(1.4), top + s(2.2), s(2.2), RUST);
+      drawVoxel(ctx, x, top + s(4), s(1.4), SULFUR_DULL);
+      return;
+    case 'soot_fang':
+      drawVoxel(ctx, x, top, s(3.2), CHAR);
+      drawVoxel(ctx, x, top + s(2.4), s(2), ROCK_DEEP);
+      return;
+    case 'icicle':
+      drawVoxel(ctx, x - s(1.6), top, s(2.4), MIST);
+      drawVoxel(ctx, x + s(1.8), top + s(0.8), s(2), MIST);
+      drawVoxel(ctx, x, top + s(2.6), s(1.4), MIST);
+      return;
+    case 'spore_veil': {
+      // O veu da colonia RESPIRA como o cogumelo respira: deriva lenta por
+      // tempo local + variant, nunca pela RNG autoritativa.
+      const drift = Math.sin(nowMs / 1400 + (v % 9)) * s(0.7);
+      drawVoxel(ctx, x + drift, top, s(4.2), FUNGUS_DEEP);
+      drawVoxel(ctx, x - drift * 0.6, top + s(2.2), s(3), FUNGUS);
+      drawVoxel(ctx, x + drift * 0.3, top + s(4.2), s(1.8), FUNGUS_DEEP);
+      return;
+    }
+    case 'root_strand': {
+      // Raiz da superficie descendo pela fenda: terrosa com a ponta palida,
+      // balancando devagar — vida de CIMA, nao a colonia daqui.
+      const swing = Math.sin(nowMs / 1900 + (v % 6)) * s(0.6);
+      drawVoxel(ctx, x, top, s(2.2), RUST);
+      drawVoxel(ctx, x + swing * 0.5, top + s(2), s(1.8), RUST);
+      drawVoxel(ctx, x + swing, top + s(3.8), s(1.5), BONE);
+      drawVoxel(ctx, x + swing * 1.3, top + s(5.2), s(1.1), BONE);
+      return;
+    }
+    case 'cable_hook': {
+      // Cabo Aurix esquecido: pende reto, gancho vazio. Sem carga, sem
+      // brilho — o que a operacao icava ja foi embora ha muito tempo.
+      const sway = Math.sin(nowMs / 1700 + (v % 5)) * s(0.5);
+      drawVoxel(ctx, x, top, s(1.6), RUST);
+      drawVoxel(ctx, x + sway * 0.5, top + s(2.2), s(1.4), RUST);
+      drawVoxel(ctx, x + sway, top + s(4.2), s(2.2), ROCK_DEEP);
+      return;
+    }
+    default:
+      return;
+  }
+};
+
+/**
+ * Landmarks: os monumentos que coroam uma celula SOLIDA no coracao do salao.
+ * Sao os unicos props altos e macicos — e por isso mesmo ancorados em materia
+ * que de fato bloqueia. Desenham a partir do TOPO do bloco pedestal.
+ */
+const drawLandmarkProp = (
+  ctx: CanvasRenderingContext2D,
+  prop: DecorativeProp,
+  x: number,
+  sy: number,
+  s: (px: number) => number,
+  flip: number,
+): void => {
+  // O topo do bloco de parede fica ~14px (WALL_H) acima da base do tile; o
+  // monumento nasce dali para cima.
+  const base = sy - s(12);
+  switch (prop.kind) {
+    case 'monolith':
+      // Basalto: tambores empilhados afinando — o peso que sobrou de pe.
+      drawVoxel(ctx, x, base, s(7), ROCK);
+      drawVoxel(ctx, x + flip * s(0.6), base - s(4), s(5.6), ROCK_DEEP);
+      drawVoxel(ctx, x, base - s(7.6), s(4.4), ROCK);
+      drawVoxel(ctx, x - flip * s(0.4), base - s(10.6), s(3), ROCK_DEEP);
+      return;
+    case 'great_prism':
+      // Catedral: agulha da familia FRIA. Imensa, mas sem um unico pixel do
+      // biolum reativo — monumento nao e municao.
+      drawVoxel(ctx, x, base, s(6.4), MIST);
+      drawVoxel(ctx, x + flip * s(2.8), base - s(2), s(3.4), MIST);
+      drawVoxel(ctx, x, base - s(4.6), s(4.6), MIST);
+      drawVoxel(ctx, x, base - s(8.6), s(3.2), MIST);
+      drawVoxel(ctx, x, base - s(11.4), s(2), MIST);
+      return;
+    case 'stalagnate':
+      // Aquifero: a coluna que juntou chao e teto — milhoes de gotas.
+      drawVoxel(ctx, x, base, s(6.6), BONE);
+      drawVoxel(ctx, x, base - s(3.6), s(4.4), BONE);
+      drawVoxel(ctx, x, base - s(6.6), s(3.4), MIST);
+      drawVoxel(ctx, x, base - s(9.4), s(4.2), BONE);
+      drawVoxel(ctx, x, base - s(12), s(5.4), BONE);
+      return;
+    case 'strata_arch':
+      // Silica: dois pilares laminados e o lintel — a porta que a erosao fez.
+      drawVoxel(ctx, x - s(3.6), base, s(3.6), BONE);
+      drawVoxel(ctx, x - s(3.6), base - s(3.2), s(3.2), RUST);
+      drawVoxel(ctx, x - s(3.6), base - s(6), s(3), BONE);
+      drawVoxel(ctx, x + s(3.6), base, s(3.6), RUST);
+      drawVoxel(ctx, x + s(3.6), base - s(3.2), s(3.2), BONE);
+      drawVoxel(ctx, x + s(3.6), base - s(6), s(3), RUST);
+      drawVoxel(ctx, x, base - s(8.8), s(8), BONE);
+      return;
+    case 'great_fumarole':
+      // Fenda: a chamine-mae, EXTINTA — boca escura, nenhuma fumaca.
+      drawVoxel(ctx, x, base, s(8), SULFUR_DULL);
+      drawVoxel(ctx, x + flip * s(0.8), base - s(4.4), s(6), RUST);
+      drawVoxel(ctx, x, base - s(8), s(4.4), SULFUR_DULL);
+      drawVoxel(ctx, x, base - s(10.6), s(2.6), CHAR);
+      return;
+    case 'slag_monolith':
+      // Fornalha: escoria que esfriou empilhada, um idolo involuntario.
+      drawVoxel(ctx, x, base, s(7.4), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(1.6), base - s(4), s(5.4), CHAR);
+      drawVoxel(ctx, x - flip * s(0.8), base - s(7.4), s(4.6), ROCK_DEEP);
+      drawVoxel(ctx, x, base - s(10.2), s(2.8), CHAR);
+      return;
+    case 'frost_obelisk':
+      // Cripta: pedra antiga sob gelo morto — opaco, sem cintilar.
+      drawVoxel(ctx, x, base, s(6), ROCK);
+      drawVoxel(ctx, x, base - s(4), s(4.6), MIST);
+      drawVoxel(ctx, x, base - s(7.6), s(3.6), MIST);
+      drawVoxel(ctx, x, base - s(10.4), s(2.2), MIST);
+      return;
+    case 'magnet_core': {
+      // O NO-MAE do Ferrifero: bloco de magnetita com placas de oxido presas
+      // em orbita — a unica "fisica" e visual e congelada. Escuro e pesado;
+      // nenhuma luz, nenhum ouro.
+      drawVoxel(ctx, x, base, s(7.2), ROCK_DEEP);
+      drawVoxel(ctx, x, base - s(4.2), s(5.2), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(3.6), base - s(6), s(2.4), RUST);
+      drawVoxel(ctx, x - flip * s(3.2), base - s(7.4), s(2), RUST);
+      drawVoxel(ctx, x, base - s(8), s(3.6), RUST);
+      drawVoxel(ctx, x + flip * s(1.2), base - s(10.6), s(2.2), ROCK_DEEP);
+      return;
+    }
+    case 'drill':
+      // A broca-mae da Aurix, parada onde parou: mastro de ferrugem, colar
+      // escuro, e a ponta de osso enterrada no pedestal. Sem luz de painel,
+      // sem ouro — maquina morta e maquina morta.
+      drawVoxel(ctx, x, base, s(7.6), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(2.2), base - s(3.6), s(3), RUST);
+      drawVoxel(ctx, x, base - s(4.4), s(5), RUST);
+      drawVoxel(ctx, x, base - s(8), s(4), ROCK_DEEP);
+      drawVoxel(ctx, x, base - s(11), s(3), RUST);
+      drawVoxel(ctx, x, base - s(13.2), s(1.8), BONE);
+      return;
+    default:
+      return;
+  }
+};
+
 export const drawDecorProp = (
   ctx: CanvasRenderingContext2D,
   prop: DecorativeProp,
@@ -53,6 +329,19 @@ export const drawDecorProp = (
   const grow = 0.85 + ((v >>> 4) % 8) * 0.05; // 0.85..1.2
   const s = (px: number): number => px * z * grow;
   const x = sx + jx;
+
+  if (prop.anchor === 'ceiling') {
+    ctx.save();
+    ctx.globalAlpha *= CEILING_ALPHA;
+    drawCeilingProp(ctx, prop, x, sy, s, flip, v, nowMs);
+    ctx.restore();
+    return;
+  }
+  if (prop.anchor === 'landmark') {
+    // Landmark ignora o jitter: o monumento e centrado no pedestal.
+    drawLandmarkProp(ctx, prop, sx, sy, s, flip);
+    return;
+  }
 
   switch (prop.kind) {
     case 'fallen_column': {
@@ -133,6 +422,18 @@ export const drawDecorProp = (
       drawVoxel(ctx, x, sy, s(3), ROCK);
       drawVoxel(ctx, x, sy - s(1.6), s(1.8), MIST);
       return;
+    case 'lodestone':
+      // Magnetita solta: pedra escura com a face oxidada. Sem ouro — a parede
+      // comum do estrato mais rico do Veio nao pode fingir que rende.
+      drawVoxel(ctx, x, sy, s(2.8), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(1.6), sy - s(1.2), s(1.8), RUST);
+      return;
+    case 'ore_spur':
+      // Esporao de veio aflorando ao pe da parede: a camada que continua.
+      drawVoxel(ctx, x, sy, s(3.6), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(2.2), sy - s(1.6), s(2.6), RUST);
+      drawVoxel(ctx, x - flip * s(1.4), sy - s(2.6), s(1.8), RUST);
+      return;
     case 'mushroom': {
       // O cogumelo RESPIRA: o chapeu sobe e assenta devagar. Tempo local +
       // variant, nunca a RNG autoritativa — e um enfeite vivo, nao um estado.
@@ -156,6 +457,44 @@ export const drawDecorProp = (
       drawVoxel(ctx, x - s(1.6), sy, s(2.4), RUST);
       drawVoxel(ctx, x - s(1.6), sy - s(2.8), s(2.4), RUST);
       drawVoxel(ctx, x + s(1.8), sy - s(1.4), s(2.2), RUST);
+      return;
+    case 'walkway': {
+      // Passarela CAIDA: placas rasas em linha, com um vao — quebrada o
+      // bastante para nunca parecer um caminho que importa.
+      for (let k = 0; k < 3; k++) {
+        if (k === 1 && (v & 8) !== 0) continue; // o vao
+        drawVoxel(ctx, x + flip * (k - 1) * s(4), sy + (k - 1) * s(1), s(3.8), k === 2 ? ROCK_DEEP : RUST);
+      }
+      return;
+    }
+    case 'rail':
+      // Trilho abandonado: dois frisos paralelos sobre um dormente de osso.
+      drawVoxel(ctx, x, sy + s(0.6), s(4.6), BONE);
+      drawVoxel(ctx, x - s(1.8), sy - s(0.6), s(1.8), RUST);
+      drawVoxel(ctx, x + s(1.8), sy - s(0.2), s(1.8), RUST);
+      drawVoxel(ctx, x + flip * s(4), sy - s(1), s(1.6), RUST);
+      return;
+    case 'canary_cage':
+      // Fallback sem atlas: a gaiola generica (sem passaro — o estado
+      // vivo/morto e do caminho de atlas, que le a contaminacao).
+      drawVoxel(ctx, x, sy, s(3.4), RUST);
+      drawVoxel(ctx, x, sy - s(2.6), s(2.4), RUST);
+      drawVoxel(ctx, x, sy - s(4.2), s(1.4), RUST);
+      return;
+    case 'insulator':
+      // Isolador ceramico: discos empilhados ao pe da parede cristalina — a
+      // Aurix protegendo os circuitos DO cristal, nunca o contrario. Familia
+      // fria/ossea; nenhum pixel de biolum.
+      drawVoxel(ctx, x, sy, s(3.4), BONE);
+      drawVoxel(ctx, x, sy - s(2), s(2.6), MIST);
+      drawVoxel(ctx, x, sy - s(3.8), s(3), BONE);
+      return;
+    case 'duct':
+      // Duto rompido: dois segmentos e o cotovelo apontando para lugar
+      // nenhum — o gas que ele levava ja nao existe.
+      drawVoxel(ctx, x - s(2.2), sy, s(2.6), RUST);
+      drawVoxel(ctx, x + s(0.6), sy - s(0.4), s(2.6), RUST);
+      drawVoxel(ctx, x + s(2.6), sy - s(2.4), s(2.2), ROCK_DEEP);
       return;
     default:
       return;

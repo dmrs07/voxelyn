@@ -1,6 +1,8 @@
 import { RNG } from '@voxelyn/core';
 import {
   CHUNK,
+  RAIL_TRACK_MAX,
+  RAIL_TRACK_MIN,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_NONE,
@@ -11,6 +13,8 @@ import {
   SURF_FUNGAL,
   SURF_ICE,
   SURF_NONE,
+  SURF_RAIL,
+  SURF_RAIL_V,
   SURF_SCORCHED,
   SURF_WATER,
   WORLD_W,
@@ -46,6 +50,19 @@ export type WorldgenProfile = {
    * cristal pontual que a decoracao de parede produz.
    */
   crystalVeins: number;
+  /**
+   * Seams de minerio da sedimentar: caminhadas HORIZONTAIS que convertem
+   * rocha comum em veio ao longo de uma faixa. Na Silica o minerio segue a
+   * CAMADA — uma linha legivel na parede que recompensa minerar em fileira —
+   * em vez do salpico aleatorio da decoracao de parede. Zero fora dela.
+   */
+  oreSeams: number;
+  /**
+   * NOS de minerio do Ferrifero: discos densos de veio em volta de bolsoes
+   * abertos — a "magnetita" que ancora a leitura do estrato e alimenta a
+   * conducao por parede (um no conectado a um seam vira fiacao de sala).
+   */
+  oreKnots: number;
   fungalBlobs: SurfaceBlobSpec;
   biofluidBlobs: SurfaceBlobSpec;
   /** Lagos do Aquifero Negro. Zero em todo estrato seco. */
@@ -58,6 +75,11 @@ export type WorldgenProfile = {
   coalBlobs: SurfaceBlobSpec;
   /** Quantos respiradouros de gas o setor tenta posicionar. */
   ventCount: number;
+  /**
+   * Tramos de TRILHO da armadilha de carrinho (SURF_RAIL). So a operacao os
+   * deixou: Aurix e o Ferrifero. Zero em todo estrato intocado.
+   */
+  railTracks: number;
   /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
   minerCap: number;
   /**
@@ -90,6 +112,8 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   oreChance: 0.07,
   crystalChance: 0.03,
   crystalVeins: 0,
+  oreSeams: 0,
+  oreKnots: 0,
   fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
   biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
   waterBlobs: { count: 0, rMin: 0, rMax: 0 },
@@ -97,6 +121,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   emberBlobs: { count: 0, rMin: 0, rMax: 0 },
   coalBlobs: { count: 0, rMin: 0, rMax: 0 },
   ventCount: 6,
+  railTracks: 0,
   minerCap: 3,
   halls: 'none',
 };
@@ -111,6 +136,17 @@ export type GeneratedWorld = {
   ventPositions: Vec2[];
   enemySpawns: Vec2[];
   openCells: number[];
+  /** Tramos de trilho da armadilha de carrinho (origem, direcao, tamanho). */
+  railTracks: Array<{ x: number; y: number; dx: number; dy: number; len: number }>;
+  /**
+   * Centros dos SALOES que a gramatica espacial carimbou — o anfiteatro, a
+   * rotunda, a cupula. E informacao de APRESENTACAO: a simulacao nao le isto
+   * (nao entra no hash nem em snapshot), mas o cliente ancora os landmarks
+   * monumentais da decoracao aqui, em vez de sortear um lugar sem significado.
+   * Um salao pode ter sido selado pelas provas de alcancabilidade; quem
+   * consome a lista confere o terreno antes de usar. Com `halls: 'none'`, vazio.
+   */
+  hallCenters: Vec2[];
 };
 
 const idx = (w: number, x: number, y: number): number => y * w + x;
@@ -217,10 +253,14 @@ const stampHalls = (
   w: number,
   h: number,
   halls: WorldgenProfile['halls'],
-): { fillCells: number[]; fillKind: number } => {
+): { fillCells: number[]; fillKind: number; hallCenters: Vec2[] } => {
   const fillCells: number[] = [];
+  // Os centros dos saloes GRANDES — so registro do que a gramatica ja
+  // calculou, nenhuma tirada de RNG a mais: a sequencia (e o mapa) continuam
+  // byte a byte os mesmos de antes deste campo existir.
+  const hallCenters: Vec2[] = [];
   let fillKind = SURF_NONE;
-  if (halls === 'none') return { fillCells, fillKind };
+  if (halls === 'none') return { fillCells, fillKind, hallCenters };
 
   const center = (): Vec2 => ({
     x: 12 + rng.nextInt(Math.max(1, w - 24)),
@@ -278,6 +318,7 @@ const stampHalls = (
       const c = center();
       const r = 6 + rng.nextInt(3);
       carveBlob(solid, w, h, c.x, c.y, r);
+      hallCenters.push(c);
       const phase = rng.nextFloat01() * Math.PI * 2;
       for (let k = 0; k < 7; k++) {
         const a = phase + (k * Math.PI * 2) / 7;
@@ -289,6 +330,7 @@ const stampHalls = (
     {
       const c = center();
       carveBlob(solid, w, h, c.x, c.y, 8 + rng.nextInt(2));
+      hallCenters.push(c);
       const islands = 6 + rng.nextInt(4);
       for (let k = 0; k < islands; k++) {
         const a = rng.nextFloat01() * Math.PI * 2;
@@ -313,6 +355,7 @@ const stampHalls = (
     const c = center();
     const radius = 7 + rng.nextInt(3);
     carveBlob(solid, w, h, c.x, c.y, radius);
+    hallCenters.push(c);
     const spokes = 5;
     const phase = rng.nextFloat01() * Math.PI * 2;
     for (let k = 0; k < spokes; k++) {
@@ -332,6 +375,7 @@ const stampHalls = (
       const g = center();
       const r = 4 + rng.nextInt(2);
       carveBlob(solid, w, h, g.x, g.y, r);
+      hallCenters.push(g);
       for (let y = Math.max(1, g.y - r - 1); y <= Math.min(h - 2, g.y + r + 1); y++) {
         for (let x = Math.max(1, g.x - r - 1); x <= Math.min(w - 2, g.x + r + 1); x++) {
           const d2 = (x - g.x) ** 2 + (y - g.y) ** 2;
@@ -376,6 +420,7 @@ const stampHalls = (
     const chambers = 4 + rng.nextInt(2);
     for (let k = 0; k < chambers; k++) {
       carveBlob(solid, w, h, cx, cy, 3 + rng.nextInt(3));
+      hallCenters.push({ x: cx, y: cy });
       const jitter = (rng.nextFloat01() - 0.5) * 1.2;
       const nx = cx + Math.cos(angle + jitter) * 8;
       const ny = cy + Math.sin(angle + jitter) * 8;
@@ -392,6 +437,11 @@ const stampHalls = (
       const angle = rng.nextFloat01() * Math.PI * 2;
       const length = 22 + rng.nextInt(10);
       carveLine(start.x, start.y, angle, length, 1);
+      // O "salao" de uma fissura e o meio dela — onde as pontes desabadas moram.
+      hallCenters.push({
+        x: Math.max(2, Math.min(w - 3, Math.round(start.x + Math.cos(angle) * (length / 2)))),
+        y: Math.max(2, Math.min(h - 3, Math.round(start.y + Math.sin(angle) * (length / 2)))),
+      });
       for (let d = 0; d < 3; d++) {
         const t = 4 + rng.nextInt(Math.max(1, length - 8));
         pillar(
@@ -408,6 +458,7 @@ const stampHalls = (
     {
       const c = center();
       carveEllipse(c.x, c.y, 7 + rng.nextInt(3), 6 + rng.nextInt(2));
+      hallCenters.push(c);
     }
     // Cisternas: bacias que nascem CHEIAS — a agua mora na geografia que
     // existe para contê-la.
@@ -423,6 +474,7 @@ const stampHalls = (
       const rx = horizontal ? 8 : 4;
       const ry = horizontal ? 4 : 8;
       carveEllipse(c.x, c.y, rx, ry);
+      hallCenters.push(c);
       for (let k = -2; k <= 2; k++) {
         pillar(c.x + (horizontal ? k * 3 : 0), c.y + (horizontal ? 0 : k * 3), SOLID_ROCK);
       }
@@ -442,6 +494,7 @@ const stampHalls = (
     for (let g = 0; g < 2; g++) {
       const c = center();
       carveEllipse(c.x, c.y, 8 + rng.nextInt(4), 3 + rng.nextInt(2));
+      hallCenters.push(c);
     }
     // Corredores PARALELOS separados por parede fina: a parede vira atalho
     // destrutivel — o fragil aqui e um seam estrutural legivel, nao ruido.
@@ -476,6 +529,8 @@ const stampHalls = (
     for (let l = 0; l < 2 + rng.nextInt(2); l++) {
       const c = center();
       carveEllipse(c.x, c.y, 6 + rng.nextInt(3), 4 + rng.nextInt(2), fillCells);
+      // O lago congelado E o salao da Cripta: o obelisco nasce na margem dele.
+      hallCenters.push(c);
     }
     for (let t = 0; t < 2; t++) {
       const s = center();
@@ -483,7 +538,69 @@ const stampHalls = (
     }
     fillKind = SURF_ICE;
   }
-  return { fillCells, fillKind };
+  return { fillCells, fillKind, hallCenters };
+};
+
+/**
+ * A SALA FUNCIONAL do poco, com o sotaque do estrato.
+ *
+ * A FUNCAO nunca muda: o poco mora num disco aberto de raio 4, alcancavel, com
+ * o pedestal 3x3 limpo. O que muda e a moldura — colunas basalticas, pilares
+ * de cristal na Catedral, um fosso raso no Aquifero, a borda porosa da Fenda,
+ * escombros na Fornalha, o anel fragil da Silica, o lago congelado da Cripta.
+ * Offsets FIXOS, nenhuma tirada de RNG: o carimbo nao desloca sorteio nenhum,
+ * e as provas de alcancabilidade rodam DEPOIS dele — um pedestal que por
+ * absurdo selasse o poco reprovaria o mapa e a geracao tentaria outra seed.
+ */
+const stampCorePedestal = (
+  solid: Uint8Array,
+  surface: Uint8Array,
+  w: number,
+  h: number,
+  core: Vec2,
+  halls: WorldgenProfile['halls'],
+): void => {
+  const put = (dx: number, dy: number, mat: number): void => {
+    const x = core.x + dx;
+    const y = core.y + dy;
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
+      solid[idx(w, x, y)] = mat;
+    }
+  };
+  const paint = (dx: number, dy: number, surf: number): void => {
+    const x = core.x + dx;
+    const y = core.y + dy;
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
+      surface[idx(w, x, y)] = surf;
+    }
+  };
+  const RING = [
+    [3, 0], [-3, 0], [0, 3], [0, -3],
+    [2, 2], [2, -2], [-2, 2], [-2, -2],
+  ] as const;
+
+  if (halls === 'columns') {
+    // Anfiteatro do poco: colunas nas diagonais, corredores nos eixos.
+    for (const [dx, dy] of [[2, 2], [2, -2], [-2, 2], [-2, -2]] as const) put(dx, dy, SOLID_ROCK);
+  } else if (halls === 'radial') {
+    // Pilares de cristal nos eixos: cobertura, luz e municao do objetivo.
+    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]] as const) put(dx, dy, SOLID_CRYSTAL);
+  } else if (halls === 'karst') {
+    // Fosso raso: chegar ao poco atravessa a agua — a geografia cobra.
+    for (const [dx, dy] of RING) paint(dx, dy, SURF_WATER);
+  } else if (halls === 'lungs') {
+    // Borda porosa: duas celulas frageis — a camara do poco tambem respira.
+    for (const [dx, dy] of [[3, 0], [-3, 0]] as const) put(dx, dy, SOLID_FRAGILE);
+  } else if (halls === 'canyon') {
+    // Escombros: a camara que desabou em volta do que importava.
+    for (const [dx, dy] of [[3, 0], [-2, 2], [0, -3]] as const) put(dx, dy, SOLID_ROCK);
+  } else if (halls === 'terraced') {
+    // Anel fragil nos eixos: a parede em volta do poco e uma decisao.
+    for (const [dx, dy] of [[3, 0], [-3, 0], [0, 3], [0, -3]] as const) put(dx, dy, SOLID_FRAGILE);
+  } else if (halls === 'lakes') {
+    // O poco no meio do lago congelado: a aproximacao final desliza.
+    for (const [dx, dy] of RING) paint(dx, dy, SURF_ICE);
+  }
 };
 
 const generateAttempt = (
@@ -546,6 +663,9 @@ const generateAttempt = (
   const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
   if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
   carveBlob(solid, w, h, corePos.x, corePos.y, 4);
+  // A sala do poco ganha o sotaque do estrato ANTES do re-flood: toda prova
+  // de alcancabilidade abaixo ja enxerga a moldura carimbada.
+  stampCorePedestal(solid, surface, w, h, corePos, profile.halls);
 
   const openCells: number[] = [];
   const reOpen = floodOpen(solid, w, h, entry.x, entry.y);
@@ -629,6 +749,41 @@ const generateAttempt = (
     }
   }
 
+  // 4c) seams de minerio (Silica sedimentar): a partir de uma celula aberta,
+  // a caminhada segue a FAIXA — so anda na horizontal — convertendo rocha
+  // comum em veio. O resultado e uma linha de minerio que desenha a camada na
+  // parede. Com count 0 (todo outro estrato) nada e sorteado.
+  for (let seam = 0; seam < profile.oreSeams; seam++) {
+    const cell = openCells[rng.nextInt(openCells.length)];
+    const y = Math.floor(cell / w);
+    const x0 = cell % w;
+    const dir = rng.nextFloat01() < 0.5 ? 1 : -1;
+    const length = 10 + rng.nextInt(8);
+    for (let s = 0; s < length; s++) {
+      const x = x0 + dir * s;
+      if (x <= 0 || x >= w - 1) break;
+      const j = idx(w, x, y);
+      if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
+    }
+  }
+
+  // 4d) nos de minerio (Ferrifero): discos densos de veio em volta de um
+  // bolsao aberto — a magnetita concentrada. Um no tocado por um seam vira
+  // fiacao continua de sala em sala. Com count 0, nenhuma tirada.
+  for (let knot = 0; knot < profile.oreKnots; knot++) {
+    const cell = openCells[rng.nextInt(openCells.length)];
+    const kx = cell % w;
+    const ky = Math.floor(cell / w);
+    const r = 2;
+    for (let y = Math.max(1, ky - r); y <= Math.min(h - 2, ky + r); y++) {
+      for (let x = Math.max(1, kx - r); x <= Math.min(w - 2, kx + r); x++) {
+        if ((x - kx) ** 2 + (y - ky) ** 2 > r * r) continue;
+        const j = idx(w, x, y);
+        if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
+      }
+    }
+  }
+
   // 5) superficies: manchas fungicas e pocas de biofluido
   const openArr = openCells;
   const blobSurface = (surfKind: number, count: number, rMin: number, rMax: number): void => {
@@ -684,6 +839,34 @@ const generateAttempt = (
   for (let y = guardianSpawn.y - 1; y <= guardianSpawn.y + 1; y++) {
     for (let x = guardianSpawn.x - 1; x <= guardianSpawn.x + 1; x++) {
       surface[idx(w, x, y)] = SURF_NONE;
+    }
+  }
+
+  // 5b) TRILHOS da operacao: tramos retos sobre chao nu, longe da entrada e
+  // do poco. So marcam superficie (SURF_RAIL) — a topologia nao muda, e com
+  // count 0 nenhuma tirada de RNG acontece (todo estrato intocado).
+  const railTracks: GeneratedWorld['railTracks'] = [];
+  for (let t = 0; t < profile.railTracks; t++) {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const cell = openArr[rng.nextInt(openArr.length)];
+      const x0 = cell % w;
+      const y0 = Math.floor(cell / w);
+      const horizontal = rng.nextFloat01() < 0.5;
+      const dx = horizontal ? 1 : 0;
+      const dy = horizontal ? 0 : 1;
+      const fits = (x: number, y: number): boolean =>
+        x > 1 && y > 1 && x < w - 2 && y < h - 2 &&
+        solid[idx(w, x, y)] === SOLID_NONE &&
+        surface[idx(w, x, y)] === SURF_NONE &&
+        Math.hypot(x - entry.x, y - entry.y) > 6 &&
+        Math.hypot(x - corePos.x, y - corePos.y) > 6;
+      let len = 0;
+      while (len < RAIL_TRACK_MAX && fits(x0 + dx * len, y0 + dy * len)) len++;
+      if (len < RAIL_TRACK_MIN) continue;
+      const surf = dx === 1 ? SURF_RAIL : SURF_RAIL_V;
+      for (let k = 0; k < len; k++) surface[idx(w, x0 + dx * k, y0 + dy * k)] = surf;
+      railTracks.push({ x: x0, y: y0, dx, dy, len });
+      break;
     }
   }
 
@@ -780,7 +963,19 @@ const generateAttempt = (
   }
   if (enemySpawns.length < 10) return null;
 
-  return { solid, surface, entry, corePos, guardianSpawn, salvageSites, ventPositions, enemySpawns, openCells };
+  return {
+    solid,
+    surface,
+    entry,
+    corePos,
+    guardianSpawn,
+    salvageSites,
+    ventPositions,
+    enemySpawns,
+    openCells,
+    railTracks,
+    hallCenters: hallFill.hallCenters,
+  };
 };
 
 /** Geracao deterministica com retentativas limitadas (seed derivada) ate mapa solucionavel. */

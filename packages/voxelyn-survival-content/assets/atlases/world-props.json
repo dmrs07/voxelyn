@@ -1,12 +1,12 @@
 {
   "id": "world-props",
-  "version": 2,
+  "version": 3,
   "atlas": "world-props.png",
-  "frameWidth": 84,
-  "frameHeight": 100,
-  "columns": 27,
-  "originX": 40,
-  "originY": 78,
+  "frameWidth": 108,
+  "frameHeight": 142,
+  "columns": 37,
+  "originX": 52,
+  "originY": 106,
   "kinds": [
     {
       "name": "core",
@@ -52,13 +52,405 @@
       "name": "salvageCacheOpened",
       "frames": 1,
       "frameMs": 0
+    },
+    {
+      "name": "decor:fallen_column:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fallen_column:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalagmite:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalagmite:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:flow_curtain:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:flow_curtain:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fumarole_cone:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fumarole_cone:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slag_block:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slag_block:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:ice_spike:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:ice_spike:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crate:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crate:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:strut:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:strut:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:insulator:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:insulator:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:duct:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:duct:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:mushroom:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:mushroom:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:monolith:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:monolith:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:great_prism:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:great_prism:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalagnate:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalagnate:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:strata_arch:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:strata_arch:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:great_fumarole:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:great_fumarole:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slag_monolith:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slag_monolith:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:frost_obelisk:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:frost_obelisk:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:magnet_core:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:magnet_core:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:drill:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:drill:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:walkway:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:walkway:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:rail:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:rail:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:calcite_basin:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:calcite_basin:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_fan:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_fan:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slab_pile:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slab_pile:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fallen_plate:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fallen_plate:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_mound:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_mound:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:cinder_pile:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:cinder_pile:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:frost_stone:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:frost_stone:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:lodestone:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:lodestone:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:ore_spur:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:ore_spur:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_spur:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_spur:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_chandelier:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_chandelier:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalactite:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalactite:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_slab:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_slab:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_drip:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_drip:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:soot_fang:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:soot_fang:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:icicle:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:icicle:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:canary_cage:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:canary_cage:1",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "paletteColors": [
     "#0b0e14",
     "#1d2430",
+    "#1f3d33",
     "#2e3a4d",
     "#2f6b4f",
+    "#3f8a5e",
     "#46566e",
     "#59f2c2",
     "#66c28a",
