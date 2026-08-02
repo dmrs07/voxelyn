@@ -1493,7 +1493,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           // Detonar um Portador conta como estouro para quem o abateu, mesmo que
           // a explosao em si nasca com `source: 'enemy'`. O que a ressonancia
           // registra e a DECISAO do jogador — ele escolheu matar aquilo de perto.
-          if (enemy.archetype === 'bomber' && !enemy.alive) {
+          // Vale para os DOIS bombardeiros: a decisao do jogador e a mesma
+          // (matar aquilo de perto), e a Fenda e a Fornalha — onde so nasce o
+          // de enxofre — sao justamente biomas de afinidade com explosao.
+          if (
+            (enemy.archetype === 'bomber' || enemy.archetype === 'sulfur_bomber') &&
+            !enemy.alive
+          ) {
             recordPlayerResonance(state, proj.owner, 'blast');
           }
           if (proj.kind === 'seeker') {

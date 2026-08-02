@@ -151,6 +151,11 @@ const ENEMY_ARCHETYPES = new Set<EnemyArchetype>([
   'bellows',
   'scoriac',
   'frost_wraith',
+  // Fauna afinada por bioma. Os dois causam dano de CONTATO (o Coveiro ainda
+  // por cima com a prensa), entao os dois produzem capsula de morte — e uma
+  // capsula que a matriz fechada rejeita vira Eco perdido em silencio.
+  'sulfur_bomber',
+  'undertaker',
 ]);
 const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc', 'cart']);
 const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>

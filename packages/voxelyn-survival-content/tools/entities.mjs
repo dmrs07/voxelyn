@@ -869,61 +869,102 @@ const minerModel = (anim, f) => {
   // O cleave: a picareta descreve um circulo. Os quatro frames sao erguer,
   // girar, PASSAR POR TRAS, recolher — o terceiro e o que promete o circulo.
   const swing = anim === 'attack' ? [0, 1, 2, 3][f % 4] : -1;
-  // A cabeca sobe assim que ele deixa de estar so trabalhando.
+  // A cabeca sobe assim que ele deixa de estar so trabalhando. E o gesto que a
+  // ficha descreve: "it raises its head only to decide".
   const alert = anim === 'idle' ? 0 : 2;
   const up = -flinch;
   const b = [];
 
-  // Pernas longas e segmentadas, com pe largo: ele e alto e pesado, e o vao
-  // entre as pernas e o que impede a silhueta de virar um bloco.
+  // REWORK guiado pela ficha de referencia (EX-016). O desenho anterior tinha
+  // todas as pecas certas — lampada, veias, tremonha, bracos longos, picareta —
+  // e mesmo assim lia como um amontoado de caixas. Duas tentativas ensinaram o
+  // porque, e as duas licoes estao aplicadas aqui:
+  //
+  // 1. NAO EXISTE VOLUME LARGO E BAIXO. Uma laje mostra so a face de topo na
+  //    isometrica, e essa face vira a maior mancha chapada da tela — foi o
+  //    "telhado" que a primeira versao do manto virou, cobrindo a cabeca.
+  //    Roupa aqui e feita de FIOS VERTICAIS, como a cortina do Bispo: fio
+  //    projeta lateral, e lateral desenha contorno em vez de mancha.
+  // 2. O CENTRO DO CORPO E CLARO, AS PONTAS SAO ESCURAS. A segunda versao fez
+  //    o contrario (tronco escuro, membros de latao) e o resultado foi pior: o
+  //    meio do bicho sumia no fundo e braco, perna e cabeca flutuavam como
+  //    pecas soltas. Uma figura precisa de UMA massa continua, e ela tem de
+  //    ser a mais clara — o resto pendura nela.
+  const lean = 1; // o tronco pende para a frente (-y), sob a carga
+
+  // PERNAS digitigradas e ESCURAS, encostadas no quadril: sem vao entre elas e
+  // o corpo, senao voltam a parecer postes plantados ao lado de um tronco.
   for (const [lx, phase] of [[-3, step], [1, -step]]) {
-    b.push(box(lx, -1, Math.max(0, phase), 2, 2, 1, 'rockDeep'));
-    b.push(box(lx, -1, 1 + Math.max(0, phase), 2, 2, 4, 'rust'));
-    b.push(box(lx, -1, 5 + Math.max(0, phase), 2, 2, 3, 'rockDeep'));
+    const lift = Math.max(0, phase);
+    b.push(box(lx, -0.5, lift, 2, 3, 1, 'rockDeep')); // pe comprido
+    b.push(box(lx, 0.5, 1 + lift, 2, 2, 4, 'rockDeep')); // canela (recuada)
+    b.push(box(lx, -0.5, 5 + lift, 2, 2, 4, 'rockDeep')); // coxa (avancada)
+    b.push(box(lx - 0.5, 0, 4.5 + lift, 3, 2, 1, 'rust')); // cinta do joelho
   }
 
-  // Tronco INCLINADO para a frente, sob a carga. A inclinacao e o que sobrou da
-  // funcao dele: carregar minerio de um lado para o outro ate a grade acabar.
-  const lean = 1;
-  b.push(box(-3, -1 + lean, 8 + up, 6, 4, 5, 'rust'));
-  // Tremonha nas costas: o compartimento de carga, ainda cheio.
-  b.push(box(-2, 3 + lean, 10 + up, 4, 2, 4, 'rockDeep'));
-  b.push(box(-2, 3 + lean, 14 + up, 4, 2, 1, 'loot'));
-  // DETALHE FINO — minerio transbordando: tres torroes de meio-passo por cima
-  // da carga. A ordem que ninguem cancelou era ENCHER a tremonha, e ela esta
-  // alem da borda.
-  b.push(box(-1.5, 3.5 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
-  b.push(box(0, 4 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
-  b.push(box(1, 3.5 + lean, 15 + up, 0.5, 0.5, 0.5, 'loot'));
-  // Cabeamento exposto descendo do tronco. Azul: a corrente da grade que ainda
-  // passa por ele, e que o calor faz sobrecarregar.
-  b.push(box(-4, 1 + lean, 9 + up, 1, 1, 4, 'electric'));
-  b.push(box(3, 2 + lean, 10 + up, 1, 1, 3, 'electric'));
-  // Bracadeiras de meio-passo prendendo os cabos ao chassi: fiacao PRESA e
-  // manutencao; fiacao solta e abandono. A dele esta meio a meio.
-  b.push(box(-4.5, 1 + lean, 11 + up, 0.5, 1, 0.5, 'rust'));
-  b.push(box(4, 2 + lean, 11 + up, 0.5, 1, 0.5, 'rust'));
-  // Veio reativo crescido POR DENTRO do peito: mineral virando fiacao.
-  b.push(box(-1, -2 + lean, 10 + up, 2, 1, 2, 'electric'));
+  // A COLUNA CLARA: quadril, tronco e pescoco em latao, contiguos. E a maior
+  // massa clara do modelo e a unica coisa que o olho precisa achar primeiro.
+  b.push(box(-3, -0.5, 9 + up, 6, 3, 2, 'rust')); // quadril
+  b.push(box(-2.5, -1 + lean, 11 + up, 5, 3, 6, 'rust')); // torso
+  // Veio reativo crescido POR DENTRO do peito: mineral virando fiacao. Fica no
+  // centro optico do bicho, sobre o latao — o unico azul do torso.
+  b.push(box(-1, -2 + lean, 13 + up, 2, 1, 2, 'electric'));
+  b.push(box(-1.5, -2 + lean, 15 + up, 0.5, 0.5, 0.5, 'electric'));
+  // Costura do chassi: uma faixa escura no peito, que quebra o latao sem
+  // apaga-lo (a caixa lisa e o que fazia o torso ler como caixote).
+  b.push(box(-2.5, -1.1 + lean, 14 + up, 5, 0.5, 1, 'rockDeep'));
 
-  // Bracos longos, DESCENDO ate quase o chao. Sao eles que dizem "isto nao e
-  // gente": proporcao errada de proposito.
-  //
-  // Comecam abaixo da base do tronco (z 3 contra z 8) porque, comecando na
-  // altura do ombro, eles ficavam inteiramente dentro da silhueta do tronco na
-  // projecao isometrica e o bicho saia sem bracos. O que separa os dois volumes
-  // aqui nao e a cor — e o braco existir onde o tronco nao esta.
-  b.push(box(-5, 0 + lean, 3, 2, 2, 9 + up, 'rockDeep'));
-  b.push(box(4, 0 + lean, 3, 2, 2, 9 + up, 'rockDeep'));
+  // TREMONHA nas costas: o compartimento de carga, ainda cheio. Estreita e
+  // atras do torso — sem a tampa dourada larga da versao antiga, que virava um
+  // chapeu amarelo por cima de tudo e roubava a leitura da cabeca.
+  b.push(box(-2, 2, 12 + up, 4, 2, 5, 'rockDeep'));
+  b.push(box(-1.5, 2.5, 17 + up, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(-0.5, 3, 17 + up, 0.5, 0.5, 0.5, 'loot'));
+  b.push(box(0.5, 2.5, 17.5 + up, 0.5, 0.5, 0.5, 'loot'));
 
-  // Cabeca baixa e a frente, com placa facial rachada. `alert` a levanta.
-  const headZ = 13 + up + alert;
-  b.push(box(-1, -2 + lean, headZ, 3, 3, 3, 'rust'));
-  b.push(box(-1, -3 + lean, headZ + 1, 3, 1, 2, 'bone'));
-  // A RACHADURA da placa facial: uma fissura escura de meio-passo cortando a
-  // chapa palida em diagonal de dois segmentos. E o unico rosto que ele tem.
-  b.push(box(0.5, -3.5 + lean, headZ + 2, 0.5, 0.5, 1, 'rust'));
-  b.push(box(0, -3.5 + lean, headZ + 1.5, 0.5, 0.5, 0.5, 'rust'));
+  // O MANTO: uma capa curta e ESCURA sobre os ombros, com fios caindo atras.
+  // Ele emoldura a coluna clara em vez de cobri-la — a frente do peito fica
+  // livre, que e onde moram a veia azul e o chassi.
+  b.push(box(-3.5, 0.5, 16 + up, 7, 3, 2, 'rockDeep')); // ombreira
+  const shroud = [
+    [-3.5, 1, 5, 'rockDeep'], [-2.5, 2.5, 8, 'scorch'], [-1.5, 3, 5, 'rockDeep'],
+    [-0.5, 3.5, 7, 'scorch'], [0.5, 3.5, 4, 'rockDeep'], [1.5, 3, 6, 'scorch'],
+    [2.5, 2.5, 4, 'rockDeep'], [3, 1, 7, 'scorch'],
+  ];
+  for (const [sx, sy, len, mat] of shroud) {
+    b.push(box(sx, sy, 16 - len + up, 1, 1, len, mat));
+  }
+
+  // CABEAMENTO EXPOSTO descendo do tronco, com bracadeiras. Azul: a corrente
+  // da grade que ainda passa por ele, e que o calor faz sobrecarregar.
+  b.push(box(-3.5, 0 + lean, 12 + up, 1, 1, 3, 'electric'));
+  b.push(box(3, 0.5 + lean, 13 + up, 1, 1, 2, 'electric'));
+  b.push(box(-4, 0 + lean, 14 + up, 0.5, 1, 0.5, 'rust'));
+  b.push(box(3.5, 0.5 + lean, 14 + up, 0.5, 1, 0.5, 'rust'));
+
+  // BRACOS longos e escuros, colados ao tronco, com a MAO no fim. Escuros
+  // porque a coluna clara ja e a figura: um braco de latao ao lado de um torso
+  // de latao devolveria a mancha unica que este rework existe para desfazer.
+  for (const [ax, side] of [[-4.5, -1], [3.5, 1]]) {
+    b.push(box(ax, 0 + lean, 13 + up, 1.5, 2, 4, 'rockDeep')); // braco
+    b.push(box(ax, 0 + lean, 6 + up, 1.5, 2, 7, 'rockDeep')); // antebraco
+    b.push(box(ax - 0.25, -0.5 + lean, 4 + up, 2, 3, 2, 'rust')); // mao
+    b.push(box(ax + (side < 0 ? 0 : 1), -1 + lean, 4 + up, 0.5, 0.5, 1.5, 'bone')); // garra
+  }
+
+  // CABECA: pequena, de latao, PROJETADA A FRENTE e para baixo, saindo do
+  // capuz. Ela e a ponta da coluna clara, e nao uma peca solta em cima dela.
+  const headZ = 17 + up + alert;
+  b.push(box(-1.25, -2.5 + lean, headZ, 2.5, 2.5, 2.5, 'rust'));
+  // Placa facial ESTREITA, encaixada na frente da calota. Larga (3 de vao,
+  // como era) ela virava uma aba horizontal atravessada no topo do bicho — o
+  // olho lia um chapeu, e os rebites da calota viravam dois olhos naquela
+  // aba. Rosto aqui e a fissura e a optica, e nada mais.
+  b.push(box(-1, -3.25 + lean, headZ + 0.5, 2, 0.75, 1.5, 'bone'));
+  // A RACHADURA da placa: fissura escura em diagonal de dois segmentos. E o
+  // unico rosto que ele tem.
+  b.push(box(0, -4 + lean, headZ + 2, 0.5, 0.5, 1, 'rust'));
+  b.push(box(-0.5, -4 + lean, headZ + 1.5, 0.5, 0.5, 0.5, 'rust'));
   // Optica: um unico ponto, mais fraco que o visor do prospector. GUTTERING, e
   // nao piscando.
   //
@@ -941,10 +982,16 @@ const minerModel = (anim, f) => {
   // a cada 670 ms, que le como falha de contato e nao como pisca-pisca. O modulo
   // 4 vale para todas as animacoes — nenhuma tem menos de 4 frames alem de `hit`,
   // que dura dois e nao precisa de flicker nenhum.
-  b.push(box(0, -4 + lean, headZ + 1, 1, 1, 1, f % 4 === 3 ? 'fungus' : 'biolum'));
-  // Lanterna de mineracao no ombro, guttering. E o unico calor do modelo.
-  b.push(box(-3, -3 + lean, headZ, 2, 2, 2, 'loot'));
-  b.push(box(-3, -4 + lean, headZ + 1, 1, 1, 1, 'fire'));
+  b.push(box(-0.5, -4 + lean, headZ + 1, 1, 1, 1, f % 4 === 3 ? 'fungus' : 'biolum'));
+  // Rebite unico na crista da calota: latao rebitado, e nao casca lisa. Um so,
+  // e fora do eixo — dois simetricos no alto liam como um par de olhos.
+  b.push(box(-0.75, -1.5 + lean, headZ + 2.5, 0.5, 0.5, 0.5, 'bone'));
+
+  // LAMPADA DE MINERACAO na lateral do capacete. E o unico calor do modelo e a
+  // coisa mais brilhante dele: `lamp` EMITE (rampa de luz branca quente), entao
+  // ela acende de verdade no escuro em vez de so ser amarela.
+  b.push(box(-3, -2.5 + lean, headZ + 1, 1.5, 2, 2, 'rust'));
+  b.push(box(-3.5, -3 + lean, headZ + 1.5, 1, 1, 1, 'lamp'));
 
   // A picareta. Em repouso ela BATE NO CHAO — ele nao esta esperando voce.
   if (swing < 0) {
@@ -952,21 +999,21 @@ const minerModel = (anim, f) => {
     // pe ao lado: solta, ela lia como um poste plantado no chao ao lado de um
     // corpo, e a leitura "ele esta trabalhando" e o que faz o encontro
     // significar alguma coisa antes de o jogador decidir qualquer coisa.
-    b.push(box(4, -4, 1 + toil, 2, 2, 8 - toil, 'rust'));
-    b.push(box(3, -5, 0 + toil, 3, 2, 1, 'bone'));
-    b.push(box(3, -5, 0 + toil, 1, 1, 1, 'electric'));
+    b.push(box(4, -4, 1 + toil, 1.5, 1.5, 9 - toil, 'rust'));
+    b.push(box(3.25, -4.75, 0 + toil, 2.5, 1.5, 1, 'bone'));
+    b.push(box(3.25, -4.75, 0 + toil, 1, 1, 1, 'electric'));
   } else {
     const arc = [
-      [0, -6, 11], // erguida a frente
-      [6, -1, 10], // lado direito
-      [0, 5, 9], // POR TRAS: e este frame que promete o circulo
-      [-6, -1, 10], // lado esquerdo, recolhendo
+      [0, -6, 14], // erguida a frente
+      [6, -1, 13], // lado direito
+      [0, 5, 12], // POR TRAS: e este frame que promete o circulo
+      [-6, -1, 13], // lado esquerdo, recolhendo
     ][swing];
     b.push(box(arc[0], arc[1], arc[2] + up, 2, 2, 2, 'rust'));
     b.push(box(arc[0], arc[1], arc[2] + 2 + up, 2, 2, 1, 'bone'));
     // Corrente residual no fio da lamina: ela crepita quando ele gira.
     b.push(box(arc[0], arc[1], arc[2] + 3 + up, 1, 1, 1, 'electric'));
-    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 9 + up, 2, 2, 1, 'rockDeep'));
+    b.push(box(Math.round(arc[0] / 2), Math.round(arc[1] / 2), 13 + up, 2, 2, 1, 'rockDeep'));
   }
 
   return anim === 'die' ? collapse(b, dieT(f)) : b;

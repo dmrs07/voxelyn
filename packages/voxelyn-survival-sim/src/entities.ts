@@ -310,10 +310,26 @@ const addBomberSpores = (state: SurvivalState, ent: Entity): void => {
  * So pinta chao NU: gas por cima de fogo aceso seria uma explosao decidida
  * pela ordem de iteracao, e por cima de agua ou gelo seria quimica inventada.
  */
-const addSulfurCloud = (state: SurvivalState, ent: Entity): void => {
+const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent[]): void => {
   const cx = Math.floor(ent.x);
   const cy = Math.floor(ent.y);
   const r = SULFUR_BOMBER_GAS_RADIUS;
+  const laid: number[] = [];
+  // O calor ja presente na vizinhanca decide o destino da nuvem, e por isso e
+  // medido ANTES de ela existir: brasa e fogo nao aceitam gas por cima (a
+  // celula ja esta ocupada), entao procurar a faisca depois de pintar acharia
+  // apenas as celulas que o gas nao pode ter tomado.
+  let heat = -1;
+  for (let dy = -r - 1; dy <= r + 1; dy++) {
+    for (let dx = -r - 1; dx <= r + 1; dx++) {
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
+      const i = y * state.config.width + x;
+      const surf = state.surface[i];
+      if (surf === SURF_EMBER || surf === SURF_FIRE) heat = i;
+    }
+  }
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
       if (dx * dx + dy * dy > r * r) continue;
@@ -323,8 +339,18 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity): void => {
       const i = y * state.config.width + x;
       if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
         setSurface(state, i, SURF_GAS, SULFUR_BOMBER_GAS_LIFE_TICKS);
+        laid.push(i);
       }
     }
+  }
+  // E se havia calor, a nuvem ACENDE — que e a razao inteira de o bicho existir
+  // na Fornalha. Sem esta passagem a promessa nao se cumpria: a explosao roda
+  // ANTES de a nuvem ser depositada (ela nasce da morte, e a morte e o que
+  // detona), e uma fissura de brasa nao propaga fogo sozinha para o gas que
+  // apareceu no tick seguinte. A ignicao entra por uma celula so: o resto e a
+  // propagacao normal do fogo, que ja existe e ja e orcada.
+  if (heat >= 0 && laid.length > 0) {
+    igniteCell(state, laid[0], events);
   }
 };
 
@@ -421,7 +447,7 @@ export const damageEntity = (
   // exatamente a corrente de reacoes que este bicho existe para provocar.
   if (ent.archetype === 'sulfur_bomber') {
     explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
-    addSulfurCloud(state, ent);
+    addSulfurCloud(state, ent, events);
   }
   // O MINER e o unico corpo do bestiario cuja morte vira JULGAMENTO, e por isso
   // e o unico que precisa saber QUEM o matou.
@@ -740,12 +766,14 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     const stop = enemy.radius + target.radius + 0.05;
     for (let s = 0; s < steps; s++) {
       if (distTo(enemy, target) <= stop) break; // chegou: nao empurra por dentro
-      const before = { x: target.x, y: target.y };
-      moveEntity(state, target, pull.x * UNDERTAKER_PULL_STEP, pull.y * UNDERTAKER_PULL_STEP);
-      // Bateu em alguma coisa: o arrasto acabou aqui. Continuar raspando na
-      // parede o resto dos passos gastaria a mesma distancia deslizando de
-      // lado, e o obstaculo deixaria de ser a protecao que ele e.
-      if (target.x === before.x && target.y === before.y) break;
+      const moved = moveEntity(state, target, pull.x * UNDERTAKER_PULL_STEP, pull.y * UNDERTAKER_PULL_STEP);
+      // Bateu em alguma coisa: o arrasto acabou aqui — e basta UM DOS EIXOS
+      // travar. Testar "nao saiu do lugar" (os dois eixos juntos) era um erro
+      // silencioso em toda diagonal: com a parede segurando so o X, o passo
+      // continuava valendo pelo Y e o jogador era arrastado RASPANDO na
+      // parede, contornando obstaculo curto ate o colo do Coveiro. A quina
+      // deixava de ser protecao justamente no caso comum.
+      if (moved.blockedX || moved.blockedY) break;
     }
     // O rastro do campo, para o cliente desenhar o feixe entre os dois.
     events.push({ t: 'pulse', x: target.x, y: target.y, radius: 1.2 });

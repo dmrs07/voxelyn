@@ -14,12 +14,15 @@ import {
   SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ROCK,
+  SURF_EMBER,
+  SURF_FIRE,
   SURF_GAS,
   SURF_NONE,
   SURF_SPORES,
   UNDERTAKER_PULL_COOLDOWN_TICKS,
   UNDERTAKER_PULL_WINDUP_TICKS,
 } from '../src/constants';
+import { setSurface } from '../src/cells';
 import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { lineageOf } from '../src/strata';
@@ -111,6 +114,42 @@ describe('Bombardeiro de Enxofre', () => {
     expect(spores, 'esporo nao pertence a este bicho').toBe(0);
   });
 
+  it('morrer perto de BRASA acende a nuvem — a promessa da Fornalha', () => {
+    // A interacao que justifica o bicho existir. A explosao roda ANTES de a
+    // nuvem ser depositada (ela nasce da morte), e uma fissura de brasa nao
+    // propaga fogo sozinha para o gas que apareceu no tick seguinte: sem a
+    // ignicao explicita, "matar perto da brasa acende a sala" nao acontecia.
+    const state = arena(11);
+    setSurface(state, at(state, 29, 25), SURF_EMBER, 600);
+    const bomber = spawnEnemy(state, 'sulfur_bomber', 32, 25, false);
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+
+    let fire = 0;
+    for (let y = 22; y <= 28; y++) {
+      for (let x = 28; x <= 36; x++) {
+        if (state.surface[at(state, x, y)] === SURF_FIRE) fire++;
+      }
+    }
+    expect(fire, 'a nuvem nao acendeu ao lado da brasa').toBeGreaterThan(0);
+  });
+
+  it('longe de qualquer calor a nuvem SO fica: gas nao acende sozinho', () => {
+    const state = arena(11);
+    const bomber = spawnEnemy(state, 'sulfur_bomber', 32, 25, false);
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+    let fire = 0;
+    let gas = 0;
+    for (let y = 22; y <= 28; y++) {
+      for (let x = 29; x <= 35; x++) {
+        const surf = state.surface[at(state, x, y)];
+        if (surf === SURF_FIRE) fire++;
+        if (surf === SURF_GAS) gas++;
+      }
+    }
+    expect(gas).toBeGreaterThan(0);
+    expect(fire, 'gas pegou fogo sem faisca nenhuma').toBe(0);
+  });
+
   it('o Spore Bomber continua deixando esporo: sao bichos diferentes', () => {
     const state = arena(11);
     const bomber = spawnEnemy(state, 'bomber', 32, 25, false);
@@ -188,6 +227,27 @@ describe('Coveiro', () => {
     // Puxou (saiu de 38,5) e PAROU na parede, em vez de atravessa-la.
     expect(state.player.x, 'o eletroima nem chegou a puxar').toBeLessThan(38.4);
     expect(state.player.x, 'atravessou o pilar').toBeGreaterThan(35.5);
+  });
+
+  it('parede em UM EIXO ja segura o arrasto diagonal', () => {
+    // O caso comum, e o que o teste do pilar frontal nao pegava: na diagonal,
+    // `moveEntity` avanca o eixo livre quando so o outro trava. Checar "nao
+    // saiu do lugar" deixava o jogador RASPANDO na parede ate contornar o
+    // obstaculo — a quina deixava de proteger justamente onde ela existe.
+    const state = arena(21);
+    state.player.x = 37.5;
+    state.player.y = 28.5; // diagonal em relacao ao Coveiro
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+    runHaul(state, 2);
+    expect(undertaker.action?.kind).toBe('haul');
+    // Parede vertical entre os dois, depois de o eletroima engatar.
+    for (let y = 24; y <= 30; y++) state.solid[at(state, 35, y)] = SOLID_ROCK;
+    const beforeY = state.player.y;
+
+    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 4);
+    expect(state.player.x, 'atravessou a parede').toBeGreaterThan(35.5);
+    // E parou: nao deslizou pelo eixo livre ate contornar o obstaculo.
+    expect(Math.abs(state.player.y - beforeY), 'raspou na parede').toBeLessThan(1);
   });
 
   it('a prensa vem depois do puxao, com telegrafo proprio', () => {
