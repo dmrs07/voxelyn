@@ -2,11 +2,11 @@
   "id": "world-props",
   "version": 3,
   "atlas": "world-props.png",
-  "frameWidth": 84,
-  "frameHeight": 108,
-  "columns": 48,
-  "originX": 40,
-  "originY": 86,
+  "frameWidth": 108,
+  "frameHeight": 136,
+  "columns": 37,
+  "originX": 52,
+  "originY": 106,
   "kinds": [
     {
       "name": "core",

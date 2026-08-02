@@ -8,6 +8,15 @@
 // blocos e das criaturas — mesma projecao, mesma ordem do pintor, mesmo
 // tamanho de voxel — e entram no atlas world-props como kinds estaticos.
 //
+// AUTORADOS NA MALHA FINA, como as paredes: cada prop carrega o dobro de
+// celulas por eixo do primeiro rascunho, entao a textura volumetrica (a
+// malha por material) trabalha em grao cheio e as silhuetas ganham chanfro
+// nos cantos — nada de torre de bolo quadrada. As reguas de escala:
+// - prop de chao/borda: SEMPRE mais estreito que um tile (16 voxels finos) —
+//   nunca pode parecer que bloqueia;
+// - landmark: ate ~1 tile de largura e mais alto que a parede, mas SEMPRE
+//   abaixo do Nucleo — o monumento pontua o salao, o objetivo comanda o mapa.
+//
 // As regras anti-mentira da camada valem no modelo:
 // - nada de 'loot' nem 'biolum': enfeite nao parece premio nem municao;
 // - nada de 'fire': a fumarola decorativa e EXTINTA;
@@ -50,11 +59,6 @@ export const DECOR_PROP_KINDS = VOLUMETRIC.flatMap((kind) =>
     frameMs: 0,
   })),
 );
-
-/** Camada quadrada centrada: o tijolo de toda torre e de todo cone. */
-const layer = (boxes, r, z, h, mat) => {
-  boxes.push(box(-r, -r, z, r * 2 + 1, r * 2 + 1, h, mat));
-};
 
 const hash3 = (x, y, z, seed) => {
   let h =
@@ -114,11 +118,29 @@ const texture = (boxes, seed) => {
   return out;
 };
 
-/** Cone: camadas quadradas encolhendo. `steps` = [[raio, altura, mat], ...]. */
-const cone = (boxes, steps) => {
+/**
+ * Camada quadrada centrada com CANTOS CHANFRADOS: o tijolo de toda torre.
+ * Cortar o voxel do canto a partir de r>=2 arredonda a leitura sem custar
+ * resolucao — e a diferenca entre "coluna" e "pilha de caixas".
+ */
+const slab = (boxes, cx, cy, r, z, h, mat) => {
+  if (r <= 1) {
+    boxes.push(box(cx - r, cy - r, z, r * 2 + 1, r * 2 + 1, h, mat));
+    return;
+  }
+  for (let y = -r; y <= r; y++) {
+    for (let x = -r; x <= r; x++) {
+      if (Math.abs(x) === r && Math.abs(y) === r) continue; // chanfro
+      boxes.push(box(cx + x, cy + y, z, 1, 1, h, mat));
+    }
+  }
+};
+
+/** Cone centrado em (0,0): camadas chanfradas encolhendo. */
+const cone = (boxes, steps, cx = 0, cy = 0) => {
   let z = 0;
   for (const [r, h, mat] of steps) {
-    layer(boxes, r, z, h, mat);
+    slab(boxes, cx, cy, r, z, h, mat);
     z += h;
   }
   return z;
@@ -130,89 +152,119 @@ const modelOf = (kind, v) => {
 
   switch (kind) {
     case 'fallen_column': {
-      // Tambores tombados em linha, afundando no chao; o capitel quebrado
-      // largado ao lado. Peso tectonico deitado, nao empilhado.
-      boxes.push(box(-5, -2 + v, 0, 3, 3, 3, 'rock'));
-      boxes.push(box(-2, -2 + v, 0, 3, 3, 2, 'rock'));
-      boxes.push(box(1, -1 + v, 0, 3, 3, 2, 'rockDeep'));
-      boxes.push(box(4, s, 0, 2, 2, 1, 'rockDeep'));
+      // Tambores tombados em linha, meio afundados; o capitel quebrado ao
+      // lado. Cada tambor tem cinta propria — juntas legiveis, nao um tubo.
+      boxes.push(box(-7, -3 + v, 0, 4, 5, 5, 'rock'));
+      boxes.push(box(-3, -3 + v, 0, 1, 5, 5, 'rockDeep')); // junta
+      boxes.push(box(-2, -3 + v, 0, 4, 5, 4, 'rock'));
+      boxes.push(box(2, -2 + v, 0, 1, 4, 4, 'rockDeep'));
+      boxes.push(box(3, -2 + v, 0, 4, 4, 3, 'rock'));
+      boxes.push(box(6, s * 2, 0, 3, 3, 2, 'rockDeep')); // capitel
       break;
     }
     case 'stalagmite': {
-      cone(boxes, [[2, 2, 'bone'], [1, 3, 'bone'], [0, 3 + v, 'bone']]);
-      boxes.push(box(s * 2, 1, 0, 1, 1, 2, 'bone')); // broto ao lado
+      cone(boxes, [
+        [3, 2, 'bone'],
+        [2, 3, 'bone'],
+        [1, 3, 'bone'],
+        [0, 3 + v, 'bone'],
+      ]);
+      cone(boxes, [[1, 2, 'bone'], [0, 2, 'bone']], s * 4, 2); // broto
       break;
     }
     case 'flow_curtain': {
-      // Cascata petrificada: laminas CONTIGUAS descendo em degraus — placas
-      // soltas liam como tres pilares, nao como cortina.
-      boxes.push(box(-4, -1, 0, 2, 2, 8, 'bone'));
-      boxes.push(box(-2, -1, 0, 2, 2, 7 + v, 'ice'));
-      boxes.push(box(0, -1, 0, 2, 2, 5, 'bone'));
-      boxes.push(box(2, -1, 0, 2, 2, 3, 'ice'));
-      boxes.push(box(s * 3, -1, 0, 1, 2, 1, 'bone')); // a saia da base
+      // Cascata petrificada: laminas contiguas descendo em degraus, com a
+      // saia escorrida na base — a agua desenhou, o tempo petrificou.
+      boxes.push(box(-6, -1, 0, 3, 3, 12, 'bone'));
+      boxes.push(box(-3, -1, 0, 3, 3, 10 + v, 'ice'));
+      boxes.push(box(0, -1, 0, 3, 3, 8, 'bone'));
+      boxes.push(box(3, -1, 0, 2, 3, 5, 'ice'));
+      boxes.push(box(5, -1, 0, 2, 3, 3, 'bone'));
+      boxes.push(box(-6 + v, 1, 0, 12, 2, 1, 'bone')); // a saia
       break;
     }
     case 'fumarole_cone': {
       // Cone mineral com a BOCA escura: extinta — nenhum voxel de fogo.
-      const top = cone(boxes, [[3, 2, 'bone'], [2, 2, 'rust'], [1, 2 + v, 'bone']]);
-      boxes.push(box(0, 0, top, 1, 1, 1, 'scorch'));
+      const top = cone(boxes, [
+        [5, 2, 'bone'],
+        [4, 2, 'rust'],
+        [3, 2, 'bone'],
+        [2, 2, 'rust'],
+        [1, 2 + v, 'bone'],
+      ]);
+      boxes.push(box(-1, -1, top, 2, 2, 1, 'scorch'));
+      boxes.push(box(s * 4, s, 2, 1, 1, 2, 'rust')); // escorrimento na saia
       break;
     }
     case 'slag_block': {
       // Corpo em rockDeep, nao em scorch: a rampa do queimado e toda escura
       // e some no fundo — a MESMA armadilha do primeiro sprite do Escoriaceo.
       // O scorch fica nas frestas, onde escuro e informacao, nao silhueta.
-      boxes.push(box(-3, -3, 0, 6, 6, 3, 'rockDeep'));
-      boxes.push(box(-2, -1 + v, 3, 4, 3, 2, 'rock'));
-      boxes.push(box(-1, 0, 5, 2, 1, 1, 'scorch'));
-      boxes.push(box(s * 2, -2, 3, 1, 1, 1, 'rust'));
+      slab(boxes, 0, 0, 4, 0, 4, 'rockDeep');
+      slab(boxes, v - 1, 0, 3, 4, 3, 'rock');
+      boxes.push(box(-2, 0, 7, 4, 2, 1, 'scorch'));
+      boxes.push(box(s * 3, -3, 4, 2, 2, 2, 'rust'));
       break;
     }
     case 'ice_spike': {
-      cone(boxes, [[2, 3, 'ice'], [1, 3, 'ice'], [0, 3 + v, 'ice']]);
-      boxes.push(box(s * 2, s, 0, 1, 1, 3, 'ice'));
+      cone(boxes, [
+        [3, 3, 'ice'],
+        [2, 4, 'ice'],
+        [1, 4, 'ice'],
+        [0, 4 + v, 'ice'],
+      ]);
+      cone(boxes, [[1, 3, 'ice'], [0, 3, 'ice']], s * 4, s * 2); // agulha filha
       break;
     }
     case 'crate': {
-      // Caixa Aurix: corpo de ferrugem, tampa de osso, cinta escura. Sem
+      // Caixa Aurix: corpo de ferrugem, tampa de osso, cintas escuras. Sem
       // ouro, sem halo — o brilho de coletavel pertence ao cofre.
-      boxes.push(box(-3, -3, 0, 7, 6, 5, 'rust'));
-      boxes.push(box(-3, -3, 5, 7, 6, 1, 'bone'));
-      boxes.push(box(-1 + v, -3, 0, 1, 6, 6, 'rockDeep'));
+      boxes.push(box(-5, -4, 0, 10, 8, 7, 'rust'));
+      boxes.push(box(-5, -4, 7, 10, 8, 1, 'bone'));
+      boxes.push(box(-2 + v, -4, 0, 1, 8, 8, 'rockDeep'));
+      boxes.push(box(2 - v, -4, 0, 1, 8, 8, 'rockDeep'));
+      boxes.push(box(-5, -1, 0, 10, 1, 8, 'rockDeep'));
       break;
     }
     case 'strut': {
-      boxes.push(box(-4, -1, 0, 2, 2, 7, 'rust'));
-      boxes.push(box(2, -1, 0, 2, 2, 7 - v, 'rust'));
-      boxes.push(box(-4, -1, 7 - v, 8, 2, 1, 'rust'));
-      boxes.push(box(-1, -1, 3, 2, 2, 1, 'bone'));
+      // Escora em portico: pes alargados, vigas duplas, contraventamento.
+      boxes.push(box(-6, -2, 0, 3, 4, 1, 'rockDeep'));
+      boxes.push(box(4, -2, 0, 3, 4, 1, 'rockDeep'));
+      boxes.push(box(-5, -1, 1, 2, 2, 10, 'rust'));
+      boxes.push(box(4, -1, 1, 2, 2, 10 - v, 'rust'));
+      boxes.push(box(-5, -1, 11 - v, 11, 2, 2, 'rust'));
+      boxes.push(box(-2, -1, 5, 5, 2, 1, 'bone')); // contraventamento
       break;
     }
     case 'insulator': {
-      layer(boxes, 2, 0, 2, 'bone');
-      layer(boxes, 1, 2, 2, 'ice');
-      layer(boxes, 2, 4, 1, 'bone');
-      boxes.push(box(0, 0, 5, 1, 1, 2 + v, 'rust'));
+      // Isolador ceramico: pratos empilhados com garganta entre eles.
+      slab(boxes, 0, 0, 3, 0, 2, 'bone');
+      slab(boxes, 0, 0, 2, 2, 2, 'ice');
+      slab(boxes, 0, 0, 3, 4, 1, 'bone');
+      slab(boxes, 0, 0, 2, 5, 2, 'ice');
+      slab(boxes, 0, 0, 3, 7, 1, 'bone');
+      boxes.push(box(0, 0, 8, 1, 1, 3 + v, 'rust')); // pino
       break;
     }
     case 'duct': {
       // Cotovelo rompido: o gas que ele levava ja nao existe.
-      boxes.push(box(-5, -1, 1, 6, 3, 3, 'rust'));
-      boxes.push(box(0, -1, 1, 3, 3, 3, 'rockDeep'));
-      boxes.push(box(0, -1, 4, 3, 3, 3 + v, 'rust'));
-      boxes.push(box(1, 0, 7 + v, 1, 1, 1, 'scorch'));
+      boxes.push(box(-8, -2, 2, 9, 4, 4, 'rust'));
+      boxes.push(box(-8, -2, 2, 1, 4, 4, 'rockDeep')); // flange
+      boxes.push(box(0, -2, 2, 4, 4, 4, 'rockDeep')); // cotovelo
+      boxes.push(box(0, -2, 6, 4, 4, 4 + v, 'rust'));
+      boxes.push(box(1, -1, 10 + v, 2, 2, 1, 'scorch')); // boca rompida
       break;
     }
     case 'mushroom': {
       // Talo ALTO e chapeu em domo: com o chapeu baixo demais a projecao o
       // achatava sobre o talo e o cogumelo lia como panqueca verde no chao.
-      boxes.push(box(-1, -1, 0, 2, 2, 6, 'bone'));
-      layer(boxes, 3, 6, 2, 'fungus');
-      layer(boxes, 2, 8, 1, 'fungus');
-      layer(boxes, 1, 9, 1 + v, 'fungusDeep');
-      boxes.push(box(s * 2, -2, 7, 1, 1, 1, 'bone'));
-      boxes.push(box(-s * 2, 1 + v, 7, 1, 1, 1, 'bone'));
+      boxes.push(box(-1, -1, 0, 3, 3, 8, 'bone'));
+      slab(boxes, 0, 0, 5, 8, 2, 'fungus');
+      slab(boxes, 0, 0, 4, 10, 2, 'fungus');
+      slab(boxes, 0, 0, 2, 12, 1 + v, 'fungusDeep');
+      boxes.push(box(s * 3, -3, 9, 1, 1, 1, 'bone')); // pintas
+      boxes.push(box(-s * 3, 2 + v, 9, 1, 1, 1, 'bone'));
+      boxes.push(box(s, 3, 10, 1, 1, 1, 'bone'));
       break;
     }
 
@@ -222,105 +274,114 @@ const modelOf = (kind, v) => {
     // ------------------------------------------------------------------
     case 'monolith': {
       cone(boxes, [
-        [4, 5, 'rock'],
-        [3, 5, 'rockDeep'],
-        [2, 5, 'rock'],
-        [1, 4 + v, 'rockDeep'],
+        [6, 6, 'rock'],
+        [5, 6, 'rockDeep'],
+        [4, 6, 'rock'],
+        [2, 5 + v, 'rockDeep'],
       ]);
-      boxes.push(box(s * 3, s * 2, 5, 1, 1, 2, 'rockDeep')); // lasca na junta
+      boxes.push(box(s * 5, s * 3, 6, 2, 2, 3, 'rockDeep')); // lasca na junta
+      boxes.push(box(-s * 4, s * 4, 12, 1, 1, 2, 'rock'));
       break;
     }
     case 'great_prism': {
       // A agulha FRIA: facetas que abrem e fecham, familia do gelo — nem um
       // voxel do biolum reativo. Monumento nao e municao.
-      layer(boxes, 3, 0, 2, 'rock');
-      const radii = [1, 2, 3, 2, 1, 0];
-      let z = 2;
+      slab(boxes, 0, 0, 5, 0, 3, 'rock');
+      const radii = [2, 3, 4, 3, 2, 1];
+      let z = 3;
       for (const r of radii) {
-        layer(boxes, r, z, 3, 'ice');
+        slab(boxes, 0, 0, r, z, 3, 'ice');
         z += 3;
       }
-      boxes.push(box(s * 4, 0, 4, 1, 1, 3, 'ice'));
-      boxes.push(box(-s * 3, s * 2, 3, 1, 1, 2 + v, 'ice'));
+      slab(boxes, 0, 0, 0, z, 2, 'ice'); // a ponta
+      cone(boxes, [[1, 4, 'ice'], [0, 3, 'ice']], s * 6, s); // lasca satelite
+      cone(boxes, [[1, 3, 'ice'], [0, 2 + v, 'ice']], -s * 5, s * 3);
       break;
     }
     case 'stalagnate': {
       // Chao e teto unidos: larga embaixo, cintura no meio, flare discreto
       // em cima — o flare largo demais lia como MESA, nao como coluna.
       cone(boxes, [
-        [3, 3, 'bone'],
+        [5, 3, 'bone'],
+        [3, 4, 'bone'],
+        [2, 5, 'ice'],
+        [1, 5, 'bone'],
         [2, 4, 'bone'],
-        [1, 5, 'ice'],
-        [2, 3, 'bone'],
-        [1, 2 + v, 'bone'],
+        [1, 3 + v, 'bone'],
       ]);
+      cone(boxes, [[1, 3, 'bone'], [0, 2, 'bone']], s * 5, s * 2); // filha
       break;
     }
     case 'strata_arch': {
-      // A porta que a erosao fez: pilares laminados e o lintel por cima.
-      for (const px of [-4, 3]) {
-        boxes.push(box(px, -1, 0, 2, 3, 4, 'bone'));
-        boxes.push(box(px, -1, 4, 2, 3, 4, 'rust'));
-        boxes.push(box(px, -1, 8, 2, 3, 3, 'bone'));
+      // A porta que a erosao fez: pilares laminados (a banda segue o z, como
+      // a parede da Silica) e o lintel por cima.
+      for (const px of [-6, 4]) {
+        boxes.push(box(px, -2, 0, 3, 4, 3, 'bone'));
+        boxes.push(box(px, -2, 3, 3, 4, 3, 'rust'));
+        boxes.push(box(px, -2, 6, 3, 4, 3, 'bone'));
+        boxes.push(box(px, -2, 9, 3, 4, 3, 'rust'));
       }
-      boxes.push(box(-5, -1, 11, 10, 3, 2, 'bone'));
-      boxes.push(box(-3 + v, -1, 13, 5, 2, 1, 'rust'));
+      boxes.push(box(-7, -2, 12, 15, 4, 3, 'bone'));
+      boxes.push(box(-5 + v, -2, 15, 8, 3, 2, 'rust'));
       break;
     }
     case 'great_fumarole': {
       // A chamine-mae, extinta: boca escura funda, nenhuma fumaca.
       const top = cone(boxes, [
+        [6, 3, 'bone'],
+        [5, 3, 'rust'],
         [4, 3, 'bone'],
         [3, 3, 'rust'],
-        [2, 3, 'bone'],
-        [1, 4 + v, 'rust'],
+        [2, 4 + v, 'bone'],
       ]);
-      boxes.push(box(0, 0, top, 1, 1, 2, 'scorch'));
-      boxes.push(box(s * 3, s, 3, 1, 1, 3, 'rust')); // escorrimento na saia
+      boxes.push(box(-1, -1, top, 3, 3, 2, 'scorch'));
+      boxes.push(box(s * 5, s, 3, 1, 2, 5, 'rust')); // escorrimento na saia
+      boxes.push(box(-s * 4, s * 3, 3, 1, 1, 3, 'rust'));
       break;
     }
     case 'slag_monolith': {
       // Mesma regra do slag_block: rockDeep/rock dao a silhueta; o scorch e
       // detalhe de fresta, nunca o volume (invisivel contra o fundo).
-      boxes.push(box(-4, -3, 0, 8, 7, 4, 'rockDeep'));
-      boxes.push(box(-3, -2, 4, 6, 5, 4, 'rock'));
-      boxes.push(box(-2, 0, 6, 4, 1, 2, 'scorch'));
-      boxes.push(box(-1 + s, -1, 8, 4, 3, 4, 'rockDeep'));
-      boxes.push(box(0, -1, 12, 2, 2, 3 - v, 'rock'));
-      boxes.push(box(s * 4, 0, 2, 1, 1, 6, 'rust')); // veio de oxido na face
+      slab(boxes, 0, 0, 6, 0, 5, 'rockDeep');
+      slab(boxes, v - 1, 0, 4, 5, 5, 'rock');
+      boxes.push(box(-3, 1, 8, 6, 2, 2, 'scorch'));
+      slab(boxes, s, 0, 3, 10, 5, 'rockDeep');
+      slab(boxes, 0, 0, 1, 15, 4 - v, 'rock');
+      boxes.push(box(s * 6, 0, 2, 1, 2, 9, 'rust')); // veio de oxido na face
       break;
     }
     case 'frost_obelisk': {
-      layer(boxes, 3, 0, 3, 'rock');
-      layer(boxes, 2, 3, 5, 'ice');
-      layer(boxes, 1, 8, 6, 'ice');
-      layer(boxes, 0, 14, 4 + v, 'ice');
-      boxes.push(box(s * 3, s * 2, 3, 1, 1, 2, 'ice'));
+      slab(boxes, 0, 0, 5, 0, 4, 'rock');
+      slab(boxes, 0, 0, 3, 4, 7, 'ice');
+      slab(boxes, 0, 0, 2, 11, 7, 'ice');
+      slab(boxes, 0, 0, 1, 18, 5, 'ice');
+      slab(boxes, 0, 0, 0, 23, 2 + v, 'ice');
+      cone(boxes, [[1, 4, 'ice'], [0, 3, 'ice']], s * 5, s * 3); // agulha filha
       break;
     }
     case 'magnet_core': {
       // O no-mae: massa escura com placas de oxido presas em orbita — a
       // unica "fisica" e visual e congelada.
-      layer(boxes, 3, 0, 6, 'rockDeep');
-      layer(boxes, 2, 6, 3, 'rockDeep');
-      boxes.push(box(-5, -1, 4 + v, 1, 3, 3, 'rust'));
-      boxes.push(box(4, -1, 6 - v, 1, 3, 3, 'rust'));
-      boxes.push(box(-1, -1, 9, 3, 3, 2, 'rust'));
-      boxes.push(box(0, 0, 11, 1, 1, 2, 'rockDeep'));
+      slab(boxes, 0, 0, 5, 0, 8, 'rockDeep');
+      slab(boxes, 0, 0, 3, 8, 5, 'rockDeep');
+      boxes.push(box(-8, -2, 6 + v, 2, 5, 4, 'rust'));
+      boxes.push(box(6, -2, 9 - v, 2, 5, 4, 'rust'));
+      boxes.push(box(-2, -2, 13, 5, 5, 3, 'rust'));
+      slab(boxes, 0, 0, 1, 16, 3, 'rockDeep');
       break;
     }
     case 'drill': {
       // A broca-mae, parada onde parou: plataforma, mastro, colar e a ponta
       // de osso apontando para o veio. Maquina morta — sem luz de painel.
-      boxes.push(box(-4, -4, 0, 9, 8, 2, 'rockDeep'));
-      for (const [lx, ly] of [[-4, -4], [3, -4], [-4, 3], [3, 3]]) {
-        boxes.push(box(lx, ly, 2, 1, 1, 3, 'rust'));
+      slab(boxes, 0, 0, 6, 0, 3, 'rockDeep');
+      for (const [lx, ly] of [[-6, -6], [5, -6], [-6, 5], [5, 5]]) {
+        boxes.push(box(lx, ly, 3, 2, 2, 5, 'rust'));
       }
-      boxes.push(box(-1, -1, 2, 2, 2, 12, 'rust'));
-      boxes.push(box(-2, -2, 8, 4, 4, 2, 'rockDeep'));
-      boxes.push(box(1, -1 + v, 11, 3, 2, 1, 'rust'));
-      boxes.push(box(s * 2, 0, 4, 1, 1, 4, 'bone'));
-      boxes.push(box(s * 2, 0, 3, 1, 1, 1, 'bone'));
+      boxes.push(box(-2, -2, 3, 4, 4, 17, 'rust')); // mastro
+      slab(boxes, 0, 0, 3, 12, 3, 'rockDeep'); // colar
+      boxes.push(box(2, -1 + v, 17, 5, 3, 2, 'rust')); // braco
+      boxes.push(box(s * 4, -1, 6, 2, 2, 6, 'bone')); // a broca
+      cone(boxes, [[0, 2, 'bone']], s * 4, 0);
       break;
     }
     default:
