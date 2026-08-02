@@ -170,6 +170,31 @@ export const surfaceRuptureFor = (
 };
 
 /**
+ * A ruptura do setor de um estado VIVO, escolhida contra o mundo PRISTINO.
+ *
+ * `hallCenters` retem de proposito saloes que as provas de alcancabilidade
+ * selaram de volta — um centro pode ser rocha solida. A fenda so pode se
+ * abrir sobre um salao que EXISTE: aqui a lista e filtrada pelo terreno
+ * reconstruido da seed antes da selecao. Filtrar pelo estado vivo seria
+ * errado duas vezes: mineracao so ABRE celulas (nunca mudaria a escolha),
+ * mas o cerco do Guardiao fecha celulas temporariamente — e a fenda que
+ * muda de salao no meio da luta seria o teto mentindo.
+ */
+export const sectorRupture = (live: SurvivalState): { x: number; y: number } | null => {
+  if (live.sector > 2) return null;
+  const state = createRun({
+    seed: live.config.seed,
+    sector: live.sector,
+    width: live.config.width,
+    height: live.config.height,
+    playerCount: 1,
+  });
+  const w = state.config.width;
+  const open = state.hallCenters.filter((c) => state.solid[c.y * w + c.x] === SOLID_NONE);
+  return surfaceRuptureFor(state.config.seed, state.sector, open);
+};
+
+/**
  * Kit de arquetipos por strata: borda/ritmo, microprops de chao, teto e o
  * landmark monumental do salao — a hierarquia de composicao completa.
  */
@@ -449,7 +474,13 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
 
   // As raizes da RUPTURA: so no setor raro em que o teto rachou, penduradas
   // em volta da fenda — a superficie entrando pelo buraco que a luz mostra.
-  const rupture = surfaceRuptureFor(state.config.seed, state.sector, state.hallCenters);
+  // A selecao filtra saloes SELADOS pelas provas de alcancabilidade (mesma
+  // regra de `sectorRupture`): a fenda so se abre sobre um salao que existe.
+  const rupture = surfaceRuptureFor(
+    state.config.seed,
+    state.sector,
+    state.hallCenters.filter((c) => solid[idx(c.x, c.y)] === SOLID_NONE),
+  );
   if (rupture) {
     const sampler = nearHall(rupture);
     for (let n = 0; n < 7; n++) tryPlace(['root_strand'], 'ceiling', isOpen, sampler);

@@ -9,7 +9,7 @@
 //    micelio so cresce sobre o proprio tapete; prop de borda tem parede viva.
 import { describe, expect, it } from 'vitest';
 import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SURF_FUNGAL, SURF_WATER } from '@voxelyn/survival-sim';
-import { placeDecor, propStillValid, surfaceRuptureFor } from '../client/decor';
+import { placeDecor, propStillValid, sectorRupture, surfaceRuptureFor } from '../client/decor';
 
 describe('decoracao derivada', () => {
   it('mesma seed, mesma lista — e nada da RNG autoritativa e consumido', () => {
@@ -267,17 +267,28 @@ describe('decoracao derivada', () => {
     expect(shallow).toBeGreaterThan(1200 * 0.08);
     expect(shallow).toBeLessThan(1200 * 0.3);
 
+    // A fenda so se abre sobre salao que EXISTE: a selecao filtra centros
+    // selados pelas provas de alcancabilidade. Seed 36 setor 2 e o
+    // contraexemplo historico — o centro cru era SOLID_ROCK.
+    const r36 = sectorRupture(createRun({ seed: 36, sector: 2 }));
+    if (r36) {
+      const w36 = createRun({ seed: 36, sector: 2 });
+      expect(w36.solid[r36.y * w36.config.width + r36.x]).toBe(SOLID_NONE);
+    }
+
     // No setor rompido, as raizes pendem em volta da fenda.
-    const seedWith = (() => {
+    const found = (() => {
       for (let s = 1; s < 4096; s++) {
-        if (surfaceRuptureFor(s, 1, probe)) return s;
+        if (!surfaceRuptureFor(s, 1, probe)) continue;
+        const st = createRun({ seed: s });
+        const r = sectorRupture(st);
+        if (r) return { state: st, rupture: r };
       }
-      throw new Error('nenhuma seed com ruptura');
+      throw new Error('nenhuma seed com ruptura viavel');
     })();
-    const state = createRun({ seed: seedWith });
-    const rupture = surfaceRuptureFor(seedWith, 1, state.hallCenters);
-    expect(rupture).not.toBeNull();
-    if (!rupture) return;
+    const { state, rupture } = found;
+    // A fenda mora numa celula aberta do mundo pristino.
+    expect(state.solid[rupture.y * state.config.width + rupture.x]).toBe(SOLID_NONE);
     const roots = placeDecor(state).filter((p) => p.kind === 'root_strand');
     expect(roots.length).toBeGreaterThan(0);
     for (const root of roots) {

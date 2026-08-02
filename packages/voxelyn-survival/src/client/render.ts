@@ -57,7 +57,7 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
-import { placeDecor, propStillValid, surfaceRuptureFor, type DecorativeProp } from './decor';
+import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
 import { drawDecorProp } from './decor-draw';
 import { drawWallEdgeDetail } from './edge-detail';
 import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
@@ -752,6 +752,8 @@ export class SurvivalRenderer {
   private decorKey = '';
   /** Rastro dos espreitadores ocultos, por id. Ver lurker-trail.ts. */
   private readonly lurkerTrails = new Map<number, LurkerTrail>();
+  /** A Ruptura do setor atual (ou null), cacheada junto com a decoracao. */
+  private rupture: { x: number; y: number } | null = null;
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -1513,6 +1515,12 @@ export class SurvivalRenderer {
     if (this.decorKey !== decorKey) {
       this.decorKey = decorKey;
       this.decor = placeDecor(state);
+      // A fenda e escolhida contra o mundo PRISTINO (saloes selados nao
+      // contam) e cacheada com a decoracao: uma reconstrucao por setor.
+      this.rupture = sectorRupture(state);
+      // Mundo novo, lamina nova: rastros do setor anterior morreriam como
+      // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
+      this.lurkerTrails.clear();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -1575,6 +1583,10 @@ export class SurvivalRenderer {
         // viva; o rastro sao as anteriores, desbotando.
         for (let p = 0; p < trail.points.length - 1; p++) {
           const pt = trail.points[p];
+          // A pegada obedece a MESMA luz que tudo: um risco desenhado no
+          // escuro entregaria a rota do bicho por terreno que o jogador nao
+          // ve — stealth pago em iluminacao nao pode vazar pelo rastro.
+          if (brightness(pt.x, pt.y) <= 0.05) continue;
           const [tx, ty] = toScreen(pt.x, pt.y);
           if (tx < -60 || tx > vw + 60 || ty < -60 || ty > vh + 60) continue;
           const age = trailAge(trail, pt, nowMs);
@@ -1669,6 +1681,7 @@ export class SurvivalRenderer {
       }
       const inWater = this.archetypeById.get(id) === 'mud_lamprey';
       for (const pt of trail.points) {
+        if (brightness(pt.x, pt.y) <= 0.05) continue;
         const [tx, ty] = toScreen(pt.x, pt.y);
         if (tx < -60 || tx > vw + 60 || ty < -60 || ty > vh + 60) continue;
         const age = trailAge(trail, pt, nowMs);
@@ -1939,7 +1952,7 @@ export class SurvivalRenderer {
     // HUD. E ambiente, nao informacao: nada joga diferente debaixo dela —
     // por isso o tom e quente-neutro, longe do telegrafo e do gas.
     {
-      const rupture = surfaceRuptureFor(state.config.seed, state.sector, state.hallCenters);
+      const rupture = this.rupture;
       if (rupture) {
         const [rx, ry] = toScreen(rupture.x + 0.5, rupture.y + 0.5);
         if (rx > -180 && rx < vw + 180 && ry > -180 && ry < vh + 180) {
