@@ -337,7 +337,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'hud.purgeCells': 'PURGE CELL ×{count}',
   'hud.sector': 'SECTOR {sector}/{total}',
   'hud.objective.descend': 'DESCEND THE SHAFT',
-  'hud.objective.returnWithCore': 'RETURN TO THE ENTRANCE',
+  'hud.objective.ascend': 'ASCEND AT THE ENTRANCE — THE SHAFT IS SEALED',
   'hud.objective.extract': 'EXTRACT AT THE ENTRANCE',
   'hud.objective.findCore': 'FIND THE CORE',
   'hud.cache': 'CACHE: {direction} · ~{distance}m',

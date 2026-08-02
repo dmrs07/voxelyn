@@ -431,6 +431,48 @@ informação, não coletável); quando a contaminação passa de `CANARY_DEAD_AT
 autoritativo do HUD. Frames vivo/morto no atlas (`decor:canary_cage:0/1` —
 o eixo de "variante" aqui é o estado, de propósito).
 
+## Vigésima etapa (implementada): portais por bioma
+
+O transporte entre setores era UM poço genérico (`descent`) em todos os
+estratos. Agora cada bioma tem o seu portal no atlas `world-props` (v4),
+**dez chaves animadas** `portal:<chave>` — a chave é a ocupação quando há
+ocupação (`mycelial`, `aurix`: a operação cava do seu jeito em qualquer
+rocha) e o estrato quando não há (as oito rochas). Seis quadros a 170ms,
+a mesma cadência do poço original.
+
+**A gramática universal** — o que grita "isto é um portal" em qualquer
+dialeto: a **boca escura** (furo opaco 6×6, único centro assim no jogo) e
+a **cruz de quatro luzes-guia douradas convergindo** para ela, com a mesma
+lei de movimento do `descent` clássico. A regra anti-mentira da decoração
+(enfeite nunca usa ouro) existe justamente para esses quatro voxels
+continuarem significando "entre". Flavors: escada de colunas basálticas em
+espiral, garganta de geodo com reflexos, sumidouro d'água, lábio de osso
+com placas de enxofre que respira, entulho com brasa da Fornalha, túnel
+escorado da Sílica, furo no gelo rachado, poço do veio com faísca
+magnética, íris fúngica que respira, e o elevador de castelete Aurix com
+guincho, cabo e cabine descendo.
+
+**O poço selado** (`portal:sealed`, 1 quadro): na subida da extração de
+retorno o poço vira tampa de laje com barrotes — sem luzes, sem convite —
+e a **luz funcional dele apaga** (`objectiveLightSpec` → null com o Núcleo
+na mão). Na volta, a **entrada** dos setores 2+ é desenhada como o portal
+do bioma (é funcionalmente a subida); a do setor 1 continua plataforma de
+extração. O HUD acompanha: `hud.objective.ascend` ("SUBA PELA ENTRADA — O
+POÇO SELOU") substitui o "DESÇA PELO POÇO" que apontava para um poço
+recusando interação. O `descent` genérico continua no atlas como fallback
+de cache antigo (`objectiveAtlasChain`/`entryAtlasChain` tentam na ordem).
+
+**Co-op**: os relógios dos trilhos (`readyAt`/`firingAt`) viajam nas
+`WorldFlags` (`railTimers`, alinhados por índice com a geometria
+determinística da seed): o `worldSig` dispara o envio sozinho no tick do
+gatilho e o `full_resync` sempre os carrega — join/reconnect no meio do
+windup recupera o telegrafo. No espelho, `firingAt` só anda para FRENTE:
+a linha de render corre atrás do servidor (quadro bufferizado), e aplicar
+o zero do snapshot do disparo apagaria o aviso ~100ms antes de o carrinho
+aparecer; deixado quieto, o aviso expira no instante exato em que a linha
+de render cruza o `firingAt`. Campo opcional (precedente do `wellOffers`),
+sem mudança de protocolo.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;

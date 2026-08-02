@@ -52,7 +52,11 @@ export const SIMULATION_VERSION = 16;
 // a broca deixam o desenho de runtime (que vira fallback).
 // 14: crostas dos TRILHOS da operacao (surface-tiles v6: rail e rail-v) —
 // o chao da armadilha de carrinho.
-export const CONTENT_VERSION = 14;
+// 15: PORTAIS por bioma no atlas world-props (v4): dez chaves animadas
+// portal:<estrato|ocupacao> — todas com a mesma gramatica (boca escura +
+// cruz de luzes-guia convergentes) — e o poco SELADO (portal:sealed) da
+// extracao de retorno. O `descent` generico vira fallback.
+export const CONTENT_VERSION = 15;
 
 export type VersionTriple = {
   protocolVersion: number;

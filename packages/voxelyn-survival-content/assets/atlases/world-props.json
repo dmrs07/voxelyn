@@ -1,6 +1,6 @@
 {
   "id": "world-props",
-  "version": 3,
+  "version": 4,
   "atlas": "world-props.png",
   "frameWidth": 108,
   "frameHeight": 142,
@@ -442,6 +442,61 @@
       "name": "decor:canary_cage:1",
       "frames": 1,
       "frameMs": 0
+    },
+    {
+      "name": "portal:basalt",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:prismatic",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:aquifer",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:sulfur",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:furnace",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:silica",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:glacial",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:ferric",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:mycelial",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:aurix",
+      "frames": 6,
+      "frameMs": 170
+    },
+    {
+      "name": "portal:sealed",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "paletteColors": [
@@ -455,11 +510,16 @@
     "#59f2c2",
     "#66c28a",
     "#6e4a33",
+    "#7ab8ff",
     "#7b8ba3",
     "#8a7154",
+    "#a8e63c",
     "#b8a98f",
     "#d5cdba",
+    "#d93b4c",
     "#e8f1ff",
+    "#ff7a2f",
+    "#ffa63f",
     "#ffd166"
   ],
   "generation": {

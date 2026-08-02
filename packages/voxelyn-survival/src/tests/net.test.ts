@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { SurvivalServer } from '@voxelyn/survival-server';
 import { CURRENT_VERSIONS } from '@voxelyn/survival-protocol';
-import { breakSolid, emptyCommand, type PlayerCommand } from '@voxelyn/survival-sim';
+import {
+  breakSolid,
+  CART_WINDUP_TICKS,
+  createRun,
+  emptyCommand,
+  lineageOf,
+  type PlayerCommand,
+  type RailTrack,
+} from '@voxelyn/survival-sim';
 import { NetClient } from '../client/net';
 
 /**
@@ -388,5 +396,112 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
 
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(['extracted', 'extracted_with_core']).toContain(view.phase);
+  });
+});
+
+describe('telegrafo do carrinho em co-op', () => {
+  // Os relogios dos trilhos viajam nas WorldFlags (`railTimers`): a GEOMETRIA
+  // dos tramos o cliente regenera da seed, mas o TEMPO e estado de runtime —
+  // sem ele o espelho nasce (e vive) com firingAt = 0 e o carrinho chega pelo
+  // snapshot de projeteis SEM aviso. Como o full_resync sempre carrega as
+  // flags, quem entra ou reconecta NO MEIO do aviso tambem ve o telegrafo.
+  const seedIndustrial = (() => {
+    for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'industrial') return s;
+    throw new Error('nenhuma seed industrial');
+  })();
+
+  const connect = (): { client: NetClient; track: RailTrack } => {
+    // Referencia local do mundo que o cliente vai gerar da mesma seed.
+    const reference = createRun({ seed: seedIndustrial, sector: 2, playerCount: 2 });
+    expect(reference.railTracks.length).toBeGreaterThan(0);
+    const client = new NetClient(() => {});
+    client.receive(JSON.stringify({
+      t: 'welcome',
+      versions: CURRENT_VERSIONS,
+      playerId: 1,
+      resumeToken: 'tk',
+      roomCode: 'SALA',
+      seed: seedIndustrial,
+      sector: 2,
+      worldWidth: reference.config.width,
+      worldHeight: reference.config.height,
+      mapHash: '', // vazio: pula a validacao de mapa neste teste de unidade
+    }));
+    const mirror = (client as unknown as { state: { railTracks: RailTrack[] } }).state;
+    return { client, track: mirror.railTracks[0] };
+  };
+
+  const worldWith = (timers: Array<{ readyAt: number; firingAt: number }>) => ({
+    salvageSites: [],
+    coreTaken: false,
+    guardianAwake: false,
+    wellOffers: [],
+    railTimers: timers,
+  });
+
+  it('railTimers do snapshot rearmam o firingAt do tramo espelhado', () => {
+    const { client, track } = connect();
+    expect(track.firingAt).toBe(0);
+    client.receive(JSON.stringify({
+      t: 'snapshot',
+      serverTick: 400,
+      ackSeq: 0,
+      phase: 'running',
+      entities: [],
+      projectiles: [],
+      removedEntities: [],
+      chunkDiffs: [],
+      contamination: 0,
+      events: [],
+      world: worldWith([{ readyAt: 0, firingAt: 400 + CART_WINDUP_TICKS }]),
+    }));
+    // O aviso do espelho e TICK-based, como no solo: o renderer le
+    // state.railTracks e compara com o tick da linha de render.
+    expect(track.firingAt).toBe(400 + CART_WINDUP_TICKS);
+  });
+
+  it('o snapshot do DISPARO nao apaga o aviso antes da linha de render', () => {
+    // O render desenha um quadro bufferizado (atras do servidor): o snapshot
+    // que zera firingAt chega ANTES de o carrinho alcancar o tick desenhado.
+    // O espelho so deixa o relogio andar para frente — o aviso expira sozinho
+    // quando a linha de render cruza o firingAt antigo.
+    const { client, track } = connect();
+    const snapshotWith = (serverTick: number, timers: Array<{ readyAt: number; firingAt: number }>) =>
+      JSON.stringify({
+        t: 'snapshot',
+        serverTick,
+        ackSeq: 0,
+        phase: 'running',
+        entities: [],
+        projectiles: [],
+        removedEntities: [],
+        chunkDiffs: [],
+        contamination: 0,
+        events: [],
+        world: worldWith(timers),
+      });
+    client.receive(snapshotWith(400, [{ readyAt: 0, firingAt: 424 }]));
+    // O disparo: o servidor zera o relogio e arma o cooldown.
+    client.receive(snapshotWith(424, [{ readyAt: 824, firingAt: 0 }]));
+    expect(track.firingAt).toBe(424); // o aviso vive ate a linha de render chegar la
+    expect(track.readyAt).toBe(824); // o cooldown, sem timeline, aplica direto
+  });
+
+  it('reconexao NO MEIO do aviso recupera o telegrafo pelo full_resync', () => {
+    const { client, track } = connect();
+    client.receive(JSON.stringify({
+      t: 'full_resync',
+      serverTick: 410,
+      seed: seedIndustrial,
+      sector: 2,
+      chunkDiffs: [],
+      entities: [],
+      projectiles: [],
+      you: null,
+      world: worldWith([{ readyAt: 3, firingAt: 424 }]),
+      authHash: '',
+    }));
+    expect(track.firingAt).toBe(424);
+    expect(track.readyAt).toBe(3);
   });
 });

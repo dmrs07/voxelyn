@@ -301,6 +301,11 @@ export class NetClient {
         if (msg.you) {
           this.viewer = msg.you;
         }
+        // (O telegrafo do carrinho NAO precisa de tratamento aqui: os
+        // relogios dos trilhos viajam nas WorldFlags — `railTimers` — que o
+        // applyWorld acima ja aplicou. Pisar num gatilho muda o worldSig e
+        // dispara o envio no proprio tick do aviso; e o full_resync sempre
+        // as carrega, entao quem entra NO MEIO do aviso tambem o ve.)
         this.eventQueue.push(msg.serverTick, msg.events);
         break;
       }
@@ -350,6 +355,29 @@ export class NetClient {
       y: offer.y,
       takenBy: offer.takenBy,
     }));
+    // Relogios dos trilhos, por indice: a geometria dos tramos vem da seed
+    // (mesma ordem deterministica do worldgen), so o TEMPO e autoritativo.
+    // E o que faz o telegrafo do carrinho existir online — inclusive para
+    // quem entra ou reconecta NO MEIO do aviso, porque o full_resync sempre
+    // carrega as WorldFlags. Servidor antigo nao manda o campo: fica tudo
+    // em zero, como antes.
+    const timers = world.railTimers;
+    if (timers) {
+      for (let i = 0; i < state.railTracks.length && i < timers.length; i++) {
+        state.railTracks[i].readyAt = timers[i].readyAt;
+        // O firingAt so ANDA PARA FRENTE. A linha de render corre atras do
+        // servidor de proposito (quadro bufferizado), e o snapshot do
+        // DISPARO — que zera o relogio — chega um a tres ticks antes de o
+        // proprio carrinho alcancar o tick desenhado: zerar aqui apagaria o
+        // aviso ~100ms antes de o perigo aparecer. Deixado quieto, o aviso
+        // expira sozinho no instante exato em que a linha de render cruza o
+        // firingAt antigo (`firingAt > tick` vira falso) — e um valor no
+        // passado nao desenha nada, entao nao ha o que limpar.
+        if (timers[i].firingAt > state.railTracks[i].firingAt) {
+          state.railTracks[i].firingAt = timers[i].firingAt;
+        }
+      }
+    }
   }
 
   /**

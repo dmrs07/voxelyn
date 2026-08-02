@@ -341,7 +341,7 @@ export const PT_BR = {
   'hud.purgeCells': 'CÉLULA DE PURGA ×{count}',
   'hud.sector': 'SETOR {sector}/{total}',
   'hud.objective.descend': 'DESÇA PELO POÇO',
-  'hud.objective.returnWithCore': 'VOLTE PARA A ENTRADA',
+  'hud.objective.ascend': 'SUBA PELA ENTRADA — O POÇO SELOU',
   'hud.objective.extract': 'EXTRAIA NA ENTRADA',
   'hud.objective.findCore': 'ENCONTRE O NÚCLEO',
   'hud.cache': 'COFRE: {direction} · ~{distance}m',
