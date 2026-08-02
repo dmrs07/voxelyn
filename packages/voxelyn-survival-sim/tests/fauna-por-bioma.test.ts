@@ -20,7 +20,10 @@ import {
   SURF_NONE,
   SURF_SPORES,
   UNDERTAKER_PULL_COOLDOWN_TICKS,
+  UNDERTAKER_PULL_RANGE,
+  UNDERTAKER_PULL_TILES,
   UNDERTAKER_PULL_WINDUP_TICKS,
+  UNDERTAKER_SLAM_RANGE,
 } from '../src/constants';
 import { setSurface } from '../src/cells';
 import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
@@ -260,6 +263,25 @@ describe('Coveiro', () => {
     // que e o segundo aviso: da tempo de rolar.
     expect(undertaker.action?.kind).toBe('slam');
     expect(undertaker.action?.phase).toBe('windup');
+  });
+
+  it('do alcance MAXIMO, o puxao entrega o alvo dentro da prensa', () => {
+    // A conta que amarra os tres numeros: PULL_RANGE - PULL_TILES <= SLAM_RANGE.
+    // Sem ela o combo nao fechava no primeiro contato — engate a 8,5 com
+    // arrasto de 3,6 deixava o alvo a 4,9 de uma prensa que alcanca 1,5, e o
+    // Coveiro gastava os DOIS telegrafos num golpe impossivel contra alguem
+    // parado. Como o aggro vale o mesmo que o engate, esse era o encontro
+    // normal, e nao um caso de borda.
+    expect(UNDERTAKER_PULL_RANGE - UNDERTAKER_PULL_TILES).toBeLessThanOrEqual(UNDERTAKER_SLAM_RANGE);
+
+    const state = arena(21);
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+    // Exatamente na borda do engate, e parado.
+    state.player.x = undertaker.x + UNDERTAKER_PULL_RANGE - 0.05;
+    state.player.y = undertaker.y;
+    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 2);
+    const after = Math.hypot(state.player.x - undertaker.x, state.player.y - undertaker.y);
+    expect(after, 'o puxao nao alcanca a propria prensa').toBeLessThanOrEqual(UNDERTAKER_SLAM_RANGE);
   });
 
   it('so puxa de novo depois do descanso: nao e um cabo de guerra', () => {

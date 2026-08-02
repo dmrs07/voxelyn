@@ -281,12 +281,28 @@ export const SULFUR_BOMBER_GAS_LIFE_TICKS = 240;
  * dele. Esquivar durante a carga tambem sai — o iframe do dodge nao anula o
  * arrasto, mas os tiles ganhos, sim.
  */
-export const UNDERTAKER_PULL_RANGE = 8.5;
+/**
+ * O ALCANCE e o ARRASTO andam juntos, e a conta e uma so:
+ *
+ *   PULL_RANGE - PULL_TILES <= SLAM_RANGE
+ *
+ * Sem ela, o combo nao fecha justamente no PRIMEIRO CONTATO. Com o engate a
+ * 8,5 tiles e o arrasto de 3,6, o alvo terminava a 4,9 do Coveiro — e a
+ * prensa alcanca 1,5. Ele gastava os dois telegrafos num golpe que nao podia
+ * acertar nem contra alguem parado, e como o aggro tambem valia 8,5 esse era
+ * o comportamento NORMAL do encontro, nao um caso de borda.
+ *
+ * A correcao mantem a fantasia (o eletroima traz voce de longe) encurtando o
+ * engate e alongando o arrasto: 6,5 - 5 = 1,5, exatamente o alcance da
+ * prensa. No pior caso o puxao entrega o alvo na borda do golpe; em qualquer
+ * distancia menor, dentro dele.
+ */
+export const UNDERTAKER_PULL_RANGE = 6.5;
 export const UNDERTAKER_PULL_MIN_RANGE = 2.2; // colado, ele so prensa
 export const UNDERTAKER_PULL_WINDUP_TICKS = 22;
 export const UNDERTAKER_PULL_COOLDOWN_TICKS = 130;
 /** Quanto o eletroima arrasta, em tiles, se nada bloquear o caminho. */
-export const UNDERTAKER_PULL_TILES = 3.6;
+export const UNDERTAKER_PULL_TILES = 5;
 /** Passo do arrasto: a colisao e avaliada tile a tile, nunca em salto. */
 export const UNDERTAKER_PULL_STEP = 0.2;
 /** A prensa que vem logo depois do puxao — o "porradao". */

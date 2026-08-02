@@ -47,7 +47,21 @@ type ActionVisualClock = {
 };
 
 export const actionAnimation = (action: EntityActionKind): string => {
-  if (action === 'detonate' || action === 'charge' || action === 'pulse' || action === 'hurl') return 'special';
+  // `special` e a pose de PREPARO — o pod inchando, o corpo recuando para a
+  // investida, a coroa abrindo. `haul` pertence a esta familia: no atlas do
+  // Coveiro o `special` e a carga do eletroima (bobinas acesas, campo visivel)
+  // e o `attack` e a prensa. Sem esta linha, o telegrafo de 1,1 s do puxao
+  // mostrava o BRACO ERRADO se movendo — o aviso mais importante do bicho
+  // apontando para o golpe seguinte em vez de para o que estava acontecendo.
+  if (
+    action === 'detonate' ||
+    action === 'charge' ||
+    action === 'pulse' ||
+    action === 'hurl' ||
+    action === 'haul'
+  ) {
+    return 'special';
+  }
   return 'attack';
 };
 

@@ -70,7 +70,12 @@ export const SIMULATION_VERSION = 17;
 // portal:<estrato|ocupacao> — todas com a mesma gramatica (boca escura +
 // cruz de luzes-guia convergentes) — e o poco SELADO (portal:sealed) da
 // extracao de retorno. O `descent` generico vira fallback.
-export const CONTENT_VERSION = 15;
+// 16: o POOL DE CRIATURAS muda — dois corpos novos no bestiario
+// (enemy-sulfur-bomber e enemy-undertaker, com atlas proprios) e o atlas do
+// Miner REFEITO. E exatamente o que este campo existe para marcar: sem o
+// bump, o conjunto de assets de antes e o de depois se declarariam a mesma
+// revisao de conteudo.
+export const CONTENT_VERSION = 16;
 
 export type VersionTriple = {
   protocolVersion: number;
