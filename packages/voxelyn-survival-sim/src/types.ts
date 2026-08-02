@@ -605,6 +605,16 @@ export type SurvivalState = {
    */
   wellOffers: WellOffer[];
   vents: Vent[];
+  /**
+   * Centros dos saloes carimbados pela gramatica espacial do estrato.
+   *
+   * Informacao de APRESENTACAO, nao de jogo: a simulacao nunca le isto, nao
+   * entra no hash autoritativo nem viaja em snapshot — qualquer cliente
+   * reconstroi a mesma lista via `createRun`, como faz com o resto do mundo.
+   * O consumidor e a camada de decoracao, que ancora os landmarks monumentais
+   * no centro dos saloes em vez de num sorteio sem significado.
+   */
+  hallCenters: Vec2[];
   charges: Array<{ idx: number; until: number }>;
   contamination: number;
   contaminationWaves: number;

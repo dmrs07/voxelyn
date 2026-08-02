@@ -8,7 +8,7 @@
 // 3. HONESTIDADE: prop de chao so em celula aberta e sem materia reativa; o
 //    micelio so cresce sobre o proprio tapete; prop de borda tem parede viva.
 import { describe, expect, it } from 'vitest';
-import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SURF_FUNGAL } from '@voxelyn/survival-sim';
+import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SURF_FUNGAL, SURF_WATER } from '@voxelyn/survival-sim';
 import { placeDecor, propStillValid } from '../client/decor';
 
 describe('decoracao derivada', () => {
@@ -62,8 +62,14 @@ describe('decoracao derivada', () => {
       const state = createRun({ seed });
       for (const prop of placeDecor(state)) {
         expect(propStillValid(state, prop), `seed ${seed} ${prop.kind}`).toBe(true);
+        if (prop.anchor === 'landmark') {
+          // O monumento e o UNICO prop ancorado em materia solida: e por isso
+          // que a silhueta imensa dele nunca mente sobre colisao.
+          expect(state.solid[prop.y * state.config.width + prop.x]).not.toBe(SOLID_NONE);
+          continue;
+        }
         expect(state.solid[prop.y * state.config.width + prop.x]).toBe(SOLID_NONE);
-        if (prop.anchor === 'wall_base') {
+        if (prop.anchor === 'wall_base' || prop.anchor === 'ceiling') {
           expect(state.solid[prop.wallCell]).not.toBe(SOLID_NONE);
         }
       }
@@ -80,6 +86,60 @@ describe('decoracao derivada', () => {
     // formacao — o prop deixa de desenhar em vez de flutuar.
     state.solid[wallProp.wallCell] = SOLID_NONE;
     expect(propStillValid(state, wallProp)).toBe(false);
+  });
+
+  it('landmarks nascem no coracao dos saloes, no maximo dois, e caem com o pedestal', () => {
+    let sawLandmark = false;
+    for (const seed of [3, 42, 1337]) {
+      const state = createRun({ seed });
+      const landmarks = placeDecor(state).filter((p) => p.anchor === 'landmark');
+      expect(landmarks.length).toBeLessThanOrEqual(2);
+      for (const mark of landmarks) {
+        sawLandmark = true;
+        // O pedestal fica a um anel curto de um centro de salao registrado
+        // pela gramatica — o monumento marca o LUGAR, nao um sorteio.
+        const near = state.hallCenters.some(
+          (c) => Math.max(Math.abs(c.x - mark.x), Math.abs(c.y - mark.y)) <= 3,
+        );
+        expect(near, `seed ${seed}: landmark longe de qualquer salao`).toBe(true);
+        // Minerar o pedestal derruba o monumento.
+        const i = mark.y * state.config.width + mark.x;
+        expect(propStillValid(state, mark)).toBe(true);
+        const was = state.solid[i];
+        state.solid[i] = SOLID_NONE;
+        expect(propStillValid(state, mark)).toBe(false);
+        state.solid[i] = was;
+      }
+    }
+    // Todos os estratos tem gramatica de salao; alguma das seeds precisa
+    // produzir um monumento, senao o recurso esta morto sem ninguem notar.
+    expect(sawLandmark).toBe(true);
+  });
+
+  it('prop de teto pende de parede viva e some quando ela cai', () => {
+    let sawCeiling = false;
+    for (const seed of [3, 42, 1337]) {
+      const state = createRun({ seed });
+      const hangers = placeDecor(state).filter((p) => p.anchor === 'ceiling');
+      for (const prop of hangers) {
+        sawCeiling = true;
+        expect(state.solid[prop.y * state.config.width + prop.x]).toBe(SOLID_NONE);
+        expect(state.solid[prop.wallCell]).not.toBe(SOLID_NONE);
+        // O Bruiser arranca a parede: o teto que pendia dela desaba junto.
+        const was = state.solid[prop.wallCell];
+        state.solid[prop.wallCell] = SOLID_NONE;
+        expect(propStillValid(state, prop)).toBe(false);
+        state.solid[prop.wallCell] = was;
+        // Mas o CHAO embaixo e livre para jogar: agua, fogo, o que vier — o
+        // prop pende do alto e nao esconde nada disso.
+        const i = prop.y * state.config.width + prop.x;
+        const surf = state.surface[i];
+        state.surface[i] = SURF_WATER;
+        expect(propStillValid(state, prop)).toBe(true);
+        state.surface[i] = surf;
+      }
+    }
+    expect(sawCeiling).toBe(true);
   });
 
   it('cogumelos so crescem sobre o tapete fungico', () => {

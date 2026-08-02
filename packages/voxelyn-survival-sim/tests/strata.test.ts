@@ -209,6 +209,36 @@ describe('perfis por estrato', () => {
     expect(seedsWithPillars).toBeGreaterThanOrEqual(3);
   });
 
+  it('a gramatica registra os centros dos saloes — sem mover um byte do mapa', () => {
+    // hallCenters e informacao de APRESENTACAO (ancora dos landmarks do
+    // cliente): registrar nao pode consumir RNG nem mudar celula nenhuma.
+    // O perfil historico puro (halls 'none') continua sem centro algum.
+    const pure = generateWorld(42, WORLD_W, WORLD_H, DEFAULT_PROFILE);
+    expect(pure.hallCenters).toEqual([]);
+
+    for (const seed of SEEDS.slice(0, 4)) {
+      // Todo estrato da primeira leva tem gramatica; os centros existem e
+      // moram dentro da moldura do mapa.
+      const state = createRun({ seed, sector: 2 });
+      expect(state.hallCenters.length).toBeGreaterThan(0);
+      for (const c of state.hallCenters) {
+        expect(c.x).toBeGreaterThan(1);
+        expect(c.y).toBeGreaterThan(1);
+        expect(c.x).toBeLessThan(WORLD_W - 1);
+        expect(c.y).toBeLessThan(WORLD_H - 1);
+      }
+      // Mesma seed, mesma lista: e a mesma derivacao pura do resto do mundo.
+      expect(createRun({ seed, sector: 2 }).hallCenters).toEqual(state.hallCenters);
+    }
+
+    // A descida ao vivo e a reconstrucao por createRun veem os MESMOS
+    // centros — a decoracao de quem reconecta ancora nos mesmos saloes.
+    const live = createRun({ seed: 7 });
+    const events: SemanticEvent[] = [];
+    descend(live, events);
+    expect(live.hallCenters).toEqual(createRun({ seed: 7, sector: 2 }).hallCenters);
+  });
+
   it('as bacias do Aquifero nascem cheias: existe um lago CONECTADO grande', () => {
     const seed = seedWithLineage('hydric');
     const state = createRun({ seed, sector: 2 });

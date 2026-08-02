@@ -28,7 +28,19 @@ import {
 } from '@voxelyn/survival-sim';
 import type { OccupationId, StratumId, SurvivalState } from '@voxelyn/survival-sim';
 
-export type PropAnchor = 'floor' | 'wall_base';
+/**
+ * Onde um prop mora:
+ * - `floor`: sobre uma celula aberta e nua;
+ * - `wall_base`: na celula aberta ao PE de uma parede viva;
+ * - `ceiling`: PENDURADO sobre uma celula aberta, agarrado a uma parede
+ *   vizinha (o teto desce nas bordas). Desenhado alto e TRANSLUCIDO: o chao
+ *   que joga continua visivel por baixo;
+ * - `landmark`: COROANDO uma celula SOLIDA no centro de um salao. E o unico
+ *   prop com presenca monumental, e por isso o unico ancorado em materia que
+ *   de fato bloqueia — a silhueta imensa nunca mente sobre colisao, porque o
+ *   pedestal e uma parede de verdade.
+ */
+export type PropAnchor = 'floor' | 'wall_base' | 'ceiling' | 'landmark';
 
 export type PropKind =
   // Basalto: pesado e tectonico.
@@ -59,14 +71,36 @@ export type PropKind =
   | 'puffball'
   // Cicatriz Aurix (ocupacao): operacao abandonada, sem brilho de interacao.
   | 'crate'
-  | 'strut';
+  | 'strut'
+  // TETO, por estrato: o que desce da rocha sobre a cabeca do Prospector.
+  | 'hanging_spur'
+  | 'crystal_chandelier'
+  | 'stalactite'
+  | 'hanging_slab'
+  | 'sulfur_drip'
+  | 'soot_fang'
+  | 'icicle'
+  // Teto das ocupacoes.
+  | 'spore_veil'
+  | 'cable_hook'
+  // LANDMARKS, um por estrato: o monumento no coracao do salao.
+  | 'monolith'
+  | 'great_prism'
+  | 'stalagnate'
+  | 'strata_arch'
+  | 'great_fumarole'
+  | 'slag_monolith'
+  | 'frost_obelisk';
 
 export type DecorativeProp = {
   kind: PropKind;
-  /** Celula ancora. Para `wall_base`, a celula ABERTA ao pe da parede. */
+  /**
+   * Celula ancora. Para `wall_base` e `ceiling`, a celula ABERTA junto a
+   * parede; para `landmark`, a propria celula SOLIDA do pedestal.
+   */
   x: number;
   y: number;
-  /** Celula da parede que sustenta um `wall_base`; -1 para props de chao. */
+  /** Parede que sustenta um `wall_base`/`ceiling`; -1 para chao e landmark. */
   wallCell: number;
   variant: number;
   anchor: PropAnchor;
@@ -97,27 +131,80 @@ const hashStr = (s: string): number => {
   return h >>> 0;
 };
 
-/** Kit de arquetipos por strata: [props de borda/ritmo, microprops de chao]. */
-const STRATA_KIT: Record<StratumId, { edge: PropKind[]; micro: PropKind[] }> = {
-  basalt: { edge: ['fallen_column'], micro: ['rubble', 'basalt_shard'] },
-  prismatic: { edge: ['crystal_fan'], micro: ['crystal_shards'] },
-  aquifer: { edge: ['flow_curtain', 'stalagmite'], micro: ['calcite_basin'] },
-  silica: { edge: ['fallen_plate'], micro: ['slab_pile'] },
-  sulfur: { edge: ['fumarole_cone'], micro: ['sulfur_mound'] },
-  furnace: { edge: ['slag_block'], micro: ['cinder_pile'] },
-  glacial: { edge: ['ice_spike'], micro: ['frost_stone'] },
+/**
+ * Kit de arquetipos por strata: borda/ritmo, microprops de chao, teto e o
+ * landmark monumental do salao — a hierarquia de composicao completa.
+ */
+const STRATA_KIT: Record<
+  StratumId,
+  { edge: PropKind[]; micro: PropKind[]; ceiling: PropKind[]; landmark: PropKind }
+> = {
+  basalt: {
+    edge: ['fallen_column'],
+    micro: ['rubble', 'basalt_shard'],
+    ceiling: ['hanging_spur'],
+    landmark: 'monolith',
+  },
+  prismatic: {
+    edge: ['crystal_fan'],
+    micro: ['crystal_shards'],
+    ceiling: ['crystal_chandelier'],
+    landmark: 'great_prism',
+  },
+  aquifer: {
+    edge: ['flow_curtain', 'stalagmite'],
+    micro: ['calcite_basin'],
+    ceiling: ['stalactite'],
+    landmark: 'stalagnate',
+  },
+  silica: {
+    edge: ['fallen_plate'],
+    micro: ['slab_pile'],
+    ceiling: ['hanging_slab'],
+    landmark: 'strata_arch',
+  },
+  sulfur: {
+    edge: ['fumarole_cone'],
+    micro: ['sulfur_mound'],
+    ceiling: ['sulfur_drip'],
+    landmark: 'great_fumarole',
+  },
+  furnace: {
+    edge: ['slag_block'],
+    micro: ['cinder_pile'],
+    ceiling: ['soot_fang'],
+    landmark: 'slag_monolith',
+  },
+  glacial: {
+    edge: ['ice_spike'],
+    micro: ['frost_stone'],
+    ceiling: ['icicle'],
+    landmark: 'frost_obelisk',
+  },
 };
 
-const OCCUPATION_KIT: Record<Exclude<OccupationId, 'none'>, { edge: PropKind[]; micro: PropKind[] }> = {
-  mycelial: { edge: ['mushroom'], micro: ['puffball'] },
-  aurix: { edge: ['crate', 'strut'], micro: [] },
+const OCCUPATION_KIT: Record<
+  Exclude<OccupationId, 'none'>,
+  { edge: PropKind[]; micro: PropKind[]; ceiling: PropKind[] }
+> = {
+  mycelial: { edge: ['mushroom'], micro: ['puffball'], ceiling: ['spore_veil'] },
+  aurix: { edge: ['crate', 'strut'], micro: [], ceiling: ['cable_hook'] },
 };
 
 /** Orcamento por setor. Ritmo estrutura; micro da acabamento sem dominar. */
 const EDGE_BUDGET = 18;
 const MICRO_BUDGET = 40;
+const CEILING_BUDGET = 14;
 const OCCUPATION_EDGE_BUDGET = 10;
 const OCCUPATION_MICRO_BUDGET = 16;
+const OCCUPATION_CEILING_BUDGET = 8;
+/**
+ * No maximo DOIS monumentos por setor: landmark e pontuacao, nao ritmo — tres
+ * "corações de salao" no mesmo mapa ja competiriam entre si pela leitura.
+ */
+const LANDMARK_CAP = 2;
+/** Dois landmarks colados leem como um so borrado; espacamento minimo. */
+const LANDMARK_MIN_GAP = 14;
 /** Tentativas de sorteio por vaga; falhar e normal (zonas proibidas). */
 const ATTEMPTS_PER_SLOT = 6;
 
@@ -182,9 +269,10 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
 
   const tryPlace = (
     kinds: readonly PropKind[],
-    wantsWall: boolean,
+    anchor: 'floor' | 'wall_base' | 'ceiling',
     floorTest: (x: number, y: number) => boolean,
   ): void => {
+    const wantsWall = anchor !== 'floor';
     for (let attempt = 0; attempt < ATTEMPTS_PER_SLOT; attempt++) {
       const x = 1 + Math.floor(rng() * (w - 2));
       const y = 1 + Math.floor(rng() * (h - 2));
@@ -192,8 +280,8 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
 
       let wallCell = -1;
       if (wantsWall) {
-        // Prop de borda mora ao PE de uma parede: quebra o aspecto quadrado da
-        // grade sem nunca pisar no centro de um corredor.
+        // Borda e teto moram junto a uma parede: o prop de borda no PE dela, o
+        // de teto PENDURADO onde a rocha desce — nunca no centro do corredor.
         const walls: number[] = [];
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
           if (!isOpen(x + dx, y + dy) && x + dx > 0 && y + dy > 0 && x + dx < w - 1 && y + dy < h - 1) {
@@ -211,15 +299,55 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
         y,
         wallCell,
         variant: Math.floor(rng() * 1024),
-        anchor: wantsWall ? 'wall_base' : 'floor',
+        anchor,
       });
       return;
     }
   };
 
   const kit = STRATA_KIT[state.stratum];
-  for (let n = 0; n < EDGE_BUDGET; n++) tryPlace(kit.edge, true, bareFloor);
-  for (let n = 0; n < MICRO_BUDGET; n++) tryPlace(kit.micro, false, bareFloor);
+
+  // LANDMARKS primeiro: a hierarquia de composicao comeca no monumento e o
+  // resto se organiza em volta. A ancora vem dos centros de salao que a
+  // gramatica registrou — o pedestal e a primeira celula SOLIDA visivel (com
+  // vizinho aberto) num anel curto em volta do centro. Um salao selado pelas
+  // provas de alcancabilidade nao tem celula visivel e e pulado sem drama.
+  const landmarks: Array<{ x: number; y: number }> = [];
+  for (const c of state.hallCenters) {
+    if (landmarks.length >= LANDMARK_CAP) break;
+    if (landmarks.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < LANDMARK_MIN_GAP)) continue;
+    let placed = false;
+    for (let r = 0; r <= 3 && !placed; r++) {
+      for (let dy = -r; dy <= r && !placed; dy++) {
+        for (let dx = -r; dx <= r && !placed; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = c.x + dx;
+          const y = c.y + dy;
+          if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+          if (solid[idx(x, y)] === SOLID_NONE) continue;
+          const visible = isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
+          if (!visible || !allowed(x, y) || taken.has(idx(x, y))) continue;
+          taken.add(idx(x, y));
+          props.push({
+            kind: kit.landmark,
+            x,
+            y,
+            wallCell: -1,
+            variant: Math.floor(rng() * 1024),
+            anchor: 'landmark',
+          });
+          landmarks.push({ x, y });
+          placed = true;
+        }
+      }
+    }
+  }
+
+  for (let n = 0; n < EDGE_BUDGET; n++) tryPlace(kit.edge, 'wall_base', bareFloor);
+  for (let n = 0; n < MICRO_BUDGET; n++) tryPlace(kit.micro, 'floor', bareFloor);
+  // Teto pendura sobre qualquer celula aberta (a superficie do chao nao
+  // importa: o prop e alto e translucido, o que joga continua visivel).
+  for (let n = 0; n < CEILING_BUDGET; n++) tryPlace(kit.ceiling, 'ceiling', isOpen);
 
   if (state.occupation !== 'none') {
     const occKit = OCCUPATION_KIT[state.occupation];
@@ -229,8 +357,11 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
       state.occupation === 'mycelial'
         ? (x: number, y: number): boolean => isOpen(x, y) && surface[idx(x, y)] === SURF_FUNGAL
         : bareFloor;
-    for (let n = 0; n < OCCUPATION_EDGE_BUDGET; n++) tryPlace(occKit.edge, true, occFloor);
-    for (let n = 0; n < OCCUPATION_MICRO_BUDGET; n++) tryPlace(occKit.micro, false, occFloor);
+    for (let n = 0; n < OCCUPATION_EDGE_BUDGET; n++) tryPlace(occKit.edge, 'wall_base', occFloor);
+    for (let n = 0; n < OCCUPATION_MICRO_BUDGET; n++) tryPlace(occKit.micro, 'floor', occFloor);
+    // O veu de esporos so pende sobre o tapete da colonia — teto e chao
+    // contam a mesma historia. O gancho Aurix pende sobre o chao firme.
+    for (let n = 0; n < OCCUPATION_CEILING_BUDGET; n++) tryPlace(occKit.ceiling, 'ceiling', occFloor);
   }
 
   return props;
@@ -245,7 +376,13 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
 export const propStillValid = (state: SurvivalState, prop: DecorativeProp): boolean => {
   const w = state.config.width;
   const i = prop.y * w + prop.x;
+  // Landmark: o monumento vive ENQUANTO o pedestal solido viver. Minerar a
+  // celula derruba o salao inteiro de simbolo — o prop some com ela.
+  if (prop.anchor === 'landmark') return state.solid[i] !== SOLID_NONE;
   if (state.solid[i] !== SOLID_NONE) return false;
+  // Teto: nao toca o chao, entao a superficie embaixo e livre para jogar —
+  // mas a parede de onde a formacao pende precisa continuar de pe.
+  if (prop.anchor === 'ceiling') return state.solid[prop.wallCell] !== SOLID_NONE;
   const surf = state.surface[i];
   if (!(surf === SURF_NONE || surf === SURF_SCORCHED || surf === SURF_FUNGAL)) return false;
   if (prop.anchor === 'wall_base' && prop.kind !== 'crate' && prop.kind !== 'strut') {

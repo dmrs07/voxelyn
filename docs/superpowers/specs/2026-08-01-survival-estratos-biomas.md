@@ -284,10 +284,37 @@ Camada `client/decor.ts` + `decor-draw.ts` — puramente visual e DERIVADA:
   (respiração do cogumelo) derivada de relógio local + variant, nunca da RNG
   autoritativa. Entram na fila de profundidade do pintor.
 
-Futuro da camada: props de teto (estalactites com translucidez perto do
-jogador), landmarks monumentais ancorados nos centros dos salões carimbados,
-composição landmark/ritmo/micro por tipo de sala, kit Aurix de infraestrutura
-(passarelas, trilhos, broca monumental).
+## Oitava etapa (implementada): teto e landmarks
+
+A hierarquia de composição da camada de props fechou de ponta a ponta —
+landmark → ritmo → micro — e ganhou a dimensão vertical:
+
+- **Props de teto** (`anchor: 'ceiling'`): formações que PENDEM da rocha sobre
+  celulas abertas junto a uma parede viva — esporão basáltico, lustre frio da
+  Catedral, estalactite, laje sedimentar, escorrimento sulfuroso apagado,
+  presa de fuligem, sincelos, véu de esporos (só sobre o tapete da colônia) e
+  o cabo Aurix de gancho vazio. Desenhados ERGUIDOS e **translúcidos**
+  (alpha 0.58): o contrato de honestidade é que nada pendurado esconde o chão
+  que joga — a validade por quadro ignora a superfície de baixo (água/fogo
+  continuam visíveis e válidos) mas exige a parede de origem viva.
+- **Landmarks monumentais** (`anchor: 'landmark'`): um monumento por estrato
+  (monólito, grande prisma frio, estalagnato, arco de estratos, fumarola-mãe
+  extinta, ídolo de escória, obelisco gelado), no máximo DOIS por setor, com
+  espaçamento mínimo. São os únicos props altos e maciços — e por isso os
+  únicos ancorados em célula SÓLIDA: o pedestal bloqueia de verdade, então a
+  silhueta imensa nunca mente sobre colisão. Minerar o pedestal derruba o
+  monumento (`propStillValid`).
+- **`hallCenters` no worldgen**: a gramática espacial registra os centros dos
+  salões que já calculava (anfiteatro, rotunda, geodo, cúpula, colunata,
+  galerias, câmaras dos pulmões, meio das fissuras, lagos da Cripta). Zero
+  tirada de RNG a mais, zero byte de mapa mudado — puro registro, então sem
+  bump de `SIMULATION_VERSION`. O campo não entra no hash nem em snapshot; o
+  cliente lê do mundo pristino reconstruído e ancora os landmarks ali, em vez
+  de num sorteio sem significado. Salão selado pelas provas de alcançabilidade
+  simplesmente não oferece pedestal visível e é pulado.
+
+Futuro da camada: composição landmark/ritmo/micro por tipo de sala, kit Aurix
+de infraestrutura (passarelas, trilhos, broca monumental).
 
 ## Trabalho futuro
 

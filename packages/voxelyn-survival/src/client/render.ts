@@ -1454,15 +1454,25 @@ export class SurvivalRenderer {
       this.decor = placeDecor(state);
     }
     for (const prop of this.decor) {
-      const db = brightness(prop.x + 0.5, prop.y + 0.5);
+      // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
+      // convencao do desenho de blocos), nao a do chao que nao existe ali.
+      const db =
+        prop.anchor === 'landmark' ? brightness(prop.x, prop.y) : brightness(prop.x + 0.5, prop.y + 0.5);
       if (db <= 0.05) continue;
       const [dsx, dsy] = toScreen(prop.x + 0.5, prop.y + 0.5);
-      if (dsx < -60 || dsx > vw + 60 || dsy < -60 || dsy > vh + 60) continue;
+      // Monumentos e formacoes de teto sobem varias alturas de parede; a
+      // margem vertical maior evita poda-los enquanto o topo ainda aparece.
+      const tall = prop.anchor === 'landmark' || prop.anchor === 'ceiling';
+      if (dsx < -60 || dsx > vw + 60 || dsy < (tall ? -140 : -60) || dsy > vh + 60) continue;
       // O mundo muda por baixo do enfeite: parede arrancada, fogo passando.
       // Um prop invalido simplesmente nao e desenhado neste quadro.
       if (!propStillValid(state, prop)) continue;
       items.push({
-        depth: prop.x + prop.y,
+        // Teto desenha DEPOIS do que anda na mesma celula: pende acima das
+        // criaturas, e a translucidez garante que nada fica escondido. O
+        // landmark compartilha a profundidade do pedestal — o sort estavel o
+        // desenha logo apos o proprio bloco.
+        depth: prop.x + prop.y + (prop.anchor === 'ceiling' ? 2 : 0),
         draw: () => drawDecorProp(ctx, prop, dsx, dsy, z, nowMs),
       });
     }

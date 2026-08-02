@@ -111,6 +111,15 @@ export type GeneratedWorld = {
   ventPositions: Vec2[];
   enemySpawns: Vec2[];
   openCells: number[];
+  /**
+   * Centros dos SALOES que a gramatica espacial carimbou — o anfiteatro, a
+   * rotunda, a cupula. E informacao de APRESENTACAO: a simulacao nao le isto
+   * (nao entra no hash nem em snapshot), mas o cliente ancora os landmarks
+   * monumentais da decoracao aqui, em vez de sortear um lugar sem significado.
+   * Um salao pode ter sido selado pelas provas de alcancabilidade; quem
+   * consome a lista confere o terreno antes de usar. Com `halls: 'none'`, vazio.
+   */
+  hallCenters: Vec2[];
 };
 
 const idx = (w: number, x: number, y: number): number => y * w + x;
@@ -217,10 +226,14 @@ const stampHalls = (
   w: number,
   h: number,
   halls: WorldgenProfile['halls'],
-): { fillCells: number[]; fillKind: number } => {
+): { fillCells: number[]; fillKind: number; hallCenters: Vec2[] } => {
   const fillCells: number[] = [];
+  // Os centros dos saloes GRANDES — so registro do que a gramatica ja
+  // calculou, nenhuma tirada de RNG a mais: a sequencia (e o mapa) continuam
+  // byte a byte os mesmos de antes deste campo existir.
+  const hallCenters: Vec2[] = [];
   let fillKind = SURF_NONE;
-  if (halls === 'none') return { fillCells, fillKind };
+  if (halls === 'none') return { fillCells, fillKind, hallCenters };
 
   const center = (): Vec2 => ({
     x: 12 + rng.nextInt(Math.max(1, w - 24)),
@@ -278,6 +291,7 @@ const stampHalls = (
       const c = center();
       const r = 6 + rng.nextInt(3);
       carveBlob(solid, w, h, c.x, c.y, r);
+      hallCenters.push(c);
       const phase = rng.nextFloat01() * Math.PI * 2;
       for (let k = 0; k < 7; k++) {
         const a = phase + (k * Math.PI * 2) / 7;
@@ -289,6 +303,7 @@ const stampHalls = (
     {
       const c = center();
       carveBlob(solid, w, h, c.x, c.y, 8 + rng.nextInt(2));
+      hallCenters.push(c);
       const islands = 6 + rng.nextInt(4);
       for (let k = 0; k < islands; k++) {
         const a = rng.nextFloat01() * Math.PI * 2;
@@ -313,6 +328,7 @@ const stampHalls = (
     const c = center();
     const radius = 7 + rng.nextInt(3);
     carveBlob(solid, w, h, c.x, c.y, radius);
+    hallCenters.push(c);
     const spokes = 5;
     const phase = rng.nextFloat01() * Math.PI * 2;
     for (let k = 0; k < spokes; k++) {
@@ -332,6 +348,7 @@ const stampHalls = (
       const g = center();
       const r = 4 + rng.nextInt(2);
       carveBlob(solid, w, h, g.x, g.y, r);
+      hallCenters.push(g);
       for (let y = Math.max(1, g.y - r - 1); y <= Math.min(h - 2, g.y + r + 1); y++) {
         for (let x = Math.max(1, g.x - r - 1); x <= Math.min(w - 2, g.x + r + 1); x++) {
           const d2 = (x - g.x) ** 2 + (y - g.y) ** 2;
@@ -376,6 +393,7 @@ const stampHalls = (
     const chambers = 4 + rng.nextInt(2);
     for (let k = 0; k < chambers; k++) {
       carveBlob(solid, w, h, cx, cy, 3 + rng.nextInt(3));
+      hallCenters.push({ x: cx, y: cy });
       const jitter = (rng.nextFloat01() - 0.5) * 1.2;
       const nx = cx + Math.cos(angle + jitter) * 8;
       const ny = cy + Math.sin(angle + jitter) * 8;
@@ -392,6 +410,11 @@ const stampHalls = (
       const angle = rng.nextFloat01() * Math.PI * 2;
       const length = 22 + rng.nextInt(10);
       carveLine(start.x, start.y, angle, length, 1);
+      // O "salao" de uma fissura e o meio dela — onde as pontes desabadas moram.
+      hallCenters.push({
+        x: Math.max(2, Math.min(w - 3, Math.round(start.x + Math.cos(angle) * (length / 2)))),
+        y: Math.max(2, Math.min(h - 3, Math.round(start.y + Math.sin(angle) * (length / 2)))),
+      });
       for (let d = 0; d < 3; d++) {
         const t = 4 + rng.nextInt(Math.max(1, length - 8));
         pillar(
@@ -408,6 +431,7 @@ const stampHalls = (
     {
       const c = center();
       carveEllipse(c.x, c.y, 7 + rng.nextInt(3), 6 + rng.nextInt(2));
+      hallCenters.push(c);
     }
     // Cisternas: bacias que nascem CHEIAS — a agua mora na geografia que
     // existe para contê-la.
@@ -423,6 +447,7 @@ const stampHalls = (
       const rx = horizontal ? 8 : 4;
       const ry = horizontal ? 4 : 8;
       carveEllipse(c.x, c.y, rx, ry);
+      hallCenters.push(c);
       for (let k = -2; k <= 2; k++) {
         pillar(c.x + (horizontal ? k * 3 : 0), c.y + (horizontal ? 0 : k * 3), SOLID_ROCK);
       }
@@ -442,6 +467,7 @@ const stampHalls = (
     for (let g = 0; g < 2; g++) {
       const c = center();
       carveEllipse(c.x, c.y, 8 + rng.nextInt(4), 3 + rng.nextInt(2));
+      hallCenters.push(c);
     }
     // Corredores PARALELOS separados por parede fina: a parede vira atalho
     // destrutivel — o fragil aqui e um seam estrutural legivel, nao ruido.
@@ -476,6 +502,8 @@ const stampHalls = (
     for (let l = 0; l < 2 + rng.nextInt(2); l++) {
       const c = center();
       carveEllipse(c.x, c.y, 6 + rng.nextInt(3), 4 + rng.nextInt(2), fillCells);
+      // O lago congelado E o salao da Cripta: o obelisco nasce na margem dele.
+      hallCenters.push(c);
     }
     for (let t = 0; t < 2; t++) {
       const s = center();
@@ -483,7 +511,7 @@ const stampHalls = (
     }
     fillKind = SURF_ICE;
   }
-  return { fillCells, fillKind };
+  return { fillCells, fillKind, hallCenters };
 };
 
 const generateAttempt = (
@@ -780,7 +808,18 @@ const generateAttempt = (
   }
   if (enemySpawns.length < 10) return null;
 
-  return { solid, surface, entry, corePos, guardianSpawn, salvageSites, ventPositions, enemySpawns, openCells };
+  return {
+    solid,
+    surface,
+    entry,
+    corePos,
+    guardianSpawn,
+    salvageSites,
+    ventPositions,
+    enemySpawns,
+    openCells,
+    hallCenters: hallFill.hallCenters,
+  };
 };
 
 /** Geracao deterministica com retentativas limitadas (seed derivada) ate mapa solucionavel. */

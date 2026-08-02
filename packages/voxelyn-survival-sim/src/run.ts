@@ -271,6 +271,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
       openedBySlot: null,
     })),
     vents: world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 })),
+    hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
     contaminationWaves: 0,

@@ -303,6 +303,7 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.charges = [];
   state.reactionQueue = [];
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
+  state.hallCenters = world.hallCenters;
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
