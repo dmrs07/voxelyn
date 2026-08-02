@@ -130,7 +130,9 @@ describe('fracao deterministica de aceitacao', () => {
     // comprimento que passasse. A re-simulacao para no tick terminal e a
     // canonicalizacao apaga a cauda, entao todas as variantes chegam ao MESMO
     // digest — e o portao decide sobre o digest.
-    const fixture = suicideLog(0x51ee0);
+    // Seed re-escolhida na SIMULATION_VERSION 16: o pedestal do poco desloca a
+    // populacao semeada e a 0x51ee0 parou de morrer ociosa dentro do teto.
+    const fixture = suicideLog(2);
     const clean = verifySoloDeath(fixture.seed, fixture.log);
     const padded = verifySoloDeath(
       fixture.seed,
@@ -175,7 +177,9 @@ const suicideLog = (seed: number): { seed: number; log: string } => {
 
 describe('verificacao da morte solo por re-simulacao', () => {
   it('constroi a capsula a partir do log, sem campo para o cliente mentir', () => {
-    const fixture = suicideLog(0x51ee0);
+    // Seed re-escolhida na SIMULATION_VERSION 16: o pedestal do poco desloca a
+    // populacao semeada e a 0x51ee0 parou de morrer ociosa dentro do teto.
+    const fixture = suicideLog(2);
     const verdict = verifySoloDeath(fixture.seed, fixture.log);
     expect(verdict.ok).toBe(true);
     if (!verdict.ok) return;
