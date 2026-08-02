@@ -82,6 +82,17 @@ import {
   WRAITH_LUNGE_RANGE,
   WRAITH_LUNGE_WINDUP_TICKS,
   WRAITH_UNDER_ICE_SPEED_SCALE,
+  SULFUR_BOMBER_GAS_LIFE_TICKS,
+  SULFUR_BOMBER_GAS_RADIUS,
+  UNDERTAKER_PULL_COOLDOWN_TICKS,
+  UNDERTAKER_PULL_MIN_RANGE,
+  UNDERTAKER_PULL_RANGE,
+  UNDERTAKER_PULL_STEP,
+  UNDERTAKER_PULL_TILES,
+  UNDERTAKER_PULL_WINDUP_TICKS,
+  UNDERTAKER_SLAM_DAMAGE,
+  UNDERTAKER_SLAM_RANGE,
+  UNDERTAKER_SLAM_WINDUP_TICKS,
 } from './constants.js';
 import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
@@ -163,6 +174,14 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // como um bruiser; quente, morre rapido — e corre atras da troca.
   scoriac: { hp: 130, speed: 2.4, radius: 0.44, contactDamage: 16, contactCooldown: 14, aggroRange: 8 },
   frost_wraith: { hp: 48, speed: 3.8, radius: 0.36, contactDamage: 14, contactCooldown: 12, aggroRange: 11 },
+  // Mesmo chassi do Spore Bomber (vida baixa, corre e estoura): trocar os
+  // numeros faria dele outro inimigo, e ele e o MESMO inimigo com outra
+  // quimica. O que muda esta na morte — gas no lugar de esporo.
+  sulfur_bomber: { hp: 18, speed: 3.7, radius: 0.3, contactDamage: 4, contactCooldown: 10, aggroRange: 9 },
+  // Lento e pesado: ele nao precisa te alcancar, ele te TRAZ. Vida alta de
+  // bruiser porque o encontro tem de durar o bastante para o puxao acontecer
+  // pelo menos duas vezes — uma so seria um susto, nao uma regra aprendida.
+  undertaker: { hp: 145, speed: 1.9, radius: 0.5, contactDamage: 12, contactCooldown: 16, aggroRange: UNDERTAKER_PULL_RANGE },
 };
 
 /** O inimigo de assinatura de cada estrato, ou null (basalto e silica). */
@@ -172,6 +191,7 @@ export const SIGNATURE_OF_STRATUM: Partial<Record<string, EnemyArchetype>> = {
   sulfur: 'bellows',
   furnace: 'scoriac',
   glacial: 'frost_wraith',
+  ferric: 'undertaker',
 };
 
 /**
@@ -184,8 +204,31 @@ export const SIGNATURE_OF_STRATUM: Partial<Record<string, EnemyArchetype>> = {
  * DELA", que e a leitura que o estrato promete. Continuam ocupando vagas
  * comuns da contagem: a densidade do setor nao muda.
  */
+/**
+ * Quantas assinaturas o setor recebe, por arquetipo.
+ *
+ * A regra ANTIGA era "uma, sempre" — um encontro autoral — e a Lampreia era a
+ * unica excecao. O playtest disse a mesma coisa dela que dizia dos outros: um
+ * bicho por mapa e uma CURIOSIDADE, nao a fauna do lugar. O jogador cruzava a
+ * Cripta inteira sem entender que o gelo pertence ao Espectro, porque so havia
+ * um, num canto, e o resto do bestiario era o mesmo elenco generico de sempre.
+ *
+ * Agora cada estrato tem um bando de verdade. Continuam ocupando VAGAS COMUNS
+ * do orcamento — a densidade do setor nao muda, o que muda e quem a preenche:
+ * onde antes entrava mais um stalker, entra o bicho que so existe ali.
+ *
+ * Os numeros nao sao uniformes porque as ameacas nao sao: o Fole e um orgao
+ * do bioma (varios respiradouros fazem a Fenda respirar), o Ressonante e caro
+ * de enfrentar perto de cristal (dois ja redesenham a sala), e o Coveiro puxa
+ * — tres deles numa galeria de minerio e a promessa inteira do Ferrifero.
+ */
 export const SIGNATURE_PACK: Partial<Record<EnemyArchetype, number>> = {
   mud_lamprey: 3,
+  bellows: 3,
+  scoriac: 3,
+  undertaker: 3,
+  resonant: 2,
+  frost_wraith: 2,
 };
 
 export const isSolidAt = (state: SurvivalState, x: number, y: number): boolean => {
@@ -256,6 +299,35 @@ const addBomberSpores = (state: SurvivalState, ent: Entity): void => {
   }
 };
 
+/**
+ * Nuvem de GAS deixada pela ruptura do Bombardeiro de Enxofre.
+ *
+ * Mesma forma da nuvem de esporos, materia diferente — e a diferenca e toda a
+ * razao de o bicho existir: esporo envenena quem fica dentro, gas ESPERA uma
+ * faisca. Numa Fornalha, morrer perto de uma fissura de brasa transforma o
+ * cadaver dele na sua propria emboscada.
+ *
+ * So pinta chao NU: gas por cima de fogo aceso seria uma explosao decidida
+ * pela ordem de iteracao, e por cima de agua ou gelo seria quimica inventada.
+ */
+const addSulfurCloud = (state: SurvivalState, ent: Entity): void => {
+  const cx = Math.floor(ent.x);
+  const cy = Math.floor(ent.y);
+  const r = SULFUR_BOMBER_GAS_RADIUS;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= state.config.width || y >= state.config.height) continue;
+      const i = y * state.config.width + x;
+      if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+        setSurface(state, i, SURF_GAS, SULFUR_BOMBER_GAS_LIFE_TICKS);
+      }
+    }
+  }
+};
+
 export const damageEntity = (
   state: SurvivalState,
   ent: Entity,
@@ -319,6 +391,15 @@ export const damageEntity = (
   ent.hp = 0;
   ent.alive = false;
   recordKill(state.stats, ent.archetype as EnemyArchetype);
+  // O chefe deste setor CAIU — e cai uma vez so na run.
+  //
+  // A marca vive no estado (e nao na entidade, que o repovoamento descarta)
+  // porque a extracao de retorno REGENERA o setor na subida: sem ela, quem
+  // matou o Bispo para poder descer o encontrava inteiro na volta. Fauna
+  // comum repovoar e a pressao prometida; um chefe repovoar apaga a conquista.
+  if (ent.archetype === 'bishop' || ent.archetype === 'guardian') {
+    state.bossesDown |= 1 << state.sector;
+  }
   events.push({
     t: 'death',
     x: ent.x,
@@ -332,6 +413,15 @@ export const damageEntity = (
   if (ent.archetype === 'bomber') {
     explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
     addBomberSpores(state, ent);
+  }
+  // O de ENXOFRE explode igual e larga GAS no lugar dos esporos. A nuvem sai
+  // DEPOIS da explosao de proposito: a explosao ja consumiu o instante dela
+  // (e ja acendeu o que tinha de acender), entao o gas assenta sobre o
+  // resultado — inclusive sobre o fogo que a propria explosao criou, que e
+  // exatamente a corrente de reacoes que este bicho existe para provocar.
+  if (ent.archetype === 'sulfur_bomber') {
+    explodeAt(state, ent.x, ent.y, 1.8, events, { source: 'enemy', owner: ent.id });
+    addSulfurCloud(state, ent);
   }
   // O MINER e o unico corpo do bestiario cuja morte vira JULGAMENTO, e por isso
   // e o unico que precisa saber QUEM o matou.
@@ -634,10 +724,48 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       });
     }
     events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MINER_CLEAVE_RADIUS });
+  } else if (action.kind === 'haul' && target) {
+    // O ELETROIMA. Arrasta o alvo em passos pequenos, e cada passo respeita a
+    // colisao: quem tem uma quina entre si e o Coveiro para NELA, e nao no
+    // colo dele. Um teleporte (ou um salto grande de uma vez) atravessaria
+    // parede e transformaria um golpe com contra-jogo geometrico num castigo
+    // sem resposta — e o corredor estreito e justamente onde ele mora.
+    //
+    // Puxa POR PASSOS e nao por velocidade porque o jogador nao integra
+    // `vx/vy`: o movimento dele e comandado tick a tick e o campo e derivado
+    // (so a inercia do gelo o consome). Um impulso ali seria apagado no mesmo
+    // tick, e o puxao simplesmente nao aconteceria.
+    const pull = normalized(enemy.x - target.x, enemy.y - target.y);
+    const steps = Math.round(UNDERTAKER_PULL_TILES / UNDERTAKER_PULL_STEP);
+    const stop = enemy.radius + target.radius + 0.05;
+    for (let s = 0; s < steps; s++) {
+      if (distTo(enemy, target) <= stop) break; // chegou: nao empurra por dentro
+      const before = { x: target.x, y: target.y };
+      moveEntity(state, target, pull.x * UNDERTAKER_PULL_STEP, pull.y * UNDERTAKER_PULL_STEP);
+      // Bateu em alguma coisa: o arrasto acabou aqui. Continuar raspando na
+      // parede o resto dos passos gastaria a mesma distancia deslizando de
+      // lado, e o obstaculo deixaria de ser a protecao que ele e.
+      if (target.x === before.x && target.y === before.y) break;
+    }
+    // O rastro do campo, para o cliente desenhar o feixe entre os dois.
+    events.push({ t: 'pulse', x: target.x, y: target.y, radius: 1.2 });
+    // E a prensa vem em seguida, com telegrafo proprio: sao DOIS avisos, e o
+    // segundo ainda da tempo de rolar. O puxao tira a posicao; o dano continua
+    // sendo uma coisa que o jogador pode negar.
+    enemy.contactReadyAt = state.tick + UNDERTAKER_SLAM_WINDUP_TICKS;
+    startAction(state, enemy, 'slam', pull, UNDERTAKER_SLAM_WINDUP_TICKS, 8, events, target.id);
   } else if (action.kind === 'slam' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
-    if (distTo(enemy, target) < 2.1) {
-      damageEntity(state, target, def.contactDamage * 1.2, events, {
+    // A prensa do Coveiro tem dano PROPRIO (o dobro largo do contato dele):
+    // derivar de `contactDamage` faria o golpe pesado valer 14, e um golpe
+    // que custa uma posicao inteira nao pode doer como um encostao.
+    const heavy =
+      enemy.archetype === 'undertaker'
+        ? UNDERTAKER_SLAM_DAMAGE
+        : def.contactDamage * 1.2;
+    const reach = enemy.archetype === 'undertaker' ? UNDERTAKER_SLAM_RANGE : 2.1;
+    if (distTo(enemy, target) < reach) {
+      damageEntity(state, target, heavy, events, {
         kind: 'enemy_contact',
         archetype: enemy.archetype as EnemyArchetype,
         elite: enemy.elite,
@@ -1423,8 +1551,29 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         continue;
       }
 
-      if (enemy.archetype === 'bomber' && dist < 2.05) {
+      // Os dois bombardeiros compartilham o gatilho: a silhueta e a leitura
+      // sao as mesmas de proposito, e so a materia que sobra difere.
+      if ((enemy.archetype === 'bomber' || enemy.archetype === 'sulfur_bomber') && dist < 2.05) {
         startAction(state, enemy, 'detonate', toward, 12, 4, events, player.id);
+        continue;
+      }
+
+      // COVEIRO: o eletroima. Carrega longo, e no release ARRASTA o alvo.
+      //
+      // A faixa tem minimo e maximo: colado ele nao puxa (nao ha para onde
+      // trazer — prensa direto pelo contato comum), e longe demais o campo
+      // nao alcanca. Exige LINHA DE VISAO na hora de comecar, pela mesma
+      // razao da investida do Cavalo: um puxao que atravessa parede seria
+      // dano sem contra-jogo, e a quina no caminho E o contra-jogo.
+      if (
+        enemy.archetype === 'undertaker' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist >= UNDERTAKER_PULL_MIN_RANGE &&
+        dist <= UNDERTAKER_PULL_RANGE &&
+        hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
+      ) {
+        enemy.rangedReadyAt = state.tick + UNDERTAKER_PULL_COOLDOWN_TICKS;
+        startAction(state, enemy, 'haul', toward, UNDERTAKER_PULL_WINDUP_TICKS, 6, events, player.id);
         continue;
       }
 
@@ -1483,8 +1632,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       }
 
       const contactRange = enemy.radius + player.radius + 0.18;
-      if (dist < contactRange && state.tick >= enemy.contactReadyAt && enemy.archetype !== 'bomber') {
-        const heavy = enemy.archetype === 'guardian' || enemy.archetype === 'bishop';
+      if (
+        dist < contactRange &&
+        state.tick >= enemy.contactReadyAt &&
+        enemy.archetype !== 'bomber' &&
+        enemy.archetype !== 'sulfur_bomber'
+      ) {
+        // O Coveiro prensa: golpe pesado, telegrafo de golpe pesado. E o
+        // "porradao" que o puxao existe para tornar possivel.
+        const heavy =
+          enemy.archetype === 'guardian' ||
+          enemy.archetype === 'bishop' ||
+          enemy.archetype === 'undertaker';
         const windup = heavy ? 7 : enemy.archetype === 'bruiser' ? 5 : 3;
         enemy.contactReadyAt = state.tick + def.contactCooldown;
         startAction(state, enemy, heavy ? 'slam' : 'contact', toward, windup, 4, events, player.id);

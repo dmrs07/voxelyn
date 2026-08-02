@@ -260,6 +260,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     coreTaken: false,
     guardianAwake: false,
     guardianSummoned: false,
+    bossesDown: 0,
     arenaClosed: false,
     arenaBarrierCells: [],
     guardianPath: [],
@@ -1838,6 +1839,10 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'bellows',
   'scoriac',
   'frost_wraith',
+  // Fauna afinada por bioma, tambem no fim pela mesma regra de nunca
+  // reordenar o que ja existe.
+  'sulfur_bomber',
+  'undertaker',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -1947,6 +1952,9 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.stats.discoveries);
   for (const archetype of HASHED_ARCHETYPES) mix(state.stats.kills[archetype]);
   mix(state.guardianSummoned ? 1 : 0);
+  // Chefes abatidos: decide o que a SUBIDA vai (nao) repovoar, entao duas
+  // simulacoes que discordam disso divergem no primeiro retorno.
+  mix(state.bossesDown);
   mix(state.arenaClosed ? 1 : 0);
   mix(state.arenaBarrierCells.length);
   for (const cell of state.arenaBarrierCells) mix(cell);

@@ -1,0 +1,214 @@
+// A fauna afinada por bioma, e o que ela cobra.
+//
+// O que estes testes cobram:
+// 1. CHEFE ABATIDO NAO VOLTA: a extracao de retorno regenera o setor, e o
+//    repovoamento carimbava o Bispo de volta na camara — o feito mais caro da
+//    run desmanchando sozinho.
+// 2. BOMBARDEIRO DE ENXOFRE: estoura em GAS, nao em esporo. A diferenca nao e
+//    cosmetica — gas pega fogo, esporo nao.
+// 3. COVEIRO: o eletroima ARRASTA o alvo (e para na parede, que e o
+//    contra-jogo), e a prensa vem com telegrafo proprio.
+import { describe, expect, it } from 'vitest';
+import {
+  BISHOP_SECTOR,
+  SECTOR_COUNT,
+  SOLID_NONE,
+  SOLID_ROCK,
+  SURF_GAS,
+  SURF_NONE,
+  SURF_SPORES,
+  UNDERTAKER_PULL_COOLDOWN_TICKS,
+  UNDERTAKER_PULL_WINDUP_TICKS,
+} from '../src/constants';
+import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
+import { createRun, emptyCommand, stepRun } from '../src/run';
+import { lineageOf } from '../src/strata';
+import type { SemanticEvent, SurvivalState } from '../src/types';
+
+const at = (state: SurvivalState, x: number, y: number): number => y * state.config.width + x;
+
+const seedWithLineage = (lineage: string): number => {
+  for (let seed = 1; seed < 4096; seed++) if (lineageOf(seed) === lineage) return seed;
+  throw new Error(`nenhuma seed pequena com linhagem ${lineage}`);
+};
+
+/** Arena limpa: corredor aberto, sem fauna, para a cena ser controlada. */
+const arena = (seed: number, sector = 1): SurvivalState => {
+  const state = createRun({ seed, sector });
+  for (let y = 20; y <= 30; y++) {
+    for (let x = 20; x <= 44; x++) {
+      state.solid[at(state, x, y)] = SOLID_NONE;
+      state.surface[at(state, x, y)] = SURF_NONE;
+    }
+  }
+  state.enemies = [];
+  return state;
+};
+
+const interactAt = (state: SurvivalState, x: number, y: number): SemanticEvent[] => {
+  state.player.x = x + 0.5;
+  state.player.y = y + 0.5;
+  const cmd = emptyCommand();
+  cmd.interact = true;
+  return stepRun(state, [cmd]).events;
+};
+
+describe('chefe abatido nao repovoa', () => {
+  it('o Bispo morto no setor 2 nao volta quando a subida regenera o mapa', () => {
+    const state = createRun({ seed: 7, sector: SECTOR_COUNT });
+    // Pega o Nucleo (a subida so existe com ele).
+    state.enemies = [];
+    state.leftEntryZone = true;
+    interactAt(state, state.corePos.x, state.corePos.y);
+    expect(state.coreTaken).toBe(true);
+
+    // Sobe para o setor do Bispo: ele esta la, inteiro.
+    state.enemies = [];
+    interactAt(state, state.entry.x, state.entry.y);
+    expect(state.sector).toBe(BISHOP_SECTOR);
+    const bishop = state.enemies.find((e) => e.archetype === 'bishop');
+    expect(bishop, 'o Bispo deveria estar na camara').toBeDefined();
+
+    // Mata o chefe.
+    damageEntity(state, bishop!, bishop!.maxHp * 2, [], { kind: 'player_shot' });
+    expect(bishop!.alive).toBe(false);
+
+    // ...e o mundo e regenerado de novo (uma segunda subida a partir daqui
+    // usa o mesmo caminho de repovoamento que trazia o chefe de volta).
+    state.enemies = [];
+    interactAt(state, state.entry.x, state.entry.y);
+    expect(state.sector).toBe(1);
+    expect(state.enemies.some((e) => e.archetype === 'bishop')).toBe(false);
+  });
+
+  it('a memoria e por SETOR, e o bolso micelial continua plantado', () => {
+    // Um chefe caido no setor 2 nao pode apagar o Guardiao do setor 3: a marca
+    // e da camara daquele setor, nao de "ja matei um chefe".
+    const state = createRun({ seed: 7, sector: BISHOP_SECTOR });
+    const bishop = state.enemies.find((e) => e.archetype === 'bishop')!;
+    damageEntity(state, bishop, bishop.maxHp * 2, [], { kind: 'player_shot' });
+    expect(state.bossesDown & (1 << BISHOP_SECTOR)).not.toBe(0);
+    expect(state.bossesDown & (1 << SECTOR_COUNT)).toBe(0);
+  });
+});
+
+describe('Bombardeiro de Enxofre', () => {
+  it('estoura em GAS, e nao na nuvem de esporos do micelio', () => {
+    const state = arena(11);
+    const bomber = spawnEnemy(state, 'sulfur_bomber', 32, 25, false);
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+
+    let gas = 0;
+    let spores = 0;
+    for (let y = 22; y <= 28; y++) {
+      for (let x = 29; x <= 35; x++) {
+        const surf = state.surface[at(state, x, y)];
+        if (surf === SURF_GAS) gas++;
+        if (surf === SURF_SPORES) spores++;
+      }
+    }
+    expect(gas, 'nenhuma celula de gas').toBeGreaterThan(0);
+    expect(spores, 'esporo nao pertence a este bicho').toBe(0);
+  });
+
+  it('o Spore Bomber continua deixando esporo: sao bichos diferentes', () => {
+    const state = arena(11);
+    const bomber = spawnEnemy(state, 'bomber', 32, 25, false);
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+    let spores = 0;
+    for (let y = 23; y <= 27; y++) {
+      for (let x = 30; x <= 34; x++) {
+        if (state.surface[at(state, x, y)] === SURF_SPORES) spores++;
+      }
+    }
+    expect(spores).toBeGreaterThan(0);
+  });
+});
+
+describe('Coveiro', () => {
+  /** Roda a IA ate o eletroima soltar, devolvendo a distancia final. */
+  const runHaul = (state: SurvivalState, ticks: number): void => {
+    const events: SemanticEvent[] = [];
+    for (let t = 0; t < ticks; t++) {
+      updateEnemies(state, events);
+      state.tick += 1;
+    }
+  };
+
+  it('o eletroima ARRASTA o jogador para perto — e telegrafa antes', () => {
+    const state = arena(21);
+    state.player.x = 38.5;
+    state.player.y = 25.5;
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+    const before = Math.hypot(state.player.x - undertaker.x, state.player.y - undertaker.y);
+
+    // Durante o windup ninguem se move por causa dele: o aviso e real.
+    runHaul(state, 2);
+    expect(undertaker.action, 'sem acao iniciada').toBeDefined();
+    expect(undertaker.action!.kind).toBe('haul');
+    expect(undertaker.action!.phase).toBe('windup');
+    expect(Math.hypot(state.player.x - undertaker.x, state.player.y - undertaker.y)).toBeCloseTo(before, 5);
+
+    // Passado o telegrafo, o puxao acontece.
+    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 2);
+    const after = Math.hypot(state.player.x - undertaker.x, state.player.y - undertaker.y);
+    expect(after, 'o jogador deveria ter sido arrastado').toBeLessThan(before - 1);
+  });
+
+  it('sem LINHA DE VISAO o eletroima nem carrega: a quina protege', () => {
+    // O primeiro contra-jogo, e o mais forte: um pilar entre os dois e o
+    // puxao simplesmente nao comeca. Quebrar a linha e a resposta que o
+    // corredor estreito do Ferrifero oferece de graca.
+    const state = arena(21);
+    state.player.x = 38.5;
+    state.player.y = 25.5;
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+    for (const y of [24, 25, 26]) state.solid[at(state, 35, y)] = SOLID_ROCK;
+
+    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 4);
+    expect(undertaker.action?.kind, 'puxou atraves da parede').not.toBe('haul');
+    expect(state.player.x, 'o jogador foi arrastado sem linha de visao').toBeCloseTo(38.5, 5);
+  });
+
+  it('o arrasto respeita COLISAO: parede que aparece no meio do telegrafo segura', () => {
+    // O segundo contra-jogo, e o que prova que o puxao nao teleporta: a acao
+    // comeca com o caminho livre e o mundo MUDA durante o windup de 1,1 s —
+    // coisa corriqueira num jogo em que a parede e material (um bloco desaba,
+    // o Bruiser arranca a cobertura). O arrasto tem de parar no obstaculo.
+    const state = arena(21);
+    state.player.x = 38.5;
+    state.player.y = 25.5;
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+
+    runHaul(state, 2); // linha livre: o eletroima engata
+    expect(undertaker.action?.kind).toBe('haul');
+    for (const y of [24, 25, 26]) state.solid[at(state, 35, y)] = SOLID_ROCK;
+
+    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 4);
+    // Puxou (saiu de 38,5) e PAROU na parede, em vez de atravessa-la.
+    expect(state.player.x, 'o eletroima nem chegou a puxar').toBeLessThan(38.4);
+    expect(state.player.x, 'atravessou o pilar').toBeGreaterThan(35.5);
+  });
+
+  it('a prensa vem depois do puxao, com telegrafo proprio', () => {
+    const state = arena(21);
+    state.player.x = 36.5;
+    state.player.y = 25.5;
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+    runHaul(state, UNDERTAKER_PULL_WINDUP_TICKS + 2);
+    // Logo apos o arrasto, a acao corrente e o golpe pesado — ainda em windup,
+    // que e o segundo aviso: da tempo de rolar.
+    expect(undertaker.action?.kind).toBe('slam');
+    expect(undertaker.action?.phase).toBe('windup');
+  });
+
+  it('so puxa de novo depois do descanso: nao e um cabo de guerra', () => {
+    const state = arena(21);
+    state.player.x = 38.5;
+    state.player.y = 25.5;
+    const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+    runHaul(state, 2);
+    expect(undertaker.rangedReadyAt).toBeGreaterThan(state.tick);
+    expect(undertaker.rangedReadyAt - state.tick).toBeLessThanOrEqual(UNDERTAKER_PULL_COOLDOWN_TICKS);
+  });
+});

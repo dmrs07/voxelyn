@@ -169,6 +169,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.bellows': 'Bellows',
   'enemy.scoriac': 'Scoriac',
   'enemy.frost_wraith': 'Wraith',
+  'enemy.sulfur_bomber': 'Sulfur Bearer',
+  'enemy.undertaker': 'Undertaker',
 
   'bestiary.name.stalker': 'Stalker',
   'bestiary.name.spitter': 'Spitter',
@@ -181,6 +183,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.bellows': 'Bellows',
   'bestiary.name.scoriac': 'Scoriac',
   'bestiary.name.frost_wraith': 'Frost Wraith',
+  'bestiary.name.sulfur_bomber': 'Sulfur Bomber',
+  'bestiary.name.undertaker': 'Undertaker',
   'bestiary.name.bishop': 'Bishop of the Vein',
   'bestiary.name.guardian': 'Guardian of the Core',
 
@@ -217,6 +221,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.code.frost_wraith': 'SPECIMEN GLAC-02',
   'bestiary.note.frost_wraith':
     'Travels beneath the ice sheet. Reports of "haunting" reflect poor visibility, not anomalous phenomena.',
+  'bestiary.code.sulfur_bomber': 'SPECIMEN SULF-14',
+  'bestiary.note.sulfur_bomber':
+    'Mineral variant of vector FUNG-23. Flammable internal charge. Neutralisation at distance from heat sources is advised — advice reiterated after the gallery 7 incident.',
+  'bestiary.code.undertaker': 'UNIT EX-041',
+  'bestiary.note.undertaker':
+    'Scrap retrieval unit. Continues to execute its collection directive without distinguishing inactive machinery from personnel on duty. Reclassification pending since the last audit.',
   'bestiary.code.bishop': 'HOSTILE ASSET EQ-09',
   'bestiary.note.bishop':
     'Ceremonial figure. The claim of religious structure remains uncorroborated.',

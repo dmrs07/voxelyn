@@ -48,6 +48,10 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   charge: 'telegraphCharge',
   detonate: 'telegraphDetonate',
   slam: 'telegraphSlam',
+  // O eletroima do Coveiro usa a voz do ARREMESSO, e nao a do golpe: as duas
+  // acoes dizem "sai da linha", e o que vem depois do zumbido nao e um corpo
+  // avancando, e voce indo para ele.
+  haul: 'telegraphHurl',
   hurl: 'telegraphHurl',
   pulse: 'telegraphPulse',
 };

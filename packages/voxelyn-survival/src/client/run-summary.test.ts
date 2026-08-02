@@ -20,7 +20,7 @@ const base: RunSummary = {
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 20,
-    kills: { stalker: 2, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0, resonant: 0, mud_lamprey: 0, bellows: 0, scoriac: 0, frost_wraith: 0 },
+    kills: { stalker: 2, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0, resonant: 0, mud_lamprey: 0, bellows: 0, scoriac: 0, frost_wraith: 0, sulfur_bomber: 0, undertaker: 0 },
     damageTakenTenths: 875,
     damageDealtTenths: 4000,
     solidsDestroyed: 12,

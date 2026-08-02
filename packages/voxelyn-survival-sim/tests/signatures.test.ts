@@ -53,20 +53,48 @@ const arena = (seed: number): SurvivalState => {
 
 describe('spawn por estrato', () => {
   it('cada estrato recebe as assinaturas do proprio bando, dentro da contagem normal', () => {
-    // Padrao: UMA (encontro autoral). A Lampreia e fauna: TRES, espalhadas —
-    // veio de playtest: com uma, o Aquifero tinha um lago perigoso e dezenas de
-    // lagos que eram so cenario.
+    // A regra ANTIGA era "uma por setor, e a Lampreia e a excecao". O playtest
+    // disse o mesmo dela e dos outros: um bicho por mapa e uma curiosidade,
+    // nao a fauna do lugar. Cada estrato tem bando agora (SIGNATURE_PACK), e o
+    // tamanho e a AMEACA: o Fole e um orgao do bioma, o Ressonante e caro de
+    // enfrentar perto de cristal, o Coveiro puxa.
     const cases: Array<{ lineage: string; sector: number; archetype: string; count: number }> = [
-      { lineage: 'mineral', sector: 2, archetype: 'resonant', count: 1 },
+      { lineage: 'mineral', sector: 2, archetype: 'resonant', count: 2 },
       { lineage: 'hydric', sector: 2, archetype: 'mud_lamprey', count: 3 },
-      { lineage: 'thermal', sector: 2, archetype: 'bellows', count: 1 },
-      { lineage: 'thermal', sector: 3, archetype: 'scoriac', count: 1 },
-      { lineage: 'cryo', sector: 2, archetype: 'frost_wraith', count: 1 },
+      { lineage: 'thermal', sector: 2, archetype: 'bellows', count: 3 },
+      { lineage: 'thermal', sector: 3, archetype: 'scoriac', count: 3 },
+      { lineage: 'cryo', sector: 2, archetype: 'frost_wraith', count: 2 },
+      { lineage: 'industrial', sector: 2, archetype: 'undertaker', count: 3 },
     ];
     for (const c of cases) {
       const state = createRun({ seed: seedWithLineage(c.lineage), sector: c.sector });
       const found = state.enemies.filter((e) => e.archetype === c.archetype);
       expect(found.length, `${c.lineage} s${c.sector}: ${c.archetype}`).toBe(c.count);
+    }
+  });
+
+  it('a assinatura ocupa VAGA COMUM: o bando nao infla a contagem do setor', () => {
+    // O contrato que sustenta os bandos: densidade e a coisa que menos deveria
+    // variar por bioma. Com o mesmo orcamento de spawns, dois estratos
+    // diferentes devem produzir a MESMA quantidade de corpos (os mineradores
+    // saem da conta: eles nascem por minerio, nao por vaga de inimigo).
+    const countable = (s: SurvivalState): number =>
+      s.enemies.filter((e) => e.archetype !== 'miner').length;
+    const cryo = createRun({ seed: seedWithLineage('cryo'), sector: 2 });
+    const industrial = createRun({ seed: seedWithLineage('industrial'), sector: 2 });
+    expect(countable(industrial)).toBe(countable(cryo));
+  });
+
+  it('o Spore Bomber nao existe onde nao ha micelio: enxofre e magma usam o de ENXOFRE', () => {
+    // O achado que originou o bicho: uma nuvem verde de esporos organicos no
+    // meio de uma caverna de magma era o sinal mais fora de lugar do jogo.
+    for (const c of [
+      { lineage: 'thermal', sector: 2 }, // Fenda Sulfurosa
+      { lineage: 'thermal', sector: 3 }, // Fornalha Abissal
+    ]) {
+      const state = createRun({ seed: seedWithLineage(c.lineage), sector: c.sector });
+      expect(state.enemies.some((e) => e.archetype === 'bomber'), `s${c.sector} tem spore bomber`).toBe(false);
+      expect(state.enemies.some((e) => e.archetype === 'sulfur_bomber'), `s${c.sector} sem sulfur bomber`).toBe(true);
     }
   });
 

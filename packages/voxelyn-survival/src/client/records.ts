@@ -298,6 +298,8 @@ export const BESTIARY_ORDER: readonly EnemyArchetype[] = [
   'bellows',
   'scoriac',
   'frost_wraith',
+  'sulfur_bomber',
+  'undertaker',
   'bishop',
   'guardian',
 ];
@@ -315,6 +317,8 @@ export const BESTIARY_NAME_KEYS: Record<EnemyArchetype, MessageKey> = {
   bellows: 'bestiary.name.bellows',
   scoriac: 'bestiary.name.scoriac',
   frost_wraith: 'bestiary.name.frost_wraith',
+  sulfur_bomber: 'bestiary.name.sulfur_bomber',
+  undertaker: 'bestiary.name.undertaker',
   bishop: 'bestiary.name.bishop',
   guardian: 'bestiary.name.guardian',
 };
@@ -352,6 +356,8 @@ export const BESTIARY_FILES: Record<EnemyArchetype, BestiaryFile> = {
   bellows: { code: 'bestiary.code.bellows', note: 'bestiary.note.bellows' },
   scoriac: { code: 'bestiary.code.scoriac', note: 'bestiary.note.scoriac' },
   frost_wraith: { code: 'bestiary.code.frost_wraith', note: 'bestiary.note.frost_wraith' },
+  sulfur_bomber: { code: 'bestiary.code.sulfur_bomber', note: 'bestiary.note.sulfur_bomber' },
+  undertaker: { code: 'bestiary.code.undertaker', note: 'bestiary.note.undertaker' },
   bishop: { code: 'bestiary.code.bishop', note: 'bestiary.note.bishop' },
   guardian: { code: 'bestiary.code.guardian', note: 'bestiary.note.guardian' },
 };

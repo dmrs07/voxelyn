@@ -187,11 +187,18 @@ export const populateSector = (
   // O Bispo ocupa o mesmo ponto que o Guardiao ocuparia — a camara que a geracao
   // reserva para um chefe. Nao ha sala nova: o setor 2 ja tinha o espaco vazio, e
   // o que faltava era alguem la dentro.
+  //
+  // MAS chefe abatido nao volta. Na subida da extracao de retorno o setor e
+  // regenerado inteiro, e sem esta guarda o Bispo morto reaparecia na camara —
+  // a fauna repovoar e a pressao prometida, um chefe repovoar e uma conquista
+  // desmanchando. O BOLSO continua sendo plantado de qualquer jeito: a colonia
+  // e terreno, e ela nao morreu junto com quem reinava sobre ela.
+  const bossAlreadyDown = (state.bossesDown & (1 << state.sector)) !== 0;
   if (state.sector === BISHOP_SECTOR) {
     plantBishopPocket(state, guardian.x, guardian.y);
-    spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
+    if (!bossAlreadyDown) spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
   }
-  if (isFinalSector(state.sector)) {
+  if (isFinalSector(state.sector) && !bossAlreadyDown) {
     spawnEnemy(state, 'guardian', guardian.x, guardian.y, false);
   }
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);

@@ -172,6 +172,8 @@ export const PT_BR = {
   'enemy.bellows': 'Fole',
   'enemy.scoriac': 'Escoriáceo',
   'enemy.frost_wraith': 'Espectro',
+  'enemy.sulfur_bomber': 'Bombardeiro',
+  'enemy.undertaker': 'Coveiro',
 
   'bestiary.name.stalker': 'Espreitador',
   'bestiary.name.spitter': 'Cuspidor',
@@ -184,6 +186,8 @@ export const PT_BR = {
   'bestiary.name.bellows': 'Fole',
   'bestiary.name.scoriac': 'Escoriáceo',
   'bestiary.name.frost_wraith': 'Espectro de Geada',
+  'bestiary.name.sulfur_bomber': 'Bombardeiro de Enxofre',
+  'bestiary.name.undertaker': 'Coveiro',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
 
@@ -219,6 +223,12 @@ export const PT_BR = {
   'bestiary.code.frost_wraith': 'ESPÉCIME GLAC-02',
   'bestiary.note.frost_wraith':
     'Desloca-se sob a lâmina de gelo. Relatos de "assombração" refletem baixa visibilidade, não fenômeno anômalo.',
+  'bestiary.code.sulfur_bomber': 'ESPÉCIME SULF-14',
+  'bestiary.note.sulfur_bomber':
+    'Variante mineral do vetor FUNG-23. Carga interna inflamável. Recomenda-se neutralização a distância de fontes de calor — recomendação reiterada após o incidente da galeria 7.',
+  'bestiary.code.undertaker': 'UNIDADE EX-041',
+  'bestiary.note.undertaker':
+    'Recolhedora de sucata. Continua cumprindo a diretriz de coleta sem distinguir maquinário inativo de pessoal em serviço. Reclassificação pendente desde a última auditoria.',
   'bestiary.code.bishop': 'ATIVO HOSTIL EQ-09',
   'bestiary.note.bishop':
     'Figura cerimonial. A alegação de estrutura religiosa permanece não corroborada.',

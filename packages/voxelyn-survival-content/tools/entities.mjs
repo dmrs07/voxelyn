@@ -1142,6 +1142,149 @@ const frostWraithModel = (anim, f) => {
 };
 const frostWraithFrame = (dir, anim, f) => renderVoxels(frostWraithModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
 
+// enemy-sulfur-bomber 64x64 — a MESMA silhueta do Spore Bomber, outra quimica.
+//
+// Igual de proposito: o jogador ja aprendeu a ler "encapuzado com pod atras =
+// vem correndo e estoura", e essa licao nao pode ser cobrada duas vezes. O que
+// muda e a MATERIA — capuz de osso mineral crostado em vez de fungo, pod de
+// enxofre em vez de esporo, e cristais de enxofre condensado onde o outro tem
+// lamelas. Quem ve isto sabe o que vem; o que ele precisa saber a mais e que a
+// nuvem que sobra PEGA FOGO, e a cor amarela e quem diz isso.
+const sulfurBomberModel = (anim, f) => {
+  const drift = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const swell = anim === 'special' ? Math.min(2, f) : anim === 'attack' ? [0, 1, 1, 0][f % 4] : 0;
+  const pulse = anim === 'idle' ? [0, 1, 1, 0][f % 4] : 0;
+  const z = -flinch + drift;
+  const b = [];
+  // Pes curtos de rocha crostada: ele tambem pende mais do que caminha.
+  b.push(box(-2, -1, 0, 2, 2, 1, 'rockDeep'));
+  b.push(box(1, -1, 0, 2, 2, 1, 'rockDeep'));
+  // Capuz conico ESCURO, com o cone afinando depressa.
+  //
+  // Duas tentativas erradas antes desta, e as duas ensinaram a mesma coisa
+  // sobre hierarquia. Na primeira o pod era grande demais e virava a silhueta
+  // (topo `loot`, o dourado de maior amplitude da paleta, contra um corpo que
+  // sumia no fundo). Na segunda o capuz virou OSSO para ganhar presenca — e
+  // ai corpo e pod ficaram os dois claros, sem nada separando um do outro: a
+  // criatura lia como uma escadaria de degraus bege.
+  //
+  // O Spore Bomber resolve isso ha muito tempo e a resposta e a dele: capuz
+  // ESCURO (a forma), acento CLARO (o pod). Aqui o escuro e mineral em vez de
+  // organico, que e justamente a troca que este bicho representa.
+  b.push(box(-3, -2, 1 + z, 6, 4, 2, 'rockDeep'));
+  b.push(box(-2, -1.5, 3 + z, 4, 3, 2, 'rockDeep'));
+  b.push(box(-1, -1, 5 + z, 2, 2, 2, 'rockDeep'));
+  b.push(box(-0.5, -0.5, 7 + z, 1, 1, 1, 'rust'));
+  // Onde o outro tem lamelas de fungo, este tem CROSTA: agulhas de enxofre
+  // condensado crescidas na borda de cada degrau.
+  b.push(box(-2.5, -2.5, 2 + z, 0.5, 0.5, 1, 'sulfur'));
+  b.push(box(1, -2.5, 1.5 + z, 0.5, 0.5, 1, 'sulfur'));
+  b.push(box(-1.5, -2.5, 4 + z, 0.5, 0.5, 0.5, 'sulfur'));
+  b.push(box(0.5, -1.5, 6 + z, 0.5, 0.5, 0.5, 'sulfur'));
+  // O olho: BRASA, e nao biolum. Ele nao e uma coisa viva do micelio — e um
+  // corpo mineral com calor dentro, como o nucleo do Escoriaceo (mesma rampa
+  // `fire`, mesma leitura: o que arde por dentro deste estrato).
+  b.push(box(0, -3, 4 + z, 1, 1, 1.5, 'fire'));
+  // O pod: a bolsa de gas, MENOR que o capuz e com o ombro chanfrado — ela
+  // acompanha o corpo em vez de engoli-lo. Cresce nos dois eixos no telegrafo,
+  // que continua sendo o unico momento em que ela manda na silhueta.
+  b.push(box(-2.5, 2, 2 + z, 4 + swell, 2, 3 + swell + pulse, 'sulfur'));
+  b.push(box(-2, 2.5, 5 + swell + pulse + z, 3 + swell, 1, 0.5, 'sulfur'));
+  // Valvulas de ferrugem no lugar dos poros: por onde o gas escapa.
+  b.push(box(-1.5, 3.5, 3 + z, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(0, 3.5, 4 + z, 0.5, 0.5, 0.5, 'rust'));
+  b.push(box(1, 3.5, 3 + z, 0.5, 0.5, 0.5, 'rust'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const sulfurBomberFrame = (dir, anim, f) => renderVoxels(sulfurBomberModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+
+// enemy-undertaker 96x120 — o Coveiro: catador de sucata do Ferrifero.
+//
+// A silhueta tem de dizer as duas coisas que ele faz, e nesta ordem: o BRACO
+// DE ELETROIMA (o disco enorme de um lado, desproporcional, que e o unico
+// jeito de o jogador entender de longe o que o puxou) e as costas de carga —
+// a caçamba onde ele empilhava carcaças. O corpo e ferrugem industrial, da
+// mesma familia do Miner: os dois sao maquinario da Aurix que ninguem
+// desligou. A diferenca e que este ainda esta cumprindo a ordem com voce.
+const undertakerModel = (anim, f) => {
+  const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  // `special` e a carga do eletroima: as bobinas acendem e o campo aparece.
+  const charge = anim === 'special' ? Math.min(3, f) : 0;
+  // O ataque e a prensa: o braco pesado sobe e desce.
+  const slam = anim === 'attack' ? [0, 0, 4, 1][f % 4] : 0;
+  const idle = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  // O primeiro desenho era uma PILHA DE LAJES: caixas largas e baixas
+  // empilhadas, cada uma mais comprida que alta, e o resultado lia como
+  // mobilia — uma mesa com uma prancha por cima. A correcao e proporcao, nao
+  // detalhe: o corpo agora e ESTREITO e ALTO (6 de largura contra 15 de
+  // altura), e o unico volume horizontal do bicho e o braco que puxa.
+  //
+  // Pernas curtas e grossas, plantadas: ele nao corre, ele CHEGA.
+  for (const s of [-1, 1]) {
+    const lift = s > 0 ? Math.max(0, step) : Math.max(0, -step);
+    b.push(box(s * 1.5 - 1, -1, lift, 2, 2.5, 4, 'rockDeep'));
+    b.push(box(s * 1.5 - 1.5, -1.5, lift, 3, 3.5, 1, 'rust')); // o pe
+  }
+  // Torso alto e estreito, com a cintura marcada: o vulto e vertical.
+  b.push(box(-2, -1.5, 4 + idle - flinch, 4, 3.5, 3, 'rust'));
+  b.push(box(-2.5, -2, 7 + idle - flinch, 5, 4, 5, 'rust'));
+  // Costura industrial: uma faixa escura na altura do peito quebra o bloco.
+  b.push(box(-2.5, -2.1, 9 + idle - flinch, 5, 0.5, 1, 'rockDeep'));
+  // A CACAMBA nas costas: alta e encostada no dorso (nao uma bancada por
+  // cima). E a caçamba que conta o que ele faz — carregar carcaça.
+  b.push(box(-2, 2, 6 + idle, 4, 2, 7, 'rockDeep'));
+  b.push(box(-2, 2, 13 + idle, 4, 2, 0.5, 'bone'));
+  // Sucata espiando de dentro: dois cotos de osso, a carga que ele ja tem.
+  b.push(box(-1.5, 2.5, 13 + idle, 1, 1, 1.5, 'bone'));
+  b.push(box(0.5, 2.5, 13.5 + idle, 1, 1, 1, 'bone'));
+  // Cabeca pequena, afundada entre os ombros: ele nao olha, ele VARRE.
+  b.push(box(-1.5, -1.5, 12 + idle - flinch, 3, 3, 2.5, 'rockDeep'));
+  // A lente de varredura, larga e fina. Eletrica: e sensor, nao premio.
+  b.push(box(-1, -2, 13 + idle - flinch, 2, 0.5, 0.8, 'electric'));
+
+  // BRACO DE ELETROIMA (esquerda). A leitura inteira do bicho mora aqui,
+  // entao ele e desproporcional de proposito — e o disco fica EM PE, no plano
+  // vertical, com um vao no meio: um anel. Chapado e deitado (a primeira
+  // versao) projetava como uma prancha e nao dizia nada.
+  const armZ = 8 + idle - slam;
+  b.push(box(-3.5, -1, armZ, 2, 2, 2, 'rust')); // ombro
+  b.push(box(-5, -1, armZ - 1, 1.5, 2, 2, 'rust')); // antebraco
+  // O ANEL do eletroima: quatro segmentos em volta de um vao, no plano y-z.
+  //
+  // Compacto de proposito. A primeira versao esticava o braco ate x=-8,5 e o
+  // sprite passava de 80px de largura projetada — para um bicho de raio 0,5,
+  // que e o mesmo do Fole (canvas 64x64). O custo nao era so de memoria de
+  // textura: um corpo tao largo quanto o do Britador prometia uma ameaca de
+  // peso que o Coveiro nao e. O disco continua desproporcional em relacao ao
+  // RESTO DELE, que e o que faz a leitura — nao em relacao ao mundo.
+  const ringX = -6;
+  const ringZ = armZ - 3.5;
+  b.push(box(ringX, -2, ringZ + 4.5, 1.5, 4, 1, 'rockDeep')); // topo
+  b.push(box(ringX, -2, ringZ, 1.5, 4, 1, 'rockDeep')); // base
+  b.push(box(ringX, -2, ringZ + 1, 1.5, 1, 3.5, 'rockDeep')); // lado
+  b.push(box(ringX, 1, ringZ + 1, 1.5, 1, 3.5, 'rockDeep')); // lado
+  // Bobinas: acendem na carga. Apagadas sao osso; carregando viram corrente —
+  // o telegrafo em COR, no lugar exato de onde o puxao vai sair.
+  const coil = charge > 0 ? 'electric' : 'bone';
+  b.push(box(ringX - 0.5, -1.5, ringZ + 1.5, 0.5, 3, 0.5, coil));
+  b.push(box(ringX - 0.5, -1.5, ringZ + 3, 0.5, 3, 0.5, coil));
+  if (charge >= 2) {
+    // No auge da carga o campo se ve: o vao do anel acende.
+    b.push(box(ringX, -1, ringZ + 2, 1, 2, 1.5, 'electric'));
+  }
+
+  // BRACO DE PRENSA (direita): curto e pesado, com o bloco no punho. E ele
+  // que desce no `attack` — o "porradao" que o puxao existe para viabilizar.
+  b.push(box(2, -1, 8 + idle - slam * 0.5, 1.5, 2, 2, 'rust'));
+  b.push(box(2.5, -1.5, 5 + idle - slam, 2.5, 3, 3.5, 'rockDeep'));
+  b.push(box(2.5, -1.5, 4.5 + idle - slam, 2.5, 3, 0.5, 'bone'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+const undertakerFrame = (dir, anim, f) => renderVoxels(undertakerModel(anim, f), DIR_INDEX[dir], 72, 88, 34, 78);
+
 // FX AUTORADOS NATIVOS na resolucao fina (32x32). Ate a subdivisao da grade
 // eles eram desenhos de 16x16 dobrados por vizinho-mais-proximo — pixels
 // gordos de 2x2 fingindo resolucao. Redesenhados no grao real: o estilhaco
@@ -1282,6 +1425,17 @@ export const ENTITY_SPECS = [
   base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 1),
   base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 1),
   base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 1),
+  // Fauna afinada por bioma. O de enxofre herda o `special` do Spore Bomber
+  // (mesmo telegrafo de pod inchando), e o Coveiro tem o proprio: a carga do
+  // eletroima, que e o aviso mais importante do bicho.
+  base('enemy-sulfur-bomber', 64, 64, 32, 60, { w: 0.62, h: 0.72 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 6, fps: 10, loop: false },
+  }, sulfurBomberFrame, 'voxel-isometric hooded sulfur carrier, mineral crusted hood with yellow sulfur needles, ember eye, swelling sulfur gas bladder with rusted valves', 1),
+  base('enemy-undertaker', 72, 88, 34, 78, { w: 1, h: 1.5 }, { w: 1.25, h: 1.25, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 6, fps: 10, loop: false },
+  }, undertakerFrame, 'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens', 1),
   {
     id: 'fx-projectile-bolt', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },

@@ -379,12 +379,16 @@ export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArch
         ? ['spitter', 'stalker', 'spitter', 'stalker', 'bomber', 'spitter', 'stalker', 'bomber']
         : ['spitter', 'stalker', 'spitter', 'bomber', 'stalker', 'spitter', 'bomber', 'bruiser', 'spitter', 'stalker'];
   } else if (biome.stratum === 'sulfur') {
-    // Afinidade alta de spitter e bomber (a tabela da spec); bruisers bloqueiam
-    // as passagens respiraveis.
-    mix = ['spitter', 'bomber', 'bruiser', 'spitter', 'stalker', 'bomber', 'bruiser', 'spitter', 'bomber', 'stalker'];
+    // O bombardeiro daqui e o de ENXOFRE, nunca o de esporos: o Spore Bomber e
+    // uma coisa micelial, e nao ha micelio nenhum produzindo esporo dentro de
+    // uma fenda de gas. Mesma silhueta, quimica do lugar — e o cadaver dele
+    // larga a nuvem que a fenda inteira ja ameaca acender.
+    mix = ['spitter', 'sulfur_bomber', 'bruiser', 'spitter', 'stalker', 'sulfur_bomber', 'bruiser', 'spitter', 'sulfur_bomber', 'stalker'];
   } else if (biome.stratum === 'furnace') {
-    // Corpos minerais e portadores: o que sobrevive ao calor.
-    mix = ['bruiser', 'bomber', 'bruiser', 'stalker', 'bomber', 'bruiser', 'bomber', 'bruiser', 'stalker', 'bomber'];
+    // Corpos minerais e portadores: o que sobrevive ao calor. O bombardeiro,
+    // pelo mesmo motivo da Fenda, e o de enxofre — numa caverna de magma a
+    // nuvem verde de esporos era o sinal mais fora de lugar do jogo.
+    mix = ['bruiser', 'sulfur_bomber', 'bruiser', 'stalker', 'sulfur_bomber', 'bruiser', 'sulfur_bomber', 'bruiser', 'stalker', 'sulfur_bomber'];
   } else if (biome.stratum === 'silica') {
     // Emboscada: stalkers atras de paredes que qualquer tiro abre.
     mix = ['stalker', 'spitter', 'stalker', 'bruiser', 'stalker', 'spitter', 'bomber', 'stalker'];

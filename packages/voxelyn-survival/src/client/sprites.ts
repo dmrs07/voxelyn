@@ -38,6 +38,8 @@ import lampreyManifest from '@voxelyn/survival-content/assets/atlases/enemy-mud-
 import bellowsManifest from '@voxelyn/survival-content/assets/atlases/enemy-bellows.json';
 import scoriacManifest from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.json';
 import wraithManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.json';
+import sulfurBomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.json';
+import undertakerManifest from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
@@ -61,6 +63,8 @@ import lampreyUrl from '@voxelyn/survival-content/assets/atlases/enemy-mud-lampr
 import bellowsUrl from '@voxelyn/survival-content/assets/atlases/enemy-bellows.png?url';
 import scoriacUrl from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.png?url';
 import wraithUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.png?url';
+import sulfurBomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.png?url';
+import undertakerUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
@@ -223,6 +227,8 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: bellowsManifest as unknown as SpriteManifestEntry, url: bellowsUrl },
   { manifest: scoriacManifest as unknown as SpriteManifestEntry, url: scoriacUrl },
   { manifest: wraithManifest as unknown as SpriteManifestEntry, url: wraithUrl },
+  { manifest: sulfurBomberManifest as unknown as SpriteManifestEntry, url: sulfurBomberUrl },
+  { manifest: undertakerManifest as unknown as SpriteManifestEntry, url: undertakerUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
 ];
@@ -242,6 +248,8 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
   bellows: 'enemy-bellows',
   scoriac: 'enemy-scoriac',
   frost_wraith: 'enemy-frost-wraith',
+  sulfur_bomber: 'enemy-sulfur-bomber',
+  undertaker: 'enemy-undertaker',
 };
 
 /**

@@ -109,6 +109,10 @@ export const CHARACTER_SPRITE_IDS = [
   'enemy-bellows',
   'enemy-scoriac',
   'enemy-frost-wraith',
+  // Fauna afinada por bioma: o bombardeiro que a Fenda e a Fornalha usam no
+  // lugar do de esporos, e o Coveiro do Ferrifero.
+  'enemy-sulfur-bomber',
+  'enemy-undertaker',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [
