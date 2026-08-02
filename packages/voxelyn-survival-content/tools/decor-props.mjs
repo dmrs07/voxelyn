@@ -49,6 +49,30 @@ const VOLUMETRIC = [
   'frost_obelisk',
   'magnet_core',
   'drill',
+  // Segunda varredura: os medios de chao/borda e a infra Aurix tambem
+  // ganham malha fina — so pedrinha/caco e os pendentes que BALANCAM por
+  // relogio (veu, cabo, raiz) continuam em runtime.
+  'walkway',
+  'rail',
+  'calcite_basin',
+  'crystal_fan',
+  'slab_pile',
+  'fallen_plate',
+  'sulfur_mound',
+  'cinder_pile',
+  'frost_stone',
+  'lodestone',
+  'ore_spur',
+  // Pendentes MINERAIS de teto: autorados de ponta-cabeca — a bica no z0
+  // (que e a ancora) alargando para cima; o cliente os desenha ERGUIDOS e
+  // translucidos, como sempre.
+  'hanging_spur',
+  'crystal_chandelier',
+  'stalactite',
+  'hanging_slab',
+  'sulfur_drip',
+  'soot_fang',
+  'icicle',
 ];
 
 /** Kinds no formato do atlas de props: um frame estatico por variante. */
@@ -380,8 +404,157 @@ const modelOf = (kind, v) => {
       boxes.push(box(-2, -2, 3, 4, 4, 17, 'rust')); // mastro
       slab(boxes, 0, 0, 3, 12, 3, 'rockDeep'); // colar
       boxes.push(box(2, -1 + v, 17, 5, 3, 2, 'rust')); // braco
-      boxes.push(box(s * 4, -1, 6, 2, 2, 6, 'bone')); // a broca
-      cone(boxes, [[0, 2, 'bone']], s * 4, 0);
+      boxes.push(box(s * 4, -1, 6, 2, 2, 6, 'bone')); // o fuste da broca
+      // A PONTA: entre o topo da plataforma (z3) e o fuste (z6) — no z0 o
+      // helper a enterrava dentro da propria plataforma.
+      boxes.push(box(s * 4, 0, 3, 1, 1, 3, 'bone'));
+      break;
+    }
+    // ------------------------------------------------------------------
+    // CHAO/BORDA medios e a infraestrutura Aurix de piso.
+    // ------------------------------------------------------------------
+    case 'walkway': {
+      // Passarela CAIDA: pranchas rasas com vao e uma ponta levantada —
+      // baixa de proposito, quebrada o bastante para nunca parecer caminho.
+      boxes.push(box(-7, -3 + v, 0, 5, 5, 1, 'rust'));
+      boxes.push(box(-2, -3 + v, 0, 1, 5, 1, 'rockDeep')); // travessa
+      // o VAO
+      boxes.push(box(1, -2 + v, 0, 5, 5, 1, 'rust'));
+      boxes.push(box(4, -2 + v, 1, 2, 5, 1, 'rust')); // ponta levantada
+      boxes.push(box(s * 6, 2, 0, 2, 2, 1, 'rockDeep')); // prancha solta
+      break;
+    }
+    case 'rail': {
+      // Trilho: DORMENTES curtos atravessados, dois frisos compridos por
+      // cima — e um dormente arrancado adiante, porque a linha morreu.
+      for (const tx of [-6, -2, 2]) boxes.push(box(tx, -4, 0, 2, 9, 1, 'bone'));
+      boxes.push(box(-7, -3, 1, 13 + v, 1, 1, 'rust'));
+      boxes.push(box(-7, 2, 1, 13 + v, 1, 1, 'rust'));
+      boxes.push(box(6, s * 4, 0, 2, 5, 1, 'bone')); // dormente arrancado
+      break;
+    }
+    case 'calcite_basin': {
+      // Bacia: anel de borda com o fundo raso — a agua que a esculpiu ja
+      // secou; sobra o espelho mineral.
+      slab(boxes, 0, 0, 5, 0, 1, 'bone');
+      for (let y = -5; y <= 5; y++) {
+        for (let x = -5; x <= 5; x++) {
+          const edge = Math.max(Math.abs(x), Math.abs(y));
+          if (edge < 4 || (Math.abs(x) === 5 && Math.abs(y) === 5)) continue;
+          boxes.push(box(x, y, 1, 1, 1, 1 + (edge === 4 ? 0 : v), 'bone'));
+        }
+      }
+      boxes.push(box(-2, -2 + v, 1, 4, 4, 1, 'ice')); // o fundo umido
+      break;
+    }
+    case 'crystal_fan': {
+      // Leque FRIO: laminas em degraus contra a parede — familia do gelo,
+      // nunca o biolum reativo.
+      boxes.push(box(-4, -1, 0, 2, 2, 5, 'ice'));
+      boxes.push(box(-2, -1, 0, 2, 2, 8, 'ice'));
+      boxes.push(box(0, -1, 0, 2, 2, 10 + v, 'ice'));
+      boxes.push(box(2, -1, 0, 2, 2, 7, 'ice'));
+      boxes.push(box(4, -1, 0, 2, 2, 4, 'ice'));
+      boxes.push(box(s * 2 - 1, 1, 0, 3, 1, 2, 'bone')); // a base mineral
+      break;
+    }
+    case 'slab_pile': {
+      // Pilha de lajes desalinhadas: cada uma com o proprio rumo.
+      boxes.push(box(-5, -3, 0, 9, 7, 2, 'bone'));
+      boxes.push(box(-4 + v, -2, 2, 7, 5, 2, 'rust'));
+      boxes.push(box(-2, -1 + v, 4, 5, 4, 2, 'bone'));
+      boxes.push(box(s * 4, 3, 0, 3, 2, 1, 'rust')); // a laja que escorregou
+      break;
+    }
+    case 'fallen_plate': {
+      // Placa inteira tombada, apoiada num canto — congelada no meio da queda.
+      boxes.push(box(-6, -3, 0, 10, 7, 2, 'bone'));
+      boxes.push(box(-6, -3, 2, 10, 2, 1, 'rust')); // a borda laminada
+      boxes.push(box(3, 2, 0, 3, 3, 3 + v, 'bone')); // o apoio
+      boxes.push(box(s * 5, -2, 0, 2, 2, 1, 'rust'));
+      break;
+    }
+    case 'sulfur_mound': {
+      cone(boxes, [[3, 1, 'bone'], [2, 1, 'rust'], [1, 1 + v, 'bone']]);
+      cone(boxes, [[1, 1, 'rust'], [0, 1, 'bone']], s * 4, s);
+      break;
+    }
+    case 'cinder_pile': {
+      // Cinza assentada: montinho escuro com nucleos que ja foram brasa.
+      cone(boxes, [[3, 1, 'rockDeep'], [2, 1, 'rockDeep'], [1, 1, 'rock']]);
+      boxes.push(box(s * 3, -2, 0, 2, 2, 1 + v, 'rockDeep'));
+      boxes.push(box(-s * 2, 2, 0, 2, 2, 1, 'rock'));
+      break;
+    }
+    case 'frost_stone': {
+      slab(boxes, 0, 0, 3, 0, 3, 'rock');
+      slab(boxes, v - 1, 0, 2, 3, 2, 'ice'); // a capa de geada
+      boxes.push(box(s * 3, s, 0, 2, 2, 2, 'rock'));
+      break;
+    }
+    case 'lodestone': {
+      // Magnetita: pedra escura com a face oxidada — sem ouro, nunca.
+      slab(boxes, 0, 0, 2, 0, 4, 'rockDeep');
+      boxes.push(box(2, -2, 1, 1, 4, 3, 'rust')); // a face oxidada
+      boxes.push(box(s * 3, s, 0, 2, 2, 2 - v, 'rockDeep'));
+      break;
+    }
+    case 'ore_spur': {
+      // Esporao de veio aflorando: a camada que continua parede adentro.
+      boxes.push(box(-4, -2, 0, 8, 4, 2, 'rockDeep'));
+      boxes.push(box(-3, -1, 2, 3, 2, 3, 'rust'));
+      boxes.push(box(1, -1, 2, 3, 2, 2 + v, 'rust'));
+      boxes.push(box(s * 2, 1, 4, 2, 1, 2, 'rust'));
+      break;
+    }
+
+    // ------------------------------------------------------------------
+    // TETO (minerais): de ponta-cabeca — a BICA no z0 (ancora), alargando
+    // para cima. O cliente desenha erguido e translucido.
+    // ------------------------------------------------------------------
+    case 'hanging_spur': {
+      cone(boxes, [[0, 3, 'rockDeep'], [1, 4, 'rock'], [2, 4, 'rockDeep']]);
+      cone(boxes, [[0, 2, 'rock'], [1, 3 + v, 'rockDeep']], s * 4, s);
+      break;
+    }
+    case 'crystal_chandelier': {
+      // Lustre frio: agulhas invertidas em leque, presas num miolo comum.
+      cone(boxes, [[0, 4, 'ice'], [1, 4, 'ice']], 0, 0);
+      cone(boxes, [[0, 3, 'ice'], [1, 2, 'ice']], -4, s);
+      cone(boxes, [[0, 3 + v, 'ice'], [1, 2, 'ice']], 4, -s);
+      boxes.push(box(-5, -1, 7, 11, 3, 2, 'rock')); // o miolo na rocha
+      break;
+    }
+    case 'stalactite': {
+      cone(boxes, [[0, 3, 'bone'], [1, 4, 'bone'], [2, 4, 'bone'], [3, 3 + v, 'bone']]);
+      cone(boxes, [[0, 2, 'bone'], [1, 3, 'bone']], s * 5, s * 2);
+      break;
+    }
+    case 'hanging_slab': {
+      // Laje descolada do teto, pendendo em diagonal — degraus descendo.
+      boxes.push(box(-5, -2, 6 + v, 4, 4, 3, 'bone'));
+      boxes.push(box(-2, -2, 4, 4, 4, 3, 'rust'));
+      boxes.push(box(1, -2, 2, 4, 4, 3, 'bone'));
+      boxes.push(box(4, -1, 0, 2, 3, 3, 'rust')); // a ponta que vai cair
+      break;
+    }
+    case 'sulfur_drip': {
+      // Escorrimento mineral APAGADO: crosta terrosa gotejando — sem verde
+      // de gas, sem particula.
+      cone(boxes, [[0, 2, 'rust'], [1, 3, 'bone'], [2, 3, 'rust'], [3, 2 + v, 'bone']]);
+      cone(boxes, [[0, 3, 'bone']], s * 3, s);
+      cone(boxes, [[0, 2, 'rust']], -s * 3, -s);
+      break;
+    }
+    case 'soot_fang': {
+      cone(boxes, [[0, 3, 'rockDeep'], [1, 4, 'rockDeep'], [2, 3 + v, 'rock']]);
+      boxes.push(box(s * 2, 0, 8 + v, 2, 2, 1, 'scorch')); // fuligem na raiz
+      break;
+    }
+    case 'icicle': {
+      cone(boxes, [[0, 4, 'ice'], [1, 4, 'ice'], [2, 3, 'ice']]);
+      cone(boxes, [[0, 3, 'ice'], [1, 2, 'ice']], s * 4, s);
+      cone(boxes, [[0, 2 + v, 'ice']], -s * 3, s * 2);
       break;
     }
     default:

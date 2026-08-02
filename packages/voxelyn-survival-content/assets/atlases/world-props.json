@@ -3,7 +3,7 @@
   "version": 3,
   "atlas": "world-props.png",
   "frameWidth": 108,
-  "frameHeight": 136,
+  "frameHeight": 142,
   "columns": 37,
   "originX": 52,
   "originY": 106,
@@ -250,6 +250,186 @@
     },
     {
       "name": "decor:drill:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:walkway:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:walkway:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:rail:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:rail:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:calcite_basin:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:calcite_basin:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_fan:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_fan:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slab_pile:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:slab_pile:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fallen_plate:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:fallen_plate:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_mound:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_mound:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:cinder_pile:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:cinder_pile:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:frost_stone:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:frost_stone:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:lodestone:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:lodestone:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:ore_spur:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:ore_spur:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_spur:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_spur:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_chandelier:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:crystal_chandelier:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalactite:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:stalactite:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_slab:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:hanging_slab:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_drip:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:sulfur_drip:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:soot_fang:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:soot_fang:1",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:icicle:0",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "decor:icicle:1",
       "frames": 1,
       "frameMs": 0
     }

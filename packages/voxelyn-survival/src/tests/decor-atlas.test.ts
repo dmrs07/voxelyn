@@ -14,13 +14,18 @@ const VOLUMETRIC: PropKind[] = [
   'ice_spike', 'crate', 'strut', 'insulator', 'duct', 'mushroom',
   'monolith', 'great_prism', 'stalagnate', 'strata_arch', 'great_fumarole',
   'slag_monolith', 'frost_obelisk', 'magnet_core', 'drill',
+  // Segunda varredura: medios, infra Aurix e pendentes minerais de teto.
+  'walkway', 'rail', 'calcite_basin', 'crystal_fan', 'slab_pile',
+  'fallen_plate', 'sulfur_mound', 'cinder_pile', 'frost_stone', 'lodestone',
+  'ore_spur', 'hanging_spur', 'crystal_chandelier', 'stalactite',
+  'hanging_slab', 'sulfur_drip', 'soot_fang', 'icicle',
 ];
 
+// Runtime por MERITO: pedrinhas/cacos (silhueta basta) e os pendentes que
+// balancam por relogio (frame estatico mataria a deriva).
 const RUNTIME_ONLY: PropKind[] = [
-  'rubble', 'basalt_shard', 'crystal_shards', 'sulfur_mound', 'cinder_pile',
-  'frost_stone', 'lodestone', 'slab_pile', 'fallen_plate', 'ore_spur',
-  'calcite_basin', 'crystal_fan', 'puffball', 'walkway', 'rail',
-  'hanging_spur', 'stalactite', 'icicle', 'spore_veil', 'cable_hook', 'root_strand',
+  'rubble', 'basalt_shard', 'crystal_shards', 'puffball',
+  'spore_veil', 'cable_hook', 'root_strand',
 ];
 
 const propOf = (kind: PropKind, variant: number): DecorativeProp => ({

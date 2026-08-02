@@ -58,7 +58,7 @@ import {
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
 import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
-import { decorAtlasName, drawDecorProp } from './decor-draw';
+import { CEILING_ALPHA, decorAtlasName, drawDecorProp } from './decor-draw';
 import { drawWallEdgeDetail } from './edge-detail';
 import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
 import { t } from './i18n';
@@ -1549,11 +1549,23 @@ export class SurvivalRenderer {
         draw: () => {
           // Prop com massa vem do atlas (modelo voxel de verdade); o desenho
           // de runtime fica como fallback de atlas nao carregado — e como o
-          // caminho unico dos micros e do teto. O landmark ancora no TOPO do
-          // bloco pedestal, uma altura de parede acima da base do tile.
+          // caminho unico dos micros e dos pendentes que balancam. O
+          // landmark ancora no TOPO do bloco pedestal (uma altura de parede
+          // acima da base); o pendente de teto e modelado de ponta-cabeca
+          // com a bica na ancora, entao sobe erguido — e translucido, com o
+          // MESMO contrato de honestidade do caminho de runtime.
           const atlasName = decorAtlasName(prop);
-          const lift = prop.anchor === 'landmark' ? 14 * z : 0;
-          if (atlasName && this.props.draw(ctx, atlasName, nowMs, dsx, dsy - lift, z)) return;
+          if (atlasName) {
+            const ceiling = prop.anchor === 'ceiling';
+            const lift = prop.anchor === 'landmark' ? 14 * z : ceiling ? 10 * z : 0;
+            if (ceiling) {
+              ctx.save();
+              ctx.globalAlpha *= CEILING_ALPHA;
+            }
+            const drew = this.props.draw(ctx, atlasName, nowMs, dsx, dsy - lift, z);
+            if (ceiling) ctx.restore();
+            if (drew) return;
+          }
           drawDecorProp(ctx, prop, dsx, dsy, z, nowMs);
         },
       });

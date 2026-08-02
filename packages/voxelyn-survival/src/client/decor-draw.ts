@@ -77,6 +77,28 @@ const ATLAS_VOLUMETRIC: ReadonlySet<PropKind> = new Set<PropKind>([
   'frost_obelisk',
   'magnet_core',
   'drill',
+  // Segunda varredura: medios de chao/borda + infra Aurix de piso.
+  'walkway',
+  'rail',
+  'calcite_basin',
+  'crystal_fan',
+  'slab_pile',
+  'fallen_plate',
+  'sulfur_mound',
+  'cinder_pile',
+  'frost_stone',
+  'lodestone',
+  'ore_spur',
+  // Pendentes MINERAIS de teto (modelados de ponta-cabeca no atlas). Os
+  // pendentes que BALANCAM por relogio (veu, cabo, raiz) ficam em runtime:
+  // frame estatico mataria a deriva que os faz parecer vivos.
+  'hanging_spur',
+  'crystal_chandelier',
+  'stalactite',
+  'hanging_slab',
+  'sulfur_drip',
+  'soot_fang',
+  'icicle',
 ]);
 
 /**
@@ -101,7 +123,7 @@ export const decorAtlasName = (prop: DecorativeProp): string | null =>
  * acontece; a translucidez e o contrato de honestidade — nada que pende do
  * alto pode esconder um inimigo, um projetil ou a superficie que joga.
  */
-const CEILING_ALPHA = 0.58;
+export const CEILING_ALPHA = 0.58;
 
 /** Props de teto: desenhados ERGUIDOS (pendem da rocha) e sob alpha proprio. */
 const drawCeilingProp = (
