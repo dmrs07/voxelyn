@@ -9,7 +9,7 @@
 //    micelio so cresce sobre o proprio tapete; prop de borda tem parede viva.
 import { describe, expect, it } from 'vitest';
 import { createRun, hashAuthoritativeState, sectorBiome, SOLID_NONE, SURF_FUNGAL, SURF_WATER } from '@voxelyn/survival-sim';
-import { placeDecor, propStillValid } from '../client/decor';
+import { placeDecor, propStillValid, surfaceRuptureFor } from '../client/decor';
 
 describe('decoracao derivada', () => {
   it('mesma seed, mesma lista — e nada da RNG autoritativa e consumido', () => {
@@ -249,6 +249,51 @@ describe('decoracao derivada', () => {
     expect(baseKinds.has('duct')).toBe(false);
     // E a infraestrutura de chao esta la: o lugar que justificou a operacao.
     expect(baseKinds.has('walkway') || baseKinds.has('rail') || baseKinds.has('crate')).toBe(true);
+  });
+
+  it('a Ruptura a Superficie e rara, rasa, deterministica — e traz raizes', () => {
+    const probe = [{ x: 30, y: 30 }];
+    let shallow = 0;
+    for (let seed = 1; seed <= 600; seed++) {
+      for (const sector of [1, 2]) {
+        const a = surfaceRuptureFor(seed, sector, probe);
+        expect(surfaceRuptureFor(seed, sector, probe)).toEqual(a);
+        if (a) shallow++;
+      }
+      // Fundo demais nao ha superficie por perto: setor 3+ nunca rompe.
+      expect(surfaceRuptureFor(seed, 3, probe)).toBeNull();
+    }
+    // Raro de verdade, mas existente: na faixa de ~1/6.
+    expect(shallow).toBeGreaterThan(1200 * 0.08);
+    expect(shallow).toBeLessThan(1200 * 0.3);
+
+    // No setor rompido, as raizes pendem em volta da fenda.
+    const seedWith = (() => {
+      for (let s = 1; s < 4096; s++) {
+        if (surfaceRuptureFor(s, 1, probe)) return s;
+      }
+      throw new Error('nenhuma seed com ruptura');
+    })();
+    const state = createRun({ seed: seedWith });
+    const rupture = surfaceRuptureFor(seedWith, 1, state.hallCenters);
+    expect(rupture).not.toBeNull();
+    if (!rupture) return;
+    const roots = placeDecor(state).filter((p) => p.kind === 'root_strand');
+    expect(roots.length).toBeGreaterThan(0);
+    for (const root of roots) {
+      expect(root.anchor).toBe('ceiling');
+      expect(Math.max(Math.abs(root.x - rupture.x), Math.abs(root.y - rupture.y))).toBeLessThanOrEqual(8);
+    }
+
+    // Sem ruptura, nem uma raiz: a superficie nao vaza para setor intacto.
+    const seedWithout = (() => {
+      for (let s = 1; s < 4096; s++) {
+        if (!surfaceRuptureFor(s, 1, probe)) return s;
+      }
+      throw new Error('toda seed com ruptura?');
+    })();
+    const clean = placeDecor(createRun({ seed: seedWithout }));
+    expect(clean.some((p) => p.kind === 'root_strand')).toBe(false);
   });
 
   it('cogumelos so crescem sobre o tapete fungico', () => {

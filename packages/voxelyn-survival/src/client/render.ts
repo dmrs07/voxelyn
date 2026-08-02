@@ -57,7 +57,7 @@ import {
   summaryLines,
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
-import { placeDecor, propStillValid, type DecorativeProp } from './decor';
+import { placeDecor, propStillValid, surfaceRuptureFor, type DecorativeProp } from './decor';
 import { drawDecorProp } from './decor-draw';
 import { drawWallEdgeDetail } from './edge-detail';
 import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
@@ -1932,6 +1932,44 @@ export class SurvivalRenderer {
     // A luz ambiente do estrato entra AQUI: por cima do mundo e das criaturas,
     // por baixo de particulas, numeros de dano e HUD.
     drawBiomeVeil(ctx, state.stratum, vw, vh);
+
+    // A RUPTURA A SUPERFICIE: no setor raro em que o teto rachou ate o ceu,
+    // um feixe de luz de dia desce inclinado sobre o salao e abre uma poca
+    // clara no chao. Sobre o veu (a luz vence a atmosfera), sob particulas e
+    // HUD. E ambiente, nao informacao: nada joga diferente debaixo dela —
+    // por isso o tom e quente-neutro, longe do telegrafo e do gas.
+    {
+      const rupture = surfaceRuptureFor(state.config.seed, state.sector, state.hallCenters);
+      if (rupture) {
+        const [rx, ry] = toScreen(rupture.x + 0.5, rupture.y + 0.5);
+        if (rx > -180 && rx < vw + 180 && ry > -180 && ry < vh + 180) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          // O feixe desce INCLINADO, como luz por uma fenda — nunca um pilar
+          // vertical perfeito, que leria como efeito de habilidade.
+          const topX = rx + 42 * z;
+          const beam = ctx.createLinearGradient(topX, 0, rx, ry);
+          beam.addColorStop(0, 'rgba(255,244,214,0.15)');
+          beam.addColorStop(1, 'rgba(255,244,214,0.03)');
+          ctx.fillStyle = beam;
+          ctx.beginPath();
+          ctx.moveTo(topX - 24 * z, -8);
+          ctx.lineTo(topX + 24 * z, -8);
+          ctx.lineTo(rx + 46 * z, ry);
+          ctx.lineTo(rx - 46 * z, ry);
+          ctx.closePath();
+          ctx.fill();
+          const pool = ctx.createRadialGradient(rx, ry, 4 * z, rx, ry, 46 * z);
+          pool.addColorStop(0, 'rgba(255,244,214,0.13)');
+          pool.addColorStop(1, 'rgba(255,244,214,0)');
+          ctx.fillStyle = pool;
+          ctx.beginPath();
+          ctx.ellipse(rx, ry, 46 * z, 23 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
 
     // FX
     // Vem do relogio, nao de um 16.7 fixo: em rAF o passo fixo amarrava a vida

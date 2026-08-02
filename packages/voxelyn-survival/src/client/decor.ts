@@ -92,6 +92,8 @@ export type PropKind =
   // Teto das ocupacoes.
   | 'spore_veil'
   | 'cable_hook'
+  // Ruptura a Superficie: raizes que desceram pela fenda.
+  | 'root_strand'
   // ...e em escala monumental: a broca que justificou tudo.
   | 'drill'
   // LANDMARKS, um por estrato: o monumento no coracao do salao.
@@ -141,6 +143,30 @@ const hashStr = (s: string): number => {
     h = Math.imul(h, 0x01000193);
   }
   return h >>> 0;
+};
+
+const mix32 = (a: number, b: number): number =>
+  (Math.imul(a ^ Math.imul(b, 0x9e3779b9), 0x85ebca6b) ^ ((a ^ b) >>> 13)) >>> 0;
+
+/**
+ * A RUPTURA A SUPERFICIE: o evento raro em que o teto do Veio rachou ate o
+ * ceu — um feixe de luz de dia desce sobre UM salao, e raizes da superficie
+ * pendem pela fenda. E um EVENTO, nao um setor: ~1 em 6 setores RASOS
+ * (1 e 2; mais fundo nao ha superficie por perto), derivado puramente de
+ * (seed, setor) + os centros de salao que a gramatica registrou — qualquer
+ * cliente ve a mesma fenda no mesmo lugar, sem um byte de rede nem de RNG
+ * autoritativa. A luz e ambiente e as raizes sao decor: NADA joga diferente
+ * debaixo dela (a mecanica da Ruptura e trabalho futuro com doc proprio).
+ */
+export const surfaceRuptureFor = (
+  seed: number,
+  sector: number,
+  hallCenters: ReadonlyArray<{ x: number; y: number }>,
+): { x: number; y: number } | null => {
+  if (sector > 2 || hallCenters.length === 0) return null;
+  const h = mix32(seed >>> 0, Math.imul(sector, 0x27d4eb2f) ^ 0x52e5a7);
+  if (h % 6 !== 0) return null;
+  return hallCenters[(h >>> 8) % hallCenters.length];
 };
 
 /**
@@ -419,6 +445,14 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
     const sampler = nearHall(c);
     for (let n = 0; n < HALL_RING_EDGE; n++) tryPlace(kit.edge, 'wall_base', bareFloor, sampler);
     for (let n = 0; n < HALL_RING_MICRO; n++) tryPlace(kit.micro, 'floor', bareFloor, sampler);
+  }
+
+  // As raizes da RUPTURA: so no setor raro em que o teto rachou, penduradas
+  // em volta da fenda — a superficie entrando pelo buraco que a luz mostra.
+  const rupture = surfaceRuptureFor(state.config.seed, state.sector, state.hallCenters);
+  if (rupture) {
+    const sampler = nearHall(rupture);
+    for (let n = 0; n < 7; n++) tryPlace(['root_strand'], 'ceiling', isOpen, sampler);
   }
 
   for (let n = 0; n < EDGE_BUDGET; n++) tryPlace(kit.edge, 'wall_base', bareFloor);

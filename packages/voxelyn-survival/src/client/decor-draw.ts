@@ -127,6 +127,16 @@ const drawCeilingProp = (
       drawVoxel(ctx, x + drift * 0.3, top + s(4.2), s(1.8), FUNGUS_DEEP);
       return;
     }
+    case 'root_strand': {
+      // Raiz da superficie descendo pela fenda: terrosa com a ponta palida,
+      // balancando devagar — vida de CIMA, nao a colonia daqui.
+      const swing = Math.sin(nowMs / 1900 + (v % 6)) * s(0.6);
+      drawVoxel(ctx, x, top, s(2.2), RUST);
+      drawVoxel(ctx, x + swing * 0.5, top + s(2), s(1.8), RUST);
+      drawVoxel(ctx, x + swing, top + s(3.8), s(1.5), BONE);
+      drawVoxel(ctx, x + swing * 1.3, top + s(5.2), s(1.1), BONE);
+      return;
+    }
     case 'cable_hook': {
       // Cabo Aurix esquecido: pende reto, gancho vazio. Sem carga, sem
       // brilho — o que a operacao icava ja foi embora ha muito tempo.
