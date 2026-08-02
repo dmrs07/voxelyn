@@ -58,7 +58,7 @@ import {
 } from './run-summary';
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
 import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
-import { drawDecorProp } from './decor-draw';
+import { decorAtlasName, drawDecorProp } from './decor-draw';
 import { drawWallEdgeDetail } from './edge-detail';
 import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
 import { t } from './i18n';
@@ -848,6 +848,10 @@ export class SurvivalRenderer {
    */
   resetRunPresentation(): void {
     this.presentation.reset();
+    // Run nova na MESMA seed/setor nao muda o decorKey — mas os rastros sao
+    // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
+    // pegadas velhas e as demais desenhariam orfas sobre a run nova.
+    this.lurkerTrails.clear();
   }
 
   private addFlash(x: number, y: number, r: number, power: number, nowMs: number, durationMs: number): void {
@@ -1542,7 +1546,16 @@ export class SurvivalRenderer {
         // landmark compartilha a profundidade do pedestal — o sort estavel o
         // desenha logo apos o proprio bloco.
         depth: prop.x + prop.y + (prop.anchor === 'ceiling' ? 2 : 0),
-        draw: () => drawDecorProp(ctx, prop, dsx, dsy, z, nowMs),
+        draw: () => {
+          // Prop com massa vem do atlas (modelo voxel de verdade); o desenho
+          // de runtime fica como fallback de atlas nao carregado — e como o
+          // caminho unico dos micros e do teto. O landmark ancora no TOPO do
+          // bloco pedestal, uma altura de parede acima da base do tile.
+          const atlasName = decorAtlasName(prop);
+          const lift = prop.anchor === 'landmark' ? 14 * z : 0;
+          if (atlasName && this.props.draw(ctx, atlasName, nowMs, dsx, dsy - lift, z)) return;
+          drawDecorProp(ctx, prop, dsx, dsy, z, nowMs);
+        },
       });
     }
 

@@ -11,6 +11,7 @@
 // isso e ALTO. Altura e o unico eixo que a projecao isometrica nao encurta com
 // a distancia, e e o que faz o jogador virar a camera e ir ate la.
 import { box, DIR_UNROTATED, modelBounds, renderVoxels } from './voxel.mjs';
+import { DECOR_PROP_KINDS, decorPropModel } from './decor-props.mjs';
 
 /**
  * Tipos e suas animacoes ASSADAS.
@@ -33,6 +34,10 @@ export const PROP_KINDS = [
   { name: 'salvageTerminalComplete', frames: 2, frameMs: 300 },
   { name: 'salvageCache', frames: 1, frameMs: 0 },
   { name: 'salvageCacheOpened', frames: 1, frameMs: 0 },
+  // Props DECORATIVOS volumetricos (fumarolas, monolitos, a broca...):
+  // modelos estaticos em duas variantes, no fim para nao mover indices.
+  // Ver decor-props.mjs — pedrinhas e cacos continuam em runtime.
+  ...DECOR_PROP_KINDS,
 ];
 
 /** Meia-largura da base, em voxels. */
@@ -232,6 +237,7 @@ const salvageCacheModel = (opened) => {
 export const propModel = (kind, frame) => {
   const spec = PROP_KINDS.find((k) => k.name === kind);
   if (!spec) throw new Error(`prop desconhecido: ${kind}`);
+  if (kind.startsWith('decor:')) return decorPropModel(kind);
   const phase = spec.frames > 1 ? frame / spec.frames : 0;
   if (kind === 'core') return coreModel(phase, false);
   if (kind === 'coreTaken') return coreModel(0, true);

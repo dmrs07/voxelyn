@@ -39,7 +39,10 @@ export const SIMULATION_VERSION = 16;
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
 // (terrain-blocks v4, kind rockFerric no fim da lista).
-export const CONTENT_VERSION = 12;
+// 13: props decorativos VOLUMETRICOS viram modelos voxel no atlas
+// world-props (v3, kinds decor:<kind>:<variante>) — fumarolas, monolitos e
+// a broca deixam o desenho de runtime (que vira fallback).
+export const CONTENT_VERSION = 13;
 
 export type VersionTriple = {
   protocolVersion: number;

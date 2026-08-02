@@ -257,7 +257,10 @@ const buildProps = () => {
   const manifest = {
     id: 'world-props',
     // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
-    version: 2,
+    // 3: props DECORATIVOS volumetricos (decor:<kind>:<variante>) no fim da
+    // lista — fumarolas, monolitos, a broca e demais pecas com massa deixam
+    // o desenho de runtime e viram modelos rasterizados de verdade.
+    version: 3,
     atlas: 'world-props.png',
     frameWidth,
     frameHeight,

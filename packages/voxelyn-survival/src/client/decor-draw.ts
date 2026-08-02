@@ -13,7 +13,7 @@
 // - enxofre decorativo e APAGADO (terroso), sem o verde vivo do gas;
 // - nenhum vermelho de projetil, nenhuma brasa acesa.
 import { drawVoxel, type FaceRamp } from './voxel-draw';
-import type { DecorativeProp } from './decor';
+import type { DecorativeProp, PropKind } from './decor';
 
 const ROCK: FaceRamp = ['#46566e', '#2e3a4d', '#1d2430'];
 const ROCK_DEEP: FaceRamp = ['#2e3a4d', '#1d2430', '#0b0e14'];
@@ -48,6 +48,45 @@ const h32 = (v: number): number => {
   x ^= x >>> 13;
   return (Math.imul(x, 0xc2b2ae35) ^ (x >>> 16)) >>> 0;
 };
+
+/**
+ * Os kinds com MASSA de verdade moram no atlas world-props como modelos voxel
+ * rasterizados (ver content/tools/decor-props.mjs): cubos empilhados em
+ * runtime leem como painel de papelao numa fumarola ou numa broca. Pedrinha,
+ * caco e monte continuam em runtime — neles a silhueta basta — e os props de
+ * TETO tambem (sao translucidos e pendem; o atlas ancora pela base).
+ */
+const ATLAS_VOLUMETRIC: ReadonlySet<PropKind> = new Set<PropKind>([
+  'fallen_column',
+  'stalagmite',
+  'flow_curtain',
+  'fumarole_cone',
+  'slag_block',
+  'ice_spike',
+  'crate',
+  'strut',
+  'insulator',
+  'duct',
+  'mushroom',
+  'monolith',
+  'great_prism',
+  'stalagnate',
+  'strata_arch',
+  'great_fumarole',
+  'slag_monolith',
+  'frost_obelisk',
+  'magnet_core',
+  'drill',
+]);
+
+/**
+ * Nome do frame no atlas de props para este prop — ou null para os kinds que
+ * (de proposito) continuam desenhados em runtime. A variante do modelo sai do
+ * mesmo `variant` sorteado na colocacao: deterministico e igual em qualquer
+ * maquina.
+ */
+export const decorAtlasName = (prop: DecorativeProp): string | null =>
+  ATLAS_VOLUMETRIC.has(prop.kind) ? `decor:${prop.kind}:${h32(prop.variant) & 1}` : null;
 
 /**
  * Desenha um prop na posicao de tela (sx, sy) da celula ancora.

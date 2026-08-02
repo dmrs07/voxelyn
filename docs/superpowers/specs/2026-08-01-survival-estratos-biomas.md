@@ -379,6 +379,21 @@ Com isso a tabela de mapeamento original está coberta de ponta a ponta:
 todos os estratos (incl. Ferrífero), ocupações, assinaturas, gramáticas,
 paleta/paredes/contorno/decoração, e a Ruptura em corte visual.
 
+## Décima sétima etapa (implementada): props volumétricos no atlas
+
+Feedback de playtest: cubos de `drawVoxel` empilhados leem como painel de
+papelão em qualquer prop com massa (fumarola, broca, monólito). Os 20 kinds
+volumétricos — 11 de chão/borda + os 9 landmarks — viraram modelos `box()`
+rasterizados pelo pipeline de conteúdo (mesma projeção/âncora de blocos e
+criaturas) no atlas `world-props` v3, como kinds estáticos
+`decor:<kind>:<variante>` (2 variantes, contra o carimbo). O cliente desenha
+do atlas primeiro (`decorAtlasName` + `PropBank`); o desenho de runtime vira
+fallback de atlas não carregado e continua sendo o caminho único de
+pedrinhas/cacos (onde a silhueta basta) e do teto translúcido.
+`CONTENT_VERSION` 13. Lições re-aprendidas no preview: `scorch` é rampa
+toda-escura e não pode ser volume (só fresta); chapéu baixo achata o
+cogumelo em panqueca na projeção 2:1.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
