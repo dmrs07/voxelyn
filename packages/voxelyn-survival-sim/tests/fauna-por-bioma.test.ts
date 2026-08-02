@@ -198,6 +198,29 @@ describe('Bombardeiro de Enxofre', () => {
     expect(south, 'a bolsa sul ficou fria do outro lado da parede').toBeGreaterThan(0);
   });
 
+  it('brasa que so toca pela DIAGONAL de um canto selado nao acende', () => {
+    // A ignicao do bombardeiro nao pode ser a unica excecao a geometria do
+    // jogo: o fogo comum anda pelas quatro arestas (ver `stepCells`), entao
+    // uma brasa que so encosta no gas pelo canto de duas paredes tambem nao
+    // pode acender a nuvem — senao o canto selado, com que o jogador conta,
+    // deixaria de proteger justamente contra este bicho.
+    const state = arena(11);
+    // Canto selado: a brasa em (30,27) toca (31,26) so na diagonal.
+    state.solid[at(state, 30, 26)] = SOLID_ROCK;
+    state.solid[at(state, 31, 27)] = SOLID_ROCK;
+    setSurface(state, at(state, 30, 27), SURF_EMBER, 600);
+    const bomber = spawnEnemy(state, 'sulfur_bomber', 32, 25, false);
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+
+    let fire = 0;
+    for (let y = 23; y <= 27; y++) {
+      for (let x = 30; x <= 34; x++) {
+        if (state.surface[at(state, x, y)] === SURF_FIRE) fire++;
+      }
+    }
+    expect(fire, 'o fogo atravessou um canto selado').toBe(0);
+  });
+
   it('o Spore Bomber continua deixando esporo: sao bichos diferentes', () => {
     const state = arena(11);
     const bomber = spawnEnemy(state, 'bomber', 32, 25, false);

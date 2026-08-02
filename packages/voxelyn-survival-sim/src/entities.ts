@@ -363,12 +363,19 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent
   // e o que a fisica ja diz: gas encostado em brasa pega fogo onde encosta.
   // Dentro de uma mesma bolsa o resultado nao muda — a propagacao levaria o
   // fogo ali de qualquer jeito, so alguns ticks depois.
+  // "Encostar" aqui e a MESMA vizinhanca que o fogo usa para andar: as quatro
+  // arestas, nunca a diagonal (ver `stepCells`, que propaga por
+  // `[i-1, i+1, i-w, i+w]`). Com a diagonal valendo, uma brasa que so toca o
+  // gas pelo CANTO de duas paredes acendia a nuvem por uma passagem que o
+  // fogo comum nao atravessa — a ignicao do bombardeiro viraria a unica
+  // excecao a geometria do jogo, e justamente num canto selado, onde o
+  // jogador conta com a parede.
   const w = state.config.width;
   for (const gas of laid) {
     const touchesHeat = heatCells.some((h) => {
       const dx = Math.abs((gas % w) - (h % w));
       const dy = Math.abs(Math.floor(gas / w) - Math.floor(h / w));
-      return dx <= 1 && dy <= 1;
+      return dx + dy === 1;
     });
     if (touchesHeat) igniteCell(state, gas, events);
   }
