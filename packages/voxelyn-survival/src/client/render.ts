@@ -108,6 +108,7 @@ const STRATUM_ROCK_KIND = {
   furnace: 11,
   silica: 12,
   glacial: 13,
+  ferric: 14,
 } as const satisfies Record<StratumId, number>;
 
 /** Indice do bloco no atlas, dado o solido e o estrato do setor. */
@@ -175,6 +176,7 @@ const STRATUM_LABEL_KEY = {
   furnace: 'biome.stratum.furnace',
   silica: 'biome.stratum.silica',
   glacial: 'biome.stratum.glacial',
+  ferric: 'biome.stratum.ferric',
 } as const satisfies Record<StratumId, string>;
 
 const OCCUPATION_LABEL_KEY = {
@@ -217,6 +219,8 @@ const BIOME_VEIL = {
   furnace: { color: '#ff7a2f', alpha: 0.13 },
   silica: { color: '#b8a98f', alpha: 0.14 },
   glacial: { color: '#9fc2e8', alpha: 0.17 },
+  // Ferrifero: oxido — quente e metalico, distinto do laranja vivo da Fornalha.
+  ferric: { color: '#b3541e', alpha: 0.12 },
 } as const satisfies Record<StratumId, { color: string; alpha: number } | null>;
 
 const drawBiomeVeil = (

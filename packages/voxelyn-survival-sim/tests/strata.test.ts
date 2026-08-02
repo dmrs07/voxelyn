@@ -187,6 +187,7 @@ describe('perfis por estrato', () => {
     expect(halls('furnace', 'thermal')).toBe('canyon');
     expect(halls('silica', 'arid')).toBe('terraced');
     expect(halls('glacial', 'cryo')).toBe('lakes');
+    expect(halls('ferric', 'industrial')).toBe('canyon');
   });
 
   it('a rotunda da Catedral deixa pilares de cristal soltos no salao', () => {
@@ -595,6 +596,57 @@ describe('fratura por camada da Silica', () => {
       if (found) seedsWithSeam++;
     }
     expect(seedsWithSeam).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('Estrato Ferrifero', () => {
+  const seedInd = seedWithLineage('industrial');
+
+  it('a linhagem industrial desce para o veio principal — e a cicatriz mora nele', () => {
+    expect(sectorBiome(seedInd, 2)).toEqual({
+      stratum: 'ferric',
+      occupation: 'aurix',
+      lineage: 'industrial',
+    });
+    expect(sectorBiome(seedInd, 3).stratum).toBe('ferric');
+  });
+
+  it('o ferrifero e denso: muito mais minerio e mais Miners que o basalto', () => {
+    const countOre = (state: SurvivalState): number => {
+      let n = 0;
+      for (let i = 0; i < state.solid.length; i++) {
+        if (state.solid[i] === SOLID_ORE) n++;
+      }
+      return n;
+    };
+    const basalt = createRun({ seed: seedInd, sector: 1 });
+    const ferric = createRun({ seed: seedInd, sector: 2 });
+    expect(ferric.stratum).toBe('ferric');
+    expect(countOre(ferric)).toBeGreaterThan(countOre(basalt) * 2);
+    const miners = (s: SurvivalState): number =>
+      s.enemies.filter((e) => e.archetype === 'miner').length;
+    expect(miners(ferric)).toBeGreaterThan(miners(basalt));
+  });
+
+  it('no ferrifero a PAREDE conduz: a descarga viaja o triplo pelo veio', () => {
+    // A mesma fiacao artificial nos dois estratos: um seam reto de minerio na
+    // fileira 50, com a fileira 49 aberta para receber a carga. So o
+    // orcamento muda (FERRIC_VEIN_SCALE) — e ele decide ate onde a energia
+    // chega.
+    const wire = (state: SurvivalState): boolean => {
+      const w = state.config.width;
+      for (let x = 8; x <= 92; x++) {
+        state.solid[50 * w + x] = SOLID_ORE;
+        state.solid[49 * w + x] = SOLID_NONE;
+        state.surface[49 * w + x] = SURF_NONE;
+      }
+      const events: SemanticEvent[] = [];
+      impactSolid(state, 10, 50, 'energy', events);
+      // A celula aberta sobre o veio, ~80 celulas adiante do impacto.
+      return state.charges.some((c) => c.idx === 49 * w + 88);
+    };
+    expect(wire(createRun({ seed: seedInd, sector: 2 }))).toBe(true);
+    expect(wire(createRun({ seed: seedInd, sector: 1 }))).toBe(false);
   });
 });
 

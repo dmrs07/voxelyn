@@ -358,6 +358,7 @@ export const PT_BR = {
   'biome.stratum.furnace': 'FORNALHA ABISSAL',
   'biome.stratum.silica': 'SUMIDOUROS DE SÍLICA',
   'biome.stratum.glacial': 'CRIPTA GLACIAL',
+  'biome.stratum.ferric': 'ESTRATO FERRÍFERO',
   'biome.occupation.mycelial': 'MATRIZ MICELIAL',
   'biome.occupation.aurix': 'CICATRIZ AURIX',
 

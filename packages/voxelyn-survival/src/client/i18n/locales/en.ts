@@ -354,6 +354,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'biome.stratum.furnace': 'ABYSSAL FURNACE',
   'biome.stratum.silica': 'SILICA SINKHOLES',
   'biome.stratum.glacial': 'GLACIAL CRYPT',
+  'biome.stratum.ferric': 'FERRIC STRATUM',
   'biome.occupation.mycelial': 'MYCELIAL MATRIX',
   'biome.occupation.aurix': 'AURIX SCAR',
 

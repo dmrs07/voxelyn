@@ -14,6 +14,7 @@
 import {
   BUDGET_RESONANCE_CELLS,
   BUDGET_VEIN_CELLS,
+  FERRIC_VEIN_SCALE,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
@@ -201,12 +202,14 @@ export const impactSolid = (
     case SOLID_ORE_CHIPPED: {
       if (cls === 'energy') {
         // O veio e fiacao: a carga percorre o minerio conectado e sai nas
-        // aberturas do outro lado. E a razao de o minerio existir.
+        // aberturas do outro lado. E a razao de o minerio existir. No
+        // FERRIFERO a parede inteira e a fiacao: o orcamento triplica e a
+        // descarga viaja de sala em sala pelo seam.
         const vein = floodFrom(
           state,
           cx,
           cy,
-          BUDGET_VEIN_CELLS,
+          state.stratum === 'ferric' ? BUDGET_VEIN_CELLS * FERRIC_VEIN_SCALE : BUDGET_VEIN_CELLS,
           (n) => state.solid[n] === SOLID_ORE || state.solid[n] === SOLID_ORE_CHIPPED
         );
         chargeCells(state, openNeighbours(state, vein), events, origin);

@@ -30,10 +30,16 @@ export const PROTOCOL_VERSION = 11;
 // SILICA ganha FRATURA POR CAMADA (quebrar fragil enfraquece os vizinhos
 // frageis da mesma faixa horizontal) + SEAMS de minerio no worldgen — a
 // geracao e a fisica dos setores sedimentares mudam juntas nesta versao.
+// Ainda em 16 (mesma leva, nunca lancada separada): o ESTRATO FERRIFERO —
+// a linhagem industrial re-trilhada (basalto -> ferrifero -> ferrifero),
+// seams + nos de minerio, minerCap alto e conducao por parede
+// (FERRIC_VEIN_SCALE) — e o pedestal do poco por estrato no worldgen.
 export const SIMULATION_VERSION = 16;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
-export const CONTENT_VERSION = 11;
+// 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
+// (terrain-blocks v4, kind rockFerric no fim da lista).
+export const CONTENT_VERSION = 12;
 
 export type VersionTriple = {
   protocolVersion: number;

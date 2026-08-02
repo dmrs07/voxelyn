@@ -213,6 +213,18 @@ const drawLandmarkProp = (
       drawVoxel(ctx, x, base - s(7.6), s(3.6), MIST);
       drawVoxel(ctx, x, base - s(10.4), s(2.2), MIST);
       return;
+    case 'magnet_core': {
+      // O NO-MAE do Ferrifero: bloco de magnetita com placas de oxido presas
+      // em orbita — a unica "fisica" e visual e congelada. Escuro e pesado;
+      // nenhuma luz, nenhum ouro.
+      drawVoxel(ctx, x, base, s(7.2), ROCK_DEEP);
+      drawVoxel(ctx, x, base - s(4.2), s(5.2), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(3.6), base - s(6), s(2.4), RUST);
+      drawVoxel(ctx, x - flip * s(3.2), base - s(7.4), s(2), RUST);
+      drawVoxel(ctx, x, base - s(8), s(3.6), RUST);
+      drawVoxel(ctx, x + flip * s(1.2), base - s(10.6), s(2.2), ROCK_DEEP);
+      return;
+    }
     case 'drill':
       // A broca-mae da Aurix, parada onde parou: mastro de ferrugem, colar
       // escuro, e a ponta de osso enterrada no pedestal. Sem luz de painel,
@@ -335,6 +347,18 @@ export const drawDecorProp = (
     case 'frost_stone':
       drawVoxel(ctx, x, sy, s(3), ROCK);
       drawVoxel(ctx, x, sy - s(1.6), s(1.8), MIST);
+      return;
+    case 'lodestone':
+      // Magnetita solta: pedra escura com a face oxidada. Sem ouro — a parede
+      // comum do estrato mais rico do Veio nao pode fingir que rende.
+      drawVoxel(ctx, x, sy, s(2.8), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(1.6), sy - s(1.2), s(1.8), RUST);
+      return;
+    case 'ore_spur':
+      // Esporao de veio aflorando ao pe da parede: a camada que continua.
+      drawVoxel(ctx, x, sy, s(3.6), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(2.2), sy - s(1.6), s(2.6), RUST);
+      drawVoxel(ctx, x - flip * s(1.4), sy - s(2.6), s(1.8), RUST);
       return;
     case 'mushroom': {
       // O cogumelo RESPIRA: o chapeu sobe e assenta devagar. Tempo local +

@@ -53,6 +53,12 @@ export type WorldgenProfile = {
    * em vez do salpico aleatorio da decoracao de parede. Zero fora dela.
    */
   oreSeams: number;
+  /**
+   * NOS de minerio do Ferrifero: discos densos de veio em volta de bolsoes
+   * abertos — a "magnetita" que ancora a leitura do estrato e alimenta a
+   * conducao por parede (um no conectado a um seam vira fiacao de sala).
+   */
+  oreKnots: number;
   fungalBlobs: SurfaceBlobSpec;
   biofluidBlobs: SurfaceBlobSpec;
   /** Lagos do Aquifero Negro. Zero em todo estrato seco. */
@@ -98,6 +104,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   crystalChance: 0.03,
   crystalVeins: 0,
   oreSeams: 0,
+  oreKnots: 0,
   fungalBlobs: { count: 26, rMin: 2, rMax: 4 },
   biofluidBlobs: { count: 12, rMin: 1, rMax: 3 },
   waterBlobs: { count: 0, rMin: 0, rMax: 0 },
@@ -745,6 +752,23 @@ const generateAttempt = (
       if (x <= 0 || x >= w - 1) break;
       const j = idx(w, x, y);
       if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
+    }
+  }
+
+  // 4d) nos de minerio (Ferrifero): discos densos de veio em volta de um
+  // bolsao aberto — a magnetita concentrada. Um no tocado por um seam vira
+  // fiacao continua de sala em sala. Com count 0, nenhuma tirada.
+  for (let knot = 0; knot < profile.oreKnots; knot++) {
+    const cell = openCells[rng.nextInt(openCells.length)];
+    const kx = cell % w;
+    const ky = Math.floor(cell / w);
+    const r = 2;
+    for (let y = Math.max(1, ky - r); y <= Math.min(h - 2, ky + r); y++) {
+      for (let x = Math.max(1, kx - r); x <= Math.min(w - 2, kx + r); x++) {
+        if ((x - kx) ** 2 + (y - ky) ** 2 > r * r) continue;
+        const j = idx(w, x, y);
+        if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
+      }
     }
   }
 

@@ -155,7 +155,8 @@ const buildTerrain = () => {
     // 3: rocha por ESTRATO — seis peles novas da parede comum no fim da lista
     // (prismatica, aquifera, sulfurosa, fornalha, silica, glacial). Fragil,
     // minerio e cristal continuam universais: sao linguagem mecanica.
-    version: 3,
+    // 4: a pele do Estrato FERRIFERO (rockFerric) entra no fim da lista.
+    version: 4,
     atlas: 'terrain-blocks.png',
     frameWidth,
     frameHeight,

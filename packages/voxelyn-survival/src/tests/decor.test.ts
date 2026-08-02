@@ -233,19 +233,22 @@ describe('decoracao derivada', () => {
     const kinds = new Set(placeDecor(cathedral).map((p) => p.kind));
     expect(kinds.has('insulator')).toBe(true);
 
-    // Basalto + Aurix (linhagem industrial): o kit base, sem adaptacao — o
-    // isolador e resposta ao cristal, o duto e resposta ao gas/calor.
-    const basaltAurix = (() => {
+    // Ferrifero + Aurix (linhagem industrial, o pareamento canonico): o kit
+    // base da operacao, sem isolador nem duto — essas pecas sao resposta ao
+    // cristal e ao gas/calor, que o veio principal nao tem.
+    const ferricAurix = (() => {
       for (let s = 1; s < 65536; s++) {
         const b = sectorBiome(s, 2);
-        if (b.stratum === 'basalt' && b.occupation === 'aurix') return { seed: s, sector: 2 };
+        if (b.stratum === 'ferric' && b.occupation === 'aurix') return { seed: s, sector: 2 };
       }
-      throw new Error('nenhuma seed basalt+aurix');
+      throw new Error('nenhuma seed ferric+aurix');
     })();
-    const gallery = createRun(basaltAurix);
-    const baseKinds = new Set(placeDecor(gallery).map((p) => p.kind));
+    const lode = createRun(ferricAurix);
+    const baseKinds = new Set(placeDecor(lode).map((p) => p.kind));
     expect(baseKinds.has('insulator')).toBe(false);
     expect(baseKinds.has('duct')).toBe(false);
+    // E a infraestrutura de chao esta la: o lugar que justificou a operacao.
+    expect(baseKinds.has('walkway') || baseKinds.has('rail') || baseKinds.has('crate')).toBe(true);
   });
 
   it('cogumelos so crescem sobre o tapete fungico', () => {

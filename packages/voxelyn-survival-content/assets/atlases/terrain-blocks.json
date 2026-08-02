@@ -1,6 +1,6 @@
 {
   "id": "terrain-blocks",
-  "version": 3,
+  "version": 4,
   "atlas": "terrain-blocks.png",
   "frameWidth": 64,
   "frameHeight": 68,
@@ -21,7 +21,8 @@
     "rockSulfur",
     "rockFurnace",
     "rockSilica",
-    "rockGlacial"
+    "rockGlacial",
+    "rockFerric"
   ],
   "variants": 3,
   "lightLevels": 8,

@@ -66,6 +66,9 @@ export type PropKind =
   // Cripta: gelo morto.
   | 'ice_spike'
   | 'frost_stone'
+  // Ferrifero: magnetita fria.
+  | 'lodestone'
+  | 'ore_spur'
   // Matriz Micelial (ocupacao): cresce SOBRE o tapete fungico.
   | 'mushroom'
   | 'puffball'
@@ -92,6 +95,7 @@ export type PropKind =
   // ...e em escala monumental: a broca que justificou tudo.
   | 'drill'
   // LANDMARKS, um por estrato: o monumento no coracao do salao.
+  | 'magnet_core'
   | 'monolith'
   | 'great_prism'
   | 'stalagnate'
@@ -188,6 +192,12 @@ const STRATA_KIT: Record<
     micro: ['frost_stone'],
     ceiling: ['icicle'],
     landmark: 'frost_obelisk',
+  },
+  ferric: {
+    edge: ['ore_spur'],
+    micro: ['lodestone', 'rubble'],
+    ceiling: ['hanging_spur'],
+    landmark: 'magnet_core',
   },
 };
 

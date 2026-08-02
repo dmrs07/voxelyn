@@ -333,27 +333,54 @@ landmark → ritmo → micro — e ganhou a dimensão vertical:
   Testado por contraste: densidade de props por célula aberta perto dos
   salões > longe deles, em seeds fixas.
 
-Futuro da camada: kit Aurix de infraestrutura (passarelas, trilhos, broca
-monumental).
+## Décima etapa em diante (implementadas): o resto do backlog
+
+- **Kit Aurix de infraestrutura** (10ª): passarela caída com vão, trilho
+  sobre dormente, e a **broca-mãe** — landmark da OCUPAÇÃO, erguida num
+  salão que os monumentos do estrato deixaram livre, uma por setor.
+- **Rastros dedicados** (11ª, `client/lurker-trail.ts`): a Lampreia deixa
+  esteira de anéis que se dissolvem; o Espectro deixa rachaduras que não
+  desfazem, só perdem contraste (o gelo lembra ~2× o tempo da água).
+  Pegadas espaçadas por deslocamento real, zero sorteio, zero byte na rede;
+  rastros órfãos desbotam no próprio ritmo.
+- **Inércia sobre gelo** (12ª, `SIMULATION_VERSION` 16): sobre `SURF_ICE` o
+  movimento do jogador carrega embalo (`ICE_GLIDE` 0,82/tick) — rápido nas
+  retas, impreciso nas curvas, deslize ao soltar. Colisão mata o embalo via
+  `vx/vy` reais; fora do gelo o passo é byte a byte o histórico. Só o
+  jogador: o Espectro tem o próprio contrato com a lâmina.
+- **Fratura por camada na Sílica** (13ª): quebrar frágil racha os vizinhos
+  frágeis da MESMA faixa horizontal para o estágio enfraquecido (avisa, não
+  derruba; o vertical não sente). E o minério corre em **seams horizontais**
+  no worldgen (`oreSeams`), com a chance pontual reduzida.
+- **Sala funcional do poço por estrato** (14ª, `stampCorePedestal`): função
+  intacta (disco r4, alcançável, pedestal limpo), moldura com sotaque —
+  colunas basálticas, pilares de cristal, fosso raso, borda porosa,
+  escombros, anel frágil, lago congelado. Offsets fixos, zero RNG, antes das
+  provas de alcançabilidade. E a **Aurix adaptada ao substrato**: isoladores
+  no cristal, dutos na Fenda/Fornalha, escoras extra no sedimento,
+  passarelas no Aquífero.
+- **Estrato Ferrífero** (15ª): a linhagem industrial re-trilhada — Basalto →
+  Ferrífero (Cicatriz) → Ferrífero profundo, "o lugar que justificou a
+  operação". Minério em seams grossos + **nós** densos (`oreKnots`),
+  `minerCap` máximo do Veio, e **condução por parede**: no ferric o
+  orçamento do flood de veio triplica (`FERRIC_VEIN_SCALE`) e a descarga
+  viaja de sala em sala pelo seam. Pele de rocha própria (bandas de óxido,
+  sem ouro — `CONTENT_VERSION` 12, terrain v4), véu de óxido, mix
+  bruiser-pesado, kit de decor (magnetita, esporão de veio, núcleo-mãe) e
+  morfologia de borda (rebarbas de óxido).
 
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
-  drenar uma região e inundar outra no Aquífero.
-- **Inércia sobre gelo** na Cripta, quando o estrato tiver provado a rota
-  derreter/recongelar.
+  drenar uma região e inundar outra no Aquífero. (Sistema de gameplay novo —
+  pede doc de design próprio antes de implementar.)
 - **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
-- **Estrato Ferrífero**: formação natural de ferro/magnetita — veio principal,
-  nós magnéticos, condução por parede, Miners e Aurix densos ("o lugar que
-  justificou a operação").
-- **Salas funcionais com variantes por strata** (poço, arena do Bispo, arena
-  do Guardião trocando de forma mantendo a função) e **Aurix adaptada ao
-  substrato** (escoras no sedimento, passarelas no aquífero, isoladores no
-  cristal, dutos na fenda).
-- **Fratura por camada** na sedimentar (quebrar uma célula frágil enfraquece
-  vizinhas da mesma faixa; minério em seams lineares).
-- Trilha de rachaduras do Espectro e ondulação da Lampreia como apresentação
-  dedicada no cliente (hoje a leitura vem da postura `mood` + superfície).
+  (Idem: uma linha de spec não decide o suficiente.)
+- **Nós magnéticos ativos** no Ferrífero (desvio de projéteis): a versão
+  atual dos nós é geológica (concentração de veio); a versão ativa mexe em
+  balística e merece playtest próprio.
+- Variantes por estrato para as arenas do Bispo e do Guardião (o poço já
+  tem as suas).
 
 ## Ressonância favorecida por bioma (referência de tuning)
 

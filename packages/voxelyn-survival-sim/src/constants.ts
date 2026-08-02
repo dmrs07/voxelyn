@@ -213,6 +213,14 @@ export const CONDUCTIVE_STUN_TICKS = Math.round(1.2 * TICK_HZ);
 // Propagacao por material solido. Orcamentos separados do biofluido porque um
 // veio de minerio atravessa a sala inteira e nao pode custar um tick.
 export const BUDGET_VEIN_CELLS = 64;
+
+/**
+ * CONDUCAO POR PAREDE do Estrato Ferrifero: la, o veio conectado nao e um
+ * fio — e a fiacao do lugar. O orcamento do flood triplica, entao a descarga
+ * que entra num seam atravessa o no de magnetita e sai DUAS salas adiante.
+ * So muda dentro do ferric: nos demais estratos o veio conduz como sempre.
+ */
+export const FERRIC_VEIN_SCALE = 3;
 export const BUDGET_RESONANCE_CELLS = 24;
 
 

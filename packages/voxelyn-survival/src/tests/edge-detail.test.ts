@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import type { StratumId } from '@voxelyn/survival-sim';
 import { edgeDetailVoxels } from '../client/edge-detail';
 
-const STRATA: StratumId[] = ['basalt', 'prismatic', 'aquifer', 'silica', 'sulfur', 'furnace', 'glacial'];
+const STRATA: StratumId[] = ['basalt', 'prismatic', 'aquifer', 'silica', 'sulfur', 'furnace', 'glacial', 'ferric'];
 
 /** As duas cores que enfeite NUNCA pode vestir. */
 const BIOLUM = '#59f2c2';

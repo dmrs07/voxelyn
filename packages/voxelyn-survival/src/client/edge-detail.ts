@@ -101,6 +101,11 @@ const build = (
       out.push({ dx: flip * 1.5, dy: -15.8, size: 2, ramp: MIST });
       out.push({ dx: 6 - j, dy: -13.2, size: 2.2, ramp: MIST });
       break;
+    case 'ferric':
+      // Rebarba de oxido: o veio da parede continua no rim, em farpas.
+      out.push({ dx: flip * (3 + j), dy: -15.4, size: 2.6, ramp: RUST });
+      out.push({ dx: -flip * (4 - j), dy: -13.6, size: 2, ramp: ROCK_DEEP });
+      break;
   }
   return out;
 };
