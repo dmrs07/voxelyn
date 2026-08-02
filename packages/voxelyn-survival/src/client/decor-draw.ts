@@ -213,6 +213,17 @@ const drawLandmarkProp = (
       drawVoxel(ctx, x, base - s(7.6), s(3.6), MIST);
       drawVoxel(ctx, x, base - s(10.4), s(2.2), MIST);
       return;
+    case 'drill':
+      // A broca-mae da Aurix, parada onde parou: mastro de ferrugem, colar
+      // escuro, e a ponta de osso enterrada no pedestal. Sem luz de painel,
+      // sem ouro — maquina morta e maquina morta.
+      drawVoxel(ctx, x, base, s(7.6), ROCK_DEEP);
+      drawVoxel(ctx, x + flip * s(2.2), base - s(3.6), s(3), RUST);
+      drawVoxel(ctx, x, base - s(4.4), s(5), RUST);
+      drawVoxel(ctx, x, base - s(8), s(4), ROCK_DEEP);
+      drawVoxel(ctx, x, base - s(11), s(3), RUST);
+      drawVoxel(ctx, x, base - s(13.2), s(1.8), BONE);
+      return;
     default:
       return;
   }
@@ -348,6 +359,22 @@ export const drawDecorProp = (
       drawVoxel(ctx, x - s(1.6), sy, s(2.4), RUST);
       drawVoxel(ctx, x - s(1.6), sy - s(2.8), s(2.4), RUST);
       drawVoxel(ctx, x + s(1.8), sy - s(1.4), s(2.2), RUST);
+      return;
+    case 'walkway': {
+      // Passarela CAIDA: placas rasas em linha, com um vao — quebrada o
+      // bastante para nunca parecer um caminho que importa.
+      for (let k = 0; k < 3; k++) {
+        if (k === 1 && (v & 8) !== 0) continue; // o vao
+        drawVoxel(ctx, x + flip * (k - 1) * s(4), sy + (k - 1) * s(1), s(3.8), k === 2 ? ROCK_DEEP : RUST);
+      }
+      return;
+    }
+    case 'rail':
+      // Trilho abandonado: dois frisos paralelos sobre um dormente de osso.
+      drawVoxel(ctx, x, sy + s(0.6), s(4.6), BONE);
+      drawVoxel(ctx, x - s(1.8), sy - s(0.6), s(1.8), RUST);
+      drawVoxel(ctx, x + s(1.8), sy - s(0.2), s(1.8), RUST);
+      drawVoxel(ctx, x + flip * s(4), sy - s(1), s(1.6), RUST);
       return;
     default:
       return;

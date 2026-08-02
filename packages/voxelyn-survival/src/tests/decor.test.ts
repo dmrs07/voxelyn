@@ -92,9 +92,13 @@ describe('decoracao derivada', () => {
     let sawLandmark = false;
     for (const seed of [3, 42, 1337]) {
       const state = createRun({ seed });
-      const landmarks = placeDecor(state).filter((p) => p.anchor === 'landmark');
+      const all = placeDecor(state).filter((p) => p.anchor === 'landmark');
+      // Ate dois monumentos do ESTRATO; a broca da Aurix (ocupacao) e o
+      // terceiro possivel e so existe na cicatriz.
+      const landmarks = all.filter((p) => p.kind !== 'drill');
       expect(landmarks.length).toBeLessThanOrEqual(2);
-      for (const mark of landmarks) {
+      expect(all.filter((p) => p.kind === 'drill').length).toBeLessThanOrEqual(1);
+      for (const mark of all) {
         sawLandmark = true;
         // O pedestal fica a um anel curto de um centro de salao registrado
         // pela gramatica — o monumento marca o LUGAR, nao um sorteio.
@@ -173,6 +177,45 @@ describe('decoracao derivada', () => {
       const densityOut = propsOut / Math.max(1, openOut);
       expect(densityIn, `seed ${seed}: salao mais vazio que corredor`).toBeGreaterThan(densityOut);
     }
+  });
+
+  it('a cicatriz Aurix tem infraestrutura no chao — e a broca so existe nela', () => {
+    // Derivacao pura acha a seed com ocupacao aurix; createRun roda uma vez.
+    const found = (() => {
+      for (let s = 1; s < 4096; s++) {
+        for (let sector = 1; sector <= 3; sector++) {
+          if (sectorBiome(s, sector).occupation === 'aurix') return { seed: s, sector };
+        }
+      }
+      throw new Error('nenhuma seed aurix encontrada');
+    })();
+    const state = createRun(found);
+    const decor = placeDecor(state);
+    const infra = decor.filter((p) => p.kind === 'walkway' || p.kind === 'rail');
+    expect(infra.length).toBeGreaterThan(0);
+    for (const prop of infra) {
+      expect(prop.anchor).toBe('floor');
+      expect(state.solid[prop.y * state.config.width + prop.x]).toBe(SOLID_NONE);
+    }
+    const drills = decor.filter((p) => p.kind === 'drill');
+    expect(drills.length).toBeLessThanOrEqual(1);
+    for (const drill of drills) {
+      // A broca e monumento: pedestal solido, como qualquer landmark.
+      expect(state.solid[drill.y * state.config.width + drill.x]).not.toBe(SOLID_NONE);
+    }
+
+    // Fora da cicatriz, nem um parafuso: um setor sem ocupacao nao tem
+    // passarela, trilho nem broca.
+    const clean = (() => {
+      for (let s = 1; s < 4096; s++) {
+        if (sectorBiome(s, 2).occupation === 'none') return s;
+      }
+      throw new Error('nenhuma seed limpa encontrada');
+    })();
+    const cleanDecor = placeDecor(createRun({ seed: clean, sector: 2 }));
+    expect(
+      cleanDecor.filter((p) => p.kind === 'walkway' || p.kind === 'rail' || p.kind === 'drill'),
+    ).toEqual([]);
   });
 
   it('cogumelos so crescem sobre o tapete fungico', () => {

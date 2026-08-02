@@ -80,9 +80,14 @@ export type PropKind =
   | 'sulfur_drip'
   | 'soot_fang'
   | 'icicle'
+  // Infraestrutura Aurix: a operacao abandonada em escala de chao...
+  | 'walkway'
+  | 'rail'
   // Teto das ocupacoes.
   | 'spore_veil'
   | 'cable_hook'
+  // ...e em escala monumental: a broca que justificou tudo.
+  | 'drill'
   // LANDMARKS, um por estrato: o monumento no coracao do salao.
   | 'monolith'
   | 'great_prism'
@@ -188,7 +193,7 @@ const OCCUPATION_KIT: Record<
   { edge: PropKind[]; micro: PropKind[]; ceiling: PropKind[] }
 > = {
   mycelial: { edge: ['mushroom'], micro: ['puffball'], ceiling: ['spore_veil'] },
-  aurix: { edge: ['crate', 'strut'], micro: [], ceiling: ['cable_hook'] },
+  aurix: { edge: ['crate', 'strut'], micro: ['walkway', 'rail'], ceiling: ['cable_hook'] },
 };
 
 /** Orcamento por setor. Ritmo estrutura; micro da acabamento sem dominar. */
@@ -336,13 +341,10 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
   // vizinho aberto) num anel curto em volta do centro. Um salao selado pelas
   // provas de alcancabilidade nao tem celula visivel e e pulado sem drama.
   const landmarks: Array<{ x: number; y: number }> = [];
-  for (const c of state.hallCenters) {
-    if (landmarks.length >= LANDMARK_CAP) break;
-    if (landmarks.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < LANDMARK_MIN_GAP)) continue;
-    let placed = false;
-    for (let r = 0; r <= 3 && !placed; r++) {
-      for (let dy = -r; dy <= r && !placed; dy++) {
-        for (let dx = -r; dx <= r && !placed; dx++) {
+  const placeLandmarkAt = (c: { x: number; y: number }, kind: PropKind): boolean => {
+    for (let r = 0; r <= 3; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const x = c.x + dx;
           const y = c.y + dy;
@@ -352,7 +354,7 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
           if (!visible || !allowed(x, y) || taken.has(idx(x, y))) continue;
           taken.add(idx(x, y));
           props.push({
-            kind: kit.landmark,
+            kind,
             x,
             y,
             wallCell: -1,
@@ -360,9 +362,24 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
             anchor: 'landmark',
           });
           landmarks.push({ x, y });
-          placed = true;
+          return true;
         }
       }
+    }
+    return false;
+  };
+  for (const c of state.hallCenters) {
+    if (landmarks.length >= LANDMARK_CAP) break;
+    if (landmarks.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < LANDMARK_MIN_GAP)) continue;
+    placeLandmarkAt(c, kit.landmark);
+  }
+  // A broca da Cicatriz Aurix: o monumento da OCUPACAO, num salao que os
+  // monumentos do estrato deixaram livre — "o buraco que justificou a
+  // operacao". Uma so por setor: e a origem da cicatriz, nao mobiliario.
+  if (state.occupation === 'aurix') {
+    for (const c of state.hallCenters) {
+      if (landmarks.some((p) => Math.hypot(p.x - c.x, p.y - c.y) < LANDMARK_MIN_GAP)) continue;
+      if (placeLandmarkAt(c, 'drill')) break;
     }
   }
 
