@@ -368,14 +368,25 @@ landmark → ritmo → micro — e ganhou a dimensão vertical:
   sem ouro — `CONTENT_VERSION` 12, terrain v4), véu de óxido, mix
   bruiser-pesado, kit de decor (magnetita, esporão de veio, núcleo-mãe) e
   morfologia de borda (rebarbas de óxido).
+- **Ruptura à Superfície** (16ª, primeiro corte visual): ~1 em 6 setores
+  RASOS (1–2) rompe — feixe de luz de dia inclinado sobre um salão da
+  gramática, poça clara no chão, raízes da superfície pendendo pela fenda.
+  Evento **derivado** (hash de seed+setor+hallCenters), mesma fenda em
+  qualquer cliente, zero rede/RNG autoritativa, pura apresentação: nada
+  joga diferente debaixo da luz.
+
+Com isso a tabela de mapeamento original está coberta de ponta a ponta:
+todos os estratos (incl. Ferrífero), ocupações, assinaturas, gramáticas,
+paleta/paredes/contorno/decoração, e a Ruptura em corte visual.
 
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
   drenar uma região e inundar outra no Aquífero. (Sistema de gameplay novo —
   pede doc de design próprio antes de implementar.)
-- **Ruptura à Superfície**: evento raro de luz/raízes/chuva, não um setor.
-  (Idem: uma linha de spec não decide o suficiente.)
+- **Mecânica da Ruptura** (chuva que molha, raízes escaláveis, luz que cura
+  contaminação?): o corte atual é visual de propósito — o que ela FAZ
+  merece decisão de design, não improviso.
 - **Nós magnéticos ativos** no Ferrífero (desvio de projéteis): a versão
   atual dos nós é geológica (concentração de veio); a versão ativa mexe em
   balística e merece playtest próprio.
