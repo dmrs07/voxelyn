@@ -60,6 +60,7 @@ import { objectiveLightSpec, objectivePropName } from './objective-prop';
 import { placeDecor, propStillValid, type DecorativeProp } from './decor';
 import { drawDecorProp } from './decor-draw';
 import { drawWallEdgeDetail } from './edge-detail';
+import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
 import { t } from './i18n';
 import {
   deathEchoReadout,
@@ -523,6 +524,46 @@ const drawLurkerDisturbance = (
 };
 
 /**
+ * Uma PEGADA do rastro de espreitador (ver lurker-trail.ts): a versao que
+ * desbota da perturbacao viva. Na agua, um anel que se abre e dissipa; no
+ * gelo, duas rachaduras FIXAS que so perdem contraste — rachadura nao
+ * desfaz. A geometria sai da posicao quantizada da pegada: as duas maquinas
+ * de um co-op desenham o mesmo risco no mesmo lugar.
+ */
+const drawLurkerTrailPoint = (
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  age: number,
+  inWater: boolean
+): void => {
+  const fade = 1 - age;
+  if (fade <= 0) return;
+  if (inWater) {
+    const r = size * (0.45 + age * 1.3);
+    ctx.strokeStyle = `rgba(122,184,255,${(0.26 * fade).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, z * 0.8);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, r, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    return;
+  }
+  const seed = (Math.imul(Math.round(sx * 3) + Math.imul(Math.round(sy * 3), 131), 2654435761) >>> 0) % 628;
+  ctx.strokeStyle = `rgba(123,139,163,${(0.42 * fade).toFixed(3)})`;
+  ctx.lineWidth = Math.max(1, z * 0.8);
+  for (let c = 0; c < 2; c++) {
+    const angle = ((seed + c * 271) % 628) / 100;
+    const len = size * (0.7 + c * 0.35);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len * 0.5);
+    ctx.stroke();
+  }
+};
+
+/**
  * O visor do parceiro: a luz que sobra dele quando o corpo apaga.
  *
  * Desenhado SEMPRE, iluminado ou nao. Sob a luz ele e um acento que separa o
@@ -705,6 +746,8 @@ export class SurvivalRenderer {
   /** Decoracao do setor atual, derivada por seed. Ver decor.ts. */
   private decor: DecorativeProp[] = [];
   private decorKey = '';
+  /** Rastro dos espreitadores ocultos, por id. Ver lurker-trail.ts. */
+  private readonly lurkerTrails = new Map<number, LurkerTrail>();
   /** Proxima posicao do leque de numeros de dano. */
   private damageFanIndex = 0;
   private readonly touchIcons = new TouchIconBank();
@@ -1493,6 +1536,7 @@ export class SurvivalRenderer {
 
     this.archetypeById.clear();
     for (const pl of state.players) this.archetypeById.set(pl.id, 'prospector');
+    const trailUpdated = new Set<number>();
     for (const enemy of state.enemies) {
       this.archetypeById.set(enemy.id, enemy.archetype);
       if (!enemy.alive) continue;
@@ -1510,6 +1554,32 @@ export class SurvivalRenderer {
       const lurkerHidden =
         (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') &&
         enemy.mood === LURKER_HIDDEN;
+      if (lurkerHidden) {
+        // O RASTRO: alem da perturbacao no lugar atual, a lamina lembra por
+        // onde o bicho passou — o espreitador vira um vetor legivel, nao um
+        // ponto. Ver lurker-trail.ts; tudo deriva de posicao + relogio.
+        const inWater = enemy.archetype === 'mud_lamprey';
+        let trail = this.lurkerTrails.get(enemy.id);
+        if (!trail) {
+          trail = { ttlMs: trailTtlMs(inWater), points: [] };
+          this.lurkerTrails.set(enemy.id, trail);
+        }
+        updateTrail(trail, enemy.x, enemy.y, nowMs);
+        trailUpdated.add(enemy.id);
+        const size = enemy.radius * TILE_W * 0.9 * z;
+        // A pegada mais nova E a posicao atual — la desenha a perturbacao
+        // viva; o rastro sao as anteriores, desbotando.
+        for (let p = 0; p < trail.points.length - 1; p++) {
+          const pt = trail.points[p];
+          const [tx, ty] = toScreen(pt.x, pt.y);
+          if (tx < -60 || tx > vw + 60 || ty < -60 || ty > vh + 60) continue;
+          const age = trailAge(trail, pt, nowMs);
+          items.push({
+            depth: pt.x + pt.y - 0.25,
+            draw: () => drawLurkerTrailPoint(ctx, tx, ty, size, z, age, inWater),
+          });
+        }
+      }
       items.push({
         depth: enemy.x + enemy.y,
         draw: () => {
@@ -1582,6 +1652,27 @@ export class SurvivalRenderer {
           drawHealthBar(sx, sy - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
         },
       });
+    }
+
+    // Rastros orfaos (o bicho emergiu, morreu ou apagou): desbotam ate o fim
+    // e a entrada some — a lamina esquece no proprio ritmo, nunca de supetao.
+    for (const [id, trail] of this.lurkerTrails) {
+      if (trailUpdated.has(id)) continue;
+      decayTrail(trail, nowMs);
+      if (trail.points.length === 0) {
+        this.lurkerTrails.delete(id);
+        continue;
+      }
+      const inWater = this.archetypeById.get(id) === 'mud_lamprey';
+      for (const pt of trail.points) {
+        const [tx, ty] = toScreen(pt.x, pt.y);
+        if (tx < -60 || tx > vw + 60 || ty < -60 || ty > vh + 60) continue;
+        const age = trailAge(trail, pt, nowMs);
+        items.push({
+          depth: pt.x + pt.y - 0.25,
+          draw: () => drawLurkerTrailPoint(ctx, tx, ty, TILE_W * 0.35 * z, z, age, inWater),
+        });
+      }
     }
 
     // desenha TODOS os players (co-op): o parceiro precisa estar visivel para
