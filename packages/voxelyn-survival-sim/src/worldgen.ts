@@ -603,6 +603,120 @@ const stampCorePedestal = (
   }
 };
 
+/**
+ * A ARENA DO CHEFE, com o sotaque do estrato.
+ *
+ * O poco ja tinha a sua moldura (`stampCorePedestal`); a camara do chefe era a
+ * ultima sala importante do jogo que saia igual em todo bioma — a mesma clareira
+ * lisa na Catedral, na Cripta e na Fornalha. E ela e a sala onde o jogador passa
+ * mais tempo olhando para o chao.
+ *
+ * A mesma camara serve aos DOIS chefes (o Bispo no setor 2, o Guardiao no
+ * final), entao o carimbo tem duas faixas com papeis diferentes:
+ *
+ * - SOLIDOS no anel 4 (colunas, pilares de cristal, celulas frageis): cobertura.
+ *   Ficam fora do 3x3 que o Guardiao precisa para caber e longe do pedestal.
+ * - SUPERFICIE nos aneis 5 e 6 (agua, gelo, brasa): a ORLA. Mora fora do bolso
+ *   micelial do Bispo (raio 4), entao no setor 2 as duas leituras convivem —
+ *   tapete de fungo no miolo, materia do estrato em volta — e no setor final a
+ *   arena inteira e do bioma.
+ *
+ * Nada e sorteado, como no pedestal: offsets fixos nao deslocam a RNG. O que
+ * muda em relacao a ele e a ORDEM — a arena e carimbada DEPOIS de o ponto do
+ * chefe ser escolhido (ele depende do terreno), entao a prova de alcancabilidade
+ * nao vem de graca e e feita aqui: se o carimbo isolar o poco ou o chefe, ele e
+ * DESFEITO por inteiro. Um acento de bioma nunca vale uma run impossivel.
+ *
+ * Exportada para o teste: nas seeds reais o desfazer nunca dispara (as camaras
+ * que a geracao abre sao largas demais para um anel esparso fechar), entao a
+ * unica maneira de provar que a rede de seguranca funciona e arma-la a mao.
+ */
+export const stampBossArena = (
+  solid: Uint8Array,
+  surface: Uint8Array,
+  w: number,
+  h: number,
+  boss: Vec2,
+  core: Vec2,
+  entry: Vec2,
+  halls: WorldgenProfile['halls'],
+): void => {
+  if (halls === 'none') return;
+
+  const before = new Uint8Array(solid);
+  const cheb = (dx: number, dy: number): number => Math.max(Math.abs(dx), Math.abs(dy));
+  /** Longe do corpo do chefe e do pedestal: as duas coisas precisam de chao. */
+  const free = (x: number, y: number): boolean =>
+    cheb(x - boss.x, y - boss.y) > 2 && cheb(x - core.x, y - core.y) > 2;
+
+  const put = (dx: number, dy: number, mat: number): void => {
+    const x = boss.x + dx;
+    const y = boss.y + dy;
+    if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) return;
+    if (!free(x, y) || solid[idx(w, x, y)] !== SOLID_NONE) return;
+    solid[idx(w, x, y)] = mat;
+  };
+  const paint = (dx: number, dy: number, surf: number): void => {
+    const x = boss.x + dx;
+    const y = boss.y + dy;
+    if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) return;
+    if (!free(x, y) || solid[idx(w, x, y)] !== SOLID_NONE) return;
+    surface[idx(w, x, y)] = surf;
+  };
+
+  // Anel 4: as quatro diagonais e os quatro eixos. Cobertura, nunca cerco.
+  const PILLARS = [[4, 4], [4, -4], [-4, 4], [-4, -4]] as const;
+  const AXES = [[4, 0], [-4, 0], [0, 4], [0, -4]] as const;
+  /** Aneis 5 e 6, em passo 2: a orla, esparsa o bastante para ler como orla. */
+  const ORLA: Array<readonly [number, number]> = [];
+  for (let r = 5; r <= 6; r++) {
+    for (let k = -r; k <= r; k += 2) {
+      ORLA.push([k, -r], [k, r], [-r, k], [r, k]);
+    }
+  }
+
+  if (halls === 'columns') {
+    // Anfiteatro: colunas nas diagonais. A luta ganha quinas para cortar linha.
+    for (const [dx, dy] of PILLARS) put(dx, dy, SOLID_ROCK);
+  } else if (halls === 'radial') {
+    // Catedral: pilares de CRISTAL. Cobertura que tambem e municao — quebrar um
+    // deles no meio da luta descarrega a cadeia que o proprio jogador armou.
+    for (const [dx, dy] of PILLARS) put(dx, dy, SOLID_CRYSTAL);
+    for (const [dx, dy] of AXES) put(dx, dy, SOLID_CRYSTAL);
+  } else if (halls === 'karst') {
+    // Aquifero: a orla e agua. Numa arena fechada, agua e o chao que CONDUZ —
+    // a descarga que o jogador solta volta para ele se ele estiver na lamina.
+    for (const [dx, dy] of ORLA) paint(dx, dy, SURF_WATER);
+  } else if (halls === 'lungs') {
+    // Fenda: paredes porosas nos eixos. A arena abre com um tiro, e o que era
+    // cobertura vira passagem — nos dois sentidos.
+    for (const [dx, dy] of AXES) put(dx, dy, SOLID_FRAGILE);
+    for (const [dx, dy] of PILLARS) put(dx, dy, SOLID_FRAGILE);
+  } else if (halls === 'canyon') {
+    // Fornalha/Ferrifero: escombros e BRASA na orla. O calor abre a couraca do
+    // Escoriaceo e cobra do jogador a mesma barra que a arma dele ja cobra.
+    for (const [dx, dy] of PILLARS) put(dx, dy, SOLID_ROCK);
+    for (const [dx, dy] of ORLA) paint(dx, dy, SURF_EMBER);
+  } else if (halls === 'terraced') {
+    // Silica: anel fragil inteiro. A camada cede em faixa (fratura por camada),
+    // entao a cobertura desta arena desaparece mais depressa do que parece.
+    for (const [dx, dy] of AXES) put(dx, dy, SOLID_FRAGILE);
+  } else if (halls === 'lakes') {
+    // Cripta: a arena inteira ESCORREGA. A inercia do gelo transforma esquivar
+    // do chefe num problema de embalo, e nao de reflexo.
+    for (const [dx, dy] of ORLA) paint(dx, dy, SURF_ICE);
+  }
+
+  // A PROVA. Diferente do pedestal, este carimbo roda depois das validacoes de
+  // alcancabilidade, entao ele paga a propria: se isolou o poco ou o chefe, some
+  // por inteiro. Desfazer tudo (e nao a celula culpada) mantem a arena legivel —
+  // meia moldura seria um acento que ninguem sabe ler.
+  const reach = floodOpen(solid, w, h, entry.x, entry.y);
+  if (!reach.has(idx(w, core.x, core.y)) || !reach.has(idx(w, boss.x, boss.y))) {
+    solid.set(before);
+  }
+};
+
 const generateAttempt = (
   seed: number,
   w: number,
@@ -705,6 +819,11 @@ const generateAttempt = (
   // Esta tentativa de mapa nao oferece uma arena fisicamente valida.
   // A geracao limitada tentara outra seed derivada em vez de criar um boss preso.
   if (!guardianSpawn) return null;
+
+  // A camara do chefe ganha o sotaque do estrato. Depois do ponto do chefe
+  // existir (ele depende do terreno) e antes da decoracao de parede, que so
+  // olha para rocha comum e portanto respeita o que a arena carimbou.
+  stampBossArena(solid, surface, w, h, guardianSpawn, corePos, entry, profile.halls);
 
   // 4) decorar paredes adjacentes a areas abertas: minerio, rocha fragil, cristais
   for (let y = 1; y < h - 1; y++) {

@@ -56,7 +56,19 @@ export const PROTOCOL_VERSION = 11;
 // - COVEIRO: assinatura do Ferrifero. Eletroima com telegrafo longo ARRASTA
 //   o jogador (passo a passo, respeitando colisao) e a prensa vem em
 //   seguida. Primeiro corpo do bestiario que tira do jogador a posicao.
-export const SIMULATION_VERSION = 17;
+// 18: ARENA DO CHEFE POR ESTRATO. A camara do Bispo e a do Guardiao eram a
+// ultima sala importante que saia igual em todo bioma — a mesma clareira lisa
+// na Catedral, na Cripta e na Fornalha, e e onde o jogador passa mais tempo
+// olhando para o chao. Agora ela recebe uma moldura no vocabulario do proprio
+// estrato: pilares de cristal que sao cobertura E municao (prismatico), orla
+// de agua que devolve a descarga do jogador (aquifero), parede porosa que
+// vira passagem nos dois sentidos (sulfur), orla de brasa que abre a couraca
+// do Escoriaceo e cobra a mesma barra da arma (fornalha/ferrifero), anel
+// fragil que cede em faixa (silica) e chao que ESCORREGA por inteiro
+// (glacial). O carimbo roda depois da escolha do ponto do chefe, entao paga a
+// propria prova de alcancabilidade e se DESFAZ inteiro se isolar poco ou
+// chefe. O terreno semeado de todo setor de chefe muda.
+export const SIMULATION_VERSION = 18;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

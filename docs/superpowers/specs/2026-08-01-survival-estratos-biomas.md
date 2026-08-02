@@ -519,6 +519,52 @@ Custo de atlas: o Coveiro nasceu num canvas herdado do Miner (96×120) com
 mais do que o próprio bicho custa. Só depois disso o teto de RGBA do
 validador subiu (96 → 112 MiB), com folga de ~14% sobre o medido.
 
+## Vigésima segunda etapa (implementada): a arena do chefe por estrato
+
+A câmara do chefe era a última sala importante que saía igual em todo bioma.
+O poço já tinha pedestal próprio, a parede já tinha pele própria, o corredor
+já tinha gramática própria — e aí o jogador chegava na sala em que passa mais
+tempo olhando para o chão e encontrava a mesma clareira lisa na Catedral, na
+Cripta e na Fornalha. Onde o combate é mais longo, o lugar era mais mudo.
+
+A moldura usa o **vocabulário que o estrato já tem** — nada de material novo,
+só o material do lugar posto onde muda a luta:
+
+| Estrato | Moldura | O que muda no combate |
+| --- | --- | --- |
+| Basalto (`columns`) | pilares de rocha nas diagonais | anfiteatro: quinas para cortar linha de tiro |
+| Prismático (`radial`) | pilares de **cristal** nas diagonais e nos eixos | cobertura que também é munição: quebrar um no meio da luta descarrega a cadeia |
+| Aquífero (`karst`) | orla de **água** | numa arena fechada a água é chão que CONDUZ: a descarga volta para quem a soltou |
+| Sulfuroso (`lungs`) | parede **porosa** nos eixos e diagonais | abre com um tiro — e o que era cobertura vira passagem nos dois sentidos |
+| Fornalha/Ferrífero (`canyon`) | escombros + orla de **brasa** | o calor abre a couraça do Escoriáceo e cobra do jogador a mesma barra que a arma dele já cobra |
+| Sílica (`terraced`) | anel **frágil** nos eixos | a camada cede em faixa: a cobertura desta arena some mais depressa do que parece |
+| Glacial (`lakes`) | orla de **gelo** | a arena escorrega: esquivar do chefe vira problema de embalo, não de reflexo |
+
+**Geometria.** Sólidos no anel de Chebyshev 4, superfícies nos anéis 5–6 em
+passo 2 (esparsa o bastante para ler como orla). O carimbo pula tudo dentro
+de Chebyshev 2 do chefe e do poço — o Guardião ocupa quase 1,5 tile e
+precisa do 3×3 dele, e o pedestal precisa do dele. A orla fica **fora** do
+raio do bolso do Bispo (4), então no setor 2 a colônia micelial e a orla do
+estrato coexistem em vez de brigar pelo mesmo chão.
+
+**A ordem é o detalhe caro.** Diferente do pedestal do poço, esta arena é
+carimbada *depois* de o ponto do chefe ser escolhido (ele depende do
+terreno), ou seja, depois das provas de alcançabilidade da geração. Então
+ela paga a própria: refaz o flood da entrada e, se isolou o poço ou o chefe,
+**se desfaz por inteiro**. Desfazer tudo — e não a célula culpada — é
+deliberado: meia moldura é um acento que ninguém sabe ler. Um acento de
+bioma nunca vale uma run impossível.
+
+Nas 800 gerações medidas o desfazer nunca disparou (as câmaras que a geração
+abre são largas demais para um anel esparso de 8 células fechar). Uma rede de
+segurança que nunca é exercitada não é uma rede: `stampBossArena` é exportada
+e o teste arma o caso à mão — câmara ligada ao mundo por um corredor de uma
+faixa que passa exatamente pela célula de eixo do anel — mais o controle de
+duas faixas, em que o pilar fica. Sem o par, um carimbo que não escrevesse
+nada passaria no primeiro teste sem fazer nada.
+
+`SIMULATION_VERSION` 17 → 18: o terreno semeado de todo setor de chefe muda.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
@@ -530,8 +576,6 @@ validador subiu (96 → 112 MiB), com folga de ~14% sobre o medido.
 - **Nós magnéticos ativos** no Ferrífero (desvio de projéteis): a versão
   atual dos nós é geológica (concentração de veio); a versão ativa mexe em
   balística e merece playtest próprio.
-- Variantes por estrato para as arenas do Bispo e do Guardião (o poço já
-  tem as suas).
 
 ## Ressonância favorecida por bioma (referência de tuning)
 
