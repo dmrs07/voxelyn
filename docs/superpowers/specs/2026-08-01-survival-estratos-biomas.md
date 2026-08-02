@@ -462,9 +462,15 @@ POÇO SELOU") substitui o "DESÇA PELO POÇO" que apontava para um poço
 recusando interação. O `descent` genérico continua no atlas como fallback
 de cache antigo (`objectiveAtlasChain`/`entryAtlasChain` tentam na ordem).
 
-**Co-op**: os relógios dos trilhos (`readyAt`/`firingAt`) não viajam nos
-`WorldFlags`; o espelho do cliente rearma `firingAt` a partir do evento
-`cart_warning` que já cruza o fio — telegrafo tick-based também online,
+**Co-op**: os relógios dos trilhos (`readyAt`/`firingAt`) viajam nas
+`WorldFlags` (`railTimers`, alinhados por índice com a geometria
+determinística da seed): o `worldSig` dispara o envio sozinho no tick do
+gatilho e o `full_resync` sempre os carrega — join/reconnect no meio do
+windup recupera o telegrafo. No espelho, `firingAt` só anda para FRENTE:
+a linha de render corre atrás do servidor (quadro bufferizado), e aplicar
+o zero do snapshot do disparo apagaria o aviso ~100ms antes de o carrinho
+aparecer; deixado quieto, o aviso expira no instante exato em que a linha
+de render cruza o `firingAt`. Campo opcional (precedente do `wellOffers`),
 sem mudança de protocolo.
 
 ## Trabalho futuro

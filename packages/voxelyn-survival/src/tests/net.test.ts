@@ -460,6 +460,33 @@ describe('telegrafo do carrinho em co-op', () => {
     expect(track.firingAt).toBe(400 + CART_WINDUP_TICKS);
   });
 
+  it('o snapshot do DISPARO nao apaga o aviso antes da linha de render', () => {
+    // O render desenha um quadro bufferizado (atras do servidor): o snapshot
+    // que zera firingAt chega ANTES de o carrinho alcancar o tick desenhado.
+    // O espelho so deixa o relogio andar para frente — o aviso expira sozinho
+    // quando a linha de render cruza o firingAt antigo.
+    const { client, track } = connect();
+    const snapshotWith = (serverTick: number, timers: Array<{ readyAt: number; firingAt: number }>) =>
+      JSON.stringify({
+        t: 'snapshot',
+        serverTick,
+        ackSeq: 0,
+        phase: 'running',
+        entities: [],
+        projectiles: [],
+        removedEntities: [],
+        chunkDiffs: [],
+        contamination: 0,
+        events: [],
+        world: worldWith(timers),
+      });
+    client.receive(snapshotWith(400, [{ readyAt: 0, firingAt: 424 }]));
+    // O disparo: o servidor zera o relogio e arma o cooldown.
+    client.receive(snapshotWith(424, [{ readyAt: 824, firingAt: 0 }]));
+    expect(track.firingAt).toBe(424); // o aviso vive ate a linha de render chegar la
+    expect(track.readyAt).toBe(824); // o cooldown, sem timeline, aplica direto
+  });
+
   it('reconexao NO MEIO do aviso recupera o telegrafo pelo full_resync', () => {
     const { client, track } = connect();
     client.receive(JSON.stringify({

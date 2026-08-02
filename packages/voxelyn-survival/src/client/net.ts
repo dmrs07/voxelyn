@@ -365,7 +365,17 @@ export class NetClient {
     if (timers) {
       for (let i = 0; i < state.railTracks.length && i < timers.length; i++) {
         state.railTracks[i].readyAt = timers[i].readyAt;
-        state.railTracks[i].firingAt = timers[i].firingAt;
+        // O firingAt so ANDA PARA FRENTE. A linha de render corre atras do
+        // servidor de proposito (quadro bufferizado), e o snapshot do
+        // DISPARO — que zera o relogio — chega um a tres ticks antes de o
+        // proprio carrinho alcancar o tick desenhado: zerar aqui apagaria o
+        // aviso ~100ms antes de o perigo aparecer. Deixado quieto, o aviso
+        // expira sozinho no instante exato em que a linha de render cruza o
+        // firingAt antigo (`firingAt > tick` vira falso) — e um valor no
+        // passado nao desenha nada, entao nao ha o que limpar.
+        if (timers[i].firingAt > state.railTracks[i].firingAt) {
+          state.railTracks[i].firingAt = timers[i].firingAt;
+        }
       }
     }
   }
