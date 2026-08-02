@@ -349,11 +349,20 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent
   // detona), e uma fissura de brasa nao propaga fogo sozinha para o gas que
   // apareceu no tick seguinte. A ignicao entra por uma celula so: o resto e a
   // propagacao normal do fogo, que ja existe e ja e orcada.
-  // A celula que acende tem de ser VIZINHA do calor, e nao a primeira que foi
-  // pintada. Uma parede pode partir a nuvem em duas bolsas: com a brasa ao sul
-  // e `laid[0]` ao norte, o fogo comecava do lado errado da rocha e a bolsa
-  // que realmente encostava no calor ficava intacta. Acender por adjacencia
-  // deixa a propagacao (que so anda por celulas conectadas) fazer o resto.
+  // ACENDE TODA celula de gas que ENCOSTA no calor — todas, e nao a primeira.
+  //
+  // Duas correcoes moram nesta unica regra, e as duas vieram de contraexemplos
+  // com parede no meio da nuvem. A primeira: acender `laid[0]` punha fogo do
+  // lado errado da rocha, deixando intacta justamente a bolsa que tocava a
+  // brasa. A segunda: parar na primeira bolsa encontrada deixava a OUTRA
+  // metade fria quando cada metade tinha a sua propria brasa — e o fogo, que
+  // so anda por celulas conectadas, nunca atravessaria a parede para
+  // corrigir.
+  //
+  // Acender cada borda quente e mais simples que mapear componentes conexos e
+  // e o que a fisica ja diz: gas encostado em brasa pega fogo onde encosta.
+  // Dentro de uma mesma bolsa o resultado nao muda — a propagacao levaria o
+  // fogo ali de qualquer jeito, so alguns ticks depois.
   const w = state.config.width;
   for (const gas of laid) {
     const touchesHeat = heatCells.some((h) => {
@@ -361,10 +370,7 @@ const addSulfurCloud = (state: SurvivalState, ent: Entity, events: SemanticEvent
       const dy = Math.abs(Math.floor(gas / w) - Math.floor(h / w));
       return dx <= 1 && dy <= 1;
     });
-    if (touchesHeat) {
-      igniteCell(state, gas, events);
-      break;
-    }
+    if (touchesHeat) igniteCell(state, gas, events);
   }
 };
 
@@ -795,7 +801,14 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     // segundo ainda da tempo de rolar. O puxao tira a posicao; o dano continua
     // sendo uma coisa que o jogador pode negar.
     enemy.contactReadyAt = state.tick + UNDERTAKER_SLAM_WINDUP_TICKS;
-    startAction(state, enemy, 'slam', pull, UNDERTAKER_SLAM_WINDUP_TICKS, 8, events, target.id);
+    // A prensa aponta PARA o alvo, e nao ao contrario. `pull` foi calculado do
+    // alvo em direcao ao Coveiro (e o que arrasta para dentro); reaproveitar
+    // esse vetor no golpe fazia o cliente desenhar o braco descendo para o
+    // lado OPOSTO de quem acabou de ser puxado — o segundo telegrafo mentindo
+    // sobre onde o golpe vai cair, embora o dano (por distancia) acertasse.
+    const toTarget = { x: -pull.x, y: -pull.y };
+    enemy.facing = { ...toTarget };
+    startAction(state, enemy, 'slam', toTarget, UNDERTAKER_SLAM_WINDUP_TICKS, 8, events, target.id);
   } else if (action.kind === 'slam' && target) {
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     // A prensa do Coveiro tem dano PROPRIO (o dobro largo do contato dele):

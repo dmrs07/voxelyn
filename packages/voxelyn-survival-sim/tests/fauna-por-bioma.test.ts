@@ -175,6 +175,28 @@ describe('Bombardeiro de Enxofre', () => {
     expect(fireNorth, 'fogo nasceu do lado errado da parede').toBe(0);
   });
 
+  it('nuvem partida com brasa dos DOIS lados: as duas bolsas acendem', () => {
+    // Parar na primeira bolsa encontrada deixava a outra metade fria quando
+    // cada metade tinha a propria brasa — e o fogo, que so anda por celulas
+    // conectadas, nunca atravessaria a parede para corrigir.
+    const state = arena(11);
+    for (let x = 28; x <= 36; x++) state.solid[at(state, x, 25)] = SOLID_ROCK;
+    setSurface(state, at(state, 32, 23), SURF_EMBER, 600);
+    setSurface(state, at(state, 32, 27), SURF_EMBER, 600);
+    const bomber = spawnEnemy(state, 'sulfur_bomber', 32, 25, false);
+    // O bomber morre SOBRE a parede: a nuvem cai nos dois lados dela.
+    damageEntity(state, bomber, bomber.maxHp * 2, [], { kind: 'player_shot' });
+
+    let north = 0;
+    let south = 0;
+    for (let x = 29; x <= 35; x++) {
+      for (let y = 22; y <= 24; y++) if (state.surface[at(state, x, y)] === SURF_FIRE) north++;
+      for (let y = 26; y <= 28; y++) if (state.surface[at(state, x, y)] === SURF_FIRE) south++;
+    }
+    expect(north, 'a bolsa norte nao acendeu').toBeGreaterThan(0);
+    expect(south, 'a bolsa sul ficou fria do outro lado da parede').toBeGreaterThan(0);
+  });
+
   it('o Spore Bomber continua deixando esporo: sao bichos diferentes', () => {
     const state = arena(11);
     const bomber = spawnEnemy(state, 'bomber', 32, 25, false);
@@ -317,6 +339,11 @@ describe('Coveiro', () => {
     // que e o segundo aviso: da tempo de rolar.
     expect(undertaker.action?.kind).toBe('slam');
     expect(undertaker.action?.phase).toBe('windup');
+    // E ela aponta PARA o alvo. O vetor do arrasto vai na direcao contraria
+    // (alvo -> Coveiro), e reaproveita-lo aqui fazia o cliente desenhar o
+    // braco descendo para o lado oposto de quem acabou de ser puxado.
+    const toTargetX = state.player.x - undertaker.x;
+    expect(Math.sign(undertaker.action!.direction.x)).toBe(Math.sign(toTargetX));
   });
 
   it('do alcance MAXIMO, o puxao entrega o alvo dentro da prensa', () => {
