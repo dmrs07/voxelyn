@@ -142,6 +142,39 @@ describe('decoracao derivada', () => {
     expect(sawCeiling).toBe(true);
   });
 
+  it('a composicao adensa o mobiliario em volta dos saloes', () => {
+    // A regra da composicao por sala: perto de um centro de salao ha MAIS
+    // ritmo e micro por celula aberta do que nos corredores. E o contraste
+    // que faz o salao ler como lugar — nao a quantidade global.
+    for (const seed of [3, 42, 1337]) {
+      const state = createRun({ seed });
+      const w = state.config.width;
+      const nearHall = (x: number, y: number): boolean =>
+        state.hallCenters.some((c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) <= 8);
+
+      let openIn = 0;
+      let openOut = 0;
+      for (let y = 1; y < state.config.height - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          if (state.solid[y * w + x] !== SOLID_NONE) continue;
+          if (nearHall(x, y)) openIn++;
+          else openOut++;
+        }
+      }
+      let propsIn = 0;
+      let propsOut = 0;
+      for (const prop of placeDecor(state)) {
+        if (prop.anchor === 'landmark' || prop.anchor === 'ceiling') continue;
+        if (nearHall(prop.x, prop.y)) propsIn++;
+        else propsOut++;
+      }
+      expect(openIn, `seed ${seed}: setor sem salao aberto`).toBeGreaterThan(0);
+      const densityIn = propsIn / openIn;
+      const densityOut = propsOut / Math.max(1, openOut);
+      expect(densityIn, `seed ${seed}: salao mais vazio que corredor`).toBeGreaterThan(densityOut);
+    }
+  });
+
   it('cogumelos so crescem sobre o tapete fungico', () => {
     // A derivacao PURA acha a seed micelial sem construir mundo nenhum;
     // createRun (caro) roda uma unica vez, na seed certa.

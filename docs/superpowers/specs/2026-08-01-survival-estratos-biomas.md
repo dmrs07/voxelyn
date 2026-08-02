@@ -313,8 +313,28 @@ landmark → ritmo → micro — e ganhou a dimensão vertical:
   de num sorteio sem significado. Salão selado pelas provas de alcançabilidade
   simplesmente não oferece pedestal visível e é pulado.
 
-Futuro da camada: composição landmark/ritmo/micro por tipo de sala, kit Aurix
-de infraestrutura (passarelas, trilhos, broca monumental).
+## Nona etapa (implementada): morfologia de borda + composição por sala
+
+- **Morfologia de borda** (`client/edge-detail.ts`): o detalhe que a parede
+  faz exatamente onde encontra o vazio — pontas frias no rim da Catedral,
+  lábio dissolvido do Aquífero, degraus laminados NA face exposta da Sílica,
+  crosta apagada da Fenda, dentes de fuligem da Fornalha, orla de geada da
+  Cripta. **Basalto: nada** (a ausência é a régua). Só a rocha comum recebe
+  morfologia — frágil/minério/cristal seguem linguagem mecânica universal —
+  e só no contorno (parede sem vizinho aberto não ganha detalhe). Voxels
+  determinísticos por índice de célula com portão de densidade (~60%),
+  cacheados por (estrato, variante, exposição) para não alocar por quadro;
+  famílias de cor da decoração (sem biolum/loot); desenhado também no
+  fallback sem atlas.
+- **Composição por sala** (decor): cada salão registrado em `hallCenters`
+  recebe um anel próprio de ritmo (6) e micro (4) num raio de 8 células,
+  enquanto o orçamento global de micro encolheu (40→32) — o salão é
+  mobiliado (landmark → ritmo → micro) e os corredores continuam rarefeitos.
+  Testado por contraste: densidade de props por célula aberta perto dos
+  salões > longe deles, em seeds fixas.
+
+Futuro da camada: kit Aurix de infraestrutura (passarelas, trilhos, broca
+monumental).
 
 ## Trabalho futuro
 
@@ -326,8 +346,6 @@ de infraestrutura (passarelas, trilhos, broca monumental).
 - **Estrato Ferrífero**: formação natural de ferro/magnetita — veio principal,
   nós magnéticos, condução por parede, Miners e Aurix densos ("o lugar que
   justificou a operação").
-- **Morfologia de borda** (silhueta escalonada da sedimentar, pontas
-  prismáticas no contorno): kit visual de borda por strata no renderer.
 - **Salas funcionais com variantes por strata** (poço, arena do Bispo, arena
   do Guardião trocando de forma mantendo a função) e **Aurix adaptada ao
   substrato** (escoras no sedimento, passarelas no aquífero, isoladores no

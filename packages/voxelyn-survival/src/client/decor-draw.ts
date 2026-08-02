@@ -25,6 +25,24 @@ const FUNGUS_DEEP: FaceRamp = ['#2f6b4f', '#1f3d33', '#0b0e14'];
 const SULFUR_DULL: FaceRamp = ['#8a7154', '#6e4a33', '#3d2a22'];
 const CHAR: FaceRamp = ['#3d2a22', '#1d2430', '#0b0e14'];
 
+/**
+ * As familias de cor da decoracao, exportadas para quem desenha ENFEITE fora
+ * deste arquivo (a morfologia de borda das paredes usa as mesmas). A regra
+ * anti-mentira viaja junto: nenhuma delas contem o biolum reativo, o ouro de
+ * loot, nem cor de fogo/projetil.
+ */
+export const DECOR_RAMPS = {
+  ROCK,
+  ROCK_DEEP,
+  BONE,
+  RUST,
+  MIST,
+  FUNGUS,
+  FUNGUS_DEEP,
+  SULFUR_DULL,
+  CHAR,
+} as const;
+
 const h32 = (v: number): number => {
   let x = Math.imul(v ^ 0x9e3779b9, 0x85ebca6b);
   x ^= x >>> 13;

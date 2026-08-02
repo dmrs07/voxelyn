@@ -59,6 +59,7 @@ import {
 import { objectiveLightSpec, objectivePropName } from './objective-prop';
 import { placeDecor, propStillValid, type DecorativeProp } from './decor';
 import { drawDecorProp } from './decor-draw';
+import { drawWallEdgeDetail } from './edge-detail';
 import { t } from './i18n';
 import {
   deathEchoReadout,
@@ -1252,6 +1253,13 @@ export class SurvivalRenderer {
         const [sx, sy] = toScreen(x + 0.5, y + 0.5);
         if (sx < -60 || sx > vw + 60 || sy < -60 || sy > vh + 80) continue;
 
+        // Morfologia de borda: SO a rocha comum (fragil/minerio/cristal sao
+        // linguagem mecanica e ficam universais) e SO no contorno — as faces
+        // que a projecao mostra sao +x (direita) e +y (esquerda).
+        const edgeRight = solid === SOLID_ROCK && x + 1 < w && state.solid[i + 1] === SOLID_NONE;
+        const edgeLeft =
+          solid === SOLID_ROCK && y + 1 < state.config.height && state.solid[i + w] === SOLID_NONE;
+
         items.push({
           depth: x + y,
           draw: () => {
@@ -1262,7 +1270,10 @@ export class SurvivalRenderer {
             // gerador empacota os tipos — com a rocha comum trocando de pele
             // pelo estrato do setor.
             const kindIndex = terrainKindIndexFor(solid, state.stratum);
-            if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) return;
+            if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) {
+              drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
+              return;
+            }
 
             const hw = (TILE_W / 2) * z;
             const hh = (TILE_H / 2) * z;
@@ -1340,6 +1351,9 @@ export class SurvivalRenderer {
               ctx.lineTo(sx + hw * 0.15, sy - wh + hh * 0.3);
               ctx.stroke();
             }
+            // O contorno tambem existe no fallback: a identidade do estrato
+            // nao pode depender do atlas ter carregado.
+            drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
           },
         });
       }

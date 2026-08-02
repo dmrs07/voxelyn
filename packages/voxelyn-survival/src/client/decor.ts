@@ -193,8 +193,20 @@ const OCCUPATION_KIT: Record<
 
 /** Orcamento por setor. Ritmo estrutura; micro da acabamento sem dominar. */
 const EDGE_BUDGET = 18;
-const MICRO_BUDGET = 40;
+const MICRO_BUDGET = 32;
 const CEILING_BUDGET = 14;
+/**
+ * COMPOSICAO POR SALA: alem do orcamento global, cada salao registrado pela
+ * gramatica recebe um anel proprio de ritmo e micro. O salao e MOBILIADO —
+ * landmark no centro, ritmo em volta, micro no acabamento — enquanto os
+ * corredores continuam rarefeitos (o orcamento global de micro encolheu na
+ * mesma medida). E o contraste, nao a quantidade, que faz o salao ler como
+ * lugar.
+ */
+const HALL_RING_EDGE = 6;
+const HALL_RING_MICRO = 4;
+const HALL_RADIUS = 8;
+const HALLS_COMPOSED = 3;
 const OCCUPATION_EDGE_BUDGET = 10;
 const OCCUPATION_MICRO_BUDGET = 16;
 const OCCUPATION_CEILING_BUDGET = 8;
@@ -267,15 +279,26 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
   const props: DecorativeProp[] = [];
   const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length) % arr.length];
 
+  /** Sorteio global: qualquer celula da moldura para dentro. */
+  const anywhere = (): { x: number; y: number } => ({
+    x: 1 + Math.floor(rng() * (w - 2)),
+    y: 1 + Math.floor(rng() * (h - 2)),
+  });
+  /** Sorteio no ANEL de um salao: a composicao da sala, nao do setor. */
+  const nearHall = (c: { x: number; y: number }) => (): { x: number; y: number } => ({
+    x: Math.max(1, Math.min(w - 2, c.x + Math.floor((rng() * 2 - 1) * HALL_RADIUS))),
+    y: Math.max(1, Math.min(h - 2, c.y + Math.floor((rng() * 2 - 1) * HALL_RADIUS))),
+  });
+
   const tryPlace = (
     kinds: readonly PropKind[],
     anchor: 'floor' | 'wall_base' | 'ceiling',
     floorTest: (x: number, y: number) => boolean,
+    sample: () => { x: number; y: number } = anywhere,
   ): void => {
     const wantsWall = anchor !== 'floor';
     for (let attempt = 0; attempt < ATTEMPTS_PER_SLOT; attempt++) {
-      const x = 1 + Math.floor(rng() * (w - 2));
-      const y = 1 + Math.floor(rng() * (h - 2));
+      const { x, y } = sample();
       if (!floorTest(x, y) || !allowed(x, y) || taken.has(idx(x, y))) continue;
 
       let wallCell = -1;
@@ -341,6 +364,14 @@ export const placeDecor = (live: SurvivalState): DecorativeProp[] => {
         }
       }
     }
+  }
+
+  // O anel dos saloes vem antes do orcamento global: a sala escolhe primeiro,
+  // o setor preenche o resto — landmark, depois ritmo, depois micro.
+  for (const c of state.hallCenters.slice(0, HALLS_COMPOSED)) {
+    const sampler = nearHall(c);
+    for (let n = 0; n < HALL_RING_EDGE; n++) tryPlace(kit.edge, 'wall_base', bareFloor, sampler);
+    for (let n = 0; n < HALL_RING_MICRO; n++) tryPlace(kit.micro, 'floor', bareFloor, sampler);
   }
 
   for (let n = 0; n < EDGE_BUDGET; n++) tryPlace(kit.edge, 'wall_base', bareFloor);
