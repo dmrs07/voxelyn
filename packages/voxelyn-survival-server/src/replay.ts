@@ -33,6 +33,7 @@ import {
   TICK_HZ,
   TICK_MS,
   type PlayerCommand,
+  type PlayerTuning,
   type RunSummary,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -99,7 +100,7 @@ export const replayDigest = (seed: number, canonicalLog: Uint8Array): string => 
 const TRACE_TICKS_PER_SAMPLE = Math.max(1, Math.round(DEATH_ECHO_TRACE_STEP_MS / TICK_MS));
 const TRACE_STEP_MS_RESIMULATED = TRACE_TICKS_PER_SAMPLE * TICK_MS;
 
-type Resimulation =
+export type Resimulation =
   | { ok: true; state: SurvivalState; canonicalLog: Uint8Array; trace: DeathEchoTraceSample[] }
   | { ok: false; reason: string };
 
@@ -115,7 +116,20 @@ type Resimulation =
  * a simulacao: depois do ultimo tick, as posicoes intermediarias sumiram. Custa
  * uma amostra a cada dois ticks num buffer de 24 — nada perto de um `stepRun`.
  */
-const resimulate = (seed: number, logBase64: string): Resimulation => {
+/**
+ * Re-simula um log e devolve o estado terminal.
+ *
+ * `tuning` e a unica coisa que a progressao acrescentou a este modulo, e ela
+ * entra como PARAMETRO em vez de vir do log: o cliente manda o que apertou, e
+ * quem decide com qual Prospector aqueles comandos rodam e o ticket guardado no
+ * servidor. Ausente = G-00, que e o que mantem o leaderboard sendo o mesmo jogo
+ * para todo mundo.
+ */
+export const resimulateRun = (
+  seed: number,
+  logBase64: string,
+  tuning?: PlayerTuning,
+): Resimulation => {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
     return { ok: false, reason: 'seed invalida' };
   }
@@ -130,7 +144,7 @@ const resimulate = (seed: number, logBase64: string): Resimulation => {
   if (!commands) return { ok: false, reason: 'log malformado' };
   if (commands.length === 0) return { ok: false, reason: 'log vazio' };
 
-  const state = createRun({ seed, playerCount: 1 });
+  const state = createRun({ seed, playerCount: 1, tuning });
   const buffer: PlayerCommand[] = [emptyCommand()];
   const trace: DeathEchoTraceSample[] = [];
   let consumedTicks = 0;
@@ -188,7 +202,7 @@ const resimulate = (seed: number, logBase64: string): Resimulation => {
 
 /** Re-simula uma submissao e devolve o resultado AUTORITATIVO. */
 export const verifySoloRun = (seed: number, logBase64: string): ReplayResult => {
-  const run = resimulate(seed, logBase64);
+  const run = resimulateRun(seed, logBase64);
   if (!run.ok) return run;
   const summary = run.state.summary;
   if (!summary) return { ok: false, reason: 'run terminou sem sumario' };
@@ -222,7 +236,7 @@ export type DeathEchoReplayResult =
  * atravessa esta funcao.
  */
 export const verifySoloDeath = (seed: number, logBase64: string): DeathEchoReplayResult => {
-  const run = resimulate(seed, logBase64);
+  const run = resimulateRun(seed, logBase64);
   if (!run.ok) return run;
   const state = run.state;
   if (state.phase !== 'dead') {

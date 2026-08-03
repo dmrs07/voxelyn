@@ -1,5 +1,6 @@
 import type { RNG } from '@voxelyn/core';
 import type { LineageId, OccupationId, StratumId } from './strata.js';
+import type { PlayerTuning } from './progression.js';
 
 export type Vec2 = { x: number; y: number };
 
@@ -19,6 +20,15 @@ export type RunConfig = {
    * asserção sobre a arena.
    */
   sector?: number;
+  /**
+   * A configuracao do Prospector desta run. Ausente = G-00 de fabrica.
+   *
+   * Congelada na criacao e nunca relida: a run inteira roda contra o mesmo
+   * objeto, e comprar um protocolo no meio de uma expedicao nao muda o
+   * Prospector que ja desceu. E o que permite re-simular uma run antiga com o
+   * tuning que ela realmente usou, meses depois de a arvore ter mudado.
+   */
+  tuning?: PlayerTuning;
 };
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
@@ -187,7 +197,22 @@ export const DISCOVERY_BISHOP_FELLED = 1 << 8;
 export const DISCOVERY_HORSE_FELLED = 1 << 9;
 export const DISCOVERY_MINER_FLED = 1 << 10;
 export const DISCOVERY_MINER_ENRAGED = 1 << 11;
-export const DISCOVERY_ORE_QUOTA = 1 << 12;
+/**
+ * APOSENTADO. Era "a empresa paga por tonelada", da cota de modulo por minerio.
+ *
+ * A constante fica reservada em vez de reciclada: perfis salvos ja tem este bit
+ * aceso, e dar o mesmo numero a uma descoberta nova a faria nascer desbloqueada
+ * para quem jogou antes. O bit nao volta a ser usado.
+ */
+export const DISCOVERY_ORE_QUOTA_RETIRED = 1 << 12;
+/**
+ * Morrer carregando carga nao homologada.
+ *
+ * A licao que substitui a da cota, e a unica frase que o loop novo precisa
+ * ensinar: o que fica no Veio nunca existiu. Ninguem aprende isso lendo o menu;
+ * aprende-se perdendo trinta lascas a dois setores da plataforma.
+ */
+export const DISCOVERY_CARGO_LOST = 1 << 13;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -334,15 +359,6 @@ export type PlayerExtra = {
   purgeCells: number;
   activeModules: ActiveModule[];
   pendingModuleChoice: PendingModuleChoice | null;
-  /**
-   * Ate qual limiar da cota de minerio ESTE slot ja foi pago.
-   *
-   * Por jogador, e nao por run, porque so quem recebeu a escolha na mao foi
-   * pago. Um contador unico so sabia que o limiar tinha sido alcancado; quem
-   * estivesse com uma escolha aberta na hora era pulado e nunca mais cobrado,
-   * e minerar durante um cofre aberto custava o modulo inteiro em silencio.
-   */
-  oreModulesPaid: number;
   hasCore: boolean;
   dodgeDir: Vec2;
   downed: boolean;

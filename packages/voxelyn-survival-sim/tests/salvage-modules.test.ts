@@ -305,7 +305,7 @@ describe('modulos temporarios', () => {
     module.lifetime.remaining--;
     expect(hashAuthoritativeState(state)).not.toBe(before);
 
-    resetPlayerProgress(state.playerExtra);
+    resetPlayerProgress(state.playerExtra, state.config.tuning);
     expect(state.playerExtra.activeModules).toEqual([]);
     expect(state.playerExtra.pendingModuleChoice).toBeNull();
   });

@@ -70,3 +70,28 @@ export {
   type AbilityDefinition,
 } from './abilities.js';
 export { MODULE_DEFINITIONS, moduleDefinition, activeModule, moduleHasCapacity, liveProjectileModules, grantOrRechargeModule, consumeModuleCharge, expireTimedModules, rollModuleChoice } from './modules.js';
+export {
+  BASE_PURGE_CELLS,
+  DEFAULT_PLAYER_TUNING,
+  GENERATION_THRESHOLDS,
+  TIER_CORE_COST,
+  TIER_ORE_COST,
+  TOTAL_UPGRADES,
+  TUNING_HASH_ORDER,
+  UPGRADES,
+  UPGRADE_BRANCHES,
+  deriveGeneration,
+  derivePlayerTuning,
+  findUpgrade,
+  generationsReached,
+  hashPlayerTuning,
+  isValidUpgradeSet,
+  normalizeUpgradeIds,
+  upgradesOfBranch,
+  type LoreFragmentId,
+  type PlayerTuning,
+  type ProspectorGeneration,
+  type UpgradeBranch,
+  type UpgradeDefinition,
+  type UpgradeId,
+} from './progression.js';

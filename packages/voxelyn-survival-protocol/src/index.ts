@@ -10,3 +10,4 @@ export * from './room-code.js';
 export * from './command-log.js';
 export * from './death-echo.js';
 export * from './death-echo-contract.js';
+export * from './progression-contract.js';

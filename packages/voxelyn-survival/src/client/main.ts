@@ -1,6 +1,6 @@
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
-import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { PlayerTuning, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
@@ -29,7 +29,24 @@ import {
 } from './settings';
 import { audio } from './audio';
 import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
+import {
+  fetchCodex,
+  openSession,
+  purchaseKey,
+  purchaseUpgrade,
+  requestRunTicketWithSession,
+  settleRun,
+} from './progression-api';
+import { readCachedProfile, writeCachedProfile } from './progression-cache';
+import { SettlementQueue } from './settlement-queue';
+import { LatestQuery, type Query } from './latest-query';
 import { renderRecordsPanel } from './records-panel';
+import {
+  needsConfirmation,
+  renderMatrixPanel,
+  type MatrixHandlers,
+  type MatrixViewState,
+} from './matrix-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import {
   deathEchoContractLabelParts,
@@ -180,6 +197,10 @@ const renderState = (
   inputState: Parameters<SurvivalRenderer['render']>[2],
   nowMs: number,
 ): void => {
+  // A carga sai do ESTADO, todo quadro. No solo e a simulacao local; no online e
+  // o `cargoOre` que o snapshot copiou para ca. Um caminho so, e o evento
+  // `ore_gained` fica sendo apenas a animacao.
+  renderer.setCargoOre(state.stats.oreCollected);
   if (state.phase === 'running') requestPool(state);
   renderer.setDeathEchoes(deathEchoes.sync(state, nowMs));
   renderer.render(state, alpha, inputState, nowMs);
@@ -321,6 +342,179 @@ let recordedSummaryKey: string | null = null;
 let submitted = false;
 /** Seed fixada pelo jogador no menu, ou null para sortear a cada descida. */
 let forcedSeed: number | null = null;
+
+/**
+ * A autorizacao da expedicao corrente.
+ *
+ * `null` significa SIMULACAO LOCAL: a run acontece igual, com o Prospector de
+ * fabrica, e nao rende nada. Nao existe caminho que guarde a run para creditar
+ * depois — um log guardado no navegador para submeter "quando a rede voltar" e
+ * uma superficie grande de adulteracao em troca de conveniencia pequena.
+ */
+let expedition: { runId: string; seed: number } | null = null;
+/**
+ * Ha uma autorizacao de expedicao EM VOO?
+ *
+ * Guarda de reentrada, e nao de conveniencia. `authorizeExpedition` e uma ida a
+ * rede, e a tela de resultado continua desenhando enquanto ela corre — com o
+ * portao ja armado. Cada toque a mais (e na tela de morte o jogador toca varias
+ * vezes) emitia um ticket novo, e a ULTIMA promessa a resolver sobrescrevia
+ * `state`: com respostas fora de ordem, a run que aparecia na tela nao era a do
+ * ticket que seria liquidado no fim.
+ */
+let authorizing = false;
+
+/**
+ * Uma liquidacao que FALHOU e ainda pode ser reenviada.
+ *
+ * O log fica aqui porque a run que o produziu ja acabou: o `recorder` e o
+ * `expedition` sao sobrescritos na proxima descida, e sem esta copia o minerio de
+ * uma extracao bem-sucedida sumia por causa de um timeout de rede.
+ *
+ * Nao vai para o `localStorage`, e a distincao importa: isto NAO e o "guardar run
+ * offline para creditar depois" que a spec proibe. Aquilo seria um log sem ticket,
+ * uma superficie de adulteracao; isto e um log com ticket JA EMITIDO pelo
+ * servidor, dentro da validade dele, reenviado com o MESMO `runId` — que a
+ * liquidacao trata de forma idempotente. Perder isso ao fechar a aba e aceitavel;
+ * perder ao abrir a Matriz nao era.
+ */
+const pendingSettlements = new SettlementQueue();
+/** Esta run ja foi enviada para homologacao? */
+let settlementSent = false;
+
+/**
+ * Pede a autorizacao da proxima expedicao.
+ *
+ * Falha vira simulacao local COM AVISO, e nunca silenciosamente: o jogador
+ * precisa saber, antes de descer, que a carga daquela descida nao vai contar.
+ */
+/**
+ * @param descent Qual descida pediu esta autorizacao.
+ *
+ * O token nao serve so para o CHAMADOR decidir se ainda vale — ele precisa ser
+ * conferido AQUI DENTRO, antes de qualquer escrita global. A descida A
+ * abandonada, resolvendo depois da B, publicava o proprio `runId` em
+ * `expedition` e a B liquidava o log dela contra o ticket errado; se a A tivesse
+ * falhado, ela zerava `expedition` e a B nao homologava nada.
+ */
+const authorizeExpedition = async (
+  seed: number,
+  descent: number,
+): Promise<{ seed: number; tuning?: PlayerTuning }> => {
+  authorizing = true;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  // A carga da run ANTERIOR primeiro: ela ja esta paga e so precisa chegar.
+  retryPendingSettlement();
+  const authorized = await requestRunTicketWithSession(url, seed).finally(() => {
+    authorizing = false;
+  });
+  // Chegou tarde: outra descida ja e a atual, ou o jogador voltou ao menu. Sai
+  // sem tocar em `expedition`, no cache nem no chassi desenhado.
+  if (descent !== descentToken) return { seed };
+  // A sessao pode ter nascido AGORA, nesta chamada: o perfil que veio com ela e
+  // o unico estado autoritativo que o jogo tem antes de descer.
+  if (authorized.openedProfile) {
+    writeCachedProfile(authorized.openedProfile, Date.now());
+    renderer.setProspectorGeneration(authorized.openedProfile.generation);
+  }
+  const result = authorized.ticket;
+  if (!result.ok) {
+    expedition = null;
+    setBanner(t('banner.expedition.offline'));
+    setTimeout(() => setBanner(null), 4200);
+    return { seed };
+  }
+  const ticket = result.value.ticket;
+  expedition = { runId: ticket.runId, seed: ticket.seed };
+  // O chassi que vai aparecer na tela e o da arvore que AUTORIZOU esta run.
+  // Derivado da contagem de protocolos do perfil em cache — o servidor ja
+  // devolveu a geracao no perfil, e o ticket carrega a versao que a produziu.
+  const cachedProfile = readCachedProfile()?.profile;
+  if (cachedProfile && cachedProfile.profileVersion === ticket.progressionProfileVersion) {
+    renderer.setProspectorGeneration(cachedProfile.generation);
+  }
+  // O tuning vem do SERVIDOR, derivado do perfil autoritativo. O cliente nao o
+  // calcula nem o corrige: ele executa a configuracao que foi autorizada.
+  return { seed: ticket.seed, tuning: ticket.tuning };
+};
+
+/**
+ * Envia o que o jogador apertou, e mostra o que o SERVIDOR decidiu.
+ *
+ * Repare no que nao e enviado: minerio, nucleo, fase, tempo. O servidor
+ * re-simula a run inteira com a seed e o tuning que ele mesmo autorizou.
+ */
+/** Envia (ou reenvia) uma liquidacao. Idempotente do lado do servidor. */
+const transmitSettlement = (url: string, runId: string, log: string): void => {
+  void settleRun(url, runId, log).then((result) => {
+    if (!result.ok) {
+      // GUARDA para reenviar, CHAVEADO POR runId.
+      //
+      // Um slot unico nao servia: a liquidacao espera ate 45 s e o ticket
+      // seguinte volta em 6, entao a run B pode terminar e falhar enquanto a
+      // retentativa da run A ainda esta no ar. Com um slot, o sucesso tardio de
+      // A limpava o pendente de B — e a carga de B nunca mais seria reenviada.
+      pendingSettlements.hold({ runId, log, url });
+      console.info('[progressao] nao homologada:', result.error);
+      setBanner(t('banner.expedition.pending'));
+      setTimeout(() => setBanner(null), 4200);
+      return;
+    }
+    // So o proprio runId sai do mapa. Ver o comentario da falha, acima.
+    pendingSettlements.settled(runId);
+    writeCachedProfile(result.value.profile, Date.now());
+    const credited = result.value.result;
+    // Tres frases, e nao uma com "+0 NUCLEO" no fim: a extracao antecipada e
+    // uma decisao legitima, e anunciar o zero que ela nao trouxe a transforma
+    // num fracasso parcial toda vez que o jogador escolhe voltar cedo.
+    if (credited.coresCredited > 0) {
+      setBanner(
+        t('banner.cargo.cleared.core', {
+          ore: credited.oreCredited,
+          cores: credited.coresCredited,
+        }),
+      );
+    } else if (credited.oreCredited > 0) {
+      setBanner(t('banner.cargo.cleared', { ore: credited.oreCredited }));
+    } else {
+      setBanner(t('banner.cargo.lost', { ore: credited.oreLost }));
+    }
+    setTimeout(() => setBanner(null), 4600);
+  });
+};
+
+/**
+ * Tenta de novo a liquidacao que ficou pendente.
+ *
+ * Chamada nos dois momentos em que o jogo ja esta falando com o servidor de
+ * qualquer forma — abrir a Matriz e autorizar a proxima expedicao —, em vez de um
+ * temporizador proprio: reenviar em laco contra um servidor fora do ar so gasta
+ * bateria e rate limit.
+ */
+const retryPendingSettlement = (): void => {
+  // Uma copia da lista antes de iterar: `transmitSettlement` pode escrever no
+  // mapa de forma assincrona, e iterar sobre a colecao viva enquanto ela muda e
+  // exatamente o tipo de bug que so aparece com a rede ruim.
+  for (const pending of pendingSettlements.drain()) {
+    transmitSettlement(pending.url, pending.runId, pending.log);
+  }
+};
+
+const homologateRun = (state: SurvivalState): void => {
+  if (settlementSent || !expedition || !state.summary) return;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  if (!recorder.submittable) {
+    // A run passou do teto de gravacao e nao ha log canonico para o servidor
+    // re-simular. Dizer isso e obrigatorio: em silencio, a tela mostrava a carga
+    // "transmitida para homologacao" e nada era creditado nunca.
+    settlementSent = true;
+    setBanner(t('banner.expedition.tooLong'));
+    setTimeout(() => setBanner(null), 5200);
+    return;
+  }
+  settlementSent = true;
+  transmitSettlement(url, expedition.runId, recorder.encode());
+};
 const recordRun = (state: SurvivalState): void => {
   if (!state.summary) return;
   const result = applyRunOnce(records, state.summary, recordedSummaryKey);
@@ -399,6 +593,7 @@ const submitDeathToPool = (state: SurvivalState): void => {
  * a volta ao menu e a PROXIMA extracao nunca chegava ao ranking.
  */
 const resetRunTracking = (): void => {
+  settlementSent = false;
   recordedSummaryKey = null;
   submitted = false;
   echoSubmitted = false;
@@ -485,6 +680,20 @@ const applyAdaptiveQuality = (dt: number): void => {
 // SOLO (simulacao local, funciona offline)
 // ---------------------------------------------------------------------------
 let stopLoop: (() => void) | null = null;
+
+/**
+ * Qual descida e a ATUAL.
+ *
+ * `stopLoop` so existe depois que o laco comeca, e agora a descida espera uma ida
+ * a rede antes disso. Nessa janela, abandonar pelo menu de campo nao tinha o que
+ * cancelar: quando o ticket chegasse, a continuacao criava o mundo e ligava o
+ * laco ATRAS da tela de titulo — e comecar outra descida nesse meio-tempo deixava
+ * dois lacos vivos disputando o unico `stopLoop`.
+ *
+ * Um contador resolve os dois casos com a mesma pergunta: "eu ainda sou a descida
+ * atual?". Abandonar incrementa; comecar outra tambem.
+ */
+let descentToken = 0;
 
 /**
  * Seed da proxima descida.
@@ -588,6 +797,9 @@ const abandonRun = (): void => {
   if (state && state.phase === 'running' && state.tick >= 20) {
     telemetry.abandon(state.sector, state.tick, state.contamination);
   }
+  // Invalida qualquer autorizacao em voo: sem isto, um ticket que chegasse depois
+  // do abandono ainda ligaria um laco por tras da tela de titulo.
+  descentToken++;
   stopLoop?.();
   stopLoop = null;
   liveRun = null;
@@ -689,15 +901,25 @@ const hintOnce = (): void => {
   }, 1600);
 };
 
-const runSolo = (): void => {
+const runSolo = async (): Promise<void> => {
+  const myDescent = ++descentToken;
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
   audio.reset();
-  const seed = nextSeed();
+  // A AUTORIZACAO VEM ANTES DO MUNDO. O servidor escolhe (ou confirma) a seed e
+  // devolve o tuning derivado do perfil; so entao a run existe. Construir o
+  // mundo primeiro e pedir o ticket depois criaria uma janela em que o
+  // Prospector na tela nao e o Prospector autorizado.
+  const authorized = await authorizeExpedition(nextSeed(), myDescent);
+  // O jogador pode ter desistido — ou comecado outra descida — enquanto o ticket
+  // vinha. Sair AQUI, antes de tocar em qualquer estado global, e o que impede um
+  // mundo de nascer atras do menu.
+  if (myDescent !== descentToken) return;
+  const seed = authorized.seed;
   recorder.start(seed);
   resetRunTracking();
   telemetry.begin();
-  let state: SurvivalState = createRun({ seed });
+  let state: SurvivalState = createRun({ seed, tuning: authorized.tuning });
   liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
@@ -763,6 +985,7 @@ const runSolo = (): void => {
       // acontecido atras dela.
       eventQueue.flush(Number.POSITIVE_INFINITY);
       recordRun(state);
+      homologateRun(state);
       submitSoloRun(state);
       submitDeathToPool(state);
       if (state.summary) telemetry.finish(state.summary, state.sector);
@@ -775,16 +998,27 @@ const runSolo = (): void => {
       // sem ele, quem abrisse o menu na tela de fim para sair veria a run
       // reiniciar por baixo do proprio menu. Os TOQUES ja param sozinhos — a
       // overlay engole o pointerdown antes de o canvas ve-lo.
-      if (!pauseMenu.isOpen && armed && (input.hasTap() || input.consumeRestartKey())) {
-        const nextRunSeed = nextSeed();
-        recorder.start(nextRunSeed);
-        telemetry.begin();
-        state = createRun({ seed: nextRunSeed });
-        liveRun = state;
-        rearm();
-        audio.reset();
-        resetRunTracking();
-        gate.reset();
+      if (
+        !pauseMenu.isOpen &&
+        armed &&
+        !authorizing &&
+        (input.hasTap() || input.consumeRestartKey())
+      ) {
+        // Cada tentativa e uma expedicao NOVA: ticket novo, runId novo, tuning
+        // relido do perfil. Reusar o anterior deixaria a segunda run tentando
+        // liquidar contra um runId ja fechado — e daria ao jogador um Prospector
+        // desatualizado se ele tivesse comprado alguma coisa no intervalo.
+        void authorizeExpedition(nextSeed(), myDescent).then((next) => {
+          if (myDescent !== descentToken) return;
+          recorder.start(next.seed);
+          telemetry.begin();
+          state = createRun({ seed: next.seed, tuning: next.tuning });
+          liveRun = state;
+          rearm();
+          audio.reset();
+          resetRunTracking();
+          gate.reset();
+        });
       }
       accumulator = 0;
       requestAnimationFrame(frame);
@@ -1088,7 +1322,7 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
   stopLoop?.();
   runInProgress = true;
   pauseMenu.armHistory();
-  runSolo();
+  void runSolo();
   hintOnce();
 };
 const startOnline = (): void => {
@@ -1217,6 +1451,187 @@ document.getElementById('btn-records')?.addEventListener('click', () => {
 document
   .getElementById('btn-records-close')
   ?.addEventListener('click', () => closeOverlay(recordsOverlay));
+
+// ---------------------------------------------------------------------------
+// Matriz Geracional
+// ---------------------------------------------------------------------------
+const matrixOverlay = document.getElementById('matrix') as HTMLDivElement;
+const matrixBody = document.getElementById('matrix-body') as HTMLDivElement;
+
+/**
+ * O estado do painel. NAO e o estado da progressao.
+ *
+ * `profile` e sempre o que o servidor mandou por ultimo (ou o cache, marcado
+ * como tal). Nenhuma acao deste painel escreve nele: a compra manda a intencao
+ * e espera a resposta, que substitui o objeto inteiro.
+ */
+const matrixView: MatrixViewState = {
+  tab: 'matrix',
+  profile: readCachedProfile()?.profile ?? null,
+  cached: true,
+  loading: false,
+  codex: null,
+  pending: null,
+  notice: null,
+  reveal: null,
+};
+
+const drawMatrix = (): void => renderMatrixPanel(matrixBody, matrixView, matrixHandlers);
+
+const progressionUrl = (): string => serverInput.value.trim() || defaultServerUrl();
+
+/**
+ * Qual consulta da Matriz e a ATUAL, e contra qual servidor.
+ *
+ * Mesma familia do token de descida — ver `latest-query.ts` para as tres vezes
+ * em que esta corrida apareceu. Aqui o caso concreto: o campo de servidor e
+ * editavel, entao abrir a Matriz para o servidor A, fechar, trocar o campo e
+ * abrir para o B deixa duas consultas no ar. A de A, resolvendo depois,
+ * substituia o perfil de B e ainda o marcava como autoritativo — e a compra
+ * seguinte ia para o B carregando a arvore e a `profileVersion` do A, debitando
+ * o B quando as versoes por acaso batessem.
+ */
+/**
+ * UM RASTREADOR POR OPERACAO, e nao um compartilhado.
+ *
+ * A primeira versao usava um contador so para as tres, e isso e errado pela
+ * definicao do mecanismo: ele existe para dizer "chegou outra do MESMO tipo,
+ * esta aqui envelheceu". Abrir o Codex nao envelhece um refresh de perfil — sao
+ * perguntas diferentes, e a resposta de uma nao substitui a da outra.
+ *
+ * O estrago de compartilhar era pior que uma resposta perdida: a do perfil era
+ * descartada com `loading` ainda em true (painel presa em "Consultando"), e uma
+ * compra ja debitada no servidor deixava `pending` preso para sempre, porque so
+ * o callback pulado o limpava — e nem fechar e reabrir o painel resolvia.
+ */
+const profileQueries = new LatestQuery<string>();
+const codexQueries = new LatestQuery<string>();
+const purchaseQueries = new LatestQuery<string>();
+
+const beginQuery = (tracker: LatestQuery<string>): Query<string> => tracker.begin(progressionUrl());
+
+const isCurrentQuery = (tracker: LatestQuery<string>, query: Query<string>): boolean =>
+  tracker.isCurrent(query, progressionUrl());
+
+/** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
+const refreshProfile = async (): Promise<void> => {
+  retryPendingSettlement();
+  const query = beginQuery(profileQueries);
+  matrixView.loading = true;
+  drawMatrix();
+  const result = await openSession(query.url);
+  // Chegou tarde, ou o jogador trocou de servidor: descarta sem tocar em nada.
+  // Nem `loading` — quem for a consulta atual cuida do proprio estado.
+  if (!isCurrentQuery(profileQueries, query)) return;
+  matrixView.loading = false;
+  if (!result.ok) {
+    // Offline: continua mostrando o cache, marcado, e sem botao de compra.
+    matrixView.cached = true;
+    matrixView.notice = null;
+    drawMatrix();
+    return;
+  }
+  matrixView.profile = result.value.profile;
+  matrixView.cached = false;
+  writeCachedProfile(result.value.profile, Date.now());
+  renderer.setProspectorGeneration(result.value.profile.generation);
+  drawMatrix();
+};
+
+const refreshCodex = async (): Promise<void> => {
+  const query = beginQuery(codexQueries);
+  const result = await fetchCodex(query.url, getLocale());
+  if (!isCurrentQuery(codexQueries, query)) return;
+  matrixView.codex = result.ok ? result.value : null;
+  drawMatrix();
+};
+
+const matrixHandlers: MatrixHandlers = {
+  onTab: (tab) => {
+    matrixView.tab = tab;
+    matrixView.notice = null;
+    drawMatrix();
+    audio.ui();
+    // O codex e buscado sob demanda: o corpo dos documentos so sai do servidor
+    // para quem tem autorizacao, e nao ha por que pedi-lo antes de abrir a aba.
+    if (tab === 'codex') void refreshCodex();
+  },
+  onPurchase: (upgrade) => {
+    const profile = matrixView.profile;
+    if (!profile || matrixView.pending) return;
+    if (
+      needsConfirmation(upgrade) &&
+      !confirm(
+        `${t('matrix.confirm.title')}\n\n${t('matrix.confirm.cost', {
+          ore: upgrade.oreCost,
+          cores: upgrade.coreCost,
+        })}\n${t('matrix.confirm.warning')}`,
+      )
+    ) {
+      return;
+    }
+    matrixView.pending = upgrade.id;
+    matrixView.notice = null;
+    drawMatrix();
+    const query = beginQuery(purchaseQueries);
+    void purchaseUpgrade(
+      query.url,
+      upgrade.id,
+      profile.profileVersion,
+      purchaseKey(profile.profileId, upgrade.id, profile.profileVersion),
+    ).then((result) => {
+      // Uma compra respondida depois de o jogador trocar de servidor ja foi
+      // cobrada la — mas o perfil que ela devolve nao descreve o servidor que
+      // esta na tela, e escreve-lo aqui mostraria a arvore do lugar errado.
+      if (!isCurrentQuery(purchaseQueries, query)) return;
+      matrixView.pending = null;
+      if (!result.ok) {
+        // Conflito de versao nao e erro do jogador: outra sessao mexeu na
+        // Matriz. Recarrega e explica, em vez de tentar de novo sozinho.
+        if (result.error === 'profile_version_conflict') {
+          matrixView.notice = 'matrix.conflict';
+          void refreshProfile();
+          return;
+        }
+        matrixView.notice = 'matrix.offline';
+        drawMatrix();
+        return;
+      }
+      matrixView.profile = result.value.profile;
+      matrixView.cached = false;
+      writeCachedProfile(result.value.profile, Date.now());
+      matrixView.codex = null; // desatualizado: um documento novo entrou
+      matrixView.reveal = result.value.unlockedLoreFragment;
+      drawMatrix();
+      audio.ui();
+    });
+  },
+  onDismissReveal: () => {
+    matrixView.reveal = null;
+    drawMatrix();
+    audio.ui();
+  },
+};
+
+document.getElementById('btn-matrix')?.addEventListener('click', () => {
+  // Abrir o painel LIMPA o estado transitorio, e nao so o desenha.
+  //
+  // Rede de seguranca, e nao correcao do bug acima: qualquer caminho futuro que
+  // deixe `pending` ou `loading` presos deixaria a Matriz inutilizavel ate um
+  // reload, e "feche e abra de novo" precisa funcionar. Reabilitar o botao e
+  // seguro porque a chave de idempotencia da compra e derivada do perfil e do
+  // protocolo — um segundo clique sobre uma compra que ja passou recebe de volta
+  // o mesmo resultado, sem debitar duas vezes.
+  matrixView.pending = null;
+  matrixView.loading = false;
+  matrixView.notice = null;
+  drawMatrix();
+  openOverlay(matrixOverlay);
+  void refreshProfile();
+});
+document
+  .getElementById('btn-matrix-close')
+  ?.addEventListener('click', () => closeOverlay(matrixOverlay));
 
 const renderTelemetryLabel = (): void => {
   telemetryButton.textContent = t(isOptedOut() ? 'options.telemetry.off' : 'options.telemetry.on');

@@ -18,8 +18,6 @@ import {
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
   DISCHARGE_DAMAGE,
-  DODGE_COOLDOWN_TICKS,
-  DODGE_IFRAME_TICKS,
   DODGE_SPEED,
   DODGE_TICKS,
   EXPLOSION_RADIUS,
@@ -28,24 +26,19 @@ import {
   FIRE_DAMAGE_PER_TICK,
   GAS_DAMAGE_PER_TICK,
   SPORE_DAMAGE_PER_TICK,
-  HEAT_DECAY_PER_TICK,
-  HEAT_MAX,
   HEAT_PER_SHOT,
   MAX_PLAYERS,
   MAX_PROJECTILES,
-  OVERHEAT_LOCK_TICKS,
-  OVERHEAT_SELF_DAMAGE,
-  PLAYER_HP,
   PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
   PLAYER_RADIUS,
-  PLAYER_SPEED,
   REVIVE_HP_FRACTION,
   REVIVE_RADIUS,
   RETURN_DISC_MAX_DISTANCE,
   RICOCHET_BOUNCES,
   RETURN_DISC_SPEED,
-  ORE_PER_MODULE,
   SALVAGE_SCAN_TICKS,
+  CARGO_LOST_DISCOVERY_ORE,
+  CONTAMINATION_WAVES,
   CONTAMINATION_SECTOR_SCALE,
   SECTOR_COUNT,
   RUN_SEED_MIX,
@@ -81,8 +74,20 @@ import {
   recordResonance,
   resonanceOffers,
 } from './abilities.js';
-import { dischargeAt, explodeAt, igniteCell, isConductiveSurface, setSurface, stepCells } from './cells.js';
-import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
+import {
+  dischargeAt,
+  explodeAt,
+  igniteCell,
+  isConductiveSurface,
+  setSurface,
+  stepCells,
+} from './cells.js';
+import {
+  explosiveArmedByDistance,
+  impactSolid,
+  impactSurface,
+  projectileClass,
+} from './materials.js';
 import {
   applyExplosionDamage,
   cellUnder,
@@ -106,11 +111,8 @@ import {
   moduleHasCapacity,
   rollModuleChoice,
 } from './modules.js';
-import {
-  DISCOVERY_DISCHARGE_POOL,
-  DISCOVERY_ORE_QUOTA,
-  DISCOVERY_SELF_HARM,
-} from './types.js';
+import { DISCOVERY_CARGO_LOST, DISCOVERY_DISCHARGE_POOL, DISCOVERY_SELF_HARM } from './types.js';
+import { DEFAULT_PLAYER_TUNING, TUNING_HASH_ORDER, type PlayerTuning } from './progression.js';
 import type {
   DamageCause,
   Entity,
@@ -127,7 +129,6 @@ import type {
   SurvivalState,
 } from './types.js';
 
-
 export const emptyCommand = (): PlayerCommand => ({
   move: { x: 0, y: 0 },
   aim: { x: 1, y: 0 },
@@ -139,7 +140,38 @@ export const emptyCommand = (): PlayerCommand => ({
   choose: null,
 });
 
-const makePlayer = (slot: number, x: number, y: number): Entity => ({
+/**
+ * Dano com AUTORIA do Prospector.
+ *
+ * Aplicado na FONTE — onde o numero nasce —, e nao em `damageEntity`, porque a
+ * causa nem sempre chega la: flamethrower e arc entram sem `DamageCause`. Na
+ * fonte a lista e curta e auditavel, e nada mais escala junto: explosao
+ * ambiental, carrinho, dano de inimigo e reacao sem autoria continuam intactos.
+ */
+const playerDamage = (tuning: PlayerTuning, base: number): number =>
+  base * tuning.playerDamageScale;
+
+/**
+ * A penalidade de liquido, ja suavizada pelo tuning do Prospector.
+ *
+ * Encolhe a PENALIDADE, e nao multiplica a velocidade: `liquidSlowScale` de 0,92
+ * significa "o slow dói 8% menos", entao agua continua sendo agua. Multiplicar a
+ * velocidade final daria o mesmo bonus em chao seco, onde nao ha nada a
+ * compensar — e MV-03 promete travessia, nao corrida.
+ *
+ * Inimigos continuam usando `surfaceSpeedMul` cru: a arvore e do Prospector.
+ */
+const playerSurfaceSpeedMul = (
+  state: SurvivalState,
+  player: Entity,
+  tuning: PlayerTuning,
+): number => {
+  const base = surfaceSpeedMul(state, player);
+  if (base >= 1) return base;
+  return 1 - (1 - base) * tuning.liquidSlowScale;
+};
+
+const makePlayer = (slot: number, x: number, y: number, tuning: PlayerTuning): Entity => ({
   id: slot + 1,
   kind: 'player',
   archetype: 'prospector',
@@ -147,8 +179,8 @@ const makePlayer = (slot: number, x: number, y: number): Entity => ({
   y,
   vx: 0,
   vy: 0,
-  hp: PLAYER_HP,
-  maxHp: PLAYER_HP,
+  hp: tuning.maxHp,
+  maxHp: tuning.maxHp,
   radius: PLAYER_RADIUS,
   alive: true,
   elite: false,
@@ -161,7 +193,7 @@ const makePlayer = (slot: number, x: number, y: number): Entity => ({
   slot,
 });
 
-const makeExtra = (): PlayerExtra => ({
+const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   aim: { x: 1, y: 0 },
   heat: 0,
   overheatedUntil: 0,
@@ -170,10 +202,9 @@ const makeExtra = (): PlayerExtra => ({
   iframesUntil: 0,
   dodgeCooldownUntil: 0,
   abilityCooldownUntil: 0,
-  purgeCells: 1,
+  purgeCells: tuning.startingPurgeCells,
   activeModules: [],
   pendingModuleChoice: null,
-  oreModulesPaid: 0,
   hasCore: false,
   dodgeDir: { x: 1, y: 0 },
   downed: false,
@@ -190,10 +221,10 @@ const makeExtra = (): PlayerExtra => ({
  * abandonado e reocupado: o novo jogador nao pode herdar os modificadores,
  * os frascos nem a posse do nucleo de quem saiu.
  */
-export const resetPlayerProgress = (extra: PlayerExtra): void => {
+export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): void => {
   extra.activeModules = [];
   extra.pendingModuleChoice = null;
-  extra.purgeCells = 1;
+  extra.purgeCells = tuning.startingPurgeCells;
   extra.hasCore = false;
   extra.heat = 0;
   extra.overheatedUntil = 0;
@@ -214,6 +245,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
   const height = config.height ?? WORLD_H;
   const playerCount = Math.max(1, Math.min(MAX_PLAYERS, config.playerCount ?? 1));
   const sector = Math.max(1, Math.min(SECTOR_COUNT, config.sector ?? 1));
+  // Congelado UMA vez. A run inteira le deste objeto, e comprar um protocolo no
+  // meio de uma expedicao nao muda o Prospector que ja desceu.
+  const tuning = config.tuning ?? DEFAULT_PLAYER_TUNING;
   // A seed de CADA setor sai da mesma derivacao. Usar a formula antiga so para
   // o primeiro faria o setor de abertura ser o unico fora do esquema, e a
   // derivacao e o que garante que uma seed compartilhada reproduza a descida
@@ -237,12 +271,12 @@ export const createRun = (config: RunConfig): SurvivalState => {
   const players: Entity[] = [];
   const playerExtras: PlayerExtra[] = [];
   for (let s = 0; s < playerCount; s++) {
-    players.push(makePlayer(s, world.entry.x + offsets[s].x, world.entry.y + offsets[s].y));
-    playerExtras.push(makeExtra());
+    players.push(makePlayer(s, world.entry.x + offsets[s].x, world.entry.y + offsets[s].y, tuning));
+    playerExtras.push(makeExtra(tuning));
   }
 
   const state: SurvivalState = {
-    config: { seed: config.seed, width, height, playerCount, sector },
+    config: { seed: config.seed, width, height, playerCount, sector, tuning },
     rng,
     tick: 0,
     phase: 'running',
@@ -282,7 +316,12 @@ export const createRun = (config: RunConfig): SurvivalState => {
       openedBySlot: null,
     })),
     vents: world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 })),
-    railTracks: world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const })),
+    railTracks: world.railTracks.map((t) => ({
+      ...t,
+      readyAt: 0,
+      firingAt: 0,
+      fromEnd: 0 as const,
+    })),
     hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
@@ -314,7 +353,11 @@ export const standingPlayers = (state: SurvivalState): Entity[] =>
   });
 
 /** Player de pe mais proximo de (x,y), ou null. */
-export const nearestStandingPlayer = (state: SurvivalState, x: number, y: number): Entity | null => {
+export const nearestStandingPlayer = (
+  state: SurvivalState,
+  x: number,
+  y: number,
+): Entity | null => {
   let best: Entity | null = null;
   let bestD = Infinity;
   for (const p of standingPlayers(state)) {
@@ -385,7 +428,14 @@ const stepRailCarts = (state: SurvivalState, events: SemanticEvent[]): void => {
       // tempo de aviso util para quem pisou.
       track.fromEnd = along * 2 < track.len ? 1 : 0;
       track.firingAt = state.tick + CART_WINDUP_TICKS;
-      events.push({ t: 'cart_warning', x: track.x, y: track.y, dx: track.dx, dy: track.dy, len: track.len });
+      events.push({
+        t: 'cart_warning',
+        x: track.x,
+        y: track.y,
+        dx: track.dx,
+        dy: track.dy,
+        len: track.len,
+      });
       break;
     }
   }
@@ -422,9 +472,8 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
         if (!cells.has(cellIndexAt(state, ent.x, ent.y))) continue;
-        const scale = ev.source === 'player' && ent.kind === 'player'
-          ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE
-          : 1;
+        const scale =
+          ev.source === 'player' && ent.kind === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1;
         damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events, {
           kind: 'discharge',
           source: ev.source,
@@ -448,7 +497,7 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         ev.radius,
         events,
         ev.source === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1,
-        ev.source
+        ev.source,
       );
     }
   }
@@ -486,6 +535,7 @@ const recordPlayerResonance = (
 };
 
 const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
+  const tuning = state.config.tuning;
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const aimLength = Math.hypot(extra.aim.x, extra.aim.y) || 1;
@@ -493,8 +543,16 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
   const dy = extra.aim.y / aimLength;
 
   events.push({
-    t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
-    dx, dy, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
+    t: 'action_start',
+    entity: player.id,
+    action: 'pulse',
+    x: player.x,
+    y: player.y,
+    dx,
+    dy,
+    startTick: state.tick,
+    releaseTick: state.tick,
+    endTick: state.tick + 8,
   });
 
   switch (extra.ability) {
@@ -524,7 +582,11 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
           const oy = y + 0.5 - player.y;
           if (ox * ox + oy * oy > radius * radius) continue;
           const i = y * w + x;
-          if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
+          if (
+            state.surface[i] === SURF_FIRE ||
+            state.surface[i] === SURF_GAS ||
+            state.surface[i] === SURF_SPORES
+          ) {
             setSurface(state, i, SURF_NONE, 0);
             recordResonance(extra.resonance, 'kinetic');
           }
@@ -589,7 +651,7 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
         const d = Math.hypot(ox, oy);
         if (d > range || d < 0.001) continue;
         if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
-        damageEntity(state, enemy, FLAMETHROWER_DAMAGE, events);
+        damageEntity(state, enemy, playerDamage(tuning, FLAMETHROWER_DAMAGE), events);
         recordResonance(extra.resonance, 'fire');
       }
       return;
@@ -603,9 +665,9 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
         owner: player.id,
         x: player.x + dx * 0.5,
         y: player.y + dy * 0.5,
-        vx: dx * speed,
-        vy: dy * speed,
-        damage,
+        vx: dx * speed * tuning.projectileSpeedScale,
+        vy: dy * speed * tuning.projectileSpeedScale,
+        damage: playerDamage(tuning, damage),
         radius: 0.32,
         distanceTravelled: 0,
         hostile: false,
@@ -640,7 +702,7 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
         if (!best) break;
         struck.add(best.id);
         hops.push({ x: best.x, y: best.y });
-        damageEntity(state, best, damage, events);
+        damageEntity(state, best, playerDamage(tuning, damage), events);
         // Mesma regra do modulo condutivo: pedra nao conduz. Duplicar a excecao
         // aqui seria criar uma segunda verdade sobre o Britador.
         if (!isStoneEnemy(best)) stunEntity(state, best, CONDUCTIVE_STUN_TICKS);
@@ -711,7 +773,13 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   events.push({ t: 'well_offers', sector: state.sector, abilities: offers });
 };
 
-const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, events: SemanticEvent[]): void => {
+const stepPlayer = (
+  state: SurvivalState,
+  slot: number,
+  cmd: PlayerCommand,
+  events: SemanticEvent[],
+): void => {
+  const tuning = state.config.tuning;
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const dt = 1 / TICK_HZ;
@@ -726,7 +794,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     player.vx = 0;
     player.vy = 0;
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
-    extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK);
+    extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
     return;
   }
 
@@ -761,13 +829,14 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   // esquiva
   if (cmd.dodge && state.tick >= extra.dodgeCooldownUntil) {
     const moveLen = Math.hypot(cmd.move.x, cmd.move.y);
-    const dir = moveLen > 0.01
-      ? { x: cmd.move.x / moveLen, y: cmd.move.y / moveLen }
-      : { x: player.facing.x, y: player.facing.y };
+    const dir =
+      moveLen > 0.01
+        ? { x: cmd.move.x / moveLen, y: cmd.move.y / moveLen }
+        : { x: player.facing.x, y: player.facing.y };
     extra.dodgeDir = dir;
     extra.dodgeUntil = state.tick + DODGE_TICKS;
-    extra.iframesUntil = state.tick + DODGE_IFRAME_TICKS;
-    extra.dodgeCooldownUntil = state.tick + DODGE_COOLDOWN_TICKS;
+    extra.iframesUntil = state.tick + tuning.dodgeIframeTicks;
+    extra.dodgeCooldownUntil = state.tick + tuning.dodgeCooldownTicks;
     events.push({ t: 'dodge', x: player.x, y: player.y });
   }
 
@@ -776,7 +845,12 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   const beforeMoveX = player.x;
   const beforeMoveY = player.y;
   if (state.tick < extra.dodgeUntil) {
-    moveEntity(state, player, extra.dodgeDir.x * DODGE_SPEED * dt, extra.dodgeDir.y * DODGE_SPEED * dt);
+    moveEntity(
+      state,
+      player,
+      extra.dodgeDir.x * DODGE_SPEED * dt,
+      extra.dodgeDir.y * DODGE_SPEED * dt,
+    );
   } else if (state.surface[cellUnder(state, player)] === SURF_ICE) {
     // INERCIA DO GELO: o pe nao morde a lamina. O rumo comandado entra aos
     // poucos na velocidade real, e soltar o direcional NAO para na hora — o
@@ -789,12 +863,17 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     let desiredY = 0;
     if (moveLen > 0.01) {
       const clamped = Math.min(1, moveLen);
-      const speed = PLAYER_SPEED * surfaceSpeedMul(state, player);
+      const speed = tuning.moveSpeed * playerSurfaceSpeedMul(state, player, tuning);
       desiredX = (cmd.move.x / moveLen) * clamped * speed;
       desiredY = (cmd.move.y / moveLen) * clamped * speed;
     }
-    const vx = player.vx * ICE_GLIDE + desiredX * (1 - ICE_GLIDE);
-    const vy = player.vy * ICE_GLIDE + desiredY * (1 - ICE_GLIDE);
+    // `iceGlide` do tuning ENCOLHE a persistencia do embalo anterior em vez de
+    // remove-la: MV-04 promete "mais controle no gelo", nao chao seco. Com a
+    // arvore inteira o embalo cai de 0,82 para ~0,62 — o Prospector ainda
+    // escorrega, so nao patina por tres tiles depois de soltar o comando.
+    const glide = ICE_GLIDE * (1 - tuning.iceGlide);
+    const vx = player.vx * glide + desiredX * (1 - glide);
+    const vy = player.vy * glide + desiredY * (1 - glide);
     // Abaixo do limiar o embalo morre de vez: deslizar para sempre por um
     // epsilon de float seria a lamina mentindo que ainda ha movimento.
     if (Math.hypot(vx, vy) > 0.02) moveEntity(state, player, vx * dt, vy * dt);
@@ -804,7 +883,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       const clamped = Math.min(1, moveLen);
       const nx = (cmd.move.x / moveLen) * clamped;
       const ny = (cmd.move.y / moveLen) * clamped;
-      const speed = PLAYER_SPEED * surfaceSpeedMul(state, player);
+      const speed = tuning.moveSpeed * playerSurfaceSpeedMul(state, player, tuning);
       moveEntity(state, player, nx * speed * dt, ny * speed * dt);
     }
   }
@@ -813,7 +892,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
   // extracao so libera depois de deixar a zona de entrada uma vez
   if (!state.leftEntryZone) {
-    const distFromEntry = Math.hypot(player.x - (state.entry.x + 0.5), player.y - (state.entry.y + 0.5));
+    const distFromEntry = Math.hypot(
+      player.x - (state.entry.x + 0.5),
+      player.y - (state.entry.y + 0.5),
+    );
     if (distFromEntry > 4) state.leftEntryZone = true;
   }
 
@@ -821,7 +903,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   // A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
   // sair dela e a decisao que devolve a dissipacao normal.
   const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
-  extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1));
+  extra.heat = Math.max(
+    0,
+    extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1),
+  );
 
   // disparo principal
   if (
@@ -859,7 +944,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         y: player.y + extra.aim.y * 0.45,
         vx: extra.aim.x * RETURN_DISC_SPEED,
         vy: extra.aim.y * RETURN_DISC_SPEED,
-        damage: BOLT_DAMAGE * 0.85,
+        damage: playerDamage(tuning, BOLT_DAMAGE * 0.85),
         modules: armed,
         distanceTravelled: 0,
         disc: {
@@ -880,9 +965,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         owner: player.id,
         x: player.x + extra.aim.x * 0.4,
         y: player.y + extra.aim.y * 0.4,
-        vx: extra.aim.x * BOLT_SPEED,
-        vy: extra.aim.y * BOLT_SPEED,
-        damage: BOLT_DAMAGE,
+        vx: extra.aim.x * BOLT_SPEED * tuning.projectileSpeedScale,
+        vy: extra.aim.y * BOLT_SPEED * tuning.projectileSpeedScale,
+        damage: playerDamage(tuning, BOLT_DAMAGE),
         modules: armed,
         distanceTravelled: 0,
         hostile: false,
@@ -891,15 +976,30 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       });
     }
     events.push({
-      t: 'action_start', entity: player.id, action: 'player_shot', x: player.x, y: player.y,
-      dx: extra.aim.x, dy: extra.aim.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 7,
+      t: 'action_start',
+      entity: player.id,
+      action: 'player_shot',
+      x: player.x,
+      y: player.y,
+      dx: extra.aim.x,
+      dy: extra.aim.y,
+      startTick: state.tick,
+      releaseTick: state.tick,
+      endTick: state.tick + 7,
     });
-    events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y, owner: player.id });
+    events.push({
+      t: 'shot',
+      x: player.x,
+      y: player.y,
+      dx: extra.aim.x,
+      dy: extra.aim.y,
+      owner: player.id,
+    });
     state.stats.shotsFired += 1;
-    if (extra.heat >= HEAT_MAX) {
-      extra.overheatedUntil = state.tick + OVERHEAT_LOCK_TICKS;
-      extra.heat = HEAT_MAX * 0.55;
-      damageEntity(state, player, OVERHEAT_SELF_DAMAGE, events, { kind: 'overheat' });
+    if (extra.heat >= tuning.heatMax) {
+      extra.overheatedUntil = state.tick + tuning.overheatLockTicks;
+      extra.heat = tuning.heatMax * 0.55;
+      damageEntity(state, player, tuning.overheatSelfDamage, events, { kind: 'overheat' });
       markDiscovery(state.stats, DISCOVERY_SELF_HARM);
       events.push({ t: 'overheat', x: player.x, y: player.y });
     }
@@ -907,7 +1007,11 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
   // habilidade: pulso cinetico (empurra criaturas, apaga fogo, dissipa gas)
   if (cmd.ability && state.tick >= extra.abilityCooldownUntil) {
-    extra.abilityCooldownUntil = state.tick + abilityDefinition(extra.ability).cooldownTicks;
+    // Arredondado para TICK inteiro: cooldown fracionario faria a comparacao
+    // `state.tick >= until` depender de acumulo de float ao longo da run.
+    extra.abilityCooldownUntil =
+      state.tick +
+      Math.round(abilityDefinition(extra.ability).cooldownTicks * tuning.abilityCooldownScale);
     castAbility(state, slot, events);
   }
 
@@ -974,7 +1078,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
     // O mesmo ponto significa coisas diferentes conforme a profundidade: nos
     // setores anteriores ao ultimo ele e o POCO, e no ultimo e o nucleo.
-    const distCore = Math.hypot(player.x - (state.corePos.x + 0.5), player.y - (state.corePos.y + 0.5));
+    const distCore = Math.hypot(
+      player.x - (state.corePos.x + 0.5),
+      player.y - (state.corePos.y + 0.5),
+    );
     if (state.coreTaken && !isFinalSector(state.sector) && distCore < 1.6) {
       // Com o Nucleo na mao o poco SELOU: descer de novo nao existe. O
       // caminho de volta sai por onde se entrou — a ENTRADA do setor.
@@ -986,9 +1093,13 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       // para tras num mapa que deixou de existir nao teria como ser resgatado.
       const standing = standingPlayers(state);
       const allNear = standing.every(
-        (p) => Math.hypot(p.x - (state.corePos.x + 0.5), p.y - (state.corePos.y + 0.5)) <= EXTRACT_RADIUS
+        (p) =>
+          Math.hypot(p.x - (state.corePos.x + 0.5), p.y - (state.corePos.y + 0.5)) <=
+          EXTRACT_RADIUS,
       );
-      const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
+      const anyDowned = state.playerExtras.some(
+        (e, i) => e.joined && state.players[i].alive && e.downed,
+      );
       if (anyDowned) {
         events.push({ t: 'message', key: 'sim.reviveBeforeDescend' });
       } else if (!allNear) {
@@ -1008,7 +1119,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     for (const site of state.salvageSites) {
       const terminalDistance = Math.hypot(
         player.x - (site.terminal.x + 0.5),
-        player.y - (site.terminal.y + 0.5)
+        player.y - (site.terminal.y + 0.5),
       );
       if (site.terminalState === 'inactive' && terminalDistance < 1.45) {
         site.terminalState = 'scanning';
@@ -1020,13 +1131,21 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           y: site.terminal.y,
           completesAtTick: site.scanEndsAt,
         });
-        const offsets = [[-3, 0], [3, 0], [0, -3], [0, 3], [-2, -2], [2, 2]] as const;
+        const offsets = [
+          [-3, 0],
+          [3, 0],
+          [0, -3],
+          [0, 3],
+          [-2, -2],
+          [2, 2],
+        ] as const;
         let spawned = 0;
         for (let i = 0; i < offsets.length && spawned < 2 + site.tier; i++) {
           const [dx, dy] = offsets[(i + site.id) % offsets.length];
           const x = site.terminal.x + dx;
           const y = site.terminal.y + dy;
-          if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1) continue;
+          if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1)
+            continue;
           if (state.solid[y * state.config.width + x] !== SOLID_NONE) continue;
           spawnEnemy(state, spawned === 0 && site.tier > 1 ? 'spitter' : 'stalker', x, y, false);
           spawned++;
@@ -1036,7 +1155,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
       const cacheDistance = Math.hypot(
         player.x - (site.cache.x + 0.5),
-        player.y - (site.cache.y + 0.5)
+        player.y - (site.cache.y + 0.5),
       );
       if (site.cacheRevealed && !site.cacheOpened && cacheDistance < 1.35) {
         site.cacheOpened = true;
@@ -1048,18 +1167,30 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           options,
           createdAtTick: state.tick,
         };
-        events.push({ t: 'salvage_cache_opened', siteId: site.id, slot, x: site.cache.x, y: site.cache.y });
+        events.push({
+          t: 'salvage_cache_opened',
+          siteId: site.id,
+          slot,
+          x: site.cache.x,
+          y: site.cache.y,
+        });
         events.push({ t: 'purge_cell_acquired', slot, amount: 1 });
         return;
       }
     }
     // extracao coletiva: todos os players de pe precisam estar na zona de entrada
-    const distEntry = Math.hypot(player.x - (state.entry.x + 0.5), player.y - (state.entry.y + 0.5));
+    const distEntry = Math.hypot(
+      player.x - (state.entry.x + 0.5),
+      player.y - (state.entry.y + 0.5),
+    );
     if (distEntry < 1.6 && state.leftEntryZone) {
       const allAtEntry = standingPlayers(state).every(
-        (p) => Math.hypot(p.x - (state.entry.x + 0.5), p.y - (state.entry.y + 0.5)) <= EXTRACT_RADIUS
+        (p) =>
+          Math.hypot(p.x - (state.entry.x + 0.5), p.y - (state.entry.y + 0.5)) <= EXTRACT_RADIUS,
       );
-      const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
+      const anyDowned = state.playerExtras.some(
+        (e, i) => e.joined && state.players[i].alive && e.downed,
+      );
       const withCore = state.playerExtras.some((e) => e.hasCore);
       // Com o NUCLEO, a entrada de um setor profundo nao extrai: ela SOBE. O
       // contrato so fecha na plataforma do setor 1 — cada setor tem de ser
@@ -1102,7 +1233,7 @@ const procModule = (
   extra: PlayerExtra | undefined,
   slot: number | undefined,
   id: ModuleId,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): boolean => {
   if (!extra || slot === undefined) return false;
   if (!moduleHasCapacity(extra, id, state.tick)) return false;
@@ -1112,7 +1243,8 @@ const procModule = (
 };
 
 /** O projetil ainda tem rebote sobrando neste voo? */
-const canBounce = (proj: Projectile): boolean => (proj.modules?.ricochet?.remainingBounces ?? 0) > 0;
+const canBounce = (proj: Projectile): boolean =>
+  (proj.modules?.ricochet?.remainingBounces ?? 0) > 0;
 
 /**
  * O disco iniciou a volta — e AQUI que o Return Disc entrega o que promete, e
@@ -1127,7 +1259,7 @@ const beginDiscReturn = (
   proj: Projectile,
   extra: PlayerExtra | undefined,
   slot: number | undefined,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   if (!proj.disc || proj.disc.phase === 'returning') return;
   proj.disc.phase = 'returning';
@@ -1144,7 +1276,13 @@ const beginDiscReturn = (
  * material poder reagir. Destruir terreno e mecanica central, e um modulo de
  * tier 1 anunciado como "seguro" nao pode desligar isso sem avisar.
  */
-const bounceOffSolid = (proj: Projectile, prevX: number, prevY: number, cx: number, cy: number): void => {
+const bounceOffSolid = (
+  proj: Projectile,
+  prevX: number,
+  prevY: number,
+  cx: number,
+  cy: number,
+): void => {
   const enteredX = Math.floor(prevX) !== cx;
   const enteredY = Math.floor(prevY) !== cy;
   if (enteredX) proj.vx *= -1;
@@ -1269,14 +1407,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         explosiveArmedByDistance(proj) &&
         Boolean(ownerExtra && moduleHasCapacity(ownerExtra, 'explosive', state.tick));
       const conductiveReady = Boolean(
-        proj.modules?.conductive && ownerExtra && moduleHasCapacity(ownerExtra, 'conductive', state.tick)
+        proj.modules?.conductive &&
+        ownerExtra &&
+        moduleHasCapacity(ownerExtra, 'conductive', state.tick),
       );
       const cls = projectileClass(proj, conductiveReady, explosiveArmed);
 
       if (state.solid[i] !== SOLID_NONE) {
         // Explosive vem ANTES do disco: quem equipa os dois troca o retorno por
         // uma detonacao, e essa e a escolha — nao um dos dois sumindo em silencio.
-        if (explosiveArmed && !proj.hostile && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
+        if (
+          explosiveArmed &&
+          !proj.hostile &&
+          procModule(state, ownerExtra, ownerSlot, 'explosive', events)
+        ) {
           explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
           dead = true;
           break;
@@ -1328,7 +1472,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             // O rebote so acontece no que NAO cedeu. Se a parede quebrou,
             // refletir seria refletir num buraco recem-aberto — e o tiro ja fez
             // o que tinha a fazer ali.
-            if (!broke && canBounce(proj) && procModule(state, ownerExtra, ownerSlot, 'ricochet', events)) {
+            if (
+              !broke &&
+              canBounce(proj) &&
+              procModule(state, ownerExtra, ownerSlot, 'ricochet', events)
+            ) {
               bounceOffSolid(proj, prevX, prevY, cx, cy);
               break;
             }
@@ -1366,7 +1514,9 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           recordPlayerResonance(state, origin.owner, 'fire');
         }
         if (
-          conductiveReady && ownerExtra && ownerSlot !== undefined &&
+          conductiveReady &&
+          ownerExtra &&
+          ownerSlot !== undefined &&
           events.slice(eventStart).some((event) => event.t === 'discharge')
         ) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
@@ -1379,7 +1529,9 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       }
 
       if (
-        conductiveReady && ownerExtra && ownerSlot !== undefined &&
+        conductiveReady &&
+        ownerExtra &&
+        ownerSlot !== undefined &&
         isConductiveSurface(state.surface[i]) &&
         consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
       ) {
@@ -1414,14 +1566,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             const shooter = state.enemies.find((e) => e.id === proj.owner);
             damageEntity(state, player, proj.damage, events, {
               kind: 'enemy_projectile',
-              archetype: (shooter?.archetype as EnemyArchetype) ?? (proj.kind === 'rock' ? 'bruiser' : 'spitter'),
+              archetype:
+                (shooter?.archetype as EnemyArchetype) ??
+                (proj.kind === 'rock' ? 'bruiser' : 'spitter'),
               elite: shooter?.elite ?? false,
               projectile: proj.kind,
             });
             if (proj.kind === 'rock' && vulnerable) {
               stunEntity(state, player, BRUISER_ROCK_STUN_TICKS);
             }
-            if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+            if (
+              proj.leavesBiofluid &&
+              state.solid[i] === SOLID_NONE &&
+              state.surface[i] === SURF_NONE
+            ) {
               setSurface(state, i, SURF_BIOFLUID, 0);
             }
             dead = true;
@@ -1435,7 +1593,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           for (const enemy of state.enemies) {
             if (!enemy.alive) continue;
             if (proj.hits?.includes(enemy.id)) continue;
-            if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2)) continue;
+            if (
+              Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >=
+              enemy.radius + (proj.radius ?? 0.2)
+            )
+              continue;
             proj.hits?.push(enemy.id);
             damageEntity(state, enemy, proj.damage, events, {
               kind: 'enemy_projectile',
@@ -1449,20 +1611,27 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
           const discHits = proj.disc
-            ? (proj.disc.phase === 'outbound' ? proj.disc.outboundHits : proj.disc.returnHits)
+            ? proj.disc.phase === 'outbound'
+              ? proj.disc.outboundHits
+              : proj.disc.returnHits
             : undefined;
           if (discHits?.includes(enemy.id) || proj.hits?.includes(enemy.id)) continue;
-          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2)) continue;
+          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2))
+            continue;
 
           let damage = proj.damage;
           const enemyCell = cellIndexAt(state, enemy.x, enemy.y);
           let conductiveTriggered = false;
           const conductiveAvailable = Boolean(
-            proj.modules?.conductive && ownerExtra && ownerSlot !== undefined &&
-            moduleHasCapacity(ownerExtra, 'conductive', state.tick)
+            proj.modules?.conductive &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
+            moduleHasCapacity(ownerExtra, 'conductive', state.tick),
           );
           if (
-            conductiveAvailable && ownerExtra && ownerSlot !== undefined &&
+            conductiveAvailable &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
             isConductiveSurface(state.surface[enemyCell]) &&
             consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
           ) {
@@ -1471,8 +1640,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             dischargeAt(state, Math.floor(enemy.x), Math.floor(enemy.y), events, origin);
           }
           if (
-            conductiveAvailable && !conductiveTriggered && !isStoneEnemy(enemy) &&
-            ownerExtra && ownerSlot !== undefined &&
+            conductiveAvailable &&
+            !conductiveTriggered &&
+            !isStoneEnemy(enemy) &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
             consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
           ) {
             conductiveTriggered = true;
@@ -1483,8 +1655,12 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           damageEntity(state, enemy, damage, events, { kind: 'player_shot' });
 
           if (
-            proj.modules?.siphon && owner && ownerExtra && ownerSlot !== undefined &&
-            owner.hp < owner.maxHp && moduleHasCapacity(ownerExtra, 'siphon', state.tick) &&
+            proj.modules?.siphon &&
+            owner &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
+            owner.hp < owner.maxHp &&
+            moduleHasCapacity(ownerExtra, 'siphon', state.tick) &&
             consumeModuleCharge(ownerExtra, 'siphon', ownerSlot, events)
           ) {
             owner.hp = Math.min(owner.maxHp, owner.hp + 2);
@@ -1508,14 +1684,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             // jogador, entao ela machuca quem atirou tambem se ele estiver colado.
             explodeAt(state, proj.x, proj.y, SEEKER_BLAST_RADIUS, events, origin);
             dead = true;
-          } else if (explosiveArmed && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
+          } else if (
+            explosiveArmed &&
+            procModule(state, ownerExtra, ownerSlot, 'explosive', events)
+          ) {
             explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
             dead = true;
           } else if (proj.disc) {
             // O disco ja atravessa por natureza. Piercing nao e cobrado aqui
             // porque nao ha nada que ele acrescente a este veiculo.
             discHits?.push(enemy.id);
-          } else if (proj.modules?.piercing && procModule(state, ownerExtra, ownerSlot, 'piercing', events)) {
+          } else if (
+            proj.modules?.piercing &&
+            procModule(state, ownerExtra, ownerSlot, 'piercing', events)
+          ) {
             (proj.hits ??= []).push(enemy.id);
           } else {
             dead = true;
@@ -1527,7 +1709,12 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
     if (dead && proj.leavesBiofluid) {
       const i = cellIndexAt(state, proj.x, proj.y);
-      if (i >= 0 && i < state.solid.length && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+      if (
+        i >= 0 &&
+        i < state.solid.length &&
+        state.solid[i] === SOLID_NONE &&
+        state.surface[i] === SURF_NONE
+      ) {
         setSurface(state, i, SURF_BIOFLUID, 0);
       }
     }
@@ -1535,7 +1722,6 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
   }
   state.projectiles = survivors;
 };
-
 
 const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void => {
   for (const site of state.salvageSites) {
@@ -1566,15 +1752,10 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
   const sectorScale = 1 + (state.sector - 1) * CONTAMINATION_SECTOR_SCALE;
   state.contamination = Math.min(
     1,
-    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coreTaken ? 2.2 : 1)
+    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coreTaken ? 2.2 : 1),
   );
-  const thresholds: Array<[number, number]> = [
-    [0.35, 2],
-    [0.6, 3],
-    [0.85, 4],
-  ];
-  for (let w = 0; w < thresholds.length; w++) {
-    const [level, count] = thresholds[w];
+  for (let w = 0; w < CONTAMINATION_WAVES.length; w++) {
+    const [level, count] = CONTAMINATION_WAVES[w];
     // contador one-shot: vents sao reescritos por stepCells, entao um sentinel
     // ali seria apagado e a onda dispararia repetidamente.
     if (state.contamination >= level && state.contaminationWaves <= w) {
@@ -1615,8 +1796,14 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
     events.push({ t: 'message', key: 'sim.coreDropped' });
   }
   events.push({
-    t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector',
-    facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+    t: 'death',
+    x: p.x,
+    y: p.y,
+    entity: p.id,
+    archetype: 'prospector',
+    facingX: p.facing.x,
+    facingY: p.facing.y,
+    tick: state.tick,
   });
 };
 
@@ -1641,7 +1828,8 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
     if (p.hp <= 0) {
       p.hp = 0;
       const hasStandingAlly = state.players.some(
-        (o, i) => i !== slot && state.playerExtras[i].joined && o.alive && !state.playerExtras[i].downed
+        (o, i) =>
+          i !== slot && state.playerExtras[i].joined && o.alive && !state.playerExtras[i].downed,
       );
       if (hasStandingAlly) {
         // co-op: entra em estado abatido, revivel pelo parceiro
@@ -1654,13 +1842,23 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
         e.bleedoutAt = state.tick + BLEEDOUT_TICKS;
         state.stats.timesDowned += 1;
         events.push({
-          t: 'player_down', slot, x: p.x, y: p.y,
-          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+          t: 'player_down',
+          slot,
+          x: p.x,
+          y: p.y,
+          facingX: p.facing.x,
+          facingY: p.facing.y,
+          tick: state.tick,
         });
       } else {
         events.push({
-          t: 'player_down', slot, x: p.x, y: p.y,
-          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+          t: 'player_down',
+          slot,
+          x: p.x,
+          y: p.y,
+          facingX: p.facing.x,
+          facingY: p.facing.y,
+          tick: state.tick,
         });
         killPlayer(state, slot, events);
       }
@@ -1702,58 +1900,26 @@ const runEndingCause = (state: SurvivalState): DamageCause => {
  */
 const finalizeRun = (state: SurvivalState): void => {
   if (state.phase === 'running' || state.summary !== null) return;
-  state.summary = buildSummary(state, state.phase === 'dead' ? runEndingCause(state) : null);
-};
-
-/**
- * A cota paga em ESCOLHA DE MODULO — a mesma moeda com que o salvage paga risco.
- *
- * Era a peca que faltava do minerio: o prospector e um robo de mineracao que nao
- * minerava, e "pontos no fim" nao e beneficio, e placar. Pagando com a moeda que
- * o jogo ja usa, as duas atividades ficam COMPARAVEIS dentro da run — vale mais
- * abrir aquele terminal ou arrancar aquele veio? — em vez de a mineracao virar
- * uma economia paralela com regras proprias.
- *
- * `sourceSiteId` negativo separa a oferta da cota das ofertas de salvage no
- * `rollModuleChoice`, que semeia por site: reusar um id de site faria a escolha
- * paga em minerio sair identica a de um cofre que o jogador ja abriu.
- *
- * Roda depois dos inimigos porque o drop do miner morto entra na mesma contagem:
- * o minerio que ele carregava conta como cota no mesmo tick em que ele cai.
- *
- * O limiar so e dado por PAGO quando a escolha correspondente chega a mao de
- * quem a merece. Marcar o pagamento na hora em que a contagem cruza o multiplo
- * parecia equivalente e nao era: quem tivesse um cofre aberto naquele instante
- * era pulado logo abaixo, e o contador ja adiantado fazia `earned <= pago`
- * barrar a oferta para sempre. Minerar durante uma escolha pendente — que e
- * exatamente o que se faz enquanto se decide — apagava o modulo em silencio.
- */
-const payOreQuota = (state: SurvivalState, events: SemanticEvent[]): void => {
-  const earned = Math.floor(state.stats.oreCollected / ORE_PER_MODULE);
-  if (earned <= 0) return;
-  // Uma escolha por jogador de pe. No co-op a cota e do time — quem carrega a
-  // picareta e quem cobre nao deveriam ser pagos de forma diferente por isso.
-  for (const player of standingPlayers(state)) {
-    const extra = state.playerExtras[player.slot ?? 0];
-    if (extra.oreModulesPaid >= earned) continue;
-    // O slot de escolha e unico: enquanto o anterior nao for resolvido o limiar
-    // continua DEVENDO, e o proximo tick tenta de novo.
-    if (extra.pendingModuleChoice) continue;
-    // Um limiar por vez, e nao um salto ate `earned`. Quem cruzou dois multiplos
-    // com um cofre aberto recebe os dois, um apos o outro — a alternativa
-    // colapsava os dois numa oferta so e comia a diferenca.
-    const threshold = extra.oreModulesPaid + 1;
-    const options = rollModuleChoice(state.config.seed, -threshold, 2, extra, state.tick);
-    extra.pendingModuleChoice = { sourceSiteId: -threshold, options, createdAtTick: state.tick };
-    extra.oreModulesPaid = threshold;
-    markDiscovery(state.stats, DISCOVERY_ORE_QUOTA);
+  // A licao central do loop novo, anotada no unico instante em que ela e
+  // verdade: o Prospector caiu carregando carga que nunca sera homologada.
+  //
+  // O limiar existe para a descoberta significar alguma coisa — morrer com duas
+  // lascas nao ensina nada sobre perder uma carga. Marcado ANTES do sumario
+  // porque `buildSummary` congela `stats.discoveries`.
+  if (state.phase === 'dead' && state.stats.oreCollected >= CARGO_LOST_DISCOVERY_ORE) {
+    markDiscovery(state.stats, DISCOVERY_CARGO_LOST);
   }
+  state.summary = buildSummary(state, state.phase === 'dead' ? runEndingCause(state) : null);
 };
 
 export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]): StepResult => {
   const events: SemanticEvent[] = [];
 
-  if (state.phase === 'dead' || state.phase === 'extracted' || state.phase === 'extracted_with_core') {
+  if (
+    state.phase === 'dead' ||
+    state.phase === 'extracted' ||
+    state.phase === 'extracted_with_core'
+  ) {
     return { state, events };
   }
 
@@ -1778,7 +1944,6 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepRailCarts(state, events);
   applyCellHazards(state, events);
   stepContamination(state, events);
-  payOreQuota(state, events);
   resolveChainedEvents(state, events);
   resolveDownedAndDeaths(state, events);
   finalizeRun(state);
@@ -1933,6 +2098,17 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(site.cacheOpened ? 1 : 0);
     mix(site.openedBySlot ?? -1);
   }
+  // O tuning entra no hash porque ele MUDA a run.
+  //
+  // Sem isto, uma expedicao com +12% de vida verificaria contra o replay de uma
+  // run de fabrica: o leaderboard confere re-simulando o log de comandos, e dois
+  // Prospectors diferentes chegariam ao mesmo digest. Milesimos inteiros pela
+  // mesma razao dos contadores — float acumulado em ordens diferentes diverge
+  // entre maquinas.
+  //
+  // `navigation` fica de fora: nada la altera um tick, e inclui-lo faria duas
+  // runs identicas divergirem por causa de um HUD.
+  for (const key of TUNING_HASH_ORDER) mix(Math.round(state.config.tuning[key] * 1000));
   mix(state.sector);
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));

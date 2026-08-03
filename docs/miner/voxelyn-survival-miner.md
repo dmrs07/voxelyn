@@ -112,26 +112,33 @@ sobre o jogador. O jogo não diz nada disso; só mostra a linha.
 Some em zero. Uma linha "0 civis" toda run transformaria a **ausência** de
 violência gratuita numa pontuação, que é o mesmo erro pelo outro lado.
 
-## 4. A cota tem de ter um benefício
+## 4. Minério paga a PRÓXIMA run, não esta
 
-"Pontos no fim" não é benefício, é placar. A cota paga em **escolha de módulo** —
-a mesma moeda com que o salvage paga risco.
+Durante um tempo a coleta pagava **escolha de módulo**: cada 14 lascas
+(`ORE_PER_MODULE`) rendiam uma oferta, a mesma moeda com que o salvage paga
+risco. A intenção era manter as duas atividades comparáveis dentro da run.
 
-Pagando com a moeda que o jogo já usa, as duas atividades ficam **comparáveis
-dentro da run**: vale mais a pena abrir aquele terminal ou arrancar aquele veio?
-Uma moeda própria faria da mineração uma economia paralela com regras próprias.
+O problema era exatamente esse. Mineração e salvage viravam duas torneiras da
+mesma economia, e minerar era uma forma mais lenta de abrir um cofre. Um sistema
+inteiro do jogo existia para produzir o que outro já produzia melhor.
 
-- `ORE_PER_MODULE = 14` — cerca de dois veios inteiros. Baixo demais e minerar
-  vira a estratégia única; alto demais e ninguém chega lá dentro do tempo-alvo.
-- `oreModulesPaid` é contador de **pagamentos**, não um limiar. Sem ele,
-  `oreCollected` acima do múltiplo pagaria de novo a cada tick enquanto o jogador
-  não escolhesse, e um veio grande viraria módulo infinito.
-- No co-op a cota é do **time**: quem carrega a picareta e quem cobre não
-  deveriam ser pagos de forma diferente.
+Desde a spec de 2026-08-02, cada sistema tem uma função só:
 
-A cota é **opcional** por design. Ninguém é obrigado a minerar; uma cota
-obrigatória viraria imposto sobre o tempo, e o tempo já é cobrado pela terceira
-estrela.
+```
+Salvage  →  módulos temporários
+Ecos     →  habilidade da run
+Minério  →  carga de metaprogressão (a próxima geração)
+Núcleo   →  chave rara de progressão permanente
+```
+
+`ORE_PER_MODULE`, `oreModulesPaid` e `payOreQuota` foram removidos. O que ficou
+intacto: os veios, `stats.oreCollected`, o evento `ore_gained`, as partículas de
+lasca, o drop do Minerador e o minério como desempate do ranking.
+
+Minerar continua **opcional** por design, e a razão mudou de lugar: ninguém é
+obrigado a minerar porque a carga é um risco, não um imposto. Toda lasca só vale
+alguma coisa se o Prospector voltar — e nada na Matriz Geracional reduz essa
+perda.
 
 ## 5. Minério no ranking: desempate, nunca objetivo
 

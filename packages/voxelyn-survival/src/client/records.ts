@@ -1,15 +1,37 @@
-// Memoria entre runs: o que sobrevive a permadeath.
+// Memoria LOCAL entre runs: o que sobrevive a permadeath sem valer nada.
 //
-// A spec (secao 2.3) e explicita: metaprogressao aqui e VARIEDADE — bestiario,
-// descobertas, cosmeticos —, nunca poder numerico. Nada neste arquivo altera
-// uma unica constante da simulacao, e essa e a linha que nao se cruza: no
-// instante em que um recorde virar +5 de vida, a run deixa de ser justa consigo
-// mesma e a seed compartilhada deixa de significar a mesma coisa para duas
-// pessoas.
+// ---------------------------------------------------------------------------
+// A POLITICA MUDOU, E DE PROPOSITO
+// ---------------------------------------------------------------------------
+// Este arquivo dizia que metaprogressao era VARIEDADE — bestiario, descobertas,
+// cosmeticos — e nunca poder numerico, porque no instante em que um recorde
+// virasse +5 de vida a seed compartilhada deixaria de significar a mesma coisa
+// para duas pessoas.
 //
-// O que ele faz e mais simples e mais importante: registrar. Permadeath sem
-// registro nao e permadeath, e reset — e a diferenca entre um jogador que volta
-// e um que fecha a aba costuma ser ter algo a mostrar do que acabou de perder.
+// O argumento estava certo sobre o que protegia, e continua valendo. A resposta
+// nao foi abrir excecao, e sim separar contextos (spec de 2026-08-02):
+//
+//   Expedicao autoritativa → tuning derivado do perfil do SERVIDOR
+//   Contrato ranqueado     → G-00 de fabrica, para todos
+//   Co-op (1a versao)      → G-00 de fabrica, para todos
+//
+// A politica nova, escrita por extenso: a metaprogressao da Expedicao pode
+// fornecer melhorias numericas leves e ponderadas; modos competitivos continuam
+// usando Prospectors padronizados.
+//
+// ---------------------------------------------------------------------------
+// O QUE ESTE ARQUIVO NAO E MAIS
+// ---------------------------------------------------------------------------
+// Ele NAO e autoridade sobre nada permanente. Carteira, nucleos, protocolos,
+// geracao, codex e tuning vivem no servidor, e por um motivo que nao tem a ver
+// com desconfianca do jogador: um saldo que mora no navegador e um saldo que
+// qualquer aba de devtools edita, e uma economia que se pode editar nao consegue
+// dar peso a decisao de extrair. Ver `progression-api.ts` e `progression-cache.ts`.
+//
+// O que sobra aqui e o que sempre foi util e nunca foi moeda: historico,
+// bestiario, descobertas, seeds dominadas. Permadeath sem registro nao e
+// permadeath, e reset — e a diferenca entre um jogador que volta e um que fecha
+// a aba costuma ser ter algo a mostrar do que acabou de perder.
 
 import {
   DISCOVERY_CORE_TAKEN,
@@ -20,7 +42,7 @@ import {
   DISCOVERY_BISHOP_FELLED,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
-  DISCOVERY_ORE_QUOTA,
+  DISCOVERY_CARGO_LOST,
   DISCOVERY_GUARDIAN_FELLED,
   DISCOVERY_HORSE_FELLED,
   DISCOVERY_ORE_CHAIN,
@@ -255,9 +277,9 @@ export const DISCOVERIES: readonly Discovery[] = [
     lesson: 'discovery.minerEnraged.lesson',
   },
   {
-    bit: DISCOVERY_ORE_QUOTA,
-    title: 'discovery.oreQuota.title',
-    lesson: 'discovery.oreQuota.lesson',
+    bit: DISCOVERY_CARGO_LOST,
+    title: 'discovery.cargoLost.title',
+    lesson: 'discovery.cargoLost.lesson',
   },
   {
     bit: DISCOVERY_HORSE_FELLED,

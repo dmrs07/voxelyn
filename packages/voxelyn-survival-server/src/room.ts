@@ -229,7 +229,7 @@ export class GameRoom {
         // parceiro fica sem objetivo alcancavel por culpa alheia
         this.state.coreTaken = false;
       }
-      resetPlayerProgress(extra);
+      resetPlayerProgress(extra, this.state.config.tuning);
     }
   }
 
@@ -483,6 +483,10 @@ export class GameRoom {
       events,
       contamination: round3(this.state.contamination),
       you: this.viewerState(slot.slot),
+      // Em TODO snapshot, e nao so quando muda: sao poucos bytes, e a
+      // alternativa (mandar na mudanca) reintroduziria exatamente o furo que o
+      // campo existe para tapar — quem reconecta entre duas lascas veria zero.
+      cargoOre: this.state.stats.oreCollected,
     };
     // flags de mundo so viajam quando mudam (abrir bau, pegar nucleo, acordar guardiao)
     const world = this.worldFlags();
@@ -527,6 +531,7 @@ export class GameRoom {
       you: slot ? this.viewerState(slot.slot) : null,
       world,
       authHash: hashAuthoritativeState(this.state),
+      cargoOre: this.state.stats.oreCollected,
     };
   }
 }

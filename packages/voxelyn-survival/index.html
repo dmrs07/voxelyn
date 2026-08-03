@@ -145,6 +145,139 @@
         color: #e8f1ff;
         text-align: right;
       }
+      /* ------------------------------------------------------------------ */
+      /* Matriz Geracional                                                    */
+      /* ------------------------------------------------------------------ */
+      /* Grade de dois por dois em telas estreitas e quatro em largas: o
+         cabecalho tem quatro numeros e nenhum deles pode encolher a ponto de
+         virar reticencia — carteira e geracao sao o que o jogador veio ler. */
+      .matrix-header {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .matrix-card {
+        background: #161b25;
+        border: 1px solid #2e3a4d;
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+      .matrix-card-label {
+        color: #7f8da3;
+        font-size: 10px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .matrix-card-value {
+        color: #e8f1ff;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+      .matrix-card-note {
+        color: #7f8da3;
+        font-size: 10px;
+      }
+      .matrix-tabs {
+        margin-bottom: 10px;
+      }
+      .matrix-branch {
+        margin-bottom: 4px;
+      }
+      .matrix-node {
+        border: 1px solid #2e3a4d;
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin: 6px 0;
+        background: #131822;
+      }
+      /* Instalado ganha borda viva e o resto apaga: a leitura de "onde eu
+         estou na arvore" tem de funcionar de relance, sem ler texto.
+
+         O seletor do CARIMBO e `span`, e o do CARTAO e `div.matrix-node`: os
+         dois carregavam a mesma classe, e a cor do carimbo escorria para o
+         cartao inteiro — nome e descricao saiam verdes junto com o selo. */
+      span.matrix-node-installed {
+        color: #59f2c2;
+        font-size: 10px;
+        letter-spacing: 1px;
+      }
+      .matrix-node.matrix-node-installed {
+        border-color: #2f6f5b;
+      }
+      .matrix-node.matrix-node-locked {
+        opacity: 0.45;
+      }
+      .matrix-node.matrix-node-affordable {
+        border-color: #4c7fd4;
+      }
+      .matrix-node-id {
+        color: #7f8da3;
+        font-size: 10px;
+        letter-spacing: 1px;
+      }
+      .matrix-node-name {
+        color: #e8f1ff;
+        font-size: 13px;
+      }
+      .matrix-node-desc {
+        color: #b8a98f;
+        font-size: 11px;
+      }
+      .matrix-node-side {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        margin-top: 4px;
+      }
+      .matrix-node-cost {
+        color: #ffd166;
+        font-size: 11px;
+      }
+      .matrix-node-status {
+        color: #7f8da3;
+        font-size: 10px;
+      }
+      .matrix-policy {
+        margin-top: 12px;
+        font-style: italic;
+        color: #7f8da3;
+      }
+      .codex-doc {
+        border-left: 2px solid #2e3a4d;
+        padding: 4px 0 4px 10px;
+        margin: 10px 0;
+      }
+      .codex-doc h3 {
+        color: #e8f1ff;
+        font-size: 13px;
+        margin: 2px 0 4px;
+      }
+      .codex-code {
+        color: #7f8da3;
+        font-size: 10px;
+        letter-spacing: 1px;
+      }
+      .codex-body {
+        color: #b8a98f;
+        margin: 6px 0;
+        white-space: pre-wrap;
+      }
+      .codex-source,
+      .codex-related {
+        color: #7f8da3;
+        font-size: 10px;
+      }
+      .codex-locked {
+        opacity: 0.5;
+        border-left-color: #46566e;
+      }
+      .codex-reveal-title {
+        color: #59f2c2;
+        letter-spacing: 2px;
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
       .panel .locked {
         color: #46566e;
       }
@@ -377,6 +510,7 @@
       <div class="row menu-actions">
         <button id="btn-options" class="compact" data-i18n="menu.options">Opções</button>
         <button id="btn-records" class="compact" data-i18n="menu.records">Registro</button>
+        <button id="btn-matrix" class="compact" data-i18n="menu.matrix">Matriz Geracional</button>
         <button id="btn-rank" class="compact" data-i18n="menu.rank">Ranking</button>
       </div>
       <!-- Ferramentas de desenvolvimento: so aparecem com ?dev=1. -->
@@ -516,6 +650,12 @@
       <h1 data-i18n="records.title">REGISTRO</h1>
       <div id="records-body" class="panel"></div>
       <button id="btn-records-close" class="primary" data-i18n="options.back">Voltar</button>
+    </div>
+
+    <div id="matrix" class="overlay hidden">
+      <h1 class="corp" data-i18n="matrix.title">MATRIZ GERACIONAL AURIX</h1>
+      <div id="matrix-body" class="panel"></div>
+      <button id="btn-matrix-close" class="primary" data-i18n="options.back">Voltar</button>
     </div>
 
     <div id="rank" class="overlay hidden">
