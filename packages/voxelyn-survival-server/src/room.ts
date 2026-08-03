@@ -229,7 +229,7 @@ export class GameRoom {
         // parceiro fica sem objetivo alcancavel por culpa alheia
         this.state.coreTaken = false;
       }
-      resetPlayerProgress(extra);
+      resetPlayerProgress(extra, this.state.config.tuning);
     }
   }
 

@@ -400,13 +400,25 @@ export const damageEntity = (
   if (ent.kind === 'player') {
     const extra = state.playerExtras[ent.slot ?? 0];
     if (extra.iframesUntil > state.tick || extra.downed) return;
-    ent.hp = Math.max(0, ent.hp - amount);
+    // A selagem ambiental (CA-04) e aplicada AQUI, e nao em cada `applyCellHazards`,
+    // porque a lista de causas ambientais e a coisa que precisa ficar visivel: um
+    // caminho de dano novo que se esqueca dela apareceria como bug de balanco em
+    // vez de aparecer neste `if`.
+    //
+    // Ataques, explosoes e overheat ficam de FORA de proposito. "Dano ambiental"
+    // e o chao cobrando presenca — fogo, gas, esporo —; uma pedra do Britador nao
+    // vira ambiente por ter caido do teto, e o overheat e o reator do proprio
+    // Prospector, ja coberto por RX-05.
+    const scaled = isEnvironmentalCause(cause)
+      ? amount * state.config.tuning.environmentalDamageScale
+      : amount;
+    ent.hp = Math.max(0, ent.hp - scaled);
     // Registrado AQUI e nao na morte: quando `resolveDownedAndDeaths` roda, ele
     // so ve `hp <= 0` e nao tem como saber se foram os 22 da pedra ou os 2,2 do
     // fogo por baixo.
     extra.lastDamage = { cause, tick: state.tick };
-    state.stats.damageTakenTenths = addDamageTenths(state.stats.damageTakenTenths, amount);
-    events.push({ t: 'hit', x: ent.x, y: ent.y, amount, target: ent.id });
+    state.stats.damageTakenTenths = addDamageTenths(state.stats.damageTakenTenths, scaled);
+    events.push({ t: 'hit', x: ent.x, y: ent.y, amount: scaled, target: ent.id });
     return;
   }
   // Dano CAUSADO conta so o que e ATRIBUIVEL ao jogador, por lista fechada.
@@ -579,9 +591,26 @@ const crushesWalls = (enemy: Entity): boolean =>
 export const isStoneEnemy = (enemy: Entity): boolean =>
   enemy.archetype === 'bruiser' || enemy.archetype === 'guardian';
 
+/**
+ * O chao cobrando presenca: fogo, gas e esporo.
+ *
+ * Lista FECHADA e nomeada, em vez de "tudo que nao e ataque": explosao, descarga,
+ * overheat e pedra tem autor, e um deles entrando aqui por descuido daria a CA-04
+ * uma reducao de dano geral que a arvore nunca prometeu.
+ */
+export const isEnvironmentalCause = (cause: DamageCause): boolean =>
+  cause.kind === 'fire' || cause.kind === 'gas' || cause.kind === 'spores';
+
 /** Aplica controle autoritativo e interrompe a acao corrente do alvo. */
 export const stunEntity = (state: SurvivalState, entity: Entity, durationTicks: number): void => {
-  entity.stunnedUntil = Math.max(entity.stunnedUntil, state.tick + durationTicks);
+  // Bercos de impacto (CA-02) encurtam o stun de QUEM O RECEBE, e so do jogador.
+  // Arredondado para tick inteiro: `stunnedUntil` e comparado com `state.tick`, e
+  // meio tick de atordoamento nao existe.
+  const ticks =
+    entity.kind === 'player'
+      ? Math.round(durationTicks * state.config.tuning.stunDurationScale)
+      : durationTicks;
+  entity.stunnedUntil = Math.max(entity.stunnedUntil, state.tick + ticks);
   entity.vx = 0;
   entity.vy = 0;
   if (entity.kind === 'enemy') {

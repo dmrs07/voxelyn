@@ -1,5 +1,6 @@
 import type { RNG } from '@voxelyn/core';
 import type { LineageId, OccupationId, StratumId } from './strata.js';
+import type { PlayerTuning } from './progression.js';
 
 export type Vec2 = { x: number; y: number };
 
@@ -19,6 +20,15 @@ export type RunConfig = {
    * asserção sobre a arena.
    */
   sector?: number;
+  /**
+   * A configuracao do Prospector desta run. Ausente = G-00 de fabrica.
+   *
+   * Congelada na criacao e nunca relida: a run inteira roda contra o mesmo
+   * objeto, e comprar um protocolo no meio de uma expedicao nao muda o
+   * Prospector que ja desceu. E o que permite re-simular uma run antiga com o
+   * tuning que ela realmente usou, meses depois de a arvore ter mudado.
+   */
+  tuning?: PlayerTuning;
 };
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';

@@ -18,8 +18,6 @@ import {
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
   DISCHARGE_DAMAGE,
-  DODGE_COOLDOWN_TICKS,
-  DODGE_IFRAME_TICKS,
   DODGE_SPEED,
   DODGE_TICKS,
   EXPLOSION_RADIUS,
@@ -28,17 +26,11 @@ import {
   FIRE_DAMAGE_PER_TICK,
   GAS_DAMAGE_PER_TICK,
   SPORE_DAMAGE_PER_TICK,
-  HEAT_DECAY_PER_TICK,
-  HEAT_MAX,
   HEAT_PER_SHOT,
   MAX_PLAYERS,
   MAX_PROJECTILES,
-  OVERHEAT_LOCK_TICKS,
-  OVERHEAT_SELF_DAMAGE,
-  PLAYER_HP,
   PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
   PLAYER_RADIUS,
-  PLAYER_SPEED,
   REVIVE_HP_FRACTION,
   REVIVE_RADIUS,
   RETURN_DISC_MAX_DISTANCE,
@@ -107,6 +99,7 @@ import {
   rollModuleChoice,
 } from './modules.js';
 import { DISCOVERY_CARGO_LOST, DISCOVERY_DISCHARGE_POOL, DISCOVERY_SELF_HARM } from './types.js';
+import { DEFAULT_PLAYER_TUNING, TUNING_HASH_ORDER, type PlayerTuning } from './progression.js';
 import type {
   DamageCause,
   Entity,
@@ -135,7 +128,38 @@ export const emptyCommand = (): PlayerCommand => ({
   choose: null,
 });
 
-const makePlayer = (slot: number, x: number, y: number): Entity => ({
+/**
+ * Dano com AUTORIA do Prospector.
+ *
+ * Aplicado na FONTE — onde o numero nasce —, e nao em `damageEntity`, porque a
+ * causa nem sempre chega la: flamethrower e arc entram sem `DamageCause`. Na
+ * fonte a lista e curta e auditavel, e nada mais escala junto: explosao
+ * ambiental, carrinho, dano de inimigo e reacao sem autoria continuam intactos.
+ */
+const playerDamage = (tuning: PlayerTuning, base: number): number =>
+  base * tuning.playerDamageScale;
+
+/**
+ * A penalidade de liquido, ja suavizada pelo tuning do Prospector.
+ *
+ * Encolhe a PENALIDADE, e nao multiplica a velocidade: `liquidSlowScale` de 0,92
+ * significa "o slow dói 8% menos", entao agua continua sendo agua. Multiplicar a
+ * velocidade final daria o mesmo bonus em chao seco, onde nao ha nada a
+ * compensar — e MV-03 promete travessia, nao corrida.
+ *
+ * Inimigos continuam usando `surfaceSpeedMul` cru: a arvore e do Prospector.
+ */
+const playerSurfaceSpeedMul = (
+  state: SurvivalState,
+  player: Entity,
+  tuning: PlayerTuning,
+): number => {
+  const base = surfaceSpeedMul(state, player);
+  if (base >= 1) return base;
+  return 1 - (1 - base) * tuning.liquidSlowScale;
+};
+
+const makePlayer = (slot: number, x: number, y: number, tuning: PlayerTuning): Entity => ({
   id: slot + 1,
   kind: 'player',
   archetype: 'prospector',
@@ -143,8 +167,8 @@ const makePlayer = (slot: number, x: number, y: number): Entity => ({
   y,
   vx: 0,
   vy: 0,
-  hp: PLAYER_HP,
-  maxHp: PLAYER_HP,
+  hp: tuning.maxHp,
+  maxHp: tuning.maxHp,
   radius: PLAYER_RADIUS,
   alive: true,
   elite: false,
@@ -157,7 +181,7 @@ const makePlayer = (slot: number, x: number, y: number): Entity => ({
   slot,
 });
 
-const makeExtra = (): PlayerExtra => ({
+const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   aim: { x: 1, y: 0 },
   heat: 0,
   overheatedUntil: 0,
@@ -166,7 +190,7 @@ const makeExtra = (): PlayerExtra => ({
   iframesUntil: 0,
   dodgeCooldownUntil: 0,
   abilityCooldownUntil: 0,
-  purgeCells: 1,
+  purgeCells: tuning.startingPurgeCells,
   activeModules: [],
   pendingModuleChoice: null,
   hasCore: false,
@@ -185,10 +209,10 @@ const makeExtra = (): PlayerExtra => ({
  * abandonado e reocupado: o novo jogador nao pode herdar os modificadores,
  * os frascos nem a posse do nucleo de quem saiu.
  */
-export const resetPlayerProgress = (extra: PlayerExtra): void => {
+export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): void => {
   extra.activeModules = [];
   extra.pendingModuleChoice = null;
-  extra.purgeCells = 1;
+  extra.purgeCells = tuning.startingPurgeCells;
   extra.hasCore = false;
   extra.heat = 0;
   extra.overheatedUntil = 0;
@@ -209,6 +233,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
   const height = config.height ?? WORLD_H;
   const playerCount = Math.max(1, Math.min(MAX_PLAYERS, config.playerCount ?? 1));
   const sector = Math.max(1, Math.min(SECTOR_COUNT, config.sector ?? 1));
+  // Congelado UMA vez. A run inteira le deste objeto, e comprar um protocolo no
+  // meio de uma expedicao nao muda o Prospector que ja desceu.
+  const tuning = config.tuning ?? DEFAULT_PLAYER_TUNING;
   // A seed de CADA setor sai da mesma derivacao. Usar a formula antiga so para
   // o primeiro faria o setor de abertura ser o unico fora do esquema, e a
   // derivacao e o que garante que uma seed compartilhada reproduza a descida
@@ -232,12 +259,12 @@ export const createRun = (config: RunConfig): SurvivalState => {
   const players: Entity[] = [];
   const playerExtras: PlayerExtra[] = [];
   for (let s = 0; s < playerCount; s++) {
-    players.push(makePlayer(s, world.entry.x + offsets[s].x, world.entry.y + offsets[s].y));
-    playerExtras.push(makeExtra());
+    players.push(makePlayer(s, world.entry.x + offsets[s].x, world.entry.y + offsets[s].y, tuning));
+    playerExtras.push(makeExtra(tuning));
   }
 
   const state: SurvivalState = {
-    config: { seed: config.seed, width, height, playerCount, sector },
+    config: { seed: config.seed, width, height, playerCount, sector, tuning },
     rng,
     tick: 0,
     phase: 'running',
@@ -481,6 +508,7 @@ const recordPlayerResonance = (
 };
 
 const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
+  const tuning = state.config.tuning;
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const aimLength = Math.hypot(extra.aim.x, extra.aim.y) || 1;
@@ -584,7 +612,7 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
         const d = Math.hypot(ox, oy);
         if (d > range || d < 0.001) continue;
         if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
-        damageEntity(state, enemy, FLAMETHROWER_DAMAGE, events);
+        damageEntity(state, enemy, playerDamage(tuning, FLAMETHROWER_DAMAGE), events);
         recordResonance(extra.resonance, 'fire');
       }
       return;
@@ -598,9 +626,9 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
         owner: player.id,
         x: player.x + dx * 0.5,
         y: player.y + dy * 0.5,
-        vx: dx * speed,
-        vy: dy * speed,
-        damage,
+        vx: dx * speed * tuning.projectileSpeedScale,
+        vy: dy * speed * tuning.projectileSpeedScale,
+        damage: playerDamage(tuning, damage),
         radius: 0.32,
         distanceTravelled: 0,
         hostile: false,
@@ -635,7 +663,7 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
         if (!best) break;
         struck.add(best.id);
         hops.push({ x: best.x, y: best.y });
-        damageEntity(state, best, damage, events);
+        damageEntity(state, best, playerDamage(tuning, damage), events);
         // Mesma regra do modulo condutivo: pedra nao conduz. Duplicar a excecao
         // aqui seria criar uma segunda verdade sobre o Britador.
         if (!isStoneEnemy(best)) stunEntity(state, best, CONDUCTIVE_STUN_TICKS);
@@ -707,6 +735,7 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
 };
 
 const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, events: SemanticEvent[]): void => {
+  const tuning = state.config.tuning;
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
   const dt = 1 / TICK_HZ;
@@ -721,7 +750,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     player.vx = 0;
     player.vy = 0;
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
-    extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK);
+    extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
     return;
   }
 
@@ -761,8 +790,8 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       : { x: player.facing.x, y: player.facing.y };
     extra.dodgeDir = dir;
     extra.dodgeUntil = state.tick + DODGE_TICKS;
-    extra.iframesUntil = state.tick + DODGE_IFRAME_TICKS;
-    extra.dodgeCooldownUntil = state.tick + DODGE_COOLDOWN_TICKS;
+    extra.iframesUntil = state.tick + tuning.dodgeIframeTicks;
+    extra.dodgeCooldownUntil = state.tick + tuning.dodgeCooldownTicks;
     events.push({ t: 'dodge', x: player.x, y: player.y });
   }
 
@@ -784,12 +813,17 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     let desiredY = 0;
     if (moveLen > 0.01) {
       const clamped = Math.min(1, moveLen);
-      const speed = PLAYER_SPEED * surfaceSpeedMul(state, player);
+      const speed = tuning.moveSpeed * playerSurfaceSpeedMul(state, player, tuning);
       desiredX = (cmd.move.x / moveLen) * clamped * speed;
       desiredY = (cmd.move.y / moveLen) * clamped * speed;
     }
-    const vx = player.vx * ICE_GLIDE + desiredX * (1 - ICE_GLIDE);
-    const vy = player.vy * ICE_GLIDE + desiredY * (1 - ICE_GLIDE);
+    // `iceGlide` do tuning ENCOLHE a persistencia do embalo anterior em vez de
+    // remove-la: MV-04 promete "mais controle no gelo", nao chao seco. Com a
+    // arvore inteira o embalo cai de 0,82 para ~0,62 — o Prospector ainda
+    // escorrega, so nao patina por tres tiles depois de soltar o comando.
+    const glide = ICE_GLIDE * (1 - tuning.iceGlide);
+    const vx = player.vx * glide + desiredX * (1 - glide);
+    const vy = player.vy * glide + desiredY * (1 - glide);
     // Abaixo do limiar o embalo morre de vez: deslizar para sempre por um
     // epsilon de float seria a lamina mentindo que ainda ha movimento.
     if (Math.hypot(vx, vy) > 0.02) moveEntity(state, player, vx * dt, vy * dt);
@@ -799,7 +833,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       const clamped = Math.min(1, moveLen);
       const nx = (cmd.move.x / moveLen) * clamped;
       const ny = (cmd.move.y / moveLen) * clamped;
-      const speed = PLAYER_SPEED * surfaceSpeedMul(state, player);
+      const speed = tuning.moveSpeed * playerSurfaceSpeedMul(state, player, tuning);
       moveEntity(state, player, nx * speed * dt, ny * speed * dt);
     }
   }
@@ -816,7 +850,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   // A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
   // sair dela e a decisao que devolve a dissipacao normal.
   const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
-  extra.heat = Math.max(0, extra.heat - HEAT_DECAY_PER_TICK * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1));
+  extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1));
 
   // disparo principal
   if (
@@ -854,7 +888,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         y: player.y + extra.aim.y * 0.45,
         vx: extra.aim.x * RETURN_DISC_SPEED,
         vy: extra.aim.y * RETURN_DISC_SPEED,
-        damage: BOLT_DAMAGE * 0.85,
+        damage: playerDamage(tuning, BOLT_DAMAGE * 0.85),
         modules: armed,
         distanceTravelled: 0,
         disc: {
@@ -875,9 +909,9 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
         owner: player.id,
         x: player.x + extra.aim.x * 0.4,
         y: player.y + extra.aim.y * 0.4,
-        vx: extra.aim.x * BOLT_SPEED,
-        vy: extra.aim.y * BOLT_SPEED,
-        damage: BOLT_DAMAGE,
+        vx: extra.aim.x * BOLT_SPEED * tuning.projectileSpeedScale,
+        vy: extra.aim.y * BOLT_SPEED * tuning.projectileSpeedScale,
+        damage: playerDamage(tuning, BOLT_DAMAGE),
         modules: armed,
         distanceTravelled: 0,
         hostile: false,
@@ -891,10 +925,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     });
     events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y, owner: player.id });
     state.stats.shotsFired += 1;
-    if (extra.heat >= HEAT_MAX) {
-      extra.overheatedUntil = state.tick + OVERHEAT_LOCK_TICKS;
-      extra.heat = HEAT_MAX * 0.55;
-      damageEntity(state, player, OVERHEAT_SELF_DAMAGE, events, { kind: 'overheat' });
+    if (extra.heat >= tuning.heatMax) {
+      extra.overheatedUntil = state.tick + tuning.overheatLockTicks;
+      extra.heat = tuning.heatMax * 0.55;
+      damageEntity(state, player, tuning.overheatSelfDamage, events, { kind: 'overheat' });
       markDiscovery(state.stats, DISCOVERY_SELF_HARM);
       events.push({ t: 'overheat', x: player.x, y: player.y });
     }
@@ -902,7 +936,11 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
   // habilidade: pulso cinetico (empurra criaturas, apaga fogo, dissipa gas)
   if (cmd.ability && state.tick >= extra.abilityCooldownUntil) {
-    extra.abilityCooldownUntil = state.tick + abilityDefinition(extra.ability).cooldownTicks;
+    // Arredondado para TICK inteiro: cooldown fracionario faria a comparacao
+    // `state.tick >= until` depender de acumulo de float ao longo da run.
+    extra.abilityCooldownUntil =
+      state.tick +
+      Math.round(abilityDefinition(extra.ability).cooldownTicks * tuning.abilityCooldownScale);
     castAbility(state, slot, events);
   }
 
@@ -1891,6 +1929,17 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(site.cacheOpened ? 1 : 0);
     mix(site.openedBySlot ?? -1);
   }
+  // O tuning entra no hash porque ele MUDA a run.
+  //
+  // Sem isto, uma expedicao com +12% de vida verificaria contra o replay de uma
+  // run de fabrica: o leaderboard confere re-simulando o log de comandos, e dois
+  // Prospectors diferentes chegariam ao mesmo digest. Milesimos inteiros pela
+  // mesma razao dos contadores — float acumulado em ordens diferentes diverge
+  // entre maquinas.
+  //
+  // `navigation` fica de fora: nada la altera um tick, e inclui-lo faria duas
+  // runs identicas divergirem por causa de um HUD.
+  for (const key of TUNING_HASH_ORDER) mix(Math.round(state.config.tuning[key] * 1000));
   mix(state.sector);
   mix(state.coreTaken ? 1 : 0);
   mix(Math.round(state.contamination * 100000));
