@@ -38,6 +38,20 @@ describe('a resposta que chega tarde nao vence', () => {
     expect(queries.isCurrent(a, 'servidor-A')).toBe(false);
   });
 
+  // O mecanismo diz "chegou outra DO MESMO TIPO, esta envelheceu". Perguntas
+  // diferentes nao se envelhecem: compartilhar um rastreador entre elas fazia
+  // abrir o Codex descartar um refresh de perfil em voo — e, pior, deixar uma
+  // compra ja debitada com o botao travado para sempre.
+  it('rastreadores diferentes nao invalidam um ao outro', () => {
+    const perfil = new LatestQuery<string>();
+    const codex = new LatestQuery<string>();
+
+    const consultaDePerfil = perfil.begin('servidor-A');
+    codex.begin('servidor-A');
+
+    expect(perfil.isCurrent(consultaDePerfil, 'servidor-A')).toBe(true);
+  });
+
   it('serve para qualquer escopo comparavel por igualdade', () => {
     const queries = new LatestQuery<number>();
     const primeiro = queries.begin(1);

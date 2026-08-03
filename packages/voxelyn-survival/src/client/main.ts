@@ -1491,23 +1491,38 @@ const progressionUrl = (): string => serverInput.value.trim() || defaultServerUr
  * seguinte ia para o B carregando a arvore e a `profileVersion` do A, debitando
  * o B quando as versoes por acaso batessem.
  */
-const matrixQueries = new LatestQuery<string>();
+/**
+ * UM RASTREADOR POR OPERACAO, e nao um compartilhado.
+ *
+ * A primeira versao usava um contador so para as tres, e isso e errado pela
+ * definicao do mecanismo: ele existe para dizer "chegou outra do MESMO tipo,
+ * esta aqui envelheceu". Abrir o Codex nao envelhece um refresh de perfil — sao
+ * perguntas diferentes, e a resposta de uma nao substitui a da outra.
+ *
+ * O estrago de compartilhar era pior que uma resposta perdida: a do perfil era
+ * descartada com `loading` ainda em true (painel presa em "Consultando"), e uma
+ * compra ja debitada no servidor deixava `pending` preso para sempre, porque so
+ * o callback pulado o limpava — e nem fechar e reabrir o painel resolvia.
+ */
+const profileQueries = new LatestQuery<string>();
+const codexQueries = new LatestQuery<string>();
+const purchaseQueries = new LatestQuery<string>();
 
-const beginMatrixQuery = (): Query<string> => matrixQueries.begin(progressionUrl());
+const beginQuery = (tracker: LatestQuery<string>): Query<string> => tracker.begin(progressionUrl());
 
-const isCurrentQuery = (query: Query<string>): boolean =>
-  matrixQueries.isCurrent(query, progressionUrl());
+const isCurrentQuery = (tracker: LatestQuery<string>, query: Query<string>): boolean =>
+  tracker.isCurrent(query, progressionUrl());
 
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
   retryPendingSettlement();
-  const query = beginMatrixQuery();
+  const query = beginQuery(profileQueries);
   matrixView.loading = true;
   drawMatrix();
   const result = await openSession(query.url);
   // Chegou tarde, ou o jogador trocou de servidor: descarta sem tocar em nada.
   // Nem `loading` — quem for a consulta atual cuida do proprio estado.
-  if (!isCurrentQuery(query)) return;
+  if (!isCurrentQuery(profileQueries, query)) return;
   matrixView.loading = false;
   if (!result.ok) {
     // Offline: continua mostrando o cache, marcado, e sem botao de compra.
@@ -1524,9 +1539,9 @@ const refreshProfile = async (): Promise<void> => {
 };
 
 const refreshCodex = async (): Promise<void> => {
-  const query = beginMatrixQuery();
+  const query = beginQuery(codexQueries);
   const result = await fetchCodex(query.url, getLocale());
-  if (!isCurrentQuery(query)) return;
+  if (!isCurrentQuery(codexQueries, query)) return;
   matrixView.codex = result.ok ? result.value : null;
   drawMatrix();
 };
@@ -1558,7 +1573,7 @@ const matrixHandlers: MatrixHandlers = {
     matrixView.pending = upgrade.id;
     matrixView.notice = null;
     drawMatrix();
-    const query = beginMatrixQuery();
+    const query = beginQuery(purchaseQueries);
     void purchaseUpgrade(
       query.url,
       upgrade.id,
@@ -1568,7 +1583,7 @@ const matrixHandlers: MatrixHandlers = {
       // Uma compra respondida depois de o jogador trocar de servidor ja foi
       // cobrada la — mas o perfil que ela devolve nao descreve o servidor que
       // esta na tela, e escreve-lo aqui mostraria a arvore do lugar errado.
-      if (!isCurrentQuery(query)) return;
+      if (!isCurrentQuery(purchaseQueries, query)) return;
       matrixView.pending = null;
       if (!result.ok) {
         // Conflito de versao nao e erro do jogador: outra sessao mexeu na
@@ -1599,8 +1614,17 @@ const matrixHandlers: MatrixHandlers = {
 };
 
 document.getElementById('btn-matrix')?.addEventListener('click', () => {
-  // Desenha JA com o cache — a Matriz abre instantanea — e busca o
-  // autoritativo em seguida, que substitui o que estiver na tela.
+  // Abrir o painel LIMPA o estado transitorio, e nao so o desenha.
+  //
+  // Rede de seguranca, e nao correcao do bug acima: qualquer caminho futuro que
+  // deixe `pending` ou `loading` presos deixaria a Matriz inutilizavel ate um
+  // reload, e "feche e abra de novo" precisa funcionar. Reabilitar o botao e
+  // seguro porque a chave de idempotencia da compra e derivada do perfil e do
+  // protocolo — um segundo clique sobre uma compra que ja passou recebe de volta
+  // o mesmo resultado, sem debitar duas vezes.
+  matrixView.pending = null;
+  matrixView.loading = false;
+  matrixView.notice = null;
   drawMatrix();
   openOverlay(matrixOverlay);
   void refreshProfile();
