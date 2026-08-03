@@ -235,12 +235,12 @@ const bfsFarthest = (
   return { cell: { x: far % w, y: Math.floor(far / w) }, dist };
 };
 
-const carveBlob = (solid: Uint8Array, w: number, h: number, cx: number, cy: number, r: number): void => {
+const carveBlob = (draft: TerrainDraft, w: number, h: number, cx: number, cy: number, r: number): void => {
   for (let y = Math.max(1, cy - r); y <= Math.min(h - 2, cy + r); y++) {
     for (let x = Math.max(1, cx - r); x <= Math.min(w - 2, cx + r); x++) {
       const dx = x - cx;
       const dy = y - cy;
-      if (dx * dx + dy * dy <= r * r) solid[idx(w, x, y)] = SOLID_NONE;
+      if (dx * dx + dy * dy <= r * r) draft.setSolid(idx(w, x, y), SOLID_NONE);
     }
   }
 };
@@ -259,11 +259,12 @@ const carveBlob = (solid: Uint8Array, w: number, h: number, cx: number, cy: numb
  */
 const stampHalls = (
   rng: RNG,
-  solid: Uint8Array,
+  draft: TerrainDraft,
   w: number,
   h: number,
   halls: WorldgenProfile['halls'],
 ): { fillCells: number[]; fillKind: number; hallCenters: Vec2[] } => {
+  const { solid } = draft;
   const fillCells: number[] = [];
   // Os centros dos saloes GRANDES — so registro do que a gramatica ja
   // calculou, nenhuma tirada de RNG a mais: a sequencia (e o mapa) continuam
@@ -282,12 +283,12 @@ const stampHalls = (
     for (let step = 0; step < length; step++) {
       fx += Math.cos(angle);
       fy += Math.sin(angle);
-      carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), r);
+      carveBlob(draft, w, h, Math.floor(fx), Math.floor(fy), r);
     }
   };
   /** Poe um pilar SOLIDO dentro de um salao. So dentro da moldura do mapa. */
   const pillar = (x: number, y: number, mat: number): void => {
-    if (x > 1 && y > 1 && x < w - 2 && y < h - 2) solid[idx(w, x, y)] = mat;
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2) draft.setSolid(idx(w, x, y), mat);
   };
   /** Elipse aberta; devolve as celulas internas (para encher de elemento). */
   const carveEllipse = (cx: number, cy: number, rx: number, ry: number, collect?: number[]): void => {
@@ -296,7 +297,7 @@ const stampHalls = (
         const nx = (x - cx) / rx;
         const ny = (y - cy) / ry;
         if (nx * nx + ny * ny > 1) continue;
-        solid[idx(w, x, y)] = SOLID_NONE;
+        draft.setSolid(idx(w, x, y), SOLID_NONE);
         if (collect && nx * nx + ny * ny <= 0.82) collect.push(idx(w, x, y));
       }
     }
@@ -316,7 +317,7 @@ const stampHalls = (
       fx += Math.cos(angle);
       fy += Math.sin(angle);
       if (fx < 4 || fy < 4 || fx > w - 4 || fy > h - 4) angle += Math.PI / 2;
-      carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), step % 5 < 3 ? 1 : 2);
+      carveBlob(draft, w, h, Math.floor(fx), Math.floor(fy), step % 5 < 3 ? 1 : 2);
     }
   };
 
@@ -327,7 +328,7 @@ const stampHalls = (
     {
       const c = center();
       const r = 6 + rng.nextInt(3);
-      carveBlob(solid, w, h, c.x, c.y, r);
+      carveBlob(draft, w, h, c.x, c.y, r);
       hallCenters.push(c);
       const phase = rng.nextFloat01() * Math.PI * 2;
       for (let k = 0; k < 7; k++) {
@@ -339,7 +340,7 @@ const stampHalls = (
     // cobertura, ricochete e rota de perseguicao.
     {
       const c = center();
-      carveBlob(solid, w, h, c.x, c.y, 8 + rng.nextInt(2));
+      carveBlob(draft, w, h, c.x, c.y, 8 + rng.nextInt(2));
       hallCenters.push(c);
       const islands = 6 + rng.nextInt(4);
       for (let k = 0; k < islands; k++) {
@@ -354,8 +355,8 @@ const stampHalls = (
       const angle = rng.nextFloat01() * Math.PI * 2;
       const bx = Math.max(6, Math.min(w - 6, Math.round(a.x + Math.cos(angle) * 12)));
       const by = Math.max(6, Math.min(h - 6, Math.round(a.y + Math.sin(angle) * 12)));
-      carveBlob(solid, w, h, a.x, a.y, 4 + rng.nextInt(2));
-      carveBlob(solid, w, h, bx, by, 4 + rng.nextInt(2));
+      carveBlob(draft, w, h, a.x, a.y, 4 + rng.nextInt(2));
+      carveBlob(draft, w, h, bx, by, 4 + rng.nextInt(2));
       carveLine(a.x, a.y, Math.atan2(by - a.y, bx - a.x), 12, 0);
     }
   } else if (halls === 'radial') {
@@ -364,7 +365,7 @@ const stampHalls = (
     // cobertura, luz e municao do Ressonante ao mesmo tempo.
     const c = center();
     const radius = 7 + rng.nextInt(3);
-    carveBlob(solid, w, h, c.x, c.y, radius);
+    carveBlob(draft, w, h, c.x, c.y, radius);
     hallCenters.push(c);
     const spokes = 5;
     const phase = rng.nextFloat01() * Math.PI * 2;
@@ -384,13 +385,13 @@ const stampHalls = (
     {
       const g = center();
       const r = 4 + rng.nextInt(2);
-      carveBlob(solid, w, h, g.x, g.y, r);
+      carveBlob(draft, w, h, g.x, g.y, r);
       hallCenters.push(g);
       for (let y = Math.max(1, g.y - r - 1); y <= Math.min(h - 2, g.y + r + 1); y++) {
         for (let x = Math.max(1, g.x - r - 1); x <= Math.min(w - 2, g.x + r + 1); x++) {
           const d2 = (x - g.x) ** 2 + (y - g.y) ** 2;
           if (d2 > r * r && d2 <= (r + 1.6) * (r + 1.6) && solid[idx(w, x, y)] === SOLID_ROCK) {
-            solid[idx(w, x, y)] = SOLID_CRYSTAL;
+            draft.setSolid(idx(w, x, y), SOLID_CRYSTAL);
           }
         }
       }
@@ -404,8 +405,8 @@ const stampHalls = (
         const ox = rng.nextInt(6);
         const oy = rng.nextInt(5) - 2;
         const r = 1 + rng.nextInt(2);
-        carveBlob(solid, w, h, m.x - 2 - ox, m.y + oy, r);
-        carveBlob(solid, w, h, m.x + 2 + ox, m.y + oy, r);
+        carveBlob(draft, w, h, m.x - 2 - ox, m.y + oy, r);
+        carveBlob(draft, w, h, m.x + 2 + ox, m.y + oy, r);
       }
       let px = m.x;
       let py = m.y;
@@ -429,7 +430,7 @@ const stampHalls = (
     let cy = start.y;
     const chambers = 4 + rng.nextInt(2);
     for (let k = 0; k < chambers; k++) {
-      carveBlob(solid, w, h, cx, cy, 3 + rng.nextInt(3));
+      carveBlob(draft, w, h, cx, cy, 3 + rng.nextInt(3));
       hallCenters.push({ x: cx, y: cy });
       const jitter = (rng.nextFloat01() - 0.5) * 1.2;
       const nx = cx + Math.cos(angle + jitter) * 8;
@@ -515,7 +516,7 @@ const stampHalls = (
       carveLine(c.x, c.y + 4, 0, len, 1);
       for (let x = c.x; x < Math.min(w - 2, c.x + len); x++) {
         const i = idx(w, x, c.y + 2);
-        if (solid[i] === SOLID_ROCK) solid[i] = SOLID_FRAGILE;
+        if (solid[i] === SOLID_ROCK) draft.setSolid(i, SOLID_FRAGILE);
       }
     }
     // Sumidouros: pocos circulares com a BORDA fragil — a sala cuja parede
@@ -523,12 +524,12 @@ const stampHalls = (
     for (let s = 0; s < 3; s++) {
       const c = center();
       const r = 4 + rng.nextInt(3);
-      carveBlob(solid, w, h, c.x, c.y, r);
+      carveBlob(draft, w, h, c.x, c.y, r);
       for (let y = Math.max(1, c.y - r - 1); y <= Math.min(h - 2, c.y + r + 1); y++) {
         for (let x = Math.max(1, c.x - r - 1); x <= Math.min(w - 2, c.x + r + 1); x++) {
           const d2 = (x - c.x) ** 2 + (y - c.y) ** 2;
           if (d2 > r * r && d2 <= (r + 1.5) * (r + 1.5) && solid[idx(w, x, y)] === SOLID_ROCK) {
-            solid[idx(w, x, y)] = SOLID_FRAGILE;
+            draft.setSolid(idx(w, x, y), SOLID_FRAGILE);
           }
         }
       }
@@ -563,18 +564,18 @@ const stampHalls = (
  * absurdo selasse o poco reprovaria o mapa e a geracao tentaria outra seed.
  */
 const stampCorePedestal = (
-  solid: Uint8Array,
-  surface: Uint8Array,
+  draft: TerrainDraft,
   w: number,
   h: number,
   core: Vec2,
   halls: WorldgenProfile['halls'],
 ): void => {
+  const { solid, surface } = draft;
   const put = (dx: number, dy: number, mat: number): void => {
     const x = core.x + dx;
     const y = core.y + dy;
     if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
-      solid[idx(w, x, y)] = mat;
+      draft.setSolid(idx(w, x, y), mat);
     }
   };
   const paint = (dx: number, dy: number, surf: number): void => {
@@ -649,8 +650,7 @@ const stampCorePedestal = (
  * versao (seed 205, setor 3: um cuspidor emparedado num pilar de cristal).
  */
 export const stampBossArena = (
-  solid: Uint8Array,
-  surface: Uint8Array,
+  draft: TerrainDraft,
   w: number,
   h: number,
   boss: Vec2,
@@ -658,6 +658,7 @@ export const stampBossArena = (
   entry: Vec2,
   halls: WorldgenProfile['halls'],
 ): Set<number> => {
+  const { solid, surface } = draft;
   const filled = new Set<number>();
   if (halls === 'none') return filled;
 
@@ -677,7 +678,7 @@ export const stampBossArena = (
     const y = boss.y + dy;
     if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) return;
     if (!free(x, y) || solid[idx(w, x, y)] !== SOLID_NONE) return;
-    solid[idx(w, x, y)] = mat;
+    draft.setSolid(idx(w, x, y), mat);
   };
   const paint = (dx: number, dy: number, surf: number): void => {
     const x = boss.x + dx;
@@ -736,12 +737,109 @@ export const stampBossArena = (
   // meia moldura seria um acento que ninguem sabe ler.
   const reach = floodOpen(solid, w, h, entry.x, entry.y);
   if (!reach.has(idx(w, core.x, core.y)) || !reach.has(idx(w, boss.x, boss.y))) {
-    solid.set(before);
+    draft.replaceSolid(before);
     surface.set(beforeSurface);
     return filled;
   }
   for (let i = 0; i < solid.length; i++) if (solid[i] !== before[i]) filled.add(i);
   return filled;
+};
+
+/**
+ * O terreno em construcao, junto com as estruturas que DERIVAM dele.
+ *
+ * O defeito que isto existe para tornar impossivel: `openCells` e
+ * `distFromEntry` sao calculados num ponto da geracao e consumidos muito
+ * depois, por `blobSurface`, `pickOpenFar`, `chooseBandCell` e os trilhos —
+ * nenhum deles reconfere o terreno. Quem carimbasse chao no meio do caminho
+ * tinha de lembrar de reparar as duas a mao. A arena do chefe nao lembrou, e
+ * custou tres defeitos distintos: bicho nascendo dentro de pilar, chao orfao
+ * em `openCells`, e o site de tier 3 escolhido pela distancia de um mundo que
+ * ja nao existia. `stampCorePedestal` escapava por acidente de ORDENACAO — ele
+ * e carimbado antes do calculo — e nao por garantia nenhuma.
+ *
+ * Aqui a garantia e estrutural: escrita que muda a ABERTURA de uma celula
+ * invalida o derivado, e `derived()` recalcula quando alguem pede. Quem
+ * carimbar terreno no futuro nao precisa saber que estas estruturas existem.
+ *
+ * LEITURA de `solid`/`surface` continua direta e crua: sao arrays quentes,
+ * lidos milhares de vezes por geracao (o automato, `countWallNeighbors`,
+ * `isOpen`), e por um acessor custariam caro sem comprar nada — leitura nao
+ * invalida coisa nenhuma. So a ESCRITA passa pela barreira.
+ *
+ * NAO HA FRONTEIRA. A primeira versao desta etapa isentava o que roda antes de
+ * `entry` existir — ruido, automato, gramatica de salao — com o argumento de
+ * que ali nao ha o que invalidar. E verdade, mas a isencao tornava a garantia
+ * dependente da ORDEM: bastaria alguem ler `derived()` mais cedo, ou um estrato
+ * com `halls: 'none'` (que nao carimba pedestal nem arena, e portanto nunca
+ * invalida depois), para o derivado voltar uma topologia vencida. Uma regra que
+ * so vale enquanto ninguem reordena nada nao e estrutural — e reordenar foi
+ * exatamente o que quebrou a arena. Entao TODA escrita em `solid` passa por
+ * aqui, inclusive as que hoje nao poderiam causar dano.
+ *
+ * Quem quiser conferir que a barreira aguentou nao precisa auditar chamada por
+ * chamada: `tests/terreno-derivado.test.ts` cobra o RESULTADO — o derivado que
+ * a geracao entregou tem de bater com um flood e um BFS refeitos do zero sobre
+ * o terreno final. Isso pega qualquer vazamento futuro, venha ele de onde vier.
+ */
+export type TerrainDraft = {
+  readonly solid: Uint8Array;
+  readonly surface: Uint8Array;
+  /** Escreve em `solid`. Invalida o derivado se a abertura da celula mudou. */
+  setSolid: (i: number, mat: number) => void;
+  /** Troca o buffer inteiro (o automato celular trabalha em dobro e comuta). */
+  replaceSolid: (next: Uint8Array) => void;
+  /**
+   * Chao alcancavel a partir da entrada e distancia ate cada celula, no
+   * terreno COMO ELE ESTA. Recalcula so quando a abertura mudou desde a ultima
+   * chamada — entao pedir duas vezes seguidas custa uma.
+   */
+  derived: (entry: Vec2) => { openCells: number[]; distFromEntry: Int32Array };
+};
+
+/**
+ * Exportado para o teste do carimbo da arena, que precisa armar a mao um mapa
+ * onde a moldura fecharia o unico corredor — situacao que nenhuma seed real
+ * produz. Usar o draft de verdade ali faz o teste exercitar a MESMA barreira de
+ * escrita que a geracao usa, em vez de um par de arrays cru que so se parece
+ * com ela.
+ */
+export const createTerrainDraft = (w: number, h: number): TerrainDraft => {
+  const solid = new Uint8Array(w * h).fill(SOLID_ROCK);
+  const surface = new Uint8Array(w * h).fill(SURF_NONE);
+  let revision = 0;
+  let cache: {
+    revision: number;
+    entry: number;
+    openCells: number[];
+    distFromEntry: Int32Array;
+  } | null = null;
+
+  return {
+    solid,
+    surface,
+    setSolid: (i, mat) => {
+      const wasOpen = solid[i] === SOLID_NONE;
+      solid[i] = mat;
+      if (wasOpen !== (mat === SOLID_NONE)) revision++;
+    },
+    replaceSolid: (next) => {
+      solid.set(next);
+      revision++;
+    },
+    derived: (entry) => {
+      const key = idx(w, entry.x, entry.y);
+      if (cache && cache.revision === revision && cache.entry === key) {
+        return { openCells: cache.openCells, distFromEntry: cache.distFromEntry };
+      }
+      const openCells: number[] = [];
+      for (const i of floodOpen(solid, w, h, entry.x, entry.y)) openCells.push(i);
+      openCells.sort((a, b) => a - b);
+      const distFromEntry = bfsFarthest(solid, w, h, entry).dist;
+      cache = { revision, entry: key, openCells, distFromEntry };
+      return { openCells, distFromEntry };
+    },
+  };
 };
 
 const generateAttempt = (
@@ -751,13 +849,13 @@ const generateAttempt = (
   profile: WorldgenProfile
 ): GeneratedWorld | null => {
   const rng = new RNG(seed >>> 0 || 1);
-  const solid = new Uint8Array(w * h).fill(SOLID_ROCK);
-  const surface = new Uint8Array(w * h).fill(SURF_NONE);
+  const draft = createTerrainDraft(w, h);
+  const { solid, surface } = draft;
 
   // 1) ruido inicial
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
-      if (rng.nextFloat01() > 0.44) solid[idx(w, x, y)] = SOLID_NONE;
+      if (rng.nextFloat01() > 0.44) draft.setSolid(idx(w, x, y), SOLID_NONE);
     }
   }
 
@@ -772,13 +870,13 @@ const generateAttempt = (
         else if (walls <= 3) next[i] = SOLID_NONE;
       }
     }
-    solid.set(next);
+    draft.replaceSolid(next);
   }
 
   // 2b) a estrutura de salao do estrato, sobre o labirinto do automato. Com
   // `halls: 'none'` (basalto) nada roda e nenhuma tirada de RNG e consumida —
   // o mapa historico continua byte a byte.
-  const hallFill = stampHalls(rng, solid, w, h, profile.halls);
+  const hallFill = stampHalls(rng, draft, w, h, profile.halls);
 
   // 3) entrada perto da borda superior-esquerda, nucleo no ponto mais distante
   let entry: Vec2 | null = null;
@@ -791,31 +889,20 @@ const generateAttempt = (
     }
   }
   if (!entry) return null;
-  carveBlob(solid, w, h, entry.x, entry.y, 3);
+  carveBlob(draft, w, h, entry.x, entry.y, 3);
 
   const open = floodOpen(solid, w, h, entry.x, entry.y);
   if (open.size < w * h * 0.28) return null;
 
   // celulas fora da regiao principal viram parede (evita bolsoes inalcancaveis enganosos)
   for (let i = 0; i < solid.length; i++) {
-    if (solid[i] === SOLID_NONE && !open.has(i)) solid[i] = SOLID_ROCK;
+    if (solid[i] === SOLID_NONE && !open.has(i)) draft.setSolid(i, SOLID_ROCK);
   }
 
   const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
   if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
-  carveBlob(solid, w, h, corePos.x, corePos.y, 4);
-  // A sala do poco ganha o sotaque do estrato ANTES do re-flood: toda prova
-  // de alcancabilidade abaixo ja enxerga a moldura carimbada.
-  stampCorePedestal(solid, surface, w, h, corePos, profile.halls);
-
-  const openCells: number[] = [];
-  const reOpen = floodOpen(solid, w, h, entry.x, entry.y);
-  for (const i of reOpen) openCells.push(i);
-  openCells.sort((a, b) => a - b);
-
-  // `let` porque a moldura da arena, que so pode ser carimbada depois de o
-  // ponto do chefe existir, refaz este BFS. Ver o rebuild logo abaixo dela.
-  let distFromEntry = bfsFarthest(solid, w, h, entry).dist;
+  carveBlob(draft, w, h, corePos.x, corePos.y, 4);
+  stampCorePedestal(draft, w, h, corePos, profile.halls);
 
   const isOpen = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;
@@ -852,29 +939,17 @@ const generateAttempt = (
   // A camara do chefe ganha o sotaque do estrato. Depois do ponto do chefe
   // existir (ele depende do terreno) e antes da decoracao de parede, que so
   // olha para rocha comum e portanto respeita o que a arena carimbou.
-  const arenaFilled = stampBossArena(solid, surface, w, h, guardianSpawn, corePos, entry, profile.halls);
-  // REFAZ o re-flood e o BFS, como o pedestal do poco ja goza por ser carimbado
-  // ANTES deles (linha ~809). A moldura da arena nao tem essa sorte: ela depende
-  // do ponto do chefe, que depende do terreno. Entao ela repara o que sujou.
   //
-  // Podar so as celulas viradas pilar NAO bastava, e as duas provas disso sao
-  // caras de achar a olho: um pilar tambem CORTA caminho. Na seed 141 s3 ele
-  // isolava um pedaco de chao que continuava em `openCells` sem pertencer ao
-  // flood final; na seed 210 s2 ele alongava a rota e o site opcional de tier 3
-  // caia em 135 quando a banda de 82% do novo maximo pedia 136 — a distancia
-  // usada para escolher era de um mundo que deixou de existir.
-  //
-  // `blobSurface`, `pickOpenFar` e `chooseBandCell` consomem estas estruturas
-  // sem revalidar terreno. Refazer as duas e mais barato do que auditar cada
-  // consumidor — e nao depende de eu adivinhar quais deles se importam, que e
-  // o raciocinio que ja falhou duas vezes nesta mesma funcao.
-  if (arenaFilled.size > 0) {
-    const reFlood = floodOpen(solid, w, h, entry.x, entry.y);
-    openCells.length = 0;
-    for (const i of reFlood) openCells.push(i);
-    openCells.sort((a, b) => a - b);
-    distFromEntry = bfsFarthest(solid, w, h, entry).dist;
-  }
+  // Nao ha reparo a fazer aqui: o carimbo escreve pelo draft, entao `openCells`
+  // e `distFromEntry` ja se sabem vencidos e se refazem sozinhos na primeira
+  // leitura. Antes, este ponto carregava um bloco de rebuild manual — e as tres
+  // vezes em que ele esteve errado (bicho dentro de pilar, chao orfao, site de
+  // tier 3 medido num mundo extinto) foram tres esquecimentos do mesmo reparo.
+  const arenaFilled = stampBossArena(draft, w, h, guardianSpawn, corePos, entry, profile.halls);
+
+  // A PARTIR DAQUI o terreno nao muda mais de abertura: as passadas abaixo so
+  // trocam rocha por rocha (minerio, fragil, cristal) e pintam superficie.
+  const { openCells, distFromEntry } = draft.derived(entry);
 
   /**
    * A moldura da arena escolheu o material dela; NENHUMA passada de decoracao
@@ -906,9 +981,9 @@ const generateAttempt = (
       // parede fina (aberto dos dois lados) tem chance alta de ser fragil
       const thinH = isOpen(x - 1, y) && isOpen(x + 1, y);
       const thinV = isOpen(x, y - 1) && isOpen(x, y + 1);
-      if ((thinH || thinV) && roll < profile.fragileThinChance) solid[i] = SOLID_FRAGILE;
-      else if (roll < profile.oreChance) solid[i] = SOLID_ORE;
-      else if (roll < profile.oreChance + profile.crystalChance) solid[i] = SOLID_CRYSTAL;
+      if ((thinH || thinV) && roll < profile.fragileThinChance) draft.setSolid(i, SOLID_FRAGILE);
+      else if (roll < profile.oreChance) draft.setSolid(i, SOLID_ORE);
+      else if (roll < profile.oreChance + profile.crystalChance) draft.setSolid(i, SOLID_CRYSTAL);
     }
   }
 
@@ -934,7 +1009,7 @@ const generateAttempt = (
       const y = Math.floor(fy);
       if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
       const i = idx(w, x, y);
-      if (solid[i] === SOLID_ROCK && !arenaKeeps(i)) solid[i] = SOLID_CRYSTAL;
+      if (solid[i] === SOLID_ROCK && !arenaKeeps(i)) draft.setSolid(i, SOLID_CRYSTAL);
     }
   }
 
@@ -952,7 +1027,7 @@ const generateAttempt = (
       const x = x0 + dir * s;
       if (x <= 0 || x >= w - 1) break;
       const j = idx(w, x, y);
-      if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) solid[j] = SOLID_ORE;
+      if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) draft.setSolid(j, SOLID_ORE);
     }
   }
 
@@ -968,7 +1043,7 @@ const generateAttempt = (
       for (let x = Math.max(1, kx - r); x <= Math.min(w - 2, kx + r); x++) {
         if ((x - kx) ** 2 + (y - ky) ** 2 > r * r) continue;
         const j = idx(w, x, y);
-        if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) solid[j] = SOLID_ORE;
+        if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) draft.setSolid(j, SOLID_ORE);
       }
     }
   }
