@@ -359,7 +359,9 @@ let settlementSent = false;
  * Falha vira simulacao local COM AVISO, e nunca silenciosamente: o jogador
  * precisa saber, antes de descer, que a carga daquela descida nao vai contar.
  */
-const authorizeExpedition = async (seed: number): Promise<{ seed: number; tuning?: PlayerTuning }> => {
+const authorizeExpedition = async (
+  seed: number,
+): Promise<{ seed: number; tuning?: PlayerTuning }> => {
   const url = serverInput.value.trim() || defaultServerUrl();
   const result = await requestRunTicket(url, seed);
   if (!result.ok) {

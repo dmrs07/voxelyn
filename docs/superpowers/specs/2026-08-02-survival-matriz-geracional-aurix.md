@@ -1,7 +1,7 @@
 # Voxelyn Survival — Matriz Geracional Aurix
 
 Data: 2026-08-02
-Status: spec de implementação, seguida de entrega em slices.
+Status: **implementado** nos slices 1 a 9 (ver §15 para o que ficou de fora).
 
 > «O que retorna é homologado. O que fica no Veio nunca existiu.»
 >
@@ -615,7 +615,61 @@ Alterar qualquer um deles é editar uma tabela — nenhum exige reescrever regra
 
 ---
 
-## 14. Trabalho futuro (documentado, não implementado)
+## 14. Decisões tomadas durante a implementação
+
+Quatro pontos em que a construção mudou o que a spec previa. Estão aqui porque a
+razão de cada um só ficou visível ao escrever o código.
+
+### 14.1 Dois rate limits, e não um
+
+A rota herdaria o teto do ranking (6 por minuto por origem), que existe porque
+cada POST de lá custa uma re-simulação. Aqui só a liquidação custa isso — sessão,
+perfil, ticket e codex são leituras baratas — e **uma run inteira já consome duas
+chamadas**. Seis por minuto viraria 429 no meio da campanha, em três partidas
+curtas. Ficaram 12/min para `settle` e 60/min para as leituras, ambos injetáveis.
+
+### 14.2 O texto do Codex viaja resolvido, não como chave de i18n
+
+O resto do jogo guarda chaves e resolve na hora de desenhar, para trocar de
+idioma sem recarregar. Aqui a troca vale o preço inverso: uma chave exige o texto
+no bundle, e um bundle com os 29 documentos é um bundle em que qualquer pessoa lê
+o ato V no primeiro dia. Com a frase vindo do servidor, "bloqueado" é uma
+afirmação sobre bytes que o cliente nunca recebeu. Trocar de idioma refaz a busca
+do codex — barato, e raro.
+
+### 14.3 O dano com autoria é escalado na FONTE, não na causa
+
+`playerDamageScale` entraria em `damageEntity` filtrando por `DamageCause`. Não
+dá: flamethrower e arc chamam `damageEntity` **sem causa**, e cairiam em
+`unknown`. Ficou aplicado onde o número nasce (bolt, seeker, sopro, arco) — lista
+curta e auditável, e nada mais escala junto.
+
+A selagem ambiental (CA-04) e os berços de impacto (CA-02) foram pelo caminho
+oposto, e pela razão simétrica: os dois são **centralizados** em `damageEntity` e
+`stunEntity`, contra uma lista fechada de causas. Um caminho de dano ambiental
+novo que esquecesse o multiplicador apareceria como bug de balanceamento; assim
+ele aparece no `if`.
+
+### 14.4 A evolução visual é overlay de runtime
+
+Um atlas por protocolo seriam 24 conjuntos completos de animação por direção, e a
+silhueta — o requisito mais duro da direção de arte — quebra antes disso. Ficaram
+cinco marcos cumulativos desenhados sobre o sprite, sem tocar hitbox, com os
+atlases finais registrados como trabalho futuro.
+
+## 15. O que ficou de fora desta entrega
+
+- **Telemetria da progressão.** Os eventos existentes continuam intactos, mas
+  `oreCollected`, `generation` e `protocolos comprados` ainda não viajam no
+  payload de telemetria — mexer nele exige alterar a validação do servidor e o
+  schema da tabela, e não cabia junto com o resto. A estrutura para isso está
+  pronta: a liquidação já loga `phase`, `ore`, `cores` e duração de forma
+  estruturada.
+- **Atlases finais dos marcos geracionais** (§14.4).
+- **Co-op geracional.** O co-op continua padronizado em G-00, como a spec previa
+  para a primeira entrega.
+
+## 16. Trabalho futuro (documentado, não implementado)
 
 Progressão individual autenticada; host escolhendo "padronizado" ou "geracional";
 geração viajando no protocolo de sala; leaderboard separado por geração;

@@ -384,8 +384,10 @@ export const PT_BR = {
   'matrix.buying': 'PROCESSANDO…',
   'matrix.declassified': 'ARQUIVO DESCLASSIFICADO',
   'matrix.generationUp': 'CHASSI HOMOLOGADO: {generation}',
-  'matrix.offline': 'Conexão com a Aurix Dynamics indisponível. A Matriz mostra o último estado conhecido e nenhuma compra pode ser incorporada.',
-  'matrix.conflict': 'O ESTADO DA MATRIZ FOI ATUALIZADO EM OUTRA SESSÃO. REVISE OS DADOS ANTES DE INCORPORAR O PROTOCOLO.',
+  'matrix.offline':
+    'Conexão com a Aurix Dynamics indisponível. A Matriz mostra o último estado conhecido e nenhuma compra pode ser incorporada.',
+  'matrix.conflict':
+    'O ESTADO DA MATRIZ FOI ATUALIZADO EM OUTRA SESSÃO. REVISE OS DADOS ANTES DE INCORPORAR O PROTOCOLO.',
   'matrix.loading': 'Consultando a Aurix Dynamics…',
   'matrix.policy': 'O que retorna é homologado. O que fica no Veio nunca existiu.',
   'codex.locked': 'AUTORIZAÇÃO INSUFICIENTE',

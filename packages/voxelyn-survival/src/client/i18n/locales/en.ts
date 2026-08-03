@@ -380,8 +380,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.buying': 'PROCESSING…',
   'matrix.declassified': 'FILE DECLASSIFIED',
   'matrix.generationUp': 'CHASSIS CLEARED: {generation}',
-  'matrix.offline': 'Connection to Aurix Dynamics unavailable. The Matrix shows the last known state and no purchase can be incorporated.',
-  'matrix.conflict': 'THE MATRIX STATE WAS UPDATED IN ANOTHER SESSION. REVIEW THE DATA BEFORE INCORPORATING THE PROTOCOL.',
+  'matrix.offline':
+    'Connection to Aurix Dynamics unavailable. The Matrix shows the last known state and no purchase can be incorporated.',
+  'matrix.conflict':
+    'THE MATRIX STATE WAS UPDATED IN ANOTHER SESSION. REVIEW THE DATA BEFORE INCORPORATING THE PROTOCOL.',
   'matrix.loading': 'Querying Aurix Dynamics…',
   'matrix.policy': 'What returns is cleared. What stays in the Vein never existed.',
   'codex.locked': 'INSUFFICIENT CLEARANCE',
