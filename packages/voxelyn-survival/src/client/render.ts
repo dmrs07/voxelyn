@@ -56,6 +56,7 @@ import {
   describeOutcome,
   formatSeed,
   nextStarHint,
+  cargoNote,
   reputationNote,
   summaryLines,
 } from './run-summary';
@@ -3401,6 +3402,7 @@ export class SurvivalRenderer {
     const half = Math.ceil(lines.length / 2);
     const hint = nextStarHint(summary);
     const record = reputationNote(summary);
+    const cargo = cargoNote(summary);
 
     // Altura do bloco medida ANTES de desenhar, para centralizar de verdade.
     //
@@ -3414,6 +3416,7 @@ export class SurvivalRenderer {
       unit * (cause.lesson ? 1.35 : 0) + // licao
       unit * 2 + // respiro antes dos numeros
       half * unit * 1.25 + // numeros
+      (cargo ? unit * 1.45 : 0) +
       (record ? unit * 1.45 : 0) +
       (hint ? unit * 1.45 : 0) +
       unit * 1.5 + // seed
@@ -3476,6 +3479,20 @@ export class SurvivalRenderer {
     }
     ctx.textAlign = 'center';
     y += half * unit * 1.25;
+
+    // A CARGA vem primeiro, antes do registro e da dica.
+    //
+    // E a linha que ensina o loop: numa morte ela diz o que ficou no Veio, e a
+    // cor faz metade do trabalho — vermelho de perda contra o ouro do que
+    // voltou. Depois de uma extracao ela anuncia a transmissao; o numero
+    // creditado chega pelo banner quando o servidor responde.
+    if (cargo) {
+      y += unit * 0.6;
+      ctx.fillStyle = cargo.tone === 'lost' ? PAL.blood : PAL.loot;
+      ctx.font = statFont;
+      ctx.fillText(cargo.text, vw / 2, y);
+      y += unit * 0.85;
+    }
 
     // O registro vem ANTES da dica de estrela e em vermelho: ele nao e um
     // conselho de como jogar melhor, e a unica linha desta tela que so constata.

@@ -19,7 +19,12 @@
 // protocolo ou qual e a sua geracao. Onde a tentacao apareceu, ela esta marcada
 // como ignorada — ver `ProgressionSettlementRequest`.
 
-import type { LoreFragmentId, PlayerTuning, ProspectorGeneration, UpgradeId } from '@voxelyn/survival-sim';
+import type {
+  LoreFragmentId,
+  PlayerTuning,
+  ProspectorGeneration,
+  UpgradeId,
+} from '@voxelyn/survival-sim';
 
 /** Em que contexto a run acontece. So `expedition` rende recurso permanente. */
 export type RunMode = 'expedition' | 'ranked' | 'coop' | 'local_simulation';

@@ -125,8 +125,5 @@ export const fetchCodex = (serverUrl: string, lang: string): Promise<ApiResult<C
  * trata como uma segunda compra. Aleatoria por clique protegeria contra
  * clique duplo e nao contra a rede, que e o caso que acontece.
  */
-export const purchaseKey = (
-  profileId: string,
-  upgradeId: string,
-  profileVersion: number,
-): string => `${profileId.slice(0, 12)}-${upgradeId}-${profileVersion}`.replace(/[^A-Za-z0-9_-]/g, '');
+export const purchaseKey = (profileId: string, upgradeId: string, profileVersion: number): string =>
+  `${profileId.slice(0, 12)}-${upgradeId}-${profileVersion}`.replace(/[^A-Za-z0-9_-]/g, '');

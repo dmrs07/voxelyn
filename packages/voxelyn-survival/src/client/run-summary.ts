@@ -206,6 +206,39 @@ export const reputationNote = (summary: RunSummary): string | null => {
   return tCount({ one: 'summary.reputation.one', other: 'summary.reputation.other' }, n);
 };
 
+/**
+ * O que a carga desta run virou.
+ *
+ * A linha e derivada da FASE, e nao da resposta do servidor, de proposito: a
+ * tela de resultado aparece no instante em que a run acaba, e esperar a
+ * homologacao para dizer "voce perdeu 27 de carga" deixaria a informacao mais
+ * importante do loop atras de um spinner de rede.
+ *
+ * O que ela NAO faz e prometer saldo. Numa morte ela diz o que ficou no Veio —
+ * um fato que a simulacao local ja conhece e que nao depende de ninguem. Numa
+ * extracao ela anuncia a carga transmitida; o numero creditado chega pelo banner
+ * quando o servidor responde (`homologateRun`), e e ele que vale.
+ *
+ * Devolve null quando a run nao coletou nada: uma linha "0 de carga perdida"
+ * transformaria a ausencia de mineracao num placar.
+ */
+export type CargoNote = { text: string; tone: 'lost' | 'cleared' };
+
+export const cargoNote = (summary: RunSummary): CargoNote | null => {
+  const ore = summary.stats.oreCollected;
+  if (ore <= 0) return null;
+  if (summary.phase === 'dead') {
+    return { text: t('summary.cargo.lost', { ore }), tone: 'lost' };
+  }
+  return {
+    text: t(
+      summary.phase === 'extracted_with_core' ? 'summary.cargo.core' : 'summary.cargo.cleared',
+      { ore },
+    ),
+    tone: 'cleared',
+  };
+};
+
 export type OutcomeText = { title: string; color: 'blood' | 'loot' | 'biolum' };
 
 export const describeOutcome = (summary: RunSummary): OutcomeText => {

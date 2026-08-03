@@ -597,7 +597,9 @@ describe('codex', () => {
   it('o documento publico pode ser lido, nos dois idiomas', async () => {
     const client = new Client();
     await client.session();
-    const pt = (await (await client.call('/api/progression/codex/AX-PUB-001?lang=pt-BR')).json()) as {
+    const pt = (await (
+      await client.call('/api/progression/codex/AX-PUB-001?lang=pt-BR')
+    ).json()) as {
       fragment: { title: string; body: string };
     };
     const en = (await (await client.call('/api/progression/codex/AX-PUB-001?lang=en')).json()) as {

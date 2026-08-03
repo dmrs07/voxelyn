@@ -24,7 +24,11 @@ import {
   type UpgradeBranch,
   type UpgradeDefinition,
 } from '@voxelyn/survival-sim';
-import type { CodexResponse, PublicLoreFragment, PublicProgressionProfile } from '@voxelyn/survival-protocol';
+import type {
+  CodexResponse,
+  PublicLoreFragment,
+  PublicProgressionProfile,
+} from '@voxelyn/survival-protocol';
 import { t, type MessageKey } from './i18n';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
@@ -131,7 +135,11 @@ const renderHeader = (view: MatrixViewState): HTMLElement => {
     walletCard('matrix.wallet.ore', String(profile?.wallet.ore ?? 0), 'matrix.wallet.ore.note'),
   );
   header.appendChild(
-    walletCard('matrix.wallet.cores', String(profile?.wallet.cores ?? 0), 'matrix.wallet.cores.note'),
+    walletCard(
+      'matrix.wallet.cores',
+      String(profile?.wallet.cores ?? 0),
+      'matrix.wallet.cores.note',
+    ),
   );
   header.appendChild(
     walletCard('matrix.generation', profile?.generation ?? 'G-00', 'matrix.generation.note'),
@@ -159,18 +167,16 @@ const renderNode = (
   const head = el('div', 'matrix-node-head');
   head.appendChild(el('span', 'matrix-node-id', `${upgrade.id} · T${upgrade.tier}`));
   node.appendChild(head);
-  node.appendChild(
-    el('div', 'matrix-node-name', t(`upgrade.${upgrade.id}.name` as MessageKey)),
-  );
-  node.appendChild(
-    el('div', 'matrix-node-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)),
-  );
+  node.appendChild(el('div', 'matrix-node-name', t(`upgrade.${upgrade.id}.name` as MessageKey)));
+  node.appendChild(el('div', 'matrix-node-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)));
 
   const side = el('div', 'matrix-node-side');
   if (state.kind === 'installed') {
     side.appendChild(el('span', 'matrix-node-installed', t('matrix.node.installed')));
   } else {
-    side.appendChild(el('span', 'matrix-node-cost', `${upgrade.oreCost} ⬡ · ${upgrade.coreCost} ◉`));
+    side.appendChild(
+      el('span', 'matrix-node-cost', `${upgrade.oreCost} ⬡ · ${upgrade.coreCost} ◉`),
+    );
     const status = statusText(state);
     if (status) side.appendChild(el('span', 'matrix-node-status', status));
   }
@@ -219,7 +225,11 @@ const renderFragment = (fragment: PublicLoreFragment): HTMLElement => {
   card.appendChild(el('div', 'codex-source', `${t('codex.source')}: ${fragment.source}`));
   if (fragment.relatedFragmentIds.length > 0) {
     card.appendChild(
-      el('div', 'codex-related', `${t('codex.related')}: ${fragment.relatedFragmentIds.join(', ')}`),
+      el(
+        'div',
+        'codex-related',
+        `${t('codex.related')}: ${fragment.relatedFragmentIds.join(', ')}`,
+      ),
     );
   }
   return card;
@@ -233,11 +243,7 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
     return body;
   }
   body.appendChild(
-    el(
-      'div',
-      'sub',
-      t('codex.count', { unlocked: codex.unlocked.length, total: codex.total }),
-    ),
+    el('div', 'sub', t('codex.count', { unlocked: codex.unlocked.length, total: codex.total })),
   );
   for (const fragment of codex.unlocked) body.appendChild(renderFragment(fragment));
   if (codex.unlocked.length <= 1) body.appendChild(el('p', 'sub', t('codex.empty')));

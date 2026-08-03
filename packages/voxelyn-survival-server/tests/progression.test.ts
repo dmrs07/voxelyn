@@ -18,7 +18,14 @@ import {
   type StoredProfile,
 } from '../src/progression';
 import { MemoryProgressionStore } from '../src/progression-store';
-import { DEFAULT_UNLOCKED_LORE, LORE_FRAGMENTS, TOTAL_LORE_FRAGMENTS, findLoreFragment, loreCoversEveryUpgrade, maskCode } from '../src/progression-lore';
+import {
+  DEFAULT_UNLOCKED_LORE,
+  LORE_FRAGMENTS,
+  TOTAL_LORE_FRAGMENTS,
+  findLoreFragment,
+  loreCoversEveryUpgrade,
+  maskCode,
+} from '../src/progression-lore';
 import { LORE_LOCALES, LORE_TEXT } from '../src/progression-lore-text';
 
 const NOW = '2026-08-02T12:00:00.000Z';
@@ -55,10 +62,19 @@ describe('a recompensa sai da fase, e so dela', () => {
   it('a estatistica separa retorno de perda', () => {
     const base = profileWith(0, 0);
     const died = applySettlement(base, 'dead', rewardFor('dead', 30), NOW);
-    expect(died.statistics).toMatchObject({ oreLost: 30, failedExpeditions: 1, successfulReturns: 0 });
+    expect(died.statistics).toMatchObject({
+      oreLost: 30,
+      failedExpeditions: 1,
+      successfulReturns: 0,
+    });
     expect(died.wallet).toEqual({ ore: 0, cores: 0 });
 
-    const returned = applySettlement(base, 'extracted_with_core', rewardFor('extracted_with_core', 30), NOW);
+    const returned = applySettlement(
+      base,
+      'extracted_with_core',
+      rewardFor('extracted_with_core', 30),
+      NOW,
+    );
     expect(returned.wallet).toEqual({ ore: 30, cores: 1 });
     expect(returned.statistics).toMatchObject({
       oreHomologated: 30,
@@ -126,7 +142,11 @@ describe('a compra e do servidor', () => {
     const upgrade = UPGRADES.find((u) => u.id === 'RX-X');
     expect(upgrade).toBeDefined();
     const withTree = profileWith(upgrade?.oreCost ?? 0, upgrade?.coreCost ?? 0, [
-      'RX-01', 'RX-02', 'RX-03', 'RX-04', 'RX-05',
+      'RX-01',
+      'RX-02',
+      'RX-03',
+      'RX-04',
+      'RX-05',
     ]);
     const decision = decidePurchase(withTree, 'RX-X', NOW);
     expect(decision.ok).toBe(true);
@@ -153,9 +173,9 @@ describe('a compra e do servidor', () => {
   // saem da mesma derivacao no mesmo objeto.
   it('a compra desbloqueia o fragmento correspondente, sempre', () => {
     for (const upgrade of UPGRADES) {
-      const owned = UPGRADES.filter((u) => u.branch === upgrade.branch && u.tier < upgrade.tier).map(
-        (u) => u.id,
-      );
+      const owned = UPGRADES.filter(
+        (u) => u.branch === upgrade.branch && u.tier < upgrade.tier,
+      ).map((u) => u.id);
       const decision = decidePurchase(profileWith(99999, 99, owned), upgrade.id, NOW);
       expect(decision.ok, upgrade.id).toBe(true);
       if (!decision.ok) continue;
@@ -217,7 +237,12 @@ describe('perfil autoritativo', () => {
 // ---------------------------------------------------------------------------
 
 describe('liquidacao no store', () => {
-  const settle = (store: MemoryProgressionStore, runId: string, phase: 'dead' | 'extracted' | 'extracted_with_core', ore: number) =>
+  const settle = (
+    store: MemoryProgressionStore,
+    runId: string,
+    phase: 'dead' | 'extracted' | 'extracted_with_core',
+    ore: number,
+  ) =>
     store.settleRun({
       profileId: 'p1',
       runId,
@@ -266,7 +291,10 @@ describe('liquidacao no store', () => {
   it('duas liquidacoes concorrentes do mesmo runId creditam uma vez', async () => {
     const store = new MemoryProgressionStore();
     await store.createProfile('p1', NOW);
-    await Promise.all([settle(store, 'run-x', 'extracted', 15), settle(store, 'run-x', 'extracted', 15)]);
+    await Promise.all([
+      settle(store, 'run-x', 'extracted', 15),
+      settle(store, 'run-x', 'extracted', 15),
+    ]);
     const profile = await store.getProfile('p1');
     expect(profile?.wallet).toEqual({ ore: 15, cores: 0 });
     expect(await store.ledger('p1')).toHaveLength(1);

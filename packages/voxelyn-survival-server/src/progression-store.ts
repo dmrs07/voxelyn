@@ -255,7 +255,10 @@ export class MemoryProgressionStore implements ProgressionStore {
 // ---------------------------------------------------------------------------
 
 type PgClient = {
-  query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>;
+  query: (
+    text: string,
+    values?: unknown[],
+  ) => Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>;
   release: () => void;
 };
 
@@ -268,7 +271,10 @@ type PgClient = {
  * perder o ledger.
  */
 type PgPool = {
-  query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>;
+  query: (
+    text: string,
+    values?: unknown[],
+  ) => Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>;
   connect: () => Promise<PgClient>;
   end: () => Promise<void>;
 };

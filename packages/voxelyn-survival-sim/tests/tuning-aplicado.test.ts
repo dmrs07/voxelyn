@@ -104,7 +104,10 @@ describe('determinismo com tuning', () => {
 
 describe('cada protocolo faz o que promete, dentro da run', () => {
   it('CA-01/03/05 sobem a vida inicial e o teto', () => {
-    const state = createRun({ seed: SEED, tuning: derivePlayerTuning(['CA-01', 'CA-03', 'CA-05']) });
+    const state = createRun({
+      seed: SEED,
+      tuning: derivePlayerTuning(['CA-01', 'CA-03', 'CA-05']),
+    });
     expect(state.player.maxHp).toBe(PLAYER_HP + 12);
     expect(state.player.hp).toBe(PLAYER_HP + 12);
   });

@@ -32,7 +32,13 @@
 // que a operacao de resgate custa mais que a unidade, e deixam a distancia entre
 // isso e o que o jogador acabou de viver fazer o trabalho.
 
-import { findUpgrade, UPGRADES, type LoreFragmentId, type ProspectorGeneration, type UpgradeId } from '@voxelyn/survival-sim';
+import {
+  findUpgrade,
+  UPGRADES,
+  type LoreFragmentId,
+  type ProspectorGeneration,
+  type UpgradeId,
+} from '@voxelyn/survival-sim';
 import type { LoreCategory, PublicLoreFragment } from '@voxelyn/survival-protocol';
 import { LORE_TEXT, type LoreLocale, type LoreText } from './progression-lore-text.js';
 

@@ -30,10 +30,7 @@ import {
   type RunPhase,
   type UpgradeId,
 } from '@voxelyn/survival-sim';
-import type {
-  ProgressionErrorCode,
-  PublicProgressionProfile,
-} from '@voxelyn/survival-protocol';
+import type { ProgressionErrorCode, PublicProgressionProfile } from '@voxelyn/survival-protocol';
 import { DEFAULT_UNLOCKED_LORE, loreForGeneration } from './progression-lore.js';
 
 export type ProgressionWallet = { ore: number; cores: number };

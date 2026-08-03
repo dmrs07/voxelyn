@@ -195,39 +195,187 @@ const nav = (t: PlayerTuning, patch: Partial<PlayerTuning['navigation']>): Playe
 const UPGRADE_SPECS: readonly Omit<UpgradeDefinition, 'oreCost' | 'coreCost' | 'prerequisite'>[] = [
   // CHASSI — sobrevivencia. Vida em tres degraus de +4, e um capstone que da
   // margem em vez de poder: mais uma purga e mais uma chance de apagar o chao.
-  { id: 'CA-01', branch: 'chassis', tier: 1, loreFragmentId: 'AX-PUB-002', apply: (t) => ({ ...t, maxHp: t.maxHp + 4 }) },
-  { id: 'CA-02', branch: 'chassis', tier: 2, loreFragmentId: 'AX-ENG-011', apply: (t) => ({ ...t, stunDurationScale: 0.9 }) },
-  { id: 'CA-03', branch: 'chassis', tier: 3, loreFragmentId: 'AX-PRC-014', apply: (t) => ({ ...t, maxHp: t.maxHp + 4 }) },
-  { id: 'CA-04', branch: 'chassis', tier: 4, loreFragmentId: 'AX-INC-027', apply: (t) => ({ ...t, environmentalDamageScale: 0.92 }) },
-  { id: 'CA-05', branch: 'chassis', tier: 5, loreFragmentId: 'AX-EXE-033', apply: (t) => ({ ...t, maxHp: t.maxHp + 4 }) },
-  { id: 'CA-X', branch: 'chassis', tier: 6, loreFragmentId: 'AX-UNK-041', apply: (t) => ({ ...t, startingPurgeCells: t.startingPurgeCells + 1 }) },
+  {
+    id: 'CA-01',
+    branch: 'chassis',
+    tier: 1,
+    loreFragmentId: 'AX-PUB-002',
+    apply: (t) => ({ ...t, maxHp: t.maxHp + 4 }),
+  },
+  {
+    id: 'CA-02',
+    branch: 'chassis',
+    tier: 2,
+    loreFragmentId: 'AX-ENG-011',
+    apply: (t) => ({ ...t, stunDurationScale: 0.9 }),
+  },
+  {
+    id: 'CA-03',
+    branch: 'chassis',
+    tier: 3,
+    loreFragmentId: 'AX-PRC-014',
+    apply: (t) => ({ ...t, maxHp: t.maxHp + 4 }),
+  },
+  {
+    id: 'CA-04',
+    branch: 'chassis',
+    tier: 4,
+    loreFragmentId: 'AX-INC-027',
+    apply: (t) => ({ ...t, environmentalDamageScale: 0.92 }),
+  },
+  {
+    id: 'CA-05',
+    branch: 'chassis',
+    tier: 5,
+    loreFragmentId: 'AX-EXE-033',
+    apply: (t) => ({ ...t, maxHp: t.maxHp + 4 }),
+  },
+  {
+    id: 'CA-X',
+    branch: 'chassis',
+    tier: 6,
+    loreFragmentId: 'AX-UNK-041',
+    apply: (t) => ({ ...t, startingPurgeCells: t.startingPurgeCells + 1 }),
+  },
 
   // MOBILIDADE — movimento. Dois degraus de +2%, e um capstone de UM iframe:
   // distancia, velocidade, iframe e cooldown nao sobem juntos.
-  { id: 'MV-01', branch: 'mobility', tier: 1, loreFragmentId: 'AX-PUB-003', apply: (t) => ({ ...t, moveSpeed: round3(t.moveSpeed * 1.02) }) },
-  { id: 'MV-02', branch: 'mobility', tier: 2, loreFragmentId: 'AX-ENG-013', apply: (t) => ({ ...t, dodgeCooldownTicks: t.dodgeCooldownTicks - 1 }) },
-  { id: 'MV-03', branch: 'mobility', tier: 3, loreFragmentId: 'AX-PRC-016', apply: (t) => ({ ...t, liquidSlowScale: 0.92 }) },
-  { id: 'MV-04', branch: 'mobility', tier: 4, loreFragmentId: 'AX-INC-023', apply: (t) => ({ ...t, iceGlide: 0.25 }) },
-  { id: 'MV-05', branch: 'mobility', tier: 5, loreFragmentId: 'AX-EXE-031', apply: (t) => ({ ...t, moveSpeed: round3(t.moveSpeed * 1.02) }) },
-  { id: 'MV-X', branch: 'mobility', tier: 6, loreFragmentId: 'AX-UNK-044', apply: (t) => ({ ...t, dodgeIframeTicks: t.dodgeIframeTicks + 1 }) },
+  {
+    id: 'MV-01',
+    branch: 'mobility',
+    tier: 1,
+    loreFragmentId: 'AX-PUB-003',
+    apply: (t) => ({ ...t, moveSpeed: round3(t.moveSpeed * 1.02) }),
+  },
+  {
+    id: 'MV-02',
+    branch: 'mobility',
+    tier: 2,
+    loreFragmentId: 'AX-ENG-013',
+    apply: (t) => ({ ...t, dodgeCooldownTicks: t.dodgeCooldownTicks - 1 }),
+  },
+  {
+    id: 'MV-03',
+    branch: 'mobility',
+    tier: 3,
+    loreFragmentId: 'AX-PRC-016',
+    apply: (t) => ({ ...t, liquidSlowScale: 0.92 }),
+  },
+  {
+    id: 'MV-04',
+    branch: 'mobility',
+    tier: 4,
+    loreFragmentId: 'AX-INC-023',
+    apply: (t) => ({ ...t, iceGlide: 0.25 }),
+  },
+  {
+    id: 'MV-05',
+    branch: 'mobility',
+    tier: 5,
+    loreFragmentId: 'AX-EXE-031',
+    apply: (t) => ({ ...t, moveSpeed: round3(t.moveSpeed * 1.02) }),
+  },
+  {
+    id: 'MV-X',
+    branch: 'mobility',
+    tier: 6,
+    loreFragmentId: 'AX-UNK-044',
+    apply: (t) => ({ ...t, dodgeIframeTicks: t.dodgeIframeTicks + 1 }),
+  },
 
   // REATOR — calor e combate. O UNICO bonus direto de dano da arvore inteira
   // esta no fim deste ramo, e vale 4%.
-  { id: 'RX-01', branch: 'reactor', tier: 1, loreFragmentId: 'AX-PUB-005', apply: (t) => ({ ...t, heatDecayPerTick: round3(t.heatDecayPerTick * 1.05) }) },
-  { id: 'RX-02', branch: 'reactor', tier: 2, loreFragmentId: 'AX-ENG-018', apply: (t) => ({ ...t, heatMax: 105 }) },
-  { id: 'RX-03', branch: 'reactor', tier: 3, loreFragmentId: 'AX-PRC-019', apply: (t) => ({ ...t, abilityCooldownScale: 0.96 }) },
-  { id: 'RX-04', branch: 'reactor', tier: 4, loreFragmentId: 'AX-INC-029', apply: (t) => ({ ...t, projectileSpeedScale: 1.06 }) },
-  { id: 'RX-05', branch: 'reactor', tier: 5, loreFragmentId: 'AX-EXE-036', apply: (t) => ({ ...t, overheatLockTicks: t.overheatLockTicks - 4, overheatSelfDamage: Math.max(0, t.overheatSelfDamage - 1) }) },
-  { id: 'RX-X', branch: 'reactor', tier: 6, loreFragmentId: 'AX-UNK-047', apply: (t) => ({ ...t, playerDamageScale: 1.04 }) },
+  {
+    id: 'RX-01',
+    branch: 'reactor',
+    tier: 1,
+    loreFragmentId: 'AX-PUB-005',
+    apply: (t) => ({ ...t, heatDecayPerTick: round3(t.heatDecayPerTick * 1.05) }),
+  },
+  {
+    id: 'RX-02',
+    branch: 'reactor',
+    tier: 2,
+    loreFragmentId: 'AX-ENG-018',
+    apply: (t) => ({ ...t, heatMax: 105 }),
+  },
+  {
+    id: 'RX-03',
+    branch: 'reactor',
+    tier: 3,
+    loreFragmentId: 'AX-PRC-019',
+    apply: (t) => ({ ...t, abilityCooldownScale: 0.96 }),
+  },
+  {
+    id: 'RX-04',
+    branch: 'reactor',
+    tier: 4,
+    loreFragmentId: 'AX-INC-029',
+    apply: (t) => ({ ...t, projectileSpeedScale: 1.06 }),
+  },
+  {
+    id: 'RX-05',
+    branch: 'reactor',
+    tier: 5,
+    loreFragmentId: 'AX-EXE-036',
+    apply: (t) => ({
+      ...t,
+      overheatLockTicks: t.overheatLockTicks - 4,
+      overheatSelfDamage: Math.max(0, t.overheatSelfDamage - 1),
+    }),
+  },
+  {
+    id: 'RX-X',
+    branch: 'reactor',
+    tier: 6,
+    loreFragmentId: 'AX-UNK-047',
+    apply: (t) => ({ ...t, playerDamageScale: 1.04 }),
+  },
 
   // LEVANTAMENTO — informacao. Nada aqui altera um tick: e a ramificacao que o
   // hash autoritativo pode ignorar com seguranca.
-  { id: 'SV-01', branch: 'survey', tier: 1, loreFragmentId: 'AX-PUB-007', apply: (t) => nav(t, { objectiveBeacon: true }) },
-  { id: 'SV-02', branch: 'survey', tier: 2, loreFragmentId: 'AX-ENG-015', apply: (t) => nav(t, { salvageTraceRange: 18 }) },
-  { id: 'SV-03', branch: 'survey', tier: 3, loreFragmentId: 'AX-PRC-021', apply: (t) => nav(t, { oreScannerRange: 11, oreScannerOcclusion: 1 }) },
-  { id: 'SV-04', branch: 'survey', tier: 4, loreFragmentId: 'AX-INC-025', apply: (t) => nav(t, { routeMemory: true }) },
-  { id: 'SV-05', branch: 'survey', tier: 5, loreFragmentId: 'AX-EXE-038', apply: (t) => nav(t, { returnVector: true }) },
-  { id: 'SV-X', branch: 'survey', tier: 6, loreFragmentId: 'AX-UNK-049', apply: (t) => nav(t, { contaminationForecast: true }) },
+  {
+    id: 'SV-01',
+    branch: 'survey',
+    tier: 1,
+    loreFragmentId: 'AX-PUB-007',
+    apply: (t) => nav(t, { objectiveBeacon: true }),
+  },
+  {
+    id: 'SV-02',
+    branch: 'survey',
+    tier: 2,
+    loreFragmentId: 'AX-ENG-015',
+    apply: (t) => nav(t, { salvageTraceRange: 18 }),
+  },
+  {
+    id: 'SV-03',
+    branch: 'survey',
+    tier: 3,
+    loreFragmentId: 'AX-PRC-021',
+    apply: (t) => nav(t, { oreScannerRange: 11, oreScannerOcclusion: 1 }),
+  },
+  {
+    id: 'SV-04',
+    branch: 'survey',
+    tier: 4,
+    loreFragmentId: 'AX-INC-025',
+    apply: (t) => nav(t, { routeMemory: true }),
+  },
+  {
+    id: 'SV-05',
+    branch: 'survey',
+    tier: 5,
+    loreFragmentId: 'AX-EXE-038',
+    apply: (t) => nav(t, { returnVector: true }),
+  },
+  {
+    id: 'SV-X',
+    branch: 'survey',
+    tier: 6,
+    loreFragmentId: 'AX-UNK-049',
+    apply: (t) => nav(t, { contaminationForecast: true }),
+  },
 ];
 
 const BRANCH_ORDER: readonly UpgradeBranch[] = ['chassis', 'mobility', 'reactor', 'survey'];
@@ -319,7 +467,10 @@ export const isValidUpgradeSet = (ids: readonly UpgradeId[]): boolean => {
 
 /** Derivacao pura. Ordem irrelevante, IDs desconhecidos ignorados. */
 export const derivePlayerTuning = (purchased: readonly UpgradeId[]): PlayerTuning => {
-  let tuning: PlayerTuning = { ...DEFAULT_PLAYER_TUNING, navigation: { ...DEFAULT_PLAYER_TUNING.navigation } };
+  let tuning: PlayerTuning = {
+    ...DEFAULT_PLAYER_TUNING,
+    navigation: { ...DEFAULT_PLAYER_TUNING.navigation },
+  };
   for (const id of normalizeUpgradeIds(purchased)) {
     const def = BY_ID.get(id);
     if (def) tuning = def.apply(tuning);

@@ -193,7 +193,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // Sessao
     // -----------------------------------------------------------------------
     if (path === '/api/progression/session' && req.method === 'POST') {
-      if (readLimiter.check(ip, nowMs())) return fail(res, 'rate_limited'), true;
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const existing = await authenticate(req);
       if (existing) {
         json(res, 200, { profile: publicProfile(existing) });
@@ -213,21 +213,21 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // -----------------------------------------------------------------------
     if (path === '/api/progression/profile' && req.method === 'GET') {
       const profile = await authenticate(req);
-      if (!profile) return fail(res, 'unauthenticated'), true;
+      if (!profile) return (fail(res, 'unauthenticated'), true);
       json(res, 200, { profile: publicProfile(profile) });
       return true;
     }
 
     if (path === '/api/progression/codex' && req.method === 'GET') {
       const profile = await authenticate(req);
-      if (!profile) return fail(res, 'unauthenticated'), true;
+      if (!profile) return (fail(res, 'unauthenticated'), true);
       json(res, 200, codexFor(profile, localeOf(url)));
       return true;
     }
 
     if (path.startsWith('/api/progression/codex/') && req.method === 'GET') {
       const profile = await authenticate(req);
-      if (!profile) return fail(res, 'unauthenticated'), true;
+      if (!profile) return (fail(res, 'unauthenticated'), true);
       const id = decodeURIComponent(path.slice('/api/progression/codex/'.length));
       const fragment = findLoreFragment(id);
       // Documento inexistente e documento nao autorizado respondem IGUAL. A
@@ -244,18 +244,18 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // Emissao de ticket
     // -----------------------------------------------------------------------
     if (path === '/api/progression/runs' && req.method === 'POST') {
-      if (readLimiter.check(ip, nowMs())) return fail(res, 'rate_limited'), true;
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
-      if (!profile) return fail(res, 'unauthenticated'), true;
+      if (!profile) return (fail(res, 'unauthenticated'), true);
 
       const raw = await readJsonBody(req, MAX_PURCHASE_BODY_BYTES);
-      if (raw === null) return fail(res, 'payload_too_large'), true;
+      if (raw === null) return (fail(res, 'payload_too_large'), true);
       let body: { seed?: unknown; mode?: unknown } = {};
       if (raw.trim()) {
         try {
           body = JSON.parse(raw) as typeof body;
         } catch {
-          return json(res, 400, { error: 'internal', detail: 'json invalido' }), true;
+          return (json(res, 400, { error: 'internal', detail: 'json invalido' }), true);
         }
       }
 
@@ -264,7 +264,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
       // nada. O que ele nao consegue e o contrario — pedir `expedition` nao
       // basta, porque a recompensa sai do replay e nao do pedido.
       const mode: RunMode = body.mode === 'expedition' ? 'expedition' : 'ranked';
-      if (!isRewardEligibleMode(mode)) return fail(res, 'mode_not_eligible'), true;
+      if (!isRewardEligibleMode(mode)) return (fail(res, 'mode_not_eligible'), true);
 
       // A seed pode ser escolhida (a seed compartilhada e um recurso do jogo),
       // mas so como uint32 — e ela nao decide recompensa nenhuma sozinha.
@@ -302,20 +302,20 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // -----------------------------------------------------------------------
     const settleMatch = /^\/api\/progression\/runs\/([^/]+)\/settle$/.exec(path);
     if (settleMatch && req.method === 'POST') {
-      if (settleLimiter.check(ip, nowMs())) return fail(res, 'rate_limited'), true;
+      if (settleLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
-      if (!profile) return fail(res, 'unauthenticated'), true;
+      if (!profile) return (fail(res, 'unauthenticated'), true);
 
       // Recusa ANTES de ler o corpo: ler meio megabyte para descartar em seguida
       // e exatamente o trabalho que o limite existe para evitar.
-      if (budget.busy()) return fail(res, 'busy'), true;
+      if (budget.busy()) return (fail(res, 'busy'), true);
 
       const runId = decodeURIComponent(settleMatch[1]);
       const ticket = await opts.store.getTicket(runId);
-      if (!ticket) return fail(res, 'ticket_not_found'), true;
-      if (ticket.profileId !== profile.profileId) return fail(res, 'ticket_foreign'), true;
-      if (Date.parse(ticket.expiresAt) <= nowMs()) return fail(res, 'ticket_expired'), true;
-      if (!isRewardEligibleMode(ticket.mode)) return fail(res, 'mode_not_eligible'), true;
+      if (!ticket) return (fail(res, 'ticket_not_found'), true);
+      if (ticket.profileId !== profile.profileId) return (fail(res, 'ticket_foreign'), true);
+      if (Date.parse(ticket.expiresAt) <= nowMs()) return (fail(res, 'ticket_expired'), true);
+      if (!isRewardEligibleMode(ticket.mode)) return (fail(res, 'mode_not_eligible'), true);
       if (
         ticket.protocolVersion !== PROTOCOL_VERSION ||
         ticket.simulationVersion !== SIMULATION_VERSION
@@ -323,14 +323,14 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
         // Uma run jogada contra outra versao da simulacao nao pode ser
         // re-simulada por esta: o resultado seria diferente, e diferente para
         // MENOS na maioria das vezes. Recusar e a resposta honesta.
-        return fail(res, 'version_mismatch'), true;
+        return (fail(res, 'version_mismatch'), true);
       }
       // O tuning guardado ainda e o que a arvore de hoje produziria para ele?
       // Divergencia aqui significa registro corrompido, nao trapaca — mas em
       // qualquer dos casos a run nao pode ser creditada contra um Prospector que
       // ninguem consegue reproduzir.
       if (hashPlayerTuning(ticket.tuning) !== ticket.tuningHash) {
-        return fail(res, 'tuning_mismatch'), true;
+        return (fail(res, 'tuning_mismatch'), true);
       }
 
       const raw = await readJsonBody(req, MAX_REPLAY_BYTES + 4096);
@@ -344,11 +344,11 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
       try {
         payload = JSON.parse(raw) as typeof payload;
       } catch {
-        return json(res, 400, { error: 'internal', detail: 'json invalido' }), true;
+        return (json(res, 400, { error: 'internal', detail: 'json invalido' }), true);
       }
       const log = typeof payload.log === 'string' ? payload.log : '';
 
-      if (!budget.claim()) return fail(res, 'busy'), true;
+      if (!budget.claim()) return (fail(res, 'busy'), true);
       try {
         const started = nowMs();
         // AQUI esta a decisao inteira. Seed e tuning saem do ticket guardado no
@@ -356,12 +356,18 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
         const run = resimulateRun(ticket.seed, log, ticket.tuning);
         const elapsed = nowMs() - started;
         if (!run.ok) {
-          opts.log({ ev: 'progression_replay_rejected', ip, runId, reason: run.reason, ms: elapsed });
-          return fail(res, 'replay_rejected', run.reason), true;
+          opts.log({
+            ev: 'progression_replay_rejected',
+            ip,
+            runId,
+            reason: run.reason,
+            ms: elapsed,
+          });
+          return (fail(res, 'replay_rejected', run.reason), true);
         }
         const summary = run.state.summary;
         if (!summary || run.state.phase === 'running') {
-          return fail(res, 'replay_rejected', 'run nao terminal'), true;
+          return (fail(res, 'replay_rejected', 'run nao terminal'), true);
         }
 
         const settled = await opts.store.settleRun({
@@ -376,7 +382,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
           now: new Date(nowMs()).toISOString(),
           idFactory: () => randomUUID(),
         });
-        if ('error' in settled) return fail(res, settled.error), true;
+        if ('error' in settled) return (fail(res, settled.error), true);
 
         opts.log({
           ev: 'progression_settled',
@@ -411,24 +417,24 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // -----------------------------------------------------------------------
     const purchaseMatch = /^\/api\/progression\/upgrades\/([^/]+)\/purchase$/.exec(path);
     if (purchaseMatch && req.method === 'POST') {
-      if (readLimiter.check(ip, nowMs())) return fail(res, 'rate_limited'), true;
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
-      if (!profile) return fail(res, 'unauthenticated'), true;
+      if (!profile) return (fail(res, 'unauthenticated'), true);
 
       const raw = await readJsonBody(req, MAX_PURCHASE_BODY_BYTES);
-      if (raw === null) return fail(res, 'payload_too_large'), true;
+      if (raw === null) return (fail(res, 'payload_too_large'), true);
       let body: { expectedProfileVersion?: unknown; idempotencyKey?: unknown };
       try {
         body = JSON.parse(raw || '{}') as typeof body;
       } catch {
-        return json(res, 400, { error: 'internal', detail: 'json invalido' }), true;
+        return (json(res, 400, { error: 'internal', detail: 'json invalido' }), true);
       }
       if (!isValidIdempotencyKey(body.idempotencyKey)) {
-        return json(res, 400, { error: 'internal', detail: 'idempotencyKey invalida' }), true;
+        return (json(res, 400, { error: 'internal', detail: 'idempotencyKey invalida' }), true);
       }
       const expected = Number(body.expectedProfileVersion);
       if (!Number.isInteger(expected)) {
-        return json(res, 400, { error: 'internal', detail: 'expectedProfileVersion' }), true;
+        return (json(res, 400, { error: 'internal', detail: 'expectedProfileVersion' }), true);
       }
 
       // `oreCost`/`coreCost` podem ate ter vindo no corpo. Nao sao lidos: o
@@ -441,7 +447,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
         now: new Date(nowMs()).toISOString(),
         idFactory: () => randomUUID(),
       });
-      if (!result.ok) return fail(res, result.error), true;
+      if (!result.ok) return (fail(res, result.error), true);
 
       const fragment = findLoreFragment(result.loreFragmentId);
       opts.log({

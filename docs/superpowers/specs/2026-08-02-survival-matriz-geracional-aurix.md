@@ -15,10 +15,10 @@ O Prospector deixa de melhorar apenas **dentro** da run. Ele passa a melhorar
 **entre** runs, e a moeda dessa melhoria é exatamente aquilo que a run atual
 arrisca perder.
 
-| Camada     | O que é                               | Onde vive           |
-| ---------- | ------------------------------------- | ------------------- |
-| Temporária | Módulos de salvage, Ecos, purga        | A run atual         |
-| Permanente | Protocolos da Matriz Geracional        | O perfil autoritativo |
+| Camada     | O que é                         | Onde vive             |
+| ---------- | ------------------------------- | --------------------- |
+| Temporária | Módulos de salvage, Ecos, purga | A run atual           |
+| Permanente | Protocolos da Matriz Geracional | O perfil autoritativo |
 
 As duas não competem: uma é escolhida sob pressão com informação incompleta, a
 outra é escolhida com calma na superfície.
@@ -36,17 +36,17 @@ Núcleo   → chave rara de progressão permanente
 
 Durante a run, todo minério é **CARGA NÃO HOMOLOGADA**.
 
-| Desfecho                                  | Minério | Núcleo |
-| ----------------------------------------- | ------- | ------ |
-| Morte (`dead`)                            | 0       | 0      |
-| Abandono (nenhuma fase terminal)          | 0       | 0      |
-| Extração (`extracted`)                    | tudo    | 0      |
-| Extração com núcleo (`extracted_with_core`) | tudo  | +1     |
+| Desfecho                                    | Minério | Núcleo |
+| ------------------------------------------- | ------- | ------ |
+| Morte (`dead`)                              | 0       | 0      |
+| Abandono (nenhuma fase terminal)            | 0       | 0      |
+| Extração (`extracted`)                      | tudo    | 0      |
+| Extração com núcleo (`extracted_with_core`) | tudo    | +1     |
 
 Duas consequências que valem por si:
 
 - **Extração antecipada continua legítima.** Ela salva minério — mas minério
-  sozinho não compra nada, porque *todo* protocolo custa pelo menos um núcleo.
+  sozinho não compra nada, porque _todo_ protocolo custa pelo menos um núcleo.
 - **Nenhum nó da árvore reduz a perda da morte** (§5).
 
 Isso encaixa no fluxo que já existe: o jogo já distingue `extracted` de
@@ -58,25 +58,25 @@ contaminação acelerada. A parte cara do loop já está construída.
 ## 2. Mudança de política no repositório
 
 `packages/voxelyn-survival/src/client/records.ts` abre hoje com uma decisão
-explícita: metaprogressão é *variedade*, nunca poder numérico, sob o argumento de
+explícita: metaprogressão é _variedade_, nunca poder numérico, sob o argumento de
 que uma seed compartilhada precisa significar a mesma coisa para duas pessoas.
 
 **Esta feature substitui essa política.** Não como exceção — como troca
 consciente, para o repositório não conter duas filosofias incompatíveis.
 
-O argumento antigo continua correto *sobre o que protegia*. A resposta não é
+O argumento antigo continua correto _sobre o que protegia_. A resposta não é
 abandoná-lo, é **separar contextos**:
 
 > A metaprogressão da Expedição pode fornecer melhorias numéricas leves e
 > ponderadas. Modos competitivos e contratos ranqueados continuam usando
 > Prospectors padronizados.
 
-| Contexto                        | Prospector                            |
-| ------------------------------- | ------------------------------------- |
-| Expedição solo autoritativa     | Tuning derivado do perfil             |
-| Simulação local (fallback)      | G-00, sem recompensa                  |
-| Contrato ranqueado / leaderboard | G-00 padronizado                     |
-| Co-op (1ª versão)               | G-00 padronizado                      |
+| Contexto                         | Prospector                |
+| -------------------------------- | ------------------------- |
+| Expedição solo autoritativa      | Tuning derivado do perfil |
+| Simulação local (fallback)       | G-00, sem recompensa      |
+| Contrato ranqueado / leaderboard | G-00 padronizado          |
+| Co-op (1ª versão)                | G-00 padronizado          |
 
 Bestiário, descobertas e registros continuam existindo. A árvore não os remove.
 
@@ -87,12 +87,12 @@ Bestiário, descobertas e registros continuam existindo. A árvore não os remov
 Hoje `payOreQuota` (`sim/src/run.ts`) converte cada 14 lascas em uma escolha de
 módulo. Essa mecânica sai inteira.
 
-| Símbolo                      | Ação                                     |
-| ---------------------------- | ---------------------------------------- |
-| `ORE_PER_MODULE`             | remover                                  |
-| `payOreQuota` + chamada      | remover                                  |
-| `PlayerExtra.oreModulesPaid` | remover (init, reset, hash, testes)      |
-| `DISCOVERY_ORE_QUOTA`        | aposentar o bit; ver §3.2                |
+| Símbolo                      | Ação                                |
+| ---------------------------- | ----------------------------------- |
+| `ORE_PER_MODULE`             | remover                             |
+| `payOreQuota` + chamada      | remover                             |
+| `PlayerExtra.oreModulesPaid` | remover (init, reset, hash, testes) |
+| `DISCOVERY_ORE_QUOTA`        | aposentar o bit; ver §3.2           |
 
 **Preservado**: mineração dos veios, `SOLID_ORE*`, `stats.oreCollected`, evento
 `ore_gained`, partículas `oreChip`, cue de áudio, drop do Minerador, minério no
@@ -101,7 +101,7 @@ sumário, minério como desempate do leaderboard, módulos por salvage e Ecos.
 ### 3.1 Por que o campo continua se chamando `oreCollected`
 
 Renomear provocaria migração de leaderboard, telemetria e replay sem ganho
-técnico. O significado não mudou: *minério coletado durante esta run*. A
+técnico. O significado não mudou: _minério coletado durante esta run_. A
 homologação é operação do servidor de progressão, não da simulação.
 
 ### 3.2 A descoberta órfã
@@ -137,14 +137,14 @@ guarda vira **cache explicitamente marcado** (§4.9).
 
 O que já existe e é reaproveitado sem cópia:
 
-| Peça existente                          | Uso na progressão                    |
-| --------------------------------------- | ------------------------------------ |
-| `replay.ts` → `resimulate()`            | prova canônica da run                |
-| `command-log.ts` (RLE + base64)         | formato de gravação                  |
-| `run-recorder.ts`                       | gravação no caminho da simulação     |
-| `http-util.ts` (rate limit, budget, body) | proteções da rota                  |
-| `leaderboard.ts` (Memory + Postgres)    | padrão de store por ambiente         |
-| `hashAuthoritativeState`                | comparação de estado terminal        |
+| Peça existente                            | Uso na progressão                |
+| ----------------------------------------- | -------------------------------- |
+| `replay.ts` → `resimulate()`              | prova canônica da run            |
+| `command-log.ts` (RLE + base64)           | formato de gravação              |
+| `run-recorder.ts`                         | gravação no caminho da simulação |
+| `http-util.ts` (rate limit, budget, body) | proteções da rota                |
+| `leaderboard.ts` (Memory + Postgres)      | padrão de store por ambiente     |
+| `hashAuthoritativeState`                  | comparação de estado terminal    |
 
 `resimulate` era privado de `replay.ts`; passa a ser exportado como
 `resimulateRun`, com o mesmo comportamento, para o settlement não reimplementar o
@@ -162,10 +162,15 @@ type AuthoritativeProgressionProfile = {
   progression: { purchasedUpgradeIds: UpgradeId[] };
   codex: { unlockedLoreFragmentIds: LoreFragmentId[] };
   statistics: {
-    oreHomologated: number; oreLost: number; coresRecovered: number;
-    successfulReturns: number; failedExpeditions: number; upgradesPurchased: number;
+    oreHomologated: number;
+    oreLost: number;
+    coresRecovered: number;
+    successfulReturns: number;
+    failedExpeditions: number;
+    upgradesPurchased: number;
   };
-  createdAt: string; updatedAt: string;
+  createdAt: string;
+  updatedAt: string;
 };
 ```
 
@@ -201,12 +206,19 @@ controlado. **Merge automático de saldos não é implementado.**
 
 ```ts
 type ProgressionRunTicket = {
-  runId: string; profileId: string;
-  seed: number; mode: RunMode; playerCount: number;
-  tuning: PlayerTuning; tuningHash: string;
+  runId: string;
+  profileId: string;
+  seed: number;
+  mode: RunMode;
+  playerCount: number;
+  tuning: PlayerTuning;
+  tuningHash: string;
   progressionProfileVersion: number;
-  protocolVersion: number; simulationVersion: string;
-  issuedAt: string; expiresAt: string; nonce: string;
+  protocolVersion: number;
+  simulationVersion: string;
+  issuedAt: string;
+  expiresAt: string;
+  nonce: string;
 };
 ```
 
@@ -238,9 +250,15 @@ ticket já congelou `progressionProfileVersion` e o tuning.
 
 ```ts
 switch (canonical.phase) {
-  case 'dead':                 reward = { ore: 0, cores: 0 }; break;
-  case 'extracted':            reward = { ore: canonical.stats.oreCollected, cores: 0 }; break;
-  case 'extracted_with_core':  reward = { ore: canonical.stats.oreCollected, cores: 1 }; break;
+  case 'dead':
+    reward = { ore: 0, cores: 0 };
+    break;
+  case 'extracted':
+    reward = { ore: canonical.stats.oreCollected, cores: 0 };
+    break;
+  case 'extracted_with_core':
+    reward = { ore: canonical.stats.oreCollected, cores: 1 };
+    break;
 }
 ```
 
@@ -295,7 +313,7 @@ recursos, sem compras, sem lore, sem submissão posterior. Anunciada antes de
 começar.
 
 Runs offline **não** são armazenadas para crédito futuro — seria uma superfície
-enorme de adulteração. Se o servidor cair *durante* uma run que já tem ticket
+enorme de adulteração. Se o servidor cair _durante_ uma run que já tem ticket
 válido, o cliente guarda o log e repete a submissão do **mesmo `runId`** dentro da
 validade. O servidor continua decidindo.
 
@@ -325,16 +343,16 @@ custos futuros.
 
 Orçamento com a **árvore inteira** comprada:
 
-| Eixo                  | Total       |
-| --------------------- | ----------- |
-| Vida máxima           | +12%        |
-| Velocidade            | +4%         |
-| Dano direto           | +4%         |
-| Redução ambiental     | −8%         |
-| Cooldown de habilidade| −4%         |
-| Esquiva               | −1 tick, +1 iframe |
-| Calor máximo          | +5%         |
-| Dissipação            | +5%         |
+| Eixo                   | Total              |
+| ---------------------- | ------------------ |
+| Vida máxima            | +12%               |
+| Velocidade             | +4%                |
+| Dano direto            | +4%                |
+| Redução ambiental      | −8%                |
+| Cooldown de habilidade | −4%                |
+| Esquiva                | −1 tick, +1 iframe |
+| Calor máximo           | +5%                |
+| Dissipação             | +5%                |
 
 Testado por asserção sobre `derivePlayerTuning(TODOS)` (§10).
 
@@ -358,36 +376,36 @@ Ramo completo: 805 minério, 10 núcleos. Árvore: 3.220 minério, 40 núcleos.
 
 ### CHASSI — sobrevivência
 
-| ID    | Nome                  | Efeito                | Campo do tuning            |
-| ----- | --------------------- | --------------------- | -------------------------- |
-| CA-01 | Carapaça Reforçada I  | +4 vida               | `maxHp`                    |
-| CA-02 | Berços de Impacto     | stun −10%             | `stunDurationScale`        |
-| CA-03 | Carapaça Reforçada II | +4 vida               | `maxHp`                    |
-| CA-04 | Selagem Ambiental     | dano ambiental −8%    | `environmentalDamageScale` |
-| CA-05 | Carapaça Reforçada III| +4 vida               | `maxHp`                    |
-| CA-X  | Reservatório Auxiliar | +1 célula de purga    | `startingPurgeCells`       |
+| ID    | Nome                   | Efeito             | Campo do tuning            |
+| ----- | ---------------------- | ------------------ | -------------------------- |
+| CA-01 | Carapaça Reforçada I   | +4 vida            | `maxHp`                    |
+| CA-02 | Berços de Impacto      | stun −10%          | `stunDurationScale`        |
+| CA-03 | Carapaça Reforçada II  | +4 vida            | `maxHp`                    |
+| CA-04 | Selagem Ambiental      | dano ambiental −8% | `environmentalDamageScale` |
+| CA-05 | Carapaça Reforçada III | +4 vida            | `maxHp`                    |
+| CA-X  | Reservatório Auxiliar  | +1 célula de purga | `startingPurgeCells`       |
 
 ### MOBILIDADE — movimento
 
-| ID    | Nome                       | Efeito                  | Campo                |
-| ----- | -------------------------- | ----------------------- | -------------------- |
-| MV-01 | Servomotores I             | +2% velocidade          | `moveSpeed`          |
-| MV-02 | Relé de Esquiva            | cooldown 18 → 17 ticks  | `dodgeCooldownTicks` |
-| MV-03 | Tração Segmentada          | slow de líquidos −8%    | `liquidSlowScale`    |
-| MV-04 | Estabilizadores Giroscópicos | mais controle no gelo | `iceGlide`           |
-| MV-05 | Servomotores II            | +2% velocidade          | `moveSpeed`          |
-| MV-X  | Firmware Reflexo           | +1 iframe na esquiva    | `dodgeIframeTicks`   |
+| ID    | Nome                         | Efeito                 | Campo                |
+| ----- | ---------------------------- | ---------------------- | -------------------- |
+| MV-01 | Servomotores I               | +2% velocidade         | `moveSpeed`          |
+| MV-02 | Relé de Esquiva              | cooldown 18 → 17 ticks | `dodgeCooldownTicks` |
+| MV-03 | Tração Segmentada            | slow de líquidos −8%   | `liquidSlowScale`    |
+| MV-04 | Estabilizadores Giroscópicos | mais controle no gelo  | `iceGlide`           |
+| MV-05 | Servomotores II              | +2% velocidade         | `moveSpeed`          |
+| MV-X  | Firmware Reflexo             | +1 iframe na esquiva   | `dodgeIframeTicks`   |
 
 ### REATOR — calor e combate
 
-| ID    | Nome                    | Efeito                       | Campo                    |
-| ----- | ----------------------- | ---------------------------- | ------------------------ |
-| RX-01 | Dissipador Expandido    | dissipação +5%               | `heatDecayPerTick`       |
-| RX-02 | Coletor Térmico         | calor máximo 100 → 105       | `heatMax`                |
-| RX-03 | Capacitor de Resposta   | cooldown de habilidade −4%   | `abilityCooldownScale`   |
-| RX-04 | Colimador Balístico     | projéteis +6% de velocidade  | `projectileSpeedScale`   |
-| RX-05 | Governador de Emergência| overheat −4 ticks, −1 dano   | `overheat*`              |
-| RX-X  | Malha de Combate        | dano +4% (bolt e habilidade) | `playerDamageScale`      |
+| ID    | Nome                     | Efeito                       | Campo                  |
+| ----- | ------------------------ | ---------------------------- | ---------------------- |
+| RX-01 | Dissipador Expandido     | dissipação +5%               | `heatDecayPerTick`     |
+| RX-02 | Coletor Térmico          | calor máximo 100 → 105       | `heatMax`              |
+| RX-03 | Capacitor de Resposta    | cooldown de habilidade −4%   | `abilityCooldownScale` |
+| RX-04 | Colimador Balístico      | projéteis +6% de velocidade  | `projectileSpeedScale` |
+| RX-05 | Governador de Emergência | overheat −4 ticks, −1 dano   | `overheat*`            |
+| RX-X  | Malha de Combate         | dano +4% (bolt e habilidade) | `playerDamageScale`    |
 
 `playerDamageScale` aplica-se **somente** a dano com autoria do Prospector.
 Explosões ambientais, carrinhos, dano de inimigo e reações sem autoria ficam de
@@ -395,14 +413,14 @@ fora — garantido por teste.
 
 ### LEVANTAMENTO — navegação
 
-| ID    | Nome                      | Efeito                                | Campo                    |
-| ----- | ------------------------- | ------------------------------------- | ------------------------ |
-| SV-01 | Beacon de Objetivo        | pulso ao objetivo na entrada          | `objectiveBeacon`        |
-| SV-02 | Traço de Salvage          | terminal próximo a ~18 tiles          | `salvageTraceRange`      |
-| SV-03 | Espectrômetro Mineral     | veio pulsa através de 1 parede, ~11 tiles | `oreScanner*`        |
-| SV-04 | Memória de Rota           | salões visitados na run               | `routeMemory`            |
-| SV-05 | Vetor de Retorno          | direção da entrada com o núcleo       | `returnVector`           |
-| SV-X  | Previsão de Contaminação  | leitura da próxima onda               | `contaminationForecast`  |
+| ID    | Nome                     | Efeito                                    | Campo                   |
+| ----- | ------------------------ | ----------------------------------------- | ----------------------- |
+| SV-01 | Beacon de Objetivo       | pulso ao objetivo na entrada              | `objectiveBeacon`       |
+| SV-02 | Traço de Salvage         | terminal próximo a ~18 tiles              | `salvageTraceRange`     |
+| SV-03 | Espectrômetro Mineral    | veio pulsa através de 1 parede, ~11 tiles | `oreScanner*`           |
+| SV-04 | Memória de Rota          | salões visitados na run                   | `routeMemory`           |
+| SV-05 | Vetor de Retorno         | direção da entrada com o núcleo           | `returnVector`          |
+| SV-X  | Previsão de Contaminação | leitura da próxima onda                   | `contaminationForecast` |
 
 **Levantamento é apresentação pura.** Nenhum campo dessa ramificação altera um
 tick. Consequência valiosa: um quarto da árvore é impossível de dessincronizar.
@@ -414,16 +432,25 @@ Por isso `navigation` fica fora do hash (§8).
 
 ```ts
 type PlayerTuning = {
-  maxHp: number; moveSpeed: number;
-  dodgeCooldownTicks: number; dodgeIframeTicks: number;
-  heatMax: number; heatDecayPerTick: number;
-  stunDurationScale: number; environmentalDamageScale: number;
-  liquidSlowScale: number; iceGlide: number;
-  abilityCooldownScale: number; projectileSpeedScale: number;
+  maxHp: number;
+  moveSpeed: number;
+  dodgeCooldownTicks: number;
+  dodgeIframeTicks: number;
+  heatMax: number;
+  heatDecayPerTick: number;
+  stunDurationScale: number;
+  environmentalDamageScale: number;
+  liquidSlowScale: number;
+  iceGlide: number;
+  abilityCooldownScale: number;
+  projectileSpeedScale: number;
   playerDamageScale: number;
-  overheatLockTicks: number; overheatSelfDamage: number;
+  overheatLockTicks: number;
+  overheatSelfDamage: number;
   startingPurgeCells: number;
-  navigation: { /* SV-01..SV-X, ver §6 */ };
+  navigation: {
+    /* SV-01..SV-X, ver §6 */
+  };
 };
 
 const DEFAULT_PLAYER_TUNING: PlayerTuning; // exatamente os números atuais
@@ -472,12 +499,12 @@ slot; o corpo vem do servidor.)
 
 ### 9.1 Os quatro arcos
 
-| Ramo          | Arco                          | Pergunta central                                                        |
-| ------------- | ----------------------------- | ----------------------------------------------------------------------- |
-| Chassi        | A economia do descarte        | A Aurix quer que o Prospector sobreviva, ou apenas que funcione o bastante? |
-| Mobilidade    | Retornar não é ser resgatado  | Quem conduz as unidades de volta quando os sistemas já deviam estar desligados? |
-| Reator        | Limites deliberadamente ignorados | O reator serve ao Prospector, ou o transforma em sonda descartável?  |
-| Levantamento  | O que a Aurix encontrou       | A Aurix descobriu o Veio, ou foi atraída por ele?                      |
+| Ramo         | Arco                              | Pergunta central                                                                |
+| ------------ | --------------------------------- | ------------------------------------------------------------------------------- |
+| Chassi       | A economia do descarte            | A Aurix quer que o Prospector sobreviva, ou apenas que funcione o bastante?     |
+| Mobilidade   | Retornar não é ser resgatado      | Quem conduz as unidades de volta quando os sistemas já deviam estar desligados? |
+| Reator       | Limites deliberadamente ignorados | O reator serve ao Prospector, ou o transforma em sonda descartável?             |
+| Levantamento | O que a Aurix encontrou           | A Aurix descobriu o Veio, ou foi atraída por ele?                               |
 
 ### 9.2 Cinco atos
 
@@ -550,31 +577,31 @@ reparável; bloqueado não é entregue.
 
 ## 11. Fases de entrega
 
-| Slice | Conteúdo                                                        |
-| ----- | --------------------------------------------------------------- |
-| 1     | Remoção da cota + modelo de domínio (`sim/progression.ts`)       |
-| 2     | Tuning aplicado à simulação, hash, determinismo                  |
+| Slice | Conteúdo                                                            |
+| ----- | ------------------------------------------------------------------- |
+| 1     | Remoção da cota + modelo de domínio (`sim/progression.ts`)          |
+| 2     | Tuning aplicado à simulação, hash, determinismo                     |
 | 3     | Contratos no protocolo (ticket, settle, perfil público, `cargoOre`) |
-| 4     | Servidor: store, ledger, auth, ticket, settle, compra, codex     |
-| 5     | Conteúdo narrativo: 29 documentos, pt-BR e en                    |
-| 6     | Cliente: API, cache, records sem autoridade, wiring da run       |
-| 7     | HUD de carga e feedback de coleta                                |
-| 8     | Matriz Geracional e Codex                                        |
-| 9     | Evolução visual, tela de resultado e telemetria                  |
+| 4     | Servidor: store, ledger, auth, ticket, settle, compra, codex        |
+| 5     | Conteúdo narrativo: 29 documentos, pt-BR e en                       |
+| 6     | Cliente: API, cache, records sem autoridade, wiring da run          |
+| 7     | HUD de carga e feedback de coleta                                   |
+| 8     | Matriz Geracional e Codex                                           |
+| 9     | Evolução visual, tela de resultado e telemetria                     |
 
 ---
 
 ## 12. Riscos
 
-| Risco                                             | Mitigação                                                   |
-| ------------------------------------------------- | ----------------------------------------------------------- |
-| Re-simulação de progressão compete com o tick de co-op | Orçamento **compartilhado** com leaderboard e ecos: uma por vez |
-| Sessão anônima presa a um navegador               | Documentado; estrutura preparada para conta; sem merge automático |
-| Segredo HMAC ausente em produção                  | Segredo efêmero + log explícito no boot                     |
-| Custo de CPU por run liquidada                    | Mesmos tetos do leaderboard (30 min, 512 KB, rate limit)    |
-| Postgres indisponível                             | Fallback em memória, como o leaderboard — sem recompensa persistida entre restarts |
-| Spoiler no bundle                                 | Corpo dos fragmentos vem do servidor; bundle só tem metadados |
-| Inflação de poder por acúmulo silencioso          | Teto verificado por teste sobre a árvore completa           |
+| Risco                                                  | Mitigação                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Re-simulação de progressão compete com o tick de co-op | Orçamento **compartilhado** com leaderboard e ecos: uma por vez                    |
+| Sessão anônima presa a um navegador                    | Documentado; estrutura preparada para conta; sem merge automático                  |
+| Segredo HMAC ausente em produção                       | Segredo efêmero + log explícito no boot                                            |
+| Custo de CPU por run liquidada                         | Mesmos tetos do leaderboard (30 min, 512 KB, rate limit)                           |
+| Postgres indisponível                                  | Fallback em memória, como o leaderboard — sem recompensa persistida entre restarts |
+| Spoiler no bundle                                      | Corpo dos fragmentos vem do servidor; bundle só tem metadados                      |
+| Inflação de poder por acúmulo silencioso               | Teto verificado por teste sobre a árvore completa                                  |
 
 ---
 

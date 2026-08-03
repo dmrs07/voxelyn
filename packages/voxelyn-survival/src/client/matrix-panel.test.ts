@@ -58,9 +58,9 @@ describe('estado de um no', () => {
   // Minerio de sobra e nenhum nucleo: a situacao exata de quem so extrai cedo.
   it('minerio sozinho nunca deixa um no comprável', () => {
     for (const upgrade of UPGRADES) {
-      const owned = UPGRADES.filter((u) => u.branch === upgrade.branch && u.tier < upgrade.tier).map(
-        (u) => u.id,
-      );
+      const owned = UPGRADES.filter(
+        (u) => u.branch === upgrade.branch && u.tier < upgrade.tier,
+      ).map((u) => u.id);
       const state = nodeState(upgrade, profile(999_999, 0, owned));
       expect(state.kind, upgrade.id).toBe('missing');
       if (state.kind === 'missing') expect(state.cores).toBeGreaterThan(0);
