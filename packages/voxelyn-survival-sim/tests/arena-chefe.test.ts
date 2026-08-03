@@ -27,7 +27,7 @@ import { SOLID_ROCK } from '../src/constants';
 import { RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
 import { createRun } from '../src/run';
 import { sectorSeed } from '../src/sectors';
-import { floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
+import { createTerrainDraft, floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
 import { biomeProfile, lineageOf, sectorBiome } from '../src/strata';
 import type { SurvivalState } from '../src/types';
 
@@ -190,16 +190,22 @@ describe('arena do chefe por estrato', () => {
     const core = { x: 10, y: 20 };
     const entry = { x: 24, y: 20 };
 
+    // O draft de verdade, e nao um par de arrays cru: assim o teste exercita a
+    // MESMA barreira de escrita que a geracao usa.
     /** Camara de raio 3 + corredor a leste, com `lanes` faixas de largura. */
     const build = (lanes: number) => {
-      const solid = new Uint8Array(W * H).fill(SOLID_ROCK);
+      const draft = createTerrainDraft(W, H);
       for (let dy = -3; dy <= 3; dy++) {
-        for (let dx = -3; dx <= 3; dx++) solid[(boss.y + dy) * W + boss.x + dx] = SOLID_NONE;
+        for (let dx = -3; dx <= 3; dx++) {
+          draft.setSolid((boss.y + dy) * W + boss.x + dx, SOLID_NONE);
+        }
       }
       for (let lane = 0; lane < lanes; lane++) {
-        for (let x = boss.x + 3; x <= entry.x; x++) solid[(boss.y + lane) * W + x] = SOLID_NONE;
+        for (let x = boss.x + 3; x <= entry.x; x++) {
+          draft.setSolid((boss.y + lane) * W + x, SOLID_NONE);
+        }
       }
-      return solid;
+      return draft;
     };
     // (16,20) e o eixo leste do anel 4 — e o gargalo por onde o corredor passa.
     const choke = boss.y * W + boss.x + 4;
@@ -207,27 +213,39 @@ describe('arena do chefe por estrato', () => {
     // Uma faixa: o pilar de cristal do ramo `radial` tapa o gargalo. O carimbo
     // percebe e some POR INTEIRO.
     const sealed = build(1);
-    stampBossArena(sealed, new Uint8Array(W * H), W, H, boss, core, entry, 'radial');
-    expect(sealed[choke], 'o gargalo foi tapado: a moldura tinha de ter sumido').toBe(SOLID_NONE);
+    stampBossArena(sealed, W, H, boss, core, entry, 'radial');
+    expect(sealed.solid[choke], 'o gargalo foi tapado: a moldura tinha de ter sumido').toBe(SOLID_NONE);
     expect(
-      floodOpen(sealed, W, H, entry.x, entry.y).has(boss.y * W + boss.x),
+      floodOpen(sealed.solid, W, H, entry.x, entry.y).has(boss.y * W + boss.x),
       'chefe isolado apos o carimbo',
+    ).toBe(true);
+    // E o derivado do draft ja enxerga o mundo desfeito, sem ninguem reparar.
+    expect(
+      sealed.derived(entry).openCells.includes(boss.y * W + boss.x),
+      'o derivado ficou preso no mundo de antes do desfazer',
     ).toBe(true);
 
     // Controle: com duas faixas o gargalo deixa de ser gargalo, e ai o pilar
     // FICA. Sem este par, um carimbo que nunca escreve nada passaria no teste
     // de cima sem fazer nada.
     const open = build(2);
-    stampBossArena(open, new Uint8Array(W * H), W, H, boss, core, entry, 'radial');
-    expect(open[choke], 'sem gargalo, o pilar tinha de ficar').toBe(SOLID_CRYSTAL);
+    // O derivado e pedido ANTES do carimbo: e o caso que o draft existe para
+    // resolver — depois do pilar entrar, a leitura seguinte tem de vir refeita.
+    const antes = open.derived(entry).openCells.length;
+    stampBossArena(open, W, H, boss, core, entry, 'radial');
+    expect(open.solid[choke], 'sem gargalo, o pilar tinha de ficar').toBe(SOLID_CRYSTAL);
+    expect(
+      open.derived(entry).openCells.length,
+      'o derivado nao percebeu o pilar novo: ficou com o chao de antes',
+    ).toBe(antes - 1);
 
     // E o desfazer tem de levar a SUPERFICIE junto. O `canyon` e o unico ramo
     // que faz as duas coisas — escombro nas diagonais e BRASA na orla — entao e
     // o unico em que dava para desfazer o solido e deixar o hazard de pe.
     // Aqui o gargalo passa pela diagonal (4,4), que e o que o canyon fecha.
-    const solidCanyon = new Uint8Array(W * H).fill(SOLID_ROCK);
+    const canyon = createTerrainDraft(W, H);
     const abre = (x: number, y: number): void => {
-      solidCanyon[y * W + x] = SOLID_NONE;
+      canyon.setSolid(y * W + x, SOLID_NONE);
     };
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) abre(boss.x + dx, boss.y + dy);
     abre(boss.x + 4, boss.y + 3); // liga a camara ao gargalo pela ortogonal
@@ -235,23 +253,22 @@ describe('arena do chefe por estrato', () => {
     for (let x = boss.x + 4; x <= entry.x; x++) abre(x, boss.y + 4);
     for (let y = boss.y; y <= boss.y + 4; y++) abre(entry.x, y);
 
-    const surfCanyon = new Uint8Array(W * H);
-    stampBossArena(solidCanyon, surfCanyon, W, H, boss, core, entry, 'canyon');
+    stampBossArena(canyon, W, H, boss, core, entry, 'canyon');
     expect(
-      solidCanyon[(boss.y + 4) * W + boss.x + 4],
+      canyon.solid[(boss.y + 4) * W + boss.x + 4],
       'o canyon tapou o gargalo e nao se desfez',
     ).toBe(SOLID_NONE);
     expect(
-      surfCanyon.some((s) => s === SURF_EMBER),
+      canyon.surface.some((s) => s === SURF_EMBER),
       'a moldura sumiu mas a brasa dela ficou',
     ).toBe(false);
 
     // Controle do controle: num mapa sem gargalo o canyon PINTA mesmo — senao a
     // assercao acima passaria por o ramo nunca ter pintado nada.
-    const largo = new Uint8Array(W * H);
-    const surfLargo = new Uint8Array(W * H);
-    stampBossArena(largo, surfLargo, W, H, boss, core, entry, 'canyon');
-    expect(surfLargo.some((s) => s === SURF_EMBER), 'o canyon nao pinta brasa?').toBe(true);
+    const largo = createTerrainDraft(W, H);
+    for (let i = 0; i < W * H; i++) largo.setSolid(i, SOLID_NONE);
+    stampBossArena(largo, W, H, boss, core, entry, 'canyon');
+    expect(largo.surface.some((s) => s === SURF_EMBER), 'o canyon nao pinta brasa?').toBe(true);
   });
 
   it('a decoracao de parede NAO re-sorteia o material da moldura', () => {

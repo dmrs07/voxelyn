@@ -673,6 +673,69 @@ ao posicionar. É de outro sistema e merece correção própria.
 
 `SIMULATION_VERSION` 17 → 18: o terreno semeado de todo setor de chefe muda.
 
+## Vigésima terceira etapa (implementada): o terreno derivado deixa de vencer
+
+Esta etapa não acrescenta nada que o jogador veja. Ela existe porque a etapa
+anterior custou **seis rodadas de revisão, e nenhuma delas foi sobre a
+moldura** — as ~70 linhas de geometria da arena nunca tiveram um defeito
+apontado. Todos vieram do mesmo lugar, e é esse lugar que muda aqui.
+
+**O defeito, dito uma vez.** `openCells` e `distFromEntry` eram calculados num
+ponto da geração e consumidos muito depois, por `blobSurface`, `pickOpenFar`,
+`chooseBandCell` e os trilhos — nenhum deles reconfere o terreno. Quem
+carimbasse chão no meio do caminho tinha de lembrar de reparar as duas à mão.
+`stampCorePedestal` escapava por **acidente de ordenação** (é carimbado antes
+do cálculo), não por garantia. A arena do chefe não podia seguir essa ordem —
+depende do ponto do chefe, que depende do terreno — e não lembrou:
+
+| Sintoma | Evidência |
+| --- | --- |
+| bicho nascendo dentro de um pilar | seed 205 s3 |
+| chão órfão continuando em `openCells` | seed 141 s3, célula 8251 |
+| site de tier 3 medido num mundo extinto | seed 210 s2: 135 quando a banda pedia 136 |
+
+Os três são o **mesmo defeito**. Foram achados um a um, cada um depois de uma
+correção que parecia completa — porque cada correção raciocinava sobre *quais
+consumidores se importam*, e essa lista sempre estava incompleta.
+
+**`TerrainDraft`.** O terreno em construção passa a carregar as estruturas que
+derivam dele. Escrita que muda a *abertura* de uma célula invalida o derivado;
+`derived()` recalcula quando alguém pede. Quem carimbar terreno no futuro não
+precisa saber que essas estruturas existem — e o bloco de reparo manual que a
+arena carregava **desapareceu**.
+
+Duas decisões que valem registro:
+
+- **Leitura continua crua.** `solid` e `surface` são lidos milhares de vezes
+  por geração (o autômato, `countWallNeighbors`, `isOpen`); por um acessor
+  custariam caro sem comprar nada, porque leitura não invalida. Só a escrita
+  passa pela barreira.
+- **A fronteira é explícita.** Enquanto `entry` não existe — ruído, autômato,
+  gramática de salão — não há o que derivar, e escrever direto no array é
+  legítimo (`stampHalls` faz isso, com suas 12 chamadas a `carveBlob`). Dizer
+  isso em voz alta importa: regra com exceção escondida foi exatamente o que
+  custou as seis rodadas.
+
+**A garantia é cobrada pelo resultado, não pela disciplina.**
+`tests/terreno-derivado.test.ts` refaz o flood e o BFS do zero sobre o terreno
+final de 120 seeds × 3 setores e cobra igualdade. Não audita consumidor nenhum
+— auditar foi o que falhou, duas vezes. Recriando a estrutura antiga (derivar
+cedo, carimbar depois, sem reparo) ele falha **na primeira seed**; os mesmos
+três defeitos precisaram de seis rodadas de revisão para aparecer.
+
+**A geração saiu byte a byte idêntica** — nenhum bump de `SIMULATION_VERSION`.
+Isso é verificado, não afirmado: `tests/impressao-digital-geracao.test.ts` fixa
+um hash FNV-1a de tudo o que a geração decide (terreno, superfície, entrada,
+poço, chefe, sites, respiradouros, spawns, trilhos, moldura) em 64 seeds × 3
+setores. Esse teste é o segundo produto da etapa, e vale sozinho: até aqui,
+mudar o worldgen e esquecer o bump só aparecia como fixture semeada quebrando
+em *outro pacote*, com sintoma que não aponta para a causa. Isso custou duas
+rodadas de investigação nesta série.
+
+De brinde, a geração ficou **~16% mais rápida** (192 mundos: 3,35 s → 2,81 s):
+o cálculo pré-arena existia para ser jogado fora e refeito, e com derivação
+preguiçosa ele simplesmente não acontece mais.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;

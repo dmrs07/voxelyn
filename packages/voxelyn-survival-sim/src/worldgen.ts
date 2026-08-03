@@ -563,18 +563,18 @@ const stampHalls = (
  * absurdo selasse o poco reprovaria o mapa e a geracao tentaria outra seed.
  */
 const stampCorePedestal = (
-  solid: Uint8Array,
-  surface: Uint8Array,
+  draft: TerrainDraft,
   w: number,
   h: number,
   core: Vec2,
   halls: WorldgenProfile['halls'],
 ): void => {
+  const { solid, surface } = draft;
   const put = (dx: number, dy: number, mat: number): void => {
     const x = core.x + dx;
     const y = core.y + dy;
     if (x > 1 && y > 1 && x < w - 2 && y < h - 2 && solid[idx(w, x, y)] === SOLID_NONE) {
-      solid[idx(w, x, y)] = mat;
+      draft.setSolid(idx(w, x, y), mat);
     }
   };
   const paint = (dx: number, dy: number, surf: number): void => {
@@ -649,8 +649,7 @@ const stampCorePedestal = (
  * versao (seed 205, setor 3: um cuspidor emparedado num pilar de cristal).
  */
 export const stampBossArena = (
-  solid: Uint8Array,
-  surface: Uint8Array,
+  draft: TerrainDraft,
   w: number,
   h: number,
   boss: Vec2,
@@ -658,6 +657,7 @@ export const stampBossArena = (
   entry: Vec2,
   halls: WorldgenProfile['halls'],
 ): Set<number> => {
+  const { solid, surface } = draft;
   const filled = new Set<number>();
   if (halls === 'none') return filled;
 
@@ -677,7 +677,7 @@ export const stampBossArena = (
     const y = boss.y + dy;
     if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) return;
     if (!free(x, y) || solid[idx(w, x, y)] !== SOLID_NONE) return;
-    solid[idx(w, x, y)] = mat;
+    draft.setSolid(idx(w, x, y), mat);
   };
   const paint = (dx: number, dy: number, surf: number): void => {
     const x = boss.x + dx;
@@ -736,12 +736,106 @@ export const stampBossArena = (
   // meia moldura seria um acento que ninguem sabe ler.
   const reach = floodOpen(solid, w, h, entry.x, entry.y);
   if (!reach.has(idx(w, core.x, core.y)) || !reach.has(idx(w, boss.x, boss.y))) {
-    solid.set(before);
+    draft.replaceSolid(before);
     surface.set(beforeSurface);
     return filled;
   }
   for (let i = 0; i < solid.length; i++) if (solid[i] !== before[i]) filled.add(i);
   return filled;
+};
+
+/**
+ * O terreno em construcao, junto com as estruturas que DERIVAM dele.
+ *
+ * O defeito que isto existe para tornar impossivel: `openCells` e
+ * `distFromEntry` sao calculados num ponto da geracao e consumidos muito
+ * depois, por `blobSurface`, `pickOpenFar`, `chooseBandCell` e os trilhos —
+ * nenhum deles reconfere o terreno. Quem carimbasse chao no meio do caminho
+ * tinha de lembrar de reparar as duas a mao. A arena do chefe nao lembrou, e
+ * custou tres defeitos distintos: bicho nascendo dentro de pilar, chao orfao
+ * em `openCells`, e o site de tier 3 escolhido pela distancia de um mundo que
+ * ja nao existia. `stampCorePedestal` escapava por acidente de ORDENACAO — ele
+ * e carimbado antes do calculo — e nao por garantia nenhuma.
+ *
+ * Aqui a garantia e estrutural: escrita que muda a ABERTURA de uma celula
+ * invalida o derivado, e `derived()` recalcula quando alguem pede. Quem
+ * carimbar terreno no futuro nao precisa saber que estas estruturas existem.
+ *
+ * LEITURA de `solid`/`surface` continua direta e crua: sao arrays quentes,
+ * lidos milhares de vezes por geracao (o automato, `countWallNeighbors`,
+ * `isOpen`), e por um acessor custariam caro sem comprar nada — leitura nao
+ * invalida coisa nenhuma. So a ESCRITA passa pela barreira.
+ *
+ * A FRONTEIRA, dita explicitamente porque regra com excecao escondida foi
+ * justamente o que custou caro: enquanto `entry` nao existe — ruido, automato,
+ * gramatica de salao — nao ha o que derivar, e escrever direto no array e
+ * legitimo (e `stampHalls` faz isso, com suas 12 chamadas a `carveBlob`). Do
+ * momento em que a entrada e escolhida em diante, `derived()` e a unica porta
+ * para chao alcancavel e distancia, e escrita que muda abertura passa por aqui.
+ *
+ * Quem quiser conferir que a fronteira aguentou nao precisa auditar chamada por
+ * chamada: `tests/terreno-derivado.test.ts` cobra o RESULTADO — o derivado que
+ * a geracao entregou tem de bater com um flood e um BFS refeitos do zero sobre
+ * o terreno final. Isso pega qualquer vazamento futuro, venha ele de onde vier.
+ */
+export type TerrainDraft = {
+  readonly solid: Uint8Array;
+  readonly surface: Uint8Array;
+  /** Escreve em `solid`. Invalida o derivado se a abertura da celula mudou. */
+  setSolid: (i: number, mat: number) => void;
+  /** Troca o buffer inteiro (o automato celular trabalha em dobro e comuta). */
+  replaceSolid: (next: Uint8Array) => void;
+  /**
+   * Chao alcancavel a partir da entrada e distancia ate cada celula, no
+   * terreno COMO ELE ESTA. Recalcula so quando a abertura mudou desde a ultima
+   * chamada — entao pedir duas vezes seguidas custa uma.
+   */
+  derived: (entry: Vec2) => { openCells: number[]; distFromEntry: Int32Array };
+};
+
+/**
+ * Exportado para o teste do carimbo da arena, que precisa armar a mao um mapa
+ * onde a moldura fecharia o unico corredor — situacao que nenhuma seed real
+ * produz. Usar o draft de verdade ali faz o teste exercitar a MESMA barreira de
+ * escrita que a geracao usa, em vez de um par de arrays cru que so se parece
+ * com ela.
+ */
+export const createTerrainDraft = (w: number, h: number): TerrainDraft => {
+  const solid = new Uint8Array(w * h).fill(SOLID_ROCK);
+  const surface = new Uint8Array(w * h).fill(SURF_NONE);
+  let revision = 0;
+  let cache: {
+    revision: number;
+    entry: number;
+    openCells: number[];
+    distFromEntry: Int32Array;
+  } | null = null;
+
+  return {
+    solid,
+    surface,
+    setSolid: (i, mat) => {
+      const wasOpen = solid[i] === SOLID_NONE;
+      solid[i] = mat;
+      if (wasOpen !== (mat === SOLID_NONE)) revision++;
+    },
+    replaceSolid: (next) => {
+      solid.set(next);
+      revision++;
+    },
+    derived: (entry) => {
+      const key = idx(w, entry.x, entry.y);
+      if (cache && cache.revision === revision && cache.entry === key) {
+        return { openCells: cache.openCells, distFromEntry: cache.distFromEntry };
+      }
+      const openCells: number[] = [];
+      for (const i of floodOpen(solid, w, h, entry.x, entry.y)) openCells.push(i);
+      openCells.sort((a, b) => a - b);
+      const distFromEntry = bfsFarthest(solid, w, h, entry).dist;
+      cache = { revision, entry: key, openCells, distFromEntry };
+      return { openCells, distFromEntry };
+    },
+  };
 };
 
 const generateAttempt = (
@@ -751,8 +845,8 @@ const generateAttempt = (
   profile: WorldgenProfile
 ): GeneratedWorld | null => {
   const rng = new RNG(seed >>> 0 || 1);
-  const solid = new Uint8Array(w * h).fill(SOLID_ROCK);
-  const surface = new Uint8Array(w * h).fill(SURF_NONE);
+  const draft = createTerrainDraft(w, h);
+  const { solid, surface } = draft;
 
   // 1) ruido inicial
   for (let y = 1; y < h - 1; y++) {
@@ -772,7 +866,7 @@ const generateAttempt = (
         else if (walls <= 3) next[i] = SOLID_NONE;
       }
     }
-    solid.set(next);
+    draft.replaceSolid(next);
   }
 
   // 2b) a estrutura de salao do estrato, sobre o labirinto do automato. Com
@@ -804,18 +898,7 @@ const generateAttempt = (
   const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
   if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
   carveBlob(solid, w, h, corePos.x, corePos.y, 4);
-  // A sala do poco ganha o sotaque do estrato ANTES do re-flood: toda prova
-  // de alcancabilidade abaixo ja enxerga a moldura carimbada.
-  stampCorePedestal(solid, surface, w, h, corePos, profile.halls);
-
-  const openCells: number[] = [];
-  const reOpen = floodOpen(solid, w, h, entry.x, entry.y);
-  for (const i of reOpen) openCells.push(i);
-  openCells.sort((a, b) => a - b);
-
-  // `let` porque a moldura da arena, que so pode ser carimbada depois de o
-  // ponto do chefe existir, refaz este BFS. Ver o rebuild logo abaixo dela.
-  let distFromEntry = bfsFarthest(solid, w, h, entry).dist;
+  stampCorePedestal(draft, w, h, corePos, profile.halls);
 
   const isOpen = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;
@@ -852,29 +935,17 @@ const generateAttempt = (
   // A camara do chefe ganha o sotaque do estrato. Depois do ponto do chefe
   // existir (ele depende do terreno) e antes da decoracao de parede, que so
   // olha para rocha comum e portanto respeita o que a arena carimbou.
-  const arenaFilled = stampBossArena(solid, surface, w, h, guardianSpawn, corePos, entry, profile.halls);
-  // REFAZ o re-flood e o BFS, como o pedestal do poco ja goza por ser carimbado
-  // ANTES deles (linha ~809). A moldura da arena nao tem essa sorte: ela depende
-  // do ponto do chefe, que depende do terreno. Entao ela repara o que sujou.
   //
-  // Podar so as celulas viradas pilar NAO bastava, e as duas provas disso sao
-  // caras de achar a olho: um pilar tambem CORTA caminho. Na seed 141 s3 ele
-  // isolava um pedaco de chao que continuava em `openCells` sem pertencer ao
-  // flood final; na seed 210 s2 ele alongava a rota e o site opcional de tier 3
-  // caia em 135 quando a banda de 82% do novo maximo pedia 136 — a distancia
-  // usada para escolher era de um mundo que deixou de existir.
-  //
-  // `blobSurface`, `pickOpenFar` e `chooseBandCell` consomem estas estruturas
-  // sem revalidar terreno. Refazer as duas e mais barato do que auditar cada
-  // consumidor — e nao depende de eu adivinhar quais deles se importam, que e
-  // o raciocinio que ja falhou duas vezes nesta mesma funcao.
-  if (arenaFilled.size > 0) {
-    const reFlood = floodOpen(solid, w, h, entry.x, entry.y);
-    openCells.length = 0;
-    for (const i of reFlood) openCells.push(i);
-    openCells.sort((a, b) => a - b);
-    distFromEntry = bfsFarthest(solid, w, h, entry).dist;
-  }
+  // Nao ha reparo a fazer aqui: o carimbo escreve pelo draft, entao `openCells`
+  // e `distFromEntry` ja se sabem vencidos e se refazem sozinhos na primeira
+  // leitura. Antes, este ponto carregava um bloco de rebuild manual — e as tres
+  // vezes em que ele esteve errado (bicho dentro de pilar, chao orfao, site de
+  // tier 3 medido num mundo extinto) foram tres esquecimentos do mesmo reparo.
+  const arenaFilled = stampBossArena(draft, w, h, guardianSpawn, corePos, entry, profile.halls);
+
+  // A PARTIR DAQUI o terreno nao muda mais de abertura: as passadas abaixo so
+  // trocam rocha por rocha (minerio, fragil, cristal) e pintam superficie.
+  const { openCells, distFromEntry } = draft.derived(entry);
 
   /**
    * A moldura da arena escolheu o material dela; NENHUMA passada de decoracao
