@@ -38,6 +38,29 @@ const seedWithLineage = (lineage: string): number => {
 
 const LINEAGES = ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'];
 
+/** Distancia em passos a partir da entrada, no mundo COMO ELE FICOU. */
+const bfsFromEntry = (solid: Uint8Array, entry: { x: number; y: number }): Int32Array => {
+  const dist = new Int32Array(WORLD_W * WORLD_H).fill(-1);
+  const start = entry.y * WORLD_W + entry.x;
+  dist[start] = 0;
+  const queue = [start];
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head];
+    const x = cell % WORLD_W;
+    const y = Math.floor(cell / WORLD_W);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) continue;
+      const n = ny * WORLD_W + nx;
+      if (dist[n] !== -1 || solid[n] !== SOLID_NONE) continue;
+      dist[n] = dist[cell] + 1;
+      queue.push(n);
+    }
+  }
+  return dist;
+};
+
 /** Onde o chefe daquele setor esta (Bispo ou Guardiao ocupam o mesmo ponto). */
 const bossOf = (state: SurvivalState): { x: number; y: number } => {
   const boss = state.enemies.find((e) => e.archetype === 'bishop' || e.archetype === 'guardian');
@@ -286,6 +309,58 @@ describe('arena do chefe por estrato', () => {
     expect(conferidos, 'nenhuma celula de moldura na amostra: o teste nao mede nada')
       .toBeGreaterThan(50);
   });
+
+  it('o mundo que a moldura deixa e o mundo que a geracao MEDE', () => {
+    // O pedestal do poco e carimbado ANTES do re-flood e do BFS, entao toda
+    // estrutura derivada ja o enxerga. A moldura da arena nao tem essa sorte —
+    // depende do ponto do chefe, que depende do terreno — e por isso refaz as
+    // duas depois de carimbar.
+    //
+    // Podar so as celulas viradas pilar nao bastava: um pilar tambem CORTA
+    // caminho. Sao dois sintomas distintos, e nenhum dos dois aparece olhando
+    // a camara do chefe:
+    //   - seed 141 s3: chao isolado que continuava em `openCells` sem
+    //     pertencer ao flood final (celula 8251);
+    //   - seed 210 s2: o site opcional de tier 3 caindo em 135 quando a banda
+    //     de 82% do maximo final pedia 136 — escolhido com a distancia de um
+    //     mundo que deixou de existir.
+    for (let seed = 1; seed <= 220; seed++) {
+      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+        const biome = sectorBiome(seed, sector);
+        const profile = biomeProfile(biome, sector);
+        const world = generateWorld(
+          sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
+          WORLD_W,
+          WORLD_H,
+          profile,
+        );
+        if (world.arenaCells.length === 0) continue;
+
+        // 1. `openCells` nao guarda orfao: tudo nela pertence ao flood FINAL.
+        const reach = floodOpen(world.solid, WORLD_W, WORLD_H, world.entry.x, world.entry.y);
+        for (const cell of world.openCells) {
+          expect(
+            reach.has(cell),
+            `seed ${seed} s${sector}: openCells guarda ${cell % WORLD_W},` +
+              `${Math.floor(cell / WORLD_W)}, fora do flood final`,
+          ).toBe(true);
+        }
+
+        // 2. As BANDAS dos sites valem no mundo final. O tier 3 e o alvo: e a
+        //    banda mais funda (82%) e a que uma rota alongada desrespeita.
+        const dist = bfsFromEntry(world.solid, world.entry);
+        const maxPath = dist[world.corePos.y * WORLD_W + world.corePos.x];
+        for (const site of world.salvageSites) {
+          if (site.tier !== 3) continue;
+          const d = dist[site.terminal.y * WORLD_W + site.terminal.x];
+          expect(
+            d,
+            `seed ${seed} s${sector}: site tier 3 a ${d}, raso para a banda de 82% de ${maxPath}`,
+          ).toBeGreaterThanOrEqual(Math.ceil(maxPath * 0.82));
+        }
+      }
+    }
+  }, 90_000);
 
   it('a moldura NAO importa materia de outro estrato', () => {
     // O reverso do teste anterior, e o que de fato quebra se alguem copiar um

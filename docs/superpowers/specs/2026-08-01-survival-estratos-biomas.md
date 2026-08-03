@@ -570,14 +570,28 @@ nada passaria no primeiro teste sem fazer nada.
 
 ### Dois defeitos que a moldura desenterrou
 
-**Bicho emparedado no spawn.** `openCells` é montado no começo da geração e
-nenhum consumidor dele reconfere `solid` — `pickOpenFar`, os sites e os
-trilhos sorteiam direto da lista. Como a arena carimba *depois*, as células
-que viraram pilar continuavam candidatas a spawn: na seed 205, setor 3, um
-cuspidor nascia dentro de um pilar de cristal — invisível, inalcançável, e
-ainda ocupando uma vaga do orçamento do setor. O carimbo agora **devolve** as
-células que consumiu e a lista é podada. O caso aparecia em 1 de 13 mil
-posições, então o teste varre 500 mundos: um punhado de seeds não acharia.
+**O mundo medido deixou de existir.** `openCells` e `distFromEntry` são
+montados no começo da geração, e nenhum consumidor deles reconfere o terreno —
+`blobSurface`, `pickOpenFar`, `chooseBandCell` e os trilhos sorteiam direto
+dali. O pedestal do poço não sofre disso porque é carimbado *antes* dos dois; a
+arena não tem essa sorte, porque depende do ponto do chefe, que depende do
+terreno. Três sintomas, todos do mesmo defeito:
+
+- **Bicho emparedado**: seed 205, setor 3 — um cuspidor nascia dentro de um
+  pilar de cristal, invisível, inalcançável, e ainda ocupando uma vaga do
+  orçamento do setor. Aparecia em 1 de 13 mil posições.
+- **Chão órfão**: seed 141, setor 3 — um pilar isolava um pedaço de chão que
+  continuava em `openCells` sem pertencer ao flood final (célula 8251).
+- **Banda de site rasa**: seed 210, setor 2 — o pilar alongava a rota, e o site
+  opcional de tier 3 caía em 135 quando a banda de 82% do novo máximo (165)
+  pedia 136. Foi escolhido com a distância de um mundo que deixou de existir.
+
+A primeira correção só **podava** as células viradas pilar, o que resolve o
+primeiro sintoma e nenhum dos outros dois: um pilar não só ocupa chão, ele
+também *corta caminho*. Agora a moldura **refaz** o re-flood e o BFS depois de
+carimbar — as duas estruturas que o pedestal já goza por ordem de execução.
+Refazê-las é mais barato do que auditar cada consumidor, e não depende de
+adivinhar quais deles se importam.
 
 **Porta franca no cerco do Guardião.** `closeArena` nunca emparedou ninguém —
 mas *pular* a célula ocupada deixava um vão **aberto e permanente**: o corpo

@@ -813,7 +813,9 @@ const generateAttempt = (
   for (const i of reOpen) openCells.push(i);
   openCells.sort((a, b) => a - b);
 
-  const distFromEntry = bfsFarthest(solid, w, h, entry).dist;
+  // `let` porque a moldura da arena, que so pode ser carimbada depois de o
+  // ponto do chefe existir, refaz este BFS. Ver o rebuild logo abaixo dela.
+  let distFromEntry = bfsFarthest(solid, w, h, entry).dist;
 
   const isOpen = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < w && y < h && solid[idx(w, x, y)] === SOLID_NONE;
@@ -851,14 +853,27 @@ const generateAttempt = (
   // existir (ele depende do terreno) e antes da decoracao de parede, que so
   // olha para rocha comum e portanto respeita o que a arena carimbou.
   const arenaFilled = stampBossArena(solid, surface, w, h, guardianSpawn, corePos, entry, profile.halls);
-  // `openCells` foi montado la em cima e NINGUEM que o consome reconfere
-  // `solid` — pickOpenFar, os sites e os trilhos sorteiam direto dele. Sem esta
-  // poda, uma celula que virou pilar continuaria candidata e um bicho nasceria
-  // emparedado: invisivel, inalcancavel, e ainda contando no orcamento do setor.
+  // REFAZ o re-flood e o BFS, como o pedestal do poco ja goza por ser carimbado
+  // ANTES deles (linha ~809). A moldura da arena nao tem essa sorte: ela depende
+  // do ponto do chefe, que depende do terreno. Entao ela repara o que sujou.
+  //
+  // Podar so as celulas viradas pilar NAO bastava, e as duas provas disso sao
+  // caras de achar a olho: um pilar tambem CORTA caminho. Na seed 141 s3 ele
+  // isolava um pedaco de chao que continuava em `openCells` sem pertencer ao
+  // flood final; na seed 210 s2 ele alongava a rota e o site opcional de tier 3
+  // caia em 135 quando a banda de 82% do novo maximo pedia 136 — a distancia
+  // usada para escolher era de um mundo que deixou de existir.
+  //
+  // `blobSurface`, `pickOpenFar` e `chooseBandCell` consomem estas estruturas
+  // sem revalidar terreno. Refazer as duas e mais barato do que auditar cada
+  // consumidor — e nao depende de eu adivinhar quais deles se importam, que e
+  // o raciocinio que ja falhou duas vezes nesta mesma funcao.
   if (arenaFilled.size > 0) {
-    let keep = 0;
-    for (const cell of openCells) if (!arenaFilled.has(cell)) openCells[keep++] = cell;
-    openCells.length = keep;
+    const reFlood = floodOpen(solid, w, h, entry.x, entry.y);
+    openCells.length = 0;
+    for (const i of reFlood) openCells.push(i);
+    openCells.sort((a, b) => a - b);
+    distFromEntry = bfsFarthest(solid, w, h, entry).dist;
   }
 
   /**
