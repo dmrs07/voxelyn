@@ -29,9 +29,22 @@ import {
 } from './settings';
 import { audio } from './audio';
 import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
-import { requestRunTicket, settleRun } from './progression-api';
+import {
+  fetchCodex,
+  openSession,
+  purchaseKey,
+  purchaseUpgrade,
+  requestRunTicket,
+  settleRun,
+} from './progression-api';
 import { readCachedProfile, writeCachedProfile } from './progression-cache';
 import { renderRecordsPanel } from './records-panel';
+import {
+  needsConfirmation,
+  renderMatrixPanel,
+  type MatrixHandlers,
+  type MatrixViewState,
+} from './matrix-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import {
   deathEchoContractLabelParts,
@@ -1305,6 +1318,128 @@ document.getElementById('btn-records')?.addEventListener('click', () => {
 document
   .getElementById('btn-records-close')
   ?.addEventListener('click', () => closeOverlay(recordsOverlay));
+
+// ---------------------------------------------------------------------------
+// Matriz Geracional
+// ---------------------------------------------------------------------------
+const matrixOverlay = document.getElementById('matrix') as HTMLDivElement;
+const matrixBody = document.getElementById('matrix-body') as HTMLDivElement;
+
+/**
+ * O estado do painel. NAO e o estado da progressao.
+ *
+ * `profile` e sempre o que o servidor mandou por ultimo (ou o cache, marcado
+ * como tal). Nenhuma acao deste painel escreve nele: a compra manda a intencao
+ * e espera a resposta, que substitui o objeto inteiro.
+ */
+const matrixView: MatrixViewState = {
+  tab: 'matrix',
+  profile: readCachedProfile()?.profile ?? null,
+  cached: true,
+  codex: null,
+  pending: null,
+  notice: null,
+  reveal: null,
+};
+
+const drawMatrix = (): void => renderMatrixPanel(matrixBody, matrixView, matrixHandlers);
+
+const progressionUrl = (): string => serverInput.value.trim() || defaultServerUrl();
+
+/** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
+const refreshProfile = async (): Promise<void> => {
+  const result = await openSession(progressionUrl());
+  if (!result.ok) {
+    // Offline: continua mostrando o cache, marcado, e sem botao de compra.
+    matrixView.cached = true;
+    matrixView.notice = null;
+    drawMatrix();
+    return;
+  }
+  matrixView.profile = result.value.profile;
+  matrixView.cached = false;
+  writeCachedProfile(result.value.profile, Date.now());
+  drawMatrix();
+};
+
+const refreshCodex = async (): Promise<void> => {
+  const result = await fetchCodex(progressionUrl(), getLocale());
+  matrixView.codex = result.ok ? result.value : null;
+  drawMatrix();
+};
+
+const matrixHandlers: MatrixHandlers = {
+  onTab: (tab) => {
+    matrixView.tab = tab;
+    matrixView.notice = null;
+    drawMatrix();
+    audio.ui();
+    // O codex e buscado sob demanda: o corpo dos documentos so sai do servidor
+    // para quem tem autorizacao, e nao ha por que pedi-lo antes de abrir a aba.
+    if (tab === 'codex') void refreshCodex();
+  },
+  onPurchase: (upgrade) => {
+    const profile = matrixView.profile;
+    if (!profile || matrixView.pending) return;
+    if (
+      needsConfirmation(upgrade) &&
+      !confirm(
+        `${t('matrix.confirm.title')}\n\n${t('matrix.confirm.cost', {
+          ore: upgrade.oreCost,
+          cores: upgrade.coreCost,
+        })}\n${t('matrix.confirm.warning')}`,
+      )
+    ) {
+      return;
+    }
+    matrixView.pending = upgrade.id;
+    matrixView.notice = null;
+    drawMatrix();
+    void purchaseUpgrade(
+      progressionUrl(),
+      upgrade.id,
+      profile.profileVersion,
+      purchaseKey(profile.profileId, upgrade.id, profile.profileVersion),
+    ).then((result) => {
+      matrixView.pending = null;
+      if (!result.ok) {
+        // Conflito de versao nao e erro do jogador: outra sessao mexeu na
+        // Matriz. Recarrega e explica, em vez de tentar de novo sozinho.
+        if (result.error === 'profile_version_conflict') {
+          matrixView.notice = 'matrix.conflict';
+          void refreshProfile();
+          return;
+        }
+        matrixView.notice = 'matrix.offline';
+        drawMatrix();
+        return;
+      }
+      matrixView.profile = result.value.profile;
+      matrixView.cached = false;
+      writeCachedProfile(result.value.profile, Date.now());
+      matrixView.codex = null; // desatualizado: um documento novo entrou
+      matrixView.reveal = result.value.unlockedLoreFragment;
+      drawMatrix();
+      audio.ui();
+    });
+  },
+  onDismissReveal: () => {
+    matrixView.reveal = null;
+    drawMatrix();
+    audio.ui();
+  },
+};
+
+document.getElementById('btn-matrix')?.addEventListener('click', () => {
+  // Desenha JA com o cache — a Matriz abre instantanea — e busca o
+  // autoritativo em seguida, que substitui o que estiver na tela.
+  drawMatrix();
+  openOverlay(matrixOverlay);
+  void refreshProfile();
+});
+document
+  .getElementById('btn-matrix-close')
+  ?.addEventListener('click', () => closeOverlay(matrixOverlay));
 
 const renderTelemetryLabel = (): void => {
   telemetryButton.textContent = t(isOptedOut() ? 'options.telemetry.off' : 'options.telemetry.on');
