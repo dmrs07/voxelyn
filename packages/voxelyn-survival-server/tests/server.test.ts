@@ -39,6 +39,20 @@ class Harness {
   }
 }
 
+/**
+ * Tira a fauna da sala.
+ *
+ * Os testes de APOSENTADORIA DE SLOT precisam atravessar os 45 s de graca, e
+ * durante esse tempo os avatares ficam parados — comida de espreitador. Quando
+ * a run morre no meio da espera, o servidor para de processar a aposentadoria e
+ * o teste falha por um motivo que nao e o que ele mede. O que segurava isso era
+ * o terreno que a seed calhou de gerar (onde a fauna nascia), ou seja: a
+ * bancada estava medindo a sorte do mapa junto com a regra do slot.
+ */
+const pacify = (room: { state: { enemies: unknown[] } }): void => {
+  room.state.enemies = [];
+};
+
 const move = (x: number, y: number) => ({ move: { x, y }, aim: { x: 1, y: 0 } });
 const interact = () => ({ move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, interact: true });
 
@@ -509,6 +523,7 @@ describe('servidor autoritativo de co-op', () => {
     room.state.players[0].y = room.state.entry.y + 0.5;
     room.state.players[1].x = room.state.entry.x + 25;
     room.state.players[1].y = room.state.entry.y + 25;
+    pacify(room);
     h.disconnect('B');
 
     // dentro do grace o slot segue reservado: o avatar parado bloqueia a saida
@@ -547,6 +562,7 @@ describe('servidor autoritativo de co-op', () => {
     be.hasCore = true;
     room.state.coreTaken = true;
 
+    pacify(room);
     h.disconnect('B');
     h.tick(20 * 45 + 2); // grace expira -> slot aposenta
 
@@ -578,6 +594,7 @@ describe('servidor autoritativo de co-op', () => {
     const deadToken = wb.resumeToken;
 
     const room = h.server.roomForClient('A')!;
+    pacify(room);
     h.disconnect('B');
     h.tick(20 * 45 + 2); // grace expira
 

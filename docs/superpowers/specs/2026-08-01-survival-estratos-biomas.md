@@ -519,6 +519,160 @@ Custo de atlas: o Coveiro nasceu num canvas herdado do Miner (96×120) com
 mais do que o próprio bicho custa. Só depois disso o teto de RGBA do
 validador subiu (96 → 112 MiB), com folga de ~14% sobre o medido.
 
+## Vigésima segunda etapa (implementada): a arena do chefe por estrato
+
+A câmara do chefe era a última sala importante que saía igual em todo bioma.
+O poço já tinha pedestal próprio, a parede já tinha pele própria, o corredor
+já tinha gramática própria — e aí o jogador chegava na sala em que passa mais
+tempo olhando para o chão e encontrava a mesma clareira lisa na Catedral, na
+Cripta e na Fornalha. Onde o combate é mais longo, o lugar era mais mudo.
+
+A moldura usa o **vocabulário que o estrato já tem** — nada de material novo,
+só o material do lugar posto onde muda a luta:
+
+| Estrato | Moldura | O que muda no combate |
+| --- | --- | --- |
+| Basalto (`columns`) | pilares de rocha nas diagonais | anfiteatro: quinas para cortar linha de tiro |
+| Prismático (`radial`) | pilares de **cristal** nas diagonais e nos eixos | cobertura que também é munição: quebrar um no meio da luta descarrega a cadeia |
+| Aquífero (`karst`) | orla de **água** | numa arena fechada a água é chão que CONDUZ: a descarga volta para quem a soltou |
+| Sulfuroso (`lungs`) | parede **porosa** nos eixos e diagonais | abre com um tiro — e o que era cobertura vira passagem nos dois sentidos |
+| Fornalha/Ferrífero (`canyon`) | escombros + orla de **brasa** | o calor abre a couraça do Escoriáceo e cobra do jogador a mesma barra que a arma dele já cobra |
+| Sílica (`terraced`) | anel **frágil** nos eixos | a camada cede em faixa: a cobertura desta arena some mais depressa do que parece |
+| Glacial (`lakes`) | orla de **gelo** | a arena escorrega: esquivar do chefe vira problema de embalo, não de reflexo |
+
+**Geometria.** Sólidos no anel de Chebyshev 4, superfícies nos anéis 5–6 em
+passo 2 (esparsa o bastante para ler como orla). O carimbo pula tudo dentro
+de Chebyshev 2 do chefe e do poço — o Guardião ocupa quase 1,5 tile e
+precisa do 3×3 dele, e o pedestal precisa do dele. A orla fica **fora** do
+raio do bolso do Bispo (4), então no setor 2 a colônia micelial e a orla do
+estrato coexistem em vez de brigar pelo mesmo chão.
+
+**A ordem é o detalhe caro.** Diferente do pedestal do poço, esta arena é
+carimbada *depois* de o ponto do chefe ser escolhido (ele depende do
+terreno), ou seja, depois das provas de alcançabilidade da geração. Então
+ela paga a própria: refaz o flood da entrada e, se isolou o poço ou o chefe,
+**se desfaz por inteiro**. Desfazer tudo — e não a célula culpada — é
+deliberado: meia moldura é um acento que ninguém sabe ler. Um acento de
+bioma nunca vale uma run impossível.
+
+O desfazer leva **as duas camadas**. O `canyon` é o único ramo que levanta
+escombro *e* pinta brasa, e restaurar só o sólido deixava a orla incandescente
+de pé — justo quando a prova decidiu que a moldura inteira não podia existir.
+Meia moldura já seria ilegível; meia moldura que ainda queima é pior.
+
+Nas 800 gerações medidas o desfazer nunca disparou (as câmaras que a geração
+abre são largas demais para um anel esparso de 8 células fechar). Uma rede de
+segurança que nunca é exercitada não é uma rede: `stampBossArena` é exportada
+e o teste arma o caso à mão — câmara ligada ao mundo por um corredor de uma
+faixa que passa exatamente pela célula de eixo do anel — mais o controle de
+duas faixas, em que o pilar fica. Sem o par, um carimbo que não escrevesse
+nada passaria no primeiro teste sem fazer nada.
+
+### Dois defeitos que a moldura desenterrou
+
+**O mundo medido deixou de existir.** `openCells` e `distFromEntry` são
+montados no começo da geração, e nenhum consumidor deles reconfere o terreno —
+`blobSurface`, `pickOpenFar`, `chooseBandCell` e os trilhos sorteiam direto
+dali. O pedestal do poço não sofre disso porque é carimbado *antes* dos dois; a
+arena não tem essa sorte, porque depende do ponto do chefe, que depende do
+terreno. Três sintomas, todos do mesmo defeito:
+
+- **Bicho emparedado**: seed 205, setor 3 — um cuspidor nascia dentro de um
+  pilar de cristal, invisível, inalcançável, e ainda ocupando uma vaga do
+  orçamento do setor. Aparecia em 1 de 13 mil posições.
+- **Chão órfão**: seed 141, setor 3 — um pilar isolava um pedaço de chão que
+  continuava em `openCells` sem pertencer ao flood final (célula 8251).
+- **Banda de site rasa**: seed 210, setor 2 — o pilar alongava a rota, e o site
+  opcional de tier 3 caía em 135 quando a banda de 82% do novo máximo (165)
+  pedia 136. Foi escolhido com a distância de um mundo que deixou de existir.
+
+A primeira correção só **podava** as células viradas pilar, o que resolve o
+primeiro sintoma e nenhum dos outros dois: um pilar não só ocupa chão, ele
+também *corta caminho*. Agora a moldura **refaz** o re-flood e o BFS depois de
+carimbar — as duas estruturas que o pedestal já goza por ordem de execução.
+Refazê-las é mais barato do que auditar cada consumidor, e não depende de
+adivinhar quais deles se importam.
+
+**Porta franca no cerco do Guardião.** `closeArena` nunca emparedou ninguém —
+mas *pular* a célula ocupada deixava um vão **aberto e permanente**: o corpo
+saía de cima dela e sobrava uma saída que nem custa tiro, ao contrário das
+frágeis. O cerco é a promessa da segunda fase, e uma porta de graça a
+desmancha. Agora o corpo é **empurrado uma casa para dentro** (onde a luta é)
+e a parede fecha atrás dele; só quando nem isso dá certo é que o vão sobra,
+porque emparedar alguém é pior do que um cerco furado. Poço e entrada
+continuam podendo furar o anel — são os objetivos da run.
+
+"Nem isso dá certo" inclui **casa de dentro ocupada**, e são dois casos: o
+óbvio (já tem alguém lá) e um que só a geometria do anel produz — duas
+células vizinhas de um lado reto compartilham o mesmo destino, porque `(r,0)`
+e `(r,1)` apontam ambas para `(r-1,0)`. Quem é empurrado passa a constar no
+mapa de corpos, então o segundo enxerga o primeiro. Sem isso o corpo pousava
+nas coordenadas *exatas* do ocupante: um inimigo escondido em cima do
+jogador, com o dano de contato dos dois no mesmo ponto.
+
+E há um terceiro: **dois corpos já na mesma célula do anel**. A simulação não
+aplica colisão entre entidades no movimento, então dois bichos dividem uma
+célula com coordenadas diferentes — mandar os dois para o centro da casa de
+dentro os sobreporia *perfeitamente*, que é exatamente o que o empurrão existe
+para evitar. Nesse caso o vão sobra.
+
+Nenhum dos dois é da arena por estrato: são anteriores a ela, e a mudança de
+terreno só re-sorteou qual seed os exibia. O primeiro era latente desde que a
+geração passou a carimbar terreno depois de montar `openCells`; o segundo,
+desde que o cerco existe.
+
+### Fixtures que fingiam medir
+
+Mudar terreno semeado expôs uma família de testes que dependia da sorte do
+mapa sem dizer. Todos foram reescritos para **procurar** a condição em vez de
+fixá-la, ou para abrir o próprio espaço:
+
+- **Morte ociosa** (`death-echoes`) e **extração do bot** (`leaderboard-http`)
+  fixavam uma seed em que a condição acontecia. Já tinham sido re-semeados à
+  mão antes, e o sintoma era sempre enganoso — `fixture nao morreu` parece
+  defeito da morte, e a falha da extração aparecia numa asserção de
+  `duplicate`, como se o servidor tivesse duplicado a entrada. Agora procuram.
+- **Prensa do Coveiro em ângulo oblíquo**: o alvo a 60° e 90° nascia *fora* da
+  faixa que o helper limpava, então o que segurava o arrasto era o terreno que
+  a seed calhou de gerar. Agora o teste abre a própria caixa.
+- **Aposentadoria de slot** (três testes de servidor): atravessam 45 s de
+  graça com os avatares parados — comida de espreitador. Quando a run morria
+  no meio, o servidor parava de processar a aposentadoria e o teste falhava
+  por outro motivo. Agora a sala é esvaziada de fauna antes da espera.
+- **"Ninguém nasce dentro da moldura"**: usava alcançabilidade a pé, e passava
+  por sorte. Bolsão fechado é feição normal de caverna — a broca abre parede,
+  então bicho atrás de rocha é conteúdo, não defeito. O critério certo é estar
+  *dentro da pedra*, que é o que de fato é impossível.
+
+**A decoração não re-sorteia a moldura.** O passo 4 da geração converte rocha
+adjacente a chão aberto em frágil, minério ou cristal — e um pilar isolado é
+parede *fina nos dois eixos*, o caso de maior chance de virar frágil. Na
+Fornalha da seed 7 os quatro escombros saíam `[minério, minério, frágil,
+rocha]`: como rocha é o único material que não cede a tiro nenhum, três dos
+quatro pilares iam embora a tiro e levavam junto a cobertura que a arena
+promete. As células do carimbo agora saem da decoração — o material da moldura
+é escolha do estrato, não sorteio.
+
+A proteção é **uniforme**, e não só na passada que hoje alcança a moldura. São
+quatro passadas que convertem rocha depois do carimbo (decoração pontual,
+nervuras de cristal, seams e nós de minério), e saber quais podem tocá-la exige
+cruzar estrato com `halls`: o Ferrífero carimba rocha *e* roda nós de minério,
+o Prismático carimba cristal *e* roda nervuras de cristal. Esse raciocínio
+quebra em silêncio quando alguém acrescenta um estrato — e quebrou na primeira
+tentativa, que só cobriu a decoração pontual e deixou os nós do Ferrífero
+comendo um pilar (seed 168, setor 2).
+
+`arenaCells` entra em `GeneratedWorld` por causa disso, e também para o teste
+conseguir distinguir um pilar da arena de uma rocha comum que por acaso caiu
+na mesma diagonal. Sem a distinção o teste cobraria da moldura um minério que
+nunca foi dela — foi o que a primeira versão dele fez.
+
+**Fica pendente, e não é destes:** na seed 71 um perseguidor *invocado* nasce
+dentro da coluna de borda do mapa — o invocar do Guardião não confere solidez
+ao posicionar. É de outro sistema e merece correção própria.
+
+`SIMULATION_VERSION` 17 → 18: o terreno semeado de todo setor de chefe muda.
+
 ## Trabalho futuro
 
 - **Roteamento de energia Aurix**: cabos ligando portas/bombas/defesas;
@@ -530,8 +684,6 @@ validador subiu (96 → 112 MiB), com folga de ~14% sobre o medido.
 - **Nós magnéticos ativos** no Ferrífero (desvio de projéteis): a versão
   atual dos nós é geológica (concentração de veio); a versão ativa mexe em
   balística e merece playtest próprio.
-- Variantes por estrato para as arenas do Bispo e do Guardião (o poço já
-  tem as suas).
 
 ## Ressonância favorecida por bioma (referência de tuning)
 

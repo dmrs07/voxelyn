@@ -130,9 +130,7 @@ describe('fracao deterministica de aceitacao', () => {
     // comprimento que passasse. A re-simulacao para no tick terminal e a
     // canonicalizacao apaga a cauda, entao todas as variantes chegam ao MESMO
     // digest — e o portao decide sobre o digest.
-    // Seed re-escolhida na SIMULATION_VERSION 16: o pedestal do poco desloca a
-    // populacao semeada e a 0x51ee0 parou de morrer ociosa dentro do teto.
-    const fixture = suicideLog(2);
+    const fixture = suicideLog();
     const clean = verifySoloDeath(fixture.seed, fixture.log);
     const padded = verifySoloDeath(
       fixture.seed,
@@ -151,15 +149,8 @@ describe('fracao deterministica de aceitacao', () => {
   });
 });
 
-/**
- * Uma run solo que morre de verdade, e o log dela.
- *
- * Sem nenhuma entrada a contaminação sobe até o teto e o Prospector morre — é a
- * morte mais barata de produzir e a única que não depende de balanceamento de
- * inimigo. LANÇA em vez de devolver null: um fixture que falha em silêncio
- * transformaria os testes abaixo em no-ops verdes, que é pior do que não tê-los.
- */
-const suicideLog = (seed: number): { seed: number; log: string } => {
+/** Tenta UMA seed: devolve o log se ela morre parada, ou null se sobrevive. */
+const tryIdleDeath = (seed: number): { seed: number; log: string } | null => {
   const state = createRun({ seed, playerCount: 1 });
   const commands: PlayerCommand[] = [];
   const buffer: PlayerCommand[] = [emptyCommand()];
@@ -169,17 +160,41 @@ const suicideLog = (seed: number): { seed: number; log: string } => {
     buffer[0] = cmd;
     stepRun(state, buffer);
   }
-  if (state.phase !== 'dead') {
-    throw new Error(`fixture nao morreu: fase ${state.phase}`);
-  }
+  if (state.phase !== 'dead') return null;
   return { seed, log: toBase64(encodeCommandLog(commands)) };
+};
+
+/**
+ * Uma run solo que morre de verdade, e o log dela.
+ *
+ * Sem nenhuma entrada a contaminação sobe até o teto e o Prospector morre — é a
+ * morte mais barata de produzir e a única que não depende de balanceamento de
+ * inimigo. LANÇA em vez de devolver null: um fixture que falha em silêncio
+ * transformaria os testes abaixo em no-ops verdes, que é pior do que não tê-los.
+ *
+ * PROCURA a seed em vez de fixar uma. Se morrer parado depende do terreno em
+ * volta do ponto de nascimento — gás, fungo, distância da primeira fonte — e
+ * toda mudança de geração re-sorteia isso. Com seed fixa (era a 2) o fixture
+ * quebrava a cada mudança de worldgen e o sintoma era "fixture nao morreu",
+ * que parece defeito da morte e não do fixture. O que os testes abaixo exigem
+ * é UMA morte solo determinística; qual seed a produz não importa.
+ */
+let cachedSuicide: { seed: number; log: string } | null = null;
+const suicideLog = (): { seed: number; log: string } => {
+  if (cachedSuicide) return cachedSuicide;
+  for (let seed = 1; seed <= 64; seed++) {
+    const found = tryIdleDeath(seed);
+    if (found) {
+      cachedSuicide = found;
+      return found;
+    }
+  }
+  throw new Error('nenhuma seed morre parada: a contaminacao deixou de matar?');
 };
 
 describe('verificacao da morte solo por re-simulacao', () => {
   it('constroi a capsula a partir do log, sem campo para o cliente mentir', () => {
-    // Seed re-escolhida na SIMULATION_VERSION 16: o pedestal do poco desloca a
-    // populacao semeada e a 0x51ee0 parou de morrer ociosa dentro do teto.
-    const fixture = suicideLog(2);
+    const fixture = suicideLog();
     const verdict = verifySoloDeath(fixture.seed, fixture.log);
     expect(verdict.ok).toBe(true);
     if (!verdict.ok) return;
