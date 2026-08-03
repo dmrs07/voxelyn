@@ -345,6 +345,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // HUD
   // ---------------------------------------------------------------------
   'banner.expedition.offline': 'AURIX UNREACHABLE · LOCAL SIMULATION, NOTHING WILL BE RECORDED',
+  'banner.expedition.tooLong': 'EXPEDITION EXCEEDED THE 30 MIN RECORD · CARGO CANNOT BE CLEARED',
   'banner.expedition.pending': 'TRANSMISSION INTERRUPTED · TELEMETRY WILL BE RESENT',
   'banner.cargo.cleared': 'CARGO CLEARED · +{ore} ORE',
   'banner.cargo.cleared.core': 'CONTRACT COMPLETE · +{ore} ORE AND +{cores} CORE',

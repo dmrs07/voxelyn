@@ -361,6 +361,22 @@ let expedition: { runId: string; seed: number } | null = null;
  * ticket que seria liquidado no fim.
  */
 let authorizing = false;
+
+/**
+ * Uma liquidacao que FALHOU e ainda pode ser reenviada.
+ *
+ * O log fica aqui porque a run que o produziu ja acabou: o `recorder` e o
+ * `expedition` sao sobrescritos na proxima descida, e sem esta copia o minerio de
+ * uma extracao bem-sucedida sumia por causa de um timeout de rede.
+ *
+ * Nao vai para o `localStorage`, e a distincao importa: isto NAO e o "guardar run
+ * offline para creditar depois" que a spec proibe. Aquilo seria um log sem ticket,
+ * uma superficie de adulteracao; isto e um log com ticket JA EMITIDO pelo
+ * servidor, dentro da validade dele, reenviado com o MESMO `runId` — que a
+ * liquidacao trata de forma idempotente. Perder isso ao fechar a aba e aceitavel;
+ * perder ao abrir a Matriz nao era.
+ */
+let pendingSettlement: { runId: string; log: string; url: string } | null = null;
 /** Esta run ja foi enviada para homologacao? */
 let settlementSent = false;
 
@@ -375,6 +391,8 @@ const authorizeExpedition = async (
 ): Promise<{ seed: number; tuning?: PlayerTuning }> => {
   authorizing = true;
   const url = serverInput.value.trim() || defaultServerUrl();
+  // A carga da run ANTERIOR primeiro: ela ja esta paga e so precisa chegar.
+  retryPendingSettlement();
   const authorized = await requestRunTicketWithSession(url, seed).finally(() => {
     authorizing = false;
   });
@@ -411,22 +429,21 @@ const authorizeExpedition = async (
  * Repare no que nao e enviado: minerio, nucleo, fase, tempo. O servidor
  * re-simula a run inteira com a seed e o tuning que ele mesmo autorizou.
  */
-const homologateRun = (state: SurvivalState): void => {
-  if (settlementSent || !expedition || !state.summary) return;
-  if (!recorder.submittable) return; // run longa demais: nao ha o que verificar
-  settlementSent = true;
-  const url = serverInput.value.trim() || defaultServerUrl();
-  const runId = expedition.runId;
-  void settleRun(url, runId, recorder.encode()).then((result) => {
+/** Envia (ou reenvia) uma liquidacao. Idempotente do lado do servidor. */
+const transmitSettlement = (url: string, runId: string, log: string): void => {
+  void settleRun(url, runId, log).then((result) => {
     if (!result.ok) {
-      // A run ja acabou e a tela de resultado esta no ar. Reenviar com o MESMO
-      // runId continua seguro (a liquidacao e idempotente), mas quem decide
-      // tentar de novo e o jogador, na proxima vez que abrir a Matriz.
+      // GUARDA para reenviar. O comentario que estava aqui prometia que o
+      // jogador poderia tentar de novo pela Matriz, e essa rota nao existia:
+      // um timeout de rede apagava em silencio o minerio de uma extracao que
+      // tinha dado certo.
+      pendingSettlement = { runId, log, url };
       console.info('[progressao] nao homologada:', result.error);
       setBanner(t('banner.expedition.pending'));
       setTimeout(() => setBanner(null), 4200);
       return;
     }
+    pendingSettlement = null;
     writeCachedProfile(result.value.profile, Date.now());
     const credited = result.value.result;
     // Tres frases, e nao uma com "+0 NUCLEO" no fim: a extracao antecipada e
@@ -446,6 +463,37 @@ const homologateRun = (state: SurvivalState): void => {
     }
     setTimeout(() => setBanner(null), 4600);
   });
+};
+
+/**
+ * Tenta de novo a liquidacao que ficou pendente.
+ *
+ * Chamada nos dois momentos em que o jogo ja esta falando com o servidor de
+ * qualquer forma — abrir a Matriz e autorizar a proxima expedicao —, em vez de um
+ * temporizador proprio: reenviar em laco contra um servidor fora do ar so gasta
+ * bateria e rate limit.
+ */
+const retryPendingSettlement = (): void => {
+  const pending = pendingSettlement;
+  if (!pending) return;
+  pendingSettlement = null;
+  transmitSettlement(pending.url, pending.runId, pending.log);
+};
+
+const homologateRun = (state: SurvivalState): void => {
+  if (settlementSent || !expedition || !state.summary) return;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  if (!recorder.submittable) {
+    // A run passou do teto de gravacao e nao ha log canonico para o servidor
+    // re-simular. Dizer isso e obrigatorio: em silencio, a tela mostrava a carga
+    // "transmitida para homologacao" e nada era creditado nunca.
+    settlementSent = true;
+    setBanner(t('banner.expedition.tooLong'));
+    setTimeout(() => setBanner(null), 5200);
+    return;
+  }
+  settlementSent = true;
+  transmitSettlement(url, expedition.runId, recorder.encode());
 };
 const recordRun = (state: SurvivalState): void => {
   if (!state.summary) return;
@@ -614,6 +662,20 @@ const applyAdaptiveQuality = (dt: number): void => {
 let stopLoop: (() => void) | null = null;
 
 /**
+ * Qual descida e a ATUAL.
+ *
+ * `stopLoop` so existe depois que o laco comeca, e agora a descida espera uma ida
+ * a rede antes disso. Nessa janela, abandonar pelo menu de campo nao tinha o que
+ * cancelar: quando o ticket chegasse, a continuacao criava o mundo e ligava o
+ * laco ATRAS da tela de titulo — e comecar outra descida nesse meio-tempo deixava
+ * dois lacos vivos disputando o unico `stopLoop`.
+ *
+ * Um contador resolve os dois casos com a mesma pergunta: "eu ainda sou a descida
+ * atual?". Abandonar incrementa; comecar outra tambem.
+ */
+let descentToken = 0;
+
+/**
  * Seed da proxima descida.
  *
  * Uma seed digitada vale para a run inteira, INCLUSIVE os reinicios: a razao de
@@ -715,6 +777,9 @@ const abandonRun = (): void => {
   if (state && state.phase === 'running' && state.tick >= 20) {
     telemetry.abandon(state.sector, state.tick, state.contamination);
   }
+  // Invalida qualquer autorizacao em voo: sem isto, um ticket que chegasse depois
+  // do abandono ainda ligaria um laco por tras da tela de titulo.
+  descentToken++;
   stopLoop?.();
   stopLoop = null;
   liveRun = null;
@@ -817,6 +882,7 @@ const hintOnce = (): void => {
 };
 
 const runSolo = async (): Promise<void> => {
+  const myDescent = ++descentToken;
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
   audio.reset();
@@ -825,6 +891,10 @@ const runSolo = async (): Promise<void> => {
   // mundo primeiro e pedir o ticket depois criaria uma janela em que o
   // Prospector na tela nao e o Prospector autorizado.
   const authorized = await authorizeExpedition(nextSeed());
+  // O jogador pode ter desistido — ou comecado outra descida — enquanto o ticket
+  // vinha. Sair AQUI, antes de tocar em qualquer estado global, e o que impede um
+  // mundo de nascer atras do menu.
+  if (myDescent !== descentToken) return;
   const seed = authorized.seed;
   recorder.start(seed);
   resetRunTracking();
@@ -919,6 +989,7 @@ const runSolo = async (): Promise<void> => {
         // liquidar contra um runId ja fechado — e daria ao jogador um Prospector
         // desatualizado se ele tivesse comprado alguma coisa no intervalo.
         void authorizeExpedition(nextSeed()).then((next) => {
+          if (myDescent !== descentToken) return;
           recorder.start(next.seed);
           telemetry.begin();
           state = createRun({ seed: next.seed, tuning: next.tuning });
@@ -1391,6 +1462,7 @@ const progressionUrl = (): string => serverInput.value.trim() || defaultServerUr
 
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
+  retryPendingSettlement();
   matrixView.loading = true;
   drawMatrix();
   const result = await openSession(progressionUrl());

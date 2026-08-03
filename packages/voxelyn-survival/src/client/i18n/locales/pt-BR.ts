@@ -349,6 +349,7 @@ export const PT_BR = {
   // HUD
   // ---------------------------------------------------------------------
   'banner.expedition.offline': 'AURIX INDISPONÍVEL · SIMULAÇÃO LOCAL, NADA SERÁ REGISTRADO',
+  'banner.expedition.tooLong': 'EXPEDIÇÃO EXCEDEU O REGISTRO DE 30 MIN · CARGA NÃO HOMOLOGÁVEL',
   'banner.expedition.pending': 'TRANSMISSÃO INTERROMPIDA · A TELEMETRIA SERÁ REENVIADA',
   'banner.cargo.cleared': 'CARGA HOMOLOGADA · +{ore} MINÉRIO',
   'banner.cargo.cleared.core': 'CONTRATO CONCLUÍDO · +{ore} MINÉRIO E +{cores} NÚCLEO',

@@ -580,6 +580,47 @@ describe('compra autoritativa', () => {
 // Codex
 // ---------------------------------------------------------------------------
 
+describe('limite das rotas de leitura', () => {
+  // Uma sessao anonima sai de um POST — qualquer script consegue uma. As rotas
+  // de leitura pareciam baratas e nao sao: cada uma consulta o store, e o codex
+  // ainda serializa a colecao inteira de documentos.
+  it('perfil, codex e documento respeitam o teto por origem', async () => {
+    const booted = createWsServer({
+      port: 0,
+      host: '127.0.0.1',
+      baseSeed: 7,
+      progressionSecret: 'segredo-de-teste-com-tamanho-suficiente',
+      progressionRateLimits: { readsPerMinute: 3, settlePerMinute: 3 },
+    });
+    await booted.ready;
+    await new Promise<void>((resolve) => {
+      if (booted.http.listening) return resolve();
+      booted.http.once('listening', () => resolve());
+    });
+    const addr = booted.http.address();
+    const port = typeof addr === 'object' && addr ? addr.port : 0;
+    const url = `http://127.0.0.1:${port}`;
+
+    try {
+      const created = await fetch(`${url}/api/progression/session`, { method: 'POST' });
+      const cookie = (created.headers.get('set-cookie') ?? '').split(';')[0];
+      const get = (path: string): Promise<Response> =>
+        fetch(`${url}${path}`, { headers: { cookie } });
+
+      // A sessao ja consumiu uma vaga; as tres rotas de leitura consomem o resto.
+      const statuses = [
+        (await get('/api/progression/profile')).status,
+        (await get('/api/progression/codex')).status,
+        (await get('/api/progression/codex/AX-PUB-001')).status,
+        (await get('/api/progression/profile')).status,
+      ];
+      expect(statuses).toContain(429);
+    } finally {
+      await booted.close();
+    }
+  });
+});
+
 describe('codex', () => {
   it('um perfil novo le so o documento publico, e ve o resto mascarado', async () => {
     const client = new Client();

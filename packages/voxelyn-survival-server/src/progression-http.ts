@@ -211,7 +211,15 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // -----------------------------------------------------------------------
     // Perfil e codex (leitura)
     // -----------------------------------------------------------------------
+    // As TRES rotas de leitura passam pelo limitador.
+    //
+    // Elas ficaram de fora na primeira versao por parecerem baratas, e nao sao:
+    // cada uma consulta o store, e o codex ainda serializa a colecao inteira de
+    // documentos. Com uma sessao anonima — que qualquer script consegue num POST
+    // — o teto configurado nao protegia justamente as rotas mais faceis de
+    // repetir em laco.
     if (path === '/api/progression/profile' && req.method === 'GET') {
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
       if (!profile) return (fail(res, 'unauthenticated'), true);
       json(res, 200, { profile: publicProfile(profile) });
@@ -219,6 +227,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     }
 
     if (path === '/api/progression/codex' && req.method === 'GET') {
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
       if (!profile) return (fail(res, 'unauthenticated'), true);
       json(res, 200, codexFor(profile, localeOf(url)));
@@ -226,6 +235,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     }
 
     if (path.startsWith('/api/progression/codex/') && req.method === 'GET') {
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
       if (!profile) return (fail(res, 'unauthenticated'), true);
       const id = decodeURIComponent(path.slice('/api/progression/codex/'.length));
