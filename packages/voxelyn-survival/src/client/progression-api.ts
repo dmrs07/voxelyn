@@ -27,9 +27,23 @@ import type {
   PublicProgressionProfile,
 } from '@voxelyn/survival-protocol';
 
+/**
+ * `bad_server_url` nao vem do servidor: e um defeito NOSSO, e por isso tem nome
+ * proprio.
+ *
+ * Ele existe por causa de um bug que passou por uma review inteira e chegou a
+ * producao. Uma renomeacao deixou `openSession(query.url)` com `undefined` no
+ * lugar da URL; `httpBase(undefined)` lancou dentro do mesmo `try` que trata
+ * rede ausente, e a falha saiu como `offline`. Do lado de fora ficou
+ * indistinguivel de um cabo desligado — a Matriz anunciava a Aurix como fora do
+ * ar contra um servidor que respondia normalmente, e a unica pista estava num
+ * DevTools que ninguem tinha motivo para abrir.
+ *
+ * Um erro de programacao nunca deve conseguir se disfarcar de condicao de rede.
+ */
 export type ApiResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: ProgressionErrorCode | 'offline'; status?: number };
+  | { ok: false; error: ProgressionErrorCode | 'offline' | 'bad_server_url'; status?: number };
 
 const httpBase = (serverUrl: string): string =>
   serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
@@ -106,12 +120,41 @@ const writeSessionToken = (serverUrl: string, token: string | null): void => {
 export const TIMEOUT_INTERACTIVE_MS = 6_000;
 export const TIMEOUT_SETTLE_MS = 45_000;
 
+/**
+ * Teto do PRIMEIRO contato com uma origem que ainda nao respondeu nada.
+ *
+ * Seis segundos e o teto certo para uma chamada interativa e o teto errado para
+ * acordar um processo. Um host que hiberna por ociosidade — o padrao de quase
+ * todo PaaS — leva de trinta a sessenta segundos para servir a primeira
+ * requisicao, e com uma tentativa so o jogador nunca via a Aurix: o painel
+ * anunciava "indisponivel" contra um servidor perfeitamente no ar, e a descida
+ * saia sem ticket, jogando a run inteira em simulacao local sem render nada.
+ *
+ * Isto NAO e um teto maior para tudo. E uma segunda tentativa, uma unica vez por
+ * origem por carregamento de pagina, so quando a primeira falhou por nao ter
+ * chegado resposta nenhuma.
+ */
+export const TIMEOUT_WAKE_MS = 25_000;
+
+/**
+ * Origens que ja devolveram uma resposta HTTP nesta pagina.
+ *
+ * Qualquer status serve, inclusive 401 e 429: o que esta afirmacao guarda e
+ * "existe alguem escutando ali", e nao "a chamada deu certo". Uma origem quente
+ * nao paga a espera longa — o custo do despertar acontece no maximo uma vez.
+ */
+const respondedOrigins = new Set<string>();
+
 const call = async <T>(
   serverUrl: string,
   path: string,
   init: RequestInit = {},
   timeoutMs = TIMEOUT_INTERACTIVE_MS,
 ): Promise<ApiResult<T>> => {
+  // ANTES do try: uma URL impossivel nao pode cair no mesmo caminho que uma
+  // rede ausente. Ver o comentario de `ApiResult`.
+  const origin = originOf(serverUrl);
+  if (!origin) return { ok: false, error: 'bad_server_url' };
   try {
     const token = readSessionToken(serverUrl);
     const res = await fetch(`${httpBase(serverUrl)}${path}`, {
@@ -127,6 +170,8 @@ const call = async <T>(
         ...init.headers,
       },
     });
+    // Respondeu: a origem esta acordada, qualquer que tenha sido o status.
+    respondedOrigins.add(origin);
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: ProgressionErrorCode };
       return { ok: false, error: body.error ?? 'internal', status: res.status };
@@ -140,10 +185,32 @@ const call = async <T>(
   }
 };
 
+/**
+ * Uma chamada interativa que aceita pagar o despertar da origem — uma vez.
+ *
+ * A segunda tentativa so acontece com as duas condicoes juntas: a origem nunca
+ * respondeu nesta pagina, e a primeira tentativa nao trouxe resposta nenhuma.
+ * Um 429 ou um 500 nao repetem: o servidor esta acordado e ja disse o que tinha
+ * a dizer, e insistir so gastaria o teto do limitador.
+ */
+const callAwake = async <T>(
+  serverUrl: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<ApiResult<T>> => {
+  const origin = originOf(serverUrl);
+  const first = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
+  if (first.ok || first.error !== 'offline') return first;
+  // `respondedOrigins` e consultado DEPOIS da primeira tentativa: e ela quem
+  // acabou de descobrir se ha alguem ali.
+  if (!origin || respondedOrigins.has(origin)) return first;
+  return call<T>(serverUrl, path, init, TIMEOUT_WAKE_MS);
+};
+
 export const openSession = async (
   serverUrl: string,
 ): Promise<ApiResult<{ profile: PublicProgressionProfile }>> => {
-  const result = await call<{ profile: PublicProgressionProfile; token?: string }>(
+  const result = await callAwake<{ profile: PublicProgressionProfile; token?: string }>(
     serverUrl,
     '/api/progression/session',
     { method: 'POST' },
@@ -157,7 +224,7 @@ export const openSession = async (
 export const fetchProfile = (
   serverUrl: string,
 ): Promise<ApiResult<{ profile: PublicProgressionProfile }>> =>
-  call(serverUrl, '/api/progression/profile');
+  callAwake(serverUrl, '/api/progression/profile');
 
 /**
  * Pede autorizacao para uma expedicao que pode render recurso.
@@ -170,7 +237,7 @@ export const requestRunTicket = (
   serverUrl: string,
   seed?: number,
 ): Promise<ApiResult<{ ticket: ProgressionRunTicket }>> =>
-  call(serverUrl, '/api/progression/runs', {
+  callAwake(serverUrl, '/api/progression/runs', {
     method: 'POST',
     body: JSON.stringify({ seed, mode: 'expedition' }),
   });
@@ -213,7 +280,7 @@ export const purchaseUpgrade = (
   });
 
 export const fetchCodex = (serverUrl: string, lang: string): Promise<ApiResult<CodexResponse>> =>
-  call(serverUrl, `/api/progression/codex?lang=${encodeURIComponent(lang)}`);
+  callAwake(serverUrl, `/api/progression/codex?lang=${encodeURIComponent(lang)}`);
 
 /**
  * Chave de idempotencia de uma compra.

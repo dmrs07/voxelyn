@@ -1469,6 +1469,9 @@ const matrixView: MatrixViewState = {
   tab: 'matrix',
   profile: readCachedProfile()?.profile ?? null,
   cached: true,
+  // Ainda nao perguntamos: nao ha codigo de recusa para mostrar, e afirmar um
+  // seria inventar diagnostico.
+  staleCode: null,
   loading: false,
   codex: null,
   pending: null,
@@ -1513,26 +1516,41 @@ const beginQuery = (tracker: LatestQuery<string>): Query<string> => tracker.begi
 const isCurrentQuery = (tracker: LatestQuery<string>, query: Query<string>): boolean =>
   tracker.isCurrent(query, progressionUrl());
 
+/**
+ * O codigo de uma recusa, do jeito que ele chega a tela: `rate_limited 429`.
+ *
+ * Nao e texto de jogador, e diagnostico — e e justamente o que faltava. Sem ele
+ * o painel mandava conferir a conexao por um problema que nao estava nela, e
+ * descobrir o motivo exigia abrir o DevTools.
+ */
+const refusalCode = (result: { error: string; status?: number }): string =>
+  result.status === undefined ? result.error : `${result.error} ${result.status}`;
+
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
   retryPendingSettlement();
   const query = beginQuery(profileQueries);
   matrixView.loading = true;
   drawMatrix();
-  const result = await openSession(query.url);
+  const result = await openSession(query.scope);
   // Chegou tarde, ou o jogador trocou de servidor: descarta sem tocar em nada.
   // Nem `loading` — quem for a consulta atual cuida do proprio estado.
   if (!isCurrentQuery(profileQueries, query)) return;
   matrixView.loading = false;
   if (!result.ok) {
-    // Offline: continua mostrando o cache, marcado, e sem botao de compra.
+    // Continua mostrando o cache, marcado, e sem botao de compra — mas agora
+    // dizendo QUAL das duas falhas foi. `offline` e a unica que significa "nao
+    // chegou resposta"; todo o resto e a Aurix respondendo e recusando, e o
+    // codigo dela e o que aponta para onde olhar.
     matrixView.cached = true;
+    matrixView.staleCode = result.error === 'offline' ? null : refusalCode(result);
     matrixView.notice = null;
     drawMatrix();
     return;
   }
   matrixView.profile = result.value.profile;
   matrixView.cached = false;
+  matrixView.staleCode = null;
   writeCachedProfile(result.value.profile, Date.now());
   renderer.setProspectorGeneration(result.value.profile.generation);
   drawMatrix();
@@ -1540,7 +1558,7 @@ const refreshProfile = async (): Promise<void> => {
 
 const refreshCodex = async (): Promise<void> => {
   const query = beginQuery(codexQueries);
-  const result = await fetchCodex(query.url, getLocale());
+  const result = await fetchCodex(query.scope, getLocale());
   if (!isCurrentQuery(codexQueries, query)) return;
   matrixView.codex = result.ok ? result.value : null;
   drawMatrix();
@@ -1575,7 +1593,7 @@ const matrixHandlers: MatrixHandlers = {
     drawMatrix();
     const query = beginQuery(purchaseQueries);
     void purchaseUpgrade(
-      query.url,
+      query.scope,
       upgrade.id,
       profile.profileVersion,
       purchaseKey(profile.profileId, upgrade.id, profile.profileVersion),
@@ -1589,16 +1607,25 @@ const matrixHandlers: MatrixHandlers = {
         // Conflito de versao nao e erro do jogador: outra sessao mexeu na
         // Matriz. Recarrega e explica, em vez de tentar de novo sozinho.
         if (result.error === 'profile_version_conflict') {
-          matrixView.notice = 'matrix.conflict';
+          matrixView.notice = { key: 'matrix.conflict' };
           void refreshProfile();
           return;
         }
-        matrixView.notice = 'matrix.offline';
+        // Mesma separacao do aviso de topo: `offline` e a unica falha que
+        // significa "nao chegou resposta". Saldo insuficiente, teto de
+        // requisicoes e protocolo desconhecido sao a Aurix respondendo, e
+        // chamar isso de conexao indisponivel mandava o jogador conferir a rede
+        // por um problema que nao estava nela.
+        matrixView.notice =
+          result.error === 'offline'
+            ? { key: 'matrix.offline' }
+            : { key: 'matrix.refused', params: { code: refusalCode(result) } };
         drawMatrix();
         return;
       }
       matrixView.profile = result.value.profile;
       matrixView.cached = false;
+      matrixView.staleCode = null;
       writeCachedProfile(result.value.profile, Date.now());
       matrixView.codex = null; // desatualizado: um documento novo entrou
       matrixView.reveal = result.value.unlockedLoreFragment;
