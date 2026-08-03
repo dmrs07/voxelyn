@@ -262,6 +262,21 @@ export type ServerSnapshot = {
   world?: WorldFlags;
   // estado privado do viewer (HUD)
   you?: ViewerState;
+  /**
+   * CARGA NAO HOMOLOGADA da run: `stats.oreCollected`, espelhado.
+   *
+   * GLOBAL, e nao dentro de `you`. O contador sempre foi da equipe — a lasca que
+   * o parceiro arranca conta para os dois —, e poe-lo no estado privado do
+   * viewer inventaria uma posse individual que a simulacao nao tem.
+   *
+   * Viaja apesar de o evento `ore_gained` ja carregar `total` porque evento nao
+   * sobrevive a reconexao nem a resync: sem este campo, quem volta para a sala ve
+   * a carga zerada e decide extrair com o numero errado na tela.
+   *
+   * Opcional: um servidor anterior a v12 simplesmente nao o manda, e o cliente
+   * cai em zero ate o proximo `ore_gained` repor o valor.
+   */
+  cargoOre?: number;
   // hash autoritativo periodico para deteccao de divergencia
   authHash?: string;
   /**
@@ -300,6 +315,21 @@ export type ServerFullResync = {
   // sempre presente: e a base que reconecta/late-join sincroniza de uma vez
   world: WorldFlags;
   authHash: string;
+  /**
+   * CARGA NAO HOMOLOGADA da run: `stats.oreCollected`, espelhado.
+   *
+   * GLOBAL, e nao dentro de `you`. O contador sempre foi da equipe — a lasca que
+   * o parceiro arranca conta para os dois —, e poe-lo no estado privado do
+   * viewer inventaria uma posse individual que a simulacao nao tem.
+   *
+   * Viaja apesar de o evento `ore_gained` ja carregar `total` porque evento nao
+   * sobrevive a reconexao nem a resync: sem este campo, quem volta para a sala ve
+   * a carga zerada e decide extrair com o numero errado na tela.
+   *
+   * Opcional: um servidor anterior a v12 simplesmente nao o manda, e o cliente
+   * cai em zero ate o proximo `ore_gained` repor o valor.
+   */
+  cargoOre?: number;
 };
 
 export type ServerHeartbeatAck = {

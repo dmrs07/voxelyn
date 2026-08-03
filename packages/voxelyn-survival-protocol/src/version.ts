@@ -10,7 +10,13 @@
 // branco, e um cliente antigo contra servidor novo procuraria `text`. Sem o
 // bump, o handshake aceitaria os dois pares e o defeito apareceria como um
 // aviso vazio no meio do co-op, em vez de uma recusa explicita na conexao.
-export const PROTOCOL_VERSION = 11;
+// 12: CARGA NAO HOMOLOGADA no wire. `cargoOre` entra em snapshot e full_resync
+// como estado GLOBAL da sala — `oreCollected` sempre foi contador de equipe, e
+// poe-lo no estado privado do viewer inventaria uma posse individual que a
+// simulacao nao tem. Sem o campo, o contador do HUD dependeria so dos eventos
+// `ore_gained`: quem reconecta ou pede resync veria a carga da run zerada e
+// tomaria a decisao de extrair com o numero errado na tela.
+export const PROTOCOL_VERSION = 12;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -68,7 +74,16 @@ export const PROTOCOL_VERSION = 11;
 // (glacial). O carimbo roda depois da escolha do ponto do chefe, entao paga a
 // propria prova de alcancabilidade e se DESFAZ inteiro se isolar poco ou
 // chefe. O terreno semeado de todo setor de chefe muda.
-export const SIMULATION_VERSION = 18;
+// 19: MATRIZ GERACIONAL. Duas mudancas autoritativas na mesma leva:
+// - a cota de modulo por minerio SAI (payOreQuota, ORE_PER_MODULE,
+//   oreModulesPaid). Dois peers em versoes diferentes discordariam sobre a
+//   existencia de uma escolha pendente no tick em que a 14a lasca cai;
+// - o PlayerTuning entra no estado e no HASH autoritativo. Uma expedicao com
+//   +12% de vida tem de produzir um digest diferente do de uma run de fabrica,
+//   senao o replay do leaderboard verificaria uma contra a outra.
+// Tambem aqui: DISCOVERY_CARGO_LOST (bit 13) entra na bitmask de descobertas,
+// que ja fazia parte do hash.
+export const SIMULATION_VERSION = 19;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
