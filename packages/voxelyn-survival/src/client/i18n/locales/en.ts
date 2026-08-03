@@ -346,7 +346,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   'banner.expedition.offline': 'AURIX UNREACHABLE · LOCAL SIMULATION, NOTHING WILL BE RECORDED',
   'banner.expedition.pending': 'TRANSMISSION INTERRUPTED · TELEMETRY WILL BE RESENT',
-  'banner.cargo.cleared': 'CARGO CLEARED · +{ore} ORE AND +{cores} CORE',
+  'banner.cargo.cleared': 'CARGO CLEARED · +{ore} ORE',
+  'banner.cargo.cleared.core': 'CONTRACT COMPLETE · +{ore} ORE AND +{cores} CORE',
   'banner.cargo.lost': 'NO RECOVERY VALUE · {ore} CARGO LOST IN THE VEIN',
   'matrix.title': 'AURIX GENERATIONAL MATRIX',
   'matrix.tab.matrix': 'Matrix',

@@ -350,7 +350,8 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   'banner.expedition.offline': 'AURIX INDISPONÍVEL · SIMULAÇÃO LOCAL, NADA SERÁ REGISTRADO',
   'banner.expedition.pending': 'TRANSMISSÃO INTERROMPIDA · A TELEMETRIA SERÁ REENVIADA',
-  'banner.cargo.cleared': 'CARGA HOMOLOGADA · +{ore} MINÉRIO E +{cores} NÚCLEO',
+  'banner.cargo.cleared': 'CARGA HOMOLOGADA · +{ore} MINÉRIO',
+  'banner.cargo.cleared.core': 'CONTRATO CONCLUÍDO · +{ore} MINÉRIO E +{cores} NÚCLEO',
   'banner.cargo.lost': 'SEM VALOR DE RECUPERAÇÃO · {ore} DE CARGA PERDIDOS NO VEIO',
   'matrix.title': 'MATRIZ GERACIONAL AURIX',
   'matrix.tab.matrix': 'Matriz',

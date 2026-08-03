@@ -375,6 +375,20 @@ const rowToProfile = (row: Record<string, unknown>): StoredProfile =>
     updatedAt: String(row.updated_at),
   });
 
+/**
+ * Recusa de negocio que precisa DESFAZER a transacao.
+ *
+ * Nao e excecao de erro: e o unico jeito de sair de dentro de um BEGIN sem
+ * commitar o que ja foi escrito ate ali. Quem chama a converte de volta num
+ * codigo de erro comum.
+ */
+class AbortTransaction extends Error {
+  constructor(readonly code: ProgressionErrorCode) {
+    super(code);
+    this.name = 'AbortTransaction';
+  }
+}
+
 export class PostgresProgressionStore implements ProgressionStore {
   constructor(private readonly pool: PgPool) {}
 
@@ -395,7 +409,21 @@ export class PostgresProgressionStore implements ProgressionStore {
     return new PostgresProgressionStore(pool);
   }
 
-  /** BEGIN/COMMIT com rollback garantido. Nenhuma escrita parcial sobrevive. */
+  /**
+   * BEGIN/COMMIT com rollback garantido. Nenhuma escrita parcial sobrevive.
+   *
+   * ATENCAO ao contrato: um `return` normal COMMITA. Uma recusa de negocio que
+   * devolvesse `{ ok: false }` depois de ja ter inserido alguma linha commitaria
+   * essa linha — e foi exatamente o que aconteceu com a compra: o registro de
+   * idempotencia entrava antes da checagem de versao, e um 409 deixava para tras
+   * uma chave envenenada. O retry seguinte encontrava a chave, respondia
+   * `replayed: true`, e o jogador via um protocolo que nunca foi debitado nem
+   * concedido.
+   *
+   * Por isso toda recusa de dentro de uma transacao passa por `AbortTransaction`:
+   * ela sai pelo `catch`, o rollback acontece, e o codigo de erro chega intacto a
+   * quem chamou.
+   */
   private async transaction<T>(fn: (client: PgClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try {
@@ -487,198 +515,222 @@ export class PostgresProgressionStore implements ProgressionStore {
   }
 
   async settleRun(input: SettleInput): Promise<SettleOutput | { error: ProgressionErrorCode }> {
-    return this.transaction(async (client) => {
-      // `for update` serializa duas liquidacoes do mesmo perfil. Sem ele, duas
-      // runs terminando junto leriam o mesmo saldo e uma sobrescreveria a outra.
-      const profileRows = await client.query(
-        'select * from progression_profiles where profile_id = $1 for update',
-        [input.profileId],
-      );
-      const row = profileRows.rows[0];
-      if (!row) return { error: 'unauthenticated' as ProgressionErrorCode };
-      const profile = rowToProfile(row);
+    return this.runOrAbort<SettleOutput | { error: ProgressionErrorCode }>(
+      (code) => ({ error: code }),
+      async (client) => {
+        // `for update` serializa duas liquidacoes do mesmo perfil. Sem ele, duas
+        // runs terminando junto leriam o mesmo saldo e uma sobrescreveria a outra.
+        const profileRows = await client.query(
+          'select * from progression_profiles where profile_id = $1 for update',
+          [input.profileId],
+        );
+        const row = profileRows.rows[0];
+        if (!row) throw new AbortTransaction('unauthenticated');
+        const profile = rowToProfile(row);
 
-      const existing = await client.query(
-        'select * from progression_settled_runs where profile_id = $1 and run_id = $2',
-        [input.profileId, input.runId],
-      );
-      const previous = existing.rows[0];
-      if (previous) {
-        return {
-          fresh: false,
-          reward: {
-            ore: Number(previous.ore_credited),
-            cores: Number(previous.cores_credited),
-            lost: Number(previous.ore_lost),
-          },
-          phase: String(previous.phase) as RunPhase,
-          cargoOre: Number(previous.cargo_ore),
-          durationTicks: Number(previous.duration_ticks),
-          profile,
-        };
-      }
+        const existing = await client.query(
+          'select * from progression_settled_runs where profile_id = $1 and run_id = $2',
+          [input.profileId, input.runId],
+        );
+        const previous = existing.rows[0];
+        if (previous) {
+          return {
+            fresh: false,
+            reward: {
+              ore: Number(previous.ore_credited),
+              cores: Number(previous.cores_credited),
+              lost: Number(previous.ore_lost),
+            },
+            phase: String(previous.phase) as RunPhase,
+            cargoOre: Number(previous.cargo_ore),
+            durationTicks: Number(previous.duration_ticks),
+            profile,
+          };
+        }
 
-      const reward = rewardFor(input.phase, input.cargoOre);
-      const next = applySettlement(profile, input.phase, reward, input.now);
+        const reward = rewardFor(input.phase, input.cargoOre);
+        const next = applySettlement(profile, input.phase, reward, input.now);
 
-      await client.query(
-        `insert into progression_settled_runs
+        await client.query(
+          `insert into progression_settled_runs
            (profile_id, run_id, phase, cargo_ore, ore_credited, cores_credited, ore_lost, duration_ticks)
          values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [
-          input.profileId,
-          input.runId,
-          input.phase,
-          input.cargoOre,
-          reward.ore,
-          reward.cores,
-          reward.lost,
-          input.durationTicks,
-        ],
-      );
-      await client.query(
-        `update progression_profiles
+          [
+            input.profileId,
+            input.runId,
+            input.phase,
+            input.cargoOre,
+            reward.ore,
+            reward.cores,
+            reward.lost,
+            input.durationTicks,
+          ],
+        );
+        await client.query(
+          `update progression_profiles
             set profile_version = $2, ore = $3, cores = $4, statistics = $5::jsonb, updated_at = $6
           where profile_id = $1`,
-        [
-          input.profileId,
-          next.profileVersion,
-          next.wallet.ore,
-          next.wallet.cores,
-          JSON.stringify(next.statistics),
-          input.now,
-        ],
-      );
-      await client.query(
-        `insert into progression_ledger
+          [
+            input.profileId,
+            next.profileVersion,
+            next.wallet.ore,
+            next.wallet.cores,
+            JSON.stringify(next.statistics),
+            input.now,
+          ],
+        );
+        await client.query(
+          `insert into progression_ledger
            (entry_id, profile_id, type, reference, ore_delta, core_delta, ore_after, cores_after, metadata, created_at)
          values ($1,$2,'run_settlement',$3,$4,$5,$6,$7,$8::jsonb,$9)`,
-        [
-          input.idFactory(),
-          input.profileId,
-          input.runId,
-          reward.ore,
-          reward.cores,
-          next.wallet.ore,
-          next.wallet.cores,
-          JSON.stringify({
-            phase: input.phase,
-            seed: input.seed,
-            simulationVersion: input.simulationVersion,
-            durationTicks: input.durationTicks,
-          }),
-          input.now,
-        ],
-      );
+          [
+            input.idFactory(),
+            input.profileId,
+            input.runId,
+            reward.ore,
+            reward.cores,
+            next.wallet.ore,
+            next.wallet.cores,
+            JSON.stringify({
+              phase: input.phase,
+              seed: input.seed,
+              simulationVersion: input.simulationVersion,
+              durationTicks: input.durationTicks,
+            }),
+            input.now,
+          ],
+        );
 
-      return {
-        fresh: true,
-        reward,
-        phase: input.phase,
-        cargoOre: input.cargoOre,
-        durationTicks: input.durationTicks,
-        profile: next,
-      };
-    });
+        return {
+          fresh: true,
+          reward,
+          phase: input.phase,
+          cargoOre: input.cargoOre,
+          durationTicks: input.durationTicks,
+          profile: next,
+        };
+      },
+    );
+  }
+
+  /** Roda numa transacao e converte `AbortTransaction` no erro de negocio. */
+  private async runOrAbort<T>(
+    onAbort: (code: ProgressionErrorCode) => T,
+    fn: (client: PgClient) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.transaction(fn);
+    } catch (err) {
+      if (err instanceof AbortTransaction) return onAbort(err.code);
+      throw err;
+    }
   }
 
   async purchase(input: PurchaseInput): Promise<PurchaseOutput> {
-    return this.transaction(async (client) => {
-      const profileRows = await client.query(
-        'select * from progression_profiles where profile_id = $1 for update',
-        [input.profileId],
-      );
-      const row = profileRows.rows[0];
-      if (!row) return { ok: false, error: 'unauthenticated' as ProgressionErrorCode };
-      const profile = rowToProfile(row);
+    return this.runOrAbort<PurchaseOutput>(
+      (code) => ({ ok: false, error: code }),
+      async (client) => {
+        const profileRows = await client.query(
+          'select * from progression_profiles where profile_id = $1 for update',
+          [input.profileId],
+        );
+        const row = profileRows.rows[0];
+        if (!row) throw new AbortTransaction('unauthenticated');
+        const profile = rowToProfile(row);
 
-      const replay = await client.query(
-        'select * from progression_purchases where profile_id = $1 and idempotency_key = $2',
-        [input.profileId, input.idempotencyKey],
-      );
-      const previous = replay.rows[0];
-      if (previous) {
-        return {
-          ok: true,
-          replayed: true,
-          profile,
-          upgradeId: String(previous.upgrade_id),
-          oreSpent: Number(previous.ore_spent),
-          coresSpent: Number(previous.cores_spent),
-          loreFragmentId: String(previous.lore_fragment),
-        };
-      }
+        const replay = await client.query(
+          'select * from progression_purchases where profile_id = $1 and idempotency_key = $2',
+          [input.profileId, input.idempotencyKey],
+        );
+        const previous = replay.rows[0];
+        if (previous) {
+          return {
+            ok: true,
+            replayed: true,
+            profile,
+            upgradeId: String(previous.upgrade_id),
+            oreSpent: Number(previous.ore_spent),
+            coresSpent: Number(previous.cores_spent),
+            loreFragmentId: String(previous.lore_fragment),
+          };
+        }
 
-      if (profile.profileVersion !== input.expectedProfileVersion) {
-        return { ok: false, error: 'profile_version_conflict' as ProgressionErrorCode };
-      }
+        if (profile.profileVersion !== input.expectedProfileVersion) {
+          throw new AbortTransaction('profile_version_conflict');
+        }
 
-      const decision = decidePurchase(profile, input.upgradeId, input.now);
-      if (!decision.ok) return { ok: false, error: decision.error };
+        const decision = decidePurchase(profile, input.upgradeId, input.now);
+        if (!decision.ok) throw new AbortTransaction(decision.error);
 
-      await client.query(
-        `insert into progression_purchases
-           (profile_id, idempotency_key, upgrade_id, ore_spent, cores_spent, lore_fragment)
-         values ($1,$2,$3,$4,$5,$6)`,
-        [
-          input.profileId,
-          input.idempotencyKey,
-          decision.upgradeId,
-          decision.oreSpent,
-          decision.coresSpent,
-          decision.loreFragmentId,
-        ],
-      );
-      // `and profile_version = $N` fecha a corrida que o `for update` ja cobre
-      // dentro desta instancia — e cobre tambem duas instancias contra o mesmo
-      // banco, onde o lock de linha de uma nao existe para a outra.
-      const updated = await client.query(
-        `update progression_profiles
+        // O PERFIL PRIMEIRO, e a chave de idempotencia depois.
+        //
+        // A ordem inversa era o bug: a chave entrava, a atualizacao de versao
+        // falhava por corrida, e a recusa commitava a chave sozinha. Gravando o
+        // perfil primeiro, a corrida e detectada antes de existir qualquer
+        // registro de compra — e o `AbortTransaction` desfaz o que houver.
+        //
+        // `and profile_version = $N` fecha a corrida que o `for update` ja cobre
+        // dentro desta instancia — e cobre tambem duas instancias contra o mesmo
+        // banco, onde o lock de linha de uma nao existe para a outra.
+        const updated = await client.query(
+          `update progression_profiles
             set profile_version = $2, ore = $3, cores = $4, purchased = $5::jsonb,
                 unlocked_lore = $6::jsonb, statistics = $7::jsonb, updated_at = $8
           where profile_id = $1 and profile_version = $9`,
-        [
-          input.profileId,
-          decision.profile.profileVersion,
-          decision.profile.wallet.ore,
-          decision.profile.wallet.cores,
-          JSON.stringify(decision.profile.purchasedUpgradeIds),
-          JSON.stringify(decision.profile.unlockedLoreFragmentIds),
-          JSON.stringify(decision.profile.statistics),
-          input.now,
-          input.expectedProfileVersion,
-        ],
-      );
-      if (!updated.rowCount) {
-        return { ok: false, error: 'profile_version_conflict' as ProgressionErrorCode };
-      }
-      await client.query(
-        `insert into progression_ledger
+          [
+            input.profileId,
+            decision.profile.profileVersion,
+            decision.profile.wallet.ore,
+            decision.profile.wallet.cores,
+            JSON.stringify(decision.profile.purchasedUpgradeIds),
+            JSON.stringify(decision.profile.unlockedLoreFragmentIds),
+            JSON.stringify(decision.profile.statistics),
+            input.now,
+            input.expectedProfileVersion,
+          ],
+        );
+        if (!updated.rowCount) throw new AbortTransaction('profile_version_conflict');
+        await client.query(
+          `insert into progression_purchases
+           (profile_id, idempotency_key, upgrade_id, ore_spent, cores_spent, lore_fragment)
+         values ($1,$2,$3,$4,$5,$6)`,
+          [
+            input.profileId,
+            input.idempotencyKey,
+            decision.upgradeId,
+            decision.oreSpent,
+            decision.coresSpent,
+            decision.loreFragmentId,
+          ],
+        );
+        await client.query(
+          `insert into progression_ledger
            (entry_id, profile_id, type, reference, ore_delta, core_delta, ore_after, cores_after, metadata, created_at)
          values ($1,$2,'upgrade_purchase',$3,$4,$5,$6,$7,$8::jsonb,$9)`,
-        [
-          input.idFactory(),
-          input.profileId,
-          input.idempotencyKey,
-          -decision.oreSpent,
-          -decision.coresSpent,
-          decision.profile.wallet.ore,
-          decision.profile.wallet.cores,
-          JSON.stringify({ unlockedLoreFragmentId: decision.loreFragmentId }),
-          input.now,
-        ],
-      );
+          [
+            input.idFactory(),
+            input.profileId,
+            input.idempotencyKey,
+            -decision.oreSpent,
+            -decision.coresSpent,
+            decision.profile.wallet.ore,
+            decision.profile.wallet.cores,
+            JSON.stringify({ unlockedLoreFragmentId: decision.loreFragmentId }),
+            input.now,
+          ],
+        );
 
-      return {
-        ok: true,
-        replayed: false,
-        profile: decision.profile,
-        upgradeId: decision.upgradeId,
-        oreSpent: decision.oreSpent,
-        coresSpent: decision.coresSpent,
-        loreFragmentId: decision.loreFragmentId,
-      };
-    });
+        return {
+          ok: true,
+          replayed: false,
+          profile: decision.profile,
+          upgradeId: decision.upgradeId,
+          oreSpent: decision.oreSpent,
+          coresSpent: decision.coresSpent,
+          loreFragmentId: decision.loreFragmentId,
+        };
+      },
+    );
   }
 
   async ledger(profileId: string): Promise<ProgressionLedgerEntry[]> {

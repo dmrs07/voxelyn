@@ -350,6 +350,17 @@ let forcedSeed: number | null = null;
  * uma superficie grande de adulteracao em troca de conveniencia pequena.
  */
 let expedition: { runId: string; seed: number } | null = null;
+/**
+ * Ha uma autorizacao de expedicao EM VOO?
+ *
+ * Guarda de reentrada, e nao de conveniencia. `authorizeExpedition` e uma ida a
+ * rede, e a tela de resultado continua desenhando enquanto ela corre — com o
+ * portao ja armado. Cada toque a mais (e na tela de morte o jogador toca varias
+ * vezes) emitia um ticket novo, e a ULTIMA promessa a resolver sobrescrevia
+ * `state`: com respostas fora de ordem, a run que aparecia na tela nao era a do
+ * ticket que seria liquidado no fim.
+ */
+let authorizing = false;
 /** Esta run ja foi enviada para homologacao? */
 let settlementSent = false;
 
@@ -362,8 +373,11 @@ let settlementSent = false;
 const authorizeExpedition = async (
   seed: number,
 ): Promise<{ seed: number; tuning?: PlayerTuning }> => {
+  authorizing = true;
   const url = serverInput.value.trim() || defaultServerUrl();
-  const result = await requestRunTicket(url, seed);
+  const result = await requestRunTicket(url, seed).finally(() => {
+    authorizing = false;
+  });
   if (!result.ok) {
     expedition = null;
     setBanner(t('banner.expedition.offline'));
@@ -408,14 +422,21 @@ const homologateRun = (state: SurvivalState): void => {
     }
     writeCachedProfile(result.value.profile, Date.now());
     const credited = result.value.result;
-    setBanner(
-      credited.oreCredited > 0 || credited.coresCredited > 0
-        ? t('banner.cargo.cleared', {
-            ore: credited.oreCredited,
-            cores: credited.coresCredited,
-          })
-        : t('banner.cargo.lost', { ore: credited.oreLost }),
-    );
+    // Tres frases, e nao uma com "+0 NUCLEO" no fim: a extracao antecipada e
+    // uma decisao legitima, e anunciar o zero que ela nao trouxe a transforma
+    // num fracasso parcial toda vez que o jogador escolhe voltar cedo.
+    if (credited.coresCredited > 0) {
+      setBanner(
+        t('banner.cargo.cleared.core', {
+          ore: credited.oreCredited,
+          cores: credited.coresCredited,
+        }),
+      );
+    } else if (credited.oreCredited > 0) {
+      setBanner(t('banner.cargo.cleared', { ore: credited.oreCredited }));
+    } else {
+      setBanner(t('banner.cargo.lost', { ore: credited.oreLost }));
+    }
     setTimeout(() => setBanner(null), 4600);
   });
 };
@@ -880,7 +901,12 @@ const runSolo = async (): Promise<void> => {
       // sem ele, quem abrisse o menu na tela de fim para sair veria a run
       // reiniciar por baixo do proprio menu. Os TOQUES ja param sozinhos — a
       // overlay engole o pointerdown antes de o canvas ve-lo.
-      if (!pauseMenu.isOpen && armed && (input.hasTap() || input.consumeRestartKey())) {
+      if (
+        !pauseMenu.isOpen &&
+        armed &&
+        !authorizing &&
+        (input.hasTap() || input.consumeRestartKey())
+      ) {
         // Cada tentativa e uma expedicao NOVA: ticket novo, runId novo, tuning
         // relido do perfil. Reusar o anterior deixaria a segunda run tentando
         // liquidar contra um runId ja fechado — e daria ao jogador um Prospector
@@ -1345,6 +1371,7 @@ const matrixView: MatrixViewState = {
   tab: 'matrix',
   profile: readCachedProfile()?.profile ?? null,
   cached: true,
+  loading: false,
   codex: null,
   pending: null,
   notice: null,
@@ -1357,7 +1384,10 @@ const progressionUrl = (): string => serverInput.value.trim() || defaultServerUr
 
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
+  matrixView.loading = true;
+  drawMatrix();
   const result = await openSession(progressionUrl());
+  matrixView.loading = false;
   if (!result.ok) {
     // Offline: continua mostrando o cache, marcado, e sem botao de compra.
     matrixView.cached = true;

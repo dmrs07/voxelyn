@@ -381,6 +381,46 @@ describe('compra no store', () => {
     expect(result).toEqual({ ok: false, error: 'profile_version_conflict' });
   });
 
+  // A regressao mais cara desta feature, e ela so existia no caminho Postgres:
+  // a chave de idempotencia era gravada ANTES da checagem de versao, e a recusa
+  // saia por `return` — que COMMITA. A chave ficava envenenada: o retry seguinte
+  // a encontrava, respondia `replayed: true`, e o jogador via um protocolo que
+  // nunca foi debitado nem concedido.
+  //
+  // O store de memoria nunca teve o bug (ele decide antes de escrever), mas o
+  // invariante e o mesmo nos dois e e aqui que ele fica escrito: uma compra
+  // recusada nao deixa rastro, e a MESMA chave continua servindo depois.
+  it('uma compra recusada por conflito nao envenena a chave de idempotencia', async () => {
+    const store = await funded();
+    const version = (await store.getProfile('p1'))?.profileVersion ?? 0;
+
+    const stale = await buy(store, 'CA-01', version - 1, 'key-veneno-01');
+    expect(stale).toEqual({ ok: false, error: 'profile_version_conflict' });
+
+    // Nada foi gravado: nem compra, nem ledger, nem debito.
+    const afterConflict = await store.getProfile('p1');
+    expect(afterConflict?.purchasedUpgradeIds).toEqual([]);
+    expect(afterConflict?.profileVersion).toBe(version);
+    expect(await store.ledger('p1')).toHaveLength(1); // so a liquidacao inicial
+
+    // E a mesma chave ainda funciona, agora com a versao certa.
+    const retry = await buy(store, 'CA-01', version, 'key-veneno-01');
+    expect(retry.ok).toBe(true);
+    if (!retry.ok) return;
+    expect(retry.replayed).toBe(false);
+    expect(retry.profile.purchasedUpgradeIds).toEqual(['CA-01']);
+  });
+
+  it('uma compra recusada por saldo tambem nao deixa rastro', async () => {
+    const store = new MemoryProgressionStore();
+    await store.createProfile('p1', NOW);
+    const version = (await store.getProfile('p1'))?.profileVersion ?? 0;
+    const broke = await buy(store, 'CA-01', version, 'key-sem-saldo-1');
+    expect(broke).toEqual({ ok: false, error: 'insufficient_ore' });
+    expect(await store.ledger('p1')).toHaveLength(0);
+    expect((await store.getProfile('p1'))?.profileVersion).toBe(version);
+  });
+
   it('a mesma idempotencyKey nao compra duas vezes', async () => {
     const store = await funded();
     const version = (await store.getProfile('p1'))?.profileVersion ?? 0;

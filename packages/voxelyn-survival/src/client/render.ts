@@ -832,6 +832,14 @@ export class SurvivalRenderer {
    */
   private cargoOre = 0;
   /**
+   * Onde o contador de carga foi desenhado por ultimo, em pixels de tela.
+   *
+   * Medido no desenho e nao recalculado no voo: a largura do painel depende da
+   * viewport e o texto depende do idioma e do numero, entao qualquer segunda
+   * conta divergiria da primeira em alguma tela.
+   */
+  private cargoCounterX = 0;
+  /**
    * A geracao do Prospector LOCAL, para os marcos visuais.
    *
    * Vem do perfil autoritativo, e nao da run: a run nao carrega a arvore, so o
@@ -2875,7 +2883,11 @@ export class SurvivalRenderer {
   ): void {
     if (this.cargoFlights.length === 0) return;
     const ctx = this.ctx;
-    const target = { x: this.safeArea.left + 30, y: this.safeArea.top + 67 };
+    // O alvo e o CONTADOR DE CARGA, encostado a direita do painel — e nao o
+    // glifo de purga na esquerda, para onde o voo da recompensa vai. As duas
+    // animacoes tem alvos diferentes porque sao coisas diferentes chegando; a
+    // lasca que pousasse em cima da purga diria que minerar rende purga.
+    const target = { x: this.cargoCounterX, y: this.safeArea.top + 61 };
     const alive: typeof this.cargoFlights = [];
     for (const flight of this.cargoFlights) {
       if (!flight.startScreen) {
@@ -3078,13 +3090,8 @@ export class SurvivalRenderer {
     ctx.fillStyle = cargoPulse ? PAL.bone : PAL.loot;
     const cargoLabel = t('hud.cargo', { count: this.cargoOre });
     ctx.fillText(cargoLabel, cargoRight, purgeY + 4);
-    drawOreGlyph(
-      ctx,
-      cargoRight - ctx.measureText(cargoLabel).width - 9,
-      purgeY,
-      cargoPulse ? 15 : 13,
-      ctx.fillStyle as string,
-    );
+    this.cargoCounterX = cargoRight - ctx.measureText(cargoLabel).width - 9;
+    drawOreGlyph(ctx, this.cargoCounterX, purgeY, cargoPulse ? 15 : 13, ctx.fillStyle as string);
     ctx.textAlign = 'left';
 
     if (hasModules) {

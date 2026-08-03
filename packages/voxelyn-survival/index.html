@@ -192,8 +192,12 @@
         background: #131822;
       }
       /* Instalado ganha borda viva e o resto apaga: a leitura de "onde eu
-         estou na arvore" tem de funcionar de relance, sem ler texto. */
-      .matrix-node-installed {
+         estou na arvore" tem de funcionar de relance, sem ler texto.
+
+         O seletor do CARIMBO e `span`, e o do CARTAO e `div.matrix-node`: os
+         dois carregavam a mesma classe, e a cor do carimbo escorria para o
+         cartao inteiro — nome e descricao saiam verdes junto com o selo. */
+      span.matrix-node-installed {
         color: #59f2c2;
         font-size: 10px;
         letter-spacing: 1px;
@@ -201,10 +205,10 @@
       .matrix-node.matrix-node-installed {
         border-color: #2f6f5b;
       }
-      .matrix-node-locked {
+      .matrix-node.matrix-node-locked {
         opacity: 0.45;
       }
-      .matrix-node-affordable {
+      .matrix-node.matrix-node-affordable {
         border-color: #4c7fd4;
       }
       .matrix-node-id {

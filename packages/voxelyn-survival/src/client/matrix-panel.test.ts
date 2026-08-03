@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import { findUpgrade, UPGRADES } from '@voxelyn/survival-sim';
 import type { PublicProgressionProfile } from '@voxelyn/survival-protocol';
-import { needsConfirmation, nodeState } from './matrix-panel';
+import {
+  needsConfirmation,
+  nodeState,
+  panelNotice,
+  purchaseEnabled,
+  type MatrixViewState,
+} from './matrix-panel';
 
 const profile = (
   ore: number,
@@ -78,5 +84,44 @@ describe('confirmacao', () => {
     for (const upgrade of UPGRADES) {
       expect(needsConfirmation(upgrade), upgrade.id).toBe(upgrade.tier >= 4);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Estados do painel
+// ---------------------------------------------------------------------------
+
+const view = (over: Partial<MatrixViewState> = {}): MatrixViewState => ({
+  tab: 'matrix',
+  profile: profile(9999, 9),
+  cached: false,
+  loading: false,
+  codex: null,
+  pending: null,
+  notice: null,
+  reveal: null,
+  ...over,
+});
+
+describe('o painel distingue "perguntando" de "a pergunta falhou"', () => {
+  it('enquanto carrega, anuncia a consulta e nao a queda', () => {
+    expect(panelNotice(view({ loading: true, cached: true }))).toBe('matrix.loading');
+  });
+
+  it('so depois de a consulta falhar e que avisa que esta offline', () => {
+    expect(panelNotice(view({ loading: false, cached: true }))).toBe('matrix.offline');
+  });
+
+  it('com perfil autoritativo, nao anuncia nada', () => {
+    expect(panelNotice(view())).toBeNull();
+  });
+});
+
+describe('quando da para comprar', () => {
+  it('so contra saldo que o servidor confirmou, e sem compra em voo', () => {
+    expect(purchaseEnabled(view())).toBe(true);
+    expect(purchaseEnabled(view({ loading: true }))).toBe(false);
+    expect(purchaseEnabled(view({ cached: true }))).toBe(false);
+    expect(purchaseEnabled(view({ pending: 'CA-01' }))).toBe(false);
   });
 });

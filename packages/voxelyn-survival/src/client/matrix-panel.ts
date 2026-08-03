@@ -45,6 +45,15 @@ export type MatrixViewState = {
   profile: PublicProgressionProfile | null;
   /** O perfil veio do cache e ainda nao foi confirmado pelo servidor? */
   cached: boolean;
+  /**
+   * A primeira consulta ao servidor ainda esta correndo?
+   *
+   * Separado de `cached` porque os dois significam coisas diferentes para o
+   * jogador: "estamos perguntando" e "a pergunta falhou". Sem isso o painel
+   * anunciava a Aurix como indisponivel no primeiro quadro de TODA abertura,
+   * incluindo as que davam certo meio segundo depois.
+   */
+  loading: boolean;
   codex: CodexResponse | null;
   /** Compra em voo, para desabilitar o botao sem aplicar nada. */
   pending: string | null;
@@ -98,6 +107,32 @@ export const nodeState = (
   }
   return { kind: 'affordable' };
 };
+
+/**
+ * O que o painel ANUNCIA no topo, se e que anuncia algo.
+ *
+ * Pura e exportada pelo mesmo motivo de `nodeState`: e uma decisao de produto
+ * disfarcada de detalhe de render. "Estamos perguntando" e "a pergunta falhou"
+ * sao estados diferentes, e trata-los como um so fazia o painel acusar a Aurix
+ * de estar fora no primeiro quadro de toda abertura — inclusive as que davam
+ * certo meio segundo depois.
+ */
+export const panelNotice = (view: MatrixViewState): MessageKey | null => {
+  if (view.loading) return 'matrix.loading';
+  if (view.cached) return 'matrix.offline';
+  return null;
+};
+
+/**
+ * Da para comprar agora?
+ *
+ * Falso enquanto carrega, enquanto o perfil e so cache, e enquanto qualquer
+ * compra esta em voo. As tres sao a mesma regra vista de angulos diferentes: so
+ * se compra contra um saldo que o SERVIDOR confirmou e que ninguem mais esta
+ * gastando neste instante.
+ */
+export const purchaseEnabled = (view: MatrixViewState): boolean =>
+  !view.loading && !view.cached && view.pending === null;
 
 /** Tiers caros pedem confirmacao: 130 minerio e dois nucleos sao horas de jogo. */
 export const needsConfirmation = (upgrade: UpgradeDefinition): boolean => upgrade.tier >= 4;
@@ -187,7 +222,7 @@ const renderNode = (
     button.textContent = view.pending === upgrade.id ? t('matrix.buying') : t('matrix.confirm.yes');
     // Desabilitado enquanto a requisicao corre. Nao e otimismo: o estado da
     // arvore so muda quando a resposta do servidor chega.
-    button.disabled = view.pending !== null || view.cached;
+    button.disabled = !purchaseEnabled(view);
     button.addEventListener('click', () => handlers.onPurchase(upgrade));
     node.appendChild(button);
   }
@@ -196,7 +231,10 @@ const renderNode = (
 
 const renderMatrixTab = (view: MatrixViewState, handlers: MatrixHandlers): HTMLElement => {
   const body = el('div', 'matrix-body');
-  if (view.cached) body.appendChild(el('p', 'sub warn', t('matrix.offline')));
+  const notice = panelNotice(view);
+  if (notice) {
+    body.appendChild(el('p', notice === 'matrix.loading' ? 'sub' : 'sub warn', t(notice)));
+  }
   if (view.notice) body.appendChild(el('p', 'sub warn', t(view.notice)));
 
   for (const branch of UPGRADE_BRANCHES) {
