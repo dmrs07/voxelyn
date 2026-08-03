@@ -1,6 +1,6 @@
 import { TICK_MS } from '@voxelyn/survival-sim';
 import { createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
-import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import type { PlayerTuning, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { SurvivalRenderer } from './render';
@@ -29,6 +29,8 @@ import {
 } from './settings';
 import { audio } from './audio';
 import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
+import { requestRunTicket, settleRun } from './progression-api';
+import { readCachedProfile, writeCachedProfile } from './progression-cache';
 import { renderRecordsPanel } from './records-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import {
@@ -180,6 +182,10 @@ const renderState = (
   inputState: Parameters<SurvivalRenderer['render']>[2],
   nowMs: number,
 ): void => {
+  // A carga sai do ESTADO, todo quadro. No solo e a simulacao local; no online e
+  // o `cargoOre` que o snapshot copiou para ca. Um caminho so, e o evento
+  // `ore_gained` fica sendo apenas a animacao.
+  renderer.setCargoOre(state.stats.oreCollected);
   if (state.phase === 'running') requestPool(state);
   renderer.setDeathEchoes(deathEchoes.sync(state, nowMs));
   renderer.render(state, alpha, inputState, nowMs);
@@ -321,6 +327,76 @@ let recordedSummaryKey: string | null = null;
 let submitted = false;
 /** Seed fixada pelo jogador no menu, ou null para sortear a cada descida. */
 let forcedSeed: number | null = null;
+
+/**
+ * A autorizacao da expedicao corrente.
+ *
+ * `null` significa SIMULACAO LOCAL: a run acontece igual, com o Prospector de
+ * fabrica, e nao rende nada. Nao existe caminho que guarde a run para creditar
+ * depois — um log guardado no navegador para submeter "quando a rede voltar" e
+ * uma superficie grande de adulteracao em troca de conveniencia pequena.
+ */
+let expedition: { runId: string; seed: number } | null = null;
+/** Esta run ja foi enviada para homologacao? */
+let settlementSent = false;
+
+/**
+ * Pede a autorizacao da proxima expedicao.
+ *
+ * Falha vira simulacao local COM AVISO, e nunca silenciosamente: o jogador
+ * precisa saber, antes de descer, que a carga daquela descida nao vai contar.
+ */
+const authorizeExpedition = async (seed: number): Promise<{ seed: number; tuning?: PlayerTuning }> => {
+  const url = serverInput.value.trim() || defaultServerUrl();
+  const result = await requestRunTicket(url, seed);
+  if (!result.ok) {
+    expedition = null;
+    setBanner(t('banner.expedition.offline'));
+    setTimeout(() => setBanner(null), 4200);
+    return { seed };
+  }
+  const ticket = result.value.ticket;
+  expedition = { runId: ticket.runId, seed: ticket.seed };
+  // O tuning vem do SERVIDOR, derivado do perfil autoritativo. O cliente nao o
+  // calcula nem o corrige: ele executa a configuracao que foi autorizada.
+  return { seed: ticket.seed, tuning: ticket.tuning };
+};
+
+/**
+ * Envia o que o jogador apertou, e mostra o que o SERVIDOR decidiu.
+ *
+ * Repare no que nao e enviado: minerio, nucleo, fase, tempo. O servidor
+ * re-simula a run inteira com a seed e o tuning que ele mesmo autorizou.
+ */
+const homologateRun = (state: SurvivalState): void => {
+  if (settlementSent || !expedition || !state.summary) return;
+  if (!recorder.submittable) return; // run longa demais: nao ha o que verificar
+  settlementSent = true;
+  const url = serverInput.value.trim() || defaultServerUrl();
+  const runId = expedition.runId;
+  void settleRun(url, runId, recorder.encode()).then((result) => {
+    if (!result.ok) {
+      // A run ja acabou e a tela de resultado esta no ar. Reenviar com o MESMO
+      // runId continua seguro (a liquidacao e idempotente), mas quem decide
+      // tentar de novo e o jogador, na proxima vez que abrir a Matriz.
+      console.info('[progressao] nao homologada:', result.error);
+      setBanner(t('banner.expedition.pending'));
+      setTimeout(() => setBanner(null), 4200);
+      return;
+    }
+    writeCachedProfile(result.value.profile, Date.now());
+    const credited = result.value.result;
+    setBanner(
+      credited.oreCredited > 0 || credited.coresCredited > 0
+        ? t('banner.cargo.cleared', {
+            ore: credited.oreCredited,
+            cores: credited.coresCredited,
+          })
+        : t('banner.cargo.lost', { ore: credited.oreLost }),
+    );
+    setTimeout(() => setBanner(null), 4600);
+  });
+};
 const recordRun = (state: SurvivalState): void => {
   if (!state.summary) return;
   const result = applyRunOnce(records, state.summary, recordedSummaryKey);
@@ -399,6 +475,7 @@ const submitDeathToPool = (state: SurvivalState): void => {
  * a volta ao menu e a PROXIMA extracao nunca chegava ao ranking.
  */
 const resetRunTracking = (): void => {
+  settlementSent = false;
   recordedSummaryKey = null;
   submitted = false;
   echoSubmitted = false;
@@ -689,15 +766,20 @@ const hintOnce = (): void => {
   }, 1600);
 };
 
-const runSolo = (): void => {
+const runSolo = async (): Promise<void> => {
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
   audio.reset();
-  const seed = nextSeed();
+  // A AUTORIZACAO VEM ANTES DO MUNDO. O servidor escolhe (ou confirma) a seed e
+  // devolve o tuning derivado do perfil; so entao a run existe. Construir o
+  // mundo primeiro e pedir o ticket depois criaria uma janela em que o
+  // Prospector na tela nao e o Prospector autorizado.
+  const authorized = await authorizeExpedition(nextSeed());
+  const seed = authorized.seed;
   recorder.start(seed);
   resetRunTracking();
   telemetry.begin();
-  let state: SurvivalState = createRun({ seed });
+  let state: SurvivalState = createRun({ seed, tuning: authorized.tuning });
   liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
@@ -763,6 +845,7 @@ const runSolo = (): void => {
       // acontecido atras dela.
       eventQueue.flush(Number.POSITIVE_INFINITY);
       recordRun(state);
+      homologateRun(state);
       submitSoloRun(state);
       submitDeathToPool(state);
       if (state.summary) telemetry.finish(state.summary, state.sector);
@@ -776,15 +859,20 @@ const runSolo = (): void => {
       // reiniciar por baixo do proprio menu. Os TOQUES ja param sozinhos — a
       // overlay engole o pointerdown antes de o canvas ve-lo.
       if (!pauseMenu.isOpen && armed && (input.hasTap() || input.consumeRestartKey())) {
-        const nextRunSeed = nextSeed();
-        recorder.start(nextRunSeed);
-        telemetry.begin();
-        state = createRun({ seed: nextRunSeed });
-        liveRun = state;
-        rearm();
-        audio.reset();
-        resetRunTracking();
-        gate.reset();
+        // Cada tentativa e uma expedicao NOVA: ticket novo, runId novo, tuning
+        // relido do perfil. Reusar o anterior deixaria a segunda run tentando
+        // liquidar contra um runId ja fechado — e daria ao jogador um Prospector
+        // desatualizado se ele tivesse comprado alguma coisa no intervalo.
+        void authorizeExpedition(nextSeed()).then((next) => {
+          recorder.start(next.seed);
+          telemetry.begin();
+          state = createRun({ seed: next.seed, tuning: next.tuning });
+          liveRun = state;
+          rearm();
+          audio.reset();
+          resetRunTracking();
+          gate.reset();
+        });
       }
       accumulator = 0;
       requestAnimationFrame(frame);
@@ -1088,7 +1176,7 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
   stopLoop?.();
   runInProgress = true;
   pauseMenu.armHistory();
-  runSolo();
+  void runSolo();
   hintOnce();
 };
 const startOnline = (): void => {

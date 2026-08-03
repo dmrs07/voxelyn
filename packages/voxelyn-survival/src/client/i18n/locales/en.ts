@@ -344,6 +344,11 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   // HUD
   // ---------------------------------------------------------------------
+  'banner.expedition.offline': 'AURIX UNREACHABLE · LOCAL SIMULATION, NOTHING WILL BE RECORDED',
+  'banner.expedition.pending': 'TRANSMISSION INTERRUPTED · TELEMETRY WILL BE RESENT',
+  'banner.cargo.cleared': 'CARGO CLEARED · +{ore} ORE AND +{cores} CORE',
+  'banner.cargo.lost': 'NO RECOVERY VALUE · {ore} CARGO LOST IN THE VEIN',
+  'hud.cargo': '{count} CARGO',
   'hud.purgeCells': 'PURGE CELL ×{count}',
   'hud.sector': 'SECTOR {sector}/{total}',
   'hud.objective.descend': 'DESCEND THE SHAFT',

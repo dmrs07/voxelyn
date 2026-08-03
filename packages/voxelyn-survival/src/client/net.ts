@@ -276,6 +276,11 @@ export class NetClient {
         // Nulo quando o servidor nao soube a quem o resync pertencia: e melhor
         // manter o ultimo ViewerState conhecido do que adotar o de outro slot.
         if (msg.you) this.viewer = msg.you;
+        // Mesma razao do snapshot, e mais forte aqui: o resync E o caminho de
+        // quem reconectou, e e nele que a carga zerada apareceria na tela.
+        if (this.state && typeof msg.cargoOre === 'number') {
+          this.state.stats.oreCollected = msg.cargoOre;
+        }
         this.ingestFrame(msg.entities, msg.projectiles, msg.serverTick, nowMs);
         break;
       }
@@ -300,6 +305,12 @@ export class NetClient {
         }
         if (msg.you) {
           this.viewer = msg.you;
+        }
+        // A carga da SALA. `oreCollected` e contador de equipe: a lasca que o
+        // parceiro arranca conta para os dois, e o espelho local nao simula
+        // mineracao nenhuma para descobrir isso sozinho.
+        if (this.state && typeof msg.cargoOre === 'number') {
+          this.state.stats.oreCollected = msg.cargoOre;
         }
         // (O telegrafo do carrinho NAO precisa de tratamento aqui: os
         // relogios dos trilhos viajam nas WorldFlags — `railTimers` — que o

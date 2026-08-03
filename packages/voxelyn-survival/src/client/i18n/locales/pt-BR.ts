@@ -348,6 +348,11 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   // HUD
   // ---------------------------------------------------------------------
+  'banner.expedition.offline': 'AURIX INDISPONÍVEL · SIMULAÇÃO LOCAL, NADA SERÁ REGISTRADO',
+  'banner.expedition.pending': 'TRANSMISSÃO INTERROMPIDA · A TELEMETRIA SERÁ REENVIADA',
+  'banner.cargo.cleared': 'CARGA HOMOLOGADA · +{ore} MINÉRIO E +{cores} NÚCLEO',
+  'banner.cargo.lost': 'SEM VALOR DE RECUPERAÇÃO · {ore} DE CARGA PERDIDOS NO VEIO',
+  'hud.cargo': '{count} CARGA',
   'hud.purgeCells': 'CÉLULA DE PURGA ×{count}',
   'hud.sector': 'SETOR {sector}/{total}',
   'hud.objective.descend': 'DESÇA PELO POÇO',

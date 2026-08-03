@@ -669,6 +669,39 @@ const drawModuleGlyph = (
   }
 };
 
+/**
+ * O glifo da carga: um hexagono mineral, e nao uma moeda.
+ *
+ * Moeda redonda diria "dinheiro", e a carga nao e dinheiro dentro da run — e
+ * pedra que o Prospector arrancou e ainda pode perder. O hexagono e o mesmo
+ * simbolo que a Matriz usa na superficie, entao a lasca que sobe do chao e o
+ * numero do menu sao visivelmente a mesma coisa.
+ */
+const drawOreGlyph = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+): void => {
+  const r = size * 0.42;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    const px = Math.cos(a) * r;
+    const py = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.11);
+  ctx.stroke();
+  ctx.restore();
+};
+
 const drawPurgeCellGlyph = (
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -785,6 +818,32 @@ export class SurvivalRenderer {
   } | null = null;
   private choiceRevealAt = 0;
   private purgePulseUntil = 0;
+  /** Pulso do contador de carga, disparado por `ore_gained`. */
+  private cargoPulseUntil = 0;
+  /**
+   * Carga AUTORITATIVA da run.
+   *
+   * Vem do snapshot (`cargoOre`) no online e de `stats.oreCollected` no solo. O
+   * evento so ANIMA; quem diz o numero e o estado. Sem isso, quem reconecta veria
+   * a carga zerada e decidiria extrair com o numero errado na tela.
+   */
+  private cargoOre = 0;
+  /**
+   * Lascas em voo ate o contador.
+   *
+   * Lista, e nao slot unico como o `rewardFlight` da Purga: minerar rende varias
+   * lascas em segundos, e um slot so faria cada nova apagar a anterior no ar. O
+   * teto existe porque acima de meia duzia simultaneas o efeito deixa de ser
+   * leitura e vira confete.
+   */
+  private cargoFlights: {
+    worldX: number;
+    worldY: number;
+    startedAt: number;
+    durationMs: number;
+    amount: number;
+    startScreen?: { x: number; y: number };
+  }[] = [];
   private deathEchoes: DeathEchoFrame = emptyDeathEchoFrame();
   quality: QualityPreset = PRESETS.high;
 
@@ -870,6 +929,17 @@ export class SurvivalRenderer {
 
   private addFlash(x: number, y: number, r: number, power: number, nowMs: number, durationMs: number): void {
     addFlash(this.flashes, { x, y, r, power, startedMs: nowMs, durationMs });
+  }
+
+  /**
+   * A carga AUTORITATIVA da run.
+   *
+   * Chamado a cada quadro no solo (do proprio estado) e a cada snapshot no
+   * online (de `cargoOre`). O evento anima; isto corrige. E o que faz reconectar
+   * no meio de uma run mostrar o numero certo em vez de zero.
+   */
+  setCargoOre(total: number): void {
+    this.cargoOre = total;
   }
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
@@ -1022,6 +1092,28 @@ export class SurvivalRenderer {
             this.choiceRevealAt = Math.max(this.choiceRevealAt, nowMs + 920);
           }
           break;
+        case 'ore_gained': {
+          // O TOTAL vem do evento, e o estado autoritativo o corrige no proximo
+          // quadro (`setCargoOre`). Os dois concordam quase sempre; quando nao
+          // concordam — reconexao, resync — quem manda e o estado.
+          this.cargoOre = ev.total;
+          if (this.cargoFlights.length < 6) {
+            this.cargoFlights.push({
+              worldX: ev.x,
+              worldY: ev.y,
+              startedAt: nowMs,
+              durationMs: 560,
+              // `amount` e o que faz a carga do Minerador aparecer como "+6" e
+              // nao como seis textos disputando o mesmo pixel.
+              amount: ev.amount,
+            });
+          } else {
+            // Estourou o teto: o numero ainda pulsa, so nao ha lasca sobrando
+            // para desenhar. Perder a animacao e melhor que perder a leitura.
+            this.cargoPulseUntil = nowMs + 320;
+          }
+          break;
+        }
         case 'purge_cell_acquired':
           if (ev.slot === this.localPlayerId - 1) {
             const startsAt = nowMs + 220;
@@ -2135,6 +2227,7 @@ export class SurvivalRenderer {
     }
 
     this.renderRewardFlight(toScreen, nowMs);
+    this.renderCargoFlights(toScreen, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
   }
@@ -2732,6 +2825,65 @@ export class SurvivalRenderer {
     ctx.restore();
   }
 
+  /**
+   * A lasca que sobe, curva e chega.
+   *
+   * Duas coisas ao mesmo tempo, de proposito: o "+N ⬡" sobe do ponto ATINGIDO
+   * (onde o jogador esta olhando) enquanto a lasca viaja ate o contador (onde o
+   * numero vive). Fazer em sequencia dobraria a duracao e a mineracao ficaria
+   * atrasada em relacao ao proprio som.
+   */
+  private renderCargoFlights(
+    toScreen: (x: number, y: number) => [number, number],
+    nowMs: number
+  ): void {
+    if (this.cargoFlights.length === 0) return;
+    const ctx = this.ctx;
+    const target = { x: this.safeArea.left + 30, y: this.safeArea.top + 67 };
+    const alive: typeof this.cargoFlights = [];
+    for (const flight of this.cargoFlights) {
+      if (!flight.startScreen) {
+        const [x, y] = toScreen(flight.worldX, flight.worldY);
+        flight.startScreen = { x, y };
+      }
+      const elapsed = nowMs - flight.startedAt;
+      const sample = rewardFlightPosition(
+        flight.startScreen,
+        target,
+        elapsed,
+        flight.durationMs
+      );
+      if (sample.progress >= 1) {
+        this.cargoPulseUntil = nowMs + 380;
+        continue;
+      }
+      alive.push(flight);
+
+      // O texto: sobe do ponto atingido e some na primeira metade do voo.
+      const textPhase = Math.min(1, elapsed / (flight.durationMs * 0.55));
+      if (textPhase < 1) {
+        ctx.save();
+        ctx.globalAlpha = textPhase < 0.6 ? 1 : 1 - (textPhase - 0.6) / 0.4;
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#0b0e14';
+        const label = `+${flight.amount} ⬡`;
+        const ty = flight.startScreen.y - 10 - textPhase * 18;
+        ctx.strokeText(label, flight.startScreen.x, ty);
+        ctx.fillStyle = PAL.loot;
+        ctx.fillText(label, flight.startScreen.x, ty);
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      drawOreGlyph(ctx, sample.x, sample.y, 9 + Math.sin(sample.progress * Math.PI) * 3, PAL.loot);
+      ctx.restore();
+    }
+    this.cargoFlights = alive;
+  }
+
   private renderRewardFlight(
     toScreen: (x: number, y: number) => [number, number],
     nowMs: number
@@ -2879,6 +3031,25 @@ export class SurvivalRenderer {
     ctx.fillStyle = purgePulse ? PAL.biolum : PAL.bone;
     drawPurgeCellGlyph(ctx, safeLeft + 18, purgeY, purgePulse ? 15 : 13, ctx.fillStyle as string);
     ctx.fillText(t('hud.purgeCells', { count: extra.purgeCells }), safeLeft + 34, purgeY + 4);
+
+    // A carga fica na MESMA linha da purga, encostada a direita do painel: os
+    // dois sao recursos que o jogador carrega, e uma linha propria custaria
+    // altura de HUD num painel que ja disputa espaco com os modulos.
+    const cargoPulse = nowMs < this.cargoPulseUntil;
+    const cargoRight = safeLeft + panelW - 12;
+    ctx.textAlign = 'right';
+    ctx.font = `bold ${cargoPulse ? 13 : 12}px monospace`;
+    ctx.fillStyle = cargoPulse ? PAL.bone : PAL.loot;
+    const cargoLabel = t('hud.cargo', { count: this.cargoOre });
+    ctx.fillText(cargoLabel, cargoRight, purgeY + 4);
+    drawOreGlyph(
+      ctx,
+      cargoRight - ctx.measureText(cargoLabel).width - 9,
+      purgeY,
+      cargoPulse ? 15 : 13,
+      ctx.fillStyle as string,
+    );
+    ctx.textAlign = 'left';
 
     if (hasModules) {
       this.renderModuleHud(
