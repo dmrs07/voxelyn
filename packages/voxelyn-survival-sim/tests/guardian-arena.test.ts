@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { GUARDIAN_ARENA_EXITS, GUARDIAN_ARENA_RADIUS, GUARDIAN_SUMMON_COUNT, SECTOR_COUNT,
   SOLID_FRAGILE, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
+import { closeArena } from '../src/cells';
 import { impactSolid } from '../src/materials';
 import { damageEntity } from '../src/entities';
 import { floodOpen } from '../src/worldgen';
@@ -127,6 +128,58 @@ describe('arena do guardiao', () => {
         barreira.has(Math.floor(e.y) * w + Math.floor(e.x)),
         `${(e as { archetype?: string }).archetype ?? 'player'} emparedado pelo cerco`,
       ).toBe(false);
+    }
+  });
+
+  // O empurrao nao pode empilhar corpos.
+  //
+  // Achado do Codex na primeira versao: a condicao olhava terreno e objetivos,
+  // mas nao se a casa de dentro ja tinha DONO — e o corpo do anel pousava nas
+  // coordenadas exatas do ocupante, escondendo um inimigo em cima do jogador
+  // com o dano de contato dos dois no mesmo ponto. E ha um segundo empilhamento
+  // que so aparece na geometria do anel: duas celulas vizinhas de um lado reto
+  // compartilham o mesmo destino — (r,0) e (r,1) apontam ambas para (r-1,0).
+  it('nao empilha corpos ao empurrar para dentro', () => {
+    const state = createRun({ seed: 76, sector: SECTOR_COUNT });
+    const w = state.config.width;
+    const R = GUARDIAN_ARENA_RADIUS;
+    // O centro do cerco e PARAMETRO de `closeArena`, entao o teste usa o meio do
+    // mapa em vez de onde o guardiao calhou de nascer. O chefe nasce colado ao
+    // Nucleo, que na maioria das seeds fica no canto — e ai metade do anel cai
+    // fora do mapa e as celulas que este teste precisa simplesmente nao existem.
+    const cx = Math.floor(w / 2);
+    const cy = Math.floor(state.config.height / 2);
+    for (let y = cy - R - 1; y <= cy + R + 1; y++) {
+      for (let x = cx - R - 1; x <= cx + R + 1; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        state.solid[y * w + x] = SOLID_NONE;
+      }
+    }
+    // (cx+R, cy) e (cx+R, cy+1) dividem o mesmo destino (cx+R-1, cy) — e esse
+    // destino ja esta ocupado por um terceiro. Sao os dois empilhamentos.
+    const vivos = state.enemies.filter((e) => e.alive).slice(0, 3);
+    expect(vivos.length, 'setor sem bicho suficiente para o caso').toBe(3);
+    vivos[0].x = cx + R + 0.5;
+    vivos[0].y = cy + 0.5;
+    vivos[1].x = cx + R + 0.5;
+    vivos[1].y = cy + 1.5;
+    vivos[2].x = cx + R - 1 + 0.5;
+    vivos[2].y = cy + 0.5;
+    // Fora do anel e longe de todo mundo.
+    state.player.x = cx + 0.5;
+    state.player.y = cy + 0.5;
+
+    closeArena(state, cx, cy, R, GUARDIAN_ARENA_EXITS, []);
+
+    const ocupacao = new Map<string, string[]>();
+    for (const e of [...state.players, ...state.enemies]) {
+      if (!e.alive) continue;
+      const chave = `${e.x},${e.y}`;
+      const quem = (e as { archetype?: string }).archetype ?? 'player';
+      ocupacao.set(chave, [...(ocupacao.get(chave) ?? []), quem]);
+    }
+    for (const [onde, quem] of ocupacao) {
+      expect(quem.length, `corpos empilhados em ${onde}: ${quem.join(' + ')}`).toBe(1);
     }
   });
 

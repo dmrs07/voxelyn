@@ -569,12 +569,20 @@ export const closeArena = (
         const tx = x + Math.sign(cx - x);
         const ty = y + Math.sign(cy - y);
         const target = ty * w + tx;
+        // Casa de dentro OCUPADA tambem invalida o empurrao. Sem isto o corpo
+        // do anel pousava nas coordenadas exatas de quem ja estava la — um
+        // inimigo escondido em cima do jogador, com o dano de contato dos dois
+        // no mesmo ponto. Duas celulas do anel podem ainda dividir o mesmo
+        // destino (o canto (r,0) e o (r,1) apontam os dois para (r-1,0)), entao
+        // quem e empurrado PASSA A CONSTAR em `bodies`: o segundo ve o primeiro.
         if (state.solid[target] !== SOLID_NONE || objectives.has(target)) continue;
+        if (bodies.has(target)) continue;
         for (const e of here) {
           e.x = tx + 0.5;
           e.y = ty + 0.5;
         }
         bodies.delete(i);
+        bodies.set(target, here);
       }
       ring.push(i);
     }

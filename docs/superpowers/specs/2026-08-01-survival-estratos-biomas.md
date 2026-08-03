@@ -583,6 +583,14 @@ e a parede fecha atrás dele; só quando nem isso dá certo é que o vão sobra,
 porque emparedar alguém é pior do que um cerco furado. Poço e entrada
 continuam podendo furar o anel — são os objetivos da run.
 
+"Nem isso dá certo" inclui **casa de dentro ocupada**, e são dois casos: o
+óbvio (já tem alguém lá) e um que só a geometria do anel produz — duas
+células vizinhas de um lado reto compartilham o mesmo destino, porque `(r,0)`
+e `(r,1)` apontam ambas para `(r-1,0)`. Quem é empurrado passa a constar no
+mapa de corpos, então o segundo enxerga o primeiro. Sem isso o corpo pousava
+nas coordenadas *exatas* do ocupante: um inimigo escondido em cima do
+jogador, com o dano de contato dos dois no mesmo ponto.
+
 Nenhum dos dois é da arena por estrato: são anteriores a ela, e a mudança de
 terreno só re-sorteou qual seed os exibia. O primeiro era latente desde que a
 geração passou a carimbar terreno depois de montar `openCells`; o segundo,
