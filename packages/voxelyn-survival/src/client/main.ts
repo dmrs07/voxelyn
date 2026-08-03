@@ -39,6 +39,7 @@ import {
 } from './progression-api';
 import { readCachedProfile, writeCachedProfile } from './progression-cache';
 import { SettlementQueue } from './settlement-queue';
+import { LatestQuery, type Query } from './latest-query';
 import { renderRecordsPanel } from './records-panel';
 import {
   needsConfirmation,
@@ -1479,12 +1480,34 @@ const drawMatrix = (): void => renderMatrixPanel(matrixBody, matrixView, matrixH
 
 const progressionUrl = (): string => serverInput.value.trim() || defaultServerUrl();
 
+/**
+ * Qual consulta da Matriz e a ATUAL, e contra qual servidor.
+ *
+ * Mesma familia do token de descida — ver `latest-query.ts` para as tres vezes
+ * em que esta corrida apareceu. Aqui o caso concreto: o campo de servidor e
+ * editavel, entao abrir a Matriz para o servidor A, fechar, trocar o campo e
+ * abrir para o B deixa duas consultas no ar. A de A, resolvendo depois,
+ * substituia o perfil de B e ainda o marcava como autoritativo — e a compra
+ * seguinte ia para o B carregando a arvore e a `profileVersion` do A, debitando
+ * o B quando as versoes por acaso batessem.
+ */
+const matrixQueries = new LatestQuery<string>();
+
+const beginMatrixQuery = (): Query<string> => matrixQueries.begin(progressionUrl());
+
+const isCurrentQuery = (query: Query<string>): boolean =>
+  matrixQueries.isCurrent(query, progressionUrl());
+
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
   retryPendingSettlement();
+  const query = beginMatrixQuery();
   matrixView.loading = true;
   drawMatrix();
-  const result = await openSession(progressionUrl());
+  const result = await openSession(query.url);
+  // Chegou tarde, ou o jogador trocou de servidor: descarta sem tocar em nada.
+  // Nem `loading` — quem for a consulta atual cuida do proprio estado.
+  if (!isCurrentQuery(query)) return;
   matrixView.loading = false;
   if (!result.ok) {
     // Offline: continua mostrando o cache, marcado, e sem botao de compra.
@@ -1501,7 +1524,9 @@ const refreshProfile = async (): Promise<void> => {
 };
 
 const refreshCodex = async (): Promise<void> => {
-  const result = await fetchCodex(progressionUrl(), getLocale());
+  const query = beginMatrixQuery();
+  const result = await fetchCodex(query.url, getLocale());
+  if (!isCurrentQuery(query)) return;
   matrixView.codex = result.ok ? result.value : null;
   drawMatrix();
 };
@@ -1533,12 +1558,17 @@ const matrixHandlers: MatrixHandlers = {
     matrixView.pending = upgrade.id;
     matrixView.notice = null;
     drawMatrix();
+    const query = beginMatrixQuery();
     void purchaseUpgrade(
-      progressionUrl(),
+      query.url,
       upgrade.id,
       profile.profileVersion,
       purchaseKey(profile.profileId, upgrade.id, profile.profileVersion),
     ).then((result) => {
+      // Uma compra respondida depois de o jogador trocar de servidor ja foi
+      // cobrada la — mas o perfil que ela devolve nao descreve o servidor que
+      // esta na tela, e escreve-lo aqui mostraria a arvore do lugar errado.
+      if (!isCurrentQuery(query)) return;
       matrixView.pending = null;
       if (!result.ok) {
         // Conflito de versao nao e erro do jogador: outra sessao mexeu na
