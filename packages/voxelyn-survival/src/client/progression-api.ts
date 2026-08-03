@@ -136,56 +136,6 @@ const writeSessionToken = (serverUrl: string, token: string | null): void => {
 export const TIMEOUT_INTERACTIVE_MS = 6_000;
 export const TIMEOUT_SETTLE_MS = 45_000;
 
-/**
- * Teto do PRIMEIRO contato com uma origem que ainda nao respondeu nada.
- *
- * Seis segundos e o teto certo para uma chamada interativa e o teto errado para
- * acordar um processo. Um host que hiberna por ociosidade — o padrao de quase
- * todo PaaS — leva de trinta a sessenta segundos para servir a primeira
- * requisicao, e com uma tentativa so o jogador nunca via a Aurix: o painel
- * anunciava "indisponivel" contra um servidor perfeitamente no ar, e a descida
- * saia sem ticket, jogando a run inteira em simulacao local sem render nada.
- *
- * Isto NAO e um teto maior para tudo. E uma segunda tentativa, uma unica vez por
- * origem por carregamento de pagina, so quando a primeira falhou por nao ter
- * chegado resposta nenhuma.
- */
-export const TIMEOUT_WAKE_MS = 25_000;
-
-/**
- * Origens cuja pergunta "tem alguem ai?" ja foi feita e PAGA.
- *
- * Duas coisas entram aqui, e as duas por serem a mesma: uma resposta HTTP de
- * qualquer status (401 e 429 servem — o que se guarda e "existe alguem
- * escutando", nao "deu certo"), e a propria tentativa longa no instante em que
- * ela e disparada.
- *
- * Registrar a TENTATIVA, e nao so a resposta, e o ponto. Marcar apenas o
- * sucesso deixava a origem genuinamente inalcancavel fora do conjunto para
- * sempre, e ai TODA chamada pagava 6s + 25s. Como `authorizeExpedition` espera
- * o ticket antes de comecar a run, cada descida offline travaria por meio
- * minuto — trocando um teto ruim por um pior, exatamente no caminho que a
- * mudanca queria proteger.
- */
-const wakePaid = new Set<string>();
-
-/**
- * O despertar EM ANDAMENTO de cada origem. Resolve com "acordou?".
- *
- * Sem isto, duas chamadas concorrentes contra a mesma origem fria se atrapalham:
- * a primeira a retomar marca `wakePaid` e sai esperando; a segunda ve a marca,
- * conclui que a tentativa ja foi gasta e anuncia queda na hora — mesmo que a
- * espera da primeira termine com o servidor de pe. Na Matriz isso e rotina, e
- * nao excecao: `refreshProfile` e `refreshCodex` se sobrepoem quando o painel
- * abre na aba dos Arquivos.
- *
- * As duas chamadas pedem caminhos diferentes, entao a RESPOSTA nao da para
- * compartilhar. O que da — e e o que importa — e o desfecho da pergunta "tem
- * alguem ai?": quem chega depois espera por ela e refaz o proprio pedido contra
- * uma origem que agora esta quente.
- */
-const wakeInFlight = new Map<string, Promise<boolean>>();
-
 const call = async <T>(
   serverUrl: string,
   path: string,
@@ -194,8 +144,7 @@ const call = async <T>(
 ): Promise<ApiResult<T>> => {
   // ANTES do try: uma URL impossivel nao pode cair no mesmo caminho que uma
   // rede ausente. Ver o comentario de `ApiResult`.
-  const origin = originOf(serverUrl);
-  if (!origin) return { ok: false, error: 'bad_server_url' };
+  if (!originOf(serverUrl)) return { ok: false, error: 'bad_server_url' };
   try {
     const token = readSessionToken(serverUrl);
     const res = await fetch(`${httpBase(serverUrl)}${path}`, {
@@ -211,8 +160,6 @@ const call = async <T>(
         ...init.headers,
       },
     });
-    // Respondeu: a origem esta acordada, qualquer que tenha sido o status.
-    wakePaid.add(origin);
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: ProgressionErrorCode };
       return { ok: false, error: body.error ?? 'internal', status: res.status };
@@ -226,102 +173,24 @@ const call = async <T>(
   }
 };
 
-/**
- * Uma chamada interativa que aceita pagar o despertar da origem — uma vez.
- *
- * A segunda tentativa so acontece com as duas condicoes juntas: a origem nunca
- * respondeu nesta pagina, e a primeira tentativa nao trouxe resposta nenhuma.
- * Um 429 ou um 500 nao repetem: o servidor esta acordado e ja disse o que tinha
- * a dizer, e insistir so gastaria o teto do limitador.
- */
-const callAwake = async <T>(
+export const openSession = async (
   serverUrl: string,
-  path: string,
-  init: RequestInit = {},
-  /**
-   * O que precisa estar FEITO antes de liberar quem espera este despertar.
-   *
-   * Existe por uma questao de ordem de microtask, e nao de estilo. Sem ele, o
-   * `announce` do `finally` resolvia a espera ANTES de quem chamou processar a
-   * propria resposta — e o unico chamador que processa alguma coisa e o
-   * `openSession`, que grava o token da sessao.
-   *
-   * O estrago aparecia exatamente onde o token e a UNICA credencial que existe:
-   * navegador bloqueando cookie de terceiros, origem fria, e uma chamada
-   * autenticada esperando o mesmo despertar. Ela era liberada primeiro, lia um
-   * token que ainda nao tinha sido gravado, saia sem `Authorization` e voltava
-   * `unauthenticated` — com a sessao dando certo um instante depois.
-   */
-  commit: (result: ApiResult<T>) => void = () => undefined,
-): Promise<ApiResult<T>> => {
-  const origin = originOf(serverUrl);
-  const first = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
-  if (first.ok || first.error !== 'offline') {
-    commit(first);
-    return first;
-  }
-  if (!origin) return first;
-
-  // Ja ha alguem pagando a espera por esta origem: aproveitar o desfecho dela e
-  // melhor que anunciar uma queda que talvez nem exista.
-  const ongoing = wakeInFlight.get(origin);
-  if (ongoing) {
-    if (!(await ongoing)) return first;
-    const retried = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
-    commit(retried);
-    return retried;
-  }
-
-  // `wakePaid` e consultado DEPOIS da primeira tentativa: e ela quem acabou de
-  // descobrir se ha alguem ali.
-  if (wakePaid.has(origin)) return first;
-  // ANTES de esperar, e nao depois: a tentativa esta gasta quer ela traga
-  // resposta ou nao. Marcar so no sucesso faria a origem morta pagar os 25s
-  // outra vez, e outra, e outra.
-  wakePaid.add(origin);
-
-  let announce: (awake: boolean) => void = () => undefined;
-  wakeInFlight.set(
-    origin,
-    new Promise<boolean>((resolve) => {
-      announce = resolve;
-    }),
-  );
-  let awake = false;
-  try {
-    const retry = await call<T>(serverUrl, path, init, TIMEOUT_WAKE_MS);
-    awake = retry.ok || retry.error !== 'offline';
-    // ANTES do `announce` do `finally`: quem espera precisa encontrar o token
-    // ja gravado quando acordar.
-    commit(retry);
-    return retry;
-  } finally {
-    // No `finally` para que nenhum caminho de saida deixe quem espera pendurado.
-    wakeInFlight.delete(origin);
-    announce(awake);
-  }
-};
-
-export const openSession = (
-  serverUrl: string,
-): Promise<ApiResult<{ profile: PublicProgressionProfile }>> =>
-  // A gravacao vai como `commit`, e nao depois do `await`, porque ela precisa
-  // acontecer antes de qualquer outra chamada ser liberada — ver `callAwake`.
-  callAwake<{ profile: PublicProgressionProfile; token?: string }>(
+): Promise<ApiResult<{ profile: PublicProgressionProfile }>> => {
+  const result = await call<{ profile: PublicProgressionProfile; token?: string }>(
     serverUrl,
     '/api/progression/session',
     { method: 'POST' },
-    (result) => {
-      // O token so vem quando a sessao NASCE. Confirmar uma sessao existente
-      // devolve so o perfil, e o que ja estava guardado continua valendo.
-      if (result.ok && result.value.token) writeSessionToken(serverUrl, result.value.token);
-    },
   );
+  // O token so vem quando a sessao NASCE. Confirmar uma sessao existente devolve
+  // so o perfil, e o que ja estava guardado continua valendo.
+  if (result.ok && result.value.token) writeSessionToken(serverUrl, result.value.token);
+  return result;
+};
 
 export const fetchProfile = (
   serverUrl: string,
 ): Promise<ApiResult<{ profile: PublicProgressionProfile }>> =>
-  callAwake(serverUrl, '/api/progression/profile');
+  call(serverUrl, '/api/progression/profile');
 
 /**
  * Pede autorizacao para uma expedicao que pode render recurso.
@@ -334,7 +203,7 @@ export const requestRunTicket = (
   serverUrl: string,
   seed?: number,
 ): Promise<ApiResult<{ ticket: ProgressionRunTicket }>> =>
-  callAwake(serverUrl, '/api/progression/runs', {
+  call(serverUrl, '/api/progression/runs', {
     method: 'POST',
     body: JSON.stringify({ seed, mode: 'expedition' }),
   });
@@ -377,7 +246,7 @@ export const purchaseUpgrade = (
   });
 
 export const fetchCodex = (serverUrl: string, lang: string): Promise<ApiResult<CodexResponse>> =>
-  callAwake(serverUrl, `/api/progression/codex?lang=${encodeURIComponent(lang)}`);
+  call(serverUrl, `/api/progression/codex?lang=${encodeURIComponent(lang)}`);
 
 /**
  * Chave de idempotencia de uma compra.

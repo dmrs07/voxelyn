@@ -5,8 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   TIMEOUT_INTERACTIVE_MS,
   TIMEOUT_SETTLE_MS,
-  TIMEOUT_WAKE_MS,
-  fetchCodex,
   fetchProfile,
   openSession,
   purchaseKey,
@@ -229,74 +227,6 @@ describe('URL de servidor impossivel', () => {
 });
 
 // ---------------------------------------------------------------------------
-// O despertar da origem
-// ---------------------------------------------------------------------------
-// Seis segundos e o teto certo para uma chamada interativa e o teto errado para
-// acordar um processo hibernado, que e o comportamento padrao de quase todo
-// PaaS. Com uma tentativa so, um servidor no ar era lido como um servidor fora.
-
-describe('primeiro contato com uma origem fria', () => {
-  it('tenta de novo, com teto maior, quando nao veio resposta nenhuma', async () => {
-    let attempt = 0;
-    const calls = stubFetch(() => {
-      attempt += 1;
-      if (attempt === 1) throw new DOMException('aborted', 'TimeoutError');
-      return json(200, { profile: PROFILE });
-    });
-
-    const result = await fetchProfile('https://fria.example');
-    expect(result.ok).toBe(true);
-    expect(calls).toHaveLength(2);
-    expect(TIMEOUT_WAKE_MS).toBeGreaterThan(TIMEOUT_INTERACTIVE_MS * 3);
-  });
-
-  it('nao repete quando o servidor RESPONDEU e recusou', async () => {
-    // Um 429 prova que ha alguem acordado do outro lado. Insistir so gastaria o
-    // teto do limitador — e a segunda tentativa seria recusada igual.
-    const calls = stubFetch(() => json(429, { error: 'rate_limited' }));
-    const result = await fetchProfile('https://ocupada.example');
-    expect(result).toMatchObject({ ok: false, error: 'rate_limited', status: 429 });
-    expect(calls).toHaveLength(1);
-  });
-
-  // A regressao que a primeira versao desta mudanca introduziu, e que era PIOR
-  // que o problema original: marcando so o sucesso, uma origem genuinamente
-  // morta nunca entrava no conjunto, entao toda chamada pagava 6s + 25s. Como
-  // `authorizeExpedition` espera o ticket antes de comecar a run, cada descida
-  // offline travaria por meio minuto — no lugar exato que a mudanca protegia.
-  it('desiste de vez: origem morta nao paga a espera longa duas vezes', async () => {
-    const dead = stubFetch(() => {
-      throw new TypeError('network');
-    });
-    const first = await fetchProfile('https://morta.example');
-    expect(first).toMatchObject({ ok: false, error: 'offline' });
-    expect(dead).toHaveLength(2); // a curta e a longa
-
-    const again = stubFetch(() => {
-      throw new TypeError('network');
-    });
-    const second = await fetchProfile('https://morta.example');
-    expect(second).toMatchObject({ ok: false, error: 'offline' });
-    expect(again).toHaveLength(1); // so a curta: a tentativa longa ja foi gasta
-  });
-
-  it('a espera longa e paga UMA vez por origem, e nao a cada chamada', async () => {
-    // A primeira chamada descobre que ha alguem ali. A partir dai a origem esta
-    // quente, e uma queda posterior e uma queda — nao um servidor hibernando.
-    const warm = stubFetch(() => json(200, { profile: PROFILE }));
-    await fetchProfile('https://quente.example');
-    expect(warm).toHaveLength(1);
-
-    const later = stubFetch(() => {
-      throw new TypeError('network');
-    });
-    const result = await fetchProfile('https://quente.example');
-    expect(result).toMatchObject({ ok: false, error: 'offline' });
-    expect(later).toHaveLength(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Esquema que o `fetch` nao atende tambem e endereco invalido
 // ---------------------------------------------------------------------------
 // Parseavel nao e utilizavel. `new URL` aceita `ftp://` e `file://` sem
@@ -332,90 +262,5 @@ describe('esquemas que o navegador nao busca', () => {
       expect((await fetchProfile(good)).ok).toBe(true);
       expect(calls).toHaveLength(1);
     }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Duas chamadas, um unico despertar
-// ---------------------------------------------------------------------------
-// `refreshProfile` e `refreshCodex` se sobrepoem quando o painel abre na aba dos
-// Arquivos. Contra uma origem fria, quem chegasse em segundo via a marca de
-// "tentativa gasta" e anunciava queda na hora — mesmo com a espera do primeiro
-// terminando com o servidor de pe.
-
-describe('duas chamadas concorrentes contra a mesma origem fria', () => {
-  it('a segunda espera o despertar da primeira em vez de anunciar queda', async () => {
-    // As duas primeiras idas (uma por chamada) estouram; a partir dai o servidor
-    // responde, que e exatamente o comportamento de um host hibernado acordando.
-    let attempt = 0;
-    stubFetch(() => {
-      attempt += 1;
-      if (attempt <= 2) throw new DOMException('aborted', 'TimeoutError');
-      return json(200, { profile: PROFILE });
-    });
-
-    const [a, b] = await Promise.all([
-      fetchProfile('https://concorrente.example'),
-      fetchProfile('https://concorrente.example'),
-    ]);
-    expect(a.ok).toBe(true);
-    expect(b.ok).toBe(true);
-  });
-
-  it('se a origem nao acorda, a segunda nao fica pendurada', async () => {
-    stubFetch(() => {
-      throw new TypeError('network');
-    });
-    const [a, b] = await Promise.all([
-      fetchProfile('https://nunca-acorda.example'),
-      fetchProfile('https://nunca-acorda.example'),
-    ]);
-    expect(a).toMatchObject({ ok: false, error: 'offline' });
-    expect(b).toMatchObject({ ok: false, error: 'offline' });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// O token tem de estar gravado antes de a espera ser liberada
-// ---------------------------------------------------------------------------
-// Questao de ordem de microtask, e o cenario e justamente aquele em que o token
-// e a UNICA credencial que existe: navegador bloqueando cookie de terceiros,
-// origem fria, e uma chamada autenticada esperando o mesmo despertar. Liberada
-// cedo demais, ela lia um token que ainda nao existia, saia sem `Authorization`
-// e voltava `unauthenticated` — com a sessao dando certo um instante depois.
-
-describe('despertar compartilhado com sessao nascendo junto', () => {
-  const memory = (): Storage => {
-    const map = new Map<string, string>();
-    return {
-      getItem: (k: string) => map.get(k) ?? null,
-      setItem: (k: string, v: string) => void map.set(k, v),
-      removeItem: (k: string) => void map.delete(k),
-      clear: () => map.clear(),
-      key: (i: number) => [...map.keys()][i] ?? null,
-      get length() {
-        return map.size;
-      },
-    } as Storage;
-  };
-
-  it('quem espera so acorda com o token ja gravado', async () => {
-    vi.stubGlobal('localStorage', memory());
-    let attempt = 0;
-    const calls = stubFetch(({ url }) => {
-      // As duas primeiras idas (uma por chamada) estouram: o host esta frio.
-      attempt += 1;
-      if (attempt <= 2) throw new DOMException('aborted', 'TimeoutError');
-      return url.includes('/session')
-        ? json(201, { profile: PROFILE, token: 'token-frio' })
-        : json(200, { unlocked: [], locked: [], total: 0 });
-    });
-
-    const url = 'https://fria-com-sessao.example';
-    await Promise.all([openSession(url), fetchCodex(url, 'pt-BR')]);
-
-    const codex = calls.filter((c) => c.url.includes('/codex')).at(-1);
-    expect(codex).toBeDefined();
-    expect(new Headers(codex?.init.headers).get('authorization')).toBe('Bearer token-frio');
   });
 });

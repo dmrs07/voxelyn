@@ -1576,7 +1576,7 @@ const refreshCodex = async (): Promise<void> => {
   // Mantida, ela seria mostrada durante toda a consulta seguinte — e o pior caso
   // e o unico que o jogador realmente vive: ele corrige o endereco do servidor,
   // reabre a aba, e continua lendo a reclamacao sobre o endereco que acabou de
-  // consertar, possivelmente pelos 25s de uma origem fria.
+  // consertar, ate a resposta nova chegar.
   matrixView.codexNotice = null;
   drawMatrix();
   const result = await fetchCodex(query.scope, getLocale());
