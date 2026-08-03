@@ -238,17 +238,38 @@ const callAwake = async <T>(
   serverUrl: string,
   path: string,
   init: RequestInit = {},
+  /**
+   * O que precisa estar FEITO antes de liberar quem espera este despertar.
+   *
+   * Existe por uma questao de ordem de microtask, e nao de estilo. Sem ele, o
+   * `announce` do `finally` resolvia a espera ANTES de quem chamou processar a
+   * propria resposta — e o unico chamador que processa alguma coisa e o
+   * `openSession`, que grava o token da sessao.
+   *
+   * O estrago aparecia exatamente onde o token e a UNICA credencial que existe:
+   * navegador bloqueando cookie de terceiros, origem fria, e uma chamada
+   * autenticada esperando o mesmo despertar. Ela era liberada primeiro, lia um
+   * token que ainda nao tinha sido gravado, saia sem `Authorization` e voltava
+   * `unauthenticated` — com a sessao dando certo um instante depois.
+   */
+  commit: (result: ApiResult<T>) => void = () => undefined,
 ): Promise<ApiResult<T>> => {
   const origin = originOf(serverUrl);
   const first = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
-  if (first.ok || first.error !== 'offline') return first;
+  if (first.ok || first.error !== 'offline') {
+    commit(first);
+    return first;
+  }
   if (!origin) return first;
 
   // Ja ha alguem pagando a espera por esta origem: aproveitar o desfecho dela e
   // melhor que anunciar uma queda que talvez nem exista.
   const ongoing = wakeInFlight.get(origin);
   if (ongoing) {
-    return (await ongoing) ? call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS) : first;
+    if (!(await ongoing)) return first;
+    const retried = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
+    commit(retried);
+    return retried;
   }
 
   // `wakePaid` e consultado DEPOIS da primeira tentativa: e ela quem acabou de
@@ -270,6 +291,9 @@ const callAwake = async <T>(
   try {
     const retry = await call<T>(serverUrl, path, init, TIMEOUT_WAKE_MS);
     awake = retry.ok || retry.error !== 'offline';
+    // ANTES do `announce` do `finally`: quem espera precisa encontrar o token
+    // ja gravado quando acordar.
+    commit(retry);
     return retry;
   } finally {
     // No `finally` para que nenhum caminho de saida deixe quem espera pendurado.
@@ -278,19 +302,21 @@ const callAwake = async <T>(
   }
 };
 
-export const openSession = async (
+export const openSession = (
   serverUrl: string,
-): Promise<ApiResult<{ profile: PublicProgressionProfile }>> => {
-  const result = await callAwake<{ profile: PublicProgressionProfile; token?: string }>(
+): Promise<ApiResult<{ profile: PublicProgressionProfile }>> =>
+  // A gravacao vai como `commit`, e nao depois do `await`, porque ela precisa
+  // acontecer antes de qualquer outra chamada ser liberada — ver `callAwake`.
+  callAwake<{ profile: PublicProgressionProfile; token?: string }>(
     serverUrl,
     '/api/progression/session',
     { method: 'POST' },
+    (result) => {
+      // O token so vem quando a sessao NASCE. Confirmar uma sessao existente
+      // devolve so o perfil, e o que ja estava guardado continua valendo.
+      if (result.ok && result.value.token) writeSessionToken(serverUrl, result.value.token);
+    },
   );
-  // O token so vem quando a sessao NASCE. Confirmar uma sessao existente devolve
-  // so o perfil, e o que ja estava guardado continua valendo.
-  if (result.ok && result.value.token) writeSessionToken(serverUrl, result.value.token);
-  return result;
-};
 
 export const fetchProfile = (
   serverUrl: string,

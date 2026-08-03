@@ -6,6 +6,7 @@ import {
   TIMEOUT_INTERACTIVE_MS,
   TIMEOUT_SETTLE_MS,
   TIMEOUT_WAKE_MS,
+  fetchCodex,
   fetchProfile,
   openSession,
   purchaseKey,
@@ -371,5 +372,50 @@ describe('duas chamadas concorrentes contra a mesma origem fria', () => {
     ]);
     expect(a).toMatchObject({ ok: false, error: 'offline' });
     expect(b).toMatchObject({ ok: false, error: 'offline' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// O token tem de estar gravado antes de a espera ser liberada
+// ---------------------------------------------------------------------------
+// Questao de ordem de microtask, e o cenario e justamente aquele em que o token
+// e a UNICA credencial que existe: navegador bloqueando cookie de terceiros,
+// origem fria, e uma chamada autenticada esperando o mesmo despertar. Liberada
+// cedo demais, ela lia um token que ainda nao existia, saia sem `Authorization`
+// e voltava `unauthenticated` — com a sessao dando certo um instante depois.
+
+describe('despertar compartilhado com sessao nascendo junto', () => {
+  const memory = (): Storage => {
+    const map = new Map<string, string>();
+    return {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+      clear: () => map.clear(),
+      key: (i: number) => [...map.keys()][i] ?? null,
+      get length() {
+        return map.size;
+      },
+    } as Storage;
+  };
+
+  it('quem espera so acorda com o token ja gravado', async () => {
+    vi.stubGlobal('localStorage', memory());
+    let attempt = 0;
+    const calls = stubFetch(({ url }) => {
+      // As duas primeiras idas (uma por chamada) estouram: o host esta frio.
+      attempt += 1;
+      if (attempt <= 2) throw new DOMException('aborted', 'TimeoutError');
+      return url.includes('/session')
+        ? json(201, { profile: PROFILE, token: 'token-frio' })
+        : json(200, { unlocked: [], locked: [], total: 0 });
+    });
+
+    const url = 'https://fria-com-sessao.example';
+    await Promise.all([openSession(url), fetchCodex(url, 'pt-BR')]);
+
+    const codex = calls.filter((c) => c.url.includes('/codex')).at(-1);
+    expect(codex).toBeDefined();
+    expect(new Headers(codex?.init.headers).get('authorization')).toBe('Bearer token-frio');
   });
 });
