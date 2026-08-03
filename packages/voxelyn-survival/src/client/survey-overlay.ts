@@ -23,6 +23,7 @@
 // de balanceamento que nenhuma inspecao visual pega.
 
 import {
+  CONTAMINATION_WAVES,
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ORE_CHIPPED,
@@ -195,15 +196,19 @@ export class RouteMemory {
 /**
  * A previsao de contaminacao (SV-X): quanto falta para a proxima onda.
  *
- * Os limiares sao os mesmos da simulacao — 0,12 / 0,35 / 0,6 / 0,85 — e estao
- * DUPLICADOS aqui de proposito. Importa-los acoplaria a apresentacao a uma
- * constante interna do laco de contaminacao, e o teste abaixo trava os dois
- * juntos: se a sim mudar a escada, ele falha e alguem decide conscientemente.
+ * IMPORTADA da simulacao, e nao copiada. A primeira versao duplicava a escada
+ * "de proposito", com um comentario dizendo que o teste travaria as duas — e o
+ * teste comparava a copia com um literal DELA MESMA. A copia estava errada (um
+ * degrau inventado em 0,12 que a simulacao nao tem), o teste passava, e a barra
+ * ficava uma onda inteira atrasada para sempre.
+ *
+ * A licao ficou no lugar da constante: um teste que so confere uma copia contra
+ * si mesma nao trava nada, e uma constante compartilhada nao precisa de teste.
  *
  * Devolve `null` depois da ultima onda: nao ha proxima, e inventar uma barra
  * parada seria pior que nao mostrar nada.
  */
-export const WAVE_THRESHOLDS: readonly number[] = [0.12, 0.35, 0.6, 0.85];
+export const WAVE_THRESHOLDS: readonly number[] = CONTAMINATION_WAVES.map(([level]) => level);
 
 export type WaveForecast = { next: number; progress: number; imminent: boolean };
 

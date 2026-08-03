@@ -38,6 +38,7 @@ import {
   settleRun,
 } from './progression-api';
 import { readCachedProfile, writeCachedProfile } from './progression-cache';
+import { SettlementQueue } from './settlement-queue';
 import { renderRecordsPanel } from './records-panel';
 import {
   needsConfirmation,
@@ -376,7 +377,7 @@ let authorizing = false;
  * liquidacao trata de forma idempotente. Perder isso ao fechar a aba e aceitavel;
  * perder ao abrir a Matriz nao era.
  */
-let pendingSettlement: { runId: string; log: string; url: string } | null = null;
+const pendingSettlements = new SettlementQueue();
 /** Esta run ja foi enviada para homologacao? */
 let settlementSent = false;
 
@@ -386,8 +387,18 @@ let settlementSent = false;
  * Falha vira simulacao local COM AVISO, e nunca silenciosamente: o jogador
  * precisa saber, antes de descer, que a carga daquela descida nao vai contar.
  */
+/**
+ * @param descent Qual descida pediu esta autorizacao.
+ *
+ * O token nao serve so para o CHAMADOR decidir se ainda vale — ele precisa ser
+ * conferido AQUI DENTRO, antes de qualquer escrita global. A descida A
+ * abandonada, resolvendo depois da B, publicava o proprio `runId` em
+ * `expedition` e a B liquidava o log dela contra o ticket errado; se a A tivesse
+ * falhado, ela zerava `expedition` e a B nao homologava nada.
+ */
 const authorizeExpedition = async (
   seed: number,
+  descent: number,
 ): Promise<{ seed: number; tuning?: PlayerTuning }> => {
   authorizing = true;
   const url = serverInput.value.trim() || defaultServerUrl();
@@ -396,6 +407,9 @@ const authorizeExpedition = async (
   const authorized = await requestRunTicketWithSession(url, seed).finally(() => {
     authorizing = false;
   });
+  // Chegou tarde: outra descida ja e a atual, ou o jogador voltou ao menu. Sai
+  // sem tocar em `expedition`, no cache nem no chassi desenhado.
+  if (descent !== descentToken) return { seed };
   // A sessao pode ter nascido AGORA, nesta chamada: o perfil que veio com ela e
   // o unico estado autoritativo que o jogo tem antes de descer.
   if (authorized.openedProfile) {
@@ -433,17 +447,20 @@ const authorizeExpedition = async (
 const transmitSettlement = (url: string, runId: string, log: string): void => {
   void settleRun(url, runId, log).then((result) => {
     if (!result.ok) {
-      // GUARDA para reenviar. O comentario que estava aqui prometia que o
-      // jogador poderia tentar de novo pela Matriz, e essa rota nao existia:
-      // um timeout de rede apagava em silencio o minerio de uma extracao que
-      // tinha dado certo.
-      pendingSettlement = { runId, log, url };
+      // GUARDA para reenviar, CHAVEADO POR runId.
+      //
+      // Um slot unico nao servia: a liquidacao espera ate 45 s e o ticket
+      // seguinte volta em 6, entao a run B pode terminar e falhar enquanto a
+      // retentativa da run A ainda esta no ar. Com um slot, o sucesso tardio de
+      // A limpava o pendente de B — e a carga de B nunca mais seria reenviada.
+      pendingSettlements.hold({ runId, log, url });
       console.info('[progressao] nao homologada:', result.error);
       setBanner(t('banner.expedition.pending'));
       setTimeout(() => setBanner(null), 4200);
       return;
     }
-    pendingSettlement = null;
+    // So o proprio runId sai do mapa. Ver o comentario da falha, acima.
+    pendingSettlements.settled(runId);
     writeCachedProfile(result.value.profile, Date.now());
     const credited = result.value.result;
     // Tres frases, e nao uma com "+0 NUCLEO" no fim: a extracao antecipada e
@@ -474,10 +491,12 @@ const transmitSettlement = (url: string, runId: string, log: string): void => {
  * bateria e rate limit.
  */
 const retryPendingSettlement = (): void => {
-  const pending = pendingSettlement;
-  if (!pending) return;
-  pendingSettlement = null;
-  transmitSettlement(pending.url, pending.runId, pending.log);
+  // Uma copia da lista antes de iterar: `transmitSettlement` pode escrever no
+  // mapa de forma assincrona, e iterar sobre a colecao viva enquanto ela muda e
+  // exatamente o tipo de bug que so aparece com a rede ruim.
+  for (const pending of pendingSettlements.drain()) {
+    transmitSettlement(pending.url, pending.runId, pending.log);
+  }
 };
 
 const homologateRun = (state: SurvivalState): void => {
@@ -890,7 +909,7 @@ const runSolo = async (): Promise<void> => {
   // devolve o tuning derivado do perfil; so entao a run existe. Construir o
   // mundo primeiro e pedir o ticket depois criaria uma janela em que o
   // Prospector na tela nao e o Prospector autorizado.
-  const authorized = await authorizeExpedition(nextSeed());
+  const authorized = await authorizeExpedition(nextSeed(), myDescent);
   // O jogador pode ter desistido — ou comecado outra descida — enquanto o ticket
   // vinha. Sair AQUI, antes de tocar em qualquer estado global, e o que impede um
   // mundo de nascer atras do menu.
@@ -988,7 +1007,7 @@ const runSolo = async (): Promise<void> => {
         // relido do perfil. Reusar o anterior deixaria a segunda run tentando
         // liquidar contra um runId ja fechado — e daria ao jogador um Prospector
         // desatualizado se ele tivesse comprado alguma coisa no intervalo.
-        void authorizeExpedition(nextSeed()).then((next) => {
+        void authorizeExpedition(nextSeed(), myDescent).then((next) => {
           if (myDescent !== descentToken) return;
           recorder.start(next.seed);
           telemetry.begin();

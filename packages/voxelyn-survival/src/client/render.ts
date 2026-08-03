@@ -1020,6 +1020,13 @@ export class SurvivalRenderer {
     // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
     this.lurkerTrails.clear();
+    // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
+    // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
+    // `trackSector` compara NUMEROS e sairia cedo, deixando o beacon de SV-01
+    // sem disparar e a memoria de rota mostrando os saloes da run passada.
+    this.route.reset();
+    this.lastSector = 0;
+    this.sectorEnteredAtMs = 0;
   }
 
   private addFlash(

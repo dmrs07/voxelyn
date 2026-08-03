@@ -4,7 +4,7 @@
 // balanceamento que nenhuma inspecao visual pega.
 
 import { describe, expect, it } from 'vitest';
-import { createRun, derivePlayerTuning } from '@voxelyn/survival-sim';
+import { CONTAMINATION_WAVES, createRun, derivePlayerTuning } from '@voxelyn/survival-sim';
 import { SOLID_NONE, SOLID_ORE } from '@voxelyn/survival-sim';
 import type { SurvivalState } from '@voxelyn/survival-sim';
 import {
@@ -194,25 +194,29 @@ describe('SV-04 · memoria de rota', () => {
 describe('SV-X · previsao de contaminacao', () => {
   it('mede o progresso ate a proxima onda', () => {
     expect(forecastWave(0, 0)).toMatchObject({ next: 1, progress: 0 });
-    expect(forecastWave(0.06, 0)?.progress).toBeCloseTo(0.5, 2);
-    expect(forecastWave(0.12, 0)?.progress).toBeCloseTo(1, 5);
+    expect(forecastWave(0.175, 0)?.progress).toBeCloseTo(0.5, 2);
+    expect(forecastWave(0.35, 0)?.progress).toBeCloseTo(1, 5);
     // Depois da primeira onda, a escala e do proximo degrau.
-    expect(forecastWave(0.12, 1)?.progress).toBeCloseTo(0, 5);
+    expect(forecastWave(0.35, 1)?.progress).toBeCloseTo(0, 5);
+    expect(forecastWave(0.475, 1)?.progress).toBeCloseTo(0.5, 2);
   });
 
   it('avisa a iminencia perto do limiar', () => {
-    expect(forecastWave(0.05, 0)?.imminent).toBe(false);
-    expect(forecastWave(0.11, 0)?.imminent).toBe(true);
+    expect(forecastWave(0.1, 0)?.imminent).toBe(false);
+    expect(forecastWave(0.33, 0)?.imminent).toBe(true);
   });
 
   it('some depois da ultima onda em vez de mostrar barra parada', () => {
     expect(forecastWave(0.99, WAVE_THRESHOLDS.length)).toBeNull();
   });
 
-  // Os limiares sao copia dos da simulacao. Este teste e o que trava os dois
-  // juntos: se a escada mudar la, alguem decide conscientemente aqui.
-  it('a escada de limiares e a que a simulacao usa', () => {
-    expect([...WAVE_THRESHOLDS]).toEqual([0.12, 0.35, 0.6, 0.85]);
+  // A versao anterior deste teste comparava a copia local com um literal DELA
+  // MESMA — e a copia estava errada, entao ele passava enquanto a barra ficava
+  // uma onda atrasada. Agora a escada VEM da simulacao, e o que resta afirmar e
+  // a ligacao, nao os numeros.
+  it('a escada vem da simulacao, e nao de uma copia', () => {
+    expect([...WAVE_THRESHOLDS]).toEqual(CONTAMINATION_WAVES.map(([level]) => level));
+    expect(WAVE_THRESHOLDS).toHaveLength(3);
   });
 });
 

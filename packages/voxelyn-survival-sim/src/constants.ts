@@ -333,7 +333,6 @@ export const BUDGET_VEIN_CELLS = 64;
 export const FERRIC_VEIN_SCALE = 3;
 export const BUDGET_RESONANCE_CELLS = 24;
 
-
 export const PLAYER_HP = 100;
 export const PLAYER_SPEED = 4.6; // tiles/s
 export const PLAYER_RADIUS = 0.34;
@@ -750,3 +749,21 @@ export const MINER_ORE_SEARCH = 6;
  * de qualquer run deixa de ser descoberta.
  */
 export const CARGO_LOST_DISCOVERY_ORE = 20;
+
+/**
+ * Em que contaminacao cada onda dispara, e quantos bichos ela traz.
+ *
+ * Exportado, e nao um literal dentro de `stepContamination`, porque a
+ * apresentacao precisa do mesmo numero: a previsao de onda (SV-X) desenha o
+ * progresso ate o proximo limiar. A primeira versao dela COPIOU a escada e
+ * copiou errado — inventou um degrau em 0,12 que a simulacao nao tem —, e o
+ * teste que deveria travar as duas comparava a copia com um literal dela mesma.
+ *
+ * Uma constante compartilhada elimina a classe inteira do problema: nao ha o que
+ * divergir.
+ */
+export const CONTAMINATION_WAVES: readonly (readonly [level: number, count: number])[] = [
+  [0.35, 2],
+  [0.6, 3],
+  [0.85, 4],
+];

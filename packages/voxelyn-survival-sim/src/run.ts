@@ -38,6 +38,7 @@ import {
   RETURN_DISC_SPEED,
   SALVAGE_SCAN_TICKS,
   CARGO_LOST_DISCOVERY_ORE,
+  CONTAMINATION_WAVES,
   CONTAMINATION_SECTOR_SCALE,
   SECTOR_COUNT,
   RUN_SEED_MIX,
@@ -73,8 +74,20 @@ import {
   recordResonance,
   resonanceOffers,
 } from './abilities.js';
-import { dischargeAt, explodeAt, igniteCell, isConductiveSurface, setSurface, stepCells } from './cells.js';
-import { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass } from './materials.js';
+import {
+  dischargeAt,
+  explodeAt,
+  igniteCell,
+  isConductiveSurface,
+  setSurface,
+  stepCells,
+} from './cells.js';
+import {
+  explosiveArmedByDistance,
+  impactSolid,
+  impactSurface,
+  projectileClass,
+} from './materials.js';
 import {
   applyExplosionDamage,
   cellUnder,
@@ -115,7 +128,6 @@ import type {
   SurvivalSnapshot,
   SurvivalState,
 } from './types.js';
-
 
 export const emptyCommand = (): PlayerCommand => ({
   move: { x: 0, y: 0 },
@@ -304,7 +316,12 @@ export const createRun = (config: RunConfig): SurvivalState => {
       openedBySlot: null,
     })),
     vents: world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 })),
-    railTracks: world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const })),
+    railTracks: world.railTracks.map((t) => ({
+      ...t,
+      readyAt: 0,
+      firingAt: 0,
+      fromEnd: 0 as const,
+    })),
     hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
@@ -336,7 +353,11 @@ export const standingPlayers = (state: SurvivalState): Entity[] =>
   });
 
 /** Player de pe mais proximo de (x,y), ou null. */
-export const nearestStandingPlayer = (state: SurvivalState, x: number, y: number): Entity | null => {
+export const nearestStandingPlayer = (
+  state: SurvivalState,
+  x: number,
+  y: number,
+): Entity | null => {
   let best: Entity | null = null;
   let bestD = Infinity;
   for (const p of standingPlayers(state)) {
@@ -407,7 +428,14 @@ const stepRailCarts = (state: SurvivalState, events: SemanticEvent[]): void => {
       // tempo de aviso util para quem pisou.
       track.fromEnd = along * 2 < track.len ? 1 : 0;
       track.firingAt = state.tick + CART_WINDUP_TICKS;
-      events.push({ t: 'cart_warning', x: track.x, y: track.y, dx: track.dx, dy: track.dy, len: track.len });
+      events.push({
+        t: 'cart_warning',
+        x: track.x,
+        y: track.y,
+        dx: track.dx,
+        dy: track.dy,
+        len: track.len,
+      });
       break;
     }
   }
@@ -444,9 +472,8 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
         if (!cells.has(cellIndexAt(state, ent.x, ent.y))) continue;
-        const scale = ev.source === 'player' && ent.kind === 'player'
-          ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE
-          : 1;
+        const scale =
+          ev.source === 'player' && ent.kind === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1;
         damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events, {
           kind: 'discharge',
           source: ev.source,
@@ -470,7 +497,7 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         ev.radius,
         events,
         ev.source === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1,
-        ev.source
+        ev.source,
       );
     }
   }
@@ -516,8 +543,16 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
   const dy = extra.aim.y / aimLength;
 
   events.push({
-    t: 'action_start', entity: player.id, action: 'pulse', x: player.x, y: player.y,
-    dx, dy, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 8,
+    t: 'action_start',
+    entity: player.id,
+    action: 'pulse',
+    x: player.x,
+    y: player.y,
+    dx,
+    dy,
+    startTick: state.tick,
+    releaseTick: state.tick,
+    endTick: state.tick + 8,
   });
 
   switch (extra.ability) {
@@ -547,7 +582,11 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
           const oy = y + 0.5 - player.y;
           if (ox * ox + oy * oy > radius * radius) continue;
           const i = y * w + x;
-          if (state.surface[i] === SURF_FIRE || state.surface[i] === SURF_GAS || state.surface[i] === SURF_SPORES) {
+          if (
+            state.surface[i] === SURF_FIRE ||
+            state.surface[i] === SURF_GAS ||
+            state.surface[i] === SURF_SPORES
+          ) {
             setSurface(state, i, SURF_NONE, 0);
             recordResonance(extra.resonance, 'kinetic');
           }
@@ -734,7 +773,12 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   events.push({ t: 'well_offers', sector: state.sector, abilities: offers });
 };
 
-const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, events: SemanticEvent[]): void => {
+const stepPlayer = (
+  state: SurvivalState,
+  slot: number,
+  cmd: PlayerCommand,
+  events: SemanticEvent[],
+): void => {
   const tuning = state.config.tuning;
   const player = state.players[slot];
   const extra = state.playerExtras[slot];
@@ -785,9 +829,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   // esquiva
   if (cmd.dodge && state.tick >= extra.dodgeCooldownUntil) {
     const moveLen = Math.hypot(cmd.move.x, cmd.move.y);
-    const dir = moveLen > 0.01
-      ? { x: cmd.move.x / moveLen, y: cmd.move.y / moveLen }
-      : { x: player.facing.x, y: player.facing.y };
+    const dir =
+      moveLen > 0.01
+        ? { x: cmd.move.x / moveLen, y: cmd.move.y / moveLen }
+        : { x: player.facing.x, y: player.facing.y };
     extra.dodgeDir = dir;
     extra.dodgeUntil = state.tick + DODGE_TICKS;
     extra.iframesUntil = state.tick + tuning.dodgeIframeTicks;
@@ -800,7 +845,12 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   const beforeMoveX = player.x;
   const beforeMoveY = player.y;
   if (state.tick < extra.dodgeUntil) {
-    moveEntity(state, player, extra.dodgeDir.x * DODGE_SPEED * dt, extra.dodgeDir.y * DODGE_SPEED * dt);
+    moveEntity(
+      state,
+      player,
+      extra.dodgeDir.x * DODGE_SPEED * dt,
+      extra.dodgeDir.y * DODGE_SPEED * dt,
+    );
   } else if (state.surface[cellUnder(state, player)] === SURF_ICE) {
     // INERCIA DO GELO: o pe nao morde a lamina. O rumo comandado entra aos
     // poucos na velocidade real, e soltar o direcional NAO para na hora — o
@@ -842,7 +892,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
   // extracao so libera depois de deixar a zona de entrada uma vez
   if (!state.leftEntryZone) {
-    const distFromEntry = Math.hypot(player.x - (state.entry.x + 0.5), player.y - (state.entry.y + 0.5));
+    const distFromEntry = Math.hypot(
+      player.x - (state.entry.x + 0.5),
+      player.y - (state.entry.y + 0.5),
+    );
     if (distFromEntry > 4) state.leftEntryZone = true;
   }
 
@@ -850,7 +903,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
   // A fissura nao machuca: o que ela cobra e a barra que ja esta no HUD, e
   // sair dela e a decisao que devolve a dissipacao normal.
   const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
-  extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1));
+  extra.heat = Math.max(
+    0,
+    extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1),
+  );
 
   // disparo principal
   if (
@@ -920,10 +976,25 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       });
     }
     events.push({
-      t: 'action_start', entity: player.id, action: 'player_shot', x: player.x, y: player.y,
-      dx: extra.aim.x, dy: extra.aim.y, startTick: state.tick, releaseTick: state.tick, endTick: state.tick + 7,
+      t: 'action_start',
+      entity: player.id,
+      action: 'player_shot',
+      x: player.x,
+      y: player.y,
+      dx: extra.aim.x,
+      dy: extra.aim.y,
+      startTick: state.tick,
+      releaseTick: state.tick,
+      endTick: state.tick + 7,
     });
-    events.push({ t: 'shot', x: player.x, y: player.y, dx: extra.aim.x, dy: extra.aim.y, owner: player.id });
+    events.push({
+      t: 'shot',
+      x: player.x,
+      y: player.y,
+      dx: extra.aim.x,
+      dy: extra.aim.y,
+      owner: player.id,
+    });
     state.stats.shotsFired += 1;
     if (extra.heat >= tuning.heatMax) {
       extra.overheatedUntil = state.tick + tuning.overheatLockTicks;
@@ -1007,7 +1078,10 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
     // O mesmo ponto significa coisas diferentes conforme a profundidade: nos
     // setores anteriores ao ultimo ele e o POCO, e no ultimo e o nucleo.
-    const distCore = Math.hypot(player.x - (state.corePos.x + 0.5), player.y - (state.corePos.y + 0.5));
+    const distCore = Math.hypot(
+      player.x - (state.corePos.x + 0.5),
+      player.y - (state.corePos.y + 0.5),
+    );
     if (state.coreTaken && !isFinalSector(state.sector) && distCore < 1.6) {
       // Com o Nucleo na mao o poco SELOU: descer de novo nao existe. O
       // caminho de volta sai por onde se entrou — a ENTRADA do setor.
@@ -1019,9 +1093,13 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
       // para tras num mapa que deixou de existir nao teria como ser resgatado.
       const standing = standingPlayers(state);
       const allNear = standing.every(
-        (p) => Math.hypot(p.x - (state.corePos.x + 0.5), p.y - (state.corePos.y + 0.5)) <= EXTRACT_RADIUS
+        (p) =>
+          Math.hypot(p.x - (state.corePos.x + 0.5), p.y - (state.corePos.y + 0.5)) <=
+          EXTRACT_RADIUS,
       );
-      const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
+      const anyDowned = state.playerExtras.some(
+        (e, i) => e.joined && state.players[i].alive && e.downed,
+      );
       if (anyDowned) {
         events.push({ t: 'message', key: 'sim.reviveBeforeDescend' });
       } else if (!allNear) {
@@ -1041,7 +1119,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
     for (const site of state.salvageSites) {
       const terminalDistance = Math.hypot(
         player.x - (site.terminal.x + 0.5),
-        player.y - (site.terminal.y + 0.5)
+        player.y - (site.terminal.y + 0.5),
       );
       if (site.terminalState === 'inactive' && terminalDistance < 1.45) {
         site.terminalState = 'scanning';
@@ -1053,13 +1131,21 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           y: site.terminal.y,
           completesAtTick: site.scanEndsAt,
         });
-        const offsets = [[-3, 0], [3, 0], [0, -3], [0, 3], [-2, -2], [2, 2]] as const;
+        const offsets = [
+          [-3, 0],
+          [3, 0],
+          [0, -3],
+          [0, 3],
+          [-2, -2],
+          [2, 2],
+        ] as const;
         let spawned = 0;
         for (let i = 0; i < offsets.length && spawned < 2 + site.tier; i++) {
           const [dx, dy] = offsets[(i + site.id) % offsets.length];
           const x = site.terminal.x + dx;
           const y = site.terminal.y + dy;
-          if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1) continue;
+          if (x < 1 || y < 1 || x >= state.config.width - 1 || y >= state.config.height - 1)
+            continue;
           if (state.solid[y * state.config.width + x] !== SOLID_NONE) continue;
           spawnEnemy(state, spawned === 0 && site.tier > 1 ? 'spitter' : 'stalker', x, y, false);
           spawned++;
@@ -1069,7 +1155,7 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
 
       const cacheDistance = Math.hypot(
         player.x - (site.cache.x + 0.5),
-        player.y - (site.cache.y + 0.5)
+        player.y - (site.cache.y + 0.5),
       );
       if (site.cacheRevealed && !site.cacheOpened && cacheDistance < 1.35) {
         site.cacheOpened = true;
@@ -1081,18 +1167,30 @@ const stepPlayer = (state: SurvivalState, slot: number, cmd: PlayerCommand, even
           options,
           createdAtTick: state.tick,
         };
-        events.push({ t: 'salvage_cache_opened', siteId: site.id, slot, x: site.cache.x, y: site.cache.y });
+        events.push({
+          t: 'salvage_cache_opened',
+          siteId: site.id,
+          slot,
+          x: site.cache.x,
+          y: site.cache.y,
+        });
         events.push({ t: 'purge_cell_acquired', slot, amount: 1 });
         return;
       }
     }
     // extracao coletiva: todos os players de pe precisam estar na zona de entrada
-    const distEntry = Math.hypot(player.x - (state.entry.x + 0.5), player.y - (state.entry.y + 0.5));
+    const distEntry = Math.hypot(
+      player.x - (state.entry.x + 0.5),
+      player.y - (state.entry.y + 0.5),
+    );
     if (distEntry < 1.6 && state.leftEntryZone) {
       const allAtEntry = standingPlayers(state).every(
-        (p) => Math.hypot(p.x - (state.entry.x + 0.5), p.y - (state.entry.y + 0.5)) <= EXTRACT_RADIUS
+        (p) =>
+          Math.hypot(p.x - (state.entry.x + 0.5), p.y - (state.entry.y + 0.5)) <= EXTRACT_RADIUS,
       );
-      const anyDowned = state.playerExtras.some((e, i) => e.joined && state.players[i].alive && e.downed);
+      const anyDowned = state.playerExtras.some(
+        (e, i) => e.joined && state.players[i].alive && e.downed,
+      );
       const withCore = state.playerExtras.some((e) => e.hasCore);
       // Com o NUCLEO, a entrada de um setor profundo nao extrai: ela SOBE. O
       // contrato so fecha na plataforma do setor 1 — cada setor tem de ser
@@ -1135,7 +1233,7 @@ const procModule = (
   extra: PlayerExtra | undefined,
   slot: number | undefined,
   id: ModuleId,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): boolean => {
   if (!extra || slot === undefined) return false;
   if (!moduleHasCapacity(extra, id, state.tick)) return false;
@@ -1145,7 +1243,8 @@ const procModule = (
 };
 
 /** O projetil ainda tem rebote sobrando neste voo? */
-const canBounce = (proj: Projectile): boolean => (proj.modules?.ricochet?.remainingBounces ?? 0) > 0;
+const canBounce = (proj: Projectile): boolean =>
+  (proj.modules?.ricochet?.remainingBounces ?? 0) > 0;
 
 /**
  * O disco iniciou a volta — e AQUI que o Return Disc entrega o que promete, e
@@ -1160,7 +1259,7 @@ const beginDiscReturn = (
   proj: Projectile,
   extra: PlayerExtra | undefined,
   slot: number | undefined,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
 ): void => {
   if (!proj.disc || proj.disc.phase === 'returning') return;
   proj.disc.phase = 'returning';
@@ -1177,7 +1276,13 @@ const beginDiscReturn = (
  * material poder reagir. Destruir terreno e mecanica central, e um modulo de
  * tier 1 anunciado como "seguro" nao pode desligar isso sem avisar.
  */
-const bounceOffSolid = (proj: Projectile, prevX: number, prevY: number, cx: number, cy: number): void => {
+const bounceOffSolid = (
+  proj: Projectile,
+  prevX: number,
+  prevY: number,
+  cx: number,
+  cy: number,
+): void => {
   const enteredX = Math.floor(prevX) !== cx;
   const enteredY = Math.floor(prevY) !== cy;
   if (enteredX) proj.vx *= -1;
@@ -1302,14 +1407,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         explosiveArmedByDistance(proj) &&
         Boolean(ownerExtra && moduleHasCapacity(ownerExtra, 'explosive', state.tick));
       const conductiveReady = Boolean(
-        proj.modules?.conductive && ownerExtra && moduleHasCapacity(ownerExtra, 'conductive', state.tick)
+        proj.modules?.conductive &&
+        ownerExtra &&
+        moduleHasCapacity(ownerExtra, 'conductive', state.tick),
       );
       const cls = projectileClass(proj, conductiveReady, explosiveArmed);
 
       if (state.solid[i] !== SOLID_NONE) {
         // Explosive vem ANTES do disco: quem equipa os dois troca o retorno por
         // uma detonacao, e essa e a escolha — nao um dos dois sumindo em silencio.
-        if (explosiveArmed && !proj.hostile && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
+        if (
+          explosiveArmed &&
+          !proj.hostile &&
+          procModule(state, ownerExtra, ownerSlot, 'explosive', events)
+        ) {
           explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
           dead = true;
           break;
@@ -1361,7 +1472,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             // O rebote so acontece no que NAO cedeu. Se a parede quebrou,
             // refletir seria refletir num buraco recem-aberto — e o tiro ja fez
             // o que tinha a fazer ali.
-            if (!broke && canBounce(proj) && procModule(state, ownerExtra, ownerSlot, 'ricochet', events)) {
+            if (
+              !broke &&
+              canBounce(proj) &&
+              procModule(state, ownerExtra, ownerSlot, 'ricochet', events)
+            ) {
               bounceOffSolid(proj, prevX, prevY, cx, cy);
               break;
             }
@@ -1399,7 +1514,9 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           recordPlayerResonance(state, origin.owner, 'fire');
         }
         if (
-          conductiveReady && ownerExtra && ownerSlot !== undefined &&
+          conductiveReady &&
+          ownerExtra &&
+          ownerSlot !== undefined &&
           events.slice(eventStart).some((event) => event.t === 'discharge')
         ) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
@@ -1412,7 +1529,9 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
       }
 
       if (
-        conductiveReady && ownerExtra && ownerSlot !== undefined &&
+        conductiveReady &&
+        ownerExtra &&
+        ownerSlot !== undefined &&
         isConductiveSurface(state.surface[i]) &&
         consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
       ) {
@@ -1447,14 +1566,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             const shooter = state.enemies.find((e) => e.id === proj.owner);
             damageEntity(state, player, proj.damage, events, {
               kind: 'enemy_projectile',
-              archetype: (shooter?.archetype as EnemyArchetype) ?? (proj.kind === 'rock' ? 'bruiser' : 'spitter'),
+              archetype:
+                (shooter?.archetype as EnemyArchetype) ??
+                (proj.kind === 'rock' ? 'bruiser' : 'spitter'),
               elite: shooter?.elite ?? false,
               projectile: proj.kind,
             });
             if (proj.kind === 'rock' && vulnerable) {
               stunEntity(state, player, BRUISER_ROCK_STUN_TICKS);
             }
-            if (proj.leavesBiofluid && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+            if (
+              proj.leavesBiofluid &&
+              state.solid[i] === SOLID_NONE &&
+              state.surface[i] === SURF_NONE
+            ) {
               setSurface(state, i, SURF_BIOFLUID, 0);
             }
             dead = true;
@@ -1468,7 +1593,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           for (const enemy of state.enemies) {
             if (!enemy.alive) continue;
             if (proj.hits?.includes(enemy.id)) continue;
-            if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2)) continue;
+            if (
+              Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >=
+              enemy.radius + (proj.radius ?? 0.2)
+            )
+              continue;
             proj.hits?.push(enemy.id);
             damageEntity(state, enemy, proj.damage, events, {
               kind: 'enemy_projectile',
@@ -1482,20 +1611,27 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
           const discHits = proj.disc
-            ? (proj.disc.phase === 'outbound' ? proj.disc.outboundHits : proj.disc.returnHits)
+            ? proj.disc.phase === 'outbound'
+              ? proj.disc.outboundHits
+              : proj.disc.returnHits
             : undefined;
           if (discHits?.includes(enemy.id) || proj.hits?.includes(enemy.id)) continue;
-          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2)) continue;
+          if (Math.hypot(enemy.x - proj.x, enemy.y - proj.y) >= enemy.radius + (proj.radius ?? 0.2))
+            continue;
 
           let damage = proj.damage;
           const enemyCell = cellIndexAt(state, enemy.x, enemy.y);
           let conductiveTriggered = false;
           const conductiveAvailable = Boolean(
-            proj.modules?.conductive && ownerExtra && ownerSlot !== undefined &&
-            moduleHasCapacity(ownerExtra, 'conductive', state.tick)
+            proj.modules?.conductive &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
+            moduleHasCapacity(ownerExtra, 'conductive', state.tick),
           );
           if (
-            conductiveAvailable && ownerExtra && ownerSlot !== undefined &&
+            conductiveAvailable &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
             isConductiveSurface(state.surface[enemyCell]) &&
             consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
           ) {
@@ -1504,8 +1640,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             dischargeAt(state, Math.floor(enemy.x), Math.floor(enemy.y), events, origin);
           }
           if (
-            conductiveAvailable && !conductiveTriggered && !isStoneEnemy(enemy) &&
-            ownerExtra && ownerSlot !== undefined &&
+            conductiveAvailable &&
+            !conductiveTriggered &&
+            !isStoneEnemy(enemy) &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
             consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events)
           ) {
             conductiveTriggered = true;
@@ -1516,8 +1655,12 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           damageEntity(state, enemy, damage, events, { kind: 'player_shot' });
 
           if (
-            proj.modules?.siphon && owner && ownerExtra && ownerSlot !== undefined &&
-            owner.hp < owner.maxHp && moduleHasCapacity(ownerExtra, 'siphon', state.tick) &&
+            proj.modules?.siphon &&
+            owner &&
+            ownerExtra &&
+            ownerSlot !== undefined &&
+            owner.hp < owner.maxHp &&
+            moduleHasCapacity(ownerExtra, 'siphon', state.tick) &&
             consumeModuleCharge(ownerExtra, 'siphon', ownerSlot, events)
           ) {
             owner.hp = Math.min(owner.maxHp, owner.hp + 2);
@@ -1541,14 +1684,20 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             // jogador, entao ela machuca quem atirou tambem se ele estiver colado.
             explodeAt(state, proj.x, proj.y, SEEKER_BLAST_RADIUS, events, origin);
             dead = true;
-          } else if (explosiveArmed && procModule(state, ownerExtra, ownerSlot, 'explosive', events)) {
+          } else if (
+            explosiveArmed &&
+            procModule(state, ownerExtra, ownerSlot, 'explosive', events)
+          ) {
             explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
             dead = true;
           } else if (proj.disc) {
             // O disco ja atravessa por natureza. Piercing nao e cobrado aqui
             // porque nao ha nada que ele acrescente a este veiculo.
             discHits?.push(enemy.id);
-          } else if (proj.modules?.piercing && procModule(state, ownerExtra, ownerSlot, 'piercing', events)) {
+          } else if (
+            proj.modules?.piercing &&
+            procModule(state, ownerExtra, ownerSlot, 'piercing', events)
+          ) {
             (proj.hits ??= []).push(enemy.id);
           } else {
             dead = true;
@@ -1560,7 +1709,12 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
     if (dead && proj.leavesBiofluid) {
       const i = cellIndexAt(state, proj.x, proj.y);
-      if (i >= 0 && i < state.solid.length && state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+      if (
+        i >= 0 &&
+        i < state.solid.length &&
+        state.solid[i] === SOLID_NONE &&
+        state.surface[i] === SURF_NONE
+      ) {
         setSurface(state, i, SURF_BIOFLUID, 0);
       }
     }
@@ -1568,7 +1722,6 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
   }
   state.projectiles = survivors;
 };
-
 
 const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void => {
   for (const site of state.salvageSites) {
@@ -1599,15 +1752,10 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
   const sectorScale = 1 + (state.sector - 1) * CONTAMINATION_SECTOR_SCALE;
   state.contamination = Math.min(
     1,
-    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coreTaken ? 2.2 : 1)
+    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coreTaken ? 2.2 : 1),
   );
-  const thresholds: Array<[number, number]> = [
-    [0.35, 2],
-    [0.6, 3],
-    [0.85, 4],
-  ];
-  for (let w = 0; w < thresholds.length; w++) {
-    const [level, count] = thresholds[w];
+  for (let w = 0; w < CONTAMINATION_WAVES.length; w++) {
+    const [level, count] = CONTAMINATION_WAVES[w];
     // contador one-shot: vents sao reescritos por stepCells, entao um sentinel
     // ali seria apagado e a onda dispararia repetidamente.
     if (state.contamination >= level && state.contaminationWaves <= w) {
@@ -1648,8 +1796,14 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
     events.push({ t: 'message', key: 'sim.coreDropped' });
   }
   events.push({
-    t: 'death', x: p.x, y: p.y, entity: p.id, archetype: 'prospector',
-    facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+    t: 'death',
+    x: p.x,
+    y: p.y,
+    entity: p.id,
+    archetype: 'prospector',
+    facingX: p.facing.x,
+    facingY: p.facing.y,
+    tick: state.tick,
   });
 };
 
@@ -1674,7 +1828,8 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
     if (p.hp <= 0) {
       p.hp = 0;
       const hasStandingAlly = state.players.some(
-        (o, i) => i !== slot && state.playerExtras[i].joined && o.alive && !state.playerExtras[i].downed
+        (o, i) =>
+          i !== slot && state.playerExtras[i].joined && o.alive && !state.playerExtras[i].downed,
       );
       if (hasStandingAlly) {
         // co-op: entra em estado abatido, revivel pelo parceiro
@@ -1687,13 +1842,23 @@ const resolveDownedAndDeaths = (state: SurvivalState, events: SemanticEvent[]): 
         e.bleedoutAt = state.tick + BLEEDOUT_TICKS;
         state.stats.timesDowned += 1;
         events.push({
-          t: 'player_down', slot, x: p.x, y: p.y,
-          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+          t: 'player_down',
+          slot,
+          x: p.x,
+          y: p.y,
+          facingX: p.facing.x,
+          facingY: p.facing.y,
+          tick: state.tick,
         });
       } else {
         events.push({
-          t: 'player_down', slot, x: p.x, y: p.y,
-          facingX: p.facing.x, facingY: p.facing.y, tick: state.tick,
+          t: 'player_down',
+          slot,
+          x: p.x,
+          y: p.y,
+          facingX: p.facing.x,
+          facingY: p.facing.y,
+          tick: state.tick,
         });
         killPlayer(state, slot, events);
       }
@@ -1750,7 +1915,11 @@ const finalizeRun = (state: SurvivalState): void => {
 export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]): StepResult => {
   const events: SemanticEvent[] = [];
 
-  if (state.phase === 'dead' || state.phase === 'extracted' || state.phase === 'extracted_with_core') {
+  if (
+    state.phase === 'dead' ||
+    state.phase === 'extracted' ||
+    state.phase === 'extracted_with_core'
+  ) {
     return { state, events };
   }
 
