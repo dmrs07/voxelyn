@@ -95,25 +95,57 @@ const view = (over: Partial<MatrixViewState> = {}): MatrixViewState => ({
   tab: 'matrix',
   profile: profile(9999, 9),
   cached: false,
+  stale: null,
   loading: false,
   codex: null,
   pending: null,
   notice: null,
+  codexNotice: null,
   reveal: null,
   ...over,
 });
 
 describe('o painel distingue "perguntando" de "a pergunta falhou"', () => {
   it('enquanto carrega, anuncia a consulta e nao a queda', () => {
-    expect(panelNotice(view({ loading: true, cached: true }))).toBe('matrix.loading');
+    expect(panelNotice(view({ loading: true, cached: true }))).toEqual({ key: 'matrix.loading' });
   });
 
   it('so depois de a consulta falhar e que avisa que esta offline', () => {
-    expect(panelNotice(view({ loading: false, cached: true }))).toBe('matrix.offline');
+    expect(panelNotice(view({ loading: false, cached: true }))).toEqual({ key: 'matrix.offline' });
   });
 
   it('com perfil autoritativo, nao anuncia nada', () => {
     expect(panelNotice(view())).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Nao alcancamos" e "recusou" nao sao a mesma noticia
+// ---------------------------------------------------------------------------
+// As duas pedem acoes OPOSTAS: uma manda esperar a rede, a outra manda olhar o
+// servidor. O painel dizia a mesma frase para as duas, e descobrir qual era
+// exigia abrir o DevTools — foi assim que um servidor no ar passou dias sendo
+// lido como um servidor fora do ar.
+
+describe('o painel distingue as tres maneiras de ficar sem perfil', () => {
+  it('sem tentativa registrada, cai no generico de conexao', () => {
+    expect(panelNotice(view({ cached: true, stale: null }))).toEqual({ key: 'matrix.offline' });
+  });
+
+  it('com resposta que recusou, mostra o codigo em vez de culpar a conexao', () => {
+    const stale = { key: 'matrix.refused', params: { code: 'rate_limited 429' } } as const;
+    expect(panelNotice(view({ cached: true, stale }))).toEqual(stale);
+  });
+
+  it('endereco invalido nao vira "a Aurix recusou": ninguem foi consultado', () => {
+    const stale = { key: 'matrix.badUrl' } as const;
+    expect(panelNotice(view({ cached: true, stale }))).toEqual(stale);
+  });
+
+  it('perfil confirmado nao anuncia nada, mesmo com falha antiga pendurada', () => {
+    expect(
+      panelNotice(view({ cached: false, stale: { key: 'matrix.refused', params: { code: 'x' } } })),
+    ).toBeNull();
   });
 });
 

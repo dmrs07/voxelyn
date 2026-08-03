@@ -384,6 +384,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.generationUp': 'CHASSIS CLEARED: {generation}',
   'matrix.offline':
     'Connection to Aurix Dynamics unavailable. The Matrix shows the last known state and no purchase can be incorporated.',
+  'matrix.badUrl':
+    'Invalid server address. No query was ever sent — check the Server field in the menu or the server= parameter in the URL.',
+  'matrix.refused':
+    'Aurix Dynamics answered and refused the query ({code}). The Matrix shows the last known state and no purchase can be incorporated.',
   'matrix.conflict':
     'THE MATRIX STATE WAS UPDATED IN ANOTHER SESSION. REVIEW THE DATA BEFORE INCORPORATING THE PROTOCOL.',
   'matrix.loading': 'Querying Aurix Dynamics…',

@@ -27,9 +27,23 @@ import type {
   PublicProgressionProfile,
 } from '@voxelyn/survival-protocol';
 
+/**
+ * `bad_server_url` nao vem do servidor: e um defeito NOSSO, e por isso tem nome
+ * proprio.
+ *
+ * Ele existe por causa de um bug que passou por uma review inteira e chegou a
+ * producao. Uma renomeacao deixou `openSession(query.url)` com `undefined` no
+ * lugar da URL; `httpBase(undefined)` lancou dentro do mesmo `try` que trata
+ * rede ausente, e a falha saiu como `offline`. Do lado de fora ficou
+ * indistinguivel de um cabo desligado — a Matriz anunciava a Aurix como fora do
+ * ar contra um servidor que respondia normalmente, e a unica pista estava num
+ * DevTools que ninguem tinha motivo para abrir.
+ *
+ * Um erro de programacao nunca deve conseguir se disfarcar de condicao de rede.
+ */
 export type ApiResult<T> =
   | { ok: true; value: T }
-  | { ok: false; error: ProgressionErrorCode | 'offline'; status?: number };
+  | { ok: false; error: ProgressionErrorCode | 'offline' | 'bad_server_url'; status?: number };
 
 const httpBase = (serverUrl: string): string =>
   serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
@@ -55,7 +69,23 @@ const TOKEN_KEY_PREFIX = 'voxelyn.progression.token';
  */
 const originOf = (serverUrl: string): string | null => {
   try {
-    return new URL(httpBase(serverUrl)).origin;
+    const url = new URL(httpBase(serverUrl));
+    // Parseavel NAO e o mesmo que utilizavel, e a diferenca escapou na primeira
+    // versao desta validacao: `ftp://host` devolve uma origem perfeitamente
+    // truthy, e `file:///x` devolve a STRING "null", que tambem passa. Os dois
+    // furavam a checagem, o `fetch` os recusava depois, e a recusa saia como
+    // `offline` — de novo um endereco errado se passando por queda de rede.
+    //
+    // Depois do `httpBase` so restam dois esquemas legitimos. Qualquer outro e
+    // configuracao invalida, e e assim que precisa ser anunciado.
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    // Credencial embutida (`https://user:senha@host`) sobrevive ao `url.origin`,
+    // que a descarta em silencio — mas NAO sobrevive ao `fetch`, que recusa a
+    // URL antes de mandar qualquer pacote. Sem esta linha a recusa voltava como
+    // `offline`: mais uma configuracao errada se passando por queda de rede,
+    // dentro da propria validacao criada para acabar com isso.
+    if (url.username !== '' || url.password !== '') return null;
+    return url.origin;
   } catch {
     return null;
   }
@@ -112,6 +142,9 @@ const call = async <T>(
   init: RequestInit = {},
   timeoutMs = TIMEOUT_INTERACTIVE_MS,
 ): Promise<ApiResult<T>> => {
+  // ANTES do try: uma URL impossivel nao pode cair no mesmo caminho que uma
+  // rede ausente. Ver o comentario de `ApiResult`.
+  if (!originOf(serverUrl)) return { ok: false, error: 'bad_server_url' };
   try {
     const token = readSessionToken(serverUrl);
     const res = await fetch(`${httpBase(serverUrl)}${path}`, {

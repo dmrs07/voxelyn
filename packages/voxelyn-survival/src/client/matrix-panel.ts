@@ -40,11 +40,26 @@ const el = (tag: string, className?: string, text?: string): HTMLElement => {
 
 export type MatrixTab = 'matrix' | 'codex';
 
+/** Um aviso do painel: a chave e, quando houver, o que ela interpola. */
+export type PanelNotice = { key: MessageKey; params?: Record<string, string | number> };
+
 export type MatrixViewState = {
   tab: MatrixTab;
   profile: PublicProgressionProfile | null;
   /** O perfil veio do cache e ainda nao foi confirmado pelo servidor? */
   cached: boolean;
+  /**
+   * POR QUE o perfil e so cache — ja no formato em que aparece na tela.
+   *
+   * Sao TRES falhas com acoes diferentes, e o painel dizia a mesma frase para as
+   * tres: nao alcancamos ninguem (espere a rede), a Aurix respondeu e recusou
+   * (olhe o servidor, e o codigo diz onde), e o endereco esta invalido (nenhuma
+   * consulta chegou a sair; conserte o campo). Descobrir qual era exigia abrir o
+   * DevTools — era o unico jeito, e nao deveria ser.
+   *
+   * `null` com `cached` significa que ainda nao houve tentativa nesta sessao.
+   */
+  stale: PanelNotice | null;
   /**
    * A primeira consulta ao servidor ainda esta correndo?
    *
@@ -57,8 +72,25 @@ export type MatrixViewState = {
   codex: CodexResponse | null;
   /** Compra em voo, para desabilitar o botao sem aplicar nada. */
   pending: string | null;
-  /** Erro da ultima operacao, ja traduzido em chave. */
-  notice: MessageKey | null;
+  /**
+   * Erro da ultima OPERACAO (uma compra), ja traduzido.
+   *
+   * Carrega parametros pelo mesmo motivo de `stale`: aqui tambem toda falha
+   * que nao fosse conflito de versao saia como "conexao indisponivel", entao
+   * saldo insuficiente, teto de requisicoes e protocolo desconhecido eram a
+   * mesma frase — e nenhuma delas tinha a ver com conexao.
+   */
+  notice: PanelNotice | null;
+  /**
+   * A falha da ULTIMA consulta aos Arquivos, quando houve uma.
+   *
+   * A aba dos Arquivos mostrava `matrix.loading` sempre que `codex` fosse nulo,
+   * e nulo era tanto "ainda vem" quanto "nao veio". Uma consulta que falhava
+   * deixava a aba em "Consultando a Aurix Dynamics…" para sempre — a mesma
+   * confusao entre pergunta e resposta que este arquivo ja corrigiu duas vezes,
+   * aqui pela terceira.
+   */
+  codexNotice: PanelNotice | null;
   /** O documento a revelar depois de uma compra. */
   reveal: PublicLoreFragment | null;
 };
@@ -116,11 +148,19 @@ export const nodeState = (
  * sao estados diferentes, e trata-los como um so fazia o painel acusar a Aurix
  * de estar fora no primeiro quadro de toda abertura — inclusive as que davam
  * certo meio segundo depois.
+ *
+ * A mesma confusao acontecia um nivel abaixo, e custou mais caro: "nao
+ * alcancamos a Aurix", "a Aurix recusou" e "o endereco esta invalido" sairiam
+ * com a MESMA frase, entao um servidor no ar respondendo 429 era
+ * indistinguivel de um cabo desligado — e de um campo digitado errado. O codigo
+ * vai no texto porque e ele que diz para onde olhar.
  */
-export const panelNotice = (view: MatrixViewState): MessageKey | null => {
-  if (view.loading) return 'matrix.loading';
-  if (view.cached) return 'matrix.offline';
-  return null;
+export const panelNotice = (view: MatrixViewState): PanelNotice | null => {
+  if (view.loading) return { key: 'matrix.loading' };
+  if (!view.cached) return null;
+  // Sem tentativa registrada, o generico de conexao e o unico que nao inventa
+  // diagnostico: e o estado de quem abriu o painel antes da primeira resposta.
+  return view.stale ?? { key: 'matrix.offline' };
 };
 
 /**
@@ -233,9 +273,10 @@ const renderMatrixTab = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   const body = el('div', 'matrix-body');
   const notice = panelNotice(view);
   if (notice) {
-    body.appendChild(el('p', notice === 'matrix.loading' ? 'sub' : 'sub warn', t(notice)));
+    const tone = notice.key === 'matrix.loading' ? 'sub' : 'sub warn';
+    body.appendChild(el('p', tone, t(notice.key, notice.params)));
   }
-  if (view.notice) body.appendChild(el('p', 'sub warn', t(view.notice)));
+  if (view.notice) body.appendChild(el('p', 'sub warn', t(view.notice.key, view.notice.params)));
 
   for (const branch of UPGRADE_BRANCHES) {
     const section = el('section', 'matrix-branch');
@@ -277,7 +318,14 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
   const body = el('div', 'matrix-body');
   const codex = view.codex;
   if (!codex) {
-    body.appendChild(el('p', 'sub', t('matrix.loading')));
+    const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
+    body.appendChild(
+      el(
+        'p',
+        pending.key === 'matrix.loading' ? 'sub' : 'sub warn',
+        t(pending.key, pending.params),
+      ),
+    );
     return body;
   }
   body.appendChild(

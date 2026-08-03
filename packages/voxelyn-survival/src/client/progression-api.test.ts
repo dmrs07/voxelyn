@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   TIMEOUT_INTERACTIVE_MS,
   TIMEOUT_SETTLE_MS,
+  fetchProfile,
   openSession,
   purchaseKey,
   readSessionToken,
@@ -195,5 +196,71 @@ describe('o token nunca sai da origem que o emitiu', () => {
   it('URL invalida nao guarda nem devolve token', () => {
     vi.stubGlobal('localStorage', memoryStorage());
     expect(readSessionToken('nao é uma url')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Um erro nosso nao pode se disfarcar de rede
+// ---------------------------------------------------------------------------
+// Este teste nasce de um bug que chegou a producao. Uma renomeacao trocou a URL
+// por `undefined`, `httpBase(undefined)` lancou dentro do `try` que trata rede
+// ausente, e a Matriz passou dias anunciando "conexao indisponivel" contra um
+// servidor que respondia normalmente. O sintoma era perfeito; o diagnostico,
+// impossivel sem DevTools.
+
+describe('URL de servidor impossivel', () => {
+  it('nao vira offline: tem codigo proprio e nem chega a tocar na rede', async () => {
+    const calls = stubFetch(() => json(200, {}));
+    // O caso real: a variavel existia, o valor nao.
+    const result = await fetchProfile(undefined as unknown as string);
+    expect(result).toEqual({ ok: false, error: 'bad_server_url' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('vale para qualquer coisa que nao seja uma origem', async () => {
+    const calls = stubFetch(() => json(200, {}));
+    for (const bad of ['', '   ', 'nao é uma url']) {
+      expect((await fetchProfile(bad)).ok).toBe(false);
+    }
+    expect(calls).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Esquema que o `fetch` nao atende tambem e endereco invalido
+// ---------------------------------------------------------------------------
+// Parseavel nao e utilizavel. `new URL` aceita `ftp://` e `file://` sem
+// reclamar — o primeiro devolve uma origem truthy e o segundo devolve a STRING
+// "null" —, e os dois furavam a checagem para morrer no `fetch` como `offline`.
+
+describe('esquemas que o navegador nao busca', () => {
+  it.each(['ftp://host', 'file:///tmp/x', 'javascript:alert(1)', 'data:text/plain,x'])(
+    '%s e endereco invalido, e nao queda de rede',
+    async (bad) => {
+      const calls = stubFetch(() => json(200, {}));
+      expect(await fetchProfile(bad)).toEqual({ ok: false, error: 'bad_server_url' });
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  // O `url.origin` descarta a credencial em silencio, entao a URL "parece" boa
+  // depois de normalizada. O `fetch` nao concorda: ele recusa a URL antes de
+  // mandar pacote nenhum, e a recusa voltava como `offline`.
+  it.each([
+    'https://user:senha@example.com',
+    'https://user@example.com',
+    'wss://user:senha@example.com',
+  ])('%s traz credencial embutida e nao chega ao fetch', async (bad) => {
+    const calls = stubFetch(() => json(200, {}));
+    expect(await fetchProfile(bad)).toEqual({ ok: false, error: 'bad_server_url' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('http, https, ws e wss continuam passando', async () => {
+    for (const good of ['http://a.example', 'https://a.example', 'wss://a.example']) {
+      const calls = stubFetch(() => json(200, { profile: PROFILE }));
+      expect((await fetchProfile(good)).ok).toBe(true);
+      expect(calls).toHaveLength(1);
+    }
   });
 });

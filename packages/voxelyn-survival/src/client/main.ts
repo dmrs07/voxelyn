@@ -46,6 +46,7 @@ import {
   renderMatrixPanel,
   type MatrixHandlers,
   type MatrixViewState,
+  type PanelNotice,
 } from './matrix-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import {
@@ -1469,6 +1470,10 @@ const matrixView: MatrixViewState = {
   tab: 'matrix',
   profile: readCachedProfile()?.profile ?? null,
   cached: true,
+  // Ainda nao perguntamos: nao ha falha para explicar, e nomear uma seria
+  // inventar diagnostico.
+  stale: null,
+  codexNotice: null,
   loading: false,
   codex: null,
   pending: null,
@@ -1513,26 +1518,52 @@ const beginQuery = (tracker: LatestQuery<string>): Query<string> => tracker.begi
 const isCurrentQuery = (tracker: LatestQuery<string>, query: Query<string>): boolean =>
   tracker.isCurrent(query, progressionUrl());
 
+/**
+ * O aviso que o painel mostra para uma falha da API.
+ *
+ * Um lugar so, porque sao TRES desfechos com acoes diferentes e antes os tres
+ * saiam como "conexao indisponivel":
+ *
+ * - `offline`: nao chegou resposta. Espere a rede.
+ * - `bad_server_url`: o endereco e invalido e a chamada nem saiu — nada foi
+ *   perguntado a servidor nenhum, entao dizer que a Aurix recusou seria mentira.
+ * - qualquer outro: a Aurix respondeu e recusou, e o codigo diz para onde olhar.
+ *
+ * O codigo nao e texto de jogador, e diagnostico — e era justamente o que
+ * faltava para responder "e agora, o que eu conserto?" sem abrir o DevTools.
+ */
+const failureNotice = (result: { error: string; status?: number }): PanelNotice => {
+  if (result.error === 'offline') return { key: 'matrix.offline' };
+  if (result.error === 'bad_server_url') return { key: 'matrix.badUrl' };
+  const code = result.status === undefined ? result.error : `${result.error} ${result.status}`;
+  return { key: 'matrix.refused', params: { code } };
+};
+
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
   retryPendingSettlement();
   const query = beginQuery(profileQueries);
   matrixView.loading = true;
   drawMatrix();
-  const result = await openSession(query.url);
+  const result = await openSession(query.scope);
   // Chegou tarde, ou o jogador trocou de servidor: descarta sem tocar em nada.
   // Nem `loading` — quem for a consulta atual cuida do proprio estado.
   if (!isCurrentQuery(profileQueries, query)) return;
   matrixView.loading = false;
   if (!result.ok) {
-    // Offline: continua mostrando o cache, marcado, e sem botao de compra.
+    // Continua mostrando o cache, marcado, e sem botao de compra — mas agora
+    // dizendo QUAL das duas falhas foi. `offline` e a unica que significa "nao
+    // chegou resposta"; todo o resto e a Aurix respondendo e recusando, e o
+    // codigo dela e o que aponta para onde olhar.
     matrixView.cached = true;
+    matrixView.stale = failureNotice(result);
     matrixView.notice = null;
     drawMatrix();
     return;
   }
   matrixView.profile = result.value.profile;
   matrixView.cached = false;
+  matrixView.stale = null;
   writeCachedProfile(result.value.profile, Date.now());
   renderer.setProspectorGeneration(result.value.profile.generation);
   drawMatrix();
@@ -1540,9 +1571,18 @@ const refreshProfile = async (): Promise<void> => {
 
 const refreshCodex = async (): Promise<void> => {
   const query = beginQuery(codexQueries);
-  const result = await fetchCodex(query.url, getLocale());
+  // A falha ANTERIOR sai da tela antes da pergunta nova, e nao depois dela.
+  //
+  // Mantida, ela seria mostrada durante toda a consulta seguinte — e o pior caso
+  // e o unico que o jogador realmente vive: ele corrige o endereco do servidor,
+  // reabre a aba, e continua lendo a reclamacao sobre o endereco que acabou de
+  // consertar, ate a resposta nova chegar.
+  matrixView.codexNotice = null;
+  drawMatrix();
+  const result = await fetchCodex(query.scope, getLocale());
   if (!isCurrentQuery(codexQueries, query)) return;
   matrixView.codex = result.ok ? result.value : null;
+  matrixView.codexNotice = result.ok ? null : failureNotice(result);
   drawMatrix();
 };
 
@@ -1575,7 +1615,7 @@ const matrixHandlers: MatrixHandlers = {
     drawMatrix();
     const query = beginQuery(purchaseQueries);
     void purchaseUpgrade(
-      query.url,
+      query.scope,
       upgrade.id,
       profile.profileVersion,
       purchaseKey(profile.profileId, upgrade.id, profile.profileVersion),
@@ -1589,18 +1629,25 @@ const matrixHandlers: MatrixHandlers = {
         // Conflito de versao nao e erro do jogador: outra sessao mexeu na
         // Matriz. Recarrega e explica, em vez de tentar de novo sozinho.
         if (result.error === 'profile_version_conflict') {
-          matrixView.notice = 'matrix.conflict';
+          matrixView.notice = { key: 'matrix.conflict' };
           void refreshProfile();
           return;
         }
-        matrixView.notice = 'matrix.offline';
+        // Mesma separacao do aviso de topo: `offline` e a unica falha que
+        // significa "nao chegou resposta". Saldo insuficiente, teto de
+        // requisicoes e protocolo desconhecido sao a Aurix respondendo, e
+        // chamar isso de conexao indisponivel mandava o jogador conferir a rede
+        // por um problema que nao estava nela.
+        matrixView.notice = failureNotice(result);
         drawMatrix();
         return;
       }
       matrixView.profile = result.value.profile;
       matrixView.cached = false;
+      matrixView.stale = null;
       writeCachedProfile(result.value.profile, Date.now());
       matrixView.codex = null; // desatualizado: um documento novo entrou
+      matrixView.codexNotice = null;
       matrixView.reveal = result.value.unlockedLoreFragment;
       drawMatrix();
       audio.ui();
