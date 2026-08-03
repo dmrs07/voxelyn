@@ -33,6 +33,25 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'menu.controls': 'Tap to play · WASD/mouse on desktop · R restarts · M mutes',
   'menu.headphones': 'Use headphones: the sound warns you before the screen does.',
 
+  // Aurix chrome (redesign doc AD-UI-2.0): decorative document labels.
+  'aurix.rail.dispatch': 'Dispatch',
+  'aurix.rail.copy': 'Operator copy',
+  'aurix.menu.docTitle': 'Dispatch order',
+  'aurix.menu.requisition': 'Requisition',
+  'aurix.menu.authorisation': 'Descent authorisation',
+  'aurix.doc.options': 'AD-CFG-2.1 · local terminal',
+  'aurix.doc.records': 'AD-REG-8.1 · recovery ledger',
+  'aurix.doc.matrix': 'AD-MTX-5.0 · authorisation console',
+  'aurix.doc.rank': 'AD-RNK-6.2 · verified expeditions',
+  'aurix.doc.pause': 'AD-DEP-0114 · contract in progress',
+  'aurix.doc.abandon': 'FORM AD-RS-04 · asset write-off',
+  'aurix.abandon.stamp': 'no recovery value',
+  'aurix.options.operator': 'Operator',
+  'aurix.options.video': 'Video system',
+  'aurix.options.audio': 'Audio',
+  'aurix.options.telemetry': 'Telemetry',
+  'aurix.options.footer': 'changes saved locally',
+
   'options.title': 'OPTIONS',
   'options.name': 'Name',
   'options.name.placeholder': 'anonymous',
@@ -80,6 +99,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   // Co-op invite
   // ---------------------------------------------------------------------
+  'invite.channel': 'ENCRYPTED CHANNEL',
   'invite.copy': 'Copy invite',
   'invite.shared': 'Sent',
   'invite.copied': 'Copied!',
@@ -114,6 +134,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // Log panel
   // ---------------------------------------------------------------------
   'records.title': 'LOG',
+  'records.tab.summary': 'Summary',
+  'records.tab.assets': 'Assets',
+  'records.tab.discoveries': 'Discoveries',
+  'records.tab.history': 'History',
   'records.totals': 'TOTALS',
   'records.totals.runs': 'Descents',
   'records.totals.deaths': 'Deaths',
@@ -149,6 +173,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'rank.empty.offline': 'nobody has extracted yet — or the server is down',
   'rank.loading': 'loading…',
   'rank.entry': '{position}. {stars} {name}',
+  'rank.col.operator': 'Operator',
+  'rank.col.time': 'Time',
   'rank.how': 'HOW TO GET IN',
   'rank.how.text':
     'Only runs that extracted count. The server re-simulates your match from the keys you pressed — there is no score to submit, only what happened.',
@@ -340,6 +366,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.nextStar.one': '★ requires reaching extraction alive.',
   'summary.seed': 'seed {seed}',
   'summary.restart': 'Tap or press R to descend again',
+  'summary.doc.loss': 'UNIT LOSS REPORT',
+  'summary.doc.settlement': 'CONTRACT SETTLEMENT',
+  'summary.doc.cause': 'PROBABLE CAUSE',
+  'summary.doc.recommendation': 'FIELD RECOMMENDATION',
 
   // ---------------------------------------------------------------------
   // HUD
@@ -380,6 +410,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.confirm.yes': 'Incorporate',
   'matrix.confirm.no': 'Cancel',
   'matrix.buying': 'PROCESSING…',
+  'matrix.inspector.title': 'SELECTED NODE',
+  'matrix.inspector.hint': 'tap a protocol on the rail to inspect it',
+  'matrix.inspector.requires': 'Requires',
+  'matrix.inspector.cost': 'Cost',
+  'matrix.inspector.balanceAfter': 'Balance after',
+  'matrix.legend': '● installed · + authorisable · ⬡ short on funds · ✕ prerequisite missing',
   'matrix.declassified': 'FILE DECLASSIFIED',
   'matrix.generationUp': 'CHASSIS CLEARED: {generation}',
   'matrix.offline':

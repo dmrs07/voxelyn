@@ -37,6 +37,26 @@ export const PT_BR = {
   'menu.controls': 'Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia',
   'menu.headphones': 'Use fones: o som avisa o que a tela ainda não mostra.',
 
+  // Cromo Aurix do redesign (doc AD-UI-2.0): rótulos decorativos do documento.
+  // Não mudam o significado de nenhum botão existente — só o papel timbrado.
+  'aurix.rail.dispatch': 'Despacho',
+  'aurix.rail.copy': 'Via do operador',
+  'aurix.menu.docTitle': 'Ordem de despacho',
+  'aurix.menu.requisition': 'Requisição',
+  'aurix.menu.authorisation': 'Autorização de descida',
+  'aurix.doc.options': 'AD-CFG-2.1 · terminal local',
+  'aurix.doc.records': 'AD-REG-8.1 · livro de recuperação',
+  'aurix.doc.matrix': 'AD-MTX-5.0 · console de autorização',
+  'aurix.doc.rank': 'AD-RNK-6.2 · expedições homologadas',
+  'aurix.doc.pause': 'AD-DEP-0114 · contrato em curso',
+  'aurix.doc.abandon': 'FORMULÁRIO AD-RS-04 · baixa de ativo',
+  'aurix.abandon.stamp': 'sem valor de recuperação',
+  'aurix.options.operator': 'Operador',
+  'aurix.options.video': 'Sistema de vídeo',
+  'aurix.options.audio': 'Áudio',
+  'aurix.options.telemetry': 'Telemetria',
+  'aurix.options.footer': 'alterações salvas localmente',
+
   'options.title': 'OPÇÕES',
   'options.name': 'Nome',
   'options.name.placeholder': 'anônimo',
@@ -83,6 +103,7 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   // Convite de co-op
   // ---------------------------------------------------------------------
+  'invite.channel': 'CANAL CIFRADO',
   'invite.copy': 'Copiar convite',
   'invite.shared': 'Enviado',
   'invite.copied': 'Copiado!',
@@ -117,6 +138,10 @@ export const PT_BR = {
   // Painel Registro
   // ---------------------------------------------------------------------
   'records.title': 'REGISTRO',
+  'records.tab.summary': 'Resumo',
+  'records.tab.assets': 'Ativos',
+  'records.tab.discoveries': 'Descobertas',
+  'records.tab.history': 'Histórico',
   'records.totals': 'TOTAIS',
   'records.totals.runs': 'Descidas',
   'records.totals.deaths': 'Mortes',
@@ -152,6 +177,8 @@ export const PT_BR = {
   'rank.empty.offline': 'ninguém extraiu ainda — ou o servidor está fora do ar',
   'rank.loading': 'carregando…',
   'rank.entry': '{position}. {stars} {name}',
+  'rank.col.operator': 'Operador',
+  'rank.col.time': 'Tempo',
   'rank.how': 'COMO ENTRAR',
   'rank.how.text':
     'Só runs que extraíram entram. O servidor re-simula a sua partida a partir das teclas que você apertou — não há placar para enviar, só o que aconteceu.',
@@ -344,6 +371,10 @@ export const PT_BR = {
   'summary.nextStar.one': '★ exige alcançar a extração vivo.',
   'summary.seed': 'seed {seed}',
   'summary.restart': 'Toque ou pressione R para descer de novo',
+  'summary.doc.loss': 'RELATÓRIO DE PERDA DE UNIDADE',
+  'summary.doc.settlement': 'LIQUIDAÇÃO DE CONTRATO',
+  'summary.doc.cause': 'CAUSA PROVÁVEL',
+  'summary.doc.recommendation': 'RECOMENDAÇÃO DE CAMPO',
 
   // ---------------------------------------------------------------------
   // HUD
@@ -384,6 +415,12 @@ export const PT_BR = {
   'matrix.confirm.yes': 'Incorporar',
   'matrix.confirm.no': 'Cancelar',
   'matrix.buying': 'PROCESSANDO…',
+  'matrix.inspector.title': 'NÓ SELECIONADO',
+  'matrix.inspector.hint': 'toque um protocolo no trilho para inspecioná-lo',
+  'matrix.inspector.requires': 'Requer',
+  'matrix.inspector.cost': 'Custo',
+  'matrix.inspector.balanceAfter': 'Saldo após',
+  'matrix.legend': '● incorporado · + autorizável · ⬡ sem lastro · ✕ pré-requisito ausente',
   'matrix.declassified': 'ARQUIVO DESCLASSIFICADO',
   'matrix.generationUp': 'CHASSI HOMOLOGADO: {generation}',
   'matrix.offline':

@@ -9,18 +9,68 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0b0e14" />
+    <meta name="theme-color" content="#0a0a0b" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon-192.png" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>Voxelyn Survival</title>
     <style>
+      /* ==================================================================
+         AURIX DYNAMICS — sistema de design "Ordem de Despacho / Torre de
+         Arquivo" (doc AD-UI-2.0).
+
+         Duas famílias de tela, um só vocabulário:
+         - Ordem de Despacho: operação, autorização, rescisão (menu, pausa,
+           abandono). Formulários corporativos com carimbo primário.
+         - Torre de Arquivo: informação persistente (opções, registro,
+           matriz, ranking). Trilho de navegação fixo à esquerda.
+
+         Semântica de cor — a regra que nenhuma tela pode quebrar:
+         - teal   = o sistema opera / o jogador age;
+         - ouro   = autoridade e estrutura do documento Aurix;
+         - vermelho = perda irreversível, e SÓ ela;
+         - laranja/verde-ácido pertencem ao mundo (calor, contaminação),
+           nunca a controles.
+         Nenhum estado depende só de cor: desabilitado ganha hachura,
+         selecionado ganha keyline de 2px, censura ganha barra sólida.
+         ================================================================== */
       :root {
         color-scheme: dark;
         --safe-area-inset-top: env(safe-area-inset-top, 0px);
         --safe-area-inset-right: env(safe-area-inset-right, 0px);
         --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
         --safe-area-inset-left: env(safe-area-inset-left, 0px);
+
+        /* superfície e estrutura */
+        --ax-void: #0a0a0b;
+        --ax-sheet: #100f0d;
+        --ax-plate: #141311;
+        --ax-key: #241d10;
+        --ax-brass: #4a3a1e;
+        --ax-brass-strong: #6b4a1c;
+        /* semântica */
+        --ax-teal: #4fd6c9;
+        --ax-teal-dim: #2f7d75;
+        --ax-teal-bright: #8ff0e6;
+        --ax-teal-mute: #7fb0aa;
+        --ax-gold: #c9a35a;
+        --ax-gold-dim: #a2854a;
+        --ax-red: #c0392b;
+        --ax-red-line: #6b2a20;
+        --ax-red-text: #e6a99f;
+        --ax-acid: #9bbf3a;
+        /* texto */
+        --ax-text: #cfc6b4;
+        --ax-text-bright: #e2d9c6;
+        --ax-text-mute: #9a9184;
+        --ax-text-dim: #857d6d;
+        --ax-text-dead: #5f584c;
+        /* padrão de indisponível: hachura diagonal, nunca só opacidade */
+        --ax-hatch: repeating-linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.02) 0 6px,
+          transparent 6px 12px
+        );
       }
       html,
       body {
@@ -29,8 +79,8 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #0b0e14;
-        color: #e8f1ff;
+        background: var(--ax-void);
+        color: var(--ax-text);
         touch-action: none;
         overscroll-behavior: none;
         -webkit-user-select: none;
@@ -45,6 +95,15 @@
         display: block;
         image-rendering: pixelated;
       }
+      @keyframes axPulse {
+        0%,
+        100% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
       .overlay {
         position: fixed;
         inset: 0;
@@ -52,8 +111,13 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
-        background: rgba(11, 14, 20, 0.92);
+        gap: 12px;
+        background: linear-gradient(
+          180deg,
+          rgba(16, 15, 13, 0.96) 0%,
+          rgba(10, 10, 9, 0.97) 58%,
+          rgba(6, 6, 5, 0.98) 100%
+        );
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
           env(safe-area-inset-left);
         z-index: 10;
@@ -69,67 +133,608 @@
            sem suporte descarta a linha e mantem o `center` acima. */
         justify-content: safe center;
       }
+      /* Atmosfera: scanline sutil + vinheta, por tras de todo conteudo de
+         overlay. `pointer-events:none` e obrigatorio — e decoracao. */
+      .overlay::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.013) 0 1px,
+          transparent 1px 3px
+        );
+      }
+      .overlay::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.8);
+      }
+      .overlay > * {
+        position: relative;
+        z-index: 1;
+      }
       .hidden {
         display: none !important;
       }
       h1 {
-        color: #59f2c2;
+        color: var(--ax-text-bright);
         margin: 0;
-        font-size: clamp(20px, 5vw, 34px);
-        letter-spacing: 2px;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(18px, 4vw, 26px);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
       }
       .sub {
-        color: #b8a98f;
+        color: var(--ax-text-mute);
         font-size: 12px;
-        margin-top: -8px;
       }
+      .sub.warn {
+        color: var(--ax-gold);
+      }
+
+      /* ------------------------------------------------------------------
+         Controles: a linguagem de hardware Aurix.
+         Sem raio de canto em componente nenhum — a única curva do sistema
+         é o selo de diretiva. Alvo mínimo de toque 44px.
+         ------------------------------------------------------------------ */
       button {
-        background: #1d2430;
-        color: #e8f1ff;
-        border: 1px solid #2e3a4d;
-        border-radius: 8px;
+        background: linear-gradient(180deg, #161513, #0e0d0c);
+        color: var(--ax-text);
+        border: 1px solid var(--ax-brass);
+        border-radius: 0;
         padding: 12px 22px;
         font-family: inherit;
-        font-size: 15px;
+        font-size: 14px;
+        letter-spacing: 0.08em;
         min-width: 220px;
+        min-height: 44px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--ax-brass-strong);
+        color: var(--ax-text-bright);
+      }
+      button:focus-visible {
+        outline: 1px dashed var(--ax-teal-bright);
+        outline-offset: 2px;
+      }
+      button:active {
+        box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.5);
       }
       button.primary {
-        border-color: #59f2c2;
-        color: #59f2c2;
+        border: 2px solid var(--ax-teal);
+        color: #eaf6f3;
+        background: linear-gradient(180deg, rgba(79, 214, 201, 0.09), rgba(79, 214, 201, 0.03));
+        box-shadow:
+          0 0 22px rgba(79, 214, 201, 0.16),
+          inset 0 0 26px rgba(79, 214, 201, 0.07);
+        text-shadow: 0 0 16px rgba(79, 214, 201, 0.4);
       }
       button.compact {
         min-width: 0;
         padding: 8px 12px;
         font-size: 12px;
+        min-height: 36px;
       }
-      .sub.warn {
-        color: #7f8da3;
-        margin-top: -4px;
+      /* O abandono e a unica acao irreversivel do jogo: ela nao pode parecer
+         com "Voltar". Vermelho, e nunca a primeira da coluna. */
+      button.danger {
+        border-color: var(--ax-red-line);
+        color: var(--ax-red-text);
+        background: rgba(192, 57, 43, 0.05);
+      }
+      button.danger:active {
+        background: rgba(192, 57, 43, 0.14);
+      }
+      button:disabled {
+        border-style: dashed;
+        border-color: #3a3128;
+        background: var(--ax-hatch);
+        color: var(--ax-text-dead);
+        cursor: default;
+        box-shadow: none;
+        text-shadow: none;
+      }
+      input,
+      select {
+        background: #0a0a0a;
+        color: var(--ax-text-bright);
+        border: 1px solid var(--ax-brass);
+        border-radius: 0;
+        padding: 8px;
+        min-height: 34px;
+        box-sizing: border-box;
+        font-family: inherit;
+      }
+      input:focus-visible,
+      select:focus-visible {
+        outline: none;
+        border-color: var(--ax-teal);
+        background: rgba(79, 214, 201, 0.06);
+        box-shadow: inset 0 0 16px rgba(79, 214, 201, 0.1);
       }
       input[type='range'] {
         padding: 0;
         width: 110px;
-        accent-color: #59f2c2;
+        min-height: 0;
+        border: none;
+        background: transparent;
+        accent-color: var(--ax-teal);
       }
-      /* O painel rola por dentro: em landscape de celular a lista de
-         descobertas passa da altura da tela, e o body nunca rola. */
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--ax-text-mute);
+      }
+
+      /* ------------------------------------------------------------------
+         Cromo compartilhado dos documentos Aurix
+         ------------------------------------------------------------------ */
+      .ax-doc-title {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 14px;
+        letter-spacing: 0.22em;
+        color: var(--ax-gold);
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .ax-doc-code {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: var(--ax-gold-dim);
+        margin-top: 2px;
+        white-space: nowrap;
+      }
+      .ax-section-label {
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        color: var(--ax-gold-dim);
+        text-transform: uppercase;
+      }
+      /* Linha de requisição: rótulo — pontilhado — valor */
+      .ax-field {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        min-width: 0;
+        font-size: 12px;
+      }
+      .ax-field > .ax-field-label {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        color: var(--ax-text-mute);
+        white-space: nowrap;
+        text-transform: uppercase;
+      }
+      .ax-field > .ax-field-dots {
+        flex: 1;
+        border-bottom: 1px dotted #33291d;
+        transform: translateY(-3px);
+      }
+      /* Chip de estado do sistema: sempre símbolo + palavra, nunca só cor */
+      .ax-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        padding: 4px 8px;
+        border: 1px solid var(--ax-brass-strong);
+        color: var(--ax-gold);
+        background: rgba(201, 163, 90, 0.06);
+        white-space: nowrap;
+      }
+      .ax-chip::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        background: var(--ax-gold);
+        flex: 0 0 auto;
+      }
+      .ax-chip.is-live {
+        border-color: var(--ax-teal-dim);
+        color: var(--ax-teal-bright);
+        background: rgba(79, 214, 201, 0.07);
+      }
+      .ax-chip.is-live::before {
+        background: var(--ax-teal);
+        box-shadow: 0 0 8px var(--ax-teal);
+        animation: axPulse 2.4s infinite;
+      }
+      .ax-chip.is-danger {
+        border-color: var(--ax-red-line);
+        color: var(--ax-red-text);
+        background: rgba(192, 57, 43, 0.08);
+      }
+      .ax-chip.is-danger::before {
+        background: var(--ax-red);
+      }
+
+      /* ------------------------------------------------------------------
+         Torre de Arquivo: trilho + folha
+         ------------------------------------------------------------------ */
+      .ax-screen {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        align-items: stretch;
+        justify-content: stretch;
+        gap: 0;
+        padding: var(--safe-area-inset-top) var(--safe-area-inset-right)
+          var(--safe-area-inset-bottom) var(--safe-area-inset-left);
+        overflow: hidden; /* a folha rola por dentro; o trilho e fixo */
+      }
+      .ax-rail {
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(90deg, #15140f, #0c0b0a);
+        border-right: 1px solid var(--ax-brass);
+        min-height: 0;
+      }
+      .ax-rail-mark {
+        height: 56px;
+        display: grid;
+        place-items: center;
+        border-bottom: 1px solid var(--ax-key);
+        flex: 0 0 auto;
+      }
+      .ax-rail-mark .corp-mark {
+        width: 34px;
+        height: 34px;
+      }
+      .ax-rail-item {
+        display: flex;
+        align-items: center;
+        min-height: 48px;
+        padding: 4px 4px 4px 10px;
+        border: none;
+        border-left: 3px solid var(--ax-brass);
+        border-top: 1px solid #1c170e;
+        background: linear-gradient(90deg, rgba(201, 163, 90, 0.045), transparent);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        line-height: 1.3;
+        text-transform: uppercase;
+        text-align: left;
+        color: #b3a893;
+        min-width: 0;
+        white-space: normal;
+        cursor: pointer;
+      }
+      .ax-rail-item:hover {
+        color: var(--ax-text-bright);
+        border-left-color: var(--ax-brass-strong);
+        background: linear-gradient(90deg, rgba(201, 163, 90, 0.09), transparent);
+      }
+      .ax-rail-item.is-active {
+        border-left-color: var(--ax-teal);
+        background: linear-gradient(90deg, rgba(79, 214, 201, 0.14), transparent);
+        color: #eaf6f3;
+        cursor: default;
+      }
+      .ax-rail-copy {
+        margin-top: auto;
+        padding: 8px 9px;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        color: var(--ax-text-mute);
+        line-height: 1.7;
+        text-transform: uppercase;
+      }
+      .ax-sheet {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .ax-sheet-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 14px;
+        border-bottom: 1px solid var(--ax-brass);
+        flex: 0 0 auto;
+        min-width: 0;
+      }
+      .ax-sheet-body {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 10px 14px;
+      }
+      .ax-sheet-foot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 7px 14px;
+        border-top: 1px solid var(--ax-brass);
+        background: #0b0a09;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        color: var(--ax-text-mute);
+        flex: 0 0 auto;
+        min-height: 34px;
+        min-width: 0;
+      }
+
+      /* ------------------------------------------------------------------
+         Menu principal: a Ordem de Despacho (direção 2a)
+         ------------------------------------------------------------------ */
+      #menu .ax-sheet-head h1 {
+        font-size: 17px;
+        letter-spacing: 0.1em;
+        color: #a89e8c; /* presença reduzida: DESCER e quem manda na tela */
+      }
+      .ax-dispatch {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+        gap: 0;
+        overflow: hidden;
+      }
+      .ax-requisition {
+        min-width: 0;
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-right: 1px solid var(--ax-key);
+        overflow-y: auto;
+      }
+      .ax-authorisation {
+        min-width: 0;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+      }
+      /* O carimbo primario: DESCER. O maior alvo da tela, o unico com brilho. */
+      .ax-stamp {
+        flex: 1 1 auto;
+        min-height: 76px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 8px 16px;
+        font-family: inherit;
+        font-size: 26px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .ax-stamp small {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        color: var(--ax-teal-mute);
+        margin-top: 3px;
+        text-shadow: none;
+      }
+      /* Ações secundárias da coluna de autorização */
+      .ax-order-secondary {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        min-width: 0;
+        white-space: nowrap;
+      }
+      .ax-order-secondary.is-uplink {
+        border-color: #2f5f5c;
+        background: linear-gradient(180deg, #121717, #0c0f0f);
+      }
+      .ax-order-secondary.is-directive {
+        border-color: var(--ax-brass-strong);
+        background: linear-gradient(180deg, #171410, #0e0c0a);
+      }
+      .ax-order-secondary .ax-order-tag {
+        flex: 0 0 auto;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: #08080a;
+        background: var(--ax-gold);
+        padding: 2px 5px;
+      }
+      .ax-wallet {
+        display: flex;
+        gap: 6px;
+      }
+      .ax-cell {
+        flex: 1;
+        min-width: 0;
+        border: 1px solid var(--ax-key);
+        background: #0b0b0a;
+        padding: 5px 7px;
+      }
+      .ax-cell-label {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--ax-text-mute);
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ax-cell-value {
+        font-size: 17px;
+        color: var(--ax-text-bright);
+        line-height: 1.2;
+      }
+      .ax-cell-value.is-teal {
+        color: var(--ax-teal);
+        text-shadow: 0 0 12px rgba(79, 214, 201, 0.3);
+      }
+      /* A diretiva semanal como ficha de contexto (o botao e a acao) */
+      #contract-label {
+        border: 1px solid var(--ax-brass-strong);
+        background: linear-gradient(180deg, rgba(201, 163, 90, 0.09), rgba(201, 163, 90, 0.03));
+        padding: 7px 9px;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: var(--ax-gold);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #menu .ax-sheet-foot .ax-motto {
+        color: var(--ax-gold);
+        letter-spacing: 0.12em;
+        white-space: nowrap;
+      }
+      #menu .ax-sheet-foot .ax-foot-note {
+        margin-left: auto;
+        min-width: 0;
+        text-align: right;
+        font-size: 11px;
+        letter-spacing: 0.02em;
+        line-height: 1.35;
+        color: var(--ax-text-mute);
+      }
+
+      /* ------------------------------------------------------------------
+         Opções: configuração da unidade (Torre de Arquivo)
+         ------------------------------------------------------------------ */
+      /* Os controles de opcoes sao UM bloco so, movido entre a tela de opcoes e
+         o menu de campo (ver `mountOptions` em main.ts). Duplicar o HTML
+         duplicaria a sincronizacao de estado, e as duas copias divergiriam na
+         primeira mudanca. */
+      #options-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        width: min(420px, 100%);
+      }
+      #options-controls .ax-section-label {
+        border-bottom: 1px solid var(--ax-key);
+        padding-bottom: 4px;
+        margin-top: 4px;
+      }
+      #options-controls .row {
+        justify-content: space-between;
+      }
+      #options-controls .row label {
+        min-width: 72px;
+      }
+      #options .ax-sheet-body {
+        display: flex;
+        justify-content: center;
+      }
+
+      /* ------------------------------------------------------------------
+         Ordem de Despacho modal: terminal de campo e rescisão
+         ------------------------------------------------------------------ */
+      /* Acima do banner e do convite: o menu de campo e modal, e nada da run
+         pode ficar por cima dele. */
+      #pause,
+      #pause-confirm {
+        z-index: 30;
+      }
+      .ax-form {
+        width: min(560px, 94vw);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border: 1px solid var(--ax-brass);
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+        background: linear-gradient(180deg, #12110f, #0b0b0a);
+        padding: 12px 14px;
+      }
+      .ax-form.is-danger {
+        border-color: var(--ax-red-line);
+        box-shadow:
+          inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+          inset 0 0 40px rgba(192, 57, 43, 0.06);
+      }
+      .ax-form-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--ax-key);
+        padding-bottom: 8px;
+        min-width: 0;
+      }
+      .ax-form.is-danger .ax-form-head {
+        border-bottom-color: var(--ax-red-line);
+      }
+      .ax-form-head h1 {
+        font-size: 15px;
+        letter-spacing: 0.18em;
+      }
+      .ax-form-head .corp-plate {
+        flex: 0 0 auto;
+      }
+      /* Carimbo diagonal de documento (SEM VALOR DE RECUPERAÇÃO) */
+      .ax-diagonal-stamp {
+        margin-left: auto;
+        flex: 0 0 auto;
+        transform: rotate(-6deg);
+        border: 2px solid var(--ax-red);
+        color: var(--ax-red-text);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        padding: 3px 8px;
+        opacity: 0.85;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      /* Faixa de aviso co-op: vermelha porque a perda ali e real */
+      #pause-coop-warning {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 7px 10px;
+        border: 1px solid var(--ax-red-line);
+        background: linear-gradient(90deg, rgba(192, 57, 43, 0.16), rgba(192, 57, 43, 0.04));
+        color: var(--ax-red-text);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+      }
+      #pause-coop-warning::before {
+        content: '';
+        flex: 0 0 auto;
+        width: 7px;
+        height: 7px;
+        background: var(--ax-red);
+        box-shadow: 0 0 9px var(--ax-red);
+        animation: axPulse 1.6s infinite;
+      }
+      /* O livro de perdas da rescisão */
       .panel {
         width: min(560px, 92vw);
         max-height: 58vh;
         overflow-y: auto;
         font-size: 12px;
         line-height: 1.55;
-        color: #b8a98f;
-        background: #11151d;
-        border: 1px solid #2e3a4d;
-        border-radius: 8px;
-        padding: 14px 16px;
+        color: var(--ax-text);
+        background: rgba(255, 255, 255, 0.012);
+        border: 1px solid var(--ax-key);
+        padding: 12px 14px;
+        box-sizing: border-box;
+      }
+      .ax-form .panel {
+        width: auto;
       }
       .panel h2 {
-        color: #59f2c2;
-        font-size: 12px;
-        letter-spacing: 1px;
+        color: var(--ax-gold-dim);
+        font-size: 10px;
+        letter-spacing: 0.22em;
         margin: 14px 0 6px;
+        text-transform: uppercase;
       }
       .panel h2:first-child {
         margin-top: 0;
@@ -137,197 +742,403 @@
       .panel dl {
         display: grid;
         grid-template-columns: 1fr auto;
-        gap: 2px 12px;
+        gap: 3px 12px;
         margin: 0;
+      }
+      .panel dt {
+        color: var(--ax-text-mute);
+        letter-spacing: 0.04em;
+        border-bottom: 1px dotted #241d10;
+        padding: 2px 0;
       }
       .panel dd {
         margin: 0;
-        color: #e8f1ff;
+        color: var(--ax-text-bright);
+        text-align: right;
+        border-bottom: 1px dotted #241d10;
+        padding: 2px 0;
+      }
+      .locked {
+        color: var(--ax-text-dead);
+      }
+      .lesson {
+        display: block;
+        color: var(--ax-text-mute);
+        margin-bottom: 6px;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .found {
+        color: var(--ax-text-bright);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px dotted #241d10;
+        padding: 2px 0;
+        font-size: 12px;
+      }
+      /* Na rescisao os valores perdidos sao vermelhos: e a unica tela em que a
+         listagem E a perda. */
+      #pause-confirm .found .tally {
+        color: var(--ax-red-text);
+      }
+      .tally {
+        color: var(--ax-text-mute);
+        flex: none;
+      }
+      /* O nome que o JOGADOR aprendeu, anotado a mao sobre o relatorio. Recuado
+         e menor: no arquivo da empresa ele e marginalia. */
+      .field-note {
+        display: block;
+        color: var(--ax-text-dead);
+        font-style: italic;
+        margin: -2px 0 10px 12px;
+        font-size: 11px;
+      }
+      h2.ax-section-label {
+        margin: 14px 0 6px;
+      }
+      h2.ax-section-label:first-child {
+        margin-top: 0;
+      }
+
+      /* ------------------------------------------------------------------
+         Painéis da Torre de Arquivo (registro, matriz, ranking)
+         ------------------------------------------------------------------ */
+      /* Abas de terminal: seleção = fundo teal + keyline de 2px na base */
+      .ax-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--ax-brass);
+        background: #0b0a09;
+        flex: 0 0 auto;
+        overflow-x: auto;
+      }
+      .ax-tab {
+        min-width: 0;
+        min-height: 40px;
+        padding: 0 13px;
+        display: flex;
+        align-items: center;
+        border: none;
+        border-right: 1px solid var(--ax-key);
+        background: transparent;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        color: var(--ax-text-mute);
+        cursor: pointer;
+      }
+      .ax-tab.is-active {
+        color: #eaf6f3;
+        background: linear-gradient(180deg, rgba(79, 214, 201, 0.12), transparent);
+        box-shadow: inset 0 -2px 0 var(--ax-teal);
+      }
+      /* Célula de métrica do livro-caixa (nada de cartão arredondado) */
+      .ax-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      /* Ficha de ativo do registro biologico */
+      .ax-asset {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+        padding: 7px 9px;
+        border: 1px solid var(--ax-key);
+        background: #0b0b0a;
+        min-width: 0;
+        margin: 5px 0;
+      }
+      .ax-asset .found {
+        border-bottom: none;
+      }
+      .ax-asset.is-locked {
+        border: 1px dashed #3a3128;
+        background: var(--ax-hatch);
+      }
+      .ax-asset.is-locked .locked,
+      .ax-asset.is-locked .lesson {
+        color: var(--ax-text-dead);
+      }
+      /* Fragmento de descoberta */
+      .ax-fragment {
+        border: 1px solid var(--ax-brass);
+        padding: 7px 9px;
+        margin: 5px 0;
+      }
+      .ax-fragment.is-locked {
+        border: 1px dashed #3a3128;
+        background: var(--ax-hatch);
+      }
+      /* Livro de historico */
+      .ax-ledger-row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        border-bottom: 1px solid var(--ax-key);
+        padding: 5px 0;
+        min-width: 0;
+      }
+      .ax-ledger-row .lesson {
+        margin: 0 0 0 auto;
         text-align: right;
       }
-      /* ------------------------------------------------------------------ */
-      /* Matriz Geracional                                                    */
-      /* ------------------------------------------------------------------ */
-      /* Grade de dois por dois em telas estreitas e quatro em largas: o
-         cabecalho tem quatro numeros e nenhum deles pode encolher a ponto de
-         virar reticencia — carteira e geracao sao o que o jogador veio ler. */
+      .ax-stars {
+        color: var(--ax-gold);
+        letter-spacing: 0.06em;
+        flex: 0 0 auto;
+      }
+
+      /* Matriz Geracional: trilhos de ramo + inspetor */
       .matrix-header {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
         margin-bottom: 10px;
       }
       .matrix-card {
-        background: #161b25;
-        border: 1px solid #2e3a4d;
-        border-radius: 6px;
-        padding: 8px 10px;
+        flex: 1 1 120px;
+        min-width: 0;
+        border: 1px solid var(--ax-key);
+        background: #0b0b0a;
+        padding: 5px 8px;
       }
       .matrix-card-label {
-        color: #7f8da3;
+        color: var(--ax-text-mute);
         font-size: 10px;
-        letter-spacing: 1px;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
       .matrix-card-value {
-        color: #e8f1ff;
-        font-size: 20px;
+        color: var(--ax-teal);
+        text-shadow: 0 0 12px rgba(79, 214, 201, 0.3);
+        font-size: 18px;
         line-height: 1.2;
       }
       .matrix-card-note {
-        color: #7f8da3;
+        color: var(--ax-text-mute);
         font-size: 10px;
       }
       .matrix-tabs {
         margin-bottom: 10px;
       }
-      .matrix-branch {
-        margin-bottom: 4px;
-      }
-      .matrix-node {
-        border: 1px solid #2e3a4d;
-        border-radius: 6px;
-        padding: 8px 10px;
-        margin: 6px 0;
-        background: #131822;
-      }
-      /* Instalado ganha borda viva e o resto apaga: a leitura de "onde eu
-         estou na arvore" tem de funcionar de relance, sem ler texto.
-
-         O seletor do CARIMBO e `span`, e o do CARTAO e `div.matrix-node`: os
-         dois carregavam a mesma classe, e a cor do carimbo escorria para o
-         cartao inteiro — nome e descricao saiam verdes junto com o selo. */
-      span.matrix-node-installed {
-        color: #59f2c2;
-        font-size: 10px;
-        letter-spacing: 1px;
-      }
-      .matrix-node.matrix-node-installed {
-        border-color: #2f6f5b;
-      }
-      .matrix-node.matrix-node-locked {
-        opacity: 0.45;
-      }
-      .matrix-node.matrix-node-affordable {
-        border-color: #4c7fd4;
-      }
-      .matrix-node-id {
-        color: #7f8da3;
-        font-size: 10px;
-        letter-spacing: 1px;
-      }
-      .matrix-node-name {
-        color: #e8f1ff;
-        font-size: 13px;
-      }
-      .matrix-node-desc {
-        color: #b8a98f;
-        font-size: 11px;
-      }
-      .matrix-node-side {
+      .ax-branch {
         display: flex;
-        gap: 10px;
-        align-items: baseline;
-        margin-top: 4px;
+        align-items: center;
+        gap: 0;
+        min-width: 0;
+        margin: 7px 0;
       }
-      .matrix-node-cost {
-        color: #ffd166;
+      .ax-branch-label {
+        width: 96px;
+        flex: 0 0 auto;
+        padding-right: 8px;
+        min-width: 0;
+      }
+      .ax-branch-label .ax-branch-name {
         font-size: 11px;
+        letter-spacing: 0.12em;
+        color: var(--ax-gold);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
-      .matrix-node-status {
-        color: #7f8da3;
+      .ax-branch-label .ax-branch-note {
         font-size: 10px;
+        color: var(--ax-text-mute);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      /* O nó: sigla + símbolo de estado. Toda a prosa vive no inspetor. */
+      .ax-node {
+        width: 46px;
+        height: 40px;
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--ax-brass);
+        background: #0b0b0a;
+        color: var(--ax-gold-dim);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        font-family: inherit;
+        padding: 0;
+        min-width: 0;
+        min-height: 0;
+        cursor: pointer;
+      }
+      .ax-node .ax-node-glyph {
+        font-size: 10px;
+        opacity: 0.85;
+      }
+      .ax-node.is-installed {
+        border-color: var(--ax-teal);
+        background: rgba(79, 214, 201, 0.16);
+        color: #eaf6f3;
+        box-shadow: inset 0 0 14px rgba(79, 214, 201, 0.25);
+      }
+      .ax-node.is-affordable {
+        border-color: var(--ax-teal);
+        background: rgba(79, 214, 201, 0.04);
+        color: var(--ax-teal);
+      }
+      .ax-node.is-locked {
+        border: 1px dashed #3a3128;
+        background: var(--ax-hatch);
+        color: var(--ax-text-dead);
+      }
+      .ax-node.is-selected {
+        outline: 1px dashed var(--ax-teal-bright);
+        outline-offset: 3px;
+        border-width: 2px;
+      }
+      .ax-node-link {
+        flex: 1 1 10px;
+        min-width: 8px;
+        height: 1px;
+        background: #2a2418;
+      }
+      .ax-node-link.is-live {
+        background: var(--ax-teal);
+        box-shadow: 0 0 6px rgba(79, 214, 201, 0.5);
+      }
+      .ax-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--ax-text-mute);
+        margin-top: 6px;
+      }
+      .ax-inspector {
+        border: 1px solid var(--ax-key);
+        border-left: 3px solid var(--ax-brass);
+        background: rgba(255, 255, 255, 0.012);
+        padding: 9px 11px;
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ax-inspector .ax-inspector-name {
+        font-size: 15px;
+        color: var(--ax-text-bright);
+        line-height: 1.25;
+      }
+      .ax-inspector .ax-inspector-desc {
+        font-size: 12px;
+        color: var(--ax-text-mute);
+        line-height: 1.5;
       }
       .matrix-policy {
         margin-top: 12px;
         font-style: italic;
-        color: #7f8da3;
+        color: var(--ax-text-mute);
       }
+
+      /* Codex: documentação corporativa recuperada */
       .codex-doc {
-        border-left: 2px solid #2e3a4d;
-        padding: 4px 0 4px 10px;
+        border: 1px solid var(--ax-key);
+        border-left: 3px solid var(--ax-brass);
+        padding: 8px 10px;
         margin: 10px 0;
+        background: rgba(255, 255, 255, 0.012);
       }
       .codex-doc h3 {
-        color: #e8f1ff;
-        font-size: 13px;
+        color: var(--ax-text-bright);
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 15px;
+        letter-spacing: 0.04em;
         margin: 2px 0 4px;
       }
       .codex-code {
-        color: #7f8da3;
+        color: var(--ax-gold-dim);
         font-size: 10px;
-        letter-spacing: 1px;
+        letter-spacing: 0.14em;
       }
       .codex-body {
-        color: #b8a98f;
+        color: var(--ax-text);
         margin: 6px 0;
         white-space: pre-wrap;
+        line-height: 1.55;
       }
       .codex-source,
       .codex-related {
-        color: #7f8da3;
+        color: var(--ax-text-mute);
         font-size: 10px;
       }
       .codex-locked {
-        opacity: 0.5;
-        border-left-color: #46566e;
+        border-left-color: #3a3128;
+        border-style: dashed;
+        background: var(--ax-hatch);
+      }
+      .codex-locked .codex-code {
+        color: var(--ax-text-dead);
       }
       .codex-reveal-title {
-        color: #59f2c2;
-        letter-spacing: 2px;
+        color: var(--ax-teal-bright);
+        letter-spacing: 0.22em;
         font-size: 12px;
         margin-bottom: 8px;
       }
-      .panel .locked {
-        color: #46566e;
-      }
-      .panel .lesson {
-        display: block;
-        color: #7f8da3;
-        margin-bottom: 6px;
-      }
-      .panel .found {
-        color: #e8f1ff;
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-      }
-      /* A contagem e um numero de inventario, nao um trofeu: mesmo peso do
-         resto da linha, alinhada a direita como numa planilha. */
-      .panel .tally {
-        color: #7f8da3;
-        flex: none;
-      }
-      /* O nome que o JOGADOR aprendeu, anotado a mao sobre o relatorio. Recuado
-         e menor: no arquivo da empresa ele e marginalia. */
-      .panel .field-note {
-        display: block;
-        color: #46566e;
-        font-style: italic;
-        margin: -4px 0 10px 12px;
-      }
-      button:active {
-        background: #2e3a4d;
-      }
-      .row {
-        display: flex;
+
+      /* Ranking: livro de expedições homologadas */
+      .ax-rank-head,
+      .ax-rank-row {
+        display: grid;
+        grid-template-columns: 34px 54px minmax(0, 1fr) 64px;
         gap: 8px;
-        align-items: center;
-        font-size: 12px;
-        color: #b8a98f;
+        align-items: baseline;
+        padding: 5px 8px;
+        min-width: 0;
       }
-      input,
-      select {
-        background: #11151d;
-        color: #e8f1ff;
-        border: 1px solid #2e3a4d;
-        border-radius: 6px;
-        padding: 8px;
-        font-family: inherit;
+      .ax-rank-head {
+        border-bottom: 1px solid var(--ax-brass);
+        background: rgba(201, 163, 90, 0.05);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--ax-gold);
+        text-transform: uppercase;
       }
-      .menu-actions {
-        margin-top: 4px;
+      .ax-rank-row {
+        border-bottom: 1px solid var(--ax-key);
+        border-left: 3px solid transparent;
+        font-size: 13px;
       }
+      /* Distinção de papel timbrado para o pódio, não de game show */
+      .ax-rank-row.is-podium {
+        border-left-color: var(--ax-gold);
+        background: linear-gradient(90deg, rgba(201, 163, 90, 0.07), transparent);
+      }
+      .ax-rank-row .ax-rank-pos {
+        color: var(--ax-text-mute);
+      }
+      .ax-rank-row.is-podium .ax-rank-pos {
+        color: var(--ax-gold);
+      }
+      .ax-rank-row .ax-rank-name {
+        color: var(--ax-text-bright);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ax-rank-row .ax-rank-time {
+        color: var(--ax-teal);
+        text-align: right;
+      }
+
+      /* ------------------------------------------------------------------
+         Uplink de esquadrão e avisos de sistema
+         ------------------------------------------------------------------ */
+      /* Convite: fica FORA do banner de propósito — o banner e transitorio e
+         some sozinho, e o convite precisa continuar la ate alguem entrar. */
       #invite {
         position: fixed;
         top: calc(6px + env(safe-area-inset-top));
@@ -336,58 +1147,93 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        background: rgba(17, 21, 29, 0.94);
-        border: 1px solid #2e3a4d;
-        color: #b8a98f;
+        background: linear-gradient(180deg, #121717, #0c0f0f);
+        border: 1px solid var(--ax-teal-dim);
+        color: var(--ax-text-mute);
         padding: 6px 10px;
-        border-radius: 8px;
-        font-size: 12px;
+        font-size: 11px;
+        letter-spacing: 0.1em;
         z-index: 15;
       }
+      #invite::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        background: var(--ax-teal);
+        box-shadow: 0 0 9px var(--ax-teal);
+        animation: axPulse 2.4s infinite;
+        flex: 0 0 auto;
+      }
       #invite-code {
-        color: #59f2c2;
+        color: #eaf6f3;
         letter-spacing: 3px;
         font-weight: bold;
         font-size: 15px;
       }
+      /* Um estilo por significado, nunca o mesmo vermelho para tudo. O tom e um
+         atributo (`data-tone`) escrito por `setBanner` em main.ts. */
       #banner {
         position: fixed;
         top: calc(6px + env(safe-area-inset-top));
         left: 50%;
         transform: translateX(-50%);
-        background: rgba(217, 59, 76, 0.9);
-        color: #fff;
-        padding: 6px 14px;
-        border-radius: 6px;
+        max-width: min(720px, 92vw);
+        border: 1px solid var(--ax-brass-strong);
+        background: rgba(16, 14, 10, 0.96);
+        color: var(--ax-gold);
+        padding: 7px 14px;
         font-size: 12px;
+        letter-spacing: 0.06em;
         /* Acima de TUDO, inclusive das overlays modais. O banner e aviso de
            sistema — "Reconectando…", "Código de sala inválido" —, e atras de um
            fundo a 92% ele aparecia esmaecido a ponto de parecer defeito,
            justamente nas telas em que a mensagem e a informacao que falta. */
         z-index: 40;
       }
+      #banner[data-tone='info'] {
+        border-color: var(--ax-teal-dim);
+        background: rgba(10, 16, 15, 0.96);
+        color: var(--ax-teal-mute);
+      }
+      #banner[data-tone='success'] {
+        border-color: var(--ax-teal-dim);
+        background: rgba(10, 18, 17, 0.96);
+        color: var(--ax-teal-bright);
+      }
+      #banner[data-tone='offline'] {
+        border-color: #3a3a3a;
+        background: rgba(12, 12, 12, 0.96);
+        color: var(--ax-text-mute);
+      }
+      #banner[data-tone='error'] {
+        border-color: var(--ax-red-line);
+        background: rgba(20, 9, 8, 0.96);
+        color: var(--ax-red-text);
+      }
+      #banner[data-tone='destructive'] {
+        border: 2px solid var(--ax-red);
+        background: rgba(24, 8, 7, 0.97);
+        color: var(--ax-red-text);
+      }
 
       /* ------------------------------------------------------------------
-         Aurix Dynamics.
-
-         A companhia usa OURO, e o jogo usa menta (#59f2c2). Nao e decoracao:
-         a menta e a voz do sistema falando com o jogador (títulos, botao que
-         avanca, codigo de convite), e o ouro e a companhia falando POR CIMA
-         dela. Onde a placa aparece, quem esta na tela e a Aurix.
+         Aurix Dynamics: a placa da companhia.
+         A companhia usa OURO, e o sistema usa teal. Nao e decoracao: o teal e a
+         voz do sistema falando com o jogador (carimbo primario, codigo de
+         convite), e o ouro e a companhia falando POR CIMA dela.
          ------------------------------------------------------------------ */
       .corp-plate {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 6px;
-        padding: 14px 26px 12px;
+        padding: 12px 24px 10px;
         background: #0d0b08;
         border: 1px solid #57452a;
         /* borda dupla, como a placa gravada: a de dentro nasce da sombra */
         box-shadow:
           inset 0 0 0 1px #0d0b08,
           inset 0 0 0 2px #2c2318;
-        border-radius: 4px;
       }
       .corp-mark {
         width: 54px;
@@ -395,7 +1241,7 @@
         display: block;
       }
       .corp-name {
-        color: #c9a25e;
+        color: var(--ax-gold);
         font-size: 12px;
         letter-spacing: 5px;
         text-indent: 5px; /* compensa o espaco extra depois da ultima letra */
@@ -407,50 +1253,27 @@
         text-indent: 2px;
       }
       h1.corp {
-        color: #c9a25e;
+        color: var(--ax-gold);
       }
       .sub.corp {
         color: #7d6540;
       }
-      /* O abandono e a unica acao irreversivel do jogo: ela nao pode parecer
-         com "Voltar". Vermelho, e nunca a primeira da coluna. */
-      button.danger {
-        border-color: #7e2b35;
-        color: #ff8a94;
-      }
-      button.danger:active {
-        background: #3a1218;
-      }
-      /* Acima do banner (20) e do convite (15): o menu de campo e modal, e
-         nada da run pode ficar por cima dele. */
-      #pause,
-      #pause-confirm {
-        z-index: 30;
-      }
-      /* Os controles de opcoes sao UM bloco so, movido entre a tela de opcoes e
-         o menu de campo (ver `mountOptions` em main.ts). Duplicar o HTML
-         duplicaria a sincronizacao de estado, e as duas copias divergiriam na
-         primeira mudanca. */
-      #options-controls {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 14px;
-      }
 
-      /* Paisagem de celular: ~360 px de altura para caber marca, titulo, o bloco
-         de opcoes inteiro e dois botoes. Encolher o cabecalho faz o conteudo
-         caber no caso comum; a rolagem da `.overlay` continua sendo a rede de
-         seguranca para fontes grandes e telas ainda menores. */
+      /* ------------------------------------------------------------------
+         Responsivo.
+         844×390 paisagem e o alvo primario: titulo e carimbo primario sempre
+         visiveis, conteudo secundario rola por dentro, o body nunca rola.
+         ------------------------------------------------------------------ */
+      /* Paisagem curta: o formulario modal encolhe o cromo antes do conteudo */
       @media (max-height: 560px) {
         .overlay {
           gap: 8px;
         }
         #options-controls {
-          gap: 8px;
+          gap: 7px;
         }
         h1 {
-          font-size: clamp(15px, 4vw, 22px);
+          font-size: clamp(14px, 3.4vw, 20px);
         }
         button {
           padding: 8px 18px;
@@ -473,6 +1296,74 @@
         .panel {
           max-height: 38vh;
         }
+        .ax-form {
+          gap: 7px;
+          padding: 9px 11px;
+        }
+      }
+      /* Retrato / telas estreitas: o trilho vira barra inferior de 56px e a
+         ordem de despacho empilha (autorização primeiro — DESCER no topo). */
+      @media (max-width: 700px) {
+        .ax-screen {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: minmax(0, 1fr) auto;
+        }
+        .ax-rail {
+          order: 2;
+          flex-direction: row;
+          border-right: none;
+          border-top: 1px solid var(--ax-brass);
+          min-height: 56px;
+        }
+        .ax-rail-mark {
+          height: auto;
+          width: 52px;
+          border-bottom: none;
+          border-right: 1px solid var(--ax-key);
+        }
+        .ax-rail-mark .corp-mark {
+          width: 26px;
+          height: 26px;
+        }
+        .ax-rail-item {
+          flex: 1;
+          justify-content: center;
+          text-align: center;
+          padding: 4px 2px;
+          min-height: 56px;
+          border-top: none;
+          border-left: 1px solid var(--ax-key);
+          border-bottom: 3px solid var(--ax-brass);
+        }
+        .ax-rail-item.is-active {
+          border-bottom-color: var(--ax-teal);
+          border-left-color: var(--ax-key);
+        }
+        .ax-rail-copy {
+          display: none;
+        }
+        .ax-dispatch {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: auto;
+          overflow-y: auto;
+        }
+        .ax-authorisation {
+          order: 1;
+          overflow: visible;
+        }
+        .ax-requisition {
+          order: 2;
+          border-right: none;
+          border-top: 1px solid var(--ax-key);
+          overflow: visible;
+        }
+        .ax-stamp {
+          min-height: 66px;
+          font-size: 22px;
+        }
+        #menu .ax-sheet-foot .ax-foot-note {
+          white-space: normal;
+        }
       }
     </style>
   </head>
@@ -480,195 +1371,390 @@
     <canvas id="game"></canvas>
 
     <!--
-      Tela de titulo: cinco decisoes, nada mais.
+      Tela de titulo: a Ordem de Despacho (direção 2a do doc AD-UI-2.0).
 
-      O que saiu daqui — qualidade, volume, nome, telemetria — nao e menos
-      importante, e menos FREQUENTE: sao coisas que se ajustam uma vez e nunca
-      mais. Deixa-las na primeira tela custava a atencao de quem so quer jogar,
-      toda vez, em favor de quem ja resolveu aquilo.
+      Cinco decisoes, nada mais. O que saiu daqui — qualidade, volume, nome,
+      telemetria — nao e menos importante, e menos FREQUENTE: sao coisas que se
+      ajustam uma vez e nunca mais.
 
       Seed e URL de servidor sairam por outro motivo: nao sao funcionalidades de
-      jogador, sao ferramentas de desenvolvimento. Vivem atras de ?dev=1.
+      jogador, sao ferramentas de desenvolvimento. Vivem atras de ?dev=1, como
+      linhas de requisicao do formulario.
+
+      A hierarquia da folha: 1. autorizacao de descida (DESCER, o carimbo
+      primario e o maior alvo da tela) · 2. modos (co-op, semanal) ·
+      3. requisicao (sala, seed, servidor) · 4. trilho de arquivo ·
+      5. telemetria de rodape.
     -->
-    <div id="menu" class="overlay">
-      <h1 data-i18n="menu.title">VOXELYN SURVIVAL</h1>
-      <div class="sub" data-i18n="menu.tagline">o Veio está vivo — sobreviva</div>
-      <button id="btn-solo" class="primary" data-i18n="menu.solo">Descer</button>
-      <button id="btn-online" data-i18n="menu.online">Co-op online</button>
-      <!--
-        Desafio Semanal: a MESMA seed para todo mundo, publicada pela companhia.
-        Escondido enquanto o servidor nao anuncia um — sem pool, o botao
-        prometeria uma experiencia comunitaria que ele nao pode entregar.
-      -->
-      <button id="btn-contract" class="hidden" data-i18n="menu.contract">Desafio Semanal</button>
-      <div id="contract-label" class="sub hidden"></div>
-      <div class="row">
-        <label for="room" data-i18n="menu.room.label">Sala</label>
-        <input id="room" size="6" maxlength="9" data-i18n-placeholder="menu.room.placeholder" />
-        <span class="sub" data-i18n="menu.room.hint">vazio = qualquer sala</span>
-      </div>
-      <div class="row menu-actions">
-        <button id="btn-options" class="compact" data-i18n="menu.options">Opções</button>
-        <button id="btn-records" class="compact" data-i18n="menu.records">Registro</button>
-        <button id="btn-matrix" class="compact" data-i18n="menu.matrix">Matriz Geracional</button>
-        <button id="btn-rank" class="compact" data-i18n="menu.rank">Ranking</button>
-      </div>
-      <!-- Ferramentas de desenvolvimento: so aparecem com ?dev=1. -->
-      <div id="dev-tools" class="row hidden">
-        <label for="seed" data-i18n="menu.dev.seed">Seed</label>
-        <input id="seed" size="12" data-i18n-placeholder="menu.dev.seed.placeholder" />
-        <label for="server" data-i18n="menu.dev.server">Servidor</label>
-        <input id="server" size="18" data-i18n-placeholder="menu.dev.server.placeholder" />
-      </div>
-      <div class="sub" data-i18n="menu.controls">
-        Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia
-      </div>
-      <div class="sub warn" data-i18n="menu.headphones">
-        Use fones: o som avisa o que a tela ainda não mostra.
+    <div id="menu" class="overlay ax-screen">
+      <nav class="ax-rail">
+        <div class="ax-rail-mark" id="menu-mark"></div>
+        <span class="ax-rail-item is-active" data-i18n="aurix.rail.dispatch">Despacho</span>
+        <button id="btn-records" class="ax-rail-item" data-i18n="menu.records">Registro</button>
+        <button id="btn-matrix" class="ax-rail-item" data-i18n="menu.matrix">
+          Matriz Geracional
+        </button>
+        <button id="btn-rank" class="ax-rail-item" data-i18n="menu.rank">Ranking</button>
+        <button id="btn-options" class="ax-rail-item" data-i18n="menu.options">Opções</button>
+        <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
+      </nav>
+      <div class="ax-sheet">
+        <div class="ax-sheet-head">
+          <div style="min-width: 0">
+            <div class="ax-doc-title" data-i18n="aurix.menu.docTitle">Ordem de despacho</div>
+            <div class="ax-doc-code">AD-DEP-0114 · AURIX DYNAMICS</div>
+          </div>
+          <div style="margin-left: auto; text-align: right; min-width: 0">
+            <h1 data-i18n="menu.title">VOXELYN SURVIVAL</h1>
+            <div class="sub" style="font-style: italic" data-i18n="menu.tagline">
+              o Veio está vivo — sobreviva
+            </div>
+          </div>
+        </div>
+        <div class="ax-dispatch">
+          <div class="ax-requisition">
+            <div class="ax-section-label" data-i18n="aurix.menu.requisition">Requisição</div>
+            <div class="ax-field">
+              <label class="ax-field-label" for="room" data-i18n="menu.room.label">Sala</label>
+              <span class="ax-field-dots"></span>
+              <input
+                id="room"
+                size="6"
+                maxlength="9"
+                data-i18n-placeholder="menu.room.placeholder"
+              />
+            </div>
+            <div class="sub" data-i18n="menu.room.hint">vazio = qualquer sala</div>
+            <!-- Ferramentas de desenvolvimento: so aparecem com ?dev=1. -->
+            <div
+              id="dev-tools"
+              class="hidden"
+              style="display: flex; flex-direction: column; gap: 8px"
+            >
+              <div class="ax-field">
+                <label class="ax-field-label" for="seed" data-i18n="menu.dev.seed">Seed</label>
+                <span class="ax-field-dots"></span>
+                <input id="seed" size="12" data-i18n-placeholder="menu.dev.seed.placeholder" />
+              </div>
+              <div class="ax-field">
+                <label class="ax-field-label" for="server" data-i18n="menu.dev.server"
+                  >Servidor</label
+                >
+                <span class="ax-field-dots"></span>
+                <input id="server" size="18" data-i18n-placeholder="menu.dev.server.placeholder" />
+              </div>
+            </div>
+            <!--
+              Desafio Semanal: a MESMA seed para todo mundo, publicada pela
+              companhia. A ficha e contexto; o carimbo (botao) fica na coluna de
+              autorizacao. Escondida enquanto o servidor nao anuncia contrato.
+            -->
+            <div id="contract-label" class="hidden"></div>
+            <div class="sub warn" style="margin-top: auto" data-i18n="menu.headphones">
+              Use fones: o som avisa o que a tela ainda não mostra.
+            </div>
+          </div>
+          <div class="ax-authorisation">
+            <div class="ax-section-label" data-i18n="aurix.menu.authorisation">
+              Autorização de descida
+            </div>
+            <button id="btn-solo" class="primary ax-stamp" data-i18n="menu.solo">Descer</button>
+            <button id="btn-online" class="ax-order-secondary is-uplink" data-i18n="menu.online">
+              Co-op online
+            </button>
+            <button
+              id="btn-contract"
+              class="ax-order-secondary is-directive hidden"
+              data-i18n="menu.contract"
+            >
+              Desafio Semanal
+            </button>
+          </div>
+        </div>
+        <div class="ax-sheet-foot">
+          <span class="ax-motto">EXTRAIR. PROTEGER. ADAPTAR.</span>
+          <span class="ax-foot-note" data-i18n="menu.controls">
+            Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia
+          </span>
+        </div>
       </div>
     </div>
 
     <!--
+      Configuracao da unidade (Torre de Arquivo).
+
       As mesmas opcoes servem a tela de titulo e ao menu de campo, e por isso
       elas existem UMA vez so: `#options-controls` e movido de um slot para o
       outro conforme a tela que abre. As duas nunca estao abertas juntas, entao
       o no nunca precisa de duas casas ao mesmo tempo.
     -->
-    <div id="options" class="overlay hidden">
-      <h1 data-i18n="options.title">OPÇÕES</h1>
-      <div id="options-slot">
-        <div id="options-controls">
-          <div class="row">
-            <label for="name" data-i18n="options.name">Nome</label>
-            <input
-              id="name"
-              size="14"
-              maxlength="18"
-              data-i18n-placeholder="options.name.placeholder"
-            />
-          </div>
-          <!--
-            O idioma vem PRIMEIRO entre os ajustes de sistema.
-
-            Quem precisa dele é justamente quem não está lendo o resto da tela:
-            deixá-lo no fim obrigaria a percorrer, em uma língua que não se lê,
-            tudo o que vem antes. As opções são carregadas uma vez na vida e a
-            ordem aqui não custa nada a quem já resolveu isso.
-          -->
-          <div class="row">
-            <label for="language" data-i18n="options.language">Idioma</label>
-            <select id="language"></select>
-          </div>
-          <div class="row">
-            <label for="quality" data-i18n="options.quality">Qualidade</label>
-            <select id="quality">
-              <option value="high" data-i18n="options.quality.high">Alta</option>
-              <option value="medium" data-i18n="options.quality.medium">Média</option>
-              <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
-            </select>
-          </div>
-          <div class="row">
-            <label for="volume" data-i18n="options.volume">Volume</label>
-            <input id="volume" type="range" min="0" max="100" step="1" />
-            <button id="btn-mute" class="compact primary">Som: ligado</button>
-          </div>
-          <div class="row">
-            <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
-          </div>
-          <div class="sub" data-i18n="options.telemetry.note">
-            dados anônimos de sessão, sem identificação
+    <div id="options" class="overlay ax-screen hidden">
+      <nav class="ax-rail">
+        <div class="ax-rail-mark" id="options-mark"></div>
+        <button id="btn-options-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
+          Despacho
+        </button>
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+          Registro
+        </button>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
+          Matriz Geracional
+        </button>
+        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="menu.rank">Ranking</button>
+        <span class="ax-rail-item is-active" data-i18n="menu.options">Opções</span>
+        <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
+      </nav>
+      <div class="ax-sheet">
+        <div class="ax-sheet-head">
+          <div style="min-width: 0">
+            <h1 class="ax-doc-title" data-i18n="options.title">OPÇÕES</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.options">AD-CFG-2.1 · terminal local</div>
           </div>
         </div>
+        <div class="ax-sheet-body">
+          <div id="options-slot">
+            <div id="options-controls">
+              <div class="ax-section-label" data-i18n="aurix.options.operator">Operador</div>
+              <div class="row">
+                <label for="name" data-i18n="options.name">Nome</label>
+                <input
+                  id="name"
+                  size="14"
+                  maxlength="18"
+                  data-i18n-placeholder="options.name.placeholder"
+                />
+              </div>
+              <!--
+                O idioma vem PRIMEIRO entre os ajustes de sistema.
+
+                Quem precisa dele é justamente quem não está lendo o resto da
+                tela: deixá-lo no fim obrigaria a percorrer, em uma língua que
+                não se lê, tudo o que vem antes.
+              -->
+              <div class="row">
+                <label for="language" data-i18n="options.language">Idioma</label>
+                <select id="language"></select>
+              </div>
+              <div class="ax-section-label" data-i18n="aurix.options.video">Sistema de vídeo</div>
+              <div class="row">
+                <label for="quality" data-i18n="options.quality">Qualidade</label>
+                <select id="quality">
+                  <option value="high" data-i18n="options.quality.high">Alta</option>
+                  <option value="medium" data-i18n="options.quality.medium">Média</option>
+                  <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
+                </select>
+              </div>
+              <div class="ax-section-label" data-i18n="aurix.options.audio">Áudio</div>
+              <div class="row">
+                <label for="volume" data-i18n="options.volume">Volume</label>
+                <input id="volume" type="range" min="0" max="100" step="1" />
+                <button id="btn-mute" class="compact primary">Som: ligado</button>
+              </div>
+              <div class="ax-section-label" data-i18n="aurix.options.telemetry">Telemetria</div>
+              <div class="row">
+                <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
+              </div>
+              <div class="sub" data-i18n="options.telemetry.note">
+                dados anônimos de sessão, sem identificação
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ax-sheet-foot">
+          <span data-i18n="aurix.options.footer">alterações salvas localmente</span>
+        </div>
       </div>
-      <button id="btn-options-close" class="primary" data-i18n="options.back">Voltar</button>
     </div>
 
     <!--
-      Menu de campo: a porta de saida de uma run em andamento.
+      Menu de campo: a porta de saida de uma run em andamento, como formulario
+      de despacho da Aurix. Sem trilho de arquivo: no meio de uma run o trilho
+      nao teria para onde levar, e um item de navegacao que nao navega e pior
+      que nenhum.
 
       Nao ha botao para ele na tela. Abre por ESC/P, pelo botao VOLTAR do
       celular ou por toque longo na faixa de topo — o porque de cada um esta em
-      `pause.ts`. A tela de titulo tem espaco de sobra para um botao; a tela de
-      jogo nao tem nenhum, e o menu e a coisa menos frequente da sessao.
+      `pause.ts`.
     -->
     <div id="pause" class="overlay hidden">
-      <div id="pause-mark"></div>
-      <h1 class="corp" data-i18n="pause.title">TERMINAL DE CAMPO</h1>
-      <div id="pause-status" class="sub"></div>
-      <div id="pause-coop-warning" class="sub warn hidden" data-i18n="pause.coopWarning">
-        No co-op o mundo não para — a descida continua enquanto você lê isto.
+      <div class="ax-form">
+        <div class="ax-form-head">
+          <div id="pause-mark"></div>
+          <div style="min-width: 0">
+            <h1 class="corp" data-i18n="pause.title">TERMINAL DE CAMPO</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.pause">
+              AD-DEP-0114 · contrato em curso
+            </div>
+          </div>
+        </div>
+        <div id="pause-status" class="sub"></div>
+        <div id="pause-coop-warning" class="hidden" data-i18n="pause.coopWarning">
+          No co-op o mundo não para — a descida continua enquanto você lê isto.
+        </div>
+        <button
+          id="btn-pause-resume"
+          class="primary ax-stamp"
+          style="flex: 0 0 auto"
+          data-i18n="pause.resume"
+        >
+          Retomar descida
+        </button>
+        <div id="pause-options-slot"></div>
+        <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
       </div>
-      <button id="btn-pause-resume" class="primary" data-i18n="pause.resume">
-        Retomar descida
-      </button>
-      <div id="pause-options-slot"></div>
-      <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
     </div>
 
     <!--
-      A confirmacao. A pergunta e feita na voz da companhia, e nao na do jogo:
-      quem cobra o contrato e a Aurix, e e ela quem lista o que se perde.
-      "Continuar a descida" vem primeiro e e o botao primario de proposito — o
-      caminho barato tem de ser o de NAO perder a run.
+      A confirmacao: o formulario de rescisao AD-RS-04. A pergunta e feita na
+      voz da companhia, e nao na do jogo: quem cobra o contrato e a Aurix, e e
+      ela quem lista o que se perde. "Continuar a descida" vem primeiro e e o
+      botao primario de proposito — o caminho barato tem de ser o de NAO perder
+      a run.
     -->
     <div id="pause-confirm" class="overlay hidden">
-      <div id="pause-confirm-mark"></div>
-      <h1 class="corp" data-i18n="abandon.title">ABANDONAR CONTRATO?</h1>
-      <div class="panel">
-        <span class="lesson" data-i18n="abandon.notice">
-          Registro de rescisão — leia antes de confirmar.
-        </span>
-        <div class="found">
-          <span data-i18n="abandon.material">Material coletado neste setor</span
-          ><span class="tally" data-i18n="abandon.material.value">não creditado</span>
+      <div class="ax-form is-danger">
+        <div class="ax-form-head">
+          <div id="pause-confirm-mark"></div>
+          <div style="min-width: 0">
+            <h1 class="corp" data-i18n="abandon.title">ABANDONAR CONTRATO?</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.abandon">
+              FORMULÁRIO AD-RS-04 · baixa de ativo
+            </div>
+          </div>
+          <span class="ax-diagonal-stamp" data-i18n="aurix.abandon.stamp">
+            sem valor de recuperação
+          </span>
         </div>
-        <div class="found">
-          <span data-i18n="abandon.progress">Progresso da descida</span
-          ><span class="tally" data-i18n="abandon.progress.value">perdido</span>
+        <div class="panel">
+          <span class="lesson" data-i18n="abandon.notice">
+            Registro de rescisão — leia antes de confirmar.
+          </span>
+          <div class="found">
+            <span data-i18n="abandon.material">Material coletado neste setor</span
+            ><span class="tally" data-i18n="abandon.material.value">não creditado</span>
+          </div>
+          <div class="found">
+            <span data-i18n="abandon.progress">Progresso da descida</span
+            ><span class="tally" data-i18n="abandon.progress.value">perdido</span>
+          </div>
+          <div class="found">
+            <span data-i18n="abandon.rank">Posição no ranking</span
+            ><span class="tally" data-i18n="abandon.rank.value">nenhuma</span>
+          </div>
+          <div class="found">
+            <span data-i18n="abandon.unit">Unidade em campo</span
+            ><span class="tally" data-i18n="abandon.unit.value">baixa operacional</span>
+          </div>
+          <span class="field-note" data-i18n="abandon.footnote">
+            a companhia não registra o motivo.
+          </span>
         </div>
-        <div class="found">
-          <span data-i18n="abandon.rank">Posição no ranking</span
-          ><span class="tally" data-i18n="abandon.rank.value">nenhuma</span>
-        </div>
-        <div class="found">
-          <span data-i18n="abandon.unit">Unidade em campo</span
-          ><span class="tally" data-i18n="abandon.unit.value">baixa operacional</span>
-        </div>
-        <span class="field-note" data-i18n="abandon.footnote">
-          a companhia não registra o motivo.
-        </span>
+        <button id="btn-abandon-cancel" class="primary" data-i18n="abandon.cancel">
+          Continuar a descida
+        </button>
+        <button id="btn-abandon-confirm" class="danger" data-i18n="abandon.confirm">
+          Confirmar abandono
+        </button>
       </div>
-      <button id="btn-abandon-cancel" class="primary" data-i18n="abandon.cancel">
-        Continuar a descida
-      </button>
-      <button id="btn-abandon-confirm" class="danger" data-i18n="abandon.confirm">
-        Confirmar abandono
-      </button>
     </div>
 
-    <div id="records" class="overlay hidden">
-      <h1 data-i18n="records.title">REGISTRO</h1>
-      <div id="records-body" class="panel"></div>
-      <button id="btn-records-close" class="primary" data-i18n="options.back">Voltar</button>
+    <!-- Arquivo de expedições (Torre de Arquivo). O corpo e montado por
+         records-panel.ts, com abas internas: resumo, ativos, descobertas,
+         historico. -->
+    <div id="records" class="overlay ax-screen hidden">
+      <nav class="ax-rail">
+        <div class="ax-rail-mark" id="records-mark"></div>
+        <button id="btn-records-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
+          Despacho
+        </button>
+        <span class="ax-rail-item is-active" data-i18n="menu.records">Registro</span>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
+          Matriz Geracional
+        </button>
+        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="menu.rank">Ranking</button>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
+      </nav>
+      <div class="ax-sheet">
+        <div class="ax-sheet-head">
+          <div style="min-width: 0">
+            <h1 class="ax-doc-title" data-i18n="records.title">REGISTRO</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.records">
+              AD-REG-8.1 · livro de recuperação
+            </div>
+          </div>
+        </div>
+        <div id="records-body" class="ax-sheet-body"></div>
+      </div>
     </div>
 
-    <div id="matrix" class="overlay hidden">
-      <h1 class="corp" data-i18n="matrix.title">MATRIZ GERACIONAL AURIX</h1>
-      <div id="matrix-body" class="panel"></div>
-      <button id="btn-matrix-close" class="primary" data-i18n="options.back">Voltar</button>
+    <!-- Matriz Geracional (Torre de Arquivo): console de autorizacao de
+         hardware. O corpo e montado por matrix-panel.ts: trilhos de ramo,
+         inspetor de no e a aba dos Arquivos Aurix. -->
+    <div id="matrix" class="overlay ax-screen hidden">
+      <nav class="ax-rail">
+        <div class="ax-rail-mark" id="matrix-mark"></div>
+        <button id="btn-matrix-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
+          Despacho
+        </button>
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+          Registro
+        </button>
+        <span class="ax-rail-item is-active" data-i18n="menu.matrix">Matriz Geracional</span>
+        <button class="ax-rail-item" data-ax-nav="rank" data-i18n="menu.rank">Ranking</button>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
+      </nav>
+      <div class="ax-sheet">
+        <div class="ax-sheet-head">
+          <div style="min-width: 0">
+            <h1 class="ax-doc-title corp" data-i18n="matrix.title">MATRIZ GERACIONAL AURIX</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.matrix">
+              AD-MTX-5.0 · console de autorização
+            </div>
+          </div>
+        </div>
+        <div id="matrix-body" class="ax-sheet-body"></div>
+      </div>
     </div>
 
-    <div id="rank" class="overlay hidden">
-      <h1 data-i18n="rank.title">RANKING</h1>
-      <div id="rank-body" class="panel"></div>
-      <button id="btn-rank-close" class="primary" data-i18n="options.back">Voltar</button>
+    <!-- Ranking (Torre de Arquivo): o livro de expedições homologadas. -->
+    <div id="rank" class="overlay ax-screen hidden">
+      <nav class="ax-rail">
+        <div class="ax-rail-mark" id="rank-mark"></div>
+        <button id="btn-rank-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
+          Despacho
+        </button>
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+          Registro
+        </button>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
+          Matriz Geracional
+        </button>
+        <span class="ax-rail-item is-active" data-i18n="menu.rank">Ranking</span>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
+      </nav>
+      <div class="ax-sheet">
+        <div class="ax-sheet-head">
+          <div style="min-width: 0">
+            <h1 class="ax-doc-title" data-i18n="rank.title">RANKING</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.rank">
+              AD-RNK-6.2 · expedições homologadas
+            </div>
+          </div>
+        </div>
+        <div id="rank-body" class="ax-sheet-body"></div>
+      </div>
     </div>
 
     <!--
-      Convite. Fica FORA do banner de propósito: o banner e transitorio e some
-      sozinho, e o convite precisa continuar la ate alguem entrar.
+      Uplink de esquadrão. Fica FORA do banner de propósito: o banner e
+      transitorio e some sozinho, e o convite precisa continuar la ate alguem
+      entrar.
     -->
     <div id="invite" class="hidden">
+      <span data-i18n="invite.channel">canal cifrado</span>
       <span id="invite-code"></span>
       <button id="btn-invite" class="compact" data-i18n="invite.copy">Copiar convite</button>
     </div>

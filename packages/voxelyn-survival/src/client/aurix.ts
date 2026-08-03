@@ -10,6 +10,10 @@
  * mesmo pixel-art que a tela usa, atravessa o service worker sem virar mais um
  * arquivo no precache (o app shell ja passa de 1 MB) e muda de cor por CSS,
  * o que a tela de abandono usa para esmaecer a marca.
+ *
+ * O desenho segue a arte de referencia do redesign (doc AD-UI-2.0): uma placa
+ * triangular chanfrada de bronze com fendas de teal aceso — o "A" da Aurix
+ * como peca de maquinario, nao como letra.
  */
 
 /** Ouro da companhia. Mesma familia do bege de texto secundario ja usado (#b8a98f). */
@@ -28,7 +32,7 @@ export const AURIX_NAME = 'AURIX DYNAMICS';
 export const AURIX_TAGLINE = 'EXTRAIR. PROTEGER. ADAPTAR.';
 
 /**
- * Contador de instancias, para o id do gradiente.
+ * Contador de instancias, para os ids de gradiente.
  *
  * Um id fixo custou uma placa inteira: as duas telas montam a marca, os dois
  * `<linearGradient>` nasciam com o MESMO id e o `url(#...)` da segunda resolvia
@@ -41,26 +45,40 @@ export const AURIX_TAGLINE = 'EXTRAIR. PROTEGER. ADAPTAR.';
 let markSerial = 0;
 
 /**
- * O monograma: um "A" angular montado de fitas chanfradas, como uma placa
- * gravada em metal. Sem `width`/`height` — quem monta decide o tamanho por CSS.
+ * O monograma: um "A" angular montado de fitas chanfradas de bronze, com as
+ * fendas de teal da arte de referencia. Sem `width`/`height` — quem monta
+ * decide o tamanho por CSS.
  */
 const markSvg = (): string => {
-  const gradient = `aurix-leaf-${(markSerial += 1)}`;
+  const serial = (markSerial += 1);
+  const leaf = `aurix-leaf-${serial}`;
+  const vein = `aurix-vein-${serial}`;
   return `
 <svg class="corp-mark" viewBox="0 0 100 100" role="img" aria-label="${AURIX_NAME}">
   <defs>
-    <linearGradient id="${gradient}" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="${leaf}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#e0bd7c" />
       <stop offset="60%" stop-color="#c9a25e" />
       <stop offset="100%" stop-color="#8a6f42" />
     </linearGradient>
+    <linearGradient id="${vein}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8ff0e6" />
+      <stop offset="100%" stop-color="#2f7d75" />
+    </linearGradient>
   </defs>
+  <!-- a placa de fundo: o triangulo chanfrado em bronze escuro -->
+  <path fill="#4a3a22" d="M50 2 L96 88 L78 96 L22 96 L4 88 Z" />
+  <path fill="#2c2318" d="M50 10 L88 86 L68 92 L32 92 L12 86 Z" />
   <!-- as duas pernas do A, sem barra: o vao entre elas e o vazio do simbolo -->
-  <path fill="url(#${gradient})" d="M50 8 L88 90 L69 90 L50 46 L31 90 L12 90 Z" />
+  <path fill="url(#${leaf})" d="M50 8 L88 90 L69 90 L50 46 L31 90 L12 90 Z" />
   <!-- a dobra do apice, mais escura: e o que faz a fita parecer chanfrada -->
   <path fill="#6d5533" opacity="0.85" d="M50 22 L61 46 L39 46 Z" />
   <!-- travessa, em trapezio para acompanhar o angulo das pernas -->
-  <path fill="url(#${gradient})" d="M35 60 L65 60 L70 74 L30 74 Z" />
+  <path fill="url(#${leaf})" d="M35 60 L65 60 L70 74 L30 74 Z" />
+  <!-- fendas de teal: o nucleo aceso atras da placa -->
+  <path fill="url(#${vein})" d="M50 30 L56 44 L50 58 L44 44 Z" />
+  <path fill="url(#${vein})" opacity="0.8" d="M24 78 L30 78 L27 88 Z" />
+  <path fill="url(#${vein})" opacity="0.8" d="M70 78 L76 78 L73 88 Z" />
 </svg>`;
 };
 
@@ -77,3 +95,9 @@ export const aurixPlateHtml = (tagline = false): string =>
   `<div class="corp-plate">${markSvg()}<div class="corp-name">${AURIX_NAME}</div>${
     tagline ? `<div class="corp-tagline">${AURIX_TAGLINE}</div>` : ''
   }</div>`;
+
+/**
+ * So o monograma, para o trilho de arquivo — onde a placa completa nao cabe.
+ * O tamanho e decidido pelo CSS de quem monta (`.ax-rail-mark .corp-mark`).
+ */
+export const aurixMarkHtml = (): string => markSvg();
