@@ -34,27 +34,58 @@ export type ApiResult<T> =
 const httpBase = (serverUrl: string): string =>
   serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
 
-const TOKEN_KEY = 'voxelyn.progression.token';
+const TOKEN_KEY_PREFIX = 'voxelyn.progression.token';
 
 /**
- * O token de sessao guardado localmente.
+ * A ORIGEM que emitiu um token, normalizada.
  *
- * So e USADO quando o cookie nao acompanha a requisicao — mas e enviado sempre,
- * porque o cliente nao tem como saber se o cookie chegou: `document.cookie` nao
- * enxerga um cookie HttpOnly, e o servidor prefere o cookie de qualquer forma.
+ * O escopo por origem e obrigatorio, e a razao merece estar escrita: o cookie
+ * tinha isso DE GRACA — o navegador nunca manda o cookie de um site para outro.
+ * Ao trocar para um token em header, essa garantia sumiu, e reimplementa-la
+ * passou a ser responsabilidade deste arquivo. A primeira versao nao o fez.
+ *
+ * O que isso permitia: o servidor e escolhivel por `?server=` e pelo campo do
+ * menu. Um link apontando para um servidor hostil fazia o cliente ANEXAR o token
+ * de producao na primeira chamada — e quem o recebesse poderia repeti-lo contra a
+ * API real e assumir o perfil do jogador.
+ *
+ * Uma chave por origem tambem conserta o caso benigno: alternar entre dois
+ * servidores confiaveis sobrescrevia o token do primeiro e orfanava aquele perfil
+ * anonimo em qualquer navegador que bloqueie cookies de terceiros.
  */
-export const readSessionToken = (): string | null => {
+const originOf = (serverUrl: string): string | null => {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    return new URL(httpBase(serverUrl)).origin;
   } catch {
     return null;
   }
 };
 
-const writeSessionToken = (token: string | null): void => {
+const tokenKey = (origin: string): string => `${TOKEN_KEY_PREFIX}:${origin}`;
+
+/**
+ * O token guardado PARA AQUELE SERVIDOR.
+ *
+ * So e usado quando o cookie nao acompanha a requisicao — mas e enviado sempre,
+ * porque o cliente nao tem como saber se o cookie chegou: `document.cookie` nao
+ * enxerga um cookie HttpOnly, e o servidor prefere o cookie de qualquer forma.
+ */
+export const readSessionToken = (serverUrl: string): string | null => {
+  const origin = originOf(serverUrl);
+  if (!origin) return null;
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    return localStorage.getItem(tokenKey(origin));
+  } catch {
+    return null;
+  }
+};
+
+const writeSessionToken = (serverUrl: string, token: string | null): void => {
+  const origin = originOf(serverUrl);
+  if (!origin) return;
+  try {
+    if (token) localStorage.setItem(tokenKey(origin), token);
+    else localStorage.removeItem(tokenKey(origin));
   } catch {
     /* sem storage: sobra o cookie, que e o caminho preferido de qualquer jeito */
   }
@@ -82,7 +113,7 @@ const call = async <T>(
   timeoutMs = TIMEOUT_INTERACTIVE_MS,
 ): Promise<ApiResult<T>> => {
   try {
-    const token = readSessionToken();
+    const token = readSessionToken(serverUrl);
     const res = await fetch(`${httpBase(serverUrl)}${path}`, {
       ...init,
       credentials: 'include',
@@ -119,7 +150,7 @@ export const openSession = async (
   );
   // O token so vem quando a sessao NASCE. Confirmar uma sessao existente devolve
   // so o perfil, e o que ja estava guardado continua valendo.
-  if (result.ok && result.value.token) writeSessionToken(result.value.token);
+  if (result.ok && result.value.token) writeSessionToken(serverUrl, result.value.token);
   return result;
 };
 

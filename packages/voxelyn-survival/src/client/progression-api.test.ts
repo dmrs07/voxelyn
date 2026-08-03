@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   TIMEOUT_INTERACTIVE_MS,
   TIMEOUT_SETTLE_MS,
+  openSession,
   purchaseKey,
+  readSessionToken,
   requestRunTicketWithSession,
 } from './progression-api';
 
@@ -127,5 +129,71 @@ describe('chave de idempotencia da compra', () => {
 
   it('sobrevive a um profileId com caracteres fora da allowlist', () => {
     expect(purchaseKey('a+b/c=d+e/f=g', 'CA-01', 1)).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Escopo do token por origem
+// ---------------------------------------------------------------------------
+// O cookie tinha isto DE GRACA: o navegador nunca manda o cookie de um site para
+// outro. Ao trocar para um token em header, a garantia sumiu e virou trabalho
+// deste arquivo — e a primeira versao nao o fez.
+
+describe('o token nunca sai da origem que o emitiu', () => {
+  const memoryStorage = (): Storage => {
+    const map = new Map<string, string>();
+    return {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+      clear: () => map.clear(),
+      key: (i: number) => [...map.keys()][i] ?? null,
+      get length() {
+        return map.size;
+      },
+    } as Storage;
+  };
+
+  // O ataque: um link com `?server=` apontando para um servidor hostil. Antes,
+  // a primeira chamada anexava o token de PRODUCAO — e quem o recebesse poderia
+  // repeti-lo contra a API real e assumir o perfil do jogador.
+  it('nao anexa a um servidor o token emitido por outro', async () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    stubFetch(() => json(201, { profile: PROFILE, token: 'token-de-producao' }));
+    await openSession('https://api-real.example');
+    expect(readSessionToken('https://api-real.example')).toBe('token-de-producao');
+
+    const calls = stubFetch(() => json(201, { ticket: TICKET }));
+    await requestRunTicketWithSession('https://servidor-hostil.example', 1);
+    const sent = new Headers(calls[0].init.headers);
+    expect(sent.get('authorization')).toBeNull();
+  });
+
+  it('cada servidor guarda o proprio token', async () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    stubFetch(() => json(201, { profile: PROFILE, token: 'token-A' }));
+    await openSession('https://a.example');
+    stubFetch(() => json(201, { profile: PROFILE, token: 'token-B' }));
+    await openSession('https://b.example');
+
+    // Alternar entre dois servidores confiaveis nao pode orfanar o primeiro
+    // perfil — que era o caso benigno do mesmo bug.
+    expect(readSessionToken('https://a.example')).toBe('token-A');
+    expect(readSessionToken('https://b.example')).toBe('token-B');
+  });
+
+  it('a origem ignora caminho e barra final, e ws vira http', async () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    stubFetch(() => json(201, { profile: PROFILE, token: 'token-A' }));
+    await openSession('https://a.example');
+    expect(readSessionToken('https://a.example/')).toBe('token-A');
+    expect(readSessionToken('wss://a.example')).toBe('token-A');
+    // Porta diferente e OUTRA origem: a regra e a do navegador, nao "parece o mesmo".
+    expect(readSessionToken('https://a.example:8443')).toBeNull();
+  });
+
+  it('URL invalida nao guarda nem devolve token', () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    expect(readSessionToken('nao é uma url')).toBeNull();
   });
 });

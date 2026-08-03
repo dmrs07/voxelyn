@@ -162,7 +162,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     const locked: CodexResponse['locked'] = [];
     for (const fragment of LORE_FRAGMENTS) {
       if (unlocked.has(fragment.id)) {
-        open.push(toPublicFragment(fragment, locale));
+        open.push(toPublicFragment(fragment, locale, unlocked));
       } else {
         // Nem o titulo viaja. O corpo de um documento bloqueado nao sai deste
         // processo — e por isso que "bloqueado" e uma afirmacao sobre bytes que
@@ -253,7 +253,13 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
         json(res, 404, { error: 'unknown_upgrade', detail: 'fragmento indisponivel' });
         return true;
       }
-      json(res, 200, { fragment: toPublicFragment(fragment, localeOf(url)) });
+      json(res, 200, {
+        fragment: toPublicFragment(
+          fragment,
+          localeOf(url),
+          new Set(profile.unlockedLoreFragmentIds),
+        ),
+      });
       return true;
     }
 
@@ -486,7 +492,13 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
           }).generation,
           generationAfter: publicProfile(result.profile).generation,
         },
-        unlockedLoreFragment: fragment ? toPublicFragment(fragment, localeOf(url)) : null,
+        unlockedLoreFragment: fragment
+          ? toPublicFragment(
+              fragment,
+              localeOf(url),
+              new Set(result.profile.unlockedLoreFragmentIds),
+            )
+          : null,
       });
       return true;
     }

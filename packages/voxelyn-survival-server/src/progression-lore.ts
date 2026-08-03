@@ -223,10 +223,20 @@ export const TOTAL_LORE_FRAGMENTS = LORE_FRAGMENTS.length;
 const textFor = (id: LoreFragmentId, locale: LoreLocale): LoreText =>
   LORE_TEXT[locale][id] ?? LORE_TEXT['en'][id] ?? { title: id, summary: '', body: '', source: '' };
 
-/** Um fragmento pronto para viajar. So chamado depois de conferir autorizacao. */
+/**
+ * Um fragmento pronto para viajar. So chamado depois de conferir autorizacao.
+ *
+ * `unlocked` mascara os ARQUIVOS RELACIONADOS que o perfil ainda nao pode ler.
+ * Sem isso, o documento publico inicial — que todo perfil novo recebe — entregava
+ * `AX-PRC-014` e `AX-GEN-G04` em texto limpo, e o painel os desenhava verbatim:
+ * exatamente os prefixos de ato e de geracao que `maskCode` existe para esconder.
+ * O mecanismo de mascara continuava certo e a lista de relacionados o devolvia
+ * pela porta dos fundos, no primeiro minuto de jogo.
+ */
 export const toPublicFragment = (
   definition: LoreFragmentDefinition,
   locale: LoreLocale,
+  unlocked?: ReadonlySet<LoreFragmentId>,
 ): PublicLoreFragment => {
   const text = textFor(definition.id, locale);
   return {
@@ -241,7 +251,11 @@ export const toPublicFragment = (
     summary: text.summary,
     body: text.body,
     source: text.source,
-    relatedFragmentIds: definition.relatedFragmentIds,
+    // Sem `unlocked`, nada e mascarado: e o caso do fragmento revelado logo apos
+    // uma compra, em que quem chama ja sabe que o perfil o possui.
+    relatedFragmentIds: unlocked
+      ? definition.relatedFragmentIds.map((id) => (unlocked.has(id) ? id : maskCode(id)))
+      : definition.relatedFragmentIds,
     redactionLevel: definition.redactionLevel,
   };
 };

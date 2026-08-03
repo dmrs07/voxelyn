@@ -739,6 +739,36 @@ describe('codex', () => {
     expect(en.fragment.body.length).toBeGreaterThan(50);
   });
 
+  // `maskCode` esconde o prefixo de ato dos documentos bloqueados — e a lista de
+  // ARQUIVOS RELACIONADOS o devolvia pela porta dos fundos: o documento publico
+  // inicial, que todo perfil novo recebe, citava AX-PRC-014 e AX-GEN-G04 em texto
+  // limpo, no primeiro minuto de jogo.
+  it('os arquivos relacionados de um documento bloqueado vem mascarados', async () => {
+    const client = new Client();
+    await client.session();
+    const body = (await (await client.call('/api/progression/codex?lang=pt-BR')).json()) as {
+      unlocked: { id: string; relatedFragmentIds: string[] }[];
+    };
+    const publico = body.unlocked.find((f) => f.id === 'AX-PUB-001');
+    expect(publico).toBeDefined();
+    expect(publico?.relatedFragmentIds.length).toBeGreaterThan(0);
+    for (const related of publico?.relatedFragmentIds ?? []) {
+      // O sufixo sobrevive de proposito (AX-███-014, AX-███-G04): saber que
+      // existe um documento 014 e parte do desenho, e a escada G-00..G-04 ja e
+      // visivel na propria Matriz. O que nao pode vazar e o ATO.
+      expect(related, 'nenhum ato pode vazar').toMatch(/^AX-███-\w+$/);
+    }
+  });
+
+  it('nenhum prefixo de ato aparece na resposta inteira de um perfil novo', async () => {
+    const client = new Client();
+    await client.session();
+    const raw = await (await client.call('/api/progression/codex?lang=pt-BR')).text();
+    for (const prefix of ['AX-PRC', 'AX-INC', 'AX-EXE', 'AX-UNK', 'AX-GEN', 'AX-ENG']) {
+      expect(raw, `${prefix} vazou`).not.toContain(prefix);
+    }
+  });
+
   it('sem sessao nao ha codex', async () => {
     expect((await fetch(`${base}/api/progression/codex`)).status).toBe(401);
   });
