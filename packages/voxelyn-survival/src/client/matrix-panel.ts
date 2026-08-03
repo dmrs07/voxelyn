@@ -81,6 +81,16 @@ export type MatrixViewState = {
    * mesma frase — e nenhuma delas tinha a ver com conexao.
    */
   notice: PanelNotice | null;
+  /**
+   * A falha da ULTIMA consulta aos Arquivos, quando houve uma.
+   *
+   * A aba dos Arquivos mostrava `matrix.loading` sempre que `codex` fosse nulo,
+   * e nulo era tanto "ainda vem" quanto "nao veio". Uma consulta que falhava
+   * deixava a aba em "Consultando a Aurix Dynamics…" para sempre — a mesma
+   * confusao entre pergunta e resposta que este arquivo ja corrigiu duas vezes,
+   * aqui pela terceira.
+   */
+  codexNotice: PanelNotice | null;
   /** O documento a revelar depois de uma compra. */
   reveal: PublicLoreFragment | null;
 };
@@ -308,7 +318,14 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
   const body = el('div', 'matrix-body');
   const codex = view.codex;
   if (!codex) {
-    body.appendChild(el('p', 'sub', t('matrix.loading')));
+    const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
+    body.appendChild(
+      el(
+        'p',
+        pending.key === 'matrix.loading' ? 'sub' : 'sub warn',
+        t(pending.key, pending.params),
+      ),
+    );
     return body;
   }
   body.appendChild(

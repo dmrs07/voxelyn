@@ -294,3 +294,69 @@ describe('primeiro contato com uma origem fria', () => {
     expect(later).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Esquema que o `fetch` nao atende tambem e endereco invalido
+// ---------------------------------------------------------------------------
+// Parseavel nao e utilizavel. `new URL` aceita `ftp://` e `file://` sem
+// reclamar — o primeiro devolve uma origem truthy e o segundo devolve a STRING
+// "null" —, e os dois furavam a checagem para morrer no `fetch` como `offline`.
+
+describe('esquemas que o navegador nao busca', () => {
+  it.each(['ftp://host', 'file:///tmp/x', 'javascript:alert(1)', 'data:text/plain,x'])(
+    '%s e endereco invalido, e nao queda de rede',
+    async (bad) => {
+      const calls = stubFetch(() => json(200, {}));
+      expect(await fetchProfile(bad)).toEqual({ ok: false, error: 'bad_server_url' });
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it('http, https, ws e wss continuam passando', async () => {
+    for (const good of ['http://a.example', 'https://a.example', 'wss://a.example']) {
+      const calls = stubFetch(() => json(200, { profile: PROFILE }));
+      expect((await fetchProfile(good)).ok).toBe(true);
+      expect(calls).toHaveLength(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Duas chamadas, um unico despertar
+// ---------------------------------------------------------------------------
+// `refreshProfile` e `refreshCodex` se sobrepoem quando o painel abre na aba dos
+// Arquivos. Contra uma origem fria, quem chegasse em segundo via a marca de
+// "tentativa gasta" e anunciava queda na hora — mesmo com a espera do primeiro
+// terminando com o servidor de pe.
+
+describe('duas chamadas concorrentes contra a mesma origem fria', () => {
+  it('a segunda espera o despertar da primeira em vez de anunciar queda', async () => {
+    // As duas primeiras idas (uma por chamada) estouram; a partir dai o servidor
+    // responde, que e exatamente o comportamento de um host hibernado acordando.
+    let attempt = 0;
+    stubFetch(() => {
+      attempt += 1;
+      if (attempt <= 2) throw new DOMException('aborted', 'TimeoutError');
+      return json(200, { profile: PROFILE });
+    });
+
+    const [a, b] = await Promise.all([
+      fetchProfile('https://concorrente.example'),
+      fetchProfile('https://concorrente.example'),
+    ]);
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+  });
+
+  it('se a origem nao acorda, a segunda nao fica pendurada', async () => {
+    stubFetch(() => {
+      throw new TypeError('network');
+    });
+    const [a, b] = await Promise.all([
+      fetchProfile('https://nunca-acorda.example'),
+      fetchProfile('https://nunca-acorda.example'),
+    ]);
+    expect(a).toMatchObject({ ok: false, error: 'offline' });
+    expect(b).toMatchObject({ ok: false, error: 'offline' });
+  });
+});

@@ -1473,6 +1473,7 @@ const matrixView: MatrixViewState = {
   // Ainda nao perguntamos: nao ha falha para explicar, e nomear uma seria
   // inventar diagnostico.
   stale: null,
+  codexNotice: null,
   loading: false,
   codex: null,
   pending: null,
@@ -1573,6 +1574,7 @@ const refreshCodex = async (): Promise<void> => {
   const result = await fetchCodex(query.scope, getLocale());
   if (!isCurrentQuery(codexQueries, query)) return;
   matrixView.codex = result.ok ? result.value : null;
+  matrixView.codexNotice = result.ok ? null : failureNotice(result);
   drawMatrix();
 };
 
@@ -1637,6 +1639,7 @@ const matrixHandlers: MatrixHandlers = {
       matrixView.stale = null;
       writeCachedProfile(result.value.profile, Date.now());
       matrixView.codex = null; // desatualizado: um documento novo entrou
+      matrixView.codexNotice = null;
       matrixView.reveal = result.value.unlockedLoreFragment;
       drawMatrix();
       audio.ui();

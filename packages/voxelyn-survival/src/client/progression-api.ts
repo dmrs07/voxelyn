@@ -69,7 +69,17 @@ const TOKEN_KEY_PREFIX = 'voxelyn.progression.token';
  */
 const originOf = (serverUrl: string): string | null => {
   try {
-    return new URL(httpBase(serverUrl)).origin;
+    const url = new URL(httpBase(serverUrl));
+    // Parseavel NAO e o mesmo que utilizavel, e a diferenca escapou na primeira
+    // versao desta validacao: `ftp://host` devolve uma origem perfeitamente
+    // truthy, e `file:///x` devolve a STRING "null", que tambem passa. Os dois
+    // furavam a checagem, o `fetch` os recusava depois, e a recusa saia como
+    // `offline` — de novo um endereco errado se passando por queda de rede.
+    //
+    // Depois do `httpBase` so restam dois esquemas legitimos. Qualquer outro e
+    // configuracao invalida, e e assim que precisa ser anunciado.
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.origin;
   } catch {
     return null;
   }
@@ -153,6 +163,23 @@ export const TIMEOUT_WAKE_MS = 25_000;
  */
 const wakePaid = new Set<string>();
 
+/**
+ * O despertar EM ANDAMENTO de cada origem. Resolve com "acordou?".
+ *
+ * Sem isto, duas chamadas concorrentes contra a mesma origem fria se atrapalham:
+ * a primeira a retomar marca `wakePaid` e sai esperando; a segunda ve a marca,
+ * conclui que a tentativa ja foi gasta e anuncia queda na hora — mesmo que a
+ * espera da primeira termine com o servidor de pe. Na Matriz isso e rotina, e
+ * nao excecao: `refreshProfile` e `refreshCodex` se sobrepoem quando o painel
+ * abre na aba dos Arquivos.
+ *
+ * As duas chamadas pedem caminhos diferentes, entao a RESPOSTA nao da para
+ * compartilhar. O que da — e e o que importa — e o desfecho da pergunta "tem
+ * alguem ai?": quem chega depois espera por ela e refaz o proprio pedido contra
+ * uma origem que agora esta quente.
+ */
+const wakeInFlight = new Map<string, Promise<boolean>>();
+
 const call = async <T>(
   serverUrl: string,
   path: string,
@@ -209,14 +236,40 @@ const callAwake = async <T>(
   const origin = originOf(serverUrl);
   const first = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
   if (first.ok || first.error !== 'offline') return first;
+  if (!origin) return first;
+
+  // Ja ha alguem pagando a espera por esta origem: aproveitar o desfecho dela e
+  // melhor que anunciar uma queda que talvez nem exista.
+  const ongoing = wakeInFlight.get(origin);
+  if (ongoing) {
+    return (await ongoing) ? call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS) : first;
+  }
+
   // `wakePaid` e consultado DEPOIS da primeira tentativa: e ela quem acabou de
   // descobrir se ha alguem ali.
-  if (!origin || wakePaid.has(origin)) return first;
+  if (wakePaid.has(origin)) return first;
   // ANTES de esperar, e nao depois: a tentativa esta gasta quer ela traga
   // resposta ou nao. Marcar so no sucesso faria a origem morta pagar os 25s
   // outra vez, e outra, e outra.
   wakePaid.add(origin);
-  return call<T>(serverUrl, path, init, TIMEOUT_WAKE_MS);
+
+  let announce: (awake: boolean) => void = () => undefined;
+  wakeInFlight.set(
+    origin,
+    new Promise<boolean>((resolve) => {
+      announce = resolve;
+    }),
+  );
+  let awake = false;
+  try {
+    const retry = await call<T>(serverUrl, path, init, TIMEOUT_WAKE_MS);
+    awake = retry.ok || retry.error !== 'offline';
+    return retry;
+  } finally {
+    // No `finally` para que nenhum caminho de saida deixe quem espera pendurado.
+    wakeInFlight.delete(origin);
+    announce(awake);
+  }
 };
 
 export const openSession = async (

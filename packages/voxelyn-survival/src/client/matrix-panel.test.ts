@@ -100,6 +100,7 @@ const view = (over: Partial<MatrixViewState> = {}): MatrixViewState => ({
   codex: null,
   pending: null,
   notice: null,
+  codexNotice: null,
   reveal: null,
   ...over,
 });
