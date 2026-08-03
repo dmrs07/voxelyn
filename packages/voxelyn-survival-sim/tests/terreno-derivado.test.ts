@@ -112,6 +112,30 @@ describe('a barreira de escrita do draft', () => {
     expect(draft.derived(entry).openCells).toBe(draft.derived(entry).openCells);
   });
 
+  it('escavar DEPOIS de uma leitura precoce tambem invalida', () => {
+    // O cenario que a primeira versao desta etapa deixava passar, e que so
+    // aparece se alguem ler cedo: as escavacoes (`carveBlob`, o prune de
+    // bolsoes, o ruido inicial) escreviam CRU, com a desculpa de que rodam
+    // antes de haver o que invalidar. A desculpa dependia da ordem — e com
+    // `halls: 'none'` nao ha pedestal nem arena carimbando depois para
+    // consertar por acidente, entao a leitura final devolveria a topologia
+    // velha. Agora nao ha isencao: toda escrita passa pela barreira.
+    const draft = createTerrainDraft(W, H);
+    for (let y = 1; y < 6; y++) {
+      for (let x = 1; x < 6; x++) draft.setSolid(y * W + x, SOLID_NONE);
+    }
+    const antes = draft.derived(entry).openCells.length;
+    // Uma escavacao do tipo que `carveBlob` faz — COLADA na regiao aberta, se
+    // nao o flood da entrada nao a alcanca e a contagem nao mudaria nem com a
+    // invalidacao funcionando (foi assim que a primeira versao deste teste
+    // falhou: media a coisa certa no lugar errado).
+    draft.setSolid(3 * W + 6, SOLID_NONE);
+    expect(
+      draft.derived(entry).openCells.length,
+      'abrir chao novo nao refez o derivado',
+    ).toBe(antes + 1);
+  });
+
   it('trocar o buffer inteiro (o automato) tambem invalida', () => {
     const draft = abrirTudo();
     const antes = draft.derived(entry).openCells.length;

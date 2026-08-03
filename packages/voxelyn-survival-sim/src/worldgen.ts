@@ -235,12 +235,12 @@ const bfsFarthest = (
   return { cell: { x: far % w, y: Math.floor(far / w) }, dist };
 };
 
-const carveBlob = (solid: Uint8Array, w: number, h: number, cx: number, cy: number, r: number): void => {
+const carveBlob = (draft: TerrainDraft, w: number, h: number, cx: number, cy: number, r: number): void => {
   for (let y = Math.max(1, cy - r); y <= Math.min(h - 2, cy + r); y++) {
     for (let x = Math.max(1, cx - r); x <= Math.min(w - 2, cx + r); x++) {
       const dx = x - cx;
       const dy = y - cy;
-      if (dx * dx + dy * dy <= r * r) solid[idx(w, x, y)] = SOLID_NONE;
+      if (dx * dx + dy * dy <= r * r) draft.setSolid(idx(w, x, y), SOLID_NONE);
     }
   }
 };
@@ -259,11 +259,12 @@ const carveBlob = (solid: Uint8Array, w: number, h: number, cx: number, cy: numb
  */
 const stampHalls = (
   rng: RNG,
-  solid: Uint8Array,
+  draft: TerrainDraft,
   w: number,
   h: number,
   halls: WorldgenProfile['halls'],
 ): { fillCells: number[]; fillKind: number; hallCenters: Vec2[] } => {
+  const { solid } = draft;
   const fillCells: number[] = [];
   // Os centros dos saloes GRANDES — so registro do que a gramatica ja
   // calculou, nenhuma tirada de RNG a mais: a sequencia (e o mapa) continuam
@@ -282,12 +283,12 @@ const stampHalls = (
     for (let step = 0; step < length; step++) {
       fx += Math.cos(angle);
       fy += Math.sin(angle);
-      carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), r);
+      carveBlob(draft, w, h, Math.floor(fx), Math.floor(fy), r);
     }
   };
   /** Poe um pilar SOLIDO dentro de um salao. So dentro da moldura do mapa. */
   const pillar = (x: number, y: number, mat: number): void => {
-    if (x > 1 && y > 1 && x < w - 2 && y < h - 2) solid[idx(w, x, y)] = mat;
+    if (x > 1 && y > 1 && x < w - 2 && y < h - 2) draft.setSolid(idx(w, x, y), mat);
   };
   /** Elipse aberta; devolve as celulas internas (para encher de elemento). */
   const carveEllipse = (cx: number, cy: number, rx: number, ry: number, collect?: number[]): void => {
@@ -296,7 +297,7 @@ const stampHalls = (
         const nx = (x - cx) / rx;
         const ny = (y - cy) / ry;
         if (nx * nx + ny * ny > 1) continue;
-        solid[idx(w, x, y)] = SOLID_NONE;
+        draft.setSolid(idx(w, x, y), SOLID_NONE);
         if (collect && nx * nx + ny * ny <= 0.82) collect.push(idx(w, x, y));
       }
     }
@@ -316,7 +317,7 @@ const stampHalls = (
       fx += Math.cos(angle);
       fy += Math.sin(angle);
       if (fx < 4 || fy < 4 || fx > w - 4 || fy > h - 4) angle += Math.PI / 2;
-      carveBlob(solid, w, h, Math.floor(fx), Math.floor(fy), step % 5 < 3 ? 1 : 2);
+      carveBlob(draft, w, h, Math.floor(fx), Math.floor(fy), step % 5 < 3 ? 1 : 2);
     }
   };
 
@@ -327,7 +328,7 @@ const stampHalls = (
     {
       const c = center();
       const r = 6 + rng.nextInt(3);
-      carveBlob(solid, w, h, c.x, c.y, r);
+      carveBlob(draft, w, h, c.x, c.y, r);
       hallCenters.push(c);
       const phase = rng.nextFloat01() * Math.PI * 2;
       for (let k = 0; k < 7; k++) {
@@ -339,7 +340,7 @@ const stampHalls = (
     // cobertura, ricochete e rota de perseguicao.
     {
       const c = center();
-      carveBlob(solid, w, h, c.x, c.y, 8 + rng.nextInt(2));
+      carveBlob(draft, w, h, c.x, c.y, 8 + rng.nextInt(2));
       hallCenters.push(c);
       const islands = 6 + rng.nextInt(4);
       for (let k = 0; k < islands; k++) {
@@ -354,8 +355,8 @@ const stampHalls = (
       const angle = rng.nextFloat01() * Math.PI * 2;
       const bx = Math.max(6, Math.min(w - 6, Math.round(a.x + Math.cos(angle) * 12)));
       const by = Math.max(6, Math.min(h - 6, Math.round(a.y + Math.sin(angle) * 12)));
-      carveBlob(solid, w, h, a.x, a.y, 4 + rng.nextInt(2));
-      carveBlob(solid, w, h, bx, by, 4 + rng.nextInt(2));
+      carveBlob(draft, w, h, a.x, a.y, 4 + rng.nextInt(2));
+      carveBlob(draft, w, h, bx, by, 4 + rng.nextInt(2));
       carveLine(a.x, a.y, Math.atan2(by - a.y, bx - a.x), 12, 0);
     }
   } else if (halls === 'radial') {
@@ -364,7 +365,7 @@ const stampHalls = (
     // cobertura, luz e municao do Ressonante ao mesmo tempo.
     const c = center();
     const radius = 7 + rng.nextInt(3);
-    carveBlob(solid, w, h, c.x, c.y, radius);
+    carveBlob(draft, w, h, c.x, c.y, radius);
     hallCenters.push(c);
     const spokes = 5;
     const phase = rng.nextFloat01() * Math.PI * 2;
@@ -384,13 +385,13 @@ const stampHalls = (
     {
       const g = center();
       const r = 4 + rng.nextInt(2);
-      carveBlob(solid, w, h, g.x, g.y, r);
+      carveBlob(draft, w, h, g.x, g.y, r);
       hallCenters.push(g);
       for (let y = Math.max(1, g.y - r - 1); y <= Math.min(h - 2, g.y + r + 1); y++) {
         for (let x = Math.max(1, g.x - r - 1); x <= Math.min(w - 2, g.x + r + 1); x++) {
           const d2 = (x - g.x) ** 2 + (y - g.y) ** 2;
           if (d2 > r * r && d2 <= (r + 1.6) * (r + 1.6) && solid[idx(w, x, y)] === SOLID_ROCK) {
-            solid[idx(w, x, y)] = SOLID_CRYSTAL;
+            draft.setSolid(idx(w, x, y), SOLID_CRYSTAL);
           }
         }
       }
@@ -404,8 +405,8 @@ const stampHalls = (
         const ox = rng.nextInt(6);
         const oy = rng.nextInt(5) - 2;
         const r = 1 + rng.nextInt(2);
-        carveBlob(solid, w, h, m.x - 2 - ox, m.y + oy, r);
-        carveBlob(solid, w, h, m.x + 2 + ox, m.y + oy, r);
+        carveBlob(draft, w, h, m.x - 2 - ox, m.y + oy, r);
+        carveBlob(draft, w, h, m.x + 2 + ox, m.y + oy, r);
       }
       let px = m.x;
       let py = m.y;
@@ -429,7 +430,7 @@ const stampHalls = (
     let cy = start.y;
     const chambers = 4 + rng.nextInt(2);
     for (let k = 0; k < chambers; k++) {
-      carveBlob(solid, w, h, cx, cy, 3 + rng.nextInt(3));
+      carveBlob(draft, w, h, cx, cy, 3 + rng.nextInt(3));
       hallCenters.push({ x: cx, y: cy });
       const jitter = (rng.nextFloat01() - 0.5) * 1.2;
       const nx = cx + Math.cos(angle + jitter) * 8;
@@ -515,7 +516,7 @@ const stampHalls = (
       carveLine(c.x, c.y + 4, 0, len, 1);
       for (let x = c.x; x < Math.min(w - 2, c.x + len); x++) {
         const i = idx(w, x, c.y + 2);
-        if (solid[i] === SOLID_ROCK) solid[i] = SOLID_FRAGILE;
+        if (solid[i] === SOLID_ROCK) draft.setSolid(i, SOLID_FRAGILE);
       }
     }
     // Sumidouros: pocos circulares com a BORDA fragil — a sala cuja parede
@@ -523,12 +524,12 @@ const stampHalls = (
     for (let s = 0; s < 3; s++) {
       const c = center();
       const r = 4 + rng.nextInt(3);
-      carveBlob(solid, w, h, c.x, c.y, r);
+      carveBlob(draft, w, h, c.x, c.y, r);
       for (let y = Math.max(1, c.y - r - 1); y <= Math.min(h - 2, c.y + r + 1); y++) {
         for (let x = Math.max(1, c.x - r - 1); x <= Math.min(w - 2, c.x + r + 1); x++) {
           const d2 = (x - c.x) ** 2 + (y - c.y) ** 2;
           if (d2 > r * r && d2 <= (r + 1.5) * (r + 1.5) && solid[idx(w, x, y)] === SOLID_ROCK) {
-            solid[idx(w, x, y)] = SOLID_FRAGILE;
+            draft.setSolid(idx(w, x, y), SOLID_FRAGILE);
           }
         }
       }
@@ -766,14 +767,17 @@ export const stampBossArena = (
  * `isOpen`), e por um acessor custariam caro sem comprar nada — leitura nao
  * invalida coisa nenhuma. So a ESCRITA passa pela barreira.
  *
- * A FRONTEIRA, dita explicitamente porque regra com excecao escondida foi
- * justamente o que custou caro: enquanto `entry` nao existe — ruido, automato,
- * gramatica de salao — nao ha o que derivar, e escrever direto no array e
- * legitimo (e `stampHalls` faz isso, com suas 12 chamadas a `carveBlob`). Do
- * momento em que a entrada e escolhida em diante, `derived()` e a unica porta
- * para chao alcancavel e distancia, e escrita que muda abertura passa por aqui.
+ * NAO HA FRONTEIRA. A primeira versao desta etapa isentava o que roda antes de
+ * `entry` existir — ruido, automato, gramatica de salao — com o argumento de
+ * que ali nao ha o que invalidar. E verdade, mas a isencao tornava a garantia
+ * dependente da ORDEM: bastaria alguem ler `derived()` mais cedo, ou um estrato
+ * com `halls: 'none'` (que nao carimba pedestal nem arena, e portanto nunca
+ * invalida depois), para o derivado voltar uma topologia vencida. Uma regra que
+ * so vale enquanto ninguem reordena nada nao e estrutural — e reordenar foi
+ * exatamente o que quebrou a arena. Entao TODA escrita em `solid` passa por
+ * aqui, inclusive as que hoje nao poderiam causar dano.
  *
- * Quem quiser conferir que a fronteira aguentou nao precisa auditar chamada por
+ * Quem quiser conferir que a barreira aguentou nao precisa auditar chamada por
  * chamada: `tests/terreno-derivado.test.ts` cobra o RESULTADO — o derivado que
  * a geracao entregou tem de bater com um flood e um BFS refeitos do zero sobre
  * o terreno final. Isso pega qualquer vazamento futuro, venha ele de onde vier.
@@ -851,7 +855,7 @@ const generateAttempt = (
   // 1) ruido inicial
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
-      if (rng.nextFloat01() > 0.44) solid[idx(w, x, y)] = SOLID_NONE;
+      if (rng.nextFloat01() > 0.44) draft.setSolid(idx(w, x, y), SOLID_NONE);
     }
   }
 
@@ -872,7 +876,7 @@ const generateAttempt = (
   // 2b) a estrutura de salao do estrato, sobre o labirinto do automato. Com
   // `halls: 'none'` (basalto) nada roda e nenhuma tirada de RNG e consumida —
   // o mapa historico continua byte a byte.
-  const hallFill = stampHalls(rng, solid, w, h, profile.halls);
+  const hallFill = stampHalls(rng, draft, w, h, profile.halls);
 
   // 3) entrada perto da borda superior-esquerda, nucleo no ponto mais distante
   let entry: Vec2 | null = null;
@@ -885,19 +889,19 @@ const generateAttempt = (
     }
   }
   if (!entry) return null;
-  carveBlob(solid, w, h, entry.x, entry.y, 3);
+  carveBlob(draft, w, h, entry.x, entry.y, 3);
 
   const open = floodOpen(solid, w, h, entry.x, entry.y);
   if (open.size < w * h * 0.28) return null;
 
   // celulas fora da regiao principal viram parede (evita bolsoes inalcancaveis enganosos)
   for (let i = 0; i < solid.length; i++) {
-    if (solid[i] === SOLID_NONE && !open.has(i)) solid[i] = SOLID_ROCK;
+    if (solid[i] === SOLID_NONE && !open.has(i)) draft.setSolid(i, SOLID_ROCK);
   }
 
   const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
   if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
-  carveBlob(solid, w, h, corePos.x, corePos.y, 4);
+  carveBlob(draft, w, h, corePos.x, corePos.y, 4);
   stampCorePedestal(draft, w, h, corePos, profile.halls);
 
   const isOpen = (x: number, y: number): boolean =>
@@ -977,9 +981,9 @@ const generateAttempt = (
       // parede fina (aberto dos dois lados) tem chance alta de ser fragil
       const thinH = isOpen(x - 1, y) && isOpen(x + 1, y);
       const thinV = isOpen(x, y - 1) && isOpen(x, y + 1);
-      if ((thinH || thinV) && roll < profile.fragileThinChance) solid[i] = SOLID_FRAGILE;
-      else if (roll < profile.oreChance) solid[i] = SOLID_ORE;
-      else if (roll < profile.oreChance + profile.crystalChance) solid[i] = SOLID_CRYSTAL;
+      if ((thinH || thinV) && roll < profile.fragileThinChance) draft.setSolid(i, SOLID_FRAGILE);
+      else if (roll < profile.oreChance) draft.setSolid(i, SOLID_ORE);
+      else if (roll < profile.oreChance + profile.crystalChance) draft.setSolid(i, SOLID_CRYSTAL);
     }
   }
 
@@ -1005,7 +1009,7 @@ const generateAttempt = (
       const y = Math.floor(fy);
       if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
       const i = idx(w, x, y);
-      if (solid[i] === SOLID_ROCK && !arenaKeeps(i)) solid[i] = SOLID_CRYSTAL;
+      if (solid[i] === SOLID_ROCK && !arenaKeeps(i)) draft.setSolid(i, SOLID_CRYSTAL);
     }
   }
 
@@ -1023,7 +1027,7 @@ const generateAttempt = (
       const x = x0 + dir * s;
       if (x <= 0 || x >= w - 1) break;
       const j = idx(w, x, y);
-      if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) solid[j] = SOLID_ORE;
+      if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) draft.setSolid(j, SOLID_ORE);
     }
   }
 
@@ -1039,7 +1043,7 @@ const generateAttempt = (
       for (let x = Math.max(1, kx - r); x <= Math.min(w - 2, kx + r); x++) {
         if ((x - kx) ** 2 + (y - ky) ** 2 > r * r) continue;
         const j = idx(w, x, y);
-        if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) solid[j] = SOLID_ORE;
+        if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) draft.setSolid(j, SOLID_ORE);
       }
     }
   }

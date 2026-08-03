@@ -68,8 +68,21 @@ const fingerprint = (world: GeneratedWorld): number => {
   // a moldura da arena invalidava: se um refactor as deixar diferentes, o
   // sintoma tem de ser ESTE teste, e nao um bicho emparedado tres etapas
   // depois.
-  h = mix(h, world.openCells.length);
+  //
+  // CADA CELULA, e nao o tamanho da lista. A primeira versao misturava so
+  // `.length`, e uma regressao que trocasse QUAIS celulas estao abertas sem
+  // mexer na contagem — um pilar que fecha uma e abre outra, exatamente o tipo
+  // de coisa que um refactor de ordem produz — passaria verde. A assinatura
+  // existe para provar byte-identidade; provar "mesma quantidade" nao serve.
+  for (const c of world.openCells) h = mix(h, c);
   for (const c of world.arenaCells) h = mix(h, c);
+  // Os centros de salao NAO sao so apresentacao: `client/decor.ts` ancora neles
+  // os landmarks monumentais e SORTEIA a Ruptura a Superficie. Mudar quais sao
+  // muda o que o jogador ve, entao entram no contrato como o resto.
+  for (const p of world.hallCenters) {
+    h = mix(h, p.x);
+    h = mix(h, p.y);
+  }
   return h >>> 0;
 };
 
@@ -93,7 +106,11 @@ describe('impressao digital da geracao', () => {
       }
     }
     // Assinatura da SIMULATION_VERSION 18 (a arena do chefe por estrato).
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(9076861);
+    //
+    // Conferida nos DOIS lados do refactor do gerador: `origin/main` (5126232,
+    // sem TerrainDraft) e esta branch produzem o mesmo numero. E o que sustenta
+    // "a geracao saiu byte a byte identica" — sem isso seria so afirmacao.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1444846605);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

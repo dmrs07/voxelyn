@@ -710,11 +710,15 @@ Duas decisões que valem registro:
   por geração (o autômato, `countWallNeighbors`, `isOpen`); por um acessor
   custariam caro sem comprar nada, porque leitura não invalida. Só a escrita
   passa pela barreira.
-- **A fronteira é explícita.** Enquanto `entry` não existe — ruído, autômato,
-  gramática de salão — não há o que derivar, e escrever direto no array é
-  legítimo (`stampHalls` faz isso, com suas 12 chamadas a `carveBlob`). Dizer
-  isso em voz alta importa: regra com exceção escondida foi exatamente o que
-  custou as seis rodadas.
+- **Não há fronteira.** A primeira versão isentava o que roda antes de `entry`
+  existir, com o argumento de que ali não há o que invalidar. É verdade — mas a
+  isenção tornava a garantia dependente da **ordem**: bastaria alguém ler
+  `derived()` mais cedo, ou um perfil com `halls: 'none'` (que não carimba
+  pedestal nem arena, e portanto nunca invalida depois), para o derivado
+  devolver topologia vencida. Uma regra que só vale enquanto ninguém reordena
+  nada não é estrutural, e reordenar foi exatamente o que quebrou a arena.
+  Toda escrita em `solid` passa pela barreira, inclusive as que hoje não
+  poderiam causar dano.
 
 **A garantia é cobrada pelo resultado, não pela disciplina.**
 `tests/terreno-derivado.test.ts` refaz o flood e o BFS do zero sobre o terreno
@@ -726,8 +730,16 @@ três defeitos precisaram de seis rodadas de revisão para aparecer.
 **A geração saiu byte a byte idêntica** — nenhum bump de `SIMULATION_VERSION`.
 Isso é verificado, não afirmado: `tests/impressao-digital-geracao.test.ts` fixa
 um hash FNV-1a de tudo o que a geração decide (terreno, superfície, entrada,
-poço, chefe, sites, respiradouros, spawns, trilhos, moldura) em 64 seeds × 3
-setores. Esse teste é o segundo produto da etapa, e vale sozinho: até aqui,
+poço, chefe, sites, respiradouros, spawns, trilhos, moldura, **cada célula**
+de `openCells` e os centros de salão) em 64 seeds × 3 setores, e o número foi
+conferido nos **dois lados** do refactor: `origin/main` e esta branch produzem
+`1444846605`.
+
+A primeira versão do hash tinha dois furos que valem registro, porque eram
+furos na própria prova: misturava só o *tamanho* de `openCells` — então uma
+regressão que trocasse **quais** células estão abertas sem mexer na contagem
+passaria verde — e omitia `hallCenters`, que não é apresentação: é onde
+`client/decor.ts` ancora os landmarks e **sorteia a Ruptura à Superfície**. Esse teste é o segundo produto da etapa, e vale sozinho: até aqui,
 mudar o worldgen e esquecer o bump só aparecia como fixture semeada quebrando
 em *outro pacote*, com sintoma que não aponta para a causa. Isso custou duas
 rodadas de investigação nesta série.
