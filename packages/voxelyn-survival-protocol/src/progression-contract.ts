@@ -165,9 +165,14 @@ export type LoreCategory =
 /**
  * Um documento desbloqueado, como o cliente o recebe.
  *
- * As chaves de texto viajam, e nao as frases: o painel resolve o idioma na hora
- * de desenhar. Um documento congelado em portugues no instante do desbloqueio
- * ficaria em portugues para sempre para quem trocasse de idioma depois.
+ * Aqui, ao contrario do resto do jogo, viaja a FRASE e nao a chave de i18n.
+ *
+ * O resto do cliente guarda chaves para poder trocar de idioma sem recarregar,
+ * e isso continua certo la. Aqui a troca vale o preco inverso: uma chave exige
+ * que o texto esteja no bundle, e um bundle com os 29 documentos e um bundle em
+ * que qualquer pessoa le o ultimo ato no primeiro dia. Com a frase vindo do
+ * servidor, "documento bloqueado" e uma afirmacao sobre bytes que o cliente
+ * nunca recebeu. Trocar de idioma refaz a busca do codex.
  */
 export type PublicLoreFragment = {
   id: LoreFragmentId;
@@ -178,10 +183,10 @@ export type PublicLoreFragment = {
   clearanceLevel: number;
   documentCode: string;
   chronologyIndex: number;
-  titleKey: string;
-  summaryKey: string;
-  bodyKey: string;
-  sourceKey: string;
+  title: string;
+  summary: string;
+  body: string;
+  source: string;
   relatedFragmentIds: LoreFragmentId[];
   redactionLevel: 0 | 1 | 2 | 3;
 };

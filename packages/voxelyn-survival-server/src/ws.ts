@@ -15,6 +15,9 @@ import { createTelemetry, type TelemetryStore } from './telemetry.js';
 import { createTelemetryHandler } from './telemetry-http.js';
 import { createDeathEchoStore, type DeathEchoStore } from './death-echoes.js';
 import { createDeathEchoHandler } from './death-echoes-http.js';
+import { createProgressionStore, type ProgressionStore } from './progression-store.js';
+import { createProgressionHandler } from './progression-http.js';
+import { resolveProgressionSecret } from './progression-auth.js';
 import { createVerificationBudget } from './http-util.js';
 
 export type WsServerHandle = {
@@ -25,6 +28,7 @@ export type WsServerHandle = {
   leaderboard: () => LeaderboardStore | null;
   telemetry: () => TelemetryStore | null;
   deathEchoes: () => DeathEchoStore | null;
+  progression: () => ProgressionStore | null;
   close: () => Promise<void>;
 };
 
@@ -38,6 +42,10 @@ export type WsOptions = ServerOptions & {
   trustedProxyHops?: number;
   /** Token de leitura do digest de telemetria. Ausente = leitura fechada. */
   telemetryToken?: string;
+  /** Segredo do HMAC das sessoes de progressao. Sem ele, sessao efemera + aviso. */
+  progressionSecret?: string;
+  /** Tetos por origem da rota de progressao. Ver `progression-http.ts`. */
+  progressionRateLimits?: { settlePerMinute?: number; readsPerMinute?: number };
 };
 
 /**
@@ -129,6 +137,9 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   let handleDeathEchoes:
     | ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>)
     | null = null;
+  let progressionStore: ProgressionStore | null = null;
+  let handleProgression: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
+    null;
 
   // A conexao com o banco e assincrona; o servidor NAO espera por ela para
   // aceitar jogo. Ate o store existir, as rotas de ranking respondem 503 e o
@@ -154,6 +165,24 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         allowedOrigins: opts.allowedOrigins,
         trustedProxyHops: opts.trustedProxyHops,
         budget: verificationBudget,
+      });
+    }),
+    createProgressionStore(databaseUrl, log).then((store) => {
+      progressionStore = store;
+      handleProgression = createProgressionHandler({
+        store,
+        log,
+        secret: resolveProgressionSecret(
+          opts.progressionSecret ?? process.env.PROGRESSION_SECRET,
+          log,
+        ),
+        allowedOrigins: opts.allowedOrigins,
+        trustedProxyHops: opts.trustedProxyHops,
+        // MESMO orcamento do ranking e do pool: os tres re-simulam contra o
+        // event loop que roda o tick autoritativo. Tres orcamentos de um
+        // significariam tres replays concorrentes.
+        budget: verificationBudget,
+        rateLimits: opts.progressionRateLimits,
       });
     }),
     createTelemetry(databaseUrl, log).then((store) => {
@@ -204,6 +233,24 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         if (!res.headersSent) {
           res.writeHead(500, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'erro interno' }));
+        }
+      });
+      return;
+    }
+    if (req.url?.startsWith('/api/progression')) {
+      // 503 como o ranking, e nao 204: o cliente TEM um caminho de retry sensato
+      // (a simulacao local, e uma nova tentativa depois) e precisa saber que a
+      // expedicao nao vai render nada agora.
+      if (!handleProgression) {
+        res.writeHead(503, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'busy', detail: 'progressao inicializando' }));
+        return;
+      }
+      void handleProgression(req, res).catch((err: unknown) => {
+        log({ ev: 'progression_error', error: err instanceof Error ? err.message : String(err) });
+        if (!res.headersSent) {
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'internal' }));
         }
       });
       return;
@@ -314,6 +361,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
             leaderboardStore?.close() ?? Promise.resolve(),
             telemetryStore?.close() ?? Promise.resolve(),
             deathEchoStore?.close() ?? Promise.resolve(),
+            progressionStore?.close() ?? Promise.resolve(),
           ]).then(() => resolve());
         }),
       );
@@ -326,6 +374,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     leaderboard: () => leaderboardStore,
     telemetry: () => telemetryStore,
     deathEchoes: () => deathEchoStore,
+    progression: () => progressionStore,
     close,
   };
 };
