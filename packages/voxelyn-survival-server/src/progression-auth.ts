@@ -7,7 +7,29 @@
 //
 //   profileId   128 bits de CSPRNG. Nao previsivel, nao enumeravel.
 //   token       profileId.expiracao.hmac, assinado com PROGRESSION_SECRET.
-//   transporte  cookie HttpOnly; Secure; SameSite=None em https (ver `cookieHeader`).
+//   transporte  cookie HttpOnly quando ele funciona, e `Authorization: Bearer`
+//               quando nao (ver abaixo).
+//
+// ---------------------------------------------------------------------------
+// POR QUE EXISTEM DOIS TRANSPORTES
+// ---------------------------------------------------------------------------
+// O cookie sozinho seria melhor: `HttpOnly` mantem o token fora do alcance de
+// qualquer JavaScript, inclusive do JavaScript injetado.
+//
+// So que no deploy real o cliente e a API sao SITES DIFERENTES, e ai o cookie e
+// de terceiros. `SameSite=None` autoriza o envio cross-site, mas nao contorna o
+// BLOQUEIO de cookies de terceiros — Safari bloqueia por padrao, e ali o cookie
+// simplesmente nao chega. O sintoma seria o pior possivel: toda expedicao virando
+// simulacao local sem recompensa, em silencio, num alvo de PWA declarado.
+//
+// Entao o mesmo token tambem viaja num header, e o cliente o guarda. O custo esta
+// declarado: um XSS no cliente consegue ler o token e assumir aquele perfil de
+// progressao. E um custo aceitavel aqui e nao seria em outro lugar — o que ele
+// protege e um saldo de jogo, nao dinheiro nem identidade —, e a alternativa era
+// a feature nao funcionar para uma parte dos jogadores.
+//
+// O cookie continua sendo tentado PRIMEIRO onde funciona: quem estiver em
+// mesma origem, ou com cookies de terceiros liberados, nunca expoe o token ao JS.
 //
 // O segredo nunca sai do servidor, e o cliente nunca ve nada alem de um opaco
 // que ele so pode devolver inteiro. Adulterar um byte muda o HMAC, e a
@@ -28,6 +50,37 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const SESSION_COOKIE = 'aurix_profile';
+const BEARER_PREFIX = 'Bearer ';
+
+/** Le um cookie do header bruto. Tolerante: valor ausente vira undefined. */
+export const readCookie = (header: string | undefined, name: string): string | undefined => {
+  if (!header) return undefined;
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() !== name) continue;
+    return part.slice(eq + 1).trim();
+  }
+  return undefined;
+};
+
+/**
+ * O token da requisicao: cookie primeiro, header depois.
+ *
+ * A ordem e a politica. Onde o cookie chega, ele e a credencial — e o token nunca
+ * precisou passar por JavaScript nenhum.
+ */
+export const readSessionToken = (
+  cookieHeader: string | undefined,
+  authorizationHeader: string | undefined,
+): string | undefined => {
+  const cookie = readCookie(cookieHeader, SESSION_COOKIE);
+  if (cookie) return cookie;
+  if (typeof authorizationHeader !== 'string') return undefined;
+  if (!authorizationHeader.startsWith(BEARER_PREFIX)) return undefined;
+  const token = authorizationHeader.slice(BEARER_PREFIX.length).trim();
+  return token.length > 0 ? token : undefined;
+};
 export const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 export type SessionAuth = {
@@ -118,16 +171,4 @@ export const createSessionAuth = (secret: string): SessionAuth => {
         .filter(Boolean)
         .join('; '),
   };
-};
-
-/** Le um cookie do header bruto. Tolerante: valor ausente vira undefined. */
-export const readCookie = (header: string | undefined, name: string): string | undefined => {
-  if (!header) return undefined;
-  for (const part of header.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq < 0) continue;
-    if (part.slice(0, eq).trim() !== name) continue;
-    return part.slice(eq + 1).trim();
-  }
-  return undefined;
 };

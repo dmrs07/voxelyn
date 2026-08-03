@@ -9,9 +9,14 @@
 // editavel nao consegue dar peso a decisao de extrair. Todo o desenho da feature
 // depende de perder a carga DOER.
 //
-// `credentials: 'include'` em todas as chamadas: a sessao e um cookie HttpOnly,
-// e sem isso o navegador nao o envia para outra origem — o jogo e servido de um
-// lugar e o servidor de outro.
+// `credentials: 'include'` em todas as chamadas: onde o cookie funciona, ele e a
+// credencial, e sem isso o navegador nao o envia para outra origem.
+//
+// Onde ele NAO funciona — cliente e API em sites diferentes e o navegador
+// bloqueando cookies de terceiros, que e o padrao do Safari — entra o token no
+// header `Authorization`. O custo esta declarado em `progression-auth.ts` no
+// servidor: guardado aqui, o token deixa de ser HttpOnly. O que se ganha e a
+// feature existir para esses jogadores em vez de virar simulacao local silenciosa.
 
 import type {
   CodexResponse,
@@ -28,6 +33,32 @@ export type ApiResult<T> =
 
 const httpBase = (serverUrl: string): string =>
   serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
+
+const TOKEN_KEY = 'voxelyn.progression.token';
+
+/**
+ * O token de sessao guardado localmente.
+ *
+ * So e USADO quando o cookie nao acompanha a requisicao — mas e enviado sempre,
+ * porque o cliente nao tem como saber se o cookie chegou: `document.cookie` nao
+ * enxerga um cookie HttpOnly, e o servidor prefere o cookie de qualquer forma.
+ */
+export const readSessionToken = (): string | null => {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeSessionToken = (token: string | null): void => {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* sem storage: sobra o cookie, que e o caminho preferido de qualquer jeito */
+  }
+};
 
 /**
  * Tetos de espera, por natureza da chamada.
@@ -51,6 +82,7 @@ const call = async <T>(
   timeoutMs = TIMEOUT_INTERACTIVE_MS,
 ): Promise<ApiResult<T>> => {
   try {
+    const token = readSessionToken();
     const res = await fetch(`${httpBase(serverUrl)}${path}`, {
       ...init,
       credentials: 'include',
@@ -58,7 +90,11 @@ const call = async <T>(
       // resultado ja e tratado como offline — o mesmo caminho de uma rede
       // ausente, que e exatamente o que uma conexao pendurada e na pratica.
       signal: AbortSignal.timeout(timeoutMs),
-      headers: init.body ? { 'content-type': 'application/json', ...init.headers } : init.headers,
+      headers: {
+        ...(init.body ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: ProgressionErrorCode };
@@ -73,10 +109,19 @@ const call = async <T>(
   }
 };
 
-export const openSession = (
+export const openSession = async (
   serverUrl: string,
-): Promise<ApiResult<{ profile: PublicProgressionProfile }>> =>
-  call(serverUrl, '/api/progression/session', { method: 'POST' });
+): Promise<ApiResult<{ profile: PublicProgressionProfile }>> => {
+  const result = await call<{ profile: PublicProgressionProfile; token?: string }>(
+    serverUrl,
+    '/api/progression/session',
+    { method: 'POST' },
+  );
+  // O token so vem quando a sessao NASCE. Confirmar uma sessao existente devolve
+  // so o perfil, e o que ja estava guardado continua valendo.
+  if (result.ok && result.value.token) writeSessionToken(result.value.token);
+  return result;
+};
 
 export const fetchProfile = (
   serverUrl: string,

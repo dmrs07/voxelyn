@@ -34,8 +34,22 @@ import {
   isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
-import type { AbilityId, ActiveModule, ModuleId, OccupationId, SemanticEvent, StratumId, SurvivalState } from '@voxelyn/survival-sim';
-import { ATLAS_SCALE, SpriteBank, SurfaceBank, TerrainBank, deriveAnim, type EntityAnimState,
+import type {
+  AbilityId,
+  ActiveModule,
+  ModuleId,
+  OccupationId,
+  SemanticEvent,
+  StratumId,
+  SurvivalState,
+} from '@voxelyn/survival-sim';
+import {
+  ATLAS_SCALE,
+  SpriteBank,
+  SurfaceBank,
+  TerrainBank,
+  deriveAnim,
+  type EntityAnimState,
   PropBank,
 } from './sprites';
 import { VoxelParticles, frameDeltaMs, hitMaterialOf } from './particles';
@@ -50,8 +64,14 @@ import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { abilityPresentation } from './ability-presentation';
-import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
+import {
+  moduleChoiceLayout,
+  rewardFlightPosition,
+  type Rect,
+  type SafeInsets,
+} from './module-layout';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
+import { RouteMemory, drawSurveyHud, drawSurveyWorld, hasSurvey } from './survey-overlay';
 import type { ProspectorGeneration } from '@voxelyn/survival-sim';
 import {
   describeCause,
@@ -244,7 +264,7 @@ const drawBiomeVeil = (
   ctx: CanvasRenderingContext2D,
   stratum: StratumId,
   vw: number,
-  vh: number
+  vh: number,
 ): void => {
   const veil = BIOME_VEIL[stratum];
   if (!veil) return;
@@ -269,9 +289,10 @@ export const moduleHudMetrics = (count: number, availableWidth: number): ModuleH
   if (normalizedCount === 1) return { size: Math.max(24, Math.min(30, availableWidth)), gap: 0 };
 
   const baseGap = 7;
-  const size = Math.max(24, Math.min(30, Math.floor(
-    (availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount
-  )));
+  const size = Math.max(
+    24,
+    Math.min(30, Math.floor((availableWidth - baseGap * (normalizedCount - 1)) / normalizedCount)),
+  );
   const remaining = Math.max(0, availableWidth - size * normalizedCount);
   const gap = Math.max(3, Math.min(baseGap, remaining / (normalizedCount - 1)));
   return { size, gap };
@@ -308,7 +329,16 @@ const PAL = {
  * ser voxels de verdade em VoxelParticles.ring.
  */
 export type Fx =
-  | { kind: 'ring'; x: number; y: number; r: number; maxR: number; color: string; life: number; maxLife: number }
+  | {
+      kind: 'ring';
+      x: number;
+      y: number;
+      r: number;
+      maxR: number;
+      color: string;
+      life: number;
+      maxLife: number;
+    }
   | {
       kind: 'text';
       x: number;
@@ -383,7 +413,7 @@ export const aimLanePath = (
   dirY: number,
   isSolid: (x: number, y: number) => boolean,
   bounces = 0,
-  maxLength = AIM_LANE_LENGTH
+  maxLength = AIM_LANE_LENGTH,
 ): AimLaneLeg[] => {
   const initial = Math.hypot(dirX, dirY);
   if (initial < 1e-6) return [];
@@ -415,7 +445,15 @@ export const aimLanePath = (
       travelled = d;
     }
 
-    legs.push({ x0: x, y0: y, x1: x + nx * travelled, y1: y + ny * travelled, nx, ny, length: travelled });
+    legs.push({
+      x0: x,
+      y0: y,
+      x1: x + nx * travelled,
+      y1: y + ny * travelled,
+      nx,
+      ny,
+      length: travelled,
+    });
     budget -= travelled;
     if (!blocked || left === 0 || budget <= AIM_LANE_STEP) break;
 
@@ -445,7 +483,7 @@ export const aimLaneReach = (
   dirX: number,
   dirY: number,
   isSolid: (x: number, y: number) => boolean,
-  maxLength = AIM_LANE_LENGTH
+  maxLength = AIM_LANE_LENGTH,
 ): number => {
   const [first] = aimLanePath(originX, originY, dirX, dirY, isSolid, 0, maxLength);
   return first?.length ?? 0;
@@ -477,7 +515,10 @@ export const GAS_ALPHA = 192 / 255;
 const CHARGE_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 
 /** Posicoes puras dos dois arcos de stun; mesma entidade/tick, mesma leitura em todo cliente. */
-export const stunIndicatorOffsets = (entityId: number, tick: number): readonly [number, number][] => {
+export const stunIndicatorOffsets = (
+  entityId: number,
+  tick: number,
+): readonly [number, number][] => {
   const phase = ((tick + entityId * 3) % 8) * (Math.PI / 4);
   return [
     [Math.cos(phase), Math.sin(phase) * 0.45],
@@ -486,7 +527,13 @@ export const stunIndicatorOffsets = (entityId: number, tick: number): readonly [
 };
 
 const drawStunIndicator = (
-  ctx: CanvasRenderingContext2D, sx: number, sy: number, size: number, z: number, entityId: number, tick: number
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  size: number,
+  z: number,
+  entityId: number,
+  tick: number,
 ): void => {
   const lift = size * 2.25 + 6 * z;
   for (const [ox, oy] of stunIndicatorOffsets(entityId, tick)) {
@@ -513,13 +560,13 @@ const drawLurkerDisturbance = (
   z: number,
   nowMs: number,
   entityId: number,
-  inWater: boolean
+  inWater: boolean,
 ): void => {
   const seed = (Math.imul(entityId, 2654435761) >>> 0) % 1000;
   if (inWater) {
     // Dois aneis defasados meio ciclo: sempre ha um visivel, nenhum pisca.
     for (const offset of [0, 0.5]) {
-      const phase = ((nowMs / 900 + seed / 1000 + offset) % 1 + 1) % 1;
+      const phase = (((nowMs / 900 + seed / 1000 + offset) % 1) + 1) % 1;
       const r = size * (0.5 + phase * 1.6);
       ctx.strokeStyle = `rgba(122,184,255,${(0.4 * (1 - phase)).toFixed(3)})`;
       ctx.lineWidth = Math.max(1, z);
@@ -558,7 +605,7 @@ const drawLurkerTrailPoint = (
   size: number,
   z: number,
   age: number,
-  inWater: boolean
+  inWater: boolean,
 ): void => {
   const fade = 1 - age;
   if (fade <= 0) return;
@@ -571,7 +618,8 @@ const drawLurkerTrailPoint = (
     ctx.stroke();
     return;
   }
-  const seed = (Math.imul(Math.round(sx * 3) + Math.imul(Math.round(sy * 3), 131), 2654435761) >>> 0) % 628;
+  const seed =
+    (Math.imul(Math.round(sx * 3) + Math.imul(Math.round(sy * 3), 131), 2654435761) >>> 0) % 628;
   ctx.strokeStyle = `rgba(123,139,163,${(0.42 * fade).toFixed(3)})`;
   ctx.lineWidth = Math.max(1, z * 0.8);
   for (let c = 0; c < 2; c++) {
@@ -598,7 +646,7 @@ const drawAllyVisor = (
   size: number,
   z: number,
   nowMs: number,
-  light: number
+  light: number,
 ): void => {
   const glow = allyVisorGlow(light);
   const cy = sy - size * 1.55;
@@ -612,7 +660,12 @@ const drawAllyVisor = (
   ctx.restore();
   ctx.fillStyle = PAL.biolum;
   const visor = Math.max(2, size * 0.34);
-  ctx.fillRect(Math.round(sx - visor / 2), Math.round(cy - visor / 2), visor, Math.max(2, visor * 0.6));
+  ctx.fillRect(
+    Math.round(sx - visor / 2),
+    Math.round(cy - visor / 2),
+    visor,
+    Math.max(2, visor * 0.6),
+  );
 };
 
 const drawModuleGlyph = (
@@ -621,7 +674,7 @@ const drawModuleGlyph = (
   cx: number,
   cy: number,
   size: number,
-  color: string
+  color: string,
 ): void => {
   const u = Math.max(1, Math.floor(size / 8));
   ctx.fillStyle = color;
@@ -646,7 +699,16 @@ const drawModuleGlyph = (
     ctx.fill();
   } else if (id === 'explosive') {
     ctx.fillRect(cx - 2 * u, cy - 2 * u, 4 * u, 4 * u);
-    for (const [dx, dy] of [[0,-5],[0,5],[-5,0],[5,0],[-4,-4],[4,-4],[-4,4],[4,4]]) {
+    for (const [dx, dy] of [
+      [0, -5],
+      [0, 5],
+      [-5, 0],
+      [5, 0],
+      [-4, -4],
+      [4, -4],
+      [-4, 4],
+      [4, 4],
+    ]) {
       ctx.fillRect(cx + dx * u - u / 2, cy + dy * u - u / 2, u, u);
     }
   } else if (id === 'siphon') {
@@ -710,7 +772,7 @@ const drawPurgeCellGlyph = (
   cx: number,
   cy: number,
   size: number,
-  color: string
+  color: string,
 ): void => {
   const u = Math.max(1, Math.floor(size / 8));
   ctx.fillStyle = 'rgba(11,14,20,0.92)';
@@ -728,7 +790,7 @@ const drawPurgeCellGlyph = (
 const wrapMeasuredText = (
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number
+  maxWidth: number,
 ): string[] => {
   const lines: string[] = [];
   let current = '';
@@ -768,8 +830,7 @@ export const allyBodyAlpha = (light: number): number => {
  * Cresce conforme a luz some: iluminado, o visor é um detalhe do sprite; no
  * breu, é a única marca do parceiro e precisa ser encontrável de longe.
  */
-export const allyVisorGlow = (light: number): number =>
-  1.6 - allyBodyAlpha(light) * 0.75;
+export const allyVisorGlow = (light: number): number => 1.6 - allyBodyAlpha(light) * 0.75;
 
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -850,6 +911,11 @@ export class SurvivalRenderer {
    * a geracao viajar no protocolo, e aqui que ela entra.
    */
   private localGeneration: ProspectorGeneration = 'G-00';
+  /** Salões já atravessados neste setor, para SV-04. */
+  private readonly route = new RouteMemory();
+  /** Quando o setor corrente começou, no relógio de quadro (SV-01). */
+  private sectorEnteredAtMs = 0;
+  private lastSector = 0;
   /**
    * Lascas em voo ate o contador.
    *
@@ -900,7 +966,14 @@ export class SurvivalRenderer {
     return nowMs >= this.choiceRevealAt;
   }
 
-  private animFor(id: number, x: number, y: number, hp: number, alive: boolean, nowMs: number): EntityAnimState {
+  private animFor(
+    id: number,
+    x: number,
+    y: number,
+    hp: number,
+    alive: boolean,
+    nowMs: number,
+  ): EntityAnimState {
     const next = deriveAnim(this.animStates.get(id), x, y, hp, alive, nowMs);
     this.animStates.set(id, next);
     return next;
@@ -949,7 +1022,14 @@ export class SurvivalRenderer {
     this.lurkerTrails.clear();
   }
 
-  private addFlash(x: number, y: number, r: number, power: number, nowMs: number, durationMs: number): void {
+  private addFlash(
+    x: number,
+    y: number,
+    r: number,
+    power: number,
+    nowMs: number,
+    durationMs: number,
+  ): void {
     addFlash(this.flashes, { x, y, r, power, startedMs: nowMs, durationMs });
   }
 
@@ -962,6 +1042,20 @@ export class SurvivalRenderer {
    */
   setCargoOre(total: number): void {
     this.cargoOre = total;
+  }
+
+  /**
+   * O relogio do setor, para o beacon de entrada.
+   *
+   * Detectado por MUDANCA de setor e nao por evento: `sector_entered` existe, mas
+   * quem reconecta no meio de um setor nunca o recebe — e o beacon de um setor
+   * que ja comecou nao deve disparar de novo. Comparar o numero cobre os dois.
+   */
+  private trackSector(state: SurvivalState, nowMs: number): void {
+    if (state.sector === this.lastSector) return;
+    this.lastSector = state.sector;
+    this.sectorEnteredAtMs = nowMs;
+    this.route.reset();
   }
 
   /** A geracao do chassi local. Puramente cosmetica: nao toca hitbox nem sim. */
@@ -1009,7 +1103,7 @@ export class SurvivalRenderer {
             ev.y,
             hitMaterialOf(this.archetypeById.get(ev.target)),
             ev.amount,
-            this.quality.maxFx / PRESETS.high.maxFx
+            this.quality.maxFx / PRESETS.high.maxFx,
           );
           // O numero abre em leque a partir do ponto do golpe. A fase vem do
           // relogio e do alvo, nao de um sorteio: dois acertos no mesmo tick no
@@ -1032,7 +1126,16 @@ export class SurvivalRenderer {
           if (ev.target === this.localPlayerId) this.shake = { power: 3, until: nowMs + 120 };
           break;
         case 'death':
-          this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.9, color: PAL.blood, life: 260, maxLife: 260 });
+          this.fxList.push({
+            kind: 'ring',
+            x: ev.x,
+            y: ev.y,
+            r: 0.1,
+            maxR: 0.9,
+            color: PAL.blood,
+            life: 260,
+            maxLife: 260,
+          });
           break;
         case 'pulse':
           this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200);
@@ -1064,8 +1167,14 @@ export class SurvivalRenderer {
           // duracao que a simulacao nao tem.
           for (const hop of ev.hops) {
             this.fxList.push({
-              kind: 'ring', x: hop.x, y: hop.y, r: 0.1, maxR: 0.8,
-              color: PAL.electric, life: 220, maxLife: 220,
+              kind: 'ring',
+              x: hop.x,
+              y: hop.y,
+              r: 0.1,
+              maxR: 0.8,
+              color: PAL.electric,
+              life: 220,
+              maxLife: 220,
             });
           }
           break;
@@ -1076,12 +1185,23 @@ export class SurvivalRenderer {
         case 'ability_taken':
           this.addFlash(ev.x, ev.y, 3, 0.9, nowMs, 320);
           this.messages.push({
-            text: t('toast.ability.assimilated', { ability: abilityPresentation(ev.ability).label }),
+            text: t('toast.ability.assimilated', {
+              ability: abilityPresentation(ev.ability).label,
+            }),
             until: nowMs + 2600,
           });
           break;
         case 'dodge':
-          this.fxList.push({ kind: 'ring', x: ev.x, y: ev.y, r: 0.1, maxR: 0.6, color: PAL.player, life: 180, maxLife: 180 });
+          this.fxList.push({
+            kind: 'ring',
+            x: ev.x,
+            y: ev.y,
+            r: 0.1,
+            maxR: 0.6,
+            color: PAL.player,
+            life: 180,
+            maxLife: 180,
+          });
           break;
         case 'pickup_core':
           this.messages.push({ text: t('toast.core.taken'), until: nowMs + 4200 });
@@ -1235,7 +1355,7 @@ export class SurvivalRenderer {
       lights.push({ x: f.x, y: f.y, r: f.r, power: flashPower(f, nowMs) });
     }
 
-    const range = Math.ceil((vw / z / TILE_W) + (vh / z / TILE_H)) + 4;
+    const range = Math.ceil(vw / z / TILE_W + vh / z / TILE_H) + 4;
     const px = Math.floor(player.x);
     const py = Math.floor(player.y);
     const x0 = Math.max(0, px - range);
@@ -1247,11 +1367,13 @@ export class SurvivalRenderer {
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           const i = y * w + x;
-          if (state.surface[i] === SURF_FIRE) lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
+          if (state.surface[i] === SURF_FIRE)
+            lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
           // Apenas o cristal VIVO ilumina. Opacado pelo acido ele continua na
           // tela com a mesma silhueta, mas o mapa escurece — que e exatamente a
           // perda que o jogador tem de sentir.
-          else if (state.solid[i] === SOLID_CRYSTAL) lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
+          else if (state.solid[i] === SOLID_CRYSTAL)
+            lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
         }
       }
       for (const c of state.charges) {
@@ -1388,7 +1510,10 @@ export class SurvivalRenderer {
         // O poco fala o dialeto do bioma (portal:<chave>), com o `descent`
         // generico segurando atlas antigos em cache; selado na subida.
         const objectiveChain = objectiveAtlasChain(
-          state.sector, state.coreTaken, state.stratum, state.occupation,
+          state.sector,
+          state.coreTaken,
+          state.stratum,
+          state.occupation,
         );
         items.push({
           depth: state.corePos.x + state.corePos.y,
@@ -1418,7 +1543,8 @@ export class SurvivalRenderer {
             }
 
             const pulse = 0.6 + 0.4 * Math.sin(nowMs * 0.006);
-            ctx.fillStyle = objectiveName === 'coreTaken' ? PAL.rockShadow : shade(PAL.biolum, pulse);
+            ctx.fillStyle =
+              objectiveName === 'coreTaken' ? PAL.rockShadow : shade(PAL.biolum, pulse);
             ctx.fillRect(csx - 4 * z, csy - 10 * z, 8 * z, 10 * z);
           },
         });
@@ -1428,7 +1554,10 @@ export class SurvivalRenderer {
         // Na subida com o Nucleo a entrada E o portal para o setor de cima:
         // desenhar a plataforma chapada aqui esconderia o unico caminho.
         const entryChain = entryAtlasChain(
-          state.sector, state.coreTaken, state.stratum, state.occupation,
+          state.sector,
+          state.coreTaken,
+          state.stratum,
+          state.occupation,
         );
         items.push({
           depth: state.entry.x + state.entry.y,
@@ -1567,15 +1696,21 @@ export class SurvivalRenderer {
         items.push({
           depth: site.terminal.x + site.terminal.y,
           draw: () => {
-            const prop = site.terminalState === 'scanning'
-              ? 'salvageTerminalScanning'
-              : site.terminalState === 'complete'
-                ? 'salvageTerminalComplete'
-                : 'salvageTerminalIdle';
+            const prop =
+              site.terminalState === 'scanning'
+                ? 'salvageTerminalScanning'
+                : site.terminalState === 'complete'
+                  ? 'salvageTerminalComplete'
+                  : 'salvageTerminalIdle';
             if (this.props.draw(ctx, prop, nowMs, tsx, tsy, z)) return;
             ctx.fillStyle = shade(PAL.rockLight, 0.45 + tb * 0.45);
             ctx.fillRect(tsx - 4 * z, tsy - 12 * z, 8 * z, 12 * z);
-            ctx.fillStyle = site.terminalState === 'scanning' ? PAL.loot : site.terminalState === 'complete' ? PAL.biolum : PAL.rock;
+            ctx.fillStyle =
+              site.terminalState === 'scanning'
+                ? PAL.loot
+                : site.terminalState === 'complete'
+                  ? PAL.biolum
+                  : PAL.rock;
             ctx.fillRect(tsx - 2 * z, tsy - 9 * z, 4 * z, 4 * z);
           },
         });
@@ -1677,7 +1812,9 @@ export class SurvivalRenderer {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
       // convencao do desenho de blocos), nao a do chao que nao existe ali.
       const db =
-        prop.anchor === 'landmark' ? brightness(prop.x, prop.y) : brightness(prop.x + 0.5, prop.y + 0.5);
+        prop.anchor === 'landmark'
+          ? brightness(prop.x, prop.y)
+          : brightness(prop.x + 0.5, prop.y + 0.5);
       if (db <= 0.05) continue;
       const [dsx, dsy] = toScreen(prop.x + 0.5, prop.y + 0.5);
       // Monumentos e formacoes de teto sobem varias alturas de parede; a
@@ -1780,7 +1917,16 @@ export class SurvivalRenderer {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
           if (lurkerHidden) {
-            drawLurkerDisturbance(ctx, sx, sy, size, z, nowMs, enemy.id, enemy.archetype === 'mud_lamprey');
+            drawLurkerDisturbance(
+              ctx,
+              sx,
+              sy,
+              size,
+              z,
+              nowMs,
+              enemy.id,
+              enemy.archetype === 'mud_lamprey',
+            );
             if (enemy.stunnedUntil > state.tick) {
               drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
             }
@@ -1806,7 +1952,7 @@ export class SurvivalRenderer {
               ? { color: 'rgba(217,59,76,0.45)', alpha: 0.45 }
               : enemy.elite
                 ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
-                : undefined
+                : undefined,
           );
           if (!drew) {
             drawVoxelEntity(ctx, {
@@ -1829,7 +1975,8 @@ export class SurvivalRenderer {
               // em dois parametros so duplicaria o `if` do outro lado.
               charged:
                 (enemy.archetype === 'bishop' &&
-                  state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] === SURF_FUNGAL) ||
+                  state.surface[Math.floor(enemy.y) * state.config.width + Math.floor(enemy.x)] ===
+                    SURF_FUNGAL) ||
                 (enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED),
             });
           }
@@ -1905,7 +2052,11 @@ export class SurvivalRenderer {
           // significa outra coisa.
           if (overheating) {
             this.particles.emitOverheatSmoke(
-              slot, pl.x, pl.y, nowMs, this.quality.maxFx / PRESETS.high.maxFx
+              slot,
+              pl.x,
+              pl.y,
+              nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx,
             );
           }
           // O jogador local NUNCA some: a camera esta nele, e um Prospector
@@ -1921,8 +2072,13 @@ export class SurvivalRenderer {
           const dashing = state.tick < ex.dodgeUntil;
           if (dashing) {
             this.particles.emitDashJets(
-              slot, pl.x, pl.y, ex.dodgeDir.x, ex.dodgeDir.y, nowMs,
-              this.quality.maxFx / PRESETS.high.maxFx
+              slot,
+              pl.x,
+              pl.y,
+              ex.dodgeDir.x,
+              ex.dodgeDir.y,
+              nowMs,
+              this.quality.maxFx / PRESETS.high.maxFx,
             );
           }
           if (bodyAlpha > 0) {
@@ -1953,7 +2109,7 @@ export class SurvivalRenderer {
                 psy,
                 spriteZoom,
                 // parceiro (nao-local) recebe leve tint frio para diferenciar
-                isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 }
+                isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 },
               );
               if (!drew) {
                 drawVoxelEntity(ctx, {
@@ -1984,6 +2140,25 @@ export class SurvivalRenderer {
                   presented.facingX,
                   nowMs,
                 );
+                // Levantamento: instrumentacao, e nao mapa. Sai depois do corpo
+                // porque as setas partem DELE, e so para o Prospector local — a
+                // arvore e de quem a comprou.
+                const nav = state.config.tuning.navigation;
+                if (hasSurvey(nav)) {
+                  if (nav.routeMemory) this.route.observe(state);
+                  drawSurveyWorld({
+                    ctx,
+                    state,
+                    nav,
+                    sx: psx,
+                    sy: psy,
+                    z,
+                    nowMs,
+                    sectorEnteredAtMs: this.sectorEnteredAtMs,
+                    route: this.route,
+                    toScreen,
+                  });
+                }
               }
             }
             ctx.restore();
@@ -2025,15 +2200,26 @@ export class SurvivalRenderer {
           const [tsx, tsy] = toScreen(tombstone.x, tombstone.y);
           const elapsed = nowMs - tombstone.startedMs;
           const drew = this.sprites.drawEntity(
-            ctx, tombstone.archetype, 'die', tombstone.facingX, tombstone.facingY,
-            elapsed, tsx, tsy, spriteZoom
+            ctx,
+            tombstone.archetype,
+            'die',
+            tombstone.facingX,
+            tombstone.facingY,
+            elapsed,
+            tsx,
+            tsy,
+            spriteZoom,
           );
           if (!drew) {
             drawVoxelEntity(ctx, {
-              sx: tsx, sy: tsy, z,
+              sx: tsx,
+              sy: tsy,
+              z,
               radius: tombstone.archetype === 'guardian' ? 0.68 : 0.34,
-              brightness: 0.7, archetype: tombstone.archetype,
-              elite: false, nowMs,
+              brightness: 0.7,
+              archetype: tombstone.archetype,
+              elite: false,
+              nowMs,
             });
           }
         },
@@ -2069,12 +2255,22 @@ export class SurvivalRenderer {
             const underCart =
               state.surface[Math.floor(proj.y) * state.config.width + Math.floor(proj.x)];
             const horizontal =
-              underCart === SURF_RAIL_V ? false :
-              underCart === SURF_RAIL ? true :
-              Math.abs(proj.vx) >= Math.abs(proj.vy);
+              underCart === SURF_RAIL_V
+                ? false
+                : underCart === SURF_RAIL
+                  ? true
+                  : Math.abs(proj.vx) >= Math.abs(proj.vy);
             const wob = Math.sin(nowMs / 45) * z * 0.5;
-            drawVoxel(ctx, csx - (horizontal ? 4 : 2) * z, csy + wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
-            drawVoxel(ctx, csx + (horizontal ? 4 : 2) * z, csy - wob * 0.4, 3 * z, ['#1d2430', '#0b0e14', '#0b0e14']);
+            drawVoxel(ctx, csx - (horizontal ? 4 : 2) * z, csy + wob * 0.4, 3 * z, [
+              '#1d2430',
+              '#0b0e14',
+              '#0b0e14',
+            ]);
+            drawVoxel(ctx, csx + (horizontal ? 4 : 2) * z, csy - wob * 0.4, 3 * z, [
+              '#1d2430',
+              '#0b0e14',
+              '#0b0e14',
+            ]);
             drawVoxel(ctx, csx, csy - 3 * z + wob, 9 * z, ['#6e4a33', '#3d2a22', '#1d2430']);
             drawVoxel(ctx, csx, csy - 6 * z + wob, 7 * z, ['#46566e', '#2e3a4d', '#1d2430']);
             return;
@@ -2096,7 +2292,11 @@ export class SurvivalRenderer {
         // A agua do Aquifero pinga como a poca: goteiras sao a assinatura
         // sonora e visual do estrato, e o efeito ja e deterministico por celula.
         const dripSurf = state.surface[i];
-        if (state.solid[i] !== SOLID_NONE || (dripSurf !== SURF_BIOFLUID && dripSurf !== SURF_WATER)) continue;
+        if (
+          state.solid[i] !== SOLID_NONE ||
+          (dripSurf !== SURF_BIOFLUID && dripSurf !== SURF_WATER)
+        )
+          continue;
         const seed = (Math.imul(x, 374761393) ^ Math.imul(y, 668265263)) >>> 0;
         if (seed % 5 !== 0) continue; // so parte das celulas pinga
         if (brightness(x, y) <= 0.05) continue;
@@ -2266,12 +2466,22 @@ export class SurvivalRenderer {
         // O numero segura opaco na primeira metade e so entao some. Desvanecer
         // desde o quadro zero — como fazia — gasta em transparencia justamente
         // o instante em que o jogador esta olhando para o golpe.
-        drawDamageNumber(ctx, fx.text, sx, sy - 16 * z - t * 12 * z, fx.color, fx.scale, damageAlpha(t), z);
+        drawDamageNumber(
+          ctx,
+          fx.text,
+          sx,
+          sy - 16 * z - t * 12 * z,
+          fx.color,
+          fx.scale,
+          damageAlpha(t),
+          z,
+        );
       }
     }
 
     this.renderRewardFlight(toScreen, nowMs);
     this.renderCargoFlights(toScreen, nowMs);
+    this.trackSector(state, nowMs);
     this.renderHud(state, input, nowMs, vw, vh);
     this.renderDeathEchoReadout(state, vw, vh);
   }
@@ -2295,7 +2505,7 @@ export class SurvivalRenderer {
     state: SurvivalState,
     player: SurvivalState['player'],
     toScreen: (x: number, y: number) => [number, number],
-    z: number
+    z: number,
   ): void {
     const ctx = this.ctx;
     const extra = state.playerExtras[player.slot ?? 0];
@@ -2367,7 +2577,10 @@ export class SurvivalRenderer {
     // quando o jogador quer mesmo saber se o inimigo esta dentro.
     ctx.save();
     ctx.fillStyle = PAL.biolum;
-    for (const [scale, alpha] of [[1, 0.22], [0.34, 0.4]] as const) {
+    for (const [scale, alpha] of [
+      [1, 0.22],
+      [0.34, 0.4],
+    ] as const) {
       let walked = 0;
       for (const leg of legs) {
         band(leg, walked, scale, alpha);
@@ -2433,7 +2646,7 @@ export class SurvivalRenderer {
     z: number,
     phase: number,
     seed: number,
-    enclosed: boolean
+    enclosed: boolean,
   ): void {
     // Ponto de impacto contido no miolo do losango: perto da borda o anel
     // teria de nascer ja cortado.
@@ -2465,7 +2678,10 @@ export class SurvivalRenderer {
     // Dois aneis concentricos defasados, achatados na proporcao do losango.
     ctx.strokeStyle = PAL.biolum;
     ctx.lineWidth = Math.max(1, z * 0.8);
-    for (const [delay, gain] of [[0, 0.55], [0.3, 0.35]] as const) {
+    for (const [delay, gain] of [
+      [0, 0.55],
+      [0.3, 0.35],
+    ] as const) {
       const tt = (t - delay) / (1 - delay);
       if (tt <= 0 || tt >= 1) continue;
       ctx.globalAlpha = (1 - tt) * gain;
@@ -2602,7 +2818,15 @@ export class SurvivalRenderer {
     ctx.save();
     ctx.globalAlpha = 0.5 + breath * 0.25;
     const drew = this.sprites.drawEntity(
-      ctx, 'prospector', 'idle', 0, 1, nowMs, sx, sy, spriteZoom,
+      ctx,
+      'prospector',
+      'idle',
+      0,
+      1,
+      nowMs,
+      sx,
+      sy,
+      spriteZoom,
       { color: presentation.color, alpha: 0.7 },
     );
     if (!drew) {
@@ -2709,7 +2933,12 @@ export class SurvivalRenderer {
       const [px, py] = toScreen(point.x, point.y);
       ctx.globalAlpha = 0.5;
       ctx.fillStyle = PAL.electric;
-      ctx.fillRect(Math.round(px - z), Math.round(py - 10 * z), Math.max(1, 2 * z), Math.max(1, 2 * z));
+      ctx.fillRect(
+        Math.round(px - z),
+        Math.round(py - 10 * z),
+        Math.max(1, 2 * z),
+        Math.max(1, 2 * z),
+      );
     }
 
     const current = decodeDeathEchoTracePoint(trace, head, link.echo.x, link.echo.y);
@@ -2722,8 +2951,18 @@ export class SurvivalRenderer {
     // é a transmissão de um corpo que já não está ali.
     ctx.globalAlpha = 0.34 + Math.sin(nowMs * 0.01) * 0.06;
     ctx.fillStyle = PAL.biolum;
-    ctx.fillRect(Math.round(hx - 3 * z), Math.round(hy - 16 * z), Math.max(2, 6 * z), Math.max(2, 16 * z));
-    ctx.fillRect(Math.round(hx - 4 * z), Math.round(hy - 21 * z), Math.max(2, 8 * z), Math.max(2, 5 * z));
+    ctx.fillRect(
+      Math.round(hx - 3 * z),
+      Math.round(hy - 16 * z),
+      Math.max(2, 6 * z),
+      Math.max(2, 16 * z),
+    );
+    ctx.fillRect(
+      Math.round(hx - 4 * z),
+      Math.round(hy - 21 * z),
+      Math.max(2, 8 * z),
+      Math.max(2, 5 * z),
+    );
 
     // Para onde ele estava mirando no instante que a reprodução alcançou.
     const aimLength = Math.hypot(current.aimX, current.aimY) || 1;
@@ -2807,9 +3046,7 @@ export class SurvivalRenderer {
     // A lição é o que a caixa-preta tem de melhor a oferecer, mas é também a
     // parte mais longa: numa viewport curta ela sai antes do resto, em vez de o
     // painel inteiro desaparecer.
-    const lessonLines = readout.lesson
-      ? wrapMeasuredText(ctx, readout.lesson, textWidth)
-      : [];
+    const lessonLines = readout.lesson ? wrapMeasuredText(ctx, readout.lesson, textWidth) : [];
     const aggregateLines = readout.aggregate
       ? wrapMeasuredText(ctx, readout.aggregate, textWidth)
       : [];
@@ -2821,9 +3058,10 @@ export class SurvivalRenderer {
     const withLesson = boxHeight + 6 + lessonLines.length * lessonHeight;
     const showLesson = lessonLines.length > 0 && withLesson <= region.maxHeight;
     const totalHeight = showLesson ? withLesson : boxHeight;
-    const x = region.align === 'right'
-      ? region.x + region.maxWidth - boxWidth
-      : region.x + (region.maxWidth - boxWidth) / 2;
+    const x =
+      region.align === 'right'
+        ? region.x + region.maxWidth - boxWidth
+        : region.x + (region.maxWidth - boxWidth) / 2;
     const y = region.y;
 
     ctx.save();
@@ -2853,9 +3091,7 @@ export class SurvivalRenderer {
     }
     ctx.fillStyle = PAL.player;
     ctx.font = `bold ${bodySize}px monospace`;
-    lines.forEach((line, index) =>
-      ctx.fillText(line, x + 12, bodyTop + index * lineHeight),
-    );
+    lines.forEach((line, index) => ctx.fillText(line, x + 12, bodyTop + index * lineHeight));
     if (showLesson) {
       ctx.fillStyle = PAL.bone;
       ctx.font = `${lessonSize}px monospace`;
@@ -2879,7 +3115,7 @@ export class SurvivalRenderer {
    */
   private renderCargoFlights(
     toScreen: (x: number, y: number) => [number, number],
-    nowMs: number
+    nowMs: number,
   ): void {
     if (this.cargoFlights.length === 0) return;
     const ctx = this.ctx;
@@ -2895,12 +3131,7 @@ export class SurvivalRenderer {
         flight.startScreen = { x, y };
       }
       const elapsed = nowMs - flight.startedAt;
-      const sample = rewardFlightPosition(
-        flight.startScreen,
-        target,
-        elapsed,
-        flight.durationMs
-      );
+      const sample = rewardFlightPosition(flight.startScreen, target, elapsed, flight.durationMs);
       if (sample.progress >= 1) {
         this.cargoPulseUntil = nowMs + 380;
         continue;
@@ -2934,7 +3165,7 @@ export class SurvivalRenderer {
 
   private renderRewardFlight(
     toScreen: (x: number, y: number) => [number, number],
-    nowMs: number
+    nowMs: number,
   ): void {
     const flight = this.rewardFlight;
     if (!flight || nowMs < flight.startedAt) return;
@@ -2947,7 +3178,7 @@ export class SurvivalRenderer {
       flight.startScreen,
       target,
       nowMs - flight.startedAt,
-      flight.durationMs
+      flight.durationMs,
     );
     if (sample.progress >= 1) {
       this.rewardFlight = null;
@@ -2963,7 +3194,13 @@ export class SurvivalRenderer {
     ctx.restore();
   }
 
-  private renderHud(state: SurvivalState, input: InputState, nowMs: number, vw: number, vh: number): void {
+  private renderHud(
+    state: SurvivalState,
+    input: InputState,
+    nowMs: number,
+    vw: number,
+    vh: number,
+  ): void {
     const ctx = this.ctx;
     const extra = state.playerExtra;
     const safeTop = this.safeArea.top + 10;
@@ -3043,7 +3280,7 @@ export class SurvivalRenderer {
     ctx.fillText(
       `${Math.max(0, Math.ceil(state.player.hp))} / ${Math.ceil(state.player.maxHp)}`,
       hpBarX + hpBarW - 5,
-      hpBarY + 11
+      hpBarY + 11,
     );
 
     // Calor permanece legivel, mas como trilho secundario dentro do mesmo painel.
@@ -3096,7 +3333,12 @@ export class SurvivalRenderer {
 
     if (hasModules) {
       this.renderModuleHud(
-        extra.activeModules, state.tick, nowMs, safeLeft + 12, moduleY, safeLeft + panelW
+        extra.activeModules,
+        state.tick,
+        nowMs,
+        safeLeft + 12,
+        moduleY,
+        safeLeft + panelW,
       );
     }
 
@@ -3122,6 +3364,14 @@ export class SurvivalRenderer {
     ctx.fillStyle = PAL.bone;
     ctx.font = '9px monospace';
     ctx.fillText(biomeLabel(state.stratum, state.occupation), safeLeft + 12, biomeY);
+
+    // Instrumentacao de Levantamento: mapa de saloes visitados e previsao de
+    // onda. Depois do bioma porque sao a leitura MAIS lenta do painel — quem
+    // consulta um mapa nao esta no meio de uma luta.
+    const nav = state.config.tuning.navigation;
+    if (nav.routeMemory || nav.contaminationForecast) {
+      drawSurveyHud(ctx, state, nav, this.route, safeLeft + 12, biomeY + 6, nowMs);
+    }
 
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 12px monospace';
@@ -3181,7 +3431,7 @@ export class SurvivalRenderer {
       const drawJoystick = (
         stick: InputState['joystick'] | InputState['aimTouch'],
         radius: number,
-        shooting: boolean
+        shooting: boolean,
       ): void => {
         const accent = shooting ? PAL.biolum : PAL.player;
         const activeAlpha = stick.active ? 0.76 : 0.42;
@@ -3212,7 +3462,7 @@ export class SurvivalRenderer {
         for (let i = 0; i < 4; i++) {
           ctx.save();
           ctx.translate(stick.originX, stick.originY);
-          ctx.rotate(i * Math.PI / 2);
+          ctx.rotate((i * Math.PI) / 2);
           ctx.beginPath();
           ctx.moveTo(0, -radius * 0.76);
           ctx.lineTo(-4, -radius * 0.66);
@@ -3297,7 +3547,7 @@ export class SurvivalRenderer {
     nowMs: number,
     x: number,
     y: number,
-    viewportWidth: number
+    viewportWidth: number,
   ): void {
     const ctx = this.ctx;
     const availableWidth = Math.max(0, viewportWidth - 12 - x);
@@ -3320,7 +3570,8 @@ export class SurvivalRenderer {
       let fraction = 1;
       let label = '';
       if (module.lifetime.kind === 'charges') {
-        fraction = module.lifetime.maximum > 0 ? module.lifetime.remaining / module.lifetime.maximum : 0;
+        fraction =
+          module.lifetime.maximum > 0 ? module.lifetime.remaining / module.lifetime.maximum : 0;
         label = String(module.lifetime.remaining);
       } else {
         const total = Math.max(1, module.lifetime.expiresAtTick - module.lifetime.acquiredAtTick);
@@ -3345,7 +3596,7 @@ export class SurvivalRenderer {
     state: SurvivalState,
     vw: number,
     vh: number,
-    input?: InputState
+    input?: InputState,
   ): Array<{ x: number; y: number; w: number; h: number }> {
     const pending = state.playerExtra.pendingModuleChoice;
     if (!pending) return [];

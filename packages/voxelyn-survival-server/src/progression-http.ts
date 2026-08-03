@@ -43,12 +43,7 @@ import {
 import { MAX_REPLAY_BYTES, resimulateRun } from './replay.js';
 import { publicProfile, tuningForProfile, type StoredProfile } from './progression.js';
 import type { ProgressionStore } from './progression-store.js';
-import {
-  createSessionAuth,
-  readCookie,
-  SESSION_COOKIE,
-  type SessionAuth,
-} from './progression-auth.js';
+import { createSessionAuth, readSessionToken, type SessionAuth } from './progression-auth.js';
 import {
   findLoreFragment,
   LORE_FRAGMENTS,
@@ -129,7 +124,9 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
       res.setHeader('vary', 'origin');
     }
     res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
-    res.setHeader('access-control-allow-headers', 'content-type');
+    // `authorization` na allowlist: sem ele o preflight recusa o header que
+    // carrega a sessao justamente nos navegadores em que o cookie nao chega.
+    res.setHeader('access-control-allow-headers', 'content-type, authorization');
   };
 
   const json = (res: ServerResponse, status: number, body: unknown): void => {
@@ -142,7 +139,13 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
 
   /** Resolve o perfil da requisicao. Nunca cria: sessao e um POST explicito. */
   const authenticate = async (req: IncomingMessage): Promise<StoredProfile | null> => {
-    const token = readCookie(req.headers.cookie, SESSION_COOKIE);
+    // Cookie primeiro, `Authorization: Bearer` depois — ver `progression-auth.ts`.
+    const token = readSessionToken(
+      req.headers.cookie,
+      Array.isArray(req.headers.authorization)
+        ? req.headers.authorization[0]
+        : req.headers.authorization,
+    );
     const profileId = auth.verify(token, nowMs());
     if (!profileId) return null;
     return opts.store.getProfile(profileId);
@@ -202,9 +205,13 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
       const profileId = auth.newProfileId();
       const profile = await opts.store.createProfile(profileId, new Date(nowMs()).toISOString());
       const secure = (req.headers['x-forwarded-proto'] ?? '').toString().startsWith('https');
-      res.setHeader('set-cookie', auth.cookieHeader(auth.issue(profileId, nowMs()), secure));
+      const token = auth.issue(profileId, nowMs());
+      res.setHeader('set-cookie', auth.cookieHeader(token, secure));
       opts.log({ ev: 'progression_session_created' });
-      json(res, 201, { profile: publicProfile(profile) });
+      // O token vai TAMBEM no corpo. Onde o cookie chegar, o cliente nem olha
+      // para ele; onde nao chegar — cookie de terceiros bloqueado —, e a unica
+      // credencial que existe. Ver o cabecalho de `progression-auth.ts`.
+      json(res, 201, { profile: publicProfile(profile), token });
       return true;
     }
 

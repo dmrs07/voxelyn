@@ -209,6 +209,70 @@ describe('sessao anonima', () => {
 // Ticket
 // ---------------------------------------------------------------------------
 
+describe('a sessao tambem viaja fora do cookie', () => {
+  // O cenario do Safari: cliente e API em sites diferentes, cookie de terceiros
+  // bloqueado. `SameSite=None` autoriza o envio e NAO contorna o bloqueio — sem
+  // um segundo transporte, toda expedicao virava simulacao local em silencio.
+  it('um cliente SEM cookie autentica pelo header Authorization', async () => {
+    const created = await fetch(`${base}/api/progression/session`, { method: 'POST' });
+    const body = (await created.json()) as { token?: string; profile: PublicProgressionProfile };
+    expect(body.token, 'a sessao nova precisa devolver o token').toBeTruthy();
+
+    // Nenhum cookie: exatamente o que o navegador bloqueado entrega.
+    const profile = await fetch(`${base}/api/progression/profile`, {
+      headers: { authorization: `Bearer ${body.token}` },
+    });
+    expect(profile.status).toBe(200);
+    const seen = (await profile.json()) as { profile: PublicProgressionProfile };
+    expect(seen.profile.profileId).toBe(body.profile.profileId);
+  });
+
+  it('o header tambem autoriza ticket e codex, e nao so a leitura de perfil', async () => {
+    const created = await fetch(`${base}/api/progression/session`, { method: 'POST' });
+    const { token } = (await created.json()) as { token: string };
+    const auth = { authorization: `Bearer ${token}` };
+
+    const ticket = await fetch(`${base}/api/progression/runs`, {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ seed: 5, mode: 'expedition' }),
+    });
+    expect(ticket.status).toBe(201);
+    expect((await fetch(`${base}/api/progression/codex`, { headers: auth })).status).toBe(200);
+  });
+
+  it('token adulterado no header e recusado como o cookie adulterado', async () => {
+    const res = await fetch(`${base}/api/progression/profile`, {
+      headers: { authorization: 'Bearer abc.99999999999999.assinaturafalsa' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('header sem o esquema Bearer nao autentica', async () => {
+    const created = await fetch(`${base}/api/progression/session`, { method: 'POST' });
+    const { token } = (await created.json()) as { token: string };
+    const res = await fetch(`${base}/api/progression/profile`, {
+      headers: { authorization: token },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  // O cookie continua sendo o caminho preferido: onde ele chega, o token nunca
+  // precisa passar por JavaScript nenhum.
+  it('com cookie E header, o cookie manda', async () => {
+    const a = new Client();
+    const first = await a.session();
+    const outro = await fetch(`${base}/api/progression/session`, { method: 'POST' });
+    const { token: outroToken } = (await outro.json()) as { token: string };
+
+    const res = await a.call('/api/progression/profile', {
+      headers: { authorization: `Bearer ${outroToken}` },
+    });
+    const seen = (await res.json()) as { profile: PublicProgressionProfile };
+    expect(seen.profile.profileId).toBe(first.profileId);
+  });
+});
+
 describe('emissao de ticket', () => {
   it('vincula perfil, seed, tuning e versoes', async () => {
     const client = new Client();
