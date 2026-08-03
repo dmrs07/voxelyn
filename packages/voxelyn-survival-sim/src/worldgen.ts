@@ -651,7 +651,12 @@ export const stampBossArena = (
   const filled = new Set<number>();
   if (halls === 'none') return filled;
 
+  // As DUAS camadas: o `canyon` levanta escombro E pinta brasa, entao desfazer
+  // so o solido deixaria a orla incandescente de pe — justo quando a prova
+  // decidiu que a moldura inteira nao podia existir. Meia moldura ja seria
+  // ilegivel; meia moldura que ainda QUEIMA e pior.
   const before = new Uint8Array(solid);
+  const beforeSurface = new Uint8Array(surface);
   const cheb = (dx: number, dy: number): number => Math.max(Math.abs(dx), Math.abs(dy));
   /** Longe do corpo do chefe e do pedestal: as duas coisas precisam de chao. */
   const free = (x: number, y: number): boolean =>
@@ -722,6 +727,7 @@ export const stampBossArena = (
   const reach = floodOpen(solid, w, h, entry.x, entry.y);
   if (!reach.has(idx(w, core.x, core.y)) || !reach.has(idx(w, boss.x, boss.y))) {
     solid.set(before);
+    surface.set(beforeSurface);
     return filled;
   }
   for (let i = 0; i < solid.length; i++) if (solid[i] !== before[i]) filled.add(i);

@@ -555,6 +555,11 @@ ela paga a própria: refaz o flood da entrada e, se isolou o poço ou o chefe,
 deliberado: meia moldura é um acento que ninguém sabe ler. Um acento de
 bioma nunca vale uma run impossível.
 
+O desfazer leva **as duas camadas**. O `canyon` é o único ramo que levanta
+escombro *e* pinta brasa, e restaurar só o sólido deixava a orla incandescente
+de pé — justo quando a prova decidiu que a moldura inteira não podia existir.
+Meia moldura já seria ilegível; meia moldura que ainda queima é pior.
+
 Nas 800 gerações medidas o desfazer nunca disparou (as câmaras que a geração
 abre são largas demais para um anel esparso de 8 células fechar). Uma rede de
 segurança que nunca é exercitada não é uma rede: `stampBossArena` é exportada

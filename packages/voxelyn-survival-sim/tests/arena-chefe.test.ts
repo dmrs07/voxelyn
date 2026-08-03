@@ -191,6 +191,38 @@ describe('arena do chefe por estrato', () => {
     const open = build(2);
     stampBossArena(open, new Uint8Array(W * H), W, H, boss, core, entry, 'radial');
     expect(open[choke], 'sem gargalo, o pilar tinha de ficar').toBe(SOLID_CRYSTAL);
+
+    // E o desfazer tem de levar a SUPERFICIE junto. O `canyon` e o unico ramo
+    // que faz as duas coisas — escombro nas diagonais e BRASA na orla — entao e
+    // o unico em que dava para desfazer o solido e deixar o hazard de pe.
+    // Aqui o gargalo passa pela diagonal (4,4), que e o que o canyon fecha.
+    const solidCanyon = new Uint8Array(W * H).fill(SOLID_ROCK);
+    const abre = (x: number, y: number): void => {
+      solidCanyon[y * W + x] = SOLID_NONE;
+    };
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) abre(boss.x + dx, boss.y + dy);
+    abre(boss.x + 4, boss.y + 3); // liga a camara ao gargalo pela ortogonal
+    abre(boss.x + 4, boss.y + 4); // O GARGALO: a diagonal que o canyon tapa
+    for (let x = boss.x + 4; x <= entry.x; x++) abre(x, boss.y + 4);
+    for (let y = boss.y; y <= boss.y + 4; y++) abre(entry.x, y);
+
+    const surfCanyon = new Uint8Array(W * H);
+    stampBossArena(solidCanyon, surfCanyon, W, H, boss, core, entry, 'canyon');
+    expect(
+      solidCanyon[(boss.y + 4) * W + boss.x + 4],
+      'o canyon tapou o gargalo e nao se desfez',
+    ).toBe(SOLID_NONE);
+    expect(
+      surfCanyon.some((s) => s === SURF_EMBER),
+      'a moldura sumiu mas a brasa dela ficou',
+    ).toBe(false);
+
+    // Controle do controle: num mapa sem gargalo o canyon PINTA mesmo — senao a
+    // assercao acima passaria por o ramo nunca ter pintado nada.
+    const largo = new Uint8Array(W * H);
+    const surfLargo = new Uint8Array(W * H);
+    stampBossArena(largo, surfLargo, W, H, boss, core, entry, 'canyon');
+    expect(surfLargo.some((s) => s === SURF_EMBER), 'o canyon nao pinta brasa?').toBe(true);
   });
 
   it('a moldura NAO importa materia de outro estrato', () => {
