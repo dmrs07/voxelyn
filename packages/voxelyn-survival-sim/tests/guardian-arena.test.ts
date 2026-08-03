@@ -169,6 +169,17 @@ describe('arena do guardiao', () => {
     state.player.x = cx + 0.5;
     state.player.y = cy + 0.5;
 
+    // Terceiro empilhamento: DOIS corpos na mesma celula do anel, com
+    // coordenadas diferentes (a sim nao aplica colisao entre entidades no
+    // movimento, entao isso acontece). Mandar os dois para o centro da casa de
+    // dentro os sobreporia perfeitamente — pior do que estavam.
+    const extras = state.enemies.filter((e) => e.alive).slice(3, 5);
+    expect(extras.length, 'setor sem bicho suficiente para o par').toBe(2);
+    extras[0].x = cx - R + 0.3;
+    extras[0].y = cy + 0.3;
+    extras[1].x = cx - R + 0.7;
+    extras[1].y = cy + 0.8;
+
     closeArena(state, cx, cy, R, GUARDIAN_ARENA_EXITS, []);
 
     const ocupacao = new Map<string, string[]>();

@@ -861,18 +861,30 @@ const generateAttempt = (
     openCells.length = keep;
   }
 
+  /**
+   * A moldura da arena escolheu o material dela; NENHUMA passada de decoracao
+   * re-sorteia esse material.
+   *
+   * A protecao e uniforme de proposito, e nao so na passada que hoje alcanca a
+   * moldura. Saber quais passadas podem toca-la exige cruzar estrato com
+   * `halls` — o Ferrifero carimba rocha e roda nos de minerio, o Prismatico
+   * carimba cristal e roda nervuras de cristal — e esse raciocinio quebra
+   * silenciosamente quando alguem acrescentar um estrato. Foi assim que os nos
+   * do passo 4d escaparam da primeira correcao, que so cobria o passo 4.
+   *
+   * O que esta em jogo: um pilar isolado e parede FINA nos dois eixos, o caso
+   * de MAIOR chance de virar fragil, e rocha e o unico material que nao cede a
+   * tiro nenhum. Na Fornalha da seed 7 os quatro escombros saiam [minerio,
+   * minerio, fragil, rocha] — tres dos quatro iam embora a tiro, e com eles a
+   * cobertura indestrutivel que a arena promete.
+   */
+  const arenaKeeps = (i: number): boolean => arenaFilled.has(i);
+
   // 4) decorar paredes adjacentes a areas abertas: minerio, rocha fragil, cristais
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = idx(w, x, y);
-      if (solid[i] !== SOLID_ROCK) continue;
-      // A moldura da arena escolheu o material dela de proposito, e um pilar
-      // isolado e parede FINA nos dois eixos — ou seja, o caso de maior chance
-      // de virar fragil. Na Fornalha da seed 7 os quatro escombros saiam
-      // [minerio, minerio, fragil, rocha]: a cobertura que a arena promete e
-      // indestrutivel, e rocha e o unico material que nao cede a tiro nenhum.
-      // Tres dos quatro pilares iam embora a tiro, e a promessa com eles.
-      if (arenaFilled.has(i)) continue;
+      if (solid[i] !== SOLID_ROCK || arenaKeeps(i)) continue;
       const touchesOpen = isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
       if (!touchesOpen) continue;
       const roll = rng.nextFloat01();
@@ -907,7 +919,7 @@ const generateAttempt = (
       const y = Math.floor(fy);
       if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) break;
       const i = idx(w, x, y);
-      if (solid[i] === SOLID_ROCK) solid[i] = SOLID_CRYSTAL;
+      if (solid[i] === SOLID_ROCK && !arenaKeeps(i)) solid[i] = SOLID_CRYSTAL;
     }
   }
 
@@ -925,7 +937,7 @@ const generateAttempt = (
       const x = x0 + dir * s;
       if (x <= 0 || x >= w - 1) break;
       const j = idx(w, x, y);
-      if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
+      if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) solid[j] = SOLID_ORE;
     }
   }
 
@@ -941,7 +953,7 @@ const generateAttempt = (
       for (let x = Math.max(1, kx - r); x <= Math.min(w - 2, kx + r); x++) {
         if ((x - kx) ** 2 + (y - ky) ** 2 > r * r) continue;
         const j = idx(w, x, y);
-        if (solid[j] === SOLID_ROCK) solid[j] = SOLID_ORE;
+        if (solid[j] === SOLID_ROCK && !arenaKeeps(j)) solid[j] = SOLID_ORE;
       }
     }
   }

@@ -577,10 +577,16 @@ export const closeArena = (
         // quem e empurrado PASSA A CONSTAR em `bodies`: o segundo ve o primeiro.
         if (state.solid[target] !== SOLID_NONE || objectives.has(target)) continue;
         if (bodies.has(target)) continue;
-        for (const e of here) {
-          e.x = tx + 0.5;
-          e.y = ty + 0.5;
-        }
+        // DOIS corpos na mesma celula do anel: o vao sobra. A simulacao nao
+        // aplica colisao entre entidades no movimento, entao dois bichos podem
+        // dividir uma celula com coordenadas diferentes — mandar os dois para o
+        // centro da casa de dentro os sobreporia PERFEITAMENTE, que e o
+        // empilhamento que este trecho existe para evitar. Espalha-los em
+        // subposicoes resolveria a sobreposicao e criaria outro problema (dois
+        // corpos onde o cerco conta um), e um vao a mais e mais barato.
+        if (here.length > 1) continue;
+        here[0].x = tx + 0.5;
+        here[0].y = ty + 0.5;
         bodies.delete(i);
         bodies.set(target, here);
       }

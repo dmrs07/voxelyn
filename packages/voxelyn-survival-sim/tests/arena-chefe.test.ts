@@ -253,8 +253,14 @@ describe('arena do chefe por estrato', () => {
       lungs: SOLID_FRAGILE,
       terraced: SOLID_FRAGILE,
     };
+    // A varredura tem de alcancar o FERRIFERO, que e onde a segunda passada de
+    // decoracao (os nos de minerio do passo 4d) morde: a primeira correcao so
+    // cobria o passo 4 e a seed 168 s2 continuava entregando um pilar de
+    // minerio. Saber quais passadas alcancam a moldura exige cruzar estrato com
+    // `halls`, e esse raciocinio quebra quando alguem acrescenta um estrato —
+    // por isso a protecao no codigo e uniforme e a amostra aqui e larga.
     let conferidos = 0;
-    for (let seed = 1; seed <= 60; seed++) {
+    for (let seed = 1; seed <= 200; seed++) {
       for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
         const biome = sectorBiome(seed, sector);
         const profile = biomeProfile(biome, sector);

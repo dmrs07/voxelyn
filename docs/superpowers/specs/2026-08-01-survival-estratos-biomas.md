@@ -596,6 +596,12 @@ mapa de corpos, então o segundo enxerga o primeiro. Sem isso o corpo pousava
 nas coordenadas *exatas* do ocupante: um inimigo escondido em cima do
 jogador, com o dano de contato dos dois no mesmo ponto.
 
+E há um terceiro: **dois corpos já na mesma célula do anel**. A simulação não
+aplica colisão entre entidades no movimento, então dois bichos dividem uma
+célula com coordenadas diferentes — mandar os dois para o centro da casa de
+dentro os sobreporia *perfeitamente*, que é exatamente o que o empurrão existe
+para evitar. Nesse caso o vão sobra.
+
 Nenhum dos dois é da arena por estrato: são anteriores a ela, e a mudança de
 terreno só re-sorteou qual seed os exibia. O primeiro era latente desde que a
 geração passou a carimbar terreno depois de montar `openCells`; o segundo,
@@ -632,6 +638,15 @@ rocha]`: como rocha é o único material que não cede a tiro nenhum, três dos
 quatro pilares iam embora a tiro e levavam junto a cobertura que a arena
 promete. As células do carimbo agora saem da decoração — o material da moldura
 é escolha do estrato, não sorteio.
+
+A proteção é **uniforme**, e não só na passada que hoje alcança a moldura. São
+quatro passadas que convertem rocha depois do carimbo (decoração pontual,
+nervuras de cristal, seams e nós de minério), e saber quais podem tocá-la exige
+cruzar estrato com `halls`: o Ferrífero carimba rocha *e* roda nós de minério,
+o Prismático carimba cristal *e* roda nervuras de cristal. Esse raciocínio
+quebra em silêncio quando alguém acrescenta um estrato — e quebrou na primeira
+tentativa, que só cobriu a decoração pontual e deixou os nós do Ferrífero
+comendo um pilar (seed 168, setor 2).
 
 `arenaCells` entra em `GeneratedWorld` por causa disso, e também para o teste
 conseguir distinguir um pilar da arena de uma rocha comum que por acaso caiu
