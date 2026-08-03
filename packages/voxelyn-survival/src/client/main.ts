@@ -370,6 +370,13 @@ const authorizeExpedition = async (seed: number): Promise<{ seed: number; tuning
   }
   const ticket = result.value.ticket;
   expedition = { runId: ticket.runId, seed: ticket.seed };
+  // O chassi que vai aparecer na tela e o da arvore que AUTORIZOU esta run.
+  // Derivado da contagem de protocolos do perfil em cache — o servidor ja
+  // devolveu a geracao no perfil, e o ticket carrega a versao que a produziu.
+  const cachedProfile = readCachedProfile()?.profile;
+  if (cachedProfile && cachedProfile.profileVersion === ticket.progressionProfileVersion) {
+    renderer.setProspectorGeneration(cachedProfile.generation);
+  }
   // O tuning vem do SERVIDOR, derivado do perfil autoritativo. O cliente nao o
   // calcula nem o corrige: ele executa a configuracao que foi autorizada.
   return { seed: ticket.seed, tuning: ticket.tuning };
@@ -1359,6 +1366,7 @@ const refreshProfile = async (): Promise<void> => {
   matrixView.profile = result.value.profile;
   matrixView.cached = false;
   writeCachedProfile(result.value.profile, Date.now());
+  renderer.setProspectorGeneration(result.value.profile.generation);
   drawMatrix();
 };
 

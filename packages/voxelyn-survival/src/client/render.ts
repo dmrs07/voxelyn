@@ -51,6 +51,8 @@ import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { abilityPresentation } from './ability-presentation';
 import { moduleChoiceLayout, rewardFlightPosition, type Rect, type SafeInsets } from './module-layout';
+import { drawGenerationMarks, marksFor } from './prospector-generation';
+import type { ProspectorGeneration } from '@voxelyn/survival-sim';
 import {
   describeCause,
   describeOutcome,
@@ -830,6 +832,17 @@ export class SurvivalRenderer {
    */
   private cargoOre = 0;
   /**
+   * A geracao do Prospector LOCAL, para os marcos visuais.
+   *
+   * Vem do perfil autoritativo, e nao da run: a run nao carrega a arvore, so o
+   * tuning derivado dela. Isso mantem o desenho ignorante de metaprogressao — ele
+   * recebe uma etiqueta e desenha.
+   *
+   * O parceiro do co-op continua em G-00 enquanto o modo for padronizado; quando
+   * a geracao viajar no protocolo, e aqui que ela entra.
+   */
+  private localGeneration: ProspectorGeneration = 'G-00';
+  /**
    * Lascas em voo ate o contador.
    *
    * Lista, e nao slot unico como o `rewardFlight` da Purga: minerar rende varias
@@ -941,6 +954,11 @@ export class SurvivalRenderer {
    */
   setCargoOre(total: number): void {
     this.cargoOre = total;
+  }
+
+  /** A geracao do chassi local. Puramente cosmetica: nao toca hitbox nem sim. */
+  setProspectorGeneration(generation: ProspectorGeneration): void {
+    this.localGeneration = generation;
   }
 
   ingestEvents(events: SemanticEvent[], nowMs: number): void {
@@ -1941,6 +1959,23 @@ export class SurvivalRenderer {
                   nowMs,
                   allyTint: !isLocal,
                 });
+              }
+              // Os marcos geracionais vao DEPOIS do corpo, por cima dele, e so
+              // no Prospector local: o parceiro do co-op e padronizado enquanto
+              // o modo for G-00, e desenhar a geracao de quem nao a tem seria
+              // mentir sobre o que aquela unidade pode fazer.
+              //
+              // Nada aqui toca `pl.radius` — a colisao e a mesma em G-00 e G-04.
+              if (isLocal) {
+                drawGenerationMarks(
+                  ctx,
+                  marksFor(this.localGeneration),
+                  psx,
+                  psy,
+                  z,
+                  presented.facingX,
+                  nowMs,
+                );
               }
             }
             ctx.restore();
