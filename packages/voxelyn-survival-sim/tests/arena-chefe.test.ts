@@ -24,9 +24,11 @@ import {
   SURF_WATER,
 } from '../src/constants';
 import { SOLID_ROCK } from '../src/constants';
+import { RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
 import { createRun } from '../src/run';
-import { floodOpen, stampBossArena } from '../src/worldgen';
-import { lineageOf } from '../src/strata';
+import { sectorSeed } from '../src/sectors';
+import { floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
+import { biomeProfile, lineageOf, sectorBiome } from '../src/strata';
 import type { SurvivalState } from '../src/types';
 
 const seedWithLineage = (lineage: string): number => {
@@ -127,20 +129,24 @@ describe('arena do chefe por estrato', () => {
     //
     // A varredura e ampla de proposito: o caso aparecia em 1 de 13 mil
     // posicoes, entao um punhado de seeds nao teria achado nada.
+    //
+    // O criterio e "dentro da PEDRA", e nao "alcancavel a pe". A primeira
+    // versao usava o flood da entrada e passava por sorte: bolsao fechado e
+    // feicao normal de caverna — a broca abre parede, entao um bicho atras de
+    // rocha e conteudo, nao defeito. Corpo DENTRO da parede e que e impossivel.
     let checked = 0;
     for (let seed = 1; seed <= 250; seed++) {
       for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
-        const reach = floodOpen(state.solid, w, state.config.height, state.entry.x, state.entry.y);
         for (const e of state.enemies) {
           const x = Math.floor(e.x);
           const y = Math.floor(e.y);
           checked++;
           expect(
-            reach.has(y * w + x),
+            state.solid[y * w + x],
             `seed ${seed} s${sector}: ${e.archetype} emparedado em ${x},${y}`,
-          ).toBe(true);
+          ).toBe(SOLID_NONE);
         }
       }
     }
@@ -223,6 +229,56 @@ describe('arena do chefe por estrato', () => {
     const surfLargo = new Uint8Array(W * H);
     stampBossArena(largo, surfLargo, W, H, boss, core, entry, 'canyon');
     expect(surfLargo.some((s) => s === SURF_EMBER), 'o canyon nao pinta brasa?').toBe(true);
+  });
+
+  it('a decoracao de parede NAO re-sorteia o material da moldura', () => {
+    // O passo 4 da geracao converte rocha adjacente a chao aberto em fragil,
+    // minerio ou cristal — e um pilar isolado e parede FINA nos dois eixos, o
+    // caso de MAIOR chance de virar fragil. Na Fornalha da seed 7 os quatro
+    // escombros saiam [minerio, minerio, fragil, rocha]: como rocha e o unico
+    // material que nao cede a tiro nenhum, tres dos quatro pilares iam embora a
+    // tiro e levavam junto a cobertura que a arena promete.
+    //
+    // Os ramos que carimbam ROCHA sao `columns` (basalto) e `canyon`
+    // (fornalha/ferrifero) — os unicos expostos, porque a decoracao so olha
+    // para SOLID_ROCK e nunca tocou nos pilares de cristal nem nos frageis.
+    // A distincao importa: uma rocha COMUM que por acaso caiu na diagonal do
+    // anel virar minerio e o comportamento normal da caverna, e cobrar isso da
+    // moldura seria cobrar um pilar que nunca foi dela. So `arenaCells` — o que
+    // o carimbo de fato escreveu — esta sob julgamento aqui.
+    const esperado: Record<string, number> = {
+      columns: SOLID_ROCK,
+      canyon: SOLID_ROCK,
+      radial: SOLID_CRYSTAL,
+      lungs: SOLID_FRAGILE,
+      terraced: SOLID_FRAGILE,
+    };
+    let conferidos = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+        const biome = sectorBiome(seed, sector);
+        const profile = biomeProfile(biome, sector);
+        const alvo = esperado[profile.halls];
+        if (alvo === undefined) continue; // karst e lakes so pintam chao
+        // Mesma derivacao de createRun, para olhar o MESMO mundo que a run ve.
+        const world = generateWorld(
+          sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
+          WORLD_W,
+          WORLD_H,
+          profile,
+        );
+        for (const cell of world.arenaCells) {
+          conferidos++;
+          expect(
+            world.solid[cell],
+            `seed ${seed} s${sector} (${profile.halls}): moldura em ` +
+              `${cell % WORLD_W},${Math.floor(cell / WORLD_W)} virou ${world.solid[cell]}`,
+          ).toBe(alvo);
+        }
+      }
+    }
+    expect(conferidos, 'nenhuma celula de moldura na amostra: o teste nao mede nada')
+      .toBeGreaterThan(50);
   });
 
   it('a moldura NAO importa materia de outro estrato', () => {

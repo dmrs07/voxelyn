@@ -136,6 +136,16 @@ export type GeneratedWorld = {
   ventPositions: Vec2[];
   enemySpawns: Vec2[];
   openCells: number[];
+  /**
+   * Celulas que a MOLDURA da arena do chefe transformou em parede (vazio
+   * quando o carimbo se desfez ou quando o estrato nao carimba sólido).
+   *
+   * A simulacao nao le isto — existe para a geracao proteger essas celulas da
+   * decoracao de parede e para o teste conseguir distinguir um pilar da arena
+   * de uma rocha comum que por acaso caiu na mesma diagonal. Sem a distincao o
+   * teste cobraria da moldura um minerio que nunca foi dela.
+   */
+  arenaCells: number[];
   /** Tramos de trilho da armadilha de carrinho (origem, direcao, tamanho). */
   railTracks: Array<{ x: number; y: number; dx: number; dy: number; len: number }>;
   /**
@@ -856,6 +866,13 @@ const generateAttempt = (
     for (let x = 1; x < w - 1; x++) {
       const i = idx(w, x, y);
       if (solid[i] !== SOLID_ROCK) continue;
+      // A moldura da arena escolheu o material dela de proposito, e um pilar
+      // isolado e parede FINA nos dois eixos — ou seja, o caso de maior chance
+      // de virar fragil. Na Fornalha da seed 7 os quatro escombros saiam
+      // [minerio, minerio, fragil, rocha]: a cobertura que a arena promete e
+      // indestrutivel, e rocha e o unico material que nao cede a tiro nenhum.
+      // Tres dos quatro pilares iam embora a tiro, e a promessa com eles.
+      if (arenaFilled.has(i)) continue;
       const touchesOpen = isOpen(x - 1, y) || isOpen(x + 1, y) || isOpen(x, y - 1) || isOpen(x, y + 1);
       if (!touchesOpen) continue;
       const roll = rng.nextFloat01();
@@ -1118,6 +1135,7 @@ const generateAttempt = (
     ventPositions,
     enemySpawns,
     openCells,
+    arenaCells: [...arenaFilled],
     railTracks,
     hallCenters: hallFill.hallCenters,
   };

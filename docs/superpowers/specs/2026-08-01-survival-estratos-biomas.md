@@ -601,6 +601,43 @@ terreno só re-sorteou qual seed os exibia. O primeiro era latente desde que a
 geração passou a carimbar terreno depois de montar `openCells`; o segundo,
 desde que o cerco existe.
 
+### Fixtures que fingiam medir
+
+Mudar terreno semeado expôs uma família de testes que dependia da sorte do
+mapa sem dizer. Todos foram reescritos para **procurar** a condição em vez de
+fixá-la, ou para abrir o próprio espaço:
+
+- **Morte ociosa** (`death-echoes`) e **extração do bot** (`leaderboard-http`)
+  fixavam uma seed em que a condição acontecia. Já tinham sido re-semeados à
+  mão antes, e o sintoma era sempre enganoso — `fixture nao morreu` parece
+  defeito da morte, e a falha da extração aparecia numa asserção de
+  `duplicate`, como se o servidor tivesse duplicado a entrada. Agora procuram.
+- **Prensa do Coveiro em ângulo oblíquo**: o alvo a 60° e 90° nascia *fora* da
+  faixa que o helper limpava, então o que segurava o arrasto era o terreno que
+  a seed calhou de gerar. Agora o teste abre a própria caixa.
+- **Aposentadoria de slot** (três testes de servidor): atravessam 45 s de
+  graça com os avatares parados — comida de espreitador. Quando a run morria
+  no meio, o servidor parava de processar a aposentadoria e o teste falhava
+  por outro motivo. Agora a sala é esvaziada de fauna antes da espera.
+- **"Ninguém nasce dentro da moldura"**: usava alcançabilidade a pé, e passava
+  por sorte. Bolsão fechado é feição normal de caverna — a broca abre parede,
+  então bicho atrás de rocha é conteúdo, não defeito. O critério certo é estar
+  *dentro da pedra*, que é o que de fato é impossível.
+
+**A decoração não re-sorteia a moldura.** O passo 4 da geração converte rocha
+adjacente a chão aberto em frágil, minério ou cristal — e um pilar isolado é
+parede *fina nos dois eixos*, o caso de maior chance de virar frágil. Na
+Fornalha da seed 7 os quatro escombros saíam `[minério, minério, frágil,
+rocha]`: como rocha é o único material que não cede a tiro nenhum, três dos
+quatro pilares iam embora a tiro e levavam junto a cobertura que a arena
+promete. As células do carimbo agora saem da decoração — o material da moldura
+é escolha do estrato, não sorteio.
+
+`arenaCells` entra em `GeneratedWorld` por causa disso, e também para o teste
+conseguir distinguir um pilar da arena de uma rocha comum que por acaso caiu
+na mesma diagonal. Sem a distinção o teste cobraria da moldura um minério que
+nunca foi dela — foi o que a primeira versão dele fez.
+
 **Fica pendente, e não é destes:** na seed 71 um perseguidor *invocado* nasce
 dentro da coluna de borda do mapa — o invocar do Guardião não confere solidez
 ao posicionar. É de outro sistema e merece correção própria.

@@ -431,6 +431,18 @@ describe('Coveiro', () => {
       const state = arena(21);
       state.enemies = [];
       const undertaker = spawnEnemy(state, 'undertaker', 32, 25, false);
+      // O `arena()` limpa uma FAIXA (y 20..30), e nos rumos obliquos o alvo
+      // cai fora dela: a 60 graus ele nasce em y~30,6 e a 90 em y~31,5. O que
+      // segurava o arrasto ali era o terreno que a seed calhou de gerar, ou
+      // seja, o teste estava medindo a sorte do mapa junto com a prensa.
+      // Aqui ele abre a propria caixa, com folga de um passo alem do alcance.
+      const margem = Math.ceil(UNDERTAKER_PULL_RANGE) + 2;
+      for (let y = 25 - margem; y <= 25 + margem; y++) {
+        for (let x = 32 - margem; x <= 32 + margem; x++) {
+          state.solid[at(state, x, y)] = SOLID_NONE;
+          state.surface[at(state, x, y)] = SURF_NONE;
+        }
+      }
       const a = (deg * Math.PI) / 180;
       state.player.x = undertaker.x + Math.cos(a) * UNDERTAKER_PULL_RANGE;
       state.player.y = undertaker.y + Math.sin(a) * UNDERTAKER_PULL_RANGE;

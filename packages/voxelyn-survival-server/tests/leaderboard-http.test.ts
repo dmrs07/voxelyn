@@ -58,7 +58,22 @@ const playRun = (seed: number) => {
     log.push(cmd);
     stepRun(state, [cmd]);
   }
-  return { state, base64: toBase64(encodeCommandLog(log)) };
+  return { seed, state, base64: toBase64(encodeCommandLog(log)) };
+};
+
+/**
+ * A primeira seed em que o bot senoidal EXTRAI.
+ *
+ * Extrair depende do entorno da entrada, e toda mudanca de geracao re-sorteia
+ * isso — uma seed fixa aqui e um fixture que quebra sozinho a cada worldgen, e
+ * pior: quebra numa assercao (`duplicate`) que nao tem nada a ver com a causa.
+ */
+const firstExtraction = (): ReturnType<typeof playRun> => {
+  for (let seed = 1; seed <= 200; seed++) {
+    const played = playRun(seed);
+    if (played.state.phase === 'extracted') return played;
+  }
+  throw new Error('nenhuma seed em que o bot extrai: a extracao ficou impossivel?');
 };
 
 const postTo = (target: string, body: unknown): Promise<Response> =>
@@ -114,14 +129,18 @@ describe('rate limit de replay', () => {
 
 describe('POST /leaderboard', () => {
   it('verifica uma run real e devolve o sumario que o servidor derivou', async () => {
-    // Seed escolhida porque o bot senoidal EXTRAI nela sob a geracao atual —
-    // `duplicate: false` exige elegibilidade, e elegivel e so quem extraiu. A
-    // seed anterior (4242) extraia no mapa antigo; a gramatica basaltica mudou
-    // o entorno da entrada e o bot passou a morrer la.
-    const played = playRun(1);
-    expect(played.state.phase).not.toBe('running');
+    // PROCURA a seed em vez de fixar uma. `duplicate: false` exige
+    // elegibilidade, e elegivel e so quem EXTRAIU — e se o bot senoidal
+    // consegue extrair depende do entorno da entrada, que toda mudanca de
+    // geracao re-sorteia. Ja tinha sido re-escolhida a mao duas vezes (4242 ->
+    // 1 -> ...), sempre com o mesmo sintoma enganoso: o teste falhava na
+    // assercao de `duplicate`, como se o servidor tivesse duplicado a entrada,
+    // quando o que houve foi o bot morrer no caminho. Qual seed o bot vence
+    // nao importa; o que o teste mede e o servidor DERIVAR estrelas e tempo.
+    const played = firstExtraction();
+    expect(played.state.phase).toBe('extracted');
 
-    const res = await post({ seed: 1, log: played.base64, name: 'Dani' });
+    const res = await post({ seed: played.seed, log: played.base64, name: 'Dani' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { summary: { stars: number; ticks: number }; duplicate: boolean };
 
