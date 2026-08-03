@@ -308,7 +308,12 @@ describe('arena do chefe por estrato', () => {
     }
     expect(conferidos, 'nenhuma celula de moldura na amostra: o teste nao mede nada')
       .toBeGreaterThan(50);
-  });
+    // Timeout proprio, como os outros dois varredores deste arquivo. Sem ele a
+    // varredura de 200 seeds rodava em ~4,3 s aqui — passando por pouco do
+    // padrao de 5 s do vitest — e ESTOURAVA no CI, que e mais lento. Amostra
+    // larga precisa de orcamento explicito; encostar no limite e o mesmo que
+    // deixar o teste depender da maquina.
+  }, 60_000);
 
   it('o mundo que a moldura deixa e o mundo que a geracao MEDE', () => {
     // O pedestal do poco e carimbado ANTES do re-flood e do BFS, entao toda
