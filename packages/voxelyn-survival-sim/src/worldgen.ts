@@ -630,6 +630,13 @@ const stampCorePedestal = (
  * Exportada para o teste: nas seeds reais o desfazer nunca dispara (as camaras
  * que a geracao abre sao largas demais para um anel esparso fechar), entao a
  * unica maneira de provar que a rede de seguranca funciona e arma-la a mao.
+ *
+ * DEVOLVE as celulas que deixaram de ser chao (vazio quando o carimbo se
+ * desfez). Quem chama TEM de tira-las de `openCells`: aquela lista e montada
+ * antes daqui e nenhum consumidor dela reconfere `solid`, entao uma celula
+ * virada pilar continuaria candidata a spawn — e um bicho nasceria DENTRO da
+ * parede, invisivel e inalcancavel. Foi exatamente o que aconteceu na primeira
+ * versao (seed 205, setor 3: um cuspidor emparedado num pilar de cristal).
  */
 export const stampBossArena = (
   solid: Uint8Array,
@@ -640,8 +647,9 @@ export const stampBossArena = (
   core: Vec2,
   entry: Vec2,
   halls: WorldgenProfile['halls'],
-): void => {
-  if (halls === 'none') return;
+): Set<number> => {
+  const filled = new Set<number>();
+  if (halls === 'none') return filled;
 
   const before = new Uint8Array(solid);
   const cheb = (dx: number, dy: number): number => Math.max(Math.abs(dx), Math.abs(dy));
@@ -714,7 +722,10 @@ export const stampBossArena = (
   const reach = floodOpen(solid, w, h, entry.x, entry.y);
   if (!reach.has(idx(w, core.x, core.y)) || !reach.has(idx(w, boss.x, boss.y))) {
     solid.set(before);
+    return filled;
   }
+  for (let i = 0; i < solid.length; i++) if (solid[i] !== before[i]) filled.add(i);
+  return filled;
 };
 
 const generateAttempt = (
@@ -823,7 +834,16 @@ const generateAttempt = (
   // A camara do chefe ganha o sotaque do estrato. Depois do ponto do chefe
   // existir (ele depende do terreno) e antes da decoracao de parede, que so
   // olha para rocha comum e portanto respeita o que a arena carimbou.
-  stampBossArena(solid, surface, w, h, guardianSpawn, corePos, entry, profile.halls);
+  const arenaFilled = stampBossArena(solid, surface, w, h, guardianSpawn, corePos, entry, profile.halls);
+  // `openCells` foi montado la em cima e NINGUEM que o consome reconfere
+  // `solid` — pickOpenFar, os sites e os trilhos sorteiam direto dele. Sem esta
+  // poda, uma celula que virou pilar continuaria candidata e um bicho nasceria
+  // emparedado: invisivel, inalcancavel, e ainda contando no orcamento do setor.
+  if (arenaFilled.size > 0) {
+    let keep = 0;
+    for (const cell of openCells) if (!arenaFilled.has(cell)) openCells[keep++] = cell;
+    openCells.length = keep;
+  }
 
   // 4) decorar paredes adjacentes a areas abertas: minerio, rocha fragil, cristais
   for (let y = 1; y < h - 1; y++) {

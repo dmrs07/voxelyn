@@ -563,6 +563,35 @@ faixa que passa exatamente pela célula de eixo do anel — mais o controle de
 duas faixas, em que o pilar fica. Sem o par, um carimbo que não escrevesse
 nada passaria no primeiro teste sem fazer nada.
 
+### Dois defeitos que a moldura desenterrou
+
+**Bicho emparedado no spawn.** `openCells` é montado no começo da geração e
+nenhum consumidor dele reconfere `solid` — `pickOpenFar`, os sites e os
+trilhos sorteiam direto da lista. Como a arena carimba *depois*, as células
+que viraram pilar continuavam candidatas a spawn: na seed 205, setor 3, um
+cuspidor nascia dentro de um pilar de cristal — invisível, inalcançável, e
+ainda ocupando uma vaga do orçamento do setor. O carimbo agora **devolve** as
+células que consumiu e a lista é podada. O caso aparecia em 1 de 13 mil
+posições, então o teste varre 500 mundos: um punhado de seeds não acharia.
+
+**Porta franca no cerco do Guardião.** `closeArena` nunca emparedou ninguém —
+mas *pular* a célula ocupada deixava um vão **aberto e permanente**: o corpo
+saía de cima dela e sobrava uma saída que nem custa tiro, ao contrário das
+frágeis. O cerco é a promessa da segunda fase, e uma porta de graça a
+desmancha. Agora o corpo é **empurrado uma casa para dentro** (onde a luta é)
+e a parede fecha atrás dele; só quando nem isso dá certo é que o vão sobra,
+porque emparedar alguém é pior do que um cerco furado. Poço e entrada
+continuam podendo furar o anel — são os objetivos da run.
+
+Nenhum dos dois é da arena por estrato: são anteriores a ela, e a mudança de
+terreno só re-sorteou qual seed os exibia. O primeiro era latente desde que a
+geração passou a carimbar terreno depois de montar `openCells`; o segundo,
+desde que o cerco existe.
+
+**Fica pendente, e não é destes:** na seed 71 um perseguidor *invocado* nasce
+dentro da coluna de borda do mapa — o invocar do Guardião não confere solidez
+ao posicionar. É de outro sistema e merece correção própria.
+
 `SIMULATION_VERSION` 17 → 18: o terreno semeado de todo setor de chefe muda.
 
 ## Trabalho futuro

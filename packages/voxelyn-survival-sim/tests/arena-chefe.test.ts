@@ -117,6 +117,38 @@ describe('arena do chefe por estrato', () => {
     }
   });
 
+  it('ninguem nasce DENTRO da moldura', () => {
+    // O defeito que este arquivo quase deixou passar. `openCells` e montado
+    // no comeco da geracao e o carimbo roda depois — mas nenhum consumidor
+    // daquela lista reconfere `solid`. Sem podar a lista, uma celula virada
+    // pilar continua candidata a spawn: na seed 205, setor 3, um cuspidor
+    // nascia emparedado num pilar de cristal, invisivel e inalcancavel, e
+    // ainda ocupando uma vaga do orcamento do setor.
+    //
+    // A varredura e ampla de proposito: o caso aparecia em 1 de 13 mil
+    // posicoes, entao um punhado de seeds nao teria achado nada.
+    let checked = 0;
+    for (let seed = 1; seed <= 250; seed++) {
+      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+        const state = createRun({ seed, sector });
+        const w = state.config.width;
+        const reach = floodOpen(state.solid, w, state.config.height, state.entry.x, state.entry.y);
+        for (const e of state.enemies) {
+          const x = Math.floor(e.x);
+          const y = Math.floor(e.y);
+          checked++;
+          expect(
+            reach.has(y * w + x),
+            `seed ${seed} s${sector}: ${e.archetype} emparedado em ${x},${y}`,
+          ).toBe(true);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(5000);
+    // Timeout proprio: 500 mundos gerados passam dos 5 s padrao do vitest. A
+    // varredura larga E o teste — o caso aparecia em 1 de 13 mil posicoes.
+  }, 60_000);
+
   it('a moldura SE DESFAZ quando fecharia o unico corredor', () => {
     // Nas seeds reais este ramo nunca dispara: as camaras que a geracao abre
     // sao largas demais para um anel esparso de 8 celulas fechar. Uma rede de

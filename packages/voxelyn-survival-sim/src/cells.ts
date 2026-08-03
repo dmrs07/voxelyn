@@ -36,7 +36,7 @@ import {
 import { markDiscovery } from './stats.js';
 import { DISCOVERY_FIRE_SPREAD, DISCOVERY_FRAGILE_BREACH, DISCOVERY_GAS_IGNITION } from './types.js';
 import { chunkOf } from './worldgen.js';
-import type { EffectOrigin, SemanticEvent, SurvivalState } from './types.js';
+import type { EffectOrigin, Entity, SemanticEvent, SurvivalState } from './types.js';
 
 const W = (state: SurvivalState): number => state.config.width;
 const H = (state: SurvivalState): number => state.config.height;
@@ -516,8 +516,16 @@ export const ripSolid = (state: SurvivalState, x: number, y: number, events: Sem
  * morte por decisao arriscada, nao por falta de opcao.
  *
  * So converte celula VAZIA: minerio, cristal e rocha ja existentes ficam como
- * estao, senao o cerco apagaria recurso e luz que o jogador foi ali buscar. E
- * pula celula ocupada por alguem, que viraria entidade presa dentro de pedra.
+ * estao, senao o cerco apagaria recurso e luz que o jogador foi ali buscar.
+ *
+ * Celula com CORPO em cima nao pode virar pedra — seria alguem emparedado. Mas
+ * pular a celula deixava um vao ABERTO e permanente: o bicho saia de cima dela
+ * e o cerco ficava com uma porta franca, que nem custa tiro como as saidas
+ * frageis custam. O cerco e a promessa da segunda fase do guardiao, e uma porta
+ * de graca a desmancha. Entao o corpo e EMPURRADO uma casa para DENTRO (onde a
+ * luta e) e a parede fecha atras dele. So quando nem isso da certo — a casa de
+ * dentro tambem ocupada ou solida — e que o vao sobra, porque emparedar alguem
+ * e pior do que um cerco furado.
  */
 export const closeArena = (
   state: SurvivalState,
@@ -529,14 +537,22 @@ export const closeArena = (
 ): number => {
   const w = W(state);
   const h = state.config.height;
-  const occupied = new Set<number>();
+  // Ordem fixa (jogadores, depois inimigos) porque o empurrao abaixo mexe em
+  // posicao autoritativa: as duas maquinas de uma sala de co-op tem de resolver
+  // a mesma celula do mesmo jeito.
+  const bodies = new Map<number, Entity[]>();
   for (const e of [...state.players, ...state.enemies]) {
     if (!e.alive) continue;
-    occupied.add(Math.floor(e.y) * w + Math.floor(e.x));
+    const i = Math.floor(e.y) * w + Math.floor(e.x);
+    const list = bodies.get(i);
+    if (list) list.push(e);
+    else bodies.set(i, [e]);
   }
   // Nucleo e extracao nunca viram parede: sao os dois objetivos da run.
-  occupied.add(state.corePos.y * w + state.corePos.x);
-  occupied.add(state.entry.y * w + state.entry.x);
+  const objectives = new Set<number>([
+    state.corePos.y * w + state.corePos.x,
+    state.entry.y * w + state.entry.x,
+  ]);
 
   const ring: number[] = [];
   for (let y = cy - radius; y <= cy + radius; y++) {
@@ -545,7 +561,21 @@ export const closeArena = (
       if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) !== radius) continue;
       const i = y * w + x;
       if (state.solid[i] !== SOLID_NONE) continue;
-      if (occupied.has(i)) continue;
+      if (objectives.has(i)) continue;
+      const here = bodies.get(i);
+      if (here) {
+        // Uma casa para DENTRO: Chebyshev cai para radius-1, ou seja, sempre no
+        // lado de dentro do anel — nunca empurra alguem para fora do cerco.
+        const tx = x + Math.sign(cx - x);
+        const ty = y + Math.sign(cy - y);
+        const target = ty * w + tx;
+        if (state.solid[target] !== SOLID_NONE || objectives.has(target)) continue;
+        for (const e of here) {
+          e.x = tx + 0.5;
+          e.y = ty + 0.5;
+        }
+        bodies.delete(i);
+      }
       ring.push(i);
     }
   }

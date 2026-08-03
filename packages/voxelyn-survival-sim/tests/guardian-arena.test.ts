@@ -92,6 +92,44 @@ describe('arena do guardiao', () => {
     expect(rock.length).toBeGreaterThan(fragile.length * 4);
   });
 
+  // Um corpo em cima do anel nao pode virar porta franca.
+  //
+  // O cerco nunca emparedou ninguem — mas PULAR a celula ocupada deixava um vao
+  // aberto e permanente: o bicho saia de cima dela e sobrava uma saida que nem
+  // custa tiro, ao contrario das frageis. Foi assim que a seed 71 passou a
+  // deixar o jogador sair andando quando um bombardeiro calhou de parar no
+  // anel. Agora o corpo e empurrado para DENTRO e a parede fecha atras dele.
+  it('empurra para dentro quem estava no anel, em vez de deixar o vao', () => {
+    const { state, gx, gy } = enrage(71);
+    const w = state.config.width;
+    const ring = ringCells(state, gx, gy);
+    const open = ring.filter((i) => state.solid[i] === SOLID_NONE);
+    // O poco e a entrada continuam podendo furar o anel — sao objetivos da run.
+    const objetivos = new Set([
+      state.corePos.y * w + state.corePos.x,
+      state.entry.y * w + state.entry.x,
+    ]);
+    for (const i of open) {
+      expect(
+        objetivos.has(i),
+        `vao aberto em ${i % w},${Math.floor(i / w)} sem ser objetivo`,
+      ).toBe(true);
+    }
+    // E ninguem terminou dentro de uma parede DO CERCO. A verificacao e sobre
+    // as celulas que o cerco levantou, e nao sobre rocha em geral: nesta mesma
+    // seed um perseguido invocado nasce dentro da coluna de borda do mapa
+    // (defeito do INVOCAR, anterior a isto e de outro sistema), e um teste do
+    // cerco que falhasse por causa dele estaria medindo a coisa errada.
+    const barreira = new Set(state.arenaBarrierCells ?? []);
+    for (const e of [...state.players, ...state.enemies]) {
+      if (!e.alive) continue;
+      expect(
+        barreira.has(Math.floor(e.y) * w + Math.floor(e.x)),
+        `${(e as { archetype?: string }).archetype ?? 'player'} emparedado pelo cerco`,
+      ).toBe(false);
+    }
+  });
+
   it('invoca quatro perseguidores rapidos', () => {
     const { state } = enrage(73);
     const stalkers = state.enemies.filter((e) => e.archetype === 'stalker' && e.alive);
