@@ -79,6 +79,12 @@ const originOf = (serverUrl: string): string | null => {
     // Depois do `httpBase` so restam dois esquemas legitimos. Qualquer outro e
     // configuracao invalida, e e assim que precisa ser anunciado.
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    // Credencial embutida (`https://user:senha@host`) sobrevive ao `url.origin`,
+    // que a descarta em silencio — mas NAO sobrevive ao `fetch`, que recusa a
+    // URL antes de mandar qualquer pacote. Sem esta linha a recusa voltava como
+    // `offline`: mais uma configuracao errada se passando por queda de rede,
+    // dentro da propria validacao criada para acabar com isso.
+    if (url.username !== '' || url.password !== '') return null;
     return url.origin;
   } catch {
     return null;

@@ -312,6 +312,19 @@ describe('esquemas que o navegador nao busca', () => {
     },
   );
 
+  // O `url.origin` descarta a credencial em silencio, entao a URL "parece" boa
+  // depois de normalizada. O `fetch` nao concorda: ele recusa a URL antes de
+  // mandar pacote nenhum, e a recusa voltava como `offline`.
+  it.each([
+    'https://user:senha@example.com',
+    'https://user@example.com',
+    'wss://user:senha@example.com',
+  ])('%s traz credencial embutida e nao chega ao fetch', async (bad) => {
+    const calls = stubFetch(() => json(200, {}));
+    expect(await fetchProfile(bad)).toEqual({ ok: false, error: 'bad_server_url' });
+    expect(calls).toHaveLength(0);
+  });
+
   it('http, https, ws e wss continuam passando', async () => {
     for (const good of ['http://a.example', 'https://a.example', 'wss://a.example']) {
       const calls = stubFetch(() => json(200, { profile: PROFILE }));

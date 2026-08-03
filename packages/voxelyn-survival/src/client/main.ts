@@ -1571,6 +1571,14 @@ const refreshProfile = async (): Promise<void> => {
 
 const refreshCodex = async (): Promise<void> => {
   const query = beginQuery(codexQueries);
+  // A falha ANTERIOR sai da tela antes da pergunta nova, e nao depois dela.
+  //
+  // Mantida, ela seria mostrada durante toda a consulta seguinte — e o pior caso
+  // e o unico que o jogador realmente vive: ele corrige o endereco do servidor,
+  // reabre a aba, e continua lendo a reclamacao sobre o endereco que acabou de
+  // consertar, possivelmente pelos 25s de uma origem fria.
+  matrixView.codexNotice = null;
+  drawMatrix();
   const result = await fetchCodex(query.scope, getLocale());
   if (!isCurrentQuery(codexQueries, query)) return;
   matrixView.codex = result.ok ? result.value : null;
