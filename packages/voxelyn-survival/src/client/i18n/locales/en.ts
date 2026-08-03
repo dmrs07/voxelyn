@@ -260,9 +260,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'discovery.minerEnraged.title': 'Heat overloads it',
   'discovery.minerEnraged.lesson':
     'Arrive red-hot and its circuit fails: pickaxe in a circle. Backing off answers it; orbiting does not.',
-  'discovery.oreQuota.title': 'The company pays by the ton',
-  'discovery.oreQuota.lesson':
-    'Accumulated ore becomes a module choice. Digging is a route, not decoration.',
+  'discovery.cargoLost.title': 'No recovery value',
+  'discovery.cargoLost.lesson':
+    'Cargo only exists past the platform. What stayed in the Vein was never yours.',
   'discovery.horseFelled.title': 'The trail stays',
   'discovery.horseFelled.lesson':
     'The charge crosses the room and leaves fire where it passed. Rock in the way ends it.',

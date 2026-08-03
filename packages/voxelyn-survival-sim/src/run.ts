@@ -44,8 +44,8 @@ import {
   RETURN_DISC_MAX_DISTANCE,
   RICOCHET_BOUNCES,
   RETURN_DISC_SPEED,
-  ORE_PER_MODULE,
   SALVAGE_SCAN_TICKS,
+  CARGO_LOST_DISCOVERY_ORE,
   CONTAMINATION_SECTOR_SCALE,
   SECTOR_COUNT,
   RUN_SEED_MIX,
@@ -106,11 +106,7 @@ import {
   moduleHasCapacity,
   rollModuleChoice,
 } from './modules.js';
-import {
-  DISCOVERY_DISCHARGE_POOL,
-  DISCOVERY_ORE_QUOTA,
-  DISCOVERY_SELF_HARM,
-} from './types.js';
+import { DISCOVERY_CARGO_LOST, DISCOVERY_DISCHARGE_POOL, DISCOVERY_SELF_HARM } from './types.js';
 import type {
   DamageCause,
   Entity,
@@ -173,7 +169,6 @@ const makeExtra = (): PlayerExtra => ({
   purgeCells: 1,
   activeModules: [],
   pendingModuleChoice: null,
-  oreModulesPaid: 0,
   hasCore: false,
   dodgeDir: { x: 1, y: 0 },
   downed: false,
@@ -1702,52 +1697,16 @@ const runEndingCause = (state: SurvivalState): DamageCause => {
  */
 const finalizeRun = (state: SurvivalState): void => {
   if (state.phase === 'running' || state.summary !== null) return;
-  state.summary = buildSummary(state, state.phase === 'dead' ? runEndingCause(state) : null);
-};
-
-/**
- * A cota paga em ESCOLHA DE MODULO — a mesma moeda com que o salvage paga risco.
- *
- * Era a peca que faltava do minerio: o prospector e um robo de mineracao que nao
- * minerava, e "pontos no fim" nao e beneficio, e placar. Pagando com a moeda que
- * o jogo ja usa, as duas atividades ficam COMPARAVEIS dentro da run — vale mais
- * abrir aquele terminal ou arrancar aquele veio? — em vez de a mineracao virar
- * uma economia paralela com regras proprias.
- *
- * `sourceSiteId` negativo separa a oferta da cota das ofertas de salvage no
- * `rollModuleChoice`, que semeia por site: reusar um id de site faria a escolha
- * paga em minerio sair identica a de um cofre que o jogador ja abriu.
- *
- * Roda depois dos inimigos porque o drop do miner morto entra na mesma contagem:
- * o minerio que ele carregava conta como cota no mesmo tick em que ele cai.
- *
- * O limiar so e dado por PAGO quando a escolha correspondente chega a mao de
- * quem a merece. Marcar o pagamento na hora em que a contagem cruza o multiplo
- * parecia equivalente e nao era: quem tivesse um cofre aberto naquele instante
- * era pulado logo abaixo, e o contador ja adiantado fazia `earned <= pago`
- * barrar a oferta para sempre. Minerar durante uma escolha pendente — que e
- * exatamente o que se faz enquanto se decide — apagava o modulo em silencio.
- */
-const payOreQuota = (state: SurvivalState, events: SemanticEvent[]): void => {
-  const earned = Math.floor(state.stats.oreCollected / ORE_PER_MODULE);
-  if (earned <= 0) return;
-  // Uma escolha por jogador de pe. No co-op a cota e do time — quem carrega a
-  // picareta e quem cobre nao deveriam ser pagos de forma diferente por isso.
-  for (const player of standingPlayers(state)) {
-    const extra = state.playerExtras[player.slot ?? 0];
-    if (extra.oreModulesPaid >= earned) continue;
-    // O slot de escolha e unico: enquanto o anterior nao for resolvido o limiar
-    // continua DEVENDO, e o proximo tick tenta de novo.
-    if (extra.pendingModuleChoice) continue;
-    // Um limiar por vez, e nao um salto ate `earned`. Quem cruzou dois multiplos
-    // com um cofre aberto recebe os dois, um apos o outro — a alternativa
-    // colapsava os dois numa oferta so e comia a diferenca.
-    const threshold = extra.oreModulesPaid + 1;
-    const options = rollModuleChoice(state.config.seed, -threshold, 2, extra, state.tick);
-    extra.pendingModuleChoice = { sourceSiteId: -threshold, options, createdAtTick: state.tick };
-    extra.oreModulesPaid = threshold;
-    markDiscovery(state.stats, DISCOVERY_ORE_QUOTA);
+  // A licao central do loop novo, anotada no unico instante em que ela e
+  // verdade: o Prospector caiu carregando carga que nunca sera homologada.
+  //
+  // O limiar existe para a descoberta significar alguma coisa — morrer com duas
+  // lascas nao ensina nada sobre perder uma carga. Marcado ANTES do sumario
+  // porque `buildSummary` congela `stats.discoveries`.
+  if (state.phase === 'dead' && state.stats.oreCollected >= CARGO_LOST_DISCOVERY_ORE) {
+    markDiscovery(state.stats, DISCOVERY_CARGO_LOST);
   }
+  state.summary = buildSummary(state, state.phase === 'dead' ? runEndingCause(state) : null);
 };
 
 export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]): StepResult => {
@@ -1778,7 +1737,6 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   stepRailCarts(state, events);
   applyCellHazards(state, events);
   stepContamination(state, events);
-  payOreQuota(state, events);
   resolveChainedEvents(state, events);
   resolveDownedAndDeaths(state, events);
   finalizeRun(state);

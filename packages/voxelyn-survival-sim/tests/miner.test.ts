@@ -7,7 +7,6 @@ import {
   MINER_FEAR_HEAT,
   MINER_ORE_DROP,
   MINER_RAGE_HEAT,
-  ORE_PER_MODULE,
   SOLID_NONE,
   SOLID_ORE,
   SURF_NONE,
@@ -153,8 +152,8 @@ describe('Miner — o que a morte dele rende', () => {
   });
 });
 
-describe('cota de minerio', () => {
-  it('lascar veio soma a cota e anuncia o total', () => {
+describe('carga de minerio', () => {
+  it('lascar veio soma a carga e anuncia o total', () => {
     const state = createRun({ seed: 11 });
     clearArena(state, 10);
     const w = state.config.width;
@@ -174,50 +173,17 @@ describe('cota de minerio', () => {
     expect(state.stats.oreCollected).toBe(gained[gained.length - 1]);
   });
 
-  // A cota precisava de um BENEFICIO concreto, e nao de um numero bonito no fim.
-  it('paga escolha de modulo ao cruzar o limiar', () => {
+  // A cota de modulo por minerio foi REMOVIDA (spec 2026-08-02): minerar paga a
+  // proxima run, nao esta. O teste fica como regressao — o dia em que alguem
+  // reintroduzir uma recompensa dentro da run, ele denuncia.
+  it('minerar NAO abre escolha de modulo, em nenhum limiar', () => {
     const { state } = encounter(12, 0);
     expect(state.playerExtra.pendingModuleChoice).toBeNull();
-    state.stats.oreCollected = ORE_PER_MODULE;
-    stepIdle(state, 1);
-    expect(state.playerExtra.pendingModuleChoice).not.toBeNull();
-  });
-
-  // Sem o contador de pagamentos, o limiar dispararia a cada tick enquanto o
-  // jogador nao escolhesse, e um veio grande viraria modulo infinito.
-  it('paga UMA vez por limiar, nao a cada tick', () => {
-    const { state } = encounter(13, 0);
-    state.stats.oreCollected = ORE_PER_MODULE;
-    stepIdle(state, 1);
-    expect(state.playerExtra.oreModulesPaid).toBe(1);
-    stepIdle(state, 30);
-    expect(state.playerExtra.oreModulesPaid).toBe(1);
-  });
-
-  // A regressao que o contador unico escondia: quem minera com um cofre aberto
-  // cruzava o limiar, era pulado por ja ter escolha pendente, e o contador
-  // adiantado barrava a oferta para sempre. O limiar tem de continuar DEVENDO ate
-  // chegar a mao de alguem.
-  it('nao perde a cota cruzada enquanto uma escolha esta aberta', () => {
-    const { state } = encounter(14, 0);
-    state.stats.oreCollected = ORE_PER_MODULE;
-    stepIdle(state, 1);
-    const first = state.playerExtra.pendingModuleChoice;
-    expect(first).not.toBeNull();
-    expect(state.playerExtra.oreModulesPaid).toBe(1);
-
-    // Minera o segundo limiar SEM ter resolvido o primeiro.
-    state.stats.oreCollected = ORE_PER_MODULE * 2;
-    stepIdle(state, 5);
-    expect(state.playerExtra.oreModulesPaid).toBe(1);
-    expect(state.playerExtra.pendingModuleChoice).toBe(first);
-
-    // Resolvida a primeira, a segunda aparece — em vez de sumir.
-    stepRun(state, [{ ...emptyCommand(), choose: 0 }]);
-    stepIdle(state, 1);
-    expect(state.playerExtra.oreModulesPaid).toBe(2);
-    expect(state.playerExtra.pendingModuleChoice).not.toBeNull();
-    expect(state.playerExtra.pendingModuleChoice).not.toBe(first);
+    for (const total of [14, 28, 140]) {
+      state.stats.oreCollected = total;
+      stepIdle(state, 3);
+      expect(state.playerExtra.pendingModuleChoice).toBeNull();
+    }
   });
 });
 

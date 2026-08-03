@@ -263,9 +263,9 @@ export const PT_BR = {
   'discovery.minerEnraged.title': 'O calor sobrecarrega',
   'discovery.minerEnraged.lesson':
     'Chegue em brasa e o circuito dele falha: picareta em círculo. Recuar responde; orbitar, não.',
-  'discovery.oreQuota.title': 'A empresa paga por tonelada',
-  'discovery.oreQuota.lesson':
-    'Minério acumulado vira escolha de módulo. Cavar é uma rota, não um enfeite.',
+  'discovery.cargoLost.title': 'Sem valor de recuperação',
+  'discovery.cargoLost.lesson':
+    'A carga só existe depois da plataforma. O que ficou no Veio nunca foi seu.',
   'discovery.horseFelled.title': 'O rastro fica',
   'discovery.horseFelled.lesson':
     'A investida atravessa a sala e deixa fogo onde passou. Pedra no caminho a encerra.',
