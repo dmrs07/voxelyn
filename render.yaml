@@ -47,6 +47,15 @@ services:
       # porque precisa ser.
       - key: TELEMETRY_TOKEN
         generateValue: true
+      # Assinatura das sessoes de progressao. GERADO UMA VEZ e estavel entre
+      # deploys — e a diferenca entre um perfil que sobrevive e um que nao.
+      #
+      # Sem esta variavel o servidor sobe com um segredo efemero (e avisa no
+      # log), e cada restart invalida TODOS os cookies: o proximo POST /session
+      # cria um perfil em branco e o jogador perde carteira, protocolos e codex
+      # que o banco ainda tem, so que agora sem chave que os alcance.
+      - key: PROGRESSION_SECRET
+        generateValue: true
       # PORT e injetada pelo Render; o servidor faz bind em 0.0.0.0:$PORT
 
   # ---------------------------------------------------------------------------

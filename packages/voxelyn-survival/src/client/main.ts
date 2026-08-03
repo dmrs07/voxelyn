@@ -34,7 +34,7 @@ import {
   openSession,
   purchaseKey,
   purchaseUpgrade,
-  requestRunTicket,
+  requestRunTicketWithSession,
   settleRun,
 } from './progression-api';
 import { readCachedProfile, writeCachedProfile } from './progression-cache';
@@ -375,9 +375,16 @@ const authorizeExpedition = async (
 ): Promise<{ seed: number; tuning?: PlayerTuning }> => {
   authorizing = true;
   const url = serverInput.value.trim() || defaultServerUrl();
-  const result = await requestRunTicket(url, seed).finally(() => {
+  const authorized = await requestRunTicketWithSession(url, seed).finally(() => {
     authorizing = false;
   });
+  // A sessao pode ter nascido AGORA, nesta chamada: o perfil que veio com ela e
+  // o unico estado autoritativo que o jogo tem antes de descer.
+  if (authorized.openedProfile) {
+    writeCachedProfile(authorized.openedProfile, Date.now());
+    renderer.setProspectorGeneration(authorized.openedProfile.generation);
+  }
+  const result = authorized.ticket;
   if (!result.ok) {
     expedition = null;
     setBanner(t('banner.expedition.offline'));

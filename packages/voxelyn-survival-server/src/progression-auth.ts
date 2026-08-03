@@ -7,7 +7,7 @@
 //
 //   profileId   128 bits de CSPRNG. Nao previsivel, nao enumeravel.
 //   token       profileId.expiracao.hmac, assinado com PROGRESSION_SECRET.
-//   transporte  cookie HttpOnly, Secure, SameSite=Lax.
+//   transporte  cookie HttpOnly; Secure; SameSite=None em https (ver `cookieHeader`).
 //
 // O segredo nunca sai do servidor, e o cliente nunca ve nada alem de um opaco
 // que ele so pode devolver inteiro. Adulterar um byte muda o HMAC, e a
@@ -96,11 +96,23 @@ export const createSessionAuth = (secret: string): SessionAuth => {
       [
         `${SESSION_COOKIE}=${token}`,
         'HttpOnly',
-        'SameSite=Lax',
         'Path=/api/progression',
         `Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`,
-        // Sem `Secure` em HTTP local o cookie simplesmente nao seria gravado, e o
-        // desenvolvimento inteiro pararia. Em producao (https) ele e obrigatorio.
+        // ---------------------------------------------------------------
+        // SameSite: None em producao, Lax em desenvolvimento
+        // ---------------------------------------------------------------
+        // O cliente e o servidor sao ORIGENS DIFERENTES no deploy real — Static
+        // Site e Web Service no Render, e a URL do servidor ainda pode ser
+        // trocada por `?server=` ou `VITE_SERVER_URL`. Com `SameSite=Lax` o
+        // navegador nao envia o cookie num `fetch` para outro site: a sessao era
+        // criada com sucesso e TODA chamada seguinte — perfil, ticket,
+        // liquidacao, compra — voltava 401.
+        //
+        // `SameSite=None` exige `Secure`, e os dois so podem ser emitidos sobre
+        // https. Em http local isso nao existe, e ali `Lax` funciona porque o
+        // desenvolvimento e mesma origem (ou localhost, que os navegadores
+        // tratam como contexto seguro para outros fins, mas nao para este).
+        secure ? 'SameSite=None' : 'SameSite=Lax',
         secure ? 'Secure' : '',
       ]
         .filter(Boolean)

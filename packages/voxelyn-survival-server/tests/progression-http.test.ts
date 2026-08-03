@@ -233,6 +233,30 @@ describe('emissao de ticket', () => {
     expect(ticket.tuning.playerDamageScale).toBe(1);
   });
 
+  // O cliente e o servidor sao origens DIFERENTES no deploy (Static Site x Web
+  // Service). Com `SameSite=Lax` o navegador nao manda o cookie num fetch
+  // cross-site: a sessao nascia e todas as chamadas seguintes voltavam 401.
+  it('o cookie de sessao atravessa origens quando servido por https', async () => {
+    const res = await fetch(`${base}/api/progression/session`, {
+      method: 'POST',
+      // O que o proxy do Render poe: e o unico sinal de https que o servidor tem.
+      headers: { 'x-forwarded-proto': 'https' },
+    });
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain('SameSite=None');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('HttpOnly');
+  });
+
+  // Em http local `SameSite=None` seria descartado pelo navegador (ele exige
+  // Secure), e o desenvolvimento inteiro pararia.
+  it('em http local o cookie fica em Lax, sem Secure', async () => {
+    const res = await fetch(`${base}/api/progression/session`, { method: 'POST' });
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).not.toContain('Secure');
+  });
+
   it('sem sessao nao ha ticket', async () => {
     const res = await fetch(`${base}/api/progression/runs`, {
       method: 'POST',

@@ -29,15 +29,35 @@ export type ApiResult<T> =
 const httpBase = (serverUrl: string): string =>
   serverUrl.replace(/^ws/, 'http').replace(/\/+$/, '');
 
+/**
+ * Tetos de espera, por natureza da chamada.
+ *
+ * Toda chamada precisa de um, e nao so por elegancia: uma conexao ENGOLIDA (o
+ * pacote sai e nada volta, que e o que uma rede de hotel ou um captive portal
+ * fazem) nao rejeita — ela pendura. Sem teto, apertar "Descer" congelava o jogo
+ * ate o timeout do sistema operacional, que pode ser mais de um minuto, e a
+ * promessa do fallback offline virava uma tela travada.
+ *
+ * O da liquidacao e muito maior porque do outro lado ha uma RE-SIMULACAO de ate
+ * trinta minutos de jogo, e abortar cedo desistiria de uma carga ja conquistada.
+ */
+export const TIMEOUT_INTERACTIVE_MS = 6_000;
+export const TIMEOUT_SETTLE_MS = 45_000;
+
 const call = async <T>(
   serverUrl: string,
   path: string,
   init: RequestInit = {},
+  timeoutMs = TIMEOUT_INTERACTIVE_MS,
 ): Promise<ApiResult<T>> => {
   try {
     const res = await fetch(`${httpBase(serverUrl)}${path}`, {
       ...init,
       credentials: 'include',
+      // `AbortSignal.timeout` aborta o fetch e cai no `catch` abaixo, onde o
+      // resultado ja e tratado como offline — o mesmo caminho de uma rede
+      // ausente, que e exatamente o que uma conexao pendurada e na pratica.
+      signal: AbortSignal.timeout(timeoutMs),
       headers: init.body ? { 'content-type': 'application/json', ...init.headers } : init.headers,
     });
     if (!res.ok) {
@@ -91,10 +111,12 @@ export const settleRun = (
   runId: string,
   log: string,
 ): Promise<ApiResult<ProgressionSettlementResponse>> =>
-  call(serverUrl, `/api/progression/runs/${encodeURIComponent(runId)}/settle`, {
-    method: 'POST',
-    body: JSON.stringify({ log }),
-  });
+  call(
+    serverUrl,
+    `/api/progression/runs/${encodeURIComponent(runId)}/settle`,
+    { method: 'POST', body: JSON.stringify({ log }) },
+    TIMEOUT_SETTLE_MS,
+  );
 
 export const purchaseUpgrade = (
   serverUrl: string,
@@ -127,3 +149,45 @@ export const fetchCodex = (serverUrl: string, lang: string): Promise<ApiResult<C
  */
 export const purchaseKey = (profileId: string, upgradeId: string, profileVersion: number): string =>
   `${profileId.slice(0, 12)}-${upgradeId}-${profileVersion}`.replace(/[^A-Za-z0-9_-]/g, '');
+
+/**
+ * Pede o ticket, abrindo a sessao ANTES se ainda nao houver uma.
+ *
+ * Vive aqui, e nao no `main.ts`, porque e uma regra da CAMADA DE API: a sessao e
+ * um cookie que so nasce num POST explicito, e todo endpoint autenticado depende
+ * dele. Quem instalasse o jogo e apertasse "Descer" sem nunca abrir a Matriz —
+ * o unico lugar que abria sessao — levava 401, caia em simulacao local em
+ * silencio, e perdia a progressao da primeira run.
+ *
+ * A sessao NAO e criada no boot de proposito: o jogo abre offline (e o PWA
+ * existe para isso), e uma chamada de rede obrigatoria na inicializacao
+ * transformaria "sem rede" em "sem jogo".
+ *
+ * `unauthenticated` tambem cobre o perfil que sumiu do lado do servidor — store
+ * em memoria reiniciado, cookie expirado —, e a retentativa cria um perfil novo
+ * em vez de deixar o jogador presa em local para sempre.
+ *
+ * Devolve tambem o perfil, quando a sessao foi criada agora: quem chama precisa
+ * dele para o cache e para a geracao do chassi, e uma segunda ida a rede so para
+ * relê-lo seria desperdicio no caminho mais sensivel do jogo.
+ */
+export const requestRunTicketWithSession = async (
+  serverUrl: string,
+  seed?: number,
+): Promise<{
+  ticket: ApiResult<{ ticket: ProgressionRunTicket }>;
+  openedProfile: PublicProgressionProfile | null;
+}> => {
+  const first = await requestRunTicket(serverUrl, seed);
+  if (first.ok || first.error !== 'unauthenticated') {
+    return { ticket: first, openedProfile: null };
+  }
+  const session = await openSession(serverUrl);
+  if (!session.ok) return { ticket: first, openedProfile: null };
+  // UMA retentativa. Um segundo 401 depois de a sessao ter sido criada nao e um
+  // problema de sessao, e insistir viraria laco.
+  return {
+    ticket: await requestRunTicket(serverUrl, seed),
+    openedProfile: session.value.profile,
+  };
+};

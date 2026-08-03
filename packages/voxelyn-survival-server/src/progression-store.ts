@@ -311,6 +311,9 @@ create table if not exists progression_tickets (
   nonce            text        not null
 );
 create index if not exists progression_tickets_profile_idx on progression_tickets (profile_id);
+-- A varredura de retencao filtra por expiracao; sem este indice ela seria um
+-- seq scan na tabela que mais cresce do schema.
+create index if not exists progression_tickets_expiry_idx on progression_tickets (expires_at);
 
 create table if not exists progression_settled_runs (
   id             bigserial primary key,
@@ -389,8 +392,51 @@ class AbortTransaction extends Error {
   }
 }
 
+/**
+ * Quanto tempo um ticket ja expirado ainda fica guardado.
+ *
+ * O TTL do ticket e de 90 minutos; a retencao e de sete dias. A folga nao e
+ * medo — e o que mantem o registro disponivel para auditar uma liquidacao
+ * contestada depois do fim de semana, que e quando alguem repara.
+ *
+ * Sem ela a tabela crescia PARA SEMPRE: toda run autorizada insere uma linha com
+ * o tuning inteiro, nada apagava, e o proprio TTL nao remove nada — ele so faz o
+ * ticket ser recusado.
+ */
+export const TICKET_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Intervalo minimo entre duas varreduras. Uma por hora basta e nao pesa. */
+const TICKET_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
 export class PostgresProgressionStore implements ProgressionStore {
+  private nextTicketSweepAt = 0;
+
   constructor(private readonly pool: PgPool) {}
+
+  /**
+   * Apaga tickets vencidos ha mais de `TICKET_RETENTION_MS`.
+   *
+   * Presa a emissao de ticket em vez de um cron: o unico momento em que a tabela
+   * cresce e este, e um servico que so tem uma instancia nao precisa de agendador
+   * para uma limpeza que pode acontecer atrasada sem consequencia.
+   *
+   * NAO apaga na liquidacao, e essa e a parte que importa. O caminho idempotente
+   * — reenviar o mesmo `runId` depois de uma queda — le o TICKET para conferir
+   * dono e validade antes de devolver o resultado ja persistido. Apagar ali
+   * trocaria "aqui esta o que ja foi creditado" por um 404.
+   *
+   * Falha em silencio de proposito: limpeza que derruba a emissao de ticket
+   * seria pior que a tabela grande.
+   */
+  private sweepExpiredTickets(nowMs: number): void {
+    if (nowMs < this.nextTicketSweepAt) return;
+    this.nextTicketSweepAt = nowMs + TICKET_SWEEP_INTERVAL_MS;
+    void this.pool
+      .query('delete from progression_tickets where expires_at < $1', [
+        new Date(nowMs - TICKET_RETENTION_MS).toISOString(),
+      ])
+      .catch(() => undefined);
+  }
 
   static async connect(databaseUrl: string): Promise<PostgresProgressionStore> {
     const pg = (await import('pg')) as unknown as {
@@ -469,6 +515,7 @@ export class PostgresProgressionStore implements ProgressionStore {
   }
 
   async saveTicket(ticket: ProgressionRunTicket): Promise<void> {
+    this.sweepExpiredTickets(Date.parse(ticket.issuedAt) || Date.now());
     await this.pool.query(
       `insert into progression_tickets
          (run_id, profile_id, seed, mode, tuning, tuning_hash, profile_version, protocol_version, sim_version, issued_at, expires_at, nonce)
@@ -715,7 +762,14 @@ export class PostgresProgressionStore implements ProgressionStore {
             -decision.coresSpent,
             decision.profile.wallet.ore,
             decision.profile.wallet.cores,
-            JSON.stringify({ unlockedLoreFragmentId: decision.loreFragmentId }),
+            // `upgradeId` TEM de estar aqui: `ledger()` o le de `metadata`, e sem
+            // ele toda compra persistida voltava com `upgradeId: ''` — um ledger de
+            // auditoria incapaz de dizer qual protocolo causou cada debito, que e
+            // a unica pergunta que se faz a ele.
+            JSON.stringify({
+              upgradeId: decision.upgradeId,
+              unlockedLoreFragmentId: decision.loreFragmentId,
+            }),
             input.now,
           ],
         );
