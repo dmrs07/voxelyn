@@ -258,6 +258,27 @@ describe('primeiro contato com uma origem fria', () => {
     expect(calls).toHaveLength(1);
   });
 
+  // A regressao que a primeira versao desta mudanca introduziu, e que era PIOR
+  // que o problema original: marcando so o sucesso, uma origem genuinamente
+  // morta nunca entrava no conjunto, entao toda chamada pagava 6s + 25s. Como
+  // `authorizeExpedition` espera o ticket antes de comecar a run, cada descida
+  // offline travaria por meio minuto — no lugar exato que a mudanca protegia.
+  it('desiste de vez: origem morta nao paga a espera longa duas vezes', async () => {
+    const dead = stubFetch(() => {
+      throw new TypeError('network');
+    });
+    const first = await fetchProfile('https://morta.example');
+    expect(first).toMatchObject({ ok: false, error: 'offline' });
+    expect(dead).toHaveLength(2); // a curta e a longa
+
+    const again = stubFetch(() => {
+      throw new TypeError('network');
+    });
+    const second = await fetchProfile('https://morta.example');
+    expect(second).toMatchObject({ ok: false, error: 'offline' });
+    expect(again).toHaveLength(1); // so a curta: a tentativa longa ja foi gasta
+  });
+
   it('a espera longa e paga UMA vez por origem, e nao a cada chamada', async () => {
     // A primeira chamada descobre que ha alguem ali. A partir dai a origem esta
     // quente, e uma queda posterior e uma queda — nao um servidor hibernando.

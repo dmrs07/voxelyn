@@ -49,18 +49,17 @@ export type MatrixViewState = {
   /** O perfil veio do cache e ainda nao foi confirmado pelo servidor? */
   cached: boolean;
   /**
-   * POR QUE o perfil e so cache — quando ja se sabe.
+   * POR QUE o perfil e so cache — ja no formato em que aparece na tela.
    *
-   * `null` significa que nao chegou resposta nenhuma: rede ausente, DNS, teto de
-   * espera estourado. Uma string significa que a Aurix RESPONDEU e recusou, e a
-   * string e o codigo dela.
+   * Sao TRES falhas com acoes diferentes, e o painel dizia a mesma frase para as
+   * tres: nao alcancamos ninguem (espere a rede), a Aurix respondeu e recusou
+   * (olhe o servidor, e o codigo diz onde), e o endereco esta invalido (nenhuma
+   * consulta chegou a sair; conserte o campo). Descobrir qual era exigia abrir o
+   * DevTools — era o unico jeito, e nao deveria ser.
    *
-   * A distincao existe porque as duas falhas pedem acoes opostas — esperar a
-   * rede voltar contra olhar o servidor —, e o painel dizia a mesma frase para
-   * timeout, 404, 429 e 500. Quem quisesse saber qual era tinha de abrir o
-   * DevTools; era o unico jeito, e nao deveria ser.
+   * `null` com `cached` significa que ainda nao houve tentativa nesta sessao.
    */
-  staleCode: string | null;
+  stale: PanelNotice | null;
   /**
    * A primeira consulta ao servidor ainda esta correndo?
    *
@@ -76,7 +75,7 @@ export type MatrixViewState = {
   /**
    * Erro da ultima OPERACAO (uma compra), ja traduzido.
    *
-   * Carrega parametros pelo mesmo motivo de `staleCode`: aqui tambem toda falha
+   * Carrega parametros pelo mesmo motivo de `stale`: aqui tambem toda falha
    * que nao fosse conflito de versao saia como "conexao indisponivel", entao
    * saldo insuficiente, teto de requisicoes e protocolo desconhecido eram a
    * mesma frase — e nenhuma delas tinha a ver com conexao.
@@ -141,16 +140,17 @@ export const nodeState = (
  * certo meio segundo depois.
  *
  * A mesma confusao acontecia um nivel abaixo, e custou mais caro: "nao
- * alcancamos a Aurix" e "a Aurix recusou" sairiam com a MESMA frase, entao um
- * servidor no ar respondendo 429 era indistinguivel de um cabo desligado. O
- * codigo vai no texto porque e ele que diz para onde olhar.
+ * alcancamos a Aurix", "a Aurix recusou" e "o endereco esta invalido" sairiam
+ * com a MESMA frase, entao um servidor no ar respondendo 429 era
+ * indistinguivel de um cabo desligado — e de um campo digitado errado. O codigo
+ * vai no texto porque e ele que diz para onde olhar.
  */
 export const panelNotice = (view: MatrixViewState): PanelNotice | null => {
   if (view.loading) return { key: 'matrix.loading' };
   if (!view.cached) return null;
-  return view.staleCode === null
-    ? { key: 'matrix.offline' }
-    : { key: 'matrix.refused', params: { code: view.staleCode } };
+  // Sem tentativa registrada, o generico de conexao e o unico que nao inventa
+  // diagnostico: e o estado de quem abriu o painel antes da primeira resposta.
+  return view.stale ?? { key: 'matrix.offline' };
 };
 
 /**

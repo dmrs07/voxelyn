@@ -137,13 +137,21 @@ export const TIMEOUT_SETTLE_MS = 45_000;
 export const TIMEOUT_WAKE_MS = 25_000;
 
 /**
- * Origens que ja devolveram uma resposta HTTP nesta pagina.
+ * Origens cuja pergunta "tem alguem ai?" ja foi feita e PAGA.
  *
- * Qualquer status serve, inclusive 401 e 429: o que esta afirmacao guarda e
- * "existe alguem escutando ali", e nao "a chamada deu certo". Uma origem quente
- * nao paga a espera longa — o custo do despertar acontece no maximo uma vez.
+ * Duas coisas entram aqui, e as duas por serem a mesma: uma resposta HTTP de
+ * qualquer status (401 e 429 servem — o que se guarda e "existe alguem
+ * escutando", nao "deu certo"), e a propria tentativa longa no instante em que
+ * ela e disparada.
+ *
+ * Registrar a TENTATIVA, e nao so a resposta, e o ponto. Marcar apenas o
+ * sucesso deixava a origem genuinamente inalcancavel fora do conjunto para
+ * sempre, e ai TODA chamada pagava 6s + 25s. Como `authorizeExpedition` espera
+ * o ticket antes de comecar a run, cada descida offline travaria por meio
+ * minuto — trocando um teto ruim por um pior, exatamente no caminho que a
+ * mudanca queria proteger.
  */
-const respondedOrigins = new Set<string>();
+const wakePaid = new Set<string>();
 
 const call = async <T>(
   serverUrl: string,
@@ -171,7 +179,7 @@ const call = async <T>(
       },
     });
     // Respondeu: a origem esta acordada, qualquer que tenha sido o status.
-    respondedOrigins.add(origin);
+    wakePaid.add(origin);
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: ProgressionErrorCode };
       return { ok: false, error: body.error ?? 'internal', status: res.status };
@@ -201,9 +209,13 @@ const callAwake = async <T>(
   const origin = originOf(serverUrl);
   const first = await call<T>(serverUrl, path, init, TIMEOUT_INTERACTIVE_MS);
   if (first.ok || first.error !== 'offline') return first;
-  // `respondedOrigins` e consultado DEPOIS da primeira tentativa: e ela quem
-  // acabou de descobrir se ha alguem ali.
-  if (!origin || respondedOrigins.has(origin)) return first;
+  // `wakePaid` e consultado DEPOIS da primeira tentativa: e ela quem acabou de
+  // descobrir se ha alguem ali.
+  if (!origin || wakePaid.has(origin)) return first;
+  // ANTES de esperar, e nao depois: a tentativa esta gasta quer ela traga
+  // resposta ou nao. Marcar so no sucesso faria a origem morta pagar os 25s
+  // outra vez, e outra, e outra.
+  wakePaid.add(origin);
   return call<T>(serverUrl, path, init, TIMEOUT_WAKE_MS);
 };
 

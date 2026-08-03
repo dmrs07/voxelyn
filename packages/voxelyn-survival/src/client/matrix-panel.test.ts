@@ -95,7 +95,7 @@ const view = (over: Partial<MatrixViewState> = {}): MatrixViewState => ({
   tab: 'matrix',
   profile: profile(9999, 9),
   cached: false,
-  staleCode: null,
+  stale: null,
   loading: false,
   codex: null,
   pending: null,
@@ -126,22 +126,25 @@ describe('o painel distingue "perguntando" de "a pergunta falhou"', () => {
 // exigia abrir o DevTools — foi assim que um servidor no ar passou dias sendo
 // lido como um servidor fora do ar.
 
-describe('o painel distingue "nao alcancamos" de "a Aurix recusou"', () => {
-  it('sem resposta nenhuma, fala de conexao', () => {
-    expect(panelNotice(view({ cached: true, staleCode: null }))).toEqual({
-      key: 'matrix.offline',
-    });
+describe('o painel distingue as tres maneiras de ficar sem perfil', () => {
+  it('sem tentativa registrada, cai no generico de conexao', () => {
+    expect(panelNotice(view({ cached: true, stale: null }))).toEqual({ key: 'matrix.offline' });
   });
 
   it('com resposta que recusou, mostra o codigo em vez de culpar a conexao', () => {
-    expect(panelNotice(view({ cached: true, staleCode: 'rate_limited 429' }))).toEqual({
-      key: 'matrix.refused',
-      params: { code: 'rate_limited 429' },
-    });
+    const stale = { key: 'matrix.refused', params: { code: 'rate_limited 429' } } as const;
+    expect(panelNotice(view({ cached: true, stale }))).toEqual(stale);
   });
 
-  it('perfil confirmado nao anuncia nada, mesmo com codigo antigo pendurado', () => {
-    expect(panelNotice(view({ cached: false, staleCode: 'internal 500' }))).toBeNull();
+  it('endereco invalido nao vira "a Aurix recusou": ninguem foi consultado', () => {
+    const stale = { key: 'matrix.badUrl' } as const;
+    expect(panelNotice(view({ cached: true, stale }))).toEqual(stale);
+  });
+
+  it('perfil confirmado nao anuncia nada, mesmo com falha antiga pendurada', () => {
+    expect(
+      panelNotice(view({ cached: false, stale: { key: 'matrix.refused', params: { code: 'x' } } })),
+    ).toBeNull();
   });
 });
 

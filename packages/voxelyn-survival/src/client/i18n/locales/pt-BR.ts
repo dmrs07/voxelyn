@@ -388,6 +388,8 @@ export const PT_BR = {
   'matrix.generationUp': 'CHASSI HOMOLOGADO: {generation}',
   'matrix.offline':
     'Conexão com a Aurix Dynamics indisponível. A Matriz mostra o último estado conhecido e nenhuma compra pode ser incorporada.',
+  'matrix.badUrl':
+    'Endereço de servidor inválido. Nenhuma consulta chegou a ser enviada — confira o campo Servidor no menu ou o parâmetro server= na URL.',
   'matrix.refused':
     'A Aurix Dynamics respondeu e recusou a consulta ({code}). A Matriz mostra o último estado conhecido e nenhuma compra pode ser incorporada.',
   'matrix.conflict':

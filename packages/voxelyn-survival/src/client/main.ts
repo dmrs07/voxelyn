@@ -46,6 +46,7 @@ import {
   renderMatrixPanel,
   type MatrixHandlers,
   type MatrixViewState,
+  type PanelNotice,
 } from './matrix-panel';
 import { formatSeed, parseSeed } from './run-summary';
 import {
@@ -1469,9 +1470,9 @@ const matrixView: MatrixViewState = {
   tab: 'matrix',
   profile: readCachedProfile()?.profile ?? null,
   cached: true,
-  // Ainda nao perguntamos: nao ha codigo de recusa para mostrar, e afirmar um
-  // seria inventar diagnostico.
-  staleCode: null,
+  // Ainda nao perguntamos: nao ha falha para explicar, e nomear uma seria
+  // inventar diagnostico.
+  stale: null,
   loading: false,
   codex: null,
   pending: null,
@@ -1517,14 +1518,25 @@ const isCurrentQuery = (tracker: LatestQuery<string>, query: Query<string>): boo
   tracker.isCurrent(query, progressionUrl());
 
 /**
- * O codigo de uma recusa, do jeito que ele chega a tela: `rate_limited 429`.
+ * O aviso que o painel mostra para uma falha da API.
  *
- * Nao e texto de jogador, e diagnostico — e e justamente o que faltava. Sem ele
- * o painel mandava conferir a conexao por um problema que nao estava nela, e
- * descobrir o motivo exigia abrir o DevTools.
+ * Um lugar so, porque sao TRES desfechos com acoes diferentes e antes os tres
+ * saiam como "conexao indisponivel":
+ *
+ * - `offline`: nao chegou resposta. Espere a rede.
+ * - `bad_server_url`: o endereco e invalido e a chamada nem saiu — nada foi
+ *   perguntado a servidor nenhum, entao dizer que a Aurix recusou seria mentira.
+ * - qualquer outro: a Aurix respondeu e recusou, e o codigo diz para onde olhar.
+ *
+ * O codigo nao e texto de jogador, e diagnostico — e era justamente o que
+ * faltava para responder "e agora, o que eu conserto?" sem abrir o DevTools.
  */
-const refusalCode = (result: { error: string; status?: number }): string =>
-  result.status === undefined ? result.error : `${result.error} ${result.status}`;
+const failureNotice = (result: { error: string; status?: number }): PanelNotice => {
+  if (result.error === 'offline') return { key: 'matrix.offline' };
+  if (result.error === 'bad_server_url') return { key: 'matrix.badUrl' };
+  const code = result.status === undefined ? result.error : `${result.error} ${result.status}`;
+  return { key: 'matrix.refused', params: { code } };
+};
 
 /** Busca o perfil autoritativo e SUBSTITUI o que estava na tela. */
 const refreshProfile = async (): Promise<void> => {
@@ -1543,14 +1555,14 @@ const refreshProfile = async (): Promise<void> => {
     // chegou resposta"; todo o resto e a Aurix respondendo e recusando, e o
     // codigo dela e o que aponta para onde olhar.
     matrixView.cached = true;
-    matrixView.staleCode = result.error === 'offline' ? null : refusalCode(result);
+    matrixView.stale = failureNotice(result);
     matrixView.notice = null;
     drawMatrix();
     return;
   }
   matrixView.profile = result.value.profile;
   matrixView.cached = false;
-  matrixView.staleCode = null;
+  matrixView.stale = null;
   writeCachedProfile(result.value.profile, Date.now());
   renderer.setProspectorGeneration(result.value.profile.generation);
   drawMatrix();
@@ -1616,16 +1628,13 @@ const matrixHandlers: MatrixHandlers = {
         // requisicoes e protocolo desconhecido sao a Aurix respondendo, e
         // chamar isso de conexao indisponivel mandava o jogador conferir a rede
         // por um problema que nao estava nela.
-        matrixView.notice =
-          result.error === 'offline'
-            ? { key: 'matrix.offline' }
-            : { key: 'matrix.refused', params: { code: refusalCode(result) } };
+        matrixView.notice = failureNotice(result);
         drawMatrix();
         return;
       }
       matrixView.profile = result.value.profile;
       matrixView.cached = false;
-      matrixView.staleCode = null;
+      matrixView.stale = null;
       writeCachedProfile(result.value.profile, Date.now());
       matrixView.codex = null; // desatualizado: um documento novo entrou
       matrixView.reveal = result.value.unlockedLoreFragment;
