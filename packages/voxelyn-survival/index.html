@@ -477,24 +477,31 @@
          não é movimento; quem zumbe ali é só o carimbo RETOMAR.
          ---------------------------------------------------------------- */
       #game.is-crt-hold {
-        filter: sepia(1) hue-rotate(128deg) saturate(1.6) brightness(0.92) contrast(1.08);
+        /* Fósforo de TELEVISÃO, não filtro: o contraste sobe ANTES do véu
+           — pretos fundos, realces quase estourando — porque as scanlines
+           vão comer luz e a imagem entre elas tem de continuar acesa. */
+        filter: sepia(1) hue-rotate(128deg) saturate(2.1) contrast(1.5) brightness(1.05);
       }
       #pause,
       #pause-confirm {
-        background: linear-gradient(180deg, rgba(7, 12, 11, 0.32), rgba(3, 6, 5, 0.5));
+        /* Sem filme cinza sobre o tubo: quem escurece a imagem são as
+           linhas de varredura, não um backdrop. */
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.26));
       }
       #pause::before,
       #pause-confirm::before {
+        /* Varredura de televisão: linha horizontal DOMINANTE, imagem viva
+           entre uma e outra; a máscara vertical só insinua a tríade. */
         background:
-          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.4) 0 1px, transparent 1px 3px),
-          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.26) 0 1px, transparent 1px 2px);
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.55) 0 1px, transparent 1px 4px),
+          repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
       }
       #pause::after,
       #pause-confirm::after {
         background:
-          radial-gradient(85% 42% at 50% 5%, rgba(217, 255, 250, 0.06), transparent 62%),
-          radial-gradient(135% 135% at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.6) 100%);
-        box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.55);
+          radial-gradient(85% 42% at 50% 5%, rgba(217, 255, 250, 0.07), transparent 62%),
+          radial-gradient(140% 140% at 50% 50%, transparent 64%, rgba(0, 0, 0, 0.55) 100%);
+        box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.45);
       }
       .hidden {
         display: none !important;
