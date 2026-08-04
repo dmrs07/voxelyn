@@ -528,11 +528,11 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 68 documentos: 30 protocolos, 4 marcos, 19 de Ativo, 13 Descobertas, 1 composto e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(68);
+  it('tem 88 documentos: 30 protocolos, 4 marcos, 39 de Ativo, 13 Descobertas, 1 composto e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(88);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(19);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(39);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(13);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(1);
     expect(DEFAULT_UNLOCKED_LORE).toHaveLength(1);
