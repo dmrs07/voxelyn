@@ -410,6 +410,7 @@ export const PT_BR = {
   'matrix.node.missing': 'faltam {ore} ⬡ e {cores} ◉',
   'matrix.node.missingOre': 'faltam {ore} ⬡',
   'matrix.node.missingCores': 'faltam {cores} ◉',
+  'matrix.node.sealed': 'PROTOCOLO NÃO ESPECIFICADO',
   'matrix.confirm.title': 'INCORPORAR PROTOCOLO À PRÓXIMA GERAÇÃO?',
   'matrix.confirm.cost': 'Custo: {ore} minério e {cores} núcleo(s).',
   'matrix.confirm.warning': 'Esta operação não pode ser desfeita.',
@@ -421,6 +422,8 @@ export const PT_BR = {
   'matrix.inspector.requires': 'Requer',
   'matrix.inspector.cost': 'Custo',
   'matrix.inspector.balanceAfter': 'Saldo após',
+  'matrix.inspector.sealed':
+    'A Aurix Dynamics não especifica o que ainda não alcançou. Incorpore o protocolo anterior para abrir esta especificação.',
   'matrix.legend': '● incorporado · + autorizável · ⬡ sem lastro · ✕ pré-requisito ausente',
   'matrix.declassified': 'ARQUIVO DESCLASSIFICADO',
   'matrix.generationUp': 'CHASSI HOMOLOGADO: {generation}',

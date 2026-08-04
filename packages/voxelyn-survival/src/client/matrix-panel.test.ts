@@ -8,6 +8,7 @@ import type { PublicProgressionProfile } from '@voxelyn/survival-protocol';
 import {
   needsConfirmation,
   nodeAriaLabel,
+  nodeRevealed,
   nodeState,
   panelNotice,
   purchaseEnabled,
@@ -77,6 +78,36 @@ describe('estado de um no', () => {
 
   it('sem perfil, nada e comprável', () => {
     expect(nodeState(ca01, null).kind).toBe('missing');
+  });
+
+  // Sem perfil ninguem possui nada: o bloqueio vale offline, senao um cabo
+  // desligado revelaria a arvore inteira.
+  it('sem perfil, tudo alem do primeiro tier continua bloqueado', () => {
+    expect(nodeState(ca02, null)).toEqual({ kind: 'locked', prerequisite: 'CA-01' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A regra de visibilidade: so e especificado o que ja foi comprado e o que ja
+// pode ser comprado. Um no atras de pre-requisito ausente nao mostra o que faz
+// — senao o jogador upa uma trilha inteira mirando um capstone que leu no
+// primeiro dia, e as outras tres viram paisagem.
+// ---------------------------------------------------------------------------
+
+describe('visibilidade de um protocolo', () => {
+  it('comprado e fronteira sao especificados; bloqueado nao', () => {
+    expect(nodeRevealed(nodeState(ca01, profile(0, 0, ['CA-01'])))).toBe(true);
+    // Sem lastro, mas com o pre-requisito atendido: visivel mesmo assim.
+    expect(nodeRevealed(nodeState(ca01, profile(0, 0)))).toBe(true);
+    expect(nodeRevealed(nodeState(ca02, profile(99999, 99)))).toBe(false);
+  });
+
+  it('a fronteira e exatamente um no alem do comprado, por trilha', () => {
+    for (const upgrade of UPGRADES) {
+      const revealed = nodeRevealed(nodeState(upgrade, profile(0, 0, ['CA-01'])));
+      const expected = upgrade.tier === 1 || upgrade.id === 'CA-02';
+      expect(revealed, upgrade.id).toBe(expected);
+    }
   });
 });
 
@@ -164,10 +195,18 @@ describe('quando da para comprar', () => {
 // ouve um botao por vez: ramo, codigo, nome e situacao precisam estar na fala.
 describe('rotulo de leitor de tela do no', () => {
   it('carrega ramo, codigo, nome e a situacao escrita', () => {
-    const label = nodeAriaLabel(ca02, nodeState(ca02, profile(99999, 99)));
+    const label = nodeAriaLabel(ca02, nodeState(ca02, profile(99999, 99, ['CA-01'])));
     expect(label).toContain(t('matrix.branch.chassis'));
     expect(label).toContain('CA-02');
     expect(label).toContain(t('upgrade.CA-02.name'));
+  });
+
+  // O selo vale para todo canal: o que o olho nao ve, o ouvido tambem nao.
+  it('no bloqueado fala o selo e o que ele exige, nunca o nome real', () => {
+    const label = nodeAriaLabel(ca02, nodeState(ca02, profile(99999, 99)));
+    expect(label).toContain('CA-02');
+    expect(label).toContain(t('matrix.node.sealed'));
+    expect(label).not.toContain(t('upgrade.CA-02.name'));
     expect(label).toContain(t('matrix.node.locked', { id: 'CA-01' }));
   });
 

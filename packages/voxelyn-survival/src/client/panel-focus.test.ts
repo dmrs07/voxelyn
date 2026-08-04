@@ -118,13 +118,28 @@ describe('matriz: selecao, fala e foco', () => {
   });
 
   it('o no fala ramo, codigo, nome e estado — nunca so "01 ●"', () => {
-    renderMatrixPanel(host, matrixView(), handlers);
+    // CA-01 comprado: CA-02 e fronteira, e a fronteira fala o nome real.
+    renderMatrixPanel(host, matrixView({ profile: profile(99999, 99, ['CA-01']) }), handlers);
     const ca02 = findUpgrade('CA-02');
     expect(ca02).toBeTruthy();
     const label = host.querySelector('[data-ax-focus="node:CA-02"]')?.getAttribute('aria-label');
     expect(label).toContain('CA-02');
     expect(label).toContain(t('matrix.branch.chassis'));
     expect(label).toContain(t(`upgrade.CA-02.name`));
+  });
+
+  it('o no selado nao entrega nome nem descricao, nem no inspetor', () => {
+    // Nada comprado: CA-02 esta atras de pre-requisito ausente.
+    renderMatrixPanel(host, matrixView(), handlers);
+    const label = host.querySelector('[data-ax-focus="node:CA-02"]')?.getAttribute('aria-label');
+    expect(label).toContain(t('matrix.node.sealed'));
+    expect(label).not.toContain(t('upgrade.CA-02.name'));
+    // Abrir o inspetor continua permitido — e la que mora a explicacao do
+    // bloqueio — mas o que ele mostra e o selo, nao a especificacao.
+    click(host.querySelector('[data-ax-focus="node:CA-02"]'));
+    expect(host.textContent).toContain(t('matrix.inspector.sealed'));
+    expect(host.textContent).not.toContain(t('upgrade.CA-02.name'));
+    expect(host.textContent).not.toContain(t('upgrade.CA-02.desc'));
   });
 
   it('quando o botao focado some, o foco recua para o no selecionado', () => {
