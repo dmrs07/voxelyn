@@ -24,7 +24,10 @@
 //
 // Decisões de custo, porque isto roda num celular:
 // - cada célula anima SÓ `transform: scale` com `transition-delay` própria —
-//   nenhuma propriedade de pintura muda por quadro;
+//   nenhuma propriedade de pintura muda por quadro; o lampejo teal da frente
+//   de onda é UM elemento varrendo a diagonal por transform (a versão que
+//   animava a COR de cada célula repintava centenas de clip-paths por quadro
+//   no meio da onda — era o engasgo sentido no aparelho);
 // - o sequenciamento é por setTimeout, não por transitionend: um evento
 //   perdido (aba oculta, célula removida) travaria o véu na tela para sempre;
 // - o custo tem TETO em qualquer tela: o hexágono cresce até a colmeia caber
@@ -160,12 +163,20 @@ export const deployVeil = async (seq: DeploySequence): Promise<boolean> => {
       cell.style.left = `${col * hexW + (row % 2 === 1 ? hexW / 2 : 0) - hexW / 2}px`;
       cell.style.top = `${row * hexH * 0.75 - hexH / 2}px`;
       cell.style.transitionDelay = `${delay}ms`;
-      // O mesmo atraso na ANIMAÇÃO do lampejo teal: é ele que faz a frente de
-      // onda brilhar célula a célula em vez de a tela inteira piscar junto.
-      cell.style.animationDelay = `${delay}ms`;
       veil.appendChild(cell);
     }
   }
+  // O fio da frente de onda: por cima das células (último filho), viajando a
+  // MESMA diagonal no MESMO tempo da onda — o brilho cavalga a borda que está
+  // fechando, sem custar uma animação por célula.
+  const front = document.createElement('i');
+  front.className = 'ax-veil-front';
+  const sweep = maxDelay + CELL_MS + 50;
+  front.style.animationDuration = `${sweep}ms`;
+  // O percurso em px desta tela: da diagonal x+y=0 até x+y=vw+vh, com folga
+  // para a meia-largura da faixa entrar e sair limpa.
+  veil.style.setProperty('--ax-sweep', `${(width + height) / 4 + 140}px`);
+  veil.appendChild(front);
   document.body.appendChild(veil);
 
   // Reflow: sem ele o navegador aplicaria escala 0 e 1 no mesmo quadro e
@@ -174,7 +185,6 @@ export const deployVeil = async (seq: DeploySequence): Promise<boolean> => {
   veil.classList.add('is-closed');
   seq.sound?.();
 
-  const sweep = maxDelay + CELL_MS + 50;
   await wait(sweep);
   // Sob o preto: a preparação precisa ter TERMINADO antes da troca — é isto
   // que impede o mundo de nascer (ou o loop de girar) atrás de uma tela que

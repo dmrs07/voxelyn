@@ -100,18 +100,22 @@ describe('véu de deploy', () => {
     window.removeEventListener('keydown', reached);
   });
 
-  it('cada célula carrega o proprio atraso diagonal, na transicao E no lampejo', async () => {
+  it('atrasos diagonais nas células; o lampejo é UM elemento, nao N animacoes', async () => {
     void deployVeil({ swap: () => {} });
     const cells = document.querySelectorAll<HTMLElement>('.ax-veil span');
     const delays = new Set(Array.from(cells).map((cell) => cell.style.transitionDelay));
     // Onda diagonal exige atrasos ESCALONADOS — um atraso unico seria um
     // fade de tela inteira, nao um obturador.
     expect(delays.size).toBeGreaterThan(3);
-    // O lampejo teal da frente de onda viaja com a mesma diagonal: cada
-    // celula carrega o MESMO atraso na animacao e na transicao.
+    // Celulas NAO carregam animacao propria: animar cor por celula repintava
+    // centenas de clip-paths por quadro no meio da onda. O lampejo teal e um
+    // unico elemento varrendo por transform, com a duracao da onda inteira.
     for (const cell of Array.from(cells).slice(0, 20)) {
-      expect(cell.style.animationDelay).toBe(cell.style.transitionDelay);
+      expect(cell.style.animationDelay).toBe('');
     }
+    const fronts = document.querySelectorAll<HTMLElement>('.ax-veil .ax-veil-front');
+    expect(fronts.length).toBe(1);
+    expect(fronts[0].style.animationDuration).not.toBe('');
     await vi.runAllTimersAsync();
   });
 
