@@ -248,6 +248,19 @@
           repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
         box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.55);
       }
+      /* Protocolo ATIVO é um monitor ligado na parede da matriz: o mesmo
+         vidro do carimbo, em escala de célula. Reflexo e vinheta menores,
+         mesmo raio interno — o bezel do nó continua quadrado. */
+      .ax-node.is-installed::before {
+        inset: 2px;
+        border-radius: 6px;
+        background:
+          radial-gradient(82% 46% at 50% 10%, rgba(255, 255, 255, 0.1), transparent 62%),
+          radial-gradient(140% 140% at 50% 50%, transparent 52%, rgba(0, 0, 0, 0.5) 100%),
+          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+      }
 
       /* O zumbido do carimbo primario: o unico circuito LIGADO da folha.
          Uma lampada de mata-mosquito, nao uma respiracao — a base fica sempre
@@ -1436,11 +1449,34 @@
         font-size: 10px;
         opacity: 0.85;
       }
+      /* O ícone do protocolo (Phosphor) herda a cor de estado do nó. */
+      .ax-node .ax-node-icon {
+        width: 19px;
+        height: 19px;
+        flex: 0 0 auto;
+      }
+      .ax-node .ax-node-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
       .ax-node.is-installed {
         border-color: var(--ax-teal);
-        background: rgba(79, 214, 201, 0.16);
+        background: radial-gradient(
+          120% 120% at 50% 42%,
+          rgba(79, 214, 201, 0.3),
+          rgba(79, 214, 201, 0.1)
+        );
         color: #eaf6f3;
-        box-shadow: inset 0 0 14px rgba(79, 214, 201, 0.25);
+        box-shadow:
+          0 0 12px rgba(79, 214, 201, 0.3),
+          inset 0 0 14px rgba(79, 214, 201, 0.25);
+      }
+      /* Aceso: o ícone vira o fósforo do mini-tubo, quase branco com halo
+         teal — mesma receita luminosa dos carimbos primários. */
+      .ax-node.is-installed .ax-node-icon {
+        color: #d9fffa;
+        filter: drop-shadow(0 0 5px rgba(79, 214, 201, 0.9));
       }
       .ax-node.is-affordable {
         border-color: var(--ax-teal);
@@ -1485,6 +1521,22 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
+      }
+      .ax-inspector .ax-inspector-head {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .ax-inspector .ax-inspector-icon {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 auto;
+        color: var(--ax-teal);
+      }
+      .ax-inspector .ax-inspector-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
       }
       .ax-inspector .ax-inspector-name {
         font-size: 15px;

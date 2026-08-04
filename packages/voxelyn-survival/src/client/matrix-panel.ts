@@ -37,6 +37,7 @@ import type {
   PublicProgressionProfile,
 } from '@voxelyn/survival-protocol';
 import { t, type MessageKey } from './i18n';
+import { protocolIconSvg } from './matrix-icons';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
   const node = document.createElement(tag);
@@ -320,7 +321,17 @@ const renderBranchRail = (
         view.pending === upgrade.id ? ' is-pending' : ''
       }`,
     ) as HTMLButtonElement;
-    node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
+    // O protocolo fala por icone (Phosphor, ver matrix-icons.ts); a sigla e o
+    // fallback de um id que ainda nao tem desenho. innerHTML e seguro aqui:
+    // o SVG e constante nossa, nunca dado de fora.
+    const icon = protocolIconSvg(upgrade.id);
+    if (icon) {
+      const holder = el('span', 'ax-node-icon');
+      holder.innerHTML = icon;
+      node.appendChild(holder);
+    } else {
+      node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
+    }
     node.appendChild(el('span', 'ax-node-glyph', nodeGlyph(state, view.pending === upgrade.id)));
     node.title = upgrade.id;
     node.dataset.axFocus = `node:${upgrade.id}`;
@@ -347,10 +358,20 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   }
   const state = nodeState(upgrade, view.profile);
 
-  inspector.appendChild(el('div', 'codex-code', `${upgrade.id} · T${upgrade.tier}`));
-  inspector.appendChild(
+  const head = el('div', 'ax-inspector-head');
+  const headIcon = protocolIconSvg(upgrade.id);
+  if (headIcon) {
+    const holder = el('span', 'ax-inspector-icon');
+    holder.innerHTML = headIcon;
+    head.appendChild(holder);
+  }
+  const headText = el('div');
+  headText.appendChild(el('div', 'codex-code', `${upgrade.id} · T${upgrade.tier}`));
+  headText.appendChild(
     el('div', 'ax-inspector-name', t(`upgrade.${upgrade.id}.name` as MessageKey)),
   );
+  head.appendChild(headText);
+  inspector.appendChild(head);
   inspector.appendChild(
     el('div', 'ax-inspector-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)),
   );
