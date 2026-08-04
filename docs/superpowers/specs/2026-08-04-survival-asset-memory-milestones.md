@@ -189,7 +189,7 @@ A interface nunca mostra `minKills`, próximo marco ou porcentagem do arco.
 
 ## 7. Invariantes e testes
 
-A entrega deve garantir:
+A entrega acrescenta testes que cobrem:
 
 - 20 novos IDs únicos;
 - quatro milestones por Ativo, nos limiares 3, 6, 10 e 15;
@@ -202,6 +202,12 @@ A entrega deve garantir:
 - settlement idempotente por `runId`;
 - documentos novos nascendo não lidos;
 - índice `Ver docs` contendo todos os documentos já abertos do Ativo.
+
+A configuração de CI do repositório não publicou status para a branch durante a
+implementação. A composição dos módulos foi verificada com TypeScript estrito em
+um harness local equivalente, mas a suíte integral do monorepo ainda deve ser
+executada pelo pipeline ou por um checkout com as dependências instaladas antes
+do merge.
 
 ---
 
