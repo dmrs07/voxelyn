@@ -215,9 +215,20 @@ export class PauseMenu {
     this.mountPlates();
   }
 
+  /**
+   * O feed do Veio atras do terminal vira um monitor CRT enquanto o despacho
+   * esta em espera — o tint teal entra no canvas e o vidro do tubo (grade de
+   * fosforo, reflexo, vinheta) entra na overlay, via CSS. A rescisao conta
+   * como espera: e o mesmo terminal, so que na pagina de rasgar o contrato.
+   */
+  private syncHold(): void {
+    this.canvas.classList.toggle('is-crt-hold', this.open || this.confirming);
+  }
+
   openMenu(): void {
     if (this.open || this.confirming) return;
     this.open = true;
+    this.syncHold();
     this.cancelHold();
     this.refreshLabels();
     // O aviso so aparece quando e verdade. No solo o mundo REALMENTE parou, e
@@ -233,6 +244,7 @@ export class PauseMenu {
     if (!this.open && !this.confirming) return;
     this.open = false;
     this.confirming = false;
+    this.syncHold();
     this.overlay.classList.add('hidden');
     this.confirmOverlay.classList.add('hidden');
     this.cancelHold();
@@ -286,6 +298,7 @@ export class PauseMenu {
   private leave(): void {
     this.open = false;
     this.confirming = false;
+    this.syncHold();
     this.overlay.classList.add('hidden');
     this.confirmOverlay.classList.add('hidden');
     this.cancelHold();
