@@ -405,6 +405,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.node.missing': 'need {ore} ⬡ and {cores} ◉',
   'matrix.node.missingOre': 'need {ore} ⬡',
   'matrix.node.missingCores': 'need {cores} ◉',
+  'matrix.node.sealed': 'PROTOCOL NOT SPECIFIED',
   'matrix.confirm.title': 'INCORPORATE PROTOCOL INTO THE NEXT GENERATION?',
   'matrix.confirm.cost': 'Cost: {ore} ore and {cores} core(s).',
   'matrix.confirm.warning': 'This operation cannot be undone.',
@@ -416,6 +417,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'matrix.inspector.requires': 'Requires',
   'matrix.inspector.cost': 'Cost',
   'matrix.inspector.balanceAfter': 'Balance after',
+  'matrix.inspector.sealed':
+    'Aurix Dynamics does not specify what it has not yet reached. Incorporate the previous protocol to open this specification.',
   'matrix.legend': '● installed · + authorisable · ⬡ short on funds · ✕ prerequisite missing',
   'matrix.declassified': 'FILE DECLASSIFIED',
   'matrix.generationUp': 'CHASSIS CLEARED: {generation}',

@@ -134,12 +134,16 @@ export const nodeState = (
   upgrade: UpgradeDefinition,
   profile: PublicProgressionProfile | null,
 ): NodeState => {
-  if (!profile) return { kind: 'missing', ore: upgrade.oreCost, cores: upgrade.coreCost };
-  const owned = new Set(profile.purchasedUpgradeIds);
+  const owned = new Set(profile?.purchasedUpgradeIds ?? []);
   if (owned.has(upgrade.id)) return { kind: 'installed' };
+  // Sem perfil ninguem possui nada, entao o bloqueio por pre-requisito vale
+  // tambem offline. Antes o perfil nulo caia direto em "missing", o que era
+  // inofensivo quando o estado so escolhia uma frase — mas agora ele escolhe o
+  // que o jogador VE, e um cabo desligado nao pode revelar a arvore inteira.
   if (upgrade.prerequisite && !owned.has(upgrade.prerequisite)) {
     return { kind: 'locked', prerequisite: upgrade.prerequisite };
   }
+  if (!profile) return { kind: 'missing', ore: upgrade.oreCost, cores: upgrade.coreCost };
   const missingOre = Math.max(0, upgrade.oreCost - profile.wallet.ore);
   const missingCores = Math.max(0, upgrade.coreCost - profile.wallet.cores);
   if (missingOre > 0 || missingCores > 0) {
@@ -147,6 +151,22 @@ export const nodeState = (
   }
   return { kind: 'affordable' };
 };
+
+/**
+ * Este no tem as caracteristicas ABERTAS para este perfil?
+ *
+ * A regra de produto: so e especificado o que ja foi comprado e o que ja pode
+ * ser comprado — pre-requisito instalado, mesmo sem lastro para pagar. Um no
+ * atras de pre-requisito ausente mostra posicao, tier e o que ele exige, e
+ * NADA do que faz: nem nome, nem descricao, nem icone, nem custo.
+ *
+ * Dois motivos, um de jogo e um de ficcao. De jogo: com a arvore inteira
+ * legivel, o jogador mira um capstone, upa a trilha dele de uma vez e ignora
+ * o resto; selado, cada compra revela apenas o proximo passo, e a escolha
+ * volta a ser sobre o que esta na mesa. De ficcao: e progresso cientifico —
+ * a Aurix nao especifica o que ainda nao alcancou.
+ */
+export const nodeRevealed = (state: NodeState): boolean => state.kind !== 'locked';
 
 /**
  * O que o painel ANUNCIA no topo, se e que anuncia algo.
@@ -261,7 +281,11 @@ const nodeShortLabel = (upgrade: UpgradeDefinition): string => {
  */
 export const nodeAriaLabel = (upgrade: UpgradeDefinition, state: NodeState): string => {
   const branch = t(BRANCH_LABEL[upgrade.branch].title);
-  const name = t(`upgrade.${upgrade.id}.name` as MessageKey);
+  // O selo vale para todo canal: um no nao especificado no olho tambem e nao
+  // especificado no ouvido, senao o leitor de tela viraria o furo da regra.
+  const name = nodeRevealed(state)
+    ? t(`upgrade.${upgrade.id}.name` as MessageKey)
+    : t('matrix.node.sealed');
   const status = state.kind === 'affordable' ? t('matrix.confirm.yes') : statusText(state);
   return `${branch} · ${upgrade.id} · ${name}${status ? ` — ${status}` : ''}`;
 };
@@ -323,8 +347,10 @@ const renderBranchRail = (
     ) as HTMLButtonElement;
     // O protocolo fala por icone (Phosphor, ver matrix-icons.ts); a sigla e o
     // fallback de um id que ainda nao tem desenho. innerHTML e seguro aqui:
-    // o SVG e constante nossa, nunca dado de fora.
-    const icon = protocolIconSvg(upgrade.id);
+    // o SVG e constante nossa, nunca dado de fora. Um no selado nao ganha
+    // icone: o desenho DIZ o que o protocolo faz, e e exatamente isso que a
+    // regra de visibilidade esconde — sobra a sigla, que so diz a posicao.
+    const icon = nodeRevealed(state) ? protocolIconSvg(upgrade.id) : null;
     if (icon) {
       const holder = el('span', 'ax-node-icon');
       holder.innerHTML = icon;
@@ -357,9 +383,13 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
     return inspector;
   }
   const state = nodeState(upgrade, view.profile);
+  // O inspetor e onde o selo mais importa: e o unico lugar do painel com prosa.
+  // Um no nao revelado mantem posicao, tier e o pre-requisito — a explicacao de
+  // por que ele esta fechado —, e perde nome, descricao, icone e custo.
+  const revealed = nodeRevealed(state);
 
   const head = el('div', 'ax-inspector-head');
-  const headIcon = protocolIconSvg(upgrade.id);
+  const headIcon = revealed ? protocolIconSvg(upgrade.id) : null;
   if (headIcon) {
     const holder = el('span', 'ax-inspector-icon');
     holder.innerHTML = headIcon;
@@ -368,12 +398,20 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   const headText = el('div');
   headText.appendChild(el('div', 'codex-code', `${upgrade.id} · T${upgrade.tier}`));
   headText.appendChild(
-    el('div', 'ax-inspector-name', t(`upgrade.${upgrade.id}.name` as MessageKey)),
+    el(
+      'div',
+      'ax-inspector-name',
+      revealed ? t(`upgrade.${upgrade.id}.name` as MessageKey) : t('matrix.node.sealed'),
+    ),
   );
   head.appendChild(headText);
   inspector.appendChild(head);
   inspector.appendChild(
-    el('div', 'ax-inspector-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)),
+    el(
+      'div',
+      'ax-inspector-desc',
+      revealed ? t(`upgrade.${upgrade.id}.desc` as MessageKey) : t('matrix.inspector.sealed'),
+    ),
   );
 
   const fieldRow = (label: string, value: string, valueClass?: string): HTMLElement => {
@@ -396,9 +434,13 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
       ),
     );
   }
-  inspector.appendChild(
-    fieldRow(t('matrix.inspector.cost'), `${upgrade.oreCost} ⬡ · ${upgrade.coreCost} ◉`),
-  );
+  // O custo tambem e caracteristica: escondido, ninguem poupa 200 ⬡ mirando um
+  // capstone que nem sabe o que faz. So a fronteira mostra preco.
+  if (revealed) {
+    inspector.appendChild(
+      fieldRow(t('matrix.inspector.cost'), `${upgrade.oreCost} ⬡ · ${upgrade.coreCost} ◉`),
+    );
+  }
   if (view.profile && state.kind === 'affordable') {
     inspector.appendChild(
       fieldRow(
