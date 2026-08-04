@@ -689,9 +689,23 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
  *
  * A excecao unica e a troca de habilidade no poco, que zera o cooldown por
  * design e por isso descarta o canal DIRETO, sem passar por aqui.
+ *
+ * Interrupcao (tick ainda dentro do canal) tambem emite `action_end`: o
+ * `action_start` do cast prometeu ao cliente uma pose ate o `endTick` cheio, e
+ * sem o aviso um jogador derrubado e reerguido RETOMAVA a pose de sopro sem
+ * chama nenhuma saindo. O fim natural nao avisa — ele coincide com o prazo que
+ * o cliente ja conhece.
  */
-const settleBreathChannel = (state: SurvivalState, extra: PlayerExtra): void => {
+const settleBreathChannel = (
+  state: SurvivalState,
+  slot: number,
+  events: SemanticEvent[],
+): void => {
+  const extra = state.playerExtras[slot];
   if (extra.channelingUntil === 0) return;
+  if (state.tick < extra.channelingUntil) {
+    events.push({ t: 'action_end', entity: state.players[slot].id });
+  }
   extra.channelingUntil = 0;
   extra.abilityCooldownUntil =
     state.tick +
@@ -934,7 +948,7 @@ const stepPlayer = (
   // voltaria a cuspir fogo no revive e manteria o bolt travado sem nada na tela
   // explicando por que.
   if (!extra.joined || !player.alive || extra.downed) {
-    settleBreathChannel(state, extra);
+    settleBreathChannel(state, slot, events);
     return;
   }
 
@@ -947,7 +961,7 @@ const stepPlayer = (
     player.vx = 0;
     player.vy = 0;
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
-    settleBreathChannel(state, extra);
+    settleBreathChannel(state, slot, events);
     extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
     return;
   }
@@ -1066,7 +1080,7 @@ const stepPlayer = (
   // o cooldown recem-cobrado ja bloqueia um recast neste mesmo tick, e o
   // gatilho do bolt (que le `channeling` abaixo) destrava imediatamente.
   if (extra.channelingUntil !== 0 && state.tick >= extra.channelingUntil) {
-    settleBreathChannel(state, extra);
+    settleBreathChannel(state, slot, events);
   }
 
   // habilidade. Vem ANTES do gatilho: um cast de sopro no mesmo tick do disparo
@@ -1254,7 +1268,11 @@ const stepPlayer = (
       // continuar cuspindo chama de uma habilidade que o slot nao tem mais
       // deixaria o bolt travado por um estado orfao. Descartado DIRETO, sem
       // `settleBreathChannel`: a troca zera o cooldown por design, e cobrar
-      // para zerar na linha de cima seria contradicao morta.
+      // para zerar na linha de cima seria contradicao morta. O cliente ainda
+      // recebe o `action_end` — a pose prometida pelo cast morre junto.
+      if (extra.channelingUntil > state.tick) {
+        events.push({ t: 'action_end', entity: player.id });
+      }
       extra.channelingUntil = 0;
       // As outras ofertas somem: a escolha e UMA, e um Eco que continua ali
       // depois de voce escolher convida a voltar e trocar de novo.
@@ -1297,7 +1315,7 @@ const stepPlayer = (
         // Canal de sopro atravessando a descida e liquidado ANTES: o cooldown
         // cobrado sobrevive a transicao, senao descer no meio do canal seria o
         // unico jeito de sopro sem preco.
-        for (const playerExtra of state.playerExtras) settleBreathChannel(state, playerExtra);
+        for (let s = 0; s < state.playerExtras.length; s++) settleBreathChannel(state, s, events);
         descend(state, events);
       }
       return;
@@ -1397,7 +1415,7 @@ const stepPlayer = (
           events.push({ t: 'message', key: 'sim.waitAtExit' });
         } else {
           // Mesma regra da descida: o preco do canal nao some na subida.
-          for (const playerExtra of state.playerExtras) settleBreathChannel(state, playerExtra);
+          for (let s = 0; s < state.playerExtras.length; s++) settleBreathChannel(state, s, events);
           ascend(state, events);
         }
         return;

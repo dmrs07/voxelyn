@@ -198,6 +198,27 @@ describe('sopro termico canalizado', () => {
     expect(state.playerExtra.abilityCooldownUntil).toBe(until + cooldown);
   });
 
+  it('canal interrompido emite action_end; fim natural nao', () => {
+    // O action_start do cast promete uma pose ate o endTick cheio. Cancelou
+    // antes, o cliente tem de ser avisado — senao um jogador reerguido retoma
+    // a pose de sopro sem chama nenhuma saindo.
+    const interrupted = withFlamethrower(0xf22);
+    stepRun(interrupted, [castCommand({ x: 1, y: 0 })]);
+    interrupted.player.stunnedUntil = interrupted.tick + 2;
+    const cancelled = stepRun(interrupted, [emptyCommand()]).events;
+    expect(cancelled.filter((event) => event.t === 'action_end')).toHaveLength(1);
+
+    const natural = withFlamethrower(0xf23);
+    stepRun(natural, [castCommand({ x: 1, y: 0 })]);
+    let ends = 0;
+    while (natural.playerExtra.channelingUntil !== 0) {
+      ends += stepRun(natural, [emptyCommand()]).events.filter(
+        (event) => event.t === 'action_end',
+      ).length;
+    }
+    expect(ends).toBe(0);
+  });
+
   it('canal interrompido cobra o cooldown a partir do instante do cancelamento', () => {
     // Sem isto, ser atordoado no comeco do sopro viraria recast gratis.
     const state = withFlamethrower(0xf21);

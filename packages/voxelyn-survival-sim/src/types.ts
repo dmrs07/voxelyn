@@ -476,6 +476,14 @@ export type RailTrack = {
 
 export type SemanticEvent =
   | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
+  /**
+   * Uma acao telegrafada morreu ANTES do `endTick` anunciado. Existe para o
+   * sopro canalizado: `action_start` promete uma pose de 2,5 s, e um canal
+   * cancelado (stun, queda, troca no poco) deixaria o cliente segurando a pose
+   * — e retomando-a apos o revive — sem chama nenhuma saindo. O fim natural
+   * NAO emite isto: ele coincide com o `endTick` que o cliente ja conhece.
+   */
+  | { t: 'action_end'; entity: number }
   | { t: 'hit'; x: number; y: number; amount: number; target: number }
   | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
   | { t: 'explosion'; x: number; y: number; radius: number; source: 'player' | 'enemy' | 'environment'; owner?: number }

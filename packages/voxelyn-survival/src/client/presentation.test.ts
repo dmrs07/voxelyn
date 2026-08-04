@@ -288,6 +288,38 @@ describe('EntityPresentation', () => {
     }
   });
 
+  it('action_end apaga o intent: pose de sopro cancelada nao volta depois do revive', () => {
+    const presentation = new EntityPresentation();
+    // O cast prometeu 50 ticks de pose; a sim cancelou no tick 10.
+    presentation.ingest(
+      [
+        {
+          t: 'action_start',
+          entity: 1,
+          action: 'breath',
+          x: 0,
+          y: 0,
+          dx: 1,
+          dy: 0,
+          startTick: 0,
+          releaseTick: 0,
+          endTick: 50,
+        },
+        { t: 'action_end', entity: 1 },
+      ] as never,
+      1_000
+    );
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
+    const presented = presentation.animationFor(
+      entity as never, { tick: 12 } as never, baseAnim('idle') as never, 1_500
+    );
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      expect(presented.anim.upper.animation).toBe('idle');
+      expect(presented.anim.recoil).toBe(0);
+    }
+  });
+
   it('durante o sopro canalizado o tronco segue a mira VIVA, nao a do instante do cast', () => {
     const presentation = new EntityPresentation();
     // A acao `breath` durou dezenas de ticks e nasceu apontando para +x; no meio

@@ -236,6 +236,14 @@ export class EntityPresentation {
         // renderização, ancorado ao elapsed autoritativo daquele instante.
         const clock = this.actionVisualClocks.get(event.entity);
         if (clock && clock.startTick !== event.startTick) this.actionVisualClocks.delete(event.entity);
+      } else if (event.t === 'action_end') {
+        // A simulação cancelou a ação antes do endTick prometido (canal de
+        // sopro interrompido por stun, queda ou troca no poço). Sem apagar o
+        // intent aqui, um jogador reerguido RETOMAVA a pose de sopro — o
+        // player_down preserva intents de propósito, e o prazo original ainda
+        // não venceu.
+        this.actions.delete(event.entity);
+        this.actionVisualClocks.delete(event.entity);
       } else if (event.t === 'player_down') {
         this.downedAt.set(event.slot + 1, nowMs);
       } else if (event.t === 'revive') {
