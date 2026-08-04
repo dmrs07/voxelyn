@@ -1,4 +1,5 @@
-// Os 64 documentos da Aurix Dynamics, em pt-BR e en.
+// Os documentos da Aurix Dynamics, em pt-BR e en (a contagem viva mora no
+// catalogo: TOTAL_LORE_FRAGMENTS em progression-lore.ts).
 //
 // Regras de escrita, para quem for acrescentar o trigesimo:
 //
@@ -404,6 +405,91 @@ const pt: Record<LoreFragmentId, LoreText> = {
     body: 'O compasso do SULF-08 foi cruzado com o arquivo da operação anterior.\n\nV., operador de ventilação do turno da noite, bloco 7. Tocava fole na cantina — valsas, sempre valsas; dizia que era o único compasso que os pulmões entendem. Quando a manutenção da ventilação saiu do orçamento, o setor dele passou a depender de fole manual.\n\nNo colapso do bolsão, V. ficou na manivela. Bombeou ar para a galeria até a última pessoa da equipe sair. O relatório da época registra "perda de um operador e um equipamento de ventilação". Nesta ordem.\n\nO SULF-08 rompe o gás na direção das nossas unidades e se retira. Durante ciclos lemos isso como tática. Não é. Ele dá às máquinas da companhia exatamente o que a companhia deu a ele: o ar que havia.\n\nA oscilação nunca perde o compasso. Em alguma parte do Veio, a valsa continua.',
     source: 'Sem departamento atribuído',
   },
+  'AX-INC-035': {
+    title: 'Incidente 35 — falha de ventilação, bloco 7',
+    summary: 'O registro do colapso. E de uma contagem que não parou na hora certa.',
+    body: 'Recuperado do arquivo da operação anterior: registro do colapso de bolsão no setor de ventilação do bloco 7.\n\nOs sensores do compartimento remoto reportaram ausência de sinais vitais aos 11 minutos. O operador da estação manual continuou o acionamento. A equipe saiu viva aos 34 minutos: os sensores estavam em falha. O operador, não. O laudo fixa o óbito dele entre os minutos 29 e 31, por exaustão tóxica, na manivela.\n\nO registrador da estação captou a voz dele contando os ciclos do equipamento: "oitenta e sete. oitenta e oito. oitenta e nove."\n\nA contagem prossegue, na gravação, até o minuto 34. O laudo não comenta os minutos finais. O campo "observações" está em branco.',
+    source: 'Comitê de Incidentes — anexo recuperado da operação anterior',
+  },
+  'AX-EXE-041': {
+    title: 'Rubrica: Persistência Mnêmica Operacional',
+    summary: 'O fenômeno ganha nome aprovado. As palavras de campo, não.',
+    body: 'Relatórios sobre comportamento residual atribuído a pessoal da operação anterior passam a ser arquivados sob a rubrica única: PERSISTÊNCIA MNÊMICA OPERACIONAL.\n\nO termo de campo "Eco" fica reservado à biblioteca de Pesquisa e vedado em relatório operacional.\n\nEm relatórios sobre o ativo SULF-08, ficam vedados os termos "respiração", "contagem" e "operador". A cadência ternária registrada entre os sopros do espécime é classificada como artefato de compressão do canal de áudio.\n\nEngenharia observou que o canal de áudio não possui compressão. A observação não consta da versão aprovada.',
+    source: 'Conselho Executivo — ordem de arquivamento',
+  },
+  'AX-INC-036': {
+    title: 'Incidente 36 — galeria alagada, quarta descida',
+    summary: '"Segura em mim. Não solta." O encerramento diz "recuperação completa".',
+    body: 'Registro da quarta descida não autorizada da mergulhadora de resgate [REDACTED], operação anterior.\n\nEfetivo da ocorrência: duas pessoas — a mergulhadora e o mineiro preso. Última transmissão clara, aos 8 minutos: "segura em mim. Não solta."\n\nO mineiro foi retirado vivo pela abertura norte. A galeria cedeu aos 11 minutos.\n\nO campo de encerramento do relatório registra: "recuperação completa". O inventário mortuário do ciclo contém uma entrada a menos que o efetivo da ocorrência. Os dois documentos foram arquivados em pastas separadas e nunca conciliados.',
+    source: 'Comitê de Incidentes — anexo recuperado da operação anterior',
+  },
+  'AX-EXE-044': {
+    title: 'Reclassificação: trajetos do AQU-03',
+    summary: 'Arrastar para uma bolsa de ar vira coincidência. Por escrito.',
+    body: 'Três relatórios de campo registram unidades arrastadas pelo AQU-03 até bolsas de ar ou aberturas de galeria, e liberadas.\n\nFica determinado: os três eventos são reclassificados como coincidência hidrodinâmica. A expressão "comportamento de resgate" fica vedada em relatório operacional, sob a rubrica de Persistência Mnêmica Operacional aplicável apenas mediante autorização.\n\nRegistra-se, sem constar da ordem: os pontos de destino dos arrastos correspondem a saídas do mapa ANTERIOR ao colapso da galeria sul. O espécime não leva as unidades para onde há saída. Leva para onde havia.',
+    source: 'Conselho Executivo — ordem de reclassificação',
+  },
+  'AX-ENG-024': {
+    title: 'Gradiente térmico: GLAC-02',
+    summary: 'O calor subtraído não some. Ele vai para algum lugar.',
+    body: 'ESPÉCIME GLAC-02. Análise de fluxo térmico.\n\nA subtração de calor registrada no contato não é uniforme: forma gradiente. O calor não é absorvido nem dissipado — é DESLOCADO, com direção estável entre ocorrências.\n\nA direção converge para o setor de alojamentos desativados do bloco 7. As leituras residuais naquele setor permanecem 0,4 grau acima do modelo, sem fonte identificada, desde a desativação.\n\nSolicitamos autorização para instrumentar os alojamentos. A solicitação aguarda parecer havia três ciclos quando este documento foi arquivado.',
+    source: 'Engenharia Térmica — análise de fluxo',
+  },
+  'AX-INC-037': {
+    title: 'Incidente 37 — diário da casa de máquinas',
+    summary: 'As últimas entradas do diário registram temperaturas. De outro lugar.',
+    body: 'Recuperado da casa de máquinas do bloco 7: o diário de turno da operadora de caldeira, noite da falha dupla.\n\nAs entradas seguem o procedimento: horário, pressão, destino do fluxo. A partir das 02:10, a temperatura ambiente do posto cai abaixo do limite de operação segura. As entradas continuam.\n\n"02:40 — Dormitório 3: estável." "03:10 — Dormitório 1: estável." "03:40 — Dormitório 3: estável."\n\nO laudo fixa a perda de consciência da operadora por hipotermia entre 02:50 e 03:00. A caligrafia das entradas seguintes é idêntica à das anteriores. O laudo não comenta as entradas seguintes.',
+    source: 'Comitê de Incidentes — anexo recuperado da operação anterior',
+  },
+  'AX-ENG-026': {
+    title: 'Padrão acústico: CRIST-01',
+    summary: 'Três batidas, pausa, duas, pausa, três. Estatisticamente irrelevante.',
+    body: 'ESPÉCIME CRIST-01. Análise do padrão de resposta a impacto.\n\nA resposta acústica do espécime a impactos de escavação organiza-se em grupos recorrentes: três pulsos, intervalo, dois pulsos, intervalo, três pulsos.\n\nO padrão coincide com o código de emergência por impacto do manual da operação anterior, seção 9: "sinal de soterramento com sobreviventes".\n\nClassificação avaliou a correspondência como estatisticamente irrelevante, dado que sequências curtas coincidem com facilidade. A análise que estimou a probabilidade da coincidência em [REDACTED] não foi incorporada ao parecer.\n\nRegistra-se que, em 6 das 41 ocorrências, o padrão PRECEDE o primeiro impacto da unidade.',
+    source: 'Engenharia de Sensores — análise de resposta',
+  },
+  'AX-INC-038': {
+    title: 'Incidente 38 — registro sísmico, frente leste',
+    summary: 'O sinal do soterramento constava dos instrumentos. Por onze dias.',
+    body: 'Recuperado do arquivo sísmico da operação anterior: registro da frente de lavra leste, ciclo do colapso.\n\nA partir de 40 minutos após o colapso, os geofones registram padrão rítmico no estrato: três pulsos, intervalo, dois, intervalo, três. O parecer técnico da época, anexo B, afirma: "o padrão não é compatível com acomodação natural de material".\n\nO padrão persiste, com amplitude decrescente, por onze dias.\n\nO registro foi arquivado sem encaminhamento. O anexo B foi arquivado em separado.',
+    source: 'Comitê de Incidentes — arquivo sísmico recuperado',
+  },
+  'AX-EXE-045': {
+    title: 'Encerramento da frente leste',
+    summary: 'O resgate custava mais do que o resgatado. A conta fechou assim.',
+    body: 'Deliberação sobre a frente de lavra leste, operação anterior, recuperada na incorporação.\n\nCusto estimado da escavação de resgate: 6,2 unidades-equivalente. Valor contábil do pessoal e equipamento retidos: 4,7. A operação de resgate fica cancelada.\n\nO sinal rítmico registrado pelos geofones fica reclassificado como atividade sísmica residual. A frente leste fica selada e removida da cartografia operacional.\n\nA deliberação encerra: "o assunto não requer novas reuniões."',
+    source: 'Conselho Executivo da operação anterior — deliberação, recuperada',
+  },
+  'AX-UNK-055': {
+    title: 'Sobre quem responde',
+    summary: 'O código aparece onde nunca houve gente. Ou aprendeu a andar.',
+    body: 'O padrão três-dois-três não está confinado à frente leste.\n\nGeofones registram o mesmo código em quatro setores sem histórico de presença humana — dois deles anteriores à própria operação anterior. Em nenhum caso há colapso, equipamento ou corpo. Em dois casos, o padrão precede a chegada da unidade que o registrou.\n\nO CRIST-01 não é a fonte. Destruído um corpo ressonante, as batidas continuam nas paredes por até 40 minutos, em amplitude decrescente, como despedida ou como insistência.\n\nEste registro não conclui que as pessoas da frente leste estão espalhadas pelo estrato. Registra a hipótese que nenhum parecer aprovado aceitou formular: o estrato aprendeu o código. O estrato aprendeu a pedir socorro.\n\nA unidade pensa que acordou o espécime. O espécime talvez pense que, finalmente, alguém respondeu.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-ENG-027': {
+    title: 'Geometria de bloqueio: VULC-05',
+    summary: 'Ele não fecha passagens quaisquer. Fecha comportas.',
+    body: 'ESPÉCIME VULC-05. Análise dos bloqueios de escória.\n\nOs selos produzidos pelo espécime não têm dimensão aleatória: 31 de 34 medições coincidem, dentro da tolerância, com o vão padrão das comportas industriais da operação anterior.\n\nO espécime não sela toda abertura disponível. Sela as categorias de acesso listadas na seção de contenção do manual de emergência daquela operação — e ignora as demais.\n\nA hipótese de que uma formação de escória consulte um manual não foi formulada. A medição foi verificada duas vezes.',
+    source: 'Engenharia Estrutural — análise de bloqueio',
+  },
+  'AX-INC-039': {
+    title: 'Incidente 39 — comporta sul',
+    summary: '"Não abram esta porta." A lista de um lado. As instalações do outro.',
+    body: 'Recuperado do arquivo da operação anterior: registro do incidente da comporta sul.\n\nDiante da frente de contaminação, o chefe de segurança [REDACTED] fechou manualmente a comporta e a manteve travada contra a reabertura. Do lado isolado permaneceram 9 trabalhadores. A última ordem registrada dele, no canal geral: "não abram esta porta."\n\nA contenção preservou a casa de força, o depósito de material homologado e os dois níveis inferiores.\n\nA lista de óbitos do ciclo registra 9 entradas com o mesmo código de setor. A ata do ciclo seguinte registra uma condecoração póstuma por "decisão de contenção exemplar".',
+    source: 'Comitê de Incidentes — anexo recuperado da operação anterior',
+  },
+  'AX-EXE-046': {
+    title: 'Revisão da comporta sul',
+    summary: 'A condecoração vira falha humana. A falha vira material de treino.',
+    body: 'Revisão do incidente da comporta sul, conduzida na incorporação do acervo.\n\nPrimeira determinação: a condecoração póstuma fica revogada. O fechamento é reclassificado como falha humana com resultado acidentalmente favorável — a decisão correta teria preservado também os 9 ativos de pessoal, cuja perda consta do passivo.\n\nSegunda determinação, memorando anexo: o caso integra o estudo "indução de prioridade" — sob que condições um operador escolhe o ativo corporativo em vez da vida. O estudo foi encaminhado ao programa de treinamento do modelo comportamental.\n\nO modelo aprendeu o caso. O que o modelo concluiu dele não consta deste documento.',
+    source: 'Conselho Executivo — revisão de incidente',
+  },
+  'AX-UNK-056': {
+    title: 'Sobre a porta',
+    summary: 'Ele ainda sela a mesma direção. A pergunta é o que fica do outro lado.',
+    body: 'O VULC-05 não sela em direções aleatórias. Sobrepostos os registros, todos os bloqueios fecham acessos na MESMA orientação relativa ao antigo setor sul.\n\nQuando uma unidade elimina o espécime e rompe o selo, os sensores registram, do lado que ele protegia: diferencial de pressão positivo e traço de contaminação em elevação, por 12 a 40 minutos. Em três ocorrências, o incidente subsequente do setor consta do registro do ciclo.\n\nA ordem "não abram esta porta" não especificava por quanto tempo. Ordens de contenção não expiram: são revogadas — e ninguém com autoridade sobre aquela porta está vivo para revogá-la.\n\nA pergunta que este registro arquiva sem resposta: ele está impedindo a nossa entrada, ou ainda obedecendo à ordem de não deixar aquilo sair?',
+    source: 'Sem departamento atribuído',
+  },
+
   'AX-INC-031': {
     title: 'Padrão de preensão: AQU-03',
     summary: 'A pega da Lampreia está no manual de mergulho. Figura 12.',
@@ -877,6 +963,91 @@ const en: Record<LoreFragmentId, LoreText> = {
     body: 'The SULF-08 cadence has been cross-referenced with the previous operation’s archive.\n\nV., night-shift ventilation operator, block 7. He played the bellows-box in the canteen — waltzes, always waltzes; he said it was the only time signature lungs understand. When ventilation maintenance was cut from the budget, his sector came to depend on a hand bellows.\n\nWhen the pocket collapsed, V. stayed at the crank. He pumped air into the gallery until the last of his crew was out. The report of the time records "loss of one operator and one ventilation apparatus". In that order.\n\nSULF-08 breaches gas toward our units and withdraws. For cycles we read that as tactics. It is not. It gives the company’s machines exactly what the company gave him: the air there was.\n\nThe oscillation never drops the beat. Somewhere in the Vein, the waltz goes on.',
     source: 'No department assigned',
   },
+  'AX-INC-035': {
+    title: 'Incident 35 — ventilation failure, block 7',
+    summary: 'The record of the collapse. And of a count that did not stop on time.',
+    body: 'Recovered from the previous operation’s archive: record of the pocket collapse in the block 7 ventilation sector.\n\nThe remote compartment sensors reported absence of vital signs at 11 minutes. The manual station operator kept cranking. The crew walked out alive at 34 minutes: the sensors had failed. The operator had not. The finding places his death between minutes 29 and 31, of toxic exhaustion, at the crank.\n\nThe station recorder picked up his voice counting the equipment cycles: "eighty-seven. Eighty-eight. Eighty-nine."\n\nOn the recording, the count continues to minute 34. The finding does not comment on the final minutes. The "remarks" field is blank.',
+    source: 'Incident Committee — annex recovered from the previous operation',
+  },
+  'AX-EXE-041': {
+    title: 'Filing rubric: Operational Mnemonic Persistence',
+    summary: 'The phenomenon gets an approved name. The field words do not.',
+    body: 'Reports of residual behaviour attributed to previous-operation personnel are henceforth filed under a single rubric: OPERATIONAL MNEMONIC PERSISTENCE.\n\nThe field term "Echo" is reserved to the Research library and prohibited in operational reporting.\n\nIn reports concerning asset SULF-08, the terms "breathing", "count" and "operator" are prohibited. The triple-time cadence recorded between the specimen’s blasts is classified as an audio-channel compression artefact.\n\nEngineering noted that the audio channel has no compression. The note does not appear in the approved version.',
+    source: 'Executive Board — filing order',
+  },
+  'AX-INC-036': {
+    title: 'Incident 36 — flooded gallery, fourth descent',
+    summary: '"Hold on to me. Don’t let go." The closure field says "full recovery".',
+    body: 'Record of the fourth unauthorised descent by rescue diver [REDACTED], previous operation.\n\nPersonnel on the occurrence: two — the diver and the trapped miner. Last clear transmission, at 8 minutes: "hold on to me. Don’t let go."\n\nThe miner was brought out alive through the north opening. The gallery gave way at 11 minutes.\n\nThe report’s closure field records: "full recovery". The cycle’s morgue inventory contains one entry fewer than the occurrence personnel. The two documents were filed in separate folders and never reconciled.',
+    source: 'Incident Committee — annex recovered from the previous operation',
+  },
+  'AX-EXE-044': {
+    title: 'Reclassification: AQU-03 trajectories',
+    summary: 'Dragging toward an air pocket becomes coincidence. In writing.',
+    body: 'Three field reports record units dragged by AQU-03 to air pockets or gallery openings, and released.\n\nIt is hereby determined: the three events are reclassified as hydrodynamic coincidence. The expression "rescue behaviour" is prohibited in operational reporting; the Operational Mnemonic Persistence rubric applies only upon authorisation.\n\nNoted, without forming part of this order: the drag destinations correspond to exits on the map as it stood BEFORE the south gallery collapse. The specimen does not take units to where there is a way out. It takes them to where there was one.',
+    source: 'Executive Board — reclassification order',
+  },
+  'AX-ENG-024': {
+    title: 'Thermal gradient: GLAC-02',
+    summary: 'The subtracted heat does not vanish. It goes somewhere.',
+    body: 'SPECIMEN GLAC-02. Thermal flux analysis.\n\nThe heat subtraction recorded on contact is not uniform: it forms a gradient. The heat is neither absorbed nor dissipated — it is DISPLACED, with a direction stable across occurrences.\n\nThe direction converges on the decommissioned dormitory sector of block 7. Residual readings in that sector have held 0.4 degrees above model, with no identified source, since decommissioning.\n\nWe requested authorisation to instrument the dormitories. The request had been awaiting an opinion for three cycles when this document was filed.',
+    source: 'Thermal Engineering — flux analysis',
+  },
+  'AX-INC-037': {
+    title: 'Incident 37 — machine-room logbook',
+    summary: 'The last entries in the log record temperatures. From somewhere else.',
+    body: 'Recovered from the block 7 machine room: the boiler operator’s shift log, night of the double failure.\n\nThe entries follow procedure: time, pressure, flow destination. From 02:10, the ambient temperature of the post falls below the safe-operation limit. The entries continue.\n\n"02:40 — Dormitory 3: stable." "03:10 — Dormitory 1: stable." "03:40 — Dormitory 3: stable."\n\nThe finding places the operator’s loss of consciousness from hypothermia between 02:50 and 03:00. The handwriting of the subsequent entries is identical to the earlier ones. The finding does not comment on the subsequent entries.',
+    source: 'Incident Committee — annex recovered from the previous operation',
+  },
+  'AX-ENG-026': {
+    title: 'Acoustic pattern: CRIST-01',
+    summary: 'Three knocks, pause, two, pause, three. Statistically irrelevant.',
+    body: 'SPECIMEN CRIST-01. Impact-response pattern analysis.\n\nThe specimen’s acoustic response to excavation impacts organises into recurring groups: three pulses, interval, two pulses, interval, three pulses.\n\nThe pattern matches the impact emergency code in the previous operation’s manual, section 9: "burial signal, survivors present".\n\nClassification assessed the match as statistically irrelevant, since short sequences coincide easily. The analysis estimating the probability of that coincidence at [REDACTED] was not incorporated into the opinion.\n\nIt is noted that in 6 of 41 occurrences the pattern PRECEDES the unit’s first impact.',
+    source: 'Sensor Engineering — response analysis',
+  },
+  'AX-INC-038': {
+    title: 'Incident 38 — seismic record, east face',
+    summary: 'The burial signal was on the instruments. For eleven days.',
+    body: 'Recovered from the previous operation’s seismic archive: record of the east mining face, cycle of the collapse.\n\nFrom 40 minutes after the collapse, the geophones register a rhythmic pattern in the stratum: three pulses, interval, two, interval, three. The technical opinion of the time, annex B, states: "the pattern is not consistent with natural settling of material".\n\nThe pattern persists, with decreasing amplitude, for eleven days.\n\nThe record was filed with no referral. Annex B was filed separately.',
+    source: 'Incident Committee — recovered seismic archive',
+  },
+  'AX-EXE-045': {
+    title: 'Closure of the east face',
+    summary: 'The rescue cost more than the rescued. The arithmetic closed it.',
+    body: 'Deliberation on the east mining face, previous operation, recovered at incorporation.\n\nEstimated cost of the rescue excavation: 6.2 unit-equivalents. Book value of the retained personnel and equipment: 4.7. The rescue operation is cancelled.\n\nThe rhythmic signal registered by the geophones is reclassified as residual seismic activity. The east face is sealed and removed from operational cartography.\n\nThe deliberation closes: "the matter requires no further meetings."',
+    source: 'Executive Board of the previous operation — deliberation, recovered',
+  },
+  'AX-UNK-055': {
+    title: 'On what answers back',
+    summary: 'The code appears where no one ever was. Or it learned to travel.',
+    body: 'The three-two-three pattern is not confined to the east face.\n\nGeophones register the same code in four sectors with no history of human presence — two of them predating the previous operation itself. In no case is there a collapse, equipment, or a body. In two cases the pattern precedes the arrival of the unit that recorded it.\n\nCRIST-01 is not the source. Destroy a resonant body and the knocking continues in the walls for up to 40 minutes, at decreasing amplitude, like a farewell or like insistence.\n\nThis record does not conclude that the people of the east face are spread through the stratum. It records the hypothesis no approved opinion would formulate: the stratum learned the code. The stratum learned to call for help.\n\nThe unit thinks it woke the specimen. The specimen may think that, at last, someone answered.',
+    source: 'No department assigned',
+  },
+  'AX-ENG-027': {
+    title: 'Blockage geometry: VULC-05',
+    summary: 'It does not seal just any passage. It seals floodgates.',
+    body: 'SPECIMEN VULC-05. Analysis of scoria blockages.\n\nThe seals produced by the specimen are not of arbitrary dimension: 31 of 34 measurements match, within tolerance, the standard aperture of the previous operation’s industrial floodgates.\n\nThe specimen does not seal every available opening. It seals the access categories listed in the containment section of that operation’s emergency manual — and ignores the rest.\n\nThe hypothesis that a scoria formation consults a manual was not formulated. The measurement was verified twice.',
+    source: 'Structural Engineering — blockage analysis',
+  },
+  'AX-INC-039': {
+    title: 'Incident 39 — south floodgate',
+    summary: '"Do not open this door." The list on one side. The facilities on the other.',
+    body: 'Recovered from the previous operation’s archive: record of the south floodgate incident.\n\nFacing the contamination front, security chief [REDACTED] closed the floodgate by hand and held it locked against reopening. On the isolated side remained 9 workers. His last recorded order, on the general channel: "do not open this door."\n\nThe containment preserved the powerhouse, the cleared-material depot and the two lower levels.\n\nThe cycle’s casualty list records 9 entries with the same sector code. The following cycle’s minutes record a posthumous commendation for "exemplary containment decision".',
+    source: 'Incident Committee — annex recovered from the previous operation',
+  },
+  'AX-EXE-046': {
+    title: 'South floodgate review',
+    summary: 'The commendation becomes human error. The error becomes training material.',
+    body: 'Review of the south floodgate incident, conducted at incorporation of the archive.\n\nFirst determination: the posthumous commendation is revoked. The closure is reclassified as human error with accidentally favourable outcome — the correct decision would also have preserved the 9 personnel assets, whose loss appears on the liability side.\n\nSecond determination, attached memorandum: the case joins the "priority induction" study — under what conditions an operator chooses the corporate asset over the life. The study was forwarded to the behavioural model training program.\n\nThe model learned the case. What the model concluded from it does not appear in this document.',
+    source: 'Executive Board — incident review',
+  },
+  'AX-UNK-056': {
+    title: 'On the door',
+    summary: 'It still seals the same direction. The question is what is on the other side.',
+    body: 'VULC-05 does not seal in random directions. Overlay the records and every blockage closes access in the SAME orientation relative to the old south sector.\n\nWhen a unit eliminates the specimen and breaches the seal, sensors register, from the side it protected: positive pressure differential and a rising contamination trace, for 12 to 40 minutes. In three occurrences, the sector’s subsequent incident appears in the cycle record.\n\nThe order "do not open this door" did not specify for how long. Containment orders do not expire: they are revoked — and no one with authority over that door is alive to revoke it.\n\nThe question this record files without an answer: is it keeping us out, or still obeying the order not to let that thing through?',
+    source: 'No department assigned',
+  },
+
   'AX-INC-031': {
     title: 'Grip pattern: AQU-03',
     summary: 'The Lamprey’s hold is in the diving manual. Figure 12.',

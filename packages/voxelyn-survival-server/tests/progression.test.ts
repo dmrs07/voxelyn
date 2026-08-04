@@ -32,6 +32,7 @@ import { MemoryProgressionStore } from '../src/progression-store';
 import {
   ASSET_ARCHETYPES,
   ASSET_LORE,
+  ASSET_MILESTONE_LORE,
   DEFAULT_UNLOCKED_LORE,
   DISCOVERY_LORE,
   LORE_DISCOVERY_BITS,
@@ -528,11 +529,16 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 75 documentos: 30 protocolos, 4 marcos, 25 de Ativo, 13 Descobertas, 2 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(75);
+  it('tem 89 documentos: 30 protocolos, 4 marcos, 39 de Ativo, 13 Descobertas, 2 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(89);
+    // A contagem de Ativo = 15 fichas + as trilhas de ASSET_MILESTONE_LORE,
+    // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 4 + 1 + 15 + ASSET_MILESTONE_LORE.length + 13 + 2);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(25);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
+      15 + ASSET_MILESTONE_LORE.length,
+    );
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(13);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(2);
     expect(DEFAULT_UNLOCKED_LORE).toHaveLength(1);
@@ -767,33 +773,62 @@ describe('liquidacao com fatos narrativos', () => {
     expect(expectedLoreIds([], { fungal_horse: 15 }, 0)).toContain('AX-UNK-046');
   });
 
-  // As tres linhas de Solaris seguem o mesmo desenho: 8 abre a anomalia que a
-  // burocracia nao consegue arquivar, 20 nomeia a pessoa.
-  it('Fole, Lampreia e Espectro revelam as pessoas nos mesmos marcos', () => {
-    for (const [archetype, mid, final] of [
-      ['bellows', 'AX-ENG-019', 'AX-UNK-042'],
-      ['mud_lamprey', 'AX-INC-031', 'AX-UNK-048'],
-      ['frost_wraith', 'AX-EXE-037', 'AX-UNK-053'],
-    ] as const) {
-      expect(expectedLoreIds([], { [archetype]: 7 }, 0), archetype).not.toContain(mid);
-      expect(expectedLoreIds([], { [archetype]: 8 }, 0), archetype).toContain(mid);
-      expect(expectedLoreIds([], { [archetype]: 19 }, 0), archetype).not.toContain(final);
-      expect(expectedLoreIds([], { [archetype]: 20 }, 0), archetype).toContain(final);
+  // Cada marco do catalogo abre EXATAMENTE no seu limiar. Data-driven sobre
+  // ASSET_MILESTONE_LORE: um arco novo entra na tabela e ja esta coberto.
+  it('todo marco de abate abre no limiar, e um abate antes nao', () => {
+    for (const { archetype, minKills, fragmentId } of ASSET_MILESTONE_LORE) {
+      expect(
+        expectedLoreIds([], { [archetype]: minKills - 1 }, 0),
+        `${fragmentId} @ ${minKills - 1}`,
+      ).not.toContain(fragmentId);
+      expect(
+        expectedLoreIds([], { [archetype]: minKills }, 0),
+        `${fragmentId} @ ${minKills}`,
+      ).toContain(fragmentId);
     }
   });
 
-  // A sintese so existe para quem terminou as QUATRO historias humanas.
+  it('os marcos sao dados bem formados: ordenados por arquetipo, sem repeticao', () => {
+    const byArchetype = new Map<string, number[]>();
+    const fragmentIds = ASSET_MILESTONE_LORE.map((m) => m.fragmentId);
+    expect(new Set(fragmentIds).size).toBe(fragmentIds.length);
+    for (const { archetype, minKills } of ASSET_MILESTONE_LORE) {
+      const list = byArchetype.get(archetype) ?? [];
+      list.push(minKills);
+      byArchetype.set(archetype, list);
+    }
+    for (const [archetype, thresholds] of byArchetype) {
+      expect(thresholds, archetype).toEqual([...thresholds].sort((a, b) => a - b));
+      expect(new Set(thresholds).size, archetype).toBe(thresholds.length);
+    }
+    // As cinco assinaturas de estrato tem trilha completa (4 marcos + ficha).
+    for (const signature of ['resonant', 'mud_lamprey', 'bellows', 'scoriac', 'frost_wraith']) {
+      expect(byArchetype.get(signature)?.length, signature).toBe(4);
+    }
+  });
+
+  // Uma run que cruza VARIOS marcos de uma vez abre todos os elegiveis.
+  it('cruzar varios marcos numa unica liquidacao abre todos de uma vez', () => {
+    const ids = expectedLoreIds([], { resonant: 15 }, 0);
+    for (const doc of ['AX-ENG-026', 'AX-INC-038', 'AX-EXE-045', 'AX-UNK-055']) {
+      expect(ids).toContain(doc);
+    }
+  });
+
+  // A sintese so existe para quem terminou as QUATRO historias humanas —
+  // Ressonante e Scoriac ficam fora de proposito (a sintese nao e formula).
   it('a sintese de Solaris exige os quatro finais', () => {
     const threeOfFour = {
       fungal_horse: 15,
-      bellows: 20,
-      mud_lamprey: 20,
-      frost_wraith: 19,
+      bellows: 15,
+      mud_lamprey: 15,
+      frost_wraith: 14,
     };
     expect(expectedLoreIds([], threeOfFour, 0)).not.toContain('AX-UNK-054');
     expect(
-      expectedLoreIds([], { ...threeOfFour, frost_wraith: 20 }, 0),
+      expectedLoreIds([], { ...threeOfFour, frost_wraith: 15 }, 0),
     ).toContain('AX-UNK-054');
+    expect(expectedLoreIds([], { resonant: 99, scoriac: 99 }, 0)).not.toContain('AX-UNK-054');
   });
 
   // Perfil da versao anterior: tinha knownArchetypes e nenhuma contagem.
@@ -819,6 +854,36 @@ describe('liquidacao com fatos narrativos', () => {
     expect(index.assets.fungal_horse).toEqual(
       expect.arrayContaining(['AX-INC-024', 'AX-ENG-023', 'AX-INC-034', 'AX-EXE-043', 'AX-UNK-046']),
     );
+  });
+
+  it('o dossie do Ativo inclui os docs de Descoberta dele, em ordem de leitura', async () => {
+    const store = new MemoryProgressionStore();
+    await store.createProfile('p1', NOW);
+    // 15 abates de Corcel + a descoberta do abate: a necropsia (INC-033, que e
+    // documento de DESCOBERTA) entra no dossie do fungal_horse.
+    await store.settleRun({
+      profileId: 'p1',
+      runId: 'run-1',
+      phase: 'extracted',
+      cargoOre: 5,
+      kills: { fungal_horse: 15 },
+      discoveries: 1 << 9, // DISCOVERY_HORSE_FELLED
+      seed: 7,
+      simulationVersion: 19,
+      durationTicks: 100,
+      now: NOW,
+      idFactory,
+    });
+    const profile = await store.getProfile('p1');
+    if (!profile) throw new Error('perfil sumiu');
+    const index = loreIndexFor(profile);
+    const dossier = index.assets.fungal_horse ?? [];
+    expect(dossier).toContain('AX-INC-033');
+    // Ordem de LEITURA, nao de desbloqueio: cronologia crescente.
+    const chrono = dossier.map((id) => findLoreFragment(id)?.chronologyIndex ?? -1);
+    expect(chrono).toEqual([...chrono].sort((a, b) => a - b));
+    // E a ficha (INC-024) vem antes da sintese do arco (UNK-046).
+    expect(dossier.indexOf('AX-INC-024')).toBeLessThan(dossier.indexOf('AX-UNK-046'));
   });
 
   it('o indice "Ver docs" so lista Ativos conhecidos e Descobertas feitas', async () => {

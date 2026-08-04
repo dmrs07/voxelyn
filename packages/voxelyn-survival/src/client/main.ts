@@ -1590,8 +1590,12 @@ const recordsCodexLink = (): RecordsCodexLink => ({
     matrixView.codexContext = context;
     matrixView.codexReturn = true;
     matrixView.notice = null;
+    // O foco vai para o primeiro documento NOVO do contexto; sem novidade,
+    // para o primeiro desbloqueado. A lista ja vem do servidor em ordem de
+    // cronologia, entao "primeiro" e o comeco da historia daquele Ativo.
     const ids = contextDocIds(context);
-    openCodexDocument(ids[0] ?? null);
+    const read = new Set(matrixView.profile?.readLoreFragmentIds ?? []);
+    openCodexDocument(ids.find((id) => !read.has(id)) ?? ids[0] ?? null);
     drawMatrix();
     matrixOverlay.classList.remove('hidden');
     audio.ui();

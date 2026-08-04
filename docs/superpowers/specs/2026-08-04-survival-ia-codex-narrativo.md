@@ -32,7 +32,7 @@ A divisão de trabalho da progressão não muda:
 
 ```
 progression-lore.ts       catálogo + gatilhos (dado puro)
-progression-lore-text.ts  os 75 textos, pt-BR e en (só no servidor)
+progression-lore-text.ts  os textos, pt-BR e en (só no servidor)
 progression.ts            decide (puro): fatos → desbloqueio, leitura
 progression-store.ts      persiste o decidido (atômico, idempotente)
 progression-http.ts       traduz HTTP e protege a rota
@@ -79,11 +79,13 @@ progresso de marco.
   desbloqueados; `compound` não enumera as partes (um `anyOf` não cumprido
   nomearia o que o jogador ainda não viu).
 
-## 4. Catálogo: 75 documentos
+## 4. Catálogo: 89 documentos
 
-35 existentes + 40 novos: 30 de protocolo, 4 marcos geracionais, 1 público,
-**25 de Ativo** (15 fichas + 4 marcos do Corcel + 6 das linhas de Solaris),
-**13 de Descoberta**, 2 compostos (AX-UNK-051 e o capstone AX-UNK-054).
+30 de protocolo, 4 marcos geracionais, 1 público, **39 de Ativo** (15 fichas
++ 24 marcos: cinco assinaturas e o Corcel com trilhas completas de 4 degraus),
+**13 de Descoberta**, 2 compostos (AX-UNK-051 e o capstone AX-UNK-054). A
+contagem viva é `TOTAL_LORE_FRAGMENTS`; o teste de catálogo a deriva de
+`ASSET_MILESTONE_LORE` em vez de fixar o número.
 
 Trilha IA (já existente, PR #107): IA-01→AX-PUB-009, IA-02→AX-ENG-020,
 IA-03→AX-PRC-024, IA-04→AX-INC-032, IA-05→AX-EXE-040, IA-X→AX-UNK-052.
@@ -150,11 +152,42 @@ consegue arquivar; 20 = o nome):
 | Espectro de Geada (GLAC-02) | AX-EXE-037 — a ordem que cortou a redundância de aquecimento, o "desvio" da operadora de caldeira, e a apuração "encerrada por falecimento da apurada" | AX-UNK-053 — *Sobre quem aquecia* | R., operadora de caldeira que mandou o calor todo para os dormitórios e congelou na casa de máquinas. O espécime subtrai calor porque ela nunca parou de dar o dela |
 
 **Capstone** AX-UNK-054 — *Sobre o que o Veio guarda* (compound: os quatro
-finais — Corcel 15, Fole 20, Lampreia 20, Espectro 20): nomeia o fenômeno sem
+finais — Corcel 15, Fole 15, Lampreia 15, Espectro 15): nomeia o fenômeno sem
 resolvê-lo — "chamamos de contaminação porque a alternativa era chamar de
 memória" — e planta a pergunta que liga tudo aos Ecos e ao Núcleo: o que
 acontece no dia em que todos se lembrarem, ao mesmo tempo, de quem os deixou
 lá?
+
+### Arcos completos das cinco assinaturas de estrato (grade 3/6/10/15)
+
+Todos os cinco Ativos de assinatura seguem a mesma grade do Corcel, com papel
+fixo por degrau — 3: anomalia; 6: antecedente humano (sem declarar a relação);
+10: contenção institucional; 15: persistência não classificada. A ficha (1
+abate) permanece em `ASSET_LORE`. O marco é mecanismo interno: a UI nunca
+mostra "faltam N abates" nem quantos documentos secretos existem.
+
+Os arcos do Fole, da Lampreia e do Espectro **preservam as histórias já
+escritas** (V., D. e R.) e ganham os dois degraus que faltavam:
+
+| Ativo | 3 | 6 | 10 | 15 |
+| --- | --- | --- | --- | --- |
+| Fole | AX-ENG-019 (fole/valsa) | AX-INC-035 — o colapso: sensores diziam "sem sinais vitais" (estavam em falha), V. continuou; a contagem dos ciclos ("oitenta e sete…") prossegue na gravação além do óbito | AX-EXE-041 — cunha a rubrica **Persistência Mnêmica Operacional**; "Eco" vira termo vedado; a valsa vira "artefato de compressão" de um canal sem compressão | AX-UNK-042 (quem dava o ar) |
+| Lampreia | AX-INC-031 (figura 12) | AX-INC-036 — quarta descida: "segura em mim. Não solta."; encerramento "recuperação completa" vs. inventário mortuário com uma entrada a menos | AX-EXE-044 — arrastos até bolsas de ar viram "coincidência hidrodinâmica"; "comportamento de resgate" vedado; os destinos são saídas do mapa **anterior** ao colapso | AX-UNK-048 (quem buscava) |
+| Espectro | AX-ENG-024 — o calor subtraído não some: forma gradiente rumo aos alojamentos desativados, que medem 0,4° acima do modelo | AX-INC-037 — o diário da caldeira: "Dormitório 3: estável", em entradas que continuam após a perda de consciência, na mesma caligrafia | AX-EXE-037 (existente) | AX-UNK-053 (quem aquecia) |
+| **Ressonante** (novo, coletivo) | AX-ENG-026 — resposta em 3-2-3 = código de soterramento do manual antigo; "estatisticamente irrelevante"; às vezes precede o primeiro impacto | AX-INC-038 — o registro sísmico da frente leste: o padrão persistiu 11 dias; o anexo B ("não é acomodação natural") foi arquivado em separado | AX-EXE-045 — resgate cancelado por custo (6,2 vs 4,7 unidades-equivalente); sinal reclassificado como tremor residual; "o assunto não requer novas reuniões" | AX-UNK-055 — o código aparece em setores sem histórico humano; destruído um corpo, as batidas continuam nas paredes; "o estrato aprendeu a pedir socorro" |
+| **Scoriac** (novo, ordem e culpa) | AX-ENG-027 — os selos têm o vão padrão das comportas industriais; ele fecha as categorias de acesso do manual de emergência e ignora as demais | AX-INC-039 — a comporta sul: "não abram esta porta"; 9 óbitos do lado isolado; condecoração póstuma | AX-EXE-046 — condecoração revogada; caso vira o estudo "indução de prioridade", encaminhado ao **programa de treinamento do modelo comportamental** (↔ trilha IA, AX-EXE-040) | AX-UNK-056 — ele sela sempre a mesma direção; rompido o selo, sensores registram pressão e contaminação do lado protegido; "impedindo a entrada, ou obedecendo à ordem de não deixar sair?" |
+
+Graus de continuidade deliberadamente distintos (a síntese não vira fórmula):
+Corcel = imagem individual; Fole = tarefa repetida; Lampreia = gesto sem
+orientação; Espectro = cuidado deslocado; Ressonante = memória **coletiva**;
+Scoriac = ordem que talvez nem seja pessoa. Por isso o capstone AX-UNK-054
+continua exigindo só os quatro primeiros — Ressonante e Scoriac relacionam-se
+a ele sem destravá-lo.
+
+O `loreIndex` ("Ver docs") passou a: ordenar por cronologia global, incluir os
+documentos de Descoberta do arquétipo (via `DISCOVERY_ARCHETYPE`: necropsia do
+Corcel, autopreservação do Minerador etc.) e a navegação foca o primeiro
+documento **não lido** do contexto (ou o primeiro, se nada for novo).
 
 Regras de escrita mantidas (cabeçalho de `progression-lore-text.ts`): voz de
 relatório, sem vilão declarado, redação com moderação, nenhuma resposta

@@ -39,6 +39,7 @@ import type {
 import {
   ASSET_ARCHETYPES,
   DEFAULT_UNLOCKED_LORE,
+  DISCOVERY_ARCHETYPE,
   findLoreFragment,
   LORE_DISCOVERY_BITS,
   LORE_DISCOVERY_MASK,
@@ -248,10 +249,21 @@ export const loreIndexFor = (profile: StoredProfile): LoreIndex => {
   const discoveries: LoreIndex['discoveries'] = {};
   const unlockedDefs = profile.unlockedLoreFragmentIds
     .map((id) => findLoreFragment(id))
-    .filter((def) => def !== undefined);
+    .filter((def) => def !== undefined)
+    // Ordem de LEITURA, nao de desbloqueio: o "Ver docs" apresenta o dossie
+    // do Ativo como historia, e o primeiro da lista e o que a navegacao foca.
+    .sort((a, b) => a.chronologyIndex - b.chronologyIndex);
   for (const archetype of normalizeArchetypes(profile.knownArchetypes)) {
+    // O dossie inclui os documentos de DESCOBERTA que falam deste arquetipo
+    // (a necropsia do Corcel, a autopreservacao do Minerador): so entram os
+    // ja desbloqueados, entao nada antecipa nome nenhum.
+    const bits = DISCOVERY_ARCHETYPE.filter((d) => d.archetype === archetype).map((d) => d.bit);
     const ids = unlockedDefs
-      .filter((def) => triggerMentionsArchetype(def.trigger, archetype))
+      .filter(
+        (def) =>
+          triggerMentionsArchetype(def.trigger, archetype) ||
+          bits.some((bit) => triggerMentionsDiscovery(def.trigger, bit)),
+      )
       .map((def) => def.id);
     if (ids.length > 0) assets[archetype] = ids;
   }

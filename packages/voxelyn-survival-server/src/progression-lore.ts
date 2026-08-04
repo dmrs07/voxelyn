@@ -1,4 +1,5 @@
-// O Codex corporativo: 64 documentos, e as regras de quem pode ler o que.
+// O Codex corporativo (89 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
 // POR QUE O TEXTO MORA NO SERVIDOR
@@ -294,19 +295,53 @@ export const ASSET_MILESTONE_LORE: readonly {
   minKills: number;
   fragmentId: LoreFragmentId;
 }[] = [
+  // A GRADE e uma so (3/6/10/15) e cada degrau tem um papel fixo:
+  //   3  anomalia que a tecnica nao explica        (ENG/INC)
+  //   6  antecedente humano, sem declarar a relacao (INC)
+  //   10 contencao institucional                    (EXE)
+  //   15 persistencia, sem resolver a ontologia     (UNK)
+  // A ficha inicial (1 abate) vive em ASSET_LORE. Os numeros sao baixos de
+  // proposito: assinatura de estrato morre as duzias no proprio bioma, e a
+  // revelacao nao pode virar farm. O marco e mecanismo interno — a UI nunca
+  // mostra "faltam N abates".
   { archetype: 'fungal_horse', minKills: 3, fragmentId: 'AX-ENG-023' },
   { archetype: 'fungal_horse', minKills: 6, fragmentId: 'AX-INC-034' },
   { archetype: 'fungal_horse', minKills: 10, fragmentId: 'AX-EXE-043' },
   { archetype: 'fungal_horse', minKills: 15, fragmentId: 'AX-UNK-046' },
-  // As TRES linhas de Solaris: o Veio guarda quem morre nele e devolve o
-  // GESTO — o que a pessoa fazia pelos outros quando terminou. Assinaturas de
-  // bioma morrem em maior numero que o Corcel, entao os marcos sobem (8/20).
-  { archetype: 'bellows', minKills: 8, fragmentId: 'AX-ENG-019' },
-  { archetype: 'bellows', minKills: 20, fragmentId: 'AX-UNK-042' },
-  { archetype: 'mud_lamprey', minKills: 8, fragmentId: 'AX-INC-031' },
-  { archetype: 'mud_lamprey', minKills: 20, fragmentId: 'AX-UNK-048' },
-  { archetype: 'frost_wraith', minKills: 8, fragmentId: 'AX-EXE-037' },
-  { archetype: 'frost_wraith', minKills: 20, fragmentId: 'AX-UNK-053' },
+  { archetype: 'bellows', minKills: 3, fragmentId: 'AX-ENG-019' },
+  { archetype: 'bellows', minKills: 6, fragmentId: 'AX-INC-035' },
+  { archetype: 'bellows', minKills: 10, fragmentId: 'AX-EXE-041' },
+  { archetype: 'bellows', minKills: 15, fragmentId: 'AX-UNK-042' },
+  { archetype: 'mud_lamprey', minKills: 3, fragmentId: 'AX-INC-031' },
+  { archetype: 'mud_lamprey', minKills: 6, fragmentId: 'AX-INC-036' },
+  { archetype: 'mud_lamprey', minKills: 10, fragmentId: 'AX-EXE-044' },
+  { archetype: 'mud_lamprey', minKills: 15, fragmentId: 'AX-UNK-048' },
+  { archetype: 'frost_wraith', minKills: 3, fragmentId: 'AX-ENG-024' },
+  { archetype: 'frost_wraith', minKills: 6, fragmentId: 'AX-INC-037' },
+  { archetype: 'frost_wraith', minKills: 10, fragmentId: 'AX-EXE-037' },
+  { archetype: 'frost_wraith', minKills: 15, fragmentId: 'AX-UNK-053' },
+  { archetype: 'resonant', minKills: 3, fragmentId: 'AX-ENG-026' },
+  { archetype: 'resonant', minKills: 6, fragmentId: 'AX-INC-038' },
+  { archetype: 'resonant', minKills: 10, fragmentId: 'AX-EXE-045' },
+  { archetype: 'resonant', minKills: 15, fragmentId: 'AX-UNK-055' },
+  { archetype: 'scoriac', minKills: 3, fragmentId: 'AX-ENG-027' },
+  { archetype: 'scoriac', minKills: 6, fragmentId: 'AX-INC-039' },
+  { archetype: 'scoriac', minKills: 10, fragmentId: 'AX-EXE-046' },
+  { archetype: 'scoriac', minKills: 15, fragmentId: 'AX-UNK-056' },
+];
+
+/**
+ * Descobertas que FALAM de um arquetipo, para o "Ver docs" do Registro
+ * incluir tambem os documentos de Descoberta daquele Ativo (a necropsia do
+ * Corcel, a autopreservacao do Minerador). So entra no indice o que ja esta
+ * desbloqueado, entao nada aqui antecipa nome nenhum.
+ */
+export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchetype }[] = [
+  { bit: DISCOVERY_HORSE_FELLED, archetype: 'fungal_horse' },
+  { bit: DISCOVERY_BISHOP_FELLED, archetype: 'bishop' },
+  { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
+  { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
+  { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
 ];
 
 /** Bits que o Codex reconhece. Usado para sanitizar a mascara persistida. */
@@ -402,14 +437,14 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-ENG-012': ['AX-INC-024'],
   'AX-ENG-014': ['AX-ENG-022'],
   'AX-ENG-016': ['AX-INC-030'],
-  'AX-ENG-017': ['AX-INC-029'],
+  'AX-ENG-017': ['AX-INC-029', 'AX-ENG-026'],
   'AX-PRC-015': ['AX-PRC-014'],
   'AX-PRC-017': ['AX-ENG-020', 'AX-EXE-035', 'AX-ENG-025'],
   'AX-PRC-018': ['AX-PRC-023'],
   'AX-PRC-020': ['AX-EXE-038'],
   'AX-INC-022': ['AX-INC-030'],
   'AX-INC-024': ['AX-INC-033', 'AX-ENG-012', 'AX-ENG-023'],
-  'AX-INC-026': ['AX-INC-025'],
+  'AX-INC-026': ['AX-INC-025', 'AX-ENG-027'],
   'AX-INC-028': ['AX-ENG-025'],
   'AX-INC-033': ['AX-INC-024', 'AX-UNK-045', 'AX-UNK-046'],
   // A trilha do Corcel: taxonomia perdida → fogo impossivel → vocabulario
@@ -418,16 +453,33 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-INC-034': ['AX-ENG-023', 'AX-EXE-043'],
   'AX-EXE-043': ['AX-INC-034', 'AX-UNK-046'],
   'AX-UNK-046': ['AX-EXE-043', 'AX-INC-033', 'AX-UNK-054'],
-  // As linhas de Solaris. Cada revelacao aponta para o documento da COMPANHIA
-  // que causou a morte que o Veio guardou: o fole para o corte de manutencao,
-  // a mergulhadora para o fim das operacoes de resgate, a caldeira para o
-  // proprio corte que a ordem executiva admite no adendo.
-  'AX-ENG-019': ['AX-INC-022', 'AX-UNK-042'],
-  'AX-UNK-042': ['AX-ENG-019', 'AX-PRC-016', 'AX-UNK-054'],
-  'AX-INC-031': ['AX-PRC-018', 'AX-UNK-048'],
-  'AX-UNK-048': ['AX-INC-031', 'AX-PRC-014', 'AX-EXE-031', 'AX-UNK-054'],
-  'AX-EXE-037': ['AX-INC-028', 'AX-UNK-053'],
+  // As linhas de Solaris. Cada arco e um caminho de investigacao completo
+  // (anomalia → antecedente → contencao → persistencia), e cada revelacao
+  // aponta para o documento da COMPANHIA que causou a morte que o Veio
+  // guardou: o fole para o corte de manutencao, a mergulhadora para o fim das
+  // operacoes de resgate, a caldeira para o corte que a ordem admite no
+  // adendo, o Ressonante para a conta do resgate cancelado, o Scoriac para o
+  // programa que treina maquinas a priorizar ativo sobre vida.
+  'AX-ENG-019': ['AX-INC-022', 'AX-INC-035'],
+  'AX-INC-035': ['AX-ENG-019', 'AX-EXE-041', 'AX-INC-027'],
+  'AX-EXE-041': ['AX-INC-035', 'AX-UNK-042'],
+  'AX-UNK-042': ['AX-ENG-019', 'AX-EXE-041', 'AX-PRC-016', 'AX-UNK-054'],
+  'AX-INC-031': ['AX-PRC-018', 'AX-INC-036'],
+  'AX-INC-036': ['AX-INC-031', 'AX-EXE-044', 'AX-PRC-016'],
+  'AX-EXE-044': ['AX-INC-036', 'AX-UNK-048'],
+  'AX-UNK-048': ['AX-INC-031', 'AX-EXE-044', 'AX-PRC-014', 'AX-EXE-031', 'AX-UNK-054'],
+  'AX-ENG-024': ['AX-INC-028', 'AX-INC-037'],
+  'AX-INC-037': ['AX-ENG-024', 'AX-EXE-037'],
+  'AX-EXE-037': ['AX-INC-028', 'AX-INC-037', 'AX-UNK-053'],
   'AX-UNK-053': ['AX-EXE-037', 'AX-UNK-054'],
+  'AX-ENG-026': ['AX-ENG-017', 'AX-INC-038'],
+  'AX-INC-038': ['AX-ENG-026', 'AX-EXE-045'],
+  'AX-EXE-045': ['AX-INC-038', 'AX-PRC-014', 'AX-UNK-055'],
+  'AX-UNK-055': ['AX-EXE-045', 'AX-UNK-047', 'AX-UNK-054'],
+  'AX-ENG-027': ['AX-INC-026', 'AX-INC-039'],
+  'AX-INC-039': ['AX-ENG-027', 'AX-EXE-046'],
+  'AX-EXE-046': ['AX-INC-039', 'AX-EXE-040', 'AX-UNK-056'],
+  'AX-UNK-056': ['AX-EXE-046', 'AX-UNK-050', 'AX-UNK-054'],
   'AX-UNK-054': ['AX-UNK-046', 'AX-UNK-042', 'AX-UNK-048', 'AX-UNK-053', 'AX-UNK-049'],
   'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
@@ -478,6 +530,17 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-UNK-048': 3,
   'AX-UNK-053': 2,
   'AX-UNK-054': 3,
+  'AX-INC-035': 1,
+  'AX-INC-036': 1,
+  'AX-INC-037': 1,
+  'AX-INC-038': 1,
+  'AX-INC-039': 1,
+  'AX-EXE-041': 2,
+  'AX-EXE-044': 2,
+  'AX-EXE-045': 2,
+  'AX-EXE-046': 2,
+  'AX-UNK-055': 3,
+  'AX-UNK-056': 3,
 };
 
 /**
@@ -515,7 +578,10 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-021',
   'AX-ENG-022',
   'AX-ENG-023',
+  'AX-ENG-024',
   'AX-ENG-025',
+  'AX-ENG-026',
+  'AX-ENG-027',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',
@@ -543,6 +609,11 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-032',
   'AX-INC-033',
   'AX-INC-034',
+  'AX-INC-035',
+  'AX-INC-036',
+  'AX-INC-037',
+  'AX-INC-038',
+  'AX-INC-039',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -554,8 +625,12 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-038',
   'AX-EXE-039',
   'AX-EXE-040',
+  'AX-EXE-041',
   'AX-EXE-042',
   'AX-EXE-043',
+  'AX-EXE-044',
+  'AX-EXE-045',
+  'AX-EXE-046',
   // Ato VI — Memoria
   'AX-UNK-041',
   'AX-UNK-042',
@@ -570,6 +645,9 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-051',
   'AX-UNK-052',
   'AX-UNK-053',
+  'AX-UNK-055',
+  'AX-UNK-056',
+  // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
 ];
@@ -618,14 +696,16 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   }),
   // A sintese de Solaris: so quem chegou ao fim das QUATRO historias humanas
   // (o cavaleiro, o homem do fole, a mergulhadora, a operadora de caldeira)
-  // pode ler o documento que as nomeia como o mesmo fenomeno.
+  // pode ler o documento que as nomeia como o mesmo fenomeno. Os arcos do
+  // Ressonante e do Scoriac ficam de fora DE PROPOSITO: um e memoria coletiva
+  // e o outro talvez nem seja pessoa — a sintese nao pode virar formula.
   define('AX-UNK-054', {
     kind: 'compound',
     allOf: [
       { kind: 'asset', archetype: 'fungal_horse', minKills: 15 },
-      { kind: 'asset', archetype: 'bellows', minKills: 20 },
-      { kind: 'asset', archetype: 'mud_lamprey', minKills: 20 },
-      { kind: 'asset', archetype: 'frost_wraith', minKills: 20 },
+      { kind: 'asset', archetype: 'bellows', minKills: 15 },
+      { kind: 'asset', archetype: 'mud_lamprey', minKills: 15 },
+      { kind: 'asset', archetype: 'frost_wraith', minKills: 15 },
     ],
   }),
 ];
