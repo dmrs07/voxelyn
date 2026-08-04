@@ -8,6 +8,7 @@
 import { UPGRADES, type EnemyArchetype, type LoreFragmentId } from '@voxelyn/survival-sim';
 import type { LoreCategory, PublicLoreFragment } from '@voxelyn/survival-protocol';
 import * as base from './progression-lore-base.js';
+import type { LoreFacts, LoreFragmentDefinition } from './progression-lore-base.js';
 import {
   ASSET_MEMORY_CHRONOLOGY,
   ASSET_MEMORY_MILESTONE_LORE,
@@ -78,7 +79,7 @@ const chronologyIndexFor = (id: LoreFragmentId): number => {
   return index;
 };
 
-const baseFragments: base.LoreFragmentDefinition[] = base.LORE_FRAGMENTS.map(
+const baseFragments: LoreFragmentDefinition[] = base.LORE_FRAGMENTS.map(
   (fragment) => ({
     ...fragment,
     chronologyIndex: chronologyIndexFor(fragment.id),
@@ -87,7 +88,7 @@ const baseFragments: base.LoreFragmentDefinition[] = base.LORE_FRAGMENTS.map(
   }),
 );
 
-const memoryFragments: base.LoreFragmentDefinition[] = ASSET_MEMORY_MILESTONE_LORE.map(
+const memoryFragments: LoreFragmentDefinition[] = ASSET_MEMORY_MILESTONE_LORE.map(
   ({ archetype, minKills, fragmentId }) => {
     const prefix = prefixOf(fragmentId);
     return {
@@ -103,7 +104,7 @@ const memoryFragments: base.LoreFragmentDefinition[] = ASSET_MEMORY_MILESTONE_LO
   },
 );
 
-export const LORE_FRAGMENTS: readonly base.LoreFragmentDefinition[] = [
+export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   ...baseFragments,
   ...memoryFragments,
 ];
@@ -112,12 +113,12 @@ const BY_ID = new Map(LORE_FRAGMENTS.map((fragment) => [fragment.id, fragment]))
 
 export const findLoreFragment = (
   id: LoreFragmentId,
-): base.LoreFragmentDefinition | undefined => BY_ID.get(id);
+): LoreFragmentDefinition | undefined => BY_ID.get(id);
 
 export const TOTAL_LORE_FRAGMENTS = LORE_FRAGMENTS.length;
 
 /** A unica porta de derivacao agora enxerga base e milestones. */
-export const unlockedLoreFor = (facts: base.LoreFacts): LoreFragmentId[] =>
+export const unlockedLoreFor = (facts: LoreFacts): LoreFragmentId[] =>
   LORE_FRAGMENTS.filter((fragment) => base.triggerSatisfied(fragment.trigger, facts)).map(
     (fragment) => fragment.id,
   );
@@ -126,7 +127,7 @@ const textFor = (id: LoreFragmentId, locale: LoreLocale): LoreText =>
   LORE_TEXT[locale][id] ?? LORE_TEXT.en[id] ?? { title: id, summary: '', body: '', source: '' };
 
 export const toPublicFragment = (
-  definition: base.LoreFragmentDefinition,
+  definition: LoreFragmentDefinition,
   locale: LoreLocale,
   unlocked?: ReadonlySet<LoreFragmentId>,
   read?: ReadonlySet<LoreFragmentId>,
