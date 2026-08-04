@@ -460,6 +460,37 @@
         overflow-y: auto;
         padding: 10px 14px;
       }
+      /* Matriz e Registro: cabecalho e abas FIXOS, so o conteudo rola.
+         A folha vira coluna flex; o corpo da aba (.matrix-body / .panel)
+         assume a rolagem. Pedido de revisao de campo: perder as abas de vista
+         ao rolar obrigava a rolar de volta so para trocar de aba. */
+      #matrix-body.ax-sheet-body,
+      #records-body.ax-sheet-body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #matrix-body > .matrix-header,
+      #matrix-body > .ax-tabs,
+      #records-body > .ax-tabs {
+        flex: 0 0 auto;
+      }
+      #matrix-body > .matrix-body,
+      #matrix-body > .codex-reveal,
+      #records-body > .panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      /* Livro-caixa em tela larga: dois pares rotulo–valor por linha, como no
+         board 3f — pontilhado de 1600px entre rotulo e numero nao e leitura,
+         e travessia. */
+      @media (min-width: 900px) {
+        #records-body .panel dl {
+          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+          column-gap: 36px;
+        }
+      }
       .ax-sheet-foot {
         display: flex;
         align-items: center;
@@ -622,13 +653,21 @@
       /* Os controles de opcoes sao UM bloco so, movido entre a tela de opcoes e
          o menu de campo (ver `mountOptions` em main.ts). Duplicar o HTML
          duplicaria a sincronizacao de estado, e as duas copias divergiriam na
-         primeira mudanca. */
+         primeira mudanca. Os quatro grupos de secao existem para o bloco poder
+         REFLUIR: grade 2×2 na folha de opcoes, coluna compacta na pausa. */
       #options-controls {
         display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
-        width: min(420px, 100%);
+        width: 100%;
+        min-width: 0;
+      }
+      .ax-optgroup {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
       }
       #options-controls .ax-section-label {
         border-bottom: 1px solid var(--ax-key);
@@ -644,6 +683,20 @@
       #options .ax-sheet-body {
         display: flex;
         justify-content: center;
+      }
+      #options #options-controls {
+        max-width: 860px;
+      }
+      /* Na folha de opcoes em paisagem, a grade 2×2 do board 3c: tudo visivel
+         de uma vez, sem rolagem — a rolagem so volta como rede de seguranca em
+         telas realmente curtas. */
+      @media (min-width: 701px) {
+        #options #options-controls {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px 32px;
+          align-content: start;
+        }
       }
 
       /* ------------------------------------------------------------------
@@ -669,6 +722,49 @@
         box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7);
         background: linear-gradient(180deg, #12110f, #0b0b0a);
         padding: 12px 14px;
+      }
+      /* O terminal de campo usa a folha larga: as opcoes compactas cabem ao
+         lado do carimbo em vez de empurra-lo para fora da tela. */
+      .ax-form-wide {
+        width: min(880px, 94vw);
+        /* A folha nunca rola: ela se limita a altura util e delega a rolagem
+           a coluna de opcoes. Retomar e Abandonar ficam sempre visiveis. */
+        max-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom) - 16px);
+      }
+      .ax-pause-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 10px;
+        min-height: 0;
+        flex: 1 1 auto;
+      }
+      .ax-pause-side {
+        min-width: 0;
+        min-height: 0;
+        overflow-y: auto;
+        border: 1px solid var(--ax-key);
+        background: rgba(255, 255, 255, 0.012);
+        padding: 8px 10px;
+        box-sizing: border-box;
+      }
+      .ax-pause-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+        min-height: 0;
+      }
+      .ax-pause-actions .ax-stamp {
+        flex: 1 1 auto;
+        min-height: 96px;
+      }
+      /* Dentro da pausa o bloco de opcoes encolhe o respiro: e um painel
+         auxiliar, nao a tela de opcoes. */
+      #pause-options-slot #options-controls {
+        gap: 7px;
+      }
+      #pause-options-slot .ax-optgroup {
+        gap: 6px;
       }
       .ax-form.is-danger {
         border-color: var(--ax-red-line);
@@ -1376,6 +1472,26 @@
           border-top: 1px solid var(--ax-key);
           overflow: visible;
         }
+        /* Pausa em retrato: RETOMAR volta ao topo (primeira coisa visivel),
+           opcoes rolam por dentro no meio, Abandonar fecha a coluna — as
+           opcoes SEPARAM a acao segura da destrutiva, para o toque acidental
+           logo abaixo do carimbo nunca ser o irreversivel. */
+        .ax-pause-body {
+          display: flex;
+          flex-direction: column;
+        }
+        .ax-pause-actions {
+          display: contents;
+        }
+        .ax-pause-actions .ax-stamp {
+          order: -1;
+          flex: 0 0 auto;
+          min-height: 66px;
+        }
+        .ax-pause-side {
+          max-height: 38vh;
+          flex: 0 1 auto;
+        }
         /* Matriz em retrato: o rótulo do ramo sobe para a própria linha e os
            nós ficam com a largura inteira — seis nós de 44px cabem em 390px
            sem cortar o último protocolo nem encolher o alvo de toque. */
@@ -1554,49 +1670,63 @@
         </div>
         <div class="ax-sheet-body">
           <div id="options-slot">
+            <!--
+              Quatro grupos de secao, e nao uma lista corrida: na folha de
+              opcoes eles viram uma grade 2×2 que usa a folha inteira e cabe
+              sem rolagem em paisagem (board 3c); no terminal de pausa
+              empilham numa coluna compacta.
+            -->
             <div id="options-controls">
-              <div class="ax-section-label" data-i18n="aurix.options.operator">Operador</div>
-              <div class="row">
-                <label for="name" data-i18n="options.name">Nome</label>
-                <input
-                  id="name"
-                  size="14"
-                  maxlength="18"
-                  data-i18n-placeholder="options.name.placeholder"
-                />
-              </div>
-              <!--
-                O idioma vem PRIMEIRO entre os ajustes de sistema.
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.operator">Operador</div>
+                <div class="row">
+                  <label for="name" data-i18n="options.name">Nome</label>
+                  <input
+                    id="name"
+                    size="14"
+                    maxlength="18"
+                    data-i18n-placeholder="options.name.placeholder"
+                  />
+                </div>
+                <!--
+                  O idioma vem PRIMEIRO entre os ajustes de sistema.
 
-                Quem precisa dele é justamente quem não está lendo o resto da
-                tela: deixá-lo no fim obrigaria a percorrer, em uma língua que
-                não se lê, tudo o que vem antes.
-              -->
-              <div class="row">
-                <label for="language" data-i18n="options.language">Idioma</label>
-                <select id="language"></select>
+                  Quem precisa dele é justamente quem não está lendo o resto da
+                  tela: deixá-lo no fim obrigaria a percorrer, em uma língua que
+                  não se lê, tudo o que vem antes.
+                -->
+                <div class="row">
+                  <label for="language" data-i18n="options.language">Idioma</label>
+                  <select id="language"></select>
+                </div>
               </div>
-              <div class="ax-section-label" data-i18n="aurix.options.video">Sistema de vídeo</div>
-              <div class="row">
-                <label for="quality" data-i18n="options.quality">Qualidade</label>
-                <select id="quality">
-                  <option value="high" data-i18n="options.quality.high">Alta</option>
-                  <option value="medium" data-i18n="options.quality.medium">Média</option>
-                  <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
-                </select>
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.video">Sistema de vídeo</div>
+                <div class="row">
+                  <label for="quality" data-i18n="options.quality">Qualidade</label>
+                  <select id="quality">
+                    <option value="high" data-i18n="options.quality.high">Alta</option>
+                    <option value="medium" data-i18n="options.quality.medium">Média</option>
+                    <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
+                  </select>
+                </div>
               </div>
-              <div class="ax-section-label" data-i18n="aurix.options.audio">Áudio</div>
-              <div class="row">
-                <label for="volume" data-i18n="options.volume">Volume</label>
-                <input id="volume" type="range" min="0" max="100" step="1" />
-                <button id="btn-mute" class="compact primary">Som: ligado</button>
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.audio">Áudio</div>
+                <div class="row">
+                  <label for="volume" data-i18n="options.volume">Volume</label>
+                  <input id="volume" type="range" min="0" max="100" step="1" />
+                  <button id="btn-mute" class="compact primary">Som: ligado</button>
+                </div>
               </div>
-              <div class="ax-section-label" data-i18n="aurix.options.telemetry">Telemetria</div>
-              <div class="row">
-                <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
-              </div>
-              <div class="sub" data-i18n="options.telemetry.note">
-                dados anônimos de sessão, sem identificação
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.telemetry">Telemetria</div>
+                <div class="row">
+                  <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
+                </div>
+                <div class="sub" data-i18n="options.telemetry.note">
+                  dados anônimos de sessão, sem identificação
+                </div>
               </div>
             </div>
           </div>
@@ -1618,7 +1748,7 @@
       `pause.ts`.
     -->
     <div id="pause" class="overlay hidden">
-      <div class="ax-form">
+      <div class="ax-form ax-form-wide">
         <div class="ax-form-head">
           <div id="pause-mark"></div>
           <div style="min-width: 0">
@@ -1632,16 +1762,23 @@
         <div id="pause-coop-warning" class="hidden" data-i18n="pause.coopWarning">
           No co-op o mundo não para — a descida continua enquanto você lê isto.
         </div>
-        <button
-          id="btn-pause-resume"
-          class="primary ax-stamp"
-          style="flex: 0 0 auto"
-          data-i18n="pause.resume"
-        >
-          Retomar descida
-        </button>
-        <div id="pause-options-slot"></div>
-        <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
+        <!--
+          Duas colunas (board 3d): opcoes compactas a esquerda com rolagem
+          INTERNA; RETOMAR domina a coluna direita inteira, com o abandono
+          separado embaixo. A folha em si nunca rola — retomar e abandonar
+          ficam sempre visiveis, que e a unica exigencia inegociavel da tela.
+        -->
+        <div class="ax-pause-body">
+          <div class="ax-pause-side">
+            <div id="pause-options-slot"></div>
+          </div>
+          <div class="ax-pause-actions">
+            <button id="btn-pause-resume" class="primary ax-stamp" data-i18n="pause.resume">
+              Retomar descida
+            </button>
+            <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
+          </div>
+        </div>
       </div>
     </div>
 
