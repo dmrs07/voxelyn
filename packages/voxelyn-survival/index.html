@@ -147,31 +147,40 @@
         pointer-events: all;
         overflow: hidden;
       }
-      .ax-veil span {
-        position: absolute;
-        clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-        background: #050506;
-        transform: scale(0);
-        transition: transform 240ms cubic-bezier(0.2, 0.7, 0.3, 1);
-        will-change: transform;
-      }
-      /* A frente de onda teal é UM elemento, não uma animação por célula. A
-         primeira versão animava a COR de cada hexágono — cor é pintura, e no
-         meio da onda (a anti-diagonal, onde mais células animam juntas) o
-         navegador repintava centenas de clip-paths por quadro: era o tranco.
+      /* ZERO células (terceira estratégia — ver deploy-veil.ts): o véu são
+         três elementos fixos e DUAS animações de transform, custo igual em
+         qualquer tela.
 
-         O visual CELULAR do lampejo original volta por um estêncil: a faixa
-         viaja por transform puro ATRÁS de uma máscara estática em forma de
-         colmeia (gerada no deploy-veil.ts com o MESMO passo das células).
-         Cada abertura hexagonal acende quando a faixa cruza por baixo — o
-         olho vê célula a célula piscando; o compositor vê uma camada se
-         movendo sob uma máscara que nunca muda. */
+         O obturador (.ax-veil-fill) é um retângulo preto gigante rotacionado
+         45° com a metade traseira sólida: deslizando na diagonal, ele cobre
+         tudo atrás da frente. A borda celular vem do fio (.ax-veil-front)
+         viajando ATRÁS de um estêncil de colmeia estático (mask-image gerada
+         no deploy-veil.ts): cada abertura hexagonal acende quando a faixa
+         cruza por baixo — o olho vê hexágonos piscando na frente de onda; o
+         compositor vê duas camadas se movendo sob uma máscara imutável. */
+      .ax-veil-fill {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 300vmax;
+        height: 300vmax;
+        margin-left: -150vmax;
+        margin-top: -150vmax;
+        pointer-events: none;
+        /* 100% (embaixo) é a borda que LIDERA a viagem; o preto fica ATRÁS
+           dela e esmaece pouco antes — a zona esmaecida é onde os hexágonos
+           do fio assumem a borda. */
+        background: linear-gradient(180deg, #050506 0%, #050506 47%, transparent 49.5%);
+        will-change: transform;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+      }
       .ax-veil-stencil {
         position: absolute;
         inset: 0;
         overflow: hidden;
         pointer-events: none;
-        /* mask-image chega inline do deploy-veil.ts, no passo real da colmeia. */
+        /* mask-image chega inline do deploy-veil.ts, no passo da colmeia. */
       }
       .ax-veil-front {
         position: absolute;
@@ -182,15 +191,16 @@
         margin-left: -150vmax;
         margin-top: -130px;
         pointer-events: none;
-        /* 100% é a borda que LIDERA (o eixo local aponta na direção da
-           viagem): fósforo OPACO na frente — as células antigas piscavam
-           #8ff0e6 cheio, e o estêncil não pode devolver menos — com a cauda
-           apagando atrás, o mesmo flash → decaimento de antes. */
+        /* Do topo (cauda) para baixo (frente que lidera): células pretas
+           cobrindo a emenda com o obturador, fósforo subindo até a linha
+           quase branca, e o vazio à frente. O flash → decaimento por célula
+           de sempre — só que pago uma vez, no gradiente. */
         background: linear-gradient(
           180deg,
-          transparent 0%,
-          rgba(29, 87, 81, 0.5) 42%,
-          rgba(79, 214, 201, 0.9) 78%,
+          #050506 0%,
+          #050506 34%,
+          rgba(29, 87, 81, 0.85) 56%,
+          rgba(79, 214, 201, 0.9) 80%,
           #8ff0e6 92%,
           #d9fffa 98%,
           transparent 100%
@@ -212,6 +222,7 @@
           transform: translate3d(var(--ax-sweep, 60vmax), var(--ax-sweep, 60vmax), 0) rotate(-45deg);
         }
       }
+      .ax-veil.is-closed .ax-veil-fill,
       .ax-veil.is-closed .ax-veil-front {
         animation-name: axVeilSweep;
       }
@@ -232,17 +243,29 @@
           transform: translate3d(var(--ax-sweep, 60vmax), var(--ax-sweep, 60vmax), 0) rotate(-45deg);
         }
       }
+      /* Na abertura os gradientes se invertem (repintura única, feita sob o
+         preto total): o preto do obturador passa para a FRENTE da linha —
+         o que a onda deixa para trás é a tela nova, revelada. */
+      .ax-veil.is-opening .ax-veil-fill {
+        animation-name: axVeilSweepOut;
+        background: linear-gradient(180deg, transparent 50.5%, #050506 53%, #050506 100%);
+      }
       .ax-veil.is-opening .ax-veil-front {
         animation-name: axVeilSweepOut;
-        opacity: 0.45;
-      }
-      /* 1.12 de sobreposição: hexágonos vizinhos se cobrem e o preto fecha
-         sem frestas. */
-      .ax-veil.is-closed span {
-        transform: scale(1.12);
-      }
-      .ax-veil.is-opening span {
-        transform: scale(0);
+        opacity: 0.55;
+        /* Espelhado: células dissolvendo ATRÁS da linha (área já revelada),
+           brilho de despedida na borda, e o preto sólido à frente fica por
+           conta do obturador. */
+        background: linear-gradient(
+          180deg,
+          transparent 0%,
+          rgba(29, 87, 81, 0.55) 26%,
+          rgba(79, 214, 201, 0.85) 40%,
+          #8ff0e6 46%,
+          rgba(5, 5, 6, 0.9) 56%,
+          #050506 70%,
+          #050506 100%
+        );
       }
 
       /* ------------------------------------------------------------------

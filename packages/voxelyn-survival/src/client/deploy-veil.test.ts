@@ -100,38 +100,32 @@ describe('véu de deploy', () => {
     window.removeEventListener('keydown', reached);
   });
 
-  it('atrasos diagonais nas células; o lampejo é UM elemento, nao N animacoes', async () => {
+  it('ZERO células: obturador + estêncil + fio, duas animacoes de transform', async () => {
     void deployVeil({ swap: () => {} });
-    const cells = document.querySelectorAll<HTMLElement>('.ax-veil span');
-    const delays = new Set(Array.from(cells).map((cell) => cell.style.transitionDelay));
-    // Onda diagonal exige atrasos ESCALONADOS — um atraso unico seria um
-    // fade de tela inteira, nao um obturador.
-    expect(delays.size).toBeGreaterThan(3);
-    // Celulas NAO carregam animacao propria: animar cor por celula repintava
-    // centenas de clip-paths por quadro no meio da onda. O lampejo teal e um
-    // unico elemento varrendo por transform, com a duracao da onda inteira.
-    for (const cell of Array.from(cells).slice(0, 20)) {
-      expect(cell.style.animationDelay).toBe('');
-    }
-    const fronts = document.querySelectorAll<HTMLElement>('.ax-veil .ax-veil-front');
-    expect(fronts.length).toBe(1);
-    expect(fronts[0].style.animationDuration).not.toBe('');
+    const veil = document.querySelector<HTMLElement>('.ax-veil');
+    // Nenhum nó por célula — as duas primeiras estratégias (cor por célula,
+    // transform por célula) engasgavam no aparelho; a colmeia agora é um
+    // estêncil de máscara sobre um fio que se move.
+    expect(veil?.querySelectorAll('span').length).toBe(0);
+    const fill = veil?.querySelector<HTMLElement>('.ax-veil-fill');
+    const stencil = veil?.querySelector<HTMLElement>('.ax-veil-stencil');
+    const front = veil?.querySelector<HTMLElement>('.ax-veil-front');
+    expect(fill?.style.animationDuration).not.toBe('');
+    expect(front?.style.animationDuration).not.toBe('');
+    // A colmeia vive na máscara do estêncil, não em nós.
+    expect(stencil?.style.getPropertyValue('mask-image')).toContain('data:image/svg+xml');
     await vi.runAllTimersAsync();
   });
 
-  it('tela grande nao paga mais: células com teto, onda com a MESMA duracao', async () => {
-    // O happy-dom deixa o viewport nas maos do teste.
+  it('tela grande nao paga mais: a estrutura é a MESMA em qualquer viewport', async () => {
     (window as unknown as { innerWidth: number }).innerWidth = 1920;
     (window as unknown as { innerHeight: number }).innerHeight = 1080;
     void deployVeil({ swap: () => {} });
-    const cells = document.querySelectorAll<HTMLElement>('.ax-veil span');
-    // Sem o teto, 1920×1080 geraria ~2200 spans; com ele, a célula cresce.
-    expect(cells.length).toBeLessThan(800);
-    // E a onda dura o que dura no celular: o maior atraso respeita o teto.
-    const maxDelay = Math.max(
-      ...Array.from(cells).map((cell) => parseInt(cell.style.transitionDelay, 10)),
-    );
-    expect(maxDelay).toBeLessThanOrEqual(520 + 13);
+    const veil = document.querySelector<HTMLElement>('.ax-veil');
+    // 1920×1080 e 844×390 pagam os mesmos três elementos e as mesmas duas
+    // animações — só o percurso (--ax-sweep) muda.
+    expect(veil?.querySelectorAll('*').length).toBe(3);
+    expect(veil?.style.getPropertyValue('--ax-sweep')).not.toBe('');
     await vi.runAllTimersAsync();
     (window as unknown as { innerWidth: number }).innerWidth = 1024;
     (window as unknown as { innerHeight: number }).innerHeight = 768;
