@@ -29,7 +29,11 @@
 // `channelingUntil`) e a habilidade EQUIPADA (`ability`) — o radial do HUD
 // online deixa de chutar a duracao a partir do toque e segue o servidor, com
 // o cooldown da habilidade certa.
-export const PROTOCOL_VERSION = 13;
+// 14: `flame_cone` ganha `owner` OBRIGATORIO — e por ele que o cliente gira o
+// tronco do dono junto com o jato, inclusive o do parceiro remoto, cujo
+// `facing` de snapshot passou a seguir os pes. Um cliente novo contra servidor
+// v13 receberia emissoes sem `owner` e nunca associaria a chama ao corpo.
+export const PROTOCOL_VERSION = 14;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -107,7 +111,12 @@ export const PROTOCOL_VERSION = 13;
 // - a mira persistida e o canal entram no HASH autoritativo, e o bolt que
 //   morre em parede firme emite `bolt_impact`.
 // O terreno semeado NAO muda: a impressao digital da geracao continua a da 18.
-export const SIMULATION_VERSION = 20;
+// 21: FACING POR MOVIMENTO. `player.facing` deixa de ser sinonimo da mira:
+// andar sem mirar gira o corpo (fora do canal do sopro), e o facing entra no
+// hash autoritativo — ele decide a esquiva SEM direcional, entao um replay
+// v20 re-simulado sob a regra nova esquiva para outro lado. O terreno semeado
+// continua o da 18.
+export const SIMULATION_VERSION = 21;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

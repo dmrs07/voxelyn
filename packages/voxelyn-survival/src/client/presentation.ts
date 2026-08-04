@@ -160,16 +160,12 @@ const layeredPlayerAnimation = (
   // memorias decidirem sozinhas em cima da fronteira — que e exatamente onde
   // W, A, S e D sozinhos caem. O bot andaria para cima com as pernas em `ul` e o
   // tronco em `ur`, torcido, e ficaria assim enquanto a tecla estivesse presa.
-  // O sopro canalizado e a excecao da excecao: a acao dura segundos e o jogador
-  // REDIRECIONA o jato durante ela, entao o tronco segue a mira VIVA
-  // (`entity.facing`, que a sim atualiza por tick) e nao o rumo congelado no
-  // instante do cast — congela-lo faria o corpo apontar para um lado enquanto a
-  // chama sai pelo outro.
-  const upperFacing = action
-    ? action.action === 'breath'
-      ? facing(FACING_UPPER, entity.facing.x, entity.facing.y)
-      : facing(FACING_UPPER, action.dx, action.dy)
-    : lowerFacing;
+  // O sopro canalizado dura segundos e o jogador REDIRECIONA o jato durante a
+  // acao: o `dx/dy` do intent e atualizado a cada emissao `flame_cone` (ver
+  // `ingest`), entao o tronco gira junto com a chama — sem seguir
+  // `entity.facing`, que desde "andar gira o corpo" pode ser o rumo dos PES, e
+  // movimento nao guia o sopro.
+  const upperFacing = action ? facing(FACING_UPPER, action.dx, action.dy) : lowerFacing;
 
   return {
     kind: 'layered-player',
@@ -244,6 +240,15 @@ export class EntityPresentation {
         // não venceu.
         this.actions.delete(event.entity);
         this.actionVisualClocks.delete(event.entity);
+      } else if (event.t === 'flame_cone') {
+        // Cada emissão carrega a mira DAQUELE instante: o tronco do dono gira
+        // junto com o jato, inclusive o do parceiro remoto — cujo facing de
+        // snapshot segue os pés, não a chama.
+        const intent = this.actions.get(event.owner);
+        if (intent && intent.action === 'breath') {
+          intent.dx = event.dx;
+          intent.dy = event.dy;
+        }
       } else if (event.t === 'player_down') {
         this.downedAt.set(event.slot + 1, nowMs);
       } else if (event.t === 'revive') {

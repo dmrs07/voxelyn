@@ -339,8 +339,13 @@ export class GameRoom {
         alive: p.alive,
         elite: false,
         downed: this.state.playerExtras[i].downed,
-        facingX: round3(this.state.playerExtras[i].aim.x),
-        facingY: round3(this.state.playerExtras[i].aim.y),
+        // O RUMO DO CORPO, nao a mira: desde que andar sem mirar gira o
+        // Prospector, os dois divergem — e o que o parceiro precisa ver e para
+        // onde o corpo olha. A mira continua viajando no viewer (`aimX/aimY`)
+        // para o HUD local, e o tronco em acao segue o dx/dy dos proprios
+        // eventos (action_start / flame_cone).
+        facingX: round3(p.facing.x),
+        facingY: round3(p.facing.y),
         stunnedUntil: p.stunnedUntil,
         action: p.action ? {
           kind: p.action.kind,

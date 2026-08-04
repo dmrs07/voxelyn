@@ -320,25 +320,43 @@ describe('EntityPresentation', () => {
     }
   });
 
-  it('durante o sopro canalizado o tronco segue a mira VIVA, nao a do instante do cast', () => {
+  it('durante o sopro canalizado o tronco gira junto com as emissoes do jato', () => {
     const presentation = new EntityPresentation();
-    // A acao `breath` durou dezenas de ticks e nasceu apontando para +x; no meio
-    // dela o jogador girou o stick para -y. `entity.facing` — que a simulacao
-    // atualiza por tick — e quem manda no tronco, senao o corpo aponta para um
-    // lado enquanto a chama sai pelo outro.
-    const entity = {
-      id: 1,
-      archetype: 'prospector',
-      facing: { x: 0, y: -1 },
-      stunnedUntil: 0,
-      action: {
-        kind: 'breath',
-        startedAt: 0,
-        releaseAt: 0,
-        endsAt: 50,
-        direction: { x: 1, y: 0 },
-      },
-    };
+    // O cast nasceu apontando para +x; no meio do canal o jogador girou o
+    // stick para -y, e a emissao `flame_cone` daquele tick carrega a mira nova.
+    // O tronco segue o dx/dy do intent — atualizado por emissao — e NAO
+    // `entity.facing`, que desde "andar gira o corpo" pode ser o rumo dos pes.
+    presentation.ingest(
+      [
+        {
+          t: 'action_start',
+          entity: 1,
+          action: 'breath',
+          x: 0,
+          y: 0,
+          dx: 1,
+          dy: 0,
+          startTick: 0,
+          releaseTick: 0,
+          endTick: 50,
+        },
+        {
+          t: 'flame_cone',
+          owner: 1,
+          x: 0,
+          y: 0,
+          dx: 0,
+          dy: -1,
+          range: 4.2,
+          arc: 0.61,
+          seq: 40,
+          reach: [4.2, 4.2, 4.2, 4.2, 4.2],
+        },
+      ] as never,
+      1_000
+    );
+    // `entity.facing` aponta para onde os PES andam; a chama manda no tronco.
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
     const presented = presentation.animationFor(
       entity as never, { tick: 10 } as never, baseAnim('idle') as never, 1_000
     );

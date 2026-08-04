@@ -808,7 +808,18 @@ const emitFlameBreath = (state: SurvivalState, slot: number, events: SemanticEve
     reach.push(Math.round(flameReach(state, player.x, player.y, lx, ly, range) * 100) / 100);
   }
   const seq = extra.channelingUntil - state.tick;
-  events.push({ t: 'flame_cone', x: player.x, y: player.y, dx, dy, range, arc, seq, reach });
+  events.push({
+    t: 'flame_cone',
+    owner: player.id,
+    x: player.x,
+    y: player.y,
+    dx,
+    dy,
+    range,
+    arc,
+    seq,
+    reach,
+  });
 
   // Dano e chao sao resolvidos pela MESMA varredura de celulas: o cone acende
   // o que atravessa, e o fogo que fica e o que continua matando depois. Sem
@@ -985,13 +996,23 @@ const stepPlayer = (
     });
   }
 
-  // mira
+  // mira e rumo visual. `extra.aim` e a MIRA (bolts e sopro saem por ela);
+  // `player.facing` e para onde o corpo olha. Mira nova comanda os dois.
   const aimLen = Math.hypot(cmd.aim.x, cmd.aim.y);
+  const moveInputLen = Math.hypot(cmd.move.x, cmd.move.y);
   if (aimLen > 0.01) {
     extra.aim.x = cmd.aim.x / aimLen;
     extra.aim.y = cmd.aim.y / aimLen;
     player.facing.x = extra.aim.x;
     player.facing.y = extra.aim.y;
+  } else if (moveInputLen > 0.01 && state.tick >= extra.channelingUntil) {
+    // Sem mira neste tick, ANDAR vira o rumo do corpo — e parar preserva a
+    // ultima direcao USADA, seja ela de mira ou de movimento. So o facing:
+    // a mira persistida fica intacta, senao caminhar depois de apontar
+    // redirecionaria o proximo bolt para onde os pes foram. Durante o canal
+    // do sopro o corpo pertence a chama: mover nao gira o tronco.
+    player.facing.x = cmd.move.x / moveInputLen;
+    player.facing.y = cmd.move.y / moveInputLen;
   }
 
   // esquiva
@@ -2330,12 +2351,15 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(p.alive ? 1 : 0);
     mix(e.downed ? 1 : 0);
     mix(Math.round(e.heat * 100));
-    // A mira persistida e o canal do sopro sao estado autoritativo: a mira
-    // decide o rumo do proximo bolt e de cada emissao do sopro, e o canal
-    // decide se esse bolt sequer existe. Duas simulacoes que discordam aqui
-    // divergem no primeiro disparo.
+    // A mira persistida, o rumo do corpo e o canal do sopro sao estado
+    // autoritativo: a mira decide o rumo do proximo bolt e de cada emissao do
+    // sopro, o facing decide a esquiva sem direcional, e o canal decide se
+    // esse bolt sequer existe. Duas simulacoes que discordam aqui divergem no
+    // primeiro disparo ou na primeira esquiva neutra.
     mix(Math.round(e.aim.x * 1000));
     mix(Math.round(e.aim.y * 1000));
+    mix(Math.round(p.facing.x * 1000));
+    mix(Math.round(p.facing.y * 1000));
     mix(e.channelingUntil);
     mix(e.purgeCells);
     // A habilidade equipada MUDA o resultado da run, entao ela e estado

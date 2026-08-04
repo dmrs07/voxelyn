@@ -66,7 +66,10 @@ describe('facing persistente do jogador', () => {
     }
   });
 
-  it('mover sem mirar nao toca no facing: movimento e mira sao eixos separados', () => {
+  it('andar sem mirar gira o corpo, preserva a mira, e parar mantem o rumo do andar', () => {
+    // A direcao canonica e "a ultima direcao USADA": mirar E andar contam.
+    // Andar depois de mirar vira o corpo para onde os pes vao — mas NAO toca na
+    // mira persistida, senao caminhar redirecionaria o proximo bolt.
     const state = createRun({ seed: 12 });
     clearArena(state);
     stepRun(state, [aimCommand({ x: 0, y: -1 })]);
@@ -74,11 +77,11 @@ describe('facing persistente do jogador', () => {
     const walk = emptyCommand();
     walk.move = { x: 1, y: 0 };
     for (let tick = 0; tick < 20; tick++) stepRun(state, [walk]);
-    // Entra em idle depois de andar: continua olhando para onde mirou.
+    // Solta o direcional: o corpo permanece virado para onde ANDOU.
     for (let tick = 0; tick < 20; tick++) stepRun(state, [emptyCommand()]);
 
+    expect(state.player.facing).toEqual({ x: 1, y: 0 });
     expect(state.playerExtra.aim).toEqual({ x: 0, y: -1 });
-    expect(state.player.facing).toEqual({ x: 0, y: -1 });
   });
 
   it('disparar e parar nao devolve o facing para DR', () => {
@@ -133,13 +136,25 @@ describe('facing persistente do jogador', () => {
     clearArena(state);
     stepRun(state, [aimCommand({ x: 0, y: 1 })]);
 
-    // Mistura de tudo que antes reintroduzia o fantasma: neutro, andar, esquiva.
+    // Mistura de tudo que antes reintroduzia o fantasma: neutro, andar (na
+    // MESMA direcao — andar noutra direcao girar o corpo e comportamento, nao
+    // reset), esquiva.
     for (let tick = 0; tick < 120; tick++) {
       const command = emptyCommand();
-      if (tick % 3 === 0) command.move = { x: 1, y: 0 };
+      if (tick % 3 === 0) command.move = { x: 0, y: 1 };
       if (tick === 40) command.dodge = true;
       stepRun(state, [command]);
       expect(state.player.facing).toEqual({ x: 0, y: 1 });
     }
+  });
+
+  it('a esquiva sem direcional segue o rumo do corpo, que entra no hash', () => {
+    // O facing decide a esquiva neutra, entao ele e estado autoritativo: duas
+    // simulacoes que discordam dele divergem na primeira esquiva sem move.
+    const a = createRun({ seed: 18 });
+    const b = createRun({ seed: 18 });
+    expect(hashAuthoritativeState(a)).toBe(hashAuthoritativeState(b));
+    b.player.facing = { x: 0, y: 1 };
+    expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
   });
 });
