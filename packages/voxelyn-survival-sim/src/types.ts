@@ -533,9 +533,11 @@ export type SemanticEvent =
    * para as particulas variarem entre emissoes sem relogio local. `reach` e o
    * alcance REAL, ja recortado por paredes, de raios amostrados de `-arc` a
    * `+arc`: o cliente desenha o jato ate onde a simulacao de fato chegou, em vez
-   * de prometer um cone que atravessa pedra.
+   * de prometer um cone que atravessa pedra. `owner` e a entidade soprando: e
+   * por ele que o cliente mantem o TRONCO do dono girando junto com o jato —
+   * inclusive o do parceiro remoto, cujo `facing` de snapshot segue os pes.
    */
-  | { t: 'flame_cone'; x: number; y: number; dx: number; dy: number; range: number; arc: number; seq: number; reach: number[] }
+  | { t: 'flame_cone'; owner: number; x: number; y: number; dx: number; dy: number; range: number; arc: number; seq: number; reach: number[] }
   /**
    * Um bolt do jogador morreu contra um solido que nao cedeu. Puramente
    * presentacional — o burst de plasma no ponto de contato. `nx`/`ny` e a normal

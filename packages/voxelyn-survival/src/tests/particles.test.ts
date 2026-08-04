@@ -416,6 +416,7 @@ describe('particulas voxel', () => {
   // as duas maquinas do co-op vejam o MESMO jato variando entre emissoes.
   const cone = (seq: number, reach: number[] = [4.2, 4.2, 4.2, 4.2, 4.2]): SemanticEvent => ({
     t: 'flame_cone',
+    owner: 1,
     x: 20,
     y: 20,
     dx: 1,

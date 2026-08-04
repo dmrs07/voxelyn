@@ -134,6 +134,9 @@ describe('sopro termico canalizado', () => {
     }
     // A mira persistida nunca virou o vetor de movimento.
     expect(state.playerExtra.aim).toEqual({ x: 0, y: 1 });
+    // E o CORPO tambem nao: durante o canal, mover nao gira o tronco — a regra
+    // "andar vira o rumo do corpo" so vale fora do sopro.
+    expect(state.player.facing).toEqual({ x: 0, y: 1 });
     // O fogo continua nascendo ao sul da posicao ATUAL do jogador.
     expect(state.surface[cellAt(state, 0, 2)]).toBe(SURF_FIRE);
   });
