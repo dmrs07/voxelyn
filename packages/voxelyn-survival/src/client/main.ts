@@ -58,6 +58,7 @@ import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
+import { deployVeil, veilActive } from './deploy-veil';
 import { aurixMarkHtml } from './aurix';
 import { PauseMenu } from './pause-menu';
 import {
@@ -253,13 +254,29 @@ const playerScreen = (): { x: number; y: number } => ({
  * de titulo abre um menu de campo para uma run que nunca comecou, com direito a
  * uma confirmacao de abandono prometendo perder um progresso inexistente.
  */
+/** A estática de rádio que acompanha cada varredura do véu de deploy. */
+const veilSound = (): void => audio.ui('deployStatic');
+
+/**
+ * Uma run preparada e ainda parada: o mundo (ou a conexao) existe, mas nenhum
+ * quadro rodou. `firstFrame` desenha o estado inicial — chamado sob o preto do
+ * véu, para a escotilha abrir sobre um mundo ja desenhado — e `start` liga o
+ * laco, chamado so quando o véu termina e devolve os controles.
+ */
+type PreparedRun = { firstFrame: () => void; start: () => void };
+
 const backToMenu = (): void => {
   runInProgress = false;
   liveRun = null;
   paused = false;
   stopLoop = null;
   pauseMenu.disarmHistory();
-  menu.classList.remove('hidden');
+  // A volta ao terminal tambem passa pela escotilha: a unidade e recolhida.
+  // Se um véu estiver no ar (nao deveria: as falhas de partida vivem no
+  // `prepare` dele), a volta nao pode se perder — mostra o menu sem cerimonia.
+  void deployVeil({ swap: () => menu.classList.remove('hidden'), sound: veilSound }).then((ran) => {
+    if (!ran) menu.classList.remove('hidden');
+  });
 };
 
 /**
@@ -829,7 +846,9 @@ const abandonRun = (): void => {
   showInvite(null);
   setBanner(null);
   audio.reset();
-  menu.classList.remove('hidden');
+  void deployVeil({ swap: () => menu.classList.remove('hidden'), sound: veilSound }).then((ran) => {
+    if (!ran) menu.classList.remove('hidden');
+  });
 };
 
 /** Solo congela; co-op nao. Lido pelo menu ANTES de `onOpen`, entao nao pode depender de `paused`. */
@@ -918,7 +937,13 @@ const hintOnce = (): void => {
   }, 1600);
 };
 
-const runSolo = async (): Promise<void> => {
+/**
+ * Prepara uma descida solo: autoriza, constroi o mundo e monta o laco — sem
+ * rodar um quadro sequer. Quem decide QUANDO o primeiro quadro aparece e
+ * quando o laco anda e o véu de deploy, atraves do `PreparedRun` devolvido.
+ * `null` quando a autorizacao chegou tarde (outra descida ja e a atual).
+ */
+const prepareSolo = async (): Promise<PreparedRun | null> => {
   const myDescent = ++descentToken;
   renderer.setLocalPlayerId(1); // solo: o unico player e o id 1
   audio.setLocalPlayerId(1);
@@ -931,7 +956,7 @@ const runSolo = async (): Promise<void> => {
   // O jogador pode ter desistido — ou comecado outra descida — enquanto o ticket
   // vinha. Sair AQUI, antes de tocar em qualquer estado global, e o que impede um
   // mundo de nascer atras do menu.
-  if (myDescent !== descentToken) return;
+  if (myDescent !== descentToken) return null;
   const seed = authorized.seed;
   recorder.start(seed);
   resetRunTracking();
@@ -1104,9 +1129,22 @@ const runSolo = async (): Promise<void> => {
     }
     requestAnimationFrame(frame);
   };
-  requestAnimationFrame(frame);
-  stopLoop = () => {
-    running = false;
+  return {
+    // Sob o preto do véu: a escotilha abre sobre o setor ja desenhado, nunca
+    // sobre um canvas vazio.
+    firstFrame: (): void => {
+      frameNow = performance.now();
+      renderState(playout.sample(state, 0) ?? state, 1, input.state, frameNow);
+    },
+    start: (): void => {
+      // `lastTime` renasce aqui: o tempo que o véu segurou nao e divida de
+      // simulacao — o mundo comeca a andar AGORA, nao 1,7 s atras.
+      lastTime = performance.now();
+      requestAnimationFrame(frame);
+      stopLoop = () => {
+        running = false;
+      };
+    },
   };
 };
 
@@ -1124,7 +1162,13 @@ const defaultServerUrl = (): string => {
   return `${proto}://${location.hostname || 'localhost'}:8080`;
 };
 
-const runOnline = (url: string, roomCode: string | null): void => {
+/**
+ * Prepara a descida online: abre a run na telemetria, cria o socket e monta o
+ * laco — que so anda quando o véu chamar `start`. `null` quando o socket nem
+ * nasceu (URL malformada): o banner de erro ja esta na tela e o menu NUNCA
+ * saiu dela — nao ha "voltar" a fazer.
+ */
+const runOnline = (url: string, roomCode: string | null): PreparedRun | null => {
   resetRunTracking();
   // O co-op tem de abrir a run na telemetria igual ao solo.
   //
@@ -1190,10 +1234,12 @@ const runOnline = (url: string, roomCode: string | null): void => {
       // jogador fica numa tela morta, sem retry e sem como corrigir a URL.
       ws = new WebSocket(url);
     } catch {
+      // So acontece na PRIMEIRA conexao: um reconnect reusa a mesma URL que ja
+      // funcionou. O véu ainda esta fechando sobre o menu — que continua sendo
+      // a tela certa — entao aqui so se declara a falha; nao ha volta a fazer.
       fatal = true;
       startupFailed = true;
       setBanner(t('banner.server.invalid', { url }), 'error');
-      backToMenu();
       return;
     }
     ws.onopen = () => net.connect(net.resumeToken ?? undefined);
@@ -1206,11 +1252,9 @@ const runOnline = (url: string, roomCode: string | null): void => {
     ws.onerror = () => ws?.close();
   };
   connect();
-  // URL malformada: `connect` ja devolveu o jogador ao menu de forma sincrona.
-  // Sem sair aqui, o quadro seria agendado assim mesmo e ficaria girando para
-  // sempre por tras da tela de titulo, so para reencontrar `fatal` a cada 16 ms
-  // — e `stopLoop` apontaria para um loop que o jogador nao esta jogando.
-  if (startupFailed) return;
+  // URL malformada: nao ha loop a montar. O chamador ve o `null`, mantem o
+  // menu na tela e desfaz o anuncio da run — o banner de erro ja diz o resto.
+  if (startupFailed) return null;
 
   const frame = (now: number): void => {
     if (!running) return;
@@ -1307,11 +1351,19 @@ const runOnline = (url: string, roomCode: string | null): void => {
     }
     requestAnimationFrame(frame);
   };
-  requestAnimationFrame(frame);
-  stopLoop = () => {
-    running = false;
-    showInvite(null);
-    ws?.close();
+  return {
+    // Online nao tem mundo antes do primeiro snapshot: o "primeiro quadro" e o
+    // canvas escuro com o banner de conexao — que ja esta montado no DOM.
+    firstFrame: (): void => {},
+    start: (): void => {
+      lastTime = performance.now();
+      requestAnimationFrame(frame);
+      stopLoop = () => {
+        running = false;
+        showInvite(null);
+        ws?.close();
+      };
+    },
   };
 };
 
@@ -1332,20 +1384,44 @@ qualitySelect.addEventListener('change', () => {
  * dentro do jogo — e por isso `unlock` tambem e chamado pelo input.
  */
 const startSolo = (contract: DeathEchoContract | null = null): void => {
+  // Ja ha um despacho no ar: Enter repetido no carimbo (ou dois toques) nao
+  // pode emitir segunda autorizacao. O clique e descartado, nao enfileirado.
+  if (veilActive()) return;
   // A modalidade e declarada por quem INICIA a run, e nao herdada do que o
   // servidor anunciou: descer normalmente sempre significa pool geral, mesmo com
   // um contrato aberto na tela.
   contractRun = contract;
   audio.unlock();
   audio.ui();
-  menu.classList.add('hidden');
-  stopLoop?.();
-  runInProgress = true;
-  pauseMenu.armHistory();
-  void runSolo();
-  hintOnce();
+  // O despacho INTEIRO passa pelo véu: a autorizacao e a montagem do mundo
+  // correm enquanto a colmeia fecha; a troca de telas e o primeiro quadro
+  // acontecem sob o preto; e o laco so anda quando a escotilha reabre e os
+  // controles voltam — nada progride por fora da sequencia.
+  let run: PreparedRun | null = null;
+  void deployVeil({
+    sound: veilSound,
+    prepare: async () => {
+      stopLoop?.();
+      runInProgress = true;
+      run = await prepareSolo();
+      // Autorizacao superada (outra descida ja e a atual): o anuncio se desfaz
+      // e o swap mantem o terminal na tela.
+      if (!run) runInProgress = false;
+    },
+    swap: () => {
+      if (!run) return;
+      menu.classList.add('hidden');
+      run.firstFrame();
+    },
+  }).then((ran) => {
+    if (!ran || !run) return;
+    pauseMenu.armHistory();
+    run.start();
+    hintOnce();
+  });
 };
 const startOnline = (): void => {
+  if (veilActive()) return;
   const code = normalizeRoomCode(roomInput.value);
   if (code !== '' && !isValidRoomCode(code)) {
     setBanner(t('banner.room.invalid', { code }), 'error');
@@ -1355,12 +1431,29 @@ const startOnline = (): void => {
   contractRun = null;
   audio.unlock();
   audio.ui();
-  menu.classList.add('hidden');
-  stopLoop?.();
-  runInProgress = true;
-  pauseMenu.armHistory();
-  runOnline(serverInput.value.trim() || defaultServerUrl(), code || null);
-  hintOnce();
+  // Mesma sequencia do solo; aqui o `prepare` cria o socket — a conexao viaja
+  // enquanto a colmeia fecha, e uma URL malformada falha AINDA NO MENU, sem
+  // nunca deixar o jogador numa tela morta.
+  let run: PreparedRun | null = null;
+  void deployVeil({
+    sound: veilSound,
+    prepare: () => {
+      stopLoop?.();
+      runInProgress = true;
+      run = runOnline(serverInput.value.trim() || defaultServerUrl(), code || null);
+      if (!run) runInProgress = false;
+    },
+    swap: () => {
+      if (!run) return;
+      menu.classList.add('hidden');
+      run.firstFrame();
+    },
+  }).then((ran) => {
+    if (!ran || !run) return;
+    pauseMenu.armHistory();
+    run.start();
+    hintOnce();
+  });
 };
 
 // Rede de seguranca para o auto-start por query e para browsers que exigem um
@@ -1465,7 +1558,7 @@ const closeOverlay = (overlay: HTMLDivElement): void => {
 };
 
 document.getElementById('btn-records')?.addEventListener('click', () => {
-  renderRecordsPanel(recordsBody, records);
+  renderRecordsPanel(recordsBody, records, renderer.sprites);
   openOverlay(recordsOverlay);
 });
 document
@@ -1729,6 +1822,7 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
     entries: [],
     emptyReason: t('rank.loading'),
     seed: forcedSeed ?? undefined,
+    loading: true,
   });
   openOverlay(rankOverlay);
   const url = serverInput.value.trim() || defaultServerUrl();
@@ -1797,7 +1891,8 @@ onLocaleChange(() => {
   // Os paineis so sao remontados se estiverem ABERTOS: reconstruir o de
   // ranking fechado descartaria as entradas que vieram da rede, e reabri-lo
   // dispararia outra busca.
-  if (!recordsOverlay.classList.contains('hidden')) renderRecordsPanel(recordsBody, records);
+  if (!recordsOverlay.classList.contains('hidden'))
+    renderRecordsPanel(recordsBody, records, renderer.sprites);
   // O menu de campo escreve o estado e o rotulo do abandono ao abrir; com ele
   // aberto (e e de dentro dele que o idioma costuma ser trocado no meio de uma
   // run) os dois ficariam na lingua anterior ate a proxima abertura.

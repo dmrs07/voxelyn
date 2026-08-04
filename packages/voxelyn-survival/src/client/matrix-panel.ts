@@ -37,6 +37,7 @@ import type {
   PublicProgressionProfile,
 } from '@voxelyn/survival-protocol';
 import { t, type MessageKey } from './i18n';
+import { protocolIconSvg } from './matrix-icons';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
   const node = document.createElement(tag);
@@ -316,9 +317,21 @@ const renderBranchRail = (
     const state = nodeState(upgrade, view.profile);
     const node = el(
       'button',
-      `ax-node${nodeStateClass(state)}${selectedId === upgrade.id ? ' is-selected' : ''}`,
+      `ax-node${nodeStateClass(state)}${selectedId === upgrade.id ? ' is-selected' : ''}${
+        view.pending === upgrade.id ? ' is-pending' : ''
+      }`,
     ) as HTMLButtonElement;
-    node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
+    // O protocolo fala por icone (Phosphor, ver matrix-icons.ts); a sigla e o
+    // fallback de um id que ainda nao tem desenho. innerHTML e seguro aqui:
+    // o SVG e constante nossa, nunca dado de fora.
+    const icon = protocolIconSvg(upgrade.id);
+    if (icon) {
+      const holder = el('span', 'ax-node-icon');
+      holder.innerHTML = icon;
+      node.appendChild(holder);
+    } else {
+      node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
+    }
     node.appendChild(el('span', 'ax-node-glyph', nodeGlyph(state, view.pending === upgrade.id)));
     node.title = upgrade.id;
     node.dataset.axFocus = `node:${upgrade.id}`;
@@ -345,10 +358,20 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   }
   const state = nodeState(upgrade, view.profile);
 
-  inspector.appendChild(el('div', 'codex-code', `${upgrade.id} · T${upgrade.tier}`));
-  inspector.appendChild(
+  const head = el('div', 'ax-inspector-head');
+  const headIcon = protocolIconSvg(upgrade.id);
+  if (headIcon) {
+    const holder = el('span', 'ax-inspector-icon');
+    holder.innerHTML = headIcon;
+    head.appendChild(holder);
+  }
+  const headText = el('div');
+  headText.appendChild(el('div', 'codex-code', `${upgrade.id} · T${upgrade.tier}`));
+  headText.appendChild(
     el('div', 'ax-inspector-name', t(`upgrade.${upgrade.id}.name` as MessageKey)),
   );
+  head.appendChild(headText);
+  inspector.appendChild(head);
   inspector.appendChild(
     el('div', 'ax-inspector-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)),
   );
@@ -388,8 +411,9 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   }
 
   if (state.kind === 'affordable') {
-    const button = el('button', 'primary') as HTMLButtonElement;
-    button.textContent = view.pending === upgrade.id ? t('matrix.buying') : t('matrix.confirm.yes');
+    const pending = view.pending === upgrade.id;
+    const button = el('button', pending ? 'primary is-pending' : 'primary') as HTMLButtonElement;
+    button.textContent = pending ? t('matrix.buying') : t('matrix.confirm.yes');
     // Desabilitado enquanto a requisicao corre. Nao e otimismo: o estado da
     // arvore so muda quando a resposta do servidor chega.
     button.disabled = !purchaseEnabled(view);
@@ -421,8 +445,13 @@ const renderMatrixTab = (
   const body = el('div', 'matrix-body');
   const notice = panelNotice(view);
   if (notice) {
-    const tone = notice.key === 'matrix.loading' ? 'sub' : 'sub warn';
-    body.appendChild(el('p', tone, t(notice.key, notice.params)));
+    // Carregando ganha a varredura CRT (board 3p: o unico lugar dela); falha
+    // continua texto parado em tom de aviso — espera e erro nao vestem igual.
+    body.appendChild(
+      notice.key === 'matrix.loading'
+        ? el('div', 'ax-scan ax-loading', t(notice.key, notice.params))
+        : el('p', 'sub warn', t(notice.key, notice.params)),
+    );
   }
   if (view.notice) body.appendChild(el('p', 'sub warn', t(view.notice.key, view.notice.params)));
 
@@ -464,11 +493,9 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
   if (!codex) {
     const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
     body.appendChild(
-      el(
-        'p',
-        pending.key === 'matrix.loading' ? 'sub' : 'sub warn',
-        t(pending.key, pending.params),
-      ),
+      pending.key === 'matrix.loading'
+        ? el('div', 'ax-scan ax-loading', t(pending.key, pending.params))
+        : el('p', 'sub warn', t(pending.key, pending.params)),
     );
     return body;
   }

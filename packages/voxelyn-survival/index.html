@@ -34,6 +34,35 @@
          Nenhum estado depende só de cor: desabilitado ganha hachura,
          selecionado ganha keyline de 2px, censura ganha barra sólida.
          ================================================================== */
+      /* As duas vozes tipograficas do redesign, auto-hospedadas (woff2 latin,
+         ~37KB somados — emitidas com hash pelo Vite e precacheadas pelo SW):
+         - Chakra Petch: a autoridade Aurix — placa usinada, chanfros — em
+           titulos de documento, wordmark e rotulos de secao;
+         - VT323: o pixel do terminal, CONFINADO ao carimbo primario, onde as
+           letras se fundem com a grade de fosforo.
+         `font-display: swap` cai no stack antigo enquanto carrega — e como
+         tudo e precacheado, isso so acontece no primeirissimo quadro da vida. */
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('./src/assets/fonts/chakra-petch-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('./src/assets/fonts/chakra-petch-700.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'VT323';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('./src/assets/fonts/vt323-400.woff2') format('woff2');
+      }
       :root {
         color-scheme: dark;
         --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -106,6 +135,276 @@
           opacity: 1;
         }
       }
+      /* O véu de deploy (deploy-veil.ts): a colmeia de hexágonos pretos que
+         fecha em onda diagonal em toda troca UI ↔ canvas. Acima de todas as
+         folhas (menu 10, pausa 30) e abaixo do banner de sistema (40); engole
+         toques enquanto existe para um segundo DESCER não disparar duas runs.
+         Cada célula anima SÓ transform — nada repinta por quadro. */
+      .ax-veil {
+        position: fixed;
+        inset: 0;
+        z-index: 35;
+        pointer-events: all;
+        overflow: hidden;
+      }
+      .ax-veil span {
+        position: absolute;
+        clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+        background: #050506;
+        transform: scale(0);
+        transition: transform 240ms cubic-bezier(0.2, 0.7, 0.3, 1);
+        will-change: transform;
+        /* O lampejo da frente de onda: longhand de propósito — o atraso por
+           célula vem inline do deploy-veil.ts (o mesmo da transição), e um
+           shorthand `animation` aqui o zeraria. */
+        animation-duration: 160ms;
+        animation-timing-function: ease-out;
+        animation-fill-mode: backwards;
+      }
+      /* A frente de onda é TEAL: cada célula nasce acesa e apaga para o preto
+         em 340ms — como os atrasos escalonam por diagonal, o brilho vivo é
+         sempre a borda da onda, nunca a tela inteira. */
+      @keyframes axVeilFront {
+        0% {
+          background: #8ff0e6;
+        }
+        40% {
+          background: #1d5751;
+        }
+        100% {
+          background: #050506;
+        }
+      }
+      /* Na abertura o lampejo inverte: a célula pisca teal no instante em que
+         começa a se dissolver — a borda que está sumindo é a que brilha. */
+      @keyframes axVeilFrontOut {
+        0% {
+          background: #050506;
+        }
+        30% {
+          background: #2f7d75;
+        }
+        100% {
+          background: #050506;
+        }
+      }
+      /* 1.12 de sobreposição: hexágonos vizinhos se cobrem e o preto fecha
+         sem frestas. */
+      .ax-veil.is-closed span {
+        transform: scale(1.12);
+        animation-name: axVeilFront;
+      }
+      .ax-veil.is-opening span {
+        transform: scale(0);
+        animation-name: axVeilFrontOut;
+      }
+
+      /* ------------------------------------------------------------------
+         Fósforo CRT (referência de campo: monitor de fósforo verde).
+         Todo elemento LUMINOSO carrega a grade de células de um monitor
+         antigo: separadores escuros horizontais (passo de 3px) e verticais
+         (passo de 2px) desenham os retângulos de fósforo, e o brilho que o
+         elemento já tem faz o bloom. Textura estática — não é movimento e
+         não depende dele. A regra do doc AD-UI-2.0 continua de pé: fósforo
+         SÓ sobre superfície acesa, nunca sobre corpo de leitura.
+         ------------------------------------------------------------------ */
+      .ax-chip.is-live,
+      .ax-loading,
+      #pause-coop-warning,
+      .ax-node,
+      button.primary:not(.compact) {
+        position: relative;
+      }
+      button.primary:not(.compact)::before,
+      .ax-node.is-installed::before,
+      .ax-node.is-affordable::before,
+      .ax-node.is-pending::before,
+      .ax-chip.is-live::after,
+      #invite::after,
+      .ax-loading::after,
+      #pause-coop-warning::after,
+      #banner[data-tone='success']::after,
+      #banner[data-tone='info']::after,
+      .ax-asset-slot:not(.is-locked)::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
+      }
+      /* O vidro abaulado do carimbo: por cima do fosforo entram o reflexo
+         elíptico do topo (vidro curvo devolvendo a luz da sala) e a vinheta
+         que pinça os cantos (a curvatura fugindo do olho). O raio de canto
+         vive SO neste vidro interno — o bezel do botão segue quadrado. */
+      button.primary:not(.compact)::before {
+        inset: 3px;
+        border-radius: 12px;
+        background:
+          radial-gradient(82% 46% at 50% 7%, rgba(255, 255, 255, 0.09), transparent 62%),
+          radial-gradient(135% 135% at 50% 50%, transparent 56%, rgba(0, 0, 0, 0.55) 100%),
+          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
+        box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.55);
+      }
+      /* Protocolo ATIVO é um monitor ligado na parede da matriz: o mesmo
+         vidro do carimbo, em escala de célula. Reflexo e vinheta menores,
+         mesmo raio interno — o bezel do nó continua quadrado. */
+      .ax-node.is-installed::before {
+        inset: 2px;
+        border-radius: 6px;
+        background:
+          radial-gradient(82% 46% at 50% 10%, rgba(255, 255, 255, 0.1), transparent 62%),
+          radial-gradient(140% 140% at 50% 50%, transparent 52%, rgba(0, 0, 0, 0.5) 100%),
+          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+      }
+
+      /* O zumbido do carimbo primario: o unico circuito LIGADO da folha.
+         Uma lampada de mata-mosquito, nao uma respiracao — a base fica sempre
+         acesa e clara (o zumbido so ADICIONA luz, nunca escurece o texto) e a
+         oscilacao e seca e irregular, em saltos steps(), com tres faiscas
+         fortes por ciclo. Anima SO a opacidade de uma camada de brilho:
+         compositor-friendly, nada de repintar box-shadow a cada quadro. */
+      @keyframes axBuzz {
+        0% {
+          opacity: 0.35;
+        }
+        3% {
+          opacity: 0.6;
+        }
+        5% {
+          opacity: 0.42;
+        }
+        11% {
+          opacity: 0.52;
+        }
+        13% {
+          opacity: 0.95;
+        }
+        14% {
+          opacity: 0.45;
+        }
+        21% {
+          opacity: 0.58;
+        }
+        23% {
+          opacity: 0.4;
+        }
+        29% {
+          opacity: 0.62;
+        }
+        31% {
+          opacity: 0.5;
+        }
+        44% {
+          opacity: 0.55;
+        }
+        46% {
+          opacity: 1;
+        }
+        47% {
+          opacity: 0.5;
+        }
+        53% {
+          opacity: 0.62;
+        }
+        61% {
+          opacity: 0.45;
+        }
+        66% {
+          opacity: 0.58;
+        }
+        74% {
+          opacity: 0.5;
+        }
+        76% {
+          opacity: 0.9;
+        }
+        78% {
+          opacity: 0.55;
+        }
+        87% {
+          opacity: 0.42;
+        }
+        92% {
+          opacity: 0.6;
+        }
+        100% {
+          opacity: 0.35;
+        }
+      }
+      /* Todo primario grande zumbe: DESCER, RETOMAR, CONTINUAR A DESCIDA,
+         AUTORIZAR. Os compactos (toggles de som/telemetria) ficam parados —
+         sao interruptores, nao autorizacoes. Pendente tem o proprio pulso e
+         desabilitado nao carrega energia nenhuma. */
+      button.primary:not(.compact):not(:disabled):not(.is-pending) {
+        position: relative;
+      }
+      button.primary:not(.compact):not(:disabled):not(.is-pending)::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        pointer-events: none;
+        box-shadow:
+          0 0 28px rgba(79, 214, 201, 0.5),
+          inset 0 0 32px rgba(79, 214, 201, 0.18);
+        opacity: 0.45;
+        animation: axBuzz 3.4s steps(1, end) infinite;
+      }
+      /* A varredura CRT do board 3p: reservada a ESPERA DE REDE e boot —
+         consultando a Aurix, homologando compra, carregando o livro. Nunca em
+         texto de leitura nem em estado parado; o resto da UI fica imóvel. */
+      @keyframes axScan {
+        0% {
+          transform: translateY(-100%);
+        }
+        100% {
+          transform: translateY(400%);
+        }
+      }
+      .ax-scan {
+        position: relative;
+        overflow: hidden;
+      }
+      .ax-scan::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 16px;
+        background: linear-gradient(180deg, transparent, rgba(79, 214, 201, 0.18), transparent);
+        animation: axScan 2s linear infinite;
+        pointer-events: none;
+      }
+      /* Espera de rede: moldura teal + varredura. NAO e a hachura de
+         indisponivel — carregar e o sistema trabalhando, nao uma porta
+         fechada, e as duas coisas nao podem vestir a mesma roupa. */
+      .ax-loading {
+        border: 1px solid var(--ax-teal-dim);
+        background: rgba(79, 214, 201, 0.05);
+        color: var(--ax-teal-bright);
+        padding: 7px 10px;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        line-height: 1.5;
+      }
+      /* Transacao em voo (board 07b): o botao espera a Aurix — pulso + rotulo,
+         com moldura teal solida no lugar da hachura de desabilitado. */
+      button.is-pending:disabled {
+        border: 1px solid var(--ax-teal-dim);
+        border-style: solid;
+        background: rgba(79, 214, 201, 0.05);
+        color: var(--ax-teal-bright);
+        animation: axPulse 1.4s infinite;
+      }
+      .ax-node.is-pending {
+        border-color: var(--ax-teal);
+        color: var(--ax-teal-bright);
+        background: rgba(79, 214, 201, 0.06);
+        animation: axPulse 1.4s infinite;
+      }
       /* O pulso e decoração de estado, nunca a informação: quem pediu menos
          movimento fica com o ponto aceso parado e não perde nada. */
       @media (prefers-reduced-motion: reduce) {
@@ -168,13 +467,50 @@
         position: relative;
         z-index: 1;
       }
+      /* ----------------------------------------------------------------
+         Terminal de campo: o despacho em ESPERA vira um monitor. O feed
+         do Veio continua visível atrás da folha — tintado do mesmo teal
+         monocromático dos slots de ativos — e o vidro do tubo entra na
+         frente da tela inteira: grade de células de fósforo, reflexo
+         elíptico do topo e vinheta de curvatura nos cantos. A rescisão
+         usa o mesmo vidro: é o mesmo terminal. Tudo estático — espera
+         não é movimento; quem zumbe ali é só o carimbo RETOMAR.
+         ---------------------------------------------------------------- */
+      #game.is-crt-hold {
+        /* Fósforo de TELEVISÃO, não filtro: o contraste sobe ANTES do véu
+           — pretos fundos, realces quase estourando — porque as scanlines
+           vão comer luz e a imagem entre elas tem de continuar acesa. */
+        filter: sepia(1) hue-rotate(128deg) saturate(2.1) contrast(1.5) brightness(1.05);
+      }
+      #pause,
+      #pause-confirm {
+        /* Sem filme cinza sobre o tubo: quem escurece a imagem são as
+           linhas de varredura, não um backdrop. */
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.26));
+      }
+      #pause::before,
+      #pause-confirm::before {
+        /* Varredura de televisão: linha horizontal DOMINANTE, imagem viva
+           entre uma e outra; a máscara vertical só insinua a tríade. */
+        background:
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.55) 0 1px, transparent 1px 4px),
+          repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+      }
+      #pause::after,
+      #pause-confirm::after {
+        background:
+          radial-gradient(85% 42% at 50% 5%, rgba(217, 255, 250, 0.07), transparent 62%),
+          radial-gradient(140% 140% at 50% 50%, transparent 64%, rgba(0, 0, 0, 0.55) 100%);
+        box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.45);
+      }
       .hidden {
         display: none !important;
       }
       h1 {
         color: var(--ax-text-bright);
         margin: 0;
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-weight: 700;
         font-size: clamp(18px, 4vw, 26px);
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -189,8 +525,9 @@
 
       /* ------------------------------------------------------------------
          Controles: a linguagem de hardware Aurix.
-         Sem raio de canto em componente nenhum — a única curva do sistema
-         é o selo de diretiva. Alvo mínimo de toque 44px.
+         Sem raio de canto em componente nenhum — as únicas curvas do sistema
+         são o selo de diretiva e o VIDRO do tubo CRT dentro do carimbo
+         primário (o bezel do carimbo continua quadrado). Alvo mínimo 44px.
          ------------------------------------------------------------------ */
       button {
         background: linear-gradient(180deg, #161513, #0e0d0c);
@@ -225,6 +562,23 @@
           0 0 22px rgba(79, 214, 201, 0.16),
           inset 0 0 26px rgba(79, 214, 201, 0.07);
         text-shadow: 0 0 16px rgba(79, 214, 201, 0.4);
+      }
+      /* O carimbo primario e um MONITOR: bezel quadrado, tubo de fosforo teal
+         dentro. O campo teal irradia do centro e morre nas bordas (o tubo e
+         mais fundo que o bezel), e a letra e fosforescencia, nao tinta. */
+      button.primary:not(.compact) {
+        color: #d9fffa;
+        text-shadow:
+          0 0 3px rgba(143, 240, 230, 0.9),
+          0 0 16px rgba(79, 214, 201, 0.75);
+        background:
+          radial-gradient(
+            120% 170% at 50% 34%,
+            rgba(79, 214, 201, 0.17),
+            rgba(79, 214, 201, 0.05) 58%,
+            rgba(0, 0, 0, 0.5) 100%
+          ),
+          linear-gradient(180deg, #0a1413, #060b0a);
       }
       button.compact {
         min-width: 0;
@@ -289,7 +643,8 @@
          Cromo compartilhado dos documentos Aurix
          ------------------------------------------------------------------ */
       .ax-doc-title {
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-weight: 600;
         font-size: 14px;
         letter-spacing: 0.22em;
         color: var(--ax-gold);
@@ -304,6 +659,8 @@
         white-space: nowrap;
       }
       .ax-section-label {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-weight: 600;
         font-size: 10px;
         letter-spacing: 0.22em;
         color: var(--ax-gold-dim);
@@ -460,6 +817,37 @@
         overflow-y: auto;
         padding: 10px 14px;
       }
+      /* Matriz e Registro: cabecalho e abas FIXOS, so o conteudo rola.
+         A folha vira coluna flex; o corpo da aba (.matrix-body / .panel)
+         assume a rolagem. Pedido de revisao de campo: perder as abas de vista
+         ao rolar obrigava a rolar de volta so para trocar de aba. */
+      #matrix-body.ax-sheet-body,
+      #records-body.ax-sheet-body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #matrix-body > .matrix-header,
+      #matrix-body > .ax-tabs,
+      #records-body > .ax-tabs {
+        flex: 0 0 auto;
+      }
+      #matrix-body > .matrix-body,
+      #matrix-body > .codex-reveal,
+      #records-body > .panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      /* Livro-caixa em tela larga: dois pares rotulo–valor por linha, como no
+         board 3f — pontilhado de 1600px entre rotulo e numero nao e leitura,
+         e travessia. */
+      @media (min-width: 900px) {
+        #records-body .panel dl {
+          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+          column-gap: 36px;
+        }
+      }
       .ax-sheet-foot {
         display: flex;
         align-items: center;
@@ -517,14 +905,17 @@
         align-items: flex-start;
         justify-content: center;
         padding: 8px 16px;
-        font-family: inherit;
-        font-size: 26px;
-        letter-spacing: 0.16em;
+        /* VT323 e o pixel do terminal: só aqui, fundindo com o fosforo. O
+           corpo sobe (26 → 36px) porque a fonte desenha menor que o mono. */
+        font-family: 'VT323', ui-monospace, monospace;
+        font-size: 36px;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
         white-space: nowrap;
       }
       .ax-stamp small {
         display: block;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         font-size: 10px;
         letter-spacing: 0.16em;
         color: var(--ax-teal-mute);
@@ -622,13 +1013,21 @@
       /* Os controles de opcoes sao UM bloco so, movido entre a tela de opcoes e
          o menu de campo (ver `mountOptions` em main.ts). Duplicar o HTML
          duplicaria a sincronizacao de estado, e as duas copias divergiriam na
-         primeira mudanca. */
+         primeira mudanca. Os quatro grupos de secao existem para o bloco poder
+         REFLUIR: grade 2×2 na folha de opcoes, coluna compacta na pausa. */
       #options-controls {
         display: flex;
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
-        width: min(420px, 100%);
+        width: 100%;
+        min-width: 0;
+      }
+      .ax-optgroup {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
       }
       #options-controls .ax-section-label {
         border-bottom: 1px solid var(--ax-key);
@@ -644,6 +1043,20 @@
       #options .ax-sheet-body {
         display: flex;
         justify-content: center;
+      }
+      #options #options-controls {
+        max-width: 860px;
+      }
+      /* Na folha de opcoes em paisagem, a grade 2×2 do board 3c: tudo visivel
+         de uma vez, sem rolagem — a rolagem so volta como rede de seguranca em
+         telas realmente curtas. */
+      @media (min-width: 701px) {
+        #options #options-controls {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px 32px;
+          align-content: start;
+        }
       }
 
       /* ------------------------------------------------------------------
@@ -669,6 +1082,49 @@
         box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7);
         background: linear-gradient(180deg, #12110f, #0b0b0a);
         padding: 12px 14px;
+      }
+      /* O terminal de campo usa a folha larga: as opcoes compactas cabem ao
+         lado do carimbo em vez de empurra-lo para fora da tela. */
+      .ax-form-wide {
+        width: min(880px, 94vw);
+        /* A folha nunca rola: ela se limita a altura util e delega a rolagem
+           a coluna de opcoes. Retomar e Abandonar ficam sempre visiveis. */
+        max-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom) - 16px);
+      }
+      .ax-pause-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 10px;
+        min-height: 0;
+        flex: 1 1 auto;
+      }
+      .ax-pause-side {
+        min-width: 0;
+        min-height: 0;
+        overflow-y: auto;
+        border: 1px solid var(--ax-key);
+        background: rgba(255, 255, 255, 0.012);
+        padding: 8px 10px;
+        box-sizing: border-box;
+      }
+      .ax-pause-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+        min-height: 0;
+      }
+      .ax-pause-actions .ax-stamp {
+        flex: 1 1 auto;
+        min-height: 96px;
+      }
+      /* Dentro da pausa o bloco de opcoes encolhe o respiro: e um painel
+         auxiliar, nao a tela de opcoes. */
+      #pause-options-slot #options-controls {
+        gap: 7px;
+      }
+      #pause-options-slot .ax-optgroup {
+        gap: 6px;
       }
       .ax-form.is-danger {
         border-color: var(--ax-red-line);
@@ -860,16 +1316,49 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 6px;
       }
-      /* Ficha de ativo do registro biologico */
+      /* Ficha de ativo do registro biologico: monitor de sprite a esquerda
+         (board 3g), prosa a direita. */
       .ax-asset {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 2px;
+        grid-template-columns: 60px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
         padding: 7px 9px;
         border: 1px solid var(--ax-key);
         background: #0b0b0a;
         min-width: 0;
         margin: 5px 0;
+      }
+      .ax-asset-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+        min-width: 0;
+      }
+      /* O monitor da ficha: a gravacao da criatura no arquivo da Aurix.
+         Moldura de latao, fundo de tubo apagado, fosforo por cima (o ::after
+         vem da lista de superficies acesas) e o brilho teal do proprio tint. */
+      .ax-asset-slot {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        border: 1px solid var(--ax-brass);
+        background:
+          radial-gradient(closest-side, rgba(79, 214, 201, 0.07), transparent 85%), #050807;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .ax-asset-slot canvas {
+        display: block;
+        image-rendering: pixelated;
+        filter: drop-shadow(0 0 6px rgba(79, 214, 201, 0.35));
+      }
+      .ax-asset-slot.is-locked {
+        border: 1px dashed #3a3128;
+        background: var(--ax-hatch);
+        color: var(--ax-text-dead);
+        font-size: 19px;
       }
       .ax-asset .found {
         border-bottom: none;
@@ -996,11 +1485,34 @@
         font-size: 10px;
         opacity: 0.85;
       }
+      /* O ícone do protocolo (Phosphor) herda a cor de estado do nó. */
+      .ax-node .ax-node-icon {
+        width: 19px;
+        height: 19px;
+        flex: 0 0 auto;
+      }
+      .ax-node .ax-node-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
       .ax-node.is-installed {
         border-color: var(--ax-teal);
-        background: rgba(79, 214, 201, 0.16);
+        background: radial-gradient(
+          120% 120% at 50% 42%,
+          rgba(79, 214, 201, 0.3),
+          rgba(79, 214, 201, 0.1)
+        );
         color: #eaf6f3;
-        box-shadow: inset 0 0 14px rgba(79, 214, 201, 0.25);
+        box-shadow:
+          0 0 12px rgba(79, 214, 201, 0.3),
+          inset 0 0 14px rgba(79, 214, 201, 0.25);
+      }
+      /* Aceso: o ícone vira o fósforo do mini-tubo, quase branco com halo
+         teal — mesma receita luminosa dos carimbos primários. */
+      .ax-node.is-installed .ax-node-icon {
+        color: #d9fffa;
+        filter: drop-shadow(0 0 5px rgba(79, 214, 201, 0.9));
       }
       .ax-node.is-affordable {
         border-color: var(--ax-teal);
@@ -1046,6 +1558,22 @@
         flex-direction: column;
         gap: 6px;
       }
+      .ax-inspector .ax-inspector-head {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .ax-inspector .ax-inspector-icon {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 auto;
+        color: var(--ax-teal);
+      }
+      .ax-inspector .ax-inspector-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
       .ax-inspector .ax-inspector-name {
         font-size: 15px;
         color: var(--ax-text-bright);
@@ -1072,7 +1600,7 @@
       }
       .codex-doc h3 {
         color: var(--ax-text-bright);
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
         font-size: 15px;
         letter-spacing: 0.04em;
         margin: 2px 0 4px;
@@ -1214,6 +1742,18 @@
         background: rgba(10, 16, 15, 0.96);
         color: var(--ax-teal-mute);
       }
+      /* Info = o sistema esta trabalhando (conectando, ressincronizando):
+         ganha o ponto pulsante dos chips vivos. Os outros tons ficam parados. */
+      #banner[data-tone='info']::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: var(--ax-teal);
+        box-shadow: 0 0 8px var(--ax-teal);
+        margin-right: 8px;
+        animation: axPulse 1.2s infinite;
+      }
       #banner[data-tone='success'] {
         border-color: var(--ax-teal-dim);
         background: rgba(10, 18, 17, 0.96);
@@ -1260,6 +1800,8 @@
         display: block;
       }
       .corp-name {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-weight: 600;
         color: var(--ax-gold);
         font-size: 12px;
         letter-spacing: 5px;
@@ -1376,6 +1918,26 @@
           border-top: 1px solid var(--ax-key);
           overflow: visible;
         }
+        /* Pausa em retrato: RETOMAR volta ao topo (primeira coisa visivel),
+           opcoes rolam por dentro no meio, Abandonar fecha a coluna — as
+           opcoes SEPARAM a acao segura da destrutiva, para o toque acidental
+           logo abaixo do carimbo nunca ser o irreversivel. */
+        .ax-pause-body {
+          display: flex;
+          flex-direction: column;
+        }
+        .ax-pause-actions {
+          display: contents;
+        }
+        .ax-pause-actions .ax-stamp {
+          order: -1;
+          flex: 0 0 auto;
+          min-height: 66px;
+        }
+        .ax-pause-side {
+          max-height: 38vh;
+          flex: 0 1 auto;
+        }
         /* Matriz em retrato: o rótulo do ramo sobe para a própria linha e os
            nós ficam com a largura inteira — seis nós de 44px cabem em 390px
            sem cortar o último protocolo nem encolher o alvo de toque. */
@@ -1400,7 +1962,7 @@
         }
         .ax-stamp {
           min-height: 66px;
-          font-size: 22px;
+          font-size: 30px;
         }
         #menu .ax-sheet-foot .ax-foot-note {
           white-space: normal;
@@ -1554,49 +2116,63 @@
         </div>
         <div class="ax-sheet-body">
           <div id="options-slot">
+            <!--
+              Quatro grupos de secao, e nao uma lista corrida: na folha de
+              opcoes eles viram uma grade 2×2 que usa a folha inteira e cabe
+              sem rolagem em paisagem (board 3c); no terminal de pausa
+              empilham numa coluna compacta.
+            -->
             <div id="options-controls">
-              <div class="ax-section-label" data-i18n="aurix.options.operator">Operador</div>
-              <div class="row">
-                <label for="name" data-i18n="options.name">Nome</label>
-                <input
-                  id="name"
-                  size="14"
-                  maxlength="18"
-                  data-i18n-placeholder="options.name.placeholder"
-                />
-              </div>
-              <!--
-                O idioma vem PRIMEIRO entre os ajustes de sistema.
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.operator">Operador</div>
+                <div class="row">
+                  <label for="name" data-i18n="options.name">Nome</label>
+                  <input
+                    id="name"
+                    size="14"
+                    maxlength="18"
+                    data-i18n-placeholder="options.name.placeholder"
+                  />
+                </div>
+                <!--
+                  O idioma vem PRIMEIRO entre os ajustes de sistema.
 
-                Quem precisa dele é justamente quem não está lendo o resto da
-                tela: deixá-lo no fim obrigaria a percorrer, em uma língua que
-                não se lê, tudo o que vem antes.
-              -->
-              <div class="row">
-                <label for="language" data-i18n="options.language">Idioma</label>
-                <select id="language"></select>
+                  Quem precisa dele é justamente quem não está lendo o resto da
+                  tela: deixá-lo no fim obrigaria a percorrer, em uma língua que
+                  não se lê, tudo o que vem antes.
+                -->
+                <div class="row">
+                  <label for="language" data-i18n="options.language">Idioma</label>
+                  <select id="language"></select>
+                </div>
               </div>
-              <div class="ax-section-label" data-i18n="aurix.options.video">Sistema de vídeo</div>
-              <div class="row">
-                <label for="quality" data-i18n="options.quality">Qualidade</label>
-                <select id="quality">
-                  <option value="high" data-i18n="options.quality.high">Alta</option>
-                  <option value="medium" data-i18n="options.quality.medium">Média</option>
-                  <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
-                </select>
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.video">Sistema de vídeo</div>
+                <div class="row">
+                  <label for="quality" data-i18n="options.quality">Qualidade</label>
+                  <select id="quality">
+                    <option value="high" data-i18n="options.quality.high">Alta</option>
+                    <option value="medium" data-i18n="options.quality.medium">Média</option>
+                    <option value="low" data-i18n="options.quality.low">Baixa (30 FPS)</option>
+                  </select>
+                </div>
               </div>
-              <div class="ax-section-label" data-i18n="aurix.options.audio">Áudio</div>
-              <div class="row">
-                <label for="volume" data-i18n="options.volume">Volume</label>
-                <input id="volume" type="range" min="0" max="100" step="1" />
-                <button id="btn-mute" class="compact primary">Som: ligado</button>
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.audio">Áudio</div>
+                <div class="row">
+                  <label for="volume" data-i18n="options.volume">Volume</label>
+                  <input id="volume" type="range" min="0" max="100" step="1" />
+                  <button id="btn-mute" class="compact primary">Som: ligado</button>
+                </div>
               </div>
-              <div class="ax-section-label" data-i18n="aurix.options.telemetry">Telemetria</div>
-              <div class="row">
-                <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
-              </div>
-              <div class="sub" data-i18n="options.telemetry.note">
-                dados anônimos de sessão, sem identificação
+              <div class="ax-optgroup">
+                <div class="ax-section-label" data-i18n="aurix.options.telemetry">Telemetria</div>
+                <div class="row">
+                  <button id="btn-telemetry" class="compact">Telemetria: ligada</button>
+                </div>
+                <div class="sub" data-i18n="options.telemetry.note">
+                  dados anônimos de sessão, sem identificação
+                </div>
               </div>
             </div>
           </div>
@@ -1618,7 +2194,7 @@
       `pause.ts`.
     -->
     <div id="pause" class="overlay hidden">
-      <div class="ax-form">
+      <div class="ax-form ax-form-wide">
         <div class="ax-form-head">
           <div id="pause-mark"></div>
           <div style="min-width: 0">
@@ -1632,16 +2208,23 @@
         <div id="pause-coop-warning" class="hidden" data-i18n="pause.coopWarning">
           No co-op o mundo não para — a descida continua enquanto você lê isto.
         </div>
-        <button
-          id="btn-pause-resume"
-          class="primary ax-stamp"
-          style="flex: 0 0 auto"
-          data-i18n="pause.resume"
-        >
-          Retomar descida
-        </button>
-        <div id="pause-options-slot"></div>
-        <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
+        <!--
+          Duas colunas (board 3d): opcoes compactas a esquerda com rolagem
+          INTERNA; RETOMAR domina a coluna direita inteira, com o abandono
+          separado embaixo. A folha em si nunca rola — retomar e abandonar
+          ficam sempre visiveis, que e a unica exigencia inegociavel da tela.
+        -->
+        <div class="ax-pause-body">
+          <div class="ax-pause-side">
+            <div id="pause-options-slot"></div>
+          </div>
+          <div class="ax-pause-actions">
+            <button id="btn-pause-resume" class="primary ax-stamp" data-i18n="pause.resume">
+              Retomar descida
+            </button>
+            <button id="btn-pause-abandon" class="danger">Abandonar contrato</button>
+          </div>
+        </div>
       </div>
     </div>
 

@@ -29,6 +29,15 @@ export type RankView = {
   seed?: number;
   /** Mensagem quando nao ha o que mostrar (offline, vazio). */
   emptyReason?: string;
+  /**
+   * A consulta ainda esta no ar?
+   *
+   * Separado de `emptyReason` porque espera e ausencia nao podem vestir a
+   * mesma roupa: carregando ganha a varredura CRT (board 3p); vazio/offline
+   * ganha a hachura de indisponivel. Antes os dois saiam hachurados — e a
+   * hachura promete "nao ha", que e mentira enquanto a resposta nao chegou.
+   */
+  loading?: boolean;
 };
 
 export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
@@ -42,7 +51,10 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
     ),
   );
 
-  if (view.entries.length === 0) {
+  if (view.entries.length === 0 && view.loading) {
+    // Consultando o livro: varredura CRT, o unico CRT permitido (board 3p).
+    host.appendChild(el('div', 'ax-scan ax-loading', view.emptyReason ?? t('rank.loading')));
+  } else if (view.entries.length === 0) {
     // Livro vazio: tracejado + motivo escrito, nunca uma tela em branco.
     const empty = el('div', 'ax-fragment is-locked');
     empty.appendChild(el('div', 'locked', view.emptyReason ?? t('rank.empty')));
