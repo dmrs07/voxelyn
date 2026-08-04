@@ -170,6 +170,41 @@
         animation-name: axVeilFrontOut;
       }
 
+      /* ------------------------------------------------------------------
+         Fósforo CRT (referência de campo: monitor de fósforo verde).
+         Todo elemento LUMINOSO carrega a grade de células de um monitor
+         antigo: separadores escuros horizontais (passo de 3px) e verticais
+         (passo de 2px) desenham os retângulos de fósforo, e o brilho que o
+         elemento já tem faz o bloom. Textura estática — não é movimento e
+         não depende dele. A regra do doc AD-UI-2.0 continua de pé: fósforo
+         SÓ sobre superfície acesa, nunca sobre corpo de leitura.
+         ------------------------------------------------------------------ */
+      .ax-chip.is-live,
+      .ax-loading,
+      #pause-coop-warning,
+      .ax-node,
+      button.primary:not(.compact) {
+        position: relative;
+      }
+      button.primary:not(.compact)::before,
+      .ax-node.is-installed::before,
+      .ax-node.is-affordable::before,
+      .ax-node.is-pending::before,
+      .ax-chip.is-live::after,
+      #invite::after,
+      .ax-loading::after,
+      #pause-coop-warning::after,
+      #banner[data-tone='success']::after,
+      #banner[data-tone='info']::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
+      }
+
       /* O zumbido do carimbo primario: o unico circuito LIGADO da folha.
          Uma lampada de mata-mosquito, nao uma respiracao — a base fica sempre
          acesa e clara (o zumbido so ADICIONA luz, nunca escurece o texto) e a
