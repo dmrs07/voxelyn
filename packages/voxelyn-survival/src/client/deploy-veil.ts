@@ -21,11 +21,11 @@ const HEX_W = 34;
 /** Proporção de altura de um hexágono de topo pontudo: 2/√3. */
 const HEX_H = HEX_W * 1.1547;
 /** Passo do atraso por diagonal (linha+coluna), ms. */
-const DELAY_STEP = 9;
+const DELAY_STEP = 13;
 /** Duração da transição de UMA célula, ms — casa com o CSS de `.ax-veil`. */
-const CELL_MS = 170;
+const CELL_MS = 240;
 /** Pausa com a tela totalmente preta, antes de reabrir, ms. */
-const HOLD_MS = 90;
+const HOLD_MS = 140;
 
 let busy = false;
 
@@ -36,8 +36,12 @@ let busy = false;
  * pulado (movimento reduzido) ou quando outra transição ainda está no ar
  * (caso em que a troca é imediata: perder a animação é melhor que perder o
  * clique).
+ *
+ * `sound` toca no INÍCIO de cada varredura (fechar e abrir): é o gancho da
+ * estática de rádio que acompanha a onda. Opcional e nunca chamado quando o
+ * véu é pulado — sem onda, sem estática.
  */
-export const deployVeil = (swap: () => void): void => {
+export const deployVeil = (swap: () => void, sound?: () => void): void => {
   const reduced =
     typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (busy || reduced || typeof document === 'undefined') {
@@ -66,6 +70,9 @@ export const deployVeil = (swap: () => void): void => {
       cell.style.left = `${col * HEX_W + (row % 2 === 1 ? HEX_W / 2 : 0) - HEX_W / 2}px`;
       cell.style.top = `${row * HEX_H * 0.75 - HEX_H / 2}px`;
       cell.style.transitionDelay = `${delay}ms`;
+      // O mesmo atraso na ANIMAÇÃO do lampejo teal: é ele que faz a frente de
+      // onda brilhar célula a célula em vez de a tela inteira piscar junto.
+      cell.style.animationDelay = `${delay}ms`;
       veil.appendChild(cell);
     }
   }
@@ -75,14 +82,19 @@ export const deployVeil = (swap: () => void): void => {
   // nenhuma transição aconteceria.
   void veil.offsetWidth;
   veil.classList.add('is-closed');
+  sound?.();
 
   const sweep = maxDelay + CELL_MS + 50;
   setTimeout(() => {
     swap();
     setTimeout(() => {
       // Reabre na MESMA ordem de atrasos: a célula que fechou primeiro abre
-      // primeiro, e a onda atravessa a tela em vez de voltar.
+      // primeiro, e a onda atravessa a tela em vez de voltar. A classe de
+      // abertura troca o lampejo teal de lado — a frente de onda brilha na
+      // borda que está se dissolvendo.
       veil.classList.remove('is-closed');
+      veil.classList.add('is-opening');
+      sound?.();
       setTimeout(() => {
         veil.remove();
         busy = false;

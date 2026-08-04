@@ -254,6 +254,9 @@ const playerScreen = (): { x: number; y: number } => ({
  * de titulo abre um menu de campo para uma run que nunca comecou, com direito a
  * uma confirmacao de abandono prometendo perder um progresso inexistente.
  */
+/** A estática de rádio que acompanha cada varredura do véu de deploy. */
+const veilSound = (): void => audio.ui('deployStatic');
+
 const backToMenu = (): void => {
   runInProgress = false;
   liveRun = null;
@@ -261,7 +264,7 @@ const backToMenu = (): void => {
   stopLoop = null;
   pauseMenu.disarmHistory();
   // A volta ao terminal tambem passa pela escotilha: a unidade e recolhida.
-  deployVeil(() => menu.classList.remove('hidden'));
+  deployVeil(() => menu.classList.remove('hidden'), veilSound);
 };
 
 /**
@@ -831,7 +834,7 @@ const abandonRun = (): void => {
   showInvite(null);
   setBanner(null);
   audio.reset();
-  deployVeil(() => menu.classList.remove('hidden'));
+  deployVeil(() => menu.classList.remove('hidden'), veilSound);
 };
 
 /** Solo congela; co-op nao. Lido pelo menu ANTES de `onOpen`, entao nao pode depender de `paused`. */
@@ -1341,7 +1344,7 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
   audio.unlock();
   audio.ui();
   // O despacho: a colmeia fecha sobre a ordem e abre sobre o Veio.
-  deployVeil(() => menu.classList.add('hidden'));
+  deployVeil(() => menu.classList.add('hidden'), veilSound);
   stopLoop?.();
   runInProgress = true;
   pauseMenu.armHistory();
@@ -1358,7 +1361,7 @@ const startOnline = (): void => {
   contractRun = null;
   audio.unlock();
   audio.ui();
-  deployVeil(() => menu.classList.add('hidden'));
+  deployVeil(() => menu.classList.add('hidden'), veilSound);
   stopLoop?.();
   runInProgress = true;
   pauseMenu.armHistory();

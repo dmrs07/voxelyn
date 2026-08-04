@@ -62,7 +62,9 @@ export type VoiceId =
   | 'revive'
   | 'extracted'
   | 'died'
-  | 'uiTap';
+  | 'uiTap'
+  // A estatica do véu de deploy: a colmeia fechando sobre a tela.
+  | 'deployStatic';
 
 export type VoiceSpec = {
   /**
@@ -186,6 +188,9 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   extracted: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
   died: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
   uiTap: { priority: 5, gain: 0.35, minIntervalMs: 40, spatial: false },
+  // Trava de 500 ms: o véu chama uma vez por varredura (fechar e abrir), e a
+  // trava so existe para um duplo-disparo acidental nao somar duas estaticas.
+  deployStatic: { priority: 8, gain: 0.5, minIntervalMs: 500, spatial: false },
 };
 
 export const voiceSpec = (id: VoiceId): VoiceSpec => VOICE_SPECS[id];

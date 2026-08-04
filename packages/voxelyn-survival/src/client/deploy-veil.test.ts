@@ -49,13 +49,39 @@ describe('véu de deploy', () => {
     expect(first).toHaveBeenCalledTimes(1);
   });
 
-  it('cada célula carrega o proprio atraso diagonal', () => {
+  it('cada célula carrega o proprio atraso diagonal, na transicao E no lampejo', () => {
     deployVeil(() => {});
     const cells = document.querySelectorAll<HTMLElement>('.ax-veil span');
     const delays = new Set(Array.from(cells).map((cell) => cell.style.transitionDelay));
     // Onda diagonal exige atrasos ESCALONADOS — um atraso unico seria um
     // fade de tela inteira, nao um obturador.
     expect(delays.size).toBeGreaterThan(3);
+    // O lampejo teal da frente de onda viaja com a mesma diagonal: cada
+    // celula carrega o MESMO atraso na animacao e na transicao.
+    for (const cell of Array.from(cells).slice(0, 20)) {
+      expect(cell.style.animationDelay).toBe(cell.style.transitionDelay);
+    }
+    vi.runAllTimers();
+  });
+
+  it('a estática toca uma vez por varredura: fechar e abrir', () => {
+    const sound = vi.fn();
+    deployVeil(() => {}, sound);
+    // Fechou: primeira estática, junto com a onda.
+    expect(sound).toHaveBeenCalledTimes(1);
+    vi.runAllTimers();
+    // Abriu: segunda e última — sem terceira depois que o véu some.
+    expect(sound).toHaveBeenCalledTimes(2);
+  });
+
+  it('véu pulado nao toca estática: sem onda, sem som', () => {
+    const sound = vi.fn();
+    const swap = vi.fn();
+    deployVeil(() => {});
+    // Segunda chamada com a onda no ar: troca imediata, silenciosa.
+    deployVeil(swap, sound);
+    expect(swap).toHaveBeenCalledTimes(1);
+    expect(sound).not.toHaveBeenCalled();
     vi.runAllTimers();
   });
 });

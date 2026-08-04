@@ -279,9 +279,23 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // sem cauda, no registro medio — nada de grave, que e dos chefes.
   deathMiner: (ctx, out, t0, noise) => {
     // O corte da corrente: banda estreita e alta, quase instantanea.
-    burst(ctx, out, t0, noise, { peak: 0.3, decay: 0.05, type: 'bandpass', from: 2600, to: 1400, q: 3 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.05,
+      type: 'bandpass',
+      from: 2600,
+      to: 1400,
+      q: 3,
+    });
     // A queda: o zumbido perdendo tensao. Desce e para, sem chegar ao chao.
-    tone(ctx, out, t0, { type: 'square', from: 420, to: 190, peak: 0.26, decay: 0.13, attack: 0.004 });
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 420,
+      to: 190,
+      peak: 0.26,
+      decay: 0.13,
+      attack: 0.004,
+    });
     tone(ctx, out, t0 + 0.02, { type: 'sawtooth', from: 300, to: 210, peak: 0.1, decay: 0.1 });
     // Sem terceira camada, sem grave, sem cauda. O corte E o desenho.
   },
@@ -316,24 +330,59 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   // Grito humano. Serra denteada subindo, curta e crua — deliberadamente a voz
   // mais FEIA do banco: nada mais no jogo grita, e o desconforto e o ponto.
   minerRage: (ctx, out, t0, noise) => {
-    tone(ctx, out, t0, { type: 'sawtooth', from: 210, to: 430, peak: 0.4, decay: 0.34, attack: 0.01 });
+    tone(ctx, out, t0, {
+      type: 'sawtooth',
+      from: 210,
+      to: 430,
+      peak: 0.4,
+      decay: 0.34,
+      attack: 0.01,
+    });
     tone(ctx, out, t0 + 0.04, { type: 'square', from: 320, to: 250, peak: 0.16, decay: 0.28 });
-    burst(ctx, out, t0, noise, { peak: 0.2, decay: 0.2, type: 'bandpass', from: 1400, to: 600, q: 1.2 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.2,
+      decay: 0.2,
+      type: 'bandpass',
+      from: 1400,
+      to: 600,
+      q: 1.2,
+    });
   },
   // Fuga: sopro curto que DESCE e se afasta. Sem tom definido — quem foge nao
   // esta anunciando nada, so foi visto.
   minerFlee: (ctx, out, t0, noise) => {
-    burst(ctx, out, t0, noise, { peak: 0.3, decay: 0.3, type: 'bandpass', from: 900, to: 260, q: 0.9 });
+    burst(ctx, out, t0, noise, {
+      peak: 0.3,
+      decay: 0.3,
+      type: 'bandpass',
+      from: 900,
+      to: 260,
+      q: 0.9,
+    });
     tone(ctx, out, t0, { type: 'triangle', from: 300, to: 170, peak: 0.14, decay: 0.24 });
   },
   // Minerio na cota: clique curto e metalico, no registro alto onde nada mais
   // do jogo toca. E um recibo, nao um evento — tem de sumir sob o combate.
   oreGained: (ctx, out, t0) => {
-    tone(ctx, out, t0, { type: 'square', from: 1180, to: 1560, peak: 0.14, decay: 0.09, attack: 0.002 });
+    tone(ctx, out, t0, {
+      type: 'square',
+      from: 1180,
+      to: 1560,
+      peak: 0.14,
+      decay: 0.09,
+      attack: 0.002,
+    });
   },
   bishopHeal: (ctx, out, t0) => {
     tone(ctx, out, t0, { type: 'sine', from: 320, to: 620, peak: 0.3, decay: 0.26, attack: 0.03 });
-    tone(ctx, out, t0 + 0.02, { type: 'triangle', from: 480, to: 930, peak: 0.14, decay: 0.22, attack: 0.03 });
+    tone(ctx, out, t0 + 0.02, {
+      type: 'triangle',
+      from: 480,
+      to: 930,
+      peak: 0.14,
+      decay: 0.22,
+      attack: 0.03,
+    });
   },
 
   // --- mundo --------------------------------------------------------------
@@ -557,6 +606,29 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   },
   uiTap: (ctx, out, t0) => {
     tone(ctx, out, t0, { type: 'square', from: 900, to: 900, peak: 0.22, decay: 0.045 });
+  },
+  // A estatica do deploy: ruido de banda subindo com a onda de hexagonos —
+  // radio mal sintonizado que ganha sinal. A banda SOBE (900 → 3200 Hz)
+  // porque a colmeia fecha "para cima" da tela do operador; o crepitar agudo
+  // curto no inicio e a faisca do circuito armando. Dura ~0,85 s, o tempo de
+  // uma varredura completa do véu.
+  deployStatic: (ctx, out, t0, noise) => {
+    burst(ctx, out, t0, noise, {
+      peak: 0.42,
+      decay: 0.85,
+      type: 'bandpass',
+      from: 900,
+      to: 3200,
+      q: 1.1,
+      attack: 0.05,
+    });
+    burst(ctx, out, t0, noise, {
+      peak: 0.2,
+      decay: 0.18,
+      type: 'highpass',
+      from: 4200,
+      attack: 0.005,
+    });
   },
 };
 
