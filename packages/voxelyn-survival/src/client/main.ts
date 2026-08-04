@@ -489,6 +489,7 @@ const transmitSettlement = (url: string, runId: string, log: string): void => {
           ore: credited.oreCredited,
           cores: credited.coresCredited,
         }),
+        'success',
       );
     } else if (credited.oreCredited > 0) {
       setBanner(t('banner.cargo.cleared', { ore: credited.oreCredited }), 'success');
