@@ -28,6 +28,8 @@ const CELL_MS = 240;
 const HOLD_MS = 140;
 
 let busy = false;
+/** A troca do véu em voo, enquanto ainda não rodou. Ver o ramo `busy`. */
+let flushPending: (() => void) | null = null;
 
 /**
  * Fecha a colmeia, executa `swap` sob o preto total e reabre.
@@ -45,10 +47,25 @@ export const deployVeil = (swap: () => void, sound?: () => void): void => {
   const reduced =
     typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (busy || reduced || typeof document === 'undefined') {
+    // Atropelar um véu em voo NÃO pode deixar a troca dele agendada: o timeout
+    // dispararia depois desta e desfaria a tela mais nova (URL inválida, por
+    // exemplo: DESCER agenda esconder o menu, o erro síncrono manda de volta,
+    // e o timeout antigo esconderia o menu de novo — jogador preso num canvas
+    // morto). A troca pendente roda AGORA, na ordem original, e o timeout dela
+    // vira no-op.
+    flushPending?.();
     swap();
     return;
   }
   busy = true;
+  let done = false;
+  const runSwap = (): void => {
+    if (done) return;
+    done = true;
+    flushPending = null;
+    swap();
+  };
+  flushPending = runSwap;
 
   const veil = document.createElement('div');
   veil.className = 'ax-veil';
@@ -86,7 +103,7 @@ export const deployVeil = (swap: () => void, sound?: () => void): void => {
 
   const sweep = maxDelay + CELL_MS + 50;
   setTimeout(() => {
-    swap();
+    runSwap();
     setTimeout(() => {
       // Reabre na MESMA ordem de atrasos: a célula que fechou primeiro abre
       // primeiro, e a onda atravessa a tela em vez de voltar. A classe de

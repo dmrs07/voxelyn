@@ -40,13 +40,30 @@ describe('véu de deploy', () => {
     deployVeil(first);
     deployVeil(second);
 
-    // A segunda troca ja aconteceu (perder a animacao e melhor que perder o
+    // As DUAS trocas ja aconteceram, na ordem original: a pendente e puxada
+    // para frente antes da nova (perder a animacao e melhor que perder o
     // clique) e nenhum segundo véu foi empilhado.
+    expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(1);
     expect(document.querySelectorAll('.ax-veil').length).toBe(1);
 
     vi.runAllTimers();
     expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('véu atropelado nao ressuscita: a troca antiga nunca roda DEPOIS da nova', () => {
+    // O caso de campo: DESCER agenda esconder o menu, um erro sincrono manda
+    // de volta ao menu no meio da onda. Se o timeout do véu antigo ainda
+    // rodasse a troca dele, esconderia o menu de novo — jogador preso num
+    // canvas morto. O estado final tem que ser o da troca mais NOVA.
+    const order: string[] = [];
+    deployVeil(() => order.push('esconde menu'));
+    deployVeil(() => order.push('mostra menu'));
+    expect(order).toEqual(['esconde menu', 'mostra menu']);
+
+    vi.runAllTimers();
+    expect(order).toEqual(['esconde menu', 'mostra menu']);
   });
 
   it('cada célula carrega o proprio atraso diagonal, na transicao E no lampejo', () => {
