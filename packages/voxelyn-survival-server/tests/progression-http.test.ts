@@ -696,10 +696,10 @@ describe('codex', () => {
       locked: { maskedCode: string }[];
       total: number;
     };
-    expect(body.total).toBe(68);
+    expect(body.total).toBe(75);
     expect(body.unlocked).toHaveLength(1);
     expect(body.unlocked[0].id).toBe('AX-PUB-001');
-    expect(body.locked).toHaveLength(67);
+    expect(body.locked).toHaveLength(74);
   });
 
   // O que este teste protege e a razao inteira de o texto morar no servidor.

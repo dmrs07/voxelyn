@@ -390,6 +390,52 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // As linhas de Solaris — o Veio devolve o gesto de quem morreu nele
+  // -------------------------------------------------------------------------
+  'AX-ENG-019': {
+    title: 'Fisiologia respiratória: SULF-08',
+    summary: 'O órgão é um fole. E mantém compasso de valsa.',
+    body: 'ESPÉCIME SULF-08. Revisão de fisiologia.\n\nO par de sacos internos do espécime não tem função biológica identificável. Não oxigena tecido. Não regula temperatura. Avaliada como mecanismo, a estrutura é um fole: admissão, câmara, sopro. O espécime não respira para viver. Respira para FORA.\n\nRegistro acústico: a oscilação de pressão dos sacos mantém 84 ciclos por minuto, em compasso ternário, estável entre indivíduos. Fauna não mantém compasso.\n\nSolicitamos que a palavra "valsa", usada em três relatórios de campo, seja substituída por terminologia aprovada. Não existe terminologia aprovada.',
+    source: 'Engenharia de Sistemas — revisão de fisiologia',
+  },
+  'AX-UNK-042': {
+    title: 'Sobre quem dava o ar',
+    summary: 'O compasso ternário tem dono.',
+    body: 'O compasso do SULF-08 foi cruzado com o arquivo da operação anterior.\n\nV., operador de ventilação do turno da noite, bloco 7. Tocava fole na cantina — valsas, sempre valsas; dizia que era o único compasso que os pulmões entendem. Quando a manutenção da ventilação saiu do orçamento, o setor dele passou a depender de fole manual.\n\nNo colapso do bolsão, V. ficou na manivela. Bombeou ar para a galeria até a última pessoa da equipe sair. O relatório da época registra "perda de um operador e um equipamento de ventilação". Nesta ordem.\n\nO SULF-08 rompe o gás na direção das nossas unidades e se retira. Durante ciclos lemos isso como tática. Não é. Ele dá às máquinas da companhia exatamente o que a companhia deu a ele: o ar que havia.\n\nA oscilação nunca perde o compasso. Em alguma parte do Veio, a valsa continua.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-INC-031': {
+    title: 'Padrão de preensão: AQU-03',
+    summary: 'A pega da Lampreia está no manual de mergulho. Figura 12.',
+    body: 'ESPÉCIME AQU-03. Análise do padrão de preensão.\n\nAs marcas nas unidades recuperadas são consistentes entre si: pressão distribuída, pontos de apoio simétricos, nenhum esmagamento. O espécime imobiliza sem danificar. Repetimos a medição. SEM danificar.\n\nA sobreposição com o manual de mergulho da operação anterior encontrou correspondência de 97% com a figura 12: "pega de resgate de vítima em pânico".\n\nA hipótese de que um organismo aquático reproduza por acaso uma técnica de salvamento humana foi classificada como convergência morfológica. A seção que calculava a probabilidade dessa convergência foi removida na revisão.',
+    source: 'Comitê de Incidentes — análise de preensão',
+  },
+  'AX-UNK-048': {
+    title: 'Sobre quem buscava',
+    summary: 'A Lampreia não afoga. Ela resgata para baixo.',
+    body: 'D., mergulhadora de resgate da operação anterior. O parecer "reposição versus resgate" encerrou a função dela. Ela não encerrou.\n\nO arquivo registra três descidas não autorizadas depois da ordem, três mineiros vivos, e uma advertência formal por descida. Na quarta, a galeria alagada cedeu. O corpo não foi recuperado. O mineiro que ela segurava, sim.\n\nA AQU-03 imobiliza sem esmagar, puxa para baixo e segura. E a carga se dispersa — ela sempre largou o minério para carregar gente.\n\nNão é um ataque. É a pega da figura 12, executada por alguém para quem não existe mais superfície. Ela não está afogando as unidades. Está tentando salvá-las na única direção que restou.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-EXE-037': {
+    title: 'Corte de aquecimento: setor glacial',
+    summary: 'A ordem, o desvio, e o fim da apuração.',
+    body: 'Fica removida do orçamento a redundância de aquecimento dos alojamentos do setor glacial. Justificativa: a probabilidade de falha simultânea das duas linhas é inferior a [REDACTED].\n\nAdendo de conformidade, ciclo seguinte: durante a falha simultânea das duas linhas, a operadora da caldeira central redirecionou a reserva térmica integral para os dormitórios, em desacordo com a prioridade aprovada. A prioridade aprovada era o pátio de equipamentos. O desvio será apurado.\n\nSegundo adendo: a apuração foi encerrada por falecimento da apurada.',
+    source: 'Conselho Executivo — revisão orçamentária, com adendos',
+  },
+  'AX-UNK-053': {
+    title: 'Sobre quem aquecia',
+    summary: 'O sensor está certo: ela não está lá. Está onde mandou o calor.',
+    body: 'R., operadora de caldeira, bloco 7. Na noite da falha dupla, mandou o calor todo para onde as pessoas dormiam e ficou na casa de máquinas, que deixou esfriar com ela dentro.\n\nO relatório de conformidade a registra como desvio operacional. As cinquenta e uma pessoas que acordaram vivas não constam do relatório.\n\nO GLAC-02 não emite frio. Subtrai calor — o instrumento está certo, as duas equipes que se recusaram a assinar o mesmo parecer estavam certas. Ela passou a morte inteira fazendo o que fez na última noite: dando o calor dela para outro lugar. Nunca parou.\n\nO sistema de mira a registra como estimativa, e não como leitura. O balanço da companhia fez o mesmo.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-UNK-054': {
+    title: 'Sobre o que o Veio guarda',
+    summary: 'Quatro nomes, quatro fichas de fauna, um único fenômeno.',
+    body: 'Quatro nomes, quatro fichas de fauna.\n\nO oficial de cavalaria virou o cavalo que carrega a guerra dele. O homem do fole ainda dá o ar, em compasso de valsa. A mergulhadora ainda executa a pega da figura 12. A operadora de caldeira ainda manda o calor para longe de si.\n\nNenhum deles é fauna. Nenhum deles é anomalia. O padrão é um só: o Veio guarda o que morre nele — e devolve não o corpo, mas o GESTO. O que a pessoa fazia pelos outros quando terminou.\n\nChamamos de contaminação porque a alternativa era chamar de memória.\n\nA pergunta que este registro não formula, porque formulá-la é ser reclassificado: se o Veio guarda quem morre sonhando, quantos registros ele fez em [REDACTED] anos de operação? E o que acontece no dia em que todos se lembrarem, ao mesmo tempo, de quem os deixou lá?',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // O arco do Corcel Fúngico — a burocracia contra um cavalo
   // -------------------------------------------------------------------------
   'AX-ENG-023': {
@@ -817,6 +863,49 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'The only order that authorises destroying what guards the objective.',
     body: 'TERMINAL ANOMALY. Engagement and disposal authorisation.\n\nThe asset invariably positions itself between the units and the primary objective of the operation. It does not patrol. It does not hunt. It guards.\n\nFull disposal of the asset is hereby authorised whenever it impedes access to the primary objective. This authorisation prevails over every specimen preservation directive.\n\nThe nature of the primary objective is not the subject of this document. See [REDACTED].',
     source: 'Executive Board — engagement authorisation',
+  },
+
+  'AX-ENG-019': {
+    title: 'Respiratory physiology: SULF-08',
+    summary: 'The organ is a bellows. And it keeps waltz time.',
+    body: 'SPECIMEN SULF-08. Physiology review.\n\nThe specimen’s pair of internal sacs has no identifiable biological function. It oxygenates no tissue. It regulates no temperature. Assessed as a mechanism, the structure is a bellows: intake, chamber, blast. The specimen does not breathe to live. It breathes OUTWARD.\n\nAcoustic record: the pressure oscillation of the sacs holds 84 cycles per minute, in triple time, stable across individuals. Fauna does not keep time.\n\nWe request that the word "waltz", used in three field reports, be replaced with approved terminology. No approved terminology exists.',
+    source: 'Systems Engineering — physiology review',
+  },
+  'AX-UNK-042': {
+    title: 'On the one who gave the air',
+    summary: 'The triple time has an owner.',
+    body: 'The SULF-08 cadence has been cross-referenced with the previous operation’s archive.\n\nV., night-shift ventilation operator, block 7. He played the bellows-box in the canteen — waltzes, always waltzes; he said it was the only time signature lungs understand. When ventilation maintenance was cut from the budget, his sector came to depend on a hand bellows.\n\nWhen the pocket collapsed, V. stayed at the crank. He pumped air into the gallery until the last of his crew was out. The report of the time records "loss of one operator and one ventilation apparatus". In that order.\n\nSULF-08 breaches gas toward our units and withdraws. For cycles we read that as tactics. It is not. It gives the company’s machines exactly what the company gave him: the air there was.\n\nThe oscillation never drops the beat. Somewhere in the Vein, the waltz goes on.',
+    source: 'No department assigned',
+  },
+  'AX-INC-031': {
+    title: 'Grip pattern: AQU-03',
+    summary: 'The Lamprey’s hold is in the diving manual. Figure 12.',
+    body: 'SPECIMEN AQU-03. Grip pattern analysis.\n\nThe marks on recovered units are consistent with one another: distributed pressure, symmetrical anchor points, no crushing. The specimen immobilises without damaging. We repeated the measurement. WITHOUT damaging.\n\nOverlay against the previous operation’s diving manual found a 97% match with figure 12: "rescue hold for a panicking victim".\n\nThe hypothesis that an aquatic organism reproduces a human life-saving technique by chance has been classified as morphological convergence. The section computing the probability of that convergence was removed in review.',
+    source: 'Incident Committee — grip analysis',
+  },
+  'AX-UNK-048': {
+    title: 'On the one who went after them',
+    summary: 'The Lamprey does not drown. It rescues downward.',
+    body: 'D., rescue diver of the previous operation. The "replacement versus recovery" opinion terminated her role. It did not terminate her.\n\nThe archive records three unauthorised descents after the order, three miners alive, and one formal reprimand per descent. On the fourth, the flooded gallery gave way. Her body was not recovered. The miner she was holding was.\n\nAQU-03 immobilises without crushing, pulls down and holds. And the cargo disperses — she always dropped the ore to carry people.\n\nIt is not an attack. It is the figure-12 hold, performed by someone for whom there is no surface anymore. She is not drowning the units. She is trying to save them in the only direction left.',
+    source: 'No department assigned',
+  },
+  'AX-EXE-037': {
+    title: 'Heating cut: glacial sector',
+    summary: 'The order, the deviation, and the end of the inquiry.',
+    body: 'The heating redundancy of the glacial sector dormitories is hereby removed from the budget. Justification: the probability of simultaneous failure of both lines is below [REDACTED].\n\nCompliance addendum, following cycle: during the simultaneous failure of both lines, the central boiler operator redirected the entire thermal reserve to the dormitories, contrary to the approved priority. The approved priority was the equipment yard. The deviation will be investigated.\n\nSecond addendum: the investigation was closed owing to the death of the investigated.',
+    source: 'Executive Board — budget review, with addenda',
+  },
+  'AX-UNK-053': {
+    title: 'On the one who kept them warm',
+    summary: 'The sensor is right: she is not there. She is where she sent the heat.',
+    body: 'R., boiler operator, block 7. On the night of the double failure, she sent all the heat to where people slept and stayed in the machine room, which she let go cold with her inside it.\n\nThe compliance report records her as an operational deviation. The fifty-one people who woke up alive do not appear in the report.\n\nGLAC-02 does not emit cold. It subtracts heat — the instrument is right; the two teams that refused to sign the same opinion were right. She has spent her whole death doing what she did on her last night: sending her heat somewhere else. She never stopped.\n\nThe targeting system records her as an estimate, not a reading. The company’s balance sheet did the same.',
+    source: 'No department assigned',
+  },
+  'AX-UNK-054': {
+    title: 'On what the Vein keeps',
+    summary: 'Four names, four fauna files, a single phenomenon.',
+    body: 'Four names, four fauna files.\n\nThe cavalry officer became the horse that carries his war. The bellows man still gives the air, in waltz time. The diver still performs the figure-12 hold. The boiler operator still sends her heat away from herself.\n\nNone of them is fauna. None of them is an anomaly. The pattern is one: the Vein keeps what dies in it — and gives back not the body but the GESTURE. What the person was doing for others when they ended.\n\nWe call it contamination because the alternative was to call it memory.\n\nThe question this record does not pose, because posing it means being reclassified: if the Vein keeps those who die dreaming, how many records has it made in [REDACTED] years of operation? And what happens on the day they all remember, at the same time, who left them there?',
+    source: 'No department assigned',
   },
 
   'AX-ENG-023': {

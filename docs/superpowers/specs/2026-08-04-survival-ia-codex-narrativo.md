@@ -32,7 +32,7 @@ A divisão de trabalho da progressão não muda:
 
 ```
 progression-lore.ts       catálogo + gatilhos (dado puro)
-progression-lore-text.ts  os 64 textos, pt-BR e en (só no servidor)
+progression-lore-text.ts  os 75 textos, pt-BR e en (só no servidor)
 progression.ts            decide (puro): fatos → desbloqueio, leitura
 progression-store.ts      persiste o decidido (atômico, idempotente)
 progression-http.ts       traduz HTTP e protege a rota
@@ -79,11 +79,11 @@ progresso de marco.
   desbloqueados; `compound` não enumera as partes (um `anyOf` não cumprido
   nomearia o que o jogador ainda não viu).
 
-## 4. Catálogo: 68 documentos
+## 4. Catálogo: 75 documentos
 
-35 existentes + 33 novos: 30 de protocolo, 4 marcos geracionais, 1 público,
-**19 de Ativo** (15 fichas + 4 marcos do Corcel), **13 de Descoberta**,
-1 composto.
+35 existentes + 40 novos: 30 de protocolo, 4 marcos geracionais, 1 público,
+**25 de Ativo** (15 fichas + 4 marcos do Corcel + 6 das linhas de Solaris),
+**13 de Descoberta**, 2 compostos (AX-UNK-051 e o capstone AX-UNK-054).
 
 Trilha IA (já existente, PR #107): IA-01→AX-PUB-009, IA-02→AX-ENG-020,
 IA-03→AX-PRC-024, IA-04→AX-INC-032, IA-05→AX-EXE-040, IA-X→AX-UNK-052.
@@ -134,6 +134,27 @@ A necropsia (AX-INC-033, via `DISCOVERY_HORSE_FELLED`) costura o arreio ao
 cavaleiro: as fivelas são da linha de equipamento de pessoal do bloco 7.
 Limiares baixos de propósito — o EQ-02 é um miniboss e a piada morre se o
 segredo exigir farm.
+
+### As linhas de Solaris (espécimes raros como pessoas)
+
+Premissa (inspiração declarada: *Solaris*, Tarkovsky 1972): o Veio guarda quem
+morre nele e devolve não o corpo, mas o **gesto** — o que a pessoa fazia pelos
+outros quando terminou. O Major Tom inaugurou o padrão; três assinaturas de
+bioma o estendem, cada uma com dois marcos (8 = a anomalia que a burocracia não
+consegue arquivar; 20 = o nome):
+
+| Espécime | 8 abates | 20 abates | A pessoa e o gesto |
+| --- | --- | --- | --- |
+| Fole (SULF-08) | AX-ENG-019 — o órgão é um fole que "respira para fora", em 84 cpm, compasso ternário; "não existe terminologia aprovada" para valsa | AX-UNK-042 — *Sobre quem dava o ar* | V., operador de ventilação do bloco 7, tocava fole na cantina; quando a manutenção saiu do orçamento (↔ AX-PRC-016), morreu na manivela do fole manual dando ar à galeria. O espécime dá às máquinas da Aurix o ar que a companhia deu a ele |
+| Lampreia (AQU-03) | AX-INC-031 — a preensão imobiliza SEM danificar; 97% de correspondência com a "pega de resgate de vítima em pânico", figura 12 do manual de mergulho | AX-UNK-048 — *Sobre quem buscava* | D., mergulhadora de resgate cuja função o parecer "reposição versus resgate" (↔ AX-PRC-014, AX-EXE-031) encerrou — ela não; morreu segurando o quarto resgatado. A Lampreia larga a carga para carregar gente e resgata na única direção que restou |
+| Espectro de Geada (GLAC-02) | AX-EXE-037 — a ordem que cortou a redundância de aquecimento, o "desvio" da operadora de caldeira, e a apuração "encerrada por falecimento da apurada" | AX-UNK-053 — *Sobre quem aquecia* | R., operadora de caldeira que mandou o calor todo para os dormitórios e congelou na casa de máquinas. O espécime subtrai calor porque ela nunca parou de dar o dela |
+
+**Capstone** AX-UNK-054 — *Sobre o que o Veio guarda* (compound: os quatro
+finais — Corcel 15, Fole 20, Lampreia 20, Espectro 20): nomeia o fenômeno sem
+resolvê-lo — "chamamos de contaminação porque a alternativa era chamar de
+memória" — e planta a pergunta que liga tudo aos Ecos e ao Núcleo: o que
+acontece no dia em que todos se lembrarem, ao mesmo tempo, de quem os deixou
+lá?
 
 Regras de escrita mantidas (cabeçalho de `progression-lore-text.ts`): voz de
 relatório, sem vilão declarado, redação com moderação, nenhuma resposta

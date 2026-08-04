@@ -298,6 +298,15 @@ export const ASSET_MILESTONE_LORE: readonly {
   { archetype: 'fungal_horse', minKills: 6, fragmentId: 'AX-INC-034' },
   { archetype: 'fungal_horse', minKills: 10, fragmentId: 'AX-EXE-043' },
   { archetype: 'fungal_horse', minKills: 15, fragmentId: 'AX-UNK-046' },
+  // As TRES linhas de Solaris: o Veio guarda quem morre nele e devolve o
+  // GESTO — o que a pessoa fazia pelos outros quando terminou. Assinaturas de
+  // bioma morrem em maior numero que o Corcel, entao os marcos sobem (8/20).
+  { archetype: 'bellows', minKills: 8, fragmentId: 'AX-ENG-019' },
+  { archetype: 'bellows', minKills: 20, fragmentId: 'AX-UNK-042' },
+  { archetype: 'mud_lamprey', minKills: 8, fragmentId: 'AX-INC-031' },
+  { archetype: 'mud_lamprey', minKills: 20, fragmentId: 'AX-UNK-048' },
+  { archetype: 'frost_wraith', minKills: 8, fragmentId: 'AX-EXE-037' },
+  { archetype: 'frost_wraith', minKills: 20, fragmentId: 'AX-UNK-053' },
 ];
 
 /** Bits que o Codex reconhece. Usado para sanitizar a mascara persistida. */
@@ -408,7 +417,18 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-ENG-023': ['AX-INC-024', 'AX-INC-034'],
   'AX-INC-034': ['AX-ENG-023', 'AX-EXE-043'],
   'AX-EXE-043': ['AX-INC-034', 'AX-UNK-046'],
-  'AX-UNK-046': ['AX-EXE-043', 'AX-INC-033', 'AX-UNK-049'],
+  'AX-UNK-046': ['AX-EXE-043', 'AX-INC-033', 'AX-UNK-054'],
+  // As linhas de Solaris. Cada revelacao aponta para o documento da COMPANHIA
+  // que causou a morte que o Veio guardou: o fole para o corte de manutencao,
+  // a mergulhadora para o fim das operacoes de resgate, a caldeira para o
+  // proprio corte que a ordem executiva admite no adendo.
+  'AX-ENG-019': ['AX-INC-022', 'AX-UNK-042'],
+  'AX-UNK-042': ['AX-ENG-019', 'AX-PRC-016', 'AX-UNK-054'],
+  'AX-INC-031': ['AX-PRC-018', 'AX-UNK-048'],
+  'AX-UNK-048': ['AX-INC-031', 'AX-PRC-014', 'AX-EXE-031', 'AX-UNK-054'],
+  'AX-EXE-037': ['AX-INC-028', 'AX-UNK-053'],
+  'AX-UNK-053': ['AX-EXE-037', 'AX-UNK-054'],
+  'AX-UNK-054': ['AX-UNK-046', 'AX-UNK-042', 'AX-UNK-048', 'AX-UNK-053', 'AX-UNK-049'],
   'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
@@ -452,6 +472,12 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-INC-034': 1,
   'AX-EXE-043': 2,
   'AX-UNK-046': 3,
+  'AX-INC-031': 1,
+  'AX-EXE-037': 2,
+  'AX-UNK-042': 2,
+  'AX-UNK-048': 3,
+  'AX-UNK-053': 2,
+  'AX-UNK-054': 3,
 };
 
 /**
@@ -484,6 +510,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-016',
   'AX-ENG-017',
   'AX-ENG-018',
+  'AX-ENG-019',
   'AX-ENG-020',
   'AX-ENG-021',
   'AX-ENG-022',
@@ -512,6 +539,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-028',
   'AX-INC-029',
   'AX-INC-030',
+  'AX-INC-031',
   'AX-INC-032',
   'AX-INC-033',
   'AX-INC-034',
@@ -522,6 +550,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-034',
   'AX-EXE-035',
   'AX-EXE-036',
+  'AX-EXE-037',
   'AX-EXE-038',
   'AX-EXE-039',
   'AX-EXE-040',
@@ -529,15 +558,19 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-043',
   // Ato VI — Memoria
   'AX-UNK-041',
+  'AX-UNK-042',
   'AX-UNK-043',
   'AX-UNK-044',
   'AX-UNK-045',
   'AX-UNK-046',
   'AX-UNK-047',
+  'AX-UNK-048',
   'AX-UNK-049',
   'AX-UNK-050',
   'AX-UNK-051',
   'AX-UNK-052',
+  'AX-UNK-053',
+  'AX-UNK-054',
   'AX-GEN-G04',
 ];
 
@@ -573,14 +606,26 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   ...DISCOVERY_LORE.map(({ bit, fragmentId }) =>
     define(fragmentId, { kind: 'discovery', discoveryBit: bit }),
   ),
-  // O unico compound do catalogo, de proposito no fim do arco: recuperar o
-  // Nucleo E conhecer a ANOMALIA TERMINAL sao fatos separados, e o documento
-  // que os cruza so existe para quem viveu os dois.
+  // Compound de fim de arco: recuperar o Nucleo E conhecer a ANOMALIA
+  // TERMINAL sao fatos separados, e o documento que os cruza so existe para
+  // quem viveu os dois.
   define('AX-UNK-051', {
     kind: 'compound',
     allOf: [
       { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
       { kind: 'asset', archetype: 'guardian' },
+    ],
+  }),
+  // A sintese de Solaris: so quem chegou ao fim das QUATRO historias humanas
+  // (o cavaleiro, o homem do fole, a mergulhadora, a operadora de caldeira)
+  // pode ler o documento que as nomeia como o mesmo fenomeno.
+  define('AX-UNK-054', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'fungal_horse', minKills: 15 },
+      { kind: 'asset', archetype: 'bellows', minKills: 20 },
+      { kind: 'asset', archetype: 'mud_lamprey', minKills: 20 },
+      { kind: 'asset', archetype: 'frost_wraith', minKills: 20 },
     ],
   }),
 ];

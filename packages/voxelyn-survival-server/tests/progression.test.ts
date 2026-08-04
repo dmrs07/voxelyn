@@ -528,13 +528,13 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 68 documentos: 30 protocolos, 4 marcos, 19 de Ativo, 13 Descobertas, 1 composto e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(68);
+  it('tem 75 documentos: 30 protocolos, 4 marcos, 25 de Ativo, 13 Descobertas, 2 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(75);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(19);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(25);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(13);
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(1);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(2);
     expect(DEFAULT_UNLOCKED_LORE).toHaveLength(1);
   });
 
@@ -765,6 +765,35 @@ describe('liquidacao com fatos narrativos', () => {
   it('o segredo do cavaleiro nao abre um abate antes da hora', () => {
     expect(expectedLoreIds([], { fungal_horse: 14 }, 0)).not.toContain('AX-UNK-046');
     expect(expectedLoreIds([], { fungal_horse: 15 }, 0)).toContain('AX-UNK-046');
+  });
+
+  // As tres linhas de Solaris seguem o mesmo desenho: 8 abre a anomalia que a
+  // burocracia nao consegue arquivar, 20 nomeia a pessoa.
+  it('Fole, Lampreia e Espectro revelam as pessoas nos mesmos marcos', () => {
+    for (const [archetype, mid, final] of [
+      ['bellows', 'AX-ENG-019', 'AX-UNK-042'],
+      ['mud_lamprey', 'AX-INC-031', 'AX-UNK-048'],
+      ['frost_wraith', 'AX-EXE-037', 'AX-UNK-053'],
+    ] as const) {
+      expect(expectedLoreIds([], { [archetype]: 7 }, 0), archetype).not.toContain(mid);
+      expect(expectedLoreIds([], { [archetype]: 8 }, 0), archetype).toContain(mid);
+      expect(expectedLoreIds([], { [archetype]: 19 }, 0), archetype).not.toContain(final);
+      expect(expectedLoreIds([], { [archetype]: 20 }, 0), archetype).toContain(final);
+    }
+  });
+
+  // A sintese so existe para quem terminou as QUATRO historias humanas.
+  it('a sintese de Solaris exige os quatro finais', () => {
+    const threeOfFour = {
+      fungal_horse: 15,
+      bellows: 20,
+      mud_lamprey: 20,
+      frost_wraith: 19,
+    };
+    expect(expectedLoreIds([], threeOfFour, 0)).not.toContain('AX-UNK-054');
+    expect(
+      expectedLoreIds([], { ...threeOfFour, frost_wraith: 20 }, 0),
+    ).toContain('AX-UNK-054');
   });
 
   // Perfil da versao anterior: tinha knownArchetypes e nenhuma contagem.
