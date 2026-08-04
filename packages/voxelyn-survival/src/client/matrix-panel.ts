@@ -606,6 +606,8 @@ const renderFragment = (
   fragment: PublicLoreFragment,
   handlers: MatrixHandlers,
   redraw: () => void,
+  /** Ids visiveis sob o filtro atual; null = sem filtro. Ver o link de relacionado. */
+  contextIds: ReadonlySet<string> | null = null,
 ): HTMLElement => {
   const card = el('article', 'codex-doc');
   const open = openDocId === fragment.id;
@@ -654,7 +656,15 @@ const renderFragment = (
           link.setAttribute('aria-label', t('codex.related.aria', { code: id }));
           link.addEventListener('click', () => {
             openCodexDocument(id);
-            redraw();
+            // O alvo pode estar FORA do filtro contextual (o dossie do Corcel
+            // apontando para um documento do Espreitador): abrir sem limpar o
+            // filtro deixaria o botao clicavel e a tela parada. Seguir o link
+            // e sair do contexto — o filtro cai para "Todos" e o alvo abre.
+            if (contextIds && !contextIds.has(id)) {
+              handlers.onCodexContext({ kind: 'all' });
+            } else {
+              redraw();
+            }
           });
           related.appendChild(link);
         }
@@ -720,7 +730,9 @@ const renderCodexTab = (
   body.appendChild(
     el('div', 'sub', t('codex.count', { unlocked: codex.unlocked.length, total: codex.total })),
   );
-  for (const fragment of visible) body.appendChild(renderFragment(fragment, handlers, redraw));
+  for (const fragment of visible) {
+    body.appendChild(renderFragment(fragment, handlers, redraw, contextIds));
+  }
 
   if (contextIds) {
     if (visible.length === 0) body.appendChild(el('p', 'sub', t('codex.contextEmpty')));

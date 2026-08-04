@@ -1842,8 +1842,12 @@ const matrixHandlers: MatrixHandlers = {
     audio.ui();
   },
   onCodexContext: (context) => {
+    // O documento aberto NAO e limpo aqui: seguir um link de relacionado para
+    // fora do filtro passa por este handler com { kind: 'all' }, e limpar o
+    // aberto engoliria exatamente a navegacao que o clique pediu. Quem limpa
+    // o estado transitorio e a abertura normal da Matriz e o retorno ao
+    // Registro.
     matrixView.codexContext = context;
-    if (context.kind === 'all') openCodexDocument(null);
     drawMatrix();
     audio.ui();
   },
@@ -1899,6 +1903,13 @@ document.getElementById('btn-matrix')?.addEventListener('click', () => {
   matrixView.pending = null;
   matrixView.loading = false;
   matrixView.notice = null;
+  // A navegacao contextual (Registro → Codex) tambem e estado transitorio:
+  // fechar a Matriz pelo botao normal nao passa pelo retorno ao Registro, e
+  // sem esta limpeza a proxima abertura pelo menu herdaria o filtro e o botao
+  // de voltar de uma visita que ja acabou.
+  matrixView.codexContext = { kind: 'all' };
+  matrixView.codexReturn = false;
+  openCodexDocument(null);
   drawMatrix();
   openOverlay(matrixOverlay);
   void refreshProfile();

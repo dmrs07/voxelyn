@@ -475,3 +475,50 @@ describe('leitura acompanha o documento aberto, nao o caminho', () => {
     expect(opened).toEqual([]);
   });
 });
+
+describe('link de relacionado fora do filtro contextual', () => {
+  it('seguir o link limpa o filtro em vez de nao abrir nada', () => {
+    // AX-ENG-012 (dossie do stalker) aponta para AX-PUB-001, que esta
+    // desbloqueado mas FORA do filtro do stalker. Clicar precisa pedir a
+    // limpeza do contexto — nunca deixar um botao clicavel que nao faz nada.
+    openCodexDocument('AX-ENG-012');
+    const contexts: CodexContext[] = [];
+    const source = fragment('AX-ENG-012', { relatedFragmentIds: ['AX-PUB-001'] });
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: profileWithDocs(),
+        codex: codexOf([fragment('AX-PUB-001'), source]),
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: true,
+      }),
+      { ...handlers, onCodexContext: (ctx) => contexts.push(ctx) },
+    );
+    click(host.querySelector('.codex-related-link'));
+    expect(contexts).toEqual([{ kind: 'all' }]);
+  });
+
+  it('link para alvo DENTRO do filtro nao mexe no contexto', () => {
+    openCodexDocument('AX-ENG-012');
+    const contexts: CodexContext[] = [];
+    const withDocs = profileWithDocs();
+    withDocs.loreIndex.assets.stalker = ['AX-ENG-012', 'AX-PUB-001'];
+    const source = fragment('AX-ENG-012', { relatedFragmentIds: ['AX-PUB-001'] });
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: withDocs,
+        codex: codexOf([fragment('AX-PUB-001'), source]),
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: true,
+      }),
+      { ...handlers, onCodexContext: (ctx) => contexts.push(ctx) },
+    );
+    click(host.querySelector('.codex-related-link'));
+    expect(contexts).toEqual([]);
+    // E o alvo abriu de verdade.
+    expect(host.textContent).toContain('Corpo AX-PUB-001');
+  });
+});
