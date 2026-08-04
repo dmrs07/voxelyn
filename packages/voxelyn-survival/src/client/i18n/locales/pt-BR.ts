@@ -39,6 +39,7 @@ export const PT_BR = {
 
   // Cromo Aurix do redesign (doc AD-UI-2.0): rótulos decorativos do documento.
   // Não mudam o significado de nenhum botão existente — só o papel timbrado.
+  'aurix.motto': 'EXTRAIR. PROTEGER. ADAPTAR.',
   'aurix.rail.dispatch': 'Despacho',
   'aurix.rail.copy': 'Via do operador',
   'aurix.menu.docTitle': 'Ordem de despacho',

@@ -64,7 +64,9 @@
         --ax-text-bright: #e2d9c6;
         --ax-text-mute: #9a9184;
         --ax-text-dim: #857d6d;
-        --ax-text-dead: #5f584c;
+        /* "morto" continua legível: 4.6:1 sobre #0b0b0a — atmosfera não pode
+           custar a leitura da razão de um bloqueio. */
+        --ax-text-dead: #6d6455;
         /* padrão de indisponível: hachura diagonal, nunca só opacidade */
         --ax-hatch: repeating-linear-gradient(
           135deg,
@@ -102,6 +104,15 @@
         }
         50% {
           opacity: 1;
+        }
+      }
+      /* O pulso e decoração de estado, nunca a informação: quem pediu menos
+         movimento fica com o ponto aceso parado e não perde nada. */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
         }
       }
       .overlay {
@@ -645,7 +656,12 @@
         z-index: 30;
       }
       .ax-form {
+        /* `border-box` e a largura descontando as safe areas: sem os dois, a
+           moldura + padding somavam ao 94vw e o formulário passava da tela em
+           390px de largura — justamente nas telas de pausa e rescisão. */
+        box-sizing: border-box;
         width: min(560px, 94vw);
+        max-width: calc(100vw - var(--safe-area-inset-left) - var(--safe-area-inset-right) - 12px);
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -663,7 +679,10 @@
       .ax-form-head {
         display: flex;
         align-items: center;
-        gap: 12px;
+        /* Placa, título e carimbo não cabem lado a lado em retrato: o carimbo
+           quebra para a segunda linha em vez de estourar a moldura. */
+        flex-wrap: wrap;
+        gap: 8px 12px;
         border-bottom: 1px solid var(--ax-key);
         padding-bottom: 8px;
         min-width: 0;
@@ -1357,6 +1376,28 @@
           border-top: 1px solid var(--ax-key);
           overflow: visible;
         }
+        /* Matriz em retrato: o rótulo do ramo sobe para a própria linha e os
+           nós ficam com a largura inteira — seis nós de 44px cabem em 390px
+           sem cortar o último protocolo nem encolher o alvo de toque. */
+        .ax-branch {
+          flex-wrap: wrap;
+          row-gap: 4px;
+        }
+        .ax-branch-label {
+          width: 100%;
+          flex: 1 0 100%;
+          padding-right: 0;
+          display: flex;
+          gap: 8px;
+          align-items: baseline;
+        }
+        .ax-node {
+          width: 44px;
+          height: 44px;
+        }
+        .ax-node-link {
+          min-width: 4px;
+        }
         .ax-stamp {
           min-height: 66px;
           font-size: 22px;
@@ -1472,7 +1513,7 @@
           </div>
         </div>
         <div class="ax-sheet-foot">
-          <span class="ax-motto">EXTRAIR. PROTEGER. ADAPTAR.</span>
+          <span class="ax-motto" data-i18n="aurix.motto">EXTRAIR. PROTEGER. ADAPTAR.</span>
           <span class="ax-foot-note" data-i18n="menu.controls">
             Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia
           </span>

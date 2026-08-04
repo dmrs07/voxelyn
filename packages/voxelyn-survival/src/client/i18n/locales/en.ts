@@ -34,6 +34,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'menu.headphones': 'Use headphones: the sound warns you before the screen does.',
 
   // Aurix chrome (redesign doc AD-UI-2.0): decorative document labels.
+  'aurix.motto': 'EXTRACT. PROTECT. ADAPT.',
   'aurix.rail.dispatch': 'Dispatch',
   'aurix.rail.copy': 'Operator copy',
   'aurix.menu.docTitle': 'Dispatch order',

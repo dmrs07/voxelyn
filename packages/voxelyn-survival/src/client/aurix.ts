@@ -16,6 +16,8 @@
  * como peca de maquinario, nao como letra.
  */
 
+import { t } from './i18n';
+
 /** Ouro da companhia. Mesma familia do bege de texto secundario ja usado (#b8a98f). */
 export const AURIX_GOLD = '#c9a25e';
 
@@ -28,6 +30,9 @@ export const AURIX_NAME = 'AURIX DYNAMICS';
  * companhia espera de um Prospector, e ele acabou de anunciar que nao vai fazer
  * nenhuma das tres. Nao ha reprimenda escrita em lugar nenhum — o lema faz o
  * trabalho sozinho.
+ *
+ * LOCALIZADO de proposito (chave `aurix.motto`): a Aurix fala a lingua do
+ * operador — e o lema so cobra alguma coisa se quem le entender a cobranca.
  */
 export const AURIX_TAGLINE = 'EXTRAIR. PROTEGER. ADAPTAR.';
 
@@ -93,7 +98,7 @@ const markSvg = (): string => {
  */
 export const aurixPlateHtml = (tagline = false): string =>
   `<div class="corp-plate">${markSvg()}<div class="corp-name">${AURIX_NAME}</div>${
-    tagline ? `<div class="corp-tagline">${AURIX_TAGLINE}</div>` : ''
+    tagline ? `<div class="corp-tagline">${t('aurix.motto')}</div>` : ''
   }</div>`;
 
 /**

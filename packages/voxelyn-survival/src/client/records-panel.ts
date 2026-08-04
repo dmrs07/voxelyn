@@ -190,15 +190,27 @@ const TAB_RENDER: Record<RecordsTab, (host: HTMLElement, records: Records) => vo
 };
 
 export const renderRecordsPanel = (host: HTMLElement, records: Records): void => {
+  // Redesenhar limpa o DOM e derrubaria o foco no documento a cada troca de
+  // aba — o mesmo problema (e a mesma solucao) do painel da Matriz.
+  const active = document.activeElement;
+  const focusKey =
+    active instanceof HTMLElement && host.contains(active)
+      ? (active.dataset.axFocus ?? null)
+      : null;
+
   host.textContent = '';
 
   const tabs = el('div', 'ax-tabs');
+  tabs.setAttribute('role', 'tablist');
   for (const tab of ['summary', 'assets', 'discoveries', 'history'] as const) {
     const button = el(
       'button',
       `ax-tab${activeTab === tab ? ' is-active' : ''}`,
       t(TAB_LABEL[tab]),
     ) as HTMLButtonElement;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', activeTab === tab ? 'true' : 'false');
+    button.dataset.axFocus = `tab:${tab}`;
     button.addEventListener('click', () => {
       activeTab = tab;
       renderRecordsPanel(host, records);
@@ -213,4 +225,8 @@ export const renderRecordsPanel = (host: HTMLElement, records: Records): void =>
   body.style.border = 'none';
   TAB_RENDER[activeTab](body, records);
   host.appendChild(body);
+
+  if (focusKey) {
+    host.querySelector<HTMLElement>(`[data-ax-focus="${CSS.escape(focusKey)}"]`)?.focus();
+  }
 };

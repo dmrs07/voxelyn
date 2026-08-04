@@ -3712,13 +3712,42 @@ export class SurvivalRenderer {
     ctx.fillStyle = 'rgba(10, 10, 11, 0.9)';
     ctx.fillRect(0, 0, vw, vh);
 
-    // Escala tipografica derivada da altura: a tela tem de caber num celular em
-    // landscape (390 de altura) sem cortar a linha da licao, que e a util.
-    const unit = Math.max(10, Math.min(20, vh / 24));
+    const cause = describeCause(summary.deathCause);
+    const lines = summaryLines(summary);
+    const half = Math.ceil(lines.length / 2);
+    const hint = nextStarHint(summary);
+    const record = reputationNote(summary);
+    const cargo = cargoNote(summary);
+
+    // Escala tipografica MEDIDA, nao estimada. Toda a geometria vertical desta
+    // tela e linear em `unit`, entao a altura necessaria e uma soma de
+    // coeficientes vezes `unit` — e quando ela nao cabe (paisagem de 360px com
+    // o caso completo: nove metricas, carga, registro, dica e reinicio), um
+    // unico fator de escala devolve o maior `unit` que cabe. Sem laco e sem
+    // corte: o documento encolhe inteiro em vez de perder a ultima linha.
+    const margin = Math.max(8, Math.min(22, vw * 0.02));
+    // Coeficientes na ordem do desenho: ascendente do titulo, causa (rotulo +
+    // manchete), licao (rotulo + frase), respiro, numeros, carga, registro,
+    // dica, reinicio e a folga do descendente da ultima linha.
+    const blockUnits =
+      1.4 +
+      1.6 +
+      0.9 +
+      (cause.lesson ? 1.95 : 0) +
+      2 +
+      half * 1.25 +
+      (cargo ? 1.45 : 0) +
+      (record ? 1.45 : 0) +
+      (hint ? 0.6 : 0) +
+      1.6 +
+      0.5;
+    // Cabecalho (2.8) + respiro minimo antes do conteudo (1.6) + bloco.
+    const neededUnits = 2.8 + 1.6 + blockUnits;
+    const unitBase = Math.max(10, Math.min(20, vh / 24));
+    const unit = Math.max(7, Math.min(unitBase, (vh - margin * 2) / neededUnits));
 
     // A moldura do formulario: 1px de latao (perda: vermelho), com keyline
     // interna escura — a mesma gramatica das folhas em DOM.
-    const margin = Math.max(8, Math.min(22, vw * 0.02));
     ctx.strokeStyle = lost ? AX.redLine : AX.brass;
     ctx.lineWidth = 1;
     ctx.strokeRect(margin + 0.5, margin + 0.5, vw - margin * 2 - 1, vh - margin * 2 - 1);
@@ -3758,31 +3787,15 @@ export class SurvivalRenderer {
 
     ctx.textAlign = 'center';
 
-    const cause = describeCause(summary.deathCause);
-    const lines = summaryLines(summary);
-    const half = Math.ceil(lines.length / 2);
-    const hint = nextStarHint(summary);
-    const record = reputationNote(summary);
-    const cargo = cargoNote(summary);
-
-    // Altura do bloco medida ANTES de desenhar, para centralizar de verdade
-    // no espaco que sobra abaixo do cabecalho.
-    //
-    // Comecar num percentual fixo da altura parece funcionar e nao funciona: o
-    // bloco cresce e encolhe com a causa, com a licao e com a dica de estrela,
-    // entao um topo fixo deixa a tela de morte colada no topo e a de extracao
-    // com um vao embaixo. Centralizar exige saber o total.
-    const blockHeight =
-      unit * 2 + // titulo
-      unit * 1.9 + // rotulo de causa + causa
-      unit * (cause.lesson ? 2.1 : 0) + // rotulo de recomendacao + licao
-      unit * 2 + // respiro antes dos numeros
-      half * unit * 1.25 + // numeros
-      (cargo ? unit * 1.45 : 0) +
-      (record ? unit * 1.45 : 0) +
-      (hint ? unit * 1.45 : 0) +
-      unit * 1.6; // chamada de reinicio
-    let y = Math.max(ruleY + unit * 1.8, ruleY + (vh - margin - ruleY - blockHeight) / 2);
+    // Centraliza o bloco no espaco que sobra abaixo da regua; com o `unit`
+    // ajustado acima, o minimo nunca empurra a ultima linha para fora.
+    // `y` e a linha de base do titulo; o bloco comeca 1.4·unit acima dela
+    // (o ascendente ja contado em `blockUnits`).
+    const blockHeight = blockUnits * unit;
+    let y = Math.max(
+      ruleY + unit * 1.6,
+      ruleY + (vh - margin - ruleY - blockHeight) / 2 + unit * 1.4,
+    );
 
     ctx.fillStyle = colors[outcome.color];
     ctx.font = `bold ${Math.round(unit * 1.7)}px monospace`;

@@ -251,6 +251,20 @@ const nodeShortLabel = (upgrade: UpgradeDefinition): string => {
   return dash >= 0 ? upgrade.id.slice(dash + 1) : upgrade.id;
 };
 
+/**
+ * O rotulo do no para leitores de tela.
+ *
+ * "01 ●" comunica tudo a quem VE o trilho inteiro e nada a quem ouve um botao
+ * por vez: ramo, codigo, nome e situacao precisam estar na propria fala do
+ * botao. Pura e exportada para o teste cobrar exatamente isso.
+ */
+export const nodeAriaLabel = (upgrade: UpgradeDefinition, state: NodeState): string => {
+  const branch = t(BRANCH_LABEL[upgrade.branch].title);
+  const name = t(`upgrade.${upgrade.id}.name` as MessageKey);
+  const status = state.kind === 'affordable' ? t('matrix.confirm.yes') : statusText(state);
+  return `${branch} · ${upgrade.id} · ${name}${status ? ` — ${status}` : ''}`;
+};
+
 /** O simbolo de estado do no. Nunca cor sozinha: simbolo + moldura + fundo. */
 const nodeGlyph = (state: NodeState, pending: boolean): string => {
   if (pending) return '…';
@@ -307,6 +321,9 @@ const renderBranchRail = (
     node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
     node.appendChild(el('span', 'ax-node-glyph', nodeGlyph(state, view.pending === upgrade.id)));
     node.title = upgrade.id;
+    node.dataset.axFocus = `node:${upgrade.id}`;
+    node.setAttribute('aria-label', nodeAriaLabel(upgrade, state));
+    node.setAttribute('aria-pressed', selectedId === upgrade.id ? 'true' : 'false');
     // O no trancado continua CLICAVEL: o inspetor e onde o jogador descobre o
     // pre-requisito. Bloquear o clique esconderia justamente a explicacao.
     node.addEventListener('click', () => {
@@ -376,6 +393,7 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
     // Desabilitado enquanto a requisicao corre. Nao e otimismo: o estado da
     // arvore so muda quando a resposta do servidor chega.
     button.disabled = !purchaseEnabled(view);
+    button.dataset.axFocus = 'authorize';
     button.addEventListener('click', () => handlers.onPurchase(upgrade));
     inspector.appendChild(button);
   } else {
@@ -486,17 +504,31 @@ export const renderMatrixPanel = (
   view: MatrixViewState,
   handlers: MatrixHandlers,
 ): void => {
+  // Redesenhar limpa o DOM inteiro, e com ele o elemento focado — o foco caia
+  // no documento a cada selecao de no ou troca de aba, o que quebra teclado e
+  // leitor de tela no meio do fluxo de compra. A identidade do foco viaja por
+  // `data-ax-focus` e e restaurada sobre o elemento equivalente novo.
+  const active = document.activeElement;
+  const focusKey =
+    active instanceof HTMLElement && root.contains(active)
+      ? (active.dataset.axFocus ?? null)
+      : null;
+
   root.textContent = '';
 
   root.appendChild(renderHeader(view));
 
   const tabs = el('div', 'ax-tabs matrix-tabs');
+  tabs.setAttribute('role', 'tablist');
   for (const tab of ['matrix', 'codex'] as const) {
     const button = el(
       'button',
       `ax-tab${view.tab === tab ? ' is-active' : ''}`,
       t(`matrix.tab.${tab}` as MessageKey),
     ) as HTMLButtonElement;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', view.tab === tab ? 'true' : 'false');
+    button.dataset.axFocus = `tab:${tab}`;
     button.addEventListener('click', () => handlers.onTab(tab));
     tabs.appendChild(button);
   }
@@ -510,6 +542,18 @@ export const renderMatrixPanel = (
   root.appendChild(
     view.tab === 'matrix' ? renderMatrixTab(view, handlers, redraw) : renderCodexTab(view),
   );
+
+  if (focusKey) {
+    // Se o elemento focado deixou de existir (o botao de compra some quando o
+    // no vira "instalado"), o foco recua para o no selecionado — nunca para o
+    // vazio do documento.
+    const target =
+      root.querySelector<HTMLElement>(`[data-ax-focus="${CSS.escape(focusKey)}"]`) ??
+      (selectedId
+        ? root.querySelector<HTMLElement>(`[data-ax-focus="${CSS.escape(`node:${selectedId}`)}"]`)
+        : null);
+    target?.focus();
+  }
 };
 
 /** Quantos protocolos existem, para o teste de contagem do painel. */
