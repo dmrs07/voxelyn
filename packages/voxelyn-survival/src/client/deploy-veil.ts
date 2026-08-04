@@ -24,7 +24,10 @@
 //
 // Decisões de custo, porque isto roda num celular:
 // - cada célula anima SÓ `transform: scale` com `transition-delay` própria —
-//   nenhuma propriedade de pintura muda por quadro;
+//   nenhuma propriedade de pintura muda por quadro; o lampejo teal da frente
+//   de onda é UM elemento varrendo a diagonal por transform (a versão que
+//   animava a COR de cada célula repintava centenas de clip-paths por quadro
+//   no meio da onda — era o engasgo sentido no aparelho);
 // - o sequenciamento é por setTimeout, não por transitionend: um evento
 //   perdido (aba oculta, célula removida) travaria o véu na tela para sempre;
 // - o custo tem TETO em qualquer tela: o hexágono cresce até a colmeia caber
@@ -69,6 +72,37 @@ export type DeploySequence = {
 };
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * O estêncil da colmeia: um tile SVG (período hexW × 1.5·hexH) com hexágonos
+ * levemente encolhidos (0.92) nas mesmas posições das células — as costuras
+ * entre eles são o que devolve ao fio a aparência de acender CÉLULA a célula
+ * em vez de uma faixa contínua. Branco é o que a máscara deixa visível.
+ */
+const hexStencilSvg = (hexW: number, hexH: number): string => {
+  const tileH = hexH * 1.5;
+  const s = 0.92;
+  const r2 = (v: number): number => Math.round(v * 100) / 100;
+  const hex = (cx: number, cy: number): string => {
+    const hw = (hexW / 2) * s;
+    const q = (hexH / 4) * s;
+    const h = (hexH / 2) * s;
+    return (
+      `M${r2(cx)} ${r2(cy - h)}L${r2(cx + hw)} ${r2(cy - q)}L${r2(cx + hw)} ${r2(cy + q)}` +
+      `L${r2(cx)} ${r2(cy + h)}L${r2(cx - hw)} ${r2(cy + q)}L${r2(cx - hw)} ${r2(cy - q)}Z`
+    );
+  };
+  // Os cinco centros de um período: os quatro cantos (fileiras pares) e o
+  // meio deslocado meia célula (fileiras ímpares) — igual ao laço das células.
+  const d = [
+    hex(0, 0),
+    hex(hexW, 0),
+    hex(hexW / 2, hexH * 0.75),
+    hex(0, tileH),
+    hex(hexW, tileH),
+  ].join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${r2(hexW)}" height="${r2(tileH)}"><path fill="#fff" d="${d}"/></svg>`;
+};
 
 /**
  * O quadro trocado em `swap` de fato APRESENTADO na tela. Dois rAF: o
@@ -160,12 +194,27 @@ export const deployVeil = async (seq: DeploySequence): Promise<boolean> => {
       cell.style.left = `${col * hexW + (row % 2 === 1 ? hexW / 2 : 0) - hexW / 2}px`;
       cell.style.top = `${row * hexH * 0.75 - hexH / 2}px`;
       cell.style.transitionDelay = `${delay}ms`;
-      // O mesmo atraso na ANIMAÇÃO do lampejo teal: é ele que faz a frente de
-      // onda brilhar célula a célula em vez de a tela inteira piscar junto.
-      cell.style.animationDelay = `${delay}ms`;
       veil.appendChild(cell);
     }
   }
+  // O lampejo da frente de onda: a faixa viaja por transform ATRÁS de um
+  // estêncil de colmeia estático, gerado aqui no MESMO passo das células.
+  // Cada abertura hexagonal acende quando a faixa cruza por baixo — o olho vê
+  // o lampejo célula a célula de antes; o navegador nunca repinta nada.
+  const front = document.createElement('i');
+  front.className = 'ax-veil-front';
+  const sweep = maxDelay + CELL_MS + 50;
+  front.style.animationDuration = `${sweep}ms`;
+  // O percurso em px desta tela: da diagonal x+y=0 até x+y=vw+vh, com folga
+  // para a meia-largura da faixa entrar e sair limpa.
+  veil.style.setProperty('--ax-sweep', `${(width + height) / 4 + 140}px`);
+  const stencil = document.createElement('div');
+  stencil.className = 'ax-veil-stencil';
+  const mask = `url("data:image/svg+xml,${encodeURIComponent(hexStencilSvg(hexW, hexH))}")`;
+  stencil.style.setProperty('mask-image', mask);
+  stencil.style.setProperty('-webkit-mask-image', mask);
+  stencil.appendChild(front);
+  veil.appendChild(stencil);
   document.body.appendChild(veil);
 
   // Reflow: sem ele o navegador aplicaria escala 0 e 1 no mesmo quadro e
@@ -174,7 +223,6 @@ export const deployVeil = async (seq: DeploySequence): Promise<boolean> => {
   veil.classList.add('is-closed');
   seq.sound?.();
 
-  const sweep = maxDelay + CELL_MS + 50;
   await wait(sweep);
   // Sob o preto: a preparação precisa ter TERMINADO antes da troca — é isto
   // que impede o mundo de nascer (ou o loop de girar) atrás de uma tela que
