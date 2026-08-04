@@ -234,6 +234,20 @@
           repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
           repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
       }
+      /* O vidro abaulado do carimbo: por cima do fosforo entram o reflexo
+         elíptico do topo (vidro curvo devolvendo a luz da sala) e a vinheta
+         que pinça os cantos (a curvatura fugindo do olho). O raio de canto
+         vive SO neste vidro interno — o bezel do botão segue quadrado. */
+      button.primary:not(.compact)::before {
+        inset: 3px;
+        border-radius: 12px;
+        background:
+          radial-gradient(82% 46% at 50% 7%, rgba(255, 255, 255, 0.09), transparent 62%),
+          radial-gradient(135% 135% at 50% 50%, transparent 56%, rgba(0, 0, 0, 0.55) 100%),
+          repeating-linear-gradient(0deg, rgba(3, 5, 5, 0.34) 0 1px, transparent 1px 3px),
+          repeating-linear-gradient(90deg, rgba(3, 5, 5, 0.22) 0 1px, transparent 1px 2px);
+        box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.55);
+      }
 
       /* O zumbido do carimbo primario: o unico circuito LIGADO da folha.
          Uma lampada de mata-mosquito, nao uma respiracao — a base fica sempre
@@ -462,8 +476,9 @@
 
       /* ------------------------------------------------------------------
          Controles: a linguagem de hardware Aurix.
-         Sem raio de canto em componente nenhum — a única curva do sistema
-         é o selo de diretiva. Alvo mínimo de toque 44px.
+         Sem raio de canto em componente nenhum — as únicas curvas do sistema
+         são o selo de diretiva e o VIDRO do tubo CRT dentro do carimbo
+         primário (o bezel do carimbo continua quadrado). Alvo mínimo 44px.
          ------------------------------------------------------------------ */
       button {
         background: linear-gradient(180deg, #161513, #0e0d0c);
@@ -498,6 +513,23 @@
           0 0 22px rgba(79, 214, 201, 0.16),
           inset 0 0 26px rgba(79, 214, 201, 0.07);
         text-shadow: 0 0 16px rgba(79, 214, 201, 0.4);
+      }
+      /* O carimbo primario e um MONITOR: bezel quadrado, tubo de fosforo teal
+         dentro. O campo teal irradia do centro e morre nas bordas (o tubo e
+         mais fundo que o bezel), e a letra e fosforescencia, nao tinta. */
+      button.primary:not(.compact) {
+        color: #d9fffa;
+        text-shadow:
+          0 0 3px rgba(143, 240, 230, 0.9),
+          0 0 16px rgba(79, 214, 201, 0.75);
+        background:
+          radial-gradient(
+            120% 170% at 50% 34%,
+            rgba(79, 214, 201, 0.17),
+            rgba(79, 214, 201, 0.05) 58%,
+            rgba(0, 0, 0, 0.5) 100%
+          ),
+          linear-gradient(180deg, #0a1413, #060b0a);
       }
       button.compact {
         min-width: 0;
