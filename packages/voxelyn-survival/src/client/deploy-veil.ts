@@ -1,0 +1,92 @@
+// O véu de deploy: a transição entre o terminal e o Veio.
+//
+// Toda troca entre a UI e o canvas do jogo passa por uma colmeia de hexágonos
+// pretos que fecha em onda DIAGONAL (canto superior esquerdo → inferior
+// direito), troca a tela por baixo e segue abrindo na mesma direção — a onda
+// atravessa, como um obturador de escotilha. É a ficção do despacho: a unidade
+// não "aparece" no Veio, ela é DEPLOYADA através do casco.
+//
+// Decisões de custo, porque isto roda num celular:
+// - cada célula anima SÓ `transform: scale` com `transition-delay` própria —
+//   nenhuma propriedade de pintura muda por quadro;
+// - o sequenciamento é por setTimeout, não por transitionend: um evento
+//   perdido (aba oculta, célula removida) travaria o véu na tela para sempre;
+// - o véu engole toques enquanto existe — sem isso, um segundo DESCER no meio
+//   da onda dispararia duas runs.
+//
+// `prefers-reduced-motion` pula o véu inteiro: a troca é imediata, como era.
+
+/** Largura de cada hexágono, px. Pequeno o bastante para ler como "colmeia". */
+const HEX_W = 34;
+/** Proporção de altura de um hexágono de topo pontudo: 2/√3. */
+const HEX_H = HEX_W * 1.1547;
+/** Passo do atraso por diagonal (linha+coluna), ms. */
+const DELAY_STEP = 9;
+/** Duração da transição de UMA célula, ms — casa com o CSS de `.ax-veil`. */
+const CELL_MS = 170;
+/** Pausa com a tela totalmente preta, antes de reabrir, ms. */
+const HOLD_MS = 90;
+
+let busy = false;
+
+/**
+ * Fecha a colmeia, executa `swap` sob o preto total e reabre.
+ *
+ * `swap` é sempre chamado exatamente uma vez — inclusive quando o véu é
+ * pulado (movimento reduzido) ou quando outra transição ainda está no ar
+ * (caso em que a troca é imediata: perder a animação é melhor que perder o
+ * clique).
+ */
+export const deployVeil = (swap: () => void): void => {
+  const reduced =
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (busy || reduced || typeof document === 'undefined') {
+    swap();
+    return;
+  }
+  busy = true;
+
+  const veil = document.createElement('div');
+  veil.className = 'ax-veil';
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  // Colunas/linhas com uma de folga: a fileira ímpar desloca meio hexágono e
+  // a última célula precisa cobrir a borda mesmo assim.
+  const cols = Math.ceil(width / HEX_W) + 1;
+  const rows = Math.ceil(height / (HEX_H * 0.75)) + 1;
+  let maxDelay = 0;
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const cell = document.createElement('span');
+      const delay = (row + col) * DELAY_STEP;
+      maxDelay = Math.max(maxDelay, delay);
+      cell.style.width = `${HEX_W}px`;
+      cell.style.height = `${HEX_H}px`;
+      cell.style.left = `${col * HEX_W + (row % 2 === 1 ? HEX_W / 2 : 0) - HEX_W / 2}px`;
+      cell.style.top = `${row * HEX_H * 0.75 - HEX_H / 2}px`;
+      cell.style.transitionDelay = `${delay}ms`;
+      veil.appendChild(cell);
+    }
+  }
+  document.body.appendChild(veil);
+
+  // Reflow: sem ele o navegador aplicaria escala 0 e 1 no mesmo quadro e
+  // nenhuma transição aconteceria.
+  void veil.offsetWidth;
+  veil.classList.add('is-closed');
+
+  const sweep = maxDelay + CELL_MS + 50;
+  setTimeout(() => {
+    swap();
+    setTimeout(() => {
+      // Reabre na MESMA ordem de atrasos: a célula que fechou primeiro abre
+      // primeiro, e a onda atravessa a tela em vez de voltar.
+      veil.classList.remove('is-closed');
+      setTimeout(() => {
+        veil.remove();
+        busy = false;
+      }, sweep);
+    }, HOLD_MS);
+  }, sweep);
+};

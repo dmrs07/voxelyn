@@ -106,6 +106,32 @@
           opacity: 1;
         }
       }
+      /* O véu de deploy (deploy-veil.ts): a colmeia de hexágonos pretos que
+         fecha em onda diagonal em toda troca UI ↔ canvas. Acima de todas as
+         folhas (menu 10, pausa 30) e abaixo do banner de sistema (40); engole
+         toques enquanto existe para um segundo DESCER não disparar duas runs.
+         Cada célula anima SÓ transform — nada repinta por quadro. */
+      .ax-veil {
+        position: fixed;
+        inset: 0;
+        z-index: 35;
+        pointer-events: all;
+        overflow: hidden;
+      }
+      .ax-veil span {
+        position: absolute;
+        clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+        background: #050506;
+        transform: scale(0);
+        transition: transform 170ms cubic-bezier(0.2, 0.7, 0.3, 1);
+        will-change: transform;
+      }
+      /* 1.12 de sobreposição: hexágonos vizinhos se cobrem e o preto fecha
+         sem frestas. */
+      .ax-veil.is-closed span {
+        transform: scale(1.12);
+      }
+
       /* O zumbido do carimbo primario: o unico circuito LIGADO da folha.
          Uma lampada de mata-mosquito, nao uma respiracao — a base fica sempre
          acesa e clara (o zumbido so ADICIONA luz, nunca escurece o texto) e a

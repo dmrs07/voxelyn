@@ -58,6 +58,7 @@ import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
+import { deployVeil } from './deploy-veil';
 import { aurixMarkHtml } from './aurix';
 import { PauseMenu } from './pause-menu';
 import {
@@ -259,7 +260,8 @@ const backToMenu = (): void => {
   paused = false;
   stopLoop = null;
   pauseMenu.disarmHistory();
-  menu.classList.remove('hidden');
+  // A volta ao terminal tambem passa pela escotilha: a unidade e recolhida.
+  deployVeil(() => menu.classList.remove('hidden'));
 };
 
 /**
@@ -829,7 +831,7 @@ const abandonRun = (): void => {
   showInvite(null);
   setBanner(null);
   audio.reset();
-  menu.classList.remove('hidden');
+  deployVeil(() => menu.classList.remove('hidden'));
 };
 
 /** Solo congela; co-op nao. Lido pelo menu ANTES de `onOpen`, entao nao pode depender de `paused`. */
@@ -1338,7 +1340,8 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
   contractRun = contract;
   audio.unlock();
   audio.ui();
-  menu.classList.add('hidden');
+  // O despacho: a colmeia fecha sobre a ordem e abre sobre o Veio.
+  deployVeil(() => menu.classList.add('hidden'));
   stopLoop?.();
   runInProgress = true;
   pauseMenu.armHistory();
@@ -1355,7 +1358,7 @@ const startOnline = (): void => {
   contractRun = null;
   audio.unlock();
   audio.ui();
-  menu.classList.add('hidden');
+  deployVeil(() => menu.classList.add('hidden'));
   stopLoop?.();
   runInProgress = true;
   pauseMenu.armHistory();
