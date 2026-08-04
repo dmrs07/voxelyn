@@ -220,7 +220,8 @@ export type PublicLoreTrigger =
   | { kind: 'default' }
   | { kind: 'upgrade'; upgradeId: UpgradeId }
   | { kind: 'generation'; generation: ProspectorGeneration }
-  | { kind: 'asset'; archetype: string }
+  /** `minKills` presente = documento de marco (so viaja ja desbloqueado). */
+  | { kind: 'asset'; archetype: string; minKills?: number }
   | { kind: 'discovery'; discoveryBit: number }
   | { kind: 'compound' };
 

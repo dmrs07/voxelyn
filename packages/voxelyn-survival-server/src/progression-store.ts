@@ -328,6 +328,7 @@ create table if not exists progression_profiles (
 -- antigo comeca a contar da proxima run liquidada (nada e importado do
 -- Registro local do navegador — ver spec 2026-08-04).
 alter table progression_profiles add column if not exists known_assets jsonb not null default '[]'::jsonb;
+alter table progression_profiles add column if not exists asset_kills jsonb not null default '{}'::jsonb;
 alter table progression_profiles add column if not exists discoveries bigint not null default 0;
 alter table progression_profiles add column if not exists read_lore jsonb not null default '[]'::jsonb;
 
@@ -402,6 +403,7 @@ const rowToProfile = (row: Record<string, unknown>): StoredProfile =>
     purchasedUpgradeIds: (row.purchased as UpgradeId[]) ?? [],
     unlockedLoreFragmentIds: (row.unlocked_lore as LoreFragmentId[]) ?? [],
     knownArchetypes: (row.known_assets as EnemyArchetype[]) ?? [],
+    assetKills: (row.asset_kills as Partial<Record<EnemyArchetype, number>>) ?? {},
     discoveries: Number(row.discoveries ?? 0),
     readLoreFragmentIds: (row.read_lore as LoreFragmentId[]) ?? [],
     statistics: (row.statistics as StoredProfile['statistics']) ?? {
@@ -662,8 +664,8 @@ export class PostgresProgressionStore implements ProgressionStore {
         await client.query(
           `update progression_profiles
             set profile_version = $2, ore = $3, cores = $4, statistics = $5::jsonb,
-                known_assets = $6::jsonb, discoveries = $7, unlocked_lore = $8::jsonb,
-                updated_at = $9
+                known_assets = $6::jsonb, asset_kills = $7::jsonb, discoveries = $8,
+                unlocked_lore = $9::jsonb, updated_at = $10
           where profile_id = $1`,
           [
             input.profileId,
@@ -672,6 +674,7 @@ export class PostgresProgressionStore implements ProgressionStore {
             next.wallet.cores,
             JSON.stringify(next.statistics),
             JSON.stringify(next.knownArchetypes),
+            JSON.stringify(next.assetKills),
             next.discoveries,
             JSON.stringify(next.unlockedLoreFragmentIds),
             input.now,

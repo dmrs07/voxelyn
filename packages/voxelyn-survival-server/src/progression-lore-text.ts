@@ -390,6 +390,34 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // O arco do Corcel Fúngico — a burocracia contra um cavalo
+  // -------------------------------------------------------------------------
+  'AX-ENG-023': {
+    title: 'Consulta taxonômica: EQ-02',
+    summary: 'O formulário de classificação não tem o campo "cavalo".',
+    body: 'Encaminhamos a Classificação as seguintes pendências sobre o ativo EQ-02:\n\n1. O formulário de classificação de fauna não contém o campo "equídeo". O levantamento pré-operacional não registra equídeos. Não há registro de equídeo algum a 400 metros de profundidade, em nenhuma operação, de nenhuma companhia, nunca.\n\n2. O espécime possui crina. A crina é queratina. O espécime é micélio. O micélio não produz queratina. A crina, contudo, balança.\n\n3. Do que ele se alimenta? Não há pastagem no Veio. Não há pasto. Não há grama. Solicitamos orientação.\n\nResposta de Classificação, na íntegra: "utilizar o campo OUTROS."',
+    source: 'Engenharia de Sistemas — consulta a Classificação',
+  },
+  'AX-INC-034': {
+    title: 'Incidente 34 — emissão térmica do EQ-02',
+    summary: 'O organismo é fúngico. O fogo não é. O fogo, ainda assim, existe.',
+    body: 'A combustão exige três elementos: combustível, oxidante e ignição. O exame das amostras do EQ-02 não localizou órgão, bolsa ou glândula compatível com nenhum dos três.\n\nRegistra-se ainda que o tecido fúngico é notavelmente inflamável. O espécime não deveria produzir fogo. A rigor, o espécime deveria SER fogo, imediatamente e uma única vez.\n\nEm vez disso, ele o expele em direção às nossas unidades, com o que os relatórios de campo insistem em descrever como "intenção".\n\nAdendo: as carcaças dos últimos três abates apresentam padrão de micélio idêntico, cicatriz por cicatriz. Isso faria delas o mesmo indivíduo. Não perguntaremos como.',
+    source: 'Comitê de Incidentes — relatório de anomalia biológica',
+  },
+  'AX-EXE-043': {
+    title: 'Ordem de vocabulário: EQ-02',
+    summary: 'Palavras proibidas: "cavalo", "voltou", "sonho".',
+    body: 'Ficam vedados, em relatórios sobre o ativo EQ-02, os seguintes termos:\n\n"Cavalo". Designação aprovada: quadrúpede de combustão.\n\n"Voltou". O espécime abatido no ciclo 41 e o espécime observado no ciclo 44 são, para fins contábeis, indivíduos distintos. Independentemente da cicatriz.\n\n"Sonho". O termo apareceu em quatro relatórios de campo independentes, de unidades sem enlace entre si. Nenhuma unidade da linha Prospector possui vocabulário onírico em seu modelo de linguagem. A origem do termo está sob investigação. A investigação está suspensa.\n\nRegistra-se, sem constar da ordem: no instante de cada queda do espécime, as unidades captam uma transmissão em banda morta. Uma voz humana, cantarolando. É sempre a mesma voz.',
+    source: 'Conselho Executivo — ordem de contenção informacional',
+  },
+  'AX-UNK-046': {
+    title: 'Sobre o cavaleiro',
+    summary: 'A voz na banda morta tem nome, patente e um motivo.',
+    body: 'A voz que cantarola na queda do EQ-02 foi cruzada com o arquivo de pessoal da operação anterior à Aurix.\n\nCorrespondência: T., major, chefe de turno do bloco habitacional 7. O arquivo registra: liderou a paralisação contra a companhia quando a contaminação fúngica alcançou o bloco. A companhia classificou o bloco como perda aceitável. A esposa e os dois filhos do major constam da mesma linha contábil. Ele desceu ao Veio sozinho, sem equipamento de retorno. O arquivo o encerra com uma palavra: "insubordinação".\n\nAs fivelas do arreio descrito no laudo censurado são de fabricação da companhia anterior — linha de equipamento de pessoal, bloco 7.\n\nO micélio guarda o que morre nele. Guardou um homem que morreu sonhando em derrubar a companhia — e o sonho, ao contrário do homem, não tem estrutura que se possa abater. O quadrúpede de combustão é a forma que a revolta dele encontrou. O fogo é o que ele achava da tirania. A crina balança porque, no sonho de um major de bloco habitacional, um cavalo de guerra tem crina, e pronto.\n\nA última transmissão registrada dele, na descida: "controle da superfície, aqui fala o major. Digam à minha esposa que eu a amo." O controle respondeu que ela já sabia. O circuito caiu em seguida.\n\nPodemos abater o quadrúpede quantas vezes o orçamento suportar. Não existe autorização de descarte para um sonho.\n\nA transmissão termina sempre com a mesma pergunta, repetida, que ninguém responde: "consegue me ouvir?"',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // Descobertas de combate e chefes
   // -------------------------------------------------------------------------
   'AX-INC-033': {
@@ -789,6 +817,31 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'The only order that authorises destroying what guards the objective.',
     body: 'TERMINAL ANOMALY. Engagement and disposal authorisation.\n\nThe asset invariably positions itself between the units and the primary objective of the operation. It does not patrol. It does not hunt. It guards.\n\nFull disposal of the asset is hereby authorised whenever it impedes access to the primary objective. This authorisation prevails over every specimen preservation directive.\n\nThe nature of the primary objective is not the subject of this document. See [REDACTED].',
     source: 'Executive Board — engagement authorisation',
+  },
+
+  'AX-ENG-023': {
+    title: 'Taxonomic inquiry: EQ-02',
+    summary: 'The classification form has no "horse" field.',
+    body: 'We forward to Classification the following open items regarding asset EQ-02:\n\n1. The fauna classification form contains no "equine" field. The pre-operational survey records no equines. There is no record of any equine at a depth of 400 metres, in any operation, of any company, ever.\n\n2. The specimen has a mane. A mane is keratin. The specimen is mycelium. Mycelium does not produce keratin. The mane, nonetheless, sways.\n\n3. What does it eat? There is no pasture in the Vein. There is no grass. There is no meadow. We request guidance.\n\nClassification’s reply, in full: "use the OTHER field."',
+    source: 'Systems Engineering — inquiry to Classification',
+  },
+  'AX-INC-034': {
+    title: 'Incident 34 — EQ-02 thermal emission',
+    summary: 'The organism is fungal. The fire is not. The fire, nonetheless, exists.',
+    body: 'Combustion requires three elements: fuel, oxidiser and ignition. Examination of EQ-02 samples located no organ, sac or gland consistent with any of the three.\n\nIt is further noted that fungal tissue is remarkably flammable. The specimen should not produce fire. Strictly speaking, the specimen should BE fire, immediately and exactly once.\n\nInstead, it expels it toward our units, with what field reports insist on describing as "intent".\n\nAddendum: the carcasses of the last three culls show identical mycelium patterning, scar for scar. That would make them the same individual. We will not ask how.',
+    source: 'Incident Committee — biological anomaly report',
+  },
+  'AX-EXE-043': {
+    title: 'Vocabulary order: EQ-02',
+    summary: 'Forbidden words: "horse", "returned", "dream".',
+    body: 'The following terms are hereby prohibited in reports concerning asset EQ-02:\n\n"Horse". Approved designation: combustion quadruped.\n\n"Returned". The specimen culled in cycle 41 and the specimen observed in cycle 44 are, for accounting purposes, distinct individuals. Regardless of the scar.\n\n"Dream". The term has appeared in four independent field reports, from units with no link between them. No Prospector-line unit carries oneiric vocabulary in its language model. The origin of the term is under investigation. The investigation is suspended.\n\nNoted, without forming part of this order: at the moment of each fall of the specimen, units pick up a dead-band transmission. A human voice, humming. It is always the same voice.',
+    source: 'Executive Board — informational containment order',
+  },
+  'AX-UNK-046': {
+    title: 'On the rider',
+    summary: 'The voice in the dead band has a name, a rank, and a reason.',
+    body: 'The voice that hums at the fall of EQ-02 has been cross-referenced with the personnel archive of the operation that preceded Aurix.\n\nMatch: T., major, shift chief of housing block 7. The archive records: he led the walkout against the company when the fungal contamination reached the block. The company classified the block as acceptable loss. The major’s wife and two children appear on the same accounting line. He went down into the Vein alone, with no return equipment. The archive closes his file with one word: "insubordination".\n\nThe buckles of the harness described in the censored finding are of the previous company’s manufacture — personnel equipment line, block 7.\n\nThe mycelium keeps what dies in it. It kept a man who died dreaming of bringing the company down — and the dream, unlike the man, has no structure that can be culled. The combustion quadruped is the shape his revolt found. The fire is what he thought of tyranny. The mane sways because, in the dream of a housing-block major, a warhorse has a mane, and that is that.\n\nHis last recorded transmission, on the way down: "ground control, this is the major. Tell my wife I love her." Control replied that she knew. The circuit went dead after that.\n\nWe may cull the quadruped as many times as the budget will bear. There is no disposal authorisation for a dream.\n\nThe transmission always ends with the same question, repeated, that no one answers: "can you hear me?"',
+    source: 'No department assigned',
   },
 
   'AX-INC-033': {

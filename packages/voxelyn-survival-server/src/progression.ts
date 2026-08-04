@@ -78,6 +78,12 @@ export type StoredProfile = {
    * importado do Registro local, por politica (ver spec 2026-08-04).
    */
   knownArchetypes: EnemyArchetype[];
+  /**
+   * Abates ACUMULADOS por arquetipo, do replay. E o que sustenta gatilhos de
+   * marco (o arco do Corcel Fungico abre documentos a 3/6/10/15 abates).
+   * `knownArchetypes` e a projecao materializada disto (contagem > 0).
+   */
+  assetKills: Partial<Record<EnemyArchetype, number>>;
   /** Bitmask de DISCOVERY_*, restrita aos bits que o Codex reconhece. */
   discoveries: number;
   /** Estado de leitura do Codex. Nunca entra em hash; sempre ⊆ unlocked. */
@@ -113,6 +119,7 @@ export const newProfile = (profileId: string, now: string): StoredProfile => ({
   purchasedUpgradeIds: [],
   unlockedLoreFragmentIds: [...DEFAULT_UNLOCKED_LORE],
   knownArchetypes: [],
+  assetKills: {},
   discoveries: 0,
   readLoreFragmentIds: [],
   statistics: emptyStatistics(),
@@ -132,15 +139,27 @@ export const normalizeArchetypes = (
   return ASSET_ARCHETYPES.filter((a) => seen.has(a));
 };
 
+/** Contagens validas (inteiro >= 1) de arquetipos que o Codex conhece. */
+export const normalizeAssetKills = (
+  kills: Partial<Record<EnemyArchetype, number>> | undefined,
+): Partial<Record<EnemyArchetype, number>> => {
+  const result: Partial<Record<EnemyArchetype, number>> = {};
+  for (const archetype of ASSET_ARCHETYPES) {
+    const count = Math.floor(kills?.[archetype] ?? 0);
+    if (count > 0) result[archetype] = count;
+  }
+  return result;
+};
+
 /** Os fatos narrativos de um perfil, prontos para avaliar gatilhos. */
 export const factsFor = (
   purchased: readonly UpgradeId[],
-  knownArchetypes: readonly EnemyArchetype[],
+  assetKills: Partial<Record<EnemyArchetype, number>>,
   discoveries: number,
 ): LoreFacts => ({
   purchasedUpgradeIds: new Set(normalizeUpgradeIds(purchased)),
   generations: new Set(generationsReached(purchased)),
-  knownArchetypes: new Set(normalizeArchetypes(knownArchetypes)),
+  assetKills: normalizeAssetKills(assetKills),
   discoveries: discoveries & LORE_DISCOVERY_MASK,
 });
 
@@ -148,15 +167,15 @@ export const factsFor = (
  * Quais fragmentos este perfil DEVERIA ter, derivado dos fatos.
  *
  * Existe para REPARAR: a lista materializada e conveniencia de leitura, e a
- * verdade sao os fatos (arvore comprada, Ativos conhecidos, Descobertas). Um
+ * verdade sao os fatos (arvore comprada, abates acumulados, Descobertas). Um
  * perfil que perdeu um unlock por falha parcial volta ao lugar na proxima
  * leitura, em vez de exigir intervencao manual.
  */
 export const expectedLoreIds = (
   purchased: readonly UpgradeId[],
-  knownArchetypes: readonly EnemyArchetype[] = [],
+  assetKills: Partial<Record<EnemyArchetype, number>> = {},
   discoveries = 0,
-): LoreFragmentId[] => unlockedLoreFor(factsFor(purchased, knownArchetypes, discoveries));
+): LoreFragmentId[] => unlockedLoreFor(factsFor(purchased, assetKills, discoveries));
 
 /**
  * Higieniza um perfil vindo do armazenamento.
@@ -170,9 +189,16 @@ export const expectedLoreIds = (
 export const sanitizeProfile = (profile: StoredProfile): StoredProfile => {
   const purchased = normalizeUpgradeIds(profile.purchasedUpgradeIds);
   const valid = isValidUpgradeSet(purchased) ? purchased : repairTree(purchased);
-  const knownArchetypes = normalizeArchetypes(profile.knownArchetypes);
+  const assetKills = normalizeAssetKills(profile.assetKills);
+  // Migracao: um perfil gravado antes das contagens tem so a lista de
+  // conhecidos. Conhecido sem contagem vira "pelo menos 1" — preserva a ficha
+  // ja aberta sem inventar progresso de marco.
+  for (const archetype of normalizeArchetypes(profile.knownArchetypes)) {
+    assetKills[archetype] = Math.max(assetKills[archetype] ?? 0, 1);
+  }
+  const knownArchetypes = ASSET_ARCHETYPES.filter((a) => (assetKills[a] ?? 0) > 0);
   const discoveries = (profile.discoveries ?? 0) & LORE_DISCOVERY_MASK;
-  const unlocked = expectedLoreIds(valid, knownArchetypes, discoveries);
+  const unlocked = expectedLoreIds(valid, assetKills, discoveries);
   const unlockedSet = new Set(unlocked);
   return {
     ...profile,
@@ -183,6 +209,7 @@ export const sanitizeProfile = (profile: StoredProfile): StoredProfile => {
     purchasedUpgradeIds: valid,
     unlockedLoreFragmentIds: unlocked,
     knownArchetypes,
+    assetKills,
     discoveries,
     // Lido ⊆ desbloqueado, SEMPRE: um documento bloqueado nao pode constar
     // como lido, senao ele nasceria sem bolinha quando abrir de verdade.
@@ -340,9 +367,16 @@ export const applySettlement = (
 ): StoredProfile => {
   // Defensivo contra registro velho: uma linha gravada antes destes campos
   // existirem chega sem eles, e a liquidacao nao pode falhar por isso.
-  const kills = facts.kills ?? {};
-  const killed = ASSET_ARCHETYPES.filter((a) => (kills[a] ?? 0) > 0);
-  const knownArchetypes = normalizeArchetypes([...(profile.knownArchetypes ?? []), ...killed]);
+  const runKills = normalizeAssetKills(facts.kills);
+  const assetKills = normalizeAssetKills(profile.assetKills);
+  for (const archetype of normalizeArchetypes(profile.knownArchetypes ?? [])) {
+    assetKills[archetype] = Math.max(assetKills[archetype] ?? 0, 1);
+  }
+  for (const archetype of ASSET_ARCHETYPES) {
+    const gained = runKills[archetype] ?? 0;
+    if (gained > 0) assetKills[archetype] = (assetKills[archetype] ?? 0) + gained;
+  }
+  const knownArchetypes = ASSET_ARCHETYPES.filter((a) => (assetKills[a] ?? 0) > 0);
   const discoveries =
     ((profile.discoveries ?? 0) | (facts.discoveries ?? 0)) & LORE_DISCOVERY_MASK;
   return {
@@ -353,10 +387,11 @@ export const applySettlement = (
       cores: profile.wallet.cores + reward.cores,
     },
     knownArchetypes,
+    assetKills,
     discoveries,
     unlockedLoreFragmentIds: expectedLoreIds(
       profile.purchasedUpgradeIds,
-      knownArchetypes,
+      assetKills,
       discoveries,
     ),
     statistics: {
@@ -424,11 +459,7 @@ export const decidePurchase = (
     // O desbloqueio nao e um passo separado que possa falhar sozinho: ele sai da
     // MESMA derivacao, no mesmo objeto que o store vai gravar. Comprar sem lore,
     // ou lore sem compra, nao tem por onde acontecer.
-    unlockedLoreFragmentIds: expectedLoreIds(
-      purchased,
-      profile.knownArchetypes,
-      profile.discoveries,
-    ),
+    unlockedLoreFragmentIds: expectedLoreIds(purchased, profile.assetKills, profile.discoveries),
     statistics: {
       ...profile.statistics,
       upgradesPurchased: profile.statistics.upgradesPurchased + 1,

@@ -87,7 +87,14 @@ export type LoreUnlockTrigger =
   | { kind: 'default' }
   | { kind: 'upgrade'; upgradeId: UpgradeId }
   | { kind: 'generation'; generation: ProspectorGeneration }
-  | { kind: 'asset'; archetype: EnemyArchetype }
+  /**
+   * `minKills` transforma um Ativo numa TRILHA: a ficha inicial abre no
+   * primeiro abate (default 1), e documentos posteriores abrem em marcos de
+   * abates ACUMULADOS pelo replay autoritativo. E o mecanismo do arco do
+   * Corcel Fungico — a burocracia so admite o que o cavalo e depois de o
+   * jogador derruba-lo vezes o bastante para a papelada nao dar mais conta.
+   */
+  | { kind: 'asset'; archetype: EnemyArchetype; minKills?: number }
   | { kind: 'discovery'; discoveryBit: number }
   | { kind: 'compound'; allOf?: LoreUnlockTrigger[]; anyOf?: LoreUnlockTrigger[] };
 
@@ -101,7 +108,8 @@ export type LoreUnlockTrigger =
 export type LoreFacts = {
   purchasedUpgradeIds: ReadonlySet<UpgradeId>;
   generations: ReadonlySet<ProspectorGeneration>;
-  knownArchetypes: ReadonlySet<EnemyArchetype>;
+  /** Abates ACUMULADOS por arquetipo, confirmados por re-simulacao. */
+  assetKills: Partial<Record<EnemyArchetype, number>>;
   /** Bitmask acumulada de DISCOVERY_*. */
   discoveries: number;
 };
@@ -115,7 +123,7 @@ export const triggerSatisfied = (trigger: LoreUnlockTrigger, facts: LoreFacts): 
     case 'generation':
       return facts.generations.has(trigger.generation);
     case 'asset':
-      return facts.knownArchetypes.has(trigger.archetype);
+      return (facts.assetKills[trigger.archetype] ?? 0) >= (trigger.minKills ?? 1);
     case 'discovery':
       return (facts.discoveries & trigger.discoveryBit) !== 0;
     case 'compound': {
@@ -140,7 +148,11 @@ export const isValidTrigger = (trigger: LoreUnlockTrigger): boolean => {
     case 'generation':
       return ['G-01', 'G-02', 'G-03', 'G-04'].includes(trigger.generation);
     case 'asset':
-      return ASSET_ARCHETYPES.includes(trigger.archetype);
+      return (
+        ASSET_ARCHETYPES.includes(trigger.archetype) &&
+        (trigger.minKills === undefined ||
+          (Number.isInteger(trigger.minKills) && trigger.minKills >= 1))
+      );
     case 'discovery':
       return LORE_DISCOVERY_BITS.includes(trigger.discoveryBit);
     case 'compound': {
@@ -267,6 +279,27 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
 
+/**
+ * Marcos de abate: a trilha do Corcel Fungico.
+ *
+ * A ficha inicial (AX-INC-024) nega os arreios; cada marco seguinte e a
+ * burocracia perdendo a capacidade de nao ver — o formulario sem campo
+ * "cavalo", o fogo que a quimica nao explica, a ordem de vocabulario — ate o
+ * documento sem departamento que nomeia o cavaleiro. Os numeros sao baixos de
+ * proposito: o EQ-02 e um miniboss, e a piada morre se o segredo exigir
+ * farm.
+ */
+export const ASSET_MILESTONE_LORE: readonly {
+  archetype: EnemyArchetype;
+  minKills: number;
+  fragmentId: LoreFragmentId;
+}[] = [
+  { archetype: 'fungal_horse', minKills: 3, fragmentId: 'AX-ENG-023' },
+  { archetype: 'fungal_horse', minKills: 6, fragmentId: 'AX-INC-034' },
+  { archetype: 'fungal_horse', minKills: 10, fragmentId: 'AX-EXE-043' },
+  { archetype: 'fungal_horse', minKills: 15, fragmentId: 'AX-UNK-046' },
+];
+
 /** Bits que o Codex reconhece. Usado para sanitizar a mascara persistida. */
 export const LORE_DISCOVERY_BITS: readonly number[] = DISCOVERY_LORE.map((d) => d.bit);
 
@@ -366,10 +399,16 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-PRC-018': ['AX-PRC-023'],
   'AX-PRC-020': ['AX-EXE-038'],
   'AX-INC-022': ['AX-INC-030'],
-  'AX-INC-024': ['AX-INC-033', 'AX-ENG-012'],
+  'AX-INC-024': ['AX-INC-033', 'AX-ENG-012', 'AX-ENG-023'],
   'AX-INC-026': ['AX-INC-025'],
   'AX-INC-028': ['AX-ENG-025'],
-  'AX-INC-033': ['AX-INC-024', 'AX-UNK-045'],
+  'AX-INC-033': ['AX-INC-024', 'AX-UNK-045', 'AX-UNK-046'],
+  // A trilha do Corcel: taxonomia perdida → fogo impossivel → vocabulario
+  // proibido → o cavaleiro. Cada elo e o proximo passo da investigacao.
+  'AX-ENG-023': ['AX-INC-024', 'AX-INC-034'],
+  'AX-INC-034': ['AX-ENG-023', 'AX-EXE-043'],
+  'AX-EXE-043': ['AX-INC-034', 'AX-UNK-046'],
+  'AX-UNK-046': ['AX-EXE-043', 'AX-INC-033', 'AX-UNK-049'],
   'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
@@ -410,6 +449,9 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-UNK-045': 3,
   'AX-UNK-050': 3,
   'AX-UNK-051': 3,
+  'AX-INC-034': 1,
+  'AX-EXE-043': 2,
+  'AX-UNK-046': 3,
 };
 
 /**
@@ -445,6 +487,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-020',
   'AX-ENG-021',
   'AX-ENG-022',
+  'AX-ENG-023',
   'AX-ENG-025',
   // Ato III — Custo
   'AX-PRC-014',
@@ -471,6 +514,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-030',
   'AX-INC-032',
   'AX-INC-033',
+  'AX-INC-034',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -482,11 +526,13 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-039',
   'AX-EXE-040',
   'AX-EXE-042',
+  'AX-EXE-043',
   // Ato VI — Memoria
   'AX-UNK-041',
   'AX-UNK-043',
   'AX-UNK-044',
   'AX-UNK-045',
+  'AX-UNK-046',
   'AX-UNK-047',
   'AX-UNK-049',
   'AX-UNK-050',
@@ -520,6 +566,9 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   define('AX-GEN-G04', { kind: 'generation', generation: 'G-04' }),
   ...ASSET_ARCHETYPES.map((archetype) =>
     define(ASSET_LORE[archetype], { kind: 'asset', archetype }),
+  ),
+  ...ASSET_MILESTONE_LORE.map(({ archetype, minKills, fragmentId }) =>
+    define(fragmentId, { kind: 'asset', archetype, minKills }),
   ),
   ...DISCOVERY_LORE.map(({ bit, fragmentId }) =>
     define(fragmentId, { kind: 'discovery', discoveryBit: bit }),

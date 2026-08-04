@@ -54,10 +54,17 @@ type LoreUnlockTrigger =
   | { kind: 'default' }
   | { kind: 'upgrade'; upgradeId: UpgradeId }
   | { kind: 'generation'; generation: ProspectorGeneration }
-  | { kind: 'asset'; archetype: EnemyArchetype }
+  | { kind: 'asset'; archetype: EnemyArchetype; minKills?: number }
   | { kind: 'discovery'; discoveryBit: number }
   | { kind: 'compound'; allOf?: LoreUnlockTrigger[]; anyOf?: LoreUnlockTrigger[] };
 ```
+
+`minKills` (default 1) transforma um Ativo numa **trilha de marcos**: o perfil
+autoritativo acumula `assetKills` por arquétipo a cada liquidação re-simulada,
+e documentos posteriores abrem em limiares de abates. `knownArchetypes` passa a
+ser projeção materializada de `assetKills > 0`; perfis da versão anterior
+(lista de conhecidos sem contagem) migram como "pelo menos 1", sem inventar
+progresso de marco.
 
 - `triggerSatisfied(trigger, facts)` é pura; `facts` (`LoreFacts`) derivam do
   perfil autoritativo: árvore comprada, gerações alcançadas, arquétipos
@@ -72,10 +79,11 @@ type LoreUnlockTrigger =
   desbloqueados; `compound` não enumera as partes (um `anyOf` não cumprido
   nomearia o que o jogador ainda não viu).
 
-## 4. Catálogo: 64 documentos
+## 4. Catálogo: 68 documentos
 
-35 existentes + 29 novos: 30 de protocolo, 4 marcos geracionais, 1 público,
-**15 de Ativo**, **13 de Descoberta**, 1 composto.
+35 existentes + 33 novos: 30 de protocolo, 4 marcos geracionais, 1 público,
+**19 de Ativo** (15 fichas + 4 marcos do Corcel), **13 de Descoberta**,
+1 composto.
 
 Trilha IA (já existente, PR #107): IA-01→AX-PUB-009, IA-02→AX-ENG-020,
 IA-03→AX-PRC-024, IA-04→AX-INC-032, IA-05→AX-EXE-040, IA-X→AX-UNK-052.
@@ -108,6 +116,24 @@ CARGO_LOST→AX-PRC-023, HORSE_FELLED→AX-INC-033, BISHOP_FELLED→AX-UNK-045,
 GUARDIAN_FELLED→AX-EXE-042, CORE_TAKEN→AX-UNK-050. O bit aposentado
 (`DISCOVERY_ORE_QUOTA_RETIRED`) fica fora do catálogo e é mascarado na
 persistência.
+
+### O arco do Corcel Fúngico (marcos de abate)
+
+O EQ-02 ganha uma trilha própria, de tom **cômico-burocrático** que escala até
+o trágico — a papelada tentando não ver um cavalo, até não conseguir mais:
+
+| Abates | Documento | Conteúdo |
+| --- | --- | --- |
+| 1 | AX-INC-024 | ficha de contato: três negações para "sela" |
+| 3 | AX-ENG-023 | consulta taxonômica: o formulário não tem campo "cavalo"; a crina é queratina e o espécime é micélio; "usar o campo OUTROS" |
+| 6 | AX-INC-034 | emissão térmica: fungo não produz fogo — "a rigor, deveria SER fogo, uma única vez"; as carcaças são o mesmo indivíduo, "não perguntaremos como" |
+| 10 | AX-EXE-043 | ordem de vocabulário: proibidos "cavalo", "voltou" e "sonho"; unidades captam, a cada queda, uma voz humana cantarolando — sempre a mesma |
+| 15 | AX-UNK-046 | **Sobre o cavaleiro**: a voz é do Major Tom, chefe de turno do bloco habitacional 7 da operação anterior, que perdeu esposa e filhos para a contaminação fúngica classificada como "perda aceitável" e desceu ao Veio sem equipamento de retorno. O micélio guardou o sonho de revolta dele; o Corcel é a forma que a revolta encontrou, e o fogo é o que ele achava da tirania. Não existe autorização de descarte para um sonho. (Referências a Space Oddity: "controle da superfície", "digam à minha esposa que eu a amo — ela já sabia", o circuito que cai, a pergunta final sem resposta.) |
+
+A necropsia (AX-INC-033, via `DISCOVERY_HORSE_FELLED`) costura o arreio ao
+cavaleiro: as fivelas são da linha de equipamento de pessoal do bloco 7.
+Limiares baixos de propósito — o EQ-02 é um miniboss e a piada morre se o
+segredo exigir farm.
 
 Regras de escrita mantidas (cabeçalho de `progression-lore-text.ts`): voz de
 relatório, sem vilão declarado, redação com moderação, nenhuma resposta

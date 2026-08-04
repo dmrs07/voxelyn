@@ -528,11 +528,11 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 64 documentos: 30 protocolos, 4 marcos, 15 Ativos, 13 Descobertas, 1 composto e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(64);
+  it('tem 68 documentos: 30 protocolos, 4 marcos, 19 de Ativo, 13 Descobertas, 1 composto e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(68);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(15);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(19);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(13);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(1);
     expect(DEFAULT_UNLOCKED_LORE).toHaveLength(1);
@@ -589,17 +589,14 @@ describe('codex', () => {
 
   it('os desbloqueios derivam dos fatos — um perfil inconsistente e reparavel', () => {
     const allBits = LORE_DISCOVERY_BITS.reduce((m, b) => m | b, 0);
-    const full = expectedLoreIds(
-      UPGRADES.map((u) => u.id),
-      [...ASSET_ARCHETYPES],
-      allBits,
-    );
+    const allKills = Object.fromEntries(ASSET_ARCHETYPES.map((a) => [a, 99]));
+    const full = expectedLoreIds(UPGRADES.map((u) => u.id), allKills, allBits);
     expect(full).toHaveLength(TOTAL_LORE_FRAGMENTS);
     expect(expectedLoreIds([])).toEqual([...DEFAULT_UNLOCKED_LORE]);
   });
 
   it('um Ativo conhecido abre a ficha dele, e nada alem', () => {
-    const ids = expectedLoreIds([], ['stalker'], 0);
+    const ids = expectedLoreIds([], { stalker: 1 }, 0);
     expect(ids).toContain(ASSET_LORE.stalker);
     expect(ids).not.toContain(ASSET_LORE.guardian);
     expect(ids).toHaveLength(DEFAULT_UNLOCKED_LORE.length + 1);
@@ -613,13 +610,13 @@ describe('codex', () => {
 
   // O compound do catalogo: Nucleo recuperado E Guardiao conhecido.
   it('o desbloqueio composto exige TODAS as partes', () => {
-    expect(expectedLoreIds([], ['guardian'], 0)).not.toContain('AX-UNK-051');
-    expect(expectedLoreIds([], [], DISCOVERY_CORE_TAKEN)).not.toContain('AX-UNK-051');
-    expect(expectedLoreIds([], ['guardian'], DISCOVERY_CORE_TAKEN)).toContain('AX-UNK-051');
+    expect(expectedLoreIds([], { guardian: 1 }, 0)).not.toContain('AX-UNK-051');
+    expect(expectedLoreIds([], {}, DISCOVERY_CORE_TAKEN)).not.toContain('AX-UNK-051');
+    expect(expectedLoreIds([], { guardian: 1 }, DISCOVERY_CORE_TAKEN)).toContain('AX-UNK-051');
   });
 
   it('triggerSatisfied avalia cada tipo de gatilho', () => {
-    const facts = factsFor(['CA-01', 'CA-02', 'CA-03'], ['miner'], DISCOVERY_MINER_FLED);
+    const facts = factsFor(['CA-01', 'CA-02', 'CA-03'], { miner: 1 }, DISCOVERY_MINER_FLED);
     expect(triggerSatisfied({ kind: 'default' }, facts)).toBe(true);
     expect(triggerSatisfied({ kind: 'upgrade', upgradeId: 'CA-01' }, facts)).toBe(true);
     expect(triggerSatisfied({ kind: 'upgrade', upgradeId: 'MV-01' }, facts)).toBe(false);
@@ -739,6 +736,60 @@ describe('liquidacao com fatos narrativos', () => {
     await settleWith(store, 'run-2', {}, DISCOVERY_CORE_TAKEN);
     profile = await store.getProfile('p1');
     expect(profile?.unlockedLoreFragmentIds).toContain('AX-UNK-051');
+  });
+
+  // O arco do Corcel Fungico: 1 (ficha) → 3 → 6 → 10 → 15 (o cavaleiro).
+  it('os marcos do Corcel abrem por abates ACUMULADOS entre runs', async () => {
+    const store = new MemoryProgressionStore();
+    await store.createProfile('p1', NOW);
+
+    await settleWith(store, 'run-1', { fungal_horse: 2 }, 0);
+    let profile = await store.getProfile('p1');
+    expect(profile?.unlockedLoreFragmentIds).toContain('AX-INC-024'); // ficha, 1 abate
+    expect(profile?.unlockedLoreFragmentIds).not.toContain('AX-ENG-023'); // taxonomia, 3
+
+    await settleWith(store, 'run-2', { fungal_horse: 1 }, 0);
+    profile = await store.getProfile('p1');
+    expect(profile?.assetKills.fungal_horse).toBe(3);
+    expect(profile?.unlockedLoreFragmentIds).toContain('AX-ENG-023');
+    expect(profile?.unlockedLoreFragmentIds).not.toContain('AX-INC-034'); // fogo, 6
+
+    await settleWith(store, 'run-3', { fungal_horse: 12 }, 0);
+    profile = await store.getProfile('p1');
+    expect(profile?.assetKills.fungal_horse).toBe(15);
+    expect(profile?.unlockedLoreFragmentIds).toContain('AX-INC-034');
+    expect(profile?.unlockedLoreFragmentIds).toContain('AX-EXE-043'); // vocabulario, 10
+    expect(profile?.unlockedLoreFragmentIds).toContain('AX-UNK-046'); // o cavaleiro, 15
+  });
+
+  it('o segredo do cavaleiro nao abre um abate antes da hora', () => {
+    expect(expectedLoreIds([], { fungal_horse: 14 }, 0)).not.toContain('AX-UNK-046');
+    expect(expectedLoreIds([], { fungal_horse: 15 }, 0)).toContain('AX-UNK-046');
+  });
+
+  // Perfil da versao anterior: tinha knownArchetypes e nenhuma contagem.
+  it('migracao: conhecido sem contagem vira "pelo menos 1", sem inventar marco', () => {
+    const legacy: StoredProfile = {
+      ...newProfile('p1', NOW),
+      knownArchetypes: ['fungal_horse'],
+      assetKills: {},
+    };
+    const fixed = sanitizeProfile(legacy);
+    expect(fixed.assetKills.fungal_horse).toBe(1);
+    expect(fixed.unlockedLoreFragmentIds).toContain('AX-INC-024');
+    expect(fixed.unlockedLoreFragmentIds).not.toContain('AX-ENG-023');
+  });
+
+  it('os marcos aparecem no indice "Ver docs" do Corcel quando abertos', async () => {
+    const store = new MemoryProgressionStore();
+    await store.createProfile('p1', NOW);
+    await settleWith(store, 'run-1', { fungal_horse: 15 }, 0);
+    const profile = await store.getProfile('p1');
+    if (!profile) throw new Error('perfil sumiu');
+    const index = loreIndexFor(profile);
+    expect(index.assets.fungal_horse).toEqual(
+      expect.arrayContaining(['AX-INC-024', 'AX-ENG-023', 'AX-INC-034', 'AX-EXE-043', 'AX-UNK-046']),
+    );
   });
 
   it('o indice "Ver docs" so lista Ativos conhecidos e Descobertas feitas', async () => {
