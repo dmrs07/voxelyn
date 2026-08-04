@@ -534,8 +534,10 @@ const renderMatrixTab = (
  */
 export const codexUnreadCount = (profile: PublicProgressionProfile | null): number => {
   if (!profile) return 0;
-  const read = new Set(profile.readLoreFragmentIds);
-  return profile.unlockedLoreFragmentIds.filter((id) => !read.has(id)).length;
+  // `?? []` em tudo: um perfil vindo de cache anterior a estes campos nao pode
+  // derrubar o painel — ele so nao tem bolinha ate o servidor responder.
+  const read = new Set(profile.readLoreFragmentIds ?? []);
+  return (profile.unlockedLoreFragmentIds ?? []).filter((id) => !read.has(id)).length;
 };
 
 /**
@@ -559,8 +561,8 @@ export const codexContextIds = (view: MatrixViewState): ReadonlySet<string> | nu
   if (!index) return new Set();
   const ids =
     context.kind === 'asset'
-      ? (index.assets[context.archetype] ?? [])
-      : (index.discoveries[String(context.bit)] ?? []);
+      ? (index.assets?.[context.archetype] ?? [])
+      : (index.discoveries?.[String(context.bit)] ?? []);
   return new Set(ids);
 };
 
@@ -622,10 +624,11 @@ const renderFragment = (
     `${fragment.documentCode} — ${fragment.title}${fragment.read ? '' : ` — ${t('codex.new')}`}`,
   );
   header.addEventListener('click', () => {
-    const opening = openDocId !== fragment.id;
-    openDocId = opening ? fragment.id : null;
-    // Abrir E o gatilho de leitura — exatamente um documento, exatamente este.
-    if (opening) handlers.onOpenDocument(fragment);
+    // So troca o documento aberto: quem marca leitura e o PROXIMO desenho, em
+    // `renderCodexTab` — a mesma porta usada pelo link de relacionado e pela
+    // navegacao "Ver docs". Uma porta so, para a bolinha nao depender do
+    // caminho que abriu o corpo.
+    openDocId = openDocId === fragment.id ? null : fragment.id;
     redraw();
   });
   card.appendChild(header);
@@ -704,6 +707,15 @@ const renderCodexTab = (
   const visible = contextIds
     ? codex.unlocked.filter((f) => contextIds.has(f.id))
     : codex.unlocked;
+
+  // A marcacao de leitura acompanha o documento ABERTO, nao o caminho ate ele:
+  // cabecalho, link de relacionado e "Ver docs" do Registro passam todos por
+  // `openDocId`, e um corpo visivel na tela nao pode continuar "novo". So
+  // conta se o documento esta de fato renderizado (dentro do filtro atual).
+  if (openDocId) {
+    const opened = visible.find((f) => f.id === openDocId);
+    if (opened && !opened.read) handlers.onOpenDocument(opened);
+  }
 
   body.appendChild(
     el('div', 'sub', t('codex.count', { unlocked: codex.unlocked.length, total: codex.total })),

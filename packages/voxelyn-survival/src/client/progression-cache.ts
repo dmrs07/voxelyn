@@ -41,6 +41,16 @@ export const readCachedProfile = (): CachedProgressionProfile | null => {
     // nao decidir se o dado e verdadeiro — essa pergunta nao se responde aqui.
     if (typeof cached.profile?.profileId !== 'string') return null;
     if (typeof cached.profile?.wallet?.ore !== 'number') return null;
+    // Um cache gravado ANTES dos campos narrativos chega sem eles, e "nao
+    // explodir ao desenhar" vale tambem para o Registro: preenche com o vazio
+    // (nenhum doc, nada lido) ate a resposta do servidor substituir tudo.
+    cached.profile.unlockedLoreFragmentIds ??= [];
+    cached.profile.readLoreFragmentIds ??= [];
+    cached.profile.knownAssetArchetypes ??= [];
+    cached.profile.discoveries ??= 0;
+    cached.profile.loreIndex ??= { assets: {}, discoveries: {} };
+    cached.profile.loreIndex.assets ??= {};
+    cached.profile.loreIndex.discoveries ??= {};
     return cached;
   } catch {
     return null;

@@ -1603,8 +1603,8 @@ const recordsCodexLink = (): RecordsCodexLink => ({
 const contextDocIds = (context: CodexContext): string[] => {
   const index = matrixView.profile?.loreIndex;
   if (!index) return [];
-  if (context.kind === 'asset') return index.assets[context.archetype] ?? [];
-  if (context.kind === 'discovery') return index.discoveries[String(context.bit)] ?? [];
+  if (context.kind === 'asset') return index.assets?.[context.archetype] ?? [];
+  if (context.kind === 'discovery') return index.discoveries?.[String(context.bit)] ?? [];
   return [];
 };
 
@@ -1872,9 +1872,13 @@ const markDocumentRead = (fragment: PublicLoreFragment): void => {
   if (fragment.read) return;
   fragment.read = true;
   const profile = matrixView.profile;
-  if (profile && !profile.readLoreFragmentIds.includes(fragment.id)) {
-    profile.readLoreFragmentIds.push(fragment.id);
-    writeCachedProfile(profile, Date.now());
+  if (profile) {
+    // O `??=` cobre o perfil hidratado de um cache anterior a este campo.
+    profile.readLoreFragmentIds ??= [];
+    if (!profile.readLoreFragmentIds.includes(fragment.id)) {
+      profile.readLoreFragmentIds.push(fragment.id);
+      writeCachedProfile(profile, Date.now());
+    }
   }
   void markLoreRead(progressionUrl(), fragment.id);
 };

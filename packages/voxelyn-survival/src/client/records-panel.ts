@@ -50,7 +50,7 @@ const hasUnreadDocs = (
   profile: PublicProgressionProfile,
   fragmentIds: readonly string[],
 ): boolean => {
-  const read = new Set(profile.readLoreFragmentIds);
+  const read = new Set(profile.readLoreFragmentIds ?? []);
   return fragmentIds.some((id) => !read.has(id));
 };
 
@@ -264,10 +264,13 @@ const renderAssetsTab = (
     const row = el('div', 'found');
     row.appendChild(el('span', undefined, t(file.code)));
     row.appendChild(el('span', 'tally', t('records.assets.tally', { count: entry.killed })));
+    // Encadeamento opcional ate o fim: um perfil hidratado de um cache antigo
+    // pode chegar sem `loreIndex`, e o Registro tem de continuar utilizavel —
+    // sem links, mas de pe.
     const docs = viewDocsLink(
       codex,
       { kind: 'asset', archetype },
-      codex?.profile?.loreIndex.assets[archetype],
+      codex?.profile?.loreIndex?.assets?.[archetype],
       t(BESTIARY_NAME_KEYS[archetype]),
       `viewdocs:${archetype}`,
     );
@@ -309,7 +312,7 @@ const renderDiscoveriesTab = (
       const docs = viewDocsLink(
         codex,
         { kind: 'discovery', bit: discovery.bit },
-        codex?.profile?.loreIndex.discoveries[String(discovery.bit)],
+        codex?.profile?.loreIndex?.discoveries?.[String(discovery.bit)],
         t(discovery.title),
         `viewdocs:discovery:${discovery.bit}`,
       );

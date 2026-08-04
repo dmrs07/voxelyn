@@ -376,3 +376,102 @@ describe('aba de Arquivos: abrir, ler, filtrar', () => {
     expect(document.activeElement?.getAttribute('data-ax-focus')).toBe('doc:AX-ENG-012');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regressoes da review do PR #108
+// ---------------------------------------------------------------------------
+
+describe('perfil de cache legado (sem os campos narrativos)', () => {
+  // Um cache gravado antes desta feature valida so profileId e wallet; o
+  // perfil chega sem loreIndex/readLoreFragmentIds e NADA pode explodir.
+  const legacyProfile = (): ReturnType<typeof profile> => {
+    const p = profile(10, 1) as unknown as Record<string, unknown>;
+    delete p.loreIndex;
+    delete p.readLoreFragmentIds;
+    delete p.knownAssetArchetypes;
+    delete p.discoveries;
+    return p as unknown as ReturnType<typeof profile>;
+  };
+
+  it('o Registro continua de pe: sem links, sem excecao', () => {
+    renderRecordsPanel(host, recordsWithStalker(), undefined, {
+      profile: legacyProfile(),
+      onViewDocs: () => {},
+    });
+    click(host.querySelector('[data-ax-focus="tab:assets"]'));
+    expect(host.querySelector('[data-ax-focus^="viewdocs:"]')).toBeNull();
+    click(host.querySelector('[data-ax-focus="tab:discoveries"]'));
+    expect(host.querySelector('[data-ax-focus^="viewdocs:"]')).toBeNull();
+  });
+
+  it('a Matriz desenha sem bolinha e sem excecao', () => {
+    renderMatrixPanel(host, matrixView({ profile: legacyProfile() }), handlers);
+    expect(host.querySelector('[data-ax-focus="tab:codex"] .ax-dot')).toBeNull();
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: legacyProfile(),
+        codex: codexOf([fragment('AX-PUB-001')]),
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: false,
+      }),
+      handlers,
+    );
+    // Filtro contextual sem indice = contexto vazio, nunca crash.
+    expect(host.textContent).toContain(t('codex.contextEmpty'));
+  });
+});
+
+describe('leitura acompanha o documento aberto, nao o caminho', () => {
+  it('a navegacao contextual (Ver docs) marca o documento focado', () => {
+    openCodexDocument('AX-ENG-012');
+    const opened: string[] = [];
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: profileWithDocs(),
+        codex: codexOf([fragment('AX-ENG-012')]),
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: true,
+      }),
+      { ...handlers, onOpenDocument: (f) => opened.push(f.id) },
+    );
+    expect(opened).toEqual(['AX-ENG-012']);
+  });
+
+  it('abrir por link de relacionado tambem marca', () => {
+    openCodexDocument('AX-PUB-001');
+    const opened: string[] = [];
+    const related = fragment('AX-PUB-001');
+    const target = fragment('AX-ENG-012', { relatedFragmentIds: [] });
+    related.relatedFragmentIds = ['AX-ENG-012'];
+    renderMatrixPanel(
+      host,
+      matrixView({ tab: 'codex', profile: profileWithDocs(), codex: codexOf([related, target]) }),
+      { ...handlers, onOpenDocument: (f) => opened.push(f.id) },
+    );
+    // AX-PUB-001 esta aberto; clicar no relacionado navega para AX-ENG-012.
+    click(host.querySelector('.codex-related-link'));
+    expect(opened).toContain('AX-ENG-012');
+  });
+
+  it('documento fora do filtro atual NAO e marcado: o corpo nao esta visivel', () => {
+    openCodexDocument('AX-PUB-001');
+    const opened: string[] = [];
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: profileWithDocs(),
+        codex: codexOf([fragment('AX-PUB-001'), fragment('AX-ENG-012')]),
+        // O filtro de stalker so mostra AX-ENG-012; o aberto (PUB-001) esta fora.
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: false,
+      }),
+      { ...handlers, onOpenDocument: (f) => opened.push(f.id) },
+    );
+    expect(opened).toEqual([]);
+  });
+});
