@@ -15,7 +15,15 @@ export {
   joinedPlayers,
   nearestStandingPlayer,
 } from './run.js';
-export { generateWorld, floodOpen, chunkOf, cellIdx, DEFAULT_PROFILE, type WorldgenProfile, type SurfaceBlobSpec } from './worldgen.js';
+export {
+  generateWorld,
+  floodOpen,
+  chunkOf,
+  cellIdx,
+  DEFAULT_PROFILE,
+  type WorldgenProfile,
+  type SurfaceBlobSpec,
+} from './worldgen.js';
 export {
   biomeMix,
   biomeProfile,
@@ -27,12 +35,7 @@ export {
   type SectorBiome,
   type StratumId,
 } from './strata.js';
-export {
-  descend,
-  isFinalSector,
-  populateSector,
-  sectorSeed,
-} from './sectors.js';
+export { descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
 export {
   TARGET_EXTRACTION_TICKS,
   TARGET_SECTOR_TICKS,
@@ -43,7 +46,15 @@ export {
   recordKill,
   starsFor,
 } from './stats.js';
-export { ARCHETYPES, SIGNATURE_OF_STRATUM, spawnEnemy, moveEntity, damageEntity, isSolidAt } from './entities.js';
+export {
+  ARCHETYPES,
+  SIGNATURE_OF_STRATUM,
+  spawnEnemy,
+  moveEntity,
+  damageEntity,
+  isSolidAt,
+} from './entities.js';
+export { hasLineOfSight } from './pathing.js';
 export {
   explodeAt,
   dischargeAt,
@@ -57,7 +68,14 @@ export {
   floodFrom,
   chargeCells,
 } from './cells.js';
-export { explosiveArmedByDistance, impactSolid, impactSurface, projectileClass, type ProjectileClass, type SolidImpact } from './materials.js';
+export {
+  explosiveArmedByDistance,
+  impactSolid,
+  impactSurface,
+  projectileClass,
+  type ProjectileClass,
+  type SolidImpact,
+} from './materials.js';
 
 export {
   ABILITY_DEFINITIONS,
@@ -69,7 +87,17 @@ export {
   resonanceOffers,
   type AbilityDefinition,
 } from './abilities.js';
-export { MODULE_DEFINITIONS, moduleDefinition, activeModule, moduleHasCapacity, liveProjectileModules, grantOrRechargeModule, consumeModuleCharge, expireTimedModules, rollModuleChoice } from './modules.js';
+export {
+  MODULE_DEFINITIONS,
+  moduleDefinition,
+  activeModule,
+  moduleHasCapacity,
+  liveProjectileModules,
+  grantOrRechargeModule,
+  consumeModuleCharge,
+  expireTimedModules,
+  rollModuleChoice,
+} from './modules.js';
 export {
   BASE_PURGE_CELLS,
   DEFAULT_PLAYER_TUNING,

@@ -114,6 +114,7 @@ const BRANCH_LABEL: Record<UpgradeBranch, { title: MessageKey; note: MessageKey 
   mobility: { title: 'matrix.branch.mobility', note: 'matrix.branch.mobility.note' },
   reactor: { title: 'matrix.branch.reactor', note: 'matrix.branch.reactor.note' },
   survey: { title: 'matrix.branch.survey', note: 'matrix.branch.survey.note' },
+  intelligence: { title: 'matrix.branch.intelligence', note: 'matrix.branch.intelligence.note' },
 };
 
 /**

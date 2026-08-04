@@ -1,4 +1,4 @@
-// O Codex corporativo: 29 documentos, e as regras de quem pode ler o que.
+// O Codex corporativo: 35 documentos, e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
 // POR QUE O TEXTO MORA NO SERVIDOR
@@ -126,6 +126,15 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-INC-025': ['AX-ENG-015', 'AX-UNK-049'],
   'AX-EXE-038': ['AX-PRC-021', 'AX-UNK-049'],
   'AX-UNK-049': ['AX-INC-025', 'AX-GEN-G04'],
+  // A trilha de IA costura em DUAS linhas que se cruzam no fim: a da venda
+  // (propaganda → treino com dados de mortos → engajamento preventivo) e a da
+  // maquina (classificador → disparo sem operador → o modelo se lembra).
+  'AX-PUB-009': ['AX-PRC-024'],
+  'AX-ENG-020': ['AX-INC-032'],
+  'AX-PRC-024': ['AX-PUB-009', 'AX-EXE-040'],
+  'AX-INC-032': ['AX-ENG-020', 'AX-UNK-052'],
+  'AX-EXE-040': ['AX-PRC-024', 'AX-UNK-052'],
+  'AX-UNK-052': ['AX-INC-032', 'AX-GEN-G04'],
   'AX-GEN-G01': ['AX-PUB-001'],
   'AX-GEN-G02': ['AX-GEN-G01'],
   'AX-GEN-G03': ['AX-GEN-G02', 'AX-EXE-033'],
@@ -136,13 +145,16 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-INC-027': 1,
   'AX-INC-029': 1,
   'AX-INC-025': 2,
+  'AX-INC-032': 1,
   'AX-EXE-033': 2,
   'AX-EXE-036': 1,
   'AX-EXE-038': 2,
+  'AX-EXE-040': 2,
   'AX-UNK-041': 3,
   'AX-UNK-044': 2,
   'AX-UNK-047': 3,
   'AX-UNK-049': 3,
+  'AX-UNK-052': 3,
   'AX-GEN-G04': 1,
 };
 
@@ -159,29 +171,35 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PUB-003',
   'AX-PUB-005',
   'AX-PUB-007',
+  'AX-PUB-009',
   'AX-GEN-G01',
   'AX-ENG-011',
   'AX-ENG-013',
   'AX-ENG-015',
   'AX-ENG-018',
+  'AX-ENG-020',
   'AX-PRC-014',
   'AX-PRC-016',
   'AX-PRC-019',
   'AX-PRC-021',
+  'AX-PRC-024',
   'AX-GEN-G02',
   'AX-INC-023',
   'AX-INC-025',
   'AX-INC-027',
   'AX-INC-029',
+  'AX-INC-032',
   'AX-GEN-G03',
   'AX-EXE-031',
   'AX-EXE-033',
   'AX-EXE-036',
   'AX-EXE-038',
+  'AX-EXE-040',
   'AX-UNK-041',
   'AX-UNK-044',
   'AX-UNK-047',
   'AX-UNK-049',
+  'AX-UNK-052',
   'AX-GEN-G04',
 ];
 

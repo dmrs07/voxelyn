@@ -38,7 +38,14 @@ describe('touch modality', () => {
     const input = new SurvivalInput({} as HTMLCanvasElement);
     input.layoutButtons(844, 390);
     input.state.usingTouch = true;
-    input.state.joystick = { active: true, originX: 80, originY: 300, dx: 0.8, dy: 0.2, pointerId: 1 };
+    input.state.joystick = {
+      active: true,
+      originX: 80,
+      originY: 300,
+      dx: 0.8,
+      dy: 0.2,
+      pointerId: 1,
+    };
     input.state.aimTouch.active = true;
     input.state.aimTouch.dx = 1;
     input.state.aimTouch.dy = 0.5;
@@ -57,7 +64,16 @@ describe('touch modality', () => {
     const input = new SurvivalInput({} as HTMLCanvasElement);
     input.state.usingTouch = false;
     input.state.joystick = { active: true, originX: 0, originY: 0, dx: 1, dy: 1, pointerId: 1 };
-    input.state.aimTouch = { active: true, originX: 0, originY: 0, dx: 1, dy: 1, pointerId: 2 };
+    input.state.aimTouch = {
+      active: true,
+      originX: 0,
+      originY: 0,
+      dx: 1,
+      dy: 1,
+      pointerId: 2,
+      sawDeflection: true,
+      downAtMs: 0,
+    };
 
     const command = input.snapshot({ x: 0, y: 0 });
 
@@ -105,13 +121,12 @@ describe('touch safe-area layout', () => {
       const aHit = a.r * TOUCH_BUTTON_HIT_SCALE;
       const distanceFromAim = Math.hypot(a.cx - aim.originX, a.cy - aim.originY);
       expect(distanceFromAim).toBeGreaterThanOrEqual(
-        AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE + aHit + 10
+        AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE + aHit + 10,
       );
 
       for (let j = i + 1; j < input.state.buttons.length; j++) {
         const b = input.state.buttons[j]!;
-        const gap = Math.hypot(a.cx - b.cx, a.cy - b.cy) -
-          (aHit + b.r * TOUCH_BUTTON_HIT_SCALE);
+        const gap = Math.hypot(a.cx - b.cx, a.cy - b.cy) - (aHit + b.r * TOUCH_BUTTON_HIT_SCALE);
         expect(gap).toBeGreaterThanOrEqual(10);
       }
     }
@@ -125,7 +140,8 @@ describe('touch safe-area layout', () => {
     const activationRadius = AIM_JOYSTICK_RADIUS * AIM_STICK_ACTIVATION_SCALE;
     for (const button of input.state.buttons) {
       const buttonHitRadius = button.r * TOUCH_BUTTON_HIT_SCALE;
-      const gap = Math.hypot(button.cx - aim.originX, button.cy - aim.originY) -
+      const gap =
+        Math.hypot(button.cx - aim.originX, button.cy - aim.originY) -
         (activationRadius + buttonHitRadius);
       expect(gap).toBeGreaterThanOrEqual(10);
     }

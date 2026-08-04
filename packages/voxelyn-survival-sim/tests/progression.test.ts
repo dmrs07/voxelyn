@@ -23,8 +23,8 @@ import { PLAYER_HP, PLAYER_SPEED } from '../src/constants';
 const ALL: UpgradeId[] = UPGRADES.map((u) => u.id);
 
 describe('catalogo da Matriz Geracional', () => {
-  it('tem quatro ramificacoes de seis tiers', () => {
-    expect(TOTAL_UPGRADES).toBe(24);
+  it('tem cinco ramificacoes de seis tiers', () => {
+    expect(TOTAL_UPGRADES).toBe(30);
     for (const branch of UPGRADE_BRANCHES) {
       const tiers = upgradesOfBranch(branch).map((u) => u.tier);
       expect(tiers).toEqual([1, 2, 3, 4, 5, 6]);
@@ -59,11 +59,11 @@ describe('catalogo da Matriz Geracional', () => {
     }
   });
 
-  it('a arvore inteira custa 3220 minerio e 40 nucleos', () => {
+  it('a arvore inteira custa 4025 minerio e 50 nucleos', () => {
     const ore = UPGRADES.reduce((sum, u) => sum + u.oreCost, 0);
     const cores = UPGRADES.reduce((sum, u) => sum + u.coreCost, 0);
-    expect(ore).toBe(3220);
-    expect(cores).toBe(40);
+    expect(ore).toBe(4025);
+    expect(cores).toBe(50);
   });
 
   it('cada protocolo aponta para um fragmento de lore proprio', () => {
@@ -98,6 +98,7 @@ describe('derivePlayerTuning', () => {
     derivePlayerTuning(ALL);
     expect(DEFAULT_PLAYER_TUNING.maxHp).toBe(PLAYER_HP);
     expect(DEFAULT_PLAYER_TUNING.navigation.objectiveBeacon).toBe(false);
+    expect(DEFAULT_PLAYER_TUNING.combat.autoAcquire).toBe(false);
   });
 
   it('cada protocolo altera SOMENTE os campos que promete', () => {
@@ -111,6 +112,14 @@ describe('derivePlayerTuning', () => {
             const a = base.navigation[navKey as keyof PlayerTuning['navigation']];
             const b = next.navigation[navKey as keyof PlayerTuning['navigation']];
             if (a !== b) keys.push(`navigation.${navKey}`);
+          }
+          continue;
+        }
+        if (key === 'combat') {
+          for (const cmbKey of Object.keys(base.combat)) {
+            const a = base.combat[cmbKey as keyof PlayerTuning['combat']];
+            const b = next.combat[cmbKey as keyof PlayerTuning['combat']];
+            if (a !== b) keys.push(`combat.${cmbKey}`);
           }
           continue;
         }
@@ -131,6 +140,12 @@ describe('derivePlayerTuning', () => {
       'navigation.oreScannerOcclusion',
       'navigation.oreScannerRange',
       'navigation.salvageTraceRange',
+    ]);
+    expect(changed(['IA-01'])).toEqual(['combat.threatBrackets']);
+    expect(changed(['IA-01', 'IA-02', 'IA-03'])).toEqual([
+      'combat.intentTelegraph',
+      'combat.interceptMarker',
+      'combat.threatBrackets',
     ]);
   });
 
@@ -199,6 +214,7 @@ describe('nenhum protocolo toca a economia', () => {
   it('a superficie do tuning e exatamente esta, e nenhum campo rende recurso', () => {
     expect(Object.keys(DEFAULT_PLAYER_TUNING).sort()).toEqual([
       'abilityCooldownScale',
+      'combat',
       'dodgeCooldownTicks',
       'dodgeIframeTicks',
       'environmentalDamageScale',
@@ -225,12 +241,31 @@ describe('nenhum protocolo toca a economia', () => {
       'routeMemory',
       'salvageTraceRange',
     ]);
+    expect(Object.keys(DEFAULT_PLAYER_TUNING.combat).sort()).toEqual([
+      'aimAssistConeDegrees',
+      'autoAcquire',
+      'intentTelegraph',
+      'interceptMarker',
+      'targetMemoryTicks',
+      'threatBrackets',
+    ]);
   });
 
   it('o conjunto de campos do tuning e fechado e conhecido', () => {
     expect(Object.keys(DEFAULT_PLAYER_TUNING).sort()).toEqual(
-      [...TUNING_HASH_ORDER.map(String), 'navigation'].sort(),
+      [...TUNING_HASH_ORDER.map(String), 'navigation', 'combat'].sort(),
     );
+  });
+
+  // A trilha de IA interpreta e executa; nunca soma dano. O unico bonus direto
+  // da arvore continua sendo o RX-X, e este teste e o que impede um IA futuro
+  // de virar a segunda trilha de dano que a proposta rejeitou.
+  it('a trilha de IA nao toca nenhum campo autoritativo', () => {
+    const intelligence = derivePlayerTuning(['IA-01', 'IA-02', 'IA-03', 'IA-04', 'IA-05', 'IA-X']);
+    for (const key of TUNING_HASH_ORDER) {
+      expect(intelligence[key], String(key)).toBe(DEFAULT_PLAYER_TUNING[key]);
+    }
+    expect(intelligence.playerDamageScale).toBe(1);
   });
 });
 
@@ -293,5 +328,14 @@ describe('hashPlayerTuning', () => {
     const survey = derivePlayerTuning(['SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-X']);
     expect(hashPlayerTuning(survey)).toBe(hashPlayerTuning(DEFAULT_PLAYER_TUNING));
     expect(survey.navigation.contaminationForecast).toBe(true);
+  });
+
+  // A IA resolve-se em COMANDO antes de a simulacao ver qualquer coisa: o que
+  // o servidor re-simula e um `aim` comum. Inclui-la no hash invalidaria todo
+  // ticket emitido antes do deploy sem proteger nada.
+  it('a trilha de IA NAO muda o hash', () => {
+    const intelligence = derivePlayerTuning(['IA-01', 'IA-02', 'IA-03', 'IA-04', 'IA-05', 'IA-X']);
+    expect(hashPlayerTuning(intelligence)).toBe(hashPlayerTuning(DEFAULT_PLAYER_TUNING));
+    expect(intelligence.combat.autoAcquire).toBe(true);
   });
 });

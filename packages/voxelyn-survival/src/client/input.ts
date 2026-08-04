@@ -17,7 +17,14 @@ export type TouchSafeArea = {
 };
 
 export type InputState = {
-  joystick: { active: boolean; originX: number; originY: number; dx: number; dy: number; pointerId: number };
+  joystick: {
+    active: boolean;
+    originX: number;
+    originY: number;
+    dx: number;
+    dy: number;
+    pointerId: number;
+  };
   aimTouch: {
     active: boolean;
     originX: number;
@@ -25,6 +32,17 @@ export type InputState = {
     dx: number;
     dy: number;
     pointerId: number;
+    /**
+     * O dedo chegou a SAIR da zona morta durante este toque?
+     *
+     * E o que separa "mirou e soltou" de "tocou e soltou": o primeiro e o
+     * gesto de sempre, o segundo e o comando neutro da Diretiva Autonoma
+     * (IA-X). Voltar para dentro da zona morta antes de soltar NAO vira tap —
+     * quem mirou e desistiu nao pediu tiro nenhum.
+     */
+    sawDeflection: boolean;
+    /** timestamp (`event.timeStamp`) do pointerdown deste toque. */
+    downAtMs: number;
   };
   buttons: TouchButton[];
   actionPressSeq: { dodge: number; ability: number };
@@ -49,6 +67,14 @@ export type InputState = {
 
 export const MOVE_JOYSTICK_RADIUS = 60;
 export const AIM_JOYSTICK_RADIUS = 60;
+/**
+ * Janela maxima de um TAP NEUTRO no manche de mira, em ms.
+ *
+ * Curta de proposito: um polegar que pousa e fica pensando nao e um comando, e
+ * um segurar comprido demais confundiria com o inicio de uma mira que o dedo
+ * ainda nao deslocou. 250 ms cobre o toque deliberado sem engolir hesitacao.
+ */
+export const AIM_TAP_MAX_MS = 250;
 export const TOUCH_BUTTON_HIT_SCALE = 1.08;
 const MOVE_STICK_ACTIVATION_SCALE = 1.55;
 export const AIM_STICK_ACTIVATION_SCALE = 1.45;
@@ -63,6 +89,16 @@ const AIM_DEAD_ZONE = 0.12;
  * um teste que reclame, e nao de um jogo que silencie o som quando o jogador se
  * chama Marta.
  */
+/**
+ * O toque no manche de mira foi um TAP NEUTRO?
+ *
+ * Pura e exportada para o teste cobrar as duas fronteiras: quem cruzou a zona
+ * morta em qualquer instante estava MIRANDO (e ja atirou pelo caminho normal),
+ * e quem segurou alem da janela nao tocou — pousou o dedo.
+ */
+export const isNeutralAimTap = (sawDeflection: boolean, heldMs: number): boolean =>
+  !sawDeflection && heldMs >= 0 && heldMs <= AIM_TAP_MAX_MS;
+
 export const isEditableTag = (tagName: string, contentEditable = false): boolean =>
   tagName === 'INPUT' ||
   tagName === 'TEXTAREA' ||
@@ -95,6 +131,7 @@ export const deactivateTouchControls = (state: InputState): void => {
   state.aimTouch.dx = 0;
   state.aimTouch.dy = 0;
   state.aimTouch.pointerId = -1;
+  state.aimTouch.sawDeflection = false;
   for (const button of state.buttons) button.pressed = false;
 };
 
@@ -177,10 +214,20 @@ export class SurvivalInput {
   private queuedAbility = false;
   private queuedChoice: 0 | 1 | null = null;
   private queuedRestart = false;
+  private queuedAimTap = false;
 
   readonly state: InputState = {
     joystick: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
-    aimTouch: { active: false, originX: 0, originY: 0, dx: 0, dy: 0, pointerId: -1 },
+    aimTouch: {
+      active: false,
+      originX: 0,
+      originY: 0,
+      dx: 0,
+      dy: 0,
+      pointerId: -1,
+      sawDeflection: false,
+      downAtMs: 0,
+    },
     buttons: [],
     actionPressSeq: { dodge: 0, ability: 0 },
     usingTouch: false,
@@ -211,7 +258,7 @@ export class SurvivalInput {
   layoutButtons(
     width: number,
     height: number,
-    safeArea: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>> = {}
+    safeArea: Partial<Pick<TouchSafeArea, 'left' | 'right' | 'bottom'>> = {},
   ): void {
     const r = Math.max(24, Math.min(34, height * 0.066));
     const horizontalInset = Math.max(18, width * 0.025);
@@ -267,7 +314,22 @@ export class SurvivalInput {
     if (k === 'r') this.queuedRestart = true;
     if (k === '1') this.queuedChoice = 0;
     if (k === '2') this.queuedChoice = 1;
-    if ([' ', 'w', 'a', 's', 'd', 'e', 'f', 'q', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+    if (
+      [
+        ' ',
+        'w',
+        'a',
+        's',
+        'd',
+        'e',
+        'f',
+        'q',
+        'arrowup',
+        'arrowdown',
+        'arrowleft',
+        'arrowright',
+      ].includes(k)
+    ) {
       e.preventDefault();
     }
   };
@@ -285,6 +347,9 @@ export class SurvivalInput {
 
   private selectMouseModality(): void {
     deactivateTouchControls(this.state);
+    // Um tap de touch pendente nao sobrevive a troca de modalidade: o mouse
+    // que assumiu nao pediu tiro nenhum.
+    this.queuedAimTap = false;
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
@@ -311,7 +376,8 @@ export class SurvivalInput {
 
       const move = this.state.joystick;
       const inMoveZone =
-        Math.hypot(x - move.originX, y - move.originY) <= MOVE_JOYSTICK_RADIUS * MOVE_STICK_ACTIVATION_SCALE;
+        Math.hypot(x - move.originX, y - move.originY) <=
+        MOVE_JOYSTICK_RADIUS * MOVE_STICK_ACTIVATION_SCALE;
       if (inMoveZone && !move.active) {
         move.active = true;
         move.pointerId = e.pointerId;
@@ -326,6 +392,8 @@ export class SurvivalInput {
       if (inAimZone && !aim.active) {
         aim.active = true;
         aim.pointerId = e.pointerId;
+        aim.sawDeflection = false;
+        aim.downAtMs = e.timeStamp;
         this.updateAimTouch(x, y);
       }
     } else {
@@ -370,6 +438,7 @@ export class SurvivalInput {
 
     aim.dx = (dx / len) * clamp;
     aim.dy = (dy / len) * clamp;
+    aim.sawDeflection = true;
   }
 
   private readonly onPointerMove = (e: PointerEvent): void => {
@@ -395,10 +464,19 @@ export class SurvivalInput {
         this.state.joystick.pointerId = -1;
       }
       if (e.pointerId === this.state.aimTouch.pointerId) {
-        this.state.aimTouch.active = false;
-        this.state.aimTouch.dx = 0;
-        this.state.aimTouch.dy = 0;
-        this.state.aimTouch.pointerId = -1;
+        const aim = this.state.aimTouch;
+        // Tocar e soltar sem cruzar a zona morta e o comando NEUTRO: fica
+        // travado ate o snapshot, como as outras acoes de uso unico. Quem
+        // decide se ele vira tiro e a camada de assistencia (IA-X) — sem ela,
+        // o tap e consumido e nada acontece.
+        if (aim.active && isNeutralAimTap(aim.sawDeflection, e.timeStamp - aim.downAtMs)) {
+          this.queuedAimTap = true;
+        }
+        aim.active = false;
+        aim.dx = 0;
+        aim.dy = 0;
+        aim.pointerId = -1;
+        aim.sawDeflection = false;
       }
       for (const b of this.state.buttons) b.pressed = false;
     } else {
@@ -459,6 +537,22 @@ export class SurvivalInput {
     this.queuedPurge = false;
     this.queuedAbility = false;
     this.queuedChoice = null;
+    this.queuedAimTap = false;
+  }
+
+  /**
+   * Consome o TAP NEUTRO do manche de mira, se houver um.
+   *
+   * Nao vira `fire` aqui de proposito: o input nao sabe se o perfil tem a
+   * Diretiva Autonoma (IA-X). O tap e uma INTENCAO, e quem a resolve — em alvo
+   * ou em nada — e a camada de assistencia, contra o tuning da run. Travado
+   * ate ser consumido, como a esquiva: um tap no meio do tick nao pode se
+   * perder.
+   */
+  consumeAimTap(): boolean {
+    if (!this.queuedAimTap) return false;
+    this.queuedAimTap = false;
+    return true;
   }
 
   hasTap(): boolean {

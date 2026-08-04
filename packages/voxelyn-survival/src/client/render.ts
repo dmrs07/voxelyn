@@ -72,6 +72,12 @@ import {
 } from './module-layout';
 import { drawGenerationMarks, marksFor } from './prospector-generation';
 import { RouteMemory, drawSurveyHud, drawSurveyWorld, hasSurvey } from './survey-overlay';
+import {
+  TargetMotion,
+  combatTuningOf,
+  drawCombatSenseWorld,
+  hasCombatSense,
+} from './combat-assist';
 import type { ProspectorGeneration } from '@voxelyn/survival-sim';
 import {
   describeCause,
@@ -913,6 +919,8 @@ export class SurvivalRenderer {
   private localGeneration: ProspectorGeneration = 'G-00';
   /** Salões já atravessados neste setor, para SV-04. */
   private readonly route = new RouteMemory();
+  /** Estimador de velocidade de alvo, para o marcador de antecipação (IA-03). */
+  private readonly targetMotion = new TargetMotion();
   /** Quando o setor corrente começou, no relógio de quadro (SV-01). */
   private sectorEnteredAtMs = 0;
   private lastSector = 0;
@@ -2159,6 +2167,22 @@ export class SurvivalRenderer {
                     nowMs,
                     sectorEnteredAtMs: this.sectorEnteredAtMs,
                     route: this.route,
+                    toScreen,
+                  });
+                }
+                // IA — Cognicao de Combate: leitura, pela mesma regra do
+                // Levantamento. So o Prospector local, e so o que a arvore
+                // comprada informa: brackets, telegrafo e antecipacao.
+                const combat = combatTuningOf(state.config.tuning);
+                if (hasCombatSense(combat)) {
+                  this.targetMotion.observe(state, nowMs);
+                  drawCombatSenseWorld({
+                    ctx,
+                    state,
+                    combat,
+                    z,
+                    nowMs,
+                    motion: this.targetMotion,
                     toScreen,
                   });
                 }
