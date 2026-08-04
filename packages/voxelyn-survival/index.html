@@ -106,6 +106,57 @@
           opacity: 1;
         }
       }
+      /* A varredura CRT do board 3p: reservada a ESPERA DE REDE e boot —
+         consultando a Aurix, homologando compra, carregando o livro. Nunca em
+         texto de leitura nem em estado parado; o resto da UI fica imóvel. */
+      @keyframes axScan {
+        0% {
+          transform: translateY(-100%);
+        }
+        100% {
+          transform: translateY(400%);
+        }
+      }
+      .ax-scan {
+        position: relative;
+        overflow: hidden;
+      }
+      .ax-scan::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 16px;
+        background: linear-gradient(180deg, transparent, rgba(79, 214, 201, 0.18), transparent);
+        animation: axScan 2s linear infinite;
+        pointer-events: none;
+      }
+      /* Espera de rede: moldura teal + varredura. NAO e a hachura de
+         indisponivel — carregar e o sistema trabalhando, nao uma porta
+         fechada, e as duas coisas nao podem vestir a mesma roupa. */
+      .ax-loading {
+        border: 1px solid var(--ax-teal-dim);
+        background: rgba(79, 214, 201, 0.05);
+        color: var(--ax-teal-bright);
+        padding: 7px 10px;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        line-height: 1.5;
+      }
+      /* Transacao em voo (board 07b): o botao espera a Aurix — pulso + rotulo,
+         com moldura teal solida no lugar da hachura de desabilitado. */
+      button.is-pending:disabled {
+        border: 1px solid var(--ax-teal-dim);
+        border-style: solid;
+        background: rgba(79, 214, 201, 0.05);
+        color: var(--ax-teal-bright);
+        animation: axPulse 1.4s infinite;
+      }
+      .ax-node.is-pending {
+        border-color: var(--ax-teal);
+        color: var(--ax-teal-bright);
+        background: rgba(79, 214, 201, 0.06);
+        animation: axPulse 1.4s infinite;
+      }
       /* O pulso e decoração de estado, nunca a informação: quem pediu menos
          movimento fica com o ponto aceso parado e não perde nada. */
       @media (prefers-reduced-motion: reduce) {
@@ -1309,6 +1360,18 @@
         border-color: var(--ax-teal-dim);
         background: rgba(10, 16, 15, 0.96);
         color: var(--ax-teal-mute);
+      }
+      /* Info = o sistema esta trabalhando (conectando, ressincronizando):
+         ganha o ponto pulsante dos chips vivos. Os outros tons ficam parados. */
+      #banner[data-tone='info']::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: var(--ax-teal);
+        box-shadow: 0 0 8px var(--ax-teal);
+        margin-right: 8px;
+        animation: axPulse 1.2s infinite;
       }
       #banner[data-tone='success'] {
         border-color: var(--ax-teal-dim);

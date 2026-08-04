@@ -316,7 +316,9 @@ const renderBranchRail = (
     const state = nodeState(upgrade, view.profile);
     const node = el(
       'button',
-      `ax-node${nodeStateClass(state)}${selectedId === upgrade.id ? ' is-selected' : ''}`,
+      `ax-node${nodeStateClass(state)}${selectedId === upgrade.id ? ' is-selected' : ''}${
+        view.pending === upgrade.id ? ' is-pending' : ''
+      }`,
     ) as HTMLButtonElement;
     node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
     node.appendChild(el('span', 'ax-node-glyph', nodeGlyph(state, view.pending === upgrade.id)));
@@ -388,8 +390,9 @@ const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   }
 
   if (state.kind === 'affordable') {
-    const button = el('button', 'primary') as HTMLButtonElement;
-    button.textContent = view.pending === upgrade.id ? t('matrix.buying') : t('matrix.confirm.yes');
+    const pending = view.pending === upgrade.id;
+    const button = el('button', pending ? 'primary is-pending' : 'primary') as HTMLButtonElement;
+    button.textContent = pending ? t('matrix.buying') : t('matrix.confirm.yes');
     // Desabilitado enquanto a requisicao corre. Nao e otimismo: o estado da
     // arvore so muda quando a resposta do servidor chega.
     button.disabled = !purchaseEnabled(view);
@@ -421,8 +424,13 @@ const renderMatrixTab = (
   const body = el('div', 'matrix-body');
   const notice = panelNotice(view);
   if (notice) {
-    const tone = notice.key === 'matrix.loading' ? 'sub' : 'sub warn';
-    body.appendChild(el('p', tone, t(notice.key, notice.params)));
+    // Carregando ganha a varredura CRT (board 3p: o unico lugar dela); falha
+    // continua texto parado em tom de aviso — espera e erro nao vestem igual.
+    body.appendChild(
+      notice.key === 'matrix.loading'
+        ? el('div', 'ax-scan ax-loading', t(notice.key, notice.params))
+        : el('p', 'sub warn', t(notice.key, notice.params)),
+    );
   }
   if (view.notice) body.appendChild(el('p', 'sub warn', t(view.notice.key, view.notice.params)));
 
@@ -464,11 +472,9 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
   if (!codex) {
     const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
     body.appendChild(
-      el(
-        'p',
-        pending.key === 'matrix.loading' ? 'sub' : 'sub warn',
-        t(pending.key, pending.params),
-      ),
+      pending.key === 'matrix.loading'
+        ? el('div', 'ax-scan ax-loading', t(pending.key, pending.params))
+        : el('p', 'sub warn', t(pending.key, pending.params)),
     );
     return body;
   }

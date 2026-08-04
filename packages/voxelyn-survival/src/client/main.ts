@@ -1729,6 +1729,7 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
     entries: [],
     emptyReason: t('rank.loading'),
     seed: forcedSeed ?? undefined,
+    loading: true,
   });
   openOverlay(rankOverlay);
   const url = serverInput.value.trim() || defaultServerUrl();
