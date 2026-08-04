@@ -389,9 +389,71 @@ export class VoxelParticles {
         case 'overheat':
           this.burst(ev.x, ev.y, 'ember', n(6), 1.0, 2.0, 380, 37);
           break;
+        case 'flame_cone':
+          // UMA emissao do sopro canalizado: brasas voando do bocal na direcao
+          // da mira, recortadas pelo alcance REAL que a simulacao mediu por
+          // raio (`reach`). O sal e o `seq` da emissao — deterministico nas
+          // duas maquinas do co-op, e diferente entre emissoes vizinhas.
+          this.flameJet(ev.x, ev.y, ev.dx, ev.dy, ev.arc, ev.reach, ev.seq, scale);
+          break;
+        case 'bolt_impact':
+          // Burst de plasma do bolt contra parede firme: a MESMA linguagem
+          // ciano do projetil (a paleta do atlas fx-impact-burst), em materia
+          // voxel — impacto aqui e particula, nao sprite, desde o redesign dos
+          // FX. O anel diz "acabou aqui"; os cacos escorrem da face atingida.
+          this.ring(ev.x, ev.y, 'spark', Math.max(5, n(9)), 0.55, 190, 23);
+          this.burst(ev.x + ev.nx * 0.08, ev.y + ev.ny * 0.08, 'crystalShard', n(4), 1.2, 1.6, 320, 29);
+          break;
         default:
           break;
       }
+    }
+  }
+
+  /**
+   * Jato do lanca-chamas: brasas balisticas nascendo no bocal e morrendo
+   * exatamente no alcance que a simulacao reportou para o raio mais proximo —
+   * a chama visual nunca atravessa a parede que bloqueou a de verdade.
+   */
+  private flameJet(
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    arc: number,
+    reach: readonly number[],
+    seq: number,
+    scale: number
+  ): void {
+    if (reach.length === 0) return;
+    const rnd = seeded(eventSeed(x, y, Math.imul(seq + 1, 2654435761)));
+    const count = Math.max(3, Math.round(7 * scale));
+    /** Offset do bocal: a chama nasce na arma, nao no centro do peito. */
+    const muzzle = 0.45;
+    for (let i = 0; i < count; i++) {
+      const t = rnd();
+      const angle = -arc + 2 * arc * t;
+      const lane = Math.min(reach.length - 1, Math.round(t * (reach.length - 1)));
+      const travel = reach[lane] - muzzle;
+      if (travel <= 0.1) continue;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const jx = dx * cos - dy * sin;
+      const jy = dx * sin + dy * cos;
+      const speed = 6.5 * (0.75 + rnd() * 0.35);
+      const life = (travel / speed) * 1000;
+      this.push({
+        x: x + jx * muzzle,
+        y: y + jy * muzzle,
+        z: 0.55 + rnd() * 0.15,
+        vx: jx * speed,
+        vy: jy * speed,
+        vz: 0,
+        life,
+        maxLife: life,
+        kind: 'ember',
+        ballistic: true,
+      });
     }
   }
 

@@ -405,6 +405,10 @@ export class GameRoom {
       aimX: round3(e.aim.x),
       aimY: round3(e.aim.y),
       overheated: this.state.tick < e.overheatedUntil,
+      dodgeCooldownUntil: e.dodgeCooldownUntil,
+      abilityCooldownUntil: e.abilityCooldownUntil,
+      channelingUntil: e.channelingUntil,
+      ability: e.ability,
     };
   }
 

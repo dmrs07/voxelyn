@@ -1148,26 +1148,22 @@ export class SurvivalRenderer {
           this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200);
           break;
         case 'flame_cone': {
-          // O cone e desenhado como uma frente que ANDA: brasas nascem ao longo
-          // do alcance, e nao um leque estatico. A chama que fica no chao ja e
-          // superficie de verdade e se desenha sozinha — isto e so o sopro.
-          this.addFlash(ev.x, ev.y, ev.range, 0.9, nowMs, 260);
-          const steps = Math.max(3, Math.round(ev.range * 2));
-          for (let i = 1; i <= steps; i++) {
-            const reach = (ev.range * i) / steps;
-            const spread = Math.tan(ev.arc) * reach;
-            for (const side of [-1, 0, 1]) {
-              this.particles.emitGas(
-                ev.x + ev.dx * reach - ev.dy * spread * side * 0.6,
-                ev.y + ev.dy * reach + ev.dx * spread * side * 0.6,
-                nowMs,
-                0.6,
-              );
-            }
-          }
-          this.shake = { power: 2, until: nowMs + 140 };
+          // Cada emissao do canal ja chega com o jato pronto: as brasas nascem
+          // em `particles.ingest` (que recebe estes mesmos eventos), voando do
+          // bocal e morrendo no alcance REAL que a sim mediu por raio. Aqui fica
+          // so o que particula nao fornece — a luz do fogo e um tremor curto,
+          // brando porque o canal repete isto varias vezes por segundo. A chama
+          // que fica no chao e superficie de verdade e se desenha sozinha.
+          const lit = ev.reach.length > 0 ? Math.max(...ev.reach) : ev.range;
+          this.addFlash(ev.x + ev.dx * lit * 0.4, ev.y + ev.dy * lit * 0.4, lit, 0.8, nowMs, 180);
+          this.shake = { power: 1, until: nowMs + 80 };
           break;
         }
+        case 'bolt_impact':
+          // O clarao curto do plasma na parede; o burst em si e materia voxel
+          // em VoxelParticles.ingest, como toda explosao desde o redesign.
+          this.addFlash(ev.x, ev.y, 1.2, 0.7, nowMs, 150);
+          break;
         case 'arc_chain': {
           // Um anel curto em cada salto. A LINHA entre eles nao e desenhada: o
           // arco ja resolveu tudo num tick, e um raio persistente prometeria uma

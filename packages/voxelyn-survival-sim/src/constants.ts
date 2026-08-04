@@ -451,14 +451,35 @@ export const FLAMETHROWER_RANGE = 4.2;
 /** Meia-abertura do cone, em radianos. ~35 graus para cada lado. */
 export const FLAMETHROWER_ARC = 0.61;
 export const FLAMETHROWER_DAMAGE = 9;
+/**
+ * Duracao da CANALIZACAO do sopro. O lanca-chamas nao e mais um cast de tick
+ * unico: ele expele chama continuamente por esta janela, seguindo a mira a cada
+ * emissao. Valor inicial de balanceamento — ajustar AQUI muda a habilidade
+ * inteira, incluindo o telegrafo (`action_start.endTick`) e o bloqueio do bolt.
+ */
+export const FLAMETHROWER_CHANNEL_TICKS = Math.round(2.5 * TICK_HZ); // 2,5 s
+/** Intervalo entre emissoes durante a canalizacao. */
+export const FLAMETHROWER_EMIT_INTERVAL_TICKS = 2;
+/**
+ * Dano POR EMISSAO em criaturas dentro do cone. O total sustentado (canal
+ * inteiro, alvo parado no fogo) fica em ~`CHANNEL/INTERVAL * este valor`, alem
+ * do fogo que persiste no chao — mais que os 9 do antigo golpe unico, mas pago
+ * em 2,5 s de compromisso com a postura.
+ */
+export const FLAMETHROWER_EMISSION_DAMAGE = 1.2;
+/**
+ * Passo, em tiles, da amostragem de linha-de-visada do sopro. Menor que meia
+ * celula para uma parede de um tile nunca ser saltada entre duas amostras.
+ */
+export const FLAMETHROWER_LOS_STEP = 0.25;
 
 /**
- * Missil rastreador: UM, com dano alto e curva lenta.
+ * Drone rastreador: UM quadricoptero kamikaze, com dano alto e curva lenta.
  *
  * Um so, e nao uma salva, porque a habilidade tem de ser uma DECISAO e nao um
- * segundo gatilho. A curva lenta e o que a impede de ser infalivel: contra um
- * alvo que se move de lado ele erra, e acertar exige atirar quando o inimigo esta
- * comprometido com uma direcao.
+ * segundo gatilho. A curva lenta e o que o impede de ser infalivel: contra um
+ * alvo que se move de lado ele erra, e acertar exige lancar quando o inimigo
+ * esta comprometido com uma direcao.
  */
 export const SEEKER_COOLDOWN_TICKS = 180; // 9 s
 export const SEEKER_DAMAGE = 46;

@@ -160,7 +160,16 @@ const layeredPlayerAnimation = (
   // memorias decidirem sozinhas em cima da fronteira — que e exatamente onde
   // W, A, S e D sozinhos caem. O bot andaria para cima com as pernas em `ul` e o
   // tronco em `ur`, torcido, e ficaria assim enquanto a tecla estivesse presa.
-  const upperFacing = action ? facing(FACING_UPPER, action.dx, action.dy) : lowerFacing;
+  // O sopro canalizado e a excecao da excecao: a acao dura segundos e o jogador
+  // REDIRECIONA o jato durante ela, entao o tronco segue a mira VIVA
+  // (`entity.facing`, que a sim atualiza por tick) e nao o rumo congelado no
+  // instante do cast — congela-lo faria o corpo apontar para um lado enquanto a
+  // chama sai pelo outro.
+  const upperFacing = action
+    ? action.action === 'breath'
+      ? facing(FACING_UPPER, entity.facing.x, entity.facing.y)
+      : facing(FACING_UPPER, action.dx, action.dy)
+    : lowerFacing;
 
   return {
     kind: 'layered-player',
@@ -227,6 +236,14 @@ export class EntityPresentation {
         // renderização, ancorado ao elapsed autoritativo daquele instante.
         const clock = this.actionVisualClocks.get(event.entity);
         if (clock && clock.startTick !== event.startTick) this.actionVisualClocks.delete(event.entity);
+      } else if (event.t === 'action_end') {
+        // A simulação cancelou a ação antes do endTick prometido (canal de
+        // sopro interrompido por stun, queda ou troca no poço). Sem apagar o
+        // intent aqui, um jogador reerguido RETOMAVA a pose de sopro — o
+        // player_down preserva intents de propósito, e o prazo original ainda
+        // não venceu.
+        this.actions.delete(event.entity);
+        this.actionVisualClocks.delete(event.entity);
       } else if (event.t === 'player_down') {
         this.downedAt.set(event.slot + 1, nowMs);
       } else if (event.t === 'revive') {

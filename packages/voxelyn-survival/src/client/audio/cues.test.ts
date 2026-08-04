@@ -149,6 +149,15 @@ describe('traducao de evento para som', () => {
     expect(cuesForEvent({ t: 'message', key: 'sim.partnerRevived' }, ctx)).toEqual([]);
   });
 
+  it('o bolt morrendo em parede firme deixou de ser mudo', () => {
+    // Era o UNICO fim de tiro sem som nem particula: rocha firme engolia o bolt
+    // em silencio. O burst de plasma soa no ponto de contato.
+    const [cue] = cuesForEvent({ t: 'bolt_impact', x: 3.5, y: 4, nx: -1, ny: 0 }, ctx);
+    expect(cue).toBeDefined();
+    expect(cue.x).toBe(3.5);
+    expect(cue.y).toBe(4);
+  });
+
   it('preserva a ordem de chegada ao traduzir uma leva', () => {
     const events: SemanticEvent[] = [
       { t: 'shot', x: 0, y: 0, dx: 1, dy: 0, owner: 1 },

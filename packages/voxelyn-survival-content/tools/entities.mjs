@@ -15,7 +15,7 @@ import {
 // `dirInfo`, as tabelas de fase e os ajudantes de elipse — sairam junto com o
 // ultimo personagem que ainda os usava. Continuavam importados e definidos sem
 // nenhuma chamada, e o lint do repositorio ja os acusava.
-import { fillDiamond, grid, outlineWith, set } from './lib.mjs';
+import { fillDiamond, fillEllipse, fillRect, grid, outlineWith, set, thickLine } from './lib.mjs';
 
 export const ANIM_ORDER = ['idle', 'walk', 'attack', 'special', 'hit', 'downed', 'revive', 'die', 'fly', 'burst'];
 const DIRS = ['dr', 'dl', 'ur', 'ul'];
@@ -1364,6 +1364,44 @@ const boltFrame = (_dir, _anim, f) => {
   outlineWith(g, 'dark');
   return g;
 };
+// DRONE RASTREADOR: quadricoptero kamikaze visto de cima, em isometrico
+// achatado (2:1). A leitura que importa: MAQUINA, nao inseto. Um mosquito e
+// pernas finas penduradas, tromba comprida e asas de membrana — aqui nada
+// disso existe: quatro DISCOS de rotor solidos girando em X, bracos curtos e
+// grossos, chassi facetado com a mesma key light de todo volume do jogo, e a
+// carga explosiva pulsando ambar no centro — o unico ponto quente do corpo,
+// dizendo "isto e uma bomba com helices" antes de qualquer legenda.
+const droneFrame = (_dir, _anim, f) => {
+  const g = grid(32, 32);
+  // Cubos de rotor em X, achatados pela projecao. Pares diagonais giram em
+  // sentidos opostos, como num quad de verdade.
+  const hubs = [
+    { x: 8, y: 11, ccw: false },
+    { x: 24, y: 11, ccw: true },
+    { x: 8, y: 21, ccw: true },
+    { x: 24, y: 21, ccw: false },
+  ];
+  // Bracos primeiro, por baixo de tudo: curtos e grossos, de chassi.
+  for (const hub of hubs) thickLine(g, 16, 16, hub.x, hub.y, 2, 'rockLight');
+  // Chassi central facetado, frio como o casco do projetil em jogo.
+  fillDiamond(g, 16, 16, 5, 3, 'rock');
+  fillDiamond(g, 15, 15, 3, 2, 'mist');
+  set(g, 14, 14, 'player');
+  // A CARGA: nucleo emissivo pulsando no centro. E o kamikaze do nome.
+  fillRect(g, 15, 15, 2, 2, f % 2 === 0 ? 'amber' : 'beam');
+  // Rotores por cima dos bracos: disco de borrao solido, cubo escuro no eixo e
+  // duas pas claras opostas que giram um oitavo de volta por quadro.
+  hubs.forEach((hub, i) => {
+    fillEllipse(g, hub.x, hub.y, 4, 2, 'mist');
+    const a = (hub.ccw ? -1 : 1) * ((f * Math.PI) / 4) + (i * Math.PI) / 8;
+    for (const opposite of [0, Math.PI]) {
+      set(g, hub.x + Math.cos(a + opposite) * 3, hub.y + Math.sin(a + opposite) * 1.5, 'player');
+    }
+    set(g, hub.x, hub.y, 'dark');
+  });
+  outlineWith(g, 'dark');
+  return g;
+};
 const impactFrame = (_dir, _anim, f) => {
   const g = grid(32, 32);
   // Anel principal expandindo, com meio passo de giro por quadro para os
@@ -1496,5 +1534,12 @@ export const ENTITY_SPECS = [
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
     animations: { burst: { frames: 5, fps: 14, loop: false } }, draw: impactFrame,
     prompt: 'fragmenting impact burst, elongated shards, fading inner ring',
+  },
+  {
+    id: 'fx-seeker-drone', version: 1, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
+    directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.32, h: 0.32 },
+    footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
+    animations: { fly: { frames: 4, fps: 12, loop: true } }, draw: droneFrame,
+    prompt: 'voxel-isometric kamikaze quadcopter drone, four solid rotor discs in X, faceted cold chassis, pulsing amber demolition core — machine, not insect',
   },
 ];

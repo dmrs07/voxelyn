@@ -287,4 +287,65 @@ describe('EntityPresentation', () => {
       expect(dirFromFacing(upper.facingX, upper.facingY)).toBe(dirFromFacing(lower.facingX, lower.facingY));
     }
   });
+
+  it('action_end apaga o intent: pose de sopro cancelada nao volta depois do revive', () => {
+    const presentation = new EntityPresentation();
+    // O cast prometeu 50 ticks de pose; a sim cancelou no tick 10.
+    presentation.ingest(
+      [
+        {
+          t: 'action_start',
+          entity: 1,
+          action: 'breath',
+          x: 0,
+          y: 0,
+          dx: 1,
+          dy: 0,
+          startTick: 0,
+          releaseTick: 0,
+          endTick: 50,
+        },
+        { t: 'action_end', entity: 1 },
+      ] as never,
+      1_000
+    );
+    const entity = { id: 1, archetype: 'prospector', facing: { x: 1, y: 0 }, stunnedUntil: 0 };
+    const presented = presentation.animationFor(
+      entity as never, { tick: 12 } as never, baseAnim('idle') as never, 1_500
+    );
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      expect(presented.anim.upper.animation).toBe('idle');
+      expect(presented.anim.recoil).toBe(0);
+    }
+  });
+
+  it('durante o sopro canalizado o tronco segue a mira VIVA, nao a do instante do cast', () => {
+    const presentation = new EntityPresentation();
+    // A acao `breath` durou dezenas de ticks e nasceu apontando para +x; no meio
+    // dela o jogador girou o stick para -y. `entity.facing` — que a simulacao
+    // atualiza por tick — e quem manda no tronco, senao o corpo aponta para um
+    // lado enquanto a chama sai pelo outro.
+    const entity = {
+      id: 1,
+      archetype: 'prospector',
+      facing: { x: 0, y: -1 },
+      stunnedUntil: 0,
+      action: {
+        kind: 'breath',
+        startedAt: 0,
+        releaseAt: 0,
+        endsAt: 50,
+        direction: { x: 1, y: 0 },
+      },
+    };
+    const presented = presentation.animationFor(
+      entity as never, { tick: 10 } as never, baseAnim('idle') as never, 1_000
+    );
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      expect(presented.anim.upper.facingX).toBe(0);
+      expect(presented.anim.upper.facingY).toBe(-1);
+    }
+  });
 });

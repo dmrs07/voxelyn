@@ -410,6 +410,73 @@ describe('particulas voxel', () => {
     p.ingest([{ t: 'message', key: 'sim.partnerRevived' }, { t: 'extracted', withCore: true }], 96, 1);
     expect(p.count).toBe(0);
   });
+
+  // O sopro canalizado emite um flame_cone por emissao; cada um vira um punhado
+  // de brasas balisticas voando do bocal, e o `seq` deterministico garante que
+  // as duas maquinas do co-op vejam o MESMO jato variando entre emissoes.
+  const cone = (seq: number, reach: number[] = [4.2, 4.2, 4.2, 4.2, 4.2]): SemanticEvent => ({
+    t: 'flame_cone',
+    x: 20,
+    y: 20,
+    dx: 1,
+    dy: 0,
+    range: 4.2,
+    arc: 0.61,
+    seq,
+    reach,
+  });
+
+  it('o sopro emite brasas na direcao da mira, deterministicas por emissao', () => {
+    const a = new VoxelParticles();
+    const b = new VoxelParticles();
+    a.ingest([cone(50)], 96, 1);
+    b.ingest([cone(50)], 96, 1);
+    expect(a.count).toBeGreaterThan(0);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+
+    const variado = new VoxelParticles();
+    variado.ingest([cone(48)], 96, 1);
+    expect(JSON.stringify(variado)).not.toBe(JSON.stringify(a));
+
+    // Toda brasa do jato avanca no rumo da mira (+x), nunca para tras.
+    const items = (a as unknown as { items: Array<{ vx: number; kind: string }> }).items;
+    expect(items.every((i) => i.kind === 'ember' && i.vx > 0)).toBe(true);
+  });
+
+  it('a chama visual do sopro morre no alcance que a simulacao reportou', () => {
+    // `reach` curto = parede perto: nenhuma brasa pode viajar alem dele.
+    const p = new VoxelParticles();
+    p.ingest([cone(50, [1.2, 1.2, 1.2, 1.2, 1.2])], 96, 1);
+    expect(p.count).toBeGreaterThan(0);
+    let best = 0;
+    for (let i = 0; i < 60; i++) {
+      p.step(16.7);
+      best = Math.max(best, alcance(p, 'ember', 20, 20));
+    }
+    expect(best).toBeLessThanOrEqual(1.2 + 1e-6);
+  });
+
+  it('o burst de plasma do bolt nasce do evento de impacto, na paleta do projetil', () => {
+    const p = new VoxelParticles();
+    p.ingest([{ t: 'bolt_impact', x: 30, y: 20, nx: -1, ny: 0 }], 96, 1);
+    expect(p.count).toBeGreaterThan(0);
+    const kinds = new Set(
+      (p as unknown as { items: Array<{ kind: string }> }).items.map((i) => i.kind)
+    );
+    // spark (branco/azul) + crystalShard (ciano): a familia do fx-impact-burst.
+    expect(kinds).toEqual(new Set(['spark', 'crystalShard']));
+  });
+
+  it('o burst de plasma e deterministico e menor que uma explosao', () => {
+    const a = new VoxelParticles();
+    const b = new VoxelParticles();
+    const estouro = new VoxelParticles();
+    a.ingest([{ t: 'bolt_impact', x: 30, y: 20, nx: -1, ny: 0 }], 96, 1);
+    b.ingest([{ t: 'bolt_impact', x: 30, y: 20, nx: -1, ny: 0 }], 96, 1);
+    estouro.ingest([explosion(30, 20)], 96, 1);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.count).toBeLessThan(estouro.count);
+  });
 });
 
 describe('passo do frame', () => {

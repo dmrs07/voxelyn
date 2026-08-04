@@ -581,9 +581,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'ability.flamethrower.hint':
     'The flame STAYS on the ground. Worth it in a corridor, a trap on your way back.',
   'ability.flamethrower.origin': 'The Vein heard you dry and burn what you found.',
-  'ability.seeker.label': 'SEEKER LANCE',
+  'ability.seeker.label': 'SEEKER DRONE',
   'ability.seeker.hint':
-    'Just one, curving slowly. Release once the target has committed to a direction.',
+    'One quad, one charge: it hunts and dives, banking slowly. Release once the target has committed to a direction.',
   'ability.seeker.origin': 'The Vein heard you detonate what you found.',
   'ability.arc.label': 'CONDUCTIVE ARC',
   'ability.arc.hint':

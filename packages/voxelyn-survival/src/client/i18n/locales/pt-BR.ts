@@ -584,9 +584,9 @@ export const PT_BR = {
   'ability.flamethrower.hint':
     'A chama FICA no chão. Vale em corredor, e vira armadilha no seu recuo.',
   'ability.flamethrower.origin': 'O Veio ouviu você secar e queimar o que encontrou.',
-  'ability.seeker.label': 'LANÇA RASTREADORA',
+  'ability.seeker.label': 'DRONE RASTREADOR',
   'ability.seeker.hint':
-    'Um só, com curva lenta. Solte quando o alvo já se comprometeu com uma direção.',
+    'Um quadricóptero, uma carga: ele caça e mergulha, com curva lenta. Solte quando o alvo já se comprometeu com uma direção.',
   'ability.seeker.origin': 'O Veio ouviu você detonar o que encontrou.',
   'ability.arc.label': 'ARCO CONDUTIVO',
   'ability.arc.hint': 'Salta entre corpos próximos e não precisa de poça. Grupo colado é o alvo.',

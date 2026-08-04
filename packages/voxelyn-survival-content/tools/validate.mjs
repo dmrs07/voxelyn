@@ -29,6 +29,7 @@ const CANONICAL = {
   'enemy-guardian': [112, 128],
   'fx-projectile-bolt': [32, 32],
   'fx-impact-burst': [32, 32],
+  'fx-seeker-drone': [32, 32],
 };
 const REQUIRED_LIVING = ['idle', 'walk', 'attack', 'hit', 'die'];
 /**

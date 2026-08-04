@@ -129,6 +129,27 @@ export type ViewerState = {
   aimX: number;
   aimY: number;
   overheated: boolean;
+  /**
+   * Timers privados de recarga, em TICK absoluto. Sem eles o radial do HUD
+   * online era um chute a partir do toque local, com duracao fixa — errada
+   * para toda habilidade que nao fosse o pulso, e ~4,5 s otimista para o
+   * sopro, cujo cooldown so e cobrado no FIM do canal.
+   */
+  dodgeCooldownUntil: number;
+  abilityCooldownUntil: number;
+  /**
+   * Ate quando o canal do sopro vive; 0 fora dele. Viaja junto porque durante
+   * o canal `abilityCooldownUntil` ainda nao foi cobrado — o HUD projeta
+   * `channelingUntil + cooldown`, o mesmo instante que a liquidacao vai gravar.
+   */
+  channelingUntil: number;
+  /**
+   * A habilidade EQUIPADA. Os timers acima nao bastam: a duracao do radial e a
+   * projecao do canal saem do cooldown DESTA habilidade, e o espelho local do
+   * co-op nascia com o `pulse` default e nunca sabia da troca no poco — o
+   * `ability_taken` so alimentava toast e clarao.
+   */
+  ability: AbilityId;
 };
 
 /**

@@ -16,7 +16,20 @@
 // simulacao nao tem. Sem o campo, o contador do HUD dependeria so dos eventos
 // `ore_gained`: quem reconecta ou pede resync veria a carga da run zerada e
 // tomaria a decisao de extrair com o numero errado na tela.
-export const PROTOCOL_VERSION = 12;
+// 13: o SOPRO CANALIZADO muda o formato do evento `flame_cone` — `seq` e
+// `reach` (alcances reais por raio, recortados por parede) viram campos
+// OBRIGATORIOS — e dois eventos novos entram no wire: `bolt_impact` (burst de
+// plasma do bolt em parede firme) e `action_end` (cancelamento de acao
+// telegrafada antes do `endTick` anunciado). E quebra nos dois sentidos: um
+// cliente novo contra servidor antigo espalha um `reach` ausente em
+// `Math.max(...)` e quebra no primeiro sopro; um cliente antigo contra
+// servidor novo ignora o recorte e desenha chama atravessando parede.
+// Ainda na 13 (mesma leva): `ViewerState` passa a transportar os timers
+// privados de recarga (`dodgeCooldownUntil`, `abilityCooldownUntil`,
+// `channelingUntil`) e a habilidade EQUIPADA (`ability`) — o radial do HUD
+// online deixa de chutar a duracao a partir do toque e segue o servidor, com
+// o cooldown da habilidade certa.
+export const PROTOCOL_VERSION = 13;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -83,7 +96,18 @@ export const PROTOCOL_VERSION = 12;
 //   senao o replay do leaderboard verificaria uma contra a outra.
 // Tambem aqui: DISCOVERY_CARGO_LOST (bit 13) entra na bitmask de descobertas,
 // que ja fazia parte do hash.
-export const SIMULATION_VERSION = 19;
+// 20: DIRECAO PERSISTENTE E SOPRO CANALIZADO. Tres mudancas autoritativas na
+// mesma leva:
+// - o comando neutro passa a ter mira ZERO (era a mira fantasma {1,0} que
+//   esmagava o facing): dois peers em versoes diferentes discordam do rumo de
+//   cada bolt disparado sem mira ativa;
+// - o lanca-chamas vira CANALIZACAO (`channelingUntil`): emissoes por tick
+//   seguindo a mira, bolt travado durante o canal e cooldown cobrado no FIM —
+//   um replay pre-canal re-simulado sob as regras novas produz outra run;
+// - a mira persistida e o canal entram no HASH autoritativo, e o bolt que
+//   morre em parede firme emite `bolt_impact`.
+// O terreno semeado NAO muda: a impressao digital da geracao continua a da 18.
+export const SIMULATION_VERSION = 20;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -102,7 +126,9 @@ export const SIMULATION_VERSION = 19;
 // Miner REFEITO. E exatamente o que este campo existe para marcar: sem o
 // bump, o conjunto de assets de antes e o de depois se declarariam a mesma
 // revisao de conteudo.
-export const CONTENT_VERSION = 16;
+// 17: o Seeker Lance vira SEEKER DRONE — atlas novo fx-seeker-drone
+// (quadricoptero kamikaze, fly 4f) entra no primeiro pacote de sprites.
+export const CONTENT_VERSION = 17;
 
 export type VersionTriple = {
   protocolVersion: number;

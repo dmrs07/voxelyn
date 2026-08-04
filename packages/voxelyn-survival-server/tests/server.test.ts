@@ -198,6 +198,33 @@ describe('servidor autoritativo de co-op', () => {
     expect(full.world.wellOffers).toHaveLength(room.state.wellOffers.length);
   });
 
+  it('o `you` transporta a habilidade equipada e os timers privados de recarga', () => {
+    // O radial do HUD deriva duracao e prontidao do cooldown da habilidade
+    // EQUIPADA. Sem esses campos no viewer, o espelho online ficava preso no
+    // `pulse` default (o `ability_taken` so alimenta toast e clarao) e o sopro
+    // projetava 120 ticks onde o servidor cobraria canal + 160.
+    const h = new Harness();
+    h.connect('A');
+    h.hello('A');
+    const room = h.server.roomForClient('A');
+    if (!room) throw new Error('sala nao criada');
+    h.drain('A');
+
+    room.state.playerExtra.ability = 'flamethrower';
+    room.state.playerExtra.dodgeCooldownUntil = room.state.tick + 10;
+    room.state.playerExtra.abilityCooldownUntil = room.state.tick + 100;
+    room.state.playerExtra.channelingUntil = room.state.tick + 40;
+    h.tick(2);
+
+    const snap = h.drain('A').filter((m) => m.t === 'snapshot').pop();
+    if (snap?.t !== 'snapshot' || !snap.you) throw new Error('snapshot sem viewer');
+    const extra = room.state.playerExtra;
+    expect(snap.you.ability).toBe('flamethrower');
+    expect(snap.you.dodgeCooldownUntil).toBe(extra.dodgeCooldownUntil);
+    expect(snap.you.abilityCooldownUntil).toBe(extra.abilityCooldownUntil);
+    expect(snap.you.channelingUntil).toBe(extra.channelingUntil);
+  });
+
   it('resync reconstroi o mundo de um cliente divergente', () => {
     const h = new Harness();
     h.connect('A');

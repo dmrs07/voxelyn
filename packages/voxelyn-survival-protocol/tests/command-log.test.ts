@@ -41,6 +41,16 @@ describe('quantizacao', () => {
     expect(q.aim.y).toBe(0);
   });
 
+  it('mira NEUTRA (zero) atravessa o codec como zero, nunca vira um rumo', () => {
+    // O comando neutro significa "sem mira nova, preserve a ultima": se a
+    // quantizacao ou o log inventassem um rumo aqui, o replay giraria o
+    // personagem para um lado que o jogador nunca apontou.
+    const neutral = quantizeCommand(cmd());
+    expect(neutral.aim).toEqual({ x: 0, y: 0 });
+    const decoded = decodeCommandLog(encodeCommandLog([neutral]), 10)!;
+    expect(decoded[0].aim).toEqual({ x: 0, y: 0 });
+  });
+
   /**
    * O defeito que custou a pontaria do jogo.
    *
