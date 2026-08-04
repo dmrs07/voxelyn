@@ -408,6 +408,7 @@ export class GameRoom {
       dodgeCooldownUntil: e.dodgeCooldownUntil,
       abilityCooldownUntil: e.abilityCooldownUntil,
       channelingUntil: e.channelingUntil,
+      ability: e.ability,
     };
   }
 

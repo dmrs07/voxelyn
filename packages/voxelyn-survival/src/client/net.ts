@@ -592,6 +592,10 @@ export class NetClient {
       ex.dodgeCooldownUntil = this.viewer.dodgeCooldownUntil;
       ex.abilityCooldownUntil = this.viewer.abilityCooldownUntil;
       ex.channelingUntil = this.viewer.channelingUntil;
+      // A habilidade equipada viaja junto: os timers sozinhos nao bastam — a
+      // duracao do radial e a projecao do canal saem do cooldown DELA, e o
+      // espelho local nascia com `pulse` e nunca sabia da troca no poco.
+      ex.ability = this.viewer.ability;
     }
 
     // o renderer segue state.player/playerExtra (camera, HUD, mira): aponta-os

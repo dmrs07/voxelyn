@@ -143,6 +143,13 @@ export type ViewerState = {
    * `channelingUntil + cooldown`, o mesmo instante que a liquidacao vai gravar.
    */
   channelingUntil: number;
+  /**
+   * A habilidade EQUIPADA. Os timers acima nao bastam: a duracao do radial e a
+   * projecao do canal saem do cooldown DESTA habilidade, e o espelho local do
+   * co-op nascia com o `pulse` default e nunca sabia da troca no poco — o
+   * `ability_taken` so alimentava toast e clarao.
+   */
+  ability: AbilityId;
 };
 
 /**
