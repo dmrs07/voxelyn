@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@voxelyn/survival-server": "workspace:*",
+    "happy-dom": "^20.11.1",
     "typescript": "^5.6.3",
     "vite": "^6.0.0",
     "vitest": "^3.2.4"
