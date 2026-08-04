@@ -42,6 +42,7 @@ import sulfurBomberManifest from '@voxelyn/survival-content/assets/atlases/enemy
 import undertakerManifest from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
+import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
@@ -67,6 +68,7 @@ import sulfurBomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulf
 import undertakerUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
+import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
@@ -231,6 +233,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: undertakerManifest as unknown as SpriteManifestEntry, url: undertakerUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
+  { manifest: droneManifest as unknown as SpriteManifestEntry, url: droneUrl },
 ];
 
 const ARCHETYPE_SPRITE: Record<string, string> = {

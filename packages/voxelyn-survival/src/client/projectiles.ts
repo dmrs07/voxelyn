@@ -32,9 +32,12 @@ export type ProjectileLike = {
 /** Estilhaco mineral do jogador contra cuspe acido do inimigo. */
 const PLAYER_RAMP: FaceRamp = ['#e8f1ff', '#59f2c2', '#2f6b4f'];
 const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
-/** Missil rastreador: casco frio na frente, chama quente atras. */
+/** Drone rastreador: chassi frio; a carga ambar pulsa no centro. */
 const SEEKER_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
-const SEEKER_FLAME_RAMP: FaceRamp = ['#ffd166', '#ff7a2f', '#6e4a33'];
+/** Borrao dos rotores: o cinza-azulado `mist` da paleta mestra. */
+const DRONE_ROTOR_BLUR = '#7b8ba3';
+/** Pulso da carga kamikaze: loot -> amber, os dois emissivos da paleta. */
+const DRONE_CORE_PULSE = ['#ffd166', '#ffa63f'] as const;
 /**
  * Pedra do bruiser: pedra CARREGADA, nao pedra camuflada.
  *
@@ -448,19 +451,75 @@ export class ProjectileView {
       return;
     }
     if (seeker) {
-      // Corpo unico com a chama atras, e a chama aponta para TRAS do voo: e ela
-      // que denuncia a curva enquanto o missil corrige o rumo, que e a unica
-      // coisa que o jogador precisa conseguir ler nele.
-      drawVoxel(ctx, sx, sy - lift, size, ramp);
-      if (track) {
-        drawVoxel(
-          ctx,
-          sx - track.dx * size * 0.9,
-          sy - lift - track.dy * size * 0.45,
-          size * 0.55,
-          SEEKER_FLAME_RAMP,
-        );
+      // DRONE QUAD KAMIKAZE: quatro discos de rotor em X sobre um chassi
+      // facetado, com a carga pulsando ambar no centro — o mesmo desenho do
+      // atlas fx-seeker-drone, em traço nativo como todo projetil. O que
+      // denuncia a curva do homing e o rastro de deslocamento de ar atras do
+      // voo; nao ha chama de foguete. E MAQUINA, nao inseto: discos solidos e
+      // bracos grossos, sem pernas finas penduradas nem nariz de agulha.
+      const bodyY = sy - lift;
+      const spin = (track?.travelled ?? 0) * 6;
+
+      // Deslocamento de ar: nevoa curta na direcao de onde ele veio.
+      if (track && (track.dx !== 0 || track.dy !== 0)) {
+        for (let i = 2; i >= 1; i--) {
+          const [px, py] = project(
+            projectile.x - track.dx * i * 0.3,
+            projectile.y - track.dy * i * 0.3,
+          );
+          ctx.globalAlpha = 0.32 - i * 0.11;
+          drawVoxel(ctx, px, py - lift, size * 0.4, ramp);
+        }
+        ctx.globalAlpha = 1;
       }
+
+      // Bracos em X, achatados pela projecao. Pares diagonais giram em
+      // sentidos opostos, como num quad de verdade.
+      const arms = [
+        { ux: -1, uy: -1, ccw: false },
+        { ux: 1, uy: -1, ccw: true },
+        { ux: -1, uy: 1, ccw: true },
+        { ux: 1, uy: 1, ccw: false },
+      ];
+      ctx.strokeStyle = ramp[2];
+      ctx.lineWidth = Math.max(1, zoom);
+      for (const arm of arms) {
+        ctx.beginPath();
+        ctx.moveTo(sx, bodyY);
+        ctx.lineTo(sx + arm.ux * size * 1.05, bodyY + arm.uy * size * 0.55);
+        ctx.stroke();
+      }
+
+      // Chassi e carga: o unico ponto quente do corpo e a bomba.
+      drawVoxel(ctx, sx, bodyY, size * 0.9, ramp);
+      const core = Math.max(1, Math.round(size * 0.3));
+      ctx.fillStyle = DRONE_CORE_PULSE[Math.floor(spin * 0.7) % 2];
+      ctx.fillRect(Math.round(sx - core / 2), Math.round(bodyY - core / 2), core, core);
+
+      // Rotores por cima de tudo: disco de borrao translucido, duas pas claras
+      // girando em fase com a DISTANCIA percorrida (param quando o mundo para)
+      // e o cubo escuro do eixo.
+      arms.forEach((arm, i) => {
+        const hx = sx + arm.ux * size * 1.05;
+        const hy = bodyY + arm.uy * size * 0.55;
+        const rx = size * 0.55;
+        const ry = size * 0.28;
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = DRONE_ROTOR_BLUR;
+        ctx.beginPath();
+        ctx.ellipse(hx, hy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        const angle = (arm.ccw ? -spin : spin) + i * 0.8;
+        ctx.fillStyle = ramp[0];
+        for (const opposite of [0, Math.PI]) {
+          const mx = hx + Math.cos(angle + opposite) * rx * 0.75;
+          const my = hy + Math.sin(angle + opposite) * ry * 0.75;
+          ctx.fillRect(Math.round(mx - 1), Math.round(my - 1), Math.max(2, zoom), Math.max(2, zoom));
+        }
+        ctx.fillStyle = ramp[2];
+        ctx.fillRect(Math.round(hx - 1), Math.round(hy - 1), Math.max(2, zoom), Math.max(2, zoom));
+      });
       return;
     }
     if (disc) {

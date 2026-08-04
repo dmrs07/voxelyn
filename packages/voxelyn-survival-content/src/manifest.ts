@@ -154,6 +154,7 @@ export const FIRST_PACK_IDS = [
   ...PLAYER_LAYER_SPRITE_IDS,
   'fx-projectile-bolt',
   'fx-impact-burst',
+  'fx-seeker-drone',
 ] as const;
 
 /**

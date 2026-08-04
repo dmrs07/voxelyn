@@ -474,12 +474,12 @@ export const FLAMETHROWER_EMISSION_DAMAGE = 1.2;
 export const FLAMETHROWER_LOS_STEP = 0.25;
 
 /**
- * Missil rastreador: UM, com dano alto e curva lenta.
+ * Drone rastreador: UM quadricoptero kamikaze, com dano alto e curva lenta.
  *
  * Um so, e nao uma salva, porque a habilidade tem de ser uma DECISAO e nao um
- * segundo gatilho. A curva lenta e o que a impede de ser infalivel: contra um
- * alvo que se move de lado ele erra, e acertar exige atirar quando o inimigo esta
- * comprometido com uma direcao.
+ * segundo gatilho. A curva lenta e o que o impede de ser infalivel: contra um
+ * alvo que se move de lado ele erra, e acertar exige lancar quando o inimigo
+ * esta comprometido com uma direcao.
  */
 export const SEEKER_COOLDOWN_TICKS = 180; // 9 s
 export const SEEKER_DAMAGE = 46;

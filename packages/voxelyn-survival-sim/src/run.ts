@@ -1562,11 +1562,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
         ? { source: 'player' as const, owner: proj.owner }
         : { source: 'environment' as const };
 
-    // O missil rastreador CORRIGE o rumo, e nao aponta.
+    // O drone rastreador CORRIGE o rumo, e nao aponta.
     //
     // A correcao e limitada por tick, e e isso que o impede de ser infalivel:
     // contra um alvo que muda de direcao ele erra a curva e passa reto. Acertar
-    // exige atirar quando o inimigo esta comprometido — que e a decisao que a
+    // exige lancar quando o inimigo esta comprometido — que e a decisao que a
     // habilidade cobra em troca do dano alto.
     if (proj.kind === 'seeker') {
       let target: Entity | null = null;
