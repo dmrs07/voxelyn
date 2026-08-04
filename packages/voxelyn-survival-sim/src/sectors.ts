@@ -398,6 +398,10 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
     }
     extra.heat = 0;
     extra.overheatedUntil = 0;
+    // O canal do sopro nao atravessa a descida: o mapa novo nao tem o fogo que
+    // o canal estava pintando, e um bolt travado sem chama na tela mentiria.
+    // A MIRA fica — trocar de setor nao gira o Prospector.
+    extra.channelingUntil = 0;
     extra.dodgeUntil = 0;
     extra.iframesUntil = 0;
     extra.pendingModuleChoice = null;
@@ -500,6 +504,8 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
     }
     extra.heat = 0;
     extra.overheatedUntil = 0;
+    // Mesma regra da descida: canal do sopro nao atravessa a transicao; mira sim.
+    extra.channelingUntil = 0;
     extra.dodgeUntil = 0;
     extra.iframesUntil = 0;
     extra.pendingModuleChoice = null;

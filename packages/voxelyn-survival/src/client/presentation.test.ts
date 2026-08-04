@@ -287,4 +287,33 @@ describe('EntityPresentation', () => {
       expect(dirFromFacing(upper.facingX, upper.facingY)).toBe(dirFromFacing(lower.facingX, lower.facingY));
     }
   });
+
+  it('durante o sopro canalizado o tronco segue a mira VIVA, nao a do instante do cast', () => {
+    const presentation = new EntityPresentation();
+    // A acao `breath` durou dezenas de ticks e nasceu apontando para +x; no meio
+    // dela o jogador girou o stick para -y. `entity.facing` — que a simulacao
+    // atualiza por tick — e quem manda no tronco, senao o corpo aponta para um
+    // lado enquanto a chama sai pelo outro.
+    const entity = {
+      id: 1,
+      archetype: 'prospector',
+      facing: { x: 0, y: -1 },
+      stunnedUntil: 0,
+      action: {
+        kind: 'breath',
+        startedAt: 0,
+        releaseAt: 0,
+        endsAt: 50,
+        direction: { x: 1, y: 0 },
+      },
+    };
+    const presented = presentation.animationFor(
+      entity as never, { tick: 10 } as never, baseAnim('idle') as never, 1_000
+    );
+    expect(typeof presented.anim).toBe('object');
+    if (typeof presented.anim === 'object') {
+      expect(presented.anim.upper.facingX).toBe(0);
+      expect(presented.anim.upper.facingY).toBe(-1);
+    }
+  });
 });

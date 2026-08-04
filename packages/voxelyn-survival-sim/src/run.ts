@@ -7,7 +7,10 @@ import {
   BRUISER_ROCK_STUN_TICKS,
   CONDUCTIVE_STUN_TICKS,
   FIRE_FUEL_TICKS,
-  FLAMETHROWER_DAMAGE,
+  FLAMETHROWER_CHANNEL_TICKS,
+  FLAMETHROWER_EMISSION_DAMAGE,
+  FLAMETHROWER_EMIT_INTERVAL_TICKS,
+  FLAMETHROWER_LOS_STEP,
   SEEKER_BLAST_RADIUS,
   SEEKER_SPEED,
   SEEKER_TURN_RATE,
@@ -129,9 +132,15 @@ import type {
   SurvivalState,
 } from './types.js';
 
+// `aim` NEUTRO e vetor ZERO, nunca um rumo valido. O default antigo `{1, 0}`
+// era uma mira fantasma apontando para leste: qualquer tick sem input de mira
+// (stick solto, menu aberto, slot sem comando) reenviava esse rumo e esmagava o
+// facing persistido do jogador — o famoso "sempre volta para DR". O guard de
+// `stepPlayer` ignora mira de comprimento ~0, entao o zero significa o que o
+// nome diz: "sem mira nova, preserve a ultima".
 export const emptyCommand = (): PlayerCommand => ({
   move: { x: 0, y: 0 },
-  aim: { x: 1, y: 0 },
+  aim: { x: 0, y: 0 },
   fire: false,
   ability: false,
   dodge: false,
@@ -198,6 +207,7 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   heat: 0,
   overheatedUntil: 0,
   nextShotAt: 0,
+  channelingUntil: 0,
   dodgeUntil: 0,
   iframesUntil: 0,
   dodgeCooldownUntil: 0,
@@ -229,6 +239,7 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.heat = 0;
   extra.overheatedUntil = 0;
   extra.nextShotAt = 0;
+  extra.channelingUntil = 0;
   extra.dodgeUntil = 0;
   extra.iframesUntil = 0;
   extra.dodgeCooldownUntil = 0;
@@ -542,17 +553,20 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
   const dx = extra.aim.x / aimLength;
   const dy = extra.aim.y / aimLength;
 
+  // O sopro e a unica habilidade com DURACAO: o telegrafo dela cobre o canal
+  // inteiro, senao o cliente encerraria a pose de canalizacao em 8 ticks.
+  const isBreath = extra.ability === 'flamethrower';
   events.push({
     t: 'action_start',
     entity: player.id,
-    action: 'pulse',
+    action: isBreath ? 'breath' : 'pulse',
     x: player.x,
     y: player.y,
     dx,
     dy,
     startTick: state.tick,
     releaseTick: state.tick,
-    endTick: state.tick + 8,
+    endTick: state.tick + (isBreath ? FLAMETHROWER_CHANNEL_TICKS : 8),
   });
 
   switch (extra.ability) {
@@ -596,64 +610,11 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
     }
 
     case 'flamethrower': {
-      const { range, arc } = ABILITY_SHAPE.flamethrower;
-      events.push({ t: 'flame_cone', x: player.x, y: player.y, dx, dy, range, arc });
-      // Dano e chao sao resolvidos pela MESMA varredura de celulas: o cone acende
-      // o que atravessa, e o fogo que fica e o que continua matando depois. Sem
-      // isso o lanca-chamas seria um tiro largo com nome bonito.
-      const w = state.config.width;
-      const h = state.config.height;
-      const r = Math.ceil(range);
-      const px = Math.floor(player.x);
-      const py = Math.floor(player.y);
-      for (let y = py - r; y <= py + r; y++) {
-        for (let x = px - r; x <= px + r; x++) {
-          if (x < 0 || y < 0 || x >= w || y >= h) continue;
-          const ox = x + 0.5 - player.x;
-          const oy = y + 0.5 - player.y;
-          const d = Math.hypot(ox, oy);
-          if (d > range || d < 0.001) continue;
-          // Dentro do cone: o produto escalar com a mira normalizada da o cosseno
-          // do angulo, e comparar cossenos evita um `atan2` por celula.
-          if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
-          const i = y * w + x;
-          if (state.solid[i] !== SOLID_NONE) continue;
-          // O cone NAO acende materia por conta propria: ele pede a `igniteCell`,
-          // como toda outra fonte de chama do jogo. Escrever `SURF_FIRE` direto
-          // pulava as regras do material — fungo umido saltava para fogo sem
-          // passar pelo estado fumegante que AVISA, gas recebia o combustivel
-          // longo em vez do flash curto, e nem o evento de ignicao nem a
-          // descoberta aconteciam. Uma habilidade nova que ensina outra fisica
-          // para o mesmo material e pior do que uma habilidade que falta.
-          const ignited = igniteCell(state, i, events);
-          if (!ignited) {
-            // Chao nu nao tem o que "pegar" fogo: ali a chama do sopro fica por
-            // conta propria. Qualquer superficie com materia pertence a
-            // `igniteCell`, inclusive quando ela decide nao acender nada.
-            const bare = state.surface[i];
-            if (bare === SURF_NONE || bare === SURF_SCORCHED || bare === SURF_FIRE) {
-              setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
-            }
-          }
-          // Credita pelo RESULTADO, e nao pela intencao: fungo que so comecou a
-          // secar ainda e o jogador provocando combustao, e celula que a
-          // `igniteCell` recusou nao e.
-          const after = state.surface[i];
-          if (after === SURF_FIRE || after === SURF_FUNGAL_HEATED) {
-            recordResonance(extra.resonance, 'fire');
-          }
-        }
-      }
-      for (const enemy of state.enemies) {
-        if (!enemy.alive) continue;
-        const ox = enemy.x - player.x;
-        const oy = enemy.y - player.y;
-        const d = Math.hypot(ox, oy);
-        if (d > range || d < 0.001) continue;
-        if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
-        damageEntity(state, enemy, playerDamage(tuning, FLAMETHROWER_DAMAGE), events);
-        recordResonance(extra.resonance, 'fire');
-      }
+      // O cast so ABRE o canal. Celulas, dano, evento visual e a leitura da
+      // mira acontecem POR EMISSAO em `emitFlameBreath`, no ritmo do intervalo:
+      // e isso que faz o sopro seguir o stick durante a habilidade em vez de
+      // congelar a mira do instante do cast.
+      extra.channelingUntil = state.tick + FLAMETHROWER_CHANNEL_TICKS;
       return;
     }
 
@@ -713,6 +674,166 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
       if (hops.length > 1) events.push({ t: 'arc_chain', hops });
       return;
     }
+  }
+};
+
+/**
+ * Quantos raios de amostra viajam no evento `flame_cone.reach`, de `-arc` a
+ * `+arc`. Cinco cobrem o cone visual sem inflar o snapshot; o GAMEPLAY nao usa
+ * isto — as celulas sao varridas uma a uma com linha-de-visada propria.
+ */
+const FLAME_REACH_LANES = 5;
+
+/**
+ * Ate onde o sopro alcanca na direcao (dx,dy) antes de bater em solido ou na
+ * borda do mapa, em tiles. Amostra o raio em passos menores que meia celula
+ * (`FLAMETHROWER_LOS_STEP`), entao uma parede de um tile nunca e saltada.
+ */
+const flameReach = (
+  state: SurvivalState,
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  range: number,
+): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const steps = Math.ceil(range / FLAMETHROWER_LOS_STEP);
+  for (let s = 1; s <= steps; s++) {
+    const d = (range * s) / steps;
+    const cx = Math.floor(x + dx * d);
+    const cy = Math.floor(y + dy * d);
+    if (cx < 0 || cy < 0 || cx >= w || cy >= h) return (range * (s - 1)) / steps;
+    if (state.solid[cy * w + cx] !== SOLID_NONE) return (range * (s - 1)) / steps;
+  }
+  return range;
+};
+
+/**
+ * A chama consegue viajar de (x0,y0) ate (x1,y1) sem atravessar solido?
+ *
+ * Para no instante em que a amostra entra na CELULA alvo: o que se pergunta e
+ * se o caminho ate ela esta livre, nao se ela propria e solida — quem chama ja
+ * decidiu isso. Ambos os extremos precisam estar dentro do mapa.
+ */
+const flameCanReach = (
+  state: SurvivalState,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): boolean => {
+  const distance = Math.hypot(x1 - x0, y1 - y0);
+  if (distance < 0.001) return true;
+  const w = state.config.width;
+  const targetCx = Math.floor(x1);
+  const targetCy = Math.floor(y1);
+  const steps = Math.ceil(distance / FLAMETHROWER_LOS_STEP);
+  for (let s = 1; s < steps; s++) {
+    const t = s / steps;
+    const cx = Math.floor(x0 + (x1 - x0) * t);
+    const cy = Math.floor(y0 + (y1 - y0) * t);
+    if (cx === targetCx && cy === targetCy) break;
+    if (state.solid[cy * w + cx] !== SOLID_NONE) return false;
+  }
+  return true;
+};
+
+/**
+ * UMA emissao do sopro canalizado: le a mira ATUAL, acende as celulas do cone
+ * que a chama de fato alcanca e fere criaturas na mesma area.
+ *
+ * A direcao vem da MIRA persistida (`extra.aim`), nunca do movimento: stick de
+ * mira neutro reusa a ultima mira valida — o comando neutro tem mira zero e nao
+ * toca em `extra.aim` —, e andar para um lado soprando para o outro funciona
+ * por construcao. Tudo aqui e deterministico: sem RNG, so tick e geometria.
+ */
+const emitFlameBreath = (state: SurvivalState, slot: number, events: SemanticEvent[]): void => {
+  const tuning = state.config.tuning;
+  const player = state.players[slot];
+  const extra = state.playerExtras[slot];
+  const aimLength = Math.hypot(extra.aim.x, extra.aim.y) || 1;
+  const dx = extra.aim.x / aimLength;
+  const dy = extra.aim.y / aimLength;
+  const { range, arc } = ABILITY_SHAPE.flamethrower;
+
+  // Alcances reais por raio de amostra, para o cliente desenhar o jato ate onde
+  // a simulacao chegou. Centesimos bastam para apresentacao e mantem o evento
+  // curto no wire.
+  const reach: number[] = [];
+  for (let lane = 0; lane < FLAME_REACH_LANES; lane++) {
+    const angle = -arc + (2 * arc * lane) / (FLAME_REACH_LANES - 1);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const lx = dx * cos - dy * sin;
+    const ly = dx * sin + dy * cos;
+    reach.push(Math.round(flameReach(state, player.x, player.y, lx, ly, range) * 100) / 100);
+  }
+  const seq = extra.channelingUntil - state.tick;
+  events.push({ t: 'flame_cone', x: player.x, y: player.y, dx, dy, range, arc, seq, reach });
+
+  // Dano e chao sao resolvidos pela MESMA varredura de celulas: o cone acende
+  // o que atravessa, e o fogo que fica e o que continua matando depois. Sem
+  // isso o lanca-chamas seria um tiro largo com nome bonito.
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = Math.ceil(range);
+  const px = Math.floor(player.x);
+  const py = Math.floor(player.y);
+  for (let y = py - r; y <= py + r; y++) {
+    for (let x = px - r; x <= px + r; x++) {
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const ox = x + 0.5 - player.x;
+      const oy = y + 0.5 - player.y;
+      const d = Math.hypot(ox, oy);
+      if (d > range || d < 0.001) continue;
+      // Dentro do cone: o produto escalar com a mira normalizada da o cosseno
+      // do angulo, e comparar cossenos evita um `atan2` por celula.
+      if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // Parede BLOQUEIA o sopro: celula dentro do cone mas atras de solido nao
+      // recebe chama. O cone antigo pintava fogo do outro lado da parede.
+      if (!flameCanReach(state, player.x, player.y, x + 0.5, y + 0.5)) continue;
+      const before = state.surface[i];
+      // O cone NAO acende materia por conta propria: ele pede a `igniteCell`,
+      // como toda outra fonte de chama do jogo. Escrever `SURF_FIRE` direto
+      // pulava as regras do material — fungo umido saltava para fogo sem
+      // passar pelo estado fumegante que AVISA, gas recebia o combustivel
+      // longo em vez do flash curto, e nem o evento de ignicao nem a
+      // descoberta aconteciam. Uma habilidade nova que ensina outra fisica
+      // para o mesmo material e pior do que uma habilidade que falta.
+      const ignited = igniteCell(state, i, events);
+      if (!ignited) {
+        // Chao nu nao tem o que "pegar" fogo: ali a chama do sopro fica por
+        // conta propria. Qualquer superficie com materia pertence a
+        // `igniteCell`, inclusive quando ela decide nao acender nada.
+        const bare = state.surface[i];
+        if (bare === SURF_NONE || bare === SURF_SCORCHED || bare === SURF_FIRE) {
+          setSurface(state, i, SURF_FIRE, FIRE_FUEL_TICKS);
+        }
+      }
+      // Credita pelo RESULTADO, e so quando ele MUDOU nesta emissao: o canal
+      // repassa as mesmas celulas dezenas de vezes, e creditar chama ja acesa a
+      // cada emissao inflaria a ressonancia de fogo por repeticao, nao por
+      // provocacao.
+      const after = state.surface[i];
+      if (after !== before && (after === SURF_FIRE || after === SURF_FUNGAL_HEATED)) {
+        recordResonance(extra.resonance, 'fire');
+      }
+    }
+  }
+  for (const enemy of state.enemies) {
+    if (!enemy.alive) continue;
+    const ox = enemy.x - player.x;
+    const oy = enemy.y - player.y;
+    const d = Math.hypot(ox, oy);
+    if (d > range || d < 0.001) continue;
+    if ((ox / d) * dx + (oy / d) * dy < Math.cos(arc)) continue;
+    if (!flameCanReach(state, player.x, player.y, enemy.x, enemy.y)) continue;
+    damageEntity(state, enemy, playerDamage(tuning, FLAMETHROWER_EMISSION_DAMAGE), events);
+    recordResonance(extra.resonance, 'fire');
   }
 };
 
@@ -785,15 +906,23 @@ const stepPlayer = (
   const dt = 1 / TICK_HZ;
   const coop = state.config.playerCount > 1;
 
-  // slots nao reivindicados, abatidos e mortos nao agem
-  if (!extra.joined || !player.alive || extra.downed) return;
+  // slots nao reivindicados, abatidos e mortos nao agem. Cair ou morrer CANCELA
+  // o canal do sopro: um canal "pausado" voltaria a cuspir fogo no revive e
+  // manteria o bolt travado sem nada na tela explicando por que.
+  if (!extra.joined || !player.alive || extra.downed) {
+    extra.channelingUntil = Math.min(extra.channelingUntil, state.tick);
+    return;
+  }
 
   // Pedra do Bruiser interrompe movimento e todas as acoes. Timers do mundo e
-  // dos modulos continuam correndo; o stun nao pausa a simulacao.
+  // dos modulos continuam correndo; o stun nao pausa a simulacao. O canal do
+  // sopro e interrompido DE VEZ, como a esquiva — e com ele cai o bloqueio de
+  // disparo, que so existe enquanto ha chama saindo.
   if (player.stunnedUntil > state.tick) {
     player.vx = 0;
     player.vy = 0;
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
+    extra.channelingUntil = Math.min(extra.channelingUntil, state.tick);
     extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
     return;
   }
@@ -908,9 +1037,37 @@ const stepPlayer = (
     extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1),
   );
 
-  // disparo principal
+  // habilidade. Vem ANTES do gatilho: um cast de sopro no mesmo tick do disparo
+  // ja trava o bolt daquele tick, em vez de deixar escapar um ultimo tiro.
+  if (
+    cmd.ability &&
+    state.tick >= extra.abilityCooldownUntil &&
+    state.tick >= extra.channelingUntil
+  ) {
+    // Arredondado para TICK inteiro: cooldown fracionario faria a comparacao
+    // `state.tick >= until` depender de acumulo de float ao longo da run.
+    extra.abilityCooldownUntil =
+      state.tick +
+      Math.round(abilityDefinition(extra.ability).cooldownTicks * tuning.abilityCooldownScale);
+    castAbility(state, slot, events);
+  }
+
+  // Canalizacao do sopro: a simulacao emite chama por conta propria, no ritmo
+  // do intervalo, sempre lendo a mira ATUAL — o jogador redireciona o jato
+  // durante a habilidade. A fase vem de `channelingUntil`, entao a primeira
+  // emissao sai no proprio tick do cast.
+  const channeling = state.tick < extra.channelingUntil;
+  if (channeling && (extra.channelingUntil - state.tick) % FLAMETHROWER_EMIT_INTERVAL_TICKS === 0) {
+    emitFlameBreath(state, slot, events);
+  }
+
+  // disparo principal. `!channeling` e o bloqueio AUTORITATIVO do bolt durante
+  // o sopro: a tentativa barrada nao arma modulo, nao gera calor e nao toca em
+  // `nextShotAt` — nada e consumido, e nada fica enfileirado para depois. O
+  // bloqueio morre junto com o canal, inclusive quando ele e cancelado.
   if (
     cmd.fire &&
+    !channeling &&
     state.tick >= extra.nextShotAt &&
     state.tick >= extra.overheatedUntil &&
     state.projectiles.length < MAX_PROJECTILES
@@ -1005,16 +1162,6 @@ const stepPlayer = (
     }
   }
 
-  // habilidade: pulso cinetico (empurra criaturas, apaga fogo, dissipa gas)
-  if (cmd.ability && state.tick >= extra.abilityCooldownUntil) {
-    // Arredondado para TICK inteiro: cooldown fracionario faria a comparacao
-    // `state.tick >= until` depender de acumulo de float ao longo da run.
-    extra.abilityCooldownUntil =
-      state.tick +
-      Math.round(abilityDefinition(extra.ability).cooldownTicks * tuning.abilityCooldownScale);
-    castAbility(state, slot, events);
-  }
-
   // Celula de Purga: cartucho interno de cura e descontaminacao.
   if (cmd.purge && extra.purgeCells > 0) {
     extra.purgeCells--;
@@ -1067,6 +1214,10 @@ const stepPlayer = (
       // O cooldown zera na troca. Herdar o cooldown da habilidade antiga puniria
       // justamente quem acabou de usar a que tinha para chegar vivo ate aqui.
       extra.abilityCooldownUntil = state.tick;
+      // Um canal de sopro em andamento morre junto com a habilidade antiga:
+      // continuar cuspindo chama de uma habilidade que o slot nao tem mais
+      // deixaria o bolt travado por um estado orfao.
+      extra.channelingUntil = Math.min(extra.channelingUntil, state.tick);
       // As outras ofertas somem: a escolha e UMA, e um Eco que continua ali
       // depois de voce escolher convida a voltar e trocar de novo.
       for (const other of state.wellOffers) {
@@ -1297,6 +1448,49 @@ const bounceOffSolid = (
   if (ricochet) ricochet.remainingBounces--;
 };
 
+/**
+ * Ponto de contato do projetil na FACE por onde ele entrou na celula solida
+ * (cx,cy), mais a normal dessa face. Mesma heuristica de face de
+ * `bounceOffSolid`; o ponto e a interseccao do segmento prev->pos com o plano
+ * da face, entao o burst de impacto nasce NA superficie da parede — nem dentro
+ * dela, nem no centro da celula errada, nem na posicao anterior do projetil.
+ */
+const solidImpactPoint = (
+  prevX: number,
+  prevY: number,
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+): { x: number; y: number; nx: number; ny: number } => {
+  const enteredX = Math.floor(prevX) !== cx;
+  const enteredY = Math.floor(prevY) !== cy;
+  const dx = x - prevX;
+  const dy = y - prevY;
+  let tx = Number.POSITIVE_INFINITY;
+  let ty = Number.POSITIVE_INFINITY;
+  if (enteredX && dx !== 0) tx = ((dx > 0 ? cx : cx + 1) - prevX) / dx;
+  if (enteredY && dy !== 0) ty = ((dy > 0 ? cy : cy + 1) - prevY) / dy;
+  if (!Number.isFinite(tx) && !Number.isFinite(ty)) {
+    // Projetil que ja NASCEU dentro do solido (tiro colado na parede): a ultima
+    // posicao livre e o contato honesto, com a normal contra o rumo dominante.
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+    return {
+      x: prevX,
+      y: prevY,
+      nx: horizontal ? -Math.sign(dx) || 1 : 0,
+      ny: horizontal ? 0 : -Math.sign(dy) || 1,
+    };
+  }
+  const t = Math.max(0, Math.min(1, Math.min(tx, ty)));
+  const ix = prevX + dx * t;
+  const iy = prevY + dy * t;
+  // Quando as duas faces foram cruzadas no mesmo sub-passo (entrada por quina),
+  // a de MENOR t e a que o projetil tocou primeiro.
+  if (tx <= ty) return { x: ix, y: iy, nx: dx > 0 ? -1 : 1, ny: 0 };
+  return { x: ix, y: iy, nx: 0, ny: dy > 0 ? -1 : 1 };
+};
+
 const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void => {
   const dt = 1 / TICK_HZ;
   const w = state.config.width;
@@ -1479,6 +1673,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
             ) {
               bounceOffSolid(proj, prevX, prevY, cx, cy);
               break;
+            }
+            // O fim SILENCIOSO do bolt: parede firme que nao cedeu, sem rebote
+            // sobrando e sem perfuracao — o unico termino que nao emitia evento
+            // nenhum. O burst de plasma nasce aqui, uma unica vez, no ponto de
+            // contato. Parede que QUEBROU ja tem `break` (entulho + som), e os
+            // outros veiculos ficam de fora: explosive detonou antes, o disco
+            // reverte, e cuspe/pedra hostis nao sao plasma de bolt.
+            if (proj.kind === 'bolt' && !proj.hostile && !broke) {
+              const impact = solidImpactPoint(prevX, prevY, proj.x, proj.y, cx, cy);
+              events.push({
+                t: 'bolt_impact',
+                x: impact.x,
+                y: impact.y,
+                nx: impact.nx,
+                ny: impact.ny,
+              });
             }
             dead = true;
           }
@@ -2058,6 +2268,13 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(p.alive ? 1 : 0);
     mix(e.downed ? 1 : 0);
     mix(Math.round(e.heat * 100));
+    // A mira persistida e o canal do sopro sao estado autoritativo: a mira
+    // decide o rumo do proximo bolt e de cada emissao do sopro, e o canal
+    // decide se esse bolt sequer existe. Duas simulacoes que discordam aqui
+    // divergem no primeiro disparo.
+    mix(Math.round(e.aim.x * 1000));
+    mix(Math.round(e.aim.y * 1000));
+    mix(e.channelingUntil);
     mix(e.purgeCells);
     // A habilidade equipada MUDA o resultado da run, entao ela e estado
     // autoritativo: duas simulacoes que discordam de qual habilidade o slot

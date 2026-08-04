@@ -160,7 +160,16 @@ const layeredPlayerAnimation = (
   // memorias decidirem sozinhas em cima da fronteira — que e exatamente onde
   // W, A, S e D sozinhos caem. O bot andaria para cima com as pernas em `ul` e o
   // tronco em `ur`, torcido, e ficaria assim enquanto a tecla estivesse presa.
-  const upperFacing = action ? facing(FACING_UPPER, action.dx, action.dy) : lowerFacing;
+  // O sopro canalizado e a excecao da excecao: a acao dura segundos e o jogador
+  // REDIRECIONA o jato durante ela, entao o tronco segue a mira VIVA
+  // (`entity.facing`, que a sim atualiza por tick) e nao o rumo congelado no
+  // instante do cast — congela-lo faria o corpo apontar para um lado enquanto a
+  // chama sai pelo outro.
+  const upperFacing = action
+    ? action.action === 'breath'
+      ? facing(FACING_UPPER, entity.facing.x, entity.facing.y)
+      : facing(FACING_UPPER, action.dx, action.dy)
+    : lowerFacing;
 
   return {
     kind: 'layered-player',

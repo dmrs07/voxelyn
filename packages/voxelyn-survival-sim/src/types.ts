@@ -246,7 +246,9 @@ export type EntityActionKind =
   | 'hurl'
   | 'pulse'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
-  | 'haul';
+  | 'haul'
+  /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
+  | 'breath';
 export type EntityActionPhase = 'windup' | 'release' | 'recovery';
 export type EntityAction = {
   kind: EntityActionKind;
@@ -352,6 +354,15 @@ export type PlayerExtra = {
   heat: number;
   overheatedUntil: number;
   nextShotAt: number;
+  /**
+   * Ate quando este jogador esta CANALIZANDO o lanca-chamas.
+   *
+   * Estado autoritativo: enquanto `tick < channelingUntil`, a simulacao emite o
+   * sopro por conta propria a cada emissao e o disparo de bolts fica travado.
+   * Zero significa "sem canal". Entra no hash — duas simulacoes que discordam
+   * de um canal ativo divergem no primeiro tiro travado.
+   */
+  channelingUntil: number;
   dodgeUntil: number;
   iframesUntil: number;
   dodgeCooldownUntil: number;
@@ -508,8 +519,22 @@ export type SemanticEvent =
    * constante copiado no cliente viraria mentira no primeiro ajuste de balanco.
    */
   | { t: 'pulse'; x: number; y: number; radius: number }
-  /** Cone de chamas do lanca-chamas. `dx`/`dy` sao a direcao, `arc` a meia-abertura. */
-  | { t: 'flame_cone'; x: number; y: number; dx: number; dy: number; range: number; arc: number }
+  /**
+   * UMA emissao do sopro do lanca-chamas. `dx`/`dy` sao a direcao, `arc` a
+   * meia-abertura. `seq` numera a emissao dentro do canal — sal deterministico
+   * para as particulas variarem entre emissoes sem relogio local. `reach` e o
+   * alcance REAL, ja recortado por paredes, de raios amostrados de `-arc` a
+   * `+arc`: o cliente desenha o jato ate onde a simulacao de fato chegou, em vez
+   * de prometer um cone que atravessa pedra.
+   */
+  | { t: 'flame_cone'; x: number; y: number; dx: number; dy: number; range: number; arc: number; seq: number; reach: number[] }
+  /**
+   * Um bolt do jogador morreu contra um solido que nao cedeu. Puramente
+   * presentacional — o burst de plasma no ponto de contato. `nx`/`ny` e a normal
+   * da face atingida, para o clarao nascer NA superficie da parede e nao no
+   * centro da celula solida.
+   */
+  | { t: 'bolt_impact'; x: number; y: number; nx: number; ny: number }
   /** Um salto do arco condutivo, ja resolvido: o cliente so desenha a linha. */
   | { t: 'arc_chain'; hops: Array<{ x: number; y: number }> }
   /** Os Ecos do poco apareceram com o que demonstrar. */

@@ -54,6 +54,10 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   haul: 'telegraphHurl',
   hurl: 'telegraphHurl',
   pulse: 'telegraphPulse',
+  // O inicio do sopro canalizado reusa a voz do pulso: e o mesmo "a habilidade
+  // saiu" que o cast de tick unico sempre tocou, e o resto do canal ja soa
+  // pelas ignicoes que as emissoes provocam.
+  breath: 'telegraphPulse',
 };
 
 /** Centro geometrico de uma descarga, em tiles. */
@@ -186,6 +190,13 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
 
     case 'chip':
       return [{ voice: 'chip', x: ev.x, y: ev.y, scale: 1 }];
+
+    case 'bolt_impact':
+      // O bolt morrendo em parede firme era o UNICO fim de tiro mudo. Reusa a
+      // lasca do impacto cinetico em vez de estrear voz nova: e o mesmo "a
+      // parede engoliu", so que agora audivel — o burst de plasma e quem carrega
+      // a identidade visual.
+      return [{ voice: 'chip', x: ev.x, y: ev.y, scale: 0.85 }];
 
     case 'dodge':
       return [{ voice: 'dodge', x: ev.x, y: ev.y, scale: 1 }];
