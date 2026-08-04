@@ -34,6 +34,35 @@
          Nenhum estado depende só de cor: desabilitado ganha hachura,
          selecionado ganha keyline de 2px, censura ganha barra sólida.
          ================================================================== */
+      /* As duas vozes tipograficas do redesign, auto-hospedadas (woff2 latin,
+         ~37KB somados — emitidas com hash pelo Vite e precacheadas pelo SW):
+         - Chakra Petch: a autoridade Aurix — placa usinada, chanfros — em
+           titulos de documento, wordmark e rotulos de secao;
+         - VT323: o pixel do terminal, CONFINADO ao carimbo primario, onde as
+           letras se fundem com a grade de fosforo.
+         `font-display: swap` cai no stack antigo enquanto carrega — e como
+         tudo e precacheado, isso so acontece no primeirissimo quadro da vida. */
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('./src/assets/fonts/chakra-petch-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Chakra Petch';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('./src/assets/fonts/chakra-petch-700.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'VT323';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('./src/assets/fonts/vt323-400.woff2') format('woff2');
+      }
       :root {
         color-scheme: dark;
         --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -416,7 +445,8 @@
       h1 {
         color: var(--ax-text-bright);
         margin: 0;
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-weight: 700;
         font-size: clamp(18px, 4vw, 26px);
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -531,7 +561,8 @@
          Cromo compartilhado dos documentos Aurix
          ------------------------------------------------------------------ */
       .ax-doc-title {
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-weight: 600;
         font-size: 14px;
         letter-spacing: 0.22em;
         color: var(--ax-gold);
@@ -546,6 +577,8 @@
         white-space: nowrap;
       }
       .ax-section-label {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-weight: 600;
         font-size: 10px;
         letter-spacing: 0.22em;
         color: var(--ax-gold-dim);
@@ -790,14 +823,17 @@
         align-items: flex-start;
         justify-content: center;
         padding: 8px 16px;
-        font-family: inherit;
-        font-size: 26px;
-        letter-spacing: 0.16em;
+        /* VT323 e o pixel do terminal: só aqui, fundindo com o fosforo. O
+           corpo sobe (26 → 36px) porque a fonte desenha menor que o mono. */
+        font-family: 'VT323', ui-monospace, monospace;
+        font-size: 36px;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
         white-space: nowrap;
       }
       .ax-stamp small {
         display: block;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         font-size: 10px;
         letter-spacing: 0.16em;
         color: var(--ax-teal-mute);
@@ -1410,7 +1446,7 @@
       }
       .codex-doc h3 {
         color: var(--ax-text-bright);
-        font-family: Georgia, 'Times New Roman', serif;
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
         font-size: 15px;
         letter-spacing: 0.04em;
         margin: 2px 0 4px;
@@ -1610,6 +1646,8 @@
         display: block;
       }
       .corp-name {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-weight: 600;
         color: var(--ax-gold);
         font-size: 12px;
         letter-spacing: 5px;
@@ -1770,7 +1808,7 @@
         }
         .ax-stamp {
           min-height: 66px;
-          font-size: 22px;
+          font-size: 30px;
         }
         #menu .ax-sheet-foot .ax-foot-note {
           white-space: normal;
