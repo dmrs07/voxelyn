@@ -26,6 +26,10 @@ const profile = (
   purchasedUpgradeIds: purchased,
   generation: 'G-00',
   unlockedLoreFragmentIds: [],
+  readLoreFragmentIds: [],
+  knownAssetArchetypes: [],
+  discoveries: 0,
+  loreIndex: { assets: {}, discoveries: {} },
   statistics: {
     oreHomologated: 0,
     oreLost: 0,
@@ -47,6 +51,8 @@ const matrixView = (over: Partial<MatrixViewState> = {}): MatrixViewState => ({
   notice: null,
   codexNotice: null,
   reveal: null,
+  codexContext: { kind: 'all' },
+  codexReturn: false,
   ...over,
 });
 
@@ -54,6 +60,9 @@ const handlers: MatrixHandlers = {
   onTab: () => {},
   onPurchase: () => {},
   onDismissReveal: () => {},
+  onCodexContext: () => {},
+  onOpenDocument: () => {},
+  onReturnToRecords: () => {},
 };
 
 const click = (element: Element | null): void => {
@@ -166,5 +175,204 @@ describe('matriz: selecao, fala e foco', () => {
     expect(host.querySelector('[data-ax-focus="tab:codex"]')?.getAttribute('aria-selected')).toBe(
       'false',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Codex narrativo: "Ver docs", bolinhas e estado de leitura
+// ---------------------------------------------------------------------------
+
+import type { CodexContext, CodexResponse, PublicLoreFragment } from '@voxelyn/survival-protocol';
+import { openCodexDocument } from './matrix-panel';
+import { applyRun, emptyRecords as freshRecords } from './records';
+import { DISCOVERY_GAS_IGNITION, type RunSummary } from '@voxelyn/survival-sim';
+
+const fragment = (id: string, over: Partial<PublicLoreFragment> = {}): PublicLoreFragment => ({
+  id,
+  trigger: { kind: 'default' },
+  category: 'engineering',
+  clearanceLevel: 1,
+  documentCode: id,
+  chronologyIndex: 0,
+  title: `Titulo ${id}`,
+  summary: `Resumo ${id}`,
+  body: `Corpo ${id}`,
+  source: 'Teste',
+  relatedFragmentIds: [],
+  redactionLevel: 0,
+  read: false,
+  ...over,
+});
+
+const codexOf = (unlocked: PublicLoreFragment[]): CodexResponse => ({
+  unlocked,
+  locked: [],
+  total: unlocked.length,
+});
+
+/** Um Registro em que o Espreitador ja foi abatido (fica "conhecido"). */
+const recordsWithStalker = () => {
+  const summary = {
+    seed: 1,
+    phase: 'dead',
+    ticks: 100,
+    contamination: 0,
+    deathCause: null,
+    stars: 0,
+    targetTicks: 1,
+    stats: {
+      shotsFired: 0,
+      kills: { stalker: 1 },
+      damageDealtTenths: 0,
+      damageTakenTenths: 0,
+      timesDowned: 0,
+      revivesGiven: 0,
+      oreCollected: 0,
+      innocentsKilled: 0,
+      discoveries: DISCOVERY_GAS_IGNITION,
+    },
+  } as unknown as RunSummary;
+  return applyRun(freshRecords(), summary);
+};
+
+const profileWithDocs = (read: string[] = []): ReturnType<typeof profile> => ({
+  ...profile(0, 0),
+  unlockedLoreFragmentIds: ['AX-PUB-001', 'AX-ENG-012'],
+  readLoreFragmentIds: read,
+  knownAssetArchetypes: ['stalker'],
+  discoveries: DISCOVERY_GAS_IGNITION,
+  loreIndex: {
+    assets: { stalker: ['AX-ENG-012'] },
+    discoveries: { [String(DISCOVERY_GAS_IGNITION)]: ['AX-ENG-012'] },
+  },
+});
+
+describe('"Ver docs" no Registro de Ativos', () => {
+  it('aparece so no Ativo conhecido com documentos, com bolinha de nao lido', () => {
+    const contexts: CodexContext[] = [];
+    renderRecordsPanel(host, recordsWithStalker(), undefined, {
+      profile: profileWithDocs(),
+      onViewDocs: (ctx) => contexts.push(ctx),
+    });
+    click(host.querySelector('[data-ax-focus="tab:assets"]'));
+    const link = host.querySelector<HTMLElement>('[data-ax-focus="viewdocs:stalker"]');
+    expect(link).not.toBeNull();
+    // A bolinha esta la enquanto AX-ENG-012 nao foi lido...
+    expect(link?.querySelector('.ax-dot')).not.toBeNull();
+    // ...e o rotulo fala para o leitor de tela.
+    expect(link?.getAttribute('aria-label')).toContain(t('bestiary.name.stalker'));
+    // Nenhum outro Ativo (todos bloqueados) ganha link: existir link revelaria
+    // que existe ficha concreta para um inimigo nao identificado.
+    expect(host.querySelectorAll('[data-ax-focus^="viewdocs:"]').length).toBe(1);
+    click(link);
+    expect(contexts).toEqual([{ kind: 'asset', archetype: 'stalker' }]);
+  });
+
+  it('a bolinha some depois de lido, e o link permanece', () => {
+    renderRecordsPanel(host, recordsWithStalker(), undefined, {
+      profile: profileWithDocs(['AX-ENG-012']),
+      onViewDocs: () => {},
+    });
+    click(host.querySelector('[data-ax-focus="tab:assets"]'));
+    const link = host.querySelector<HTMLElement>('[data-ax-focus="viewdocs:stalker"]');
+    expect(link).not.toBeNull();
+    expect(link?.querySelector('.ax-dot')).toBeNull();
+  });
+
+  it('sem perfil autoritativo nao ha link nenhum — o Registro segue offline', () => {
+    renderRecordsPanel(host, recordsWithStalker(), undefined, {
+      profile: null,
+      onViewDocs: () => {},
+    });
+    click(host.querySelector('[data-ax-focus="tab:assets"]'));
+    expect(host.querySelector('[data-ax-focus^="viewdocs:"]')).toBeNull();
+  });
+
+  it('a Descoberta feita ganha o link com o contexto certo', () => {
+    const contexts: CodexContext[] = [];
+    renderRecordsPanel(host, recordsWithStalker(), undefined, {
+      profile: profileWithDocs(),
+      onViewDocs: (ctx) => contexts.push(ctx),
+    });
+    click(host.querySelector('[data-ax-focus="tab:discoveries"]'));
+    const link = host.querySelector<HTMLElement>(
+      `[data-ax-focus="viewdocs:discovery:${DISCOVERY_GAS_IGNITION}"]`,
+    );
+    expect(link).not.toBeNull();
+    click(link);
+    expect(contexts).toEqual([{ kind: 'discovery', bit: DISCOVERY_GAS_IGNITION }]);
+  });
+});
+
+describe('aba de Arquivos: abrir, ler, filtrar', () => {
+  it('a aba mostra bolinha quando ha documento nao lido, e some depois', () => {
+    renderMatrixPanel(host, matrixView({ profile: profileWithDocs() }), handlers);
+    expect(host.querySelector('[data-ax-focus="tab:codex"] .ax-dot')).not.toBeNull();
+    renderMatrixPanel(
+      host,
+      matrixView({ profile: profileWithDocs(['AX-PUB-001', 'AX-ENG-012']) }),
+      handlers,
+    );
+    expect(host.querySelector('[data-ax-focus="tab:codex"] .ax-dot')).toBeNull();
+  });
+
+  it('abrir um documento mostra o corpo e dispara a marcacao de leitura', () => {
+    openCodexDocument(null);
+    const opened: string[] = [];
+    const doc = fragment('AX-ENG-012');
+    renderMatrixPanel(
+      host,
+      matrixView({ tab: 'codex', profile: profileWithDocs(), codex: codexOf([doc]) }),
+      { ...handlers, onOpenDocument: (f) => opened.push(f.id) },
+    );
+    const header = host.querySelector<HTMLElement>('[data-ax-focus="doc:AX-ENG-012"]');
+    expect(header?.getAttribute('aria-expanded')).toBe('false');
+    expect(host.textContent).not.toContain('Corpo AX-ENG-012');
+    click(header);
+    expect(opened).toEqual(['AX-ENG-012']);
+    expect(host.textContent).toContain('Corpo AX-ENG-012');
+    expect(
+      host.querySelector('[data-ax-focus="doc:AX-ENG-012"]')?.getAttribute('aria-expanded'),
+    ).toBe('true');
+  });
+
+  it('o filtro contextual mostra so os documentos do Ativo e oferece "Todos"', () => {
+    openCodexDocument(null);
+    const contexts: CodexContext[] = [];
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: profileWithDocs(),
+        codex: codexOf([fragment('AX-PUB-001'), fragment('AX-ENG-012')]),
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: true,
+      }),
+      { ...handlers, onCodexContext: (ctx) => contexts.push(ctx) },
+    );
+    expect(host.querySelector('[data-ax-focus="doc:AX-ENG-012"]')).not.toBeNull();
+    expect(host.querySelector('[data-ax-focus="doc:AX-PUB-001"]')).toBeNull();
+    // O retorno ao Registro existe porque a navegacao veio de la.
+    expect(host.querySelector('[data-ax-focus="codex-back"]')).not.toBeNull();
+    click(host.querySelector('[data-ax-focus="codex-all"]'));
+    expect(contexts).toEqual([{ kind: 'all' }]);
+  });
+
+  it('a navegacao contextual abre e foca o documento pedido', () => {
+    openCodexDocument('AX-ENG-012');
+    renderMatrixPanel(
+      host,
+      matrixView({
+        tab: 'codex',
+        profile: profileWithDocs(),
+        codex: codexOf([fragment('AX-ENG-012')]),
+        codexContext: { kind: 'asset', archetype: 'stalker' },
+        codexReturn: true,
+      }),
+      handlers,
+    );
+    // Aberto (corpo visivel) e focado.
+    expect(host.textContent).toContain('Corpo AX-ENG-012');
+    expect(document.activeElement?.getAttribute('data-ax-focus')).toBe('doc:AX-ENG-012');
   });
 });

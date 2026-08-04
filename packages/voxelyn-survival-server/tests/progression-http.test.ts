@@ -696,10 +696,10 @@ describe('codex', () => {
       locked: { maskedCode: string }[];
       total: number;
     };
-    expect(body.total).toBe(35);
+    expect(body.total).toBe(64);
     expect(body.unlocked).toHaveLength(1);
     expect(body.unlocked[0].id).toBe('AX-PUB-001');
-    expect(body.locked).toHaveLength(34);
+    expect(body.locked).toHaveLength(63);
   });
 
   // O que este teste protege e a razao inteira de o texto morar no servidor.
@@ -737,6 +737,56 @@ describe('codex', () => {
     expect(pt.fragment.title).not.toBe(en.fragment.title);
     expect(pt.fragment.body.length).toBeGreaterThan(50);
     expect(en.fragment.body.length).toBeGreaterThan(50);
+  });
+
+  it('abrir um documento marca leitura — so aquele, idempotente, e persiste', async () => {
+    const client = new Client();
+    const fresh = await client.session();
+    // Todo desbloqueado nasce nao lido.
+    expect(fresh.readLoreFragmentIds).toEqual([]);
+
+    const marked = await client.call('/api/progression/codex/AX-PUB-001/read', {
+      method: 'POST',
+      body: '{}',
+    });
+    expect(marked.status).toBe(200);
+    expect(((await marked.json()) as { readLoreFragmentIds: string[] }).readLoreFragmentIds).toEqual(
+      ['AX-PUB-001'],
+    );
+
+    // Persiste no perfil, sem subir a versao (leitura nao e uma "escrita" de
+    // economia e nao pode derrubar uma compra concorrente em 409).
+    const after = await client.profile();
+    expect(after.readLoreFragmentIds).toEqual(['AX-PUB-001']);
+    expect(after.profileVersion).toBe(fresh.profileVersion);
+
+    const again = await client.call('/api/progression/codex/AX-PUB-001/read', {
+      method: 'POST',
+      body: '{}',
+    });
+    expect(again.status).toBe(200);
+
+    // E o codex passa a dizer `read: true` naquele documento.
+    const codex = (await (await client.call('/api/progression/codex?lang=pt-BR')).json()) as {
+      unlocked: { id: string; read: boolean }[];
+    };
+    expect(codex.unlocked.find((f) => f.id === 'AX-PUB-001')?.read).toBe(true);
+  });
+
+  it('documento bloqueado nao pode ser marcado como lido, e responde como inexistente', async () => {
+    const client = new Client();
+    await client.session();
+    const locked = await client.call('/api/progression/codex/AX-UNK-047/read', {
+      method: 'POST',
+      body: '{}',
+    });
+    const missing = await client.call('/api/progression/codex/AX-NAO-000/read', {
+      method: 'POST',
+      body: '{}',
+    });
+    expect(locked.status).toBe(404);
+    expect(missing.status).toBe(404);
+    expect(await locked.text()).toBe(await missing.text());
   });
 
   // `maskCode` esconde o prefixo de ato dos documentos bloqueados — e a lista de

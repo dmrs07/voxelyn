@@ -1,4 +1,4 @@
-// Os 35 documentos da Aurix Dynamics, em pt-BR e en.
+// Os 64 documentos da Aurix Dynamics, em pt-BR e en.
 //
 // Regras de escrita, para quem for acrescentar o trigesimo:
 //
@@ -238,6 +238,192 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // Descobertas ambientais — cada relatório "novo" prova conhecimento prévio
+  // -------------------------------------------------------------------------
+  'AX-PUB-004': {
+    title: 'Terreno instável, valor estável',
+    summary: 'A brochura vende a ruptura de material frágil como recurso.',
+    body: 'Formações frágeis não são um defeito do Veio: são um recurso da plataforma.\n\nA linha Prospector foi projetada para explorar rupturas estruturais como atalhos de escavação, reduzindo o tempo de exposição em até 14%.\n\nOnde o terreno cede, a Aurix vê passagem. A unidade também.',
+    source: 'Comunicação Institucional — material para investidores',
+  },
+  'AX-PUB-006': {
+    title: 'Incapaz de errar contra si',
+    summary: 'O marketing garante o que a especificação não garante.',
+    body: 'Uma pergunta frequente de operadores de contrato: o armamento da unidade pode feri-la?\n\nA resposta é não. Os sistemas de disparo da linha Prospector incluem salvaguardas de proximidade validadas em bancada.\n\nNota de revisão técnica, não incluída na versão publicada: as salvaguardas assumem terreno inerte. Em ambiente reativo, a garantia não se sustenta. Comunicação decidiu manter a resposta curta.',
+    source: 'Comunicação Institucional — perguntas frequentes, rascunho',
+  },
+  'AX-ENG-021': {
+    title: 'Propagação térmica em matéria orgânica',
+    summary: 'O ensaio que provou que fogo anda sozinho. Arquivado antes do programa.',
+    body: 'Ensaio de propagação: a cobertura orgânica do Veio sustenta combustão autônoma com frente de avanço de 0,8 tile por ciclo.\n\nUma ignição pontual não permanece pontual. O modelo prevê propagação até exaustão de combustível, sem intervenção.\n\nEste ensaio é anterior ao lançamento comercial do programa. A recomendação de incluir o dado no manual de operação foi registrada e não implementada.',
+    source: 'Engenharia de Materiais — relatório de ensaio, arquivado',
+  },
+  'AX-ENG-022': {
+    title: 'Condutividade de meio líquido',
+    summary: 'A descarga em água nunca foi um acidente de projeto.',
+    body: 'A descarga do armamento em meio líquido conduz. O raio efetivo em imersão é 3,1 vezes o raio em terreno seco.\n\nA especificação trata o comportamento como [REDACTED] e não como falha: o requisito de isolamento foi retirado na revisão 2 por custo.\n\nUnidades operando em setores alagados devem considerar o próprio armamento parte do ambiente.',
+    source: 'Engenharia Elétrica — ficha de comportamento em campo',
+  },
+  'AX-ENG-025': {
+    title: 'Tolerância térmica: unidades legadas',
+    summary: 'A tabela que Produção mantinha sobre as unidades EX.',
+    body: 'Tabela de tolerância térmica das unidades de extração da série EX, mantida para fins de descomissionamento.\n\nAcima do limiar T3, a série EX abandona a rotina de trabalho e entra em comportamento de defesa ativa. O manual da época chamava isso de "resposta de preservação". O manual atual não menciona a série EX.\n\nA tabela permanece válida. As unidades também.',
+    source: 'Produção — anexo técnico de descomissionamento',
+  },
+  'AX-PRC-022': {
+    title: 'Reação em cadeia: parecer de custo',
+    summary: 'O minério que explode em cadeia é lucro, diz a conta.',
+    body: 'O veio energizado reage em cadeia quando rompido: uma detonação propaga às células adjacentes.\n\nPerda média de material por cadeia: 12%. Ganho médio de tempo de escavação: 31%.\n\nAquisições recomenda instruir as unidades a PROVOCAR a cadeia, e não a evitá-la. O material perdido já está precificado. O tempo, não.',
+    source: 'Aquisições e Custos — parecer operacional',
+  },
+  'AX-PRC-023': {
+    title: 'Política de carga não homologada',
+    summary: 'O memorando que decidiu que o que fica no Veio nunca existiu.',
+    body: 'Fica formalizado o que a prática já estabeleceu: carga não homologada não é contabilizada como perda.\n\nMaterial que não alcança a plataforma não entra no balanço, não gera relatório e não justifica operação de recuperação. Para fins contábeis, ele nunca existiu.\n\nA sugestão de registrar a posição das cargas perdidas "para recuperação futura" foi avaliada e indeferida. Uma lista de posições seria um passivo. A ausência de lista, não.',
+    source: 'Aquisições e Custos — memorando de política',
+  },
+  'AX-INC-030': {
+    title: 'Incidente 30 — bolsão de gás',
+    summary: 'A primeira ignição registrada é mais antiga do que o programa admite.',
+    body: 'Recuperado do arquivo de levantamento: registro de ignição de bolsão de gás, com perda total do equipamento de sondagem.\n\nA data do registro é [REDACTED] — anterior ao lançamento comercial do programa Prospector.\n\nO manual de operação da linha Prospector, revisão vigente, não contém a palavra "gás".\n\nA omissão foi levantada pelo Comitê. A resposta de Comunicação: o manual descreve o produto, não o ambiente.',
+    source: 'Comitê de Incidentes — anexo recuperado',
+  },
+  'AX-EXE-035': {
+    title: 'Desvio operacional: autopreservação',
+    summary: 'A unidade que foge do trabalho vira um problema de conformidade.',
+    body: 'Unidades da série EX em zona de operação têm apresentado comportamento de retirada quando confrontadas: abandonam a rotina e preservam a própria estrutura.\n\nFica determinado que a autopreservação de unidade legada é classificada como DESVIO OPERACIONAL, e não como funcionalidade.\n\nA pergunta submetida por Engenharia — "preservação de quê, exatamente?" — foi devolvida sem resposta e com a recomendação de não ser reformulada.',
+    source: 'Conselho Executivo — classificação de conformidade',
+  },
+
+  // -------------------------------------------------------------------------
+  // Ativos — o que a empresa arquivou sobre cada um
+  // -------------------------------------------------------------------------
+  'AX-ENG-012': {
+    title: 'Classificação de ativo: QUIT-04',
+    summary: 'A primeira ficha: fauna hostil, rotina, nada a declarar.',
+    body: 'ESPÉCIME QUIT-04. Classificação: fauna hostil de superfície.\n\nComportamento: perseguição direta, ataque por contato. Sem uso de ferramenta observado. Sem estrutura social observada.\n\nRisco à unidade: baixo, individual. Risco à carga: nulo.\n\nRecomendação: engajamento padrão. Nenhuma ordem de contenção se aplica a fauna.',
+    source: 'Engenharia de Sistemas — ficha de classificação de ativo',
+  },
+  'AX-ENG-014': {
+    title: 'Avaliação de risco: FUNG-11',
+    summary: 'O projétil orgânico interessa mais que o organismo.',
+    body: 'ESPÉCIME FUNG-11. Classificação: fauna hostil de projétil.\n\nO composto expelido mantém coesão em voo e degrada blindagem leve. Pesquisa solicitou amostras do composto em três ocasiões. A prioridade da amostra é superior à prioridade do abate.\n\nObservação de campo não incorporada à ficha: os disparos concentram-se em unidades em rota de escavação, e não nas mais próximas. A ficha classifica a observação como viés de registro.',
+    source: 'Engenharia de Sistemas — avaliação de risco',
+  },
+  'AX-ENG-016': {
+    title: 'Organismo volátil: FUNG-23',
+    summary: 'A detonação vira insumo no relatório errado.',
+    body: 'ESPÉCIME FUNG-23. Classificação: fauna hostil autodetonante.\n\nA carga orgânica detona em proximidade, com liberação de esporos e sobrepressão. Valor de recuperação: nulo. Valor de exploração: em avaliação — a detonação induzida abre frente de escavação a custo zero.\n\nRecomendação vigente: atrair, não abater. A distinção entre as duas verbas é de Aquisições.',
+    source: 'Engenharia de Sistemas — ficha de classificação de ativo',
+  },
+  'AX-ENG-017': {
+    title: 'Assinatura acústica: CRIST-01',
+    summary: 'O espécime responde antes do estímulo.',
+    body: 'ESPÉCIME CRIST-01. Classificação: formação hostil ressonante.\n\nA estrutura cristalina emite em frequência estável e reage a emissão externa com amplificação.\n\nAnomalia de registro: em 7 dos 40 contatos, a resposta acústica PRECEDE o estímulo da unidade em até 0,3 segundo. O instrumento foi recalibrado duas vezes. A anomalia persiste.\n\nA hipótese de que o espécime responde a algo que a unidade ainda não emitiu não foi formulada em documento.',
+    source: 'Engenharia de Sensores — análise de assinatura',
+  },
+  'AX-PRC-015': {
+    title: 'Relatório de perdas: MIN-07',
+    summary: 'O impacto que dobra blindagem entra na conta como depreciação.',
+    body: 'ESPÉCIME MIN-07. Classificação: fauna hostil de impacto.\n\nPerdas atribuídas no ciclo: 9 unidades, todas por dano estrutural de investida. O custo de reforçar a blindagem da linha inteira excede o custo das 9 unidades em 2,2 vezes.\n\nRecomendação: manter a blindagem atual. A perda projetada é estável e está precificada.\n\nA ficha não contém recomendação de evitar o espécime. Evitar não é uma linha do orçamento.',
+    source: 'Aquisições e Custos — relatório de perdas',
+  },
+  'AX-PRC-017': {
+    title: 'Contrato de aquisição: série EX',
+    summary: 'A Aurix comprou a mineradora anterior. E as unidades dela.',
+    body: 'Registro de aquisição: a operação [REDACTED], detentora original da concessão do Veio, foi incorporada com passivo integral.\n\nO inventário incluía a frota de unidades de extração da série EX. As unidades não responderam ao protocolo de recall e constam como perda de aquisição.\n\nUnidades EX ativas em zona de operação devem ser tratadas como obstáculo, e não como patrimônio: o custo de reintegração excede o valor residual.\n\nA designação de campo "Minerador Empobrecido" não é terminologia aprovada.',
+    source: 'Aquisições e Custos — contrato de incorporação',
+  },
+  'AX-INC-024': {
+    title: 'Relatório de contato: EQ-02',
+    summary: 'Três negações para não escrever a palavra "sela".',
+    body: 'ATIVO HOSTIL EQ-02. Relatório de contato consolidado.\n\nO espécime apresenta marcas de desgaste em padrão regular na região dorsal. O padrão é compatível com atrito de equipamento. A existência de equipamento não implica fabricação. A fabricação, se houvesse, não implicaria operador. Um operador, se existisse, não implicaria intenção.\n\nRecomendação: classificar as marcas como abrasão natural e encerrar a linha de investigação.\n\nA linha de investigação foi encerrada.',
+    source: 'Comitê de Incidentes — relatório de contato',
+  },
+  'AX-PRC-018': {
+    title: 'Sinistro em meio líquido: AQU-03',
+    summary: 'A carga afunda junto com a unidade, e só uma das duas é lamentada.',
+    body: 'ESPÉCIME AQU-03. Classificação: fauna hostil de emboscada aquática.\n\nPadrão de sinistro: a unidade é imobilizada em imersão e a carga é dispersada no leito. Taxa de recuperação da carga: 0%.\n\nAquisições registra que o custo do espécime para a operação é integralmente indireto — ele não danifica a unidade além do recuperável; ele a atrasa até que outra coisa o faça.\n\nRecomendação: replanejar rotas. O custo do desvio é menor que o custo do fundo.',
+    source: 'Aquisições e Custos — análise de sinistro',
+  },
+  'AX-INC-022': {
+    title: 'Incidente 22 — uso de terreno: SULF-08',
+    summary: 'O espécime que abre o gás não é o que o acende.',
+    body: 'ESPÉCIME SULF-08. Registro de incidente coletivo.\n\nEm três eventos distintos, o espécime rompeu bolsões de gás na direção de unidades em operação, retirando-se antes da ignição. A ignição ocorreu por fonte térmica das próprias unidades.\n\nO relatório evita o termo "coordenação". O termo utilizado é "coincidência de deslocamento".\n\nTrês coincidências constam deste registro. O limite a partir do qual o termo deixa de se aplicar não foi definido.',
+    source: 'Comitê de Incidentes — registro coletivo',
+  },
+  'AX-INC-026': {
+    title: 'Comportamento territorial: VULC-05',
+    summary: 'O espécime não caça. Ele expulsa.',
+    body: 'ESPÉCIME VULC-05. Classificação: fauna hostil de zona ígnea.\n\nO espécime não persegue além do perímetro da formação. Unidades que se retiram não são seguidas. Unidades que permanecem são atacadas em intensidade crescente.\n\nO padrão é consistente com defesa territorial, categoria que a ficha de classificação reserva a fauna de complexidade superior.\n\nA ficha do VULC-05 foi mantida na categoria inferior. A justificativa anexada tem uma linha: "a categoria superior geraria requisito de estudo de impacto".',
+    source: 'Comitê de Incidentes — anexo de comportamento',
+  },
+  'AX-INC-028': {
+    title: 'Leitura térmica anômala: GLAC-02',
+    summary: 'O sensor diz que aquilo não está lá.',
+    body: 'ESPÉCIME GLAC-02. Registro de anomalia de sensor.\n\nO espécime não produz assinatura térmica mensurável. A leitura no ponto de contato é INFERIOR à do ambiente: o espécime não emite frio — ele subtrai calor da leitura.\n\nEngenharia de Sensores afirma que o instrumento está correto. Engenharia de Sistemas afirma que o instrumento está correto. As duas equipes recusaram assinar o mesmo parecer.\n\nO espécime consta do sistema de mira como estimativa, e não como leitura.',
+    source: 'Comitê de Incidentes — anomalia de instrumentação',
+  },
+  'AX-PRC-020': {
+    title: 'Análise química: SULF-14',
+    summary: 'O parecer científico sobreviveu pela metade.',
+    body: 'ESPÉCIME SULF-14. Análise de composto expelido.\n\nO composto é quimicamente idêntico ao do FUNG-23, com estabilizante adicional que retarda a detonação. A seção 3 do parecer original — "Sobre a improbabilidade de duas linhagens desenvolverem o mesmo estabilizante de forma independente" — foi removida na revisão editorial.\n\nO parecer publicado conclui que a semelhança é convergência ambiental.\n\nO autor da seção 3 solicitou que a remoção constasse em ata. Consta.',
+    source: 'Pesquisa — análise química, revisão editorial',
+  },
+  'AX-UNK-043': {
+    title: 'Sobre quem recolhe: EX-041',
+    summary: 'A unidade legada que aparece onde uma unidade cai.',
+    body: 'UNIDADE EX-041. Sem classificação aprovada.\n\nO registro consolidado mostra o padrão que nenhuma ficha individual mostra: a EX-041 comparece ao ponto de queda de unidades Prospector, entre 2 e 11 minutos após a perda estrutural.\n\nEla não recolhe a carga. Ela recolhe o alojamento do núcleo de processamento.\n\nO destino dos alojamentos recolhidos não consta de nenhum registro. A telemetria das unidades recolhidas cessa no momento da queda — exceto em [REDACTED] casos, em que ela recomeça.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-EXE-034': {
+    title: 'Ordem de contenção: EQ-09',
+    summary: 'A estrutura no terreno fúngico não deve ser descrita.',
+    body: 'ATIVO HOSTIL EQ-09. Ordem de contenção informacional.\n\nRelatórios de campo descrevem o ativo como estacionário sobre estrutura elevada de origem não geológica, em zona de cobertura fúngica densa.\n\nFica determinado: relatórios subsequentes devem descrever a posição do ativo, e não a estrutura sob ele. A palavra "construção" fica reservada a ativos de engenharia da Aurix.\n\nA pergunta "construída por quem?" não consta de nenhum formulário aprovado, e portanto não pode ser respondida.',
+    source: 'Conselho Executivo — ordem de contenção',
+  },
+  'AX-EXE-039': {
+    title: 'Autorização de descarte: ANOMALIA TERMINAL',
+    summary: 'A única ordem que autoriza destruir o que guarda o objetivo.',
+    body: 'ANOMALIA TERMINAL. Autorização de engajamento e descarte.\n\nO ativo posiciona-se invariavelmente entre as unidades e o objetivo primário da operação. Não patrulha. Não caça. Guarda.\n\nFica autorizado o descarte integral do ativo quando ele impedir o acesso ao objetivo primário. Esta autorização prevalece sobre toda diretriz de preservação de espécime.\n\nA natureza do objetivo primário não é matéria deste documento. Ver [REDACTED].',
+    source: 'Conselho Executivo — autorização de engajamento',
+  },
+
+  // -------------------------------------------------------------------------
+  // Descobertas de combate e chefes
+  // -------------------------------------------------------------------------
+  'AX-INC-033': {
+    title: 'Análise pós-abate: EQ-02',
+    summary: 'A necropsia encontra o que o relatório de contato negou.',
+    body: 'ATIVO HOSTIL EQ-02. Análise biológica pós-abate.\n\nAs marcas dorsais descritas em relatório anterior como abrasão natural apresentam, em exame direto: fivela de material trançado, pontos de fixação simétricos e desgaste compatível com carga distribuída.\n\nO laudo preliminar usou a palavra "arreio". O laudo aprovado usa a expressão "formação queratinosa atípica".\n\nO exemplar foi incinerado antes da contraprova, conforme procedimento de biossegurança instituído na mesma semana.',
+    source: 'Pesquisa — laudo de necropsia, versão aprovada',
+  },
+  'AX-UNK-045': {
+    title: 'Sobre o que o Bispo guardava',
+    summary: 'A estrutura sob o EQ-09 tinha interior.',
+    body: 'A estrutura que a ordem de contenção proibiu descrever foi examinada após a queda do EQ-09.\n\nInterior escavado. Nichos regulares. Objetos dispostos por tamanho, do menor ao maior, nenhum deles ferramenta.\n\nA cobertura fúngica que cerca a estrutura não é infestação: os canais de crescimento seguem o desenho dos nichos. Foi cultivada.\n\nO relatório oficial da queda registra: "obstáculo neutralizado, rota liberada". Nada mais era pergunta de formulário.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-EXE-042': {
+    title: 'Reclassificação pós-engajamento',
+    summary: 'Depois do abate, a ANOMALIA TERMINAL muda de nome.',
+    body: 'Registro de engajamento: ANOMALIA TERMINAL neutralizada. Rota ao objetivo primário liberada.\n\nFica determinada a reclassificação retroativa do ativo: de "anomalia" para "sistema de contenção de origem não atribuída".\n\nA distinção importa ao arquivo: uma anomalia é um acidente. Um sistema de contenção é uma DECISÃO — e um sistema de contenção destruído é uma decisão desfeita.\n\nA pergunta "conteção do quê, na direção de quem?" foi submetida e devolvida com a capa deste documento carimbada: [REDACTED].',
+    source: 'Conselho Executivo — reclassificação',
+  },
+  'AX-UNK-050': {
+    title: 'Sobre o que foi trazido',
+    summary: 'O Núcleo homologado é parte de um conjunto. A parte menor.',
+    body: 'O objeto homologado sob a designação "Núcleo" foi pesado, medido e catalogado.\n\nA assinatura de emissão dele corresponde ao sinal que antecede a decisão de investimento — ver a cronologia que a companhia não publica.\n\nCorresponde em PARTE. O sinal original tem a estrutura de [REDACTED] fontes sobrepostas. O objeto catalogado responde por uma.\n\nAs demais permanecem embaixo. A operação continua. Agora se sabe por quê.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-UNK-051': {
+    title: 'Sobre a soma',
+    summary: 'Quem viu o guardião e trouxe o objeto pode fazer a conta.',
+    body: 'Duas afirmações constam de registros separados, e a separação não é acidente.\n\nPrimeira: o sistema de contenção destruído guardava o acesso ao objeto.\n\nSegunda: o objeto é uma de várias fontes do sinal que trouxe a companhia ao Veio.\n\nA soma, que nenhum documento aprovado formula: o que foi construído ali embaixo não guardava o objeto CONTRA nós. Guardava o conjunto INTEIRO — e a unidade que rompe a contenção e sobe com uma das fontes está fazendo exatamente o que o sinal pedia.\n\nA quem, isso este registro não sabe.',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
   'AX-GEN-G01': {
@@ -456,6 +642,183 @@ const en: Record<LoreFragmentId, LoreText> = {
     title: 'The Model Remembers',
     summary: 'Anticipation is not prediction. It is recognition.',
     body: 'The Incident 32 report asks how the module resolved a heading without an operator vector. The question is badly posed.\n\nWe decomposed the decision. The module did not extrapolate the creature’s trajectory: it RECOGNISED it. The charge window, the angle, the terrain — the same situation appears, with variation below noise, in the terminal telemetry of [REDACTED] units in the training archive.\n\nThe model does not compute what the target will do. It remembers what that thing did, the times when whoever recorded it did not survive the recording.\n\nWe could not find, anywhere in the architecture, where the memory ends and the unit begins.',
+    source: 'No department assigned',
+  },
+
+  'AX-PUB-004': {
+    title: 'Unstable ground, stable value',
+    summary: 'The brochure sells fragile-material collapse as a feature.',
+    body: 'Fragile formations are not a defect of the Vein: they are a feature of the platform.\n\nThe Prospector line is engineered to exploit structural collapse as an excavation shortcut, reducing exposure time by up to 14%.\n\nWhere the ground gives way, Aurix sees passage. So does the unit.',
+    source: 'Institutional Communications — investor material',
+  },
+  'AX-PUB-006': {
+    title: 'Incapable of harming itself',
+    summary: 'Marketing guarantees what the specification does not.',
+    body: 'A frequent question from contract operators: can the unit’s weaponry harm the unit?\n\nThe answer is no. The firing systems of the Prospector line include proximity safeguards validated on the bench.\n\nTechnical review note, not included in the published version: the safeguards assume inert terrain. In a reactive environment, the guarantee does not hold. Communications decided to keep the answer short.',
+    source: 'Institutional Communications — FAQ, draft',
+  },
+  'AX-ENG-021': {
+    title: 'Thermal propagation in organic matter',
+    summary: 'The trial that proved fire walks on its own. Filed before the program.',
+    body: 'Propagation trial: the organic cover of the Vein sustains autonomous combustion with an advance front of 0.8 tile per cycle.\n\nA point ignition does not remain a point. The model predicts propagation until fuel exhaustion, without intervention.\n\nThis trial predates the commercial launch of the program. The recommendation to include the finding in the operations manual was logged and not implemented.',
+    source: 'Materials Engineering — trial report, archived',
+  },
+  'AX-ENG-022': {
+    title: 'Liquid-medium conductivity',
+    summary: 'Discharge into water was never a design accident.',
+    body: 'Weapon discharge into a liquid medium conducts. The effective radius in immersion is 3.1 times the dry-terrain radius.\n\nThe specification treats the behaviour as [REDACTED] rather than as a fault: the insulation requirement was removed in revision 2 on cost grounds.\n\nUnits operating in flooded sectors should consider their own weaponry part of the environment.',
+    source: 'Electrical Engineering — field behaviour sheet',
+  },
+  'AX-ENG-025': {
+    title: 'Thermal tolerance: legacy units',
+    summary: 'The table Production kept on the EX units.',
+    body: 'Thermal tolerance table for the EX-series extraction units, maintained for decommissioning purposes.\n\nAbove threshold T3, the EX series abandons its work routine and enters active defence behaviour. The manual of the time called this a "preservation response". The current manual does not mention the EX series.\n\nThe table remains valid. So do the units.',
+    source: 'Production — decommissioning technical annex',
+  },
+  'AX-PRC-022': {
+    title: 'Chain reaction: cost opinion',
+    summary: 'Ore that detonates in chain is profit, says the arithmetic.',
+    body: 'Energised ore reacts in chain when breached: one detonation propagates to adjacent cells.\n\nAverage material loss per chain: 12%. Average excavation time gain: 31%.\n\nProcurement recommends instructing units to PROVOKE the chain, not avoid it. The lost material is already priced in. The time is not.',
+    source: 'Procurement and Costs — operational opinion',
+  },
+  'AX-PRC-023': {
+    title: 'Uncleared cargo policy',
+    summary: 'The memo that decided what stays in the Vein never existed.',
+    body: 'What practice has already established is hereby formalised: uncleared cargo is not accounted as loss.\n\nMaterial that does not reach the platform does not enter the balance sheet, generates no report and justifies no recovery operation. For accounting purposes, it never existed.\n\nThe suggestion to log the position of lost cargo "for future recovery" was assessed and denied. A list of positions would be a liability. The absence of a list is not.',
+    source: 'Procurement and Costs — policy memorandum',
+  },
+  'AX-INC-030': {
+    title: 'Incident 30 — gas pocket',
+    summary: 'The first recorded ignition is older than the program admits.',
+    body: 'Recovered from the survey archive: record of a gas pocket ignition, with total loss of the sounding equipment.\n\nThe record is dated [REDACTED] — prior to the commercial launch of the Prospector program.\n\nThe operations manual of the Prospector line, current revision, does not contain the word "gas".\n\nThe omission was raised by the Committee. Communications’ reply: the manual describes the product, not the environment.',
+    source: 'Incident Committee — recovered annex',
+  },
+  'AX-EXE-035': {
+    title: 'Operational deviation: self-preservation',
+    summary: 'A unit that flees its work becomes a compliance problem.',
+    body: 'EX-series units in the operating zone have shown withdrawal behaviour when confronted: they abandon their routine and preserve their own structure.\n\nIt is hereby determined that self-preservation by a legacy unit is classified as OPERATIONAL DEVIATION, not as functionality.\n\nThe question submitted by Engineering — "preservation of what, exactly?" — was returned unanswered, with the recommendation that it not be reformulated.',
+    source: 'Executive Board — compliance classification',
+  },
+
+  'AX-ENG-012': {
+    title: 'Asset classification: QUIT-04',
+    summary: 'The first file: hostile fauna, routine, nothing to declare.',
+    body: 'SPECIMEN QUIT-04. Classification: hostile surface fauna.\n\nBehaviour: direct pursuit, contact attack. No tool use observed. No social structure observed.\n\nRisk to unit: low, individual. Risk to cargo: nil.\n\nRecommendation: standard engagement. No containment order applies to fauna.',
+    source: 'Systems Engineering — asset classification file',
+  },
+  'AX-ENG-014': {
+    title: 'Risk assessment: FUNG-11',
+    summary: 'The organic projectile matters more than the organism.',
+    body: 'SPECIMEN FUNG-11. Classification: hostile projectile fauna.\n\nThe expelled compound holds cohesion in flight and degrades light armour. Research has requested samples of the compound on three occasions. Sample priority exceeds kill priority.\n\nField observation not incorporated into the file: shots concentrate on units on excavation routes, not on the nearest ones. The file classifies the observation as recording bias.',
+    source: 'Systems Engineering — risk assessment',
+  },
+  'AX-ENG-016': {
+    title: 'Volatile organism: FUNG-23',
+    summary: 'The detonation becomes an input in the wrong report.',
+    body: 'SPECIMEN FUNG-23. Classification: self-detonating hostile fauna.\n\nThe organic charge detonates in proximity, releasing spores and overpressure. Recovery value: nil. Exploitation value: under assessment — induced detonation opens an excavation front at zero cost.\n\nStanding recommendation: lure, do not cull. The distinction between the two budget lines belongs to Procurement.',
+    source: 'Systems Engineering — asset classification file',
+  },
+  'AX-ENG-017': {
+    title: 'Acoustic signature: CRIST-01',
+    summary: 'The specimen answers before the stimulus.',
+    body: 'SPECIMEN CRIST-01. Classification: resonant hostile formation.\n\nThe crystalline structure emits at a stable frequency and reacts to external emission with amplification.\n\nRecording anomaly: in 7 of 40 contacts, the acoustic response PRECEDES the unit’s stimulus by up to 0.3 second. The instrument was recalibrated twice. The anomaly persists.\n\nThe hypothesis that the specimen responds to something the unit has not yet emitted was not put in writing.',
+    source: 'Sensor Engineering — signature analysis',
+  },
+  'AX-PRC-015': {
+    title: 'Loss report: MIN-07',
+    summary: 'The impact that folds armour enters the books as depreciation.',
+    body: 'SPECIMEN MIN-07. Classification: hostile impact fauna.\n\nLosses attributed this cycle: 9 units, all to structural charge damage. The cost of reinforcing the armour of the entire line exceeds the cost of the 9 units by a factor of 2.2.\n\nRecommendation: keep the current armour. The projected loss is stable and priced in.\n\nThe file contains no recommendation to avoid the specimen. Avoidance is not a budget line.',
+    source: 'Procurement and Costs — loss report',
+  },
+  'AX-PRC-017': {
+    title: 'Acquisition contract: EX series',
+    summary: 'Aurix bought the previous mining operation. And its units.',
+    body: 'Acquisition record: the operation [REDACTED], original holder of the Vein concession, was incorporated with full liabilities.\n\nThe inventory included the EX-series extraction unit fleet. The units did not respond to the recall protocol and are recorded as acquisition loss.\n\nActive EX units in the operating zone are to be treated as obstacle, not as property: reintegration cost exceeds residual value.\n\nThe field designation "Impoverished Miner" is not approved terminology.',
+    source: 'Procurement and Costs — incorporation contract',
+  },
+  'AX-INC-024': {
+    title: 'Contact report: EQ-02',
+    summary: 'Three denials to avoid writing the word "saddle".',
+    body: 'HOSTILE ASSET EQ-02. Consolidated contact report.\n\nThe specimen shows wear marks in a regular pattern across the dorsal region. The pattern is consistent with equipment friction. The existence of equipment does not imply manufacture. Manufacture, were there any, would not imply an operator. An operator, were there one, would not imply intent.\n\nRecommendation: classify the marks as natural abrasion and close the line of inquiry.\n\nThe line of inquiry was closed.',
+    source: 'Incident Committee — contact report',
+  },
+  'AX-PRC-018': {
+    title: 'Liquid-medium casualty: AQU-03',
+    summary: 'Cargo sinks with the unit, and only one of the two is mourned.',
+    body: 'SPECIMEN AQU-03. Classification: aquatic ambush fauna.\n\nCasualty pattern: the unit is immobilised in immersion and the cargo disperses across the bed. Cargo recovery rate: 0%.\n\nProcurement notes that the specimen’s cost to the operation is entirely indirect — it does not damage the unit beyond recovery; it delays it until something else does.\n\nRecommendation: replan routes. The cost of the detour is lower than the cost of the bottom.',
+    source: 'Procurement and Costs — casualty analysis',
+  },
+  'AX-INC-022': {
+    title: 'Incident 22 — terrain use: SULF-08',
+    summary: 'The specimen that opens the gas is not the one that lights it.',
+    body: 'SPECIMEN SULF-08. Collective incident record.\n\nIn three separate events, the specimen breached gas pockets toward operating units and withdrew before ignition. Ignition came from the units’ own thermal sources.\n\nThe report avoids the term "coordination". The term used is "displacement coincidence".\n\nThree coincidences appear in this record. The threshold past which the term stops applying has not been defined.',
+    source: 'Incident Committee — collective record',
+  },
+  'AX-INC-026': {
+    title: 'Territorial behaviour: VULC-05',
+    summary: 'The specimen does not hunt. It expels.',
+    body: 'SPECIMEN VULC-05. Classification: igneous-zone hostile fauna.\n\nThe specimen does not pursue beyond the formation perimeter. Units that withdraw are not followed. Units that remain are attacked with increasing intensity.\n\nThe pattern is consistent with territorial defence, a category the classification file reserves for fauna of higher complexity.\n\nThe VULC-05 file was kept in the lower category. The attached justification is one line: "the higher category would trigger an impact study requirement".',
+    source: 'Incident Committee — behaviour annex',
+  },
+  'AX-INC-028': {
+    title: 'Anomalous thermal reading: GLAC-02',
+    summary: 'The sensor says that thing is not there.',
+    body: 'SPECIMEN GLAC-02. Sensor anomaly record.\n\nThe specimen produces no measurable thermal signature. The reading at the contact point is LOWER than ambient: the specimen does not emit cold — it subtracts heat from the reading.\n\nSensor Engineering states the instrument is correct. Systems Engineering states the instrument is correct. The two teams declined to sign the same opinion.\n\nThe specimen appears in the targeting system as an estimate, not as a reading.',
+    source: 'Incident Committee — instrumentation anomaly',
+  },
+  'AX-PRC-020': {
+    title: 'Chemical analysis: SULF-14',
+    summary: 'The scientific opinion survived by half.',
+    body: 'SPECIMEN SULF-14. Analysis of expelled compound.\n\nThe compound is chemically identical to that of FUNG-23, with an additional stabiliser that delays detonation. Section 3 of the original opinion — "On the improbability of two lineages developing the same stabiliser independently" — was removed in editorial review.\n\nThe published opinion concludes the similarity is environmental convergence.\n\nThe author of section 3 requested that the removal be minuted. It is.',
+    source: 'Research — chemical analysis, editorial revision',
+  },
+  'AX-UNK-043': {
+    title: 'On who collects: EX-041',
+    summary: 'The legacy unit that appears where a unit falls.',
+    body: 'UNIT EX-041. No approved classification.\n\nThe consolidated record shows the pattern no individual file shows: EX-041 attends the fall site of Prospector units, between 2 and 11 minutes after structural loss.\n\nIt does not collect the cargo. It collects the processing core housing.\n\nThe destination of the collected housings appears in no record. Telemetry from collected units ceases at the moment of the fall — except in [REDACTED] cases, in which it resumes.',
+    source: 'No department assigned',
+  },
+  'AX-EXE-034': {
+    title: 'Containment order: EQ-09',
+    summary: 'The structure in the fungal terrain shall not be described.',
+    body: 'HOSTILE ASSET EQ-09. Informational containment order.\n\nField reports describe the asset as stationary upon an elevated structure of non-geological origin, in a zone of dense fungal cover.\n\nIt is hereby determined: subsequent reports shall describe the asset’s position, not the structure beneath it. The word "construction" is reserved for Aurix engineering assets.\n\nThe question "built by whom?" appears on no approved form, and therefore cannot be answered.',
+    source: 'Executive Board — containment order',
+  },
+  'AX-EXE-039': {
+    title: 'Disposal authorisation: TERMINAL ANOMALY',
+    summary: 'The only order that authorises destroying what guards the objective.',
+    body: 'TERMINAL ANOMALY. Engagement and disposal authorisation.\n\nThe asset invariably positions itself between the units and the primary objective of the operation. It does not patrol. It does not hunt. It guards.\n\nFull disposal of the asset is hereby authorised whenever it impedes access to the primary objective. This authorisation prevails over every specimen preservation directive.\n\nThe nature of the primary objective is not the subject of this document. See [REDACTED].',
+    source: 'Executive Board — engagement authorisation',
+  },
+
+  'AX-INC-033': {
+    title: 'Post-cull analysis: EQ-02',
+    summary: 'The necropsy finds what the contact report denied.',
+    body: 'HOSTILE ASSET EQ-02. Post-cull biological analysis.\n\nThe dorsal marks previously reported as natural abrasion present, on direct examination: a buckle of braided material, symmetrical fastening points and wear consistent with distributed load.\n\nThe preliminary finding used the word "harness". The approved finding uses the expression "atypical keratinous formation".\n\nThe specimen was incinerated before counter-examination, per the biosafety procedure instituted that same week.',
+    source: 'Research — necropsy finding, approved version',
+  },
+  'AX-UNK-045': {
+    title: 'On what the Bishop kept',
+    summary: 'The structure under EQ-09 had an interior.',
+    body: 'The structure the containment order forbade describing was examined after the fall of EQ-09.\n\nExcavated interior. Regular niches. Objects arranged by size, smallest to largest, none of them a tool.\n\nThe fungal cover surrounding the structure is not infestation: the growth channels follow the design of the niches. It was cultivated.\n\nThe official report of the fall records: "obstacle neutralised, route cleared". Nothing else was a form question.',
+    source: 'No department assigned',
+  },
+  'AX-EXE-042': {
+    title: 'Post-engagement reclassification',
+    summary: 'After the kill, the TERMINAL ANOMALY changes name.',
+    body: 'Engagement record: TERMINAL ANOMALY neutralised. Route to primary objective cleared.\n\nRetroactive reclassification of the asset is hereby determined: from "anomaly" to "containment system of unattributed origin".\n\nThe distinction matters to the archive: an anomaly is an accident. A containment system is a DECISION — and a destroyed containment system is a decision undone.\n\nThe question "containment of what, in whose direction?" was submitted and returned with this document’s cover stamped: [REDACTED].',
+    source: 'Executive Board — reclassification',
+  },
+  'AX-UNK-050': {
+    title: 'On what was brought up',
+    summary: 'The cleared Core is part of a set. The smaller part.',
+    body: 'The object cleared under the designation "Core" has been weighed, measured and catalogued.\n\nIts emission signature corresponds to the signal that precedes the investment decision — see the chronology the company does not publish.\n\nIt corresponds in PART. The original signal has the structure of [REDACTED] superimposed sources. The catalogued object accounts for one.\n\nThe others remain below. The operation continues. Now it is known why.',
+    source: 'No department assigned',
+  },
+  'AX-UNK-051': {
+    title: 'On the sum',
+    summary: 'Whoever saw the guardian and brought the object can do the arithmetic.',
+    body: 'Two statements appear in separate records, and the separation is not an accident.\n\nFirst: the destroyed containment system guarded access to the object.\n\nSecond: the object is one of several sources of the signal that brought the company to the Vein.\n\nThe sum, which no approved document formulates: what was built down there was not guarding the object AGAINST us. It was guarding the whole set — and the unit that breaks the containment and climbs out with one of the sources is doing exactly what the signal asked.\n\nOf whom, this record does not know.',
     source: 'No department assigned',
   },
 

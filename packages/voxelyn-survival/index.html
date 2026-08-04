@@ -1704,6 +1704,111 @@
         font-size: 12px;
         margin-bottom: 8px;
       }
+      /* O cabeçalho do documento é um botão: abrir marca leitura. */
+      .codex-doc-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        background: none;
+        border: none;
+        padding: 2px 0;
+        cursor: pointer;
+        text-align: left;
+        color: inherit;
+        font: inherit;
+        min-height: 32px;
+      }
+      .codex-doc-header:focus-visible {
+        outline: 1px solid var(--ax-teal-bright);
+        outline-offset: 2px;
+      }
+      .codex-doc-title {
+        color: var(--ax-text-bright);
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+      }
+      .codex-filter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 8px 0;
+        padding: 6px 8px;
+        border: 1px dashed var(--ax-key);
+      }
+      .codex-filter-label {
+        color: var(--ax-gold-dim);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+      }
+      .codex-related-link {
+        background: none;
+        border: none;
+        padding: 0;
+        color: var(--ax-teal-bright);
+        font: inherit;
+        font-size: 10px;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      /* A bolinha de conteúdo novo. Nunca cor sozinha: carrega rótulo (sr-only
+         + title) para leitor de tela e tooltip. */
+      .ax-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--ax-teal-bright);
+        box-shadow: 0 0 6px rgba(79, 214, 201, 0.7);
+        flex: none;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+      /* "Ver docs ↗": secundário e compacto, mas com alvo de toque honesto. */
+      .ax-viewdocs {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: auto;
+        padding: 4px 8px;
+        min-height: 28px;
+        background: none;
+        border: 1px solid var(--ax-key);
+        color: var(--ax-teal-bright);
+        font: inherit;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+      }
+      .ax-viewdocs:focus-visible {
+        outline: 1px solid var(--ax-teal-bright);
+        outline-offset: 2px;
+      }
+      .ax-viewdocs-icon svg {
+        width: 11px;
+        height: 11px;
+        display: block;
+      }
+      @media (pointer: coarse) {
+        .ax-viewdocs {
+          min-height: 44px;
+          padding: 8px 12px;
+        }
+      }
+      .found {
+        align-items: center;
+      }
+      .ax-tab .ax-dot {
+        margin-left: 6px;
+      }
 
       /* Ranking: livro de expedições homologadas */
       .ax-rank-head,
