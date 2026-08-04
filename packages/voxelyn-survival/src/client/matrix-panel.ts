@@ -4,6 +4,13 @@
 // e rolavel, e reimplementar quebra de linha, scroll e hit-test de toque no
 // canvas seria trabalho gasto no lugar errado.
 //
+// O redesign (doc AD-UI-2.0) trocou a pilha de cartoes por um CONSOLE: quatro
+// trilhos horizontais, um por ramo, com nos que carregam so a sigla e o simbolo
+// de estado. Toda a prosa — nome, descricao, custo, o que falta — vive no
+// inspetor, que so existe quando ha um no selecionado. A conexao entre nos
+// acende quando o pre-requisito esta instalado: o caminho ja pago e visivel de
+// relance, sem ler texto.
+//
 // ---------------------------------------------------------------------------
 // A REGRA QUE ESTE ARQUIVO NAO PODE QUEBRAR
 // ---------------------------------------------------------------------------
@@ -231,45 +238,186 @@ const renderHeader = (view: MatrixViewState): HTMLElement => {
   return header;
 };
 
-const renderNode = (
-  upgrade: UpgradeDefinition,
-  view: MatrixViewState,
-  handlers: MatrixHandlers,
-): HTMLElement => {
-  const state = nodeState(upgrade, view.profile);
-  const node = el('div', `matrix-node matrix-node-${state.kind}`);
+/**
+ * O no selecionado vive no MODULO, como a aba do Registro: o painel inteiro e
+ * redesenhado a cada mudanca de estado (compra, resposta do servidor, troca de
+ * idioma), e um estado local a chamada esqueceria a selecao no meio da compra.
+ */
+let selectedId: string | null = null;
 
-  const head = el('div', 'matrix-node-head');
-  head.appendChild(el('span', 'matrix-node-id', `${upgrade.id} · T${upgrade.tier}`));
-  node.appendChild(head);
-  node.appendChild(el('div', 'matrix-node-name', t(`upgrade.${upgrade.id}.name` as MessageKey)));
-  node.appendChild(el('div', 'matrix-node-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)));
+/** Sigla curta do no no trilho: "CA-01" vira "01", "CA-X" vira "X". */
+const nodeShortLabel = (upgrade: UpgradeDefinition): string => {
+  const dash = upgrade.id.lastIndexOf('-');
+  return dash >= 0 ? upgrade.id.slice(dash + 1) : upgrade.id;
+};
 
-  const side = el('div', 'matrix-node-side');
-  if (state.kind === 'installed') {
-    side.appendChild(el('span', 'matrix-node-installed', t('matrix.node.installed')));
-  } else {
-    side.appendChild(
-      el('span', 'matrix-node-cost', `${upgrade.oreCost} ⬡ · ${upgrade.coreCost} ◉`),
-    );
-    const status = statusText(state);
-    if (status) side.appendChild(el('span', 'matrix-node-status', status));
+/**
+ * O rotulo do no para leitores de tela.
+ *
+ * "01 ●" comunica tudo a quem VE o trilho inteiro e nada a quem ouve um botao
+ * por vez: ramo, codigo, nome e situacao precisam estar na propria fala do
+ * botao. Pura e exportada para o teste cobrar exatamente isso.
+ */
+export const nodeAriaLabel = (upgrade: UpgradeDefinition, state: NodeState): string => {
+  const branch = t(BRANCH_LABEL[upgrade.branch].title);
+  const name = t(`upgrade.${upgrade.id}.name` as MessageKey);
+  const status = state.kind === 'affordable' ? t('matrix.confirm.yes') : statusText(state);
+  return `${branch} · ${upgrade.id} · ${name}${status ? ` — ${status}` : ''}`;
+};
+
+/** O simbolo de estado do no. Nunca cor sozinha: simbolo + moldura + fundo. */
+const nodeGlyph = (state: NodeState, pending: boolean): string => {
+  if (pending) return '…';
+  switch (state.kind) {
+    case 'installed':
+      return '●';
+    case 'affordable':
+      return '+';
+    case 'missing':
+      return '⬡';
+    case 'locked':
+      return '✕';
   }
-  node.appendChild(side);
+};
+
+const nodeStateClass = (state: NodeState): string => {
+  switch (state.kind) {
+    case 'installed':
+      return ' is-installed';
+    case 'affordable':
+      return ' is-affordable';
+    case 'locked':
+      return ' is-locked';
+    case 'missing':
+      return '';
+  }
+};
+
+const renderBranchRail = (
+  branch: UpgradeBranch,
+  view: MatrixViewState,
+  redraw: () => void,
+): HTMLElement => {
+  const rail = el('div', 'ax-branch');
+  const label = el('div', 'ax-branch-label');
+  label.appendChild(el('div', 'ax-branch-name', t(BRANCH_LABEL[branch].title)));
+  label.appendChild(el('div', 'ax-branch-note', t(BRANCH_LABEL[branch].note)));
+  rail.appendChild(label);
+
+  const owned = new Set(view.profile?.purchasedUpgradeIds ?? []);
+  const upgrades = upgradesOfBranch(branch);
+  upgrades.forEach((upgrade, index) => {
+    if (index > 0) {
+      // A conexao acende quando o pre-requisito ja esta instalado: o caminho
+      // pago e legivel sem abrir nenhum inspetor.
+      const link = el('span', `ax-node-link${owned.has(upgrades[index - 1].id) ? ' is-live' : ''}`);
+      rail.appendChild(link);
+    }
+    const state = nodeState(upgrade, view.profile);
+    const node = el(
+      'button',
+      `ax-node${nodeStateClass(state)}${selectedId === upgrade.id ? ' is-selected' : ''}`,
+    ) as HTMLButtonElement;
+    node.appendChild(el('span', undefined, nodeShortLabel(upgrade)));
+    node.appendChild(el('span', 'ax-node-glyph', nodeGlyph(state, view.pending === upgrade.id)));
+    node.title = upgrade.id;
+    node.dataset.axFocus = `node:${upgrade.id}`;
+    node.setAttribute('aria-label', nodeAriaLabel(upgrade, state));
+    node.setAttribute('aria-pressed', selectedId === upgrade.id ? 'true' : 'false');
+    // O no trancado continua CLICAVEL: o inspetor e onde o jogador descobre o
+    // pre-requisito. Bloquear o clique esconderia justamente a explicacao.
+    node.addEventListener('click', () => {
+      selectedId = selectedId === upgrade.id ? null : upgrade.id;
+      redraw();
+    });
+    rail.appendChild(node);
+  });
+  return rail;
+};
+
+const renderInspector = (view: MatrixViewState, handlers: MatrixHandlers): HTMLElement => {
+  const inspector = el('div', 'ax-inspector');
+  inspector.appendChild(el('div', 'ax-section-label', t('matrix.inspector.title')));
+  const upgrade = UPGRADES.find((entry) => entry.id === selectedId);
+  if (!upgrade) {
+    inspector.appendChild(el('div', 'sub', t('matrix.inspector.hint')));
+    return inspector;
+  }
+  const state = nodeState(upgrade, view.profile);
+
+  inspector.appendChild(el('div', 'codex-code', `${upgrade.id} · T${upgrade.tier}`));
+  inspector.appendChild(
+    el('div', 'ax-inspector-name', t(`upgrade.${upgrade.id}.name` as MessageKey)),
+  );
+  inspector.appendChild(
+    el('div', 'ax-inspector-desc', t(`upgrade.${upgrade.id}.desc` as MessageKey)),
+  );
+
+  const fieldRow = (label: string, value: string, valueClass?: string): HTMLElement => {
+    const row = el('div', 'ax-field');
+    row.appendChild(el('span', 'ax-field-label', label));
+    row.appendChild(el('span', 'ax-field-dots'));
+    const cell = el('span', undefined, value);
+    if (valueClass) cell.className = valueClass;
+    row.appendChild(cell);
+    return row;
+  };
+
+  if (upgrade.prerequisite) {
+    const met = view.profile?.purchasedUpgradeIds.includes(upgrade.prerequisite) ?? false;
+    inspector.appendChild(
+      fieldRow(
+        t('matrix.inspector.requires'),
+        `${upgrade.prerequisite}${met ? ' ✓' : ''}`,
+        met ? 'matrix-card-value' : undefined,
+      ),
+    );
+  }
+  inspector.appendChild(
+    fieldRow(t('matrix.inspector.cost'), `${upgrade.oreCost} ⬡ · ${upgrade.coreCost} ◉`),
+  );
+  if (view.profile && state.kind === 'affordable') {
+    inspector.appendChild(
+      fieldRow(
+        t('matrix.inspector.balanceAfter'),
+        `${view.profile.wallet.ore - upgrade.oreCost} ⬡ · ${
+          view.profile.wallet.cores - upgrade.coreCost
+        } ◉`,
+      ),
+    );
+  }
 
   if (state.kind === 'affordable') {
-    const button = el('button', 'compact primary') as HTMLButtonElement;
+    const button = el('button', 'primary') as HTMLButtonElement;
     button.textContent = view.pending === upgrade.id ? t('matrix.buying') : t('matrix.confirm.yes');
     // Desabilitado enquanto a requisicao corre. Nao e otimismo: o estado da
     // arvore so muda quando a resposta do servidor chega.
     button.disabled = !purchaseEnabled(view);
+    button.dataset.axFocus = 'authorize';
     button.addEventListener('click', () => handlers.onPurchase(upgrade));
-    node.appendChild(button);
+    inspector.appendChild(button);
+  } else {
+    const status = statusText(state);
+    if (status) {
+      // O que falta e escrito no proprio lugar do botao — ouro, nao vermelho:
+      // nao houve perda, so falta lastro (ou falta o pre-requisito nomeado).
+      const plate = el('button', undefined, status) as HTMLButtonElement;
+      plate.disabled = true;
+      if (state.kind === 'installed') {
+        plate.className = 'primary';
+        plate.disabled = true;
+      }
+      inspector.appendChild(plate);
+    }
   }
-  return node;
+  return inspector;
 };
 
-const renderMatrixTab = (view: MatrixViewState, handlers: MatrixHandlers): HTMLElement => {
+const renderMatrixTab = (
+  view: MatrixViewState,
+  handlers: MatrixHandlers,
+  redraw: () => void,
+): HTMLElement => {
   const body = el('div', 'matrix-body');
   const notice = panelNotice(view);
   if (notice) {
@@ -279,14 +427,10 @@ const renderMatrixTab = (view: MatrixViewState, handlers: MatrixHandlers): HTMLE
   if (view.notice) body.appendChild(el('p', 'sub warn', t(view.notice.key, view.notice.params)));
 
   for (const branch of UPGRADE_BRANCHES) {
-    const section = el('section', 'matrix-branch');
-    section.appendChild(el('h2', undefined, t(BRANCH_LABEL[branch].title)));
-    section.appendChild(el('div', 'sub', t(BRANCH_LABEL[branch].note)));
-    for (const upgrade of upgradesOfBranch(branch)) {
-      section.appendChild(renderNode(upgrade, view, handlers));
-    }
-    body.appendChild(section);
+    body.appendChild(renderBranchRail(branch, view, redraw));
   }
+  body.appendChild(el('div', 'ax-legend', t('matrix.legend')));
+  body.appendChild(renderInspector(view, handlers));
   body.appendChild(el('p', 'sub matrix-policy', t('matrix.policy')));
   return body;
 };
@@ -360,17 +504,31 @@ export const renderMatrixPanel = (
   view: MatrixViewState,
   handlers: MatrixHandlers,
 ): void => {
+  // Redesenhar limpa o DOM inteiro, e com ele o elemento focado — o foco caia
+  // no documento a cada selecao de no ou troca de aba, o que quebra teclado e
+  // leitor de tela no meio do fluxo de compra. A identidade do foco viaja por
+  // `data-ax-focus` e e restaurada sobre o elemento equivalente novo.
+  const active = document.activeElement;
+  const focusKey =
+    active instanceof HTMLElement && root.contains(active)
+      ? (active.dataset.axFocus ?? null)
+      : null;
+
   root.textContent = '';
 
   root.appendChild(renderHeader(view));
 
-  const tabs = el('div', 'row matrix-tabs');
+  const tabs = el('div', 'ax-tabs matrix-tabs');
+  tabs.setAttribute('role', 'tablist');
   for (const tab of ['matrix', 'codex'] as const) {
     const button = el(
       'button',
-      `compact${view.tab === tab ? ' primary' : ''}`,
+      `ax-tab${view.tab === tab ? ' is-active' : ''}`,
       t(`matrix.tab.${tab}` as MessageKey),
     ) as HTMLButtonElement;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', view.tab === tab ? 'true' : 'false');
+    button.dataset.axFocus = `tab:${tab}`;
     button.addEventListener('click', () => handlers.onTab(tab));
     tabs.appendChild(button);
   }
@@ -380,7 +538,22 @@ export const renderMatrixPanel = (
     root.appendChild(renderReveal(view.reveal, handlers));
     return;
   }
-  root.appendChild(view.tab === 'matrix' ? renderMatrixTab(view, handlers) : renderCodexTab(view));
+  const redraw = (): void => renderMatrixPanel(root, view, handlers);
+  root.appendChild(
+    view.tab === 'matrix' ? renderMatrixTab(view, handlers, redraw) : renderCodexTab(view),
+  );
+
+  if (focusKey) {
+    // Se o elemento focado deixou de existir (o botao de compra some quando o
+    // no vira "instalado"), o foco recua para o no selecionado — nunca para o
+    // vazio do documento.
+    const target =
+      root.querySelector<HTMLElement>(`[data-ax-focus="${CSS.escape(focusKey)}"]`) ??
+      (selectedId
+        ? root.querySelector<HTMLElement>(`[data-ax-focus="${CSS.escape(`node:${selectedId}`)}"]`)
+        : null);
+    target?.focus();
+  }
 };
 
 /** Quantos protocolos existem, para o teste de contagem do painel. */

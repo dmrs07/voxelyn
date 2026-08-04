@@ -68,6 +68,15 @@ export class PauseMenu {
     this.coopWarning = document.getElementById('pause-coop-warning') as HTMLDivElement;
     this.abandonButton = document.getElementById('btn-pause-abandon') as HTMLButtonElement;
 
+    this.mountPlates();
+  }
+
+  /**
+   * (Re)monta as placas da companhia. Chamado tambem por `refreshLabels`: o
+   * lema da placa de rescisao e localizado, e trocar de idioma no bloco de
+   * opcoes que este menu hospeda tem de valer para ele tambem.
+   */
+  private mountPlates(): void {
     for (const id of ['pause-mark', 'pause-confirm-mark']) {
       const slot = document.getElementById(id);
       if (slot) slot.innerHTML = aurixPlateHtml(id === 'pause-confirm-mark');
@@ -203,6 +212,7 @@ export class PauseMenu {
   refreshLabels(): void {
     this.statusLine.textContent = this.host.status();
     this.abandonButton.textContent = t(this.host.runTerminal() ? 'pause.leave' : 'pause.abandon');
+    this.mountPlates();
   }
 
   openMenu(): void {

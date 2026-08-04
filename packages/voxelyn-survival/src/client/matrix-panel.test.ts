@@ -7,11 +7,13 @@ import { findUpgrade, UPGRADES } from '@voxelyn/survival-sim';
 import type { PublicProgressionProfile } from '@voxelyn/survival-protocol';
 import {
   needsConfirmation,
+  nodeAriaLabel,
   nodeState,
   panelNotice,
   purchaseEnabled,
   type MatrixViewState,
 } from './matrix-panel';
+import { t } from './i18n';
 
 const profile = (
   ore: number,
@@ -155,5 +157,27 @@ describe('quando da para comprar', () => {
     expect(purchaseEnabled(view({ loading: true }))).toBe(false);
     expect(purchaseEnabled(view({ cached: true }))).toBe(false);
     expect(purchaseEnabled(view({ pending: 'CA-01' }))).toBe(false);
+  });
+});
+
+// O rotulo falado de um no. "01 ●" diz tudo a quem ve o trilho e nada a quem
+// ouve um botao por vez: ramo, codigo, nome e situacao precisam estar na fala.
+describe('rotulo de leitor de tela do no', () => {
+  it('carrega ramo, codigo, nome e a situacao escrita', () => {
+    const label = nodeAriaLabel(ca02, nodeState(ca02, profile(99999, 99)));
+    expect(label).toContain(t('matrix.branch.chassis'));
+    expect(label).toContain('CA-02');
+    expect(label).toContain(t('upgrade.CA-02.name'));
+    expect(label).toContain(t('matrix.node.locked', { id: 'CA-01' }));
+  });
+
+  it('no compravel anuncia a acao, nao um estado vazio', () => {
+    const label = nodeAriaLabel(ca01, nodeState(ca01, profile(99999, 99)));
+    expect(label).toContain(t('matrix.confirm.yes'));
+  });
+
+  it('no instalado anuncia a incorporacao', () => {
+    const label = nodeAriaLabel(ca01, nodeState(ca01, profile(0, 0, ['CA-01'])));
+    expect(label).toContain(t('matrix.node.installed'));
   });
 });

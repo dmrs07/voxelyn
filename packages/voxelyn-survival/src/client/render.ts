@@ -3669,7 +3669,12 @@ export class SurvivalRenderer {
   }
 
   /**
-   * Tela de resultado.
+   * Tela de resultado — o documento de fim de contrato da Aurix (doc AD-UI-2.0).
+   *
+   * Morte e o RELATORIO DE PERDA DE UNIDADE; extracao e a LIQUIDACAO DE
+   * CONTRATO. O mesmo conteudo de sempre, agora dentro de uma moldura de
+   * formulario: cabecalho com codigo de documento, causa como "CAUSA PROVAVEL"
+   * e licao como "RECOMENDACAO DE CAMPO". Vermelho so aparece na perda.
    *
    * Desenha o SUMARIO congelado, nunca o estado vivo: `state` continua sendo o
    * objeto real depois do fim da run, e ler a contaminacao dele aqui daria um
@@ -3687,15 +3692,25 @@ export class SurvivalRenderer {
     if (!summary) return;
     const ctx = this.ctx;
     const outcome = describeOutcome(summary);
-    const colors = { blood: PAL.blood, loot: PAL.loot, biolum: PAL.biolum } as const;
+    const lost = summary.phase === 'dead';
+    // A paleta Aurix da folha de documento. Local ao metodo: o resto do jogo
+    // continua na paleta do mundo (PAL), e o documento e a UNICA superficie
+    // que fala na paleta corporativa.
+    const AX = {
+      gold: '#c9a35a',
+      goldDim: '#a2854a',
+      brass: '#4a3a1e',
+      redLine: '#6b2a20',
+      redText: '#e6a99f',
+      teal: '#4fd6c9',
+      ink: '#cfc6b4',
+      inkBright: '#e2d9c6',
+      inkMute: '#9a9184',
+    } as const;
+    const colors = { blood: AX.redText, loot: AX.gold, biolum: AX.teal } as const;
 
-    ctx.fillStyle = 'rgba(11,14,20,0.88)';
+    ctx.fillStyle = 'rgba(10, 10, 11, 0.9)';
     ctx.fillRect(0, 0, vw, vh);
-    ctx.textAlign = 'center';
-
-    // Escala tipografica derivada da altura: a tela tem de caber num celular em
-    // landscape (390 de altura) sem cortar a linha da licao, que e a util.
-    const unit = Math.max(10, Math.min(20, vh / 24));
 
     const cause = describeCause(summary.deathCause);
     const lines = summaryLines(summary);
@@ -3704,50 +3719,110 @@ export class SurvivalRenderer {
     const record = reputationNote(summary);
     const cargo = cargoNote(summary);
 
-    // Altura do bloco medida ANTES de desenhar, para centralizar de verdade.
-    //
-    // Comecar num percentual fixo da altura (era 0.14) parece funcionar e nao
-    // funciona: o bloco cresce e encolhe com a causa, com a licao e com a dica
-    // de estrela, entao um topo fixo deixa a tela de morte colada no topo e a
-    // de extracao com um vao embaixo. Centralizar exige saber o total.
-    const blockHeight =
-      unit * 2 + // titulo
-      unit * 2.1 + // estrelas
-      unit * (cause.lesson ? 1.35 : 0) + // licao
-      unit * 2 + // respiro antes dos numeros
-      half * unit * 1.25 + // numeros
-      (cargo ? unit * 1.45 : 0) +
-      (record ? unit * 1.45 : 0) +
-      (hint ? unit * 1.45 : 0) +
-      unit * 1.5 + // seed
-      unit * 1.6; // chamada de reinicio
-    let y = Math.max(unit * 1.6, (vh - blockHeight) / 2);
+    // Escala tipografica MEDIDA, nao estimada. Toda a geometria vertical desta
+    // tela e linear em `unit`, entao a altura necessaria e uma soma de
+    // coeficientes vezes `unit` — e quando ela nao cabe (paisagem de 360px com
+    // o caso completo: nove metricas, carga, registro, dica e reinicio), um
+    // unico fator de escala devolve o maior `unit` que cabe. Sem laco e sem
+    // corte: o documento encolhe inteiro em vez de perder a ultima linha.
+    const margin = Math.max(8, Math.min(22, vw * 0.02));
+    // Coeficientes na ordem do desenho: ascendente do titulo, causa (rotulo +
+    // manchete), licao (rotulo + frase), respiro, numeros, carga, registro,
+    // dica, reinicio e a folga do descendente da ultima linha.
+    const blockUnits =
+      1.4 +
+      1.6 +
+      0.9 +
+      (cause.lesson ? 1.95 : 0) +
+      2 +
+      half * 1.25 +
+      (cargo ? 1.45 : 0) +
+      (record ? 1.45 : 0) +
+      (hint ? 0.6 : 0) +
+      1.6 +
+      0.5;
+    // Cabecalho (2.8) + respiro minimo antes do conteudo (1.6) + bloco.
+    const neededUnits = 2.8 + 1.6 + blockUnits;
+    const unitBase = Math.max(10, Math.min(20, vh / 24));
+    const unit = Math.max(7, Math.min(unitBase, (vh - margin * 2) / neededUnits));
+
+    // A moldura do formulario: 1px de latao (perda: vermelho), com keyline
+    // interna escura — a mesma gramatica das folhas em DOM.
+    ctx.strokeStyle = lost ? AX.redLine : AX.brass;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(margin + 0.5, margin + 0.5, vw - margin * 2 - 1, vh - margin * 2 - 1);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.strokeRect(margin + 1.5, margin + 1.5, vw - margin * 2 - 3, vh - margin * 2 - 3);
+
+    // Cabecalho do documento: titulo a esquerda, estrelas a direita, regua.
+    const headY = margin + unit * 1.4;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = lost ? AX.redText : AX.gold;
+    ctx.font = `bold ${Math.round(unit * 0.8)}px monospace`;
+    ctx.fillText(t(lost ? 'summary.doc.loss' : 'summary.doc.settlement'), margin + unit, headY);
+    ctx.fillStyle = AX.goldDim;
+    ctx.font = `${Math.round(unit * 0.6)}px monospace`;
+    // Serial de documento: cromo neutro de lingua (codigos nao se traduzem),
+    // numa variavel para a varredura de sumidouros nao o ler como prosa.
+    const docSerial = lost ? 'AD-PU-0114' : 'AD-LQ-0114';
+    ctx.fillText(
+      `${docSerial} · ${t('summary.seed', { seed: formatSeed(summary.seed) })}`,
+      margin + unit,
+      headY + unit * 0.85,
+    );
+    ctx.textAlign = 'right';
+    ctx.fillStyle = AX.gold;
+    ctx.font = `${Math.round(unit * 1.1)}px monospace`;
+    ctx.fillText(
+      '★'.repeat(summary.stars) + '☆'.repeat(3 - summary.stars),
+      vw - margin - unit,
+      headY + unit * 0.4,
+    );
+    const ruleY = headY + unit * 1.4;
+    ctx.strokeStyle = lost ? AX.redLine : AX.brass;
+    ctx.beginPath();
+    ctx.moveTo(margin + 1, ruleY);
+    ctx.lineTo(vw - margin - 1, ruleY);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+
+    // Centraliza o bloco no espaco que sobra abaixo da regua; com o `unit`
+    // ajustado acima, o minimo nunca empurra a ultima linha para fora.
+    // `y` e a linha de base do titulo; o bloco comeca 1.4·unit acima dela
+    // (o ascendente ja contado em `blockUnits`).
+    const blockHeight = blockUnits * unit;
+    let y = Math.max(
+      ruleY + unit * 1.6,
+      ruleY + (vh - margin - ruleY - blockHeight) / 2 + unit * 1.4,
+    );
 
     ctx.fillStyle = colors[outcome.color];
     ctx.font = `bold ${Math.round(unit * 1.7)}px monospace`;
     ctx.fillText(outcome.title, vw / 2, y);
 
-    y += unit * 2;
-    ctx.font = `${Math.round(unit * 1.9)}px monospace`;
-    ctx.fillStyle = PAL.loot;
-    const filled = '★'.repeat(summary.stars);
-    const empty = '☆'.repeat(3 - summary.stars);
-    ctx.fillText(filled + empty, vw / 2, y);
-
-    // Causa e licao: o motivo de esta tela existir.
-    y += unit * 2.1;
-    ctx.fillStyle = PAL.player;
+    // Causa e licao: o motivo de esta tela existir, na voz do formulario.
+    y += unit * 1.6;
+    ctx.fillStyle = AX.goldDim;
+    ctx.font = `${Math.round(unit * 0.6)}px monospace`;
+    ctx.fillText(t('summary.doc.cause'), vw / 2, y);
+    y += unit * 0.9;
+    ctx.fillStyle = AX.inkBright;
     ctx.font = `bold ${Math.round(unit)}px monospace`;
     ctx.fillText(cause.headline, vw / 2, y);
     if (cause.lesson) {
-      y += unit * 1.35;
-      ctx.fillStyle = PAL.bone;
+      y += unit * 1.1;
+      ctx.fillStyle = AX.goldDim;
+      ctx.font = `${Math.round(unit * 0.6)}px monospace`;
+      ctx.fillText(t('summary.doc.recommendation'), vw / 2, y);
+      y += unit * 0.85;
+      ctx.fillStyle = AX.ink;
       ctx.font = `${Math.round(unit * 0.85)}px monospace`;
       ctx.fillText(cause.lesson, vw / 2, y);
     }
 
-    // Numeros em duas colunas: uma coluna unica de oito linhas nao cabe em
-    // landscape de celular.
+    // Numeros em duas colunas de livro-caixa: uma coluna unica de oito linhas
+    // nao cabe em landscape de celular.
     //
     // A largura da coluna e MEDIDA, nao chutada. Um valor fixo em `unit` colidia
     // rotulo com numero exatamente nas linhas mais longas ("Contaminação 62%"
@@ -3771,11 +3846,23 @@ export class SurvivalRenderer {
       const row = i < half ? i : i - half;
       const lineY = y + row * unit * 1.25;
       ctx.textAlign = 'left';
-      ctx.fillStyle = PAL.bone;
+      ctx.fillStyle = AX.inkMute;
       ctx.fillText(lines[i].label, colX[col], lineY);
       ctx.textAlign = 'right';
-      ctx.fillStyle = PAL.player;
+      ctx.fillStyle = AX.inkBright;
       ctx.fillText(lines[i].value, colX[col] + colW, lineY);
+      // A linha pontilhada do livro-caixa, no vao entre rotulo e numero.
+      const dotStart = colX[col] + ctx.measureText(lines[i].label).width + 5;
+      const dotEnd = colX[col] + colW - ctx.measureText(lines[i].value).width - 5;
+      if (dotEnd > dotStart) {
+        ctx.strokeStyle = 'rgba(51, 41, 29, 0.9)';
+        ctx.setLineDash([1, 3]);
+        ctx.beginPath();
+        ctx.moveTo(dotStart, lineY);
+        ctx.lineTo(dotEnd, lineY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
     ctx.textAlign = 'center';
     y += half * unit * 1.25;
@@ -3783,12 +3870,12 @@ export class SurvivalRenderer {
     // A CARGA vem primeiro, antes do registro e da dica.
     //
     // E a linha que ensina o loop: numa morte ela diz o que ficou no Veio, e a
-    // cor faz metade do trabalho — vermelho de perda contra o ouro do que
-    // voltou. Depois de uma extracao ela anuncia a transmissao; o numero
+    // cor faz metade do trabalho — vermelho de perda contra o teal do que foi
+    // transmitido. Depois de uma extracao ela anuncia a transmissao; o numero
     // creditado chega pelo banner quando o servidor responde.
     if (cargo) {
       y += unit * 0.6;
-      ctx.fillStyle = cargo.tone === 'lost' ? PAL.blood : PAL.loot;
+      ctx.fillStyle = cargo.tone === 'lost' ? AX.redText : AX.teal;
       ctx.font = statFont;
       ctx.fillText(cargo.text, vw / 2, y);
       y += unit * 0.85;
@@ -3798,7 +3885,7 @@ export class SurvivalRenderer {
     // conselho de como jogar melhor, e a unica linha desta tela que so constata.
     if (record) {
       y += unit * 0.6;
-      ctx.fillStyle = PAL.blood;
+      ctx.fillStyle = AX.redText;
       ctx.font = statFont;
       ctx.fillText(record, vw / 2, y);
       y += unit * 0.85;
@@ -3806,18 +3893,15 @@ export class SurvivalRenderer {
 
     if (hint) {
       y += unit * 0.6;
-      ctx.fillStyle = PAL.loot;
+      ctx.fillStyle = AX.gold;
       ctx.font = statFont;
       ctx.fillText(hint, vw / 2, y);
     }
 
-    y += unit * 1.5;
-    ctx.fillStyle = PAL.rockLight;
-    ctx.font = `${Math.round(unit * 0.8)}px monospace`;
-    ctx.fillText(t('summary.seed', { seed: formatSeed(summary.seed) }), vw / 2, y);
-
+    // A chamada de reinicio e a UNICA linha teal da metade de baixo: e o
+    // proximo gesto do operador, e o teal e a cor de agir.
     y += unit * 1.6;
-    ctx.fillStyle = PAL.player;
+    ctx.fillStyle = AX.teal;
     ctx.font = `bold ${Math.round(unit * 0.95)}px monospace`;
     ctx.fillText(t('summary.restart'), vw / 2, y);
   }

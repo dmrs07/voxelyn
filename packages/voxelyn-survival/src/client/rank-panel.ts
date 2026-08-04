@@ -1,10 +1,14 @@
-// O painel do ranking.
+// O painel do ranking: o livro de expedições homologadas.
 //
 // Montagem por DOM, nunca por innerHTML com interpolacao. Aqui isso deixa de
 // ser precaucao e vira necessidade: os nomes vem de OUTRAS PESSOAS, pela rede.
 // O servidor ja remove caracteres de controle e corta o comprimento, mas quem
 // renderiza e o ultimo responsavel — e `textContent` torna a injecao impossivel
 // em vez de improvavel.
+//
+// O redesign (doc AD-UI-2.0) transformou a lista em LIVRO-CAIXA: colunas de
+// posicao, estrelas, operador e tempo, com keyline dourada nas tres primeiras
+// linhas — distincao de papel timbrado, nao de podio de game show.
 
 import { formatDuration, formatSeed } from './run-summary';
 import type { RankEntry } from './run-recorder';
@@ -33,31 +37,36 @@ export const renderRankPanel = (host: HTMLElement, view: RankView): void => {
   host.appendChild(
     el(
       'h2',
-      undefined,
+      'ax-section-label',
       view.seed === undefined ? t('rank.best') : t('rank.seed', { seed: formatSeed(view.seed) }),
     ),
   );
 
   if (view.entries.length === 0) {
-    host.appendChild(el('div', 'locked', view.emptyReason ?? t('rank.empty')));
-    return;
+    // Livro vazio: tracejado + motivo escrito, nunca uma tela em branco.
+    const empty = el('div', 'ax-fragment is-locked');
+    empty.appendChild(el('div', 'locked', view.emptyReason ?? t('rank.empty')));
+    host.appendChild(empty);
+  } else {
+    const head = el('div', 'ax-rank-head');
+    head.appendChild(el('span', undefined, '#'));
+    head.appendChild(el('span', undefined, '★'));
+    head.appendChild(el('span', undefined, t('rank.col.operator')));
+    head.appendChild(el('span', undefined, t('rank.col.time')));
+    host.appendChild(head);
+
+    view.entries.forEach((entry, index) => {
+      const row = el('div', `ax-rank-row${index < 3 ? ' is-podium' : ''}`);
+      row.appendChild(el('span', 'ax-rank-pos', String(index + 1).padStart(2, '0')));
+      row.appendChild(el('span', 'ax-stars', stars(entry.stars)));
+      row.appendChild(el('span', 'ax-rank-name', entry.name));
+      row.appendChild(el('span', 'ax-rank-time', formatDuration(entry.ticks)));
+      host.appendChild(row);
+    });
   }
 
-  const dl = el('dl');
-  view.entries.forEach((entry, index) => {
-    // A posicao entra no rotulo, e nao numa coluna propria: o painel ja e
-    // estreito no celular, e uma terceira coluna espremeria o nome.
-    dl.appendChild(
-      el(
-        'dt',
-        undefined,
-        t('rank.entry', { position: index + 1, stars: stars(entry.stars), name: entry.name }),
-      ),
-    );
-    dl.appendChild(el('dd', undefined, formatDuration(entry.ticks)));
-  });
-  host.appendChild(dl);
-
-  host.appendChild(el('h2', undefined, t('rank.how')));
+  // A explicacao da homologacao: toda descida e reexecutada pela Aurix a
+  // partir das entradas registradas. E o que separa o livro de um placar.
+  host.appendChild(el('h2', 'ax-section-label', t('rank.how')));
   host.appendChild(el('span', 'lesson', t('rank.how.text')));
 };

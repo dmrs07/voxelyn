@@ -58,6 +58,7 @@ import { RunRecorder, fetchLeaderboard, submitRun } from './run-recorder';
 import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
+import { aurixMarkHtml } from './aurix';
 import { PauseMenu } from './pause-menu';
 import {
   LOCALES,
@@ -261,11 +262,25 @@ const backToMenu = (): void => {
   menu.classList.remove('hidden');
 };
 
-const setBanner = (text: string | null): void => {
+/**
+ * O tom de um aviso de sistema (doc AD-UI-2.0): um estilo por SIGNIFICADO,
+ * nunca o mesmo vermelho para tudo.
+ *
+ * - warning (ouro, o padrao): condicao operacional — nao e erro;
+ * - info (teal apagado): o sistema esta trabalhando (conectando, ressinc);
+ * - success (teal): confirmacao — carga homologada, run verificada;
+ * - offline (cinza): perda de conexao — bloqueia gasto, mantem leitura;
+ * - error (vermelho): falha real de sistema, com acao de repetir;
+ * - destructive (vermelho 2px): perda irreversivel, e SO ela.
+ */
+type BannerTone = 'warning' | 'info' | 'success' | 'offline' | 'error' | 'destructive';
+
+const setBanner = (text: string | null, tone: BannerTone = 'warning'): void => {
   if (!text) {
     banner.classList.add('hidden');
   } else {
     banner.textContent = text;
+    banner.dataset.tone = tone;
     banner.classList.remove('hidden');
   }
 };
@@ -323,7 +338,7 @@ window.addEventListener('keydown', (ev) => {
   if (isEditingText(ev.target)) return; // "Marta" nao pode desligar o som
   setMuted(!audioSettings.muted);
   if (!audioSettings.muted) audio.unlock();
-  setBanner(t(audioSettings.muted ? 'banner.sound.off' : 'banner.sound.on'));
+  setBanner(t(audioSettings.muted ? 'banner.sound.off' : 'banner.sound.on'), 'info');
   setTimeout(() => setBanner(null), 1200);
 });
 
@@ -421,7 +436,7 @@ const authorizeExpedition = async (
   const result = authorized.ticket;
   if (!result.ok) {
     expedition = null;
-    setBanner(t('banner.expedition.offline'));
+    setBanner(t('banner.expedition.offline'), 'offline');
     setTimeout(() => setBanner(null), 4200);
     return { seed };
   }
@@ -474,11 +489,12 @@ const transmitSettlement = (url: string, runId: string, log: string): void => {
           ore: credited.oreCredited,
           cores: credited.coresCredited,
         }),
+        'success',
       );
     } else if (credited.oreCredited > 0) {
-      setBanner(t('banner.cargo.cleared', { ore: credited.oreCredited }));
+      setBanner(t('banner.cargo.cleared', { ore: credited.oreCredited }), 'success');
     } else {
-      setBanner(t('banner.cargo.lost', { ore: credited.oreLost }));
+      setBanner(t('banner.cargo.lost', { ore: credited.oreLost }), 'destructive');
     }
     setTimeout(() => setBanner(null), 4600);
   });
@@ -547,7 +563,7 @@ const submitSoloRun = (state: SurvivalState): void => {
       console.info('[leaderboard] nao enviado:', outcome.reason);
       return;
     }
-    setBanner(t(outcome.duplicate ? 'banner.run.duplicate' : 'banner.run.verified'));
+    setBanner(t(outcome.duplicate ? 'banner.run.duplicate' : 'banner.run.verified'), 'success');
     setTimeout(() => setBanner(null), 2600);
   });
 };
@@ -897,7 +913,7 @@ const hintOnce = (): void => {
     } catch {
       /* ignora */
     }
-    setBanner(t('pause.hint'));
+    setBanner(t('pause.hint'), 'info');
     hintTimer = setTimeout(clearHint, 4000);
   }, 1600);
 };
@@ -1157,17 +1173,17 @@ const runOnline = (url: string, roomCode: string | null): void => {
   net.onReject = (reason, field) => {
     if (field) {
       fatal = true;
-      setBanner(t('banner.version.mismatch', { field }));
+      setBanner(t('banner.version.mismatch', { field }), 'error');
       ws?.close();
       return;
     }
     setBanner(t('banner.session.expired'));
     ws?.close();
   };
-  net.onDiverged = () => setBanner(t('banner.resync'));
+  net.onDiverged = () => setBanner(t('banner.resync'), 'info');
 
   const connect = (): void => {
-    setBanner(t(net.resumeToken ? 'banner.reconnecting' : 'banner.connecting'));
+    setBanner(t(net.resumeToken ? 'banner.reconnecting' : 'banner.connecting'), 'info');
     try {
       // URL malformada ou esquema nao-WebSocket lanca AQUI, de forma sincrona.
       // Sem tratar, o menu ja esta escondido e o loop ainda nao comecou: o
@@ -1176,7 +1192,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
     } catch {
       fatal = true;
       startupFailed = true;
-      setBanner(t('banner.server.invalid', { url }));
+      setBanner(t('banner.server.invalid', { url }), 'error');
       backToMenu();
       return;
     }
@@ -1269,7 +1285,7 @@ const runOnline = (url: string, roomCode: string | null): void => {
             // Sala nova e run nova: mesmo `begin()` da entrada, pelo mesmo
             // motivo — e daqui que sai o intervalo ate o reinicio.
             telemetry.begin();
-            setBanner(t('banner.restarting'));
+            setBanner(t('banner.restarting'), 'info');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
           }
@@ -1280,7 +1296,10 @@ const runOnline = (url: string, roomCode: string | null): void => {
         requestAnimationFrame(frame);
         return; // banner ja explica; nao insiste
       }
-      setBanner(t(net.status === 'reconnecting' ? 'banner.reconnecting' : 'banner.offline'));
+      setBanner(
+        t(net.status === 'reconnecting' ? 'banner.reconnecting' : 'banner.offline'),
+        net.status === 'reconnecting' ? 'info' : 'offline',
+      );
       if (reconnectAt && now >= reconnectAt && (!ws || ws.readyState === WebSocket.CLOSED)) {
         reconnectAt = 0;
         connect();
@@ -1329,7 +1348,7 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
 const startOnline = (): void => {
   const code = normalizeRoomCode(roomInput.value);
   if (code !== '' && !isValidRoomCode(code)) {
-    setBanner(t('banner.room.invalid', { code }));
+    setBanner(t('banner.room.invalid', { code }), 'error');
     setTimeout(() => setBanner(null), 2400);
     return;
   }
@@ -1725,6 +1744,37 @@ document.getElementById('btn-rank')?.addEventListener('click', () => {
 document
   .getElementById('btn-rank-close')
   ?.addEventListener('click', () => closeOverlay(rankOverlay));
+
+// ---------------------------------------------------------------------------
+// Trilho de arquivo (doc AD-UI-2.0)
+// ---------------------------------------------------------------------------
+// O monograma no topo de cada trilho. Montado por codigo, e nao inline no HTML,
+// pelo mesmo motivo da placa da pausa: o SVG vive em aurix.ts, unico lugar da
+// marca, e cada instancia precisa do proprio id de gradiente.
+for (const id of ['menu-mark', 'options-mark', 'records-mark', 'matrix-mark', 'rank-mark']) {
+  const slot = document.getElementById(id);
+  if (slot) slot.innerHTML = aurixMarkHtml();
+}
+
+// Navegacao lateral entre telas de arquivo. O trilho nao ganha caminho proprio
+// de abertura: navegar e fechar a tela atual (pelo botao de fechar que os
+// handlers ja escutam) e apertar o botao do menu correspondente — quem carrega
+// dados, toca som e esconde o menu continua sendo o handler existente.
+const NAV_BUTTON: Record<string, string> = {
+  records: 'btn-records',
+  matrix: 'btn-matrix',
+  rank: 'btn-rank',
+  options: 'btn-options',
+};
+document.querySelectorAll<HTMLButtonElement>('[data-ax-nav]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const target = NAV_BUTTON[button.dataset.axNav ?? ''];
+    const overlay = button.closest('.overlay');
+    if (!target || !overlay) return;
+    (document.getElementById(`btn-${overlay.id}-close`) as HTMLButtonElement | null)?.click();
+    (document.getElementById(target) as HTMLButtonElement | null)?.click();
+  });
+});
 
 /**
  * O que a troca de idioma NAO conserta sozinha.
