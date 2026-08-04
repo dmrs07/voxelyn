@@ -24,6 +24,10 @@
 // cliente novo contra servidor antigo espalha um `reach` ausente em
 // `Math.max(...)` e quebra no primeiro sopro; um cliente antigo contra
 // servidor novo ignora o recorte e desenha chama atravessando parede.
+// Ainda na 13 (mesma leva): `ViewerState` passa a transportar os timers
+// privados de recarga (`dodgeCooldownUntil`, `abilityCooldownUntil`,
+// `channelingUntil`) — o radial do HUD online deixa de chutar a duracao a
+// partir do toque e segue o servidor.
 export const PROTOCOL_VERSION = 13;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de

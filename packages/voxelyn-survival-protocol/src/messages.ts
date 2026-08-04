@@ -129,6 +129,20 @@ export type ViewerState = {
   aimX: number;
   aimY: number;
   overheated: boolean;
+  /**
+   * Timers privados de recarga, em TICK absoluto. Sem eles o radial do HUD
+   * online era um chute a partir do toque local, com duracao fixa — errada
+   * para toda habilidade que nao fosse o pulso, e ~4,5 s otimista para o
+   * sopro, cujo cooldown so e cobrado no FIM do canal.
+   */
+  dodgeCooldownUntil: number;
+  abilityCooldownUntil: number;
+  /**
+   * Ate quando o canal do sopro vive; 0 fora dele. Viaja junto porque durante
+   * o canal `abilityCooldownUntil` ainda nao foi cobrado — o HUD projeta
+   * `channelingUntil + cooldown`, o mesmo instante que a liquidacao vai gravar.
+   */
+  channelingUntil: number;
 };
 
 /**

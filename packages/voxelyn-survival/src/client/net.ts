@@ -585,6 +585,13 @@ export class NetClient {
       ex.aim.x = aiming && localAim ? localAim.x : this.viewer.aimX;
       ex.aim.y = aiming && localAim ? localAim.y : this.viewer.aimY;
       ex.overheatedUntil = this.viewer.overheated ? state.tick + 1 : 0;
+      // Timers privados de recarga: o radial do HUD segue o SERVIDOR. Antes o
+      // online predizia a partir do toque com duracao fixa — errada para toda
+      // habilidade que nao fosse o pulso, e otimista para o sopro, que so cobra
+      // o cooldown no fim do canal.
+      ex.dodgeCooldownUntil = this.viewer.dodgeCooldownUntil;
+      ex.abilityCooldownUntil = this.viewer.abilityCooldownUntil;
+      ex.channelingUntil = this.viewer.channelingUntil;
     }
 
     // o renderer segue state.player/playerExtra (camera, HUD, mira): aponta-os

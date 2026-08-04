@@ -1,7 +1,7 @@
 import {
-  ABILITY_COOLDOWN_TICKS,
-  DODGE_COOLDOWN_TICKS,
+  FLAMETHROWER_CHANNEL_TICKS,
   TICK_HZ,
+  abilityDefinition,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
 import type { InputState, TouchButton } from './input';
@@ -10,20 +10,56 @@ type CooldownButtonId = Extract<TouchButton['id'], 'dodge' | 'ability'>;
 export type CooldownMode = 'authoritative' | 'predicted';
 
 type CooldownSpec = {
-  duration: number;
+  duration: (state: SurvivalState) => number;
   readyAt: (state: SurvivalState) => number;
   accent: string;
 };
 
+/**
+ * Cooldown da habilidade EQUIPADA, ja escalado pelo tuning — a mesma conta que
+ * a simulacao faz ao cobrar. A duracao fixa de antes so estava certa para o
+ * pulso: o radial do sopro (160 ticks) e do drone (180) enchia e esvaziava no
+ * ritmo dos 120 do pulso, prometendo prontidao que o servidor recusava.
+ */
+export const abilityCooldownTicks = (state: SurvivalState): number =>
+  Math.round(
+    abilityDefinition(state.playerExtra.ability).cooldownTicks *
+      state.config.tuning.abilityCooldownScale,
+  );
+
+/**
+ * Quando a habilidade equipada volta a estar disponivel, em tick absoluto.
+ *
+ * Durante o canal do sopro `abilityCooldownUntil` ainda nao foi cobrado — a
+ * simulacao so grava o cooldown NA liquidacao do canal. O HUD projeta
+ * `channelingUntil + cooldown`, que e exatamente o instante que
+ * `settleBreathChannel` vai escrever: o radial cobre o compromisso inteiro
+ * (canal + recarga) desde o cast, sem anunciar prontidao 4,5 s antes da hora.
+ */
+export const abilityReadyAtTick = (state: SurvivalState): number => {
+  const extra = state.playerExtra;
+  if (extra.channelingUntil > state.tick) {
+    return extra.channelingUntil + abilityCooldownTicks(state);
+  }
+  return extra.abilityCooldownUntil;
+};
+
+/** Duracao total do radial da habilidade: recarga, mais o canal quando ha um. */
+export const abilityCooldownDurationTicks = (state: SurvivalState): number =>
+  abilityCooldownTicks(state) +
+  (state.playerExtra.ability === 'flamethrower' ? FLAMETHROWER_CHANNEL_TICKS : 0);
+
 const COOLDOWNS: Record<CooldownButtonId, CooldownSpec> = {
   dodge: {
-    duration: DODGE_COOLDOWN_TICKS,
+    // Do TUNING, nao da constante: a arvore MV-02 encurta a esquiva, e um
+    // radial na duracao de fabrica esvaziaria atrasado para quem comprou.
+    duration: (state) => state.config.tuning.dodgeCooldownTicks,
     readyAt: (state) => state.playerExtra.dodgeCooldownUntil,
     accent: '#e8f1ff',
   },
   ability: {
-    duration: ABILITY_COOLDOWN_TICKS,
-    readyAt: (state) => state.playerExtra.abilityCooldownUntil,
+    duration: abilityCooldownDurationTicks,
+    readyAt: abilityReadyAtTick,
     accent: '#7ab8ff',
   },
 };
@@ -61,8 +97,9 @@ export const resolveCooldownReadyAt = (
  * A máscara escura começa cobrindo o círculo inteiro e recua no sentido horário,
  * revelando o ícone conforme a ação fica disponível. Ao completar, há um pulso curto.
  *
- * No solo, o timer é exclusivamente autoritativo. No online, enquanto o protocolo
- * não transporta esses dois timers privados, o HUD prediz apenas os comandos locais.
+ * No solo, o timer é exclusivamente autoritativo. No online, o `ViewerState`
+ * transporta os timers privados a cada snapshot; a predição local sobrevive só
+ * para cobrir a ida-e-volta entre o toque e o primeiro snapshot que já o viu.
  */
 export class TouchCooldownOverlay {
   private readonly ctx: CanvasRenderingContext2D;
@@ -125,6 +162,7 @@ export class TouchCooldownOverlay {
       const pressChanged = pressSeq !== this.seenPressSeq[id];
       this.seenPressSeq[id] = pressSeq;
 
+      const duration = spec.duration(state);
       const authoritativeReadyAt = spec.readyAt(state);
       const predicted = this.predictedReadyAt.get(id) ?? 0;
       const readyAt = resolveCooldownReadyAt(
@@ -133,7 +171,7 @@ export class TouchCooldownOverlay {
         predicted,
         pressChanged,
         tick,
-        spec.duration
+        duration
       );
 
       if (mode === 'predicted' && readyAt > authoritativeReadyAt && readyAt > tick) {
@@ -142,11 +180,11 @@ export class TouchCooldownOverlay {
         this.predictedReadyAt.delete(id);
       }
 
-      const remaining = cooldownRemainingFraction(readyAt, tick, spec.duration);
+      const remaining = cooldownRemainingFraction(readyAt, tick, duration);
 
       if (remaining > 0) {
         this.cooling.add(id);
-        this.drawCooldown(button, remaining, spec);
+        this.drawCooldown(button, remaining, duration, spec);
       } else if (this.cooling.delete(id)) {
         this.readyPulseUntil.set(id, nowMs + 240);
       }
@@ -177,7 +215,12 @@ export class TouchCooldownOverlay {
     this.syncPressSequences(input);
   }
 
-  private drawCooldown(button: TouchButton, remaining: number, spec: CooldownSpec): void {
+  private drawCooldown(
+    button: TouchButton,
+    remaining: number,
+    duration: number,
+    spec: CooldownSpec,
+  ): void {
     const ctx = this.ctx;
     const start = -Math.PI / 2;
     const revealed = 1 - remaining;
@@ -206,7 +249,7 @@ export class TouchCooldownOverlay {
     }
 
     // Contagem curta apenas para cooldowns de pelo menos um segundo.
-    const seconds = (remaining * spec.duration) / TICK_HZ;
+    const seconds = (remaining * duration) / TICK_HZ;
     if (seconds >= 0.95) {
       ctx.globalAlpha = 0.92;
       ctx.fillStyle = '#e8f1ff';

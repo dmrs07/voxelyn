@@ -1,12 +1,18 @@
 // A troca de sessao no HUD de cooldown.
 //
-// O radial online e PREDITO: o snapshot nao carrega os timers privados, entao a
-// unica evidencia de que uma esquiva foi aceita e a sequencia de toques do
-// proprio cliente. Quem zera essa sequencia zera a evidencia — e o botao fica
-// pronto na tela enquanto o servidor o considera em recarga.
+// O radial online recebe os timers autoritativos pelo ViewerState, mas a
+// PREDICAO local continua cobrindo a ida-e-volta entre o toque e o primeiro
+// snapshot que ja o viu. Quem zera a sequencia de toques zera essa ponte — e o
+// botao fica pronto na tela enquanto o servidor o considera em recarga.
 import { describe, expect, it } from 'vitest';
-import { TouchCooldownOverlay } from '../client/cooldown-overlay';
+import {
+  TouchCooldownOverlay,
+  abilityCooldownDurationTicks,
+  abilityCooldownTicks,
+  abilityReadyAtTick,
+} from '../client/cooldown-overlay';
 import type { InputState } from '../client/input';
+import { FLAMETHROWER_CHANNEL_TICKS, abilityDefinition } from '@voxelyn/survival-sim';
 import type { SurvivalState } from '@voxelyn/survival-sim';
 
 /** Canvas de mentira que conta os arcos desenhados — o radial e feito de arcos. */
@@ -34,8 +40,14 @@ const stubCanvas = () => {
 const onlineState = (): SurvivalState =>
   ({
     phase: 'running',
-    config: { playerCount: 2 },
-    playerExtra: { dodgeCooldownUntil: 0, abilityCooldownUntil: 0 },
+    tick: 0,
+    config: { playerCount: 2, tuning: { dodgeCooldownTicks: 24, abilityCooldownScale: 1 } },
+    playerExtra: {
+      dodgeCooldownUntil: 0,
+      abilityCooldownUntil: 0,
+      channelingUntil: 0,
+      ability: 'pulse',
+    },
   }) as unknown as SurvivalState;
 
 const touchInput = (): InputState =>
@@ -44,6 +56,48 @@ const touchInput = (): InputState =>
     buttons: [{ id: 'dodge', cx: 100, cy: 100, r: 40, pressed: false }],
     actionPressSeq: { dodge: 0, ability: 0 },
   }) as unknown as InputState;
+
+describe('cooldown da habilidade equipada', () => {
+  const stateWith = (over: Record<string, unknown>): SurvivalState => {
+    const base = onlineState() as unknown as { playerExtra: Record<string, unknown> };
+    Object.assign(base.playerExtra, over);
+    return base as unknown as SurvivalState;
+  };
+
+  it('a duracao segue a habilidade equipada e o tuning, nao os 120 do pulso', () => {
+    // O radial do sopro enchia e esvaziava no ritmo do pulso — e anunciava
+    // prontidao que o servidor recusava.
+    const pulse = stateWith({ ability: 'pulse' });
+    expect(abilityCooldownTicks(pulse)).toBe(abilityDefinition('pulse').cooldownTicks);
+
+    const breath = stateWith({ ability: 'flamethrower' });
+    expect(abilityCooldownDurationTicks(breath)).toBe(
+      abilityDefinition('flamethrower').cooldownTicks + FLAMETHROWER_CHANNEL_TICKS,
+    );
+
+    const tuned = stateWith({ ability: 'seeker' }) as unknown as {
+      config: { tuning: { abilityCooldownScale: number } };
+    };
+    tuned.config.tuning.abilityCooldownScale = 0.9;
+    expect(abilityCooldownTicks(tuned as unknown as SurvivalState)).toBe(
+      Math.round(abilityDefinition('seeker').cooldownTicks * 0.9),
+    );
+  });
+
+  it('durante o canal do sopro projeta canal + recarga, o instante que a liquidacao grava', () => {
+    // Mid-canal `abilityCooldownUntil` ainda esta zerado — o cooldown so e
+    // cobrado no FIM do canal. Sem a projecao, o radial dizia "pronto" com o
+    // canal ainda cuspindo fogo.
+    const state = stateWith({ ability: 'flamethrower', channelingUntil: 30 });
+    expect(abilityReadyAtTick(state)).toBe(
+      30 + abilityDefinition('flamethrower').cooldownTicks,
+    );
+
+    // Canal encerrado: o timer autoritativo transportado no ViewerState manda.
+    const settled = stateWith({ ability: 'flamethrower', channelingUntil: 0, abilityCooldownUntil: 190 });
+    expect(abilityReadyAtTick(settled)).toBe(190);
+  });
+});
 
 describe('TouchCooldownOverlay — troca de sessao', () => {
   // A regressao: `runOnline` consome e envia o comando ANTES de renderizar. Uma
