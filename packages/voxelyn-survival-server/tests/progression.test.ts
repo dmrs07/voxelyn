@@ -504,9 +504,9 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 29 documentos: 24 protocolos, 4 marcos e o publico inicial', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(29);
-    expect(LORE_FRAGMENTS.filter((f) => f.unlockedByUpgradeId !== null)).toHaveLength(24);
+  it('tem 35 documentos: 30 protocolos, 4 marcos e o publico inicial', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(35);
+    expect(LORE_FRAGMENTS.filter((f) => f.unlockedByUpgradeId !== null)).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.unlockedByGeneration !== null)).toHaveLength(4);
     expect(DEFAULT_UNLOCKED_LORE).toHaveLength(1);
   });

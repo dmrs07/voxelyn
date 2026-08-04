@@ -100,6 +100,16 @@ describe('determinismo com tuning', () => {
       hashAuthoritativeState(play(undefined, 300)),
     );
   });
+
+  // A IA resolve-se na camada de entrada do cliente: o que chega aqui e um
+  // comando comum. Se um no de IA um dia ler o tuning DENTRO da simulacao,
+  // este teste falha — e a assistencia teria virado outra coisa.
+  it('a trilha de IA NAO altera a simulacao', () => {
+    const intelligence = derivePlayerTuning(['IA-01', 'IA-02', 'IA-03', 'IA-04', 'IA-05', 'IA-X']);
+    expect(hashAuthoritativeState(play(intelligence, 300))).toBe(
+      hashAuthoritativeState(play(undefined, 300)),
+    );
+  });
 });
 
 describe('cada protocolo faz o que promete, dentro da run', () => {

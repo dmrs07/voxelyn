@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { quantizeCommand } from '@voxelyn/survival-protocol';
 import { emptyCommand } from '@voxelyn/survival-sim';
-import { screenToWorldAim, screenToWorldMove } from './input';
+import { AIM_TAP_MAX_MS, isNeutralAimTap, screenToWorldAim, screenToWorldMove } from './input';
 
 const len = (v: { x: number; y: number }): number => Math.hypot(v.x, v.y);
 
@@ -134,5 +134,31 @@ describe('conversao tela -> mundo da mira', () => {
       worst = Math.max(worst, angleError(screenAngleOf(simulated.aim), deg));
     }
     expect(worst).toBeLessThan(0.6);
+  });
+});
+
+describe('tap neutro no manche de mira', () => {
+  it('tocar e soltar dentro da janela, sem cruzar a zona morta, e tap', () => {
+    expect(isNeutralAimTap(false, 0)).toBe(true);
+    expect(isNeutralAimTap(false, 120)).toBe(true);
+    expect(isNeutralAimTap(false, AIM_TAP_MAX_MS)).toBe(true);
+  });
+
+  // Quem cruzou a zona morta estava MIRANDO — o tiro dele ja saiu pelo caminho
+  // do auto-fire. Contar o solta como tap dobraria o ultimo disparo.
+  it('qualquer deflexao durante o toque cancela o tap', () => {
+    expect(isNeutralAimTap(true, 50)).toBe(false);
+    expect(isNeutralAimTap(true, AIM_TAP_MAX_MS + 1)).toBe(false);
+  });
+
+  it('segurar alem da janela nao e tap: e um dedo pousado', () => {
+    expect(isNeutralAimTap(false, AIM_TAP_MAX_MS + 1)).toBe(false);
+    expect(isNeutralAimTap(false, 4000)).toBe(false);
+  });
+
+  // Relogios de evento podem regredir entre dispositivos; um intervalo
+  // negativo nunca deve virar comando.
+  it('intervalo negativo nao e tap', () => {
+    expect(isNeutralAimTap(false, -1)).toBe(false);
   });
 });

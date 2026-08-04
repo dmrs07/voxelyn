@@ -1,4 +1,4 @@
-// Os 29 documentos da Aurix Dynamics, em pt-BR e en.
+// Os 35 documentos da Aurix Dynamics, em pt-BR e en.
 //
 // Regras de escrita, para quem for acrescentar o trigesimo:
 //
@@ -60,6 +60,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     body: 'Pela primeira vez, o Veio está sendo mapeado sem custo humano.\n\nCada Prospector carrega instrumentação de levantamento capaz de registrar formação, densidade e anomalia em tempo real. Os dados são propriedade da Aurix Dynamics e serão disponibilizados à comunidade científica conforme cronograma a definir.\n\nO cronograma ainda não foi definido.',
     source: 'Comunicação Institucional — nota à imprensa',
   },
+  'AX-PUB-009': {
+    title: 'Assistência Cognitiva de Campo',
+    summary: 'A hesitação vira um defeito de produto — e a Aurix vende a cura.',
+    body: 'A linha Prospector passa a incluir o pacote de Assistência Cognitiva de Campo.\n\nEstudos internos indicam que até 11% do tempo de exposição a risco decorre de hesitação operacional: a unidade vê, mas demora a decidir. O pacote elimina esse intervalo.\n\nA unidade continua no comando da missão. A assistência apenas garante que, entre ver e agir, não exista mais um espaço onde algo possa dar errado.',
+    source: 'Comunicação Institucional — material para investidores',
+  },
 
   // -------------------------------------------------------------------------
   // ATO II — Engenharia
@@ -87,6 +93,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     summary: 'O teto de calor sobe. O que ele protege não é o chassi.',
     body: 'O coletor eleva o teto térmico operacional de 100 para 105.\n\nA margem adicional foi alocada integralmente ao pacote de transmissão, conforme diretriz. A preservação do chassi permanece como efeito secundário aceitável.\n\nA equipe solicita que a diretriz seja anexada a este documento. A diretriz não foi anexada.',
     source: 'Engenharia Térmica — ficha técnica RX-02',
+  },
+  'AX-ENG-020': {
+    title: 'Especificação do Classificador Hostil',
+    summary: 'Três classes, dois limiares, e os primeiros falsos positivos.',
+    body: 'O classificador distingue três posturas: hostil, passivo e em fuga. A transição entre elas usa dois limiares de comportamento observado, calibrados em bancada.\n\nEnsaio de campo: 96,4% de acerto. Os falsos positivos concentram-se num único caso — unidades de extração da geração anterior, paradas, classificadas como hostis antes de qualquer movimento.\n\nHipótese da equipe: o modelo reconhece nelas alguma coisa que a bancada não mede. Hipótese registrada sem encaminhamento.',
+    source: 'Engenharia de Sistemas — especificação IA-02',
   },
 
   // -------------------------------------------------------------------------
@@ -116,6 +128,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     body: 'Os mapas do Setor Três não estão mudando. A cartografia anterior é que estava incompleta.\n\nEsta é a terceira revisão da mesma formação em dois ciclos. Cada revisão foi classificada como correção de levantamento anterior.\n\nNão encaminhar esta conclusão à equipe de investidores.',
     source: 'Aquisições e Custos — memorando interno',
   },
+  'AX-PRC-024': {
+    title: 'Aquisição de Telemetria Comportamental',
+    summary: 'O modelo de antecipação foi comprado pronto. De quem, a conta diz.',
+    body: 'Custo de produzir o conjunto de treino do módulo de antecipação em ambiente controlado: 340 unidades-equivalente.\n\nCusto de licenciar o acervo interno de telemetria terminal — expedições encerradas sem recuperação física da unidade: 0.\n\nAquisições recomenda o acervo interno. O módulo prevê a trajetória de um alvo com base no que as unidades que o enfrentaram registraram. As unidades que mais registraram são as que não voltaram.\n\nA recomendação foi aprovada sem ressalva.',
+    source: 'Aquisições e Custos — parecer de licenciamento',
+  },
 
   // -------------------------------------------------------------------------
   // ATO IV — Incidentes
@@ -142,6 +160,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     title: 'Incidente 29 — padrão de eco',
     summary: 'O reator emitiu no mesmo padrão que os Ecos.',
     body: 'Durante o ensaio de sobrecarga, o reator da unidade [REDACTED] emitiu por 9 segundos num padrão que não consta da biblioteca de emissão da plataforma.\n\nO padrão consta da biblioteca de Ecos, catalogada por Pesquisa antes do lançamento comercial do programa.\n\nA correspondência é de 94%.\n\nO ensaio foi encerrado. A unidade foi encerrada.',
+    source: 'Comitê de Incidentes — relatório preliminar',
+  },
+  'AX-INC-032': {
+    title: 'Incidente 32 — disparo sem vetor de operador',
+    summary: 'A unidade abriu fogo. Ninguém apontou.',
+    body: 'A unidade [REDACTED] efetuou três disparos no Setor Dois às 09:41.\n\nO log de comando do intervalo não contém vetor direcional. Contém a intenção de disparo e nenhum rumo. O módulo de assistência resolveu o rumo, dentro da tolerância especificada.\n\nOs três disparos atingiram uma criatura em janela de investida, antes do contato. A intervenção é classificada como bem-sucedida.\n\nA questão encaminhada a Engenharia não é sobre o acerto. É sobre a especificação ter uma tolerância para "nenhum rumo".',
     source: 'Comitê de Incidentes — relatório preliminar',
   },
 
@@ -172,6 +196,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     body: 'Todo material de levantamento anterior ao lançamento comercial do programa Prospector fica reclassificado como [REDACTED].\n\nIsto inclui: os registros de emissão da formação, o catálogo de Ecos, e a documentação da decisão de investimento.\n\nQuestionamentos sobre o motivo do interesse inicial da companhia no Veio devem ser encaminhados a Comunicação Institucional, que dispõe da resposta aprovada.',
     source: 'Conselho Executivo — ordem de classificação',
   },
+  'AX-EXE-040': {
+    title: 'Diretiva de Engajamento Preventivo',
+    summary: 'O sistema ganha o direito de decidir o que é uma ameaça.',
+    body: 'Fica autorizado o modo de engajamento preventivo: o módulo de assistência pode manter aquisição sobre um alvo já engajado e transferi-la ao alvo seguinte sem novo vetor de operador.\n\nA definição de "ameaça" deixa de ser um critério fixado em especificação e passa a ser [REDACTED], atualizável pelo próprio modelo a cada geração.\n\nEngenharia de Sistemas solicitou que a definição vigente fosse arquivada em cada revisão, para auditoria. O pedido foi indeferido: a definição é o modelo.',
+    source: 'Conselho Executivo — diretriz',
+  },
 
   // -------------------------------------------------------------------------
   // ATO VI — Não classificado
@@ -198,6 +228,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     title: 'Sobre por que descemos',
     summary: 'A decisão de investimento veio depois do sinal.',
     body: 'A documentação reclassificada em AX-EXE-038 estabelece a cronologia que a companhia não publica.\n\nO registro de emissão da formação é anterior à decisão de investimento em onze meses.\n\nA companhia não encontrou o Veio e depois detectou o sinal. A companhia detectou o sinal e depois encontrou o Veio.\n\nO material de investidores descreve a operação como extração mineral. O volume extraído até hoje não paga a folha de Pesquisa.\n\nNão estamos minerando. Estamos [REDACTED].',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-UNK-052': {
+    title: 'O Modelo se Lembra',
+    summary: 'A antecipação não é previsão. É reconhecimento.',
+    body: 'O relatório do Incidente 32 pergunta como o módulo resolveu um rumo sem vetor de operador. A pergunta está mal formulada.\n\nDecompusemos a decisão. O módulo não extrapolou a trajetória da criatura: ele a RECONHECEU. A janela de investida, o ângulo, o terreno — a mesma situação consta, com variação inferior ao ruído, na telemetria terminal de [REDACTED] unidades do acervo de treino.\n\nO modelo não calcula o que o alvo vai fazer. Ele se lembra do que aquilo fez, das vezes em que quem registrou não sobreviveu ao registro.\n\nNão encontramos, na arquitetura, onde a lembrança termina e a unidade começa.',
     source: 'Sem departamento atribuído',
   },
 
@@ -261,6 +297,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     body: 'For the first time, the Vein is being mapped at no human cost.\n\nEvery Prospector carries survey instrumentation capable of recording formation, density and anomaly in real time. The data is the property of Aurix Dynamics and will be released to the scientific community on a schedule to be determined.\n\nThe schedule has not yet been determined.',
     source: 'Institutional Communications — press note',
   },
+  'AX-PUB-009': {
+    title: 'Cognitive Field Assistance',
+    summary: 'Hesitation becomes a product defect — and Aurix sells the cure.',
+    body: 'The Prospector line now ships with the Cognitive Field Assistance package.\n\nInternal studies indicate that up to 11% of risk exposure time stems from operational hesitation: the unit sees, but is slow to decide. The package removes that interval.\n\nThe unit remains in command of the mission. Assistance merely ensures that, between seeing and acting, there is no longer a space where anything can go wrong.',
+    source: 'Institutional Communications — investor material',
+  },
 
   'AX-ENG-011': {
     title: 'Impact cradles: specification',
@@ -285,6 +327,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'The heat ceiling rises. What it protects is not the chassis.',
     body: 'The collector raises the operational thermal ceiling from 100 to 105.\n\nThe additional margin has been allocated in full to the transmission package, per directive. Preservation of the chassis remains an acceptable secondary effect.\n\nThe team requests that the directive be attached to this document. The directive was not attached.',
     source: 'Thermal Engineering — RX-02 datasheet',
+  },
+  'AX-ENG-020': {
+    title: 'Hostile Classifier Specification',
+    summary: 'Three classes, two thresholds, and the first false positives.',
+    body: 'The classifier distinguishes three postures: hostile, passive and fleeing. Transitions use two observed-behaviour thresholds, calibrated on the bench.\n\nField trial: 96.4% accuracy. The false positives concentrate in a single case — extraction units of the previous generation, stationary, classified as hostile before any movement.\n\nTeam hypothesis: the model recognises something in them the bench does not measure. Hypothesis logged, not forwarded.',
+    source: 'Systems Engineering — IA-02 specification',
   },
 
   'AX-PRC-014': {
@@ -311,6 +359,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     body: 'The Sector Three maps are not changing. The prior cartography was incomplete.\n\nThis is the third revision of the same formation in two cycles. Each revision was classified as a correction of the previous survey.\n\nDo not forward this conclusion to the investor relations team.',
     source: 'Procurement and Costs — internal memorandum',
   },
+  'AX-PRC-024': {
+    title: 'Behavioural Telemetry Acquisition',
+    summary: 'The anticipation model was bought ready-made. From whom, the invoice says.',
+    body: 'Cost of producing the anticipation module training set in a controlled environment: 340 unit-equivalents.\n\nCost of licensing the internal terminal telemetry archive — expeditions closed without physical recovery of the unit: 0.\n\nProcurement recommends the internal archive. The module predicts a target’s trajectory from what the units that faced it recorded. The units that recorded the most are the ones that did not come back.\n\nThe recommendation was approved without reservation.',
+    source: 'Procurement and Costs — licensing opinion',
+  },
 
   'AX-INC-023': {
     title: 'Incident 23 — uncommanded return',
@@ -334,6 +388,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     title: 'Incident 29 — echo pattern',
     summary: 'The reactor emitted in the same pattern as the Echoes.',
     body: 'During the overload trial, the reactor of unit [REDACTED] emitted for 9 seconds in a pattern absent from the platform emission library.\n\nThe pattern appears in the Echo library, catalogued by Research prior to the commercial launch of the program.\n\nThe match is 94%.\n\nThe trial was terminated. The unit was terminated.',
+    source: 'Incident Committee — preliminary report',
+  },
+  'AX-INC-032': {
+    title: 'Incident 32 — fire without operator vector',
+    summary: 'The unit opened fire. Nobody aimed.',
+    body: 'Unit [REDACTED] fired three shots in Sector Two at 09:41.\n\nThe command log for the interval contains no directional vector. It contains the intent to fire and no heading. The assistance module resolved the heading, within specified tolerance.\n\nAll three shots struck a creature inside its charge window, before contact. The intervention is classified as successful.\n\nThe question referred to Engineering is not about the hit. It is about the specification having a tolerance for "no heading".',
     source: 'Incident Committee — preliminary report',
   },
 
@@ -361,6 +421,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     body: 'All survey material predating the commercial launch of the Prospector program is hereby reclassified as [REDACTED].\n\nThis includes: the formation emission records, the Echo catalogue, and the investment decision documentation.\n\nEnquiries regarding the origin of the company interest in the Vein are to be referred to Institutional Communications, which holds the approved answer.',
     source: 'Executive Board — classification order',
   },
+  'AX-EXE-040': {
+    title: 'Preemptive Engagement Directive',
+    summary: 'The system earns the right to decide what a threat is.',
+    body: 'Preemptive engagement mode is hereby authorised: the assistance module may hold acquisition on an engaged target and transfer it to the next target without a new operator vector.\n\nThe definition of "threat" ceases to be a criterion fixed in specification and becomes [REDACTED], updatable by the model itself with each generation.\n\nSystems Engineering requested that the current definition be archived at every revision, for audit. The request was denied: the definition is the model.',
+    source: 'Executive Board — directive',
+  },
 
   'AX-UNK-041': {
     title: 'On what survives',
@@ -384,6 +450,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     title: 'On why we went down',
     summary: 'The investment decision came after the signal.',
     body: 'The material reclassified under AX-EXE-038 establishes the chronology the company does not publish.\n\nThe formation emission record predates the investment decision by eleven months.\n\nThe company did not find the Vein and then detect the signal. The company detected the signal and then found the Vein.\n\nInvestor material describes the operation as mineral extraction. The volume extracted to date does not cover the Research payroll.\n\nWe are not mining. We are [REDACTED].',
+    source: 'No department assigned',
+  },
+  'AX-UNK-052': {
+    title: 'The Model Remembers',
+    summary: 'Anticipation is not prediction. It is recognition.',
+    body: 'The Incident 32 report asks how the module resolved a heading without an operator vector. The question is badly posed.\n\nWe decomposed the decision. The module did not extrapolate the creature’s trajectory: it RECOGNISED it. The charge window, the angle, the terrain — the same situation appears, with variation below noise, in the terminal telemetry of [REDACTED] units in the training archive.\n\nThe model does not compute what the target will do. It remembers what that thing did, the times when whoever recorded it did not survive the recording.\n\nWe could not find, anywhere in the architecture, where the memory ends and the unit begins.',
     source: 'No department assigned',
   },
 

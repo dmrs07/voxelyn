@@ -54,7 +54,7 @@ export const BASE_PURGE_CELLS = 1;
 
 export type UpgradeId = string;
 export type LoreFragmentId = string;
-export type UpgradeBranch = 'chassis' | 'mobility' | 'reactor' | 'survey';
+export type UpgradeBranch = 'chassis' | 'mobility' | 'reactor' | 'survey' | 'intelligence';
 export type ProspectorGeneration = 'G-00' | 'G-01' | 'G-02' | 'G-03' | 'G-04';
 
 /**
@@ -113,6 +113,35 @@ export type PlayerTuning = {
     returnVector: boolean;
     contaminationForecast: boolean;
   };
+
+  /**
+   * IA — Cognicao de Combate: tambem fora do hash autoritativo, e o motivo
+   * merece a mesma frase em voz alta que o Levantamento ganhou.
+   *
+   * Nenhum campo daqui e lido por um tick. Os tres primeiros protocolos sao
+   * leitura pura (brackets, telegrafo, marcador de antecipacao), e os tres
+   * ultimos rodam na CAMADA DE ENTRADA do cliente: eles decidem que comando
+   * sai do polegar, e o comando — ja resolvido — e o que o recorder grava e o
+   * servidor re-simula. A assistencia nunca atravessa a fronteira da
+   * simulacao; o que atravessa e um `aim` comum, indistinguivel de um do
+   * mouse. E por isso que a trilha inteira nao pode dessincronizar, e por
+   * isso que ela nao toca `playerDamageScale`: a IA interpreta e executa
+   * melhor o comando do jogador, nunca bate mais forte.
+   */
+  combat: {
+    /** IA-01: brackets em hostis proximos e leitura de postura. */
+    threatBrackets: boolean;
+    /** IA-02: destaque de windup antes da execucao do ataque. */
+    intentTelegraph: boolean;
+    /** IA-03: marcador de antecipacao (alvo + velocidade do bolt). */
+    interceptMarker: boolean;
+    /** IA-04: meia-abertura, em graus, do cone de correcao vetorial. 0 = desligada. */
+    aimAssistConeDegrees: number;
+    /** IA-05: duracao, em ticks, da aderencia apos aquisicao manual. 0 = desligada. */
+    targetMemoryTicks: number;
+    /** IA-X: tiro sem vetor resolve contra o alvo valido mais proximo. */
+    autoAcquire: boolean;
+  };
 };
 
 /**
@@ -148,6 +177,14 @@ export const DEFAULT_PLAYER_TUNING: PlayerTuning = Object.freeze({
     returnVector: false,
     contaminationForecast: false,
   }),
+  combat: Object.freeze({
+    threatBrackets: false,
+    intentTelegraph: false,
+    interceptMarker: false,
+    aimAssistConeDegrees: 0,
+    targetMemoryTicks: 0,
+    autoAcquire: false,
+  }),
 }) as PlayerTuning;
 
 /** Custo por tier. Igual entre ramificacoes — a escolha e de ROTA, nao de preco. */
@@ -182,6 +219,11 @@ const round3 = (v: number): number => Math.round(v * 1000) / 1000;
 const nav = (t: PlayerTuning, patch: Partial<PlayerTuning['navigation']>): PlayerTuning => ({
   ...t,
   navigation: { ...t.navigation, ...patch },
+});
+
+const cmb = (t: PlayerTuning, patch: Partial<PlayerTuning['combat']>): PlayerTuning => ({
+  ...t,
+  combat: { ...t.combat, ...patch },
 });
 
 /**
@@ -376,9 +418,68 @@ const UPGRADE_SPECS: readonly Omit<UpgradeDefinition, 'oreCost' | 'coreCost' | '
     loreFragmentId: 'AX-UNK-049',
     apply: (t) => nav(t, { contaminationForecast: true }),
   },
+
+  // IA — COGNICAO DE COMBATE. Nao e outra trilha de dano: o Reator ja guarda o
+  // unico bonus direto, e continua guardando. A progressao aqui e cognitiva —
+  // detectar, compreender, prever, corrigir, acompanhar, agir — e cada efeito
+  // roda na apresentacao ou na camada de entrada do cliente (ver o comentario
+  // do grupo `combat` no tuning).
+  {
+    id: 'IA-01',
+    branch: 'intelligence',
+    tier: 1,
+    loreFragmentId: 'AX-PUB-009',
+    apply: (t) => cmb(t, { threatBrackets: true }),
+  },
+  {
+    id: 'IA-02',
+    branch: 'intelligence',
+    tier: 2,
+    loreFragmentId: 'AX-ENG-020',
+    apply: (t) => cmb(t, { intentTelegraph: true }),
+  },
+  {
+    id: 'IA-03',
+    branch: 'intelligence',
+    tier: 3,
+    loreFragmentId: 'AX-PRC-024',
+    apply: (t) => cmb(t, { interceptMarker: true }),
+  },
+  // O cone de 6 graus e o TETO da correcao: a mira que ja passa perto e
+  // encostada no alvo, e a que passa longe fica exatamente onde o jogador a
+  // pos. Nao ha rampa a acumular com outros tiers.
+  {
+    id: 'IA-04',
+    branch: 'intelligence',
+    tier: 4,
+    loreFragmentId: 'AX-INC-032',
+    apply: (t) => cmb(t, { aimAssistConeDegrees: 6 }),
+  },
+  // 30 ticks = 1,5 s de aderencia. Curta de proposito: e memoria de
+  // engajamento, nao um lock-on — largar o gatilho ou desviar a mira solta.
+  {
+    id: 'IA-05',
+    branch: 'intelligence',
+    tier: 5,
+    loreFragmentId: 'AX-EXE-040',
+    apply: (t) => cmb(t, { targetMemoryTicks: 30 }),
+  },
+  {
+    id: 'IA-X',
+    branch: 'intelligence',
+    tier: 6,
+    loreFragmentId: 'AX-UNK-052',
+    apply: (t) => cmb(t, { autoAcquire: true }),
+  },
 ];
 
-const BRANCH_ORDER: readonly UpgradeBranch[] = ['chassis', 'mobility', 'reactor', 'survey'];
+const BRANCH_ORDER: readonly UpgradeBranch[] = [
+  'chassis',
+  'mobility',
+  'reactor',
+  'survey',
+  'intelligence',
+];
 
 export const UPGRADES: readonly UpgradeDefinition[] = UPGRADE_SPECS.map((spec) => {
   const previous = UPGRADE_SPECS.find((o) => o.branch === spec.branch && o.tier === spec.tier - 1);
@@ -470,6 +571,7 @@ export const derivePlayerTuning = (purchased: readonly UpgradeId[]): PlayerTunin
   let tuning: PlayerTuning = {
     ...DEFAULT_PLAYER_TUNING,
     navigation: { ...DEFAULT_PLAYER_TUNING.navigation },
+    combat: { ...DEFAULT_PLAYER_TUNING.combat },
   };
   for (const id of normalizeUpgradeIds(purchased)) {
     const def = BY_ID.get(id);
@@ -485,10 +587,12 @@ export const derivePlayerTuning = (purchased: readonly UpgradeId[]): PlayerTunin
  * garantida entre engines, e um hash que depende dela quebraria a verificacao
  * entre o navegador e o servidor sem nenhum aviso.
  *
- * `navigation` fica de fora de proposito — nada la altera um tick, e inclui-lo
- * faria duas runs identicas divergirem por causa de um HUD.
+ * `navigation` e `combat` ficam de fora de proposito — nada neles altera um
+ * tick, e inclui-los faria duas runs identicas divergirem por causa de um HUD
+ * (ou de uma assistencia que ja foi resolvida em comando antes de a simulacao
+ * ver qualquer coisa).
  */
-export const TUNING_HASH_ORDER: readonly (keyof Omit<PlayerTuning, 'navigation'>)[] = [
+export const TUNING_HASH_ORDER: readonly (keyof Omit<PlayerTuning, 'navigation' | 'combat'>)[] = [
   'maxHp',
   'moveSpeed',
   'dodgeCooldownTicks',

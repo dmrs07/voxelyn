@@ -3,6 +3,7 @@ import { createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
 import type { PlayerTuning, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
+import { EngagementMemory, applyCombatAssist } from './combat-assist';
 import { SurvivalRenderer } from './render';
 import { DeathEchoController } from './death-echo-presentation';
 import {
@@ -977,6 +978,12 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
   // chegar onde ela explodiu.
   const playout = new LocalPlayout();
   playout.capture(state);
+  /**
+   * A memoria de engajamento (IA-05) vive com a DESCIDA, nunca com a run
+   * anterior: e estado de assistencia, e o alvo lembrado de um mundo que ja
+   * morreu apontaria para um id que o mundo novo pode ter dado a outra coisa.
+   */
+  const assistMemory = new EngagementMemory();
   /** Instante do quadro corrente: e quando o evento vira imagem e som. */
   let frameNow = lastTime;
   const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
@@ -989,6 +996,10 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
     playout.reset();
     eventQueue.clear();
     playout.capture(state);
+    assistMemory.clear();
+    // Um tap neutro engatilhado na tela de fim nao pode virar o primeiro tiro
+    // da run nova.
+    input.consumeAimTap();
   };
 
   const frame = (now: number): void => {
@@ -1073,6 +1084,11 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
         raw.choose = queuedChoice;
         queuedChoice = null;
       }
+      // A assistencia de combate (IA-04/05/X) resolve o comando ANTES do
+      // recorder: o log grava — e o servidor re-simula — o comando ja
+      // resolvido, entao a trilha inteira e invisivel para a simulacao. No
+      // co-op ela nao existe: la todo mundo desce G-00 de fabrica.
+      applyCombatAssist(state, raw, input.consumeAimTap(), assistMemory);
       // O recorder fica NO CAMINHO, e nao ao lado: `capture` devolve o comando
       // quantizado, e e esse que a simulacao recebe. Gravar de um lado e
       // simular de outro produziria um log que, re-simulado no servidor,
