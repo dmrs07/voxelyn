@@ -106,6 +106,98 @@
           opacity: 1;
         }
       }
+      /* O zumbido do carimbo primario: o unico circuito LIGADO da folha.
+         Uma lampada de mata-mosquito, nao uma respiracao — a base fica sempre
+         acesa e clara (o zumbido so ADICIONA luz, nunca escurece o texto) e a
+         oscilacao e seca e irregular, em saltos steps(), com tres faiscas
+         fortes por ciclo. Anima SO a opacidade de uma camada de brilho:
+         compositor-friendly, nada de repintar box-shadow a cada quadro. */
+      @keyframes axBuzz {
+        0% {
+          opacity: 0.35;
+        }
+        3% {
+          opacity: 0.6;
+        }
+        5% {
+          opacity: 0.42;
+        }
+        11% {
+          opacity: 0.52;
+        }
+        13% {
+          opacity: 0.95;
+        }
+        14% {
+          opacity: 0.45;
+        }
+        21% {
+          opacity: 0.58;
+        }
+        23% {
+          opacity: 0.4;
+        }
+        29% {
+          opacity: 0.62;
+        }
+        31% {
+          opacity: 0.5;
+        }
+        44% {
+          opacity: 0.55;
+        }
+        46% {
+          opacity: 1;
+        }
+        47% {
+          opacity: 0.5;
+        }
+        53% {
+          opacity: 0.62;
+        }
+        61% {
+          opacity: 0.45;
+        }
+        66% {
+          opacity: 0.58;
+        }
+        74% {
+          opacity: 0.5;
+        }
+        76% {
+          opacity: 0.9;
+        }
+        78% {
+          opacity: 0.55;
+        }
+        87% {
+          opacity: 0.42;
+        }
+        92% {
+          opacity: 0.6;
+        }
+        100% {
+          opacity: 0.35;
+        }
+      }
+      /* Todo primario grande zumbe: DESCER, RETOMAR, CONTINUAR A DESCIDA,
+         AUTORIZAR. Os compactos (toggles de som/telemetria) ficam parados —
+         sao interruptores, nao autorizacoes. Pendente tem o proprio pulso e
+         desabilitado nao carrega energia nenhuma. */
+      button.primary:not(.compact):not(:disabled):not(.is-pending) {
+        position: relative;
+      }
+      button.primary:not(.compact):not(:disabled):not(.is-pending)::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        pointer-events: none;
+        box-shadow:
+          0 0 28px rgba(79, 214, 201, 0.5),
+          inset 0 0 32px rgba(79, 214, 201, 0.18);
+        opacity: 0.45;
+        animation: axBuzz 3.4s steps(1, end) infinite;
+      }
       /* A varredura CRT do board 3p: reservada a ESPERA DE REDE e boot —
          consultando a Aurix, homologando compra, carregando o livro. Nunca em
          texto de leitura nem em estado parado; o resto da UI fica imóvel. */
