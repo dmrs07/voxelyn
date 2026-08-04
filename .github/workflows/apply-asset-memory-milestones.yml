@@ -1,0 +1,73 @@
+name: Apply asset memory milestones
+
+on:
+  push:
+    branches:
+      - asset-memory-milestones
+    paths:
+      - .github/workflows/apply-asset-memory-milestones.yml
+      - scripts/apply-asset-memory-milestones.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  integrate-test-and-clean:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: asset-memory-milestones
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Integrate milestone catalog
+        run: node scripts/apply-asset-memory-milestones.mjs
+
+      - name: Format changed files
+        run: |
+          pnpm exec prettier --write \
+            packages/voxelyn-survival-server/src/progression-lore.ts \
+            packages/voxelyn-survival-server/src/progression-lore-text.ts \
+            packages/voxelyn-survival-server/src/progression-lore-asset-memory.ts \
+            packages/voxelyn-survival-server/src/progression-lore-asset-memory-text.ts \
+            packages/voxelyn-survival-server/tests/progression.test.ts \
+            packages/voxelyn-survival-server/tests/asset-memory-milestones.test.ts \
+            docs/superpowers/specs/2026-08-04-survival-ia-codex-narrativo.md \
+            docs/superpowers/specs/2026-08-04-survival-asset-memory-milestones.md
+
+      - name: Build server dependency graph
+        run: pnpm --filter @voxelyn/survival-server... build
+
+      - name: Test progression server
+        run: pnpm --filter @voxelyn/survival-server test
+
+      - name: Remove one-shot integration files
+        run: |
+          rm scripts/apply-asset-memory-milestones.mjs
+          rm .github/workflows/apply-asset-memory-milestones.yml
+
+      - name: Commit validated integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Implement signature asset memory milestones"
+          git push origin HEAD:asset-memory-milestones
