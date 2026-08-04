@@ -159,23 +159,40 @@
          primeira versão animava a COR de cada hexágono — cor é pintura, e no
          meio da onda (a anti-diagonal, onde mais células animam juntas) o
          navegador repintava centenas de clip-paths por quadro: era o tranco.
-         Esta faixa rotacionada viaja por transform puro — zero pintura — e
-         cavalga a mesma diagonal dos atrasos das células. */
+
+         O visual CELULAR do lampejo original volta por um estêncil: a faixa
+         viaja por transform puro ATRÁS de uma máscara estática em forma de
+         colmeia (gerada no deploy-veil.ts com o MESMO passo das células).
+         Cada abertura hexagonal acende quando a faixa cruza por baixo — o
+         olho vê célula a célula piscando; o compositor vê uma camada se
+         movendo sob uma máscara que nunca muda. */
+      .ax-veil-stencil {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        /* mask-image chega inline do deploy-veil.ts, no passo real da colmeia. */
+      }
       .ax-veil-front {
         position: absolute;
         left: 50%;
         top: 50%;
         width: 300vmax;
-        height: 150px;
+        height: 260px;
         margin-left: -150vmax;
-        margin-top: -75px;
+        margin-top: -130px;
         pointer-events: none;
+        /* 100% é a borda que LIDERA (o eixo local aponta na direção da
+           viagem): fósforo OPACO na frente — as células antigas piscavam
+           #8ff0e6 cheio, e o estêncil não pode devolver menos — com a cauda
+           apagando atrás, o mesmo flash → decaimento de antes. */
         background: linear-gradient(
           180deg,
           transparent 0%,
-          rgba(79, 214, 201, 0.14) 34%,
-          rgba(143, 240, 230, 0.7) 50%,
-          rgba(79, 214, 201, 0.14) 66%,
+          rgba(29, 87, 81, 0.5) 42%,
+          rgba(79, 214, 201, 0.9) 78%,
+          #8ff0e6 92%,
+          #d9fffa 98%,
           transparent 100%
         );
         will-change: transform;
