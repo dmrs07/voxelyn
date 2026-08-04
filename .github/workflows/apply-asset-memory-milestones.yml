@@ -7,6 +7,15 @@ on:
     paths:
       - .github/workflows/apply-asset-memory-milestones.yml
       - scripts/apply-asset-memory-milestones.mjs
+  pull_request:
+    branches:
+      - claude/codex-narrativo-ia-trail-q8plat
+    paths:
+      - .github/workflows/apply-asset-memory-milestones.yml
+      - scripts/apply-asset-memory-milestones.mjs
+      - packages/voxelyn-survival-server/src/progression-lore-asset-memory.ts
+      - packages/voxelyn-survival-server/src/progression-lore-asset-memory-text.ts
+      - packages/voxelyn-survival-server/tests/asset-memory-milestones.test.ts
 
 permissions:
   contents: write
