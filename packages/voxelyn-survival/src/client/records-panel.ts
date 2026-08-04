@@ -27,6 +27,7 @@ import {
 } from './records';
 import { t, type MessageKey } from './i18n';
 import { describeCause, formatDuration, formatSeed } from './run-summary';
+import type { SpriteBank } from './sprites';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
   const node = document.createElement(tag);
@@ -105,7 +106,73 @@ const renderSummaryTab = (host: HTMLElement, records: Records): void => {
 //
 // A distancia entre as duas linhas e o efeito inteiro. O jogo nao diz ao
 // jogador o que sentir sobre isso — so mostra o que foi arquivado.
-const renderAssetsTab = (host: HTMLElement, records: Records): void => {
+// ---------------------------------------------------------------------------
+// O slot de sprite da ficha (board 3g): a criatura viva, em miniatura.
+// ---------------------------------------------------------------------------
+// A criatura anda em DL (baixo-esquerda) dentro de um monitor de 56px com
+// tint teal — a ficha nao mostra a criatura, mostra a GRAVACAO dela no
+// arquivo da Aurix. O atlas e o mesmo do jogo, emprestado do renderer; o
+// painel nunca carrega imagem propria.
+
+/** Lado do monitor da ficha, px (o canvas; a moldura vem do CSS). */
+const SPRITE_SLOT = 56;
+/** O tint do arquivo: toda gravacao da Aurix sai na fosforescencia teal. */
+const ARCHIVE_TINT = { color: '#4fd6c9', alpha: 0.45 };
+
+let spriteRaf = 0;
+
+const drawSpriteSlot = (bank: SpriteBank, canvas: HTMLCanvasElement, elapsedMs: number): void => {
+  const archetype = canvas.dataset.archetype;
+  if (!archetype) return;
+  const manifest = bank.manifestForArchetype(archetype);
+  const ctx = canvas.getContext('2d');
+  if (!manifest || !ctx) return;
+  ctx.clearRect(0, 0, SPRITE_SLOT, SPRITE_SLOT);
+  const zoom = Math.min(
+    (SPRITE_SLOT - 6) / manifest.frameWidth,
+    (SPRITE_SLOT - 6) / manifest.frameHeight,
+  );
+  // Ancoragem: centraliza na horizontal e senta o pe 3px acima da borda.
+  const footX = SPRITE_SLOT / 2 + (manifest.anchorX - manifest.frameWidth / 2) * zoom;
+  const footY = SPRITE_SLOT - 3 - (manifest.frameHeight - manifest.anchorY) * zoom;
+  bank.drawEntity(ctx, archetype, 'walk', -1, 1, elapsedMs, footX, footY, zoom, ARCHIVE_TINT);
+};
+
+/**
+ * O laco de animacao das fichas. UM rAF para o painel inteiro, que se
+ * desliga sozinho quando as fichas saem do DOM ou a overlay esconde — um
+ * laco orfao continuaria queimando bateria atras de um menu fechado.
+ */
+const animateSprites = (bank: SpriteBank, host: HTMLElement): void => {
+  cancelAnimationFrame(spriteRaf);
+  const reduced =
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const start = performance.now();
+  const tick = (now: number): void => {
+    const canvases = host.querySelectorAll<HTMLCanvasElement>('canvas.ax-asset-sprite');
+    const hidden = host.closest('.overlay')?.classList.contains('hidden') ?? false;
+    if (canvases.length === 0 || hidden || !host.isConnected) {
+      spriteRaf = 0;
+      return;
+    }
+    canvases.forEach((canvas, index) => {
+      // Fases defasadas: dezesseis criaturas marchando em sincronia leem como
+      // um unico GIF; o arquivo e feito de gravacoes independentes.
+      drawSpriteSlot(bank, canvas, now - start + index * 350);
+    });
+    spriteRaf = requestAnimationFrame(tick);
+  };
+  if (reduced) {
+    // Sem movimento: um unico quadro parado de cada gravacao.
+    host
+      .querySelectorAll<HTMLCanvasElement>('canvas.ax-asset-sprite')
+      .forEach((canvas, index) => drawSpriteSlot(bank, canvas, index * 350));
+    return;
+  }
+  spriteRaf = requestAnimationFrame(tick);
+};
+
+const renderAssetsTab = (host: HTMLElement, records: Records, sprites?: SpriteBank): void => {
   section(host, t('records.assets'));
   for (const archetype of BESTIARY_ORDER) {
     const entry = records.bestiary[archetype];
@@ -114,27 +181,43 @@ const renderAssetsTab = (host: HTMLElement, records: Records): void => {
     // moldura solida por tracejado + hachura — nunca so opacidade.
     if (!entry) {
       const file = el('div', 'ax-asset is-locked');
-      file.appendChild(el('div', 'locked', t('records.assets.locked')));
-      file.appendChild(el('span', 'lesson', t('records.assets.noOccurrence')));
+      const slot = el('div', 'ax-asset-slot is-locked', '?');
+      file.appendChild(slot);
+      const body = el('div', 'ax-asset-body');
+      body.appendChild(el('div', 'locked', t('records.assets.locked')));
+      body.appendChild(el('span', 'lesson', t('records.assets.noOccurrence')));
+      file.appendChild(body);
       host.appendChild(file);
       continue;
     }
     const file = BESTIARY_FILES[archetype];
     const card = el('div', 'ax-asset');
+    const slot = el('div', 'ax-asset-slot');
+    if (sprites) {
+      const canvas = el('canvas', 'ax-asset-sprite') as HTMLCanvasElement;
+      canvas.width = SPRITE_SLOT;
+      canvas.height = SPRITE_SLOT;
+      canvas.dataset.archetype = archetype;
+      slot.appendChild(canvas);
+    }
+    card.appendChild(slot);
+    const body = el('div', 'ax-asset-body');
     const row = el('div', 'found');
     row.appendChild(el('span', undefined, t(file.code)));
     row.appendChild(el('span', 'tally', t('records.assets.tally', { count: entry.killed })));
-    card.appendChild(row);
-    card.appendChild(el('span', 'lesson', t(file.note)));
-    card.appendChild(
+    body.appendChild(row);
+    body.appendChild(el('span', 'lesson', t(file.note)));
+    body.appendChild(
       el(
         'span',
         'field-note',
         t('records.assets.fieldName', { name: t(BESTIARY_NAME_KEYS[archetype]) }),
       ),
     );
+    card.appendChild(body);
     host.appendChild(card);
   }
+  if (sprites) animateSprites(sprites, host);
 };
 
 const renderDiscoveriesTab = (host: HTMLElement, records: Records): void => {
@@ -182,14 +265,21 @@ const renderHistoryTab = (host: HTMLElement, records: Records): void => {
   }
 };
 
-const TAB_RENDER: Record<RecordsTab, (host: HTMLElement, records: Records) => void> = {
+const TAB_RENDER: Record<
+  RecordsTab,
+  (host: HTMLElement, records: Records, sprites?: SpriteBank) => void
+> = {
   summary: renderSummaryTab,
   assets: renderAssetsTab,
   discoveries: renderDiscoveriesTab,
   history: renderHistoryTab,
 };
 
-export const renderRecordsPanel = (host: HTMLElement, records: Records): void => {
+export const renderRecordsPanel = (
+  host: HTMLElement,
+  records: Records,
+  sprites?: SpriteBank,
+): void => {
   // Redesenhar limpa o DOM e derrubaria o foco no documento a cada troca de
   // aba — o mesmo problema (e a mesma solucao) do painel da Matriz.
   const active = document.activeElement;
@@ -213,7 +303,7 @@ export const renderRecordsPanel = (host: HTMLElement, records: Records): void =>
     button.dataset.axFocus = `tab:${tab}`;
     button.addEventListener('click', () => {
       activeTab = tab;
-      renderRecordsPanel(host, records);
+      renderRecordsPanel(host, records, sprites);
     });
     tabs.appendChild(button);
   }
@@ -223,7 +313,7 @@ export const renderRecordsPanel = (host: HTMLElement, records: Records): void =>
   body.style.width = 'auto';
   body.style.maxHeight = 'none';
   body.style.border = 'none';
-  TAB_RENDER[activeTab](body, records);
+  TAB_RENDER[activeTab](body, records, sprites);
   host.appendChild(body);
 
   if (focusKey) {

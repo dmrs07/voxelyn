@@ -1471,7 +1471,7 @@ const closeOverlay = (overlay: HTMLDivElement): void => {
 };
 
 document.getElementById('btn-records')?.addEventListener('click', () => {
-  renderRecordsPanel(recordsBody, records);
+  renderRecordsPanel(recordsBody, records, renderer.sprites);
   openOverlay(recordsOverlay);
 });
 document
@@ -1804,7 +1804,8 @@ onLocaleChange(() => {
   // Os paineis so sao remontados se estiverem ABERTOS: reconstruir o de
   // ranking fechado descartaria as entradas que vieram da rede, e reabri-lo
   // dispararia outra busca.
-  if (!recordsOverlay.classList.contains('hidden')) renderRecordsPanel(recordsBody, records);
+  if (!recordsOverlay.classList.contains('hidden'))
+    renderRecordsPanel(recordsBody, records, renderer.sprites);
   // O menu de campo escreve o estado e o rotulo do abandono ao abrir; com ele
   // aberto (e e de dentro dele que o idioma costuma ser trocado no meio de uma
   // run) os dois ficariam na lingua anterior ate a proxima abertura.

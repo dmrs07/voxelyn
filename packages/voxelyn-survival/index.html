@@ -224,7 +224,8 @@
       .ax-loading::after,
       #pause-coop-warning::after,
       #banner[data-tone='success']::after,
-      #banner[data-tone='info']::after {
+      #banner[data-tone='info']::after,
+      .ax-asset-slot:not(.is-locked)::after {
         content: '';
         position: absolute;
         inset: 0;
@@ -1234,16 +1235,49 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 6px;
       }
-      /* Ficha de ativo do registro biologico */
+      /* Ficha de ativo do registro biologico: monitor de sprite a esquerda
+         (board 3g), prosa a direita. */
       .ax-asset {
         display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 2px;
+        grid-template-columns: 60px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
         padding: 7px 9px;
         border: 1px solid var(--ax-key);
         background: #0b0b0a;
         min-width: 0;
         margin: 5px 0;
+      }
+      .ax-asset-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+        min-width: 0;
+      }
+      /* O monitor da ficha: a gravacao da criatura no arquivo da Aurix.
+         Moldura de latao, fundo de tubo apagado, fosforo por cima (o ::after
+         vem da lista de superficies acesas) e o brilho teal do proprio tint. */
+      .ax-asset-slot {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        border: 1px solid var(--ax-brass);
+        background:
+          radial-gradient(closest-side, rgba(79, 214, 201, 0.07), transparent 85%), #050807;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .ax-asset-slot canvas {
+        display: block;
+        image-rendering: pixelated;
+        filter: drop-shadow(0 0 6px rgba(79, 214, 201, 0.35));
+      }
+      .ax-asset-slot.is-locked {
+        border: 1px dashed #3a3128;
+        background: var(--ax-hatch);
+        color: var(--ax-text-dead);
+        font-size: 19px;
       }
       .ax-asset .found {
         border-bottom: none;
