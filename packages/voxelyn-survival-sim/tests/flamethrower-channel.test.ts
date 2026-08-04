@@ -11,6 +11,7 @@ import {
   SURF_ICE,
   SURF_NONE,
 } from '../src/constants';
+import { abilityDefinition } from '../src/abilities';
 import { MODULE_DEFINITIONS, grantOrRechargeModule } from '../src/modules';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
 import type { PlayerCommand, SemanticEvent, SurvivalState } from '../src/types';
@@ -179,6 +180,35 @@ describe('sopro termico canalizado', () => {
     stepRun(state, [holdFire]);
     // Tick seguinte ainda esta dentro de BOLT_COOLDOWN_TICKS: nada acumulou.
     expect(state.stats.shotsFired).toBe(1);
+  });
+
+  it('cobra o cooldown no FIM do canal, nao no cast', () => {
+    const state = withFlamethrower(0xf20);
+    stepRun(state, [castCommand({ x: 1, y: 0 })]);
+    // Durante o canal o cooldown ainda nao correu: o preco so comeca quando a
+    // chama para de sair.
+    expect(state.playerExtra.abilityCooldownUntil).toBeLessThanOrEqual(state.tick);
+
+    const until = state.playerExtra.channelingUntil;
+    while (state.playerExtra.channelingUntil !== 0) stepRun(state, [emptyCommand()]);
+    expect(state.tick).toBe(until);
+    const cooldown = Math.round(
+      abilityDefinition('flamethrower').cooldownTicks * state.config.tuning.abilityCooldownScale,
+    );
+    expect(state.playerExtra.abilityCooldownUntil).toBe(until + cooldown);
+  });
+
+  it('canal interrompido cobra o cooldown a partir do instante do cancelamento', () => {
+    // Sem isto, ser atordoado no comeco do sopro viraria recast gratis.
+    const state = withFlamethrower(0xf21);
+    stepRun(state, [castCommand({ x: 1, y: 0 })]);
+    state.player.stunnedUntil = state.tick + 2;
+    stepRun(state, [emptyCommand()]);
+    expect(state.playerExtra.channelingUntil).toBe(0);
+    const cooldown = Math.round(
+      abilityDefinition('flamethrower').cooldownTicks * state.config.tuning.abilityCooldownScale,
+    );
+    expect(state.playerExtra.abilityCooldownUntil).toBe(state.tick + cooldown);
   });
 
   it('nao permite recomecar a habilidade enquanto o canal vive', () => {

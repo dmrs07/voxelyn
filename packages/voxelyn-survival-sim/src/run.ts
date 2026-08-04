@@ -678,6 +678,29 @@ const castAbility = (state: SurvivalState, slot: number, events: SemanticEvent[]
 };
 
 /**
+ * Encerra o canal do sopro NESTE tick e so entao cobra o cooldown.
+ *
+ * O cooldown corre a partir do FIM do canal, nao do cast: cobrar no gatilho
+ * fazia 2,5 s da janela serem consumidos pela propria chama, e "8 s de
+ * cooldown" viravam 5,5 s de espera real. A cobranca vale tambem para canal
+ * INTERROMPIDO (stun, queda) — sem ela, ser atordoado viraria recast gratis.
+ * `channelingUntil === 0` e o marcador de "sem canal", e e o que garante que a
+ * cobranca aconteca uma unica vez por canal.
+ *
+ * A excecao unica e a troca de habilidade no poco, que zera o cooldown por
+ * design e por isso descarta o canal DIRETO, sem passar por aqui.
+ */
+const settleBreathChannel = (state: SurvivalState, extra: PlayerExtra): void => {
+  if (extra.channelingUntil === 0) return;
+  extra.channelingUntil = 0;
+  extra.abilityCooldownUntil =
+    state.tick +
+    Math.round(
+      abilityDefinition('flamethrower').cooldownTicks * state.config.tuning.abilityCooldownScale,
+    );
+};
+
+/**
  * Quantos raios de amostra viajam no evento `flame_cone.reach`, de `-arc` a
  * `+arc`. Cinco cobrem o cone visual sem inflar o snapshot; o GAMEPLAY nao usa
  * isto — as celulas sao varridas uma a uma com linha-de-visada propria.
@@ -907,22 +930,24 @@ const stepPlayer = (
   const coop = state.config.playerCount > 1;
 
   // slots nao reivindicados, abatidos e mortos nao agem. Cair ou morrer CANCELA
-  // o canal do sopro: um canal "pausado" voltaria a cuspir fogo no revive e
-  // manteria o bolt travado sem nada na tela explicando por que.
+  // o canal do sopro (cobrando o cooldown no cancelamento): um canal "pausado"
+  // voltaria a cuspir fogo no revive e manteria o bolt travado sem nada na tela
+  // explicando por que.
   if (!extra.joined || !player.alive || extra.downed) {
-    extra.channelingUntil = Math.min(extra.channelingUntil, state.tick);
+    settleBreathChannel(state, extra);
     return;
   }
 
   // Pedra do Bruiser interrompe movimento e todas as acoes. Timers do mundo e
   // dos modulos continuam correndo; o stun nao pausa a simulacao. O canal do
-  // sopro e interrompido DE VEZ, como a esquiva — e com ele cai o bloqueio de
-  // disparo, que so existe enquanto ha chama saindo.
+  // sopro e interrompido DE VEZ, como a esquiva — com ele cai o bloqueio de
+  // disparo, que so existe enquanto ha chama saindo, e o cooldown comeca a
+  // correr do instante da interrupcao.
   if (player.stunnedUntil > state.tick) {
     player.vx = 0;
     player.vy = 0;
     extra.dodgeUntil = Math.min(extra.dodgeUntil, state.tick);
-    extra.channelingUntil = Math.min(extra.channelingUntil, state.tick);
+    settleBreathChannel(state, extra);
     extra.heat = Math.max(0, extra.heat - tuning.heatDecayPerTick);
     return;
   }
@@ -1037,6 +1062,13 @@ const stepPlayer = (
     extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1),
   );
 
+  // Canal do sopro que chegou ao proprio fim: liquida ANTES do gate de cast —
+  // o cooldown recem-cobrado ja bloqueia um recast neste mesmo tick, e o
+  // gatilho do bolt (que le `channeling` abaixo) destrava imediatamente.
+  if (extra.channelingUntil !== 0 && state.tick >= extra.channelingUntil) {
+    settleBreathChannel(state, extra);
+  }
+
   // habilidade. Vem ANTES do gatilho: um cast de sopro no mesmo tick do disparo
   // ja trava o bolt daquele tick, em vez de deixar escapar um ultimo tiro.
   if (
@@ -1044,11 +1076,15 @@ const stepPlayer = (
     state.tick >= extra.abilityCooldownUntil &&
     state.tick >= extra.channelingUntil
   ) {
+    // O sopro cobra o cooldown no FIM do canal (`settleBreathChannel`); as
+    // habilidades instantaneas cobram aqui, onde o efeito inteiro acontece.
     // Arredondado para TICK inteiro: cooldown fracionario faria a comparacao
     // `state.tick >= until` depender de acumulo de float ao longo da run.
-    extra.abilityCooldownUntil =
-      state.tick +
-      Math.round(abilityDefinition(extra.ability).cooldownTicks * tuning.abilityCooldownScale);
+    if (extra.ability !== 'flamethrower') {
+      extra.abilityCooldownUntil =
+        state.tick +
+        Math.round(abilityDefinition(extra.ability).cooldownTicks * tuning.abilityCooldownScale);
+    }
     castAbility(state, slot, events);
   }
 
@@ -1216,8 +1252,10 @@ const stepPlayer = (
       extra.abilityCooldownUntil = state.tick;
       // Um canal de sopro em andamento morre junto com a habilidade antiga:
       // continuar cuspindo chama de uma habilidade que o slot nao tem mais
-      // deixaria o bolt travado por um estado orfao.
-      extra.channelingUntil = Math.min(extra.channelingUntil, state.tick);
+      // deixaria o bolt travado por um estado orfao. Descartado DIRETO, sem
+      // `settleBreathChannel`: a troca zera o cooldown por design, e cobrar
+      // para zerar na linha de cima seria contradicao morta.
+      extra.channelingUntil = 0;
       // As outras ofertas somem: a escolha e UMA, e um Eco que continua ali
       // depois de voce escolher convida a voltar e trocar de novo.
       for (const other of state.wellOffers) {
@@ -1256,6 +1294,10 @@ const stepPlayer = (
       } else if (!allNear) {
         events.push({ t: 'message', key: 'sim.waitAtShaft' });
       } else {
+        // Canal de sopro atravessando a descida e liquidado ANTES: o cooldown
+        // cobrado sobrevive a transicao, senao descer no meio do canal seria o
+        // unico jeito de sopro sem preco.
+        for (const playerExtra of state.playerExtras) settleBreathChannel(state, playerExtra);
         descend(state, events);
       }
       return;
@@ -1354,6 +1396,8 @@ const stepPlayer = (
         } else if (!allAtEntry) {
           events.push({ t: 'message', key: 'sim.waitAtExit' });
         } else {
+          // Mesma regra da descida: o preco do canal nao some na subida.
+          for (const playerExtra of state.playerExtras) settleBreathChannel(state, playerExtra);
           ascend(state, events);
         }
         return;
