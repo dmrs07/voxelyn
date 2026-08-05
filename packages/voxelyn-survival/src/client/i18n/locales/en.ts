@@ -198,6 +198,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.frost_wraith': 'Wraith',
   'enemy.sulfur_bomber': 'Sulfur Bearer',
   'enemy.diamandis': 'Diamandis',
+  'enemy.white_devourer': 'White Devourer',
   'enemy.undertaker': 'Undertaker',
 
   'bestiary.name.stalker': 'Stalker',
@@ -213,6 +214,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.frost_wraith': 'Frost Wraith',
   'bestiary.name.sulfur_bomber': 'Sulfur Bomber',
   'bestiary.name.diamandis': 'Diamandis',
+  'bestiary.name.white_devourer': 'White Devourer',
   'bestiary.name.undertaker': 'Undertaker',
   'bestiary.name.bishop': 'Bishop of the Vein',
   'bestiary.name.guardian': 'Guardian of the Core',
@@ -254,6 +256,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.note.sulfur_bomber':
     'Mineral variant of vector FUNG-23. Flammable internal charge. Neutralisation at distance from heat sources is advised — advice reiterated after the gallery 7 incident.',
   'bestiary.code.diamandis': 'CAPITAL ASSET DX-001',
+  'bestiary.code.white_devourer': 'MOVEMENT PATTERN SIL-00',
+  'bestiary.note.white_devourer':
+    'Estimated mass exceeds, by several orders, the organic matter the entire stratum could sustain. The hypothesis later reports formulate, and none of them sign: the body does not move through the silica — the silica temporarily takes the shape of the body.',
   'bestiary.code.undertaker': 'UNIT EX-041',
   'bestiary.note.diamandis':
     'Economically unrecoverable mobile recovery installation. It was not decommissioned: it was RECLASSIFIED — the company turned a running machine into part of the map so the loss would not have to be booked. It is still digging in a direction that appears on no contract.',

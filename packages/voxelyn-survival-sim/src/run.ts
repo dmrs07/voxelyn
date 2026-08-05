@@ -2319,6 +2319,7 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'sulfur_bomber',
   'undertaker',
   'diamandis',
+  'white_devourer',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */

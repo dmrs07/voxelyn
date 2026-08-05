@@ -1,4 +1,4 @@
-// O Codex corporativo (102 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (105 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -47,6 +47,7 @@ import {
   DISCOVERY_BISHOP_FELLED,
   DISCOVERY_DIAMANDIS_CORRIDOR,
   DISCOVERY_DIAMANDIS_MODULE,
+  DISCOVERY_SILICA_VITRIFIED,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_CARGO_LOST,
@@ -239,6 +240,7 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
   'bishop',
   'guardian',
   'diamandis',
+  'white_devourer',
 ];
 
 /**
@@ -267,6 +269,7 @@ export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   bishop: 'AX-EXE-034',
   guardian: 'AX-EXE-039',
   diamandis: 'AX-PUB-010',
+  white_devourer: 'AX-ENG-030',
 };
 
 /** Um documento por Descoberta. O bit aposentado (ORE_QUOTA) fica de fora. */
@@ -294,6 +297,9 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   // Um Coveiro arrancando um modulo da carcaça: o instante em que o jogador
   // descobre que aquelas unidades nao vieram com o chefe — vieram ANTES dele.
   { bit: DISCOVERY_DIAMANDIS_MODULE, fragmentId: 'AX-UNK-060' },
+  // Vitrificar silica solta: o bit exige ter FEITO, e nao ter entendido — a
+  // compreensao vem depois, de ver o verme falhar em subir ali.
+  { bit: DISCOVERY_SILICA_VITRIFIED, fragmentId: 'AX-INC-042' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
@@ -362,6 +368,7 @@ export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchet
   { bit: DISCOVERY_DIAMANDIS_CORRIDOR, archetype: 'diamandis' },
   { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'diamandis' },
   { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'undertaker' },
+  { bit: DISCOVERY_SILICA_VITRIFIED, archetype: 'white_devourer' },
   { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
   { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
   { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
@@ -522,6 +529,11 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-INC-041': ['AX-ENG-029', 'AX-UNK-059'],
   'AX-UNK-059': ['AX-INC-041', 'AX-UNK-051', 'AX-UNK-050'],
   'AX-UNK-060': ['AX-PRC-026', 'AX-UNK-043', 'AX-EXE-048'],
+  // O arco do Devorador: a massa que nao fecha → o chao que o recusa → a
+  // hipotese que nenhum laudo aprovado assina.
+  'AX-ENG-030': ['AX-INC-042', 'AX-UNK-061'],
+  'AX-INC-042': ['AX-ENG-030', 'AX-UNK-061'],
+  'AX-UNK-061': ['AX-ENG-030', 'AX-INC-042', 'AX-UNK-054'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
@@ -592,6 +604,9 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-PRC-026': 1,
   'AX-EXE-048': 2,
   'AX-UNK-060': 3,
+  'AX-ENG-030': 0,
+  'AX-INC-042': 1,
+  'AX-UNK-061': 3,
 };
 
 /**
@@ -636,6 +651,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-027',
   'AX-ENG-028',
   'AX-ENG-029',
+  'AX-ENG-030',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',
@@ -672,6 +688,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-039',
   'AX-INC-040',
   'AX-INC-041',
+  'AX-INC-042',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -711,6 +728,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-058',
   'AX-UNK-059',
   'AX-UNK-060',
+  'AX-UNK-061',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
@@ -834,6 +852,15 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
       { kind: 'asset', archetype: 'diamandis' },
       { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_CORRIDOR },
       { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
+    ],
+  }),
+  // O fecho do Devorador: so quem o derrubou E vitrificou o chao pode ler a
+  // hipotese de que nao havia corpo nenhum para derrubar.
+  define('AX-UNK-061', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'white_devourer' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_SILICA_VITRIFIED },
     ],
   }),
   define('AX-UNK-054', {

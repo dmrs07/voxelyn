@@ -20,7 +20,9 @@ import {
   SURF_WATER,
   SURF_EMBER,
   SURF_ICE,
+  SURF_GLASS,
   SURF_RAIL,
+  SURF_SILT,
   SURF_RAIL_V,
   CANARY_DEAD_AT,
   LURKER_HIDDEN,
@@ -201,6 +203,12 @@ const SURFACE_FALLBACK: Record<number, string> = {
   // porque pisar nela arma a armadilha.
   [SURF_RAIL]: '#6e4a33',
   [SURF_RAIL_V]: '#6e4a33',
+  // Silica solta: areia palida. Tem de ser LIDA de longe — e o rastro do
+  // Devorador, ou seja, o aviso de por onde ele anda por baixo.
+  [SURF_SILT]: '#c9b48c',
+  // Vidro: quase branco, frio. A leitura pretendida e "isto aqui esta selado",
+  // e o contraste com a areia e o que conta a historia sozinho.
+  [SURF_GLASS]: '#dfe9f2',
 };
 
 /**
@@ -1442,8 +1450,16 @@ export class SurvivalRenderer {
         // esta na frente delas — celula de gas encostada em parede tinha o
         // penacho engolido por ela. O chao dessas celulas sai como rocha nua e o
         // gas entra na fila ordenada, mais abaixo.
-        const surfKind = surf === SURF_GAS ? 0 : (SURFACE_KIND_INDEX[surf] ?? 0);
-        if (!this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
+        // Superficie SEM tile no atlas cai na cor de recuo, e nao no tile 0.
+        //
+        // O `?? 0` de antes desenhava CHAO LIMPO para toda materia que o atlas
+        // ainda nao conhecia — e `draw` devolve true, entao a cor de recuo
+        // nunca chegava a rodar. Uma materia nova ficava literalmente
+        // invisivel, que e o pior defeito possivel num jogo em que o chao e a
+        // mecanica: a silica solta do Devorador e o aviso de por onde ele anda,
+        // e o vidro e a prova de que aquele pedaco esta negado a ele.
+        const surfKind = surf === SURF_GAS ? 0 : SURFACE_KIND_INDEX[surf];
+        if (surfKind === undefined || !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
         }
         const ambientScale = this.quality.maxFx / PRESETS.high.maxFx;

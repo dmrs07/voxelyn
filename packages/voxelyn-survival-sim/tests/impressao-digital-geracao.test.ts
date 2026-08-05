@@ -110,7 +110,12 @@ describe('impressao digital da geracao', () => {
     // Conferida nos DOIS lados do refactor do gerador: `origin/main` (5126232,
     // sem TerrainDraft) e esta branch produzem o mesmo numero. E o que sustenta
     // "a geracao saiu byte a byte identica" — sem isso seria so afirmacao.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1444846605);
+    // 2796116346 (era 1444846605): a linhagem ARIDA passou a terminar em
+    // Sumidouros de Silica em vez de Fornalha Abissal — sem isso o estrato
+    // sedimentar nunca era o ultimo, e o Devorador Branco, que so pode nascer
+    // na camara final, nao tinha onde existir. Acompanhado de bump de
+    // SIMULATION_VERSION, como o cabecalho manda.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2796116346);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

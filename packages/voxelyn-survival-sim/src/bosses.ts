@@ -109,13 +109,13 @@ export const bossForBiome = ({ stratum, occupation }: BossBiome): BossId =>
 /**
  * Os chefes que JA EXISTEM como arquetipo de simulacao. Os demais caem no
  * Guardiao — um fallback jogavel e honesto (ele e o chefe-base do jogo), que
- * some sozinho conforme cada linha da tabela ganhar corpo. O proximo da fila e
- * o Devorador Branco (Sumidouros de Silica).
+ * some sozinho conforme cada linha da tabela ganhar corpo.
  */
 export const IMPLEMENTED_BOSS: Partial<Record<BossId, EnemyArchetype>> = {
   bishop: 'bishop',
   guardian: 'guardian',
   diamandis: 'diamandis',
+  white_devourer: 'white_devourer',
 };
 
 /**

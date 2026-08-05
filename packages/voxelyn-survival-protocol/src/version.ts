@@ -174,7 +174,17 @@ export const PROTOCOL_VERSION = 17;
 // `modulesExposed`/`modulesLost` entram no hash e a Descoberta
 // DISCOVERY_DIAMANDIS_MODULE (bit 17) na bitmask: dois peers em versoes
 // diferentes discordam de quais armas o chefe ainda tem.
-export const SIMULATION_VERSION = 26;
+// 27: DEVORADOR BRANCO, e duas materias novas de superficie. SURF_SILT (13) e
+// o rastro que ele deixa por baixo; SURF_GLASS (14) e o que sobra quando alguem
+// poe calor nele — e sobre vidro ele NAO emerge, que e o contra-jogo inteiro do
+// encontro. `igniteCell` ganha o ramo de vitrificacao e DISCOVERY_SILICA_
+// VITRIFIED (bit 18) entra na bitmask.
+//
+// E a linhagem ARIDA passou a terminar em Sumidouros de Silica em vez de
+// Fornalha Abissal: sem isso o estrato sedimentar nunca era o ultimo e o chefe
+// dele nao tinha onde nascer. O TERRENO SEMEADO de toda run arida muda (ver
+// tests/impressao-digital-geracao.test.ts).
+export const SIMULATION_VERSION = 27;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -198,7 +208,11 @@ export const SIMULATION_VERSION = 26;
 // 18: o pool de criaturas ganha o DIAMANDIS. Ele ainda nao tem atlas — desenha
 // pelo caminho de fallback, como o Bispo e o Corcel antes de ganharem o deles —
 // mas o conjunto de conteudo mudou, e e exatamente isso que este campo marca.
-export const CONTENT_VERSION = 18;
+// 19: o pool ganha o DEVORADOR BRANCO e duas crostas de chao (silica solta e
+// vidro). As duas ainda nao tem tile no atlas de superficie — desenham pela cor
+// de recuo, que a partir desta versao realmente dispara para materia sem tile
+// (antes o `?? 0` desenhava chao limpo e a materia ficava invisivel).
+export const CONTENT_VERSION = 19;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -416,7 +416,9 @@ describe('segunda leva: linhagens termica, arida e crio', () => {
     expect(sectorBiome(thermal, 3).stratum).toBe('furnace');
     const arid = seedWithLineage('arid');
     expect(sectorBiome(arid, 2).stratum).toBe('silica');
-    expect(sectorBiome(arid, 3).stratum).toBe('furnace');
+    // A arida termina NA silica: o estrato sedimentar precisa poder ser o
+    // ultimo para o Devorador Branco existir (so o setor final tem chefe).
+    expect(sectorBiome(arid, 3).stratum).toBe('silica');
     const cryo = seedWithLineage('cryo');
     expect(sectorBiome(cryo, 2).stratum).toBe('glacial');
     expect(sectorBiome(cryo, 3).stratum).toBe('glacial');

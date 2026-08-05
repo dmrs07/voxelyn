@@ -203,6 +203,7 @@ export const PT_BR = {
   'enemy.sulfur_bomber': 'Bombardeiro',
   'enemy.undertaker': 'Coveiro',
   'enemy.diamandis': 'Diamandis',
+  'enemy.white_devourer': 'Devorador Branco',
 
   'bestiary.name.stalker': 'Espreitador',
   'bestiary.name.spitter': 'Cuspidor',
@@ -218,6 +219,7 @@ export const PT_BR = {
   'bestiary.name.sulfur_bomber': 'Bombardeiro de Enxofre',
   'bestiary.name.undertaker': 'Coveiro',
   'bestiary.name.diamandis': 'Diamandis',
+  'bestiary.name.white_devourer': 'Devorador Branco',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
 
@@ -258,6 +260,9 @@ export const PT_BR = {
     'Variante mineral do vetor FUNG-23. Carga interna inflamável. Recomenda-se neutralização a distância de fontes de calor — recomendação reiterada após o incidente da galeria 7.',
   'bestiary.code.undertaker': 'UNIDADE EX-041',
   'bestiary.code.diamandis': 'ATIVO DE PATRIMÔNIO DX-001',
+  'bestiary.code.white_devourer': 'PADRÃO DE MOVIMENTO SIL-00',
+  'bestiary.note.white_devourer':
+    'A massa estimada excede em várias ordens a matéria orgânica que o estrato inteiro poderia sustentar. A hipótese que os laudos posteriores formulam, e que nenhum deles assina: o corpo não atravessa a sílica — a sílica assume temporariamente a forma do corpo.',
   'bestiary.note.diamandis':
     'Instalação móvel de recuperação economicamente inviável. Não foi desativado: foi RECLASSIFICADO — a companhia transformou uma máquina em operação em parte do mapa para não contabilizar a perda. Continua escavando numa direção que não consta do contrato.',
   'bestiary.note.undertaker':

@@ -110,8 +110,8 @@ export type SectorBiome = {
  *   temperatura, os gases e a instabilidade crescem com a descida.
  * - industrial: Basalto -> Ferrifero (Cicatriz) -> Ferrifero profundo. O
  *   veio principal E a cicatriz: o lugar que justificou a operacao.
- * - arida: Basalto -> Sumidouros de Silica -> Fornalha Abissal. A silica
- *   vitrifica rumo ao calor: dois caminhos chegam a Fornalha.
+ * - arida: Basalto -> Sumidouros de Silica -> Sumidouros profundos. O chao
+ *   deixa de segurar o teto, e o fundo e o dono dele (ver LINEAGES).
  * - crio: Basalto -> Cripta Glacial -> Cripta profunda. O gelo domina e a
  *   profundidade adensa as pontes e lagos congelados.
  */
@@ -139,7 +139,20 @@ const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation
   arid: [
     { stratum: 'basalt', occupation: 'none' },
     { stratum: 'silica', occupation: 'none' },
-    { stratum: 'furnace', occupation: 'none' },
+    // A arida termina NA SILICA, e nao mais na Fornalha.
+    //
+    // A tabela antiga era basalto -> silica -> fornalha ("a silica vitrifica
+    // rumo ao calor: dois caminhos chegam a Fornalha"), e ela tinha uma
+    // consequencia que so apareceu quando o Devorador Branco ganhou corpo: o
+    // estrato sedimentar NUNCA era o ultimo, e como so o setor final tem
+    // chefe, o dono dos Sumidouros nao podia existir. Um chefe que nao spawna
+    // nao esta implementado.
+    //
+    // Terminar no proprio estrato e o que as outras linhagens ja fazem
+    // (mineral, industrial e crio dobram o seu no fim), e a Fornalha continua
+    // tendo o caminho dela pela termica. O que se perde e o segundo acesso a
+    // Fornalha; o que se ganha e o encontro que o estrato sempre prometeu.
+    { stratum: 'silica', occupation: 'none' },
   ],
   cryo: [
     { stratum: 'basalt', occupation: 'none' },

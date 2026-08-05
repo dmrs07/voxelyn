@@ -670,6 +670,28 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // O arco do Devorador Branco — a massa que o estrato nao sustenta
+  // -------------------------------------------------------------------------
+  'AX-ENG-030': {
+    title: 'Levantamento de massa: SIL-00',
+    summary: 'A conta nao fecha por varias ordens de grandeza.',
+    body: 'ATIVO HOSTIL SIL-00. Estimativa dimensional a partir do deslocamento de terreno.\n\nO volume deslocado por uma unica passagem do ativo implica uma massa corporea entre 400 e 600 toneladas.\n\nO inventario de matéria orgânica de TODO o estrato sedimentar — biomassa fúngica, colônias, fauna registrada e depósitos — foi estimado em três ordens de grandeza abaixo disso.\n\nEngenharia não formula hipótese. Engenharia registra que a conta não fecha, e que ela não fecha por uma margem que nenhum erro de instrumento explica.\n\nSolicitamos que o ativo seja mantido em observação e que a designação permaneça provisória.',
+    source: 'Engenharia de Sistemas — levantamento dimensional',
+  },
+  'AX-INC-042': {
+    title: 'Incidente 42 — o chão que recusa',
+    summary: 'Onde a sílica virou vidro, ele não emerge. Nunca.',
+    body: 'Registro consolidado de 61 emergências do ativo SIL-00.\n\nEm 61 ocorrências, nenhuma se deu sobre superfície vitrificada. Em 9 delas, a trajetória sob o solo passou por baixo de uma placa de vidro e a emergência ocorreu ADIANTE dela, em areia solta, com atraso compatível com o desvio.\n\nO ativo não quebra o vidro. O ativo não emerge através do vidro. O ativo aparentemente não pode.\n\nOperações registra o corolário, e a redação foi mantida: a superfície que ele deixa ao passar é a mesma que ele precisa para voltar. Queimar o rastro fecha o caminho de volta.\n\nA recomendação de campo cabe numa linha: vitrifiquem o chão em que pretendem ficar de pé.',
+    source: 'Comitê de Incidentes — análise de recorrência',
+  },
+  'AX-UNK-061': {
+    title: 'Sobre a forma que a sílica assume',
+    summary: 'Talvez não haja corpo nenhum atravessando o estrato.',
+    body: 'Reunidos: a massa que o estrato não sustenta, a ausência de qualquer carcaça em 61 abates registrados, e o fato de o ativo ser detido por uma mudança de estado do próprio solo.\n\nA hipótese que os laudos aprovados não formulam, e que este registro formula porque não tem departamento a proteger:\n\nO ativo não atravessa a sílica. A sílica assume temporariamente a forma do ativo.\n\nIsso explicaria a massa, que não precisa vir de lugar nenhum. Explicaria a ausência de carcaça, porque o que se abate volta a ser chão. E explicaria por que o vidro o detém: vidro não é sílica solta — é sílica que já assumiu uma forma, e não pode assumir outra.\n\nSe a hipótese estiver correta, não estamos matando um organismo. Estamos interrompendo um PADRÃO DE MOVIMENTO do estrato, do mesmo modo que uma onda é interrompida por uma parede — e pelo mesmo tempo.\n\nA operação continua registrando os 61 abates como 61 indivíduos.',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
   'AX-GEN-G01': {
@@ -1329,6 +1351,28 @@ const en: Record<LoreFragmentId, LoreText> = {
     title: 'On what it was building',
     summary: 'It was not digging towards the signal. It was digging around it.',
     body: 'The movement telemetry of DX-001 was reconstructed from the corridors it left behind.\n\nThe trace does not converge. The galleries opened by the asset since cycle 118 form CONCENTRIC arcs, in layers, at an approximately constant distance from the emission source — and each new layer is opened outside the previous one.\n\nThis is not a failed excavation route. It is a successful excavation route, with a different objective.\n\nThe company sent the largest machine it ever built to reach the signal. The machine got close, understood something the maps do not record, and spent the following cycles building layers of containment around it.\n\nThe question this record does not formulate, because formulating it reclassifies the entire programme: did the Diamandis fail to reach the objective, or did it understand before we did that the objective should not be reached?\n\nSee also the containment system of unattributed origin. One of them we built.',
+    source: 'No department assigned',
+  },
+
+  // -------------------------------------------------------------------------
+  // The White Devourer arc — the mass the stratum cannot sustain
+  // -------------------------------------------------------------------------
+  'AX-ENG-030': {
+    title: 'Mass survey: SIL-00',
+    summary: 'The arithmetic misses by several orders of magnitude.',
+    body: 'HOSTILE ASSET SIL-00. Dimensional estimate derived from terrain displacement.\n\nThe volume displaced by a single pass of the asset implies a body mass between 400 and 600 tonnes.\n\nThe organic matter inventory of the ENTIRE sedimentary stratum — fungal biomass, colonies, recorded fauna and deposits — was estimated at three orders of magnitude below that figure.\n\nEngineering formulates no hypothesis. Engineering records that the arithmetic does not close, and that it misses by a margin no instrument error accounts for.\n\nWe request that the asset be kept under observation and that the designation remain provisional.',
+    source: 'Systems Engineering — dimensional survey',
+  },
+  'AX-INC-042': {
+    title: 'Incident 42 — the ground that refuses',
+    summary: 'Where the silica became glass, it does not surface. Ever.',
+    body: 'Consolidated record of 61 emergences by asset SIL-00.\n\nAcross 61 occurrences, none took place on vitrified surface. In 9 of them the subsurface trajectory passed beneath a glass plate and the emergence occurred BEYOND it, in loose sand, with a delay consistent with the detour.\n\nThe asset does not break the glass. The asset does not emerge through the glass. The asset apparently cannot.\n\nOperations records the corollary, and the wording was left standing: the surface it leaves behind as it passes is the same surface it needs in order to return. Burning the trail closes the way back.\n\nThe field recommendation fits on one line: vitrify the ground you intend to stand on.',
+    source: 'Incident Committee — recurrence analysis',
+  },
+  'AX-UNK-061': {
+    title: 'On the shape the silica takes',
+    summary: 'There may be no body crossing the stratum at all.',
+    body: 'Taken together: the mass the stratum cannot sustain, the absence of any carcass across 61 recorded kills, and the fact that the asset is stopped by a change of state in the ground itself.\n\nThe hypothesis the approved reports do not formulate, and which this record formulates because it has no department to protect:\n\nThe asset does not move through the silica. The silica temporarily takes the shape of the asset.\n\nThat would account for the mass, which need not come from anywhere. It would account for the absent carcass, because what is killed simply becomes ground again. And it would account for why glass stops it: glass is not loose silica — it is silica that has already taken a shape, and cannot take another.\n\nIf the hypothesis holds, we are not killing an organism. We are interrupting a MOVEMENT PATTERN of the stratum, in the way a wave is interrupted by a wall — and for as long.\n\nThe operation continues to record the 61 kills as 61 individuals.',
     source: 'No department assigned',
   },
 };

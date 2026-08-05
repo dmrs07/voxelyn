@@ -52,6 +52,27 @@ export const SURF_EMBER = 9;
 // condutiva, e a agua derretida recongela sozinha depois de um tempo.
 export const SURF_ICE = 10;
 
+/**
+ * SILICA SOLTA (id 13) e VIDRO (id 14) — as duas materias do Devorador Branco.
+ *
+ * Append-only, como toda superficie: os ids viajam nos diffs de chunk e nao
+ * podem mudar de significado.
+ *
+ * A silica solta e o RASTRO dele: onde o verme passou por baixo, o chao cedeu e
+ * virou areia instavel. Ela e inerte para tudo — nao conduz, nao machuca, nao
+ * retarda — e faz uma coisa so: e por ela que ele consegue emergir.
+ *
+ * O VIDRO e o que sobra quando alguem poe calor na silica solta. Tambem inerte,
+ * tambem faz uma coisa so, e e a inversa: por cima de vidro ele NAO sobe.
+ *
+ * As duas juntas sao o encontro inteiro. O rastro dele e ao mesmo tempo o aviso
+ * de por onde ele anda E a municao do contra-jogo: queimar o proprio caminho
+ * dele fecha o chao por onde ele viria. O jogador nao aprende isso num tutorial
+ * — aprende vendo a areia virar vidro na primeira vez que o fogo passa por ela.
+ */
+export const SURF_SILT = 13;
+export const SURF_GLASS = 14;
+
 // Orcamentos por tick (degradacao previsivel via fila deterministica).
 export const BUDGET_REACTING_CELLS = 4096;
 export const BUDGET_DISCHARGE_CELLS = 256;
@@ -634,6 +655,60 @@ export const UNDERTAKER_SALVAGE_WINDUP_TICKS = 40;
  * continua valendo, para quem escapa de verdade.
  */
 export const UNDERTAKER_SALVAGE_ESCAPE_DIST = 24;
+
+// ---------------------------------------------------------------------------
+// DEVORADOR BRANCO — o chefe dos Sumidouros de Silica
+// ---------------------------------------------------------------------------
+/**
+ * O grande verme subterraneo. Ou o que quer que seja: a quantidade de materia
+ * organica do estrato nao sustentaria um corpo daquele tamanho, e a hipotese
+ * que os documentos acabam formulando e outra — ele nao atravessa a silica, a
+ * silica assume temporariamente a forma dele.
+ *
+ * O ciclo e um so e nunca muda: MERGULHA, deixa faixa de silica solta enquanto
+ * anda por baixo, calcula onde o jogador vai estar, EMERGE ali. Submerso ele e
+ * quase invulneravel; a janela de dano e o tempo em que fica na superficie
+ * depois de emergir.
+ *
+ * O contra-jogo nao esta escrito em lugar nenhum: esta no fato de o rastro dele
+ * ser silica solta, e de calor virar silica solta em vidro. Quem entende
+ * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
+ */
+export const DEVOURER_HP = 760;
+/** Submerso ele desliza; na superficie e um corpo lento e pesado. */
+export const DEVOURER_BURROW_SPEED = 4.6;
+export const DEVOURER_SURFACE_SPEED = 1.6;
+export const DEVOURER_RADIUS = 0.8;
+/**
+ * Quanto do dano a areia absorve enquanto ele esta por baixo.
+ *
+ * Reducao, e nao imunidade — a mesma escolha da couraça do Escoriaceo. Imune
+ * ensinaria "guarde a municao e espere", que e a ausencia de jogo; a 12% o tiro
+ * durante o mergulho vale a pena o bastante para atirar no rastro ser uma
+ * jogada, e pouco o bastante para a janela de superficie continuar sendo A
+ * janela.
+ */
+export const DEVOURER_BURROWED_ARMOR = 0.12;
+/** Quanto tempo ele fica exposto depois de emergir: a janela de dano. */
+export const DEVOURER_SURFACE_TICKS = 110;
+/** E quanto tempo passa por baixo antes de tentar sair de novo. */
+export const DEVOURER_BURROW_MIN_TICKS = 70;
+/**
+ * O telegrafo da emergencia: 1,2 s de chao rachando no ponto marcado.
+ *
+ * Mais curto que o do Corcel (1,3 s) e o da broca (1,8 s) de proposito: a marca
+ * dele aparece SOB o jogador, e a distancia a percorrer para sair dela e um
+ * passo. O que custa aqui nao e o tempo, e perceber.
+ */
+export const DEVOURER_ERUPT_WINDUP_TICKS = 24;
+export const DEVOURER_ERUPT_RADIUS = 2.8;
+export const DEVOURER_ERUPT_DAMAGE = 30;
+/** Ate onde ele procura chao valido quando o alvo esta sobre vidro. */
+export const DEVOURER_ERUPT_SEARCH = 6;
+/** Quanto a mira antecipa o movimento do alvo, em segundos. */
+export const DEVOURER_LEAD_SECONDS = 0.9;
+/** Meia-largura da faixa de silica que o mergulho deixa. */
+export const DEVOURER_TRAIL_WIDTH = 1;
 
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;

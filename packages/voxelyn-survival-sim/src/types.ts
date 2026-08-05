@@ -93,7 +93,14 @@ export type EnemyArchetype =
    * nao consta dos mapas. As tres armas dele sao FERRAMENTAS: broca, cargas de
    * implosao e um feixe de prospeccao. Ele nao esta lutando, esta trabalhando.
    */
-  | 'diamandis';
+  | 'diamandis'
+  /**
+   * DEVORADOR BRANCO: o chefe dos Sumidouros de Silica. Mergulha, deixa faixa
+   * de silica solta por onde passa, preve onde o jogador vai estar e emerge
+   * dali. Nao ha o que perseguir — o que se decide contra ele e ONDE ele pode
+   * sair, e a resposta e vitrificar o chao com calor.
+   */
+  | 'white_devourer';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -255,6 +262,13 @@ export const DISCOVERY_DIAMANDIS_CORRIDOR = 1 << 16;
  * interceptar) e a escolha do encontro.
  */
 export const DISCOVERY_DIAMANDIS_MODULE = 1 << 17;
+/**
+ * VITRIFICOU silica solta — transformou o rastro do Devorador em vidro.
+ *
+ * O bit nao exige ter entendido para que serve: exige ter FEITO. E a ordem
+ * certa, porque a compreensao vem de ver o verme falhar em subir ali depois.
+ */
+export const DISCOVERY_SILICA_VITRIFIED = 1 << 18;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -293,6 +307,8 @@ export type EntityActionKind =
   | 'demolish'
   /** Feixe de prospeccao: varredura inofensiva, depois potencia na mesma linha. */
   | 'beam'
+  /** Emergencia do Devorador: o chao racha no ponto marcado, e entao ele sobe. */
+  | 'erupt'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
   | 'haul'
   /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
@@ -449,6 +465,14 @@ export const MINER_MOOD_ENRAGED = 2;
  */
 export const LURKER_HIDDEN = 0;
 export const LURKER_EXPOSED = 1;
+
+/**
+ * Postura do Devorador Branco: por baixo da silica ou exposto na superficie.
+ * Viaja no snapshot porque o cliente desenha coisas completamente diferentes —
+ * submerso ele e uma ondulacao na areia, e nao um corpo.
+ */
+export const DEVOURER_BURROWED = 0;
+export const DEVOURER_SURFACED = 1;
 
 /** Postura do Escoriaceo: couraça fria fechada, ou aberta pelo calor. */
 export const SCORIAC_COOL = 0;

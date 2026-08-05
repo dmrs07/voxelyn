@@ -2,6 +2,22 @@ import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
   WITNESS_RANGE,
+  DEVOURER_BURROWED_ARMOR,
+  DEVOURER_BURROW_MIN_TICKS,
+  DEVOURER_BURROW_SPEED,
+  DEVOURER_ERUPT_DAMAGE,
+  DEVOURER_ERUPT_RADIUS,
+  DEVOURER_ERUPT_SEARCH,
+  DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_HP,
+  DEVOURER_LEAD_SECONDS,
+  DEVOURER_RADIUS,
+  DEVOURER_SURFACE_SPEED,
+  DEVOURER_SURFACE_TICKS,
+  DEVOURER_TRAIL_WIDTH,
+  SURF_GLASS,
+  SURF_SCORCHED,
+  SURF_SILT,
   DIAMANDIS_BEAM_COOLDOWN_TICKS,
   DIAMANDIS_BEAM_DAMAGE,
   DIAMANDIS_BEAM_LENGTH,
@@ -143,6 +159,8 @@ import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  DEVOURER_BURROWED,
+  DEVOURER_SURFACED,
   BOSS_MODULE_DRILL,
   BOSS_MODULE_SCANNER,
   BOSS_MODULE_TOWER,
@@ -240,6 +258,18 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // todo tiro em acerto garantido. O tamanho dele mora no sprite e no ESTRAGO
   // que ele deixa no mapa, nunca no raio de colisao. Lento porque nunca foi
   // feito para alcancar ninguem: o perigo e o caminho que ele abre.
+  // DEVORADOR BRANCO. Vida de chefe e corpo grande, mas o numero que importa e
+  // a REDUCAO submerso (ver DEVOURER_BURROWED_ARMOR): a barra dele nao e o
+  // problema, a janela e. `speed` fica com a velocidade de superficie — o
+  // mergulho tem a propria, e ele nem usa `moveEntity` la.
+  white_devourer: {
+    hp: DEVOURER_HP,
+    speed: DEVOURER_SURFACE_SPEED,
+    radius: DEVOURER_RADIUS,
+    contactDamage: 22,
+    contactCooldown: 16,
+    aggroRange: 26,
+  },
   diamandis: {
     hp: DIAMANDIS_HP,
     speed: DIAMANDIS_SPEED,
@@ -502,6 +532,13 @@ export const damageEntity = (
   if (ent.archetype === 'scoriac' && ent.mood !== SCORIAC_HOT) {
     amount *= SCORIAC_ARMOR_SCALE;
   }
+  // A areia entre o tiro e o corpo. Reducao e nao imunidade, pela mesma razao
+  // da couraça acima: imune ensinaria "guarde a municao e espere", que e a
+  // ausencia de jogo. Vive aqui, no unico funil de dano, para nenhum caminho
+  // novo esquecer dela.
+  if (ent.archetype === 'white_devourer' && ent.mood === DEVOURER_BURROWED) {
+    amount *= DEVOURER_BURROWED_ARMOR;
+  }
   const attributable =
     cause.kind === 'player_shot' ||
     ((cause.kind === 'explosion' || cause.kind === 'discharge') && cause.source === 'player');
@@ -666,6 +703,9 @@ export const spawnEnemy = (
     ...(archetype === 'mud_lamprey' || archetype === 'frost_wraith' ? { mood: LURKER_HIDDEN } : {}),
     ...(archetype === 'scoriac' ? { mood: SCORIAC_COOL } : {}),
     ...(archetype === 'bellows' ? { mood: BELLOWS_INHALING } : {}),
+    // O Devorador nasce POR BAIXO: a primeira coisa que o jogador ve dele e o
+    // rastro de areia, nunca o corpo.
+    ...(archetype === 'white_devourer' ? { mood: DEVOURER_BURROWED } : {}),
   };
   state.enemies.push(enemy);
   return enemy;
@@ -1048,6 +1088,10 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       });
     }
     state.bossRuntime.blastCells = [];
+    return;
+  }
+  if (action.kind === 'erupt') {
+    devourerErupt(state, enemy, events);
     return;
   }
   if (action.kind === 'beam') {
@@ -1901,6 +1945,174 @@ const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: Seman
   }
 };
 
+/**
+ * O passo do DEVORADOR BRANCO: mergulhado, ele anda por baixo e deixa rastro;
+ * exposto, e um corpo lento que pode ser cobrado.
+ *
+ * O ciclo inteiro mora aqui porque ele nao e "perseguir e bater" em nenhum
+ * momento — submerso ele nem colide com o jogador, e exposto ele nao decide
+ * nada alem de continuar de pe pelo tempo da janela. E o mesmo motivo pelo qual
+ * o Miner, os espreitadores e o Fole tem fluxo proprio.
+ */
+const devourerStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const surfaced = enemy.mood === DEVOURER_SURFACED;
+
+  if (surfaced) {
+    // EXPOSTO: a janela de dano. Ele anda devagar na direcao do jogador e cobra
+    // contato de quem ficar colado, mas nao tem golpe — o golpe dele foi a
+    // emergencia, e a proxima so vem depois de mergulhar de novo.
+    if (state.tick >= enemy.nextActionAt) {
+      enemy.mood = DEVOURER_BURROWED;
+      enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+      return;
+    }
+    if (!player) return;
+    const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+    enemy.facing = { ...toward };
+    const def = ARCHETYPES.white_devourer;
+    if (distTo(enemy, player) < enemy.radius + player.radius + 0.2 && state.tick >= enemy.contactReadyAt) {
+      enemy.contactReadyAt = state.tick + def.contactCooldown;
+      startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
+      return;
+    }
+    const speed = DEVOURER_SURFACE_SPEED * surfaceSpeedMul(state, enemy);
+    moveEntity(state, enemy, toward.x * speed * dt, toward.y * speed * dt);
+    return;
+  }
+
+  // MERGULHADO. Ele nao colide e nao e alcancado pelo terreno: esta POR BAIXO
+  // dele. O que fica na superficie e a faixa de silica solta — o aviso de por
+  // onde ele anda, e ao mesmo tempo a materia que o contra-jogo consome.
+  if (!player) return;
+  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  enemy.facing = { ...toward };
+  const step = DEVOURER_BURROW_SPEED * dt;
+  // Sem `moveEntity`: parede nao vale por baixo. Ele e o unico corpo do jogo
+  // que atravessa solido, e e por isso que perseguir nao e uma resposta a ele.
+  enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + toward.x * step));
+  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + toward.y * step));
+
+  // O RASTRO: silica solta na faixa por onde passou, so em chao aberto e limpo.
+  // Nao pinta por cima de nada — nem de fogo, nem de agua, nem do proprio
+  // vidro: sobrescrever o vidro apagaria o contra-jogo do jogador com o
+  // proprio corpo do chefe.
+  const side = { x: -toward.y, y: toward.x };
+  for (let lane = -DEVOURER_TRAIL_WIDTH; lane <= DEVOURER_TRAIL_WIDTH; lane++) {
+    const tx = Math.floor(enemy.x + side.x * lane);
+    const ty = Math.floor(enemy.y + side.y * lane);
+    if (tx < 1 || ty < 1 || tx >= w - 1 || ty >= state.config.height - 1) continue;
+    const i = ty * w + tx;
+    if (state.solid[i] !== SOLID_NONE) continue;
+    if (state.surface[i] !== SURF_NONE && state.surface[i] !== SURF_SCORCHED) continue;
+    setSurface(state, i, SURF_SILT, 0);
+  }
+
+  if (state.tick < enemy.nextActionAt) return;
+
+  // A EMERGENCIA. Ele mira onde o jogador VAI estar, e nao onde esta: o alvo
+  // parado e o unico que a antecipacao erra, e isso e de proposito — quem le o
+  // rastro e para de correr em linha reta ja esta jogando contra ele.
+  const leadX = player.x + player.vx * DEVOURER_LEAD_SECONDS;
+  const leadY = player.y + player.vy * DEVOURER_LEAD_SECONDS;
+  const spot = devourerSurfacingSpot(state, Math.floor(leadX), Math.floor(leadY));
+  if (spot < 0) {
+    // Chao vitrificado em toda a volta: ele NAO consegue sair aqui. Volta a
+    // andar por baixo e tenta de novo mais tarde — e essa recusa e a
+    // recompensa inteira de quem transformou a areia em vidro.
+    enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.2 });
+    return;
+  }
+  enemy.x = (spot % w) + 0.5;
+  enemy.y = Math.floor(spot / w) + 0.5;
+  startAction(state, enemy, 'erupt', toward, DEVOURER_ERUPT_WINDUP_TICKS, 6, events, player.id);
+};
+
+/**
+ * Onde ele consegue sair, a partir do ponto mirado, ou -1.
+ *
+ * VIDRO recusa: e o unico jeito de o jogador negar espaco a ele. Solido
+ * tambem, e por um motivo diferente — sair dentro de uma parede o deixaria
+ * emparedado, e chefe preso e chefe morto.
+ *
+ * A busca e em anel crescente e deterministica: duas maquinas da mesma sala
+ * precisam faze-lo emergir na MESMA celula.
+ */
+const devourerSurfacingSpot = (state: SurvivalState, cx: number, cy: number): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let r = 0; r <= DEVOURER_ERUPT_SEARCH; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        if (state.surface[i] === SURF_GLASS) continue;
+        return i;
+      }
+    }
+  }
+  return -1;
+};
+
+/**
+ * A EMERGENCIA propriamente dita: o sumidouro.
+ *
+ * Abre o chao em volta (fragil cede, rocha nao — ele sobe por onde o terreno ja
+ * era instavel), machuca quem estiver no raio e deixa o solo revirado como
+ * silica solta. O estrago dele ALIMENTA o contra-jogo: cada emergencia entrega
+ * mais areia para o jogador vitrificar.
+ */
+const devourerErupt = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = Math.ceil(DEVOURER_ERUPT_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > DEVOURER_ERUPT_RADIUS * DEVOURER_ERUPT_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) {
+        // Sumidouro: o que ja era fragil cede. Rocha, minerio e cristal ficam —
+        // ele revira o chao instavel, nao demole a galeria (isso e o Diamandis).
+        breakSolid(state, x, y, events);
+        continue;
+      }
+      // O vidro NAO volta a ser areia. Quem vitrificou pagou por aquilo, e o
+      // chefe passando por cima nao pode desfazer a decisao do jogador — senao
+      // o contra-jogo se apaga sozinho a cada emergencia.
+      if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
+        setSurface(state, i, SURF_SILT, 0);
+      }
+    }
+  }
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > DEVOURER_ERUPT_RADIUS) continue;
+    damageEntity(state, player, DEVOURER_ERUPT_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'white_devourer',
+      elite: enemy.elite,
+    });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+  enemy.mood = DEVOURER_SURFACED;
+  enemy.nextActionAt = state.tick + DEVOURER_SURFACE_TICKS;
+};
+
 /** O chefe ainda tem esta arma? (o modulo dela nao foi arrancado) */
 const hasModule = (state: SurvivalState, module: number): boolean =>
   (state.bossRuntime.modulesLost & (1 << module)) === 0;
@@ -2239,6 +2451,10 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
     if (enemy.archetype === 'bellows') {
       bellowsStep(state, enemy, player, dist, dt, events);
+      continue;
+    }
+    if (enemy.archetype === 'white_devourer') {
+      devourerStep(state, enemy, player, dt, events);
       continue;
     }
     // O Escoriaceo usa o fluxo comum; so a postura termica e propria.

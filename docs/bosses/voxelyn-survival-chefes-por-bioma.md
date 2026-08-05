@@ -27,7 +27,7 @@ Prioridade:
 | Estrato | Aquífero Negro | Leviatã do Lençol | fallback → Guardião |
 | Estrato | Fenda Sulfurosa | Pulmão-Matriz | fallback → Guardião |
 | Estrato | Fornalha Abissal | Coração da Fornalha | fallback → Guardião |
-| Estrato | Sumidouros de Sílica | Devorador Branco | fallback → Guardião |
+| Estrato | Sumidouros de Sílica | Devorador Branco | **implementado** |
 | Estrato | Cripta Glacial | Rainha da Geada | fallback → Guardião |
 | Estrato | Estrato Ferrífero | Magnetarca | fallback → Guardião |
 
@@ -282,6 +282,71 @@ não o interrompe — ela apenas o remove do balanço.
 - A apresentação dos módulos no cliente: `boss_module` já viaja com os quatro
   estados, mas quem desenha ainda não os distingue.
 
+## Devorador Branco — o chão é que decide
+
+O ciclo é um só e nunca muda: **mergulha**, deixa faixa de sílica solta enquanto anda
+por baixo, calcula onde o jogador vai estar, **emerge ali**. Submerso ele absorve 88%
+do dano; a janela é o tempo em que fica exposto depois de subir.
+
+Ele **atravessa parede** — é o único corpo do jogo que anda por baixo do sólido — e é
+por isso que perseguir não é uma resposta a ele. Nem cobertura é. O que sobra é
+decidir **onde ele pode sair**.
+
+**As duas matérias são o encontro inteiro.** `SURF_SILT` (sílica solta) é o rastro
+dele: onde passou por baixo, o chão cedeu. Calor sobre ela não acende nada — **funde**,
+e o que sobra é `SURF_GLASS`. Sobre vidro ele não emerge.
+
+O rastro dele é ao mesmo tempo o aviso de por onde ele anda **e a matéria-prima do
+contra-jogo**. Queimar o caminho dele fecha o chão por onde ele viria. E a emergência
+revira mais solo em sílica solta — o estrago dele alimenta a própria resposta.
+
+Três regras que sustentam isso:
+
+- **O vidro não volta a ser areia.** Nem o rastro nem a emergência sobrescrevem
+  `SURF_GLASS`: o chefe passando por cima não pode desfazer a decisão do jogador,
+  senão o contra-jogo se apaga sozinho a cada ciclo.
+- **Emergência negada é emergência perdida.** Se o ponto previsto e tudo num raio de
+  6 estiverem vitrificados, ele não sobe — volta a andar por baixo e gasta o ciclo.
+  Essa recusa é a recompensa inteira de quem transformou a areia em vidro.
+- **Redução, não imunidade** (12%, a mesma escolha da couraça do Escoriáceo). Imune
+  ensinaria "guarde a munição e espere", que é a ausência de jogo.
+
+**A mira antecipa** (0,9 s de lead): o alvo parado é o único que ela erra, de
+propósito — quem lê o rastro e para de correr em linha reta já está jogando contra
+ele.
+
+### A linhagem árida mudou de destino
+
+`arid` era `basalto → sílica → fornalha`, e isso tinha uma consequência que só
+apareceu quando o Devorador ganhou corpo: **o estrato sedimentar nunca era o último**,
+e como só o setor final tem chefe, o dono dos Sumidouros não podia existir. Um chefe
+que não spawna não está implementado.
+
+Agora é `basalto → sílica → sílica`, como as outras três linhagens que dobram o seu
+estrato no fim (mineral, industrial, crio). Perde-se o segundo acesso à Fornalha (a
+térmica mantém o dela); ganha-se o encontro que o estrato sempre prometeu. O terreno
+semeado de toda run árida muda — daí o bump e a impressão digital nova em
+`tests/impressao-digital-geracao.test.ts`.
+
+### Uma correção de renderização que veio junto
+
+Superfície sem tile no atlas caía em `SURFACE_KIND_INDEX[surf] ?? 0` — o tile de
+**chão limpo** — e `draw` devolve `true`, então a cor de recuo nunca rodava. Qualquer
+matéria nova ficava literalmente **invisível**, que é o pior defeito possível num jogo
+em que o chão é a mecânica. Agora um índice ausente cai na cor, como o comentário do
+`SURFACE_FALLBACK` sempre prometeu.
+
+### Documentos do Devorador
+
+| Gatilho | Documento | ID |
+| --- | --- | --- |
+| Primeiro abate | Levantamento de massa: 400–600 t contra um estrato inteiro três ordens de grandeza abaixo. *"Engenharia registra que a conta não fecha"* | `AX-ENG-030` |
+| **Vitrificar sílica solta** | Incidente 42: em 61 emergências, nenhuma sobre vidro. *"A superfície que ele deixa ao passar é a mesma que ele precisa para voltar"* | `AX-INC-042` |
+| Abate **+** vitrificar | Não classificado: ele não atravessa a sílica — **a sílica assume temporariamente a forma dele**. Não estamos matando um organismo, estamos interrompendo um padrão de movimento do estrato | `AX-UNK-061` |
+
+`DISCOVERY_SILICA_VITRIFIED` exige ter **feito**, não ter entendido — a compreensão vem
+depois, de ver o verme falhar em subir ali.
+
 ## Ordem recomendada de desenvolvimento (restante)
 
 1. ~~Gatilho da Supernova + remover cuspe do Bispo~~ ✔
@@ -290,8 +355,7 @@ não o interrompe — ela apenas o remove do balanço.
 4. ~~Generalizar o estado específico do Guardião num `bossRuntime`~~ ✔
 5. ~~**Diamandis** (Cicatriz Aurix) — broca, demolição, feixe, colapso do reator e a
    economia dos Coveiros~~ ✔
-6. **Devorador Branco** (Sumidouros de Sílica) — linha de vibração, emergir por
-   baixo, vitrificar o chão como contra-jogo.
+6. ~~**Devorador Branco** (Sumidouros de Sílica)~~ ✔
 7. Documentos de chefe desbloqueados por **entendimento do encontro** (primeiro
    encontro → classificação corporativa; presenciar o golpe principal → relatório
    técnico; primeira derrota → incidente; condição especial → ordem executiva;
