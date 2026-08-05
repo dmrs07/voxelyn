@@ -162,11 +162,16 @@ describe('cápsula de morte local', () => {
     const state = finishDead(createRun({ seed: 10 }));
     const echo = captureDeathEcho(state, 'base');
     if (!echo) throw new Error('eco não capturado');
+    // A lista segue a matriz da simulacao, e ela MUDOU: o Guardiao atira pedra
+    // desde a Salva Litoclasta, e o Bispo saiu do ramo de projetil (a resposta
+    // a distancia dele e a Supernova, que e area). Este teste afirmava as duas
+    // combinacoes antigas — passava verde sobre um defeito, que e o pior lugar
+    // para um teste estar.
     const validCauses: DamageCause[] = [
       { kind: 'enemy_projectile', archetype: 'spitter', elite: false, projectile: 'spit' },
-      { kind: 'enemy_projectile', archetype: 'guardian', elite: false, projectile: 'spit' },
-      { kind: 'enemy_projectile', archetype: 'bishop', elite: false, projectile: 'spit' },
+      { kind: 'enemy_projectile', archetype: 'guardian', elite: false, projectile: 'rock' },
       { kind: 'enemy_projectile', archetype: 'bruiser', elite: false, projectile: 'rock' },
+      { kind: 'enemy_projectile', archetype: 'miner', elite: false, projectile: 'cart' },
     ];
     const decoded = decodeDeathEchoRecords(JSON.stringify({
       schema: 1,
@@ -174,6 +179,39 @@ describe('cápsula de morte local', () => {
       echoes: validCauses.map((cause, index) => ({ ...echo, id: `valid-${index}`, cause })),
     }));
     expect(decoded.echoes).toHaveLength(validCauses.length);
+
+    // E o que a simulacao NAO consegue mais produzir continua barrado, para o
+    // teste nao passar por afrouxamento da matriz.
+    const impossible: DamageCause[] = [
+      { kind: 'enemy_projectile', archetype: 'guardian', elite: false, projectile: 'spit' },
+      { kind: 'enemy_projectile', archetype: 'bishop', elite: false, projectile: 'spit' },
+    ];
+    const rejected = decodeDeathEchoRecords(JSON.stringify({
+      schema: 1,
+      nextSerial: 5,
+      echoes: impossible.map((cause, index) => ({ ...echo, id: `no-${index}`, cause })),
+    }));
+    expect(rejected.echoes).toHaveLength(0);
+  });
+
+  it('a morte para um chefe novo tambem vira Eco', () => {
+    // Oito chefes entraram no jogo sem entrar na matriz de arquetipos, e toda
+    // morte para eles era descartada em silencio ao carregar o storage.
+    const state = finishDead(createRun({ seed: 10 }));
+    const echo = captureDeathEcho(state, 'base');
+    if (!echo) throw new Error('eco não capturado');
+    const bosses = ['diamandis', 'white_devourer', 'archcantor', 'sheet_leviathan',
+      'lung_matrix', 'furnace_heart', 'frost_queen', 'magnetarch'];
+    const decoded = decodeDeathEchoRecords(JSON.stringify({
+      schema: 1,
+      nextSerial: 5,
+      echoes: bosses.map((archetype, index) => ({
+        ...echo,
+        id: `boss-${index}`,
+        cause: { kind: 'enemy_contact', archetype, elite: false },
+      })),
+    }));
+    expect(decoded.echoes).toHaveLength(bosses.length);
   });
 
   it('mantém somente o teto de mortes recentes', () => {

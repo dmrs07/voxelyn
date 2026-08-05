@@ -202,6 +202,14 @@ export const PT_BR = {
   'enemy.frost_wraith': 'Espectro',
   'enemy.sulfur_bomber': 'Bombardeiro',
   'enemy.undertaker': 'Coveiro',
+  'enemy.diamandis': 'Diamandis',
+  'enemy.white_devourer': 'Devorador Branco',
+  'enemy.archcantor': 'Arquicantor',
+  'enemy.sheet_leviathan': 'Leviatã do Lençol',
+  'enemy.lung_matrix': 'Pulmão-Matriz',
+  'enemy.furnace_heart': 'Coração da Fornalha',
+  'enemy.frost_queen': 'Rainha da Geada',
+  'enemy.magnetarch': 'Magnetarca',
 
   'bestiary.name.stalker': 'Espreitador',
   'bestiary.name.spitter': 'Cuspidor',
@@ -216,6 +224,14 @@ export const PT_BR = {
   'bestiary.name.frost_wraith': 'Espectro de Geada',
   'bestiary.name.sulfur_bomber': 'Bombardeiro de Enxofre',
   'bestiary.name.undertaker': 'Coveiro',
+  'bestiary.name.diamandis': 'Diamandis',
+  'bestiary.name.white_devourer': 'Devorador Branco',
+  'bestiary.name.archcantor': 'Arquicantor',
+  'bestiary.name.sheet_leviathan': 'Leviatã do Lençol',
+  'bestiary.name.lung_matrix': 'Pulmão-Matriz',
+  'bestiary.name.furnace_heart': 'Coração da Fornalha',
+  'bestiary.name.frost_queen': 'Rainha da Geada',
+  'bestiary.name.magnetarch': 'Magnetarca',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
 
@@ -255,6 +271,30 @@ export const PT_BR = {
   'bestiary.note.sulfur_bomber':
     'Variante mineral do vetor FUNG-23. Carga interna inflamável. Recomenda-se neutralização a distância de fontes de calor — recomendação reiterada após o incidente da galeria 7.',
   'bestiary.code.undertaker': 'UNIDADE EX-041',
+  'bestiary.code.diamandis': 'ATIVO DE PATRIMÔNIO DX-001',
+  'bestiary.code.white_devourer': 'PADRÃO DE MOVIMENTO SIL-00',
+  'bestiary.code.archcantor': 'ARRANJO PIEZOELÉTRICO PRZ-00',
+  'bestiary.note.archcantor':
+    'A companhia o classifica como "arranjo piezoelétrico natural". Os laudos posteriores registram que os cristais reproduzem frequências da transmissão — e que alguns respondem ANTES de receber o pulso.',
+  'bestiary.code.sheet_leviathan': 'ATIVO HOSTIL AQF-00',
+  'bestiary.note.sheet_leviathan':
+    'Cada equipe mediu um comprimento diferente. A explicação mais simples é que as medições estão erradas. A segunda mais simples é que não se trata de um único corpo.',
+  'bestiary.code.lung_matrix': 'ESTRUTURA DE VENTILAÇÃO VNT-00',
+  'bestiary.note.lung_matrix':
+    'A operação acreditou que os respiradouros alimentavam a criatura. Levantamentos posteriores sugerem o inverso: ela é o órgão que mantém o estrato inteiro respirando. Matá-la não é claramente uma vitória.',
+  'bestiary.code.furnace_heart': 'FORMAÇÃO ÍGNEA FRN-00',
+  'bestiary.note.furnace_heart':
+    'A companhia tentou usar a formação como fonte de energia. Os registros mostram que o calor não vem do magma: o magma se mantém líquido por causa da emissão, e a temperatura responde quando a transmissão aumenta.',
+  'bestiary.code.frost_queen': 'ATIVO HOSTIL CRP-00',
+  'bestiary.note.frost_queen':
+    '"Rainha" é apelido de equipes anteriores, não classificação. Os registros discordam sobre a identidade: alguns sugerem uma pessoa; outros, que ela se forma de todas as vozes perdidas no estrato. Ela não reproduz uma pessoa — reproduz uma HIERARQUIA.',
+  'bestiary.code.magnetarch': 'ANOMALIA MAGNÉTICA MGN-00',
+  'bestiary.note.magnetarch':
+    'A companhia afirma que o campo foi criado por décadas de mineração. Registros anteriores à operação já mostram o mesmo padrão magnético. Talvez a companhia tenha escolhido aquele lugar porque o campo já transmitia dados através do minério.',
+  'bestiary.note.white_devourer':
+    'A massa estimada excede em várias ordens a matéria orgânica que o estrato inteiro poderia sustentar. A hipótese que os laudos posteriores formulam, e que nenhum deles assina: o corpo não atravessa a sílica — a sílica assume temporariamente a forma do corpo.',
+  'bestiary.note.diamandis':
+    'Instalação móvel de recuperação economicamente inviável. Não foi desativado: foi RECLASSIFICADO — a companhia transformou uma máquina em operação em parte do mapa para não contabilizar a perda. Continua escavando numa direção que não consta do contrato.',
   'bestiary.note.undertaker':
     'Recolhedora de sucata. Continua cumprindo a diretriz de coleta sem distinguir maquinário inativo de pessoal em serviço. Reclassificação pendente desde a última auditoria.',
   'bestiary.code.bishop': 'ATIVO HOSTIL EQ-09',
@@ -551,6 +591,18 @@ export const PT_BR = {
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
   'toast.module.expired': '{module} DESATIVADO',
+  // Os quatro estados de uma peça do Diamandis. O verbo de cada frase e o que
+  // separa os quatro: SOLTOU (apareceu), LEVANDO (ainda da tempo), CAIU (voltou
+  // a ser sua) e PERDIDO (acabou). Sem o verbo, quatro frases com o mesmo nome
+  // de peça lem todas igual no canto da tela.
+  'toast.bossModule.exposed': '{module} SOLTOU DA CARCAÇA',
+  'toast.bossModule.detached': 'COVEIRO LEVANDO {module}',
+  'toast.bossModule.dropped': '{module} CAIU — RECUPERÁVEL',
+  'toast.bossModule.lost': '{module} PERDIDO',
+  'bossModule.drill': 'BROCA',
+  'bossModule.tower': 'TORRE',
+  'bossModule.scanner': 'LENTE',
+  'bossModule.unknown': 'MÓDULO',
   'toast.cache.opened': 'COFRE RECUPERADO',
   'toast.purgeCell': '+1 CÉLULA DE PURGA',
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',

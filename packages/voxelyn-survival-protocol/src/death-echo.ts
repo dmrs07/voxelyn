@@ -16,6 +16,7 @@
 // política. Ele define a cápsula, valida uma que chegou de fora e projeta.
 
 import {
+  emptyStats,
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ORE_CHIPPED,
@@ -137,26 +138,23 @@ const finiteInt = (value: unknown, min: number, max: number): number | null => {
 const isEffectSource = (value: unknown): value is 'player' | 'enemy' | 'environment' =>
   value === 'player' || value === 'enemy' || value === 'environment';
 
-const ENEMY_ARCHETYPES = new Set<EnemyArchetype>([
-  'stalker',
-  'bruiser',
-  'spitter',
-  'bomber',
-  'guardian',
-  'bishop',
-  'fungal_horse',
-  'miner',
-  'resonant',
-  'mud_lamprey',
-  'bellows',
-  'scoriac',
-  'frost_wraith',
-  // Fauna afinada por bioma. Os dois causam dano de CONTATO (o Coveiro ainda
-  // por cima com a prensa), entao os dois produzem capsula de morte — e uma
-  // capsula que a matriz fechada rejeita vira Eco perdido em silencio.
-  'sulfur_bomber',
-  'undertaker',
-]);
+/**
+ * Os arquetipos que a simulacao realmente tem, DERIVADOS dela.
+ *
+ * Era uma lista escrita a mao, e ela envelheceu exatamente como listas escritas
+ * a mao envelhecem: oito chefes entraram no jogo e nenhum entrou aqui, entao
+ * toda morte para Diamandis, Devorador ou os seis de estrato era rejeitada na
+ * validacao e o Eco daquela morte sumia em silencio — justamente as mortes que
+ * mais ensinam alguma coisa.
+ *
+ * `emptyStats().kills` tem uma chave por arquetipo por construcao (o tipo e
+ * `Record<EnemyArchetype, number>`, entao o compilador cobra a tabela completa).
+ * Derivar dali mantem a matriz FECHADA — que e o ponto dela, barrar capsula
+ * forjada — sem depender de alguem lembrar de vir aqui.
+ */
+const ENEMY_ARCHETYPES = new Set<EnemyArchetype>(
+  Object.keys(emptyStats().kills) as EnemyArchetype[]
+);
 const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc', 'cart']);
 const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>
   typeof value === 'string' && ENEMY_ARCHETYPES.has(value as EnemyArchetype);
@@ -170,8 +168,16 @@ const isProjectileKind = (value: unknown): value is ProjectileKind =>
 const HOSTILE_PROJECTILES_BY_ARCHETYPE: Partial<Record<EnemyArchetype, ReadonlySet<ProjectileKind>>> = {
   bruiser: new Set(['rock']),
   spitter: new Set(['spit']),
-  guardian: new Set(['spit']),
-  bishop: new Set(['spit']),
+  // O Guardiao atira PEDRA (Salva Litoclasta), nunca gosma. A entrada dizia
+  // `spit` desde antes da troca e estava errada nos dois sentidos: aceitava um
+  // projetil que ele nao dispara e rejeitava o unico que ele dispara — toda
+  // morte para a Salva perdia o Eco.
+  guardian: new Set(['rock']),
+  // O Bispo saiu da tabela porque saiu do ramo de projetil: a resposta a
+  // distancia dele e a Supernova, que e dano em area e nao carrega `projectile`.
+  // Uma entrada que a simulacao nao consegue produzir e uma porta aberta a
+  // capsula forjada, que e o que esta matriz existe para fechar.
+  //
   // A armadilha de carrinho credita 'miner' (os automatos da operacao): a
   // capsula de morte por atropelo tem de passar pela matriz fechada.
   miner: new Set(['cart']),

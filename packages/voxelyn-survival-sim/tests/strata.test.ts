@@ -10,7 +10,6 @@
 //    definem o Aquifero — conduz, retarda e apaga fogo.
 import { describe, expect, it } from 'vitest';
 import {
-  BISHOP_SECTOR,
   ICE_REFREEZE_TICKS,
   SECTOR_COUNT,
   SOLID_CRYSTAL,
@@ -417,7 +416,9 @@ describe('segunda leva: linhagens termica, arida e crio', () => {
     expect(sectorBiome(thermal, 3).stratum).toBe('furnace');
     const arid = seedWithLineage('arid');
     expect(sectorBiome(arid, 2).stratum).toBe('silica');
-    expect(sectorBiome(arid, 3).stratum).toBe('furnace');
+    // A arida termina NA silica: o estrato sedimentar precisa poder ser o
+    // ultimo para o Devorador Branco existir (so o setor final tem chefe).
+    expect(sectorBiome(arid, 3).stratum).toBe('silica');
     const cryo = seedWithLineage('cryo');
     expect(sectorBiome(cryo, 2).stratum).toBe('glacial');
     expect(sectorBiome(cryo, 3).stratum).toBe('glacial');
@@ -750,13 +751,16 @@ describe('gelo da Cripta Glacial', () => {
 });
 
 describe('bolso micelial do Bispo', () => {
-  it('a arena do setor 2 tem tapete fungico em QUALQUER linhagem', () => {
-    for (const lineage of ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'] as const) {
-      const seed = seedWithLineage(lineage);
-      const state = createRun({ seed, sector: BISHOP_SECTOR });
+  it('onde o Bispo reina (setor final micelial), a camara tem tapete garantido', () => {
+    // O Bispo deixou de morar no numero 2: ele e o chefe de qualquer mapa
+    // final profundamente ocupado pelo micelio (bossForBiome). Onde ele nasce,
+    // a colonia da camara e garantida — a luta dele E o chao.
+    let checked = 0;
+    for (let seed = 1; seed <= 400 && checked < 3; seed++) {
+      const state = createRun({ seed, sector: SECTOR_COUNT });
       const bishop = state.enemies.find((e) => e.archetype === 'bishop');
-      expect(bishop, `linhagem ${lineage}: setor 2 sem bispo`).toBeDefined();
       if (!bishop) continue;
+      checked += 1;
       let fungal = 0;
       const cx = Math.floor(bishop.x);
       const cy = Math.floor(bishop.y);
@@ -768,7 +772,23 @@ describe('bolso micelial do Bispo', () => {
           if (state.surface[at(state, x, y)] === SURF_FUNGAL) fungal += 1;
         }
       }
-      expect(fungal, `linhagem ${lineage}: arena sem colonia`).toBeGreaterThan(8);
+      expect(fungal, `seed ${seed}: camara do Bispo sem colonia`).toBeGreaterThan(8);
+      // E o Bispo NASCE em cima do tapete: a cura dele e o chao sob os pes.
+      expect(state.surface[at(state, cx, cy)], `seed ${seed}: Bispo em chao nu`).toBe(SURF_FUNGAL);
+    }
+    expect(checked, 'nenhuma seed da amostra terminou em mapa micelial').toBeGreaterThan(0);
+  });
+
+  it('sem micelio dominante no mapa final, nao ha Bispo em lugar nenhum', () => {
+    const seed = seedWithLineage('cryo');
+    for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      const biome = sectorBiome(seed, sector);
+      if (biome.occupation === 'mycelial') continue; // intrusao sorteada: ai e dele
+      const state = createRun({ seed, sector });
+      expect(
+        state.enemies.some((e) => e.archetype === 'bishop'),
+        `s${sector}: Bispo fora de mapa micelial`,
+      ).toBe(false);
     }
   });
 });

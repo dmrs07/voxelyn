@@ -85,6 +85,32 @@ export const RAMPS = {
    */
   ice: ['mist', 'rockLight', 'rockShadow'],
   /**
+   * Silica solta dos Sumidouros: a areia palida que o Devorador revolve.
+   *
+   * Familia quente neutra, um degrau ACIMA do osso: o rastro dele precisa ser
+   * lido de longe e a distancia so a luminancia sobrevive. E o material mais
+   * claro do chao — o que e proposital, porque ele so aparece onde alguma coisa
+   * passou por baixo.
+   */
+  silt: ['chalk', 'bone', 'brass'],
+  /**
+   * Vidro: a silica DEPOIS do calor. Mais claro que o gelo e frio como ele.
+   *
+   * As duas placas do jogo precisam se separar a distancia porque significam
+   * coisas opostas — o gelo derrete e vira agua, o vidro sela o chao e nega a
+   * emergencia. O gelo topa em `mist`; o vidro topa no branco azulado do
+   * jogador, um degrau acima, e cai mais fundo nas laterais: placa polida
+   * reflete forte em cima e escurece rapido de lado, que e o que separa vidro
+   * de neve.
+   *
+   * A base e `rock` e nao `rockLight` por causa do salto: de branco azulado
+   * direto para rockLight o primeiro passo comia 66% da rampa, e uma rampa com
+   * um degrau so nao e volume, e um decalque claro. Descer ate `rock` poe
+   * `mist` no meio da escada E aprofunda as laterais, que era o que a leitura
+   * de placa polida pedia de qualquer jeito.
+   */
+  glass: ['player', 'mist', 'rock'],
+  /**
    * Gas sulfuroso: crosta amarela sobre corpo esverdeado.
    *
    * O gas era `acid` puro — verde-limao — e a paleta nao tem amarelo de enxofre.

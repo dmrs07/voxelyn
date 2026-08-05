@@ -110,7 +110,20 @@ describe('impressao digital da geracao', () => {
     // Conferida nos DOIS lados do refactor do gerador: `origin/main` (5126232,
     // sem TerrainDraft) e esta branch produzem o mesmo numero. E o que sustenta
     // "a geracao saiu byte a byte identica" — sem isso seria so afirmacao.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1444846605);
+    // 2694607655 (era 1444846605). Tres mudancas de proposito, na mesma leva
+    // dos chefes de estrato, todas com bump de SIMULATION_VERSION:
+    //
+    // 1. a linhagem ARIDA passou a terminar em Sumidouros de Silica em vez de
+    //    Fornalha Abissal — sem isso o estrato sedimentar nunca era o ultimo e
+    //    o Devorador Branco nao tinha onde existir;
+    // 2. entrou a linhagem BASALTICA (basalto do topo ao fundo), pelo mesmo
+    //    motivo aplicado ao Guardiao: com a tabela de chefes completa, ele e o
+    //    dono das Galerias, e nenhuma linhagem terminava nelas. Uma linhagem a
+    //    mais remapeia TODA seed (o sorteio e `% LINEAGE_ORDER.length`);
+    // 3. o objetivo deixou de poder encostar na moldura do mapa
+    //    (CORE_BORDER_MARGIN): o 3x3 livre em volta dele e onde o corpo do
+    //    chefe tem de caber, e num canto ele nao cabia.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2694607655);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

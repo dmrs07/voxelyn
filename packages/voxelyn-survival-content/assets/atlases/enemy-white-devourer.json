@@ -1,0 +1,122 @@
+{
+  "id": "enemy-white-devourer",
+  "version": 1,
+  "atlas": "enemy-white-devourer.png",
+  "frameWidth": 104,
+  "frameHeight": 94,
+  "columns": 39,
+  "anchorX": 50,
+  "anchorY": 71,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 2.2,
+    "h": 1.2
+  },
+  "footprint": {
+    "w": 2,
+    "h": 1.6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c",
+    "#e8f1ff"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    },
+    "special": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    },
+    "downed": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "special": 14,
+      "hit": 18,
+      "downed": 20,
+      "die": 24
+    },
+    "dl": {
+      "idle": 29,
+      "walk": 33,
+      "attack": 39,
+      "special": 43,
+      "hit": 47,
+      "downed": 49,
+      "die": 53
+    },
+    "ur": {
+      "idle": 58,
+      "walk": 62,
+      "attack": 68,
+      "special": 72,
+      "hit": 76,
+      "downed": 78,
+      "die": 82
+    },
+    "ul": {
+      "idle": 87,
+      "walk": 91,
+      "attack": 97,
+      "special": 101,
+      "hit": 105,
+      "downed": 107,
+      "die": 111
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; stuck pose rears the front half vertically out of a silt collar with the maw opening upward",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

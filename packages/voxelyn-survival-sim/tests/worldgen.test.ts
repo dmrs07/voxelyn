@@ -8,6 +8,7 @@ import {
   SECTOR_COUNT,
 } from '../src/constants';
 import { chunkOf, floodOpen, generateWorld } from '../src/worldgen';
+import { isBossArchetype } from '../src/bosses';
 import { createRun } from '../src/run';
 import { setSurface } from '../src/cells';
 
@@ -106,17 +107,19 @@ describe('worldgen', () => {
       // O Guardiao so existe no setor final; a reserva de espaco para o corpo
       // dele e feita pelo worldgen em TODO setor, mas so ali ela e ocupada.
       const state = createRun({ seed, sector: SECTOR_COUNT });
-      const guardian = state.enemies.find((e) => e.archetype === 'guardian');
-      expect(guardian, `seed ${seed}: sem Guardian`).toBeDefined();
-      if (!guardian) continue;
-      for (const dx of [-guardian.radius, guardian.radius]) {
-        for (const dy of [-guardian.radius, guardian.radius]) {
-          const x = Math.floor(guardian.x + dx);
-          const y = Math.floor(guardian.y + dy);
-          expect(state.solid[y * state.config.width + x], `seed ${seed}: Guardian sobre parede em ${x},${y}`).toBe(SOLID_NONE);
+      // O chefe do setor final vem de bossForBiome; a reserva de corpo do
+      // worldgen vale para qualquer um deles.
+      const boss = state.enemies.find((e) => isBossArchetype(e.archetype));
+      expect(boss, `seed ${seed}: setor final sem chefe`).toBeDefined();
+      if (!boss) continue;
+      for (const dx of [-boss.radius, boss.radius]) {
+        for (const dy of [-boss.radius, boss.radius]) {
+          const x = Math.floor(boss.x + dx);
+          const y = Math.floor(boss.y + dy);
+          expect(state.solid[y * state.config.width + x], `seed ${seed}: chefe sobre parede em ${x},${y}`).toBe(SOLID_NONE);
         }
       }
-      expect(Math.hypot(guardian.x - (state.corePos.x + 0.5), guardian.y - (state.corePos.y + 0.5))).toBeGreaterThanOrEqual(2);
+      expect(Math.hypot(boss.x - (state.corePos.x + 0.5), boss.y - (state.corePos.y + 0.5))).toBeGreaterThanOrEqual(2);
     }
   });
 

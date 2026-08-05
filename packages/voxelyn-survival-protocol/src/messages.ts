@@ -217,7 +217,14 @@ export type WellOfferFlags = {
 export type WorldFlags = {
   salvageSites: SalvageSiteFlags[];
   coreTaken: boolean;
-  guardianAwake: boolean;
+  /**
+   * O chefe do setor ja acordou.
+   *
+   * Chamava-se `guardianAwake` enquanto o Guardiao era o unico chefe com
+   * estado proprio. Desde `bossForBiome` a camara final pode ser do Bispo ou
+   * de qualquer outro da tabela, e o nome antigo mentia sobre metade das runs.
+   */
+  bossAwake: boolean;
   /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.

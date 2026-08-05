@@ -114,7 +114,7 @@ describe('limites de payload: ingresso vs egresso', () => {
       entities: [],
       projectiles: [],
       you: { slot: 0, heat: 0, purgeCells: 1, activeModules: [], pendingModuleChoice: null, hasCore: false, downed: false, aimX: 1, aimY: 0, overheated: false },
-      world: { salvageSites: [], coreTaken: false, guardianAwake: false },
+      world: { salvageSites: [], coreTaken: false, bossAwake: false },
       authHash: 'deadbeef',
     } as never);
     expect(big.length).toBeGreaterThan(LIMITS.maxClientMessageBytes);

@@ -1,13 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { ARCHETYPES, damageEntity, spawnEnemy } from '../src/entities';
+import {
+  BOSS_OF_OCCUPATION,
+  BOSS_OF_STRATUM,
+  IMPLEMENTED_BOSS,
+  bossArchetypeForBiome,
+  bossForBiome,
+} from '../src/bosses';
+import { sectorBiome } from '../src/strata';
 import { emptyStats } from '../src/stats';
 import { heatFungalCell } from '../src/cells';
 import {
+  BISHOP_NOVA_COOLDOWN_TICKS,
+  BISHOP_NOVA_SEEK_TICKS,
   BISHOP_NOVA_WINDUP_TICKS,
   BISHOP_REGEN_PER_TICK,
   BISHOP_RETREAT_HP_FRACTION,
-  BISHOP_SECTOR,
+  GUARDIAN_FAN_SPREAD,
+  GUARDIAN_VOLLEY_SHOTS,
   HORSE_CHARGE_TICKS,
   HORSE_CHARGE_WINDUP_TICKS,
   SECTOR_COUNT,
@@ -17,7 +28,22 @@ import {
   SURF_FUNGAL,
   SURF_NONE,
 } from '../src/constants';
-import type { EnemyArchetype, SemanticEvent, SurvivalState } from '../src/types';
+import { BOSS_PHASE_SUMMON } from '../src/types';
+import {
+  DISCOVERY_BISHOP_HEALED,
+  DISCOVERY_BISHOP_NOVA_SURVIVED,
+  type EnemyArchetype,
+  type SemanticEvent,
+  type SurvivalState,
+} from '../src/types';
+
+/** Primeira seed >= base cujo setor FINAL recebe o arquetipo pedido. */
+const seedWithFinalBoss = (archetype: EnemyArchetype, base = 1): number => {
+  for (let seed = base; seed < base + 4096; seed++) {
+    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === archetype) return seed;
+  }
+  throw new Error(`nenhuma seed proxima de ${base} com ${archetype} no setor final`);
+};
 
 const stepIdle = (state: SurvivalState, ticks: number): void => {
   for (let t = 0; t < ticks; t++) stepRun(state, [emptyCommand()]);
@@ -65,17 +91,68 @@ describe('tabela de arquetipos', () => {
   });
 });
 
-describe('Bispo — onde ele mora', () => {
-  it('esta no setor 2, e so nele', () => {
-    expect(archetypesOf(createRun({ seed: 7, sector: 1 }))).not.toContain('bishop');
-    expect(archetypesOf(createRun({ seed: 7, sector: BISHOP_SECTOR }))).toContain('bishop');
-    expect(archetypesOf(createRun({ seed: 7, sector: SECTOR_COUNT }))).not.toContain('bishop');
+describe('chefes por bioma — bossForBiome', () => {
+  it('ocupacao forte substitui o chefe do estrato', () => {
+    expect(bossForBiome({ stratum: 'aquifer', occupation: 'mycelial' })).toBe('bishop');
+    expect(bossForBiome({ stratum: 'prismatic', occupation: 'mycelial' })).toBe('bishop');
+    expect(bossForBiome({ stratum: 'ferric', occupation: 'aurix' })).toBe('diamandis');
   });
 
-  it('nao divide setor com o Guardiao', () => {
-    const final = archetypesOf(createRun({ seed: 11, sector: SECTOR_COUNT }));
-    expect(final).toContain('guardian');
-    expect(final).not.toContain('bishop');
+  it('sem ocupacao dominante, entra o chefe natural do estrato', () => {
+    expect(bossForBiome({ stratum: 'basalt', occupation: 'none' })).toBe('guardian');
+    expect(bossForBiome({ stratum: 'prismatic', occupation: 'none' })).toBe('archcantor');
+    expect(bossForBiome({ stratum: 'aquifer', occupation: 'none' })).toBe('sheet_leviathan');
+    expect(bossForBiome({ stratum: 'sulfur', occupation: 'none' })).toBe('lung_matrix');
+    expect(bossForBiome({ stratum: 'furnace', occupation: 'none' })).toBe('furnace_heart');
+    expect(bossForBiome({ stratum: 'silica', occupation: 'none' })).toBe('white_devourer');
+    expect(bossForBiome({ stratum: 'glacial', occupation: 'none' })).toBe('frost_queen');
+    expect(bossForBiome({ stratum: 'ferric', occupation: 'none' })).toBe('magnetarch');
+  });
+
+  it('a tabela esta COMPLETA: todo bioma tem o proprio dono', () => {
+    // O fallback no Guardiao sustentou a selecao enquanto a lista era parcial.
+    // Agora nao responde por nenhuma linha — e este teste e o que impede que
+    // ele volte a responder em silencio quando um BossId novo entrar.
+    for (const stratum of Object.keys(BOSS_OF_STRATUM) as (keyof typeof BOSS_OF_STRATUM)[]) {
+      const id = BOSS_OF_STRATUM[stratum];
+      expect(IMPLEMENTED_BOSS[id], `estrato ${stratum} -> ${id} sem corpo`).toBeDefined();
+    }
+    for (const id of Object.values(BOSS_OF_OCCUPATION)) {
+      expect(IMPLEMENTED_BOSS[id], `ocupacao -> ${id} sem corpo`).toBeDefined();
+    }
+    expect(bossArchetypeForBiome({ stratum: 'prismatic', occupation: 'none', lineage: 'mineral' }))
+      .toBe('archcantor');
+    expect(bossArchetypeForBiome({ stratum: 'aquifer', occupation: 'mycelial', lineage: 'hydric' }))
+      .toBe('bishop');
+    expect(bossArchetypeForBiome({ stratum: 'basalt', occupation: 'none', lineage: 'basaltic' }))
+      .toBe('guardian');
+  });
+});
+
+describe('Bispo — onde ele mora', () => {
+  it('e o chefe do mapa final profundamente ocupado pelo micelio', () => {
+    // A linhagem hidrica termina em Aquifero + Matriz Micelial: o Bispo e o
+    // chefe DALI — nao mais "o chefe obrigatorio do setor 2".
+    const seed = seedWithFinalBoss('bishop');
+    expect(archetypesOf(createRun({ seed, sector: SECTOR_COUNT }))).toContain('bishop');
+  });
+
+  it('o setor 1 nunca tem chefe, e o do meio tambem nao', () => {
+    for (const seed of [7, 11, 42, seedWithFinalBoss('bishop')]) {
+      for (const sector of [1, 2]) {
+        const kinds = archetypesOf(createRun({ seed, sector }));
+        expect(kinds, `seed ${seed} s${sector}`).not.toContain('bishop');
+        expect(kinds, `seed ${seed} s${sector}`).not.toContain('guardian');
+      }
+    }
+  });
+
+  it('ha UM chefe no setor final, nunca dois', () => {
+    for (const seed of [seedWithFinalBoss('bishop'), seedWithFinalBoss('guardian')]) {
+      const kinds = archetypesOf(createRun({ seed, sector: SECTOR_COUNT }));
+      const bosses = kinds.filter((k) => k === 'bishop' || k === 'guardian');
+      expect(bosses.length, `seed ${seed}`).toBe(1);
+    }
   });
 });
 
@@ -237,10 +314,234 @@ describe('Bispo — o tell', () => {
     const py = Math.floor(state.player.y);
     const bishop = spawnEnemy(state, 'bishop', px + 6, py, false);
     paint(state, px + 14, py, 2, SURF_FUNGAL);
+    // Supernova em recarga: aqui interessa a perseguicao, nao o ataque.
+    bishop.nextActionAt = state.tick + 10_000;
 
     const distBefore = Math.hypot(bishop.x - state.player.x, bishop.y - state.player.y);
     stepIdle(state, 30);
     expect(Math.hypot(bishop.x - state.player.x, bishop.y - state.player.y)).toBeLessThan(distBefore);
+  });
+
+  // O caso que travava a Supernova PARA SEMPRE: uma unica celula de fungo
+  // detectavel pela varredura, mas inalcancavel atras de uma parede. A regra
+  // antiga ("so dispara se NAO houver fungo em 14 tiles") fazia o Bispo recuar
+  // eternamente contra a pedra. A regra nova mede o que importa: ele PISOU em
+  // fungo dentro da janela? Nao pisou — replanta.
+  it('fungo detectavel mas INALCANCAVEL atras de parede: a Supernova sai apos a janela', () => {
+    const state = createRun({ seed: 46 });
+    clearArena(state, 20);
+    const w = state.config.width;
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 6, py, false);
+    bishop.hp = bishop.maxHp * (BISHOP_RETREAT_HP_FRACTION - 0.1);
+    // Uma celula de fungo a leste — atras de um muro que o corpo dele nao passa.
+    const fx = px + 12;
+    state.surface[py * w + fx] = SURF_FUNGAL;
+    state.surfaceTimer[py * w + fx] = 0;
+    for (let dy = -8; dy <= 8; dy++) state.solid[(py + dy) * w + (fx - 2)] = SOLID_ROCK;
+
+    let telegraph = false;
+    for (let t = 0; t < BISHOP_NOVA_SEEK_TICKS + BISHOP_NOVA_WINDUP_TICKS + 20 && !telegraph; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === bishop.id && ev.action === 'pulse') telegraph = true;
+      }
+    }
+    expect(telegraph, 'a celula inalcancavel bloqueou a Supernova para sempre').toBe(true);
+  });
+
+  // A Supernova e a resposta PRIMARIA a distancia — ela existe na luta normal,
+  // nao apenas no cenario artificial com o mapa inteiro queimado.
+  it('em luta normal, com o jogador dentro do raio, a Supernova sai', () => {
+    const state = createRun({ seed: 47 });
+    clearArena(state, 20);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    // INTEIRO e em cima do proprio tapete: nada de retirada envolvida.
+    const bishop = spawnEnemy(state, 'bishop', px + 4, py, false);
+    paint(state, px + 4, py, 3, SURF_FUNGAL);
+
+    let telegraph = false;
+    for (let t = 0; t < BISHOP_NOVA_WINDUP_TICKS + 20 && !telegraph; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === bishop.id && ev.action === 'pulse') telegraph = true;
+      }
+    }
+    expect(telegraph, 'a Supernova nao participa da luta normal').toBe(true);
+    // E cobra a recarga: nao vira metralhadora de area.
+    expect(bishop.nextActionAt - state.tick).toBeGreaterThan(BISHOP_NOVA_COOLDOWN_TICKS / 2);
+  });
+
+  it('o Bispo NAO cospe: nenhum projetil sai dele', () => {
+    const state = createRun({ seed: 48 });
+    clearArena(state, 20);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 5, py, false);
+
+    for (let t = 0; t < 200; t++) {
+      stepRun(state, [emptyCommand()]);
+      expect(
+        state.projectiles.some((p) => p.owner === bishop.id),
+        `tick ${t}: o chefe do chao atirou gosma`,
+      ).toBe(false);
+      if (!state.player.alive) break;
+    }
+  });
+});
+
+// O arco documental do Bispo nao abre por FARM: ele aparece uma vez por run,
+// no maximo, e uma grade de abates transformaria a revelacao em cinquenta
+// descidas. Abre por ENTENDER o encontro — e sao estes dois bits que medem o
+// entendimento.
+describe('Bispo — as Descobertas de entendimento', () => {
+  const healingScene = (seed: number) => {
+    const state = createRun({ seed });
+    clearArena(state, 16);
+    const bishop = spawnEnemy(
+      state,
+      'bishop',
+      Math.floor(state.player.x) + 8,
+      Math.floor(state.player.y),
+      false,
+    );
+    paint(state, Math.floor(bishop.x), Math.floor(bishop.y), 3, SURF_FUNGAL);
+    bishop.hp = 100;
+    return { state, bishop };
+  };
+
+  it('ver a cura de perto marca a Descoberta', () => {
+    const { state } = healingScene(91);
+    stepIdle(state, 8);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_HEALED).not.toBe(0);
+  });
+
+  it('a cura atras de uma parede NAO marca: medicao de campo exige campo', () => {
+    const { state, bishop } = healingScene(92);
+    const w = state.config.width;
+    const wallX = Math.floor((state.player.x + bishop.x) / 2);
+    for (let dy = -6; dy <= 6; dy++) {
+      state.solid[(Math.floor(state.player.y) + dy) * w + wallX] = SOLID_ROCK;
+    }
+    stepIdle(state, 8);
+    expect(bishop.hp, 'a cena nao chegou a curar: o teste nao mede nada').toBeGreaterThan(100);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_HEALED).toBe(0);
+  });
+
+  it('estar dentro do disco da Supernova e continuar de pe marca a Descoberta', () => {
+    const state = createRun({ seed: 93 });
+    clearArena(state, 20);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    spawnEnemy(state, 'bishop', px + 4, py, false);
+    paint(state, px + 4, py, 3, SURF_FUNGAL);
+
+    for (let t = 0; t < BISHOP_NOVA_WINDUP_TICKS + 20; t++) {
+      stepRun(state, [emptyCommand()]);
+      if ((state.stats.discoveries & DISCOVERY_BISHOP_NOVA_SURVIVED) !== 0) break;
+    }
+    expect(state.player.hp, 'o jogador morreu: isso nao e sobreviver').toBeGreaterThan(0);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_NOVA_SURVIVED).not.toBe(0);
+  });
+
+  it('ver a Supernova de FORA do disco nao marca nada', () => {
+    const state = createRun({ seed: 94 });
+    clearArena(state, 20);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    // Ferido e sem fungo: a Supernova sai pela janela de busca, com o jogador
+    // dentro do aggro (10) e fora do raio do disco (5,5).
+    const bishop = spawnEnemy(state, 'bishop', px + 8, py, false);
+    bishop.hp = bishop.maxHp * (BISHOP_RETREAT_HP_FRACTION - 0.1);
+
+    let fired = false;
+    for (let t = 0; t < BISHOP_NOVA_SEEK_TICKS + BISHOP_NOVA_WINDUP_TICKS + 30 && !fired; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'pulse' && Math.hypot(ev.x - bishop.x, ev.y - bishop.y) < 1) fired = true;
+      }
+    }
+    expect(fired, 'a Supernova nao chegou a sair: o teste nao mede nada').toBe(true);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_NOVA_SURVIVED).toBe(0);
+  });
+});
+
+describe('Guardiao — Salva Litoclasta', () => {
+  const guardianDuel = (seed: number): { state: SurvivalState; guardian: SurvivalState['enemies'][number] } => {
+    const state = createRun({ seed });
+    clearArena(state, 20);
+    state.enemies = [];
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const guardian = spawnEnemy(state, 'guardian', px + 5, py, false);
+    state.bossRuntime.awake = true;
+    return { state, guardian };
+  };
+
+  /** Roda ate o primeiro release de salva e devolve as pedras do guardiao. */
+  const fireOnce = (state: SurvivalState, guardian: { id: number }) => {
+    for (let t = 0; t < 80; t++) {
+      stepRun(state, [emptyCommand()]);
+      const rocks = state.projectiles.filter((p) => p.owner === guardian.id);
+      if (rocks.length > 0) return rocks;
+    }
+    return [];
+  };
+
+  it('atira um LEQUE de tres pedras, nunca gosma', () => {
+    const { state, guardian } = guardianDuel(81);
+    const rocks = fireOnce(state, guardian);
+    expect(rocks.length, 'nenhuma pedra saiu').toBe(3);
+    for (const rock of rocks) {
+      expect(rock.kind, 'o chefe de basalto cuspiu').toBe('rock');
+      expect(rock.leavesBiofluid, 'pedra sujou o chao de biofluido').toBe(false);
+      expect(rock.stuns, 'pedra de salva nao pode atordoar (stun-lock)').toBeUndefined();
+      expect(rock.radius, 'pedra sem hitbox visivel').toBeGreaterThan(0.3);
+    }
+    // Tres corredores: as direcoes abrem em leque, nao empilham no mesmo rumo.
+    // Medido como desvio do rumo MEDIO (normalizado) para nao tropecar no
+    // wraparound do atan2 quando o alvo esta a oeste (angulos perto de +-pi).
+    const mid = Math.atan2(
+      rocks.reduce((acc, r) => acc + r.vy, 0),
+      rocks.reduce((acc, r) => acc + r.vx, 0),
+    );
+    const offsets = rocks
+      .map((r) => {
+        const d = Math.atan2(r.vy, r.vx) - mid;
+        return Math.atan2(Math.sin(d), Math.cos(d));
+      })
+      .sort((a, b) => a - b);
+    expect(offsets[0]).toBeCloseTo(-GUARDIAN_FAN_SPREAD, 1);
+    expect(offsets[1]).toBeCloseTo(0, 1);
+    expect(offsets[2]).toBeCloseTo(GUARDIAN_FAN_SPREAD, 1);
+  });
+
+  it('as pedras sao mais lentas que o cuspe do Spitter', () => {
+    const { state, guardian } = guardianDuel(82);
+    const rocks = fireOnce(state, guardian);
+    expect(rocks.length).toBe(3);
+    for (const rock of rocks) {
+      expect(Math.hypot(rock.vx, rock.vy)).toBeLessThan(7);
+    }
+  });
+
+  it('na segunda fase, alterna leque e RAJADA de tres pedras corrigidas', () => {
+    const { state, guardian } = guardianDuel(83);
+    guardian.hp = guardian.maxHp * 0.4; // enfurecido
+    // A guarda de invocacao dispara stalkers; o teste isola a salva.
+    state.bossRuntime.phasesFired |= BOSS_PHASE_SUMMON;
+
+    // Primeira salva enfurecida (impar): RAJADA — as pedras saem em TICKS
+    // diferentes, uma por release, com re-mira entre elas.
+    const shotTicks: number[] = [];
+    for (let t = 0; t < 200 && shotTicks.length < GUARDIAN_VOLLEY_SHOTS; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'shot' && ev.owner === guardian.id) shotTicks.push(state.tick);
+      }
+    }
+    expect(shotTicks.length, 'a rajada nao completou os tres disparos').toBe(GUARDIAN_VOLLEY_SHOTS);
+    expect(new Set(shotTicks).size, 'os disparos sairam todos juntos: isso e leque, nao rajada').toBe(
+      GUARDIAN_VOLLEY_SHOTS,
+    );
   });
 });
 

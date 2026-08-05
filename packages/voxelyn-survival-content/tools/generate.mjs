@@ -207,7 +207,9 @@ const buildSurfaces = () => {
     // (SURF_EMBER) e gelo da Cripta Glacial (SURF_ICE), no fim da lista.
     // 6: trilhos da operacao (SURF_RAIL 11 horizontal, SURF_RAIL_V 12
     // vertical) — a crosta da armadilha de carrinho.
-    version: 6,
+    // 7: silica solta (SURF_SILT 13) e vidro (SURF_GLASS 14), os dois lados do
+    // contra-jogo do Devorador Branco.
+    version: 7,
     atlas: 'surface-tiles.png',
     frameWidth,
     frameHeight,

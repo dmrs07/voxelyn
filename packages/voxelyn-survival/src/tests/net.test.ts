@@ -434,7 +434,7 @@ describe('telegrafo do carrinho em co-op', () => {
   const worldWith = (timers: Array<{ readyAt: number; firingAt: number }>) => ({
     salvageSites: [],
     coreTaken: false,
-    guardianAwake: false,
+    bossAwake: false,
     wellOffers: [],
     railTimers: timers,
   });

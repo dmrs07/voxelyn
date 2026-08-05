@@ -69,11 +69,13 @@ import {
   WORLD_H,
   WORLD_W,
 } from './constants.js';
+import { emptyBossRuntime } from './bosses.js';
 import {
   ABILITY_SHAPE,
   STARTING_ABILITY,
   abilityDefinition,
   emptyResonance,
+  fallbackOffer,
   recordResonance,
   resonanceOffers,
 } from './abilities.js';
@@ -114,7 +116,12 @@ import {
   moduleHasCapacity,
   rollModuleChoice,
 } from './modules.js';
-import { DISCOVERY_CARGO_LOST, DISCOVERY_DISCHARGE_POOL, DISCOVERY_SELF_HARM } from './types.js';
+import {
+  DISCOVERY_CARGO_LOST,
+  DISCOVERY_DISCHARGE_POOL,
+  DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_SELF_HARM,
+} from './types.js';
 import { DEFAULT_PLAYER_TUNING, TUNING_HASH_ORDER, type PlayerTuning } from './progression.js';
 import type {
   DamageCause,
@@ -303,13 +310,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
     entry: world.entry,
     corePos: world.corePos,
     coreTaken: false,
-    guardianAwake: false,
-    guardianSummoned: false,
+    bossRuntime: emptyBossRuntime(),
     bossesDown: 0,
-    arenaClosed: false,
-    arenaBarrierCells: [],
-    guardianPath: [],
-    guardianPathAt: -1000,
     leftEntryZone: false,
     players,
     playerExtras,
@@ -491,6 +493,9 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         });
         if (ev.source === 'player' && ent.kind === 'enemy' && !isStoneEnemy(ent)) {
           stunEntity(state, ent, CONDUCTIVE_STUN_TICKS);
+          if (ent.archetype === 'sheet_leviathan') {
+            markDiscovery(state.stats, DISCOVERY_LEVIATHAN_SHOCKED);
+          }
         }
         // Eletrificar a poca em que voce mesmo esta e a licao numero um do
         // material condutivo, e ela so ensina se for registrada.
@@ -920,12 +925,23 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   // A oferta le a ressonancia de quem CHEGOU. No co-op os dois jogaram o mesmo
   // setor de formas diferentes, e escolher a de um deles e mais honesto do que
   // somar as duas: uma media de estilos nao descreve estilo nenhum.
-  const offers = resonanceOffers(
+  let offers = resonanceOffers(
     state.playerExtras[nearest].resonance,
     state.playerExtras[nearest].ability,
     state.config.seed,
     state.sector,
   );
+  // O poco do PRIMEIRO setor nunca fica mudo: pelo menos UM Eco, sempre.
+  //
+  // Nos setores fundos a regra continua a historica — sem ressonancia o Veio
+  // nao tem o que demonstrar. Mas o setor 1 e onde o jogador APRENDE que o poco
+  // oferece habilidade, e um poco calado na primeira descida ensina que ele e
+  // so um buraco. Quem chegou sem provocar reacao nenhuma recebe uma
+  // demonstracao sorteada pela seed (deterministica: mesmo Eco para as duas
+  // maquinas da sala e para o replay).
+  if (offers.length === 0 && state.sector === 1) {
+    offers = [fallbackOffer(state.playerExtras[nearest].ability, state.config.seed, state.sector)];
+  }
   if (offers.length === 0) return;
 
   state.wellOffers = offers.map((ability, index) => {
@@ -1865,7 +1881,10 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
               elite: shooter?.elite ?? false,
               projectile: proj.kind,
             });
-            if (proj.kind === 'rock' && vulnerable) {
+            // So a pedra que CARREGA a flag atordoa (o arremesso unico do
+            // Britador). A Salva Litoclasta do Guardiao usa o mesmo `kind`
+            // sem ela: tres pedras encadeando stun seria um lock sem resposta.
+            if (proj.kind === 'rock' && proj.stuns && vulnerable) {
               stunEntity(state, player, BRUISER_ROCK_STUN_TICKS);
             }
             if (
@@ -1944,6 +1963,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           }
           if (conductiveTriggered && !isStoneEnemy(enemy)) {
             stunEntity(state, enemy, CONDUCTIVE_STUN_TICKS);
+            // Eletrificar a lamina em que ele nada e o contra-jogo do
+            // Aquifero, e o atordoamento e o instante em que isso fica claro.
+            if (enemy.archetype === 'sheet_leviathan') {
+              markDiscovery(state.stats, DISCOVERY_LEVIATHAN_SHOCKED);
+            }
           }
           damageEntity(state, enemy, damage, events, { kind: 'player_shot' });
 
@@ -2307,6 +2331,15 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   // reordenar o que ja existe.
   'sulfur_bomber',
   'undertaker',
+  'diamandis',
+  'white_devourer',
+  // Os seis chefes de estrato, no fim pela mesma regra de nunca reordenar.
+  'archcantor',
+  'sheet_leviathan',
+  'lung_matrix',
+  'furnace_heart',
+  'frost_queen',
+  'magnetarch',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -2436,13 +2469,35 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.stats.innocentsKilled);
   mix(state.stats.discoveries);
   for (const archetype of HASHED_ARCHETYPES) mix(state.stats.kills[archetype]);
-  mix(state.guardianSummoned ? 1 : 0);
+  // As FASES ja disparadas (bitmask), no lugar do antigo par de booleanos:
+  // duas simulacoes que discordam de uma fase de uma vez divergem no proximo
+  // gatilho dela.
+  mix(state.bossRuntime.phasesFired);
   // Chefes abatidos: decide o que a SUBIDA vai (nao) repovoar, entao duas
   // simulacoes que discordam disso divergem no primeiro retorno.
   mix(state.bossesDown);
-  mix(state.arenaClosed ? 1 : 0);
-  mix(state.arenaBarrierCells.length);
-  for (const cell of state.arenaBarrierCells) mix(cell);
+  mix(state.bossRuntime.arenaClosed ? 1 : 0);
+  mix(state.bossRuntime.arenaBarrierCells.length);
+  for (const cell of state.bossRuntime.arenaBarrierCells) mix(cell);
+  // As cargas MARCADAS: duas simulacoes que discordem de onde a Salva de
+  // Demolicao cai divergem no estrago, um telegrafo depois.
+  mix(state.bossRuntime.blastCells.length);
+  for (const cell of state.bossRuntime.blastCells) mix(cell);
+  // Quais modulos soltaram e quais foram arrancados decidem QUAIS ARMAS o
+  // chefe ainda tem e quanto minerio o abate paga: divergir aqui e divergir na
+  // luta e na recompensa.
+  mix(state.bossRuntime.modulesExposed);
+  mix(state.bossRuntime.modulesLost);
+  // O ARCO do Devorador: onde ele vai cair e quantos saltos faltam na rajada.
+  //
+  // Os dois sao escolhidos UMA vez, na decolagem, e mandam no resto do ciclo —
+  // a cratera, o dano, a posicao final e se o proximo pouso encadeia outro arco
+  // ou abre a janela de dano. Duas simulacoes que discordem aqui ainda parecem
+  // iguais no tick da escolha e so divergem visivelmente um segundo depois;
+  // sem estes campos no hash, o desvio seria detectado tarde e no lugar errado.
+  mix(Math.round(state.bossRuntime.leapToX * 1000));
+  mix(Math.round(state.bossRuntime.leapToY * 1000));
+  mix(state.bossRuntime.leapsLeft);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

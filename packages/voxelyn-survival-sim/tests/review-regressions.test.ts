@@ -55,7 +55,7 @@ describe('investida do Guardian — o impulso anda no release', () => {
     );
     // O Guardian so entra no fluxo de IA depois de acordar; aqui interessa a
     // investida dele, e nao o gatilho que a antecede.
-    state.guardianAwake = true;
+    state.bossRuntime.awake = true;
 
     let released = false;
     let posAtRelease = { x: guardian.x, y: guardian.y };

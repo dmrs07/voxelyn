@@ -1,9 +1,120 @@
 import {
   ALERT_TICKS,
-  SOLID_FRAGILE,
-  SOLID_FRAGILE_WEAK,
-  SOLID_ROCK,
   BIOFLUID_SLOW,
+  WITNESS_RANGE,
+  ARCHCANTOR_COOLDOWN_TICKS,
+  ARCHCANTOR_CRYSTAL_BUDGET,
+  ARCHCANTOR_HP,
+  ARCHCANTOR_PULSE_RADIUS,
+  ARCHCANTOR_SILENT_ARMOR,
+  ARCHCANTOR_WINDUP_TICKS,
+  FROST_QUEEN_FREEZE_COOLDOWN_TICKS,
+  FROST_QUEEN_FREEZE_RADIUS,
+  FROST_QUEEN_FREEZE_WINDUP_TICKS,
+  FROST_QUEEN_HP,
+  FROST_QUEEN_ICE_ARMOR,
+  FROST_QUEEN_ICE_RADIUS,
+  FROST_QUEEN_ICE_THRESHOLD,
+  FROST_QUEEN_RADIUS,
+  FROST_QUEEN_SPEED,
+  FROST_QUEEN_WRAITHS,
+  FROST_QUEEN_WRAITH_HP_FRACTION,
+  FURNACE_HEART_CYCLE_TICKS,
+  FURNACE_HEART_HOT_ARMOR,
+  FURNACE_HEART_HP,
+  FURNACE_HEART_RADIUS,
+  FURNACE_HEART_WAVE_ARC,
+  FURNACE_HEART_WAVE_INTERVAL_TICKS,
+  FURNACE_HEART_WAVE_RADIUS,
+  LEVIATHAN_BREACH_DAMAGE,
+  LEVIATHAN_BREACH_RADIUS,
+  LEVIATHAN_BREACH_SEARCH,
+  LEVIATHAN_BREACH_WINDUP_TICKS,
+  LEVIATHAN_DIVE_MIN_TICKS,
+  LEVIATHAN_HP,
+  LEVIATHAN_LEAD_SECONDS,
+  LEVIATHAN_RADIUS,
+  LEVIATHAN_SUBMERGED_ARMOR,
+  LEVIATHAN_SURFACE_SPEED,
+  LEVIATHAN_SURFACE_TICKS,
+  LEVIATHAN_SWIM_SPEED,
+  LUNG_MATRIX_BREATH_INTERVAL_TICKS,
+  LUNG_MATRIX_BURN_DAMAGE,
+  LUNG_MATRIX_CYCLE_TICKS,
+  LUNG_MATRIX_EXHALE_LENGTH,
+  LUNG_MATRIX_EXHALE_WIDTH,
+  LUNG_MATRIX_HP,
+  LUNG_MATRIX_INHALE_PER_BREATH,
+  LUNG_MATRIX_INHALE_RADIUS,
+  LUNG_MATRIX_RADIUS,
+  MAGNETARCH_CRUSH_DAMAGE,
+  MAGNETARCH_CRUSH_RANGE,
+  MAGNETARCH_CYCLE_TICKS,
+  MAGNETARCH_FIELD_RANGE,
+  MAGNETARCH_FIELD_TICK_INTERVAL,
+  MAGNETARCH_HP,
+  MAGNETARCH_PULL_STEP,
+  MAGNETARCH_RADIUS,
+  MAGNETARCH_SPEED,
+  MAGNETARCH_TETHER_DAMAGE,
+  MAGNETARCH_TETHER_RANGE,
+  MAX_ENEMIES,
+  DEVOURER_BURROWED_ARMOR,
+  DEVOURER_BURROW_MIN_TICKS,
+  DEVOURER_BURROW_SPEED,
+  DEVOURER_ERUPT_DAMAGE,
+  DEVOURER_ERUPT_RADIUS,
+  DEVOURER_ERUPT_SEARCH,
+  DEVOURER_LAUNCH_DAMAGE,
+  DEVOURER_LAUNCH_SEARCH,
+  DEVOURER_LEAP_MAX_RANGE,
+  DEVOURER_LEAP_MIN_RANGE,
+  DEVOURER_LEAP_SPEED,
+  DEVOURER_LEAP_TURN,
+  DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_HP,
+  DEVOURER_LEAD_SECONDS,
+  DEVOURER_RADIUS,
+  DEVOURER_SURFACE_SPEED,
+  DEVOURER_HOP_GAP_TICKS,
+  DEVOURER_LEAPS_PER_CYCLE,
+  DEVOURER_STUCK_TICKS,
+  DEVOURER_TRAIL_WIDTH,
+  SURF_GLASS,
+  SURF_SCORCHED,
+  SURF_SILT,
+  DIAMANDIS_BEAM_COOLDOWN_TICKS,
+  DIAMANDIS_BEAM_DAMAGE,
+  DIAMANDIS_BEAM_LENGTH,
+  DIAMANDIS_BEAM_STEP,
+  DIAMANDIS_BEAM_WINDUP_TICKS,
+  DIAMANDIS_DEMOLISH_CHARGES,
+  DIAMANDIS_DEMOLISH_COOLDOWN_TICKS,
+  DIAMANDIS_DEMOLISH_MIN_RANGE,
+  DIAMANDIS_DEMOLISH_RADIUS,
+  DIAMANDIS_DEMOLISH_RANGE,
+  DIAMANDIS_DEMOLISH_SPREAD,
+  DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  DIAMANDIS_DRILL_COOLDOWN_TICKS,
+  DIAMANDIS_DRILL_DAMAGE,
+  DIAMANDIS_DRILL_MAX_RANGE,
+  DIAMANDIS_DRILL_MIN_RANGE,
+  DIAMANDIS_DRILL_SPEED,
+  DIAMANDIS_DRILL_TICKS,
+  DIAMANDIS_DRILL_WIDTH,
+  DIAMANDIS_DRILL_WINDUP_TICKS,
+  DIAMANDIS_HP,
+  DIAMANDIS_MODULE_COUNT,
+  DIAMANDIS_MODULE_EXPOSE_AT,
+  DIAMANDIS_MODULE_ORE,
+  DIAMANDIS_RADIUS,
+  DIAMANDIS_REACTOR_CADENCE_SCALE,
+  DIAMANDIS_REACTOR_EMBER_RADIUS,
+  DIAMANDIS_REACTOR_EMBER_TICKS,
+  DIAMANDIS_REACTOR_HP_FRACTION,
+  DIAMANDIS_SPEED,
+  SOLID_ORE,
+  SOLID_ORE_CHIPPED,
   BRUISER_HURL_COOLDOWN_TICKS,
   BRUISER_HURL_DAMAGE,
   BRUISER_HURL_FLIGHT_TILES,
@@ -30,6 +141,7 @@ import {
   BISHOP_NOVA_DAMAGE,
   BISHOP_NOVA_FUNGAL_TICKS,
   BISHOP_NOVA_RADIUS,
+  BISHOP_NOVA_SEEK_TICKS,
   BISHOP_NOVA_WINDUP_TICKS,
   BISHOP_REGEN_PER_TICK,
   BISHOP_RETREAT_HP_FRACTION,
@@ -45,8 +157,16 @@ import {
   HORSE_TRAIL_FUEL_TICKS,
   GUARDIAN_ARENA_EXITS,
   GUARDIAN_ARENA_RADIUS,
+  GUARDIAN_FAN_SPREAD,
   GUARDIAN_PATH_INTERVAL_TICKS,
+  GUARDIAN_ROCK_DAMAGE,
+  GUARDIAN_ROCK_FLIGHT_TILES,
+  GUARDIAN_ROCK_RADIUS,
+  GUARDIAN_ROCK_SPEED,
+  GUARDIAN_SALVO_COOLDOWN_TICKS,
   GUARDIAN_SUMMON_COUNT,
+  GUARDIAN_VOLLEY_INTERVAL_TICKS,
+  GUARDIAN_VOLLEY_SHOTS,
   EXPLOSION_DAMAGE,
   SOLID_NONE,
   SPORE_LIFE_TICKS,
@@ -85,6 +205,10 @@ import {
   SULFUR_BOMBER_GAS_LIFE_TICKS,
   SULFUR_BOMBER_GAS_RADIUS,
   UNDERTAKER_PULL_COOLDOWN_TICKS,
+  UNDERTAKER_SALVAGE_ESCAPE_DIST,
+  UNDERTAKER_SALVAGE_RANGE,
+  UNDERTAKER_SALVAGE_REACH,
+  UNDERTAKER_SALVAGE_WINDUP_TICKS,
   UNDERTAKER_PULL_MIN_RANGE,
   UNDERTAKER_PULL_RANGE,
   UNDERTAKER_PULL_STEP,
@@ -94,12 +218,36 @@ import {
   UNDERTAKER_SLAM_RANGE,
   UNDERTAKER_SLAM_WINDUP_TICKS,
 } from './constants.js';
-import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, openArena, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  DEVOURER_AIRBORNE,
+  DEVOURER_BURROWED,
+  DEVOURER_STUCK,
+  DEVOURER_SURFACED,
+  FURNACE_COOLING,
+  FURNACE_OVERHEATING,
+  LUNG_EXHALING,
+  LUNG_INHALING,
+  MAGNET_ATTRACT,
+  MAGNET_REPEL,
+  BOSS_MODULE_DRILL,
+  BOSS_MODULE_SCANNER,
+  BOSS_MODULE_TOWER,
+  BOSS_PHASE_REACTOR,
+  BOSS_PHASE_SUMMON,
+  DISCOVERY_BISHOP_HEALED,
+  DISCOVERY_BISHOP_NOVA_SURVIVED,
+  DISCOVERY_DIAMANDIS_CORRIDOR,
+  DISCOVERY_CATHEDRAL_SILENCED,
+  DISCOVERY_DIAMANDIS_MODULE,
+  DISCOVERY_FURNACE_COOLED,
+  DISCOVERY_LUNG_IGNITED,
+  DISCOVERY_MAGNET_BANDED,
+  DISCOVERY_QUEEN_THAWED,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
   LURKER_EXPOSED,
@@ -114,6 +262,7 @@ import type {
   DamageCause,
   EffectOrigin,
   Entity,
+  EntityAction,
   EntityActionKind,
   EnemyArchetype,
   SemanticEvent,
@@ -182,6 +331,87 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // bruiser porque o encontro tem de durar o bastante para o puxao acontecer
   // pelo menos duas vezes — uma so seria um susto, nao uma regra aprendida.
   undertaker: { hp: 145, speed: 1.9, radius: 0.5, contactDamage: 12, contactCooldown: 16, aggroRange: UNDERTAKER_PULL_RANGE },
+  // DIAMANDIS. Vida de chefe e corpo MODERADO: visualmente ele e dez vezes um
+  // Prospector, mas uma hitbox gigante transformaria toda parede em gaiola e
+  // todo tiro em acerto garantido. O tamanho dele mora no sprite e no ESTRAGO
+  // que ele deixa no mapa, nunca no raio de colisao. Lento porque nunca foi
+  // feito para alcancar ninguem: o perigo e o caminho que ele abre.
+  // DEVORADOR BRANCO. Vida de chefe e corpo grande, mas o numero que importa e
+  // a REDUCAO submerso (ver DEVOURER_BURROWED_ARMOR): a barra dele nao e o
+  // problema, a janela e. `speed` fica com a velocidade de superficie — o
+  // mergulho tem a propria, e ele nem usa `moveEntity` la.
+  white_devourer: {
+    hp: DEVOURER_HP,
+    speed: DEVOURER_SURFACE_SPEED,
+    radius: DEVOURER_RADIUS,
+    contactDamage: 22,
+    contactCooldown: 16,
+    aggroRange: 26,
+  },
+  // ------------------------------------------------------------------------
+  // Chefes de estrato: um dono por geologia. Ver constants.ts.
+  // ------------------------------------------------------------------------
+  // Lento e pesado: ele nao persegue, ele CANTA e a sala responde.
+  archcantor: {
+    hp: ARCHCANTOR_HP,
+    speed: 1.2,
+    radius: 0.75,
+    contactDamage: 20,
+    contactCooldown: 16,
+    aggroRange: ARCHCANTOR_PULSE_RADIUS + 2,
+  },
+  // `speed` e a de superficie; o mergulho tem a propria e nem usa moveEntity.
+  sheet_leviathan: {
+    hp: LEVIATHAN_HP,
+    speed: LEVIATHAN_SURFACE_SPEED,
+    radius: LEVIATHAN_RADIUS,
+    contactDamage: 24,
+    contactCooldown: 16,
+    aggroRange: 26,
+  },
+  // FIXO (speed 0): ancorado nos respiradouros. O perigo dele e onde o gas
+  // passa a estar, nunca a perseguicao.
+  lung_matrix: {
+    hp: LUNG_MATRIX_HP,
+    speed: 0,
+    radius: LUNG_MATRIX_RADIUS,
+    contactDamage: 18,
+    contactCooldown: 16,
+    aggroRange: LUNG_MATRIX_EXHALE_LENGTH + 4,
+  },
+  // FIXO tambem: a luta e contra a sala, e ele e o centro dela.
+  furnace_heart: {
+    hp: FURNACE_HEART_HP,
+    speed: 0,
+    radius: FURNACE_HEART_RADIUS,
+    contactDamage: 26,
+    contactCooldown: 16,
+    aggroRange: FURNACE_HEART_WAVE_RADIUS + 4,
+  },
+  frost_queen: {
+    hp: FROST_QUEEN_HP,
+    speed: FROST_QUEEN_SPEED,
+    radius: FROST_QUEEN_RADIUS,
+    contactDamage: 20,
+    contactCooldown: 14,
+    aggroRange: 12,
+  },
+  magnetarch: {
+    hp: MAGNETARCH_HP,
+    speed: MAGNETARCH_SPEED,
+    radius: MAGNETARCH_RADIUS,
+    contactDamage: 22,
+    contactCooldown: 16,
+    aggroRange: MAGNETARCH_FIELD_RANGE,
+  },
+  diamandis: {
+    hp: DIAMANDIS_HP,
+    speed: DIAMANDIS_SPEED,
+    radius: DIAMANDIS_RADIUS,
+    contactDamage: 28,
+    contactCooldown: 16,
+    aggroRange: 10,
+  },
 };
 
 /** O inimigo de assinatura de cada estrato, ou null (basalto e silica). */
@@ -436,6 +666,38 @@ export const damageEntity = (
   if (ent.archetype === 'scoriac' && ent.mood !== SCORIAC_HOT) {
     amount *= SCORIAC_ARMOR_SCALE;
   }
+  // A areia entre o tiro e o corpo. Reducao e nao imunidade, pela mesma razao
+  // da couraça acima: imune ensinaria "guarde a municao e espere", que e a
+  // ausencia de jogo. Vive aqui, no unico funil de dano, para nenhum caminho
+  // novo esquecer dela.
+  if (ent.archetype === 'white_devourer' && ent.mood === DEVOURER_BURROWED) {
+    amount *= DEVOURER_BURROWED_ARMOR;
+  }
+  // As blindagens dos chefes de estrato, todas no unico funil de dano — assim
+  // nenhum caminho novo (fogo, descarga, explosao) as esquece.
+  //
+  // Leviata submerso: a lamina entre o tiro e o corpo. Coracao superaquecido:
+  // o nucleo fechado. Rainha cercada de gelo: a couraça E o estrato, e ela cai
+  // quando o lago derrete. Arquicantor SEM rede: o inverso de todas — a sala
+  // esvaziada o deixa mais FRAGIL, porque a Catedral era a defesa dele.
+  if (ent.archetype === 'sheet_leviathan' && ent.mood === DEVOURER_BURROWED) {
+    amount *= LEVIATHAN_SUBMERGED_ARMOR;
+  }
+  if (ent.archetype === 'furnace_heart') {
+    if (ent.mood === FURNACE_OVERHEATING) amount *= FURNACE_HEART_HOT_ARMOR;
+    // Acertar na janela fria E a leitura do encontro: ele nao esta mais duro,
+    // voce esperou a hora. A marca sai aqui e nao no golpe do jogador porque
+    // e AQUI que se sabe que o dano entrou inteiro.
+    else markDiscovery(state.stats, DISCOVERY_FURNACE_COOLED);
+  }
+  if (ent.archetype === 'frost_queen') {
+    if (frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD) amount *= FROST_QUEEN_ICE_ARMOR;
+    else markDiscovery(state.stats, DISCOVERY_QUEEN_THAWED);
+  }
+  if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
+    amount *= ARCHCANTOR_SILENT_ARMOR;
+    markDiscovery(state.stats, DISCOVERY_CATHEDRAL_SILENCED);
+  }
   const attributable =
     cause.kind === 'player_shot' ||
     ((cause.kind === 'explosion' || cause.kind === 'discharge') && cause.source === 'player');
@@ -521,6 +783,43 @@ export const damageEntity = (
       });
     }
   }
+  // O DIAMANDIS paga pelo que NAO foi levado embora. Cada modulo ainda preso
+  // a carcaça vira lasca no abate; os arrancados ja foram — ou estao a caminho
+  // da borda nas maos de um Coveiro.
+  if (ent.archetype === 'diamandis') {
+    let kept = 0;
+    for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+      if ((state.bossRuntime.modulesLost & (1 << m)) === 0) kept++;
+    }
+    if (kept > 0) {
+      const paid = kept * DIAMANDIS_MODULE_ORE;
+      state.stats.oreCollected += paid;
+      events.push({
+        t: 'ore_gained',
+        x: ent.x,
+        y: ent.y,
+        amount: paid,
+        total: state.stats.oreCollected,
+      });
+    }
+  }
+  // O CARREGADOR abatido DERRUBA a peca — e ela ainda pode ser sua. E a
+  // segunda metade da escolha: deixar o Coveiro arrancar nao e perder a
+  // sucata, e passar a ter de intercepta-lo antes da borda.
+  if (ent.archetype === 'undertaker' && (ent.mood ?? 0) > 0) {
+    const module = ent.mood! - 1;
+    if ((state.bossRuntime.modulesLost & (1 << module)) !== 0) {
+      state.stats.oreCollected += DIAMANDIS_MODULE_ORE;
+      events.push({ t: 'boss_module', x: ent.x, y: ent.y, module, state: 'dropped' });
+      events.push({
+        t: 'ore_gained',
+        x: ent.x,
+        y: ent.y,
+        amount: DIAMANDIS_MODULE_ORE,
+        total: state.stats.oreCollected,
+      });
+    }
+  }
   if (ent.archetype === 'guardian') {
     // A parede e uma fase da luta, nao uma alteracao permanente do mapa.
     // Derruba-la aqui garante acesso ao nucleo mesmo se o cerco fechou
@@ -563,6 +862,15 @@ export const spawnEnemy = (
     ...(archetype === 'mud_lamprey' || archetype === 'frost_wraith' ? { mood: LURKER_HIDDEN } : {}),
     ...(archetype === 'scoriac' ? { mood: SCORIAC_COOL } : {}),
     ...(archetype === 'bellows' ? { mood: BELLOWS_INHALING } : {}),
+    // O Devorador nasce POR BAIXO: a primeira coisa que o jogador ve dele e o
+    // rastro de areia, nunca o corpo.
+    ...(archetype === 'white_devourer' ? { mood: DEVOURER_BURROWED } : {}),
+    // O Leviata tambem nasce por baixo: a primeira coisa que se ve dele e a
+    // ondulacao. Os tres de ciclo nascem na fase de abertura do proprio ciclo.
+    ...(archetype === 'sheet_leviathan' ? { mood: DEVOURER_BURROWED } : {}),
+    ...(archetype === 'lung_matrix' ? { mood: LUNG_INHALING } : {}),
+    ...(archetype === 'furnace_heart' ? { mood: FURNACE_OVERHEATING } : {}),
+    ...(archetype === 'magnetarch' ? { mood: MAGNET_ATTRACT } : {}),
   };
   state.enemies.push(enemy);
   return enemy;
@@ -578,18 +886,36 @@ const normalized = (x: number, y: number): Vec2 => {
  * Corpos grandes o bastante para ABRIR caminho em vez de contornar.
  *
  * O bispo entra na lista sem ganhar a busca de rota do guardiao: chefe preso e
- * chefe morto, mas a rota do guardiao mora em `state.guardianPath`, um campo
- * unico. Compartilha-lo daria dois chefes disputando o mesmo array — inofensivo
- * hoje, porque um e do setor 2 e o outro do 3, e uma bomba armada no dia em que
- * isso deixar de ser verdade. Empurrar e quebrar resolve o mesmo problema sem
- * inventar um acoplamento com prazo de validade.
+ * chefe morto, mas a rota mora em `state.bossRuntime.path`, um campo unico do
+ * encontro. Compartilha-la daria dois chefes disputando o mesmo array —
+ * inofensivo hoje, porque `bossForBiome` poe UM chefe por run. Empurrar e
+ * quebrar resolve o mesmo problema sem inventar acoplamento com prazo de
+ * validade; no dia em que houver dois chefes, `BossRuntime` vira um mapa por
+ * entidade e este comentario e o unico lugar que precisa mudar.
  */
 const crushesWalls = (enemy: Entity): boolean =>
-  enemy.archetype === 'bruiser' || enemy.archetype === 'guardian' || enemy.archetype === 'bishop';
+  enemy.archetype === 'bruiser' ||
+  enemy.archetype === 'guardian' ||
+  enemy.archetype === 'bishop' ||
+  enemy.archetype === 'diamandis';
+
+/**
+ * Os chefes que GUARDAM o Nucleo: dormem ate serem notados e, acordados, nunca
+ * mais perdem o alvo. Nao e uma lista de "quem e chefe" — o Bispo e chefe e
+ * nao esta aqui, porque ele e territorial (a luta dele e o chao em que pisa) e
+ * nao um portao com um objetivo atras.
+ */
+const guardsTheCore = (enemy: Entity): boolean =>
+  enemy.archetype === 'guardian' || enemy.archetype === 'diamandis';
 
 /** Bruiser e Guardian sao corpos minerais; eletricidade causa dano, nao paralisia. */
 export const isStoneEnemy = (enemy: Entity): boolean =>
-  enemy.archetype === 'bruiser' || enemy.archetype === 'guardian';
+  enemy.archetype === 'bruiser' ||
+  enemy.archetype === 'guardian' ||
+  // O Diamandis nao e mineral, e uma MAQUINA — e entra aqui pelo outro motivo
+  // da lista: chefe paralisavel e chefe que morre num stun-lock. Corrente o
+  // machuca, como machuca os outros dois; nao o desliga.
+  enemy.archetype === 'diamandis';
 
 /**
  * O chao cobrando presenca: fogo, gas e esporo.
@@ -707,6 +1033,204 @@ const startAction = (
   });
 };
 
+/** Gira um vetor unitario por `angle` radianos. */
+const rotated = (dir: Vec2, angle: number): Vec2 => {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { x: dir.x * cos - dir.y * sin, y: dir.x * sin + dir.y * cos };
+};
+
+/** Uma pedra da Salva Litoclasta. Sem biofluido, sem stun — ver constants.ts. */
+const fireGuardianRock = (
+  state: SurvivalState,
+  enemy: Entity,
+  dir: Vec2,
+  events: SemanticEvent[],
+): void => {
+  state.projectiles.push({
+    kind: 'rock',
+    id: state.nextEntityId++,
+    owner: enemy.id,
+    x: enemy.x,
+    y: enemy.y,
+    vx: dir.x * GUARDIAN_ROCK_SPEED,
+    vy: dir.y * GUARDIAN_ROCK_SPEED,
+    damage: GUARDIAN_ROCK_DAMAGE,
+    radius: GUARDIAN_ROCK_RADIUS,
+    distanceTravelled: 0,
+    hostile: true,
+    leavesBiofluid: false,
+    ttl: Math.ceil((GUARDIAN_ROCK_FLIGHT_TILES / GUARDIAN_ROCK_SPEED) * TICK_HZ),
+  });
+  events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: dir.x, dy: dir.y, owner: enemy.id });
+};
+
+/**
+ * O release da Salva Litoclasta.
+ *
+ * Sem `salvo` na acao: LEQUE — tres pedras de uma vez, a central interceptando
+ * a posicao prevista do alvo e as laterais abrindo GUARDIAN_FAN_SPREAD para
+ * cada lado. Tres corredores legiveis, que e o contrario de tres tiros
+ * perfeitos em sequencia.
+ *
+ * Com `salvo`: RAJADA da segunda fase — uma pedra por release, com correcao de
+ * mira entre disparos. O truque da cadencia mora aqui: enquanto restam
+ * disparos, a acao volta para `windup` e empurra o proprio `releaseAt` pelo
+ * intervalo, entao `advanceAction` a libera de novo sozinho. Os relogios da
+ * acao entram no hash autoritativo, e as duas maquinas de uma sala empurram os
+ * mesmos valores.
+ *
+ * A mira re-resolve por interceptacao a CADA disparo e nunca corrige em voo:
+ * a pedra lancada e reta e desviavel, como a do Britador.
+ */
+const guardianSalvoRelease = (
+  state: SurvivalState,
+  enemy: Entity,
+  action: EntityAction,
+  target: Entity | null,
+  events: SemanticEvent[],
+): void => {
+  const aim = target
+    ? interceptDirection(
+        enemy.x,
+        enemy.y,
+        target,
+        GUARDIAN_ROCK_SPEED,
+        GUARDIAN_ROCK_FLIGHT_TILES / GUARDIAN_ROCK_SPEED
+      )
+    : action.direction;
+  enemy.facing = { ...aim };
+  action.direction = { ...aim };
+
+  if (action.salvo === undefined) {
+    for (const spread of [-GUARDIAN_FAN_SPREAD, 0, GUARDIAN_FAN_SPREAD]) {
+      fireGuardianRock(state, enemy, rotated(aim, spread), events);
+    }
+    return;
+  }
+
+  fireGuardianRock(state, enemy, aim, events);
+  if (action.salvo > 0) {
+    action.salvo -= 1;
+    action.phase = 'windup';
+    action.releaseAt = state.tick + GUARDIAN_VOLLEY_INTERVAL_TICKS;
+    action.endsAt = action.releaseAt + 6;
+  }
+};
+
+/**
+ * SALVA DE DEMOLICAO — as marcas, no inicio do telegrafo.
+ *
+ * Tres cargas: uma sobre a posicao do alvo NAQUELE instante e duas abertas
+ * perpendicularmente. As marcas nao se corrigem depois de postas, e e por isso
+ * que o golpe tem resposta: sair do circulo funciona porque o circulo ficou
+ * onde nasceu. Uma salva que perseguisse seria dano sem contra-jogo, com um
+ * telegrafo bonito por cima.
+ */
+const markDemolition = (
+  state: SurvivalState,
+  enemy: Entity,
+  target: Entity,
+  fireTick: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const toward = normalized(target.x - enemy.x, target.y - enemy.y);
+  // Perpendicular ao eixo chefe->alvo: as laterais abrem o corredor de fuga
+  // para os LADOS, e nao para tras (recuar em linha reta ja e o reflexo de
+  // todo mundo, e um golpe que so pune o reflexo nao ensina nada).
+  const side = { x: -toward.y, y: toward.x };
+  state.bossRuntime.blastCells = [];
+  for (let k = 0; k < DIAMANDIS_DEMOLISH_CHARGES; k++) {
+    const offset = (k - (DIAMANDIS_DEMOLISH_CHARGES - 1) / 2) * DIAMANDIS_DEMOLISH_SPREAD;
+    const bx = Math.floor(target.x + side.x * offset);
+    const by = Math.floor(target.y + side.y * offset);
+    if (bx < 1 || by < 1 || bx >= w - 1 || by >= state.config.height - 1) continue;
+    state.bossRuntime.blastCells.push(by * w + bx);
+    events.push({
+      t: 'blast_marker',
+      x: bx + 0.5,
+      y: by + 0.5,
+      radius: DIAMANDIS_DEMOLISH_RADIUS,
+      fireTick,
+    });
+  }
+};
+
+/**
+ * FEIXE DE PROSPECCAO — uma passada da linha.
+ *
+ * `powered` false e a VARREDURA: um scanner medindo, que nao machuca nada.
+ * True e a passagem com potencia, e ai a linha aplica a tabela de materiais
+ * que o jogo ja tem — `igniteCell` seca fungo e acende gas, `meltIce` derrete,
+ * o minerio energiza — alem de queimar quem estiver nela. Nenhuma reacao nova:
+ * o feixe e mais um cliente do sistema de materiais, como o rastro do Corcel.
+ *
+ * Para na primeira parede, nos dois modos: um levantamento que atravessa rocha
+ * nao seria um levantamento, e um feixe que queima do outro lado do muro seria
+ * dano sem sinal.
+ */
+const fireProspectingBeam = (
+  state: SurvivalState,
+  enemy: Entity,
+  dir: Vec2,
+  powered: boolean,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  let reach = DIAMANDIS_BEAM_LENGTH;
+  const hitPlayers = new Set<number>();
+  for (let d = 0.5; d <= DIAMANDIS_BEAM_LENGTH; d += DIAMANDIS_BEAM_STEP) {
+    const fx = enemy.x + dir.x * d;
+    const fy = enemy.y + dir.y * d;
+    const cx = Math.floor(fx);
+    const cy = Math.floor(fy);
+    if (cx < 0 || cy < 0 || cx >= w || cy >= state.config.height) {
+      reach = d;
+      break;
+    }
+    const i = cy * w + cx;
+    if (state.solid[i] !== SOLID_NONE) {
+      // A parede PARA o feixe — mas antes disso o minerio dela responde: o
+      // veio energiza pelas aberturas coladas nele, que e a mesma regra da
+      // descarga em rocha. E o que "ativar minerio" quer dizer sem inventar
+      // reacao nova.
+      if (powered && (state.solid[i] === SOLID_ORE || state.solid[i] === SOLID_ORE_CHIPPED)) {
+        const open: number[] = [];
+        for (const n of [i - 1, i + 1, i - w, i + w]) {
+          if (n >= 0 && n < state.solid.length && state.solid[n] === SOLID_NONE) open.push(n);
+        }
+        if (open.length > 0) chargeCells(state, open, events, { source: 'enemy', owner: enemy.id });
+      }
+      reach = d;
+      break;
+    }
+    if (!powered) continue;
+    igniteCell(state, i, events);
+    meltIce(state, i);
+    for (const player of state.players) {
+      if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+      if (hitPlayers.has(player.id)) continue;
+      if (Math.hypot(player.x - fx, player.y - fy) > player.radius + 0.4) continue;
+      hitPlayers.add(player.id);
+      damageEntity(state, player, DIAMANDIS_BEAM_DAMAGE, events, {
+        kind: 'enemy_contact',
+        archetype: 'diamandis',
+        elite: enemy.elite,
+      });
+    }
+  }
+  events.push({
+    t: 'beam_line',
+    x: enemy.x,
+    y: enemy.y,
+    dx: dir.x,
+    dy: dir.y,
+    length: reach,
+    powered,
+  });
+};
+
 const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const action = enemy.action;
   if (!action || action.phase !== 'windup') return;
@@ -717,7 +1241,40 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
 
   if (action.kind === 'pulse') {
     if (enemy.archetype === 'resonant') resonantPulse(state, enemy, events);
+    else if (enemy.archetype === 'archcantor') archcantorPulse(state, enemy, events);
     else bishopNova(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'demolish') {
+    const w = state.config.width;
+    for (const cell of state.bossRuntime.blastCells) {
+      explodeAt(state, (cell % w) + 0.5, Math.floor(cell / w) + 0.5, DIAMANDIS_DEMOLISH_RADIUS, events, {
+        source: 'enemy',
+        owner: enemy.id,
+      });
+    }
+    state.bossRuntime.blastCells = [];
+    return;
+  }
+  if (action.kind === 'erupt') {
+    if (enemy.archetype === 'sheet_leviathan') leviathanBreach(state, enemy, events);
+    else devourerErupt(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'freeze') {
+    frostQueenFreeze(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'beam') {
+    fireProspectingBeam(state, enemy, action.direction, true, events);
+    return;
+  }
+  if (action.kind === 'drill') {
+    // A broca NAO recebe impulso aqui, pela mesma razao da investida do
+    // Corcel: ela e conduzida tick a tick por `diamandisDrillStride`, que
+    // precisa da posicao exata de cada passo para abrir o vao na largura
+    // certa. Somar velocidade solta daria dois movimentos no mesmo tick e o
+    // corredor sairia desalinhado do caminho percorrido.
     return;
   }
   if (action.kind === 'detonate') {
@@ -727,6 +1284,13 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     return;
   }
   if (action.kind === 'ranged') {
+    // Salva Litoclasta: o ranged do Guardiao e PEDRA, nunca gosma. Ver
+    // guardianSalvoRelease — leque na primeira fase, rajada alternada na
+    // segunda. O cuspe abaixo volta a ser exclusivo do Spitter.
+    if (enemy.archetype === 'guardian') {
+      guardianSalvoRelease(state, enemy, action, target, events);
+      return;
+    }
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     state.projectiles.push({
       kind: 'spit',
@@ -736,7 +1300,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       y: enemy.y,
       vx: action.direction.x * 7,
       vy: action.direction.y * 7,
-      damage: enemy.archetype === 'guardian' ? 14 : enemy.archetype === 'bishop' ? 12 : 9,
+      damage: 9,
       distanceTravelled: 0,
       hostile: true,
       leavesBiofluid: true,
@@ -775,6 +1339,10 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       radius: BRUISER_ROCK_RADIUS,
       distanceTravelled: 0,
       hostile: true,
+      // O stun e a assinatura DESTE arremesso: um bloco unico, telegrafado por
+      // 0,8 s, que custa uma parede da arena. A salva do Guardiao usa o mesmo
+      // `kind` sem a flag — tres pedras atordoando seria stun-lock.
+      stuns: true,
       // Pedra nao deixa poca: quem suja o chao e o cuspidor, e as duas ameacas
       // tem de continuar querendo dizer coisas diferentes.
       leavesBiofluid: false,
@@ -806,6 +1374,25 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       });
     }
     events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MINER_CLEAVE_RADIUS });
+  } else if (action.kind === 'haul' && enemy.archetype === 'undertaker' && (enemy.mood ?? 0) > 0) {
+    // ARRANQUE DO MODULO. O mesmo eletroima, outro alvo: aqui ele nao puxa
+    // ninguem para perto, ele destaca a peca. O chefe perde a arma daquele
+    // modulo NESTE instante — e a partir daqui o Coveiro vira um carregador,
+    // que e um alvo diferente de um Coveiro caçando.
+    const module = enemy.mood! - 1;
+    const bit = 1 << module;
+    if ((state.bossRuntime.modulesLost & bit) === 0) {
+      state.bossRuntime.modulesLost |= bit;
+      events.push({ t: 'boss_module', x: enemy.x, y: enemy.y, module, state: 'detached' });
+      // Ver o arranque e a Descoberta: e quando fica claro que o Coveiro nao
+      // e minion do chefe — e um catador que chegou primeiro.
+      const witness = nearestTarget(state, enemy.x, enemy.y);
+      if (witness && distTo(enemy, witness) <= WITNESS_RANGE) {
+        markDiscovery(state.stats, DISCOVERY_DIAMANDIS_MODULE);
+      }
+      events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.4 });
+    }
+    return;
   } else if (action.kind === 'haul' && target) {
     // O ELETROIMA. Arrasta o alvo em passos pequenos, e cada passo respeita a
     // colisao: quem tem uma quina entre si e o Coveiro para NELA, e nao no
@@ -935,31 +1522,31 @@ const guardianSteering = (
   events: SemanticEvent[]
 ): Vec2 => {
   if (hasLineOfSight(state, enemy.x, enemy.y, targetX, targetY)) {
-    state.guardianPath = [];
+    state.bossRuntime.path = [];
     return normalized(targetX - enemy.x, targetY - enemy.y);
   }
 
   const w = state.config.width;
   const ex = Math.floor(enemy.x);
   const ey = Math.floor(enemy.y);
-  const stale = state.tick - state.guardianPathAt >= GUARDIAN_PATH_INTERVAL_TICKS;
-  if (stale || state.guardianPath.length === 0) {
-    state.guardianPath = findPath(state, ex, ey, Math.floor(targetX), Math.floor(targetY));
-    state.guardianPathAt = state.tick;
+  const stale = state.tick - state.bossRuntime.pathAt >= GUARDIAN_PATH_INTERVAL_TICKS;
+  if (stale || state.bossRuntime.path.length === 0) {
+    state.bossRuntime.path = findPath(state, ex, ey, Math.floor(targetX), Math.floor(targetY));
+    state.bossRuntime.pathAt = state.tick;
   }
 
   // Consome os passos ja alcancados. Sem isto ele fica mirando a celula em que
   // ja esta e trava no lugar.
-  while (state.guardianPath.length > 0 && state.guardianPath[0] === ey * w + ex) {
-    state.guardianPath.shift();
+  while (state.bossRuntime.path.length > 0 && state.bossRuntime.path[0] === ey * w + ex) {
+    state.bossRuntime.path.shift();
   }
-  if (state.guardianPath.length === 0) {
+  if (state.bossRuntime.path.length === 0) {
     // Sem rota dentro do orcamento: volta a empurrar na direcao do alvo. Pior,
     // mas nunca imovel — um chefe parado e o fim da luta.
     return normalized(targetX - enemy.x, targetY - enemy.y);
   }
 
-  const next = state.guardianPath[0];
+  const next = state.bossRuntime.path[0];
   const nx = next % w;
   const ny = (next / w) | 0;
   // Parede no proximo passo: a rota ja pagou o preco de atravessa-la, entao ele
@@ -1000,6 +1587,20 @@ const bishopRegen = (state: SurvivalState, enemy: Entity, events: SemanticEvent[
   if (state.surface[cellUnder(state, enemy)] !== SURF_FUNGAL) return false;
   if (enemy.hp >= enemy.maxHp) return true;
   enemy.hp = Math.min(enemy.maxHp, enemy.hp + BISHOP_REGEN_PER_TICK);
+  // A cura VISTA e uma descoberta — e o documento que ela abre e uma medicao
+  // de campo, entao medir exige ter estado la. O bit ja aceso sai antes de
+  // qualquer raycast: sem essa saida, a linha de visao seria recalculada a
+  // cada tick de cura pelo resto da run, por nada.
+  if ((state.stats.discoveries & DISCOVERY_BISHOP_HEALED) === 0) {
+    const witness = nearestTarget(state, enemy.x, enemy.y);
+    if (
+      witness &&
+      distTo(enemy, witness) <= WITNESS_RANGE &&
+      hasLineOfSight(state, enemy.x, enemy.y, witness.x, witness.y)
+    ) {
+      markDiscovery(state.stats, DISCOVERY_BISHOP_HEALED);
+    }
+  }
   // Um evento a cada quatro ticks, e nao a cada tick: a 20 Hz o barramento
   // semantico levaria 20 curas por segundo so deste inimigo, e o mixer de audio
   // gastaria o orcamento de vozes inteiro num som que se le igual em 5 Hz.
@@ -1109,14 +1710,29 @@ const bishopNova = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]
       setSurface(state, i, SURF_FUNGAL, BISHOP_NOVA_FUNGAL_TICKS);
     }
   }
+  // Quem estava DENTRO do disco, medido ANTES do dano: depois dele o corpo
+  // pode ter caido, e a pergunta que a descoberta faz e "estava la?", nao
+  // "continua de pe?" — as duas juntas e que valem a marca.
+  const caught: Entity[] = [];
   for (const player of state.players) {
     if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
     if (distTo(enemy, player) > BISHOP_NOVA_RADIUS) continue;
+    caught.push(player);
     damageEntity(state, player, BISHOP_NOVA_DAMAGE, events, {
       kind: 'enemy_contact',
       archetype: 'bishop',
       elite: enemy.elite,
     });
+  }
+  // Sobreviver a Supernova destrava o documento que diz que ela nunca foi um
+  // ataque. Le `hp > 0` e nao `alive`: quem chegou a zero ainda esta vivo
+  // neste instante — `resolveDownedAndDeaths` roda depois, no fim do tick — e
+  // marcar ali daria a descoberta a quem justamente nao sobreviveu.
+  for (const player of caught) {
+    if (player.hp > 0 && !state.playerExtras[player.slot ?? 0].downed) {
+      markDiscovery(state.stats, DISCOVERY_BISHOP_NOVA_SURVIVED);
+      break;
+    }
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: BISHOP_NOVA_RADIUS });
 };
@@ -1425,6 +2041,1067 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
 };
 
 /**
+ * Uma passada da BROCA DE AVANCO: anda, abre o vao e atropela.
+ *
+ * Mora fora de `releaseAction` pelo mesmo motivo da investida do Corcel — a
+ * recuperacao E a acao, e ela dura dezenas de ticks. O que a distingue do
+ * Corcel e o que acontece na pedra: o cavalo PARA (ler o telegrafo e por uma
+ * parede no caminho e o contra-jogo dele), a broca ATRAVESSA. Contra o
+ * Diamandis a parede nao e resposta; a resposta e sair da linha, e o corredor
+ * que fica aberto e permanente.
+ *
+ * `canRip` decide o que cai: rocha e fragil vao, minerio e cristal FICAM de
+ * pe. E a mesma regra do Britador, e e o que faz a passagem dele EXPOR veio
+ * que estava emparedado — o estrago do chefe vira a mina do jogador.
+ */
+const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const action = enemy.action;
+  if (!action || action.kind !== 'drill' || action.phase === 'windup') return;
+
+  const w = state.config.width;
+  const dt = 1 / TICK_HZ;
+  const step = DIAMANDIS_DRILL_SPEED * dt;
+  enemy.facing = { ...action.direction };
+
+  // Abre ANTES de andar, e nao depois: um corpo de raio 0,9 empurrado contra
+  // rocha e um corpo travado, e a broca que so limpasse o rastro deixaria o
+  // chefe raspando na parede com a acao correndo. O vao nasce a frente, na
+  // largura do corpo, e ai o passo cabe.
+  const ahead = 1.2;
+  const side = { x: -action.direction.y, y: action.direction.x };
+  for (let lane = -DIAMANDIS_DRILL_WIDTH; lane <= DIAMANDIS_DRILL_WIDTH; lane++) {
+    for (const reach of [ahead, ahead + 0.9]) {
+      const cx = Math.floor(enemy.x + action.direction.x * reach + side.x * lane);
+      const cy = Math.floor(enemy.y + action.direction.y * reach + side.y * lane);
+      if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
+      if (state.solid[cy * w + cx] === SOLID_NONE) continue;
+      // `breakSolid` primeiro (fragil e cristal tem resposta propria), e o que
+      // ele recusar vai para `ripSolid`, que e quem derruba rocha comum.
+      const opened = breakSolid(state, cx, cy, events) || ripSolid(state, cx, cy, events);
+      // A obra VISTA e uma descoberta. Sai antes de qualquer raycast quando o
+      // bit ja esta aceso — a broca abre dezenas de celulas por passagem, e
+      // isto roda por celula.
+      // A obra VISTA e uma descoberta. So distancia, SEM linha de visao — e a
+      // unica testemunha do jogo em que exigir visada seria absurdo: a parede
+      // entre os dois e exatamente a coisa que esta sendo removida, e quem
+      // esta do outro lado dela e quem mais precisa entender o que aconteceu.
+      if (opened && (state.stats.discoveries & DISCOVERY_DIAMANDIS_CORRIDOR) === 0) {
+        const witness = nearestTarget(state, enemy.x, enemy.y);
+        if (witness && distTo(enemy, witness) <= WITNESS_RANGE) {
+          markDiscovery(state.stats, DISCOVERY_DIAMANDIS_CORRIDOR);
+        }
+      }
+    }
+  }
+
+  moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
+
+  const victim = nearestTarget(state, enemy.x, enemy.y);
+  if (victim && state.tick >= enemy.contactReadyAt && distTo(enemy, victim) < enemy.radius + victim.radius + 0.4) {
+    enemy.contactReadyAt = state.tick + ARCHETYPES.diamandis.contactCooldown;
+    damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'diamandis',
+      elite: enemy.elite,
+    });
+  }
+
+  // Reator em colapso deixa brasa por onde passa: a obra vai esquentando a
+  // sala sozinha, sem nenhum golpe a mais.
+  if ((state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0) {
+    const i = cellUnder(state, enemy);
+    if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+      setSurface(state, i, SURF_EMBER, DIAMANDIS_REACTOR_EMBER_TICKS);
+    }
+  }
+};
+
+/**
+ * O passo do DEVORADOR BRANCO: mergulhado, ele anda por baixo e deixa rastro;
+ * exposto, e um corpo lento que pode ser cobrado.
+ *
+ * O ciclo inteiro mora aqui porque ele nao e "perseguir e bater" em nenhum
+ * momento — submerso ele nem colide com o jogador, e exposto ele nao decide
+ * nada alem de continuar de pe pelo tempo da janela. E o mesmo motivo pelo qual
+ * o Miner, os espreitadores e o Fole tem fluxo proprio.
+ */
+const devourerStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+
+  // NO AR o arco ja foi resolvido inteiro na decolagem, e quem conduz o corpo e
+  // `devourerLeapStride`, no ramo em que a ACAO manda (o mesmo do Corcel e da
+  // broca). Chegar aqui voando significa que a acao sumiu no meio do voo —
+  // um `endsAt` curto demais, um atordoamento, um resync.
+  //
+  // A resposta e POUSAR, e nao ignorar. Ignorar foi a primeira versao e deixava
+  // o chefe suspenso para sempre: sem acao para conduzi-lo e sem humor que a IA
+  // aceitasse, ele parava no ar e a luta acabava ali. Um chefe que trava e pior
+  // que um chefe que cai um passo fora do lugar.
+  if (enemy.mood === DEVOURER_AIRBORNE) {
+    devourerLand(state, enemy, events);
+    return;
+  }
+
+  // PRESO: a janela. Ele nao faz NADA aqui, e a lista do que ele nao faz e a
+  // mecanica inteira — nao anda, nao vira, nao cobra contato e nao tem areia
+  // absorvendo tiro. Encostar nele e de graca, e e por isso que este e o
+  // momento de gastar o superaquecimento.
+  //
+  // Antes existia um estado EXPOSTO em que ele perseguia devagar e machucava
+  // por contato. Ele saiu: perseguir de leve no meio da unica abertura do ciclo
+  // punia justamente a aproximacao que a abertura existe para convidar.
+  if (enemy.mood === DEVOURER_STUCK) {
+    if (state.tick >= enemy.nextActionAt) {
+      enemy.mood = DEVOURER_BURROWED;
+      state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
+      enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    }
+    return;
+  }
+
+  // MERGULHADO. Ele nao colide e nao e alcancado pelo terreno: esta POR BAIXO
+  // dele. O que fica na superficie e a faixa de silica solta — o aviso de por
+  // onde ele anda, e ao mesmo tempo a materia que o contra-jogo consome.
+  if (!player) return;
+  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  enemy.facing = { ...toward };
+  const step = DEVOURER_BURROW_SPEED * dt;
+  // Sem `moveEntity`: parede nao vale por baixo. Ele e o unico corpo do jogo
+  // que atravessa solido, e e por isso que perseguir nao e uma resposta a ele.
+  enemy.x = Math.max(1.5, Math.min(w - 1.5, enemy.x + toward.x * step));
+  enemy.y = Math.max(1.5, Math.min(state.config.height - 1.5, enemy.y + toward.y * step));
+
+  // O RASTRO: silica solta na faixa por onde passou, so em chao aberto e limpo.
+  // Nao pinta por cima de nada — nem de fogo, nem de agua, nem do proprio
+  // vidro: sobrescrever o vidro apagaria o contra-jogo do jogador com o
+  // proprio corpo do chefe.
+  const side = { x: -toward.y, y: toward.x };
+  for (let lane = -DEVOURER_TRAIL_WIDTH; lane <= DEVOURER_TRAIL_WIDTH; lane++) {
+    const tx = Math.floor(enemy.x + side.x * lane);
+    const ty = Math.floor(enemy.y + side.y * lane);
+    if (tx < 1 || ty < 1 || tx >= w - 1 || ty >= state.config.height - 1) continue;
+    const i = ty * w + tx;
+    if (state.solid[i] !== SOLID_NONE) continue;
+    if (state.surface[i] !== SURF_NONE && state.surface[i] !== SURF_SCORCHED) continue;
+    setSurface(state, i, SURF_SILT, 0);
+  }
+
+  if (state.tick < enemy.nextActionAt) return;
+
+  // A EMERGENCIA. Ele mira onde o jogador VAI estar, e nao onde esta: o alvo
+  // parado e o unico que a antecipacao erra, e isso e de proposito — quem le o
+  // rastro e para de correr em linha reta ja esta jogando contra ele.
+  const leadX = player.x + player.vx * DEVOURER_LEAD_SECONDS;
+  const leadY = player.y + player.vy * DEVOURER_LEAD_SECONDS;
+  const spot = devourerSurfacingSpot(state, Math.floor(leadX), Math.floor(leadY));
+  if (spot < 0) {
+    // Chao vitrificado em toda a volta: ele NAO consegue cair aqui. Volta a
+    // andar por baixo e tenta de novo mais tarde — e essa recusa e a
+    // recompensa inteira de quem transformou a areia em vidro.
+    enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.2 });
+    return;
+  }
+  const landX = (spot % w) + 0.5;
+  const landY = Math.floor(spot / w) + 0.5;
+  // A conta se recompoe sozinha em vez de depender de quem criou o chefe: um
+  // Devorador que chegue aqui com a rajada zerada (spawn por caminho novo,
+  // resync, teste) comeca uma rajada inteira em vez de saltar uma vez e ir
+  // direto para a janela.
+  if (state.bossRuntime.leapsLeft <= 0) state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
+
+  // A DECOLAGEM fica ATRAS da queda, na linha por onde ele veio: ele recua por
+  // baixo o quanto for preciso e sobe dali. E aqui que o vidro cobra a segunda
+  // vez — sem chao solto para romper, nao ha salto.
+  const launch = devourerLaunchSpot(state, enemy, landX, landY);
+  if (launch < 0) {
+    enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.2 });
+    return;
+  }
+  enemy.x = (launch % w) + 0.5;
+  enemy.y = Math.floor(launch / w) + 0.5;
+  state.bossRuntime.leapToX = landX;
+  state.bossRuntime.leapToY = landY;
+  // O telegrafo aponta para a QUEDA e nao para o jogador: e o rumo do arco que
+  // o aviso precisa prometer, e nos poucos ticks entre a mira e a decolagem o
+  // jogador ja andou. Apontar para ele desenharia uma linha que o salto nao vai
+  // seguir.
+  const arc = normalized(landX - enemy.x, landY - enemy.y);
+  startAction(state, enemy, 'erupt', arc, DEVOURER_ERUPT_WINDUP_TICKS, 6, events, player.id);
+};
+
+/**
+ * Onde o salto DECOLA, ou -1 se nao houver chao solto para romper.
+ *
+ * O ponto ideal fica na reta entre ele e a queda, recuado o bastante para o
+ * arco ter comprimento legivel — a distancia e a que ele ja tem, presa entre o
+ * minimo e o maximo. Se ele estiver perto demais, o ponto cai ATRAS dele: e ele
+ * recua por baixo antes de subir, que e exatamente o que um bicho que toma
+ * impulso faz.
+ *
+ * A validacao e a MESMA da queda (`devourerSurfacingSpot`): nem vidro, nem
+ * solido. Reusar a funcao e o ponto — sao a mesma pergunta ("da para romper o
+ * chao aqui?") e duas copias dela acabariam discordando sobre o vidro, que e a
+ * unica coisa que o jogador controla no encontro.
+ */
+const devourerLaunchSpot = (
+  state: SurvivalState,
+  enemy: Entity,
+  landX: number,
+  landY: number,
+): number => {
+  const span = Math.hypot(enemy.x - landX, enemy.y - landY);
+  // Colado no ponto de queda, a subtracao nao da direcao nenhuma — e esse e o
+  // caso COMUM, nao o raro: o pouso e mirado no jogador, entao o salto seguinte
+  // comeca de cima dele. Sem um rumo de recuo aqui o arco sai com comprimento
+  // zero. O rumo do corpo e o primeiro recurso; o eixo x e o ultimo, para a
+  // funcao nunca devolver um vetor nulo.
+  let back = span > 0.5 ? normalized(enemy.x - landX, enemy.y - landY) : { ...enemy.facing };
+  if (Math.hypot(back.x, back.y) < 0.001) back = { x: 1, y: 0 };
+  // E cada salto da rajada gira: os tres cercam o alvo em vez de repetirem o
+  // mesmo ataque de um lado so.
+  const done = DEVOURER_LEAPS_PER_CYCLE - state.bossRuntime.leapsLeft;
+  const dir = rotated(back, done * DEVOURER_LEAP_TURN);
+  const reach = Math.min(
+    DEVOURER_LEAP_MAX_RANGE,
+    Math.max(DEVOURER_LEAP_MIN_RANGE, span)
+  );
+  return devourerSurfacingSpot(
+    state,
+    Math.floor(landX + dir.x * reach),
+    Math.floor(landY + dir.y * reach),
+    DEVOURER_LAUNCH_SEARCH
+  );
+};
+
+/**
+ * UM TICK DE VOO. Conduzido pela acao, como a investida do Corcel.
+ *
+ * Sem `moveEntity`: ele esta no AR, e parede nao vale para quem passa por cima
+ * dela — pela mesma razao que nao valia para quem passava por baixo. E sem
+ * rastro: silica solta e o que o corpo revira ao raspar por baixo do chao, e no
+ * arco nao ha chao raspando. O jogador que ve a faixa parar sabe que ele saiu.
+ */
+const devourerLeapStride = (
+  state: SurvivalState,
+  enemy: Entity,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const toX = state.bossRuntime.leapToX;
+  const toY = state.bossRuntime.leapToY;
+  const dx = toX - enemy.x;
+  const dy = toY - enemy.y;
+  const remaining = Math.hypot(dx, dy);
+  const step = DEVOURER_LEAP_SPEED * dt;
+  if (remaining <= step || remaining <= 0.0001) {
+    enemy.x = toX;
+    enemy.y = toY;
+    devourerLand(state, enemy, events);
+    return;
+  }
+  enemy.x += (dx / remaining) * step;
+  enemy.y += (dy / remaining) * step;
+  enemy.facing = { x: dx / remaining, y: dy / remaining };
+};
+
+/**
+ * A QUEDA: a segunda cratera, e o fim do arco.
+ *
+ * Ela devolve o chefe a janela de dano de sempre — o salto ACRESCENTA tempo
+ * exposto, nao substitui o que ja existia. A acao e limpa aqui e nao pelo
+ * relogio dela: quem decide que o voo acabou e a CHEGADA, e um arco que
+ * terminasse pelo cronometro poderia largar o corpo um passo antes ou depois do
+ * ponto que o telegrafo prometeu.
+ */
+const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  enemy.action = undefined;
+  devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
+  // A rajada decide o que vem depois da cratera. Ainda ha salto na conta: ele
+  // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: ele ENTALA.
+  //
+  // O decremento acontece aqui, no pouso, e nao na decolagem — um arco que o
+  // vidro negou nunca chegou a ser um ataque, e cobrar da conta um salto que
+  // nao aconteceu deixaria o jogador ganhar a janela sem ter esquivado nada.
+  state.bossRuntime.leapsLeft -= 1;
+  if (state.bossRuntime.leapsLeft > 0) {
+    enemy.mood = DEVOURER_BURROWED;
+    enemy.nextActionAt = state.tick + DEVOURER_HOP_GAP_TICKS;
+    return;
+  }
+  enemy.mood = DEVOURER_STUCK;
+  enemy.nextActionAt = state.tick + DEVOURER_STUCK_TICKS;
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+};
+
+/**
+ * Onde ele consegue sair, a partir do ponto mirado, ou -1.
+ *
+ * VIDRO recusa: e o unico jeito de o jogador negar espaco a ele. Solido
+ * tambem, e por um motivo diferente — sair dentro de uma parede o deixaria
+ * emparedado, e chefe preso e chefe morto.
+ *
+ * A busca e em anel crescente e deterministica: duas maquinas da mesma sala
+ * precisam faze-lo emergir na MESMA celula.
+ */
+const devourerSurfacingSpot = (
+  state: SurvivalState,
+  cx: number,
+  cy: number,
+  search = DEVOURER_ERUPT_SEARCH,
+): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let r = 0; r <= search; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        if (state.surface[i] === SURF_GLASS) continue;
+        return i;
+      }
+    }
+  }
+  return -1;
+};
+
+/**
+ * O SUMIDOURO: a cratera que rompe o chao, nas DUAS pontas do arco.
+ *
+ * Abre o chao em volta (fragil cede, rocha nao — ele rompe por onde o terreno ja
+ * era instavel), machuca quem estiver no raio e deixa o solo revirado como
+ * silica solta. O estrago dele ALIMENTA o contra-jogo: cada cratera entrega
+ * mais areia para o jogador vitrificar, e agora sao duas por ciclo.
+ *
+ * O `damage` e parametro porque as duas pontas nao valem o mesmo: a queda e
+ * mirada em voce, a decolagem acontece longe. Ver DEVOURER_LAUNCH_DAMAGE.
+ */
+const devourerCrater = (
+  state: SurvivalState,
+  enemy: Entity,
+  damage: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const r = Math.ceil(DEVOURER_ERUPT_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > DEVOURER_ERUPT_RADIUS * DEVOURER_ERUPT_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) {
+        // Sumidouro: o que ja era fragil cede. Rocha, minerio e cristal ficam —
+        // ele revira o chao instavel, nao demole a galeria (isso e o Diamandis).
+        breakSolid(state, x, y, events);
+        continue;
+      }
+      // O vidro NAO volta a ser areia. Quem vitrificou pagou por aquilo, e o
+      // chefe passando por cima nao pode desfazer a decisao do jogador — senao
+      // o contra-jogo se apaga sozinho a cada emergencia.
+      if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
+        setSurface(state, i, SURF_SILT, 0);
+      }
+    }
+  }
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > DEVOURER_ERUPT_RADIUS) continue;
+    damageEntity(state, player, damage, events, {
+      kind: 'enemy_contact',
+      archetype: 'white_devourer',
+      elite: enemy.elite,
+    });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
+};
+
+/**
+ * A DECOLAGEM: primeira cratera, e o comeco do voo.
+ *
+ * Encadear a acao do arco aqui dentro segue o caminho que o Coveiro ja abriu
+ * (`haul` arma o `slam` no proprio release). A acao de salto nao tem ramo de
+ * release nenhum: ela existe para POR o corpo no fluxo conduzido pela acao e
+ * para dar ao cliente o vao de tempo do voo. Quem termina o arco e a chegada,
+ * em `devourerLeapStride`.
+ */
+const devourerErupt = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  devourerCrater(state, enemy, DEVOURER_LAUNCH_DAMAGE, events);
+  const toX = state.bossRuntime.leapToX;
+  const toY = state.bossRuntime.leapToY;
+  const dx = toX - enemy.x;
+  const dy = toY - enemy.y;
+  const distance = Math.hypot(dx, dy);
+  // O vao da acao arredonda para CIMA, e o `ceil` nao e gosto: o voo anda em
+  // passos de `velocidade / TICK_HZ` e o ultimo passo quase nunca fecha a
+  // distancia exata. Arredondando para baixo, a acao expirava um tick antes de
+  // o corpo chegar — e `advanceAction`, ao limpar a acao, devolve o chefe ao
+  // fluxo de IA no meio do arco. Medido: o salto de 10 tiles pedia 23 ticks e
+  // recebia 22, e o Devorador ficava parado no ar a 0,1 tile do alvo, para
+  // sempre. A acao tem de sobreviver ao voo; quem o encerra e a CHEGADA.
+  const flightTicks = Math.max(1, Math.ceil((distance / DEVOURER_LEAP_SPEED) * TICK_HZ));
+  enemy.mood = DEVOURER_AIRBORNE;
+  const arc = distance > 0.0001 ? { x: dx / distance, y: dy / distance } : { ...enemy.facing };
+  startAction(state, enemy, 'leap', arc, flightTicks, 0, events);
+};
+
+// ---------------------------------------------------------------------------
+// OS CHEFES DE ESTRATO
+// ---------------------------------------------------------------------------
+
+/**
+ * ARQUICANTOR: o pulso que arma a Catedral inteira.
+ *
+ * Mesma regra do Ressonante, na escala da nave: cada cristal ao alcance
+ * descarrega pelas aberturas coladas nele. A carga sai com origem de inimigo,
+ * entao machuca OUTROS inimigos parados no lugar errado tambem — a cadeia e do
+ * mundo, nao dele.
+ *
+ * O contra-jogo mora no que o pulso NAO faz: cristal quebrado antes nao canta.
+ * E como a Catedral tambem e a luz e o recurso do setor, esvazia-la e uma
+ * decisao com preco, e nao uma otimizacao.
+ */
+const archcantorPulse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = ARCHCANTOR_PULSE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  const charged = new Set<number>();
+  let armed = 0;
+  for (let dy = -r; dy <= r && armed < ARCHCANTOR_CRYSTAL_BUDGET; dy++) {
+    for (let dx = -r; dx <= r && armed < ARCHCANTOR_CRYSTAL_BUDGET; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_CRYSTAL) continue;
+      armed++;
+      for (const n of [i - 1, i + 1, i - w, i + w]) {
+        if (state.solid[n] === SOLID_NONE) charged.add(n);
+      }
+    }
+  }
+  if (charged.size > 0) {
+    chargeCells(state, [...charged], events, { source: 'enemy', owner: enemy.id });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+};
+
+/** Ha cristal ao alcance do canto? A rede vazia e o que o desarma. */
+const archcantorHasNetwork = (state: SurvivalState, enemy: Entity): boolean => {
+  const w = state.config.width;
+  const r = ARCHCANTOR_PULSE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= state.config.height - 1) continue;
+      if (state.solid[y * w + x] === SOLID_CRYSTAL) return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * LEVIATA DO LENCOL: o Devorador do outro elemento.
+ *
+ * Mesma gramatica — mergulha, preve, emerge — com duas diferencas que sao o
+ * encontro: ele so anda e so emerge por superficie CONDUTIVA, e o que o para
+ * nao e negar o chao, e eletrificar a agua. O atordoamento sai da regra
+ * generica de descarga que ja existe; o preco e o meio ficar mortal para quem
+ * o parou.
+ */
+const leviathanStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  if (enemy.mood === DEVOURER_SURFACED) {
+    if (state.tick >= enemy.nextActionAt) {
+      enemy.mood = DEVOURER_BURROWED;
+      enemy.nextActionAt = state.tick + LEVIATHAN_DIVE_MIN_TICKS;
+      return;
+    }
+    if (!player) return;
+    const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+    enemy.facing = { ...toward };
+    const def = ARCHETYPES.sheet_leviathan;
+    if (distTo(enemy, player) < enemy.radius + player.radius + 0.2 && state.tick >= enemy.contactReadyAt) {
+      enemy.contactReadyAt = state.tick + def.contactCooldown;
+      startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
+      return;
+    }
+    moveEntity(state, enemy, toward.x * LEVIATHAN_SURFACE_SPEED * dt, toward.y * LEVIATHAN_SURFACE_SPEED * dt);
+    return;
+  }
+
+  if (!player) return;
+  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  enemy.facing = { ...toward };
+  // Submerso ele anda pela LAMINA, e nao pelo chao: passos que continuem em
+  // agua. Sem lamina para onde ir ele guarda a margem — que e exatamente a
+  // leitura que o jogador precisa ter dele.
+  const step = LEVIATHAN_SWIM_SPEED * dt;
+  const wet = (mx: number, my: number): boolean => {
+    const i = Math.floor(enemy.y + my) * w + Math.floor(enemy.x + mx);
+    return i >= 0 && i < state.surface.length && isConductiveSurface(state.surface[i]);
+  };
+  const sx = toward.x * step;
+  const sy = toward.y * step;
+  if (wet(sx, sy)) moveEntity(state, enemy, sx, sy);
+  else if (wet(sx, 0)) moveEntity(state, enemy, sx, 0);
+  else if (wet(0, sy)) moveEntity(state, enemy, 0, sy);
+
+  if (state.tick < enemy.nextActionAt) return;
+  const leadX = player.x + player.vx * LEVIATHAN_LEAD_SECONDS;
+  const leadY = player.y + player.vy * LEVIATHAN_LEAD_SECONDS;
+  const spot = leviathanBreachSpot(state, Math.floor(leadX), Math.floor(leadY));
+  if (spot < 0) {
+    // Sem agua sob o alvo ele nao tem por onde subir. Nao e um contra-jogo
+    // ativo como o vidro do Devorador — e o terreno seco do proprio Aquifero,
+    // e saber onde ele NAO alcanca e metade de atravessar o setor.
+    enemy.nextActionAt = state.tick + LEVIATHAN_DIVE_MIN_TICKS;
+    return;
+  }
+  enemy.x = (spot % w) + 0.5;
+  enemy.y = Math.floor(spot / w) + 0.5;
+  startAction(state, enemy, 'erupt', toward, LEVIATHAN_BREACH_WINDUP_TICKS, 6, events, player.id);
+};
+
+/** Agua aberta mais proxima do ponto mirado, ou -1. Varredura em anel fixa. */
+const leviathanBreachSpot = (state: SurvivalState, cx: number, cy: number): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let r = 0; r <= LEVIATHAN_BREACH_SEARCH; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        if (!isConductiveSurface(state.surface[i])) continue;
+        return i;
+      }
+    }
+  }
+  return -1;
+};
+
+/**
+ * PULMAO-MATRIZ: o orgao que faz a Fenda respirar.
+ *
+ * Mesma respiracao do Fole, na escala da camara. Inspirando, LIMPA gas num raio
+ * grande — e abre uma janela de rota que nao existia. Expelindo, sopra uma
+ * coluna larga na direcao do jogador.
+ *
+ * A janela de dano e o jogador que abre: gas aceso encostado nele durante a
+ * expiracao queima a coluna inteira de volta. Custa transformar parte da arena
+ * em fogo, e e por isso que e uma decisao.
+ */
+const lungMatrixStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const phase = Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? LUNG_INHALING : LUNG_EXHALING;
+
+  if (state.tick >= enemy.nextActionAt) {
+    enemy.nextActionAt = state.tick + LUNG_MATRIX_BREATH_INTERVAL_TICKS;
+    if (enemy.mood === LUNG_INHALING) {
+      const r = LUNG_MATRIX_INHALE_RADIUS;
+      const cx = Math.floor(enemy.x);
+      const cy = Math.floor(enemy.y);
+      let taken = 0;
+      for (let dy = -r; dy <= r && taken < LUNG_MATRIX_INHALE_PER_BREATH; dy++) {
+        for (let dx = -r; dx <= r && taken < LUNG_MATRIX_INHALE_PER_BREATH; dx++) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const i = y * w + x;
+          if (state.surface[i] !== SURF_GAS) continue;
+          setSurface(state, i, SURF_NONE, 0);
+          taken++;
+        }
+      }
+    } else {
+      const dir = player ? normalized(player.x - enemy.x, player.y - enemy.y) : enemy.facing;
+      enemy.facing = { ...dir };
+      const side = { x: -dir.y, y: dir.x };
+      for (let step = 1; step <= LUNG_MATRIX_EXHALE_LENGTH; step++) {
+        let blocked = false;
+        for (let lane = -LUNG_MATRIX_EXHALE_WIDTH; lane <= LUNG_MATRIX_EXHALE_WIDTH; lane++) {
+          const x = Math.floor(enemy.x + dir.x * step + side.x * lane);
+          const y = Math.floor(enemy.y + dir.y * step + side.y * lane);
+          if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+          const i = y * w + x;
+          if (state.solid[i] !== SOLID_NONE) {
+            if (lane === 0) blocked = true;
+            continue;
+          }
+          if (state.surface[i] === SURF_NONE) setSurface(state, i, SURF_GAS, GAS_LIFE_TICKS);
+        }
+        if (blocked) break;
+      }
+      // E o RETORNO: fogo encostado nele enquanto expele sobe pela coluna. O
+      // jogador acende a nuvem, e a nuvem e continua ate a boca do pulmao.
+      if (state.tick >= enemy.rangedReadyAt && lungMatrixBurning(state, enemy)) {
+        enemy.rangedReadyAt = state.tick + LUNG_MATRIX_BREATH_INTERVAL_TICKS * 3;
+        damageEntity(state, enemy, LUNG_MATRIX_BURN_DAMAGE, events, {
+          kind: 'explosion',
+          source: 'player',
+        });
+        markDiscovery(state.stats, DISCOVERY_LUNG_IGNITED);
+        events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2 });
+      }
+    }
+  }
+  if (player) enemy.facing = normalized(player.x - enemy.x, player.y - enemy.y);
+};
+
+/** Ha fogo colado na boca do pulmao? (as quatro arestas, como a propagacao) */
+const lungMatrixBurning = (state: SurvivalState, enemy: Entity): boolean => {
+  const w = state.config.width;
+  const i = cellUnder(state, enemy);
+  for (const n of [i, i - 1, i + 1, i - w, i + w]) {
+    if (n < 0 || n >= state.surface.length) continue;
+    if (state.surface[n] === SURF_FIRE) return true;
+  }
+  return false;
+};
+
+/**
+ * CORACAO DA FORNALHA: a sala inteira e o chefe.
+ *
+ * Alterna superaquecimento (blindado; setores da arena acendem em sequencia) e
+ * resfriamento (aberto). O jogador nao escolhe quando bater — escolhe onde
+ * estar quando puder.
+ *
+ * O SETOR que acende gira com o relogio, e nao por sorteio: a sequencia e
+ * aprendivel, e aprender a sequencia e a diferenca entre atravessar a sala e
+ * ser pego por ela.
+ */
+const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const phase = Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? FURNACE_OVERHEATING : FURNACE_COOLING;
+  if (enemy.mood !== FURNACE_OVERHEATING) return;
+  if (state.tick < enemy.nextActionAt) return;
+  enemy.nextActionAt = state.tick + FURNACE_HEART_WAVE_INTERVAL_TICKS;
+
+  const w = state.config.width;
+  const r = FURNACE_HEART_WAVE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  // O setor gira uma fracao de volta por onda. Deterministico e legivel: o
+  // jogador ve para onde a chama esta indo e anda contra ela.
+  const heading = (state.tick / FURNACE_HEART_WAVE_INTERVAL_TICKS) * 0.7;
+  const dirX = Math.cos(heading);
+  const dirY = Math.sin(heading);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r * r || d2 < 4) continue;
+      const len = Math.sqrt(d2);
+      if ((dx / len) * dirX + (dy / len) * dirY < Math.cos(FURNACE_HEART_WAVE_ARC)) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // `igniteCell` primeiro: cada materia tem a propria resposta ao calor, e
+      // o Coracao nao e a excecao que atropela a tabela. So chao sem resposta
+      // recebe brasa direto.
+      if (!igniteCell(state, i, events) && state.surface[i] === SURF_NONE) {
+        setSurface(state, i, SURF_EMBER, 240);
+      }
+    }
+  }
+  events.push({ t: 'beam_line', x: enemy.x, y: enemy.y, dx: dirX, dy: dirY, length: r, powered: true });
+};
+
+/**
+ * RAINHA DA GEADA: a couraça dela e o estrato.
+ *
+ * Enquanto houver gelo em volta, o dano quase nao entra; derreter o lago a
+ * expoe. E a agua que sobra e condutiva — quem a revela transforma o chao em
+ * algo que a descarga atravessa nos dois sentidos.
+ *
+ * O congelamento refaz o lago (e devolve a couraça), e os Espectros saem do
+ * GELO em volta, e nao dela: sao extensoes do estrato, nao filhotes.
+ */
+const frostQueenIceAround = (state: SurvivalState, enemy: Entity): number => {
+  const w = state.config.width;
+  const r = FROST_QUEEN_ICE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  let ice = 0;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+      if (state.surface[y * w + x] === SURF_ICE) ice++;
+    }
+  }
+  return ice;
+};
+
+const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = FROST_QUEEN_FREEZE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // Congela agua e chao nu; NAO apaga fogo vivo. Apagar o incendio que o
+      // jogador acendeu desfaria a acao dele — a mesma regra da Supernova.
+      const surf = state.surface[i];
+      if (surf === SURF_FIRE) continue;
+      if (surf === SURF_NONE || isConductiveSurface(surf)) setSurface(state, i, SURF_ICE, 0);
+    }
+  }
+  // Os Espectros saem do gelo, em volta dela.
+  for (let k = 0; k < FROST_QUEEN_WRAITHS; k++) {
+    const angle = (k / FROST_QUEEN_WRAITHS) * Math.PI * 2;
+    const wx = Math.floor(enemy.x + Math.cos(angle) * 3);
+    const wy = Math.floor(enemy.y + Math.sin(angle) * 3);
+    if (wx < 1 || wy < 1 || wx >= w - 1 || wy >= state.config.height - 1) continue;
+    if (state.solid[wy * w + wx] !== SOLID_NONE) continue;
+    if (state.enemies.length >= MAX_ENEMIES) break;
+    const wraith = spawnEnemy(state, 'frost_wraith', wx, wy, false);
+    // Extensoes, e nao uma matilha: nascem parciais e caem depressa.
+    wraith.maxHp = Math.max(1, Math.floor(wraith.maxHp * FROST_QUEEN_WRAITH_HP_FRACTION));
+    wraith.hp = wraith.maxHp;
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+};
+
+/**
+ * MAGNETARCA: a polaridade decide o que e perigoso.
+ *
+ * ATRAINDO, ele te puxa e a proximidade cobra. REPELINDO, ele te empurra e a
+ * distancia cobra. Nao ha posicao segura permanente — ha uma FAIXA, e ela troca
+ * de lado a cada ciclo.
+ *
+ * O deslocamento e por PASSOS pequenos com colisao, como o eletroima do
+ * Coveiro: a quina no caminho continua sendo o contra-jogo geometrico do campo,
+ * e o jogador nao integra velocidade, entao impulso aqui seria apagado no mesmo
+ * tick.
+ */
+const magnetarchStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  events: SemanticEvent[],
+): void => {
+  const phase = Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? MAGNET_ATTRACT : MAGNET_REPEL;
+  if (!player) return;
+  const dist = distTo(enemy, player);
+  enemy.facing = normalized(player.x - enemy.x, player.y - enemy.y);
+  if (dist > MAGNETARCH_FIELD_RANGE) return;
+
+  const pull = enemy.mood === MAGNET_ATTRACT ? 1 : -1;
+  const dir = normalized((enemy.x - player.x) * pull, (enemy.y - player.y) * pull);
+  moveEntity(state, player, dir.x * MAGNETARCH_PULL_STEP, dir.y * MAGNETARCH_PULL_STEP);
+
+  if (state.tick < enemy.rangedReadyAt) return;
+  enemy.rangedReadyAt = state.tick + MAGNETARCH_FIELD_TICK_INTERVAL;
+  if (enemy.mood === MAGNET_ATTRACT && dist < MAGNETARCH_CRUSH_RANGE) {
+    damageEntity(state, player, MAGNETARCH_CRUSH_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'magnetarch',
+      elite: enemy.elite,
+    });
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MAGNETARCH_CRUSH_RANGE });
+  } else if (enemy.mood === MAGNET_REPEL && dist > MAGNETARCH_TETHER_RANGE) {
+    damageEntity(state, player, MAGNETARCH_TETHER_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'magnetarch',
+      elite: enemy.elite,
+    });
+    events.push({ t: 'pulse', x: player.x, y: player.y, radius: 1.4 });
+  } else {
+    // Dentro do campo e fora das duas bordas: o jogador ACHOU a faixa. E a
+    // unica das seis Descobertas que marca uma ausencia de dano — porque aqui
+    // o entendimento e exatamente nao ter sido cobrado.
+    markDiscovery(state.stats, DISCOVERY_MAGNET_BANDED);
+  }
+};
+
+/**
+ * A EMERGENCIA do Leviata: ele rompe a lamina sob o alvo.
+ *
+ * Nao abre sumidouro como o Devorador — nao ha o que desabar debaixo de agua.
+ * O que ele faz e DESLOCAR: o golpe espalha a lamina para os lados, e a poca
+ * cresce. Cada emergencia deixa o Aquifero um pouco mais condutivo, o que
+ * torna eletrifica-lo mais tentador e mais perigoso ao mesmo tempo.
+ */
+const leviathanBreach = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = Math.ceil(LEVIATHAN_BREACH_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > LEVIATHAN_BREACH_RADIUS * LEVIATHAN_BREACH_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // Agua deslocada cobre chao nu e cinza; nao apaga fogo do jogador nem
+      // desfaz gelo — as duas coisas sao decisoes de alguem.
+      if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
+        setSurface(state, i, SURF_WATER, 0);
+      }
+    }
+  }
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > LEVIATHAN_BREACH_RADIUS) continue;
+    damageEntity(state, player, LEVIATHAN_BREACH_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'sheet_leviathan',
+      elite: enemy.elite,
+    });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: LEVIATHAN_BREACH_RADIUS });
+  enemy.mood = DEVOURER_SURFACED;
+  enemy.nextActionAt = state.tick + LEVIATHAN_SURFACE_TICKS;
+};
+
+/** O chefe ainda tem esta arma? (o modulo dela nao foi arrancado) */
+const hasModule = (state: SurvivalState, module: number): boolean =>
+  (state.bossRuntime.modulesLost & (1 << module)) === 0;
+
+/**
+ * Solta os modulos conforme a vida cai. Ordem fixa, do maior alcance para o
+ * menor: e ensinavel, e faz o cerco em volta do chefe ir FECHANDO.
+ *
+ * Soltar nao tira a arma — o modulo continua pendurado e funcionando. O que
+ * muda e que agora um Coveiro consegue engatar o eletroima nele.
+ */
+const diamandisShedModules = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const fraction = enemy.hp / enemy.maxHp;
+  for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+    const bit = 1 << m;
+    if ((state.bossRuntime.modulesExposed & bit) !== 0) continue;
+    if (fraction > DIAMANDIS_MODULE_EXPOSE_AT[m]) continue;
+    state.bossRuntime.modulesExposed |= bit;
+    events.push({ t: 'boss_module', x: enemy.x, y: enemy.y, module: m, state: 'exposed' });
+  }
+};
+
+/**
+ * O modulo solto que um Coveiro ainda pode arrancar, ou -1.
+ *
+ * "Ainda pode" exclui os ja arrancados E os que outro Coveiro ja engatou: sem
+ * a segunda checagem, os tres Coveiros de uma galeria ferrifera convergiam
+ * todos para a mesma peca e dois deles ficavam parados em cima do chefe sem
+ * nada para fazer. A varredura e por indice crescente, deterministica.
+ */
+const claimableModule = (state: SurvivalState, undertaker: Entity): number => {
+  for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+    const bit = 1 << m;
+    if ((state.bossRuntime.modulesExposed & bit) === 0) continue;
+    if ((state.bossRuntime.modulesLost & bit) !== 0) continue;
+    const claimed = state.enemies.some(
+      (e) => e.alive && e.archetype === 'undertaker' && e !== undertaker && e.mood === m + 1,
+    );
+    if (!claimed) return m;
+  }
+  return -1;
+};
+
+/**
+ * O PASSO DO COVEIRO SUCATEIRO: ele larga o jogador e vai buscar a peca.
+ *
+ * Devolve `true` quando assumiu o tick — o Coveiro so volta a caçar gente
+ * quando nao ha nada solto para recolher. Isso e caracterizacao, e nao um
+ * favor ao jogador: ele foi construido para recolher automatos abatidos, e
+ * entre um Prospector de pe e uma carcaça de escavadeira ele escolhe a
+ * carcaça. Toda vez.
+ *
+ * `mood` guarda o modulo reivindicado (m + 1, para 0 continuar significando
+ * "nenhum"), e `contactReadyAt` guarda se ele ja esta CARREGANDO. Nenhum campo
+ * novo na entidade: os dois viajam no snapshot e entram no resync, e um chefe
+ * opcional nao justifica engordar todo inimigo do jogo.
+ */
+const undertakerSalvageStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  dt: number,
+  events: SemanticEvent[],
+): boolean => {
+  const carrying = (enemy.mood ?? 0) > 0 && (state.bossRuntime.modulesLost & (1 << (enemy.mood! - 1))) !== 0;
+  const w = state.config.width;
+  const h = state.config.height;
+
+  if (carrying) {
+    // CARREGANDO: ele vai para a borda mais proxima e sai do mapa com a peca.
+    // O caminho e reto de proposito — ele nao esta fugindo do jogador, esta
+    // cumprindo uma rota de entrega, e a linha reta e o que torna o intercepto
+    // possivel: da para ver para onde ele vai e cortar caminho.
+    const toLeft = enemy.x;
+    const toRight = w - enemy.x;
+    const toTop = enemy.y;
+    const toBottom = h - enemy.y;
+    const best = Math.min(toLeft, toRight, toTop, toBottom);
+    const dir =
+      best === toLeft ? { x: -1, y: 0 }
+      : best === toRight ? { x: 1, y: 0 }
+      : best === toTop ? { x: 0, y: -1 }
+      : { x: 0, y: 1 };
+    enemy.facing = { ...dir };
+    const speed = ARCHETYPES.undertaker.speed * surfaceSpeedMul(state, enemy);
+    const moved = moveEntity(state, enemy, dir.x * speed * dt, dir.y * speed * dt);
+    // Ele ABRE caminho ate a borda, e isso nao e um detalhe de conveniencia:
+    // um carregador que trava na primeira rocha nunca chega a lugar nenhum, e
+    // a escolha inteira desmonta — "deixar trabalhar" viraria "espere, ele vai
+    // ficar preso e voce mata depois". Com a saida possivel, o preco de deixar
+    // a peca sair e real, e o intercepto vira decisao de rota.
+    //
+    // Em linha reta, e nao contornando: e o que torna o corte de caminho
+    // legivel. Da para ver para onde ele vai.
+    if (moved.blockCell) {
+      const { x: bx, y: by } = moved.blockCell;
+      const opened = breakSolid(state, bx, by, events) || ripSolid(state, bx, by, events);
+      if (!opened) {
+        // MINERIO e cristal ele nao come — sao recurso do jogador, e vale aqui
+        // a mesma regra da broca. Contorna deslizando pelo eixo
+        // perpendicular, sempre para o mesmo lado primeiro (deterministico).
+        //
+        // Sem este desvio a rota morria contra o primeiro veio: medido na
+        // seed 404, o carregador parava em x=74 de um mapa de 96 e ficava ali
+        // pelo resto da run. "Deixar trabalhar" virava "espere, ele empaca" —
+        // e a escolha inteira desmontava, porque o preco de nao interceptar
+        // nunca chegava a ser cobrado.
+        const perp = { x: -dir.y, y: dir.x };
+        const slid = moveEntity(state, enemy, perp.x * speed * dt, perp.y * speed * dt);
+        if (slid.blockedX || slid.blockedY) {
+          moveEntity(state, enemy, -perp.x * speed * dt, -perp.y * speed * dt);
+        }
+      }
+    }
+    // FORA DE ALCANCE: a borda do mapa, ou longe o bastante da carcaça para a
+    // peca ter saido da luta. Ver UNDERTAKER_SALVAGE_ESCAPE_DIST.
+    const carcass = state.enemies.find((e) => e.archetype === 'diamandis');
+    const farFromFight =
+      carcass !== undefined && distTo(enemy, carcass) > UNDERTAKER_SALVAGE_ESCAPE_DIST;
+    if (farFromFight || enemy.x < 2 || enemy.y < 2 || enemy.x > w - 2 || enemy.y > h - 2) {
+      // Saiu do mapa. A peca foi junto, e com ela a recompensa dela.
+      events.push({
+        t: 'boss_module',
+        x: enemy.x,
+        y: enemy.y,
+        module: enemy.mood! - 1,
+        state: 'lost',
+      });
+      enemy.alive = false;
+      // NAO passa por `damageEntity`: ninguem o abateu, ele foi embora. Contar
+      // isto como abate creditaria ao jogador um kill que ele nao fez — e, pior,
+      // o registro do bestiario diria que ele resolveu um problema que na
+      // verdade escapou.
+    }
+    return true;
+  }
+
+  const boss = state.enemies.find((e) => e.alive && e.archetype === 'diamandis');
+  if (!boss) {
+    enemy.mood = 0;
+    return false;
+  }
+  const claimed = (enemy.mood ?? 0) > 0 ? enemy.mood! - 1 : claimableModule(state, enemy);
+  if (claimed < 0) {
+    enemy.mood = 0;
+    return false;
+  }
+  if (distTo(enemy, boss) > UNDERTAKER_SALVAGE_RANGE) {
+    enemy.mood = 0;
+    return false;
+  }
+  enemy.mood = claimed + 1;
+
+  const toward = normalized(boss.x - enemy.x, boss.y - enemy.y);
+  enemy.facing = { ...toward };
+  if (distTo(enemy, boss) <= UNDERTAKER_SALVAGE_REACH) {
+    if (state.tick >= enemy.rangedReadyAt) {
+      enemy.rangedReadyAt = state.tick + UNDERTAKER_SALVAGE_WINDUP_TICKS + 20;
+      startAction(state, enemy, 'haul', toward, UNDERTAKER_SALVAGE_WINDUP_TICKS, 6, events, boss.id);
+    }
+    return true;
+  }
+  const speed = ARCHETYPES.undertaker.speed * surfaceSpeedMul(state, enemy);
+  moveEntity(state, enemy, toward.x * speed * dt, toward.y * speed * dt);
+  return true;
+};
+
+/**
+ * O COLAPSO DO REATOR, uma vez, abaixo de metade da vida.
+ *
+ * Brasa em volta dele — a fissura que ja existe no jogo, com a regra que ja
+ * existe: nao machuca por pisar, SEGURA o calor da arma. A luta continua
+ * sendo sobre posicao, e o mapa e que fica caro.
+ */
+const diamandisReactorCollapse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = DIAMANDIS_REACTOR_EMBER_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      // ANEL, e nao disco: o centro fica pisavel para a luta nao virar "fique
+      // longe e espere". O reator vaza para os lados, e o jogador ainda pode
+      // escolher entrar.
+      if (d2 > r * r || d2 < (r - 2) * (r - 2)) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_NONE) continue;
+      setSurface(state, i, SURF_EMBER, DIAMANDIS_REACTOR_EMBER_TICKS);
+    }
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+};
+
+/**
  * Gasta a velocidade SOLTA de um inimigo — perambular, impulso de investida,
  * empurrao — e a amortece um pouco.
  *
@@ -1477,10 +3154,29 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     const onFungus = enemy.archetype === 'bishop' && bishopRegen(state, enemy, events);
     if (advanceAction(state, enemy, events)) {
       if (!enemy.alive) continue;
-      // O cavalo e conduzido passo a passo por `horseChargeStride`; todo o resto
-      // gasta aqui o impulso que o `release` deixou — ver `driftByVelocity`.
+      // Cavalo e Diamandis sao conduzidos passo a passo (a recuperacao E a
+      // acao); todo o resto gasta aqui o impulso que o `release` deixou — ver
+      // `driftByVelocity`.
       if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
-      else driftByVelocity(state, enemy, dt, events, false);
+      else if (enemy.archetype === 'diamandis') diamandisDrillStride(state, enemy, events);
+      // O ARCO do Devorador entra aqui pela mesma razao dos dois acima: durante
+      // o voo a ACAO conduz o corpo. Gated no humor porque a outra acao dele —
+      // o telegrafo da decolagem — e justamente o momento em que ele NAO se
+      // mexe, e um passo de voo ali o arrastaria durante o proprio aviso.
+      else if (enemy.archetype === 'white_devourer' && enemy.mood === DEVOURER_AIRBORNE) {
+        devourerLeapStride(state, enemy, dt, events);
+      } else driftByVelocity(state, enemy, dt, events, false);
+      // A varredura do feixe roda DURANTE o telegrafo: e ela que promete a
+      // linha, e o cliente redesenha a cada emissao porque o chefe continua
+      // girando devagar enquanto mede.
+      if (
+        enemy.archetype === 'diamandis' &&
+        enemy.action?.kind === 'beam' &&
+        enemy.action.phase === 'windup' &&
+        state.tick % 4 === 0
+      ) {
+        fireProspectingBeam(state, enemy, enemy.action.direction, false, events);
+      }
       continue;
     }
     if (enemy.stunnedUntil > state.tick) continue;
@@ -1538,6 +3234,13 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       );
       continue;
     }
+    // COVEIRO SUCATEIRO: se ha peca solta para recolher, e isso que ele faz.
+    // Roda antes do fluxo comum porque ele LARGA o jogador para trabalhar —
+    // ver `undertakerSalvageStep`.
+    if (enemy.archetype === 'undertaker' && undertakerSalvageStep(state, enemy, dt, events)) {
+      continue;
+    }
+
     // Espreitadores e Fole tem fluxo proprio, como o Miner: o comportamento
     // deles nao e "perseguir e bater", e o fluxo comum so os deformaria.
     if (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') {
@@ -1548,27 +3251,52 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       bellowsStep(state, enemy, player, dist, dt, events);
       continue;
     }
+    if (enemy.archetype === 'white_devourer') {
+      devourerStep(state, enemy, player, dt, events);
+      continue;
+    }
+    // Os chefes de estrato: cada um opera a alavanca do proprio bioma, e
+    // nenhum deles e "perseguir e bater" — mesmo motivo do Miner e do Fole.
+    if (enemy.archetype === 'sheet_leviathan') {
+      leviathanStep(state, enemy, player, dt, events);
+      continue;
+    }
+    if (enemy.archetype === 'lung_matrix') {
+      lungMatrixStep(state, enemy, player, events);
+      continue;
+    }
+    if (enemy.archetype === 'furnace_heart') {
+      furnaceHeartStep(state, enemy, events);
+      continue;
+    }
+    if (enemy.archetype === 'magnetarch') {
+      magnetarchStep(state, enemy, player, events);
+      continue;
+    }
     // O Escoriaceo usa o fluxo comum; so a postura termica e propria.
     if (enemy.archetype === 'scoriac') settleScoriacHeat(state, enemy);
 
-    // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
-    // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
-    const guardianHunting = enemy.archetype === 'guardian' && state.guardianAwake;
+    // Chefe de camara ACORDADO nunca perde o alvo. Ele e o clima da sala, nao
+    // um bicho que patrulha: sair do raio dele nao pode ser uma forma de
+    // vencer. Vale para o Guardiao e para o Diamandis — os dois guardam o
+    // Nucleo, e os dois tem golpes de alcance MAIOR que o proprio aggro, o que
+    // sem isto os deixava mirando de um raio em que nunca decidem nada.
+    const bossHunting = guardsTheCore(enemy) && state.bossRuntime.awake;
     const aggro =
       player !== null &&
-      (guardianHunting ||
+      (bossHunting ||
         dist <= def.aggroRange + (enemy.elite ? 3 : 0) ||
         state.tick < enemy.alertedUntil);
 
-    if (enemy.archetype === 'guardian' && !state.guardianAwake) {
+    if (guardsTheCore(enemy) && !state.bossRuntime.awake) {
       // O alerta TAMBEM acorda. Sem isto, `aggro` ficava verdadeiro por dano mas
       // o portao logo abaixo devolvia `continue`: o chefe levava tiro de 8 tiles
       // sem se mexer, cada tiro renovando um alerta que nao servia para nada.
       // Era exatamente a morte sem retaliacao que o aggro por dano existe para
       // impedir, preservada no unico inimigo em que ela mais doi.
       if (state.coreTaken || dist < 7 || state.tick < enemy.alertedUntil) {
-        state.guardianAwake = true;
-        events.push({ t: 'guardian_awake' });
+        state.bossRuntime.awake = true;
+        events.push({ t: 'boss_awake' });
       } else continue;
     }
 
@@ -1597,31 +3325,63 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // nao esta escrito em lugar nenhum: esta no fato de o proprio chefe apontar
       // para o que o mantem vivo toda vez que ele se machuca. Queimar a arena e a
       // conclusao que o jogador tira sozinho depois de ve-lo fugir duas vezes.
-      //
-      // Sem fungo ao alcance ele nao tem para onde ir e volta a perseguir: a
-      // arena queimada nao o deixa acuado num canto, so o deixa mortal.
       const retreating =
         enemy.archetype === 'bishop' &&
         !onFungus &&
         enemy.hp < enemy.maxHp * BISHOP_RETREAT_HP_FRACTION;
+      if (enemy.archetype === 'bishop' && !retreating) {
+        // Fora de retirada (inteiro, ou ja de pe no tapete) a janela de busca
+        // desarma. `rangedReadyAt` e o unico relogio ocioso do bispo desde que
+        // ele deixou o cuspe generico — aqui ele guarda o "prazo para pisar em
+        // fungo", no mesmo espirito do "quente ate" do Escoriaceo.
+        enemy.rangedReadyAt = 0;
+      }
       if (retreating) {
+        // A regra antiga era "so ha Supernova se NENHUM fungo aparecer na
+        // varredura de 14 tiles" — e uma unica celula detectavel atras de uma
+        // parede bloqueava o ataque para sempre: ele recuava eternamente para
+        // um tapete que nunca ia alcancar. A janela mede a coisa certa: ele
+        // CONSEGUIU pisar em fungo? `onFungus` desarma (o ramo acima); o prazo
+        // vencido dispara, com refugio a vista ou nao.
+        if (enemy.rangedReadyAt === 0) {
+          enemy.rangedReadyAt = state.tick + BISHOP_NOVA_SEEK_TICKS;
+        }
         const refuge = nearestFungal(state, enemy);
+        if (
+          (refuge === null || state.tick >= enemy.rangedReadyAt) &&
+          state.tick >= enemy.nextActionAt
+        ) {
+          // Perdeu o chao — sem refugio nenhum, ou com a janela vencida sem
+          // ter pisado em fungo. A Supernova replanta o tapete NO RELEASE:
+          // o jogador vive a sequencia como causa e efeito (queimei, ele
+          // fugiu, nao chegou, plantou).
+          enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
+          enemy.rangedReadyAt = 0;
+          startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
+          continue;
+        }
         if (refuge) {
           const flee = normalized(refuge.x + 0.5 - enemy.x, refuge.y + 0.5 - enemy.y);
           dirX = flee.x;
           dirY = flee.y;
-        } else if (state.tick >= enemy.nextActionAt) {
-          // Ferido e SEM refugio: e aqui, e so aqui, que a Supernova sai.
-          //
-          // Nao e mais um golpe no rodizio — e a resposta dele a ter perdido o
-          // chao. O jogador vive a sequencia inteira como causa e efeito: queimei
-          // o tapete, ele fugiu, nao achou nada, e replantou. Se disparasse por
-          // cooldown, o replantio seria um evento que acontece COM o jogador;
-          // assim e um evento que ele provocou.
-          enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
-          startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
-          continue;
         }
+      }
+
+      // A Supernova tambem e a resposta do Bispo a distancia EM LUTA NORMAL —
+      // ele nao cospe gosma; um chefe do chao responde com o chao. Jogador
+      // dentro do raio e recarga pronta: o telegrafo radial de 1,5 s sobe, e
+      // sair do disco e a resposta. Nao dispara em retirada: uma acao no meio
+      // da fuga apagaria o tell (ele pareceria manobrar, nao correr para um
+      // lugar especifico).
+      if (
+        enemy.archetype === 'bishop' &&
+        !retreating &&
+        state.tick >= enemy.nextActionAt &&
+        dist <= BISHOP_NOVA_RADIUS
+      ) {
+        enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
+        startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
+        continue;
       }
 
       // A investida exige LINHA DE VISAO na hora de comecar.
@@ -1682,6 +3442,107 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         continue;
       }
 
+      // DIAMANDIS: tres ferramentas, escolhidas por DISTANCIA — ele nao tem
+      // rodizio, tem uma obra a fazer e usa o instrumento que cabe.
+      //
+      //   longe  -> broca: fixa o rumo e atravessa a arena;
+      //   medio  -> demolicao: marca o chao e implode;
+      //   perto  -> feixe: varre a linha e depois a energiza.
+      //
+      // A ordem da checagem e do mais longe para o mais perto porque as faixas
+      // se sobrepoem de proposito: na borda, quem manda e o golpe que cobre o
+      // espaco maior, e nunca uma escolha que dependa da ordem de leitura.
+      if (enemy.archetype === 'diamandis') {
+        const reactorDown = (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0;
+        const cadence = reactorDown ? DIAMANDIS_REACTOR_CADENCE_SCALE : 1;
+        // A broca NAO exige linha de visao, e e a unica acao telegrafada do
+        // jogo que nao exige. Exigir seria anular a mecanica: ela existe
+        // justamente para a cobertura deixar de valer — o Corcel precisa de
+        // visada porque a investida dele se perde numa parede, e a do
+        // Diamandis a COME. O que a mantem justa continua sendo o 1,8 s
+        // parado antes de sair.
+        if (
+          hasModule(state, BOSS_MODULE_DRILL) &&
+          state.tick >= enemy.nextActionAt &&
+          dist >= DIAMANDIS_DRILL_MIN_RANGE &&
+          dist <= DIAMANDIS_DRILL_MAX_RANGE
+        ) {
+          enemy.nextActionAt = state.tick + Math.round(DIAMANDIS_DRILL_COOLDOWN_TICKS * cadence);
+          startAction(
+            state,
+            enemy,
+            'drill',
+            toward,
+            DIAMANDIS_DRILL_WINDUP_TICKS,
+            DIAMANDIS_DRILL_TICKS,
+            events,
+            player.id,
+          );
+          continue;
+        }
+        if (
+          hasModule(state, BOSS_MODULE_TOWER) &&
+          state.tick >= enemy.rangedReadyAt &&
+          dist >= DIAMANDIS_DEMOLISH_MIN_RANGE &&
+          dist <= DIAMANDIS_DEMOLISH_RANGE
+        ) {
+          enemy.rangedReadyAt = state.tick + Math.round(DIAMANDIS_DEMOLISH_COOLDOWN_TICKS * cadence);
+          startAction(
+            state,
+            enemy,
+            'demolish',
+            toward,
+            DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+            8,
+            events,
+            player.id,
+          );
+          // As marcas nascem AGORA, com a posicao que o alvo tem agora: e o
+          // instante do telegrafo que elas congelam, e sair dali e a resposta.
+          markDemolition(state, enemy, player, state.tick + DIAMANDIS_DEMOLISH_WINDUP_TICKS, events);
+          continue;
+        }
+        // O feixe MORRE no colapso do reator: e o primeiro sistema a cair
+        // quando a alimentacao entra em colapso, e e o que faz a segunda fase
+        // ser outra luta em vez da mesma com numeros piores.
+        if (
+          !reactorDown &&
+          hasModule(state, BOSS_MODULE_SCANNER) &&
+          state.tick >= enemy.contactReadyAt &&
+          dist <= DIAMANDIS_BEAM_LENGTH &&
+          hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
+        ) {
+          enemy.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+          startAction(state, enemy, 'beam', toward, DIAMANDIS_BEAM_WINDUP_TICKS, 10, events, player.id);
+          continue;
+        }
+      }
+
+      // ARQUICANTOR: canta, e a Catedral responde. Sem cristal ao alcance ele
+      // nao tem quem responda — a sala esvaziada E o contra-jogo, entao a
+      // checagem tem de ser real.
+      if (
+        enemy.archetype === 'archcantor' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist <= ARCHCANTOR_PULSE_RADIUS + 1.5 &&
+        archcantorHasNetwork(state, enemy)
+      ) {
+        enemy.rangedReadyAt = state.tick + ARCHCANTOR_COOLDOWN_TICKS;
+        startAction(state, enemy, 'pulse', toward, ARCHCANTOR_WINDUP_TICKS, 10, events, player.id);
+        continue;
+      }
+
+      // RAINHA DA GEADA: refaz o lago e solta os Espectros dele.
+      if (
+        enemy.archetype === 'frost_queen' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist <= FROST_QUEEN_FREEZE_RADIUS + 3
+      ) {
+        enemy.rangedReadyAt = state.tick + FROST_QUEEN_FREEZE_COOLDOWN_TICKS;
+        startAction(state, enemy, 'freeze', toward, FROST_QUEEN_FREEZE_WINDUP_TICKS, 8, events, player.id);
+        continue;
+      }
+
       // Bruiser: arranca a parede e joga.
       //
       // Ele era o unico sem NENHUMA resposta a distancia, a metade da velocidade
@@ -1704,20 +3565,30 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         }
       }
 
-      // Bispo em fuga NAO para para cuspir. Uma acao a distancia no meio da
-      // retirada apagaria o tell: ele pareceria estar manobrando, e nao correndo
-      // para um lugar especifico.
+      // O ramo de projetil generico. So Spitter (cuspe) e Guardiao (Salva
+      // Litoclasta) passam por aqui: o Bispo saiu de vez — a resposta a
+      // distancia dele e a Supernova, decidida la em cima.
       if (
-        (enemy.archetype === 'spitter' ||
-          enemy.archetype === 'guardian' ||
-          (enemy.archetype === 'bishop' && !retreating)) &&
+        (enemy.archetype === 'spitter' || enemy.archetype === 'guardian') &&
         state.tick >= enemy.rangedReadyAt
       ) {
         const rangedDistance = enemy.archetype === 'spitter' ? 5.5 : 6.5;
         if (dist <= rangedDistance) {
           const windup = enemy.archetype === 'spitter' ? 6 : 10;
-          enemy.rangedReadyAt = state.tick + (enemy.archetype === 'spitter' ? 56 : 44);
+          enemy.rangedReadyAt =
+            state.tick + (enemy.archetype === 'spitter' ? 56 : GUARDIAN_SALVO_COOLDOWN_TICKS);
           startAction(state, enemy, 'ranged', toward, windup, 5, events, player.id);
+          if (enemy.archetype === 'guardian') {
+            // `mood` conta as salvas — o unico campo livre dele, no mesmo
+            // espirito do relogio emprestado do Escoriaceo. Na segunda fase
+            // (abaixo de 50%), salvas impares viram RAJADA: leque para negar
+            // espaco, rajada para perseguir movimento, alternando.
+            enemy.mood = (enemy.mood ?? 0) + 1;
+            const enraged = enemy.hp < enemy.maxHp * 0.5;
+            if (enraged && enemy.mood % 2 === 1 && enemy.action) {
+              enemy.action.salvo = GUARDIAN_VOLLEY_SHOTS - 1;
+            }
+          }
           continue;
         }
       }
@@ -1842,12 +3713,25 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     }
   }
 
+  // O DIAMANDIS tem a propria fase de uma vez: o reator vaza abaixo da metade.
+  const diamandis = state.enemies.find((e) => e.archetype === 'diamandis');
+  if (diamandis && diamandis.alive) diamandisShedModules(state, diamandis, events);
+  if (
+    diamandis &&
+    diamandis.alive &&
+    diamandis.hp < diamandis.maxHp * DIAMANDIS_REACTOR_HP_FRACTION &&
+    (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) === 0
+  ) {
+    state.bossRuntime.phasesFired |= BOSS_PHASE_REACTOR;
+    diamandisReactorCollapse(state, diamandis, events);
+  }
+
   const guardian = state.enemies.find((e) => e.archetype === 'guardian');
   if (!guardian || !guardian.alive) return;
   const enraged = guardian.hp < guardian.maxHp * 0.5;
 
-  if (enraged && !state.guardianSummoned) {
-    state.guardianSummoned = true;
+  if (enraged && (state.bossRuntime.phasesFired & BOSS_PHASE_SUMMON) === 0) {
+    state.bossRuntime.phasesFired |= BOSS_PHASE_SUMMON;
     // Em anel, e nao dois dos lados: saindo todos da mesma linha, o jogador
     // resolvia os quatro com um recuo so.
     const around = [
@@ -1868,7 +3752,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
   // pretendido: trancaria o chefe e libertaria quem devia estar preso. Por isso
   // e uma tentativa por tick enquanto ele estiver enfurecido, e nao um evento
   // unico no instante em que a vida cruza a metade.
-  if (enraged && !state.arenaClosed) {
+  if (enraged && !state.bossRuntime.arenaClosed) {
     const near = state.players.find(
       (p) =>
         p.alive &&
@@ -1884,7 +3768,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         GUARDIAN_ARENA_EXITS,
         events
       );
-      if (placed > 0) state.arenaClosed = true;
+      if (placed > 0) state.bossRuntime.arenaClosed = true;
     }
   }
 };

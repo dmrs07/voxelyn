@@ -27,14 +27,21 @@ import {
   SURF_GAS,
   SURF_NONE,
   SURF_ICE,
+  SURF_GLASS,
   SURF_SCORCHED,
+  SURF_SILT,
   SURF_SPORES,
   SURF_WATER,
   VENT_BASE_INTERVAL_TICKS,
   VENT_CYCLE_TICKS,
 } from './constants.js';
 import { markDiscovery } from './stats.js';
-import { DISCOVERY_FIRE_SPREAD, DISCOVERY_FRAGILE_BREACH, DISCOVERY_GAS_IGNITION } from './types.js';
+import {
+  DISCOVERY_FIRE_SPREAD,
+  DISCOVERY_FRAGILE_BREACH,
+  DISCOVERY_GAS_IGNITION,
+  DISCOVERY_SILICA_VITRIFIED,
+} from './types.js';
 import { chunkOf } from './worldgen.js';
 import type { EffectOrigin, Entity, SemanticEvent, SurvivalState } from './types.js';
 
@@ -146,6 +153,17 @@ export const igniteCell = (state: SurvivalState, i: number, events: SemanticEven
     // Calor nao acende gelo: derrete. A agua que sobra e condutiva e vai
     // recongelar — quem derreteu abriu uma janela, nao editou o mapa.
     meltIce(state, i);
+    return false;
+  }
+  if (surf === SURF_SILT) {
+    // VITRIFICACAO. Calor na silica solta nao acende nada: FUNDE. O que sobra e
+    // vidro, e vidro e chao firme — o Devorador Branco nao sobe por ele.
+    //
+    // E o unico contra-jogo do encontro, e ele e territorial em vez de
+    // reflexivo: nao se trata de acertar o verme, e de decidir onde ele NAO
+    // pode sair. O rastro dele e a propria materia-prima disso.
+    setSurface(state, i, SURF_GLASS, 0);
+    markDiscovery(state.stats, DISCOVERY_SILICA_VITRIFIED);
     return false;
   }
   if (surf === SURF_SCORCHED && state.stratum === 'furnace') {
@@ -594,7 +612,7 @@ export const closeArena = (
     }
   }
   if (ring.length === 0) return 0;
-  state.arenaBarrierCells = [];
+  state.bossRuntime.arenaBarrierCells = [];
 
   // Saidas sorteadas com a RNG da simulacao, e nao com `Math.random`: as duas
   // maquinas de uma sala de co-op precisam abrir a parede nos mesmos pontos.
@@ -610,7 +628,7 @@ export const closeArena = (
 
   for (const i of ring) {
     state.solid[i] = doors.has(i) ? SOLID_FRAGILE : SOLID_ROCK;
-    state.arenaBarrierCells.push(i);
+    state.bossRuntime.arenaBarrierCells.push(i);
     markDirty(state, i % w, Math.floor(i / w));
   }
   events.push({ t: 'message', key: 'sim.arenaSealed' });
@@ -621,7 +639,7 @@ export const closeArena = (
 export const openArena = (state: SurvivalState, events: SemanticEvent[]): number => {
   const w = W(state);
   let removed = 0;
-  for (const i of state.arenaBarrierCells) {
+  for (const i of state.bossRuntime.arenaBarrierCells) {
     const solid = state.solid[i];
     if (solid === SOLID_NONE) continue;
     state.solid[i] = SOLID_NONE;
@@ -631,8 +649,8 @@ export const openArena = (state: SurvivalState, events: SemanticEvent[]): number
     events.push({ t: 'break', x: x + 0.5, y: y + 0.5, solid });
     removed++;
   }
-  state.arenaBarrierCells = [];
-  state.arenaClosed = false;
+  state.bossRuntime.arenaBarrierCells = [];
+  state.bossRuntime.arenaClosed = false;
   if (removed > 0) events.push({ t: 'message', key: 'sim.siegeCollapsed' });
   return removed;
 };

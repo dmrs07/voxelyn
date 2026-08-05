@@ -20,7 +20,9 @@ import {
   SURF_WATER,
   SURF_EMBER,
   SURF_ICE,
+  SURF_GLASS,
   SURF_RAIL,
+  SURF_SILT,
   SURF_RAIL_V,
   CANARY_DEAD_AT,
   LURKER_HIDDEN,
@@ -60,6 +62,19 @@ import { HEAT_WARN_AT } from './audio/ambience';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
+import {
+  LEAP_PEAK_PX,
+  leapHeight,
+  leapProgress,
+  leapShadowAlpha,
+  leapShadowScale,
+} from './leap-arc';
+import {
+  applyBossModuleMark,
+  bossModuleNameKey,
+  bossModulePresentation,
+  type BossModuleMark,
+} from './boss-module-presentation';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
@@ -157,7 +172,7 @@ export const terrainKindIndexFor = (solid: number, stratum: StratumId): number =
  * acima: a cadeia de ifs que existia aqui tratava tres dos seis casos e deixava
  * os outros caindo no ramo da rocha nua sem que nada acusasse.
  */
-const SURFACE_KIND_INDEX: Record<number, number> = {
+export const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_NONE]: 0,
   [SURF_FUNGAL]: 1,
   [SURF_BIOFLUID]: 2,
@@ -171,6 +186,8 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_ICE]: 10,
   [SURF_RAIL]: 11,
   [SURF_RAIL_V]: 12,
+  [SURF_SILT]: 13,
+  [SURF_GLASS]: 14,
 };
 
 /**
@@ -179,7 +196,7 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
  * Nao e a arte: e o minimo para o jogador nao pisar num gas invisivel enquanto a
  * imagem nao chega. A arte de verdade e o voxel do atlas.
  */
-const SURFACE_FALLBACK: Record<number, string> = {
+export const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_FUNGAL]: '#1f3d33',
   [SURF_BIOFLUID]: '#2f6b4f',
   // Amarelo-esverdeado, e da paleta mestra: o oliva anterior nao existia nela e
@@ -201,6 +218,12 @@ const SURFACE_FALLBACK: Record<number, string> = {
   // porque pisar nela arma a armadilha.
   [SURF_RAIL]: '#6e4a33',
   [SURF_RAIL_V]: '#6e4a33',
+  // Silica solta: areia palida. Tem de ser LIDA de longe — e o rastro do
+  // Devorador, ou seja, o aviso de por onde ele anda por baixo.
+  [SURF_SILT]: '#c9b48c',
+  // Vidro: quase branco, frio. A leitura pretendida e "isto aqui esta selado",
+  // e o contraste com a areia e o que conta a historia sozinho.
+  [SURF_GLASS]: '#dfe9f2',
 };
 
 /**
@@ -877,6 +900,14 @@ export class SurvivalRenderer {
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
   private readonly modulePulseUntil = new Map<ModuleId, number>();
+  /**
+   * Peças do Diamandis marcadas no chao, por indice de peça.
+   *
+   * Indexado pela PEÇA e nao pela posicao: a mesma broca pode soltar, ser
+   * arrancada, cair noutro canto e ser arrancada de novo, e cada transicao move
+   * a marca em vez de acrescentar mais uma. Ver applyBossModuleMark.
+   */
+  private readonly bossModuleMarks = new Map<number, BossModuleMark>();
   private safeArea: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
   private pendingRewardOrigin: { slot: number; x: number; y: number } | null = null;
   private rewardFlight: {
@@ -1028,6 +1059,7 @@ export class SurvivalRenderer {
     // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
     this.lurkerTrails.clear();
+    this.bossModuleMarks.clear();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
     // `trackSector` compara NUMEROS e sairia cedo, deixando o beacon de SV-01
@@ -1229,10 +1261,23 @@ export class SurvivalRenderer {
             until: nowMs + 3400,
           });
           break;
-        case 'guardian_awake':
+        case 'boss_awake':
           this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
           this.shake = { power: 6, until: nowMs + 500 };
           break;
+        case 'boss_module': {
+          // Um evento, quatro leituras. A tabela em boss-module-presentation.ts
+          // decide cor, frase, clarao e se a peça fica marcada no chao — e a
+          // marca so existe quando ha mesmo alguma coisa naquele ponto.
+          const bm = bossModulePresentation(ev.state);
+          this.messages.push({
+            text: t(bm.toastKey, { module: t(bossModuleNameKey(ev.module)) }),
+            until: nowMs + bm.toastMs,
+          });
+          this.addFlash(ev.x, ev.y, bm.flashRadius, bm.flashPower, nowMs, bm.flashMs);
+          applyBossModuleMark(this.bossModuleMarks, ev, nowMs);
+          break;
+        }
         case 'module_charge_consumed':
           this.modulePulseUntil.set(ev.module, nowMs + 260);
           break;
@@ -1442,8 +1487,16 @@ export class SurvivalRenderer {
         // esta na frente delas — celula de gas encostada em parede tinha o
         // penacho engolido por ela. O chao dessas celulas sai como rocha nua e o
         // gas entra na fila ordenada, mais abaixo.
-        const surfKind = surf === SURF_GAS ? 0 : (SURFACE_KIND_INDEX[surf] ?? 0);
-        if (!this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
+        // Superficie SEM tile no atlas cai na cor de recuo, e nao no tile 0.
+        //
+        // O `?? 0` de antes desenhava CHAO LIMPO para toda materia que o atlas
+        // ainda nao conhecia — e `draw` devolve true, entao a cor de recuo
+        // nunca chegava a rodar. Uma materia nova ficava literalmente
+        // invisivel, que e o pior defeito possivel num jogo em que o chao e a
+        // mecanica: a silica solta do Devorador e o aviso de por onde ele anda,
+        // e o vidro e a prova de que aquele pedaco esta negado a ele.
+        const surfKind = surf === SURF_GAS ? 0 : SURFACE_KIND_INDEX[surf];
+        if (surfKind === undefined || !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
         }
         const ambientScale = this.quality.maxFx / PRESETS.high.maxFx;
@@ -1744,8 +1797,8 @@ export class SurvivalRenderer {
     }
 
     // sombra de contato + barra de vida, comuns aos caminhos sprite e voxel
-    const drawShadow = (sx: number, sy: number, size: number): void => {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    const drawShadow = (sx: number, sy: number, size: number, alpha = 0.45): void => {
+      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
       ctx.beginPath();
       ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1776,6 +1829,18 @@ export class SurvivalRenderer {
       items.push({
         depth: offer.x + offer.y,
         draw: () => this.drawWellOffer(offer, osx, osy, z, spriteZoom, nowMs, reachable),
+      });
+    }
+
+    // As peças do Diamandis caidas no chao. Entram na mesma fila ordenada pela
+    // mesma razao dos Ecos: elas estao NO mundo, e uma marca desenhada por cima
+    // da parede que a esconde mentiria sobre haver caminho ate ela.
+    for (const mark of this.bossModuleMarks.values()) {
+      const [msx, msy] = toScreen(mark.x, mark.y);
+      if (msx < -80 || msx > vw + 80 || msy < -100 || msy > vh + 80) continue;
+      items.push({
+        depth: mark.x + mark.y,
+        draw: () => this.drawBossModuleMark(mark, msx, msy, z, nowMs),
       });
     }
 
@@ -1818,6 +1883,7 @@ export class SurvivalRenderer {
       // Mundo novo, lamina nova: rastros do setor anterior morreriam como
       // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
       this.lurkerTrails.clear();
+    this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -1927,6 +1993,15 @@ export class SurvivalRenderer {
         draw: () => {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
+          // O ARCO do Devorador. A simulacao nao tem altura — nao ha colisao em
+          // z — entao ela viaja como TEMPO, no vao da acao de salto, e vira
+          // pixel aqui. `sy` continua sendo o chao (e onde a sombra e a
+          // profundidade da fila moram); so o corpo sobe.
+          const leap =
+            enemy.action?.kind === 'leap'
+              ? leapHeight(leapProgress(state.tick, enemy.action.startedAt, enemy.action.releaseAt))
+              : 0;
+          const bodyY = sy - leap * LEAP_PEAK_PX * z;
           if (lurkerHidden) {
             drawLurkerDisturbance(
               ctx,
@@ -1943,7 +2018,7 @@ export class SurvivalRenderer {
             }
             return;
           }
-          drawShadow(sx, sy, size);
+          drawShadow(sx, sy, size * leapShadowScale(leap), leapShadowAlpha(leap));
           const drew = this.sprites.drawEntity(
             ctx,
             enemy.archetype,
@@ -1952,7 +2027,7 @@ export class SurvivalRenderer {
             presented.facingY,
             presented.elapsedMs,
             sx,
-            sy,
+            bodyY,
             spriteZoom,
             // Um sheet de frames fixos nao sabe o humor da entidade, e o
             // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
@@ -1968,7 +2043,7 @@ export class SurvivalRenderer {
           if (!drew) {
             drawVoxelEntity(ctx, {
               sx,
-              sy,
+              sy: bodyY,
               z,
               radius: enemy.radius,
               brightness: b,
@@ -1992,16 +2067,19 @@ export class SurvivalRenderer {
             });
           }
           if (enemy.stunnedUntil > state.tick) {
-            drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
+            drawStunIndicator(ctx, sx, bodyY, size, z, enemy.id, state.tick);
           }
           if (enemy.elite && drew) {
+            // O anel de elite fica no CHAO com a sombra, e nao com o corpo: ele
+            // marca a celula que a criatura ocupa, e um anel subindo junto com
+            // um salto marcaria o ar.
             ctx.strokeStyle = PAL.fire;
             ctx.lineWidth = z;
             ctx.beginPath();
             ctx.ellipse(sx, sy, size * 1.05, size * 0.55, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
-          drawHealthBar(sx, sy - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+          drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
         },
       });
     }
@@ -2821,6 +2899,42 @@ export class SurvivalRenderer {
    * fog of war revela luzes, não silhuetas" protege informação sobre o mundo —
    * uma oferta que o jogo está fazendo ao jogador não é informação sobre o mundo.
    */
+  /**
+   * Uma peça do chefe caida no chao: anel pulsando e um bloco pequeno em cima.
+   *
+   * Deliberadamente MENOR e mais discreto que a oferta do Poco. As duas coisas
+   * marcam "ha algo aqui para pegar", mas a do Poco e uma escolha de build que
+   * para a luta, e esta e uma peça de sucata no meio dela. Igualar as duas
+   * ensinaria o jogador a parar no meio do combate do Diamandis.
+   */
+  private drawBossModuleMark(
+    mark: BossModuleMark,
+    sx: number,
+    sy: number,
+    z: number,
+    nowMs: number,
+  ): void {
+    const ctx = this.ctx;
+    // A fase vem da POSICAO, e nao do instante em que a marca nasceu: duas
+    // peças caidas lado a lado pulsando em unissono lem como interface, e nao
+    // como duas coisas separadas no chao.
+    const breath = 0.5 + Math.sin(nowMs * 0.006 + mark.x + mark.y) * 0.3;
+    ctx.save();
+    ctx.globalAlpha = 0.3 + breath * 0.4;
+    ctx.strokeStyle = mark.color;
+    ctx.lineWidth = Math.max(1, z * 0.6);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, (6 + breath * 2) * z, (3 + breath) * z, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.75 + breath * 0.25;
+    ctx.fillStyle = mark.color;
+    ctx.fillRect(sx - 2 * z, sy - 5 * z, Math.max(2, 4 * z), Math.max(2, 4 * z));
+    ctx.restore();
+  }
+
   private drawWellOffer(
     offer: { ability: AbilityId; x: number; y: number },
     sx: number,

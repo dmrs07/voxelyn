@@ -3,6 +3,7 @@ import {
   SOLID_NONE,
   SOLID_ROCK,
   createRun,
+  emptyStats,
   type DamageCause,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -123,6 +124,46 @@ describe('cápsula compartilhada', () => {
     expect(parseDeathEchoCapsule({ ...good, id: 'x'.repeat(200) })).toBeNull();
     expect(parseDeathEchoCapsule({ ...good, progressQ: 999 })).toBeNull();
     expect(parseDeathEchoCapsule(null)).toBeNull();
+  });
+
+  it('aceita TODO arquetipo que a simulacao tem, inclusive os chefes novos', () => {
+    // A lista de arquetipos aqui era escrita a mao e envelheceu: oito chefes
+    // entraram no jogo e nenhum entrou nela, entao toda morte para o Diamandis,
+    // o Devorador ou os seis de estrato era rejeitada na validacao — e o Eco
+    // daquela morte sumia calado, justamente nas mortes que mais ensinam.
+    //
+    // O teste cobra a tabela INTEIRA da simulacao, e nao uma amostra: e o que
+    // faz o bicho de amanha nascer coberto.
+    const state = createRun({ seed: 7 });
+    const good = capsuleAt(state, 'wire-ok');
+    for (const archetype of Object.keys(emptyStats().kills)) {
+      const capsule = parseDeathEchoCapsule({
+        ...good,
+        cause: { kind: 'enemy_contact', archetype, elite: false },
+      });
+      expect(capsule, `${archetype} rejeitado`).not.toBeNull();
+    }
+  });
+
+  it('a Salva Litoclasta do Guardiao produz capsula valida; a gosma dele, nao', () => {
+    // O Guardiao atira PEDRA desde a Salva Litoclasta. A matriz dizia `spit` e
+    // estava errada nos dois sentidos: aceitava o que ele nao dispara e
+    // rejeitava o unico que ele dispara.
+    const state = createRun({ seed: 7 });
+    const good = capsuleAt(state, 'wire-ok');
+    const cause = (archetype: string, projectile: string) => ({
+      ...good,
+      cause: { kind: 'enemy_projectile', archetype, elite: false, projectile },
+    });
+    expect(parseDeathEchoCapsule(cause('guardian', 'rock'))).not.toBeNull();
+    expect(parseDeathEchoCapsule(cause('guardian', 'spit'))).toBeNull();
+    // O Bispo nao tem projetil nenhum: a resposta a distancia dele e a
+    // Supernova, que e area e nao carrega `projectile`.
+    expect(parseDeathEchoCapsule(cause('bishop', 'spit'))).toBeNull();
+    // E o que continua valendo, para o teste nao passar por afrouxamento.
+    expect(parseDeathEchoCapsule(cause('spitter', 'spit'))).not.toBeNull();
+    expect(parseDeathEchoCapsule(cause('bruiser', 'rock'))).not.toBeNull();
+    expect(parseDeathEchoCapsule(cause('miner', 'cart'))).not.toBeNull();
   });
 
   it('nunca ocupa a mesma célula com dois corpos', () => {

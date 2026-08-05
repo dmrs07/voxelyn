@@ -39,7 +39,8 @@ export type EnemyArchetype =
   | 'bomber'
   | 'guardian'
   /**
-   * Bispo: chefe do setor 2. Regenera em pe sobre chao fungico, e o contra e
+   * Bispo: o chefe de qualquer mapa profundamente ocupado pelo micelio (ver
+   * bossForBiome em bosses.ts). Regenera em pe sobre chao fungico, e o contra e
    * queimar a arena. A identidade dele nao e o ataque, e o TERRENO — ele
    * transforma a luta num problema de material, que e a identidade do jogo.
    */
@@ -84,7 +85,34 @@ export type EnemyArchetype =
    * do braço e prensa. E o unico corpo do bestiario que tira do jogador a
    * posicao — a variavel de que todo o resto do combate depende.
    */
-  | 'undertaker';
+  | 'undertaker'
+  /**
+   * DIAMANDIS: o chefe da Cicatriz Aurix. Nao e fauna e nao e do Veio — e a
+   * maior escavadeira que a companhia construiu, abandonada porque recupera-la
+   * custava mais que o programa inteiro, ainda executando uma escavacao que
+   * nao consta dos mapas. As tres armas dele sao FERRAMENTAS: broca, cargas de
+   * implosao e um feixe de prospeccao. Ele nao esta lutando, esta trabalhando.
+   */
+  | 'diamandis'
+  /**
+   * DEVORADOR BRANCO: o chefe dos Sumidouros de Silica. Mergulha, deixa faixa
+   * de silica solta por onde passa, preve onde o jogador vai estar e emerge
+   * dali. Nao ha o que perseguir — o que se decide contra ele e ONDE ele pode
+   * sair, e a resposta e vitrificar o chao com calor.
+   */
+  | 'white_devourer'
+  /**
+   * Os seis chefes de estrato. Cada um opera, em escala de chefe, a alavanca
+   * que a propria geologia ja tem: cristal que descarrega, agua que conduz,
+   * gas que ocupa espaco, brasa que aquece, gelo que derrete, minerio que
+   * atrai. Ver constants.ts, secao "OS CHEFES DE ESTRATO".
+   */
+  | 'archcantor'
+  | 'sheet_leviathan'
+  | 'lung_matrix'
+  | 'furnace_heart'
+  | 'frost_queen'
+  | 'magnetarch';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -213,6 +241,89 @@ export const DISCOVERY_ORE_QUOTA_RETIRED = 1 << 12;
  * aprende-se perdendo trinta lascas a dois setores da plataforma.
  */
 export const DISCOVERY_CARGO_LOST = 1 << 13;
+/**
+ * VIU a cura do Bispo acontecer — perto o bastante e com a linha livre.
+ *
+ * Nao basta ele ter se curado: o documento que este bit abre e uma MEDICAO de
+ * campo, e medir exige ter estado la. Um bit aceso por uma cura do outro lado
+ * do mapa entregaria o relatorio a quem nunca viu o chao devolver vida a nada.
+ */
+export const DISCOVERY_BISHOP_HEALED = 1 << 14;
+/**
+ * Estava DENTRO do disco da Supernova quando ela abriu — e continuou de pe.
+ *
+ * O par natural do bit acima, e o unico jeito honesto de destravar o documento
+ * que diz que a emissao nao persegue ninguem: quem leu isso pagou para ler.
+ */
+export const DISCOVERY_BISHOP_NOVA_SURVIVED = 1 << 15;
+/**
+ * VIU a broca do Diamandis abrir um corredor pela rocha.
+ *
+ * E o unico fato do encontro que ensina o que ele E: uma maquina cujo golpe
+ * nao mira em voce — ele reescreve a sala. O documento que este bit abre e o
+ * relatorio de engenharia sobre o raio minimo de operacao, e ele so faz
+ * sentido para quem viu a resposta da companhia acontecer na propria parede.
+ */
+export const DISCOVERY_DIAMANDIS_CORRIDOR = 1 << 16;
+/**
+ * VIU um Coveiro arrancar um modulo da carcaça do Diamandis.
+ *
+ * E o instante em que o jogador descobre que aquelas unidades nao vieram COM o
+ * chefe — vieram antes dele, e continuam executando uma ordem de recolhimento
+ * que ninguem cancelou. O que ele faz com essa informacao (deixar trabalhar ou
+ * interceptar) e a escolha do encontro.
+ */
+export const DISCOVERY_DIAMANDIS_MODULE = 1 << 17;
+/**
+ * VITRIFICOU silica solta — transformou o rastro do Devorador em vidro.
+ *
+ * O bit nao exige ter entendido para que serve: exige ter FEITO. E a ordem
+ * certa, porque a compreensao vem de ver o verme falhar em subir ali depois.
+ */
+export const DISCOVERY_SILICA_VITRIFIED = 1 << 18;
+
+/**
+ * As seis Descobertas dos chefes de estrato.
+ *
+ * Cada uma marca o instante em que o jogador ENTENDE a alavanca daquele bioma
+ * — nao "matou o chefe", e sim "descobriu por que ele e daquele lugar". Sao os
+ * bits que destravam o miolo do arco documental de cada um, e a razao de eles
+ * nao serem marcos de abate e a mesma de sempre: um chefe aparece uma vez por
+ * run, e uma grade de repeticao transformaria a revelacao em farm.
+ */
+/** Bateu no Arquicantor com a Catedral em silencio: a rede vazia o expoe. */
+export const DISCOVERY_CATHEDRAL_SILENCED = 1 << 19;
+/** Atordoou o Leviata eletrificando a lamina em que ele nada. */
+export const DISCOVERY_LEVIATHAN_SHOCKED = 1 << 20;
+/** Acendeu a expiracao do Pulmao-Matriz e queimou a coluna de volta. */
+export const DISCOVERY_LUNG_IGNITED = 1 << 21;
+/** Acertou o Coracao da Fornalha na janela fria — a unica em que ele abre. */
+export const DISCOVERY_FURNACE_COOLED = 1 << 22;
+/** Derreteu o lago da Rainha e bateu nela sem a couraça do estrato. */
+export const DISCOVERY_QUEEN_THAWED = 1 << 23;
+/** Ficou na FAIXA do Magnetarca: dentro do campo e fora das duas bordas. */
+export const DISCOVERY_MAGNET_BANDED = 1 << 24;
+
+/**
+ * Todo bit de descoberta que existe, num numero so.
+ *
+ * Existe porque a lista cresce e quem consome ela de fora nao percebe. A
+ * telemetria do servidor prendia `discoveries` em `0xffff` — um teto escrito
+ * quando havia dezesseis bits — e a partir do bit 16 toda run com uma
+ * descoberta de chefe era GRAVADA COMO 65535: o bit real se perdia e todos os
+ * bits abaixo dele apareciam ligados, fabricando dezesseis descobertas que
+ * nunca aconteceram. O defeito nao dava erro em lugar nenhum; so envenenava a
+ * analise.
+ *
+ * Prender por faixa era o erro de fundo, e nao o numero: um valor acima do teto
+ * SATURA, e saturar uma bitmask inventa bits. Quem recebe isto de fora deve
+ * MASCARAR (`& DISCOVERY_MASK`), que descarta o que nao reconhece em vez de
+ * mentir sobre o que reconhece.
+ *
+ * O teste `descobertas.test.ts` confere que todo `DISCOVERY_*` exportado cabe
+ * aqui dentro — e o que faz o bit 25 nascer coberto em vez de nascer perdido.
+ */
+export const DISCOVERY_MASK = (1 << 25) - 1;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -245,6 +356,27 @@ export type EntityActionKind =
   | 'slam'
   | 'hurl'
   | 'pulse'
+  /** Broca de avanco do Diamandis: rumo fixo, atravessa a arena abrindo vao. */
+  | 'drill'
+  /** Salva de demolicao: tres cargas caem nas areas marcadas no windup. */
+  | 'demolish'
+  /** Feixe de prospeccao: varredura inofensiva, depois potencia na mesma linha. */
+  | 'beam'
+  /** Emergencia do Devorador: o chao racha no ponto marcado, e entao ele sobe. */
+  | 'erupt'
+  /**
+   * O ARCO do Devorador, da decolagem ate a queda.
+   *
+   * Nao tem `release`: nenhum ramo de `releaseAction` responde por ela. Ela
+   * existe para dois trabalhos, e os dois sao de tempo. Na simulacao, e o que
+   * poe o voo no ramo em que a ACAO conduz o corpo passo a passo (o mesmo do
+   * Corcel e da broca), em vez de no fluxo de IA. No cliente, `startedAt` e
+   * `releaseAt` dao o vao do voo — e so com ele da para desenhar a parabola,
+   * porque a ALTURA nao existe na simulacao e nao viaja no snapshot.
+   */
+  | 'leap'
+  /** Congelamento da Rainha: o lago se refaz e os Espectros saem dele. */
+  | 'freeze'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
   | 'haul'
   /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
@@ -258,6 +390,14 @@ export type EntityAction = {
   endsAt: number;
   direction: Vec2;
   target?: number;
+  /**
+   * Disparos AINDA POR SAIR de uma rajada (Salva Litoclasta do Guardiao em
+   * segunda fase). Presente = a acao re-arma o proprio release: cada disparo
+   * corrige a mira e empurra `releaseAt` pelo intervalo da rajada, entao o
+   * hash (que mistura os relogios da acao) acompanha sozinho. Ausente = acao
+   * de release unico, como todas as outras.
+   */
+  salvo?: number;
 };
 
 export type Entity = {
@@ -300,6 +440,109 @@ export type Entity = {
   mood?: number;
 };
 
+/**
+ * O estado vivo do encontro de chefe do setor.
+ *
+ * Existia como seis campos soltos no estado, todos com prefixo `guardian`,
+ * porque durante muito tempo so havia um chefe com estado proprio. Com
+ * `bossForBiome` a camara final passou a poder ser de qualquer um da tabela —
+ * e `state.guardianPath` sendo consumido pelo Bispo era um nome mentindo.
+ *
+ * Um objeto so, e nao um por chefe: a run tem UM encontro de chefe (o setor
+ * final). O dia em que tiver dois, isto vira um mapa por `entityId` e todo
+ * consumidor ja esta lendo de um lugar so.
+ */
+export type BossRuntime = {
+  /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
+  awake: boolean;
+  /**
+   * Fases de UMA VEZ ja disparadas, por bit (ver `BOSS_PHASE_*`).
+   *
+   * Bitmask e nao um booleano por fase: o Guardiao tem uma (a matilha), o
+   * Diamandis tera o colapso do reator, e cada chefe novo somaria mais um
+   * campo ao estado autoritativo — que e hasheado e reenviado a cada resync.
+   */
+  phasesFired: number;
+  /**
+   * Rota corrente do chefe, em indices de celula, e o tick em que foi
+   * calculada. DERIVADO: da para recalcular da grade a qualquer momento, entao
+   * nao entra no hash nem viaja em snapshot.
+   */
+  path: number[];
+  pathAt: number;
+  /**
+   * O cerco ja fechou? Separado das fases porque ele pode ter de ESPERAR o
+   * jogador entrar no raio, enquanto os invocados saem na hora.
+   */
+  arenaClosed: boolean;
+  /** Celulas vazias convertidas pelo cerco; removidas quando o chefe morre. */
+  arenaBarrierCells: number[];
+  /**
+   * Onde as cargas da Salva de Demolicao vao cair, marcadas no INICIO do
+   * telegrafo.
+   *
+   * Vive aqui e nao na acao porque `EntityAction` carrega UMA direcao, e a
+   * salva sao tres pontos — e porque os pontos nao podem se corrigir depois de
+   * marcados: sair do circulo e a resposta inteira do golpe, e ela so existe
+   * se a marca ficar onde nasceu. Entra no hash: duas simulacoes que discordem
+   * de onde a carga cai divergem no estrago.
+   */
+  blastCells: number[];
+  /**
+   * Modulos do Diamandis que ja se SOLTARAM da carcaca (bitmask por indice).
+   *
+   * Solto nao e perdido: a arma daquele modulo continua funcionando enquanto
+   * ele estiver ali pendurado. O que "solto" muda e que um Coveiro passa a
+   * conseguir engatar o eletroima nele.
+   */
+  modulesExposed: number;
+  /**
+   * Modulos ARRANCADOS (bitmask). Estes o chefe perdeu de vez: a arma
+   * correspondente para de existir na luta.
+   *
+   * Separado de `modulesExposed` porque as duas coisas respondem a perguntas
+   * diferentes — "da para arrancar?" e "ele ainda tem essa arma?" — e um unico
+   * campo com tres estados obrigaria todo leitor a saber a ordem deles.
+   */
+  modulesLost: number;
+  /**
+   * Onde o salto do Devorador vai CAIR, escolhido na decolagem.
+   *
+   * Vive aqui e nao na acao pelo mesmo motivo das cargas de demolicao: o alvo
+   * nao pode se corrigir no meio do voo. Sair de baixo da queda e a resposta
+   * inteira do golpe, e ela so existe se o ponto ficar onde nasceu — um arco
+   * que persegue seria dano sem contra-jogo.
+   *
+   * Entra no hash: duas simulacoes que discordem de onde ele cai divergem na
+   * cratera, no dano e na posicao do chefe pelo resto da luta.
+   */
+  leapToX: number;
+  leapToY: number;
+  /**
+   * Saltos que faltam na rajada atual do Devorador.
+   *
+   * O ciclo dele e uma RAJADA e nao um golpe: tres arcos mirados em sequencia e
+   * so entao a janela. Zero (ou menos) significa "comece uma rajada nova" — a
+   * contagem se recompoe sozinha em vez de depender de quem inicializou o
+   * chefe, que e o que evita um Devorador nascido pelo caminho errado ir direto
+   * para a janela sem nunca ter atacado.
+   */
+  leapsLeft: number;
+};
+
+/** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
+export const BOSS_PHASE_SUMMON = 1 << 0;
+/** O colapso do reator do Diamandis, abaixo de metade da vida. */
+export const BOSS_PHASE_REACTOR = 1 << 1;
+
+/**
+ * Os modulos do Diamandis, na ordem em que se soltam. Cada um alimenta UMA
+ * arma: sem o modulo, a arma nao existe mais na luta.
+ */
+export const BOSS_MODULE_DRILL = 0;
+export const BOSS_MODULE_TOWER = 1;
+export const BOSS_MODULE_SCANNER = 2;
+
 /** Postura do Miner. Ele nasce PASSIVO; o calor da sua arma decide o resto. */
 export const MINER_MOOD_PASSIVE = 0;
 export const MINER_MOOD_FLEEING = 1;
@@ -313,6 +556,55 @@ export const MINER_MOOD_ENRAGED = 2;
  */
 export const LURKER_HIDDEN = 0;
 export const LURKER_EXPOSED = 1;
+
+/**
+ * Postura do Devorador Branco: por baixo da silica ou exposto na superficie.
+ * Viaja no snapshot porque o cliente desenha coisas completamente diferentes —
+ * submerso ele e uma ondulacao na areia, e nao um corpo.
+ */
+export const DEVOURER_BURROWED = 0;
+export const DEVOURER_SURFACED = 1;
+/**
+ * NO AR: entre a decolagem e a queda do salto.
+ *
+ * E uma postura e nao um detalhe de animacao porque ela decide DANO. Submerso a
+ * areia absorve 88% do tiro; no ar nao ha areia entre a bala e o corpo, e o
+ * dano entra inteiro — a mesma regra do `SURFACED`, por um motivo diferente. O
+ * cliente tambem depende dela: e o unico momento em que o corpo e desenhado
+ * ACIMA do chao, com sombra propria embaixo.
+ */
+export const DEVOURER_AIRBORNE = 2;
+/**
+ * PRESO: meio enterrado no proprio buraco, no fim da rajada de saltos.
+ *
+ * E a janela de dano do encontro inteiro, e por isso e um humor e nao um
+ * cooldown invisivel: ele nao anda, nao cobra contato e nao tem areia
+ * absorvendo tiro. O cliente troca a silhueta por causa dele — a pose `downed`
+ * do atlas ergue a metade dianteira para fora da cratera, que e o unico
+ * desenho do bicho com altura.
+ *
+ * O nome nao e `SURFACED` de proposito: aquele humor continua existindo e e do
+ * LEVIATA, que emerge para perseguir. Os dois ficariam com o mesmo numero e
+ * significados opostos — um caçando, o outro entalado.
+ */
+export const DEVOURER_STUCK = 3;
+
+/**
+ * Posturas dos chefes de estrato que ALTERNAM, e por que elas viajam.
+ *
+ * Em todos os tres a postura decide se o dano entra — e o cliente precisa
+ * desenhar a diferenca no MESMO tick em que ela vale, senao o jogador gasta a
+ * janela inteira sem saber que ela abriu.
+ */
+/** Pulmao-Matriz: puxando o gas para dentro, ou soprando a coluna. */
+export const LUNG_INHALING = 0;
+export const LUNG_EXHALING = 1;
+/** Coracao da Fornalha: blindado e acendendo a sala, ou frio e aberto. */
+export const FURNACE_OVERHEATING = 0;
+export const FURNACE_COOLING = 1;
+/** Magnetarca: atraindo (perto machuca) ou repelindo (longe machuca). */
+export const MAGNET_ATTRACT = 0;
+export const MAGNET_REPEL = 1;
 
 /** Postura do Escoriaceo: couraça fria fechada, ou aberta pelo calor. */
 export const SCORIAC_COOL = 0;
@@ -438,6 +730,14 @@ export type Projectile = {
   disc?: DiscState;
   hostile: boolean;
   leavesBiofluid: boolean;
+  /**
+   * Interrompe o alvo no impacto (BRUISER_ROCK_STUN_TICKS). E a assinatura do
+   * arremesso unico do Britador; a Salva Litoclasta do Guardiao usa o mesmo
+   * `kind: 'rock'` sem esta flag — tres pedras encadeando atordoamento seria
+   * um stun-lock sem resposta. A flag vive no projetil (e nao numa checagem de
+   * arquetipo do dono) porque o dono pode morrer com a pedra em voo.
+   */
+  stuns?: true;
   ttl: number;
   hits?: number[];
   /** Celulas fungicas que este projetil ja aqueceu; evita duplicar o mesmo impacto nos subpassos. */
@@ -561,7 +861,12 @@ export type SemanticEvent =
   | { t: 'module_charge_consumed'; slot: number; module: ModuleId; remaining: number; maximum: number }
   | { t: 'module_expired'; slot: number; module: ModuleId }
   | { t: 'overheat'; x: number; y: number }
-  | { t: 'guardian_awake' }
+  /**
+   * O chefe do setor acordou. Chamava-se `guardian_awake`: o Guardiao era o
+   * unico chefe que dormia ate ser notado, e desde `bossForBiome` a camara
+   * final pode ser de outro.
+   */
+  | { t: 'boss_awake' }
   /**
    * O mundo inteiro foi trocado: o cliente precisa redesenhar do zero.
    *
@@ -586,6 +891,39 @@ export type SemanticEvent =
    * o aviso util nao e "algo vem ai", e "saia DESTA faixa".
    */
   | { t: 'cart_warning'; x: number; y: number; dx: number; dy: number; len: number }
+  /**
+   * UMA carga da Salva de Demolicao foi marcada. O cliente desenha o circulo
+   * ate `fireTick`; o dano so acontece la. Sai um evento por carga (e nao um
+   * com a lista) porque o cliente ja trata efeitos por posicao, e assim uma
+   * carga a mais nao muda o formato da mensagem.
+   */
+  | { t: 'blast_marker'; x: number; y: number; radius: number; fireTick: number }
+  /**
+   * O feixe de prospeccao. `powered` distingue as DUAS metades do golpe: a
+   * varredura (false, inofensiva, durante o windup) e a passagem com potencia
+   * (true, no release). Sem o campo o cliente desenharia as duas iguais e a
+   * unica informacao que importa — "agora queima" — nao chegaria.
+   */
+  | { t: 'beam_line'; x: number; y: number; dx: number; dy: number; length: number; powered: boolean }
+  /**
+   * A vida de um modulo do Diamandis, num evento so em vez de tres tipos.
+   *
+   * `exposed`  soltou da carcaca — a partir daqui um Coveiro consegue engatar;
+   * `detached` foi ARRANCADO: o chefe perdeu a arma e a peca esta sendo levada;
+   * `dropped`  o carregador caiu e a peca voltou ao chao, recuperavel;
+   * `lost`     a peca saiu do mapa. A recompensa foi junto.
+   *
+   * Um tipo por estado inflaria o wire com quatro formatos identicos, e o
+   * cliente ja trata efeitos por posicao: o que muda entre eles e a cor do
+   * aviso, nao a estrutura.
+   */
+  | {
+      t: 'boss_module';
+      x: number;
+      y: number;
+      module: number;
+      state: 'exposed' | 'detached' | 'dropped' | 'lost';
+    }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }
@@ -669,8 +1007,15 @@ export type SurvivalState = {
   entry: Vec2;
   corePos: Vec2;
   coreTaken: boolean;
-  guardianAwake: boolean;
-  guardianSummoned: boolean;
+  /**
+   * O estado VIVO do encontro de chefe deste setor. Ver `BossRuntime`.
+   *
+   * Um objeto e nao seis campos soltos com prefixo `guardian*`: desde
+   * `bossForBiome` a camara final pode ser do Bispo, do Diamandis ou de quem
+   * mais entrar na tabela, e um campo chamado `guardianPath` sendo consumido
+   * por um Bispo e a documentacao mentindo em silencio.
+   */
+  bossRuntime: BossRuntime;
   /**
    * Rota atual do guardiao, em indices de celula, e o tick em que foi calculada.
    *
@@ -694,13 +1039,6 @@ export type SurvivalState = {
    * campo novo. Cabe folgado em 32 bits (SECTOR_COUNT e 3).
    */
   bossesDown: number;
-  /** A arena ja foi lacrada? Separado de `guardianSummoned` porque o cerco pode
-   * ter de esperar o jogador entrar no raio, enquanto os invocados saem na hora. */
-  arenaClosed: boolean;
-  /** Celulas vazias convertidas pelo cerco; removidas quando o Guardian morre. */
-  arenaBarrierCells: number[];
-  guardianPath: number[];
-  guardianPathAt: number;
   leftEntryZone: boolean;
   players: Entity[];
   playerExtras: PlayerExtra[];

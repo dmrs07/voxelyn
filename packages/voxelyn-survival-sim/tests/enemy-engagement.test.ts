@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
+import { bossArchetypeForBiome } from '../src/bosses';
+import { sectorBiome } from '../src/strata';
 import { damageEntity, findRippable, interceptDirection, spawnEnemy } from '../src/entities';
 import { canRip, ripSolid } from '../src/cells';
 import {
@@ -34,6 +36,15 @@ const clearArena = (state: SurvivalState, radius: number): void => {
 
 const distToPlayer = (state: SurvivalState, e: { x: number; y: number }): number =>
   Math.hypot(e.x - state.player.x, e.y - state.player.y);
+
+
+/** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
+const guardianSeed = (base: number): number => {
+  for (let seed = base; seed < base + 4096; seed++) {
+    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+  }
+  throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
+};
 
 describe('inimigo reage a levar dano', () => {
   // O aggro era so distancia, recalculado a cada tick. Com alcance de tiro de
@@ -105,6 +116,8 @@ describe('bruiser arremessa bloco', () => {
     // cliente desenhava o bloco arrancado da parede como cusparada de acido.
     expect(thrown.every((p) => p.kind === 'rock'), 'o bloco nao se identifica como pedra').toBe(true);
     expect(thrown.every((p) => p.radius === BRUISER_ROCK_RADIUS), 'colisao ainda usa calibre de cuspe').toBe(true);
+    // E carrega o stun DELE: a Salva do Guardiao usa o mesmo kind sem a flag.
+    expect(thrown.every((p) => p.stuns === true), 'o bloco do Britador perdeu o stun').toBe(true);
   });
 
   it('recalcula a mira no release e adianta um alvo em movimento', () => {
@@ -128,7 +141,7 @@ describe('bruiser arremessa bloco', () => {
       kind: 'rock', id: state.nextEntityId++, owner: owner.id,
       x: state.player.x + state.player.radius + BRUISER_ROCK_RADIUS - 0.02, y: state.player.y,
       vx: 0, vy: 0, damage: 1, radius: BRUISER_ROCK_RADIUS, distanceTravelled: 0,
-      hostile: true, leavesBiofluid: false, ttl: 10,
+      hostile: true, stuns: true, leavesBiofluid: false, ttl: 10,
     }];
     stepRun(state, [emptyCommand()]);
     expect(state.projectiles).toHaveLength(0);
@@ -263,19 +276,19 @@ describe('achados da revisao', () => {
   // retaliacao que o aggro por dano existe para impedir, preservada justamente
   // no inimigo em que ela mais doi.
   it('acorda o guardiao quando ele leva dano de longe', () => {
-    const state = createRun({ seed: 41, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(41), sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     if (!guardian) return;
     // Bem alem dos 7 tiles do portao de sono.
     guardian.x = state.player.x + 15;
     guardian.y = state.player.y;
-    expect(state.guardianAwake).toBe(false);
+    expect(state.bossRuntime.awake).toBe(false);
 
     damageEntity(state, guardian, 5, []);
     stepIdle(state, 2);
 
-    expect(state.guardianAwake, 'continuou dormindo levando tiro').toBe(true);
+    expect(state.bossRuntime.awake, 'continuou dormindo levando tiro').toBe(true);
   });
 
   // `findRippable` escolhia pelo tipo do bloco e `ripSolid` recusava a borda:

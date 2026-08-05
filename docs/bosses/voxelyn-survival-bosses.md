@@ -10,12 +10,180 @@ Os dois inimigos aqui não são "mais conteúdo": cada um preenche uma lacuna di
 
 | | Bispo do Veio | Corcel Fúngico |
 | --- | --- | --- |
-| Onde | Setor 2, sempre | Qualquer setor, ~1/3 das vezes |
+| Onde | Chefe do mapa final **ocupado pelo micélio** (`bossForBiome`) | Qualquer setor, ~1/3 das vezes |
 | O que ele pede | que você mude o **chão** | que você mude a sua **posição** |
 | Como se anuncia | fugindo quando se machuca | 1,3 s de telégrafo parado |
 | Silhueta | pilar vertical | o único bicho **horizontal** do jogo |
+| O que ele **é** (§2) | o órgão que fechava as feridas do Veio, falhando | o gesto de um homem que morreu sonhando (`AX-UNK-046`) |
 
-## 2. Bispo — a cura vem do chão, não dele
+## 2. Bispo — quem ele era antes de ser um chefe
+
+### O buraco que esta lore tapa
+
+Mecanicamente o Bispo sempre esteve pronto. Narrativamente ele era *"uma criatura
+fúngica que se cura no fungo"* — uma frase que descreve o que ele **faz** e não diz
+nada sobre o que ele **é**. Num jogo cuja premissa inteira é que o Veio guarda o que
+morre nele, um chefe sem história era o único elemento do mapa que não participava
+da premissa.
+
+A correção não inventa um vilão. Inventa uma **vítima que virou obstáculo** — a única
+categoria de inimigo que a ficção da Aurix ainda não tinha, e a que melhor explica
+por que o jogador ganha a luta e sai dela sem se sentir vencedor.
+
+### O que ele era
+
+Antigo, lento, paciente. Não um deus e não um monstro: um **órgão**. O Veio respira
+(o Pulmão-Matriz), circula (o Aquífero) e tinha isto — a coisa que fecha a ferida.
+
+Ele não guardava um tesouro. Guardava uma **taxa**: o que se tira tem de ser menor do
+que o que volta a crescer. Enquanto a conta fechasse, ele não tinha o que fazer. Um
+guardião cujo trabalho, bem feito, é indistinguível de não fazer nada — e é por isso
+que ninguém na Aurix jamais encontrou registro dele em atividade. Registro só existe
+de quando ele já tinha falhado.
+
+E ele **antecede a civilização**. Por tempo que ninguém mediu — milênios, é o que a
+datação sugere e ninguém afirma — não houve contato humano nenhum: não havia quem
+descesse, e não havia o que a taxa precisasse conter. Ele não estava esperando. Ele
+estava fazendo a única coisa que faz, num lugar onde ninguém abria buracos.
+
+### O pacto artesanal
+
+Há alguns milhares de anos ele foi **encontrado** — e por gente que não estava
+minerando. Os objetos mais fundos do nicho não são minerais: são semente, grão e
+vasilhame de grão. Quem primeiro reconheceu o que aquilo era foram **pequenos
+agricultores**, e isso não é detalhe de cor. Uma comunidade que planta entende
+nativamente a regra que ele encarna, porque é a mesma regra que a mantém viva: *quem
+colhe mais do que nasce não colhe no ano seguinte.* Eles não precisaram deduzir a
+taxa. Eles já viviam dentro de uma.
+
+A extração veio depois, e nunca foi o problema. Picareta, um veio por vez, a parede
+deixada de pé: o micélio fecha o corte em uma estação e a galeria continua viva. O
+rito passou dos que plantavam para os que cavavam junto com a regra, e a regra nunca
+esteve escrita em lugar nenhum — estava no fato de que quem a quebrava não achava
+mais nada no ano seguinte.
+
+O jogo **já descreve o rito**, num documento escrito por gente que não sabia estar
+descrevendo um rito. `AX-UNK-045`, "Sobre o que o Bispo guardava": nichos escavados,
+objetos dispostos do menor ao maior, **nenhum deles ferramenta**, e a cobertura
+fúngica crescendo pelo desenho dos nichos — *cultivada*.
+
+Não é um altar de oferendas. É uma **contabilidade**: uma amostra de cada coisa que
+foi tirada, devolvida ao lugar de onde saiu. A ferramenta não entra porque a
+ferramenta é de quem trabalha; o que se devolve é o que se levou. E a resposta dele a
+cada devolução era o fungo fechando o buraco.
+
+O laudo de datação (`AX-PRC-025`) fecha a leitura com o fato que a Aurix pagou para
+descobrir e arquivou em seguida: a série é **contínua** por cerca de cinco milênios,
+do grão até um objeto de fabricação da operação anterior. Alguém repôs aquele nicho,
+sem interrupção registrável, durante todo o período.
+
+As duas metades do pacto estão na mesma sala. A Aurix catalogou as duas e não leu
+nenhuma — `AX-EXE-034` proíbe descrever a estrutura, e a pergunta *"construída por
+quem?"* é recusada por não constar de formulário aprovado.
+
+### A ruptura
+
+A Aurix não quebrou a regra: ela nunca soube que havia uma. Chegou com escala
+industrial, e escala não é diferença de grau — a extração passou a abrir feridas mais
+rápido do que qualquer coisa viva consegue fechar.
+
+A tragédia é **mecânica**, e é a mesma linha de código que o jogador enfrenta: a cura
+dele é involuntária. Ele não decide curar. Fecha feridas como um corpo coagula, e um
+corpo não pergunta se ainda faz sentido coagular. Diante de uma escavação que não
+para, ele fez a única coisa que sabe fazer — mais micélio, mais rápido, em todo lugar.
+
+O remédio virou infestação. **A contaminação que sobe na barra durante a run é isso**:
+não é um inimigo atacando, é uma cicatrização fora de controle. O Veio está tentando
+se fechar, e o jogador está dentro do corte.
+
+### A queda
+
+Ele se voltou contra os invasores — e essa é a parte que a mesa conta sem uma linha de
+texto: ele **não distingue mais**. Um Prospector, um minerador, uma equipe de socorro:
+tudo que anda é uma ferida se movendo. Ele não está errado sobre a companhia e está
+inteiramente errado sobre quem entra na sala.
+
+"Caiu em desgraça" é literal nos dois sentidos. Na ficção, o zelador do lugar virou a
+ANOMALIA TERMINAL do formulário — e `AX-EXE-039` autoriza o descarte com a frase que
+resume a inversão: *"Não patrulha. Não caça. Guarda."* Na mesa, o jogador **completa a
+queda**: para chegar ao objetivo ele queima o chão que mantém a coisa viva, ela
+replanta, ele queima de novo. A luta inteira é uma cauterização.
+
+### A Supernova nunca foi um ataque
+
+É a releitura que sai mais barata e paga mais: **ele está replantando a sala**. O dano
+em 360° é incidental — quem estiver de pé dentro do raio quando o chão volta a crescer
+é atropelado pelo crescimento.
+
+Nada muda no código, e essa é a virtude. Muda o que o jogador entende quando lê o
+documento e lembra do que viu: o chefe não revidou. Ele fechou a ferida com o jogador
+dentro dela.
+
+### Os asseclas
+
+Os que cuidavam dele ficaram. O Veio guarda o que morre nele e devolve não o corpo,
+mas o **gesto** — a mesma regra do Corcel Fúngico (`AX-UNK-046`), aplicada a uma
+congregação inteira em vez de a um homem só.
+
+O gesto preservado é o da devoção; o que mudou foi o objeto dela. Onde o rito era
+levar ao Bispo uma amostra do que se tirou, o que a colônia entende hoje por "levar"
+já não faz essa distinção. Eles não foram corrompidos por ele — continuam executando,
+com precisão, a coisa errada, que é a assinatura de horror de todo o resto do
+bestiário.
+
+Isso dá ao mapa micelial uma fauna que **pertence a ele** sem custar arquétipo novo:
+os bichos daquela ocupação não são fauna, são o que sobrou do turno da tarde.
+
+### O que a lore NÃO responde
+
+Regra 4 do catálogo de documentos: nenhuma resposta fechada. Três perguntas ficam
+abertas de propósito.
+
+- **Ele foi construído, nasceu, ou foi ficando?** Nenhum documento sabe, e o único que
+  poderia perguntar foi carimbado.
+- **A forma de bispo é dele ou foi aprendida?** O que se lê como mitra e báculo pode
+  ser o que ele sempre foi — ou o formato que séculos de devolução deixaram grudados
+  nele. A arte (§9) foi autorada como *arquitetura vestida* justamente para sustentar
+  as duas leituras.
+- **Ele ainda entende alguma coisa?** Se entende, a luta deixa de ser uma luta e vira
+  uma execução.
+
+E a maior, que amarra com `AX-UNK-051`: duas coisas guardavam este lugar, uma
+fabricada e outra viva. **Se a viva falhou por não conseguir acompanhar o ritmo da
+companhia, o que exatamente o Guardião ainda está segurando — e há quanto tempo está
+sozinho?**
+
+### Os documentos do arco
+
+Escritos e no catálogo (`progression-lore.ts` + `progression-lore-text.ts`, pt-BR e
+en). O gatilho é **entendimento do encontro**, nunca repetição: o Bispo aparece no
+máximo uma vez por run, então uma grade de abates como a do Corcel (3/6/10/15)
+transformaria a revelação em cinquenta descidas.
+
+| Gatilho | Documento | ID |
+| --- | --- | --- |
+| Primeiro abate | Ordem de contenção: a estrutura sob ele não deve ser descrita | `AX-EXE-034` |
+| **Ver a cura** de perto, com a linha livre | Medição de campo: o tecido fecha na velocidade do corte; o nosso é maior | `AX-ENG-028` |
+| **Sobreviver à Supernova** (estar dentro do disco e continuar de pé) | Incidente 40: a emissão não persegue ninguém — ela replanta, no raio da lavra | `AX-INC-040` |
+| Abate | Necropsia da estrutura: nichos, objetos por tamanho, fungo cultivado | `AX-UNK-045` |
+| Abate **+** ter visto a cura | Custo de datação: a série é contínua há cinco milênios, e começa em semente | `AX-PRC-025` |
+| Abate **+** ter sobrevivido à Supernova | Ordem de vocabulário: "sítio" é proibido porque um sítio suspende a lavra | `AX-EXE-047` |
+| Abate **+** as duas Descobertas | Não classificado: a regra que ninguém escreveu, e a ferida fechando com você dentro | `AX-UNK-057` |
+| Bispo **+** Guardião **+** Núcleo | Não classificado: duas contenções, uma viva e uma fabricada — a viva caiu primeiro | `AX-UNK-058` |
+
+As duas Descobertas são novas na simulação (`DISCOVERY_BISHOP_HEALED` e
+`DISCOVERY_BISHOP_NOVA_SURVIVED`, bits 14 e 15) e entram no hash autoritativo, daí o
+`SIMULATION_VERSION` 23. A primeira exige testemunha real — distância e **linha de
+visão** —, porque o documento que ela abre é uma medição de campo, e medir pressupõe
+alguém no campo. A segunda lê `hp > 0` e não `alive`: quem chegou a zero ainda está
+vivo naquele instante (`resolveDownedAndDeaths` roda no fim do tick), e marcar ali
+daria a descoberta justamente a quem não sobreviveu.
+
+O documento que fecha o arco (`AX-UNK-058`) é a única peça que exige o **Guardião**
+também: ele cruza as duas contenções e o Núcleo, e por isso só existe para quem
+desmontou o lugar inteiro e subiu com a peça.
+
+## 3. Bispo — a cura vem do chão, não dele
 
 `BISHOP_REGEN_PER_TICK = 1.2` a 20 Hz são **24 de vida por segundo** enquanto ele
 pisa em `SURF_FUNGAL`. Isso é deliberadamente acima do que o tiro base sustenta: em
@@ -67,11 +235,21 @@ A Supernova é a resposta dele a ter perdido o chão: dano em 360° e o tapete
 **replantado** num raio de 5,5. A resposta certa continua certa e passa a ter de ser
 **repetida**, que é a diferença entre um truque e uma luta.
 
-O gatilho é o que faz ela funcionar. Ela **não** dispara por cooldown: sai apenas
-quando ele está ferido **e** não achou fungo nenhum ao alcance. Assim o jogador vive a
-sequência inteira como causa e efeito — *queimei o tapete, ele fugiu, não achou nada,
-plantou*. Disparando por relógio, o replantio seria um evento que acontece **com** o
-jogador; assim é um evento que ele **provocou**.
+O gatilho mudou duas vezes, e a segunda versão corrigiu um bloqueio real. A
+primeira regra era "ferido **e** nenhum fungo detectável em 14 tiles" — e uma única
+célula de fungo atrás de uma parede travava a Supernova para sempre: ele recuava
+eternamente para um tapete inalcançável. A regra atual mede o que importa:
+
+1. **Em luta normal**, a Supernova é a resposta primária dele à distância — jogador
+   dentro do raio, recarga pronta, telégrafo radial de 1,5 s. Ele **não** tem mais o
+   cuspe genérico do Spitter: um chefe do chão responde com o chão.
+2. **Ferido e fora do fungo**, ele tenta alcançar uma área viva; se não consegue
+   **pisar** em fungo dentro de uma janela curta (`BISHOP_NOVA_SEEK_TICKS`, 4 s), a
+   Supernova sai — com fungo à vista ou não. A sequência *queimei, ele fugiu, não
+   chegou, plantou* continua sendo causa e efeito.
+
+O fungo é replantado somente no **release**, nunca no windup: o incêndio do jogador
+fica de pé até o último instante do aviso.
 
 Ela não planta sobre fogo vivo. Apagar o incêndio que o jogador acabou de acender
 transformaria a ação dele em nada — o fungo cresce onde o fogo já passou, nunca por
@@ -88,7 +266,7 @@ A frente de partículas existe justamente para o jogador aprender o alcance *ven
 sem número nem manual. Uma frente que mente sobre isso é pior do que nenhuma, então o
 raio passou a viajar no evento.
 
-## 3. Corcel Fúngico — a investida é o depósito, o rastro é a mecânica
+## 4. Corcel Fúngico — a investida é o depósito, o rastro é a mecânica
 
 Ele não mata pelo impacto. Mata **tirando espaço da sala**.
 
@@ -119,7 +297,7 @@ reações; ele é mais um cliente dele.
 É o único contra-jogo posicional que ele oferece: quem lê o telégrafo põe uma parede
 no caminho e ganha o cooldown inteiro de graça. Continuar raspando na parede até o
 tempo acabar tiraria a recompensa de ter lido a ameaça — e foi exatamente essa
-distinção que o teste original **não** provava (ver §6).
+distinção que o teste original **não** provava (ver §7).
 
 ### Ele ocupa a vaga do elite, não soma um inimigo
 
@@ -135,7 +313,7 @@ cavalo ficaria cercado do fogo que só a investida dele devia acender.
 raro demais é conteúdo que a maioria das runs nunca vê, e um encontro que ninguém
 encontra não ensina nada.
 
-## 4. A decisão de implementação: a investida mora fora de `releaseAction`
+## 5. A decisão de implementação: a investida mora fora de `releaseAction`
 
 Todas as outras ações resolvem tudo no **release** — a pedra sai, o golpe acerta ou
 não — e por isso `advanceAction` pode devolver `true` e a criatura ficar parada na
@@ -151,7 +329,7 @@ direção vezes o atraso. Guardar as células visitadas daria o mesmo resultado 
 acrescentaria um campo por inimigo ao estado autoritativo — que é sincronizado,
 hasheado e reenviado a cada resync.
 
-## 5. O que arquétipo novo obriga a tocar
+## 6. O que arquétipo novo obriga a tocar
 
 Adicionar um membro a `EnemyArchetype` **não** quebra o typecheck sozinho, mas quebra
 duas coisas que só aparecem em produção:
@@ -171,10 +349,10 @@ vez de deixar a divergência aparecer só no co-op de alguém.
 O bispo entra em `crushesWalls` mas **não** ganha a busca de rota do guardião: chefe
 preso é chefe morto, mas a rota do guardião mora em `state.guardianPath`, um campo
 único. Compartilhá-lo daria dois chefes disputando o mesmo array — inofensivo hoje,
-porque um é do setor 2 e o outro do 3, e uma bomba armada no dia em que isso deixar
-de ser verdade.
+porque `bossForBiome` põe **um** chefe por run, e uma bomba armada no dia em que um
+encontro quiser dois. É o que o `bossRuntime` pendente resolve.
 
-## 6. Verificação
+## 7. Verificação
 
 ```
 pnpm --filter @voxelyn/survival-sim test    # tests/bosses.test.ts, 17 casos
@@ -195,7 +373,7 @@ atravessar sólido, então um cavalo que raspasse na pedra pela janela inteira p
 no mesmo `expect`. O que distingue as duas versões é a investida **acabar antes do
 tempo dela**, e é isso que o teste mede agora — em quantos ticks a ação morreu.
 
-## 7. Áudio
+## 8. Áudio
 
 `bishopHeal` é a única voz do jogo que **sobe** em frequência. Todo o resto do banco
 desce — tiro, impacto, morte, quebra — porque tudo o mais é alguma coisa terminando.
@@ -212,7 +390,7 @@ A morte do bispo divide a voz `deathGuardian`: os dois são o fim de um ato, e o
 jogador não precisa distingui-los pelo som — ele acabou de passar minutos olhando
 para o que caiu.
 
-## 8. Arte
+## 9. Arte
 
 ### Bispo: atlas de verdade
 
@@ -307,10 +485,10 @@ a normalização devolve o vetor original: o cavalo simplesmente não virava, e 
 quem estava atrás dele era o jogador — o caso em que a curva importa. O teste
 `vira em arco, e nao no lugar` foi escrito antes da correção e pegou isso.
 
-## 9. O que fica pendente
+## 10. O que fica pendente
 
 - O Bispo compartilha `deathGuardian` e o anel de `pulse` com o jogador. A primeira é
-  intencional (§7); a segunda é uma simplificação aceita — a mudança de mundo (um
+  intencional (§8); a segunda é uma simplificação aceita — a mudança de mundo (um
   tapete inteiro nascendo) é o sinal real, não o anel.
 - O Corcel não tem voz própria de investida além de `telegraphCharge`, que ele
   compartilha com o Guardião.

@@ -353,7 +353,7 @@ export class NetClient {
       site.cacheOpened = flags.cacheOpened;
     }
     state.coreTaken = world.coreTaken;
-    state.guardianAwake = world.guardianAwake;
+    state.bossRuntime.awake = world.bossAwake;
     // Substitui a lista inteira em vez de casar por indice: as ofertas nao tem
     // identidade estavel entre setores — elas nascem no poco e somem na descida —,
     // e um merge posicional deixaria um Eco do setor anterior no mapa novo.

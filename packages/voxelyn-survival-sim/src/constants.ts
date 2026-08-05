@@ -52,6 +52,27 @@ export const SURF_EMBER = 9;
 // condutiva, e a agua derretida recongela sozinha depois de um tempo.
 export const SURF_ICE = 10;
 
+/**
+ * SILICA SOLTA (id 13) e VIDRO (id 14) — as duas materias do Devorador Branco.
+ *
+ * Append-only, como toda superficie: os ids viajam nos diffs de chunk e nao
+ * podem mudar de significado.
+ *
+ * A silica solta e o RASTRO dele: onde o verme passou por baixo, o chao cedeu e
+ * virou areia instavel. Ela e inerte para tudo — nao conduz, nao machuca, nao
+ * retarda — e faz uma coisa so: e por ela que ele consegue emergir.
+ *
+ * O VIDRO e o que sobra quando alguem poe calor na silica solta. Tambem inerte,
+ * tambem faz uma coisa so, e e a inversa: por cima de vidro ele NAO sobe.
+ *
+ * As duas juntas sao o encontro inteiro. O rastro dele e ao mesmo tempo o aviso
+ * de por onde ele anda E a municao do contra-jogo: queimar o proprio caminho
+ * dele fecha o chao por onde ele viria. O jogador nao aprende isso num tutorial
+ * — aprende vendo a areia virar vidro na primeira vez que o fogo passa por ela.
+ */
+export const SURF_SILT = 13;
+export const SURF_GLASS = 14;
+
 // Orcamentos por tick (degradacao previsivel via fila deterministica).
 export const BUDGET_REACTING_CELLS = 4096;
 export const BUDGET_DISCHARGE_CELLS = 256;
@@ -426,6 +447,361 @@ export const GUARDIAN_ARENA_RADIUS = 7;
 export const GUARDIAN_ARENA_EXITS = 2;
 export const GUARDIAN_SUMMON_COUNT = 4;
 
+/**
+ * Salva Litoclasta — a resposta a distancia do Guardiao.
+ *
+ * Ele dividia o ramo generico de ataque a distancia com o Spitter e criava UM
+ * projetil de gosma que deixava biofluido — visual e mecanicamente, o chefe das
+ * Galerias de Basalto estava cuspindo. Agora ele arranca materia da propria
+ * arena e dispara um LEQUE de tres pedras: a central mira a posicao prevista do
+ * jogador (intercept sem homing, como a do Britador) e as laterais abrem um
+ * pequeno angulo. O leque cria tres corredores legiveis — melhor que tres tiros
+ * sequenciais perfeitos, que so testariam paciencia.
+ *
+ * As pedras sao `kind: 'rock'`: colidem com parede solida, quebram parede
+ * fragil (a classe cinetica ja faz isso em impactSolid), tem hitbox visivel
+ * (raio proprio) e NAO deixam biofluido — quem suja o chao e o cuspidor, e as
+ * duas ameacas continuam querendo dizer coisas diferentes. Tambem nao atordoam:
+ * o stun de pedra e a assinatura do arremesso unico do Britador, e tres pedras
+ * encadeando atordoamento seria um stun-lock sem resposta.
+ */
+/** Mais lenta que o cuspe (7): a pedra e lida pelo corredor, nao pela pressa. */
+export const GUARDIAN_ROCK_SPEED = 6;
+export const GUARDIAN_ROCK_DAMAGE = 14;
+/** Corpo visivel da pedra, entre o cuspe (0,2) e o bloco do Britador (0,46). */
+export const GUARDIAN_ROCK_RADIUS = 0.42;
+/** Distancia de voo, com a mesma margem para alvo em fuga do Britador. */
+export const GUARDIAN_ROCK_FLIGHT_TILES = 14;
+/** Meia-abertura do leque, em radianos (~22 graus por lado). */
+export const GUARDIAN_FAN_SPREAD = 0.38;
+/**
+ * Segunda fase (abaixo de 50% de vida): ele ALTERNA o leque com uma RAJADA de
+ * tres pedras em sequencia, com pequenos intervalos e correcao de mira entre os
+ * disparos — o leque nega espaco, a rajada persegue movimento.
+ */
+export const GUARDIAN_VOLLEY_SHOTS = 3;
+export const GUARDIAN_VOLLEY_INTERVAL_TICKS = 7;
+/** Recarga da salva (leque ou rajada). O valor historico do ranged dele. */
+export const GUARDIAN_SALVO_COOLDOWN_TICKS = 44;
+
+// ---------------------------------------------------------------------------
+// DIAMANDIS — o chefe da Cicatriz Aurix
+// ---------------------------------------------------------------------------
+/**
+ * Projeto DIAMANDIS: o maior equipamento de escavacao autonoma que a Aurix
+ * construiu, dez vezes um Prospector, abandonado no fundo porque recupera-lo
+ * custava mais que o programa inteiro. Ele nao parou de funcionar — parou de
+ * executar a tarefa que a Aurix dizia ter lhe dado.
+ *
+ * A regra que rege as tres armas dele: NENHUMA e militar. Sao ferramentas
+ * industriais aplicadas com indiferenca — uma broca de avanco, cargas de
+ * implosao de teto e um feixe de prospeccao. E o que separa o encontro de "um
+ * robo grande atira em voce": o Diamandis nao esta lutando, esta TRABALHANDO,
+ * e o jogador esta no caminho da obra.
+ *
+ * VIDA alta e corpo MODERADO, de proposito. Visualmente ele e uma fabrica
+ * ambulante; mecanicamente uma hitbox gigante transformaria toda parede em
+ * gaiola e todo tiro em acerto garantido. O tamanho mora no sprite e no
+ * ESTRAGO que ele deixa, nunca no raio de colisao.
+ */
+export const DIAMANDIS_HP = 880;
+export const DIAMANDIS_SPEED = 1.5;
+export const DIAMANDIS_RADIUS = 0.9;
+
+/**
+ * BROCA DE AVANCO. Ele fixa uma direcao, carrega e ATRAVESSA a arena.
+ *
+ * Diferente da investida do Corcel em tudo o que importa: bater na pedra nao
+ * encerra a acao — a pedra e que acaba. Abre um corredor de
+ * `DIAMANDIS_DRILL_WIDTH` celulas, derruba rocha e fragil e deixa minerio e
+ * cristal DE PE (e `canRip` que decide, a mesma regra do Britador), entao a
+ * passagem dele expoe veio que estava emparedado. A luta altera a geometria da
+ * sala em definitivo — e essa alteracao e recompensa e perigo ao mesmo tempo.
+ */
+export const DIAMANDIS_DRILL_WINDUP_TICKS = 36; // 1,8 s parado: a obra avisa
+export const DIAMANDIS_DRILL_TICKS = 46;
+export const DIAMANDIS_DRILL_SPEED = 7.5;
+export const DIAMANDIS_DRILL_COOLDOWN_TICKS = 190;
+/**
+ * As tres ferramentas tem FAIXAS que nao se engolem, e a ordem de leitura da
+ * IA e a mesma: longe -> broca, medio -> demolicao, perto -> feixe.
+ *
+ * A primeira versao deixou a broca comecando em 5 e a demolicao cobrindo
+ * 0..13: como a broca e checada primeiro, ela vencia em toda distancia util e
+ * a salva simplesmente nunca saia. Faixa que so existe no comentario nao e
+ * faixa.
+ */
+export const DIAMANDIS_DRILL_MIN_RANGE = 9;
+export const DIAMANDIS_DRILL_MAX_RANGE = 20;
+export const DIAMANDIS_DRILL_DAMAGE = 34;
+/** Meia-largura do corredor, em celulas: 1 => um vao de 3. */
+export const DIAMANDIS_DRILL_WIDTH = 1;
+
+/**
+ * SALVA DE DEMOLICAO. Tres cargas caem em areas MARCADAS.
+ *
+ * Nao sao misseis: sao as cargas industriais de implodir teto e fraturar veio,
+ * e a linguagem corporativa insiste que o Diamandis nunca foi armado. As
+ * marcas nascem no INICIO do telegrafo, sobre a posicao do jogador naquele
+ * instante, e nao se corrigem — sair do circulo e a resposta inteira, e ela so
+ * existe porque a marca nao persegue.
+ */
+export const DIAMANDIS_DEMOLISH_WINDUP_TICKS = 34;
+export const DIAMANDIS_DEMOLISH_COOLDOWN_TICKS = 150;
+export const DIAMANDIS_DEMOLISH_RANGE = 13;
+export const DIAMANDIS_DEMOLISH_MIN_RANGE = 4;
+export const DIAMANDIS_DEMOLISH_CHARGES = 3;
+export const DIAMANDIS_DEMOLISH_RADIUS = 2.6;
+/** Quanto as duas cargas laterais se afastam da central, em tiles. */
+export const DIAMANDIS_DEMOLISH_SPREAD = 3.2;
+
+/**
+ * FEIXE DE PROSPECCAO. Uma linha de levantamento que depois SOBE de potencia.
+ *
+ * A ordem importa e e o encontro inteiro: primeiro ele varre, e a varredura
+ * nao machuca ninguem — e um scanner fazendo o trabalho dele. So no release o
+ * feixe ganha potencia, e ai ele aquece fungo, acende gas, derrete gelo,
+ * energiza minerio e queima quem estiver na linha. E uma ferramenta industrial
+ * aplicada com indiferenca, nao uma arma: o dano e efeito colateral de uma
+ * medicao.
+ */
+export const DIAMANDIS_BEAM_WINDUP_TICKS = 40; // 2 s de linha de levantamento
+export const DIAMANDIS_BEAM_COOLDOWN_TICKS = 170;
+export const DIAMANDIS_BEAM_LENGTH = 16;
+export const DIAMANDIS_BEAM_DAMAGE = 26;
+/** Passo da amostragem da linha: menor que meia celula nao pula parede. */
+export const DIAMANDIS_BEAM_STEP = 0.25;
+
+/**
+ * COLAPSO DO REATOR, abaixo de metade da vida.
+ *
+ * A luta deixa de ser "uma maquina controlada" e vira "uma instalacao
+ * industrial desabando em volta do jogador". O que acontece e deterministico e
+ * legivel, e nao um sorteio de cadencia:
+ *
+ *   - o reator VAZA: brasa nasce em volta dele no instante do colapso, e
+ *     continua nascendo sob os rastos enquanto ele anda;
+ *   - um sistema DESLIGA: o feixe de prospeccao morre (o scanner e a primeira
+ *     coisa a cair quando a alimentacao entra em colapso);
+ *   - os outros OPERAM ACIMA DO LIMITE: broca e demolicao recarregam mais
+ *     rapido.
+ *
+ * "Cadencia irregular" por sorteio seria dano sem sinal, que e justamente o
+ * que o jogo proibe. Cadencia MAIOR com uma arma a menos e a mesma sensacao,
+ * legivel e ensinavel.
+ */
+export const DIAMANDIS_REACTOR_HP_FRACTION = 0.5;
+export const DIAMANDIS_REACTOR_EMBER_RADIUS = 5;
+export const DIAMANDIS_REACTOR_EMBER_TICKS = 900;
+/** Fator de recarga das armas que sobrevivem ao colapso. */
+export const DIAMANDIS_REACTOR_CADENCE_SCALE = 0.65;
+
+/**
+ * OS MODULOS, e os Coveiros em volta deles.
+ *
+ * E o detalhe que transforma o encontro de bom em memoravel, e ele nao e um
+ * golpe: e uma ESCOLHA que o jogador faz enquanto luta.
+ *
+ * Cada arma do Diamandis mora num modulo preso a carcaca. Conforme a vida cai,
+ * o modulo daquela arma se SOLTA (fica exposto, ainda presol). Um Coveiro que
+ * enxergue um modulo solto abandona o que estiver fazendo, conecta o
+ * eletroima e o ARRANCA — e ai carrega a peca para fora do mapa.
+ *
+ * Os Coveiros nao sao minions do chefe e nao estao ajudando o jogador. Eles
+ * continuam executando o trabalho para o qual foram deixados ali: recolher
+ * sucata de equipamento abatido. O Diamandis so ainda nao esta abatido.
+ *
+ * A escolha, e os dois lados sao legitimos:
+ *
+ *   DEIXAR TRABALHAR  o modulo sai, o Diamandis PERDE aquela arma (a luta
+ *                     fica mais facil) e a peca comeca a ir embora — se
+ *                     escapar do mapa, a recompensa vai junto.
+ *   MATAR O COVEIRO   antes do arranque, o modulo continua presol e a arma
+ *                     continua funcionando (a luta fica mais longa), e a
+ *                     sucata fica garantida no abate do chefe. Depois do
+ *                     arranque, matar o carregador derruba a peca de volta e
+ *                     ela ainda pode ser sua.
+ */
+export const DIAMANDIS_MODULE_COUNT = 3;
+/**
+ * Em que fracao de vida cada modulo se solta, na ORDEM em que se soltam.
+ *
+ * A ordem e fixa e nao sorteada porque ela e ensinavel: quem lutou uma vez
+ * sabe que a broca sai primeiro. E ela vai da arma de maior alcance para a de
+ * menor, entao o cerco em volta do chefe vai FECHANDO — perder a broca cedo
+ * significa que a luta termina de perto, que e onde o corpo dele cobra caro.
+ */
+export const DIAMANDIS_MODULE_EXPOSE_AT: readonly number[] = [0.78, 0.55, 0.3];
+/** Lascas por modulo preservado. Vale um veio inteiro: e uma decisao, nao um troco. */
+export const DIAMANDIS_MODULE_ORE = 16;
+/** Ate onde um Coveiro NOTA um modulo solto — bem alem do aggro dele. */
+export const UNDERTAKER_SALVAGE_RANGE = 20;
+/** Distancia em que ele consegue engatar o eletroima na carcaca. */
+export const UNDERTAKER_SALVAGE_REACH = 2.2;
+/** O engate: 2 s de eletroima carregando contra a blindagem, telegrafados. */
+export const UNDERTAKER_SALVAGE_WINDUP_TICKS = 40;
+/**
+ * A que distancia da carcaça a peca esta FORA DE ALCANCE.
+ *
+ * "Sair do mapa" era o criterio obvio e estava errado: o carregador nao come
+ * minerio (recurso do jogador, mesma regra da broca), entao um veio no caminho
+ * o encalhava — medido na seed 404, ele parava em x=85 de um mapa de 96 e
+ * ficava ali pelo resto da run. Com uma PORTA como criterio, "deixar
+ * trabalhar" virava "espere, ele empaca", e o preco de nao interceptar nunca
+ * chegava a ser cobrado.
+ *
+ * Distancia resolve isso sem pathfinding e diz a coisa certa: a peca se perde
+ * quando sai da luta, e nao quando cruza uma linha desenhada na borda. A borda
+ * continua valendo, para quem escapa de verdade.
+ */
+export const UNDERTAKER_SALVAGE_ESCAPE_DIST = 24;
+
+// ---------------------------------------------------------------------------
+// DEVORADOR BRANCO — o chefe dos Sumidouros de Silica
+// ---------------------------------------------------------------------------
+/**
+ * O grande verme subterraneo. Ou o que quer que seja: a quantidade de materia
+ * organica do estrato nao sustentaria um corpo daquele tamanho, e a hipotese
+ * que os documentos acabam formulando e outra — ele nao atravessa a silica, a
+ * silica assume temporariamente a forma dele.
+ *
+ * O ciclo e um so e nunca muda: MERGULHA, deixa faixa de silica solta enquanto
+ * anda por baixo, calcula onde o jogador vai estar, EMERGE ali. Submerso ele e
+ * quase invulneravel; a janela de dano e o tempo em que fica na superficie
+ * depois de emergir.
+ *
+ * O contra-jogo nao esta escrito em lugar nenhum: esta no fato de o rastro dele
+ * ser silica solta, e de calor virar silica solta em vidro. Quem entende
+ * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
+ */
+export const DEVOURER_HP = 760;
+/** Submerso ele desliza. E o unico deslocamento por velocidade que ele tem. */
+export const DEVOURER_BURROW_SPEED = 4.6;
+/**
+ * Sobra do tempo em que ele perseguia a pe depois de emergir.
+ *
+ * Nao move mais nada: fora do mergulho ele esta no ar (conduzido pelo arco) ou
+ * entalado (parado). Continua aqui porque `ARCHETYPES` exige um `speed` por
+ * arquetipo, e um zero ali diria "fixo como o Pulmao", que e outra coisa.
+ */
+export const DEVOURER_SURFACE_SPEED = 1.6;
+export const DEVOURER_RADIUS = 0.8;
+/**
+ * Quanto do dano a areia absorve enquanto ele esta por baixo.
+ *
+ * Reducao, e nao imunidade — a mesma escolha da couraça do Escoriaceo. Imune
+ * ensinaria "guarde a municao e espere", que e a ausencia de jogo; a 12% o tiro
+ * durante o mergulho vale a pena o bastante para atirar no rastro ser uma
+ * jogada, e pouco o bastante para a janela de superficie continuar sendo A
+ * janela.
+ */
+export const DEVOURER_BURROWED_ARMOR = 0.12;
+/**
+ * A RAJADA e a JANELA.
+ *
+ * O ciclo dele nao e um golpe seguido de descanso: sao TRES arcos mirados em
+ * sequencia e so entao a abertura. Um salto por ciclo dava um chefe que
+ * alternava ameaca e folga em ritmo constante, e ritmo constante e a coisa que
+ * um encontro de chefe menos pode ter — a pressao precisa SUBIR ate obrigar o
+ * jogador a errar, e a recompensa por sobreviver a ela precisa ser um alvo
+ * parado.
+ *
+ * Entre um salto e o proximo ele mergulha por pouco tempo: o suficiente para o
+ * rastro dizer de onde vem o proximo arco, e curto o bastante para os tres
+ * lerem como UMA rajada e nao como tres ataques separados.
+ */
+export const DEVOURER_LEAPS_PER_CYCLE = 3;
+export const DEVOURER_HOP_GAP_TICKS = 25;
+/**
+ * PRESO: a janela de dano do encontro inteiro.
+ *
+ * Ele entala meio enterrado no proprio buraco no fim da rajada — nao anda, nao
+ * cobra contato e nao tem areia absorvendo tiro. 7,5 s e longo de proposito: e
+ * a unica abertura do ciclo, e ela paga tres arcos esquivados.
+ *
+ * O total de exposicao por ciclo fica proximo do que existia antes (~60% contra
+ * ~58%), mas concentrado num lugar so. E essa concentracao que transforma "vou
+ * chipando dano quando der" em "guardei o superaquecimento para AGORA".
+ */
+export const DEVOURER_STUCK_TICKS = 150;
+/** E quanto tempo passa por baixo antes de tentar sair de novo. */
+export const DEVOURER_BURROW_MIN_TICKS = 70;
+/**
+ * O telegrafo da emergencia: 1,2 s de chao rachando no ponto marcado.
+ *
+ * Mais curto que o do Corcel (1,3 s) e o da broca (1,8 s) de proposito: a marca
+ * dele aparece SOB o jogador, e a distancia a percorrer para sair dela e um
+ * passo. O que custa aqui nao e o tempo, e perceber.
+ */
+export const DEVOURER_ERUPT_WINDUP_TICKS = 24;
+export const DEVOURER_ERUPT_RADIUS = 2.8;
+export const DEVOURER_ERUPT_DAMAGE = 30;
+/** Ate onde ele procura chao valido quando o alvo esta sobre vidro. */
+export const DEVOURER_ERUPT_SEARCH = 6;
+
+/**
+ * O SALTO. A emergencia nao e um ponto, e um ARCO.
+ *
+ * Ele nao sobe onde esta: recua por baixo ate um ponto de DECOLAGEM, rompe o
+ * chao ali e atravessa o ar em parabola ate a queda, que e o ponto mirado. Duas
+ * crateras por ciclo, uma em cada ponta, e nada no meio — passar por baixo do
+ * arco nao machuca. A regra que o jogador aprende e limpa: saia das duas
+ * marcas, e o intervalo entre elas e seu.
+ *
+ * O que isso muda no ENCONTRO, e a razao de existir: no ar nao ha areia entre a
+ * bala e o corpo, entao o dano entra inteiro. E o comprimento do arco nao e
+ * dele — e seu. Ele so decola de chao solto, entao vitrificar em volta de si
+ * empurra a decolagem para longe, e decolagem longe e voo longo, e voo longo e
+ * tiro de graca. O contra-jogo do vidro deixa de ser so "negar a saida" e passa
+ * a ser "esticar a trajetoria": a mesma materia, agora com duas alavancas.
+ *
+ * O minimo existe porque um arco curto nao se le como arco — sem distancia nao
+ * ha silhueta subindo, so um corpo pulando no lugar. O maximo existe porque o
+ * voo e tempo de invulnerabilidade zero, e um arco de meia arena viraria a luta
+ * inteira num tiro ao alvo.
+ */
+export const DEVOURER_LEAP_MIN_RANGE = 5;
+export const DEVOURER_LEAP_MAX_RANGE = 11;
+/** Bem mais rapido que o mergulho: um salto nao e uma caminhada. */
+export const DEVOURER_LEAP_SPEED = 9;
+/**
+ * Ate onde ele procura chao de decolagem valido em volta do ponto ideal.
+ *
+ * Menor que a busca da queda de proposito. Recusar a QUEDA e o premio do
+ * jogador e tem de ser dificil de conseguir; recusar a DECOLAGEM e um bonus
+ * do mesmo trabalho, e se as duas buscas fossem igualmente teimosas o vidro
+ * perto do corpo dele quase nunca contaria.
+ */
+export const DEVOURER_LAUNCH_SEARCH = 3;
+/**
+ * Quanto cada salto da rajada gira em volta do alvo, em radianos (~120 graus).
+ *
+ * Existe por dois motivos, e o segundo foi um defeito medido. O primeiro e de
+ * desenho: tres arcos vindo sempre do mesmo lado sao o mesmo ataque repetido, e
+ * girar faz a rajada CERCAR o jogador — a cada pouso o proximo vem de outra
+ * direcao, e ficar parado deixa de ser uma opcao.
+ *
+ * O segundo e que a direcao de recuo DEGENERA. Ela sai de (posicao - queda), e
+ * o pouso e mirado no jogador: parado o alvo, o verme cai exatamente em cima
+ * dele e a subtracao da (0,0). Medido, o resultado era um arco de comprimento
+ * zero — decolagem e queda no MESMO tick, sem voo, sem janela de dano no ar, e
+ * a rajada de tres virava uma de um. Girar por um angulo fixo garante uma
+ * direcao valida mesmo quando nao ha de onde tirar uma.
+ */
+export const DEVOURER_LEAP_TURN = 2.1;
+/**
+ * Dano da decolagem, mais baixo que o da queda.
+ *
+ * A queda e mirada em voce; a decolagem acontece longe, num ponto que ele
+ * escolheu por ser chao solto. Cobrar o mesmo pelas duas puniria estar perto de
+ * um lugar que o jogo nunca prometeu que seria seguro.
+ */
+export const DEVOURER_LAUNCH_DAMAGE = 18;
+/** Quanto a mira antecipa o movimento do alvo, em segundos. */
+export const DEVOURER_LEAD_SECONDS = 0.9;
+/** Meia-largura da faixa de silica que o mergulho deixa. */
+export const DEVOURER_TRAIL_WIDTH = 1;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;
@@ -568,23 +944,18 @@ export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.
 export const VENT_BASE_INTERVAL_TICKS = 160;
 
 /**
- * Bispo — chefe do setor 2.
+ * Bispo — o chefe de qualquer mapa profundamente ocupado pelo micelio.
+ *
+ * Ele deixou de ser "o chefe obrigatorio do setor 2": a escolha de chefe agora
+ * sai de `bossForBiome` (bosses.ts) — uma ocupacao forte substitui o chefe do
+ * estrato, e a Matriz Micelial e uma ocupacao forte. So o setor FINAL da
+ * linhagem tem chefe; um chefe por setor fragmentaria a run inteira.
  *
  * A cura NAO e um recurso que ele gasta: e uma propriedade do lugar onde ele
  * pisa. Isso muda a pergunta da luta de "quanto dano por segundo eu faco" para
  * "de que chao eu o tiro", e usa fungo, fogo e propagacao que ja existem, sem
  * mecanica nova nenhuma.
  */
-/**
- * Setor do Bispo.
- *
- * O 2 e o unico lugar onde ele cabe. No 1 o jogador ainda nao tem modulo nenhum
- * e a resposta correta (queimar o chao) depende de ferramentas que ele ainda vai
- * achar; no 3 ele dividiria a cena com o Guardiao e a run teria dois chefes
- * seguidos sem respiro entre eles. O meio da descida e onde a run precisava de
- * um evento — era o setor sem nada de proprio.
- */
-export const BISHOP_SECTOR = 2;
 export const BISHOP_HP = 260;
 /**
  * Cura por tick sobre fungo. A 20 Hz sao 24 de vida por segundo.
@@ -599,24 +970,61 @@ export const BISHOP_REGEN_PER_TICK = 1.2;
 export const BISHOP_RETREAT_HP_FRACTION = 0.72;
 /** Ate onde ele procura chao fungico, em tiles. */
 export const BISHOP_FUNGAL_SEARCH = 14;
+/**
+ * De quao perto uma coisa conta como TESTEMUNHADA.
+ *
+ * Um raio so para todas as Descobertas que exigem presenca — a cura do Bispo,
+ * a galeria que a broca abre, o modulo que o Coveiro arranca. Um pouco alem do
+ * aggro dos chefes (10): quem esta trocando tiro ve, quem passou por outro
+ * corredor nao. Os documentos que estes bits abrem sao relatorios de CAMPO, e
+ * campo pressupoe alguem la.
+ *
+ * Um numero, e nao um por bicho: o criterio e o mesmo em todos os casos, e
+ * tres copias divergiriam no primeiro ajuste.
+ */
+export const WITNESS_RANGE = 12;
 
 /**
- * Supernova Fungica — a assinatura do Bispo.
+ * Supernova Fungica — a assinatura e a PRINCIPAL resposta a distancia do Bispo.
  *
  * O que ela faz de verdade nao e o dano: e REPLANTAR o tapete. Sem ela, queimar
  * a arena resolvia a luta de uma vez e o resto era formalidade; com ela, o chao
  * volta e a pergunta "de que piso eu o tiro" precisa ser respondida de novo. E o
  * que transforma um truque numa luta.
  *
- * So dispara com ele FERIDO e SEM fungo por perto — e a resposta dele a ter
- * perdido o chao, e nao mais um golpe no rodizio. Assim o jogador vive a
- * sequencia inteira como causa e efeito: queimei, ele fugiu, nao achou nada,
- * plantou.
+ * Ela sai por DOIS caminhos, e os dois sao legiveis:
+ *
+ * 1. Em luta normal: jogador dentro do raio, cooldown pronto — o telegrafo
+ *    radial de 1,5 s e o aviso, e sair do disco e a resposta. O Bispo NAO tem
+ *    mais o cuspe generico do Spitter: um chefe do chao nao atira gosma.
+ * 2. Ferido e sem conseguir PISAR em fungo dentro de uma janela curta
+ *    (BISHOP_NOVA_SEEK_TICKS). A regra antiga era "nenhum fungo detectavel em
+ *    14 tiles", e uma unica celula atras de uma parede bloqueava a Supernova
+ *    para sempre: ele recuava eternamente para um tapete inalcancavel enquanto
+ *    cuspia gosma. A janela mede o que importa — ele CHEGOU ao fungo? — e nao o
+ *    que a varredura enxerga.
+ *
+ * O fungo e replantado somente no RELEASE, nunca no windup: o jogador que
+ * queimou o tapete ve o proprio incendio ate o ultimo instante do aviso.
  */
 export const BISHOP_NOVA_RADIUS = 5.5;
 export const BISHOP_NOVA_DAMAGE = 16;
 export const BISHOP_NOVA_WINDUP_TICKS = 30;
-export const BISHOP_NOVA_COOLDOWN_TICKS = 420;
+/**
+ * Recarga da Supernova. Era 420 quando ela so existia como replantio de
+ * emergencia; como resposta primaria a distancia, 15 s mantem o rodizio da
+ * luta (uma nova por "fase" de queima do tapete) sem virar metralhadora de
+ * area — o windup de 1,5 s continua sendo a unica coisa que a torna justa.
+ */
+export const BISHOP_NOVA_COOLDOWN_TICKS = 300;
+/**
+ * A janela de busca por chao vivo (4 s). Ferido e fora do fungo, ele recua em
+ * direcao a area viva mais proxima; se a janela fecha sem ele ter PISADO em
+ * fungo — parede no caminho, tapete comido pelo fogo, celula isolada — a
+ * Supernova sai. Curta de proposito: mais que isso e um chefe fugindo da
+ * propria luta.
+ */
+export const BISHOP_NOVA_SEEK_TICKS = 80;
 /** Vida do tapete replantado. Longo: ele precisa durar a luta, nao um segundo. */
 export const BISHOP_NOVA_FUNGAL_TICKS = 6000;
 
@@ -788,3 +1196,147 @@ export const CONTAMINATION_WAVES: readonly (readonly [level: number, count: numb
   [0.6, 3],
   [0.85, 4],
 ];
+
+// ---------------------------------------------------------------------------
+// OS CHEFES DE ESTRATO: um dono para cada geologia
+// ---------------------------------------------------------------------------
+// A regra que rege os seis: nenhum inventa sistema novo. Cada um opera, em
+// escala de chefe, a alavanca que o proprio estrato ja tem — cristal que
+// descarrega, agua que conduz, gas que ocupa espaco, brasa que aquece, gelo que
+// derrete, minerio que atrai. E a mesma regra do bestiario de assinatura, e ela
+// vale ainda mais aqui: um chefe que trouxesse mecanica propria seria um chefe
+// que poderia estar em qualquer mapa.
+
+/**
+ * ARQUICANTOR (Catedral Prismatica) — a formacao cristalina articulada.
+ *
+ * Ele nao atira: CANTA, e a sala responde. O pulso arma todo cristal ao alcance
+ * e cada um descarrega pelas aberturas coladas nele — a mesma regra do
+ * Ressonante, na escala da nave inteira.
+ *
+ * O contra-jogo e uma decisao de quanto destruir: cristal quebrado antes do
+ * pulso e um cristal que nao canta, mas a Catedral tambem e a iluminacao e o
+ * recurso do setor. O jogador decide quanto da catedral apagar para sobreviver
+ * a ela.
+ */
+export const ARCHCANTOR_HP = 620;
+export const ARCHCANTOR_PULSE_RADIUS = 9;
+export const ARCHCANTOR_CRYSTAL_BUDGET = 26;
+export const ARCHCANTOR_WINDUP_TICKS = 34;
+export const ARCHCANTOR_COOLDOWN_TICKS = 150;
+/** Quanto a rede vazia o enfraquece: sem cristal, o canto nao tem quem responda. */
+export const ARCHCANTOR_SILENT_ARMOR = 1.5;
+
+/**
+ * LEVIATA DO LENCOL (Aquifero Negro) — o corpo que se move sob a agua.
+ *
+ * Mesma gramatica do Devorador Branco, outro elemento e outro contra-jogo: ele
+ * so anda e so emerge por superficie CONDUTIVA, e o que o detem nao e negar o
+ * chao — e eletrificar a agua. A descarga o atordoa pela regra generica que ja
+ * existe, e eletrifica a regiao inteira junto: o preco de para-lo e o mesmo
+ * meio ficar mortal para quem o parou.
+ */
+export const LEVIATHAN_HP = 800;
+export const LEVIATHAN_SWIM_SPEED = 5;
+export const LEVIATHAN_SURFACE_SPEED = 1.8;
+export const LEVIATHAN_RADIUS = 0.85;
+export const LEVIATHAN_SUBMERGED_ARMOR = 0.15;
+export const LEVIATHAN_SURFACE_TICKS = 100;
+export const LEVIATHAN_DIVE_MIN_TICKS = 60;
+export const LEVIATHAN_BREACH_WINDUP_TICKS = 26;
+export const LEVIATHAN_BREACH_RADIUS = 3;
+export const LEVIATHAN_BREACH_DAMAGE = 28;
+export const LEVIATHAN_BREACH_SEARCH = 7;
+export const LEVIATHAN_LEAD_SECONDS = 0.8;
+
+/**
+ * PULMAO-MATRIZ (Fenda Sulfurosa) — o orgao que faz o estrato respirar.
+ *
+ * FIXO: ele nao persegue ninguem, esta ancorado nos respiradouros. Inspira o
+ * gas da arena (abrindo zonas temporariamente seguras) e o expele em outra
+ * direcao. Quem entende a respiracao ganha rota; quem nao entende descobre que
+ * a passagem limpa de agora e a camara contaminada de daqui a pouco.
+ *
+ * O contra-jogo e incendiar a expiracao: o fogo sobe pela coluna de gas ate
+ * ele e machuca de verdade — e transforma parte da arena em fogo. Ele e o unico
+ * chefe do jogo cuja janela de dano o JOGADOR abre, e ela custa terreno.
+ */
+export const LUNG_MATRIX_HP = 700;
+export const LUNG_MATRIX_RADIUS = 0.9;
+export const LUNG_MATRIX_CYCLE_TICKS = 130;
+export const LUNG_MATRIX_BREATH_INTERVAL_TICKS = 10;
+export const LUNG_MATRIX_INHALE_RADIUS = 7;
+export const LUNG_MATRIX_INHALE_PER_BREATH = 10;
+export const LUNG_MATRIX_EXHALE_LENGTH = 12;
+export const LUNG_MATRIX_EXHALE_WIDTH = 1;
+/** Dano por celula de gas acesa encostada nele durante a expiracao. */
+export const LUNG_MATRIX_BURN_DAMAGE = 26;
+
+/**
+ * CORACAO DA FORNALHA (Fornalha Abissal) — o nucleo igneo parcialmente exposto.
+ *
+ * FIXO, como o Pulmao: a luta nao e contra um corpo, e contra a sala. Ele
+ * alterna SUPERAQUECIMENTO (blindado, e as fissuras da arena acendem em
+ * sequencia) e RESFRIAMENTO (vulneravel, e a sala esfria junto).
+ *
+ * So fica vulneravel no resfriamento, e essa e a leitura inteira: o jogador nao
+ * escolhe quando bater, escolhe onde estar quando puder.
+ */
+export const FURNACE_HEART_HP = 900;
+export const FURNACE_HEART_RADIUS = 1;
+export const FURNACE_HEART_CYCLE_TICKS = 150;
+export const FURNACE_HEART_HOT_ARMOR = 0.2;
+export const FURNACE_HEART_WAVE_RADIUS = 8;
+export const FURNACE_HEART_WAVE_INTERVAL_TICKS = 12;
+/** Meia-abertura do setor que acende por vez, em radianos (~60 graus). */
+export const FURNACE_HEART_WAVE_ARC = 0.52;
+
+/**
+ * RAINHA DA GEADA (Cripta Glacial) — a figura de gelo, nevoa e reflexos.
+ *
+ * A couraça dela e o proprio estrato: enquanto houver gelo em volta, o dano
+ * quase nao entra. Derreter o lago a expoe — e a agua que sobra e condutiva,
+ * entao o jogador que a revela transforma o chao em algo que a descarga dele
+ * atravessa nos dois sentidos.
+ *
+ * Os Espectros nao sao invocados como matilha: sao EXTENSOES dela, e por isso
+ * saem do gelo em volta e nao dela.
+ */
+export const FROST_QUEEN_HP = 640;
+export const FROST_QUEEN_SPEED = 2.4;
+export const FROST_QUEEN_RADIUS = 0.7;
+export const FROST_QUEEN_ICE_ARMOR = 0.22;
+/** Quantas celulas de gelo em volta ainda a mantem blindada. */
+export const FROST_QUEEN_ICE_RADIUS = 5;
+export const FROST_QUEEN_ICE_THRESHOLD = 6;
+export const FROST_QUEEN_FREEZE_COOLDOWN_TICKS = 120;
+export const FROST_QUEEN_FREEZE_WINDUP_TICKS = 26;
+export const FROST_QUEEN_FREEZE_RADIUS = 6;
+export const FROST_QUEEN_WRAITHS = 2;
+export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
+
+/**
+ * MAGNETARCA (Estrato Ferrifero) — a entidade de magnetita.
+ *
+ * A polaridade alterna, e com ela o que e perigoso. ATRAINDO, ele te puxa e a
+ * proximidade cobra; REPELINDO, ele te empurra e a distancia cobra. Nao existe
+ * posicao segura permanente: existe uma FAIXA, e ela troca de lado a cada
+ * ciclo.
+ *
+ * O puxao usa o mesmo passo-a-passo do eletroima do Coveiro — colisao
+ * respeitada, sem teleporte — porque a quina no caminho continua sendo o
+ * contra-jogo geometrico do campo.
+ */
+export const MAGNETARCH_HP = 720;
+export const MAGNETARCH_SPEED = 1.8;
+export const MAGNETARCH_RADIUS = 0.8;
+export const MAGNETARCH_CYCLE_TICKS = 170;
+export const MAGNETARCH_FIELD_RANGE = 13;
+export const MAGNETARCH_PULL_STEP = 0.12;
+/** Dentro disto, atraindo, o campo esmaga. */
+export const MAGNETARCH_CRUSH_RANGE = 3;
+export const MAGNETARCH_CRUSH_DAMAGE = 16;
+/** Alem disto, repelindo, o arco de retorno castiga. */
+export const MAGNETARCH_TETHER_RANGE = 9;
+export const MAGNETARCH_TETHER_DAMAGE = 14;
+export const MAGNETARCH_FIELD_TICK_INTERVAL = 20;

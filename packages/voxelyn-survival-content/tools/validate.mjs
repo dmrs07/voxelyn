@@ -33,6 +33,21 @@ const CANONICAL = {
 };
 const REQUIRED_LIVING = ['idle', 'walk', 'attack', 'hit', 'die'];
 /**
+ * Sprites que legitimamente nao tem `walk`, com o motivo escrito.
+ *
+ * A regra por tras da lista: `walk` e obrigatorio porque a falta dele quase
+ * sempre e um esquecimento, e o cliente cai calado em `idle` — a criatura anda
+ * pelo mapa parada e ninguem e avisado. Nao e obrigatorio quando a SIMULACAO
+ * garante que a marcha nunca vai ser pedida. Os dois abaixo tem `speed: 0` em
+ * ARCHETYPES: estao ancorados no chao e a luta contra eles e contra a sala.
+ * Assar 24 quadros de caminhada para eles seria textura que nenhum frame do
+ * jogo chega a amostrar.
+ *
+ * Entrar nesta lista exige a mesma conferencia: se um dia um deles ganhar
+ * velocidade, o atlas volta a precisar de marcha e a linha sai daqui.
+ */
+const ANCHORED_NO_WALK = new Set(['enemy-lung-matrix', 'enemy-furnace-heart']);
+/**
  * Teto de cores por atlas, incluindo o contorno.
  *
  * Era 16, o tamanho da paleta mestra de entao. A paleta cresceu para 22 ao
@@ -72,10 +87,33 @@ const MAX_ATLAS_WIDTH = 4096;
  * mais curta que a das revisoes anteriores justamente porque o pacote esta
  * grande. Um atlas fora da curva continua sendo barrado, e a proxima materia
  * nova volta a exigir esta mesma conversa — que e o ponto do orcamento.
+ *
+ * Quarta revisao (os oito chefes): e esta a conversa que a revisao anterior
+ * marcou. O bestiario tinha dois chefes autorados e passou a ter dez — os oito
+ * que faltavam desenhavam pelo recuo do cliente, isto e, nao desenhavam. Sao os
+ * sprites mais caros do pacote por definicao: canvas grande porque a criatura e
+ * grande, e quatro direcoes como todo mundo. Medido: +1,7 MiB de PNG e +41 MiB
+ * de RGBA, para um pacote de ~7,3 MiB e ~145 MiB.
+ *
+ * O desperdicio foi pago primeiro, como da outra vez. Todo canvas de chefe e
+ * calculado a partir da caixa envolvente medida dos proprios quadros (conteudo
+ * + 2px de margem, nunca um numero redondo herdado de outro bicho), e os dois
+ * chefes ANCORADOS nao levam marcha — 24 quadros por atlas que a simulacao,
+ * com `speed: 0`, nunca chegaria a pedir. Sem essas duas medidas o pacote
+ * fecharia perto de 160 MiB.
+ *
+ * Os tetos vao a 10 MiB e 160 MiB, folga de ~10% sobre o medido — a mais curta
+ * ate hoje, e de proposito. E aqui que este orcamento para de ser um numero e
+ * vira uma decisao de arquitetura: TODO atlas e carregado no boot, e um chefe
+ * so pode existir no setor final de uma run. Dez atlas de chefe na memoria para
+ * desenhar no maximo um e o desperdicio que o teto agora esta encostando. A
+ * proxima adicao de peso nao deve ser paga com outro aumento — deve ser paga
+ * com carregamento sob demanda, que e o que remove os nove chefes que a run nao
+ * vai encontrar.
  */
 const MAX_PNG_BYTES = 1536 * 1024;
-const MAX_TOTAL_PNG_BYTES = 6 * 1024 * 1024;
-const MAX_DECODED_BYTES = 112 * 1024 * 1024;
+const MAX_TOTAL_PNG_BYTES = 10 * 1024 * 1024;
+const MAX_DECODED_BYTES = 160 * 1024 * 1024;
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 const framePixels = (png, m, index) => {
@@ -123,7 +161,10 @@ export const validateManifest = (id) => {
   } else if (m.footprint.w < 0 || m.footprint.h < 0) errors.push(`${id}: footprint negativo`);
 
   if (id.startsWith('player-') || id.startsWith('enemy-')) {
-    for (const a of REQUIRED_LIVING) if (!m.animations[a]) errors.push(`${id}: animação obrigatória ausente: ${a}`);
+    for (const a of REQUIRED_LIVING) {
+      if (a === 'walk' && ANCHORED_NO_WALK.has(id)) continue;
+      if (!m.animations[a]) errors.push(`${id}: animação obrigatória ausente: ${a}`);
+    }
     if (m.directions !== 4) errors.push(`${id}: entidade viva deve declarar 4 direções`);
     for (const dir of ['dr', 'dl', 'ur', 'ul']) {
       if (!m.authoredDirs.includes(dir) && !m.flipPairs[dir]) errors.push(`${id}: direção ${dir} não resolvível`);

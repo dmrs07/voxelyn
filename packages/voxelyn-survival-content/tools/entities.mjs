@@ -1360,6 +1360,755 @@ const undertakerModel = (anim, f) => {
 };
 const undertakerFrame = (dir, anim, f) => renderVoxels(undertakerModel(anim, f), DIR_INDEX[dir], 72, 88, 34, 78);
 
+// ===========================================================================
+// CHEFES — um por estrato, mais os dois de ocupacao forte.
+//
+// Regra que vale para os oito, e ela vem de uma falha que ja custou caro: o
+// jogador tem de conseguir NOMEAR o contra-jogo olhando o corpo, antes de a
+// primeira acao sair. O Bispo ja funciona assim (o fungo esta no manto, e o
+// fungo e a regra dele) e o Guardiao tambem (o nucleo rachado e onde o dano
+// entra). Aqui isso vira exigencia explicita de autoria: cada modelo carrega,
+// na SILHUETA, a materia que decide a luta.
+//
+//   Diamandis      — os modulos salientes: sao eles que os Coveiros levam.
+//   Devorador      — placas de silica: ele e o chao, e o chao vira vidro.
+//   Arquicantor    — os cristais: quebra-los e apagar o canto dele.
+//   Leviata        — as linhas condutivas: a agua eletrificada e o freio.
+//   Pulmao-Matriz  — o saco de gas: incendia-lo e a unica janela de dano.
+//   Coracao        — as placas sobre a brasa: fechadas, blindado; abertas, nao.
+//   Rainha         — a couraça de gelo: derreter em volta e desnuda-la.
+//   Magnetarca     — os aneis de ferro: a polaridade se le na distancia deles.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// enemy-diamandis — a fabrica ambulante da Cicatriz Aurix.
+//
+// A leitura tem de dizer TRABALHO, nao guerra. Nada nele e militar: e uma broca
+// de avanco, um rack de cargas de implosao e um mastro de prospeccao montados
+// num chassi industrial que ninguem desligou. O jogador nao esta sendo atacado,
+// esta no caminho da obra — e essa e a diferenca entre este chefe e "um robo
+// grande atira em voce".
+//
+// A primeira versao errou a proporcao e o erro tem nome no repositorio: virou
+// uma CAIXA. Chassi baixo e largo, tampo claro de `rust` (a face de topo dessa
+// rampa e cor de osso) e tudo o que contava a historia — mastro, rack, reator —
+// contido dentro do bloco. E o mesmo defeito da primeira versao do Corcel e da
+// do Coveiro: um volume horizontal grande, iluminado por cima, le como MOBILIA.
+//
+// A correcao e vertical e e de hierarquia. O corpo sobe em tres degraus com o
+// tampo ESCURO, as pernas ganham vao para ler como pernas, e as tres
+// ferramentas saem para FORA da silhueta: a broca a frente, o rack acima da
+// linha do deck, o mastro acima de tudo. Em ordem de leitura a distancia:
+//   1. A BROCA — o cone que come parede;
+//   2. O REATOR no ventre, brasa exposta — a segunda fase inteira mora ali;
+//   3. Os TRES MODULOS salientes — o que os Coveiros vem buscar, e por isso
+//      precisam parecer peças aparafusadas, e nao partes do corpo.
+// ---------------------------------------------------------------------------
+const diamandisModel = (anim, f) => {
+  const step = anim === 'walk' ? [0, 1, 2, 1, 0, -1][f % 6] : 0;
+  // `special` e a carga da broca: 1,8 s parado com a ponta girando. E o
+  // telegrafo mais longo do jogo e tem de PARECER longo — a broca avanca sobre
+  // o mancal sem que o chefe saia do lugar.
+  const wind = anim === 'special' ? Math.min(3, f) : 0;
+  const fire = anim === 'attack' ? [0, 2, 1, 0][f % 4] : 0;
+  const idle = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // A broca gira SEMPRE, em todo quadro de toda animacao: uma ferramenta
+  // industrial que so gira quando ataca e uma arma disfarçada de ferramenta.
+  const spin = f % 4;
+  const b = [];
+
+  // PERNAS com vao. O primeiro desenho tinha quatro pastilhas coladas no chassi
+  // e o bicho parecia assentado numa mesa; aqui ha 5 voxels de perna VISIVEL
+  // antes de o corpo comecar, e e esse vao que diz "isto anda".
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const lift = Math.max(0, sx * sy > 0 ? step : -step) * 0.5;
+      b.push(box(sx * 3 - 1, sy * 3 - 1, lift + 1, 2, 2, 4.5, 'rockDeep'));
+      b.push(box(sx * 3.5 - 1.5, sy * 3.5 - 1.5, lift, 3, 3, 1.2, 'rust'));
+    }
+  }
+
+  const z = 5.5 + idle - flinch;
+  // Ventre: o volume mais estreito, para o corpo AFINAR na cintura em vez de
+  // ser um bloco unico do chao ao topo.
+  b.push(box(-3.5, -3.5, z, 7, 7, 4, 'rust'));
+  // Deck: mais largo que o ventre e com o tampo ESCURO. `rust` iluminado por
+  // cima e a cor de osso, e um tampo de osso desse tamanho vira tabua.
+  b.push(box(-4.5, -4, z + 4, 9, 8, 3, 'rust'));
+  b.push(box(-4.7, -4.2, z + 7, 9.4, 8.4, 1.2, 'rockDeep'));
+  // Torre: o terceiro degrau, recuado para tras, so de rocha.
+  b.push(box(-3, -3.5, z + 8.2, 6, 6, 4, 'rockDeep'));
+  b.push(box(-3, -3.6, z + 10.5, 6, 0.6, 1.2, 'rust'));
+
+  // O REATOR, exposto no ventre pela FRENTE (-y). Nao esta atras de tampa: uma
+  // instalacao que vaza brasa na segunda fase tem de estar vazando de algum
+  // lugar visivel desde o primeiro segundo. Ele ocupa quase toda a face frontal
+  // do ventre de proposito — e o alvo que a segunda fase promete.
+  b.push(box(-2.6, -4.6, z + 0.4, 5.2, 1.4, 3.4, 'fire'));
+  b.push(box(-1.6, -5, z + 1, 3.2, 0.8, 2.2, 'loot'));
+
+  // MODULO 1 — A BROCA. Cone de cinco degraus afinando ate a ponta, montado
+  // num mancal a frente do ventre e na altura dele: a broca do jogo abre um
+  // CORREDOR no chao, entao ela nao pode estar apontada para o horizonte.
+  const bit = -6 - wind - fire * 0.5;
+  b.push(box(-3, bit + 3, z + 0.6, 6, 3, 5, 'rust')); // mancal
+  b.push(box(-2.4, bit + 1.4, z + 0.6, 4.8, 2, 4.2, 'rockDeep'));
+  b.push(box(-1.9, bit - 0.2, z + 1.1, 3.8, 2, 3.2, 'bone'));
+  b.push(box(-1.4, bit - 1.8, z + 1.6, 2.8, 2, 2.2, 'bone'));
+  b.push(box(-0.9, bit - 3.2, z + 2.1, 1.8, 1.6, 1.2, 'bone'));
+  b.push(box(-0.4, bit - 4.4, z + 2.4, 0.8, 1.4, 0.6, 'bone'));
+  for (let i = 0; i < 4; i++) {
+    // Helicoide: um nub por degrau, girando um quarto de volta por quadro. E o
+    // giro que faz um cone virar broca — sem ele e um bico.
+    const a = ((spin + i) * Math.PI) / 2;
+    const r = 2.4 - i * 0.45;
+    b.push(box(Math.cos(a) * r - 0.3, bit + 1.4 - i * 1.6, z + 2.6 + Math.sin(a) * r - 0.3, 0.6, 1.2, 0.6, 'rust'));
+  }
+
+  // MODULO 2 — O RACK DE DEMOLICAO, acima do deck e para tras. Ele fica ACIMA
+  // da linha do corpo porque uma peça encaixada dentro da silhueta nao parece
+  // removivel, e a economia inteira dos Coveiros depende de o jogador olhar
+  // isto e pensar "aquilo sai". Sao TRES cilindros porque a salva tem tres
+  // cargas: quem contar o rack sabe quantos circulos vao nascer no chao.
+  for (let i = 0; i < 3; i++) {
+    const gone = anim === 'attack' && f >= 2 && i === 1;
+    if (gone) continue; // no disparo o do meio ja saiu: o rack conta a salva
+    b.push(box(-3.6 + i * 2.8, 2.6, z + 12.2, 1.8, 2.4, 4.5, 'loot'));
+    b.push(box(-3.8 + i * 2.8, 2.4, z + 16.7, 2.2, 2.8, 0.8, 'rust'));
+  }
+
+  // MODULO 3 — O MASTRO DE PROSPECCAO: a peça mais alta e a mais fina. Ele e o
+  // primeiro sistema a cair no colapso do reator, entao a fragilidade tem de
+  // estar na proporcao — um pino de 1,2 de lado contra um corpo de 9.
+  b.push(box(-0.6, -0.8, z + 12.2, 1.2, 1.2, 6, 'rust'));
+  b.push(box(-1.6, -1.4, z + 18.2, 3.2, 2.6, 1.8, 'rockDeep'));
+  // A lente varre no idle e ACENDE no feixe. Enquanto so varre e sensor —
+  // eletrica, fria; a potencia so aparece no release, e o atlas nao mente
+  // sobre isso: nem no `special` ela vira chama.
+  b.push(box(-1.1, -1.9, z + 18.8, 2.2, 0.8, 0.9, fire >= 2 ? 'loot' : 'electric'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-white-devourer — o verme dos Sumidouros de Silica.
+//
+// Autorado com a frente em +x (ver quarterTurn): o corpo E um eixo comprido, e
+// pensa-lo em qualquer outro eixo seria escrever contra ele.
+//
+// Duas decisoes carregam o bicho:
+//
+// SEM OLHOS. Ele caça por vibracao, e a ausencia de rosto e o que separa "um
+// verme grande" de "uma coisa que nao esta olhando para voce porque nao
+// precisa". A boca em anel de dentes ocupa a frente inteira.
+//
+// PLACAS DE SILICA. O corpo e feito da mesma materia do chao onde ele vive —
+// e essa e literalmente a regra do encontro: ele nao atravessa a silica, a
+// silica assume a forma dele.
+//
+// A boca teve de ser refeita: na primeira versao ela era uma placa frontal com
+// uma fenda escura, e a fenda projeta como um risco de dois pixels. Boca de
+// lampreia nao e um corte, e um BURACO — entao aqui nao ha placa nenhuma na
+// frente: ha um anel de dentes montado em volta do vazio, com a goela escura ao
+// fundo dele. O que se ve de longe e a abertura, que e o que ela e.
+// ---------------------------------------------------------------------------
+const devourerModel = (anim, f) => {
+  // PRESO NO PROPRIO BURACO — a janela de dano do encontro, e a unica pose em
+  // que o corpo sai do plano do chao.
+  //
+  // Ela existe porque a alternativa nao funcionou, e a tentativa esta medida:
+  // recortar o modelo deitado na linha do chao deixava ~10px de lombo acima da
+  // areia, e a esse tamanho o chefe lia como uma PEDRA. O problema nao era o
+  // recorte, era a proporcao — um verme autorado baixo e comprido nao tem
+  // silhueta vertical para cortar. Uma janela de ataque precisa de um alvo com
+  // ALTURA e com ROSTO, e o rosto deste bicho e a boca.
+  //
+  // Entao aqui ele nao esta deitado: esta ERGUIDO, com a metade traseira
+  // enterrada e a dianteira de pe saindo de um colar de silica revirada. E a
+  // pose que promete "atire AGORA" sem uma linha de interface.
+  if (anim === 'downed') {
+    const sway = [0, 0.5, 0.8, 0.4][f % 4];
+    const b = [];
+    // Colar de silica: a borda do buraco. Sem ele o tronco brota de chao liso e
+    // a leitura vira "um verme de pe", nao "um verme entalado".
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6;
+      const r = 3.4 + (i % 3) * 0.4;
+      b.push(box(Math.cos(a) * r - 0.7, Math.sin(a) * r - 0.7, 0, 1.4, 1.4, 0.8 + (i % 3) * 0.4, 'silt'));
+    }
+    // Cinco aneis empilhados em Z, afinando para cima. O balanco cresce com a
+    // altura: preso, ele nao anda — ele TENTA, e o topo e o que mais se mexe.
+    const RINGS = 6;
+    const STEP = 2.2;
+    for (let s = 0; s < RINGS; s++) {
+      const d = 4.6 - s * 0.55;
+      const lean = (sway * (s + 1)) / RINGS;
+      b.push(box(-d / 2 + lean, -d / 2, 0.5 + s * STEP, d, d, STEP, 'silt'));
+      // Sulco entre aneis, como no corpo deitado: sem ele o tronco e um tubo
+      // liso e perde a escala.
+      b.push(box(-d / 2 + lean + 0.35, -d / 2 + 0.35, 0.5 + s * STEP + STEP - 0.5, d - 0.7, d - 0.7, 0.5, 'rockDeep'));
+    }
+    // A BOCA no topo, aberta para cima: anel de dentes em volta da goela.
+    const topZ = 0.5 + RINGS * STEP;
+    const tip = sway;
+    b.push(box(-1.5 + tip, -1.5, topZ - 1.6, 3, 3, 1.8, 'blood'));
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6;
+      const r = 2.2 + (i % 2) * 0.35;
+      b.push(box(Math.cos(a) * r - 0.45 + tip, Math.sin(a) * r - 0.45, topZ - 0.4, 0.9, 0.9, 1.3, 'bone'));
+    }
+    return b;
+  }
+
+  const rear = anim === 'attack' ? [0, 2, 4, 2][f % 4] : anim === 'special' ? Math.min(3, f) : 0;
+  // A ondulacao nunca para: o corpo de um verme e o proprio movimento dele.
+  const wave = (s) =>
+    anim === 'walk'
+      ? Math.round(Math.sin((s + f) * 0.9)) * 0.5
+      : anim === 'idle'
+        ? ((s + f) % 2) * 0.5
+        : (s % 2) * 0.5;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+
+  // Oito aneis SOBREPOSTOS (passo 1,6 para largura 2,2), afinando para tras.
+  // Sobrepostos e o ponto: com passo igual a largura a primeira versao saiu
+  // como uma fila de caixas separadas por vazio, e um verme com vao entre os
+  // segmentos e um trenzinho.
+  for (let s = 0; s < 8; s++) {
+    const x = -10 + s * 1.9;
+    const d = 2.2 + s * 0.42;
+    // ARCO: o dorso sobe no meio e volta a descer. Um verme que sai do chao nao
+    // deita reto — e a curva que diz que o resto dele continua LA EMBAIXO. Sem
+    // ela o corpo projetava como uma prancha comprida, que foi o defeito da
+    // primeira versao mesmo depois de os segmentos passarem a se sobrepor.
+    const arch = Math.sin(((s + 1) / 9) * Math.PI) * 1.4;
+    const lift = arch + (s >= 5 ? rear * (s - 4) * 0.45 : 0);
+    const y = -d / 2 + wave(s);
+    b.push(box(x, y, 0.4 + lift + flinch * 0.3, 2.2, d, d * 1.05, 'silt'));
+    // Cume mais estreito: o anel deixa de ser um cubo e passa a ler como tubo.
+    b.push(box(x, y + d * 0.2, 0.4 + lift + flinch * 0.3 + d * 1.05, 2.2, d * 0.6, 0.6, 'silt'));
+    // Sulco entre aneis: uma fatia ESTREITA e ESCURA, recuada nos dois eixos.
+    // Ela e a sombra da juntura — em osso, como estava antes, o corpo virava
+    // uma escada de dois beges sem separacao nenhuma.
+    b.push(box(x + 1.7, y + 0.35, 0.5 + lift + flinch * 0.3, 0.5, d - 0.7, d * 0.95, 'rockDeep'));
+  }
+
+  // A CABECA: anel de dentes em volta de um vazio, no plano y-z. Doze lascas
+  // de osso num circulo, a goela escura ao fundo e NENHUMA placa na frente.
+  const hx = 5.4 + rear * 0.5;
+  const hz = 2.6 + rear * 1.6;
+  b.push(box(hx - 1.6, -1.6, hz - 1.6, 1.4, 3.2, 3.2, 'blood')); // a goela, ao fundo
+  for (let i = 0; i < 12; i++) {
+    const a = (i * Math.PI) / 6;
+    const r = 2.5 + (i % 2) * 0.35; // dentes desiguais: arcada, nao engrenagem
+    // Os dentes AVANCAM no bote — a boca abre para fora em vez de so subir.
+    b.push(box(hx + rear * 0.25, Math.cos(a) * r - 0.45, hz + Math.sin(a) * r - 0.45, 1.2, 0.9, 0.9, 'bone'));
+    // Segundo anel, meio passo atras e mais fechado: da PROFUNDIDADE ao furo.
+    b.push(box(hx - 1.1, Math.cos(a) * (r - 0.9) - 0.4, hz + Math.sin(a) * (r - 0.9) - 0.4, 1, 0.8, 0.8, 'silt'));
+  }
+  // Areia escorrendo dos flancos enquanto ele esta fora. So no bote — submerso
+  // nao ha sprite, e parado ele ja assentou.
+  if (rear > 0) {
+    for (let i = 0; i < 4; i++) {
+      b.push(box(-5 + i * 2.6, (i % 2 ? 1.9 : -2.6), 0.4 + (3 - i) * 0.6, 0.6, 0.6, 0.6, 'silt'));
+    }
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-archcantor — o Arquicantor da Catedral Prismatica.
+//
+// Ele nao atira: CANTA, e a sala responde. Entao o corpo nao pode ter arma
+// nenhuma — nem braco, nem bocal, nem cano. O que ele tem sao TUBOS: cristais
+// de orgao crescidos do corpo, altos e desiguais, e uma cavidade de ressonancia
+// no lugar onde um rosto estaria.
+//
+// Os tubos nasceram todos nas COSTAS, e isso os escondia em duas das quatro
+// direcoes — justamente a peça que e a regra do encontro (quebrar a rede apaga
+// o canto) desaparecendo metade do tempo. Agora eles circundam o tronco: sete
+// cristais distribuidos em volta, de alturas diferentes, de modo que qualquer
+// angulo mostre pelo menos quatro deles.
+//
+// O corpo tambem subiu um degrau de valor. Em `rockDeep` sobre o chao da
+// Catedral ele era uma mancha preta que so tinha silhueta contra os cristais;
+// em `rock`, a massa existe antes da luz.
+// ---------------------------------------------------------------------------
+const archcantorModel = (anim, f) => {
+  const gait = anim === 'walk' ? [0, 1, 1, 0, -1, -1][f % 6] : 0;
+  // O canto: os tubos INCHAM e acendem. E a unica coisa que ele faz, entao
+  // ataque e especial sao a mesma acao em intensidades diferentes.
+  const sing = anim === 'attack' ? [1, 2, 3, 1][f % 4] : anim === 'special' ? Math.min(3, f) : 0;
+  const hum = anim === 'idle' ? [0, 0, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+
+  // Base pesada em vez de pernas: ele desliza mais do que caminha, e o passo e
+  // um balanco do corpo inteiro.
+  for (const s of [-1, 1]) {
+    b.push(box(s * 2 - 1, -1.2, Math.max(0, s > 0 ? gait : -gait) * 0.5, 2, 2.4, 3.2, 'rockDeep'));
+  }
+  b.push(box(-3.2, -2.4, 3, 6.4, 4.8, 3, 'rockDeep'));
+  const z = 6 - flinch;
+  // Tronco alto e estreito: a massa que segura os tubos.
+  b.push(box(-2.7, -2.2, z, 5.4, 4.4, 7, 'rock'));
+  // Costelas de cristal aflorando pelo peito — a rede comeca DENTRO dele.
+  b.push(box(-1.8, -2.3, z + 1.5, 1, 0.6, 3, 'electric'));
+  b.push(box(0.9, -2.3, z + 2.5, 1, 0.6, 2.4, 'electric'));
+
+  // A CAVIDADE DE RESSONANCIA no lugar do rosto: um vao emoldurado com a
+  // garganta acendendo quando ele canta. Nao ha olhos e nao ha boca — ha uma
+  // abertura por onde o som sai, e ela e o unico "rosto" que ele tem.
+  b.push(box(-2, -2, z + 7, 4, 4, 3.6, 'rock'));
+  b.push(box(-1.4, -2.4, z + 7.8, 2.8, 0.6, 2.2, sing > 0 ? 'electric' : 'rockDeep'));
+  // Coroa de lascas: tres pontas desiguais.
+  b.push(box(-1.6, -0.9, z + 10.6, 0.9, 0.9, 2 + sing * 0.5, 'electric'));
+  b.push(box(-0.4, 0.1, z + 10.6, 0.9, 0.9, 3 + sing * 0.5, 'electric'));
+  b.push(box(0.8, -0.5, z + 10.6, 0.9, 0.9, 2.5 + sing * 0.5, 'electric'));
+
+  // OS TUBOS DE ORGAO: sete cristais EM VOLTA do tronco, nao atras dele. As
+  // alturas sao desiguais para nao lerem como cerca, e os angulos sao
+  // irregulares pelo mesmo motivo — um heptagono regular vira engrenagem.
+  // O setor FRONTAL fica vazio de proposito. Cercando o tronco por inteiro, os
+  // sete tubos fecharam uma paliçada em volta dele e o corpo desapareceu: sobrou
+  // um feixe de canos sem nada dentro, e com ele foi embora a cavidade de
+  // ressonancia, que e o unico "rosto" do bicho. Os tubos ficam dos flancos para
+  // tras (angulos 0,4 a 4,0 rad), entao o peito e a garganta continuam a vista
+  // de qualquer direcao e a floresta de cristal emoldura em vez de engolir.
+  const pipes = [
+    { a: 0.4, h: 9 },
+    { a: 1.0, h: 6 },
+    { a: 1.6, h: 11 },
+    { a: 2.2, h: 7.5 },
+    { a: 2.8, h: 10 },
+    { a: 3.4, h: 6.5 },
+    { a: 4.0, h: 8.5 },
+  ];
+  for (const p of pipes) {
+    const px = Math.cos(p.a) * 3.6 - 0.6;
+    const py = Math.sin(p.a) * 3.6 - 0.6;
+    b.push(box(px, py, z + 1, 1.2, 1.2, p.h + sing * 1.2 + hum, 'electric'));
+    // Base fosca: o cristal NASCE da rocha, nao esta plantado nela.
+    b.push(box(px - 0.3, py - 0.3, z + 0.4, 1.8, 1.8, 1.4, 'rock'));
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-sheet-leviathan — o Leviata do Lencol, no Aquifero Negro.
+//
+// Mesma gramatica do Devorador (mergulha, marca, emerge) e por isso a silhueta
+// tem de ser o OPOSTO da dele: onde o verme e um tubo que se levanta, este e uma
+// LAMINA larga — uma arraia de agua escura. Duas ameaças com o mesmo ciclo e a
+// mesma forma seriam a mesma criatura pintada de outra cor.
+//
+// A cor, alias, foi o primeiro erro: o corpo saiu em `pool`, cuja face de topo e
+// verde de fungo. Um chefe do Aquifero NEGRO nao pode ser verde — verde e do
+// micelio, e o jogo inteiro depende dessa separacao. Agora ele e `water`, a
+// familia azul da rocha, exatamente como a crosta do lago em que ele vive.
+//
+// As linhas laterais condutivas sao o contra-jogo desenhado no corpo: o que o
+// detem e eletrificar a agua. Autorado com a frente em +x.
+// ---------------------------------------------------------------------------
+const leviathanModel = (anim, f) => {
+  const breach = anim === 'attack' ? [0, 2, 4, 2][f % 4] : anim === 'special' ? Math.min(3, f) : 0;
+  // As asas batem devagar sempre — mesmo encalhado ele nao para de nadar.
+  const flap =
+    anim === 'walk'
+      ? [0, 1, 2, 1, 0, -1][f % 6]
+      : anim === 'idle'
+        ? [0, 0.5, 1, 0.5][f % 4]
+        : breach * 0.5;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  const z = 0.5 + breach * 0.7 + flinch * 0.3;
+
+  // Corpo central: baixo e largo, mas com LOMBO. A primeira versao tinha 3 de
+  // altura contra 12 de comprimento e projetava como um tapete; o dorso agora
+  // sobe ao dobro no meio, e e essa corcova que separa "bicho" de "mancha".
+  for (let s = 0; s < 5; s++) {
+    const x = -6 + s * 2.4;
+    const d = 5.4 - s * 0.7;
+    const h = [3.5, 5, 5.5, 4, 2.6][s];
+    b.push(box(x, -d / 2, z, 2.4, d, h, 'water'));
+  }
+  // Cauda em chicote: quatro segmentos finos, ondulando fora de fase.
+  for (let s = 0; s < 4; s++) {
+    const ph = Math.round(Math.sin((s + f) * 1.2)) * 0.6;
+    b.push(box(-8.4 - s * 1.6, -0.7 + ph, z + 0.6, 1.6, 1.4, 1.4 - s * 0.2, 'water'));
+  }
+  // AS ASAS: as duas placas largas que dao nome ao bicho. Nascem coladas ao
+  // lombo e DESCEM ate a borda, entao a secao le como asa e nao como prateleira
+  // saindo do meio do corpo. A ponta bate o dobro da raiz.
+  // Cinco tiras por asa, com a corda encolhendo e as pontas alinhadas para
+  // TRAS: a membrana sai triangular, como asa de arraia. Em tres tiras largas
+  // com degraus de altura, como estava, ela projetava como uma escadaria de
+  // prateleiras saindo do meio do corpo.
+  for (const s of [-1, 1]) {
+    for (let w = 0; w < 5; w++) {
+      const lift = flap * (w + 1) * 0.3 * s;
+      const wy = s > 0 ? 2.4 + w * 1.1 : -3.5 - w * 1.1;
+      b.push(box(-5.4 + w * 1.1, wy, z + 2.4 - w * 0.25 + lift * 0.5, 7.2 - w * 1.2, 1.1, 1, 'water'));
+    }
+  }
+  // LINHAS LATERAIS CONDUTIVAS: dois frisos de corrente correndo do focinho a
+  // cauda, na quina do lombo. Sao o unico brilho do corpo e apontam para o
+  // contra-jogo — o que para este bicho e eletrificar a agua embaixo dele.
+  for (let s = 0; s < 5; s++) {
+    const d = 5.4 - s * 0.7;
+    const h = [3.5, 5, 5.5, 4, 2.6][s];
+    b.push(box(-6 + s * 2.4, -d / 2 - 0.3, z + h - 1.2, 2.4, 0.6, 0.6, 'electric'));
+    b.push(box(-6 + s * 2.4, d / 2 - 0.3, z + h - 1.2, 2.4, 0.6, 0.6, 'electric'));
+  }
+  // A cabeca: cunha achatada e larga, com fendas branquiais e a boca em fresta
+  // — nao um focinho de peixe, um sugador de fundo.
+  const hx = 6.4 + breach * 0.4;
+  b.push(box(hx - 0.4, -3, z, 1.4, 6, 3, 'water'));
+  b.push(box(hx + 1, -2.2, z, 1.2, 4.4, 2.4, 'water'));
+  b.push(box(hx + 2.2, -1.4, z, 1.2, 2.8, 1.8, 'water')); // focinho em cunha
+  b.push(box(hx + 1, -2, z + 0.2, 0.8, 4, 1, 'bone')); // a boca
+  for (const dy of [-2.8, 2.2]) {
+    b.push(box(hx - 0.2, dy, z + 0.6, 0.6, 0.6, 1.8, 'rockDeep'));
+    b.push(box(hx + 1, dy, z + 0.6, 0.6, 0.6, 1.8, 'rockDeep'));
+  }
+  // Olhos no TOPO da cabeca, nao na frente: ele vive por baixo e olha para
+  // cima, que e de onde a presa vem.
+  b.push(box(hx + 0.2, -1.9, z + 3, 0.8, 0.8, 0.6, 'electric'));
+  b.push(box(hx + 0.2, 1.1, z + 3, 0.8, 0.8, 0.6, 'electric'));
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-lung-matrix — o Pulmao-Matriz da Fenda Sulfurosa.
+//
+// FIXO: nao tem pernas e nao vai ter. Ele esta ancorado nos respiradouros por
+// tubos enraizados no chao, e a ausencia de meio de locomocao e informacao —
+// quem ve isto sabe que fugir dele funciona, e que o problema e o que ele faz
+// com o ar da sala.
+//
+// O saco nasceu CUBICO e um cubo de 9 de lado com tampo `loot` (a face de topo
+// mais clara da paleta) le como engradado, nao como orgao. Agora ele e uma
+// abobada: cinco camadas de pegada decrescente, sem nenhum tampo grande, e as
+// costelas ACOMPANHAM a curva em vez de correrem retas por cima. Materia mole
+// nao tem quina — a unica quina do modelo e a gaiola de osso que a comprime, e
+// e justamente esse contraste que conta o que esta acontecendo ali.
+//
+// O ciclo E o modelo: `idle` inspira e solta, `special` e a inspiracao cheia
+// (zona limpa em volta) e `attack` e a expiracao espremida (o jato). O saco
+// inchado tambem e a janela de dano — e ele que pega fogo.
+// ---------------------------------------------------------------------------
+const lungMatrixModel = (anim, f) => {
+  const breath = anim === 'idle' ? [0, 1, 2, 1][f % 4] : 0;
+  const inhale = anim === 'special' ? Math.min(3, f) : 0;
+  const exhale = anim === 'attack' ? [0, 1.5, 3, 1.5][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+
+  // RAIZES: quatro tubos de ferrugem descendo do corpo e mordendo o chao. Sao
+  // a razao de ele nao perseguir ninguem, e por isso sao grossos e visiveis.
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      // Os tubos ABREM para fora enquanto descem e terminam num pe largo: uma
+      // coluna reta com pastilha embaixo le como PERNA, e a unica coisa que
+      // este chefe nao pode parecer e capaz de andar.
+      b.push(box(sx * 2.2 - 1, sy * 2.2 - 1, 2.4, 2, 2, 2, 'rust'));
+      b.push(box(sx * 2.9 - 1.1, sy * 2.9 - 1.1, 1, 2.2, 2.2, 1.6, 'rust'));
+      b.push(box(sx * 3.6 - 1.6, sy * 3.6 - 1.6, 0, 3.2, 3.2, 1.2, 'rockDeep'));
+    }
+  }
+  b.push(box(-3.6, -3.6, 4, 7.2, 7.2, 1.5, 'rust'));
+
+  // O SACO, em abobada. `swell` e o folego; a pegada de cada camada encolhe
+  // para cima, entao o topo e uma cupula e nao um tampo.
+  const swell = breath * 0.5 + inhale * 0.6 - exhale * 0.8;
+  const z = 5.5 - flinch * 0.5;
+  const layers = [
+    { w: 8.4, h: 2.6 },
+    { w: 9.6, h: 2.6 },
+    { w: 9.2, h: 2.4 },
+    { w: 7.6, h: 2.2 },
+    { w: 5.2, h: 2 },
+    { w: 2.8, h: 1.4 },
+  ];
+  let lz = z;
+  for (const layer of layers) {
+    const w = layer.w + swell;
+    b.push(box(-w / 2, -w / 2, lz, w, w, layer.h, 'sulfur'));
+    lz += layer.h;
+  }
+  const top = lz;
+
+  // COSTELAS: quatro arcos de osso subindo pela abobada em degraus que seguem
+  // a curva dela. Elas NAO mudam de tamanho com o folego — e por isso que o
+  // saco parece pressionado por elas em vez de simplesmente encolher.
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    let rz = z;
+    for (const layer of layers) {
+      const w = layer.w + swell;
+      const rx = dx === 0 ? -1 : dx * (w / 2 - 0.2) - (dx < 0 ? 0.8 : 0);
+      const ry = dy === 0 ? -1 : dy * (w / 2 - 0.2) - (dy < 0 ? 0.8 : 0);
+      b.push(box(rx, ry, rz, dx === 0 ? 2 : 1, dy === 0 ? 2 : 1, layer.h, 'bone'));
+      rz += layer.h;
+    }
+  }
+  // Coroa de valvulas no alto da cupula: por onde o orgao sangra gas quando
+  // esta cheio demais.
+  b.push(box(-1.2, -1.2, top, 2.4, 2.4, 1.2, 'rust'));
+
+  // TRAQUEIA frontal: o bocal por onde a expiracao sai. Fica na altura media do
+  // saco e projeta para FORA da abobada — e o unico apendice do corpo, entao e
+  // ele que diz de que lado o sopro vem.
+  const ty = -(layers[1].w + swell) / 2;
+  b.push(box(-1.8, ty - 2.8, z + 3, 3.6, 3, 3.6, 'rust'));
+  b.push(box(-1.2, ty - 3.2, z + 3.8, 2.4, 0.6, 1.8, 'rockDeep'));
+  if (exhale >= 1.5) {
+    for (let p = 0; p < 4; p++) {
+      b.push(box(-1 + (p % 2) * 1.2, ty - 4 - p * 1.6, z + 3.4 + p * 0.4, 1.2, 1.2, 1.2, 'acid'));
+    }
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-furnace-heart — o Coracao da Fornalha Abissal.
+//
+// FIXO, como o Pulmao, e pelo mesmo motivo: a luta e contra a SALA. O que o
+// modelo tem de entregar e o ciclo, porque o ciclo e a unica decisao que o
+// jogador toma — ele nao escolhe quando bater, escolhe onde estar quando puder.
+//
+// SUPERAQUECIDO (blindado): as placas fecham sobre a brasa, as espinhas sobem e
+// so as frestas brilham. RESFRIANDO (vulneravel): as placas se abrem e o nucleo
+// aparece inteiro. E a mesma linguagem da couraça do Escoriaceo na escala de um
+// chefe — repeticao deliberada, nao falta de ideia: o jogador ja sabe ler
+// "placa fechada = nao entra".
+//
+// A base era um pedestal de dois degraus centrados, e pedestal e ARQUITETURA.
+// Isto e geologia: o monte agora e assimetrico, com blocos de escoria de
+// tamanhos diferentes empilhados fora de eixo.
+// ---------------------------------------------------------------------------
+const furnaceHeartModel = (anim, f) => {
+  // `special` e o superaquecimento (fecha) e `attack` e a onda que sai dele;
+  // `idle` respira devagar entre os dois, que e o estado neutro do ciclo.
+  const shut = anim === 'special' ? Math.min(2, f) : anim === 'attack' ? [2, 1, 0, 1][f % 4] : 0;
+  const open = anim === 'idle' ? [0, 0.5, 1, 0.5][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  // Espalhamento das placas: fechado no superaquecimento, aberto no resfriar.
+  const gap = 1.6 - shut * 0.8 + open;
+
+  // Monte de escoria fria, assimetrico: cinco blocos fora de eixo. Um monte
+  // regular lê como construcao, e isto e a rocha que o nucleo rompeu.
+  b.push(box(-5.5, -4.6, 0, 10.5, 9.4, 2.6, 'rockDeep'));
+  b.push(box(-4.8, -3.4, 2.6, 6.2, 7.4, 2.4, 'rockDeep'));
+  b.push(box(-0.6, -4.2, 2.6, 5.4, 6.4, 3.2, 'rockDeep'));
+  b.push(box(-4.4, -2.6, 5, 3.4, 4.4, 1.8, 'scorch'));
+  b.push(box(1.2, -3.6, 5.8, 3.2, 5.2, 1.4, 'scorch'));
+
+  // O NUCLEO: sempre presente, e a fonte de toda a luz do modelo. Ele nao muda
+  // de tamanho com o ciclo — o que muda e o quanto as placas o cobrem, e essa
+  // distincao e o que ensina "abrir e a janela".
+  b.push(box(-3.4, -3.4, 5.4, 6.8, 6.8, 6.6, 'fire'));
+  b.push(box(-2, -2, 12, 4, 4, 2.4, 'fire'));
+
+  // PLACAS: quatro laminas em volta do nucleo, afastando-se dele quando abre.
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    const px = -2.5 + dx * (3.2 + gap * 0.8) - (dx < 0 ? 1.5 : 0);
+    const py = -2.5 + dy * (3.2 + gap * 0.8) - (dy < 0 ? 1.5 : 0);
+    const pw = dx === 0 ? 6.8 : 2;
+    const pd = dy === 0 ? 6.8 : 2;
+    b.push(box(px, py, 4.8 - flinch * 0.5, pw, pd, 8, 'rockDeep'));
+    b.push(box(px, py, 12.8 - flinch * 0.5, pw, pd, 0.5, 'scorch'));
+  }
+  // ESPINHAS: sobem no superaquecimento e somem no resfriar. Sao o aviso que se
+  // le de mais longe — a SILHUETA muda antes de a cor mudar.
+  if (shut >= 1) {
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      b.push(box(sx * 3.4 - 0.5, sy * 3.4 - 0.5, 11.8, 1, 1, 1.5 + shut, 'scorch'));
+    }
+  }
+  // Frestas: com as placas abertas, veios de brasa vazam pela base do monte.
+  if (gap >= 1.6) {
+    b.push(box(-5, -1, 5.4, 2.5, 1, 0.8, 'fire'));
+    b.push(box(2.5, 0.5, 5.4, 2.5, 1, 0.8, 'fire'));
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-frost-queen — a Rainha da Geada, na Cripta Glacial.
+//
+// A unica figura HUMANOIDE entre os chefes de estrato, e isso e a escolha: os
+// outros sao orgaos, maquinas e bichos, e ela e a coisa que tem POSTURA.
+//
+// A primeira versao nao tinha postura nenhuma: a saia era uma sequencia de
+// degraus centrados que encolhiam para cima, e o resultado foi um ZIGURATE —
+// um bolo de casamento de gelo. A licao e a mesma que o Coveiro deu com a
+// pilha de lajes: silhueta se faz por PROPORCAO, nao por detalhe. Uma figura de
+// pe precisa de tres larguras distintas na vertical (saia larga, cintura
+// estreita, ombros medios) e de algo saindo para os LADOS na altura dos bracos.
+// Um cone de degraus so tem uma largura, que diminui — e isso e um monte.
+//
+// A couraça dela e o estrato: placas de gelo crescidas sobre um corpo escuro que
+// so aparece pelas frestas. Derreter o lago em volta e o contra-jogo, e o modelo
+// diz por que — tire o gelo e o que sobra e a coisa magra debaixo dele.
+// ---------------------------------------------------------------------------
+const frostQueenModel = (anim, f) => {
+  const glide = anim === 'walk' ? [0, 0.5, 1, 1, 0.5, 0][f % 6] : 0;
+  // `special` e a carga do congelamento: os bracos sobem e as lascas crescem.
+  const raise = anim === 'special' ? Math.min(3, f) : anim === 'attack' ? [1, 3, 2, 0][f % 4] : 0;
+  const drift = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  const b = [];
+  const z = drift + glide * 0.3;
+
+  // SAIA: um tronco ESTREITO do chao a cintura, com o alargamento so na barra.
+  // Duas larguras, nao seis — a saia tem de ler como uma peça, e a barra e o
+  // que arrasta. As lascas soltas na borda sao a nevoa; sao elas, e nao mais
+  // degraus, que quebram a base.
+  b.push(box(-1.8, -1.6, z + 4, 3.6, 3.2, 5, 'ice'));
+  b.push(box(-2.6, -2.2, z + 1.6, 5.2, 4.4, 2.4, 'ice'));
+  b.push(box(-3.4, -2.8, z, 6.8, 5.6, 1.6, 'ice'));
+  for (let i = 0; i < 7; i++) {
+    const a = (i * 2 * Math.PI) / 7 + glide * 0.3;
+    b.push(box(Math.cos(a) * 3.6 - 0.45, Math.sin(a) * 3 - 0.45, z + (i % 2) * 0.8, 0.9, 0.9, 1.4 + (i % 3) * 0.6, 'ice'));
+  }
+
+  // CINTURA e TRONCO: a parte mais estreita do corpo inteiro, e e ela que faz a
+  // figura ler como figura. O corpo por baixo e ESCURO, e a fresta entre as duas
+  // placas de gelo deixa ver isso — a promessa do contra-jogo.
+  b.push(box(-1.2, -1, z + 9, 2.4, 2, 5.6, 'rockDeep'));
+  b.push(box(-2.2, -1.5, z + 9.4, 1.5, 3, 5, 'ice'));
+  b.push(box(0.7, -1.5, z + 9.4, 1.5, 3, 5, 'ice'));
+
+  // OMBROS: uma barra atravessada, mais larga que a cintura e mais estreita que
+  // a barra da saia. E o terceiro degrau de largura, e sem ele nao ha figura.
+  b.push(box(-3.2, -1.2, z + 14 - flinch * 0.5, 6.4, 2.4, 1.6, 'ice'));
+
+  // BRACOS de sincelo: finos, sem mao — terminam em ponta, e saem para os LADOS
+  // antes de descer. Sobem na carga, e e nesse gesto que o telegrafo do
+  // congelamento acontece.
+  for (const s of [-1, 1]) {
+    const ax = s * 3.4 - 0.5;
+    b.push(box(ax, -0.7, z + 13 - flinch * 0.5, 1.1, 1.6, 1.6, 'ice'));
+    b.push(box(ax, -0.7, z + 9.5 + raise * 1.4, 1.1, 1.4, 3.5 + raise * 0.4, 'ice'));
+  }
+
+  // PESCOCO e CABECA: pequenos. A cabeca pequena sobre ombros largos e o que
+  // da ESCALA a figura — do tamanho da cintura, ela viraria um boneco.
+  b.push(box(-0.8, -0.8, z + 15.6 - flinch * 0.5, 1.6, 1.6, 1.2, 'rockDeep'));
+  b.push(box(-1.4, -1.4, z + 16.8 - flinch * 0.5, 2.8, 2.8, 2.4, 'ice'));
+  // O rosto: dois pontos de corrente na fresta escura. Nada mais — e o unico
+  // brilho do modelo e ele fica na altura dos olhos de proposito.
+  b.push(box(-1.1, -1.7, z + 17.6 - flinch * 0.5, 0.7, 0.6, 0.7, 'electric'));
+  b.push(box(0.4, -1.7, z + 17.6 - flinch * 0.5, 0.7, 0.6, 0.7, 'electric'));
+
+  // COROA: cinco lascas desiguais, a do meio mais alta. Crescem com a carga —
+  // a silhueta anuncia antes de a cor mudar, como no Coracao.
+  [1.4, 2.4, 4, 2.4, 1.4].forEach((hgt, i) => {
+    b.push(box(-1.5 + i * 0.8, -0.4, z + 19.2 - flinch * 0.5, 0.7, 0.9, hgt + raise * 0.5, 'ice'));
+  });
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+// ---------------------------------------------------------------------------
+// enemy-magnetarch — o Magnetarca do Estrato Ferrifero.
+//
+// Nao e uma criatura e nao pode parecer uma: e um NUCLEO de magnetita suspenso
+// dentro de dois aneis de ferro. Nao tem pernas, nao tem rosto e nao toca o chao.
+//
+// Os aneis sairam pontilhados na primeira versao — oito cubos de lado 1 num
+// raio de 4,5 nao sao um anel, sao oito cubos. Ficaram vinte segmentos
+// SOBREPOSTOS por anel, e o segmento cresceu para 1,4: a circunferencia fecha e
+// o olho le uma peça unica girando, que era o ponto.
+//
+// A polaridade e a luta inteira, e ela se le na distancia dos aneis: atraindo,
+// eles se fecham sobre o nucleo; repelindo, se abrem. O jogador nao precisa de
+// icone — o campo esta desenhado no corpo, e a faixa segura e o que sobra entre
+// os dois.
+// ---------------------------------------------------------------------------
+const RING_SEGMENTS = 20;
+const magnetarchModel = (anim, f) => {
+  // ATRAINDO e `attack` (os aneis fecham); REPELINDO e `special` (abrem).
+  const pull = anim === 'attack' ? [2, 3, 3, 2][f % 4] : 0;
+  const push = anim === 'special' ? Math.min(3, f) : 0;
+  const hover = [0, 0.5, 1, 0.5][f % 4];
+  const glide = anim === 'walk' ? [0, 0.5, 1, 0.5, 0, -0.5][f % 6] : 0;
+  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
+  // Raio dos aneis. A amplitude e curta de proposito: com aneis abrindo o dobro
+  // disto o sprite passava de 170px de largura projetada — mais largo que o
+  // Diamandis — e prometia uma massa que um chefe de raio 0,8 nao tem. A
+  // polaridade se le na PROPORCAO entre anel e nucleo, e essa nao depende de o
+  // anel ser grande.
+  const r = 4 - pull * 0.5 + push * 0.7;
+  const b = [];
+
+  // Ele PAIRA, entao a base e o vazio. O que ancora a leitura no chao e uma
+  // pequena chuva de limalha suspensa logo abaixo — sem ela o corpo flutua sem
+  // referencia e o jogador nao sabe onde ele esta pisando.
+  for (let i = 0; i < 5; i++) {
+    const a = (i * 2 * Math.PI) / 5 + f * 0.4;
+    b.push(box(Math.cos(a) * 2.4 - 0.35, Math.sin(a) * 2.4 - 0.35, 0.4 + (i % 3) * 0.5, 0.7, 0.7, 0.7, 'rust'));
+  }
+
+  const z = 6 + hover + glide * 0.5 - flinch;
+  // O NUCLEO: um octaedro grosseiro de magnetita, e o volume DOMINANTE. Ele era
+  // menor que os aneis e por isso o bicho lia como uma nuvem com um ponto no
+  // meio; agora e o anel que orbita alguma coisa, que e a leitura certa.
+  b.push(box(-2.6, -2.6, z + 1.6, 5.2, 5.2, 4.4, 'rockDeep'));
+  b.push(box(-1.8, -1.8, z, 3.6, 3.6, 1.6, 'rockDeep'));
+  b.push(box(-1.8, -1.8, z + 6, 3.6, 3.6, 1.6, 'rockDeep'));
+  // Costuras: dois frisos cruzados de corrente, mais uma cinta equatorial. E o
+  // unico brilho, e ele diz "campo", nao "olho".
+  b.push(box(-2.9, -0.5, z + 3.2, 5.8, 1, 1, 'electric'));
+  b.push(box(-0.5, -2.9, z + 3.2, 1, 5.8, 1, 'electric'));
+  b.push(box(-2.7, -2.7, z + 5.4, 5.4, 5.4, 0.6, 'electric'));
+
+  // OS DOIS ANEIS, em planos perpendiculares. Segmentos sobrepostos e um giro
+  // lento com o quadro para nao lerem como estrutura parada.
+  for (let i = 0; i < RING_SEGMENTS; i++) {
+    const a = (i * 2 * Math.PI) / RING_SEGMENTS + f * 0.16;
+    b.push(box(Math.cos(a) * r - 0.7, -0.7, z + 3.2 + Math.sin(a) * r - 0.7, 1.4, 1.4, 1.4, 'rust'));
+    const a2 = a + Math.PI / RING_SEGMENTS;
+    b.push(box(-0.7, Math.cos(a2) * r - 0.7, z + 3.2 + Math.sin(a2) * r - 0.7, 1.4, 1.4, 1.4, 'rust'));
+  }
+  // SUCATA presa ao campo: tres cacos de ferro, e sao TRES porque cinco viravam
+  // ruido em volta do anel. Colados no nucleo quando ele puxa, arremessados
+  // para fora quando ele empurra — o estado do campo em objetos, e nao so na
+  // geometria dos aneis.
+  const debris = 1.4 + pull * -0.3 + push * 0.8;
+  for (let i = 0; i < 3; i++) {
+    const a = (i * 2 * Math.PI) / 3 - f * 0.3;
+    b.push(box(
+      Math.cos(a) * (r + debris) - 0.7,
+      Math.sin(a) * (r + debris) - 0.7,
+      z + 2 + (i % 3) * 1.6,
+      1.4,
+      1.4,
+      1.4,
+      i % 2 ? 'bone' : 'rust'
+    ));
+  }
+  return anim === 'die' ? collapse(b, dieT(f)) : b;
+};
+
+const diamandisFrame = (dir, anim, f) =>
+  renderVoxels(diamandisModel(anim, f), DIR_INDEX[dir], 120, 138, 58, 114);
+const devourerFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(devourerModel(anim, f)), DIR_INDEX[dir], 104, 94, 50, 71);
+const archcantorFrame = (dir, anim, f) =>
+  renderVoxels(archcantorModel(anim, f), DIR_INDEX[dir], 64, 114, 30, 97);
+const leviathanFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(leviathanModel(anim, f)), DIR_INDEX[dir], 124, 80, 60, 51);
+const lungMatrixFrame = (dir, anim, f) =>
+  renderVoxels(lungMatrixModel(anim, f), DIR_INDEX[dir], 116, 112, 56, 88);
+const furnaceHeartFrame = (dir, anim, f) =>
+  renderVoxels(furnaceHeartModel(anim, f), DIR_INDEX[dir], 116, 108, 56, 84);
+const frostQueenFrame = (dir, anim, f) =>
+  renderVoxels(frostQueenModel(anim, f), DIR_INDEX[dir], 60, 118, 28, 101);
+const magnetarchFrame = (dir, anim, f) =>
+  renderVoxels(magnetarchModel(anim, f), DIR_INDEX[dir], 128, 98, 62, 83);
+
 // FX AUTORADOS NATIVOS na resolucao fina (32x32). Ate a subdivisao da grade
 // eles eram desenhos de 16x16 dobrados por vizinho-mais-proximo — pixels
 // gordos de 2x2 fingindo resolucao. Redesenhados no grao real: o estilhaco
@@ -1549,6 +2298,61 @@ export const ENTITY_SPECS = [
     ...living,
     special: { frames: 6, fps: 10, loop: false },
   }, undertakerFrame, 'voxel-isometric scrap-collector automaton, oversized electromagnet disc arm with glowing coils, heavy press arm, rusted industrial chassis, hauling bin on its back, recessed scanning lens', 1),
+  // Chefes. Todos nascem em `version: 1` — sao os primeiros pixels destes
+  // atlases; ate agora estes oito arquetipos desenhavam pelo recuo do cliente.
+  //
+  // O `special` de cada um e o TELEGRAFO que mais importa naquele chefe, e nao
+  // um segundo ataque: broca carregando, verme rasgando o chao, canto inchando
+  // os tubos, mergulho, inspiracao, superaquecimento, coroa carregando o
+  // congelamento, campo invertendo. Foi o que o Coveiro ensinou — apontar o
+  // `special` para o golpe seguinte em vez de para o aviso em curso mostra o
+  // membro errado se movendo na hora que decide a luta.
+  base('enemy-diamandis', 120, 138, 58, 114, { w: 1.8, h: 2.4 }, { w: 2, h: 2, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 4, fps: 8, loop: false },
+  }, diamandisFrame, 'voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon', 1),
+  base('enemy-white-devourer', 104, 94, 50, 71, { w: 2.2, h: 1.2 }, { w: 2, h: 1.6, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 4, fps: 10, loop: false },
+    // `downed` e a fase PRESA, e nao a morte: o Devorador e o unico inimigo que
+    // usa este slot em vida. O nome do slot ja existia no contrato de atlas e
+    // significa exatamente isto — "fora de combate, no chao, vulneravel".
+    downed: { frames: 4, fps: 5, loop: true },
+  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; stuck pose rears the front half vertically out of a silt collar with the maw opening upward', 1),
+  base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 4, fps: 9, loop: false },
+  }, archcantorFrame, 'voxel-isometric prismatic cathedral cantor boss, dark rock body with five uneven electric crystal organ pipes growing from its back, resonance cavity instead of a face, crown of crystal shards, no arms and no weapon', 1),
+  base('enemy-sheet-leviathan', 124, 80, 60, 51, { w: 2.2, h: 1.4 }, { w: 2, h: 1.8, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 4, fps: 10, loop: false },
+  }, leviathanFrame, 'voxel-isometric black aquifer ray-leviathan boss, broad flat wing sheets, whip tail, conductive electric lateral lines running nose to tail, flattened wedge head with gill slits and a slit mouth, top-mounted eyes', 1),
+  // Pulmao e Coracao sao FIXOS na simulacao (speed 0) e por isso nao tem
+  // `walk`: um atlas com marcha para quem nunca sai do lugar seria 24 quadros
+  // de textura que nenhum frame do jogo chega a pedir. O cliente ja cai em
+  // `idle` para animacao ausente.
+  base('enemy-lung-matrix', 116, 112, 56, 88, { w: 1.8, h: 1.8 }, { w: 2, h: 2, offsetX: 0, offsetY: 0 }, {
+    idle: { frames: 4, fps: 5, loop: true },
+    attack: { frames: 4, fps: 10, loop: false },
+    special: { frames: 4, fps: 6, loop: false },
+    hit: { frames: 2, fps: 12, loop: false },
+    die: { frames: 5, fps: 10, loop: false },
+  }, lungMatrixFrame, 'voxel-isometric anchored sulfur lung organ boss, huge yellow gas sac caged by four bone ribs, rusted root pipes biting the floor, frontal trachea valve venting sulfur, accessory sacs on the back — no legs', 1),
+  base('enemy-furnace-heart', 116, 108, 56, 84, { w: 2, h: 2 }, { w: 2, h: 2, offsetX: 0, offsetY: 0 }, {
+    idle: { frames: 4, fps: 5, loop: true },
+    attack: { frames: 4, fps: 10, loop: false },
+    special: { frames: 4, fps: 8, loop: false },
+    hit: { frames: 2, fps: 12, loop: false },
+    die: { frames: 5, fps: 10, loop: false },
+  }, furnaceHeartFrame, 'voxel-isometric anchored igneous core boss, four dark slag plates opening and closing around a permanent molten core, charred plate edges, scoria mound base, spines rising when overheated — no legs', 1),
+  base('enemy-frost-queen', 60, 118, 28, 101, { w: 1.2, h: 2.2 }, { w: 1.4, h: 1.4, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 4, fps: 9, loop: false },
+  }, frostQueenFrame, 'voxel-isometric glacial crypt queen boss, humanoid posture, dragging skirt of ice and mist instead of legs, dark narrow body showing through gaps between ice plates, icicle arms without hands, five-shard crown, two electric eyes', 1),
+  base('enemy-magnetarch', 128, 98, 62, 83, { w: 1.4, h: 1.8 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
+    ...living,
+    special: { frames: 4, fps: 9, loop: false },
+  }, magnetarchFrame, 'voxel-isometric hovering magnetite core boss, rough dark octahedron with glowing electric seams, two perpendicular iron segment rings that tighten or widen with polarity, orbiting scrap debris, suspended iron filings below — no legs, no face', 1),
   {
     id: 'fx-projectile-bolt', version: 4, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 16,
     directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.2, h: 0.2 },

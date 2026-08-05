@@ -1,4 +1,4 @@
-// O Codex corporativo (89 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (123 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -45,6 +45,17 @@
 
 import {
   DISCOVERY_BISHOP_FELLED,
+  DISCOVERY_DIAMANDIS_CORRIDOR,
+  DISCOVERY_DIAMANDIS_MODULE,
+  DISCOVERY_CATHEDRAL_SILENCED,
+  DISCOVERY_FURNACE_COOLED,
+  DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_LUNG_IGNITED,
+  DISCOVERY_MAGNET_BANDED,
+  DISCOVERY_QUEEN_THAWED,
+  DISCOVERY_SILICA_VITRIFIED,
+  DISCOVERY_BISHOP_HEALED,
+  DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_CARGO_LOST,
   DISCOVERY_CORE_TAKEN,
   DISCOVERY_DISCHARGE_POOL,
@@ -234,6 +245,14 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
   'undertaker',
   'bishop',
   'guardian',
+  'diamandis',
+  'white_devourer',
+  'archcantor',
+  'sheet_leviathan',
+  'lung_matrix',
+  'furnace_heart',
+  'frost_queen',
+  'magnetarch',
 ];
 
 /**
@@ -261,6 +280,14 @@ export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   undertaker: 'AX-UNK-043',
   bishop: 'AX-EXE-034',
   guardian: 'AX-EXE-039',
+  diamandis: 'AX-PUB-010',
+  white_devourer: 'AX-ENG-030',
+  archcantor: 'AX-ENG-031',
+  sheet_leviathan: 'AX-ENG-032',
+  lung_matrix: 'AX-ENG-033',
+  furnace_heart: 'AX-ENG-034',
+  frost_queen: 'AX-ENG-035',
+  magnetarch: 'AX-ENG-036',
 };
 
 /** Um documento por Descoberta. O bit aposentado (ORE_QUOTA) fica de fora. */
@@ -276,6 +303,30 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   { bit: DISCOVERY_CARGO_LOST, fragmentId: 'AX-PRC-023' },
   { bit: DISCOVERY_HORSE_FELLED, fragmentId: 'AX-INC-033' },
   { bit: DISCOVERY_BISHOP_FELLED, fragmentId: 'AX-UNK-045' },
+  // As duas Descobertas do Bispo sao de ENTENDIMENTO, e nao de repeticao: uma
+  // exige ter visto o chao devolver vida a ele, a outra exige ter estado
+  // dentro do disco da Supernova e continuado de pe. Sao os dois fatos que os
+  // documentos abaixo interpretam — e nenhum deles abre por farm.
+  { bit: DISCOVERY_BISHOP_HEALED, fragmentId: 'AX-ENG-028' },
+  { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, fragmentId: 'AX-INC-040' },
+  // A broca do Diamandis abrindo corredor: o unico fato do encontro que
+  // ensina o que ele e — um golpe que nao mira em voce, reescreve a sala.
+  { bit: DISCOVERY_DIAMANDIS_CORRIDOR, fragmentId: 'AX-ENG-029' },
+  // Um Coveiro arrancando um modulo da carcaça: o instante em que o jogador
+  // descobre que aquelas unidades nao vieram com o chefe — vieram ANTES dele.
+  { bit: DISCOVERY_DIAMANDIS_MODULE, fragmentId: 'AX-UNK-060' },
+  // Vitrificar silica solta: o bit exige ter FEITO, e nao ter entendido — a
+  // compreensao vem depois, de ver o verme falhar em subir ali.
+  { bit: DISCOVERY_SILICA_VITRIFIED, fragmentId: 'AX-INC-042' },
+  // As seis alavancas de estrato. Cada bit e o instante em que o jogador
+  // ENTENDE por que aquele chefe pertence aquele bioma — nunca "matou de
+  // novo": eles aparecem uma vez por run, e repeticao viraria farm.
+  { bit: DISCOVERY_CATHEDRAL_SILENCED, fragmentId: 'AX-INC-043' },
+  { bit: DISCOVERY_LEVIATHAN_SHOCKED, fragmentId: 'AX-INC-044' },
+  { bit: DISCOVERY_LUNG_IGNITED, fragmentId: 'AX-INC-045' },
+  { bit: DISCOVERY_FURNACE_COOLED, fragmentId: 'AX-INC-046' },
+  { bit: DISCOVERY_QUEEN_THAWED, fragmentId: 'AX-INC-047' },
+  { bit: DISCOVERY_MAGNET_BANDED, fragmentId: 'AX-INC-048' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
@@ -339,6 +390,18 @@ export const ASSET_MILESTONE_LORE: readonly {
 export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchetype }[] = [
   { bit: DISCOVERY_HORSE_FELLED, archetype: 'fungal_horse' },
   { bit: DISCOVERY_BISHOP_FELLED, archetype: 'bishop' },
+  { bit: DISCOVERY_BISHOP_HEALED, archetype: 'bishop' },
+  { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, archetype: 'bishop' },
+  { bit: DISCOVERY_DIAMANDIS_CORRIDOR, archetype: 'diamandis' },
+  { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'diamandis' },
+  { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'undertaker' },
+  { bit: DISCOVERY_SILICA_VITRIFIED, archetype: 'white_devourer' },
+  { bit: DISCOVERY_CATHEDRAL_SILENCED, archetype: 'archcantor' },
+  { bit: DISCOVERY_LEVIATHAN_SHOCKED, archetype: 'sheet_leviathan' },
+  { bit: DISCOVERY_LUNG_IGNITED, archetype: 'lung_matrix' },
+  { bit: DISCOVERY_FURNACE_COOLED, archetype: 'furnace_heart' },
+  { bit: DISCOVERY_QUEEN_THAWED, archetype: 'frost_queen' },
+  { bit: DISCOVERY_MAGNET_BANDED, archetype: 'magnetarch' },
   { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
   { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
   { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
@@ -481,13 +544,55 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-EXE-046': ['AX-INC-039', 'AX-EXE-040', 'AX-UNK-056'],
   'AX-UNK-056': ['AX-EXE-046', 'AX-UNK-050', 'AX-UNK-054'],
   'AX-UNK-054': ['AX-UNK-046', 'AX-UNK-042', 'AX-UNK-048', 'AX-UNK-053', 'AX-UNK-049'],
-  'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033'],
+  // O arco do Bispo: a medicao fria → o custo do laudo → a emissao que nao
+  // persegue ninguem → a palavra proibida → a regra → os dois que guardavam.
+  'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033', 'AX-ENG-028'],
+  'AX-ENG-028': ['AX-EXE-034', 'AX-INC-040'],
+  'AX-PRC-025': ['AX-UNK-045', 'AX-EXE-047'],
+  'AX-INC-040': ['AX-ENG-028', 'AX-UNK-045', 'AX-EXE-047'],
+  'AX-EXE-047': ['AX-PRC-025', 'AX-UNK-057'],
+  'AX-UNK-057': ['AX-ENG-028', 'AX-PRC-025', 'AX-INC-040', 'AX-UNK-045'],
+  'AX-UNK-058': ['AX-UNK-057', 'AX-UNK-051', 'AX-EXE-042', 'AX-UNK-050'],
+  // O arco do Diamandis: a propaganda → o ativo grande demais para a propria
+  // obra → a ordem que ele acusou e nao cumpriu → o que ele estava cercando.
+  'AX-PUB-010': ['AX-ENG-029', 'AX-PRC-014'],
+  'AX-ENG-029': ['AX-PUB-010', 'AX-INC-041'],
+  'AX-PRC-026': ['AX-PUB-010', 'AX-EXE-048', 'AX-UNK-043'],
+  'AX-EXE-048': ['AX-PRC-026', 'AX-UNK-059'],
+  'AX-INC-041': ['AX-ENG-029', 'AX-UNK-059'],
+  'AX-UNK-059': ['AX-INC-041', 'AX-UNK-051', 'AX-UNK-050'],
+  'AX-UNK-060': ['AX-PRC-026', 'AX-UNK-043', 'AX-EXE-048'],
+  // O arco do Devorador: a massa que nao fecha → o chao que o recusa → a
+  // hipotese que nenhum laudo aprovado assina.
+  'AX-ENG-030': ['AX-INC-042', 'AX-UNK-061'],
+  'AX-INC-042': ['AX-ENG-030', 'AX-UNK-061'],
+  'AX-UNK-061': ['AX-ENG-030', 'AX-INC-042', 'AX-UNK-054'],
+  // As fichas dos chefes de estrato apontam para o que a companhia nao quis
+  // concluir sobre o proprio Veio: a transmissao, o Nucleo e a sintese.
+  'AX-ENG-031': ['AX-ENG-017', 'AX-UNK-050'],
+  'AX-ENG-032': ['AX-PRC-018', 'AX-UNK-048'],
+  'AX-ENG-033': ['AX-ENG-019', 'AX-UNK-042'],
+  'AX-ENG-034': ['AX-ENG-027', 'AX-UNK-050'],
+  'AX-ENG-035': ['AX-ENG-024', 'AX-UNK-053'],
+  'AX-ENG-036': ['AX-UNK-043', 'AX-UNK-050'],
+  'AX-INC-043': ['AX-ENG-031', 'AX-UNK-062'],
+  'AX-UNK-062': ['AX-INC-043', 'AX-ENG-031', 'AX-UNK-054'],
+  'AX-INC-044': ['AX-ENG-032', 'AX-UNK-063'],
+  'AX-UNK-063': ['AX-INC-044', 'AX-ENG-032', 'AX-UNK-054'],
+  'AX-INC-045': ['AX-ENG-033', 'AX-UNK-064'],
+  'AX-UNK-064': ['AX-INC-045', 'AX-ENG-033', 'AX-UNK-054'],
+  'AX-INC-046': ['AX-ENG-034', 'AX-UNK-065'],
+  'AX-UNK-065': ['AX-INC-046', 'AX-ENG-034', 'AX-UNK-054'],
+  'AX-INC-047': ['AX-ENG-035', 'AX-UNK-066'],
+  'AX-UNK-066': ['AX-INC-047', 'AX-ENG-035', 'AX-UNK-054'],
+  'AX-INC-048': ['AX-ENG-036', 'AX-UNK-067'],
+  'AX-UNK-067': ['AX-INC-048', 'AX-ENG-036', 'AX-UNK-054'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
-  'AX-UNK-045': ['AX-EXE-034', 'AX-INC-033', 'AX-UNK-047'],
+  'AX-UNK-045': ['AX-EXE-034', 'AX-INC-033', 'AX-UNK-047', 'AX-PRC-025'],
   'AX-UNK-050': ['AX-EXE-039', 'AX-UNK-049'],
-  'AX-UNK-051': ['AX-UNK-050', 'AX-EXE-042'],
+  'AX-UNK-051': ['AX-UNK-050', 'AX-EXE-042', 'AX-UNK-058'],
 };
 
 const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
@@ -541,6 +646,32 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-EXE-046': 2,
   'AX-UNK-055': 3,
   'AX-UNK-056': 3,
+  'AX-PRC-025': 1,
+  'AX-INC-040': 1,
+  'AX-EXE-047': 2,
+  'AX-UNK-057': 2,
+  'AX-UNK-058': 3,
+  'AX-ENG-029': 0,
+  'AX-INC-041': 1,
+  'AX-UNK-059': 3,
+  'AX-PRC-026': 1,
+  'AX-EXE-048': 2,
+  'AX-UNK-060': 3,
+  'AX-ENG-030': 0,
+  'AX-INC-042': 1,
+  'AX-UNK-061': 3,
+  'AX-INC-043': 1,
+  'AX-UNK-062': 3,
+  'AX-INC-044': 1,
+  'AX-UNK-063': 3,
+  'AX-INC-045': 1,
+  'AX-UNK-064': 3,
+  'AX-INC-046': 1,
+  'AX-UNK-065': 3,
+  'AX-INC-047': 1,
+  'AX-UNK-066': 3,
+  'AX-INC-048': 1,
+  'AX-UNK-067': 3,
 };
 
 /**
@@ -563,6 +694,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PUB-006',
   'AX-PUB-007',
   'AX-PUB-009',
+  'AX-PUB-010',
   'AX-GEN-G01',
   // Ato II — Procedimento
   'AX-ENG-011',
@@ -582,6 +714,15 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-025',
   'AX-ENG-026',
   'AX-ENG-027',
+  'AX-ENG-028',
+  'AX-ENG-029',
+  'AX-ENG-030',
+  'AX-ENG-031',
+  'AX-ENG-032',
+  'AX-ENG-033',
+  'AX-ENG-034',
+  'AX-ENG-035',
+  'AX-ENG-036',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',
@@ -594,6 +735,8 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PRC-022',
   'AX-PRC-023',
   'AX-PRC-024',
+  'AX-PRC-025',
+  'AX-PRC-026',
   'AX-GEN-G02',
   // Ato IV — Incidente
   'AX-INC-022',
@@ -614,6 +757,15 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-037',
   'AX-INC-038',
   'AX-INC-039',
+  'AX-INC-040',
+  'AX-INC-041',
+  'AX-INC-042',
+  'AX-INC-043',
+  'AX-INC-044',
+  'AX-INC-045',
+  'AX-INC-046',
+  'AX-INC-047',
+  'AX-INC-048',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -631,6 +783,8 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-044',
   'AX-EXE-045',
   'AX-EXE-046',
+  'AX-EXE-047',
+  'AX-EXE-048',
   // Ato VI — Memoria
   'AX-UNK-041',
   'AX-UNK-042',
@@ -647,6 +801,17 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-053',
   'AX-UNK-055',
   'AX-UNK-056',
+  'AX-UNK-057',
+  'AX-UNK-058',
+  'AX-UNK-059',
+  'AX-UNK-060',
+  'AX-UNK-061',
+  'AX-UNK-062',
+  'AX-UNK-063',
+  'AX-UNK-064',
+  'AX-UNK-065',
+  'AX-UNK-066',
+  'AX-UNK-067',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
@@ -699,6 +864,133 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   // pode ler o documento que as nomeia como o mesmo fenomeno. Os arcos do
   // Ressonante e do Scoriac ficam de fora DE PROPOSITO: um e memoria coletiva
   // e o outro talvez nem seja pessoa — a sintese nao pode virar formula.
+  // O arco do Bispo, do custo a regra. Os tres primeiros cruzam ter DERRUBADO
+  // o ativo com ter entendido uma metade do encontro; o ultimo exige as duas.
+  // Nenhum deles usa marco de abate: o Bispo aparece uma vez por run, e no
+  // maximo, entao uma grade de 15 abates transformaria a revelacao em farm de
+  // cinquenta descidas.
+  define('AX-PRC-025', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'bishop' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_HEALED },
+    ],
+  }),
+  define('AX-EXE-047', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'bishop' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_NOVA_SURVIVED },
+    ],
+  }),
+  define('AX-UNK-057', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'bishop' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_HEALED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_NOVA_SURVIVED },
+    ],
+  }),
+  // E o fecho dos DOIS chefes: so quem derrubou a contencao viva, a fabricada
+  // e subiu com o Nucleo pode ler o documento que soma as tres coisas.
+  define('AX-UNK-058', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_FELLED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_GUARDIAN_FELLED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
+    ],
+  }),
+  // O arco do Diamandis. A ficha (AX-PUB-010) sai no abate, como todo Ativo;
+  // os demais cruzam ter derrubado a maquina com ter VISTO a broca reescrever
+  // a sala — o unico fato do encontro que explica o que ele e.
+  define('AX-INC-041', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'diamandis' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_CORRIDOR },
+    ],
+  }),
+  // Os dois documentos dos COVEIROS. O parecer de recuperacao explica de onde
+  // eles vieram (o item 3 que ninguem cancelou) e so abre para quem VIU um
+  // arrancar um modulo; a reclassificacao fecha a piada contabil e exige ter
+  // derrubado a maquina que a companhia ja tinha declarado parte do terreno.
+  define('AX-PRC-026', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'undertaker' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_MODULE },
+    ],
+  }),
+  define('AX-EXE-048', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'diamandis' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_MODULE },
+    ],
+  }),
+  define('AX-UNK-059', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'diamandis' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_CORRIDOR },
+      { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
+    ],
+  }),
+  // O fecho do Devorador: so quem o derrubou E vitrificou o chao pode ler a
+  // hipotese de que nao havia corpo nenhum para derrubar.
+  define('AX-UNK-061', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'white_devourer' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_SILICA_VITRIFIED },
+    ],
+  }),
+  // O fecho de cada chefe de estrato: derrubar E ter entendido a alavanca.
+  // Derrubar sozinho da a ficha; entender sozinho da o incidente; os dois
+  // juntos dao o documento que a companhia nao assina.
+  define('AX-UNK-062', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'archcantor' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_CATHEDRAL_SILENCED },
+    ],
+  }),
+  define('AX-UNK-063', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'sheet_leviathan' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_LEVIATHAN_SHOCKED },
+    ],
+  }),
+  define('AX-UNK-064', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'lung_matrix' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_LUNG_IGNITED },
+    ],
+  }),
+  define('AX-UNK-065', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'furnace_heart' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_FURNACE_COOLED },
+    ],
+  }),
+  define('AX-UNK-066', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'frost_queen' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_QUEEN_THAWED },
+    ],
+  }),
+  define('AX-UNK-067', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'magnetarch' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_MAGNET_BANDED },
+    ],
+  }),
   define('AX-UNK-054', {
     kind: 'compound',
     allOf: [

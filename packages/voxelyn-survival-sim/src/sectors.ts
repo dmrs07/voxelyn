@@ -22,7 +22,6 @@
 // campo. Escrever o que muda e menor e diz o que realmente acontece.
 
 import {
-  BISHOP_SECTOR,
   CHUNK,
   CONTAMINATION_CARRYOVER,
   HORSE_SPAWN_CHANCE,
@@ -35,6 +34,7 @@ import {
   SURF_FUNGAL,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
+import { bossArchetypeForBiome, emptyBossRuntime } from './bosses.js';
 import { isConductiveSurface, setSurface } from './cells.js';
 import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
@@ -60,16 +60,17 @@ export const isFinalSector = (sector: number): boolean => sector >= SECTOR_COUNT
 /**
  * Bolso micelial do Bispo: a colonia que tomou a camara do chefe.
  *
- * Existe porque o Bispo continua no setor 2 em QUALQUER estrato — a luta dele
- * e um problema de terreno (tirar o chao fungico de baixo dele), e uma
- * Catedral Prismatica sem fungo faria a mecanica inteira da luta simplesmente
- * nao existir. Em vez de obrigar o setor 2 a ser fungico, a arena vira um
- * BOLSO: um disco de tapete garantido em volta do ponto do chefe, plantado
- * sobre o que quer que o estrato tenha posto ali (inclusive agua — a colonia
- * cresceu por cima). E a gramatica de "bolso" da spec: um encontro autoral
- * dentro de um estrato qualquer.
+ * O Bispo agora so aparece onde o micelio DOMINA (bossForBiome), entao o mapa
+ * dele sempre tem fungo espalhado — mas a luta e um problema de terreno (tirar
+ * o chao fungico de baixo dele), e a CAMARA especificamente precisa da colonia
+ * garantida: um disco de tapete em volta do ponto do chefe, plantado sobre o
+ * que quer que o estrato tenha posto ali (inclusive agua — a colonia cresceu
+ * por cima). E a gramatica de "bolso" da spec: um encontro autoral dentro de
+ * um estrato qualquer.
  */
 const BISHOP_POCKET_RADIUS = 4;
+/** Ate onde o pedestal do objetivo resiste a colonia (Chebyshev, em celulas). */
+const PEDESTAL_KEEPOUT = 3;
 const plantBishopPocket = (state: SurvivalState, cx: number, cy: number): void => {
   const w = state.config.width;
   const h = state.config.height;
@@ -78,6 +79,18 @@ const plantBishopPocket = (state: SurvivalState, cx: number, cy: number): void =
       const dx = x - cx;
       const dy = y - cy;
       if (dx * dx + dy * dy > BISHOP_POCKET_RADIUS * BISHOP_POCKET_RADIUS) continue;
+      // O PEDESTAL e mais antigo que a colonia. O anel do objetivo carrega o
+      // sotaque do estrato (fosso de agua no Aquifero, brasa na Fornalha...) e
+      // ele e FUNCIONAL — o fosso conduz a descarga do jogador. Com o chefe
+      // agora na MESMA camara que o nucleo (um chefe por run, no setor final),
+      // deixar o bolso engolir o anel apagaria a identidade e a funcao do
+      // pedestal em todo mapa micelial. Excecao: o 3x3 do PROPRIO chefe —
+      // a cura dele e o tapete sob os pes, e um Bispo que nasce em chao nu
+      // porque calhou de nascer perto do pedestal nao tem encontro.
+      const onPedestal =
+        Math.max(Math.abs(x - state.corePos.x), Math.abs(y - state.corePos.y)) <= PEDESTAL_KEEPOUT;
+      const underBoss = Math.max(Math.abs(dx), Math.abs(dy)) <= 1;
+      if (onPedestal && !underBoss) continue;
       const i = y * w + x;
       if (state.solid[i] !== SOLID_NONE) continue;
       setSurface(state, i, SURF_FUNGAL, 0);
@@ -147,7 +160,11 @@ export const populateSector = (
   // Um elite por setor, no meio da lista: cedo demais e o jogador ainda nao tem
   // com o que responder, tarde demais e ele ja passou pelo setor.
   const eliteIndex = Math.floor(spawns.length / 2);
-  const bossHere = state.sector === BISHOP_SECTOR || isFinalSector(state.sector);
+  // UM chefe por run, no setor final, escolhido pelo BIOMA (bossForBiome) — e
+  // nunca no primeiro setor, que e onde a run ensina. Os setores do meio ficam
+  // com a fauna de assinatura como identidade; tres chefes obrigatorios
+  // fragmentariam toda descida.
+  const bossHere = isFinalSector(state.sector);
   const budget = Math.min(spawns.length, MAX_ENEMIES - (bossHere ? 1 : 0));
 
   // O Cavalo OCUPA a vaga do elite em vez de somar um inimigo.
@@ -201,22 +218,20 @@ export const populateSector = (
     spawnEnemy(state, mix[i % mix.length], spawns[i].x, spawns[i].y, i === eliteIndex);
   }
 
-  // O Bispo ocupa o mesmo ponto que o Guardiao ocuparia — a camara que a geracao
-  // reserva para um chefe. Nao ha sala nova: o setor 2 ja tinha o espaco vazio, e
-  // o que faltava era alguem la dentro.
+  // A camara final recebe o chefe QUE O BIOMA PEDE: ocupacao forte primeiro
+  // (micelio -> Bispo), depois o chefe natural do estrato (bossForBiome, com
+  // fallback no Guardiao enquanto a tabela ganha corpo).
   //
   // MAS chefe abatido nao volta. Na subida da extracao de retorno o setor e
-  // regenerado inteiro, e sem esta guarda o Bispo morto reaparecia na camara —
+  // regenerado inteiro, e sem esta guarda o chefe morto reaparecia na camara —
   // a fauna repovoar e a pressao prometida, um chefe repovoar e uma conquista
-  // desmanchando. O BOLSO continua sendo plantado de qualquer jeito: a colonia
-  // e terreno, e ela nao morreu junto com quem reinava sobre ela.
+  // desmanchando. O BOLSO do Bispo continua sendo plantado de qualquer jeito:
+  // a colonia e terreno, e ela nao morreu junto com quem reinava sobre ela.
   const bossAlreadyDown = (state.bossesDown & (1 << state.sector)) !== 0;
-  if (state.sector === BISHOP_SECTOR) {
-    plantBishopPocket(state, guardian.x, guardian.y);
-    if (!bossAlreadyDown) spawnEnemy(state, 'bishop', guardian.x, guardian.y, false);
-  }
-  if (isFinalSector(state.sector) && !bossAlreadyDown) {
-    spawnEnemy(state, 'guardian', guardian.x, guardian.y, false);
+  if (bossHere) {
+    const boss = bossArchetypeForBiome(biome);
+    if (boss === 'bishop') plantBishopPocket(state, guardian.x, guardian.y);
+    if (!bossAlreadyDown) spawnEnemy(state, boss, guardian.x, guardian.y, false);
   }
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
 };
@@ -360,12 +375,7 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.wellOffers = [];
   for (const extra of state.playerExtras) extra.resonance = emptyResonance();
 
-  state.guardianAwake = false;
-  state.guardianSummoned = false;
-  state.arenaClosed = false;
-  state.arenaBarrierCells = [];
-  state.guardianPath = [];
-  state.guardianPathAt = -1000;
+  state.bossRuntime = emptyBossRuntime();
   state.leftEntryZone = false;
 
   // A contaminacao NAO zera. Descer alivia, nunca absolve: comecar limpo faria
@@ -473,12 +483,7 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   // caminho de volta e a prova do estilo com que se desceu, nao um recomeco.
   state.wellOffers = [];
 
-  state.guardianAwake = false;
-  state.guardianSummoned = false;
-  state.arenaClosed = false;
-  state.arenaBarrierCells = [];
-  state.guardianPath = [];
-  state.guardianPathAt = -1000;
+  state.bossRuntime = emptyBossRuntime();
   // Os jogadores emergem no POCO, fundo do mapa: a zona de entrada ja esta
   // longe, entao a saida (subir de novo, ou extrair no setor 1) nasce armada.
   state.leftEntryZone = true;

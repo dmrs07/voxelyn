@@ -37,6 +37,18 @@ export {
 } from './strata.js';
 export { descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
 export {
+  BOSS_ARCHETYPES,
+  BOSS_OF_OCCUPATION,
+  BOSS_OF_STRATUM,
+  IMPLEMENTED_BOSS,
+  bossArchetypeForBiome,
+  bossForBiome,
+  emptyBossRuntime,
+  isBossArchetype,
+  type BossBiome,
+  type BossId,
+} from './bosses.js';
+export {
   TARGET_EXTRACTION_TICKS,
   TARGET_SECTOR_TICKS,
   addDamageTenths,

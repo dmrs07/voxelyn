@@ -33,7 +33,28 @@
 // tronco do dono junto com o jato, inclusive o do parceiro remoto, cujo
 // `facing` de snapshot passou a seguir os pes. Um cliente novo contra servidor
 // v13 receberia emissoes sem `owner` e nunca associaria a chama ao corpo.
-export const PROTOCOL_VERSION = 14;
+// 15: `WorldFlags.guardianAwake` vira `bossAwake`, e o evento `guardian_awake`
+// vira `boss_awake`. Desde `bossForBiome` a camara final pode ser do Bispo (ou
+// de qualquer outro da tabela), e os dois nomes antigos mentiam sobre metade
+// das runs. E quebra nos dois sentidos: um cliente novo contra servidor antigo
+// le `bossAwake` ausente e nunca acorda a apresentacao do chefe; um cliente
+// antigo contra servidor novo procura `guardianAwake` e nao acha.
+// 16: dois eventos novos do Diamandis. `blast_marker` (uma carga da Salva de
+// Demolicao marcada, com o tick em que cai) e `beam_line` (o feixe de
+// prospeccao, com `powered` distinguindo a varredura inofensiva da passagem
+// com potencia). Um cliente antigo nao desenharia nem a marca nem a linha — e
+// as duas SAO o telegrafo: sem elas, os dois golpes chegam sem sinal.
+// 17: o evento `boss_module` — a vida de um modulo do Diamandis (soltou,
+// arrancado, derrubado, perdido). Um cliente antigo nao desenharia nem o
+// modulo pendurado nem o Coveiro carregando: a ESCOLHA do encontro (deixar
+// trabalhar ou interceptar) e feita a partir do que se ve.
+// 18: a acao `leap` — o arco do Devorador Branco, da decolagem a queda. O
+// `EntityActionKind` e um enum no wire, entao um cliente antigo recebe um
+// `kind` que ele nao conhece e cai no ramo de ataque: desenharia o chefe
+// PLANTADO NO CHAO durante o voo, porque a altura da parabola sai justamente
+// do vao de tempo dessa acao. O corpo apareceria atravessando a arena colado no
+// piso, sem sombra descolada e sem arco nenhum.
+export const PROTOCOL_VERSION = 18;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -116,7 +137,100 @@ export const PROTOCOL_VERSION = 14;
 // hash autoritativo — ele decide a esquiva SEM direcional, entao um replay
 // v20 re-simulado sob a regra nova esquiva para outro lado. O terreno semeado
 // continua o da 18.
-export const SIMULATION_VERSION = 21;
+// 22: CHEFES POR BIOMA. Quatro mudancas autoritativas na mesma leva:
+// - `bossForBiome` substitui o chefe por numero de setor: UM chefe por run, no
+//   setor FINAL, escolhido por estrato x ocupacao (micelio -> Bispo; os demais
+//   caem no Guardiao ate cada linha da tabela ganhar corpo). O setor 2 deixa
+//   de ter Bispo e o setor 1 nunca tem chefe — a POPULACAO semeada de todo
+//   setor muda, e dois peers em versoes diferentes montariam elencos
+//   diferentes da mesma seed.
+// - O Bispo perde o cuspe generico; a Supernova vira a resposta primaria a
+//   distancia (cooldown 300) e o gatilho ferido muda de "nenhum fungo em 14
+//   tiles" para "nao PISOU em fungo dentro da janela de busca" — fungo
+//   inalcancavel atras de parede deixa de bloquear o ataque para sempre.
+// - O Guardiao troca o cuspe pela SALVA LITOCLASTA: leque de tres pedras
+//   (kind 'rock', sem biofluido, sem stun) com rajada alternada na segunda
+//   fase; a rajada re-arma o release da acao, e os relogios da acao ja entram
+//   no hash.
+// - O poco do setor 1 sempre revela pelo menos UM Eco (fallback
+//   deterministico pela seed quando nao ha ressonancia).
+// 23: as duas DESCOBERTAS do Bispo — `DISCOVERY_BISHOP_HEALED` (viu a cura de
+// perto, com a linha livre) e `DISCOVERY_BISHOP_NOVA_SURVIVED` (estava dentro
+// do disco da Supernova e continuou de pe). A bitmask de descobertas ja fazia
+// parte do hash autoritativo, entao dois peers em versoes diferentes divergem
+// no primeiro tick de cura testemunhada — e o Codex do perfil abriria
+// documentos diferentes para a mesma run.
+// 24: o estado do encontro de chefe vira `BossRuntime` — `guardianAwake`,
+// `guardianSummoned`, `guardianPath`, `guardianPathAt`, `arenaClosed` e
+// `arenaBarrierCells` saem do topo do estado e entram num objeto so, com as
+// fases de uma vez viradas BITMASK (`phasesFired`). O hash passa a misturar a
+// bitmask no lugar do booleano de invocacao: dois peers em versoes diferentes
+// divergem no tick em que a matilha sai.
+// 25: DIAMANDIS. Arquetipo novo (entra no fim de HASHED_ARCHETYPES e nos
+// contadores de abate), tres acoes novas (`drill`, `demolish`, `beam`), a fase
+// de uma vez do colapso do reator (BOSS_PHASE_REACTOR), as celulas marcadas da
+// salva no estado hasheado (`bossRuntime.blastCells`) e a Descoberta
+// DISCOVERY_DIAMANDIS_CORRIDOR (bit 16). A camara final de todo bioma Aurix
+// troca de ocupante: dois peers em versoes diferentes montam elencos
+// diferentes da mesma seed.
+// 26: A ECONOMIA DOS COVEIROS. Modulos presos ao Diamandis (cada um alimenta
+// uma arma) soltam por limiar de vida, e um Coveiro que enxergue um modulo
+// solto LARGA o jogador, arranca a peca e a carrega para fora do alcance. O
+// chefe perde a arma; a recompensa do abate paga so pelos modulos que ficaram.
+// `modulesExposed`/`modulesLost` entram no hash e a Descoberta
+// DISCOVERY_DIAMANDIS_MODULE (bit 17) na bitmask: dois peers em versoes
+// diferentes discordam de quais armas o chefe ainda tem.
+// 27: DEVORADOR BRANCO, e duas materias novas de superficie. SURF_SILT (13) e
+// o rastro que ele deixa por baixo; SURF_GLASS (14) e o que sobra quando alguem
+// poe calor nele — e sobre vidro ele NAO emerge, que e o contra-jogo inteiro do
+// encontro. `igniteCell` ganha o ramo de vitrificacao e DISCOVERY_SILICA_
+// VITRIFIED (bit 18) entra na bitmask.
+//
+// E a linhagem ARIDA passou a terminar em Sumidouros de Silica em vez de
+// Fornalha Abissal: sem isso o estrato sedimentar nunca era o ultimo e o chefe
+// dele nao tinha onde nascer. O TERRENO SEMEADO de toda run arida muda (ver
+// tests/impressao-digital-geracao.test.ts).
+// 28: OS SEIS CHEFES DE ESTRATO. Arquicantor, Leviata do Lencol,
+// Pulmao-Matriz, Coracao da Fornalha, Rainha da Geada e Magnetarca entram como
+// arquetipos (fim de HASHED_ARCHETYPES e dos contadores) com uma acao nova
+// (`freeze`) e as posturas de ciclo. A tabela de chefes fica COMPLETA e o
+// fallback no Guardiao deixa de responder por qualquer linha.
+//
+// E duas mudancas de MUNDO, ambas pelo mesmo motivo — um chefe que nao pode
+// nascer nao esta implementado:
+// - entra a linhagem BASALTICA (basalto do topo ao fundo). O Guardiao e o dono
+//   das Galerias e nenhuma linhagem terminava nelas. Uma linhagem a mais
+//   remapeia TODA seed (o sorteio e `% LINEAGE_ORDER.length`);
+// - o objetivo nao pode mais encostar na moldura do mapa
+//   (CORE_BORDER_MARGIN): o 3x3 livre em volta dele e onde o corpo do chefe
+//   tem de caber, e num canto ele nao cabia.
+// 29: as seis DESCOBERTAS de estrato — silenciar a Catedral, eletrocutar o
+// Leviata, incendiar a expiracao do Pulmao, acertar o Coracao na janela fria,
+// derreter o lago da Rainha e ficar na faixa do Magnetarca (bits 19..24). A
+// bitmask de descobertas ja entrava no hash: dois peers em versoes diferentes
+// divergem no primeiro tick em que qualquer uma delas acende.
+// 30: o Devorador Branco deixa de EMERGIR e passa a SALTAR. A emergencia era um
+// ponto; agora e um arco — ele recua por baixo ate um ponto de decolagem, rompe
+// o chao ali e atravessa o ar ate a queda, com cratera nas duas pontas e nada
+// no meio. Muda posicao, dano, humor (`DEVOURER_AIRBORNE`) e o hash: o ponto de
+// queda entra no estado autoritativo. Duas simulacoes em versoes diferentes
+// divergem no primeiro ciclo do chefe.
+//
+// O contra-jogo cresceu junto, e essa e a razao da mudanca: ele so decola de
+// chao SOLTO, entao vitrificar em volta de si empurra a decolagem para longe —
+// e arco longo e voo longo, e no ar nao ha areia absorvendo tiro. O vidro
+// deixou de so negar a saida e passou a esticar a trajetoria.
+// 31: o ciclo do Devorador vira RAJADA. Sao tres arcos mirados em sequencia e
+// so entao a abertura — e a abertura deixou de ser "exposto perseguindo devagar"
+// e virou PRESO: meio enterrado, imovel, sem cobrar contato e sem areia
+// absorvendo tiro. Humor novo (`DEVOURER_STUCK`), contador de saltos no estado
+// autoritativo e no hash, e o ponto de queda do arco — que estava faltando no
+// hash desde a versao anterior — entram junto.
+//
+// O que muda de jogo: a pressao passa a SUBIR ate a janela em vez de alternar
+// em ritmo constante, e a janela concentra a exposicao num alvo parado. Duas
+// simulacoes em versoes diferentes divergem no primeiro pouso.
+export const SIMULATION_VERSION = 31;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -137,7 +251,25 @@ export const SIMULATION_VERSION = 21;
 // revisao de conteudo.
 // 17: o Seeker Lance vira SEEKER DRONE — atlas novo fx-seeker-drone
 // (quadricoptero kamikaze, fly 4f) entra no primeiro pacote de sprites.
-export const CONTENT_VERSION = 17;
+// 18: o pool de criaturas ganha o DIAMANDIS. Ele ainda nao tem atlas — desenha
+// pelo caminho de fallback, como o Bispo e o Corcel antes de ganharem o deles —
+// mas o conjunto de conteudo mudou, e e exatamente isso que este campo marca.
+// 19: o pool ganha o DEVORADOR BRANCO e duas crostas de chao (silica solta e
+// vidro). As duas ainda nao tem tile no atlas de superficie — desenham pela cor
+// de recuo, que a partir desta versao realmente dispara para materia sem tile
+// (antes o `?? 0` desenhava chao limpo e a materia ficava invisivel).
+// 20: o pool ganha os seis chefes de estrato. Como o Diamandis e o Devorador,
+// eles desenham pelo caminho de fallback ate ganharem atlas.
+// 21: os OITO chefes ganham atlas voxel e a silica e o vidro ganham tile no
+// atlas de superficie (SURFACE_KINDS 13 e 14, manifest de crostas v7). E a
+// versao que fecha as tres promessas em aberto das tres anteriores: nada do
+// pool de conteudo desenha mais pelo caminho de recuo.
+// 22: o Devorador ganha a pose PRESA no atlas (`downed`) — a metade dianteira
+// erguida para fora de um colar de silica, com a boca aberta para cima. E a
+// unica silhueta vertical do bicho, e a janela de dano do encontro depende dela:
+// recortado deitado na linha do chao ele virava um calombo de dez pixels, que
+// le como pedra e nao como alvo.
+export const CONTENT_VERSION = 22;
 
 export type VersionTriple = {
   protocolVersion: number;

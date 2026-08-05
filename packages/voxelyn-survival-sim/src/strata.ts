@@ -84,7 +84,29 @@ export type StratumId =
 export type OccupationId = 'none' | 'mycelial' | 'aurix';
 
 /** A historia geologica que os tres setores de uma run contam juntos. */
-export type LineageId = 'hydric' | 'mineral' | 'industrial' | 'thermal' | 'arid' | 'cryo';
+export type LineageId =
+  | 'hydric'
+  | 'mineral'
+  | 'industrial'
+  | 'thermal'
+  | 'arid'
+  | 'cryo'
+  /**
+   * BASALTICA: o mapa historico como linhagem inteira, do topo ao fundo.
+   *
+   * Existe por uma razao estrutural, e ela so apareceu quando a tabela de
+   * chefes ficou completa: o Guardiao e o dono das Galerias de Basalto, e o
+   * basalto era o setor 1 de TODAS as linhagens e o final de nenhuma. Como so
+   * o setor final tem chefe, o chefe original do jogo tinha deixado de poder
+   * existir.
+   *
+   * Nao e uma linhagem sem graca por ser um estrato so: as intrusoes de
+   * ocupacao continuam sorteando micelio e Aurix nos setores 2 e 3, entao ela
+   * termina no Guardiao, no Bispo ou no Diamandis conforme o que tomou conta
+   * do fundo. E a unica linhagem em que os TRES chefes de ocupacao e de
+   * basalto disputam a mesma camara.
+   */
+  | 'basaltic';
 
 export type SectorBiome = {
   stratum: StratumId;
@@ -110,10 +132,15 @@ export type SectorBiome = {
  *   temperatura, os gases e a instabilidade crescem com a descida.
  * - industrial: Basalto -> Ferrifero (Cicatriz) -> Ferrifero profundo. O
  *   veio principal E a cicatriz: o lugar que justificou a operacao.
- * - arida: Basalto -> Sumidouros de Silica -> Fornalha Abissal. A silica
- *   vitrifica rumo ao calor: dois caminhos chegam a Fornalha.
+ * - arida: Basalto -> Sumidouros de Silica -> Sumidouros profundos. O chao
+ *   deixa de segurar o teto, e o fundo e o dono dele (ver LINEAGES).
  * - crio: Basalto -> Cripta Glacial -> Cripta profunda. O gelo domina e a
  *   profundidade adensa as pontes e lagos congelados.
+ * - basaltica: Basalto -> Basalto -> Basalto. O mapa historico do comeco ao
+ *   fim, e a unica linhagem em que a camara final e das Galerias — ou seja, a
+ *   unica em que o Guardiao pode ser o dono dela. As intrusoes de ocupacao
+ *   continuam valendo, entao ela tambem termina no Bispo ou no Diamandis
+ *   quando alguma delas toma o fundo.
  */
 const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation: OccupationId }>> = {
   hydric: [
@@ -139,12 +166,30 @@ const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation
   arid: [
     { stratum: 'basalt', occupation: 'none' },
     { stratum: 'silica', occupation: 'none' },
-    { stratum: 'furnace', occupation: 'none' },
+    // A arida termina NA SILICA, e nao mais na Fornalha.
+    //
+    // A tabela antiga era basalto -> silica -> fornalha ("a silica vitrifica
+    // rumo ao calor: dois caminhos chegam a Fornalha"), e ela tinha uma
+    // consequencia que so apareceu quando o Devorador Branco ganhou corpo: o
+    // estrato sedimentar NUNCA era o ultimo, e como so o setor final tem
+    // chefe, o dono dos Sumidouros nao podia existir. Um chefe que nao spawna
+    // nao esta implementado.
+    //
+    // Terminar no proprio estrato e o que as outras linhagens ja fazem
+    // (mineral, industrial e crio dobram o seu no fim), e a Fornalha continua
+    // tendo o caminho dela pela termica. O que se perde e o segundo acesso a
+    // Fornalha; o que se ganha e o encontro que o estrato sempre prometeu.
+    { stratum: 'silica', occupation: 'none' },
   ],
   cryo: [
     { stratum: 'basalt', occupation: 'none' },
     { stratum: 'glacial', occupation: 'none' },
     { stratum: 'glacial', occupation: 'none' },
+  ],
+  basaltic: [
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none' },
   ],
 };
 
@@ -155,6 +200,7 @@ const LINEAGE_ORDER: readonly LineageId[] = [
   'thermal',
   'arid',
   'cryo',
+  'basaltic',
 ];
 
 /**

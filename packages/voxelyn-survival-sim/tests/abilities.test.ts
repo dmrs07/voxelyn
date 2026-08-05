@@ -194,8 +194,32 @@ describe('habilidades', () => {
 describe('ressonancia do poco', () => {
   it('nao oferece nada quando o jogador nao provocou reacao nenhuma', () => {
     // Um poco que sempre oferece algo transformaria a oferta em corredor
-    // obrigatorio, e nao numa consequencia do que aconteceu no setor.
+    // obrigatorio, e nao numa consequencia do que aconteceu no setor. (O SETOR
+    // 1 e a excecao, resolvida fora desta funcao: ver o teste do Eco garantido.)
     expect(resonanceOffers(emptyResonance(), 'pulse', 7, 1)).toEqual([]);
+  });
+
+  it('o poco do setor 1 nunca fica mudo: sem ressonancia, UM Eco garantido', () => {
+    // O setor 1 e onde o jogador aprende que o poco oferece habilidade; um
+    // poco calado na primeira descida ensina que ele e so um buraco.
+    const reveal = (seed: number): AbilityId[] => {
+      const state = createRun({ seed });
+      atWell(state, WELL_OFFER_REVEAL - 1);
+      stepRun(state, [emptyCommand()]);
+      return state.wellOffers.map((offer) => offer.ability);
+    };
+    const offers = reveal(0x0ffe3);
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).not.toBe('pulse');
+    // Deterministico pela seed: mesmo Eco nas duas maquinas da sala.
+    expect(reveal(0x0ffe3)).toEqual(offers);
+  });
+
+  it('nos setores fundos a regra historica continua: sem reacao, sem oferta', () => {
+    const state = createRun({ seed: 0x0ffe4, sector: 2 });
+    atWell(state, WELL_OFFER_REVEAL - 1);
+    stepRun(state, [emptyCommand()]);
+    expect(state.wellOffers).toHaveLength(0);
   });
 
   it('oferece a habilidade do que o jogador mais provocou', () => {

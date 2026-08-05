@@ -1,4 +1,4 @@
-import { HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
+import { DEVOURER_STUCK, HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
 import { FacingHysteresis } from './facing';
 import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
 
@@ -53,12 +53,27 @@ export const actionAnimation = (action: EntityActionKind): string => {
   // e o `attack` e a prensa. Sem esta linha, o telegrafo de 1,1 s do puxao
   // mostrava o BRACO ERRADO se movendo — o aviso mais importante do bicho
   // apontando para o golpe seguinte em vez de para o que estava acontecendo.
+  //
+  // `drill`, `erupt` e `freeze` entram pela mesma porta, agora que os chefes
+  // tem atlas. Sao as tres acoes do jogo cujo PREPARO e mais longo e mais
+  // importante que o golpe: a broca do Diamandis fica 1,8 s parada girando
+  // antes de atravessar a arena, o Devorador rasga o chao antes de sair dele, e
+  // a Rainha levanta os bracos antes de o lago congelar. Mostrar a pose de
+  // ataque durante esses telegrafos e o erro do Coveiro outra vez.
   if (
     action === 'detonate' ||
     action === 'charge' ||
     action === 'pulse' ||
     action === 'hurl' ||
-    action === 'haul'
+    action === 'haul' ||
+    action === 'drill' ||
+    action === 'erupt' ||
+    action === 'freeze' ||
+    // O voo herda a pose do telegrafo: no atlas do Devorador o `special` e o
+    // corpo erguido com a boca aberta, que e exatamente a silhueta de quem
+    // atravessa o ar. Cair no `attack` traria a pose de bote, com o corpo
+    // ainda plantado no chao.
+    action === 'leap'
   ) {
     return 'special';
   }
@@ -319,6 +334,21 @@ export class EntityPresentation {
       return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
     }
     this.downedAt.delete(entity.id);
+
+    // O DEVORADOR ENTALADO. Vem antes de tudo o que consulta acao porque preso
+    // ele nao TEM acao — e sem esta linha o `base.anim` cairia em `idle`, que e
+    // o corpo deitado passeando pelo chao. E a unica janela de dano do encontro:
+    // desenha-la com a pose de repouso apagaria o convite que ela e.
+    //
+    // A pose `downed` do atlas ergue a metade dianteira para fora da cratera. O
+    // slot ja significava exatamente isto — "fora de combate, vulneravel" — e o
+    // Devorador e o unico inimigo que o usa em vida.
+    if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_STUCK) {
+      const start = this.downedAt.get(entity.id) ?? nowMs;
+      this.downedAt.set(entity.id, start);
+      const aim = bodyFacing();
+      return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
+    }
 
     // Morte sempre substitui a silhueta inteira. Hit só interrompe a composição
     // do Prospector; inimigos mantêm telegraphs de ações que a sim não cancelou.
