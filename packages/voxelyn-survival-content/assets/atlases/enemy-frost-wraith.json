@@ -1,6 +1,6 @@
 {
   "id": "enemy-frost-wraith",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-frost-wraith.png",
   "frameWidth": 64,
   "frameHeight": 64,

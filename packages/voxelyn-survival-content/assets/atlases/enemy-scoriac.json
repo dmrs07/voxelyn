@@ -1,6 +1,6 @@
 {
   "id": "enemy-scoriac",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-scoriac.png",
   "frameWidth": 64,
   "frameHeight": 64,

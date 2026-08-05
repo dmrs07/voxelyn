@@ -1,6 +1,6 @@
 {
   "id": "enemy-bellows",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-bellows.png",
   "frameWidth": 64,
   "frameHeight": 64,

@@ -1,6 +1,6 @@
 {
   "id": "enemy-mud-lamprey",
-  "version": 1,
+  "version": 2,
   "atlas": "enemy-mud-lamprey.png",
   "frameWidth": 64,
   "frameHeight": 64,
