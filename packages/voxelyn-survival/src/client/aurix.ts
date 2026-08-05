@@ -20,10 +20,39 @@
  * 1 MB sozinho). O recorte fica so no emblema — o wordmark do arquivo fonte
  * fica de fora porque `.corp-name` ja escreve "AURIX DYNAMICS" em HTML, na
  * fonte Chakra Petch do sistema.
+ *
+ * A marca aparece em ate sete lugares na mesma pagina (cinco topos de trilho
+ * de arquivo, duas placas de pausa), e o app monta cada um via `innerHTML`.
+ * Devolver o SVG inteiro sete vezes faria o navegador analisar sete copias
+ * completas da geometria — dezenas de milhares de subtracos ao todo, so no
+ * carregamento inicial. Por isso a geometria e montada UMA vez, como
+ * `<symbol>` escondido, e cada instancia e so um `<use>` apontando para ela
+ * (o padrao classico de "sprite" de SVG).
  */
 
-import aurixMarkSvg from '../assets/aurix-mark.svg?raw';
+import aurixMarkGeometry from '../assets/aurix-mark.svg?raw';
 import { t } from './i18n';
+
+const AURIX_MARK_VIEWBOX = '0 0 375 350';
+const AURIX_MARK_SYMBOL_ID = 'aurix-mark-symbol';
+
+/**
+ * Injeta o `<symbol>` da marca no documento, se ainda nao estiver la.
+ *
+ * Idempotente por checagem de DOM (nao por flag em modulo): `mountPlates` do
+ * menu de pausa remonta as placas a cada troca de idioma, e um modulo
+ * recarregado pelo HMR do Vite perderia uma flag em memoria mas nao o
+ * `<symbol>` que ja injetou.
+ */
+const ensureMarkSymbolMounted = (): void => {
+  if (document.getElementById(AURIX_MARK_SYMBOL_ID)) return;
+  document.body.insertAdjacentHTML(
+    'afterbegin',
+    `<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">` +
+      `<symbol id="${AURIX_MARK_SYMBOL_ID}" viewBox="${AURIX_MARK_VIEWBOX}">${aurixMarkGeometry}</symbol>` +
+      `</svg>`,
+  );
+};
 
 /** Ouro da companhia. Mesma familia do bege de texto secundario ja usado (#b8a98f). */
 export const AURIX_GOLD = '#c9a25e';
@@ -44,14 +73,13 @@ export const AURIX_NAME = 'AURIX DYNAMICS';
 export const AURIX_TAGLINE = 'EXTRAIR. PROTEGER. ADAPTAR.';
 
 /**
- * O monograma: o emblema oficial do pacote de marca (recorte de
- * `assets/aurix-mark.svg`, ver comentario no topo do arquivo). Sem
- * `<defs>`/gradientes — cada fragmento ja carrega a propria cor solida —
- * entao, ao contrario da versao anterior deste arquivo, nao ha id nenhum
- * para colidir quando a marca aparece duas vezes na mesma pagina (pausa e
- * confirmacao de abandono); as duas copias sao o mesmo texto estatico.
+ * O monograma: uma referencia leve ao `<symbol>` compartilhado (ver
+ * `ensureMarkSymbolMounted`), nao a geometria inteira de novo.
  */
-const markSvg = (): string => aurixMarkSvg;
+const markSvg = (): string => {
+  ensureMarkSymbolMounted();
+  return `<svg class="corp-mark" viewBox="${AURIX_MARK_VIEWBOX}" role="img" aria-label="${AURIX_NAME}"><use href="#${AURIX_MARK_SYMBOL_ID}"></use></svg>`;
+};
 
 /**
  * Placa da companhia: simbolo, nome e lema.
