@@ -232,7 +232,12 @@ import {
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_DIAMANDIS_CORRIDOR,
+  DISCOVERY_CATHEDRAL_SILENCED,
   DISCOVERY_DIAMANDIS_MODULE,
+  DISCOVERY_FURNACE_COOLED,
+  DISCOVERY_LUNG_IGNITED,
+  DISCOVERY_MAGNET_BANDED,
+  DISCOVERY_QUEEN_THAWED,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
   LURKER_EXPOSED,
@@ -668,14 +673,20 @@ export const damageEntity = (
   if (ent.archetype === 'sheet_leviathan' && ent.mood === DEVOURER_BURROWED) {
     amount *= LEVIATHAN_SUBMERGED_ARMOR;
   }
-  if (ent.archetype === 'furnace_heart' && ent.mood === FURNACE_OVERHEATING) {
-    amount *= FURNACE_HEART_HOT_ARMOR;
+  if (ent.archetype === 'furnace_heart') {
+    if (ent.mood === FURNACE_OVERHEATING) amount *= FURNACE_HEART_HOT_ARMOR;
+    // Acertar na janela fria E a leitura do encontro: ele nao esta mais duro,
+    // voce esperou a hora. A marca sai aqui e nao no golpe do jogador porque
+    // e AQUI que se sabe que o dano entrou inteiro.
+    else markDiscovery(state.stats, DISCOVERY_FURNACE_COOLED);
   }
-  if (ent.archetype === 'frost_queen' && frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD) {
-    amount *= FROST_QUEEN_ICE_ARMOR;
+  if (ent.archetype === 'frost_queen') {
+    if (frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD) amount *= FROST_QUEEN_ICE_ARMOR;
+    else markDiscovery(state.stats, DISCOVERY_QUEEN_THAWED);
   }
   if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
     amount *= ARCHCANTOR_SILENT_ARMOR;
+    markDiscovery(state.stats, DISCOVERY_CATHEDRAL_SILENCED);
   }
   const attributable =
     cause.kind === 'player_shot' ||
@@ -2482,6 +2493,7 @@ const lungMatrixStep = (
           kind: 'explosion',
           source: 'player',
         });
+        markDiscovery(state.stats, DISCOVERY_LUNG_IGNITED);
         events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2 });
       }
     }
@@ -2658,6 +2670,11 @@ const magnetarchStep = (
       elite: enemy.elite,
     });
     events.push({ t: 'pulse', x: player.x, y: player.y, radius: 1.4 });
+  } else {
+    // Dentro do campo e fora das duas bordas: o jogador ACHOU a faixa. E a
+    // unica das seis Descobertas que marca uma ausencia de dano — porque aqui
+    // o entendimento e exatamente nao ter sido cobrado.
+    markDiscovery(state.stats, DISCOVERY_MAGNET_BANDED);
   }
 };
 

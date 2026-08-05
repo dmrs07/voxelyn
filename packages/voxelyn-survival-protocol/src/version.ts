@@ -198,7 +198,12 @@ export const PROTOCOL_VERSION = 17;
 // - o objetivo nao pode mais encostar na moldura do mapa
 //   (CORE_BORDER_MARGIN): o 3x3 livre em volta dele e onde o corpo do chefe
 //   tem de caber, e num canto ele nao cabia.
-export const SIMULATION_VERSION = 28;
+// 29: as seis DESCOBERTAS de estrato — silenciar a Catedral, eletrocutar o
+// Leviata, incendiar a expiracao do Pulmao, acertar o Coracao na janela fria,
+// derreter o lago da Rainha e ficar na faixa do Magnetarca (bits 19..24). A
+// bitmask de descobertas ja entrava no hash: dois peers em versoes diferentes
+// divergem no primeiro tick em que qualquer uma delas acende.
+export const SIMULATION_VERSION = 29;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

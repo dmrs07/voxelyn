@@ -283,6 +283,28 @@ export const DISCOVERY_DIAMANDIS_MODULE = 1 << 17;
 export const DISCOVERY_SILICA_VITRIFIED = 1 << 18;
 
 /**
+ * As seis Descobertas dos chefes de estrato.
+ *
+ * Cada uma marca o instante em que o jogador ENTENDE a alavanca daquele bioma
+ * — nao "matou o chefe", e sim "descobriu por que ele e daquele lugar". Sao os
+ * bits que destravam o miolo do arco documental de cada um, e a razao de eles
+ * nao serem marcos de abate e a mesma de sempre: um chefe aparece uma vez por
+ * run, e uma grade de repeticao transformaria a revelacao em farm.
+ */
+/** Bateu no Arquicantor com a Catedral em silencio: a rede vazia o expoe. */
+export const DISCOVERY_CATHEDRAL_SILENCED = 1 << 19;
+/** Atordoou o Leviata eletrificando a lamina em que ele nada. */
+export const DISCOVERY_LEVIATHAN_SHOCKED = 1 << 20;
+/** Acendeu a expiracao do Pulmao-Matriz e queimou a coluna de volta. */
+export const DISCOVERY_LUNG_IGNITED = 1 << 21;
+/** Acertou o Coracao da Fornalha na janela fria — a unica em que ele abre. */
+export const DISCOVERY_FURNACE_COOLED = 1 << 22;
+/** Derreteu o lago da Rainha e bateu nela sem a couraça do estrato. */
+export const DISCOVERY_QUEEN_THAWED = 1 << 23;
+/** Ficou na FAIXA do Magnetarca: dentro do campo e fora das duas bordas. */
+export const DISCOVERY_MAGNET_BANDED = 1 << 24;
+
+/**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
  *
  * Congelado e nao derivado sob demanda porque `state` continua sendo o objeto

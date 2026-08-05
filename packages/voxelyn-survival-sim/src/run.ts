@@ -116,7 +116,12 @@ import {
   moduleHasCapacity,
   rollModuleChoice,
 } from './modules.js';
-import { DISCOVERY_CARGO_LOST, DISCOVERY_DISCHARGE_POOL, DISCOVERY_SELF_HARM } from './types.js';
+import {
+  DISCOVERY_CARGO_LOST,
+  DISCOVERY_DISCHARGE_POOL,
+  DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_SELF_HARM,
+} from './types.js';
 import { DEFAULT_PLAYER_TUNING, TUNING_HASH_ORDER, type PlayerTuning } from './progression.js';
 import type {
   DamageCause,
@@ -488,6 +493,9 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         });
         if (ev.source === 'player' && ent.kind === 'enemy' && !isStoneEnemy(ent)) {
           stunEntity(state, ent, CONDUCTIVE_STUN_TICKS);
+          if (ent.archetype === 'sheet_leviathan') {
+            markDiscovery(state.stats, DISCOVERY_LEVIATHAN_SHOCKED);
+          }
         }
         // Eletrificar a poca em que voce mesmo esta e a licao numero um do
         // material condutivo, e ela so ensina se for registrada.
@@ -1955,6 +1963,11 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           }
           if (conductiveTriggered && !isStoneEnemy(enemy)) {
             stunEntity(state, enemy, CONDUCTIVE_STUN_TICKS);
+            // Eletrificar a lamina em que ele nada e o contra-jogo do
+            // Aquifero, e o atordoamento e o instante em que isso fica claro.
+            if (enemy.archetype === 'sheet_leviathan') {
+              markDiscovery(state.stats, DISCOVERY_LEVIATHAN_SHOCKED);
+            }
           }
           damageEntity(state, enemy, damage, events, { kind: 'player_shot' });
 

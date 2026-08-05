@@ -1,4 +1,4 @@
-// O Codex corporativo (111 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (123 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -47,6 +47,12 @@ import {
   DISCOVERY_BISHOP_FELLED,
   DISCOVERY_DIAMANDIS_CORRIDOR,
   DISCOVERY_DIAMANDIS_MODULE,
+  DISCOVERY_CATHEDRAL_SILENCED,
+  DISCOVERY_FURNACE_COOLED,
+  DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_LUNG_IGNITED,
+  DISCOVERY_MAGNET_BANDED,
+  DISCOVERY_QUEEN_THAWED,
   DISCOVERY_SILICA_VITRIFIED,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
@@ -312,6 +318,15 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   // Vitrificar silica solta: o bit exige ter FEITO, e nao ter entendido — a
   // compreensao vem depois, de ver o verme falhar em subir ali.
   { bit: DISCOVERY_SILICA_VITRIFIED, fragmentId: 'AX-INC-042' },
+  // As seis alavancas de estrato. Cada bit e o instante em que o jogador
+  // ENTENDE por que aquele chefe pertence aquele bioma — nunca "matou de
+  // novo": eles aparecem uma vez por run, e repeticao viraria farm.
+  { bit: DISCOVERY_CATHEDRAL_SILENCED, fragmentId: 'AX-INC-043' },
+  { bit: DISCOVERY_LEVIATHAN_SHOCKED, fragmentId: 'AX-INC-044' },
+  { bit: DISCOVERY_LUNG_IGNITED, fragmentId: 'AX-INC-045' },
+  { bit: DISCOVERY_FURNACE_COOLED, fragmentId: 'AX-INC-046' },
+  { bit: DISCOVERY_QUEEN_THAWED, fragmentId: 'AX-INC-047' },
+  { bit: DISCOVERY_MAGNET_BANDED, fragmentId: 'AX-INC-048' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
@@ -381,6 +396,12 @@ export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchet
   { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'diamandis' },
   { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'undertaker' },
   { bit: DISCOVERY_SILICA_VITRIFIED, archetype: 'white_devourer' },
+  { bit: DISCOVERY_CATHEDRAL_SILENCED, archetype: 'archcantor' },
+  { bit: DISCOVERY_LEVIATHAN_SHOCKED, archetype: 'sheet_leviathan' },
+  { bit: DISCOVERY_LUNG_IGNITED, archetype: 'lung_matrix' },
+  { bit: DISCOVERY_FURNACE_COOLED, archetype: 'furnace_heart' },
+  { bit: DISCOVERY_QUEEN_THAWED, archetype: 'frost_queen' },
+  { bit: DISCOVERY_MAGNET_BANDED, archetype: 'magnetarch' },
   { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
   { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
   { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
@@ -554,6 +575,18 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-ENG-034': ['AX-ENG-027', 'AX-UNK-050'],
   'AX-ENG-035': ['AX-ENG-024', 'AX-UNK-053'],
   'AX-ENG-036': ['AX-UNK-043', 'AX-UNK-050'],
+  'AX-INC-043': ['AX-ENG-031', 'AX-UNK-062'],
+  'AX-UNK-062': ['AX-INC-043', 'AX-ENG-031', 'AX-UNK-054'],
+  'AX-INC-044': ['AX-ENG-032', 'AX-UNK-063'],
+  'AX-UNK-063': ['AX-INC-044', 'AX-ENG-032', 'AX-UNK-054'],
+  'AX-INC-045': ['AX-ENG-033', 'AX-UNK-064'],
+  'AX-UNK-064': ['AX-INC-045', 'AX-ENG-033', 'AX-UNK-054'],
+  'AX-INC-046': ['AX-ENG-034', 'AX-UNK-065'],
+  'AX-UNK-065': ['AX-INC-046', 'AX-ENG-034', 'AX-UNK-054'],
+  'AX-INC-047': ['AX-ENG-035', 'AX-UNK-066'],
+  'AX-UNK-066': ['AX-INC-047', 'AX-ENG-035', 'AX-UNK-054'],
+  'AX-INC-048': ['AX-ENG-036', 'AX-UNK-067'],
+  'AX-UNK-067': ['AX-INC-048', 'AX-ENG-036', 'AX-UNK-054'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
@@ -627,6 +660,18 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-ENG-030': 0,
   'AX-INC-042': 1,
   'AX-UNK-061': 3,
+  'AX-INC-043': 1,
+  'AX-UNK-062': 3,
+  'AX-INC-044': 1,
+  'AX-UNK-063': 3,
+  'AX-INC-045': 1,
+  'AX-UNK-064': 3,
+  'AX-INC-046': 1,
+  'AX-UNK-065': 3,
+  'AX-INC-047': 1,
+  'AX-UNK-066': 3,
+  'AX-INC-048': 1,
+  'AX-UNK-067': 3,
 };
 
 /**
@@ -715,6 +760,12 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-040',
   'AX-INC-041',
   'AX-INC-042',
+  'AX-INC-043',
+  'AX-INC-044',
+  'AX-INC-045',
+  'AX-INC-046',
+  'AX-INC-047',
+  'AX-INC-048',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -755,6 +806,12 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-059',
   'AX-UNK-060',
   'AX-UNK-061',
+  'AX-UNK-062',
+  'AX-UNK-063',
+  'AX-UNK-064',
+  'AX-UNK-065',
+  'AX-UNK-066',
+  'AX-UNK-067',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
@@ -887,6 +944,51 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
     allOf: [
       { kind: 'asset', archetype: 'white_devourer' },
       { kind: 'discovery', discoveryBit: DISCOVERY_SILICA_VITRIFIED },
+    ],
+  }),
+  // O fecho de cada chefe de estrato: derrubar E ter entendido a alavanca.
+  // Derrubar sozinho da a ficha; entender sozinho da o incidente; os dois
+  // juntos dao o documento que a companhia nao assina.
+  define('AX-UNK-062', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'archcantor' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_CATHEDRAL_SILENCED },
+    ],
+  }),
+  define('AX-UNK-063', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'sheet_leviathan' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_LEVIATHAN_SHOCKED },
+    ],
+  }),
+  define('AX-UNK-064', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'lung_matrix' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_LUNG_IGNITED },
+    ],
+  }),
+  define('AX-UNK-065', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'furnace_heart' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_FURNACE_COOLED },
+    ],
+  }),
+  define('AX-UNK-066', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'frost_queen' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_QUEEN_THAWED },
+    ],
+  }),
+  define('AX-UNK-067', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'magnetarch' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_MAGNET_BANDED },
     ],
   }),
   define('AX-UNK-054', {

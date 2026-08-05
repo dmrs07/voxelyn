@@ -280,10 +280,6 @@ não o interrompe — ela apenas o remove do balanço.
 
 ### O que fica para a próxima fatia
 
-- Os **arcos de entendimento** dos seis chefes de estrato. Cada um entrou com a ficha
-  de Ativo (a classificação corporativa, o primeiro degrau da estrutura); os
-  documentos destravados por *presenciar o golpe principal* e por *condição especial*
-  são o próximo passo, e cada um deles precisa de uma Descoberta nova na simulação.
 - O **atlas voxel** do Diamandis. Hoje ele usa o renderizador de fallback, como o
   Bispo e o Corcel usaram antes de ganharem atlas.
 - A apresentação dos módulos no cliente: `boss_module` já viaja com os quatro
@@ -386,6 +382,32 @@ Notas de desenho que valem registrar:
   filhotes, e nascem com vida parcial.
 - Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
   (fogo, descarga, explosão) as esqueça.
+
+### Os arcos de entendimento
+
+Cada um dos seis entrou com a **ficha de Ativo** (a classificação corporativa, aberta
+no primeiro abate). O miolo do arco abre por uma **Descoberta** que marca o instante
+em que o jogador entende a alavanca — nunca por repetição: um chefe aparece no máximo
+uma vez por run, e uma grade de abates transformaria a revelação em farm.
+
+| Chefe | A Descoberta exige | Incidente | Não classificado (abate + Descoberta) |
+| --- | --- | --- | --- |
+| Arquicantor | bater nele com a **Catedral em silêncio** | `AX-INC-043` | `AX-UNK-062` — alguns cristais respondem *antes* do pulso; ele não emite o sinal, **rege** |
+| Leviatã | **atordoá-lo** eletrificando a lâmina | `AX-INC-044` | `AX-UNK-063` — as sete medições não discordam: cada uma mediu uma parte, ao mesmo tempo |
+| Pulmão-Matriz | **acender a expiração** e queimar a coluna de volta | `AX-INC-045` | `AX-UNK-064` — nos setores em que ele caiu, a ventilação nunca voltou |
+| Coração da Fornalha | acertar na **janela fria** | `AX-INC-046` | `AX-UNK-065` — o magma não aquece a formação; a emissão aquece o magma |
+| Rainha da Geada | **derreter o lago** e bater sem a couraça | `AX-INC-047` | `AX-UNK-066` — ela não reproduz uma pessoa, reproduz um organograma |
+| Magnetarca | ficar na **faixa** (dentro do campo, fora das duas bordas) | `AX-INC-048` | `AX-UNK-067` — o campo antecede a mina; a operação foi construída sobre um cabo que ela não instalou |
+
+Duas notas de implementação:
+
+- **Cinco das seis marcam no funil de dano ou no golpe**, no instante em que se sabe
+  que o dano entrou inteiro (ou que a alavanca cobrou). A do Magnetarca é a única que
+  marca uma **ausência** de dano — porque ali o entendimento é exatamente não ter sido
+  cobrado.
+- A do Leviatã mora nos **três** caminhos de atordoamento por descarga (`run.ts`), e
+  não num deles: o contra-jogo é "eletrificar a água", não "eletrificar a água com
+  aquele módulo específico".
 
 ### A linhagem basáltica
 

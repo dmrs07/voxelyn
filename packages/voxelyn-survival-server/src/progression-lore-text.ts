@@ -732,6 +732,82 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // Os arcos de ENTENDIMENTO dos chefes de estrato: o que a alavanca revela
+  // -------------------------------------------------------------------------
+  'AX-INC-043': {
+    title: 'Incidente 43 — o silêncio da PRZ-00',
+    summary: 'Sem cristal para responder, a formação fica indefesa.',
+    body: 'Registro de engajamento contra a formação PRZ-00 em câmara previamente esvaziada de estrutura cristalina.\n\nSem cristais no raio, a formação não produz descarga alguma — e a resistência dela ao impacto cai abaixo da de um corpo orgânico comum. O que lemos como couraça não era couraça: era a câmara respondendo por ela.\n\nRegistra-se a consequência operacional, que é desconfortável: a lavra de cristal reduz drasticamente o risco do engajamento E elimina a iluminação natural do setor, a fonte de carga e o próprio motivo de a câmara ter valor.\n\nA unidade escolhe entre atravessar uma catedral perigosa ou uma ruína segura.',
+    source: 'Comitê de Incidentes — análise de engajamento',
+  },
+  'AX-UNK-062': {
+    title: 'Sobre o que a Catedral estava cantando',
+    summary: 'Alguns cristais respondem antes do pulso. Não é eco.',
+    body: 'Reunidos: as três bandas coincidentes com a transmissão, os 11 registros de descarga ANTERIOR ao pulso, e a queda de resistência da formação numa câmara vazia.\n\nA leitura de "eco mecânico" não sobrevive à cronologia. Um eco não precede a fonte.\n\nA leitura que este registro formula: a formação não emite o sinal — ela o REGE. Os cristais da câmara não estão respondendo a ela; estão executando junto, e alguns entram adiantados porque conhecem a parte.\n\nO que a companhia chamou de arranjo piezoelétrico é um instrumento com muitas vozes. E ele muda de composição quando uma geração nova de Prospector entra na sala.\n\nNão há registro de quem escreveu a peça.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-INC-044': {
+    title: 'Incidente 44 — descarga na lâmina do AQF-00',
+    summary: 'A corrente o detém. E toma o lençol inteiro junto.',
+    body: 'Registro de neutralização temporária do ativo AQF-00 por descarga em meio líquido.\n\nO ativo interrompe o deslocamento e permanece imóvel enquanto a carga se dissipa. É o único método confirmado de interrompê-lo.\n\nRegistra-se que a descarga percorre a poça inteira, e que o Aquífero é contíguo em extensão que nenhum levantamento fechou. A unidade que eletrifica a lâmina está de pé sobre ela.\n\nO procedimento aprovado descreve isto como "risco compartilhado com o alvo". A redação foi mantida.',
+    source: 'Comitê de Incidentes — neutralização temporária',
+  },
+  'AX-UNK-063': {
+    title: 'Sobre as sete medições',
+    summary: 'Elas não discordam. Cada uma mediu uma parte diferente.',
+    body: 'As sete medições do AQF-00 foram cruzadas com a posição e o horário de cada equipe.\n\nAs leituras não se contradizem: elas descrevem trechos SIMULTÂNEOS em poças que os levantamentos tratam como separadas, a distâncias que nenhum corpo percorreria no intervalo registrado.\n\nTrês leituras possíveis, e este registro não escolhe: são vários corpos sincronizados; é um corpo cujo comprimento não é uma constante; ou o que se move sob a lâmina não é um corpo, e sim o próprio lençol reagindo — e nesse caso a extensão medida é apenas o quanto dele estava reagindo naquela hora.\n\nA última leitura tem uma consequência que os laudos aprovados evitam: o ativo não teria como ser abatido, apenas interrompido. O que combina, incomodamente, com a única coisa que se sabe fazer contra ele.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-INC-045': {
+    title: 'Incidente 45 — combustão da coluna da VNT-00',
+    summary: 'A expiração dela é contínua até a boca. E queima nos dois sentidos.',
+    body: 'Registro de dano confirmado à estrutura VNT-00 por ignição do gás durante a fase de expiração.\n\nA coluna expelida é contínua da estrutura até a extremidade. Acesa em qualquer ponto, a combustão retorna pela coluna e alcança a boca do órgão. É o único método confirmado de causar dano relevante à estrutura.\n\nCusto operacional registrado: a mesma combustão converte a câmara em ambiente ígneo por vários ciclos, e a estrutura deixa de inspirar enquanto queima — de modo que o gás das câmaras vizinhas para de ser removido.\n\nA unidade compra a janela de dano com o terreno em que pretende continuar de pé.',
+    source: 'Comitê de Incidentes — análise de engajamento',
+  },
+  'AX-UNK-064': {
+    title: 'Sobre o que para de respirar',
+    summary: 'Nos setores em que ela caiu, a ventilação não voltou.',
+    body: 'Levantamento dos setores em que a estrutura VNT-00 foi neutralizada, em janela de 40 ciclos.\n\nA ventilação cessou em todos, entre três e nove ciclos após a neutralização. Nenhum voltou a registrar troca de ar. As câmaras a jusante permanecem irrespiráveis.\n\nA estrutura não se alimentava dos respiradouros. Os respiradouros eram ela — a malha inteira era um sistema, e o que a operação classificou como criatura hostil era o órgão que o movia.\n\nO registro não formula recomendação, porque a recomendação seria não abatê-la, e não existe formulário para isso.\n\nRegistra-se apenas que cada vitória neste estrato fecha uma parte dele para sempre.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-INC-046': {
+    title: 'Incidente 46 — a janela fria da FRN-00',
+    summary: 'A couraça não é dura. Ela é intermitente.',
+    body: 'Registro de dano efetivo à formação FRN-00 durante a fase de resfriamento.\n\nDurante o superaquecimento, o impacto é dissipado pela camada externa com perda superior a 80%. Durante o resfriamento, a mesma munição atravessa a estrutura sem atenuação mensurável.\n\nO ciclo é regular e previsível. Isso torna o engajamento inteiramente uma questão de POSIÇÃO: a unidade não escolhe quando o alvo abre, escolhe onde estar quando ele abrir.\n\nRegistra-se que as ondas térmicas da fase quente varrem setores em sequência rotativa, também regular. Uma unidade que aprenda a sequência atravessa a câmara. Uma que não aprenda atravessa a câmara uma vez.',
+    source: 'Comitê de Incidentes — análise de engajamento',
+  },
+  'AX-UNK-065': {
+    title: 'Sobre o que aquece o quê',
+    summary: 'O magma não aquece a formação. A emissão aquece o magma.',
+    body: 'A cronologia térmica da FRN-00 foi cruzada com o registro da transmissão.\n\nA temperatura da formação acompanha as variações da emissão com atraso de três a cinco horas. A relação é consistente em toda a série. A relação inversa — emissão respondendo à temperatura — não aparece em ponto nenhum.\n\nO projeto de aproveitamento energético supunha uma fonte geotérmica com um sinal por cima. É o contrário: há um sinal, e o calor é o que ele faz com a rocha.\n\nA consequência que o encerramento do projeto não registra: se a emissão cessasse, este estrato esfriaria. E se ela aumentar, nada aqui embaixo tem como não responder.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-INC-047': {
+    title: 'Incidente 47 — fusão do lago da CRP-00',
+    summary: 'A couraça dela é o chão. Derreta o chão.',
+    body: 'Registro de dano efetivo ao ativo CRP-00 após fusão da superfície congelada em raio operacional.\n\nEnquanto cercado de gelo, o ativo dissipa quase todo impacto. Reduzida a cobertura, a mesma munição atravessa. A couraça não pertence ao corpo: pertence à câmara.\n\nRegistra-se o custo, que é o mesmo de sempre neste estrato: a água de fusão é condutiva, recongela em janela conhecida, e a unidade que derreteu o lago está de pé nele.\n\nRegistra-se também que o ativo recompõe a superfície, e que os espectros que o acompanham emergem do gelo recomposto — e não do próprio ativo.',
+    source: 'Comitê de Incidentes — análise de engajamento',
+  },
+  'AX-UNK-066': {
+    title: 'Sobre a hierarquia, e não a pessoa',
+    summary: 'Ela não reproduz alguém. Reproduz a forma de dar ordens.',
+    body: 'Os relatórios de campo sobre a CRP-00 divergem sobre identidade e não divergem sobre COMPORTAMENTO.\n\nEm todos, o padrão é o mesmo: uma figura orienta, as demais respondem, e a resposta precede a ordem em uma fração consistente de segundo — como quem já sabe o que vai ser pedido.\n\nAlguns registros sugerem uma pessoa. Outros sugerem que a figura se forma de todas as vozes perdidas no estrato, e que "Rainha" foi o nome que uma turma anterior deu ao arranjo, não a alguém.\n\nA leitura deste registro é a segunda, com um acréscimo: o que sobrevive ali não é a memória de uma pessoa. É a memória de uma ESTRUTURA — a forma de um turno em que alguém manda e os outros obedecem, preservada depois de todos os envolvidos terem parado de existir.\n\nO Veio guardou o organograma.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-INC-048': {
+    title: 'Incidente 48 — a faixa da MGN-00',
+    summary: 'Existe uma distância em que o campo não cobra nada.',
+    body: 'Mapeamento do campo da anomalia MGN-00 por posição relativa e fase.\n\nNa fase de atração, o campo esmaga abaixo de três metros. Na de repulsão, o arco de retorno castiga acima de nove. Entre os dois limites não há dano registrado em nenhuma das fases.\n\nA faixa existe. Ela é estreita, e o limite que importa TROCA DE LADO a cada inversão de polaridade: a distância segura de agora é a distância letal do ciclo seguinte.\n\nO procedimento recomendado é contraintuitivo e foi verificado em campo: contra a atração, afaste-se; contra a repulsão, avance. A unidade não resiste ao campo — ela caminha dentro dele.',
+    source: 'Comitê de Incidentes — mapeamento de campo',
+  },
+  'AX-UNK-067': {
+    title: 'Sobre o campo que já estava aqui',
+    summary: 'O levantamento pré-operacional registra o mesmo padrão.',
+    body: 'O levantamento geomagnético anterior à instalação da operação foi recuperado do arquivo morto e comparado ao mapa atual.\n\nMesma orientação. Mesma periodicidade. Mesma anomalia central, na mesma coordenada.\n\nA versão institucional — de que décadas de lavra magnetizaram o estrato — é cronologicamente impossível: o padrão antecede a primeira escavação.\n\nO relatório de prospecção original descreve a região como "de leitura instrumental anômala, com transporte de sinal através do próprio veio". Foi essa frase que motivou a aquisição da concessão.\n\nA companhia não escolheu este lugar pelo minério. Escolheu porque alguma coisa já estava usando o minério para transmitir — e a operação inteira foi construída em cima de um cabo que ela não instalou.',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
   'AX-GEN-G01': {
@@ -1454,6 +1530,82 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'The field predates the mine. The mine came afterwards.',
     body: 'ANOMALY MGN-00. Magnetite body incorporating metal debris, rails and ore.\n\nThe asset alternates polarity in regular cycles: it draws units in during one phase and repels them in the next, moving the chamber\'s ferrous material along with them. There is no fixed safe position within field radius.\n\nThe institutional version attributes the field to decades of extraction. The archived pre-operational geomagnetic survey already records the same pattern — same orientation, same periodicity.\n\nThe question the institutional version avoids: did the company choose this place because of the ore, or because the field was already carrying data through it?',
     source: 'Systems Engineering — anomaly classification',
+  },
+
+  // -------------------------------------------------------------------------
+  // The UNDERSTANDING arcs of the stratum bosses: what the lever reveals
+  // -------------------------------------------------------------------------
+  'AX-INC-043': {
+    title: 'Incident 43 — the silence of PRZ-00',
+    summary: 'With no crystal to answer, the formation is defenceless.',
+    body: 'Engagement record against formation PRZ-00 in a chamber previously stripped of crystal structure.\n\nWith no crystals in radius the formation produces no discharge at all — and its resistance to impact drops below that of an ordinary organic body. What we read as armour was not armour: it was the chamber answering on its behalf.\n\nThe operational consequence is recorded, and it is uncomfortable: crystal extraction drastically reduces engagement risk AND removes the sector\'s natural lighting, its charge source, and the very reason the chamber had value.\n\nThe unit chooses between crossing a dangerous cathedral or a safe ruin.',
+    source: 'Incident Committee — engagement analysis',
+  },
+  'AX-UNK-062': {
+    title: 'On what the Cathedral was singing',
+    summary: 'Some crystals answer before the pulse. That is not an echo.',
+    body: 'Taken together: the three bands matching the transmission, the 11 records of discharge PRECEDING the pulse, and the formation\'s collapse in resistance inside an emptied chamber.\n\nThe "mechanical echo" reading does not survive the chronology. An echo does not precede its source.\n\nThe reading this record formulates: the formation does not emit the signal — it CONDUCTS it. The chamber\'s crystals are not answering it; they are performing alongside it, and some come in early because they know the part.\n\nWhat the company called a piezoelectric array is an instrument with many voices. And it changes composition when a new generation of Prospector enters the room.\n\nThere is no record of who wrote the piece.',
+    source: 'No department assigned',
+  },
+  'AX-INC-044': {
+    title: 'Incident 44 — discharge in the AQF-00 sheet',
+    summary: 'Current stops it. And takes the whole sheet with it.',
+    body: 'Record of temporary neutralisation of asset AQF-00 by discharge in liquid medium.\n\nThe asset halts and remains motionless while the charge dissipates. It is the only confirmed method of interrupting it.\n\nIt is recorded that the discharge travels the entire pool, and that the Aquifer is contiguous over an extent no survey has ever closed. The unit electrifying the sheet is standing on it.\n\nThe approved procedure describes this as "risk shared with the target". The wording was left standing.',
+    source: 'Incident Committee — temporary neutralisation',
+  },
+  'AX-UNK-063': {
+    title: 'On the seven measurements',
+    summary: 'They do not disagree. Each measured a different part.',
+    body: 'The seven AQF-00 measurements were cross-referenced against each team\'s position and timestamp.\n\nThe readings do not contradict one another: they describe SIMULTANEOUS stretches in pools the surveys treat as separate, at distances no body would cover in the recorded interval.\n\nThree possible readings, and this record picks none: several synchronised bodies; one body whose length is not a constant; or what moves beneath the sheet is not a body at all, but the sheet itself reacting — in which case the measured extent is merely how much of it was reacting at the time.\n\nThe last reading carries a consequence the approved assessments avoid: the asset could not be killed, only interrupted. Which fits, uncomfortably, with the only thing we know how to do to it.',
+    source: 'No department assigned',
+  },
+  'AX-INC-045': {
+    title: 'Incident 45 — combustion of the VNT-00 column',
+    summary: 'Its exhalation is continuous to the mouth. And it burns both ways.',
+    body: 'Record of confirmed damage to structure VNT-00 by ignition of the gas during the exhalation phase.\n\nThe expelled column is continuous from the structure to its far end. Lit at any point, combustion travels back along the column and reaches the mouth of the organ. It is the only confirmed method of inflicting meaningful damage on the structure.\n\nRecorded operational cost: the same combustion turns the chamber into an igneous environment for several cycles, and the structure stops inhaling while it burns — so the gas in neighbouring chambers stops being removed.\n\nThe unit buys its damage window with the ground it intends to keep standing on.',
+    source: 'Incident Committee — engagement analysis',
+  },
+  'AX-UNK-064': {
+    title: 'On what stops breathing',
+    summary: 'In the sectors where it fell, ventilation never returned.',
+    body: 'Survey of the sectors in which structure VNT-00 was neutralised, over a 40-cycle window.\n\nVentilation ceased in all of them, between three and nine cycles after neutralisation. None resumed air exchange. The chambers downstream remain unbreathable.\n\nThe structure was not feeding on the vents. The vents were it — the whole network was one system, and what the operation classified as a hostile creature was the organ that moved it.\n\nThe record makes no recommendation, because the recommendation would be not to kill it, and there is no form for that.\n\nIt records only that every victory in this stratum closes a part of it permanently.',
+    source: 'No department assigned',
+  },
+  'AX-INC-046': {
+    title: 'Incident 46 — the cold window of FRN-00',
+    summary: 'The shell is not hard. It is intermittent.',
+    body: 'Record of effective damage to formation FRN-00 during the cooling phase.\n\nDuring overheating, impact is dissipated by the outer layer with losses above 80%. During cooling, the same ordnance passes through the structure with no measurable attenuation.\n\nThe cycle is regular and predictable. That makes the engagement entirely a question of POSITION: the unit does not choose when the target opens, it chooses where to be when it does.\n\nIt is recorded that the thermal waves of the hot phase sweep sectors in a rotating sequence, also regular. A unit that learns the sequence crosses the chamber. A unit that does not crosses the chamber once.',
+    source: 'Incident Committee — engagement analysis',
+  },
+  'AX-UNK-065': {
+    title: 'On what heats what',
+    summary: 'The magma does not heat the formation. The emission heats the magma.',
+    body: 'The thermal chronology of FRN-00 was cross-referenced against the transmission record.\n\nThe formation\'s temperature tracks variations in the emission with a lag of three to five hours. The relationship is consistent across the whole series. The inverse relationship — emission responding to temperature — appears nowhere.\n\nThe energy recovery project assumed a geothermal source with a signal on top of it. It is the other way round: there is a signal, and the heat is what it does to the rock.\n\nThe consequence the project closure does not record: if the emission ceased, this stratum would cool. And if it rises, nothing down here has any way not to respond.',
+    source: 'No department assigned',
+  },
+  'AX-INC-047': {
+    title: 'Incident 47 — melting the CRP-00 lake',
+    summary: 'Her armour is the floor. Melt the floor.',
+    body: 'Record of effective damage to asset CRP-00 following fusion of the frozen surface within operating radius.\n\nWhile surrounded by ice the asset dissipates almost all impact. With the cover reduced, the same ordnance passes through. The armour does not belong to the body: it belongs to the chamber.\n\nThe cost is recorded, and it is the usual one in this stratum: meltwater is conductive, refreezes within a known window, and the unit that melted the lake is standing in it.\n\nIt is also recorded that the asset restores the surface, and that the wraiths accompanying it emerge from the restored ice — not from the asset itself.',
+    source: 'Incident Committee — engagement analysis',
+  },
+  'AX-UNK-066': {
+    title: 'On the hierarchy, not the person',
+    summary: 'She does not reproduce someone. She reproduces how orders are given.',
+    body: 'Field reports on CRP-00 disagree about identity and do not disagree about BEHAVIOUR.\n\nIn all of them the pattern is the same: one figure directs, the rest answer, and the answer precedes the order by a consistent fraction of a second — like someone who already knows what will be asked.\n\nSome records suggest a person. Others suggest the figure forms from every voice lost in the stratum, and that "Queen" was the name an earlier crew gave the arrangement, not to anyone.\n\nThis record takes the second reading, with an addition: what survives there is not the memory of a person. It is the memory of a STRUCTURE — the shape of a shift in which someone gives orders and the others obey, preserved after everyone involved stopped existing.\n\nThe Vein kept the org chart.',
+    source: 'No department assigned',
+  },
+  'AX-INC-048': {
+    title: 'Incident 48 — the MGN-00 band',
+    summary: 'There is a distance at which the field charges nothing.',
+    body: 'Mapping of the MGN-00 anomaly field by relative position and phase.\n\nIn the attracting phase the field crushes below three metres. In the repelling phase the return arc punishes above nine. Between the two limits no damage is recorded in either phase.\n\nThe band exists. It is narrow, and the limit that matters SWITCHES SIDES at every polarity inversion: the safe distance now is the lethal distance next cycle.\n\nThe recommended procedure is counter-intuitive and was verified in the field: against attraction, withdraw; against repulsion, advance. The unit does not resist the field — it walks inside it.',
+    source: 'Incident Committee — field mapping',
+  },
+  'AX-UNK-067': {
+    title: 'On the field that was already here',
+    summary: 'The pre-operational survey records the same pattern.',
+    body: 'The geomagnetic survey predating the operation was recovered from dead archive and compared against the current map.\n\nSame orientation. Same periodicity. Same central anomaly, at the same coordinate.\n\nThe institutional version — that decades of extraction magnetised the stratum — is chronologically impossible: the pattern predates the first excavation.\n\nThe original prospecting report describes the region as "of anomalous instrument reading, with signal transport through the vein itself". It was that sentence which motivated acquisition of the concession.\n\nThe company did not choose this place for the ore. It chose it because something was already using the ore to transmit — and the entire operation was built on top of a cable it did not lay.',
+    source: 'No department assigned',
   },
 };
 

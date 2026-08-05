@@ -529,21 +529,21 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 111 documentos: 30 protocolos, 4 marcos, 47 de Ativo, 18 Descobertas, 11 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(111);
+  it('tem 123 documentos: 30 protocolos, 4 marcos, 47 de Ativo, 24 Descobertas, 17 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(123);
     // A contagem de Ativo = 15 fichas + as trilhas de ASSET_MILESTONE_LORE,
     // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
-    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 4 + 1 + 23 + ASSET_MILESTONE_LORE.length + 18 + 11);
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 4 + 1 + 23 + ASSET_MILESTONE_LORE.length + 24 + 17);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
       23 + ASSET_MILESTONE_LORE.length,
     );
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(18);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(24);
     // Quatro dos seis compostos sao o arco do Bispo: ele aparece uma vez por
     // run, entao a revelacao dele sai de ENTENDER o encontro (viu a cura,
     // sobreviveu a Supernova) e nunca de repetir o abate.
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(11);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'compound')).toHaveLength(17);
     expect(DEFAULT_UNLOCKED_LORE).toHaveLength(1);
   });
 

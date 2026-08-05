@@ -31,6 +31,11 @@ import {
   FURNACE_OVERHEATING,
   LUNG_EXHALING,
   LUNG_INHALING,
+  DISCOVERY_CATHEDRAL_SILENCED,
+  DISCOVERY_FURNACE_COOLED,
+  DISCOVERY_LUNG_IGNITED,
+  DISCOVERY_MAGNET_BANDED,
+  DISCOVERY_QUEEN_THAWED,
   MAGNET_ATTRACT,
   MAGNET_REPEL,
   type EnemyArchetype,
@@ -372,5 +377,74 @@ describe('Magnetarca — a faixa troca de lado', () => {
     const farHp = far.state.player.hp;
     for (let t = 0; t < 40; t++) stepRun(far.state, [emptyCommand()]);
     expect(far.state.player.hp, 'repelindo, a distancia nao cobrou').toBeLessThan(farHp);
+  });
+});
+
+// As DESCOBERTAS: o instante em que o jogador entende a alavanca de cada bioma.
+//
+// Elas destravam o miolo do arco documental de cada chefe, e por isso o que
+// cada uma exige e a coisa CERTA — nao "matou de novo". Um bit que acendesse
+// por proximidade, ou por dano qualquer, entregaria a revelacao a quem nunca
+// entendeu nada.
+describe('as Descobertas de estrato exigem o entendimento, e nao o abate', () => {
+  it('Arquicantor: so acende batendo nele com a Catedral em SILENCIO', () => {
+    const { state, boss, px, py, w } = duel(661, 'archcantor', 5);
+    for (const dy of [-2, 2]) state.solid[(py + dy) * w + px + 5] = SOLID_CRYSTAL;
+    damageEntity(state, boss, 10, [], { kind: 'player_shot' });
+    expect(state.stats.discoveries & DISCOVERY_CATHEDRAL_SILENCED, 'acendeu com a rede de pe').toBe(0);
+
+    for (const dy of [-2, 2]) state.solid[(py + dy) * w + px + 5] = SOLID_NONE;
+    damageEntity(state, boss, 10, [], { kind: 'player_shot' });
+    expect(state.stats.discoveries & DISCOVERY_CATHEDRAL_SILENCED).not.toBe(0);
+  });
+
+  it('Coracao: so acende no RESFRIAMENTO, nunca com a couraça fechada', () => {
+    const { state, boss } = duel(662, 'furnace_heart', 5);
+    boss.mood = FURNACE_OVERHEATING;
+    damageEntity(state, boss, 10, [], { kind: 'player_shot' });
+    expect(state.stats.discoveries & DISCOVERY_FURNACE_COOLED, 'acendeu na fase quente').toBe(0);
+
+    boss.mood = FURNACE_COOLING;
+    damageEntity(state, boss, 10, [], { kind: 'player_shot' });
+    expect(state.stats.discoveries & DISCOVERY_FURNACE_COOLED).not.toBe(0);
+  });
+
+  it('Rainha: so acende com o lago DERRETIDO', () => {
+    const { state, boss } = duel(663, 'frost_queen', 5);
+    paint(state, Math.floor(boss.x), Math.floor(boss.y), 4, SURF_ICE);
+    damageEntity(state, boss, 10, [], { kind: 'player_shot' });
+    expect(state.stats.discoveries & DISCOVERY_QUEEN_THAWED, 'acendeu com ela blindada').toBe(0);
+
+    paint(state, Math.floor(boss.x), Math.floor(boss.y), 6, SURF_NONE);
+    damageEntity(state, boss, 10, [], { kind: 'player_shot' });
+    expect(state.stats.discoveries & DISCOVERY_QUEEN_THAWED).not.toBe(0);
+  });
+
+  it('Pulmao: so acende quando a coluna acesa cobra dele', () => {
+    const { state, boss, w } = duel(664, 'lung_matrix', 6);
+    expect(advanceUntil(state, () => Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2 === 1)).toBe(true);
+    expect(state.stats.discoveries & DISCOVERY_LUNG_IGNITED, 'acendeu so por ele expelir').toBe(0);
+
+    const mouth = Math.floor(boss.y) * w + Math.floor(boss.x);
+    for (let t = 0; t < 40; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      state.surface[mouth] = SURF_FIRE;
+      state.surfaceTimer[mouth] = 600;
+    }
+    expect(state.stats.discoveries & DISCOVERY_LUNG_IGNITED).not.toBe(0);
+  });
+
+  it('Magnetarca: acende ao ficar na FAIXA, e nao em nenhuma das bordas', () => {
+    const { state, boss } = duel(665, 'magnetarch', 6);
+    expect(advanceUntil(state, () => Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2 === 0)).toBe(true);
+    // Dentro do campo, fora do esmagamento: a faixa.
+    state.player.x = boss.x - (MAGNETARCH_CRUSH_RANGE + MAGNETARCH_TETHER_RANGE) / 2;
+    state.player.y = boss.y;
+    for (let t = 0; t < 40; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.stats.discoveries & DISCOVERY_MAGNET_BANDED).not.toBe(0);
   });
 });
