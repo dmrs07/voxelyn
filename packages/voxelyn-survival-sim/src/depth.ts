@@ -108,7 +108,7 @@ export const runIsReturning = (state: SurvivalState): boolean =>
 export const resolveSectorBoss = (state: SurvivalState, sector: number): SectorBossState => {
   const depth = runDepth(state);
   const definition = bossForSector(
-    sectorBiome(state.config.seed, sector),
+    (s) => sectorBiome(state.config.seed, s),
     sector,
     depth.sectorCount,
     depth.coreSectors,

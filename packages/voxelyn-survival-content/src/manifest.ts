@@ -167,6 +167,7 @@ export const FIRST_PACK_IDS = [
   'fx-projectile-bolt',
   'fx-impact-burst',
   'fx-seeker-drone',
+  'fx-fire-cyclone',
 ] as const;
 
 /**

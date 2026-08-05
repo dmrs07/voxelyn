@@ -54,6 +54,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   arenaClosed: false,
   arenaBarrierCells: [],
   blastCells: [],
+  collapseCells: [],
   modulesExposed: 0,
   modulesLost: 0,
   leapToX: 0,
@@ -214,28 +215,94 @@ export const sectorHoldsBoss = (
 /**
  * O chefe do setor N de uma run, resolvido de forma DETERMINISTICA.
  *
- * Puro em (bioma, posicao, profundidade congelada): nao consome RNG, nao olha o
- * estado e nao depende de o jogador ja ter estado la. E o que permite ao cliente
- * que reconecta no setor 6 saber quem mora ali antes do primeiro tick, e ao
- * replay reproduzir a mesma camara.
+ * Puro em (linhagem, posicao, profundidade congelada): nao consome RNG, nao
+ * olha o estado e nao depende de o jogador ja ter estado la. E o que permite ao
+ * cliente que reconecta no setor 6 saber quem mora ali antes do primeiro tick,
+ * e ao replay reproduzir a mesma camara.
  *
- * A ESCOLHA de quem e continua sendo `bossForBiome` — ocupacao forte primeiro,
+ * Recebe `biomeAt` e nao um bioma solto porque a resolucao e da RUN INTEIRA, e
+ * nao de um setor isolado: com dois setores de chefe, quem mora num deles
+ * depende de quem mora no outro (ver `UM CHEFE POR RUN` abaixo).
+ *
+ * A ESCOLHA base continua sendo `bossForBiome` — ocupacao forte primeiro,
  * depois o dono do estrato. A posicao decide SE ha chefe; o bioma decide QUEM.
- * Foi assim que a spec dos biomas deixou o assunto e nao ha razao para mudar:
- * a mesma Catedral Prismatica no setor 3 de uma run de G-04 e no setor 3 de uma
- * run de G-03 tem o mesmo Arquicantor.
  */
 export const bossForSector = (
-  biome: SectorBiome,
+  biomeAt: (sector: number) => SectorBiome,
   sector: number,
   sectorCount: number,
   coreSectors: readonly number[],
 ): SectorBossDefinition | null => {
   if (!sectorHoldsBoss(sector, sectorCount, coreSectors)) return null;
-  const boss = bossForBiome(biome);
-  return {
-    boss,
-    archetype: IMPLEMENTED_BOSS[boss] ?? null,
-    source: BOSS_OF_OCCUPATION[biome.occupation] ? 'occupation' : 'stratum',
-  };
+
+  const biome = biomeAt(sector);
+  const primary = bossForBiome(biome);
+  const source: SectorBossSource = BOSS_OF_OCCUPATION[biome.occupation]
+    ? 'occupation'
+    : 'stratum';
+
+  // ---------------------------------------------------------------------
+  // UM CHEFE POR RUN
+  // ---------------------------------------------------------------------
+  // O setor MAIS FUNDO fica com o dono do proprio bioma, sempre. Ele e o
+  // climax da descida e nao cede nada a ninguem.
+  const deepest = deepestBossSector(sectorCount, coreSectors);
+  if (sector >= deepest) return { boss: primary, archetype: archetypeOf(primary), source };
+
+  // Um setor de chefe RASO que repetiria o dono do fundo cede o posto.
+  //
+  // Sem esta regra, 38% das runs de G-04 enfrentavam o MESMO chefe duas vezes,
+  // e em algumas linhagens quase metade: o setor 3 e o setor 7 costumam ser o
+  // mesmo estrato (uma linhagem arida e silica do meio ao fim — e o que a faz
+  // arida), e duas intrusoes Aurix produzem dois Diamandis. Repetir o encontro
+  // mais caro da run e a forma mais barata de gastar a profundidade que a
+  // geracao acabou de autorizar.
+  const deepBoss = bossForBiome(biomeAt(deepest));
+  if (primary !== deepBoss) return { boss: primary, archetype: archetypeOf(primary), source };
+
+  for (const alternate of alternatesFor(biome)) {
+    if (alternate === deepBoss) continue;
+    // `special` e a marca de que este dono nao saiu da leitura normal do mapa:
+    // ele esta aqui porque o fundo ja tinha o dono natural. Sem a marca, uma
+    // Catedral com Bispo no setor 3 leria como defeito de tabela.
+    return { boss: alternate, archetype: archetypeOf(alternate), source: 'special' };
+  }
+
+  // Inalcancavel com as tabelas atuais (ha sempre um alternado diferente), e
+  // por isso NAO ha invencao aqui: repetir o dono e melhor que servir um chefe
+  // que o bioma nao explica.
+  return { boss: primary, archetype: archetypeOf(primary), source };
 };
+
+/** O setor de chefe mais fundo da run — o que nunca cede o posto. */
+const deepestBossSector = (sectorCount: number, coreSectors: readonly number[]): number => {
+  let deepest = 0;
+  for (let sector = 1; sector <= sectorCount; sector++) {
+    if (sectorHoldsBoss(sector, sectorCount, coreSectors)) deepest = sector;
+  }
+  return deepest;
+};
+
+/**
+ * Para quem o setor raso cede, em ordem de preferencia.
+ *
+ * - Com OCUPACAO forte, o alternado e o chefe do ESTRATO: a cicatriz cede ao
+ *   veio. E o caso mais legivel — as duas camadas do bioma ja estao ali, e o
+ *   fundo fica com a de cima.
+ * - SEM ocupacao, o estrato ja e a unica leitura natural e ela esta tomada.
+ *   Ai a camara do Nucleo intermediario e uma camara TOMADA: a Matriz ou a
+ *   Aurix chegaram nela primeiro, que e a mesma gramatica das intrusoes e
+ *   explica por que aquele pedestal especificamente esta selado.
+ *
+ * O terreno NAO muda por causa disto: `sectorBiome` continua puro em
+ * (seed, setor), e o que se escolhe aqui e o ocupante da camara. Um Bispo traz
+ * o proprio bolso micelial ao nascer (ver populateSector), que e exatamente o
+ * quanto de mundo o encontro precisa.
+ */
+const alternatesFor = (biome: SectorBiome): readonly BossId[] => {
+  const occupied = BOSS_OF_OCCUPATION[biome.occupation];
+  if (occupied) return [BOSS_OF_STRATUM[biome.stratum]];
+  return [BOSS_OF_OCCUPATION.mycelial as BossId, BOSS_OF_OCCUPATION.aurix as BossId];
+};
+
+const archetypeOf = (boss: BossId): EnemyArchetype | null => IMPLEMENTED_BOSS[boss] ?? null;

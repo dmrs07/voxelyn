@@ -1299,10 +1299,118 @@ export const FURNACE_HEART_HP = 900;
 export const FURNACE_HEART_RADIUS = 1;
 export const FURNACE_HEART_CYCLE_TICKS = 150;
 export const FURNACE_HEART_HOT_ARMOR = 0.2;
-export const FURNACE_HEART_WAVE_RADIUS = 8;
+/**
+ * Alcance da varredura. Era 8, e oito era o defeito do encontro inteiro.
+ *
+ * O Coracao e FIXO: ele nao persegue e nao atira. Com a onda parando em oito
+ * tiles e o bolt do Prospector chegando muito alem disso, existia uma faixa
+ * confortavel em que o jogador matava um chefe de 900 de vida sem nunca entrar
+ * no alcance dele. Nao era uma luta dificil nem facil — nao era uma luta.
+ *
+ * Quinze cobre a camara: a promessa "a luta e contra a SALA" so vale se a sala
+ * inteira for a luta. O que continua sendo escolha do jogador e ONDE estar
+ * dentro dela, porque a varredura e um setor girando e nao um pulso total.
+ */
+export const FURNACE_HEART_WAVE_RADIUS = 15;
 export const FURNACE_HEART_WAVE_INTERVAL_TICKS = 12;
 /** Meia-abertura do setor que acende por vez, em radianos (~60 graus). */
 export const FURNACE_HEART_WAVE_ARC = 0.52;
+/**
+ * Dano de quem esta DENTRO do setor quando ele varre.
+ *
+ * A onda so pintava brasa no chao, e brasa cobra de quem fica parado nela — o
+ * que um jogador em movimento nunca era. O calor da passagem tem de custar no
+ * instante da passagem, senao a varredura e decoracao com atraso.
+ */
+export const FURNACE_HEART_WAVE_DAMAGE = 11;
+/**
+ * ESCORIACEOS: o que a Fornalha manda quando esquenta.
+ *
+ * O Coracao nao tinha resposta nenhuma para um jogador que se recusasse a
+ * chegar perto — e um chefe imovel sem resposta a distancia e um alvo de tiro
+ * ao alvo. Os Escoriaceos sao a resposta, e sao a fauna do PROPRIO estrato:
+ * corpos minerais que sobrevivem ao calor. Nao e um bestiario novo enxertado
+ * na luta, e a Fornalha usando o que ela ja tem.
+ *
+ * Eles saem no comeco de cada superaquecimento e ATRAVESSAM o resfriamento —
+ * e ai esta o desenho: a janela em que o Coracao fica vulneravel e a janela em
+ * que a sala esta mais cheia. O jogador escolhe entre bater no chefe e
+ * responder ao que veio atras dele.
+ */
+export const FURNACE_HEART_BROOD_PER_WAVE = 2;
+/** Teto de Escoriaceos vivos por conta do Coracao. Sem ele, a sala entope. */
+export const FURNACE_HEART_BROOD_CAP = 5;
+
+/**
+ * O COLAPSO TERMICO: as duas fases de uma vez do Coracao da Fornalha.
+ *
+ * Cuidado com o nome. O Coracao ja tinha um ciclo `FURNACE_OVERHEATING` /
+ * `FURNACE_COOLING` — a janela de blindagem, que gira o tempo inteiro e nunca
+ * para. O que entra aqui e outra coisa: uma escada de DANO ACUMULADO, disparada
+ * uma unica vez em cada limiar e sem volta. O ciclo continua girando por dentro
+ * das duas.
+ *
+ * 45% — COLAPSO. O constructo comeca a se desfazer: a pedra do corpo dele
+ * esquenta ate ficar vermelha, o nucleo solta fumaca, e o TETO da camara cede.
+ * As estalactites sao o que a escada acrescenta de jogo — ate aqui a unica
+ * ameaca vinha do chao (a varredura), e um jogador que aprendesse a ler o setor
+ * girando tinha resolvido o encontro. A queda vem de cima, e a leitura e outra.
+ *
+ * 10% — INSTABILIDADE. Ele perde o que ainda tinha de constructo e vira o
+ * proprio fogo: ciclones atravessam a sala acendendo o que encostam. E a
+ * inversao final do encontro — a arena que o jogador aprendeu a usar deixa de
+ * existir enquanto eles passam.
+ *
+ * Os dois limiares sao FRACOES da vida, e nao valores absolutos, porque a vida
+ * do chefe e um numero de tuning: fixa-los em pontos os desalinharia no
+ * primeiro rebalanceamento.
+ */
+export const FURNACE_HEART_OVERHEAT_HP = 0.45;
+export const FURNACE_HEART_UNSTABLE_HP = 0.1;
+
+/**
+ * ESTALACTITES: o teto cobrando o que o chao ja cobrava.
+ *
+ * Caem MARCADAS, com o aviso no chao antes da queda — a mesma gramatica da
+ * Salva de Demolicao do Diamandis, pelo mesmo motivo: dano sem sinal e o
+ * invariante que este jogo nao quebra. A janela e curta o bastante para cobrar
+ * atencao e longa o bastante para caber um passo.
+ *
+ * Elas caem PERTO dos jogadores e nao em cima: marcar a celula exata do
+ * jogador transformaria o aviso numa taxa sobre ficar parado, e ficar parado ja
+ * e punido pela varredura. O que a estalactite cobra e o espaco em volta —
+ * ela tira opcoes de rota, que e o que uma sala desabando faz.
+ */
+export const FURNACE_HEART_STALACTITE_INTERVAL_TICKS = 34;
+export const FURNACE_HEART_STALACTITE_WARNING_TICKS = 26;
+export const FURNACE_HEART_STALACTITE_DAMAGE = 16;
+export const FURNACE_HEART_STALACTITE_RADIUS = 1.6;
+/** Quantas por leva no colapso. A instabilidade dobra. */
+export const FURNACE_HEART_STALACTITES_PER_DROP = 2;
+/** Ate onde do jogador uma estalactite pode ser marcada, em celulas. */
+export const FURNACE_HEART_STALACTITE_SPREAD = 5;
+
+/**
+ * CICLONES DE FOGO: a arena deixa de ser terreno neutro.
+ *
+ * Sao projeteis hostis persistentes, como o carrinho da armadilha — andam,
+ * colidem com parede e entram no hash como qualquer outro. O que eles tem de
+ * proprio e ACENDER o que atravessam: o perigo nao e o corpo do ciclone, e o
+ * rastro que ele deixa e que fica.
+ *
+ * Poucos e lentos de proposito. Um ciclone rapido vira dano aleatorio; um
+ * ciclone lento e legivel vira uma parede movel que o jogador tem de contornar
+ * — e contornar, numa sala que ja esta com o teto caindo, e a decisao.
+ */
+export const FURNACE_HEART_CYCLONE_INTERVAL_TICKS = 90;
+export const FURNACE_HEART_CYCLONE_SPEED = 2.6;
+export const FURNACE_HEART_CYCLONE_DAMAGE = 14;
+export const FURNACE_HEART_CYCLONE_RADIUS = 0.85;
+/** Ticks entre dois toques do MESMO ciclone no mesmo corpo. */
+export const FURNACE_HEART_CYCLONE_TOUCH_TICKS = 22;
+export const FURNACE_HEART_CYCLONE_TTL_TICKS = 260;
+/** Teto de ciclones vivos. Acima disto a sala deixa de ter rota. */
+export const FURNACE_HEART_CYCLONE_CAP = 3;
 
 /**
  * RAINHA DA GEADA (Cripta Glacial) — a figura de gelo, nevoa e reflexos.

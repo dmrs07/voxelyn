@@ -2179,6 +2179,72 @@ const droneFrame = (_dir, _anim, f) => {
   outlineWith(g, 'dark');
   return g;
 };
+/**
+ * CICLONE DE FOGO — a instabilidade do Coracao da Fornalha andando pela sala.
+ *
+ * Uma coluna e nao uma bola: o perigo dele e ocupar espaco de chao, e uma
+ * silhueta vertical le como "isto esta no meu caminho" a distancia, que e a
+ * unica informacao que o jogador precisa a tempo. Estreito no chao e aberto
+ * no alto, com a cintura apertada no meio — a silhueta de um redemoinho.
+ *
+ * A rotacao vem de DUAS espirais defasadas meia volta, e nao de girar o corpo
+ * inteiro: girar um funil simetrico nao produz movimento visivel nenhum, e o
+ * ciclone leria como uma chama parada. As espirais dao o sentido do giro.
+ *
+ * A paleta ESFRIA com a altura — `beam` no chao, `amber` no meio, `fire` na
+ * ponta —, que e como uma chama de verdade se le: o mais quente e onde ela
+ * nasce. Aqui isso tambem e informacao de jogo, porque o que machuca e a base,
+ * e ela tem de ser a parte que puxa o olho. As tres estao em EMISSIVE_HEX,
+ * entao ele acende sozinho no caminho de brilho do cliente; a fumaca (`char`)
+ * fecha o topo e impede o ciclone de virar um borrao laranja.
+ */
+const cycloneFrame = (_dir, _anim, f) => {
+  const g = grid(32, 32);
+  const FRAMES = 6;
+  const spin = (f / FRAMES) * Math.PI * 2;
+  // BASE em 27 e nao em 29: o contorno de `outlineWith` cresce um pixel para
+  // fora do conteudo, e a base colada no rodape do quadro empurrava esse
+  // contorno para a linha 31 — o validador recusa conteudo tocando a borda,
+  // e com razao: um sprite que encosta na moldura mostra costura quando o
+  // atlas e amostrado.
+  const BASE = 27;
+  const TOP = 5;
+  const H = BASE - TOP;
+  for (let y = BASE; y >= TOP; y--) {
+    const t = (BASE - y) / H;
+    const waist = 1 - Math.sin(t * Math.PI) * 0.55;
+    const radius = Math.max(1.2, (2.4 + t * 4.8) * waist);
+    const tone = t < 0.35 ? 'beam' : t < 0.7 ? 'amber' : 'fire';
+    // O eixo serpenteia: uma coluna reta parece um poste aceso.
+    const cx = 16 + Math.sin(spin + t * 3.2) * 1.4;
+    fillEllipse(g, cx, y, radius, 1, tone);
+    // Miolo mais claro so na metade de baixo, onde a chama e densa.
+    if (t > 0.5 && radius > 3.2) fillEllipse(g, cx, y, radius - 2.2, 1, 'amber');
+  }
+  // As DUAS espirais, defasadas meia volta: sao elas que giram.
+  for (const phase of [0, Math.PI]) {
+    for (let y = BASE - 2; y >= TOP + 1; y -= 2) {
+      const t = (BASE - y) / H;
+      const waist = 1 - Math.sin(t * Math.PI) * 0.55;
+      const radius = Math.max(1.2, (2.4 + t * 4.8) * waist);
+      const a = spin + phase + t * 5.4;
+      const cx = 16 + Math.sin(spin + t * 3.2) * 1.4;
+      set(g, cx + Math.cos(a) * radius, y, t < 0.5 ? 'chalk' : 'beam');
+    }
+  }
+  // A fumaca que sai do topo, arrastada pelo giro.
+  for (let k = 0; k < 3; k++) {
+    const a = spin * 1.4 + (k * Math.PI * 2) / 3;
+    set(g, 16 + Math.cos(a) * (2.5 + k), TOP - 1 - Math.floor(k / 2), 'char');
+  }
+  // A brasa que ele levanta do chao, girando junto com a base.
+  for (let k = 0; k < 4; k++) {
+    const a = -spin * 1.8 + (k * Math.PI) / 2;
+    set(g, 16 + Math.cos(a) * 6.5, BASE + Math.sin(a) * 1.2, k % 2 === 0 ? 'fire' : 'rust');
+  }
+  outlineWith(g, 'dark');
+  return g;
+};
 const impactFrame = (_dir, _anim, f) => {
   const g = grid(32, 32);
   // Anel principal expandindo, com meio passo de giro por quadro para os
@@ -2373,5 +2439,12 @@ export const ENTITY_SPECS = [
     footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
     animations: { fly: { frames: 4, fps: 12, loop: true } }, draw: droneFrame,
     prompt: 'voxel-isometric kamikaze quadcopter drone, four solid rotor discs in X, faceted cold chassis, pulsing amber demolition core — machine, not insect',
+  },
+  {
+    id: 'fx-fire-cyclone', version: 1, frameWidth: 32, frameHeight: 32, anchorX: 16, anchorY: 27,
+    directions: 1, authoredDirs: ['n'], flipPairs: {}, hitbox: { w: 0.85, h: 0.85 },
+    footprint: { w: 0, h: 0, offsetX: 0, offsetY: 0 },
+    animations: { fly: { frames: 6, fps: 14, loop: true } }, draw: cycloneFrame,
+    prompt: 'voxel-isometric fire tornado, tall funnel of ember and white-hot flame, two counter-rotating spiral threads, smoke curling off the top, embers kicked up at the base',
   },
 ];

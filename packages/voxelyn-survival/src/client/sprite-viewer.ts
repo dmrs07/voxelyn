@@ -11,6 +11,7 @@ import guardianManifest from '@voxelyn/survival-content/assets/atlases/enemy-gua
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
+import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
 import playerUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.png?url';
 import stalkerUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.png?url';
 import spitterUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.png?url';
@@ -20,6 +21,7 @@ import guardianUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
+import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
 
 type Item = { manifest: SpriteManifestEntry; url: string };
 const ITEMS: Item[] = [
@@ -32,6 +34,7 @@ const ITEMS: Item[] = [
   [boltManifest, boltUrl],
   [impactManifest, impactUrl],
   [droneManifest, droneUrl],
+  [cycloneManifest, cycloneUrl],
 ].map(([manifest, url]) => ({ manifest: manifest as unknown as SpriteManifestEntry, url: url as string }));
 
 const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;

@@ -538,6 +538,17 @@ export type BossRuntime = {
    */
   blastCells: number[];
   /**
+   * O TETO CEDENDO: celulas marcadas para receber uma estalactite, com o tick
+   * da queda.
+   *
+   * Par (celula, quando) e nao duas listas paralelas: as estalactites caem em
+   * levas sobrepostas — uma marcada agora convive com uma prestes a cair — e
+   * duas listas que precisam ficar alinhadas por indice sao a forma mais facil
+   * de desalinhar. Entra no hash: duas simulacoes que discordem de onde o teto
+   * vai ceder divergem um segundo depois, e no lugar errado.
+   */
+  collapseCells: Array<{ idx: number; at: number }>;
+  /**
    * Modulos do Diamandis que ja se SOLTARAM da carcaca (bitmask por indice).
    *
    * Solto nao e perdido: a arma daquele modulo continua funcionando enquanto
@@ -583,6 +594,16 @@ export type BossRuntime = {
 export const BOSS_PHASE_SUMMON = 1 << 0;
 /** O colapso do reator do Diamandis, abaixo de metade da vida. */
 export const BOSS_PHASE_REACTOR = 1 << 1;
+/**
+ * COLAPSO TERMICO do Coracao da Fornalha (45% de vida). O teto comeca a ceder.
+ *
+ * Nao confundir com a mood `FURNACE_OVERHEATING`: aquela e a janela de
+ * blindagem, que gira o encontro inteiro; esta e uma escada de dano acumulado,
+ * disparada uma vez e sem volta.
+ */
+export const BOSS_PHASE_OVERHEAT = 1 << 2;
+/** INSTABILIDADE do Coracao (10% de vida). Ciclones de fogo atravessam a sala. */
+export const BOSS_PHASE_UNSTABLE = 1 << 3;
 
 /**
  * Os modulos do Diamandis, na ordem em que se soltam. Cada um alimenta UMA
@@ -763,7 +784,23 @@ export type PlayerExtra = {
  * rampa acida — um bloco de rocha arrancado da parede aparecia como cusparada.
  * As flags dizem o que o projetil FAZ; isto diz o que ele E.
  */
-export type ProjectileKind = 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart';
+export type ProjectileKind =
+  | 'bolt'
+  | 'spit'
+  | 'rock'
+  | 'return_disc'
+  | 'seeker'
+  | 'cart'
+  /**
+   * CICLONE DE FOGO: a instabilidade do Coracao da Fornalha andando pela sala.
+   *
+   * Projetil e nao entidade porque ele nao decide nada — nao persegue, nao mira
+   * e nao morre no impacto. Ele atravessa, acende o que encosta e some. Como
+   * projetil, ganha de graca o movimento, a colisao com parede, o hash e o
+   * snapshot; como inimigo, teria uma IA vazia e um lugar na contagem de
+   * abates que ele nao merece.
+   */
+  | 'cyclone';
 
 export type ProjectileModules = {
   piercing?: true;
@@ -793,6 +830,14 @@ export type Projectile = {
   /** Raio de colisao autoritativo; projeteis pequenos usam o fallback historico. */
   radius?: number;
   modules?: ProjectileModules;
+  /**
+   * Proximo tick em que este projetil pode cobrar de novo. So o ciclone usa.
+   *
+   * Um relogio POR PROJETIL e nao por par (projetil, corpo): quem esta dentro
+   * do funil esta no mesmo problema, e o encontro nao fica mais barato por
+   * serem dois Prospectors. Entra no hash junto com o resto do projetil.
+   */
+  nextTouchAt?: number;
   distanceTravelled: number;
   disc?: DiscState;
   hostile: boolean;
@@ -940,6 +985,36 @@ export type SemanticEvent =
    */
   | { t: 'boss_awake' }
   /**
+   * O chefe cruzou um LIMIAR e nao volta atras.
+   *
+   * Evento proprio, e nao um `hit` que o cliente interprete: quem sabe que
+   * aquele dano foi o que cruzou os 45% e a simulacao, e a apresentacao da
+   * fase (o brilho, a fumaca, o tremor no ritmo do coracao) precisa comecar no
+   * tick exato — um cliente contando vida por conta propria comecaria cedo ou
+   * tarde conforme o atraso da rede.
+   *
+   * O bit tambem viaja em `WorldFlags.bossPhases`, entao quem reconecta no meio
+   * do colapso chega ja com a apresentacao certa.
+   */
+  | { t: 'boss_phase'; archetype: EnemyArchetype; phase: number }
+  /**
+   * Uma estalactite foi MARCADA. `fireTick` e quando ela chega.
+   *
+   * O aviso viaja separado da queda pelo invariante de sempre: nada neste jogo
+   * causa dano sem sinal. O cliente desenha a sombra crescendo no chao; a
+   * simulacao cobra quando o tick chega.
+   */
+  | { t: 'stalactite'; x: number; y: number; radius: number; fireTick: number }
+  /**
+   * A SALA ESFRIA: o Coracao caiu e o calor sai junto com ele.
+   *
+   * Nao e so apresentacao — a simulacao apaga a brasa e o fogo da camara e
+   * dissolve os ciclones. E o alivio que fecha o encontro, e ele tem de ser
+   * autoritativo: um cliente que apagasse o fogo sozinho estaria desenhando um
+   * chao seguro sobre celulas que ainda queimam.
+   */
+  | { t: 'furnace_cooled'; x: number; y: number; radius: number }
+  /**
    * O mundo inteiro foi trocado: o cliente precisa redesenhar do zero.
    *
    * Carrega o BIOMA porque o setor deixou de ser so um numero: o anuncio de
@@ -1062,6 +1137,12 @@ export type SimMessageKey =
   | 'sim.coreDropped'
   | 'sim.arenaSealed'
   | 'sim.siegeCollapsed'
+  /** O teto da camara comecou a ceder. */
+  | 'sim.ceilingCollapsing'
+  /** O constructo perdeu a forma: a sala inteira virou fogo. */
+  | 'sim.furnaceUnstable'
+  /** O Coracao caiu e o calor foi embora com ele. */
+  | 'sim.furnaceCooled'
   /** O poco nao abre: o dono do setor ainda esta de pe. */
   | 'sim.descentSealedByBoss'
   /** O pedestal recusa a mao: o mesmo selo, o mesmo dono. */

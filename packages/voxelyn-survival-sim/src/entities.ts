@@ -24,6 +24,23 @@ import {
   FURNACE_HEART_HP,
   FURNACE_HEART_RADIUS,
   FURNACE_HEART_WAVE_ARC,
+  FURNACE_HEART_CYCLONE_CAP,
+  FURNACE_HEART_CYCLONE_TTL_TICKS,
+  FURNACE_HEART_CYCLONE_RADIUS,
+  FURNACE_HEART_CYCLONE_DAMAGE,
+  FURNACE_HEART_CYCLONE_SPEED,
+  FURNACE_HEART_CYCLONE_INTERVAL_TICKS,
+  FURNACE_HEART_STALACTITE_SPREAD,
+  FURNACE_HEART_STALACTITES_PER_DROP,
+  FURNACE_HEART_STALACTITE_RADIUS,
+  FURNACE_HEART_STALACTITE_DAMAGE,
+  FURNACE_HEART_STALACTITE_WARNING_TICKS,
+  FURNACE_HEART_STALACTITE_INTERVAL_TICKS,
+  FURNACE_HEART_UNSTABLE_HP,
+  FURNACE_HEART_OVERHEAT_HP,
+  FURNACE_HEART_BROOD_CAP,
+  FURNACE_HEART_BROOD_PER_WAVE,
+  FURNACE_HEART_WAVE_DAMAGE,
   FURNACE_HEART_WAVE_INTERVAL_TICKS,
   FURNACE_HEART_WAVE_RADIUS,
   LEVIATHAN_BREACH_DAMAGE,
@@ -241,6 +258,8 @@ import {
   BOSS_MODULE_TOWER,
   BOSS_PHASE_REACTOR,
   BOSS_PHASE_SUMMON,
+  BOSS_PHASE_UNSTABLE,
+  BOSS_PHASE_OVERHEAT,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_DIAMANDIS_CORRIDOR,
@@ -268,6 +287,7 @@ import type {
   EntityActionKind,
   EnemyArchetype,
   SemanticEvent,
+  SimMessageKey,
   SurvivalState,
   Vec2,
 } from './types.js';
@@ -731,6 +751,13 @@ export const damageEntity = (
   // arquetipos a mao (`bishop || guardian`) ja errou: a tabela ganhou oito
   // chefes e esta linha continuou marcando dois, entao o Arquicantor abatido
   // renascia na subida e o portal do setor dele nunca destrancava.
+  // O Coracao leva o calor embora com ele.
+  //
+  // FORA da guarda do selo de setor, e a distincao importa: esfriar a sala e
+  // propriedade da morte DELE, e nao da quebra do selo. Amarrar as duas faria o
+  // alivio depender de ele ser o dono do setor — o que ele sempre e hoje, e o
+  // "hoje" e exatamente o tipo de coisa que envelhece calado.
+  if (ent.archetype === 'furnace_heart') furnaceHeartCooldown(state, ent, events);
   if (state.sectorBoss.entityId === ent.id && isBossArchetype(ent.archetype)) {
     markSectorBossDown(state, state.sector);
     // O SELO CEDEU. Evento proprio, e nao o `death` reinterpretado: o cliente
@@ -2726,7 +2753,26 @@ const lungMatrixBurning = (state: SurvivalState, enemy: Entity): boolean => {
 const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const phase = Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2;
   enemy.mood = phase === 0 ? FURNACE_OVERHEATING : FURNACE_COOLING;
+  // A escalada roda ANTES do ciclo: os dois limiares mudam o que este mesmo
+  // tick faz, e o colapso continua acontecendo durante o RESFRIAMENTO — o teto
+  // nao para de cair so porque a blindagem dele abriu.
+  furnaceHeartEscalate(state, enemy, events);
+  if (furnaceOverheated(state)) furnaceHeartCollapse(state, enemy, events);
+  if (furnaceUnstable(state)) furnaceHeartCyclones(state, enemy, events);
+
   if (enemy.mood !== FURNACE_OVERHEATING) return;
+
+  // A NINHADA sai no primeiro tick de cada superaquecimento.
+  //
+  // O instante e derivado do relogio, e nao de um contador guardado: o ciclo ja
+  // e `tick / CYCLE_TICKS`, entao a virada e exata e nenhum campo novo precisa
+  // entrar no hash. As posicoes tambem sao geometria pura — nada aqui consome
+  // `state.rng`, senao duas maquinas com a mesma seed divergiriam na primeira
+  // ninhada.
+  if (state.tick % (FURNACE_HEART_CYCLE_TICKS * 2) === 0) {
+    furnaceHeartBrood(state, enemy);
+  }
+
   if (state.tick < enemy.nextActionAt) return;
   enemy.nextActionAt = state.tick + FURNACE_HEART_WAVE_INTERVAL_TICKS;
 
@@ -2758,7 +2804,292 @@ const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticE
       }
     }
   }
+  // O calor cobra NA PASSAGEM, e nao so de quem fica parado na brasa depois.
+  //
+  // Sem isto a varredura era uma promessa que so se cumpria para quem parasse
+  // em cima dela: quem atravessava o setor no instante em que ele acendia nao
+  // levava nada, e atravessar era o movimento obvio. O dano fecha a leitura —
+  // "escolha onde estar quando puder" precisa de um preco por estar no lugar
+  // errado.
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!player.alive || !extra.joined || extra.downed) continue;
+    const px = player.x - enemy.x;
+    const py = player.y - enemy.y;
+    const len = Math.hypot(px, py);
+    if (len < 2 || len > r) continue;
+    if ((px / len) * dirX + (py / len) * dirY < Math.cos(FURNACE_HEART_WAVE_ARC)) continue;
+    damageEntity(state, player, FURNACE_HEART_WAVE_DAMAGE, events, { kind: 'fire' });
+  }
+
   events.push({ t: 'beam_line', x: enemy.x, y: enemy.y, dx: dirX, dy: dirY, length: r, powered: true });
+};
+
+/**
+ * Os Escoriaceos que a Fornalha manda quando esquenta.
+ *
+ * Em ANEL, pelo mesmo motivo da matilha do Guardiao: saindo todos da mesma
+ * linha, o jogador resolve a leva inteira com um recuo so. O anel e maior que o
+ * do Guardiao porque o Coracao nao persegue — quem tem de atravessar a sala e
+ * o bicho, e nascer colado no chefe entregaria os dois no mesmo tiro.
+ *
+ * O teto conta os Escoriaceos VIVOS: um jogador que limpa a leva anterior ganha
+ * a proxima inteira, e um que ignora acumula pressao ate o teto e para. E o
+ * mesmo contrato do resto do bestiario — densidade nao vira castigo.
+ */
+const FURNACE_BROOD_RING: readonly (readonly [number, number])[] = [
+  [-5, 0],
+  [5, 0],
+  [0, -5],
+  [0, 5],
+  [-4, -4],
+  [4, 4],
+];
+
+/**
+ * O COLAPSO TERMICO, em duas fases de uma vez.
+ *
+ * Roda ANTES da varredura e do ciclo, e nao depois: os dois limiares mudam o
+ * que a varredura faz naquele mesmo tick, e checar depois atrasaria a
+ * escalada em um tick de cada vez ate ninguem notar que ela esta atrasada.
+ *
+ * As duas sao `phasesFired`, a mesma bitmask da matilha do Guardiao e do
+ * reator do Diamandis: elas disparam UMA vez e nao voltam atras nem se o
+ * chefe for curado. Uma escada que desce nao e uma escada.
+ */
+const furnaceHeartEscalate = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  const fraction = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
+  const fire = (bit: number, message: SimMessageKey): void => {
+    if ((state.bossRuntime.phasesFired & bit) !== 0) return;
+    state.bossRuntime.phasesFired |= bit;
+    events.push({ t: 'boss_phase', archetype: 'furnace_heart', phase: bit });
+    events.push({ t: 'message', key: message });
+  };
+  if (fraction <= FURNACE_HEART_OVERHEAT_HP) fire(BOSS_PHASE_OVERHEAT, 'sim.ceilingCollapsing');
+  // A instabilidade NAO espera o colapso ser anunciado: um golpe que leve o
+  // chefe de 50% a 8% acende as duas no mesmo tick, e o jogador ve as duas
+  // acontecerem. Esconder a primeira porque a segunda chegou junto apagaria a
+  // leitura de que ele passou por ela.
+  if (fraction <= FURNACE_HEART_UNSTABLE_HP) fire(BOSS_PHASE_UNSTABLE, 'sim.furnaceUnstable');
+};
+
+/** O colapso ja comecou? */
+const furnaceOverheated = (state: SurvivalState): boolean =>
+  (state.bossRuntime.phasesFired & BOSS_PHASE_OVERHEAT) !== 0;
+
+const furnaceUnstable = (state: SurvivalState): boolean =>
+  (state.bossRuntime.phasesFired & BOSS_PHASE_UNSTABLE) !== 0;
+
+/**
+ * Ruido inteiro puro, no espirito de `sectorSeed`.
+ *
+ * As estalactites NAO consomem `state.rng`. Poderiam — o sorteio de
+ * contaminacao consome —, e seria errado por um motivo especifico: elas caem
+ * dezenas de vezes por encontro, e cada tirada deslocaria a sequencia da run
+ * inteira. Duas partidas com a mesma seed passariam a divergir em tudo o que
+ * vem depois de um chefe conforme o jogador demorasse mais ou menos para
+ * mata-lo. Derivar de (seed, tick, indice) da a mesma imprevisibilidade sem
+ * tocar no gerador da run.
+ */
+const furnaceNoise = (a: number, b: number, c: number): number => {
+  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b);
+  h = Math.imul(h ^ (b + 0x165667b1), 0xc2b2ae35);
+  h = Math.imul(h ^ (c + 0x27d4eb2f), 0x27d4eb2f);
+  return (h ^ (h >>> 15)) >>> 0;
+};
+
+/**
+ * O TETO CEDE: marca estalactites perto de quem esta na sala.
+ *
+ * Perto, e nunca EM CIMA: marcar a celula do jogador transformaria o aviso numa
+ * taxa sobre ficar parado, e ficar parado ja e punido pela varredura. O que a
+ * queda cobra e o espaco em volta — ela tira rota, que e o que uma camara
+ * desabando faz.
+ */
+const furnaceHeartCollapse = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  if (state.tick % FURNACE_HEART_STALACTITE_INTERVAL_TICKS !== 0) return;
+  const w = state.config.width;
+  const h = state.config.height;
+  // A instabilidade DOBRA a leva: a mesma mecanica, com a sala ja pior.
+  const count = FURNACE_HEART_STALACTITES_PER_DROP * (furnaceUnstable(state) ? 2 : 1);
+  const targets = state.players.filter((p) => {
+    const extra = state.playerExtras[p.slot ?? 0];
+    return p.alive && extra.joined && !extra.downed;
+  });
+  if (targets.length === 0) return;
+
+  for (let k = 0; k < count; k++) {
+    const target = targets[k % targets.length];
+    const noise = furnaceNoise(state.config.seed, state.tick, k);
+    const spread = FURNACE_HEART_STALACTITE_SPREAD;
+    const dx = (noise % (spread * 2 + 1)) - spread;
+    const dy = (Math.floor(noise / 64) % (spread * 2 + 1)) - spread;
+    const x = Math.floor(target.x) + dx;
+    const y = Math.floor(target.y) + dy;
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+    // So onde ha teto para cair: uma estalactite nascendo dentro da rocha nao
+    // tem de onde vir, e o aviso ficaria invisivel sob a parede.
+    if (state.solid[y * w + x] !== SOLID_NONE) continue;
+    const at = state.tick + FURNACE_HEART_STALACTITE_WARNING_TICKS;
+    state.bossRuntime.collapseCells.push({ idx: y * w + x, at });
+    events.push({
+      t: 'stalactite',
+      x: x + 0.5,
+      y: y + 0.5,
+      radius: FURNACE_HEART_STALACTITE_RADIUS,
+      fireTick: at,
+    });
+  }
+  void enemy;
+};
+
+/** As estalactites que chegaram a hora. Roda sempre, mesmo sem o chefe em campo. */
+export const stepCollapse = (state: SurvivalState, events: SemanticEvent[]): void => {
+  const pending = state.bossRuntime.collapseCells;
+  if (pending.length === 0) return;
+  const w = state.config.width;
+  let write = 0;
+  for (let read = 0; read < pending.length; read++) {
+    const cell = pending[read];
+    if (state.tick < cell.at) {
+      pending[write++] = cell;
+      continue;
+    }
+    const cx = (cell.idx % w) + 0.5;
+    const cy = Math.floor(cell.idx / w) + 0.5;
+    for (const player of state.players) {
+      const extra = state.playerExtras[player.slot ?? 0];
+      if (!player.alive || !extra.joined || extra.downed) continue;
+      if (Math.hypot(player.x - cx, player.y - cy) > FURNACE_HEART_STALACTITE_RADIUS) continue;
+      damageEntity(state, player, FURNACE_HEART_STALACTITE_DAMAGE, events, {
+        kind: 'enemy_contact',
+        archetype: 'furnace_heart',
+        elite: false,
+      });
+    }
+    // A pedra chega quente: o impacto deixa brasa. E o que faz a queda somar
+    // ao problema do chao em vez de ser um evento isolado que passa.
+    const i = cell.idx;
+    if (state.solid[i] === SOLID_NONE && !igniteCell(state, i, events)) {
+      if (state.surface[i] === SURF_NONE) setSurface(state, i, SURF_EMBER, 180);
+    }
+    events.push({ t: 'pulse', x: cx, y: cy, radius: FURNACE_HEART_STALACTITE_RADIUS });
+  }
+  pending.length = write;
+};
+
+/**
+ * CICLONES: a sala deixa de ser terreno neutro.
+ *
+ * Saem do CORPO do chefe e vao para fora em rumos espalhados — nascer longe
+ * dele os desligaria da causa, e a leitura "ele esta se desfazendo" depende de
+ * o fogo vir dele.
+ */
+const furnaceHeartCyclones = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  if (state.tick % FURNACE_HEART_CYCLONE_INTERVAL_TICKS !== 0) return;
+  let alive = 0;
+  for (const proj of state.projectiles) if (proj.kind === 'cyclone') alive++;
+  if (alive >= FURNACE_HEART_CYCLONE_CAP) return;
+
+  const noise = furnaceNoise(state.config.seed, state.tick, 0);
+  const base = (noise % 360) * (Math.PI / 180);
+  const spawn = Math.min(FURNACE_HEART_CYCLONE_CAP - alive, 2);
+  for (let k = 0; k < spawn; k++) {
+    const angle = base + (k * Math.PI * 2) / spawn;
+    state.projectiles.push({
+      kind: 'cyclone',
+      id: state.nextEntityId++,
+      owner: enemy.id,
+      x: enemy.x,
+      y: enemy.y,
+      vx: Math.cos(angle) * FURNACE_HEART_CYCLONE_SPEED,
+      vy: Math.sin(angle) * FURNACE_HEART_CYCLONE_SPEED,
+      damage: FURNACE_HEART_CYCLONE_DAMAGE,
+      radius: FURNACE_HEART_CYCLONE_RADIUS,
+      hostile: true,
+      leavesBiofluid: false,
+      distanceTravelled: 0,
+      ttl: FURNACE_HEART_CYCLONE_TTL_TICKS,
+      hits: [],
+    });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2 });
+};
+
+/**
+ * A SALA ESFRIA quando o Coracao cai.
+ *
+ * Apaga brasa e fogo da camara, dissolve os ciclones e cancela as estalactites
+ * ja marcadas. E autoritativo e nao apresentacao: um cliente que apagasse o
+ * fogo sozinho desenharia chao seguro sobre celulas que ainda queimam, e o
+ * parceiro do co-op morreria num lugar que a tela dele mostrava apagado.
+ *
+ * A estalactite JA MARCADA some junto. Cobrar uma queda anunciada por um chefe
+ * que nao existe mais e a definicao de dano sem dono.
+ */
+export const furnaceHeartCooldown = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = FURNACE_HEART_WAVE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+      const i = y * w + x;
+      if (state.surface[i] === SURF_EMBER || state.surface[i] === SURF_FIRE) {
+        setSurface(state, i, SURF_NONE, 0);
+      }
+    }
+  }
+  state.projectiles = state.projectiles.filter((proj) => proj.kind !== 'cyclone');
+  state.bossRuntime.collapseCells.length = 0;
+  events.push({ t: 'furnace_cooled', x: enemy.x, y: enemy.y, radius: r });
+  events.push({ t: 'message', key: 'sim.furnaceCooled' });
+};
+
+const furnaceHeartBrood = (state: SurvivalState, enemy: Entity): void => {
+  let alive = 0;
+  for (const other of state.enemies) {
+    if (other.alive && other.archetype === 'scoriac') alive++;
+  }
+  const w = state.config.width;
+  const h = state.config.height;
+  let placed = 0;
+  for (let k = 0; k < FURNACE_BROOD_RING.length; k++) {
+    if (placed >= FURNACE_HEART_BROOD_PER_WAVE) return;
+    if (alive + placed >= FURNACE_HEART_BROOD_CAP) return;
+    if (state.enemies.length >= MAX_ENEMIES) return;
+    // A leva gira junto com a varredura: duas levas seguidas nao saem das
+    // mesmas quatro casas, e a sala nao vira um padrao decorado.
+    const cycle = Math.floor(state.tick / (FURNACE_HEART_CYCLE_TICKS * 2));
+    const [dx, dy] = FURNACE_BROOD_RING[(k + cycle) % FURNACE_BROOD_RING.length];
+    const x = Math.floor(enemy.x) + dx;
+    const y = Math.floor(enemy.y) + dy;
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+    if (state.solid[y * w + x] !== SOLID_NONE) continue;
+    spawnEnemy(state, 'scoriac', x, y, false);
+    placed++;
+  }
 };
 
 /**

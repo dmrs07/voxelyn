@@ -43,6 +43,7 @@ import {
   CARGO_LOST_DISCOVERY_ORE,
   CONTAMINATION_WAVES,
   CONTAMINATION_SECTOR_SCALE,
+  FURNACE_HEART_CYCLONE_TOUCH_TICKS,
   MAX_LINEAGE_SECTORS,
   RUN_SEED_MIX,
   SOLID_NONE,
@@ -100,6 +101,7 @@ import {
   moveEntity,
   isStoneEnemy,
   spawnEnemy,
+  stepCollapse,
   stunEntity,
   surfaceSpeedMul,
   updateEnemies,
@@ -1696,6 +1698,22 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
     // contra um alvo que muda de direcao ele erra a curva e passa reto. Acertar
     // exige lancar quando o inimigo esta comprometido — que e a decisao que a
     // habilidade cobra em troca do dano alto.
+    // O CICLONE acende o que atravessa, e e ai que mora o perigo dele.
+    //
+    // O corpo passa e vai embora; o rastro FICA. E a diferenca entre um
+    // projetil que o jogador desvia uma vez e um que reescreve a rota dele
+    // pelo resto do encontro — que e o que "a sala virou fogo" quer dizer.
+    //
+    // `igniteCell` primeiro, como no resto do sistema termico: cada materia
+    // tem a propria resposta ao calor, e o ciclone nao e a excecao que
+    // atropela a tabela.
+    if (proj.kind === 'cyclone') {
+      const i = cellIndexAt(state, proj.x, proj.y);
+      if (state.solid[i] === SOLID_NONE && !igniteCell(state, i, events)) {
+        if (state.surface[i] === SURF_NONE) setSurface(state, i, SURF_EMBER, 200);
+      }
+    }
+
     if (proj.kind === 'seeker') {
       let target: Entity | null = null;
       let bestDistance = Number.POSITIVE_INFINITY;
@@ -1930,6 +1948,26 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           if (Math.hypot(player.x - proj.x, player.y - proj.y) < player.radius + projectileRadius) {
             // O CARRINHO atropela e SEGUE: nao morre no impacto (a linha
             // continua ate a parede) e cada corpo so paga uma vez (hits).
+            // O CICLONE nao morre no toque, e cobra por TEMPO e nao por corpo.
+            //
+            // Ele atravessa a sala devagar, entao encostaria dezenas de ticks
+            // seguidos: sem um intervalo, ficar um segundo dentro dele seria
+            // morte certa e desviar dele deixaria de ser uma decisao para
+            // virar a unica jogada. Um relogio por ciclone, e nao por par
+            // (ciclone, jogador): dois Prospectors dentro do mesmo funil estao
+            // no mesmo problema, e o encontro nao fica mais barato por serem
+            // dois.
+            if (proj.kind === 'cyclone') {
+              if (state.tick < (proj.nextTouchAt ?? 0)) continue;
+              proj.nextTouchAt = state.tick + FURNACE_HEART_CYCLONE_TOUCH_TICKS;
+              damageEntity(state, player, proj.damage, events, {
+                kind: 'enemy_projectile',
+                archetype: 'furnace_heart',
+                elite: false,
+                projectile: proj.kind,
+              });
+              continue;
+            }
             if (proj.kind === 'cart') {
               if (proj.hits?.includes(player.id)) continue;
               proj.hits?.push(player.id);
@@ -2339,6 +2377,9 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   updateEnemies(state, events);
   stepCells(state, events);
   stepRailCarts(state, events);
+  // O teto DEPOIS dos projeteis e do movimento: a estalactite cobra onde o
+  // jogador terminou o tick, e nao onde ele estava quando ela foi marcada.
+  stepCollapse(state, events);
   applyCellHazards(state, events);
   stepContamination(state, events);
   resolveChainedEvents(state, events);
@@ -2576,6 +2617,13 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // Demolicao cai divergem no estrago, um telegrafo depois.
   mix(state.bossRuntime.blastCells.length);
   for (const cell of state.bossRuntime.blastCells) mix(cell);
+  // O TETO MARCADO: duas simulacoes que discordem de onde — ou de quando — a
+  // estalactite cai divergem no dano um segundo depois, longe da causa.
+  mix(state.bossRuntime.collapseCells.length);
+  for (const cell of state.bossRuntime.collapseCells) {
+    mix(cell.idx);
+    mix(cell.at);
+  }
   // Quais modulos soltaram e quais foram arrancados decidem QUAIS ARMAS o
   // chefe ainda tem e quanto minerio o abate paga: divergir aqui e divergir na
   // luta e na recompensa.
@@ -2617,6 +2665,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(Math.round(proj.vy * 1000));
     mix(Math.round(proj.distanceTravelled * 1000));
     mix(proj.ttl);
+    mix(proj.nextTouchAt ?? 0);
     mix(proj.modules?.piercing ? 1 : 0);
     mix(proj.modules?.conductive ? 1 : 0);
     mix(proj.modules?.siphon ? 1 : 0);

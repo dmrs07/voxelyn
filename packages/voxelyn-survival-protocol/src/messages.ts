@@ -259,6 +259,36 @@ export type WorldFlags = {
    */
   bossAwake: boolean;
   /**
+   * As FASES de uma vez que o chefe deste setor ja cruzou (bitmask
+   * `BOSS_PHASE_*`).
+   *
+   * Viaja pelo mesmo motivo que `bossAwake`: o evento `boss_phase` anuncia a
+   * virada no tick exato, mas quem RECONECTA no meio do colapso nunca o
+   * recebeu. Sem o espelho, esse jogador veria a camara desabando com o chefe
+   * desenhado inteiro e sem tremor nenhum — a apresentacao mentindo sobre o
+   * estado que o mata.
+   */
+  bossPhases: number;
+  /**
+   * As marcas de chao PENDENTES: onde alguma coisa vai cair, e em que tick.
+   *
+   * Elas existem no wire porque o aviso e o unico caminho legitimo ate o dano.
+   * Os eventos `stalactite` e `blast_marker` anunciam a marca no tick em que
+   * ela nasce — e quem RECONECTA no meio da janela de aviso nunca os recebeu.
+   * O servidor continua rodando `stepCollapse` e continua cobrando, entao sem
+   * este espelho a reconexao produzia uma pancada sem telegrafo nenhum: dano
+   * sem sinal, o unico invariante de combate que este projeto nao quebra.
+   *
+   * Espelha o estado AUTORITATIVO (`bossRuntime.collapseCells` e
+   * `blastCells`), e nao uma lista montada a parte: uma segunda derivacao teria
+   * como divergir da primeira, e ela divergiria justamente no caso raro que
+   * este campo existe para cobrir.
+   */
+  collapseCells: Array<{ idx: number; at: number }>;
+  blastCells: number[];
+  /** Tick em que a Salva marcada cai. 0 quando nao ha salva no ar. */
+  blastAt: number;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

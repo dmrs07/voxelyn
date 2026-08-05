@@ -20,7 +20,7 @@ export type ProjectileLike = {
   y: number;
   hostile: boolean;
   /** Ausente em estados antigos: cai para o comportamento anterior. */
-  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart';
+  kind?: 'bolt' | 'spit' | 'rock' | 'return_disc' | 'seeker' | 'cart' | 'cyclone';
   modules?: {
     explosive?: { armAfterDistance: number };
     piercing?: true;
