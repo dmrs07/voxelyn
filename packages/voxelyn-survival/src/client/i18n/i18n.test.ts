@@ -144,7 +144,12 @@ describe('detecção de língua', () => {
  * língua sem acento — ou uma frase em português que não usa nenhum — escapar.
  */
 describe('nenhum texto de jogador fora do catálogo', () => {
-  const IGNORADOS = new Set(['i18n', 'sprite-viewer.ts']);
+  // A arena de chefes (arena.html) é a mesma classe de exceção que o visualizador
+  // de sprites: ferramenta de playtest interno, não a run que o jogador paga para
+  // ver. Passa pelo mesmo motor de render (por isso mora em `src/client`, e não
+  // num diretório de ferramentas separado), mas o texto da tela de setup nunca
+  // aparece no jogo publicado.
+  const IGNORADOS = new Set(['i18n', 'sprite-viewer.ts', 'arena-main.ts', 'arena-catalog.ts']);
 
   const arquivos = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

@@ -1,0 +1,285 @@
+// Ponto de entrada da Arena de Chefes: uma ferramenta de playtest isolado,
+// separada da run normal (arena.html, nao index.html). Deixa escolher chefe,
+// HP e eco/módulos de entrada e joga a luta com o MESMO motor de render/input
+// do jogo real — sem servidor, sem leaderboard, sem telemetria, sem replay.
+//
+// O laco de jogo abaixo e um recorte deliberado do de `main.ts`: mesma
+// simulacao (`stepRun` a 20 Hz, `LocalPlayout` interpolando para o desenho),
+// mesmo `SurvivalRenderer`/`SurvivalInput`, mesma assistencia de combate — o
+// que sobra de fora e tudo que pertence a EXPEDICAO (ticket do servidor,
+// gravacao de log, homologacao, Ecos de morte, som): nada disso faz sentido
+// para uma arena que existe so para testar uma luta isolada.
+import { TICK_MS, stepRun } from '@voxelyn/survival-sim';
+import type { AbilityId, ModuleId, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import { SurvivalInput, type TouchSafeArea } from './input';
+import { EngagementMemory, applyCombatAssist } from './combat-assist';
+import { SurvivalRenderer } from './render';
+import { LocalPlayout } from './local-playout';
+import { TickEventQueue } from './playout';
+import { TouchCooldownOverlay } from './cooldown-overlay';
+import { loadQuality } from './settings';
+import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from './arena-catalog';
+import {
+  ARENA_MAX_HP,
+  ARENA_MIN_HP,
+  clampArenaHp,
+  createArenaRun,
+  type ArenaConditions,
+} from './arena-setup';
+
+const ABILITY_LABELS: Record<AbilityId, string> = {
+  pulse: 'Pulso Cinético',
+  flamethrower: 'Sopro (lança-chamas)',
+  seeker: 'Perseguidor',
+  arc: 'Arco Condutivo',
+};
+const ABILITY_ORDER: readonly AbilityId[] = ['pulse', 'flamethrower', 'seeker', 'arc'];
+
+const MODULE_LABELS: Record<ModuleId, string> = {
+  piercing: 'Perfurante',
+  conductive: 'Condutivo',
+  explosive: 'Explosivo',
+  siphon: 'Sifão',
+  ricochet: 'Ricochete',
+  return_disc: 'Disco de Retorno',
+};
+const MODULE_ORDER: readonly ModuleId[] = [
+  'piercing',
+  'conductive',
+  'explosive',
+  'siphon',
+  'ricochet',
+  'return_disc',
+];
+
+const setupEl = document.getElementById('setup') as HTMLDivElement;
+const formEl = document.getElementById('setup-form') as HTMLFormElement;
+const bossSelect = document.getElementById('boss') as HTMLSelectElement;
+const bossPlaceEl = document.getElementById('boss-place') as HTMLSpanElement;
+const hpInput = document.getElementById('hp') as HTMLInputElement;
+const abilityGrid = document.getElementById('ability-grid') as HTMLDivElement;
+const moduleGrid = document.getElementById('module-grid') as HTMLDivElement;
+const canvas = document.getElementById('game');
+if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game não encontrado.');
+const hudNote = document.getElementById('hud-note') as HTMLDivElement;
+const endOverlay = document.getElementById('end-overlay') as HTMLDivElement;
+const endTitle = document.getElementById('end-title') as HTMLHeadingElement;
+const endSummary = document.getElementById('end-summary') as HTMLDivElement;
+const btnRetry = document.getElementById('btn-retry') as HTMLButtonElement;
+const btnReconfigure = document.getElementById('btn-reconfigure') as HTMLButtonElement;
+
+hpInput.min = String(ARENA_MIN_HP);
+hpInput.max = String(ARENA_MAX_HP);
+
+for (const id of ARENA_BOSS_ORDER) {
+  const option = document.createElement('option');
+  option.value = id;
+  option.textContent = ARENA_CATALOG[id].label;
+  bossSelect.appendChild(option);
+}
+const updateBossPlace = (): void => {
+  const id = bossSelect.value as ArenaBossId;
+  bossPlaceEl.textContent = ARENA_CATALOG[id]?.place ?? '';
+};
+bossSelect.addEventListener('change', updateBossPlace);
+updateBossPlace();
+
+for (const id of ABILITY_ORDER) {
+  const label = document.createElement('label');
+  const input = document.createElement('input');
+  input.type = 'radio';
+  input.name = 'ability';
+  input.value = id;
+  if (id === 'pulse') input.checked = true;
+  const span = document.createElement('span');
+  span.textContent = ABILITY_LABELS[id];
+  label.append(input, span);
+  abilityGrid.appendChild(label);
+}
+
+for (const id of MODULE_ORDER) {
+  const label = document.createElement('label');
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.name = 'module';
+  input.value = id;
+  const span = document.createElement('span');
+  span.textContent = MODULE_LABELS[id];
+  label.append(input, span);
+  moduleGrid.appendChild(label);
+}
+
+const readConditions = (): ArenaConditions => {
+  const boss = bossSelect.value as ArenaBossId;
+  const maxHp = clampArenaHp(Number(hpInput.value));
+  const abilityInput = formEl.querySelector<HTMLInputElement>('input[name="ability"]:checked');
+  const ability = (abilityInput?.value ?? 'pulse') as AbilityId;
+  const modules = Array.from(
+    formEl.querySelectorAll<HTMLInputElement>('input[name="module"]:checked'),
+    (el) => el.value as ModuleId,
+  );
+  return { boss, maxHp, ability, modules };
+};
+
+// ---------------------------------------------------------------------------
+// Motor de jogo — recorte do laco solo de main.ts, sem expedicao/servidor.
+// ---------------------------------------------------------------------------
+const renderer = new SurvivalRenderer(canvas);
+renderer.setLocalPlayerId(1);
+renderer.setQuality(loadQuality());
+const input = new SurvivalInput(canvas);
+const cooldownOverlay = new TouchCooldownOverlay(canvas);
+input.attach();
+
+const readCssPixels = (name: string): number => {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+};
+const readSafeArea = (): TouchSafeArea => ({
+  top: readCssPixels('--safe-area-inset-top'),
+  right: readCssPixels('--safe-area-inset-right'),
+  bottom: readCssPixels('--safe-area-inset-bottom'),
+  left: readCssPixels('--safe-area-inset-left'),
+});
+const resize = (): void => {
+  const safeArea = readSafeArea();
+  renderer.setSafeArea(safeArea);
+  renderer.resize();
+  input.layoutButtons(window.innerWidth, window.innerHeight, safeArea);
+};
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+resize();
+
+const playerScreen = (): { x: number; y: number } => ({
+  x: window.innerWidth / 2,
+  y: window.innerHeight / 2,
+});
+
+let stopLoop: (() => void) | null = null;
+
+const outcomeLabel = (state: SurvivalState): string => {
+  switch (state.phase) {
+    case 'dead':
+      return 'O Prospector caiu';
+    case 'extracted':
+    case 'extracted_with_core':
+      return 'Extração concluída';
+    default:
+      return '—';
+  }
+};
+
+const showEnd = (state: SurvivalState): void => {
+  endTitle.textContent = outcomeLabel(state);
+  const summary = state.summary;
+  const lines: string[] = [`${state.tick} ticks simulados`];
+  if (summary) {
+    lines.push(`Causa: ${summary.deathCause?.kind ?? 'nenhuma (extração)'}`);
+    lines.push(`Dano causado: ${(summary.stats.damageDealtTenths / 10).toFixed(1)}`);
+    lines.push(`Dano recebido: ${(summary.stats.damageTakenTenths / 10).toFixed(1)}`);
+    lines.push(`Tiros disparados: ${summary.stats.shotsFired}`);
+  }
+  endSummary.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
+  endOverlay.classList.remove('hidden');
+};
+
+const runArena = (conditions: ArenaConditions): void => {
+  setupEl.classList.add('hidden');
+  endOverlay.classList.add('hidden');
+  canvas.classList.remove('hidden');
+  hudNote.classList.remove('hidden');
+  resize();
+
+  const state: SurvivalState = createArenaRun(conditions);
+  let accumulator = 0;
+  let lastTime = performance.now();
+  let running = true;
+  const playout = new LocalPlayout();
+  playout.capture(state);
+  const assistMemory = new EngagementMemory();
+  let frameNow = lastTime;
+  const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
+    renderer.ingestEvents(events, frameNow);
+  });
+  let queuedChoice: 0 | 1 | null = null;
+  let ended = false;
+
+  const frame = (now: number): void => {
+    if (!running) return;
+    frameNow = now;
+    const delta = Math.min(120, now - lastTime);
+    lastTime = now;
+    accumulator += delta;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    if (state.phase !== 'running') {
+      eventQueue.flush(Number.POSITIVE_INFINITY);
+      renderer.render(state, 1, input.state, now);
+      renderer.renderEnd(state, vw, vh);
+      if (!ended) {
+        ended = true;
+        showEnd(state);
+      }
+      requestAnimationFrame(frame);
+      return;
+    }
+
+    while (accumulator >= TICK_MS) {
+      const raw = input.snapshot(playerScreen());
+      if (queuedChoice !== null) {
+        raw.choose = queuedChoice;
+        queuedChoice = null;
+      }
+      applyCombatAssist(state, raw, input.consumeAimTap(), assistMemory);
+      const result = stepRun(state, [raw]);
+      playout.capture(state);
+      eventQueue.push(state.tick, result.events);
+      accumulator -= TICK_MS;
+      if (state.phase !== 'running') break;
+    }
+    const alpha = accumulator / TICK_MS;
+    const view = state.phase === 'running' ? (playout.sample(state, alpha) ?? state) : state;
+    eventQueue.flush(view.tick);
+    renderer.setCargoOre(view.stats.oreCollected);
+    renderer.render(view, 1, input.state, now);
+    cooldownOverlay.render(state, input.state, state.tick + alpha, now);
+    const pendingChoice = view.playerExtra.pendingModuleChoice;
+    if (pendingChoice && renderer.isChoiceRevealReady(now)) {
+      const regions = renderer.renderChoice(view, vw, vh, input.state);
+      const choice = input.consumeChoiceTap(regions);
+      if (choice !== null) queuedChoice = choice;
+    } else if (pendingChoice) {
+      input.clearPendingChoiceInput();
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  stopLoop = (): void => {
+    running = false;
+  };
+};
+
+let currentConditions: ArenaConditions = readConditions();
+
+formEl.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  currentConditions = readConditions();
+  runArena(currentConditions);
+});
+
+btnRetry.addEventListener('click', () => {
+  stopLoop?.();
+  runArena(currentConditions);
+});
+
+btnReconfigure.addEventListener('click', () => {
+  stopLoop?.();
+  canvas.classList.add('hidden');
+  hudNote.classList.add('hidden');
+  endOverlay.classList.add('hidden');
+  setupEl.classList.remove('hidden');
+});
