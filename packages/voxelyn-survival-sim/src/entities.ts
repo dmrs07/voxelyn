@@ -1,6 +1,35 @@
 import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
+  DIAMANDIS_BEAM_COOLDOWN_TICKS,
+  DIAMANDIS_BEAM_DAMAGE,
+  DIAMANDIS_BEAM_LENGTH,
+  DIAMANDIS_BEAM_STEP,
+  DIAMANDIS_BEAM_WINDUP_TICKS,
+  DIAMANDIS_DEMOLISH_CHARGES,
+  DIAMANDIS_DEMOLISH_COOLDOWN_TICKS,
+  DIAMANDIS_DEMOLISH_MIN_RANGE,
+  DIAMANDIS_DEMOLISH_RADIUS,
+  DIAMANDIS_DEMOLISH_RANGE,
+  DIAMANDIS_DEMOLISH_SPREAD,
+  DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  DIAMANDIS_DRILL_COOLDOWN_TICKS,
+  DIAMANDIS_DRILL_DAMAGE,
+  DIAMANDIS_DRILL_MAX_RANGE,
+  DIAMANDIS_DRILL_MIN_RANGE,
+  DIAMANDIS_DRILL_SPEED,
+  DIAMANDIS_DRILL_TICKS,
+  DIAMANDIS_DRILL_WIDTH,
+  DIAMANDIS_DRILL_WINDUP_TICKS,
+  DIAMANDIS_HP,
+  DIAMANDIS_RADIUS,
+  DIAMANDIS_REACTOR_CADENCE_SCALE,
+  DIAMANDIS_REACTOR_EMBER_RADIUS,
+  DIAMANDIS_REACTOR_EMBER_TICKS,
+  DIAMANDIS_REACTOR_HP_FRACTION,
+  DIAMANDIS_SPEED,
+  SOLID_ORE,
+  SOLID_ORE_CHIPPED,
   BRUISER_HURL_COOLDOWN_TICKS,
   BRUISER_HURL_DAMAGE,
   BRUISER_HURL_FLIGHT_TILES,
@@ -101,15 +130,17 @@ import {
   UNDERTAKER_SLAM_RANGE,
   UNDERTAKER_SLAM_WINDUP_TICKS,
 } from './constants.js';
-import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, openArena, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  BOSS_PHASE_REACTOR,
   BOSS_PHASE_SUMMON,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
+  DISCOVERY_DIAMANDIS_CORRIDOR,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
   LURKER_EXPOSED,
@@ -193,6 +224,19 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
   // bruiser porque o encontro tem de durar o bastante para o puxao acontecer
   // pelo menos duas vezes — uma so seria um susto, nao uma regra aprendida.
   undertaker: { hp: 145, speed: 1.9, radius: 0.5, contactDamage: 12, contactCooldown: 16, aggroRange: UNDERTAKER_PULL_RANGE },
+  // DIAMANDIS. Vida de chefe e corpo MODERADO: visualmente ele e dez vezes um
+  // Prospector, mas uma hitbox gigante transformaria toda parede em gaiola e
+  // todo tiro em acerto garantido. O tamanho dele mora no sprite e no ESTRAGO
+  // que ele deixa no mapa, nunca no raio de colisao. Lento porque nunca foi
+  // feito para alcancar ninguem: o perigo e o caminho que ele abre.
+  diamandis: {
+    hp: DIAMANDIS_HP,
+    speed: DIAMANDIS_SPEED,
+    radius: DIAMANDIS_RADIUS,
+    contactDamage: 28,
+    contactCooldown: 16,
+    aggroRange: 10,
+  },
 };
 
 /** O inimigo de assinatura de cada estrato, ou null (basalto e silica). */
@@ -597,11 +641,28 @@ const normalized = (x: number, y: number): Vec2 => {
  * entidade e este comentario e o unico lugar que precisa mudar.
  */
 const crushesWalls = (enemy: Entity): boolean =>
-  enemy.archetype === 'bruiser' || enemy.archetype === 'guardian' || enemy.archetype === 'bishop';
+  enemy.archetype === 'bruiser' ||
+  enemy.archetype === 'guardian' ||
+  enemy.archetype === 'bishop' ||
+  enemy.archetype === 'diamandis';
+
+/**
+ * Os chefes que GUARDAM o Nucleo: dormem ate serem notados e, acordados, nunca
+ * mais perdem o alvo. Nao e uma lista de "quem e chefe" — o Bispo e chefe e
+ * nao esta aqui, porque ele e territorial (a luta dele e o chao em que pisa) e
+ * nao um portao com um objetivo atras.
+ */
+const guardsTheCore = (enemy: Entity): boolean =>
+  enemy.archetype === 'guardian' || enemy.archetype === 'diamandis';
 
 /** Bruiser e Guardian sao corpos minerais; eletricidade causa dano, nao paralisia. */
 export const isStoneEnemy = (enemy: Entity): boolean =>
-  enemy.archetype === 'bruiser' || enemy.archetype === 'guardian';
+  enemy.archetype === 'bruiser' ||
+  enemy.archetype === 'guardian' ||
+  // O Diamandis nao e mineral, e uma MAQUINA — e entra aqui pelo outro motivo
+  // da lista: chefe paralisavel e chefe que morre num stun-lock. Corrente o
+  // machuca, como machuca os outros dois; nao o desliga.
+  enemy.archetype === 'diamandis';
 
 /**
  * O chao cobrando presenca: fogo, gas e esporo.
@@ -804,6 +865,119 @@ const guardianSalvoRelease = (
   }
 };
 
+/**
+ * SALVA DE DEMOLICAO — as marcas, no inicio do telegrafo.
+ *
+ * Tres cargas: uma sobre a posicao do alvo NAQUELE instante e duas abertas
+ * perpendicularmente. As marcas nao se corrigem depois de postas, e e por isso
+ * que o golpe tem resposta: sair do circulo funciona porque o circulo ficou
+ * onde nasceu. Uma salva que perseguisse seria dano sem contra-jogo, com um
+ * telegrafo bonito por cima.
+ */
+const markDemolition = (
+  state: SurvivalState,
+  enemy: Entity,
+  target: Entity,
+  fireTick: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const toward = normalized(target.x - enemy.x, target.y - enemy.y);
+  // Perpendicular ao eixo chefe->alvo: as laterais abrem o corredor de fuga
+  // para os LADOS, e nao para tras (recuar em linha reta ja e o reflexo de
+  // todo mundo, e um golpe que so pune o reflexo nao ensina nada).
+  const side = { x: -toward.y, y: toward.x };
+  state.bossRuntime.blastCells = [];
+  for (let k = 0; k < DIAMANDIS_DEMOLISH_CHARGES; k++) {
+    const offset = (k - (DIAMANDIS_DEMOLISH_CHARGES - 1) / 2) * DIAMANDIS_DEMOLISH_SPREAD;
+    const bx = Math.floor(target.x + side.x * offset);
+    const by = Math.floor(target.y + side.y * offset);
+    if (bx < 1 || by < 1 || bx >= w - 1 || by >= state.config.height - 1) continue;
+    state.bossRuntime.blastCells.push(by * w + bx);
+    events.push({
+      t: 'blast_marker',
+      x: bx + 0.5,
+      y: by + 0.5,
+      radius: DIAMANDIS_DEMOLISH_RADIUS,
+      fireTick,
+    });
+  }
+};
+
+/**
+ * FEIXE DE PROSPECCAO — uma passada da linha.
+ *
+ * `powered` false e a VARREDURA: um scanner medindo, que nao machuca nada.
+ * True e a passagem com potencia, e ai a linha aplica a tabela de materiais
+ * que o jogo ja tem — `igniteCell` seca fungo e acende gas, `meltIce` derrete,
+ * o minerio energiza — alem de queimar quem estiver nela. Nenhuma reacao nova:
+ * o feixe e mais um cliente do sistema de materiais, como o rastro do Corcel.
+ *
+ * Para na primeira parede, nos dois modos: um levantamento que atravessa rocha
+ * nao seria um levantamento, e um feixe que queima do outro lado do muro seria
+ * dano sem sinal.
+ */
+const fireProspectingBeam = (
+  state: SurvivalState,
+  enemy: Entity,
+  dir: Vec2,
+  powered: boolean,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  let reach = DIAMANDIS_BEAM_LENGTH;
+  const hitPlayers = new Set<number>();
+  for (let d = 0.5; d <= DIAMANDIS_BEAM_LENGTH; d += DIAMANDIS_BEAM_STEP) {
+    const fx = enemy.x + dir.x * d;
+    const fy = enemy.y + dir.y * d;
+    const cx = Math.floor(fx);
+    const cy = Math.floor(fy);
+    if (cx < 0 || cy < 0 || cx >= w || cy >= state.config.height) {
+      reach = d;
+      break;
+    }
+    const i = cy * w + cx;
+    if (state.solid[i] !== SOLID_NONE) {
+      // A parede PARA o feixe — mas antes disso o minerio dela responde: o
+      // veio energiza pelas aberturas coladas nele, que e a mesma regra da
+      // descarga em rocha. E o que "ativar minerio" quer dizer sem inventar
+      // reacao nova.
+      if (powered && (state.solid[i] === SOLID_ORE || state.solid[i] === SOLID_ORE_CHIPPED)) {
+        const open: number[] = [];
+        for (const n of [i - 1, i + 1, i - w, i + w]) {
+          if (n >= 0 && n < state.solid.length && state.solid[n] === SOLID_NONE) open.push(n);
+        }
+        if (open.length > 0) chargeCells(state, open, events, { source: 'enemy', owner: enemy.id });
+      }
+      reach = d;
+      break;
+    }
+    if (!powered) continue;
+    igniteCell(state, i, events);
+    meltIce(state, i);
+    for (const player of state.players) {
+      if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+      if (hitPlayers.has(player.id)) continue;
+      if (Math.hypot(player.x - fx, player.y - fy) > player.radius + 0.4) continue;
+      hitPlayers.add(player.id);
+      damageEntity(state, player, DIAMANDIS_BEAM_DAMAGE, events, {
+        kind: 'enemy_contact',
+        archetype: 'diamandis',
+        elite: enemy.elite,
+      });
+    }
+  }
+  events.push({
+    t: 'beam_line',
+    x: enemy.x,
+    y: enemy.y,
+    dx: dir.x,
+    dy: dir.y,
+    length: reach,
+    powered,
+  });
+};
+
 const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const action = enemy.action;
   if (!action || action.phase !== 'windup') return;
@@ -815,6 +989,29 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
   if (action.kind === 'pulse') {
     if (enemy.archetype === 'resonant') resonantPulse(state, enemy, events);
     else bishopNova(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'demolish') {
+    const w = state.config.width;
+    for (const cell of state.bossRuntime.blastCells) {
+      explodeAt(state, (cell % w) + 0.5, Math.floor(cell / w) + 0.5, DIAMANDIS_DEMOLISH_RADIUS, events, {
+        source: 'enemy',
+        owner: enemy.id,
+      });
+    }
+    state.bossRuntime.blastCells = [];
+    return;
+  }
+  if (action.kind === 'beam') {
+    fireProspectingBeam(state, enemy, action.direction, true, events);
+    return;
+  }
+  if (action.kind === 'drill') {
+    // A broca NAO recebe impulso aqui, pela mesma razao da investida do
+    // Corcel: ela e conduzida tick a tick por `diamandisDrillStride`, que
+    // precisa da posicao exata de cada passo para abrir o vao na largura
+    // certa. Somar velocidade solta daria dois movimentos no mesmo tick e o
+    // corredor sairia desalinhado do caminho percorrido.
     return;
   }
   if (action.kind === 'detonate') {
@@ -1562,6 +1759,112 @@ const horseChargeStride = (state: SurvivalState, enemy: Entity, events: Semantic
 };
 
 /**
+ * Uma passada da BROCA DE AVANCO: anda, abre o vao e atropela.
+ *
+ * Mora fora de `releaseAction` pelo mesmo motivo da investida do Corcel — a
+ * recuperacao E a acao, e ela dura dezenas de ticks. O que a distingue do
+ * Corcel e o que acontece na pedra: o cavalo PARA (ler o telegrafo e por uma
+ * parede no caminho e o contra-jogo dele), a broca ATRAVESSA. Contra o
+ * Diamandis a parede nao e resposta; a resposta e sair da linha, e o corredor
+ * que fica aberto e permanente.
+ *
+ * `canRip` decide o que cai: rocha e fragil vao, minerio e cristal FICAM de
+ * pe. E a mesma regra do Britador, e e o que faz a passagem dele EXPOR veio
+ * que estava emparedado — o estrago do chefe vira a mina do jogador.
+ */
+const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const action = enemy.action;
+  if (!action || action.kind !== 'drill' || action.phase === 'windup') return;
+
+  const w = state.config.width;
+  const dt = 1 / TICK_HZ;
+  const step = DIAMANDIS_DRILL_SPEED * dt;
+  enemy.facing = { ...action.direction };
+
+  // Abre ANTES de andar, e nao depois: um corpo de raio 0,9 empurrado contra
+  // rocha e um corpo travado, e a broca que so limpasse o rastro deixaria o
+  // chefe raspando na parede com a acao correndo. O vao nasce a frente, na
+  // largura do corpo, e ai o passo cabe.
+  const ahead = 1.2;
+  const side = { x: -action.direction.y, y: action.direction.x };
+  for (let lane = -DIAMANDIS_DRILL_WIDTH; lane <= DIAMANDIS_DRILL_WIDTH; lane++) {
+    for (const reach of [ahead, ahead + 0.9]) {
+      const cx = Math.floor(enemy.x + action.direction.x * reach + side.x * lane);
+      const cy = Math.floor(enemy.y + action.direction.y * reach + side.y * lane);
+      if (cx < 1 || cy < 1 || cx >= w - 1 || cy >= state.config.height - 1) continue;
+      if (state.solid[cy * w + cx] === SOLID_NONE) continue;
+      // `breakSolid` primeiro (fragil e cristal tem resposta propria), e o que
+      // ele recusar vai para `ripSolid`, que e quem derruba rocha comum.
+      const opened = breakSolid(state, cx, cy, events) || ripSolid(state, cx, cy, events);
+      // A obra VISTA e uma descoberta. Sai antes de qualquer raycast quando o
+      // bit ja esta aceso — a broca abre dezenas de celulas por passagem, e
+      // isto roda por celula.
+      // A obra VISTA e uma descoberta. So distancia, SEM linha de visao — e a
+      // unica testemunha do jogo em que exigir visada seria absurdo: a parede
+      // entre os dois e exatamente a coisa que esta sendo removida, e quem
+      // esta do outro lado dela e quem mais precisa entender o que aconteceu.
+      if (opened && (state.stats.discoveries & DISCOVERY_DIAMANDIS_CORRIDOR) === 0) {
+        const witness = nearestTarget(state, enemy.x, enemy.y);
+        if (witness && distTo(enemy, witness) <= BISHOP_HEAL_WITNESS_RANGE) {
+          markDiscovery(state.stats, DISCOVERY_DIAMANDIS_CORRIDOR);
+        }
+      }
+    }
+  }
+
+  moveEntity(state, enemy, action.direction.x * step, action.direction.y * step);
+
+  const victim = nearestTarget(state, enemy.x, enemy.y);
+  if (victim && state.tick >= enemy.contactReadyAt && distTo(enemy, victim) < enemy.radius + victim.radius + 0.4) {
+    enemy.contactReadyAt = state.tick + ARCHETYPES.diamandis.contactCooldown;
+    damageEntity(state, victim, DIAMANDIS_DRILL_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'diamandis',
+      elite: enemy.elite,
+    });
+  }
+
+  // Reator em colapso deixa brasa por onde passa: a obra vai esquentando a
+  // sala sozinha, sem nenhum golpe a mais.
+  if ((state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0) {
+    const i = cellUnder(state, enemy);
+    if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_NONE) {
+      setSurface(state, i, SURF_EMBER, DIAMANDIS_REACTOR_EMBER_TICKS);
+    }
+  }
+};
+
+/**
+ * O COLAPSO DO REATOR, uma vez, abaixo de metade da vida.
+ *
+ * Brasa em volta dele — a fissura que ja existe no jogo, com a regra que ja
+ * existe: nao machuca por pisar, SEGURA o calor da arma. A luta continua
+ * sendo sobre posicao, e o mapa e que fica caro.
+ */
+const diamandisReactorCollapse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = DIAMANDIS_REACTOR_EMBER_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      // ANEL, e nao disco: o centro fica pisavel para a luta nao virar "fique
+      // longe e espere". O reator vaza para os lados, e o jogador ainda pode
+      // escolher entrar.
+      if (d2 > r * r || d2 < (r - 2) * (r - 2)) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE || state.surface[i] !== SURF_NONE) continue;
+      setSurface(state, i, SURF_EMBER, DIAMANDIS_REACTOR_EMBER_TICKS);
+    }
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+};
+
+/**
  * Gasta a velocidade SOLTA de um inimigo — perambular, impulso de investida,
  * empurrao — e a amortece um pouco.
  *
@@ -1614,10 +1917,23 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     const onFungus = enemy.archetype === 'bishop' && bishopRegen(state, enemy, events);
     if (advanceAction(state, enemy, events)) {
       if (!enemy.alive) continue;
-      // O cavalo e conduzido passo a passo por `horseChargeStride`; todo o resto
-      // gasta aqui o impulso que o `release` deixou — ver `driftByVelocity`.
+      // Cavalo e Diamandis sao conduzidos passo a passo (a recuperacao E a
+      // acao); todo o resto gasta aqui o impulso que o `release` deixou — ver
+      // `driftByVelocity`.
       if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
+      else if (enemy.archetype === 'diamandis') diamandisDrillStride(state, enemy, events);
       else driftByVelocity(state, enemy, dt, events, false);
+      // A varredura do feixe roda DURANTE o telegrafo: e ela que promete a
+      // linha, e o cliente redesenha a cada emissao porque o chefe continua
+      // girando devagar enquanto mede.
+      if (
+        enemy.archetype === 'diamandis' &&
+        enemy.action?.kind === 'beam' &&
+        enemy.action.phase === 'windup' &&
+        state.tick % 4 === 0
+      ) {
+        fireProspectingBeam(state, enemy, enemy.action.direction, false, events);
+      }
       continue;
     }
     if (enemy.stunnedUntil > state.tick) continue;
@@ -1688,16 +2004,19 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
     // O Escoriaceo usa o fluxo comum; so a postura termica e propria.
     if (enemy.archetype === 'scoriac') settleScoriacHeat(state, enemy);
 
-    // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
-    // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
-    const guardianHunting = enemy.archetype === 'guardian' && state.bossRuntime.awake;
+    // Chefe de camara ACORDADO nunca perde o alvo. Ele e o clima da sala, nao
+    // um bicho que patrulha: sair do raio dele nao pode ser uma forma de
+    // vencer. Vale para o Guardiao e para o Diamandis — os dois guardam o
+    // Nucleo, e os dois tem golpes de alcance MAIOR que o proprio aggro, o que
+    // sem isto os deixava mirando de um raio em que nunca decidem nada.
+    const bossHunting = guardsTheCore(enemy) && state.bossRuntime.awake;
     const aggro =
       player !== null &&
-      (guardianHunting ||
+      (bossHunting ||
         dist <= def.aggroRange + (enemy.elite ? 3 : 0) ||
         state.tick < enemy.alertedUntil);
 
-    if (enemy.archetype === 'guardian' && !state.bossRuntime.awake) {
+    if (guardsTheCore(enemy) && !state.bossRuntime.awake) {
       // O alerta TAMBEM acorda. Sem isto, `aggro` ficava verdadeiro por dano mas
       // o portao logo abaixo devolvia `continue`: o chefe levava tiro de 8 tiles
       // sem se mexer, cada tiro renovando um alerta que nao servia para nada.
@@ -1849,6 +2168,79 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         enemy.rangedReadyAt = state.tick + RESONANT_COOLDOWN_TICKS;
         startAction(state, enemy, 'pulse', toward, RESONANT_WINDUP_TICKS, 8, events, player.id);
         continue;
+      }
+
+      // DIAMANDIS: tres ferramentas, escolhidas por DISTANCIA — ele nao tem
+      // rodizio, tem uma obra a fazer e usa o instrumento que cabe.
+      //
+      //   longe  -> broca: fixa o rumo e atravessa a arena;
+      //   medio  -> demolicao: marca o chao e implode;
+      //   perto  -> feixe: varre a linha e depois a energiza.
+      //
+      // A ordem da checagem e do mais longe para o mais perto porque as faixas
+      // se sobrepoem de proposito: na borda, quem manda e o golpe que cobre o
+      // espaco maior, e nunca uma escolha que dependa da ordem de leitura.
+      if (enemy.archetype === 'diamandis') {
+        const reactorDown = (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) !== 0;
+        const cadence = reactorDown ? DIAMANDIS_REACTOR_CADENCE_SCALE : 1;
+        // A broca NAO exige linha de visao, e e a unica acao telegrafada do
+        // jogo que nao exige. Exigir seria anular a mecanica: ela existe
+        // justamente para a cobertura deixar de valer — o Corcel precisa de
+        // visada porque a investida dele se perde numa parede, e a do
+        // Diamandis a COME. O que a mantem justa continua sendo o 1,8 s
+        // parado antes de sair.
+        if (
+          state.tick >= enemy.nextActionAt &&
+          dist >= DIAMANDIS_DRILL_MIN_RANGE &&
+          dist <= DIAMANDIS_DRILL_MAX_RANGE
+        ) {
+          enemy.nextActionAt = state.tick + Math.round(DIAMANDIS_DRILL_COOLDOWN_TICKS * cadence);
+          startAction(
+            state,
+            enemy,
+            'drill',
+            toward,
+            DIAMANDIS_DRILL_WINDUP_TICKS,
+            DIAMANDIS_DRILL_TICKS,
+            events,
+            player.id,
+          );
+          continue;
+        }
+        if (
+          state.tick >= enemy.rangedReadyAt &&
+          dist >= DIAMANDIS_DEMOLISH_MIN_RANGE &&
+          dist <= DIAMANDIS_DEMOLISH_RANGE
+        ) {
+          enemy.rangedReadyAt = state.tick + Math.round(DIAMANDIS_DEMOLISH_COOLDOWN_TICKS * cadence);
+          startAction(
+            state,
+            enemy,
+            'demolish',
+            toward,
+            DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+            8,
+            events,
+            player.id,
+          );
+          // As marcas nascem AGORA, com a posicao que o alvo tem agora: e o
+          // instante do telegrafo que elas congelam, e sair dali e a resposta.
+          markDemolition(state, enemy, player, state.tick + DIAMANDIS_DEMOLISH_WINDUP_TICKS, events);
+          continue;
+        }
+        // O feixe MORRE no colapso do reator: e o primeiro sistema a cair
+        // quando a alimentacao entra em colapso, e e o que faz a segunda fase
+        // ser outra luta em vez da mesma com numeros piores.
+        if (
+          !reactorDown &&
+          state.tick >= enemy.contactReadyAt &&
+          dist <= DIAMANDIS_BEAM_LENGTH &&
+          hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
+        ) {
+          enemy.contactReadyAt = state.tick + DIAMANDIS_BEAM_COOLDOWN_TICKS;
+          startAction(state, enemy, 'beam', toward, DIAMANDIS_BEAM_WINDUP_TICKS, 10, events, player.id);
+          continue;
+        }
       }
 
       // Bruiser: arranca a parede e joga.
@@ -2019,6 +2411,18 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       const i = cellUnder(state, enemy);
       if (state.surface[i] === SURF_FUNGAL) igniteCell(state, i, events);
     }
+  }
+
+  // O DIAMANDIS tem a propria fase de uma vez: o reator vaza abaixo da metade.
+  const diamandis = state.enemies.find((e) => e.archetype === 'diamandis');
+  if (
+    diamandis &&
+    diamandis.alive &&
+    diamandis.hp < diamandis.maxHp * DIAMANDIS_REACTOR_HP_FRACTION &&
+    (state.bossRuntime.phasesFired & BOSS_PHASE_REACTOR) === 0
+  ) {
+    state.bossRuntime.phasesFired |= BOSS_PHASE_REACTOR;
+    diamandisReactorCollapse(state, diamandis, events);
   }
 
   const guardian = state.enemies.find((e) => e.archetype === 'guardian');

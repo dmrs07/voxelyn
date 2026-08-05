@@ -21,7 +21,7 @@ Prioridade:
 | Categoria | Mapa | Chefe | Status |
 | --- | --- | --- | --- |
 | Ocupação | Contaminação Micelial | Bispo | **implementado** |
-| Ocupação | Cicatriz Aurix | Diamandis | fallback → Guardião |
+| Ocupação | Cicatriz Aurix | Diamandis | **implementado** |
 | Estrato | Galerias de Basalto | Guardião | **implementado** |
 | Estrato | Catedral Prismática | Arquicantor | fallback → Guardião |
 | Estrato | Aquífero Negro | Leviatã do Lençol | fallback → Guardião |
@@ -135,16 +135,115 @@ virou `boss_awake` — os dois nomes mentiam sobre metade das runs desde
 `bossForBiome`. `PROTOCOL_VERSION` 15, `SIMULATION_VERSION` 24. (A *voz* de áudio
 continua se chamando `guardianAwake`: ela é o nome de um som, não de um chefe.)
 
+## Diamandis — a máquina que parou de executar a tarefa
+
+O chefe da ocupação Aurix. A regra que rege as três armas: **nenhuma é militar**. São
+ferramentas industriais aplicadas com indiferença — e é isso que separa o encontro de
+"um robô grande atira em você". O Diamandis não está lutando, está **trabalhando**, e
+o jogador está no caminho da obra.
+
+**Corpo.** 880 de vida, velocidade 1,5, raio **0,9**. Visualmente ele é dez vezes um
+Prospector; mecanicamente uma hitbox gigante transformaria toda parede em gaiola e
+todo tiro em acerto garantido — o tamanho mora no sprite e no estrago, nunca no raio.
+Ele entra em `crushesWalls` (abre caminho) e em `isStoneEnemy` (corrente machuca, não
+paralisa: chefe paralisável é chefe que morre num stun-lock).
+
+**As três faixas, sem sobreposição** — e a ordem de leitura da IA é a mesma:
+
+| Distância | Ferramenta | O que ela faz |
+| --- | --- | --- |
+| 9–20 | **Broca de avanço** | fixa o rumo, 1,8 s parado, atravessa a arena abrindo um corredor de 3 células |
+| 4–13 | **Salva de demolição** | 3 cargas marcadas no chão no início do telégrafo, implodem onde foram marcadas |
+| ≤ 16 | **Feixe de prospecção** | varre a linha inofensivo por 2 s, depois a mesma linha com potência |
+
+A primeira versão tinha a broca começando em 5 e a demolição cobrindo 0–13: como a
+broca é checada primeiro, ela vencia em toda distância útil e a salva **nunca saía**.
+Faixa que só existe no comentário não é faixa.
+
+**A broca é a única ação telegrafada do jogo que não exige linha de visão.** Exigir
+anularia a mecânica: o Corcel precisa de visada porque a investida dele se perde numa
+parede, e a do Diamandis a *come*. Ela existe justamente para a cobertura deixar de
+valer. O que a mantém justa é o 1,8 s parado antes de sair — e, ao contrário do
+Corcel, **bater na pedra não encerra a ação**: a pedra é que acaba.
+
+Quem decide o que cai é `canRip`, a mesma regra do Britador: rocha e frágil vão,
+**minério e cristal ficam de pé**. A passagem dele expõe veio que estava emparedado —
+o estrago do chefe vira a mina do jogador, e a sala fica permanentemente alterada.
+
+**A salva não persegue.** As marcas nascem sobre a posição do alvo no instante do
+telégrafo e congelam ali (`bossRuntime.blastCells`, hasheado). Sair do círculo é a
+resposta inteira do golpe, e ela só existe porque o círculo fica onde nasceu. As
+laterais abrem **perpendicularmente**, não para trás: recuar em linha reta já é o
+reflexo de todo mundo, e um golpe que só pune o reflexo não ensina nada.
+
+**O feixe é duas metades.** `beam_line` carrega `powered` para o cliente distinguir a
+varredura (inofensiva) da passagem com potência — sem o campo, as duas seriam
+desenhadas iguais e a única informação que importa ("agora queima") não chegaria. Com
+potência ele aplica a tabela de materiais que já existe: `igniteCell` seca fungo e
+acende gás, `meltIce` derrete, o minério energiza pelas aberturas coladas nele.
+Nenhuma reação nova — o feixe é mais um cliente do sistema, como o rastro do Corcel.
+Para na primeira parede nos dois modos: um levantamento que atravessa rocha não é um
+levantamento, e um feixe que queima do outro lado do muro é dano sem sinal.
+
+**Colapso do reator (< 50%)**, uma vez, via `BOSS_PHASE_REACTOR`:
+
+- o reator **vaza**: um *anel* de brasa nasce em volta dele (anel e não disco — o
+  centro fica pisável para a luta não virar "fique longe e espere"), e ele continua
+  deixando brasa sob os rastos enquanto perfura;
+- um sistema **desliga**: o feixe morre — é o primeiro a cair quando a alimentação
+  entra em colapso, e é o que faz a segunda fase ser *outra luta* em vez da mesma com
+  números piores;
+- os outros **operam acima do limite**: broca e demolição recarregam a 65%.
+
+"Cadência irregular por sorteio" seria dano sem sinal, que é o que o jogo proíbe.
+Cadência maior com uma arma a menos é a mesma sensação, legível e ensinável.
+
+**Ele guarda o Núcleo.** `guardsTheCore` (Guardião + Diamandis) dorme até ser notado
+e, acordado, nunca mais perde o alvo: os dois têm golpes de alcance maior que o
+próprio aggro, e sem isso ficavam mirando de um raio em que nunca decidiam nada.
+
+### Documentos do Diamandis
+
+| Gatilho | Documento | ID |
+| --- | --- | --- |
+| Primeiro abate | Propaganda: *"Uma máquina. Quatrocentas funções. Nenhum trabalhador abaixo da superfície."* | `AX-PUB-010` |
+| **Ver a broca abrir um corredor** | Raio mínimo de operação: o ativo não cabe nos túneis que deveria escavar → *"os túneis serão adaptados ao ativo"* | `AX-ENG-029` |
+| Abate **+** ver o corredor | Incidente 41: ele recebeu o desligamento, **acusou o recebimento**, parou 9 s e continuou — em azimute que não consta de contrato | `AX-INC-041` |
+| Abate **+** corredor **+** Núcleo | Não classificado: os corredores dele formam arcos **concêntricos** ao redor do sinal. Ele não escavava em direção à fonte — escavava **ao redor** | `AX-UNK-059` |
+
+`DISCOVERY_DIAMANDIS_CORRIDOR` (bit 16) é a única testemunha do jogo que **não** exige
+linha de visão, e por um motivo estreito: a parede entre os dois é exatamente a coisa
+que está sendo removida, e quem está do outro lado dela é quem mais precisa entender
+o que aconteceu.
+
+`AX-UNK-059` fecha com o gancho do Guardião (`AX-UNK-051`): dois sistemas de contenção,
+e *um deles nós construímos*. A pergunta que nenhum documento aprovado formula é se o
+Diamandis falhou em alcançar o objetivo — ou entendeu antes da companhia que ele não
+devia ser alcançado.
+
+### O que fica para a próxima fatia
+
+- **A economia dos Coveiros**: módulos destrutíveis que caem do Diamandis e Coveiros
+  que os arrastam para fora do mapa enquanto ele ainda se move — deixar trabalharem
+  torna a luta mais fácil e a recompensa menor; destruí-los preserva a sucata e
+  prolonga a capacidade ofensiva dele. É a escolha que transforma o encontro de bom
+  em memorável, e é um sistema próprio (estado de módulo, IA de arrasto, cache de
+  salvage), não um ajuste do chefe.
+- Os dois documentos que dependem dela: **Aquisições** (custo de recuperação — é de
+  onde os Coveiros vêm) e **Executivo** (reclassificação: "instalação móvel de
+  recuperação economicamente inviável").
+- O **atlas voxel** do Diamandis. Hoje ele usa o renderizador de fallback, como o
+  Bispo e o Corcel usaram antes de ganharem atlas.
+
 ## Ordem recomendada de desenvolvimento (restante)
 
 1. ~~Gatilho da Supernova + remover cuspe do Bispo~~ ✔
 2. ~~Salva Litoclasta do Guardião~~ ✔
 3. ~~`bossForBiome()` sem dependência de setor~~ ✔
 4. ~~Generalizar o estado específico do Guardião num `bossRuntime`~~ ✔
-5. **Diamandis** (Cicatriz Aurix) — o próximo chefe novo: broca de avanço, salva de
-   demolição, feixe de prospecção, colapso do reator, e os Coveiros recuperando
-   módulos (luta mais fácil × recompensa maior). Usa peças que o jogo já tem —
-   pedra, destruição de parede, calor, módulos, Coveiros, sucata.
+5. ~~**Diamandis** (Cicatriz Aurix) — broca, demolição, feixe, colapso do reator~~ ✔
+   (a economia dos Coveiros — módulos destrutíveis e sucata arrastada — fica para a
+   fatia seguinte; ver abaixo)
 6. **Devorador Branco** (Sumidouros de Sílica) — linha de vibração, emergir por
    baixo, vitrificar o chão como contra-jogo.
 7. Documentos de chefe desbloqueados por **entendimento do encontro** (primeiro

@@ -197,6 +197,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.scoriac': 'Scoriac',
   'enemy.frost_wraith': 'Wraith',
   'enemy.sulfur_bomber': 'Sulfur Bearer',
+  'enemy.diamandis': 'Diamandis',
   'enemy.undertaker': 'Undertaker',
 
   'bestiary.name.stalker': 'Stalker',
@@ -211,6 +212,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.scoriac': 'Scoriac',
   'bestiary.name.frost_wraith': 'Frost Wraith',
   'bestiary.name.sulfur_bomber': 'Sulfur Bomber',
+  'bestiary.name.diamandis': 'Diamandis',
   'bestiary.name.undertaker': 'Undertaker',
   'bestiary.name.bishop': 'Bishop of the Vein',
   'bestiary.name.guardian': 'Guardian of the Core',
@@ -251,7 +253,10 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.code.sulfur_bomber': 'SPECIMEN SULF-14',
   'bestiary.note.sulfur_bomber':
     'Mineral variant of vector FUNG-23. Flammable internal charge. Neutralisation at distance from heat sources is advised — advice reiterated after the gallery 7 incident.',
+  'bestiary.code.diamandis': 'CAPITAL ASSET DX-001',
   'bestiary.code.undertaker': 'UNIT EX-041',
+  'bestiary.note.diamandis':
+    'Economically unrecoverable mobile recovery installation. It was not decommissioned: it was RECLASSIFIED — the company turned a running machine into part of the map so the loss would not have to be booked. It is still digging in a direction that appears on no contract.',
   'bestiary.note.undertaker':
     'Scrap retrieval unit. Continues to execute its collection directive without distinguishing inactive machinery from personnel on duty. Reclassification pending since the last audit.',
   'bestiary.code.bishop': 'HOSTILE ASSET EQ-09',

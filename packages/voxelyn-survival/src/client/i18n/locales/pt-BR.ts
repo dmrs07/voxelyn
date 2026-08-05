@@ -202,6 +202,7 @@ export const PT_BR = {
   'enemy.frost_wraith': 'Espectro',
   'enemy.sulfur_bomber': 'Bombardeiro',
   'enemy.undertaker': 'Coveiro',
+  'enemy.diamandis': 'Diamandis',
 
   'bestiary.name.stalker': 'Espreitador',
   'bestiary.name.spitter': 'Cuspidor',
@@ -216,6 +217,7 @@ export const PT_BR = {
   'bestiary.name.frost_wraith': 'Espectro de Geada',
   'bestiary.name.sulfur_bomber': 'Bombardeiro de Enxofre',
   'bestiary.name.undertaker': 'Coveiro',
+  'bestiary.name.diamandis': 'Diamandis',
   'bestiary.name.bishop': 'Bispo do Veio',
   'bestiary.name.guardian': 'Guardião do Núcleo',
 
@@ -255,6 +257,9 @@ export const PT_BR = {
   'bestiary.note.sulfur_bomber':
     'Variante mineral do vetor FUNG-23. Carga interna inflamável. Recomenda-se neutralização a distância de fontes de calor — recomendação reiterada após o incidente da galeria 7.',
   'bestiary.code.undertaker': 'UNIDADE EX-041',
+  'bestiary.code.diamandis': 'ATIVO DE PATRIMÔNIO DX-001',
+  'bestiary.note.diamandis':
+    'Instalação móvel de recuperação economicamente inviável. Não foi desativado: foi RECLASSIFICADO — a companhia transformou uma máquina em operação em parte do mapa para não contabilizar a perda. Continua escavando numa direção que não consta do contrato.',
   'bestiary.note.undertaker':
     'Recolhedora de sucata. Continua cumprindo a diretriz de coleta sem distinguir maquinário inativo de pessoal em serviço. Reclassificação pendente desde a última auditoria.',
   'bestiary.code.bishop': 'ATIVO HOSTIL EQ-09',

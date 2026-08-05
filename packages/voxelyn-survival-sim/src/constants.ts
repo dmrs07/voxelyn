@@ -463,6 +463,118 @@ export const GUARDIAN_VOLLEY_INTERVAL_TICKS = 7;
 /** Recarga da salva (leque ou rajada). O valor historico do ranged dele. */
 export const GUARDIAN_SALVO_COOLDOWN_TICKS = 44;
 
+// ---------------------------------------------------------------------------
+// DIAMANDIS — o chefe da Cicatriz Aurix
+// ---------------------------------------------------------------------------
+/**
+ * Projeto DIAMANDIS: o maior equipamento de escavacao autonoma que a Aurix
+ * construiu, dez vezes um Prospector, abandonado no fundo porque recupera-lo
+ * custava mais que o programa inteiro. Ele nao parou de funcionar — parou de
+ * executar a tarefa que a Aurix dizia ter lhe dado.
+ *
+ * A regra que rege as tres armas dele: NENHUMA e militar. Sao ferramentas
+ * industriais aplicadas com indiferenca — uma broca de avanco, cargas de
+ * implosao de teto e um feixe de prospeccao. E o que separa o encontro de "um
+ * robo grande atira em voce": o Diamandis nao esta lutando, esta TRABALHANDO,
+ * e o jogador esta no caminho da obra.
+ *
+ * VIDA alta e corpo MODERADO, de proposito. Visualmente ele e uma fabrica
+ * ambulante; mecanicamente uma hitbox gigante transformaria toda parede em
+ * gaiola e todo tiro em acerto garantido. O tamanho mora no sprite e no
+ * ESTRAGO que ele deixa, nunca no raio de colisao.
+ */
+export const DIAMANDIS_HP = 880;
+export const DIAMANDIS_SPEED = 1.5;
+export const DIAMANDIS_RADIUS = 0.9;
+
+/**
+ * BROCA DE AVANCO. Ele fixa uma direcao, carrega e ATRAVESSA a arena.
+ *
+ * Diferente da investida do Corcel em tudo o que importa: bater na pedra nao
+ * encerra a acao — a pedra e que acaba. Abre um corredor de
+ * `DIAMANDIS_DRILL_WIDTH` celulas, derruba rocha e fragil e deixa minerio e
+ * cristal DE PE (e `canRip` que decide, a mesma regra do Britador), entao a
+ * passagem dele expoe veio que estava emparedado. A luta altera a geometria da
+ * sala em definitivo — e essa alteracao e recompensa e perigo ao mesmo tempo.
+ */
+export const DIAMANDIS_DRILL_WINDUP_TICKS = 36; // 1,8 s parado: a obra avisa
+export const DIAMANDIS_DRILL_TICKS = 46;
+export const DIAMANDIS_DRILL_SPEED = 7.5;
+export const DIAMANDIS_DRILL_COOLDOWN_TICKS = 190;
+/**
+ * As tres ferramentas tem FAIXAS que nao se engolem, e a ordem de leitura da
+ * IA e a mesma: longe -> broca, medio -> demolicao, perto -> feixe.
+ *
+ * A primeira versao deixou a broca comecando em 5 e a demolicao cobrindo
+ * 0..13: como a broca e checada primeiro, ela vencia em toda distancia util e
+ * a salva simplesmente nunca saia. Faixa que so existe no comentario nao e
+ * faixa.
+ */
+export const DIAMANDIS_DRILL_MIN_RANGE = 9;
+export const DIAMANDIS_DRILL_MAX_RANGE = 20;
+export const DIAMANDIS_DRILL_DAMAGE = 34;
+/** Meia-largura do corredor, em celulas: 1 => um vao de 3. */
+export const DIAMANDIS_DRILL_WIDTH = 1;
+
+/**
+ * SALVA DE DEMOLICAO. Tres cargas caem em areas MARCADAS.
+ *
+ * Nao sao misseis: sao as cargas industriais de implodir teto e fraturar veio,
+ * e a linguagem corporativa insiste que o Diamandis nunca foi armado. As
+ * marcas nascem no INICIO do telegrafo, sobre a posicao do jogador naquele
+ * instante, e nao se corrigem — sair do circulo e a resposta inteira, e ela so
+ * existe porque a marca nao persegue.
+ */
+export const DIAMANDIS_DEMOLISH_WINDUP_TICKS = 34;
+export const DIAMANDIS_DEMOLISH_COOLDOWN_TICKS = 150;
+export const DIAMANDIS_DEMOLISH_RANGE = 13;
+export const DIAMANDIS_DEMOLISH_MIN_RANGE = 4;
+export const DIAMANDIS_DEMOLISH_CHARGES = 3;
+export const DIAMANDIS_DEMOLISH_RADIUS = 2.6;
+/** Quanto as duas cargas laterais se afastam da central, em tiles. */
+export const DIAMANDIS_DEMOLISH_SPREAD = 3.2;
+
+/**
+ * FEIXE DE PROSPECCAO. Uma linha de levantamento que depois SOBE de potencia.
+ *
+ * A ordem importa e e o encontro inteiro: primeiro ele varre, e a varredura
+ * nao machuca ninguem — e um scanner fazendo o trabalho dele. So no release o
+ * feixe ganha potencia, e ai ele aquece fungo, acende gas, derrete gelo,
+ * energiza minerio e queima quem estiver na linha. E uma ferramenta industrial
+ * aplicada com indiferenca, nao uma arma: o dano e efeito colateral de uma
+ * medicao.
+ */
+export const DIAMANDIS_BEAM_WINDUP_TICKS = 40; // 2 s de linha de levantamento
+export const DIAMANDIS_BEAM_COOLDOWN_TICKS = 170;
+export const DIAMANDIS_BEAM_LENGTH = 16;
+export const DIAMANDIS_BEAM_DAMAGE = 26;
+/** Passo da amostragem da linha: menor que meia celula nao pula parede. */
+export const DIAMANDIS_BEAM_STEP = 0.25;
+
+/**
+ * COLAPSO DO REATOR, abaixo de metade da vida.
+ *
+ * A luta deixa de ser "uma maquina controlada" e vira "uma instalacao
+ * industrial desabando em volta do jogador". O que acontece e deterministico e
+ * legivel, e nao um sorteio de cadencia:
+ *
+ *   - o reator VAZA: brasa nasce em volta dele no instante do colapso, e
+ *     continua nascendo sob os rastos enquanto ele anda;
+ *   - um sistema DESLIGA: o feixe de prospeccao morre (o scanner e a primeira
+ *     coisa a cair quando a alimentacao entra em colapso);
+ *   - os outros OPERAM ACIMA DO LIMITE: broca e demolicao recarregam mais
+ *     rapido.
+ *
+ * "Cadencia irregular" por sorteio seria dano sem sinal, que e justamente o
+ * que o jogo proibe. Cadencia MAIOR com uma arma a menos e a mesma sensacao,
+ * legivel e ensinavel.
+ */
+export const DIAMANDIS_REACTOR_HP_FRACTION = 0.5;
+export const DIAMANDIS_REACTOR_EMBER_RADIUS = 5;
+export const DIAMANDIS_REACTOR_EMBER_TICKS = 900;
+/** Fator de recarga das armas que sobrevivem ao colapso. */
+export const DIAMANDIS_REACTOR_CADENCE_SCALE = 0.65;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;

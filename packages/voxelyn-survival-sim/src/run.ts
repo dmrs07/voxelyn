@@ -2318,6 +2318,7 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   // reordenar o que ja existe.
   'sulfur_bomber',
   'undertaker',
+  'diamandis',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */
@@ -2457,6 +2458,10 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.arenaClosed ? 1 : 0);
   mix(state.bossRuntime.arenaBarrierCells.length);
   for (const cell of state.bossRuntime.arenaBarrierCells) mix(cell);
+  // As cargas MARCADAS: duas simulacoes que discordem de onde a Salva de
+  // Demolicao cai divergem no estrago, um telegrafo depois.
+  mix(state.bossRuntime.blastCells.length);
+  for (const cell of state.bossRuntime.blastCells) mix(cell);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

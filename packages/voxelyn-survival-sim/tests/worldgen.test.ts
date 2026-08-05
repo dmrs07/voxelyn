@@ -8,6 +8,7 @@ import {
   SECTOR_COUNT,
 } from '../src/constants';
 import { chunkOf, floodOpen, generateWorld } from '../src/worldgen';
+import { isBossArchetype } from '../src/bosses';
 import { createRun } from '../src/run';
 import { setSurface } from '../src/cells';
 
@@ -106,9 +107,9 @@ describe('worldgen', () => {
       // O Guardiao so existe no setor final; a reserva de espaco para o corpo
       // dele e feita pelo worldgen em TODO setor, mas so ali ela e ocupada.
       const state = createRun({ seed, sector: SECTOR_COUNT });
-      // O chefe do setor final vem de bossForBiome (Bispo em mapa micelial,
-      // Guardiao nos demais por enquanto); a reserva de corpo vale para ambos.
-      const boss = state.enemies.find((e) => e.archetype === 'guardian' || e.archetype === 'bishop');
+      // O chefe do setor final vem de bossForBiome; a reserva de corpo do
+      // worldgen vale para qualquer um deles.
+      const boss = state.enemies.find((e) => isBossArchetype(e.archetype));
       expect(boss, `seed ${seed}: setor final sem chefe`).toBeDefined();
       if (!boss) continue;
       for (const dx of [-boss.radius, boss.radius]) {

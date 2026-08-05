@@ -36,6 +36,7 @@ const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
   frost_wraith: 'enemy.frost_wraith',
   sulfur_bomber: 'enemy.sulfur_bomber',
   undertaker: 'enemy.undertaker',
+  diamandis: 'enemy.diamandis',
 };
 
 /**

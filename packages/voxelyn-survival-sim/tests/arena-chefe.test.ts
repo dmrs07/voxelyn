@@ -25,6 +25,7 @@ import {
 import { SOLID_ROCK } from '../src/constants';
 import { RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
 import { createRun } from '../src/run';
+import { isBossArchetype } from '../src/bosses';
 import { sectorSeed } from '../src/sectors';
 import { createTerrainDraft, floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
 import { biomeProfile, lineageOf, sectorBiome } from '../src/strata';
@@ -97,9 +98,7 @@ describe('arena do chefe por estrato', () => {
         expect(reach.has(boss.y * w + boss.x), `${lineage} s${sector}: camara isolada`).toBe(true);
         // E o setor final tem o chefe DE VERDADE, na camara.
         if (sector === SECTOR_COUNT) {
-          const alive = state.enemies.find(
-            (e) => e.archetype === 'bishop' || e.archetype === 'guardian',
-          );
+          const alive = state.enemies.find((e) => isBossArchetype(e.archetype));
           expect(alive, `${lineage} s${sector}: setor final sem chefe`).toBeDefined();
         }
       }

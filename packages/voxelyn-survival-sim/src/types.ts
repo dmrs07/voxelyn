@@ -85,7 +85,15 @@ export type EnemyArchetype =
    * do braço e prensa. E o unico corpo do bestiario que tira do jogador a
    * posicao — a variavel de que todo o resto do combate depende.
    */
-  | 'undertaker';
+  | 'undertaker'
+  /**
+   * DIAMANDIS: o chefe da Cicatriz Aurix. Nao e fauna e nao e do Veio — e a
+   * maior escavadeira que a companhia construiu, abandonada porque recupera-la
+   * custava mais que o programa inteiro, ainda executando uma escavacao que
+   * nao consta dos mapas. As tres armas dele sao FERRAMENTAS: broca, cargas de
+   * implosao e um feixe de prospeccao. Ele nao esta lutando, esta trabalhando.
+   */
+  | 'diamandis';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -229,6 +237,15 @@ export const DISCOVERY_BISHOP_HEALED = 1 << 14;
  * que diz que a emissao nao persegue ninguem: quem leu isso pagou para ler.
  */
 export const DISCOVERY_BISHOP_NOVA_SURVIVED = 1 << 15;
+/**
+ * VIU a broca do Diamandis abrir um corredor pela rocha.
+ *
+ * E o unico fato do encontro que ensina o que ele E: uma maquina cujo golpe
+ * nao mira em voce — ele reescreve a sala. O documento que este bit abre e o
+ * relatorio de engenharia sobre o raio minimo de operacao, e ele so faz
+ * sentido para quem viu a resposta da companhia acontecer na propria parede.
+ */
+export const DISCOVERY_DIAMANDIS_CORRIDOR = 1 << 16;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -261,6 +278,12 @@ export type EntityActionKind =
   | 'slam'
   | 'hurl'
   | 'pulse'
+  /** Broca de avanco do Diamandis: rumo fixo, atravessa a arena abrindo vao. */
+  | 'drill'
+  /** Salva de demolicao: tres cargas caem nas areas marcadas no windup. */
+  | 'demolish'
+  /** Feixe de prospeccao: varredura inofensiva, depois potencia na mesma linha. */
+  | 'beam'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
   | 'haul'
   /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
@@ -361,10 +384,23 @@ export type BossRuntime = {
   arenaClosed: boolean;
   /** Celulas vazias convertidas pelo cerco; removidas quando o chefe morre. */
   arenaBarrierCells: number[];
+  /**
+   * Onde as cargas da Salva de Demolicao vao cair, marcadas no INICIO do
+   * telegrafo.
+   *
+   * Vive aqui e nao na acao porque `EntityAction` carrega UMA direcao, e a
+   * salva sao tres pontos — e porque os pontos nao podem se corrigir depois de
+   * marcados: sair do circulo e a resposta inteira do golpe, e ela so existe
+   * se a marca ficar onde nasceu. Entra no hash: duas simulacoes que discordem
+   * de onde a carga cai divergem no estrago.
+   */
+  blastCells: number[];
 };
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
 export const BOSS_PHASE_SUMMON = 1 << 0;
+/** O colapso do reator do Diamandis, abaixo de metade da vida. */
+export const BOSS_PHASE_REACTOR = 1 << 1;
 
 /** Postura do Miner. Ele nasce PASSIVO; o calor da sua arma decide o resto. */
 export const MINER_MOOD_PASSIVE = 0;
@@ -665,6 +701,20 @@ export type SemanticEvent =
    * o aviso util nao e "algo vem ai", e "saia DESTA faixa".
    */
   | { t: 'cart_warning'; x: number; y: number; dx: number; dy: number; len: number }
+  /**
+   * UMA carga da Salva de Demolicao foi marcada. O cliente desenha o circulo
+   * ate `fireTick`; o dano so acontece la. Sai um evento por carga (e nao um
+   * com a lista) porque o cliente ja trata efeitos por posicao, e assim uma
+   * carga a mais nao muda o formato da mensagem.
+   */
+  | { t: 'blast_marker'; x: number; y: number; radius: number; fireTick: number }
+  /**
+   * O feixe de prospeccao. `powered` distingue as DUAS metades do golpe: a
+   * varredura (false, inofensiva, durante o windup) e a passagem com potencia
+   * (true, no release). Sem o campo o cliente desenharia as duas iguais e a
+   * unica informacao que importa — "agora queima" — nao chegaria.
+   */
+  | { t: 'beam_line'; x: number; y: number; dx: number; dy: number; length: number; powered: boolean }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }

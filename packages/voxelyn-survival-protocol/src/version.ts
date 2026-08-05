@@ -39,7 +39,12 @@
 // das runs. E quebra nos dois sentidos: um cliente novo contra servidor antigo
 // le `bossAwake` ausente e nunca acorda a apresentacao do chefe; um cliente
 // antigo contra servidor novo procura `guardianAwake` e nao acha.
-export const PROTOCOL_VERSION = 15;
+// 16: dois eventos novos do Diamandis. `blast_marker` (uma carga da Salva de
+// Demolicao marcada, com o tick em que cai) e `beam_line` (o feixe de
+// prospeccao, com `powered` distinguindo a varredura inofensiva da passagem
+// com potencia). Um cliente antigo nao desenharia nem a marca nem a linha — e
+// as duas SAO o telegrafo: sem elas, os dois golpes chegam sem sinal.
+export const PROTOCOL_VERSION = 16;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -151,7 +156,14 @@ export const PROTOCOL_VERSION = 15;
 // fases de uma vez viradas BITMASK (`phasesFired`). O hash passa a misturar a
 // bitmask no lugar do booleano de invocacao: dois peers em versoes diferentes
 // divergem no tick em que a matilha sai.
-export const SIMULATION_VERSION = 24;
+// 25: DIAMANDIS. Arquetipo novo (entra no fim de HASHED_ARCHETYPES e nos
+// contadores de abate), tres acoes novas (`drill`, `demolish`, `beam`), a fase
+// de uma vez do colapso do reator (BOSS_PHASE_REACTOR), as celulas marcadas da
+// salva no estado hasheado (`bossRuntime.blastCells`) e a Descoberta
+// DISCOVERY_DIAMANDIS_CORRIDOR (bit 16). A camara final de todo bioma Aurix
+// troca de ocupante: dois peers em versoes diferentes montam elencos
+// diferentes da mesma seed.
+export const SIMULATION_VERSION = 25;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -172,7 +184,10 @@ export const SIMULATION_VERSION = 24;
 // revisao de conteudo.
 // 17: o Seeker Lance vira SEEKER DRONE — atlas novo fx-seeker-drone
 // (quadricoptero kamikaze, fly 4f) entra no primeiro pacote de sprites.
-export const CONTENT_VERSION = 17;
+// 18: o pool de criaturas ganha o DIAMANDIS. Ele ainda nao tem atlas — desenha
+// pelo caminho de fallback, como o Bispo e o Corcel antes de ganharem o deles —
+// mas o conjunto de conteudo mudou, e e exatamente isso que este campo marca.
+export const CONTENT_VERSION = 18;
 
 export type VersionTriple = {
   protocolVersion: number;

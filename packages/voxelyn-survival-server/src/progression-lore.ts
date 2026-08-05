@@ -1,4 +1,4 @@
-// O Codex corporativo (95 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (99 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -45,6 +45,7 @@
 
 import {
   DISCOVERY_BISHOP_FELLED,
+  DISCOVERY_DIAMANDIS_CORRIDOR,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_CARGO_LOST,
@@ -236,6 +237,7 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
   'undertaker',
   'bishop',
   'guardian',
+  'diamandis',
 ];
 
 /**
@@ -263,6 +265,7 @@ export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   undertaker: 'AX-UNK-043',
   bishop: 'AX-EXE-034',
   guardian: 'AX-EXE-039',
+  diamandis: 'AX-PUB-010',
 };
 
 /** Um documento por Descoberta. O bit aposentado (ORE_QUOTA) fica de fora. */
@@ -284,6 +287,9 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   // documentos abaixo interpretam — e nenhum deles abre por farm.
   { bit: DISCOVERY_BISHOP_HEALED, fragmentId: 'AX-ENG-028' },
   { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, fragmentId: 'AX-INC-040' },
+  // A broca do Diamandis abrindo corredor: o unico fato do encontro que
+  // ensina o que ele e — um golpe que nao mira em voce, reescreve a sala.
+  { bit: DISCOVERY_DIAMANDIS_CORRIDOR, fragmentId: 'AX-ENG-029' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
@@ -349,6 +355,7 @@ export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchet
   { bit: DISCOVERY_BISHOP_FELLED, archetype: 'bishop' },
   { bit: DISCOVERY_BISHOP_HEALED, archetype: 'bishop' },
   { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, archetype: 'bishop' },
+  { bit: DISCOVERY_DIAMANDIS_CORRIDOR, archetype: 'diamandis' },
   { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
   { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
   { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
@@ -500,6 +507,12 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-EXE-047': ['AX-PRC-025', 'AX-UNK-057'],
   'AX-UNK-057': ['AX-ENG-028', 'AX-PRC-025', 'AX-INC-040', 'AX-UNK-045'],
   'AX-UNK-058': ['AX-UNK-057', 'AX-UNK-051', 'AX-EXE-042', 'AX-UNK-050'],
+  // O arco do Diamandis: a propaganda → o ativo grande demais para a propria
+  // obra → a ordem que ele acusou e nao cumpriu → o que ele estava cercando.
+  'AX-PUB-010': ['AX-ENG-029', 'AX-PRC-014'],
+  'AX-ENG-029': ['AX-PUB-010', 'AX-INC-041'],
+  'AX-INC-041': ['AX-ENG-029', 'AX-UNK-059'],
+  'AX-UNK-059': ['AX-INC-041', 'AX-UNK-051', 'AX-UNK-050'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
@@ -564,6 +577,9 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-EXE-047': 2,
   'AX-UNK-057': 2,
   'AX-UNK-058': 3,
+  'AX-ENG-029': 0,
+  'AX-INC-041': 1,
+  'AX-UNK-059': 3,
 };
 
 /**
@@ -586,6 +602,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PUB-006',
   'AX-PUB-007',
   'AX-PUB-009',
+  'AX-PUB-010',
   'AX-GEN-G01',
   // Ato II — Procedimento
   'AX-ENG-011',
@@ -606,6 +623,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-026',
   'AX-ENG-027',
   'AX-ENG-028',
+  'AX-ENG-029',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',
@@ -640,6 +658,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-038',
   'AX-INC-039',
   'AX-INC-040',
+  'AX-INC-041',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -676,6 +695,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-056',
   'AX-UNK-057',
   'AX-UNK-058',
+  'AX-UNK-059',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
@@ -762,6 +782,24 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
     allOf: [
       { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_FELLED },
       { kind: 'discovery', discoveryBit: DISCOVERY_GUARDIAN_FELLED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
+    ],
+  }),
+  // O arco do Diamandis. A ficha (AX-PUB-010) sai no abate, como todo Ativo;
+  // os demais cruzam ter derrubado a maquina com ter VISTO a broca reescrever
+  // a sala — o unico fato do encontro que explica o que ele e.
+  define('AX-INC-041', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'diamandis' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_CORRIDOR },
+    ],
+  }),
+  define('AX-UNK-059', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'diamandis' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_CORRIDOR },
       { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
     ],
   }),

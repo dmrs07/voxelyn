@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isBossArchetype } from '../src/bosses';
 import {
   EXTRACT_RADIUS,
   SECTOR_COUNT,
@@ -35,11 +36,14 @@ describe('estrutura de setores', () => {
     expect(state.enemies.some((e) => e.archetype === 'guardian')).toBe(false);
   });
 
-  it('so o setor final tem Guardiao', () => {
+  it('so o setor final tem chefe — qualquer que seja o do bioma', () => {
+    // Quem e o chefe sai de `bossForBiome`; o que este teste protege e a
+    // ESTRUTURA: um por run, no fim. Enumerar arquetipos a mao aqui fez o
+    // teste mentir a cada chefe novo.
     for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
       const state = createRun({ seed: 102, sector });
-      const hasGuardian = state.enemies.some((e) => e.archetype === 'guardian');
-      expect(hasGuardian, `setor ${sector}`).toBe(sector === SECTOR_COUNT);
+      const bosses = state.enemies.filter((e) => isBossArchetype(e.archetype));
+      expect(bosses.length, `setor ${sector}`).toBe(sector === SECTOR_COUNT ? 1 : 0);
     }
   });
 

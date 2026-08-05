@@ -48,6 +48,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   pathAt: -1000,
   arenaClosed: false,
   arenaBarrierCells: [],
+  blastCells: [],
 });
 
 /**
@@ -106,14 +107,29 @@ export const bossForBiome = ({ stratum, occupation }: BossBiome): BossId =>
 /**
  * Os chefes que JA EXISTEM como arquetipo de simulacao. Os demais caem no
  * Guardiao — um fallback jogavel e honesto (ele e o chefe-base do jogo), que
- * some sozinho conforme cada linha da tabela ganhar corpo. Ordem recomendada
- * de implementacao: Diamandis (usa pecas que o jogo ja tem — pedra, parede,
- * calor, Coveiros), depois o Devorador Branco.
+ * some sozinho conforme cada linha da tabela ganhar corpo. O proximo da fila e
+ * o Devorador Branco (Sumidouros de Silica).
  */
 export const IMPLEMENTED_BOSS: Partial<Record<BossId, EnemyArchetype>> = {
   bishop: 'bishop',
   guardian: 'guardian',
+  diamandis: 'diamandis',
 };
+
+/**
+ * Os arquetipos que HOJE ocupam uma camara de chefe. DERIVADO de
+ * `IMPLEMENTED_BOSS`, e nao uma segunda lista: toda vez que um chefe da tabela
+ * ganhava corpo, quem enumerava `'guardian' || 'bishop'` a mao passava a
+ * mentir em silencio — e quem enumerava eram os testes de alcancabilidade da
+ * camara, ou seja, justamente a rede que devia pegar o chefe novo preso numa
+ * parede.
+ */
+export const BOSS_ARCHETYPES: readonly EnemyArchetype[] = [
+  ...new Set(Object.values(IMPLEMENTED_BOSS)),
+];
+
+export const isBossArchetype = (archetype: EnemyArchetype | 'prospector'): boolean =>
+  BOSS_ARCHETYPES.includes(archetype as EnemyArchetype);
 
 /** O arquetipo que a camara final do bioma recebe HOJE. */
 export const bossArchetypeForBiome = (biome: SectorBiome): EnemyArchetype =>

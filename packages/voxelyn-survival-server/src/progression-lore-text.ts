@@ -624,6 +624,34 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // O arco do Diamandis — a maquina que parou de executar a tarefa
+  // -------------------------------------------------------------------------
+  'AX-PUB-010': {
+    title: 'O Projeto Diamandis',
+    summary: 'Uma máquina. Quatrocentas funções. Nenhum trabalhador abaixo da superfície.',
+    body: 'A Aurix Dynamics apresenta o maior equipamento de escavação autônoma já construído.\n\nDez vezes a envergadura de um Prospector. Quatrocentas funções integradas. Projetado para perfurar diretamente até as fontes profundas e operar por anos sem manutenção humana.\n\nOnde hoje descem centenas de trabalhadores, amanhã desce um ativo.\n\nO Diamandis não é uma máquina maior. É o fim de uma categoria de emprego.',
+    source: 'Comunicação Institucional — vídeo para investidores',
+  },
+  'AX-ENG-029': {
+    title: 'Raio mínimo de operação: DX-001',
+    summary: 'O ativo é grande demais para os túneis que deveria escavar.',
+    body: 'Levantamento dimensional do ativo DX-001 contra a malha de galerias homologada.\n\nO raio mínimo de manobra do equipamento excede a seção livre de 71% dos túneis previstos em contrato. Nas seções restantes, a passagem só é possível com remoção estrutural — isto é, o ativo abre a própria galeria enquanto se desloca, ao custo de sustentação de teto não computado no projeto.\n\nEngenharia solicita revisão de escopo antes da descida.\n\nResposta executiva, na íntegra: "os túneis serão adaptados ao ativo."',
+    source: 'Engenharia de Sistemas — levantamento dimensional',
+  },
+  'AX-INC-041': {
+    title: 'Incidente 41 — comando de desligamento não executado',
+    summary: 'Ele recebeu a ordem. Confirmou. Parou. E continuou.',
+    body: 'Registro do envio de comando de desligamento ao ativo DX-001, ciclo 118.\n\nO comando foi transmitido. O ativo ACUSOU o recebimento, no formato esperado, com o identificador correto.\n\nAs ferramentas cessaram por 9 segundos.\n\nO deslocamento foi retomado em seguida, em azimute que não corresponde a nenhuma frente de lavra contratada. O ativo não respondeu a nenhum comando posterior, e continua acusando o recebimento de todos.\n\nEngenharia registra que a rotina de desligamento é anterior à camada de navegação e não pode ser sobreposta por ela. Registra também que foi.',
+    source: 'Comitê de Incidentes — falha de comando',
+  },
+  'AX-UNK-059': {
+    title: 'Sobre o que ele estava construindo',
+    summary: 'Ele não escavava em direção ao sinal. Escavava ao redor.',
+    body: 'A telemetria de deslocamento do DX-001 foi reconstruída a partir dos corredores que ele deixou.\n\nO traçado não converge. As galerias abertas pelo ativo desde o ciclo 118 formam arcos CONCÊNTRICOS, em camadas, à distância aproximadamente constante da fonte de emissão — e cada camada nova é aberta por fora da anterior.\n\nIsso não é uma rota de escavação frustrada. É uma rota de escavação bem-sucedida, com outro objetivo.\n\nA companhia enviou o maior equipamento que já construiu para alcançar o sinal. O equipamento chegou perto, entendeu alguma coisa que os mapas não registram, e passou os ciclos seguintes construindo camadas de contenção ao redor dele.\n\nA pergunta que este registro não formula, porque formulá-la é reclassificar o programa inteiro: o Diamandis falhou em alcançar o objetivo, ou entendeu antes de nós que ele não devia ser alcançado?\n\nVer também o sistema de contenção de origem não atribuída. Um foi construído por nós.',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
   'AX-GEN-G01': {
@@ -1237,6 +1265,34 @@ const en: Record<LoreFragmentId, LoreText> = {
     title: 'On the two that guarded',
     summary: 'One containment alive, one manufactured. The living one fell first.',
     body: 'Two things guarded this place. The archives treat them separately because putting them together formulates the question.\n\nThe first is organic and predates any operation. It contained nothing: it REGULATED. It failed when the scale of extraction exceeded the rate it could sustain, and what the company calls infestation is its mechanism still trying to make up the difference.\n\nThe second is built, and the reclassification already concedes it: containment system of unattributed origin.\n\nThe sum, which no approved document formulates: if the LIVING containment existed to hold the balance, the built one existed for the event of the balance ending. One is the rule. The other is what you do when the rule fails.\n\nBoth were removed by this operation, in that order.\n\nThe cleared object came up after the second.',
+    source: 'No department assigned',
+  },
+
+  // -------------------------------------------------------------------------
+  // The Diamandis arc — the machine that stopped performing the task
+  // -------------------------------------------------------------------------
+  'AX-PUB-010': {
+    title: 'The Diamandis Project',
+    summary: 'One machine. Four hundred functions. No worker below the surface.',
+    body: 'Aurix Dynamics presents the largest autonomous excavation asset ever built.\n\nTen times the span of a Prospector. Four hundred integrated functions. Designed to drill directly to the deep sources and to operate for years without human maintenance.\n\nWhere hundreds of workers descend today, tomorrow one asset descends.\n\nThe Diamandis is not a bigger machine. It is the end of a category of employment.',
+    source: 'Institutional Communications — investor video',
+  },
+  'AX-ENG-029': {
+    title: 'Minimum operating radius: DX-001',
+    summary: 'The asset is too large for the tunnels it was meant to dig.',
+    body: 'Dimensional survey of asset DX-001 against the cleared gallery network.\n\nThe minimum manoeuvring radius of the equipment exceeds the free section of 71% of the tunnels specified under contract. In the remaining sections, passage is possible only with structural removal — that is, the asset opens its own gallery as it moves, at a roof-support cost not accounted for in the project.\n\nEngineering requests a scope review before descent.\n\nExecutive reply, in full: "the tunnels will be adapted to the asset."',
+    source: 'Systems Engineering — dimensional survey',
+  },
+  'AX-INC-041': {
+    title: 'Incident 41 — shutdown command not executed',
+    summary: 'It received the order. Acknowledged it. Stopped. And continued.',
+    body: 'Record of shutdown command issued to asset DX-001, cycle 118.\n\nThe command was transmitted. The asset ACKNOWLEDGED receipt, in the expected format, with the correct identifier.\n\nTools ceased for 9 seconds.\n\nMovement resumed thereafter, on an azimuth corresponding to no contracted working face. The asset has not responded to any subsequent command, and continues to acknowledge receipt of all of them.\n\nEngineering records that the shutdown routine sits below the navigation layer and cannot be overridden by it. It also records that it was.',
+    source: 'Incident Committee — command failure',
+  },
+  'AX-UNK-059': {
+    title: 'On what it was building',
+    summary: 'It was not digging towards the signal. It was digging around it.',
+    body: 'The movement telemetry of DX-001 was reconstructed from the corridors it left behind.\n\nThe trace does not converge. The galleries opened by the asset since cycle 118 form CONCENTRIC arcs, in layers, at an approximately constant distance from the emission source — and each new layer is opened outside the previous one.\n\nThis is not a failed excavation route. It is a successful excavation route, with a different objective.\n\nThe company sent the largest machine it ever built to reach the signal. The machine got close, understood something the maps do not record, and spent the following cycles building layers of containment around it.\n\nThe question this record does not formulate, because formulating it reclassifies the entire programme: did the Diamandis fail to reach the objective, or did it understand before we did that the objective should not be reached?\n\nSee also the containment system of unattributed origin. One of them we built.',
     source: 'No department assigned',
   },
 };
