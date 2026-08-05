@@ -33,6 +33,8 @@ const base: RunSummary = {
     innocentsKilled: 0,
     discoveries: 0,
   },
+  cores: 0,
+  sectorCount: 3,
   stars: 0,
   targetTicks: 8 * 60 * TICK_HZ,
 };

@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ICE_REFREEZE_TICKS,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
@@ -53,7 +53,7 @@ const seedWithLineage = (lineage: string): number => {
 describe('derivacao do bioma', () => {
   it('e funcao pura da seed: mesma entrada, mesmo bioma, sem consumir RNG', () => {
     for (const seed of SEEDS) {
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const a = sectorBiome(seed, sector);
         const b = sectorBiome(seed, sector);
         expect(b).toEqual(a);
@@ -78,7 +78,7 @@ describe('derivacao do bioma', () => {
   it('a run segue UMA linhagem: os tres setores contam a mesma historia', () => {
     for (const seed of SEEDS) {
       const lineage = lineageOf(seed);
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         expect(sectorBiome(seed, sector).lineage).toBe(lineage);
       }
     }
@@ -117,7 +117,7 @@ describe('perfis por estrato', () => {
     // materias — nada de agua, brasa, gelo ou nervura de cristal nele.
     // Variacao de materia no basalto segue sendo trabalho das ocupacoes.
     for (const lineage of ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'] as const) {
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const clean: SectorBiome = { stratum: 'basalt', occupation: 'none', lineage };
         const profile = biomeProfile(clean, sector);
         expect({ ...profile, halls: 'none' }, `${lineage} s${sector}`).toEqual(DEFAULT_PROFILE);
@@ -328,7 +328,7 @@ describe('perfis por estrato', () => {
     // cristal mudam materia, nunca a prova de alcancabilidade.
     for (const lineage of ['hydric', 'mineral', 'industrial'] as const) {
       const seed = seedWithLineage(lineage);
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const state = createRun({ seed, sector });
         expect(state.solid[at(state, state.corePos.x, state.corePos.y)]).toBe(SOLID_NONE);
         expect(state.solid[at(state, state.entry.x, state.entry.y)]).toBe(SOLID_NONE);
@@ -426,7 +426,7 @@ describe('segunda leva: linhagens termica, arida e crio', () => {
 
   it('a Fornalha nunca recebe colonia micelial: a intrusao vira Aurix', () => {
     for (let seed = 1; seed < 4096; seed++) {
-      for (let sector = 2; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 2; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const biome = sectorBiome(seed, sector);
         if (biome.stratum === 'furnace') expect(biome.occupation).not.toBe('mycelial');
       }
@@ -757,7 +757,7 @@ describe('bolso micelial do Bispo', () => {
     // a colonia da camara e garantida — a luta dele E o chao.
     let checked = 0;
     for (let seed = 1; seed <= 400 && checked < 3; seed++) {
-      const state = createRun({ seed, sector: SECTOR_COUNT });
+      const state = createRun({ seed, sector: DEFAULT_SECTOR_COUNT });
       const bishop = state.enemies.find((e) => e.archetype === 'bishop');
       if (!bishop) continue;
       checked += 1;
@@ -781,7 +781,7 @@ describe('bolso micelial do Bispo', () => {
 
   it('sem micelio dominante no mapa final, nao ha Bispo em lugar nenhum', () => {
     const seed = seedWithLineage('cryo');
-    for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+    for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
       const biome = sectorBiome(seed, sector);
       if (biome.occupation === 'mycelial') continue; // intrusao sorteada: ai e dele
       const state = createRun({ seed, sector });

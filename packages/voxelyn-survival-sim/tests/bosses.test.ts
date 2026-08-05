@@ -21,7 +21,7 @@ import {
   GUARDIAN_VOLLEY_SHOTS,
   HORSE_CHARGE_TICKS,
   HORSE_CHARGE_WINDUP_TICKS,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ROCK,
   SURF_FIRE,
@@ -40,7 +40,7 @@ import {
 /** Primeira seed >= base cujo setor FINAL recebe o arquetipo pedido. */
 const seedWithFinalBoss = (archetype: EnemyArchetype, base = 1): number => {
   for (let seed = base; seed < base + 4096; seed++) {
-    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === archetype) return seed;
+    if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) === archetype) return seed;
   }
   throw new Error(`nenhuma seed proxima de ${base} com ${archetype} no setor final`);
 };
@@ -134,7 +134,7 @@ describe('Bispo — onde ele mora', () => {
     // A linhagem hidrica termina em Aquifero + Matriz Micelial: o Bispo e o
     // chefe DALI — nao mais "o chefe obrigatorio do setor 2".
     const seed = seedWithFinalBoss('bishop');
-    expect(archetypesOf(createRun({ seed, sector: SECTOR_COUNT }))).toContain('bishop');
+    expect(archetypesOf(createRun({ seed, sector: DEFAULT_SECTOR_COUNT }))).toContain('bishop');
   });
 
   it('o setor 1 nunca tem chefe, e o do meio tambem nao', () => {
@@ -149,7 +149,7 @@ describe('Bispo — onde ele mora', () => {
 
   it('ha UM chefe no setor final, nunca dois', () => {
     for (const seed of [seedWithFinalBoss('bishop'), seedWithFinalBoss('guardian')]) {
-      const kinds = archetypesOf(createRun({ seed, sector: SECTOR_COUNT }));
+      const kinds = archetypesOf(createRun({ seed, sector: DEFAULT_SECTOR_COUNT }));
       const bosses = kinds.filter((k) => k === 'bishop' || k === 'guardian');
       expect(bosses.length, `seed ${seed}`).toBe(1);
     }

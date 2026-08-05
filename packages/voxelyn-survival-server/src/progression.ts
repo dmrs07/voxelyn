@@ -23,11 +23,13 @@ import {
   generationsReached,
   isValidUpgradeSet,
   normalizeUpgradeIds,
+  runDepthForGeneration,
   UPGRADES,
   type EnemyArchetype,
   type LoreFragmentId,
   type PlayerTuning,
   type ProspectorGeneration,
+  type RunDepthConfig,
   type RunPhase,
   type UpgradeId,
 } from '@voxelyn/survival-sim';
@@ -294,6 +296,17 @@ export const publicProfile = (profile: StoredProfile): PublicProgressionProfile 
 export const tuningForProfile = (profile: StoredProfile): PlayerTuning =>
   derivePlayerTuning(profile.purchasedUpgradeIds);
 
+/**
+ * A PROFUNDIDADE que este perfil autoriza — a segunda metade do ticket.
+ *
+ * Deriva da mesma fonte que tudo o mais: a lista de protocolos comprados. A
+ * geracao NAO e lida de um campo do perfil porque nao existe campo nenhum (ver
+ * `StoredProfile`); ela e derivada, e derivar duas vezes do mesmo dado e a
+ * unica forma de as duas respostas nunca discordarem.
+ */
+export const depthForProfile = (profile: StoredProfile): RunDepthConfig =>
+  runDepthForGeneration(deriveGeneration(profile.purchasedUpgradeIds));
+
 // ---------------------------------------------------------------------------
 // Ledger
 // ---------------------------------------------------------------------------
@@ -327,18 +340,30 @@ export type ProgressionLedgerEntry =
 /**
  * A recompensa, calculada SOMENTE a partir do replay canonico.
  *
- * Nenhum parametro desta funcao pode vir do cliente: `phase` e `cargoOre` saem
- * do estado terminal que o servidor re-simulou. E o coracao da politica —
- * morrer perde tudo, extrair salva o minerio, e so o nucleo compra futuro.
+ * Nenhum parametro desta funcao pode vir do cliente: `phase`, `cargoOre` e
+ * `cores` saem do estado terminal que o servidor re-simulou. E o coracao da
+ * politica — morrer perde tudo, extrair salva o minerio, e so o nucleo compra
+ * futuro.
+ *
+ * `cores` entrou quando uma run passou a poder render DOIS: G-03 e G-04 tem um
+ * Nucleo no setor 3 e outro no final. Antes disso a funcao devolvia o literal
+ * `1` para `extracted_with_core`, o que era a mesma coisa enquanto so havia um
+ * Nucleo e viraria uma perda silenciosa de metade da recompensa depois. O
+ * saneamento (inteiro, nao-negativo) fica aqui e nao no chamador porque este e
+ * o unico lugar que decide quanto entra na carteira.
  */
 export type RunReward = { ore: number; cores: number; lost: number };
 
-export const rewardFor = (phase: RunPhase, cargoOre: number): RunReward => {
+export const rewardFor = (phase: RunPhase, cargoOre: number, cores = 0): RunReward => {
+  const recovered = Math.max(0, Math.floor(cores) || 0);
   switch (phase) {
     case 'extracted':
+      // Extraiu sem Nucleo nenhum: o minerio e da equipe, o resto ficou la.
       return { ore: cargoOre, cores: 0, lost: 0 };
     case 'extracted_with_core':
-      return { ore: cargoOre, cores: 1, lost: 0 };
+      // A fase ja garante ao menos um; o piso existe para que um replay de
+      // versao antiga (sem `cores` no resumo) nao credite zero por omissao.
+      return { ore: cargoOre, cores: Math.max(1, recovered), lost: 0 };
     case 'dead':
       return { ore: 0, cores: 0, lost: cargoOre };
     // Uma run que nao terminou nao e liquidavel; quem chama ja barrou antes.

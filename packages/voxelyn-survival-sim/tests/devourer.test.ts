@@ -20,7 +20,7 @@ import {
   DEVOURER_LEAP_MAX_RANGE,
   DEVOURER_LEAP_MIN_RANGE,
   DEVOURER_LEAPS_PER_CYCLE,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SURF_GLASS,
   SURF_NONE,
@@ -79,8 +79,8 @@ describe('Devorador Branco — onde ele mora', () => {
   it('quando a linhagem termina em silica, ele esta na camara', () => {
     let found = false;
     for (let seed = 1; seed <= 300 && !found; seed++) {
-      if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) !== 'white_devourer') continue;
-      const state = createRun({ seed, sector: SECTOR_COUNT });
+      if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) !== 'white_devourer') continue;
+      const state = createRun({ seed, sector: DEFAULT_SECTOR_COUNT });
       found = state.enemies.some((e) => e.archetype === 'white_devourer');
       expect(found, `seed ${seed}: sumidouro sem Devorador`).toBe(true);
     }

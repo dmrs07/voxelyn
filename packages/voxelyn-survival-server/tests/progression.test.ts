@@ -529,13 +529,16 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 123 documentos: 30 protocolos, 4 marcos, 47 de Ativo, 24 Descobertas, 17 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(123);
+  it('tem 127 documentos: 30 protocolos, 8 por geracao, 47 de Ativo, 24 Descobertas, 17 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(127);
     // A contagem de Ativo = 15 fichas + as trilhas de ASSET_MILESTONE_LORE,
     // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
-    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 4 + 1 + 23 + ASSET_MILESTONE_LORE.length + 24 + 17);
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 23 + ASSET_MILESTONE_LORE.length + 24 + 17);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
+    // OITO por geracao: os quatro marcos de homologacao do chassi
+    // (`AX-GEN-*`) e as quatro autorizacoes de descida, que sao documentos
+    // sobre o VEIO e nao sobre a unidade — mesmo gatilho, assuntos distintos.
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(8);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
       23 + ASSET_MILESTONE_LORE.length,
     );

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BLEEDOUT_TICKS } from '../src/constants';
+import { BLEEDOUT_TICKS, DEFAULT_SECTOR_COUNT } from '../src/constants';
+import { countCoresTaken, isCoreTaken, markCoreTaken } from '../src/depth';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
 import type { PlayerCommand, SurvivalState } from '../src/types';
 
@@ -225,12 +226,23 @@ describe('co-op: multiplayer na simulacao', () => {
   });
 });
 
+/**
+ * Poe o Nucleo do setor final na mao de um slot, como se ele o tivesse
+ * recolhido. Tres escritas em par (mascara da run, mascara do portador,
+ * booleano derivado) — e por isso e um helper e nao tres linhas repetidas:
+ * esquecer uma delas produziria um estado que a simulacao nunca cria.
+ */
+const giveCore = (state: SurvivalState, slot: number): void => {
+  markCoreTaken(state, DEFAULT_SECTOR_COUNT);
+  state.playerExtras[slot].carriedCoreMask |= 1 << DEFAULT_SECTOR_COUNT;
+  state.playerExtras[slot].hasCore = true;
+};
+
 describe('nucleo e morte do portador', () => {
   it('portador que sangra ate morrer devolve o nucleo ao mundo', () => {
     const state = createRun({ seed: 7, playerCount: 2 });
     // slot 1 pegou o nucleo e esta abatido, prestes a sangrar
-    state.coreTaken = true;
-    state.playerExtras[1].hasCore = true;
+    giveCore(state, 1);
     state.playerExtras[1].downed = true;
     state.playerExtras[1].bleedoutAt = state.tick + 1;
     state.players[1].hp = 0;
@@ -239,14 +251,15 @@ describe('nucleo e morte do portador', () => {
 
     expect(state.players[1].alive).toBe(false);
     expect(state.playerExtras[1].hasCore).toBe(false);
-    expect(state.coreTaken).toBe(false); // recuperavel pelo parceiro
+    // recuperavel pelo parceiro: o pedestal DAQUELE setor reabre
+    expect(isCoreTaken(state, DEFAULT_SECTOR_COUNT)).toBe(false);
+    expect(countCoresTaken(state)).toBe(0);
   });
 
   it('parceiro sobrevivente NAO extrai com nucleo que nao carrega', () => {
     const state = createRun({ seed: 7, playerCount: 2 });
     state.enemies = [];
-    state.coreTaken = true;
-    state.playerExtras[1].hasCore = true;
+    giveCore(state, 1);
     state.playerExtras[1].downed = true;
     state.playerExtras[1].bleedoutAt = state.tick + 1;
     state.players[1].hp = 0;
@@ -266,8 +279,7 @@ describe('nucleo e morte do portador', () => {
 
   it('morte solo tambem devolve o nucleo (estado consistente)', () => {
     const state = createRun({ seed: 7, playerCount: 1 });
-    state.coreTaken = true;
-    state.playerExtra.hasCore = true;
+    giveCore(state, 0);
     state.player.hp = 1;
     const w = state.config.width;
     const i = Math.floor(state.player.y) * w + Math.floor(state.player.x);
@@ -277,6 +289,6 @@ describe('nucleo e morte do portador', () => {
 
     expect(state.phase).toBe('dead');
     expect(state.playerExtra.hasCore).toBe(false);
-    expect(state.coreTaken).toBe(false);
+    expect(countCoresTaken(state)).toBe(0);
   });
 });

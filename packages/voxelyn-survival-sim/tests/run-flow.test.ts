@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { GUARDIAN_SUMMON_COUNT, SECTOR_COUNT, SOLID_NONE } from '../src/constants';
+import { GUARDIAN_SUMMON_COUNT, DEFAULT_SECTOR_COUNT, SOLID_NONE } from '../src/constants';
 import { BOSS_PHASE_SUMMON } from '../src/types';
 import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import { createRun, emptyCommand, stepRun } from '../src/run';
+import { countCoresTaken, markSectorBossDown } from '../src/depth';
 import { spawnEnemy } from '../src/entities';
 import { grantOrRechargeModule } from '../src/modules';
 import type { SurvivalState } from '../src/types';
@@ -16,7 +17,7 @@ const stepIdle = (state: SurvivalState, ticks: number): void => {
 /** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
 const guardianSeed = (base: number): number => {
   for (let seed = base; seed < base + 4096; seed++) {
-    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+    if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) === 'guardian') return seed;
   }
   throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
 };
@@ -60,14 +61,17 @@ describe('fluxo da run', () => {
 
   it('pegar o nucleo e extrair encerra como "extracted_with_core"', () => {
     // Setor final: e o unico com nucleo. Nos anteriores o mesmo ponto e o poco.
-    const state = createRun({ seed: guardianSeed(11), sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(11), sector: DEFAULT_SECTOR_COUNT });
+    // O selo do setor cede primeiro: o pedestal so aceita a mao depois de o
+    // dono cair (ver depth.ts, coreUnlocked).
+    markSectorBossDown(state, state.sector);
     // teleporta o jogador ao pedestal (atalho de teste; interacao é autoritativa)
     state.player.x = state.corePos.x + 0.5;
     state.player.y = state.corePos.y + 0.5;
     const grab = emptyCommand();
     grab.interact = true;
     const result = stepRun(state, [grab]);
-    expect(state.coreTaken).toBe(true);
+    expect(countCoresTaken(state)).toBe(1);
     expect(state.playerExtra.hasCore).toBe(true);
     expect(result.events.some((e) => e.t === 'pickup_core')).toBe(true);
 
@@ -81,7 +85,7 @@ describe('fluxo da run', () => {
     extract.interact = true;
     stepRun(state, [extract]);
     expect(state.phase).toBe('running');
-    expect(state.sector).toBe(SECTOR_COUNT - 1);
+    expect(state.sector).toBe(DEFAULT_SECTOR_COUNT - 1);
   });
 
   it('cofre abre uma unica vez e a escolha privada aplica exatamente um modulo', () => {
@@ -112,7 +116,7 @@ describe('fluxo da run', () => {
   });
 
   it('o guardiao existe, esta vivo e proximo do nucleo', () => {
-    const state = createRun({ seed: guardianSeed(11), sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(11), sector: DEFAULT_SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     expect(guardian!.alive).toBe(true);
@@ -140,7 +144,7 @@ describe('fluxo da run', () => {
 
 describe('guardiao: invocacao de 50%', () => {
   it('nao e bloqueada por um stalker spawnado antes (id maior que o do guardiao)', () => {
-    const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: DEFAULT_SECTOR_COUNT });
     // acorda o guardiao e o coloca abaixo de 50%
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian, 'seed sem guardiao').toBeDefined();
@@ -168,7 +172,7 @@ describe('guardiao: invocacao de 50%', () => {
   });
 
   it('invoca uma unica vez, mesmo com o guardiao muito tempo abaixo de 50%', () => {
-    const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: DEFAULT_SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
     state.bossRuntime.awake = true;
     guardian.hp = guardian.maxHp * 0.3;

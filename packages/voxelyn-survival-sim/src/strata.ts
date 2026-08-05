@@ -24,7 +24,7 @@
 // setor N precisa ser conhecivel por um cliente que reconecta no meio da run e
 // reconstroi o mundo com `createRun({ sector: N })`, antes de qualquer tick.
 
-import { MINER_PER_SECTOR, SECTOR_COUNT } from './constants.js';
+import { MAX_LINEAGE_SECTORS, MINER_PER_SECTOR } from './constants.js';
 import type { EnemyArchetype } from './types.js';
 import type { WorldgenProfile } from './worldgen.js';
 
@@ -115,7 +115,18 @@ export type SectorBiome = {
 };
 
 /**
- * As linhagens da primeira leva, setor a setor.
+ * As linhagens, setor a setor — SETE posicoes cada uma.
+ *
+ * A tabela tem sete entradas e nao tres porque o comprimento POTENCIAL da
+ * linhagem deixou de ser o mesmo numero que a profundidade acessivel da run.
+ * Uma run de G-01 le as posicoes 1-3; uma de G-02, 1-4; G-03, 1-5; G-04, as
+ * sete. As posicoes 1-3 sao EXATAMENTE as historicas em toda linhagem: uma
+ * seed antiga com autorizacao de tres setores produz o mesmo mapa de sempre.
+ *
+ * A metade profunda nao e a repeticao da rasa. Cada linhagem ganha uma volta
+ * — uma segunda colonia mais fundo, uma camara da Aurix dentro da catedral, um
+ * pulmao de gas entre duas fornalhas — porque tres setores iguais ao fim de uma
+ * descida de sete leem como mapa faltando conteudo, e nao como profundidade.
  *
  * - hidrica: Galeria Umida -> Aquifero Negro -> Abismo Micelial. A agua
  *   aumenta, as rotas secas desaparecem, a vida domina.
@@ -142,30 +153,85 @@ export type SectorBiome = {
  *   continuam valendo, entao ela tambem termina no Bispo ou no Diamandis
  *   quando alguma delas toma o fundo.
  */
-const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation: OccupationId }>> = {
+type LineageStep = {
+  stratum: StratumId;
+  occupation: OccupationId;
+  /**
+   * O nome editorial da posicao, em pt-BR.
+   *
+   * Ele nao decide nada da simulacao — o estrato e a ocupacao decidem tudo —
+   * mas mora AQUI e nao no cliente porque e a curva da linhagem escrita por
+   * extenso, e ela e o unico jeito de ler a tabela e saber se o quinto setor
+   * diz alguma coisa nova. Um segundo arquivo de nomes desalinharia na
+   * primeira vez que alguem trocasse um estrato.
+   */
+  title: string;
+};
+
+/** Uma linhagem resolve SETE posicoes. Quantas a run visita e outra coisa. */
+type LineageTable = readonly [
+  LineageStep,
+  LineageStep,
+  LineageStep,
+  LineageStep,
+  LineageStep,
+  LineageStep,
+  LineageStep,
+];
+
+const LINEAGES: Record<LineageId, LineageTable> = {
   hydric: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'aquifer', occupation: 'none' },
-    { stratum: 'aquifer', occupation: 'mycelial' },
+    { stratum: 'basalt', occupation: 'none', title: 'Galerias Umidas' },
+    { stratum: 'aquifer', occupation: 'none', title: 'Aquifero Superior' },
+    { stratum: 'aquifer', occupation: 'mycelial', title: 'Reservatorio Negro' },
+    { stratum: 'aquifer', occupation: 'none', title: 'Galerias Submersas' },
+    { stratum: 'aquifer', occupation: 'none', title: 'Lencol Profundo' },
+    // A colonia volta MAIS FUNDO, e nao e a mesma do setor 3: la ela tinha
+    // tomado um reservatorio; aqui ela e o proprio lencol. E o unico jeito de
+    // a linhagem hidrica ter dois encontros miceliais sem repetir o primeiro.
+    { stratum: 'aquifer', occupation: 'mycelial', title: 'Colonia Abissal' },
+    { stratum: 'aquifer', occupation: 'none', title: 'Fossa do Aquifero' },
   ],
   mineral: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'prismatic', occupation: 'none' },
-    { stratum: 'prismatic', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none', title: 'Basalto Cristalizado' },
+    { stratum: 'prismatic', occupation: 'none', title: 'Galerias Prismaticas' },
+    { stratum: 'prismatic', occupation: 'none', title: 'Catedral Prismatica' },
+    { stratum: 'prismatic', occupation: 'none', title: 'Nervuras Ressonantes' },
+    { stratum: 'prismatic', occupation: 'none', title: 'Coro Mineral' },
+    // A Aurix montou uma camara de LEITURA aqui: a ressonancia do estrato era
+    // dado, e dado se mede. A cicatriz industrial dentro da catedral e o que
+    // impede a metade profunda da linhagem de ser a mesma nave seis vezes.
+    { stratum: 'prismatic', occupation: 'aurix', title: 'Camara de Reflexao' },
+    { stratum: 'prismatic', occupation: 'none', title: 'Coracao Ressonante' },
   ],
   industrial: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'ferric', occupation: 'aurix' },
-    { stratum: 'ferric', occupation: 'aurix' },
+    { stratum: 'basalt', occupation: 'none', title: 'Escavacao Inicial' },
+    { stratum: 'ferric', occupation: 'aurix', title: 'Galerias Ferriferas' },
+    { stratum: 'ferric', occupation: 'aurix', title: 'Complexo Aurix' },
+    { stratum: 'ferric', occupation: 'aurix', title: 'Linha de Extracao' },
+    { stratum: 'ferric', occupation: 'aurix', title: 'Cicatriz Aurix' },
+    { stratum: 'ferric', occupation: 'aurix', title: 'Instalacao de Recuperacao' },
+    // O fundo da industrial NAO tem ocupacao, e e a unica posicao da linhagem
+    // sem ela. O poco leva o nome da maquina que o abriu, mas a operacao parou
+    // antes de chegar aqui: o que reina no fim e o VEIO — a formacao que
+    // justificou tudo, e o Magnetarca com ela. Sem esta linha a linhagem
+    // enfrentaria o Diamandis duas vezes na mesma run de G-04.
+    { stratum: 'ferric', occupation: 'none', title: 'Poco Diamandis' },
   ],
   thermal: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'sulfur', occupation: 'none' },
-    { stratum: 'furnace', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none', title: 'Basalto Fraturado' },
+    { stratum: 'sulfur', occupation: 'none', title: 'Fenda Sulfurosa' },
+    { stratum: 'furnace', occupation: 'none', title: 'Camara de Ventilacao' },
+    { stratum: 'furnace', occupation: 'none', title: 'Galeria Carbonizada' },
+    // A Fenda volta MAIS FUNDA no meio da descida: o gas nao acaba porque a
+    // rocha esquentou, ele se concentra. E o respiro entre duas fornalhas.
+    { stratum: 'sulfur', occupation: 'none', title: 'Pulmao Profundo' },
+    { stratum: 'furnace', occupation: 'none', title: 'Mar de Escoria' },
+    { stratum: 'furnace', occupation: 'none', title: 'Coracao da Fornalha' },
   ],
   arid: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'silica', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none', title: 'Basalto Seco' },
+    { stratum: 'silica', occupation: 'none', title: 'Silica Fraturada' },
     // A arida termina NA SILICA, e nao mais na Fornalha.
     //
     // A tabela antiga era basalto -> silica -> fornalha ("a silica vitrifica
@@ -179,21 +245,33 @@ const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation
     // (mineral, industrial e crio dobram o seu no fim), e a Fornalha continua
     // tendo o caminho dela pela termica. O que se perde e o segundo acesso a
     // Fornalha; o que se ganha e o encontro que o estrato sempre prometeu.
-    { stratum: 'silica', occupation: 'none' },
+    { stratum: 'silica', occupation: 'none', title: 'Sumidouros de Silica' },
+    { stratum: 'silica', occupation: 'none', title: 'Galerias Moveis' },
+    { stratum: 'silica', occupation: 'none', title: 'Deserto Subterraneo' },
+    { stratum: 'silica', occupation: 'none', title: 'Silica Vitrificada' },
+    { stratum: 'silica', occupation: 'none', title: 'Ninho do Devorador' },
   ],
   cryo: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'glacial', occupation: 'none' },
-    { stratum: 'glacial', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none', title: 'Basalto Frio' },
+    { stratum: 'glacial', occupation: 'none', title: 'Galerias de Geada' },
+    { stratum: 'glacial', occupation: 'none', title: 'Cripta Glacial' },
+    { stratum: 'glacial', occupation: 'none', title: 'Lencol Congelado' },
+    { stratum: 'glacial', occupation: 'none', title: 'Camara dos Ecos' },
+    { stratum: 'glacial', occupation: 'none', title: 'Palacio de Gelo' },
+    { stratum: 'glacial', occupation: 'none', title: 'Trono da Geada' },
   ],
   basaltic: [
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'basalt', occupation: 'none' },
-    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none', title: 'Galerias de Basalto' },
+    { stratum: 'basalt', occupation: 'none', title: 'Galerias Inferiores' },
+    { stratum: 'basalt', occupation: 'none', title: 'Camara do Guardiao' },
+    { stratum: 'basalt', occupation: 'none', title: 'Fratura Basaltica' },
+    { stratum: 'basalt', occupation: 'none', title: 'Colunata Profunda' },
+    { stratum: 'basalt', occupation: 'none', title: 'Anfiteatro Negro' },
+    { stratum: 'basalt', occupation: 'none', title: 'Raiz do Veio' },
   ],
 };
 
-const LINEAGE_ORDER: readonly LineageId[] = [
+export const LINEAGE_IDS: readonly LineageId[] = [
   'hydric',
   'mineral',
   'industrial',
@@ -212,7 +290,7 @@ const mix32 = (a: number, b: number): number =>
 
 /** Linhagem da run. Funcao pura da seed. */
 export const lineageOf = (runSeed: number): LineageId =>
-  LINEAGE_ORDER[mix32(runSeed >>> 0, 0x11d3a6e5) % LINEAGE_ORDER.length];
+  LINEAGE_IDS[mix32(runSeed >>> 0, 0x11d3a6e5) % LINEAGE_IDS.length];
 
 /**
  * Bioma do setor N da run.
@@ -226,8 +304,8 @@ export const lineageOf = (runSeed: number): LineageId =>
 export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
   const lineage = lineageOf(runSeed);
   const table = LINEAGES[lineage];
-  const clamped = Math.max(1, Math.min(SECTOR_COUNT, sector));
-  const base = table[Math.min(clamped, table.length) - 1];
+  const clamped = Math.max(1, Math.min(MAX_LINEAGE_SECTORS, sector));
+  const base = table[clamped - 1];
 
   let occupation = base.occupation;
   if (occupation === 'none' && clamped >= 2) {
@@ -240,6 +318,59 @@ export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
   // abandonados sao exatamente o que a operacao deixaria num estrato assim.
   if (occupation === 'mycelial' && base.stratum === 'furnace') occupation = 'aurix';
   return { stratum: base.stratum, occupation, lineage };
+};
+
+/**
+ * O nome editorial da posicao N da linhagem. Funcao pura, como tudo aqui.
+ *
+ * Existe para o anuncio de setor poder dizer "Lencol Profundo" em vez de
+ * repetir "Aquifero Negro" quatro vezes numa run de sete setores. O cliente
+ * traduz o que quiser em cima disto; a simulacao so responde qual posicao e.
+ */
+export const sectorTitle = (runSeed: number, sector: number): string =>
+  LINEAGES[lineageOf(runSeed)][
+    Math.max(1, Math.min(MAX_LINEAGE_SECTORS, sector)) - 1
+  ].title;
+
+/**
+ * A INTENSIDADE de profundidade que os perfis de worldgen leem.
+ *
+ * Duas exigencias se cruzam aqui e a funcao existe para atende-las juntas.
+ *
+ * 1. Os tres primeiros setores nao podem mudar. A intensidade e IDENTICA ao
+ *    indice cru (`sector - 1`) ate o terceiro, entao uma seed jogada antes da
+ *    expansao gera o mesmo mapa depois dela — e a mesma seed em G-01 e em G-04
+ *    gera os mesmos tres primeiros setores, que e a promessa da spec.
+ * 2. A partir do quarto a inclinacao CAI PELA METADE. Multiplicar densidade
+ *    linearmente ate o setimo entregaria uma Catedral com um terco de cristal
+ *    no chao e um Aquifero sem chao seco — profundidade lida como caos, e nao
+ *    como pressao. O que cresce fundo e a COMPOSICAO (ver `biomeMix`), o chefe
+ *    e o Nucleo selado; a densidade acompanha de longe.
+ *
+ *   setor       1  2  3  4  5  6  7
+ *   intensidade 0  1  2  3  3  4  4
+ *
+ * Inteiro de proposito: os perfis multiplicam contagens de blob por ela, e
+ * meio blob nao existe.
+ */
+export const depthIntensity = (sector: number): number => {
+  const index = Math.max(0, Math.min(MAX_LINEAGE_SECTORS - 1, Math.trunc(sector) - 1));
+  return index <= 2 ? index : 2 + Math.ceil((index - 2) / 2);
+};
+
+/**
+ * A profundidade PROPORCIONAL da run, 0 na entrada e 1 no ultimo setor.
+ *
+ * Ao contrario de `depthIntensity`, esta depende do total acessivel: ela
+ * responde "quanto da descida ja foi", que e uma pergunta sobre a RUN e nao
+ * sobre o Veio. Serve a apresentacao e a quem precisa de uma escala relativa;
+ * nunca ao worldgen, que teria de produzir mapas diferentes para a mesma seed
+ * em geracoes diferentes se lesse daqui.
+ */
+export const normalizedDepth = (sector: number, sectorCount: number): number => {
+  if (sectorCount <= 1) return 1;
+  const index = Math.max(0, Math.min(sectorCount - 1, sector - 1));
+  return index / (sectorCount - 1);
 };
 
 /**
@@ -258,7 +389,11 @@ export const sectorBiome = (runSeed: number, sector: number): SectorBiome => {
  * removido de proposito por violar exatamente isto.)
  */
 export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfile => {
-  const depth = Math.max(0, Math.min(SECTOR_COUNT - 1, sector - 1));
+  // `depthIntensity` e nao `sector - 1`: ver a funcao. Os tres primeiros
+  // setores mantem o valor historico (0, 1, 2) e a inclinacao cai pela metade
+  // depois, entao o setimo setor e mais denso que o terceiro sem ser o triplo
+  // dele.
+  const depth = depthIntensity(sector);
 
   // Base: Galerias de Basalto — os valores historicos do worldgen.
   const profile: WorldgenProfile = {
@@ -411,7 +546,9 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
  * mistura, como o SECTOR_MIX historico fazia.
  */
 export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArchetype[] => {
-  const depth = Math.max(1, Math.min(SECTOR_COUNT, sector));
+  // Mesma escada de `depthIntensity`, deslocada para 1: setores 1, 2 e 3 leem
+  // 1, 2 e 3 como sempre leram, e a metade profunda vive no ramo mais duro.
+  const depth = depthIntensity(sector) + 1;
 
   let mix: EnemyArchetype[];
   if (biome.stratum === 'prismatic') {
@@ -461,7 +598,34 @@ export const biomeMix = (biome: SectorBiome, sector: number): readonly EnemyArch
     // densidade e a coisa que menos deveria variar por ocupacao.
     mix = mix.map((arch, i) => (i % 3 === 2 ? (i % 2 === 0 ? 'spitter' : 'bomber') : arch));
   }
+  if (sector >= DEEP_SECTOR) {
+    // A metade profunda nao ganha MAIS bichos — ganha uma composicao que uma
+    // resposta so nao cobre. Trocar uma vaga em cada quatro pelo contraponto do
+    // arquetipo (corpo a corpo vira alcance, alcance vira corpo a corpo)
+    // significa que nenhuma faixa da arena fica confortavel: recuar encontra
+    // quem atira, avancar encontra quem prensa.
+    //
+    // Mesmo tamanho de lista, mesma ordem de RNG, mesma densidade. E a unica
+    // forma de escalar que nao termina em vida inflada.
+    mix = mix.map((arch, i) => (i % 4 === 1 ? (DEEP_COUNTERPART[arch] ?? arch) : arch));
+  }
   return mix;
+};
+
+/** A partir daqui a run deixou de ser uma descida de tres setores. */
+const DEEP_SECTOR = 5;
+
+/**
+ * O contraponto de cada arquetipo comum: quem responde ao jeito de lutar que o
+ * original convida. Fechado nos arquetipos que aparecem em MISTURA — chefes,
+ * assinaturas e o Cavalo entram por outros caminhos e nao passam por aqui.
+ */
+const DEEP_COUNTERPART: Partial<Record<EnemyArchetype, EnemyArchetype>> = {
+  stalker: 'bruiser',
+  bruiser: 'spitter',
+  spitter: 'bomber',
+  bomber: 'bruiser',
+  sulfur_bomber: 'bruiser',
 };
 
 /**

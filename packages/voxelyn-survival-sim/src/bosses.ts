@@ -11,10 +11,15 @@
 //    Bispo; a Cicatriz Aurix traz o Diamandis).
 // 2. Sem ocupacao dominante, entra o chefe natural do estrato.
 //
-// E ha UM chefe por run, no setor FINAL da linhagem. Um chefe em cada setor
-// fragmentaria toda descida em tres paradas obrigatorias; os setores anteriores
-// continuam com a fauna de assinatura como identidade. O primeiro setor NUNCA
-// tem chefe: e onde a run ensina, nao onde cobra.
+// E a POSICAO decide se ha chefe, nunca quem ele e: ver `sectorHoldsBoss`. Um
+// chefe em cada setor fragmentaria a descida numa fila de paradas obrigatorias,
+// entao so o ultimo setor e os setores de NUCLEO tem dono — os demais continuam
+// com a fauna de assinatura como identidade. O primeiro setor NUNCA tem chefe:
+// e onde a run ensina, nao onde cobra.
+//
+// Numa run de tres setores isso da exatamente o que sempre deu: um chefe, no
+// terceiro. E de G-03 em diante da dois, porque de G-03 em diante ha dois
+// Nucleos, e um Nucleo sem selo nao e um objetivo.
 //
 // A tabela completa (a maioria ainda por implementar — ver IMPLEMENTED_BOSS):
 //
@@ -97,7 +102,7 @@ export type BossBiome = {
   stratum: StratumId;
   occupation: OccupationId;
   /**
-   * Profundidade do setor (1..SECTOR_COUNT). Hoje nao muda a ESCOLHA — quem
+   * Profundidade do setor (1..MAX_LINEAGE_SECTORS). Hoje nao muda a ESCOLHA — quem
    * escolhe e a dupla estrato x ocupacao — mas viaja na assinatura porque e o
    * eixo natural de tuning futuro (fase extra, vida, elite) e mudar a
    * assinatura depois cobraria de todo chamador.
@@ -146,6 +151,91 @@ export const BOSS_ARCHETYPES: readonly EnemyArchetype[] = [
 export const isBossArchetype = (archetype: EnemyArchetype | 'prospector'): boolean =>
   BOSS_ARCHETYPES.includes(archetype as EnemyArchetype);
 
-/** O arquetipo que a camara final do bioma recebe HOJE. */
-export const bossArchetypeForBiome = (biome: SectorBiome): EnemyArchetype =>
-  IMPLEMENTED_BOSS[bossForBiome(biome)] ?? 'guardian';
+/**
+ * O arquetipo que a camara do bioma recebe HOJE, ou `null`.
+ *
+ * `null` e uma resposta legitima e nao um erro: a tabela conceitual de chefes
+ * (`BossId`) e um espaco aberto, e um chefe novo entra nela antes de ganhar
+ * corpo. Ate la a camara dele fica VAZIA — nao ocupada pelo Guardiao.
+ *
+ * O fallback universal no Guardiao saiu de proposito. Ele era invisivel: uma
+ * linha da tabela sem arquetipo passava a rodar como Galerias de Basalto em
+ * todo bioma que a herdasse, e o defeito aparecia como "por que a Catedral tem
+ * um Guardiao" meses depois. Com `null`, o portal do setor simplesmente segue a
+ * regra normal de disponibilidade e nada finge estar implementado.
+ */
+export const bossArchetypeForBiome = (biome: SectorBiome): EnemyArchetype | null =>
+  IMPLEMENTED_BOSS[bossForBiome(biome)] ?? null;
+
+/** De onde veio a autoridade do chefe deste setor. */
+export type SectorBossSource = 'stratum' | 'occupation' | 'lineage' | 'special';
+
+export type SectorBossDefinition = {
+  /** A identidade conceitual — existe mesmo quando o corpo ainda nao existe. */
+  boss: BossId;
+  /** O corpo que vai nascer na camara. `null` = conceito sem arquetipo ainda. */
+  archetype: EnemyArchetype | null;
+  source: SectorBossSource;
+};
+
+/**
+ * Este setor GUARDA alguma coisa? — a regra de posicao, sem olhar o bioma.
+ *
+ * Duas linhas, e as duas dizem a mesma coisa por dois motivos diferentes:
+ *
+ * - o ULTIMO setor da run tem chefe porque e o fundo, e o fundo e onde a
+ *   descida cobra o que prometeu;
+ * - um setor de NUCLEO tem chefe porque o Nucleo esta selado, e o selo precisa
+ *   de um dono. Um pedestal que qualquer um alcanca nao e um objetivo, e uma
+ *   parada.
+ *
+ * O setor 1 nunca tem chefe, e a excecao vem antes das duas: e onde a run
+ * ensina, nao onde ela cobra. (Nenhuma geracao poe Nucleo no setor 1, entao a
+ * guarda e redundante hoje — ela existe para continuar verdadeira se alguem
+ * mudar a tabela de Nucleos.)
+ *
+ * Consequencia por geracao, que e o desenho inteiro numa tabela:
+ *
+ *   G-00/G-01  3 setores  chefe no 3               (identico ao historico)
+ *   G-02       4 setores  chefe no 4
+ *   G-03       5 setores  chefes no 3 e no 5
+ *   G-04       7 setores  chefes no 3 e no 7
+ */
+export const sectorHoldsBoss = (
+  sector: number,
+  sectorCount: number,
+  coreSectors: readonly number[],
+): boolean => {
+  if (sector <= 1) return false;
+  if (sector > sectorCount) return false;
+  return sector === sectorCount || coreSectors.includes(sector);
+};
+
+/**
+ * O chefe do setor N de uma run, resolvido de forma DETERMINISTICA.
+ *
+ * Puro em (bioma, posicao, profundidade congelada): nao consome RNG, nao olha o
+ * estado e nao depende de o jogador ja ter estado la. E o que permite ao cliente
+ * que reconecta no setor 6 saber quem mora ali antes do primeiro tick, e ao
+ * replay reproduzir a mesma camara.
+ *
+ * A ESCOLHA de quem e continua sendo `bossForBiome` — ocupacao forte primeiro,
+ * depois o dono do estrato. A posicao decide SE ha chefe; o bioma decide QUEM.
+ * Foi assim que a spec dos biomas deixou o assunto e nao ha razao para mudar:
+ * a mesma Catedral Prismatica no setor 3 de uma run de G-04 e no setor 3 de uma
+ * run de G-03 tem o mesmo Arquicantor.
+ */
+export const bossForSector = (
+  biome: SectorBiome,
+  sector: number,
+  sectorCount: number,
+  coreSectors: readonly number[],
+): SectorBossDefinition | null => {
+  if (!sectorHoldsBoss(sector, sectorCount, coreSectors)) return null;
+  const boss = bossForBiome(biome);
+  return {
+    boss,
+    archetype: IMPLEMENTED_BOSS[boss] ?? null,
+    source: BOSS_OF_OCCUPATION[biome.occupation] ? 'occupation' : 'stratum',
+  };
+};

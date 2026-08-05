@@ -220,6 +220,8 @@ import {
 } from './constants.js';
 import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
+import { isBossArchetype } from './bosses.js';
+import { markSectorBossDown, runDepth } from './depth.js';
 import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
@@ -724,8 +726,21 @@ export const damageEntity = (
   // porque a extracao de retorno REGENERA o setor na subida: sem ela, quem
   // matou o Bispo para poder descer o encontrava inteiro na volta. Fauna
   // comum repovoar e a pressao prometida; um chefe repovoar apaga a conquista.
-  if (ent.archetype === 'bishop' || ent.archetype === 'guardian') {
-    state.bossesDown |= 1 << state.sector;
+  // "Esta entidade era o dono DESTE setor" tem uma definicao so, e ela e o
+  // `entityId` que `populateSector` guardou ao spawnar o chefe. Enumerar
+  // arquetipos a mao (`bishop || guardian`) ja errou: a tabela ganhou oito
+  // chefes e esta linha continuou marcando dois, entao o Arquicantor abatido
+  // renascia na subida e o portal do setor dele nunca destrancava.
+  if (state.sectorBoss.entityId === ent.id && isBossArchetype(ent.archetype)) {
+    markSectorBossDown(state, state.sector);
+    // O SELO CEDEU. Evento proprio, e nao o `death` reinterpretado: o cliente
+    // nao tem como saber sozinho que aquele cadaver era o dono do setor.
+    events.push({
+      t: 'sector_unsealed',
+      sector: state.sector,
+      archetype: ent.archetype as EnemyArchetype,
+      coreUnlocked: runDepth(state).coreSectors.includes(state.sector),
+    });
   }
   events.push({
     t: 'death',
@@ -3294,7 +3309,11 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // sem se mexer, cada tiro renovando um alerta que nao servia para nada.
       // Era exatamente a morte sem retaliacao que o aggro por dano existe para
       // impedir, preservada no unico inimigo em que ela mais doi.
-      if (state.coreTaken || dist < 7 || state.tick < enemy.alertedUntil) {
+      // O gatilho "o Nucleo saiu do pedestal" SAIU daqui, e a razao e que ele
+      // deixou de poder acontecer: desde que o pedestal passou a comecar selado
+      // pelo proprio chefe, ninguem toca no Nucleo com o dono de pe. Manter a
+      // condicao seria documentacao de uma ordem de eventos impossivel.
+      if (dist < 7 || state.tick < enemy.alertedUntil) {
         state.bossRuntime.awake = true;
         events.push({ t: 'boss_awake' });
       } else continue;

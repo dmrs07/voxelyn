@@ -84,6 +84,10 @@ export class NetClient {
       playerCount: current.config.playerCount,
       width: current.config.width,
       height: current.config.height,
+      // A profundidade da SALA atravessa a regeneracao: sem ela o espelho
+      // voltaria a tres setores e o HUD anunciaria "3/3" no meio de uma
+      // descida de sete.
+      depth: current.config.depth,
     });
     this.mirror = new ClientWorldMirror(
       current.config.width,
@@ -223,15 +227,25 @@ export class NetClient {
         this.resumeToken = msg.resumeToken;
         this.slot = msg.playerId - 1;
         this.activeRoomCode = msg.roomCode;
-        // `sector` e obrigatorio na geracao local: com tres setores por run, a
-        // seed sozinha deixou de identificar um mundo. Entrar numa sala ja no
+        // `sector` e obrigatorio na geracao local: com varios setores por run,
+        // a seed sozinha deixou de identificar um mundo. Entrar numa sala ja no
         // setor 2 gerando o mapa do setor 1 produziria divergencia imediata.
+        //
+        // E `depth` vem da SALA, nunca do perfil local: e a sala que decide
+        // quantos setores esta run tem, e um cliente que resolvesse isso
+        // sozinho desenharia outro denominador e geraria outro bioma no setor
+        // que ainda nem visitou.
         this.state = createRun({
           seed: msg.seed,
           sector: msg.sector,
           playerCount: 2,
           width: msg.worldWidth,
           height: msg.worldHeight,
+          depth: {
+            generation: msg.generation,
+            sectorCount: msg.sectorCount,
+            coreSectors: msg.coreSectors,
+          },
         });
         this.mirror = new ClientWorldMirror(msg.worldWidth, msg.worldHeight, this.state.solid, this.state.surface);
         // o renderer le as arrays do state; aponta-as para o espelho
@@ -352,8 +366,16 @@ export class NetClient {
       site.cacheRevealed = flags.cacheRevealed;
       site.cacheOpened = flags.cacheOpened;
     }
-    state.coreTaken = world.coreTaken;
+    state.coresTakenMask = world.coresTakenMask;
     state.bossRuntime.awake = world.bossAwake;
+    // O dono do setor e os selos vem RESOLVIDOS do servidor: o cliente nao
+    // reimplementa a regra de quem guarda o que, ele desenha o que a sala
+    // decidiu. `entityId` fica nulo — o espelho nunca precisa dele.
+    state.sectorBoss = {
+      archetype: world.activeBoss?.archetype ?? null,
+      entityId: null,
+      defeated: world.activeBoss?.defeated ?? false,
+    };
     // Substitui a lista inteira em vez de casar por indice: as ofertas nao tem
     // identidade estavel entre setores — elas nascem no poco e somem na descida —,
     // e um merge posicional deixaria um Eco do setor anterior no mapa novo.

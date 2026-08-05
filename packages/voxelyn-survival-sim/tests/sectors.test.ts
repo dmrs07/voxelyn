@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { isBossArchetype } from '../src/bosses';
 import {
   EXTRACT_RADIUS,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
-  TARGET_EXTRACTION_TICKS,
+  targetExtractionTicks,
   TARGET_SECTOR_TICKS,
   createRun,
   emptyCommand,
   hashAuthoritativeState,
+  isCoreTaken,
   isFinalSector,
+  markSectorBossDown,
   sectorSeed,
   stepRun,
 } from '../src/index.js';
@@ -32,7 +34,7 @@ describe('estrutura de setores', () => {
   it('a run comeca no primeiro setor, sem Guardiao nem nucleo', () => {
     const state = createRun({ seed: 101 });
     expect(state.sector).toBe(1);
-    expect(isFinalSector(1)).toBe(false);
+    expect(isFinalSector(1, DEFAULT_SECTOR_COUNT)).toBe(false);
     expect(state.enemies.some((e) => e.archetype === 'guardian')).toBe(false);
   });
 
@@ -40,10 +42,10 @@ describe('estrutura de setores', () => {
     // Quem e o chefe sai de `bossForBiome`; o que este teste protege e a
     // ESTRUTURA: um por run, no fim. Enumerar arquetipos a mao aqui fez o
     // teste mentir a cada chefe novo.
-    for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+    for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
       const state = createRun({ seed: 102, sector });
       const bosses = state.enemies.filter((e) => isBossArchetype(e.archetype));
-      expect(bosses.length, `setor ${sector}`).toBe(sector === SECTOR_COUNT ? 1 : 0);
+      expect(bosses.length, `setor ${sector}`).toBe(sector === DEFAULT_SECTOR_COUNT ? 1 : 0);
     }
   });
 
@@ -56,10 +58,11 @@ describe('estrutura de setores', () => {
   });
 
   it('no setor final o mesmo ponto entrega o nucleo, e nao uma descida', () => {
-    const state = createRun({ seed: 104, sector: SECTOR_COUNT });
+    const state = createRun({ seed: 104, sector: DEFAULT_SECTOR_COUNT });
+    markSectorBossDown(state, state.sector);
     const events = reachPit(state);
-    expect(state.sector).toBe(SECTOR_COUNT);
-    expect(state.coreTaken).toBe(true);
+    expect(state.sector).toBe(DEFAULT_SECTOR_COUNT);
+    expect(isCoreTaken(state, DEFAULT_SECTOR_COUNT)).toBe(true);
     expect(events.some((e) => e.t === 'pickup_core')).toBe(true);
   });
 
@@ -208,13 +211,13 @@ describe('determinismo com setores', () => {
 describe('tempo-alvo das tres estrelas', () => {
   // Derivado do numero de setores, e nao um numero solto: a run passou de um
   // mapa para tres, e um alvo fixo passaria a significar outra coisa se
-  // SECTOR_COUNT mudasse.
+  // DEFAULT_SECTOR_COUNT mudasse.
   it('escala com o numero de setores', () => {
-    expect(TARGET_EXTRACTION_TICKS).toBe(TARGET_SECTOR_TICKS * SECTOR_COUNT);
+    expect(targetExtractionTicks(DEFAULT_SECTOR_COUNT)).toBe(TARGET_SECTOR_TICKS * DEFAULT_SECTOR_COUNT);
   });
 
   it('cabe na promessa de 12 a 20 minutos', () => {
-    const minutes = TARGET_EXTRACTION_TICKS / (20 * 60);
+    const minutes = targetExtractionTicks(DEFAULT_SECTOR_COUNT) / (20 * 60);
     expect(minutes).toBeGreaterThanOrEqual(8);
     expect(minutes).toBeLessThanOrEqual(20);
   });

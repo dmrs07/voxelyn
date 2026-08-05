@@ -1,11 +1,13 @@
 import type {
   AbilityId,
   ActiveModule,
+  EnemyArchetype,
   EntityActionKind,
   EntityActionPhase,
   PendingModuleChoice,
   PlayerCommand,
   ProjectileKind,
+  ProspectorGeneration,
   RunPhase,
   RunSummary,
   SemanticEvent,
@@ -125,6 +127,8 @@ export type ViewerState = {
   activeModules: ActiveModule[];
   pendingModuleChoice: PendingModuleChoice | null;
   hasCore: boolean;
+  /** Quantos Nucleos ESTE jogador carrega. 0..2 hoje. */
+  coreCount: number;
   downed: boolean;
   aimX: number;
   aimY: number;
@@ -216,7 +220,36 @@ export type WellOfferFlags = {
 
 export type WorldFlags = {
   salvageSites: SalvageSiteFlags[];
+  /**
+   * ALGUM Nucleo da run ja saiu do pedestal.
+   *
+   * Continua booleano — e o que decide o prop do objetivo e o texto do
+   * objetivo — mas deixou de ser a verdade inteira desde que uma run de G-03
+   * ou G-04 tem dois. Quem precisa saber QUAIS le `coresTakenMask`.
+   */
   coreTaken: boolean;
+  /**
+   * MASCARA dos Nucleos ja recolhidos (bit N = setor N), e a lista de onde
+   * eles moram nesta run.
+   *
+   * Os dois viajam porque o HUD conta ("1 / 2 NUCLEOS") e o prop do pedestal
+   * do setor atual depende de o Nucleo DESTE setor ter saido — coisas que um
+   * booleano global responde errado assim que existe um segundo Nucleo.
+   */
+  coresTakenMask: number;
+  coreSectors: number[];
+  /**
+   * O selo deste setor. `descentUnlocked` false = o poco recusa; `coreUnlocked`
+   * false com Nucleo aqui = o pedestal recusa.
+   *
+   * Derivados no SERVIDOR e nao no cliente: o cliente nao conhece a regra de
+   * quem guarda o que, e se conhecesse teria uma segunda copia dela para
+   * divergir. O que ele faz com isto e desenhar — poco selado, aviso, objetivo.
+   */
+  descentUnlocked: boolean;
+  coreUnlocked: boolean;
+  /** O dono deste setor. `null` quando o setor nao tem chefe. */
+  activeBoss: { archetype: EnemyArchetype; defeated: boolean } | null;
   /**
    * O chefe do setor ja acordou.
    *
@@ -252,12 +285,28 @@ export type ServerWelcome = {
   /**
    * Setor em que a sala esta AGORA.
    *
-   * O cliente gera o mundo estatico localmente a partir da seed; com tres
+   * O cliente gera o mundo estatico localmente a partir da seed; com varios
    * setores por run, a seed sozinha deixou de bastar. Quem entra atrasado numa
    * sala ja no setor 2 geraria o mapa do setor 1 e receberia diffs de chunk
    * que nao casam com nada — divergencia imediata a cada entrada tardia.
    */
   sector: number;
+  /**
+   * A PROFUNDIDADE da sala: quantos setores esta run atravessa, onde estao os
+   * Nucleos, e sob que geracao ela foi autorizada.
+   *
+   * Viaja no handshake e nao e negociavel: a autoridade e da sala, nunca do
+   * cliente. Num co-op de dois perfis diferentes, o que vale e a configuracao
+   * que a sala congelou — sem isto cada cliente desenharia um denominador
+   * diferente no HUD e o segundo acharia que a run terminou cedo.
+   *
+   * O cliente PRECISA do total (e o denominador de "SETOR 2 / 7") e precisa
+   * saber onde ha Nucleo para desenhar o pedestal do setor em que esta. O que
+   * ele nao recebe e nada sobre o conteudo dos setores que ainda nao visitou.
+   */
+  sectorCount: number;
+  coreSectors: number[];
+  generation: ProspectorGeneration;
   worldWidth: number;
   worldHeight: number;
   // hash do estado estatico inicial gerado localmente pelo cliente (validacao)

@@ -287,7 +287,7 @@ describe('servidor autoritativo de co-op', () => {
     h.drain('A');
 
     const room = h.server.roomForClient('A')!;
-    room.state.coreTaken = true;
+    room.state.coresTakenMask |= 1 << room.state.config.depth.coreSectors[0];
     h.send('A', { t: 'resync', reason: 'divergencia' });
     h.tick(1);
     const msgs = h.drain('A');
@@ -586,8 +586,10 @@ describe('servidor autoritativo de co-op', () => {
       { id: 'explosive', lifetime: { kind: 'charges', remaining: 2, maximum: 6 } },
     ];
     be.purgeCells = 4;
+    const coreSector = room.state.config.depth.coreSectors[0];
     be.hasCore = true;
-    room.state.coreTaken = true;
+    be.carriedCoreMask = 1 << coreSector;
+    room.state.coresTakenMask = 1 << coreSector;
 
     pacify(room);
     h.disconnect('B');
@@ -596,8 +598,9 @@ describe('servidor autoritativo de co-op', () => {
     // ao aposentar, o progresso do antigo dono e descartado na hora
     expect(be.hasCore).toBe(false);
     expect(be.activeModules).toEqual([]);
-    // o nucleo saiu com quem abandonou: volta ao mundo em vez de sumir da run
-    expect(room.state.coreTaken).toBe(false);
+    // o nucleo saiu com quem abandonou: volta ao PEDESTAL dele, em vez de
+    // sumir da run
+    expect(room.state.coresTakenMask).toBe(0);
 
     // um jogador novo entra na vaga e comeca do zero
     h.connect('C');

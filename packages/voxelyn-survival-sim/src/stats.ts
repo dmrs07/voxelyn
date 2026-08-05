@@ -21,14 +21,17 @@ import {
   type RunSummary,
   type SurvivalState,
 } from './types.js';
-import { SECTOR_COUNT, TICK_HZ } from './constants.js';
+import { TICK_HZ } from './constants.js';
+import { countCoresTaken, runSectorCount } from './depth.js';
 
 /**
  * Tempo, em ticks, abaixo do qual a terceira estrela e concedida.
  *
- * Derivado do numero de setores (4 min cada) e nao um numero solto: a run
- * mudou de um mapa para tres encadeados, e um alvo fixo passaria a significar
- * coisas diferentes se SECTOR_COUNT mudasse.
+ * Derivado do numero de setores (4 min cada) e nao um numero solto — e agora o
+ * numero de setores e da RUN, nao do jogo. Uma expedicao de G-04 atravessa sete
+ * setores e a terceira estrela dela cobra 28 minutos; uma de G-01 atravessa
+ * tres e cobra 12. Um alvo fixo teria transformado a estrela de tempo numa
+ * punicao por progredir.
  *
  * O numero e uma aposta de design explicita: a terceira estrela tem de exigir
  * que o jogador ABRA MAO de alguma coisa — um site de salvage a mais, um modulo
@@ -40,7 +43,8 @@ import { SECTOR_COUNT, TICK_HZ } from './constants.js';
  * espera mexer.
  */
 export const TARGET_SECTOR_TICKS = 4 * 60 * TICK_HZ;
-export const TARGET_EXTRACTION_TICKS = TARGET_SECTOR_TICKS * SECTOR_COUNT;
+export const targetExtractionTicks = (sectorCount: number): number =>
+  TARGET_SECTOR_TICKS * Math.max(1, sectorCount);
 
 export const emptyStats = (): RunStats => ({
   shotsFired: 0,
@@ -113,9 +117,11 @@ export const starsFor = (phase: RunPhase, ticks: number, targetTicks: number): 0
 /** Congela o resultado. Chamado uma vez, no tick em que a run termina. */
 export const buildSummary = (state: SurvivalState, deathCause: DamageCause | null): RunSummary => {
   const stats: RunStats = { ...state.stats, kills: { ...state.stats.kills } };
-  if (state.coreTaken || state.players.some((_, i) => state.playerExtras[i].hasCore)) {
+  const cores = countCoresTaken(state);
+  if (cores > 0 || state.players.some((_, i) => state.playerExtras[i].hasCore)) {
     stats.discoveries |= DISCOVERY_CORE_TAKEN;
   }
+  const targetTicks = targetExtractionTicks(runSectorCount(state));
   return {
     seed: state.config.seed,
     phase: state.phase,
@@ -125,7 +131,15 @@ export const buildSummary = (state: SurvivalState, deathCause: DamageCause | nul
     // ultimo segundo: o campo responde "o que te matou", nao "o que te acertou".
     deathCause: state.phase === 'dead' ? deathCause : null,
     stats,
-    stars: starsFor(state.phase, state.tick, TARGET_EXTRACTION_TICKS),
-    targetTicks: TARGET_EXTRACTION_TICKS,
+    // Quantos Nucleos sairam do Veio com o time.
+    //
+    // Vive no resumo e nao em `stats` de proposito: `stats` e hasheado campo a
+    // campo, e a contagem ja e derivavel da mascara que entrou no hash. O que o
+    // resumo acrescenta e o formato que a LIQUIDACAO consome — o servidor
+    // credita a partir daqui, re-simulando, e nunca a partir do cliente.
+    cores,
+    sectorCount: runSectorCount(state),
+    stars: starsFor(state.phase, state.tick, targetTicks),
+    targetTicks,
   };
 };

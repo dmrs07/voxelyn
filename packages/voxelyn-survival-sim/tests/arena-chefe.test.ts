@@ -14,7 +14,7 @@
 //    continua sem marca nenhuma.
 import { describe, expect, it } from 'vitest';
 import {
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
   SOLID_NONE,
@@ -86,7 +86,7 @@ describe('arena do chefe por estrato', () => {
     // isolar a camara — e o proprio carimbo se desfaz quando isso acontece.
     for (const lineage of LINEAGES) {
       const seed = seedWithLineage(lineage);
-      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
         const reach = floodOpen(state.solid, w, state.config.height, state.entry.x, state.entry.y);
@@ -97,7 +97,7 @@ describe('arena do chefe por estrato', () => {
         ).toBe(true);
         expect(reach.has(boss.y * w + boss.x), `${lineage} s${sector}: camara isolada`).toBe(true);
         // E o setor final tem o chefe DE VERDADE, na camara.
-        if (sector === SECTOR_COUNT) {
+        if (sector === DEFAULT_SECTOR_COUNT) {
           const alive = state.enemies.find((e) => isBossArchetype(e.archetype));
           expect(alive, `${lineage} s${sector}: setor final sem chefe`).toBeDefined();
         }
@@ -108,7 +108,7 @@ describe('arena do chefe por estrato', () => {
   it('o corpo do chefe CABE: o 3x3 dele e o pedestal ficam livres', () => {
     for (const lineage of LINEAGES) {
       const seed = seedWithLineage(lineage);
-      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
         const boss = chamberOf(seed, sector);
@@ -135,9 +135,9 @@ describe('arena do chefe por estrato', () => {
       // Aquifero Negro: a orla e agua.
       { lineage: 'hydric', sector: MID_SECTOR, find: (s, i) => s.surface[i] === SURF_WATER },
       // Cripta Glacial: a arena escorrega.
-      { lineage: 'cryo', sector: SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_ICE },
+      { lineage: 'cryo', sector: DEFAULT_SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_ICE },
       // Fornalha/Ferrifero: brasa na orla.
-      { lineage: 'industrial', sector: SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_EMBER },
+      { lineage: 'industrial', sector: DEFAULT_SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_EMBER },
       // Fenda Sulfurosa: paredes porosas.
       { lineage: 'thermal', sector: MID_SECTOR, find: (s, i) => s.solid[i] === SOLID_FRAGILE },
     ];
@@ -175,7 +175,7 @@ describe('arena do chefe por estrato', () => {
     // rocha e conteudo, nao defeito. Corpo DENTRO da parede e que e impossivel.
     let checked = 0;
     for (let seed = 1; seed <= 250; seed++) {
-      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
         for (const e of state.enemies) {
@@ -317,7 +317,7 @@ describe('arena do chefe por estrato', () => {
     // por isso a protecao no codigo e uniforme e a amostra aqui e larga.
     let conferidos = 0;
     for (let seed = 1; seed <= 200; seed++) {
-      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const biome = sectorBiome(seed, sector);
         const profile = biomeProfile(biome, sector);
         const alvo = esperado[profile.halls];
@@ -363,7 +363,7 @@ describe('arena do chefe por estrato', () => {
     //     de 82% do maximo final pedia 136 — escolhido com a distancia de um
     //     mundo que deixou de existir.
     for (let seed = 1; seed <= 220; seed++) {
-      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
         const biome = sectorBiome(seed, sector);
         const profile = biomeProfile(biome, sector);
         const world = generateWorld(
@@ -411,7 +411,7 @@ describe('arena do chefe por estrato', () => {
       // Fenda Sulfurosa: `lungs` so abre parede porosa — nao pinta chao nenhum.
       { lineage: 'thermal', sector: MID_SECTOR, banned: [SURF_WATER, SURF_ICE, SURF_EMBER] },
       // Cripta Glacial: gelo e dela; brasa e agua nao.
-      { lineage: 'cryo', sector: SECTOR_COUNT, banned: [SURF_EMBER, SURF_WATER] },
+      { lineage: 'cryo', sector: DEFAULT_SECTOR_COUNT, banned: [SURF_EMBER, SURF_WATER] },
     ];
     for (const f of foreign) {
       const state = createRun({ seed: seedWithLineage(f.lineage), sector: f.sector });

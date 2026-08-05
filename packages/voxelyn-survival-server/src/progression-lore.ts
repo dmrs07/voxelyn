@@ -482,10 +482,16 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-INC-032': ['AX-ENG-020', 'AX-UNK-052'],
   'AX-EXE-040': ['AX-PRC-024', 'AX-UNK-052'],
   'AX-UNK-052': ['AX-INC-032', 'AX-GEN-G04'],
-  'AX-GEN-G01': ['AX-PUB-001'],
-  'AX-GEN-G02': ['AX-GEN-G01'],
-  'AX-GEN-G03': ['AX-GEN-G02', 'AX-EXE-033'],
-  'AX-GEN-G04': ['AX-GEN-G03', 'AX-UNK-041', 'AX-UNK-049'],
+  'AX-GEN-G01': ['AX-PUB-001', 'AX-ENG-037'],
+  'AX-GEN-G02': ['AX-GEN-G01', 'AX-PRC-027'],
+  'AX-GEN-G03': ['AX-GEN-G02', 'AX-EXE-033', 'AX-EXE-049'],
+  'AX-GEN-G04': ['AX-GEN-G03', 'AX-UNK-041', 'AX-UNK-049', 'AX-UNK-068'],
+  // As autorizacoes de descida, encadeadas: cada uma so significa alguma coisa
+  // contra a anterior, e a ultima so contra o Programa inteiro.
+  'AX-ENG-037': ['AX-PUB-001', 'AX-GEN-G01'],
+  'AX-PRC-027': ['AX-ENG-037', 'AX-PRC-014'],
+  'AX-EXE-049': ['AX-PRC-027', 'AX-UNK-051'],
+  'AX-UNK-068': ['AX-EXE-049', 'AX-UNK-041', 'AX-UNK-054'],
   // Descobertas ambientais: cada relatorio "novo" prova que a empresa ja sabia.
   'AX-PUB-004': ['AX-PRC-022'],
   'AX-PUB-006': ['AX-EXE-036', 'AX-INC-032'],
@@ -610,6 +616,7 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-UNK-049': 3,
   'AX-UNK-052': 3,
   'AX-GEN-G04': 1,
+  'AX-UNK-068': 1,
   'AX-ENG-022': 1,
   'AX-PRC-020': 1,
   'AX-PRC-023': 1,
@@ -695,6 +702,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PUB-007',
   'AX-PUB-009',
   'AX-PUB-010',
+  'AX-ENG-037',
   'AX-GEN-G01',
   // Ato II — Procedimento
   'AX-ENG-011',
@@ -737,6 +745,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PRC-024',
   'AX-PRC-025',
   'AX-PRC-026',
+  'AX-PRC-027',
   'AX-GEN-G02',
   // Ato IV — Incidente
   'AX-INC-022',
@@ -766,6 +775,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-046',
   'AX-INC-047',
   'AX-INC-048',
+  'AX-EXE-049',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -814,6 +824,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-067',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
+  'AX-UNK-068',
   'AX-GEN-G04',
 ];
 
@@ -840,6 +851,18 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   define('AX-GEN-G02', { kind: 'generation', generation: 'G-02' }),
   define('AX-GEN-G03', { kind: 'generation', generation: 'G-03' }),
   define('AX-GEN-G04', { kind: 'generation', generation: 'G-04' }),
+  // AS QUATRO AUTORIZACOES DE DESCIDA.
+  //
+  // Um documento por geracao, e cada um explica o limite que aquela geracao
+  // acabou de mover: tres setores, quatro, cinco com dois Nucleos, sete sem
+  // teto. Ficam separados dos marcos `AX-GEN-*` de proposito — o marco e o
+  // aviso de homologacao do CHASSI, e a autorizacao e um documento sobre o
+  // VEIO. Sao o mesmo gatilho contando duas coisas diferentes, e no Codex eles
+  // aparecem lado a lado por causa da cronologia.
+  define('AX-ENG-037', { kind: 'generation', generation: 'G-01' }),
+  define('AX-PRC-027', { kind: 'generation', generation: 'G-02' }),
+  define('AX-EXE-049', { kind: 'generation', generation: 'G-03' }),
+  define('AX-UNK-068', { kind: 'generation', generation: 'G-04' }),
   ...ASSET_ARCHETYPES.map((archetype) =>
     define(ASSET_LORE[archetype], { kind: 'asset', archetype }),
   ),

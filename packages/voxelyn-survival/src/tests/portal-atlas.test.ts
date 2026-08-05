@@ -41,11 +41,19 @@ describe('portais no atlas world-props', () => {
   it('toda cadeia de desenho termina num fallback que tambem existe no atlas', () => {
     for (const stratum of STRATA) {
       for (const occupation of OCCUPATIONS) {
-        for (const coreTaken of [false, true]) {
-          for (const sector of [1, 2, 3]) {
+        // As quatro situacoes que mudam o desenho, cruzadas com a profundidade
+        // maxima: poco livre, poco selado por chefe, pedestal cheio, subida.
+        for (const flags of [
+          { hasCore: false, coreTakenHere: false, sealedByBoss: false, returning: false },
+          { hasCore: false, coreTakenHere: false, sealedByBoss: true, returning: false },
+          { hasCore: true, coreTakenHere: false, sealedByBoss: false, returning: false },
+          { hasCore: true, coreTakenHere: true, sealedByBoss: false, returning: true },
+        ]) {
+          for (const sector of [1, 2, 3, 4, 5, 6, 7]) {
+            const view = { sector, sectorCount: 7, ...flags };
             const chains = [
-              objectiveAtlasChain(sector, coreTaken, stratum, occupation),
-              entryAtlasChain(sector, coreTaken, stratum, occupation),
+              objectiveAtlasChain(view, stratum, occupation),
+              entryAtlasChain(view, stratum, occupation),
             ];
             for (const chain of chains) {
               expect(chain.length).toBeGreaterThan(0);

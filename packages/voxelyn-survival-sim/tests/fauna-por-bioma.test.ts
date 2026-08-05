@@ -10,7 +10,7 @@
 //    contra-jogo), e a prensa vem com telegrafo proprio.
 import { describe, expect, it } from 'vitest';
 import {
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ROCK,
@@ -58,7 +58,7 @@ const arena = (seed: number, sector = 1): SurvivalState => {
 /** Primeira seed >= base cujo setor FINAL recebe o arquetipo pedido. */
 const seedWithFinalBoss = (archetype: EnemyArchetype, base = 1): number => {
   for (let seed = base; seed < base + 4096; seed++) {
-    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === archetype) return seed;
+    if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) === archetype) return seed;
   }
   throw new Error(`nenhuma seed proxima de ${base} com ${archetype} no setor final`);
 };
@@ -66,14 +66,14 @@ const seedWithFinalBoss = (archetype: EnemyArchetype, base = 1): number => {
 describe('chefe abatido nao repovoa', () => {
   it('o chefe morto nao volta quando a camara e repovoada', () => {
     const seed = seedWithFinalBoss('bishop');
-    const state = createRun({ seed, sector: SECTOR_COUNT });
+    const state = createRun({ seed, sector: DEFAULT_SECTOR_COUNT });
     const bishop = state.enemies.find((e) => e.archetype === 'bishop');
     expect(bishop, 'o Bispo deveria estar na camara final micelial').toBeDefined();
     const home = { x: Math.floor(bishop!.x), y: Math.floor(bishop!.y) };
 
     damageEntity(state, bishop!, bishop!.maxHp * 2, [], { kind: 'player_shot' });
     expect(bishop!.alive).toBe(false);
-    expect(state.bossesDown & (1 << SECTOR_COUNT)).not.toBe(0);
+    expect(state.bossesDownMask & (1 << DEFAULT_SECTOR_COUNT)).not.toBe(0);
 
     // O MESMO caminho de repovoamento da regeneracao de setor (subida ou
     // reconstrucao): a camara volta a ser populada, o chefe nao.
@@ -86,12 +86,12 @@ describe('chefe abatido nao repovoa', () => {
   it('a memoria e por SETOR, e vale para qualquer chefe do bioma', () => {
     // A mascara marca a camara DAQUELE setor, nao "ja matei um chefe".
     const seed = seedWithFinalBoss('guardian');
-    const state = createRun({ seed, sector: SECTOR_COUNT });
+    const state = createRun({ seed, sector: DEFAULT_SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
     damageEntity(state, guardian, guardian.maxHp * 2, [], { kind: 'player_shot' });
-    expect(state.bossesDown & (1 << SECTOR_COUNT)).not.toBe(0);
-    expect(state.bossesDown & (1 << 2)).toBe(0);
-    expect(state.bossesDown & (1 << 1)).toBe(0);
+    expect(state.bossesDownMask & (1 << DEFAULT_SECTOR_COUNT)).not.toBe(0);
+    expect(state.bossesDownMask & (1 << 2)).toBe(0);
+    expect(state.bossesDownMask & (1 << 1)).toBe(0);
   });
 });
 

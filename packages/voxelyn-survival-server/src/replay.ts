@@ -34,6 +34,7 @@ import {
   TICK_MS,
   type PlayerCommand,
   type PlayerTuning,
+  type RunDepthConfig,
   type RunSummary,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -119,16 +120,21 @@ export type Resimulation =
 /**
  * Re-simula um log e devolve o estado terminal.
  *
- * `tuning` e a unica coisa que a progressao acrescentou a este modulo, e ela
- * entra como PARAMETRO em vez de vir do log: o cliente manda o que apertou, e
- * quem decide com qual Prospector aqueles comandos rodam e o ticket guardado no
- * servidor. Ausente = G-00, que e o que mantem o leaderboard sendo o mesmo jogo
- * para todo mundo.
+ * `tuning` e `depth` sao o que a progressao acrescentou a este modulo, e os
+ * dois entram como PARAMETRO em vez de virem do log: o cliente manda o que
+ * apertou, e quem decide com qual Prospector — e com qual PROFUNDIDADE —
+ * aqueles comandos rodam e o ticket guardado no servidor.
+ *
+ * Ausentes = G-00 de fabrica, tres setores. E o que mantem o leaderboard e o
+ * ranqueado sendo o mesmo jogo para todo mundo: uma submissao de um perfil
+ * G-04 e re-simulada com a mesma descida curta de todos os outros, e progressao
+ * permanente nao alonga a prova ranqueada.
  */
 export const resimulateRun = (
   seed: number,
   logBase64: string,
   tuning?: PlayerTuning,
+  depth?: RunDepthConfig,
 ): Resimulation => {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
     return { ok: false, reason: 'seed invalida' };
@@ -144,7 +150,7 @@ export const resimulateRun = (
   if (!commands) return { ok: false, reason: 'log malformado' };
   if (commands.length === 0) return { ok: false, reason: 'log vazio' };
 
-  const state = createRun({ seed, playerCount: 1, tuning });
+  const state = createRun({ seed, playerCount: 1, tuning, depth });
   const buffer: PlayerCommand[] = [emptyCommand()];
   const trace: DeathEchoTraceSample[] = [];
   let consumedTicks = 0;

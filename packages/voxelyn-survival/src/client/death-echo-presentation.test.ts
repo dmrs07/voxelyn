@@ -92,6 +92,8 @@ const capsuleFrom = (seed: number, cause: DamageCause = { kind: 'fire' }): Death
     contamination: state.contamination,
     deathCause: cause,
     stats: { ...state.stats, kills: { ...state.stats.kills } },
+    cores: 0,
+    sectorCount: 3,
     stars: 0,
     targetTicks: 9600,
   };
@@ -147,7 +149,9 @@ const chambersOf = (state: SurvivalState, count: number): DeathEchoCapsule[] =>
       contamination: 0,
       deathCause: { kind: 'fire' },
       stats: { ...source.stats, kills: { ...source.stats.kills } },
-      stars: 0,
+      cores: 0,
+    sectorCount: 3,
+    stars: 0,
       targetTicks: 9600,
     };
     const capsule = captureDeathEcho(source, `camara-${index}`);

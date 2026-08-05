@@ -17,7 +17,7 @@
 // atualize o numero sozinho para "consertar" o teste: e o numero que prova que
 // alguem olhou.
 import { describe, expect, it } from 'vitest';
-import { RUN_SEED_MIX, SECTOR_COUNT, WORLD_H, WORLD_W } from '../src/constants';
+import { DEFAULT_SECTOR_COUNT, RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
 import { sectorSeed } from '../src/sectors';
 import { biomeProfile, sectorBiome } from '../src/strata';
 import { generateWorld, type GeneratedWorld } from '../src/worldgen';
@@ -101,7 +101,7 @@ describe('impressao digital da geracao', () => {
   it('o terreno semeado NAO mudou (senao: bump de SIMULATION_VERSION)', () => {
     let h = 0x811c9dc5;
     for (let seed = 1; seed <= SEEDS; seed++) {
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         h = mix(h, fingerprint(worldFor(seed, sector)));
       }
     }

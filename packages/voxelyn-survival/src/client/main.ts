@@ -1,6 +1,11 @@
 import { TICK_MS } from '@voxelyn/survival-sim';
-import { createRun, emptyCommand, stepRun } from '@voxelyn/survival-sim';
-import type { PlayerTuning, SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
+import { createRun, emptyCommand, runDepthForGeneration, stepRun } from '@voxelyn/survival-sim';
+import type {
+  PlayerTuning,
+  RunDepthConfig,
+  SemanticEvent,
+  SurvivalState,
+} from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { EngagementMemory, applyCombatAssist } from './combat-assist';
@@ -437,7 +442,7 @@ let settlementSent = false;
 const authorizeExpedition = async (
   seed: number,
   descent: number,
-): Promise<{ seed: number; tuning?: PlayerTuning }> => {
+): Promise<{ seed: number; tuning?: PlayerTuning; depth?: RunDepthConfig }> => {
   authorizing = true;
   const url = serverInput.value.trim() || defaultServerUrl();
   // A carga da run ANTERIOR primeiro: ela ja esta paga e so precisa chegar.
@@ -453,6 +458,7 @@ const authorizeExpedition = async (
   if (authorized.openedProfile) {
     writeCachedProfile(authorized.openedProfile, Date.now());
     renderer.setProspectorGeneration(authorized.openedProfile.generation);
+    renderDescentClearance();
   }
   const result = authorized.ticket;
   if (!result.ok) {
@@ -470,9 +476,11 @@ const authorizeExpedition = async (
   if (cachedProfile && cachedProfile.profileVersion === ticket.progressionProfileVersion) {
     renderer.setProspectorGeneration(cachedProfile.generation);
   }
-  // O tuning vem do SERVIDOR, derivado do perfil autoritativo. O cliente nao o
-  // calcula nem o corrige: ele executa a configuracao que foi autorizada.
-  return { seed: ticket.seed, tuning: ticket.tuning };
+  // Tuning E PROFUNDIDADE vem do SERVIDOR, derivados do perfil autoritativo. O
+  // cliente nao os calcula nem os corrige: ele executa a configuracao que foi
+  // autorizada. Quantos setores esta run tem ja esta decidido antes do primeiro
+  // tick, e comprar um protocolo no meio dela nao muda mais nada.
+  return { seed: ticket.seed, tuning: ticket.tuning, depth: ticket.depth };
 };
 
 /**
@@ -965,7 +973,7 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
   recorder.start(seed);
   resetRunTracking();
   telemetry.begin();
-  let state: SurvivalState = createRun({ seed, tuning: authorized.tuning });
+  let state: SurvivalState = createRun({ seed, tuning: authorized.tuning, depth: authorized.depth });
   liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
@@ -1068,7 +1076,7 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
           if (myDescent !== descentToken) return;
           recorder.start(next.seed);
           telemetry.begin();
-          state = createRun({ seed: next.seed, tuning: next.tuning });
+          state = createRun({ seed: next.seed, tuning: next.tuning, depth: next.depth });
           liveRun = state;
           rearm();
           audio.reset();
@@ -1644,6 +1652,38 @@ const matrixBody = document.getElementById('matrix-body') as HTMLDivElement;
  * como tal). Nenhuma acao deste painel escreve nele: a compra manda a intencao
  * e espera a resposta, que substitui o objeto inteiro.
  */
+
+/**
+ * O CARIMBO DE AUTORIZACAO do menu: geracao, profundidade, Nucleos.
+ *
+ * Existe porque a profundidade passou a ser consequencia da progressao, e uma
+ * consequencia que o jogador so descobre descendo nao e uma recompensa — e uma
+ * surpresa. Tres linhas antes de "Descer" e o suficiente: elas dizem sob que
+ * autorizacao esta run vai correr.
+ *
+ * Informativo, nunca um seletor. A geracao continua sendo derivada dos
+ * protocolos comprados, e nao ha nada aqui para escolher. Some inteiro quando
+ * nao ha perfil (primeira visita, sessao offline): um carimbo com valores
+ * inventados seria pior que carimbo nenhum.
+ */
+const renderDescentClearance = (): void => {
+  const el = document.getElementById('descent-clearance');
+  if (!el) return;
+  const profile = readCachedProfile()?.profile ?? null;
+  if (!profile) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  const depth = runDepthForGeneration(profile.generation);
+  el.classList.remove('hidden');
+  el.textContent = [
+    t('menu.clearance.generation', { generation: profile.generation }),
+    t('menu.clearance.depth', { sectors: depth.sectorCount }),
+    t('menu.clearance.cores', { cores: depth.coreSectors.length }),
+  ].join('\n');
+};
+
 const matrixView: MatrixViewState = {
   tab: 'matrix',
   profile: readCachedProfile()?.profile ?? null,
@@ -1746,6 +1786,7 @@ const refreshProfile = async (): Promise<void> => {
   matrixView.stale = null;
   writeCachedProfile(result.value.profile, Date.now());
   renderer.setProspectorGeneration(result.value.profile.generation);
+  renderDescentClearance();
   drawMatrix();
 };
 
@@ -2035,6 +2076,10 @@ onLocaleChange(() => {
 if (new URLSearchParams(location.search).get('dev') === '1') {
   devTools.classList.remove('hidden');
 }
+
+// O carimbo de autorizacao ja no primeiro quadro do menu: ele sai do perfil em
+// CACHE, entao nao espera a rede. A busca do perfil ao vivo o reescreve depois.
+renderDescentClearance();
 
 // auto-start por query (?online=1). ?room=XYZ transforma o convite num LINK,
 // que e como as pessoas realmente compartilham: quem recebe entra direto.

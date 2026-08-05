@@ -10,6 +10,7 @@
 //    conta chegando) — e o mundo repovoa: o caminho de volta e contestado.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
+import { countCoresTaken, markSectorBossDown } from '../src/depth';
 import type { SurvivalState } from '../src/types';
 
 /** Teleporta o jogador (teste) e interage uma vez. */
@@ -21,13 +22,20 @@ const interactAt = (state: SurvivalState, x: number, y: number) => {
   return stepRun(state, [cmd]).events;
 };
 
-/** Pega o Nucleo no setor final (limpa a fauna para a cena ser controlada). */
+/**
+ * Pega o Nucleo no setor final (limpa a fauna para a cena ser controlada).
+ *
+ * Derruba o chefe do setor ANTES: desde que o pedestal comeca selado pelo dono
+ * do setor, um Nucleo recolhido com o chefe de pe seria um estado que a
+ * simulacao nao produz — e o teste estaria provando um caminho inexistente.
+ */
 const takeCore = (state: SurvivalState): void => {
+  markSectorBossDown(state, state.sector);
   state.enemies = [];
   state.leftEntryZone = true;
   const events = interactAt(state, state.corePos.x, state.corePos.y);
   expect(events.some((ev) => ev.t === 'pickup_core')).toBe(true);
-  expect(state.coreTaken).toBe(true);
+  expect(countCoresTaken(state)).toBe(1);
 };
 
 describe('extracao de retorno', () => {

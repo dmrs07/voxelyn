@@ -23,6 +23,7 @@ import type {
   LoreFragmentId,
   PlayerTuning,
   ProspectorGeneration,
+  RunDepthConfig,
   UpgradeId,
 } from '@voxelyn/survival-sim';
 
@@ -97,6 +98,21 @@ export type ProgressionRunTicket = {
   playerCount: number;
   tuning: PlayerTuning;
   tuningHash: string;
+  /**
+   * A PROFUNDIDADE autorizada — quantos setores e onde estao os Nucleos.
+   *
+   * Congelada aqui pela mesma razao que o tuning: o servidor resolve a geracao
+   * no momento da emissao, e a liquidacao re-simula com o que foi autorizado,
+   * nunca com o que o perfil virou depois. Um jogador que compra o decimo
+   * segundo protocolo no meio de uma expedicao de G-02 continua numa expedicao
+   * de quatro setores ate ela acabar.
+   *
+   * Ausente em tickets emitidos antes desta versao: `normalizeRunDepth` os le
+   * como a run de tres setores que eles foram. (Na pratica a checagem de
+   * `simulationVersion` ja os recusa antes disto importar — mas a normalizacao
+   * nao pode depender de outra guarda para estar correta.)
+   */
+  depth?: RunDepthConfig;
   progressionProfileVersion: number;
   protocolVersion: number;
   simulationVersion: number;
@@ -127,6 +143,8 @@ export type ProgressionSettlementRequest = {
 export const IGNORED_CLIENT_CLAIMS = [
   'claimedOre',
   'claimedCores',
+  'claimedSectorCount',
+  'claimedDepth',
   'claimedPhase',
   'claimedGeneration',
   'claimedStars',

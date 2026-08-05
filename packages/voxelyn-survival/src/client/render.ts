@@ -31,9 +31,8 @@ import {
   RICOCHET_BOUNCES,
   liveProjectileModules,
   moduleHasCapacity,
-  SECTOR_COUNT,
+  countCoresTaken,
   WELL_OFFER_REACH,
-  isFinalSector,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
 import type {
@@ -108,6 +107,7 @@ import {
   objectiveAtlasChain,
   objectiveLightSpec,
   objectivePropName,
+  objectiveViewOf,
 } from './objective-prop';
 import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
 import { CEILING_ALPHA, decorAtlasName, drawDecorProp } from './decor-draw';
@@ -1247,7 +1247,17 @@ export class SurvivalRenderer {
           });
           break;
         case 'pickup_core':
-          this.messages.push({ text: t('toast.core.taken'), until: nowMs + 4200 });
+          // Duas frases, e a distincao e o ponto: com Nucleo abaixo ainda, o
+          // aviso NAO pode mandar voltar. Numa expedicao de G-04 o Nucleo do
+          // setor 3 e o primeiro de dois, e "volte para a entrada" ali
+          // encerraria a run que o jogador pagou para ver inteira.
+          this.messages.push({
+            text:
+              ev.taken >= ev.total
+                ? t('toast.core.taken')
+                : t('toast.core.deeper', { taken: ev.taken, total: ev.total }),
+            until: nowMs + 4200,
+          });
           this.shake = { power: 4, until: nowMs + 300 };
           break;
         case 'sector_entered':
@@ -1387,11 +1397,12 @@ export class SurvivalRenderer {
 
     // Luzes dinamicas visiveis. `corePos` e o poco nos setores intermediarios
     // e o Nucleo apenas no final; cada marcador recebe intensidade propria.
-    const objectiveName = objectivePropName(state.sector, state.coreTaken);
+    const objectiveView = objectiveViewOf(state);
+    const objectiveName = objectivePropName(objectiveView);
     const lights: Array<{ x: number; y: number; r: number; power: number }> = [
       { x: player.x, y: player.y, r: 8.5, power: 1 },
     ];
-    const objectiveLight = objectiveLightSpec(state.sector, state.coreTaken);
+    const objectiveLight = objectiveLightSpec(objectiveView);
     if (objectiveLight) {
       lights.push({
         x: state.corePos.x + 0.5,
@@ -1574,8 +1585,7 @@ export class SurvivalRenderer {
         // O poco fala o dialeto do bioma (portal:<chave>), com o `descent`
         // generico segurando atlas antigos em cache; selado na subida.
         const objectiveChain = objectiveAtlasChain(
-          state.sector,
-          state.coreTaken,
+          objectiveViewOf(state),
           state.stratum,
           state.occupation,
         );
@@ -1618,8 +1628,7 @@ export class SurvivalRenderer {
         // Na subida com o Nucleo a entrada E o portal para o setor de cima:
         // desenhar a plataforma chapada aqui esconderia o unico caminho.
         const entryChain = entryAtlasChain(
-          state.sector,
-          state.coreTaken,
+          objectiveViewOf(state),
           state.stratum,
           state.occupation,
         );
@@ -3493,8 +3502,13 @@ export class SurvivalRenderer {
     ctx.textAlign = 'left';
     ctx.fillStyle = PAL.rockLight;
     ctx.font = '11px monospace';
+    // O denominador e o TOTAL ACESSIVEL desta run, e nunca o maximo potencial
+    // da linhagem. Uma expedicao de G-01 mostra "SETOR 3/3" e le como completa;
+    // mostrar "3/7" a faria parecer truncada por uma area perdida que ela nunca
+    // teve autorizacao para ver.
+    const runSectors = state.config.depth.sectorCount;
     ctx.fillText(
-      t('hud.sector', { sector: state.sector, total: SECTOR_COUNT }),
+      t('hud.sector', { sector: state.sector, total: runSectors }),
       safeLeft + 12,
       sectorY,
     );
@@ -3514,22 +3528,46 @@ export class SurvivalRenderer {
       drawSurveyHud(ctx, state, nav, this.route, safeLeft + 12, biomeY + 6, nowMs);
     }
 
+    // NUCLEOS: so aparece quando a run tem mais de um, e ai ele e a informacao
+    // que decide se vale continuar descendo. Numa run de um Nucleo a linha
+    // seria ruido — o objetivo logo abaixo ja diz tudo.
+    const coreSectors = state.config.depth.coreSectors;
+    const hudObjective = objectiveViewOf(state);
+    if (coreSectors.length > 1) {
+      ctx.fillStyle = PAL.biolum;
+      ctx.font = '9px monospace';
+      ctx.fillText(
+        t('hud.cores', {
+          taken: countCoresTaken(state),
+          total: coreSectors.length,
+        }),
+        safeLeft + 12,
+        biomeY + 9,
+      );
+    }
+
     ctx.fillStyle = PAL.loot;
     ctx.font = 'bold 12px monospace';
-    // Com o Nucleo pego a diretiva e a MESMA para os dois jogadores em
-    // qualquer setor: va a ENTRADA — subir (setor > 1) ou fechar o contrato
-    // (setor 1). Antes disso, o eixo e descer/achar o Nucleo. O texto que
-    // mandava "descer" durante a subida apontava para um poco selado.
-    const objective = t(
-      state.coreTaken
+    // A diretiva, em ordem de urgencia:
+    //
+    // 1. o selo do setor, quando ha um — enquanto o dono esta de pe, nem o poco
+    //    nem o pedestal aceitam a mao, e mandar "desca pelo poco" apontaria
+    //    para uma interacao recusada;
+    // 2. o caminho de VOLTA, quando o Nucleo do fundo ja esta na mao: a
+    //    diretiva vira a mesma para os dois jogadores em qualquer setor — va a
+    //    ENTRADA, subir (setor > 1) ou fechar o contrato (setor 1);
+    // 3. o Nucleo deste setor, se houver um por recolher;
+    // 4. descer.
+    const objectiveKey = hudObjective.sealedByBoss
+      ? 'hud.objective.breakSeal'
+      : hudObjective.returning
         ? state.sector > 1
           ? 'hud.objective.ascend'
           : 'hud.objective.extract'
-        : isFinalSector(state.sector)
+        : hudObjective.hasCore && !hudObjective.coreTakenHere
           ? 'hud.objective.findCore'
-          : 'hud.objective.descend',
-    );
-    ctx.fillText(objective, safeLeft + 12, objectiveY);
+          : 'hud.objective.descend';
+    ctx.fillText(t(objectiveKey), safeLeft + 12, objectiveY);
 
     if (revealed) {
       const dx = revealed.cache.x + 0.5 - state.player.x;

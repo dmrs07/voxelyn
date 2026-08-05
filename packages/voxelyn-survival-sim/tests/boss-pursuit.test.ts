@@ -3,14 +3,14 @@ import { createRun, emptyCommand, stepRun } from '../src/run';
 import { findPath, hasLineOfSight, PATH_COST_BREAK } from '../src/pathing';
 import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
-import { SECTOR_COUNT, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
+import { DEFAULT_SECTOR_COUNT, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
 import type { SurvivalState } from '../src/types';
 
 
 /** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
 const guardianSeed = (base: number): number => {
   for (let seed = base; seed < base + 4096; seed++) {
-    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+    if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) === 'guardian') return seed;
   }
   throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
 };
@@ -25,7 +25,7 @@ const clear = (s: SurvivalState, x0: number, y0: number, x1: number, y1: number)
 
 describe('busca de caminho', () => {
   it('enxerga bloqueio entre dois pontos', () => {
-    const s = createRun({ seed: 51, sector: SECTOR_COUNT });
+    const s = createRun({ seed: 51, sector: DEFAULT_SECTOR_COUNT });
     const w = s.config.width;
     clear(s, 10, 10, 30, 30);
     expect(hasLineOfSight(s, 12.5, 20.5, 28.5, 20.5)).toBe(true);
@@ -37,7 +37,7 @@ describe('busca de caminho', () => {
   // busca em largura (peso unico) ele arrombaria a parede por ser um passo mais
   // curto — o que le como teimosia, nao como escolha.
   it('contorna quando ha volta curta, em vez de arrombar', () => {
-    const s = createRun({ seed: 52, sector: SECTOR_COUNT });
+    const s = createRun({ seed: 52, sector: DEFAULT_SECTOR_COUNT });
     const w = s.config.width;
     clear(s, 10, 10, 30, 30);
     for (let y = 10; y <= 30; y++) s.solid[y * w + 20] = SOLID_ROCK;
@@ -52,7 +52,7 @@ describe('busca de caminho', () => {
   // Sem volta curta, atravessar e de fato o caminho mais rapido viavel — e e por
   // isso que a parede e CARA e nao intransponivel.
   it('arromba quando o desvio e longo demais', () => {
-    const s = createRun({ seed: 53, sector: SECTOR_COUNT });
+    const s = createRun({ seed: 53, sector: DEFAULT_SECTOR_COUNT });
     const w = s.config.width;
     clear(s, 10, 10, 40, 40);
     for (let y = 10; y <= 40; y++) s.solid[y * w + 25] = SOLID_ROCK; // parede sem porta
@@ -66,7 +66,7 @@ describe('busca de caminho', () => {
 
   // Minerio e recurso do jogador: o chefe nao abre passagem por dentro dele.
   it('trata minerio como intransponivel, e nao como parede cara', () => {
-    const s = createRun({ seed: 54, sector: SECTOR_COUNT });
+    const s = createRun({ seed: 54, sector: DEFAULT_SECTOR_COUNT });
     const w = s.config.width;
     clear(s, 10, 10, 30, 30);
     // Sala LACRADA em minerio, dividida ao meio tambem por minerio: se houver
@@ -85,7 +85,7 @@ describe('busca de caminho', () => {
   });
 
   it('devolve rota vazia para origem igual ao destino', () => {
-    const s = createRun({ seed: 55, sector: SECTOR_COUNT });
+    const s = createRun({ seed: 55, sector: DEFAULT_SECTOR_COUNT });
     clear(s, 10, 10, 20, 20);
     expect(findPath(s, 15, 15, 15, 15)).toEqual([]);
   });
@@ -94,7 +94,7 @@ describe('busca de caminho', () => {
 describe('agressividade do guardiao', () => {
   const arena = (): SurvivalState => {
     // Desde bossForBiome nem toda seed termina no Guardiao: procura uma que sim.
-    const s = createRun({ seed: guardianSeed(56), sector: SECTOR_COUNT });
+    const s = createRun({ seed: guardianSeed(56), sector: DEFAULT_SECTOR_COUNT });
     clear(s, 10, 10, 60, 40);
     for (const e of s.enemies) if (e.archetype !== 'guardian') e.alive = false;
     s.player.x = 15.5;

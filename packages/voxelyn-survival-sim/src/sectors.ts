@@ -5,9 +5,10 @@
 // nao havia aposta crescente, e a fantasia declarada — "um prospector DESCENDO
 // no Veio" — nunca acontecia. O jogador entrava, andava no plano e saia.
 //
-// A correcao nao e mais conteudo, e ESTRUTURA. Uma run agora sao tres mundos
-// encadeados, e a pergunta "exploro mais ou desco agora" existe duas vezes
-// antes do Guardiao.
+// A correcao nao e mais conteudo, e ESTRUTURA. Uma run agora sao ATE SETE
+// mundos encadeados — quantos exatamente e a autorizacao da geracao (ver
+// depth.ts) —, e a pergunta "exploro mais ou desco agora" se repete a cada um
+// deles.
 //
 // A decisao de implementacao que rege o arquivo: descer REESCREVE o estado no
 // lugar em vez de criar um `SurvivalState` novo.
@@ -28,13 +29,13 @@ import {
   MAX_ENEMIES,
   MINER_ORE_SEARCH,
   RUN_SEED_MIX,
-  SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ORE,
   SURF_FUNGAL,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
-import { bossArchetypeForBiome, emptyBossRuntime } from './bosses.js';
+import { emptyBossRuntime } from './bosses.js';
+import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './depth.js';
 import { isConductiveSurface, setSurface } from './cells.js';
 import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
@@ -54,8 +55,28 @@ import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
 export const sectorSeed = (runSeed: number, sector: number): number =>
   (Math.imul(runSeed ^ (sector * 0x9e3779b9), 0x85ebca6b) ^ (sector * 0x27d4eb2f)) >>> 0;
 
-/** O ultimo setor e o unico com nucleo e Guardiao. */
-export const isFinalSector = (sector: number): boolean => sector >= SECTOR_COUNT;
+export { isFinalSector } from './depth.js';
+
+/**
+ * O anuncio de chegada num setor, montado num lugar so.
+ *
+ * Descida e subida emitem o MESMO evento (a subida so acrescenta `ascending`),
+ * e ele carrega agora o que o HUD precisa para desenhar profundidade dinamica:
+ * o total acessivel, se ha Nucleo aqui, quem guarda o setor e se o selo ja
+ * cedeu. Montar isso nos dois lugares foi o que deixou `final` correto na
+ * descida e desatualizado na subida em versoes anteriores.
+ */
+const sectorEntered = (state: SurvivalState): Extract<SemanticEvent, { t: 'sector_entered' }> => ({
+  t: 'sector_entered',
+  sector: state.sector,
+  final: isFinalSector(state.sector, runSectorCount(state)),
+  stratum: state.stratum,
+  occupation: state.occupation,
+  sectorCount: runSectorCount(state),
+  hasCore: runDepth(state).coreSectors.includes(state.sector),
+  boss: state.sectorBoss.archetype,
+  unsealed: state.sectorBoss.archetype === null || state.sectorBoss.defeated,
+});
 
 /**
  * Bolso micelial do Bispo: a colonia que tomou a camara do chefe.
@@ -146,11 +167,17 @@ const signatureHome = (
   return { x, y };
 };
 
-/** Popula inimigos e o Guardiao (se houver) do setor. */
+/**
+ * Popula inimigos e o CHEFE (se houver) do setor.
+ *
+ * `bossSpawn` e o ponto que o worldgen reservou com folga para um corpo grande.
+ * Chamava-se `guardian` e o nome mentia desde que a camara passou a poder ser
+ * de qualquer um da tabela; agora ele e o que sempre foi — uma posicao.
+ */
 export const populateSector = (
   state: SurvivalState,
   spawns: readonly { x: number; y: number }[],
-  guardian: { x: number; y: number },
+  bossSpawn: { x: number; y: number },
 ): void => {
   // A mistura sai do BIOMA, nao mais de uma tabela por numero de setor: o
   // aquifero e anfibio, o prismatico e mineral, o micelio traz o proprio
@@ -160,11 +187,15 @@ export const populateSector = (
   // Um elite por setor, no meio da lista: cedo demais e o jogador ainda nao tem
   // com o que responder, tarde demais e ele ja passou pelo setor.
   const eliteIndex = Math.floor(spawns.length / 2);
-  // UM chefe por run, no setor final, escolhido pelo BIOMA (bossForBiome) — e
-  // nunca no primeiro setor, que e onde a run ensina. Os setores do meio ficam
-  // com a fauna de assinatura como identidade; tres chefes obrigatorios
-  // fragmentariam toda descida.
-  const bossHere = isFinalSector(state.sector);
+  // O CHEFE deste setor, resolvido por posicao (ultimo setor ou setor de
+  // Nucleo) e por bioma (quem e). `null` = setor sem dono, e a maioria e.
+  //
+  // O estado generico e escrito AQUI, e nao pelo chamador, porque este e o
+  // unico ponto por onde toda entrada de setor passa — createRun, descend e
+  // ascend. Escrever nos tres deixaria o quarto de fora.
+  state.sectorBoss = resolveSectorBoss(state, state.sector);
+  const bossArchetype = state.sectorBoss.archetype;
+  const bossHere = bossArchetype !== null;
   const budget = Math.min(spawns.length, MAX_ENEMIES - (bossHere ? 1 : 0));
 
   // O Cavalo OCUPA a vaga do elite em vez de somar um inimigo.
@@ -218,20 +249,24 @@ export const populateSector = (
     spawnEnemy(state, mix[i % mix.length], spawns[i].x, spawns[i].y, i === eliteIndex);
   }
 
-  // A camara final recebe o chefe QUE O BIOMA PEDE: ocupacao forte primeiro
-  // (micelio -> Bispo), depois o chefe natural do estrato (bossForBiome, com
-  // fallback no Guardiao enquanto a tabela ganha corpo).
+  // A camara recebe o chefe QUE O BIOMA PEDE: ocupacao forte primeiro
+  // (micelio -> Bispo), depois o chefe natural do estrato.
   //
   // MAS chefe abatido nao volta. Na subida da extracao de retorno o setor e
   // regenerado inteiro, e sem esta guarda o chefe morto reaparecia na camara —
   // a fauna repovoar e a pressao prometida, um chefe repovoar e uma conquista
   // desmanchando. O BOLSO do Bispo continua sendo plantado de qualquer jeito:
   // a colonia e terreno, e ela nao morreu junto com quem reinava sobre ela.
-  const bossAlreadyDown = (state.bossesDown & (1 << state.sector)) !== 0;
   if (bossHere) {
-    const boss = bossArchetypeForBiome(biome);
-    if (boss === 'bishop') plantBishopPocket(state, guardian.x, guardian.y);
-    if (!bossAlreadyDown) spawnEnemy(state, boss, guardian.x, guardian.y, false);
+    if (bossArchetype === 'bishop') plantBishopPocket(state, bossSpawn.x, bossSpawn.y);
+    if (!state.sectorBoss.defeated) {
+      const body = spawnEnemy(state, bossArchetype, bossSpawn.x, bossSpawn.y, false);
+      // O id do corpo em campo. E por ele que a morte sabe que ESTE cadaver era
+      // o dono do setor, e nao um segundo exemplar do mesmo arquetipo — o que
+      // acontece de verdade quando um Bispo guarda uma camara micelial cheia de
+      // fauna micelial.
+      state.sectorBoss.entityId = body.id;
+    }
   }
   populateMiners(state, spawns, biomeProfile(biome, state.sector).minerCap);
 };
@@ -316,9 +351,9 @@ const populateMiners = (
 /**
  * Troca o mundo pelo do proximo setor, preservando os jogadores.
  *
- * Nao verifica se ha proximo setor: quem chama decide, porque no ultimo o
- * mesmo ponto significa outra coisa (o nucleo) e o caminho e completamente
- * diferente.
+ * Nao verifica se ha proximo setor nem se o selo cedeu: quem chama decide. No
+ * ultimo setor o mesmo ponto significa outra coisa (o Nucleo) e o caminho e
+ * completamente diferente, e num setor selado a interacao nem chega aqui.
  */
 export const descend = (state: SurvivalState, events: SemanticEvent[]): void => {
   const width = state.config.width;
@@ -418,13 +453,7 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   }
 
   populateSector(state, world.enemySpawns, world.guardianSpawn);
-  events.push({
-    t: 'sector_entered',
-    sector: state.sector,
-    final: isFinalSector(state.sector),
-    stratum: state.stratum,
-    occupation: state.occupation,
-  });
+  events.push(sectorEntered(state));
 };
 
 /**
@@ -517,14 +546,7 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   }
 
   populateSector(state, world.enemySpawns, world.guardianSpawn);
-  events.push({
-    t: 'sector_entered',
-    sector: state.sector,
-    final: isFinalSector(state.sector),
-    stratum: state.stratum,
-    occupation: state.occupation,
-    ascending: true,
-  });
+  events.push({ ...sectorEntered(state), ascending: true });
 };
 
 /** Celula do poco/nucleo esta livre? Usado so por testes e diagnostico. */

@@ -44,6 +44,9 @@ export const PT_BR = {
   'aurix.rail.copy': 'Via do operador',
   'aurix.menu.docTitle': 'Ordem de despacho',
   'aurix.menu.requisition': 'Requisição',
+  'menu.clearance.generation': 'PROSPECTOR {generation}',
+  'menu.clearance.depth': 'AUTORIZAÇÃO DE DESCIDA: {sectors} SETORES',
+  'menu.clearance.cores': 'NÚCLEOS DETECTÁVEIS: {cores}',
   'aurix.menu.authorisation': 'Autorização de descida',
   'aurix.doc.options': 'AD-CFG-2.1 · terminal local',
   'aurix.doc.records': 'AD-REG-8.1 · livro de recuperação',
@@ -401,6 +404,7 @@ export const PT_BR = {
   'summary.stat.ore': 'Minério',
   'summary.stat.none': '—',
   'summary.outcome.core': 'NÚCLEO EXTRAÍDO',
+  'summary.outcome.cores': 'NÚCLEOS EXTRAÍDOS ×{cores}',
   'summary.outcome.extracted': 'EXTRAÍDO SEM O NÚCLEO',
   'summary.outcome.dead': 'O VEIO TE CONSUMIU',
   'summary.reputation.one':
@@ -558,7 +562,7 @@ export const PT_BR = {
   'upgrade.IA-X.desc': 'toque sem direção dispara no inimigo válido mais próximo',
   'summary.cargo.lost': 'CARGA NÃO RECUPERADA: {ore} ⬡ · SEM VALOR DE RECUPERAÇÃO',
   'summary.cargo.cleared': 'CARGA TRANSMITIDA PARA HOMOLOGAÇÃO: {ore} ⬡',
-  'summary.cargo.core': 'CARGA E NÚCLEO TRANSMITIDOS PARA HOMOLOGAÇÃO: {ore} ⬡ · 1 ◉',
+  'summary.cargo.core': 'CARGA E NÚCLEOS TRANSMITIDOS PARA HOMOLOGAÇÃO: {ore} ⬡ · {cores} ◉',
   'hud.cargo': '{count} CARGA',
   'hud.purgeCells': 'CÉLULA DE PURGA ×{count}',
   'hud.sector': 'SETOR {sector}/{total}',
@@ -566,6 +570,8 @@ export const PT_BR = {
   'hud.objective.ascend': 'SUBA PELA ENTRADA — O POÇO SELOU',
   'hud.objective.extract': 'EXTRAIA NA ENTRADA',
   'hud.objective.findCore': 'ENCONTRE O NÚCLEO',
+  'hud.objective.breakSeal': 'O SELO DO SETOR RESISTE — DERRUBE QUEM O SUSTENTA',
+  'hud.cores': 'NÚCLEOS {taken}/{total}',
   'hud.cache': 'COFRE: {direction} · ~{distance}m',
   'hud.direction.east': 'LESTE',
   'hud.direction.west': 'OESTE',
@@ -588,6 +594,7 @@ export const PT_BR = {
   // Mensagens centrais da run
   // ---------------------------------------------------------------------
   'toast.ability.assimilated': '{ability} ASSIMILADO',
+  'toast.core.deeper': 'NÚCLEO {taken}/{total} RECUPERADO — DESCIDA ADICIONAL AUTORIZADA',
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
   'toast.module.expired': '{module} DESATIVADO',
@@ -622,6 +629,9 @@ export const PT_BR = {
   'sim.coreDropped': 'O núcleo caiu com o portador.',
   'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
   'sim.siegeCollapsed': 'O cerco desaba com o Guardião.',
+  'sim.descentSealedByBoss': 'O poço não responde: o selo deste setor continua ativo.',
+  'sim.coreSealedByBoss': 'O pedestal recusa o acoplamento. O selo deste setor continua ativo.',
+  'sim.coreTakenDeeper': 'Núcleo recuperado — descida adicional autorizada.',
 
   // ---------------------------------------------------------------------
   // Escolha de módulos

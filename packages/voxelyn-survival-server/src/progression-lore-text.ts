@@ -810,6 +810,30 @@ const pt: Record<LoreFragmentId, LoreText> = {
   // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
+  'AX-ENG-037': {
+    title: 'Autorizacao de Descida Padrao',
+    summary: 'Tres setores. O limite e apresentado como seguranca do equipamento.',
+    body: 'O envelope operacional homologado para a unidade Prospector compreende TRES setores consecutivos a partir da plataforma de entrada.\n\nO limite deriva da tolerancia estrutural do chassi sob carga de contaminacao acumulada. Alem do terceiro setor, a margem de retorno cai abaixo do minimo especificado e a recuperacao do ativo deixa de ser previsivel.\n\nA unidade nao deve ser instruida a prosseguir. O sistema de autorizacao recusara a descida por conta propria.',
+    source: 'Engenharia de Sistemas — envelope operacional, revisao 3',
+  },
+  'AX-PRC-027': {
+    title: 'Extensao de Garantia Estrutural',
+    summary: 'Um quarto setor. A conta fechou.',
+    body: 'Revisao do envelope operacional apos analise de custo comparada.\n\nA taxa de perda de unidade no quarto setor foi estimada em 31%. O valor recuperado por expedicao que alcanca essa profundidade e superior ao custo de reposicao da unidade em 2,4 vezes.\n\nA autorizacao passa a compreender QUATRO setores. Nao houve alteracao no chassi; houve alteracao no que a companhia considera perda aceitavel.\n\nO texto anterior sobre tolerancia estrutural permanece valido e permanece publicado.',
+    source: 'Aquisicoes — nota de revisao de envelope',
+  },
+  'AX-EXE-049': {
+    title: 'Protocolo de Recuperacao Dupla',
+    summary: 'Ha assinatura de Nucleo em mais de uma profundidade. Chamem de redundancia.',
+    body: 'A telemetria acumulada confirma o que o levantamento sismico ja indicava: assinaturas de Nucleo ocorrem em MAIS DE UMA profundidade dentro da mesma linhagem geologica.\n\nA assinatura intermediaria e classificada como REDUNDANCIA DE COLETA. Ela nao constitui descoberta, nao altera o valor unitario homologado e nao deve ser descrita em comunicacao externa como fenomeno.\n\nA unidade autorizada a cinco setores recebera indicacao das duas. A coleta da assinatura intermediaria e opcional e nao encerra o contrato: instruir a unidade a retornar apos a primeira coleta desperdicaria a autorizacao.\n\nRegistre-se que a recuperacao redundante aumenta a carga de contaminacao pelo restante da descida. Isso e esperado e nao e motivo de aborto.',
+    source: 'Comite Executivo — diretriz operacional',
+  },
+  'AX-UNK-068': {
+    title: 'Licenca de Profundidade Irrestrita',
+    summary: 'Sete setores. O limite nunca foi do equipamento.',
+    body: 'A autorizacao de descida passa a compreender SETE setores.\n\nRegistre-se, para o arquivo interno, que nenhuma alteracao de chassi precedeu esta revisao. O envelope de tres setores publicado com o Programa nao descrevia uma tolerancia estrutural. Ele descrevia uma decisao.\n\nAs unidades das primeiras geracoes nao eram impedidas de descer porque fossem incapazes. Eram impedidas porque a companhia optou por nao ter unidades ██████████ nas profundidades em que a assinatura terminal foi registrada.\n\nA opcao foi revista. Nao por mudanca de avaliacao de risco: por mudanca de quem assina.\n\nA unidade nao sera informada da natureza da revisao. A Persistencia Mnemica torna a informacao ██████████ entre geracoes, e o comportamento resultante nao foi modelado.',
+    source: '[ORIGEM NAO CLASSIFICADA]',
+  },
   'AX-GEN-G01': {
     title: 'Geração G-01 homologada',
     summary: 'A primeira incorporação. Rotina.',
@@ -1359,6 +1383,30 @@ const en: Record<LoreFragmentId, LoreText> = {
     source: 'No department assigned',
   },
 
+  'AX-ENG-037': {
+    title: 'Standard Descent Authorisation',
+    summary: 'Three sectors. The limit is presented as equipment safety.',
+    body: 'The operational envelope cleared for the Prospector unit comprises THREE consecutive sectors from the entry platform.\n\nThe limit derives from chassis structural tolerance under accumulated contamination load. Beyond the third sector the return margin falls below specified minimum and asset recovery ceases to be predictable.\n\nThe unit is not to be instructed to proceed. The authorisation system will refuse the descent on its own.',
+    source: 'Systems Engineering — operational envelope, revision 3',
+  },
+  'AX-PRC-027': {
+    title: 'Structural Warranty Extension',
+    summary: 'A fourth sector. The arithmetic closed.',
+    body: 'Revision of the operational envelope following comparative cost analysis.\n\nUnit loss rate in the fourth sector was estimated at 31%. Value recovered per expedition reaching that depth exceeds unit replacement cost by a factor of 2.4.\n\nAuthorisation now comprises FOUR sectors. There has been no change to the chassis; there has been a change to what the company considers acceptable loss.\n\nThe earlier text on structural tolerance remains valid and remains published.',
+    source: 'Procurement — envelope revision note',
+  },
+  'AX-EXE-049': {
+    title: 'Dual Recovery Protocol',
+    summary: 'Core signatures occur at more than one depth. Call it redundancy.',
+    body: 'Accumulated telemetry confirms what the seismic survey already indicated: Core signatures occur at MORE THAN ONE depth within the same geological lineage.\n\nThe intermediate signature is classified as COLLECTION REDUNDANCY. It does not constitute a discovery, does not alter the cleared unit value, and is not to be described in external communication as a phenomenon.\n\nA unit authorised to five sectors will be shown both. Collecting the intermediate signature is optional and does not close the contract: instructing the unit to return after the first collection would waste the authorisation.\n\nNote that redundant recovery increases contamination load for the remainder of the descent. This is expected and is not grounds for abort.',
+    source: 'Executive Committee — operational directive',
+  },
+  'AX-UNK-068': {
+    title: 'Unrestricted Depth Licence',
+    summary: 'Seven sectors. The limit was never the equipment.',
+    body: 'Descent authorisation now comprises SEVEN sectors.\n\nLet the internal file record that no chassis modification preceded this revision. The three-sector envelope published with the Programme did not describe a structural tolerance. It described a decision.\n\nEarly-generation units were not prevented from descending because they were incapable. They were prevented because the company chose not to have units ██████████ at the depths where the terminal signature was recorded.\n\nThe choice has been revisited. Not through a change in risk assessment: through a change in who signs.\n\nThe unit will not be informed of the nature of the revision. Mnemonic Persistence renders the information ██████████ across generations, and the resulting behaviour has not been modelled.',
+    source: '[SOURCE UNCLASSIFIED]',
+  },
   'AX-GEN-G01': {
     title: 'Generation G-01 cleared',
     summary: 'The first incorporation. Routine.',
