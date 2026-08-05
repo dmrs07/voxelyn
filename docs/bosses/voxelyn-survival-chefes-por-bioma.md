@@ -221,19 +221,66 @@ e *um deles nós construímos*. A pergunta que nenhum documento aprovado formula
 Diamandis falhou em alcançar o objetivo — ou entendeu antes da companhia que ele não
 devia ser alcançado.
 
+### Os Coveiros — a escolha que fecha o encontro
+
+Não são minions do chefe e não estão ajudando o jogador. Continuam executando o
+trabalho para o qual foram deixados ali: recolher sucata de equipamento abatido. O
+Diamandis só ainda não está abatido.
+
+Cada arma dele mora num **módulo** preso à carcaça. Conforme a vida cai, o módulo
+daquela arma **se solta** — em ordem fixa e ensinável (78% → broca, 55% → torre,
+30% → scanner), do maior alcance para o menor, então o cerco vai *fechando*: perder
+a broca cedo significa que a luta termina de perto, que é onde o corpo dele cobra
+caro. Soltar **não** é perder: a arma continua funcionando enquanto ninguém arranca.
+
+Um Coveiro que enxergue um módulo solto **larga o jogador** e vai buscar a peça —
+2 s de eletroímã engatando, telegrafados. No arranque o chefe perde aquela arma na
+hora, e o Coveiro vira um *carregador* rumo à saída.
+
+| Você faz | A luta | A recompensa |
+| --- | --- | --- |
+| **Deixa trabalhar** | mais fácil: cada módulo arrancado é uma arma a menos | vai embora com a peça, se você não interceptar |
+| **Mata antes do arranque** | mais longa: o chefe mantém as três armas | garantida — o módulo continua na carcaça e paga no abate |
+| **Mata o carregador** | já sem aquela arma | recuperada: a peça cai e é sua |
+
+O abate paga `DIAMANDIS_MODULE_ORE` (16) por módulo ainda preso. Os dois lados são
+legítimos, e é isso que faz disso uma decisão em vez de uma armadilha.
+
+**"Fora de alcance" é uma distância, não uma porta.** O critério óbvio era "saiu do
+mapa" e estava errado: o carregador não come minério (recurso do jogador, mesma
+regra da broca), então um veio no caminho o encalhava — medido na seed 404, ele
+parava em x=85 de um mapa de 96 e ficava ali pelo resto da run. Com uma porta como
+critério, *deixar trabalhar* virava *espere, ele empaca*, e o preço de não
+interceptar nunca chegava a ser cobrado. A distância (24 tiles da carcaça) diz a
+coisa certa — a peça se perde quando sai da luta — e a borda continua valendo para
+quem escapa de verdade.
+
+Quem sai do mapa **não conta como abate**: creditar um kill que o jogador não fez
+faria o registro do bestiário dizer que ele resolveu um problema que na verdade
+escapou.
+
+Dois Coveiros nunca disputam a mesma peça (`claimableModule` checa quem já engatou):
+sem isso, os três de uma galeria ferrífera convergiam todos para o mesmo módulo e
+dois ficavam parados em cima do chefe sem nada para fazer.
+
+### Documentos dos Coveiros
+
+| Gatilho | Documento | ID |
+| --- | --- | --- |
+| **Ver um módulo ser arrancado** | Não classificado: o procedimento de recolhimento foi escrito para equipamento **abatido**, e não tem passo que verifique se o ativo ainda opera — *"um Prospector é equipamento da mesma frota"* | `AX-UNK-060` |
+| Coveiro abatido **+** ver o arranque | Aquisições: recuperar o Diamandis custa mais que o programa inteiro → *abandonar o corpo, enviar unidades menores.* O item 3 foi aprovado e nunca cancelado | `AX-PRC-026` |
+| Diamandis abatido **+** ver o arranque | Executivo: reclassificação para *"instalação móvel de recuperação economicamente inviável"* — a máquina em operação vira parte do mapa, por contabilidade | `AX-EXE-048` |
+
+`AX-PRC-026` é de onde os Coveiros vêm, e `AX-UNK-060` é o que eles são. A piada
+contábil de `AX-EXE-048` fecha: a reclassificação não o desativa, não o recupera e
+não o interrompe — ela apenas o remove do balanço.
+
 ### O que fica para a próxima fatia
 
-- **A economia dos Coveiros**: módulos destrutíveis que caem do Diamandis e Coveiros
-  que os arrastam para fora do mapa enquanto ele ainda se move — deixar trabalharem
-  torna a luta mais fácil e a recompensa menor; destruí-los preserva a sucata e
-  prolonga a capacidade ofensiva dele. É a escolha que transforma o encontro de bom
-  em memorável, e é um sistema próprio (estado de módulo, IA de arrasto, cache de
-  salvage), não um ajuste do chefe.
-- Os dois documentos que dependem dela: **Aquisições** (custo de recuperação — é de
-  onde os Coveiros vêm) e **Executivo** (reclassificação: "instalação móvel de
-  recuperação economicamente inviável").
 - O **atlas voxel** do Diamandis. Hoje ele usa o renderizador de fallback, como o
   Bispo e o Corcel usaram antes de ganharem atlas.
+- A apresentação dos módulos no cliente: `boss_module` já viaja com os quatro
+  estados, mas quem desenha ainda não os distingue.
 
 ## Ordem recomendada de desenvolvimento (restante)
 
@@ -241,9 +288,8 @@ devia ser alcançado.
 2. ~~Salva Litoclasta do Guardião~~ ✔
 3. ~~`bossForBiome()` sem dependência de setor~~ ✔
 4. ~~Generalizar o estado específico do Guardião num `bossRuntime`~~ ✔
-5. ~~**Diamandis** (Cicatriz Aurix) — broca, demolição, feixe, colapso do reator~~ ✔
-   (a economia dos Coveiros — módulos destrutíveis e sucata arrastada — fica para a
-   fatia seguinte; ver abaixo)
+5. ~~**Diamandis** (Cicatriz Aurix) — broca, demolição, feixe, colapso do reator e a
+   economia dos Coveiros~~ ✔
 6. **Devorador Branco** (Sumidouros de Sílica) — linha de vibração, emergir por
    baixo, vitrificar o chão como contra-jogo.
 7. Documentos de chefe desbloqueados por **entendimento do encontro** (primeiro

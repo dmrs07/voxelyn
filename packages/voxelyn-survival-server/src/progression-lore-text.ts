@@ -638,6 +638,24 @@ const pt: Record<LoreFragmentId, LoreText> = {
     body: 'Levantamento dimensional do ativo DX-001 contra a malha de galerias homologada.\n\nO raio mínimo de manobra do equipamento excede a seção livre de 71% dos túneis previstos em contrato. Nas seções restantes, a passagem só é possível com remoção estrutural — isto é, o ativo abre a própria galeria enquanto se desloca, ao custo de sustentação de teto não computado no projeto.\n\nEngenharia solicita revisão de escopo antes da descida.\n\nResposta executiva, na íntegra: "os túneis serão adaptados ao ativo."',
     source: 'Engenharia de Sistemas — levantamento dimensional',
   },
+  'AX-UNK-060': {
+    title: 'Sobre quem recolhe primeiro',
+    summary: 'As unidades de recolhimento não distinguem abandonado de em operação.',
+    body: 'As unidades enviadas para retirar componentes do DX-001 foram observadas em campo executando o procedimento previsto: aproximação, engate do eletroímã, remoção do módulo, transporte.\n\nO procedimento está correto. Ele foi escrito para equipamento abatido.\n\nNão há, em nenhuma versão das instruções, um passo que verifique se o ativo ainda está em operação. A pergunta não aparece porque, quando o procedimento foi redigido, ela não fazia sentido: nada da nossa frota continuava se movendo depois de baixado.\n\nRegistra-se que as unidades também não distinguem a carcaça do DX-001 de qualquer outra carcaça — e que a única coisa que as detém é serem destruídas.\n\nRegistra-se, por fim, que uma unidade Prospector é equipamento da mesma frota.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-PRC-026': {
+    title: 'Custo de recuperação: DX-001',
+    summary: 'Resgatar o ativo custa mais que iniciar o programa inteiro.',
+    body: 'Estimativa de recuperação do ativo DX-001, conforme solicitado pelo Conselho.\n\nO acesso exigiria alargamento de 71% da malha, montagem de guindaste sob cota e uma janela de operação superior à do contrato de concessão. O total supera o custo de iniciar o programa Prospector do zero.\n\nRecomendação de Aquisições, em três linhas:\n\n1. Abandonar o corpo.\n2. Recuperar a telemetria.\n3. Enviar unidades menores para retirar componentes ao longo do tempo.\n\nO item 3 foi aprovado e executado. As unidades continuam em campo. Não consta do processo nenhuma ordem de encerramento do item 3.',
+    source: 'Aquisições — parecer de recuperação',
+  },
+  'AX-EXE-048': {
+    title: 'Reclassificação de projeto: DX-001',
+    summary: 'Uma máquina em operação vira parte do mapa, por contabilidade.',
+    body: 'Fica reclassificado o ativo DX-001, de "equipamento de escavação autônoma" para:\n\n"Instalação móvel de recuperação economicamente inviável."\n\nA distinção é contábil e a consequência é contábil: equipamento perdido é baixa do exercício; instalação é característica do terreno, e terreno não se deprecia.\n\nRegistra-se, sem constar da reclassificação: o ativo permanece em operação. A reclassificação não o desativa, não o recupera e não o interrompe. Ela apenas o remove do balanço.\n\nA partir desta data, para todos os efeitos internos, o Diamandis é parte do Veio.',
+    source: 'Conselho Executivo — reclassificação de ativo',
+  },
   'AX-INC-041': {
     title: 'Incidente 41 — comando de desligamento não executado',
     summary: 'Ele recebeu a ordem. Confirmou. Parou. E continuou.',
@@ -1282,6 +1300,24 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'The asset is too large for the tunnels it was meant to dig.',
     body: 'Dimensional survey of asset DX-001 against the cleared gallery network.\n\nThe minimum manoeuvring radius of the equipment exceeds the free section of 71% of the tunnels specified under contract. In the remaining sections, passage is possible only with structural removal — that is, the asset opens its own gallery as it moves, at a roof-support cost not accounted for in the project.\n\nEngineering requests a scope review before descent.\n\nExecutive reply, in full: "the tunnels will be adapted to the asset."',
     source: 'Systems Engineering — dimensional survey',
+  },
+  'AX-UNK-060': {
+    title: 'On who salvages first',
+    summary: 'The recovery units do not distinguish abandoned from operating.',
+    body: 'The units dispatched to remove components from DX-001 have been observed in the field performing the specified procedure: approach, electromagnet engagement, module removal, transport.\n\nThe procedure is correct. It was written for downed equipment.\n\nIn no version of the instructions is there a step verifying whether the asset is still in operation. The question does not appear because, when the procedure was drafted, it made no sense: nothing in our fleet kept moving after being written off.\n\nIt is recorded that the units likewise do not distinguish the DX-001 hull from any other hull — and that the only thing which stops them is being destroyed.\n\nIt is recorded, finally, that a Prospector unit is equipment of the same fleet.',
+    source: 'No department assigned',
+  },
+  'AX-PRC-026': {
+    title: 'Recovery cost: DX-001',
+    summary: 'Salvaging the asset costs more than starting the whole programme.',
+    body: 'Recovery estimate for asset DX-001, as requested by the Council.\n\nAccess would require widening 71% of the network, crane assembly below grade, and an operating window longer than the concession contract itself. The total exceeds the cost of starting the Prospector programme from zero.\n\nProcurement recommendation, in three lines:\n\n1. Abandon the body.\n2. Recover the telemetry.\n3. Send smaller units to remove components over time.\n\nItem 3 was approved and executed. Those units remain in the field. No order terminating item 3 appears anywhere in the file.',
+    source: 'Procurement — recovery assessment',
+  },
+  'AX-EXE-048': {
+    title: 'Project reclassification: DX-001',
+    summary: 'A running machine becomes part of the map, for accounting reasons.',
+    body: 'Asset DX-001 is hereby reclassified from "autonomous excavation equipment" to:\n\n"Economically unrecoverable mobile recovery installation."\n\nThe distinction is an accounting one and so is the consequence: lost equipment is a write-down for the period; an installation is a feature of the terrain, and terrain does not depreciate.\n\nRecorded, and not part of the reclassification: the asset remains in operation. The reclassification does not deactivate it, does not recover it and does not stop it. It merely removes it from the balance sheet.\n\nAs of this date, for all internal purposes, the Diamandis is part of the Vein.',
+    source: 'Executive Council — asset reclassification',
   },
   'AX-INC-041': {
     title: 'Incident 41 — shutdown command not executed',

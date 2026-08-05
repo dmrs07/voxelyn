@@ -575,6 +575,66 @@ export const DIAMANDIS_REACTOR_EMBER_TICKS = 900;
 /** Fator de recarga das armas que sobrevivem ao colapso. */
 export const DIAMANDIS_REACTOR_CADENCE_SCALE = 0.65;
 
+/**
+ * OS MODULOS, e os Coveiros em volta deles.
+ *
+ * E o detalhe que transforma o encontro de bom em memoravel, e ele nao e um
+ * golpe: e uma ESCOLHA que o jogador faz enquanto luta.
+ *
+ * Cada arma do Diamandis mora num modulo preso a carcaca. Conforme a vida cai,
+ * o modulo daquela arma se SOLTA (fica exposto, ainda presol). Um Coveiro que
+ * enxergue um modulo solto abandona o que estiver fazendo, conecta o
+ * eletroima e o ARRANCA — e ai carrega a peca para fora do mapa.
+ *
+ * Os Coveiros nao sao minions do chefe e nao estao ajudando o jogador. Eles
+ * continuam executando o trabalho para o qual foram deixados ali: recolher
+ * sucata de equipamento abatido. O Diamandis so ainda nao esta abatido.
+ *
+ * A escolha, e os dois lados sao legitimos:
+ *
+ *   DEIXAR TRABALHAR  o modulo sai, o Diamandis PERDE aquela arma (a luta
+ *                     fica mais facil) e a peca comeca a ir embora — se
+ *                     escapar do mapa, a recompensa vai junto.
+ *   MATAR O COVEIRO   antes do arranque, o modulo continua presol e a arma
+ *                     continua funcionando (a luta fica mais longa), e a
+ *                     sucata fica garantida no abate do chefe. Depois do
+ *                     arranque, matar o carregador derruba a peca de volta e
+ *                     ela ainda pode ser sua.
+ */
+export const DIAMANDIS_MODULE_COUNT = 3;
+/**
+ * Em que fracao de vida cada modulo se solta, na ORDEM em que se soltam.
+ *
+ * A ordem e fixa e nao sorteada porque ela e ensinavel: quem lutou uma vez
+ * sabe que a broca sai primeiro. E ela vai da arma de maior alcance para a de
+ * menor, entao o cerco em volta do chefe vai FECHANDO — perder a broca cedo
+ * significa que a luta termina de perto, que e onde o corpo dele cobra caro.
+ */
+export const DIAMANDIS_MODULE_EXPOSE_AT: readonly number[] = [0.78, 0.55, 0.3];
+/** Lascas por modulo preservado. Vale um veio inteiro: e uma decisao, nao um troco. */
+export const DIAMANDIS_MODULE_ORE = 16;
+/** Ate onde um Coveiro NOTA um modulo solto — bem alem do aggro dele. */
+export const UNDERTAKER_SALVAGE_RANGE = 20;
+/** Distancia em que ele consegue engatar o eletroima na carcaca. */
+export const UNDERTAKER_SALVAGE_REACH = 2.2;
+/** O engate: 2 s de eletroima carregando contra a blindagem, telegrafados. */
+export const UNDERTAKER_SALVAGE_WINDUP_TICKS = 40;
+/**
+ * A que distancia da carcaça a peca esta FORA DE ALCANCE.
+ *
+ * "Sair do mapa" era o criterio obvio e estava errado: o carregador nao come
+ * minerio (recurso do jogador, mesma regra da broca), entao um veio no caminho
+ * o encalhava — medido na seed 404, ele parava em x=85 de um mapa de 96 e
+ * ficava ali pelo resto da run. Com uma PORTA como criterio, "deixar
+ * trabalhar" virava "espere, ele empaca", e o preco de nao interceptar nunca
+ * chegava a ser cobrado.
+ *
+ * Distancia resolve isso sem pathfinding e diz a coisa certa: a peca se perde
+ * quando sai da luta, e nao quando cruza uma linha desenhada na borda. A borda
+ * continua valendo, para quem escapa de verdade.
+ */
+export const UNDERTAKER_SALVAGE_ESCAPE_DIST = 24;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;
@@ -744,13 +804,18 @@ export const BISHOP_RETREAT_HP_FRACTION = 0.72;
 /** Ate onde ele procura chao fungico, em tiles. */
 export const BISHOP_FUNGAL_SEARCH = 14;
 /**
- * De quao perto a cura conta como TESTEMUNHADA (DISCOVERY_BISHOP_HEALED).
+ * De quao perto uma coisa conta como TESTEMUNHADA.
  *
- * Um pouco alem do aggro dele (10): quem esta trocando tiro ve, quem passou
- * por outro corredor nao. O documento que este bit abre e uma medicao de
- * campo — e medicao pressupoe alguem no campo.
+ * Um raio so para todas as Descobertas que exigem presenca — a cura do Bispo,
+ * a galeria que a broca abre, o modulo que o Coveiro arranca. Um pouco alem do
+ * aggro dos chefes (10): quem esta trocando tiro ve, quem passou por outro
+ * corredor nao. Os documentos que estes bits abrem sao relatorios de CAMPO, e
+ * campo pressupoe alguem la.
+ *
+ * Um numero, e nao um por bicho: o criterio e o mesmo em todos os casos, e
+ * tres copias divergiriam no primeiro ajuste.
  */
-export const BISHOP_HEAL_WITNESS_RANGE = 12;
+export const WITNESS_RANGE = 12;
 
 /**
  * Supernova Fungica — a assinatura e a PRINCIPAL resposta a distancia do Bispo.

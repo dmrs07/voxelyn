@@ -1,6 +1,7 @@
 import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
+  WITNESS_RANGE,
   DIAMANDIS_BEAM_COOLDOWN_TICKS,
   DIAMANDIS_BEAM_DAMAGE,
   DIAMANDIS_BEAM_LENGTH,
@@ -22,6 +23,9 @@ import {
   DIAMANDIS_DRILL_WIDTH,
   DIAMANDIS_DRILL_WINDUP_TICKS,
   DIAMANDIS_HP,
+  DIAMANDIS_MODULE_COUNT,
+  DIAMANDIS_MODULE_EXPOSE_AT,
+  DIAMANDIS_MODULE_ORE,
   DIAMANDIS_RADIUS,
   DIAMANDIS_REACTOR_CADENCE_SCALE,
   DIAMANDIS_REACTOR_EMBER_RADIUS,
@@ -51,7 +55,6 @@ import {
   MINER_RAGE_HEAT,
   MINER_RAGE_SPEED,
   BISHOP_FUNGAL_SEARCH,
-  BISHOP_HEAL_WITNESS_RANGE,
   BISHOP_HP,
   BISHOP_NOVA_COOLDOWN_TICKS,
   BISHOP_NOVA_DAMAGE,
@@ -121,6 +124,10 @@ import {
   SULFUR_BOMBER_GAS_LIFE_TICKS,
   SULFUR_BOMBER_GAS_RADIUS,
   UNDERTAKER_PULL_COOLDOWN_TICKS,
+  UNDERTAKER_SALVAGE_ESCAPE_DIST,
+  UNDERTAKER_SALVAGE_RANGE,
+  UNDERTAKER_SALVAGE_REACH,
+  UNDERTAKER_SALVAGE_WINDUP_TICKS,
   UNDERTAKER_PULL_MIN_RANGE,
   UNDERTAKER_PULL_RANGE,
   UNDERTAKER_PULL_STEP,
@@ -136,11 +143,15 @@ import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  BOSS_MODULE_DRILL,
+  BOSS_MODULE_SCANNER,
+  BOSS_MODULE_TOWER,
   BOSS_PHASE_REACTOR,
   BOSS_PHASE_SUMMON,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_DIAMANDIS_CORRIDOR,
+  DISCOVERY_DIAMANDIS_MODULE,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
   LURKER_EXPOSED,
@@ -572,6 +583,43 @@ export const damageEntity = (
         x: ent.x,
         y: ent.y,
         amount: MINER_ORE_DROP,
+        total: state.stats.oreCollected,
+      });
+    }
+  }
+  // O DIAMANDIS paga pelo que NAO foi levado embora. Cada modulo ainda preso
+  // a carcaça vira lasca no abate; os arrancados ja foram — ou estao a caminho
+  // da borda nas maos de um Coveiro.
+  if (ent.archetype === 'diamandis') {
+    let kept = 0;
+    for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+      if ((state.bossRuntime.modulesLost & (1 << m)) === 0) kept++;
+    }
+    if (kept > 0) {
+      const paid = kept * DIAMANDIS_MODULE_ORE;
+      state.stats.oreCollected += paid;
+      events.push({
+        t: 'ore_gained',
+        x: ent.x,
+        y: ent.y,
+        amount: paid,
+        total: state.stats.oreCollected,
+      });
+    }
+  }
+  // O CARREGADOR abatido DERRUBA a peca — e ela ainda pode ser sua. E a
+  // segunda metade da escolha: deixar o Coveiro arrancar nao e perder a
+  // sucata, e passar a ter de intercepta-lo antes da borda.
+  if (ent.archetype === 'undertaker' && (ent.mood ?? 0) > 0) {
+    const module = ent.mood! - 1;
+    if ((state.bossRuntime.modulesLost & (1 << module)) !== 0) {
+      state.stats.oreCollected += DIAMANDIS_MODULE_ORE;
+      events.push({ t: 'boss_module', x: ent.x, y: ent.y, module, state: 'dropped' });
+      events.push({
+        t: 'ore_gained',
+        x: ent.x,
+        y: ent.y,
+        amount: DIAMANDIS_MODULE_ORE,
         total: state.stats.oreCollected,
       });
     }
@@ -1111,6 +1159,25 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       });
     }
     events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MINER_CLEAVE_RADIUS });
+  } else if (action.kind === 'haul' && enemy.archetype === 'undertaker' && (enemy.mood ?? 0) > 0) {
+    // ARRANQUE DO MODULO. O mesmo eletroima, outro alvo: aqui ele nao puxa
+    // ninguem para perto, ele destaca a peca. O chefe perde a arma daquele
+    // modulo NESTE instante — e a partir daqui o Coveiro vira um carregador,
+    // que e um alvo diferente de um Coveiro caçando.
+    const module = enemy.mood! - 1;
+    const bit = 1 << module;
+    if ((state.bossRuntime.modulesLost & bit) === 0) {
+      state.bossRuntime.modulesLost |= bit;
+      events.push({ t: 'boss_module', x: enemy.x, y: enemy.y, module, state: 'detached' });
+      // Ver o arranque e a Descoberta: e quando fica claro que o Coveiro nao
+      // e minion do chefe — e um catador que chegou primeiro.
+      const witness = nearestTarget(state, enemy.x, enemy.y);
+      if (witness && distTo(enemy, witness) <= WITNESS_RANGE) {
+        markDiscovery(state.stats, DISCOVERY_DIAMANDIS_MODULE);
+      }
+      events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.4 });
+    }
+    return;
   } else if (action.kind === 'haul' && target) {
     // O ELETROIMA. Arrasta o alvo em passos pequenos, e cada passo respeita a
     // colisao: quem tem uma quina entre si e o Coveiro para NELA, e nao no
@@ -1313,7 +1380,7 @@ const bishopRegen = (state: SurvivalState, enemy: Entity, events: SemanticEvent[
     const witness = nearestTarget(state, enemy.x, enemy.y);
     if (
       witness &&
-      distTo(enemy, witness) <= BISHOP_HEAL_WITNESS_RANGE &&
+      distTo(enemy, witness) <= WITNESS_RANGE &&
       hasLineOfSight(state, enemy.x, enemy.y, witness.x, witness.y)
     ) {
       markDiscovery(state.stats, DISCOVERY_BISHOP_HEALED);
@@ -1805,7 +1872,7 @@ const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: Seman
       // esta do outro lado dela e quem mais precisa entender o que aconteceu.
       if (opened && (state.stats.discoveries & DISCOVERY_DIAMANDIS_CORRIDOR) === 0) {
         const witness = nearestTarget(state, enemy.x, enemy.y);
-        if (witness && distTo(enemy, witness) <= BISHOP_HEAL_WITNESS_RANGE) {
+        if (witness && distTo(enemy, witness) <= WITNESS_RANGE) {
           markDiscovery(state.stats, DISCOVERY_DIAMANDIS_CORRIDOR);
         }
       }
@@ -1832,6 +1899,172 @@ const diamandisDrillStride = (state: SurvivalState, enemy: Entity, events: Seman
       setSurface(state, i, SURF_EMBER, DIAMANDIS_REACTOR_EMBER_TICKS);
     }
   }
+};
+
+/** O chefe ainda tem esta arma? (o modulo dela nao foi arrancado) */
+const hasModule = (state: SurvivalState, module: number): boolean =>
+  (state.bossRuntime.modulesLost & (1 << module)) === 0;
+
+/**
+ * Solta os modulos conforme a vida cai. Ordem fixa, do maior alcance para o
+ * menor: e ensinavel, e faz o cerco em volta do chefe ir FECHANDO.
+ *
+ * Soltar nao tira a arma — o modulo continua pendurado e funcionando. O que
+ * muda e que agora um Coveiro consegue engatar o eletroima nele.
+ */
+const diamandisShedModules = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const fraction = enemy.hp / enemy.maxHp;
+  for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+    const bit = 1 << m;
+    if ((state.bossRuntime.modulesExposed & bit) !== 0) continue;
+    if (fraction > DIAMANDIS_MODULE_EXPOSE_AT[m]) continue;
+    state.bossRuntime.modulesExposed |= bit;
+    events.push({ t: 'boss_module', x: enemy.x, y: enemy.y, module: m, state: 'exposed' });
+  }
+};
+
+/**
+ * O modulo solto que um Coveiro ainda pode arrancar, ou -1.
+ *
+ * "Ainda pode" exclui os ja arrancados E os que outro Coveiro ja engatou: sem
+ * a segunda checagem, os tres Coveiros de uma galeria ferrifera convergiam
+ * todos para a mesma peca e dois deles ficavam parados em cima do chefe sem
+ * nada para fazer. A varredura e por indice crescente, deterministica.
+ */
+const claimableModule = (state: SurvivalState, undertaker: Entity): number => {
+  for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+    const bit = 1 << m;
+    if ((state.bossRuntime.modulesExposed & bit) === 0) continue;
+    if ((state.bossRuntime.modulesLost & bit) !== 0) continue;
+    const claimed = state.enemies.some(
+      (e) => e.alive && e.archetype === 'undertaker' && e !== undertaker && e.mood === m + 1,
+    );
+    if (!claimed) return m;
+  }
+  return -1;
+};
+
+/**
+ * O PASSO DO COVEIRO SUCATEIRO: ele larga o jogador e vai buscar a peca.
+ *
+ * Devolve `true` quando assumiu o tick — o Coveiro so volta a caçar gente
+ * quando nao ha nada solto para recolher. Isso e caracterizacao, e nao um
+ * favor ao jogador: ele foi construido para recolher automatos abatidos, e
+ * entre um Prospector de pe e uma carcaça de escavadeira ele escolhe a
+ * carcaça. Toda vez.
+ *
+ * `mood` guarda o modulo reivindicado (m + 1, para 0 continuar significando
+ * "nenhum"), e `contactReadyAt` guarda se ele ja esta CARREGANDO. Nenhum campo
+ * novo na entidade: os dois viajam no snapshot e entram no resync, e um chefe
+ * opcional nao justifica engordar todo inimigo do jogo.
+ */
+const undertakerSalvageStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  dt: number,
+  events: SemanticEvent[],
+): boolean => {
+  const carrying = (enemy.mood ?? 0) > 0 && (state.bossRuntime.modulesLost & (1 << (enemy.mood! - 1))) !== 0;
+  const w = state.config.width;
+  const h = state.config.height;
+
+  if (carrying) {
+    // CARREGANDO: ele vai para a borda mais proxima e sai do mapa com a peca.
+    // O caminho e reto de proposito — ele nao esta fugindo do jogador, esta
+    // cumprindo uma rota de entrega, e a linha reta e o que torna o intercepto
+    // possivel: da para ver para onde ele vai e cortar caminho.
+    const toLeft = enemy.x;
+    const toRight = w - enemy.x;
+    const toTop = enemy.y;
+    const toBottom = h - enemy.y;
+    const best = Math.min(toLeft, toRight, toTop, toBottom);
+    const dir =
+      best === toLeft ? { x: -1, y: 0 }
+      : best === toRight ? { x: 1, y: 0 }
+      : best === toTop ? { x: 0, y: -1 }
+      : { x: 0, y: 1 };
+    enemy.facing = { ...dir };
+    const speed = ARCHETYPES.undertaker.speed * surfaceSpeedMul(state, enemy);
+    const moved = moveEntity(state, enemy, dir.x * speed * dt, dir.y * speed * dt);
+    // Ele ABRE caminho ate a borda, e isso nao e um detalhe de conveniencia:
+    // um carregador que trava na primeira rocha nunca chega a lugar nenhum, e
+    // a escolha inteira desmonta — "deixar trabalhar" viraria "espere, ele vai
+    // ficar preso e voce mata depois". Com a saida possivel, o preco de deixar
+    // a peca sair e real, e o intercepto vira decisao de rota.
+    //
+    // Em linha reta, e nao contornando: e o que torna o corte de caminho
+    // legivel. Da para ver para onde ele vai.
+    if (moved.blockCell) {
+      const { x: bx, y: by } = moved.blockCell;
+      const opened = breakSolid(state, bx, by, events) || ripSolid(state, bx, by, events);
+      if (!opened) {
+        // MINERIO e cristal ele nao come — sao recurso do jogador, e vale aqui
+        // a mesma regra da broca. Contorna deslizando pelo eixo
+        // perpendicular, sempre para o mesmo lado primeiro (deterministico).
+        //
+        // Sem este desvio a rota morria contra o primeiro veio: medido na
+        // seed 404, o carregador parava em x=74 de um mapa de 96 e ficava ali
+        // pelo resto da run. "Deixar trabalhar" virava "espere, ele empaca" —
+        // e a escolha inteira desmontava, porque o preco de nao interceptar
+        // nunca chegava a ser cobrado.
+        const perp = { x: -dir.y, y: dir.x };
+        const slid = moveEntity(state, enemy, perp.x * speed * dt, perp.y * speed * dt);
+        if (slid.blockedX || slid.blockedY) {
+          moveEntity(state, enemy, -perp.x * speed * dt, -perp.y * speed * dt);
+        }
+      }
+    }
+    // FORA DE ALCANCE: a borda do mapa, ou longe o bastante da carcaça para a
+    // peca ter saido da luta. Ver UNDERTAKER_SALVAGE_ESCAPE_DIST.
+    const carcass = state.enemies.find((e) => e.archetype === 'diamandis');
+    const farFromFight =
+      carcass !== undefined && distTo(enemy, carcass) > UNDERTAKER_SALVAGE_ESCAPE_DIST;
+    if (farFromFight || enemy.x < 2 || enemy.y < 2 || enemy.x > w - 2 || enemy.y > h - 2) {
+      // Saiu do mapa. A peca foi junto, e com ela a recompensa dela.
+      events.push({
+        t: 'boss_module',
+        x: enemy.x,
+        y: enemy.y,
+        module: enemy.mood! - 1,
+        state: 'lost',
+      });
+      enemy.alive = false;
+      // NAO passa por `damageEntity`: ninguem o abateu, ele foi embora. Contar
+      // isto como abate creditaria ao jogador um kill que ele nao fez — e, pior,
+      // o registro do bestiario diria que ele resolveu um problema que na
+      // verdade escapou.
+    }
+    return true;
+  }
+
+  const boss = state.enemies.find((e) => e.alive && e.archetype === 'diamandis');
+  if (!boss) {
+    enemy.mood = 0;
+    return false;
+  }
+  const claimed = (enemy.mood ?? 0) > 0 ? enemy.mood! - 1 : claimableModule(state, enemy);
+  if (claimed < 0) {
+    enemy.mood = 0;
+    return false;
+  }
+  if (distTo(enemy, boss) > UNDERTAKER_SALVAGE_RANGE) {
+    enemy.mood = 0;
+    return false;
+  }
+  enemy.mood = claimed + 1;
+
+  const toward = normalized(boss.x - enemy.x, boss.y - enemy.y);
+  enemy.facing = { ...toward };
+  if (distTo(enemy, boss) <= UNDERTAKER_SALVAGE_REACH) {
+    if (state.tick >= enemy.rangedReadyAt) {
+      enemy.rangedReadyAt = state.tick + UNDERTAKER_SALVAGE_WINDUP_TICKS + 20;
+      startAction(state, enemy, 'haul', toward, UNDERTAKER_SALVAGE_WINDUP_TICKS, 6, events, boss.id);
+    }
+    return true;
+  }
+  const speed = ARCHETYPES.undertaker.speed * surfaceSpeedMul(state, enemy);
+  moveEntity(state, enemy, toward.x * speed * dt, toward.y * speed * dt);
+  return true;
 };
 
 /**
@@ -1991,6 +2224,13 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       );
       continue;
     }
+    // COVEIRO SUCATEIRO: se ha peca solta para recolher, e isso que ele faz.
+    // Roda antes do fluxo comum porque ele LARGA o jogador para trabalhar —
+    // ver `undertakerSalvageStep`.
+    if (enemy.archetype === 'undertaker' && undertakerSalvageStep(state, enemy, dt, events)) {
+      continue;
+    }
+
     // Espreitadores e Fole tem fluxo proprio, como o Miner: o comportamento
     // deles nao e "perseguir e bater", e o fluxo comum so os deformaria.
     if (enemy.archetype === 'mud_lamprey' || enemy.archetype === 'frost_wraith') {
@@ -2190,6 +2430,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         // Diamandis a COME. O que a mantem justa continua sendo o 1,8 s
         // parado antes de sair.
         if (
+          hasModule(state, BOSS_MODULE_DRILL) &&
           state.tick >= enemy.nextActionAt &&
           dist >= DIAMANDIS_DRILL_MIN_RANGE &&
           dist <= DIAMANDIS_DRILL_MAX_RANGE
@@ -2208,6 +2449,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           continue;
         }
         if (
+          hasModule(state, BOSS_MODULE_TOWER) &&
           state.tick >= enemy.rangedReadyAt &&
           dist >= DIAMANDIS_DEMOLISH_MIN_RANGE &&
           dist <= DIAMANDIS_DEMOLISH_RANGE
@@ -2233,6 +2475,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         // ser outra luta em vez da mesma com numeros piores.
         if (
           !reactorDown &&
+          hasModule(state, BOSS_MODULE_SCANNER) &&
           state.tick >= enemy.contactReadyAt &&
           dist <= DIAMANDIS_BEAM_LENGTH &&
           hasLineOfSight(state, enemy.x, enemy.y, player.x, player.y)
@@ -2415,6 +2658,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
   // O DIAMANDIS tem a propria fase de uma vez: o reator vaza abaixo da metade.
   const diamandis = state.enemies.find((e) => e.archetype === 'diamandis');
+  if (diamandis && diamandis.alive) diamandisShedModules(state, diamandis, events);
   if (
     diamandis &&
     diamandis.alive &&

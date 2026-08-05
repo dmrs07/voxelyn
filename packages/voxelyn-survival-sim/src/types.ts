@@ -246,6 +246,15 @@ export const DISCOVERY_BISHOP_NOVA_SURVIVED = 1 << 15;
  * sentido para quem viu a resposta da companhia acontecer na propria parede.
  */
 export const DISCOVERY_DIAMANDIS_CORRIDOR = 1 << 16;
+/**
+ * VIU um Coveiro arrancar um modulo da carcaça do Diamandis.
+ *
+ * E o instante em que o jogador descobre que aquelas unidades nao vieram COM o
+ * chefe — vieram antes dele, e continuam executando uma ordem de recolhimento
+ * que ninguem cancelou. O que ele faz com essa informacao (deixar trabalhar ou
+ * interceptar) e a escolha do encontro.
+ */
+export const DISCOVERY_DIAMANDIS_MODULE = 1 << 17;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -395,12 +404,37 @@ export type BossRuntime = {
    * de onde a carga cai divergem no estrago.
    */
   blastCells: number[];
+  /**
+   * Modulos do Diamandis que ja se SOLTARAM da carcaca (bitmask por indice).
+   *
+   * Solto nao e perdido: a arma daquele modulo continua funcionando enquanto
+   * ele estiver ali pendurado. O que "solto" muda e que um Coveiro passa a
+   * conseguir engatar o eletroima nele.
+   */
+  modulesExposed: number;
+  /**
+   * Modulos ARRANCADOS (bitmask). Estes o chefe perdeu de vez: a arma
+   * correspondente para de existir na luta.
+   *
+   * Separado de `modulesExposed` porque as duas coisas respondem a perguntas
+   * diferentes — "da para arrancar?" e "ele ainda tem essa arma?" — e um unico
+   * campo com tres estados obrigaria todo leitor a saber a ordem deles.
+   */
+  modulesLost: number;
 };
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
 export const BOSS_PHASE_SUMMON = 1 << 0;
 /** O colapso do reator do Diamandis, abaixo de metade da vida. */
 export const BOSS_PHASE_REACTOR = 1 << 1;
+
+/**
+ * Os modulos do Diamandis, na ordem em que se soltam. Cada um alimenta UMA
+ * arma: sem o modulo, a arma nao existe mais na luta.
+ */
+export const BOSS_MODULE_DRILL = 0;
+export const BOSS_MODULE_TOWER = 1;
+export const BOSS_MODULE_SCANNER = 2;
 
 /** Postura do Miner. Ele nasce PASSIVO; o calor da sua arma decide o resto. */
 export const MINER_MOOD_PASSIVE = 0;
@@ -715,6 +749,25 @@ export type SemanticEvent =
    * unica informacao que importa — "agora queima" — nao chegaria.
    */
   | { t: 'beam_line'; x: number; y: number; dx: number; dy: number; length: number; powered: boolean }
+  /**
+   * A vida de um modulo do Diamandis, num evento so em vez de tres tipos.
+   *
+   * `exposed`  soltou da carcaca — a partir daqui um Coveiro consegue engatar;
+   * `detached` foi ARRANCADO: o chefe perdeu a arma e a peca esta sendo levada;
+   * `dropped`  o carregador caiu e a peca voltou ao chao, recuperavel;
+   * `lost`     a peca saiu do mapa. A recompensa foi junto.
+   *
+   * Um tipo por estado inflaria o wire com quatro formatos identicos, e o
+   * cliente ja trata efeitos por posicao: o que muda entre eles e a cor do
+   * aviso, nao a estrutura.
+   */
+  | {
+      t: 'boss_module';
+      x: number;
+      y: number;
+      module: number;
+      state: 'exposed' | 'detached' | 'dropped' | 'lost';
+    }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
   | { t: 'extracted'; withCore: boolean }

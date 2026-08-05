@@ -44,7 +44,11 @@
 // prospeccao, com `powered` distinguindo a varredura inofensiva da passagem
 // com potencia). Um cliente antigo nao desenharia nem a marca nem a linha — e
 // as duas SAO o telegrafo: sem elas, os dois golpes chegam sem sinal.
-export const PROTOCOL_VERSION = 16;
+// 17: o evento `boss_module` — a vida de um modulo do Diamandis (soltou,
+// arrancado, derrubado, perdido). Um cliente antigo nao desenharia nem o
+// modulo pendurado nem o Coveiro carregando: a ESCOLHA do encontro (deixar
+// trabalhar ou interceptar) e feita a partir do que se ve.
+export const PROTOCOL_VERSION = 17;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -163,7 +167,14 @@ export const PROTOCOL_VERSION = 16;
 // DISCOVERY_DIAMANDIS_CORRIDOR (bit 16). A camara final de todo bioma Aurix
 // troca de ocupante: dois peers em versoes diferentes montam elencos
 // diferentes da mesma seed.
-export const SIMULATION_VERSION = 25;
+// 26: A ECONOMIA DOS COVEIROS. Modulos presos ao Diamandis (cada um alimenta
+// uma arma) soltam por limiar de vida, e um Coveiro que enxergue um modulo
+// solto LARGA o jogador, arranca a peca e a carrega para fora do alcance. O
+// chefe perde a arma; a recompensa do abate paga so pelos modulos que ficaram.
+// `modulesExposed`/`modulesLost` entram no hash e a Descoberta
+// DISCOVERY_DIAMANDIS_MODULE (bit 17) na bitmask: dois peers em versoes
+// diferentes discordam de quais armas o chefe ainda tem.
+export const SIMULATION_VERSION = 26;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

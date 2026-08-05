@@ -1,4 +1,4 @@
-// O Codex corporativo (99 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (102 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -46,6 +46,7 @@
 import {
   DISCOVERY_BISHOP_FELLED,
   DISCOVERY_DIAMANDIS_CORRIDOR,
+  DISCOVERY_DIAMANDIS_MODULE,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_CARGO_LOST,
@@ -290,6 +291,9 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   // A broca do Diamandis abrindo corredor: o unico fato do encontro que
   // ensina o que ele e — um golpe que nao mira em voce, reescreve a sala.
   { bit: DISCOVERY_DIAMANDIS_CORRIDOR, fragmentId: 'AX-ENG-029' },
+  // Um Coveiro arrancando um modulo da carcaça: o instante em que o jogador
+  // descobre que aquelas unidades nao vieram com o chefe — vieram ANTES dele.
+  { bit: DISCOVERY_DIAMANDIS_MODULE, fragmentId: 'AX-UNK-060' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
@@ -356,6 +360,8 @@ export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchet
   { bit: DISCOVERY_BISHOP_HEALED, archetype: 'bishop' },
   { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, archetype: 'bishop' },
   { bit: DISCOVERY_DIAMANDIS_CORRIDOR, archetype: 'diamandis' },
+  { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'diamandis' },
+  { bit: DISCOVERY_DIAMANDIS_MODULE, archetype: 'undertaker' },
   { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
   { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
   { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
@@ -511,8 +517,11 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   // obra → a ordem que ele acusou e nao cumpriu → o que ele estava cercando.
   'AX-PUB-010': ['AX-ENG-029', 'AX-PRC-014'],
   'AX-ENG-029': ['AX-PUB-010', 'AX-INC-041'],
+  'AX-PRC-026': ['AX-PUB-010', 'AX-EXE-048', 'AX-UNK-043'],
+  'AX-EXE-048': ['AX-PRC-026', 'AX-UNK-059'],
   'AX-INC-041': ['AX-ENG-029', 'AX-UNK-059'],
   'AX-UNK-059': ['AX-INC-041', 'AX-UNK-051', 'AX-UNK-050'],
+  'AX-UNK-060': ['AX-PRC-026', 'AX-UNK-043', 'AX-EXE-048'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
@@ -580,6 +589,9 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-ENG-029': 0,
   'AX-INC-041': 1,
   'AX-UNK-059': 3,
+  'AX-PRC-026': 1,
+  'AX-EXE-048': 2,
+  'AX-UNK-060': 3,
 };
 
 /**
@@ -637,6 +649,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PRC-023',
   'AX-PRC-024',
   'AX-PRC-025',
+  'AX-PRC-026',
   'AX-GEN-G02',
   // Ato IV — Incidente
   'AX-INC-022',
@@ -677,6 +690,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-045',
   'AX-EXE-046',
   'AX-EXE-047',
+  'AX-EXE-048',
   // Ato VI — Memoria
   'AX-UNK-041',
   'AX-UNK-042',
@@ -696,6 +710,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-057',
   'AX-UNK-058',
   'AX-UNK-059',
+  'AX-UNK-060',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
@@ -793,6 +808,24 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
     allOf: [
       { kind: 'asset', archetype: 'diamandis' },
       { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_CORRIDOR },
+    ],
+  }),
+  // Os dois documentos dos COVEIROS. O parecer de recuperacao explica de onde
+  // eles vieram (o item 3 que ninguem cancelou) e so abre para quem VIU um
+  // arrancar um modulo; a reclassificacao fecha a piada contabil e exige ter
+  // derrubado a maquina que a companhia ja tinha declarado parte do terreno.
+  define('AX-PRC-026', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'undertaker' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_MODULE },
+    ],
+  }),
+  define('AX-EXE-048', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'diamandis' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_DIAMANDIS_MODULE },
     ],
   }),
   define('AX-UNK-059', {

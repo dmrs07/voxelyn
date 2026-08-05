@@ -11,7 +11,7 @@
 // 3. O COLAPSO muda a luta, e nao so os numeros: uma arma DESLIGA.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { spawnEnemy } from '../src/entities';
+import { damageEntity, spawnEnemy } from '../src/entities';
 import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import {
@@ -20,6 +20,9 @@ import {
   DIAMANDIS_DEMOLISH_WINDUP_TICKS,
   DIAMANDIS_DRILL_TICKS,
   DIAMANDIS_DRILL_WINDUP_TICKS,
+  DIAMANDIS_MODULE_COUNT,
+  DIAMANDIS_MODULE_EXPOSE_AT,
+  DIAMANDIS_MODULE_ORE,
   DIAMANDIS_REACTOR_HP_FRACTION,
   SECTOR_COUNT,
   SOLID_NONE,
@@ -29,6 +32,9 @@ import {
   SURF_NONE,
 } from '../src/constants';
 import {
+  BOSS_MODULE_DRILL,
+  BOSS_MODULE_SCANNER,
+  BOSS_MODULE_TOWER,
   BOSS_PHASE_REACTOR,
   DISCOVERY_DIAMANDIS_CORRIDOR,
   type SemanticEvent,
@@ -288,5 +294,121 @@ describe('Diamandis — colapso do reator', () => {
       state.player.hp = state.player.maxHp;
     }
     expect(started, 'o scanner continuou operando com o reator em colapso').toBe(0);
+  });
+});
+
+describe('Diamandis — os Coveiros e a escolha', () => {
+  /** Diamandis ferido no ponto pedido, com um Coveiro perto o bastante. */
+  const salvageScene = (seed: number, hpFraction: number) => {
+    const { state, boss, px, py } = duel(seed, 6);
+    boss.hp = boss.maxHp * hpFraction;
+    const coveiro = spawnEnemy(state, 'undertaker', px + 9, py, false);
+    return { state, boss, coveiro, px, py };
+  };
+
+  it('os modulos SOLTAM conforme a vida cai, na ordem ensinavel', () => {
+    const { state, boss } = duel(401, 6);
+    expect(state.bossRuntime.modulesExposed).toBe(0);
+
+    boss.hp = boss.maxHp * (DIAMANDIS_MODULE_EXPOSE_AT[0] - 0.01);
+    stepRun(state, [emptyCommand()]);
+    expect(state.bossRuntime.modulesExposed & (1 << BOSS_MODULE_DRILL)).not.toBe(0);
+    expect(state.bossRuntime.modulesExposed & (1 << BOSS_MODULE_SCANNER)).toBe(0);
+
+    boss.hp = boss.maxHp * (DIAMANDIS_MODULE_EXPOSE_AT[2] - 0.01);
+    stepRun(state, [emptyCommand()]);
+    for (let m = 0; m < DIAMANDIS_MODULE_COUNT; m++) {
+      expect(state.bossRuntime.modulesExposed & (1 << m), `modulo ${m}`).not.toBe(0);
+    }
+    // Soltar NAO e perder: as armas continuam de pe enquanto ninguem arranca.
+    expect(state.bossRuntime.modulesLost).toBe(0);
+  });
+
+  it('o Coveiro larga o jogador e vai ARRANCAR a peca', () => {
+    const { state, coveiro } = salvageScene(402, DIAMANDIS_MODULE_EXPOSE_AT[0] - 0.05);
+    let detached = -1;
+    for (let t = 0; t < 400 && detached < 0; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_module' && ev.state === 'detached') detached = ev.module;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(detached, 'o Coveiro nunca arrancou o modulo').toBe(BOSS_MODULE_DRILL);
+    expect(state.bossRuntime.modulesLost & (1 << BOSS_MODULE_DRILL)).not.toBe(0);
+    expect(coveiro.alive).toBe(true);
+  });
+
+  it('arrancado, o chefe PERDE aquela arma', () => {
+    const { state, boss } = duel(403, 11);
+    // A broca some; o resto da luta continua.
+    state.bossRuntime.modulesExposed = 1 << BOSS_MODULE_DRILL;
+    state.bossRuntime.modulesLost = 1 << BOSS_MODULE_DRILL;
+    let drills = 0;
+    for (let t = 0; t < 300; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'drill') drills++;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(drills, 'perfurou sem o modulo da broca').toBe(0);
+  });
+
+  it('o carregador que ESCAPA leva a recompensa junto', () => {
+    const { state, coveiro } = salvageScene(404, DIAMANDIS_MODULE_EXPOSE_AT[0] - 0.05);
+    let lost = false;
+    for (let t = 0; t < 2000 && !lost; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'boss_module' && ev.state === 'lost') lost = true;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(lost, 'o Coveiro nunca chegou a borda com a peca').toBe(true);
+    expect(coveiro.alive, 'saiu do mapa, entao nao esta mais na luta').toBe(false);
+    // E ninguem o abateu: sair do mapa nao pode virar abate no registro.
+    expect(state.stats.kills.undertaker).toBe(0);
+  });
+
+  it('matar o carregador DERRUBA a peca — e ela ainda e sua', () => {
+    const { state, coveiro } = salvageScene(405, DIAMANDIS_MODULE_EXPOSE_AT[0] - 0.05);
+    for (let t = 0; t < 400 && state.bossRuntime.modulesLost === 0; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.bossRuntime.modulesLost, 'o modulo nao chegou a ser arrancado').not.toBe(0);
+
+    const oreBefore = state.stats.oreCollected;
+    const events: SemanticEvent[] = [];
+    damageEntity(state, coveiro, coveiro.maxHp * 2, events, { kind: 'player_shot' });
+    expect(events.some((e) => e.t === 'boss_module' && e.state === 'dropped')).toBe(true);
+    expect(state.stats.oreCollected).toBe(oreBefore + DIAMANDIS_MODULE_ORE);
+  });
+
+  it('o abate paga pelos modulos que NAO foram levados', () => {
+    const { state, boss } = duel(406, 6);
+    const oreBefore = state.stats.oreCollected;
+    damageEntity(state, boss, boss.maxHp * 2, [], { kind: 'player_shot' });
+    // Nenhum Coveiro trabalhou: os tres modulos continuam na carcaça.
+    expect(state.stats.oreCollected).toBe(oreBefore + DIAMANDIS_MODULE_COUNT * DIAMANDIS_MODULE_ORE);
+  });
+
+  it('cada modulo levado embora e uma lasca a menos no abate', () => {
+    const { state, boss } = duel(407, 6);
+    state.bossRuntime.modulesLost = (1 << BOSS_MODULE_DRILL) | (1 << BOSS_MODULE_TOWER);
+    const oreBefore = state.stats.oreCollected;
+    damageEntity(state, boss, boss.maxHp * 2, [], { kind: 'player_shot' });
+    expect(state.stats.oreCollected).toBe(oreBefore + DIAMANDIS_MODULE_ORE);
+  });
+
+  it('dois Coveiros nao disputam a MESMA peca', () => {
+    const { state, px, py } = salvageScene(408, DIAMANDIS_MODULE_EXPOSE_AT[1] - 0.05);
+    spawnEnemy(state, 'undertaker', px + 10, py + 2, false);
+    for (let t = 0; t < 60; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    const claims = state.enemies
+      .filter((e) => e.alive && e.archetype === 'undertaker' && (e.mood ?? 0) > 0)
+      .map((e) => e.mood);
+    expect(new Set(claims).size, 'dois Coveiros no mesmo modulo').toBe(claims.length);
   });
 });

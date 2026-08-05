@@ -2462,6 +2462,11 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // Demolicao cai divergem no estrago, um telegrafo depois.
   mix(state.bossRuntime.blastCells.length);
   for (const cell of state.bossRuntime.blastCells) mix(cell);
+  // Quais modulos soltaram e quais foram arrancados decidem QUAIS ARMAS o
+  // chefe ainda tem e quanto minerio o abate paga: divergir aqui e divergir na
+  // luta e na recompensa.
+  mix(state.bossRuntime.modulesExposed);
+  mix(state.bossRuntime.modulesLost);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));
