@@ -1970,7 +1970,8 @@ document
 // ---------------------------------------------------------------------------
 // O monograma no topo de cada trilho. Montado por codigo, e nao inline no HTML,
 // pelo mesmo motivo da placa da pausa: o SVG vive em aurix.ts, unico lugar da
-// marca, e cada instancia precisa do proprio id de gradiente.
+// marca — cada chamada aqui so referencia o `<symbol>` compartilhado, nao
+// repete a geometria.
 for (const id of ['menu-mark', 'options-mark', 'records-mark', 'matrix-mark', 'rank-mark']) {
   const slot = document.getElementById(id);
   if (slot) slot.innerHTML = aurixMarkHtml();
