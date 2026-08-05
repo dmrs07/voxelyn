@@ -17,6 +17,8 @@ import { sectorBiome } from '../src/strata';
 import {
   DEVOURER_BURROWED_ARMOR,
   DEVOURER_ERUPT_WINDUP_TICKS,
+  DEVOURER_LEAP_MAX_RANGE,
+  DEVOURER_LEAP_MIN_RANGE,
   SECTOR_COUNT,
   SOLID_NONE,
   SURF_GLASS,
@@ -24,6 +26,7 @@ import {
   SURF_SILT,
 } from '../src/constants';
 import {
+  DEVOURER_AIRBORNE,
   DEVOURER_BURROWED,
   DEVOURER_SURFACED,
   DISCOVERY_SILICA_VITRIFIED,
@@ -169,6 +172,153 @@ describe('Devorador Branco — o contra-jogo', () => {
       state.player.hp = state.player.maxHp;
     }
     expect(state.surface[glassCell], 'o chefe apagou a decisao do jogador').toBe(SURF_GLASS);
+  });
+});
+
+describe('Devorador Branco — o arco', () => {
+  // O ciclo completo, observado de fora: onde ele decolou, onde caiu, e o que
+  // aconteceu com o jogador entre uma coisa e outra.
+  const flyOnce = (seed: number, ticks = 400) => {
+    const { state, worm, px, py } = arena(seed);
+    let launch: { x: number; y: number } | null = null;
+    let landing: { x: number; y: number } | null = null;
+    let airborneTicks = 0;
+    let longestFlight = 0;
+    let midFlightDamage = 0;
+    let midFlightSilt = 0;
+    for (let t = 0; t < ticks && !landing; t++) {
+      const moodBefore = worm.mood;
+      const hpBefore = state.player.hp;
+      const siltBefore = countSurface(state, SURF_SILT, px, py, 20);
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.action === 'erupt') launch = { x: ev.x, y: ev.y };
+      }
+      // ESTRITAMENTE no meio do voo: nem o tick da decolagem (que entra no ar)
+      // nem o da queda (que sai dele). E nesses ticks que "passar por baixo do
+      // arco nao machuca" tem de valer.
+      if (moodBefore === DEVOURER_AIRBORNE && worm.mood === DEVOURER_AIRBORNE) {
+        airborneTicks++;
+        longestFlight = Math.max(longestFlight, airborneTicks);
+        midFlightDamage += Math.max(0, hpBefore - state.player.hp);
+        midFlightSilt += countSurface(state, SURF_SILT, px, py, 20) - siltBefore;
+      } else {
+        airborneTicks = 0;
+      }
+      if (moodBefore === DEVOURER_AIRBORNE && worm.mood === DEVOURER_SURFACED) {
+        landing = { x: worm.x, y: worm.y };
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    return { state, worm, launch, landing, longestFlight, midFlightDamage, midFlightSilt };
+  };
+
+  it('decola LONGE de onde cai: a emergencia virou trajetoria', () => {
+    const { launch, landing } = flyOnce(601);
+    expect(launch, 'nunca decolou').not.toBeNull();
+    expect(landing, 'nunca caiu').not.toBeNull();
+    const span = Math.hypot(launch!.x - landing!.x, launch!.y - landing!.y);
+    // O minimo e o que separa um arco de um pulo no lugar; o maximo existe para
+    // o voo — que e tempo de dano cheio — nao virar a luta inteira.
+    expect(span, `arco de ${span.toFixed(1)} tiles`).toBeGreaterThanOrEqual(DEVOURER_LEAP_MIN_RANGE - 1.5);
+    expect(span).toBeLessThanOrEqual(DEVOURER_LEAP_MAX_RANGE + 1.5);
+  });
+
+  it('passar POR BAIXO do arco nao machuca, e o voo nao deixa rastro', () => {
+    // A queda e mirada no jogador parado, entao o fim do voo passa exatamente
+    // por cima dele: se o arco cobrasse contato, este teste veria.
+    const { midFlightDamage, midFlightSilt, longestFlight } = flyOnce(602);
+    expect(longestFlight, 'nao chegou a voar').toBeGreaterThan(0);
+    expect(midFlightDamage, 'o meio do arco cobrou dano').toBe(0);
+    // Silica solta e o que ele revira RASPANDO por baixo do chao. No ar nao ha
+    // chao raspando, e a faixa que para de crescer e o aviso de que ele saiu.
+    expect(midFlightSilt, 'deixou rastro estando no ar').toBe(0);
+  });
+
+  it('nunca fica presa no ar: todo arco termina', () => {
+    // Regressao de um travamento real. O vao da acao arredondava para BAIXO e
+    // expirava um tick antes da chegada; `advanceAction` limpava a acao, o
+    // chefe caia no fluxo de IA voando e ficava suspenso a 0,1 tile do alvo,
+    // para sempre. Um chefe que trava encerra a run em silencio.
+    const { state, worm } = arena(603);
+    let airborne = 0;
+    let worst = 0;
+    for (let t = 0; t < 900; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      airborne = worm.mood === DEVOURER_AIRBORNE ? airborne + 1 : 0;
+      worst = Math.max(worst, airborne);
+    }
+    // O arco mais longo possivel leva ~25 ticks. O dobro disso e folga larga;
+    // "para sempre" bate no teto de 900 e nao passa nem perto.
+    expect(worst, `ficou ${worst} ticks no ar`).toBeLessThan(60);
+  });
+
+  it('deixa cratera nas DUAS pontas: o arco entrega areia em dobro', () => {
+    const { state, worm, px, py } = arena(604);
+    const before = countSurface(state, SURF_SILT, px, py, 20);
+    let craters = 0;
+    let mood = worm.mood;
+    for (let t = 0; t < 400 && craters < 2; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      // Decolagem e queda sao as duas transicoes de humor do arco.
+      if (mood !== DEVOURER_AIRBORNE && worm.mood === DEVOURER_AIRBORNE) craters++;
+      if (mood === DEVOURER_AIRBORNE && worm.mood === DEVOURER_SURFACED) craters++;
+      mood = worm.mood;
+    }
+    expect(craters, 'o ciclo nao teve duas pontas').toBe(2);
+    expect(countSurface(state, SURF_SILT, px, py, 20)).toBeGreaterThan(before);
+  });
+});
+
+describe('Devorador Branco — o vidro nega as DUAS pontas', () => {
+  /**
+   * Vitrifica um disco em volta do jogador e abre exatamente UMA janela de
+   * areia, na distancia pedida. E o unico jeito de separar as duas recusas: com
+   * o disco inteiro fechado, a QUEDA e negada primeiro e a decolagem nunca chega
+   * a ser consultada.
+   */
+  const glassDisc = (state: SurvivalState, px: number, py: number, holeAt: number | null) => {
+    const w = state.config.width;
+    for (let y = py - 14; y <= py + 14; y++) {
+      for (let x = px - 14; x <= px + 14; x++) {
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        const d = Math.hypot(x - px, y - py);
+        if (d > 14) continue;
+        // A janela de queda: sempre colada no jogador, para a mira dele achar.
+        if (d <= 1.5) continue;
+        if (holeAt !== null && Math.abs(d - holeAt) <= 1.2) continue;
+        state.surface[y * w + x] = SURF_GLASS;
+        state.surfaceTimer[y * w + x] = 0;
+      }
+    }
+  };
+
+  const eruptsWithin = (state: SurvivalState, ticks: number): boolean => {
+    for (let t = 0; t < ticks; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.action === 'erupt') return true;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    return false;
+  };
+
+  it('sem chao solto para DECOLAR ele nao salta, mesmo podendo cair', () => {
+    // A queda tem onde acontecer (a areia colada no jogador), mas toda a faixa
+    // de decolagem virou vidro. Antes do arco isto seria uma emergencia normal:
+    // o vidro so podia negar a saida. Agora nega tambem o impulso.
+    const { state, px, py } = arena(611);
+    glassDisc(state, px, py, null);
+    expect(eruptsWithin(state, 700), 'decolou de cima do vidro').toBe(false);
+  });
+
+  it('abrindo uma faixa de areia na distancia de decolagem, ele volta a saltar', () => {
+    // O controle do teste acima, e ele importa: um Devorador que simplesmente
+    // nunca saltasse passaria no primeiro sem provar nada.
+    const { state, px, py } = arena(611);
+    glassDisc(state, px, py, DEVOURER_LEAP_MIN_RANGE + 1);
+    expect(eruptsWithin(state, 700), 'a faixa de areia nao bastou').toBe(true);
   });
 });
 

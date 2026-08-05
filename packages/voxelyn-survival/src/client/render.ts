@@ -63,6 +63,13 @@ import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
 import {
+  LEAP_PEAK_PX,
+  leapHeight,
+  leapProgress,
+  leapShadowAlpha,
+  leapShadowScale,
+} from './leap-arc';
+import {
   applyBossModuleMark,
   bossModuleNameKey,
   bossModulePresentation,
@@ -1790,8 +1797,8 @@ export class SurvivalRenderer {
     }
 
     // sombra de contato + barra de vida, comuns aos caminhos sprite e voxel
-    const drawShadow = (sx: number, sy: number, size: number): void => {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    const drawShadow = (sx: number, sy: number, size: number, alpha = 0.45): void => {
+      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
       ctx.beginPath();
       ctx.ellipse(sx, sy, size, size * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1986,6 +1993,15 @@ export class SurvivalRenderer {
         draw: () => {
           const [sx, sy] = toScreen(enemy.x, enemy.y);
           const size = enemy.radius * TILE_W * 0.9 * z;
+          // O ARCO do Devorador. A simulacao nao tem altura — nao ha colisao em
+          // z — entao ela viaja como TEMPO, no vao da acao de salto, e vira
+          // pixel aqui. `sy` continua sendo o chao (e onde a sombra e a
+          // profundidade da fila moram); so o corpo sobe.
+          const leap =
+            enemy.action?.kind === 'leap'
+              ? leapHeight(leapProgress(state.tick, enemy.action.startedAt, enemy.action.releaseAt))
+              : 0;
+          const bodyY = sy - leap * LEAP_PEAK_PX * z;
           if (lurkerHidden) {
             drawLurkerDisturbance(
               ctx,
@@ -2002,7 +2018,7 @@ export class SurvivalRenderer {
             }
             return;
           }
-          drawShadow(sx, sy, size);
+          drawShadow(sx, sy, size * leapShadowScale(leap), leapShadowAlpha(leap));
           const drew = this.sprites.drawEntity(
             ctx,
             enemy.archetype,
@@ -2011,7 +2027,7 @@ export class SurvivalRenderer {
             presented.facingY,
             presented.elapsedMs,
             sx,
-            sy,
+            bodyY,
             spriteZoom,
             // Um sheet de frames fixos nao sabe o humor da entidade, e o
             // mineiro enfurecido precisa ler como enfurecido A DISTANCIA. O
@@ -2027,7 +2043,7 @@ export class SurvivalRenderer {
           if (!drew) {
             drawVoxelEntity(ctx, {
               sx,
-              sy,
+              sy: bodyY,
               z,
               radius: enemy.radius,
               brightness: b,
@@ -2051,16 +2067,19 @@ export class SurvivalRenderer {
             });
           }
           if (enemy.stunnedUntil > state.tick) {
-            drawStunIndicator(ctx, sx, sy, size, z, enemy.id, state.tick);
+            drawStunIndicator(ctx, sx, bodyY, size, z, enemy.id, state.tick);
           }
           if (enemy.elite && drew) {
+            // O anel de elite fica no CHAO com a sombra, e nao com o corpo: ele
+            // marca a celula que a criatura ocupa, e um anel subindo junto com
+            // um salto marcaria o ar.
             ctx.strokeStyle = PAL.fire;
             ctx.lineWidth = z;
             ctx.beginPath();
             ctx.ellipse(sx, sy, size * 1.05, size * 0.55, 0, 0, Math.PI * 2);
             ctx.stroke();
           }
-          drawHealthBar(sx, sy - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
+          drawHealthBar(sx, bodyY - size * 2.1 - 5 * z, size, enemy.hp / enemy.maxHp);
         },
       });
     }

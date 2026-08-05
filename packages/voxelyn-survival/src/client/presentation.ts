@@ -68,7 +68,12 @@ export const actionAnimation = (action: EntityActionKind): string => {
     action === 'haul' ||
     action === 'drill' ||
     action === 'erupt' ||
-    action === 'freeze'
+    action === 'freeze' ||
+    // O voo herda a pose do telegrafo: no atlas do Devorador o `special` e o
+    // corpo erguido com a boca aberta, que e exatamente a silhueta de quem
+    // atravessa o ar. Cair no `attack` traria a pose de bote, com o corpo
+    // ainda plantado no chao.
+    action === 'leap'
   ) {
     return 'special';
   }

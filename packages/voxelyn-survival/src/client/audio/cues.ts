@@ -76,6 +76,11 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   demolish: 'telegraphDetonate',
   beam: 'telegraphHurl',
   freeze: 'telegraphPulse',
+  // O ARCO nao avisa: `null`, como o tiro do jogador. Ele nao e um telegrafo —
+  // e o golpe ja acontecendo, e o aviso dele foi a decolagem (`erupt`), que
+  // soou um instante antes. Um segundo bipe aqui ensinaria que ha o que
+  // esquivar no meio do voo, e nao ha: o arco nao machuca por baixo.
+  leap: null,
 };
 
 /** Centro geometrico de uma descarga, em tiles. */

@@ -705,6 +705,49 @@ export const DEVOURER_ERUPT_RADIUS = 2.8;
 export const DEVOURER_ERUPT_DAMAGE = 30;
 /** Ate onde ele procura chao valido quando o alvo esta sobre vidro. */
 export const DEVOURER_ERUPT_SEARCH = 6;
+
+/**
+ * O SALTO. A emergencia nao e um ponto, e um ARCO.
+ *
+ * Ele nao sobe onde esta: recua por baixo ate um ponto de DECOLAGEM, rompe o
+ * chao ali e atravessa o ar em parabola ate a queda, que e o ponto mirado. Duas
+ * crateras por ciclo, uma em cada ponta, e nada no meio — passar por baixo do
+ * arco nao machuca. A regra que o jogador aprende e limpa: saia das duas
+ * marcas, e o intervalo entre elas e seu.
+ *
+ * O que isso muda no ENCONTRO, e a razao de existir: no ar nao ha areia entre a
+ * bala e o corpo, entao o dano entra inteiro. E o comprimento do arco nao e
+ * dele — e seu. Ele so decola de chao solto, entao vitrificar em volta de si
+ * empurra a decolagem para longe, e decolagem longe e voo longo, e voo longo e
+ * tiro de graca. O contra-jogo do vidro deixa de ser so "negar a saida" e passa
+ * a ser "esticar a trajetoria": a mesma materia, agora com duas alavancas.
+ *
+ * O minimo existe porque um arco curto nao se le como arco — sem distancia nao
+ * ha silhueta subindo, so um corpo pulando no lugar. O maximo existe porque o
+ * voo e tempo de invulnerabilidade zero, e um arco de meia arena viraria a luta
+ * inteira num tiro ao alvo.
+ */
+export const DEVOURER_LEAP_MIN_RANGE = 5;
+export const DEVOURER_LEAP_MAX_RANGE = 11;
+/** Bem mais rapido que o mergulho: um salto nao e uma caminhada. */
+export const DEVOURER_LEAP_SPEED = 9;
+/**
+ * Ate onde ele procura chao de decolagem valido em volta do ponto ideal.
+ *
+ * Menor que a busca da queda de proposito. Recusar a QUEDA e o premio do
+ * jogador e tem de ser dificil de conseguir; recusar a DECOLAGEM e um bonus
+ * do mesmo trabalho, e se as duas buscas fossem igualmente teimosas o vidro
+ * perto do corpo dele quase nunca contaria.
+ */
+export const DEVOURER_LAUNCH_SEARCH = 3;
+/**
+ * Dano da decolagem, mais baixo que o da queda.
+ *
+ * A queda e mirada em voce; a decolagem acontece longe, num ponto que ele
+ * escolheu por ser chao solto. Cobrar o mesmo pelas duas puniria estar perto de
+ * um lugar que o jogo nunca prometeu que seria seguro.
+ */
+export const DEVOURER_LAUNCH_DAMAGE = 18;
 /** Quanto a mira antecipa o movimento do alvo, em segundos. */
 export const DEVOURER_LEAD_SECONDS = 0.9;
 /** Meia-largura da faixa de silica que o mergulho deixa. */

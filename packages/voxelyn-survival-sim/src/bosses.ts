@@ -51,6 +51,8 @@ export const emptyBossRuntime = (): BossRuntime => ({
   blastCells: [],
   modulesExposed: 0,
   modulesLost: 0,
+  leapToX: 0,
+  leapToY: 0,
 });
 
 /**

@@ -48,7 +48,13 @@
 // arrancado, derrubado, perdido). Um cliente antigo nao desenharia nem o
 // modulo pendurado nem o Coveiro carregando: a ESCOLHA do encontro (deixar
 // trabalhar ou interceptar) e feita a partir do que se ve.
-export const PROTOCOL_VERSION = 17;
+// 18: a acao `leap` — o arco do Devorador Branco, da decolagem a queda. O
+// `EntityActionKind` e um enum no wire, entao um cliente antigo recebe um
+// `kind` que ele nao conhece e cai no ramo de ataque: desenharia o chefe
+// PLANTADO NO CHAO durante o voo, porque a altura da parabola sai justamente
+// do vao de tempo dessa acao. O corpo apareceria atravessando a arena colado no
+// piso, sem sombra descolada e sem arco nenhum.
+export const PROTOCOL_VERSION = 18;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -203,7 +209,18 @@ export const PROTOCOL_VERSION = 17;
 // derreter o lago da Rainha e ficar na faixa do Magnetarca (bits 19..24). A
 // bitmask de descobertas ja entrava no hash: dois peers em versoes diferentes
 // divergem no primeiro tick em que qualquer uma delas acende.
-export const SIMULATION_VERSION = 29;
+// 30: o Devorador Branco deixa de EMERGIR e passa a SALTAR. A emergencia era um
+// ponto; agora e um arco — ele recua por baixo ate um ponto de decolagem, rompe
+// o chao ali e atravessa o ar ate a queda, com cratera nas duas pontas e nada
+// no meio. Muda posicao, dano, humor (`DEVOURER_AIRBORNE`) e o hash: o ponto de
+// queda entra no estado autoritativo. Duas simulacoes em versoes diferentes
+// divergem no primeiro ciclo do chefe.
+//
+// O contra-jogo cresceu junto, e essa e a razao da mudanca: ele so decola de
+// chao SOLTO, entao vitrificar em volta de si empurra a decolagem para longe —
+// e arco longo e voo longo, e no ar nao ha areia absorvendo tiro. O vidro
+// deixou de so negar a saida e passou a esticar a trajetoria.
+export const SIMULATION_VERSION = 30;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

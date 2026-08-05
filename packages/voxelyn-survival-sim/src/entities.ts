@@ -65,6 +65,11 @@ import {
   DEVOURER_ERUPT_DAMAGE,
   DEVOURER_ERUPT_RADIUS,
   DEVOURER_ERUPT_SEARCH,
+  DEVOURER_LAUNCH_DAMAGE,
+  DEVOURER_LAUNCH_SEARCH,
+  DEVOURER_LEAP_MAX_RANGE,
+  DEVOURER_LEAP_MIN_RANGE,
+  DEVOURER_LEAP_SPEED,
   DEVOURER_ERUPT_WINDUP_TICKS,
   DEVOURER_HP,
   DEVOURER_LEAD_SECONDS,
@@ -216,6 +221,7 @@ import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  DEVOURER_AIRBORNE,
   DEVOURER_BURROWED,
   DEVOURER_SURFACED,
   FURNACE_COOLING,
@@ -2125,6 +2131,20 @@ const devourerStep = (
   const w = state.config.width;
   const surfaced = enemy.mood === DEVOURER_SURFACED;
 
+  // NO AR o arco ja foi resolvido inteiro na decolagem, e quem conduz o corpo e
+  // `devourerLeapStride`, no ramo em que a ACAO manda (o mesmo do Corcel e da
+  // broca). Chegar aqui voando significa que a acao sumiu no meio do voo —
+  // um `endsAt` curto demais, um atordoamento, um resync.
+  //
+  // A resposta e POUSAR, e nao ignorar. Ignorar foi a primeira versao e deixava
+  // o chefe suspenso para sempre: sem acao para conduzi-lo e sem humor que a IA
+  // aceitasse, ele parava no ar e a luta acabava ali. Um chefe que trava e pior
+  // que um chefe que cai um passo fora do lugar.
+  if (enemy.mood === DEVOURER_AIRBORNE) {
+    devourerLand(state, enemy, events);
+    return;
+  }
+
   if (surfaced) {
     // EXPOSTO: a janela de dano. Ele anda devagar na direcao do jogador e cobra
     // contato de quem ficar colado, mas nao tem golpe — o golpe dele foi a
@@ -2184,16 +2204,115 @@ const devourerStep = (
   const leadY = player.y + player.vy * DEVOURER_LEAD_SECONDS;
   const spot = devourerSurfacingSpot(state, Math.floor(leadX), Math.floor(leadY));
   if (spot < 0) {
-    // Chao vitrificado em toda a volta: ele NAO consegue sair aqui. Volta a
+    // Chao vitrificado em toda a volta: ele NAO consegue cair aqui. Volta a
     // andar por baixo e tenta de novo mais tarde — e essa recusa e a
     // recompensa inteira de quem transformou a areia em vidro.
     enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
     events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.2 });
     return;
   }
-  enemy.x = (spot % w) + 0.5;
-  enemy.y = Math.floor(spot / w) + 0.5;
-  startAction(state, enemy, 'erupt', toward, DEVOURER_ERUPT_WINDUP_TICKS, 6, events, player.id);
+  const landX = (spot % w) + 0.5;
+  const landY = Math.floor(spot / w) + 0.5;
+
+  // A DECOLAGEM fica ATRAS da queda, na linha por onde ele veio: ele recua por
+  // baixo o quanto for preciso e sobe dali. E aqui que o vidro cobra a segunda
+  // vez — sem chao solto para romper, nao ha salto.
+  const launch = devourerLaunchSpot(state, enemy, landX, landY);
+  if (launch < 0) {
+    enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 1.2 });
+    return;
+  }
+  enemy.x = (launch % w) + 0.5;
+  enemy.y = Math.floor(launch / w) + 0.5;
+  state.bossRuntime.leapToX = landX;
+  state.bossRuntime.leapToY = landY;
+  // O telegrafo aponta para a QUEDA e nao para o jogador: e o rumo do arco que
+  // o aviso precisa prometer, e nos poucos ticks entre a mira e a decolagem o
+  // jogador ja andou. Apontar para ele desenharia uma linha que o salto nao vai
+  // seguir.
+  const arc = normalized(landX - enemy.x, landY - enemy.y);
+  startAction(state, enemy, 'erupt', arc, DEVOURER_ERUPT_WINDUP_TICKS, 6, events, player.id);
+};
+
+/**
+ * Onde o salto DECOLA, ou -1 se nao houver chao solto para romper.
+ *
+ * O ponto ideal fica na reta entre ele e a queda, recuado o bastante para o
+ * arco ter comprimento legivel — a distancia e a que ele ja tem, presa entre o
+ * minimo e o maximo. Se ele estiver perto demais, o ponto cai ATRAS dele: e ele
+ * recua por baixo antes de subir, que e exatamente o que um bicho que toma
+ * impulso faz.
+ *
+ * A validacao e a MESMA da queda (`devourerSurfacingSpot`): nem vidro, nem
+ * solido. Reusar a funcao e o ponto — sao a mesma pergunta ("da para romper o
+ * chao aqui?") e duas copias dela acabariam discordando sobre o vidro, que e a
+ * unica coisa que o jogador controla no encontro.
+ */
+const devourerLaunchSpot = (
+  state: SurvivalState,
+  enemy: Entity,
+  landX: number,
+  landY: number,
+): number => {
+  const back = normalized(enemy.x - landX, enemy.y - landY);
+  const reach = Math.min(
+    DEVOURER_LEAP_MAX_RANGE,
+    Math.max(DEVOURER_LEAP_MIN_RANGE, Math.hypot(enemy.x - landX, enemy.y - landY))
+  );
+  return devourerSurfacingSpot(
+    state,
+    Math.floor(landX + back.x * reach),
+    Math.floor(landY + back.y * reach),
+    DEVOURER_LAUNCH_SEARCH
+  );
+};
+
+/**
+ * UM TICK DE VOO. Conduzido pela acao, como a investida do Corcel.
+ *
+ * Sem `moveEntity`: ele esta no AR, e parede nao vale para quem passa por cima
+ * dela — pela mesma razao que nao valia para quem passava por baixo. E sem
+ * rastro: silica solta e o que o corpo revira ao raspar por baixo do chao, e no
+ * arco nao ha chao raspando. O jogador que ve a faixa parar sabe que ele saiu.
+ */
+const devourerLeapStride = (
+  state: SurvivalState,
+  enemy: Entity,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const toX = state.bossRuntime.leapToX;
+  const toY = state.bossRuntime.leapToY;
+  const dx = toX - enemy.x;
+  const dy = toY - enemy.y;
+  const remaining = Math.hypot(dx, dy);
+  const step = DEVOURER_LEAP_SPEED * dt;
+  if (remaining <= step || remaining <= 0.0001) {
+    enemy.x = toX;
+    enemy.y = toY;
+    devourerLand(state, enemy, events);
+    return;
+  }
+  enemy.x += (dx / remaining) * step;
+  enemy.y += (dy / remaining) * step;
+  enemy.facing = { x: dx / remaining, y: dy / remaining };
+};
+
+/**
+ * A QUEDA: a segunda cratera, e o fim do arco.
+ *
+ * Ela devolve o chefe a janela de dano de sempre — o salto ACRESCENTA tempo
+ * exposto, nao substitui o que ja existia. A acao e limpa aqui e nao pelo
+ * relogio dela: quem decide que o voo acabou e a CHEGADA, e um arco que
+ * terminasse pelo cronometro poderia largar o corpo um passo antes ou depois do
+ * ponto que o telegrafo prometeu.
+ */
+const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  enemy.action = undefined;
+  enemy.mood = DEVOURER_SURFACED;
+  enemy.nextActionAt = state.tick + DEVOURER_SURFACE_TICKS;
+  devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
 };
 
 /**
@@ -2206,10 +2325,15 @@ const devourerStep = (
  * A busca e em anel crescente e deterministica: duas maquinas da mesma sala
  * precisam faze-lo emergir na MESMA celula.
  */
-const devourerSurfacingSpot = (state: SurvivalState, cx: number, cy: number): number => {
+const devourerSurfacingSpot = (
+  state: SurvivalState,
+  cx: number,
+  cy: number,
+  search = DEVOURER_ERUPT_SEARCH,
+): number => {
   const w = state.config.width;
   const h = state.config.height;
-  for (let r = 0; r <= DEVOURER_ERUPT_SEARCH; r++) {
+  for (let r = 0; r <= search; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -2227,14 +2351,22 @@ const devourerSurfacingSpot = (state: SurvivalState, cx: number, cy: number): nu
 };
 
 /**
- * A EMERGENCIA propriamente dita: o sumidouro.
+ * O SUMIDOURO: a cratera que rompe o chao, nas DUAS pontas do arco.
  *
- * Abre o chao em volta (fragil cede, rocha nao — ele sobe por onde o terreno ja
+ * Abre o chao em volta (fragil cede, rocha nao — ele rompe por onde o terreno ja
  * era instavel), machuca quem estiver no raio e deixa o solo revirado como
- * silica solta. O estrago dele ALIMENTA o contra-jogo: cada emergencia entrega
- * mais areia para o jogador vitrificar.
+ * silica solta. O estrago dele ALIMENTA o contra-jogo: cada cratera entrega
+ * mais areia para o jogador vitrificar, e agora sao duas por ciclo.
+ *
+ * O `damage` e parametro porque as duas pontas nao valem o mesmo: a queda e
+ * mirada em voce, a decolagem acontece longe. Ver DEVOURER_LAUNCH_DAMAGE.
  */
-const devourerErupt = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+const devourerCrater = (
+  state: SurvivalState,
+  enemy: Entity,
+  damage: number,
+  events: SemanticEvent[],
+): void => {
   const w = state.config.width;
   const r = Math.ceil(DEVOURER_ERUPT_RADIUS);
   const cx = Math.floor(enemy.x);
@@ -2263,15 +2395,42 @@ const devourerErupt = (state: SurvivalState, enemy: Entity, events: SemanticEven
   for (const player of state.players) {
     if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
     if (distTo(enemy, player) > DEVOURER_ERUPT_RADIUS) continue;
-    damageEntity(state, player, DEVOURER_ERUPT_DAMAGE, events, {
+    damageEntity(state, player, damage, events, {
       kind: 'enemy_contact',
       archetype: 'white_devourer',
       elite: enemy.elite,
     });
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
-  enemy.mood = DEVOURER_SURFACED;
-  enemy.nextActionAt = state.tick + DEVOURER_SURFACE_TICKS;
+};
+
+/**
+ * A DECOLAGEM: primeira cratera, e o comeco do voo.
+ *
+ * Encadear a acao do arco aqui dentro segue o caminho que o Coveiro ja abriu
+ * (`haul` arma o `slam` no proprio release). A acao de salto nao tem ramo de
+ * release nenhum: ela existe para POR o corpo no fluxo conduzido pela acao e
+ * para dar ao cliente o vao de tempo do voo. Quem termina o arco e a chegada,
+ * em `devourerLeapStride`.
+ */
+const devourerErupt = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  devourerCrater(state, enemy, DEVOURER_LAUNCH_DAMAGE, events);
+  const toX = state.bossRuntime.leapToX;
+  const toY = state.bossRuntime.leapToY;
+  const dx = toX - enemy.x;
+  const dy = toY - enemy.y;
+  const distance = Math.hypot(dx, dy);
+  // O vao da acao arredonda para CIMA, e o `ceil` nao e gosto: o voo anda em
+  // passos de `velocidade / TICK_HZ` e o ultimo passo quase nunca fecha a
+  // distancia exata. Arredondando para baixo, a acao expirava um tick antes de
+  // o corpo chegar — e `advanceAction`, ao limpar a acao, devolve o chefe ao
+  // fluxo de IA no meio do arco. Medido: o salto de 10 tiles pedia 23 ticks e
+  // recebia 22, e o Devorador ficava parado no ar a 0,1 tile do alvo, para
+  // sempre. A acao tem de sobreviver ao voo; quem o encerra e a CHEGADA.
+  const flightTicks = Math.max(1, Math.ceil((distance / DEVOURER_LEAP_SPEED) * TICK_HZ));
+  enemy.mood = DEVOURER_AIRBORNE;
+  const arc = distance > 0.0001 ? { x: dx / distance, y: dy / distance } : { ...enemy.facing };
+  startAction(state, enemy, 'leap', arc, flightTicks, 0, events);
 };
 
 // ---------------------------------------------------------------------------
@@ -2974,7 +3133,13 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // `driftByVelocity`.
       if (enemy.archetype === 'fungal_horse') horseChargeStride(state, enemy, events);
       else if (enemy.archetype === 'diamandis') diamandisDrillStride(state, enemy, events);
-      else driftByVelocity(state, enemy, dt, events, false);
+      // O ARCO do Devorador entra aqui pela mesma razao dos dois acima: durante
+      // o voo a ACAO conduz o corpo. Gated no humor porque a outra acao dele —
+      // o telegrafo da decolagem — e justamente o momento em que ele NAO se
+      // mexe, e um passo de voo ali o arrastaria durante o proprio aviso.
+      else if (enemy.archetype === 'white_devourer' && enemy.mood === DEVOURER_AIRBORNE) {
+        devourerLeapStride(state, enemy, dt, events);
+      } else driftByVelocity(state, enemy, dt, events, false);
       // A varredura do feixe roda DURANTE o telegrafo: e ela que promete a
       // linha, e o cliente redesenha a cada emissao porque o chefe continua
       // girando devagar enquanto mede.

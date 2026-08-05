@@ -343,6 +343,17 @@ export type EntityActionKind =
   | 'beam'
   /** Emergencia do Devorador: o chao racha no ponto marcado, e entao ele sobe. */
   | 'erupt'
+  /**
+   * O ARCO do Devorador, da decolagem ate a queda.
+   *
+   * Nao tem `release`: nenhum ramo de `releaseAction` responde por ela. Ela
+   * existe para dois trabalhos, e os dois sao de tempo. Na simulacao, e o que
+   * poe o voo no ramo em que a ACAO conduz o corpo passo a passo (o mesmo do
+   * Corcel e da broca), em vez de no fluxo de IA. No cliente, `startedAt` e
+   * `releaseAt` dao o vao do voo — e so com ele da para desenhar a parabola,
+   * porque a ALTURA nao existe na simulacao e nao viaja no snapshot.
+   */
+  | 'leap'
   /** Congelamento da Rainha: o lago se refaz e os Espectros saem dele. */
   | 'freeze'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
@@ -473,6 +484,19 @@ export type BossRuntime = {
    * campo com tres estados obrigaria todo leitor a saber a ordem deles.
    */
   modulesLost: number;
+  /**
+   * Onde o salto do Devorador vai CAIR, escolhido na decolagem.
+   *
+   * Vive aqui e nao na acao pelo mesmo motivo das cargas de demolicao: o alvo
+   * nao pode se corrigir no meio do voo. Sair de baixo da queda e a resposta
+   * inteira do golpe, e ela so existe se o ponto ficar onde nasceu — um arco
+   * que persegue seria dano sem contra-jogo.
+   *
+   * Entra no hash: duas simulacoes que discordem de onde ele cai divergem na
+   * cratera, no dano e na posicao do chefe pelo resto da luta.
+   */
+  leapToX: number;
+  leapToY: number;
 };
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
@@ -509,6 +533,16 @@ export const LURKER_EXPOSED = 1;
  */
 export const DEVOURER_BURROWED = 0;
 export const DEVOURER_SURFACED = 1;
+/**
+ * NO AR: entre a decolagem e a queda do salto.
+ *
+ * E uma postura e nao um detalhe de animacao porque ela decide DANO. Submerso a
+ * areia absorve 88% do tiro; no ar nao ha areia entre a bala e o corpo, e o
+ * dano entra inteiro — a mesma regra do `SURFACED`, por um motivo diferente. O
+ * cliente tambem depende dela: e o unico momento em que o corpo e desenhado
+ * ACIMA do chao, com sombra propria embaixo.
+ */
+export const DEVOURER_AIRBORNE = 2;
 
 /**
  * Posturas dos chefes de estrato que ALTERNAM, e por que elas viajam.
