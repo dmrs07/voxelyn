@@ -1027,6 +1027,28 @@ const minerFrame = (dir, anim, f) => renderVoxels(minerModel(anim, f), DIR_INDEX
 // gelo palido. Nenhum introduz material novo: as rampas ja existem.
 // ---------------------------------------------------------------------------
 
+/**
+ * Gira um modelo um quarto de volta, levando a frente de +x para -y.
+ *
+ * Quatro assinaturas (Lampreia, Fole, Escoriaceo, Espectro) nasceram autoradas
+ * com a frente em +x — cabeca, valvula e eixo do corpo correndo pelo x. O
+ * contrato do rasterizador e frente em -y (ver DIRECTION_ROTATION em
+ * voxel.mjs), entao cada direcao pedida saia girada um quadrante: quem andava
+ * para dl aparecia olhando ul, quem andava para dr aparecia olhando dl.
+ *
+ * Girar o modelo PRONTO, em vez de reescrever caixa a caixa, mantem a
+ * autoria legivel no eixo em que esses corpos compridos foram pensados. A
+ * transformacao e a rotacao (x, y) -> (y, -x) aplicada a caixas: a origem
+ * vira (y, -x-w) e largura e profundidade trocam de lugar.
+ *
+ * O +0.5 nao e ajuste de gosto: shellVoxels rotaciona CANTOS de voxel, e a
+ * rotacao verdadeira de uma caixa desloca o canto em uma unidade fina. Sem a
+ * compensacao, dl e ul saiam 2px a esquerda das outras direcoes — a uniao dos
+ * frames alargava alem da margem e o sprite pulava um pixel ao virar.
+ */
+const quarterTurn = (boxes) =>
+  boxes.map((b) => ({ ...b, x: b.y, y: -b.x - b.w + 0.5, w: b.d, d: b.w }));
+
 // enemy-resonant 64x64 — nodulo mineral lento coroado de cristais vivos.
 // A leitura que importa: os CRISTAIS sao a arma, nao o corpo. No idle eles
 // pulsam devagar; no attack (o pulso que arma a sala) eles crescem e acendem.
@@ -1096,7 +1118,8 @@ const mudLampreyModel = (anim, f) => {
   b.push(box(hx + 0.4, 1, 2.8, 0.6, 0.6, 0.6, 'biolum'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const mudLampreyFrame = (dir, anim, f) => renderVoxels(mudLampreyModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const mudLampreyFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(mudLampreyModel(anim, f)), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // enemy-bellows 64x64 — o Fole: um saco de ar com costelas de osso.
 // O ciclo inteiro do bicho e RESPIRACAO, entao o idle e a mecanica: o saco
@@ -1127,7 +1150,8 @@ const bellowsModel = (anim, f) => {
   }
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const bellowsFrame = (dir, anim, f) => renderVoxels(bellowsModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const bellowsFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(bellowsModel(anim, f)), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // enemy-scoriac 64x64 — besouro de escoria: placas frias por fora, brasa viva
 // por dentro. A MECANICA esta na silhueta: as placas escondem o nucleo; o
@@ -1156,13 +1180,16 @@ const scoriacModel = (anim, f) => {
   b.push(box(0.5 + open + flinch, -2, 3.5 + vent, 3, 4, 1.5, 'rockDeep'));
   b.push(box(-3 - open + flinch, -2, 5 + vent, 1, 4, 0.5, 'scorch'));
   b.push(box(2.5 + open + flinch, -2, 5 + vent, 1, 4, 0.5, 'scorch'));
-  // Placa frontal menor: a "testa" que ele abaixa para investir.
-  b.push(box(-1 + flinch, -2.6, 2.5, 2, 1, 1.5, 'rockDeep'));
+  // Placa frontal menor: a "testa" que ele abaixa para investir. Na FRENTE do
+  // corpo (+x, o eixo em que este modelo foi autorado — ver quarterTurn): ela
+  // estava em -y, que e o flanco, e o besouro investia de lado.
+  b.push(box(2.5 + flinch, -1, 2.5, 1, 2, 1.5, 'rockDeep'));
   // Fresta dorsal: com as placas abertas, uma crista de brasa sobe no vao.
   if (open >= 1) b.push(box(-0.5 + flinch, -1, 4, 1, 2, 1 + open * 0.5, 'fire'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const scoriacFrame = (dir, anim, f) => renderVoxels(scoriacModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const scoriacFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(scoriacModel(anim, f)), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // enemy-frost-wraith 64x64 — o Espectro de Geada: um risco palido e raso.
 // Ele passa o jogo SOB o gelo (o cliente desenha a trilha de rachaduras);
@@ -1187,7 +1214,8 @@ const frostWraithModel = (anim, f) => {
   b.push(box(4.6, 0.6 + glide * 0.3, 1.8 + rise, 0.6, 0.6, 0.6, 'electric'));
   return anim === 'die' ? collapse(b, dieT(f)) : b;
 };
-const frostWraithFrame = (dir, anim, f) => renderVoxels(frostWraithModel(anim, f), DIR_INDEX[dir], 64, 64, 28, 54);
+const frostWraithFrame = (dir, anim, f) =>
+  renderVoxels(quarterTurn(frostWraithModel(anim, f)), DIR_INDEX[dir], 64, 64, 28, 54);
 
 // enemy-sulfur-bomber 64x64 — a MESMA silhueta do Spore Bomber, outra quimica.
 //
@@ -1506,10 +1534,10 @@ export const ENTITY_SPECS = [
   // Bestiario de assinatura (um por estrato). `version` nasce em 1: sao os
   // primeiros pixels destes atlases.
   base('enemy-resonant', 64, 64, 32, 60, { w: 0.88, h: 0.9 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, resonantFrame, 'voxel-isometric slow mineral node crowned with living electric crystals, dark rock body with glowing seams', 1),
-  base('enemy-mud-lamprey', 64, 64, 32, 60, { w: 0.8, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, mudLampreyFrame, 'voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes', 1),
-  base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 1),
-  base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 1),
-  base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 1),
+  base('enemy-mud-lamprey', 64, 64, 32, 60, { w: 0.8, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, mudLampreyFrame, 'voxel-isometric low mud eel, undulating dark segments, serrated dorsal fin, circular bone-ringed mouth, twin bioluminescent eyes', 2),
+  base('enemy-bellows', 64, 64, 32, 60, { w: 1, h: 0.9 }, { w: 1.1, h: 1.1, offsetX: 0, offsetY: 0 }, living, bellowsFrame, 'voxel-isometric wide breathing sac creature, sulfur-yellow bladder caged by bone ribs, rusted valve mouth, squat rust feet', 2),
+  base('enemy-scoriac', 64, 64, 32, 60, { w: 0.88, h: 0.8 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, scoriacFrame, 'voxel-isometric slag beetle, cold black scoria plates over a living ember core glowing through the seams, six charcoal legs', 2),
+  base('enemy-frost-wraith', 64, 64, 32, 60, { w: 0.72, h: 0.6 }, { w: 1, h: 1, offsetX: 0, offsetY: 0 }, living, frostWraithFrame, 'voxel-isometric pale ice wraith, low elongated milky body, translucent dorsal blade fin, wedge head with twin electric eyes', 2),
   // Fauna afinada por bioma. O de enxofre herda o `special` do Spore Bomber
   // (mesmo telegrafo de pod inchando), e o Coveiro tem o proprio: a carga do
   // eletroima, que e o aviso mais importante do bicho.

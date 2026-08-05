@@ -242,40 +242,49 @@ const statusText = (state: NodeState): string => {
   }
 };
 
-const walletCard = (label: MessageKey, value: string, note: MessageKey): HTMLElement => {
-  const card = el('div', 'matrix-card');
-  card.appendChild(el('div', 'matrix-card-label', t(label)));
-  card.appendChild(el('div', 'matrix-card-value', value));
-  card.appendChild(el('div', 'matrix-card-note', t(note)));
-  return card;
+/** Um par rotulo–valor da barra de titulo. A nota vira tooltip e fala. */
+const headStat = (label: MessageKey, value: string, note: string): HTMLElement => {
+  const stat = el('span', 'ax-head-stat');
+  stat.title = note;
+  stat.setAttribute('aria-label', `${t(label)}: ${value} — ${note}`);
+  stat.appendChild(el('span', 'ax-head-stat-label', t(label)));
+  stat.appendChild(el('span', 'ax-head-stat-value', value));
+  return stat;
 };
 
-const renderHeader = (view: MatrixViewState): HTMLElement => {
-  const header = el('div', 'matrix-header');
+/**
+ * As metricas — minerio, nucleos, geracao, protocolos — vivem na BARRA DE
+ * TITULO da folha (#matrix-head-stats), do lado oposto ao titulo, e nao numa
+ * fileira de cartoes no corpo: como cartoes elas empurravam trilhos e abas
+ * para baixo sem dizer nada que merecesse a altura. O container e estatico no
+ * index.html; quando ele nao existe (os testes montam o painel solto), nao ha
+ * onde desenhar e nada e desenhado.
+ */
+const renderHeadStats = (view: MatrixViewState): void => {
+  const host = document.getElementById('matrix-head-stats');
+  if (!host) return;
+  host.textContent = '';
   const profile = view.profile;
-  header.appendChild(
-    walletCard('matrix.wallet.ore', String(profile?.wallet.ore ?? 0), 'matrix.wallet.ore.note'),
+  host.appendChild(
+    headStat('matrix.wallet.ore', String(profile?.wallet.ore ?? 0), t('matrix.wallet.ore.note')),
   );
-  header.appendChild(
-    walletCard(
+  host.appendChild(
+    headStat(
       'matrix.wallet.cores',
       String(profile?.wallet.cores ?? 0),
-      'matrix.wallet.cores.note',
+      t('matrix.wallet.cores.note'),
     ),
   );
-  header.appendChild(
-    walletCard('matrix.generation', profile?.generation ?? 'G-00', 'matrix.generation.note'),
+  host.appendChild(
+    headStat('matrix.generation', profile?.generation ?? 'G-00', t('matrix.generation.note')),
   );
-  const protocols = el('div', 'matrix-card');
-  protocols.appendChild(el('div', 'matrix-card-label', t('matrix.protocols')));
-  protocols.appendChild(
-    el('div', 'matrix-card-value', String(profile?.purchasedUpgradeIds.length ?? 0)),
+  host.appendChild(
+    headStat(
+      'matrix.protocols',
+      `${profile?.purchasedUpgradeIds.length ?? 0}/${TOTAL_UPGRADES}`,
+      t('matrix.protocols.note', { total: TOTAL_UPGRADES }),
+    ),
   );
-  protocols.appendChild(
-    el('div', 'matrix-card-note', t('matrix.protocols.note', { total: TOTAL_UPGRADES })),
-  );
-  header.appendChild(protocols);
-  return header;
 };
 
 /**
@@ -714,9 +723,7 @@ const renderCodexTab = (
   }
 
   const contextIds = codexContextIds(view);
-  const visible = contextIds
-    ? codex.unlocked.filter((f) => contextIds.has(f.id))
-    : codex.unlocked;
+  const visible = contextIds ? codex.unlocked.filter((f) => contextIds.has(f.id)) : codex.unlocked;
 
   // A marcacao de leitura acompanha o documento ABERTO, nao o caminho ate ele:
   // cabecalho, link de relacionado e "Ver docs" do Registro passam todos por
@@ -791,7 +798,7 @@ export const renderMatrixPanel = (
 
   root.textContent = '';
 
-  root.appendChild(renderHeader(view));
+  renderHeadStats(view);
 
   const tabs = el('div', 'ax-tabs matrix-tabs');
   tabs.setAttribute('role', 'tablist');
