@@ -1104,3 +1104,147 @@ export const CONTAMINATION_WAVES: readonly (readonly [level: number, count: numb
   [0.6, 3],
   [0.85, 4],
 ];
+
+// ---------------------------------------------------------------------------
+// OS CHEFES DE ESTRATO: um dono para cada geologia
+// ---------------------------------------------------------------------------
+// A regra que rege os seis: nenhum inventa sistema novo. Cada um opera, em
+// escala de chefe, a alavanca que o proprio estrato ja tem — cristal que
+// descarrega, agua que conduz, gas que ocupa espaco, brasa que aquece, gelo que
+// derrete, minerio que atrai. E a mesma regra do bestiario de assinatura, e ela
+// vale ainda mais aqui: um chefe que trouxesse mecanica propria seria um chefe
+// que poderia estar em qualquer mapa.
+
+/**
+ * ARQUICANTOR (Catedral Prismatica) — a formacao cristalina articulada.
+ *
+ * Ele nao atira: CANTA, e a sala responde. O pulso arma todo cristal ao alcance
+ * e cada um descarrega pelas aberturas coladas nele — a mesma regra do
+ * Ressonante, na escala da nave inteira.
+ *
+ * O contra-jogo e uma decisao de quanto destruir: cristal quebrado antes do
+ * pulso e um cristal que nao canta, mas a Catedral tambem e a iluminacao e o
+ * recurso do setor. O jogador decide quanto da catedral apagar para sobreviver
+ * a ela.
+ */
+export const ARCHCANTOR_HP = 620;
+export const ARCHCANTOR_PULSE_RADIUS = 9;
+export const ARCHCANTOR_CRYSTAL_BUDGET = 26;
+export const ARCHCANTOR_WINDUP_TICKS = 34;
+export const ARCHCANTOR_COOLDOWN_TICKS = 150;
+/** Quanto a rede vazia o enfraquece: sem cristal, o canto nao tem quem responda. */
+export const ARCHCANTOR_SILENT_ARMOR = 1.5;
+
+/**
+ * LEVIATA DO LENCOL (Aquifero Negro) — o corpo que se move sob a agua.
+ *
+ * Mesma gramatica do Devorador Branco, outro elemento e outro contra-jogo: ele
+ * so anda e so emerge por superficie CONDUTIVA, e o que o detem nao e negar o
+ * chao — e eletrificar a agua. A descarga o atordoa pela regra generica que ja
+ * existe, e eletrifica a regiao inteira junto: o preco de para-lo e o mesmo
+ * meio ficar mortal para quem o parou.
+ */
+export const LEVIATHAN_HP = 800;
+export const LEVIATHAN_SWIM_SPEED = 5;
+export const LEVIATHAN_SURFACE_SPEED = 1.8;
+export const LEVIATHAN_RADIUS = 0.85;
+export const LEVIATHAN_SUBMERGED_ARMOR = 0.15;
+export const LEVIATHAN_SURFACE_TICKS = 100;
+export const LEVIATHAN_DIVE_MIN_TICKS = 60;
+export const LEVIATHAN_BREACH_WINDUP_TICKS = 26;
+export const LEVIATHAN_BREACH_RADIUS = 3;
+export const LEVIATHAN_BREACH_DAMAGE = 28;
+export const LEVIATHAN_BREACH_SEARCH = 7;
+export const LEVIATHAN_LEAD_SECONDS = 0.8;
+
+/**
+ * PULMAO-MATRIZ (Fenda Sulfurosa) — o orgao que faz o estrato respirar.
+ *
+ * FIXO: ele nao persegue ninguem, esta ancorado nos respiradouros. Inspira o
+ * gas da arena (abrindo zonas temporariamente seguras) e o expele em outra
+ * direcao. Quem entende a respiracao ganha rota; quem nao entende descobre que
+ * a passagem limpa de agora e a camara contaminada de daqui a pouco.
+ *
+ * O contra-jogo e incendiar a expiracao: o fogo sobe pela coluna de gas ate
+ * ele e machuca de verdade — e transforma parte da arena em fogo. Ele e o unico
+ * chefe do jogo cuja janela de dano o JOGADOR abre, e ela custa terreno.
+ */
+export const LUNG_MATRIX_HP = 700;
+export const LUNG_MATRIX_RADIUS = 0.9;
+export const LUNG_MATRIX_CYCLE_TICKS = 130;
+export const LUNG_MATRIX_BREATH_INTERVAL_TICKS = 10;
+export const LUNG_MATRIX_INHALE_RADIUS = 7;
+export const LUNG_MATRIX_INHALE_PER_BREATH = 10;
+export const LUNG_MATRIX_EXHALE_LENGTH = 12;
+export const LUNG_MATRIX_EXHALE_WIDTH = 1;
+/** Dano por celula de gas acesa encostada nele durante a expiracao. */
+export const LUNG_MATRIX_BURN_DAMAGE = 26;
+
+/**
+ * CORACAO DA FORNALHA (Fornalha Abissal) — o nucleo igneo parcialmente exposto.
+ *
+ * FIXO, como o Pulmao: a luta nao e contra um corpo, e contra a sala. Ele
+ * alterna SUPERAQUECIMENTO (blindado, e as fissuras da arena acendem em
+ * sequencia) e RESFRIAMENTO (vulneravel, e a sala esfria junto).
+ *
+ * So fica vulneravel no resfriamento, e essa e a leitura inteira: o jogador nao
+ * escolhe quando bater, escolhe onde estar quando puder.
+ */
+export const FURNACE_HEART_HP = 900;
+export const FURNACE_HEART_RADIUS = 1;
+export const FURNACE_HEART_CYCLE_TICKS = 150;
+export const FURNACE_HEART_HOT_ARMOR = 0.2;
+export const FURNACE_HEART_WAVE_RADIUS = 8;
+export const FURNACE_HEART_WAVE_INTERVAL_TICKS = 12;
+/** Meia-abertura do setor que acende por vez, em radianos (~60 graus). */
+export const FURNACE_HEART_WAVE_ARC = 0.52;
+
+/**
+ * RAINHA DA GEADA (Cripta Glacial) — a figura de gelo, nevoa e reflexos.
+ *
+ * A couraça dela e o proprio estrato: enquanto houver gelo em volta, o dano
+ * quase nao entra. Derreter o lago a expoe — e a agua que sobra e condutiva,
+ * entao o jogador que a revela transforma o chao em algo que a descarga dele
+ * atravessa nos dois sentidos.
+ *
+ * Os Espectros nao sao invocados como matilha: sao EXTENSOES dela, e por isso
+ * saem do gelo em volta e nao dela.
+ */
+export const FROST_QUEEN_HP = 640;
+export const FROST_QUEEN_SPEED = 2.4;
+export const FROST_QUEEN_RADIUS = 0.7;
+export const FROST_QUEEN_ICE_ARMOR = 0.22;
+/** Quantas celulas de gelo em volta ainda a mantem blindada. */
+export const FROST_QUEEN_ICE_RADIUS = 5;
+export const FROST_QUEEN_ICE_THRESHOLD = 6;
+export const FROST_QUEEN_FREEZE_COOLDOWN_TICKS = 120;
+export const FROST_QUEEN_FREEZE_WINDUP_TICKS = 26;
+export const FROST_QUEEN_FREEZE_RADIUS = 6;
+export const FROST_QUEEN_WRAITHS = 2;
+export const FROST_QUEEN_WRAITH_HP_FRACTION = 0.6;
+
+/**
+ * MAGNETARCA (Estrato Ferrifero) — a entidade de magnetita.
+ *
+ * A polaridade alterna, e com ela o que e perigoso. ATRAINDO, ele te puxa e a
+ * proximidade cobra; REPELINDO, ele te empurra e a distancia cobra. Nao existe
+ * posicao segura permanente: existe uma FAIXA, e ela troca de lado a cada
+ * ciclo.
+ *
+ * O puxao usa o mesmo passo-a-passo do eletroima do Coveiro — colisao
+ * respeitada, sem teleporte — porque a quina no caminho continua sendo o
+ * contra-jogo geometrico do campo.
+ */
+export const MAGNETARCH_HP = 720;
+export const MAGNETARCH_SPEED = 1.8;
+export const MAGNETARCH_RADIUS = 0.8;
+export const MAGNETARCH_CYCLE_TICKS = 170;
+export const MAGNETARCH_FIELD_RANGE = 13;
+export const MAGNETARCH_PULL_STEP = 0.12;
+/** Dentro disto, atraindo, o campo esmaga. */
+export const MAGNETARCH_CRUSH_RANGE = 3;
+export const MAGNETARCH_CRUSH_DAMAGE = 16;
+/** Alem disto, repelindo, o arco de retorno castiga. */
+export const MAGNETARCH_TETHER_RANGE = 9;
+export const MAGNETARCH_TETHER_DAMAGE = 14;
+export const MAGNETARCH_FIELD_TICK_INTERVAL = 20;

@@ -529,15 +529,15 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 105 documentos: 30 protocolos, 4 marcos, 41 de Ativo, 18 Descobertas, 11 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(105);
+  it('tem 111 documentos: 30 protocolos, 4 marcos, 47 de Ativo, 18 Descobertas, 11 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(111);
     // A contagem de Ativo = 15 fichas + as trilhas de ASSET_MILESTONE_LORE,
     // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
-    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 4 + 1 + 17 + ASSET_MILESTONE_LORE.length + 18 + 11);
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 4 + 1 + 23 + ASSET_MILESTONE_LORE.length + 18 + 11);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'generation')).toHaveLength(4);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
-      17 + ASSET_MILESTONE_LORE.length,
+      23 + ASSET_MILESTONE_LORE.length,
     );
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(18);
     // Quatro dos seis compostos sao o arco do Bispo: ele aparece uma vez por

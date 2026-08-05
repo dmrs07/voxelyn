@@ -2,6 +2,63 @@ import {
   ALERT_TICKS,
   BIOFLUID_SLOW,
   WITNESS_RANGE,
+  ARCHCANTOR_COOLDOWN_TICKS,
+  ARCHCANTOR_CRYSTAL_BUDGET,
+  ARCHCANTOR_HP,
+  ARCHCANTOR_PULSE_RADIUS,
+  ARCHCANTOR_SILENT_ARMOR,
+  ARCHCANTOR_WINDUP_TICKS,
+  FROST_QUEEN_FREEZE_COOLDOWN_TICKS,
+  FROST_QUEEN_FREEZE_RADIUS,
+  FROST_QUEEN_FREEZE_WINDUP_TICKS,
+  FROST_QUEEN_HP,
+  FROST_QUEEN_ICE_ARMOR,
+  FROST_QUEEN_ICE_RADIUS,
+  FROST_QUEEN_ICE_THRESHOLD,
+  FROST_QUEEN_RADIUS,
+  FROST_QUEEN_SPEED,
+  FROST_QUEEN_WRAITHS,
+  FROST_QUEEN_WRAITH_HP_FRACTION,
+  FURNACE_HEART_CYCLE_TICKS,
+  FURNACE_HEART_HOT_ARMOR,
+  FURNACE_HEART_HP,
+  FURNACE_HEART_RADIUS,
+  FURNACE_HEART_WAVE_ARC,
+  FURNACE_HEART_WAVE_INTERVAL_TICKS,
+  FURNACE_HEART_WAVE_RADIUS,
+  LEVIATHAN_BREACH_DAMAGE,
+  LEVIATHAN_BREACH_RADIUS,
+  LEVIATHAN_BREACH_SEARCH,
+  LEVIATHAN_BREACH_WINDUP_TICKS,
+  LEVIATHAN_DIVE_MIN_TICKS,
+  LEVIATHAN_HP,
+  LEVIATHAN_LEAD_SECONDS,
+  LEVIATHAN_RADIUS,
+  LEVIATHAN_SUBMERGED_ARMOR,
+  LEVIATHAN_SURFACE_SPEED,
+  LEVIATHAN_SURFACE_TICKS,
+  LEVIATHAN_SWIM_SPEED,
+  LUNG_MATRIX_BREATH_INTERVAL_TICKS,
+  LUNG_MATRIX_BURN_DAMAGE,
+  LUNG_MATRIX_CYCLE_TICKS,
+  LUNG_MATRIX_EXHALE_LENGTH,
+  LUNG_MATRIX_EXHALE_WIDTH,
+  LUNG_MATRIX_HP,
+  LUNG_MATRIX_INHALE_PER_BREATH,
+  LUNG_MATRIX_INHALE_RADIUS,
+  LUNG_MATRIX_RADIUS,
+  MAGNETARCH_CRUSH_DAMAGE,
+  MAGNETARCH_CRUSH_RANGE,
+  MAGNETARCH_CYCLE_TICKS,
+  MAGNETARCH_FIELD_RANGE,
+  MAGNETARCH_FIELD_TICK_INTERVAL,
+  MAGNETARCH_HP,
+  MAGNETARCH_PULL_STEP,
+  MAGNETARCH_RADIUS,
+  MAGNETARCH_SPEED,
+  MAGNETARCH_TETHER_DAMAGE,
+  MAGNETARCH_TETHER_RANGE,
+  MAX_ENEMIES,
   DEVOURER_BURROWED_ARMOR,
   DEVOURER_BURROW_MIN_TICKS,
   DEVOURER_BURROW_SPEED,
@@ -161,6 +218,12 @@ import {
   BELLOWS_INHALING,
   DEVOURER_BURROWED,
   DEVOURER_SURFACED,
+  FURNACE_COOLING,
+  FURNACE_OVERHEATING,
+  LUNG_EXHALING,
+  LUNG_INHALING,
+  MAGNET_ATTRACT,
+  MAGNET_REPEL,
   BOSS_MODULE_DRILL,
   BOSS_MODULE_SCANNER,
   BOSS_MODULE_TOWER,
@@ -269,6 +332,62 @@ export const ARCHETYPES: Record<EnemyArchetype, ArchetypeDef> = {
     contactDamage: 22,
     contactCooldown: 16,
     aggroRange: 26,
+  },
+  // ------------------------------------------------------------------------
+  // Chefes de estrato: um dono por geologia. Ver constants.ts.
+  // ------------------------------------------------------------------------
+  // Lento e pesado: ele nao persegue, ele CANTA e a sala responde.
+  archcantor: {
+    hp: ARCHCANTOR_HP,
+    speed: 1.2,
+    radius: 0.75,
+    contactDamage: 20,
+    contactCooldown: 16,
+    aggroRange: ARCHCANTOR_PULSE_RADIUS + 2,
+  },
+  // `speed` e a de superficie; o mergulho tem a propria e nem usa moveEntity.
+  sheet_leviathan: {
+    hp: LEVIATHAN_HP,
+    speed: LEVIATHAN_SURFACE_SPEED,
+    radius: LEVIATHAN_RADIUS,
+    contactDamage: 24,
+    contactCooldown: 16,
+    aggroRange: 26,
+  },
+  // FIXO (speed 0): ancorado nos respiradouros. O perigo dele e onde o gas
+  // passa a estar, nunca a perseguicao.
+  lung_matrix: {
+    hp: LUNG_MATRIX_HP,
+    speed: 0,
+    radius: LUNG_MATRIX_RADIUS,
+    contactDamage: 18,
+    contactCooldown: 16,
+    aggroRange: LUNG_MATRIX_EXHALE_LENGTH + 4,
+  },
+  // FIXO tambem: a luta e contra a sala, e ele e o centro dela.
+  furnace_heart: {
+    hp: FURNACE_HEART_HP,
+    speed: 0,
+    radius: FURNACE_HEART_RADIUS,
+    contactDamage: 26,
+    contactCooldown: 16,
+    aggroRange: FURNACE_HEART_WAVE_RADIUS + 4,
+  },
+  frost_queen: {
+    hp: FROST_QUEEN_HP,
+    speed: FROST_QUEEN_SPEED,
+    radius: FROST_QUEEN_RADIUS,
+    contactDamage: 20,
+    contactCooldown: 14,
+    aggroRange: 12,
+  },
+  magnetarch: {
+    hp: MAGNETARCH_HP,
+    speed: MAGNETARCH_SPEED,
+    radius: MAGNETARCH_RADIUS,
+    contactDamage: 22,
+    contactCooldown: 16,
+    aggroRange: MAGNETARCH_FIELD_RANGE,
   },
   diamandis: {
     hp: DIAMANDIS_HP,
@@ -539,6 +658,25 @@ export const damageEntity = (
   if (ent.archetype === 'white_devourer' && ent.mood === DEVOURER_BURROWED) {
     amount *= DEVOURER_BURROWED_ARMOR;
   }
+  // As blindagens dos chefes de estrato, todas no unico funil de dano — assim
+  // nenhum caminho novo (fogo, descarga, explosao) as esquece.
+  //
+  // Leviata submerso: a lamina entre o tiro e o corpo. Coracao superaquecido:
+  // o nucleo fechado. Rainha cercada de gelo: a couraça E o estrato, e ela cai
+  // quando o lago derrete. Arquicantor SEM rede: o inverso de todas — a sala
+  // esvaziada o deixa mais FRAGIL, porque a Catedral era a defesa dele.
+  if (ent.archetype === 'sheet_leviathan' && ent.mood === DEVOURER_BURROWED) {
+    amount *= LEVIATHAN_SUBMERGED_ARMOR;
+  }
+  if (ent.archetype === 'furnace_heart' && ent.mood === FURNACE_OVERHEATING) {
+    amount *= FURNACE_HEART_HOT_ARMOR;
+  }
+  if (ent.archetype === 'frost_queen' && frostQueenIceAround(state, ent) >= FROST_QUEEN_ICE_THRESHOLD) {
+    amount *= FROST_QUEEN_ICE_ARMOR;
+  }
+  if (ent.archetype === 'archcantor' && !archcantorHasNetwork(state, ent)) {
+    amount *= ARCHCANTOR_SILENT_ARMOR;
+  }
   const attributable =
     cause.kind === 'player_shot' ||
     ((cause.kind === 'explosion' || cause.kind === 'discharge') && cause.source === 'player');
@@ -706,6 +844,12 @@ export const spawnEnemy = (
     // O Devorador nasce POR BAIXO: a primeira coisa que o jogador ve dele e o
     // rastro de areia, nunca o corpo.
     ...(archetype === 'white_devourer' ? { mood: DEVOURER_BURROWED } : {}),
+    // O Leviata tambem nasce por baixo: a primeira coisa que se ve dele e a
+    // ondulacao. Os tres de ciclo nascem na fase de abertura do proprio ciclo.
+    ...(archetype === 'sheet_leviathan' ? { mood: DEVOURER_BURROWED } : {}),
+    ...(archetype === 'lung_matrix' ? { mood: LUNG_INHALING } : {}),
+    ...(archetype === 'furnace_heart' ? { mood: FURNACE_OVERHEATING } : {}),
+    ...(archetype === 'magnetarch' ? { mood: MAGNET_ATTRACT } : {}),
   };
   state.enemies.push(enemy);
   return enemy;
@@ -1076,6 +1220,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
 
   if (action.kind === 'pulse') {
     if (enemy.archetype === 'resonant') resonantPulse(state, enemy, events);
+    else if (enemy.archetype === 'archcantor') archcantorPulse(state, enemy, events);
     else bishopNova(state, enemy, events);
     return;
   }
@@ -1091,7 +1236,12 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     return;
   }
   if (action.kind === 'erupt') {
-    devourerErupt(state, enemy, events);
+    if (enemy.archetype === 'sheet_leviathan') leviathanBreach(state, enemy, events);
+    else devourerErupt(state, enemy, events);
+    return;
+  }
+  if (action.kind === 'freeze') {
+    frostQueenFreeze(state, enemy, events);
     return;
   }
   if (action.kind === 'beam') {
@@ -2113,6 +2263,446 @@ const devourerErupt = (state: SurvivalState, enemy: Entity, events: SemanticEven
   enemy.nextActionAt = state.tick + DEVOURER_SURFACE_TICKS;
 };
 
+// ---------------------------------------------------------------------------
+// OS CHEFES DE ESTRATO
+// ---------------------------------------------------------------------------
+
+/**
+ * ARQUICANTOR: o pulso que arma a Catedral inteira.
+ *
+ * Mesma regra do Ressonante, na escala da nave: cada cristal ao alcance
+ * descarrega pelas aberturas coladas nele. A carga sai com origem de inimigo,
+ * entao machuca OUTROS inimigos parados no lugar errado tambem — a cadeia e do
+ * mundo, nao dele.
+ *
+ * O contra-jogo mora no que o pulso NAO faz: cristal quebrado antes nao canta.
+ * E como a Catedral tambem e a luz e o recurso do setor, esvazia-la e uma
+ * decisao com preco, e nao uma otimizacao.
+ */
+const archcantorPulse = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const r = ARCHCANTOR_PULSE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  const charged = new Set<number>();
+  let armed = 0;
+  for (let dy = -r; dy <= r && armed < ARCHCANTOR_CRYSTAL_BUDGET; dy++) {
+    for (let dx = -r; dx <= r && armed < ARCHCANTOR_CRYSTAL_BUDGET; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_CRYSTAL) continue;
+      armed++;
+      for (const n of [i - 1, i + 1, i - w, i + w]) {
+        if (state.solid[n] === SOLID_NONE) charged.add(n);
+      }
+    }
+  }
+  if (charged.size > 0) {
+    chargeCells(state, [...charged], events, { source: 'enemy', owner: enemy.id });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+};
+
+/** Ha cristal ao alcance do canto? A rede vazia e o que o desarma. */
+const archcantorHasNetwork = (state: SurvivalState, enemy: Entity): boolean => {
+  const w = state.config.width;
+  const r = ARCHCANTOR_PULSE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x <= 0 || y <= 0 || x >= w - 1 || y >= state.config.height - 1) continue;
+      if (state.solid[y * w + x] === SOLID_CRYSTAL) return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * LEVIATA DO LENCOL: o Devorador do outro elemento.
+ *
+ * Mesma gramatica — mergulha, preve, emerge — com duas diferencas que sao o
+ * encontro: ele so anda e so emerge por superficie CONDUTIVA, e o que o para
+ * nao e negar o chao, e eletrificar a agua. O atordoamento sai da regra
+ * generica de descarga que ja existe; o preco e o meio ficar mortal para quem
+ * o parou.
+ */
+const leviathanStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  dt: number,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  if (enemy.mood === DEVOURER_SURFACED) {
+    if (state.tick >= enemy.nextActionAt) {
+      enemy.mood = DEVOURER_BURROWED;
+      enemy.nextActionAt = state.tick + LEVIATHAN_DIVE_MIN_TICKS;
+      return;
+    }
+    if (!player) return;
+    const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+    enemy.facing = { ...toward };
+    const def = ARCHETYPES.sheet_leviathan;
+    if (distTo(enemy, player) < enemy.radius + player.radius + 0.2 && state.tick >= enemy.contactReadyAt) {
+      enemy.contactReadyAt = state.tick + def.contactCooldown;
+      startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
+      return;
+    }
+    moveEntity(state, enemy, toward.x * LEVIATHAN_SURFACE_SPEED * dt, toward.y * LEVIATHAN_SURFACE_SPEED * dt);
+    return;
+  }
+
+  if (!player) return;
+  const toward = normalized(player.x - enemy.x, player.y - enemy.y);
+  enemy.facing = { ...toward };
+  // Submerso ele anda pela LAMINA, e nao pelo chao: passos que continuem em
+  // agua. Sem lamina para onde ir ele guarda a margem — que e exatamente a
+  // leitura que o jogador precisa ter dele.
+  const step = LEVIATHAN_SWIM_SPEED * dt;
+  const wet = (mx: number, my: number): boolean => {
+    const i = Math.floor(enemy.y + my) * w + Math.floor(enemy.x + mx);
+    return i >= 0 && i < state.surface.length && isConductiveSurface(state.surface[i]);
+  };
+  const sx = toward.x * step;
+  const sy = toward.y * step;
+  if (wet(sx, sy)) moveEntity(state, enemy, sx, sy);
+  else if (wet(sx, 0)) moveEntity(state, enemy, sx, 0);
+  else if (wet(0, sy)) moveEntity(state, enemy, 0, sy);
+
+  if (state.tick < enemy.nextActionAt) return;
+  const leadX = player.x + player.vx * LEVIATHAN_LEAD_SECONDS;
+  const leadY = player.y + player.vy * LEVIATHAN_LEAD_SECONDS;
+  const spot = leviathanBreachSpot(state, Math.floor(leadX), Math.floor(leadY));
+  if (spot < 0) {
+    // Sem agua sob o alvo ele nao tem por onde subir. Nao e um contra-jogo
+    // ativo como o vidro do Devorador — e o terreno seco do proprio Aquifero,
+    // e saber onde ele NAO alcanca e metade de atravessar o setor.
+    enemy.nextActionAt = state.tick + LEVIATHAN_DIVE_MIN_TICKS;
+    return;
+  }
+  enemy.x = (spot % w) + 0.5;
+  enemy.y = Math.floor(spot / w) + 0.5;
+  startAction(state, enemy, 'erupt', toward, LEVIATHAN_BREACH_WINDUP_TICKS, 6, events, player.id);
+};
+
+/** Agua aberta mais proxima do ponto mirado, ou -1. Varredura em anel fixa. */
+const leviathanBreachSpot = (state: SurvivalState, cx: number, cy: number): number => {
+  const w = state.config.width;
+  const h = state.config.height;
+  for (let r = 0; r <= LEVIATHAN_BREACH_SEARCH; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        if (!isConductiveSurface(state.surface[i])) continue;
+        return i;
+      }
+    }
+  }
+  return -1;
+};
+
+/**
+ * PULMAO-MATRIZ: o orgao que faz a Fenda respirar.
+ *
+ * Mesma respiracao do Fole, na escala da camara. Inspirando, LIMPA gas num raio
+ * grande — e abre uma janela de rota que nao existia. Expelindo, sopra uma
+ * coluna larga na direcao do jogador.
+ *
+ * A janela de dano e o jogador que abre: gas aceso encostado nele durante a
+ * expiracao queima a coluna inteira de volta. Custa transformar parte da arena
+ * em fogo, e e por isso que e uma decisao.
+ */
+const lungMatrixStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  events: SemanticEvent[],
+): void => {
+  const w = state.config.width;
+  const h = state.config.height;
+  const phase = Math.floor(state.tick / LUNG_MATRIX_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? LUNG_INHALING : LUNG_EXHALING;
+
+  if (state.tick >= enemy.nextActionAt) {
+    enemy.nextActionAt = state.tick + LUNG_MATRIX_BREATH_INTERVAL_TICKS;
+    if (enemy.mood === LUNG_INHALING) {
+      const r = LUNG_MATRIX_INHALE_RADIUS;
+      const cx = Math.floor(enemy.x);
+      const cy = Math.floor(enemy.y);
+      let taken = 0;
+      for (let dy = -r; dy <= r && taken < LUNG_MATRIX_INHALE_PER_BREATH; dy++) {
+        for (let dx = -r; dx <= r && taken < LUNG_MATRIX_INHALE_PER_BREATH; dx++) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const i = y * w + x;
+          if (state.surface[i] !== SURF_GAS) continue;
+          setSurface(state, i, SURF_NONE, 0);
+          taken++;
+        }
+      }
+    } else {
+      const dir = player ? normalized(player.x - enemy.x, player.y - enemy.y) : enemy.facing;
+      enemy.facing = { ...dir };
+      const side = { x: -dir.y, y: dir.x };
+      for (let step = 1; step <= LUNG_MATRIX_EXHALE_LENGTH; step++) {
+        let blocked = false;
+        for (let lane = -LUNG_MATRIX_EXHALE_WIDTH; lane <= LUNG_MATRIX_EXHALE_WIDTH; lane++) {
+          const x = Math.floor(enemy.x + dir.x * step + side.x * lane);
+          const y = Math.floor(enemy.y + dir.y * step + side.y * lane);
+          if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
+          const i = y * w + x;
+          if (state.solid[i] !== SOLID_NONE) {
+            if (lane === 0) blocked = true;
+            continue;
+          }
+          if (state.surface[i] === SURF_NONE) setSurface(state, i, SURF_GAS, GAS_LIFE_TICKS);
+        }
+        if (blocked) break;
+      }
+      // E o RETORNO: fogo encostado nele enquanto expele sobe pela coluna. O
+      // jogador acende a nuvem, e a nuvem e continua ate a boca do pulmao.
+      if (state.tick >= enemy.rangedReadyAt && lungMatrixBurning(state, enemy)) {
+        enemy.rangedReadyAt = state.tick + LUNG_MATRIX_BREATH_INTERVAL_TICKS * 3;
+        damageEntity(state, enemy, LUNG_MATRIX_BURN_DAMAGE, events, {
+          kind: 'explosion',
+          source: 'player',
+        });
+        events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 2 });
+      }
+    }
+  }
+  if (player) enemy.facing = normalized(player.x - enemy.x, player.y - enemy.y);
+};
+
+/** Ha fogo colado na boca do pulmao? (as quatro arestas, como a propagacao) */
+const lungMatrixBurning = (state: SurvivalState, enemy: Entity): boolean => {
+  const w = state.config.width;
+  const i = cellUnder(state, enemy);
+  for (const n of [i, i - 1, i + 1, i - w, i + w]) {
+    if (n < 0 || n >= state.surface.length) continue;
+    if (state.surface[n] === SURF_FIRE) return true;
+  }
+  return false;
+};
+
+/**
+ * CORACAO DA FORNALHA: a sala inteira e o chefe.
+ *
+ * Alterna superaquecimento (blindado; setores da arena acendem em sequencia) e
+ * resfriamento (aberto). O jogador nao escolhe quando bater — escolhe onde
+ * estar quando puder.
+ *
+ * O SETOR que acende gira com o relogio, e nao por sorteio: a sequencia e
+ * aprendivel, e aprender a sequencia e a diferenca entre atravessar a sala e
+ * ser pego por ela.
+ */
+const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const phase = Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? FURNACE_OVERHEATING : FURNACE_COOLING;
+  if (enemy.mood !== FURNACE_OVERHEATING) return;
+  if (state.tick < enemy.nextActionAt) return;
+  enemy.nextActionAt = state.tick + FURNACE_HEART_WAVE_INTERVAL_TICKS;
+
+  const w = state.config.width;
+  const r = FURNACE_HEART_WAVE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  // O setor gira uma fracao de volta por onda. Deterministico e legivel: o
+  // jogador ve para onde a chama esta indo e anda contra ela.
+  const heading = (state.tick / FURNACE_HEART_WAVE_INTERVAL_TICKS) * 0.7;
+  const dirX = Math.cos(heading);
+  const dirY = Math.sin(heading);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r * r || d2 < 4) continue;
+      const len = Math.sqrt(d2);
+      if ((dx / len) * dirX + (dy / len) * dirY < Math.cos(FURNACE_HEART_WAVE_ARC)) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // `igniteCell` primeiro: cada materia tem a propria resposta ao calor, e
+      // o Coracao nao e a excecao que atropela a tabela. So chao sem resposta
+      // recebe brasa direto.
+      if (!igniteCell(state, i, events) && state.surface[i] === SURF_NONE) {
+        setSurface(state, i, SURF_EMBER, 240);
+      }
+    }
+  }
+  events.push({ t: 'beam_line', x: enemy.x, y: enemy.y, dx: dirX, dy: dirY, length: r, powered: true });
+};
+
+/**
+ * RAINHA DA GEADA: a couraça dela e o estrato.
+ *
+ * Enquanto houver gelo em volta, o dano quase nao entra; derreter o lago a
+ * expoe. E a agua que sobra e condutiva — quem a revela transforma o chao em
+ * algo que a descarga atravessa nos dois sentidos.
+ *
+ * O congelamento refaz o lago (e devolve a couraça), e os Espectros saem do
+ * GELO em volta, e nao dela: sao extensoes do estrato, nao filhotes.
+ */
+const frostQueenIceAround = (state: SurvivalState, enemy: Entity): number => {
+  const w = state.config.width;
+  const r = FROST_QUEEN_ICE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  let ice = 0;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 0 || y < 0 || x >= w || y >= state.config.height) continue;
+      if (state.surface[y * w + x] === SURF_ICE) ice++;
+    }
+  }
+  return ice;
+};
+
+const frostQueenFreeze = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = FROST_QUEEN_FREEZE_RADIUS;
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // Congela agua e chao nu; NAO apaga fogo vivo. Apagar o incendio que o
+      // jogador acendeu desfaria a acao dele — a mesma regra da Supernova.
+      const surf = state.surface[i];
+      if (surf === SURF_FIRE) continue;
+      if (surf === SURF_NONE || isConductiveSurface(surf)) setSurface(state, i, SURF_ICE, 0);
+    }
+  }
+  // Os Espectros saem do gelo, em volta dela.
+  for (let k = 0; k < FROST_QUEEN_WRAITHS; k++) {
+    const angle = (k / FROST_QUEEN_WRAITHS) * Math.PI * 2;
+    const wx = Math.floor(enemy.x + Math.cos(angle) * 3);
+    const wy = Math.floor(enemy.y + Math.sin(angle) * 3);
+    if (wx < 1 || wy < 1 || wx >= w - 1 || wy >= state.config.height - 1) continue;
+    if (state.solid[wy * w + wx] !== SOLID_NONE) continue;
+    if (state.enemies.length >= MAX_ENEMIES) break;
+    const wraith = spawnEnemy(state, 'frost_wraith', wx, wy, false);
+    // Extensoes, e nao uma matilha: nascem parciais e caem depressa.
+    wraith.maxHp = Math.max(1, Math.floor(wraith.maxHp * FROST_QUEEN_WRAITH_HP_FRACTION));
+    wraith.hp = wraith.maxHp;
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: r });
+};
+
+/**
+ * MAGNETARCA: a polaridade decide o que e perigoso.
+ *
+ * ATRAINDO, ele te puxa e a proximidade cobra. REPELINDO, ele te empurra e a
+ * distancia cobra. Nao ha posicao segura permanente — ha uma FAIXA, e ela troca
+ * de lado a cada ciclo.
+ *
+ * O deslocamento e por PASSOS pequenos com colisao, como o eletroima do
+ * Coveiro: a quina no caminho continua sendo o contra-jogo geometrico do campo,
+ * e o jogador nao integra velocidade, entao impulso aqui seria apagado no mesmo
+ * tick.
+ */
+const magnetarchStep = (
+  state: SurvivalState,
+  enemy: Entity,
+  player: Entity | null,
+  events: SemanticEvent[],
+): void => {
+  const phase = Math.floor(state.tick / MAGNETARCH_CYCLE_TICKS) % 2;
+  enemy.mood = phase === 0 ? MAGNET_ATTRACT : MAGNET_REPEL;
+  if (!player) return;
+  const dist = distTo(enemy, player);
+  enemy.facing = normalized(player.x - enemy.x, player.y - enemy.y);
+  if (dist > MAGNETARCH_FIELD_RANGE) return;
+
+  const pull = enemy.mood === MAGNET_ATTRACT ? 1 : -1;
+  const dir = normalized((enemy.x - player.x) * pull, (enemy.y - player.y) * pull);
+  moveEntity(state, player, dir.x * MAGNETARCH_PULL_STEP, dir.y * MAGNETARCH_PULL_STEP);
+
+  if (state.tick < enemy.rangedReadyAt) return;
+  enemy.rangedReadyAt = state.tick + MAGNETARCH_FIELD_TICK_INTERVAL;
+  if (enemy.mood === MAGNET_ATTRACT && dist < MAGNETARCH_CRUSH_RANGE) {
+    damageEntity(state, player, MAGNETARCH_CRUSH_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'magnetarch',
+      elite: enemy.elite,
+    });
+    events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: MAGNETARCH_CRUSH_RANGE });
+  } else if (enemy.mood === MAGNET_REPEL && dist > MAGNETARCH_TETHER_RANGE) {
+    damageEntity(state, player, MAGNETARCH_TETHER_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'magnetarch',
+      elite: enemy.elite,
+    });
+    events.push({ t: 'pulse', x: player.x, y: player.y, radius: 1.4 });
+  }
+};
+
+/**
+ * A EMERGENCIA do Leviata: ele rompe a lamina sob o alvo.
+ *
+ * Nao abre sumidouro como o Devorador — nao ha o que desabar debaixo de agua.
+ * O que ele faz e DESLOCAR: o golpe espalha a lamina para os lados, e a poca
+ * cresce. Cada emergencia deixa o Aquifero um pouco mais condutivo, o que
+ * torna eletrifica-lo mais tentador e mais perigoso ao mesmo tempo.
+ */
+const leviathanBreach = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
+  const w = state.config.width;
+  const r = Math.ceil(LEVIATHAN_BREACH_RADIUS);
+  const cx = Math.floor(enemy.x);
+  const cy = Math.floor(enemy.y);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > LEVIATHAN_BREACH_RADIUS * LEVIATHAN_BREACH_RADIUS) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+      const i = y * w + x;
+      if (state.solid[i] !== SOLID_NONE) continue;
+      // Agua deslocada cobre chao nu e cinza; nao apaga fogo do jogador nem
+      // desfaz gelo — as duas coisas sao decisoes de alguem.
+      if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
+        setSurface(state, i, SURF_WATER, 0);
+      }
+    }
+  }
+  for (const player of state.players) {
+    if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
+    if (distTo(enemy, player) > LEVIATHAN_BREACH_RADIUS) continue;
+    damageEntity(state, player, LEVIATHAN_BREACH_DAMAGE, events, {
+      kind: 'enemy_contact',
+      archetype: 'sheet_leviathan',
+      elite: enemy.elite,
+    });
+  }
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: LEVIATHAN_BREACH_RADIUS });
+  enemy.mood = DEVOURER_SURFACED;
+  enemy.nextActionAt = state.tick + LEVIATHAN_SURFACE_TICKS;
+};
+
 /** O chefe ainda tem esta arma? (o modulo dela nao foi arrancado) */
 const hasModule = (state: SurvivalState, module: number): boolean =>
   (state.bossRuntime.modulesLost & (1 << module)) === 0;
@@ -2457,6 +3047,24 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       devourerStep(state, enemy, player, dt, events);
       continue;
     }
+    // Os chefes de estrato: cada um opera a alavanca do proprio bioma, e
+    // nenhum deles e "perseguir e bater" — mesmo motivo do Miner e do Fole.
+    if (enemy.archetype === 'sheet_leviathan') {
+      leviathanStep(state, enemy, player, dt, events);
+      continue;
+    }
+    if (enemy.archetype === 'lung_matrix') {
+      lungMatrixStep(state, enemy, player, events);
+      continue;
+    }
+    if (enemy.archetype === 'furnace_heart') {
+      furnaceHeartStep(state, enemy, events);
+      continue;
+    }
+    if (enemy.archetype === 'magnetarch') {
+      magnetarchStep(state, enemy, player, events);
+      continue;
+    }
     // O Escoriaceo usa o fluxo comum; so a postura termica e propria.
     if (enemy.archetype === 'scoriac') settleScoriacHeat(state, enemy);
 
@@ -2700,6 +3308,31 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
           startAction(state, enemy, 'beam', toward, DIAMANDIS_BEAM_WINDUP_TICKS, 10, events, player.id);
           continue;
         }
+      }
+
+      // ARQUICANTOR: canta, e a Catedral responde. Sem cristal ao alcance ele
+      // nao tem quem responda — a sala esvaziada E o contra-jogo, entao a
+      // checagem tem de ser real.
+      if (
+        enemy.archetype === 'archcantor' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist <= ARCHCANTOR_PULSE_RADIUS + 1.5 &&
+        archcantorHasNetwork(state, enemy)
+      ) {
+        enemy.rangedReadyAt = state.tick + ARCHCANTOR_COOLDOWN_TICKS;
+        startAction(state, enemy, 'pulse', toward, ARCHCANTOR_WINDUP_TICKS, 10, events, player.id);
+        continue;
+      }
+
+      // RAINHA DA GEADA: refaz o lago e solta os Espectros dele.
+      if (
+        enemy.archetype === 'frost_queen' &&
+        state.tick >= enemy.rangedReadyAt &&
+        dist <= FROST_QUEEN_FREEZE_RADIUS + 3
+      ) {
+        enemy.rangedReadyAt = state.tick + FROST_QUEEN_FREEZE_COOLDOWN_TICKS;
+        startAction(state, enemy, 'freeze', toward, FROST_QUEEN_FREEZE_WINDUP_TICKS, 8, events, player.id);
+        continue;
       }
 
       // Bruiser: arranca a parede e joga.

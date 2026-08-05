@@ -199,6 +199,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'enemy.sulfur_bomber': 'Sulfur Bearer',
   'enemy.diamandis': 'Diamandis',
   'enemy.white_devourer': 'White Devourer',
+  'enemy.archcantor': 'Archcantor',
+  'enemy.sheet_leviathan': 'Sheet Leviathan',
+  'enemy.lung_matrix': 'Lung Matrix',
+  'enemy.furnace_heart': 'Furnace Heart',
+  'enemy.frost_queen': 'Frost Queen',
+  'enemy.magnetarch': 'Magnetarch',
   'enemy.undertaker': 'Undertaker',
 
   'bestiary.name.stalker': 'Stalker',
@@ -215,6 +221,12 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'bestiary.name.sulfur_bomber': 'Sulfur Bomber',
   'bestiary.name.diamandis': 'Diamandis',
   'bestiary.name.white_devourer': 'White Devourer',
+  'bestiary.name.archcantor': 'Archcantor',
+  'bestiary.name.sheet_leviathan': 'Sheet Leviathan',
+  'bestiary.name.lung_matrix': 'Lung Matrix',
+  'bestiary.name.furnace_heart': 'Furnace Heart',
+  'bestiary.name.frost_queen': 'Frost Queen',
+  'bestiary.name.magnetarch': 'Magnetarch',
   'bestiary.name.undertaker': 'Undertaker',
   'bestiary.name.bishop': 'Bishop of the Vein',
   'bestiary.name.guardian': 'Guardian of the Core',
@@ -257,6 +269,24 @@ export const EN: Record<keyof typeof PT_BR, string> = {
     'Mineral variant of vector FUNG-23. Flammable internal charge. Neutralisation at distance from heat sources is advised — advice reiterated after the gallery 7 incident.',
   'bestiary.code.diamandis': 'CAPITAL ASSET DX-001',
   'bestiary.code.white_devourer': 'MOVEMENT PATTERN SIL-00',
+  'bestiary.code.archcantor': 'PIEZOELECTRIC ARRAY PRZ-00',
+  'bestiary.note.archcantor':
+    'The company classifies it as a "natural piezoelectric array". Later reports record that the crystals reproduce frequencies of the transmission — and that some respond BEFORE receiving the pulse.',
+  'bestiary.code.sheet_leviathan': 'HOSTILE ASSET AQF-00',
+  'bestiary.note.sheet_leviathan':
+    'Every team measured a different length. The simplest explanation is that the measurements are wrong. The second simplest is that it is not a single body.',
+  'bestiary.code.lung_matrix': 'VENTILATION STRUCTURE VNT-00',
+  'bestiary.note.lung_matrix':
+    'The operation believed the vents fed the creature. Later surveys suggest the reverse: it is the organ that keeps the entire stratum breathing. Killing it is not clearly a victory.',
+  'bestiary.code.furnace_heart': 'IGNEOUS FORMATION FRN-00',
+  'bestiary.note.furnace_heart':
+    'The company tried to use the formation as a power source. The records show the heat does not come from the magma: the magma stays liquid because of the emission, and the temperature responds when the transmission rises.',
+  'bestiary.code.frost_queen': 'HOSTILE ASSET CRP-00',
+  'bestiary.note.frost_queen':
+    '"Queen" is a nickname from earlier crews, not a classification. The records disagree on identity: some suggest a person; others, that she forms from every voice lost in the stratum. She does not reproduce a person — she reproduces a HIERARCHY.',
+  'bestiary.code.magnetarch': 'MAGNETIC ANOMALY MGN-00',
+  'bestiary.note.magnetarch':
+    'The company states the field was created by decades of mining. Records predating the operation already show the same magnetic pattern. Perhaps the company chose that place because the field was already carrying data through the ore.',
   'bestiary.note.white_devourer':
     'Estimated mass exceeds, by several orders, the organic matter the entire stratum could sustain. The hypothesis later reports formulate, and none of them sign: the body does not move through the silica — the silica temporarily takes the shape of the body.',
   'bestiary.code.undertaker': 'UNIT EX-041',

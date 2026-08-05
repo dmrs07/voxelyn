@@ -107,15 +107,25 @@ export const bossForBiome = ({ stratum, occupation }: BossBiome): BossId =>
   BOSS_OF_OCCUPATION[occupation] ?? BOSS_OF_STRATUM[stratum];
 
 /**
- * Os chefes que JA EXISTEM como arquetipo de simulacao. Os demais caem no
- * Guardiao — um fallback jogavel e honesto (ele e o chefe-base do jogo), que
- * some sozinho conforme cada linha da tabela ganhar corpo.
+ * Os chefes que JA EXISTEM como arquetipo de simulacao.
+ *
+ * A tabela esta COMPLETA: todo bioma tem o proprio dono, e o fallback no
+ * Guardiao — que sustentou a selecao enquanto a lista era parcial — nao
+ * responde mais por nenhuma linha. Ele continua no codigo porque `BossId` e um
+ * espaco aberto: um chefe conceitual novo entra na tabela antes de ganhar
+ * corpo, e ate la a camara dele nao pode ficar vazia.
  */
 export const IMPLEMENTED_BOSS: Partial<Record<BossId, EnemyArchetype>> = {
   bishop: 'bishop',
   guardian: 'guardian',
   diamandis: 'diamandis',
   white_devourer: 'white_devourer',
+  archcantor: 'archcantor',
+  sheet_leviathan: 'sheet_leviathan',
+  lung_matrix: 'lung_matrix',
+  furnace_heart: 'furnace_heart',
+  frost_queen: 'frost_queen',
+  magnetarch: 'magnetarch',
 };
 
 /**

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { ARCHETYPES, damageEntity, spawnEnemy } from '../src/entities';
-import { bossArchetypeForBiome, bossForBiome } from '../src/bosses';
+import {
+  BOSS_OF_OCCUPATION,
+  BOSS_OF_STRATUM,
+  IMPLEMENTED_BOSS,
+  bossArchetypeForBiome,
+  bossForBiome,
+} from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import { emptyStats } from '../src/stats';
 import { heatFungalCell } from '../src/cells';
@@ -103,13 +109,23 @@ describe('chefes por bioma — bossForBiome', () => {
     expect(bossForBiome({ stratum: 'ferric', occupation: 'none' })).toBe('magnetarch');
   });
 
-  it('chefes ainda sem corpo caem no Guardiao — nunca em camara vazia', () => {
-    // A tabela conceitual e completa; o arquetipo entra linha a linha. Enquanto
-    // o Arquicantor nao luta, a Catedral limpa recebe o chefe-base do jogo.
+  it('a tabela esta COMPLETA: todo bioma tem o proprio dono', () => {
+    // O fallback no Guardiao sustentou a selecao enquanto a lista era parcial.
+    // Agora nao responde por nenhuma linha — e este teste e o que impede que
+    // ele volte a responder em silencio quando um BossId novo entrar.
+    for (const stratum of Object.keys(BOSS_OF_STRATUM) as (keyof typeof BOSS_OF_STRATUM)[]) {
+      const id = BOSS_OF_STRATUM[stratum];
+      expect(IMPLEMENTED_BOSS[id], `estrato ${stratum} -> ${id} sem corpo`).toBeDefined();
+    }
+    for (const id of Object.values(BOSS_OF_OCCUPATION)) {
+      expect(IMPLEMENTED_BOSS[id], `ocupacao -> ${id} sem corpo`).toBeDefined();
+    }
     expect(bossArchetypeForBiome({ stratum: 'prismatic', occupation: 'none', lineage: 'mineral' }))
-      .toBe('guardian');
+      .toBe('archcantor');
     expect(bossArchetypeForBiome({ stratum: 'aquifer', occupation: 'mycelial', lineage: 'hydric' }))
       .toBe('bishop');
+    expect(bossArchetypeForBiome({ stratum: 'basalt', occupation: 'none', lineage: 'basaltic' }))
+      .toBe('guardian');
   });
 });
 

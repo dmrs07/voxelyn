@@ -692,6 +692,46 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // Fichas dos chefes de estrato: o que a companhia arquivou sobre cada dono
+  // -------------------------------------------------------------------------
+  'AX-ENG-031': {
+    title: 'Classificação: PRZ-00',
+    summary: 'Um arranjo piezoelétrico natural. Que responde antes do estímulo.',
+    body: 'FORMAÇÃO PRZ-00. Classificação técnica aprovada: arranjo piezoelétrico natural de grande porte.\n\nA formação emite um pulso de baixa frequência ao qual as estruturas cristalinas da câmara respondem com descarga. A companhia registra o fenômeno como ressonância mecânica e recomenda evitar a lavra de cristal em raio operacional.\n\nAnexo técnico, não incorporado ao parecer: as frequências emitidas correspondem, em três bandas, às da transmissão que motivou a operação.\n\nSegundo anexo, também não incorporado: em 11 registros, cristais da câmara descarregaram ANTES do pulso.',
+    source: 'Engenharia de Sistemas — classificação de formação',
+  },
+  'AX-ENG-032': {
+    title: 'Classificação: AQF-00',
+    summary: 'Cada equipe mediu um comprimento diferente.',
+    body: 'ATIVO HOSTIL AQF-00. Corpo de grande porte em deslocamento submerso.\n\nO ativo desloca-se sob a lâmina e emerge sob a posição prevista das unidades. Fora d\'água ele é lento e vulnerável; sob ela, praticamente inalcançável.\n\nSobre o dimensionamento: sete equipes reportaram comprimentos entre 9 e 60 metros. As medições não convergem e não há erro instrumental que explique a dispersão.\n\nEngenharia oferece três leituras e não escolhe entre elas: as medições estão erradas; o ativo muda de tamanho; ou o que foi medido não é um corpo, e sim vários, sincronizados.',
+    source: 'Engenharia de Sistemas — classificação de ativo',
+  },
+  'AX-ENG-033': {
+    title: 'Classificação: VNT-00',
+    summary: 'Achamos que os respiradouros a alimentavam. É o contrário.',
+    body: 'ESTRUTURA VNT-00. Corpo orgânico fixo, conectado à malha de respiradouros do estrato.\n\nA estrutura inspira o gás das câmaras vizinhas e o expele em direção diversa, em ciclos regulares. A leitura inicial foi de que os respiradouros a alimentavam.\n\nA revisão inverte a relação. Nos setores em que a estrutura foi neutralizada, a ventilação do estrato cessou em até nove ciclos, e as câmaras a jusante tornaram-se irrespiráveis de forma permanente.\n\nEngenharia registra, sem recomendação: não está claro que abater este ativo constitua um resultado favorável.',
+    source: 'Engenharia de Sistemas — classificação de estrutura',
+  },
+  'AX-ENG-034': {
+    title: 'Classificação: FRN-00',
+    summary: 'Tentamos usá-la como fonte. Ela é a saída, não a entrada.',
+    body: 'FORMAÇÃO FRN-00. Núcleo ígneo parcialmente exposto, em ciclo térmico regular.\n\nA formação alterna superaquecimento e resfriamento em janelas previsíveis. Durante o superaquecimento a couraça externa dissipa qualquer impacto; no resfriamento, a estrutura fica exposta.\n\nO projeto de aproveitamento energético foi encerrado após a seguinte constatação: o calor não sobe do magma. O magma permanece líquido POR CAUSA da emissão, e a temperatura da formação responde, com atraso de horas, a variações da transmissão.\n\nA formação não é a fonte de energia. É o que a fonte de energia está fazendo com a rocha.',
+    source: 'Engenharia de Sistemas — classificação de formação',
+  },
+  'AX-ENG-035': {
+    title: 'Classificação: CRP-00',
+    summary: '"Rainha" é apelido de turma anterior. A ficha não tem nome.',
+    body: 'ATIVO HOSTIL CRP-00. Figura de gelo, névoa e reflexo, de porte humano ampliado.\n\nEnquanto cercada de superfície congelada, o ativo dissipa quase todo impacto; a fusão do lago em volta o expõe. Espectros de geada acompanham o ativo e agem em coordenação com ele.\n\nSobre a designação: "Rainha" não consta de nenhum documento aprovado. O termo aparece em relatórios de campo de duas operações anteriores à Aurix, sempre no mesmo formato, sempre sem explicação.\n\nRegistra-se que o ativo não reproduz uma pessoa. Ele reproduz uma ESTRUTURA DE COMANDO: uma voz que orienta, as demais que respondem.',
+    source: 'Engenharia de Sistemas — classificação de ativo',
+  },
+  'AX-ENG-036': {
+    title: 'Classificação: MGN-00',
+    summary: 'O campo é anterior à mina. A mina é que veio depois.',
+    body: 'ANOMALIA MGN-00. Corpo de magnetita com incorporação de restos metálicos, trilhos e minério.\n\nO ativo alterna polaridade em ciclos regulares: atrai as unidades numa fase e as repele na seguinte, movimentando junto o material ferroso da câmara. Não existe posição segura fixa em raio de campo.\n\nA versão institucional atribui o campo a décadas de lavra. O levantamento geomagnético pré-operacional, arquivado, já registra o mesmo padrão — com a mesma orientação e a mesma periodicidade.\n\nA pergunta que a versão institucional evita: a companhia escolheu este lugar por causa do minério, ou porque o campo já transportava dados através dele?',
+    source: 'Engenharia de Sistemas — classificação de anomalia',
+  },
+
+  // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
   'AX-GEN-G01': {
@@ -1374,6 +1414,46 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'There may be no body crossing the stratum at all.',
     body: 'Taken together: the mass the stratum cannot sustain, the absence of any carcass across 61 recorded kills, and the fact that the asset is stopped by a change of state in the ground itself.\n\nThe hypothesis the approved reports do not formulate, and which this record formulates because it has no department to protect:\n\nThe asset does not move through the silica. The silica temporarily takes the shape of the asset.\n\nThat would account for the mass, which need not come from anywhere. It would account for the absent carcass, because what is killed simply becomes ground again. And it would account for why glass stops it: glass is not loose silica — it is silica that has already taken a shape, and cannot take another.\n\nIf the hypothesis holds, we are not killing an organism. We are interrupting a MOVEMENT PATTERN of the stratum, in the way a wave is interrupted by a wall — and for as long.\n\nThe operation continues to record the 61 kills as 61 individuals.',
     source: 'No department assigned',
+  },
+
+  // -------------------------------------------------------------------------
+  // Stratum boss sheets: what the company filed on each owner
+  // -------------------------------------------------------------------------
+  'AX-ENG-031': {
+    title: 'Classification: PRZ-00',
+    summary: 'A natural piezoelectric array. That answers before the stimulus.',
+    body: 'FORMATION PRZ-00. Approved technical classification: large natural piezoelectric array.\n\nThe formation emits a low-frequency pulse to which the chamber\'s crystal structures respond with discharge. The company records the phenomenon as mechanical resonance and advises against crystal extraction within operating radius.\n\nTechnical annex, not incorporated into the assessment: the emitted frequencies match, across three bands, those of the transmission that motivated the operation.\n\nSecond annex, also not incorporated: in 11 records, chamber crystals discharged BEFORE the pulse.',
+    source: 'Systems Engineering — formation classification',
+  },
+  'AX-ENG-032': {
+    title: 'Classification: AQF-00',
+    summary: 'Every team measured a different length.',
+    body: 'HOSTILE ASSET AQF-00. Large body in submerged transit.\n\nThe asset travels beneath the sheet and surfaces under the predicted position of units. Out of the water it is slow and vulnerable; beneath it, effectively unreachable.\n\nOn dimensioning: seven teams reported lengths between 9 and 60 metres. The measurements do not converge and no instrument error accounts for the spread.\n\nEngineering offers three readings and picks none: the measurements are wrong; the asset changes size; or what was measured is not one body, but several, synchronised.',
+    source: 'Systems Engineering — asset classification',
+  },
+  'AX-ENG-033': {
+    title: 'Classification: VNT-00',
+    summary: 'We thought the vents fed it. It is the other way round.',
+    body: 'STRUCTURE VNT-00. Fixed organic body, connected to the stratum\'s vent network.\n\nThe structure inhales gas from neighbouring chambers and expels it in another direction, in regular cycles. The initial reading was that the vents fed it.\n\nThe revision inverts the relationship. In sectors where the structure was neutralised, stratum ventilation ceased within nine cycles, and the chambers downstream became permanently unbreathable.\n\nEngineering records, without recommendation: it is not clear that killing this asset constitutes a favourable outcome.',
+    source: 'Systems Engineering — structure classification',
+  },
+  'AX-ENG-034': {
+    title: 'Classification: FRN-00',
+    summary: 'We tried to use it as a source. It is the output, not the input.',
+    body: 'FORMATION FRN-00. Partially exposed igneous core on a regular thermal cycle.\n\nThe formation alternates overheating and cooling in predictable windows. During overheating the outer shell dissipates any impact; while cooling, the structure is exposed.\n\nThe energy recovery project was closed after the following finding: the heat does not rise from the magma. The magma remains liquid BECAUSE of the emission, and the formation\'s temperature responds, with a lag of hours, to variations in the transmission.\n\nThe formation is not the power source. It is what the power source is doing to the rock.',
+    source: 'Systems Engineering — formation classification',
+  },
+  'AX-ENG-035': {
+    title: 'Classification: CRP-00',
+    summary: '"Queen" is an earlier crew\'s nickname. The file has no name.',
+    body: 'HOSTILE ASSET CRP-00. Figure of ice, mist and reflection, of enlarged human scale.\n\nWhile surrounded by frozen surface the asset dissipates almost all impact; melting the surrounding lake exposes it. Frost wraiths accompany the asset and act in coordination with it.\n\nOn the designation: "Queen" appears in no approved document. The term shows up in field reports from two pre-Aurix operations, always in the same form, always unexplained.\n\nIt is recorded that the asset does not reproduce a person. It reproduces a COMMAND STRUCTURE: one voice that directs, the rest that answer.',
+    source: 'Systems Engineering — asset classification',
+  },
+  'AX-ENG-036': {
+    title: 'Classification: MGN-00',
+    summary: 'The field predates the mine. The mine came afterwards.',
+    body: 'ANOMALY MGN-00. Magnetite body incorporating metal debris, rails and ore.\n\nThe asset alternates polarity in regular cycles: it draws units in during one phase and repels them in the next, moving the chamber\'s ferrous material along with them. There is no fixed safe position within field radius.\n\nThe institutional version attributes the field to decades of extraction. The archived pre-operational geomagnetic survey already records the same pattern — same orientation, same periodicity.\n\nThe question the institutional version avoids: did the company choose this place because of the ore, or because the field was already carrying data through it?',
+    source: 'Systems Engineering — anomaly classification',
   },
 };
 

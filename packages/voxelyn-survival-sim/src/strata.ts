@@ -84,7 +84,29 @@ export type StratumId =
 export type OccupationId = 'none' | 'mycelial' | 'aurix';
 
 /** A historia geologica que os tres setores de uma run contam juntos. */
-export type LineageId = 'hydric' | 'mineral' | 'industrial' | 'thermal' | 'arid' | 'cryo';
+export type LineageId =
+  | 'hydric'
+  | 'mineral'
+  | 'industrial'
+  | 'thermal'
+  | 'arid'
+  | 'cryo'
+  /**
+   * BASALTICA: o mapa historico como linhagem inteira, do topo ao fundo.
+   *
+   * Existe por uma razao estrutural, e ela so apareceu quando a tabela de
+   * chefes ficou completa: o Guardiao e o dono das Galerias de Basalto, e o
+   * basalto era o setor 1 de TODAS as linhagens e o final de nenhuma. Como so
+   * o setor final tem chefe, o chefe original do jogo tinha deixado de poder
+   * existir.
+   *
+   * Nao e uma linhagem sem graca por ser um estrato so: as intrusoes de
+   * ocupacao continuam sorteando micelio e Aurix nos setores 2 e 3, entao ela
+   * termina no Guardiao, no Bispo ou no Diamandis conforme o que tomou conta
+   * do fundo. E a unica linhagem em que os TRES chefes de ocupacao e de
+   * basalto disputam a mesma camara.
+   */
+  | 'basaltic';
 
 export type SectorBiome = {
   stratum: StratumId;
@@ -114,6 +136,11 @@ export type SectorBiome = {
  *   deixa de segurar o teto, e o fundo e o dono dele (ver LINEAGES).
  * - crio: Basalto -> Cripta Glacial -> Cripta profunda. O gelo domina e a
  *   profundidade adensa as pontes e lagos congelados.
+ * - basaltica: Basalto -> Basalto -> Basalto. O mapa historico do comeco ao
+ *   fim, e a unica linhagem em que a camara final e das Galerias — ou seja, a
+ *   unica em que o Guardiao pode ser o dono dela. As intrusoes de ocupacao
+ *   continuam valendo, entao ela tambem termina no Bispo ou no Diamandis
+ *   quando alguma delas toma o fundo.
  */
 const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation: OccupationId }>> = {
   hydric: [
@@ -159,6 +186,11 @@ const LINEAGES: Record<LineageId, ReadonlyArray<{ stratum: StratumId; occupation
     { stratum: 'glacial', occupation: 'none' },
     { stratum: 'glacial', occupation: 'none' },
   ],
+  basaltic: [
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none' },
+    { stratum: 'basalt', occupation: 'none' },
+  ],
 };
 
 const LINEAGE_ORDER: readonly LineageId[] = [
@@ -168,6 +200,7 @@ const LINEAGE_ORDER: readonly LineageId[] = [
   'thermal',
   'arid',
   'cryo',
+  'basaltic',
 ];
 
 /**

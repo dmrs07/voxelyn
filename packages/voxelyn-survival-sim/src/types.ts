@@ -100,7 +100,19 @@ export type EnemyArchetype =
    * dali. Nao ha o que perseguir — o que se decide contra ele e ONDE ele pode
    * sair, e a resposta e vitrificar o chao com calor.
    */
-  | 'white_devourer';
+  | 'white_devourer'
+  /**
+   * Os seis chefes de estrato. Cada um opera, em escala de chefe, a alavanca
+   * que a propria geologia ja tem: cristal que descarrega, agua que conduz,
+   * gas que ocupa espaco, brasa que aquece, gelo que derrete, minerio que
+   * atrai. Ver constants.ts, secao "OS CHEFES DE ESTRATO".
+   */
+  | 'archcantor'
+  | 'sheet_leviathan'
+  | 'lung_matrix'
+  | 'furnace_heart'
+  | 'frost_queen'
+  | 'magnetarch';
 export type ModuleId = 'piercing' | 'conductive' | 'explosive' | 'siphon' | 'ricochet' | 'return_disc';
 export type ModuleTag = 'projectile' | 'utility' | 'volatile' | 'defensive' | 'safe';
 export type ModuleLifetime =
@@ -309,6 +321,8 @@ export type EntityActionKind =
   | 'beam'
   /** Emergencia do Devorador: o chao racha no ponto marcado, e entao ele sobe. */
   | 'erupt'
+  /** Congelamento da Rainha: o lago se refaz e os Espectros saem dele. */
+  | 'freeze'
   /** Eletroima do Coveiro: arrasta o alvo para perto antes da prensa. */
   | 'haul'
   /** Canalizacao do lanca-chamas: `endTick` cobre a duracao inteira do sopro. */
@@ -473,6 +487,23 @@ export const LURKER_EXPOSED = 1;
  */
 export const DEVOURER_BURROWED = 0;
 export const DEVOURER_SURFACED = 1;
+
+/**
+ * Posturas dos chefes de estrato que ALTERNAM, e por que elas viajam.
+ *
+ * Em todos os tres a postura decide se o dano entra — e o cliente precisa
+ * desenhar a diferenca no MESMO tick em que ela vale, senao o jogador gasta a
+ * janela inteira sem saber que ela abriu.
+ */
+/** Pulmao-Matriz: puxando o gas para dentro, ou soprando a coluna. */
+export const LUNG_INHALING = 0;
+export const LUNG_EXHALING = 1;
+/** Coracao da Fornalha: blindado e acendendo a sala, ou frio e aberto. */
+export const FURNACE_OVERHEATING = 0;
+export const FURNACE_COOLING = 1;
+/** Magnetarca: atraindo (perto machuca) ou repelindo (longe machuca). */
+export const MAGNET_ATTRACT = 0;
+export const MAGNET_REPEL = 1;
 
 /** Postura do Escoriaceo: couraça fria fechada, ou aberta pelo calor. */
 export const SCORIAC_COOL = 0;

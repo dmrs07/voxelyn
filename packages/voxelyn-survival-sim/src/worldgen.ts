@@ -159,6 +159,23 @@ export type GeneratedWorld = {
   hallCenters: Vec2[];
 };
 
+/**
+ * Quantas celulas separam o objetivo da moldura do mapa.
+ *
+ * DUAS, e o numero e um teto e nao um desejo. O que esta margem protege e o
+ * invariante duro — o 3x3 livre em volta do objetivo, onde o corpo do chefe
+ * tem de caber — e para isso duas bastam (o anel de 1 celula fica inteiro
+ * dentro do mapa).
+ *
+ * Tentei quatro primeiro, para o anel do pedestal (raio 3) tambem caber
+ * sempre, e foi longe demais: `bfsFarthest` procura o ponto mais distante da
+ * entrada, e o mais distante quase sempre e um canto — com margem 4 a maioria
+ * das tentativas passava a ser recusada e a geracao inteira desabava. O anel
+ * clipado numa borda continua sendo um caso aceito, e os testes do pedestal ja
+ * o admitem; o corpo do chefe emparedado nao era.
+ */
+const CORE_BORDER_MARGIN = 2;
+
 const idx = (w: number, x: number, y: number): number => y * w + x;
 
 const countWallNeighbors = (solid: Uint8Array, w: number, h: number, x: number, y: number): number => {
@@ -901,6 +918,27 @@ const generateAttempt = (
 
   const { cell: corePos, dist } = bfsFarthest(solid, w, h, entry);
   if (dist[idx(w, corePos.x, corePos.y)] < Math.floor((w + h) * 0.55)) return null;
+  // O objetivo nao pode encostar na MOLDURA do mapa.
+  //
+  // `bfsFarthest` procura o ponto mais distante da entrada, e o mais distante
+  // costuma ser justamente um canto — entao o pedestal caia a uma celula da
+  // borda com alguma frequencia. Duas coisas quebravam ali, e as duas sao
+  // promessas do jogo: o 3x3 livre em volta do objetivo (o Guardiao tem raio
+  // 0,68 e o Coracao da Fornalha, 1,0) e o ANEL do pedestal, que carrega o
+  // sotaque do estrato e e funcional — o fosso de agua do Aquifero devolve a
+  // descarga do jogador.
+  //
+  // Recusar a tentativa e mais barato e mais honesto que remendar depois: a
+  // geracao ja tenta outra seed derivada quando um mapa nao serve, e um mundo
+  // com o objetivo emparedado na moldura nao serve.
+  if (
+    corePos.x < CORE_BORDER_MARGIN ||
+    corePos.y < CORE_BORDER_MARGIN ||
+    corePos.x >= w - CORE_BORDER_MARGIN ||
+    corePos.y >= h - CORE_BORDER_MARGIN
+  ) {
+    return null;
+  }
   carveBlob(draft, w, h, corePos.x, corePos.y, 4);
   stampCorePedestal(draft, w, h, corePos, profile.halls);
 

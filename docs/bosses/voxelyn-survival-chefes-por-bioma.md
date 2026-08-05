@@ -23,17 +23,20 @@ Prioridade:
 | Ocupação | Contaminação Micelial | Bispo | **implementado** |
 | Ocupação | Cicatriz Aurix | Diamandis | **implementado** |
 | Estrato | Galerias de Basalto | Guardião | **implementado** |
-| Estrato | Catedral Prismática | Arquicantor | fallback → Guardião |
-| Estrato | Aquífero Negro | Leviatã do Lençol | fallback → Guardião |
-| Estrato | Fenda Sulfurosa | Pulmão-Matriz | fallback → Guardião |
-| Estrato | Fornalha Abissal | Coração da Fornalha | fallback → Guardião |
+| Estrato | Catedral Prismática | Arquicantor | **implementado** |
+| Estrato | Aquífero Negro | Leviatã do Lençol | **implementado** |
+| Estrato | Fenda Sulfurosa | Pulmão-Matriz | **implementado** |
+| Estrato | Fornalha Abissal | Coração da Fornalha | **implementado** |
 | Estrato | Sumidouros de Sílica | Devorador Branco | **implementado** |
-| Estrato | Cripta Glacial | Rainha da Geada | fallback → Guardião |
-| Estrato | Estrato Ferrífero | Magnetarca | fallback → Guardião |
+| Estrato | Cripta Glacial | Rainha da Geada | **implementado** |
+| Estrato | Estrato Ferrífero | Magnetarca | **implementado** |
 
-A tabela conceitual (`BossId`) é completa desde já; os arquétipos entram um a um em
-`IMPLEMENTED_BOSS`, com o Guardião como fallback jogável. Assim seleção, documentos e
-codex podem falar do Diamandis antes de o Diamandis lutar.
+**A tabela está completa**: os dez chefes conceituais têm corpo, e o fallback no
+Guardião — que sustentou a seleção enquanto a lista era parcial — não responde mais
+por nenhuma linha. Ele continua no código porque `BossId` é um espaço aberto: um chefe
+novo entra na tabela antes de ganhar corpo, e até lá a câmara dele não pode ficar
+vazia. O teste *"a tabela está COMPLETA"* é o que impede o fallback de voltar a
+responder em silêncio.
 
 ### Um chefe por run
 
@@ -277,6 +280,10 @@ não o interrompe — ela apenas o remove do balanço.
 
 ### O que fica para a próxima fatia
 
+- Os **arcos de entendimento** dos seis chefes de estrato. Cada um entrou com a ficha
+  de Ativo (a classificação corporativa, o primeiro degrau da estrutura); os
+  documentos destravados por *presenciar o golpe principal* e por *condição especial*
+  são o próximo passo, e cada um deles precisa de uma Descoberta nova na simulação.
 - O **atlas voxel** do Diamandis. Hoje ele usa o renderizador de fallback, como o
   Bispo e o Corcel usaram antes de ganharem atlas.
 - A apresentação dos módulos no cliente: `boss_module` já viaja com os quatro
@@ -347,6 +354,66 @@ em que o chão é a mecânica. Agora um índice ausente cai na cor, como o comen
 `DISCOVERY_SILICA_VITRIFIED` exige ter **feito**, não ter entendido — a compreensão vem
 depois, de ver o verme falhar em subir ali.
 
+## Os seis chefes de estrato
+
+A regra que rege os seis: **nenhum inventa sistema novo**. Cada um opera, em escala de
+chefe, a alavanca que a própria geologia já tem. É a mesma regra do bestiário de
+assinatura, e vale ainda mais aqui — um chefe que trouxesse mecânica própria seria um
+chefe que poderia estar em qualquer mapa.
+
+| Chefe | Estrato | A alavanca | O contra-jogo |
+| --- | --- | --- | --- |
+| **Arquicantor** | Catedral Prismática | canta, e todo cristal ao alcance descarrega | esvaziar a sala — e a Catedral é a luz e o recurso do setor |
+| **Leviatã do Lençol** | Aquífero Negro | só anda e só emerge por superfície condutiva | o terreno seco, e eletrificar a água (que fica mortal para você também) |
+| **Pulmão-Matriz** | Fenda Sulfurosa | inspira o gás da câmara, expele em outra direção | **incendiar a expiração** — a única janela de dano que o jogador abre |
+| **Coração da Fornalha** | Fornalha Abissal | ciclo térmico; setores da arena acendem em sequência | estar no lugar certo quando ele esfria |
+| **Rainha da Geada** | Cripta Glacial | a couraça é o gelo em volta; Espectros como extensões | derreter o lago — e a água que sobra conduz nos dois sentidos |
+| **Magnetarca** | Estrato Ferrífero | polaridade alterna: atrai, depois repele | achar a **faixa**, que troca de lado a cada ciclo |
+
+Notas de desenho que valem registrar:
+
+- **O Arquicantor é o único cuja blindagem é inversa.** Esvaziar a rede o deixa mais
+  *frágil* (`ARCHCANTOR_SILENT_ARMOR` > 1), porque a Catedral era a defesa dele. Nos
+  outros a couraça é o bioma intacto; nele, o bioma intacto é a arma.
+- **Pulmão e Coração são FIXOS** (`speed: 0`). A luta não é contra um corpo, é contra
+  a sala — e a ficha de Ativo do Pulmão registra que neutralizá-lo deixou câmaras a
+  jusante permanentemente irrespiráveis. Matá-lo não é claramente uma vitória.
+- **O Magnetarca não tem posição segura, tem uma faixa.** Atraindo, perto machuca;
+  repelindo, longe machuca. O deslocamento usa o passo-a-passo do eletroímã do Coveiro
+  — colisão respeitada, sem teleporte — porque a quina no caminho continua sendo o
+  contra-jogo geométrico do campo.
+- **Os Espectros da Rainha saem do gelo, não dela.** São extensões do estrato, não
+  filhotes, e nascem com vida parcial.
+- Todas as blindagens vivem no **único funil de dano**, para que nenhum caminho novo
+  (fogo, descarga, explosão) as esqueça.
+
+### A linhagem basáltica
+
+Com a tabela completa apareceu o mesmo problema que a linhagem árida já tinha tido,
+agora com o chefe original do jogo: **o Guardião é o dono das Galerias de Basalto, e o
+basalto era o setor 1 de todas as linhagens e o final de nenhuma.** Ele tinha deixado
+de poder existir.
+
+Entrou `basaltic`: basalto do topo ao fundo, o mapa histórico como linhagem inteira. E
+ela não é monótona por ser um estrato só — as intrusões de ocupação continuam
+sorteando micélio e Aurix nos setores 2 e 3, então ela termina no **Guardião, no Bispo
+ou no Diamandis** conforme o que tomou conta do fundo. É a única linhagem em que os
+chefes de ocupação e o de estrato disputam a mesma câmara.
+
+Custo: uma linhagem a mais remapeia **toda seed** (o sorteio é `% LINEAGE_ORDER.length`).
+
+### O objetivo não encosta mais na moldura
+
+`bfsFarthest` procura o ponto mais distante da entrada, e o mais distante costuma ser
+um canto — então o pedestal caía a uma célula da borda com alguma frequência. Duas
+promessas quebravam ali: o **3x3 livre** em volta do objetivo (onde o corpo do chefe
+tem de caber — o Coração da Fornalha tem raio 1,0) e o **anel do pedestal**, que
+carrega o sotaque do estrato e é funcional.
+
+`CORE_BORDER_MARGIN = 2` recusa a tentativa, e a geração tenta outra seed derivada. O
+número é um teto e não um desejo: tentei 4 primeiro, para o anel de raio 3 também caber
+sempre, e a maioria das tentativas passou a ser recusada — a geração inteira desabou.
+
 ## Ordem recomendada de desenvolvimento (restante)
 
 1. ~~Gatilho da Supernova + remover cuspe do Bispo~~ ✔
@@ -355,7 +422,8 @@ depois, de ver o verme falhar em subir ali.
 4. ~~Generalizar o estado específico do Guardião num `bossRuntime`~~ ✔
 5. ~~**Diamandis** (Cicatriz Aurix) — broca, demolição, feixe, colapso do reator e a
    economia dos Coveiros~~ ✔
-6. ~~**Devorador Branco** (Sumidouros de Sílica)~~ ✔
+6. ~~**Devorador Branco** (Sumidouros de Sílica)~~ ✔ e ~~os seis chefes de estrato
+   restantes~~ ✔
 7. Documentos de chefe desbloqueados por **entendimento do encontro** (primeiro
    encontro → classificação corporativa; presenciar o golpe principal → relatório
    técnico; primeira derrota → incidente; condição especial → ordem executiva;

@@ -38,6 +38,12 @@ const ARCHETYPE_KEYS: Record<EnemyArchetype, MessageKey> = {
   undertaker: 'enemy.undertaker',
   diamandis: 'enemy.diamandis',
   white_devourer: 'enemy.white_devourer',
+  archcantor: 'enemy.archcantor',
+  sheet_leviathan: 'enemy.sheet_leviathan',
+  lung_matrix: 'enemy.lung_matrix',
+  furnace_heart: 'enemy.furnace_heart',
+  frost_queen: 'enemy.frost_queen',
+  magnetarch: 'enemy.magnetarch',
 };
 
 /**

@@ -1,4 +1,4 @@
-// O Codex corporativo (105 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (111 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -241,6 +241,12 @@ export const ASSET_ARCHETYPES: readonly EnemyArchetype[] = [
   'guardian',
   'diamandis',
   'white_devourer',
+  'archcantor',
+  'sheet_leviathan',
+  'lung_matrix',
+  'furnace_heart',
+  'frost_queen',
+  'magnetarch',
 ];
 
 /**
@@ -270,6 +276,12 @@ export const ASSET_LORE: Record<EnemyArchetype, LoreFragmentId> = {
   guardian: 'AX-EXE-039',
   diamandis: 'AX-PUB-010',
   white_devourer: 'AX-ENG-030',
+  archcantor: 'AX-ENG-031',
+  sheet_leviathan: 'AX-ENG-032',
+  lung_matrix: 'AX-ENG-033',
+  furnace_heart: 'AX-ENG-034',
+  frost_queen: 'AX-ENG-035',
+  magnetarch: 'AX-ENG-036',
 };
 
 /** Um documento por Descoberta. O bit aposentado (ORE_QUOTA) fica de fora. */
@@ -534,6 +546,14 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-ENG-030': ['AX-INC-042', 'AX-UNK-061'],
   'AX-INC-042': ['AX-ENG-030', 'AX-UNK-061'],
   'AX-UNK-061': ['AX-ENG-030', 'AX-INC-042', 'AX-UNK-054'],
+  // As fichas dos chefes de estrato apontam para o que a companhia nao quis
+  // concluir sobre o proprio Veio: a transmissao, o Nucleo e a sintese.
+  'AX-ENG-031': ['AX-ENG-017', 'AX-UNK-050'],
+  'AX-ENG-032': ['AX-PRC-018', 'AX-UNK-048'],
+  'AX-ENG-033': ['AX-ENG-019', 'AX-UNK-042'],
+  'AX-ENG-034': ['AX-ENG-027', 'AX-UNK-050'],
+  'AX-ENG-035': ['AX-ENG-024', 'AX-UNK-053'],
+  'AX-ENG-036': ['AX-UNK-043', 'AX-UNK-050'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
@@ -652,6 +672,12 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-028',
   'AX-ENG-029',
   'AX-ENG-030',
+  'AX-ENG-031',
+  'AX-ENG-032',
+  'AX-ENG-033',
+  'AX-ENG-034',
+  'AX-ENG-035',
+  'AX-ENG-036',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',

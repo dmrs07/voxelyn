@@ -2320,6 +2320,13 @@ const HASHED_ARCHETYPES: readonly EnemyArchetype[] = [
   'undertaker',
   'diamandis',
   'white_devourer',
+  // Os seis chefes de estrato, no fim pela mesma regra de nunca reordenar.
+  'archcantor',
+  'sheet_leviathan',
+  'lung_matrix',
+  'furnace_heart',
+  'frost_queen',
+  'magnetarch',
 ];
 
 /** FNV-1a 32-bit sobre o estado autoritativo. */

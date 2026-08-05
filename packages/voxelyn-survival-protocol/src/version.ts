@@ -184,7 +184,21 @@ export const PROTOCOL_VERSION = 17;
 // Fornalha Abissal: sem isso o estrato sedimentar nunca era o ultimo e o chefe
 // dele nao tinha onde nascer. O TERRENO SEMEADO de toda run arida muda (ver
 // tests/impressao-digital-geracao.test.ts).
-export const SIMULATION_VERSION = 27;
+// 28: OS SEIS CHEFES DE ESTRATO. Arquicantor, Leviata do Lencol,
+// Pulmao-Matriz, Coracao da Fornalha, Rainha da Geada e Magnetarca entram como
+// arquetipos (fim de HASHED_ARCHETYPES e dos contadores) com uma acao nova
+// (`freeze`) e as posturas de ciclo. A tabela de chefes fica COMPLETA e o
+// fallback no Guardiao deixa de responder por qualquer linha.
+//
+// E duas mudancas de MUNDO, ambas pelo mesmo motivo — um chefe que nao pode
+// nascer nao esta implementado:
+// - entra a linhagem BASALTICA (basalto do topo ao fundo). O Guardiao e o dono
+//   das Galerias e nenhuma linhagem terminava nelas. Uma linhagem a mais
+//   remapeia TODA seed (o sorteio e `% LINEAGE_ORDER.length`);
+// - o objetivo nao pode mais encostar na moldura do mapa
+//   (CORE_BORDER_MARGIN): o 3x3 livre em volta dele e onde o corpo do chefe
+//   tem de caber, e num canto ele nao cabia.
+export const SIMULATION_VERSION = 28;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -212,7 +226,9 @@ export const SIMULATION_VERSION = 27;
 // vidro). As duas ainda nao tem tile no atlas de superficie — desenham pela cor
 // de recuo, que a partir desta versao realmente dispara para materia sem tile
 // (antes o `?? 0` desenhava chao limpo e a materia ficava invisivel).
-export const CONTENT_VERSION = 19;
+// 20: o pool ganha os seis chefes de estrato. Como o Diamandis e o Devorador,
+// eles desenham pelo caminho de fallback ate ganharem atlas.
+export const CONTENT_VERSION = 20;
 
 export type VersionTriple = {
   protocolVersion: number;
