@@ -32,12 +32,15 @@ import {
   type UpgradeDefinition,
 } from '@voxelyn/survival-sim';
 import type {
+  CodexContext,
   CodexResponse,
   PublicLoreFragment,
   PublicProgressionProfile,
 } from '@voxelyn/survival-protocol';
 import { t, type MessageKey } from './i18n';
-import { protocolIconSvg } from './matrix-icons';
+import { newDotSpan, protocolIconSvg } from './matrix-icons';
+import { DISCOVERIES, BESTIARY_NAME_KEYS } from './records';
+import type { EnemyArchetype } from '@voxelyn/survival-sim';
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
   const node = document.createElement(tag);
@@ -101,12 +104,27 @@ export type MatrixViewState = {
   codexNotice: PanelNotice | null;
   /** O documento a revelar depois de uma compra. */
   reveal: PublicLoreFragment | null;
+  /**
+   * O filtro contextual dos Arquivos ("Ver docs" no Registro).
+   *
+   * Vive na VIEW, e nao no modulo, porque quem o define e a navegacao — e o
+   * retorno ao Registro precisa saber se ha para onde voltar (`codexReturn`).
+   */
+  codexContext: CodexContext;
+  /** A navegacao veio do Registro? Decide se o botao de retorno existe. */
+  codexReturn: boolean;
 };
 
 export type MatrixHandlers = {
   onTab: (tab: MatrixTab) => void;
   onPurchase: (upgrade: UpgradeDefinition) => void;
   onDismissReveal: () => void;
+  /** Troca (ou limpa) o filtro contextual dos Arquivos. */
+  onCodexContext: (context: CodexContext) => void;
+  /** O jogador ABRIU este documento: e o momento de marcar leitura. */
+  onOpenDocument: (fragment: PublicLoreFragment) => void;
+  /** Volta ao Registro, preservando a aba anterior de la. */
+  onReturnToRecords: () => void;
 };
 
 const BRANCH_LABEL: Record<UpgradeBranch, { title: MessageKey; note: MessageKey }> = {
@@ -507,31 +525,183 @@ const renderMatrixTab = (
   return body;
 };
 
-const renderFragment = (fragment: PublicLoreFragment): HTMLElement => {
-  const card = el('article', 'codex-doc');
-  card.appendChild(el('div', 'codex-code', fragment.documentCode));
-  card.appendChild(el('h3', undefined, fragment.title));
-  card.appendChild(el('div', 'sub', fragment.summary));
-  // Paragrafo por paragrafo, e nao innerHTML: o corpo vem do servidor e nao ha
-  // razao nenhuma para dar a ele a chance de virar markup.
-  for (const paragraph of fragment.body.split('\n\n')) {
-    if (paragraph.trim()) card.appendChild(el('p', 'codex-body', paragraph));
+/**
+ * Quantos documentos desbloqueados AINDA NAO LIDOS este perfil tem.
+ *
+ * Pura e exportada: e a regra da bolinha da aba de Arquivos, e a unica fonte
+ * dela e o perfil autoritativo — nunca o codex em cache, que pode nem ter sido
+ * buscado ainda.
+ */
+export const codexUnreadCount = (profile: PublicProgressionProfile | null): number => {
+  if (!profile) return 0;
+  // `?? []` em tudo: um perfil vindo de cache anterior a estes campos nao pode
+  // derrubar o painel — ele so nao tem bolinha ate o servidor responder.
+  const read = new Set(profile.readLoreFragmentIds ?? []);
+  return (profile.unlockedLoreFragmentIds ?? []).filter((id) => !read.has(id)).length;
+};
+
+/**
+ * Os ids que o filtro contextual aceita, ou null para "sem filtro".
+ *
+ * Ativo e Descoberta saem do `loreIndex` DERIVADO NO SERVIDOR — o cliente nao
+ * carrega o mapa arquetipo→documento, porque o prefixo de um codigo entregaria
+ * o ato de um documento ainda bloqueado. Protocolo resolve pelo gatilho do
+ * proprio fragmento, que so viaja em documento aberto.
+ */
+export const codexContextIds = (view: MatrixViewState): ReadonlySet<string> | null => {
+  const context = view.codexContext;
+  if (context.kind === 'all') return null;
+  if (context.kind === 'upgrade') {
+    const ids = (view.codex?.unlocked ?? [])
+      .filter((f) => f.trigger.kind === 'upgrade' && f.trigger.upgradeId === context.upgradeId)
+      .map((f) => f.id);
+    return new Set(ids);
   }
-  card.appendChild(el('div', 'codex-source', `${t('codex.source')}: ${fragment.source}`));
-  if (fragment.relatedFragmentIds.length > 0) {
-    card.appendChild(
-      el(
-        'div',
-        'codex-related',
-        `${t('codex.related')}: ${fragment.relatedFragmentIds.join(', ')}`,
-      ),
-    );
+  const index = view.profile?.loreIndex;
+  if (!index) return new Set();
+  const ids =
+    context.kind === 'asset'
+      ? (index.assets?.[context.archetype] ?? [])
+      : (index.discoveries?.[String(context.bit)] ?? []);
+  return new Set(ids);
+};
+
+/** O rotulo humano do filtro contextual ativo. */
+export const codexContextLabel = (context: CodexContext): string => {
+  switch (context.kind) {
+    case 'all':
+      return t('codex.filter.all');
+    case 'asset':
+      return t('codex.filter.asset', {
+        name: t(BESTIARY_NAME_KEYS[context.archetype as EnemyArchetype] ?? 'codex.filter.all'),
+      });
+    case 'discovery': {
+      const discovery = DISCOVERIES.find((d) => d.bit === context.bit);
+      return t('codex.filter.discovery', {
+        name: discovery ? t(discovery.title) : String(context.bit),
+      });
+    }
+    case 'upgrade':
+      return t('codex.filter.upgrade', { id: context.upgradeId });
+  }
+};
+
+/**
+ * O documento aberto (corpo visivel) vive no MODULO, como a aba do Registro:
+ * o painel e redesenhado inteiro a cada mudanca de estado, e um estado local a
+ * chamada fecharia o documento no meio da leitura.
+ */
+let openDocId: string | null = null;
+
+/** A navegacao contextual pede foco neste documento no proximo desenho. */
+let focusDocId: string | null = null;
+
+/** Chamado pela navegacao (Registro → Codex) para abrir e focar um documento. */
+export const openCodexDocument = (id: string | null): void => {
+  openDocId = id;
+  focusDocId = id;
+};
+
+const renderFragment = (
+  fragment: PublicLoreFragment,
+  handlers: MatrixHandlers,
+  redraw: () => void,
+  /** Ids visiveis sob o filtro atual; null = sem filtro. Ver o link de relacionado. */
+  contextIds: ReadonlySet<string> | null = null,
+): HTMLElement => {
+  const card = el('article', 'codex-doc');
+  const open = openDocId === fragment.id;
+
+  // O cabecalho e um BOTAO: abrir o documento e a acao que marca leitura, e
+  // precisa ser alcancavel por teclado e anunciada por leitor de tela.
+  const header = el('button', 'codex-doc-header') as HTMLButtonElement;
+  header.setAttribute('aria-expanded', open ? 'true' : 'false');
+  header.dataset.axFocus = `doc:${fragment.id}`;
+  header.appendChild(el('span', 'codex-code', fragment.documentCode));
+  const title = el('span', 'codex-doc-title', fragment.title);
+  header.appendChild(title);
+  if (!fragment.read) header.appendChild(newDotSpan(t('codex.new')));
+  header.setAttribute(
+    'aria-label',
+    `${fragment.documentCode} — ${fragment.title}${fragment.read ? '' : ` — ${t('codex.new')}`}`,
+  );
+  header.addEventListener('click', () => {
+    // So troca o documento aberto: quem marca leitura e o PROXIMO desenho, em
+    // `renderCodexTab` — a mesma porta usada pelo link de relacionado e pela
+    // navegacao "Ver docs". Uma porta so, para a bolinha nao depender do
+    // caminho que abriu o corpo.
+    openDocId = openDocId === fragment.id ? null : fragment.id;
+    redraw();
+  });
+  card.appendChild(header);
+
+  card.appendChild(el('div', 'sub', fragment.summary));
+  if (open) {
+    // Paragrafo por paragrafo, e nao innerHTML: o corpo vem do servidor e nao ha
+    // razao nenhuma para dar a ele a chance de virar markup.
+    for (const paragraph of fragment.body.split('\n\n')) {
+      if (paragraph.trim()) card.appendChild(el('p', 'codex-body', paragraph));
+    }
+    card.appendChild(el('div', 'codex-source', `${t('codex.source')}: ${fragment.source}`));
+    if (fragment.relatedFragmentIds.length > 0) {
+      // Relacionados ainda bloqueados chegam JA mascarados do servidor
+      // (AX-███-041): aqui eles viram texto, nunca link — nao ha para onde ir.
+      const related = el('div', 'codex-related', `${t('codex.related')}: `);
+      fragment.relatedFragmentIds.forEach((id, i) => {
+        if (i > 0) related.appendChild(document.createTextNode(', '));
+        if (id.includes('█')) {
+          related.appendChild(el('span', undefined, id));
+        } else {
+          const link = el('button', 'codex-related-link', id) as HTMLButtonElement;
+          link.setAttribute('aria-label', t('codex.related.aria', { code: id }));
+          link.addEventListener('click', () => {
+            openCodexDocument(id);
+            // O alvo pode estar FORA do filtro contextual (o dossie do Corcel
+            // apontando para um documento do Espreitador): abrir sem limpar o
+            // filtro deixaria o botao clicavel e a tela parada. Seguir o link
+            // e sair do contexto — o filtro cai para "Todos" e o alvo abre.
+            if (contextIds && !contextIds.has(id)) {
+              handlers.onCodexContext({ kind: 'all' });
+            } else {
+              redraw();
+            }
+          });
+          related.appendChild(link);
+        }
+      });
+      card.appendChild(related);
+    }
   }
   return card;
 };
 
-const renderCodexTab = (view: MatrixViewState): HTMLElement => {
+const renderCodexTab = (
+  view: MatrixViewState,
+  handlers: MatrixHandlers,
+  redraw: () => void,
+): HTMLElement => {
   const body = el('div', 'matrix-body');
+
+  // A barra de contexto existe sempre que ha filtro: diz O QUE esta filtrado,
+  // oferece "Todos" e — quando a navegacao veio do Registro — o retorno.
+  if (view.codexContext.kind !== 'all' || view.codexReturn) {
+    const bar = el('div', 'codex-filter');
+    if (view.codexReturn) {
+      const back = el('button', 'compact', `← ${t('codex.backToRecords')}`) as HTMLButtonElement;
+      back.dataset.axFocus = 'codex-back';
+      back.addEventListener('click', () => handlers.onReturnToRecords());
+      bar.appendChild(back);
+    }
+    if (view.codexContext.kind !== 'all') {
+      bar.appendChild(el('span', 'codex-filter-label', codexContextLabel(view.codexContext)));
+      const clear = el('button', 'compact', t('codex.filter.all')) as HTMLButtonElement;
+      clear.dataset.axFocus = 'codex-all';
+      clear.addEventListener('click', () => handlers.onCodexContext({ kind: 'all' }));
+      bar.appendChild(clear);
+    }
+    body.appendChild(bar);
+  }
+
   const codex = view.codex;
   if (!codex) {
     const pending = view.codexNotice ?? { key: 'matrix.loading' as const };
@@ -542,10 +712,38 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
     );
     return body;
   }
+
+  const contextIds = codexContextIds(view);
+  const visible = contextIds
+    ? codex.unlocked.filter((f) => contextIds.has(f.id))
+    : codex.unlocked;
+
+  // A marcacao de leitura acompanha o documento ABERTO, nao o caminho ate ele:
+  // cabecalho, link de relacionado e "Ver docs" do Registro passam todos por
+  // `openDocId`, e um corpo visivel na tela nao pode continuar "novo". So
+  // conta se o documento esta de fato renderizado (dentro do filtro atual).
+  if (openDocId) {
+    const opened = visible.find((f) => f.id === openDocId);
+    if (opened && !opened.read) handlers.onOpenDocument(opened);
+  }
+
   body.appendChild(
     el('div', 'sub', t('codex.count', { unlocked: codex.unlocked.length, total: codex.total })),
   );
-  for (const fragment of codex.unlocked) body.appendChild(renderFragment(fragment));
+  for (const fragment of visible) {
+    body.appendChild(renderFragment(fragment, handlers, redraw, contextIds));
+  }
+
+  if (contextIds) {
+    if (visible.length === 0) body.appendChild(el('p', 'sub', t('codex.contextEmpty')));
+    // Filtrado, a lista de bloqueados fica de fora: um slot mascarado nao tem
+    // gatilho legivel, e liga-lo a um Ativo especifico revelaria que existe uma
+    // ficha concreta para algo que o jogador ainda nao viu por inteiro. Os
+    // relacionados mascarados DENTRO dos documentos abertos ja mostram que ha
+    // mais arquivo do que autorizacao.
+    return body;
+  }
+
   if (codex.unlocked.length <= 1) body.appendChild(el('p', 'sub', t('codex.empty')));
 
   for (const locked of codex.locked) {
@@ -559,10 +757,17 @@ const renderCodexTab = (view: MatrixViewState): HTMLElement => {
 };
 
 /** A revelacao pos-compra. Curta, e sempre dispensavel: ninguem e obrigado a ler. */
-const renderReveal = (fragment: PublicLoreFragment, handlers: MatrixHandlers): HTMLElement => {
+const renderReveal = (
+  fragment: PublicLoreFragment,
+  handlers: MatrixHandlers,
+  redraw: () => void,
+): HTMLElement => {
+  // A revelacao mostra o corpo INTEIRO: e o unico lugar em que o documento
+  // nasce aberto — e quem o marca como lido e o caller (main), nao o painel.
+  openDocId = fragment.id;
   const panel = el('div', 'codex-reveal');
   panel.appendChild(el('div', 'codex-reveal-title', t('matrix.declassified')));
-  panel.appendChild(renderFragment(fragment));
+  panel.appendChild(renderFragment(fragment, handlers, redraw));
   const close = el('button', 'compact primary', t('options.back')) as HTMLButtonElement;
   close.addEventListener('click', () => handlers.onDismissReveal());
   panel.appendChild(close);
@@ -599,19 +804,40 @@ export const renderMatrixPanel = (
     button.setAttribute('role', 'tab');
     button.setAttribute('aria-selected', view.tab === tab ? 'true' : 'false');
     button.dataset.axFocus = `tab:${tab}`;
+    // A bolinha da aba: ha documento desbloqueado ainda nao lido. Sai do
+    // PERFIL, e nao do codex — o perfil chega antes e e a autoridade.
+    if (tab === 'codex' && codexUnreadCount(view.profile) > 0) {
+      button.appendChild(newDotSpan(t('codex.new')));
+    }
     button.addEventListener('click', () => handlers.onTab(tab));
     tabs.appendChild(button);
   }
   root.appendChild(tabs);
 
+  const redraw = (): void => renderMatrixPanel(root, view, handlers);
   if (view.reveal) {
-    root.appendChild(renderReveal(view.reveal, handlers));
+    root.appendChild(renderReveal(view.reveal, handlers, redraw));
     return;
   }
-  const redraw = (): void => renderMatrixPanel(root, view, handlers);
   root.appendChild(
-    view.tab === 'matrix' ? renderMatrixTab(view, handlers, redraw) : renderCodexTab(view),
+    view.tab === 'matrix'
+      ? renderMatrixTab(view, handlers, redraw)
+      : renderCodexTab(view, handlers, redraw),
   );
+
+  // A navegacao contextual pediu foco num documento: rola ate ele e foca UMA
+  // vez, depois libera — o proximo redesenho nao pode roubar o foco de volta.
+  if (focusDocId) {
+    const doc = root.querySelector<HTMLElement>(
+      `[data-ax-focus="${CSS.escape(`doc:${focusDocId}`)}"]`,
+    );
+    focusDocId = null;
+    if (doc) {
+      doc.focus();
+      doc.scrollIntoView?.({ block: 'nearest' });
+      return;
+    }
+  }
 
   if (focusKey) {
     // Se o elemento focado deixou de existir (o botao de compra some quando o

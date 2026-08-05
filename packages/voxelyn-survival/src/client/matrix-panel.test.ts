@@ -27,6 +27,10 @@ const profile = (
   purchasedUpgradeIds: purchased,
   generation: 'G-00',
   unlockedLoreFragmentIds: [],
+  readLoreFragmentIds: [],
+  knownAssetArchetypes: [],
+  discoveries: 0,
+  loreIndex: { assets: {}, discoveries: {} },
   statistics: {
     oreHomologated: 0,
     oreLost: 0,
@@ -135,6 +139,8 @@ const view = (over: Partial<MatrixViewState> = {}): MatrixViewState => ({
   notice: null,
   codexNotice: null,
   reveal: null,
+  codexContext: { kind: 'all' },
+  codexReturn: false,
   ...over,
 });
 

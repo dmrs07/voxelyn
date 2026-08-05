@@ -32,6 +32,7 @@ import { audio } from './audio';
 import { applyRunOnce, loadRecords, saveRecords, type Records } from './records';
 import {
   fetchCodex,
+  markLoreRead,
   openSession,
   purchaseKey,
   purchaseUpgrade,
@@ -41,14 +42,16 @@ import {
 import { readCachedProfile, writeCachedProfile } from './progression-cache';
 import { SettlementQueue } from './settlement-queue';
 import { LatestQuery, type Query } from './latest-query';
-import { renderRecordsPanel } from './records-panel';
+import { renderRecordsPanel, type RecordsCodexLink } from './records-panel';
 import {
   needsConfirmation,
+  openCodexDocument,
   renderMatrixPanel,
   type MatrixHandlers,
   type MatrixViewState,
   type PanelNotice,
 } from './matrix-panel';
+import type { CodexContext, PublicLoreFragment } from '@voxelyn/survival-protocol';
 import { formatSeed, parseSeed } from './run-summary';
 import {
   deathEchoContractLabelParts,
@@ -1573,9 +1576,56 @@ const closeOverlay = (overlay: HTMLDivElement): void => {
   audio.ui();
 };
 
+/**
+ * A ponte Registro → Codex, montada na hora do desenho para carregar o perfil
+ * mais recente. `onViewDocs` e a navegacao inteira: fecha o Registro, poe a
+ * Matriz na aba de Arquivos com o filtro do contexto, abre e foca o primeiro
+ * documento relevante — e liga `codexReturn` para o caminho de volta existir.
+ */
+const recordsCodexLink = (): RecordsCodexLink => ({
+  profile: matrixView.profile,
+  onViewDocs: (context) => {
+    recordsOverlay.classList.add('hidden');
+    matrixView.tab = 'codex';
+    matrixView.codexContext = context;
+    matrixView.codexReturn = true;
+    matrixView.notice = null;
+    // O foco vai para o primeiro documento NOVO do contexto; sem novidade,
+    // para o primeiro desbloqueado. A lista ja vem do servidor em ordem de
+    // cronologia, entao "primeiro" e o comeco da historia daquele Ativo.
+    const ids = contextDocIds(context);
+    const read = new Set(matrixView.profile?.readLoreFragmentIds ?? []);
+    openCodexDocument(ids.find((id) => !read.has(id)) ?? ids[0] ?? null);
+    drawMatrix();
+    matrixOverlay.classList.remove('hidden');
+    audio.ui();
+    void refreshCodex();
+  },
+});
+
+/** Os ids do contexto, na ordem do indice do servidor. */
+const contextDocIds = (context: CodexContext): string[] => {
+  const index = matrixView.profile?.loreIndex;
+  if (!index) return [];
+  if (context.kind === 'asset') return index.assets?.[context.archetype] ?? [];
+  if (context.kind === 'discovery') return index.discoveries?.[String(context.bit)] ?? [];
+  return [];
+};
+
+const renderRecords = (): void =>
+  renderRecordsPanel(recordsBody, records, renderer.sprites, recordsCodexLink());
+
 document.getElementById('btn-records')?.addEventListener('click', () => {
-  renderRecordsPanel(recordsBody, records, renderer.sprites);
+  renderRecords();
   openOverlay(recordsOverlay);
+  // O "Ver docs" e a bolinha dependem do perfil autoritativo; se ele ainda nao
+  // veio nesta sessao, busca em segundo plano e redesenha por cima. O Registro
+  // continua 100% funcional offline enquanto isso.
+  if (!matrixView.profile || matrixView.cached) {
+    void refreshProfile().then(() => {
+      if (!recordsOverlay.classList.contains('hidden')) renderRecords();
+    });
+  }
 });
 document
   .getElementById('btn-records-close')
@@ -1607,6 +1657,8 @@ const matrixView: MatrixViewState = {
   pending: null,
   notice: null,
   reveal: null,
+  codexContext: { kind: 'all' },
+  codexReturn: false,
 };
 
 const drawMatrix = (): void => renderMatrixPanel(matrixBody, matrixView, matrixHandlers);
@@ -1777,6 +1829,9 @@ const matrixHandlers: MatrixHandlers = {
       matrixView.codex = null; // desatualizado: um documento novo entrou
       matrixView.codexNotice = null;
       matrixView.reveal = result.value.unlockedLoreFragment;
+      // A revelacao mostra o corpo inteiro na tela: e leitura inequivoca, e o
+      // documento nao pode renascer com bolinha de "novo" depois disso.
+      if (result.value.unlockedLoreFragment) markDocumentRead(result.value.unlockedLoreFragment);
       drawMatrix();
       audio.ui();
     });
@@ -1786,6 +1841,54 @@ const matrixHandlers: MatrixHandlers = {
     drawMatrix();
     audio.ui();
   },
+  onCodexContext: (context) => {
+    // O documento aberto NAO e limpo aqui: seguir um link de relacionado para
+    // fora do filtro passa por este handler com { kind: 'all' }, e limpar o
+    // aberto engoliria exatamente a navegacao que o clique pediu. Quem limpa
+    // o estado transitorio e a abertura normal da Matriz e o retorno ao
+    // Registro.
+    matrixView.codexContext = context;
+    drawMatrix();
+    audio.ui();
+  },
+  onOpenDocument: (fragment) => {
+    markDocumentRead(fragment);
+  },
+  onReturnToRecords: () => {
+    // A volta desfaz a navegacao contextual inteira: o proximo uso do botao da
+    // Matriz nao pode herdar um filtro que o jogador nem lembra de ter posto.
+    matrixView.codexReturn = false;
+    matrixView.codexContext = { kind: 'all' };
+    openCodexDocument(null);
+    matrixOverlay.classList.add('hidden');
+    renderRecords();
+    recordsOverlay.classList.remove('hidden');
+    audio.ui();
+  },
+};
+
+/**
+ * Marca leitura: na tela AGORA, no servidor atras.
+ *
+ * O estado local muda primeiro porque a bolinha e apresentacao pura — nada de
+ * gameplay depende dela, entao o unico custo de uma falha do POST e a bolinha
+ * voltar na proxima sessao, que e exatamente o que "o servidor nao confirmou"
+ * deve significar. O perfil local acompanha para as bolinhas do Registro e da
+ * aba sumirem juntas.
+ */
+const markDocumentRead = (fragment: PublicLoreFragment): void => {
+  if (fragment.read) return;
+  fragment.read = true;
+  const profile = matrixView.profile;
+  if (profile) {
+    // O `??=` cobre o perfil hidratado de um cache anterior a este campo.
+    profile.readLoreFragmentIds ??= [];
+    if (!profile.readLoreFragmentIds.includes(fragment.id)) {
+      profile.readLoreFragmentIds.push(fragment.id);
+      writeCachedProfile(profile, Date.now());
+    }
+  }
+  void markLoreRead(progressionUrl(), fragment.id);
 };
 
 document.getElementById('btn-matrix')?.addEventListener('click', () => {
@@ -1800,6 +1903,13 @@ document.getElementById('btn-matrix')?.addEventListener('click', () => {
   matrixView.pending = null;
   matrixView.loading = false;
   matrixView.notice = null;
+  // A navegacao contextual (Registro → Codex) tambem e estado transitorio:
+  // fechar a Matriz pelo botao normal nao passa pelo retorno ao Registro, e
+  // sem esta limpeza a proxima abertura pelo menu herdaria o filtro e o botao
+  // de voltar de uma visita que ja acabou.
+  matrixView.codexContext = { kind: 'all' };
+  matrixView.codexReturn = false;
+  openCodexDocument(null);
   drawMatrix();
   openOverlay(matrixOverlay);
   void refreshProfile();
@@ -1907,8 +2017,7 @@ onLocaleChange(() => {
   // Os paineis so sao remontados se estiverem ABERTOS: reconstruir o de
   // ranking fechado descartaria as entradas que vieram da rede, e reabri-lo
   // dispararia outra busca.
-  if (!recordsOverlay.classList.contains('hidden'))
-    renderRecordsPanel(recordsBody, records, renderer.sprites);
+  if (!recordsOverlay.classList.contains('hidden')) renderRecords();
   // O menu de campo escreve o estado e o rotulo do abandono ao abrir; com ele
   // aberto (e e de dentro dele que o idioma costuma ser trocado no meio de uma
   // run) os dois ficariam na lingua anterior ate a proxima abertura.

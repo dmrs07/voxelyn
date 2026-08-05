@@ -17,6 +17,7 @@
 // pronta para o dia em que a fonte deixar de ser local.
 
 import type { RunSummary } from '@voxelyn/survival-sim';
+import type { CodexContext, PublicProgressionProfile } from '@voxelyn/survival-protocol';
 import {
   BESTIARY_FILES,
   BESTIARY_NAME_KEYS,
@@ -28,6 +29,59 @@ import {
 import { t, type MessageKey } from './i18n';
 import { describeCause, formatDuration, formatSeed } from './run-summary';
 import type { SpriteBank } from './sprites';
+import { externalLinkIconSvg, newDotSpan } from './matrix-icons';
+
+/**
+ * A ponte Registro → Codex.
+ *
+ * O Registro continua funcionando 100% offline sem ela (o historico e local e
+ * sempre foi); quando o perfil autoritativo existe, ela acrescenta o "Ver docs"
+ * e a bolinha de documento novo. `profile.loreIndex` e DERIVADO NO SERVIDOR e
+ * so contem Ativos conhecidos e Descobertas feitas — e por isso que consulta-lo
+ * aqui nunca revela ficha de inimigo que o jogador ainda nao identificou.
+ */
+export type RecordsCodexLink = {
+  profile: PublicProgressionProfile | null;
+  onViewDocs: (context: CodexContext) => void;
+};
+
+/** Os documentos deste contexto tem algum ainda nao lido? */
+const hasUnreadDocs = (
+  profile: PublicProgressionProfile,
+  fragmentIds: readonly string[],
+): boolean => {
+  const read = new Set(profile.readLoreFragmentIds ?? []);
+  return fragmentIds.some((id) => !read.has(id));
+};
+
+/**
+ * O link "Ver docs ↗", ou null quando este contexto nao tem documentos.
+ *
+ * Nao aparecer e a regra de sigilo: um Ativo bloqueado com link revelaria que
+ * existe uma ficha concreta para um inimigo ainda nao identificado.
+ */
+const viewDocsLink = (
+  codex: RecordsCodexLink | undefined,
+  context: CodexContext,
+  fragmentIds: readonly string[] | undefined,
+  ariaName: string,
+  focusKey: string,
+): HTMLElement | null => {
+  if (!codex?.profile || !fragmentIds || fragmentIds.length === 0) return null;
+  const button = el('button', 'ax-viewdocs') as HTMLButtonElement;
+  button.dataset.axFocus = focusKey;
+  button.setAttribute('aria-label', t('records.viewDocs.aria', { name: ariaName }));
+  if (hasUnreadDocs(codex.profile, fragmentIds)) {
+    button.appendChild(newDotSpan(t('codex.new')));
+  }
+  button.appendChild(el('span', undefined, t('records.viewDocs')));
+  const icon = el('span', 'ax-viewdocs-icon');
+  // innerHTML e seguro aqui: o SVG e constante nossa, nunca dado de fora.
+  icon.innerHTML = externalLinkIconSvg();
+  button.appendChild(icon);
+  button.addEventListener('click', () => codex.onViewDocs(context));
+  return button;
+};
 
 const el = (tag: string, className?: string, text?: string): HTMLElement => {
   const node = document.createElement(tag);
@@ -172,7 +226,12 @@ const animateSprites = (bank: SpriteBank, host: HTMLElement): void => {
   spriteRaf = requestAnimationFrame(tick);
 };
 
-const renderAssetsTab = (host: HTMLElement, records: Records, sprites?: SpriteBank): void => {
+const renderAssetsTab = (
+  host: HTMLElement,
+  records: Records,
+  sprites?: SpriteBank,
+  codex?: RecordsCodexLink,
+): void => {
   section(host, t('records.assets'));
   for (const archetype of BESTIARY_ORDER) {
     const entry = records.bestiary[archetype];
@@ -205,6 +264,17 @@ const renderAssetsTab = (host: HTMLElement, records: Records, sprites?: SpriteBa
     const row = el('div', 'found');
     row.appendChild(el('span', undefined, t(file.code)));
     row.appendChild(el('span', 'tally', t('records.assets.tally', { count: entry.killed })));
+    // Encadeamento opcional ate o fim: um perfil hidratado de um cache antigo
+    // pode chegar sem `loreIndex`, e o Registro tem de continuar utilizavel —
+    // sem links, mas de pe.
+    const docs = viewDocsLink(
+      codex,
+      { kind: 'asset', archetype },
+      codex?.profile?.loreIndex?.assets?.[archetype],
+      t(BESTIARY_NAME_KEYS[archetype]),
+      `viewdocs:${archetype}`,
+    );
+    if (docs) row.appendChild(docs);
     body.appendChild(row);
     body.appendChild(el('span', 'lesson', t(file.note)));
     body.appendChild(
@@ -220,18 +290,35 @@ const renderAssetsTab = (host: HTMLElement, records: Records, sprites?: SpriteBa
   if (sprites) animateSprites(sprites, host);
 };
 
-const renderDiscoveriesTab = (host: HTMLElement, records: Records): void => {
+const renderDiscoveriesTab = (
+  host: HTMLElement,
+  records: Records,
+  _sprites?: SpriteBank,
+  codex?: RecordsCodexLink,
+): void => {
   section(host, t('records.discoveries'));
   for (const discovery of DISCOVERIES) {
     const found = hasDiscovery(records, discovery.bit);
     const fragment = el('div', found ? 'ax-fragment' : 'ax-fragment is-locked');
-    fragment.appendChild(
-      el(
-        'div',
-        found ? 'found' : 'locked',
-        found ? t(discovery.title) : t('records.assets.locked'),
-      ),
+    const headline = el(
+      'div',
+      found ? 'found' : 'locked',
+      found ? t(discovery.title) : t('records.assets.locked'),
     );
+    // A licao curta continua sendo o resumo de campo; o link leva a narrativa
+    // completa, que vive nos documentos corporativos. Descoberta bloqueada nao
+    // ganha link nem revela codigo — a regra e a mesma dos Ativos.
+    if (found) {
+      const docs = viewDocsLink(
+        codex,
+        { kind: 'discovery', bit: discovery.bit },
+        codex?.profile?.loreIndex?.discoveries?.[String(discovery.bit)],
+        t(discovery.title),
+        `viewdocs:discovery:${discovery.bit}`,
+      );
+      if (docs) headline.appendChild(docs);
+    }
+    fragment.appendChild(headline);
     fragment.appendChild(
       el('span', 'lesson', found ? t(discovery.lesson) : t('records.discoveries.locked')),
     );
@@ -267,7 +354,7 @@ const renderHistoryTab = (host: HTMLElement, records: Records): void => {
 
 const TAB_RENDER: Record<
   RecordsTab,
-  (host: HTMLElement, records: Records, sprites?: SpriteBank) => void
+  (host: HTMLElement, records: Records, sprites?: SpriteBank, codex?: RecordsCodexLink) => void
 > = {
   summary: renderSummaryTab,
   assets: renderAssetsTab,
@@ -279,6 +366,7 @@ export const renderRecordsPanel = (
   host: HTMLElement,
   records: Records,
   sprites?: SpriteBank,
+  codex?: RecordsCodexLink,
 ): void => {
   // Redesenhar limpa o DOM e derrubaria o foco no documento a cada troca de
   // aba — o mesmo problema (e a mesma solucao) do painel da Matriz.
@@ -303,7 +391,7 @@ export const renderRecordsPanel = (
     button.dataset.axFocus = `tab:${tab}`;
     button.addEventListener('click', () => {
       activeTab = tab;
-      renderRecordsPanel(host, records, sprites);
+      renderRecordsPanel(host, records, sprites, codex);
     });
     tabs.appendChild(button);
   }
@@ -313,7 +401,7 @@ export const renderRecordsPanel = (
   body.style.width = 'auto';
   body.style.maxHeight = 'none';
   body.style.border = 'none';
-  TAB_RENDER[activeTab](body, records, sprites);
+  TAB_RENDER[activeTab](body, records, sprites, codex);
   host.appendChild(body);
 
   if (focusKey) {

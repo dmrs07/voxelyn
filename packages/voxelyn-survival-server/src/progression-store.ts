@@ -27,6 +27,7 @@
 
 import {
   applySettlement,
+  decideMarkRead,
   decidePurchase,
   newProfile,
   publicProfile,
@@ -34,16 +35,21 @@ import {
   sanitizeProfile,
   type ProgressionLedgerEntry,
   type RunReward,
+  type SettlementFacts,
   type StoredProfile,
 } from './progression.js';
 import type { ProgressionErrorCode, ProgressionRunTicket } from '@voxelyn/survival-protocol';
-import type { LoreFragmentId, RunPhase, UpgradeId } from '@voxelyn/survival-sim';
+import type { EnemyArchetype, LoreFragmentId, RunPhase, UpgradeId } from '@voxelyn/survival-sim';
 
 export type SettleInput = {
   profileId: string;
   runId: string;
   phase: RunPhase;
   cargoOre: number;
+  /** Abates por arquetipo, do REPLAY. E o que torna um Ativo conhecido. */
+  kills: Partial<Record<EnemyArchetype, number>>;
+  /** Bitmask DISCOVERY_* do replay. */
+  discoveries: number;
   seed: number;
   simulationVersion: number;
   durationTicks: number;
@@ -82,6 +88,10 @@ export type PurchaseOutput =
       loreFragmentId: LoreFragmentId;
     };
 
+export type MarkReadOutput =
+  | { ok: false; error: ProgressionErrorCode }
+  | { ok: true; readLoreFragmentIds: LoreFragmentId[] };
+
 export interface ProgressionStore {
   createProfile(profileId: string, now: string): Promise<StoredProfile>;
   getProfile(profileId: string): Promise<StoredProfile | null>;
@@ -89,6 +99,8 @@ export interface ProgressionStore {
   getTicket(runId: string): Promise<ProgressionRunTicket | null>;
   settleRun(input: SettleInput): Promise<SettleOutput | { error: ProgressionErrorCode }>;
   purchase(input: PurchaseInput): Promise<PurchaseOutput>;
+  /** Idempotente; nao sobe profileVersion (ver `decideMarkRead`). */
+  markLoreRead(profileId: string, fragmentId: LoreFragmentId, now: string): Promise<MarkReadOutput>;
   ledger(profileId: string): Promise<ProgressionLedgerEntry[]>;
   close(): Promise<void>;
 }
@@ -160,7 +172,8 @@ export class MemoryProgressionStore implements ProgressionStore {
     }
 
     const reward = rewardFor(input.phase, input.cargoOre);
-    const next = applySettlement(profile, input.phase, reward, input.now);
+    const facts: SettlementFacts = { kills: input.kills, discoveries: input.discoveries };
+    const next = applySettlement(profile, input.phase, reward, input.now, facts);
 
     this.settled.set(key, {
       reward,
@@ -243,6 +256,19 @@ export class MemoryProgressionStore implements ProgressionStore {
     return output;
   }
 
+  async markLoreRead(
+    profileId: string,
+    fragmentId: LoreFragmentId,
+    now: string,
+  ): Promise<MarkReadOutput> {
+    const profile = this.profiles.get(profileId);
+    if (!profile) return { ok: false, error: 'unauthenticated' };
+    const decision = decideMarkRead(sanitizeProfile(profile), fragmentId, now);
+    if (!decision.ok) return decision;
+    if (decision.changed) this.profiles.set(profileId, decision.profile);
+    return { ok: true, readLoreFragmentIds: [...decision.profile.readLoreFragmentIds] };
+  }
+
   async ledger(profileId: string): Promise<ProgressionLedgerEntry[]> {
     return [...(this.ledgers.get(profileId) ?? [])];
   }
@@ -295,6 +321,16 @@ create table if not exists progression_profiles (
   -- vire dado. Um erro no INSERT e recuperavel, um saldo negativo persistido nao.
   constraint progression_wallet_non_negative check (ore >= 0 and cores >= 0)
 );
+
+-- Colunas narrativas chegaram DEPOIS da primeira versao da tabela: o
+-- "create if not exists" acima nao altera uma tabela existente, entao a
+-- migracao e explicita. Defaults vazios = a progressao narrativa de um perfil
+-- antigo comeca a contar da proxima run liquidada (nada e importado do
+-- Registro local do navegador — ver spec 2026-08-04).
+alter table progression_profiles add column if not exists known_assets jsonb not null default '[]'::jsonb;
+alter table progression_profiles add column if not exists asset_kills jsonb not null default '{}'::jsonb;
+alter table progression_profiles add column if not exists discoveries bigint not null default 0;
+alter table progression_profiles add column if not exists read_lore jsonb not null default '[]'::jsonb;
 
 create table if not exists progression_tickets (
   run_id           text primary key,
@@ -366,6 +402,10 @@ const rowToProfile = (row: Record<string, unknown>): StoredProfile =>
     wallet: { ore: Number(row.ore ?? 0), cores: Number(row.cores ?? 0) },
     purchasedUpgradeIds: (row.purchased as UpgradeId[]) ?? [],
     unlockedLoreFragmentIds: (row.unlocked_lore as LoreFragmentId[]) ?? [],
+    knownArchetypes: (row.known_assets as EnemyArchetype[]) ?? [],
+    assetKills: (row.asset_kills as Partial<Record<EnemyArchetype, number>>) ?? {},
+    discoveries: Number(row.discoveries ?? 0),
+    readLoreFragmentIds: (row.read_lore as LoreFragmentId[]) ?? [],
     statistics: (row.statistics as StoredProfile['statistics']) ?? {
       oreHomologated: 0,
       oreLost: 0,
@@ -596,7 +636,10 @@ export class PostgresProgressionStore implements ProgressionStore {
         }
 
         const reward = rewardFor(input.phase, input.cargoOre);
-        const next = applySettlement(profile, input.phase, reward, input.now);
+        const next = applySettlement(profile, input.phase, reward, input.now, {
+          kills: input.kills,
+          discoveries: input.discoveries,
+        });
 
         await client.query(
           `insert into progression_settled_runs
@@ -613,9 +656,16 @@ export class PostgresProgressionStore implements ProgressionStore {
             input.durationTicks,
           ],
         );
+        // Recompensa, estatisticas, Ativos, Descobertas e documentos novos
+        // gravam JUNTOS: e a mesma transacao do insert acima, entao repetir a
+        // liquidacao nao desbloqueia nem conta nada duas vezes. `read_lore`
+        // fica de fora de proposito — so `markLoreRead` escreve nela, para uma
+        // leitura concorrente nunca ser sobrescrita por uma liquidacao.
         await client.query(
           `update progression_profiles
-            set profile_version = $2, ore = $3, cores = $4, statistics = $5::jsonb, updated_at = $6
+            set profile_version = $2, ore = $3, cores = $4, statistics = $5::jsonb,
+                known_assets = $6::jsonb, asset_kills = $7::jsonb, discoveries = $8,
+                unlocked_lore = $9::jsonb, updated_at = $10
           where profile_id = $1`,
           [
             input.profileId,
@@ -623,6 +673,10 @@ export class PostgresProgressionStore implements ProgressionStore {
             next.wallet.ore,
             next.wallet.cores,
             JSON.stringify(next.statistics),
+            JSON.stringify(next.knownArchetypes),
+            JSON.stringify(next.assetKills),
+            next.discoveries,
+            JSON.stringify(next.unlockedLoreFragmentIds),
             input.now,
           ],
         );
@@ -783,6 +837,38 @@ export class PostgresProgressionStore implements ProgressionStore {
           coresSpent: decision.coresSpent,
           loreFragmentId: decision.loreFragmentId,
         };
+      },
+    );
+  }
+
+  async markLoreRead(
+    profileId: string,
+    fragmentId: LoreFragmentId,
+    now: string,
+  ): Promise<MarkReadOutput> {
+    return this.runOrAbort<MarkReadOutput>(
+      (code) => ({ ok: false, error: code }),
+      async (client) => {
+        const rows = await client.query(
+          'select * from progression_profiles where profile_id = $1 for update',
+          [profileId],
+        );
+        const row = rows.rows[0];
+        if (!row) throw new AbortTransaction('unauthenticated');
+        const decision = decideMarkRead(rowToProfile(row), fragmentId, now);
+        if (!decision.ok) throw new AbortTransaction(decision.error);
+        if (decision.changed) {
+          // SO a coluna de leitura, sem `profile_version` no where nem no set:
+          // a lista so cresce e a uniao e idempotente, entao nao ha corrida a
+          // proteger — e uma compra concorrente nao pode virar 409 porque o
+          // jogador abriu um documento.
+          await client.query(
+            `update progression_profiles set read_lore = $2::jsonb, updated_at = $3
+            where profile_id = $1`,
+            [profileId, JSON.stringify(decision.profile.readLoreFragmentIds), now],
+          );
+        }
+        return { ok: true, readLoreFragmentIds: [...decision.profile.readLoreFragmentIds] };
       },
     );
   }

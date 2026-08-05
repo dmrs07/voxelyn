@@ -158,11 +158,12 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
 
   const codexFor = (profile: StoredProfile, locale: LoreLocale): CodexResponse => {
     const unlocked = new Set(profile.unlockedLoreFragmentIds);
+    const read = new Set(profile.readLoreFragmentIds);
     const open: PublicLoreFragment[] = [];
     const locked: CodexResponse['locked'] = [];
     for (const fragment of LORE_FRAGMENTS) {
       if (unlocked.has(fragment.id)) {
-        open.push(toPublicFragment(fragment, locale, unlocked));
+        open.push(toPublicFragment(fragment, locale, unlocked, read));
       } else {
         // Nem o titulo viaja. O corpo de um documento bloqueado nao sai deste
         // processo — e por isso que "bloqueado" e uma afirmacao sobre bytes que
@@ -241,6 +242,28 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
       return true;
     }
 
+    // Marcar leitura ANTES da rota generica de leitura de fragmento: o sufixo
+    // `/read` casaria com o `startsWith` abaixo e viraria 404 de fragmento.
+    const readMatch = /^\/api\/progression\/codex\/([^/]+)\/read$/.exec(path);
+    if (readMatch && req.method === 'POST') {
+      if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
+      const profile = await authenticate(req);
+      if (!profile) return (fail(res, 'unauthenticated'), true);
+      const id = decodeURIComponent(readMatch[1]);
+      const result = await opts.store.markLoreRead(
+        profile.profileId,
+        id,
+        new Date(nowMs()).toISOString(),
+      );
+      if (!result.ok) {
+        // Inexistente, bloqueado e nao autorizado respondem IGUAL, como no GET.
+        json(res, 404, { error: 'unknown_upgrade', detail: 'fragmento indisponivel' });
+        return true;
+      }
+      json(res, 200, { readLoreFragmentIds: result.readLoreFragmentIds });
+      return true;
+    }
+
     if (path.startsWith('/api/progression/codex/') && req.method === 'GET') {
       if (readLimiter.check(ip, nowMs())) return (fail(res, 'rate_limited'), true);
       const profile = await authenticate(req);
@@ -258,6 +281,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
           fragment,
           localeOf(url),
           new Set(profile.unlockedLoreFragmentIds),
+          new Set(profile.readLoreFragmentIds),
         ),
       });
       return true;
@@ -397,8 +421,13 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
           profileId: profile.profileId,
           runId,
           phase: summary.phase,
-          // Do REPLAY, e nunca do corpo. Ver IGNORED_CLIENT_CLAIMS.
+          // Do REPLAY, e nunca do corpo. Ver IGNORED_CLIENT_CLAIMS. Vale para
+          // os tres: minerio, abates e descobertas saem do estado terminal que
+          // o servidor re-simulou — e e por isso que um Ativo "conhecido" e um
+          // fato do perfil, e nao uma afirmacao do Registro local.
           cargoOre: summary.stats.oreCollected,
+          kills: summary.stats.kills,
+          discoveries: summary.stats.discoveries,
           seed: ticket.seed,
           simulationVersion: ticket.simulationVersion,
           durationTicks: summary.ticks,
@@ -497,6 +526,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
               fragment,
               localeOf(url),
               new Set(result.profile.unlockedLoreFragmentIds),
+              new Set(result.profile.readLoreFragmentIds),
             )
           : null,
       });

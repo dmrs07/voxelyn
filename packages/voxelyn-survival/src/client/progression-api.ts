@@ -20,6 +20,7 @@
 
 import type {
   CodexResponse,
+  MarkLoreReadResponse,
   ProgressionErrorCode,
   ProgressionRunTicket,
   ProgressionSettlementResponse,
@@ -247,6 +248,23 @@ export const purchaseUpgrade = (
 
 export const fetchCodex = (serverUrl: string, lang: string): Promise<ApiResult<CodexResponse>> =>
   call(serverUrl, `/api/progression/codex?lang=${encodeURIComponent(lang)}`);
+
+/**
+ * Marca UM documento como lido no perfil autoritativo.
+ *
+ * Fire-and-forget do ponto de vista do jogador: a bolinha some no clique e o
+ * POST confirma atras. Uma falha aqui nao desfaz nada na tela — o pior caso e
+ * a bolinha voltar na proxima sessao, que e o comportamento certo para um
+ * estado que o servidor nao confirmou.
+ */
+export const markLoreRead = (
+  serverUrl: string,
+  fragmentId: string,
+): Promise<ApiResult<MarkLoreReadResponse>> =>
+  call(serverUrl, `/api/progression/codex/${encodeURIComponent(fragmentId)}/read`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
 
 /**
  * Chave de idempotencia de uma compra.

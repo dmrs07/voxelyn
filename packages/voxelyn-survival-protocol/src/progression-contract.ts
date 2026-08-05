@@ -29,6 +29,22 @@ import type {
 /** Em que contexto a run acontece. So `expedition` rende recurso permanente. */
 export type RunMode = 'expedition' | 'ranked' | 'coop' | 'local_simulation';
 
+/**
+ * O indice de documentos por origem, DERIVADO no servidor.
+ *
+ * So contem fragmentos JA desbloqueados de Ativos JA conhecidos e Descobertas
+ * JA feitas — e por isso pode viajar: nenhuma chave aqui nomeia algo que o
+ * jogador ainda nao viu. E o que permite ao Registro desenhar "Ver docs" e a
+ * bolinha de nao lido sem carregar o mapa completo do catalogo no bundle
+ * (que entregaria, pelo prefixo dos codigos, o ato de documentos bloqueados).
+ */
+export type LoreIndex = {
+  /** archetype → ids de fragmentos desbloqueados relacionados ao Ativo. */
+  assets: Record<string, LoreFragmentId[]>;
+  /** bit de DISCOVERY_* (como string decimal) → ids desbloqueados. */
+  discoveries: Record<string, LoreFragmentId[]>;
+};
+
 /** O perfil como o JOGADOR pode ve-lo. Sem segredo, sem token, sem ledger. */
 export type PublicProgressionProfile = {
   profileId: string;
@@ -38,6 +54,20 @@ export type PublicProgressionProfile = {
   /** DERIVADA no servidor. Nunca enviada pelo cliente, nunca persistida solta. */
   generation: ProspectorGeneration;
   unlockedLoreFragmentIds: LoreFragmentId[];
+  /**
+   * Estado de LEITURA, persistido no perfil autoritativo.
+   *
+   * Nao entra em hash de simulacao e nao muda gameplay — mas mora no servidor
+   * porque o desbloqueio ja mora: um estado de leitura local a um navegador
+   * faria a bolinha renascer em cada dispositivo, e o perfil recuperado
+   * perderia o que ja foi lido.
+   */
+  readLoreFragmentIds: LoreFragmentId[];
+  /** Ativos que o servidor CONFIRMOU (primeiro abate re-simulado). */
+  knownAssetArchetypes: string[];
+  /** Bitmask de DISCOVERY_* confirmada por liquidacao. */
+  discoveries: number;
+  loreIndex: LoreIndex;
   statistics: {
     oreHomologated: number;
     oreLost: number;
@@ -179,11 +209,25 @@ export type LoreCategory =
  * servidor, "documento bloqueado" e uma afirmacao sobre bytes que o cliente
  * nunca recebeu. Trocar de idioma refaz a busca do codex.
  */
+/**
+ * O gatilho de um documento JA desbloqueado, como o cliente pode ve-lo.
+ *
+ * So viaja em fragmentos abertos. Um `compound` nao enumera as partes: um
+ * `anyOf` pode conter condicoes nao cumpridas, e cada uma nomearia um Ativo ou
+ * uma Descoberta que o jogador ainda nao viu.
+ */
+export type PublicLoreTrigger =
+  | { kind: 'default' }
+  | { kind: 'upgrade'; upgradeId: UpgradeId }
+  | { kind: 'generation'; generation: ProspectorGeneration }
+  /** `minKills` presente = documento de marco (so viaja ja desbloqueado). */
+  | { kind: 'asset'; archetype: string; minKills?: number }
+  | { kind: 'discovery'; discoveryBit: number }
+  | { kind: 'compound' };
+
 export type PublicLoreFragment = {
   id: LoreFragmentId;
-  unlockedByUpgradeId: UpgradeId | null;
-  /** Marco geracional que o libera, quando nao vem de um protocolo. */
-  unlockedByGeneration: ProspectorGeneration | null;
+  trigger: PublicLoreTrigger;
   category: LoreCategory;
   clearanceLevel: number;
   documentCode: string;
@@ -194,6 +238,8 @@ export type PublicLoreFragment = {
   source: string;
   relatedFragmentIds: LoreFragmentId[];
   redactionLevel: 0 | 1 | 2 | 3;
+  /** Ja foi aberto por este perfil? Falso = bolinha de "novo". */
+  read: boolean;
 };
 
 /**
@@ -213,6 +259,24 @@ export type CodexResponse = {
   unlocked: PublicLoreFragment[];
   locked: LockedLoreSlot[];
   total: number;
+};
+
+/**
+ * A navegacao contextual do Codex ("Ver docs" no Registro).
+ *
+ * E um tipo do PROTOCOLO porque cliente e testes precisam concordar sobre a
+ * forma, mas ele nunca viaja: o filtro e aplicado na apresentacao, sobre
+ * documentos que o servidor ja autorizou.
+ */
+export type CodexContext =
+  | { kind: 'all' }
+  | { kind: 'asset'; archetype: string }
+  | { kind: 'discovery'; bit: number }
+  | { kind: 'upgrade'; upgradeId: UpgradeId };
+
+/** Resposta de POST /codex/:id/read. Idempotente. */
+export type MarkLoreReadResponse = {
+  readLoreFragmentIds: LoreFragmentId[];
 };
 
 export type ProgressionErrorCode =
