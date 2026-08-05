@@ -675,8 +675,15 @@ export const UNDERTAKER_SALVAGE_ESCAPE_DIST = 24;
  * transforma o chao instavel em vidro e passa a DECIDIR por onde ele pode sair.
  */
 export const DEVOURER_HP = 760;
-/** Submerso ele desliza; na superficie e um corpo lento e pesado. */
+/** Submerso ele desliza. E o unico deslocamento por velocidade que ele tem. */
 export const DEVOURER_BURROW_SPEED = 4.6;
+/**
+ * Sobra do tempo em que ele perseguia a pe depois de emergir.
+ *
+ * Nao move mais nada: fora do mergulho ele esta no ar (conduzido pelo arco) ou
+ * entalado (parado). Continua aqui porque `ARCHETYPES` exige um `speed` por
+ * arquetipo, e um zero ali diria "fixo como o Pulmao", que e outra coisa.
+ */
 export const DEVOURER_SURFACE_SPEED = 1.6;
 export const DEVOURER_RADIUS = 0.8;
 /**
@@ -689,8 +696,34 @@ export const DEVOURER_RADIUS = 0.8;
  * janela.
  */
 export const DEVOURER_BURROWED_ARMOR = 0.12;
-/** Quanto tempo ele fica exposto depois de emergir: a janela de dano. */
-export const DEVOURER_SURFACE_TICKS = 110;
+/**
+ * A RAJADA e a JANELA.
+ *
+ * O ciclo dele nao e um golpe seguido de descanso: sao TRES arcos mirados em
+ * sequencia e so entao a abertura. Um salto por ciclo dava um chefe que
+ * alternava ameaca e folga em ritmo constante, e ritmo constante e a coisa que
+ * um encontro de chefe menos pode ter — a pressao precisa SUBIR ate obrigar o
+ * jogador a errar, e a recompensa por sobreviver a ela precisa ser um alvo
+ * parado.
+ *
+ * Entre um salto e o proximo ele mergulha por pouco tempo: o suficiente para o
+ * rastro dizer de onde vem o proximo arco, e curto o bastante para os tres
+ * lerem como UMA rajada e nao como tres ataques separados.
+ */
+export const DEVOURER_LEAPS_PER_CYCLE = 3;
+export const DEVOURER_HOP_GAP_TICKS = 25;
+/**
+ * PRESO: a janela de dano do encontro inteiro.
+ *
+ * Ele entala meio enterrado no proprio buraco no fim da rajada — nao anda, nao
+ * cobra contato e nao tem areia absorvendo tiro. 7,5 s e longo de proposito: e
+ * a unica abertura do ciclo, e ela paga tres arcos esquivados.
+ *
+ * O total de exposicao por ciclo fica proximo do que existia antes (~60% contra
+ * ~58%), mas concentrado num lugar so. E essa concentracao que transforma "vou
+ * chipando dano quando der" em "guardei o superaquecimento para AGORA".
+ */
+export const DEVOURER_STUCK_TICKS = 150;
 /** E quanto tempo passa por baixo antes de tentar sair de novo. */
 export const DEVOURER_BURROW_MIN_TICKS = 70;
 /**
@@ -740,6 +773,22 @@ export const DEVOURER_LEAP_SPEED = 9;
  * perto do corpo dele quase nunca contaria.
  */
 export const DEVOURER_LAUNCH_SEARCH = 3;
+/**
+ * Quanto cada salto da rajada gira em volta do alvo, em radianos (~120 graus).
+ *
+ * Existe por dois motivos, e o segundo foi um defeito medido. O primeiro e de
+ * desenho: tres arcos vindo sempre do mesmo lado sao o mesmo ataque repetido, e
+ * girar faz a rajada CERCAR o jogador — a cada pouso o proximo vem de outra
+ * direcao, e ficar parado deixa de ser uma opcao.
+ *
+ * O segundo e que a direcao de recuo DEGENERA. Ela sai de (posicao - queda), e
+ * o pouso e mirado no jogador: parado o alvo, o verme cai exatamente em cima
+ * dele e a subtracao da (0,0). Medido, o resultado era um arco de comprimento
+ * zero — decolagem e queda no MESMO tick, sem voo, sem janela de dano no ar, e
+ * a rajada de tres virava uma de um. Girar por um angulo fixo garante uma
+ * direcao valida mesmo quando nao ha de onde tirar uma.
+ */
+export const DEVOURER_LEAP_TURN = 2.1;
 /**
  * Dano da decolagem, mais baixo que o da queda.
  *

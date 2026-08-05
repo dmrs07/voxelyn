@@ -49,8 +49,13 @@ export const leapProgress = (tick: number, startedAt: number, releaseAt: number)
  * de ser legivel como ARCO a distancia, e nao como um corpo tremendo — e baixa
  * o bastante para o sprite nao sair pela borda de cima da tela quando o salto
  * acontece perto do topo do viewport.
+ *
+ * Nasceu em 26 e foi CONFERIDO em video antes de valer. A 26 o corpo subia
+ * pouco mais que meio tile e o salto lia como tremor; a 52 — um tile inteiro de
+ * altura projetada no zoom padrao — ele lê como arco. O numero e de gosto, mas
+ * a escala nao: e ela que separa "pulou" de "vibrou".
  */
-export const LEAP_PEAK_PX = 26;
+export const LEAP_PEAK_PX = 52;
 
 /**
  * A sombra encolhe com a altura, e e ela que conta a distancia ao chao.

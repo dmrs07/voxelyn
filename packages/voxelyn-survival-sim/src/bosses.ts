@@ -53,6 +53,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   modulesLost: 0,
   leapToX: 0,
   leapToY: 0,
+  leapsLeft: 0,
 });
 
 /**

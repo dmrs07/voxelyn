@@ -69,6 +69,11 @@
       "frames": 4,
       "fps": 10,
       "loop": false
+    },
+    "downed": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true
     }
   },
   "frameMap": {
@@ -78,36 +83,40 @@
       "attack": 10,
       "special": 14,
       "hit": 18,
-      "die": 20
+      "downed": 20,
+      "die": 24
     },
     "dl": {
-      "idle": 25,
-      "walk": 29,
-      "attack": 35,
-      "special": 39,
-      "hit": 43,
-      "die": 45
+      "idle": 29,
+      "walk": 33,
+      "attack": 39,
+      "special": 43,
+      "hit": 47,
+      "downed": 49,
+      "die": 53
     },
     "ur": {
-      "idle": 50,
-      "walk": 54,
-      "attack": 60,
-      "special": 64,
-      "hit": 68,
-      "die": 70
+      "idle": 58,
+      "walk": 62,
+      "attack": 68,
+      "special": 72,
+      "hit": 76,
+      "downed": 78,
+      "die": 82
     },
     "ul": {
-      "idle": 75,
-      "walk": 79,
-      "attack": 85,
-      "special": 89,
-      "hit": 93,
-      "die": 95
+      "idle": 87,
+      "walk": 91,
+      "attack": 97,
+      "special": 101,
+      "hit": 105,
+      "downed": 107,
+      "die": 111
     }
   },
   "generation": {
     "tool": "procedural voxel raster (tools/entities.mjs)",
-    "prompt": "voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks",
+    "prompt": "voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; stuck pose rears the front half vertically out of a silt collar with the maw opening upward",
     "seedOrRef": "deterministic-code-v2"
   }
 }

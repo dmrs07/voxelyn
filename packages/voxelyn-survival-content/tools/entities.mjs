@@ -1513,6 +1513,53 @@ const diamandisModel = (anim, f) => {
 // fundo dele. O que se ve de longe e a abertura, que e o que ela e.
 // ---------------------------------------------------------------------------
 const devourerModel = (anim, f) => {
+  // PRESO NO PROPRIO BURACO — a janela de dano do encontro, e a unica pose em
+  // que o corpo sai do plano do chao.
+  //
+  // Ela existe porque a alternativa nao funcionou, e a tentativa esta medida:
+  // recortar o modelo deitado na linha do chao deixava ~10px de lombo acima da
+  // areia, e a esse tamanho o chefe lia como uma PEDRA. O problema nao era o
+  // recorte, era a proporcao — um verme autorado baixo e comprido nao tem
+  // silhueta vertical para cortar. Uma janela de ataque precisa de um alvo com
+  // ALTURA e com ROSTO, e o rosto deste bicho e a boca.
+  //
+  // Entao aqui ele nao esta deitado: esta ERGUIDO, com a metade traseira
+  // enterrada e a dianteira de pe saindo de um colar de silica revirada. E a
+  // pose que promete "atire AGORA" sem uma linha de interface.
+  if (anim === 'downed') {
+    const sway = [0, 0.5, 0.8, 0.4][f % 4];
+    const b = [];
+    // Colar de silica: a borda do buraco. Sem ele o tronco brota de chao liso e
+    // a leitura vira "um verme de pe", nao "um verme entalado".
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6;
+      const r = 3.4 + (i % 3) * 0.4;
+      b.push(box(Math.cos(a) * r - 0.7, Math.sin(a) * r - 0.7, 0, 1.4, 1.4, 0.8 + (i % 3) * 0.4, 'silt'));
+    }
+    // Cinco aneis empilhados em Z, afinando para cima. O balanco cresce com a
+    // altura: preso, ele nao anda — ele TENTA, e o topo e o que mais se mexe.
+    const RINGS = 6;
+    const STEP = 2.2;
+    for (let s = 0; s < RINGS; s++) {
+      const d = 4.6 - s * 0.55;
+      const lean = (sway * (s + 1)) / RINGS;
+      b.push(box(-d / 2 + lean, -d / 2, 0.5 + s * STEP, d, d, STEP, 'silt'));
+      // Sulco entre aneis, como no corpo deitado: sem ele o tronco e um tubo
+      // liso e perde a escala.
+      b.push(box(-d / 2 + lean + 0.35, -d / 2 + 0.35, 0.5 + s * STEP + STEP - 0.5, d - 0.7, d - 0.7, 0.5, 'rockDeep'));
+    }
+    // A BOCA no topo, aberta para cima: anel de dentes em volta da goela.
+    const topZ = 0.5 + RINGS * STEP;
+    const tip = sway;
+    b.push(box(-1.5 + tip, -1.5, topZ - 1.6, 3, 3, 1.8, 'blood'));
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6;
+      const r = 2.2 + (i % 2) * 0.35;
+      b.push(box(Math.cos(a) * r - 0.45 + tip, Math.sin(a) * r - 0.45, topZ - 0.4, 0.9, 0.9, 1.3, 'bone'));
+    }
+    return b;
+  }
+
   const rear = anim === 'attack' ? [0, 2, 4, 2][f % 4] : anim === 'special' ? Math.min(3, f) : 0;
   // A ondulacao nunca para: o corpo de um verme e o proprio movimento dele.
   const wave = (s) =>
@@ -2267,7 +2314,11 @@ export const ENTITY_SPECS = [
   base('enemy-white-devourer', 104, 94, 50, 71, { w: 2.2, h: 1.2 }, { w: 2, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 10, loop: false },
-  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks', 1),
+    // `downed` e a fase PRESA, e nao a morte: o Devorador e o unico inimigo que
+    // usa este slot em vida. O nome do slot ja existia no contrato de atlas e
+    // significa exatamente isto — "fora de combate, no chao, vulneravel".
+    downed: { frames: 4, fps: 5, loop: true },
+  }, devourerFrame, 'voxel-isometric pale silica worm boss, seven tapering plated segments with bone joint rings, eyeless, circular bone tooth ring around a dark gullet, loose sand shedding from the flanks; stuck pose rears the front half vertically out of a silt collar with the maw opening upward', 1),
   base('enemy-archcantor', 64, 114, 30, 97, { w: 1.4, h: 2.2 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },

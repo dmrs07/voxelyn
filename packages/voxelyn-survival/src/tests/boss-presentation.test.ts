@@ -28,6 +28,9 @@ import {
 } from '@voxelyn/survival-sim';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import { ARCHETYPE_SPRITE } from '../client/sprites';
+import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
+import { EntityPresentation } from '../client/presentation';
+import { DEVOURER_AIRBORNE, DEVOURER_BURROWED, DEVOURER_STUCK } from '@voxelyn/survival-sim';
 import { SURFACE_FALLBACK, SURFACE_KIND_INDEX } from '../client/render';
 import {
   applyBossModuleMark,
@@ -153,5 +156,49 @@ describe('a marca de peca segue a peca', () => {
     applyBossModuleMark(m, { module: 2, x: 3, y: 3, state: 'dropped' }, 0);
     expect(m.size).toBe(3);
     expect([...m.values()].map((v) => v.x)).toEqual([1, 2, 3]);
+  });
+});
+
+
+describe('o Devorador entalado troca de silhueta', () => {
+  // A janela de dano do encontro inteiro e um HUMOR, nao uma acao: preso ele
+  // nao tem acao nenhuma. Sem a troca explicita de pose ele cairia em `idle` —
+  // o corpo deitado passeando pelo chao — e a unica abertura do ciclo pareceria
+  // exatamente igual a ele nadando por baixo da areia.
+  const worm = (mood: number) => ({
+    id: 10,
+    archetype: 'white_devourer',
+    facing: { x: 1, y: 0 },
+    mood,
+    stunnedUntil: 0,
+  });
+  const base = {
+    anim: 'idle', animStartMs: 0, lastX: 0, lastY: 0, lastHp: 100,
+    hitUntilMs: 0, movingUntilMs: 0, moveFacingX: 1, moveFacingY: 0,
+  };
+
+  it('preso desenha a pose erguida; mergulhado e no ar, nao', () => {
+    const p = new EntityPresentation();
+    const stuck = p.animationFor(worm(DEVOURER_STUCK) as never, { tick: 5 } as never, base as never, 1_000);
+    expect(stuck.anim).toBe('downed');
+
+    for (const mood of [DEVOURER_BURROWED, DEVOURER_AIRBORNE]) {
+      const other = p.animationFor(worm(mood) as never, { tick: 5 } as never, base as never, 1_000);
+      expect(other.anim, `humor ${mood}`).not.toBe('downed');
+    }
+  });
+
+  it('o atlas realmente tem a pose, e ela e a mais ALTA do bicho', () => {
+    // O contrato com o gerador: `downed` existe e e uma pose de pe. Se alguem
+    // regerar o atlas sem ela, o cliente cai em `idle` calado — que e como o
+    // defeito original se pareceria de novo.
+    const m = devourerManifest as unknown as {
+      animations: Record<string, { frames: number }>;
+      frameMap: Record<string, Record<string, number>>;
+    };
+    expect(m.animations.downed?.frames).toBeGreaterThan(0);
+    for (const dir of ['dr', 'dl', 'ur', 'ul']) {
+      expect(m.frameMap[dir].downed, `direcao ${dir} sem a pose`).toBeTypeOf('number');
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
+import { DEVOURER_STUCK, HEAT_MAX, TICK_HZ, type Entity, type EntityActionKind, type SemanticEvent, type SurvivalState } from '@voxelyn/survival-sim';
 import { FacingHysteresis } from './facing';
 import type { EntityAnimState, LayeredPlayerAnimation, SpriteAnimationSelection } from './sprites';
 
@@ -334,6 +334,21 @@ export class EntityPresentation {
       return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
     }
     this.downedAt.delete(entity.id);
+
+    // O DEVORADOR ENTALADO. Vem antes de tudo o que consulta acao porque preso
+    // ele nao TEM acao — e sem esta linha o `base.anim` cairia em `idle`, que e
+    // o corpo deitado passeando pelo chao. E a unica janela de dano do encontro:
+    // desenha-la com a pose de repouso apagaria o convite que ela e.
+    //
+    // A pose `downed` do atlas ergue a metade dianteira para fora da cratera. O
+    // slot ja significava exatamente isto — "fora de combate, vulneravel" — e o
+    // Devorador e o unico inimigo que o usa em vida.
+    if (entity.archetype === 'white_devourer' && entity.mood === DEVOURER_STUCK) {
+      const start = this.downedAt.get(entity.id) ?? nowMs;
+      this.downedAt.set(entity.id, start);
+      const aim = bodyFacing();
+      return { anim: 'downed', elapsedMs: nowMs - start, facingX: aim.x, facingY: aim.y };
+    }
 
     // Morte sempre substitui a silhueta inteira. Hit só interrompe a composição
     // do Prospector; inimigos mantêm telegraphs de ações que a sim não cancelou.

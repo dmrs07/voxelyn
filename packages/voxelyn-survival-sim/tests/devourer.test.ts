@@ -19,6 +19,7 @@ import {
   DEVOURER_ERUPT_WINDUP_TICKS,
   DEVOURER_LEAP_MAX_RANGE,
   DEVOURER_LEAP_MIN_RANGE,
+  DEVOURER_LEAPS_PER_CYCLE,
   SECTOR_COUNT,
   SOLID_NONE,
   SURF_GLASS,
@@ -28,6 +29,7 @@ import {
 import {
   DEVOURER_AIRBORNE,
   DEVOURER_BURROWED,
+  DEVOURER_STUCK,
   DEVOURER_SURFACED,
   DISCOVERY_SILICA_VITRIFIED,
   type SurvivalState,
@@ -204,7 +206,7 @@ describe('Devorador Branco — o arco', () => {
       } else {
         airborneTicks = 0;
       }
-      if (moodBefore === DEVOURER_AIRBORNE && worm.mood === DEVOURER_SURFACED) {
+      if (moodBefore === DEVOURER_AIRBORNE && worm.mood !== DEVOURER_AIRBORNE) {
         landing = { x: worm.x, y: worm.y };
       }
       state.player.hp = state.player.maxHp;
@@ -263,11 +265,71 @@ describe('Devorador Branco — o arco', () => {
       state.player.hp = state.player.maxHp;
       // Decolagem e queda sao as duas transicoes de humor do arco.
       if (mood !== DEVOURER_AIRBORNE && worm.mood === DEVOURER_AIRBORNE) craters++;
-      if (mood === DEVOURER_AIRBORNE && worm.mood === DEVOURER_SURFACED) craters++;
+      if (mood === DEVOURER_AIRBORNE && worm.mood !== DEVOURER_AIRBORNE) craters++;
       mood = worm.mood;
     }
     expect(craters, 'o ciclo nao teve duas pontas').toBe(2);
     expect(countSurface(state, SURF_SILT, px, py, 20)).toBeGreaterThan(before);
+  });
+});
+
+describe('Devorador Branco — a rajada e a janela', () => {
+  /** Percorre o ciclo contando arcos ate a primeira vez que ele entala. */
+  const burst = (seed: number) => {
+    const { state, worm } = arena(seed);
+    let arcs = 0;
+    let mood = worm.mood;
+    let stuckAt = -1;
+    let contactDamage = 0;
+    let movedWhileStuck = 0;
+    let stuckPos = null;
+    let airborne = 0;
+    let shortestFlight = Infinity;
+    for (let t = 0; t < 1200; t++) {
+      const hpBefore = state.player.hp;
+      stepRun(state, [emptyCommand()]);
+      if (mood !== DEVOURER_AIRBORNE && worm.mood === DEVOURER_AIRBORNE) arcs++;
+      if (worm.mood === DEVOURER_AIRBORNE) airborne++;
+      else if (airborne > 0) { shortestFlight = Math.min(shortestFlight, airborne); airborne = 0; }
+      if (mood !== DEVOURER_STUCK && worm.mood === DEVOURER_STUCK) {
+        if (stuckAt < 0) stuckAt = arcs;
+        stuckPos = { x: worm.x, y: worm.y };
+      }
+      if (mood === DEVOURER_STUCK && worm.mood === DEVOURER_STUCK) {
+        // Entalado ele nao sai do lugar e nao cobra nada de quem encosta.
+        movedWhileStuck = Math.max(movedWhileStuck, Math.hypot(worm.x - stuckPos.x, worm.y - stuckPos.y));
+        contactDamage += Math.max(0, hpBefore - state.player.hp);
+      }
+      mood = worm.mood;
+      // O jogador fica COLADO nele: e assim que se cobra a promessa de que a
+      // janela e um convite a aproximar, e nao uma armadilha de contato.
+      if (worm.mood === DEVOURER_STUCK) {
+        state.player.x = worm.x + 0.4;
+        state.player.y = worm.y;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    return { arcsBeforeStuck: stuckAt, movedWhileStuck, contactDamage, shortestFlight };
+  };
+
+  it('sao TRES arcos antes de a janela abrir', () => {
+    // O numero e a mecanica: um arco por ciclo dava pressao constante, e
+    // pressao constante nao obriga o jogador a errar. A janela paga tres.
+    expect(burst(621).arcsBeforeStuck).toBe(DEVOURER_LEAPS_PER_CYCLE);
+  });
+
+  it('nenhum arco da rajada tem comprimento zero', () => {
+    // O defeito que o teste acima pegou pela primeira vez: o pouso e mirado no
+    // jogador, entao o salto seguinte comecava de cima dele e a direcao de
+    // recuo degenerava para (0,0). O arco saia com decolagem e queda no MESMO
+    // tick — sem voo, sem janela de dano no ar, e a rajada de tres virava uma.
+    expect(burst(623).shortestFlight).toBeGreaterThan(4);
+  });
+
+  it('entalado ele nao anda e nao cobra contato de quem chega perto', () => {
+    const r = burst(622);
+    expect(r.movedWhileStuck, 'saiu do lugar durante a janela').toBeLessThan(0.05);
+    expect(r.contactDamage, 'cobrou contato de quem aceitou o convite').toBe(0);
   });
 });
 
@@ -340,15 +402,15 @@ describe('Devorador Branco — a janela de dano', () => {
     expect(exposed, 'a janela nao vale mais que o mergulho').toBeGreaterThan(buried * 4);
   });
 
-  it('depois de emergir ele fica exposto e depois volta para baixo', () => {
+  it('depois da rajada ele ENTALA, e depois volta para baixo', () => {
     const { state, worm } = arena(522);
-    let surfaced = false;
-    for (let t = 0; t < 600 && !surfaced; t++) {
+    let stuck = false;
+    for (let t = 0; t < 900 && !stuck; t++) {
       stepRun(state, [emptyCommand()]);
       state.player.hp = state.player.maxHp;
-      if (worm.mood === DEVOURER_SURFACED) surfaced = true;
+      if (worm.mood === DEVOURER_STUCK) stuck = true;
     }
-    expect(surfaced, 'nunca chegou a ficar exposto').toBe(true);
+    expect(stuck, 'nunca chegou a entalar').toBe(true);
 
     let reburrowed = false;
     for (let t = 0; t < 400 && !reburrowed; t++) {
@@ -356,6 +418,14 @@ describe('Devorador Branco — a janela de dano', () => {
       state.player.hp = state.player.maxHp;
       if (worm.mood === DEVOURER_BURROWED) reburrowed = true;
     }
-    expect(reburrowed, 'ficou exposto para sempre').toBe(true);
+    expect(reburrowed, 'ficou entalado para sempre').toBe(true);
+  });
+
+  it('entalado o tiro entra INTEIRO, como no ar', () => {
+    const { state, worm } = arena(523);
+    worm.mood = DEVOURER_STUCK;
+    const hp0 = worm.hp;
+    damageEntity(state, worm, 100, [], { kind: 'player_shot' });
+    expect(hp0 - worm.hp, 'a janela nao vale o que promete').toBe(100);
   });
 });

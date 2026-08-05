@@ -497,6 +497,16 @@ export type BossRuntime = {
    */
   leapToX: number;
   leapToY: number;
+  /**
+   * Saltos que faltam na rajada atual do Devorador.
+   *
+   * O ciclo dele e uma RAJADA e nao um golpe: tres arcos mirados em sequencia e
+   * so entao a janela. Zero (ou menos) significa "comece uma rajada nova" — a
+   * contagem se recompoe sozinha em vez de depender de quem inicializou o
+   * chefe, que e o que evita um Devorador nascido pelo caminho errado ir direto
+   * para a janela sem nunca ter atacado.
+   */
+  leapsLeft: number;
 };
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
@@ -543,6 +553,20 @@ export const DEVOURER_SURFACED = 1;
  * ACIMA do chao, com sombra propria embaixo.
  */
 export const DEVOURER_AIRBORNE = 2;
+/**
+ * PRESO: meio enterrado no proprio buraco, no fim da rajada de saltos.
+ *
+ * E a janela de dano do encontro inteiro, e por isso e um humor e nao um
+ * cooldown invisivel: ele nao anda, nao cobra contato e nao tem areia
+ * absorvendo tiro. O cliente troca a silhueta por causa dele — a pose `downed`
+ * do atlas ergue a metade dianteira para fora da cratera, que e o unico
+ * desenho do bicho com altura.
+ *
+ * O nome nao e `SURFACED` de proposito: aquele humor continua existindo e e do
+ * LEVIATA, que emerge para perseguir. Os dois ficariam com o mesmo numero e
+ * significados opostos — um caçando, o outro entalado.
+ */
+export const DEVOURER_STUCK = 3;
 
 /**
  * Posturas dos chefes de estrato que ALTERNAM, e por que elas viajam.

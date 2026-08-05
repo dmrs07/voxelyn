@@ -70,12 +70,15 @@ import {
   DEVOURER_LEAP_MAX_RANGE,
   DEVOURER_LEAP_MIN_RANGE,
   DEVOURER_LEAP_SPEED,
+  DEVOURER_LEAP_TURN,
   DEVOURER_ERUPT_WINDUP_TICKS,
   DEVOURER_HP,
   DEVOURER_LEAD_SECONDS,
   DEVOURER_RADIUS,
   DEVOURER_SURFACE_SPEED,
-  DEVOURER_SURFACE_TICKS,
+  DEVOURER_HOP_GAP_TICKS,
+  DEVOURER_LEAPS_PER_CYCLE,
+  DEVOURER_STUCK_TICKS,
   DEVOURER_TRAIL_WIDTH,
   SURF_GLASS,
   SURF_SCORCHED,
@@ -223,6 +226,7 @@ import {
   BELLOWS_INHALING,
   DEVOURER_AIRBORNE,
   DEVOURER_BURROWED,
+  DEVOURER_STUCK,
   DEVOURER_SURFACED,
   FURNACE_COOLING,
   FURNACE_OVERHEATING,
@@ -2129,7 +2133,6 @@ const devourerStep = (
   events: SemanticEvent[],
 ): void => {
   const w = state.config.width;
-  const surfaced = enemy.mood === DEVOURER_SURFACED;
 
   // NO AR o arco ja foi resolvido inteiro na decolagem, e quem conduz o corpo e
   // `devourerLeapStride`, no ramo em que a ACAO manda (o mesmo do Corcel e da
@@ -2145,26 +2148,20 @@ const devourerStep = (
     return;
   }
 
-  if (surfaced) {
-    // EXPOSTO: a janela de dano. Ele anda devagar na direcao do jogador e cobra
-    // contato de quem ficar colado, mas nao tem golpe — o golpe dele foi a
-    // emergencia, e a proxima so vem depois de mergulhar de novo.
+  // PRESO: a janela. Ele nao faz NADA aqui, e a lista do que ele nao faz e a
+  // mecanica inteira — nao anda, nao vira, nao cobra contato e nao tem areia
+  // absorvendo tiro. Encostar nele e de graca, e e por isso que este e o
+  // momento de gastar o superaquecimento.
+  //
+  // Antes existia um estado EXPOSTO em que ele perseguia devagar e machucava
+  // por contato. Ele saiu: perseguir de leve no meio da unica abertura do ciclo
+  // punia justamente a aproximacao que a abertura existe para convidar.
+  if (enemy.mood === DEVOURER_STUCK) {
     if (state.tick >= enemy.nextActionAt) {
       enemy.mood = DEVOURER_BURROWED;
+      state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
       enemy.nextActionAt = state.tick + DEVOURER_BURROW_MIN_TICKS;
-      return;
     }
-    if (!player) return;
-    const toward = normalized(player.x - enemy.x, player.y - enemy.y);
-    enemy.facing = { ...toward };
-    const def = ARCHETYPES.white_devourer;
-    if (distTo(enemy, player) < enemy.radius + player.radius + 0.2 && state.tick >= enemy.contactReadyAt) {
-      enemy.contactReadyAt = state.tick + def.contactCooldown;
-      startAction(state, enemy, 'contact', toward, 6, 4, events, player.id);
-      return;
-    }
-    const speed = DEVOURER_SURFACE_SPEED * surfaceSpeedMul(state, enemy);
-    moveEntity(state, enemy, toward.x * speed * dt, toward.y * speed * dt);
     return;
   }
 
@@ -2213,6 +2210,11 @@ const devourerStep = (
   }
   const landX = (spot % w) + 0.5;
   const landY = Math.floor(spot / w) + 0.5;
+  // A conta se recompoe sozinha em vez de depender de quem criou o chefe: um
+  // Devorador que chegue aqui com a rajada zerada (spawn por caminho novo,
+  // resync, teste) comeca uma rajada inteira em vez de saltar uma vez e ir
+  // direto para a janela.
+  if (state.bossRuntime.leapsLeft <= 0) state.bossRuntime.leapsLeft = DEVOURER_LEAPS_PER_CYCLE;
 
   // A DECOLAGEM fica ATRAS da queda, na linha por onde ele veio: ele recua por
   // baixo o quanto for preciso e sobe dali. E aqui que o vidro cobra a segunda
@@ -2255,15 +2257,26 @@ const devourerLaunchSpot = (
   landX: number,
   landY: number,
 ): number => {
-  const back = normalized(enemy.x - landX, enemy.y - landY);
+  const span = Math.hypot(enemy.x - landX, enemy.y - landY);
+  // Colado no ponto de queda, a subtracao nao da direcao nenhuma — e esse e o
+  // caso COMUM, nao o raro: o pouso e mirado no jogador, entao o salto seguinte
+  // comeca de cima dele. Sem um rumo de recuo aqui o arco sai com comprimento
+  // zero. O rumo do corpo e o primeiro recurso; o eixo x e o ultimo, para a
+  // funcao nunca devolver um vetor nulo.
+  let back = span > 0.5 ? normalized(enemy.x - landX, enemy.y - landY) : { ...enemy.facing };
+  if (Math.hypot(back.x, back.y) < 0.001) back = { x: 1, y: 0 };
+  // E cada salto da rajada gira: os tres cercam o alvo em vez de repetirem o
+  // mesmo ataque de um lado so.
+  const done = DEVOURER_LEAPS_PER_CYCLE - state.bossRuntime.leapsLeft;
+  const dir = rotated(back, done * DEVOURER_LEAP_TURN);
   const reach = Math.min(
     DEVOURER_LEAP_MAX_RANGE,
-    Math.max(DEVOURER_LEAP_MIN_RANGE, Math.hypot(enemy.x - landX, enemy.y - landY))
+    Math.max(DEVOURER_LEAP_MIN_RANGE, span)
   );
   return devourerSurfacingSpot(
     state,
-    Math.floor(landX + back.x * reach),
-    Math.floor(landY + back.y * reach),
+    Math.floor(landX + dir.x * reach),
+    Math.floor(landY + dir.y * reach),
     DEVOURER_LAUNCH_SEARCH
   );
 };
@@ -2310,9 +2323,22 @@ const devourerLeapStride = (
  */
 const devourerLand = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   enemy.action = undefined;
-  enemy.mood = DEVOURER_SURFACED;
-  enemy.nextActionAt = state.tick + DEVOURER_SURFACE_TICKS;
   devourerCrater(state, enemy, DEVOURER_ERUPT_DAMAGE, events);
+  // A rajada decide o que vem depois da cratera. Ainda ha salto na conta: ele
+  // mergulha de novo por pouco tempo e arma o proximo arco. Acabou: ele ENTALA.
+  //
+  // O decremento acontece aqui, no pouso, e nao na decolagem — um arco que o
+  // vidro negou nunca chegou a ser um ataque, e cobrar da conta um salto que
+  // nao aconteceu deixaria o jogador ganhar a janela sem ter esquivado nada.
+  state.bossRuntime.leapsLeft -= 1;
+  if (state.bossRuntime.leapsLeft > 0) {
+    enemy.mood = DEVOURER_BURROWED;
+    enemy.nextActionAt = state.tick + DEVOURER_HOP_GAP_TICKS;
+    return;
+  }
+  enemy.mood = DEVOURER_STUCK;
+  enemy.nextActionAt = state.tick + DEVOURER_STUCK_TICKS;
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: DEVOURER_ERUPT_RADIUS });
 };
 
 /**

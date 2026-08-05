@@ -2488,6 +2488,16 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // luta e na recompensa.
   mix(state.bossRuntime.modulesExposed);
   mix(state.bossRuntime.modulesLost);
+  // O ARCO do Devorador: onde ele vai cair e quantos saltos faltam na rajada.
+  //
+  // Os dois sao escolhidos UMA vez, na decolagem, e mandam no resto do ciclo —
+  // a cratera, o dano, a posicao final e se o proximo pouso encadeia outro arco
+  // ou abre a janela de dano. Duas simulacoes que discordem aqui ainda parecem
+  // iguais no tick da escolha e so divergem visivelmente um segundo depois;
+  // sem estes campos no hash, o desvio seria detectado tarde e no lugar errado.
+  mix(Math.round(state.bossRuntime.leapToX * 1000));
+  mix(Math.round(state.bossRuntime.leapToY * 1000));
+  mix(state.bossRuntime.leapsLeft);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

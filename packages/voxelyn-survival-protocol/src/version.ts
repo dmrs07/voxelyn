@@ -220,7 +220,17 @@ export const PROTOCOL_VERSION = 18;
 // chao SOLTO, entao vitrificar em volta de si empurra a decolagem para longe —
 // e arco longo e voo longo, e no ar nao ha areia absorvendo tiro. O vidro
 // deixou de so negar a saida e passou a esticar a trajetoria.
-export const SIMULATION_VERSION = 30;
+// 31: o ciclo do Devorador vira RAJADA. Sao tres arcos mirados em sequencia e
+// so entao a abertura — e a abertura deixou de ser "exposto perseguindo devagar"
+// e virou PRESO: meio enterrado, imovel, sem cobrar contato e sem areia
+// absorvendo tiro. Humor novo (`DEVOURER_STUCK`), contador de saltos no estado
+// autoritativo e no hash, e o ponto de queda do arco — que estava faltando no
+// hash desde a versao anterior — entram junto.
+//
+// O que muda de jogo: a pressao passa a SUBIR ate a janela em vez de alternar
+// em ritmo constante, e a janela concentra a exposicao num alvo parado. Duas
+// simulacoes em versoes diferentes divergem no primeiro pouso.
+export const SIMULATION_VERSION = 31;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -254,7 +264,12 @@ export const SIMULATION_VERSION = 30;
 // atlas de superficie (SURFACE_KINDS 13 e 14, manifest de crostas v7). E a
 // versao que fecha as tres promessas em aberto das tres anteriores: nada do
 // pool de conteudo desenha mais pelo caminho de recuo.
-export const CONTENT_VERSION = 21;
+// 22: o Devorador ganha a pose PRESA no atlas (`downed`) — a metade dianteira
+// erguida para fora de um colar de silica, com a boca aberta para cima. E a
+// unica silhueta vertical do bicho, e a janela de dano do encontro depende dela:
+// recortado deitado na linha do chao ele virava um calombo de dez pixels, que
+// le como pedra e nao como alvo.
+export const CONTENT_VERSION = 22;
 
 export type VersionTriple = {
   protocolVersion: number;
