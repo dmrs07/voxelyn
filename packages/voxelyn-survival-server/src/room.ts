@@ -473,6 +473,17 @@ export class GameRoom {
         : null,
       bossAwake: this.state.bossRuntime.awake,
       bossPhases: this.state.bossRuntime.phasesFired,
+      // As marcas pendentes, espelhadas do estado autoritativo. Poucos bytes e
+      // quase sempre listas vazias — elas so existem durante a janela de aviso,
+      // e e exatamente nessa janela que uma reconexao precisa delas.
+      collapseCells: this.state.bossRuntime.collapseCells.map((cell) => ({ ...cell })),
+      blastCells: [...this.state.bossRuntime.blastCells],
+      // A Salva nao guarda o tick da queda no runtime: ele vive na ACAO do
+      // chefe que a lancou. Sem isto o cliente teria as celulas e nao teria o
+      // relogio — meia marca, que e pior que nenhuma.
+      blastAt:
+        this.state.enemies.find((e) => e.alive && e.action?.kind === 'demolish')?.action
+          ?.releaseAt ?? 0,
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
       // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto
       // inteiro, entao aparecer e ser levado disparam o envio sozinhos.

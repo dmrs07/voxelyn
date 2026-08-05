@@ -8,7 +8,12 @@
 
 import { describe, expect, it } from 'vitest';
 import { BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '@voxelyn/survival-sim';
-import { furnaceBodyTint, heartbeatShake, livePhasesOf } from '../client/render';
+import {
+  furnaceBodyTint,
+  heartbeatShake,
+  livePhasesOf,
+  pendingGroundMarkers,
+} from '../client/render';
 
 const NONE = 0;
 const OVERHEAT = BOSS_PHASE_OVERHEAT;
@@ -125,5 +130,61 @@ describe('o colapso TERMINA com o chefe', () => {
 
   it('e nao acende por um chefe que nem entrou na sala', () => {
     expect(livePhasesOf({ enemies: [], bossRuntime: { phasesFired: UNSTABLE } })).toBe(0);
+  });
+});
+
+describe('o telegrafo sobrevive a reconexao', () => {
+  // O buraco que este bloco fecha: os eventos `stalactite` e `blast_marker`
+  // anunciam a marca no tick em que ela nasce, e quem RECONECTA no meio da
+  // janela de aviso nunca os recebeu. O servidor continua cobrando na hora
+  // marcada — sem derivar do estado, a reconexao produzia uma pancada sem
+  // telegrafo nenhum.
+  const mirror = (over: Record<string, unknown> = {}) => ({
+    config: { width: 100 },
+    bossRuntime: { collapseCells: [], blastCells: [], ...(over.bossRuntime ?? {}) },
+    enemies: [],
+    ...over,
+  });
+
+  it('nao inventa marca quando nao ha nada pendente', () => {
+    expect(pendingGroundMarkers(mirror())).toHaveLength(0);
+  });
+
+  it('a estalactite pendente vira marca sem nenhum evento ter chegado', () => {
+    const marks = pendingGroundMarkers(
+      mirror({ bossRuntime: { collapseCells: [{ idx: 12 * 100 + 34, at: 900 }], blastCells: [] } }),
+    );
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toMatchObject({ x: 34.5, y: 12.5, fireTick: 900, kind: 'stalactite' });
+  });
+
+  it('a Salva pendente tambem, tirando o relogio da ACAO do chefe', () => {
+    const marks = pendingGroundMarkers(
+      mirror({
+        bossRuntime: { collapseCells: [], blastCells: [500, 501] },
+        enemies: [{ alive: true, action: { kind: 'demolish', releaseAt: 640 } }],
+      }),
+    );
+    expect(marks).toHaveLength(2);
+    expect(marks.every((m) => m.kind === 'blast' && m.fireTick === 640)).toBe(true);
+  });
+
+  it('sem relogio nao desenha meia marca', () => {
+    // Onde, mas nao quando, e pior que nada: para de comunicar urgencia e
+    // continua ocupando o chao.
+    const marks = pendingGroundMarkers(
+      mirror({ bossRuntime: { collapseCells: [], blastCells: [500] }, enemies: [] }),
+    );
+    expect(marks).toHaveLength(0);
+  });
+
+  it('as duas fontes convivem na mesma lista', () => {
+    const marks = pendingGroundMarkers(
+      mirror({
+        bossRuntime: { collapseCells: [{ idx: 200, at: 10 }], blastCells: [300] },
+        enemies: [{ alive: true, action: { kind: 'demolish', releaseAt: 20 } }],
+      }),
+    );
+    expect(marks.map((m) => m.kind).sort()).toEqual(['blast', 'stalactite']);
   });
 });

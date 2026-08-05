@@ -369,6 +369,11 @@ export class NetClient {
     state.coresTakenMask = world.coresTakenMask;
     state.bossRuntime.awake = world.bossAwake;
     state.bossRuntime.phasesFired = world.bossPhases;
+    // As marcas pendentes vem do servidor e nao dos eventos: quem reconecta no
+    // meio da janela de aviso nunca recebeu o `stalactite` que a criou, e a
+    // queda cobra dele do mesmo jeito.
+    state.bossRuntime.collapseCells = (world.collapseCells ?? []).map((c) => ({ ...c }));
+    state.bossRuntime.blastCells = [...(world.blastCells ?? [])];
     // O dono do setor e os selos vem RESOLVIDOS do servidor: o cliente nao
     // reimplementa a regra de quem guarda o que, ele desenha o que a sala
     // decidiu. `entityId` fica nulo — o espelho nunca precisa dele.

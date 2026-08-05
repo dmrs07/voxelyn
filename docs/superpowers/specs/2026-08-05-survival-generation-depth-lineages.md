@@ -374,6 +374,25 @@ em `EMISSIVE_HEX`, então ele acende sozinho no caminho de brilho do cliente.
 bastante para o voxel de runtime resolver, e este ocupa uma coluna inteira de
 chão.
 
+#### O telegrafo sobrevive à reconexão
+
+As marcas de chão são derivadas do **estado autoritativo**
+(`bossRuntime.collapseCells` + `blastCells`), e não latcheadas a partir dos
+eventos. A diferença é a única que importa: os eventos `stalactite` e
+`blast_marker` anunciam a marca no tick em que ela nasce, e quem **reconecta**
+no meio da janela de aviso nunca os recebeu — enquanto o servidor continua
+rodando `stepCollapse` e continua cobrando na hora marcada. Sem a derivação, a
+reconexão produzia uma pancada sem telegrafo nenhum.
+
+`WorldFlags` espelha as duas listas, mais `blastAt` (a Salva guarda as células
+no runtime mas o relógio na *ação* do chefe). Sem relógio o cliente não desenha
+nada: meia marca — onde, mas não quando — para de comunicar urgência e continua
+ocupando o chão.
+
+As durações de janela e os raios são **importados da simulação**, nunca
+copiados: dois números com a obrigação de continuarem iguais é como um
+telegrafo passa a mentir sem parecer quebrado.
+
 #### Achado no caminho: `blast_marker` nunca foi desenhado
 
 A Salva de Demolição do Diamandis emitia o telegrafo no wire desde que ele

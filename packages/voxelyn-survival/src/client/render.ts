@@ -27,6 +27,10 @@ import {
   CANARY_DEAD_AT,
   LURKER_HIDDEN,
   BOSS_PHASE_OVERHEAT,
+  DIAMANDIS_DEMOLISH_RADIUS,
+  DIAMANDIS_DEMOLISH_WINDUP_TICKS,
+  FURNACE_HEART_STALACTITE_RADIUS,
+  FURNACE_HEART_STALACTITE_WARNING_TICKS,
   BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
   HEAT_MAX,
@@ -879,15 +883,18 @@ export const allyVisorGlow = (light: number): number => 1.6 - allyBodyAlpha(ligh
  * Devolve 0 quando nenhuma fase esta ativa — o chamador nem soma.
  */
 /**
- * Quanto tempo antes da queda a marca aparece, por tipo. Espelham
- * `FURNACE_HEART_STALACTITE_WARNING_TICKS` e o windup da Salva: o cliente nao
- * recebe a duracao no evento (so o tick de vencimento), e derivar dela aqui e
- * o que faz o anel fechar exatamente quando a coisa cai.
+ * Duracao do aviso e raio de cada marca, IMPORTADOS da simulacao.
+ *
+ * O estado autoritativo carrega a celula e o relogio de vencimento; a duracao
+ * da janela e o raio sao propriedade do golpe e ja moram na sim. Copia-los
+ * aqui a mao seria criar dois numeros com a obrigacao de continuarem iguais —
+ * e o primeiro rebalanceamento desenharia o anel fechando na hora errada, que
+ * e o unico jeito de um telegrafo mentir sem parecer quebrado.
  */
-const STALACTITE_LEAD_TICKS = 26;
-const BLAST_LEAD_TICKS = 16;
-/** Marca com vencimento alem disto e resto de outro mundo. Descartada. */
-const MARKER_MAX_LEAD_TICKS = 240;
+const STALACTITE_LEAD_TICKS = FURNACE_HEART_STALACTITE_WARNING_TICKS;
+const BLAST_LEAD_TICKS = DIAMANDIS_DEMOLISH_WINDUP_TICKS;
+const STALACTITE_RADIUS = FURNACE_HEART_STALACTITE_RADIUS;
+const BLAST_RADIUS = DIAMANDIS_DEMOLISH_RADIUS;
 
 /**
  * A cor que o corpo do Coracao ganha durante o colapso.
@@ -909,6 +916,62 @@ const MARKER_MAX_LEAD_TICKS = 240;
  * dono dela continuar de pe. Sem este filtro a sala tremeria para sempre
  * depois do abate, que e o oposto exato do alivio que o abate promete.
  */
+/**
+ * As marcas de chao PENDENTES, derivadas do estado autoritativo.
+ *
+ * Do ESTADO e nao dos eventos, e a diferenca e a unica que importa aqui: um
+ * cliente que reconecta no meio da janela de aviso nunca recebeu o evento que
+ * criou a marca, e a queda cobra dele do mesmo jeito. Derivar por quadro custa
+ * uma varredura de duas listas quase sempre vazias e fecha o buraco inteiro —
+ * sem latch, sem poda e sem uma marca de outro mundo sobrevivendo a descida.
+ *
+ * A Salva do Diamandis guarda as celulas em `blastCells` mas o RELOGIO dela na
+ * acao do chefe, entao ele entra por fora (`blastAt`).
+ */
+export type GroundMarker = {
+  x: number;
+  y: number;
+  radius: number;
+  fireTick: number;
+  kind: 'blast' | 'stalactite';
+};
+
+export const pendingGroundMarkers = (state: {
+  config: { width: number };
+  bossRuntime: { collapseCells: readonly { idx: number; at: number }[]; blastCells: readonly number[] };
+  enemies: readonly { alive: boolean; action?: { kind: string; releaseAt: number } }[];
+}): GroundMarker[] => {
+  const w = state.config.width;
+  const out: GroundMarker[] = [];
+  for (const cell of state.bossRuntime.collapseCells) {
+    out.push({
+      x: (cell.idx % w) + 0.5,
+      y: Math.floor(cell.idx / w) + 0.5,
+      radius: STALACTITE_RADIUS,
+      fireTick: cell.at,
+      kind: 'stalactite',
+    });
+  }
+  if (state.bossRuntime.blastCells.length > 0) {
+    const at = state.enemies.find((e) => e.alive && e.action?.kind === 'demolish')?.action?.releaseAt;
+    // Sem relogio nao ha aviso possivel: meia marca (onde, mas nao quando) e
+    // pior que nenhuma, porque ela para de comunicar urgencia e continua
+    // ocupando o chao.
+    if (at !== undefined) {
+      for (const idx of state.bossRuntime.blastCells) {
+        out.push({
+          x: (idx % w) + 0.5,
+          y: Math.floor(idx / w) + 0.5,
+          radius: BLAST_RADIUS,
+          fireTick: at,
+          kind: 'blast',
+        });
+      }
+    }
+  }
+  return out;
+};
+
 export const livePhasesOf = (state: {
   enemies: readonly { archetype: string; alive: boolean }[];
   bossRuntime: { phasesFired: number };
@@ -950,21 +1013,6 @@ export class SurvivalRenderer {
   fxList: Fx[] = [];
   flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
-  /**
-   * Marcas de chao com hora certa: onde alguma coisa vai cair, e quando.
-   *
-   * Uma lista so para os dois telegrafo que existem (a Salva do Diamandis e a
-   * estalactite do Coracao) porque eles sao o mesmo objeto — um aviso ancorado
-   * numa celula com um tick de vencimento. Duas listas seriam duas chances de
-   * esquecer de podar uma delas.
-   */
-  private groundMarkers: Array<{
-    x: number;
-    y: number;
-    radius: number;
-    fireTick: number;
-    kind: 'blast' | 'stalactite';
-  }> = [];
   messages: Array<{ text: string; startsAt?: number; until: number }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
@@ -1381,22 +1429,10 @@ export class SurvivalRenderer {
           // daria a quem entrou no meio do colapso uma camara parada.
           this.shake = { power: 7, until: nowMs + 700 };
           break;
-        case 'stalactite':
-          this.groundMarkers.push({ x: ev.x, y: ev.y, radius: ev.radius, fireTick: ev.fireTick, kind: 'stalactite' });
-          break;
-        case 'blast_marker':
-          // O telegrafo da Salva de Demolicao existia no wire desde o
-          // Diamandis e NUNCA foi desenhado: as tres cargas caiam sem aviso
-          // nenhum na tela, que e a unica coisa que este jogo promete nao
-          // fazer. Entra aqui de carona porque a estalactite precisava
-          // exatamente do mesmo mecanismo — uma marca no chao com hora certa.
-          this.groundMarkers.push({ x: ev.x, y: ev.y, radius: ev.radius, fireTick: ev.fireTick, kind: 'blast' });
-          break;
         case 'furnace_cooled':
           // O alivio: o tremor para, as marcas somem e a sala escurece de uma
           // vez. O `addFlash` negativo nao existe, entao quem apaga e a
           // ausencia — o que fica e o silencio depois de dez minutos de brasa.
-          this.groundMarkers.length = 0;
           this.shake = { power: 0, until: 0 };
           this.messages.push({ text: t('toast.furnace.cooled'), until: nowMs + 3200 });
           break;
@@ -1733,18 +1769,10 @@ export class SurvivalRenderer {
     // mas cada um tem silhueta propria. Ambos precisam entrar nesta fila porque
     // AS MARCAS DE CHAO, por baixo de tudo o que tem volume: elas sao pintura
     // no piso, e um aviso que passasse na frente do corpo que ele avisa seria
-    // o oposto de um aviso. Podadas aqui e nao no ingest — a hora de vencer e
-    // um TICK, e o tick so existe onde o estado esta.
+    // o oposto de um aviso.
     {
-      let keep = 0;
-      for (let m = 0; m < this.groundMarkers.length; m++) {
-        const mark = this.groundMarkers[m];
+      for (const mark of pendingGroundMarkers(state)) {
         const remaining = mark.fireTick - state.tick;
-        // Uma marca vencida some no quadro seguinte; uma marca de um mundo que
-        // ja trocou (descida, resync) tambem, porque o tick dela ficou no
-        // futuro impossivel.
-        if (remaining < 0 || remaining > MARKER_MAX_LEAD_TICKS) continue;
-        this.groundMarkers[keep++] = mark;
         const lead = mark.kind === 'stalactite' ? STALACTITE_LEAD_TICKS : BLAST_LEAD_TICKS;
         const progress = Math.max(0, Math.min(1, 1 - remaining / lead));
         const [msx, msy] = toScreen(mark.x, mark.y);
@@ -1768,7 +1796,6 @@ export class SurvivalRenderer {
         ctx.fill();
         ctx.restore();
       }
-      this.groundMarkers.length = keep;
     }
 
     // levantam volume acima do piso e devem respeitar paredes e entidades.
