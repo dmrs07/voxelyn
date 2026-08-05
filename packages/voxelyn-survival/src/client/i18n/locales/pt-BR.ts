@@ -591,6 +591,18 @@ export const PT_BR = {
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
   'toast.module.expired': '{module} DESATIVADO',
+  // Os quatro estados de uma peça do Diamandis. O verbo de cada frase e o que
+  // separa os quatro: SOLTOU (apareceu), LEVANDO (ainda da tempo), CAIU (voltou
+  // a ser sua) e PERDIDO (acabou). Sem o verbo, quatro frases com o mesmo nome
+  // de peça lem todas igual no canto da tela.
+  'toast.bossModule.exposed': '{module} SOLTOU DA CARCAÇA',
+  'toast.bossModule.detached': 'COVEIRO LEVANDO {module}',
+  'toast.bossModule.dropped': '{module} CAIU — RECUPERÁVEL',
+  'toast.bossModule.lost': '{module} PERDIDO',
+  'bossModule.drill': 'BROCA',
+  'bossModule.tower': 'TORRE',
+  'bossModule.scanner': 'LENTE',
+  'bossModule.unknown': 'MÓDULO',
   'toast.cache.opened': 'COFRE RECUPERADO',
   'toast.purgeCell': '+1 CÉLULA DE PURGA',
   'toast.scan.complete': 'VARREDURA CONCLUÍDA — COFRE REVELADO',

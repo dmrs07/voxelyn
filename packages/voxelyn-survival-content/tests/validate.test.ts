@@ -11,6 +11,11 @@ const loadManifest = (id: string): SpriteManifestEntry =>
   JSON.parse(readFileSync(resolve(__dirname, `../assets/atlases/${id}.json`), 'utf8'));
 
 describe('validacao automatizada de sprites', () => {
+  // O timeout e explicito porque este teste decodifica TODO PNG do pacote e
+  // varre pixel a pixel: com trinta sprites ele passa dos 5 s do padrao do
+  // vitest, e a falha que aparece e "Test timed out", que nao diz nada sobre o
+  // conteudo. Um teto generoso mantem o sinal util — se um dia estourar 30 s, o
+  // problema e o tamanho do pacote e nao a paciencia do runner.
   it('todos os sprites do primeiro pacote passam na validacao', () => {
     const ids: string[] = listIds();
     expect(ids.sort()).toEqual([...FIRST_PACK_IDS].sort());
@@ -18,7 +23,7 @@ describe('validacao automatizada de sprites', () => {
       const errors: string[] = validateManifest(id);
       expect(errors, `${id}:\n${errors.join('\n')}`).toEqual([]);
     }
-  });
+  }, 30_000);
 
   // Terreno e chao ficam fora do `index.json` de sprites — nao tem animacao por
   // direcao nem frameMap — entao passariam despercebidos por `listIds()`. Sao

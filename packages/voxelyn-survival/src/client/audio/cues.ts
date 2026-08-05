@@ -58,6 +58,24 @@ const TELEGRAPH_VOICE: Record<EntityActionKind, VoiceId | null> = {
   // saiu" que o cast de tick unico sempre tocou, e o resto do canal ja soa
   // pelas ignicoes que as emissoes provocam.
   breath: 'telegraphPulse',
+  // As cinco acoes dos chefes novos reaproveitam as vozes existentes, e o
+  // criterio e o mesmo do `haul`: a voz diz O QUE FAZER, nao quem esta fazendo.
+  //
+  //   drill    o corpo vem na sua direcao e nao para na parede -> RECUA.
+  //   erupt    idem, so que por baixo: o chao onde voce esta e a marca.
+  //   demolish areas marcadas no chao vao estourar -> a voz da detonacao.
+  //   beam     uma linha reta vai ficar mortal -> a voz do arremesso, que e a
+  //            que o jogo ja usa para "sai da linha".
+  //   freeze   uma zona inteira responde ao redor do chefe -> a voz do pulso.
+  //
+  // Vozes proprias para cinco acoes que aparecem uma por run seria vocabulario
+  // novo cobrado no unico encontro em que o jogador nao tem margem para
+  // aprender nada. Reusar e a escolha, e ela e a mesma de sempre.
+  drill: 'telegraphCharge',
+  erupt: 'telegraphCharge',
+  demolish: 'telegraphDetonate',
+  beam: 'telegraphHurl',
+  freeze: 'telegraphPulse',
 };
 
 /** Centro geometrico de uma descarga, em tiles. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EnemyArchetype } from '@voxelyn/survival-sim';
-import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION } from '@voxelyn/survival-sim';
+import { DISCOVERY_FIRE_SPREAD, DISCOVERY_GAS_IGNITION, emptyStats } from '@voxelyn/survival-sim';
 import type { RunPhase, RunSummary } from '@voxelyn/survival-sim';
 import {
   BESTIARY_FILES,
@@ -22,7 +22,7 @@ const summary = (over: Partial<RunSummary> = {}): RunSummary => ({
   deathCause: { kind: 'fire' },
   stats: {
     shotsFired: 10,
-    kills: { stalker: 0, bruiser: 0, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0, resonant: 0, mud_lamprey: 0, bellows: 0, scoriac: 0, frost_wraith: 0, sulfur_bomber: 0, undertaker: 0 },
+    kills: emptyStats().kills,
     damageTakenTenths: 100,
     damageDealtTenths: 200,
     solidsDestroyed: 3,
@@ -82,7 +82,11 @@ describe('registro entre runs', () => {
 
   it('acumula abates por arquetipo no bestiario', () => {
     let rec = emptyRecords();
-    const kills = { stalker: 3, bruiser: 1, spitter: 0, bomber: 0, guardian: 0, bishop: 0, fungal_horse: 0, miner: 0, resonant: 0, mud_lamprey: 0, bellows: 0, scoriac: 0, frost_wraith: 0, sulfur_bomber: 0, undertaker: 0 };
+    // Partir de `emptyStats()` e nao de uma lista escrita a mao: a tabela de
+    // arquetipos cresce (oito chefes de uma vez, na ultima leva) e um literal
+    // aqui vira um erro de tipo a cada bicho novo, sem nada a ver com o que o
+    // teste verifica.
+    const kills = { ...emptyStats().kills, stalker: 3, bruiser: 1 };
     rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
     rec = applyRun(rec, summary({ stats: { ...summary().stats, kills } }));
     expect(rec.bestiary.stalker?.killed).toBe(6);

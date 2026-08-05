@@ -40,6 +40,14 @@ import scoriacManifest from '@voxelyn/survival-content/assets/atlases/enemy-scor
 import wraithManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.json';
 import sulfurBomberManifest from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.json';
 import undertakerManifest from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.json';
+import diamandisManifest from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.json';
+import devourerManifest from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.json';
+import archcantorManifest from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.json';
+import leviathanManifest from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.json';
+import lungMatrixManifest from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.json';
+import furnaceHeartManifest from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.json';
+import frostQueenManifest from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.json';
+import magnetarchManifest from '@voxelyn/survival-content/assets/atlases/enemy-magnetarch.json';
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
@@ -66,6 +74,14 @@ import scoriacUrl from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.p
 import wraithUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.png?url';
 import sulfurBomberUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.png?url';
 import undertakerUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.png?url';
+import diamandisUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.png?url';
+import devourerUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.png?url';
+import archcantorUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.png?url';
+import leviathanUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.png?url';
+import lungMatrixUrl from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.png?url';
+import furnaceHeartUrl from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.png?url';
+import frostQueenUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.png?url';
+import magnetarchUrl from '@voxelyn/survival-content/assets/atlases/enemy-magnetarch.png?url';
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
@@ -231,12 +247,28 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: wraithManifest as unknown as SpriteManifestEntry, url: wraithUrl },
   { manifest: sulfurBomberManifest as unknown as SpriteManifestEntry, url: sulfurBomberUrl },
   { manifest: undertakerManifest as unknown as SpriteManifestEntry, url: undertakerUrl },
+  { manifest: diamandisManifest as unknown as SpriteManifestEntry, url: diamandisUrl },
+  { manifest: devourerManifest as unknown as SpriteManifestEntry, url: devourerUrl },
+  { manifest: archcantorManifest as unknown as SpriteManifestEntry, url: archcantorUrl },
+  { manifest: leviathanManifest as unknown as SpriteManifestEntry, url: leviathanUrl },
+  { manifest: lungMatrixManifest as unknown as SpriteManifestEntry, url: lungMatrixUrl },
+  { manifest: furnaceHeartManifest as unknown as SpriteManifestEntry, url: furnaceHeartUrl },
+  { manifest: frostQueenManifest as unknown as SpriteManifestEntry, url: frostQueenUrl },
+  { manifest: magnetarchManifest as unknown as SpriteManifestEntry, url: magnetarchUrl },
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
   { manifest: droneManifest as unknown as SpriteManifestEntry, url: droneUrl },
 ];
 
-const ARCHETYPE_SPRITE: Record<string, string> = {
+/**
+ * Arquetipo da simulacao -> atlas. Exportado por causa do TESTE, e o teste
+ * existe por causa de uma falha real: oito chefes chegaram ao jogo sem entrada
+ * aqui, e como `spriteForArchetype` devolve `null` para chave desconhecida e o
+ * renderer tem recuo para tudo, ninguem foi avisado — eles simplesmente
+ * apareciam no setor final como um losango de cor. Nada quebrava, e por isso o
+ * defeito sobreviveu a varias rodadas de teste verde.
+ */
+export const ARCHETYPE_SPRITE: Record<string, string> = {
   prospector: 'player-prospector',
   stalker: 'enemy-stalker',
   spitter: 'enemy-spitter',
@@ -253,6 +285,17 @@ const ARCHETYPE_SPRITE: Record<string, string> = {
   frost_wraith: 'enemy-frost-wraith',
   sulfur_bomber: 'enemy-sulfur-bomber',
   undertaker: 'enemy-undertaker',
+  // Chefes: a chave e o `EnemyArchetype` da simulacao, e o valor o atlas. Ate
+  // estes oito existirem, o cliente nao achava entrada nenhuma para eles e caia
+  // no losango de recuo — um chefe de setor final desenhado como um bloco de cor.
+  diamandis: 'enemy-diamandis',
+  white_devourer: 'enemy-white-devourer',
+  archcantor: 'enemy-archcantor',
+  sheet_leviathan: 'enemy-sheet-leviathan',
+  lung_matrix: 'enemy-lung-matrix',
+  furnace_heart: 'enemy-furnace-heart',
+  frost_queen: 'enemy-frost-queen',
+  magnetarch: 'enemy-magnetarch',
 };
 
 /**

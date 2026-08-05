@@ -62,6 +62,12 @@ import { HEAT_WARN_AT } from './audio/ambience';
 import { PRESETS, type QualityLevel, type QualityPreset } from './settings';
 import { TouchIconBank } from './touch-icons';
 import { addFlash, flashPower, pruneFlashes, type Flash } from './flash';
+import {
+  applyBossModuleMark,
+  bossModuleNameKey,
+  bossModulePresentation,
+  type BossModuleMark,
+} from './boss-module-presentation';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
@@ -159,7 +165,7 @@ export const terrainKindIndexFor = (solid: number, stratum: StratumId): number =
  * acima: a cadeia de ifs que existia aqui tratava tres dos seis casos e deixava
  * os outros caindo no ramo da rocha nua sem que nada acusasse.
  */
-const SURFACE_KIND_INDEX: Record<number, number> = {
+export const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_NONE]: 0,
   [SURF_FUNGAL]: 1,
   [SURF_BIOFLUID]: 2,
@@ -173,6 +179,8 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
   [SURF_ICE]: 10,
   [SURF_RAIL]: 11,
   [SURF_RAIL_V]: 12,
+  [SURF_SILT]: 13,
+  [SURF_GLASS]: 14,
 };
 
 /**
@@ -181,7 +189,7 @@ const SURFACE_KIND_INDEX: Record<number, number> = {
  * Nao e a arte: e o minimo para o jogador nao pisar num gas invisivel enquanto a
  * imagem nao chega. A arte de verdade e o voxel do atlas.
  */
-const SURFACE_FALLBACK: Record<number, string> = {
+export const SURFACE_FALLBACK: Record<number, string> = {
   [SURF_FUNGAL]: '#1f3d33',
   [SURF_BIOFLUID]: '#2f6b4f',
   // Amarelo-esverdeado, e da paleta mestra: o oliva anterior nao existia nela e
@@ -885,6 +893,14 @@ export class SurvivalRenderer {
   private readonly animStates = new Map<number, EntityAnimState>();
   private readonly presentation = new EntityPresentation();
   private readonly modulePulseUntil = new Map<ModuleId, number>();
+  /**
+   * Peças do Diamandis marcadas no chao, por indice de peça.
+   *
+   * Indexado pela PEÇA e nao pela posicao: a mesma broca pode soltar, ser
+   * arrancada, cair noutro canto e ser arrancada de novo, e cada transicao move
+   * a marca em vez de acrescentar mais uma. Ver applyBossModuleMark.
+   */
+  private readonly bossModuleMarks = new Map<number, BossModuleMark>();
   private safeArea: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
   private pendingRewardOrigin: { slot: number; x: number; y: number } | null = null;
   private rewardFlight: {
@@ -1036,6 +1052,7 @@ export class SurvivalRenderer {
     // memoria da run, nao do mapa: sem isto, ids reciclados herdariam
     // pegadas velhas e as demais desenhariam orfas sobre a run nova.
     this.lurkerTrails.clear();
+    this.bossModuleMarks.clear();
     // O Levantamento e memoria da RUN pela mesma razao, e o detalhe que torna
     // isso obrigatorio: a run nova comeca no setor 1, como a anterior terminou.
     // `trackSector` compara NUMEROS e sairia cedo, deixando o beacon de SV-01
@@ -1241,6 +1258,19 @@ export class SurvivalRenderer {
           this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
           this.shake = { power: 6, until: nowMs + 500 };
           break;
+        case 'boss_module': {
+          // Um evento, quatro leituras. A tabela em boss-module-presentation.ts
+          // decide cor, frase, clarao e se a peça fica marcada no chao — e a
+          // marca so existe quando ha mesmo alguma coisa naquele ponto.
+          const bm = bossModulePresentation(ev.state);
+          this.messages.push({
+            text: t(bm.toastKey, { module: t(bossModuleNameKey(ev.module)) }),
+            until: nowMs + bm.toastMs,
+          });
+          this.addFlash(ev.x, ev.y, bm.flashRadius, bm.flashPower, nowMs, bm.flashMs);
+          applyBossModuleMark(this.bossModuleMarks, ev, nowMs);
+          break;
+        }
         case 'module_charge_consumed':
           this.modulePulseUntil.set(ev.module, nowMs + 260);
           break;
@@ -1795,6 +1825,18 @@ export class SurvivalRenderer {
       });
     }
 
+    // As peças do Diamandis caidas no chao. Entram na mesma fila ordenada pela
+    // mesma razao dos Ecos: elas estao NO mundo, e uma marca desenhada por cima
+    // da parede que a esconde mentiria sobre haver caminho ate ela.
+    for (const mark of this.bossModuleMarks.values()) {
+      const [msx, msy] = toScreen(mark.x, mark.y);
+      if (msx < -80 || msx > vw + 80 || msy < -100 || msy > vh + 80) continue;
+      items.push({
+        depth: mark.x + mark.y,
+        draw: () => this.drawBossModuleMark(mark, msx, msy, z, nowMs),
+      });
+    }
+
     const pairedEcho = this.deathEchoes.paired;
     for (const echo of this.deathEchoes.echoes) {
       const [esx, esy] = toScreen(echo.x, echo.y);
@@ -1834,6 +1876,7 @@ export class SurvivalRenderer {
       // Mundo novo, lamina nova: rastros do setor anterior morreriam como
       // "orfaos" DESENHADOS por ate 2,6s sobre coordenadas do mapa antigo.
       this.lurkerTrails.clear();
+    this.bossModuleMarks.clear();
     }
     for (const prop of this.decor) {
       // O landmark ancora numa celula SOLIDA: a luz dele e a da parede (mesma
@@ -2837,6 +2880,42 @@ export class SurvivalRenderer {
    * fog of war revela luzes, não silhuetas" protege informação sobre o mundo —
    * uma oferta que o jogo está fazendo ao jogador não é informação sobre o mundo.
    */
+  /**
+   * Uma peça do chefe caida no chao: anel pulsando e um bloco pequeno em cima.
+   *
+   * Deliberadamente MENOR e mais discreto que a oferta do Poco. As duas coisas
+   * marcam "ha algo aqui para pegar", mas a do Poco e uma escolha de build que
+   * para a luta, e esta e uma peça de sucata no meio dela. Igualar as duas
+   * ensinaria o jogador a parar no meio do combate do Diamandis.
+   */
+  private drawBossModuleMark(
+    mark: BossModuleMark,
+    sx: number,
+    sy: number,
+    z: number,
+    nowMs: number,
+  ): void {
+    const ctx = this.ctx;
+    // A fase vem da POSICAO, e nao do instante em que a marca nasceu: duas
+    // peças caidas lado a lado pulsando em unissono lem como interface, e nao
+    // como duas coisas separadas no chao.
+    const breath = 0.5 + Math.sin(nowMs * 0.006 + mark.x + mark.y) * 0.3;
+    ctx.save();
+    ctx.globalAlpha = 0.3 + breath * 0.4;
+    ctx.strokeStyle = mark.color;
+    ctx.lineWidth = Math.max(1, z * 0.6);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, (6 + breath * 2) * z, (3 + breath) * z, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.75 + breath * 0.25;
+    ctx.fillStyle = mark.color;
+    ctx.fillRect(sx - 2 * z, sy - 5 * z, Math.max(2, 4 * z), Math.max(2, 4 * z));
+    ctx.restore();
+  }
+
   private drawWellOffer(
     offer: { ability: AbilityId; x: number; y: number },
     sx: number,

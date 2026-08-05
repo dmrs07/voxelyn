@@ -1,0 +1,113 @@
+{
+  "id": "enemy-magnetarch",
+  "version": 1,
+  "atlas": "enemy-magnetarch.png",
+  "frameWidth": 128,
+  "frameHeight": 98,
+  "columns": 32,
+  "anchorX": 62,
+  "anchorY": 83,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.4,
+    "h": 1.8
+  },
+  "footprint": {
+    "w": 1.6,
+    "h": 1.6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#3d2a22",
+    "#46566e",
+    "#6e4a33",
+    "#7ab8ff",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    },
+    "special": {
+      "frames": 4,
+      "fps": 9,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "special": 14,
+      "hit": 18,
+      "die": 20
+    },
+    "dl": {
+      "idle": 25,
+      "walk": 29,
+      "attack": 35,
+      "special": 39,
+      "hit": 43,
+      "die": 45
+    },
+    "ur": {
+      "idle": 50,
+      "walk": 54,
+      "attack": 60,
+      "special": 64,
+      "hit": 68,
+      "die": 70
+    },
+    "ul": {
+      "idle": 75,
+      "walk": 79,
+      "attack": 85,
+      "special": 89,
+      "hit": 93,
+      "die": 95
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric hovering magnetite core boss, rough dark octahedron with glowing electric seams, two perpendicular iron segment rings that tighten or widen with polarity, orbiting scrap debris, suspended iron filings below — no legs, no face",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

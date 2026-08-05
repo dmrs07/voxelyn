@@ -233,7 +233,11 @@ export const SIMULATION_VERSION = 29;
 // (antes o `?? 0` desenhava chao limpo e a materia ficava invisivel).
 // 20: o pool ganha os seis chefes de estrato. Como o Diamandis e o Devorador,
 // eles desenham pelo caminho de fallback ate ganharem atlas.
-export const CONTENT_VERSION = 20;
+// 21: os OITO chefes ganham atlas voxel e a silica e o vidro ganham tile no
+// atlas de superficie (SURFACE_KINDS 13 e 14, manifest de crostas v7). E a
+// versao que fecha as tres promessas em aberto das tres anteriores: nada do
+// pool de conteudo desenha mais pelo caminho de recuo.
+export const CONTENT_VERSION = 21;
 
 export type VersionTriple = {
   protocolVersion: number;

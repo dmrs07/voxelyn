@@ -1,0 +1,116 @@
+{
+  "id": "enemy-diamandis",
+  "version": 1,
+  "atlas": "enemy-diamandis.png",
+  "frameWidth": 120,
+  "frameHeight": 138,
+  "columns": 34,
+  "anchorX": 58,
+  "anchorY": 114,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 1.8,
+    "h": 2.4
+  },
+  "footprint": {
+    "w": 2,
+    "h": 2,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#46566e",
+    "#6e4a33",
+    "#7ab8ff",
+    "#7b8ba3",
+    "#8a7154",
+    "#b8a98f",
+    "#d5cdba",
+    "#d93b4c",
+    "#ff7a2f",
+    "#ffa63f",
+    "#ffd166"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 6,
+      "loop": true
+    },
+    "walk": {
+      "frames": 6,
+      "fps": 10,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 12,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    },
+    "special": {
+      "frames": 4,
+      "fps": 8,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "walk": 4,
+      "attack": 10,
+      "special": 14,
+      "hit": 18,
+      "die": 20
+    },
+    "dl": {
+      "idle": 25,
+      "walk": 29,
+      "attack": 35,
+      "special": 39,
+      "hit": 43,
+      "die": 45
+    },
+    "ur": {
+      "idle": 50,
+      "walk": 54,
+      "attack": 60,
+      "special": 64,
+      "hit": 68,
+      "die": 70
+    },
+    "ul": {
+      "idle": 75,
+      "walk": 79,
+      "attack": 85,
+      "special": 89,
+      "hit": 93,
+      "die": 95
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric walking industrial excavator boss, conical advance drill head, exposed ember reactor in the belly, three-canister demolition rack on the back, fragile prospecting mast with a cold sensor lens, four heavy track feet, rusted Aurix chassis — a working machine, never a weapon",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

@@ -65,6 +65,13 @@ export const SURFACE_KINDS = [
   // neles e o CARRINHO, e esse e um projetil, nao a crosta.
   { name: 'rail', frames: 1, frameMs: 0 },
   { name: 'rail-v', frames: 1, frameMs: 0 },
+  // Silica solta (SURF_SILT = 13) e vidro (SURF_GLASS = 14), os dois lados da
+  // mesma decisao nos Sumidouros: a areia e o rastro do Devorador, o vidro e a
+  // resposta do jogador a ela. Precisam se separar A DISTANCIA, porque o que o
+  // jogador le no chao e onde ele pode ou nao ser pego por baixo — daí um ser
+  // areia morna com ondulacao e o outro placa fria, lisa e brilhante.
+  { name: 'silt', frames: 2, frameMs: 620 },
+  { name: 'glass', frames: 2, frameMs: 900 },
 ];
 
 const hash3d = (x, y, z, seed) => {
@@ -551,6 +558,66 @@ export const surfaceModel = (kind, variant, frame) => {
         const band = (fx + fy + frame) % FINE_COLS;
         const sparkle = band === 0 && (h & 7) === 0;
         boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, sparkle ? 'electric' : 'ice'));
+      }
+    }
+    return boxes;
+  }
+
+  if (kind === 'silt') {
+    // Areia solta: cobertura quase total sobre a laje, com ONDULACAO. A duna em
+    // miniatura e o que faz a silica nao ler como "chao claro" — sem as cristas
+    // ela vira uma laje bege e o rastro do Devorador some no cenario.
+    //
+    // A crista nao segue a diagonal da projecao: correndo no eixo X do mundo ela
+    // sai obliqua na tela, e um campo de silica passa a ter direcao. O quadro
+    // desloca a onda por UMA coluna fina — nao para animar vento (areia parada
+    // nao anda), mas para os graos grossos trocarem de lugar e a superficie
+    // parecer solta em vez de fundida.
+    const boxes = slab(variant, 'floor', 'rockDeep');
+    overSlab(variant, 149, ({ cx, cy, x, y, top, h }) => {
+      if (h % 29 === 0) return; // rocha aparecendo: a camada e fina, nao infinita
+      // Crista de duna a cada oito colunas finas, com DUAS de largura: no
+      // periodo curto que isto tinha antes as cristas caiam quase coladas e o
+      // olho lia ruido, nao ondulacao. Ondulacao precisa de vale.
+      const ripple = (cx + ((h >>> 9) & 1)) % 8;
+      // Grao grosso: uma coluna em sete sobe meio voxel a mais e sai em `bone`,
+      // um degrau abaixo. E o que da textura sem custar altura.
+      const coarse = ((h >>> 4) + frame) % 7 === 0;
+      boxes.push(box(x, y, top, 1 / F, 1 / F, 0.5, coarse ? 'bone' : 'silt'));
+      if (ripple < 2) boxes.push(box(x, y, top + 0.5, 1 / F, 1 / F, 0.5, 'silt'));
+    });
+    return boxes;
+  }
+
+  if (kind === 'glass') {
+    // Placa vitrificada: LISA. A laje por baixo perde o cascalho de proposito —
+    // o vidro e a unica crosta do jogo sem relevo nenhum, e e por isso que ela
+    // le como "isto aqui esta selado" antes mesmo de o jogador saber a regra.
+    //
+    // O que quebra a lisura sao as FRATURAS: linhas retas e longas, ao contrario
+    // das rachaduras espalhadas do gelo. Vidro trinca em reta; gelo estala em
+    // ponto. E o reflexo e uma faixa continua que anda um passo entre os dois
+    // quadros — brilho de placa polida, nao o cintilar do gelo.
+    const boxes = [];
+    const half = SURFACE_COLS / 2;
+    for (let fx = 0; fx < FINE_COLS; fx++) {
+      for (let fy = 0; fy < FINE_COLS; fy++) {
+        const x = fx / F - half;
+        const y = fy / F - half;
+        const h = hash3d(fx, fy, 151, variant);
+        boxes.push(box(x, y, 0, 1 / F, 1 / F, 1, 'floor'));
+        // Duas fraturas retas por celula, com um zigue por variante. Elas
+        // AFUNDAM meio voxel e saem em `rock`: a trinca e uma sombra dentro da
+        // placa, nunca um friso por cima dela.
+        const wob = (variant * 3) % 5;
+        const cracked =
+          (fx + fy + wob) % FINE_COLS === 0 || (fx - fy + FINE_COLS * 2 + wob) % FINE_COLS === 5;
+        if (cracked && h % 4 !== 0) {
+          boxes.push(box(x, y, 1, 1 / F, 1 / F, 0.5, 'rock'));
+          continue;
+        }
+        const band = (fx + fy * 2 + frame) % FINE_COLS;
+        boxes.push(box(x, y, 1, 1 / F, 1 / F, 1, band === 0 ? 'electric' : 'glass'));
       }
     }
     return boxes;

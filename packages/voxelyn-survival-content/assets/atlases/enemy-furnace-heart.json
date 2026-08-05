@@ -1,0 +1,100 @@
+{
+  "id": "enemy-furnace-heart",
+  "version": 1,
+  "atlas": "enemy-furnace-heart.png",
+  "frameWidth": 116,
+  "frameHeight": 108,
+  "columns": 35,
+  "anchorX": 56,
+  "anchorY": 84,
+  "directions": 4,
+  "authoredDirs": [
+    "dr",
+    "dl",
+    "ur",
+    "ul"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 2,
+    "h": 2
+  },
+  "footprint": {
+    "w": 2,
+    "h": 2,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#1d2430",
+    "#2e3a4d",
+    "#46566e",
+    "#d93b4c",
+    "#ff7a2f",
+    "#ffa63f"
+  ],
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "fps": 5,
+      "loop": true
+    },
+    "attack": {
+      "frames": 4,
+      "fps": 10,
+      "loop": false
+    },
+    "special": {
+      "frames": 4,
+      "fps": 8,
+      "loop": false
+    },
+    "hit": {
+      "frames": 2,
+      "fps": 12,
+      "loop": false
+    },
+    "die": {
+      "frames": 5,
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "frameMap": {
+    "dr": {
+      "idle": 0,
+      "attack": 4,
+      "special": 8,
+      "hit": 12,
+      "die": 14
+    },
+    "dl": {
+      "idle": 19,
+      "attack": 23,
+      "special": 27,
+      "hit": 31,
+      "die": 33
+    },
+    "ur": {
+      "idle": 38,
+      "attack": 42,
+      "special": 46,
+      "hit": 50,
+      "die": 52
+    },
+    "ul": {
+      "idle": 57,
+      "attack": 61,
+      "special": 65,
+      "hit": 69,
+      "die": 71
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric anchored igneous core boss, four dark slag plates opening and closing around a permanent molten core, charred plate edges, scoria mound base, spines rising when overheated — no legs",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

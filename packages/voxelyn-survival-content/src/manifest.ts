@@ -113,6 +113,18 @@ export const CHARACTER_SPRITE_IDS = [
   // lugar do de esporos, e o Coveiro do Ferrifero.
   'enemy-sulfur-bomber',
   'enemy-undertaker',
+  // Chefes. O Guardiao e o Bispo ja estavam acima porque nasceram antes do
+  // sistema de biomas; estes oito completam a tabela de `bossForBiome` — um
+  // dono por estrato, mais o da ocupacao Aurix. Ate aqui eles desenhavam pelo
+  // recuo do cliente, ou seja, chegavam ao setor final como um losango de cor.
+  'enemy-diamandis',
+  'enemy-white-devourer',
+  'enemy-archcantor',
+  'enemy-sheet-leviathan',
+  'enemy-lung-matrix',
+  'enemy-furnace-heart',
+  'enemy-frost-queen',
+  'enemy-magnetarch',
 ] as const;
 
 export const PLAYER_LAYER_SPRITE_IDS = [

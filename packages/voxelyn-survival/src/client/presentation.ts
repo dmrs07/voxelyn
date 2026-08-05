@@ -53,12 +53,22 @@ export const actionAnimation = (action: EntityActionKind): string => {
   // e o `attack` e a prensa. Sem esta linha, o telegrafo de 1,1 s do puxao
   // mostrava o BRACO ERRADO se movendo — o aviso mais importante do bicho
   // apontando para o golpe seguinte em vez de para o que estava acontecendo.
+  //
+  // `drill`, `erupt` e `freeze` entram pela mesma porta, agora que os chefes
+  // tem atlas. Sao as tres acoes do jogo cujo PREPARO e mais longo e mais
+  // importante que o golpe: a broca do Diamandis fica 1,8 s parada girando
+  // antes de atravessar a arena, o Devorador rasga o chao antes de sair dele, e
+  // a Rainha levanta os bracos antes de o lago congelar. Mostrar a pose de
+  // ataque durante esses telegrafos e o erro do Coveiro outra vez.
   if (
     action === 'detonate' ||
     action === 'charge' ||
     action === 'pulse' ||
     action === 'hurl' ||
-    action === 'haul'
+    action === 'haul' ||
+    action === 'drill' ||
+    action === 'erupt' ||
+    action === 'freeze'
   ) {
     return 'special';
   }

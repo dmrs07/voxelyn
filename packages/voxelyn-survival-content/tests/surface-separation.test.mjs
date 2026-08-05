@@ -20,7 +20,33 @@ describe('contrato visual das materias organicas e volateis', () => {
       'ice',
       'rail',
       'rail-v',
+      'silt',
+      'glass',
     ]);
+  });
+
+  // As duas crostas dos Sumidouros significam coisas OPOSTAS — a areia e por
+  // onde o Devorador anda por baixo, o vidro e onde ele nao pode emergir — e o
+  // jogador decide correndo. Se elas convergirem em valor, a decisao vira
+  // adivinhacao. O vidro tambem nao pode se confundir com o gelo, que e a outra
+  // placa clara do jogo e derrete em vez de selar.
+  it('separa silica, vidro e gelo por altura e por familia de cor', () => {
+    for (let variant = 0; variant < VARIANTS; variant++) {
+      const silt = surfaceModel('silt', variant, 0);
+      const glass = surfaceModel('glass', variant, 0);
+      const ice = surfaceModel('ice', variant, 0);
+
+      // Silica e SOLTA: tem crista acima do topo da laje. Vidro e placa lisa.
+      const siltTop = Math.max(...silt.map((b) => b.z + b.h));
+      const glassTop = Math.max(...glass.map((b) => b.z + b.h));
+      expect(siltTop, `silt v${variant}`).toBeGreaterThan(glassTop);
+
+      // Areia e quente; vidro e gelo sao frios, e o vidro e o mais claro.
+      expect(silt.some((b) => b.mat === 'silt')).toBe(true);
+      expect(silt.every((b) => b.mat !== 'glass' && b.mat !== 'ice')).toBe(true);
+      expect(glass.some((b) => b.mat === 'glass')).toBe(true);
+      expect(ice.every((b) => b.mat !== 'glass')).toBe(true);
+    }
   });
 
   it('esporos formam uma nuvem verde suspensa, nunca enxofre', () => {
