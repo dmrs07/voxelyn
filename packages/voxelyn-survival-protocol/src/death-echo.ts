@@ -155,7 +155,14 @@ const isEffectSource = (value: unknown): value is 'player' | 'enemy' | 'environm
 const ENEMY_ARCHETYPES = new Set<EnemyArchetype>(
   Object.keys(emptyStats().kills) as EnemyArchetype[]
 );
-const PROJECTILE_KINDS = new Set<ProjectileKind>(['bolt', 'spit', 'rock', 'return_disc', 'cart']);
+const PROJECTILE_KINDS = new Set<ProjectileKind>([
+  'bolt',
+  'spit',
+  'rock',
+  'return_disc',
+  'cart',
+  'cyclone',
+]);
 const isEnemyArchetype = (value: unknown): value is EnemyArchetype =>
   typeof value === 'string' && ENEMY_ARCHETYPES.has(value as EnemyArchetype);
 const isProjectileKind = (value: unknown): value is ProjectileKind =>
@@ -181,6 +188,10 @@ const HOSTILE_PROJECTILES_BY_ARCHETYPE: Partial<Record<EnemyArchetype, ReadonlyS
   // A armadilha de carrinho credita 'miner' (os automatos da operacao): a
   // capsula de morte por atropelo tem de passar pela matriz fechada.
   miner: new Set(['cart']),
+  // O Coracao da Fornalha mata de duas formas que produzem capsula: o ciclone
+  // da instabilidade (projetil) e a estalactite do colapso — esta ultima entra
+  // como `enemy_contact` e nao passa por aqui, porque nao e projetil nenhum.
+  furnace_heart: new Set(['cyclone']),
 };
 const isValidEnemyProjectileCause = (archetype: unknown, projectile: unknown): boolean => {
   if (!isEnemyArchetype(archetype) || !isProjectileKind(projectile)) return false;

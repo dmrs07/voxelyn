@@ -202,6 +202,7 @@ export class VoxelParticles {
    * limita o mapa ao número de jogadores.
    */
   private readonly lastOverheatBucket = new Map<number, number>();
+  private lastFurnaceBucket = -1;
   private readonly lastDashJetBucket = new Map<number, number>();
   /** Teto vindo do preset de qualidade; mobile no minimo nao aguenta o de cima. */
   budget = 240;
@@ -567,6 +568,41 @@ export class VoxelParticles {
    * Nasce ACIMA do chao (`z`) porque o cano esta na altura do peito, e o que
    * separa esta fumaca da do fungo secando e exatamente de onde ela sai.
    */
+  /**
+   * A FUMACA DO COLAPSO: o nucleo do Coracao da Fornalha se desfazendo.
+   *
+   * Duas materias no mesmo jato, e a mistura e a leitura: `ash` sobe frio e
+   * lento (o constructo virando escoria) e `ember` sai rapido e aceso (o que
+   * ainda esta queimando la dentro). Fumaca pura leria como maquina quebrando;
+   * brasa pura, como fogueira. Ele e as duas coisas.
+   *
+   * Bucket de 110ms, como o resto dos jatos continuos: o laco de render chama
+   * isto todo quadro, e sem a trava um monitor de 144Hz encheria o orcamento
+   * de particulas com a fumaca de um bicho so.
+   */
+  emitFurnaceSmoke(x: number, y: number, nowMs: number, scale: number, unstable: boolean): void {
+    const bucket = (nowMs / 110) | 0;
+    if (this.lastFurnaceBucket === bucket) return;
+    this.lastFurnaceBucket = bucket;
+
+    const rnd = seeded(eventSeed(x, y, Math.imul(bucket, 2654435761)));
+    const count = Math.max(1, Math.round((unstable ? 5 : 3) * scale));
+    for (let i = 0; i < count; i++) {
+      const hot = i % 3 === 0;
+      this.push({
+        x: x + rnd() * 1.2 - 0.6,
+        y: y + rnd() * 1.2 - 0.6,
+        z: 0.5 + rnd() * 0.5,
+        vx: (rnd() - 0.5) * 0.5,
+        vy: (rnd() - 0.5) * 0.5,
+        vz: hot ? 1.1 + rnd() * 0.6 : 0.4 + rnd() * 0.3,
+        life: hot ? 520 : 900,
+        maxLife: hot ? 520 : 900,
+        kind: hot ? 'ember' : 'ash',
+      });
+    }
+  }
+
   emitOverheatSmoke(slot: number, x: number, y: number, nowMs: number, scale: number): void {
     const bucket = (nowMs / 140) | 0;
     if (this.lastOverheatBucket.get(slot) === bucket) return;

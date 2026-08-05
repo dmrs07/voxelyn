@@ -590,6 +590,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   'toast.ability.assimilated': '{ability} ASSIMILATED',
   'toast.core.deeper': 'CORE {taken}/{total} RECOVERED — FURTHER DESCENT AUTHORISED',
+  'toast.furnace.cooled': 'THE ROOM COOLS',
   'toast.core.taken': 'CORE EXTRACTED — RETURN TO THE ENTRANCE!',
   'toast.guardian.awake': 'THE GUARDIAN AWOKE',
   'toast.module.expired': '{module} DEACTIVATED',
@@ -619,6 +620,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'sim.contaminationRising': 'The Vein stirs — contamination is rising.',
   'sim.coreDropped': 'The core fell with its bearer.',
   'sim.arenaSealed': 'The Vein closes in. Open a way or fight.',
+  'sim.ceilingCollapsing': 'The ceiling gives. The chamber is coming down.',
+  'sim.furnaceUnstable': 'The construct has lost its shape — the room is fire now.',
+  'sim.furnaceCooled': 'The Heart stopped. The heat went with it.',
   'sim.siegeCollapsed': 'The siege collapses with the Guardian.',
   'sim.descentSealedByBoss': 'The shaft does not answer: this sector seal is still active.',
   'sim.coreSealedByBoss': 'The pedestal refuses the coupling. This sector seal is still active.',

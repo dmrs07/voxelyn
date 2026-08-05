@@ -595,6 +595,7 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   'toast.ability.assimilated': '{ability} ASSIMILADO',
   'toast.core.deeper': 'NÚCLEO {taken}/{total} RECUPERADO — DESCIDA ADICIONAL AUTORIZADA',
+  'toast.furnace.cooled': 'A SALA ESFRIA',
   'toast.core.taken': 'NÚCLEO EXTRAÍDO — VOLTE PARA A ENTRADA!',
   'toast.guardian.awake': 'O GUARDIÃO DESPERTOU',
   'toast.module.expired': '{module} DESATIVADO',
@@ -628,6 +629,9 @@ export const PT_BR = {
   'sim.contaminationRising': 'O Veio se agita — a contaminação aumenta.',
   'sim.coreDropped': 'O núcleo caiu com o portador.',
   'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
+  'sim.ceilingCollapsing': 'O teto cede. A câmara está desabando.',
+  'sim.furnaceUnstable': 'O constructo perdeu a forma — a sala virou fogo.',
+  'sim.furnaceCooled': 'O Coração parou. O calor foi embora com ele.',
   'sim.siegeCollapsed': 'O cerco desaba com o Guardião.',
   'sim.descentSealedByBoss': 'O poço não responde: o selo deste setor continua ativo.',
   'sim.coreSealedByBoss': 'O pedestal recusa o acoplamento. O selo deste setor continua ativo.',

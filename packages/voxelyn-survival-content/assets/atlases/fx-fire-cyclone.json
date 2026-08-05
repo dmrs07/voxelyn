@@ -1,0 +1,52 @@
+{
+  "id": "fx-fire-cyclone",
+  "version": 1,
+  "atlas": "fx-fire-cyclone.png",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "columns": 6,
+  "anchorX": 16,
+  "anchorY": 27,
+  "directions": 1,
+  "authoredDirs": [
+    "n"
+  ],
+  "flipPairs": {},
+  "hitbox": {
+    "w": 0.85,
+    "h": 0.85
+  },
+  "footprint": {
+    "w": 0,
+    "h": 0,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "palette": "veio-fungico.v01",
+  "paletteColors": [
+    "#0b0e14",
+    "#3d2a22",
+    "#6e4a33",
+    "#d5cdba",
+    "#ff7a2f",
+    "#ffa63f",
+    "#ffe9b8"
+  ],
+  "animations": {
+    "fly": {
+      "frames": 6,
+      "fps": 14,
+      "loop": true
+    }
+  },
+  "frameMap": {
+    "n": {
+      "fly": 0
+    }
+  },
+  "generation": {
+    "tool": "procedural voxel raster (tools/entities.mjs)",
+    "prompt": "voxel-isometric fire tornado, tall funnel of ember and white-hot flame, two counter-rotating spiral threads, smoke curling off the top, embers kicked up at the base",
+    "seedOrRef": "deterministic-code-v2"
+  }
+}

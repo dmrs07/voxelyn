@@ -67,7 +67,18 @@
 // contra servidor novo procura `coreTaken` (que continua la) mas ignora os
 // selos e a contagem, entao anunciaria a run encerrada no primeiro Nucleo de
 // uma expedicao de G-04 que ainda tem quatro setores pela frente.
-export const PROTOCOL_VERSION = 19;
+// 20: o COLAPSO TERMICO do Coracao da Fornalha entra no wire. `WorldFlags`
+// ganha `bossPhases` (a bitmask de fases de uma vez, espelhada para quem
+// reconecta no meio), tres eventos novos — `boss_phase`, `stalactite` e
+// `furnace_cooled` — e `ProjectileKind` ganha `cyclone`.
+// E quebra nos dois sentidos, e a metade que dói é o cliente antigo contra
+// servidor novo: ele recebe um `kind` de projetil que nao conhece e cai no
+// ramo de desenho generico, entao o ciclone que o esta matando aparece como
+// um ponto; e ignora `stalactite`, que e o TELEGRAFO da queda — dano sem
+// sinal, o unico invariante de combate que este jogo nao quebra. Um cliente
+// novo contra servidor antigo le `bossPhases` ausente e nunca acende a
+// apresentacao do colapso.
+export const PROTOCOL_VERSION = 20;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -289,7 +300,33 @@ export const PROTOCOL_VERSION = 19;
 // setores; o que a geracao muda e ate onde se pode ir. Ainda assim o bump e
 // obrigatorio: a ordem de eventos, o hash e a estrutura de chefes mudaram, e
 // dois peers em versoes diferentes divergiriam no primeiro selo.
-export const SIMULATION_VERSION = 32;
+// 33: COLAPSO TERMICO — a escada de fim de luta do Coracao da Fornalha.
+//
+// Duas fases de uma vez em `bossRuntime.phasesFired`, que ja entrava no hash:
+//
+// - 45% (`BOSS_PHASE_OVERHEAT`): o TETO cede. Estalactites sao marcadas perto
+//   dos jogadores e caem depois de um aviso, cobrando dano e deixando brasa no
+//   impacto. As marcas vivem em `bossRuntime.collapseCells` (celula + tick da
+//   queda) e entram no hash: duas simulacoes que discordem de onde o teto cai
+//   divergem no dano um segundo depois, longe da causa.
+// - 10% (`BOSS_PHASE_UNSTABLE`): o constructo perde a forma e solta CICLONES,
+//   um `ProjectileKind` novo. Eles atravessam a sala acendendo o que encostam
+//   e cobram por tempo (`nextTouchAt`, tambem hasheado), nao por corpo.
+//
+// E o ABATE apaga a camara: brasa e fogo saem, os ciclones se dissolvem e as
+// estalactites ja marcadas sao canceladas. Autoritativo e nao apresentacao —
+// um cliente que apagasse o fogo sozinho desenharia chao seguro sobre celulas
+// que ainda queimam, e o parceiro morreria num lugar que a tela dele mostrava
+// apagado.
+//
+// As estalactites NAO consomem `state.rng`: elas caem dezenas de vezes por
+// encontro, e cada tirada deslocaria a sequencia da run inteira — duas
+// partidas com a mesma seed passariam a divergir em tudo o que vem depois de
+// um chefe conforme o jogador demorasse mais ou menos para mata-lo. A posicao
+// sai de um hash puro de (seed, tick, indice).
+//
+// O terreno semeado nao muda: nada aqui toca o worldgen.
+export const SIMULATION_VERSION = 33;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -328,7 +365,12 @@ export const SIMULATION_VERSION = 32;
 // unica silhueta vertical do bicho, e a janela de dano do encontro depende dela:
 // recortado deitado na linha do chao ele virava um calombo de dez pixels, que
 // le como pedra e nao como alvo.
-export const CONTENT_VERSION = 22;
+// 23: o atlas `fx-fire-cyclone` — seis quadros de uma coluna de fogo com duas
+// espirais defasadas girando em volta. Estreito no chao e aberto no alto, e
+// com a paleta ESFRIANDO para cima (`beam` na base, `fire` na ponta): o que
+// machuca e a base, e ela tem de ser a parte que puxa o olho. As tres cores da
+// coluna estao em EMISSIVE_HEX, entao ele acende sozinho no caminho de brilho.
+export const CONTENT_VERSION = 23;
 
 export type VersionTriple = {
   protocolVersion: number;

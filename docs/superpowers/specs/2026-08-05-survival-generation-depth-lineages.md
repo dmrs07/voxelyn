@@ -3,7 +3,7 @@
 **Data:** 2026-08-05
 **Escopo:** `voxelyn-survival-sim`, `voxelyn-survival-protocol`, `voxelyn-survival-server`, `voxelyn-survival` (cliente)
 **Depende de:** spec 2026-08-01 (Estratos e biomas), spec 2026-08-02 (Matriz Geracional Aurix), spec 2026-08-04 (Codex narrativo)
-**Versões:** `PROTOCOL_VERSION` 18 → 19, `SIMULATION_VERSION` 31 → 32
+**Versões:** `PROTOCOL_VERSION` 18 → 20, `SIMULATION_VERSION` 31 → 33, `CONTENT_VERSION` 22 → 23
 
 ---
 
@@ -299,7 +299,91 @@ luta difícil nem fácil, não era uma luta.
 Instante e posições saem do relógio e da geometria — nada consome `state.rng`,
 então a mesma seed monta a mesma sala nas duas máquinas de um co-op.
 
-### 6.5 Estado genérico
+### 6.5 Coração da Fornalha: o colapso térmico
+
+Cuidado com o nome: o Coração já tinha um ciclo `FURNACE_OVERHEATING` /
+`FURNACE_COOLING` — a janela de blindagem, que gira o encontro inteiro. O que
+entra aqui é outra coisa: uma **escada de dano acumulado**, disparada uma vez
+em cada limiar e sem volta, em `bossRuntime.phasesFired` (a mesma bitmask da
+matilha do Guardião e do reator do Diamandis). O ciclo continua girando por
+dentro das duas.
+
+**45% — `BOSS_PHASE_OVERHEAT`.** O constructo começa a se desfazer: a pedra do
+corpo esquenta até ficar vermelha, o núcleo solta fumaça, a câmara treme no
+ritmo de um coração, e o **teto cede**. Estalactites são marcadas perto dos
+jogadores (nunca em cima — marcar a célula exata viraria uma taxa sobre ficar
+parado, e ficar parado já é punido pela varredura) e caem depois de um aviso,
+cobrando dano e deixando brasa no impacto.
+
+Até aqui o encontro tinha uma ameaça só, vinda do chão. A queda vem de cima, e
+a leitura é outra.
+
+**10% — `BOSS_PHASE_UNSTABLE`.** Ele perde o que ainda tinha de constructo e
+vira o próprio fogo: **ciclones** atravessam a sala acendendo o que encostam. O
+perigo não é o corpo do ciclone — é o rastro, que fica. A leva de estalactites
+dobra. É a inversão final: a arena que o jogador aprendeu a usar deixa de
+existir enquanto eles passam.
+
+**O abate esfria a câmara.** Brasa e fogo saem, os ciclones se dissolvem, e as
+estalactites já marcadas são canceladas — cobrar uma queda anunciada por um
+chefe que não existe mais é a definição de dano sem dono. É autoritativo e não
+apresentação: um cliente que apagasse o fogo sozinho desenharia chão seguro
+sobre células que ainda queimam, e o parceiro morreria num lugar que a tela
+dele mostrava apagado.
+
+#### Determinismo
+
+As estalactites **não consomem `state.rng`**. Elas caem dezenas de vezes por
+encontro, e cada tirada deslocaria a sequência da run inteira — duas partidas
+com a mesma seed passariam a divergir em tudo o que vem depois de um chefe
+conforme o jogador demorasse mais ou menos para matá-lo. A posição sai de um
+hash puro de `(seed, tick, índice)`, e há teste provando que a sequência da RNG
+é idêntica com e sem colapso.
+
+Entram no hash: `collapseCells` (célula + tick da queda) e `nextTouchAt` do
+ciclone.
+
+#### Apresentação
+
+- **batida cardíaca**: duas gaussianas por ciclo — sístole curta e forte,
+  diástole a 38% do caminho — e não um seno. Um tremor senoidal lê como motor
+  ligado; o par tum-TÁ lê como um corpo. A instabilidade acelera **e**
+  aprofunda a mesma batida, porque é o mesmo coração piorando;
+- **corpo do chefe**: vermelho de forja no colapso, branco-amarelo (`beam`, a
+  cor da base do ciclone) na instabilidade, pulsando no **mesmo relógio** do
+  tremor — se as duas batessem fora de fase, o jogador leria duas ameaças;
+- **fumaça**: `ash` frio e lento misturado a `ember` rápido e aceso. Fumaça
+  pura leria como máquina quebrando; brasa pura, como fogueira. Ele é as duas;
+- **fim**: a apresentação deriva de `livePhasesOf(state)`, que só devolve as
+  fases enquanto o Coração está de pé. `phasesFired` é memória e nunca apaga;
+  sem esse filtro a sala tremeria para sempre depois do abate.
+
+#### Atlas `fx-fire-cyclone`
+
+Seis quadros, 32×32, ancorado na base. Estreito no chão e aberto no alto, com a
+cintura apertada no meio, e **duas espirais defasadas meia volta** — girar um
+funil simétrico não produz movimento visível nenhum, e o ciclone leria como uma
+chama parada.
+
+A paleta **esfria** com a altura (`beam` na base → `amber` → `fire` na ponta),
+que é como uma chama de verdade se lê: o mais quente é onde ela nasce. Aqui
+isso também é informação de jogo, porque o que machuca é a base. As três estão
+em `EMISSIVE_HEX`, então ele acende sozinho no caminho de brilho do cliente.
+
+É o único projétil do jogo desenhado por sprite — os outros são pequenos o
+bastante para o voxel de runtime resolver, e este ocupa uma coluna inteira de
+chão.
+
+#### Achado no caminho: `blast_marker` nunca foi desenhado
+
+A Salva de Demolição do Diamandis emitia o telegrafo no wire desde que ele
+existe, e **nenhum arquivo do cliente o consumia**: as três cargas caíam sem
+aviso na tela — dano sem sinal, o único invariante de combate que este projeto
+diz não quebrar. A estalactite precisava exatamente do mesmo mecanismo (uma
+marca de chão com hora certa), então as duas passaram a dividir
+`groundMarkers`, e o telegrafo do Diamandis passou a existir de carona.
+
+### 6.6 Estado genérico
 
 ```ts
 type SectorBossState = { archetype: EnemyArchetype | null; entityId: number | null; defeated: boolean };

@@ -259,6 +259,17 @@ export type WorldFlags = {
    */
   bossAwake: boolean;
   /**
+   * As FASES de uma vez que o chefe deste setor ja cruzou (bitmask
+   * `BOSS_PHASE_*`).
+   *
+   * Viaja pelo mesmo motivo que `bossAwake`: o evento `boss_phase` anuncia a
+   * virada no tick exato, mas quem RECONECTA no meio do colapso nunca o
+   * recebeu. Sem o espelho, esse jogador veria a camara desabando com o chefe
+   * desenhado inteiro e sem tremor nenhum — a apresentacao mentindo sobre o
+   * estado que o mata.
+   */
+  bossPhases: number;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

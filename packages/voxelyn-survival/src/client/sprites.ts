@@ -51,6 +51,7 @@ import magnetarchManifest from '@voxelyn/survival-content/assets/atlases/enemy-m
 import boltManifest from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.json';
 import impactManifest from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.json';
 import droneManifest from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.json';
+import cycloneManifest from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.json';
 import terrainManifest from '@voxelyn/survival-content/assets/atlases/terrain-blocks.json';
 import surfaceManifest from '@voxelyn/survival-content/assets/atlases/surface-tiles.json';
 import propManifest from '@voxelyn/survival-content/assets/atlases/world-props.json';
@@ -85,6 +86,7 @@ import magnetarchUrl from '@voxelyn/survival-content/assets/atlases/enemy-magnet
 import boltUrl from '@voxelyn/survival-content/assets/atlases/fx-projectile-bolt.png?url';
 import impactUrl from '@voxelyn/survival-content/assets/atlases/fx-impact-burst.png?url';
 import droneUrl from '@voxelyn/survival-content/assets/atlases/fx-seeker-drone.png?url';
+import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone.png?url';
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
@@ -258,6 +260,7 @@ const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: boltManifest as unknown as SpriteManifestEntry, url: boltUrl },
   { manifest: impactManifest as unknown as SpriteManifestEntry, url: impactUrl },
   { manifest: droneManifest as unknown as SpriteManifestEntry, url: droneUrl },
+  { manifest: cycloneManifest as unknown as SpriteManifestEntry, url: cycloneUrl },
 ];
 
 /**
@@ -658,6 +661,34 @@ export class SpriteBank {
     const loaded = this.spriteForArchetype(archetype);
     if (!loaded) return false;
     this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint);
+    return true;
+  }
+
+  /**
+   * Um atlas de FX ancorado no MUNDO, por id.
+   *
+   * Distinto de `drawEntity` porque um efeito nao tem arquetipo, nao tem
+   * direcao e nao tem estado de animacao proprio: ele cicla pelo relogio. Os
+   * FX antigos (bolt, impacto, drone) sao desenhados em runtime pelo
+   * `projectiles.ts`; este caminho existe para o ciclone, que ocupa uma coluna
+   * inteira de chao e precisa de arte autoral.
+   *
+   * Devolve `false` enquanto o atlas nao carregou, para o chamador ter recuo —
+   * um perigo invisivel e pior que um perigo feio.
+   */
+  drawFx(
+    ctx: CanvasRenderingContext2D,
+    id: string,
+    animation: string,
+    elapsedMs: number,
+    x: number,
+    y: number,
+    zoom: number,
+    tint?: Tint
+  ): boolean {
+    const loaded = this.get(id);
+    if (!loaded || !loaded.ready) return false;
+    this.drawLoadedFrame(ctx, loaded, animation, 0, 1, elapsedMs, x, y, zoom, tint);
     return true;
   }
 

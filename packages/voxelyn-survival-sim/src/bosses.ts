@@ -54,6 +54,7 @@ export const emptyBossRuntime = (): BossRuntime => ({
   arenaClosed: false,
   arenaBarrierCells: [],
   blastCells: [],
+  collapseCells: [],
   modulesExposed: 0,
   modulesLost: 0,
   leapToX: 0,

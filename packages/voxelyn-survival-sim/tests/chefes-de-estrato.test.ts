@@ -9,9 +9,15 @@ import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { damageEntity, spawnEnemy } from '../src/entities';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
+import { BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '../src/types';
 import {
   FROST_QUEEN_ICE_THRESHOLD,
   FURNACE_HEART_BROOD_CAP,
+  FURNACE_HEART_CYCLONE_CAP,
+  FURNACE_HEART_CYCLONE_INTERVAL_TICKS,
+  FURNACE_HEART_CYCLONE_TOUCH_TICKS,
+  FURNACE_HEART_STALACTITE_INTERVAL_TICKS,
+  FURNACE_HEART_STALACTITE_WARNING_TICKS,
   FURNACE_HEART_CYCLE_TICKS,
   FURNACE_HEART_WAVE_RADIUS,
   LUNG_MATRIX_CYCLE_TICKS,
@@ -23,6 +29,7 @@ import {
   SURF_FIRE,
   SURF_GAS,
   SURF_ICE,
+  SURF_EMBER,
   SURF_NONE,
   SURF_WATER,
 } from '../src/constants';
@@ -64,6 +71,21 @@ const duel = (seed: number, archetype: EnemyArchetype, gap: number) => {
   const boss = spawnEnemy(state, archetype, px + gap, py, false);
   state.bossRuntime.awake = true;
   return { state, boss, px, py, w };
+};
+
+/**
+ * Avanca N ticks e devolve TODOS os eventos, com o jogador imortal.
+ *
+ * Imortal de proposito: o que estes testes medem e o que o chefe produz, e uma
+ * fixture que morre no meio para de medir sem avisar.
+ */
+const advanceCollecting = (state: SurvivalState, ticks: number): SemanticEvent[] => {
+  const out: SemanticEvent[] = [];
+  for (let t = 0; t < ticks; t++) {
+    out.push(...stepRun(state, [emptyCommand()]).events);
+    state.player.hp = state.player.maxHp;
+  }
+  return out;
 };
 
 const paint = (state: SurvivalState, cx: number, cy: number, r: number, kind: number): void => {
@@ -337,6 +359,160 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
     expect(scoriacs(), 'a ninhada nao pode entupir a sala').toBeLessThanOrEqual(
       FURNACE_HEART_BROOD_CAP,
     );
+  });
+
+  // O COLAPSO TERMICO: a escada de fim de luta. Ate aqui o encontro tinha uma
+  // ameaca so (a varredura vindo do chao), e um jogador que aprendesse a ler o
+  // setor girando tinha resolvido o Coracao. As duas fases mudam de onde vem o
+  // perigo — primeiro de cima, depois de todo lado.
+  it('cruzar 45% acende o COLAPSO, e ele nao volta atras', () => {
+    const { state, boss } = duel(637, 'furnace_heart', 6);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_OVERHEAT).toBe(0);
+
+    boss.hp = boss.maxHp * 0.44;
+    const events = advanceCollecting(state, FURNACE_HEART_CYCLE_TICKS);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_OVERHEAT).not.toBe(0);
+    const phase = events.find((e) => e.t === 'boss_phase');
+    expect(phase).toBeDefined();
+    if (phase?.t === 'boss_phase') expect(phase.archetype).toBe('furnace_heart');
+
+    // Curar o chefe NAO desfaz a fase: uma escada que desce nao e uma escada.
+    boss.hp = boss.maxHp;
+    advanceCollecting(state, 60);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_OVERHEAT).not.toBe(0);
+  });
+
+  it('o colapso derruba ESTALACTITES, avisadas antes de cobrarem', () => {
+    const { state, boss } = duel(638, 'furnace_heart', 6);
+    boss.hp = boss.maxHp * 0.4;
+    const events = advanceCollecting(state, FURNACE_HEART_STALACTITE_INTERVAL_TICKS * 2 + 4);
+
+    const marks = events.filter((e) => e.t === 'stalactite');
+    expect(marks.length).toBeGreaterThan(0);
+    // O AVISO vem antes da queda — o invariante que este jogo nao quebra.
+    for (const mark of marks) {
+      if (mark.t !== 'stalactite') continue;
+      expect(mark.fireTick).toBeGreaterThan(0);
+      expect(mark.radius).toBeGreaterThan(0);
+    }
+    // E elas chegam a cair: a marca sai da fila.
+    const before = state.bossRuntime.collapseCells.length;
+    advanceCollecting(state, FURNACE_HEART_STALACTITE_WARNING_TICKS + 2);
+    expect(state.bossRuntime.collapseCells.length).toBeLessThanOrEqual(before + 4);
+  });
+
+  it('a estalactite cobra de quem esta embaixo dela', () => {
+    const { state, boss } = duel(639, 'furnace_heart', 6);
+    boss.hp = boss.maxHp * 0.4;
+    let hurt = false;
+    for (let t = 0; t < FURNACE_HEART_STALACTITE_INTERVAL_TICKS * 3; t++) {
+      // O jogador vai ate a primeira marca em vez de fugir dela: e o unico
+      // jeito de provar que a queda cobra, sem depender de sorte de posicao.
+      const pending = state.bossRuntime.collapseCells[0];
+      if (pending) {
+        state.player.x = (pending.idx % state.config.width) + 0.5;
+        state.player.y = Math.floor(pending.idx / state.config.width) + 0.5;
+      }
+      const before = state.player.hp;
+      stepRun(state, [emptyCommand()]);
+      // Zera a crosta sob os pes: o que sobrar so pode ter vindo da queda.
+      const i = Math.floor(state.player.y) * state.config.width + Math.floor(state.player.x);
+      state.surface[i] = SURF_NONE;
+      state.surfaceTimer[i] = 0;
+      if (state.player.hp < before) hurt = true;
+      state.player.hp = state.player.maxHp;
+    }
+    expect(hurt, 'o teto cai e nao cobra nada').toBe(true);
+  });
+
+  it('cruzar 10% acende a INSTABILIDADE e a sala ganha ciclones', () => {
+    const { state, boss } = duel(640, 'furnace_heart', 6);
+    boss.hp = boss.maxHp * 0.08;
+    advanceCollecting(state, FURNACE_HEART_CYCLONE_INTERVAL_TICKS * 2 + 4);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_UNSTABLE).not.toBe(0);
+    const cyclones = state.projectiles.filter((p) => p.kind === 'cyclone');
+    expect(cyclones.length).toBeGreaterThan(0);
+    expect(cyclones.length).toBeLessThanOrEqual(FURNACE_HEART_CYCLONE_CAP);
+  });
+
+  it('o ciclone ACENDE o que atravessa — o rastro e o perigo', () => {
+    const { state, boss, w } = duel(641, 'furnace_heart', 6);
+    boss.hp = boss.maxHp * 0.08;
+    advanceCollecting(state, FURNACE_HEART_CYCLONE_INTERVAL_TICKS + 40);
+    let burning = 0;
+    for (let y = Math.floor(boss.y) - 10; y <= Math.floor(boss.y) + 10; y++) {
+      for (let x = Math.floor(boss.x) - 10; x <= Math.floor(boss.x) + 10; x++) {
+        if (y < 0 || x < 0 || y >= state.config.height || x >= w) continue;
+        if (state.surface[y * w + x] !== SURF_NONE) burning++;
+      }
+    }
+    expect(burning, 'o ciclone passou e nao deixou nada').toBeGreaterThan(0);
+  });
+
+  it('o ciclone cobra por TEMPO, e nao a cada tick de contato', () => {
+    const { state, boss } = duel(642, 'furnace_heart', 6);
+    boss.hp = boss.maxHp * 0.08;
+    advanceCollecting(state, FURNACE_HEART_CYCLONE_INTERVAL_TICKS + 2);
+    const cyclone = state.projectiles.find((p) => p.kind === 'cyclone');
+    expect(cyclone).toBeDefined();
+    if (!cyclone) return;
+
+    let hits = 0;
+    for (let t = 0; t < FURNACE_HEART_CYCLONE_TOUCH_TICKS; t++) {
+      // O jogador fica DENTRO do ciclone o tempo todo. Sem o intervalo, isto
+      // seriam vinte cobrancas e a morte certa de quem encostou uma vez.
+      const live = state.projectiles.find((p) => p.id === cyclone.id);
+      if (!live) break;
+      state.player.x = live.x;
+      state.player.y = live.y;
+      const before = state.player.hp;
+      stepRun(state, [emptyCommand()]);
+      if (state.player.hp < before) hits++;
+      state.player.hp = state.player.maxHp;
+    }
+    expect(hits).toBeLessThanOrEqual(1);
+  });
+
+  it('o ABATE esfria a sala: fogo apagado, ciclones dissolvidos, marcas canceladas', () => {
+    const { state, boss, w } = duel(643, 'furnace_heart', 6);
+    boss.hp = boss.maxHp * 0.08;
+    advanceCollecting(state, FURNACE_HEART_CYCLONE_INTERVAL_TICKS + 30);
+    expect(state.projectiles.some((p) => p.kind === 'cyclone')).toBe(true);
+
+    const events: SemanticEvent[] = [];
+    // Folga de 10x: no superaquecimento a blindagem corta o dano a um quinto,
+    // e um golpe calculado em cima da vida exata sobreviveria a ela.
+    damageEntity(state, boss, boss.maxHp * 10, events, { kind: 'player_shot' });
+
+    expect(boss.alive).toBe(false);
+    expect(events.some((e) => e.t === 'furnace_cooled')).toBe(true);
+    expect(events.some((e) => e.t === 'message' && e.key === 'sim.furnaceCooled')).toBe(true);
+    expect(state.projectiles.some((p) => p.kind === 'cyclone')).toBe(false);
+    expect(state.bossRuntime.collapseCells).toHaveLength(0);
+    let hot = 0;
+    for (let y = Math.floor(boss.y) - 10; y <= Math.floor(boss.y) + 10; y++) {
+      for (let x = Math.floor(boss.x) - 10; x <= Math.floor(boss.x) + 10; x++) {
+        if (y < 0 || x < 0 || y >= state.config.height || x >= w) continue;
+        const surf = state.surface[y * w + x];
+        if (surf === SURF_EMBER || surf === SURF_FIRE) hot++;
+      }
+    }
+    expect(hot, 'a sala continuou quente depois do abate').toBe(0);
+  });
+
+  it('o colapso NAO consome a RNG da run', () => {
+    // Estalactites caem dezenas de vezes por encontro. Se cada uma sorteasse,
+    // a sequencia da run inteira andaria conforme o jogador demorasse mais ou
+    // menos para matar o chefe — e duas partidas com a mesma seed passariam a
+    // divergir em tudo o que vem depois.
+    const drive = (collapse: boolean): number => {
+      const { state, boss } = duel(644, 'furnace_heart', 6);
+      if (collapse) boss.hp = boss.maxHp * 0.4;
+      state.rng.nextFloat01();
+      advanceCollecting(state, FURNACE_HEART_STALACTITE_INTERVAL_TICKS * 3);
+      return state.rng.nextFloat01();
+    };
+    expect(drive(true)).toBe(drive(false));
   });
 
   it('a ninhada e DETERMINISTICA: mesma seed, mesmas posicoes', () => {

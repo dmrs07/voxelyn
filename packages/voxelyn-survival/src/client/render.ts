@@ -26,6 +26,8 @@ import {
   SURF_RAIL_V,
   CANARY_DEAD_AT,
   LURKER_HIDDEN,
+  BOSS_PHASE_OVERHEAT,
+  BOSS_PHASE_UNSTABLE,
   ABILITY_RADIUS,
   HEAT_MAX,
   RICOCHET_BOUNCES,
@@ -861,12 +863,108 @@ export const allyBodyAlpha = (light: number): number => {
  */
 export const allyVisorGlow = (light: number): number => 1.6 - allyBodyAlpha(light) * 0.75;
 
+/**
+ * A BATIDA DO CORACAO, em amplitude de tremor.
+ *
+ * Duas gaussianas por ciclo — a sistole forte e a diastole a 38% do caminho,
+ * mais fraca — e nao um seno. Um tremor senoidal le como motor ligado; o que
+ * este precisa dizer e que ha um corpo batendo do outro lado da sala, e o
+ * ouvido humano reconhece o par tum-TA antes de reconhecer qualquer outra
+ * coisa.
+ *
+ * A instabilidade acelera E aprofunda a mesma batida, porque e o mesmo coracao
+ * piorando: um segundo ritmo diria "outra coisa comecou", e nao "isto esta
+ * acabando".
+ *
+ * Devolve 0 quando nenhuma fase esta ativa — o chamador nem soma.
+ */
+/**
+ * Quanto tempo antes da queda a marca aparece, por tipo. Espelham
+ * `FURNACE_HEART_STALACTITE_WARNING_TICKS` e o windup da Salva: o cliente nao
+ * recebe a duracao no evento (so o tick de vencimento), e derivar dela aqui e
+ * o que faz o anel fechar exatamente quando a coisa cai.
+ */
+const STALACTITE_LEAD_TICKS = 26;
+const BLAST_LEAD_TICKS = 16;
+/** Marca com vencimento alem disto e resto de outro mundo. Descartada. */
+const MARKER_MAX_LEAD_TICKS = 240;
+
+/**
+ * A cor que o corpo do Coracao ganha durante o colapso.
+ *
+ * Pulsa no MESMO relogio do tremor (`heartbeatShake`) de proposito: o corpo
+ * clareando junto com a camara tremendo e uma informacao so, contada duas
+ * vezes — se as duas batessem fora de fase, o jogador leria duas ameacas.
+ *
+ * O colapso e vermelho de forja; a instabilidade sobe para o branco-amarelo do
+ * `beam`, que e a mesma cor da base do ciclone. Quando ele comeca a cuspir
+ * ciclones, o corpo dele ja e da cor deles.
+ */
+/**
+ * As fases que estao ACONTECENDO agora.
+ *
+ * `phasesFired` e memoria: ela guarda que o chefe cruzou os 45% e nunca apaga,
+ * porque uma fase de uma vez nao volta atras. O que a apresentacao quer e
+ * outra coisa — a camara ainda esta desabando? — e a resposta depende de o
+ * dono dela continuar de pe. Sem este filtro a sala tremeria para sempre
+ * depois do abate, que e o oposto exato do alivio que o abate promete.
+ */
+export const livePhasesOf = (state: {
+  enemies: readonly { archetype: string; alive: boolean }[];
+  bossRuntime: { phasesFired: number };
+}): number =>
+  state.enemies.some((e) => e.alive && e.archetype === 'furnace_heart')
+    ? state.bossRuntime.phasesFired
+    : 0;
+
+export const furnaceBodyTint = (
+  phases: number,
+  nowMs: number,
+): { color: string; alpha: number } | undefined => {
+  const beat = heartbeatShake(phases, nowMs);
+  if ((phases & (BOSS_PHASE_OVERHEAT | BOSS_PHASE_UNSTABLE)) === 0) return undefined;
+  const unstable = (phases & BOSS_PHASE_UNSTABLE) !== 0;
+  // A batida vale ate ~1,55 na sistole; normalizada, ela vira o quanto o corpo
+  // clareia acima do piso quente.
+  const swell = Math.min(1, beat / (unstable ? 3.4 : 2.1));
+  const alpha = (unstable ? 0.5 : 0.34) + swell * 0.22;
+  const color = unstable ? '255,233,184' : '217,59,76';
+  return { color: `rgba(${color},${alpha.toFixed(3)})`, alpha };
+};
+
+export const heartbeatShake = (phases: number, nowMs: number): number => {
+  const overheat = (phases & BOSS_PHASE_OVERHEAT) !== 0;
+  const unstable = (phases & BOSS_PHASE_UNSTABLE) !== 0;
+  if (!overheat && !unstable) return 0;
+  const periodMs = unstable ? 620 : 900;
+  const peak = unstable ? 3.4 : 2.1;
+  const t = (nowMs % periodMs) / periodMs;
+  const pulse = (at: number, width: number): number =>
+    Math.exp(-((t - at) * (t - at)) / (2 * width * width));
+  return peak * (pulse(0, 0.045) + 0.55 * pulse(0.38, 0.05));
+};
+
 export class SurvivalRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   zoom = 2;
   fxList: Fx[] = [];
   flashes: Flash[] = [];
   shake: CameraShake = { power: 0, until: 0 };
+  /**
+   * Marcas de chao com hora certa: onde alguma coisa vai cair, e quando.
+   *
+   * Uma lista so para os dois telegrafo que existem (a Salva do Diamandis e a
+   * estalactite do Coracao) porque eles sao o mesmo objeto — um aviso ancorado
+   * numa celula com um tick de vencimento. Duas listas seriam duas chances de
+   * esquecer de podar uma delas.
+   */
+  private groundMarkers: Array<{
+    x: number;
+    y: number;
+    radius: number;
+    fireTick: number;
+    kind: 'blast' | 'stalactite';
+  }> = [];
   messages: Array<{ text: string; startsAt?: number; until: number }> = [];
   readonly sprites = new SpriteBank();
   readonly terrain = new TerrainBank();
@@ -1275,6 +1373,33 @@ export class SurvivalRenderer {
           this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
           this.shake = { power: 6, until: nowMs + 500 };
           break;
+        case 'boss_phase':
+          // O EVENTO so da o solavanco da virada. O estado continuo (o tremor
+          // no ritmo do coracao, a pedra vermelha) sai de
+          // `state.bossRuntime.phasesFired`, que e autoritativo e chega tanto
+          // no solo quanto pelo `WorldFlags` de quem reconecta — latchear aqui
+          // daria a quem entrou no meio do colapso uma camara parada.
+          this.shake = { power: 7, until: nowMs + 700 };
+          break;
+        case 'stalactite':
+          this.groundMarkers.push({ x: ev.x, y: ev.y, radius: ev.radius, fireTick: ev.fireTick, kind: 'stalactite' });
+          break;
+        case 'blast_marker':
+          // O telegrafo da Salva de Demolicao existia no wire desde o
+          // Diamandis e NUNCA foi desenhado: as tres cargas caiam sem aviso
+          // nenhum na tela, que e a unica coisa que este jogo promete nao
+          // fazer. Entra aqui de carona porque a estalactite precisava
+          // exatamente do mesmo mecanismo — uma marca no chao com hora certa.
+          this.groundMarkers.push({ x: ev.x, y: ev.y, radius: ev.radius, fireTick: ev.fireTick, kind: 'blast' });
+          break;
+        case 'furnace_cooled':
+          // O alivio: o tremor para, as marcas somem e a sala escurece de uma
+          // vez. O `addFlash` negativo nao existe, entao quem apaga e a
+          // ausencia — o que fica e o silencio depois de dez minutos de brasa.
+          this.groundMarkers.length = 0;
+          this.shake = { power: 0, until: 0 };
+          this.messages.push({ text: t('toast.furnace.cooled'), until: nowMs + 3200 });
+          break;
         case 'boss_module': {
           // Um evento, quatro leituras. A tabela em boss-module-presentation.ts
           // decide cor, frase, clarao e se a peça fica marcada no chao — e a
@@ -1380,6 +1505,34 @@ export class SurvivalRenderer {
     if (nowMs < this.shake.until) {
       shakeX = (Math.random() - 0.5) * this.shake.power * this.quality.shakeScale;
       shakeY = (Math.random() - 0.5) * this.shake.power * this.quality.shakeScale;
+    }
+    const livePhases = livePhasesOf(state);
+    // A FUMACA sai do corpo do chefe enquanto o colapso durar. Emitida no laco
+    // de quadro e nao por evento: e um estado continuo, e um evento por baforada
+    // encheria o wire com o que o cliente ja sabe derivar.
+    if (livePhases !== 0) {
+      const heart = state.enemies.find((e) => e.alive && e.archetype === 'furnace_heart');
+      if (heart) {
+        this.particles.emitFurnaceSmoke(
+          heart.x,
+          heart.y,
+          nowMs,
+          this.quality.maxFx / PRESETS.high.maxFx,
+          (livePhases & BOSS_PHASE_UNSTABLE) !== 0,
+        );
+      }
+    }
+    // A BATIDA DO CORACAO: enquanto o colapso durar, a camara pulsa.
+    //
+    // Uma onda dupla — sistole curta e forte, diastole mais fraca logo atras —
+    // e nao um seno: um tremor senoidal le como motor, e o que este tem de
+    // dizer e que ha um corpo batendo do outro lado da sala. A instabilidade
+    // acelera e aprofunda a mesma batida, porque e o mesmo coracao piorando.
+    const beat = heartbeatShake(livePhases, nowMs);
+    if (beat > 0) {
+      const amp = beat * this.quality.shakeScale;
+      shakeX += (Math.random() - 0.5) * amp;
+      shakeY += (Math.random() - 0.5) * amp;
     }
     // teto de FX conforme qualidade (descarta os mais antigos)
     if (this.fxList.length > this.quality.maxFx) {
@@ -1578,6 +1731,46 @@ export class SurvivalRenderer {
     // Objetivos como OBJETOS, na fila de profundidade. O mesmo ponto logico
     // representa o poco nos setores intermediarios e o Nucleo no setor final,
     // mas cada um tem silhueta propria. Ambos precisam entrar nesta fila porque
+    // AS MARCAS DE CHAO, por baixo de tudo o que tem volume: elas sao pintura
+    // no piso, e um aviso que passasse na frente do corpo que ele avisa seria
+    // o oposto de um aviso. Podadas aqui e nao no ingest — a hora de vencer e
+    // um TICK, e o tick so existe onde o estado esta.
+    {
+      let keep = 0;
+      for (let m = 0; m < this.groundMarkers.length; m++) {
+        const mark = this.groundMarkers[m];
+        const remaining = mark.fireTick - state.tick;
+        // Uma marca vencida some no quadro seguinte; uma marca de um mundo que
+        // ja trocou (descida, resync) tambem, porque o tick dela ficou no
+        // futuro impossivel.
+        if (remaining < 0 || remaining > MARKER_MAX_LEAD_TICKS) continue;
+        this.groundMarkers[keep++] = mark;
+        const lead = mark.kind === 'stalactite' ? STALACTITE_LEAD_TICKS : BLAST_LEAD_TICKS;
+        const progress = Math.max(0, Math.min(1, 1 - remaining / lead));
+        const [msx, msy] = toScreen(mark.x, mark.y);
+        const rx = mark.radius * TILE_W * 0.5 * z;
+        const ry = mark.radius * TILE_H * 0.5 * z;
+        ctx.save();
+        // O anel EXTERNO nao se move: ele diz onde. O interno fecha: ele diz
+        // quando. Separar as duas leituras e o que permite decidir a rota sem
+        // ficar medindo o relogio.
+        ctx.strokeStyle = mark.kind === 'stalactite' ? 'rgba(255,166,63,0.55)' : 'rgba(217,59,76,0.55)';
+        ctx.lineWidth = Math.max(1, z * 0.6);
+        ctx.beginPath();
+        ctx.ellipse(msx, msy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle =
+          mark.kind === 'stalactite'
+            ? `rgba(255,122,47,${0.1 + progress * 0.3})`
+            : `rgba(217,59,76,${0.1 + progress * 0.3})`;
+        ctx.beginPath();
+        ctx.ellipse(msx, msy, rx * progress, ry * progress, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      this.groundMarkers.length = keep;
+    }
+
     // levantam volume acima do piso e devem respeitar paredes e entidades.
     {
       const [csx, csy] = toScreen(state.corePos.x + 0.5, state.corePos.y + 0.5);
@@ -2045,9 +2238,16 @@ export class SurvivalRenderer {
             // marcacoes distinguiveis.
             enemy.archetype === 'miner' && enemy.mood === MINER_MOOD_ENRAGED
               ? { color: 'rgba(217,59,76,0.45)', alpha: 0.45 }
-              : enemy.elite
-                ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
-                : undefined,
+              : // O COLAPSO no corpo do chefe: a pedra dele esquenta ate ficar
+                // vermelha, e a instabilidade a leva ao branco. E a leitura
+                // que diz, sem numero na tela, que a luta esta acabando — e
+                // ela pulsa no MESMO ritmo do tremor, porque e o mesmo
+                // coracao batendo.
+                enemy.archetype === 'furnace_heart'
+                ? furnaceBodyTint(livePhases, nowMs)
+                : enemy.elite
+                  ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
+                  : undefined,
           );
           if (!drew) {
             drawVoxelEntity(ctx, {
@@ -2360,6 +2560,29 @@ export class SurvivalRenderer {
           // rodas escuras, com sombra — desenhado em runtime porque a
           // orientacao vem da velocidade e o resto do jogo ja faz voxel vivo
           // assim (particulas, projeteis).
+          // O CICLONE tem atlas proprio: seis quadros de coluna girando, com
+          // as espirais defasadas dando o sentido do giro. E o unico projetil
+          // do jogo desenhado por sprite — os outros sao pequenos o bastante
+          // para o voxel de runtime resolver, e este ocupa uma coluna inteira
+          // de chao. Sem atlas ele cai no ramo generico e vira um ponto, que e
+          // exatamente o que um perigo do tamanho dele nao pode ser.
+          if (proj.kind === 'cyclone') {
+            const [csx, csy] = toScreen(proj.x, proj.y);
+            drawGroundShadow(ctx, csx, csy, 6 * z);
+            if (!this.sprites.drawFx(ctx, 'fx-fire-cyclone', 'fly', nowMs, csx, csy, z)) {
+              // Recuo enquanto o atlas nao carregou: uma coluna de chama que
+              // ainda ocupa o espaco certo. Um perigo invisivel seria pior que
+              // um perigo feio.
+              for (let k = 0; k < 6; k++) {
+                const t = k / 5;
+                const wob = Math.sin(nowMs / 90 + t * 3) * z;
+                ctx.fillStyle = t < 0.4 ? '#ffe9b8' : t < 0.75 ? '#ffa63f' : '#ff7a2f';
+                const rw = (3 + t * 5) * z;
+                ctx.fillRect(csx - rw / 2 + wob, csy - k * 4 * z, rw, 3 * z);
+              }
+            }
+            return;
+          }
           if (proj.kind === 'cart') {
             const [csx, csy] = toScreen(proj.x, proj.y);
             drawGroundShadow(ctx, csx, csy, 7 * z);
