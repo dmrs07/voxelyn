@@ -116,7 +116,24 @@ export const PROTOCOL_VERSION = 14;
 // hash autoritativo — ele decide a esquiva SEM direcional, entao um replay
 // v20 re-simulado sob a regra nova esquiva para outro lado. O terreno semeado
 // continua o da 18.
-export const SIMULATION_VERSION = 21;
+// 22: CHEFES POR BIOMA. Quatro mudancas autoritativas na mesma leva:
+// - `bossForBiome` substitui o chefe por numero de setor: UM chefe por run, no
+//   setor FINAL, escolhido por estrato x ocupacao (micelio -> Bispo; os demais
+//   caem no Guardiao ate cada linha da tabela ganhar corpo). O setor 2 deixa
+//   de ter Bispo e o setor 1 nunca tem chefe — a POPULACAO semeada de todo
+//   setor muda, e dois peers em versoes diferentes montariam elencos
+//   diferentes da mesma seed.
+// - O Bispo perde o cuspe generico; a Supernova vira a resposta primaria a
+//   distancia (cooldown 300) e o gatilho ferido muda de "nenhum fungo em 14
+//   tiles" para "nao PISOU em fungo dentro da janela de busca" — fungo
+//   inalcancavel atras de parede deixa de bloquear o ataque para sempre.
+// - O Guardiao troca o cuspe pela SALVA LITOCLASTA: leque de tres pedras
+//   (kind 'rock', sem biofluido, sem stun) com rajada alternada na segunda
+//   fase; a rajada re-arma o release da acao, e os relogios da acao ja entram
+//   no hash.
+// - O poco do setor 1 sempre revela pelo menos UM Eco (fallback
+//   deterministico pela seed quando nao ha ressonancia).
+export const SIMULATION_VERSION = 22;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

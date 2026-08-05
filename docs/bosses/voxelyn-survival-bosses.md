@@ -10,7 +10,7 @@ Os dois inimigos aqui não são "mais conteúdo": cada um preenche uma lacuna di
 
 | | Bispo do Veio | Corcel Fúngico |
 | --- | --- | --- |
-| Onde | Setor 2, sempre | Qualquer setor, ~1/3 das vezes |
+| Onde | Chefe do mapa final **ocupado pelo micélio** (`bossForBiome`) | Qualquer setor, ~1/3 das vezes |
 | O que ele pede | que você mude o **chão** | que você mude a sua **posição** |
 | Como se anuncia | fugindo quando se machuca | 1,3 s de telégrafo parado |
 | Silhueta | pilar vertical | o único bicho **horizontal** do jogo |
@@ -67,11 +67,21 @@ A Supernova é a resposta dele a ter perdido o chão: dano em 360° e o tapete
 **replantado** num raio de 5,5. A resposta certa continua certa e passa a ter de ser
 **repetida**, que é a diferença entre um truque e uma luta.
 
-O gatilho é o que faz ela funcionar. Ela **não** dispara por cooldown: sai apenas
-quando ele está ferido **e** não achou fungo nenhum ao alcance. Assim o jogador vive a
-sequência inteira como causa e efeito — *queimei o tapete, ele fugiu, não achou nada,
-plantou*. Disparando por relógio, o replantio seria um evento que acontece **com** o
-jogador; assim é um evento que ele **provocou**.
+O gatilho mudou duas vezes, e a segunda versão corrigiu um bloqueio real. A
+primeira regra era "ferido **e** nenhum fungo detectável em 14 tiles" — e uma única
+célula de fungo atrás de uma parede travava a Supernova para sempre: ele recuava
+eternamente para um tapete inalcançável. A regra atual mede o que importa:
+
+1. **Em luta normal**, a Supernova é a resposta primária dele à distância — jogador
+   dentro do raio, recarga pronta, telégrafo radial de 1,5 s. Ele **não** tem mais o
+   cuspe genérico do Spitter: um chefe do chão responde com o chão.
+2. **Ferido e fora do fungo**, ele tenta alcançar uma área viva; se não consegue
+   **pisar** em fungo dentro de uma janela curta (`BISHOP_NOVA_SEEK_TICKS`, 4 s), a
+   Supernova sai — com fungo à vista ou não. A sequência *queimei, ele fugiu, não
+   chegou, plantou* continua sendo causa e efeito.
+
+O fungo é replantado somente no **release**, nunca no windup: o incêndio do jogador
+fica de pé até o último instante do aviso.
 
 Ela não planta sobre fogo vivo. Apagar o incêndio que o jogador acabou de acender
 transformaria a ação dele em nada — o fungo cresce onde o fogo já passou, nunca por

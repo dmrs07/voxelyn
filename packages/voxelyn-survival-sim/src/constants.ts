@@ -426,6 +426,43 @@ export const GUARDIAN_ARENA_RADIUS = 7;
 export const GUARDIAN_ARENA_EXITS = 2;
 export const GUARDIAN_SUMMON_COUNT = 4;
 
+/**
+ * Salva Litoclasta — a resposta a distancia do Guardiao.
+ *
+ * Ele dividia o ramo generico de ataque a distancia com o Spitter e criava UM
+ * projetil de gosma que deixava biofluido — visual e mecanicamente, o chefe das
+ * Galerias de Basalto estava cuspindo. Agora ele arranca materia da propria
+ * arena e dispara um LEQUE de tres pedras: a central mira a posicao prevista do
+ * jogador (intercept sem homing, como a do Britador) e as laterais abrem um
+ * pequeno angulo. O leque cria tres corredores legiveis — melhor que tres tiros
+ * sequenciais perfeitos, que so testariam paciencia.
+ *
+ * As pedras sao `kind: 'rock'`: colidem com parede solida, quebram parede
+ * fragil (a classe cinetica ja faz isso em impactSolid), tem hitbox visivel
+ * (raio proprio) e NAO deixam biofluido — quem suja o chao e o cuspidor, e as
+ * duas ameacas continuam querendo dizer coisas diferentes. Tambem nao atordoam:
+ * o stun de pedra e a assinatura do arremesso unico do Britador, e tres pedras
+ * encadeando atordoamento seria um stun-lock sem resposta.
+ */
+/** Mais lenta que o cuspe (7): a pedra e lida pelo corredor, nao pela pressa. */
+export const GUARDIAN_ROCK_SPEED = 6;
+export const GUARDIAN_ROCK_DAMAGE = 14;
+/** Corpo visivel da pedra, entre o cuspe (0,2) e o bloco do Britador (0,46). */
+export const GUARDIAN_ROCK_RADIUS = 0.42;
+/** Distancia de voo, com a mesma margem para alvo em fuga do Britador. */
+export const GUARDIAN_ROCK_FLIGHT_TILES = 14;
+/** Meia-abertura do leque, em radianos (~22 graus por lado). */
+export const GUARDIAN_FAN_SPREAD = 0.38;
+/**
+ * Segunda fase (abaixo de 50% de vida): ele ALTERNA o leque com uma RAJADA de
+ * tres pedras em sequencia, com pequenos intervalos e correcao de mira entre os
+ * disparos — o leque nega espaco, a rajada persegue movimento.
+ */
+export const GUARDIAN_VOLLEY_SHOTS = 3;
+export const GUARDIAN_VOLLEY_INTERVAL_TICKS = 7;
+/** Recarga da salva (leque ou rajada). O valor historico do ranged dele. */
+export const GUARDIAN_SALVO_COOLDOWN_TICKS = 44;
+
 export const BOLT_SPEED = 13; // tiles/s
 export const BOLT_DAMAGE = 14;
 export const BOLT_COOLDOWN_TICKS = 5;
@@ -568,23 +605,18 @@ export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.
 export const VENT_BASE_INTERVAL_TICKS = 160;
 
 /**
- * Bispo — chefe do setor 2.
+ * Bispo — o chefe de qualquer mapa profundamente ocupado pelo micelio.
+ *
+ * Ele deixou de ser "o chefe obrigatorio do setor 2": a escolha de chefe agora
+ * sai de `bossForBiome` (bosses.ts) — uma ocupacao forte substitui o chefe do
+ * estrato, e a Matriz Micelial e uma ocupacao forte. So o setor FINAL da
+ * linhagem tem chefe; um chefe por setor fragmentaria a run inteira.
  *
  * A cura NAO e um recurso que ele gasta: e uma propriedade do lugar onde ele
  * pisa. Isso muda a pergunta da luta de "quanto dano por segundo eu faco" para
  * "de que chao eu o tiro", e usa fungo, fogo e propagacao que ja existem, sem
  * mecanica nova nenhuma.
  */
-/**
- * Setor do Bispo.
- *
- * O 2 e o unico lugar onde ele cabe. No 1 o jogador ainda nao tem modulo nenhum
- * e a resposta correta (queimar o chao) depende de ferramentas que ele ainda vai
- * achar; no 3 ele dividiria a cena com o Guardiao e a run teria dois chefes
- * seguidos sem respiro entre eles. O meio da descida e onde a run precisava de
- * um evento — era o setor sem nada de proprio.
- */
-export const BISHOP_SECTOR = 2;
 export const BISHOP_HP = 260;
 /**
  * Cura por tick sobre fungo. A 20 Hz sao 24 de vida por segundo.
@@ -601,22 +633,46 @@ export const BISHOP_RETREAT_HP_FRACTION = 0.72;
 export const BISHOP_FUNGAL_SEARCH = 14;
 
 /**
- * Supernova Fungica — a assinatura do Bispo.
+ * Supernova Fungica — a assinatura e a PRINCIPAL resposta a distancia do Bispo.
  *
  * O que ela faz de verdade nao e o dano: e REPLANTAR o tapete. Sem ela, queimar
  * a arena resolvia a luta de uma vez e o resto era formalidade; com ela, o chao
  * volta e a pergunta "de que piso eu o tiro" precisa ser respondida de novo. E o
  * que transforma um truque numa luta.
  *
- * So dispara com ele FERIDO e SEM fungo por perto — e a resposta dele a ter
- * perdido o chao, e nao mais um golpe no rodizio. Assim o jogador vive a
- * sequencia inteira como causa e efeito: queimei, ele fugiu, nao achou nada,
- * plantou.
+ * Ela sai por DOIS caminhos, e os dois sao legiveis:
+ *
+ * 1. Em luta normal: jogador dentro do raio, cooldown pronto — o telegrafo
+ *    radial de 1,5 s e o aviso, e sair do disco e a resposta. O Bispo NAO tem
+ *    mais o cuspe generico do Spitter: um chefe do chao nao atira gosma.
+ * 2. Ferido e sem conseguir PISAR em fungo dentro de uma janela curta
+ *    (BISHOP_NOVA_SEEK_TICKS). A regra antiga era "nenhum fungo detectavel em
+ *    14 tiles", e uma unica celula atras de uma parede bloqueava a Supernova
+ *    para sempre: ele recuava eternamente para um tapete inalcancavel enquanto
+ *    cuspia gosma. A janela mede o que importa — ele CHEGOU ao fungo? — e nao o
+ *    que a varredura enxerga.
+ *
+ * O fungo e replantado somente no RELEASE, nunca no windup: o jogador que
+ * queimou o tapete ve o proprio incendio ate o ultimo instante do aviso.
  */
 export const BISHOP_NOVA_RADIUS = 5.5;
 export const BISHOP_NOVA_DAMAGE = 16;
 export const BISHOP_NOVA_WINDUP_TICKS = 30;
-export const BISHOP_NOVA_COOLDOWN_TICKS = 420;
+/**
+ * Recarga da Supernova. Era 420 quando ela so existia como replantio de
+ * emergencia; como resposta primaria a distancia, 15 s mantem o rodizio da
+ * luta (uma nova por "fase" de queima do tapete) sem virar metralhadora de
+ * area — o windup de 1,5 s continua sendo a unica coisa que a torna justa.
+ */
+export const BISHOP_NOVA_COOLDOWN_TICKS = 300;
+/**
+ * A janela de busca por chao vivo (4 s). Ferido e fora do fungo, ele recua em
+ * direcao a area viva mais proxima; se a janela fecha sem ele ter PISADO em
+ * fungo — parede no caminho, tapete comido pelo fogo, celula isolada — a
+ * Supernova sai. Curta de proposito: mais que isso e um chefe fugindo da
+ * propria luta.
+ */
+export const BISHOP_NOVA_SEEK_TICKS = 80;
 /** Vida do tapete replantado. Longo: ele precisa durar a luta, nao um segundo. */
 export const BISHOP_NOVA_FUNGAL_TICKS = 6000;
 

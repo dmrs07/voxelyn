@@ -30,6 +30,7 @@ import {
   BISHOP_NOVA_DAMAGE,
   BISHOP_NOVA_FUNGAL_TICKS,
   BISHOP_NOVA_RADIUS,
+  BISHOP_NOVA_SEEK_TICKS,
   BISHOP_NOVA_WINDUP_TICKS,
   BISHOP_REGEN_PER_TICK,
   BISHOP_RETREAT_HP_FRACTION,
@@ -45,8 +46,16 @@ import {
   HORSE_TRAIL_FUEL_TICKS,
   GUARDIAN_ARENA_EXITS,
   GUARDIAN_ARENA_RADIUS,
+  GUARDIAN_FAN_SPREAD,
   GUARDIAN_PATH_INTERVAL_TICKS,
+  GUARDIAN_ROCK_DAMAGE,
+  GUARDIAN_ROCK_FLIGHT_TILES,
+  GUARDIAN_ROCK_RADIUS,
+  GUARDIAN_ROCK_SPEED,
+  GUARDIAN_SALVO_COOLDOWN_TICKS,
   GUARDIAN_SUMMON_COUNT,
+  GUARDIAN_VOLLEY_INTERVAL_TICKS,
+  GUARDIAN_VOLLEY_SHOTS,
   EXPLOSION_DAMAGE,
   SOLID_NONE,
   SPORE_LIFE_TICKS,
@@ -114,6 +123,7 @@ import type {
   DamageCause,
   EffectOrigin,
   Entity,
+  EntityAction,
   EntityActionKind,
   EnemyArchetype,
   SemanticEvent,
@@ -707,6 +717,91 @@ const startAction = (
   });
 };
 
+/** Gira um vetor unitario por `angle` radianos. */
+const rotated = (dir: Vec2, angle: number): Vec2 => {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { x: dir.x * cos - dir.y * sin, y: dir.x * sin + dir.y * cos };
+};
+
+/** Uma pedra da Salva Litoclasta. Sem biofluido, sem stun — ver constants.ts. */
+const fireGuardianRock = (
+  state: SurvivalState,
+  enemy: Entity,
+  dir: Vec2,
+  events: SemanticEvent[],
+): void => {
+  state.projectiles.push({
+    kind: 'rock',
+    id: state.nextEntityId++,
+    owner: enemy.id,
+    x: enemy.x,
+    y: enemy.y,
+    vx: dir.x * GUARDIAN_ROCK_SPEED,
+    vy: dir.y * GUARDIAN_ROCK_SPEED,
+    damage: GUARDIAN_ROCK_DAMAGE,
+    radius: GUARDIAN_ROCK_RADIUS,
+    distanceTravelled: 0,
+    hostile: true,
+    leavesBiofluid: false,
+    ttl: Math.ceil((GUARDIAN_ROCK_FLIGHT_TILES / GUARDIAN_ROCK_SPEED) * TICK_HZ),
+  });
+  events.push({ t: 'shot', x: enemy.x, y: enemy.y, dx: dir.x, dy: dir.y, owner: enemy.id });
+};
+
+/**
+ * O release da Salva Litoclasta.
+ *
+ * Sem `salvo` na acao: LEQUE — tres pedras de uma vez, a central interceptando
+ * a posicao prevista do alvo e as laterais abrindo GUARDIAN_FAN_SPREAD para
+ * cada lado. Tres corredores legiveis, que e o contrario de tres tiros
+ * perfeitos em sequencia.
+ *
+ * Com `salvo`: RAJADA da segunda fase — uma pedra por release, com correcao de
+ * mira entre disparos. O truque da cadencia mora aqui: enquanto restam
+ * disparos, a acao volta para `windup` e empurra o proprio `releaseAt` pelo
+ * intervalo, entao `advanceAction` a libera de novo sozinho. Os relogios da
+ * acao entram no hash autoritativo, e as duas maquinas de uma sala empurram os
+ * mesmos valores.
+ *
+ * A mira re-resolve por interceptacao a CADA disparo e nunca corrige em voo:
+ * a pedra lancada e reta e desviavel, como a do Britador.
+ */
+const guardianSalvoRelease = (
+  state: SurvivalState,
+  enemy: Entity,
+  action: EntityAction,
+  target: Entity | null,
+  events: SemanticEvent[],
+): void => {
+  const aim = target
+    ? interceptDirection(
+        enemy.x,
+        enemy.y,
+        target,
+        GUARDIAN_ROCK_SPEED,
+        GUARDIAN_ROCK_FLIGHT_TILES / GUARDIAN_ROCK_SPEED
+      )
+    : action.direction;
+  enemy.facing = { ...aim };
+  action.direction = { ...aim };
+
+  if (action.salvo === undefined) {
+    for (const spread of [-GUARDIAN_FAN_SPREAD, 0, GUARDIAN_FAN_SPREAD]) {
+      fireGuardianRock(state, enemy, rotated(aim, spread), events);
+    }
+    return;
+  }
+
+  fireGuardianRock(state, enemy, aim, events);
+  if (action.salvo > 0) {
+    action.salvo -= 1;
+    action.phase = 'windup';
+    action.releaseAt = state.tick + GUARDIAN_VOLLEY_INTERVAL_TICKS;
+    action.endsAt = action.releaseAt + 6;
+  }
+};
+
 const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const action = enemy.action;
   if (!action || action.phase !== 'windup') return;
@@ -727,6 +822,13 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
     return;
   }
   if (action.kind === 'ranged') {
+    // Salva Litoclasta: o ranged do Guardiao e PEDRA, nunca gosma. Ver
+    // guardianSalvoRelease — leque na primeira fase, rajada alternada na
+    // segunda. O cuspe abaixo volta a ser exclusivo do Spitter.
+    if (enemy.archetype === 'guardian') {
+      guardianSalvoRelease(state, enemy, action, target, events);
+      return;
+    }
     const def = ARCHETYPES[enemy.archetype as EnemyArchetype];
     state.projectiles.push({
       kind: 'spit',
@@ -736,7 +838,7 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       y: enemy.y,
       vx: action.direction.x * 7,
       vy: action.direction.y * 7,
-      damage: enemy.archetype === 'guardian' ? 14 : enemy.archetype === 'bishop' ? 12 : 9,
+      damage: 9,
       distanceTravelled: 0,
       hostile: true,
       leavesBiofluid: true,
@@ -775,6 +877,10 @@ const releaseAction = (state: SurvivalState, enemy: Entity, events: SemanticEven
       radius: BRUISER_ROCK_RADIUS,
       distanceTravelled: 0,
       hostile: true,
+      // O stun e a assinatura DESTE arremesso: um bloco unico, telegrafado por
+      // 0,8 s, que custa uma parede da arena. A salva do Guardiao usa o mesmo
+      // `kind` sem a flag — tres pedras atordoando seria stun-lock.
+      stuns: true,
       // Pedra nao deixa poca: quem suja o chao e o cuspidor, e as duas ameacas
       // tem de continuar querendo dizer coisas diferentes.
       leavesBiofluid: false,
@@ -1597,31 +1703,63 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
       // nao esta escrito em lugar nenhum: esta no fato de o proprio chefe apontar
       // para o que o mantem vivo toda vez que ele se machuca. Queimar a arena e a
       // conclusao que o jogador tira sozinho depois de ve-lo fugir duas vezes.
-      //
-      // Sem fungo ao alcance ele nao tem para onde ir e volta a perseguir: a
-      // arena queimada nao o deixa acuado num canto, so o deixa mortal.
       const retreating =
         enemy.archetype === 'bishop' &&
         !onFungus &&
         enemy.hp < enemy.maxHp * BISHOP_RETREAT_HP_FRACTION;
+      if (enemy.archetype === 'bishop' && !retreating) {
+        // Fora de retirada (inteiro, ou ja de pe no tapete) a janela de busca
+        // desarma. `rangedReadyAt` e o unico relogio ocioso do bispo desde que
+        // ele deixou o cuspe generico — aqui ele guarda o "prazo para pisar em
+        // fungo", no mesmo espirito do "quente ate" do Escoriaceo.
+        enemy.rangedReadyAt = 0;
+      }
       if (retreating) {
+        // A regra antiga era "so ha Supernova se NENHUM fungo aparecer na
+        // varredura de 14 tiles" — e uma unica celula detectavel atras de uma
+        // parede bloqueava o ataque para sempre: ele recuava eternamente para
+        // um tapete que nunca ia alcancar. A janela mede a coisa certa: ele
+        // CONSEGUIU pisar em fungo? `onFungus` desarma (o ramo acima); o prazo
+        // vencido dispara, com refugio a vista ou nao.
+        if (enemy.rangedReadyAt === 0) {
+          enemy.rangedReadyAt = state.tick + BISHOP_NOVA_SEEK_TICKS;
+        }
         const refuge = nearestFungal(state, enemy);
+        if (
+          (refuge === null || state.tick >= enemy.rangedReadyAt) &&
+          state.tick >= enemy.nextActionAt
+        ) {
+          // Perdeu o chao — sem refugio nenhum, ou com a janela vencida sem
+          // ter pisado em fungo. A Supernova replanta o tapete NO RELEASE:
+          // o jogador vive a sequencia como causa e efeito (queimei, ele
+          // fugiu, nao chegou, plantou).
+          enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
+          enemy.rangedReadyAt = 0;
+          startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
+          continue;
+        }
         if (refuge) {
           const flee = normalized(refuge.x + 0.5 - enemy.x, refuge.y + 0.5 - enemy.y);
           dirX = flee.x;
           dirY = flee.y;
-        } else if (state.tick >= enemy.nextActionAt) {
-          // Ferido e SEM refugio: e aqui, e so aqui, que a Supernova sai.
-          //
-          // Nao e mais um golpe no rodizio — e a resposta dele a ter perdido o
-          // chao. O jogador vive a sequencia inteira como causa e efeito: queimei
-          // o tapete, ele fugiu, nao achou nada, e replantou. Se disparasse por
-          // cooldown, o replantio seria um evento que acontece COM o jogador;
-          // assim e um evento que ele provocou.
-          enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
-          startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
-          continue;
         }
+      }
+
+      // A Supernova tambem e a resposta do Bispo a distancia EM LUTA NORMAL —
+      // ele nao cospe gosma; um chefe do chao responde com o chao. Jogador
+      // dentro do raio e recarga pronta: o telegrafo radial de 1,5 s sobe, e
+      // sair do disco e a resposta. Nao dispara em retirada: uma acao no meio
+      // da fuga apagaria o tell (ele pareceria manobrar, nao correr para um
+      // lugar especifico).
+      if (
+        enemy.archetype === 'bishop' &&
+        !retreating &&
+        state.tick >= enemy.nextActionAt &&
+        dist <= BISHOP_NOVA_RADIUS
+      ) {
+        enemy.nextActionAt = state.tick + BISHOP_NOVA_COOLDOWN_TICKS;
+        startAction(state, enemy, 'pulse', toward, BISHOP_NOVA_WINDUP_TICKS, 10, events, player.id);
+        continue;
       }
 
       // A investida exige LINHA DE VISAO na hora de comecar.
@@ -1704,20 +1842,30 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         }
       }
 
-      // Bispo em fuga NAO para para cuspir. Uma acao a distancia no meio da
-      // retirada apagaria o tell: ele pareceria estar manobrando, e nao correndo
-      // para um lugar especifico.
+      // O ramo de projetil generico. So Spitter (cuspe) e Guardiao (Salva
+      // Litoclasta) passam por aqui: o Bispo saiu de vez — a resposta a
+      // distancia dele e a Supernova, decidida la em cima.
       if (
-        (enemy.archetype === 'spitter' ||
-          enemy.archetype === 'guardian' ||
-          (enemy.archetype === 'bishop' && !retreating)) &&
+        (enemy.archetype === 'spitter' || enemy.archetype === 'guardian') &&
         state.tick >= enemy.rangedReadyAt
       ) {
         const rangedDistance = enemy.archetype === 'spitter' ? 5.5 : 6.5;
         if (dist <= rangedDistance) {
           const windup = enemy.archetype === 'spitter' ? 6 : 10;
-          enemy.rangedReadyAt = state.tick + (enemy.archetype === 'spitter' ? 56 : 44);
+          enemy.rangedReadyAt =
+            state.tick + (enemy.archetype === 'spitter' ? 56 : GUARDIAN_SALVO_COOLDOWN_TICKS);
           startAction(state, enemy, 'ranged', toward, windup, 5, events, player.id);
+          if (enemy.archetype === 'guardian') {
+            // `mood` conta as salvas — o unico campo livre dele, no mesmo
+            // espirito do relogio emprestado do Escoriaceo. Na segunda fase
+            // (abaixo de 50%), salvas impares viram RAJADA: leque para negar
+            // espaco, rajada para perseguir movimento, alternando.
+            enemy.mood = (enemy.mood ?? 0) + 1;
+            const enraged = enemy.hp < enemy.maxHp * 0.5;
+            if (enraged && enemy.mood % 2 === 1 && enemy.action) {
+              enemy.action.salvo = GUARDIAN_VOLLEY_SHOTS - 1;
+            }
+          }
           continue;
         }
       }

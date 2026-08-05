@@ -10,7 +10,6 @@
 //    contra-jogo), e a prensa vem com telegrafo proprio.
 import { describe, expect, it } from 'vitest';
 import {
-  BISHOP_SECTOR,
   SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ORE,
@@ -29,10 +28,12 @@ import {
   UNDERTAKER_SLAM_WINDUP_TICKS,
 } from '../src/constants';
 import { setSurface } from '../src/cells';
+import { bossArchetypeForBiome } from '../src/bosses';
 import { damageEntity, spawnEnemy, updateEnemies } from '../src/entities';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { lineageOf } from '../src/strata';
-import type { SemanticEvent, SurvivalState } from '../src/types';
+import { populateSector } from '../src/sectors';
+import { lineageOf, sectorBiome } from '../src/strata';
+import type { EnemyArchetype, SemanticEvent, SurvivalState } from '../src/types';
 
 const at = (state: SurvivalState, x: number, y: number): number => y * state.config.width + x;
 
@@ -54,50 +55,43 @@ const arena = (seed: number, sector = 1): SurvivalState => {
   return state;
 };
 
-const interactAt = (state: SurvivalState, x: number, y: number): SemanticEvent[] => {
-  state.player.x = x + 0.5;
-  state.player.y = y + 0.5;
-  const cmd = emptyCommand();
-  cmd.interact = true;
-  return stepRun(state, [cmd]).events;
+/** Primeira seed >= base cujo setor FINAL recebe o arquetipo pedido. */
+const seedWithFinalBoss = (archetype: EnemyArchetype, base = 1): number => {
+  for (let seed = base; seed < base + 4096; seed++) {
+    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === archetype) return seed;
+  }
+  throw new Error(`nenhuma seed proxima de ${base} com ${archetype} no setor final`);
 };
 
 describe('chefe abatido nao repovoa', () => {
-  it('o Bispo morto no setor 2 nao volta quando a subida regenera o mapa', () => {
-    const state = createRun({ seed: 7, sector: SECTOR_COUNT });
-    // Pega o Nucleo (a subida so existe com ele).
-    state.enemies = [];
-    state.leftEntryZone = true;
-    interactAt(state, state.corePos.x, state.corePos.y);
-    expect(state.coreTaken).toBe(true);
-
-    // Sobe para o setor do Bispo: ele esta la, inteiro.
-    state.enemies = [];
-    interactAt(state, state.entry.x, state.entry.y);
-    expect(state.sector).toBe(BISHOP_SECTOR);
+  it('o chefe morto nao volta quando a camara e repovoada', () => {
+    const seed = seedWithFinalBoss('bishop');
+    const state = createRun({ seed, sector: SECTOR_COUNT });
     const bishop = state.enemies.find((e) => e.archetype === 'bishop');
-    expect(bishop, 'o Bispo deveria estar na camara').toBeDefined();
+    expect(bishop, 'o Bispo deveria estar na camara final micelial').toBeDefined();
+    const home = { x: Math.floor(bishop!.x), y: Math.floor(bishop!.y) };
 
-    // Mata o chefe.
     damageEntity(state, bishop!, bishop!.maxHp * 2, [], { kind: 'player_shot' });
     expect(bishop!.alive).toBe(false);
+    expect(state.bossesDown & (1 << SECTOR_COUNT)).not.toBe(0);
 
-    // ...e o mundo e regenerado de novo (uma segunda subida a partir daqui
-    // usa o mesmo caminho de repovoamento que trazia o chefe de volta).
+    // O MESMO caminho de repovoamento da regeneracao de setor (subida ou
+    // reconstrucao): a camara volta a ser populada, o chefe nao.
     state.enemies = [];
-    interactAt(state, state.entry.x, state.entry.y);
-    expect(state.sector).toBe(1);
+    populateSector(state, [], home);
     expect(state.enemies.some((e) => e.archetype === 'bishop')).toBe(false);
+    expect(state.enemies.some((e) => e.archetype === 'guardian')).toBe(false);
   });
 
-  it('a memoria e por SETOR, e o bolso micelial continua plantado', () => {
-    // Um chefe caido no setor 2 nao pode apagar o Guardiao do setor 3: a marca
-    // e da camara daquele setor, nao de "ja matei um chefe".
-    const state = createRun({ seed: 7, sector: BISHOP_SECTOR });
-    const bishop = state.enemies.find((e) => e.archetype === 'bishop')!;
-    damageEntity(state, bishop, bishop.maxHp * 2, [], { kind: 'player_shot' });
-    expect(state.bossesDown & (1 << BISHOP_SECTOR)).not.toBe(0);
-    expect(state.bossesDown & (1 << SECTOR_COUNT)).toBe(0);
+  it('a memoria e por SETOR, e vale para qualquer chefe do bioma', () => {
+    // A mascara marca a camara DAQUELE setor, nao "ja matei um chefe".
+    const seed = seedWithFinalBoss('guardian');
+    const state = createRun({ seed, sector: SECTOR_COUNT });
+    const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
+    damageEntity(state, guardian, guardian.maxHp * 2, [], { kind: 'player_shot' });
+    expect(state.bossesDown & (1 << SECTOR_COUNT)).not.toBe(0);
+    expect(state.bossesDown & (1 << 2)).toBe(0);
+    expect(state.bossesDown & (1 << 1)).toBe(0);
   });
 });
 

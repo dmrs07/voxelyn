@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
+import { bossArchetypeForBiome } from '../src/bosses';
+import { sectorBiome } from '../src/strata';
 import { GUARDIAN_ARENA_EXITS, GUARDIAN_ARENA_RADIUS, GUARDIAN_SUMMON_COUNT, SECTOR_COUNT,
   SOLID_FRAGILE, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
 import { closeArena } from '../src/cells';
@@ -8,9 +10,18 @@ import { damageEntity } from '../src/entities';
 import { floodOpen } from '../src/worldgen';
 import type { SurvivalState } from '../src/types';
 
+
+/** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
+const guardianSeed = (base: number): number => {
+  for (let seed = base; seed < base + 4096; seed++) {
+    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+  }
+  throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
+};
+
 /** Leva o guardiao a segunda fase com o jogador ao lado dele. */
 const enrage = (seed: number): { state: SurvivalState; gx: number; gy: number } => {
-  const state = createRun({ seed, sector: SECTOR_COUNT });
+  const state = createRun({ seed: guardianSeed(seed), sector: SECTOR_COUNT });
   const w = state.config.width;
   const g = state.enemies.find((e) => e.archetype === 'guardian');
   if (!g) throw new Error('sem guardiao');
@@ -140,7 +151,7 @@ describe('arena do guardiao', () => {
   // que so aparece na geometria do anel: duas celulas vizinhas de um lado reto
   // compartilham o mesmo destino — (r,0) e (r,1) apontam ambas para (r-1,0).
   it('nao empilha corpos ao empurrar para dentro', () => {
-    const state = createRun({ seed: 76, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(76), sector: SECTOR_COUNT });
     const w = state.config.width;
     const R = GUARDIAN_ARENA_RADIUS;
     // O centro do cerco e PARAMETRO de `closeArena`, entao o teste usa o meio do
@@ -203,7 +214,7 @@ describe('arena do guardiao', () => {
   // Trancar o chefe e libertar quem devia estar preso seria o oposto do
   // pretendido.
   it('espera o jogador entrar no raio antes de fechar', () => {
-    const state = createRun({ seed: 74, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(74), sector: SECTOR_COUNT });
     const g = state.enemies.find((e) => e.archetype === 'guardian');
     if (!g) return;
     state.guardianAwake = true;
@@ -218,7 +229,7 @@ describe('arena do guardiao', () => {
 
   // Minerio e recurso do jogador: o cerco nao pode apaga-lo.
   it('nao converte minerio em parede de arena', () => {
-    const state = createRun({ seed: 75, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(75), sector: SECTOR_COUNT });
     const w = state.config.width;
     const g = state.enemies.find((e) => e.archetype === 'guardian');
     if (!g) return;

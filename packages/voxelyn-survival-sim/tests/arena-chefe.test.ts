@@ -14,7 +14,6 @@
 //    continua sem marca nenhuma.
 import { describe, expect, it } from 'vitest';
 import {
-  BISHOP_SECTOR,
   SECTOR_COUNT,
   SOLID_CRYSTAL,
   SOLID_FRAGILE,
@@ -37,6 +36,11 @@ const seedWithLineage = (lineage: string): number => {
 };
 
 const LINEAGES = ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'];
+
+// O setor do MEIO: a camara de chefe continua carimbada pela geracao em todo
+// setor (e a moldura por estrato vale nela), mas desde bossForBiome so o setor
+// FINAL recebe um chefe de verdade — e o primeiro nunca recebe.
+const MID_SECTOR = 2;
 
 /** Distancia em passos a partir da entrada, no mundo COMO ELE FICOU. */
 const bfsFromEntry = (solid: Uint8Array, entry: { x: number; y: number }): Int32Array => {
@@ -61,12 +65,18 @@ const bfsFromEntry = (solid: Uint8Array, entry: { x: number; y: number }): Int32
   return dist;
 };
 
-/** Onde o chefe daquele setor esta (Bispo ou Guardiao ocupam o mesmo ponto). */
-const bossOf = (state: SurvivalState): { x: number; y: number } => {
-  const boss = state.enemies.find((e) => e.archetype === 'bishop' || e.archetype === 'guardian');
-  expect(boss, 'setor de chefe sem chefe').toBeDefined();
-  return { x: Math.floor(boss!.x), y: Math.floor(boss!.y) };
-};
+/**
+ * Onde a CAMARA de chefe daquele setor esta. Vem do worldgen (mesma derivacao
+ * de createRun), e nao de uma entidade: desde bossForBiome, so o setor final
+ * tem chefe vivo — a camara e a moldura continuam existindo em todos.
+ */
+const chamberOf = (seed: number, sector: number): { x: number; y: number } =>
+  generateWorld(
+    sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
+    WORLD_W,
+    WORLD_H,
+    biomeProfile(sectorBiome(seed, sector), sector),
+  ).guardianSpawn;
 
 describe('arena do chefe por estrato', () => {
   it('poco e chefe continuam ALCANCAVEIS a partir da entrada', () => {
@@ -75,16 +85,23 @@ describe('arena do chefe por estrato', () => {
     // isolar a camara — e o proprio carimbo se desfaz quando isso acontece.
     for (const lineage of LINEAGES) {
       const seed = seedWithLineage(lineage);
-      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
         const reach = floodOpen(state.solid, w, state.config.height, state.entry.x, state.entry.y);
-        const boss = bossOf(state);
+        const boss = chamberOf(seed, sector);
         expect(
           reach.has(state.corePos.y * w + state.corePos.x),
           `${lineage} s${sector}: poco isolado`,
         ).toBe(true);
-        expect(reach.has(boss.y * w + boss.x), `${lineage} s${sector}: chefe isolado`).toBe(true);
+        expect(reach.has(boss.y * w + boss.x), `${lineage} s${sector}: camara isolada`).toBe(true);
+        // E o setor final tem o chefe DE VERDADE, na camara.
+        if (sector === SECTOR_COUNT) {
+          const alive = state.enemies.find(
+            (e) => e.archetype === 'bishop' || e.archetype === 'guardian',
+          );
+          expect(alive, `${lineage} s${sector}: setor final sem chefe`).toBeDefined();
+        }
       }
     }
   });
@@ -92,10 +109,10 @@ describe('arena do chefe por estrato', () => {
   it('o corpo do chefe CABE: o 3x3 dele e o pedestal ficam livres', () => {
     for (const lineage of LINEAGES) {
       const seed = seedWithLineage(lineage);
-      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
-        const boss = bossOf(state);
+        const boss = chamberOf(seed, sector);
         for (const [cx, cy] of [[boss.x, boss.y], [state.corePos.x, state.corePos.y]]) {
           for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -115,20 +132,20 @@ describe('arena do chefe por estrato', () => {
     // chefe. Conta na janela da camara (raio 7 = o mesmo do cerco).
     const marks: Array<{ lineage: string; sector: number; find: (s: SurvivalState, i: number) => boolean }> = [
       // Catedral Prismatica: pilares de cristal.
-      { lineage: 'mineral', sector: BISHOP_SECTOR, find: (s, i) => s.solid[i] === SOLID_CRYSTAL },
+      { lineage: 'mineral', sector: MID_SECTOR, find: (s, i) => s.solid[i] === SOLID_CRYSTAL },
       // Aquifero Negro: a orla e agua.
-      { lineage: 'hydric', sector: BISHOP_SECTOR, find: (s, i) => s.surface[i] === SURF_WATER },
+      { lineage: 'hydric', sector: MID_SECTOR, find: (s, i) => s.surface[i] === SURF_WATER },
       // Cripta Glacial: a arena escorrega.
       { lineage: 'cryo', sector: SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_ICE },
       // Fornalha/Ferrifero: brasa na orla.
       { lineage: 'industrial', sector: SECTOR_COUNT, find: (s, i) => s.surface[i] === SURF_EMBER },
       // Fenda Sulfurosa: paredes porosas.
-      { lineage: 'thermal', sector: BISHOP_SECTOR, find: (s, i) => s.solid[i] === SOLID_FRAGILE },
+      { lineage: 'thermal', sector: MID_SECTOR, find: (s, i) => s.solid[i] === SOLID_FRAGILE },
     ];
     for (const m of marks) {
       const state = createRun({ seed: seedWithLineage(m.lineage), sector: m.sector });
       const w = state.config.width;
-      const boss = bossOf(state);
+      const boss = chamberOf(seedWithLineage(m.lineage), m.sector);
       let found = 0;
       for (let dy = -7; dy <= 7; dy++) {
         for (let dx = -7; dx <= 7; dx++) {
@@ -159,7 +176,7 @@ describe('arena do chefe por estrato', () => {
     // rocha e conteudo, nao defeito. Corpo DENTRO da parede e que e impossivel.
     let checked = 0;
     for (let seed = 1; seed <= 250; seed++) {
-      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
         const state = createRun({ seed, sector });
         const w = state.config.width;
         for (const e of state.enemies) {
@@ -301,7 +318,7 @@ describe('arena do chefe por estrato', () => {
     // por isso a protecao no codigo e uniforme e a amostra aqui e larga.
     let conferidos = 0;
     for (let seed = 1; seed <= 200; seed++) {
-      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
         const biome = sectorBiome(seed, sector);
         const profile = biomeProfile(biome, sector);
         const alvo = esperado[profile.halls];
@@ -347,7 +364,7 @@ describe('arena do chefe por estrato', () => {
     //     de 82% do maximo final pedia 136 — escolhido com a distancia de um
     //     mundo que deixou de existir.
     for (let seed = 1; seed <= 220; seed++) {
-      for (const sector of [BISHOP_SECTOR, SECTOR_COUNT]) {
+      for (const sector of [MID_SECTOR, SECTOR_COUNT]) {
         const biome = sectorBiome(seed, sector);
         const profile = biomeProfile(biome, sector);
         const world = generateWorld(
@@ -393,14 +410,14 @@ describe('arena do chefe por estrato', () => {
     // ter vindo do carimbo.
     const foreign: Array<{ lineage: string; sector: number; banned: number[] }> = [
       // Fenda Sulfurosa: `lungs` so abre parede porosa — nao pinta chao nenhum.
-      { lineage: 'thermal', sector: BISHOP_SECTOR, banned: [SURF_WATER, SURF_ICE, SURF_EMBER] },
+      { lineage: 'thermal', sector: MID_SECTOR, banned: [SURF_WATER, SURF_ICE, SURF_EMBER] },
       // Cripta Glacial: gelo e dela; brasa e agua nao.
       { lineage: 'cryo', sector: SECTOR_COUNT, banned: [SURF_EMBER, SURF_WATER] },
     ];
     for (const f of foreign) {
       const state = createRun({ seed: seedWithLineage(f.lineage), sector: f.sector });
       const w = state.config.width;
-      const boss = bossOf(state);
+      const boss = chamberOf(seedWithLineage(f.lineage), f.sector);
       for (let dy = -7; dy <= 7; dy++) {
         for (let dx = -7; dx <= 7; dx++) {
           const x = boss.x + dx;

@@ -74,6 +74,7 @@ import {
   STARTING_ABILITY,
   abilityDefinition,
   emptyResonance,
+  fallbackOffer,
   recordResonance,
   resonanceOffers,
 } from './abilities.js';
@@ -920,12 +921,23 @@ const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void =
   // A oferta le a ressonancia de quem CHEGOU. No co-op os dois jogaram o mesmo
   // setor de formas diferentes, e escolher a de um deles e mais honesto do que
   // somar as duas: uma media de estilos nao descreve estilo nenhum.
-  const offers = resonanceOffers(
+  let offers = resonanceOffers(
     state.playerExtras[nearest].resonance,
     state.playerExtras[nearest].ability,
     state.config.seed,
     state.sector,
   );
+  // O poco do PRIMEIRO setor nunca fica mudo: pelo menos UM Eco, sempre.
+  //
+  // Nos setores fundos a regra continua a historica — sem ressonancia o Veio
+  // nao tem o que demonstrar. Mas o setor 1 e onde o jogador APRENDE que o poco
+  // oferece habilidade, e um poco calado na primeira descida ensina que ele e
+  // so um buraco. Quem chegou sem provocar reacao nenhuma recebe uma
+  // demonstracao sorteada pela seed (deterministica: mesmo Eco para as duas
+  // maquinas da sala e para o replay).
+  if (offers.length === 0 && state.sector === 1) {
+    offers = [fallbackOffer(state.playerExtras[nearest].ability, state.config.seed, state.sector)];
+  }
   if (offers.length === 0) return;
 
   state.wellOffers = offers.map((ability, index) => {
@@ -1865,7 +1877,10 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
               elite: shooter?.elite ?? false,
               projectile: proj.kind,
             });
-            if (proj.kind === 'rock' && vulnerable) {
+            // So a pedra que CARREGA a flag atordoa (o arremesso unico do
+            // Britador). A Salva Litoclasta do Guardiao usa o mesmo `kind`
+            // sem ela: tres pedras encadeando stun seria um lock sem resposta.
+            if (proj.kind === 'rock' && proj.stuns && vulnerable) {
               stunEntity(state, player, BRUISER_ROCK_STUN_TICKS);
             }
             if (

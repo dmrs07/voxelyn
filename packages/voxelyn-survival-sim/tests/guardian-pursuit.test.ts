@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { findPath, hasLineOfSight, PATH_COST_BREAK } from '../src/pathing';
+import { bossArchetypeForBiome } from '../src/bosses';
+import { sectorBiome } from '../src/strata';
 import { SECTOR_COUNT, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
 import type { SurvivalState } from '../src/types';
+
+
+/** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
+const guardianSeed = (base: number): number => {
+  for (let seed = base; seed < base + 4096; seed++) {
+    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+  }
+  throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
+};
 
 const clear = (s: SurvivalState, x0: number, y0: number, x1: number, y1: number): void => {
   const w = s.config.width;
@@ -82,7 +93,8 @@ describe('busca de caminho', () => {
 
 describe('agressividade do guardiao', () => {
   const arena = (): SurvivalState => {
-    const s = createRun({ seed: 56, sector: SECTOR_COUNT });
+    // Desde bossForBiome nem toda seed termina no Guardiao: procura uma que sim.
+    const s = createRun({ seed: guardianSeed(56), sector: SECTOR_COUNT });
     clear(s, 10, 10, 60, 40);
     for (const e of s.enemies) if (e.archetype !== 'guardian') e.alive = false;
     s.player.x = 15.5;

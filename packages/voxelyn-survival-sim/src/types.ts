@@ -39,7 +39,8 @@ export type EnemyArchetype =
   | 'bomber'
   | 'guardian'
   /**
-   * Bispo: chefe do setor 2. Regenera em pe sobre chao fungico, e o contra e
+   * Bispo: o chefe de qualquer mapa profundamente ocupado pelo micelio (ver
+   * bossForBiome em bosses.ts). Regenera em pe sobre chao fungico, e o contra e
    * queimar a arena. A identidade dele nao e o ataque, e o TERRENO — ele
    * transforma a luta num problema de material, que e a identidade do jogo.
    */
@@ -258,6 +259,14 @@ export type EntityAction = {
   endsAt: number;
   direction: Vec2;
   target?: number;
+  /**
+   * Disparos AINDA POR SAIR de uma rajada (Salva Litoclasta do Guardiao em
+   * segunda fase). Presente = a acao re-arma o proprio release: cada disparo
+   * corrige a mira e empurra `releaseAt` pelo intervalo da rajada, entao o
+   * hash (que mistura os relogios da acao) acompanha sozinho. Ausente = acao
+   * de release unico, como todas as outras.
+   */
+  salvo?: number;
 };
 
 export type Entity = {
@@ -438,6 +447,14 @@ export type Projectile = {
   disc?: DiscState;
   hostile: boolean;
   leavesBiofluid: boolean;
+  /**
+   * Interrompe o alvo no impacto (BRUISER_ROCK_STUN_TICKS). E a assinatura do
+   * arremesso unico do Britador; a Salva Litoclasta do Guardiao usa o mesmo
+   * `kind: 'rock'` sem esta flag — tres pedras encadeando atordoamento seria
+   * um stun-lock sem resposta. A flag vive no projetil (e nao numa checagem de
+   * arquetipo do dono) porque o dono pode morrer com a pedra em voo.
+   */
+  stuns?: true;
   ttl: number;
   hits?: number[];
   /** Celulas fungicas que este projetil ja aqueceu; evita duplicar o mesmo impacto nos subpassos. */

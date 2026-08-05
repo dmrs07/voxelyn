@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GUARDIAN_SUMMON_COUNT, SECTOR_COUNT, SOLID_NONE } from '../src/constants';
+import { bossArchetypeForBiome } from '../src/bosses';
+import { sectorBiome } from '../src/strata';
 import { createRun, emptyCommand, stepRun } from '../src/run';
 import { spawnEnemy } from '../src/entities';
 import { grantOrRechargeModule } from '../src/modules';
@@ -7,6 +9,15 @@ import type { SurvivalState } from '../src/types';
 
 const stepIdle = (state: SurvivalState, ticks: number): void => {
   for (let t = 0; t < ticks; t++) stepRun(state, [emptyCommand()]);
+};
+
+
+/** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
+const guardianSeed = (base: number): number => {
+  for (let seed = base; seed < base + 4096; seed++) {
+    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+  }
+  throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
 };
 
 describe('fluxo da run', () => {
@@ -48,7 +59,7 @@ describe('fluxo da run', () => {
 
   it('pegar o nucleo e extrair encerra como "extracted_with_core"', () => {
     // Setor final: e o unico com nucleo. Nos anteriores o mesmo ponto e o poco.
-    const state = createRun({ seed: 11, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(11), sector: SECTOR_COUNT });
     // teleporta o jogador ao pedestal (atalho de teste; interacao é autoritativa)
     state.player.x = state.corePos.x + 0.5;
     state.player.y = state.corePos.y + 0.5;
@@ -100,7 +111,7 @@ describe('fluxo da run', () => {
   });
 
   it('o guardiao existe, esta vivo e proximo do nucleo', () => {
-    const state = createRun({ seed: 11, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(11), sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     expect(guardian!.alive).toBe(true);
@@ -128,7 +139,7 @@ describe('fluxo da run', () => {
 
 describe('guardiao: invocacao de 50%', () => {
   it('nao e bloqueada por um stalker spawnado antes (id maior que o do guardiao)', () => {
-    const state = createRun({ seed: 4242, playerCount: 1, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: SECTOR_COUNT });
     // acorda o guardiao e o coloca abaixo de 50%
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian, 'seed sem guardiao').toBeDefined();
@@ -156,7 +167,7 @@ describe('guardiao: invocacao de 50%', () => {
   });
 
   it('invoca uma unica vez, mesmo com o guardiao muito tempo abaixo de 50%', () => {
-    const state = createRun({ seed: 4242, playerCount: 1, sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
     state.guardianAwake = true;
     guardian.hp = guardian.maxHp * 0.3;

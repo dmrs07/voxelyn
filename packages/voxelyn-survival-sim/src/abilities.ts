@@ -138,6 +138,24 @@ export const resonanceOffers = (
 };
 
 /**
+ * O Eco garantido do primeiro setor.
+ *
+ * `resonanceOffers` devolve vazio quando o jogador nao provocou reacao nenhuma
+ * — regra certa nos setores fundos ("o Veio so demonstra o que observou") e
+ * errada no primeiro contato: um poco calado na primeira descida ensina que o
+ * poco nao oferece nada. Sorteio deterministico pela seed, entre as
+ * habilidades que nao sao a equipada nem o pulso inicial: mesma run, mesmo
+ * Eco, nas duas maquinas da sala e no replay.
+ */
+export const fallbackOffer = (current: AbilityId, seed: number, sector: number): AbilityId => {
+  const pool = (Object.keys(ABILITY_DEFINITIONS) as AbilityId[]).filter(
+    (id) => id !== current && ABILITY_DEFINITIONS[id].resonance !== null,
+  );
+  const roll = Math.imul(seed ^ Math.imul(sector + 1, 0x9e3779b9), 0x85ebca6b) >>> 0;
+  return pool[roll % pool.length];
+};
+
+/**
  * Geometria e números de cada habilidade, num lugar só.
  *
  * Sem `as const`: os valores viram tipos literais e qualquer variável iniciada a
