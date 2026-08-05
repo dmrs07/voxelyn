@@ -13,13 +13,18 @@
  * O desenho e o emblema oficial da companhia (pacote de marca Aurix Dynamics),
  * na versao "full-vector high-fidelity": um traco vetorial pixel a pixel da
  * arte de referencia, nao um redesenho procedural. Fica mais fiel ao render
- * original, ao custo de ~1 MB de paths — grande demais para repetir inline
+ * original, ao custo de ~730 KB de paths — grande demais para repetir inline
  * por instancia, por isso mora em `assets/aurix-mark.svg` e entra via import
  * `?raw` do Vite (inlina no bundle uma unica vez em build; sem isso viraria
  * mais um arquivo no precache do service worker, que o app shell ja passa de
- * 1 MB sozinho). O recorte fica so no emblema — o wordmark do arquivo fonte
- * fica de fora porque `.corp-name` ja escreve "AURIX DYNAMICS" em HTML, na
- * fonte Chakra Petch do sistema.
+ * 1 MB sozinho). O arquivo fonte do pacote cobre o emblema E o wordmark lado
+ * a lado num unico canvas, sem separacao por grupo — cada cor aparece
+ * espalhada nas duas metades. `assets/aurix-mark.svg` ja vem RECORTADO
+ * geometricamente (nao so por `viewBox`) para conter so os fragmentos dentro
+ * da caixa do emblema; o wordmark do arquivo fonte fica de fora porque
+ * `.corp-name` ja escreve "AURIX DYNAMICS" em HTML, na fonte Chakra Petch do
+ * sistema, e manter os fragmentos do wordmark so inflaria o DOM sem nunca
+ * aparecer.
  *
  * A marca aparece em ate sete lugares na mesma pagina (cinco topos de trilho
  * de arquivo, duas placas de pausa), e o app monta cada um via `innerHTML`.
