@@ -25,6 +25,7 @@ import {
   MINER_RAGE_HEAT,
   MINER_RAGE_SPEED,
   BISHOP_FUNGAL_SEARCH,
+  BISHOP_HEAL_WITNESS_RANGE,
   BISHOP_HP,
   BISHOP_NOVA_COOLDOWN_TICKS,
   BISHOP_NOVA_DAMAGE,
@@ -109,6 +110,8 @@ import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  DISCOVERY_BISHOP_HEALED,
+  DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_MINER_ENRAGED,
   DISCOVERY_MINER_FLED,
   LURKER_EXPOSED,
@@ -1106,6 +1109,20 @@ const bishopRegen = (state: SurvivalState, enemy: Entity, events: SemanticEvent[
   if (state.surface[cellUnder(state, enemy)] !== SURF_FUNGAL) return false;
   if (enemy.hp >= enemy.maxHp) return true;
   enemy.hp = Math.min(enemy.maxHp, enemy.hp + BISHOP_REGEN_PER_TICK);
+  // A cura VISTA e uma descoberta — e o documento que ela abre e uma medicao
+  // de campo, entao medir exige ter estado la. O bit ja aceso sai antes de
+  // qualquer raycast: sem essa saida, a linha de visao seria recalculada a
+  // cada tick de cura pelo resto da run, por nada.
+  if ((state.stats.discoveries & DISCOVERY_BISHOP_HEALED) === 0) {
+    const witness = nearestTarget(state, enemy.x, enemy.y);
+    if (
+      witness &&
+      distTo(enemy, witness) <= BISHOP_HEAL_WITNESS_RANGE &&
+      hasLineOfSight(state, enemy.x, enemy.y, witness.x, witness.y)
+    ) {
+      markDiscovery(state.stats, DISCOVERY_BISHOP_HEALED);
+    }
+  }
   // Um evento a cada quatro ticks, e nao a cada tick: a 20 Hz o barramento
   // semantico levaria 20 curas por segundo so deste inimigo, e o mixer de audio
   // gastaria o orcamento de vozes inteiro num som que se le igual em 5 Hz.
@@ -1215,14 +1232,29 @@ const bishopNova = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]
       setSurface(state, i, SURF_FUNGAL, BISHOP_NOVA_FUNGAL_TICKS);
     }
   }
+  // Quem estava DENTRO do disco, medido ANTES do dano: depois dele o corpo
+  // pode ter caido, e a pergunta que a descoberta faz e "estava la?", nao
+  // "continua de pe?" — as duas juntas e que valem a marca.
+  const caught: Entity[] = [];
   for (const player of state.players) {
     if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;
     if (distTo(enemy, player) > BISHOP_NOVA_RADIUS) continue;
+    caught.push(player);
     damageEntity(state, player, BISHOP_NOVA_DAMAGE, events, {
       kind: 'enemy_contact',
       archetype: 'bishop',
       elite: enemy.elite,
     });
+  }
+  // Sobreviver a Supernova destrava o documento que diz que ela nunca foi um
+  // ataque. Le `hp > 0` e nao `alive`: quem chegou a zero ainda esta vivo
+  // neste instante — `resolveDownedAndDeaths` roda depois, no fim do tick — e
+  // marcar ali daria a descoberta a quem justamente nao sobreviveu.
+  for (const player of caught) {
+    if (player.hp > 0 && !state.playerExtras[player.slot ?? 0].downed) {
+      markDiscovery(state.stats, DISCOVERY_BISHOP_NOVA_SURVIVED);
+      break;
+    }
   }
   events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: BISHOP_NOVA_RADIUS });
 };

@@ -22,7 +22,13 @@ import {
   SURF_FUNGAL,
   SURF_NONE,
 } from '../src/constants';
-import type { EnemyArchetype, SemanticEvent, SurvivalState } from '../src/types';
+import {
+  DISCOVERY_BISHOP_HEALED,
+  DISCOVERY_BISHOP_NOVA_SURVIVED,
+  type EnemyArchetype,
+  type SemanticEvent,
+  type SurvivalState,
+} from '../src/types';
 
 /** Primeira seed >= base cujo setor FINAL recebe o arquetipo pedido. */
 const seedWithFinalBoss = (archetype: EnemyArchetype, base = 1): number => {
@@ -364,6 +370,81 @@ describe('Bispo — o tell', () => {
       ).toBe(false);
       if (!state.player.alive) break;
     }
+  });
+});
+
+// O arco documental do Bispo nao abre por FARM: ele aparece uma vez por run,
+// no maximo, e uma grade de abates transformaria a revelacao em cinquenta
+// descidas. Abre por ENTENDER o encontro — e sao estes dois bits que medem o
+// entendimento.
+describe('Bispo — as Descobertas de entendimento', () => {
+  const healingScene = (seed: number) => {
+    const state = createRun({ seed });
+    clearArena(state, 16);
+    const bishop = spawnEnemy(
+      state,
+      'bishop',
+      Math.floor(state.player.x) + 8,
+      Math.floor(state.player.y),
+      false,
+    );
+    paint(state, Math.floor(bishop.x), Math.floor(bishop.y), 3, SURF_FUNGAL);
+    bishop.hp = 100;
+    return { state, bishop };
+  };
+
+  it('ver a cura de perto marca a Descoberta', () => {
+    const { state } = healingScene(91);
+    stepIdle(state, 8);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_HEALED).not.toBe(0);
+  });
+
+  it('a cura atras de uma parede NAO marca: medicao de campo exige campo', () => {
+    const { state, bishop } = healingScene(92);
+    const w = state.config.width;
+    const wallX = Math.floor((state.player.x + bishop.x) / 2);
+    for (let dy = -6; dy <= 6; dy++) {
+      state.solid[(Math.floor(state.player.y) + dy) * w + wallX] = SOLID_ROCK;
+    }
+    stepIdle(state, 8);
+    expect(bishop.hp, 'a cena nao chegou a curar: o teste nao mede nada').toBeGreaterThan(100);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_HEALED).toBe(0);
+  });
+
+  it('estar dentro do disco da Supernova e continuar de pe marca a Descoberta', () => {
+    const state = createRun({ seed: 93 });
+    clearArena(state, 20);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    spawnEnemy(state, 'bishop', px + 4, py, false);
+    paint(state, px + 4, py, 3, SURF_FUNGAL);
+
+    for (let t = 0; t < BISHOP_NOVA_WINDUP_TICKS + 20; t++) {
+      stepRun(state, [emptyCommand()]);
+      if ((state.stats.discoveries & DISCOVERY_BISHOP_NOVA_SURVIVED) !== 0) break;
+    }
+    expect(state.player.hp, 'o jogador morreu: isso nao e sobreviver').toBeGreaterThan(0);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_NOVA_SURVIVED).not.toBe(0);
+  });
+
+  it('ver a Supernova de FORA do disco nao marca nada', () => {
+    const state = createRun({ seed: 94 });
+    clearArena(state, 20);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    // Ferido e sem fungo: a Supernova sai pela janela de busca, com o jogador
+    // dentro do aggro (10) e fora do raio do disco (5,5).
+    const bishop = spawnEnemy(state, 'bishop', px + 8, py, false);
+    bishop.hp = bishop.maxHp * (BISHOP_RETREAT_HP_FRACTION - 0.1);
+
+    let fired = false;
+    for (let t = 0; t < BISHOP_NOVA_SEEK_TICKS + BISHOP_NOVA_WINDUP_TICKS + 30 && !fired; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'pulse' && Math.hypot(ev.x - bishop.x, ev.y - bishop.y) < 1) fired = true;
+      }
+    }
+    expect(fired, 'a Supernova nao chegou a sair: o teste nao mede nada').toBe(true);
+    expect(state.stats.discoveries & DISCOVERY_BISHOP_NOVA_SURVIVED).toBe(0);
   });
 });
 

@@ -133,7 +133,13 @@ export const PROTOCOL_VERSION = 14;
 //   no hash.
 // - O poco do setor 1 sempre revela pelo menos UM Eco (fallback
 //   deterministico pela seed quando nao ha ressonancia).
-export const SIMULATION_VERSION = 22;
+// 23: as duas DESCOBERTAS do Bispo — `DISCOVERY_BISHOP_HEALED` (viu a cura de
+// perto, com a linha livre) e `DISCOVERY_BISHOP_NOVA_SURVIVED` (estava dentro
+// do disco da Supernova e continuou de pe). A bitmask de descobertas ja fazia
+// parte do hash autoritativo, entao dois peers em versoes diferentes divergem
+// no primeiro tick de cura testemunhada — e o Codex do perfil abriria
+// documentos diferentes para a mesma run.
+export const SIMULATION_VERSION = 23;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

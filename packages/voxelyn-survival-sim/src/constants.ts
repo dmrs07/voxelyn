@@ -631,6 +631,14 @@ export const BISHOP_REGEN_PER_TICK = 1.2;
 export const BISHOP_RETREAT_HP_FRACTION = 0.72;
 /** Ate onde ele procura chao fungico, em tiles. */
 export const BISHOP_FUNGAL_SEARCH = 14;
+/**
+ * De quao perto a cura conta como TESTEMUNHADA (DISCOVERY_BISHOP_HEALED).
+ *
+ * Um pouco alem do aggro dele (10): quem esta trocando tiro ve, quem passou
+ * por outro corredor nao. O documento que este bit abre e uma medicao de
+ * campo — e medicao pressupoe alguem no campo.
+ */
+export const BISHOP_HEAL_WITNESS_RANGE = 12;
 
 /**
  * Supernova Fungica — a assinatura e a PRINCIPAL resposta a distancia do Bispo.

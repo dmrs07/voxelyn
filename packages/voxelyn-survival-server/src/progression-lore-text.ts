@@ -584,6 +584,46 @@ const pt: Record<LoreFragmentId, LoreText> = {
   },
 
   // -------------------------------------------------------------------------
+  // O arco do Bispo — o que guardava, e a regra que ninguem escreveu
+  // -------------------------------------------------------------------------
+  'AX-ENG-028': {
+    title: 'Taxa de fechamento: EQ-09',
+    summary: 'O tecido fecha na velocidade do corte. O nosso corte e maior.',
+    body: 'ATIVO HOSTIL EQ-09. Medição de recuperação tecidual em campo.\n\nO ativo recompõe massa enquanto permanece sobre cobertura fúngica viva, e interrompe a recomposição quando a cobertura é aquecida — antes da combustão, não depois. A resposta é ao ESTADO do substrato, e não ao dano sofrido.\n\nA taxa medida fecha uma frente de corte de escala artesanal em algo entre uma e duas estações. A frente de corte desta operação é de outra ordem de grandeza.\n\nEngenharia registra, sem recomendação anexada: o mecanismo não é defensivo. É reparo. Não localizamos no ativo nenhum sistema que decida quando parar de reparar.',
+    source: 'Engenharia de Sistemas — medição de campo',
+  },
+  'AX-PRC-025': {
+    title: 'Custo de datação: nichos do EQ-09',
+    summary: 'O laudo veio caro. O anexo veio pior.',
+    body: 'Datação dos 41 objetos recolhidos dos nichos sob o EQ-09. Custo aprovado em caráter excepcional, com recomendação expressa de não repetir.\n\nDo anexo, na íntegra:\n\nOs objetos formam uma série CONTÍNUA. O mais recente é de fabricação da operação anterior à Aurix. O mais antigo antecede em cerca de cinco milênios qualquer registro de extração conhecido nesta formação.\n\nOs objetos da camada mais funda não são minerais. São sementes, grão e vasilhame de grão. Foram deixados por gente que plantava, não por gente que escavava.\n\nAquisições encaminha uma única observação, de natureza contábil: a série é contínua. Alguém repôs aquele nicho, sem interrupção registrável, durante todo o período.',
+    source: 'Aquisições — parecer sobre laudo contratado',
+  },
+  'AX-INC-040': {
+    title: 'Incidente 40 — a emissão radial do EQ-09',
+    summary: 'O "ataque" não persegue ninguém. Ele replanta.',
+    body: 'Relatórios de campo classificam a emissão radial do EQ-09 como ataque de área.\n\nA telemetria não sustenta a classificação. A emissão não é dirigida: não corrige rumo, não seleciona alvo e ocorre com igual frequência sem unidade alguma no raio. O que ela deposita é substrato — cobertura fúngica viável, em disco, sobre terreno esterilizado.\n\nA unidade que estiver dentro do disco sofre dano. A unidade que estiver fora não é perseguida.\n\nRegistra-se ainda que o raio da emissão coincide, dentro da margem do instrumento, com o raio médio da frente de lavra que a precedeu.\n\nO termo aprovado permanece "ataque de área". A revisão de nomenclatura foi indeferida: não há campo alternativo no formulário.',
+    source: 'Comitê de Incidentes — reclassificação indeferida',
+  },
+  'AX-EXE-047': {
+    title: 'Ordem de vocabulário: nichos do EQ-09',
+    summary: 'Palavra proibida: "sítio". Um sítio suspende a lavra.',
+    body: 'Ficam vedados, em todo relatório relativo à formação sob o ativo EQ-09, os termos "sítio", "santuário", "oferenda" e "contínuo".\n\nDesignação aprovada: acúmulo de detrito em cavidade natural.\n\nA vedação não é editorial. A classificação de sítio aciona a cláusula 11 do contrato de concessão, que suspende a lavra na área declarada até parecer externo. O prazo médio de um parecer externo excede a janela inteira da operação.\n\nRegistra-se, sem constar da ordem: o laudo de datação foi retirado do arquivo consultável e mantido em anexo de circulação restrita.\n\nO laudo não foi refutado.',
+    source: 'Conselho Executivo — ordem de contenção informacional',
+  },
+  'AX-UNK-057': {
+    title: 'Sobre a conta que não fecha',
+    summary: 'Havia uma regra. Ninguém a escreveu, e todos a cumpriam.',
+    body: 'Reunidos: a medição de fechamento, a série contínua dos nichos e a natureza da emissão radial.\n\nO que estava naquela cavidade não era culto. Era CONTABILIDADE — uma amostra do que foi retirado, devolvida ao ponto de retirada, em série ininterrupta por cinco milênios. Nenhuma ferramenta entre os objetos: a ferramenta é de quem trabalha, e o que se devolve é o que se levou.\n\nA contraparte está no relatório de Engenharia. O que quer que esteja ali fechava o corte. Enquanto o corte coubesse na taxa, a conta fechava, e não havia nada a registrar — e de fato não há: não existe registro do ativo em atividade hostil anterior à nossa chegada. Não existe registro do ativo, ponto.\n\nA primeira gente que plantou acima daquela formação entendia a regra sem precisar dela escrita. Quem colhe mais do que nasce não colhe no ano seguinte.\n\nA operação não quebrou a regra. A operação nunca soube que havia uma.\n\nE o mecanismo que fechava o corte não tem sistema que decida parar. O que os relatórios de campo descrevem como agressão é, pelas nossas próprias medições, uma ferida tentando fechar com as nossas unidades dentro dela.',
+    source: 'Sem departamento atribuído',
+  },
+  'AX-UNK-058': {
+    title: 'Sobre os dois que guardavam',
+    summary: 'Uma contenção viva e uma fabricada. A viva caiu primeiro.',
+    body: 'Duas coisas guardavam este lugar. Os arquivos as tratam em separado porque juntá-las formula a pergunta.\n\nA primeira é orgânica e anterior a qualquer operação. Ela não continha nada: REGULAVA. Falhou quando a escala da lavra ultrapassou a taxa que ela sustentava, e o que a companhia chama de infestação é o mecanismo dela ainda tentando compensar a diferença.\n\nA segunda é construída, e a reclassificação já a admite: sistema de contenção de origem não atribuída.\n\nA soma, que nenhum documento aprovado formula: se a contenção VIVA existia para manter o equilíbrio, a construída existia para o caso de o equilíbrio acabar. Uma é a regra. A outra é o que se faz quando a regra falha.\n\nAs duas foram removidas por esta operação, nesta ordem.\n\nO objeto homologado subiu depois da segunda.',
+    source: 'Sem departamento atribuído',
+  },
+
+  // -------------------------------------------------------------------------
   // Marcos geracionais
   // -------------------------------------------------------------------------
   'AX-GEN-G01': {
@@ -1158,6 +1198,46 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'The full field chassis. And the question left over.',
     body: 'Generation G-04 completes the field specification of the Prospector line.\n\nThe G-04 behavioural model preserves 96% of the structure of the G-00 model. The added layers did not replace the earlier ones: they settled on top of them.\n\nProduction records, with no recommendation attached, that the unit descending today carries the decision structure of every unit that did not come back.\n\nThe Board classifies this observation as [REDACTED] and maintains the manufacturing schedule.',
     source: 'Production — clearance note',
+  },
+
+  // -------------------------------------------------------------------------
+  // The Bishop arc — what it guarded, and the rule nobody wrote down
+  // -------------------------------------------------------------------------
+  'AX-ENG-028': {
+    title: 'Closure rate: EQ-09',
+    summary: 'The tissue closes at the speed of the cut. Our cut is bigger.',
+    body: 'HOSTILE ASSET EQ-09. Field measurement of tissue recovery.\n\nThe asset restores mass while it remains on live fungal cover, and halts restoration when the cover is heated — before combustion, not after. The response is to the STATE of the substrate, not to damage sustained.\n\nThe measured rate closes a cut face of artisanal scale in something between one and two seasons. The cut face of this operation is of another order of magnitude.\n\nEngineering records, with no recommendation attached: the mechanism is not defensive. It is repair. We located no system in the asset that decides when to stop repairing.',
+    source: 'Systems Engineering — field measurement',
+  },
+  'AX-PRC-025': {
+    title: 'Dating cost: EQ-09 niches',
+    summary: 'The report came in expensive. The annex came in worse.',
+    body: 'Dating of the 41 objects recovered from the niches beneath EQ-09. Cost approved on an exceptional basis, with an express recommendation not to repeat it.\n\nFrom the annex, in full:\n\nThe objects form a CONTINUOUS series. The most recent is of pre-Aurix operation manufacture. The oldest predates, by roughly five millennia, any known record of extraction in this formation.\n\nThe objects in the deepest layer are not mineral. They are seed, grain, and grain vessels. They were left by people who farmed, not by people who dug.\n\nProcurement forwards a single observation, of an accounting nature: the series is continuous. Someone restocked that niche, without recordable interruption, for the entire period.',
+    source: 'Procurement — opinion on contracted report',
+  },
+  'AX-INC-040': {
+    title: 'Incident 40 — the radial emission of EQ-09',
+    summary: 'The "attack" chases no one. It replants.',
+    body: 'Field reports classify the radial emission of EQ-09 as an area attack.\n\nThe telemetry does not support the classification. The emission is not directed: it does not correct heading, does not select a target, and occurs with equal frequency with no unit within the radius. What it deposits is substrate — viable fungal cover, in a disc, over sterilised terrain.\n\nA unit inside the disc takes damage. A unit outside it is not pursued.\n\nIt is further recorded that the radius of the emission coincides, within instrument margin, with the mean radius of the working face that preceded it.\n\nThe approved term remains "area attack". Revision of the nomenclature was denied: there is no alternative field on the form.',
+    source: 'Incident Committee — reclassification denied',
+  },
+  'AX-EXE-047': {
+    title: 'Vocabulary order: EQ-09 niches',
+    summary: 'Forbidden word: "site". A site suspends the dig.',
+    body: 'The terms "site", "sanctuary", "offering" and "continuous" are hereby prohibited in all reports concerning the formation beneath asset EQ-09.\n\nApproved designation: debris accumulation in natural cavity.\n\nThe prohibition is not editorial. Classification as a site triggers clause 11 of the concession contract, which suspends extraction in the declared area pending external review. The average term of an external review exceeds the entire window of the operation.\n\nRecorded, and not part of the order: the dating report was withdrawn from the searchable archive and retained as a restricted-circulation annex.\n\nThe report was not refuted.',
+    source: 'Executive Council — informational containment order',
+  },
+  'AX-UNK-057': {
+    title: 'On the account that does not balance',
+    summary: 'There was a rule. Nobody wrote it, and everybody kept it.',
+    body: 'Taken together: the closure measurement, the continuous series in the niches, and the nature of the radial emission.\n\nWhat was in that cavity was not worship. It was ACCOUNTING — a sample of what had been taken, returned to the point of removal, in unbroken series for five millennia. No tool among the objects: the tool belongs to whoever works, and what is returned is what was taken.\n\nThe other half is in the Engineering report. Whatever is down there was closing the cut. As long as the cut fit within the rate, the account balanced and there was nothing to record — and indeed there is nothing: no record exists of the asset in hostile activity prior to our arrival. No record of the asset exists at all.\n\nThe first people who farmed above that formation understood the rule without needing it written. Take more than grows back and there is nothing to take next year.\n\nThe operation did not break the rule. The operation never knew there was one.\n\nAnd the mechanism that closed the cut has no system that decides to stop. What field reports describe as aggression is, by our own measurements, a wound trying to close with our units inside it.',
+    source: 'No department assigned',
+  },
+  'AX-UNK-058': {
+    title: 'On the two that guarded',
+    summary: 'One containment alive, one manufactured. The living one fell first.',
+    body: 'Two things guarded this place. The archives treat them separately because putting them together formulates the question.\n\nThe first is organic and predates any operation. It contained nothing: it REGULATED. It failed when the scale of extraction exceeded the rate it could sustain, and what the company calls infestation is its mechanism still trying to make up the difference.\n\nThe second is built, and the reclassification already concedes it: containment system of unattributed origin.\n\nThe sum, which no approved document formulates: if the LIVING containment existed to hold the balance, the built one existed for the event of the balance ending. One is the rule. The other is what you do when the rule fails.\n\nBoth were removed by this operation, in that order.\n\nThe cleared object came up after the second.',
+    source: 'No department assigned',
   },
 };
 

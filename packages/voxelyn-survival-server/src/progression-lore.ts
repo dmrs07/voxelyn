@@ -1,4 +1,4 @@
-// O Codex corporativo (89 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
+// O Codex corporativo (95 documentos; a contagem viva e TOTAL_LORE_FRAGMENTS)
 // e as regras de quem pode ler o que.
 //
 // ---------------------------------------------------------------------------
@@ -45,6 +45,8 @@
 
 import {
   DISCOVERY_BISHOP_FELLED,
+  DISCOVERY_BISHOP_HEALED,
+  DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_CARGO_LOST,
   DISCOVERY_CORE_TAKEN,
   DISCOVERY_DISCHARGE_POOL,
@@ -276,6 +278,12 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   { bit: DISCOVERY_CARGO_LOST, fragmentId: 'AX-PRC-023' },
   { bit: DISCOVERY_HORSE_FELLED, fragmentId: 'AX-INC-033' },
   { bit: DISCOVERY_BISHOP_FELLED, fragmentId: 'AX-UNK-045' },
+  // As duas Descobertas do Bispo sao de ENTENDIMENTO, e nao de repeticao: uma
+  // exige ter visto o chao devolver vida a ele, a outra exige ter estado
+  // dentro do disco da Supernova e continuado de pe. Sao os dois fatos que os
+  // documentos abaixo interpretam — e nenhum deles abre por farm.
+  { bit: DISCOVERY_BISHOP_HEALED, fragmentId: 'AX-ENG-028' },
+  { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, fragmentId: 'AX-INC-040' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
 ];
@@ -339,6 +347,8 @@ export const ASSET_MILESTONE_LORE: readonly {
 export const DISCOVERY_ARCHETYPE: readonly { bit: number; archetype: EnemyArchetype }[] = [
   { bit: DISCOVERY_HORSE_FELLED, archetype: 'fungal_horse' },
   { bit: DISCOVERY_BISHOP_FELLED, archetype: 'bishop' },
+  { bit: DISCOVERY_BISHOP_HEALED, archetype: 'bishop' },
+  { bit: DISCOVERY_BISHOP_NOVA_SURVIVED, archetype: 'bishop' },
   { bit: DISCOVERY_GUARDIAN_FELLED, archetype: 'guardian' },
   { bit: DISCOVERY_MINER_FLED, archetype: 'miner' },
   { bit: DISCOVERY_MINER_ENRAGED, archetype: 'miner' },
@@ -481,13 +491,21 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-EXE-046': ['AX-INC-039', 'AX-EXE-040', 'AX-UNK-056'],
   'AX-UNK-056': ['AX-EXE-046', 'AX-UNK-050', 'AX-UNK-054'],
   'AX-UNK-054': ['AX-UNK-046', 'AX-UNK-042', 'AX-UNK-048', 'AX-UNK-053', 'AX-UNK-049'],
-  'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033'],
+  // O arco do Bispo: a medicao fria → o custo do laudo → a emissao que nao
+  // persegue ninguem → a palavra proibida → a regra → os dois que guardavam.
+  'AX-EXE-034': ['AX-UNK-045', 'AX-INC-033', 'AX-ENG-028'],
+  'AX-ENG-028': ['AX-EXE-034', 'AX-INC-040'],
+  'AX-PRC-025': ['AX-UNK-045', 'AX-EXE-047'],
+  'AX-INC-040': ['AX-ENG-028', 'AX-UNK-045', 'AX-EXE-047'],
+  'AX-EXE-047': ['AX-PRC-025', 'AX-UNK-057'],
+  'AX-UNK-057': ['AX-ENG-028', 'AX-PRC-025', 'AX-INC-040', 'AX-UNK-045'],
+  'AX-UNK-058': ['AX-UNK-057', 'AX-UNK-051', 'AX-EXE-042', 'AX-UNK-050'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
-  'AX-UNK-045': ['AX-EXE-034', 'AX-INC-033', 'AX-UNK-047'],
+  'AX-UNK-045': ['AX-EXE-034', 'AX-INC-033', 'AX-UNK-047', 'AX-PRC-025'],
   'AX-UNK-050': ['AX-EXE-039', 'AX-UNK-049'],
-  'AX-UNK-051': ['AX-UNK-050', 'AX-EXE-042'],
+  'AX-UNK-051': ['AX-UNK-050', 'AX-EXE-042', 'AX-UNK-058'],
 };
 
 const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
@@ -541,6 +559,11 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-EXE-046': 2,
   'AX-UNK-055': 3,
   'AX-UNK-056': 3,
+  'AX-PRC-025': 1,
+  'AX-INC-040': 1,
+  'AX-EXE-047': 2,
+  'AX-UNK-057': 2,
+  'AX-UNK-058': 3,
 };
 
 /**
@@ -582,6 +605,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-025',
   'AX-ENG-026',
   'AX-ENG-027',
+  'AX-ENG-028',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',
@@ -594,6 +618,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-PRC-022',
   'AX-PRC-023',
   'AX-PRC-024',
+  'AX-PRC-025',
   'AX-GEN-G02',
   // Ato IV — Incidente
   'AX-INC-022',
@@ -614,6 +639,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-INC-037',
   'AX-INC-038',
   'AX-INC-039',
+  'AX-INC-040',
   'AX-GEN-G03',
   // Ato V — Encobrimento
   'AX-EXE-031',
@@ -631,6 +657,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-EXE-044',
   'AX-EXE-045',
   'AX-EXE-046',
+  'AX-EXE-047',
   // Ato VI — Memoria
   'AX-UNK-041',
   'AX-UNK-042',
@@ -647,6 +674,8 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-UNK-053',
   'AX-UNK-055',
   'AX-UNK-056',
+  'AX-UNK-057',
+  'AX-UNK-058',
   // A sintese fecha o ato — e a historia — de proposito.
   'AX-UNK-054',
   'AX-GEN-G04',
@@ -699,6 +728,43 @@ export const LORE_FRAGMENTS: readonly LoreFragmentDefinition[] = [
   // pode ler o documento que as nomeia como o mesmo fenomeno. Os arcos do
   // Ressonante e do Scoriac ficam de fora DE PROPOSITO: um e memoria coletiva
   // e o outro talvez nem seja pessoa — a sintese nao pode virar formula.
+  // O arco do Bispo, do custo a regra. Os tres primeiros cruzam ter DERRUBADO
+  // o ativo com ter entendido uma metade do encontro; o ultimo exige as duas.
+  // Nenhum deles usa marco de abate: o Bispo aparece uma vez por run, e no
+  // maximo, entao uma grade de 15 abates transformaria a revelacao em farm de
+  // cinquenta descidas.
+  define('AX-PRC-025', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'bishop' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_HEALED },
+    ],
+  }),
+  define('AX-EXE-047', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'bishop' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_NOVA_SURVIVED },
+    ],
+  }),
+  define('AX-UNK-057', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'asset', archetype: 'bishop' },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_HEALED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_NOVA_SURVIVED },
+    ],
+  }),
+  // E o fecho dos DOIS chefes: so quem derrubou a contencao viva, a fabricada
+  // e subiu com o Nucleo pode ler o documento que soma as tres coisas.
+  define('AX-UNK-058', {
+    kind: 'compound',
+    allOf: [
+      { kind: 'discovery', discoveryBit: DISCOVERY_BISHOP_FELLED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_GUARDIAN_FELLED },
+      { kind: 'discovery', discoveryBit: DISCOVERY_CORE_TAKEN },
+    ],
+  }),
   define('AX-UNK-054', {
     kind: 'compound',
     allOf: [

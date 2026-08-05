@@ -41,12 +41,26 @@ guardião cujo trabalho, bem feito, é indistinguível de não fazer nada — e 
 que ninguém na Aurix jamais encontrou registro dele em atividade. Registro só existe
 de quando ele já tinha falhado.
 
+E ele **antecede a civilização**. Por tempo que ninguém mediu — milênios, é o que a
+datação sugere e ninguém afirma — não houve contato humano nenhum: não havia quem
+descesse, e não havia o que a taxa precisasse conter. Ele não estava esperando. Ele
+estava fazendo a única coisa que faz, num lugar onde ninguém abria buracos.
+
 ### O pacto artesanal
 
-Extrair nunca foi o problema. Picareta, um veio por vez, a parede deixada de pé: o
-micélio fecha o corte em uma estação e a galeria continua viva. Gente desceu ali por
-gerações sob essa regra, e a regra não estava escrita em lugar nenhum — estava no
-fato de que quem a quebrava não achava mais nada no ano seguinte.
+Há alguns milhares de anos ele foi **encontrado** — e por gente que não estava
+minerando. Os objetos mais fundos do nicho não são minerais: são semente, grão e
+vasilhame de grão. Quem primeiro reconheceu o que aquilo era foram **pequenos
+agricultores**, e isso não é detalhe de cor. Uma comunidade que planta entende
+nativamente a regra que ele encarna, porque é a mesma regra que a mantém viva: *quem
+colhe mais do que nasce não colhe no ano seguinte.* Eles não precisaram deduzir a
+taxa. Eles já viviam dentro de uma.
+
+A extração veio depois, e nunca foi o problema. Picareta, um veio por vez, a parede
+deixada de pé: o micélio fecha o corte em uma estação e a galeria continua viva. O
+rito passou dos que plantavam para os que cavavam junto com a regra, e a regra nunca
+esteve escrita em lugar nenhum — estava no fato de que quem a quebrava não achava
+mais nada no ano seguinte.
 
 O jogo **já descreve o rito**, num documento escrito por gente que não sabia estar
 descrevendo um rito. `AX-UNK-045`, "Sobre o que o Bispo guardava": nichos escavados,
@@ -57,6 +71,11 @@ Não é um altar de oferendas. É uma **contabilidade**: uma amostra de cada coi
 foi tirada, devolvida ao lugar de onde saiu. A ferramenta não entra porque a
 ferramenta é de quem trabalha; o que se devolve é o que se levou. E a resposta dele a
 cada devolução era o fungo fechando o buraco.
+
+O laudo de datação (`AX-PRC-025`) fecha a leitura com o fato que a Aurix pagou para
+descobrir e arquivou em seguida: a série é **contínua** por cerca de cinco milênios,
+do grão até um objeto de fabricação da operação anterior. Alguém repôs aquele nicho,
+sem interrupção registrável, durante todo o período.
 
 As duas metades do pacto estão na mesma sala. A Aurix catalogou as duas e não leu
 nenhuma — `AX-EXE-034` proíbe descrever a estrutura, e a pergunta *"construída por
@@ -134,24 +153,35 @@ fabricada e outra viva. **Se a viva falhou por não conseguir acompanhar o ritmo
 companhia, o que exatamente o Guardião ainda está segurando — e há quanto tempo está
 sozinho?**
 
-### Os documentos que faltam escrever
+### Os documentos do arco
 
-O arco do Bispo já tem começo (`AX-EXE-034`) e revelação (`AX-UNK-045`); o miolo é o
-que esta lore acrescenta. Seguindo a estrutura de gatilho por **entendimento do
-encontro**, e não por repetição:
+Escritos e no catálogo (`progression-lore.ts` + `progression-lore-text.ts`, pt-BR e
+en). O gatilho é **entendimento do encontro**, nunca repetição: o Bispo aparece no
+máximo uma vez por run, então uma grade de abates como a do Corcel (3/6/10/15)
+transformaria a revelação em cinquenta descidas.
 
-| Gatilho | Documento | ID sugerido |
+| Gatilho | Documento | ID |
 | --- | --- | --- |
-| Primeiro encontro | Classificação corporativa — o ativo estacionário sobre a estrutura | `AX-EXE-034` ✔ existe |
-| Ver a cura acontecer | Relatório técnico: o tecido fecha na velocidade do corte, e o corte da Aurix é maior | `AX-ENG-028` |
-| Sobreviver à Supernova | Incidente: o "ataque" replanta em raio e não persegue ninguém — a área é a mesma da lavra | `AX-INC-040` |
-| Primeira queda | Ordem executiva: reclassificação de anomalia para [REDACTED] | `AX-EXE-047` |
-| Queda + ter lido a lavra artesanal | Não classificado: o pacto, a taxa, e quem quebrou qual regra | `AX-UNK-057` |
-| Descoberta composta (com `AX-UNK-051`) | Não classificado: dois guardiões, uma falha | `AX-UNK-058` |
+| Primeiro abate | Ordem de contenção: a estrutura sob ele não deve ser descrita | `AX-EXE-034` |
+| **Ver a cura** de perto, com a linha livre | Medição de campo: o tecido fecha na velocidade do corte; o nosso é maior | `AX-ENG-028` |
+| **Sobreviver à Supernova** (estar dentro do disco e continuar de pé) | Incidente 40: a emissão não persegue ninguém — ela replanta, no raio da lavra | `AX-INC-040` |
+| Abate | Necropsia da estrutura: nichos, objetos por tamanho, fungo cultivado | `AX-UNK-045` |
+| Abate **+** ter visto a cura | Custo de datação: a série é contínua há cinco milênios, e começa em semente | `AX-PRC-025` |
+| Abate **+** ter sobrevivido à Supernova | Ordem de vocabulário: "sítio" é proibido porque um sítio suspende a lavra | `AX-EXE-047` |
+| Abate **+** as duas Descobertas | Não classificado: a regra que ninguém escreveu, e a ferida fechando com você dentro | `AX-UNK-057` |
+| Bispo **+** Guardião **+** Núcleo | Não classificado: duas contenções, uma viva e uma fabricada — a viva caiu primeiro | `AX-UNK-058` |
 
-Ficam como esboço, e **não** entram no catálogo até serem escritos com as cinco regras
-de `progression-lore-text.ts` na frente: voz de relatório, sem vilão declarado,
-redação com moderação, nenhuma resposta fechada, e curtos.
+As duas Descobertas são novas na simulação (`DISCOVERY_BISHOP_HEALED` e
+`DISCOVERY_BISHOP_NOVA_SURVIVED`, bits 14 e 15) e entram no hash autoritativo, daí o
+`SIMULATION_VERSION` 23. A primeira exige testemunha real — distância e **linha de
+visão** —, porque o documento que ela abre é uma medição de campo, e medir pressupõe
+alguém no campo. A segunda lê `hp > 0` e não `alive`: quem chegou a zero ainda está
+vivo naquele instante (`resolveDownedAndDeaths` roda no fim do tick), e marcar ali
+daria a descoberta justamente a quem não sobreviveu.
+
+O documento que fecha o arco (`AX-UNK-058`) é a única peça que exige o **Guardião**
+também: ele cruza as duas contenções e o Núcleo, e por isso só existe para quem
+desmontou o lugar inteiro e subiu com a peça.
 
 ## 3. Bispo — a cura vem do chão, não dele
 

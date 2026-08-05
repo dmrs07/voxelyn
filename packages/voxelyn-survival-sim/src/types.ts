@@ -214,6 +214,21 @@ export const DISCOVERY_ORE_QUOTA_RETIRED = 1 << 12;
  * aprende-se perdendo trinta lascas a dois setores da plataforma.
  */
 export const DISCOVERY_CARGO_LOST = 1 << 13;
+/**
+ * VIU a cura do Bispo acontecer — perto o bastante e com a linha livre.
+ *
+ * Nao basta ele ter se curado: o documento que este bit abre e uma MEDICAO de
+ * campo, e medir exige ter estado la. Um bit aceso por uma cura do outro lado
+ * do mapa entregaria o relatorio a quem nunca viu o chao devolver vida a nada.
+ */
+export const DISCOVERY_BISHOP_HEALED = 1 << 14;
+/**
+ * Estava DENTRO do disco da Supernova quando ela abriu — e continuou de pe.
+ *
+ * O par natural do bit acima, e o unico jeito honesto de destravar o documento
+ * que diz que a emissao nao persegue ninguem: quem leu isso pagou para ler.
+ */
+export const DISCOVERY_BISHOP_NOVA_SURVIVED = 1 << 15;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
