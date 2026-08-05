@@ -24,7 +24,7 @@ import {
   DIAMANDIS_MODULE_EXPOSE_AT,
   DIAMANDIS_MODULE_ORE,
   DIAMANDIS_REACTOR_HP_FRACTION,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ROCK,
@@ -97,8 +97,8 @@ describe('Diamandis — onde ele mora', () => {
     // E aparece de verdade numa run: a linhagem industrial termina em Aurix.
     let found = false;
     for (let seed = 1; seed <= 200 && !found; seed++) {
-      if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) !== 'diamandis') continue;
-      const state = createRun({ seed, sector: SECTOR_COUNT });
+      if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) !== 'diamandis') continue;
+      const state = createRun({ seed, sector: DEFAULT_SECTOR_COUNT });
       found = state.enemies.some((e) => e.archetype === 'diamandis');
       expect(found, `seed ${seed}: bioma Aurix sem Diamandis na camara`).toBe(true);
     }

@@ -39,6 +39,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'aurix.rail.copy': 'Operator copy',
   'aurix.menu.docTitle': 'Dispatch order',
   'aurix.menu.requisition': 'Requisition',
+  'menu.clearance.generation': 'PROSPECTOR {generation}',
+  'menu.clearance.depth': 'DESCENT AUTHORISATION: {sectors} SECTORS',
+  'menu.clearance.cores': 'DETECTABLE CORES: {cores}',
   'aurix.menu.authorisation': 'Descent authorisation',
   'aurix.doc.options': 'AD-CFG-2.1 · local terminal',
   'aurix.doc.records': 'AD-REG-8.1 · recovery ledger',
@@ -397,6 +400,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.stat.ore': 'Ore',
   'summary.stat.none': '—',
   'summary.outcome.core': 'CORE EXTRACTED',
+  'summary.outcome.cores': 'CORES EXTRACTED ×{cores}',
   'summary.outcome.extracted': 'EXTRACTED WITHOUT THE CORE',
   'summary.outcome.dead': 'THE VEIN CONSUMED YOU',
   'summary.reputation.one': 'CORPORATE RECORD: 1 inactive unit destroyed — no recovery value.',
@@ -553,7 +557,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'upgrade.IA-X.desc': 'directionless tap fires at the nearest valid enemy',
   'summary.cargo.lost': 'CARGO NOT RECOVERED: {ore} ⬡ · NO RECOVERY VALUE',
   'summary.cargo.cleared': 'CARGO TRANSMITTED FOR CLEARANCE: {ore} ⬡',
-  'summary.cargo.core': 'CARGO AND CORE TRANSMITTED FOR CLEARANCE: {ore} ⬡ · 1 ◉',
+  'summary.cargo.core': 'CARGO AND CORES TRANSMITTED FOR CLEARANCE: {ore} ⬡ · {cores} ◉',
   'hud.cargo': '{count} CARGO',
   'hud.purgeCells': 'PURGE CELL ×{count}',
   'hud.sector': 'SECTOR {sector}/{total}',
@@ -561,6 +565,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'hud.objective.ascend': 'ASCEND AT THE ENTRANCE — THE SHAFT IS SEALED',
   'hud.objective.extract': 'EXTRACT AT THE ENTRANCE',
   'hud.objective.findCore': 'FIND THE CORE',
+  'hud.objective.breakSeal': 'THE SECTOR SEAL HOLDS — BRING DOWN WHAT SUSTAINS IT',
+  'hud.cores': 'CORES {taken}/{total}',
   'hud.cache': 'CACHE: {direction} · ~{distance}m',
   'hud.direction.east': 'EAST',
   'hud.direction.west': 'WEST',
@@ -583,6 +589,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // Run toasts
   // ---------------------------------------------------------------------
   'toast.ability.assimilated': '{ability} ASSIMILATED',
+  'toast.core.deeper': 'CORE {taken}/{total} RECOVERED — FURTHER DESCENT AUTHORISED',
   'toast.core.taken': 'CORE EXTRACTED — RETURN TO THE ENTRANCE!',
   'toast.guardian.awake': 'THE GUARDIAN AWOKE',
   'toast.module.expired': '{module} DEACTIVATED',
@@ -613,6 +620,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'sim.coreDropped': 'The core fell with its bearer.',
   'sim.arenaSealed': 'The Vein closes in. Open a way or fight.',
   'sim.siegeCollapsed': 'The siege collapses with the Guardian.',
+  'sim.descentSealedByBoss': 'The shaft does not answer: this sector seal is still active.',
+  'sim.coreSealedByBoss': 'The pedestal refuses the coupling. This sector seal is still active.',
+  'sim.coreTakenDeeper': 'Core recovered — further descent authorised.',
 
   // ---------------------------------------------------------------------
   // Module choice

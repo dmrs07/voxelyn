@@ -35,6 +35,8 @@ const finishDead = (state: SurvivalState, cause: DamageCause = { kind: 'fire' })
     contamination: state.contamination,
     deathCause: cause,
     stats: { ...state.stats, kills: { ...state.stats.kills } },
+    cores: 0,
+    sectorCount: 3,
     stars: 0,
     targetTicks: 9600,
   };

@@ -407,7 +407,7 @@ describe('particulas voxel', () => {
 
   it('ignora eventos que nao geram materia', () => {
     const p = new VoxelParticles();
-    p.ingest([{ t: 'message', key: 'sim.partnerRevived' }, { t: 'extracted', withCore: true }], 96, 1);
+    p.ingest([{ t: 'message', key: 'sim.partnerRevived' }, { t: 'extracted', withCore: true, cores: 1 }], 96, 1);
     expect(p.count).toBe(0);
   });
 

@@ -54,7 +54,20 @@
 // PLANTADO NO CHAO durante o voo, porque a altura da parabola sai justamente
 // do vao de tempo dessa acao. O corpo apareceria atravessando a arena colado no
 // piso, sem sombra descolada e sem arco nenhum.
-export const PROTOCOL_VERSION = 18;
+// 19: PROFUNDIDADE POR GERACAO no wire. O handshake passa a carregar a
+// configuracao congelada da sala (`sectorCount`, `coreSectors`, `generation`),
+// `WorldFlags` troca o booleano `coreTaken` por ele MAIS a mascara de Nucleos
+// recolhidos e os dois selos do setor (`descentUnlocked`, `coreUnlocked`,
+// `activeBoss`), `ViewerState` ganha `coreCount`, `sector_entered` ganha o
+// total acessivel e o dono do setor, e entra o evento `sector_unsealed`.
+// E quebra nos dois sentidos, e as duas metades doem: um cliente novo contra
+// servidor antigo le `sectorCount` ausente e desenha "SETOR 2/undefined",
+// alem de nunca saber que o poco esta selado — ele mostraria o portal aberto
+// e o jogador ficaria apertando interagir sem resposta; um cliente antigo
+// contra servidor novo procura `coreTaken` (que continua la) mas ignora os
+// selos e a contagem, entao anunciaria a run encerrada no primeiro Nucleo de
+// uma expedicao de G-04 que ainda tem quatro setores pela frente.
+export const PROTOCOL_VERSION = 19;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -230,7 +243,36 @@ export const PROTOCOL_VERSION = 18;
 // O que muda de jogo: a pressao passa a SUBIR ate a janela em vez de alternar
 // em ritmo constante, e a janela concentra a exposicao num alvo parado. Duas
 // simulacoes em versoes diferentes divergem no primeiro pouso.
-export const SIMULATION_VERSION = 31;
+// 32: LINHAGENS DE ATE SETE SETORES. A profundidade de uma run deixa de ser a
+// constante `SECTOR_COUNT` e passa a ser a AUTORIZACAO da geracao, congelada na
+// criacao: G-00/G-01 tres setores, G-02 quatro, G-03 cinco, G-04 sete. Cinco
+// mudancas autoritativas na mesma leva:
+//
+// - a configuracao de profundidade (`generation`, `sectorCount`, `coreSectors`)
+//   entra no estado e no HASH. Duas runs com a mesma seed e profundidades
+//   diferentes sao runs diferentes desde o tick zero, e o replay tem de acusar
+//   isso em vez de verificar uma contra a outra;
+// - `coreTaken` (booleano) vira `coresTakenMask` (bit por setor), porque de
+//   G-03 em diante ha DOIS Nucleos — um no setor 3 e outro no final. A mascara
+//   entra no hash no lugar do booleano;
+// - CHEFE POR POSICAO: alem do setor final, todo setor de Nucleo tem dono. O
+//   selo dele tranca o poco E o pedestal (`descentUnlocked`/`coreUnlocked`), e
+//   a coleta do Nucleo com o chefe de pe deixa de existir — o que muda a ordem
+//   de eventos de toda run, inclusive as de tres setores;
+// - `bossesDown` vira `bossesDownMask` e passa a ser marcada pelo `entityId` do
+//   dono do setor em vez de por uma lista de arquetipos escrita a mao. Os oito
+//   chefes que a lista nao mencionava passam a ficar abatidos de verdade: antes
+//   deste bump, um Arquicantor morto RENASCIA na subida;
+// - as linhagens ganham as posicoes 4 a 7 e `biomeProfile` le `depthIntensity`
+//   no lugar de `sector - 1` truncado em 2.
+//
+// O TERRENO SEMEADO DOS SETORES 1 A 3 NAO MUDA — e proposital e esta coberto
+// por tests/impressao-digital-geracao.test.ts, que continua na assinatura
+// 2694607655. A mesma seed em G-01 e em G-04 produz os mesmos tres primeiros
+// setores; o que a geracao muda e ate onde se pode ir. Ainda assim o bump e
+// obrigatorio: a ordem de eventos, o hash e a estrutura de chefes mudaram, e
+// dois peers em versoes diferentes divergiriam no primeiro selo.
+export const SIMULATION_VERSION = 32;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

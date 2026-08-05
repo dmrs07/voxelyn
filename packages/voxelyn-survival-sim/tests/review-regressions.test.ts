@@ -11,7 +11,7 @@ import {
   HORSE_TRAIL_DELAY_TICKS,
   HORSE_TURN_RATE,
   MAX_ENEMIES,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SURF_FIRE,
   SURF_NONE,
@@ -43,7 +43,7 @@ describe('investida do Guardian — o impulso anda no release', () => {
   // tempo certo era acertado assim mesmo; quem esperava o golpe passar levava
   // dano de um corpo que ainda nem tinha saido.
   it('o Guardian sai do lugar no tick do release, e nao no fim da recuperacao', () => {
-    const state = createRun({ seed: 71, sector: SECTOR_COUNT });
+    const state = createRun({ seed: 71, sector: DEFAULT_SECTOR_COUNT });
     clearArena(state, 20);
     state.enemies.length = 0;
     const guardian = spawnEnemy(
@@ -193,7 +193,7 @@ describe('mineradores — uma celula, um corpo', () => {
   // desenhavam e andavam como um so.
   it('nenhum setor gerado empilha dois mineradores na mesma celula', () => {
     for (let seed = 1; seed <= 40; seed++) {
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const state = createRun({ seed, sector });
         const cells = new Map<string, number>();
         for (const enemy of state.enemies) {

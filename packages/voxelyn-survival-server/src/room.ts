@@ -1,6 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import {
+  DEFAULT_RUN_DEPTH,
+  clearCoreTaken,
+  coreUnlocked,
   createRun,
+  descentUnlocked,
   emptyCommand,
   hashAuthoritativeState,
   hashStaticWorld,
@@ -8,6 +12,7 @@ import {
   resetPlayerProgress,
   stepRun,
   type PlayerCommand,
+  type RunDepthConfig,
   type SemanticEvent,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -24,6 +29,17 @@ import {
 } from '@voxelyn/survival-protocol';
 
 const HASH_INTERVAL_TICKS = 20;
+
+/** Bits ligados. Quantos Nucleos uma mascara de porte carrega. */
+const countBits = (mask: number): number => {
+  let n = mask >>> 0;
+  let count = 0;
+  while (n !== 0) {
+    n &= n - 1;
+    count++;
+  }
+  return count;
+};
 
 /**
  * Quanto tempo um slot desconectado continua reservado (e seu avatar continua
@@ -87,9 +103,20 @@ export class GameRoom {
     readonly seed: number,
     readonly maxPlayers: number,
     /** Codigo de convite desta sala. Ver room-code.ts no protocolo. */
-    readonly code: string = ''
+    readonly code: string = '',
+    /**
+     * A PROFUNDIDADE desta sala, congelada aqui.
+     *
+     * A autoridade e da SALA e nunca do cliente: todos os participantes jogam a
+     * mesma descida, e quem entra atrasado recebe a configuracao ja congelada
+     * pelo handshake. A politica de qual profundidade usar e do servidor (ver
+     * `ServerOptions.coopDepth`); o padrao — e o unico valor hoje — e G-00, tres
+     * setores, que e o mesmo tuning de fabrica que o co-op ja usava. Progressao
+     * permanente de um participante nao pode alongar a run do outro.
+     */
+    depth: RunDepthConfig = DEFAULT_RUN_DEPTH,
   ) {
-    this.state = createRun({ seed, playerCount: maxPlayers });
+    this.state = createRun({ seed, playerCount: maxPlayers, depth });
     // nenhum avatar entra na sim ate que um cliente reivindique o slot
     for (const e of this.state.playerExtras) e.joined = false;
     this.tracker = new ChunkTracker(this.state.config.width, this.state.config.height);
@@ -224,10 +251,14 @@ export class GameRoom {
       extra.joined = false; // avatar sai da sim
       // O proximo ocupante e um jogador NOVO: nao pode herdar modificadores,
       // frascos nem a posse do nucleo de quem abandonou.
-      if (extra.hasCore) {
-        // o nucleo saiu com quem abandonou; devolve ao mundo, senao a run do
-        // parceiro fica sem objetivo alcancavel por culpa alheia
-        this.state.coreTaken = false;
+      if (extra.carriedCoreMask !== 0) {
+        // Os Nucleos sairam com quem abandonou; devolve CADA UM ao pedestal
+        // dele, senao a run do parceiro fica sem objetivo alcancavel por culpa
+        // alheia. Um por um e nao "zera tudo": numa run de G-04 o parceiro pode
+        // estar carregando o outro Nucleo, e ele nao tem nada com isso.
+        for (const sector of this.state.config.depth.coreSectors) {
+          if ((extra.carriedCoreMask & (1 << sector)) !== 0) clearCoreTaken(this.state, sector);
+        }
       }
       resetPlayerProgress(extra, this.state.config.tuning);
     }
@@ -406,6 +437,7 @@ export class GameRoom {
         createdAtTick: e.pendingModuleChoice.createdAtTick,
       } : null,
       hasCore: e.hasCore,
+      coreCount: countBits(e.carriedCoreMask),
       downed: e.downed,
       aimX: round3(e.aim.x),
       aimY: round3(e.aim.y),
@@ -426,7 +458,19 @@ export class GameRoom {
         cacheRevealed: site.cacheRevealed,
         cacheOpened: site.cacheOpened,
       })),
-      coreTaken: this.state.coreTaken,
+      coreTaken: this.state.coresTakenMask !== 0,
+      coresTakenMask: this.state.coresTakenMask,
+      coreSectors: [...this.state.config.depth.coreSectors],
+      // Os SELOS, derivados aqui e nao no cliente: a regra de quem guarda o que
+      // mora na simulacao, e uma segunda copia no cliente divergiria dela.
+      descentUnlocked: descentUnlocked(this.state),
+      coreUnlocked: coreUnlocked(this.state),
+      activeBoss: this.state.sectorBoss.archetype
+        ? {
+            archetype: this.state.sectorBoss.archetype,
+            defeated: this.state.sectorBoss.defeated,
+          }
+        : null,
       bossAwake: this.state.bossRuntime.awake,
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
       // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto

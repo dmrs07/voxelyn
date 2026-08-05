@@ -41,7 +41,12 @@ import {
   type VerificationBudget,
 } from './http-util.js';
 import { MAX_REPLAY_BYTES, resimulateRun } from './replay.js';
-import { publicProfile, tuningForProfile, type StoredProfile } from './progression.js';
+import {
+  depthForProfile,
+  publicProfile,
+  tuningForProfile,
+  type StoredProfile,
+} from './progression.js';
 import type { ProgressionStore } from './progression-store.js';
 import { createSessionAuth, readSessionToken, type SessionAuth } from './progression-auth.js';
 import {
@@ -323,6 +328,11 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
 
       // O TUNING SAI DO PERFIL, nunca do pedido.
       const tuning = tuningForProfile(profile);
+      // A PROFUNDIDADE tambem, e pelo mesmo caminho: a geracao e derivada dos
+      // protocolos comprados e a autorizacao de descida e derivada dela. Este e
+      // o unico instante em que o perfil e consultado — do ticket em diante a
+      // run tem a propria profundidade e nao pergunta mais nada a ninguem.
+      const depth = depthForProfile(profile);
       const issuedAt = nowMs();
       const ticket: ProgressionRunTicket = {
         runId: randomUUID(),
@@ -332,6 +342,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
         playerCount: 1,
         tuning,
         tuningHash: hashPlayerTuning(tuning),
+        depth,
         progressionProfileVersion: profile.profileVersion,
         protocolVersion: PROTOCOL_VERSION,
         simulationVersion: SIMULATION_VERSION,
@@ -400,7 +411,9 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
         const started = nowMs();
         // AQUI esta a decisao inteira. Seed e tuning saem do ticket guardado no
         // servidor; do corpo veio so o que o jogador apertou.
-        const run = resimulateRun(ticket.seed, log, ticket.tuning);
+        // Seed, tuning E PROFUNDIDADE saem do ticket guardado no servidor. Do
+        // corpo veio so o que o jogador apertou.
+        const run = resimulateRun(ticket.seed, log, ticket.tuning, ticket.depth);
         const elapsed = nowMs() - started;
         if (!run.ok) {
           opts.log({
@@ -426,6 +439,9 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
           // o servidor re-simulou — e e por isso que um Ativo "conhecido" e um
           // fato do perfil, e nao uma afirmacao do Registro local.
           cargoOre: summary.stats.oreCollected,
+          // Quantos Nucleos a RE-SIMULACAO trouxe. Uma run de G-03/G-04 pode
+          // render dois, e creditar `1` fixo por fase pagaria metade.
+          cores: summary.cores,
           kills: summary.stats.kills,
           discoveries: summary.stats.discoveries,
           seed: ticket.seed,

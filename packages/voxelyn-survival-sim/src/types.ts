@@ -1,6 +1,6 @@
 import type { RNG } from '@voxelyn/core';
 import type { LineageId, OccupationId, StratumId } from './strata.js';
-import type { PlayerTuning } from './progression.js';
+import type { PlayerTuning, RunDepthConfig } from './progression.js';
 
 export type Vec2 = { x: number; y: number };
 
@@ -12,11 +12,11 @@ export type RunConfig = {
   /**
    * Setor em que a run COMECA. Padrao 1.
    *
-   * Existe porque a run deixou de ser um mapa e virou tres encadeados, e sem
+   * Existe porque a run deixou de ser um mapa e virou varios encadeados, e sem
    * isto nao ha como construir o estado do setor 3 diretamente. Dois
    * consumidores reais dependem disso: um cliente que reconecta no meio de uma
    * run de co-op precisa reconstruir o mundo do setor em que a sala esta, e
-   * testar o Guardiao exigiria dirigir a run inteira ate ele antes de qualquer
+   * testar um chefe exigiria dirigir a run inteira ate ele antes de qualquer
    * asserção sobre a arena.
    */
   sector?: number;
@@ -29,6 +29,21 @@ export type RunConfig = {
    * tuning que ela realmente usou, meses depois de a arvore ter mudado.
    */
   tuning?: PlayerTuning;
+  /**
+   * A PROFUNDIDADE autorizada desta run. Ausente = tres setores, Nucleo no
+   * terceiro (o Prospector de fabrica, e toda run gravada antes da expansao).
+   *
+   * Congelada pelo mesmo motivo e com a mesma forca que `tuning`, e a razao vale
+   * ser dita por extenso porque e mais facil de errar: quantos setores a run tem
+   * NAO pode ser reconsultado no perfil a cada descida. Se fosse, comprar o
+   * decimo segundo protocolo no meio de uma expedicao de G-02 mudaria o setor
+   * final, moveria o Nucleo, trocaria o chefe e invalidaria o hash de uma run em
+   * andamento — e o jogador veria isso como "o jogo esqueceu onde eu estava".
+   *
+   * O servidor resolve a geracao no momento de emitir o ticket e congela o
+   * resultado aqui. Depois disso o perfil deixa de existir para esta run.
+   */
+  depth?: RunDepthConfig;
 };
 
 export type RunPhase = 'running' | 'dead' | 'extracted' | 'extracted_with_core';
@@ -342,6 +357,17 @@ export type RunSummary = {
   /** Nulo quando a run terminou em extracao. */
   deathCause: DamageCause | null;
   stats: RunStats;
+  /**
+   * Nucleos que sairam do Veio com o time. 0..2 hoje.
+   *
+   * A liquidacao credita a partir daqui — e daqui SO no servidor, depois de
+   * re-simular o log. Uma run de G-03 ou G-04 pode terminar com zero, com o
+   * Nucleo intermediario, com o final, ou com os dois; a recompensa segue o
+   * que a re-simulacao produziu, nunca o que o cliente afirmou.
+   */
+  cores: number;
+  /** A profundidade que esta run atravessou. Contexto para a tela de fim. */
+  sectorCount: number;
   stars: 0 | 1 | 2 | 3;
   /** Tempo, em ticks, abaixo do qual a terceira estrela e concedida. */
   targetTicks: number;
@@ -441,6 +467,28 @@ export type Entity = {
 };
 
 /**
+ * O MINIMO que o setor precisa saber sobre o proprio chefe.
+ *
+ * Tres campos, e nenhum deles e de nenhum chefe em particular. E a fronteira
+ * que o portal e o pedestal consultam: eles perguntam "ha dono aqui?" e "ele ja
+ * caiu?", e nunca "e o Bispo?". Enquanto perguntavam por arquetipo, cada chefe
+ * novo tinha de ser lembrado em dois lugares distantes do arquivo em que ele
+ * foi escrito — e nao foi.
+ *
+ * `archetype` nulo significa "setor sem chefe" e nao "chefe ainda nao nasceu":
+ * a resolucao e deterministica e acontece na entrada do setor. Um setor sem
+ * dono nunca bloqueia nada.
+ */
+export type SectorBossState = {
+  /** O corpo que guarda este setor, ou `null` quando ninguem guarda. */
+  archetype: EnemyArchetype | null;
+  /** A entidade viva em campo. `null` depois da morte ou antes do spawn. */
+  entityId: number | null;
+  /** Ja caiu NESTA RUN. Sobrevive a regeneracao do setor na subida. */
+  defeated: boolean;
+};
+
+/**
  * O estado vivo do encontro de chefe do setor.
  *
  * Existia como seis campos soltos no estado, todos com prefixo `guardian`,
@@ -448,9 +496,10 @@ export type Entity = {
  * `bossForBiome` a camara final passou a poder ser de qualquer um da tabela —
  * e `state.guardianPath` sendo consumido pelo Bispo era um nome mentindo.
  *
- * Um objeto so, e nao um por chefe: a run tem UM encontro de chefe (o setor
- * final). O dia em que tiver dois, isto vira um mapa por `entityId` e todo
- * consumidor ja esta lendo de um lugar so.
+ * Um objeto so, e nao um por chefe: a run pode ter dois encontros de chefe
+ * (G-03 e G-04), mas nunca DOIS AO MESMO TEMPO — um setor tem um dono, e trocar
+ * de setor reinicia o encontro. O runtime e do setor atual, e e por isso que
+ * `descend`/`ascend` o zeram.
  */
 export type BossRuntime = {
   /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
@@ -662,7 +711,25 @@ export type PlayerExtra = {
   purgeCells: number;
   activeModules: ActiveModule[];
   pendingModuleChoice: PendingModuleChoice | null;
+  /**
+   * Carrega ao menos um Nucleo? DERIVADO de `carriedCoreMask`, mantido em par
+   * com ele nos quatro pontos que escrevem a carga.
+   *
+   * Continua booleano porque e o que atravessa o wire, o que a extracao
+   * pergunta e o que o HUD desenha — nenhum dos tres quer saber QUAIS. Quem
+   * quer saber quais e a devolucao ao mundo quando o portador morre, e essa le
+   * a mascara.
+   */
   hasCore: boolean;
+  /**
+   * MASCARA dos setores cujos Nucleos este jogador carrega (bit N = setor N).
+   *
+   * Existe porque uma run de G-03 ou G-04 tem dois Nucleos, e quando o portador
+   * cai eles precisam voltar aos PEDESTAIS DELES. Um contador diria "dois
+   * caíram" e nao diria de onde; a run seguinte reabriria o pedestal errado, ou
+   * pior, reabriria os dois e deixaria o parceiro coletar quatro.
+   */
+  carriedCoreMask: number;
   dodgeDir: Vec2;
   downed: boolean;
   bleedoutAt: number;
@@ -850,7 +917,12 @@ export type SemanticEvent =
   /** Os Ecos do poco apareceram com o que demonstrar. */
   | { t: 'well_offers'; sector: number; abilities: AbilityId[] }
   | { t: 'ability_taken'; slot: number; ability: AbilityId; x: number; y: number }
-  | { t: 'pickup_core'; x: number; y: number }
+  /**
+   * Um Nucleo saiu do pedestal. `sector` e `total` viajam junto porque a run
+   * pode ter dois, e "NUCLEO 1 DE 2" e uma frase diferente de "NUCLEO
+   * RECUPERADO" — a primeira diz ao jogador que a descida continua autorizada.
+   */
+  | { t: 'pickup_core'; x: number; y: number; sector: number; taken: number; total: number }
   | { t: 'terminal_activated'; siteId: number; x: number; y: number; completesAtTick: number }
   | { t: 'terminal_scan_complete'; siteId: number; x: number; y: number }
   | { t: 'salvage_cache_revealed'; siteId: number; x: number; y: number }
@@ -883,6 +955,38 @@ export type SemanticEvent =
       occupation: OccupationId;
       /** Presente (true) quando a chegada e do caminho de VOLTA. */
       ascending?: true;
+      /**
+       * Quantos setores esta run atravessa. Viaja no evento e nao so no
+       * handshake porque e o denominador do HUD ("SETOR 5 / 7"), e um cliente
+       * que entrou depois da abertura precisa dele antes de desenhar o primeiro
+       * quadro do setor novo.
+       */
+      sectorCount: number;
+      /** Ha Nucleo aqui? Decide o que o ponto especial do mapa significa. */
+      hasCore: boolean;
+      /** O dono deste setor, quando existe. `null` = setor sem chefe. */
+      boss: EnemyArchetype | null;
+      /** O selo ja caiu? Verdadeiro na chegada quando nao ha chefe, ou ja caiu. */
+      unsealed: boolean;
+    }
+  /**
+   * O SELO DO SETOR CEDEU: o dono caiu e o que ele guardava abriu.
+   *
+   * Evento proprio e nao um `death` reinterpretado pelo cliente porque a morte
+   * de um chefe e a abertura de um portal sao coisas diferentes e o cliente nao
+   * tem como derivar a segunda: ele nao sabe se aquele arquetipo era o dono
+   * DESTE setor ou um segundo corpo do mesmo tipo. Quem sabe e a simulacao, e e
+   * ela quem tem de dizer.
+   *
+   * Nao transporta ninguem. Ele so anuncia que descer (e recolher, quando ha
+   * Nucleo aqui) passou a ser possivel.
+   */
+  | {
+      t: 'sector_unsealed';
+      sector: number;
+      archetype: EnemyArchetype;
+      /** O pedestal deste setor abriu junto. */
+      coreUnlocked: boolean;
     }
   /**
    * O TELEGRAFO da armadilha de carrinho: pisar num tramo armado anuncia o
@@ -926,7 +1030,7 @@ export type SemanticEvent =
     }
   | { t: 'player_down'; slot: number; x: number; y: number; facingX: number; facingY: number; tick: number }
   | { t: 'revive'; x: number; y: number; slot: number; tick: number }
-  | { t: 'extracted'; withCore: boolean }
+  | { t: 'extracted'; withCore: boolean; cores: number }
   /**
    * Um aviso da simulacao ao jogador, identificado por CHAVE e nao por frase.
    *
@@ -957,7 +1061,13 @@ export type SimMessageKey =
   | 'sim.contaminationRising'
   | 'sim.coreDropped'
   | 'sim.arenaSealed'
-  | 'sim.siegeCollapsed';
+  | 'sim.siegeCollapsed'
+  /** O poco nao abre: o dono do setor ainda esta de pe. */
+  | 'sim.descentSealedByBoss'
+  /** O pedestal recusa a mao: o mesmo selo, o mesmo dono. */
+  | 'sim.coreSealedByBoss'
+  /** Nucleo intermediario recolhido — e ha mais Veio abaixo. */
+  | 'sim.coreTakenDeeper';
 
 export type PlayerCommand = {
   move: Vec2;
@@ -976,14 +1086,17 @@ export type SurvivalState = {
   tick: number;
   phase: RunPhase;
   /**
-   * Setor atual da descida, de 1 a SECTOR_COUNT.
+   * Setor atual da descida, de 1 ao `sectorCount` congelado da run.
    *
-   * Nos setores anteriores ao ultimo, `corePos` marca o POCO de descida e nao
-   * ha Guardiao nem nucleo; alcanca-lo troca o mundo inteiro por um novo em vez
-   * de terminar a run. E a mesma posicao reaproveitada de proposito: o worldgen
-   * ja garante que ela seja alcancavel a partir da entrada, que e exatamente a
-   * garantia que o poco precisa. Gerar um segundo ponto especial exigiria
-   * repetir essa prova para ele.
+   * `corePos` e o PONTO ESPECIAL do setor, e o que ele significa depende da
+   * configuracao: no ultimo setor e o pedestal do Nucleo; num setor de Nucleo
+   * intermediario e as DUAS COISAS (recolhe-se o Nucleo ali e desce-se dali
+   * mesmo, em duas interacoes); nos demais e so o poco de descida.
+   *
+   * E a mesma posicao reaproveitada de proposito: o worldgen ja garante que ela
+   * seja alcancavel a partir da entrada, que e exatamente a garantia que o poco
+   * precisa. Gerar um segundo ponto especial exigiria repetir essa prova para
+   * ele — e, pior, mudaria a geracao semeada de todo mapa ja existente.
    */
   sector: number;
   /** Tick em que o setor atual comecou; o cronometro da run continua global. */
@@ -1006,7 +1119,35 @@ export type SurvivalState = {
   chunkVersion: Uint32Array;
   entry: Vec2;
   corePos: Vec2;
-  coreTaken: boolean;
+  /**
+   * MASCARA dos Nucleos ja recolhidos nesta run (bit N = Nucleo do setor N).
+   *
+   * Substituiu o booleano `coreTaken`, que so conseguia dizer "o Nucleo" — e a
+   * partir de G-03 ha dois. Mascara e nao lista porque o campo entra no hash
+   * autoritativo e viaja em snapshot: um inteiro tem uma unica representacao, e
+   * duas simulacoes nunca podem divergir por ordem de insercao. Sete setores
+   * cabem numa nibble e meia; o teto e `MAX_LINEAGE_SECTORS`.
+   *
+   * "Recolhido" e diferente de "liquidado": o bit acende na coleta e apaga se o
+   * portador cair (o Nucleo volta ao pedestal). So a extracao bem-sucedida
+   * converte um bit em recompensa.
+   */
+  coresTakenMask: number;
+  /**
+   * O chefe DESTE setor, como o portal e o Nucleo precisam conhece-lo.
+   *
+   * Deliberadamente magro: quem e, qual corpo esta em campo e se ja caiu. As
+   * mecanicas proprias de cada chefe continuam em `bossRuntime` e nos campos
+   * dele — generalizar a rota do Guardiao e a arena do Diamandis num tipo comum
+   * so produziria um objeto que nenhum dos dois preenche inteiro.
+   *
+   * O ponto do tipo e outro: o portal e o pedestal precisam perguntar "o dono
+   * deste setor ja caiu?" sem conhecer `bishop` nem `guardian`. Enquanto a
+   * pergunta era feita por nome, cada chefe novo exigia editar as duas
+   * respostas — e o `bossesDownMask` passou tres versoes marcando so dois
+   * arquetipos porque ninguem lembrou.
+   */
+  sectorBoss: SectorBossState;
   /**
    * O estado VIVO do encontro de chefe deste setor. Ver `BossRuntime`.
    *
@@ -1036,9 +1177,15 @@ export type SurvivalState = {
    *
    * Mascara e nao um par de booleanos porque a regra e "por setor", nao "por
    * arquetipo": o dia em que um estrato ganhar o proprio chefe, ele entra sem
-   * campo novo. Cabe folgado em 32 bits (SECTOR_COUNT e 3).
+   * campo novo. Cabe folgado em 32 bits (o teto e `MAX_LINEAGE_SECTORS`, 7).
+   *
+   * A mascara responde UMA pergunta — "o chefe do setor N ja caiu?" — e a
+   * ausencia de bit e ambigua de proposito: significa tanto "ainda vivo" quanto
+   * "este setor nao tem chefe". Quem precisa distinguir pergunta antes se o
+   * setor tem dono (`sectorBoss.archetype`), e e por isso que os dois campos
+   * andam juntos.
    */
-  bossesDown: number;
+  bossesDownMask: number;
   leftEntryZone: boolean;
   players: Entity[];
   playerExtras: PlayerExtra[];

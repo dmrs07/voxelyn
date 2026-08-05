@@ -200,12 +200,12 @@ describe('NetClient <-> SurvivalServer (in-process)', () => {
     room.state.salvageSites[0].terminalState = 'complete';
     room.state.salvageSites[0].cacheRevealed = true;
     room.state.salvageSites[0].cacheOpened = true;
-    room.state.coreTaken = true;
+    room.state.coresTakenMask |= 1 << room.state.config.depth.coreSectors[0];
     loop.advance(3);
 
     const view = a.sampleRenderState(loop['now'] as number)!;
     expect(view.salvageSites[0].cacheOpened).toBe(true); // antes: crate desenhada para sempre
-    expect(view.coreTaken).toBe(true);
+    expect(view.coresTakenMask).not.toBe(0);
   });
 
   it('mapHash divergente no welcome dispara resync (mundo local descartado)', () => {

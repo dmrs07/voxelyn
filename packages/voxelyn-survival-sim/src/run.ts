@@ -43,7 +43,7 @@ import {
   CARGO_LOST_DISCOVERY_ORE,
   CONTAMINATION_WAVES,
   CONTAMINATION_SECTOR_SCALE,
-  SECTOR_COUNT,
+  MAX_LINEAGE_SECTORS,
   RUN_SEED_MIX,
   SOLID_NONE,
   SURF_BIOFLUID,
@@ -106,7 +106,20 @@ import {
 } from './entities.js';
 import { generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
-import { ascend, descend, isFinalSector, populateSector, sectorSeed } from './sectors.js';
+import { ascend, descend, populateSector, sectorSeed } from './sectors.js';
+import {
+  clearCoreTaken,
+  coreUnlocked,
+  coresAvailable,
+  countCoresTaken,
+  descentUnlocked,
+  hasCoreHere,
+  isCoreTaken,
+  isRunFinalSector,
+  markCoreTaken,
+  runDepth,
+  runIsReturning,
+} from './depth.js';
 import { biomeProfile, sectorBiome } from './strata.js';
 import {
   activeModule,
@@ -122,7 +135,12 @@ import {
   DISCOVERY_LEVIATHAN_SHOCKED,
   DISCOVERY_SELF_HARM,
 } from './types.js';
-import { DEFAULT_PLAYER_TUNING, TUNING_HASH_ORDER, type PlayerTuning } from './progression.js';
+import {
+  DEFAULT_PLAYER_TUNING,
+  TUNING_HASH_ORDER,
+  normalizeRunDepth,
+  type PlayerTuning,
+} from './progression.js';
 import type {
   DamageCause,
   Entity,
@@ -223,6 +241,7 @@ const makeExtra = (tuning: PlayerTuning): PlayerExtra => ({
   activeModules: [],
   pendingModuleChoice: null,
   hasCore: false,
+  carriedCoreMask: 0,
   dodgeDir: { x: 1, y: 0 },
   downed: false,
   bleedoutAt: 0,
@@ -243,6 +262,7 @@ export const resetPlayerProgress = (extra: PlayerExtra, tuning: PlayerTuning): v
   extra.pendingModuleChoice = null;
   extra.purgeCells = tuning.startingPurgeCells;
   extra.hasCore = false;
+  extra.carriedCoreMask = 0;
   extra.heat = 0;
   extra.overheatedUntil = 0;
   extra.nextShotAt = 0;
@@ -262,7 +282,15 @@ export const createRun = (config: RunConfig): SurvivalState => {
   const width = config.width ?? WORLD_W;
   const height = config.height ?? WORLD_H;
   const playerCount = Math.max(1, Math.min(MAX_PLAYERS, config.playerCount ?? 1));
-  const sector = Math.max(1, Math.min(SECTOR_COUNT, config.sector ?? 1));
+  // A PROFUNDIDADE, congelada aqui e nunca mais reconsultada.
+  //
+  // `normalizeRunDepth` e o unico caminho: uma configuracao ausente vira a run
+  // de tres setores de sempre, e uma configuracao malformada (snapshot de outra
+  // versao, ticket adulterado, corpo de requisicao) e saneada em vez de
+  // confiada. O que ela nao faz, de proposito, e olhar o perfil — uma run
+  // legada nao vira uma run de sete setores porque o perfil hoje esta em G-04.
+  const depth = normalizeRunDepth(config.depth);
+  const sector = Math.max(1, Math.min(depth.sectorCount, config.sector ?? 1));
   // Congelado UMA vez. A run inteira le deste objeto, e comprar um protocolo no
   // meio de uma expedicao nao muda o Prospector que ja desceu.
   const tuning = config.tuning ?? DEFAULT_PLAYER_TUNING;
@@ -294,7 +322,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
   }
 
   const state: SurvivalState = {
-    config: { seed: config.seed, width, height, playerCount, sector, tuning },
+    config: { seed: config.seed, width, height, playerCount, sector, tuning, depth },
     rng,
     tick: 0,
     phase: 'running',
@@ -309,9 +337,10 @@ export const createRun = (config: RunConfig): SurvivalState => {
     chunkVersion: new Uint32Array(Math.ceil(width / 16) * Math.ceil(height / 16)),
     entry: world.entry,
     corePos: world.corePos,
-    coreTaken: false,
+    coresTakenMask: 0,
+    sectorBoss: { archetype: null, entityId: null, defeated: false },
     bossRuntime: emptyBossRuntime(),
-    bossesDown: 0,
+    bossesDownMask: 0,
     leftEntryZone: false,
     players,
     playerExtras,
@@ -897,11 +926,13 @@ const emitFlameBreath = (state: SurvivalState, slot: number, events: SemanticEve
  * habilidade enquanto o jogador anda entre eles — e a ressonancia MUDA enquanto
  * ele anda, porque andar ate o poco tambem provoca reacoes.
  *
- * Nao acontece no setor final: la o ponto e o nucleo do Guardiao, e parar para
- * escolher habilidade no meio da arena seria o pior lugar possivel para um menu.
+ * Nao acontece onde o ponto e um PEDESTAL — o setor final e qualquer setor de
+ * Nucleo. La o ponto ja tem dono (e, quando ha chefe, a arena dele em volta), e
+ * parar para escolher habilidade no meio da arena seria o pior lugar possivel
+ * para um menu.
  */
 const revealWellOffers = (state: SurvivalState, events: SemanticEvent[]): void => {
-  if (state.wellOffers.length > 0 || isFinalSector(state.sector)) return;
+  if (state.wellOffers.length > 0 || isRunFinalSector(state) || hasCoreHere(state)) return;
   const wellX = state.corePos.x + 0.5;
   const wellY = state.corePos.y + 0.5;
   // O MAIS PROXIMO, e nao o ultimo iterado. Guardar a ultima ocorrencia fazia o
@@ -1320,19 +1351,67 @@ const stepPlayer = (
       return;
     }
 
-    // O mesmo ponto significa coisas diferentes conforme a profundidade: nos
-    // setores anteriores ao ultimo ele e o POCO, e no ultimo e o nucleo.
+    // O mesmo ponto significa coisas diferentes conforme a CONFIGURACAO da run:
+    // pedestal do Nucleo, poco de descida, ou os dois (setor de Nucleo
+    // intermediario). O bloco abaixo resolve nesta ordem.
     const distCore = Math.hypot(
       player.x - (state.corePos.x + 0.5),
       player.y - (state.corePos.y + 0.5),
     );
-    if (state.coreTaken && !isFinalSector(state.sector) && distCore < 1.6) {
-      // Com o Nucleo na mao o poco SELOU: descer de novo nao existe. O
-      // caminho de volta sai por onde se entrou — a ENTRADA do setor.
-      events.push({ t: 'message', key: 'sim.wellSealedReturn' });
-      return;
-    }
-    if (!isFinalSector(state.sector) && distCore < 1.6) {
+    if (distCore < 1.6) {
+      // O PEDESTAL vem antes do poco.
+      //
+      // Nos setores de Nucleo intermediario (G-03 e G-04, setor 3) os dois
+      // moram no mesmo ponto, e a ordem importa: quem chega la quer o Nucleo
+      // que veio buscar, e descer sem ele por causa de uma interacao ambigua
+      // seria perder a coleta atras de um mapa que nao volta. Recolher primeiro
+      // e descer na SEGUNDA interacao e a leitura que o jogador ja tem.
+      if (hasCoreHere(state) && !isCoreTaken(state, state.sector)) {
+        if (!coreUnlocked(state)) {
+          // Selado. O cliente nem consegue forcar: a recusa e autoritativa e
+          // acontece aqui, no unico ponto que escreve a posse.
+          events.push({ t: 'message', key: 'sim.coreSealedByBoss' });
+          return;
+        }
+        markCoreTaken(state, state.sector);
+        extra.carriedCoreMask |= 1 << state.sector;
+        extra.hasCore = true;
+        events.push({
+          t: 'pickup_core',
+          x: player.x,
+          y: player.y,
+          sector: state.sector,
+          taken: countCoresTaken(state),
+          total: coresAvailable(state),
+        });
+        // Duas mensagens diferentes para duas situacoes diferentes. Com Veio
+        // abaixo, o Nucleo na mao NAO encerra nada — dizer "volte a superficie"
+        // ali mandaria o jogador embora no meio da run que ele pagou para ver.
+        events.push({
+          t: 'message',
+          key: isRunFinalSector(state) ? 'sim.coreTaken' : 'sim.coreTakenDeeper',
+        });
+        return;
+      }
+
+      if (isRunFinalSector(state)) return;
+
+      // Com o Nucleo MAIS FUNDO na mao o poco SELOU: descer de novo nao
+      // existe. O caminho de volta sai por onde se entrou — a ENTRADA do
+      // setor. Antes disso (um Nucleo intermediario na carga) descer continua
+      // liberado: recolhe-lo e uma aposta no meio da descida, nao o fim dela.
+      if (runIsReturning(state)) {
+        events.push({ t: 'message', key: 'sim.wellSealedReturn' });
+        return;
+      }
+
+      // O SELO DO SETOR. Nada de "mate todos os inimigos": so o dono do setor
+      // tranca o poco, e so enquanto ele estiver de pe.
+      if (!descentUnlocked(state)) {
+        events.push({ t: 'message', key: 'sim.descentSealedByBoss' });
+        return;
+      }
+
       // Descida COLETIVA, pela mesma razao da extracao: um parceiro deixado
       // para tras num mapa que deixou de existir nao teria como ser resgatado.
       const standing = standingPlayers(state);
@@ -1355,13 +1434,6 @@ const stepPlayer = (
         for (let s = 0; s < state.playerExtras.length; s++) settleBreathChannel(state, s, events);
         descend(state, events);
       }
-      return;
-    }
-    if (isFinalSector(state.sector) && !state.coreTaken && distCore < 1.6) {
-      state.coreTaken = true;
-      extra.hasCore = true;
-      events.push({ t: 'pickup_core', x: player.x, y: player.y });
-      events.push({ t: 'message', key: 'sim.coreTaken' });
       return;
     }
     for (const site of state.salvageSites) {
@@ -1440,6 +1512,7 @@ const stepPlayer = (
         (e, i) => e.joined && state.players[i].alive && e.downed,
       );
       const withCore = state.playerExtras.some((e) => e.hasCore);
+      const cores = countCoresTaken(state);
       // Com o NUCLEO, a entrada de um setor profundo nao extrai: ela SOBE. O
       // contrato so fecha na plataforma do setor 1 — cada setor tem de ser
       // atravessado de novo, ao contrario, com a contaminacao cobrando o
@@ -1459,7 +1532,7 @@ const stepPlayer = (
       }
       if (allAtEntry && !anyDowned) {
         state.phase = withCore ? 'extracted_with_core' : 'extracted';
-        events.push({ t: 'extracted', withCore });
+        events.push({ t: 'extracted', withCore, cores });
       } else if (anyDowned) {
         events.push({ t: 'message', key: 'sim.reviveBeforeExtract' });
       } else {
@@ -2069,7 +2142,7 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
   const sectorScale = 1 + (state.sector - 1) * CONTAMINATION_SECTOR_SCALE;
   state.contamination = Math.min(
     1,
-    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coreTaken ? 2.2 : 1),
+    state.contamination + CONTAMINATION_PER_TICK * sectorScale * (state.coresTakenMask !== 0 ? 2.2 : 1),
   );
   for (let w = 0; w < CONTAMINATION_WAVES.length; w++) {
     const [level, count] = CONTAMINATION_WAVES[w];
@@ -2107,9 +2180,16 @@ const killPlayer = (state: SurvivalState, slot: number, events: SemanticEvent[])
   p.alive = false;
   e.activeModules = [];
   e.pendingModuleChoice = null;
-  if (e.hasCore) {
+  if (e.carriedCoreMask !== 0) {
+    // Cada Nucleo volta AO PEDESTAL DELE, e nao "ao pedestal": o portador de
+    // uma run de G-04 pode estar carregando o do setor 3 e o do setor 7, e
+    // devolver os dois ao mesmo lugar deixaria um pedestal vazio para sempre e
+    // o outro rendendo duas coletas.
+    for (let sector = 1; sector <= MAX_LINEAGE_SECTORS; sector++) {
+      if ((e.carriedCoreMask & (1 << sector)) !== 0) clearCoreTaken(state, sector);
+    }
+    e.carriedCoreMask = 0;
     e.hasCore = false;
-    state.coreTaken = false; // volta ao pedestal, recuperavel pelo parceiro
     events.push({ t: 'message', key: 'sim.coreDropped' });
   }
   events.push({
@@ -2446,7 +2526,20 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // runs identicas divergirem por causa de um HUD.
   for (const key of TUNING_HASH_ORDER) mix(Math.round(state.config.tuning[key] * 1000));
   mix(state.sector);
-  mix(state.coreTaken ? 1 : 0);
+  // A PROFUNDIDADE CONGELADA entra no hash porque ela muda a run inteira: o
+  // setor final, onde estao os Nucleos, quais setores tem chefe. Duas runs com a
+  // mesma seed e `sectorCount` diferente sao runs diferentes desde o tick zero,
+  // e o replay do leaderboard tem de acusar isso em vez de verificar uma contra
+  // a outra.
+  const depthConfig = runDepth(state);
+  mixString(depthConfig.generation);
+  mix(depthConfig.sectorCount);
+  mix(depthConfig.coreSectors.length);
+  for (const coreSector of depthConfig.coreSectors) mix(coreSector);
+  // Mascara e nao booleano: com dois Nucleos, "algum foi pego" deixou de
+  // descrever o estado. Duas simulacoes que discordem de QUAL pedestal esta
+  // vazio divergem na proxima interacao com ele.
+  mix(state.coresTakenMask);
   mix(Math.round(state.contamination * 100000));
   mix(state.contaminationWaves);
   // Contadores entram no hash apesar de nao afetarem a simulacao.
@@ -2475,7 +2568,7 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.phasesFired);
   // Chefes abatidos: decide o que a SUBIDA vai (nao) repovoar, entao duas
   // simulacoes que discordam disso divergem no primeiro retorno.
-  mix(state.bossesDown);
+  mix(state.bossesDownMask);
   mix(state.bossRuntime.arenaClosed ? 1 : 0);
   mix(state.bossRuntime.arenaBarrierCells.length);
   for (const cell of state.bossRuntime.arenaBarrierCells) mix(cell);

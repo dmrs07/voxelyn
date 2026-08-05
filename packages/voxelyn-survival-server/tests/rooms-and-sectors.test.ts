@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CURRENT_VERSIONS, isValidRoomCode, type ServerMessage } from '@voxelyn/survival-protocol';
-import { SECTOR_COUNT, emptyCommand } from '@voxelyn/survival-sim';
+import { DEFAULT_SECTOR_COUNT, emptyCommand } from '@voxelyn/survival-sim';
 import { SurvivalServer } from '../src/server';
 
 class Harness {
@@ -221,7 +221,7 @@ describe('descida no servidor', () => {
     const h = new Harness();
     h.hello('a', 'BCDF');
     const room = h.server.roomForCode('BCDF')!;
-    for (let i = 0; i < SECTOR_COUNT + 2; i++) {
+    for (let i = 0; i < DEFAULT_SECTOR_COUNT + 2; i++) {
       for (const p of room.state.players) {
         p.x = room.state.corePos.x + 0.5;
         p.y = room.state.corePos.y + 0.5;
@@ -234,7 +234,11 @@ describe('descida no servidor', () => {
       });
       h.tick(2);
     }
-    expect(room.state.sector).toBe(SECTOR_COUNT);
-    expect(room.state.phase).toBe('running'); // pegar o nucleo nao encerra: falta sair
+    // A sala PARA no ultimo setor: interagir de novo no ponto especial nao
+    // desce nem termina. Ela nao chega a recolher o Nucleo — o pedestal do
+    // setor final comeca selado pelo dono dele —, e e justamente por isso que a
+    // run continua correndo.
+    expect(room.state.sector).toBe(room.state.config.depth.sectorCount);
+    expect(room.state.phase).toBe('running');
   });
 });

@@ -39,6 +39,7 @@ import {
   type StoredProfile,
 } from './progression.js';
 import type { ProgressionErrorCode, ProgressionRunTicket } from '@voxelyn/survival-protocol';
+import { normalizeRunDepth } from '@voxelyn/survival-sim';
 import type { EnemyArchetype, LoreFragmentId, RunPhase, UpgradeId } from '@voxelyn/survival-sim';
 
 export type SettleInput = {
@@ -46,6 +47,12 @@ export type SettleInput = {
   runId: string;
   phase: RunPhase;
   cargoOre: number;
+  /**
+   * Nucleos que sairam do Veio, do REPLAY. Uma run de G-03/G-04 pode trazer
+   * dois. Ausente = uma run que a re-simulacao nao soube contar, e ai
+   * `rewardFor` cai no piso da fase.
+   */
+  cores?: number;
   /** Abates por arquetipo, do REPLAY. E o que torna um Ativo conhecido. */
   kills: Partial<Record<EnemyArchetype, number>>;
   /** Bitmask DISCOVERY_* do replay. */
@@ -171,7 +178,7 @@ export class MemoryProgressionStore implements ProgressionStore {
       return { fresh: false, ...previous, profile: sanitizeProfile(profile) };
     }
 
-    const reward = rewardFor(input.phase, input.cargoOre);
+    const reward = rewardFor(input.phase, input.cargoOre, input.cores);
     const facts: SettlementFacts = { kills: input.kills, discoveries: input.discoveries };
     const next = applySettlement(profile, input.phase, reward, input.now, facts);
 
@@ -346,6 +353,13 @@ create table if not exists progression_tickets (
   expires_at       timestamptz not null,
   nonce            text        not null
 );
+-- A PROFUNDIDADE congelada chegou depois da primeira versao da tabela, pela
+-- mesma migracao explicita das colunas narrativas acima. Um ticket antigo fica
+-- com null, e normalizeRunDepth o le como a run de tres setores que ele foi.
+-- (Na pratica a checagem de sim_version ja o recusa antes disso; a coluna
+-- existe para que a leitura seja correta sozinha.)
+alter table progression_tickets add column if not exists depth jsonb;
+
 create index if not exists progression_tickets_profile_idx on progression_tickets (profile_id);
 -- A varredura de retencao filtra por expiracao; sem este indice ela seria um
 -- seq scan na tabela que mais cresce do schema.
@@ -558,8 +572,8 @@ export class PostgresProgressionStore implements ProgressionStore {
     this.sweepExpiredTickets(Date.parse(ticket.issuedAt) || Date.now());
     await this.pool.query(
       `insert into progression_tickets
-         (run_id, profile_id, seed, mode, tuning, tuning_hash, profile_version, protocol_version, sim_version, issued_at, expires_at, nonce)
-       values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12)
+         (run_id, profile_id, seed, mode, tuning, tuning_hash, depth, profile_version, protocol_version, sim_version, issued_at, expires_at, nonce)
+       values ($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb,$8,$9,$10,$11,$12,$13)
        on conflict (run_id) do nothing`,
       [
         ticket.runId,
@@ -568,6 +582,7 @@ export class PostgresProgressionStore implements ProgressionStore {
         ticket.mode,
         JSON.stringify(ticket.tuning),
         ticket.tuningHash,
+        JSON.stringify(ticket.depth ?? null),
         ticket.progressionProfileVersion,
         ticket.protocolVersion,
         ticket.simulationVersion,
@@ -592,6 +607,9 @@ export class PostgresProgressionStore implements ProgressionStore {
       playerCount: 1,
       tuning: row.tuning as ProgressionRunTicket['tuning'],
       tuningHash: String(row.tuning_hash),
+      // Saneada na LEITURA, como o perfil: uma linha gravada antes da coluna
+      // existir volta como a run de tres setores que ela foi.
+      depth: normalizeRunDepth(row.depth),
       progressionProfileVersion: Number(row.profile_version),
       protocolVersion: Number(row.protocol_version),
       simulationVersion: Number(row.sim_version),
@@ -635,7 +653,7 @@ export class PostgresProgressionStore implements ProgressionStore {
           };
         }
 
-        const reward = rewardFor(input.phase, input.cargoOre);
+        const reward = rewardFor(input.phase, input.cargoOre, input.cores);
         const next = applySettlement(profile, input.phase, reward, input.now, {
           kills: input.kills,
           discoveries: input.discoveries,

@@ -27,6 +27,7 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ORE_CHIPPED,
+  runIsReturning,
   type PlayerTuning,
   type SurvivalState,
 } from '@voxelyn/survival-sim';
@@ -50,13 +51,18 @@ export const bearingTo = (
 /**
  * O objetivo ATUAL do setor, para o beacon de entrada (SV-01).
  *
- * Enquanto o nucleo nao foi tomado, o objetivo e ele. Depois, e a saida — que na
- * subida e a propria entrada. O beacon aponta para o que o jogador tem de fazer
- * AGORA, e nao para um marco fixo do mapa: um pulso que continuasse apontando
- * para o pedestal vazio seria pior que nenhum pulso.
+ * Enquanto o ponto especial deste setor ainda tem o que dar, o objetivo e ele:
+ * o pedestal por recolher, ou o poco por descer. Quando a run entra no caminho
+ * de VOLTA — o Nucleo mais fundo na mao —, o objetivo passa a ser a saida, que
+ * na subida e a propria entrada.
+ *
+ * "A run esta voltando" e nao "algum Nucleo foi pego": numa expedicao de G-04, o
+ * Nucleo do setor 3 na mochila nao encerra nada, e mandar o beacon para a
+ * entrada ali apontaria o jogador para fora de metade da descida que ele ainda
+ * tem autorizacao para fazer.
  */
 export const objectiveOf = (state: SurvivalState): { x: number; y: number } =>
-  state.coreTaken || !state.corePos
+  runIsReturning(state) || !state.corePos
     ? { x: state.entry.x + 0.5, y: state.entry.y + 0.5 }
     : { x: state.corePos.x + 0.5, y: state.corePos.y + 0.5 };
 

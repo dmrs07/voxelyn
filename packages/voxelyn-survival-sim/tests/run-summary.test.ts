@@ -1,8 +1,9 @@
+import { DEFAULT_SECTOR_COUNT } from '../src/constants';
 import { describe, expect, it } from 'vitest';
 import {
   BLEEDOUT_TICKS,
   PLAYER_HP,
-  TARGET_EXTRACTION_TICKS,
+  targetExtractionTicks,
   buildSummary,
   createRun,
   damageEntity,
@@ -44,31 +45,33 @@ const killWith = (cause: DamageCause, seed = 7): SurvivalState => {
   return runUntilOver(state, 5);
 };
 
+const TARGET_TICKS = targetExtractionTicks(DEFAULT_SECTOR_COUNT);
+
 describe('as tres estrelas', () => {
   // A escada e de INTENCAO: morrer nao e um resultado parcial de extrair.
   it('nao concede estrela a quem morre, por mais rapido que seja', () => {
-    expect(starsFor('dead', 1, TARGET_EXTRACTION_TICKS)).toBe(0);
-    expect(starsFor('dead', TARGET_EXTRACTION_TICKS * 10, TARGET_EXTRACTION_TICKS)).toBe(0);
+    expect(starsFor('dead', 1, TARGET_TICKS)).toBe(0);
+    expect(starsFor('dead', TARGET_TICKS * 10, TARGET_TICKS)).toBe(0);
   });
 
   it('da uma estrela a quem sai vivo de maos vazias, independente do tempo', () => {
-    expect(starsFor('extracted', 1, TARGET_EXTRACTION_TICKS)).toBe(1);
-    expect(starsFor('extracted', TARGET_EXTRACTION_TICKS * 10, TARGET_EXTRACTION_TICKS)).toBe(1);
+    expect(starsFor('extracted', 1, TARGET_TICKS)).toBe(1);
+    expect(starsFor('extracted', TARGET_TICKS * 10, TARGET_TICKS)).toBe(1);
   });
 
   // A terceira nao adiciona objetivo novo: cobra o MESMO objetivo com pressa. E
   // o que mantem viva a decisao "extrair agora ou arriscar" depois que o jogador
   // ja aprendeu o mapa.
   it('a terceira estrela e a segunda cobrada no tempo', () => {
-    expect(starsFor('extracted_with_core', TARGET_EXTRACTION_TICKS - 1, TARGET_EXTRACTION_TICKS)).toBe(3);
-    expect(starsFor('extracted_with_core', TARGET_EXTRACTION_TICKS, TARGET_EXTRACTION_TICKS)).toBe(3);
-    expect(starsFor('extracted_with_core', TARGET_EXTRACTION_TICKS + 1, TARGET_EXTRACTION_TICKS)).toBe(2);
+    expect(starsFor('extracted_with_core', TARGET_TICKS - 1, TARGET_TICKS)).toBe(3);
+    expect(starsFor('extracted_with_core', TARGET_TICKS, TARGET_TICKS)).toBe(3);
+    expect(starsFor('extracted_with_core', TARGET_TICKS + 1, TARGET_TICKS)).toBe(2);
   });
 
   it('e monotonica no tempo: demorar nunca sobe a nota', () => {
     let previous = 4;
-    for (let t = 0; t <= TARGET_EXTRACTION_TICKS * 2; t += TARGET_EXTRACTION_TICKS / 8) {
-      const stars = starsFor('extracted_with_core', t, TARGET_EXTRACTION_TICKS);
+    for (let t = 0; t <= TARGET_TICKS * 2; t += TARGET_TICKS / 8) {
+      const stars = starsFor('extracted_with_core', t, TARGET_TICKS);
       expect(stars).toBeLessThanOrEqual(previous);
       previous = stars;
     }

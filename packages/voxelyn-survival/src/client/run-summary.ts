@@ -238,20 +238,29 @@ export const cargoNote = (summary: RunSummary): CargoNote | null => {
   if (summary.phase === 'dead') {
     return { text: t('summary.cargo.lost', { ore }), tone: 'lost' };
   }
-  return {
-    text: t(
-      summary.phase === 'extracted_with_core' ? 'summary.cargo.core' : 'summary.cargo.cleared',
-      { ore },
-    ),
-    tone: 'cleared',
-  };
+  if (summary.phase === 'extracted_with_core') {
+    // A contagem vem do resumo e nao do literal `1`: uma run de G-03 ou G-04
+    // pode trazer dois Nucleos, e a linha de carga e onde o jogador confere o
+    // que a companhia vai homologar.
+    return {
+      text: t('summary.cargo.core', { ore, cores: Math.max(1, summary.cores) }),
+      tone: 'cleared',
+    };
+  }
+  return { text: t('summary.cargo.cleared', { ore }), tone: 'cleared' };
 };
 
 export type OutcomeText = { title: string; color: 'blood' | 'loot' | 'biolum' };
 
 export const describeOutcome = (summary: RunSummary): OutcomeText => {
   if (summary.phase === 'extracted_with_core') {
-    return { title: t('summary.outcome.core'), color: 'biolum' };
+    // Dois Nucleos merecem uma frase diferente de um: e o resultado mais raro
+    // que a run produz, e o titulo e o unico lugar da tela que o celebra.
+    const cores = Math.max(1, summary.cores);
+    return {
+      title: cores > 1 ? t('summary.outcome.cores', { cores }) : t('summary.outcome.core'),
+      color: 'biolum',
+    };
   }
   if (summary.phase === 'extracted') {
     return { title: t('summary.outcome.extracted'), color: 'loot' };

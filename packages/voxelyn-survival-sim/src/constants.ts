@@ -913,19 +913,32 @@ export const RETURN_DISC_SPEED = 11;
 export const SALVAGE_SCAN_TICKS = 6 * TICK_HZ;
 
 /**
- * Quantos setores uma descida atravessa.
+ * O comprimento POTENCIAL de uma linhagem geologica.
+ *
+ * Sete posicoes editoriais existem em toda linhagem; quantas delas uma run
+ * consegue atravessar e outra pergunta, e a resposta e a GERACAO do Prospector
+ * (ver `sectorCountForGeneration` em progression.ts). Separar as duas coisas e
+ * a mudanca estrutural inteira: o mapa do Veio nao encolhe porque o jogador
+ * ainda nao tem autorizacao para ir tao fundo.
+ *
+ * Este numero nao e a profundidade de nenhuma run. Ele e o TETO — o que limita
+ * a tabela de linhagens, a largura util das mascaras por setor e a validacao de
+ * qualquer profundidade que chegue de fora.
+ */
+export const MAX_LINEAGE_SECTORS = 7;
+
+/**
+ * A profundidade de fabrica: as tres galerias historicas.
  *
  * Tres e o menor numero que produz um ARCO em vez de uma linha: um setor para
  * aprender o Veio do dia, um para se equipar sabendo o que enfrenta, e um para
- * o Guardiao. Com dois, o meio nao existe e o jogo vira tutorial seguido de
- * chefe. Com quatro, o terceiro repete o segundo — a run so fica mais longa, e
- * a promessa e de 12 a 20 minutos.
+ * o chefe. Com dois, o meio nao existe e o jogo vira tutorial seguido de chefe.
  *
- * Os setores 1..N-1 nao tem nucleo nem Guardiao: o objetivo neles e o POCO, e a
- * pergunta e "exploro mais ou desco agora". Apenas o ultimo tem o nucleo, o
- * Guardiao, e a viagem de volta ate a entrada.
+ * Continua sendo a profundidade de G-00 e G-01, do ranqueado, do co-op e de
+ * toda run gravada antes da expansao. Uma run sem configuracao explicita e
+ * exatamente esta run, byte a byte.
  */
-export const SECTOR_COUNT = 3;
+export const DEFAULT_SECTOR_COUNT = 3;
 
 /**
  * Quanto a contaminacao acelera a cada setor.

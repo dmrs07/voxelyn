@@ -3,6 +3,7 @@ import type {
   PlayerExtra,
   Projectile,
   SalvageSite,
+  SectorBossState,
   SurvivalState,
   Vec2,
   WellOffer,
@@ -83,7 +84,8 @@ type Pose = {
   grid: GridBuffer;
   entry: Vec2;
   corePos: Vec2;
-  coreTaken: boolean;
+  coresTakenMask: number;
+  sectorBoss: SectorBossState;
   contamination: number;
   charges: Array<{ idx: number; until: number }>;
   salvageSites: SalvageSite[];
@@ -128,7 +130,8 @@ const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
     grid,
     entry: { x: state.entry.x, y: state.entry.y },
     corePos: { x: state.corePos.x, y: state.corePos.y },
-    coreTaken: state.coreTaken,
+    coresTakenMask: state.coresTakenMask,
+    sectorBoss: { ...state.sectorBoss },
     contamination: state.contamination,
     charges: state.charges.map((c) => ({ ...c })),
     salvageSites: state.salvageSites.map((s) => ({ ...s })),
@@ -232,7 +235,8 @@ export class LocalPlayout {
       surface: from.grid.surface,
       entry: from.entry,
       corePos: from.corePos,
-      coreTaken: from.coreTaken,
+      coresTakenMask: from.coresTakenMask,
+      sectorBoss: from.sectorBoss,
       contamination: from.contamination,
       charges: from.charges,
       salvageSites: from.salvageSites,

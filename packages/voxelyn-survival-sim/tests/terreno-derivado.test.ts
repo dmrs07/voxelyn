@@ -21,7 +21,7 @@
 // alguem no futuro carimbar terreno sem passar pela barreira do draft, ESTE
 // teste falha, nao importa qual consumidor teria sofrido.
 import { describe, expect, it } from 'vitest';
-import { RUN_SEED_MIX, SECTOR_COUNT, SOLID_NONE, WORLD_H, WORLD_W } from '../src/constants';
+import { RUN_SEED_MIX, DEFAULT_SECTOR_COUNT, SOLID_NONE, WORLD_H, WORLD_W } from '../src/constants';
 import { sectorSeed } from '../src/sectors';
 import { biomeProfile, sectorBiome } from '../src/strata';
 import { createTerrainDraft, floodOpen, generateWorld } from '../src/worldgen';
@@ -34,7 +34,7 @@ const worldFor = (seed: number, sector: number) => {
 describe('o terreno derivado nunca esta vencido', () => {
   it('`openCells` bate com um flood refeito sobre o terreno FINAL', () => {
     for (let seed = 1; seed <= 120; seed++) {
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const world = worldFor(seed, sector);
         const fresh = floodOpen(world.solid, WORLD_W, WORLD_H, world.entry.x, world.entry.y);
         expect(
@@ -57,7 +57,7 @@ describe('o terreno derivado nunca esta vencido', () => {
     // O sintoma mais grosseiro dos tres: era assim que o cuspidor da seed 205
     // nascia dentro de um pilar de cristal.
     for (let seed = 1; seed <= 120; seed++) {
-      for (let sector = 1; sector <= SECTOR_COUNT; sector++) {
+      for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const world = worldFor(seed, sector);
         for (const cell of world.openCells) {
           expect(

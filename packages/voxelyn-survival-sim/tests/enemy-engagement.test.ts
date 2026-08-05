@@ -12,7 +12,7 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ROCK,
-  SECTOR_COUNT,
+  DEFAULT_SECTOR_COUNT,
 } from '../src/constants';
 import type { SurvivalState } from '../src/types';
 
@@ -41,7 +41,7 @@ const distToPlayer = (state: SurvivalState, e: { x: number; y: number }): number
 /** Primeira seed >= base cujo setor final tem o Guardiao (bossForBiome). */
 const guardianSeed = (base: number): number => {
   for (let seed = base; seed < base + 4096; seed++) {
-    if (bossArchetypeForBiome(sectorBiome(seed, SECTOR_COUNT)) === 'guardian') return seed;
+    if (bossArchetypeForBiome(sectorBiome(seed, DEFAULT_SECTOR_COUNT)) === 'guardian') return seed;
   }
   throw new Error(`nenhuma seed proxima de ${base} com Guardiao no setor final`);
 };
@@ -276,7 +276,7 @@ describe('achados da revisao', () => {
   // retaliacao que o aggro por dano existe para impedir, preservada justamente
   // no inimigo em que ela mais doi.
   it('acorda o guardiao quando ele leva dano de longe', () => {
-    const state = createRun({ seed: guardianSeed(41), sector: SECTOR_COUNT });
+    const state = createRun({ seed: guardianSeed(41), sector: DEFAULT_SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     if (!guardian) return;

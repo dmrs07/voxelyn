@@ -65,7 +65,8 @@ describe('SV-01 · beacon de objetivo', () => {
     const before = objectiveOf(state);
     expect(before).toEqual({ x: (state.corePos?.x ?? 0) + 0.5, y: (state.corePos?.y ?? 0) + 0.5 });
 
-    state.coreTaken = true;
+    // O Nucleo do fundo na mao: a run passou a voltar.
+    state.coresTakenMask |= 1 << state.config.depth.sectorCount;
     expect(objectiveOf(state)).toEqual({ x: state.entry.x + 0.5, y: state.entry.y + 0.5 });
   });
 

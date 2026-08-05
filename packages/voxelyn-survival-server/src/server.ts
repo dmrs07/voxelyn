@@ -10,7 +10,14 @@ import {
   validateClientMessage,
   type ServerMessage,
 } from '@voxelyn/survival-protocol';
-import { MAX_PLAYERS, type DamageCause, type SemanticEvent } from '@voxelyn/survival-sim';
+import {
+  DEFAULT_RUN_DEPTH,
+  MAX_PLAYERS,
+  normalizeRunDepth,
+  type DamageCause,
+  type RunDepthConfig,
+  type SemanticEvent,
+} from '@voxelyn/survival-sim';
 import { GameRoom } from './room.js';
 
 export type Outbound = { clientId: string; msg: ServerMessage };
@@ -77,6 +84,11 @@ export type ServerOptions = {
   logger?: (line: Record<string, unknown>) => void;
   onRunFinished?: RunFinishedHook;
   onPlayerDeath?: PlayerDeathHook;
+  /**
+   * A profundidade que TODA sala de co-op deste processo usa. Padrao: G-00,
+   * tres setores. Ver a atribuicao no construtor para a politica e o porque.
+   */
+  coopDepth?: RunDepthConfig;
 };
 
 type Conn = {
@@ -104,6 +116,7 @@ export class SurvivalServer {
   private readonly log: (line: Record<string, unknown>) => void;
   private readonly onRunFinished: RunFinishedHook | null;
   private readonly onPlayerDeath: PlayerDeathHook | null;
+  private readonly coopDepth: RunDepthConfig;
 
   constructor(opts: ServerOptions = {}) {
     // A sim clampa createRun a MAX_PLAYERS; se a sala aceitasse mais, o cliente
@@ -114,6 +127,19 @@ export class SurvivalServer {
     this.log = opts.logger ?? (() => {});
     this.onRunFinished = opts.onRunFinished ?? null;
     this.onPlayerDeath = opts.onPlayerDeath ?? null;
+    // A POLITICA DE PROFUNDIDADE DO CO-OP, escolhida aqui e nao por sala.
+    //
+    // Uma sala de co-op nao tem perfil: o handshake e anonimo e nao ha ticket.
+    // Nao existe, portanto, "a geracao de quem criou a sala" para consultar —
+    // e usar a menor geracao dos participantes exigiria autenticar todo mundo
+    // antes de gerar o primeiro mundo, que e uma mudanca de outro tamanho.
+    //
+    // A politica adotada e explicita e igual a que o co-op ja usa para o tuning
+    // (G-00 de fabrica, para todos): TRES setores, um Nucleo no terceiro. Uma
+    // seed de co-op significa o mesmo desafio para as duas pessoas, e progressao
+    // permanente de uma delas nao alonga a run da outra. O campo existe para
+    // que a decisao seja configuravel e testavel em vez de implicita.
+    this.coopDepth = normalizeRunDepth(opts.coopDepth ?? DEFAULT_RUN_DEPTH);
   }
 
   addConnection(clientId: string, nowMs = 0): void {
@@ -162,7 +188,7 @@ export class SurvivalServer {
 
   private newRoom(code: string): GameRoom {
     const seed = (this.baseSeed + this.seedCounter++ * 0x9e3779b9) >>> 0;
-    const room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers, code);
+    const room = new GameRoom(String(this.roomCounter++), seed, this.maxPlayers, code, this.coopDepth);
     this.rooms.push(room);
     this.log({ ev: 'room_open', room: room.id, seed, code });
     return room;
@@ -312,6 +338,12 @@ export class SurvivalServer {
       roomCode: room.code,
       seed: room.seed,
       sector: room.state.sector,
+      // A profundidade da SALA, nao a do perfil de quem entra: todos jogam a
+      // mesma descida, e o HUD do segundo participante tem de mostrar o mesmo
+      // denominador que o do primeiro.
+      sectorCount: room.state.config.depth.sectorCount,
+      coreSectors: [...room.state.config.depth.coreSectors],
+      generation: room.state.config.depth.generation,
       worldWidth: room.width,
       worldHeight: room.height,
       mapHash: room.mapHash,

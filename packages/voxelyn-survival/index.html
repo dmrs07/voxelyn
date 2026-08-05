@@ -727,6 +727,15 @@
         margin-top: 2px;
         white-space: nowrap;
       }
+      .ax-clearance {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-size: 11px;
+        line-height: 1.5;
+        letter-spacing: 0.06em;
+        color: var(--ax-gold-dim);
+        margin: 4px 0 8px;
+        white-space: pre-line;
+      }
       .ax-section-label {
         font-family: 'Chakra Petch', Georgia, serif;
         font-weight: 600;
@@ -2243,6 +2252,15 @@
             <div class="ax-section-label" data-i18n="aurix.menu.authorisation">
               Autorização de descida
             </div>
+            <!--
+              O carimbo de autorização: geração, profundidade e Núcleos
+              detectáveis. Informativo e compacto de propósito — não é uma
+              tela nova nem um seletor. A geração continua sendo consequência
+              dos protocolos comprados, e este bloco só diz o que ela liberou.
+              Preenchido em main.ts a partir do perfil em cache; fica oculto
+              enquanto não houver perfil (sessão offline, primeira visita).
+            -->
+            <div id="descent-clearance" class="ax-clearance hidden" aria-live="polite"></div>
             <button id="btn-solo" class="primary ax-stamp" data-i18n="menu.solo">Descer</button>
             <button id="btn-online" class="ax-order-secondary is-uplink" data-i18n="menu.online">
               Co-op online

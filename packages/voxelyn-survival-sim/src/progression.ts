@@ -33,10 +33,12 @@
 // `nenhum protocolo toca a economia` existe para que ela nao seja esquecida.
 
 import {
+  DEFAULT_SECTOR_COUNT,
   DODGE_COOLDOWN_TICKS,
   DODGE_IFRAME_TICKS,
   HEAT_DECAY_PER_TICK,
   HEAT_MAX,
+  MAX_LINEAGE_SECTORS,
   OVERHEAT_LOCK_TICKS,
   OVERHEAT_SELF_DAMAGE,
   PLAYER_HP,
@@ -619,6 +621,169 @@ export const TUNING_HASH_ORDER: readonly (keyof Omit<PlayerTuning, 'navigation' 
  * fica no servidor —, ele detecta DIVERGENCIA entre o que foi autorizado e o que
  * seria derivado na liquidacao.
  */
+// ---------------------------------------------------------------------------
+// AUTORIZACAO DE DESCIDA: quantos setores a geracao libera
+// ---------------------------------------------------------------------------
+// A geracao deixou de ser so um rotulo do perfil e passou a ser a AUTORIZACAO
+// OPERACIONAL da run: quantos setores da linhagem o Prospector tem permissao de
+// atravessar, e onde a Aurix admite haver Nucleo.
+//
+// Ela mora aqui, junto de `deriveGeneration`, por uma razao: a geracao ja e
+// derivada dos protocolos comprados, e a profundidade tem de ser derivada da
+// geracao — nunca de uma segunda contagem. Uma tabela em outro arquivo seria a
+// segunda verdade que este modulo inteiro existe para nao ter.
+//
+// O que NAO escala a profundidade, de proposito: chassi, protocolo individual
+// durante a run, minerio, seed, equipamento, upgrade local, Records. Somente a
+// geracao.
+
+/**
+ * Setores acessiveis por geracao.
+ *
+ * G-00 fica com TRES e nao com zero: ele nao e "sem autorizacao", e o
+ * Prospector de fabrica — o que o ranqueado usa, o que o co-op da primeira
+ * versao usa, e o que toda run legada foi. Rebaixa-lo agora encurtaria runs que
+ * ja existem e mudaria a duracao do ranqueado sem ninguem ter pedido.
+ */
+export const SECTORS_BY_GENERATION: Readonly<Record<ProspectorGeneration, number>> = Object.freeze({
+  'G-00': 3,
+  'G-01': 3,
+  'G-02': 4,
+  'G-03': 5,
+  'G-04': 7,
+});
+
+/**
+ * Onde a Aurix admite haver assinatura de Nucleo, por geracao.
+ *
+ * Ate G-02 ha UM, no ultimo setor: o objetivo e o fundo, e o fundo e o fim.
+ * De G-03 em diante ha um segundo, INTERMEDIARIO, no setor 3 — a "redundancia
+ * de coleta" dos documentos. Ele nao encerra a run: pega-lo e uma aposta
+ * (contaminacao dobrada pelo resto da descida) contra a alternativa de descer
+ * mais fundo primeiro e recolhe-lo na subida.
+ *
+ * O setor 3 e o mesmo em G-03 e G-04 de proposito: e a profundidade em que o
+ * jogador de G-01 sempre terminou, e mante-la como marco faz a expansao ler
+ * como "o mesmo Veio, mais fundo" em vez de um mapa novo.
+ */
+export const coreSectorsForGeneration = (
+  generation: ProspectorGeneration,
+): readonly number[] => {
+  switch (generation) {
+    case 'G-04':
+      return [3, 7];
+    case 'G-03':
+      return [3, 5];
+    case 'G-02':
+      return [4];
+    case 'G-00':
+    case 'G-01':
+    default:
+      return [3];
+  }
+};
+
+export const sectorCountForGeneration = (generation: ProspectorGeneration): number =>
+  SECTORS_BY_GENERATION[generation] ?? DEFAULT_SECTOR_COUNT;
+
+/**
+ * A profundidade CONGELADA de uma run.
+ *
+ * Os tres campos viajam juntos porque so juntos significam alguma coisa: um
+ * `sectorCount` sem `coreSectors` obrigaria todo consumidor a re-derivar a
+ * lista, e re-derivar e exatamente o que o congelamento existe para impedir.
+ * A `generation` fica junto por apresentacao e auditoria — o servidor precisa
+ * poder dizer sob que autorizacao a run foi emitida, meses depois.
+ */
+export type RunDepthConfig = {
+  generation: ProspectorGeneration;
+  sectorCount: number;
+  coreSectors: readonly number[];
+};
+
+const KNOWN_GENERATIONS: readonly ProspectorGeneration[] = [
+  'G-00',
+  'G-01',
+  'G-02',
+  'G-03',
+  'G-04',
+];
+
+export const isProspectorGeneration = (value: unknown): value is ProspectorGeneration =>
+  typeof value === 'string' && (KNOWN_GENERATIONS as readonly string[]).includes(value);
+
+/**
+ * Geracao desconhecida vira G-00, e a politica e EXPLICITA: um perfil corrompido,
+ * um cliente de outra versao ou um campo inventado nao podem autorizar
+ * profundidade. Rebaixar e a unica direcao segura — a run fica curta, nunca
+ * longa demais para o que o jogador pagou.
+ */
+export const normalizeGeneration = (value: unknown): ProspectorGeneration =>
+  isProspectorGeneration(value) ? value : 'G-00';
+
+/** A configuracao de profundidade que uma geracao autoriza. */
+export const runDepthForGeneration = (generation: ProspectorGeneration): RunDepthConfig => {
+  const sectorCount = sectorCountForGeneration(generation);
+  return {
+    generation,
+    sectorCount,
+    coreSectors: coreSectorsForGeneration(generation).filter((s) => s >= 1 && s <= sectorCount),
+  };
+};
+
+export const DEFAULT_RUN_DEPTH: RunDepthConfig = Object.freeze({
+  ...runDepthForGeneration('G-00'),
+  coreSectors: Object.freeze(coreSectorsForGeneration('G-00')),
+}) as RunDepthConfig;
+
+/**
+ * Normaliza uma profundidade vinda de FORA (snapshot antigo, ticket persistido,
+ * corpo de requisicao).
+ *
+ * A regra que rege esta funcao: a lista de Nucleos e sempre saneada contra o
+ * `sectorCount` que ela acompanha, e nunca re-derivada do perfil. Uma run de
+ * tres setores gravada antes desta mudanca continua sendo de tres setores — o
+ * fato de o perfil estar hoje em G-04 nao pode alonga-la retroativamente.
+ */
+export const normalizeRunDepth = (value: unknown): RunDepthConfig => {
+  const raw = (value ?? {}) as Partial<RunDepthConfig>;
+  const generation = normalizeGeneration(raw.generation);
+  // Sem `sectorCount` explicito a run e LEGADA, e run legada tem tres setores —
+  // nao a profundidade que a geracao autorizaria hoje.
+  const rawCount = typeof raw.sectorCount === 'number' ? Math.trunc(raw.sectorCount) : NaN;
+  const sectorCount = Number.isFinite(rawCount)
+    ? Math.max(1, Math.min(MAX_LINEAGE_SECTORS, rawCount))
+    : DEFAULT_SECTOR_COUNT;
+  const rawCores = Array.isArray(raw.coreSectors) ? raw.coreSectors : null;
+  const coreSectors = rawCores
+    ? [
+        ...new Set(
+          rawCores
+            .map((s) => Math.trunc(Number(s)))
+            .filter((s) => Number.isFinite(s) && s >= 1 && s <= sectorCount),
+        ),
+      ].sort((a, b) => a - b)
+    : // Sem lista, o Nucleo esta onde ele sempre esteve: no ultimo setor.
+      [sectorCount];
+  return { generation, sectorCount, coreSectors };
+};
+
+/** A profundidade e internamente coerente? Usado pelo servidor na validacao. */
+export const isValidRunDepth = (depth: RunDepthConfig): boolean => {
+  if (!isProspectorGeneration(depth.generation)) return false;
+  if (!Number.isInteger(depth.sectorCount)) return false;
+  if (depth.sectorCount < 1 || depth.sectorCount > MAX_LINEAGE_SECTORS) return false;
+  if (!Array.isArray(depth.coreSectors)) return false;
+  const seen = new Set<number>();
+  for (const sector of depth.coreSectors) {
+    if (!Number.isInteger(sector)) return false;
+    if (sector < 1 || sector > depth.sectorCount) return false;
+    if (seen.has(sector)) return false;
+    seen.add(sector);
+  }
+  return true;
+};
+
 export const hashPlayerTuning = (tuning: PlayerTuning): string => {
   let h = 0x811c9dc5;
   const mix = (v: number): void => {

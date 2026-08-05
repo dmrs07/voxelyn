@@ -185,6 +185,10 @@ export const surfaceRuptureFor = (
  * muda de salao no meio da luta seria o teto mentindo.
  */
 export const sectorRupture = (live: SurvivalState): { x: number; y: number } | null => {
+  // Dois primeiros setores, em qualquer profundidade de run. Isto NAO e um
+  // resto da era dos tres setores: a fenda chega a SUPERFICIE, e a superficie
+  // nao fica mais longe porque a run tem autorizacao para descer mais. Uma
+  // expedicao de sete setores tem exatamente as mesmas duas galerias rasas.
   if (live.sector > 2) return null;
   const state = createRun({
     seed: live.config.seed,
@@ -192,6 +196,7 @@ export const sectorRupture = (live: SurvivalState): { x: number; y: number } | n
     width: live.config.width,
     height: live.config.height,
     playerCount: 1,
+    depth: live.config.depth,
   });
   const w = state.config.width;
   const open = state.hallCenters.filter((c) => state.solid[c.y * w + c.x] === SOLID_NONE);
