@@ -14,8 +14,146 @@ Os dois inimigos aqui não são "mais conteúdo": cada um preenche uma lacuna di
 | O que ele pede | que você mude o **chão** | que você mude a sua **posição** |
 | Como se anuncia | fugindo quando se machuca | 1,3 s de telégrafo parado |
 | Silhueta | pilar vertical | o único bicho **horizontal** do jogo |
+| O que ele **é** (§2) | o órgão que fechava as feridas do Veio, falhando | o gesto de um homem que morreu sonhando (`AX-UNK-046`) |
 
-## 2. Bispo — a cura vem do chão, não dele
+## 2. Bispo — quem ele era antes de ser um chefe
+
+### O buraco que esta lore tapa
+
+Mecanicamente o Bispo sempre esteve pronto. Narrativamente ele era *"uma criatura
+fúngica que se cura no fungo"* — uma frase que descreve o que ele **faz** e não diz
+nada sobre o que ele **é**. Num jogo cuja premissa inteira é que o Veio guarda o que
+morre nele, um chefe sem história era o único elemento do mapa que não participava
+da premissa.
+
+A correção não inventa um vilão. Inventa uma **vítima que virou obstáculo** — a única
+categoria de inimigo que a ficção da Aurix ainda não tinha, e a que melhor explica
+por que o jogador ganha a luta e sai dela sem se sentir vencedor.
+
+### O que ele era
+
+Antigo, lento, paciente. Não um deus e não um monstro: um **órgão**. O Veio respira
+(o Pulmão-Matriz), circula (o Aquífero) e tinha isto — a coisa que fecha a ferida.
+
+Ele não guardava um tesouro. Guardava uma **taxa**: o que se tira tem de ser menor do
+que o que volta a crescer. Enquanto a conta fechasse, ele não tinha o que fazer. Um
+guardião cujo trabalho, bem feito, é indistinguível de não fazer nada — e é por isso
+que ninguém na Aurix jamais encontrou registro dele em atividade. Registro só existe
+de quando ele já tinha falhado.
+
+### O pacto artesanal
+
+Extrair nunca foi o problema. Picareta, um veio por vez, a parede deixada de pé: o
+micélio fecha o corte em uma estação e a galeria continua viva. Gente desceu ali por
+gerações sob essa regra, e a regra não estava escrita em lugar nenhum — estava no
+fato de que quem a quebrava não achava mais nada no ano seguinte.
+
+O jogo **já descreve o rito**, num documento escrito por gente que não sabia estar
+descrevendo um rito. `AX-UNK-045`, "Sobre o que o Bispo guardava": nichos escavados,
+objetos dispostos do menor ao maior, **nenhum deles ferramenta**, e a cobertura
+fúngica crescendo pelo desenho dos nichos — *cultivada*.
+
+Não é um altar de oferendas. É uma **contabilidade**: uma amostra de cada coisa que
+foi tirada, devolvida ao lugar de onde saiu. A ferramenta não entra porque a
+ferramenta é de quem trabalha; o que se devolve é o que se levou. E a resposta dele a
+cada devolução era o fungo fechando o buraco.
+
+As duas metades do pacto estão na mesma sala. A Aurix catalogou as duas e não leu
+nenhuma — `AX-EXE-034` proíbe descrever a estrutura, e a pergunta *"construída por
+quem?"* é recusada por não constar de formulário aprovado.
+
+### A ruptura
+
+A Aurix não quebrou a regra: ela nunca soube que havia uma. Chegou com escala
+industrial, e escala não é diferença de grau — a extração passou a abrir feridas mais
+rápido do que qualquer coisa viva consegue fechar.
+
+A tragédia é **mecânica**, e é a mesma linha de código que o jogador enfrenta: a cura
+dele é involuntária. Ele não decide curar. Fecha feridas como um corpo coagula, e um
+corpo não pergunta se ainda faz sentido coagular. Diante de uma escavação que não
+para, ele fez a única coisa que sabe fazer — mais micélio, mais rápido, em todo lugar.
+
+O remédio virou infestação. **A contaminação que sobe na barra durante a run é isso**:
+não é um inimigo atacando, é uma cicatrização fora de controle. O Veio está tentando
+se fechar, e o jogador está dentro do corte.
+
+### A queda
+
+Ele se voltou contra os invasores — e essa é a parte que a mesa conta sem uma linha de
+texto: ele **não distingue mais**. Um Prospector, um minerador, uma equipe de socorro:
+tudo que anda é uma ferida se movendo. Ele não está errado sobre a companhia e está
+inteiramente errado sobre quem entra na sala.
+
+"Caiu em desgraça" é literal nos dois sentidos. Na ficção, o zelador do lugar virou a
+ANOMALIA TERMINAL do formulário — e `AX-EXE-039` autoriza o descarte com a frase que
+resume a inversão: *"Não patrulha. Não caça. Guarda."* Na mesa, o jogador **completa a
+queda**: para chegar ao objetivo ele queima o chão que mantém a coisa viva, ela
+replanta, ele queima de novo. A luta inteira é uma cauterização.
+
+### A Supernova nunca foi um ataque
+
+É a releitura que sai mais barata e paga mais: **ele está replantando a sala**. O dano
+em 360° é incidental — quem estiver de pé dentro do raio quando o chão volta a crescer
+é atropelado pelo crescimento.
+
+Nada muda no código, e essa é a virtude. Muda o que o jogador entende quando lê o
+documento e lembra do que viu: o chefe não revidou. Ele fechou a ferida com o jogador
+dentro dela.
+
+### Os asseclas
+
+Os que cuidavam dele ficaram. O Veio guarda o que morre nele e devolve não o corpo,
+mas o **gesto** — a mesma regra do Corcel Fúngico (`AX-UNK-046`), aplicada a uma
+congregação inteira em vez de a um homem só.
+
+O gesto preservado é o da devoção; o que mudou foi o objeto dela. Onde o rito era
+levar ao Bispo uma amostra do que se tirou, o que a colônia entende hoje por "levar"
+já não faz essa distinção. Eles não foram corrompidos por ele — continuam executando,
+com precisão, a coisa errada, que é a assinatura de horror de todo o resto do
+bestiário.
+
+Isso dá ao mapa micelial uma fauna que **pertence a ele** sem custar arquétipo novo:
+os bichos daquela ocupação não são fauna, são o que sobrou do turno da tarde.
+
+### O que a lore NÃO responde
+
+Regra 4 do catálogo de documentos: nenhuma resposta fechada. Três perguntas ficam
+abertas de propósito.
+
+- **Ele foi construído, nasceu, ou foi ficando?** Nenhum documento sabe, e o único que
+  poderia perguntar foi carimbado.
+- **A forma de bispo é dele ou foi aprendida?** O que se lê como mitra e báculo pode
+  ser o que ele sempre foi — ou o formato que séculos de devolução deixaram grudados
+  nele. A arte (§9) foi autorada como *arquitetura vestida* justamente para sustentar
+  as duas leituras.
+- **Ele ainda entende alguma coisa?** Se entende, a luta deixa de ser uma luta e vira
+  uma execução.
+
+E a maior, que amarra com `AX-UNK-051`: duas coisas guardavam este lugar, uma
+fabricada e outra viva. **Se a viva falhou por não conseguir acompanhar o ritmo da
+companhia, o que exatamente o Guardião ainda está segurando — e há quanto tempo está
+sozinho?**
+
+### Os documentos que faltam escrever
+
+O arco do Bispo já tem começo (`AX-EXE-034`) e revelação (`AX-UNK-045`); o miolo é o
+que esta lore acrescenta. Seguindo a estrutura de gatilho por **entendimento do
+encontro**, e não por repetição:
+
+| Gatilho | Documento | ID sugerido |
+| --- | --- | --- |
+| Primeiro encontro | Classificação corporativa — o ativo estacionário sobre a estrutura | `AX-EXE-034` ✔ existe |
+| Ver a cura acontecer | Relatório técnico: o tecido fecha na velocidade do corte, e o corte da Aurix é maior | `AX-ENG-028` |
+| Sobreviver à Supernova | Incidente: o "ataque" replanta em raio e não persegue ninguém — a área é a mesma da lavra | `AX-INC-040` |
+| Primeira queda | Ordem executiva: reclassificação de anomalia para [REDACTED] | `AX-EXE-047` |
+| Queda + ter lido a lavra artesanal | Não classificado: o pacto, a taxa, e quem quebrou qual regra | `AX-UNK-057` |
+| Descoberta composta (com `AX-UNK-051`) | Não classificado: dois guardiões, uma falha | `AX-UNK-058` |
+
+Ficam como esboço, e **não** entram no catálogo até serem escritos com as cinco regras
+de `progression-lore-text.ts` na frente: voz de relatório, sem vilão declarado,
+redação com moderação, nenhuma resposta fechada, e curtos.
+
+## 3. Bispo — a cura vem do chão, não dele
 
 `BISHOP_REGEN_PER_TICK = 1.2` a 20 Hz são **24 de vida por segundo** enquanto ele
 pisa em `SURF_FUNGAL`. Isso é deliberadamente acima do que o tiro base sustenta: em
@@ -98,7 +236,7 @@ A frente de partículas existe justamente para o jogador aprender o alcance *ven
 sem número nem manual. Uma frente que mente sobre isso é pior do que nenhuma, então o
 raio passou a viajar no evento.
 
-## 3. Corcel Fúngico — a investida é o depósito, o rastro é a mecânica
+## 4. Corcel Fúngico — a investida é o depósito, o rastro é a mecânica
 
 Ele não mata pelo impacto. Mata **tirando espaço da sala**.
 
@@ -129,7 +267,7 @@ reações; ele é mais um cliente dele.
 É o único contra-jogo posicional que ele oferece: quem lê o telégrafo põe uma parede
 no caminho e ganha o cooldown inteiro de graça. Continuar raspando na parede até o
 tempo acabar tiraria a recompensa de ter lido a ameaça — e foi exatamente essa
-distinção que o teste original **não** provava (ver §6).
+distinção que o teste original **não** provava (ver §7).
 
 ### Ele ocupa a vaga do elite, não soma um inimigo
 
@@ -145,7 +283,7 @@ cavalo ficaria cercado do fogo que só a investida dele devia acender.
 raro demais é conteúdo que a maioria das runs nunca vê, e um encontro que ninguém
 encontra não ensina nada.
 
-## 4. A decisão de implementação: a investida mora fora de `releaseAction`
+## 5. A decisão de implementação: a investida mora fora de `releaseAction`
 
 Todas as outras ações resolvem tudo no **release** — a pedra sai, o golpe acerta ou
 não — e por isso `advanceAction` pode devolver `true` e a criatura ficar parada na
@@ -161,7 +299,7 @@ direção vezes o atraso. Guardar as células visitadas daria o mesmo resultado 
 acrescentaria um campo por inimigo ao estado autoritativo — que é sincronizado,
 hasheado e reenviado a cada resync.
 
-## 5. O que arquétipo novo obriga a tocar
+## 6. O que arquétipo novo obriga a tocar
 
 Adicionar um membro a `EnemyArchetype` **não** quebra o typecheck sozinho, mas quebra
 duas coisas que só aparecem em produção:
@@ -181,10 +319,10 @@ vez de deixar a divergência aparecer só no co-op de alguém.
 O bispo entra em `crushesWalls` mas **não** ganha a busca de rota do guardião: chefe
 preso é chefe morto, mas a rota do guardião mora em `state.guardianPath`, um campo
 único. Compartilhá-lo daria dois chefes disputando o mesmo array — inofensivo hoje,
-porque um é do setor 2 e o outro do 3, e uma bomba armada no dia em que isso deixar
-de ser verdade.
+porque `bossForBiome` põe **um** chefe por run, e uma bomba armada no dia em que um
+encontro quiser dois. É o que o `bossRuntime` pendente resolve.
 
-## 6. Verificação
+## 7. Verificação
 
 ```
 pnpm --filter @voxelyn/survival-sim test    # tests/bosses.test.ts, 17 casos
@@ -205,7 +343,7 @@ atravessar sólido, então um cavalo que raspasse na pedra pela janela inteira p
 no mesmo `expect`. O que distingue as duas versões é a investida **acabar antes do
 tempo dela**, e é isso que o teste mede agora — em quantos ticks a ação morreu.
 
-## 7. Áudio
+## 8. Áudio
 
 `bishopHeal` é a única voz do jogo que **sobe** em frequência. Todo o resto do banco
 desce — tiro, impacto, morte, quebra — porque tudo o mais é alguma coisa terminando.
@@ -222,7 +360,7 @@ A morte do bispo divide a voz `deathGuardian`: os dois são o fim de um ato, e o
 jogador não precisa distingui-los pelo som — ele acabou de passar minutos olhando
 para o que caiu.
 
-## 8. Arte
+## 9. Arte
 
 ### Bispo: atlas de verdade
 
@@ -317,10 +455,10 @@ a normalização devolve o vetor original: o cavalo simplesmente não virava, e 
 quem estava atrás dele era o jogador — o caso em que a curva importa. O teste
 `vira em arco, e nao no lugar` foi escrito antes da correção e pegou isso.
 
-## 9. O que fica pendente
+## 10. O que fica pendente
 
 - O Bispo compartilha `deathGuardian` e o anel de `pulse` com o jogador. A primeira é
-  intencional (§7); a segunda é uma simplificação aceita — a mudança de mundo (um
+  intencional (§8); a segunda é uma simplificação aceita — a mudança de mundo (um
   tapete inteiro nascendo) é o sinal real, não o anel.
 - O Corcel não tem voz própria de investida além de `telegraphCharge`, que ele
   compartilha com o Guardião.

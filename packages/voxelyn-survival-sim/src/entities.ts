@@ -590,9 +590,9 @@ const normalized = (x: number, y: number): Vec2 => {
  * O bispo entra na lista sem ganhar a busca de rota do guardiao: chefe preso e
  * chefe morto, mas a rota do guardiao mora em `state.guardianPath`, um campo
  * unico. Compartilha-lo daria dois chefes disputando o mesmo array — inofensivo
- * hoje, porque um e do setor 2 e o outro do 3, e uma bomba armada no dia em que
- * isso deixar de ser verdade. Empurrar e quebrar resolve o mesmo problema sem
- * inventar um acoplamento com prazo de validade.
+ * hoje, porque `bossForBiome` poe UM chefe por run, e uma bomba armada no dia
+ * em que um encontro quiser dois. Empurrar e quebrar resolve o mesmo problema
+ * sem inventar um acoplamento com prazo de validade.
  */
 const crushesWalls = (enemy: Entity): boolean =>
   enemy.archetype === 'bruiser' || enemy.archetype === 'guardian' || enemy.archetype === 'bishop';

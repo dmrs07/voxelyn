@@ -52,9 +52,21 @@ codex podem falar do Diamandis antes de o Diamandis lutar.
   de água/brasa do objetivo é funcional e é mais antigo que a colônia — exceto o 3x3
   do próprio chefe, que nasce sempre sobre tapete.
 
+### Por que o micélio é uma ocupação forte
+
+A regra de seleção não é só arrumação de tabela: a lore do Bispo (§2 de
+`voxelyn-survival-bosses.md`) a torna **necessária**. Ele era o órgão que fechava as
+feridas do Veio; o micélio fora de controle é a cicatrização dele falhando contra a
+escala industrial da Aurix. Um mapa profundamente ocupado pelo micélio não é um mapa
+onde o Bispo por acaso mora — é o **rastro do colapso dele**, e por isso ele é o dono
+daquele encontro em qualquer estrato. O antigo "chefe obrigatório do setor 2" invertia
+a causalidade: plantava o fungo para justificar o chefe, em vez de deixar o chefe
+explicar o fungo.
+
 ## Bispo — Supernova como resposta primária
 
-Ver `docs/bosses/voxelyn-survival-bosses.md` (atualizado). Resumo do que mudou:
+Ver `docs/bosses/voxelyn-survival-bosses.md` (atualizado, §2 lore e §3 mecânica).
+Resumo do que mudou:
 
 - **Saiu do ramo genérico de gosma.** O Bispo não compartilha mais o cuspe do
   Spitter — um chefe do chão responde com o chão.
