@@ -283,12 +283,12 @@ describe('achados da revisao', () => {
     // Bem alem dos 7 tiles do portao de sono.
     guardian.x = state.player.x + 15;
     guardian.y = state.player.y;
-    expect(state.guardianAwake).toBe(false);
+    expect(state.bossRuntime.awake).toBe(false);
 
     damageEntity(state, guardian, 5, []);
     stepIdle(state, 2);
 
-    expect(state.guardianAwake, 'continuou dormindo levando tiro').toBe(true);
+    expect(state.bossRuntime.awake, 'continuou dormindo levando tiro').toBe(true);
   });
 
   // `findRippable` escolhia pelo tipo do bloco e `ripSolid` recusava a borda:

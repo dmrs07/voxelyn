@@ -33,7 +33,13 @@
 // tronco do dono junto com o jato, inclusive o do parceiro remoto, cujo
 // `facing` de snapshot passou a seguir os pes. Um cliente novo contra servidor
 // v13 receberia emissoes sem `owner` e nunca associaria a chama ao corpo.
-export const PROTOCOL_VERSION = 14;
+// 15: `WorldFlags.guardianAwake` vira `bossAwake`, e o evento `guardian_awake`
+// vira `boss_awake`. Desde `bossForBiome` a camara final pode ser do Bispo (ou
+// de qualquer outro da tabela), e os dois nomes antigos mentiam sobre metade
+// das runs. E quebra nos dois sentidos: um cliente novo contra servidor antigo
+// le `bossAwake` ausente e nunca acorda a apresentacao do chefe; um cliente
+// antigo contra servidor novo procura `guardianAwake` e nao acha.
+export const PROTOCOL_VERSION = 15;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -139,7 +145,13 @@ export const PROTOCOL_VERSION = 14;
 // parte do hash autoritativo, entao dois peers em versoes diferentes divergem
 // no primeiro tick de cura testemunhada — e o Codex do perfil abriria
 // documentos diferentes para a mesma run.
-export const SIMULATION_VERSION = 23;
+// 24: o estado do encontro de chefe vira `BossRuntime` — `guardianAwake`,
+// `guardianSummoned`, `guardianPath`, `guardianPathAt`, `arenaClosed` e
+// `arenaBarrierCells` saem do topo do estado e entram num objeto so, com as
+// fases de uma vez viradas BITMASK (`phasesFired`). O hash passa a misturar a
+// bitmask no lugar do booleano de invocacao: dois peers em versoes diferentes
+// divergem no tick em que a matilha sai.
+export const SIMULATION_VERSION = 24;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

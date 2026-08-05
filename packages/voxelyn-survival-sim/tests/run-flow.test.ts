@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GUARDIAN_SUMMON_COUNT, SECTOR_COUNT, SOLID_NONE } from '../src/constants';
+import { BOSS_PHASE_SUMMON } from '../src/types';
 import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import { createRun, emptyCommand, stepRun } from '../src/run';
@@ -143,7 +144,7 @@ describe('guardiao: invocacao de 50%', () => {
     // acorda o guardiao e o coloca abaixo de 50%
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian, 'seed sem guardiao').toBeDefined();
-    state.guardianAwake = true;
+    state.bossRuntime.awake = true;
 
     // uma onda de contaminacao spawna um stalker ANTES dos 50%: id maior que o
     // do guardiao. Ele morre, mas continua em state.enemies.
@@ -158,7 +159,7 @@ describe('guardiao: invocacao de 50%', () => {
     stepRun(state, [emptyCommand()]);
 
     // antes: o stalker de id maior fazia a sim achar que ja tinha invocado
-    expect(state.guardianSummoned).toBe(true);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_SUMMON).not.toBe(0);
     // Derivado da constante, e nao um numero fixo: o tamanho da matilha e uma
     // decisao de balanceamento e vai mudar de novo.
     expect(state.enemies.filter((e) => e.archetype === 'stalker').length).toBe(
@@ -169,7 +170,7 @@ describe('guardiao: invocacao de 50%', () => {
   it('invoca uma unica vez, mesmo com o guardiao muito tempo abaixo de 50%', () => {
     const state = createRun({ seed: guardianSeed(4242), playerCount: 1, sector: SECTOR_COUNT });
     const guardian = state.enemies.find((e) => e.archetype === 'guardian')!;
-    state.guardianAwake = true;
+    state.bossRuntime.awake = true;
     guardian.hp = guardian.maxHp * 0.3;
     stepRun(state, [emptyCommand()]);
     const after = state.enemies.filter((e) => e.archetype === 'stalker').length;

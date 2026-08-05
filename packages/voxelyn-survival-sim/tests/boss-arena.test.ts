@@ -4,6 +4,7 @@ import { bossArchetypeForBiome } from '../src/bosses';
 import { sectorBiome } from '../src/strata';
 import { GUARDIAN_ARENA_EXITS, GUARDIAN_ARENA_RADIUS, GUARDIAN_SUMMON_COUNT, SECTOR_COUNT,
   SOLID_FRAGILE, SOLID_NONE, SOLID_ORE, SOLID_ROCK } from '../src/constants';
+import { BOSS_PHASE_SUMMON } from '../src/types';
 import { closeArena } from '../src/cells';
 import { impactSolid } from '../src/materials';
 import { damageEntity } from '../src/entities';
@@ -38,7 +39,7 @@ const enrage = (seed: number): { state: SurvivalState; gx: number; gy: number } 
   // cerco a partir de uma celula que nao existe.
   state.player.x = Math.max(2.5, Math.min(w - 3.5, g.x - 2));
   state.player.y = Math.max(2.5, Math.min(state.config.height - 3.5, g.y));
-  state.guardianAwake = true;
+  state.bossRuntime.awake = true;
   g.hp = g.maxHp * 0.4;
   const gx = Math.floor(g.x);
   const gy = Math.floor(g.y);
@@ -65,7 +66,7 @@ describe('arena do guardiao', () => {
   // livre a partir do jogador e verifica que nao passa do raio.
   it('lacra a arena quando a vida cai da metade', () => {
     const { state, gx, gy } = enrage(71);
-    expect(state.arenaClosed, 'nao fechou').toBe(true);
+    expect(state.bossRuntime.arenaClosed, 'nao fechou').toBe(true);
 
     const w = state.config.width;
     const start = Math.floor(state.player.y) * w + Math.floor(state.player.x);
@@ -132,7 +133,7 @@ describe('arena do guardiao', () => {
     // seed um perseguido invocado nasce dentro da coluna de borda do mapa
     // (defeito do INVOCAR, anterior a isto e de outro sistema), e um teste do
     // cerco que falhasse por causa dele estaria medindo a coisa errada.
-    const barreira = new Set(state.arenaBarrierCells ?? []);
+    const barreira = new Set(state.bossRuntime.arenaBarrierCells ?? []);
     for (const e of [...state.players, ...state.enemies]) {
       if (!e.alive) continue;
       expect(
@@ -217,14 +218,14 @@ describe('arena do guardiao', () => {
     const state = createRun({ seed: guardianSeed(74), sector: SECTOR_COUNT });
     const g = state.enemies.find((e) => e.archetype === 'guardian');
     if (!g) return;
-    state.guardianAwake = true;
+    state.bossRuntime.awake = true;
     g.hp = g.maxHp * 0.4;
     state.player.x = g.x + GUARDIAN_ARENA_RADIUS + 6;
     state.player.y = g.y;
     for (let t = 0; t < 5; t++) stepRun(state, [emptyCommand()]);
-    expect(state.arenaClosed, 'fechou com o jogador do lado de fora').toBe(false);
+    expect(state.bossRuntime.arenaClosed, 'fechou com o jogador do lado de fora').toBe(false);
     // Invocar, por outro lado, acontece na hora.
-    expect(state.guardianSummoned).toBe(true);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_SUMMON).not.toBe(0);
   });
 
   // Minerio e recurso do jogador: o cerco nao pode apaga-lo.
@@ -239,7 +240,7 @@ describe('arena do guardiao', () => {
     state.solid[oreCell] = SOLID_ORE;
     state.player.x = Math.max(2.5, Math.min(w - 3.5, g.x - 1));
     state.player.y = Math.max(2.5, Math.min(state.config.height - 3.5, g.y));
-    state.guardianAwake = true;
+    state.bossRuntime.awake = true;
     g.hp = g.maxHp * 0.4;
     stepRun(state, [emptyCommand()]);
     expect(state.solid[oreCell], 'o cerco comeu o minerio').toBe(SOLID_ORE);
@@ -263,12 +264,12 @@ describe('arena do guardiao', () => {
     const guardian = state.enemies.find((e) => e.archetype === 'guardian');
     expect(guardian).toBeDefined();
     if (!guardian) return;
-    const barriers = [...state.arenaBarrierCells];
+    const barriers = [...state.bossRuntime.arenaBarrierCells];
     expect(barriers.length, 'o cerco nao registrou seus blocos').toBeGreaterThan(0);
     const events = [];
     damageEntity(state, guardian, guardian.hp, events);
-    expect(state.arenaClosed).toBe(false);
-    expect(state.arenaBarrierCells).toEqual([]);
+    expect(state.bossRuntime.arenaClosed).toBe(false);
+    expect(state.bossRuntime.arenaBarrierCells).toEqual([]);
     for (const cell of barriers) expect(state.solid[cell]).toBe(SOLID_NONE);
     const startX = Math.floor(state.player.x);
     const startY = Math.floor(state.player.y);

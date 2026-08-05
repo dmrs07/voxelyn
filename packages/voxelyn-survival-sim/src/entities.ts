@@ -1,8 +1,5 @@
 import {
   ALERT_TICKS,
-  SOLID_FRAGILE,
-  SOLID_FRAGILE_WEAK,
-  SOLID_ROCK,
   BIOFLUID_SLOW,
   BRUISER_HURL_COOLDOWN_TICKS,
   BRUISER_HURL_DAMAGE,
@@ -110,6 +107,7 @@ import { addDamageTenths, markDiscovery, recordKill } from './stats.js';
 import {
   BELLOWS_EXHALING,
   BELLOWS_INHALING,
+  BOSS_PHASE_SUMMON,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
   DISCOVERY_MINER_ENRAGED,
@@ -591,11 +589,12 @@ const normalized = (x: number, y: number): Vec2 => {
  * Corpos grandes o bastante para ABRIR caminho em vez de contornar.
  *
  * O bispo entra na lista sem ganhar a busca de rota do guardiao: chefe preso e
- * chefe morto, mas a rota do guardiao mora em `state.guardianPath`, um campo
- * unico. Compartilha-lo daria dois chefes disputando o mesmo array — inofensivo
- * hoje, porque `bossForBiome` poe UM chefe por run, e uma bomba armada no dia
- * em que um encontro quiser dois. Empurrar e quebrar resolve o mesmo problema
- * sem inventar um acoplamento com prazo de validade.
+ * chefe morto, mas a rota mora em `state.bossRuntime.path`, um campo unico do
+ * encontro. Compartilha-la daria dois chefes disputando o mesmo array —
+ * inofensivo hoje, porque `bossForBiome` poe UM chefe por run. Empurrar e
+ * quebrar resolve o mesmo problema sem inventar acoplamento com prazo de
+ * validade; no dia em que houver dois chefes, `BossRuntime` vira um mapa por
+ * entidade e este comentario e o unico lugar que precisa mudar.
  */
 const crushesWalls = (enemy: Entity): boolean =>
   enemy.archetype === 'bruiser' || enemy.archetype === 'guardian' || enemy.archetype === 'bishop';
@@ -1044,31 +1043,31 @@ const guardianSteering = (
   events: SemanticEvent[]
 ): Vec2 => {
   if (hasLineOfSight(state, enemy.x, enemy.y, targetX, targetY)) {
-    state.guardianPath = [];
+    state.bossRuntime.path = [];
     return normalized(targetX - enemy.x, targetY - enemy.y);
   }
 
   const w = state.config.width;
   const ex = Math.floor(enemy.x);
   const ey = Math.floor(enemy.y);
-  const stale = state.tick - state.guardianPathAt >= GUARDIAN_PATH_INTERVAL_TICKS;
-  if (stale || state.guardianPath.length === 0) {
-    state.guardianPath = findPath(state, ex, ey, Math.floor(targetX), Math.floor(targetY));
-    state.guardianPathAt = state.tick;
+  const stale = state.tick - state.bossRuntime.pathAt >= GUARDIAN_PATH_INTERVAL_TICKS;
+  if (stale || state.bossRuntime.path.length === 0) {
+    state.bossRuntime.path = findPath(state, ex, ey, Math.floor(targetX), Math.floor(targetY));
+    state.bossRuntime.pathAt = state.tick;
   }
 
   // Consome os passos ja alcancados. Sem isto ele fica mirando a celula em que
   // ja esta e trava no lugar.
-  while (state.guardianPath.length > 0 && state.guardianPath[0] === ey * w + ex) {
-    state.guardianPath.shift();
+  while (state.bossRuntime.path.length > 0 && state.bossRuntime.path[0] === ey * w + ex) {
+    state.bossRuntime.path.shift();
   }
-  if (state.guardianPath.length === 0) {
+  if (state.bossRuntime.path.length === 0) {
     // Sem rota dentro do orcamento: volta a empurrar na direcao do alvo. Pior,
     // mas nunca imovel — um chefe parado e o fim da luta.
     return normalized(targetX - enemy.x, targetY - enemy.y);
   }
 
-  const next = state.guardianPath[0];
+  const next = state.bossRuntime.path[0];
   const nx = next % w;
   const ny = (next / w) | 0;
   // Parede no proximo passo: a rota ja pagou o preco de atravessa-la, entao ele
@@ -1691,22 +1690,22 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
 
     // Guardiao ACORDADO nunca perde o alvo. Ele e o clima da sala, nao um bicho
     // que patrulha: sair do raio dele nao pode ser uma forma de vencer.
-    const guardianHunting = enemy.archetype === 'guardian' && state.guardianAwake;
+    const guardianHunting = enemy.archetype === 'guardian' && state.bossRuntime.awake;
     const aggro =
       player !== null &&
       (guardianHunting ||
         dist <= def.aggroRange + (enemy.elite ? 3 : 0) ||
         state.tick < enemy.alertedUntil);
 
-    if (enemy.archetype === 'guardian' && !state.guardianAwake) {
+    if (enemy.archetype === 'guardian' && !state.bossRuntime.awake) {
       // O alerta TAMBEM acorda. Sem isto, `aggro` ficava verdadeiro por dano mas
       // o portao logo abaixo devolvia `continue`: o chefe levava tiro de 8 tiles
       // sem se mexer, cada tiro renovando um alerta que nao servia para nada.
       // Era exatamente a morte sem retaliacao que o aggro por dano existe para
       // impedir, preservada no unico inimigo em que ela mais doi.
       if (state.coreTaken || dist < 7 || state.tick < enemy.alertedUntil) {
-        state.guardianAwake = true;
-        events.push({ t: 'guardian_awake' });
+        state.bossRuntime.awake = true;
+        events.push({ t: 'boss_awake' });
       } else continue;
     }
 
@@ -2026,8 +2025,8 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
   if (!guardian || !guardian.alive) return;
   const enraged = guardian.hp < guardian.maxHp * 0.5;
 
-  if (enraged && !state.guardianSummoned) {
-    state.guardianSummoned = true;
+  if (enraged && (state.bossRuntime.phasesFired & BOSS_PHASE_SUMMON) === 0) {
+    state.bossRuntime.phasesFired |= BOSS_PHASE_SUMMON;
     // Em anel, e nao dois dos lados: saindo todos da mesma linha, o jogador
     // resolvia os quatro com um recuo so.
     const around = [
@@ -2048,7 +2047,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
   // pretendido: trancaria o chefe e libertaria quem devia estar preso. Por isso
   // e uma tentativa por tick enquanto ele estiver enfurecido, e nao um evento
   // unico no instante em que a vida cruza a metade.
-  if (enraged && !state.arenaClosed) {
+  if (enraged && !state.bossRuntime.arenaClosed) {
     const near = state.players.find(
       (p) =>
         p.alive &&
@@ -2064,7 +2063,7 @@ export const updateEnemies = (state: SurvivalState, events: SemanticEvent[]): vo
         GUARDIAN_ARENA_EXITS,
         events
       );
-      if (placed > 0) state.arenaClosed = true;
+      if (placed > 0) state.bossRuntime.arenaClosed = true;
     }
   }
 };

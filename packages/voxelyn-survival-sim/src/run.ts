@@ -69,6 +69,7 @@ import {
   WORLD_H,
   WORLD_W,
 } from './constants.js';
+import { emptyBossRuntime } from './bosses.js';
 import {
   ABILITY_SHAPE,
   STARTING_ABILITY,
@@ -304,13 +305,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
     entry: world.entry,
     corePos: world.corePos,
     coreTaken: false,
-    guardianAwake: false,
-    guardianSummoned: false,
+    bossRuntime: emptyBossRuntime(),
     bossesDown: 0,
-    arenaClosed: false,
-    arenaBarrierCells: [],
-    guardianPath: [],
-    guardianPathAt: -1000,
     leftEntryZone: false,
     players,
     playerExtras,
@@ -2451,13 +2447,16 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.stats.innocentsKilled);
   mix(state.stats.discoveries);
   for (const archetype of HASHED_ARCHETYPES) mix(state.stats.kills[archetype]);
-  mix(state.guardianSummoned ? 1 : 0);
+  // As FASES ja disparadas (bitmask), no lugar do antigo par de booleanos:
+  // duas simulacoes que discordam de uma fase de uma vez divergem no proximo
+  // gatilho dela.
+  mix(state.bossRuntime.phasesFired);
   // Chefes abatidos: decide o que a SUBIDA vai (nao) repovoar, entao duas
   // simulacoes que discordam disso divergem no primeiro retorno.
   mix(state.bossesDown);
-  mix(state.arenaClosed ? 1 : 0);
-  mix(state.arenaBarrierCells.length);
-  for (const cell of state.arenaBarrierCells) mix(cell);
+  mix(state.bossRuntime.arenaClosed ? 1 : 0);
+  mix(state.bossRuntime.arenaBarrierCells.length);
+  for (const cell of state.bossRuntime.arenaBarrierCells) mix(cell);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

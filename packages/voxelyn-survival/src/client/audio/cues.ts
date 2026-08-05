@@ -239,7 +239,7 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
     case 'module_expired':
       return [{ voice: 'moduleExpired', x: 0, y: 0, scale: 1 }];
 
-    case 'guardian_awake':
+    case 'boss_awake':
       return [{ voice: 'guardianAwake', x: 0, y: 0, scale: 1 }];
 
     case 'player_down':

@@ -22,6 +22,7 @@ import {
   SURF_FUNGAL,
   SURF_NONE,
 } from '../src/constants';
+import { BOSS_PHASE_SUMMON } from '../src/types';
 import {
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
@@ -456,7 +457,7 @@ describe('Guardiao — Salva Litoclasta', () => {
     const px = Math.floor(state.player.x);
     const py = Math.floor(state.player.y);
     const guardian = spawnEnemy(state, 'guardian', px + 5, py, false);
-    state.guardianAwake = true;
+    state.bossRuntime.awake = true;
     return { state, guardian };
   };
 
@@ -511,7 +512,7 @@ describe('Guardiao — Salva Litoclasta', () => {
     const { state, guardian } = guardianDuel(83);
     guardian.hp = guardian.maxHp * 0.4; // enfurecido
     // A guarda de invocacao dispara stalkers; o teste isola a salva.
-    state.guardianSummoned = true;
+    state.bossRuntime.phasesFired |= BOSS_PHASE_SUMMON;
 
     // Primeira salva enfurecida (impar): RAJADA — as pedras saem em TICKS
     // diferentes, uma por release, com re-mira entre elas.

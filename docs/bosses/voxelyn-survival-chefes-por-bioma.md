@@ -100,14 +100,47 @@ mecanicamente, o chefe das Galerias de Basalto estava cuspindo. Agora:
 - Tudo o mais fica: atravessar/destruir paredes, investida, cerco da arena,
   invocação, guarda do Núcleo.
 
+## `BossRuntime` — o estado do encontro
+
+Os seis campos `guardian*` do topo do estado (`guardianAwake`, `guardianSummoned`,
+`guardianPath`, `guardianPathAt`, `arenaClosed`, `arenaBarrierCells`) viraram um
+objeto só, `state.bossRuntime`:
+
+```ts
+type BossRuntime = {
+  awake: boolean;
+  phasesFired: number;      // bitmask; BOSS_PHASE_SUMMON é a matilha do Guardião
+  path: number[];           // derivado: não entra no hash nem no snapshot
+  pathAt: number;
+  arenaClosed: boolean;
+  arenaBarrierCells: number[];
+};
+```
+
+Três decisões dentro disso:
+
+- **Um objeto, não um por chefe.** A run tem UM encontro de chefe (o setor final).
+  No dia em que tiver dois, isto vira um mapa por `entityId` e todo consumidor já lê
+  de um lugar só — em vez de seis campos globais para desembaraçar.
+- **`phasesFired` é bitmask, não um booleano por fase.** O Guardião tem uma fase de
+  uma vez (a matilha); o Diamandis terá o colapso do reator. Cada chefe novo somaria
+  mais um campo ao estado autoritativo, que é hasheado e reenviado a cada resync.
+- **`emptyBossRuntime()` é fábrica, não literal compartilhado.** `path` e
+  `arenaBarrierCells` são mutáveis: um objeto congelado no módulo faria a descida
+  herdar a rota do setor anterior e, pior, duas salas de co-op escreverem no mesmo
+  array.
+
+No wire, `WorldFlags.guardianAwake` virou `bossAwake` e o evento `guardian_awake`
+virou `boss_awake` — os dois nomes mentiam sobre metade das runs desde
+`bossForBiome`. `PROTOCOL_VERSION` 15, `SIMULATION_VERSION` 24. (A *voz* de áudio
+continua se chamando `guardianAwake`: ela é o nome de um som, não de um chefe.)
+
 ## Ordem recomendada de desenvolvimento (restante)
 
 1. ~~Gatilho da Supernova + remover cuspe do Bispo~~ ✔
 2. ~~Salva Litoclasta do Guardião~~ ✔
 3. ~~`bossForBiome()` sem dependência de setor~~ ✔
-4. Generalizar o estado específico do Guardião (`guardianAwake`, `guardianPath`,
-   `guardianSummoned`, `arenaClosed`) num `bossRuntime` — pré-requisito para dois
-   chefes coexistirem no mesmo mundo sem disputar campos.
+4. ~~Generalizar o estado específico do Guardião num `bossRuntime`~~ ✔
 5. **Diamandis** (Cicatriz Aurix) — o próximo chefe novo: broca de avanço, salva de
    demolição, feixe de prospecção, colapso do reator, e os Coveiros recuperando
    módulos (luta mais fácil × recompensa maior). Usa peças que o jogo já tem —

@@ -427,7 +427,7 @@ export class GameRoom {
         cacheOpened: site.cacheOpened,
       })),
       coreTaken: this.state.coreTaken,
-      guardianAwake: this.state.guardianAwake,
+      bossAwake: this.state.bossRuntime.awake,
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
       // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto
       // inteiro, entao aparecer e ser levado disparam o envio sozinhos.

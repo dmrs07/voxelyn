@@ -324,6 +324,48 @@ export type Entity = {
   mood?: number;
 };
 
+/**
+ * O estado vivo do encontro de chefe do setor.
+ *
+ * Existia como seis campos soltos no estado, todos com prefixo `guardian`,
+ * porque durante muito tempo so havia um chefe com estado proprio. Com
+ * `bossForBiome` a camara final passou a poder ser de qualquer um da tabela —
+ * e `state.guardianPath` sendo consumido pelo Bispo era um nome mentindo.
+ *
+ * Um objeto so, e nao um por chefe: a run tem UM encontro de chefe (o setor
+ * final). O dia em que tiver dois, isto vira um mapa por `entityId` e todo
+ * consumidor ja esta lendo de um lugar so.
+ */
+export type BossRuntime = {
+  /** O chefe ja notou o jogador? Antes: `guardianAwake`. */
+  awake: boolean;
+  /**
+   * Fases de UMA VEZ ja disparadas, por bit (ver `BOSS_PHASE_*`).
+   *
+   * Bitmask e nao um booleano por fase: o Guardiao tem uma (a matilha), o
+   * Diamandis tera o colapso do reator, e cada chefe novo somaria mais um
+   * campo ao estado autoritativo — que e hasheado e reenviado a cada resync.
+   */
+  phasesFired: number;
+  /**
+   * Rota corrente do chefe, em indices de celula, e o tick em que foi
+   * calculada. DERIVADO: da para recalcular da grade a qualquer momento, entao
+   * nao entra no hash nem viaja em snapshot.
+   */
+  path: number[];
+  pathAt: number;
+  /**
+   * O cerco ja fechou? Separado das fases porque ele pode ter de ESPERAR o
+   * jogador entrar no raio, enquanto os invocados saem na hora.
+   */
+  arenaClosed: boolean;
+  /** Celulas vazias convertidas pelo cerco; removidas quando o chefe morre. */
+  arenaBarrierCells: number[];
+};
+
+/** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
+export const BOSS_PHASE_SUMMON = 1 << 0;
+
 /** Postura do Miner. Ele nasce PASSIVO; o calor da sua arma decide o resto. */
 export const MINER_MOOD_PASSIVE = 0;
 export const MINER_MOOD_FLEEING = 1;
@@ -593,7 +635,12 @@ export type SemanticEvent =
   | { t: 'module_charge_consumed'; slot: number; module: ModuleId; remaining: number; maximum: number }
   | { t: 'module_expired'; slot: number; module: ModuleId }
   | { t: 'overheat'; x: number; y: number }
-  | { t: 'guardian_awake' }
+  /**
+   * O chefe do setor acordou. Chamava-se `guardian_awake`: o Guardiao era o
+   * unico chefe que dormia ate ser notado, e desde `bossForBiome` a camara
+   * final pode ser de outro.
+   */
+  | { t: 'boss_awake' }
   /**
    * O mundo inteiro foi trocado: o cliente precisa redesenhar do zero.
    *
@@ -701,8 +748,15 @@ export type SurvivalState = {
   entry: Vec2;
   corePos: Vec2;
   coreTaken: boolean;
-  guardianAwake: boolean;
-  guardianSummoned: boolean;
+  /**
+   * O estado VIVO do encontro de chefe deste setor. Ver `BossRuntime`.
+   *
+   * Um objeto e nao seis campos soltos com prefixo `guardian*`: desde
+   * `bossForBiome` a camara final pode ser do Bispo, do Diamandis ou de quem
+   * mais entrar na tabela, e um campo chamado `guardianPath` sendo consumido
+   * por um Bispo e a documentacao mentindo em silencio.
+   */
+  bossRuntime: BossRuntime;
   /**
    * Rota atual do guardiao, em indices de celula, e o tick em que foi calculada.
    *
@@ -726,13 +780,6 @@ export type SurvivalState = {
    * campo novo. Cabe folgado em 32 bits (SECTOR_COUNT e 3).
    */
   bossesDown: number;
-  /** A arena ja foi lacrada? Separado de `guardianSummoned` porque o cerco pode
-   * ter de esperar o jogador entrar no raio, enquanto os invocados saem na hora. */
-  arenaClosed: boolean;
-  /** Celulas vazias convertidas pelo cerco; removidas quando o Guardian morre. */
-  arenaBarrierCells: number[];
-  guardianPath: number[];
-  guardianPathAt: number;
   leftEntryZone: boolean;
   players: Entity[];
   playerExtras: PlayerExtra[];

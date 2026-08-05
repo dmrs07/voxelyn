@@ -34,7 +34,7 @@ import {
   SURF_FUNGAL,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
-import { bossArchetypeForBiome } from './bosses.js';
+import { bossArchetypeForBiome, emptyBossRuntime } from './bosses.js';
 import { isConductiveSurface, setSurface } from './cells.js';
 import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
@@ -375,12 +375,7 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.wellOffers = [];
   for (const extra of state.playerExtras) extra.resonance = emptyResonance();
 
-  state.guardianAwake = false;
-  state.guardianSummoned = false;
-  state.arenaClosed = false;
-  state.arenaBarrierCells = [];
-  state.guardianPath = [];
-  state.guardianPathAt = -1000;
+  state.bossRuntime = emptyBossRuntime();
   state.leftEntryZone = false;
 
   // A contaminacao NAO zera. Descer alivia, nunca absolve: comecar limpo faria
@@ -488,12 +483,7 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   // caminho de volta e a prova do estilo com que se desceu, nao um recomeco.
   state.wellOffers = [];
 
-  state.guardianAwake = false;
-  state.guardianSummoned = false;
-  state.arenaClosed = false;
-  state.arenaBarrierCells = [];
-  state.guardianPath = [];
-  state.guardianPathAt = -1000;
+  state.bossRuntime = emptyBossRuntime();
   // Os jogadores emergem no POCO, fundo do mapa: a zona de entrada ja esta
   // longe, entao a saida (subir de novo, ou extrair no setor 1) nasce armada.
   state.leftEntryZone = true;

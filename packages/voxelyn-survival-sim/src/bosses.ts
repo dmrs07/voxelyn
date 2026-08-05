@@ -29,8 +29,26 @@
 //   Estrato   Cripta Glacial          -> Rainha da Geada
 //   Estrato   Estrato Ferrifero       -> Magnetarca
 
-import type { EnemyArchetype } from './types.js';
+import type { BossRuntime, EnemyArchetype } from './types.js';
 import type { OccupationId, SectorBiome, StratumId } from './strata.js';
+
+/**
+ * O estado de encontro de um setor que ainda nao comecou.
+ *
+ * Uma fabrica e nao um literal compartilhado: `path` e `arenaBarrierCells` sao
+ * arrays mutaveis, e um objeto congelado no modulo faria a descida do setor 2
+ * herdar a rota do setor 1 — pior, faria duas salas de co-op escreverem no
+ * mesmo array. `pathAt` nasce bem no passado para a primeira busca de rota
+ * nunca parecer recente.
+ */
+export const emptyBossRuntime = (): BossRuntime => ({
+  awake: false,
+  phasesFired: 0,
+  path: [],
+  pathAt: -1000,
+  arenaClosed: false,
+  arenaBarrierCells: [],
+});
 
 /**
  * A identidade CONCEITUAL de cada chefe. Distinta de EnemyArchetype de

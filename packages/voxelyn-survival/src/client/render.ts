@@ -1229,7 +1229,7 @@ export class SurvivalRenderer {
             until: nowMs + 3400,
           });
           break;
-        case 'guardian_awake':
+        case 'boss_awake':
           this.messages.push({ text: t('toast.guardian.awake'), until: nowMs + 3000 });
           this.shake = { power: 6, until: nowMs + 500 };
           break;

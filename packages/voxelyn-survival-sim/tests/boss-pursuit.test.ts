@@ -116,7 +116,7 @@ describe('agressividade do guardiao', () => {
     s.solid[12 * w + 30] = SOLID_NONE;
     g.x = 45.5;
     g.y = 25.5;
-    s.guardianAwake = true;
+    s.bossRuntime.awake = true;
 
     for (let t = 0; t < 400; t++) stepRun(s, [emptyCommand()]);
 
@@ -134,7 +134,7 @@ describe('agressividade do guardiao', () => {
     if (!g) return;
     g.x = 50.5;
     g.y = 25.5; // muito alem dos 7 tiles de aggro
-    s.guardianAwake = true;
+    s.bossRuntime.awake = true;
 
     const before = Math.hypot(g.x - s.player.x, g.y - s.player.y);
     for (let t = 0; t < 120; t++) stepRun(s, [emptyCommand()]);
@@ -149,7 +149,7 @@ describe('agressividade do guardiao', () => {
     if (!g) return;
     g.x = 50.5;
     g.y = 25.5;
-    s.guardianAwake = false;
+    s.bossRuntime.awake = false;
     const before = Math.hypot(g.x - s.player.x, g.y - s.player.y);
     for (let t = 0; t < 60; t++) stepRun(s, [emptyCommand()]);
     expect(Math.abs(Math.hypot(g.x - s.player.x, g.y - s.player.y) - before)).toBeLessThan(1);
