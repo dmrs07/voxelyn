@@ -305,6 +305,27 @@ export const DISCOVERY_QUEEN_THAWED = 1 << 23;
 export const DISCOVERY_MAGNET_BANDED = 1 << 24;
 
 /**
+ * Todo bit de descoberta que existe, num numero so.
+ *
+ * Existe porque a lista cresce e quem consome ela de fora nao percebe. A
+ * telemetria do servidor prendia `discoveries` em `0xffff` — um teto escrito
+ * quando havia dezesseis bits — e a partir do bit 16 toda run com uma
+ * descoberta de chefe era GRAVADA COMO 65535: o bit real se perdia e todos os
+ * bits abaixo dele apareciam ligados, fabricando dezesseis descobertas que
+ * nunca aconteceram. O defeito nao dava erro em lugar nenhum; so envenenava a
+ * analise.
+ *
+ * Prender por faixa era o erro de fundo, e nao o numero: um valor acima do teto
+ * SATURA, e saturar uma bitmask inventa bits. Quem recebe isto de fora deve
+ * MASCARAR (`& DISCOVERY_MASK`), que descarta o que nao reconhece em vez de
+ * mentir sobre o que reconhece.
+ *
+ * O teste `descobertas.test.ts` confere que todo `DISCOVERY_*` exportado cabe
+ * aqui dentro — e o que faz o bit 25 nascer coberto em vez de nascer perdido.
+ */
+export const DISCOVERY_MASK = (1 << 25) - 1;
+
+/**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
  *
  * Congelado e nao derivado sob demanda porque `state` continua sendo o objeto

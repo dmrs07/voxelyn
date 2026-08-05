@@ -12,6 +12,7 @@
 // histograma.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { DISCOVERY_MASK } from '@voxelyn/survival-sim';
 import { SubmissionRateLimiter, readJsonBody, requestRateLimitKey } from './http-util.js';
 import type { RunOutcome, TelemetryEvent, TelemetryStore } from './telemetry.js';
 
@@ -49,6 +50,13 @@ export type TelemetryHttpOptions = {
    * escrita e aberta porque precisa ser; a leitura nao precisa.
    */
   digestToken?: string;
+};
+
+/** Sanea um campo de BITS: fora da mascara e descartado, nunca saturado. */
+const maskBits = (value: unknown, mask: number): number => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.round(n) & mask;
 };
 
 const clampInt = (value: unknown, min: number, max: number, fallback = 0): number => {
@@ -96,7 +104,12 @@ export const sanitizeEvent = (raw: unknown, quality: unknown): TelemetryEvent | 
     damageDealtTenths: clampInt(o.damageDealtTenths, 0, 10_000_000),
     salvageCompleted: clampInt(o.salvageCompleted, 0, 1_000),
     modulesAcquired: clampInt(o.modulesAcquired, 0, 1_000),
-    discoveries: clampInt(o.discoveries, 0, 0xffff),
+    // MASCARA, e nao faixa. Prender por faixa satura: um valor acima do teto
+    // vira o proprio teto, e saturar uma bitmask LIGA todos os bits abaixo — a
+    // run que descobriu uma coisa era gravada como tendo descoberto dezesseis.
+    // Mascarar descarta o que nao se reconhece, que e o unico jeito honesto de
+    // sanear um campo de bits vindo de fora.
+    discoveries: maskBits(o.discoveries, DISCOVERY_MASK),
     quality: typeof quality === 'string' ? quality.slice(0, 12) : null,
   };
 };

@@ -8,6 +8,7 @@ import {
   type TelemetryEvent,
 } from '../src/telemetry';
 import { sanitizeEvent } from '../src/telemetry-http';
+import { DISCOVERY_FIRE_SPREAD, DISCOVERY_MAGNET_BANDED } from '@voxelyn/survival-sim';
 
 const ev = (over: Partial<TelemetryEvent> = {}): TelemetryEvent => ({
   session: 's1',
@@ -124,6 +125,33 @@ describe('saneamento de entrada nao confiavel', () => {
     expect(e!.sector).toBe(1);
     expect(e!.contamination).toBe(1);
     expect(e!.ticks).toBeLessThanOrEqual(60 * 60 * 20);
+  });
+
+  it('descobertas sao MASCARADAS, nunca saturadas', () => {
+    // O defeito que este teste fecha: `discoveries` era preso num teto de 16
+    // bits, escrito quando havia dezesseis deles. Do bit 16 em diante — todas
+    // as descobertas de chefe — a run era gravada como 65535: o bit real
+    // perdido e os dezesseis de baixo LIGADOS. A analise passava a contar
+    // descobertas que nunca aconteceram, e nada falhava.
+    //
+    // Saturar uma bitmask inventa bits; mascarar descarta o que nao se
+    // reconhece. E a diferenca entre dado incompleto e dado falso.
+    const high = sanitizeEvent(
+      { session: 'abcd', discoveries: DISCOVERY_MAGNET_BANDED | DISCOVERY_FIRE_SPREAD },
+      'high',
+    );
+    expect(high!.discoveries).toBe(DISCOVERY_MAGNET_BANDED | DISCOVERY_FIRE_SPREAD);
+
+    // Bit que a simulacao nao tem: descartado, sem levar os validos junto.
+    const forged = sanitizeEvent(
+      { session: 'abcd', discoveries: DISCOVERY_FIRE_SPREAD | (1 << 30) },
+      'high',
+    );
+    expect(forged!.discoveries).toBe(DISCOVERY_FIRE_SPREAD);
+
+    // E lixo continua virando zero em vez de derrubar o evento inteiro.
+    expect(sanitizeEvent({ session: 'abcd', discoveries: -5 }, null)!.discoveries).toBe(0);
+    expect(sanitizeEvent({ session: 'abcd', discoveries: 'nada' }, null)!.discoveries).toBe(0);
   });
 
   it('recusa apenas o que nao significa nada', () => {
