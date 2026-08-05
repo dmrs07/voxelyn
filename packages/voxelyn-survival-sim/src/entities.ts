@@ -24,6 +24,9 @@ import {
   FURNACE_HEART_HP,
   FURNACE_HEART_RADIUS,
   FURNACE_HEART_WAVE_ARC,
+  FURNACE_HEART_BROOD_CAP,
+  FURNACE_HEART_BROOD_PER_WAVE,
+  FURNACE_HEART_WAVE_DAMAGE,
   FURNACE_HEART_WAVE_INTERVAL_TICKS,
   FURNACE_HEART_WAVE_RADIUS,
   LEVIATHAN_BREACH_DAMAGE,
@@ -2727,6 +2730,18 @@ const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticE
   const phase = Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2;
   enemy.mood = phase === 0 ? FURNACE_OVERHEATING : FURNACE_COOLING;
   if (enemy.mood !== FURNACE_OVERHEATING) return;
+
+  // A NINHADA sai no primeiro tick de cada superaquecimento.
+  //
+  // O instante e derivado do relogio, e nao de um contador guardado: o ciclo ja
+  // e `tick / CYCLE_TICKS`, entao a virada e exata e nenhum campo novo precisa
+  // entrar no hash. As posicoes tambem sao geometria pura — nada aqui consome
+  // `state.rng`, senao duas maquinas com a mesma seed divergiriam na primeira
+  // ninhada.
+  if (state.tick % (FURNACE_HEART_CYCLE_TICKS * 2) === 0) {
+    furnaceHeartBrood(state, enemy);
+  }
+
   if (state.tick < enemy.nextActionAt) return;
   enemy.nextActionAt = state.tick + FURNACE_HEART_WAVE_INTERVAL_TICKS;
 
@@ -2758,7 +2773,71 @@ const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticE
       }
     }
   }
+  // O calor cobra NA PASSAGEM, e nao so de quem fica parado na brasa depois.
+  //
+  // Sem isto a varredura era uma promessa que so se cumpria para quem parasse
+  // em cima dela: quem atravessava o setor no instante em que ele acendia nao
+  // levava nada, e atravessar era o movimento obvio. O dano fecha a leitura —
+  // "escolha onde estar quando puder" precisa de um preco por estar no lugar
+  // errado.
+  for (const player of state.players) {
+    const extra = state.playerExtras[player.slot ?? 0];
+    if (!player.alive || !extra.joined || extra.downed) continue;
+    const px = player.x - enemy.x;
+    const py = player.y - enemy.y;
+    const len = Math.hypot(px, py);
+    if (len < 2 || len > r) continue;
+    if ((px / len) * dirX + (py / len) * dirY < Math.cos(FURNACE_HEART_WAVE_ARC)) continue;
+    damageEntity(state, player, FURNACE_HEART_WAVE_DAMAGE, events, { kind: 'fire' });
+  }
+
   events.push({ t: 'beam_line', x: enemy.x, y: enemy.y, dx: dirX, dy: dirY, length: r, powered: true });
+};
+
+/**
+ * Os Escoriaceos que a Fornalha manda quando esquenta.
+ *
+ * Em ANEL, pelo mesmo motivo da matilha do Guardiao: saindo todos da mesma
+ * linha, o jogador resolve a leva inteira com um recuo so. O anel e maior que o
+ * do Guardiao porque o Coracao nao persegue — quem tem de atravessar a sala e
+ * o bicho, e nascer colado no chefe entregaria os dois no mesmo tiro.
+ *
+ * O teto conta os Escoriaceos VIVOS: um jogador que limpa a leva anterior ganha
+ * a proxima inteira, e um que ignora acumula pressao ate o teto e para. E o
+ * mesmo contrato do resto do bestiario — densidade nao vira castigo.
+ */
+const FURNACE_BROOD_RING: readonly (readonly [number, number])[] = [
+  [-5, 0],
+  [5, 0],
+  [0, -5],
+  [0, 5],
+  [-4, -4],
+  [4, 4],
+];
+
+const furnaceHeartBrood = (state: SurvivalState, enemy: Entity): void => {
+  let alive = 0;
+  for (const other of state.enemies) {
+    if (other.alive && other.archetype === 'scoriac') alive++;
+  }
+  const w = state.config.width;
+  const h = state.config.height;
+  let placed = 0;
+  for (let k = 0; k < FURNACE_BROOD_RING.length; k++) {
+    if (placed >= FURNACE_HEART_BROOD_PER_WAVE) return;
+    if (alive + placed >= FURNACE_HEART_BROOD_CAP) return;
+    if (state.enemies.length >= MAX_ENEMIES) return;
+    // A leva gira junto com a varredura: duas levas seguidas nao saem das
+    // mesmas quatro casas, e a sala nao vira um padrao decorado.
+    const cycle = Math.floor(state.tick / (FURNACE_HEART_CYCLE_TICKS * 2));
+    const [dx, dy] = FURNACE_BROOD_RING[(k + cycle) % FURNACE_BROOD_RING.length];
+    const x = Math.floor(enemy.x) + dx;
+    const y = Math.floor(enemy.y) + dy;
+    if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+    if (state.solid[y * w + x] !== SOLID_NONE) continue;
+    spawnEnemy(state, 'scoriac', x, y, false);
+    placed++;
+  }
 };
 
 /**

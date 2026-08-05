@@ -266,6 +266,23 @@ export const PROTOCOL_VERSION = 19;
 // - as linhagens ganham as posicoes 4 a 7 e `biomeProfile` le `depthIntensity`
 //   no lugar de `sector - 1` truncado em 2.
 //
+// Ainda na 32, duas correcoes que sairam do primeiro playtest de sete setores:
+//
+// - UM CHEFE POR RUN. Com dois setores de chefe, 38% das runs de G-04
+//   enfrentavam o MESMO chefe duas vezes (termica 51%, mineral 48%): o setor 3
+//   e o final costumam ser o mesmo estrato — e o que faz uma linhagem arida ser
+//   arida — e duas intrusoes Aurix davam dois Diamandis. O setor mais fundo
+//   fica com o dono do proprio bioma e o raso cede: com ocupacao, para o chefe
+//   do ESTRATO (a cicatriz cede ao veio); sem ocupacao, a camara do Nucleo
+//   intermediario e uma camara TOMADA. O terreno nao muda — o que muda e quem
+//   ocupa a camara.
+// - CORACAO DA FORNALHA. Ele era fixo, so pintava brasa num raio de OITO e nao
+//   tinha resposta nenhuma a distancia: um jogador parado a doze tiles matava
+//   900 de vida sem risco. A varredura passa a cobrir a camara (raio 15), a
+//   cobrar dano NA PASSAGEM (e nao so de quem para na brasa) e a mandar
+//   Escoriaceos no comeco de cada superaquecimento — a fauna do proprio
+//   estrato, atravessando a janela fria em que o chefe fica vulneravel.
+//
 // O TERRENO SEMEADO DOS SETORES 1 A 3 NAO MUDA — e proposital e esta coberto
 // por tests/impressao-digital-geracao.test.ts, que continua na assinatura
 // 2694607655. A mesma seed em G-01 e em G-04 produz os mesmos tres primeiros

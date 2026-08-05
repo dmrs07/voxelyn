@@ -11,7 +11,9 @@ import { damageEntity, spawnEnemy } from '../src/entities';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
 import {
   FROST_QUEEN_ICE_THRESHOLD,
+  FURNACE_HEART_BROOD_CAP,
   FURNACE_HEART_CYCLE_TICKS,
+  FURNACE_HEART_WAVE_RADIUS,
   LUNG_MATRIX_CYCLE_TICKS,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
@@ -281,6 +283,77 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
       }
     }
     expect(burning, 'a sala nao esquentou').toBeGreaterThan(8);
+  });
+
+  // Os tres testes abaixo cobrem o mesmo defeito por tres angulos: o Coracao
+  // era FIXO, so pintava chao num raio de oito e nao tinha resposta nenhuma a
+  // distancia. Um jogador parado a doze tiles matava 900 de vida sem risco —
+  // nao era uma luta dificil nem facil, nao era uma luta.
+  it('a varredura alcanca a SALA, e nao um disco em volta dele', () => {
+    const { state, boss } = duel(633, 'furnace_heart', 12);
+    expect(FURNACE_HEART_WAVE_RADIUS).toBeGreaterThan(12);
+    expect(advanceUntil(state, () => boss.mood === FURNACE_OVERHEATING)).toBe(true);
+    // O jogador esta a doze tiles: dentro do alcance do proprio bolt dele, e
+    // agora dentro do alcance do chefe tambem.
+    let hurt = false;
+    for (let t = 0; t < FURNACE_HEART_CYCLE_TICKS && !hurt; t++) {
+      const before = state.player.hp;
+      stepRun(state, [emptyCommand()]);
+      if (state.player.hp < before) hurt = true;
+      state.player.hp = state.player.maxHp;
+    }
+    expect(hurt, 'a doze tiles o chefe nao alcanca ninguem').toBe(true);
+  });
+
+  it('o setor cobra de quem esta nele NA PASSAGEM, e nao so da brasa que fica', () => {
+    const { state, boss } = duel(634, 'furnace_heart', 6);
+    expect(advanceUntil(state, () => boss.mood === FURNACE_OVERHEATING)).toBe(true);
+    let direct = 0;
+    for (let t = 0; t < FURNACE_HEART_CYCLE_TICKS; t++) {
+      const before = state.player.hp;
+      // O chao e limpo a cada tick: o que sobrar de dano so pode ter vindo da
+      // passagem da onda, e nunca de brasa acumulada sob os pes.
+      stepRun(state, [emptyCommand()]);
+      const i = Math.floor(state.player.y) * state.config.width + Math.floor(state.player.x);
+      state.surface[i] = SURF_NONE;
+      state.surfaceTimer[i] = 0;
+      if (state.player.hp < before) direct++;
+      state.player.hp = state.player.maxHp;
+    }
+    expect(direct, 'a onda passa e nao cobra nada').toBeGreaterThan(0);
+  });
+
+  it('manda ESCORIACEOS a cada superaquecimento, com teto', () => {
+    const { state, boss } = duel(635, 'furnace_heart', 6);
+    const scoriacs = () => state.enemies.filter((e) => e.alive && e.archetype === 'scoriac').length;
+    expect(scoriacs()).toBe(0);
+    // Duas levas: a sala enche, e o jogador deixa de poder ignorar a distancia.
+    for (let t = 0; t < FURNACE_HEART_CYCLE_TICKS * 4; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(boss.alive).toBe(true);
+    expect(scoriacs()).toBeGreaterThan(0);
+    expect(scoriacs(), 'a ninhada nao pode entupir a sala').toBeLessThanOrEqual(
+      FURNACE_HEART_BROOD_CAP,
+    );
+  });
+
+  it('a ninhada e DETERMINISTICA: mesma seed, mesmas posicoes', () => {
+    // Ela sai de geometria e do relogio, nunca de `state.rng` — duas maquinas
+    // de co-op com a mesma seed tem de montar a mesma sala.
+    const positions = (seed: number): string => {
+      const { state } = duel(seed, 'furnace_heart', 6);
+      for (let t = 0; t < FURNACE_HEART_CYCLE_TICKS * 3; t++) {
+        stepRun(state, [emptyCommand()]);
+        state.player.hp = state.player.maxHp;
+      }
+      return state.enemies
+        .filter((e) => e.archetype === 'scoriac')
+        .map((e) => `${e.x.toFixed(3)},${e.y.toFixed(3)}`)
+        .join('|');
+    };
+    expect(positions(636)).toBe(positions(636));
   });
 });
 

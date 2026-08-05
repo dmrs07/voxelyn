@@ -24,8 +24,15 @@ import {
   UPGRADES,
   type ProspectorGeneration,
 } from '../src/progression';
-import { bossForSector, isBossArchetype, sectorHoldsBoss } from '../src/bosses';
-import { LINEAGE_IDS, depthIntensity, lineageOf, sectorBiome, sectorTitle } from '../src/strata';
+import { bossForBiome, bossForSector, isBossArchetype, sectorHoldsBoss } from '../src/bosses';
+import {
+  LINEAGE_IDS,
+  depthIntensity,
+  lineageOf,
+  sectorBiome,
+  sectorTitle,
+  type SectorBiome,
+} from '../src/strata';
 import {
   coreUnlocked,
   coresAvailable,
@@ -399,18 +406,84 @@ describe('chefes por setor', () => {
     for (const generation of GENERATIONS) {
       const depth = runDepthForGeneration(generation);
       expect(sectorHoldsBoss(1, depth.sectorCount, depth.coreSectors)).toBe(false);
-      expect(bossForSector(sectorBiome(11, 1), 1, depth.sectorCount, depth.coreSectors)).toBeNull();
+      expect(
+        bossForSector((sec) => sectorBiome(11, sec), 1, depth.sectorCount, depth.coreSectors),
+      ).toBeNull();
     }
   });
 
-  it('a POSICAO decide se ha chefe; o BIOMA decide quem', () => {
-    // O mesmo setor 3, na mesma seed, tem o mesmo dono em G-03 e em G-04 — o
-    // que muda entre as duas e so ate onde a run vai.
-    for (let seed = 1; seed <= 60; seed++) {
-      const g03 = bossForSector(sectorBiome(seed, 3), 3, 5, [3, 5]);
-      const g04 = bossForSector(sectorBiome(seed, 3), 3, 7, [3, 7]);
-      expect(g04, `seed ${seed}`).toEqual(g03);
+  it('o setor FINAL fica sempre com o dono do proprio bioma', () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      for (const [count, cores] of [[5, [3, 5]], [7, [3, 7]]] as const) {
+        const final = bossForSector((s) => sectorBiome(seed, s), count, count, cores);
+        expect(final?.boss, `seed ${seed} setor ${count}`).toBe(
+          bossForBiome(sectorBiome(seed, count)),
+        );
+        expect(final?.source).not.toBe('special');
+      }
     }
+  });
+
+  it('UM CHEFE POR RUN: o setor 3 nunca repete o dono do fundo', () => {
+    // A regressao que isto impede tinha 38% de incidencia: o setor 3 e o setor
+    // final costumam ser o MESMO estrato (e o que faz uma linhagem arida ser
+    // arida), e duas intrusoes Aurix davam dois Diamandis na mesma run.
+    for (let seed = 1; seed <= 2000; seed++) {
+      for (const [count, cores] of [[5, [3, 5]], [7, [3, 7]]] as const) {
+        const biomeAt = (s: number) => sectorBiome(seed, s);
+        const shallow = bossForSector(biomeAt, 3, count, cores);
+        const deep = bossForSector(biomeAt, count, count, cores);
+        expect(shallow, `seed ${seed}`).not.toBeNull();
+        expect(deep, `seed ${seed}`).not.toBeNull();
+        expect(shallow!.boss, `seed ${seed} (${count} setores)`).not.toBe(deep!.boss);
+        // E o cedido continua sendo um chefe DE VERDADE, com corpo.
+        expect(shallow!.archetype, `seed ${seed}`).not.toBeNull();
+      }
+    }
+  });
+
+  it('a cicatriz cede ao VEIO: com ocupacao, o alternado e o chefe do estrato', () => {
+    // A regra que o caso Aurix pede por extenso — dois setores de Cicatriz nao
+    // produzem dois Diamandis; o raso vira o dono natural do estrato.
+    const aurixBoth = (sector: number): SectorBiome =>
+      sector === 3 || sector === 7
+        ? { stratum: 'ferric', occupation: 'aurix', lineage: 'industrial' }
+        : { stratum: 'ferric', occupation: 'none', lineage: 'industrial' };
+    const deep = bossForSector(aurixBoth, 7, 7, [3, 7]);
+    const shallow = bossForSector(aurixBoth, 3, 7, [3, 7]);
+    expect(deep?.boss).toBe('diamandis');
+    expect(shallow?.boss).toBe('magnetarch'); // o chefe de bioma do Ferrifero
+    expect(shallow?.source).toBe('special');
+  });
+
+  it('sem ocupacao, a camara rasa e uma camara TOMADA', () => {
+    // Mesmo estrato limpo nos dois: o estrato ja esta tomado pelo fundo, entao
+    // o pedestal raso recebe quem chegou nele primeiro (Matriz ou Aurix).
+    const cleanSilica = (): SectorBiome => ({
+      stratum: 'silica',
+      occupation: 'none',
+      lineage: 'arid',
+    });
+    const deep = bossForSector(cleanSilica, 7, 7, [3, 7]);
+    const shallow = bossForSector(cleanSilica, 3, 7, [3, 7]);
+    expect(deep?.boss).toBe('white_devourer');
+    expect(shallow?.boss).toBe('bishop');
+    expect(shallow?.source).toBe('special');
+  });
+
+  it('G-03 e G-04 concordam sobre o setor 3 quando ele nao precisa ceder', () => {
+    // Quando o fundo de G-03 (setor 5) e o de G-04 (setor 7) pedem o mesmo
+    // dono, as duas runs resolvem o setor 3 igual. Nao e invariante universal —
+    // e nem poderia ser, ja que o fundo delas e outro setor —, mas onde vale,
+    // vale.
+    let agreed = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const biomeAt = (s: number) => sectorBiome(seed, s);
+      if (bossForBiome(sectorBiome(seed, 5)) !== bossForBiome(sectorBiome(seed, 7))) continue;
+      expect(bossForSector(biomeAt, 3, 5, [3, 5])).toEqual(bossForSector(biomeAt, 3, 7, [3, 7]));
+      agreed++;
+    }
+    expect(agreed).toBeGreaterThan(0);
   });
 
   it('o setor sem chefe nasce com o poco disponivel pela regra normal', () => {

@@ -1299,10 +1299,47 @@ export const FURNACE_HEART_HP = 900;
 export const FURNACE_HEART_RADIUS = 1;
 export const FURNACE_HEART_CYCLE_TICKS = 150;
 export const FURNACE_HEART_HOT_ARMOR = 0.2;
-export const FURNACE_HEART_WAVE_RADIUS = 8;
+/**
+ * Alcance da varredura. Era 8, e oito era o defeito do encontro inteiro.
+ *
+ * O Coracao e FIXO: ele nao persegue e nao atira. Com a onda parando em oito
+ * tiles e o bolt do Prospector chegando muito alem disso, existia uma faixa
+ * confortavel em que o jogador matava um chefe de 900 de vida sem nunca entrar
+ * no alcance dele. Nao era uma luta dificil nem facil — nao era uma luta.
+ *
+ * Quinze cobre a camara: a promessa "a luta e contra a SALA" so vale se a sala
+ * inteira for a luta. O que continua sendo escolha do jogador e ONDE estar
+ * dentro dela, porque a varredura e um setor girando e nao um pulso total.
+ */
+export const FURNACE_HEART_WAVE_RADIUS = 15;
 export const FURNACE_HEART_WAVE_INTERVAL_TICKS = 12;
 /** Meia-abertura do setor que acende por vez, em radianos (~60 graus). */
 export const FURNACE_HEART_WAVE_ARC = 0.52;
+/**
+ * Dano de quem esta DENTRO do setor quando ele varre.
+ *
+ * A onda so pintava brasa no chao, e brasa cobra de quem fica parado nela — o
+ * que um jogador em movimento nunca era. O calor da passagem tem de custar no
+ * instante da passagem, senao a varredura e decoracao com atraso.
+ */
+export const FURNACE_HEART_WAVE_DAMAGE = 11;
+/**
+ * ESCORIACEOS: o que a Fornalha manda quando esquenta.
+ *
+ * O Coracao nao tinha resposta nenhuma para um jogador que se recusasse a
+ * chegar perto — e um chefe imovel sem resposta a distancia e um alvo de tiro
+ * ao alvo. Os Escoriaceos sao a resposta, e sao a fauna do PROPRIO estrato:
+ * corpos minerais que sobrevivem ao calor. Nao e um bestiario novo enxertado
+ * na luta, e a Fornalha usando o que ela ja tem.
+ *
+ * Eles saem no comeco de cada superaquecimento e ATRAVESSAM o resfriamento —
+ * e ai esta o desenho: a janela em que o Coracao fica vulneravel e a janela em
+ * que a sala esta mais cheia. O jogador escolhe entre bater no chefe e
+ * responder ao que veio atras dele.
+ */
+export const FURNACE_HEART_BROOD_PER_WAVE = 2;
+/** Teto de Escoriaceos vivos por conta do Coracao. Sem ele, a sala entope. */
+export const FURNACE_HEART_BROOD_CAP = 5;
 
 /**
  * RAINHA DA GEADA (Cripta Glacial) — a figura de gelo, nevoa e reflexos.

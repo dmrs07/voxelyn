@@ -254,7 +254,52 @@ Bosses suportados hoje (tabela completa, todos com arquétipo):
 | estrato | glacial | Rainha da Geada |
 | estrato | ferrífero | Magnetarca |
 
-### 6.3 Estado genérico
+### 6.3 Um chefe por run
+
+O setor **mais fundo** fica com o dono do próprio bioma, sempre — ele é o
+clímax e não cede nada. Um setor de chefe **raso** que repetiria esse dono cede
+o posto:
+
+- com **ocupação** forte → o chefe do **estrato** (a cicatriz cede ao veio).
+  É o caso que o Aurix pede por extenso: dois setores de Cicatriz não produzem
+  dois Diamandis; o raso vira o Magnetarca do Ferrífero;
+- **sem** ocupação → o estrato já está tomado pelo fundo, então a câmara do
+  Núcleo intermediário é uma câmara **tomada**: a Matriz ou a Aurix chegaram
+  nela primeiro. É a mesma gramática das intrusões, e explica por que aquele
+  pedestal especificamente está selado.
+
+Sem esta regra, **38%** das runs de G-04 enfrentavam o mesmo chefe duas vezes —
+térmica 51%, mineral 48%, criogênica 42%, árida 40%. O setor 3 e o final
+costumam ser o mesmo estrato: é justamente o que faz uma linhagem árida ser
+árida. Com ela, 0%; ~40% dos setores rasos cedem o posto (`source: 'special'`).
+
+O **terreno não muda** por causa disto: `sectorBiome` continua puro em
+`(seed, sector)` e o que se escolhe aqui é o ocupante da câmara. Um Bispo traz
+o próprio bolso micelial ao nascer (`populateSector`), que é exatamente o quanto
+de mundo o encontro precisa.
+
+### 6.4 Coração da Fornalha
+
+Corrigido no mesmo lote, porque a expansão o tornou muito mais frequente (a
+térmica tem furnace no 3 e no 7). Ele é **fixo**, e a única ofensiva dele
+pintava brasa num raio de **8** — contra um bolt que alcança muito mais. Um
+jogador parado a doze tiles matava 900 de vida sem risco nenhum: não era uma
+luta difícil nem fácil, não era uma luta.
+
+- **raio 8 → 15**: a promessa "a luta é contra a sala" só vale se a sala
+  inteira for a luta. O que continua sendo escolha é *onde* estar dentro dela —
+  a varredura é um setor girando, não um pulso total;
+- **dano na passagem** (`FURNACE_HEART_WAVE_DAMAGE`): a onda só pintava chão, e
+  chão cobra de quem fica parado — o que um jogador em movimento nunca era;
+- **Escoriáceos** no primeiro tick de cada superaquecimento (2 por leva, teto de
+  5 vivos). São a fauna do próprio estrato, não um bestiário enxertado, e
+  atravessam o resfriamento: a janela em que o Coração fica vulnerável é a
+  janela em que a sala está mais cheia.
+
+Instante e posições saem do relógio e da geometria — nada consome `state.rng`,
+então a mesma seed monta a mesma sala nas duas máquinas de um co-op.
+
+### 6.5 Estado genérico
 
 ```ts
 type SectorBossState = { archetype: EnemyArchetype | null; entityId: number | null; defeated: boolean };
@@ -471,10 +516,6 @@ Total do catálogo: 123 → **127** documentos.
   (`MAX_REPLAY_TICKS`) fica apertado para uma run lenta de sete setores. Não foi
   alterado nesta entrega — a alternativa é aumentar o teto e o limite de 512 KB
   de log junto, e isso pede medição real antes.
-- **Dois Diamandis.** Uma run de G-04 numa linhagem cuja intrusão Aurix caia nos
-  setores 3 e 7 enfrenta o mesmo chefe duas vezes. Reduzido (a industrial deixou
-  de forçar Aurix no fundo), não eliminado: a intrusão é sorteada por setor e
-  pode coincidir.
 - **Núcleo intermediário e contaminação.** O fator 2,2× a partir da primeira
   coleta é o número herdado do Núcleo único. Para uma run de sete setores ele
   pode ser severo demais se o jogador recolher no setor 3; precisa de playtest.
