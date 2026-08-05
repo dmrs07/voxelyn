@@ -896,7 +896,6 @@
         flex-direction: column;
         overflow: hidden;
       }
-      #matrix-body > .matrix-header,
       #matrix-body > .ax-tabs,
       #records-body > .ax-tabs {
         flex: 0 0 auto;
@@ -1470,34 +1469,43 @@
       }
 
       /* Matriz Geracional: trilhos de ramo + inspetor */
-      .matrix-header {
+      /* As metricas do cabecalho: pares rotulo–valor na barra de titulo,
+         encostados a direita. Discretos de proposito — a barra pertence ao
+         titulo; as metricas so precisam estar a um relance, nao dominar. */
+      .ax-head-stats {
+        margin-left: auto;
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 10px;
-      }
-      .matrix-card {
-        flex: 1 1 120px;
+        justify-content: flex-end;
+        align-items: baseline;
+        gap: 2px 14px;
         min-width: 0;
-        border: 1px solid var(--ax-key);
-        background: #0b0b0a;
-        padding: 5px 8px;
+        text-align: right;
       }
-      .matrix-card-label {
+      .ax-head-stat {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        white-space: nowrap;
+      }
+      .ax-head-stat-label {
         color: var(--ax-text-mute);
-        font-size: 10px;
+        font-size: 9px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
+      .ax-head-stat-value {
+        color: var(--ax-teal);
+        text-shadow: 0 0 12px rgba(79, 214, 201, 0.3);
+        font-size: 13px;
+        line-height: 1.2;
+      }
+      /* Ainda usado pelo inspetor (pre-requisito cumprido ganha o teal). */
       .matrix-card-value {
         color: var(--ax-teal);
         text-shadow: 0 0 12px rgba(79, 214, 201, 0.3);
         font-size: 18px;
         line-height: 1.2;
-      }
-      .matrix-card-note {
-        color: var(--ax-text-mute);
-        font-size: 10px;
       }
       .matrix-tabs {
         margin-bottom: 10px;
@@ -2511,6 +2519,11 @@
               AD-MTX-5.0 · console de autorização
             </div>
           </div>
+          <!-- As metricas (minerio, nucleos, geracao, protocolos) vivem AQUI,
+               na barra de titulo, e nao numa fileira de cartoes no corpo:
+               como cartoes elas empurravam os trilhos para baixo sem merecer
+               a altura. Quem preenche e matrix-panel.ts, a cada redesenho. -->
+          <div id="matrix-head-stats" class="ax-head-stats"></div>
         </div>
         <div id="matrix-body" class="ax-sheet-body"></div>
       </div>
