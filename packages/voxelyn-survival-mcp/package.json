@@ -1,0 +1,29 @@
+{
+  "name": "@voxelyn/survival-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voxelyn Survival - MCP server so an LLM agent can play the headless sim directly (no browser), with replay export for the real anti-cheat verifier and telemetry digest for balance analysis",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "voxelyn-survival-mcp": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@voxelyn/survival-protocol": "workspace:*",
+    "@voxelyn/survival-sim": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
+  }
+}
