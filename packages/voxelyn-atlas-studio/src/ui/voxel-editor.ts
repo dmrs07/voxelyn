@@ -1,8 +1,13 @@
-// Editor VOXEL mobile-first: o personagem e um modelo 3D montado como Lego,
-// camada por camada (fatias horizontais em z). O preview isometrico ao lado e
-// o rasterizador REAL do jogo (port com teste de paridade), entao o que voce
-// ve na fatia ja aparece assado com rampa, oclusao e quina acesa — e as quatro
-// direcoes saem por rotacao do MESMO modelo, sem redesenhar nada.
+// Editor VOXEL mobile-first. Duas vistas sobre o MESMO modelo:
+//
+// - MODELO (padrao): a vista isometrica renderizada pelo rasterizador real do
+//   jogo e EDITAVEL — tocar na face de um voxel encaixa uma peca nela (Lego),
+//   a borracha remove o voxel tocado, com pinch-zoom/pan livres e canvas
+//   dimensionado pelo modelo (nunca corta). E aqui que se constroi.
+// - FATIA: planta de uma camada z, para precisao fina (balde, simetria,
+//   interiores). Ferramenta de apoio, nao o fluxo principal.
+//
+// As quatro direcoes saem por rotacao do mesmo modelo; um modelo por frame.
 import type { Project } from '../types';
 import { modelKey } from '../types';
 import { bakeFrame } from '../atlas';
@@ -14,17 +19,20 @@ import {
   VOXEL_MATERIALS,
   mirrorModelX,
   parseVoxelKey,
+  renderVoxelView,
   shiftModel,
   voxelKey,
   voxelModelBounds,
   voxelProjectedBounds,
   type VoxelModel,
+  type VoxelView,
 } from '../voxel';
 import { saveProject } from '../store';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
 
 type Tool = 'pencil' | 'eraser' | 'fill' | 'picker';
+type ViewMode = 'model' | 'slice';
 
 const TOOL_ICONS: Record<Tool, string> = {
   pencil: '🧱',
@@ -63,7 +71,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   let brushSize = 1;
   let mirror = false;
   let ghost = true;
-  let previewDir = 'dr';
+  let viewMode: ViewMode = 'model';
+  let dir = 'dr';
   let playing = false;
   let playStart = 0;
 
@@ -86,7 +95,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   const backBtn = el('button', { text: '←', title: 'Voltar' });
   const undoBtn = el('button', { text: '↩', title: 'Desfazer' });
   const redoBtn = el('button', { text: '↪', title: 'Refazer' });
-  const fitBtn = el('button', { text: '⤢', title: 'Enquadrar fatia' });
+  const fitBtn = el('button', { text: '⤢', title: 'Enquadrar' });
   const menuBtn = el('button', { text: '⋮', title: 'Menu' });
   const title = el('div', { class: 'title', text: `${project.name} · voxel` });
   const topbar = el('div', { class: 'topbar' }, [
@@ -98,59 +107,60 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     menuBtn,
   ]);
 
-  // ---------------- preview isometrico ----------------
-  const previewCanvas = el('canvas');
-  const previewWrap = el('div', { class: 'voxel-preview' }, [previewCanvas]);
-  const previewCtx = previewCanvas.getContext('2d')!;
-  const previewOff = document.createElement('canvas');
-  const previewOffCtx = previewOff.getContext('2d')!;
-
-  const renderPreview = (): void => {
-    const g = bakeFrame(project, previewDir, anim, frameIndex);
-    previewOff.width = g.w;
-    previewOff.height = g.h;
-    previewOffCtx.putImageData(new ImageData(new Uint8ClampedArray(g.buf), g.w, g.h), 0, 0);
-    const rect = previewWrap.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    previewCanvas.width = Math.max(1, Math.round(rect.width * dpr));
-    previewCanvas.height = Math.max(1, Math.round(rect.height * dpr));
-    previewCtx.setTransform(1, 0, 0, 1, 0, 0);
-    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-    previewCtx.imageSmoothingEnabled = false;
-    const scale = Math.max(
-      1,
-      Math.floor(Math.min(previewCanvas.width / g.w, previewCanvas.height / g.h)),
-    );
-    const ox = Math.floor((previewCanvas.width - g.w * scale) / 2);
-    const oy = Math.floor((previewCanvas.height - g.h * scale) / 2);
-    previewCtx.drawImage(previewOff, ox, oy, g.w * scale, g.h * scale);
-  };
-
-  const dirTabs = el('div', { class: 'row', style: 'flex-direction:column;gap:6px;padding:0' });
-  const dirTabButtons = new Map<string, HTMLButtonElement>();
+  // ---------------- vistas e direcoes ----------------
+  const modelTab = el('button', { class: 'dir-tab', text: '🧊 Modelo' });
+  const sliceTab = el('button', { class: 'dir-tab', text: '▦ Fatia' });
+  const viewRow = el('div', { class: 'row', style: 'padding-top:6px' }, [modelTab, sliceTab]);
+  const dirButtons = new Map<string, HTMLButtonElement>();
   for (const d of VOXEL_DIRS) {
-    const b = el('button', { class: 'dir-tab', text: d, style: 'flex:none;min-width:44px' });
+    const b = el('button', { class: 'dir-tab', text: d });
     b.addEventListener('click', () => {
-      previewDir = d;
-      updateDirTabs();
-      renderPreview();
+      dir = d;
+      updateViewRow();
+      invalidateView();
+      render();
+      updateFrameStrip();
     });
-    dirTabButtons.set(d, b);
-    dirTabs.append(b);
+    dirButtons.set(d, b);
+    viewRow.append(b);
   }
-  const updateDirTabs = (): void => {
-    for (const [d, b] of dirTabButtons) b.classList.toggle('active', d === previewDir);
+  const setViewMode = (m: ViewMode): void => {
+    viewMode = m;
+    updateViewRow();
+    fitView();
+  };
+  modelTab.addEventListener('click', () => setViewMode('model'));
+  sliceTab.addEventListener('click', () => setViewMode('slice'));
+  const updateViewRow = (): void => {
+    modelTab.classList.toggle('active', viewMode === 'model');
+    sliceTab.classList.toggle('active', viewMode === 'slice');
+    for (const [d, b] of dirButtons) b.classList.toggle('active', d === dir);
   };
 
-  const previewRow = el('div', { class: 'voxel-preview-row' }, [previewWrap, dirTabs]);
-
-  // ---------------- fatia (slice) ----------------
+  // ---------------- canvas ----------------
   const canvas = el('canvas');
   const hud = el('div', { class: 'hud' });
   const canvasWrap = el('div', { class: 'canvas-wrap' }, [canvas, hud]);
   const ctx = canvas.getContext('2d')!;
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const view = { scale: 18, x: 0, y: 0 };
+  // transformes independentes por vista (px do canvas CSS)
+  const modelView = { scale: 4, x: 0, y: 0 };
+  const sliceView = { scale: 18, x: 0, y: 0 };
+  const view = (): { scale: number; x: number; y: number } =>
+    viewMode === 'model' ? modelView : sliceView;
+
+  const offscreen = document.createElement('canvas');
+  const offCtx = offscreen.getContext('2d')!;
+
+  // cache da vista 3D do frame corrente (recalculada a cada edicao)
+  let cachedView: VoxelView | null = null;
+  const invalidateView = (): void => {
+    cachedView = null;
+  };
+  const modelViewData = (): VoxelView => {
+    cachedView ??= renderVoxelView(currentModel(), (VOXEL_DIRS as readonly string[]).indexOf(dir));
+    return cachedView;
+  };
 
   const resizeCanvas = (): void => {
     const rect = canvasWrap.getBoundingClientRect();
@@ -161,84 +171,109 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const fitView = (): void => {
     const rect = canvasWrap.getBoundingClientRect();
-    const bounds = voxelModelBounds(currentModel());
-    const spanX = bounds ? bounds.maxX - bounds.minX + 5 : 17;
-    const spanY = bounds ? bounds.maxY - bounds.minY + 5 : 17;
-    const scale = Math.max(6, Math.floor(Math.min(rect.width / spanX, rect.height / spanY)));
-    view.scale = Math.min(40, scale);
-    const cx = bounds ? (bounds.minX + bounds.maxX + 1) / 2 : 0;
-    const cy = bounds ? (bounds.minY + bounds.maxY + 1) / 2 : 0;
-    view.x = rect.width / 2 - cx * view.scale;
-    view.y = rect.height / 2 - cy * view.scale;
+    if (viewMode === 'model') {
+      // modelView.x/y e a posicao da ORIGEM do modelo na tela — ancorar nela
+      // impede a vista de pular quando os limites do modelo crescem no meio de
+      // um traco de edicao.
+      const vd = modelViewData();
+      const g = vd.grid;
+      const scale = Math.max(2, Math.floor(Math.min(rect.width / g.w, rect.height / g.h) * 0.9));
+      modelView.scale = Math.min(24, scale);
+      modelView.x = (rect.width - g.w * modelView.scale) / 2 + vd.originX * modelView.scale;
+      modelView.y = (rect.height - g.h * modelView.scale) / 2 + vd.originY * modelView.scale;
+    } else {
+      const bounds = voxelModelBounds(currentModel());
+      const spanX = bounds ? bounds.maxX - bounds.minX + 5 : 17;
+      const spanY = bounds ? bounds.maxY - bounds.minY + 5 : 17;
+      const scale = Math.max(6, Math.floor(Math.min(rect.width / spanX, rect.height / spanY)));
+      sliceView.scale = Math.min(40, scale);
+      const cx = bounds ? (bounds.minX + bounds.maxX + 1) / 2 : 0;
+      const cy = bounds ? (bounds.minY + bounds.maxY + 1) / 2 : 0;
+      sliceView.x = rect.width / 2 - cx * sliceView.scale;
+      sliceView.y = rect.height / 2 - cy * sliceView.scale;
+    }
     render();
   };
 
-  const render = (): void => {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#05070c';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const s = view.scale;
+  const renderModelView = (): void => {
+    const vd = modelViewData();
+    const g = vd.grid;
+    offscreen.width = g.w;
+    offscreen.height = g.h;
+    offCtx.putImageData(new ImageData(new Uint8ClampedArray(g.buf), g.w, g.h), 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    const v = modelView;
+    const cornerX = v.x - vd.originX * v.scale;
+    const cornerY = v.y - vd.originY * v.scale;
+    ctx.drawImage(offscreen, cornerX, cornerY, g.w * v.scale, g.h * v.scale);
+    // linha do chao (z=0) passando pela origem, como referencia de apoio
+    ctx.strokeStyle = 'rgba(89,242,194,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, v.y);
+    ctx.lineTo(canvas.width / dpr, v.y);
+    ctx.stroke();
+    const count = Object.keys(currentModel()).length;
+    hud.textContent = `${dir} · ${anim} ${frameIndex + 1}/${project.animations[anim]?.frames ?? 0} · ${count} voxels · ${TOOL_LABELS[tool]} (${material})`;
+  };
+
+  const renderSliceView = (): void => {
+    const s = sliceView.scale;
     const rect = canvasWrap.getBoundingClientRect();
-    const minCX = Math.floor((0 - view.x) / s) - 1;
-    const maxCX = Math.floor((rect.width - view.x) / s) + 1;
-    const minCY = Math.floor((0 - view.y) / s) - 1;
-    const maxCY = Math.floor((rect.height - view.y) / s) + 1;
+    const minCX = Math.floor((0 - sliceView.x) / s) - 1;
+    const maxCX = Math.floor((rect.width - sliceView.x) / s) + 1;
+    const minCY = Math.floor((0 - sliceView.y) / s) - 1;
+    const maxCY = Math.floor((rect.height - sliceView.y) / s) + 1;
     const model = currentModel();
 
-    // camada de baixo (fantasma) para alinhar como planta de Lego
     if (ghost) {
       ctx.globalAlpha = 0.35;
       for (const [key, mat] of Object.entries(model)) {
         const [x, y, vz] = parseVoxelKey(key);
         if (vz !== z - 1 || x < minCX || x > maxCX || y < minCY || y > maxCY) continue;
         ctx.fillStyle = HEX[RAMPS[mat][2]] ?? '#333';
-        ctx.fillRect(view.x + x * s, view.y + y * s, s, s);
+        ctx.fillRect(sliceView.x + x * s, sliceView.y + y * s, s, s);
       }
       ctx.globalAlpha = 1;
     }
 
-    // camada atual: cor de TOPO da rampa (a face que a fatia mostra)
     for (const [key, mat] of Object.entries(model)) {
       const [x, y, vz] = parseVoxelKey(key);
       if (vz !== z || x < minCX || x > maxCX || y < minCY || y > maxCY) continue;
       ctx.fillStyle = HEX[RAMPS[mat][0]] ?? '#fff';
-      ctx.fillRect(view.x + x * s, view.y + y * s, s, s);
+      ctx.fillRect(sliceView.x + x * s, sliceView.y + y * s, s, s);
     }
 
-    // grade
     if (s >= 8) {
       ctx.strokeStyle = 'rgba(122,139,163,0.15)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = minCX; x <= maxCX + 1; x++) {
-        ctx.moveTo(view.x + x * s, view.y + minCY * s);
-        ctx.lineTo(view.x + x * s, view.y + (maxCY + 1) * s);
+        ctx.moveTo(sliceView.x + x * s, sliceView.y + minCY * s);
+        ctx.lineTo(sliceView.x + x * s, sliceView.y + (maxCY + 1) * s);
       }
       for (let y = minCY; y <= maxCY + 1; y++) {
-        ctx.moveTo(view.x + minCX * s, view.y + y * s);
-        ctx.lineTo(view.x + (maxCX + 1) * s, view.y + y * s);
+        ctx.moveTo(sliceView.x + minCX * s, sliceView.y + y * s);
+        ctx.lineTo(sliceView.x + (maxCX + 1) * s, sliceView.y + y * s);
       }
       ctx.stroke();
     }
 
-    // eixos da origem (entre os pes) e frente do modelo (-y)
     ctx.strokeStyle = 'rgba(89,242,194,0.5)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(view.x, view.y + minCY * s);
-    ctx.lineTo(view.x, view.y + (maxCY + 1) * s);
-    ctx.moveTo(view.x + minCX * s, view.y);
-    ctx.lineTo(view.x + (maxCX + 1) * s, view.y);
+    ctx.moveTo(sliceView.x, sliceView.y + minCY * s);
+    ctx.lineTo(sliceView.x, sliceView.y + (maxCY + 1) * s);
+    ctx.moveTo(sliceView.x + minCX * s, sliceView.y);
+    ctx.lineTo(sliceView.x + (maxCX + 1) * s, sliceView.y);
     ctx.stroke();
 
-    // eixo de simetria do espelho (x = -0.5)
     if (mirror) {
       ctx.strokeStyle = 'rgba(255,209,102,0.6)';
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(view.x, view.y + minCY * s);
-      ctx.lineTo(view.x, view.y + (maxCY + 1) * s);
+      ctx.moveTo(sliceView.x, sliceView.y + minCY * s);
+      ctx.lineTo(sliceView.x, sliceView.y + (maxCY + 1) * s);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -247,19 +282,33 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     hud.textContent = `z=${z} · ${anim} ${frameIndex + 1}/${project.animations[anim]?.frames ?? 0} · ${count} voxels · ${TOOL_LABELS[tool]} (${material})`;
   };
 
+  const render = (): void => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#05070c';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (viewMode === 'model') renderModelView();
+    else renderSliceView();
+  };
+
   // ---------------- edicao ----------------
-  const applyBrush = (m: VoxelModel, cx: number, cy: number, erase: boolean): void => {
+  const inRange = (x: number, y: number, vz: number): boolean =>
+    Math.abs(x) <= RANGE && Math.abs(y) <= RANGE && Math.abs(vz) <= RANGE;
+
+  const placeAt = (m: VoxelModel, x: number, y: number, vz: number, erase: boolean): void => {
+    if (!inRange(x, y, vz)) return;
+    const targets = mirror ? [[x, y] as const, [-1 - x, y] as const] : [[x, y] as const];
+    for (const [tx, ty] of targets) {
+      if (erase) delete m[voxelKey(tx, ty, vz)];
+      else m[voxelKey(tx, ty, vz)] = material;
+    }
+  };
+
+  const applyBrushSlice = (m: VoxelModel, cx: number, cy: number, erase: boolean): void => {
     const half = Math.floor((brushSize - 1) / 2);
     for (let oy = 0; oy < brushSize; oy++) {
       for (let ox = 0; ox < brushSize; ox++) {
-        const x = cx - half + ox;
-        const y = cy - half + oy;
-        if (Math.abs(x) > RANGE || Math.abs(y) > RANGE || Math.abs(z) > RANGE) continue;
-        const targets = mirror ? [[x, y] as const, [-1 - x, y] as const] : [[x, y] as const];
-        for (const [tx, ty] of targets) {
-          if (erase) delete m[voxelKey(tx, ty, z)];
-          else m[voxelKey(tx, ty, z)] = material;
-        }
+        placeAt(m, cx - half + ox, cy - half + oy, z, erase);
       }
     }
   };
@@ -281,6 +330,51 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     }
   };
 
+  /** Edicao na vista 3D: um toque = uma peca (ou remocao) na face tocada. */
+  const editModelAt = (m: VoxelModel, clientX: number, clientY: number): boolean => {
+    const rect = canvas.getBoundingClientRect();
+    // hit-test contra a vista do modelo EM EDICAO (m); as coordenadas sao
+    // ancoradas na origem do modelo, entao valem mesmo com bounds crescendo
+    const viewData = renderVoxelView(m, (VOXEL_DIRS as readonly string[]).indexOf(dir));
+    const px = Math.floor(
+      (clientX - rect.left - (modelView.x - viewData.originX * modelView.scale)) / modelView.scale,
+    );
+    const py = Math.floor(
+      (clientY - rect.top - (modelView.y - viewData.originY * modelView.scale)) / modelView.scale,
+    );
+    const hit = viewData.hitAt(px, py);
+    if (!hit) {
+      // modelo vazio: primeira peca nasce na origem, entre os pes
+      if (Object.keys(m).length === 0 && tool === 'pencil') {
+        placeAt(m, 0, 0, 0, false);
+        return true;
+      }
+      return false;
+    }
+    if (tool === 'pencil') {
+      const [x, y, vz] = hit.add;
+      placeAt(m, x, y, vz, false);
+      return true;
+    }
+    if (tool === 'eraser') {
+      const [x, y, vz] = hit.vox;
+      placeAt(m, x, y, vz, true);
+      return true;
+    }
+    if (tool === 'picker') {
+      const mat = m[voxelKey(...hit.vox)];
+      if (mat) {
+        material = mat;
+        tool = 'pencil';
+        updateToolbar();
+        updateMaterials();
+        toast(`Material: ${mat}`);
+      }
+      return false;
+    }
+    return false;
+  };
+
   // ---------------- gestos ----------------
   const pointers = new Map<number, { x: number; y: number }>();
   let strokeBefore: VoxelModel | null = null;
@@ -289,53 +383,67 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   let pinchDist = 0;
   let pinchScale = 0;
 
-  const cellAt = (clientX: number, clientY: number): { x: number; y: number } => {
+  const sliceCellAt = (clientX: number, clientY: number): { x: number; y: number } => {
     const rect = canvas.getBoundingClientRect();
     return {
-      x: Math.floor((clientX - rect.left - view.x) / view.scale),
-      y: Math.floor((clientY - rect.top - view.y) / view.scale),
+      x: Math.floor((clientX - rect.left - sliceView.x) / sliceView.scale),
+      y: Math.floor((clientY - rect.top - sliceView.y) / sliceView.scale),
     };
   };
 
-  const beginStroke = (cell: { x: number; y: number }): void => {
+  const applyStrokePoint = (clientX: number, clientY: number): void => {
+    if (!strokeModel) return;
+    let changed = false;
+    if (viewMode === 'model') {
+      changed = editModelAt(strokeModel, clientX, clientY);
+    } else {
+      const cell = sliceCellAt(clientX, clientY);
+      if (tool === 'pencil') {
+        applyBrushSlice(strokeModel, cell.x, cell.y, false);
+        changed = true;
+      } else if (tool === 'eraser') {
+        applyBrushSlice(strokeModel, cell.x, cell.y, true);
+        changed = true;
+      } else if (tool === 'fill') {
+        fillSlice(strokeModel, cell.x, cell.y);
+        changed = true;
+      } else if (tool === 'picker') {
+        const mat = strokeModel[voxelKey(cell.x, cell.y, z)];
+        if (mat) {
+          material = mat;
+          tool = 'pencil';
+          updateToolbar();
+          updateMaterials();
+          toast(`Material: ${mat}`);
+        }
+      }
+    }
+    if (changed) {
+      setCurrentModel(strokeModel);
+      invalidateView();
+      render();
+    }
+  };
+
+  const beginStroke = (clientX: number, clientY: number): void => {
     if (playing) return;
+    if (viewMode === 'model' && tool === 'fill') {
+      toast('O balde funciona na vista Fatia');
+      return;
+    }
     strokeBefore = structuredClone(currentModel());
     strokeModel = structuredClone(strokeBefore);
     strokeCancelled = false;
-    if (tool === 'pencil') applyBrush(strokeModel, cell.x, cell.y, false);
-    else if (tool === 'eraser') applyBrush(strokeModel, cell.x, cell.y, true);
-    else if (tool === 'fill') fillSlice(strokeModel, cell.x, cell.y);
-    setCurrentModel(strokeModel);
-    render();
-    renderPreview();
+    applyStrokePoint(clientX, clientY);
   };
 
-  const moveStroke = (cell: { x: number; y: number }): void => {
-    if (!strokeModel || strokeCancelled || playing) return;
-    if (tool === 'pencil') applyBrush(strokeModel, cell.x, cell.y, false);
-    else if (tool === 'eraser') applyBrush(strokeModel, cell.x, cell.y, true);
-    else return;
-    setCurrentModel(strokeModel);
-    render();
-    renderPreview();
-  };
-
-  const commitStroke = (cell: { x: number; y: number } | null): void => {
-    if (!strokeBefore || !strokeModel) return;
-    if (strokeCancelled) {
+  const commitStroke = (): void => {
+    if (!strokeBefore || !strokeModel) {
       strokeBefore = null;
       strokeModel = null;
       return;
     }
-    if (tool === 'picker' && cell) {
-      const mat = currentModel()[voxelKey(cell.x, cell.y, z)];
-      if (mat) {
-        material = mat;
-        tool = 'pencil';
-        updateToolbar();
-        updateMaterials();
-        toast(`Material: ${mat}`);
-      }
+    if (strokeCancelled) {
       strokeBefore = null;
       strokeModel = null;
       return;
@@ -357,38 +465,43 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     if (strokeBefore && !strokeCancelled) {
       setCurrentModel(strokeBefore);
       strokeCancelled = true;
+      invalidateView();
       render();
-      renderPreview();
     }
   };
 
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) beginStroke(cellAt(e.clientX, e.clientY));
+    if (pointers.size === 1) beginStroke(e.clientX, e.clientY);
     else if (pointers.size === 2) {
       cancelStroke();
       const [a, b] = [...pointers.values()];
       pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
-      pinchScale = view.scale;
+      pinchScale = view().scale;
     }
   });
 
   canvas.addEventListener('pointermove', (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) moveStroke(cellAt(e.clientX, e.clientY));
-    else if (pointers.size === 2) {
+    if (pointers.size === 1) {
+      if (!strokeCancelled && strokeModel) applyStrokePoint(e.clientX, e.clientY);
+    } else if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       const cx = (a.x + b.x) / 2;
       const cy = (a.y + b.y) / 2;
       const rect = canvas.getBoundingClientRect();
-      const worldX = (cx - rect.left - view.x) / view.scale;
-      const worldY = (cy - rect.top - view.y) / view.scale;
-      if (pinchDist > 0) view.scale = Math.min(48, Math.max(4, (pinchScale * dist) / pinchDist));
-      view.x = cx - rect.left - worldX * view.scale;
-      view.y = cy - rect.top - worldY * view.scale;
+      const v = view();
+      const worldX = (cx - rect.left - v.x) / v.scale;
+      const worldY = (cy - rect.top - v.y) / v.scale;
+      const maxScale = viewMode === 'model' ? 32 : 48;
+      const minScale = viewMode === 'model' ? 1 : 4;
+      if (pinchDist > 0)
+        v.scale = Math.min(maxScale, Math.max(minScale, (pinchScale * dist) / pinchDist));
+      v.x = cx - rect.left - worldX * v.scale;
+      v.y = cy - rect.top - worldY * v.scale;
       render();
     }
   });
@@ -396,7 +509,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   const endPointer = (e: PointerEvent): void => {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
-    if (pointers.size === 0) commitStroke(cellAt(e.clientX, e.clientY));
+    if (pointers.size === 0) commitStroke();
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', (e) => {
@@ -413,11 +526,14 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     (e) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
-      const worldX = (e.clientX - rect.left - view.x) / view.scale;
-      const worldY = (e.clientY - rect.top - view.y) / view.scale;
-      view.scale = Math.min(48, Math.max(4, view.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
-      view.x = e.clientX - rect.left - worldX * view.scale;
-      view.y = e.clientY - rect.top - worldY * view.scale;
+      const v = view();
+      const worldX = (e.clientX - rect.left - v.x) / v.scale;
+      const worldY = (e.clientY - rect.top - v.y) / v.scale;
+      const maxScale = viewMode === 'model' ? 32 : 48;
+      const minScale = viewMode === 'model' ? 1 : 4;
+      v.scale = Math.min(maxScale, Math.max(minScale, v.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      v.x = e.clientX - rect.left - worldX * v.scale;
+      v.y = e.clientY - rect.top - worldY * v.scale;
       render();
     },
     { passive: false },
@@ -431,11 +547,11 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const applyHistory = (model: VoxelModel, mKey: string): void => {
     project.models![mKey] = structuredClone(model);
+    invalidateView();
     scheduleSave();
     updateUndoRedo();
     updateFrameStrip();
     render();
-    renderPreview();
   };
 
   undoBtn.addEventListener('click', () => {
@@ -469,7 +585,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     toolButtons.set(t, btn);
     toolsRow.append(btn);
   }
-  const brushBtn = el('button', { class: 'toolbtn', text: '1', title: 'Tamanho do pincel' });
+  const brushBtn = el('button', { class: 'toolbtn', text: '1', title: 'Pincel (fatia)' });
   brushBtn.addEventListener('click', () => {
     brushSize = brushSize === 1 ? 2 : brushSize === 2 ? 3 : 1;
     brushBtn.textContent = String(brushSize);
@@ -480,7 +596,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     mirrorBtn.classList.toggle('active', mirror);
     render();
   });
-  const ghostBtn = el('button', { class: 'toolbtn', text: '👻', title: 'Camada de baixo' });
+  const ghostBtn = el('button', { class: 'toolbtn', text: '👻', title: 'Camada de baixo (fatia)' });
   ghostBtn.addEventListener('click', () => {
     ghost = !ghost;
     ghostBtn.classList.toggle('active', ghost);
@@ -489,16 +605,14 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   const zDown = el('button', { class: 'toolbtn', text: 'z−', title: 'Camada abaixo' });
   const zUp = el('button', { class: 'toolbtn', text: 'z+', title: 'Camada acima' });
   const zLabel = el('span', { class: 'budget', text: 'z=0' });
-  zDown.addEventListener('click', () => {
-    z = Math.max(-RANGE, z - 1);
+  const gotoSlice = (delta: number): void => {
+    z = Math.max(-RANGE, Math.min(RANGE, z + delta));
     zLabel.textContent = `z=${z}`;
-    render();
-  });
-  zUp.addEventListener('click', () => {
-    z = Math.min(RANGE, z + 1);
-    zLabel.textContent = `z=${z}`;
-    render();
-  });
+    if (viewMode !== 'slice') setViewMode('slice');
+    else render();
+  };
+  zDown.addEventListener('click', () => gotoSlice(-1));
+  zUp.addEventListener('click', () => gotoSlice(1));
   toolsRow.append(brushBtn, mirrorBtn, ghostBtn, zDown, zLabel, zUp);
 
   const updateToolbar = (): void => {
@@ -556,9 +670,9 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     anim = animSelect.value;
     frameIndex = 0;
     stopPlayback();
+    invalidateView();
     updateFrameStrip();
     render();
-    renderPreview();
   });
 
   const updateFrameStrip = (): void => {
@@ -568,7 +682,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     for (let f = 0; f < def.frames; f++) {
       const thumb = el('button', { class: `frame-thumb${f === frameIndex ? ' active' : ''}` });
       const c = el('canvas');
-      const g = bakeFrame(project, previewDir, anim, f);
+      const g = bakeFrame(project, dir, anim, f);
       c.width = g.w;
       c.height = g.h;
       c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(g.buf), g.w, g.h), 0, 0);
@@ -576,9 +690,9 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       thumb.addEventListener('click', () => {
         frameIndex = f;
         stopPlayback();
+        invalidateView();
         updateFrameStrip();
         render();
-        renderPreview();
       });
       frameStripWrap.append(thumb);
     }
@@ -589,11 +703,11 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     if (undoStack.length > 64) undoStack.shift();
     redoStack.length = 0;
     setCurrentModel(structuredClone(after));
+    invalidateView();
     scheduleSave();
     updateUndoRedo();
     updateFrameStrip();
     render();
-    renderPreview();
   };
 
   copyPrevBtn.addEventListener('click', () => {
@@ -628,9 +742,9 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         const next = def.loop ? raw % def.frames : Math.min(raw, def.frames - 1);
         if (next !== frameIndex) {
           frameIndex = next;
+          invalidateView();
           updateFrameStrip();
           render();
-          renderPreview();
         }
         if (!def.loop && raw >= def.frames) {
           stopPlayback();
@@ -807,12 +921,12 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         title.textContent = `${project.name} · voxel`;
         undoStack.length = 0;
         redoStack.length = 0;
+        invalidateView();
         updateUndoRedo();
         updateAnimSelect();
         updateFrameStrip();
         scheduleSave();
         render();
-        renderPreview();
         close();
       });
 
@@ -850,25 +964,21 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   const mainCol = el(
     'div',
     { class: 'main-col', style: 'display:flex;flex-direction:column;flex:1;min-height:0' },
-    [topbar, previewRow, canvasWrap, bottom],
+    [topbar, viewRow, canvasWrap, bottom],
   );
   root.append(el('div', { class: 'editor' }, [mainCol]));
 
-  const resizeObserver = new ResizeObserver(() => {
-    resizeCanvas();
-    renderPreview();
-  });
+  const resizeObserver = new ResizeObserver(() => resizeCanvas());
   resizeObserver.observe(canvasWrap);
 
   updateToolbar();
   updateMaterials();
-  updateDirTabs();
+  updateViewRow();
   updateAnimSelect();
   updateFrameStrip();
   updateUndoRedo();
   requestAnimationFrame(() => {
     resizeCanvas();
     fitView();
-    renderPreview();
   });
 };
