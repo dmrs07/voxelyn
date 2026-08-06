@@ -63,7 +63,6 @@ import {
   LEVIATHAN_SWIM_SPEED,
   LEVIATHAN_SURGE_COOLDOWN_TICKS,
   LEVIATHAN_SURGE_LENGTH,
-  LEVIATHAN_SURGE_TICKS,
   LEVIATHAN_SURGE_WIDTH,
   DIVER_BOSS_AGGRO_RANGE,
   LUNG_MATRIX_BREATH_INTERVAL_TICKS,
@@ -1822,9 +1821,17 @@ const bishopNova = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]
 const bishopNovaStride = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const action = enemy.action;
   if (!action) return;
-  const span = Math.max(1, action.endsAt - action.releaseAt);
-  const before = (state.tick - 1 - action.releaseAt) / span;
-  const now = (state.tick - action.releaseAt) / span;
+  // O ultimo tick EXECUTADO e `endsAt - 1`, e nao `endsAt`: `advanceAction`
+  // limpa a acao e devolve `false` assim que `tick >= endsAt`, entao a frente
+  // nunca chega a rodar no instante final.
+  //
+  // Dividir pelo vao cheio fazia o ultimo passo parar em 25/26 do percurso — a
+  // faixa externa do disco (de ~8,65 a 9) nunca recebia fungo nem dano, e a
+  // borda que o telegrafo prometeu era mentira. Normalizar pelos passos que de
+  // fato acontecem fecha o disco exatamente no raio anunciado.
+  const steps = Math.max(1, action.endsAt - action.releaseAt - 1);
+  const before = (state.tick - 1 - action.releaseAt) / steps;
+  const now = (state.tick - action.releaseAt) / steps;
   const r0 = Math.max(0, before) * BISHOP_NOVA_RADIUS;
   const r1 = Math.min(1, now) * BISHOP_NOVA_RADIUS;
   if (r1 <= r0) return;
@@ -2723,6 +2730,13 @@ const archcantorChain = (state: SurvivalState, enemy: Entity): number[][] => {
       if (x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) continue;
       const i = y * w + x;
       if (state.solid[i] !== SOLID_CRYSTAL || seen.has(i)) continue;
+      // O TETO vale desde a camada zero.
+      //
+      // Ele so aparecia no laco das camadas seguintes, e as seeds entravam sem
+      // consulta: numa Catedral densa o release sozinho armava muito mais que o
+      // orcamento — justamente no caso em que o orcamento existe para proteger,
+      // porque cada cristal armado carrega as quatro aberturas coladas nele.
+      if (seen.size >= ARCHCANTOR_CRYSTAL_BUDGET) continue;
       seen.add(i);
       seeds.push(i);
     }
@@ -2927,6 +2941,14 @@ const leviathanStep = (
  * um chefe que sobrescrevesse gelo, fogo ou vidro estaria apagando decisao do
  * jogador com o proprio corpo.
  */
+/** Ordem FIXA de vizinhanca: o que torna a frente da enchente determinista. */
+const NEIGHBORS4: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
 const leviathanSurge = (
   state: SurvivalState,
   enemy: Entity,
@@ -2938,19 +2960,69 @@ const leviathanSurge = (
   const w = state.config.width;
   const h = state.config.height;
   const dir = normalized(player.x - enemy.x, player.y - enemy.y);
-  const side = { x: -dir.y, y: dir.x };
   let raised = 0;
-  for (let step = 1; step <= LEVIATHAN_SURGE_LENGTH; step++) {
-    for (let lane = -LEVIATHAN_SURGE_WIDTH; lane <= LEVIATHAN_SURGE_WIDTH; lane++) {
-      const x = Math.floor(enemy.x + dir.x * step + side.x * lane);
-      const y = Math.floor(enemy.y + dir.y * step + side.y * lane);
-      if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
-      const i = y * w + x;
-      if (state.solid[i] !== SOLID_NONE) continue;
-      if (state.surface[i] !== SURF_NONE && state.surface[i] !== SURF_SCORCHED) continue;
-      setSurface(state, i, SURF_WATER, LEVIATHAN_SURGE_TICKS);
-      raised++;
+  // A lamina avanca por CONECTIVIDADE, e nao por distancia.
+  //
+  // A primeira versao tracava faixas retas e so pulava a celula solida; a
+  // segunda interrompia a faixa na parede. As duas vazavam, e a segunda vazava
+  // de um jeito instrutivo: com o eixo chefe->alvo na diagonal, o deslocamento
+  // perpendicular da faixa ja punha a origem dela quase em cima da parede, e o
+  // primeiro passo caía do outro lado sem nunca amostrar a coluna solida. Uma
+  // parede transversal fechada nao segurava nada — e o chefe depois emergia
+  // atras dela, no unico lugar que o jogador tinha escolhido por ser
+  // inalcancavel.
+  //
+  // Uma frente em largura a partir do CORPO dele nao tem esse buraco: cada
+  // celula so entra se um vizinho aberto ja estiver molhado, que e como agua
+  // anda de verdade. O corredor (a frente do eixo, dentro da meia-largura) e o
+  // que a mantem uma investida dirigida em vez de uma bolha.
+  //
+  // Deterministica: a fronteira e um array em ordem de insercao e os vizinhos
+  // saem em ordem fixa. Duas maquinas da mesma sala alagam as MESMAS celulas.
+  const sx = Math.floor(enemy.x);
+  const sy = Math.floor(enemy.y);
+  const seen = new Set<number>([sy * w + sx]);
+  let frontier = [sy * w + sx];
+  for (let step = 1; step <= LEVIATHAN_SURGE_LENGTH && frontier.length > 0; step++) {
+    const next: number[] = [];
+    for (const cell of frontier) {
+      const cx = cell % w;
+      const cy = (cell - cx) / w;
+      for (const [dx, dy] of NEIGHBORS4) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (seen.has(i)) continue;
+        if (state.solid[i] !== SOLID_NONE) continue;
+        const ox = x + 0.5 - enemy.x;
+        const oy = y + 0.5 - enemy.y;
+        if (ox * dir.x + oy * dir.y <= 0) continue;
+        if (Math.abs(ox * -dir.y + oy * dir.x) > LEVIATHAN_SURGE_WIDTH) continue;
+        seen.add(i);
+        next.push(i);
+        // Superficie ocupada nao recebe agua, mas CONDUZ a frente adiante: uma
+        // poca de biofluido no caminho nao e uma barragem.
+        if (state.surface[i] !== SURF_NONE && state.surface[i] !== SURF_SCORCHED) continue;
+        // AGUA NATIVA (timer zero), e nao agua com contagem regressiva.
+        //
+        // Agua com timer tem semantica fechada no motor: e agua DERRETIDA DE
+        // GELO, e `stepCells` a devolve como `SURF_ICE` quando a contagem
+        // acaba. Reutiliza-la aqui teria feito a enchente virar gelo permanente
+        // no Aquifero — e gelo nao e condutivo, ou seja, a correcao teria
+        // acabado desligando o Leviata de novo, setenta segundos depois e longe
+        // da causa.
+        //
+        // A lamina que sobe e a mesma materia de que os lagos do estrato sao
+        // feitos, e lago nao tem prazo. O que limita a enchente nao e um
+        // relogio, e a propria condicao que a dispara: ela so sai quando a
+        // emergencia foi NEGADA, e para no instante em que a agua alcanca o
+        // alvo. Ela avanca ate resolver o problema dela e nao um metro alem.
+        setSurface(state, i, SURF_WATER, 0);
+        raised++;
+      }
     }
+    frontier = next;
   }
   // So anuncia o que ACONTECEU: uma investida contra uma parede nao levantou
   // lamina nenhuma, e um pulso ali prometeria ao jogador um avanco que ele nao
@@ -3077,8 +3149,7 @@ const lungMatrixBurning = (state: SurvivalState, enemy: Entity): boolean => {
  * ser pego por ela.
  */
 const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
-  const phase = Math.floor(state.tick / FURNACE_HEART_CYCLE_TICKS) % 2;
-  enemy.mood = phase === 0 ? FURNACE_OVERHEATING : FURNACE_COOLING;
+  enemy.mood = furnaceOverheatingAt(state.tick) ? FURNACE_OVERHEATING : FURNACE_COOLING;
   // A escalada roda ANTES do ciclo: os dois limiares mudam o que este mesmo
   // tick faz, e o colapso continua acontecendo durante o RESFRIAMENTO — o teto
   // nao para de cair so porque a blindagem dele abriu.
@@ -3168,6 +3239,16 @@ const furnaceHeartStep = (state: SurvivalState, enemy: Entity, events: SemanticE
   events.push({ t: 'beam_line', x: enemy.x, y: enemy.y, dx: dirX, dy: dirY, length: r, powered: true });
 };
 
+/**
+ * O ciclo de blindagem do Coracao, como funcao PURA do tick.
+ *
+ * Ele sempre foi derivado do relogio, mas ficava embutido no passo do chefe. Sai
+ * para fora porque o AVISO precisa perguntar pelo futuro: "no instante que estou
+ * anunciando, ele ainda vai estar superaquecido?".
+ */
+export const furnaceOverheatingAt = (tick: number): boolean =>
+  Math.floor(tick / FURNACE_HEART_CYCLE_TICKS) % 2 === 0;
+
 export type FurnaceSweep = {
   /** Centro do setor — o corpo do chefe. */
   x: number;
@@ -3178,6 +3259,16 @@ export type FurnaceSweep = {
   /** Rumo do setor que vai queimar daqui a `FURNACE_HEART_WAVE_WARNING_WAVES`. */
   warnDx: number;
   warnDy: number;
+  /**
+   * A onda anunciada VAI mesmo acontecer?
+   *
+   * Falso no fim do superaquecimento, quando o instante avisado ja cai no
+   * resfriamento — e ali o Coracao nao produz onda nenhuma. Um aviso que some
+   * sem se cumprir e pior que nenhum aviso: ele ensina uma informacao falsa, que
+   * e exatamente o defeito que esta cunha existe para corrigir. O cliente
+   * esconde a cunha quando isto e falso.
+   */
+  warnFires: boolean;
   /** Meia-abertura do setor, em radianos, e o alcance. */
   arc: number;
   radius: number;
@@ -3201,6 +3292,7 @@ export type FurnaceSweep = {
 export const furnaceSweepAt = (x: number, y: number, tick: number): FurnaceSweep => {
   const wave = tick / FURNACE_HEART_WAVE_INTERVAL_TICKS;
   const heading = wave * FURNACE_HEART_WAVE_TURN;
+  const lead = FURNACE_HEART_WAVE_WARNING_WAVES * FURNACE_HEART_WAVE_INTERVAL_TICKS;
   const warn = heading + FURNACE_HEART_WAVE_TURN * FURNACE_HEART_WAVE_WARNING_WAVES;
   return {
     x,
@@ -3209,6 +3301,11 @@ export const furnaceSweepAt = (x: number, y: number, tick: number): FurnaceSweep
     dy: Math.sin(heading),
     warnDx: Math.cos(warn),
     warnDy: Math.sin(warn),
+    // O aviso so vale se a onda anunciada existir. Nos ultimos 36 ticks do
+    // superaquecimento o instante avisado ja caiu no resfriamento, e ali nao ha
+    // varredura: prometer fogo que nao vem ensina o jogador a fugir de lugar
+    // nenhum, e essa cunha existe justamente para o chao parar de mentir.
+    warnFires: furnaceOverheatingAt(tick + lead),
     arc: FURNACE_HEART_WAVE_ARC,
     radius: FURNACE_HEART_WAVE_RADIUS,
   };
@@ -3624,23 +3721,44 @@ const magnetarchStep = (
  */
 const leviathanBreach = (state: SurvivalState, enemy: Entity, events: SemanticEvent[]): void => {
   const w = state.config.width;
-  const r = Math.ceil(LEVIATHAN_BREACH_RADIUS);
+  const h = state.config.height;
   const cx = Math.floor(enemy.x);
   const cy = Math.floor(enemy.y);
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (dx * dx + dy * dy > LEVIATHAN_BREACH_RADIUS * LEVIATHAN_BREACH_RADIUS) continue;
-      const x = cx + dx;
-      const y = cy + dy;
-      if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
-      const i = y * w + x;
-      if (state.solid[i] !== SOLID_NONE) continue;
-      // Agua deslocada cobre chao nu e cinza; nao apaga fogo do jogador nem
-      // desfaz gelo — as duas coisas sao decisoes de alguem.
-      if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
-        setSurface(state, i, SURF_WATER, 0);
+  // A poca cresce por CONECTIVIDADE, pela mesma razao da enchente: o esguicho
+  // carimbava um disco e so pulava a celula solida, entao a agua deslocada
+  // aparecia do outro lado de uma parede que ela nunca atravessou. Isso nao era
+  // so estranho de olhar — era uma cadeia: aquela agua virava ponto de
+  // emergencia valido, e o chefe passava a romper o chao atras da barreira que
+  // o jogador tinha escolhido justamente por ser inalcancavel.
+  const start = cy * w + cx;
+  const seen = new Set<number>([start]);
+  let frontier = [start];
+  const splash = (i: number): void => {
+    // Agua deslocada cobre chao nu e cinza; nao apaga fogo do jogador nem
+    // desfaz gelo — as duas coisas sao decisoes de alguem.
+    if (state.surface[i] === SURF_NONE || state.surface[i] === SURF_SCORCHED) {
+      setSurface(state, i, SURF_WATER, 0);
+    }
+  };
+  if (state.solid[start] === SOLID_NONE) splash(start);
+  for (let step = 1; step <= LEVIATHAN_BREACH_RADIUS && frontier.length > 0; step++) {
+    const next: number[] = [];
+    for (const cell of frontier) {
+      const fx = cell % w;
+      const fy = (cell - fx) / w;
+      for (const [dx, dy] of NEIGHBORS4) {
+        const x = fx + dx;
+        const y = fy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (seen.has(i) || state.solid[i] !== SOLID_NONE) continue;
+        if (Math.hypot(x + 0.5 - enemy.x, y + 0.5 - enemy.y) > LEVIATHAN_BREACH_RADIUS) continue;
+        seen.add(i);
+        next.push(i);
+        splash(i);
       }
     }
+    frontier = next;
   }
   for (const player of state.players) {
     if (!player.alive || !state.playerExtras[player.slot ?? 0].joined) continue;

@@ -1456,11 +1456,21 @@ export const LEVIATHAN_SURGE_LENGTH = 11;
 /** Meia-largura da faixa que sobe. Larga: uma enchente nao e um risco. */
 export const LEVIATHAN_SURGE_WIDTH = 2;
 /**
- * Quanto a agua trazida dura. Longa, e nao eterna: o encontro pode reescrever a
- * camara enquanto acontece, mas nao pode reescrever o SETOR para sempre — uma
- * inundacao permanente cobraria da run inteira por uma luta que ja terminou.
+ * A enchente nao tem relogio, e a ausencia dele e deliberada.
+ *
+ * A primeira versao gravava a faixa com timer, e estava errada de um jeito que
+ * so apareceria setenta segundos depois: agua COM timer, no motor, e agua
+ * derretida de gelo, e `stepCells` a devolve como `SURF_ICE` quando a contagem
+ * acaba. A enchente teria virado gelo permanente no Aquifero — e gelo nao e
+ * condutivo, ou seja, a correcao que existe para o Leviata deixar de ser
+ * kitavel teria acabado desligando o Leviata de novo, longe da causa.
+ *
+ * A lamina que sobe e a mesma materia de que os lagos do estrato sao feitos, e
+ * lago nao expira. O que limita a enchente e a condicao que a dispara, e nao um
+ * cronometro: ela so sai quando a emergencia foi NEGADA, e para no instante em
+ * que a agua alcanca o alvo — ela avanca ate resolver o problema dela e nao um
+ * metro alem.
  */
-export const LEVIATHAN_SURGE_TICKS = 1400;
 /**
  * De quao longe os dois chefes de mergulho notam alguem.
  *

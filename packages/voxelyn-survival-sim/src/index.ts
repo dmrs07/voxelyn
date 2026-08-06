@@ -99,6 +99,7 @@ export {
   // dela e desenhado no cliente a partir do mesmo tick, e nao transmitido: uma
   // cunha derivada nao entra no snapshot, nao entra no hash e nao pode
   // dessincronizar.
+  furnaceOverheatingAt,
   furnaceSweepAt,
   type FurnaceSweep,
 } from './entities.js';

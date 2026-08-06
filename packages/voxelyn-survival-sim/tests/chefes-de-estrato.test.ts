@@ -7,7 +7,7 @@
 // responder enquanto o dano continua saindo.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, furnaceSweepAt, spawnEnemy } from '../src/entities';
+import { damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy } from '../src/entities';
 import { isConductiveSurface } from '../src/cells';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
 import { BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '../src/types';
@@ -29,11 +29,13 @@ import {
   SURF_SCORCHED,
   LUNG_MATRIX_CYCLE_TICKS,
   ARCHCANTOR_PULSE_RADIUS,
+  ARCHCANTOR_CRYSTAL_BUDGET,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
   MAGNETARCH_TETHER_RANGE,
   SOLID_CRYSTAL,
   SOLID_NONE,
+  SOLID_ROCK,
   SURF_FIRE,
   SURF_GAS,
   SURF_ICE,
@@ -240,6 +242,43 @@ describe('Arquicantor — a Catedral responde', () => {
       .toBeGreaterThan(0);
   });
 
+  it('o ORCAMENTO vale desde a camada zero, e nao so nas cadeias', () => {
+    // O teto so aparecia no laco das camadas seguintes: as seeds entravam sem
+    // consulta, entao uma Catedral densa armava muito mais que o orcamento ja
+    // no release — justamente no caso em que ele existe para proteger, porque
+    // cada cristal armado carrega as quatro aberturas coladas nele.
+    const { state, px, py, w } = duel(605, 'archcantor', 4);
+    // Cristal em toda celula PAR do disco: muito acima do orcamento, e alternado
+    // para as aberturas entre eles continuarem existindo.
+    let crystals = 0;
+    const r = ARCHCANTOR_PULSE_RADIUS;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        if (((dx + dy) & 1) !== 0) continue;
+        const x = px + dx;
+        const y = py + dy;
+        if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue;
+        state.solid[y * w + x] = SOLID_CRYSTAL;
+        crystals++;
+      }
+    }
+    expect(crystals, 'a cena nao tem cristal suficiente para estourar o teto')
+      .toBeGreaterThan(ARCHCANTOR_CRYSTAL_BUDGET);
+
+    let widest = 0;
+    for (let t = 0; t < 400; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'discharge') widest = Math.max(widest, ev.cells.length);
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(widest, 'o canto nao chegou a sair').toBeGreaterThan(0);
+    // Cada cristal armado carrega no maximo as quatro aberturas coladas nele.
+    expect(widest, `um unico passo carregou ${widest} celulas`)
+      .toBeLessThanOrEqual(ARCHCANTOR_CRYSTAL_BUDGET * 4);
+  });
+
   it('CORTAR a cadeia desliga tudo o que vinha depois do corte', () => {
     // O controle do teste acima, e a razao de o alcance maior nao ser um buff
     // cego: a mesma fileira, com um vao aberto no meio, para de conduzir. O
@@ -294,6 +333,63 @@ describe('Leviata do Lencol — a lamina e o territorio', () => {
     }
     expect(wet(), 'a lamina nao avancou sobre o chao seco').toBeGreaterThan(0);
     void boss;
+  });
+
+  it('a enchente NAO vira gelo com o tempo: ela e lago, e nao degelo', () => {
+    // A primeira versao gravava a faixa com timer, e agua COM timer no motor e
+    // agua derretida de gelo: `stepCells` a devolve como SURF_ICE quando a
+    // contagem acaba. A enchente teria virado gelo permanente no Aquifero — e
+    // gelo nao e condutivo, ou seja, a correcao que existe para o Leviata
+    // deixar de ser kitavel acabaria desligando o Leviata de novo, um minuto
+    // depois e longe da causa.
+    const { state, px, py } = duel(615, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    const count = (kind: number): number => {
+      let n = 0;
+      for (let y = py - 14; y <= py + 14; y++) {
+        for (let x = px - 14; x <= px + 14; x++) {
+          if (state.surface[y * w + x] === kind) n++;
+        }
+      }
+      return n;
+    };
+    // MUITO alem de qualquer prazo que a faixa pudesse ter tido.
+    for (let t = 0; t < 2200; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(count(SURF_WATER), 'a lamina sumiu do chao').toBeGreaterThan(0);
+    expect(count(SURF_ICE), 'a enchente congelou: o Aquifero virou Cripta').toBe(0);
+  });
+
+  it('a enchente NAO atravessa parede: nada alaga atras da rocha', () => {
+    // Sem oclusao, a faixa pulava a celula solida e continuava do outro lado.
+    // Depois `leviathanBreachSpot` achava aquela agua e o chefe emergia atras
+    // de uma barreira que a lamina nunca cruzou — uma emergencia sem aviso, no
+    // unico lugar que o jogador tinha escolhido por ser inalcancavel.
+    const { state, boss, px, py } = duel(616, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    // Parede transversal FECHADA entre o chefe (a leste) e o jogador.
+    const wallX = px + 3;
+    for (let y = py - 16; y <= py + 16; y++) state.solid[y * w + wallX] = SOLID_ROCK;
+
+    let breachedBehind = false;
+    for (let t = 0; t < 600; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt') {
+          if (Math.floor(ev.x) < wallX) breachedBehind = true;
+        }
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    let wetBehind = 0;
+    for (let y = py - 14; y <= py + 14; y++) {
+      for (let x = px - 14; x < wallX; x++) {
+        if (isConductiveSurface(state.surface[y * w + x])) wetBehind++;
+      }
+    }
+    expect(wetBehind, 'a agua apareceu do outro lado da rocha').toBe(0);
+    expect(breachedBehind, 'emergiu atras de uma parede que a lamina nao cruzou').toBe(false);
   });
 
   it('com agua sob o alvo ele rompe — e a agua e que faz a diferenca', () => {
@@ -538,6 +634,23 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
     // borda anda em vez de teleportar — e o que torna a sequencia aprendivel.)
     expect(FURNACE_HEART_WAVE_TURN).toBeLessThan(FURNACE_HEART_WAVE_ARC);
     expect(ahead).toBeGreaterThan(20);
+  });
+
+  it('o aviso SOME quando a onda anunciada nao vai acontecer', () => {
+    // O aviso olha `tick + 3 ondas`. No fim do superaquecimento esse instante
+    // ja cai no resfriamento, e ali o Coracao nao produz varredura nenhuma: a
+    // cunha prometeria fogo que nunca vem. Um aviso que some sem se cumprir
+    // ensina informacao falsa — que e exatamente o defeito que esta cunha
+    // existe para corrigir.
+    const ahead = FURNACE_HEART_WAVE_WARNING_WAVES * FURNACE_HEART_WAVE_INTERVAL_TICKS;
+    // Comeco da fase quente: o aviso vale, e o instante anunciado ainda queima.
+    expect(furnaceSweepAt(0, 0, 0).warnFires, 'o aviso sumiu no comeco da fase').toBe(true);
+    expect(furnaceOverheatingAt(0 + ahead)).toBe(true);
+    // Ultimo tick da fase quente: o instante anunciado ja e resfriamento.
+    const last = FURNACE_HEART_CYCLE_TICKS - 1;
+    expect(furnaceOverheatingAt(last), 'a cena nao esta na fase quente').toBe(true);
+    expect(furnaceOverheatingAt(last + ahead), 'o instante anunciado ainda queima').toBe(false);
+    expect(furnaceSweepAt(0, 0, last).warnFires, 'prometeu uma onda que nao vem').toBe(false);
   });
 
   // O COLAPSO TERMICO: a escada de fim de luta. Ate aqui o encontro tinha uma

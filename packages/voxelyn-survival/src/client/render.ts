@@ -1820,12 +1820,18 @@ export class SurvivalRenderer {
         // que ele se separa de tudo o que ja e quente na Fornalha: "aqui ainda
         // nao queima, e vai queimar".
         const beat = 0.5 + 0.5 * Math.sin(nowMs / 140);
-        wedge(
-          sweep.warnDx,
-          sweep.warnDy,
-          `rgba(255,166,63,${(0.06 + beat * 0.1).toFixed(3)})`,
-          `rgba(255,166,63,${(0.28 + beat * 0.32).toFixed(3)})`,
-        );
+        // ...e so aparece quando a onda anunciada VAI acontecer. No fim do
+        // superaquecimento o instante avisado ja cai no resfriamento, e ali nao
+        // ha varredura: uma cunha que some sem se cumprir ensina uma informacao
+        // falsa, que e o defeito que ela existe para corrigir.
+        if (sweep.warnFires) {
+          wedge(
+            sweep.warnDx,
+            sweep.warnDy,
+            `rgba(255,166,63,${(0.06 + beat * 0.1).toFixed(3)})`,
+            `rgba(255,166,63,${(0.28 + beat * 0.32).toFixed(3)})`,
+          );
+        }
         // A QUEIMA nao pulsa: ela e o agora, e o agora nao pisca.
         wedge(sweep.dx, sweep.dy, 'rgba(255,122,47,0.24)', 'rgba(255,122,47,0.68)');
         ctx.restore();

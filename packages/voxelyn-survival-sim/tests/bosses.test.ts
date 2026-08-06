@@ -520,6 +520,32 @@ describe('Bispo — as Descobertas de entendimento', () => {
       .toBeGreaterThan(nearAt);
   });
 
+  it('a frente FECHA o disco: a celula no raio maximo tambem recebe', () => {
+    // `advanceAction` limpa a acao assim que `tick >= endsAt`, entao a frente
+    // nunca roda no instante final. Normalizando pelo vao cheio, o ultimo passo
+    // executado parava em 25/26 do percurso e a faixa externa do disco — de
+    // ~8,65 a 9 — nunca recebia fungo nem dano. A borda que o telegrafo radial
+    // prometeu tem de existir de verdade, senao o aviso mede uma coisa e o
+    // golpe cobra outra.
+    const state = createRun({ seed: 96 });
+    clearArena(state, 20);
+    const w = state.config.width;
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 3, py, false);
+    const bx = Math.floor(bishop.x);
+    const by = Math.floor(bishop.y);
+    // Exatamente no raio maximo, na direcao oposta ao jogador.
+    const rim = by * w + bx + Math.floor(BISHOP_NOVA_RADIUS);
+    let planted = false;
+    for (let t = 0; t < BISHOP_NOVA_WINDUP_TICKS + BISHOP_NOVA_TRAVEL_TICKS + 40 && !planted; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (state.surface[rim] === SURF_FUNGAL) planted = true;
+    }
+    expect(planted, 'a borda do disco anunciado nunca recebeu a onda').toBe(true);
+  });
+
   it('estar dentro do disco da Supernova e continuar de pe marca a Descoberta', () => {
     const state = createRun({ seed: 93 });
     clearArena(state, 20);
