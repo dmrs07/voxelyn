@@ -3,10 +3,11 @@
 // pacote de conteudo. O que sai daqui e carregavel pelo SpriteBank sem tocar
 // em nada do jogo.
 import type { Grid, Project, SpriteManifestEntry } from './types';
-import { frameKey } from './types';
+import { frameKey, modelKey } from './types';
 import { createGrid, colorsUsed, isEmpty } from './grid';
 import { MAX_TEXTURE, PALETTE_NAME } from './palette';
 import { orderedAnims } from './presets';
+import { VOXEL_DIRS, renderVoxelModel } from './voxel';
 
 export type PackedAtlas = {
   atlas: Grid;
@@ -16,10 +17,29 @@ export type PackedAtlas = {
 
 /** Frame do projeto, ou um buffer vazio se nunca foi desenhado. */
 export const projectFrame = (project: Project, dir: string, anim: string, index: number): Grid => {
+  if (project.mode === 'voxel') return bakeFrame(project, dir, anim, index);
   const buf = project.frames[frameKey(dir, anim, index)];
   const g = createGrid(project.frameWidth, project.frameHeight);
   if (buf && buf.length === g.buf.length) g.buf.set(buf);
   return g;
+};
+
+/**
+ * Assa um frame de projeto voxel: rotaciona o modelo para a direcao pedida e
+ * rasteriza com o port do rasterizador do jogo, origem no anchor.
+ */
+export const bakeFrame = (project: Project, dir: string, anim: string, index: number): Grid => {
+  const dirIndex = (VOXEL_DIRS as readonly string[]).indexOf(dir);
+  const model = project.models?.[modelKey(anim, index)];
+  if (dirIndex < 0 || !model) return createGrid(project.frameWidth, project.frameHeight);
+  return renderVoxelModel(
+    model,
+    dirIndex,
+    project.frameWidth,
+    project.frameHeight,
+    project.anchorX,
+    project.anchorY,
+  );
 };
 
 const blitToAtlas = (atlas: Grid, frame: Grid, col: number, row: number): void => {

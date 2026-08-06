@@ -63,10 +63,21 @@ export type Project = {
   animations: Record<string, SpriteAnimationDefinition>;
   /** frameKey -> RGBA (frameWidth*frameHeight*4). */
   frames: Record<string, Uint8Array>;
+  /**
+   * Modo de autoria. `pixel` desenha os frames direto; `voxel` monta um modelo
+   * 3D por (animacao, frame) e ASSA os frames das quatro direcoes por rotacao
+   * — o mesmo contrato do pipeline oficial. Ausente = pixel (projetos antigos).
+   */
+  mode?: 'pixel' | 'voxel';
+  /** `${anim}/${frame}` -> modelo voxel (chave "x,y,z" -> material). */
+  models?: Record<string, Record<string, string>>;
   prompt: string;
   createdAt: number;
   updatedAt: number;
 };
+
+/** Chave do modelo voxel de um frame (o modelo vale para as 4 direcoes). */
+export const modelKey = (anim: string, index: number): string => `${anim}/${index}`;
 
 export type ValidationIssue = {
   level: 'error' | 'warn';

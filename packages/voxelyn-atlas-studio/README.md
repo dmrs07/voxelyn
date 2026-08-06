@@ -2,15 +2,23 @@
 
 Editor **PWA mobile-first** de atlases de sprite do Voxelyn Survival. Existe
 para devolver a decisão artística ao autor: em vez de dirigir uma IA por prompt
-e torcer pelo resultado, você desenha os frames pixel a pixel — no celular —
-com a paleta mestra `veio-fungico` e dentro do contrato da Art Bible, e exporta
-o par `PNG + JSON` que o `SpriteBank` do jogo carrega sem nenhuma conversão.
+e torcer pelo resultado, você monta o personagem **voxel a voxel, como Lego** —
+no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
+`SpriteBank` carrega sem nenhuma conversão.
 
 ## O que ele faz
 
-- **Desenho touch-first**: 1 dedo desenha, 2 dedos fazem pan/pinch. Lápis,
-  borracha, balde, linha, retângulo e conta-gotas; pincel de 1–3 px; undo/redo;
-  grade, onion skin e guia da margem obrigatória de 2 px.
+- **Modo voxel (recomendado)**: o personagem é um modelo 3D editado camada por
+  camada (fatias horizontais em z), com espelho em X, fantasma da camada de
+  baixo, materiais do jogo (`rock`, `player`, `biolum`, `lamp`, `loot`…) e
+  preview isométrico ao vivo renderizado pelo **port 1:1 do rasterizador do
+  jogo** (`tools/voxel.mjs`): rampas de face, oclusão de ambiente, quina acesa
+  e ordem do pintor — com teste de paridade byte a byte. As **4 direções saem
+  por rotação do mesmo modelo**, sem redesenhar nada; um modelo por frame de
+  animação, e o export assa tudo.
+- **Modo pixel**: desenho touch-first frame a frame. 1 dedo desenha, 2 dedos
+  fazem pan/pinch. Lápis, borracha, balde, linha, retângulo e conta-gotas;
+  pincel de 1–3 px; undo/redo; grade, onion skin e guia da margem de 2 px.
 - **Paleta travada no jogo**: só as 22 cores da `veio-fungico.v01` (espelho de
   `voxelyn-survival-content/tools/lib.mjs`, com teste de paridade), contador do
   teto de 20 cores por atlas e alpha sempre binário — por construção.
@@ -19,10 +27,14 @@ o par `PNG + JSON` que o `SpriteBank` do jogo carrega sem nenhuma conversão.
   da Art Bible (`idle`, `walk`, `attack`, `hit`, `die`, `downed`, `revive`…),
   com frames/fps/loop editáveis, 4 direções isométricas (`dr`, `dl`, `ur`,
   `ul`) e `flipPairs` para entidades simétricas.
-- **Import**: carregue qualquer par `PNG + JSON` de
-  `packages/voxelyn-survival-content/assets/atlases/` e edite frame a frame.
-  Imagens fora do pipeline são normalizadas (alpha binário + quantização para a
-  cor mais próxima da paleta).
+- **Abrir do jogo**: as seis entidades-núcleo (Prospector, Stalker, Spitter,
+  Spore Bomber, Bruiser, Guardian) vêm embarcadas no app e abrem offline como
+  projeto pixel. **Import**: qualquer par `PNG + JSON` de
+  `packages/voxelyn-survival-content/assets/atlases/` também entra; imagens
+  fora do pipeline são normalizadas (alpha binário + quantização para a
+  cor mais próxima da paleta). Os modelos voxel originais do jogo vivem em
+  código (`tools/entities.mjs`) e não são recuperáveis do PNG — por isso o
+  modo voxel é para personagens novos.
 - **Export**: monta o atlas com a MESMA matemática do gerador
   (`tools/generate.mjs`): ordem `ANIM_ORDER`, `columns` limitado ao teto de
   4096 px de textura, `frameMap`, `paletteColors` ordenadas e `generation`
@@ -66,5 +78,6 @@ node scripts/make-icons.mjs  # regenera os icones PWA (deterministico)
 | `src/atlas.ts` (pack)           | `tools/generate.mjs` (`buildEntity`)                           |
 | `src/atlas.ts` (slice)          | `src/manifest.ts` (`resolveFrame`) — importado direto no teste |
 | `src/presets.ts` (`ANIM_ORDER`) | `tools/entities.mjs` (`ANIM_ORDER`)                            |
+| `src/voxel.ts` (rasterizador)   | `tools/voxel.mjs` (`renderVoxels`) — paridade byte a byte      |
 
 Se qualquer um desses contratos mudar no jogo, os testes deste pacote acusam.
