@@ -289,6 +289,141 @@ export const renderVoxelModel = (
   return g;
 };
 
+/**
+ * Vista EDITAVEL do modelo: renderiza numa grade dimensionada pelo proprio
+ * modelo (nunca corta) e devolve um mapa de acerto pixel→voxel para construir
+ * direto na vista 3D — tocar numa face adiciona a peca encaixada nela, como
+ * Lego. As coordenadas devolvidas sao AUTORADAS (do modelo, nao da rotacao),
+ * prontas para editar o VoxelModel.
+ */
+export type ViewHit = {
+  /** voxel tocado, em coordenadas autoradas */
+  vox: [number, number, number];
+  /** celula vizinha atraves da face tocada (onde o pencil encaixa a peca) */
+  add: [number, number, number];
+};
+
+export type VoxelView = {
+  grid: Grid;
+  /**
+   * Posicao, em pixels da grade, da ORIGEM do modelo (entre os pes). O editor
+   * ancora a tela nela: assim a vista nao "pula" quando os limites do modelo
+   * crescem durante a edicao e o hit-test continua valendo.
+   */
+  originX: number;
+  originY: number;
+  /** hit do pixel (px,py) da grade, ou undefined em fundo vazio */
+  hitAt: (px: number, py: number) => ViewHit | undefined;
+};
+
+const FACE_NORMAL: [number, number, number][] = [
+  [0, 0, 1], // slot 0: topo
+  [0, 1, 0], // slot 1: esquerda (+y na tela)
+  [1, 0, 0], // slot 2: direita (+x na tela)
+];
+
+const unrot = (x: number, y: number, r: number): [number, number] => rot(x, y, (4 - r) % 4);
+
+export const renderVoxelView = (model: VoxelModel, dirIndex: number, pad = 6): VoxelView => {
+  const rotation = DIRECTION_ROTATION[dirIndex];
+  if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);
+
+  const solid = new Set<string>();
+  const voxels: { x: number; y: number; z: number; mat: string }[] = [];
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  for (const [key, mat] of Object.entries(model)) {
+    const [ax, ay, az] = parseVoxelKey(key);
+    const [x, y] = rot(ax, ay, rotation);
+    solid.add(voxelKey(x, y, az));
+    voxels.push({ x, y, z: az, mat });
+    const { sx, sy } = projectIso(x, y, az);
+    minX = Math.min(minX, sx);
+    maxX = Math.max(maxX, sx + 3);
+    minY = Math.min(minY, sy - 2);
+    maxY = Math.max(maxY, sy + VOX.zStep - 1);
+  }
+  if (voxels.length === 0) {
+    return { grid: createGrid(1, 1), originX: 0, originY: 0, hitAt: () => undefined };
+  }
+  const w = maxX - minX + 1 + pad * 2;
+  const h = maxY - minY + 1 + pad * 2;
+  const anchorX = pad - minX;
+  const anchorY = pad - minY;
+  const g = createGrid(w, h);
+  const hits = new Map<number, ViewHit>();
+  const isSolid: IsSolid = (x, y, z) => solid.has(voxelKey(x, y, z));
+
+  const commands: { key: number; draw: () => void }[] = [];
+  for (const v of voxels) {
+    if (
+      isSolid(v.x + 1, v.y, v.z) &&
+      isSolid(v.x - 1, v.y, v.z) &&
+      isSolid(v.x, v.y + 1, v.z) &&
+      isSolid(v.x, v.y - 1, v.z) &&
+      isSolid(v.x, v.y, v.z + 1) &&
+      isSolid(v.x, v.y, v.z - 1)
+    ) {
+      continue;
+    }
+    const base = RAMPS[v.mat];
+    if (!base) throw new Error(`material sem rampa: ${v.mat}`);
+    let ramp: readonly [string, string, string] = base;
+    if (!EMISSIVE_RAMPS.has(v.mat)) {
+      const out: [string, string, string] = [base[0], base[1], base[2]];
+      let changed = false;
+      for (const [face, spec] of Object.entries(FACES) as ['top' | 'left' | 'right', Face][]) {
+        const steps = ambientOcclusionSteps(isSolid, v.x, v.y, v.z, face);
+        if (steps === 0) continue;
+        out[spec.slot] = stepped(SHADOW_OF, base[spec.slot], steps);
+        changed = true;
+      }
+      if (out[0] === base[0] && isLitCorner(isSolid, v.x, v.y, v.z)) {
+        const lit = stepped(LIGHT_OF, base[0], 1);
+        if (lit !== base[0]) {
+          out[0] = lit;
+          changed = true;
+        }
+      }
+      if (changed) ramp = out;
+    }
+    const { sx, sy } = projectIso(v.x, v.y, v.z);
+    const finalRamp = ramp;
+    const [avx, avy] = unrot(v.x, v.y, rotation);
+    commands.push({
+      key: makeDrawKey(v.x + KEY_BIAS, v.y + KEY_BIAS, v.z),
+      draw: () => {
+        const ox = Math.round(anchorX + sx);
+        const oy = Math.round(anchorY + sy);
+        for (const [dx, dy, face] of CUBE_CELLS) {
+          setGridPx(g, ox + dx, oy + dy, finalRamp[face]);
+          const n = FACE_NORMAL[face];
+          const [nax, nay] = unrot(v.x + n[0], v.y + n[1], rotation);
+          // ordem do pintor: quem desenha por ultimo e o voxel visivel no pixel
+          hits.set((oy + dy) * w + (ox + dx), {
+            vox: [avx, avy, v.z],
+            add: [nax, nay, v.z + n[2]],
+          });
+        }
+      },
+    });
+  }
+  commands.sort((a, b) => a.key - b.key);
+  for (const c of commands) c.draw();
+
+  return {
+    grid: g,
+    originX: anchorX,
+    originY: anchorY,
+    hitAt: (px, py) => {
+      if (px < 0 || py < 0 || px >= w || py >= h) return undefined;
+      return hits.get(py * w + px);
+    },
+  };
+};
+
 /** Extensao projetada nas 4 direcoes, em pixels relativos ao anchor. */
 export const voxelProjectedBounds = (
   model: VoxelModel,
