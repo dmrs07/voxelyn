@@ -105,6 +105,39 @@ services:
         source: /*
         destination: /index.html
 
+  # ---------------------------------------------------------------------------
+  # Atlas Studio (Static Site) — editor PWA de atlases de sprite
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: voxelyn-atlas-studio
+    runtime: static
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @voxelyn/atlas-studio build
+    staticPublishPath: packages/voxelyn-atlas-studio/dist
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22.22.0'
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /
+        name: Cache-Control
+        value: no-cache
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
 # -----------------------------------------------------------------------------
 # Banco do ranking
 # -----------------------------------------------------------------------------
