@@ -1,0 +1,21 @@
+{
+  "name": "@voxelyn/atlas-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voxelyn Atlas Studio - editor PWA mobile-first de atlases de sprite no formato do Voxelyn Survival",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "icons:generate": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0",
+    "vitest": "^3.2.4"
+  }
+}

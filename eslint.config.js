@@ -44,21 +44,37 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/consistent-type-imports': ['warn', { prefer: 'type-imports' }],
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
   {
     // scripts de build/validacao de sprites: rodam em Node, nao no browser
-    files: ['packages/voxelyn-survival-content/tools/**/*.mjs'],
+    files: [
+      'packages/voxelyn-survival-content/tools/**/*.mjs',
+      'packages/voxelyn-atlas-studio/scripts/**/*.mjs',
+    ],
     languageOptions: {
       globals: { Buffer: 'readonly', console: 'readonly', process: 'readonly', URL: 'readonly' },
     },
   },
   {
-    // service worker do PWA: escopo ServiceWorkerGlobalScope, nao window
-    files: ['packages/voxelyn-survival/public/sw.js'],
+    // service workers dos PWAs: escopo ServiceWorkerGlobalScope, nao window
+    files: ['packages/voxelyn-survival/public/sw.js', 'packages/voxelyn-atlas-studio/public/sw.js'],
     languageOptions: {
-      globals: { self: 'readonly', caches: 'readonly', fetch: 'readonly', console: 'readonly', URL: 'readonly' },
+      globals: {
+        self: 'readonly',
+        caches: 'readonly',
+        fetch: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+        Request: 'readonly',
+        Response: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+      },
     },
   },
   prettier,
