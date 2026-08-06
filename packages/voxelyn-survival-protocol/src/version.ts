@@ -328,7 +328,50 @@ export const PROTOCOL_VERSION = 20;
 //
 //
 // O terreno semeado nao muda: nada aqui toca o worldgen.
-export const SIMULATION_VERSION = 33;
+// 34: A LEVA DE CORRECOES DO PRIMEIRO PLAYTEST DOS DEZ CHEFES.
+//
+// Guardiao, Rainha da Geada e Pulmao-Matriz saem intactos — foram os tres que
+// impuseram a propria frase mecanica e nao ha o que consertar neles. Magnetarca
+// fica em observacao. Os outros seis mudam, e os dois primeiros por defeito
+// ESTRUTURAL e nao por numero:
+//
+// - CORACAO DA FORNALHA. Na Fornalha cinza e carvao, e `igniteCell` a devolve
+//   como fogo de 110 ticks: com o setor girando por cima da propria cinza, a
+//   varredura se realimentava e a camara inteira virava fogo permanente. O
+//   jogador nao conseguia distinguir chao perigoso de chao seguro porque nao
+//   havia mais chao seguro. A varredura passa a reacender com o COMBUSTIVEL
+//   dela (curto), o setor gira menos que a propria abertura (a borda anda em
+//   vez de teleportar), e o AVISO e uma cunha derivada de (posicao, tick) nas
+//   duas pontas — nao entra no wire nem no hash, e por isso nao pode
+//   dessincronizar. A ninhada cai para um Escoriaceo por vez enquanto a
+//   primeira fase dura: ela existe para ensinar a sala, nao para cobrar por ela.
+// - DEVORADOR BRANCO. Ele saía do portao de aggro comum e por isso nao tinha
+//   portao nenhum: cacava desde o tick zero, do outro lado do setor, e a
+//   primeira emergencia saia no tick em que notava o jogador. Ganha estado de
+//   repouso (`diverEngaged`, compartilhado com o Leviata), um mergulho de
+//   divida antes do primeiro arco, vao maior entre os arcos e distancia minima
+//   entre duas crateras seguidas.
+//
+// E os quatro de balanceamento, todos com efeito no hash:
+//
+// - BISPO: a cura sobre fungo passa a SUPLANTAR o tiro base sustentado (era
+//   24/s contra 56/s — menos da metade do que o proprio comentario prometia),
+//   com uma reducao pequena de dano enquanto ele pisa no tapete. A Supernova
+//   vira uma frente que VIAJA, plantando anel por anel durante a recuperacao da
+//   acao — o relogio e o da propria acao, que ja viaja no snapshot.
+// - DIAMANDIS: o modulo solto CHAMA Coveiros proprios (a mecanica de sucata
+//   existia inteira e quase nunca acontecia, porque o Coveiro e fauna do
+//   Ferrifero e o Diamandis nasce na Aurix), e a Salva de Demolicao passa a
+//   antecipar a rota do alvo. O anti-kite e de controle de arena: a velocidade
+//   dele nao muda.
+// - LEVIATA: negada a emergencia, a lamina AVANCA sobre o chao seco. Sem isso,
+//   rocha seca nao o atrasava, o eliminava.
+// - ARQUICANTOR: o canto passa de cristal em cristal por conectividade e
+//   atravessa a nave em camadas, uma por passo da recuperacao. O alcance deixa
+//   de ser do corpo e passa a ser da Catedral — e cortar a cadeia vira jogada.
+//
+// Nada aqui toca o worldgen: o terreno semeado continua identico.
+export const SIMULATION_VERSION = 34;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

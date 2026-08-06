@@ -13,8 +13,12 @@ import { emptyStats } from '../src/stats';
 import { heatFungalCell } from '../src/cells';
 import {
   BISHOP_NOVA_COOLDOWN_TICKS,
+  BOLT_COOLDOWN_TICKS,
+  BOLT_DAMAGE,
   BISHOP_NOVA_SEEK_TICKS,
   BISHOP_NOVA_WINDUP_TICKS,
+  BISHOP_NOVA_RADIUS,
+  BISHOP_NOVA_TRAVEL_TICKS,
   BISHOP_REGEN_PER_TICK,
   BISHOP_RETREAT_HP_FRACTION,
   GUARDIAN_FAN_SPREAD,
@@ -428,6 +432,120 @@ describe('Bispo — as Descobertas de entendimento', () => {
     expect(state.stats.discoveries & DISCOVERY_BISHOP_HEALED).toBe(0);
   });
 
+  it('SOBRE FUNGO o tiro base nao derruba: o atrito perde para a cura', () => {
+    // O teste de aceitacao que o playtest pediu, palavra por palavra: um
+    // Prospector com arma normal, atirando continuamente num Bispo sobre fungo,
+    // nao consegue reduzir a vida dele de forma sustentavel.
+    //
+    // A regra antiga dizia isso num comentario e nao cumpria na conta: a cura
+    // era 24/s contra 56/s de bolt sustentado, ou seja, menos da metade. Dava
+    // para queimar o Bispo EM CIMA do tapete, e o quebra-cabeca territorial —
+    // "de que chao eu o tiro" — nunca precisava ser resolvido.
+    const state = createRun({ seed: 41 });
+    clearArena(state, 16);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 6, py, false);
+    paint(state, px, py, 14, SURF_FUNGAL);
+
+    for (let t = 0; t < 600; t++) {
+      if (t % BOLT_COOLDOWN_TICKS === 0) {
+        damageEntity(state, bishop, BOLT_DAMAGE, [], { kind: 'player_shot' });
+      }
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      // O tapete e uma propriedade do lugar, e o lugar nao pode secar sozinho
+      // no meio da medicao: o que esta sob teste e a cura contra o dano, e nao
+      // a durabilidade do fungo.
+      paint(state, px, py, 14, SURF_FUNGAL);
+    }
+    expect(bishop.alive, 'trinta segundos de tiro base derrubaram o Bispo no tapete').toBe(true);
+    expect(bishop.hp, 'o atrito venceu a cura sobre fungo vivo').toBeGreaterThan(
+      bishop.maxHp * 0.9,
+    );
+  });
+
+  it('FORA do fungo o mesmo tiro derruba: o problema e o chao, nao a barra', () => {
+    // O controle do teste acima, e ele e o que impede a correcao de virar um
+    // chefe simplesmente mais duro. A vida nao subiu; o que decide e onde ele
+    // pisa.
+    const state = createRun({ seed: 42 });
+    clearArena(state, 16);
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 6, py, false);
+
+    for (let t = 0; t < 600 && bishop.alive; t++) {
+      if (t % BOLT_COOLDOWN_TICKS === 0) {
+        damageEntity(state, bishop, BOLT_DAMAGE, [], { kind: 'player_shot' });
+      }
+      // A Supernova replanta: sem limpar, o proprio chefe refaz o chao que este
+      // teste precisa que NAO exista.
+      clearArena(state, 16);
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(bishop.alive, 'sem tapete embaixo ele deveria cair').toBe(false);
+  });
+
+  it('a Supernova VIAJA: o tapete cresce de dentro para fora', () => {
+    // "Apareceu mais um pouco de fungo perto dele" e "eu limpei a arena e ele
+    // acabou de retomar a arena" sao a mesma mecanica com duas leituras
+    // diferentes, e a diferenca inteira e a frente andar. Um disco que nasce
+    // pronto num tick nao consegue dizer a segunda frase.
+    const state = createRun({ seed: 95 });
+    clearArena(state, 20);
+    const w = state.config.width;
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 3, py, false);
+
+    const bx = Math.floor(bishop.x);
+    const by = Math.floor(bishop.y);
+    // Duas sondas na MESMA direcao (para longe do jogador, onde nada mais
+    // mexe no chao): uma colada nele, outra na borda do disco.
+    const near = by * w + bx + 2;
+    const far = by * w + bx + (Math.floor(BISHOP_NOVA_RADIUS) - 1);
+    let nearAt = -1;
+    let farAt = -1;
+    for (let t = 0; t < BISHOP_NOVA_WINDUP_TICKS + BISHOP_NOVA_TRAVEL_TICKS + 40; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (nearAt < 0 && state.surface[near] === SURF_FUNGAL) nearAt = t;
+      if (farAt < 0 && state.surface[far] === SURF_FUNGAL) farAt = t;
+    }
+    expect(nearAt, 'a Supernova nao chegou a plantar nada').toBeGreaterThanOrEqual(0);
+    expect(farAt, 'a frente nao chegou a borda do disco').toBeGreaterThanOrEqual(0);
+    expect(farAt, 'a borda plantou junto com o centro: a onda nao viajou')
+      .toBeGreaterThan(nearAt);
+  });
+
+  it('a frente FECHA o disco: a celula no raio maximo tambem recebe', () => {
+    // `advanceAction` limpa a acao assim que `tick >= endsAt`, entao a frente
+    // nunca roda no instante final. Normalizando pelo vao cheio, o ultimo passo
+    // executado parava em 25/26 do percurso e a faixa externa do disco — de
+    // ~8,65 a 9 — nunca recebia fungo nem dano. A borda que o telegrafo radial
+    // prometeu tem de existir de verdade, senao o aviso mede uma coisa e o
+    // golpe cobra outra.
+    const state = createRun({ seed: 96 });
+    clearArena(state, 20);
+    const w = state.config.width;
+    const px = Math.floor(state.player.x);
+    const py = Math.floor(state.player.y);
+    const bishop = spawnEnemy(state, 'bishop', px + 3, py, false);
+    const bx = Math.floor(bishop.x);
+    const by = Math.floor(bishop.y);
+    // Exatamente no raio maximo, na direcao oposta ao jogador.
+    const rim = by * w + bx + Math.floor(BISHOP_NOVA_RADIUS);
+    let planted = false;
+    for (let t = 0; t < BISHOP_NOVA_WINDUP_TICKS + BISHOP_NOVA_TRAVEL_TICKS + 40 && !planted; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      if (state.surface[rim] === SURF_FUNGAL) planted = true;
+    }
+    expect(planted, 'a borda do disco anunciado nunca recebeu a onda').toBe(true);
+  });
+
   it('estar dentro do disco da Supernova e continuar de pe marca a Descoberta', () => {
     const state = createRun({ seed: 93 });
     clearArena(state, 20);
@@ -449,13 +567,23 @@ describe('Bispo — as Descobertas de entendimento', () => {
     clearArena(state, 20);
     const px = Math.floor(state.player.x);
     const py = Math.floor(state.player.y);
-    // Ferido e sem fungo: a Supernova sai pela janela de busca, com o jogador
-    // dentro do aggro (10) e fora do raio do disco (5,5).
+    // Ferido e sem fungo: a Supernova sai pela janela de busca. O jogador fica
+    // preso a uma distancia MAIOR que o raio a cada tick — a frente da onda
+    // viaja, entao "fora do disco" so significa alguma coisa se continuar
+    // valendo no instante em que ela chega ao fim do curso, e nao apenas no
+    // instante do release.
     const bishop = spawnEnemy(state, 'bishop', px + 8, py, false);
     bishop.hp = bishop.maxHp * (BISHOP_RETREAT_HP_FRACTION - 0.1);
+    // Fora do disco (9) e ainda dentro do aggro (10), que e a unica faixa em
+    // que a cena existe: um Bispo que nao ve ninguem nao lanca Supernova
+    // nenhuma, e o teste mediria o silencio em vez da regra.
+    const outside = BISHOP_NOVA_RADIUS + 0.6;
 
     let fired = false;
-    for (let t = 0; t < BISHOP_NOVA_SEEK_TICKS + BISHOP_NOVA_WINDUP_TICKS + 30 && !fired; t++) {
+    const window = BISHOP_NOVA_SEEK_TICKS + BISHOP_NOVA_WINDUP_TICKS + BISHOP_NOVA_TRAVEL_TICKS + 30;
+    for (let t = 0; t < window; t++) {
+      state.player.x = bishop.x + outside;
+      state.player.y = bishop.y;
       for (const ev of stepRun(state, [emptyCommand()]).events) {
         if (ev.t === 'pulse' && Math.hypot(ev.x - bishop.x, ev.y - bishop.y) < 1) fired = true;
       }
