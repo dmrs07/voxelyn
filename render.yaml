@@ -47,6 +47,12 @@ services:
       # porque precisa ser.
       - key: TELEMETRY_TOKEN
         generateValue: true
+      # Leitura do digest da Arena de Chefes — mesma politica do token acima
+      # (escrita aberta, leitura fechada sem token), so que numa tabela e
+      # numa rota PROPRIAS: a Arena mede encontro por chefe/loadout, nao
+      # sessao de campanha, e nao pode se misturar com o digest de cima.
+      - key: ARENA_TELEMETRY_TOKEN
+        generateValue: true
       # Assinatura das sessoes de progressao. GERADO UMA VEZ e estavel entre
       # deploys — e a diferenca entre um perfil que sobrevive e um que nao.
       #

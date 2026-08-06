@@ -91,6 +91,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         sprites: resolve(__dirname, 'sprites.html'),
+        arena: resolve(__dirname, 'arena.html'),
       },
     },
   },

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Voxelyn Survival — Arena de Chefes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --safe-area-inset-top: env(safe-area-inset-top, 0px);
+        --safe-area-inset-right: env(safe-area-inset-right, 0px);
+        --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-area-inset-left: env(safe-area-inset-left, 0px);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0a0b;
+        color: #d8cfc0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow: hidden;
+      }
+      #game {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: #000;
+      }
+      .hidden {
+        display: none !important;
+      }
+      #setup {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        overflow-y: auto;
+        background: radial-gradient(circle at 50% 20%, #14151b 0%, #08090b 70%);
+      }
+      #setup form {
+        width: 100%;
+        max-width: 480px;
+        background: #101218;
+        border: 1px solid #2a2d38;
+        border-radius: 10px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      #setup h1 {
+        margin: 0;
+        font-size: 18px;
+        color: #59f2c2;
+        letter-spacing: 0.04em;
+      }
+      #setup p.subtitle {
+        margin: -12px 0 0;
+        font-size: 12px;
+        color: #7c8290;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field label {
+        font-size: 12px;
+        color: #b8a98f;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .field select,
+      .field input[type='number'] {
+        background: #191c24;
+        border: 1px solid #333748;
+        color: #e8e2d6;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font: inherit;
+      }
+      .place-hint {
+        font-size: 12px;
+        color: #7c8290;
+      }
+      .radio-grid,
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .radio-grid label,
+      .check-grid label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        text-transform: none;
+        letter-spacing: normal;
+        color: #d8cfc0;
+        background: #191c24;
+        border: 1px solid #2a2d38;
+        border-radius: 6px;
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+      .radio-grid input:checked + span,
+      .check-grid input:checked + span {
+        color: #59f2c2;
+      }
+      #setup button[type='submit'] {
+        margin-top: 8px;
+        background: #1b6e5a;
+        color: #eafff6;
+        border: none;
+        border-radius: 6px;
+        padding: 12px;
+        font: inherit;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+      }
+      #setup button[type='submit']:hover {
+        background: #1f8069;
+      }
+      #hud-note {
+        position: fixed;
+        top: calc(8px + var(--safe-area-inset-top));
+        left: calc(8px + var(--safe-area-inset-left));
+        font-size: 11px;
+        color: #7c8290cc;
+        z-index: 5;
+        pointer-events: none;
+      }
+      #end-overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 7, 9, 0.72);
+        z-index: 10;
+      }
+      #end-overlay .panel {
+        background: #101218;
+        border: 1px solid #2a2d38;
+        border-radius: 10px;
+        padding: 24px;
+        width: min(420px, 90vw);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        text-align: center;
+      }
+      #end-overlay h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+      #end-overlay button {
+        font: inherit;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #333748;
+        background: #191c24;
+        color: #e8e2d6;
+        cursor: pointer;
+      }
+      #end-overlay button.primary {
+        background: #1b6e5a;
+        border-color: #1b6e5a;
+        color: #eafff6;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game" class="hidden"></canvas>
+    <div id="hud-note" class="hidden">
+      Arena de teste — sem telemetria, sem placar, sem gravação de replay.
+    </div>
+
+    <div id="setup">
+      <form id="setup-form">
+        <h1>ARENA DE CHEFES</h1>
+        <p class="subtitle">
+          Ferramenta de playtest isolado: escolha o chefe e as condições de entrada e jogue a luta
+          você mesmo. O setor inteiro (terreno, trash, sítios) é o mesmo que a run normal geraria —
+          só a descida até aqui é pulada.
+        </p>
+
+        <div class="field">
+          <label for="boss">Chefe</label>
+          <select id="boss" name="boss"></select>
+          <span class="place-hint" id="boss-place"></span>
+        </div>
+
+        <div class="field">
+          <label for="hp">HP máximo do Prospector</label>
+          <input id="hp" name="hp" type="number" min="20" max="500" step="1" value="100" />
+        </div>
+
+        <div class="field">
+          <label>Eco (habilidade equipada)</label>
+          <div class="radio-grid" id="ability-grid"></div>
+        </div>
+
+        <div class="field">
+          <label>Módulos ativos</label>
+          <div class="check-grid" id="module-grid"></div>
+        </div>
+
+        <button type="submit">Entrar na arena</button>
+      </form>
+    </div>
+
+    <div id="end-overlay" class="hidden">
+      <div class="panel">
+        <h2 id="end-title">—</h2>
+        <div id="end-summary"></div>
+        <button id="btn-retry" class="primary">Tentar de novo (mesmas condições)</button>
+        <button id="btn-reconfigure">Trocar configuração</button>
+      </div>
+    </div>
+
+    <script type="module" src="./src/client/arena-main.ts"></script>
+  </body>
+</html>
