@@ -359,6 +359,32 @@ label {
   min-width: 110px;
 }
 
+/* ---------- Editor voxel ---------- */
+.voxel-preview-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px 0;
+  height: 132px;
+  flex: none;
+  background: var(--panel);
+}
+
+.voxel-preview {
+  flex: 1;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: repeating-conic-gradient(#1c2436 0% 25%, #10151f 0% 50%) 0 0 / 16px 16px;
+}
+
+.voxel-preview canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 /* ---------- Sheets (modais) ---------- */
 .sheet-backdrop {
   position: fixed;

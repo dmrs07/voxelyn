@@ -5,6 +5,7 @@ import type { Project, SpriteManifestEntry } from '../types';
 import { blobToGrid, normalizeGrid } from '../png';
 import { projectFromManifest, sliceAtlas, projectFrame } from '../atlas';
 import { orderedAnims } from '../presets';
+import { GAME_CATALOG } from '../catalog';
 import { confirmSheet, el, openSheet, toast } from './components';
 
 const drawThumb = (canvas: HTMLCanvasElement, project: Project): void => {
@@ -21,6 +22,11 @@ const drawThumb = (canvas: HTMLCanvasElement, project: Project): void => {
 
 const newProjectSheet = (onCreate: (p: Project) => void): Promise<void> =>
   openSheet((close) => {
+    const modeSelect = el('select');
+    modeSelect.append(
+      el('option', { value: 'voxel', text: 'Voxel — monte como Lego, 4 direcoes automaticas' }),
+      el('option', { value: 'pixel', text: 'Pixel — desenhe cada frame a mao' }),
+    );
     const presetSelect = el('select');
     for (const p of PRESETS) presetSelect.append(el('option', { value: p.id, text: p.label }));
     const idInput = el('input', {
@@ -38,15 +44,57 @@ const newProjectSheet = (onCreate: (p: Project) => void): Promise<void> =>
         return;
       }
       const project = createProjectFromPreset(preset, spriteId, nameInput.value.trim() || spriteId);
+      if (modeSelect.value === 'voxel') {
+        project.mode = 'voxel';
+        project.models = {};
+        project.flipPairs = {};
+      }
       close();
       onCreate(project);
     });
     return el('div', {}, [
       el('h2', { text: 'Novo personagem' }),
+      el('div', {}, [el('label', { text: 'Modo de autoria (voxel recomendado)' }), modeSelect]),
       el('div', {}, [el('label', { text: 'Preset (contrato da Art Bible)' }), presetSelect]),
       el('div', {}, [el('label', { text: 'id do sprite (nome dos arquivos)' }), idInput]),
       el('div', {}, [el('label', { text: 'Nome de exibicao' }), nameInput]),
       create,
+    ]);
+  });
+
+const catalogSheet = (onImport: (p: Project) => void): Promise<void> =>
+  openSheet((close) => {
+    const list = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });
+    for (const entry of GAME_CATALOG) {
+      const btn = el('button', { text: entry.label });
+      btn.addEventListener('click', () => {
+        btn.disabled = true;
+        btn.textContent = 'Abrindo…';
+        void (async () => {
+          try {
+            const [pngRes, jsonRes] = await Promise.all([fetch(entry.png), fetch(entry.json)]);
+            const manifest = (await jsonRes.json()) as SpriteManifestEntry;
+            const atlas = await blobToGrid(await pngRes.blob());
+            normalizeGrid(atlas, false);
+            const project = projectFromManifest(manifest, sliceAtlas(manifest, atlas));
+            close();
+            onImport(project);
+          } catch (err) {
+            toast(`Falha ao abrir: ${(err as Error).message}`);
+            btn.disabled = false;
+            btn.textContent = entry.label;
+          }
+        })();
+      });
+      list.append(btn);
+    }
+    return el('div', {}, [
+      el('h2', { text: 'Abrir do jogo' }),
+      el('p', {
+        class: 'sub',
+        text: 'Atlases oficiais embarcados no app (funciona offline). Abrem como projeto pixel, frame a frame — o modo voxel e para personagens novos.',
+      }),
+      list,
     ]);
   });
 
@@ -113,14 +161,21 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       void saveProject(p).then(() => openEditor(p));
     });
   });
+  const catalogBtn = el('button', { text: '🎮 Abrir do jogo' });
+  catalogBtn.addEventListener('click', () => {
+    void catalogSheet((p) => {
+      void saveProject(p).then(() => openEditor(p));
+    });
+  });
 
   container.append(
     el('h1', {}, [el('img', { src: './icon-192.png', alt: '' }), 'Voxelyn Atlas Studio']),
     el('p', {
       class: 'sub',
-      text: 'Desenhe, importe e exporte atlases de personagem no formato do Voxelyn Survival — com a paleta veio-fungico e o contrato de animacoes da Art Bible.',
+      text: 'Monte personagens voxel a voxel (ou pixel a pixel), importe e exporte atlases no formato do Voxelyn Survival — com a paleta veio-fungico e o contrato da Art Bible.',
     }),
-    el('div', { class: 'actions' }, [newBtn, importBtn]),
+    el('div', { class: 'actions' }, [newBtn, catalogBtn]),
+    el('div', { class: 'actions' }, [importBtn]),
   );
 
   const list = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });
@@ -145,7 +200,7 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
           el('div', { class: 'title', text: project.name }),
           el('div', {
             class: 'info',
-            text: `${project.spriteId} · v${project.version} · ${project.frameWidth}×${project.frameHeight} · ${new Date(project.updatedAt).toLocaleDateString('pt-BR')}`,
+            text: `${project.spriteId} · ${project.mode === 'voxel' ? 'voxel' : 'pixel'} · v${project.version} · ${project.frameWidth}×${project.frameHeight} · ${new Date(project.updatedAt).toLocaleDateString('pt-BR')}`,
           }),
         ]),
       ]);

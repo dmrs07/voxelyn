@@ -47,6 +47,18 @@ const precacheManifest = (): Plugin => ({
 export default defineConfig({
   base: './',
   plugins: [precacheManifest()],
+  resolve: {
+    // O teste de paridade importa tools/voxel.mjs do pipeline de conteudo, que
+    // por sua vez importa @voxelyn/core — mesmo alias do cliente Survival.
+    // O alias de atlases embarca os pares PNG+JSON do catalogo "Abrir do jogo".
+    alias: [
+      { find: '@voxelyn/core', replacement: resolve(__dirname, '../voxelyn-core/src/index.ts') },
+      {
+        find: '@atlases',
+        replacement: resolve(__dirname, '../voxelyn-survival-content/assets/atlases'),
+      },
+    ],
+  },
   server: {
     port: 5177,
   },

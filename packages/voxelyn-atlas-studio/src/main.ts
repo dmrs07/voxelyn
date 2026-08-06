@@ -4,11 +4,13 @@ import './style.css';
 import type { Project } from './types';
 import { mountHome } from './ui/home';
 import { mountEditor } from './ui/editor';
+import { mountVoxelEditor } from './ui/voxel-editor';
 
 const root = document.getElementById('app')!;
 
 const openEditor = (project: Project): void => {
-  mountEditor(root, project, () => mountHome(root, openEditor));
+  const mount = project.mode === 'voxel' ? mountVoxelEditor : mountEditor;
+  mount(root, project, () => mountHome(root, openEditor));
 };
 
 mountHome(root, openEditor);
