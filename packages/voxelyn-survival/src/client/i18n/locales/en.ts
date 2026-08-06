@@ -621,6 +621,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'sim.coreDropped': 'The core fell with its bearer.',
   'sim.arenaSealed': 'The Vein closes in. Open a way or fight.',
   'sim.ceilingCollapsing': 'The ceiling gives. The chamber is coming down.',
+  'sim.delugeRising': 'The water table is rising — the whole sector is going under.',
   'sim.furnaceUnstable': 'The construct has lost its shape — the room is fire now.',
   'sim.furnaceCooled': 'The Heart stopped. The heat went with it.',
   'sim.siegeCollapsed': 'The siege collapses with the Guardian.',

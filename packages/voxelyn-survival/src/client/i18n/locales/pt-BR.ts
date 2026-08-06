@@ -630,6 +630,7 @@ export const PT_BR = {
   'sim.coreDropped': 'O núcleo caiu com o portador.',
   'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
   'sim.ceilingCollapsing': 'O teto cede. A câmara está desabando.',
+  'sim.delugeRising': 'O lençol está subindo — o setor inteiro vai submergir.',
   'sim.furnaceUnstable': 'O constructo perdeu a forma — a sala virou fogo.',
   'sim.furnaceCooled': 'O Coração parou. O calor foi embora com ele.',
   'sim.siegeCollapsed': 'O cerco desaba com o Guardião.',

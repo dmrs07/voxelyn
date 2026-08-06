@@ -6,11 +6,13 @@
 // forma de isso acontecer sem ninguem perceber e a mecanica de bioma parar de
 // responder enquanto o dano continua saindo.
 import { describe, expect, it } from 'vitest';
-import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy } from '../src/entities';
-import { isConductiveSurface } from '../src/cells';
+import { createRun, emptyCommand, resolveChainedEvents, stepRun } from '../src/run';
+import { damageEntity, furnaceOverheatingAt, furnaceSweepAt, spawnEnemy, surfaceSpeedMul } from '../src/entities';
+import { breakSolid, canRip, dischargeAt, isConductiveSurface, isDeluged, setSurface } from '../src/cells';
+import { generateWorld } from '../src/worldgen';
+import { biomeProfile } from '../src/strata';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
-import { BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '../src/types';
+import { BOSS_PHASE_DELUGE, BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '../src/types';
 import {
   FROST_QUEEN_ICE_THRESHOLD,
   FURNACE_HEART_BROOD_CAP,
@@ -29,6 +31,14 @@ import {
   SURF_SCORCHED,
   LUNG_MATRIX_CYCLE_TICKS,
   ARCHCANTOR_PULSE_RADIUS,
+  DELUGE_HP_FRACTION,
+  SOLID_PIPE_W,
+  SOLID_PIPE_E,
+  PIPE_MOUTH,
+  isPipe,
+  WORLD_W,
+  WORLD_H,
+  DELUGE_WINDUP_TICKS,
   ARCHCANTOR_CRYSTAL_BUDGET,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
@@ -987,5 +997,247 @@ describe('as Descobertas de estrato exigem o entendimento, e nao o abate', () =>
       state.player.hp = state.player.maxHp;
     }
     expect(state.stats.discoveries & DISCOVERY_MAGNET_BANDED).not.toBe(0);
+  });
+});
+
+describe('Leviata do Lencol — o DILUVIO', () => {
+  /** Poe o chefe sob pressao e roda ate a lamina ter subido `ticks`. */
+  const flood = (seed: number, ticks: number) => {
+    const scene = duel(seed, 'sheet_leviathan', 6);
+    // Um tick para ele notar o jogador (o portao de repouso), e so entao a
+    // pressao: a carta e uma resposta a um encontro em curso.
+    stepRun(scene.state, [emptyCommand()]);
+    scene.boss.hp = scene.boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
+    for (let t = 0; t < ticks; t++) {
+      stepRun(scene.state, [emptyCommand()]);
+      scene.state.player.hp = scene.state.player.maxHp;
+    }
+    return scene;
+  };
+
+  it('acima do limiar ele NAO levanta o lencol', () => {
+    const { state, boss } = duel(620, 'sheet_leviathan', 6);
+    boss.hp = boss.maxHp;
+    for (let t = 0; t < 300; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.bossRuntime.delugeAt, 'inundou com o chefe inteiro').toBeLessThan(0);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE).toBe(0);
+  });
+
+  it('sob pressao ele sobe UMA vez, e nao volta atras', () => {
+    const { state, boss } = flood(621, DELUGE_WINDUP_TICKS + 20);
+    expect(state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE, 'a carta nao saiu').not.toBe(0);
+    const at = state.bossRuntime.delugeAt;
+    expect(at, 'a subida nao foi agendada').toBeGreaterThanOrEqual(0);
+    // Curado de volta ao topo: uma fase de uma vez nao desfaz.
+    boss.hp = boss.maxHp;
+    for (let t = 0; t < 200; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.bossRuntime.delugeAt, 'a carta foi relancada').toBe(at);
+  });
+
+  it('a lamina VIAJA: perto submerge antes de longe', () => {
+    const { state } = flood(622, DELUGE_WINDUP_TICKS + 5);
+    const w = state.config.width;
+    const cx = Math.floor(state.bossRuntime.delugeX);
+    const cy = Math.floor(state.bossRuntime.delugeY);
+    const near = cy * w + cx + 1;
+    const far = cy * w + cx + 12;
+    expect(isDeluged(state, near), 'nem o proprio pe dele submergiu').toBe(true);
+    expect(isDeluged(state, far), 'o outro lado da camara submergiu junto').toBe(false);
+    for (let t = 0; t < 60; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(isDeluged(state, far), 'a frente nunca chegou la').toBe(true);
+  });
+
+  it('rocha NAO submerge: a lamina sobe pelos vaos', () => {
+    // E o que impede o Diluvio de virar um condutor que atravessa parede: o
+    // espaco submerso e o mesmo espaco aberto por onde a corrente ja andava.
+    const { state, px, py } = flood(623, DELUGE_WINDUP_TICKS + 120);
+    const w = state.config.width;
+    const rock = py * w + px + 2;
+    state.solid[rock] = SOLID_ROCK;
+    expect(isDeluged(state, rock), 'a agua entrou no macico').toBe(false);
+    expect(isDeluged(state, py * w + px + 3), 'o vao ao lado ficou seco').toBe(true);
+  });
+
+  it('depois do Diluvio ele emerge onde ANTES era chao seco', () => {
+    // A virada do encontro numa frase: a camara comeca seca, e a carta unica
+    // dele apaga a unica coisa que o segurava.
+    const { state, boss, px, py } = duel(624, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    expect(isConductiveSurface(state.surface[py * w + px]), 'a camara ja comecou molhada')
+      .toBe(false);
+    stepRun(state, [emptyCommand()]);
+    boss.hp = boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
+    let breached = false;
+    for (let t = 0; t < 600 && !breached; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt') breached = true;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(breached, 'o lencol subiu e ele continuou sem poder emergir').toBe(true);
+  });
+
+  it('a lamina APAGA o fogo que atravessa', () => {
+    // O Diluvio nao grava superficie — o material de baixo continua inteiro —,
+    // mas fogo debaixo d'agua e uma promessa que a materia nao sustenta. E o
+    // custo real da carta para o jogador: quem estava usando fogo perde o fogo.
+    const { state, px, py } = duel(625, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    stepRun(state, [emptyCommand()]);
+    state.enemies[0].hp = state.enemies[0].maxHp * (DELUGE_HP_FRACTION - 0.05);
+    const burning = py * w + px + 1;
+    for (let t = 0; t < DELUGE_WINDUP_TICKS + 120 && !isDeluged(state, burning); t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(isDeluged(state, burning), 'a lamina nunca chegou a celula').toBe(true);
+    // Acende DEBAIXO do lencol, pelo caminho normal (a fila de reacao), e da
+    // tempo de `stepCells` visitar a celula: a regra nao e "a frente apagou ao
+    // passar", e "submerso nao queima" — fogo novo tambem nao pega.
+    setSurface(state, burning, SURF_FIRE, 400);
+    for (let t = 0; t < 12; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.surface[burning], 'a chama sobreviveu debaixo do lencol').not.toBe(SURF_FIRE);
+  });
+
+  it('NAO retarda o jogador: a arena vira dele por alcance, nao por atrito', () => {
+    // Decisao de desenho, e ela merece uma trava. Um retardo permanente no setor
+    // inteiro pesaria em cada esquiva pelo resto do encontro, e nao ha mais chao
+    // seco para onde sair e recuperar a mobilidade.
+    const { state, px, py } = flood(626, DELUGE_WINDUP_TICKS + 120);
+    const w = state.config.width;
+    const cell = py * w + px;
+    expect(isDeluged(state, cell), 'o jogador nem chegou a submergir').toBe(true);
+    // Limpa a superficie REAL debaixo dele: a enchente incremental pinta agua
+    // de verdade, e agua de verdade retarda. O que esta sob teste e o Diluvio,
+    // que nao e uma superficie e nao pode retardar ninguem.
+    state.surface[cell] = SURF_NONE;
+    state.surfaceTimer[cell] = 0;
+    expect(isDeluged(state, cell), 'limpar a superficie desfez o Diluvio').toBe(true);
+    expect(surfaceSpeedMul(state, state.player), 'o Diluvio esta arrastando o jogador').toBe(1);
+  });
+
+  it('a CORRENTE atenua com a distancia: perto cobra mais que longe', () => {
+    // A outra metade da carta. Quem alaga o setor inteiro entrega um condutor do
+    // tamanho do setor inteiro — e sem atenuacao isso seria um botao de vitoria
+    // nos dois sentidos, com uma descarga solta em qualquer canto cobrando
+    // integral de tudo o que estivesse na lamina.
+    const hurt = (gap: number): number => {
+      const { state, px, py } = flood(627 + gap, DELUGE_WINDUP_TICKS + 200);
+      state.player.x = px + 0.5;
+      state.player.y = py + 0.5;
+      expect(isDeluged(state, py * state.config.width + px)).toBe(true);
+      const events: SemanticEvent[] = [];
+      dischargeAt(state, px + gap, py, events, { source: 'environment' });
+      const before = state.player.hp;
+      resolveChainedEvents(state, events);
+      return before - state.player.hp;
+    };
+    const close = hurt(1);
+    const far = hurt(9);
+    expect(close, 'a descarga nao chegou nem de perto').toBeGreaterThan(0);
+    expect(far, 'a corrente nao alcancou longe: ela deve alcancar, e nao machucar')
+      .toBeGreaterThan(0);
+    expect(far, `perto ${close.toFixed(1)} vs longe ${far.toFixed(1)}`).toBeLessThan(close * 0.5);
+  });
+});
+
+describe('Os DUTOS do Aquifero — as fontes do Diluvio', () => {
+  it('so o Aquifero tem cano, e ele nasce virado para o VAO', () => {
+    // Eles sao infraestrutura de um lugar que bombeava agua e perdeu a briga.
+    // Num estrato que nunca teve bomba, um duto na parede seria cenario mentindo.
+    const aquifer = generateWorld(
+      404,
+      WORLD_W,
+      WORLD_H,
+      biomeProfile({ stratum: 'aquifer', occupation: 'none', lineage: 'hydric' }, 3),
+    );
+    expect(aquifer, 'a geracao falhou').not.toBeNull();
+    const pipes: number[] = [];
+    for (let i = 0; i < aquifer!.solid.length; i++) if (isPipe(aquifer!.solid[i])) pipes.push(i);
+    expect(pipes.length, 'o Aquifero nasceu sem duto nenhum').toBeGreaterThan(0);
+    for (const i of pipes) {
+      const [dx, dy] = PIPE_MOUTH[aquifer!.solid[i]];
+      const mouth = (Math.floor(i / WORLD_W) + dy) * WORLD_W + ((i % WORLD_W) + dx);
+      expect(aquifer!.solid[mouth], `duto ${i} despeja contra rocha`).toBe(SOLID_NONE);
+    }
+
+    const basalt = generateWorld(
+      404,
+      WORLD_W,
+      WORLD_H,
+      biomeProfile({ stratum: 'basalt', occupation: 'none', lineage: 'basaltic' }, 3),
+    );
+    expect(basalt!.solid.some((v) => isPipe(v)), 'o basalto ganhou encanamento').toBe(false);
+  });
+
+  it('o duto nao cede: nem quebra nem e arrancado', () => {
+    // Um tubo de aco de dois metros nao cai a um bolt de plasma. Isto tambem
+    // garante que ele nunca vira uma parede que o jogador precise aprender a
+    // furar: ate o Diluvio ele e cenario.
+    const { state, px, py } = duel(640, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    const cell = py * w + px + 4;
+    state.solid[cell] = SOLID_PIPE_W;
+    expect(breakSolid(state, px + 4, py, []), 'o duto quebrou').toBe(false);
+    expect(canRip(state, px + 4, py), 'o duto foi arrancado').toBe(false);
+    expect(state.solid[cell]).toBe(SOLID_PIPE_W);
+  });
+
+  it('a agua entra pelas BOCAS, e nao do corpo do chefe', () => {
+    // A leitura inteira do Diluvio depende disto: "os dutos estao enchendo a
+    // sala" so acontece se as fontes forem os dutos. Com o chefe como unica
+    // fonte, a inundacao voltaria a ser um circulo crescendo no meio da camara.
+    const { state, boss, px, py } = duel(641, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    // Um duto na borda oeste da arena, longe do chefe (que esta a leste).
+    const pipeX = px - 14;
+    state.solid[py * w + pipeX] = SOLID_PIPE_E;
+    stepRun(state, [emptyCommand()]);
+    boss.hp = boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
+    for (let t = 0; t < DELUGE_WINDUP_TICKS + 4; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    // A boca do duto ja molhou, mesmo estando a vinte tiles do chefe.
+    expect(isDeluged(state, py * w + pipeX + 1), 'a boca do duto ficou seca').toBe(true);
+  });
+
+  it('parede DELIMITA o canal: sala selada nao enche', () => {
+    // "O Diluvio so se aplica ao solo, e paredes delimitam canais." Um circulo
+    // diria que uma sala selada do outro lado da rocha enche junto porque esta
+    // perto; a agua andando pelos vaos diz que ela enche quando encontra o
+    // caminho, ou nunca.
+    const { state, boss, px, py } = duel(642, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    // Uma caixa fechada de rocha, com uma celula oca dentro, ao lado do chefe.
+    const roomX = px - 6;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        state.solid[(py + dy) * w + roomX + dx] = SOLID_ROCK;
+      }
+    }
+    const sealed = py * w + roomX;
+    state.solid[sealed] = SOLID_NONE;
+    stepRun(state, [emptyCommand()]);
+    boss.hp = boss.maxHp * (DELUGE_HP_FRACTION - 0.05);
+    for (let t = 0; t < DELUGE_WINDUP_TICKS + 400; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    // O lado de fora, colado na caixa, submergiu ha muito tempo.
+    expect(isDeluged(state, py * w + roomX + 2), 'nem o lado de fora encheu').toBe(true);
+    expect(isDeluged(state, sealed), 'a agua atravessou a rocha').toBe(false);
   });
 });

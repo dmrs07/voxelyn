@@ -123,7 +123,20 @@ describe('impressao digital da geracao', () => {
     // 3. o objetivo deixou de poder encostar na moldura do mapa
     //    (CORE_BORDER_MARGIN): o 3x3 livre em volta dele e onde o corpo do
     //    chefe tem de caber, e num canto ele nao cabia.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2694607655);
+    //
+    // 2377998545 (era 2694607655), na SIMULATION_VERSION 35: o AQUIFERO ganhou
+    // DUTOS. Uma mudanca de proposito, e a unica desta leva que toca o terreno.
+    //
+    // Ela muda o numero por dois caminhos, e vale registrar os dois: os canos
+    // ocupam celulas que eram rocha (o `solid` muda) e o sorteio deles consome
+    // a RNG do gerador, o que desloca tudo o que vem depois — respiradouros e
+    // spawns — nos setores de Aquifero. Nenhum outro estrato e afetado: o bloco
+    // inteiro esta atras de `profile.pipeCount > 0`, e so o Aquifero o levanta.
+    //
+    // O que NAO muda e o contrato de alcancabilidade: os dutos entram depois de
+    // todas as provas do gerador e so por cima de celulas que ja eram solidas,
+    // entao nenhuma rota deixou de existir por causa deles.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2377998545);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

@@ -289,6 +289,27 @@ export type WorldFlags = {
   /** Tick em que a Salva marcada cai. 0 quando nao ha salva no ar. */
   blastAt: number;
   /**
+   * O DILUVIO do Leviata: o tick em que a lamina comeca a subir (-1 = nunca) e
+   * de onde ela sobe.
+   *
+   * Tres numeros no lugar de uma quarta camada de mundo. O Diluvio cobre TODO o
+   * setor, entao "esta submerso?" e geometria e nao um mapa: o cliente refaz a
+   * mesma conta da simulacao (`isDeluged`) e chega na mesma resposta, celula a
+   * celula, sem receber nenhuma. Uma camada de verdade teria de entrar no diff
+   * de chunks e engordar toda celula alterada do jogo — inclusive nos setores
+   * onde nenhum Leviata existe.
+   *
+   * Viaja pelo mesmo motivo que `bossPhases`: quem RECONECTA depois da subida
+   * nunca recebeu o evento que a anunciou, e sem estes campos veria um setor
+   * seco enquanto o servidor cobra por um setor submerso.
+   *
+   * Ausentes em servidores anteriores ao Diluvio: o cliente trata como -1, que
+   * e "nunca aconteceu".
+   */
+  delugeAt?: number;
+  delugeX?: number;
+  delugeY?: number;
+  /**
    * Ausente em servidores anteriores a Ressonancia do Poco: o cliente trata como
    * lista vazia e o resto do mundo continua funcionando.
    */

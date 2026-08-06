@@ -588,6 +588,23 @@ export type BossRuntime = {
    * para a janela sem nunca ter atacado.
    */
   leapsLeft: number;
+  /**
+   * O DILUVIO: o tick em que a lamina comecou a subir, e de onde.
+   *
+   * `delugeAt < 0` significa "nunca aconteceu". Tres numeros, e nao uma camada
+   * de celulas, e essa e a decisao de desenho inteira: o Diluvio cobre TODO o
+   * setor, entao "esta submerso?" nao precisa de mapa — precisa de um centro,
+   * um instante e a regra (ver `isDeluged`). Uma quarta camada de mundo teria
+   * de entrar no diff de chunks, engordar toda celula alterada do jogo e ainda
+   * assim diria menos do que estes tres campos dizem.
+   *
+   * Entram no hash: eles decidem por onde o chefe anda, onde ele emerge e
+   * quanto uma descarga cobra. Duas simulacoes que discordem do instante da
+   * subida divergem em tudo o que vem depois dela.
+   */
+  delugeAt: number;
+  delugeX: number;
+  delugeY: number;
 };
 
 /** A matilha da segunda fase do Guardiao. Antes: `guardianSummoned`. */
@@ -604,6 +621,13 @@ export const BOSS_PHASE_REACTOR = 1 << 1;
 export const BOSS_PHASE_OVERHEAT = 1 << 2;
 /** INSTABILIDADE do Coracao (10% de vida). Ciclones de fogo atravessam a sala. */
 export const BOSS_PHASE_UNSTABLE = 1 << 3;
+/**
+ * O DILUVIO do Leviata do Lencol. Uma vez por encontro, e sem volta.
+ *
+ * O resto das fases desta lista aumenta a pressao; esta muda o MAPA. Ver
+ * `isDeluged` e a nota do Diluvio em constants.ts.
+ */
+export const BOSS_PHASE_DELUGE = 1 << 4;
 
 /**
  * Os modulos do Diamandis, na ordem em que se soltam. Cada um alimenta UMA
@@ -922,7 +946,21 @@ export type SemanticEvent =
   | { t: 'miner_mood'; entity: number; x: number; y: number; mood: number }
   /** Minerio entrou na cota. `total` para o HUD nao ter de somar por conta. */
   | { t: 'ore_gained'; x: number; y: number; amount: number; total: number }
-  | { t: 'discharge'; cells: number[]; source: 'player' | 'enemy' | 'environment'; owner?: number }
+  /**
+   * `fromX`/`fromY` sao o PONTO em que a corrente entrou no condutor, quando ha
+   * um so. Ausentes nas descargas de fonte multipla (o canto do Arquicantor arma
+   * dezenas de cristais, e cada um e uma fonte) — e sem eles o dano continua
+   * plano, que e o que essas sempre fizeram. Com eles, a corrente atenua com a
+   * distancia: ver DELUGE_SHOCK_FULL_RANGE.
+   */
+  | {
+      t: 'discharge';
+      cells: number[];
+      source: 'player' | 'enemy' | 'environment';
+      owner?: number;
+      fromX?: number;
+      fromY?: number;
+    }
   | { t: 'ignite'; x: number; y: number }
   /**
    * Alguem recuperou vida. Existe para o Bispo poder ser LIDO: sem um evento, a
@@ -1141,6 +1179,7 @@ export type SimMessageKey =
   | 'sim.ceilingCollapsing'
   /** O constructo perdeu a forma: a sala inteira virou fogo. */
   | 'sim.furnaceUnstable'
+  | 'sim.delugeRising'
   /** O Coracao caiu e o calor foi embora com ele. */
   | 'sim.furnaceCooled'
   /** O poco nao abre: o dono do setor ainda esta de pe. */
@@ -1197,6 +1236,17 @@ export type SurvivalState = {
   solid: Uint8Array;
   surface: Uint8Array;
   surfaceTimer: Uint16Array;
+  /**
+   * O campo do DILUVIO: distancia da agua ate cada celula, andando pelos vaos.
+   *
+   * DERIVADO, como `bossRuntime.path`: sai de (solido, canos, origem) e da para
+   * refazer a qualquer momento, entao nao entra no hash e nao viaja em
+   * snapshot. `delugeFieldBucket` e o balde de tick em que ele foi feito — as
+   * duas pontas refazem nos MESMOS instantes, e nao quando cada uma tiver
+   * vontade. Ver `delugeField`.
+   */
+  delugeField: Uint16Array | null;
+  delugeFieldBucket: number;
   chunkVersion: Uint32Array;
   entry: Vec2;
   corePos: Vec2;

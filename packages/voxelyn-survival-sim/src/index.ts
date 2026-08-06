@@ -109,6 +109,12 @@ export {
   dischargeAt,
   igniteCell,
   isConductiveSurface,
+  // O DILUVIO. Exportados porque a lamina e DERIVADA e nao transmitida: o
+  // cliente refaz a mesma geometria da simulacao e chega na mesma resposta,
+  // celula a celula, sem receber nenhuma.
+  isConductiveCell,
+  isDeluged,
+  delugeFront,
   meltIce,
   heatFungalCell,
   breakSolid,

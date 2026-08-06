@@ -64,6 +64,9 @@ import {
   LEVIATHAN_SURGE_COOLDOWN_TICKS,
   LEVIATHAN_SURGE_LENGTH,
   LEVIATHAN_SURGE_WIDTH,
+  LEVIATHAN_DELUGE_SPEED_SCALE,
+  DELUGE_HP_FRACTION,
+  DELUGE_WINDUP_TICKS,
   DIVER_BOSS_AGGRO_RANGE,
   LUNG_MATRIX_BREATH_INTERVAL_TICKS,
   LUNG_MATRIX_BURN_DAMAGE,
@@ -252,7 +255,7 @@ import {
   UNDERTAKER_SLAM_RANGE,
   UNDERTAKER_SLAM_WINDUP_TICKS,
 } from './constants.js';
-import { breakSolid, canRip, chargeCells, closeArena, explodeAt, igniteCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
+import { breakSolid, canRip, chargeCells, closeArena, delugeFront, explodeAt, igniteCell, isConductiveCell, isConductiveSurface, meltIce, openArena, ripSolid, setSurface } from './cells.js';
 import { findPath, hasLineOfSight } from './pathing.js';
 import { isBossArchetype } from './bosses.js';
 import { markSectorBossDown, runDepth } from './depth.js';
@@ -276,6 +279,7 @@ import {
   BOSS_PHASE_REACTOR,
   BOSS_PHASE_SUMMON,
   BOSS_PHASE_UNSTABLE,
+  BOSS_PHASE_DELUGE,
   BOSS_PHASE_OVERHEAT,
   DISCOVERY_BISHOP_HEALED,
   DISCOVERY_BISHOP_NOVA_SURVIVED,
@@ -2861,6 +2865,10 @@ const leviathanStep = (
   events: SemanticEvent[],
 ): void => {
   const w = state.config.width;
+  // O DILUVIO e a primeira coisa que ele consulta, e nao um ramo do mergulho:
+  // uma carta que muda o mapa nao pode ficar esperando a fase certa do ciclo
+  // para sair. Cruzou o limiar com o encontro em curso, ela sai.
+  if (player && state.bossRuntime.awake) leviathanDeluge(state, enemy, events);
   if (enemy.mood === DEVOURER_SURFACED) {
     if (state.tick >= enemy.nextActionAt) {
       enemy.mood = DEVOURER_BURROWED;
@@ -2887,10 +2895,13 @@ const leviathanStep = (
   // Submerso ele anda pela LAMINA, e nao pelo chao: passos que continuem em
   // agua. Sem lamina para onde ir ele guarda a margem — que e exatamente a
   // leitura que o jogador precisa ter dele.
-  const step = LEVIATHAN_SWIM_SPEED * dt;
+  // Submerso no proprio elemento, ele desliza um pouco mais rapido — e nada em
+  // QUALQUER lugar, que e o presente de verdade do Diluvio.
+  const step =
+    LEVIATHAN_SWIM_SPEED * dt * (delugeFront(state) >= 0 ? LEVIATHAN_DELUGE_SPEED_SCALE : 1);
   const wet = (mx: number, my: number): boolean => {
     const i = Math.floor(enemy.y + my) * w + Math.floor(enemy.x + mx);
-    return i >= 0 && i < state.surface.length && isConductiveSurface(state.surface[i]);
+    return i >= 0 && i < state.surface.length && isConductiveCell(state, i);
   };
   const sx = toward.x * step;
   const sy = toward.y * step;
@@ -2941,6 +2952,43 @@ const leviathanStep = (
  * um chefe que sobrescrevesse gelo, fogo ou vidro estaria apagando decisao do
  * jogador com o proprio corpo.
  */
+/**
+ * O DILUVIO: a carta unica do Leviata, e a virada do encontro.
+ *
+ * Uma vez, sob PRESSAO — e a ordem importa. A primeira metade da luta e
+ * territorial: chao seco o atrasa, a enchente incremental avanca tile a tile, e
+ * o jogador aprende que o mapa e o assunto. O Diluvio e a resposta do Aquifero
+ * a quem venceu esse jogo: ele para de disputar margem e levanta o lencol
+ * inteiro. Depois dele nao ha margem, e a pergunta do encontro troca de "onde
+ * ele NAO alcanca" para "de onde eu solto a corrente".
+ *
+ * E ele NAO e so um buff. Quem alaga o setor inteiro entrega ao jogador um
+ * condutor do tamanho do setor inteiro — e o Leviata e o unico chefe do jogo
+ * que a propria descarga atordoa. A carta que o liberta e a mesma que o expoe;
+ * o que decide quem ganha o troco e a distancia (ver DELUGE_SHOCK_FULL_RANGE).
+ *
+ * `phasesFired` guarda que ela ja saiu: uma fase de uma vez nao volta atras nem
+ * se o chefe for curado, e o bit ja viaja no snapshot e ja entra no hash.
+ */
+const leviathanDeluge = (
+  state: SurvivalState,
+  enemy: Entity,
+  events: SemanticEvent[],
+): void => {
+  if ((state.bossRuntime.phasesFired & BOSS_PHASE_DELUGE) !== 0) return;
+  if (enemy.maxHp <= 0 || enemy.hp / enemy.maxHp > DELUGE_HP_FRACTION) return;
+  state.bossRuntime.phasesFired |= BOSS_PHASE_DELUGE;
+  // A subida comeca DEPOIS do telegrafo: `delugeAt` no futuro deixa
+  // `delugeFront` negativo ate la, entao a regra e a apresentacao concordam
+  // sozinhas sobre o instante em que o setor comeca a submergir.
+  state.bossRuntime.delugeAt = state.tick + DELUGE_WINDUP_TICKS;
+  state.bossRuntime.delugeX = enemy.x;
+  state.bossRuntime.delugeY = enemy.y;
+  events.push({ t: 'boss_phase', archetype: 'sheet_leviathan', phase: BOSS_PHASE_DELUGE });
+  events.push({ t: 'message', key: 'sim.delugeRising' });
+  events.push({ t: 'pulse', x: enemy.x, y: enemy.y, radius: 4 });
+};
+
 /** Ordem FIXA de vizinhanca: o que torna a frente da enchente determinista. */
 const NEIGHBORS4: readonly (readonly [number, number])[] = [
   [1, 0],
@@ -3043,7 +3091,10 @@ const leviathanBreachSpot = (state: SurvivalState, cx: number, cy: number): numb
         if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
         const i = y * w + x;
         if (state.solid[i] !== SOLID_NONE) continue;
-        if (!isConductiveSurface(state.surface[i])) continue;
+        // `isConductiveCell` e nao `isConductiveSurface`: depois do Diluvio o
+        // setor inteiro e lamina, e ele emerge onde quiser. E exatamente essa a
+        // virada que a carta unica dele compra.
+        if (!isConductiveCell(state, i)) continue;
         return i;
       }
     }
