@@ -13,6 +13,8 @@ import { createLeaderboard, type LeaderboardStore } from './leaderboard.js';
 import { createLeaderboardHandler } from './leaderboard-http.js';
 import { createTelemetry, type TelemetryStore } from './telemetry.js';
 import { createTelemetryHandler } from './telemetry-http.js';
+import { createArenaTelemetry, type ArenaTelemetryStore } from './arena-telemetry.js';
+import { createArenaTelemetryHandler } from './arena-telemetry-http.js';
 import { createDeathEchoStore, type DeathEchoStore } from './death-echoes.js';
 import { createDeathEchoHandler } from './death-echoes-http.js';
 import { createProgressionStore, type ProgressionStore } from './progression-store.js';
@@ -27,6 +29,7 @@ export type WsServerHandle = {
   ready: Promise<void>;
   leaderboard: () => LeaderboardStore | null;
   telemetry: () => TelemetryStore | null;
+  arenaTelemetry: () => ArenaTelemetryStore | null;
   deathEchoes: () => DeathEchoStore | null;
   progression: () => ProgressionStore | null;
   close: () => Promise<void>;
@@ -42,6 +45,8 @@ export type WsOptions = ServerOptions & {
   trustedProxyHops?: number;
   /** Token de leitura do digest de telemetria. Ausente = leitura fechada. */
   telemetryToken?: string;
+  /** Token de leitura do digest da Arena de Chefes. Ausente = leitura fechada. */
+  arenaTelemetryToken?: string;
   /** Segredo do HMAC das sessoes de progressao. Sem ele, sessao efemera + aviso. */
   progressionSecret?: string;
   /** Tetos por origem da rota de progressao. Ver `progression-http.ts`. */
@@ -99,8 +104,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       if (!deathEchoStore) return;
       // Anonimo por construcao: nonce da instancia, sala, setor, tick e slot. Nada
       // aqui identifica uma pessoa, e o serial que o jogador le sai deste id.
-      const identity =
-        `coop:${instanceNonce}:${room.seed}:${death.sector}:${death.tick}:${death.slot}`;
+      const identity = `coop:${instanceNonce}:${room.seed}:${death.sector}:${death.tick}:${death.slot}`;
       const capsule = buildDeathEchoCapsule(room.state, {
         id: identity,
         x: death.x,
@@ -130,13 +134,16 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   let draining = false;
 
   let telemetryStore: TelemetryStore | null = null;
+  let arenaTelemetryStore: ArenaTelemetryStore | null = null;
   let handleLeaderboard: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
     null;
   let handleTelemetry: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
     null;
-  let handleDeathEchoes:
+  let handleArenaTelemetry:
     | ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>)
     | null = null;
+  let handleDeathEchoes: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
+    null;
   let progressionStore: ProgressionStore | null = null;
   let handleProgression: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
     null;
@@ -198,6 +205,16 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         digestToken: opts.telemetryToken ?? process.env.TELEMETRY_TOKEN,
       });
     }),
+    createArenaTelemetry(databaseUrl, log).then((store) => {
+      arenaTelemetryStore = store;
+      handleArenaTelemetry = createArenaTelemetryHandler({
+        store,
+        log,
+        allowedOrigins: opts.allowedOrigins,
+        trustedProxyHops: opts.trustedProxyHops,
+        digestToken: opts.arenaTelemetryToken ?? process.env.ARENA_TELEMETRY_TOKEN,
+      });
+    }),
   ]).then(() => undefined);
 
   const http = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -212,6 +229,26 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
       }
       void handleTelemetry(req, res).catch((err: unknown) => {
         log({ ev: 'telemetry_error', error: err instanceof Error ? err.message : String(err) });
+        if (!res.headersSent) {
+          res.writeHead(204);
+          res.end();
+        }
+      });
+      return;
+    }
+    if (req.url?.startsWith('/arena-telemetry')) {
+      // Mesma politica de indisponibilidade da telemetria de campanha: 204,
+      // nunca 503 — a Arena nao deve reagir a isso de forma nenhuma.
+      if (!handleArenaTelemetry) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      void handleArenaTelemetry(req, res).catch((err: unknown) => {
+        log({
+          ev: 'arena_telemetry_error',
+          error: err instanceof Error ? err.message : String(err),
+        });
         if (!res.headersSent) {
           res.writeHead(204);
           res.end();
@@ -360,6 +397,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
           void Promise.all([
             leaderboardStore?.close() ?? Promise.resolve(),
             telemetryStore?.close() ?? Promise.resolve(),
+            arenaTelemetryStore?.close() ?? Promise.resolve(),
             deathEchoStore?.close() ?? Promise.resolve(),
             progressionStore?.close() ?? Promise.resolve(),
           ]).then(() => resolve());
@@ -373,6 +411,7 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
     ready: leaderboardReady,
     leaderboard: () => leaderboardStore,
     telemetry: () => telemetryStore,
+    arenaTelemetry: () => arenaTelemetryStore,
     deathEchoes: () => deathEchoStore,
     progression: () => progressionStore,
     close,

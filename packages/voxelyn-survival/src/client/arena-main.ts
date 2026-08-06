@@ -1,7 +1,9 @@
 // Ponto de entrada da Arena de Chefes: uma ferramenta de playtest isolado,
 // separada da run normal (arena.html, nao index.html). Deixa escolher chefe,
 // HP e eco/módulos de entrada e joga a luta com o MESMO motor de render/input
-// do jogo real — sem servidor, sem leaderboard, sem telemetria, sem replay.
+// do jogo real — sem leaderboard, sem gravacao de replay, sem Ecos de morte.
+// Tem telemetria PROPRIA (arena-telemetry-client.ts), separada da de campanha
+// de proposito — ver o cabecalho de @voxelyn/survival-server/arena-telemetry.ts.
 //
 // O laco de jogo abaixo e um recorte deliberado do de `main.ts`: mesma
 // simulacao (`stepRun` a 20 Hz, `LocalPlayout` interpolando para o desenho),
@@ -19,6 +21,8 @@ import { TickEventQueue } from './playout';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { loadQuality } from './settings';
 import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from './arena-catalog';
+import { arenaOutcomeFor, type ArenaOutcome } from './arena-outcome';
+import { reportArenaOutcome } from './arena-telemetry-client';
 import {
   ARENA_MAX_HP,
   ARENA_MIN_HP,
@@ -158,28 +162,30 @@ const playerScreen = (): { x: number; y: number } => ({
 });
 
 let stopLoop: (() => void) | null = null;
+/** Marca a run corrente como abandonada, se ela ainda nao tiver se decidido. */
+let abandonActiveRun: (() => void) | null = null;
 
-const outcomeLabel = (state: SurvivalState): string => {
-  switch (state.phase) {
-    case 'dead':
-      return 'O Prospector caiu';
-    case 'extracted':
-    case 'extracted_with_core':
-      return 'Extração concluída';
-    default:
-      return '—';
-  }
+const OUTCOME_TITLE: Record<ArenaOutcome, string> = {
+  victory: 'Chefe derrotado',
+  defeat: 'O Prospector caiu',
+  abandoned: 'Luta abandonada',
 };
 
-const showEnd = (state: SurvivalState): void => {
-  endTitle.textContent = outcomeLabel(state);
+const showEnd = (outcome: ArenaOutcome, state: SurvivalState): void => {
+  endTitle.textContent = OUTCOME_TITLE[outcome];
   const summary = state.summary;
   const lines: string[] = [`${state.tick} ticks simulados`];
   if (summary) {
-    lines.push(`Causa: ${summary.deathCause?.kind ?? 'nenhuma (extração)'}`);
+    lines.push(`Causa: ${summary.deathCause?.kind ?? 'nenhuma'}`);
     lines.push(`Dano causado: ${(summary.stats.damageDealtTenths / 10).toFixed(1)}`);
     lines.push(`Dano recebido: ${(summary.stats.damageTakenTenths / 10).toFixed(1)}`);
     lines.push(`Tiros disparados: ${summary.stats.shotsFired}`);
+  } else {
+    // Vitoria contra o chefe nao encerra `state.phase` (ver arena-outcome.ts),
+    // entao nao ha RunSummary — so o que a propria arena sabe medir.
+    lines.push(`Dano causado: ${(state.stats.damageDealtTenths / 10).toFixed(1)}`);
+    lines.push(`Dano recebido: ${(state.stats.damageTakenTenths / 10).toFixed(1)}`);
+    lines.push(`Tiros disparados: ${state.stats.shotsFired}`);
   }
   endSummary.innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
   endOverlay.classList.remove('hidden');
@@ -206,6 +212,20 @@ const runArena = (conditions: ArenaConditions): void => {
   let queuedChoice: 0 | 1 | null = null;
   let ended = false;
 
+  /**
+   * Encerra a arena EXATAMENTE UMA VEZ. Chamadas depois da primeira sao
+   * no-op de proposito: e o que impede um `abandon` tardio (o testador fecha
+   * a tela de resultado de uma vitoria ja concluida) de sobrescrever o
+   * desfecho de verdade.
+   */
+  let outcome: ArenaOutcome | null = null;
+  const conclude = (result: ArenaOutcome): void => {
+    if (outcome) return;
+    outcome = result;
+    reportArenaOutcome(conditions, result, state);
+  };
+  abandonActiveRun = (): void => conclude('abandoned');
+
   const frame = (now: number): void => {
     if (!running) return;
     frameNow = now;
@@ -215,13 +235,16 @@ const runArena = (conditions: ArenaConditions): void => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
-    if (state.phase !== 'running') {
+    if (outcome) {
       eventQueue.flush(Number.POSITIVE_INFINITY);
       renderer.render(state, 1, input.state, now);
-      renderer.renderEnd(state, vw, vh);
+      // `renderEnd` e a tela de fim NATIVA da sim (morte/extracao); vitoria
+      // contra o chefe nao passa por `state.phase`, entao nao ha nada la para
+      // desenhar — o overlay de HTML e o resultado inteiro nesse caso.
+      if (state.phase !== 'running') renderer.renderEnd(state, vw, vh);
       if (!ended) {
         ended = true;
-        showEnd(state);
+        showEnd(outcome, state);
       }
       requestAnimationFrame(frame);
       return;
@@ -238,10 +261,14 @@ const runArena = (conditions: ArenaConditions): void => {
       playout.capture(state);
       eventQueue.push(state.tick, result.events);
       accumulator -= TICK_MS;
-      if (state.phase !== 'running') break;
+      const detected = arenaOutcomeFor(state, conditions.boss);
+      if (detected) {
+        conclude(detected);
+        break;
+      }
     }
     const alpha = accumulator / TICK_MS;
-    const view = state.phase === 'running' ? (playout.sample(state, alpha) ?? state) : state;
+    const view = outcome ? state : (playout.sample(state, alpha) ?? state);
     eventQueue.flush(view.tick);
     renderer.setCargoOre(view.stats.oreCollected);
     renderer.render(view, 1, input.state, now);
@@ -277,6 +304,9 @@ btnRetry.addEventListener('click', () => {
 });
 
 btnReconfigure.addEventListener('click', () => {
+  // Se a luta ainda estava indecisa, ISTO e o que a torna 'abandoned' em vez
+  // de simplesmente sumir sem desfecho nenhum.
+  abandonActiveRun?.();
   stopLoop?.();
   canvas.classList.add('hidden');
   hudNote.classList.add('hidden');

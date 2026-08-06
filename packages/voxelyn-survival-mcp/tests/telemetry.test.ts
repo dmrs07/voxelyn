@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { DamageCause, RunStats, RunSummary } from '@voxelyn/survival-sim';
-import { digestOf, type AgentRunRecord } from '../src/telemetry.js';
+import {
+  clearAgentRunRecords,
+  digestOf,
+  listAgentRunRecords,
+  recordAgentRun,
+  type AgentRunRecord,
+} from '../src/telemetry.js';
+import { createAgentRun } from '../src/runs.js';
 
 const stats = (overrides: Partial<RunStats> = {}): RunStats => ({
   shotsFired: 20,
@@ -33,7 +40,9 @@ const summary = (overrides: Partial<RunSummary> = {}): RunSummary => ({
   ...overrides,
 });
 
+let nextRunId = 0;
 const record = (overrides: Partial<AgentRunRecord> = {}): AgentRunRecord => ({
+  runId: `fixture-${nextRunId++}`,
   seed: 1,
   tag: 'default',
   summary: summary(),
@@ -94,6 +103,12 @@ describe('digestOf', () => {
     expect(digest.runsByTag).toEqual({ baseline: 2, 'buffed-hp': 1 });
   });
 
+  it('treats a tag literally named "__proto__" as a plain key, not a prototype write', () => {
+    const digest = digestOf([record({ tag: '__proto__' }), record({ tag: '__proto__' })]);
+    expect(digest.runsByTag.__proto__).toBe(2);
+    expect(Object.getPrototypeOf(digest.runsByTag)).toBe(Object.prototype);
+  });
+
   it('computes shots-per-kill only when at least one kill happened', () => {
     const withKill = digestOf([
       record({
@@ -106,5 +121,54 @@ describe('digestOf', () => {
 
     const noKills = digestOf([record({ summary: summary({ stats: stats({ shotsFired: 10 }) }) })]);
     expect(noKills.avgShotsPerKill).toBeNull();
+  });
+});
+
+describe('recordAgentRun', () => {
+  const finishedRun = (seed: number) => {
+    const run = createAgentRun(seed);
+    run.state.phase = 'dead';
+    run.state.summary = {
+      seed,
+      phase: 'dead',
+      ticks: 500,
+      contamination: 0,
+      deathCause: { kind: 'unknown' },
+      stats: stats(),
+      cores: 0,
+      sectorCount: 3,
+      stars: 0,
+      targetTicks: 2000,
+    };
+    return run;
+  };
+
+  it('returns null for a run that has not finished', () => {
+    clearAgentRunRecords();
+    const run = createAgentRun(999);
+    expect(recordAgentRun(run, 'x')).toBeNull();
+  });
+
+  it('is idempotent: recording the same run twice keeps a single entry', () => {
+    clearAgentRunRecords();
+    const run = finishedRun(123);
+    const first = recordAgentRun(run, 'baseline');
+    const second = recordAgentRun(run, 'a-different-tag-does-not-matter');
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(second!.alreadyRecorded).toBe(true);
+    // Mesmo registro: a segunda chamada nao pode mudar a tag nem duplicar.
+    expect(second!.record).toBe(first!.record);
+    expect(second!.record.tag).toBe('baseline');
+    expect(listAgentRunRecords().filter((r) => r.runId === run.id)).toHaveLength(1);
+    expect(digestOf(listAgentRunRecords().filter((r) => r.runId === run.id)).runs).toBe(1);
+  });
+
+  it('records two distinct runs as two entries', () => {
+    clearAgentRunRecords();
+    recordAgentRun(finishedRun(1), 'x');
+    recordAgentRun(finishedRun(2), 'x');
+    expect(listAgentRunRecords()).toHaveLength(2);
   });
 });

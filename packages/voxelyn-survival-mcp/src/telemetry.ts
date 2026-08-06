@@ -13,6 +13,8 @@ import type { DamageCause, RunPhase, RunSummary } from '@voxelyn/survival-sim';
 import type { AgentRun } from './runs.js';
 
 export type AgentRunRecord = {
+  /** Id da run que produziu este registro — a chave de deduplicacao. */
+  runId: string;
   seed: number;
   tag: string;
   summary: RunSummary;
@@ -21,41 +23,70 @@ export type AgentRunRecord = {
   recordedAt: number;
 };
 
+export type RecordAgentRunResult = {
+  record: AgentRunRecord;
+  /** Esta run JA estava registrada; `record` e o registro original, intocado. */
+  alreadyRecorded: boolean;
+};
+
 type Outcome = Exclude<RunPhase, 'running'>;
 
 const records: AgentRunRecord[] = [];
+/** Indice por runId — o que torna `recordAgentRun` idempotente. */
+const recordsByRunId = new Map<string, AgentRunRecord>();
 
 /** Teto para a lista nao crescer sem limite numa sessao longa de agente. */
 const MAX_RECORDS = 20_000;
 
+/** Teto de tamanho de uma tag; alem disso e mais provavel lixo que rotulo. */
+const MAX_TAG_LENGTH = 64;
+
+const normalizeTag = (tag: string): string => {
+  const trimmed = tag.trim().slice(0, MAX_TAG_LENGTH);
+  return trimmed.length > 0 ? trimmed : 'default';
+};
+
 const deathCauseKind = (cause: DamageCause | null): string | null => (cause ? cause.kind : null);
 
 /**
- * Registra o resultado de uma run TERMINADA para o digest.
+ * Registra o resultado de uma run TERMINADA para o digest. IDEMPOTENTE por
+ * `runId`: uma segunda chamada para a mesma run devolve o registro ORIGINAL
+ * (mesma tag, mesmo timestamp) em vez de duplica-lo — um agente que retenta a
+ * tool call (ou decide registrar de novo por engano) nao pode inflar o
+ * digest sozinho.
  *
  * Devolve `null` sem registrar nada quando a run ainda esta `running`: nao
  * ha sumario nesse estado (ver `finalizeRun` em run.ts), e registrar uma run
  * em andamento inflaria o digest com um resultado que ainda nao aconteceu.
  */
-export const recordAgentRun = (run: AgentRun, tag = 'default'): AgentRunRecord | null => {
+export const recordAgentRun = (run: AgentRun, tag = 'default'): RecordAgentRunResult | null => {
   const summary = run.state.summary;
   if (!summary) return null;
+  const existing = recordsByRunId.get(run.id);
+  if (existing) return { record: existing, alreadyRecorded: true };
+
   const record: AgentRunRecord = {
+    runId: run.id,
     seed: run.seed,
-    tag,
+    tag: normalizeTag(tag),
     summary,
     finalSector: run.state.sector,
     recordedAt: Date.now(),
   };
   records.push(record);
-  if (records.length > MAX_RECORDS) records.shift();
-  return record;
+  recordsByRunId.set(run.id, record);
+  if (records.length > MAX_RECORDS) {
+    const evicted = records.shift();
+    if (evicted) recordsByRunId.delete(evicted.runId);
+  }
+  return { record, alreadyRecorded: false };
 };
 
 export const listAgentRunRecords = (): readonly AgentRunRecord[] => records;
 
 export const clearAgentRunRecords = (): void => {
   records.length = 0;
+  recordsByRunId.clear();
 };
 
 const median = (values: number[]): number | null => {
@@ -93,14 +124,18 @@ export const digestOf = (input: readonly AgentRunRecord[]): TelemetryDigest => {
   const causes = new Map<string, number>();
   const byOutcome = new Map<Outcome, number[]>();
   const sectorCounts = new Map<number, number>();
-  const runsByTag: Record<string, number> = {};
+  // Map em vez de `{}`: uma tag literalmente chamada `__proto__` num objeto
+  // comum reescreve o PROTOTIPO em vez de virar uma chave — `Object.fromEntries`
+  // no fim converte de volta sem esse risco, porque cria propriedades proprias
+  // diretamente e nao passa pelo `[[Set]]` que interpreta `__proto__`.
+  const tagCounts = new Map<string, number>();
   const outcomeCounts: Record<Outcome, number> = { dead: 0, extracted: 0, extracted_with_core: 0 };
   let totalShots = 0;
   let totalKills = 0;
   let totalDamageTaken = 0;
 
   for (const r of input) {
-    runsByTag[r.tag] = (runsByTag[r.tag] ?? 0) + 1;
+    tagCounts.set(r.tag, (tagCounts.get(r.tag) ?? 0) + 1);
     const outcome = r.summary.phase as Outcome;
     outcomeCounts[outcome] = (outcomeCounts[outcome] ?? 0) + 1;
     starHistogram[Math.max(0, Math.min(3, r.summary.stars))]++;
@@ -129,7 +164,7 @@ export const digestOf = (input: readonly AgentRunRecord[]): TelemetryDigest => {
 
   return {
     runs: total,
-    runsByTag,
+    runsByTag: Object.fromEntries(tagCounts),
     outcomeCounts,
     starHistogram,
     sectorReach,
@@ -146,5 +181,8 @@ export const digestOf = (input: readonly AgentRunRecord[]): TelemetryDigest => {
   };
 };
 
-export const telemetryDigest = (tag?: string): TelemetryDigest =>
-  digestOf(tag ? records.filter((r) => r.tag === tag) : records);
+export const telemetryDigest = (tag?: string): TelemetryDigest => {
+  if (!tag) return digestOf(records);
+  const normalized = normalizeTag(tag);
+  return digestOf(records.filter((r) => r.tag === normalized));
+};

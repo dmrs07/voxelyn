@@ -6,6 +6,8 @@ import {
   createAgentRun,
   exportReplay,
   getAgentRun,
+  listAgentRuns,
+  MAX_ACTIVE_RUNS,
   MAX_TICKS_PER_ACT,
 } from '../src/runs.js';
 
@@ -52,6 +54,16 @@ describe('applyAction', () => {
     expect(runA.state.player.y).toBe(runB.state.player.y);
     expect(runA.state.stats.shotsFired).toBe(runB.state.stats.shotsFired);
   });
+
+  it('applies `choose` only on the first tick of the batch, never on the rest', () => {
+    const run = createAgentRun(11);
+    applyAction(run, { choose: 0 }, 5);
+    expect(run.commandLog).toHaveLength(5);
+    expect(run.commandLog[0].choose).toBe(0);
+    for (let i = 1; i < run.commandLog.length; i++) {
+      expect(run.commandLog[i].choose).toBeNull();
+    }
+  });
 });
 
 describe('exportReplay', () => {
@@ -86,6 +98,23 @@ describe('exportReplay', () => {
     expect(bytes).not.toBeNull();
     expect(bytes!.length).toBe(0);
   });
+});
+
+describe('run capacity', () => {
+  it('never keeps more than MAX_ACTIVE_RUNS runs alive, evicting finished ones first', () => {
+    // Duas runs FINALIZADAS, criadas primeiro: devem ser as primeiras a cair
+    // quando o teto for atingido, em vez das runs ainda em andamento abaixo.
+    const finishedA = createAgentRun(90001);
+    finishedA.state.phase = 'dead';
+    const finishedB = createAgentRun(90002);
+    finishedB.state.phase = 'dead';
+
+    for (let i = 0; i < MAX_ACTIVE_RUNS; i++) createAgentRun(100000 + i);
+
+    expect(listAgentRuns().length).toBeLessThanOrEqual(MAX_ACTIVE_RUNS);
+    expect(getAgentRun(finishedA.id)).toBeUndefined();
+    expect(getAgentRun(finishedB.id)).toBeUndefined();
+  }, 20_000); // criar 500 mundos e o custo real de exercitar o teto de verdade.
 });
 
 // Sanity: emptyCommand nunca deveria mudar de forma sem que este arquivo quebre.

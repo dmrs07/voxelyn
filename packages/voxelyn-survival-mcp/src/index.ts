@@ -246,18 +246,19 @@ server.registerTool(
     description:
       'Registra o resultado de uma run TERMINADA (morte ou extracao) para o digest de telemetria. Falha se a ' +
       'run ainda estiver em andamento. Use `tag` para separar lotes/experimentos (ex.: "tuning-atual" vs ' +
-      '"tuning-proposto") e comparar o digest de cada um separadamente.',
+      '"tuning-proposto") e comparar o digest de cada um separadamente. IDEMPOTENTE: chamar de novo para a ' +
+      'mesma run devolve o registro original (`alreadyRecorded: true`) em vez de duplica-lo no digest.',
     inputSchema: {
       ...runIdShape,
-      tag: z.string().optional().describe('rotulo do lote; default "default"'),
+      tag: z.string().max(64).optional().describe('rotulo do lote; default "default"'),
     },
   },
   async ({ runId, tag }) => {
     const run = getAgentRun(runId);
     if (!run) return error(`run '${runId}' nao encontrada`);
-    const record = recordAgentRun(run, tag);
-    if (!record) return error('a run ainda esta em andamento; jogue ate o fim antes de registrar');
-    return json(record);
+    const result = recordAgentRun(run, tag);
+    if (!result) return error('a run ainda esta em andamento; jogue ate o fim antes de registrar');
+    return json(result);
   },
 );
 
@@ -280,7 +281,9 @@ server.registerTool(
       'Agrega as runs registradas com survival_record_run: funil de setores alcancados, distribuicao de ' +
       'estrelas, causas de morte mais comuns, tempo mediano de run por desfecho e tiros por abate. E o insumo ' +
       'para apontar onde o jogo mata demais ou de menos, e para comparar duas tags (ex.: antes/depois de um ajuste).',
-    inputSchema: { tag: z.string().optional().describe('filtra por rotulo; omitido agrega tudo') },
+    inputSchema: {
+      tag: z.string().max(64).optional().describe('filtra por rotulo; omitido agrega tudo'),
+    },
   },
   async ({ tag }) => json(telemetryDigest(tag)),
 );
