@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createRun } from '@voxelyn/survival-sim';
-import { ARENA_BOSS_ORDER, ARENA_CATALOG } from '../client/arena-catalog';
+import {
+  SOLID_NONE,
+  SURF_WATER,
+  createRun,
+  emptyCommand,
+  isPipe,
+  stepRun,
+} from '@voxelyn/survival-sim';
+import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from '../client/arena-catalog';
 import { ARENA_MAX_HP, ARENA_MIN_HP, clampArenaHp, createArenaRun } from '../client/arena-setup';
 
 /**
@@ -69,5 +76,94 @@ describe('clampArenaHp', () => {
 
   it('cai num default sensato para entrada invalida', () => {
     expect(clampArenaHp(Number.NaN)).toBeGreaterThanOrEqual(ARENA_MIN_HP);
+  });
+});
+
+/**
+ * O RECORTE. A arena existe para testar UMA luta, e sem isto ela entregava o
+ * setor inteiro: caminhada ate o chefe, fauna que nao tem nada a ver com o
+ * encontro, e stalkers nascendo no meio dele por conta da contaminacao.
+ */
+describe('createArenaRun — o recorte da arena', () => {
+  const arena = (boss: ArenaBossId) =>
+    createArenaRun({ boss, maxHp: 200, ability: 'pulse', modules: [] });
+
+  it('deixa em campo o chefe, e SO o chefe', () => {
+    for (const boss of ARENA_BOSS_ORDER) {
+      const state = arena(boss);
+      expect(state.enemies.map((e) => e.archetype), `arena de ${boss}`).toEqual([boss]);
+    }
+  });
+
+  it('o testador comeca DENTRO do alcance, e nao na entrada do setor', () => {
+    for (const boss of ARENA_BOSS_ORDER) {
+      const state = arena(boss);
+      const body = state.enemies[0];
+      const gap = Math.hypot(state.player.x - body.x, state.player.y - body.y);
+      // Perto o bastante para a luta comecar sozinha (o menor aggro do elenco e
+      // 10) e longe o bastante para nao nascer encostado nele.
+      expect(gap, `arena de ${boss}: ${gap.toFixed(1)} tiles do chefe`).toBeGreaterThan(2);
+      expect(gap, `arena de ${boss}: ${gap.toFixed(1)} tiles do chefe`).toBeLessThan(14);
+      expect(
+        state.solid[Math.floor(state.player.y) * state.config.width + Math.floor(state.player.x)],
+        `arena de ${boss}: o testador nasceu dentro da rocha`,
+      ).toBe(SOLID_NONE);
+    }
+  });
+
+  it('o chao que sobra e SO o alcancavel a pe a partir do chefe', () => {
+    // O recorte e uma busca em largura, e nao um quadrado carimbado: nao pode
+    // sobrar sala solta do outro lado da rocha, nem corredor que leva a nada.
+    for (const boss of ARENA_BOSS_ORDER) {
+      const state = arena(boss);
+      const w = state.config.width;
+      const body = state.enemies[0];
+      const seen = new Set<number>();
+      const start = Math.floor(body.y) * w + Math.floor(body.x);
+      const queue = [start];
+      seen.add(start);
+      for (let head = 0; head < queue.length; head++) {
+        const cell = queue[head];
+        const cx = cell % w;
+        const cy = (cell - cx) / w;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const i = (cy + dy) * w + (cx + dx);
+          if (state.solid[i] !== SOLID_NONE || seen.has(i)) continue;
+          seen.add(i);
+          queue.push(i);
+        }
+      }
+      let open = 0;
+      for (let i = 0; i < state.solid.length; i++) if (state.solid[i] === SOLID_NONE) open++;
+      expect(seen.size, `arena de ${boss}: sobrou chao ilhado`).toBe(open);
+      // E ela tem de ser uma ARENA, e nao um corredor: os golpes do elenco
+      // chegam a 15 tiles, e uma sala menor que o golpe mede a moldura.
+      expect(open, `arena de ${boss}: ${open} celulas e pouco`).toBeGreaterThan(150);
+    }
+  });
+
+  it('a contaminacao nao repovoa a arena no meio da luta', () => {
+    // As ondas nascem gastas. Sem isto, uma luta longa terminava com stalkers
+    // aparecendo do nada — exatamente o que o recorte tirou de campo.
+    const state = arena('furnace_heart');
+    for (let t = 0; t < 2000; t++) stepRun(state, [emptyCommand()]);
+    const intruders = state.enemies.filter(
+      (e) => e.archetype === 'stalker' || e.archetype === 'bomber',
+    );
+    expect(intruders, 'a contaminacao repovoou a arena').toHaveLength(0);
+  });
+
+  it('a arena do Leviata nasce com AGUA e com DUTOS', () => {
+    // A entrada dele deixou de ser intercambiavel: sem lamina e sem duto, nem o
+    // encontro antigo nem o Diluvio tem o que exercitar.
+    const state = arena('sheet_leviathan');
+    let water = 0;
+    let pipes = 0;
+    for (let i = 0; i < state.solid.length; i++) {
+      if (isPipe(state.solid[i])) pipes++;
+      else if (state.solid[i] === SOLID_NONE && state.surface[i] === SURF_WATER) water++;
+    }
+    expect(water, 'a camara do Leviata nasceu seca').toBeGreaterThan(80);
+    expect(pipes, 'a camara do Leviata nasceu sem duto').toBeGreaterThan(0);
   });
 });

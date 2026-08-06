@@ -1276,6 +1276,49 @@ const generateAttempt = (
   // que o jogador precise aprender a quebrar — sao cenario ate o Diluvio.
   if (profile.pipeCount > 0) {
     const placed: Vec2[] = [];
+    // A CAMARA DO CHEFE PRIMEIRO, e essa ordem e a correcao de um defeito
+    // medido: com dez dutos sorteados num mapa de 96x96 e espacamento minimo de
+    // oito, a chance de algum cair na parede da camara do Leviata era baixa —
+    // varreram-se as seeds de Aquifero e NENHUMA punha um duto de boca aberta
+    // dentro da arena dele. O Diluvio caía na fonte de reserva (o corpo do
+    // chefe) e a leitura inteira — "os dutos estao enchendo a sala" — nunca
+    // acontecia no unico lugar onde ela importa.
+    //
+    // O anel em volta do chefe garante o que o encontro promete. O resto do
+    // sorteio continua espalhando dutos pelo setor, porque eles tambem sao
+    // ambientacao: o Aquifero e um lugar que bombeava agua, e nao um lugar com
+    // quatro canos ao redor de um monstro.
+    const ARENA_RING = [
+      [0, -11], [0, 11], [-11, 0], [11, 0],
+      [-8, -8], [8, 8], [8, -8], [-8, 8],
+      [0, -15], [0, 15], [-15, 0], [15, 0],
+    ] as const;
+    const arenaQuota = Math.min(4, profile.pipeCount);
+    for (const [dx, dy] of ARENA_RING) {
+      if (placed.length >= arenaQuota) break;
+      // Da posicao ideal para FORA, ate achar parede: o anel aponta a direcao, e
+      // a busca encontra a primeira rocha de verdade naquele rumo. Sem isso um
+      // ponto que calhasse em vao aberto simplesmente perderia o duto.
+      const step = Math.hypot(dx, dy);
+      for (let out = 0; out <= 6; out++) {
+        const x = Math.round(guardianSpawn.x + (dx / step) * (step + out));
+        const y = Math.round(guardianSpawn.y + (dy / step) * (step + out));
+        if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2) break;
+        const i = y * w + x;
+        if (solid[i] !== SOLID_ROCK) continue;
+        if (placed.some((p) => Math.abs(p.x - x) + Math.abs(p.y - y) < 6)) break;
+        const facing =
+          solid[i - w] === SOLID_NONE ? SOLID_PIPE_N
+          : solid[i + w] === SOLID_NONE ? SOLID_PIPE_S
+          : solid[i - 1] === SOLID_NONE ? SOLID_PIPE_W
+          : solid[i + 1] === SOLID_NONE ? SOLID_PIPE_E
+          : 0;
+        if (facing === 0) continue;
+        solid[i] = facing;
+        placed.push({ x, y });
+        break;
+      }
+    }
     for (let attempt = 0; attempt < profile.pipeCount * 40 && placed.length < profile.pipeCount; attempt++) {
       const x = 2 + rng.nextInt(w - 4);
       const y = 2 + rng.nextInt(h - 4);

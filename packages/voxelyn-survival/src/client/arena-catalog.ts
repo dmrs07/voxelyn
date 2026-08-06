@@ -87,10 +87,18 @@ export const ARENA_CATALOG: Record<ArenaBossId, ArenaCatalogEntry> = {
     coreSectors: [3, 7],
   },
   sheet_leviathan: {
+    // Seed 112 e nao a 5: com o DILUVIO e os DUTOS, a camara do Leviata deixou
+    // de ser intercambiavel. Esta foi escolhida varrendo as seeds de Aquifero e
+    // medindo o que sobra DEPOIS do recorte, que e o unico numero honesto —
+    // medir numa caixa quadrada antes dele conta duto que a arena vai enterrar.
+    //
+    // O que ela entrega: 396 celulas de chao, 231 delas ja alagadas, e TRES
+    // dutos com a boca despejando dentro da arena. A anterior servia para um
+    // chefe que so nadava; nesta da para ver a agua entrar pelas paredes.
     label: 'Leviatã do Lençol',
     place: 'Aquífero Negro',
-    seed: 5,
-    sector: 3,
+    seed: 112,
+    sector: 7,
     generation: 'G-04',
     sectorCount: 7,
     coreSectors: [3, 7],

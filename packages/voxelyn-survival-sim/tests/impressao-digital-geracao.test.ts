@@ -136,7 +136,21 @@ describe('impressao digital da geracao', () => {
     // O que NAO muda e o contrato de alcancabilidade: os dutos entram depois de
     // todas as provas do gerador e so por cima de celulas que ja eram solidas,
     // entao nenhuma rota deixou de existir por causa deles.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(2377998545);
+    // 1850403982 (era 2377998545), na SIMULATION_VERSION 36: os dutos do
+    // Aquifero passaram a ter QUOTA na camara do chefe.
+    //
+    // O defeito era medido, e nao estetico. Com dez dutos sorteados num mapa de
+    // 96x96 e espacamento minimo de oito, varreram-se as seeds de Aquifero e
+    // nenhuma punha um duto de boca aberta dentro da arena do Leviata: o
+    // Diluvio caía sempre na fonte de reserva (o corpo dele), e a leitura que a
+    // mecanica inteira existe para produzir — "os dutos estao enchendo a sala" —
+    // nunca acontecia no unico lugar onde ela importa. Quatro deles agora saem
+    // num anel em volta do chefe, antes do sorteio; o resto continua espalhado,
+    // porque o Aquifero e um lugar que bombeava agua e nao um lugar com quatro
+    // canos em volta de um monstro.
+    //
+    // So o Aquifero muda: o bloco esta atras de `profile.pipeCount > 0`.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1850403982);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {
