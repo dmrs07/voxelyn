@@ -22,6 +22,7 @@ import { TouchCooldownOverlay } from './cooldown-overlay';
 import { loadQuality } from './settings';
 import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from './arena-catalog';
 import { arenaOutcomeFor, type ArenaOutcome } from './arena-outcome';
+import { createArenaConclusionGuard } from './arena-conclusion';
 import { reportArenaOutcome } from './arena-telemetry-client';
 import {
   ARENA_MAX_HP,
@@ -165,6 +166,17 @@ let stopLoop: (() => void) | null = null;
 /** Marca a run corrente como abandonada, se ela ainda nao tiver se decidido. */
 let abandonActiveRun: (() => void) | null = null;
 
+/**
+ * Fechar/trocar de aba no MEIO da luta e o abandono mais importante que
+ * existe, e o unico jeito de captura-lo e um listener global — nao ha botao
+ * para "sair", so o X do navegador. `pagehide` (e nao `beforeunload`) porque
+ * ele dispara de forma confiavel em navegacao para tras/fechamento de aba em
+ * mobile, onde `beforeunload` e notoriamente inconsistente; `conclude()` ja
+ * e a guarda idempotente que torna isto seguro chamar mesmo sem luta ativa
+ * (`abandonActiveRun` nulo) ou com a luta ja concluida (vitoria/derrota).
+ */
+window.addEventListener('pagehide', () => abandonActiveRun?.());
+
 const OUTCOME_TITLE: Record<ArenaOutcome, string> = {
   victory: 'Chefe derrotado',
   defeat: 'O Prospector caiu',
@@ -212,17 +224,14 @@ const runArena = (conditions: ArenaConditions): void => {
   let queuedChoice: 0 | 1 | null = null;
   let ended = false;
 
-  /**
-   * Encerra a arena EXATAMENTE UMA VEZ. Chamadas depois da primeira sao
-   * no-op de proposito: e o que impede um `abandon` tardio (o testador fecha
-   * a tela de resultado de uma vitoria ja concluida) de sobrescrever o
-   * desfecho de verdade.
-   */
-  let outcome: ArenaOutcome | null = null;
+  // Guarda pura (arena-conclusion.ts): `conclude` so tem efeito na PRIMEIRA
+  // chamada. E o que torna seguro o `pagehide` global chamar `abandonActiveRun`
+  // sem checar se ha luta em andamento, e o que impede um abandono tardio
+  // (aba fechada depois de uma vitoria ja concluida) de sobrescrever o
+  // desfecho de verdade.
+  const guard = createArenaConclusionGuard();
   const conclude = (result: ArenaOutcome): void => {
-    if (outcome) return;
-    outcome = result;
-    reportArenaOutcome(conditions, result, state);
+    if (guard.conclude(result)) reportArenaOutcome(conditions, result, state);
   };
   abandonActiveRun = (): void => conclude('abandoned');
 
@@ -235,6 +244,7 @@ const runArena = (conditions: ArenaConditions): void => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
+    const outcome = guard.current();
     if (outcome) {
       eventQueue.flush(Number.POSITIVE_INFINITY);
       renderer.render(state, 1, input.state, now);
@@ -268,7 +278,7 @@ const runArena = (conditions: ArenaConditions): void => {
       }
     }
     const alpha = accumulator / TICK_MS;
-    const view = outcome ? state : (playout.sample(state, alpha) ?? state);
+    const view = guard.current() ? state : (playout.sample(state, alpha) ?? state);
     eventQueue.flush(view.tick);
     renderer.setCargoOre(view.stats.oreCollected);
     renderer.render(view, 1, input.state, now);

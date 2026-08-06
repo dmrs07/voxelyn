@@ -78,8 +78,16 @@ const median = (values: number[]): number | null => {
   return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
 };
 
+/**
+ * Chave de agrupamento por loadout. PRECISA incluir `tuningHash` (e, de forma
+ * legivel, `startingHp`): sem eles, uma luta com HP 100 e outra com HP 400 —
+ * o mesmo eco, os mesmos modulos — cairiam no MESMO balde, e o digest
+ * compararia dois experimentos diferentes como se fossem um so. E exatamente
+ * o que este campo existe para impedir (ver o comentario de `tuningHash` em
+ * `ArenaTelemetryEvent`).
+ */
 const loadoutKey = (event: ArenaTelemetryEvent): string =>
-  `${event.ability}+${[...event.modules].sort().join(',')}`;
+  `${event.ability}+${[...event.modules].sort().join(',')}+hp${event.startingHp}+${event.tuningHash}`;
 
 const emptyBucket = (): {
   outcomeCounts: Record<ArenaOutcome, number>;

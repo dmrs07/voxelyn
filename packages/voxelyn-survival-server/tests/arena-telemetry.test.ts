@@ -59,8 +59,24 @@ describe('digestOf (arena)', () => {
       event({ ability: 'pulse', modules: [] }),
     ]);
     const loadouts = digest.byLoadout.guardian;
-    expect(loadouts['seeker+explosive,piercing'].runs).toBe(2);
-    expect(loadouts['pulse+'].runs).toBe(1);
+    expect(loadouts['seeker+explosive,piercing+hp100+abc123'].runs).toBe(2);
+    expect(loadouts['pulse++hp100+abc123'].runs).toBe(1);
+  });
+
+  it('keeps DIFFERENT starting HP / tuning out of the same loadout bucket', () => {
+    // Mesmo eco, mesmos modulos — so o HP inicial (e o tuningHash que ele
+    // deriva) muda. Sem isso no agrupamento, HP 100 e HP 400 comparariam
+    // como se fossem o mesmo experimento de balanceamento.
+    const digest = digestOf([
+      event({ ability: 'pulse', modules: [], startingHp: 100, tuningHash: 'hash-100' }),
+      event({ ability: 'pulse', modules: [], startingHp: 100, tuningHash: 'hash-100' }),
+      event({ ability: 'pulse', modules: [], startingHp: 400, tuningHash: 'hash-400' }),
+    ]);
+    const loadouts = digest.byLoadout.guardian;
+    const keys = Object.keys(loadouts);
+    expect(keys).toHaveLength(2);
+    expect(loadouts['pulse++hp100+hash-100'].runs).toBe(2);
+    expect(loadouts['pulse++hp400+hash-400'].runs).toBe(1);
   });
 
   it('treats a boss literally named "__proto__" as a plain key', () => {
