@@ -26,6 +26,16 @@
         color: #d8cfc0;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         overflow: hidden;
+        /* Sem isto, o navegador reconhece o arrasto do stick virtual como um
+           gesto de rolagem/pan proprio depois de poucos pixels e rouba o
+           toque do jogo no meio do movimento — o stick "perde aderencia" e
+           nunca chega na borda. `input.ts` nao faz `setPointerCapture`; ele
+           conta inteiramente com isto (a mesma regra ja existe em
+           index.html, e a Arena precisa dela tanto quanto a run normal). */
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
       }
       #game {
         position: fixed;
