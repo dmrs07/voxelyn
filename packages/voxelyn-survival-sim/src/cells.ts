@@ -18,6 +18,10 @@ import {
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
   SOLID_NONE,
+  DELUGE_FRONT_SPEED,
+  DELUGE_FIELD_REFRESH_TICKS,
+  PIPE_MOUTH,
+  isPipe,
   SOLID_ROCK,
   SPORE_BURN_TICKS,
   SURF_BIOFLUID,
@@ -65,6 +69,131 @@ const isReactiveSurface = (kind: number): boolean =>
  */
 export const isConductiveSurface = (kind: number): boolean =>
   kind === SURF_BIOFLUID || kind === SURF_WATER;
+
+/**
+ * O raio ja alcancado pela frente do Diluvio, ou -1 se ele nunca aconteceu.
+ *
+ * Funcao PURA de (tick, instante da subida). E o que permite ao cliente
+ * desenhar a lamina sem receber uma unica celula pelo wire: as duas pontas
+ * fazem a mesma conta a partir dos tres numeros que ja viajam no `bossRuntime`.
+ */
+export const delugeFront = (state: SurvivalState): number => {
+  const at = state.bossRuntime.delugeAt;
+  if (at < 0) return -1;
+  return Math.max(0, (state.tick - at) * DELUGE_FRONT_SPEED);
+};
+
+/**
+ * Esta celula esta SUBMERSA?
+ *
+ * O Diluvio nao e uma superficie: ele nao ocupa `state.surface`, e por isso o
+ * material de baixo continua inteiro — na regra e na tela. O que ele faz e
+ * cobrir, e cobrir e uma pergunta que se responde por geometria.
+ *
+ * Rocha nao submerge: o lencol sobe pelos vaos, nao por dentro do macico. Isso
+ * tambem e o que impede o Diluvio de virar um condutor que atravessa parede —
+ * a inundacao e total no espaco ABERTO, e o espaco aberto e o mesmo por onde a
+ * corrente ja andava.
+ */
+export const isDeluged = (state: SurvivalState, i: number): boolean => {
+  const front = delugeFront(state);
+  if (front < 0) return false;
+  if (state.solid[i] !== SOLID_NONE) return false;
+  return delugeField(state)[i] <= front;
+};
+
+/** Sem caminho ate nenhuma boca: esta celula nao enche nunca. */
+const DELUGE_UNREACHED = 0xffff;
+
+/**
+ * A DISTANCIA DA AGUA ate cada celula, andando pelos vaos.
+ *
+ * O Diluvio so molha o chao, e por isso as paredes recortam o alagado em
+ * CANAIS — e um campo geodesico e a unica forma honesta de dizer isso. Um
+ * circulo diria que uma sala selada do outro lado da rocha enche junto so
+ * porque esta perto; a busca em largura diz que ela enche quando a agua
+ * encontra o caminho ate la, ou nunca.
+ *
+ * As FONTES sao as bocas dos canos, e nao o corpo do chefe. E o que faz a
+ * inundacao entrar pelas paredes em vez de brotar do meio da sala — "os dutos
+ * estao enchendo a camara" e uma frase que o campo desenha sozinho. O corpo
+ * dele entra como fonte de reserva, porque uma camara sem cano nenhum ainda
+ * precisa submergir.
+ *
+ * DERIVADO: sai de (solido, canos, origem), que as duas pontas ja tem. Nao
+ * entra no hash e nao viaja no wire — e a mesma economia da cunha da Fornalha,
+ * num dado mil vezes maior. Refeito por BUCKET de tick para as duas pontas
+ * refazerem nos mesmos instantes, e nao quando cada uma tiver vontade.
+ */
+export const delugeField = (state: SurvivalState): Uint16Array => {
+  const w = W(state);
+  const h = H(state);
+  const bucket = Math.floor(state.tick / DELUGE_FIELD_REFRESH_TICKS);
+  const cached = state.delugeField;
+  if (cached && cached.length === w * h && state.delugeFieldBucket === bucket) return cached;
+
+  const field = cached && cached.length === w * h ? cached : new Uint16Array(w * h);
+  field.fill(DELUGE_UNREACHED);
+  state.delugeField = field;
+  state.delugeFieldBucket = bucket;
+
+  // As bocas primeiro, em ordem de indice: duas maquinas do mesmo mapa tem de
+  // semear a busca na mesma ordem.
+  const queue: number[] = [];
+  for (let i = 0; i < field.length; i++) {
+    if (!isPipe(state.solid[i])) continue;
+    const [dx, dy] = PIPE_MOUTH[state.solid[i]];
+    const x = (i % w) + dx;
+    const y = ((i - (i % w)) / w) + dy;
+    if (x < 0 || y < 0 || x >= w || y >= h) continue;
+    const mouth = y * w + x;
+    if (state.solid[mouth] !== SOLID_NONE || field[mouth] === 0) continue;
+    field[mouth] = 0;
+    queue.push(mouth);
+  }
+  // O corpo do chefe e a fonte de RESERVA: uma camara sem duto nenhum ainda
+  // precisa submergir, e o lencol sobe de baixo mesmo onde ninguem construiu
+  // nada.
+  const bx = Math.floor(state.bossRuntime.delugeX);
+  const by = Math.floor(state.bossRuntime.delugeY);
+  if (bx >= 0 && by >= 0 && bx < w && by < h) {
+    const origin = by * w + bx;
+    if (state.solid[origin] === SOLID_NONE && field[origin] !== 0) {
+      field[origin] = 0;
+      queue.push(origin);
+    }
+  }
+
+  for (let head = 0; head < queue.length; head++) {
+    const cell = queue[head];
+    const cx = cell % w;
+    const cy = (cell - cx) / w;
+    const next = field[cell] + 1;
+    for (let k = 0; k < 4; k++) {
+      const x = cx + (k === 0 ? 1 : k === 1 ? -1 : 0);
+      const y = cy + (k === 2 ? 1 : k === 3 ? -1 : 0);
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const ni = y * w + x;
+      if (state.solid[ni] !== SOLID_NONE || field[ni] <= next) continue;
+      field[ni] = next;
+      queue.push(ni);
+    }
+  }
+  return field;
+};
+
+/**
+ * A celula conduz? — a pergunta que a descarga faz, e que passou a ter duas
+ * respostas possiveis.
+ *
+ * Existe porque `isConductiveSurface` le a MATERIA e o Diluvio nao e uma
+ * materia. Todo caminho que decide por onde a corrente anda tem de passar por
+ * aqui, senao a lamina do Leviata conduziria para uns sistemas e nao para
+ * outros — e a incoerencia apareceria como "o choque nao pegou" no meio da
+ * unica fase em que o mapa inteiro e um circuito.
+ */
+export const isConductiveCell = (state: SurvivalState, i: number): boolean =>
+  isConductiveSurface(state.surface[i]) || isDeluged(state, i);
 
 export const setSurface = (state: SurvivalState, i: number, kind: number, timer: number): void => {
   state.surface[i] = kind;
@@ -231,13 +360,26 @@ export const chargeCells = (
   state: SurvivalState,
   cells: number[],
   events: SemanticEvent[],
-  origin: EffectOrigin = { source: 'environment' }
+  origin: EffectOrigin = { source: 'environment' },
+  /**
+   * Onde a corrente ENTROU no condutor, quando ha um ponto so.
+   *
+   * Opcional porque nem toda descarga tem um: o canto do Arquicantor arma
+   * dezenas de cristais de uma vez, e cada um e uma fonte. Sem ponto, o dano
+   * continua plano — que e o comportamento que essas descargas sempre tiveram.
+   */
+  from?: { x: number; y: number },
 ): void => {
   if (cells.length === 0) return;
   for (const i of cells) {
     state.charges.push({ idx: i, until: state.tick + DISCHARGE_TICKS });
   }
-  events.push({ t: 'discharge', cells, ...origin });
+  events.push({
+    t: 'discharge',
+    cells,
+    ...origin,
+    ...(from ? { fromX: from.x, fromY: from.y } : {}),
+  });
 };
 
 export const dischargeAt = (
@@ -247,8 +389,14 @@ export const dischargeAt = (
   events: SemanticEvent[],
   origin: EffectOrigin = { source: 'environment' }
 ): boolean => {
-  const cells = floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => isConductiveSurface(state.surface[i]));
-  chargeCells(state, cells, events, origin);
+  const cells = floodFrom(state, sx, sy, BUDGET_DISCHARGE_CELLS, (i) => isConductiveCell(state, i));
+  // O PONTO de entrada da corrente viaja com o evento, e nao so as celulas.
+  //
+  // Sem ele o dano da descarga so podia ser plano — a poca inteira cobrando
+  // igual —, e num setor submerso "a poca inteira" passou a ser o setor
+  // inteiro. Guardar de onde a corrente entrou e o que permite a atenuacao por
+  // distancia existir (ver DELUGE_SHOCK_FULL_RANGE).
+  chargeCells(state, cells, events, origin, { x: sx, y: sy });
   return cells.length > 0;
 };
 
@@ -343,7 +491,21 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
       // E a regra que faz o Aquifero ler como anti-termico sem tabela nova: a
       // margem de um lago e uma fronteira que o fogo nao atravessa nem
       // contorna queimando. Vira cinza, nao nada — o jogador ve ONDE apagou.
-      let doused = false;
+      // SUBMERSO nao queima. O Diluvio nao grava superficie — o material de
+      // baixo continua inteiro, e essa e a promessa dele —, mas uma chama
+      // debaixo de agua e uma promessa que a materia nao sustenta.
+      //
+      // Aqui, na fila de reacao, e nao numa varredura da area alagada: fogo ja
+      // e uma superficie reativa e ja passa por este laco, entao a regra custa
+      // uma comparacao por celula que ja ia ser visitada. Varrer o alagado
+      // custaria o mapa inteiro por tick, e a primeira versao fazia isso — pior,
+      // fazia so na passagem da frente, o que deixava acender fogo novo debaixo
+      // do lencol depois que ela passava.
+      //
+      // O custo para o JOGADOR e real e e o outro lado da carta do Leviata:
+      // quem lutava com fogo perde o fogo no setor inteiro. Em troca ganha um
+      // setor que conduz.
+      let doused = isDeluged(state, i);
       for (let k = 0; k < 4 && !doused; k++) {
         if (valid[k] && state.surface[neighbors[k]] === SURF_WATER) doused = true;
       }

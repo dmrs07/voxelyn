@@ -78,7 +78,17 @@
 // sinal, o unico invariante de combate que este jogo nao quebra. Um cliente
 // novo contra servidor antigo le `bossPhases` ausente e nunca acende a
 // apresentacao do colapso.
-export const PROTOCOL_VERSION = 20;
+// 21: o DILUVIO do Leviata entra em `WorldFlags` como tres numeros
+// (`delugeAt`, `delugeX`, `delugeY`), e o evento `discharge` ganha `fromX`/
+// `fromY` — o ponto em que a corrente entrou no condutor.
+//
+// Os tres primeiros sao OPCIONAIS de proposito: um servidor anterior ao Diluvio
+// simplesmente nao os manda e o cliente le -1, que e "nunca aconteceu". O bump
+// existe pelo segundo campo — sem `fromX`/`fromY` um cliente novo nao consegue
+// prever a atenuacao da corrente, e prever dano errado num setor inteiramente
+// condutivo e a pior forma de discordancia possivel: ela aparece como vida
+// sumindo sem causa visivel.
+export const PROTOCOL_VERSION = 21;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -371,7 +381,32 @@ export const PROTOCOL_VERSION = 20;
 //   de ser do corpo e passa a ser da Catedral — e cortar a cadeia vira jogada.
 //
 // Nada aqui toca o worldgen: o terreno semeado continua identico.
-export const SIMULATION_VERSION = 34;
+// 35: O DILUVIO — a carta unica do Leviata do Lencol.
+//
+// Abaixo de 55% de vida, e uma vez so, ele para de disputar margem e levanta o
+// lencol: o setor INTEIRO submerge. Depois disso ele nada e emerge em qualquer
+// lugar, e a pergunta do encontro troca de "onde ele nao alcanca" para "de onde
+// eu solto a corrente".
+//
+// A decisao tecnica que sustenta tudo: o Diluvio NAO E UMA SUPERFICIE.
+// `state.surface` guarda um material por celula, entao grava-lo ali apagaria o
+// chao de baixo — e a promessa dele e a oposta, submergir o material anterior
+// deixando-o visivel por transparencia. Como o alagamento e total, "esta
+// submerso?" nao precisa de mapa: precisa de um centro, de um instante e da
+// regra (`isDeluged`). Tres numeros no `bossRuntime` fazem o trabalho que uma
+// quarta camada de mundo faria pior — e ela teria de entrar no diff de chunks e
+// engordar toda celula alterada do jogo, inclusive nos setores sem Leviata.
+//
+// E o Diluvio nao e so um buff: quem alaga o setor inteiro entrega ao jogador um
+// condutor do tamanho do setor inteiro, e o Leviata e o unico chefe que a
+// propria descarga atordoa. O que decide quem ganha o troco e a DISTANCIA — a
+// corrente entra num ponto e atenua com o quadrado dele em diante, ate um piso.
+// Sem isso o dano plano viraria um botao de vitoria nos dois sentidos.
+//
+// Muda o hash por tres caminhos: os tres campos novos, o dano de descarga (que
+// deixou de ser plano quando ha ponto de origem) e o fogo que a lamina apaga ao
+// passar.
+export const SIMULATION_VERSION = 35;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

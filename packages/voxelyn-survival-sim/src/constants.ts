@@ -21,6 +21,39 @@ export const SOLID_FRAGILE_WEAK = 5; // frágil corroído, cede ao proximo toque
 export const SOLID_ORE_SPENT = 6; // veio esgotado ou contaminado: nao conduz
 export const SOLID_CRYSTAL_DULL = 7; // cristal opaco: nao emite luz nem descarrega
 export const SOLID_ORE_CHIPPED = 8; // veio ja lascado, a um golpe de esgotar
+/**
+ * OS CANOS: dutos gigantes embutidos na parede, com a boca virada para a sala.
+ *
+ * Quatro valores e nao um, porque a BOCA tem rumo: o cano precisa saber para
+ * onde despeja, e derivar isso do vizinho aberto daria respostas diferentes
+ * conforme a parede em volta fosse quebrada. O rumo e do cano, e nao do mapa.
+ *
+ * Eles nao aparecem no `breakSolid` nem no `canRip`, e isso e a definicao
+ * deles e nao um esquecimento: um duto de dois metros de aco nao cede a um
+ * bolt de plasma. Para todo o resto do motor eles sao parede — colidem,
+ * bloqueiam linha de visao, param o fogo e param a agua.
+ *
+ * O que eles fazem, fazem uma vez so na partida: quando o Leviata levanta o
+ * lencol, sao ELES que despejam. A inundacao nao brota do corpo do chefe, ela
+ * entra pelas paredes, e e por isso que o Diluvio le como "a sala esta sendo
+ * enchida" e nao como "um circulo azul cresceu". Ver `delugeField`.
+ */
+export const SOLID_PIPE_N = 9;
+export const SOLID_PIPE_E = 10;
+export const SOLID_PIPE_S = 11;
+export const SOLID_PIPE_W = 12;
+/** O rumo da boca de cada cano, em passo de celula. */
+export const PIPE_MOUTH: Record<number, readonly [number, number]> = {
+  [SOLID_PIPE_N]: [0, -1],
+  [SOLID_PIPE_E]: [1, 0],
+  [SOLID_PIPE_S]: [0, 1],
+  [SOLID_PIPE_W]: [-1, 0],
+};
+export const isPipe = (solid: number): boolean =>
+  solid === SOLID_PIPE_N ||
+  solid === SOLID_PIPE_E ||
+  solid === SOLID_PIPE_S ||
+  solid === SOLID_PIPE_W;
 
 // Camada de superficie (o que cobre o chao de uma celula aberta).
 //
@@ -1471,6 +1504,111 @@ export const LEVIATHAN_SURGE_WIDTH = 2;
  * que a agua alcanca o alvo — ela avanca ate resolver o problema dela e nao um
  * metro alem.
  */
+// ---------------------------------------------------------------------------
+// O DILUVIO — a carta unica do Leviata do Lencol
+// ---------------------------------------------------------------------------
+/**
+ * Uma vez por encontro, e sem volta: o lencol freatico SOBE e o setor inteiro
+ * submerge.
+ *
+ * O que ele e, em uma frase: a resposta do Aquifero a um jogador que passou a
+ * luta inteira negando chao molhado. A enchente incremental (`leviathanSurge`)
+ * e a primeira metade do encontro — territorio disputado tile a tile. O
+ * Diluvio e a virada: "voce me manteve longe da agua, entao eu trago a agua".
+ * Depois dele nao ha mais margem seca em lugar nenhum, ele nada por todo o
+ * setor, e a pergunta do encontro deixa de ser "onde ele NAO alcanca" e passa
+ * a ser "de onde eu solto a corrente".
+ *
+ * O DILUVIO NAO E UMA SUPERFICIE, e essa e a decisao tecnica central.
+ * `state.surface` guarda um material por celula, entao gravar Diluvio ali
+ * APAGARIA o chao de baixo — e a promessa dele e exatamente a oposta: ele
+ * submerge o material anterior, que continua visivel por transparencia. Como o
+ * alagamento e TOTAL, "esta submerso?" nao precisa de mapa nenhum: precisa de
+ * um centro, de um instante e da regra (ver `isDeluged`). Tres numeros no
+ * `bossRuntime` fazem o trabalho que uma quarta camada de mundo faria pior — e
+ * ela teria de entrar no diff de chunks e engordar toda celula alterada do
+ * jogo.
+ */
+/** Abaixo desta fracao de vida ele levanta o lencol. Uma vez, e so uma. */
+export const DELUGE_HP_FRACTION = 0.55;
+/**
+ * O telegrafo. Longo — 2,5 s —, e longo de proposito: nada aqui e esquivavel,
+ * entao o aviso nao existe para dar tempo de sair. Ele existe para o jogador
+ * VER acontecer e entender que a luta virou outra. Um golpe que muda o mapa
+ * inteiro sem anunciar leria como bug.
+ */
+export const DELUGE_WINDUP_TICKS = 50;
+/**
+ * Velocidade da frente de agua, em tiles por tick.
+ *
+ * Ela VIAJA em vez de aparecer, pela mesma razao da Supernova do Bispo: um
+ * mapa que muda de estado num tick le como falha de renderizacao, e um mapa
+ * que muda com uma parede de agua passando por cima de voce le como o que e.
+ * A 0,55 tile/tick uma camara de 96 tiles submerge em pouco mais de tres
+ * segundos.
+ */
+export const DELUGE_FRONT_SPEED = 0.55;
+/**
+ * O que o Diluvio da a ELE. Submerso no proprio elemento, em todo lugar.
+ *
+ * Modesto de proposito: o presente nao e a velocidade, e a LIBERDADE. Antes ele
+ * so podia nadar onde havia lamina e so podia emergir onde havia lamina; agora
+ * as duas restricoes sumiram do setor inteiro. Multiplicar a velocidade por
+ * dois em cima disso transformaria a virada em atropelo.
+ */
+export const LEVIATHAN_DELUGE_SPEED_SCALE = 1.25;
+/**
+ * A ATENUACAO DA CORRENTE, e o que ela conserta.
+ *
+ * O Diluvio conduz como agua — e ai esta o presente que ele faz ao jogador, e
+ * o preco que ele cobra de si mesmo: quem alaga o setor inteiro entrega um
+ * condutor do tamanho do setor inteiro. Sem atenuacao isso seria um botao de
+ * vitoria em cada lado: uma descarga solta em qualquer canto cobraria dano
+ * cheio de tudo o que estivesse na poca, inclusive de quem a soltou, e
+ * inclusive do outro lado do mapa.
+ *
+ * Com atenuacao, distancia vira decisao. A corrente entra no lencol num PONTO,
+ * e a densidade dela cai conforme se espalha — e quem quiser derrubar o
+ * Leviata precisa soltar a corrente PERTO dele, que e exatamente onde e mais
+ * caro estar. O choque continua alcancando longe; o que ele deixa de fazer e
+ * MACHUCAR longe.
+ *
+ * Dentro do raio cheio o choque cobra inteiro (e o contato direto). Alem dele
+ * cai com o quadrado da distancia, como densidade de corrente saindo de uma
+ * fonte pontual, ate um piso — porque zero seria "existe uma distancia segura",
+ * e nao existe: o lencol e um so.
+ */
+export const DELUGE_SHOCK_FULL_RANGE = 3;
+export const DELUGE_SHOCK_MIN_SCALE = 0.12;
+/**
+ * A agua ANDA PELOS VAOS, e nao por um circulo desenhado no mapa.
+ *
+ * O Diluvio so molha o CHAO, e a consequencia disso e o que da forma a ele: as
+ * paredes recortam o alagado em CANAIS. Uma sala selada do outro lado da rocha
+ * nao enche so porque esta perto da fonte — ela enche quando a agua encontra o
+ * caminho ate la, ou nunca, se nao houver caminho.
+ *
+ * O campo e uma distancia GEODESICA por celula, medida em largura a partir das
+ * bocas dos canos. Derivado e nao autoritativo: ele sai de (solido, canos,
+ * origem), que as duas pontas ja tem, entao nao entra no hash nem no wire — a
+ * mesma economia da cunha da Fornalha, num dado mil vezes maior.
+ *
+ * Refeito a cada meio segundo em vez de a cada tick, e por bucket de tick para
+ * as duas pontas refazerem nos MESMOS instantes. Meio segundo e o atraso com
+ * que uma parede derrubada no meio da enchente deixa a agua entrar — que e o
+ * tempo que a agua levaria mesmo.
+ */
+export const DELUGE_FIELD_REFRESH_TICKS = 10;
+/**
+ * Quantos dutos a Cripta... nao: o AQUIFERO recebe. Zero em todo o resto.
+ *
+ * Eles sao infraestrutura de um lugar que bombeava agua e perdeu a briga, e so
+ * fazem sentido onde a agua e o assunto. Num numero alto o Diluvio entraria por
+ * todo lado de uma vez e perderia a leitura de direcao; num numero baixo demais
+ * a sala teria uma fonte so e a inundacao viraria de novo um circulo.
+ */
+export const AQUIFER_PIPE_COUNT = 10;
+
 /**
  * De quao longe os dois chefes de mergulho notam alguem.
  *

@@ -60,6 +60,12 @@ export const emptyBossRuntime = (): BossRuntime => ({
   leapToX: 0,
   leapToY: 0,
   leapsLeft: 0,
+  // -1 e "o Diluvio nunca aconteceu", e tem de ser negativo e nao zero: zero e
+  // um tick legitimo, e um encontro que comecasse com `delugeAt = 0` nasceria
+  // com o setor ja submerso.
+  delugeAt: -1,
+  delugeX: 0,
+  delugeY: 0,
 });
 
 /**

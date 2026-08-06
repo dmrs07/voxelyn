@@ -39,6 +39,9 @@ import {
   moduleHasCapacity,
   countCoresTaken,
   furnaceSweepAt,
+  isDeluged,
+  delugeFront,
+  isPipe,
   FURNACE_OVERHEATING,
   WELL_OFFER_REACH,
 } from '@voxelyn/survival-sim';
@@ -119,7 +122,7 @@ import {
 } from './objective-prop';
 import { placeDecor, propStillValid, sectorRupture, type DecorativeProp } from './decor';
 import { CEILING_ALPHA, decorAtlasName, drawDecorProp } from './decor-draw';
-import { drawWallEdgeDetail } from './edge-detail';
+import { drawPipeSpill, drawWallEdgeDetail } from './edge-detail';
 import { decayTrail, trailAge, trailTtlMs, updateTrail, type LurkerTrail } from './lurker-trail';
 import { t } from './i18n';
 import {
@@ -1656,6 +1659,13 @@ export class SurvivalRenderer {
       return `rgb(${r},${g},${bl})`;
     };
 
+    // O DILUVIO, resolvido UMA vez por quadro: o raio ja alcancado pela frente
+    // e o centro de onde ela sobe. Negativo = nunca aconteceu, e o laco do chao
+    // nem chega a perguntar por celula.
+    const delugeR = delugeFront(state);
+    const delugeCx = state.bossRuntime.delugeX;
+    const delugeCy = state.bossRuntime.delugeY;
+
     const diamond = (sx: number, sy: number, fill: string): void => {
       const hw = (TILE_W / 2) * z;
       const hh = (TILE_H / 2) * z;
@@ -1700,6 +1710,29 @@ export class SurvivalRenderer {
         const surfKind = surf === SURF_GAS ? 0 : SURFACE_KIND_INDEX[surf];
         if (surfKind === undefined || !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
+        }
+        // O DILUVIO vem POR CIMA, e nunca no lugar.
+        //
+        // Esta ordem e a mecanica inteira desenhada: a lamina do Leviata nao
+        // substitui o chao, ela o submerge. O tile do material continua sendo
+        // desenhado exatamente como era — fungo continua fungo, brasa continua
+        // brasa — e o que muda e um veu azul translucido por cima. O jogador
+        // continua LENDO o setor que aprendeu; ele so passou a estar debaixo
+        // d'agua.
+        //
+        // Nenhuma celula disto vem pelo wire: `isDeluged` e a mesma funcao que a
+        // simulacao usa para decidir por onde o chefe nada e quanto uma descarga
+        // cobra, rodando aqui sobre os tres numeros do `bossRuntime`.
+        if (delugeR >= 0 && isDeluged(state, i)) {
+          // A BORDA da frente acende enquanto ela sobe: e o que faz a inundacao
+          // ler como uma parede de agua avancando, e nao como um filtro que
+          // alguem ligou na tela.
+          const edge = delugeR - Math.hypot(x + 0.5 - delugeCx, y + 0.5 - delugeCy);
+          const crest = edge < 1.6 ? 1 - edge / 1.6 : 0;
+          diamond(sx, sy, `rgba(46,58,77,${(0.28 + b * 0.16).toFixed(3)})`);
+          if (crest > 0) {
+            diamond(sx, sy, `rgba(150,190,225,${(crest * 0.4).toFixed(3)})`);
+          }
         }
         const ambientScale = this.quality.maxFx / PRESETS.high.maxFx;
         if (surf === SURF_GAS) {
@@ -1962,6 +1995,7 @@ export class SurvivalRenderer {
             const kindIndex = terrainKindIndexFor(solid, state.stratum);
             if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) {
               drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
+              drawPipeSpill(ctx, solid, delugeR, nowMs, sx, sy, z);
               return;
             }
 
@@ -1991,6 +2025,14 @@ export class SurvivalRenderer {
               top = '#2f6b4f';
               left = '#1f3d33';
               right = '#152721';
+            } else if (isPipe(solid)) {
+              // OS DUTOS: aco escuro e frio, distinto de toda rocha. Eles tem de
+              // ler como CONSTRUIDOS a primeira vista — sao a prova de que
+              // alguem bombeava agua daqui, e sao o unico aviso de onde ela vai
+              // entrar quando o Leviata levantar o lencol.
+              top = '#5d6b78';
+              left = '#3c4854';
+              right = '#252d36';
             } else if (solid === SOLID_FRAGILE) {
               top = '#5a5346';
               left = '#463f35';
@@ -2044,6 +2086,7 @@ export class SurvivalRenderer {
             // O contorno tambem existe no fallback: a identidade do estrato
             // nao pode depender do atlas ter carregado.
             drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
+            drawPipeSpill(ctx, solid, delugeR, nowMs, sx, sy, z);
           },
         });
       }

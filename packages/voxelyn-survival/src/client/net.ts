@@ -374,6 +374,13 @@ export class NetClient {
     // queda cobra dele do mesmo jeito.
     state.bossRuntime.collapseCells = (world.collapseCells ?? []).map((c) => ({ ...c }));
     state.bossRuntime.blastCells = [...(world.blastCells ?? [])];
+    // O DILUVIO. Ausente em servidores anteriores a ele: -1 e "nunca
+    // aconteceu", e o setor continua seco. Quem reconecta DEPOIS da subida
+    // nunca recebeu o evento que a anunciou, e sem estes tres campos veria um
+    // setor seco enquanto o servidor cobra por um setor submerso.
+    state.bossRuntime.delugeAt = world.delugeAt ?? -1;
+    state.bossRuntime.delugeX = world.delugeX ?? 0;
+    state.bossRuntime.delugeY = world.delugeY ?? 0;
     // O dono do setor e os selos vem RESOLVIDOS do servidor: o cliente nao
     // reimplementa a regra de quem guarda o que, ele desenha o que a sala
     // decidiu. `entityId` fica nulo — o espelho nunca precisa dele.

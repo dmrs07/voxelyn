@@ -21,7 +21,7 @@
 //   celula, nunca de Math.random.
 import { drawVoxel, type FaceRamp } from './voxel-draw';
 import { DECOR_RAMPS } from './decor-draw';
-import type { StratumId } from '@voxelyn/survival-sim';
+import { PIPE_MOUTH, type StratumId } from '@voxelyn/survival-sim';
 
 const { ROCK_DEEP, BONE, RUST, MIST, SULFUR_DULL, CHAR } = DECOR_RAMPS;
 
@@ -159,6 +159,58 @@ export const drawWallEdgeDetail = (
   ctx.globalAlpha = prev * Math.min(1, 0.3 + b * 0.7);
   for (const vox of list) {
     drawVoxel(ctx, sx + vox.dx * z, sy + vox.dy * z, vox.size * z, vox.ramp);
+  }
+  ctx.globalAlpha = prev;
+};
+
+/**
+ * A AGUA JORRANDO DO DUTO, e so enquanto o lencol sobe.
+ *
+ * Os canos ficam mudos a run inteira — sao parede com uma historia. O unico
+ * momento em que fazem alguma coisa e o Diluvio do Leviata, e ai eles sao a
+ * CAUSA visivel dele: a inundacao entra pelas paredes, e nao brota do meio da
+ * sala. Sem este jato a mesma mecanica leria como um filtro azul que alguem
+ * ligou na tela.
+ *
+ * O rumo do jato e o rumo da boca (`PIPE_MOUTH`), projetado na isometrica: um
+ * duto virado para o norte despeja para cima e para a esquerda na tela, e um
+ * jato que ignorasse a projecao apontaria para dentro da rocha.
+ *
+ * `front` negativo e "o Diluvio nunca aconteceu", e nesse caso nada e
+ * desenhado — que e o estado de 99% das runs.
+ */
+export const drawPipeSpill = (
+  ctx: CanvasRenderingContext2D,
+  solid: number,
+  front: number,
+  nowMs: number,
+  sx: number,
+  sy: number,
+  z: number,
+): void => {
+  if (front < 0) return;
+  const mouth = PIPE_MOUTH[solid];
+  if (!mouth) return;
+  const [mx, my] = mouth;
+  // Do tile para a tela: a isometrica do jogo mistura os dois eixos, entao um
+  // passo de celula vira meia largura em x e meia altura em y.
+  // A geometria do tile, repetida aqui em vez de importada de `render.ts`: este
+  // modulo e importado POR ele, e puxar de volta fecharia um ciclo.
+  const HALF_W = 16;
+  const HALF_H = 8;
+  const dirX = (mx - my) * HALF_W;
+  const dirY = (mx + my) * HALF_H;
+  const prev = ctx.globalAlpha;
+  // Tres jorros defasados: a boca cospe em pulsos, e nao num fio continuo.
+  for (let k = 0; k < 3; k++) {
+    const phase = ((nowMs / 240 + k / 3) % 1);
+    const reach = 0.25 + phase * 0.95;
+    ctx.globalAlpha = prev * (0.55 - phase * 0.45);
+    ctx.fillStyle = k === 0 ? '#9ec4e1' : '#5e7f9c';
+    const px = sx + dirX * reach * z;
+    const py = sy + dirY * reach * z - 6.3 * z;
+    const size = (3.2 - phase * 1.4) * z;
+    ctx.fillRect(px - size / 2, py - size / 2, size, size);
   }
   ctx.globalAlpha = prev;
 };

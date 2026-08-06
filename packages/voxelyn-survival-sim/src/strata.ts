@@ -24,7 +24,7 @@
 // setor N precisa ser conhecivel por um cliente que reconecta no meio da run e
 // reconstroi o mundo com `createRun({ sector: N })`, antes de qualquer tick.
 
-import { MAX_LINEAGE_SECTORS, MINER_PER_SECTOR } from './constants.js';
+import { AQUIFER_PIPE_COUNT, MAX_LINEAGE_SECTORS, MINER_PER_SECTOR } from './constants.js';
 import type { EnemyArchetype } from './types.js';
 import type { WorldgenProfile } from './worldgen.js';
 
@@ -411,6 +411,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     coalBlobs: { count: 0, rMin: 0, rMax: 0 },
     ventCount: 6,
     railTracks: 0,
+    pipeCount: 0,
     minerCap: MINER_PER_SECTOR,
     halls: 'none',
   };
@@ -436,6 +437,11 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     // margens; o fungo gosta da umidade mesmo sem ocupacao.
     profile.waterBlobs = { count: 12 + depth * 4, rMin: 3, rMax: 6 };
     profile.halls = 'karst';
+    // OS DUTOS. Infraestrutura de um lugar que bombeava agua e perdeu a briga:
+    // eles so existem aqui, e ficam mudos a run inteira. O unico momento em que
+    // fazem alguma coisa e o Diluvio do Leviata, e ai sao eles que despejam —
+    // ver `delugeField`. Ate la sao parede com uma historia.
+    profile.pipeCount = AQUIFER_PIPE_COUNT;
     profile.biofluidBlobs = { count: 6, rMin: 1, rMax: 2 };
     profile.fungalBlobs = { count: 14, rMin: 2, rMax: 3 };
     profile.crystalChance = 0.05;

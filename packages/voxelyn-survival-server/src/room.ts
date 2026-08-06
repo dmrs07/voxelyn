@@ -484,6 +484,11 @@ export class GameRoom {
       blastAt:
         this.state.enemies.find((e) => e.alive && e.action?.kind === 'demolish')?.action
           ?.releaseAt ?? 0,
+      // O DILUVIO em tres numeros. Nao ha camada de celulas para enviar: o
+      // cliente refaz a geometria (`isDeluged`) e chega na mesma resposta.
+      delugeAt: this.state.bossRuntime.delugeAt,
+      delugeX: round3(this.state.bossRuntime.delugeX),
+      delugeY: round3(this.state.bossRuntime.delugeY),
       // Poucos bytes e quase sempre lista vazia: os Ecos so existem depois que
       // alguem chega ao poco, e somem na descida. `worldSig` ja compara o objeto
       // inteiro, entao aparecer e ser levado disparam o envio sozinhos.

@@ -21,6 +21,8 @@ import {
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
   DISCHARGE_DAMAGE,
+  DELUGE_SHOCK_FULL_RANGE,
+  DELUGE_SHOCK_MIN_SCALE,
   DODGE_SPEED,
   DODGE_TICKS,
   EXPLOSION_RADIUS,
@@ -336,6 +338,10 @@ export const createRun = (config: RunConfig): SurvivalState => {
     solid: world.solid,
     surface: world.surface,
     surfaceTimer: new Uint16Array(width * height),
+    // O campo do Diluvio nasce vazio: ele e DERIVADO e so e construido no
+    // primeiro tick em que alguem pergunta se alguma coisa esta submersa.
+    delugeField: null,
+    delugeFieldBucket: -1,
     chunkVersion: new Uint32Array(Math.ceil(width / 16) * Math.ceil(height / 16)),
     entry: world.entry,
     corePos: world.corePos,
@@ -502,6 +508,37 @@ const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void =
   }
 };
 
+/**
+ * Quanto de uma descarga chega a um corpo, pela DISTANCIA ate a fonte.
+ *
+ * A corrente entra no condutor num ponto e se espalha. Enquanto a poca era do
+ * tamanho de uma poca, tratar isso como dano plano nao custava nada — mas o
+ * Diluvio do Leviata faz do setor inteiro um condutor so, e ai o dano plano
+ * vira um botao de vitoria nos dois sentidos: uma descarga solta em qualquer
+ * canto cobraria integral de tudo o que estivesse na lamina, inclusive do outro
+ * lado do mapa, inclusive de quem a soltou.
+ *
+ * Com a atenuacao, distancia vira decisao. Dentro do raio cheio o choque cobra
+ * inteiro — e contato. Alem dele cai com o QUADRADO da distancia, que e como a
+ * densidade de corrente cai saindo de uma fonte pontual, ate um piso: zero
+ * significaria "existe uma distancia segura", e no lencol nao existe. Quem quer
+ * derrubar o Leviata precisa eletrificar PERTO dele, que e exatamente onde e
+ * mais caro estar.
+ *
+ * Descargas sem ponto de origem (o canto do Arquicantor arma dezenas de
+ * cristais, e cada um e uma fonte) continuam planas, como sempre foram.
+ */
+const shockFalloff = (
+  ev: { fromX?: number; fromY?: number },
+  ent: { x: number; y: number },
+): number => {
+  if (ev.fromX === undefined || ev.fromY === undefined) return 1;
+  const d = Math.hypot(ent.x - ev.fromX, ent.y - ev.fromY);
+  if (d <= DELUGE_SHOCK_FULL_RANGE) return 1;
+  const ratio = DELUGE_SHOCK_FULL_RANGE / d;
+  return Math.max(DELUGE_SHOCK_MIN_SCALE, ratio * ratio);
+};
+
 /** Processa eventos encadeados (descargas e explosoes causam dano que gera novos eventos). */
 export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent[]): void => {
   for (let i = 0; i < events.length && i < 512; i++) {
@@ -518,7 +555,7 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
         if (!cells.has(cellIndexAt(state, ent.x, ent.y))) continue;
         const scale =
           ev.source === 'player' && ent.kind === 'player' ? PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE : 1;
-        damageEntity(state, ent, DISCHARGE_DAMAGE * scale, events, {
+        damageEntity(state, ent, DISCHARGE_DAMAGE * scale * shockFalloff(ev, ent), events, {
           kind: 'discharge',
           source: ev.source,
         });
@@ -2639,6 +2676,14 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(Math.round(state.bossRuntime.leapToX * 1000));
   mix(Math.round(state.bossRuntime.leapToY * 1000));
   mix(state.bossRuntime.leapsLeft);
+  // O DILUVIO. Tres numeros que valem por uma camada de mundo inteira: eles
+  // decidem, celula a celula, o que esta submerso — e submerso decide por onde
+  // o chefe nada, onde ele emerge e quanto uma descarga cobra. Fora do hash,
+  // duas simulacoes que discordassem do instante da subida continuariam
+  // parecendo iguais por alguns ticks e divergiriam depois em tudo.
+  mix(state.bossRuntime.delugeAt);
+  mix(Math.round(state.bossRuntime.delugeX * 1000));
+  mix(Math.round(state.bossRuntime.delugeY * 1000));
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

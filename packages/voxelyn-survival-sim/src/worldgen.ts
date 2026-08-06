@@ -8,6 +8,10 @@ import {
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ROCK,
+  SOLID_PIPE_N,
+  SOLID_PIPE_E,
+  SOLID_PIPE_S,
+  SOLID_PIPE_W,
   SURF_BIOFLUID,
   SURF_EMBER,
   SURF_FUNGAL,
@@ -80,6 +84,16 @@ export type WorldgenProfile = {
    * deixou: Aurix e o Ferrifero. Zero em todo estrato intocado.
    */
   railTracks: number;
+  /**
+   * DUTOS gigantes embutidos na parede (SOLID_PIPE_*). So o Aquifero os tem:
+   * eles sao infraestrutura de um lugar que bombeava agua e perdeu a briga.
+   *
+   * Ficam mudos a run inteira e nao mudam nada — sao parede com uma historia.
+   * O unico momento em que fazem alguma coisa e o Diluvio do Leviata, e ai sao
+   * ELES que despejam (ver `delugeField`): a inundacao entra pelas paredes em
+   * vez de brotar do meio da sala.
+   */
+  pipeCount: number;
   /** Teto de Miners do setor; a Cicatriz Aurix sobe isso. */
   minerCap: number;
   /**
@@ -122,6 +136,7 @@ export const DEFAULT_PROFILE: WorldgenProfile = {
   coalBlobs: { count: 0, rMin: 0, rMax: 0 },
   ventCount: 6,
   railTracks: 0,
+  pipeCount: 0,
   minerCap: 3,
   halls: 'none',
 };
@@ -1251,6 +1266,35 @@ const generateAttempt = (
     reserved.push(terminal, cache);
   }
   if (salvageSites.length < 3) return null;
+
+  // OS DUTOS. Parede virada para a sala, e o rumo da boca e o do vao que ela
+  // encontra — um cano que despejasse contra rocha nao seria um cano.
+  //
+  // Entram DEPOIS de toda prova de alcancabilidade e so sobre celulas que ja
+  // eram solidas: eles nunca fecham uma rota, porque nunca ocupam vao. E como
+  // nao aparecem no `breakSolid` nem no `canRip`, tambem nao viram uma parede
+  // que o jogador precise aprender a quebrar — sao cenario ate o Diluvio.
+  if (profile.pipeCount > 0) {
+    const placed: Vec2[] = [];
+    for (let attempt = 0; attempt < profile.pipeCount * 40 && placed.length < profile.pipeCount; attempt++) {
+      const x = 2 + rng.nextInt(w - 4);
+      const y = 2 + rng.nextInt(h - 4);
+      const i = y * w + x;
+      if (solid[i] !== SOLID_ROCK) continue;
+      // Longe uns dos outros: dez bocas em cima da mesma parede nao sao dez
+      // fontes, sao uma fonte gorda, e a inundacao voltaria a ler como circulo.
+      if (placed.some((p) => Math.abs(p.x - x) + Math.abs(p.y - y) < 8)) continue;
+      const facing =
+        solid[i - w] === SOLID_NONE ? SOLID_PIPE_N
+        : solid[i + w] === SOLID_NONE ? SOLID_PIPE_S
+        : solid[i - 1] === SOLID_NONE ? SOLID_PIPE_W
+        : solid[i + 1] === SOLID_NONE ? SOLID_PIPE_E
+        : 0;
+      if (facing === 0) continue;
+      solid[i] = facing;
+      placed.push({ x, y });
+    }
+  }
 
   const ventPositions: Vec2[] = [];
   for (let v = 0; v < profile.ventCount; v++) {
