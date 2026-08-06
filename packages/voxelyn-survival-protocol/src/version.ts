@@ -406,7 +406,18 @@ export const PROTOCOL_VERSION = 21;
 // Muda o hash por tres caminhos: os tres campos novos, o dano de descarga (que
 // deixou de ser plano quando ha ponto de origem) e o fogo que a lamina apaga ao
 // passar.
-export const SIMULATION_VERSION = 35;
+// 36: os DUTOS do Aquifero ganham quota na camara do chefe.
+//
+// Defeito medido, e nao ajuste de gosto: com dez dutos sorteados num mapa de
+// 96x96 e espacamento minimo de oito, NENHUMA seed de Aquifero punha um duto de
+// boca aberta dentro da arena do Leviata. O Diluvio caía sempre na fonte de
+// reserva (o corpo dele), e a leitura que a mecanica existe para produzir — "os
+// dutos estao enchendo a sala" — nunca acontecia onde ela importa. Quatro saem
+// agora num anel em volta do chefe, antes do sorteio.
+//
+// Muda a impressao digital da geracao, e so no Aquifero: o bloco inteiro esta
+// atras de `profile.pipeCount > 0`.
+export const SIMULATION_VERSION = 36;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
