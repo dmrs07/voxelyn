@@ -7,7 +7,8 @@
 // responder enquanto o dano continua saindo.
 import { describe, expect, it } from 'vitest';
 import { createRun, emptyCommand, stepRun } from '../src/run';
-import { damageEntity, spawnEnemy } from '../src/entities';
+import { damageEntity, furnaceSweepAt, spawnEnemy } from '../src/entities';
+import { isConductiveSurface } from '../src/cells';
 import { BOSS_OF_STRATUM, IMPLEMENTED_BOSS, bossArchetypeForBiome } from '../src/bosses';
 import { BOSS_PHASE_OVERHEAT, BOSS_PHASE_UNSTABLE } from '../src/types';
 import {
@@ -20,7 +21,14 @@ import {
   FURNACE_HEART_STALACTITE_WARNING_TICKS,
   FURNACE_HEART_CYCLE_TICKS,
   FURNACE_HEART_WAVE_RADIUS,
+  FURNACE_HEART_WAVE_ARC,
+  FURNACE_HEART_WAVE_TURN,
+  FURNACE_HEART_WAVE_INTERVAL_TICKS,
+  FURNACE_HEART_WAVE_WARNING_WAVES,
+  FURNACE_HEART_OVERHEAT_HP,
+  SURF_SCORCHED,
   LUNG_MATRIX_CYCLE_TICKS,
+  ARCHCANTOR_PULSE_RADIUS,
   MAGNETARCH_CRUSH_RANGE,
   MAGNETARCH_CYCLE_TICKS,
   MAGNETARCH_TETHER_RANGE,
@@ -185,19 +193,107 @@ describe('Arquicantor — a Catedral responde', () => {
     const sung = damageTaken(state, boss);
     expect(silent, 'quebrar a rede nao cobrou nada dele').toBeGreaterThan(sung);
   });
-});
 
-describe('Leviata do Lencol — a lamina e o territorio', () => {
-  it('so emerge onde ha agua: chao seco o segura embaixo', () => {
-    const { state, boss } = duel(611, 'sheet_leviathan', 6);
-    let breached = false;
-    for (let t = 0; t < 500; t++) {
+  /**
+   * Uma fileira de cristal saindo do chefe e indo MUITO alem do raio do canto.
+   * E a cena que separa "o alcance e do chefe" de "o alcance e da Catedral": a
+   * ponta so pode acender se o canto tiver sido passado de cristal em cristal.
+   */
+  const crystalLine = (
+    state: SurvivalState,
+    px: number,
+    py: number,
+    from: number,
+    to: number,
+    skip: readonly number[] = [],
+  ): void => {
+    const w = state.config.width;
+    for (let d = from; d <= to; d += 2) {
+      if (skip.includes(d)) continue;
+      state.solid[py * w + px + d] = SOLID_CRYSTAL;
+    }
+  };
+
+  /** O tick em que alguma celula ALEM do raio do canto descarregou, ou -1. */
+  const farDischargeTick = (state: SurvivalState, px: number, py: number, ticks: number): number => {
+    const w = state.config.width;
+    for (let t = 0; t < ticks; t++) {
       for (const ev of stepRun(state, [emptyCommand()]).events) {
-        if (ev.t === 'action_start' && ev.entity === boss.id && ev.action === 'erupt') breached = true;
+        if (ev.t !== 'discharge') continue;
+        for (const cell of ev.cells) {
+          const d = Math.hypot((cell % w) - px, Math.floor(cell / w) - py);
+          if (d > ARCHCANTOR_PULSE_RADIUS + 1) return t;
+        }
       }
       state.player.hp = state.player.maxHp;
     }
-    expect(breached, 'rompeu a lamina onde nao havia lamina').toBe(false);
+    return -1;
+  };
+
+  it('a CADEIA leva o canto alem do alcance do corpo: a nave inteira responde', () => {
+    // O defeito que isto protege: com o canto morrendo no raio do corpo, havia
+    // uma faixa em que o jogador matava 620 de vida sem que nada respondesse —
+    // o chefe ficava fora da propria mecanica.
+    const { state, px, py } = duel(604, 'archcantor', 4);
+    crystalLine(state, px, py, 2, ARCHCANTOR_PULSE_RADIUS + 10);
+    expect(farDischargeTick(state, px, py, 400), 'a cadeia nao saiu do raio do corpo')
+      .toBeGreaterThan(0);
+  });
+
+  it('CORTAR a cadeia desliga tudo o que vinha depois do corte', () => {
+    // O controle do teste acima, e a razao de o alcance maior nao ser um buff
+    // cego: a mesma fileira, com um vao aberto no meio, para de conduzir. O
+    // jogador escolhe entre gastar tiro apagando a nave e lutar dentro dela.
+    const { state, px, py } = duel(604, 'archcantor', 4);
+    const cut = ARCHCANTOR_PULSE_RADIUS + 2;
+    crystalLine(state, px, py, 2, ARCHCANTOR_PULSE_RADIUS + 10, [cut, cut + 2, cut + 4]);
+    expect(farDischargeTick(state, px, py, 400), 'o canto atravessou o vao').toBe(-1);
+  });
+});
+
+describe('Leviata do Lencol — a lamina e o territorio', () => {
+  it('nunca rompe chao seco: a lamina TEM de chegar antes', () => {
+    // A regra nao mudou e nao pode mudar: sem superficie condutiva sob o ponto,
+    // nao ha emergencia. O que mudou e que chao seco deixou de ser permanente —
+    // ver a enchente no teste seguinte. Aqui a camara e seca no instante da
+    // medicao, entao toda emergencia observada tem de ter agua embaixo.
+    const { state, boss } = duel(611, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    let breachedDry = false;
+    for (let t = 0; t < 500; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t !== 'action_start' || ev.entity !== boss.id || ev.action !== 'erupt') continue;
+        const i = Math.floor(ev.y) * w + Math.floor(ev.x);
+        if (!isConductiveSurface(state.surface[i])) breachedDry = true;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(breachedDry, 'rompeu a lamina onde nao havia lamina').toBe(false);
+  });
+
+  it('negada a emergencia, a ENCHENTE avanca: chao seco atrasa, nao elimina', () => {
+    // O defeito que isto protege: ele so anda e so emerge por superficie
+    // condutiva, entao um jogador de pe em rocha seca nao tinha o que esquivar
+    // — ficava atirando num chefe de 800 de vida sem uma unica resposta
+    // possivel. "Muito facil de kitar" era literal.
+    const { state, boss, px, py } = duel(614, 'sheet_leviathan', 6);
+    const w = state.config.width;
+    const wet = (): number => {
+      let n = 0;
+      for (let y = py - 14; y <= py + 14; y++) {
+        for (let x = px - 14; x <= px + 14; x++) {
+          if (isConductiveSurface(state.surface[y * w + x])) n++;
+        }
+      }
+      return n;
+    };
+    expect(wet(), 'a camara ja comecou molhada: o teste nao mede nada').toBe(0);
+    for (let t = 0; t < 400; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(wet(), 'a lamina nao avancou sobre o chao seco').toBeGreaterThan(0);
+    void boss;
   });
 
   it('com agua sob o alvo ele rompe — e a agua e que faz a diferenca', () => {
@@ -359,6 +455,89 @@ describe('Coracao da Fornalha — a sala inteira e o chefe', () => {
     expect(scoriacs(), 'a ninhada nao pode entupir a sala').toBeLessThanOrEqual(
       FURNACE_HEART_BROOD_CAP,
     );
+  });
+
+  it('na fase de LEITURA e um Escoriaceo por vez, nunca dois', () => {
+    // O playtest nao passou dos 50% de vida do Coracao, e a razao nao era a
+    // barra: com dois por leva e teto cinco, a primeira fase ja tinha quatro
+    // corpos blindados em campo, e as duas janelas de vulnerabilidade do chefe
+    // eram gastas limpando escolta. A fase que devia ENSINAR onde ficar, como
+    // ler a onda e quando bater cobrava o que a luta inteira ia cobrar.
+    const { state, boss } = duel(636, 'furnace_heart', 6);
+    let worst = 0;
+    for (let t = 0; t < FURNACE_HEART_CYCLE_TICKS * 8; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+      worst = Math.max(worst, state.enemies.filter((e) => e.alive && e.archetype === 'scoriac').length);
+    }
+    expect(boss.hp, 'o chefe cruzou o colapso: isto nao mede mais a fase de leitura')
+      .toBeGreaterThan(boss.maxHp * FURNACE_HEART_OVERHEAT_HP);
+    expect(worst, `chegou a ${worst} Escoriaceos antes do colapso`).toBe(1);
+  });
+
+  it('a varredura NAO transforma a camara em fogo permanente', () => {
+    // O defeito mais grave do conjunto, e ele era estrutural e nao numerico. Na
+    // Fornalha cinza e carvao, e `igniteCell` a devolve como fogo de 110 ticks;
+    // com o setor voltando por cima da propria cinza, a arena inteira virava
+    // fogo permanente. Dai o relato: "nao consigo distinguir aonde esta dando
+    // dano no chao e aonde tem chao seguro" — porque nao havia chao seguro.
+    const { state, boss } = duel(638, 'furnace_heart', 6);
+    const w = state.config.width;
+    const bx = Math.floor(boss.x);
+    const by = Math.floor(boss.y);
+    const r = FURNACE_HEART_WAVE_RADIUS;
+    const scan = (kind: number): number => {
+      let n = 0;
+      for (let y = by - r; y <= by + r; y++) {
+        for (let x = bx - r; x <= bx + r; x++) {
+          if (Math.hypot(x - bx, y - by) > r) continue;
+          if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+          if (state.solid[y * w + x] !== SOLID_NONE) continue;
+          if (state.surface[y * w + x] === kind) n++;
+        }
+      }
+      return n;
+    };
+    let open = 0;
+    for (let y = by - r; y <= by + r; y++) {
+      for (let x = bx - r; x <= bx + r; x++) {
+        if (Math.hypot(x - bx, y - by) > r) continue;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= state.config.height - 1) continue;
+        if (state.solid[y * w + x] === SOLID_NONE) open++;
+      }
+    }
+    // Muitas voltas completas do setor: se houvesse realimentacao, a esta
+    // altura o disco inteiro estaria aceso.
+    for (let t = 0; t < 1200; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    const burning = scan(SURF_FIRE);
+    expect(burning, 'a varredura parou de acender: a mecanica morreu').toBeGreaterThan(0);
+    expect(burning / open, `${((burning / open) * 100) | 0}% da camara acesa de uma vez`)
+      .toBeLessThan(0.4);
+    // E o rastro tem de ser LEGIVEL como rastro: onde ja passou fica cinza, que
+    // e a superficie mais escura do jogo.
+    expect(scan(SURF_SCORCHED), 'a onda nao deixou chao apagado atras dela').toBeGreaterThan(0);
+  });
+
+  it('a cunha de AVISO aponta para onde a varredura VAI estar', () => {
+    // O aviso e derivado do tick nas duas pontas (sim e cliente), entao a
+    // promessa que ele faz e verificavel aqui: o rumo avisado agora tem de ser
+    // o rumo que queima daqui a `WARNING_WAVES` ondas. Se as duas contas
+    // divergirem, o jogador foge para dentro do fogo.
+    const ahead = FURNACE_HEART_WAVE_WARNING_WAVES * FURNACE_HEART_WAVE_INTERVAL_TICKS;
+    for (const tick of [0, 137, 906]) {
+      const now = furnaceSweepAt(10, 10, tick);
+      const later = furnaceSweepAt(10, 10, tick + ahead);
+      expect(now.warnDx, `tick ${tick}`).toBeCloseTo(later.dx, 6);
+      expect(now.warnDy, `tick ${tick}`).toBeCloseTo(later.dy, 6);
+    }
+    // E o aviso tem de chegar ANTES: um telegrafo que nao precede nao e um
+    // telegrafo. (O setor gira menos que a propria abertura por onda, entao a
+    // borda anda em vez de teleportar — e o que torna a sequencia aprendivel.)
+    expect(FURNACE_HEART_WAVE_TURN).toBeLessThan(FURNACE_HEART_WAVE_ARC);
+    expect(ahead).toBeGreaterThan(20);
   });
 
   // O COLAPSO TERMICO: a escada de fim de luta. Ate aqui o encontro tinha uma

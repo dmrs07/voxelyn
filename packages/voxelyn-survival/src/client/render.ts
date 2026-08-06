@@ -38,6 +38,8 @@ import {
   liveProjectileModules,
   moduleHasCapacity,
   countCoresTaken,
+  furnaceSweepAt,
+  FURNACE_OVERHEATING,
   WELL_OFFER_REACH,
 } from '@voxelyn/survival-sim';
 import { AIM_JOYSTICK_RADIUS, MOVE_JOYSTICK_RADIUS, type InputState } from './input';
@@ -1770,6 +1772,66 @@ export class SurvivalRenderer {
     // AS MARCAS DE CHAO, por baixo de tudo o que tem volume: elas sao pintura
     // no piso, e um aviso que passasse na frente do corpo que ele avisa seria
     // o oposto de um aviso.
+    // A VARREDURA DO CORACAO DA FORNALHA: a cunha que queima e a que VAI
+    // queimar.
+    //
+    // Derivada do tick, e nao transmitida: as duas pontas fazem a mesma conta
+    // (`furnaceSweepAt`), entao a cunha nao entra no snapshot, nao entra no
+    // hash e nao pode dessincronizar. Um cliente que reconecta no meio do
+    // encontro ja sabe onde a chama esta e onde ela vai estar.
+    //
+    // E ela existe porque o CHAO nao consegue dizer isto sozinho. O relato de
+    // playtest foi literal — "nao consigo distinguir aonde esta dando dano no
+    // chao e aonde tem chao seguro" —, e a razao e que numa Fornalha a brasa
+    // natural do bioma, o aviso e o dano usariam todos a mesma familia de
+    // laranja. O chao continua contando o passado (fogo aceso = queimando
+    // agora, cinza = ja passou); o FUTURO e a unica coisa que so uma cunha
+    // desenhada pode contar.
+    {
+      const heart = state.enemies.find((e) => e.alive && e.archetype === 'furnace_heart');
+      if (heart && heart.mood === FURNACE_OVERHEATING) {
+        const sweep = furnaceSweepAt(heart.x, heart.y, state.tick);
+        const [ox, oy] = toScreen(sweep.x, sweep.y);
+        const wedge = (dx: number, dy: number, fill: string, stroke: string): void => {
+          const mid = Math.atan2(dy, dx);
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          // Amostrada em world space e projetada ponto a ponto: um setor
+          // circular vira um setor ELIPTICO na isometrica, e desenha-lo como
+          // arco de circunferencia na tela apontaria para o chao errado.
+          const STEPS = 16;
+          for (let s = 0; s <= STEPS; s++) {
+            const a = mid - sweep.arc + ((sweep.arc * 2) * s) / STEPS;
+            const [sx, sy] = toScreen(
+              sweep.x + Math.cos(a) * sweep.radius,
+              sweep.y + Math.sin(a) * sweep.radius,
+            );
+            ctx.lineTo(sx, sy);
+          }
+          ctx.closePath();
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = Math.max(1, z * 0.6);
+          ctx.stroke();
+        };
+        ctx.save();
+        // O AVISO PULSA — e a unica coisa na tela que pulsa por aqui, e e assim
+        // que ele se separa de tudo o que ja e quente na Fornalha: "aqui ainda
+        // nao queima, e vai queimar".
+        const beat = 0.5 + 0.5 * Math.sin(nowMs / 140);
+        wedge(
+          sweep.warnDx,
+          sweep.warnDy,
+          `rgba(255,166,63,${(0.06 + beat * 0.1).toFixed(3)})`,
+          `rgba(255,166,63,${(0.28 + beat * 0.32).toFixed(3)})`,
+        );
+        // A QUEIMA nao pulsa: ela e o agora, e o agora nao pisca.
+        wedge(sweep.dx, sweep.dy, 'rgba(255,122,47,0.24)', 'rgba(255,122,47,0.68)');
+        ctx.restore();
+      }
+    }
+
     {
       for (const mark of pendingGroundMarkers(state)) {
         const remaining = mark.fireTick - state.tick;

@@ -20,6 +20,8 @@ import {
   DEVOURER_LEAP_MAX_RANGE,
   DEVOURER_LEAP_MIN_RANGE,
   DEVOURER_LEAPS_PER_CYCLE,
+  DEVOURER_BURROW_MIN_TICKS,
+  DEVOURER_REPEAT_MIN_GAP,
   DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SURF_GLASS,
@@ -427,5 +429,72 @@ describe('Devorador Branco — a janela de dano', () => {
     const hp0 = worm.hp;
     damageEntity(state, worm, 100, [], { kind: 'player_shot' });
     expect(hp0 - worm.hp, 'a janela nao vale o que promete').toBe(100);
+  });
+});
+
+describe('Devorador Branco — o repouso e a rajada legivel', () => {
+  /**
+   * O relato de playtest: "logo no comeco da fase ele ja chega em mim, ele fica
+   * pulando que nem um louco". Nao era desbalanceamento — era a maquina de
+   * estados sem estado de repouso e sem espaco entre os arcos.
+   */
+  it('longe, ele NAO caca: o chefe tem estado de repouso', () => {
+    // Ele saía do portao de aggro comum (tem passo proprio) e por isso nao
+    // tinha portao nenhum: cacava desde o tick zero, do outro lado do setor,
+    // atravessando parede atras de um jogador que ainda estava descendo.
+    const { state, worm } = arena(701);
+    worm.x += 24;
+    const x0 = worm.x;
+    const y0 = worm.y;
+    let erupted = false;
+    for (let t = 0; t < 300; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.action === 'erupt') erupted = true;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(erupted, 'emergiu sem nunca ter notado ninguem').toBe(false);
+    expect(Math.hypot(worm.x - x0, worm.y - y0), 'caçou de fora do proprio alcance')
+      .toBeLessThan(0.5);
+  });
+
+  it('notar nao e atacar: a primeira emergencia fica devendo um mergulho', () => {
+    // `nextActionAt` nasce em zero, entao a emergencia saia no proprio tick em
+    // que ele notava o jogador — uma cratera na cara de quem nunca tinha visto
+    // o rastro. A regra do encontro e que a faixa de areia avise ANTES,
+    // inclusive na primeira vez.
+    const { state } = arena(702);
+    let firstErupt = -1;
+    for (let t = 0; t < 300 && firstErupt < 0; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t === 'action_start' && ev.action === 'erupt') firstErupt = t;
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(firstErupt, 'nunca emergiu: o teste nao mede nada').toBeGreaterThanOrEqual(0);
+    expect(firstErupt, 'atacou no tick em que notou o jogador')
+      .toBeGreaterThanOrEqual(DEVOURER_BURROW_MIN_TICKS);
+  });
+
+  it('as crateras da rajada nao se empilham: tres arcos, tres lugares', () => {
+    // A mira sai da posicao PREVISTA do jogador, e um jogador parado tem sempre
+    // a mesma posicao prevista: sem distancia minima, os tres arcos caíam quase
+    // no mesmo tile e a rajada virava um ataque piscando.
+    const { state } = arena(703);
+    const landings: Array<{ x: number; y: number }> = [];
+    for (let t = 0; t < 900; t++) {
+      for (const ev of stepRun(state, [emptyCommand()]).events) {
+        if (ev.t !== 'action_start' || ev.action !== 'erupt') continue;
+        landings.push({ x: state.bossRuntime.leapToX, y: state.bossRuntime.leapToY });
+      }
+      state.player.hp = state.player.maxHp;
+    }
+    expect(landings.length, 'nao houve rajada para medir').toBeGreaterThanOrEqual(2);
+    let worst = Infinity;
+    for (let k = 1; k < landings.length; k++) {
+      worst = Math.min(worst, Math.hypot(landings[k].x - landings[k - 1].x, landings[k].y - landings[k - 1].y));
+    }
+    expect(worst, `duas crateras seguidas a ${worst.toFixed(1)} tiles`)
+      .toBeGreaterThanOrEqual(DEVOURER_REPEAT_MIN_GAP - 1.5);
   });
 });

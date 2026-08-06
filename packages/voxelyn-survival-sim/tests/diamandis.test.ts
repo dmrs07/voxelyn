@@ -24,6 +24,8 @@ import {
   DIAMANDIS_MODULE_EXPOSE_AT,
   DIAMANDIS_MODULE_ORE,
   DIAMANDIS_REACTOR_HP_FRACTION,
+  DIAMANDIS_SALVAGE_CREW_CAP,
+  PLAYER_SPEED,
   DEFAULT_SECTOR_COUNT,
   SOLID_NONE,
   SOLID_ORE,
@@ -410,5 +412,74 @@ describe('Diamandis — os Coveiros e a escolha', () => {
       .filter((e) => e.alive && e.archetype === 'undertaker' && (e.mood ?? 0) > 0)
       .map((e) => e.mood);
     expect(new Set(claims).size, 'dois Coveiros no mesmo modulo').toBe(claims.length);
+  });
+});
+
+describe('Diamandis — a sucata chama, e a salva antecipa', () => {
+  it('o modulo solto CHAMA os Coveiros, mesmo longe do Ferrifero', () => {
+    // A mecanica de sucata sempre esteve pronta e quase nunca acontecia, e o
+    // motivo era geografico: o Coveiro e fauna do Estrato Ferrifero, e o
+    // Diamandis nasce onde a Cicatriz Aurix domina. O playtest fechou o
+    // encontro inteiro sem ver um Coveiro — a escolha mais interessante da luta
+    // (deixar arrancar a peca ou defender o chefe que esta tentando te matar)
+    // nunca chegou a existir, porque nao havia quem arrancasse.
+    const { state, boss } = duel(801, 9);
+    expect(state.enemies.filter((e) => e.archetype === 'undertaker')).toHaveLength(0);
+    // Logo abaixo do primeiro limiar de exposicao: um modulo se solta.
+    boss.hp = boss.maxHp * (DIAMANDIS_MODULE_EXPOSE_AT[0] - 0.02);
+    for (let t = 0; t < 20; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.bossRuntime.modulesExposed, 'nenhum modulo se soltou').not.toBe(0);
+    expect(
+      state.enemies.filter((e) => e.alive && e.archetype === 'undertaker').length,
+      'a peca solta nao chamou ninguem',
+    ).toBeGreaterThan(0);
+  });
+
+  it('a equipe tem TETO: a camara do chefe nao vira galeria', () => {
+    const { state, boss } = duel(802, 9);
+    // Os tres limiares de uma vez: mesmo assim a sala nao pode entupir.
+    boss.hp = boss.maxHp * 0.05;
+    for (let t = 0; t < 60; t++) {
+      stepRun(state, [emptyCommand()]);
+      state.player.hp = state.player.maxHp;
+    }
+    expect(state.enemies.filter((e) => e.alive && e.archetype === 'undertaker').length)
+      .toBeLessThanOrEqual(DIAMANDIS_SALVAGE_CREW_CAP);
+  });
+
+  it('a Salva de Demolicao cai NA FRENTE de quem corre, e em cima de quem para', () => {
+    // O anti-kite, e ele e de controle de arena e nao de velocidade: ele
+    // continua sendo uma maquina de 1,5 tile/s. O que mudou e que andar em
+    // circulo deixou de derrotar o golpe de graça — as cargas caíam na posicao
+    // presente, e um jogador em movimento ja tinha saido de todas antes do fim
+    // do telegrafo.
+    const w = () => state.config.width;
+    const { state, boss, px, py } = duel(803, 7);
+
+    // PARADO: a antecipacao de quem nao se move e o proprio lugar dele.
+    state.player.vx = 0;
+    state.player.vy = 0;
+    expect(awaitAction(state, boss.id, 'demolish', 400), 'nunca demoliu').not.toBeNull();
+    const still = state.bossRuntime.blastCells.map((i) => ({ x: i % w(), y: Math.floor(i / w()) }));
+    const nearest = Math.min(...still.map((c) => Math.hypot(c.x - px, c.y - py)));
+    expect(nearest, 'a salva ignorou um alvo parado').toBeLessThan(4);
+
+    // CORRENDO: as marcas tem de sair na direcao do movimento.
+    const moving = duel(804, 7);
+    moving.state.player.vx = 0;
+    moving.state.player.vy = -PLAYER_SPEED;
+    const before = moving.state.player.y;
+    expect(awaitAction(moving.state, moving.boss.id, 'demolish', 400)).not.toBeNull();
+    const mw = moving.state.config.width;
+    const marks = moving.state.bossRuntime.blastCells.map((i) => Math.floor(i / mw));
+    // O jogador anda para o NORTE (y decrescente), entao a salva tem de cair
+    // em y menor que onde ele estava. Comparado com a posicao dele no instante
+    // da marcacao, e nao com a inicial: ele nao parou de andar.
+    const aimedAhead = marks.some((y) => y < Math.floor(moving.state.player.y));
+    expect(before).toBeGreaterThan(0);
+    expect(aimedAhead, 'a salva caiu atras de quem estava correndo').toBe(true);
   });
 });

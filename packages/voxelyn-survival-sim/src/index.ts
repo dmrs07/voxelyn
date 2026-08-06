@@ -95,6 +95,12 @@ export {
   moveEntity,
   damageEntity,
   isSolidAt,
+  // A geometria da varredura do Coracao da Fornalha. Exportada porque o AVISO
+  // dela e desenhado no cliente a partir do mesmo tick, e nao transmitido: uma
+  // cunha derivada nao entra no snapshot, nao entra no hash e nao pode
+  // dessincronizar.
+  furnaceSweepAt,
+  type FurnaceSweep,
 } from './entities.js';
 export { hasLineOfSight } from './pathing.js';
 export {

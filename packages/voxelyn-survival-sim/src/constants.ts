@@ -554,6 +554,22 @@ export const DIAMANDIS_DEMOLISH_CHARGES = 3;
 export const DIAMANDIS_DEMOLISH_RADIUS = 2.6;
 /** Quanto as duas cargas laterais se afastam da central, em tiles. */
 export const DIAMANDIS_DEMOLISH_SPREAD = 3.2;
+/**
+ * Quanto a Salva de Demolicao ANTECIPA a rota do alvo, em segundos.
+ *
+ * O anti-kite do Diamandis, e ele e deliberadamente de controle de arena e nao
+ * de velocidade: ele continua sendo uma maquina lenta e pesada, porque e isso
+ * que ele e. O que ele deixou de aceitar e que andar em circulo derrotasse a
+ * salva de graça — as tres cargas caíam na posicao presente do jogador, e um
+ * jogador em movimento ja tinha saido de todas antes do fim do telegrafo.
+ *
+ * Meio segundo mira 2,3 tiles a frente de quem corre em velocidade cheia: o
+ * bastante para continuar na rota custar, e pouco o bastante para uma mudanca
+ * de direcao no meio do aviso ainda resolver — que e a decisao que o golpe
+ * existe para cobrar. Um alvo PARADO nao perde nada, porque a antecipacao de
+ * quem nao se move e o proprio lugar onde ele esta.
+ */
+export const DIAMANDIS_DEMOLISH_LEAD_SECONDS = 0.5;
 
 /**
  * FEIXE DE PROSPECCAO. Uma linha de levantamento que depois SOBE de potencia.
@@ -655,6 +671,33 @@ export const UNDERTAKER_SALVAGE_WINDUP_TICKS = 40;
  * continua valendo, para quem escapa de verdade.
  */
 export const UNDERTAKER_SALVAGE_ESCAPE_DIST = 24;
+/**
+ * A EQUIPE DE RESGATE: os Coveiros que o modulo solto CHAMA.
+ *
+ * A mecanica de sucata sempre esteve pronta e quase nunca aconteceu, e o motivo
+ * e geografico. O Coveiro e a fauna de assinatura do Estrato Ferrifero; o
+ * Diamandis nasce onde a Cicatriz Aurix domina, que quase nunca e ferrifero. O
+ * playtest fechou o encontro inteiro sem ver um unico Coveiro — a escolha mais
+ * interessante da luta (deixar arrancar a peca, ou defender o chefe que esta
+ * tentando te matar) simplesmente nao estava na mesa, porque nao havia quem
+ * arrancasse.
+ *
+ * Agora o modulo chama. Nao e uma invocacao do chefe — ele nao os controla e
+ * eles nao o ajudam: e sucata de escavadeira de grande porte se soltando, e um
+ * bicho construido para recolher sucata reagindo a isso a vinte tiles de
+ * distancia. Eles chegam pelas bordas da camara, e o que fazem ao chegar e o
+ * que sempre fizeram (`undertakerSalvageStep`).
+ *
+ * O efeito colateral e o segundo defeito do encontro, e ele nao e colateral por
+ * acaso: o Diamandis anda a 1,5 e telegrafa tudo, entao recuar em circulo o
+ * resolvia sem risco. Um Coveiro nao telegrafa nada e PUXA — recuar deixa de
+ * ser a resposta gratuita no instante em que ha um deles atras de voce.
+ */
+export const DIAMANDIS_SALVAGE_CREW = 2;
+/** A que distancia do chefe a equipe entra em campo. Fora do corpo a corpo. */
+export const DIAMANDIS_SALVAGE_CREW_RING = 11;
+/** Teto de Coveiros vivos por conta da carcaça. A camara nao vira galeria. */
+export const DIAMANDIS_SALVAGE_CREW_CAP = 4;
 
 // ---------------------------------------------------------------------------
 // DEVORADOR BRANCO — o chefe dos Sumidouros de Silica
@@ -711,7 +754,21 @@ export const DEVOURER_BURROWED_ARMOR = 0.12;
  * lerem como UMA rajada e nao como tres ataques separados.
  */
 export const DEVOURER_LEAPS_PER_CYCLE = 3;
-export const DEVOURER_HOP_GAP_TICKS = 25;
+/**
+ * O vao entre dois arcos da rajada. Era 25 — um segundo e um quarto.
+ *
+ * O texto acima diz que o vao existe "para o rastro dizer de onde vem o proximo
+ * arco". A 25 ticks o rastro nao dava tempo de dizer nada: descontado o
+ * telegrafo de 24 ticks da decolagem, sobrava um unico tick de mergulho visivel
+ * entre a queda de um arco e o aviso do seguinte. A rajada de tres nao lia como
+ * pressao subindo, lia como o chefe pulando sem parar em cima do jogador — que
+ * foi exatamente o relato do playtest.
+ *
+ * 45 ticks poem 2,25 s entre os arcos: sobra mergulho de verdade para a faixa
+ * de silica apontar a direcao do proximo, e a rajada volta a ser tres golpes
+ * legiveis em vez de um borrao. A janela final continua pagando os tres.
+ */
+export const DEVOURER_HOP_GAP_TICKS = 45;
 /**
  * PRESO: a janela de dano do encontro inteiro.
  *
@@ -733,6 +790,19 @@ export const DEVOURER_BURROW_MIN_TICKS = 70;
  * dele aparece SOB o jogador, e a distancia a percorrer para sair dela e um
  * passo. O que custa aqui nao e o tempo, e perceber.
  */
+/**
+ * Distancia minima entre duas crateras da MESMA rajada, em tiles.
+ *
+ * A mira sai da posicao PREVISTA do jogador, e um jogador parado tem sempre a
+ * mesma posicao prevista: sem esta regra, os tres arcos caíam quase no mesmo
+ * tile e a rajada deixava de ser tres ataques para virar um ataque piscando.
+ * Somado ao vao curto entre eles, e exatamente a leitura que o playtest teve —
+ * "ele fica pulando que nem um louco".
+ *
+ * Quatro tiles e pouco mais que o proprio raio da cratera (2,8): as tres
+ * continuam cercando o alvo de perto, mas cada uma cobra um passo diferente.
+ */
+export const DEVOURER_REPEAT_MIN_GAP = 4;
 export const DEVOURER_ERUPT_WINDUP_TICKS = 24;
 export const DEVOURER_ERUPT_RADIUS = 2.8;
 export const DEVOURER_ERUPT_DAMAGE = 30;
@@ -971,14 +1041,35 @@ export const VENT_BASE_INTERVAL_TICKS = 160;
  */
 export const BISHOP_HP = 260;
 /**
- * Cura por tick sobre fungo. A 20 Hz sao 24 de vida por segundo.
+ * Cura por tick sobre fungo. A 20 Hz sao 64 de vida por segundo.
  *
- * Deliberadamente ACIMA do dano sustentado do tiro base (14 por bolt a cada 5
- * ticks = 56/s, menos o tempo de mira e o calor). Em cima do fungo ele nao e
- * dificil de matar: e IMPOSSIVEL de matar por atrito. Tirar a cura tem de ser
- * uma decisao, nao uma otimizacao.
+ * Era 1,2 — 24/s — e o comentario que a acompanhava dizia estar "deliberadamente
+ * ACIMA do dano sustentado do tiro base". Nao estava: o bolt faz 14 a cada 5
+ * ticks, ou seja 56/s, e 24 e menos da metade disso. O playtest cobrou
+ * exatamente essa conta — dava para queimar o Bispo EM CIMA do tapete, e a
+ * pergunta "de que chao eu o tiro" nunca chegava a ser feita, porque o chao
+ * dele nao mudava a resposta.
+ *
+ * 3,2 restaura a promessa: 64/s SUPLANTA o tiro base sustentado. Sobre fungo
+ * ele nao e dificil de matar, e impossivel de matar por atrito — o dano tem de
+ * vir concentrado (explosivo, sopro, superaquecimento) ou o chao tem de sair de
+ * baixo dele. Continua nao sendo imunidade: uma janela de burst ainda morde, e
+ * e por isso que 3,2 e nao 5.
  */
-export const BISHOP_REGEN_PER_TICK = 1.2;
+export const BISHOP_REGEN_PER_TICK = 3.2;
+/**
+ * Reducao de dano enquanto ele PISA em fungo vivo. Pequena de proposito.
+ *
+ * Ela nao existe para segurar dano — existe para fechar a fresta por onde o
+ * atrito passava. A cura sozinha ja quase basta, e "quase" foi o que o playtest
+ * encontrou: com burst e modulos dava para vencer o tapete em cima do tapete, e
+ * ai o quebra-cabeca territorial deixava de precisar ser resolvido.
+ *
+ * Cai junto com a cura no instante em que o fungo aquece, porque as duas leem a
+ * mesma celula: acender o chao desliga as duas de uma vez, que e exatamente a
+ * resposta que o encontro quer ensinar.
+ */
+export const BISHOP_FUNGAL_ARMOR = 0.85;
 /** Abaixo desta fracao de vida ele ABANDONA a perseguicao e busca fungo. */
 export const BISHOP_RETREAT_HP_FRACTION = 0.72;
 /** Ate onde ele procura chao fungico, em tiles. */
@@ -1020,9 +1111,38 @@ export const WITNESS_RANGE = 12;
  * O fungo e replantado somente no RELEASE, nunca no windup: o jogador que
  * queimou o tapete ve o proprio incendio ate o ultimo instante do aviso.
  */
-export const BISHOP_NOVA_RADIUS = 5.5;
+/**
+ * O disco: 360 graus de dano E o alcance do replantio, que sao a mesma coisa.
+ *
+ * Era 5,5, e 5,5 era pequeno demais para a funcao que a Supernova tem. O tapete
+ * que ela devolvia cabia quase inteiro debaixo do proprio corpo do Bispo: o
+ * jogador queimava a arena, o chefe replantava um circulo de tres passos e a
+ * luta voltava ao mesmo lugar sem nunca abrir espaco de decisao. Nove tiles
+ * plantam CHAO — o bastante para ele ter para onde recuar e para o jogador ter
+ * de escolher que parte queimar de novo.
+ *
+ * O telegrafo sobe junto, e tem de subir: a 4,6 tiles/s um aviso de 1,5 s cobre
+ * 6,9 tiles, ou seja, menos que o novo raio — quem estivesse no centro nao
+ * teria como sair, e um disco inesquivavel nao e um telegrafo, e um imposto.
+ * Dois segundos cobrem 9,2 tiles e devolvem a saida.
+ */
+export const BISHOP_NOVA_RADIUS = 9;
 export const BISHOP_NOVA_DAMAGE = 16;
-export const BISHOP_NOVA_WINDUP_TICKS = 30;
+export const BISHOP_NOVA_WINDUP_TICKS = 40;
+/**
+ * Quanto a FRENTE leva para atravessar o raio inteiro.
+ *
+ * Ela viaja, e nao aparece: nove tiles em 1,3 s dao 6,9 tiles/s, acima dos 4,6
+ * do Prospector. Nao da para correr dela depois que saiu — e nao deve dar. O
+ * que a torna justa e o telegrafo radial de dois segundos que vem ANTES: a
+ * decisao e onde estar quando ela sair, e nao o que fazer depois.
+ *
+ * E ela planta atras de si, anel por anel, que e o ponto inteiro. O tapete
+ * refeito por uma onda que passou por cima de voce le como "ele retomou a
+ * arena"; o mesmo tapete aparecendo de uma vez lia como "nasceu mais fungo
+ * perto dele".
+ */
+export const BISHOP_NOVA_TRAVEL_TICKS = 26;
 /**
  * Recarga da Supernova. Era 420 quando ela so existia como replantio de
  * emergencia; como resposta primaria a distancia, 15 s mantem o rodizio da
@@ -1233,10 +1353,59 @@ export const CONTAMINATION_WAVES: readonly (readonly [level: number, count: numb
  * a ela.
  */
 export const ARCHCANTOR_HP = 620;
-export const ARCHCANTOR_PULSE_RADIUS = 9;
-export const ARCHCANTOR_CRYSTAL_BUDGET = 26;
+/**
+ * Ate onde o canto alcanca cristal. Era 9, e nove era a mesma falha que a
+ * varredura do Coracao tinha com 8.
+ *
+ * O bolt do Prospector voa 13 tiles/s por 1,4 s: dezoito tiles de alcance util.
+ * Com o canto parando em nove e o corpo dele andando a 1,2, existia uma faixa
+ * inteira — de dez a dezoito — em que o jogador matava um chefe de 620 de vida
+ * sem que nada na sala respondesse. Nao era uma luta facil: era um alvo fixo.
+ *
+ * Catorze poe a nave inteira dentro do canto e devolve a decisao que o encontro
+ * promete: recuar deixa de ser gratis, e quem quiser distancia tem de PAGAR
+ * quebrando cristal — que e a luz e o recurso do setor.
+ */
+export const ARCHCANTOR_PULSE_RADIUS = 14;
+/**
+ * Teto de cristais armados por canto. Sobe com o raio, e pela mesma conta: o
+ * orcamento existe para o pulso nao varrer um mapa inteiro, e nao para
+ * esvaziar de significado o alcance que ele acabou de ganhar.
+ */
+export const ARCHCANTOR_CRYSTAL_BUDGET = 40;
+/**
+ * A CADEIA: ate onde um cristal armado passa o canto ao vizinho, em tiles.
+ *
+ * O alcance do canto deixou de ser do CHEFE e passou a ser da CATEDRAL. Os
+ * cristais em volta dele sao a camada zero; cada um passa adiante aos que
+ * estiverem a tres tiles, e a nave inteira responde a um canto que comecou no
+ * meio dela.
+ *
+ * Tres e a distancia que faz uma FORMACAO ser uma formacao: cristais colados
+ * conduzem, veios separados por um corredor nao. E por isso que o contra-jogo
+ * melhora junto com o alcance — quebrar cristal deixou de ser "menos um
+ * cristal" e virou CORTAR a cadeia, e um vao aberto no lugar certo desliga tudo
+ * o que vinha depois dele.
+ */
+export const ARCHCANTOR_CHAIN_REACH = 3;
+/** Quantas camadas o canto atravessa antes de se esgotar. */
+export const ARCHCANTOR_CHAIN_LAYERS = 5;
+/**
+ * Ticks entre duas camadas. E o que faz o canto ser uma ONDA e nao um estouro:
+ * a descarga sai de perto dele e vai para fora, da para ver vindo, e da para
+ * correr contra ela. Tambem e a janela em que quebrar um cristal ainda corta a
+ * cadeia com a onda ja a caminho.
+ */
+export const ARCHCANTOR_CHAIN_STEP_TICKS = 6;
 export const ARCHCANTOR_WINDUP_TICKS = 34;
-export const ARCHCANTOR_COOLDOWN_TICKS = 150;
+/**
+ * Recarga do canto. Era 150 (7,5 s) e o encontro lia como LENTO — sete segundos
+ * e mais que a travessia inteira da nave, entao o jogador cruzava o alcance
+ * dele entre dois pulsos sem nunca ter de responder a um. Cinco segundos e meio
+ * mantem o canto como evento (ele nao e metralhadora) e fecha a janela de
+ * atravessar de graca.
+ */
+export const ARCHCANTOR_COOLDOWN_TICKS = 110;
 /** Quanto a rede vazia o enfraquece: sem cristal, o canto nao tem quem responda. */
 export const ARCHCANTOR_SILENT_ARMOR = 1.5;
 
@@ -1261,6 +1430,52 @@ export const LEVIATHAN_BREACH_RADIUS = 3;
 export const LEVIATHAN_BREACH_DAMAGE = 28;
 export const LEVIATHAN_BREACH_SEARCH = 7;
 export const LEVIATHAN_LEAD_SECONDS = 0.8;
+/**
+ * A ENCHENTE: o lencol sobe atras de quem subiu na margem.
+ *
+ * O defeito que ela corrige foi medido em playtest e era terminal: chao seco
+ * nao atrasava o Leviata, ELIMINAVA o Leviata. Ele so anda por superficie
+ * condutiva e so emerge nela, entao um jogador de pe em rocha seca a doze tiles
+ * da agua nao tinha o que esquivar — ficava atirando num chefe de 800 de vida
+ * que nao tinha uma unica resposta a dar. "Saber onde ele NAO alcanca" era para
+ * ser meia travessia do setor; virou a luta inteira.
+ *
+ * A resposta nao e um golpe novo: e o proprio estrato. Negada a emergencia, ele
+ * EMPURRA a lamina na direcao do alvo — a agua avanca uma faixa por vez, e o
+ * chao que era refugio passa a ser dominio dele. Nada aqui e mecanica
+ * inventada: e o Aquifero Negro fazendo o que um aquifero faz.
+ *
+ * E o preco continua simetrico, que e o que a mantem justa: a agua que ele traz
+ * e condutiva nos DOIS sentidos. Quem deixa a enchente chegar ganha um chao em
+ * que a descarga do proprio Prospector o atordoa — a enchente e a ameaca e a
+ * ferramenta, e escolher o instante de virar uma na outra e o encontro.
+ */
+export const LEVIATHAN_SURGE_COOLDOWN_TICKS = 60;
+/** Ate onde a lamina avanca por investida, em tiles. */
+export const LEVIATHAN_SURGE_LENGTH = 11;
+/** Meia-largura da faixa que sobe. Larga: uma enchente nao e um risco. */
+export const LEVIATHAN_SURGE_WIDTH = 2;
+/**
+ * Quanto a agua trazida dura. Longa, e nao eterna: o encontro pode reescrever a
+ * camara enquanto acontece, mas nao pode reescrever o SETOR para sempre — uma
+ * inundacao permanente cobraria da run inteira por uma luta que ja terminou.
+ */
+export const LEVIATHAN_SURGE_TICKS = 1400;
+/**
+ * De quao longe os dois chefes de mergulho notam alguem.
+ *
+ * Era 26 em ambos, e vinha com um agravante: os dois SAEM do portao de aggro
+ * comum (tem passo proprio, como o Fole e o Miner), entao na pratica os 26 nem
+ * chegavam a ser consultados — eles cacavam do outro lado do setor, desde o
+ * tick zero, atravessando parede e agua. O jogador entrava no mapa e o chefe ja
+ * estava a caminho.
+ *
+ * Dezesseis e um raio de CAMARA: bem alem do alcance do bolt (18 e o limite
+ * util dele, e um chefe que so acorda depois de apanhar seria um chefe morto de
+ * graca), e curto o bastante para a descida ate ele continuar sendo a descida
+ * ate ele, e nao uma fuga do comeco ao fim.
+ */
+export const DIVER_BOSS_AGGRO_RANGE = 16;
 
 /**
  * PULMAO-MATRIZ (Fenda Sulfurosa) — o orgao que faz o estrato respirar.
@@ -1316,6 +1531,61 @@ export const FURNACE_HEART_WAVE_INTERVAL_TICKS = 12;
 /** Meia-abertura do setor que acende por vez, em radianos (~60 graus). */
 export const FURNACE_HEART_WAVE_ARC = 0.52;
 /**
+ * Quanto o setor GIRA entre duas ondas, em radianos.
+ *
+ * Era 0,7 — quarenta graus por onda, com o setor medindo sessenta. A promessa
+ * escrita era "a sequencia e aprendivel, e aprender a sequencia e a diferenca
+ * entre atravessar a sala e ser pego por ela". A 0,7 ela nao era aprendivel:
+ * dois passos e o setor ja tinha saltado o proprio corpo, o disco inteiro
+ * fechava uma volta a cada 5,4 s e nao existia angulo que ficasse seguro tempo
+ * suficiente para valer uma escolha. O jogador nao estava lendo a sala errado —
+ * nao havia leitura possivel, so dano periodico em todo lugar.
+ *
+ * 0,3 faz o setor avancar ~17 graus por onda: menos de um terco da propria
+ * abertura, entao a borda de fogo ANDA em vez de teleportar, e a volta completa
+ * leva ~12,5 s. Como o superaquecimento dura 7,5 s, cada janela cobre pouco
+ * mais da metade do circulo — o que significa que existe metade da sala segura,
+ * e que descobrir qual metade e a decisao que o encontro sempre prometeu.
+ */
+export const FURNACE_HEART_WAVE_TURN = 0.3;
+/**
+ * OS TRES ESTADOS DO CHAO, que sao a correcao mais importante do encontro.
+ *
+ * O relato de playtest nao foi "esta dificil", foi "nao consigo distinguir onde
+ * esta dando dano no chao e onde tem chao seguro". Isso nao e dificuldade, e
+ * uma luta que nao comunica. E ela nao comunicava por uma razao estrutural: a
+ * varredura acendia, o fogo virava cinza, a varredura reacendia a cinza (na
+ * Fornalha, cinza e carvao — ver cells.ts), e em menos de um minuto os tres
+ * estados que o encontro precisa ter eram um estado so.
+ *
+ * O desenho agora separa os tres, e cada um tem materia propria:
+ *
+ *   SEGURO      rocha e a brasa natural do bioma. Quente na arte, inofensiva
+ *               na regra — e o piso que o estrato ja tinha antes do chefe.
+ *   MARCADO     o setor que VAI queimar. Nao e materia nenhuma: e geometria,
+ *               derivada do relogio e desenhada pelo cliente como cunha
+ *               pulsante (ver `furnaceSweepAt`). Nao pinta chao de proposito —
+ *               qualquer superficie que servisse de aviso colidiria com a
+ *               brasa natural, que e justamente o estado SEGURO.
+ *   QUEIMANDO   fogo de verdade, com o combustivel curto abaixo. Cobra no
+ *               instante da passagem e some logo atras dela.
+ *
+ * E o rastro fecha a leitura sozinho: fogo que expira vira cinza (stepCells), e
+ * cinza e a superficie mais escura do jogo. Onde a onda passou fica visivelmente
+ * APAGADO — "aqui ja queimou" — e o unico ponto aceso da sala e onde ela esta.
+ */
+export const FURNACE_HEART_BURN_TICKS = 26;
+/**
+ * Quantas ondas de antecedencia a cunha de aviso aparece.
+ *
+ * Tres ondas sao 1,8 s — a mesma ordem de grandeza do telegrafo da broca do
+ * Diamandis (1,8 s) e do Corcel (1,3 s), e nao por coincidencia: e o tempo que
+ * este jogo cobra por uma decisao de rota. Menos que isso vira reflexo, e a
+ * varredura nao e um golpe de reflexo — ela e um setor girando que se atravessa
+ * andando contra ele.
+ */
+export const FURNACE_HEART_WAVE_WARNING_WAVES = 3;
+/**
  * Dano de quem esta DENTRO do setor quando ele varre.
  *
  * A onda so pintava brasa no chao, e brasa cobra de quem fica parado nela — o
@@ -1337,9 +1607,23 @@ export const FURNACE_HEART_WAVE_DAMAGE = 11;
  * que a sala esta mais cheia. O jogador escolhe entre bater no chefe e
  * responder ao que veio atras dele.
  */
-export const FURNACE_HEART_BROOD_PER_WAVE = 2;
+/**
+ * Quantos por superaquecimento. Era 2, com teto 5.
+ *
+ * O Escoriaceo custa caro de matar por desenho — a couraça corta 55% do dano e
+ * so ABRE com calor —, e o encontro do Coracao ja e o unico do jogo em que o
+ * jogador nao escolhe quando bater. Dois por ciclo com teto cinco somavam
+ * quatro corpos blindados em campo antes do segundo resfriamento: o jogador
+ * gastava as duas janelas de vulnerabilidade limpando escolta e nunca chegava a
+ * atacar o chefe. Nao e dificuldade — e o encontro se recusando a comecar.
+ *
+ * Um por ciclo, teto tres, mantem a funcao que eles tem (negar o tiro ao alvo a
+ * distancia, ocupar a janela de resfriamento com uma escolha) e devolve o
+ * orcamento de atencao que a sala precisa cobrar sozinha.
+ */
+export const FURNACE_HEART_BROOD_PER_WAVE = 1;
 /** Teto de Escoriaceos vivos por conta do Coracao. Sem ele, a sala entope. */
-export const FURNACE_HEART_BROOD_CAP = 5;
+export const FURNACE_HEART_BROOD_CAP = 3;
 
 /**
  * O COLAPSO TERMICO: as duas fases de uma vez do Coracao da Fornalha.
