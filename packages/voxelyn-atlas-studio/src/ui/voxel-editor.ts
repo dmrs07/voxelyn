@@ -1139,6 +1139,9 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         void openSettingsSheet();
       });
       boundsBtn.addEventListener('click', () => {
+        // fecha como todos os outros itens: a folha aberta por cima do modelo
+        // esconde exatamente aquilo que a medida esta falando sobre
+        close();
         const b = voxelProjectedBounds(currentModel());
         const fitsW = b.w <= project.frameWidth - 4;
         const fitsH = b.h <= project.frameHeight - 4;
