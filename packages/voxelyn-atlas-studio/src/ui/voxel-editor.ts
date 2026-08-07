@@ -29,7 +29,8 @@ import {
 } from '../voxel';
 import { saveProject } from '../store';
 import { STYLE_LABELS, generateAnimation, styleForAnim, type AnimStyle } from '../animate';
-import { applyAnimationSpec, segmentParts } from '../pose';
+import { applyAnimationSpec, segmentParts, validatePosedFrames, type Part } from '../pose';
+import { buildVisionImages, partsPreviewDataUrl } from '../vision';
 import { AI_MODELS, designPoses, getApiKey, getModel, setApiKey, setModel } from '../ai';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
@@ -86,6 +87,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const currentModelKey = (): string => modelKey(anim, frameIndex);
   const currentModel = (): VoxelModel => project.models![currentModelKey()] ?? {};
+  /** Partes do modelo dado, ja com as correcoes do autor aplicadas. */
+  const partsOf = (model: VoxelModel): Part[] => segmentParts(model, project.partOverrides);
   const setCurrentModel = (m: VoxelModel): void => {
     project.models![currentModelKey()] = m;
   };
@@ -863,6 +866,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     void openSheet((close) => {
       const exportBtn = el('button', { class: 'primary', text: '⇪ Validar & exportar atlas' });
       const animateBtn = el('button', { text: '🎬 Animar automaticamente' });
+      const partsBtn = el('button', { text: '🧩 Partes do modelo' });
       const moveBtn = el('button', { text: '✥ Mover modelo (frame atual)' });
       const mirrorAllBtn = el('button', { text: '⇋ Espelhar modelo inteiro em X' });
       const settings = el('button', { text: '⚙ Configuracoes do sprite' });
@@ -874,6 +878,10 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       animateBtn.addEventListener('click', () => {
         close();
         void openAnimateSheet();
+      });
+      partsBtn.addEventListener('click', () => {
+        close();
+        void openPartsSheet();
       });
       moveBtn.addEventListener('click', () => {
         close();
@@ -901,6 +909,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         el('div', { style: 'display:flex;flex-direction:column;gap:8px' }, [
           exportBtn,
           animateBtn,
+          partsBtn,
           moveBtn,
           mirrorAllBtn,
           boundsBtn,
@@ -1009,7 +1018,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           toast('O frame atual esta vazio — monte a pose base antes de animar');
           return;
         }
-        const parts = segmentParts(base);
+        const parts = partsOf(base);
         const a = aiAnimSel.value;
         const def = project.animations[a];
         aiGenerate.disabled = true;
@@ -1024,6 +1033,9 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
               fps: def.fps,
               loop: def.loop,
               description: descInput.value.trim(),
+              // a IA VE a pose neutra e o mapa de partes colorido: sem isso ela
+              // so tem numeros e chuta para que lado cada membro aponta
+              images: buildVisionImages(base, parts),
             });
             const frames = applyAnimationSpec(base, parts, spec, def.frames);
             frames.forEach((m, f) => {
@@ -1039,8 +1051,16 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
             updateUndoRedo();
             updateFrameStrip();
             render();
+            // integridade: se algum frame perdeu materia ou soltou peca, o
+            // autor fica sabendo NA HORA em vez de descobrir no play
+            const issues = validatePosedFrames(base, frames);
             toast(
-              `Poses de "${a}" projetadas pela IA — de o play; ajuste a descricao e regenere se quiser`,
+              issues.length === 0
+                ? `Poses de "${a}" projetadas pela IA — de o play; ajuste a descricao e regenere se quiser`
+                : `Poses de "${a}" projetadas, mas ${issues.length} frame(s) sairam suspeitos: ${issues
+                    .slice(0, 2)
+                    .map((i) => `f${i.frame + 1} ${i.message}`)
+                    .join('; ')}. Confira em Partes se a segmentacao esta certa.`,
             );
             close();
           } catch (err) {
@@ -1054,10 +1074,22 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       const partsInfo = (() => {
         const base = currentModel();
         if (Object.keys(base).length === 0) return 'Frame atual vazio';
-        const parts = segmentParts(base);
-        const legs = parts.filter((p) => p.name.startsWith('perna')).length;
-        return `Partes detectadas: ${legs > 0 ? `${legs} perna(s) + ` : ''}corpo`;
+        const parts = partsOf(base);
+        const legs = parts.filter((p) => p.kind === 'perna').length;
+        const limbs = parts.filter((p) => p.kind === 'membro').length;
+        const bits = [
+          legs > 0 ? `${legs} perna(s)` : '',
+          limbs > 0 ? `${limbs} membro(s)` : '',
+          'corpo',
+        ].filter(Boolean);
+        return `Partes detectadas: ${bits.join(' + ')}`;
       })();
+
+      const partsBtn = el('button', { text: '🧩 Conferir partes detectadas' });
+      partsBtn.addEventListener('click', () => {
+        close();
+        void openPartsSheet();
+      });
 
       container.append(
         el('h2', { text: 'Animar' }),
@@ -1070,6 +1102,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           style: 'font-weight:600',
           text: '✨ IA projeta as poses (por partes)',
         }),
+        partsBtn,
         el('div', {}, [el('label', { text: 'Animacao' }), aiAnimSel]),
         el('div', {}, [el('label', { text: 'Descreva o personagem e o movimento' }), descInput]),
         el('div', {}, [el('label', { text: 'Modelo' }), modelSel]),
@@ -1087,6 +1120,118 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         el('div', {}, [el('label', { text: 'Preset de movimento' }), styleSel]),
         el('div', {}, [el('label', { text: 'Intensidade' }), intensitySel]),
         generate,
+      );
+      return container;
+    });
+
+  /**
+   * Folha de PARTES: mostra como o modelo foi dividido (uma cor por parte, a
+   * mesma imagem que a IA recebe) e deixa o autor corrigir — renomear um
+   * membro, ou dizer que ele nao e membro e sim corpo. E o unico ponto do
+   * fluxo onde a decisao volta para as maos de quem desenhou.
+   */
+  const openPartsSheet = (): Promise<void> =>
+    openSheet((close) => {
+      const container = el('div');
+      const base = currentModel();
+      if (Object.keys(base).length === 0) {
+        container.append(
+          el('h2', { text: 'Partes' }),
+          el('p', { class: 'sub', text: 'O frame atual esta vazio — monte o modelo primeiro.' }),
+        );
+        return container;
+      }
+
+      const overrides = { ...(project.partOverrides ?? {}) };
+      const names: Record<string, string> = { ...(overrides.names ?? {}) };
+      const merged = new Set(overrides.mergeToCore ?? []);
+      // a lista mostrada ignora os merges para o autor poder DESFAZER um
+      const all = segmentParts(base, { names });
+      const parts = all.filter((p) => p.kind !== 'corpo');
+
+      const img = el('img', {
+        src: partsPreviewDataUrl(segmentParts(base, project.partOverrides)),
+        style:
+          'width:100%;image-rendering:pixelated;background:#0b0e14;border-radius:8px;margin:6px 0',
+      });
+
+      const rows = el('div', { style: 'display:flex;flex-direction:column;gap:10px' });
+      const rebuild = (): void => {
+        const next = {
+          names: Object.keys(names).length > 0 ? names : undefined,
+          mergeToCore: merged.size > 0 ? [...merged] : undefined,
+        };
+        project.partOverrides = next.names || next.mergeToCore ? next : undefined;
+        img.src = partsPreviewDataUrl(segmentParts(base, project.partOverrides));
+        scheduleSave();
+      };
+
+      for (const part of parts) {
+        const nameInput = el('input', {
+          type: 'text',
+          value: part.name,
+          style: 'flex:1',
+        });
+        nameInput.addEventListener('change', () => {
+          const v = nameInput.value.trim();
+          if (v) names[part.handle] = v;
+          else delete names[part.handle];
+          rebuild();
+        });
+
+        const asBody = el('input', { type: 'checkbox' });
+        asBody.checked = merged.has(part.handle);
+        asBody.addEventListener('change', () => {
+          if (asBody.checked) merged.add(part.handle);
+          else merged.delete(part.handle);
+          rebuild();
+        });
+
+        rows.append(
+          el('div', { style: 'border-top:1px solid #2a3244;padding-top:8px' }, [
+            el('div', { style: 'display:flex;gap:6px;align-items:center' }, [nameInput]),
+            el('div', {
+              class: 'sub',
+              text: `${part.keys.length} voxels · ${part.direction ?? 'centro'} · pivo z=${part.pivot[2].toFixed(1)}`,
+            }),
+            el('label', { style: 'display:flex;gap:6px;align-items:center' }, [
+              asBody,
+              el('span', { text: 'e corpo (nao se mexe sozinho)' }),
+            ]),
+          ]),
+        );
+      }
+
+      const reset = el('button', { text: '↺ Voltar a deteccao automatica' });
+      reset.addEventListener('click', () => {
+        for (const k of Object.keys(names)) delete names[k];
+        merged.clear();
+        project.partOverrides = undefined;
+        scheduleSave();
+        close();
+        void openPartsSheet();
+      });
+
+      const done = el('button', { class: 'primary', text: 'Pronto' });
+      done.addEventListener('click', () => {
+        toast('Partes atualizadas — a IA vai citar esses nomes');
+        close();
+      });
+
+      container.append(
+        el('h2', { text: 'Partes do modelo' }),
+        el('p', {
+          class: 'sub',
+          text: 'Cada cor e uma parte que a IA pode mover sozinha. Se ela dividiu errado, corrija aqui: renomeie, ou marque como corpo o que nao deve se mexer.',
+        }),
+        img,
+        parts.length === 0
+          ? el('p', {
+              class: 'sub',
+              text: 'Nenhum membro separado — o modelo inteiro e corpo. Membros finos demais podem sumir; engrosse-os um voxel para a deteccao pegar.',
+            })
+          : rows,
+        el('div', { style: 'display:flex;gap:8px;margin-top:12px' }, [reset, done]),
       );
       return container;
     });
