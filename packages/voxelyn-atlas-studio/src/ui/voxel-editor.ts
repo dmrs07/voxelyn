@@ -31,12 +31,13 @@ import { saveProject } from '../store';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
 
-type Tool = 'pencil' | 'eraser' | 'fill' | 'picker';
+type Tool = 'pencil' | 'eraser' | 'fill' | 'box' | 'picker';
 type ViewMode = 'model' | 'slice';
 
 const TOOL_ICONS: Record<Tool, string> = {
   pencil: '🧱',
   eraser: '🧽',
+  box: '⬛',
   fill: '🪣',
   picker: '💉',
 };
@@ -44,7 +45,8 @@ const TOOL_ICONS: Record<Tool, string> = {
 const TOOL_LABELS: Record<Tool, string> = {
   pencil: 'Colocar voxel',
   eraser: 'Remover voxel',
-  fill: 'Preencher fatia',
+  box: 'Caixa (arraste na fatia)',
+  fill: 'Balde da fatia',
   picker: 'Conta-gotas',
 };
 
@@ -313,29 +315,80 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     }
   };
 
-  const fillSlice = (m: VoxelModel, cx: number, cy: number): void => {
+  /** Limites (x/y) do conteudo da camada `vz`, ou null se vazia. */
+  const layerBounds = (
+    m: VoxelModel,
+    vz: number,
+  ): { minX: number; maxX: number; minY: number; maxY: number } | null => {
+    let out: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
+    for (const key of Object.keys(m)) {
+      const [x, y, kz] = parseVoxelKey(key);
+      if (kz !== vz) continue;
+      if (!out) out = { minX: x, maxX: x, minY: y, maxY: y };
+      else {
+        out.minX = Math.min(out.minX, x);
+        out.maxX = Math.max(out.maxX, x);
+        out.minY = Math.min(out.minY, y);
+        out.maxY = Math.max(out.maxY, y);
+      }
+    }
+    return out;
+  };
+
+  /**
+   * Balde da fatia. Sobre o VAZIO ele e limitado pela caixa do conteudo da
+   * camada (+1 de folga): sem essa cerca, um toque fora do desenho inundava a
+   * grade inteira de ±RANGE e o "preencher uma area" virava um borrao gigante.
+   */
+  const fillSlice = (m: VoxelModel, cx: number, cy: number): boolean => {
     const at = (x: number, y: number): string | undefined => m[voxelKey(x, y, z)];
     const target = at(cx, cy);
-    if (target === material) return;
+    if (target === material) return false;
+    let lo = -RANGE,
+      hi = RANGE,
+      loY = -RANGE,
+      hiY = RANGE;
+    if (target === undefined) {
+      const b = layerBounds(m, z);
+      if (!b) {
+        toast('Camada vazia — use a Caixa (⬛) para criar a base');
+        return false;
+      }
+      lo = b.minX - 1;
+      hi = b.maxX + 1;
+      loY = b.minY - 1;
+      hiY = b.maxY + 1;
+      if (cx < lo || cx > hi || cy < loY || cy > hiY) {
+        toast('Toque dentro (ou na borda) do desenho da camada para preencher');
+        return false;
+      }
+    }
     const stack = [[cx, cy]];
     const seen = new Set<string>();
     while (stack.length > 0) {
       const [x, y] = stack.pop()!;
-      if (Math.abs(x) > RANGE || Math.abs(y) > RANGE) continue;
+      if (x < lo || x > hi || y < loY || y > hiY) continue;
       const k = `${x},${y}`;
       if (seen.has(k) || at(x, y) !== target) continue;
       seen.add(k);
       m[voxelKey(x, y, z)] = material;
       stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
     }
+    return true;
   };
 
-  /** Edicao na vista 3D: um toque = uma peca (ou remocao) na face tocada. */
+  /**
+   * Edicao na vista 3D. O hit-test e feito contra a SUPERFICIE DO INICIO DO
+   * TRACO (strokeBaseView), nunca contra o modelo em edicao: com o alvo
+   * movel, cada peca colocada virava a nova superficie sob o dedo e o arrasto
+   * empilhava torres crescendo em direcao ao toque. Contra a superficie fixa,
+   * um arrasto pinta UMA demao de pecas sobre o que existia — previsivel como
+   * pintar uma parede — e `strokeTouched` impede a mesma celula duas vezes.
+   */
   const editModelAt = (m: VoxelModel, clientX: number, clientY: number): boolean => {
+    const viewData = strokeBaseView;
+    if (!viewData) return false;
     const rect = canvas.getBoundingClientRect();
-    // hit-test contra a vista do modelo EM EDICAO (m); as coordenadas sao
-    // ancoradas na origem do modelo, entao valem mesmo com bounds crescendo
-    const viewData = renderVoxelView(m, (VOXEL_DIRS as readonly string[]).indexOf(dir));
     const px = Math.floor(
       (clientX - rect.left - (modelView.x - viewData.originX * modelView.scale)) / modelView.scale,
     );
@@ -345,7 +398,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     const hit = viewData.hitAt(px, py);
     if (!hit) {
       // modelo vazio: primeira peca nasce na origem, entre os pes
-      if (Object.keys(m).length === 0 && tool === 'pencil') {
+      if (Object.keys(m).length === 0 && tool === 'pencil' && !strokeTouched.has('origin')) {
+        strokeTouched.add('origin');
         placeAt(m, 0, 0, 0, false);
         return true;
       }
@@ -353,11 +407,17 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     }
     if (tool === 'pencil') {
       const [x, y, vz] = hit.add;
+      const key = voxelKey(x, y, vz);
+      if (strokeTouched.has(key)) return false;
+      strokeTouched.add(key);
       placeAt(m, x, y, vz, false);
       return true;
     }
     if (tool === 'eraser') {
       const [x, y, vz] = hit.vox;
+      const key = voxelKey(x, y, vz);
+      if (strokeTouched.has(key)) return false;
+      strokeTouched.add(key);
       placeAt(m, x, y, vz, true);
       return true;
     }
@@ -380,6 +440,12 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   let strokeBefore: VoxelModel | null = null;
   let strokeModel: VoxelModel | null = null;
   let strokeCancelled = false;
+  /** superficie congelada no inicio do traco (vista 3D) — ver editModelAt */
+  let strokeBaseView: VoxelView | null = null;
+  /** celulas ja tocadas neste traco (dedupe da demao) */
+  const strokeTouched = new Set<string>();
+  /** canto inicial do arrasto da Caixa (fatia) */
+  let strokeStart: { x: number; y: number } | null = null;
   let pinchDist = 0;
   let pinchScale = 0;
 
@@ -392,7 +458,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   };
 
   const applyStrokePoint = (clientX: number, clientY: number): void => {
-    if (!strokeModel) return;
+    if (!strokeModel || !strokeBefore) return;
     let changed = false;
     if (viewMode === 'model') {
       changed = editModelAt(strokeModel, clientX, clientY);
@@ -404,9 +470,20 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       } else if (tool === 'eraser') {
         applyBrushSlice(strokeModel, cell.x, cell.y, true);
         changed = true;
-      } else if (tool === 'fill') {
-        fillSlice(strokeModel, cell.x, cell.y);
+      } else if (tool === 'box' && strokeStart) {
+        // arrasto = retangulo PREENCHIDO entre o canto inicial e o dedo,
+        // recomputado do zero a cada movimento (preview ao vivo)
+        strokeModel = structuredClone(strokeBefore);
+        const minX = Math.min(strokeStart.x, cell.x);
+        const maxX = Math.max(strokeStart.x, cell.x);
+        const minY = Math.min(strokeStart.y, cell.y);
+        const maxY = Math.max(strokeStart.y, cell.y);
+        for (let y = minY; y <= maxY; y++) {
+          for (let x = minX; x <= maxX; x++) placeAt(strokeModel, x, y, z, false);
+        }
         changed = true;
+      } else if (tool === 'fill') {
+        changed = fillSlice(strokeModel, cell.x, cell.y);
       } else if (tool === 'picker') {
         const mat = strokeModel[voxelKey(cell.x, cell.y, z)];
         if (mat) {
@@ -427,32 +504,31 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const beginStroke = (clientX: number, clientY: number): void => {
     if (playing) return;
-    if (viewMode === 'model' && tool === 'fill') {
-      toast('O balde funciona na vista Fatia');
+    if (viewMode === 'model' && (tool === 'fill' || tool === 'box')) {
+      toast(`${TOOL_LABELS[tool]} funciona na vista Fatia`);
       return;
     }
     strokeBefore = structuredClone(currentModel());
     strokeModel = structuredClone(strokeBefore);
     strokeCancelled = false;
+    strokeTouched.clear();
+    strokeBaseView =
+      viewMode === 'model'
+        ? renderVoxelView(strokeBefore, (VOXEL_DIRS as readonly string[]).indexOf(dir))
+        : null;
+    strokeStart = viewMode === 'slice' && tool === 'box' ? sliceCellAt(clientX, clientY) : null;
     applyStrokePoint(clientX, clientY);
   };
 
   const commitStroke = (): void => {
-    if (!strokeBefore || !strokeModel) {
-      strokeBefore = null;
-      strokeModel = null;
-      return;
-    }
-    if (strokeCancelled) {
-      strokeBefore = null;
-      strokeModel = null;
-      return;
-    }
     const before = strokeBefore;
-    const after = structuredClone(strokeModel);
+    const after = strokeModel ? structuredClone(strokeModel) : null;
+    const cancelled = strokeCancelled;
     strokeBefore = null;
     strokeModel = null;
-    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    strokeBaseView = null;
+    strokeStart = null;
+    if (!before || !after || cancelled) return;
     undoStack.push({ mKey: currentModelKey(), before, after });
     if (undoStack.length > 64) undoStack.shift();
     redoStack.length = 0;
@@ -518,6 +594,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       cancelStroke();
       strokeBefore = null;
       strokeModel = null;
+      strokeBaseView = null;
+      strokeStart = null;
     }
   });
 
@@ -580,6 +658,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     const btn = el('button', { class: 'toolbtn', text: TOOL_ICONS[t], title: TOOL_LABELS[t] });
     btn.addEventListener('click', () => {
       tool = t;
+      // caixa e balde sao ferramentas de fatia: escolher uma ja leva pra la
+      if ((t === 'box' || t === 'fill') && viewMode !== 'slice') setViewMode('slice');
       updateToolbar();
     });
     toolButtons.set(t, btn);
@@ -613,7 +693,26 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   };
   zDown.addEventListener('click', () => gotoSlice(-1));
   zUp.addEventListener('click', () => gotoSlice(1));
-  toolsRow.append(brushBtn, mirrorBtn, ghostBtn, zDown, zLabel, zUp);
+  // Duplicar a camada atual para cima e subir junto: e assim que um volume
+  // cresce rapido — desenha a planta uma vez (Caixa) e sobe batendo ⏫.
+  const dupBtn = el('button', { class: 'toolbtn', text: '⏫', title: 'Duplicar camada para cima' });
+  dupBtn.addEventListener('click', () => {
+    const m = currentModel();
+    const entries = Object.entries(m).filter(([key]) => parseVoxelKey(key)[2] === z);
+    if (entries.length === 0) {
+      toast(`Camada z=${z} vazia — nada para duplicar`);
+      return;
+    }
+    if (z + 1 > RANGE) return;
+    const after = structuredClone(m);
+    for (const [key, mat] of entries) {
+      const [x, y] = parseVoxelKey(key);
+      after[voxelKey(x, y, z + 1)] = mat;
+    }
+    pushModelEdit(structuredClone(m), after);
+    gotoSlice(1);
+  });
+  toolsRow.append(brushBtn, mirrorBtn, ghostBtn, zDown, zLabel, zUp, dupBtn);
 
   const updateToolbar = (): void => {
     for (const [t, btn] of toolButtons) btn.classList.toggle('active', t === tool);
