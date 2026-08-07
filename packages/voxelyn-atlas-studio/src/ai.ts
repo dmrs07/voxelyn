@@ -8,11 +8,29 @@ import { MAX_DEG, MAX_MOVE, partsSummary } from './pose';
 import type { VoxelModel } from './voxel';
 
 const KEY_STORAGE = 'voxelyn-atlas-studio-anthropic-key';
+const MODEL_STORAGE = 'voxelyn-atlas-studio-anthropic-model';
 
 export const getApiKey = (): string => localStorage.getItem(KEY_STORAGE) ?? '';
 export const setApiKey = (key: string): void => {
   if (key) localStorage.setItem(KEY_STORAGE, key);
   else localStorage.removeItem(KEY_STORAGE);
+};
+
+/** Modelos oferecidos no seletor, do mais capaz ao mais barato. */
+export const AI_MODELS = [
+  { id: 'claude-opus-5', label: 'Claude Opus 5 — melhor qualidade (padrao)' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — rapido e mais barato' },
+  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — o mais barato' },
+] as const;
+
+export const DEFAULT_MODEL = AI_MODELS[0].id;
+
+export const getModel = (): string => {
+  const stored = localStorage.getItem(MODEL_STORAGE);
+  return AI_MODELS.some((m) => m.id === stored) ? stored! : DEFAULT_MODEL;
+};
+export const setModel = (model: string): void => {
+  localStorage.setItem(MODEL_STORAGE, model);
 };
 
 /** Schema do spec de animacao — a API valida a resposta contra ele. */
@@ -112,7 +130,7 @@ export const designPoses = async (req: PoseRequest): Promise<AnimationSpec> => {
   let response: Anthropic.Message;
   try {
     response = await client.messages.create({
-      model: 'claude-opus-5',
+      model: getModel(),
       max_tokens: 16000,
       system: SYSTEM,
       output_config: { format: { type: 'json_schema', schema: SPEC_SCHEMA } },
