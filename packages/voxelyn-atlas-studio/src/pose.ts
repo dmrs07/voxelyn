@@ -67,21 +67,48 @@ export const connectedComponents = (
   return out;
 };
 
-export type PartKind = 'corpo' | 'perna' | 'membro';
+export type PartKind = 'corpo' | 'perna' | 'membro' | 'osso';
 
+/**
+ * Um OSSO do esqueleto. A lista de partes e uma arvore achatada: `corpo` e a
+ * raiz (`parent: null`), a raiz de cada membro tem `parent: 'corpo'`, e os
+ * segmentos seguintes se penduram no anterior.
+ *
+ * A hierarquia e o que faltava para o resultado parecer riggado. Sem ela cada
+ * parte se movia sozinha: mover o corpo deixava as pernas para tras e a cura de
+ * adjacencia esticava borracha entre os dois. Com ela, girar a coxa leva a
+ * canela e o pe juntos — cinematica direta, o mesmo que um esqueleto de verdade
+ * faz — e girar so a canela dobra o joelho.
+ */
 export type Part = {
   name: string;
   kind: PartKind;
-  /** chaves dos voxels da parte no modelo BASE */
+  /** osso pai na arvore; `null` so no corpo */
+  parent: string | null;
+  /** chaves dos voxels que ESTE osso possui (nao inclui os dos filhos) */
   keys: string[];
   centroid: [number, number, number];
-  /** ponto de rotacao: para membros, a INSERCAO no corpo; para o corpo, o centroide */
+  /** ponto de rotacao: a junta com o pai (para o corpo, o centroide) */
   pivot: [number, number, number];
   bounds: { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
   /** direcao em que o membro sai do corpo, em palavras ('frente-direita') */
   direction?: string;
   /** chave estavel do membro (o pivo arredondado) — usada para overrides do autor */
   handle: string;
+};
+
+/** O osso pedido e todos os descendentes: a cadeia inteira de um membro. */
+export const chainOf = (parts: Part[], rootName: string): Part[] => {
+  const out: Part[] = [];
+  const wanted = new Set([rootName]);
+  // as partes saem em ordem de arvore, entao uma passada basta
+  for (const p of parts) {
+    if (p.name === rootName || (p.parent !== null && wanted.has(p.parent))) {
+      wanted.add(p.name);
+      out.push(p);
+    }
+  }
+  return out;
 };
 
 const boundsOf = (keys: string[]): Part['bounds'] => {
@@ -182,6 +209,102 @@ export type PartOverrides = {
   mergeToCore?: string[];
 };
 
+/** Distancia geodesica (passos na malha 26) de cada voxel do membro ate a insercao. */
+const geodesicFrom = (comp: string[], seeds: string[]): Map<string, number> => {
+  const inComp = new Set(comp);
+  const dist = new Map<string, number>();
+  let front = seeds.filter((k) => inComp.has(k));
+  for (const k of front) dist.set(k, 0);
+  let d = 0;
+  while (front.length > 0) {
+    d++;
+    const next: string[] = [];
+    for (const key of front) {
+      const [x, y, z] = parseVoxelKey(key);
+      for (const [dx, dy, dz] of NEIGHBORS_26) {
+        const nk = voxelKey(x + dx, y + dy, z + dz);
+        if (inComp.has(nk) && !dist.has(nk)) {
+          dist.set(nk, d);
+          next.push(nk);
+        }
+      }
+    }
+    front = next;
+  }
+  // voxel inalcancavel (nao deveria acontecer num componente conexo) vai para a ponta
+  for (const key of comp) if (!dist.has(key)) dist.set(key, d);
+  return dist;
+};
+
+/** Quantos ossos um membro merece: um a cada ~5 voxels de comprimento, ate 3. */
+const segmentCount = (maxDist: number): number => Math.max(1, Math.min(3, Math.round(maxDist / 5)));
+
+/**
+ * Corta o membro em ossos ao longo do proprio comprimento (coxa, canela, pe).
+ *
+ * E aqui que "riggar" acontece de verdade: sem junta interna, uma perna e um
+ * palito rigido que so pendula no quadril, e nenhuma caminhada le. O corte sai
+ * da distancia geodesica ate a insercao — que segue a forma do membro, inclusive
+ * quando ele desce na diagonal ou dobra —, nao de um plano em z.
+ */
+const splitLimbChain = (
+  comp: string[],
+  attachment: string[],
+): { keys: string[]; pivot: [number, number, number] }[] => {
+  const seeds = attachment.length > 0 ? attachment : [comp[0]];
+  const dist = geodesicFrom(comp, seeds);
+  const maxDist = Math.max(...comp.map((k) => dist.get(k) ?? 0));
+  const n = segmentCount(maxDist);
+  if (n === 1 || maxDist === 0) return [{ keys: comp, pivot: centroidOf(seeds) }];
+
+  const bands: string[][] = Array.from({ length: n }, () => []);
+  for (const key of comp) {
+    const d = dist.get(key) ?? 0;
+    bands[Math.min(n - 1, Math.floor((d / (maxDist + 1)) * n))].push(key);
+  }
+
+  const out: { keys: string[]; pivot: [number, number, number] }[] = [];
+  for (const band of bands) {
+    if (band.length === 0) continue; // banda vazia some: melhor 2 ossos gordos que 3 com um oco
+    // pivo do osso = sua extremidade PROXIMAL (a junta com o osso anterior)
+    const dmin = Math.min(...band.map((k) => dist.get(k) ?? 0));
+    const joint = band.filter((k) => (dist.get(k) ?? 0) <= dmin + 1);
+    out.push({ keys: band, pivot: out.length === 0 ? centroidOf(seeds) : centroidOf(joint) });
+  }
+  return out;
+};
+
+/** Sufixos dos ossos depois da raiz, por tipo de membro. */
+const BONE_SUFFIX: Record<'perna' | 'membro', string[]> = {
+  perna: ['canela', 'pe'],
+  membro: ['antebraco', 'mao'],
+};
+
+/**
+ * Nomes anatomicos quando o bicho e de um arquetipo conhecido. Quadrupede e
+ * bipede sao os dois casos que valem a pena: `perna-traseira-direita` diz a IA
+ * (e ao autor) o que `perna-3` nunca disse. Fora deles, a numeracao por angulo
+ * continua sendo a descricao mais honesta.
+ */
+const archetypeNames = (
+  legs: { pivot: [number, number, number] }[],
+  coreCentroid: [number, number, number],
+): string[] | null => {
+  if (legs.length !== 4 && legs.length !== 2) return null;
+  const side = (p: [number, number, number]): string =>
+    p[0] >= coreCentroid[0] ? 'direita' : 'esquerda';
+  if (legs.length === 2) {
+    if (side(legs[0].pivot) === side(legs[1].pivot)) return null;
+    return legs.map((l) => `perna-${side(l.pivot)}`);
+  }
+  const front = (p: [number, number, number]): string =>
+    p[1] < coreCentroid[1] ? 'dianteira' : 'traseira';
+  const names = legs.map((l) => `perna-${front(l.pivot)}-${side(l.pivot)}`);
+  // so aceita se as quatro combinacoes sairem distintas: senao o bicho nao e
+  // um quadrupede em pe e o palpite atrapalharia mais do que ajuda
+  return new Set(names).size === 4 ? names : null;
+};
+
 /**
  * Segmenta o modelo em `corpo` + membros completos (`perna-N` quando o membro
  * alcanca o chao, `membro-N` caso contrario), ordenados pelo angulo em torno
@@ -197,12 +320,14 @@ export const segmentParts = (model: VoxelModel, overrides?: PartOverrides): Part
 
   const modelBounds = voxelModelBounds(model)!;
   const coreKeys = [...core];
-  const limbs: {
+  type Limb = {
     keys: string[];
     pivot: [number, number, number];
     angle: number;
-    kind: PartKind;
-  }[] = [];
+    kind: 'perna' | 'membro';
+    chain: { keys: string[]; pivot: [number, number, number] }[];
+  };
+  const limbs: Limb[] = [];
 
   for (const comp of comps) {
     // componente minusculo e sujeira de superficie: fica parado com o corpo
@@ -214,10 +339,10 @@ export const segmentParts = (model: VoxelModel, overrides?: PartOverrides): Part
       const [x, y, z] = parseVoxelKey(key);
       return NEIGHBORS_26.some(([dx, dy, dz]) => core.has(voxelKey(x + dx, y + dy, z + dz)));
     });
-    const pivot = centroidOf(attachment.length > 0 ? attachment : comp);
+    const chain = splitLimbChain(comp, attachment);
     const b = boundsOf(comp);
-    const kind: PartKind = b.minZ <= modelBounds.minZ + 1 ? 'perna' : 'membro';
-    limbs.push({ keys: comp, pivot, angle: 0, kind });
+    const kind = b.minZ <= modelBounds.minZ + 1 ? 'perna' : 'membro';
+    limbs.push({ keys: comp, pivot: chain[0].pivot, angle: 0, kind, chain });
   }
 
   const coreCentroid = centroidOf(coreKeys.length > 0 ? coreKeys : Object.keys(model));
@@ -239,32 +364,50 @@ export const segmentParts = (model: VoxelModel, overrides?: PartOverrides): Part
   for (const l of limbs) if (merged.has(handleOf(l.pivot))) coreKeys.push(...l.keys);
 
   const parts: Part[] = [];
-  let legN = 0;
-  let limbN = 0;
-  for (const limb of kept) {
-    const handle = handleOf(limb.pivot);
-    const auto = limb.kind === 'perna' ? `perna-${++legN}` : `membro-${++limbN}`;
-    parts.push({
-      name: overrides?.names?.[handle] ?? auto,
-      kind: limb.kind,
-      keys: limb.keys,
-      centroid: centroidOf(limb.keys),
-      pivot: limb.pivot,
-      bounds: boundsOf(limb.keys),
-      direction: directionWord(limb.angle),
-      handle,
-    });
-  }
+  // o corpo e a RAIZ e vem primeiro: chainOf e a composicao de transformacoes
+  // percorrem a lista assumindo que todo pai aparece antes dos filhos
   if (coreKeys.length > 0) {
     const centroid = centroidOf(coreKeys);
     parts.push({
       name: 'corpo',
       kind: 'corpo',
+      parent: null,
       keys: coreKeys,
       centroid,
       pivot: centroid,
       bounds: boundsOf(coreKeys),
       handle: 'corpo',
+    });
+  }
+
+  const bodyCentroid = centroidOf(coreKeys.length > 0 ? coreKeys : Object.keys(model));
+  const legsKept = kept.filter((l) => l.kind === 'perna');
+  const anatomic = archetypeNames(legsKept, bodyCentroid);
+  const anatomicOf = new Map(anatomic ? legsKept.map((l, i) => [l, anatomic[i]]) : []);
+
+  let legN = 0;
+  let limbN = 0;
+  for (const limb of kept) {
+    const handle = handleOf(limb.pivot);
+    const auto =
+      anatomicOf.get(limb) ?? (limb.kind === 'perna' ? `perna-${++legN}` : `membro-${++limbN}`);
+    const rootName = overrides?.names?.[handle] ?? auto;
+    if (anatomicOf.has(limb)) legN++;
+    let parent: string | null = coreKeys.length > 0 ? 'corpo' : null;
+    limb.chain.forEach((bone, i) => {
+      const name = i === 0 ? rootName : `${rootName}.${BONE_SUFFIX[limb.kind][i - 1]}`;
+      parts.push({
+        name,
+        kind: i === 0 ? limb.kind : 'osso',
+        parent,
+        keys: bone.keys,
+        centroid: centroidOf(bone.keys),
+        pivot: bone.pivot,
+        bounds: boundsOf(bone.keys),
+        direction: directionWord(limb.angle),
+        handle: i === 0 ? handle : `${handle}#${i}`,
+      });
+      parent = name;
     });
   }
   return parts;
@@ -288,34 +431,37 @@ export const MAX_DEG = 60;
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-const rotatePoint = (
-  x: number,
-  y: number,
-  z: number,
-  pivot: [number, number, number],
-  axis: 'x' | 'y' | 'z',
-  deg: number,
-): [number, number, number] => {
+type Vec3 = [number, number, number];
+/** Transformacao em ponto flutuante — o arredondamento acontece uma vez so, no
+ * fim da cadeia, para o erro nao se acumular osso a osso. */
+type Xform = (p: Vec3) => Vec3;
+
+const IDENTITY: Xform = (p) => p;
+
+const rotationAround = (pivot: Vec3, axis: 'x' | 'y' | 'z', deg: number): Xform => {
+  if (deg === 0) return IDENTITY;
   const rad = (deg * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
-  const px = x - pivot[0];
-  const py = y - pivot[1];
-  const pz = z - pivot[2];
-  let nx = px,
-    ny = py,
-    nz = pz;
-  if (axis === 'z') {
-    nx = px * cos - py * sin;
-    ny = px * sin + py * cos;
-  } else if (axis === 'x') {
-    ny = py * cos - pz * sin;
-    nz = py * sin + pz * cos;
-  } else {
-    nx = px * cos + pz * sin;
-    nz = -px * sin + pz * cos;
-  }
-  return [Math.round(nx + pivot[0]), Math.round(ny + pivot[1]), Math.round(nz + pivot[2])];
+  return ([x, y, z]) => {
+    const px = x - pivot[0];
+    const py = y - pivot[1];
+    const pz = z - pivot[2];
+    let nx = px,
+      ny = py,
+      nz = pz;
+    if (axis === 'z') {
+      nx = px * cos - py * sin;
+      ny = px * sin + py * cos;
+    } else if (axis === 'x') {
+      ny = py * cos - pz * sin;
+      nz = py * sin + pz * cos;
+    } else {
+      nx = px * cos + pz * sin;
+      nz = -px * sin + pz * cos;
+    }
+    return [nx + pivot[0], ny + pivot[1], nz + pivot[2]];
+  };
 };
 
 /** Voxels de uma reta 3D entre dois pontos (inclusive). */
@@ -356,29 +502,55 @@ export const applyFramePose = (base: VoxelModel, parts: Part[], frame: FramePose
   const validPoses = frame.poses.filter((p) => byName.has(p.part));
   if (validPoses.length === 0) return structuredClone(base);
 
-  // transformacao por parte (identidade para as nao citadas)
-  const transformOf = new Map<string, (k: string) => [number, number, number]>();
+  // transformacao LOCAL de cada osso citado (girar em torno do proprio pivo,
+  // depois deslocar); ossos nao citados ficam na identidade local
+  const localOf = new Map<string, Xform>();
   for (const pose of validPoses) {
     const part = byName.get(pose.part)!;
     const dx = clamp(Math.round(pose.move?.[0] ?? 0), -MAX_MOVE, MAX_MOVE);
     const dy = clamp(Math.round(pose.move?.[1] ?? 0), -MAX_MOVE, MAX_MOVE);
     const dz = clamp(Math.round(pose.move?.[2] ?? 0), -MAX_MOVE, MAX_MOVE);
     const deg = clamp(pose.rotate?.deg ?? 0, -MAX_DEG, MAX_DEG);
-    const axis = pose.rotate?.axis ?? 'x';
-    const pivot = part.pivot;
-    for (const key of part.keys) {
-      transformOf.set(key, (k: string) => {
-        const [x, y, z] = parseVoxelKey(k);
-        const [rx, ry, rz] = deg !== 0 ? rotatePoint(x, y, z, pivot, axis, deg) : [x, y, z];
-        return [rx + dx, ry + dy, Math.max(0, rz + dz)];
-      });
-    }
+    const rot = rotationAround(part.pivot, pose.rotate?.axis ?? 'x', deg);
+    localOf.set(part.name, (p) => {
+      const r = rot(p);
+      return [r[0] + dx, r[1] + dy, r[2] + dz];
+    });
   }
 
-  const imageOf = new Map<string, [number, number, number]>();
+  // CINEMATICA DIRETA: a transformacao de um osso e a do pai aplicada por cima
+  // da propria. E o que faz girar a coxa levar a canela e o pe junto — e mover
+  // o corpo carregar o bicho inteiro em vez de deixar as pernas para tras.
+  const worldOf = new Map<string, Xform>();
+  const worldFor = (name: string): Xform => {
+    const cached = worldOf.get(name);
+    if (cached) return cached;
+    const part = byName.get(name);
+    const local = localOf.get(name) ?? IDENTITY;
+    const parent = part?.parent ? worldFor(part.parent) : IDENTITY;
+    const world: Xform =
+      local === IDENTITY && parent === IDENTITY ? IDENTITY : (p) => parent(local(p));
+    worldOf.set(name, world);
+    return world;
+  };
+
+  const transformOf = new Map<string, Xform>();
+  for (const part of parts) {
+    const world = worldFor(part.name);
+    if (world === IDENTITY) continue;
+    for (const key of part.keys) transformOf.set(key, world);
+  }
+
+  const imageOf = new Map<string, Vec3>();
   for (const key of Object.keys(base)) {
+    const p = parseVoxelKey(key) as Vec3;
     const t = transformOf.get(key);
-    imageOf.set(key, t ? t(key) : (parseVoxelKey(key) as [number, number, number]));
+    if (!t) {
+      imageOf.set(key, p);
+      continue;
+    }
+    const q = t(p);
+    imageOf.set(key, [Math.round(q[0]), Math.round(q[1]), Math.max(0, Math.round(q[2]))]);
   }
 
   const out: VoxelModel = {};
@@ -468,12 +640,21 @@ export const partsSummary = (parts: Part[], model: VoxelModel): string => {
     `Partes:`,
   ];
   for (const p of parts) {
-    const dir = p.direction ? `, sai para ${p.direction}` : '';
-    const reach = p.kind === 'perna' ? `, ponta no chao (z=${p.bounds.minZ})` : '';
+    const dir = p.direction && p.kind !== 'osso' ? `, sai para ${p.direction}` : '';
+    const chain = chainOf(parts, p.name);
+    const reach =
+      p.kind === 'perna'
+        ? `, a cadeia chega ao chao (z=${Math.min(...chain.map((c) => c.bounds.minZ))})`
+        : '';
+    const rel = p.parent ? `, preso em ${p.parent}` : ' (RAIZ)';
     lines.push(
-      `- ${p.name}: ${p.keys.length} voxels${dir}${reach}, pivo/insercao (${p.pivot.map((v) => v.toFixed(1)).join(', ')}), z[${p.bounds.minZ}..${p.bounds.maxZ}]`,
+      `- ${p.name}: ${p.keys.length} voxels${rel}${dir}${reach}, junta em (${p.pivot.map((v) => v.toFixed(1)).join(', ')}), z[${p.bounds.minZ}..${p.bounds.maxZ}]`,
     );
   }
+  lines.push(
+    '',
+    'Girar um osso leva os filhos dele junto (cinematica direta): girar a raiz de um membro balanca o membro inteiro, girar o osso seguinte dobra a junta.',
+  );
   return lines.join('\n');
 };
 
@@ -515,11 +696,21 @@ const COLOR_WORD: Record<string, string> = {
 
 /** Material atribuido a cada parte no mapa de cores — uma fonte so. */
 export const partsColorAssignment = (parts: Part[]): { part: Part; material: string }[] => {
+  const byName = new Map(parts.map((p) => [p.name, p]));
+  // a cor e do MEMBRO, nao do osso: uma perna inteira le como uma mancha so na
+  // imagem, e a legenda diz quantos ossos ela tem
+  const rootOf = (p: Part): string => {
+    let cur = p;
+    while (cur.kind === 'osso' && cur.parent) cur = byName.get(cur.parent) ?? cur;
+    return cur.name;
+  };
+  const material = new Map<string, string>();
   let i = 0;
-  return parts.map((part) => ({
-    part,
-    material: part.kind === 'corpo' ? 'rock' : PART_COLORS[i++ % PART_COLORS.length],
-  }));
+  for (const p of parts) {
+    if (p.kind === 'corpo') material.set(p.name, 'rock');
+    else if (p.kind !== 'osso') material.set(p.name, PART_COLORS[i++ % PART_COLORS.length]);
+  }
+  return parts.map((part) => ({ part, material: material.get(rootOf(part)) ?? 'rock' }));
 };
 
 export const partsPreviewModel = (parts: Part[]): VoxelModel => {
@@ -533,5 +724,10 @@ export const partsPreviewModel = (parts: Part[]): VoxelModel => {
 /** Legenda do mapa de partes, em texto, para acompanhar a imagem no prompt. */
 export const partsLegend = (parts: Part[]): string =>
   partsColorAssignment(parts)
-    .map(({ part, material }) => `${COLOR_WORD[material] ?? material} = ${part.name}`)
+    .filter(({ part }) => part.kind !== 'osso')
+    .map(({ part, material }) => {
+      const bones = chainOf(parts, part.name).length;
+      const chain = bones > 1 ? ` (${bones} ossos)` : '';
+      return `${COLOR_WORD[material] ?? material} = ${part.name}${chain}`;
+    })
     .join('; ');

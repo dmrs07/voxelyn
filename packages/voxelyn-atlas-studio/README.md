@@ -49,10 +49,16 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
 - **Validação no aparelho**: os erros que o CI do jogo acusaria (alpha parcial,
   cor fora da paleta, teto de cores, anchor fora do canvas, direção descoberta,
   margem de 2 px, frame vazio) aparecem ANTES do export.
-- **Animação por partes**: o modelo é segmentado sozinho em **corpo + membros**
+- **Rig automático**: o modelo é segmentado sozinho em **corpo + membros**
   (núcleo = a massa espessa do bicho; cada membro = um componente conexo por
-  vizinhança-26 do que sobra, da inserção até a ponta, com o pivô na inserção).
-  Daí saem os dois modos: presets determinísticos (`walk`, `idle`, `attack`,
+  vizinhança-26 do que sobra, da inserção até a ponta) e cada membro comprido é
+  cortado em **ossos ao longo do próprio comprimento** — coxa → canela → pé —
+  usando distância geodésica até a inserção, que segue a forma do membro mesmo
+  quando ele desce na diagonal. Os ossos formam uma **árvore**: `corpo` é a raiz
+  e vale cinemática direta, então girar a coxa leva a canela e o pé junto, girar
+  só a canela dobra o joelho, e mover o corpo carrega o bicho inteiro. Quadrúpede
+  e bípede ainda ganham nomes anatômicos (`perna-traseira-direita`) em vez de
+  `perna-3`. Daí saem os dois modos: presets determinísticos (`walk`, `idle`, `attack`,
   `hit`…) e a **IA projetando as poses** — o Claude recebe as imagens da pose
   neutra e um mapa colorido das partes, e devolve um JSON de
   `mover/girar por parte`; quem mexe em voxel é o motor local, nunca a IA.

@@ -32,7 +32,7 @@ import {
 } from '../voxel';
 import { saveProject } from '../store';
 import { STYLE_LABELS, generateAnimation, styleForAnim, type AnimStyle } from '../animate';
-import { applyAnimationSpec, segmentParts, validatePosedFrames, type Part } from '../pose';
+import { applyAnimationSpec, chainOf, segmentParts, validatePosedFrames, type Part } from '../pose';
 import { buildVisionImages, partsPreviewDataUrl } from '../vision';
 import { AI_MODELS, designPoses, getApiKey, getModel, setApiKey, setModel } from '../ai';
 import { el, openSheet, toast } from './components';
@@ -1375,7 +1375,9 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       const merged = new Set(overrides.mergeToCore ?? []);
       // a lista mostrada ignora os merges para o autor poder DESFAZER um
       const all = segmentParts(base, { names });
-      const parts = all.filter((p) => p.kind !== 'corpo');
+      // so as RAIZES de membro sao renomeaveis/mesclaveis; os ossos internos
+      // (canela, pe) seguem o nome da raiz e nao tem decisao propria
+      const parts = all.filter((p) => p.kind === 'perna' || p.kind === 'membro');
 
       const img = el('img', {
         src: partsPreviewDataUrl(segmentParts(base, project.partOverrides)),
@@ -1420,7 +1422,18 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
             el('div', { style: 'display:flex;gap:6px;align-items:center' }, [nameInput]),
             el('div', {
               class: 'sub',
-              text: `${part.keys.length} voxels · ${part.direction ?? 'centro'} · pivo z=${part.pivot[2].toFixed(1)}`,
+              text: (() => {
+                const chain = chainOf(all, part.name);
+                const vox = chain.reduce((n, c) => n + c.keys.length, 0);
+                const bones =
+                  chain.length > 1
+                    ? ` · ${chain.length} ossos (${chain
+                        .slice(1)
+                        .map((c) => c.name.split('.').pop())
+                        .join(' → ')})`
+                    : ' · 1 osso (rigido)';
+                return `${vox} voxels · ${part.direction ?? 'centro'}${bones}`;
+              })(),
             }),
             el('label', { style: 'display:flex;gap:6px;align-items:center' }, [
               asBody,
@@ -1450,7 +1463,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         el('h2', { text: 'Partes do modelo' }),
         el('p', {
           class: 'sub',
-          text: 'Cada cor e uma parte que a IA pode mover sozinha. Se ela dividiu errado, corrija aqui: renomeie, ou marque como corpo o que nao deve se mexer.',
+          text: 'Cada cor e um membro do esqueleto. Membro comprido ganha junta interna (coxa → canela → pe): girar a raiz balanca o membro todo, girar a canela dobra o joelho. Se a divisao saiu errada, corrija aqui.',
         }),
         img,
         parts.length === 0
