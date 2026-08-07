@@ -52,6 +52,14 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   cor mais próxima da paleta). Os modelos voxel originais do jogo vivem em
   código (`tools/entities.mjs`) e não são recuperáveis do PNG — por isso o
   modo voxel é para personagens novos.
+- **Remodelar do jogo (voxel)**: cria um projeto voxel **vazio já com o contrato
+  exato** de uma entidade que existe — tamanho de frame, âncora, hitbox,
+  footprint e a lista de animações com frames/fps/loop, lidos do manifest real.
+  Existe porque "Abrir do jogo" devolve um projeto **pixel** (os modelos voxel
+  originais vivem em código e não voltam do PNG), então quem queria *remodelar*
+  precisava reproduzir mais de vinte campos à mão na tela de configurações —
+  qualquer um deles trocado invalida o export. A versão sobe em um, e o que sai
+  cai como substituição direta do par `PNG + JSON`.
 - **Export**: monta o atlas com a MESMA matemática do gerador
   (`tools/generate.mjs`): ordem `ANIM_ORDER`, `columns` limitado ao teto de
   4096 px de textura, `frameMap`, `paletteColors` ordenadas e `generation`

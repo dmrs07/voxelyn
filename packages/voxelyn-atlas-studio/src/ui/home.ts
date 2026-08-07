@@ -8,6 +8,7 @@ import { orderedAnims } from '../presets';
 import { GAME_CATALOG } from '../catalog';
 import { fitFrames, parseStl, voxelizeStl, voxelizeTriangles } from '../stl';
 import { orientTriangles, parseGlb, type GlbOrientation } from '../glb';
+import { GAME_CONTRACTS, createProjectFromContract } from '../contracts';
 import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
 import { modelKey } from '../types';
 import { confirmSheet, el, openSheet, toast } from './components';
@@ -345,6 +346,45 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
     return container;
   });
 
+/**
+ * "Remodelar do jogo": projeto VOXEL vazio com o contrato exato de uma entidade
+ * que ja existe. O catalogo ao lado abre o atlas em modo PIXEL (os modelos
+ * voxel originais vivem em codigo e nao voltam do PNG); aqui o autor recebe a
+ * moldura certa e monta o volume novo, e o export cai como substituicao direta.
+ */
+const remodelSheet = (onImport: (p: Project) => void): Promise<void> =>
+  openSheet((close) => {
+    const list = el('div', { style: 'display:flex;flex-direction:column;gap:6px' });
+    for (const contract of GAME_CONTRACTS) {
+      const m = contract.manifest;
+      const anims = Object.entries(m.animations)
+        .map(([a, d]) => `${a} ${d.frames}f`)
+        .join(' · ');
+      const btn = el('button', { style: 'text-align:left' }, [
+        el('div', { text: `${contract.label} — ${m.id}` }),
+        el('div', {
+          class: 'sub',
+          style: 'margin:2px 0 0',
+          text: `frame ${m.frameWidth}×${m.frameHeight} · ancora ${m.anchorX},${m.anchorY} · v${m.version} → v${m.version + 1}`,
+        }),
+        el('div', { class: 'sub', style: 'margin:0', text: anims }),
+      ]);
+      btn.addEventListener('click', () => {
+        close();
+        onImport(createProjectFromContract(contract));
+      });
+      list.append(btn);
+    }
+    return el('div', {}, [
+      el('h2', { text: 'Remodelar do jogo (voxel)' }),
+      el('p', {
+        class: 'sub',
+        text: 'Cria um projeto VOXEL VAZIO ja com o contrato da entidade: tamanho de frame, ancora, hitbox, footprint e a lista de animacoes com frames/fps/loop. Voce so monta o volume — o export cai como substituicao direta do par PNG+JSON.',
+      }),
+      list,
+    ]);
+  });
+
 const catalogSheet = (onImport: (p: Project) => void): Promise<void> =>
   openSheet((close) => {
     const list = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });
@@ -450,6 +490,12 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       void saveProject(p).then(() => openEditor(p));
     });
   });
+  const remodelBtn = el('button', { text: '🧊 Remodelar do jogo (voxel)' });
+  remodelBtn.addEventListener('click', () => {
+    void remodelSheet((p) => {
+      void saveProject(p).then(() => openEditor(p));
+    });
+  });
   const glbBtn = el('button', { text: '🦴 Importar GLB (com animacao)' });
   glbBtn.addEventListener('click', () => {
     void importGlbSheet((p) => {
@@ -470,6 +516,7 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       text: 'Monte personagens voxel a voxel (ou pixel a pixel), importe e exporte atlases no formato do Voxelyn Survival — com a paleta veio-fungico e o contrato da Art Bible.',
     }),
     el('div', { class: 'actions' }, [newBtn, catalogBtn]),
+    el('div', { class: 'actions' }, [remodelBtn]),
     el('div', { class: 'actions' }, [glbBtn, stlBtn, importBtn]),
   );
 
