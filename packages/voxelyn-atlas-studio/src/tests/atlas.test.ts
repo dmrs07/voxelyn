@@ -50,6 +50,10 @@ describe('packProject', () => {
     expect(atlas.h).toBe(Math.ceil(totalFrames / columns) * project.frameHeight);
   });
 
+  // O mais pesado da suite: assa o atlas inteiro e fatia de volta, frame a
+  // frame, nas quatro direcoes. Sozinho leva ~4s e passava raspando nos 5s
+  // padrao; com o monorepo inteiro rodando em paralelo, estourava. O teste nao
+  // ficou mais lento — o limite e que era apertado demais para o que ele faz.
   it('roundtrip pack → slice devolve os frames byte a byte', () => {
     const project = makeProject();
     const { atlas, manifest } = packProject(project);
@@ -62,7 +66,7 @@ describe('packProject', () => {
         }
       }
     }
-  });
+  }, 30000);
 
   it('o resolveFrame REAL do jogo localiza cada frame exportado', () => {
     const project = makeProject();

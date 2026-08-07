@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { box, collapse, renderVoxels } from './voxel.mjs';
 import {
   ANCHOR_X as PROSPECTOR_ANCHOR_X,
@@ -1938,77 +1939,55 @@ const furnaceHeartModel = (anim, f) => {
 // ---------------------------------------------------------------------------
 // enemy-frost-queen — a Rainha da Geada, na Cripta Glacial.
 //
-// A unica figura HUMANOIDE entre os chefes de estrato, e isso e a escolha: os
-// outros sao orgaos, maquinas e bichos, e ela e a coisa que tem POSTURA.
+// A UNICA entidade cujo volume nao e escrito em box() aqui. Ela vem de uma
+// escultura feita fora, riggada e animada no Meshy, importada e voxelizada no
+// Atlas Studio, e os frames chegam como DADOS em frost-queen-voxels.json.
 //
-// A primeira versao nao tinha postura nenhuma: a saia era uma sequencia de
-// degraus centrados que encolhiam para cima, e o resultado foi um ZIGURATE —
-// um bolo de casamento de gelo. A licao e a mesma que o Coveiro deu com a
-// pilha de lajes: silhueta se faz por PROPORCAO, nao por detalhe. Uma figura de
-// pe precisa de tres larguras distintas na vertical (saia larga, cintura
-// estreita, ombros medios) e de algo saindo para os LADOS na altura dos bracos.
-// Um cone de degraus so tem uma largura, que diminui — e isso e um monte.
+// A razao e a licao das duas tentativas anteriores de escrever a silhueta dela
+// em caixas: saiu primeiro um zigurate e depois um pagode. Proporcao de figura
+// nao vem de heuristica, vem de olho — e quem tem o olho e o autor. O gerador
+// continua sendo a fonte do atlas; o que mudou e de onde vem o volume.
 //
-// A couraça dela e o estrato: placas de gelo crescidas sobre um corpo escuro que
-// so aparece pelas frestas. Derreter o lago em volta e o contra-jogo, e o modelo
-// diz por que — tire o gelo e o que sobra e a coisa magra debaixo dele.
+// A ponte e a mesma do teste de paridade do Studio: voxel fino <-> caixa por
+// fine(v) = round(v * MODEL_SCALE). Uma corrida de N voxels em x vira UMA caixa
+// de N/2 de largura, o que corta mil caixas por frame para trezentas.
+//
+// idle, walk, attack e special vem dos clipes do Meshy. hit e die NAO: nenhum
+// clipe servia (a queda de costas deitaria a Rainha e exigiria uma moldura duas
+// vezes mais larga) e o pipeline ja tem a resposta certa — recuo curto para o
+// dano, desmoronamento para a morte. Um monumento de gelo desaba; nao cai de
+// costas.
 // ---------------------------------------------------------------------------
+const FROST_QUEEN_FRAMES = JSON.parse(
+  readFileSync(new URL('./frost-queen-voxels.json', import.meta.url), 'utf8')
+);
+
+/** Frame autorado, expandido de corridas em x para caixas. */
+const frostQueenBoxes = (anim, f) => {
+  const frame = FROST_QUEEN_FRAMES[`${anim}/${f}`];
+  if (!frame) return null;
+  const out = [];
+  for (const [mat, runs] of Object.entries(frame)) {
+    // [y, z, x0, comprimento] por corrida
+    for (let i = 0; i < runs.length; i += 4) {
+      out.push(box(runs[i + 2] / 2, runs[i] / 2, runs[i + 1] / 2, runs[i + 3] / 2, 0.5, 0.5, mat));
+    }
+  }
+  return out;
+};
+
 const frostQueenModel = (anim, f) => {
-  const glide = anim === 'walk' ? [0, 0.5, 1, 1, 0.5, 0][f % 6] : 0;
-  // `special` e a carga do congelamento: os bracos sobem e as lascas crescem.
-  const raise = anim === 'special' ? Math.min(3, f) : anim === 'attack' ? [1, 3, 2, 0][f % 4] : 0;
-  const drift = anim === 'idle' ? [0, 0.5, 0.5, 0][f % 4] : 0;
-  const flinch = anim === 'hit' ? [1, 0][f % 2] : 0;
-  const b = [];
-  const z = drift + glide * 0.3;
+  const autorado = frostQueenBoxes(anim, f);
+  if (autorado) return autorado;
 
-  // SAIA: um tronco ESTREITO do chao a cintura, com o alargamento so na barra.
-  // Duas larguras, nao seis — a saia tem de ler como uma peça, e a barra e o
-  // que arrasta. As lascas soltas na borda sao a nevoa; sao elas, e nao mais
-  // degraus, que quebram a base.
-  b.push(box(-1.8, -1.6, z + 4, 3.6, 3.2, 5, 'ice'));
-  b.push(box(-2.6, -2.2, z + 1.6, 5.2, 4.4, 2.4, 'ice'));
-  b.push(box(-3.4, -2.8, z, 6.8, 5.6, 1.6, 'ice'));
-  for (let i = 0; i < 7; i++) {
-    const a = (i * 2 * Math.PI) / 7 + glide * 0.3;
-    b.push(box(Math.cos(a) * 3.6 - 0.45, Math.sin(a) * 3 - 0.45, z + (i % 2) * 0.8, 0.9, 0.9, 1.4 + (i % 3) * 0.6, 'ice'));
+  const base = frostQueenBoxes('idle', 0);
+  // Recuo de dano: o corpo inteiro para tras (+y) e volta. Curto de proposito —
+  // ela e um monumento, nao um bicho que cambaleia.
+  if (anim === 'hit') {
+    const recuo = [1, 0][f % 2];
+    return recuo === 0 ? base : base.map((b) => ({ ...b, y: b.y + recuo }));
   }
-
-  // CINTURA e TRONCO: a parte mais estreita do corpo inteiro, e e ela que faz a
-  // figura ler como figura. O corpo por baixo e ESCURO, e a fresta entre as duas
-  // placas de gelo deixa ver isso — a promessa do contra-jogo.
-  b.push(box(-1.2, -1, z + 9, 2.4, 2, 5.6, 'rockDeep'));
-  b.push(box(-2.2, -1.5, z + 9.4, 1.5, 3, 5, 'ice'));
-  b.push(box(0.7, -1.5, z + 9.4, 1.5, 3, 5, 'ice'));
-
-  // OMBROS: uma barra atravessada, mais larga que a cintura e mais estreita que
-  // a barra da saia. E o terceiro degrau de largura, e sem ele nao ha figura.
-  b.push(box(-3.2, -1.2, z + 14 - flinch * 0.5, 6.4, 2.4, 1.6, 'ice'));
-
-  // BRACOS de sincelo: finos, sem mao — terminam em ponta, e saem para os LADOS
-  // antes de descer. Sobem na carga, e e nesse gesto que o telegrafo do
-  // congelamento acontece.
-  for (const s of [-1, 1]) {
-    const ax = s * 3.4 - 0.5;
-    b.push(box(ax, -0.7, z + 13 - flinch * 0.5, 1.1, 1.6, 1.6, 'ice'));
-    b.push(box(ax, -0.7, z + 9.5 + raise * 1.4, 1.1, 1.4, 3.5 + raise * 0.4, 'ice'));
-  }
-
-  // PESCOCO e CABECA: pequenos. A cabeca pequena sobre ombros largos e o que
-  // da ESCALA a figura — do tamanho da cintura, ela viraria um boneco.
-  b.push(box(-0.8, -0.8, z + 15.6 - flinch * 0.5, 1.6, 1.6, 1.2, 'rockDeep'));
-  b.push(box(-1.4, -1.4, z + 16.8 - flinch * 0.5, 2.8, 2.8, 2.4, 'ice'));
-  // O rosto: dois pontos de corrente na fresta escura. Nada mais — e o unico
-  // brilho do modelo e ele fica na altura dos olhos de proposito.
-  b.push(box(-1.1, -1.7, z + 17.6 - flinch * 0.5, 0.7, 0.6, 0.7, 'electric'));
-  b.push(box(0.4, -1.7, z + 17.6 - flinch * 0.5, 0.7, 0.6, 0.7, 'electric'));
-
-  // COROA: cinco lascas desiguais, a do meio mais alta. Crescem com a carga —
-  // a silhueta anuncia antes de a cor mudar, como no Coracao.
-  [1.4, 2.4, 4, 2.4, 1.4].forEach((hgt, i) => {
-    b.push(box(-1.5 + i * 0.8, -0.4, z + 19.2 - flinch * 0.5, 0.7, 0.9, hgt + raise * 0.5, 'ice'));
-  });
-  return anim === 'die' ? collapse(b, dieT(f)) : b;
+  return collapse(base, dieT(f));
 };
 
 // ---------------------------------------------------------------------------
@@ -2105,7 +2084,7 @@ const lungMatrixFrame = (dir, anim, f) =>
 const furnaceHeartFrame = (dir, anim, f) =>
   renderVoxels(furnaceHeartModel(anim, f), DIR_INDEX[dir], 116, 108, 56, 84);
 const frostQueenFrame = (dir, anim, f) =>
-  renderVoxels(frostQueenModel(anim, f), DIR_INDEX[dir], 60, 118, 28, 101);
+  renderVoxels(frostQueenModel(anim, f), DIR_INDEX[dir], 88, 118, 42, 100);
 const magnetarchFrame = (dir, anim, f) =>
   renderVoxels(magnetarchModel(anim, f), DIR_INDEX[dir], 128, 98, 62, 83);
 
@@ -2411,10 +2390,10 @@ export const ENTITY_SPECS = [
     hit: { frames: 2, fps: 12, loop: false },
     die: { frames: 5, fps: 10, loop: false },
   }, furnaceHeartFrame, 'voxel-isometric anchored igneous core boss, four dark slag plates opening and closing around a permanent molten core, charred plate edges, scoria mound base, spines rising when overheated — no legs', 1),
-  base('enemy-frost-queen', 60, 118, 28, 101, { w: 1.2, h: 2.2 }, { w: 1.4, h: 1.4, offsetX: 0, offsetY: 0 }, {
+  base('enemy-frost-queen', 88, 118, 42, 100, { w: 1.2, h: 2.2 }, { w: 1.4, h: 1.4, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },
-  }, frostQueenFrame, 'voxel-isometric glacial crypt queen boss, humanoid posture, dragging skirt of ice and mist instead of legs, dark narrow body showing through gaps between ice plates, icicle arms without hands, five-shard crown, two electric eyes', 1),
+  }, frostQueenFrame, 'voxel-isometric glacial crypt queen boss sculpted externally and voxelized in the Atlas Studio: hooded figure of layered ice over a dark core, skirt dragging to the ground, electric shards on crown, shoulders, hands and hem, pale glass highlights on the hood — idle/walk/attack/special baked from rigged clips, hit and die generated by the pipeline', 2),
   base('enemy-magnetarch', 128, 98, 62, 83, { w: 1.4, h: 1.8 }, { w: 1.6, h: 1.6, offsetX: 0, offsetY: 0 }, {
     ...living,
     special: { frames: 4, fps: 9, loop: false },

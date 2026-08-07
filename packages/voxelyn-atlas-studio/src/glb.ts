@@ -57,6 +57,22 @@ export type GlbOrientation = {
 
 export const DEFAULT_ORIENTATION: GlbOrientation = { up: 'y', yaw: 0 };
 
+/**
+ * Instantes em que amostrar um clipe para virar `frames` quadros.
+ *
+ * Ciclo e clipe unico se amostram DIFERENTE. Num ciclo (idle, walk) o ultimo
+ * quadro nao pode repetir o primeiro — ele conduz de volta a ele —, entao os
+ * instantes vao de 0 ate quase o fim. Num clipe unico (die, attack, hit) o
+ * ultimo quadro E o fim: uma morte amostrada como ciclo pararia a 4/5 do
+ * caminho e o bicho nunca chegaria ao chao.
+ */
+export const clipTimes = (duration: number, frames: number, loop: boolean): number[] => {
+  if (frames <= 0) return [];
+  if (!(duration > 0) || frames === 1) return new Array(frames).fill(0);
+  const passo = loop ? frames : frames - 1;
+  return Array.from({ length: frames }, (_, f) => (f / passo) * duration);
+};
+
 // o glTF e um JSON de forma variavel (extensoes, campos opcionais); tipar cada
 // no aqui seria copiar o schema inteiro sem ganhar seguranca de verdade — a
 // validacao que importa e a de runtime, logo abaixo
@@ -630,4 +646,53 @@ export const orientTriangles = (tris: Float32Array, o: GlbOrientation): Float32A
     out[i + 2] = z;
   }
   return out;
+};
+
+/**
+ * Tira o DESLOCAMENTO DE RAIZ dos frames: cada um e recentrado em x/y sobre o
+ * primeiro.
+ *
+ * Um clipe de caminhada anda para frente de verdade — e o certo em 3D, onde o
+ * personagem atravessa o cenario. Num sprite nao: o jogo desenha a criatura na
+ * posicao dela no mundo, entao o deslocamento dentro do quadro vira a figura
+ * DESLIZANDO de lado dentro da propria moldura. O validador do pacote de
+ * conteudo reprova isso como "jitter horizontal", e com razao.
+ *
+ * So x e y sao corrigidos. O eixo vertical fica intacto de proposito: bob de
+ * passo, salto e queda sao movimento que a animacao QUER, e apaga-los deixaria
+ * tudo chapado. Por isso e "deslocamento de raiz" e nao "recentrar".
+ *
+ * A referencia e o primeiro frame de todos, e nao o de cada clipe: assim as
+ * animacoes continuam alinhadas entre si, e o bicho nao pula de lugar quando o
+ * jogo troca de idle para walk.
+ */
+export const removeRootMotion = (frames: Float32Array[]): Float32Array[] => {
+  if (frames.length === 0) return [];
+  const centro = (tris: Float32Array): [number, number] => {
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+    for (let i = 0; i < tris.length; i += 3) {
+      minX = Math.min(minX, tris[i]);
+      maxX = Math.max(maxX, tris[i]);
+      minY = Math.min(minY, tris[i + 1]);
+      maxY = Math.max(maxY, tris[i + 1]);
+    }
+    return tris.length === 0 ? [0, 0] : [(minX + maxX) / 2, (minY + maxY) / 2];
+  };
+  const [refX, refY] = centro(frames[0]);
+  return frames.map((tris) => {
+    const [cx, cy] = centro(tris);
+    const dx = refX - cx;
+    const dy = refY - cy;
+    if (dx === 0 && dy === 0) return tris;
+    const out = new Float32Array(tris.length);
+    for (let i = 0; i < tris.length; i += 3) {
+      out[i] = tris[i] + dx;
+      out[i + 1] = tris[i + 1] + dy;
+      out[i + 2] = tris[i + 2];
+    }
+    return out;
+  });
 };

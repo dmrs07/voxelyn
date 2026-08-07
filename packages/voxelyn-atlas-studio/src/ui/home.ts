@@ -7,9 +7,20 @@ import { projectFromManifest, sliceAtlas, projectFrame } from '../atlas';
 import { orderedAnims } from '../presets';
 import { GAME_CATALOG } from '../catalog';
 import { fitFrames, parseStl, voxelizeStl, voxelizeTriangles } from '../stl';
-import { orientTriangles, parseGlb, type GlbOrientation } from '../glb';
+import {
+  clipTimes,
+  orientTriangles,
+  parseGlb,
+  removeRootMotion,
+  type GlbOrientation,
+} from '../glb';
 import { GAME_CONTRACTS, createProjectFromContract } from '../contracts';
-import { quantizeToMaterials, sampleTriangleColors } from '../texture';
+import {
+  READABLE_MATERIALS,
+  materialSwatch,
+  quantizeToMaterials,
+  sampleTriangleColors,
+} from '../texture';
 import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
 import { modelKey } from '../types';
 import { confirmSheet, el, openSheet, toast } from './components';
@@ -187,6 +198,42 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
     for (const n of [2, 3, 4, 5, 6])
       maxMatSelect.append(el('option', { value: String(n), text: `${n} materiais` }));
     maxMatSelect.value = '4';
+
+    // PALETA DO AUTOR. Deixar a aproximacao escolher sozinha responde "que cor
+    // e essa" e nao "que cor eu quero": uma textura cinza vira quatro cinzas
+    // fieis, e o bicho some no fundo escuro do jogo. Marcando os materiais, a
+    // textura passa a decidir so QUAL DELES cada pedaco e.
+    const paleta = new Set<string>();
+    const paletaRow = el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' });
+    const paletaInfo = el('div', {
+      class: 'sub',
+      style: 'margin:2px 0 0',
+      text: 'Nenhum marcado: a aproximacao escolhe sozinha.',
+    });
+    const atualizaPaleta = (): void => {
+      paletaInfo.textContent =
+        paleta.size === 0
+          ? 'Nenhum marcado: a aproximacao escolhe sozinha.'
+          : `${paleta.size} material(is): ${[...paleta].join(', ')}`;
+      maxMatSelect.disabled = paleta.size > 0;
+    };
+    for (const mat of READABLE_MATERIALS) {
+      const topo = materialSwatch(mat);
+      const btn = el('button', {
+        class: 'swatch',
+        title: mat,
+        style: `background:rgb(${topo[0]},${topo[1]},${topo[2]})`,
+      });
+      btn.addEventListener('click', () => {
+        if (paleta.has(mat)) paleta.delete(mat);
+        else paleta.add(mat);
+        btn.classList.toggle('active', paleta.has(mat));
+        atualizaPaleta();
+      });
+      paletaRow.append(btn);
+    }
+    const rootCheck = el('input', { type: 'checkbox' });
+    rootCheck.checked = true;
     const upSelect = el('select');
     upSelect.append(
       el('option', { value: 'y', text: 'Y para cima (padrao glTF/Meshy)' }),
@@ -303,19 +350,24 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
           for (const [anim, def] of Object.entries(animacoes)) {
             const clip = Number(clipFor.get(anim)?.value ?? -1);
             const duration = clip >= 0 ? glb.animations[clip].duration : 0;
+            const tempos = clipTimes(duration, def.frames, def.loop);
             for (let f = 0; f < def.frames; f++) {
-              // ciclo fechado: o ultimo frame nao repete o primeiro
-              const t = duration > 0 ? (f / def.frames) * duration : 0;
               jobs.push({
                 anim,
                 frame: f,
-                tris: orientTriangles(glb.sample(clip >= 0 ? clip : null, t), o),
+                tris: orientTriangles(glb.sample(clip >= 0 ? clip : null, tempos[f]), o),
               });
             }
             doImport.textContent = `Amostrando ${anim}…`;
             await new Promise((r) => setTimeout(r, 0));
           }
-          // 2) ...para um enquadramento so, e so entao voxeliza
+          // 2) tira o deslocamento de raiz: clipe de caminhada anda para
+          // frente, e num sprite isso vira a figura deslizando na moldura
+          if (rootCheck.checked) {
+            const semDeslocamento = removeRootMotion(jobs.map((j) => j.tris));
+            jobs.forEach((j, i) => (j.tris = semDeslocamento[i]));
+          }
+          // 3) ...para um enquadramento so, e so entao voxeliza
           const fit = fitFrames(
             jobs.map((j) => j.tris),
             height,
@@ -328,7 +380,10 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
             doImport.textContent = 'Lendo as texturas…';
             await new Promise((r) => setTimeout(r, 0));
             const cores = await sampleTriangleColors(glb);
-            const q = quantizeToMaterials(cores, Number(maxMatSelect.value));
+            const q = quantizeToMaterials(cores, Number(maxMatSelect.value), {
+              palette: paleta.size > 0 ? [...paleta] : undefined,
+            });
+            console.info('materiais escolhidos:', q.used.join(', '));
             materialDoTriangulo = (t: number) => q.materials[t] ?? materialSelect.value;
             usados = q.used;
           }
@@ -390,6 +445,15 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
           el('span', { text: 'Usar as cores do modelo' }),
         ]),
         el('div', {}, [el('label', { text: 'Teto de materiais' }), maxMatSelect]),
+      ]),
+      el('label', { style: 'display:flex;gap:8px;align-items:center' }, [
+        rootCheck,
+        el('span', { text: 'Andar no lugar (tirar o deslocamento do clipe)' }),
+      ]),
+      el('div', {}, [
+        el('label', { text: 'Paleta (marque para escolher voce; vazio = automatico)' }),
+        paletaRow,
+        paletaInfo,
       ]),
       el('div', {}, [el('label', { text: 'Animacao do GLB para cada animacao do jogo' }), mapBox]),
       el('div', {}, [el('label', { text: 'id do sprite' }), idInput]),
