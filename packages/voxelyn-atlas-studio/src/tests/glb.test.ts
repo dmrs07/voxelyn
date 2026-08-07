@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ORIENTATION, orientTriangles, parseGlb } from '../glb';
 import { fitFrames, fitTriangles, voxelizeTriangles } from '../stl';
+import { quantizeToMaterials } from '../texture';
 import { voxelModelBounds } from '../voxel';
 
 const pad4 = (n: number): number => (4 - (n % 4)) % 4;
@@ -42,6 +43,35 @@ const concat = (...parts: ArrayBuffer[]): ArrayBuffer => {
     o += p.byteLength;
   }
   return out.buffer;
+};
+
+/** Cubo unitario como 12 triangulos soltos (36 vertices, 108 floats). */
+const cubeTris = (): Float32Array => {
+  const v = [
+    [0, 0, 0],
+    [1, 0, 0],
+    [1, 1, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 1, 1],
+  ];
+  const faces = [
+    [0, 2, 1],
+    [0, 3, 2],
+    [4, 5, 6],
+    [4, 6, 7],
+    [0, 1, 5],
+    [0, 5, 4],
+    [1, 2, 6],
+    [1, 6, 5],
+    [2, 3, 7],
+    [2, 7, 6],
+    [3, 0, 4],
+    [3, 4, 7],
+  ];
+  return Float32Array.from(faces.flatMap((f) => f.flatMap((i) => v[i])));
 };
 
 /** Um triangulo solto, sem skin e sem animacao. */
@@ -365,5 +395,105 @@ describe('GLB -> voxels', () => {
     });
     // enquadrado sozinho, todo frame cai no chao: a subida some
     expect(voxelModelBounds(models[0])!.minZ).toBe(voxelModelBounds(models[1])!.minZ);
+  });
+});
+
+describe('materiais e UV para colorir', () => {
+  /** Malha com DOIS materiais: um vermelho e um azul, sem textura. */
+  const doisMateriaisGlb = (): ArrayBuffer => {
+    const positions = f32([0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 0, 3, 0, 0, 2, 1, 0]);
+    const uv = f32([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    const bin = concat(positions, uv);
+    return buildGlb(
+      {
+        asset: { version: '2.0' },
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0 }],
+        meshes: [
+          {
+            primitives: [
+              { attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 0 },
+              { attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 1 },
+            ],
+          },
+        ],
+        materials: [
+          { name: 'vermelho', pbrMetallicRoughness: { baseColorFactor: [1, 0, 0, 1] } },
+          { name: 'azul', pbrMetallicRoughness: { baseColorFactor: [0, 0, 1, 1] } },
+        ],
+        accessors: [
+          { bufferView: 0, componentType: 5126, count: 6, type: 'VEC3' },
+          { bufferView: 1, componentType: 5126, count: 6, type: 'VEC2' },
+        ],
+        bufferViews: [
+          { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+          { buffer: 0, byteOffset: positions.byteLength, byteLength: uv.byteLength },
+        ],
+        buffers: [{ byteLength: bin.byteLength }],
+      },
+      bin,
+    );
+  };
+
+  it('le a cor base de cada material, em 0..255', () => {
+    const scene = parseGlb(doisMateriaisGlb());
+    expect(scene.materials.map((m) => m.name)).toEqual(['vermelho', 'azul']);
+    expect(scene.materials[0].baseColor).toEqual([255, 0, 0]);
+    expect(scene.materials[1].baseColor).toEqual([0, 0, 255]);
+    expect(scene.materials[0].image).toBeUndefined();
+  });
+
+  it('cada triangulo sabe de que material e, na ordem de `sample`', () => {
+    const scene = parseGlb(doisMateriaisGlb());
+    // duas primitivas de 6 vertices sem indice = 2 triangulos cada
+    expect(scene.triangleCount).toBe(4);
+    expect(Array.from(scene.triangleMaterial)).toEqual([0, 0, 1, 1]);
+  });
+
+  it('a UV guardada e a do CENTRO do triangulo', () => {
+    const scene = parseGlb(doisMateriaisGlb());
+    // os tres vertices tem uv (0,0), (1,0), (0,1) -> centro (1/3, 1/3)
+    expect(scene.triangleUv![0]).toBeCloseTo(1 / 3, 5);
+    expect(scene.triangleUv![1]).toBeCloseTo(1 / 3, 5);
+  });
+
+  it('malha sem UV nem material nao inventa nada', () => {
+    const scene = parseGlb(simpleGlb());
+    expect(scene.materials).toEqual([]);
+    expect(scene.triangleUv).toBeNull();
+    expect(Array.from(scene.triangleMaterial)).toEqual([-1]);
+  });
+
+  it('vermelho e azul puros nao caem no mesmo material do jogo', () => {
+    const scene = parseGlb(doisMateriaisGlb());
+    const q = quantizeToMaterials(
+      scene.materials.map((m) => m.baseColor),
+      4,
+    );
+    expect(q.materials[0]).not.toBe(q.materials[1]);
+  });
+
+  it('o voxel herda o material da SUPERFICIE mais proxima', () => {
+    // cubo com a face de x baixo num material e a de x alto no outro; o voxel
+    // fica com o da parede que estiver mais perto dele
+    const tris = orientTriangles(cubeTris(), { up: 'z', yaw: 0 });
+    const centroX = (t: number): number => (tris[t * 9] + tris[t * 9 + 3] + tris[t * 9 + 6]) / 3;
+    const model = voxelizeTriangles(
+      tris,
+      (t) => (centroX(t) < 0.5 ? 'blood' : 'electric'),
+      fitTriangles(tris, 8),
+    );
+    const usados = new Set(Object.values(model));
+    expect(usados).toEqual(new Set(['blood', 'electric']));
+
+    // e cada metade ficou com o seu: o lado de x baixo e sangue, o de cima e
+    // eletrico (a origem do editor fica no centro do modelo)
+    const porLado = { baixo: new Set<string>(), alto: new Set<string>() };
+    for (const [key, mat] of Object.entries(model)) {
+      const x = Number(key.split(',')[0]);
+      (x < 0 ? porLado.baixo : porLado.alto).add(mat);
+    }
+    expect(porLado.baixo).toEqual(new Set(['blood']));
+    expect(porLado.alto).toEqual(new Set(['electric']));
   });
 });

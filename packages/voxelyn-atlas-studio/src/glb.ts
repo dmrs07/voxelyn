@@ -14,10 +14,32 @@
 
 export type GlbClip = { name: string; duration: number };
 
+/**
+ * Material do arquivo, reduzido ao que interessa para colorir voxel: a cor base
+ * e, quando existe, a imagem de cor base ainda codificada (PNG/JPEG). Decodificar
+ * imagem exige o browser, entao acontece em src/texture.ts, nao aqui — este
+ * modulo continua puro e testavel em Node.
+ */
+export type GlbMaterial = {
+  name: string;
+  /** baseColorFactor em 0..255; branco quando o material nao declara */
+  baseColor: [number, number, number];
+  image?: { bytes: Uint8Array; mimeType: string };
+};
+
 export type GlbScene = {
   animations: GlbClip[];
   triangleCount: number;
   vertexCount: number;
+  materials: GlbMaterial[];
+  /** indice do material de cada triangulo (-1 = primitiva sem material) */
+  triangleMaterial: Int16Array;
+  /**
+   * UV do CENTRO de cada triangulo (2 floats por triangulo), ou null se a malha
+   * nao tem coordenada de textura. O centro basta: um triangulo que vira um
+   * punhado de voxels nao comporta variacao de cor dentro dele.
+   */
+  triangleUv: Float32Array | null;
   /**
    * Triangulos (9 floats por triangulo) da malha no instante `t` do clipe. Com
    * `clip = null` devolve a pose de repouso.
@@ -402,6 +424,8 @@ export const parseGlb = (buffer: ArrayBuffer): GlbScene => {
     joints?: Float32Array;
     weights?: Float32Array;
     skin?: number;
+    material: number;
+    uv?: Float32Array;
   };
   const prims: Prim[] = [];
   nodes.forEach((node, ni) => {
@@ -419,6 +443,11 @@ export const parseGlb = (buffer: ArrayBuffer): GlbScene => {
         node: ni,
         positions,
         indices,
+        material: prim.material ?? -1,
+        uv:
+          prim.attributes.TEXCOORD_0 !== undefined
+            ? readAccessor(prim.attributes.TEXCOORD_0)
+            : undefined,
         joints:
           prim.attributes.JOINTS_0 !== undefined
             ? readAccessor(prim.attributes.JOINTS_0)
@@ -443,6 +472,57 @@ export const parseGlb = (buffer: ArrayBuffer): GlbScene => {
 
   const triangleCount = prims.reduce((n, p) => n + p.indices.length / 3, 0);
   const vertexCount = prims.reduce((n, p) => n + p.positions.length / 3, 0);
+
+  // ---- materiais: cor base e, se houver, a imagem de cor base crua ----
+  const imageBytes = (index: number): { bytes: Uint8Array; mimeType: string } | undefined => {
+    const img = json!.images?.[index];
+    if (!img || img.bufferView === undefined) return undefined;
+    const { data } = viewOf(img.bufferView);
+    return { bytes: data, mimeType: img.mimeType ?? 'image/png' };
+  };
+  const materials: GlbMaterial[] = (json.materials ?? []).map((m: Json, i: number) => {
+    const pbr = m.pbrMetallicRoughness ?? {};
+    const f = pbr.baseColorFactor ?? [1, 1, 1, 1];
+    const texIndex = pbr.baseColorTexture?.index;
+    const source = texIndex !== undefined ? json!.textures?.[texIndex]?.source : undefined;
+    return {
+      name: m.name ?? `material-${i + 1}`,
+      baseColor: [Math.round(f[0] * 255), Math.round(f[1] * 255), Math.round(f[2] * 255)] as [
+        number,
+        number,
+        number,
+      ],
+      image: source !== undefined ? imageBytes(source) : undefined,
+    };
+  });
+
+  // ---- material e UV central de cada triangulo, na MESMA ordem de `sample` ----
+  const triangleMaterial = new Int16Array(triangleCount);
+  const anyUv = prims.some((p) => p.uv);
+  const triangleUv = anyUv ? new Float32Array(triangleCount * 2) : null;
+  {
+    let t = 0;
+    for (const prim of prims) {
+      for (let i = 0; i < prim.indices.length; i += 3, t++) {
+        triangleMaterial[t] = prim.material;
+        if (!triangleUv) continue;
+        if (!prim.uv) {
+          triangleUv[t * 2] = 0;
+          triangleUv[t * 2 + 1] = 0;
+          continue;
+        }
+        let u = 0;
+        let v = 0;
+        for (let k = 0; k < 3; k++) {
+          const idx = prim.indices[i + k];
+          u += prim.uv[idx * 2];
+          v += prim.uv[idx * 2 + 1];
+        }
+        triangleUv[t * 2] = u / 3;
+        triangleUv[t * 2 + 1] = v / 3;
+      }
+    }
+  }
 
   const sample = (clip: number | null, t: number): Float32Array => {
     const world = worldMatrices(clip, t);
@@ -519,6 +599,9 @@ export const parseGlb = (buffer: ArrayBuffer): GlbScene => {
     animations: clips.map((c) => ({ name: c.name, duration: c.duration })),
     triangleCount,
     vertexCount,
+    materials,
+    triangleMaterial,
+    triangleUv,
     sample,
   };
 };
