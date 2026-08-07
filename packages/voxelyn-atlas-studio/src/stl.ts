@@ -130,12 +130,20 @@ export const fitFrames = (frames: StlTriangles[], height: number): VoxelFit => {
 export const voxelizeStl = (tris: StlTriangles, opts: VoxelizeOptions): VoxelModel =>
   voxelizeTriangles(tris, opts.material, fitTriangles(tris, opts.height), opts.range);
 
+/**
+ * Material de cada voxel. Uma string pinta tudo igual (fluxo do STL, que nao tem
+ * cor); uma funcao recebe o INDICE DO TRIANGULO que gerou aquela superficie — e
+ * assim que a cor da textura de um GLB chega ao voxel.
+ */
+export type MaterialSource = string | ((triangle: number) => string);
+
 export const voxelizeTriangles = (
   tris: StlTriangles,
-  material: string,
+  material: MaterialSource,
   fit: VoxelFit,
   rangeOpt?: number,
 ): VoxelModel => {
+  const matOf = typeof material === 'string' ? () => material : material;
   const { scale, centerX, centerY, minZ, spanX, spanY, height } = fit;
   const range = rangeOpt ?? 48;
   if (tris.length === 0) throw new Error('malha sem triangulos');
@@ -176,6 +184,10 @@ export const voxelizeTriangles = (
   const iyMin = Math.max(-range, Math.floor(-spanY / 2) - 1);
   const iyMax = Math.min(range, Math.ceil(spanY / 2) + 1);
   const xs: number[] = [];
+  const tris_: number[] = [];
+  const order: number[] = [];
+  const sortedX: number[] = [];
+  const sortedT: number[] = [];
 
   for (let iz = 0; iz < height; iz++) {
     const zc = iz + 0.5 + JITTER;
@@ -183,6 +195,7 @@ export const voxelizeTriangles = (
     for (let iy = iyMin; iy <= iyMax; iy++) {
       const yc = iy + 0.5 + JITTER;
       xs.length = 0;
+      tris_.length = 0;
       for (const ti of bucket) {
         if (yc < yMinOf[ti] || yc > yMaxOf[ti]) continue;
         const o = ti * 9;
@@ -200,27 +213,49 @@ export const voxelizeTriangles = (
         const w = 1 - u - v;
         if (u < -1e-9 || v < -1e-9 || w < -1e-9) continue;
         xs.push(w * t[o] + u * t[o + 3] + v * t[o + 6]);
+        tris_.push(ti);
       }
       if (xs.length < 2) continue;
-      xs.sort((a, b) => a - b);
+      // ordena X e o triangulo de cada travessia JUNTOS: e o triangulo que diz
+      // de que material aquela superficie e
+      order.length = 0;
+      for (let i = 0; i < xs.length; i++) order.push(i);
+      order.sort((a, b) => xs[a] - xs[b]);
+      sortedX.length = 0;
+      sortedT.length = 0;
+      for (const i of order) {
+        sortedX.push(xs[i]);
+        sortedT.push(tris_[i]);
+      }
+      xs.length = 0;
+      for (const v of sortedX) xs.push(v);
       // Dedupe: uma face plana quadrada vem triangulada em DUAS metades, e um
       // ponto dentro dela pode acertar as duas — a mesma superficie contaria
       // duas vezes e inverteria a paridade dali em diante.
       let n = 0;
       for (let i = 0; i < xs.length; i++) {
-        if (n === 0 || xs[i] - xs[n - 1] > 1e-6) xs[n++] = xs[i];
+        if (n === 0 || xs[i] - xs[n - 1] > 1e-6) {
+          sortedT[n] = sortedT[i];
+          xs[n++] = xs[i];
+        }
       }
       xs.length = n;
+      sortedT.length = n;
       const pairs = Math.floor(xs.length / 2);
       for (let p = 0; p < pairs; p++) {
         const x0 = xs[p * 2];
         const x1 = xs[p * 2 + 1];
         const from = Math.max(-range, Math.ceil(x0 - 0.5));
         const to = Math.min(range, Math.floor(x1 - 0.5));
+        // o voxel herda o material da SUPERFICIE MAIS PROXIMA das duas que
+        // fecham o vao: so a casca aparece na tela, e e ela que tem de estar
+        // com a cor certa
+        const matA = matOf(sortedT[p * 2]);
+        const matB = matOf(sortedT[p * 2 + 1]);
         for (let ix = from; ix <= to; ix++) {
           const key = voxelKey(ix, iy, iz);
           if (!(key in model)) {
-            model[key] = material;
+            model[key] = ix + 0.5 - x0 <= x1 - (ix + 0.5) ? matA : matB;
             count++;
             if (count > MAX_VOXELS) throw new Error('modelo com voxels demais — reduza a altura');
           }

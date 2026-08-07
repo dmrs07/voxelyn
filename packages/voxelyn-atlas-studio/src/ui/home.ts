@@ -9,6 +9,7 @@ import { GAME_CATALOG } from '../catalog';
 import { fitFrames, parseStl, voxelizeStl, voxelizeTriangles } from '../stl';
 import { orientTriangles, parseGlb, type GlbOrientation } from '../glb';
 import { GAME_CONTRACTS, createProjectFromContract } from '../contracts';
+import { quantizeToMaterials, sampleTriangleColors } from '../texture';
 import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
 import { modelKey } from '../types';
 import { confirmSheet, el, openSheet, toast } from './components';
@@ -159,13 +160,33 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
     const fileInput = el('input', { type: 'file', accept: '.glb,.gltf' });
     const info = el('p', { class: 'sub', text: 'Nenhum arquivo carregado.' });
     const mapBox = el('div', { style: 'display:flex;flex-direction:column;gap:6px' });
+    // O alvo pode ser um preset generico OU o contrato de uma entidade que ja
+    // existe: importar a malha nova ja dentro da moldura certa e o que faz o
+    // export cair como substituicao direta, sem passar pelas configuracoes.
     const presetSelect = el('select');
-    for (const p of PRESETS) presetSelect.append(el('option', { value: p.id, text: p.label }));
+    for (const p of PRESETS)
+      presetSelect.append(el('option', { value: `preset:${p.id}`, text: p.label }));
+    for (const c of GAME_CONTRACTS) {
+      presetSelect.append(
+        el('option', {
+          value: `contract:${c.id}`,
+          text: `${c.id} — contrato do jogo (${c.manifest.frameWidth}×${c.manifest.frameHeight})`,
+        }),
+      );
+    }
     const materialSelect = el('select');
     for (const mat of VOXEL_MATERIALS)
       materialSelect.append(el('option', { value: mat, text: mat }));
     materialSelect.value = 'rock';
     const heightInput = el('input', { type: 'number', min: '4', max: '48', value: '24' });
+    // Cores: aproximar a textura do GLB nos materiais do jogo. O teto existe
+    // porque cada material traz uma rampa inteira, e o atlas so aceita 20 cores.
+    const colorCheck = el('input', { type: 'checkbox' });
+    colorCheck.checked = true;
+    const maxMatSelect = el('select');
+    for (const n of [2, 3, 4, 5, 6])
+      maxMatSelect.append(el('option', { value: String(n), text: `${n} materiais` }));
+    maxMatSelect.value = '4';
     const upSelect = el('select');
     upSelect.append(
       el('option', { value: 'y', text: 'Y para cima (padrao glTF/Meshy)' }),
@@ -205,9 +226,13 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
       mapBox.innerHTML = '';
       clipFor.clear();
       if (!scene) return;
-      const preset = PRESETS.find((p) => p.id === presetSelect.value)!;
+      const [tipo, id] = presetSelect.value.split(':');
+      const alvo =
+        tipo === 'contract'
+          ? GAME_CONTRACTS.find((c) => c.id === id)!.manifest.animations
+          : PRESETS.find((p) => p.id === id)!.animations;
       const names = scene.animations.map((a) => a.name);
-      for (const [anim, def] of Object.entries(preset.animations)) {
+      for (const [anim, def] of Object.entries(alvo)) {
         const sel = el('select');
         sel.append(el('option', { value: '-1', text: 'pose de repouso (sem animacao)' }));
         scene.animations.forEach((clip, i) => {
@@ -262,7 +287,11 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
         return;
       }
       const glb = scene;
-      const preset = PRESETS.find((p) => p.id === presetSelect.value)!;
+      const [alvoTipo, alvoId] = presetSelect.value.split(':');
+      const contrato =
+        alvoTipo === 'contract' ? GAME_CONTRACTS.find((c) => c.id === alvoId)! : null;
+      const preset = contrato ? null : PRESETS.find((p) => p.id === alvoId)!;
+      const animacoes = contrato ? contrato.manifest.animations : preset!.animations;
       const height = Math.max(4, Math.min(48, Number(heightInput.value) || 24));
       const o = orientation();
       doImport.disabled = true;
@@ -271,7 +300,7 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
         try {
           // 1) amostra TODOS os frames de todas as animacoes...
           const jobs: { anim: string; frame: number; tris: Float32Array }[] = [];
-          for (const [anim, def] of Object.entries(preset.animations)) {
+          for (const [anim, def] of Object.entries(animacoes)) {
             const clip = Number(clipFor.get(anim)?.value ?? -1);
             const duration = clip >= 0 ? glb.animations[clip].duration : 0;
             for (let f = 0; f < def.frames; f++) {
@@ -291,7 +320,23 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
             jobs.map((j) => j.tris),
             height,
           );
-          const project = createProjectFromPreset(preset, spriteId, spriteId);
+          // cores: uma amostragem so da textura serve TODOS os frames, porque o
+          // triangulo N e o mesmo triangulo em qualquer instante do clipe
+          let materialDoTriangulo: ((t: number) => string) | string = materialSelect.value;
+          let usados: string[] = [];
+          if (colorCheck.checked && glb.materials.length > 0) {
+            doImport.textContent = 'Lendo as texturas…';
+            await new Promise((r) => setTimeout(r, 0));
+            const cores = await sampleTriangleColors(glb);
+            const q = quantizeToMaterials(cores, Number(maxMatSelect.value));
+            materialDoTriangulo = (t: number) => q.materials[t] ?? materialSelect.value;
+            usados = q.used;
+          }
+
+          const project = contrato
+            ? createProjectFromContract(contrato)
+            : createProjectFromPreset(preset!, spriteId, spriteId);
+          project.spriteId = spriteId;
           project.mode = 'voxel';
           project.flipPairs = {};
           project.models = {};
@@ -299,18 +344,18 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
           for (const job of jobs) {
             project.models[modelKey(job.anim, job.frame)] = voxelizeTriangles(
               job.tris,
-              materialSelect.value,
+              materialDoTriangulo,
               fit,
             );
             done++;
             doImport.textContent = `Voxelizando ${done}/${jobs.length}…`;
             await new Promise((r) => setTimeout(r, 0));
           }
-          const first = project.models[modelKey(Object.keys(preset.animations)[0], 0)];
+          const first = project.models[modelKey(Object.keys(animacoes)[0], 0)];
           const b = voxelProjectedBounds(first);
           const fits = b.w <= project.frameWidth - 4 && b.h <= project.frameHeight - 4;
           toast(
-            `${jobs.length} frames · projecao ${b.w}×${b.h}px ${fits ? '✓ cabe no frame' : `✕ frame util e ${project.frameWidth - 4}×${project.frameHeight - 4}px — reduza a altura`}`,
+            `${jobs.length} frames · projecao ${b.w}×${b.h}px ${fits ? '✓ cabe no frame' : `✕ frame util e ${project.frameWidth - 4}×${project.frameHeight - 4}px — reduza a altura`}${usados.length ? ` · materiais: ${usados.join(', ')}` : ''}`,
           );
           close();
           onImport(project);
@@ -338,7 +383,14 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
         el('div', {}, [el('label', { text: 'Eixo para cima' }), upSelect]),
         el('div', {}, [el('label', { text: 'Girar (se estiver de costas)' }), yawSelect]),
       ]),
-      el('div', {}, [el('label', { text: 'Preset (canvas e animacoes)' }), presetSelect]),
+      el('div', {}, [el('label', { text: 'Alvo (preset ou contrato do jogo)' }), presetSelect]),
+      el('div', { class: 'grid2' }, [
+        el('label', { style: 'display:flex;gap:8px;align-items:center' }, [
+          colorCheck,
+          el('span', { text: 'Usar as cores do modelo' }),
+        ]),
+        el('div', {}, [el('label', { text: 'Teto de materiais' }), maxMatSelect]),
+      ]),
       el('div', {}, [el('label', { text: 'Animacao do GLB para cada animacao do jogo' }), mapBox]),
       el('div', {}, [el('label', { text: 'id do sprite' }), idInput]),
       doImport,

@@ -32,7 +32,21 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   e vira frames Voxelyn. O enquadramento é **um só para todos os frames de todas
   as animações** — enquadrar frame a frame faria o bicho crescer, encolher e
   pular de lugar a cada pose. Y-up (padrão glTF) vira Z-up automaticamente, com
-  giro em torno do eixo vertical quando o bicho chega de costas.
+  giro em torno do eixo vertical quando o bicho chega de costas. O alvo pode ser
+  um preset genérico **ou o contrato de uma entidade do jogo**, e aí a malha nova
+  já entra na moldura certa.
+- **Texturas viram materiais do jogo, por aproximação**: um GLB texturizado traz
+  cor por pixel; o Voxelyn tem materiais, e cada material é uma **rampa de três
+  faces**, não uma cor. Então importar cor não é quantizar pixels — é decidir,
+  para cada pedaço da malha, qual material do jogo aquele pedaço é. A comparação
+  é lexicográfica: **a face de topo decide** (é ela que domina na isometrica) e
+  as laterais só desempatam quando dois materiais têm o mesmo topo, o que
+  acontece de verdade (`loot` e `sulfur` são ambos dourados por cima). Depois o
+  resultado é **espremido nos N materiais mais usados**, com corte por área — sem
+  esse teto, uma textura rica escolheria oito materiais, cada um trazendo três
+  cores de rampa mais os degraus de oclusão, e o export reprovaria no teto de 20
+  cores *depois* de todo o trabalho. Cada voxel herda o material da superfície
+  mais próxima das duas que fecham o vão: só a casca aparece na tela.
 - **Modo pixel**: desenho touch-first frame a frame. 1 dedo desenha, 2 dedos
   fazem pan/pinch. Lápis, borracha, balde, linha, retângulo e conta-gotas;
   pincel de 1–3 px; undo/redo; grade, onion skin e guia da margem de 2 px.
