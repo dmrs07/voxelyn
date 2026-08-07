@@ -27,6 +27,7 @@ import {
   voxelKey,
   voxelModelBounds,
   voxelProjectedBounds,
+  voxelToViewPixel,
   type VoxelModel,
   type VoxelView,
 } from '../voxel';
@@ -34,6 +35,14 @@ import { saveProject } from '../store';
 import { STYLE_LABELS, generateAnimation, styleForAnim, type AnimStyle } from '../animate';
 import { applyAnimationSpec, chainOf, segmentParts, validatePosedFrames, type Part } from '../pose';
 import { buildVisionImages, partsPreviewDataUrl } from '../vision';
+import {
+  RIG_TEMPLATES,
+  guessMarkers,
+  missingSlots,
+  resolveMarkers,
+  rigToParts,
+  templateById,
+} from '../rig';
 import { AI_MODELS, designPoses, getApiKey, getModel, setApiKey, setModel } from '../ai';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
@@ -97,8 +106,42 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const currentModelKey = (): string => modelKey(anim, frameIndex);
   const currentModel = (): VoxelModel => project.models![currentModelKey()] ?? {};
-  /** Partes do modelo dado, ja com as correcoes do autor aplicadas. */
-  const partsOf = (model: VoxelModel): Part[] => segmentParts(model, project.partOverrides);
+  /**
+   * Partes do modelo. O esqueleto marcado a mao GANHA da deteccao automatica —
+   * mas so quando esta completo, senao um rig pela metade seria pior que o
+   * palpite geometrico.
+   */
+  const partsOf = (model: VoxelModel): Part[] => {
+    if (project.rig && missingSlots(project.rig).length === 0) {
+      const manual = rigToParts(model, project.rig);
+      if (manual.length > 0) return manual;
+    }
+    return segmentParts(model, project.partOverrides);
+  };
+  const usingManualRig = (): boolean => !!project.rig && missingSlots(project.rig).length === 0;
+
+  // ---------------- marcacao de juntas ----------------
+  /** junta armada: o proximo toque no canvas crava ela (ver beginStroke) */
+  let armedSlot: string | null = null;
+  let onMarkerPlaced: (() => void) | null = null;
+
+  /** Voxel sob o dedo, nas duas vistas — e assim que uma junta e cravada. */
+  const pickVoxelAt = (clientX: number, clientY: number): [number, number, number] | null => {
+    if (viewMode === 'slice') {
+      const cell = sliceCellAt(clientX, clientY);
+      return [cell.x, cell.y, z];
+    }
+    const vd = modelViewData();
+    const rect = canvas.getBoundingClientRect();
+    const px = Math.floor(
+      (clientX - rect.left - (modelView.x - vd.originX * modelView.scale)) / modelView.scale,
+    );
+    const py = Math.floor(
+      (clientY - rect.top - (modelView.y - vd.originY * modelView.scale)) / modelView.scale,
+    );
+    const hit = vd.hitAt(px, py);
+    return hit ? (hit.vox as [number, number, number]) : null;
+  };
   const setCurrentModel = (m: VoxelModel): void => {
     project.models![currentModelKey()] = m;
   };
@@ -314,6 +357,49 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     hud.textContent = `z=${z} · ${anim} ${frameIndex + 1}/${project.animations[anim]?.frames ?? 0} · ${count} voxels · ${TOOL_LABELS[tool]} (${material})`;
   };
 
+  /**
+   * Marcadores de junta desenhados por cima das duas vistas. Sem ver onde as
+   * juntas estao, cravar as proximas vira adivinhacao — e o rig inteiro depende
+   * de elas caírem no lugar certo.
+   */
+  const drawMarkers = (): void => {
+    if (!project.rig) return;
+    const tpl = templateById(project.rig.template);
+    if (!tpl) return;
+    const markers = resolveMarkers(project.rig);
+    const own = project.rig.markers;
+    const vd = viewMode === 'model' ? modelViewData() : null;
+    const dirIdx = (VOXEL_DIRS as readonly string[]).indexOf(dir);
+
+    for (const slot of tpl.slots) {
+      const pos = markers[slot.id];
+      if (!pos) continue;
+      let sx: number,
+        sy: number,
+        faded = false;
+      if (viewMode === 'model') {
+        const p = voxelToViewPixel(vd!, pos[0], pos[1], pos[2], dirIdx);
+        sx = modelView.x + (p.px - vd!.originX) * modelView.scale;
+        sy = modelView.y + (p.py - vd!.originY) * modelView.scale;
+      } else {
+        faded = pos[2] !== z; // junta de outra camada aparece apagada
+        sx = sliceView.x + (pos[0] + 0.5) * sliceView.scale;
+        sy = sliceView.y + (pos[1] + 0.5) * sliceView.scale;
+      }
+      const armed = armedSlot === slot.id;
+      const mirrored = !own[slot.id]; // veio da simetria, nao do dedo do autor
+      ctx.globalAlpha = faded ? 0.3 : 1;
+      ctx.beginPath();
+      ctx.arc(sx, sy, armed ? 9 : 6, 0, Math.PI * 2);
+      ctx.fillStyle = mirrored ? 'rgba(122,184,255,0.55)' : 'rgba(255,209,102,0.85)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = armed ? '#59f2c2' : '#0b0e14';
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  };
+
   const render = (): void => {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#05070c';
@@ -321,6 +407,12 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (viewMode === 'model') renderModelView();
     else renderSliceView();
+    if (armedSlot || project.rig) drawMarkers();
+    if (armedSlot) {
+      const tpl = templateById(project.rig!.template);
+      const label = tpl?.slots.find((sl) => sl.id === armedSlot)?.label ?? armedSlot;
+      hud.textContent = `Toque para cravar: ${label}`;
+    }
   };
 
   // ---------------- edicao ----------------
@@ -547,6 +639,21 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const beginStroke = (clientX: number, clientY: number): void => {
     if (playing) return;
+    if (armedSlot) {
+      const pos = pickVoxelAt(clientX, clientY);
+      if (!pos) {
+        toast('Toque em cima do modelo para cravar a junta');
+        return;
+      }
+      project.rig!.markers[armedSlot] = pos;
+      armedSlot = null;
+      scheduleSave();
+      render();
+      const back = onMarkerPlaced;
+      onMarkerPlaced = null;
+      back?.();
+      return;
+    }
     if (viewMode === 'model' && (tool === 'fill' || tool === 'box' || tool === 'select')) {
       toast(`${TOOL_LABELS[tool]} funciona na vista Fatia`);
       return;
@@ -993,6 +1100,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       const animateBtn = el('button', { text: '🎬 Animar automaticamente' });
       const partsBtn = el('button', { text: '🧩 Partes do modelo' });
       const layersBtn = el('button', { text: '✂ Camadas (cortar base do STL)' });
+      const rigBtn = el('button', { text: '🦴 Esqueleto (rig manual)' });
       const moveBtn = el('button', { text: '✥ Mover modelo (frame atual)' });
       const mirrorAllBtn = el('button', { text: '⇋ Espelhar modelo inteiro em X' });
       const settings = el('button', { text: '⚙ Configuracoes do sprite' });
@@ -1012,6 +1120,10 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       layersBtn.addEventListener('click', () => {
         close();
         void openLayersSheet();
+      });
+      rigBtn.addEventListener('click', () => {
+        close();
+        void openRigSheet();
       });
       moveBtn.addEventListener('click', () => {
         close();
@@ -1040,6 +1152,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           exportBtn,
           animateBtn,
           partsBtn,
+          rigBtn,
           layersBtn,
           moveBtn,
           mirrorAllBtn,
@@ -1213,7 +1326,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           limbs > 0 ? `${limbs} membro(s)` : '',
           'corpo',
         ].filter(Boolean);
-        return `Partes detectadas: ${bits.join(' + ')}`;
+        const fonte = usingManualRig() ? 'Esqueleto marcado a mao' : 'Partes detectadas';
+        return `${fonte}: ${bits.join(' + ')}`;
       })();
 
       const partsBtn = el('button', { text: '🧩 Conferir partes detectadas' });
@@ -1251,6 +1365,131 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         el('div', {}, [el('label', { text: 'Preset de movimento' }), styleSel]),
         el('div', {}, [el('label', { text: 'Intensidade' }), intensitySel]),
         generate,
+      );
+      return container;
+    });
+
+  /**
+   * Folha de ESQUELETO: o autor crava cada junta tocando no modelo, como nas
+   * ferramentas de rig manual. Existe porque a deteccao automatica so enxerga
+   * geometria — membro grudado no corpo por uma area larga, ou dois membros
+   * encostados, nao tem heuristica que resolva. Aqui quem decide desenhou.
+   */
+  const openRigSheet = (): Promise<void> =>
+    openSheet((close) => {
+      const container = el('div');
+      project.rig ??= { template: 'quadrupede', markers: {}, symmetry: true };
+      const rig = project.rig;
+
+      const tplSel = el('select');
+      for (const t of RIG_TEMPLATES) tplSel.append(el('option', { value: t.id, text: t.label }));
+      tplSel.value = rig.template;
+      tplSel.addEventListener('change', () => {
+        rig.template = tplSel.value;
+        rig.markers = {}; // juntas de um template nao valem no outro
+        scheduleSave();
+        close();
+        void openRigSheet();
+      });
+
+      const symWrap = el('label', { style: 'display:flex;gap:8px;align-items:center' });
+      const sym = el('input', { type: 'checkbox' });
+      sym.checked = rig.symmetry;
+      sym.addEventListener('change', () => {
+        rig.symmetry = sym.checked;
+        scheduleSave();
+        close();
+        void openRigSheet();
+      });
+      symWrap.append(sym, el('span', { text: 'Simetria: marcar um lado espelha no outro' }));
+
+      const tpl = templateById(rig.template)!;
+      const markers = resolveMarkers(rig);
+      const rows = el('div', { style: 'display:flex;flex-direction:column;gap:2px' });
+      for (const slot of tpl.slots) {
+        // com simetria ligada, o lado B some da lista: ele sai do A sozinho
+        if (rig.symmetry && slot.mirror && slot.id.endsWith('-B')) continue;
+        const pos = markers[slot.id];
+        const btn = el('button', {
+          style: 'display:flex;justify-content:space-between;gap:8px;text-align:left',
+          text: `${pos ? '✓' : '○'} ${slot.label}`,
+        });
+        btn.append(
+          el('span', {
+            class: 'budget',
+            text: pos ? `${pos[0]},${pos[1]},${pos[2]}` : 'marcar',
+          }),
+        );
+        btn.addEventListener('click', () => {
+          armedSlot = slot.id;
+          onMarkerPlaced = () => {
+            toast(`${slot.label} cravado`);
+            void openRigSheet();
+          };
+          close();
+          render();
+          toast(`Toque no modelo para cravar: ${slot.label}`);
+        });
+        rows.append(btn);
+      }
+
+      const missing = missingSlots(rig);
+      const status = el('div', {
+        class: missing.length === 0 ? 'issue ok' : 'issue',
+        text:
+          missing.length === 0
+            ? '✓ Esqueleto completo — ele substitui a deteccao automatica'
+            : `Faltam ${missing.length} junta(s): ${missing
+                .slice(0, 3)
+                .map((sl) => sl.label)
+                .join(', ')}${missing.length > 3 ? '…' : ''}`,
+      });
+
+      const preview = el('button', { class: 'primary', text: '👁 Ver o esqueleto colorido' });
+      preview.disabled = missing.length > 0;
+      preview.addEventListener('click', () => {
+        close();
+        void openPartsSheet();
+      });
+
+      const clear = el('button', { text: '↺ Apagar todas as juntas' });
+      clear.addEventListener('click', () => {
+        rig.markers = {};
+        scheduleSave();
+        close();
+        void openRigSheet();
+      });
+
+      const auto = el('button', { text: '✨ Chutar juntas pelo rig automatico' });
+      auto.addEventListener('click', () => {
+        const base = currentModel();
+        if (Object.keys(base).length === 0) {
+          toast('O frame atual esta vazio');
+          return;
+        }
+        const guessed = guessMarkers(base, tpl);
+        rig.markers = { ...guessed, ...rig.markers };
+        scheduleSave();
+        close();
+        toast('Juntas chutadas — confira e corrija as que sairem tortas');
+        void openRigSheet();
+      });
+
+      container.append(
+        el('h2', { text: 'Esqueleto (rig manual)' }),
+        el('p', {
+          class: 'sub',
+          text: 'Toque numa junta da lista e depois no modelo para cravar. Vale na vista 3D e na Fatia; na 3D o toque pega o voxel da superficie.',
+        }),
+        el('div', {}, [el('label', { text: 'Tipo de bicho' }), tplSel]),
+        symWrap,
+        status,
+        rows,
+        el('div', { style: 'display:flex;flex-direction:column;gap:8px;margin-top:12px' }, [
+          auto,
+          preview,
+          clear,
+        ]),
       );
       return container;
     });

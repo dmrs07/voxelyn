@@ -67,6 +67,16 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   os dois — é o que impede perna fina de se despedaçar ao girar. `Menu →
   Partes` mostra a divisão colorida e deixa renomear ou marcar um membro como
   corpo quando a geometria enganou o detector.
+- **Rig manual (`Menu → 🦴 Esqueleto`)**: quando a geometria engana o detector —
+  membro grudado no corpo por uma área larga, dois membros encostados — quem
+  decide é quem desenhou. Escolha o arquétipo (humanoide ou quadrúpede), toque
+  numa junta da lista e depois **no próprio modelo** para cravá-la; vale na
+  vista 3D (pega o voxel da superfície) e na Fatia. A **simetria** espelha o
+  lado B automaticamente, e o botão "chutar juntas" preenche tudo a partir do
+  rig automático para você só corrigir o que saiu torto. O *skinning* é exato:
+  em voxel a grade é discreta, então "cada voxel pertence ao osso mais próximo"
+  é uma resposta, não uma aproximação com pesos — e empate vai para a
+  extremidade, senão o osso da ponta nasceria vazio.
 - **Offline de verdade**: PWA instalável; projetos vivem no IndexedDB do
   aparelho com autosave; service worker com precache no padrão do cliente
   Survival.
