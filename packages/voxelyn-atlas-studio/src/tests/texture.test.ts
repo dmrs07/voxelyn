@@ -272,3 +272,69 @@ describe('quantizeToMaterials com exposicao', () => {
     );
   });
 });
+
+describe('paleta escolhida pelo autor', () => {
+  const escuras: Rgb[] = [
+    [12, 15, 20],
+    [30, 38, 52],
+    [80, 95, 120],
+    [150, 170, 200],
+  ];
+  const minha = ['ice', 'electric', 'rockDeep', 'glass'];
+
+  it('todo material devolvido sai da lista do autor', () => {
+    const q = quantizeToMaterials(escuras, 4, { palette: minha });
+    for (const m of q.materials) expect(minha).toContain(m);
+    for (const m of q.used) expect(minha).toContain(m);
+  });
+
+  it('respeita a lista mesmo quando a cor esta MUITO mais perto de outro', () => {
+    // vermelho puro: `blood` seria o vizinho obvio, mas nao foi escolhido
+    const q = quantizeToMaterials([[220, 30, 40]], 4, { palette: ['ice', 'acid'] });
+    expect(q.materials[0]).not.toBe('blood');
+    expect(['ice', 'acid']).toContain(q.materials[0]);
+  });
+
+  it('o teto de materiais nao se aplica: quem escolheu ja decidiu o tamanho', () => {
+    const cores = [
+      materialSwatch('ice'),
+      materialSwatch('electric'),
+      materialSwatch('rockDeep'),
+      materialSwatch('glass'),
+    ] as Rgb[];
+    const q = quantizeToMaterials(cores, 2, { palette: minha, exposure: false });
+    expect(new Set(q.materials).size).toBeGreaterThan(2);
+  });
+
+  it('`used` lista so o que foi realmente usado, do mais usado ao menos', () => {
+    const cores: Rgb[] = [
+      ...Array(10).fill(materialSwatch('rockDeep')),
+      ...Array(3).fill(materialSwatch('glass')),
+    ];
+    const q = quantizeToMaterials(cores, 4, { palette: minha, exposure: false });
+    expect(q.used[0]).toBe('rockDeep');
+    expect(q.used).not.toContain('electric'); // marcado, mas nenhuma cor caiu nele
+  });
+
+  it('paleta de um material so pinta tudo com ele', () => {
+    const q = quantizeToMaterials(escuras, 4, { palette: ['biolum'] });
+    expect(new Set(q.materials)).toEqual(new Set(['biolum']));
+  });
+
+  it('paleta vazia volta para o modo automatico', () => {
+    expect(quantizeToMaterials(escuras, 3, { palette: [] })).toEqual(
+      quantizeToMaterials(escuras, 3),
+    );
+  });
+
+  it('a correcao de exposicao continua valendo com paleta', () => {
+    const muitoEscura: Rgb[] = [
+      [4, 5, 7],
+      [8, 10, 14],
+      [14, 18, 24],
+    ];
+    const com = quantizeToMaterials(muitoEscura, 4, { palette: minha });
+    const sem = quantizeToMaterials(muitoEscura, 4, { palette: minha, exposure: false });
+    expect(com.used).not.toEqual(sem.used);
+  });
+});

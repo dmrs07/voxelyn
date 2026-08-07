@@ -147,21 +147,38 @@ export type Quantized = {
 export const quantizeToMaterials = (
   colors: Rgb[],
   maxMaterials = 4,
-  { exposure = true }: { exposure?: boolean } = {},
+  { exposure = true, palette }: { exposure?: boolean; palette?: string[] } = {},
 ): Quantized => {
   if (colors.length === 0) return { materials: [], used: [] };
   const amostra = exposure ? normalizeExposure(colors) : colors;
-  const first = amostra.map((c) => nearestMaterial(c));
 
-  const count = new Map<string, number>();
-  for (const m of first) count.set(m, (count.get(m) ?? 0) + 1);
-  const ranked = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  const used = ranked.slice(0, Math.max(1, maxMaterials)).map(([m]) => m);
+  const porUso = (ms: string[]): string[] => {
+    const count = new Map<string, number>();
+    for (const m of ms) count.set(m, (count.get(m) ?? 0) + 1);
+    return [...count.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([m]) => m);
+  };
+
+  // PALETA DO AUTOR: ele escolhe QUAIS materiais existem e a textura so decide
+  // qual deles cada pedaco e. Deixar a aproximacao escolher sozinha resolve o
+  // "que cor e essa" e nao resolve o "que cor eu quero" — uma textura cinza e
+  // fielmente aproximada por quatro cinzas, e o bicho some no fundo escuro. O
+  // teto de materiais nao se aplica aqui: quem escolheu a lista ja decidiu o
+  // tamanho dela.
+  if (palette && palette.length > 0) {
+    const materials = amostra.map((c) => nearestMaterial(c, palette));
+    return { materials, used: porUso(materials) };
+  }
+
+  const first = amostra.map((c) => nearestMaterial(c));
+  const ranked = porUso(first);
+  const used = ranked.slice(0, Math.max(1, maxMaterials));
   if (used.length === ranked.length) return { materials: first, used };
 
   // os que nao couberam sao reabsorvidos pelo mais proximo entre os que ficaram
   const remap = new Map<string, string>();
-  for (const [m] of ranked) {
+  for (const m of ranked) {
     remap.set(m, used.includes(m) ? m : nearestMaterial(materialSwatch(m), used));
   }
   return { materials: first.map((m) => remap.get(m)!), used };
