@@ -328,6 +328,7 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
             await new Promise((r) => setTimeout(r, 0));
             const cores = await sampleTriangleColors(glb);
             const q = quantizeToMaterials(cores, Number(maxMatSelect.value));
+            console.info('materiais escolhidos:', q.used.join(', '));
             materialDoTriangulo = (t: number) => q.materials[t] ?? materialSelect.value;
             usados = q.used;
           }

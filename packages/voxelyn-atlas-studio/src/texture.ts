@@ -42,15 +42,65 @@ export const colorDistance = (a: Rgb, b: Rgb): number => {
 export const MATERIAL_CANDIDATES = Object.keys(RAMPS);
 
 /**
- * Custo de uma cor virar um material: [distancia do TOPO, distancia das laterais].
+ * Materiais que servem para CORPO: os que tem alguma diferenca entre as tres
+ * faces da rampa.
  *
- * Os dois numeros sao comparados em ordem, nao somados. Somar deixaria as
- * laterais atropelarem o topo — uma cor identica a face de topo de `bone`
- * perdia para `silt`, que erra o topo mas acerta as duas laterais. O topo e o
- * que o olho ve na isometrica, entao ele decide sozinho; as laterais so entram
- * quando dois materiais tem o MESMO topo, o que acontece de verdade: `loot` e
- * `sulfur` sao ambos dourados por cima, `rust` e `bone` ambos claros.
+ * `scorch` e `dark/dark/dark` — topo, esquerda e direita na mesma cor. Um voxel
+ * desses nao tem volume nenhum: sem contraste entre o topo e as laterais, a
+ * forma some e o bicho vira uma silhueta chapada. Ele existe no jogo para chao
+ * queimado, onde justamente nao se quer relevo, e por isso nao pode ser a
+ * resposta de uma aproximacao de cor.
  */
+export const READABLE_MATERIALS = MATERIAL_CANDIDATES.filter((m) => new Set(RAMPS[m]).size > 1);
+
+/** Luminancia Rec.709 — o quanto uma cor "acende" para o olho. */
+export const luminance = (c: Rgb): number => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+
+/**
+ * Alvo de brilho para o percentil alto da amostra. Perto do topo da paleta
+ * (`player` e 240) mas com folga: jogar o percentil 95 no maximo faria a parte
+ * mais clara do bicho virar branco chapado.
+ */
+const ALVO_BRILHO = 190;
+
+/**
+ * Corrige a EXPOSICAO da amostra: um ganho unico, aplicado a todas as cores.
+ *
+ * Sem isto, uma textura escura — o padrao do que sai de gerador 3D, que assume
+ * iluminacao na cena — faz TODA a malha cair nos materiais quase pretos. A
+ * aproximacao esta certa e o resultado e uma mancha sem forma, porque o que
+ * decide a leitura de um sprite de 80px sobre fundo escuro nao e o brilho
+ * absoluto do texel.
+ *
+ * E GANHO, nao esticamento de contraste. Esticar (mapear o percentil baixo para
+ * o escuro da paleta e o alto para o claro) FABRICA contraste que a textura nao
+ * tem: uma amostra ja bem exposta saia deformada, com o vermelho medio
+ * empurrado para o quase preto so porque era o mais escuro da lista. Um ganho
+ * multiplica todo mundo pelo mesmo numero, entao matiz, saturacao e a relacao
+ * de brilho entre as partes atravessam exatos — so o nivel geral sobe.
+ *
+ * O percentil 95 e nao o maximo: um unico reflexo estourado definiria o ganho
+ * da malha inteira e o resto continuaria escuro.
+ *
+ * Cor que estouraria o canal recebe MENOS ganho, em vez de ser cortada em 255.
+ * Cortar canal a canal muda o matiz — um azul saturado perde so o azul e volta
+ * acinzentado —, e matiz e justamente o que a aproximacao vai ler depois.
+ */
+export const normalizeExposure = (colors: Rgb[]): Rgb[] => {
+  if (colors.length === 0) return [];
+  const lums = colors.map(luminance).sort((a, b) => a - b);
+  const alto = lums[Math.min(lums.length - 1, Math.floor(0.95 * lums.length))];
+  if (alto < 1) return colors.map((c) => [...c] as Rgb); // amostra preta: nada a corrigir
+  // so corrige o que esta claramente fora: perto do alvo, deixa como esta
+  const ganho = Math.max(0.6, Math.min(6, ALVO_BRILHO / alto));
+  if (Math.abs(ganho - 1) < 0.08) return colors.map((c) => [...c] as Rgb);
+  return colors.map((c) => {
+    const pico = Math.max(c[0], c[1], c[2]);
+    const g = pico > 0 ? Math.min(ganho, 255 / pico) : ganho;
+    return [Math.round(c[0] * g), Math.round(c[1] * g), Math.round(c[2] * g)] as Rgb;
+  });
+};
+
 export const materialCost = (rgb: Rgb, mat: string): [number, number] => {
   const ramp = RAMPS[mat];
   if (!ramp) return [Infinity, Infinity];
@@ -64,7 +114,7 @@ export const materialCost = (rgb: Rgb, mat: string): [number, number] => {
   ];
 };
 
-export const nearestMaterial = (rgb: Rgb, allowed: string[] = MATERIAL_CANDIDATES): string => {
+export const nearestMaterial = (rgb: Rgb, allowed: string[] = READABLE_MATERIALS): string => {
   let best = allowed[0];
   let bestTop = Infinity;
   let bestSide = Infinity;
@@ -94,9 +144,14 @@ export type Quantized = {
  * aparicao: o material que cobre o bicho inteiro tem de sobreviver, e um
  * respingo de cor num canto nao pode gastar uma das vagas.
  */
-export const quantizeToMaterials = (colors: Rgb[], maxMaterials = 4): Quantized => {
+export const quantizeToMaterials = (
+  colors: Rgb[],
+  maxMaterials = 4,
+  { exposure = true }: { exposure?: boolean } = {},
+): Quantized => {
   if (colors.length === 0) return { materials: [], used: [] };
-  const first = colors.map((c) => nearestMaterial(c));
+  const amostra = exposure ? normalizeExposure(colors) : colors;
+  const first = amostra.map((c) => nearestMaterial(c));
 
   const count = new Map<string, number>();
   for (const m of first) count.set(m, (count.get(m) ?? 0) + 1);

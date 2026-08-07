@@ -4,10 +4,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   MATERIAL_CANDIDATES,
+  READABLE_MATERIALS,
   colorDistance,
+  luminance,
   materialCost,
   materialSwatch,
   nearestMaterial,
+  normalizeExposure,
   quantizeToMaterials,
   type Rgb,
 } from '../texture';
@@ -46,7 +49,7 @@ describe('nearestMaterial', () => {
     // "o mesmo material" seria forte demais: `loot` e `sulfur` sao os dois
     // dourados por cima e diferem so nas laterais, entao qualquer um dos dois e
     // resposta certa para um dourado puro. O que nao pode variar e o topo.
-    for (const mat of MATERIAL_CANDIDATES) {
+    for (const mat of READABLE_MATERIALS) {
       const escolhido = nearestMaterial(materialSwatch(mat) as Rgb);
       expect(RAMPS[escolhido][0], `${mat} -> ${escolhido}`).toBe(RAMPS[mat][0]);
     }
@@ -79,7 +82,7 @@ describe('nearestMaterial', () => {
     expect(nearestMaterial([230, 40, 60])).toBe('blood');
     expect(nearestMaterial([120, 190, 255])).toBe('electric');
     // quase preto -> um dos materiais de rocha escura, nunca um emissivo
-    expect(['scorch', 'floor', 'rockDeep', 'pool']).toContain(nearestMaterial([10, 12, 18]));
+    expect(['floor', 'rockDeep', 'pool']).toContain(nearestMaterial([10, 12, 18]));
   });
 
   it('respeita a lista de permitidos', () => {
@@ -119,7 +122,7 @@ describe('quantizeToMaterials', () => {
   it('o corte e por AREA: o material que cobre o bicho sobrevive ao respingo', () => {
     // 100 triangulos de gelo e um unico de acido
     const cores: Rgb[] = [...Array(100).fill(gelo), acido];
-    const q = quantizeToMaterials(cores, 1);
+    const q = quantizeToMaterials(cores, 1, { exposure: false });
     expect(q.used).toEqual(['ice']);
     expect(new Set(q.materials)).toEqual(new Set(['ice']));
   });
@@ -128,14 +131,16 @@ describe('quantizeToMaterials', () => {
     // muito sangue, pouco `fire` (laranja) — com teto 1 o fogo vira sangue,
     // que e o vizinho quente, e nao um cinza qualquer
     const fogo = materialSwatch('fire') as Rgb;
-    const q = quantizeToMaterials([...Array(50).fill(sangue), fogo, fogo], 1);
+    const q = quantizeToMaterials([...Array(50).fill(sangue), fogo, fogo], 1, {
+      exposure: false,
+    });
     expect(q.used).toEqual(['blood']);
     expect(q.materials.every((m) => m === 'blood')).toBe(true);
   });
 
   it('a paleta final sai ordenada do mais usado para o menos', () => {
     const cores: Rgb[] = [...Array(9).fill(gelo), ...Array(5).fill(sangue), acido];
-    const q = quantizeToMaterials(cores, 3);
+    const q = quantizeToMaterials(cores, 3, { exposure: false });
     expect(q.used).toEqual(['ice', 'blood', 'acid']);
   });
 
@@ -143,5 +148,127 @@ describe('quantizeToMaterials', () => {
     const cores: Rgb[] = [gelo, sangue, acido, luz];
     expect(quantizeToMaterials(cores, 3)).toEqual(quantizeToMaterials(cores, 3));
     for (const m of quantizeToMaterials(cores, 3).materials) expect(RAMPS[m]).toBeDefined();
+  });
+});
+
+describe('READABLE_MATERIALS', () => {
+  it('exclui a rampa chapada: sem contraste entre faces, o volume some', () => {
+    expect(MATERIAL_CANDIDATES).toContain('scorch');
+    expect(READABLE_MATERIALS).not.toContain('scorch');
+    expect(new Set(RAMPS.scorch).size).toBe(1); // dark/dark/dark
+  });
+
+  it('todo material que sobrou tem pelo menos duas faces distintas', () => {
+    for (const m of READABLE_MATERIALS) expect(new Set(RAMPS[m]).size, m).toBeGreaterThan(1);
+  });
+
+  it('nenhuma aproximacao devolve um material chapado', () => {
+    for (const c of [
+      [0, 0, 0],
+      [8, 10, 14],
+      [20, 24, 30],
+      [12, 12, 12],
+    ] as Rgb[]) {
+      expect(nearestMaterial(c)).not.toBe('scorch');
+    }
+  });
+});
+
+describe('normalizeExposure', () => {
+  /** Amostra escura como a que sai de um gerador 3D com luz na cena. */
+  const escura: Rgb[] = [
+    [10, 12, 16],
+    [18, 22, 30],
+    [26, 32, 44],
+    [34, 42, 58],
+    [42, 52, 72],
+  ];
+
+  it('lista vazia nao quebra', () => {
+    expect(normalizeExposure([])).toEqual([]);
+  });
+
+  it('clareia uma amostra escura', () => {
+    const antes = Math.max(...escura.map(luminance));
+    const depois = Math.max(...normalizeExposure(escura).map(luminance));
+    expect(depois).toBeGreaterThan(antes * 2);
+  });
+
+  it('preserva a ORDEM de brilho', () => {
+    const depois = normalizeExposure(escura).map(luminance);
+    for (let i = 1; i < depois.length; i++) expect(depois[i]).toBeGreaterThan(depois[i - 1]);
+  });
+
+  it('e GANHO, nao esticamento: a razao entre as cores atravessa intacta', () => {
+    const depois = normalizeExposure(escura).map(luminance);
+    const antes = escura.map(luminance);
+    // Ganho puro: todo mundo multiplicado pelo MESMO numero. A folga de 5% e o
+    // arredondamento para inteiro, que pesa mais nos valores baixos (10*3,67 =
+    // 36,7 vira 37). Esticar contraste violaria isto por muito mais que 5%.
+    const r0 = depois[0] / antes[0];
+    for (let i = 1; i < depois.length; i++) {
+      expect(Math.abs(depois[i] / antes[i] - r0) / r0, `cor ${i}`).toBeLessThan(0.05);
+    }
+  });
+
+  it('preserva matiz mesmo quando o ganho estouraria o canal', () => {
+    // ganho cheio levaria o azul a 392; cortar em 255 devolveria um azul
+    // acinzentado. O ganho recua para a cor caber, e a razao fica exata.
+    const [r, g, b] = normalizeExposure([[20, 40, 80]])[0];
+    expect(g / r).toBeCloseTo(2, 1);
+    expect(b / r).toBeCloseTo(4, 1);
+    expect(Math.max(r, g, b)).toBeLessThanOrEqual(255);
+  });
+
+  it('amostra ja bem exposta passa intacta', () => {
+    const boa: Rgb[] = [
+      [180, 190, 200],
+      [120, 60, 70],
+      [60, 80, 100],
+    ];
+    expect(normalizeExposure(boa)).toEqual(boa);
+  });
+
+  it('nunca estoura o canal', () => {
+    for (const c of normalizeExposure([
+      [250, 250, 250],
+      [10, 10, 10],
+      [255, 200, 100],
+    ])) {
+      for (const v of c) expect(v).toBeLessThanOrEqual(255);
+    }
+  });
+
+  it('usa percentil: um reflexo estourado nao define o ganho da malha inteira', () => {
+    const comBrilho: Rgb[] = [[255, 255, 255], ...Array(40).fill([30, 34, 44] as Rgb)];
+    const depois = normalizeExposure(comBrilho);
+    // a massa escura FOI corrigida, apesar do texel branco na amostra
+    expect(luminance(depois[5])).toBeGreaterThan(luminance(comBrilho[5]) * 2);
+  });
+});
+
+describe('quantizeToMaterials com exposicao', () => {
+  const escuraIce: Rgb[] = [
+    [12, 15, 20],
+    [20, 26, 36],
+    [30, 38, 52],
+    [44, 55, 74],
+  ];
+
+  it('sem corrigir, a amostra escura colapsa nos materiais quase pretos', () => {
+    const q = quantizeToMaterials(escuraIce, 4, { exposure: false });
+    expect(q.used.filter((m) => luminance(materialSwatch(m)) > 90).length).toBe(0);
+  });
+
+  it('corrigindo, a mesma amostra ganha material claro e volta a ler como volume', () => {
+    const q = quantizeToMaterials(escuraIce, 4);
+    expect(q.used.filter((m) => luminance(materialSwatch(m)) > 90).length).toBeGreaterThan(0);
+    expect(q.used).not.toContain('scorch');
+  });
+
+  it('a correcao e o padrao', () => {
+    expect(quantizeToMaterials(escuraIce, 4)).toEqual(
+      quantizeToMaterials(escuraIce, 4, { exposure: true }),
+    );
   });
 });
