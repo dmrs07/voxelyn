@@ -43,6 +43,18 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
 - **Validação no aparelho**: os erros que o CI do jogo acusaria (alpha parcial,
   cor fora da paleta, teto de cores, anchor fora do canvas, direção descoberta,
   margem de 2 px, frame vazio) aparecem ANTES do export.
+- **Animação por partes**: o modelo é segmentado sozinho em **corpo + membros**
+  (núcleo = a massa espessa do bicho; cada membro = um componente conexo por
+  vizinhança-26 do que sobra, da inserção até a ponta, com o pivô na inserção).
+  Daí saem os dois modos: presets determinísticos (`walk`, `idle`, `attack`,
+  `hit`…) e a **IA projetando as poses** — o Claude recebe as imagens da pose
+  neutra e um mapa colorido das partes, e devolve um JSON de
+  `mover/girar por parte`; quem mexe em voxel é o motor local, nunca a IA.
+  Toda pose passa por uma **cura de adjacência**: par de voxels que era vizinho
+  na pose base e ficou separado depois da transformação ganha uma reta ligando
+  os dois — é o que impede perna fina de se despedaçar ao girar. `Menu →
+  Partes` mostra a divisão colorida e deixa renomear ou marcar um membro como
+  corpo quando a geometria enganou o detector.
 - **Offline de verdade**: PWA instalável; projetos vivem no IndexedDB do
   aparelho com autosave; service worker com precache no padrão do cliente
   Survival.

@@ -2,6 +2,7 @@
 // O manifest e ESPELHO do contrato em
 // packages/voxelyn-survival-content/src/manifest.ts (SpriteManifestEntry):
 // o que o Studio exporta e exatamente o que o SpriteBank do jogo carrega.
+import type { PartOverrides } from './pose';
 
 export type SpriteAnimationDefinition = {
   frames: number;
@@ -71,6 +72,13 @@ export type Project = {
   mode?: 'pixel' | 'voxel';
   /** `${anim}/${frame}` -> modelo voxel (chave "x,y,z" -> material). */
   models?: Record<string, Record<string, string>>;
+  /**
+   * Correcoes do autor sobre a segmentacao automatica em partes (renomear um
+   * membro, ou dizer que ele e corpo e nao deve se mexer). A segmentacao e
+   * geometrica e acerta a maioria dos bichos; quando erra, quem manda e o
+   * autor — e a IA passa a citar os nomes que ele escolheu.
+   */
+  partOverrides?: PartOverrides;
   prompt: string;
   createdAt: number;
   updatedAt: number;

@@ -5,6 +5,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { AnimationSpec, Part } from './pose';
 import { MAX_DEG, MAX_MOVE, partsSummary } from './pose';
+import type { VisionImage } from './vision';
 import type { VoxelModel } from './voxel';
 
 const KEY_STORAGE = 'voxelyn-atlas-studio-anthropic-key';
@@ -78,6 +79,8 @@ const SPEC_SCHEMA = {
 
 const SYSTEM = `Voce e um animador de sprites voxel isometricos de um jogo de acao. Voce projeta POSES por keyframe para um modelo voxel segmentado em partes nomeadas.
 
+Voce recebe imagens da pose neutra e um MAPA DE PARTES colorido, com legenda dizendo qual cor e qual parte. Use as imagens para entender a anatomia — para que lado cada membro aponta, onde ele encosta no corpo, o que e frente — e use os numeros do resumo para dimensionar o movimento.
+
 Convencoes do espaco (fixas):
 - FRENTE do personagem = -y (avancar e dy negativo). Tras = +y.
 - Cima = +z. O chao esta em z=0 e nada pode afundar nele.
@@ -105,6 +108,8 @@ export type PoseRequest = {
   loop: boolean;
   /** descricao do personagem e do movimento desejado, nas palavras do autor */
   description: string;
+  /** pose neutra renderizada + mapa de partes colorido (ver src/vision.ts) */
+  images?: VisionImage[];
 };
 
 /**
@@ -118,14 +123,26 @@ export const designPoses = async (req: PoseRequest): Promise<AnimationSpec> => {
 
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
-  const user = [
-    partsSummary(req.parts, req.model),
-    '',
-    `Animacao a projetar: "${req.animation}" com EXATAMENTE ${req.frames} frames a ${req.fps} fps (${req.loop ? 'em loop' : 'sem loop'}).`,
-    `Descricao do autor: ${req.description || '(sem descricao — use o nome da animacao e a anatomia das partes)'}`,
-    '',
-    `Projete as poses dos ${req.frames} frames.`,
-  ].join('\n');
+  // as imagens vem primeiro: o modelo le a anatomia e so depois as medidas
+  const content: Anthropic.ContentBlockParam[] = [];
+  for (const img of req.images ?? []) {
+    content.push({ type: 'text', text: img.label });
+    content.push({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: img.base64 },
+    });
+  }
+  content.push({
+    type: 'text',
+    text: [
+      partsSummary(req.parts, req.model),
+      '',
+      `Animacao a projetar: "${req.animation}" com EXATAMENTE ${req.frames} frames a ${req.fps} fps (${req.loop ? 'em loop' : 'sem loop'}).`,
+      `Descricao do autor: ${req.description || '(sem descricao — use o nome da animacao e a anatomia das partes)'}`,
+      '',
+      `Projete as poses dos ${req.frames} frames.`,
+    ].join('\n'),
+  });
 
   let response: Anthropic.Message;
   try {
@@ -134,7 +151,7 @@ export const designPoses = async (req: PoseRequest): Promise<AnimationSpec> => {
       max_tokens: 16000,
       system: SYSTEM,
       output_config: { format: { type: 'json_schema', schema: SPEC_SCHEMA } },
-      messages: [{ role: 'user', content: user }],
+      messages: [{ role: 'user', content }],
     });
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
