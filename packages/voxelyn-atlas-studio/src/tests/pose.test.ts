@@ -7,12 +7,19 @@ import {
   connectedComponents,
   partsPreviewModel,
   partsSummary,
+  PART_COLORS,
   segmentParts,
   validatePosedFrames,
   MAX_MOVE,
   type AnimationSpec,
 } from '../pose';
-import { voxelKey, voxelModelBounds, type VoxelModel } from '../voxel';
+import {
+  renderVoxelView,
+  voxelKey,
+  voxelModelBounds,
+  VOXEL_MATERIALS,
+  type VoxelModel,
+} from '../voxel';
 
 const componentCount = (m: VoxelModel): number =>
   connectedComponents(new Set(Object.keys(m))).length;
@@ -257,5 +264,21 @@ describe('resumo e preview para a IA', () => {
     expect(Object.keys(preview).length).toBe(Object.keys(m).length);
     // corpo + 8 pernas => pelo menos 9 materiais distintos
     expect(new Set(Object.values(preview)).size).toBeGreaterThanOrEqual(9);
+  });
+
+  // o mapa de partes so serve se RENDERIZAR: o rasterizador lanca em material
+  // sem rampa, e PART_COLORS ja foi preenchido com cores da paleta (fungusLight,
+  // mist, amber, moss) que nao sao materiais — a tela quebrava ao abrir a folha
+  it('todo material do mapa de partes tem rampa no rasterizador', () => {
+    for (const mat of [...PART_COLORS, 'rock']) {
+      expect(VOXEL_MATERIALS, `material do mapa de partes: ${mat}`).toContain(mat);
+    }
+  });
+
+  it('o mapa de partes renderiza sem lancar', () => {
+    const parts = segmentParts(spider());
+    const view = renderVoxelView(partsPreviewModel(parts), 0);
+    expect(view.grid.w).toBeGreaterThan(1);
+    expect(view.grid.h).toBeGreaterThan(1);
   });
 });
