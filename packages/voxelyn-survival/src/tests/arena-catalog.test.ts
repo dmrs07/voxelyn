@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SOLID_CRYSTAL,
+  SOLID_ORE,
   SOLID_NONE,
   SURF_WATER,
   createRun,
@@ -8,7 +10,14 @@ import {
   stepRun,
 } from '@voxelyn/survival-sim';
 import { ARENA_BOSS_ORDER, ARENA_CATALOG, type ArenaBossId } from '../client/arena-catalog';
-import { ARENA_MAX_HP, ARENA_MIN_HP, clampArenaHp, createArenaRun } from '../client/arena-setup';
+import {
+  ARENA_KEEP_RADIUS,
+  ARENA_MAX_HP,
+  ARENA_MIN_FLOOR,
+  ARENA_MIN_HP,
+  clampArenaHp,
+  createArenaRun,
+} from '../client/arena-setup';
 
 /**
  * O catalogo aponta para (seed, geracao, setor) achados por busca offline nas
@@ -136,9 +145,14 @@ describe('createArenaRun — o recorte da arena', () => {
       let open = 0;
       for (let i = 0; i < state.solid.length; i++) if (state.solid[i] === SOLID_NONE) open++;
       expect(seen.size, `arena de ${boss}: sobrou chao ilhado`).toBe(open);
-      // E ela tem de ser uma ARENA, e nao um corredor: os golpes do elenco
-      // chegam a 15 tiles, e uma sala menor que o golpe mede a moldura.
-      expect(open, `arena de ${boss}: ${open} celulas e pouco`).toBeGreaterThan(150);
+      // E ela tem de ser uma ARENA, e nao um corredor. O piso nao e um numero
+      // escolhido no olho: e o que `carveArena` promete escavar quando a
+      // caverna nao entrega (ARENA_MIN_FLOOR), e ele existe porque a versao
+      // anterior deixava o Coracao numa caixa de 16x19 com uma varredura que
+      // alcanca 15 — o chefe cobria a arena inteira.
+      expect(open, `arena de ${boss}: ${open} celulas e pouco`).toBeGreaterThanOrEqual(
+        ARENA_MIN_FLOOR,
+      );
     }
   });
 
@@ -151,6 +165,52 @@ describe('createArenaRun — o recorte da arena', () => {
       (e) => e.archetype === 'stalker' || e.archetype === 'bomber',
     );
     expect(intruders, 'a contaminacao repovoou a arena').toHaveLength(0);
+  });
+
+  it('da para CIRCULAR: a arena nao e um emaranhado de corredores', () => {
+    // Extensao e largura sao dois problemas diferentes, e o segundo nao se
+    // resolve com raio. Medida antes do alargamento, a arena do Diamandis tinha
+    // 13% de celulas com dois tiles livres em cruz: nao era uma sala apertada,
+    // era um labirinto — e ele e uma maquina de 1,5 tile/s que abre galeria com
+    // a broca.
+    for (const boss of ARENA_BOSS_ORDER) {
+      const state = arena(boss);
+      const w = state.config.width;
+      const open = (i: number) => state.solid[i] === SOLID_NONE;
+      let cells = 0;
+      let wide = 0;
+      for (let y = 1; y < state.config.height - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const i = y * w + x;
+          if (!open(i)) continue;
+          cells++;
+          let room = true;
+          for (let d = -2; d <= 2 && room; d++) {
+            if (!open(i + d) || !open(i + d * w)) room = false;
+          }
+          if (room) wide++;
+        }
+      }
+      const ratio = wide / cells;
+      expect(ratio, `arena de ${boss}: so ${(ratio * 100) | 0}% de chao largo`).toBeGreaterThan(0.35);
+    }
+  });
+
+  it('o macico selado e rocha LISA: sem cristal aceso do lado de fora', () => {
+    // O que sobra fora da arena nao pode chamar atencao para si. Cristal e
+    // minerio se desenham diferentes de pedra, e o cristal ainda por cima e
+    // fonte de luz no cliente: a rocha que ninguem vai visitar ficava salpicada
+    // de clarao azul e veio de ferrugem.
+    const state = arena('archcantor');
+    const w = state.config.width;
+    const body = state.enemies[0];
+    let strayFar = 0;
+    for (let i = 0; i < state.solid.length; i++) {
+      if (state.solid[i] !== SOLID_CRYSTAL && state.solid[i] !== SOLID_ORE) continue;
+      const d = Math.hypot((i % w) - body.x, Math.floor(i / w) - body.y);
+      if (d > ARENA_KEEP_RADIUS + 6) strayFar++;
+    }
+    expect(strayFar, 'sobrou cristal/minerio solto no macico selado').toBe(0);
   });
 
   it('a arena do Leviata nasce com AGUA e com DUTOS', () => {

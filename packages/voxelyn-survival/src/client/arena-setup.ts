@@ -19,6 +19,7 @@ import {
   CONTAMINATION_WAVES,
   DEFAULT_PLAYER_TUNING,
   SOLID_NONE,
+  SOLID_FRAGILE,
   SOLID_ROCK,
   isPipe,
   PIPE_MOUTH,
@@ -57,12 +58,17 @@ export const clampArenaHp = (hp: number): number =>
  * REALMENTE alcancavel em volta dele — a camara e as galerias que saem dela —,
  * e nao um quadrado carimbado por cima da rocha.
  *
- * Vinte e dois cobre a maior ameaca do elenco com folga: a varredura do Coracao
- * alcanca 15, o canto do Arquicantor 14 e os arcos do Devorador saem de 11. Uma
- * arena menor que o golpe transformaria "esquivar" em "nao ter para onde ir", e
- * o teste passaria a medir a moldura em vez da luta.
+ * Trinta, e o numero saiu de uma medicao. Com 22 a regra "cobre a maior ameaca
+ * do elenco" era so uma frase: numa gramatica de canyon ou de warren a busca
+ * satura no primeiro bolsao e devolve muito menos que o raio promete — a arena
+ * do Coracao ficava com 153 celulas numa caixa de 16x19, e a varredura DELE
+ * alcanca 15. O chefe cobria a arena inteira, e "esquivar" virava "nao ter para
+ * onde ir".
+ *
+ * Trinta da folga para o golpe mais longo do elenco (a broca do Diamandis, 20)
+ * caber com espaco para recuar depois dele.
  */
-export const ARENA_KEEP_RADIUS = 22;
+export const ARENA_KEEP_RADIUS = 30;
 /**
  * A que distancia do chefe o testador comeca.
  *
@@ -72,6 +78,51 @@ export const ARENA_KEEP_RADIUS = 22;
  * economizar.
  */
 const ARENA_PLAYER_GAP = 9;
+/**
+ * Quantas vezes a arena e ALARGADA antes do recorte.
+ *
+ * Extensao e largura sao dois problemas diferentes, e so o primeiro se resolve
+ * com raio. Medida a arena do Diamandis, 13% das celulas de chao tinham dois
+ * tiles livres em cruz: nao era uma sala apertada, era um emaranhado de
+ * corredores — e um chefe de 1,5 tile/s que abre galeria com a broca precisa de
+ * sala, nao de labirinto.
+ *
+ * A passada remove os NOS de parede: pedra solta com tres ou mais vizinhos
+ * abertos. Isso apaga pilar isolado e ponta de esporao — o que atrapalha
+ * circulacao — e deixa de pe o maciço, que e o que da forma ao lugar.
+ *
+ * UMA passada, e o numero foi medido: a segunda quase nao acha nada (uma celula
+ * na arena do Guardiao, nenhuma em sete das dez), porque o que sobra depois da
+ * primeira ja e maciço — cada celula dele tem no maximo dois lados livres.
+ * Insistir so comecaria a comer parede de verdade, e a arena e para ser a
+ * camara do bioma, e nao um disco.
+ */
+const ARENA_WIDEN_PASSES = 1;
+/**
+ * O PISO da arena, em celulas de chao, e o disco que o garante.
+ *
+ * Alargar resolve largura e o raio resolve extensao, mas nem sempre ha o que
+ * alargar: em gramatica de canyon (Fornalha) e nos sumidouros da Silica a
+ * caverna simplesmente ACABA perto do chefe, e depois das duas passadas a arena
+ * do Coracao ainda ficava numa caixa de 20 de largo — com uma varredura que
+ * alcanca 15. O chefe cobria a arena inteira.
+ *
+ * Quando a caverna nao entrega, a arena escava: um disco de pedra comum some em
+ * volta do chefe e a busca corre de novo. E uma REDE, e nao a forma padrao — as
+ * arenas que ja nascem abertas nunca chegam aqui, e continuam com os pilares e
+ * as reentrancias que o bioma pos nelas. Dezesseis de raio dao trinta e dois de
+ * vao livre: a varredura do Coracao cabe com uma passada de sobra.
+ */
+export const ARENA_MIN_FLOOR = 420;
+const ARENA_MIN_RADIUS = 16;
+
+/** Ordem fixa de vizinhanca das duas buscas do recorte. */
+const NEIGHBORS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
 
 /**
  * Reduz o setor a ARENA DO CHEFE e as adjacencias seguras, sem mobs.
@@ -106,8 +157,40 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
   const w = state.config.width;
   const h = state.config.height;
 
+  const bx = Math.floor(boss.x);
+  const by = Math.floor(boss.y);
+  // ALARGAR antes de recortar, para o chao que abrir entrar na busca.
+  //
+  // So pedra comum e fragil: minerio, cristal e duto ficam. Os tres sao
+  // linguagem — o cristal E a mecanica do Arquicantor, o duto E a fonte do
+  // Diluvio —, e alargar a sala nao pode custar aquilo que se foi testar.
+  const reach = ARENA_KEEP_RADIUS + 4;
+  for (let pass = 0; pass < ARENA_WIDEN_PASSES; pass++) {
+    const doomed: number[] = [];
+    for (let y = Math.max(2, by - reach); y <= Math.min(h - 3, by + reach); y++) {
+      for (let x = Math.max(2, bx - reach); x <= Math.min(w - 3, bx + reach); x++) {
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_ROCK && state.solid[i] !== SOLID_FRAGILE) continue;
+        let open = 0;
+        if (state.solid[i - 1] === SOLID_NONE) open++;
+        if (state.solid[i + 1] === SOLID_NONE) open++;
+        if (state.solid[i - w] === SOLID_NONE) open++;
+        if (state.solid[i + w] === SOLID_NONE) open++;
+        // Tres lados livres = no de parede: pilar solto ou ponta de esporao.
+        // Com dois ou menos a celula faz parte de um maciço, e o maciço e o
+        // que da forma ao lugar.
+        if (open >= 3) doomed.push(i);
+      }
+    }
+    if (doomed.length === 0) break;
+    // Marcadas todas ANTES de derrubar qualquer uma: derrubar durante a
+    // varredura faria uma parede inteira desabar em cascata, celula a celula,
+    // porque cada queda cria o terceiro lado livre da vizinha.
+    for (const i of doomed) state.solid[i] = SOLID_NONE;
+  }
+
   const dist = new Int32Array(w * h).fill(-1);
-  const start = Math.floor(boss.y) * w + Math.floor(boss.x);
+  const start = by * w + bx;
   if (state.solid[start] !== SOLID_NONE) return;
   dist[start] = 0;
   const queue = [start];
@@ -116,12 +199,7 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
     if (dist[cell] >= ARENA_KEEP_RADIUS) continue;
     const cx = cell % w;
     const cy = (cell - cx) / w;
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
+    for (const [dx, dy] of NEIGHBORS) {
       const x = cx + dx;
       const y = cy + dy;
       if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
@@ -132,32 +210,64 @@ export const carveArena = (state: SurvivalState, bossArchetype: string): void =>
     }
   }
 
-  // Fora da arena vira rocha. A superficie sai junto: uma poca ou um tapete de
-  // fungo trancado dentro do macico nao seria visto por ninguem, mas continuaria
-  // reagindo — fogo se propagando por dentro da parede e o tipo de fantasma que
-  // custa uma tarde para achar.
+  // A caverna nao entregou sala: escava. Ver ARENA_MIN_FLOOR.
+  let kept = 0;
+  for (let i = 0; i < dist.length; i++) if (dist[i] >= 0) kept++;
+  if (kept < ARENA_MIN_FLOOR) {
+    for (let y = Math.max(2, by - ARENA_MIN_RADIUS); y <= Math.min(h - 3, by + ARENA_MIN_RADIUS); y++) {
+      for (let x = Math.max(2, bx - ARENA_MIN_RADIUS); x <= Math.min(w - 3, bx + ARENA_MIN_RADIUS); x++) {
+        if (Math.hypot(x - bx, y - by) > ARENA_MIN_RADIUS) continue;
+        const i = y * w + x;
+        if (state.solid[i] === SOLID_ROCK || state.solid[i] === SOLID_FRAGILE) {
+          state.solid[i] = SOLID_NONE;
+        }
+      }
+    }
+    dist.fill(-1);
+    dist[start] = 0;
+    queue.length = 0;
+    queue.push(start);
+    for (let head = 0; head < queue.length; head++) {
+      const cell = queue[head];
+      if (dist[cell] >= ARENA_KEEP_RADIUS) continue;
+      const cx = cell % w;
+      const cy = (cell - cx) / w;
+      for (const [dx, dy] of NEIGHBORS) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+        const i = y * w + x;
+        if (state.solid[i] !== SOLID_NONE || dist[i] >= 0) continue;
+        dist[i] = dist[cell] + 1;
+        queue.push(i);
+      }
+    }
+  }
+
+  // Fora da arena, TUDO vira rocha comum — e o "tudo" e literal.
+  //
+  // Nao basta fechar o vao: o macico selado herdava cristal, minerio e duto
+  // intactos, e os tres se desenham diferente de pedra. Cristal ainda POR CIMA
+  // emite luz no cliente, entao a rocha que ninguem vai visitar ficava salpicada
+  // de clarao azul e de veios de ferrugem — cenario chamando atencao para um
+  // lugar que a arena acabou de declarar inexistente.
+  //
+  // A excecao e o duto que faz parede com a arena, e a pergunta ali e sobre a
+  // BOCA e nao sobre o corpo do cano: a busca so anda em vao, entao a distancia
+  // da propria celula de um duto e sempre -1 — testar por ela apagava ate os que
+  // despejam aqui dentro, e o Diluvio voltava a brotar do corpo do chefe.
   for (let i = 0; i < state.solid.length; i++) {
     if (dist[i] >= 0) continue;
-    // Os DUTOS: some com os de fora, fica com os que despejam AQUI.
-    //
-    // A pergunta certa e sobre a BOCA, e nao sobre o corpo do cano. A busca so
-    // anda em vao, entao a distancia da propria celula de um duto e sempre -1 —
-    // testar por ela apagava todos, inclusive os que fazem parede com a arena, e
-    // o Diluvio voltava a brotar do corpo do chefe. Um duto soterrado no macico
-    // sai porque ja estaria mudo e continuaria sendo desenhado: cenario
-    // prometendo uma coisa que nao vai acontecer.
     if (isPipe(state.solid[i])) {
       const [dx, dy] = PIPE_MOUTH[state.solid[i]];
       const mouth = (Math.floor(i / w) + dy) * w + (i % w) + dx;
       if (mouth >= 0 && mouth < dist.length && dist[mouth] >= 0) continue;
-      state.solid[i] = SOLID_ROCK;
-      continue;
     }
     if (state.solid[i] === SOLID_NONE) {
-      state.solid[i] = SOLID_ROCK;
       state.surface[i] = SURF_NONE;
       state.surfaceTimer[i] = 0;
     }
+    state.solid[i] = SOLID_ROCK;
   }
   for (let c = 0; c < state.chunkVersion.length; c++) state.chunkVersion[c]++;
 
