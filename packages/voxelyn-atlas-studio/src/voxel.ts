@@ -324,6 +324,24 @@ const FACE_NORMAL: [number, number, number][] = [
 
 const unrot = (x: number, y: number, r: number): [number, number] => rot(x, y, (4 - r) % 4);
 
+/**
+ * Pixel (na grade da vista) do centro do topo de um voxel autorado. E o inverso
+ * do `hitAt`, e existe para desenhar marcadores de junta POR CIMA da vista 3D:
+ * sem isso o autor cravaria as juntas as cegas na vista de fatia.
+ */
+export const voxelToViewPixel = (
+  view: VoxelView,
+  x: number,
+  y: number,
+  z: number,
+  dirIndex: number,
+): { px: number; py: number } => {
+  const rotation = DIRECTION_ROTATION[dirIndex] ?? 0;
+  const [rx, ry] = rot(x, y, rotation);
+  const { sx, sy } = projectIso(rx, ry, z);
+  return { px: view.originX + sx + VOX.tileW / 2, py: view.originY + sy + VOX.tileH / 2 };
+};
+
 export const renderVoxelView = (model: VoxelModel, dirIndex: number, pad = 6): VoxelView => {
   const rotation = DIRECTION_ROTATION[dirIndex];
   if (rotation === undefined) throw new Error(`direcao voxel invalida: ${dirIndex}`);

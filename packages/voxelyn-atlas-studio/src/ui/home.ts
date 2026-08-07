@@ -6,7 +6,8 @@ import { blobToGrid, normalizeGrid } from '../png';
 import { projectFromManifest, sliceAtlas, projectFrame } from '../atlas';
 import { orderedAnims } from '../presets';
 import { GAME_CATALOG } from '../catalog';
-import { parseStl, voxelizeStl } from '../stl';
+import { fitFrames, parseStl, voxelizeStl, voxelizeTriangles } from '../stl';
+import { orientTriangles, parseGlb, type GlbOrientation } from '../glb';
 import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
 import { modelKey } from '../types';
 import { confirmSheet, el, openSheet, toast } from './components';
@@ -142,6 +143,208 @@ const importStlSheet = (onImport: (p: Project) => void): Promise<void> =>
     ]);
   });
 
+/**
+ * Import de GLB: malha E animacao. Um clipe do GLB e amostrado em N instantes,
+ * cada instante e voxelizado, e sai um frame Voxelyn — ou seja, a animacao
+ * pronta de uma ferramenta 3D entra pelo mesmo voxelizador que ja assa o STL.
+ *
+ * O enquadramento e UM SO para todos os frames de todas as animacoes: enquadrar
+ * cada frame por conta propria faria o bicho crescer, encolher e pular de lugar
+ * a cada pose, porque os limites da malha mudam quando ela se mexe.
+ */
+const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
+  openSheet((close) => {
+    const container = el('div');
+    const fileInput = el('input', { type: 'file', accept: '.glb,.gltf' });
+    const info = el('p', { class: 'sub', text: 'Nenhum arquivo carregado.' });
+    const mapBox = el('div', { style: 'display:flex;flex-direction:column;gap:6px' });
+    const presetSelect = el('select');
+    for (const p of PRESETS) presetSelect.append(el('option', { value: p.id, text: p.label }));
+    const materialSelect = el('select');
+    for (const mat of VOXEL_MATERIALS)
+      materialSelect.append(el('option', { value: mat, text: mat }));
+    materialSelect.value = 'rock';
+    const heightInput = el('input', { type: 'number', min: '4', max: '48', value: '24' });
+    const upSelect = el('select');
+    upSelect.append(
+      el('option', { value: 'y', text: 'Y para cima (padrao glTF/Meshy)' }),
+      el('option', { value: 'z', text: 'Z para cima' }),
+    );
+    const yawSelect = el('select');
+    for (const d of [0, 90, 180, 270])
+      yawSelect.append(el('option', { value: String(d), text: `${d}°` }));
+    const idInput = el('input', {
+      placeholder: 'ex.: enemy-crystal-crab',
+      autocapitalize: 'none',
+      spellcheck: 'false',
+    });
+    const doImport = el('button', { class: 'primary', text: 'Voxelizar e abrir' });
+    doImport.disabled = true;
+
+    let scene: ReturnType<typeof parseGlb> | null = null;
+    const clipFor = new Map<string, HTMLSelectElement>();
+
+    const orientation = (): GlbOrientation => ({
+      up: upSelect.value === 'z' ? 'z' : 'y',
+      yaw: Number(yawSelect.value) as GlbOrientation['yaw'],
+    });
+
+    /** Casa clipe do GLB com animacao do preset pelo nome, quando da. */
+    const guessClip = (anim: string, names: string[]): number => {
+      const a = anim.toLowerCase();
+      const exact = names.findIndex((n) => n.toLowerCase() === a);
+      if (exact >= 0) return exact;
+      const partial = names.findIndex(
+        (n) => n.toLowerCase().includes(a) || a.includes(n.toLowerCase()),
+      );
+      return partial;
+    };
+
+    const rebuildMapping = (): void => {
+      mapBox.innerHTML = '';
+      clipFor.clear();
+      if (!scene) return;
+      const preset = PRESETS.find((p) => p.id === presetSelect.value)!;
+      const names = scene.animations.map((a) => a.name);
+      for (const [anim, def] of Object.entries(preset.animations)) {
+        const sel = el('select');
+        sel.append(el('option', { value: '-1', text: 'pose de repouso (sem animacao)' }));
+        scene.animations.forEach((clip, i) => {
+          sel.append(
+            el('option', { value: String(i), text: `${clip.name} (${clip.duration.toFixed(1)}s)` }),
+          );
+        });
+        sel.value = String(guessClip(anim, names));
+        clipFor.set(anim, sel);
+        mapBox.append(
+          el('div', { style: 'display:flex;gap:8px;align-items:center' }, [
+            el('span', {
+              class: 'budget',
+              style: 'min-width:74px',
+              text: `${anim} (${def.frames}f)`,
+            }),
+            sel,
+          ]),
+        );
+      }
+    };
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      info.textContent = 'Lendo…';
+      void (async () => {
+        try {
+          scene = parseGlb(await file.arrayBuffer());
+          const clips = scene.animations.length;
+          info.textContent =
+            `${scene.triangleCount.toLocaleString('pt-BR')} triangulos · ` +
+            (clips > 0
+              ? `${clips} animacao(oes): ${scene.animations.map((a) => a.name).join(', ')}`
+              : 'sem animacao — entra so a malha');
+          rebuildMapping();
+          doImport.disabled = false;
+        } catch (err) {
+          scene = null;
+          doImport.disabled = true;
+          info.textContent = `Falha no GLB: ${(err as Error).message}`;
+        }
+      })();
+    });
+    presetSelect.addEventListener('change', rebuildMapping);
+
+    doImport.addEventListener('click', () => {
+      if (!scene) return;
+      const spriteId = idInput.value.trim().toLowerCase().replace(/\s+/g, '-');
+      if (!/^[a-z0-9-]+$/.test(spriteId)) {
+        toast('Defina um id valido (minusculas e hifens)');
+        return;
+      }
+      const glb = scene;
+      const preset = PRESETS.find((p) => p.id === presetSelect.value)!;
+      const height = Math.max(4, Math.min(48, Number(heightInput.value) || 24));
+      const o = orientation();
+      doImport.disabled = true;
+
+      void (async () => {
+        try {
+          // 1) amostra TODOS os frames de todas as animacoes...
+          const jobs: { anim: string; frame: number; tris: Float32Array }[] = [];
+          for (const [anim, def] of Object.entries(preset.animations)) {
+            const clip = Number(clipFor.get(anim)?.value ?? -1);
+            const duration = clip >= 0 ? glb.animations[clip].duration : 0;
+            for (let f = 0; f < def.frames; f++) {
+              // ciclo fechado: o ultimo frame nao repete o primeiro
+              const t = duration > 0 ? (f / def.frames) * duration : 0;
+              jobs.push({
+                anim,
+                frame: f,
+                tris: orientTriangles(glb.sample(clip >= 0 ? clip : null, t), o),
+              });
+            }
+            doImport.textContent = `Amostrando ${anim}…`;
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          // 2) ...para um enquadramento so, e so entao voxeliza
+          const fit = fitFrames(
+            jobs.map((j) => j.tris),
+            height,
+          );
+          const project = createProjectFromPreset(preset, spriteId, spriteId);
+          project.mode = 'voxel';
+          project.flipPairs = {};
+          project.models = {};
+          let done = 0;
+          for (const job of jobs) {
+            project.models[modelKey(job.anim, job.frame)] = voxelizeTriangles(
+              job.tris,
+              materialSelect.value,
+              fit,
+            );
+            done++;
+            doImport.textContent = `Voxelizando ${done}/${jobs.length}…`;
+            await new Promise((r) => setTimeout(r, 0));
+          }
+          const first = project.models[modelKey(Object.keys(preset.animations)[0], 0)];
+          const b = voxelProjectedBounds(first);
+          const fits = b.w <= project.frameWidth - 4 && b.h <= project.frameHeight - 4;
+          toast(
+            `${jobs.length} frames · projecao ${b.w}×${b.h}px ${fits ? '✓ cabe no frame' : `✕ frame util e ${project.frameWidth - 4}×${project.frameHeight - 4}px — reduza a altura`}`,
+          );
+          close();
+          onImport(project);
+        } catch (err) {
+          toast(`Falha no GLB: ${(err as Error).message}`);
+          doImport.disabled = false;
+          doImport.textContent = 'Voxelizar e abrir';
+        }
+      })();
+    });
+
+    container.append(
+      el('h2', { text: 'Importar GLB (malha + animacao)' }),
+      el('p', {
+        class: 'sub',
+        text: 'GLB e o unico dos tres formatos que e um arquivo so e autocontido — malha, esqueleto e animacoes juntos. No Meshy, baixe em "glb". Cada animacao do arquivo e amostrada nos frames do preset e voxelizada.',
+      }),
+      fileInput,
+      info,
+      el('div', { class: 'grid2' }, [
+        el('div', {}, [el('label', { text: 'Altura do modelo (voxels finos)' }), heightInput]),
+        el('div', {}, [el('label', { text: 'Material base' }), materialSelect]),
+      ]),
+      el('div', { class: 'grid2' }, [
+        el('div', {}, [el('label', { text: 'Eixo para cima' }), upSelect]),
+        el('div', {}, [el('label', { text: 'Girar (se estiver de costas)' }), yawSelect]),
+      ]),
+      el('div', {}, [el('label', { text: 'Preset (canvas e animacoes)' }), presetSelect]),
+      el('div', {}, [el('label', { text: 'Animacao do GLB para cada animacao do jogo' }), mapBox]),
+      el('div', {}, [el('label', { text: 'id do sprite' }), idInput]),
+      doImport,
+    );
+    return container;
+  });
+
 const catalogSheet = (onImport: (p: Project) => void): Promise<void> =>
   openSheet((close) => {
     const list = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });
@@ -247,6 +450,12 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       void saveProject(p).then(() => openEditor(p));
     });
   });
+  const glbBtn = el('button', { text: '🦴 Importar GLB (com animacao)' });
+  glbBtn.addEventListener('click', () => {
+    void importGlbSheet((p) => {
+      void saveProject(p).then(() => openEditor(p));
+    });
+  });
   const stlBtn = el('button', { text: '🗿 Importar STL' });
   stlBtn.addEventListener('click', () => {
     void importStlSheet((p) => {
@@ -261,7 +470,7 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       text: 'Monte personagens voxel a voxel (ou pixel a pixel), importe e exporte atlases no formato do Voxelyn Survival — com a paleta veio-fungico e o contrato da Art Bible.',
     }),
     el('div', { class: 'actions' }, [newBtn, catalogBtn]),
-    el('div', { class: 'actions' }, [stlBtn, importBtn]),
+    el('div', { class: 'actions' }, [glbBtn, stlBtn, importBtn]),
   );
 
   const list = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });

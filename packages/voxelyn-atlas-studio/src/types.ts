@@ -3,6 +3,7 @@
 // packages/voxelyn-survival-content/src/manifest.ts (SpriteManifestEntry):
 // o que o Studio exporta e exatamente o que o SpriteBank do jogo carrega.
 import type { PartOverrides } from './pose';
+import type { ManualRig } from './rig';
 
 export type SpriteAnimationDefinition = {
   frames: number;
@@ -79,6 +80,11 @@ export type Project = {
    * autor — e a IA passa a citar os nomes que ele escolheu.
    */
   partOverrides?: PartOverrides;
+  /**
+   * Esqueleto marcado a mao. Quando existe e esta completo, ele SUBSTITUI a
+   * deteccao automatica: a geometria pode enganar o detector, o autor nao.
+   */
+  rig?: ManualRig;
   prompt: string;
   createdAt: number;
   updatedAt: number;

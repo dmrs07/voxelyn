@@ -65,12 +65,27 @@ const MAX_VOXELS = 150_000;
 // da paridade), sem mudar de celula.
 const JITTER = 1e-3;
 
-export const voxelizeStl = (tris: StlTriangles, opts: VoxelizeOptions): VoxelModel => {
-  const { height, material } = opts;
-  const range = opts.range ?? 48;
-  if (tris.length === 0) throw new Error('STL sem triangulos');
-  if (height < 2) throw new Error('altura minima: 2 voxels');
+/**
+ * Enquadramento: escala e origem usadas para levar a malha ao espaco de voxels.
+ *
+ * Existe separado porque uma ANIMACAO precisa que TODOS os frames usem o mesmo:
+ * enquadrar cada frame por conta propria faria o bicho crescer, encolher e
+ * pular de lugar a cada pose, ja que os limites da malha mudam quando ela se
+ * mexe. Um enquadramento so, tirado da uniao dos frames, resolve.
+ */
+export type VoxelFit = {
+  scale: number;
+  centerX: number;
+  centerY: number;
+  minZ: number;
+  spanX: number;
+  spanY: number;
+  height: number;
+};
 
+export const fitTriangles = (tris: StlTriangles, height: number): VoxelFit => {
+  if (tris.length === 0) throw new Error('malha sem triangulos');
+  if (height < 2) throw new Error('altura minima: 2 voxels');
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
@@ -88,8 +103,42 @@ export const voxelizeStl = (tris: StlTriangles, opts: VoxelizeOptions): VoxelMod
   const extentZ = maxZ - minZ;
   if (!(extentZ > 0)) throw new Error('malha sem altura no eixo Z');
   const scale = height / extentZ;
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
+  return {
+    scale,
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+    minZ,
+    spanX: (maxX - minX) * scale,
+    spanY: (maxY - minY) * scale,
+    height,
+  };
+};
+
+/** Enquadramento que cabe em TODOS os frames de uma animacao. */
+export const fitFrames = (frames: StlTriangles[], height: number): VoxelFit => {
+  let total = 0;
+  for (const f of frames) total += f.length;
+  const all = new Float32Array(total);
+  let o = 0;
+  for (const f of frames) {
+    all.set(f, o);
+    o += f.length;
+  }
+  return fitTriangles(all, height);
+};
+
+export const voxelizeStl = (tris: StlTriangles, opts: VoxelizeOptions): VoxelModel =>
+  voxelizeTriangles(tris, opts.material, fitTriangles(tris, opts.height), opts.range);
+
+export const voxelizeTriangles = (
+  tris: StlTriangles,
+  material: string,
+  fit: VoxelFit,
+  rangeOpt?: number,
+): VoxelModel => {
+  const { scale, centerX, centerY, minZ, spanX, spanY, height } = fit;
+  const range = rangeOpt ?? 48;
+  if (tris.length === 0) throw new Error('malha sem triangulos');
 
   // malha transformada para o espaco de voxels: origem entre os pes, chao em 0
   const t = new Float32Array(tris.length);
@@ -99,8 +148,6 @@ export const voxelizeStl = (tris: StlTriangles, opts: VoxelizeOptions): VoxelMod
     t[i + 2] = (tris[i + 2] - minZ) * scale;
   }
 
-  const spanX = (maxX - minX) * scale;
-  const spanY = (maxY - minY) * scale;
   if ((spanX + 1) * (spanY + 1) * (height + 1) > MAX_VOXELS * 4) {
     throw new Error(
       `modelo voxelizado ficaria com ~${Math.round(spanX)}×${Math.round(spanY)}×${height} celulas — reduza a altura`,
