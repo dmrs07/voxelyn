@@ -29,6 +29,8 @@ import {
 } from '../voxel';
 import { saveProject } from '../store';
 import { STYLE_LABELS, generateAnimation, styleForAnim, type AnimStyle } from '../animate';
+import { applyAnimationSpec, segmentParts } from '../pose';
+import { designPoses, getApiKey, setApiKey } from '../ai';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
 
@@ -966,11 +968,114 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         close();
       });
 
+      // ---------- secao IA: Claude projeta as poses por parte ----------
+      const aiAnimSel = el('select');
+      for (const a of orderedAnims(project.animations)) {
+        aiAnimSel.append(
+          el('option', { value: a, text: `${a} (${project.animations[a].frames}f)` }),
+        );
+      }
+      aiAnimSel.value = anim;
+      const descInput = el('textarea', {
+        rows: '3',
+        placeholder:
+          'ex.: aranha de cristal; na caminhada as 8 pernas alternam em dois grupos e o abdomen balanca; no ataque ela empina e crava as pernas da frente',
+      }) as HTMLTextAreaElement;
+
+      const keyRow = el('div', { style: 'display:flex;gap:6px' });
+      const keyInput = el('input', {
+        type: 'password',
+        placeholder: getApiKey() ? 'chave configurada ✓ (cole outra para trocar)' : 'sk-ant-…',
+        autocapitalize: 'none',
+      });
+      const keySave = el('button', { text: 'Salvar', style: 'flex:none' });
+      keySave.addEventListener('click', () => {
+        setApiKey(keyInput.value.trim());
+        keyInput.value = '';
+        keyInput.placeholder = getApiKey() ? 'chave configurada ✓' : 'sk-ant-…';
+        toast(getApiKey() ? 'Chave salva neste aparelho' : 'Chave removida');
+      });
+      keyRow.append(keyInput, keySave);
+
+      const aiGenerate = el('button', { class: 'primary', text: '✨ Projetar poses com IA' });
+      aiGenerate.addEventListener('click', () => {
+        const base = structuredClone(currentModel());
+        if (Object.keys(base).length === 0) {
+          toast('O frame atual esta vazio — monte a pose base antes de animar');
+          return;
+        }
+        const parts = segmentParts(base);
+        const a = aiAnimSel.value;
+        const def = project.animations[a];
+        aiGenerate.disabled = true;
+        aiGenerate.textContent = '✨ Projetando… (alguns segundos)';
+        void (async () => {
+          try {
+            const spec = await designPoses({
+              model: base,
+              parts,
+              animation: a,
+              frames: def.frames,
+              fps: def.fps,
+              loop: def.loop,
+              description: descInput.value.trim(),
+            });
+            const frames = applyAnimationSpec(base, parts, spec, def.frames);
+            frames.forEach((m, f) => {
+              const mKey = modelKey(a, f);
+              const before = structuredClone(project.models![mKey] ?? {});
+              project.models![mKey] = m;
+              undoStack.push({ mKey, before, after: structuredClone(m) });
+            });
+            while (undoStack.length > 64) undoStack.shift();
+            redoStack.length = 0;
+            invalidateView();
+            scheduleSave();
+            updateUndoRedo();
+            updateFrameStrip();
+            render();
+            toast(
+              `Poses de "${a}" projetadas pela IA — de o play; ajuste a descricao e regenere se quiser`,
+            );
+            close();
+          } catch (err) {
+            toast((err as Error).message);
+            aiGenerate.disabled = false;
+            aiGenerate.textContent = '✨ Projetar poses com IA';
+          }
+        })();
+      });
+
+      const partsInfo = (() => {
+        const base = currentModel();
+        if (Object.keys(base).length === 0) return 'Frame atual vazio';
+        const parts = segmentParts(base);
+        const legs = parts.filter((p) => p.name.startsWith('perna')).length;
+        return `Partes detectadas: ${legs > 0 ? `${legs} perna(s) + ` : ''}corpo`;
+      })();
+
       container.append(
-        el('h2', { text: 'Animar automaticamente' }),
+        el('h2', { text: 'Animar' }),
         el('p', {
           class: 'sub',
-          text: 'Gera os frames a partir do FRAME ATUAL como pose base. Deterministico: regenerar da sempre o mesmo resultado; cada frame gerado pode ser refinado a mao depois (undo desfaz frame a frame).',
+          text: `A partir do FRAME ATUAL como pose base. ${partsInfo}. Cada frame gerado pode ser refinado a mao (undo desfaz frame a frame).`,
+        }),
+        el('div', {
+          class: 'issue ok',
+          style: 'font-weight:600',
+          text: '✨ IA projeta as poses (por partes)',
+        }),
+        el('div', {}, [el('label', { text: 'Animacao' }), aiAnimSel]),
+        el('div', {}, [el('label', { text: 'Descreva o personagem e o movimento' }), descInput]),
+        el('div', {}, [
+          el('label', { text: 'Chave da API Anthropic (fica so neste aparelho)' }),
+          keyRow,
+        ]),
+        aiGenerate,
+        el('div', {
+          class: 'issue',
+          style: 'margin-top:8px',
+          text: '⚡ Rapido, sem IA (presets deterministicos)',
         }),
         el('div', {}, [el('label', { text: 'Animacao' }), animSel]),
         el('div', {}, [el('label', { text: 'Preset de movimento' }), styleSel]),
