@@ -6,6 +6,9 @@ import { blobToGrid, normalizeGrid } from '../png';
 import { projectFromManifest, sliceAtlas, projectFrame } from '../atlas';
 import { orderedAnims } from '../presets';
 import { GAME_CATALOG } from '../catalog';
+import { parseStl, voxelizeStl } from '../stl';
+import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
+import { modelKey } from '../types';
 import { confirmSheet, el, openSheet, toast } from './components';
 
 const drawThumb = (canvas: HTMLCanvasElement, project: Project): void => {
@@ -59,6 +62,83 @@ const newProjectSheet = (onCreate: (p: Project) => void): Promise<void> =>
       el('div', {}, [el('label', { text: 'id do sprite (nome dos arquivos)' }), idInput]),
       el('div', {}, [el('label', { text: 'Nome de exibicao' }), nameInput]),
       create,
+    ]);
+  });
+
+const importStlSheet = (onImport: (p: Project) => void): Promise<void> =>
+  openSheet((close) => {
+    const fileInput = el('input', { type: 'file', accept: '.stl' });
+    const presetSelect = el('select');
+    for (const p of PRESETS) presetSelect.append(el('option', { value: p.id, text: p.label }));
+    const materialSelect = el('select');
+    for (const mat of VOXEL_MATERIALS)
+      materialSelect.append(el('option', { value: mat, text: mat }));
+    materialSelect.value = 'rock';
+    const heightInput = el('input', { type: 'number', min: '4', max: '48', value: '24' });
+    const idInput = el('input', {
+      placeholder: 'ex.: enemy-crystal-crab',
+      autocapitalize: 'none',
+      spellcheck: 'false',
+    });
+    const doImport = el('button', { class: 'primary', text: 'Voxelizar e abrir' });
+    doImport.addEventListener('click', () => {
+      const file = fileInput.files?.[0];
+      if (!file) {
+        toast('Selecione um arquivo .stl');
+        return;
+      }
+      const spriteId = idInput.value.trim().toLowerCase().replace(/\s+/g, '-');
+      if (!/^[a-z0-9-]+$/.test(spriteId)) {
+        toast('Defina um id valido (minusculas e hifens)');
+        return;
+      }
+      doImport.disabled = true;
+      doImport.textContent = 'Voxelizando…';
+      void (async () => {
+        try {
+          const tris = parseStl(await file.arrayBuffer());
+          const height = Math.max(4, Math.min(48, Number(heightInput.value) || 24));
+          const model = voxelizeStl(tris, { height, material: materialSelect.value });
+          const preset = PRESETS.find((p) => p.id === presetSelect.value)!;
+          const project = createProjectFromPreset(preset, spriteId, spriteId);
+          project.mode = 'voxel';
+          project.flipPairs = {};
+          project.models = {};
+          // o mesmo corpo em todos os frames: e o ponto de partida para animar
+          // (copiar/mover/editar por frame), igual ao fluxo de criar do zero
+          for (const anim of Object.keys(project.animations)) {
+            for (let f = 0; f < project.animations[anim].frames; f++) {
+              project.models[modelKey(anim, f)] = structuredClone(model);
+            }
+          }
+          const b = voxelProjectedBounds(model);
+          const fits = b.w <= project.frameWidth - 4 && b.h <= project.frameHeight - 4;
+          toast(
+            `${Object.keys(model).length} voxels · projecao ${b.w}×${b.h}px ${fits ? '✓ cabe no frame' : `✕ frame util e ${project.frameWidth - 4}×${project.frameHeight - 4}px — reduza a altura ou aumente o frame`}`,
+          );
+          close();
+          onImport(project);
+        } catch (err) {
+          toast(`Falha no STL: ${(err as Error).message}`);
+          doImport.disabled = false;
+          doImport.textContent = 'Voxelizar e abrir';
+        }
+      })();
+    });
+    return el('div', {}, [
+      el('h2', { text: 'Importar STL (voxelizar)' }),
+      el('p', {
+        class: 'sub',
+        text: 'Malha 3D fechada (impressao 3D) vira modelo voxel editavel, com Z para cima e pes no chao. STL nao tem cor: tudo chega no material base, e voce pinta no editor.',
+      }),
+      fileInput,
+      el('div', { class: 'grid2' }, [
+        el('div', {}, [el('label', { text: 'Altura do modelo (voxels finos)' }), heightInput]),
+        el('div', {}, [el('label', { text: 'Material base' }), materialSelect]),
+      ]),
+      el('div', {}, [el('label', { text: 'Preset (canvas e animacoes)' }), presetSelect]),
+      el('div', {}, [el('label', { text: 'id do sprite' }), idInput]),
+      doImport,
     ]);
   });
 
@@ -167,6 +247,12 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       void saveProject(p).then(() => openEditor(p));
     });
   });
+  const stlBtn = el('button', { text: '🗿 Importar STL' });
+  stlBtn.addEventListener('click', () => {
+    void importStlSheet((p) => {
+      void saveProject(p).then(() => openEditor(p));
+    });
+  });
 
   container.append(
     el('h1', {}, [el('img', { src: './icon-192.png', alt: '' }), 'Voxelyn Atlas Studio']),
@@ -175,7 +261,7 @@ export const mountHome = (root: HTMLElement, openEditor: (project: Project) => v
       text: 'Monte personagens voxel a voxel (ou pixel a pixel), importe e exporte atlases no formato do Voxelyn Survival — com a paleta veio-fungico e o contrato da Art Bible.',
     }),
     el('div', { class: 'actions' }, [newBtn, catalogBtn]),
-    el('div', { class: 'actions' }, [importBtn]),
+    el('div', { class: 'actions' }, [stlBtn, importBtn]),
   );
 
   const list = el('div', { style: 'display:flex;flex-direction:column;gap:8px' });
