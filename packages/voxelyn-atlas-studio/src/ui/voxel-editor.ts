@@ -30,7 +30,7 @@ import {
 import { saveProject } from '../store';
 import { STYLE_LABELS, generateAnimation, styleForAnim, type AnimStyle } from '../animate';
 import { applyAnimationSpec, segmentParts } from '../pose';
-import { designPoses, getApiKey, setApiKey } from '../ai';
+import { AI_MODELS, designPoses, getApiKey, getModel, setApiKey, setModel } from '../ai';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
 
@@ -982,6 +982,11 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           'ex.: aranha de cristal; na caminhada as 8 pernas alternam em dois grupos e o abdomen balanca; no ataque ela empina e crava as pernas da frente',
       }) as HTMLTextAreaElement;
 
+      const modelSel = el('select');
+      for (const m of AI_MODELS) modelSel.append(el('option', { value: m.id, text: m.label }));
+      modelSel.value = getModel();
+      modelSel.addEventListener('change', () => setModel(modelSel.value));
+
       const keyRow = el('div', { style: 'display:flex;gap:6px' });
       const keyInput = el('input', {
         type: 'password',
@@ -1067,6 +1072,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         }),
         el('div', {}, [el('label', { text: 'Animacao' }), aiAnimSel]),
         el('div', {}, [el('label', { text: 'Descreva o personagem e o movimento' }), descInput]),
+        el('div', {}, [el('label', { text: 'Modelo' }), modelSel]),
         el('div', {}, [
           el('label', { text: 'Chave da API Anthropic (fica so neste aparelho)' }),
           keyRow,
