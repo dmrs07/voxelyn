@@ -19,7 +19,10 @@ import {
   VOXEL_MATERIALS,
   mirrorModelX,
   parseVoxelKey,
+  removeBox,
+  removeZRange,
   renderVoxelView,
+  settleToGround,
   shiftModel,
   voxelKey,
   voxelModelBounds,
@@ -35,7 +38,7 @@ import { AI_MODELS, designPoses, getApiKey, getModel, setApiKey, setModel } from
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
 
-type Tool = 'pencil' | 'eraser' | 'fill' | 'box' | 'picker';
+type Tool = 'pencil' | 'eraser' | 'fill' | 'box' | 'select' | 'picker';
 type ViewMode = 'model' | 'slice';
 
 const TOOL_ICONS: Record<Tool, string> = {
@@ -43,6 +46,7 @@ const TOOL_ICONS: Record<Tool, string> = {
   eraser: '🧽',
   box: '⬛',
   fill: '🪣',
+  select: '⬚',
   picker: '💉',
 };
 
@@ -51,8 +55,12 @@ const TOOL_LABELS: Record<Tool, string> = {
   eraser: 'Remover voxel',
   box: 'Caixa (arraste na fatia)',
   fill: 'Balde da fatia',
+  select: 'Selecionar area (arraste na fatia)',
   picker: 'Conta-gotas',
 };
+
+/** Retangulo selecionado na fatia (em celulas x/y, inclusivo). */
+type Selection = { minX: number; maxX: number; minY: number; maxY: number };
 
 /** Limite de alcance da grade de edicao (unidades finas a partir da origem). */
 const RANGE = 48;
@@ -81,6 +89,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   let dir = 'dr';
   let playing = false;
   let playStart = 0;
+  /** area marcada com a ferramenta ⬚, viva ate o autor agir ou limpar */
+  let selection: Selection | null = null;
 
   const undoStack: HistEntry[] = [];
   const redoStack: HistEntry[] = [];
@@ -286,6 +296,20 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       ctx.setLineDash([]);
     }
 
+    if (selection) {
+      const x0 = sliceView.x + selection.minX * s;
+      const y0 = sliceView.y + selection.minY * s;
+      const w = (selection.maxX - selection.minX + 1) * s;
+      const h = (selection.maxY - selection.minY + 1) * s;
+      ctx.fillStyle = 'rgba(255,209,102,0.15)';
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeStyle = 'rgba(255,209,102,0.9)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(x0, y0, w, h);
+      ctx.setLineDash([]);
+    }
+
     const count = Object.keys(model).length;
     hud.textContent = `z=${z} · ${anim} ${frameIndex + 1}/${project.animations[anim]?.frames ?? 0} · ${count} voxels · ${TOOL_LABELS[tool]} (${material})`;
   };
@@ -446,6 +470,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   let strokeBefore: VoxelModel | null = null;
   let strokeModel: VoxelModel | null = null;
   let strokeCancelled = false;
+  /** o traco chegou a mudar o modelo? (selecionar e conta-gotas nao mudam) */
+  let strokeDirty = false;
   /** superficie congelada no inicio do traco (vista 3D) — ver editModelAt */
   let strokeBaseView: VoxelView | null = null;
   /** celulas ja tocadas neste traco (dedupe da demao) */
@@ -488,6 +514,16 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           for (let x = minX; x <= maxX; x++) placeAt(strokeModel, x, y, z, false);
         }
         changed = true;
+      } else if (tool === 'select' && strokeStart) {
+        // selecionar nao edita: so marca a area e espera a acao do autor
+        selection = {
+          minX: Math.min(strokeStart.x, cell.x),
+          maxX: Math.max(strokeStart.x, cell.x),
+          minY: Math.min(strokeStart.y, cell.y),
+          maxY: Math.max(strokeStart.y, cell.y),
+        };
+        updateSelectionRow();
+        render();
       } else if (tool === 'fill') {
         changed = fillSlice(strokeModel, cell.x, cell.y);
       } else if (tool === 'picker') {
@@ -502,6 +538,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       }
     }
     if (changed) {
+      strokeDirty = true;
       setCurrentModel(strokeModel);
       invalidateView();
       render();
@@ -510,7 +547,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
 
   const beginStroke = (clientX: number, clientY: number): void => {
     if (playing) return;
-    if (viewMode === 'model' && (tool === 'fill' || tool === 'box')) {
+    if (viewMode === 'model' && (tool === 'fill' || tool === 'box' || tool === 'select')) {
       toast(`${TOOL_LABELS[tool]} funciona na vista Fatia`);
       return;
     }
@@ -522,7 +559,11 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       viewMode === 'model'
         ? renderVoxelView(strokeBefore, (VOXEL_DIRS as readonly string[]).indexOf(dir))
         : null;
-    strokeStart = viewMode === 'slice' && tool === 'box' ? sliceCellAt(clientX, clientY) : null;
+    strokeStart =
+      viewMode === 'slice' && (tool === 'box' || tool === 'select')
+        ? sliceCellAt(clientX, clientY)
+        : null;
+    strokeDirty = false;
     applyStrokePoint(clientX, clientY);
   };
 
@@ -530,11 +571,15 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     const before = strokeBefore;
     const after = strokeModel ? structuredClone(strokeModel) : null;
     const cancelled = strokeCancelled;
+    const dirty = strokeDirty;
     strokeBefore = null;
     strokeModel = null;
     strokeBaseView = null;
     strokeStart = null;
-    if (!before || !after || cancelled) return;
+    strokeDirty = false;
+    // traco que nao mudou nada (selecionar, conta-gotas, toque no vazio) nao
+    // vira entrada de historico: senao o undo passa a gastar toques a toa
+    if (!before || !after || cancelled || !dirty) return;
     undoStack.push({ mKey: currentModelKey(), before, after });
     if (undoStack.length > 64) undoStack.shift();
     redoStack.length = 0;
@@ -665,7 +710,8 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     btn.addEventListener('click', () => {
       tool = t;
       // caixa e balde sao ferramentas de fatia: escolher uma ja leva pra la
-      if ((t === 'box' || t === 'fill') && viewMode !== 'slice') setViewMode('slice');
+      if ((t === 'box' || t === 'fill' || t === 'select') && viewMode !== 'slice')
+        setViewMode('slice');
       updateToolbar();
     });
     toolButtons.set(t, btn);
@@ -718,7 +764,86 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
     pushModelEdit(structuredClone(m), after);
     gotoSlice(1);
   });
-  toolsRow.append(brushBtn, mirrorBtn, ghostBtn, zDown, zLabel, zUp, dupBtn);
+  // Apagar a camada inteira: um STL importado chega com laje de base e muitas
+  // camadas de sobra, e limpar isso voxel a voxel no celular nao acontece.
+  const delLayerBtn = el('button', { class: 'toolbtn', text: '🗑z', title: 'Apagar camada z' });
+  delLayerBtn.addEventListener('click', () => {
+    const m = currentModel();
+    const n = Object.keys(m).filter((key) => parseVoxelKey(key)[2] === z).length;
+    if (n === 0) {
+      toast(`Camada z=${z} ja esta vazia`);
+      return;
+    }
+    pushModelEdit(structuredClone(m), removeZRange(m, z, z));
+    toast(`Camada z=${z} apagada (${n} voxels) — ↩ desfaz`);
+  });
+  toolsRow.append(brushBtn, mirrorBtn, ghostBtn, zDown, zLabel, zUp, dupBtn, delLayerBtn);
+
+  // ---------------- acoes da selecao ----------------
+  // So aparece quando ha area marcada: ocupa espaco de tela apenas enquanto
+  // serve para alguma coisa.
+  const selectionRow = el('div', { class: 'row', style: 'display:none' });
+  const selInfo = el('span', { class: 'budget' });
+  const selDelLayer = el('button', { class: 'toolbtn', text: '🗑z', title: 'Apagar nesta camada' });
+  const selDelAll = el('button', {
+    class: 'toolbtn',
+    text: '🗑⇕',
+    title: 'Apagar em TODAS as camadas',
+  });
+  const selFill = el('button', { class: 'toolbtn', text: '🧱', title: 'Preencher esta camada' });
+  const selClear = el('button', { class: 'toolbtn', text: '✕', title: 'Limpar selecao' });
+  selectionRow.append(selInfo, selDelLayer, selDelAll, selFill, selClear);
+
+  const updateSelectionRow = (): void => {
+    selectionRow.style.display = selection ? '' : 'none';
+    if (!selection) return;
+    const w = selection.maxX - selection.minX + 1;
+    const h = selection.maxY - selection.minY + 1;
+    selInfo.textContent = `${w}×${h}`;
+  };
+
+  selDelLayer.addEventListener('click', () => {
+    if (!selection) return;
+    const m = currentModel();
+    const after = removeBox(m, selection, z, z);
+    const n = Object.keys(m).length - Object.keys(after).length;
+    if (n === 0) {
+      toast('Nada a apagar nessa area, nesta camada');
+      return;
+    }
+    pushModelEdit(structuredClone(m), after);
+    toast(`${n} voxels apagados em z=${z} — ↩ desfaz`);
+  });
+
+  selDelAll.addEventListener('click', () => {
+    if (!selection) return;
+    const m = currentModel();
+    const after = removeBox(m, selection);
+    const n = Object.keys(m).length - Object.keys(after).length;
+    if (n === 0) {
+      toast('Nada a apagar nessa area');
+      return;
+    }
+    pushModelEdit(structuredClone(m), after);
+    toast(`${n} voxels apagados em todas as camadas — ↩ desfaz`);
+  });
+
+  selFill.addEventListener('click', () => {
+    if (!selection) return;
+    const m = currentModel();
+    const after = structuredClone(m);
+    for (let y = selection.minY; y <= selection.maxY; y++) {
+      for (let x = selection.minX; x <= selection.maxX; x++) placeAt(after, x, y, z, false);
+    }
+    pushModelEdit(structuredClone(m), after);
+    toast(`Area preenchida com ${material} em z=${z}`);
+  });
+
+  selClear.addEventListener('click', () => {
+    selection = null;
+    updateSelectionRow();
+    render();
+  });
 
   const updateToolbar = (): void => {
     for (const [t, btn] of toolButtons) btn.classList.toggle('active', t === tool);
@@ -867,6 +992,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       const exportBtn = el('button', { class: 'primary', text: '⇪ Validar & exportar atlas' });
       const animateBtn = el('button', { text: '🎬 Animar automaticamente' });
       const partsBtn = el('button', { text: '🧩 Partes do modelo' });
+      const layersBtn = el('button', { text: '✂ Camadas (cortar base do STL)' });
       const moveBtn = el('button', { text: '✥ Mover modelo (frame atual)' });
       const mirrorAllBtn = el('button', { text: '⇋ Espelhar modelo inteiro em X' });
       const settings = el('button', { text: '⚙ Configuracoes do sprite' });
@@ -882,6 +1008,10 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       partsBtn.addEventListener('click', () => {
         close();
         void openPartsSheet();
+      });
+      layersBtn.addEventListener('click', () => {
+        close();
+        void openLayersSheet();
       });
       moveBtn.addEventListener('click', () => {
         close();
@@ -910,6 +1040,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
           exportBtn,
           animateBtn,
           partsBtn,
+          layersBtn,
           moveBtn,
           mirrorAllBtn,
           boundsBtn,
@@ -1120,6 +1251,103 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         el('div', {}, [el('label', { text: 'Preset de movimento' }), styleSel]),
         el('div', {}, [el('label', { text: 'Intensidade' }), intensitySel]),
         generate,
+      );
+      return container;
+    });
+
+  /**
+   * Folha de CAMADAS: cortes grossos em z. Existe para o fluxo de STL — o
+   * arquivo quase sempre chega apoiado numa laje de base que nao faz parte do
+   * bicho, e depois de cortar ele fica flutuando.
+   */
+  const openLayersSheet = (): Promise<void> =>
+    openSheet((close) => {
+      const container = el('div');
+      const m = currentModel();
+      const b = voxelModelBounds(m);
+      if (!b) {
+        container.append(
+          el('h2', { text: 'Camadas' }),
+          el('p', { class: 'sub', text: 'O frame atual esta vazio.' }),
+        );
+        return container;
+      }
+
+      const countAt = (vz: number): number =>
+        Object.keys(currentModel()).filter((key) => parseVoxelKey(key)[2] === vz).length;
+
+      const cutInput = el('input', {
+        type: 'number',
+        value: String(b.minZ),
+        min: String(b.minZ),
+        max: String(b.maxZ),
+      });
+      const cutInfo = el('p', { class: 'sub' });
+      const refreshInfo = (): void => {
+        const top = Number(cutInput.value);
+        let n = 0;
+        for (const key of Object.keys(currentModel())) {
+          if (parseVoxelKey(key)[2] <= top) n++;
+        }
+        cutInfo.textContent = `Apaga z=${b.minZ} ate z=${top} — ${n} voxels.`;
+      };
+      cutInput.addEventListener('input', refreshInfo);
+      refreshInfo();
+
+      const cut = el('button', { class: 'primary', text: '✂ Cortar da base ate essa camada' });
+      cut.addEventListener('click', () => {
+        const top = Number(cutInput.value);
+        const before = currentModel();
+        const after = settleToGround(removeZRange(before, b.minZ, top));
+        if (Object.keys(after).length === 0) {
+          toast('Isso apagaria o modelo inteiro — escolha uma camada mais baixa');
+          return;
+        }
+        const n = Object.keys(before).length - Object.keys(after).length;
+        pushModelEdit(structuredClone(before), after);
+        toast(`${n} voxels cortados e o modelo assentado no chao — ↩ desfaz`);
+        close();
+      });
+
+      const settle = el('button', { text: '⤓ Assentar no chao (z=0)' });
+      settle.addEventListener('click', () => {
+        const before = currentModel();
+        const now = voxelModelBounds(before);
+        if (!now || now.minZ === 0) {
+          toast('O modelo ja esta apoiado no chao');
+          return;
+        }
+        pushModelEdit(structuredClone(before), settleToGround(before));
+        toast('Modelo assentado em z=0');
+        close();
+      });
+
+      const delCurrent = el('button', { text: `🗑 Apagar a camada atual (z=${z})` });
+      delCurrent.addEventListener('click', () => {
+        const before = currentModel();
+        const n = countAt(z);
+        if (n === 0) {
+          toast(`Camada z=${z} ja esta vazia`);
+          return;
+        }
+        pushModelEdit(structuredClone(before), removeZRange(before, z, z));
+        toast(`Camada z=${z} apagada (${n} voxels)`);
+        close();
+      });
+
+      container.append(
+        el('h2', { text: 'Camadas' }),
+        el('p', {
+          class: 'sub',
+          text: `Modelo ocupa z=${b.minZ} a z=${b.maxZ}. Corte a base do STL aqui em vez de apagar voxel a voxel.`,
+        }),
+        el('div', {}, [el('label', { text: 'Cortar da base ATE a camada' }), cutInput]),
+        cutInfo,
+        cut,
+        el('div', { style: 'display:flex;flex-direction:column;gap:8px;margin-top:12px' }, [
+          settle,
+          delCurrent,
+        ]),
       );
       return container;
     });
@@ -1391,6 +1619,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   // ---------------- montagem ----------------
   const bottom = el('div', { class: 'bottom' }, [
     toolsRow,
+    selectionRow,
     materialsRow,
     timelineRow,
     frameStripWrap,

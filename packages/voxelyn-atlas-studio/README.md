@@ -16,6 +16,12 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   e ordem do pintor — com teste de paridade byte a byte. As **4 direções saem
   por rotação do mesmo modelo**, sem redesenhar nada; um modelo por frame de
   animação, e o export assa tudo.
+- **Cortes grossos (fluxo do STL)**: STL importado quase sempre chega apoiado
+  numa laje de base que não faz parte do bicho. `🗑z` apaga a camada z inteira;
+  a ferramenta `⬚` marca um retângulo na fatia e apaga **naquela camada** ou
+  **em todas de uma vez** (ou preenche com o material atual); e `Menu → ✂
+  Camadas` corta da base até a camada escolhida e **assenta o modelo em z=0**,
+  que é o que sobra fazer depois de tirar a base.
 - **Modo pixel**: desenho touch-first frame a frame. 1 dedo desenha, 2 dedos
   fazem pan/pinch. Lápis, borracha, balde, linha, retângulo e conta-gotas;
   pincel de 1–3 px; undo/redo; grade, onion skin e guia da margem de 2 px.

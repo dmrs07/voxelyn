@@ -18,7 +18,11 @@ import {
   renderVoxelModel,
   voxelKey,
   mirrorModelX,
+  removeBox,
+  removeZRange,
+  settleToGround,
   shiftModel,
+  voxelModelBounds,
   type VoxelModel,
 } from '../voxel';
 
@@ -134,5 +138,53 @@ describe('operacoes de modelo', () => {
   it('mirrorModelX e involutivo', () => {
     const model: VoxelModel = { [voxelKey(3, 1, 0)]: 'rock', [voxelKey(-4, 0, 2)]: 'fungus' };
     expect(mirrorModelX(mirrorModelX(model))).toEqual(model);
+  });
+});
+
+/**
+ * Cortes grossos: e o fluxo do STL importado, que chega apoiado numa laje de
+ * base que nao faz parte do bicho e ocupa dezenas de camadas.
+ */
+describe('cortes de camada e de area', () => {
+  /** Base solida 4x4 em z=0..1 com uma torre de 2 voxels em cima. */
+  const slab = (): VoxelModel => {
+    const m: VoxelModel = {};
+    for (let z = 0; z <= 1; z++)
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) m[voxelKey(x, y, z)] = 'rock';
+    m[voxelKey(1, 1, 2)] = 'bone';
+    m[voxelKey(1, 1, 3)] = 'bone';
+    return m;
+  };
+
+  it('removeZRange apaga so as camadas pedidas', () => {
+    const cut = removeZRange(slab(), 0, 1);
+    expect(Object.keys(cut).length).toBe(2);
+    expect(voxelModelBounds(cut)).toMatchObject({ minZ: 2, maxZ: 3 });
+  });
+
+  it('removeBox sem z atravessa TODAS as camadas', () => {
+    const cut = removeBox(slab(), { minX: 1, maxX: 1, minY: 1, maxY: 1 });
+    expect(cut[voxelKey(1, 1, 0)]).toBeUndefined();
+    expect(cut[voxelKey(1, 1, 3)]).toBeUndefined();
+    expect(cut[voxelKey(0, 0, 0)]).toBe('rock');
+  });
+
+  it('removeBox com z limitado so mexe naquela camada', () => {
+    const cut = removeBox(slab(), { minX: 0, maxX: 3, minY: 0, maxY: 3 }, 0, 0);
+    expect(cut[voxelKey(0, 0, 0)]).toBeUndefined();
+    expect(cut[voxelKey(0, 0, 1)]).toBe('rock');
+  });
+
+  it('settleToGround baixa o que ficou flutuando e nao mexe no que ja apoia', () => {
+    const floating = removeZRange(slab(), 0, 1);
+    const settled = settleToGround(floating);
+    expect(voxelModelBounds(settled)).toMatchObject({ minZ: 0, maxZ: 1 });
+    expect(settleToGround(slab())).toEqual(slab());
+  });
+
+  it('cortar a base e assentar preserva o resto do modelo intacto', () => {
+    const settled = settleToGround(removeZRange(slab(), 0, 1));
+    expect(Object.values(settled).every((mat) => mat === 'bone')).toBe(true);
+    expect(Object.keys(settled).length).toBe(2);
   });
 });

@@ -491,6 +491,56 @@ export const shiftModel = (model: VoxelModel, dx: number, dy: number, dz: number
   return out;
 };
 
+/** Caixa em x/y de uma selecao de fatia (inclusiva nos dois cantos). */
+export type VoxelBox = { minX: number; maxX: number; minY: number; maxY: number };
+
+/**
+ * Copia sem as camadas de `minZ` a `maxZ` (inclusive). E a operacao de corte
+ * da base: um STL quase sempre vem apoiado numa laje solida que nao faz parte
+ * do bicho, e apagar voxel a voxel no celular e inviavel.
+ */
+export const removeZRange = (model: VoxelModel, minZ: number, maxZ: number): VoxelModel => {
+  const out: VoxelModel = {};
+  for (const [key, mat] of Object.entries(model)) {
+    const z = parseVoxelKey(key)[2];
+    if (z >= minZ && z <= maxZ) continue;
+    out[key] = mat;
+  }
+  return out;
+};
+
+/**
+ * Copia sem os voxels dentro da caixa em x/y. Sem `minZ`/`maxZ` o corte
+ * atravessa TODAS as camadas — que e o que resolve "some com esse pedaco" em
+ * um gesto so, em vez de repetir camada por camada.
+ */
+export const removeBox = (
+  model: VoxelModel,
+  box: VoxelBox,
+  minZ?: number,
+  maxZ?: number,
+): VoxelModel => {
+  const out: VoxelModel = {};
+  for (const [key, mat] of Object.entries(model)) {
+    const [x, y, z] = parseVoxelKey(key);
+    const inXY = x >= box.minX && x <= box.maxX && y >= box.minY && y <= box.maxY;
+    const inZ = (minZ === undefined || z >= minZ) && (maxZ === undefined || z <= maxZ);
+    if (inXY && inZ) continue;
+    out[key] = mat;
+  }
+  return out;
+};
+
+/**
+ * Baixa o modelo ate encostar no chao. So DESCE: um modelo que ja afunda
+ * abaixo de z=0 sobe, um que ja esta apoiado nao se mexe. Cortar a base
+ * deixa o bicho flutuando, e e isto que o assenta de volta.
+ */
+export const settleToGround = (model: VoxelModel): VoxelModel => {
+  const b = voxelModelBounds(model);
+  return b && b.minZ !== 0 ? shiftModel(model, 0, 0, -b.minZ) : { ...model };
+};
+
 /** Espelha o modelo no plano x=-0.5 (eixo de simetria do editor). */
 export const mirrorModelX = (model: VoxelModel): VoxelModel => {
   const out: VoxelModel = {};
