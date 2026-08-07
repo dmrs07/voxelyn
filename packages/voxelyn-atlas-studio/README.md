@@ -22,6 +22,17 @@ no celular — com os materiais do jogo, e exporta o par `PNG + JSON` que o
   **em todas de uma vez** (ou preenche com o material atual); e `Menu → ✂
   Camadas` corta da base até a camada escolhida e **assenta o modelo em z=0**,
   que é o que sobra fazer depois de tirar a base.
+- **Importar GLB (malha + animação)**: `.glb` é o único dos três formatos que o
+  Meshy oferece que é **um arquivo só e autocontido** — geometria, esqueleto,
+  pesos de skin e animações no mesmo binário, com cabeçalho JSON legível. Cabe
+  num parser sem dependência, que é o que um PWA offline precisa; FBX é
+  proprietário e USDZ é um zip de USD binário. O import lê a malha **já
+  deformada pelo esqueleto** num instante do clipe e passa pelo mesmo
+  voxelizador do STL: cada animação do arquivo é amostrada nos frames do preset
+  e vira frames Voxelyn. O enquadramento é **um só para todos os frames de todas
+  as animações** — enquadrar frame a frame faria o bicho crescer, encolher e
+  pular de lugar a cada pose. Y-up (padrão glTF) vira Z-up automaticamente, com
+  giro em torno do eixo vertical quando o bicho chega de costas.
 - **Modo pixel**: desenho touch-first frame a frame. 1 dedo desenha, 2 dedos
   fazem pan/pinch. Lápis, borracha, balde, linha, retângulo e conta-gotas;
   pincel de 1–3 px; undo/redo; grade, onion skin e guia da margem de 2 px.
