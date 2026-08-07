@@ -2,7 +2,13 @@
 // um arquivo binario no repo: assim da para ver no proprio teste exatamente qual
 // construcao do spec esta sendo cobrada, e um GLB gravado nao vira caixa-preta.
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_ORIENTATION, clipTimes, orientTriangles, parseGlb } from '../glb';
+import {
+  DEFAULT_ORIENTATION,
+  clipTimes,
+  orientTriangles,
+  parseGlb,
+  removeRootMotion,
+} from '../glb';
 import { fitFrames, fitTriangles, voxelizeTriangles } from '../stl';
 import { quantizeToMaterials } from '../texture';
 import { voxelModelBounds } from '../voxel';
@@ -527,5 +533,55 @@ describe('clipTimes', () => {
       expect(t[0]).toBe(0);
       expect(t.at(-1)).toBeLessThanOrEqual(3);
     }
+  });
+});
+
+describe('removeRootMotion', () => {
+  /** Um triangulo, deslocado em x, y e z. */
+  const tri = (dx: number, dy: number, dz: number): Float32Array =>
+    Float32Array.from([0 + dx, 0 + dy, 0 + dz, 2 + dx, 0 + dy, 0 + dz, 0 + dx, 2 + dy, 0 + dz]);
+
+  it('lista vazia nao quebra', () => {
+    expect(removeRootMotion([])).toEqual([]);
+  });
+
+  it('anula o avanco horizontal: o clipe passa a andar no lugar', () => {
+    const frames = [tri(0, 0, 0), tri(5, 0, 0), tri(10, 0, 0)];
+    const fixos = removeRootMotion(frames);
+    for (const f of fixos) expect(Array.from(f)).toEqual(Array.from(frames[0]));
+  });
+
+  it('corrige nos DOIS eixos horizontais', () => {
+    const [, corrigido] = removeRootMotion([tri(0, 0, 0), tri(3, 7, 0)]);
+    expect(Array.from(corrigido)).toEqual(Array.from(tri(0, 0, 0)));
+  });
+
+  it('NAO mexe no eixo vertical — bob e salto sao movimento que a animacao quer', () => {
+    const frames = [tri(0, 0, 0), tri(5, 0, 4)];
+    const [, corrigido] = removeRootMotion(frames);
+    // x e y voltaram ao lugar, z ficou onde estava
+    expect(corrigido[0]).toBe(0);
+    expect(corrigido[1]).toBe(0);
+    expect(corrigido[2]).toBe(4);
+  });
+
+  it('a referencia e o PRIMEIRO frame de todos, para as animacoes nao se desalinharem', () => {
+    const frames = [tri(9, 9, 0), tri(0, 0, 0)];
+    const fixos = removeRootMotion(frames);
+    expect(Array.from(fixos[0])).toEqual(Array.from(frames[0])); // o primeiro nao se move
+    expect(Array.from(fixos[1])).toEqual(Array.from(tri(9, 9, 0)));
+  });
+
+  it('frame ja centrado atravessa sem copia desnecessaria', () => {
+    const frames = [tri(0, 0, 0), tri(0, 0, 3)];
+    expect(removeRootMotion(frames)[1]).toBe(frames[1]);
+  });
+
+  it('preserva a FORMA: so translada, nunca deforma', () => {
+    const antes = tri(0, 0, 0);
+    const [, depois] = removeRootMotion([antes, tri(4, 4, 0)]);
+    const largura = (t: Float32Array): number =>
+      Math.max(t[0], t[3], t[6]) - Math.min(t[0], t[3], t[6]);
+    expect(largura(depois)).toBeCloseTo(largura(antes), 5);
   });
 });

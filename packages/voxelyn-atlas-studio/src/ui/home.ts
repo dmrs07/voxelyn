@@ -7,7 +7,13 @@ import { projectFromManifest, sliceAtlas, projectFrame } from '../atlas';
 import { orderedAnims } from '../presets';
 import { GAME_CATALOG } from '../catalog';
 import { fitFrames, parseStl, voxelizeStl, voxelizeTriangles } from '../stl';
-import { clipTimes, orientTriangles, parseGlb, type GlbOrientation } from '../glb';
+import {
+  clipTimes,
+  orientTriangles,
+  parseGlb,
+  removeRootMotion,
+  type GlbOrientation,
+} from '../glb';
 import { GAME_CONTRACTS, createProjectFromContract } from '../contracts';
 import {
   READABLE_MATERIALS,
@@ -226,6 +232,8 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
       });
       paletaRow.append(btn);
     }
+    const rootCheck = el('input', { type: 'checkbox' });
+    rootCheck.checked = true;
     const upSelect = el('select');
     upSelect.append(
       el('option', { value: 'y', text: 'Y para cima (padrao glTF/Meshy)' }),
@@ -353,7 +361,13 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
             doImport.textContent = `Amostrando ${anim}…`;
             await new Promise((r) => setTimeout(r, 0));
           }
-          // 2) ...para um enquadramento so, e so entao voxeliza
+          // 2) tira o deslocamento de raiz: clipe de caminhada anda para
+          // frente, e num sprite isso vira a figura deslizando na moldura
+          if (rootCheck.checked) {
+            const semDeslocamento = removeRootMotion(jobs.map((j) => j.tris));
+            jobs.forEach((j, i) => (j.tris = semDeslocamento[i]));
+          }
+          // 3) ...para um enquadramento so, e so entao voxeliza
           const fit = fitFrames(
             jobs.map((j) => j.tris),
             height,
@@ -431,6 +445,10 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
           el('span', { text: 'Usar as cores do modelo' }),
         ]),
         el('div', {}, [el('label', { text: 'Teto de materiais' }), maxMatSelect]),
+      ]),
+      el('label', { style: 'display:flex;gap:8px;align-items:center' }, [
+        rootCheck,
+        el('span', { text: 'Andar no lugar (tirar o deslocamento do clipe)' }),
       ]),
       el('div', {}, [
         el('label', { text: 'Paleta (marque para escolher voce; vazio = automatico)' }),
