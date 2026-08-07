@@ -28,6 +28,7 @@ import {
   type VoxelView,
 } from '../voxel';
 import { saveProject } from '../store';
+import { STYLE_LABELS, generateAnimation, styleForAnim, type AnimStyle } from '../animate';
 import { el, openSheet, toast } from './components';
 import { openExportSheet } from './sheets';
 
@@ -859,6 +860,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
   menuBtn.addEventListener('click', () => {
     void openSheet((close) => {
       const exportBtn = el('button', { class: 'primary', text: '⇪ Validar & exportar atlas' });
+      const animateBtn = el('button', { text: '🎬 Animar automaticamente' });
       const moveBtn = el('button', { text: '✥ Mover modelo (frame atual)' });
       const mirrorAllBtn = el('button', { text: '⇋ Espelhar modelo inteiro em X' });
       const settings = el('button', { text: '⚙ Configuracoes do sprite' });
@@ -866,6 +868,10 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       exportBtn.addEventListener('click', () => {
         close();
         void openExportSheet(project, scheduleSave);
+      });
+      animateBtn.addEventListener('click', () => {
+        close();
+        void openAnimateSheet();
       });
       moveBtn.addEventListener('click', () => {
         close();
@@ -892,6 +898,7 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
         el('h2', { text: `${project.name} · voxel` }),
         el('div', { style: 'display:flex;flex-direction:column;gap:8px' }, [
           exportBtn,
+          animateBtn,
           moveBtn,
           mirrorAllBtn,
           boundsBtn,
@@ -900,6 +907,78 @@ export const mountVoxelEditor = (root: HTMLElement, project: Project, onBack: ()
       ]);
     });
   });
+
+  const openAnimateSheet = (): Promise<void> =>
+    openSheet((close) => {
+      const container = el('div');
+      const animSel = el('select');
+      animSel.append(el('option', { value: '*', text: 'TODAS as animacoes' }));
+      for (const a of orderedAnims(project.animations)) {
+        animSel.append(el('option', { value: a, text: `${a} (${project.animations[a].frames}f)` }));
+      }
+      animSel.value = anim;
+      const styleSel = el('select');
+      styleSel.append(el('option', { value: 'auto', text: 'Preset automatico pelo nome' }));
+      for (const [style, label] of Object.entries(STYLE_LABELS)) {
+        styleSel.append(el('option', { value: style, text: label }));
+      }
+      const intensitySel = el('select');
+      for (const [v, label] of [
+        ['1', 'Sutil'],
+        ['2', 'Normal'],
+        ['3', 'Forte'],
+      ]) {
+        intensitySel.append(el('option', { value: v, text: label }));
+      }
+      intensitySel.value = '2';
+
+      const generate = el('button', { class: 'primary', text: 'Gerar frames' });
+      generate.addEventListener('click', () => {
+        // pose base: o frame ATUAL em edicao — o autor decide de onde parte
+        const base = structuredClone(currentModel());
+        if (Object.keys(base).length === 0) {
+          toast('O frame atual esta vazio — monte a pose base antes de animar');
+          return;
+        }
+        const intensity = Number(intensitySel.value);
+        const targets = animSel.value === '*' ? orderedAnims(project.animations) : [animSel.value];
+        let touched = 0;
+        for (const a of targets) {
+          const style: AnimStyle =
+            styleSel.value === 'auto' ? styleForAnim(a) : (styleSel.value as AnimStyle);
+          const frames = generateAnimation(base, style, project.animations[a].frames, intensity);
+          frames.forEach((m, f) => {
+            const mKey = modelKey(a, f);
+            const before = structuredClone(project.models![mKey] ?? {});
+            project.models![mKey] = m;
+            undoStack.push({ mKey, before, after: structuredClone(m) });
+            touched++;
+          });
+        }
+        while (undoStack.length > 64) undoStack.shift();
+        redoStack.length = 0;
+        invalidateView();
+        scheduleSave();
+        updateUndoRedo();
+        updateFrameStrip();
+        render();
+        toast(`${touched} frame(s) gerados a partir da pose atual — de o play para conferir`);
+        close();
+      });
+
+      container.append(
+        el('h2', { text: 'Animar automaticamente' }),
+        el('p', {
+          class: 'sub',
+          text: 'Gera os frames a partir do FRAME ATUAL como pose base. Deterministico: regenerar da sempre o mesmo resultado; cada frame gerado pode ser refinado a mao depois (undo desfaz frame a frame).',
+        }),
+        el('div', {}, [el('label', { text: 'Animacao' }), animSel]),
+        el('div', {}, [el('label', { text: 'Preset de movimento' }), styleSel]),
+        el('div', {}, [el('label', { text: 'Intensidade' }), intensitySel]),
+        generate,
+      );
+      return container;
+    });
 
   const openMoveSheet = (): Promise<void> =>
     openSheet((close) => {
