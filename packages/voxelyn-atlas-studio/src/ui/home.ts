@@ -7,7 +7,7 @@ import { projectFromManifest, sliceAtlas, projectFrame } from '../atlas';
 import { orderedAnims } from '../presets';
 import { GAME_CATALOG } from '../catalog';
 import { fitFrames, parseStl, voxelizeStl, voxelizeTriangles } from '../stl';
-import { orientTriangles, parseGlb, type GlbOrientation } from '../glb';
+import { clipTimes, orientTriangles, parseGlb, type GlbOrientation } from '../glb';
 import { GAME_CONTRACTS, createProjectFromContract } from '../contracts';
 import { quantizeToMaterials, sampleTriangleColors } from '../texture';
 import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
@@ -303,13 +303,12 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
           for (const [anim, def] of Object.entries(animacoes)) {
             const clip = Number(clipFor.get(anim)?.value ?? -1);
             const duration = clip >= 0 ? glb.animations[clip].duration : 0;
+            const tempos = clipTimes(duration, def.frames, def.loop);
             for (let f = 0; f < def.frames; f++) {
-              // ciclo fechado: o ultimo frame nao repete o primeiro
-              const t = duration > 0 ? (f / def.frames) * duration : 0;
               jobs.push({
                 anim,
                 frame: f,
-                tris: orientTriangles(glb.sample(clip >= 0 ? clip : null, t), o),
+                tris: orientTriangles(glb.sample(clip >= 0 ? clip : null, tempos[f]), o),
               });
             }
             doImport.textContent = `Amostrando ${anim}…`;

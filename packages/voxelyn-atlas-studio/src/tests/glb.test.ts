@@ -2,7 +2,7 @@
 // um arquivo binario no repo: assim da para ver no proprio teste exatamente qual
 // construcao do spec esta sendo cobrada, e um GLB gravado nao vira caixa-preta.
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_ORIENTATION, orientTriangles, parseGlb } from '../glb';
+import { DEFAULT_ORIENTATION, clipTimes, orientTriangles, parseGlb } from '../glb';
 import { fitFrames, fitTriangles, voxelizeTriangles } from '../stl';
 import { quantizeToMaterials } from '../texture';
 import { voxelModelBounds } from '../voxel';
@@ -495,5 +495,37 @@ describe('materiais e UV para colorir', () => {
     }
     expect(porLado.baixo).toEqual(new Set(['blood']));
     expect(porLado.alto).toEqual(new Set(['electric']));
+  });
+});
+
+describe('clipTimes', () => {
+  it('ciclo: o ultimo quadro nao repete o primeiro', () => {
+    const t = clipTimes(1, 4, true);
+    expect(t).toEqual([0, 0.25, 0.5, 0.75]);
+    expect(t.at(-1)).toBeLessThan(1);
+  });
+
+  it('clipe unico: o ultimo quadro E o fim do clipe', () => {
+    // uma morte amostrada como ciclo pararia a 4/5 do caminho e o bicho nunca
+    // chegaria ao chao — este e o caso que a regra existe para cobrir
+    const t = clipTimes(1, 5, false);
+    expect(t).toEqual([0, 0.25, 0.5, 0.75, 1]);
+    expect(t.at(-1)).toBe(1);
+  });
+
+  it('clipe sem duracao ou de um quadro so fica na pose de repouso', () => {
+    expect(clipTimes(0, 3, true)).toEqual([0, 0, 0]);
+    expect(clipTimes(2, 1, false)).toEqual([0]);
+    expect(clipTimes(1, 0, false)).toEqual([]);
+  });
+
+  it('sempre devolve um instante por quadro, em ordem crescente', () => {
+    for (const loop of [true, false]) {
+      const t = clipTimes(3, 6, loop);
+      expect(t.length).toBe(6);
+      for (let i = 1; i < t.length; i++) expect(t[i]).toBeGreaterThan(t[i - 1]);
+      expect(t[0]).toBe(0);
+      expect(t.at(-1)).toBeLessThanOrEqual(3);
+    }
   });
 });

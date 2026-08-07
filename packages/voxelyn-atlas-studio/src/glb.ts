@@ -57,6 +57,22 @@ export type GlbOrientation = {
 
 export const DEFAULT_ORIENTATION: GlbOrientation = { up: 'y', yaw: 0 };
 
+/**
+ * Instantes em que amostrar um clipe para virar `frames` quadros.
+ *
+ * Ciclo e clipe unico se amostram DIFERENTE. Num ciclo (idle, walk) o ultimo
+ * quadro nao pode repetir o primeiro — ele conduz de volta a ele —, entao os
+ * instantes vao de 0 ate quase o fim. Num clipe unico (die, attack, hit) o
+ * ultimo quadro E o fim: uma morte amostrada como ciclo pararia a 4/5 do
+ * caminho e o bicho nunca chegaria ao chao.
+ */
+export const clipTimes = (duration: number, frames: number, loop: boolean): number[] => {
+  if (frames <= 0) return [];
+  if (!(duration > 0) || frames === 1) return new Array(frames).fill(0);
+  const passo = loop ? frames : frames - 1;
+  return Array.from({ length: frames }, (_, f) => (f / passo) * duration);
+};
+
 // o glTF e um JSON de forma variavel (extensoes, campos opcionais); tipar cada
 // no aqui seria copiar o schema inteiro sem ganhar seguranca de verdade — a
 // validacao que importa e a de runtime, logo abaixo
