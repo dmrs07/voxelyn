@@ -481,6 +481,10 @@ export const partsSummary = (parts: Part[], model: VoxelModel): string => {
  * Copia do modelo com uma cor por parte — vira a imagem que mostra a IA (e ao
  * autor) exatamente quais voxels pertencem a cada nome.
  */
+// So MATERIAIS (chaves de RAMPS), nunca cores da paleta: o rasterizador pinta
+// as tres faces de um voxel a partir da rampa do material e lanca em quem nao
+// tem uma. Os nomes de cor abaixo descrevem a face de TOPO da rampa, que e o
+// que domina na vista isometrica — e por isso que `fire` le como ambar.
 export const PART_COLORS = [
   'blood',
   'electric',
@@ -488,10 +492,10 @@ export const PART_COLORS = [
   'loot',
   'biolum',
   'fire',
-  'fungusLight',
-  'mist',
-  'amber',
-  'moss',
+  'fungus',
+  'ice',
+  'bone',
+  'lamp',
 ] as const;
 
 /** Nome legivel da cor de cada material do mapa de partes (para a legenda). */
@@ -503,10 +507,10 @@ const COLOR_WORD: Record<string, string> = {
   loot: 'dourado',
   biolum: 'ciano',
   fire: 'laranja',
-  fungusLight: 'verde-claro',
-  mist: 'cinza-claro',
-  amber: 'ambar',
-  moss: 'verde-escuro',
+  fungus: 'verde-claro',
+  ice: 'cinza-gelo',
+  bone: 'bege',
+  lamp: 'branco-quente',
 };
 
 /** Material atribuido a cada parte no mapa de cores — uma fonte so. */
