@@ -5,6 +5,7 @@ import {
   applyAnimationSpec,
   applyFramePose,
   connectedComponents,
+  chainOf,
   partsPreviewModel,
   partsSummary,
   PART_COLORS,
@@ -15,6 +16,7 @@ import {
 } from '../pose';
 import {
   renderVoxelView,
+  shiftModel,
   voxelKey,
   voxelModelBounds,
   VOXEL_MATERIALS,
@@ -96,10 +98,11 @@ describe('segmentParts', () => {
     const legs = parts.filter((p) => p.kind === 'perna');
     expect(legs.length).toBe(8);
     expect(parts.find((p) => p.name === 'corpo')).toBeDefined();
-    // cada perna vai da insercao ate o chao — nao e so a ponta
+    // a CADEIA de cada perna vai da insercao ate o chao (a raiz e so a coxa)
     for (const leg of legs) {
-      expect(leg.bounds.minZ).toBe(0);
-      expect(leg.bounds.maxZ).toBeGreaterThan(9);
+      const chain = chainOf(parts, leg.name);
+      expect(Math.min(...chain.map((c) => c.bounds.minZ)), leg.name).toBe(0);
+      expect(Math.max(...chain.map((c) => c.bounds.maxZ))).toBeGreaterThan(9);
     }
     // nenhum voxel se perde nem se duplica entre as partes
     const total = parts.reduce((n, p) => n + p.keys.length, 0);
@@ -155,6 +158,94 @@ describe('segmentParts', () => {
       segmentParts(spider()).map((p) => p.name),
     );
     expect(segmentParts({})).toEqual([]);
+  });
+});
+
+describe('esqueleto: hierarquia e cadeia de ossos', () => {
+  it('cada perna vira uma cadeia com junta interna, presa no corpo', () => {
+    const parts = segmentParts(spider());
+    for (const leg of parts.filter((p) => p.kind === 'perna')) {
+      expect(leg.parent).toBe('corpo');
+      const chain = chainOf(parts, leg.name);
+      expect(chain.length, `${leg.name} precisa de junta`).toBeGreaterThan(1);
+      // a cadeia desce: cada osso comeca mais embaixo que o anterior
+      for (let i = 1; i < chain.length; i++) {
+        expect(chain[i].parent).toBe(chain[i - 1].name);
+        expect(chain[i].pivot[2]).toBeLessThan(chain[i - 1].pivot[2]);
+      }
+    }
+    expect(parts.find((p) => p.name === 'corpo')!.parent).toBeNull();
+  });
+
+  it('os ossos particionam o modelo: nada se perde nem se duplica', () => {
+    const m = spider();
+    const parts = segmentParts(m);
+    const keys = parts.flatMap((p) => p.keys);
+    expect(new Set(keys).size).toBe(Object.keys(m).length);
+  });
+
+  it('quadrupede ganha nomes anatomicos', () => {
+    const names = segmentParts(quadruped())
+      .filter((p) => p.kind === 'perna')
+      .map((p) => p.name)
+      .sort();
+    expect(names).toEqual([
+      'perna-dianteira-direita',
+      'perna-dianteira-esquerda',
+      'perna-traseira-direita',
+      'perna-traseira-esquerda',
+    ]);
+  });
+
+  it('membro curto demais para uma junta fica com um osso so', () => {
+    // corpo macico com dois toquinhos de 3 voxels
+    const m: VoxelModel = {};
+    for (let x = -2; x <= 2; x++)
+      for (let y = -2; y <= 2; y++) for (let z = 3; z <= 7; z++) m[voxelKey(x, y, z)] = 'rock';
+    for (const sx of [-3, 3]) for (let z = 4; z <= 6; z++) m[voxelKey(sx, 0, z)] = 'bone';
+    const parts = segmentParts(m);
+    for (const limb of parts.filter((p) => p.kind !== 'corpo' && p.kind !== 'osso')) {
+      expect(chainOf(parts, limb.name).length).toBe(1);
+    }
+  });
+});
+
+describe('cinematica direta: pai carrega filho', () => {
+  it('girar a raiz da perna leva a canela e o pe junto', () => {
+    const m = spider();
+    const parts = segmentParts(m);
+    const leg = parts.find((p) => p.kind === 'perna')!;
+    const tip = chainOf(parts, leg.name).at(-1)!;
+    const posed = applyFramePose(m, parts, {
+      poses: [{ part: leg.name, rotate: { axis: 'x', deg: -30 } }],
+    });
+    // a ponta saiu do lugar mesmo sem ter sido citada na pose
+    const stillThere = tip.keys.filter((k) => k in posed).length;
+    expect(stillThere).toBeLessThan(tip.keys.length);
+    expect(componentCount(posed)).toBe(1);
+  });
+
+  it('girar so a canela dobra a junta sem mexer na coxa', () => {
+    const m = spider();
+    const parts = segmentParts(m);
+    const leg = parts.find((p) => p.kind === 'perna')!;
+    const chain = chainOf(parts, leg.name);
+    const knee = chain[1];
+    const posed = applyFramePose(m, parts, {
+      poses: [{ part: knee.name, rotate: { axis: 'x', deg: 30 } }],
+    });
+    // a coxa (raiz) nao se mexeu: todos os voxels dela continuam onde estavam
+    for (const k of leg.keys) expect(posed[k], `coxa deveria estar parada em ${k}`).toBeDefined();
+    expect(componentCount(posed)).toBe(1);
+  });
+
+  it('mover o corpo carrega o bicho inteiro, sem esticar as pernas', () => {
+    const m = spider();
+    const parts = segmentParts(m);
+    const posed = applyFramePose(m, parts, { poses: [{ part: 'corpo', move: [0, 0, 2] }] });
+    // subir o corpo = subir tudo: mesma contagem de voxels, so deslocada
+    expect(Object.keys(posed).length).toBe(Object.keys(m).length);
+    expect(posed).toEqual(shiftModel(m, 0, 0, 2));
   });
 });
 
@@ -254,7 +345,9 @@ describe('resumo e preview para a IA', () => {
     expect(text).toContain('perna-1');
     expect(text).toContain('frente');
     expect(text).toContain('corpo');
-    expect(text.length).toBeLessThan(2000); // compacto: nunca a lista de voxels
+    // a garantia real: o resumo cresce com os OSSOS, nunca com os voxels
+    expect(text.length / parts.length).toBeLessThan(150);
+    expect(text.length).toBeLessThan(6000);
   });
 
   it('preview colore cada parte de um material distinto', () => {

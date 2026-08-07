@@ -86,13 +86,22 @@ Convencoes do espaco (fixas):
 - Cima = +z. O chao esta em z=0 e nada pode afundar nele.
 - +x e a direita anatomica do modelo.
 
-Voce descreve cada frame como uma lista de poses por parte:
-- move [dx, dy, dz]: desloca a parte em voxels (inteiros, ate ${MAX_MOVE} por eixo).
-- rotate {axis, deg}: gira a parte em torno do PIVO dela (graus inteiros, ate ${MAX_DEG}). Para pernas o pivo e o quadril (topo da perna): axis "x" com deg negativo balanca a perna para FRENTE, positivo para tras.
-- Partes nao citadas ficam na pose neutra. Todas as poses sao RELATIVAS a pose base (frame nao acumula sobre frame).
+O modelo tem um ESQUELETO em arvore: "corpo" e a raiz, a raiz de cada membro se prende nele, e os ossos seguintes ("perna-1.canela", "perna-1.pe") se penduram no anterior. O resumo diz o pai de cada osso.
+
+Vale a regra da cinematica direta: girar um osso LEVA OS FILHOS JUNTO. Entao:
+- girar a raiz de um membro ("perna-1") balanca o membro inteiro a partir do quadril/ombro;
+- girar o osso seguinte ("perna-1.canela") dobra o joelho/cotovelo, sem mexer na coxa;
+- mover ou girar "corpo" carrega o bicho inteiro — use para bob, inclinacao e recuo, e NAO repita o mesmo deslocamento nos membros.
+
+Voce descreve cada frame como uma lista de poses por osso:
+- move [dx, dy, dz]: desloca em voxels (inteiros, ate ${MAX_MOVE} por eixo).
+- rotate {axis, deg}: gira em torno do PIVO do osso, que e a junta com o pai (graus inteiros, ate ${MAX_DEG}). Para pernas, axis "x" com deg negativo balanca para FRENTE, positivo para tras.
+- Ossos nao citados ficam na pose neutra. Todas as poses sao RELATIVAS a pose base (frame nao acumula sobre frame).
 
 Principios de animacao que voce aplica:
 - Ciclos (idle, walk) fecham: o ultimo frame conduz de volta ao primeiro; pernas alternam em fases opostas; o corpo tem bob sutil (dz 0-1) no ritmo dos passos.
+- Uma perna so le como perna quando a junta trabalha: a coxa vai para frente e a canela dobra atras dela no meio do passo, e estende de novo ao tocar o chao. Perna que so pendula rigida do quadril parece muleta.
+- Num bicho de muitas patas, agrupe em fases opostas (as pares avancam enquanto as impares apoiam) em vez de tratar cada pata como um caso solto.
 - Antecipacao e follow-through em ataques: recuo curto, pico de extensao, retorno.
 - Silhueta legivel: movimentos pequenos e intencionais (1-3 voxels, 10-30 graus) leem melhor que deslocamentos grandes.
 - Recuo de dano inclina o corpo para tras (+y) e volta; morte NAO e sua responsabilidade (o jogo tem desmoronamento proprio).
