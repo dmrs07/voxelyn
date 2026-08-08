@@ -20,6 +20,8 @@ import {
   mirrorModelX,
   removeBox,
   removeZRange,
+  expandModel,
+  parseVoxelKey,
   settleToGround,
   shiftModel,
   voxelModelBounds,
@@ -186,5 +188,64 @@ describe('cortes de camada e de area', () => {
     const settled = settleToGround(removeZRange(slab(), 0, 1));
     expect(Object.values(settled).every((mat) => mat === 'bone')).toBe(true);
     expect(Object.keys(settled).length).toBe(2);
+  });
+});
+
+/**
+ * Grade de blocos: o import tem de sair na MESMA resolucao em que o jogo e
+ * autorado, senao o bicho importado le como textura enquanto os vizinhos leem
+ * como forma.
+ */
+describe('expandModel', () => {
+  const um: VoxelModel = { [voxelKey(0, 0, 0)]: 'ice' };
+
+  it('passo 1 nao mexe em nada', () => {
+    const m: VoxelModel = { [voxelKey(2, -1, 3)]: 'rock' };
+    expect(expandModel(m, 1)).toEqual(m);
+    expect(expandModel(m, 0)).toEqual(m);
+  });
+
+  it('cada voxel vira um bloco de passo³', () => {
+    for (const passo of [2, 3, 4]) {
+      expect(Object.keys(expandModel(um, passo)).length, `passo ${passo}`).toBe(passo ** 3);
+    }
+  });
+
+  it('o bloco e macico e herda o material', () => {
+    const b = expandModel(um, 2);
+    for (let z = 0; z < 2; z++)
+      for (let y = 0; y < 2; y++)
+        for (let x = 0; x < 2; x++) expect(b[voxelKey(x, y, z)]).toBe('ice');
+  });
+
+  it('escala os limites pelo passo, e o chao continua no chao', () => {
+    const m: VoxelModel = { [voxelKey(-2, -1, 0)]: 'rock', [voxelKey(3, 2, 5)]: 'ice' };
+    const b = voxelModelBounds(expandModel(m, 2))!;
+    expect(b.minZ).toBe(0);
+    expect(b.maxZ).toBe(11); // 5*2 + 1
+    expect(b.minX).toBe(-4);
+    expect(b.maxX).toBe(7); // 3*2 + 1
+  });
+
+  it('todo voxel pertence a um bloco COMPLETO e alinhado — e essa a garantia', () => {
+    const m: VoxelModel = {};
+    for (let i = 0; i < 12; i++) m[voxelKey(i % 4, (i * 3) % 5, i % 3)] = 'ice';
+    const passo = 2;
+    const b = expandModel(m, passo);
+    for (const key of Object.keys(b)) {
+      const [x, y, z] = parseVoxelKey(key);
+      const ox = Math.floor(x / passo) * passo;
+      const oy = Math.floor(y / passo) * passo;
+      const oz = Math.floor(z / passo) * passo;
+      for (let dz = 0; dz < passo; dz++)
+        for (let dy = 0; dy < passo; dy++)
+          for (let dx = 0; dx < passo; dx++) {
+            expect(b[voxelKey(ox + dx, oy + dy, oz + dz)], `bloco de ${key}`).toBe('ice');
+          }
+    }
+  });
+
+  it('modelo vazio continua vazio', () => {
+    expect(expandModel({}, 2)).toEqual({});
   });
 });
