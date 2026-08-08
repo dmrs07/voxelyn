@@ -21,7 +21,7 @@ import {
   quantizeToMaterials,
   sampleTriangleColors,
 } from '../texture';
-import { VOXEL_MATERIALS, voxelProjectedBounds } from '../voxel';
+import { VOXEL_MATERIALS, voxelProjectedBounds, expandModel } from '../voxel';
 import { modelKey } from '../types';
 import { confirmSheet, el, openSheet, toast } from './components';
 
@@ -190,6 +190,20 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
       materialSelect.append(el('option', { value: mat, text: mat }));
     materialSelect.value = 'rock';
     const heightInput = el('input', { type: 'number', min: '4', max: '48', value: '24' });
+    // GRADE. O jogo inteiro e autorado com MODEL_SCALE 2: o menor volume que
+    // alguem desenha a mao tem 2 voxels finos de lado. Voxelizar na grade fina
+    // da um bicho com dez vezes mais detalhe que os vizinhos — nao mais bonito,
+    // DISPAR. Por isso o padrao e 2, e nao 1.
+    const gradeSelect = el('select');
+    for (const [v, txt] of [
+      ['2', '2 — a grade do jogo (padrao)'],
+      ['1', '1 — grade fina (detalhe maximo)'],
+      ['3', '3 — mais grosso'],
+      ['4', '4 — bem grosso'],
+    ]) {
+      gradeSelect.append(el('option', { value: v, text: txt }));
+    }
+    gradeSelect.value = '2';
     // Cores: aproximar a textura do GLB nos materiais do jogo. O teto existe
     // porque cada material traz uma rampa inteira, e o atlas so aceita 20 cores.
     const colorCheck = el('input', { type: 'checkbox' });
@@ -367,10 +381,15 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
             const semDeslocamento = removeRootMotion(jobs.map((j) => j.tris));
             jobs.forEach((j, i) => (j.tris = semDeslocamento[i]));
           }
-          // 3) ...para um enquadramento so, e so entao voxeliza
+          // 3) ...para um enquadramento so, e so entao voxeliza. Com grade
+          // grossa a malha e voxelizada na altura DIVIDIDA pelo passo e cada
+          // voxel vira um bloco depois — assim o bloco minimo do import e o
+          // mesmo bloco minimo que o resto do jogo usa.
+          const grade = Math.max(1, Number(gradeSelect.value) || 1);
+          const alturaGrade = Math.max(2, Math.round(height / grade));
           const fit = fitFrames(
             jobs.map((j) => j.tris),
-            height,
+            alturaGrade,
           );
           // cores: uma amostragem so da textura serve TODOS os frames, porque o
           // triangulo N e o mesmo triangulo em qualquer instante do clipe
@@ -397,10 +416,9 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
           project.models = {};
           let done = 0;
           for (const job of jobs) {
-            project.models[modelKey(job.anim, job.frame)] = voxelizeTriangles(
-              job.tris,
-              materialDoTriangulo,
-              fit,
+            project.models[modelKey(job.anim, job.frame)] = expandModel(
+              voxelizeTriangles(job.tris, materialDoTriangulo, fit, Math.floor(48 / grade)),
+              grade,
             );
             done++;
             doImport.textContent = `Voxelizando ${done}/${jobs.length}…`;
@@ -434,6 +452,7 @@ const importGlbSheet = (onImport: (p: Project) => void): Promise<void> =>
         el('div', {}, [el('label', { text: 'Altura do modelo (voxels finos)' }), heightInput]),
         el('div', {}, [el('label', { text: 'Material base' }), materialSelect]),
       ]),
+      el('div', {}, [el('label', { text: 'Grade de blocos' }), gradeSelect]),
       el('div', { class: 'grid2' }, [
         el('div', {}, [el('label', { text: 'Eixo para cima' }), upSelect]),
         el('div', {}, [el('label', { text: 'Girar (se estiver de costas)' }), yawSelect]),
