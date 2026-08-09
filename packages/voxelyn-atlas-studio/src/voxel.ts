@@ -509,6 +509,36 @@ export const shiftModel = (model: VoxelModel, dx: number, dy: number, dz: number
   return out;
 };
 
+/**
+ * Expande cada voxel num BLOCO de `step`x`step`x`step` voxels finos.
+ *
+ * Existe por causa da GRADE DO JOGO. Todo personagem do Voxelyn e autorado em
+ * `box()` com MODEL_SCALE 2, ou seja, o menor volume que alguem desenha a mao
+ * tem 2 voxels finos de lado. Uma malha voxelizada na grade fina fica com
+ * detalhe de 1 voxel na superficie inteira — umas dez vezes mais frequencia
+ * espacial que o resto da tela — e o resultado nao e "mais detalhado", e
+ * DISPAR: o bicho importado le como textura enquanto os vizinhos leem como
+ * forma, e os materiais viram chuvisco de um voxel em vez de manchas.
+ *
+ * Voxelizar na altura dividida por `step` e depois expandir aqui devolve o
+ * bloco minimo do jogo, e com ele a aresta longa que faz silhueta a 60px.
+ */
+export const expandModel = (model: VoxelModel, step: number): VoxelModel => {
+  if (step <= 1) return { ...model };
+  const out: VoxelModel = {};
+  for (const [key, mat] of Object.entries(model)) {
+    const [x, y, z] = parseVoxelKey(key);
+    for (let dz = 0; dz < step; dz++) {
+      for (let dy = 0; dy < step; dy++) {
+        for (let dx = 0; dx < step; dx++) {
+          out[voxelKey(x * step + dx, y * step + dy, z * step + dz)] = mat;
+        }
+      }
+    }
+  }
+  return out;
+};
+
 /** Caixa em x/y de uma selecao de fatia (inclusiva nos dois cantos). */
 export type VoxelBox = { minX: number; maxX: number; minY: number; maxY: number };
 
