@@ -61,6 +61,23 @@ export default [
     },
   },
   {
+    // pipeline do devlog: roda em Node, fora de qualquer pacote
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        // O trecho que roda DENTRO do browser (addInitScript/evaluate) mora
+        // neste arquivo mas executa na pagina: sem estes, o lint acusa
+        // no-undef em codigo que nunca roda no Node.
+        document: 'readonly',
+        localStorage: 'readonly',
+      },
+    },
+  },
+  {
     // service workers dos PWAs: escopo ServiceWorkerGlobalScope, nao window
     files: ['packages/voxelyn-survival/public/sw.js', 'packages/voxelyn-atlas-studio/public/sw.js'],
     languageOptions: {

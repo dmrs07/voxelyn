@@ -1,0 +1,33 @@
+{
+  "hook": "O chão parou de ser um bloco só",
+  "slides": [
+    {
+      "title": "O problema",
+      "body": "As cinco matérias do chão — laje, tapete fúngico, poça, fogo e esporos — ainda viviam na densidade antiga. A subdivisão automática só engordava cada voxel autorado em 2x2x2 do mesmo material. Mais volume, zero textura."
+    },
+    {
+      "title": "O que mudou",
+      "body": "Agora cada matéria é construída coluna a coluna fina, 16x16 por tile — a mesma grade do terreno. Cascalho de meio voxel na laje. Musgo com pontos vivos pulsando no tapete. A poça virou filme, com reflexo em faixa e bolhas que acendem dois quadros e estouram."
+    },
+    {
+      "title": "E o teto passou a pingar",
+      "body": "Parte das células de poça goteja da caverna: a gota cai acelerando, o respingo salta e dois anéis concêntricos abrem na lâmina. Determinístico por célula e relógio — sem estado, sem sistema de partículas. Entra na fila ordenada por profundidade, então parede oculta gota como oculta qualquer corpo.",
+      "shot": "001-solo.png"
+    },
+    {
+      "title": "A exceção deliberada",
+      "body": "O gás ficou de fora. O algoritmo de sopros tem contrato de teste na grade autorada — forma, deriva e cobertura. Cada cubo escolhido virou aglomerado fino com 1/5 dos sub-voxels roídos por hash: borda esfarrapada, coreografia intacta."
+    }
+  ],
+  "caption": "Devlog 001 — o chão do Veio parou de ser um bloco só.\n\nAs cinco matérias de chão do Voxelyn Survival ainda estavam na densidade antiga: a subdivisão só engordava cada voxel autorado em 2x2x2 do mesmo material. Volume sem textura.\n\nAgora são construídas coluna a coluna fina (16x16 por tile), como o terreno. E a poça de biofluido ganhou o que faltava: bolhas que acendem dois quadros e estouram, e gotejamento do teto — gota acelerando, respingo, dois anéis abrindo na lâmina. Tudo determinístico por célula e relógio: sem estado, sem partículas.\n\nO gás foi exceção proposital. O algoritmo de sopros tem contrato de teste na grade autorada, então ele fica lá — só ganhou borda esfarrapada por hash.\n\nsurface-tiles v3. Suítes verdes.",
+  "tags": [
+    "#gamedev",
+    "#indiedev",
+    "#voxel",
+    "#pixelart",
+    "#roguelike",
+    "#devlog",
+    "#gamedevbr",
+    "#typescript"
+  ]
+}

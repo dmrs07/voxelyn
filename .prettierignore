@@ -8,3 +8,8 @@ node_modules
 **/.turbo
 **/pnpm-lock.yaml
 **/package-lock.json
+
+# Gerados pelo pipeline do devlog: reformatar aqui so cria briga entre o
+# prettier e o gerador, que reescreve os dois a cada execucao.
+docs/devlog/plan.json
+docs/devlog/INDEX.md
