@@ -237,6 +237,7 @@ export class SurvivalInput {
   private queuedAbility = false;
   private queuedChoice: 0 | 1 | null = null;
   private queuedRestart = false;
+  private queuedTerminal = false;
   private queuedAimTap = false;
 
   readonly state: InputState = {
@@ -336,6 +337,10 @@ export class SurvivalInput {
       this.state.actionPressSeq.ability += 1;
     }
     if (k === 'r') this.queuedRestart = true;
+    // T de terminal: a outra saida da tela de fim. Nao e o M do menu porque o M
+    // ja e o mudo — e mudar o mudo depois de mil sessoes seria trocar um atalho
+    // que o jogador usa DURANTE a run por um que ele usa depois dela.
+    if (k === 't') this.queuedTerminal = true;
     if (k === '1') this.queuedChoice = 0;
     if (k === '2') this.queuedChoice = 1;
     if (
@@ -510,22 +515,37 @@ export class SurvivalInput {
     }
   };
 
+  /**
+   * O primeiro toque da fila que ACERTA alguma coisa, pela regra de quem
+   * pergunta.
+   *
+   * A fila e drenada ate o acerto: um toque que caiu no vazio nao pode ficar
+   * guardado esperando a proxima tela ter um botao naquele ponto. Quem decide o
+   * que e acerto e o chamador, porque a geometria e dele — os cards do menu de
+   * escolha e os botoes da tela de fim tem alvos e formatos diferentes.
+   */
+  consumeUiTap<T>(hit: (x: number, y: number) => T | null): T | null {
+    while (this.state.tapQueue.length > 0) {
+      const tap = this.state.tapQueue.shift() as { x: number; y: number };
+      const found = hit(tap.x, tap.y);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
   consumeChoiceTap(regions: Array<{ x: number; y: number; w: number; h: number }>): 0 | 1 | null {
     if (this.queuedChoice !== null) {
       const c = this.queuedChoice;
       this.queuedChoice = null;
       return c;
     }
-    while (this.state.tapQueue.length > 0) {
-      const tap = this.state.tapQueue.shift() as { x: number; y: number };
+    return this.consumeUiTap((x, y) => {
       for (let i = 0; i < regions.length; i++) {
         const r = regions[i];
-        if (tap.x >= r.x && tap.x <= r.x + r.w && tap.y >= r.y && tap.y <= r.y + r.h) {
-          return i as 0 | 1;
-        }
+        if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i as 0 | 1;
       }
-    }
-    return null;
+      return null;
+    });
   }
 
   /** Descarta uma escolha prematura durante a sequencia visual da recompensa. */
@@ -535,16 +555,18 @@ export class SurvivalInput {
   }
 
   /**
-   * Descarta intencoes de UI pendentes (toques e a tecla R). A fila de toques
-   * so existe para UI (menu de escolha, tela de fim); durante a run ninguem a
-   * consome, entao sem este dreno cada toque no joystick/mira/botao — e cada
-   * clique de tiro no mouse — fica guardado e o primeiro hasTap() apos a morte
-   * reinicia a run na hora, antes do jogador ver o resultado. A tecla R e
-   * travada do mesmo jeito e precisa do mesmo dreno.
+   * Descarta intencoes de UI pendentes (toques e as teclas R e T). A fila de
+   * toques so existe para UI (menu de escolha, tela de fim); durante a run
+   * ninguem a consome, entao sem este dreno cada toque no joystick/mira/botao —
+   * e cada clique de tiro no mouse — fica guardado, e um deles pode cair em
+   * cima de um botao da tela de fim no instante em que ela aparece, decidindo
+   * pelo jogador antes de ele ler o resultado. As teclas sao travadas do mesmo
+   * jeito e precisam do mesmo dreno.
    */
   clearPendingUiInput(): void {
     this.state.tapQueue.length = 0;
     this.queuedRestart = false;
+    this.queuedTerminal = false;
   }
 
   /**
@@ -581,14 +603,6 @@ export class SurvivalInput {
     return true;
   }
 
-  hasTap(): boolean {
-    if (this.state.tapQueue.length > 0) {
-      this.state.tapQueue.length = 0;
-      return true;
-    }
-    return false;
-  }
-
   /**
    * Reinicio por teclado, alinhado com o texto da tela de fim. A tecla fica
    * TRAVADA ate ser consumida: se o jogador apertar R antes de a porta armar,
@@ -597,6 +611,17 @@ export class SurvivalInput {
   consumeRestartKey(): boolean {
     if (!this.queuedRestart) return false;
     this.queuedRestart = false;
+    return true;
+  }
+
+  /**
+   * A volta ao terminal por teclado, o par do R na tela de fim. Travada pelo
+   * mesmo motivo: quem aperta antes de a porta armar nao teve a intencao
+   * descartada, so adiantada.
+   */
+  consumeTerminalKey(): boolean {
+    if (!this.queuedTerminal) return false;
+    this.queuedTerminal = false;
     return true;
   }
 

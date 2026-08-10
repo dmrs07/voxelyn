@@ -51,6 +51,7 @@ import type {
   ActiveModule,
   ModuleId,
   OccupationId,
+  RunSummary,
   SemanticEvent,
   StratumId,
   SurvivalState,
@@ -133,6 +134,22 @@ import {
   reputationNote,
   summaryLines,
 } from './run-summary';
+import {
+  ACTIONS_UNITS,
+  TOP_GAP_UNITS,
+  layoutEndActions,
+  type EndActionRegions,
+} from './run-end-actions';
+import {
+  STARS_UNITS,
+  STAR_COUNT,
+  STAR_TOP_GAP_UNITS,
+  socketAlpha,
+  starRowLayout,
+  starStamp,
+  strikeProgress,
+  sweepProgress,
+} from './run-stars';
 import {
   entryAtlasChain,
   objectiveAtlasChain,
@@ -339,6 +356,45 @@ const drawBiomeVeil = (
 export const TILE_W = 32;
 export const TILE_H = 16;
 const WALL_H = 14;
+
+/**
+ * As teclas dos dois botoes da tela de fim.
+ *
+ * Cromo neutro de lingua — a tecla R e R em qualquer catalogo, como o serial do
+ * documento — e por isso constantes, e nao chaves. Ficam em variavel tambem
+ * porque a varredura de texto solto le `fillText('...')` como prosa fora do
+ * catalogo, e ela esta certa em ler: a excecao e que precisa ser explicita.
+ * Precisam bater com o que `input.ts` escuta.
+ */
+const KEY_RESTART = 'R';
+const KEY_TERMINAL = 'T';
+
+/**
+ * O que muda entre um chamador e outro da tela de fim.
+ *
+ * `actions` existe por causa da arena de chefes: la a tela de fim da simulacao
+ * e desenhada ATRAS do proprio resultado da ferramenta, em HTML, e o laco da
+ * arena nao le nem o toque nem as teclas R/T. Desenhar os dois botoes ali seria
+ * oferecer duas saidas que nao levam a lugar nenhum — pior do que nao oferecer
+ * nenhuma, porque um botao promete que funciona.
+ */
+export type EndScreenOptions = { input?: InputState; actions?: boolean };
+
+/**
+ * Os glifos da nota. Simbolos, nao prosa: nenhuma lingua tem outra estrela.
+ * Em variavel pela mesma razao das teclas — a varredura de texto solto le
+ * `fillText('...')` como frase fora do catalogo, e ela esta certa em ler.
+ */
+const STAR_FILLED = '★';
+const STAR_EMPTY = '☆';
+
+/**
+ * Quem pediu menos movimento recebe a mesma INFORMACAO sem a animacao — nunca
+ * menos informacao. Lido a cada consulta, e nao uma vez na carga: o jogador
+ * pode ligar a preferencia no sistema com o jogo aberto.
+ */
+const prefersReducedMotion = (): boolean =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export type ModuleHudMetrics = { size: number; gap: number };
 
@@ -1211,6 +1267,16 @@ export class SurvivalRenderer {
     startScreen?: { x: number; y: number };
   }[] = [];
   private deathEchoes: DeathEchoFrame = emptyDeathEchoFrame();
+  /**
+   * O relogio da tela de fim: qual sumario esta na tela e desde quando.
+   *
+   * Vive no renderizador, e nao no laco, porque e uma propriedade da TELA e nao
+   * da run — os dois modos (solo e co-op) desenham a mesma tela por caminhos
+   * diferentes, e nenhum dos dois deveria ter de lembrar de zerar um cronometro
+   * de animacao.
+   */
+  private endScreenKey = '';
+  private endScreenAt = 0;
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -1644,6 +1710,11 @@ export class SurvivalRenderer {
   }
 
   render(state: SurvivalState, alpha: number, input: InputState, nowMs: number): void {
+    // Um mundo andando invalida a tela de fim anterior. Sem isto, uma descida
+    // repetida na MESMA seed que termina na mesma fase e no mesmo tick produz a
+    // mesma chave de sumario, e a nota da segunda morte apareceria ja carimbada
+    // — a run inteira sem o unico momento em que a tela diz o que ela valeu.
+    if (state.phase === 'running') this.endScreenKey = '';
     this.worldWidth = state.config.width; // FX por indice de celula seguem o mundo real
     void alpha;
     const ctx = this.ctx;
@@ -4690,10 +4761,37 @@ export class SurvivalRenderer {
    *   3. o que voce fez (numeros)
    *   4. o que falta para a proxima estrela
    *   5. a seed, para repetir esta mesma descida
+   *   6. as duas saidas: descer de novo ou voltar ao terminal
+   *
+   * A ordem tambem e a da ANIMACAO: a nota se carimba enquanto o resto do
+   * documento ja esta lido, e `nowMs` e o unico relogio dela — nao ha rAF
+   * proprio, porque esta tela ja e redesenhada a cada quadro.
+   *
+   * Devolve onde os dois botoes ficaram, para o laco saber o que um toque
+   * acertou; `null` quando nao ha sumario — ou quando quem chamou dispensou o
+   * rodape (`actions: false`), e nao ha botao nenhum a acertar.
    */
-  renderEnd(state: SurvivalState, vw: number, vh: number): void {
+  renderEnd(
+    state: SurvivalState,
+    vw: number,
+    vh: number,
+    nowMs: number,
+    opts: EndScreenOptions = {},
+  ): EndActionRegions | null {
+    const { input, actions = true } = opts;
     const summary = state.summary;
-    if (!summary) return;
+    if (!summary) return null;
+    // O relogio da animacao nasce no primeiro quadro DESTE sumario.
+    //
+    // A chave e feita de campos congelados, e nao da identidade do objeto: no
+    // co-op cada snapshot desserializa uma copia nova da mesma run terminal, e
+    // comparar referencias reiniciaria o carimbo a cada quadro — as estrelas
+    // ficariam caindo para sempre, sem nunca pousar.
+    const key = `${summary.seed}:${summary.phase}:${summary.ticks}`;
+    if (key !== this.endScreenKey) {
+      this.endScreenKey = key;
+      this.endScreenAt = nowMs;
+    }
     const ctx = this.ctx;
     const outcome = describeOutcome(summary);
     const lost = summary.phase === 'dead';
@@ -4730,11 +4828,15 @@ export class SurvivalRenderer {
     // unico fator de escala devolve o maior `unit` que cabe. Sem laco e sem
     // corte: o documento encolhe inteiro em vez de perder a ultima linha.
     const margin = Math.max(8, Math.min(22, vw * 0.02));
-    // Coeficientes na ordem do desenho: ascendente do titulo, causa (rotulo +
-    // manchete), licao (rotulo + frase), respiro, numeros, carga, registro,
-    // dica, reinicio e a folga do descendente da ultima linha.
+    // Coeficientes na ordem do desenho: ascendente do titulo, a nota, causa
+    // (rotulo + manchete), licao (rotulo + frase), respiro, numeros, carga,
+    // registro, dica e o rodape de acoes (respiro + botoes + folga). Os dois
+    // blocos novos trazem o proprio coeficiente do modulo que os desenha, para
+    // a conta e o desenho nunca discordarem — esquecer um deles aqui nao muda
+    // nada no desktop e corta o rodape inteiro numa paisagem de 320px.
     const blockUnits =
       1.4 +
+      STARS_UNITS +
       1.6 +
       0.9 +
       (cause.lesson ? 1.95 : 0) +
@@ -4743,8 +4845,10 @@ export class SurvivalRenderer {
       (cargo ? 1.45 : 0) +
       (record ? 1.45 : 0) +
       (hint ? 0.6 : 0) +
-      1.6 +
-      0.5;
+      // Sem rodape, so a folga do descendente da ultima linha: reservar a
+      // altura dos botoes que nao serao desenhados centraria o documento em
+      // volta de um vazio.
+      (actions ? ACTIONS_UNITS : 0.5);
     // Cabecalho (2.8) + respiro minimo antes do conteudo (1.6) + bloco.
     const neededUnits = 2.8 + 1.6 + blockUnits;
     const unitBase = Math.max(10, Math.min(20, vh / 24));
@@ -4774,14 +4878,11 @@ export class SurvivalRenderer {
       margin + unit,
       headY + unit * 0.85,
     );
-    ctx.textAlign = 'right';
-    ctx.fillStyle = AX.gold;
-    ctx.font = `${Math.round(unit * 1.1)}px monospace`;
-    ctx.fillText(
-      '★'.repeat(summary.stars) + '☆'.repeat(3 - summary.stars),
-      vw - margin - unit,
-      headY + unit * 0.4,
-    );
+    // A nota SAIU do cabecalho. Ela morava aqui, em onze pixels, na cor do
+    // numero de serie: o resultado da descida entregue como cromo de papel
+    // timbrado, do lado oposto de onde o olho le. Agora ela e um bloco proprio
+    // no corpo do documento, carimbada uma a uma — e repeti-la no canto so
+    // faria a resposta chegar antes da animacao que a conta.
     const ruleY = headY + unit * 1.4;
     ctx.strokeStyle = lost ? AX.redLine : AX.brass;
     ctx.beginPath();
@@ -4804,6 +4905,17 @@ export class SurvivalRenderer {
     ctx.fillStyle = colors[outcome.color];
     ctx.font = `bold ${Math.round(unit * 1.7)}px monospace`;
     ctx.fillText(outcome.title, vw / 2, y);
+
+    // A nota, logo abaixo do titulo: o que aconteceu e QUANTO valeu, na mesma
+    // altura do olho. Ela se carimba sozinha a partir do relogio do quadro.
+    this.drawStarRow(summary, vw, y + unit * STAR_TOP_GAP_UNITS, unit, margin, nowMs, {
+      filled: AX.gold,
+      socket: AX.brass,
+      ring: AX.teal,
+      sweep: AX.inkBright,
+      strike: AX.redText,
+    });
+    y += unit * STARS_UNITS;
 
     // Causa e licao: o motivo de esta tela existir, na voz do formulario.
     y += unit * 1.6;
@@ -4902,11 +5014,190 @@ export class SurvivalRenderer {
       ctx.fillText(hint, vw / 2, y);
     }
 
-    // A chamada de reinicio e a UNICA linha teal da metade de baixo: e o
-    // proximo gesto do operador, e o teal e a cor de agir.
-    y += unit * 1.6;
-    ctx.fillStyle = AX.teal;
-    ctx.font = `bold ${Math.round(unit * 0.95)}px monospace`;
-    ctx.fillText(t('summary.restart'), vw / 2, y);
+    // As duas saidas. Descer de novo continua sendo a primeira — e a resposta
+    // certa para a morte rapida, e vem a esquerda, onde a leitura termina — mas
+    // ela nao e mais a UNICA: o minerio desta run so vira Matriz no terminal, e
+    // parar de jogar tem de ser um botao, nao o X da aba.
+    //
+    // Teal em quem age, latao em quem sai: a mesma gramatica de cor do resto do
+    // documento, onde o teal e sempre "o proximo gesto do operador".
+    if (!actions) return null;
+    const regions = layoutEndActions(vw, y + unit * TOP_GAP_UNITS, unit, margin);
+    this.drawEndButton(
+      regions.restart,
+      t('summary.action.restart'),
+      KEY_RESTART,
+      AX.teal,
+      unit,
+      input,
+    );
+    this.drawEndButton(
+      regions.terminal,
+      t('summary.action.terminal'),
+      KEY_TERMINAL,
+      AX.gold,
+      unit,
+      input,
+    );
+    return regions;
+  }
+
+  /**
+   * A nota da run, carimbada.
+   *
+   * Os soquetes vazios entram primeiro para a fileira ter forma; depois cada
+   * estrela conquistada CAI sobre o seu, esmaga um fio abaixo do tamanho final
+   * e abre um anel de impacto. Nota cheia ganha um brilho que atravessa a
+   * fileira uma vez. Nota zero — que so acontece na morte — recebe a linha
+   * vermelha de recusa por cima dos tres soquetes.
+   *
+   * O quando de tudo isso mora em `run-stars`, testavel em Node; aqui so se
+   * pinta o que aquele modulo diz que existe neste instante.
+   */
+  private drawStarRow(
+    summary: RunSummary,
+    vw: number,
+    top: number,
+    unit: number,
+    margin: number,
+    nowMs: number,
+    palette: { filled: string; socket: string; ring: string; sweep: string; strike: string },
+  ): void {
+    const ctx = this.ctx;
+    const elapsed = nowMs - this.endScreenAt;
+    const reduced = prefersReducedMotion();
+    const row = starRowLayout(vw, top, unit, margin);
+    const stars = summary.stars;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(row.size)}px monospace`;
+
+    // Os soquetes: o lugar onde a nota CABERIA. Sao eles que dao ao jogador de
+    // duas estrelas a informacao de que existe uma terceira.
+    ctx.globalAlpha = socketAlpha(elapsed, reduced) * 0.75;
+    ctx.fillStyle = palette.socket;
+    for (const cx of row.centers) ctx.fillText(STAR_EMPTY, cx, row.cy);
+
+    for (let i = 0; i < stars; i++) {
+      const stamp = starStamp(elapsed, i, reduced);
+      if (stamp.alpha <= 0) continue;
+      ctx.globalAlpha = stamp.alpha;
+      ctx.fillStyle = palette.filled;
+      ctx.save();
+      ctx.translate(row.centers[i], row.cy);
+      ctx.scale(stamp.scale, stamp.scale);
+      ctx.fillText(STAR_FILLED, 0, 0);
+      ctx.restore();
+      if (stamp.ring > 0) {
+        // O anel nasce colado no glifo e some ao abrir: e o baque do carimbo,
+        // nao um enfeite que fica.
+        ctx.globalAlpha = (1 - stamp.ring) * 0.55;
+        ctx.strokeStyle = palette.ring;
+        ctx.lineWidth = Math.max(1, unit * 0.12);
+        ctx.beginPath();
+        ctx.arc(row.centers[i], row.cy, row.size * (0.34 + stamp.ring * 0.75), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // O brilho da nota cheia: uma luz que ATRAVESSA a fileira, uma vez.
+    //
+    // Por queda de intensidade por estrela, e nao por faixa recortada: a faixa
+    // corta o glifo no meio e le como uma emenda: a queda acende cada estrela
+    // conforme a luz passa por ela, que e o que uma luz faz. A subida de escala
+    // e o mesmo gesto — o metal parece levantar quando a luz bate.
+    const sweep = sweepProgress(elapsed, stars, reduced);
+    if (sweep > 0) {
+      const span = row.centers[STAR_COUNT - 1] - row.centers[0];
+      const reach = row.size * 1.3;
+      const x = row.centers[0] - reach + sweep * (span + reach * 2);
+      const janela = Math.sin(sweep * Math.PI);
+      ctx.fillStyle = palette.sweep;
+      for (const cx of row.centers) {
+        const intensidade = Math.max(0, 1 - Math.abs(cx - x) / reach) * janela;
+        if (intensidade <= 0.01) continue;
+        ctx.globalAlpha = intensidade;
+        ctx.save();
+        ctx.translate(cx, row.cy);
+        ctx.scale(1 + intensidade * 0.12, 1 + intensidade * 0.12);
+        ctx.fillText(STAR_FILLED, 0, 0);
+        ctx.restore();
+      }
+    }
+
+    // A recusa: sem nota nenhuma, a companhia risca o campo.
+    const strike = strikeProgress(elapsed, stars, reduced);
+    if (strike > 0) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = palette.strike;
+      ctx.lineWidth = Math.max(1, unit * 0.14);
+      // Um fio abaixo do centro do bloco de texto: e onde fica o centro OPTICO
+      // do glifo, e uma linha que passa pelo topo das estrelas parece
+      // sublinhado torto, nao um risco.
+      const strikeY = row.cy + row.size * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(vw / 2 - row.half, strikeY);
+      ctx.lineTo(vw / 2 - row.half + row.half * 2 * strike, strikeY);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+  }
+
+  /**
+   * Um botao da tela de fim: moldura, rotulo e a tecla que faz o mesmo.
+   *
+   * A tecla so aparece para quem tem teclado. No celular ela seria a UI
+   * ensinando um gesto impossivel, bem no lugar onde o polegar ja esta.
+   */
+  private drawEndButton(
+    rect: Rect,
+    label: string,
+    key: string,
+    color: string,
+    unit: number,
+    input?: InputState,
+  ): void {
+    const ctx = this.ctx;
+    // O preenchimento e quase nada de proposito: o documento inteiro e linha
+    // fina sobre preto, e um botao solido aqui leria como outra aplicacao.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+
+    // A tecla mora na borda direita, na mesma linha do rotulo — e uma etiqueta
+    // do botao, nao uma segunda frase. Empilhada embaixo ela colidiria com o
+    // descendente do rotulo na altura que este botao tem (duas unidades).
+    const showKey = !input?.usingTouch;
+    const keyRoom = showKey ? unit * 1.3 : 0;
+
+    // O rotulo cabe SEMPRE: num botao estreito ele encolhe em vez de vazar por
+    // cima da moldura ou por cima da tecla — e "VOLTAR AO TERMINAL" e a linha
+    // mais longa da tela.
+    let size = unit * 0.8;
+    ctx.font = `bold ${Math.round(size)}px monospace`;
+    const maxWidth = rect.w - unit * 0.7 - keyRoom;
+    const measured = ctx.measureText(label).width;
+    if (measured > maxWidth) {
+      size = Math.max(unit * 0.4, (size * maxWidth) / measured);
+      ctx.font = `bold ${Math.round(size)}px monospace`;
+    }
+    const baseline = rect.y + rect.h / 2 + size * 0.36;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = color;
+    ctx.fillText(label, rect.x + (rect.w - keyRoom) / 2, baseline);
+    if (showKey) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(154, 145, 132, 0.85)';
+      ctx.font = `${Math.round(unit * 0.6)}px monospace`;
+      ctx.fillText(key, rect.x + rect.w - unit * 0.45, baseline);
+      ctx.textAlign = 'center';
+    }
   }
 }

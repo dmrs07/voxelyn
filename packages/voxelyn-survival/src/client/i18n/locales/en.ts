@@ -30,7 +30,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'menu.dev.seed.placeholder': 'random',
   'menu.dev.server': 'Server',
   'menu.dev.server.placeholder': 'auto',
-  'menu.controls': 'Tap to play · WASD/mouse on desktop · R restarts · M mutes',
+  'menu.controls':
+    'Tap to play · WASD/mouse on desktop · R restarts · T backs to terminal · M mutes',
   'menu.headphones': 'Use headphones: the sound warns you before the screen does.',
 
   // Aurix chrome (redesign doc AD-UI-2.0): decorative document labels.
@@ -410,7 +411,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.nextStar.two': "★★ requires leaving with the Guardian's core.",
   'summary.nextStar.one': '★ requires reaching extraction alive.',
   'summary.seed': 'seed {seed}',
-  'summary.restart': 'Tap or press R to descend again',
+  'summary.action.restart': 'DESCEND AGAIN',
+  'summary.action.terminal': 'BACK TO TERMINAL',
   'summary.doc.loss': 'UNIT LOSS REPORT',
   'summary.doc.settlement': 'CONTRACT SETTLEMENT',
   'summary.doc.cause': 'PROBABLE CAUSE',
