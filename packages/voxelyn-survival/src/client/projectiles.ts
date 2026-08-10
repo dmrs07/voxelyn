@@ -11,6 +11,7 @@
 // legivel — e um rastro curto que mostra para onde ele vai.
 
 import { PROSPECTOR_MUZZLE_HEIGHT_TILES } from '@voxelyn/survival-content';
+import { COMBAT_PLANE_TILES, heightToScreenPx, projectileHeightTiles } from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawGroundShadow, drawVoxel } from './voxel-draw';
 
@@ -77,23 +78,27 @@ const ARMED_RAMP: FaceRamp = ['#ffd166', '#ff7a3d', '#7a2f2f'];
  */
 export const SMALL_PROJECTILE_RADIUS = 0.2;
 
-/** Altura de voo, em tiles. O bastante para a sombra se separar do corpo. */
-const FLIGHT_HEIGHT = 0.55;
 /**
- * Altura de voo do que sai da ARMA DO JOGADOR.
+ * ALTURA DE VOO: o plano de combate, o mesmo de onde a mira e medida.
  *
- * Meio tile e a altura de quem cospe do chao — e o cuspe do Spitter e a rocha do
- * Bruiser saem mesmo dali. O Prospector nao: a arma dele esta montada no
- * hardpoint direito, a um tile e um quarto do chao, e o estilhaco nascia
- * atravessando a propria barriga do bot antes de aparecer na frente dele.
+ * O que sai da arma do jogador nao voa mais na altura do cano. A boca continua
+ * sendo a ORIGEM — `PROSPECTOR_MUZZLE_HEIGHT_TILES` existe porque o estilhaco
+ * nascia atravessando a barriga do bot —, mas manter o voo INTEIRO la em cima
+ * custava a mira: em projecao isometrica, 20 px de subida sao mais de um tile de
+ * chao, e o tiro passava por cima da linha que ligava o personagem ao cursor.
+ * `combat-plane.ts` conta a historia inteira e publica a curva
+ * (`projectileHeightTiles`); aqui fica so a consequencia.
  *
- * O numero vem do MODELO (`PROSPECTOR_MUZZLE_HEIGHT_TILES`), medido nos voxels
- * da boca do cano: subir o tiro a olho ate "parecer certo" descolaria de novo no
- * dia em que a arma mudasse de lugar no chassi. A altura e so visual — a colisao
- * continua acontecendo no plano do chao, e a sombra continua marcando onde ele
- * de fato passa.
+ * A altura continua sendo so visual — a colisao acontece no plano do chao, e a
+ * sombra continua marcando onde o projetil de fato passa.
  */
-const MUZZLE_FLIGHT_HEIGHT = PROSPECTOR_MUZZLE_HEIGHT_TILES;
+/**
+ * O drone rastreador NAO assenta: ele e a unica peca voadora do jogo, e uma
+ * maquina de quatro rotores rasteirinha mentiria sobre o que ela e. Ele tambem
+ * nao e mirado — o jogador solta e ele procura sozinho —, entao a altitude dele
+ * nao entra na conta da pontaria. Fica na altura em que foi lancado.
+ */
+const DRONE_CRUISE_HEIGHT = PROSPECTOR_MUZZLE_HEIGHT_TILES;
 /** Largura de um voxel do mundo em pixels, no zoom 1 (igual ao atlas). */
 const VOXEL_PX = 4;
 /** Bloco voador quase ocupa a largura visual de um tile, como o bloco arrancado. */
@@ -406,20 +411,42 @@ export class ProjectileView {
       : armed ? ARMED_RAMP
       : projectile.hostile ? HOSTILE_RAMP
       : PLAYER_RAMP;
-    // Tudo o que nao e hostil saiu da arma do Prospector — estilhaco, disco e
-    // missil —, e por isso parte da altura do cano.
-    const lift = (projectile.hostile ? FLIGHT_HEIGHT : MUZZLE_FLIGHT_HEIGHT) * tileH * zoom;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
     const size = VOXEL_PX * zoom * (rock ? ROCK_PROJECTILE_SCALE : disc ? 1.45 : seeker ? 1.25 : 1);
     const track = this.tracks.get(projectile.id);
+
+    // ALTURA. Tudo o que nao e hostil saiu da arma do Prospector — estilhaco,
+    // disco e drone —, e por isso PARTE da altura do cano; o estilhaco e o disco
+    // assentam no plano de combate em pouco mais de um tile, e o drone fica em
+    // cruzeiro. O que voa do chao (cuspe, pedra) ja nasce no plano.
+    //
+    // A distancia vem do que foi OBSERVADO (`track.travelled`), e nao do campo
+    // `distanceTravelled` do estado: online esse campo nao viaja no snapshot, e
+    // a descida congelaria justamente no co-op. O rastreio comeca no primeiro
+    // quadro em que o tiro aparece, que e o quadro em que ele saiu da arma.
+    const heightTiles = seeker
+      ? DRONE_CRUISE_HEIGHT
+      : projectileHeightTiles(track?.travelled ?? 0, !projectile.hostile);
+    const lift = heightToScreenPx(heightTiles, tileH, zoom);
 
     // A sombra vem primeiro e e o que torna a ALTURA legivel: em projecao
     // isometrica subir na tela e afastar-se sao o mesmo deslocamento de pixel,
     // entao sem sombra um projetil alto e indistinguivel de um projetil longe.
     // Sombra proporcional ao corpo: um bloco projeta mais sombra que um cuspe,
     // e e por ela que a massa se le enquanto ele ainda esta longe.
-    drawGroundShadow(ctx, sx, sy, (rock ? 7 : seeker ? 5 : disc ? 6 : 3) * zoom);
+    //
+    // Durante a descida do cano ela e MAIOR e mais fraca, e fecha conforme o
+    // tiro assenta. E o que conta a queda: sem isso, um estilhaco descendo e um
+    // estilhaco se aproximando desenham o mesmo pixel.
+    const altitude = heightTiles / COMBAT_PLANE_TILES;
+    drawGroundShadow(
+      ctx,
+      sx,
+      sy,
+      (rock ? 7 : seeker ? 5 : disc ? 6 : 3) * zoom * (0.6 + 0.4 * altitude),
+      0.45 / altitude,
+    );
 
     // Pedra nao deixa rastro de energia nem se parte em estilhaco: e um corpo
     // solido e unico. O que ela deixa e CASCALHO — pedrinhas escuras se

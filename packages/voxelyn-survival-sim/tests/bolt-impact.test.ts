@@ -130,6 +130,39 @@ describe('bolt contra parede: burst de plasma', () => {
     expect(impacts(events)).toHaveLength(0);
   });
 
+  /**
+   * O CENTRO da detonacao e a face da parede, e nao a posicao crua do projetil.
+   *
+   * O sub-passo anda ate um terco de tile por vez, entao quando a colisao e
+   * detectada `proj.x` ja esta DENTRO do bloco — e era dali que a explosao
+   * saia. Na tela, o clarao abria atras do ponto em que o tiro visivelmente
+   * encostou, e o anel de choque (que existe para ensinar o alcance do estrago)
+   * prometia esse alcance a partir do lugar errado.
+   *
+   * A tolerancia e ZERO no eixo do voo: a face oeste da celula e um numero
+   * exato, e "quase la" e justamente o defeito que este teste fecha.
+   */
+  it('detona na FACE da parede, no mesmo ponto em que o bolt comum bate', () => {
+    const state = createRun({ seed: 0xb01f });
+    clearArena(state);
+    grantOrRechargeModule(state.playerExtra, 'explosive', state.tick);
+    const wallX = Math.floor(state.player.x) + 6;
+    const py = state.player.y;
+    state.solid[Math.floor(py) * state.config.width + wallX] = SOLID_ROCK;
+    state.projectiles = [
+      bolt(state, { vx: 13, modules: { explosive: { armAfterDistance: 2.25 } } }),
+    ];
+
+    const blasts = runUntilSettled(state).filter(
+      (event): event is Extract<SemanticEvent, { t: 'explosion' }> => event.t === 'explosion',
+    );
+    expect(blasts).toHaveLength(1);
+    expect(blasts[0].x).toBeCloseTo(wallX, 5);
+    expect(blasts[0].y).toBeCloseTo(py, 5);
+    // E nunca ALEM da face: um centro dentro da pedra e exatamente o que havia.
+    expect(blasts[0].x).toBeLessThanOrEqual(wallX);
+  });
+
   it('piercing que atravessa parede quebrada nao produz burst naquela parede', () => {
     const state = createRun({ seed: 0xb01b });
     clearArena(state);

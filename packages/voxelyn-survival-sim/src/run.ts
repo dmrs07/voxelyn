@@ -1842,7 +1842,17 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
           !proj.hostile &&
           procModule(state, ownerExtra, ownerSlot, 'explosive', events)
         ) {
-          explodeAt(state, proj.x, proj.y, EXPLOSION_RADIUS, events, origin);
+          // Detona NA FACE da parede, e nao na posicao crua do projetil.
+          //
+          // O sub-passo anda ate um terco de tile por vez, entao `proj.x/y` no
+          // instante do teste ja esta DENTRO do bloco — e era ali que a explosao
+          // nascia. O jogador via o estilhaco tocar a pedra e o clarao abrir
+          // atras dela, meio tile adiante, com o anel de choque prometendo um
+          // alcance deslocado do ponto de contato. `solidImpactPoint` e o mesmo
+          // ponto que o `bolt_impact` do tiro comum ja usava: os dois fins de
+          // voo passam a acontecer onde o tiro visivelmente parou.
+          const contact = solidImpactPoint(prevX, prevY, proj.x, proj.y, cx, cy);
+          explodeAt(state, contact.x, contact.y, EXPLOSION_RADIUS, events, origin);
           dead = true;
           break;
         }

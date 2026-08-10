@@ -133,14 +133,20 @@ export const drawVoxel = (
  *
  * E o que vende a ALTURA: sem ela, subir o projetil na tela e indistinguivel de
  * move-lo para longe, porque em projecao isometrica os dois sao o mesmo pixel.
+ *
+ * `opacity` existe para quem MUDA de altura durante o voo: uma sombra que se
+ * abre e desbota enquanto o corpo sobe (e fecha e escurece enquanto ele desce) e
+ * a unica leitura de altitude que sobra num jogo sem eixo Z. Quem voa a altura
+ * fixa nao passa nada e fica no padrao.
  */
 export const drawGroundShadow = (
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
-  radius: number
+  radius: number,
+  opacity = 0.45
 ): void => {
-  ctx.fillStyle = 'rgba(11, 14, 20, 0.45)';
+  ctx.fillStyle = `rgba(11, 14, 20, ${Math.max(0, Math.min(1, opacity)).toFixed(3)})`;
   ctx.beginPath();
   ctx.ellipse(sx, sy, Math.max(1, radius), Math.max(1, radius * 0.5), 0, 0, Math.PI * 2);
   ctx.fill();

@@ -86,6 +86,7 @@ import {
   type BossModuleMark,
 } from './boss-module-presentation';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
+import { COMBAT_PLANE_TILES, heightToScreenPx } from './combat-plane';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { abilityPresentation } from './ability-presentation';
@@ -413,6 +414,15 @@ export type CameraShake = { power: number; until: number };
 export const AIM_LANE_LENGTH = 7;
 /** Passo do raycast da faixa, em tiles. Um quarto de tile nao pula parede. */
 const AIM_LANE_STEP = 0.25;
+/**
+ * Intensidade da faixa com o gatilho SOLTO — o estado permanente do desktop.
+ *
+ * O preco de uma faixa que nunca sai da tela e ela precisar ser lida de canto de
+ * olho e nunca disputar atencao com o que se move. Um terco e o ponto em que ela
+ * ainda diz rumo e parede sobre a rocha escura, e ja nao puxa o olho: a
+ * confirmacao vem no aperto, quando ela abre inteira.
+ */
+export const IDLE_AIM_LANE_ALPHA = 0.34;
 
 /** Um trecho reto da faixa: comeco, fim e o rumo unitario entre os dois. */
 export type AimLaneLeg = {
@@ -1177,6 +1187,25 @@ export class SurvivalRenderer {
     this.zoom = window.innerWidth < 700 ? 1.6 : 2;
   }
 
+  /**
+   * O PONTO DE TELA de onde a mira do mouse e medida.
+   *
+   * O personagem esta desenhado com os PES no centro da tela, e era dali que o
+   * vetor da mira saia. So que ninguem aponta o cursor para os pes de um bicho:
+   * aponta para o corpo dele, que esta desenhado acima do chao dele. Medir de
+   * pe para corpo somava um deslocamento de tela que a projecao isometrica le
+   * como DISTANCIA — o tiro saia sistematicamente por tras do alvo, e a
+   * diferenca crescia quanto mais perto o alvo estava.
+   *
+   * Subir a origem para o plano de combate cancela esse erro: os dois extremos
+   * do vetor passam a estar na mesma altura, e o que sobra e o rumo de chao
+   * verdadeiro. E o mesmo plano em que o projetil e desenhado, entao o tiro
+   * tambem passa VISUALMENTE por cima do cursor.
+   */
+  get aimAnchorLiftPx(): number {
+    return heightToScreenPx(COMBAT_PLANE_TILES, TILE_H, this.zoom);
+  }
+
   /** Consome eventos semanticos da sim e cria FX/mensagens/shake. */
   /**
    * Id da entidade do jogador LOCAL. Feedback de dano (cor do numero e shake da
@@ -1786,13 +1815,12 @@ export class SurvivalRenderer {
     // Desenhada junto com o jogador, ela passaria por cima da parede que a
     // interrompe, e a unica coisa que a faixa nao pode fazer e mentir sobre o
     // alcance.
-    // So enquanto o jogador MIRA. No toque isso e o manche direito fora do
-    // repouso; no mouse, o gatilho apertado. Desenhada o tempo todo, a faixa
-    // vira mobilia da tela e para de ser vista justamente quando teria algo a
-    // dizer — e no toque ela mentia por omissao, prometendo uma mira que o
-    // manche em repouso nao esta fazendo.
+    // Quando a faixa aparece e decisao do INPUT (`aiming`), porque e a mesma
+    // condicao que decide o disparo. O que o renderer decide e a INTENSIDADE: o
+    // desktop carrega a faixa permanente, e ela so pode ficar permanente se, em
+    // repouso, for um sussurro. Com o gatilho apertado ela abre inteira.
     if (input.aiming && player.alive && !state.playerExtras[player.slot ?? 0].downed) {
-      this.drawAimLane(state, player, toScreen, z);
+      this.drawAimLane(state, player, toScreen, z, input.firing ? 1 : IDLE_AIM_LANE_ALPHA);
     }
 
     // passo 2: paredes + entidades + projeteis, ordenados por profundidade
@@ -2981,6 +3009,7 @@ export class SurvivalRenderer {
     player: SurvivalState['player'],
     toScreen: (x: number, y: number) => [number, number],
     z: number,
+    intensity: number,
   ): void {
     const ctx = this.ctx;
     const extra = state.playerExtras[player.slot ?? 0];
@@ -3032,7 +3061,7 @@ export class SurvivalRenderer {
         const t1 = begin + ((leg.length - begin) * (i + 1)) / steps;
         // Some para a frente: a faixa nao pode terminar num traco reto, que
         // leria como "o tiro para aqui" — e ele nao para.
-        ctx.globalAlpha = alpha * (1 - ((from + t0) / total) * 0.85);
+        ctx.globalAlpha = alpha * intensity * (1 - ((from + t0) / total) * 0.85);
         const [ax, ay] = toScreen(leg.x0 + leg.nx * t0 + px, leg.y0 + leg.ny * t0 + py);
         const [bx, by] = toScreen(leg.x0 + leg.nx * t1 + px, leg.y0 + leg.ny * t1 + py);
         const [cx, cy] = toScreen(leg.x0 + leg.nx * t1 - px, leg.y0 + leg.ny * t1 - py);
@@ -3078,7 +3107,7 @@ export class SurvivalRenderer {
     // Marca do QUIQUE: um losango na parede onde o tiro vira. E o ponto que o
     // jogador de fato escolhe quando usa Ricochete — a mira aponta para a
     // parede, nao para o alvo — entao ele precisa de um alvo proprio.
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.7 * intensity;
     for (let i = 0; i < legs.length - 1; i++) {
       const leg = legs[i];
       const [kx, ky] = toScreen(leg.x1, leg.y1);
@@ -3094,7 +3123,7 @@ export class SurvivalRenderer {
 
     // Traco final atravessado na ponta: um alvo, e nao um fim de linha. Da a
     // faixa um ponto de leitura para quem mira "aquela distancia".
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.5 * intensity;
     const [tipLx, tipLy] = toScreen(tipX + tipPx * 1.9, tipY + tipPy * 1.9);
     const [tipRx, tipRy] = toScreen(tipX - tipPx * 1.9, tipY - tipPy * 1.9);
     ctx.beginPath();

@@ -417,7 +417,21 @@ export const PROTOCOL_VERSION = 21;
 //
 // Muda a impressao digital da geracao, e so no Aquifero: o bloco inteiro esta
 // atras de `profile.pipeCount > 0`.
-export const SIMULATION_VERSION = 36;
+// 37: o bolt EXPLOSIVO detona na FACE da parede, e nao dentro dela.
+//
+// O sub-passo do projetil anda ate um terco de tile por vez, entao no instante
+// em que a colisao e detectada `proj.x/y` ja esta dentro do bloco solido — e o
+// centro da explosao saia dali. Na tela, o clarao abria meio tile ATRAS do
+// ponto em que o tiro visivelmente encostou, e o anel de choque (que existe
+// para ensinar o alcance do estrago) prometia esse alcance a partir do lugar
+// errado. O tiro comum ja usava `solidImpactPoint` para o burst de plasma; o
+// explosivo passa a usar o mesmo ponto.
+//
+// Muda o hash: o raio parte de outro centro, entao o CONJUNTO de celulas que a
+// detonacao quebra e acende muda perto da parede. Dois peers em versoes
+// diferentes escavariam buracos diferentes com a mesma jogada, e um replay
+// pre-37 re-simulado sob a regra nova abriria outro mapa.
+export const SIMULATION_VERSION = 37;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
