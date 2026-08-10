@@ -25,7 +25,8 @@ export class RestartGate {
    * @param now ms monotonico (performance.now)
    * @param terminal a run acabou (morte ou extracao)
    * @returns `drain` = descarte a fila de toques agora;
-   *          `armed` = um toque/tecla neste frame vale como reinicio.
+   *          `armed` = um toque/tecla neste frame vale como decisao do jogador
+   *          (descer de novo ou voltar ao terminal).
    */
   frame(now: number, terminal: boolean): { drain: boolean; armed: boolean } {
     if (!terminal) {

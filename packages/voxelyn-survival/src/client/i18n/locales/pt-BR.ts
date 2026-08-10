@@ -34,7 +34,8 @@ export const PT_BR = {
   'menu.dev.seed.placeholder': 'aleatória',
   'menu.dev.server': 'Servidor',
   'menu.dev.server.placeholder': 'auto',
-  'menu.controls': 'Toque para jogar · WASD/mouse no desktop · R reinicia · M silencia',
+  'menu.controls':
+    'Toque para jogar · WASD/mouse no desktop · R reinicia · T volta ao terminal · M silencia',
   'menu.headphones': 'Use fones: o som avisa o que a tela ainda não mostra.',
 
   // Cromo Aurix do redesign (doc AD-UI-2.0): rótulos decorativos do documento.
@@ -415,7 +416,8 @@ export const PT_BR = {
   'summary.nextStar.two': '★★ exige sair com o núcleo do Guardião.',
   'summary.nextStar.one': '★ exige alcançar a extração vivo.',
   'summary.seed': 'seed {seed}',
-  'summary.restart': 'Toque ou pressione R para descer de novo',
+  'summary.action.restart': 'DESCER DE NOVO',
+  'summary.action.terminal': 'VOLTAR AO TERMINAL',
   'summary.doc.loss': 'RELATÓRIO DE PERDA DE UNIDADE',
   'summary.doc.settlement': 'LIQUIDAÇÃO DE CONTRATO',
   'summary.doc.cause': 'CAUSA PROVÁVEL',

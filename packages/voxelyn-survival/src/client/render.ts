@@ -134,6 +134,12 @@ import {
   summaryLines,
 } from './run-summary';
 import {
+  ACTIONS_UNITS,
+  TOP_GAP_UNITS,
+  layoutEndActions,
+  type EndActionRegions,
+} from './run-end-actions';
+import {
   entryAtlasChain,
   objectiveAtlasChain,
   objectiveLightSpec,
@@ -339,6 +345,18 @@ const drawBiomeVeil = (
 export const TILE_W = 32;
 export const TILE_H = 16;
 const WALL_H = 14;
+
+/**
+ * As teclas dos dois botoes da tela de fim.
+ *
+ * Cromo neutro de lingua — a tecla R e R em qualquer catalogo, como o serial do
+ * documento — e por isso constantes, e nao chaves. Ficam em variavel tambem
+ * porque a varredura de texto solto le `fillText('...')` como prosa fora do
+ * catalogo, e ela esta certa em ler: a excecao e que precisa ser explicita.
+ * Precisam bater com o que `input.ts` escuta.
+ */
+const KEY_RESTART = 'R';
+const KEY_TERMINAL = 'T';
 
 export type ModuleHudMetrics = { size: number; gap: number };
 
@@ -4690,10 +4708,19 @@ export class SurvivalRenderer {
    *   3. o que voce fez (numeros)
    *   4. o que falta para a proxima estrela
    *   5. a seed, para repetir esta mesma descida
+   *   6. as duas saidas: descer de novo ou voltar ao terminal
+   *
+   * Devolve onde os dois botoes ficaram, para o laco saber o que um toque
+   * acertou; `null` quando nao ha sumario e a tela nem chegou a existir.
    */
-  renderEnd(state: SurvivalState, vw: number, vh: number): void {
+  renderEnd(
+    state: SurvivalState,
+    vw: number,
+    vh: number,
+    input?: InputState,
+  ): EndActionRegions | null {
     const summary = state.summary;
-    if (!summary) return;
+    if (!summary) return null;
     const ctx = this.ctx;
     const outcome = describeOutcome(summary);
     const lost = summary.phase === 'dead';
@@ -4732,7 +4759,8 @@ export class SurvivalRenderer {
     const margin = Math.max(8, Math.min(22, vw * 0.02));
     // Coeficientes na ordem do desenho: ascendente do titulo, causa (rotulo +
     // manchete), licao (rotulo + frase), respiro, numeros, carga, registro,
-    // dica, reinicio e a folga do descendente da ultima linha.
+    // dica e o rodape de acoes (respiro + botoes + folga), que traz o proprio
+    // coeficiente de `run-end-actions` para os dois nunca discordarem.
     const blockUnits =
       1.4 +
       1.6 +
@@ -4743,8 +4771,7 @@ export class SurvivalRenderer {
       (cargo ? 1.45 : 0) +
       (record ? 1.45 : 0) +
       (hint ? 0.6 : 0) +
-      1.6 +
-      0.5;
+      ACTIONS_UNITS;
     // Cabecalho (2.8) + respiro minimo antes do conteudo (1.6) + bloco.
     const neededUnits = 2.8 + 1.6 + blockUnits;
     const unitBase = Math.max(10, Math.min(20, vh / 24));
@@ -4902,11 +4929,83 @@ export class SurvivalRenderer {
       ctx.fillText(hint, vw / 2, y);
     }
 
-    // A chamada de reinicio e a UNICA linha teal da metade de baixo: e o
-    // proximo gesto do operador, e o teal e a cor de agir.
-    y += unit * 1.6;
-    ctx.fillStyle = AX.teal;
-    ctx.font = `bold ${Math.round(unit * 0.95)}px monospace`;
-    ctx.fillText(t('summary.restart'), vw / 2, y);
+    // As duas saidas. Descer de novo continua sendo a primeira — e a resposta
+    // certa para a morte rapida, e vem a esquerda, onde a leitura termina — mas
+    // ela nao e mais a UNICA: o minerio desta run so vira Matriz no terminal, e
+    // parar de jogar tem de ser um botao, nao o X da aba.
+    //
+    // Teal em quem age, latao em quem sai: a mesma gramatica de cor do resto do
+    // documento, onde o teal e sempre "o proximo gesto do operador".
+    const regions = layoutEndActions(vw, y + unit * TOP_GAP_UNITS, unit, margin);
+    this.drawEndButton(
+      regions.restart,
+      t('summary.action.restart'),
+      KEY_RESTART,
+      AX.teal,
+      unit,
+      input,
+    );
+    this.drawEndButton(
+      regions.terminal,
+      t('summary.action.terminal'),
+      KEY_TERMINAL,
+      AX.gold,
+      unit,
+      input,
+    );
+    return regions;
+  }
+
+  /**
+   * Um botao da tela de fim: moldura, rotulo e a tecla que faz o mesmo.
+   *
+   * A tecla so aparece para quem tem teclado. No celular ela seria a UI
+   * ensinando um gesto impossivel, bem no lugar onde o polegar ja esta.
+   */
+  private drawEndButton(
+    rect: Rect,
+    label: string,
+    key: string,
+    color: string,
+    unit: number,
+    input?: InputState,
+  ): void {
+    const ctx = this.ctx;
+    // O preenchimento e quase nada de proposito: o documento inteiro e linha
+    // fina sobre preto, e um botao solido aqui leria como outra aplicacao.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
+
+    // A tecla mora na borda direita, na mesma linha do rotulo — e uma etiqueta
+    // do botao, nao uma segunda frase. Empilhada embaixo ela colidiria com o
+    // descendente do rotulo na altura que este botao tem (duas unidades).
+    const showKey = !input?.usingTouch;
+    const keyRoom = showKey ? unit * 1.3 : 0;
+
+    // O rotulo cabe SEMPRE: num botao estreito ele encolhe em vez de vazar por
+    // cima da moldura ou por cima da tecla — e "VOLTAR AO TERMINAL" e a linha
+    // mais longa da tela.
+    let size = unit * 0.8;
+    ctx.font = `bold ${Math.round(size)}px monospace`;
+    const maxWidth = rect.w - unit * 0.7 - keyRoom;
+    const measured = ctx.measureText(label).width;
+    if (measured > maxWidth) {
+      size = Math.max(unit * 0.4, (size * maxWidth) / measured);
+      ctx.font = `bold ${Math.round(size)}px monospace`;
+    }
+    const baseline = rect.y + rect.h / 2 + size * 0.36;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = color;
+    ctx.fillText(label, rect.x + (rect.w - keyRoom) / 2, baseline);
+    if (showKey) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(154, 145, 132, 0.85)';
+      ctx.font = `${Math.round(unit * 0.6)}px monospace`;
+      ctx.fillText(key, rect.x + rect.w - unit * 0.45, baseline);
+      ctx.textAlign = 'center';
+    }
   }
 }

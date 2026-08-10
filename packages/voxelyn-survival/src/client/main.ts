@@ -65,6 +65,7 @@ import {
 } from './matrix-panel';
 import type { CodexContext, PublicLoreFragment } from '@voxelyn/survival-protocol';
 import { formatSeed, parseSeed } from './run-summary';
+import { endActionAt, type EndAction, type EndActionRegions } from './run-end-actions';
 import {
   deathEchoContractLabelParts,
   isValidRoomCode,
@@ -882,8 +883,14 @@ const abandonRun = (): void => {
   liveRun = null;
   runInProgress = false;
   paused = false;
-  // A fila de toques e a tecla R ficam cheias do que o jogador apertou durante a
-  // run. Sem drenar, o primeiro `hasTap` da PROXIMA descida encontra lixo desta.
+  // A sentinela de historico sai junto com a run, venha o abandono do menu de
+  // campo (que ja a desfez, e por isso isto e idempotente) ou do botao da tela
+  // de fim. Deixa-la para tras nao quebra nada AGORA — quebra na descida
+  // seguinte, em que `armHistory` se daria por armada e o botao voltar do
+  // celular sairia da pagina no meio da run.
+  pauseMenu.disarmHistory();
+  // A fila de toques e as teclas de fim de run ficam cheias do que o jogador
+  // apertou durante a run. Sem drenar, a PROXIMA descida encontra lixo desta.
   input.clearPendingUiInput();
   mountOptions(optionsSlot);
   showInvite(null);
@@ -940,6 +947,31 @@ const pauseMenu = new PauseMenu(canvas, {
   ui: () => audio.ui(),
 });
 pauseMenu.attach();
+
+/**
+ * O que o jogador pediu na tela de fim — descer de novo, voltar ao terminal, ou
+ * nada ainda.
+ *
+ * Uma funcao para os dois modos porque a tela de fim e a MESMA no solo e no
+ * co-op: o que muda e o que cada um faz com a resposta (mundo novo aqui, sala
+ * nova la), e nao como a resposta e lida.
+ *
+ * `pauseMenu.isOpen` barra o TECLADO, que chega por cima da overlay: sem ele,
+ * quem abrisse o menu de campo na tela de fim para sair veria a run reiniciar
+ * por baixo do proprio menu. Os toques ja param sozinhos — a overlay engole o
+ * pointerdown antes de o canvas ve-lo.
+ *
+ * `armed` vem da `RestartGate`: antes dela armar, a tela de fim ainda nao foi
+ * lida e nenhum gesto vale como decisao.
+ */
+const endScreenAction = (regions: EndActionRegions | null, armed: boolean): EndAction | null => {
+  if (!regions || !armed || pauseMenu.isOpen) return null;
+  const tapped = input.consumeUiTap((x, y) => endActionAt(regions, x, y));
+  if (tapped !== null) return tapped;
+  if (input.consumeRestartKey()) return 'restart';
+  if (input.consumeTerminalKey()) return 'terminal';
+  return null;
+};
 
 /**
  * A dica, uma vez na vida.
@@ -1088,17 +1120,13 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
       renderState(state, 1, input.state, now);
-      renderer.renderEnd(state, vw, vh);
-      // `!pauseMenu.isOpen` barra o R do teclado, que chega por cima da overlay:
-      // sem ele, quem abrisse o menu na tela de fim para sair veria a run
-      // reiniciar por baixo do proprio menu. Os TOQUES ja param sozinhos — a
-      // overlay engole o pointerdown antes de o canvas ve-lo.
-      if (
-        !pauseMenu.isOpen &&
-        armed &&
-        !authorizing &&
-        (input.hasTap() || input.consumeRestartKey())
-      ) {
+      const endRegions = renderer.renderEnd(state, vw, vh, input.state);
+      // `authorizing` so barra a DESCIDA: um ticket ja em voo e uma run nova a
+      // caminho, e um segundo toque nao pode pedir uma terceira. Voltar ao
+      // terminal continua valendo — `abandonRun` invalida o ticket em voo, que
+      // e justamente o que "mudei de ideia" significa aqui.
+      const action = endScreenAction(endRegions, armed);
+      if (action === 'restart' && !authorizing) {
         // Cada tentativa e uma expedicao NOVA: ticket novo, runId novo, tuning
         // relido do perfil. Reusar o anterior deixaria a segunda run tentando
         // liquidar contra um runId ja fechado — e daria ao jogador um Prospector
@@ -1114,6 +1142,9 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
           resetRunTracking();
           gate.reset();
         });
+      } else if (action === 'terminal') {
+        audio.ui();
+        abandonRun();
       }
       accumulator = 0;
       requestAnimationFrame(frame);
@@ -1388,15 +1419,17 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
         if (terminal) {
           recordRun(state);
           if (state.summary) telemetry.finish(state.summary, state.sector);
-          renderer.renderEnd(state, window.innerWidth, window.innerHeight);
+          const endRegions = renderer.renderEnd(
+            state,
+            window.innerWidth,
+            window.innerHeight,
+            input.state,
+          );
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
           // reabre o socket — o matchmaking so considera salas 'running'.
-          //
-          // `menuOpen` barra o R do teclado, que chega por cima da overlay: sem
-          // ele, quem abrisse o menu na tela de fim para sair veria a run
-          // reiniciar por baixo do proprio menu.
-          if (!menuOpen && armed && (input.hasTap() || input.consumeRestartKey())) {
+          const action = endScreenAction(endRegions, armed);
+          if (action === 'restart') {
             gate.reset();
             audio.reset();
             resetRunTracking();
@@ -1406,6 +1439,12 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
             setBanner(t('banner.restarting'), 'info');
             net.resetSession();
             ws?.close(); // onclose agenda o reconnect, agora sem token
+          } else if (action === 'terminal') {
+            // Sair fecha o socket para valer: `abandonRun` chama o `stopLoop`
+            // desta descida, que e quem derruba a conexao. Sem isso o cliente
+            // ficaria reconectando a uma sala terminal por tras do menu.
+            audio.ui();
+            abandonRun();
           }
         }
       }
