@@ -102,6 +102,7 @@ import type { FaceLighting } from './sprites';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
+  PROP_RESPONSE,
   solidResponse,
   surfaceResponse,
 } from './material-response';
@@ -2217,7 +2218,14 @@ export class SurvivalRenderer {
           depth: state.corePos.x + state.corePos.y,
           draw: () => {
             for (const name of objectiveChain) {
-              if (this.props.draw(ctx, name, nowMs, csx, csy, z)) return;
+              if (
+                this.props.draw(
+                  ctx, name, nowMs, csx, csy, z,
+                  bodyFaceLight(state.corePos.x, state.corePos.y, PROP_RESPONSE),
+                )
+              ) {
+                return;
+              }
             }
 
             // Fallback enquanto o atlas nao carregou. Mesmo no caminho de erro o
@@ -2260,7 +2268,14 @@ export class SurvivalRenderer {
           depth: state.entry.x + state.entry.y,
           draw: () => {
             for (const name of entryChain) {
-              if (this.props.draw(ctx, name, nowMs, esx, esy, z)) return;
+              if (
+                this.props.draw(
+                  ctx, name, nowMs, esx, esy, z,
+                  bodyFaceLight(state.entry.x, state.entry.y, PROP_RESPONSE),
+                )
+              ) {
+                return;
+              }
             }
             ctx.fillStyle = shade(PAL.loot, 0.3 + brightness(state.entry.x, state.entry.y) * 0.5);
             ctx.fillRect(esx - 4 * z, esy - 2 * z, 8 * z, 4 * z);
@@ -2425,7 +2440,14 @@ export class SurvivalRenderer {
                 : site.terminalState === 'complete'
                   ? 'salvageTerminalComplete'
                   : 'salvageTerminalIdle';
-            if (this.props.draw(ctx, prop, nowMs, tsx, tsy, z)) return;
+            if (
+              this.props.draw(
+                ctx, prop, nowMs, tsx, tsy, z,
+                bodyFaceLight(site.terminal.x, site.terminal.y, PROP_RESPONSE),
+              )
+            ) {
+              return;
+            }
             ctx.fillStyle = shade(PAL.rockLight, 0.45 + tb * 0.45);
             ctx.fillRect(tsx - 4 * z, tsy - 12 * z, 8 * z, 12 * z);
             ctx.fillStyle =
@@ -2446,7 +2468,14 @@ export class SurvivalRenderer {
         depth: site.cache.x + site.cache.y,
         draw: () => {
           const prop = site.cacheOpened ? 'salvageCacheOpened' : 'salvageCache';
-          if (this.props.draw(ctx, prop, nowMs, csx, csy, z)) return;
+          if (
+            this.props.draw(
+              ctx, prop, nowMs, csx, csy, z,
+              bodyFaceLight(site.cache.x, site.cache.y, PROP_RESPONSE),
+            )
+          ) {
+            return;
+          }
           ctx.fillStyle = shade(PAL.rock, 0.5 + cb * 0.4);
           ctx.fillRect(csx - 5 * z, csy - 5 * z, 10 * z, 5 * z);
           ctx.fillStyle = site.cacheOpened ? PAL.rockShadow : PAL.loot;
@@ -2588,7 +2617,10 @@ export class SurvivalRenderer {
               ctx.save();
               ctx.globalAlpha *= CEILING_ALPHA;
             }
-            const drew = this.props.draw(ctx, atlasName, nowMs, dsx, dsy - lift, z);
+            const drew = this.props.draw(
+              ctx, atlasName, nowMs, dsx, dsy - lift, z,
+              bodyFaceLight(prop.x, prop.y, PROP_RESPONSE),
+            );
             if (ceiling) ctx.restore();
             if (drew) return;
           }

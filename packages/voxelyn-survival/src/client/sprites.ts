@@ -91,6 +91,7 @@ import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
+import worldPropsNormalUrl from '@voxelyn/survival-content/assets/atlases/world-props.normal.png?url';
 
 // ---------------------------------------------------------------------------
 // MAPAS DE FACES (normais por pixel)
@@ -129,6 +130,7 @@ import playerProspectorNormalUrl from '@voxelyn/survival-content/assets/atlases/
 
 /** Nome de arquivo publicado no manifest -> URL empacotada pelo bundler. */
 const NORMAL_URLS: Record<string, string> = {
+  'world-props.normal.png': worldPropsNormalUrl,
   'enemy-archcantor.normal.png': enemyArchcantorNormalUrl,
   'enemy-bellows.normal.png': enemyBellowsNormalUrl,
   'enemy-bishop.normal.png': enemyBishopNormalUrl,
@@ -541,6 +543,9 @@ export class PropBank {
   private readonly offsets = propOffsets(propManifest as unknown as PropManifest);
   private readonly image = new Image();
   private ready = false;
+  /** Mapa de faces, sob demanda — mesma politica dos corpos. Ver `requestNormal`. */
+  private normal: HTMLImageElement | null = null;
+  private normalState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 
   load(): void {
     this.image.onload = () => { this.ready = true; };
@@ -548,6 +553,37 @@ export class PropBank {
       console.warn('[props] atlas failed to load; using flat markers');
     };
     this.image.src = propUrl;
+  }
+
+  /**
+   * Pede o mapa de faces dos props na primeira vez que um deles e desenhado sob
+   * luz colorida.
+   *
+   * Sob demanda como o dos corpos, e pela mesma razao de orcamento — mas com um
+   * detalhe pratico diferente: props aparecem em quase toda sala, entao este
+   * aqui vai chegar cedo em praticamente toda run. O que a demanda compra nao e
+   * memoria poupada ao longo da sessao; e nao BLOQUEAR o boot com mais um atlas
+   * antes do primeiro quadro.
+   */
+  private requestNormal(): void {
+    if (this.normalState !== 'idle') return;
+    const name = this.manifest.normalAtlas;
+    const url = name ? NORMAL_URLS[name] : undefined;
+    if (!url) {
+      this.normalState = 'failed';
+      return;
+    }
+    this.normalState = 'loading';
+    const image = new Image();
+    image.onload = () => {
+      this.normal = image;
+      this.normalState = 'ready';
+    };
+    image.onerror = () => {
+      this.normalState = 'failed';
+      console.warn('[props] mapa de faces indisponivel');
+    };
+    image.src = url;
   }
 
   indexOf(name: string): number {
@@ -567,7 +603,12 @@ export class PropBank {
     nowMs: number,
     screenX: number,
     screenY: number,
-    zoom: number
+    zoom: number,
+    /**
+     * A luz do mundo nas tres faces desta peca. Ausente = a peca e desenhada
+     * como sempre foi, sem luz somada.
+     */
+    faces?: FaceLighting
   ): boolean {
     if (!this.ready) return false;
     const kindIndex = this.indexOf(name);
@@ -579,9 +620,41 @@ export class PropBank {
     const s = zoom / ATLAS_SCALE;
     const dx = screenX - m.originX * s;
     const dy = screenY + ATLAS_SCALE * s - m.originY * s;
+    const dw = m.frameWidth * s;
+    const dh = m.frameHeight * s;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * s, m.frameHeight * s);
+    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, dw, dh);
+
+    // A LUZ POR PIXEL, por cima da peca.
+    //
+    // Props nunca sao espelhados — sao autorados numa direcao so
+    // (`DIR_UNROTATED`) e desenhados como saem do atlas —, entao nao ha a troca
+    // de colunas que os corpos precisam. A ordem das faces vai direto.
+    if (faces && faces.some((face) => face.alpha > 0.004)) {
+      this.requestNormal();
+      if (this.normal && this.normalState === 'ready') {
+        const filter = armFaceLight(faces);
+        if (filter) {
+          const scale = m.normalScale ?? 1;
+          ctx.save();
+          ctx.filter = filter;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(
+            this.normal,
+            rect.sx / scale,
+            rect.sy / scale,
+            rect.sw / scale,
+            rect.sh / scale,
+            dx,
+            dy,
+            dw,
+            dh,
+          );
+          ctx.restore();
+        }
+      }
+    }
     return true;
   }
 }

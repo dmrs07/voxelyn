@@ -464,6 +464,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (errs.length === 0) console.log(`  OK ${id}`);
     else for (const e of errs) console.error(`  FAIL ${e}`);
     const path = resolve(DIR, `${id}.png`);
+    // Os atlas de cenario tambem podem ter mapa de faces — o de props tem, e ele
+    // e sob demanda como todos os outros. Contado aqui e nao no laco de
+    // sprites porque terreno, chao e props ficam FORA do index de sprites.
+    const scenaryNormal = resolve(DIR, `${id}.normal.png`);
+    if (existsSync(scenaryNormal)) {
+      totalBytes += statSync(scenaryNormal).size;
+      const normal = PNG.sync.read(readFileSync(scenaryNormal));
+      onDemandDecodedBytes += normal.width * normal.height * 4;
+    }
     if (existsSync(path)) {
       totalBytes += statSync(path).size;
       const decoded = PNG.sync.read(readFileSync(path));

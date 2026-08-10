@@ -382,8 +382,34 @@ const buildProps = () => {
   const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
   writeFileSync(resolve(OUT, 'world-props.png'), pngBytes);
 
+  // MAPA DE FACES dos props. Mesma grade, meia resolucao, mesmas ancoras.
+  //
+  // Aqui o alinhamento e ainda mais direto que nos personagens: os props nao
+  // passam por `fitSpriteToMargin` — cada quadro e desenhado numa ancora fixa
+  // vinda de `propBounds()` — entao pedir os mesmos quadros com a captura de
+  // face ligada devolve exatamente a mesma geometria, sem deslocamento nenhum
+  // para reconciliar.
+  const faceFrames = withFaceCapture(() =>
+    buildPropFrames(frameWidth, frameHeight, -bounds.minX + 2, -bounds.minY + 2),
+  ).map(halveFaces);
+  const normalAtlas = grid(
+    columns * Math.ceil(frameWidth / NORMAL_SCALE),
+    rows * Math.ceil(frameHeight / NORMAL_SCALE),
+  );
+  faceFrames.forEach((frame, i) =>
+    blitToAtlas(normalAtlas, frame, i % columns, Math.floor(i / columns)),
+  );
+  const normalPng = new PNG({ width: normalAtlas.w, height: normalAtlas.h });
+  normalPng.data = Buffer.from(normalAtlas.buf);
+  writeFileSync(
+    resolve(OUT, 'world-props.normal.png'),
+    PNG.sync.write(normalPng, { colorType: 6, inputColorType: 6 }),
+  );
+
   const manifest = {
     id: 'world-props',
+    normalAtlas: 'world-props.normal.png',
+    normalScale: NORMAL_SCALE,
     // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
     // 3: props DECORATIVOS volumetricos (decor:<kind>:<variante>) no fim da
     // lista — fumarolas, monolitos, a broca e demais pecas com massa deixam

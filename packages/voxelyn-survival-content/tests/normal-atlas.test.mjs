@@ -20,8 +20,19 @@ const manifest = (id) => JSON.parse(readFileSync(resolve(atlasDir, `${id}.json`)
  * tocha esta a direita — um defeito que ninguem associaria ao gerador.
  */
 
-/** Os sprites que o jogo desenha como corpo. FX emitem luz, nao a recebem. */
+/**
+ * Tudo que o jogo desenha como VOLUME e que recebe luz do mundo. FX emitem luz
+ * e ficam de fora.
+ *
+ * `world-props` entra na mesma lista e passa nas mesmas regras, apesar de vir
+ * de outro construtor (sem direcoes, sem animacao por direcao, sem
+ * enquadramento por margem): o contrato do mapa de faces nao e sobre COMO o
+ * atlas foi montado, e sim que ele descreva pixel a pixel o atlas de arte
+ * irmao. Um teste que so soubesse conferir personagem deixaria metade do
+ * cenario sem cobertura.
+ */
 const LIT_SPRITES = [
+  'world-props',
   'player-prospector',
   'layer-player-prospector-lower',
   'layer-player-prospector-upper',

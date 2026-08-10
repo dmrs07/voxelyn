@@ -144,3 +144,17 @@ export const CHASSIS_RESPONSE: MaterialResponse = { albedo: '#c8a66a', gloss: 0.
  * acende quando a explosao estoura ao lado dele e informacao de combate.
  */
 export const CREATURE_RESPONSE: MaterialResponse = { albedo: '#9aa7b3', gloss: 0.14 };
+
+/**
+ * Props do mundo: pedra e aco da operacao.
+ *
+ * Uma entrada so, como no bestiario, e pela mesma razao — mas aqui ela e ainda
+ * mais defensavel: o atlas de props mistura monolito, fumarola, broca, pedestal
+ * e portal, e todos sao materia INERTE do cenario. O que a luz precisa dizer
+ * sobre um monolito nao e de que rocha ele e; e que ele tem VOLUME, e o volume
+ * quem entrega e a normal por pixel, nao o albedo.
+ *
+ * Levemente polido: metade das pecas e equipamento da companhia, e um brilho
+ * curto na quina de uma broca a separa da pedra em volta dela.
+ */
+export const PROP_RESPONSE: MaterialResponse = { albedo: '#7d8590', gloss: 0.3 };
