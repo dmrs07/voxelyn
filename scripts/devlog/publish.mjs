@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { carouselDir, devlogDir, entriesDir, mediaDir } from './lib/paths.mjs';
+import { carouselDir, devlogDir, entriesDir, mediaDir, socialDir } from './lib/paths.mjs';
 import { nextEntry, readPlan, writePlan } from './plan.mjs';
 
 function parseArgs(argv) {
@@ -49,6 +49,21 @@ export function missingPieces(entry) {
     if (!existsSync(resolve(mediaDir, shot.file))) missing.push(`media/${shot.file} sumiu`);
 
   if (!findEntryFile(entry.id)) missing.push(`entries/${entry.id}-*.md (a redacao)`);
+
+  // A copy social e OBRIGATORIA, e nao um detalhe de acabamento.
+  //
+  // Sem ela o carousel.mjs ainda gera slides, derivados dos assuntos de
+  // commit — um fallback que existe para testar o pipeline, nunca para
+  // publicar. Se `publish` aceitasse esses arquivos, a etapa de redacao seria
+  // silenciosamente pulada e o passo humano no Instagram chegaria sem legenda
+  // e sem tags, com slides escritos em linguagem de commit.
+  const social = resolve(socialDir, `${entry.id}.json`);
+  if (!existsSync(social)) missing.push(`social/${entry.id}.json (a copy do Instagram)`);
+  else {
+    const copy = JSON.parse(readFileSync(social, 'utf8'));
+    if (!copy.slides?.length) missing.push(`social/${entry.id}.json sem slides`);
+    if (!copy.caption) missing.push(`social/${entry.id}.json sem legenda`);
+  }
 
   if (!entry.carousel?.length) missing.push('carrossel (carousel.mjs)');
   for (const file of entry.carousel ?? [])

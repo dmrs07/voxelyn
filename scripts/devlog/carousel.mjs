@@ -16,11 +16,9 @@ import { resolve } from 'node:path';
 
 import { chromium } from 'playwright';
 
-import { carouselDir, chromiumExecutable, devlogDir } from './lib/paths.mjs';
+import { carouselDir, chromiumExecutable, socialDir } from './lib/paths.mjs';
 import { SLIDE, buildSlides, slidesDocument } from './lib/slides.mjs';
 import { nextEntry, readPlan, writePlan } from './plan.mjs';
-
-export const socialDir = resolve(devlogDir, 'social');
 
 function parseArgs(argv) {
   const args = { entry: null, next: false };

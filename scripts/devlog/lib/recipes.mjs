@@ -181,36 +181,56 @@ export const recipes = {
  * fotografada pelo que ela tinha: o editor em janeiro, o roguelike de
  * fevereiro a julho, o Survival dai em diante.
  */
+/**
+ * O quadro GARANTIDO de uma era: o app jogavel mais recente que ja existia
+ * naquele commit, sempre por uma receita nao-opcional.
+ *
+ * A cadeia desce ate os demos do core, que existem desde o commit inicial —
+ * por isso nenhuma entrada do devlog fica sem imagem, nem as de janeiro.
+ */
+function eraRecipe(exists, says) {
+  if (exists('survival')) return 'solo';
+  if (exists('roguelike')) return 'roguelike';
+  if (exists('editor') && says(/editor|voxelforge|material|palet/)) return 'editor';
+  if (exists('examples')) return 'noita';
+  if (exists('editor')) return 'editor';
+  return null;
+}
+
+/** A receita que melhor retrata ESTE PR — a capa. Pode nao existir no commit. */
+function coverRecipe(exists, has, says) {
+  if (exists('atlas-studio') && has('atlas-studio')) return 'atlas-studio';
+  if (exists('survival')) {
+    if (says(/arena|chefe|boss/)) return 'arena';
+    if (says(/sprite|atlas|anima|frame|pose/) && !has('atlas-studio')) return 'sprites';
+    if (says(/menu|terminal|tela|hud|opcoes|op..es|ranking|registro/)) return 'menu';
+  }
+  return null;
+}
+
 export function pickRecipes(areas, title = '', available = null) {
   const exists = (app) => available === null || available.has(app);
   const has = (needle) => areas.some((a) => a.includes(needle));
   const says = (re) => re.test(title.toLowerCase());
+
+  const cover = coverRecipe(exists, has, says);
+  const era = eraRecipe(exists, says);
   const picked = [];
 
-  if (exists('atlas-studio') && has('atlas-studio')) picked.push('atlas-studio');
+  if (cover) picked.push(cover);
 
-  if (exists('survival')) {
-    if (says(/arena|chefe|boss/)) picked.push('arena');
-    if (says(/sprite|atlas|anima|frame|pose/) && !has('atlas-studio')) picked.push('sprites');
-    if (says(/menu|terminal|tela|hud|opcoes|op..es|ranking|registro/)) picked.push('menu');
-  }
+  // A capa pode ser uma receita OPCIONAL — `arena` e `sprites` dependem de uma
+  // pagina que so nasceu no meio do historico, e `atlas-studio` de um app de
+  // agosto. Se ela for a unica escolhida e a pagina nao existir naquele
+  // commit, a captura termina sem imagem e a fila diaria PARA, porque a
+  // proxima entrada nunca e alcancada. Por isso o quadro garantido da era
+  // entra sempre que a capa nao for, ela propria, garantida.
+  if (era && !picked.includes(era) && !picked.some((r) => !recipes[r].optional)) picked.push(era);
 
-  // O leito de seguranca e o app jogavel mais recente que existia na epoca:
-  // toda entrada precisa de pelo menos um quadro, e ele nao pode vir de um
-  // app que ainda nao tinha sido escrito. A cadeia desce ate os demos do
-  // core, que existem desde o commit inicial — por isso nenhuma entrada do
-  // devlog fica sem imagem, nem as de janeiro.
-  if (!picked.length || !picked.some((r) => recipes[r].app !== 'atlas-studio')) {
-    if (exists('survival')) picked.push('solo');
-    else if (exists('roguelike')) picked.push('roguelike');
-    else if (says(/editor|voxelforge|material|palet/) && exists('editor')) picked.push('editor');
-    else if (exists('examples')) {
-      // Na era dos demos, os DOIS: sao quinze posts nessa janela e o mesmo
-      // quadro de areia caindo quinze vezes mataria o carrossel. Noita-like e
-      // iso Diablo-like mostram as duas metades da biblioteca headless.
-      picked.push('noita', 'iso');
-    }
-  }
+  // Na era dos demos, os DOIS: sao quinze posts nessa janela e o mesmo quadro
+  // de areia caindo quinze vezes mataria o carrossel. Noita-like e iso
+  // Diablo-like mostram as duas metades da biblioteca headless.
+  if (era === 'noita' && exists('examples')) picked.push('iso');
 
-  return [...new Set(picked)].filter((r) => exists(recipes[r].app)).slice(0, 2);
+  return [...new Set(picked)].filter((r) => exists(recipes[r].app));
 }

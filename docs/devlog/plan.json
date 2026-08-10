@@ -1344,7 +1344,8 @@
         }
       ],
       "recipes": [
-        "sprites"
+        "sprites",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1459,7 +1460,8 @@
         }
       ],
       "recipes": [
-        "sprites"
+        "sprites",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1758,7 +1760,8 @@
         }
       ],
       "recipes": [
-        "sprites"
+        "sprites",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -2045,7 +2048,8 @@
         }
       ],
       "recipes": [
-        "arena"
+        "arena",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -3041,7 +3045,8 @@
         }
       ],
       "recipes": [
-        "sprites"
+        "sprites",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -3876,7 +3881,8 @@
         }
       ],
       "recipes": [
-        "sprites"
+        "sprites",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -5077,7 +5083,8 @@
         }
       ],
       "recipes": [
-        "sprites"
+        "sprites",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -5349,7 +5356,8 @@
         }
       ],
       "recipes": [
-        "arena"
+        "arena",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -5385,7 +5393,8 @@
         }
       ],
       "recipes": [
-        "arena"
+        "arena",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -5618,7 +5627,8 @@
         }
       ],
       "recipes": [
-        "arena"
+        "arena",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -5654,7 +5664,8 @@
         }
       ],
       "recipes": [
-        "arena"
+        "arena",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -6269,7 +6280,8 @@
         }
       ],
       "recipes": [
-        "arena"
+        "arena",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
