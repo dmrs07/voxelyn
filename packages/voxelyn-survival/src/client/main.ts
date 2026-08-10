@@ -1120,7 +1120,7 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
       if (drain) input.clearPendingUiInput();
       audio.update(state, now);
       renderState(state, 1, input.state, now);
-      const endRegions = renderer.renderEnd(state, vw, vh, input.state);
+      const endRegions = renderer.renderEnd(state, vw, vh, now, input.state);
       // `authorizing` so barra a DESCIDA: um ticket ja em voo e uma run nova a
       // caminho, e um segundo toque nao pode pedir uma terceira. Voltar ao
       // terminal continua valendo — `abandonRun` invalida o ticket em voo, que
@@ -1423,6 +1423,7 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
             state,
             window.innerWidth,
             window.innerHeight,
+            now,
             input.state,
           );
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o

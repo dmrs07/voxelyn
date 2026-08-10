@@ -251,7 +251,7 @@ const runArena = (conditions: ArenaConditions): void => {
       // `renderEnd` e a tela de fim NATIVA da sim (morte/extracao); vitoria
       // contra o chefe nao passa por `state.phase`, entao nao ha nada la para
       // desenhar — o overlay de HTML e o resultado inteiro nesse caso.
-      if (state.phase !== 'running') renderer.renderEnd(state, vw, vh);
+      if (state.phase !== 'running') renderer.renderEnd(state, vw, vh, now, input.state);
       if (!ended) {
         ended = true;
         showEnd(outcome, state);

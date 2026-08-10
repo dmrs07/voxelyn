@@ -51,6 +51,7 @@ import type {
   ActiveModule,
   ModuleId,
   OccupationId,
+  RunSummary,
   SemanticEvent,
   StratumId,
   SurvivalState,
@@ -139,6 +140,16 @@ import {
   layoutEndActions,
   type EndActionRegions,
 } from './run-end-actions';
+import {
+  STARS_UNITS,
+  STAR_COUNT,
+  STAR_TOP_GAP_UNITS,
+  socketAlpha,
+  starRowLayout,
+  starStamp,
+  strikeProgress,
+  sweepProgress,
+} from './run-stars';
 import {
   entryAtlasChain,
   objectiveAtlasChain,
@@ -357,6 +368,22 @@ const WALL_H = 14;
  */
 const KEY_RESTART = 'R';
 const KEY_TERMINAL = 'T';
+
+/**
+ * Os glifos da nota. Simbolos, nao prosa: nenhuma lingua tem outra estrela.
+ * Em variavel pela mesma razao das teclas — a varredura de texto solto le
+ * `fillText('...')` como frase fora do catalogo, e ela esta certa em ler.
+ */
+const STAR_FILLED = '★';
+const STAR_EMPTY = '☆';
+
+/**
+ * Quem pediu menos movimento recebe a mesma INFORMACAO sem a animacao — nunca
+ * menos informacao. Lido a cada consulta, e nao uma vez na carga: o jogador
+ * pode ligar a preferencia no sistema com o jogo aberto.
+ */
+const prefersReducedMotion = (): boolean =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export type ModuleHudMetrics = { size: number; gap: number };
 
@@ -1229,6 +1256,16 @@ export class SurvivalRenderer {
     startScreen?: { x: number; y: number };
   }[] = [];
   private deathEchoes: DeathEchoFrame = emptyDeathEchoFrame();
+  /**
+   * O relogio da tela de fim: qual sumario esta na tela e desde quando.
+   *
+   * Vive no renderizador, e nao no laco, porque e uma propriedade da TELA e nao
+   * da run — os dois modos (solo e co-op) desenham a mesma tela por caminhos
+   * diferentes, e nenhum dos dois deveria ter de lembrar de zerar um cronometro
+   * de animacao.
+   */
+  private endScreenKey = '';
+  private endScreenAt = 0;
   quality: QualityPreset = PRESETS.high;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
@@ -1662,6 +1699,11 @@ export class SurvivalRenderer {
   }
 
   render(state: SurvivalState, alpha: number, input: InputState, nowMs: number): void {
+    // Um mundo andando invalida a tela de fim anterior. Sem isto, uma descida
+    // repetida na MESMA seed que termina na mesma fase e no mesmo tick produz a
+    // mesma chave de sumario, e a nota da segunda morte apareceria ja carimbada
+    // — a run inteira sem o unico momento em que a tela diz o que ela valeu.
+    if (state.phase === 'running') this.endScreenKey = '';
     this.worldWidth = state.config.width; // FX por indice de celula seguem o mundo real
     void alpha;
     const ctx = this.ctx;
@@ -4710,6 +4752,10 @@ export class SurvivalRenderer {
    *   5. a seed, para repetir esta mesma descida
    *   6. as duas saidas: descer de novo ou voltar ao terminal
    *
+   * A ordem tambem e a da ANIMACAO: a nota se carimba enquanto o resto do
+   * documento ja esta lido, e `nowMs` e o unico relogio dela — nao ha rAF
+   * proprio, porque esta tela ja e redesenhada a cada quadro.
+   *
    * Devolve onde os dois botoes ficaram, para o laco saber o que um toque
    * acertou; `null` quando nao ha sumario e a tela nem chegou a existir.
    */
@@ -4717,10 +4763,22 @@ export class SurvivalRenderer {
     state: SurvivalState,
     vw: number,
     vh: number,
+    nowMs: number,
     input?: InputState,
   ): EndActionRegions | null {
     const summary = state.summary;
     if (!summary) return null;
+    // O relogio da animacao nasce no primeiro quadro DESTE sumario.
+    //
+    // A chave e feita de campos congelados, e nao da identidade do objeto: no
+    // co-op cada snapshot desserializa uma copia nova da mesma run terminal, e
+    // comparar referencias reiniciaria o carimbo a cada quadro — as estrelas
+    // ficariam caindo para sempre, sem nunca pousar.
+    const key = `${summary.seed}:${summary.phase}:${summary.ticks}`;
+    if (key !== this.endScreenKey) {
+      this.endScreenKey = key;
+      this.endScreenAt = nowMs;
+    }
     const ctx = this.ctx;
     const outcome = describeOutcome(summary);
     const lost = summary.phase === 'dead';
@@ -4757,12 +4815,15 @@ export class SurvivalRenderer {
     // unico fator de escala devolve o maior `unit` que cabe. Sem laco e sem
     // corte: o documento encolhe inteiro em vez de perder a ultima linha.
     const margin = Math.max(8, Math.min(22, vw * 0.02));
-    // Coeficientes na ordem do desenho: ascendente do titulo, causa (rotulo +
-    // manchete), licao (rotulo + frase), respiro, numeros, carga, registro,
-    // dica e o rodape de acoes (respiro + botoes + folga), que traz o proprio
-    // coeficiente de `run-end-actions` para os dois nunca discordarem.
+    // Coeficientes na ordem do desenho: ascendente do titulo, a nota, causa
+    // (rotulo + manchete), licao (rotulo + frase), respiro, numeros, carga,
+    // registro, dica e o rodape de acoes (respiro + botoes + folga). Os dois
+    // blocos novos trazem o proprio coeficiente do modulo que os desenha, para
+    // a conta e o desenho nunca discordarem — esquecer um deles aqui nao muda
+    // nada no desktop e corta o rodape inteiro numa paisagem de 320px.
     const blockUnits =
       1.4 +
+      STARS_UNITS +
       1.6 +
       0.9 +
       (cause.lesson ? 1.95 : 0) +
@@ -4801,14 +4862,11 @@ export class SurvivalRenderer {
       margin + unit,
       headY + unit * 0.85,
     );
-    ctx.textAlign = 'right';
-    ctx.fillStyle = AX.gold;
-    ctx.font = `${Math.round(unit * 1.1)}px monospace`;
-    ctx.fillText(
-      '★'.repeat(summary.stars) + '☆'.repeat(3 - summary.stars),
-      vw - margin - unit,
-      headY + unit * 0.4,
-    );
+    // A nota SAIU do cabecalho. Ela morava aqui, em onze pixels, na cor do
+    // numero de serie: o resultado da descida entregue como cromo de papel
+    // timbrado, do lado oposto de onde o olho le. Agora ela e um bloco proprio
+    // no corpo do documento, carimbada uma a uma — e repeti-la no canto so
+    // faria a resposta chegar antes da animacao que a conta.
     const ruleY = headY + unit * 1.4;
     ctx.strokeStyle = lost ? AX.redLine : AX.brass;
     ctx.beginPath();
@@ -4831,6 +4889,17 @@ export class SurvivalRenderer {
     ctx.fillStyle = colors[outcome.color];
     ctx.font = `bold ${Math.round(unit * 1.7)}px monospace`;
     ctx.fillText(outcome.title, vw / 2, y);
+
+    // A nota, logo abaixo do titulo: o que aconteceu e QUANTO valeu, na mesma
+    // altura do olho. Ela se carimba sozinha a partir do relogio do quadro.
+    this.drawStarRow(summary, vw, y + unit * STAR_TOP_GAP_UNITS, unit, margin, nowMs, {
+      filled: AX.gold,
+      socket: AX.brass,
+      ring: AX.teal,
+      sweep: AX.inkBright,
+      strike: AX.redText,
+    });
+    y += unit * STARS_UNITS;
 
     // Causa e licao: o motivo de esta tela existir, na voz do formulario.
     y += unit * 1.6;
@@ -4954,6 +5023,112 @@ export class SurvivalRenderer {
       input,
     );
     return regions;
+  }
+
+  /**
+   * A nota da run, carimbada.
+   *
+   * Os soquetes vazios entram primeiro para a fileira ter forma; depois cada
+   * estrela conquistada CAI sobre o seu, esmaga um fio abaixo do tamanho final
+   * e abre um anel de impacto. Nota cheia ganha um brilho que atravessa a
+   * fileira uma vez. Nota zero — que so acontece na morte — recebe a linha
+   * vermelha de recusa por cima dos tres soquetes.
+   *
+   * O quando de tudo isso mora em `run-stars`, testavel em Node; aqui so se
+   * pinta o que aquele modulo diz que existe neste instante.
+   */
+  private drawStarRow(
+    summary: RunSummary,
+    vw: number,
+    top: number,
+    unit: number,
+    margin: number,
+    nowMs: number,
+    palette: { filled: string; socket: string; ring: string; sweep: string; strike: string },
+  ): void {
+    const ctx = this.ctx;
+    const elapsed = nowMs - this.endScreenAt;
+    const reduced = prefersReducedMotion();
+    const row = starRowLayout(vw, top, unit, margin);
+    const stars = summary.stars;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(row.size)}px monospace`;
+
+    // Os soquetes: o lugar onde a nota CABERIA. Sao eles que dao ao jogador de
+    // duas estrelas a informacao de que existe uma terceira.
+    ctx.globalAlpha = socketAlpha(elapsed, reduced) * 0.75;
+    ctx.fillStyle = palette.socket;
+    for (const cx of row.centers) ctx.fillText(STAR_EMPTY, cx, row.cy);
+
+    for (let i = 0; i < stars; i++) {
+      const stamp = starStamp(elapsed, i, reduced);
+      if (stamp.alpha <= 0) continue;
+      ctx.globalAlpha = stamp.alpha;
+      ctx.fillStyle = palette.filled;
+      ctx.save();
+      ctx.translate(row.centers[i], row.cy);
+      ctx.scale(stamp.scale, stamp.scale);
+      ctx.fillText(STAR_FILLED, 0, 0);
+      ctx.restore();
+      if (stamp.ring > 0) {
+        // O anel nasce colado no glifo e some ao abrir: e o baque do carimbo,
+        // nao um enfeite que fica.
+        ctx.globalAlpha = (1 - stamp.ring) * 0.55;
+        ctx.strokeStyle = palette.ring;
+        ctx.lineWidth = Math.max(1, unit * 0.12);
+        ctx.beginPath();
+        ctx.arc(row.centers[i], row.cy, row.size * (0.34 + stamp.ring * 0.75), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // O brilho da nota cheia: uma luz que ATRAVESSA a fileira, uma vez.
+    //
+    // Por queda de intensidade por estrela, e nao por faixa recortada: a faixa
+    // corta o glifo no meio e le como uma emenda: a queda acende cada estrela
+    // conforme a luz passa por ela, que e o que uma luz faz. A subida de escala
+    // e o mesmo gesto — o metal parece levantar quando a luz bate.
+    const sweep = sweepProgress(elapsed, stars, reduced);
+    if (sweep > 0) {
+      const span = row.centers[STAR_COUNT - 1] - row.centers[0];
+      const reach = row.size * 1.3;
+      const x = row.centers[0] - reach + sweep * (span + reach * 2);
+      const janela = Math.sin(sweep * Math.PI);
+      ctx.fillStyle = palette.sweep;
+      for (const cx of row.centers) {
+        const intensidade = Math.max(0, 1 - Math.abs(cx - x) / reach) * janela;
+        if (intensidade <= 0.01) continue;
+        ctx.globalAlpha = intensidade;
+        ctx.save();
+        ctx.translate(cx, row.cy);
+        ctx.scale(1 + intensidade * 0.12, 1 + intensidade * 0.12);
+        ctx.fillText(STAR_FILLED, 0, 0);
+        ctx.restore();
+      }
+    }
+
+    // A recusa: sem nota nenhuma, a companhia risca o campo.
+    const strike = strikeProgress(elapsed, stars, reduced);
+    if (strike > 0) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = palette.strike;
+      ctx.lineWidth = Math.max(1, unit * 0.14);
+      // Um fio abaixo do centro do bloco de texto: e onde fica o centro OPTICO
+      // do glifo, e uma linha que passa pelo topo das estrelas parece
+      // sublinhado torto, nao um risco.
+      const strikeY = row.cy + row.size * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(vw / 2 - row.half, strikeY);
+      ctx.lineTo(vw / 2 - row.half + row.half * 2 * strike, strikeY);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
   }
 
   /**
