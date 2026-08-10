@@ -50,8 +50,11 @@ docs/devlog/
   INDEX.md                  # índice das entradas publicadas (GERADO)
   entries/NNN-slug.md       # o post do repositório, escrito à mão
   social/NNN.json           # a copy do Instagram (hook, slides, legenda, tags)
+  social/NNN.en.json        # a copy em inglês, para o LinkedIn
   media/NNN-receita.png     # screenshot crua, do build da época
   carousel/NNN-NN.png       # os slides prontos pra postar
+  carousel/en/NNN-NN.png    # os mesmos slides em inglês
+  carousel/en/NNN.pdf       # o documento do LinkedIn
 ```
 
 As worktrees dos commits antigos vivem em `../.voxelyn-devlog-work/`, **fora** do repo, e
@@ -141,7 +144,24 @@ screenshot logo abaixo do cabeçalho, e o corpo contando o que mudou e **por qu�
 
 `shot` é opcional: com ele o slide vira imagem com legenda, sem ele vira slide de texto.
 Sem `social/NNN.json` o carrossel ainda sai, derivado dos assuntos de commit — serve para
-testar o pipeline, não para publicar.
+testar o pipeline, não para publicar, e o `publish.mjs` recusa uma entrada nesse estado.
+
+### Inglês e LinkedIn
+
+`social/NNN.en.json` tem o mesmo formato e carrega a versão em inglês:
+
+```
+node scripts/devlog/carousel.mjs --entry NNN --lang en
+```
+
+Isso escreve em `carousel/en/` e, junto dos PNGs, um **`NNN.pdf`**. O PDF não é
+conveniência: o carrossel do LinkedIn é um _documento_, não uma sequência de imagens, e
+subir PDF é a única forma de conseguir aquele formato lá. Ele sai da mesma página
+renderizada que os PNGs, então os dois formatos nunca divergem.
+
+A legenda do LinkedIn é mais longa e mais sóbria que a do Instagram, com três ou quatro
+hashtags no máximo — o público é outro. A primeira linha é o que aparece antes do "ver
+mais", então ela precisa se sustentar sozinha.
 
 Veja `entries/001-dia-1-uma-biblioteca-sem-tela.md` e `social/001.json` como referência de
 tom e tamanho.
