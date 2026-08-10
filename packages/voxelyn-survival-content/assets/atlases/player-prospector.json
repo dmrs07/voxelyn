@@ -2,6 +2,8 @@
   "id": "player-prospector",
   "version": 5,
   "atlas": "player-prospector.png",
+  "normalAtlas": "player-prospector.normal.png",
+  "normalScale": 2,
   "frameWidth": 88,
   "frameHeight": 112,
   "columns": 46,

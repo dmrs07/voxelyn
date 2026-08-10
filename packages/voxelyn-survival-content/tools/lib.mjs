@@ -75,6 +75,26 @@ export const set = (g, x, y, name) => {
   g.buf[i + 3] = 255;
 };
 
+/**
+ * Pinta um pixel com RGB CRU, fora da paleta.
+ *
+ * Existe para UMA coisa: o mapa de faces, que nao e arte — e um dado por pixel
+ * (qual face do cubo pintou aqui) que sai como atlas companheiro. `set` recusa
+ * cor fora da paleta de proposito, e essa recusa e uma boa regra que nao pode
+ * ser afrouxada; a saida e uma porta separada e explicita, usada por um unico
+ * chamador, em vez de tres cores falsas plantadas na paleta mestra.
+ */
+export const setRgb = (g, x, y, rgb) => {
+  x = Math.round(x);
+  y = Math.round(y);
+  if (x < 0 || y < 0 || x >= g.w || y >= g.h) return;
+  const i = (y * g.w + x) * 4;
+  g.buf[i] = rgb[0];
+  g.buf[i + 1] = rgb[1];
+  g.buf[i + 2] = rgb[2];
+  g.buf[i + 3] = 255;
+};
+
 export const clearPx = (g, x, y) => {
   if (x < 0 || y < 0 || x >= g.w || y >= g.h) return;
   g.buf[(y * g.w + x) * 4 + 3] = 0;

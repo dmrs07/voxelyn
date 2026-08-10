@@ -2,6 +2,8 @@
   "id": "enemy-fungal-horse",
   "version": 5,
   "atlas": "enemy-fungal-horse.png",
+  "normalAtlas": "enemy-fungal-horse.normal.png",
+  "normalScale": 2,
   "frameWidth": 160,
   "frameHeight": 168,
   "columns": 25,

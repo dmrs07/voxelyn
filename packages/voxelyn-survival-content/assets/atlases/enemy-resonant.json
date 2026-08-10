@@ -2,6 +2,8 @@
   "id": "enemy-resonant",
   "version": 1,
   "atlas": "enemy-resonant.png",
+  "normalAtlas": "enemy-resonant.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

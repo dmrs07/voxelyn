@@ -2,6 +2,8 @@
   "id": "enemy-furnace-heart",
   "version": 1,
   "atlas": "enemy-furnace-heart.png",
+  "normalAtlas": "enemy-furnace-heart.normal.png",
+  "normalScale": 2,
   "frameWidth": 116,
   "frameHeight": 108,
   "columns": 35,

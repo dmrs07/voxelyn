@@ -2,6 +2,8 @@
   "id": "enemy-magnetarch",
   "version": 1,
   "atlas": "enemy-magnetarch.png",
+  "normalAtlas": "enemy-magnetarch.normal.png",
+  "normalScale": 2,
   "frameWidth": 128,
   "frameHeight": 98,
   "columns": 32,

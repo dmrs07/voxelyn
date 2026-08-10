@@ -2,6 +2,8 @@
   "id": "enemy-undertaker",
   "version": 1,
   "atlas": "enemy-undertaker.png",
+  "normalAtlas": "enemy-undertaker.normal.png",
+  "normalScale": 2,
   "frameWidth": 72,
   "frameHeight": 88,
   "columns": 56,

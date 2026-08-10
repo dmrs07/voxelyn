@@ -2,6 +2,8 @@
   "id": "enemy-bruiser",
   "version": 6,
   "atlas": "enemy-bruiser.png",
+  "normalAtlas": "enemy-bruiser.normal.png",
+  "normalScale": 2,
   "frameWidth": 96,
   "frameHeight": 136,
   "columns": 42,

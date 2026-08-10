@@ -2,6 +2,8 @@
   "id": "enemy-bellows",
   "version": 2,
   "atlas": "enemy-bellows.png",
+  "normalAtlas": "enemy-bellows.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

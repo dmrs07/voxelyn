@@ -2,6 +2,8 @@
   "id": "enemy-sheet-leviathan",
   "version": 1,
   "atlas": "enemy-sheet-leviathan.png",
+  "normalAtlas": "enemy-sheet-leviathan.normal.png",
+  "normalScale": 2,
   "frameWidth": 124,
   "frameHeight": 80,
   "columns": 33,

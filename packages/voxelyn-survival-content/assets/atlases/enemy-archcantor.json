@@ -2,6 +2,8 @@
   "id": "enemy-archcantor",
   "version": 1,
   "atlas": "enemy-archcantor.png",
+  "normalAtlas": "enemy-archcantor.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 114,
   "columns": 64,

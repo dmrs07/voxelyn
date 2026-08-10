@@ -2,6 +2,8 @@
   "id": "enemy-mud-lamprey",
   "version": 2,
   "atlas": "enemy-mud-lamprey.png",
+  "normalAtlas": "enemy-mud-lamprey.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

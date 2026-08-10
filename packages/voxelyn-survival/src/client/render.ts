@@ -98,6 +98,7 @@ import {
   type Bounce,
   type WorldLight,
 } from './lighting';
+import type { FaceLighting } from './sprites';
 import {
   CHASSIS_RESPONSE,
   CREATURE_RESPONSE,
@@ -1873,6 +1874,38 @@ export class SurvivalRenderer {
     };
 
     /**
+     * A MESMA luz, resolvida nas TRES faces que a projecao mostra.
+     *
+     * O sprite carrega a normal por pixel (o mapa de faces gerado junto com a
+     * arte), entao a pergunta que se pode fazer por corpo deixou de ser "este
+     * bicho esta iluminado?" e passou a ser a mesma que as paredes ja
+     * respondiam: quanto CADA face recebe. A ordem — topo, esquerda, direita —
+     * e a dos canais do mapa e a das rampas do rasterizador, e as tres tem de
+     * continuar concordando.
+     *
+     * Devolve `undefined` quando nao ha cor na celula: sem isso, todo corpo do
+     * jogo pagaria uma matriz de filtro por quadro para somar zero.
+     */
+    const bodyFaceLight = (
+      x: number,
+      y: number,
+      material: typeof CHASSIS_RESPONSE,
+    ): FaceLighting | undefined => {
+      if (!field.hasChromaAt(x, y)) return undefined;
+      const illumination = field.illuminationAt(x, y);
+      const of = (normal: typeof FACE_TOP): { color: string; alpha: number } => {
+        const bounce = bounceOf(illumination, normal, material);
+        if (!bounce) return { color: 'rgb(0,0,0)', alpha: 0 };
+        return {
+          color: bounce.color,
+          alpha: Math.min(0.7, bounce.alpha + bounce.specular),
+        };
+      };
+      const faces: FaceLighting = [of(FACE_TOP), of(FACE_LEFT), of(FACE_RIGHT)];
+      return faces.some((face) => face.alpha > 0.004) ? faces : undefined;
+    };
+
+    /**
      * Pinta a luz refletida por cima do material, em DUAS passadas.
      *
      * `lighter` e obrigatorio: luz SOMA. Composta por cima em `source-over`, a
@@ -2678,6 +2711,7 @@ export class SurvivalRenderer {
             // dividissem o mesmo canal, uma explosao apagaria a marcacao de
             // elite justamente no instante de maior confusao na tela.
             bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
+            bodyFaceLight(enemy.x, enemy.y, CREATURE_RESPONSE),
           );
           if (!drew) {
             drawVoxelEntity(ctx, {
@@ -2844,6 +2878,7 @@ export class SurvivalRenderer {
                 // a armadura ao sair — a arma esta montada no ombro direito, e o
                 // estilhaco nasce a um palmo dela.
                 bodyLight(pl.x, pl.y, CHASSIS_RESPONSE),
+                bodyFaceLight(pl.x, pl.y, CHASSIS_RESPONSE),
               );
               if (!drew) {
                 drawVoxelEntity(ctx, {
