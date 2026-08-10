@@ -1,0 +1,34 @@
+{
+  "hook": "Dia 1: uma biblioteca sem tela",
+  "slides": [
+    {
+      "title": "O primeiro commit",
+      "body": "24 arquivos. Nenhum jogo, nenhuma engine, nenhuma janela. O Voxelyn começa como biblioteca headless de pixels e simulação por célula — e a lista de NÃO-objetivos é tão explícita quanto a de objetivos: sem input, sem áudio, sem física completa, sem ECS, sem UI."
+    },
+    {
+      "title": "Areia que cai",
+      "body": "O Grid2D guarda cada célula em 16 bits — material mais flags — dividido em chunks com marca de ativo e sujo. Só chunk ativo é varrido, então um mundo parado custa quase nada. O demo é isto rodando: areia empilhando, água procurando nível.",
+      "shot": "001-noita.png"
+    },
+    {
+      "title": "E um losango verde",
+      "body": "O outro demo: projeção isométrica, ordem de desenho por x+y, um retângulo vermelho no lugar do personagem. É feio de propósito — o que estava sendo testado era se a ordem painter fecha sem furo, não se a cena é bonita.",
+      "shot": "001-iso.png"
+    },
+    {
+      "title": "As regras que não mudaram",
+      "body": "TypedArrays sempre. Zero alocação no hot loop. Travessia determinística, porque replay precisa ser replay. Sete meses depois, com um jogo inteiro em cima, essas três continuam valendo — e é por isso que o Veio consegue simular o chão que você pisa."
+    }
+  ],
+  "caption": "Devlog 001 — onde tudo começou.\n\n18 de janeiro. 24 arquivos, nenhum jogo. O Voxelyn nasceu como biblioteca headless: Surface2D em Uint32Array, Grid2D chunkado com active/dirty, travessias determinísticas (row-major, bottom-up, morton), RNG próprio. Zero dependências.\n\nO PRD original é quase todo sobre o que NÃO fazer: sem janela, sem input, sem áudio, sem engine, sem ECS, sem UI. Só o miolo.\n\nAs duas imagens são os únicos demos que existiam nesse commit, e são a primeira coisa do projeto que teve imagem: areia e água caindo num grid de 128x128, e um losango isométrico com um retângulo vermelho fazendo de personagem.\n\nAs duas screenshots foram geradas construindo esse commit de janeiro. É literalmente o que rodava naquele dia.\n\nDaqui até um roguelike de mineração com co-op online são sete meses. Vou postar o caminho inteiro, um post por PR.",
+  "tags": [
+    "#gamedev",
+    "#indiedev",
+    "#voxel",
+    "#pixelart",
+    "#devlog",
+    "#gamedevbr",
+    "#typescript",
+    "#fallingsand"
+  ]
+}
