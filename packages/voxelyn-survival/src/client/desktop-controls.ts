@@ -117,19 +117,33 @@ const BAR_BOTTOM_GAP = 12;
 const SLOT_GAP = 6;
 const SLOT_PADDING = 10;
 
+/** Avanco de um caractere da fonte do rotulo (8px monoespacada), em pixels. */
+const LABEL_CHAR_PX = 5;
+/** Avanco de um caractere da tampa (9px monoespacada, negrito). */
+const CAP_CHAR_PX = 6.2;
+/** Folga interna de uma tampa, dos dois lados. */
+const CAP_PADDING = 10;
+
 /**
- * Largura de um compartimento, pela tecla mais larga que ele mostra.
+ * Largura de um compartimento: o que for mais largo, as tampas ou o rotulo.
  *
- * Medida em CARACTERES e nao em pixels de fonte: o layout e puro (o teste roda
- * sem canvas) e a fonte e monoespacada, entao contar caractere e exato. `SPACE`
- * e a tampa mais larga, e `W A S D` sao quatro tampas de um caractere com folga
- * entre elas.
+ * Medida em CARACTERES e nao com `measureText`: o layout e puro — o teste roda
+ * sem canvas — e as duas fontes sao monoespacadas, entao contar caractere e
+ * exato a menos de um arredondamento.
+ *
+ * O ROTULO vem RESOLVIDO de fora, e nao da chave de i18n. A primeira versao
+ * media `control.label`, que e a CHAVE (`'controls.interact'`, 17 caracteres) —
+ * um numero que nao tem relacao nenhuma com o texto desenhado. Em portugues
+ * "HABILIDADE" ja estourava, e o compartimento da habilidade mostra o nome da
+ * habilidade EQUIPADA ("PULSO CINETICO"), que o layout nao teria como adivinhar
+ * a partir de chave nenhuma. O resultado era rotulo cortado com reticencias e
+ * vazando por cima do compartimento vizinho.
  */
-const slotWidth = (control: DesktopControl): number => {
-  const caps = control.caps.reduce((sum, cap) => sum + cap.length * 8 + 12, 0)
-    + (control.caps.length - 1) * 4;
-  const label = control.label.length * 2.6;
-  return Math.max(52, Math.max(caps, label) + SLOT_PADDING * 2);
+const slotWidth = (control: DesktopControl, label: string): number => {
+  const caps =
+    control.caps.reduce((sum, cap) => sum + cap.length * CAP_CHAR_PX + CAP_PADDING, 0) +
+    (control.caps.length - 1) * 4;
+  return Math.max(52, Math.max(caps, label.length * LABEL_CHAR_PX) + SLOT_PADDING * 2);
 };
 
 /**
@@ -146,8 +160,15 @@ export const controlBarLayout = (
   viewportWidth: number,
   viewportHeight: number,
   safeBottom = 0,
+  /**
+   * O texto REALMENTE desenhado em cada compartimento. Sem ele o layout cai no
+   * rotulo traduzido da lista, que e o certo para todos menos a habilidade —
+   * aquele mostra o nome do Eco equipado, que so quem tem o estado sabe.
+   */
+  labelOf: (control: DesktopControl) => string = (control) => t(control.label),
 ): ControlBarLayout => {
-  const widths = controls.map(slotWidth);
+  const labels = controls.map(labelOf);
+  const widths = controls.map((control, i) => slotWidth(control, labels[i]));
   const natural = widths.reduce((sum, w) => sum + w, 0) + Math.max(0, controls.length - 1) * SLOT_GAP;
   const available = Math.max(120, viewportWidth - 32);
   const scale = Math.min(1, available / natural);
@@ -249,11 +270,20 @@ export class DesktopControlBar {
       this.lastState = state;
     }
 
+    // O rotulo da HABILIDADE e o nome do Eco equipado, e nao a palavra
+    // "habilidade": o jogador troca de Eco no poco e a barra tem de dizer o que
+    // ele acabou de equipar. Resolvido AQUI e passado ao layout para a largura
+    // do compartimento casar com o texto que vai ser desenhado nele.
+    const labelOf = (control: DesktopControl): string =>
+      control.id === 'ability'
+        ? abilityPresentation(state.playerExtra.ability).label
+        : t(control.label);
     const layout = controlBarLayout(
       DESKTOP_CONTROLS,
       viewportWidth,
       viewportHeight,
       safeBottom,
+      labelOf,
     );
     const scale = layout.h / BAR_HEIGHT;
     const cooldowns = this.sampleCooldowns(state, input, nowMs);
@@ -272,7 +302,7 @@ export class DesktopControlBar {
 
     for (const slot of layout.slots) {
       const cd = cooldowns.get(slot.control.id as DesktopCooldownId);
-      this.drawSlot(ctx, slot, scale, cd, input, nowMs, state);
+      this.drawSlot(ctx, slot, scale, cd, input, nowMs, state, labelOf(slot.control));
     }
 
     ctx.restore();
@@ -352,6 +382,7 @@ export class DesktopControlBar {
     input: InputState,
     nowMs: number,
     state: SurvivalState,
+    label: string,
   ): void {
     const { control, x, y, w, h } = slot;
     const radius = 6 * scale;
@@ -428,14 +459,8 @@ export class DesktopControlBar {
       capX += cw + 4 * scale;
     });
 
-    // ROTULO. Na habilidade ele e o NOME da habilidade equipada, e nao a palavra
-    // "habilidade": o jogador troca de Eco no poco e a barra tem de dizer o que
-    // ele acabou de equipar, senao a linha vira decoracao no momento exato em
-    // que ela ganharia conteudo.
-    const label =
-      control.id === 'ability'
-        ? abilityPresentation(state.playerExtra.ability).label
-        : t(control.label);
+    // ROTULO, ja resolvido pelo chamador — e a MESMA string que dimensionou o
+    // compartimento, que e a unica forma de a largura e o texto concordarem.
     const labelFont = Math.max(6, Math.round(8 * scale));
     ctx.font = `${labelFont}px ui-monospace, monospace`;
     ctx.fillStyle = control.id === 'ability' && cd ? withAlpha(cd.accent, 0.78) : LABEL_TEXT;

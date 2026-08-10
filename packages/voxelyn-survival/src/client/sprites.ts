@@ -116,7 +116,7 @@ export type LayeredPlayerAnimation = {
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
 
-type Tint = { color: string; alpha: number };
+export type Tint = { color: string; alpha: number };
 type Loaded = {
   manifest: SpriteManifestEntry;
   image: HTMLImageElement;
@@ -136,9 +136,29 @@ type Loaded = {
  * por quadro.
  */
 const GLOW_SCALE = 2;
-/** Quanto o halo transborda a silhueta, em pixels de atlas. */
-const GLOW_SPREAD = 2;
+/**
+ * Quanto o halo transborda a silhueta, em pixels de atlas.
+ *
+ * Era 2 — e dois pixels de transbordo num sprite de sessenta e poucos de altura
+ * nao e brilho, e uma franja. O efeito estava tecnicamente ligado e visualmente
+ * ausente: quem o autorou passou a nao enxerga-lo, o que e exatamente o que
+ * acontece com um efeito calibrado olhando de perto e vivido olhando de longe.
+ */
+const GLOW_SPREAD = 3;
 const GLOW_ALPHA = 0.55;
+/**
+ * A SEGUNDA PASSADA do halo: larga e fraca, por baixo da primeira.
+ *
+ * Uma passada so nao consegue ser as duas coisas que um brilho e — o miolo
+ * quente colado na peca e o derrame suave que sangra no escuro em volta. Com um
+ * unico transbordo, aumenta-lo o bastante para o derrame aparecer transforma o
+ * miolo num borrao e come a silhueta.
+ *
+ * Multiplo do transbordo base e nao um numero proprio: o dia em que a peca
+ * mudar de tamanho, as duas passadas tem de crescer juntas.
+ */
+const GLOW_WIDE_SCALE = 3.4;
+const GLOW_WIDE_ALPHA = 0.38;
 
 /**
  * Opacidade do halo, dada a opacidade que o desenho ja herdou.
@@ -645,10 +665,12 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
+    /** A luz do mundo caindo neste corpo. Ver `drawLit`. */
+    light?: Tint
   ): boolean {
     if (typeof animation !== 'string' && archetype === 'prospector') {
-      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint)) return true;
+      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint, light)) return true;
       // Os atlas de camada ainda podem estar carregando. O atlas completo mantém
       // o personagem visível e usa a ação do tronco como fallback temporário.
       facingX = animation.upper.facingX;
@@ -660,7 +682,7 @@ export class SpriteBank {
     if (typeof animation !== 'string') animation = animation.upper.animation;
     const loaded = this.spriteForArchetype(archetype);
     if (!loaded) return false;
-    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint);
+    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint, light);
     return true;
   }
 
@@ -698,7 +720,8 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
+    light?: Tint
   ): boolean {
     const lower = this.get(PLAYER_LOWER_ID);
     const upper = this.get(PLAYER_UPPER_ID);
@@ -737,7 +760,8 @@ export class SpriteBank {
       footX,
       footY,
       zoom,
-      bodyTint
+      bodyTint,
+      light
     );
 
     const lowerFrame = frameAtTime(lower.manifest, animation.lower.animation, animation.lower.elapsedMs);
@@ -764,7 +788,8 @@ export class SpriteBank {
         upperX,
         upperY,
         zoom,
-        bodyTint
+        bodyTint,
+        light
       );
     };
 
@@ -788,7 +813,8 @@ export class SpriteBank {
         upperX,
         upperY,
         zoom,
-        gunHeatTint(animation.heat, animation.overheated) ?? tint
+        gunHeatTint(animation.heat, animation.overheated) ?? tint,
+        light
       );
     };
 
@@ -816,7 +842,8 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
+    light?: Tint
   ): void {
     const { manifest, image } = loaded;
     const fallbackAnimation = animation === 'special' && !manifest.animations.special ? 'attack' : animation;
@@ -846,12 +873,57 @@ export class SpriteBank {
       ctx.translate(-footX, 0);
       const flippedX = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, flippedX, dy, dw, dh);
+      this.drawLit(ctx, image, rect, manifest, flippedX, dy, dw, dh, light);
       this.drawGlow(ctx, loaded, rect, flippedX, dy, dw, dh, zoom);
     } else {
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
+      this.drawLit(ctx, image, rect, manifest, dx, dy, dw, dh, light);
       this.drawGlow(ctx, loaded, rect, dx, dy, dw, dh, zoom);
     }
     ctx.restore();
+  }
+
+  /**
+   * A LUZ DO MUNDO caindo sobre o corpo.
+   *
+   * O sprite e um PNG assado: nao ha normal por pixel para fazer `N.L`, e nao
+   * vai haver. O que existe e a silhueta — e ela basta para a leitura que
+   * importa, que nao e "de que lado a luz bate no ombro dele" e sim "este corpo
+   * esta dentro da luz de alguma coisa". Um vulto que acende laranja quando a
+   * explosao estoura ao lado dele e informacao de combate; a direcao da sombra
+   * no ombro nao e.
+   *
+   * A silhueta sai do MESMO `tintedFrame` que ja pinta elite e enfurecido — com
+   * opacidade cheia, para o buffer sair sendo a forma toda na cor da luz — e e
+   * composta em `lighter`, porque luz SOMA. Em `source-over` ela apagaria o
+   * personagem e devolveria um recorte colorido.
+   *
+   * Sai depois do corpo e ANTES do halo dos emissivos: a luz de fora banha a
+   * armadura, e o visor continua sendo a coisa mais brilhante do chassi.
+   */
+  private drawLit(
+    ctx: CanvasRenderingContext2D,
+    image: CanvasImageSource,
+    rect: { sx: number; sy: number; sw: number; sh: number },
+    manifest: SpriteManifestEntry,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number,
+    light?: Tint,
+  ): void {
+    if (!light || light.alpha <= 0.004) return;
+    const inherited = ctx.globalAlpha;
+    if (inherited <= 0) return;
+    const lit = this.tintedFrame(image, rect, manifest.frameWidth, manifest.frameHeight, {
+      color: light.color,
+      alpha: 1,
+    });
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = inherited * light.alpha;
+    ctx.drawImage(lit, 0, 0, rect.sw, rect.sh, dx, dy, dw, dh);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = inherited;
   }
 
   /**
@@ -882,9 +954,18 @@ export class SpriteBank {
     const inherited = ctx.globalAlpha;
     if (inherited <= 0) return;
     const grow = GLOW_SPREAD * zoom;
+    const wide = grow * GLOW_WIDE_SCALE;
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = glowAlpha(inherited);
     ctx.imageSmoothingEnabled = true;
+    // O derrame LARGO primeiro, e o miolo por cima: invertida, a passada larga
+    // lavaria o miolo e o brilho perderia o centro.
+    ctx.globalAlpha = glowAlpha(inherited) * GLOW_WIDE_ALPHA;
+    ctx.drawImage(
+      glow,
+      rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,
+      dx - wide, dy - wide, dw + wide * 2, dh + wide * 2
+    );
+    ctx.globalAlpha = glowAlpha(inherited);
     ctx.drawImage(
       glow,
       rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,

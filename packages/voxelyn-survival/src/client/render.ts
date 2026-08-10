@@ -87,6 +87,23 @@ import {
 } from './boss-module-presentation';
 import { drawGroundShadow, drawVoxel, type FaceRamp } from './voxel-draw';
 import { COMBAT_PLANE_TILES, heightToScreenPx } from './combat-plane';
+import { drawEmissiveHalo } from './emissive-halo';
+import {
+  FACE_LEFT,
+  FACE_RIGHT,
+  FACE_TOP,
+  LIGHT_NEUTRAL,
+  LightField,
+  bounceOf,
+  type Bounce,
+  type WorldLight,
+} from './lighting';
+import {
+  CHASSIS_RESPONSE,
+  CREATURE_RESPONSE,
+  solidResponse,
+  surfaceResponse,
+} from './material-response';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
 import { abilityPresentation } from './ability-presentation';
@@ -423,6 +440,58 @@ const AIM_LANE_STEP = 0.25;
  * confirmacao vem no aperto, quando ela abre inteira.
  */
 export const IDLE_AIM_LANE_ALPHA = 0.34;
+
+/**
+ * Piso de luz da caverna: o preto do fundo, e nao zero.
+ *
+ * Estava embutido em `brightness` como um literal. Publicado porque o corte de
+ * visibilidade (`b <= 0.045`) esta a um cabelo dele, e os dois numeros precisam
+ * ser lidos juntos: acima do piso a celula existe, no piso ela some.
+ */
+const AMBIENT_FLOOR = 0.04;
+
+/**
+ * Altura padrao de uma fonte de luz acima do chao, em tiles.
+ *
+ * A lanterna do chassi, o marcador do objetivo e os clarões de evento saem mais
+ * ou menos da altura do peito de quem os provocou. E dela que sai o `N.L` do
+ * piso: uma fonte rasteira ilumina forte logo abaixo de si e passa a RASPAR
+ * conforme se afasta, que e a razao fisica de uma poca de fogo acender um
+ * circulo pequeno e intenso em vez de um disco chapado do tamanho do alcance.
+ */
+const LAMP_HEIGHT = 0.7;
+
+/** A luz que um projetil emite, ou null para o que nao brilha. */
+type ProjectileLightSpec = { r: number; power: number; hex: string };
+
+/**
+ * O TIRO COMO FONTE DE LUZ.
+ *
+ * Cada peca acende na propria cor, que e a mesma com que ela e desenhada — o
+ * estilhaco do jogador em biolum, o cuspe acido em verde, o explosivo armado em
+ * ambar (a mesma troca de rampa que avisa que ele ja pode detonar), a pedra do
+ * Britador na eletricidade do nucleo que a arrancou.
+ *
+ * Raios CURTOS de proposito. O que se quer e o corredor piscando enquanto o
+ * tiro passa, e nao um jogo iluminado por munição: uma luz de raio grande em
+ * cada projetil apagaria o escuro, que e a materia-prima do jogo inteiro.
+ */
+const projectileLightSpec = (projectile: {
+  kind?: string;
+  hostile: boolean;
+  modules?: { explosive?: { armAfterDistance: number } };
+  distanceTravelled?: number;
+}): ProjectileLightSpec | null => {
+  if (projectile.kind === 'return_disc') return { r: 1.6, power: 0.34, hex: PAL.loot };
+  if (projectile.kind === 'rock') return { r: 1.4, power: 0.26, hex: PAL.electric };
+  if (projectile.kind === 'seeker') return { r: 2.1, power: 0.44, hex: '#ffa63f' };
+  if (projectile.hostile) return { r: 1.5, power: 0.3, hex: PAL.acid };
+  const armed =
+    projectile.modules?.explosive &&
+    (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance;
+  if (armed) return { r: 2.4, power: 0.55, hex: '#ffa63f' };
+  return { r: 1.8, power: 0.4, hex: PAL.biolum };
+};
 
 /** Um trecho reto da faixa: comeco, fim e o rumo unitario entre os dois. */
 export type AimLaneLeg = {
@@ -1035,6 +1104,13 @@ export class SurvivalRenderer {
   readonly props = new PropBank();
   readonly particles = new VoxelParticles();
   readonly projectileView = new ProjectileView();
+  /**
+   * A grade de luz do quadro. Vive na instancia e nao na funcao de desenho
+   * porque ela REAPROVEITA o buffer: alocar vinte mil floats por quadro
+   * entregaria ao coletor de lixo exatamente o orcamento que o espalhamento
+   * economizou.
+   */
+  private readonly lightField = new LightField();
   /** Relogio do ultimo frame, para o passo de FX vir do tempo real. */
   private lastFrameMs = 0;
   /**
@@ -1249,6 +1325,12 @@ export class SurvivalRenderer {
     this.sectorEnteredAtMs = 0;
   }
 
+  /**
+   * `hex` tem padrao de FOGO porque a maioria dos clarões do jogo e combustao —
+   * explosao, ignicao, jato, detonacao de modulo. Quem nao e (a descarga, o
+   * pulso) declara a propria cor no ponto de chamada, que e onde a diferenca
+   * pode ser lida junto do evento que a causou.
+   */
   private addFlash(
     x: number,
     y: number,
@@ -1256,8 +1338,9 @@ export class SurvivalRenderer {
     power: number,
     nowMs: number,
     durationMs: number,
+    hex: string = PAL.fire,
   ): void {
-    addFlash(this.flashes, { x, y, r, power, startedMs: nowMs, durationMs });
+    addFlash(this.flashes, { x, y, r, power, startedMs: nowMs, durationMs, hex });
   }
 
   /**
@@ -1319,7 +1402,7 @@ export class SurvivalRenderer {
               cx += (cell % this.worldWidth) + 0.5;
               cy += Math.floor(cell / this.worldWidth) + 0.5;
             }
-            this.addFlash(cx / ev.cells.length, cy / ev.cells.length, 5.5, 0.95, nowMs, 200);
+            this.addFlash(cx / ev.cells.length, cy / ev.cells.length, 5.5, 0.95, nowMs, 200, PAL.electric);
           }
           break;
         case 'hit':
@@ -1365,7 +1448,9 @@ export class SurvivalRenderer {
           });
           break;
         case 'pulse':
-          this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200);
+          // O pulso e CINETICO: desloca ar, nao queima. Luz branca — ele revela a sala
+          // sem tingir nada, que e a diferenca visivel entre ele e uma detonacao.
+          this.addFlash(ev.x, ev.y, ABILITY_RADIUS * 2, 0.75, nowMs, 200, LIGHT_NEUTRAL);
           break;
         case 'flame_cone': {
           // Cada emissao do canal ja chega com o jato pronto: as brasas nascem
@@ -1382,7 +1467,7 @@ export class SurvivalRenderer {
         case 'bolt_impact':
           // O clarao curto do plasma na parede; o burst em si e materia voxel
           // em VoxelParticles.ingest, como toda explosao desde o redesign.
-          this.addFlash(ev.x, ev.y, 1.2, 0.7, nowMs, 150);
+          this.addFlash(ev.x, ev.y, 1.2, 0.7, nowMs, 150, PAL.biolum);
           break;
         case 'arc_chain': {
           // Um anel curto em cada salto. A LINHA entre eles nao e desenhada: o
@@ -1622,8 +1707,11 @@ export class SurvivalRenderer {
     // e o Nucleo apenas no final; cada marcador recebe intensidade propria.
     const objectiveView = objectiveViewOf(state);
     const objectiveName = objectivePropName(objectiveView);
-    const lights: Array<{ x: number; y: number; r: number; power: number }> = [
-      { x: player.x, y: player.y, r: 8.5, power: 1 },
+    // As luzes do quadro. A LANTERNA do chassi e branca de proposito: luz sem
+    // cor ilumina e nao tinge, e se ela tingisse o mundo inteiro ganharia um veu
+    // permanente — a cor deixaria de significar "ha uma fonte de fogo ali".
+    const lights: WorldLight[] = [
+      { x: player.x, y: player.y, r: 8.5, power: 1, hex: LIGHT_NEUTRAL, height: LAMP_HEIGHT },
     ];
     const objectiveLight = objectiveLightSpec(objectiveView);
     if (objectiveLight) {
@@ -1632,6 +1720,8 @@ export class SurvivalRenderer {
         y: state.corePos.y + 0.5,
         r: objectiveLight.radius,
         power: objectiveLight.power,
+        hex: PAL.biolum,
+        height: LAMP_HEIGHT,
       });
     }
 
@@ -1642,7 +1732,14 @@ export class SurvivalRenderer {
     // fracao de segundo, e sem elas o preset baixo esconderia o perigo.
     this.flashes = pruneFlashes(this.flashes, nowMs);
     for (const f of this.flashes) {
-      lights.push({ x: f.x, y: f.y, r: f.r, power: flashPower(f, nowMs) });
+      lights.push({
+        x: f.x,
+        y: f.y,
+        r: f.r,
+        power: flashPower(f, nowMs),
+        hex: f.hex,
+        height: LAMP_HEIGHT,
+      });
     }
 
     const range = Math.ceil(vw / z / TILE_W + vh / z / TILE_H) + 4;
@@ -1658,27 +1755,82 @@ export class SurvivalRenderer {
         for (let x = x0; x <= x1; x++) {
           const i = y * w + x;
           if (state.surface[i] === SURF_FIRE)
-            lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8 });
+            lights.push({ x: x + 0.5, y: y + 0.5, r: 4, power: 0.8, hex: PAL.fire, height: 0.25 });
+          else if (state.surface[i] === SURF_EMBER)
+            lights.push({ x: x + 0.5, y: y + 0.5, r: 2, power: 0.3, hex: PAL.fire, height: 0.1 });
           // Apenas o cristal VIVO ilumina. Opacado pelo acido ele continua na
           // tela com a mesma silhueta, mas o mapa escurece — que e exatamente a
           // perda que o jogador tem de sentir.
           else if (state.solid[i] === SOLID_CRYSTAL)
-            lights.push({ x: x + 0.5, y: y + 0.5, r: 3.5, power: 0.55 });
+            lights.push({
+              x: x + 0.5,
+              y: y + 0.5,
+              r: 3.5,
+              power: 0.55,
+              hex: PAL.biolum,
+              // Alto: o cristal e um BLOCO, e a luz dele sai do corpo inteiro —
+              // e por isso que ele acende o topo das paredes vizinhas, e nao so
+              // o chao ao pe delas.
+              height: 0.9,
+            });
         }
       }
       for (const c of state.charges) {
-        lights.push({ x: (c.idx % w) + 0.5, y: Math.floor(c.idx / w) + 0.5, r: 3, power: 0.9 });
+        lights.push({
+          x: (c.idx % w) + 0.5,
+          y: Math.floor(c.idx / w) + 0.5,
+          r: 3,
+          power: 0.9,
+          hex: PAL.electric,
+          height: 0.2,
+        });
+      }
+      // O TIRO ACENDE O QUE ATRAVESSA.
+      //
+      // O objeto mais brilhante da tela — e o que o jogador dispara dezenas de
+      // vezes por minuto — nao emitia um pixel de luz. Um estilhaco cruzando um
+      // corredor escuro passava por cima de paredes que continuavam pretas, e a
+      // arma parecia uma lanterna apontada para dentro.
+      //
+      // Raio curto e forca media: e um clarao que ACOMPANHA o voo, nao uma
+      // lampada. E ele nasce na altura do plano de combate, que e onde o corpo
+      // do projetil esta desenhado — a luz sai de onde a coisa esta.
+      for (const projectile of state.projectiles) {
+        const spec = projectileLightSpec(projectile);
+        if (spec) {
+          lights.push({
+            x: projectile.x,
+            y: projectile.y,
+            r: spec.r,
+            power: spec.power,
+            hex: spec.hex,
+            height: COMBAT_PLANE_TILES,
+          });
+        }
       }
     }
 
-    const brightness = (x: number, y: number): number => {
-      let b = 0.04;
-      for (const light of lights) {
-        const d = Math.hypot(x + 0.5 - light.x, y + 0.5 - light.y);
-        if (d < light.r) b = Math.max(b, light.power * (1 - d / light.r));
-      }
-      return Math.min(1, b);
-    };
+    // A GRADE DE LUZ do quadro, montada por ESPALHAMENTO.
+    //
+    // Antes, cada celula visivel percorria a lista inteira de luzes. Com fogo e
+    // cristal empurrando uma luz por celula acesa, uma sala em chamas chegava a
+    // centenas de luzes vezes vinte mil celulas. Aqui cada luz escreve nas
+    // celulas do proprio raio, uma vez, e a consulta vira leitura de indice —
+    // e a cor viaja junto no mesmo passe, praticamente de graca.
+    this.lightField.begin(x0, y0, x1, y1);
+    for (const light of lights) this.lightField.add(light);
+    const field = this.lightField;
+
+    /**
+     * O escalar de sempre — o que escolhe o nivel de luz JA ASSADO no atlas.
+     *
+     * Continua sendo maximo com queda linear, letra por letra: os oito degraus
+     * do atlas foram calibrados contra essa curva, e trocar a curva por baixo
+     * deles re-iluminaria toda caverna do jogo como efeito colateral de
+     * acrescentar cor. O piso de 0.04 e o preto do fundo da caverna.
+     */
+    const brightness = (x: number, y: number): number =>
+      Math.max(AMBIENT_FLOOR, field.intensityAt(x, y));
 
     const shade = (hex: string, factor: number): string => {
       const n = parseInt(hex.slice(1), 16);
@@ -1694,6 +1846,59 @@ export class SurvivalRenderer {
     const delugeR = delugeFront(state);
     const delugeCx = state.bossRuntime.delugeX;
     const delugeCy = state.bossRuntime.delugeY;
+
+    /**
+     * A luz que cai sobre um CORPO, pronta para o banco de sprites.
+     *
+     * Um sprite nao tem face nem normal por pixel — e um PNG assado. A normal
+     * honesta para um corpo de pe e o TOPO: ele recebe o que a fonte manda de
+     * cima, e o resto seria invencao. O que a luz precisa dizer sobre uma
+     * criatura nao e de que lado ela e iluminada; e QUE ELA ESTA ILUMINADA — um
+     * vulto que acende laranja quando a explosao estoura ao lado dele e
+     * informacao de combate.
+     *
+     * Difuso e especular somados num tint so, porque o banco compoe uma vez: a
+     * silhueta inteira e uma superficie, e separar as duas passadas nela nao
+     * mudaria um pixel do resultado.
+     */
+    const bodyLight = (
+      x: number,
+      y: number,
+      material: typeof CHASSIS_RESPONSE,
+    ): { color: string; alpha: number } | undefined => {
+      if (!field.hasChromaAt(x, y)) return undefined;
+      const bounce = bounceOf(field.illuminationAt(x, y), FACE_TOP, material);
+      if (!bounce) return undefined;
+      return { color: bounce.color, alpha: Math.min(0.62, bounce.alpha + bounce.specular) };
+    };
+
+    /**
+     * Pinta a luz refletida por cima do material, em DUAS passadas.
+     *
+     * `lighter` e obrigatorio: luz SOMA. Composta por cima em `source-over`, a
+     * cor apagaria o material em vez de acende-lo — e o que se veria seria um
+     * adesivo colorido sobre a pedra, nao a pedra iluminada.
+     *
+     * A segunda passada e o especular, e ela usa a cor da FONTE em vez da do
+     * material: e a diferenca entre gelo e rocha recebendo o mesmo clarao. Sai
+     * inteira quando o material e fosco, que e a maioria deles.
+     *
+     * `paint` recebe a cor e desenha a forma da face — quem chama sabe se e um
+     * losango de chao, um quadrilatero de parede ou um retangulo de sprite.
+     */
+    const paintBounce = (paint: (color: string) => void, bounce: Bounce): void => {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      if (bounce.alpha > 0) {
+        ctx.globalAlpha = bounce.alpha;
+        paint(bounce.color);
+      }
+      if (bounce.specular > 0) {
+        ctx.globalAlpha = bounce.specular;
+        paint(bounce.specularColor);
+      }
+      ctx.restore();
+    };
 
     const diamond = (sx: number, sy: number, fill: string): void => {
       const hw = (TILE_W / 2) * z;
@@ -1739,6 +1944,37 @@ export class SurvivalRenderer {
         const surfKind = surf === SURF_GAS ? 0 : SURFACE_KIND_INDEX[surf];
         if (surfKind === undefined || !this.surfaces.draw(ctx, surfKind, x, y, b, nowMs, sx, sy, z)) {
           diamond(sx, sy, shade(SURFACE_FALLBACK[surf] ?? PAL.rockShadow, 0.35 + b * 0.75));
+        }
+
+        // A COR da luz que chega neste chao, por cima do tile ja escolhido.
+        //
+        // A INTENSIDADE ja foi resolvida na escolha do nivel assado, e por isso
+        // este passe nao pode mexer nela: ele soma COR, em `lighter`, sobre o
+        // material que o atlas pintou. E o unico jeito de ter luz colorida sem
+        // abandonar os oito niveis — e sem inventar cor nova em cima de uma
+        // paleta que a art bible fixa.
+        //
+        // O piso e uma face que olha para CIMA, entao ele recebe o termo
+        // vertical do vetor de incidencia: forte sob a fonte, raspando quando
+        // ela se afasta. O material decide o resto — a poca espelha, a rocha
+        // espalha, a cinza queimada quase nao devolve nada.
+        if (field.hasChromaAt(x, y)) {
+          const bounce = bounceOf(field.illuminationAt(x, y), FACE_TOP, surfaceResponse(surf));
+          if (bounce) paintBounce((color) => diamond(sx, sy, color), bounce);
+        }
+
+        // O HALO da propria materia acesa. O bounce acima e a luz que ela manda
+        // para os VIZINHOS; isto e ela parecendo uma fonte. Sem o halo, o fogo
+        // iluminava a sala inteira sem ele proprio brilhar — a luz existia e o
+        // brilho nao. O tremor vem do relogio e da celula: chama nao e lampada.
+        if (this.quality.bloom) {
+          if (surf === SURF_FIRE) {
+            const flicker = 0.72 + 0.28 * Math.sin(nowMs / 90 + (x * 7 + y * 13));
+            drawEmissiveHalo(ctx, PAL.fire, sx, sy, TILE_W * 0.62 * z, 0.5 * flicker);
+          } else if (surf === SURF_EMBER) {
+            const breath = 0.5 + 0.5 * Math.sin(nowMs / 320 + (x * 3 + y * 11));
+            drawEmissiveHalo(ctx, PAL.fire, sx, sy, TILE_W * 0.3 * z, 0.2 * breath);
+          }
         }
         // O DILUVIO vem POR CIMA, e nunca no lugar.
         //
@@ -1799,6 +2035,12 @@ export class SurvivalRenderer {
       const phase = ((cx * 7 + cy * 13) % 5) / 5;
       const arc = Math.sin(nowMs * 0.018 + phase * Math.PI * 2);
       if (arc < -0.2) continue; // a corrente corre em pulsos, nao acesa sem parar
+      // O halo PULSA junto com o voxel, no mesmo `arc`: a corrente e o unico
+      // emissivo do jogo que pisca de verdade, e o brilho tem de piscar com ela
+      // ou vira uma luz constante com um cubo tremendo no meio.
+      if (this.quality.bloom) {
+        drawEmissiveHalo(ctx, PAL.electric, sx, sy - 2 * z, TILE_W * 0.34 * z, 0.3 + arc * 0.22);
+      }
       drawVoxel(ctx, sx, sy - (2 + arc * 2) * z, 3.5 * z, CHARGE_RAMP);
     }
 
@@ -2024,6 +2266,22 @@ export class SurvivalRenderer {
             if (this.terrain.draw(ctx, kindIndex, x, y, b, sx, sy, z)) {
               drawWallEdgeDetail(ctx, state.stratum, i, edgeRight, edgeLeft, sx, sy, z, b);
               drawPipeSpill(ctx, solid, delugeR, nowMs, sx, sy, z);
+              this.paintWallBounce(field, paintBounce, solid, x, y, sx, sy, z);
+              // CRISTAL VIVO: o unico solido que emite, e o unico que ganha
+              // halo. Opacado pelo acido ele apaga — e essa perda e exatamente
+              // a leitura que o material existe para entregar. O halo sai na
+              // ALTURA do bloco, e nao no pe dele: e o corpo inteiro que brilha.
+              if (this.quality.bloom && solid === SOLID_CRYSTAL) {
+                const pulse = 0.78 + 0.22 * Math.sin(nowMs / 520 + (x * 5 + y * 9));
+                drawEmissiveHalo(
+                  ctx,
+                  PAL.biolum,
+                  sx,
+                  sy - WALL_H * 0.5 * z,
+                  TILE_W * 0.6 * z,
+                  0.42 * pulse,
+                );
+              }
               return;
             }
 
@@ -2414,6 +2672,12 @@ export class SurvivalRenderer {
                 : enemy.elite
                   ? { color: 'rgba(255,122,47,0.35)', alpha: 0.35 }
                   : undefined,
+            // A LUZ DO MUNDO sobre a casca do bicho. Separada do tint acima de
+            // proposito: aquele conta um ESTADO da criatura (elite, enfurecida,
+            // colapsando) e este conta o que esta acontecendo AO REDOR dela. Se
+            // dividissem o mesmo canal, uma explosao apagaria a marcacao de
+            // elite justamente no instante de maior confusao na tela.
+            bodyLight(enemy.x, enemy.y, CREATURE_RESPONSE),
           );
           if (!drew) {
             drawVoxelEntity(ctx, {
@@ -2574,6 +2838,12 @@ export class SurvivalRenderer {
                 spriteZoom,
                 // parceiro (nao-local) recebe leve tint frio para diferenciar
                 isLocal ? undefined : { color: 'rgba(89,242,194,0.30)', alpha: 0.3 },
+                // O CHASSI E LATAO USINADO: o unico corpo polido que anda pela
+                // tela, e por isso o unico que devolve um realce concentrado em
+                // vez de um veu. E ele que faz o proprio tiro do jogador acender
+                // a armadura ao sair — a arma esta montada no ombro direito, e o
+                // estilhaco nasce a um palmo dela.
+                bodyLight(pl.x, pl.y, CHASSIS_RESPONSE),
               );
               if (!drew) {
                 drawVoxelEntity(ctx, {
@@ -2777,6 +3047,27 @@ export class SurvivalRenderer {
             drawVoxel(ctx, csx, csy - 3 * z + wob, 9 * z, ['#6e4a33', '#3d2a22', '#1d2430']);
             drawVoxel(ctx, csx, csy - 6 * z + wob, 7 * z, ['#46566e', '#2e3a4d', '#1d2430']);
             return;
+          }
+          // O halo do PROJETIL, por baixo do corpo dele.
+          //
+          // Ele ja empurra uma luz para a grade (o corredor acende quando o tiro
+          // passa), mas isso ilumina os OUTROS: sem halo proprio o estilhaco
+          // continuava sendo tres faces chapadas voando no meio de uma sala que
+          // ele mesmo acendeu. Sai ANTES do corpo para o voxel ficar nitido por
+          // cima do borrao — halo por cima comeria a silhueta que diz o rumo.
+          if (this.quality.bloom) {
+            const spec = projectileLightSpec(view);
+            if (spec) {
+              const [hx, hy] = toScreen(view.x, view.y);
+              drawEmissiveHalo(
+                ctx,
+                spec.hex,
+                hx,
+                hy - heightToScreenPx(COMBAT_PLANE_TILES, TILE_H, z),
+                TILE_W * 0.34 * z * spec.r,
+                0.34,
+              );
+            }
           }
           this.projectileView.draw(ctx, view, toScreen, z, TILE_H);
         },
@@ -3004,6 +3295,90 @@ export class SurvivalRenderer {
    * norte, estreita quando aponta para leste. Projetar os cantos mantem a
    * largura constante em tiles, que e a unica que significa alguma coisa.
    */
+  /**
+   * A LUZ COLORIDA nas tres faces de um bloco, cada uma com o proprio `N.L`.
+   *
+   * Este e o lugar em que a luz deixa de ser um numero por celula e passa a ser
+   * direcional. O bloco e desenhado como uma imagem so — o atlas ja traz as tres
+   * faces sombreadas —, mas a GEOMETRIA delas na tela e conhecida e fixa na
+   * projecao 2:1, e sao exatamente os mesmos quadrilateros que o caminho de
+   * recuo desenha logo abaixo. Repintar por cima deles em `lighter` da a cada
+   * face a luz que a orientacao dela manda receber:
+   *
+   *   - a face da ESQUERDA na tela olha para +y do mundo;
+   *   - a da DIREITA olha para +x;
+   *   - o TOPO olha para cima.
+   *
+   * O efeito e o que se espera de uma tocha: uma explosao a leste acende a face
+   * direita das paredes e deixa a esquerda no escuro. Antes, as duas recebiam o
+   * mesmo valor e a parede lia como um adesivo chapado.
+   *
+   * So roda quando ha COR na celula, e por isso nao custa nada numa sala sem
+   * fonte colorida — que e a maioria das salas na maior parte do tempo.
+   */
+  private paintWallBounce(
+    field: LightField,
+    paintBounce: (paint: (color: string) => void, bounce: Bounce) => void,
+    solid: number,
+    x: number,
+    y: number,
+    sx: number,
+    sy: number,
+    z: number,
+  ): void {
+    if (!field.hasChromaAt(x, y)) return;
+    const illumination = field.illuminationAt(x, y);
+    const material = solidResponse(solid);
+    const ctx = this.ctx;
+    const hw = (TILE_W / 2) * z;
+    const hh = (TILE_H / 2) * z;
+    const wh = WALL_H * z;
+
+    const quad = (points: ReadonlyArray<readonly [number, number]>, color: string): void => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const faces = [
+      {
+        normal: FACE_LEFT,
+        points: [
+          [sx - hw, sy],
+          [sx, sy + hh],
+          [sx, sy + hh - wh],
+          [sx - hw, sy - wh],
+        ],
+      },
+      {
+        normal: FACE_RIGHT,
+        points: [
+          [sx + hw, sy],
+          [sx, sy + hh],
+          [sx, sy + hh - wh],
+          [sx + hw, sy - wh],
+        ],
+      },
+      {
+        normal: FACE_TOP,
+        points: [
+          [sx, sy - hh - wh],
+          [sx + hw, sy - wh],
+          [sx, sy + hh - wh],
+          [sx - hw, sy - wh],
+        ],
+      },
+    ] as const;
+
+    for (const face of faces) {
+      const bounce = bounceOf(illumination, face.normal, material);
+      if (bounce) paintBounce((color) => quad(face.points, color), bounce);
+    }
+  }
+
   private drawAimLane(
     state: SurvivalState,
     player: SurvivalState['player'],
