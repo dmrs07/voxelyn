@@ -2,6 +2,8 @@
   "id": "enemy-diamandis",
   "version": 1,
   "atlas": "enemy-diamandis.png",
+  "normalAtlas": "enemy-diamandis.normal.png",
+  "normalScale": 2,
   "frameWidth": 120,
   "frameHeight": 138,
   "columns": 34,

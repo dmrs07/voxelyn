@@ -1,5 +1,7 @@
 {
   "id": "world-props",
+  "normalAtlas": "world-props.normal.png",
+  "normalScale": 2,
   "version": 4,
   "atlas": "world-props.png",
   "frameWidth": 108,

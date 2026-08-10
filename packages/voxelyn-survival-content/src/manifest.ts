@@ -18,6 +18,22 @@ export type SpriteManifestEntry = {
   id: string;
   version: number;
   atlas: string;
+  /**
+   * MAPA DE FACES deste sprite, quando ha um: a normal por pixel, na mesma
+   * grade de frames do atlas de arte.
+   *
+   * Vermelho e a face de topo, verde a da esquerda (+y do mundo) e azul a da
+   * direita (+x) — exatamente um canal aceso por pixel. E o que permite a luz
+   * do mundo bater no lado certo de um corpo em vez de banhar a silhueta
+   * inteira com uma cor so.
+   *
+   * Opcional porque nem todo sprite tem: os FX EMITEM luz e nao a recebem, e um
+   * mapa para eles seria memoria gasta para iluminar o que ja brilha. Ausente =
+   * o cliente ilumina por silhueta, que continua correto.
+   */
+  normalAtlas?: string;
+  /** Divisor de resolucao do mapa de faces (o atlas de arte dividido por ele). */
+  normalScale?: number;
   frameWidth: number;
   /** Frames por linha do atlas. Ausente = linha unica (formato antigo). */
   columns?: number;

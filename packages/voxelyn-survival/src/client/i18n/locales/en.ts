@@ -700,4 +700,59 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'echo.condition.dissolved': 'CORRODED',
   'echo.condition.overgrown': 'COLONIZED',
   'echo.condition.intact': 'INTACT',
+
+  // ---------------------------------------------------------------------
+  // Command bar (desktop)
+  // ---------------------------------------------------------------------
+  'controls.move': 'MOVE',
+  'controls.fire': 'FIRE',
+  'controls.dodge': 'DODGE',
+  'controls.ability': 'ABILITY',
+  'controls.purge': 'PURGE',
+  'controls.interact': 'INTERACT',
+  'controls.menu': 'MENU',
+
+  // ---------------------------------------------------------------------
+  // Operator induction (the welcome document)
+  //
+  // Same rule as the rest of the corporate voice: the company does not teach,
+  // it NOTIFIES. Each article carries what the first descent needs and stops
+  // where discovery starts — the Vein reacts, and which reaction belongs to
+  // which material is learned in the dark, not in a paragraph.
+  // ---------------------------------------------------------------------
+  'menu.induction': 'Induction',
+  'aurix.doc.induction': 'AD-IND-0001 · required reading',
+  'induction.title': 'OPERATOR INDUCTION',
+  'induction.preamble':
+    'Welcome to the Prospector Programme. This document replaces in-person training, discontinued on logistical grounds. Read it. Aurix does not repeat instruction in the field.',
+  'induction.asset.code': '§1 · ASSET',
+  'induction.asset.title': 'YOU DO NOT DESCEND',
+  'induction.asset.body':
+    'A Prospector chassis descends, operated remotely by you. The chassis is consumable and the company books its loss as expected cost. The CONTRACT is not consumable: every unit lost comes back as a record, and the record authorises the next one to go deeper.',
+  'induction.contract.code': '§2 · CONTRACT',
+  'induction.contract.title': 'DESCEND. RECOVER. EXTRACT.',
+  'induction.contract.body':
+    'Every sector has a shaft to the next one. Where there is a Core, take it. Cargo only clears at EXTRACTION, back at the sector entrance — ore still in the chassis is ore lost. Descending is optional; coming back is what pays.',
+  'induction.vein.code': '§3 · ENVIRONMENT',
+  'induction.vein.title': 'THE VEIN REACTS',
+  'induction.vein.body':
+    'None of it is scenery. Brittle rock gives way to gunfire, fire walks across anything dry, current crosses any pool and acid eats what it touches — your chassis included. Aurix holds no documentation on what happens when two of those meet. Caution is advised. It is noted that caution rarely recovers Cores.',
+  'induction.heat.code': '§4 · ARMAMENT',
+  'induction.heat.title': 'THE BARREL HAS A LIMIT',
+  'induction.heat.body':
+    'The weapon heats with every shot and locks when it saturates. The thin bar under your health is heat, and the mark on it is where the audible warning starts. A held trigger is the most common cause of unit loss in this programme.',
+  'induction.echo.code': '§5 · WELL',
+  'induction.echo.title': 'THE VEIN LISTENS',
+  'induction.echo.body':
+    'Wells offer abilities, and the offer is not a lottery: it answers what you have been doing. What you burned, electrified or detonated comes back as equipment. An equipped ability has a cooldown — the command bar along the bottom says when it returns.',
+  'induction.archive.code': '§6 · ARCHIVE',
+  'induction.archive.title': 'READ THE MATRIX',
+  'induction.archive.body':
+    'Every recovered unit feeds the GENERATIONAL MATRIX. That is where the Aurix Files live — what the company knows about each Asset you met down there, released as you meet it — alongside the hardware protocols that authorise the next generation to descend further, take more and aim better. What you leave unread keeps happening to you.',
+  'induction.controls.title': 'COMMAND SCHEME · DESK TERMINAL',
+  'induction.controls.note':
+    'On a touch device the scheme differs: left stick moves, right stick aims and fires, and the buttons above it repeat this list.',
+  'induction.begin': 'AUTHORISE DESCENT',
+  'induction.archiveButton': 'FILE',
+  'induction.reopen': 'This document stays in dispatch, under INDUCTION.',
 };

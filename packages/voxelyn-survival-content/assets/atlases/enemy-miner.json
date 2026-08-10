@@ -2,6 +2,8 @@
   "id": "enemy-miner",
   "version": 4,
   "atlas": "enemy-miner.png",
+  "normalAtlas": "enemy-miner.normal.png",
+  "normalScale": 2,
   "frameWidth": 96,
   "frameHeight": 120,
   "columns": 42,

@@ -111,10 +111,32 @@ const MAX_ATLAS_WIDTH = 4096;
  * proxima adicao de peso nao deve ser paga com outro aumento — deve ser paga
  * com carregamento sob demanda, que e o que remove os nove chefes que a run nao
  * vai encontrar.
+ *
+ * ---------------------------------------------------------------------------
+ * E A PROXIMA ADICAO VEIO: o MAPA DE FACES (`*.normal.png`)
+ * ---------------------------------------------------------------------------
+ * A normal por pixel de cada sprite, para a luz do mundo bater no lado certo do
+ * corpo. Medido: +0,8 MiB de PNG e +26 MiB de RGBA — o que estouraria os 160
+ * MiB em 12 MiB.
+ *
+ * O teto NAO subiu. A regra escrita acima foi seguida a letra: o peso novo e
+ * pago com carregamento SOB DEMANDA. Nenhum mapa de faces e carregado no boot;
+ * cada um chega na primeira vez que aquele arquetipo e desenhado sob luz
+ * colorida, e ate chegar o sprite recebe a iluminacao por silhueta de antes —
+ * que continua correta, so menos informativa. Um bicho que a run nao encontra
+ * nao custa um byte.
+ *
+ * Por isso ha DOIS orcamentos daqui em diante. O de boot continua sendo o que
+ * aperta, e continua em 160 MiB, sem folga nova. O sob demanda tem teto proprio
+ * e mais largo, porque o pior caso dele — o jogador encontrar todo arquetipo do
+ * jogo numa sessao — e raro e chega gradualmente, em vez de tudo na tela de
+ * carregamento.
  */
 const MAX_PNG_BYTES = 1536 * 1024;
 const MAX_TOTAL_PNG_BYTES = 10 * 1024 * 1024;
 const MAX_DECODED_BYTES = 160 * 1024 * 1024;
+/** Teto do que chega DEPOIS do boot, um arquetipo por vez. */
+const MAX_ON_DEMAND_DECODED_BYTES = 48 * 1024 * 1024;
 
 const toHex = (r, g, b) => `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 const framePixels = (png, m, index) => {
@@ -433,6 +455,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let totalErrors = 0;
   let totalBytes = 0;
   let decodedBytes = 0;
+  let onDemandDecodedBytes = 0;
   // Terreno e chao ficam FORA do index de sprites: nao tem animacao por
   // direcao, nem frameMap, e o validador de personagem tentaria le-los assim.
   for (const [id, run] of [['terrain-blocks', validateTerrain], ['surface-tiles', validateSurfaces], ['world-props', validateProps]]) {
@@ -441,6 +464,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (errs.length === 0) console.log(`  OK ${id}`);
     else for (const e of errs) console.error(`  FAIL ${e}`);
     const path = resolve(DIR, `${id}.png`);
+    // Os atlas de cenario tambem podem ter mapa de faces — o de props tem, e ele
+    // e sob demanda como todos os outros. Contado aqui e nao no laco de
+    // sprites porque terreno, chao e props ficam FORA do index de sprites.
+    const scenaryNormal = resolve(DIR, `${id}.normal.png`);
+    if (existsSync(scenaryNormal)) {
+      totalBytes += statSync(scenaryNormal).size;
+      const normal = PNG.sync.read(readFileSync(scenaryNormal));
+      onDemandDecodedBytes += normal.width * normal.height * 4;
+    }
     if (existsSync(path)) {
       totalBytes += statSync(path).size;
       const decoded = PNG.sync.read(readFileSync(path));
@@ -457,6 +489,24 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const png = PNG.sync.read(readFileSync(pngPath));
       decodedBytes += png.width * png.height * 4;
     }
+    // O MAPA DE FACES conta no mesmo orcamento.
+    //
+    // Ele nao e arte e nao passa pela conferencia de paleta — sao tres cores
+    // que nao existem na paleta mestra de proposito —, mas ocupa memoria de
+    // video exatamente como qualquer outro atlas, e um teto que ignora metade
+    // do que o jogo carrega nao e um teto. E por isso que ele sai em meia
+    // resolucao: em resolucao cheia, sozinho, estouraria o limite.
+    if (m.normalAtlas) {
+      const normalPath = resolve(DIR, m.normalAtlas);
+      if (!existsSync(normalPath)) {
+        console.error(`  FAIL ${id}: manifest declara ${m.normalAtlas}, que nao existe`);
+        totalErrors++;
+      } else {
+        totalBytes += statSync(normalPath).size;
+        const normal = PNG.sync.read(readFileSync(normalPath));
+        onDemandDecodedBytes += normal.width * normal.height * 4;
+      }
+    }
     if (errs.length === 0) console.log(`  OK ${id}`);
     else for (const e of errs) console.error(`  FAIL ${e}`);
   }
@@ -465,10 +515,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     totalErrors++;
   }
   if (decodedBytes > MAX_DECODED_BYTES) {
-    console.error(`  FAIL memória decodificada ${decodedBytes} > ${MAX_DECODED_BYTES}`);
+    console.error(`  FAIL memória decodificada (boot) ${decodedBytes} > ${MAX_DECODED_BYTES}`);
     totalErrors++;
   }
-  console.log(`\nPNG total: ${totalBytes} bytes; memória RGBA: ${decodedBytes} bytes`);
+  if (onDemandDecodedBytes > MAX_ON_DEMAND_DECODED_BYTES) {
+    console.error(
+      `  FAIL memória decodificada (sob demanda) ${onDemandDecodedBytes} > ${MAX_ON_DEMAND_DECODED_BYTES}`
+    );
+    totalErrors++;
+  }
+  console.log(
+    `\nPNG total: ${totalBytes} bytes; memória RGBA no boot: ${decodedBytes} bytes;` +
+      ` sob demanda: ${onDemandDecodedBytes} bytes`
+  );
   if (totalErrors) process.exit(1);
   console.log(`${ids.length} sprites válidos.`);
 }

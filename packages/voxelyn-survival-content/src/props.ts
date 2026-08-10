@@ -17,6 +17,16 @@ export type PropManifest = {
   id: string;
   version: number;
   atlas: string;
+  /**
+   * MAPA DE FACES: a normal por pixel, na mesma grade de quadros do atlas.
+   *
+   * Vermelho topo, verde esquerda (+y do mundo), azul direita (+x). E o que
+   * permite a luz do mundo bater no lado certo de um monolito, de uma fumarola
+   * ou do pedestal do Nucleo, em vez de banhar a peca inteira por igual.
+   */
+  normalAtlas?: string;
+  /** Divisor de resolucao do mapa de faces. */
+  normalScale?: number;
   frameWidth: number;
   frameHeight: number;
   columns: number;

@@ -11,7 +11,7 @@
 // a ordem do pintor e a chave de profundidade vem do core (projectIso,
 // makeDrawKey, sortDrawCommands) — nao ha matematica isometrica duplicada aqui.
 import { makeDrawKey, projectIso, sortDrawCommands } from '@voxelyn/core';
-import { grid, set } from './lib.mjs';
+import { grid, set, setRgb } from './lib.mjs';
 
 /**
  * Rampas de face por material: [topo, esquerda, direita].
@@ -542,8 +542,73 @@ const CUBE_CELLS = (() => {
   return cells;
 })();
 
+/**
+ * O MAPA DE FACES: qual das tres faces do cubo pintou cada pixel.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE ISTO EXISTE
+ * ---------------------------------------------------------------------------
+ * O cliente ilumina sprite por SILHUETA: o corpo inteiro recebe a mesma cor de
+ * luz, porque um PNG assado nao tem normal por pixel. Isso ja diz "este bicho
+ * esta dentro da luz", mas nao diz o que qualquer volume diz — que o lado
+ * virado para a tocha acende e o outro nao.
+ *
+ * Num jogo de voxel, a normal por pixel nao precisa ser aproximada: ela e
+ * EXATA e ja e conhecida. Todo pixel de todo sprite saiu de uma das tres faces
+ * que a projecao mostra, e o rasterizador sabe qual no instante em que pinta.
+ * O que faltava era guardar essa informacao em vez de joga-la fora.
+ *
+ * ---------------------------------------------------------------------------
+ * COMO
+ * ---------------------------------------------------------------------------
+ * O mesmo `renderVoxels`, o mesmo modelo, a mesma ordem do pintor, a mesma
+ * tabela `CUBE_CELLS` — so a COR muda: em vez do tom do material, cada face
+ * pinta um canal puro. A silhueta sai identica pixel a pixel, que e a unica
+ * forma de o mapa e o sprite se alinharem sem uma segunda conta de
+ * enquadramento para manter em sincronia.
+ *
+ * Vermelho = topo, verde = esquerda (+y do mundo), azul = direita (+x). A
+ * escolha de CANAL, e nao de um indice qualquer, e o que deixa o cliente
+ * resolver as tres faces numa unica passada: uma matriz de cor 3x3 leva
+ * (R,G,B) para a soma das tres luzes, e o navegador faz a conta.
+ */
+export const FACE_RGB = [
+  [255, 0, 0],
+  [0, 255, 0],
+  [0, 0, 255],
+];
+
+let faceCapture = false;
+
+/**
+ * Roda `fn` com o rasterizador pintando FACES em vez de material.
+ *
+ * Bandeira de modulo e nao parametro de `renderVoxels` porque quem chama o
+ * rasterizador sao dezenas de funcoes de modelo espalhadas por seis arquivos —
+ * `spitterFrame`, `bishopFrame`, as camadas do Prospector — e todas teriam de
+ * repassar o parametro para o gerador conseguir pedir o mapa. A bandeira
+ * envolve a chamada de FORA, no gerador, e nenhum modelo precisa saber que o
+ * mapa de faces existe.
+ *
+ * `try/finally` porque um modelo que estoure no meio nao pode deixar o
+ * rasterizador presente em modo face — o proximo sprite sairia com a arte
+ * inteira em vermelho, verde e azul.
+ */
+export const withFaceCapture = (fn) => {
+  faceCapture = true;
+  try {
+    return fn();
+  } finally {
+    faceCapture = false;
+  }
+};
+
 /** Desenha um cubo isometrico com as tres faces visiveis. */
 const cube = (g, sx, sy, ramp) => {
+  if (faceCapture) {
+    for (const [dx, dy, face] of CUBE_CELLS) setRgb(g, sx + dx, sy + dy, FACE_RGB[face]);
+    return;
+  }
   for (const [dx, dy, face] of CUBE_CELLS) set(g, sx + dx, sy + dy, ramp[face]);
 };
 

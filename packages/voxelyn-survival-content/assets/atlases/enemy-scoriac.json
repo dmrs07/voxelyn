@@ -2,6 +2,8 @@
   "id": "enemy-scoriac",
   "version": 2,
   "atlas": "enemy-scoriac.png",
+  "normalAtlas": "enemy-scoriac.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

@@ -2,6 +2,8 @@
   "id": "enemy-lung-matrix",
   "version": 1,
   "atlas": "enemy-lung-matrix.png",
+  "normalAtlas": "enemy-lung-matrix.normal.png",
+  "normalScale": 2,
   "frameWidth": 116,
   "frameHeight": 112,
   "columns": 35,

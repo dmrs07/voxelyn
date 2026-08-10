@@ -2,6 +2,8 @@
   "id": "layer-player-prospector-gun",
   "version": 7,
   "atlas": "layer-player-prospector-gun.png",
+  "normalAtlas": "layer-player-prospector-gun.normal.png",
+  "normalScale": 2,
   "frameWidth": 88,
   "frameHeight": 112,
   "columns": 32,

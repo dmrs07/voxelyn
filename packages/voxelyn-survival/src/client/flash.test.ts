@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_FLASHES, addFlash, flashPower, pruneFlashes, type Flash } from './flash';
 
 const flash = (startedMs: number, power = 1, durationMs = 200): Flash => ({
-  x: 0, y: 0, r: 4, power, startedMs, durationMs,
+  x: 0, y: 0, r: 4, power, startedMs, durationMs, hex: '#ff7a2f',
 });
 
 describe('clarões de evento', () => {

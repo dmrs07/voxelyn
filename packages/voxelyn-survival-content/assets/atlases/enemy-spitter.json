@@ -2,6 +2,8 @@
   "id": "enemy-spitter",
   "version": 6,
   "atlas": "enemy-spitter.png",
+  "normalAtlas": "enemy-spitter.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

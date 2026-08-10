@@ -20,6 +20,7 @@ import {
   type TerrainManifest,
   EMISSIVE_HEX,
 } from '@voxelyn/survival-content';
+import { armFaceLight, orderFacesForDraw } from './face-light';
 
 import playerManifest from '@voxelyn/survival-content/assets/atlases/player-prospector.json';
 import playerLowerManifest from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.json';
@@ -90,6 +91,74 @@ import cycloneUrl from '@voxelyn/survival-content/assets/atlases/fx-fire-cyclone
 import terrainUrl from '@voxelyn/survival-content/assets/atlases/terrain-blocks.png?url';
 import surfaceUrl from '@voxelyn/survival-content/assets/atlases/surface-tiles.png?url';
 import propUrl from '@voxelyn/survival-content/assets/atlases/world-props.png?url';
+import worldPropsNormalUrl from '@voxelyn/survival-content/assets/atlases/world-props.normal.png?url';
+
+// ---------------------------------------------------------------------------
+// MAPAS DE FACES (normais por pixel)
+// ---------------------------------------------------------------------------
+// Sao URLs, e nao imagens: `?url` devolve uma string e o navegador nao busca
+// nada ate alguem construir um `Image`. E o que permite o carregamento SOB
+// DEMANDA — a lista inteira custa alguns bytes de bundle, e so o mapa do
+// arquetipo que de fato apareceu na tela vira memoria.
+import enemyArchcantorNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-archcantor.normal.png?url';
+import enemyBellowsNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-bellows.normal.png?url';
+import enemyBishopNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-bishop.normal.png?url';
+import enemyBruiserNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-bruiser.normal.png?url';
+import enemyDiamandisNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-diamandis.normal.png?url';
+import enemyFrostQueenNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-queen.normal.png?url';
+import enemyFrostWraithNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-frost-wraith.normal.png?url';
+import enemyFungalHorseNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-fungal-horse.normal.png?url';
+import enemyFurnaceHeartNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-furnace-heart.normal.png?url';
+import enemyGuardianNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-guardian.normal.png?url';
+import enemyLungMatrixNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-lung-matrix.normal.png?url';
+import enemyMagnetarchNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-magnetarch.normal.png?url';
+import enemyMinerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-miner.normal.png?url';
+import enemyMudLampreyNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-mud-lamprey.normal.png?url';
+import enemyResonantNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-resonant.normal.png?url';
+import enemyScoriacNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-scoriac.normal.png?url';
+import enemySheetLeviathanNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-sheet-leviathan.normal.png?url';
+import enemySpitterNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-spitter.normal.png?url';
+import enemySporeBomberNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-spore-bomber.normal.png?url';
+import enemyStalkerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-stalker.normal.png?url';
+import enemySulfurBomberNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-sulfur-bomber.normal.png?url';
+import enemyUndertakerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-undertaker.normal.png?url';
+import enemyWhiteDevourerNormalUrl from '@voxelyn/survival-content/assets/atlases/enemy-white-devourer.normal.png?url';
+import layerPlayerProspectorGunNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-gun.normal.png?url';
+import layerPlayerProspectorLowerNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-lower.normal.png?url';
+import layerPlayerProspectorUpperNormalUrl from '@voxelyn/survival-content/assets/atlases/layer-player-prospector-upper.normal.png?url';
+import playerProspectorNormalUrl from '@voxelyn/survival-content/assets/atlases/player-prospector.normal.png?url';
+
+/** Nome de arquivo publicado no manifest -> URL empacotada pelo bundler. */
+const NORMAL_URLS: Record<string, string> = {
+  'world-props.normal.png': worldPropsNormalUrl,
+  'enemy-archcantor.normal.png': enemyArchcantorNormalUrl,
+  'enemy-bellows.normal.png': enemyBellowsNormalUrl,
+  'enemy-bishop.normal.png': enemyBishopNormalUrl,
+  'enemy-bruiser.normal.png': enemyBruiserNormalUrl,
+  'enemy-diamandis.normal.png': enemyDiamandisNormalUrl,
+  'enemy-frost-queen.normal.png': enemyFrostQueenNormalUrl,
+  'enemy-frost-wraith.normal.png': enemyFrostWraithNormalUrl,
+  'enemy-fungal-horse.normal.png': enemyFungalHorseNormalUrl,
+  'enemy-furnace-heart.normal.png': enemyFurnaceHeartNormalUrl,
+  'enemy-guardian.normal.png': enemyGuardianNormalUrl,
+  'enemy-lung-matrix.normal.png': enemyLungMatrixNormalUrl,
+  'enemy-magnetarch.normal.png': enemyMagnetarchNormalUrl,
+  'enemy-miner.normal.png': enemyMinerNormalUrl,
+  'enemy-mud-lamprey.normal.png': enemyMudLampreyNormalUrl,
+  'enemy-resonant.normal.png': enemyResonantNormalUrl,
+  'enemy-scoriac.normal.png': enemyScoriacNormalUrl,
+  'enemy-sheet-leviathan.normal.png': enemySheetLeviathanNormalUrl,
+  'enemy-spitter.normal.png': enemySpitterNormalUrl,
+  'enemy-spore-bomber.normal.png': enemySporeBomberNormalUrl,
+  'enemy-stalker.normal.png': enemyStalkerNormalUrl,
+  'enemy-sulfur-bomber.normal.png': enemySulfurBomberNormalUrl,
+  'enemy-undertaker.normal.png': enemyUndertakerNormalUrl,
+  'enemy-white-devourer.normal.png': enemyWhiteDevourerNormalUrl,
+  'layer-player-prospector-gun.normal.png': layerPlayerProspectorGunNormalUrl,
+  'layer-player-prospector-lower.normal.png': layerPlayerProspectorLowerNormalUrl,
+  'layer-player-prospector-upper.normal.png': layerPlayerProspectorUpperNormalUrl,
+  'player-prospector.normal.png': playerProspectorNormalUrl,
+};
 
 export type SpriteAnimationLayer = {
   animation: string;
@@ -116,7 +185,17 @@ export type LayeredPlayerAnimation = {
 
 export type SpriteAnimationSelection = string | LayeredPlayerAnimation;
 
-type Tint = { color: string; alpha: number };
+export type Tint = { color: string; alpha: number };
+
+/**
+ * A luz que chega num corpo, JA RESOLVIDA por face: [topo, esquerda, direita].
+ *
+ * A ordem e a mesma do mapa de faces e a mesma das rampas do rasterizador, e as
+ * tres coisas precisam continuar concordando: no atlas de faces vermelho e
+ * topo, verde e esquerda (+y do mundo) e azul e direita (+x).
+ */
+export type FaceLighting = readonly [Tint, Tint, Tint];
+
 type Loaded = {
   manifest: SpriteManifestEntry;
   image: HTMLImageElement;
@@ -124,6 +203,15 @@ type Loaded = {
   failed: boolean;
   /** Halo: so os pixels emissivos do atlas, em meia resolucao. Ver `emissiveMask`. */
   glow: HTMLCanvasElement | null;
+  /**
+   * MAPA DE FACES, carregado sob demanda. Ver `requestNormal`.
+   *
+   * `null` enquanto nao foi pedido, nao chegou ou falhou — e nos tres casos o
+   * desenho cai na iluminacao por silhueta, que nao esta errada, so nao sabe de
+   * que lado a luz bate.
+   */
+  normal: HTMLImageElement | null;
+  normalState: 'absent' | 'idle' | 'loading' | 'ready' | 'failed';
 };
 
 /**
@@ -136,9 +224,29 @@ type Loaded = {
  * por quadro.
  */
 const GLOW_SCALE = 2;
-/** Quanto o halo transborda a silhueta, em pixels de atlas. */
-const GLOW_SPREAD = 2;
+/**
+ * Quanto o halo transborda a silhueta, em pixels de atlas.
+ *
+ * Era 2 — e dois pixels de transbordo num sprite de sessenta e poucos de altura
+ * nao e brilho, e uma franja. O efeito estava tecnicamente ligado e visualmente
+ * ausente: quem o autorou passou a nao enxerga-lo, o que e exatamente o que
+ * acontece com um efeito calibrado olhando de perto e vivido olhando de longe.
+ */
+const GLOW_SPREAD = 3;
 const GLOW_ALPHA = 0.55;
+/**
+ * A SEGUNDA PASSADA do halo: larga e fraca, por baixo da primeira.
+ *
+ * Uma passada so nao consegue ser as duas coisas que um brilho e — o miolo
+ * quente colado na peca e o derrame suave que sangra no escuro em volta. Com um
+ * unico transbordo, aumenta-lo o bastante para o derrame aparecer transforma o
+ * miolo num borrao e come a silhueta.
+ *
+ * Multiplo do transbordo base e nao um numero proprio: o dia em que a peca
+ * mudar de tamanho, as duas passadas tem de crescer juntas.
+ */
+const GLOW_WIDE_SCALE = 3.4;
+const GLOW_WIDE_ALPHA = 0.38;
 
 /**
  * Opacidade do halo, dada a opacidade que o desenho ja herdou.
@@ -435,6 +543,9 @@ export class PropBank {
   private readonly offsets = propOffsets(propManifest as unknown as PropManifest);
   private readonly image = new Image();
   private ready = false;
+  /** Mapa de faces, sob demanda — mesma politica dos corpos. Ver `requestNormal`. */
+  private normal: HTMLImageElement | null = null;
+  private normalState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 
   load(): void {
     this.image.onload = () => { this.ready = true; };
@@ -442,6 +553,37 @@ export class PropBank {
       console.warn('[props] atlas failed to load; using flat markers');
     };
     this.image.src = propUrl;
+  }
+
+  /**
+   * Pede o mapa de faces dos props na primeira vez que um deles e desenhado sob
+   * luz colorida.
+   *
+   * Sob demanda como o dos corpos, e pela mesma razao de orcamento — mas com um
+   * detalhe pratico diferente: props aparecem em quase toda sala, entao este
+   * aqui vai chegar cedo em praticamente toda run. O que a demanda compra nao e
+   * memoria poupada ao longo da sessao; e nao BLOQUEAR o boot com mais um atlas
+   * antes do primeiro quadro.
+   */
+  private requestNormal(): void {
+    if (this.normalState !== 'idle') return;
+    const name = this.manifest.normalAtlas;
+    const url = name ? NORMAL_URLS[name] : undefined;
+    if (!url) {
+      this.normalState = 'failed';
+      return;
+    }
+    this.normalState = 'loading';
+    const image = new Image();
+    image.onload = () => {
+      this.normal = image;
+      this.normalState = 'ready';
+    };
+    image.onerror = () => {
+      this.normalState = 'failed';
+      console.warn('[props] mapa de faces indisponivel');
+    };
+    image.src = url;
   }
 
   indexOf(name: string): number {
@@ -461,7 +603,12 @@ export class PropBank {
     nowMs: number,
     screenX: number,
     screenY: number,
-    zoom: number
+    zoom: number,
+    /**
+     * A luz do mundo nas tres faces desta peca. Ausente = a peca e desenhada
+     * como sempre foi, sem luz somada.
+     */
+    faces?: FaceLighting
   ): boolean {
     if (!this.ready) return false;
     const kindIndex = this.indexOf(name);
@@ -473,9 +620,41 @@ export class PropBank {
     const s = zoom / ATLAS_SCALE;
     const dx = screenX - m.originX * s;
     const dy = screenY + ATLAS_SCALE * s - m.originY * s;
+    const dw = m.frameWidth * s;
+    const dh = m.frameHeight * s;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh,
-      dx, dy, m.frameWidth * s, m.frameHeight * s);
+    ctx.drawImage(this.image, rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, dw, dh);
+
+    // A LUZ POR PIXEL, por cima da peca.
+    //
+    // Props nunca sao espelhados — sao autorados numa direcao so
+    // (`DIR_UNROTATED`) e desenhados como saem do atlas —, entao nao ha a troca
+    // de colunas que os corpos precisam. A ordem das faces vai direto.
+    if (faces && faces.some((face) => face.alpha > 0.004)) {
+      this.requestNormal();
+      if (this.normal && this.normalState === 'ready') {
+        const filter = armFaceLight(faces);
+        if (filter) {
+          const scale = m.normalScale ?? 1;
+          ctx.save();
+          ctx.filter = filter;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(
+            this.normal,
+            rect.sx / scale,
+            rect.sy / scale,
+            rect.sw / scale,
+            rect.sh / scale,
+            dx,
+            dy,
+            dw,
+            dh,
+          );
+          ctx.restore();
+        }
+      }
+    }
     return true;
   }
 }
@@ -597,7 +776,18 @@ export class SpriteBank {
   load(): void {
     for (const { manifest, url } of SOURCES) {
       const image = new Image();
-      const entry: Loaded = { manifest, image, ready: false, failed: false, glow: null };
+      const entry: Loaded = {
+        manifest,
+        image,
+        ready: false,
+        failed: false,
+        glow: null,
+        normal: null,
+        // `absent` quando o sprite nao tem mapa (os FX), `idle` quando tem e
+        // ainda ninguem precisou dele. A distincao existe para `requestNormal`
+        // nao ficar tentando buscar um arquivo que nunca foi gerado.
+        normalState: manifest.normalAtlas ? 'idle' : 'absent',
+      };
       image.onload = () => {
         entry.ready = true;
         // A mascara e construida UMA vez, no load, e nunca por quadro. Ler pixel
@@ -618,6 +808,43 @@ export class SpriteBank {
       image.src = url;
       this.byId.set(manifest.id, entry);
     }
+  }
+
+  /**
+   * Pede o mapa de faces deste sprite, se ainda nao foi pedido.
+   *
+   * Aqui esta a decisao de memoria inteira. Os atlas de arte sao carregados no
+   * boot — todos, inclusive os dez chefes dos quais uma run encontra no maximo
+   * um — e o orcamento do pacote de conteudo ja escreveu, antes deste trabalho,
+   * que a proxima adicao de peso teria de ser paga com carregamento sob demanda
+   * em vez de com um teto maior. Os mapas de faces sao essa adicao (+26 MiB se
+   * viessem juntos), e sao pagos exatamente assim: nenhum vem no boot, cada um
+   * chega na primeira vez que aquele corpo aparece iluminado, e um bicho que a
+   * run nao encontra nao custa um byte.
+   *
+   * O custo dessa escolha e um punhado de quadros com iluminacao por silhueta
+   * enquanto a imagem viaja — o que ninguem percebe, porque a silhueta ja e o
+   * que o jogo mostrava ate ontem.
+   */
+  private requestNormal(loaded: Loaded): void {
+    if (loaded.normalState !== 'idle') return;
+    const name = loaded.manifest.normalAtlas;
+    const url = name ? NORMAL_URLS[name] : undefined;
+    if (!url) {
+      loaded.normalState = 'absent';
+      return;
+    }
+    loaded.normalState = 'loading';
+    const image = new Image();
+    image.onload = () => {
+      loaded.normal = image;
+      loaded.normalState = 'ready';
+    };
+    image.onerror = () => {
+      loaded.normalState = 'failed';
+      console.warn(`[sprites] mapa de faces indisponivel: ${loaded.manifest.id}`);
+    };
+    image.src = url;
   }
 
   get(id: string): Loaded | null {
@@ -645,10 +872,14 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
+    /** A luz do mundo caindo neste corpo, por silhueta. Ver `drawLit`. */
+    light?: Tint,
+    /** A mesma luz resolvida POR FACE: [topo, esquerda, direita]. */
+    faces?: FaceLighting
   ): boolean {
     if (typeof animation !== 'string' && archetype === 'prospector') {
-      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint)) return true;
+      if (this.drawLayeredPlayer(ctx, animation, footX, footY, zoom, tint, light, faces)) return true;
       // Os atlas de camada ainda podem estar carregando. O atlas completo mantém
       // o personagem visível e usa a ação do tronco como fallback temporário.
       facingX = animation.upper.facingX;
@@ -660,7 +891,7 @@ export class SpriteBank {
     if (typeof animation !== 'string') animation = animation.upper.animation;
     const loaded = this.spriteForArchetype(archetype);
     if (!loaded) return false;
-    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint);
+    this.drawLoadedFrame(ctx, loaded, animation, facingX, facingY, elapsedMs, footX, footY, zoom, tint, light, faces);
     return true;
   }
 
@@ -698,7 +929,9 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
+    light?: Tint,
+    faces?: FaceLighting
   ): boolean {
     const lower = this.get(PLAYER_LOWER_ID);
     const upper = this.get(PLAYER_UPPER_ID);
@@ -737,7 +970,9 @@ export class SpriteBank {
       footX,
       footY,
       zoom,
-      bodyTint
+      bodyTint,
+      light,
+      faces
     );
 
     const lowerFrame = frameAtTime(lower.manifest, animation.lower.animation, animation.lower.elapsedMs);
@@ -764,7 +999,9 @@ export class SpriteBank {
         upperX,
         upperY,
         zoom,
-        bodyTint
+        bodyTint,
+        light,
+        faces
       );
     };
 
@@ -788,7 +1025,9 @@ export class SpriteBank {
         upperX,
         upperY,
         zoom,
-        gunHeatTint(animation.heat, animation.overheated) ?? tint
+        gunHeatTint(animation.heat, animation.overheated) ?? tint,
+        light,
+        faces
       );
     };
 
@@ -816,7 +1055,9 @@ export class SpriteBank {
     footX: number,
     footY: number,
     zoom: number,
-    tint?: Tint
+    tint?: Tint,
+    light?: Tint,
+    faces?: FaceLighting
   ): void {
     const { manifest, image } = loaded;
     const fallbackAnimation = animation === 'special' && !manifest.animations.special ? 'attack' : animation;
@@ -846,12 +1087,110 @@ export class SpriteBank {
       ctx.translate(-footX, 0);
       const flippedX = footX - (manifest.frameWidth - manifest.anchorX) * zoom;
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, flippedX, dy, dw, dh);
+      this.drawLit(ctx, loaded, image, rect, manifest, flippedX, dy, dw, dh, light, faces);
       this.drawGlow(ctx, loaded, rect, flippedX, dy, dw, dh, zoom);
     } else {
       ctx.drawImage(source, sx, sy, rect.sw, rect.sh, dx, dy, dw, dh);
+      this.drawLit(ctx, loaded, image, rect, manifest, dx, dy, dw, dh, light, faces);
       this.drawGlow(ctx, loaded, rect, dx, dy, dw, dh, zoom);
     }
     ctx.restore();
+  }
+
+  /**
+   * A LUZ DO MUNDO caindo sobre o corpo — por PIXEL quando ha mapa de faces,
+   * por silhueta quando nao ha.
+   *
+   * ---------------------------------------------------------------------------
+   * O CAMINHO POR PIXEL
+   * ---------------------------------------------------------------------------
+   * Um sprite e um PNG assado e nao tem normal por pixel — essa era a razao pela
+   * qual a luz so podia banhar a silhueta inteira com uma cor so. Mas num jogo
+   * de voxel a normal NAO precisa ser aproximada: todo pixel saiu de uma das
+   * tres faces que a projecao mostra, e o rasterizador sabe qual no instante em
+   * que pinta. O mapa de faces guarda essa informacao, e aqui ela vira luz.
+   *
+   * Uma passada, sem buffer: `feColorMatrix` combina os canais de entrada
+   * linearmente, entao pôr a cor de cada face na coluna do canal dela soma as
+   * tres de uma vez. Ver `face-light.ts`.
+   *
+   * ---------------------------------------------------------------------------
+   * O ESPELHAMENTO
+   * ---------------------------------------------------------------------------
+   * Direcoes espelhadas reaproveitam a arte de outra direcao invertida em x. O
+   * corpo desenhado passa a ser a imagem espelhada dele, e nesta projecao a face
+   * que aparece a ESQUERDA na tela e sempre a que olha para +y do mundo — entao
+   * o que era a mascara verde (esquerda) passa a ocupar o lado direito. As duas
+   * colunas trocam. Sem isso, metade das direcoes do jogo receberia a luz no
+   * lado errado do corpo, e a metade em que funciona faria o defeito parecer
+   * "as vezes".
+   *
+   * Sai depois do corpo e ANTES do halo dos emissivos: a luz de fora banha a
+   * armadura, e o visor continua sendo a coisa mais brilhante do chassi.
+   */
+  private drawLit(
+    ctx: CanvasRenderingContext2D,
+    loaded: Loaded,
+    image: CanvasImageSource,
+    rect: { sx: number; sy: number; sw: number; sh: number; flip?: boolean },
+    manifest: SpriteManifestEntry,
+    dx: number,
+    dy: number,
+    dw: number,
+    dh: number,
+    light?: Tint,
+    faces?: FaceLighting,
+  ): void {
+    const inherited = ctx.globalAlpha;
+    if (inherited <= 0) return;
+
+    if (faces && faces.some((face) => face.alpha > 0.004)) {
+      this.requestNormal(loaded);
+      const normal = loaded.normal;
+      if (normal && loaded.normalState === 'ready') {
+        const ordered = orderFacesForDraw(faces, rect.flip === true);
+        const filter = armFaceLight(ordered);
+        if (filter) {
+          const scale = manifest.normalScale ?? 1;
+          ctx.save();
+          ctx.filter = filter;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = inherited;
+          // O mapa vem em meia resolucao e volta ao tamanho do sprite com
+          // suavizacao: a fronteira entre duas faces sai interpolada, e a
+          // matriz trata a mistura como a media das duas luzes — que e
+          // exatamente o que uma quina arredondada devolveria.
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(
+            normal,
+            rect.sx / scale,
+            rect.sy / scale,
+            rect.sw / scale,
+            rect.sh / scale,
+            dx,
+            dy,
+            dw,
+            dh,
+          );
+          ctx.restore();
+          return;
+        }
+      }
+    }
+
+    // RECUO: a silhueta inteira numa cor so. Vale enquanto o mapa de faces
+    // viaja, para os FX que nao tem mapa, e para navegador sem filtro de matriz
+    // em canvas. Nao esta errado — so nao sabe de que lado a luz bate.
+    if (!light || light.alpha <= 0.004) return;
+    const lit = this.tintedFrame(image, rect, manifest.frameWidth, manifest.frameHeight, {
+      color: light.color,
+      alpha: 1,
+    });
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = inherited * light.alpha;
+    ctx.drawImage(lit, 0, 0, rect.sw, rect.sh, dx, dy, dw, dh);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = inherited;
   }
 
   /**
@@ -882,9 +1221,18 @@ export class SpriteBank {
     const inherited = ctx.globalAlpha;
     if (inherited <= 0) return;
     const grow = GLOW_SPREAD * zoom;
+    const wide = grow * GLOW_WIDE_SCALE;
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = glowAlpha(inherited);
     ctx.imageSmoothingEnabled = true;
+    // O derrame LARGO primeiro, e o miolo por cima: invertida, a passada larga
+    // lavaria o miolo e o brilho perderia o centro.
+    ctx.globalAlpha = glowAlpha(inherited) * GLOW_WIDE_ALPHA;
+    ctx.drawImage(
+      glow,
+      rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,
+      dx - wide, dy - wide, dw + wide * 2, dh + wide * 2
+    );
+    ctx.globalAlpha = glowAlpha(inherited);
     ctx.drawImage(
       glow,
       rect.sx / GLOW_SCALE, rect.sy / GLOW_SCALE, rect.sw / GLOW_SCALE, rect.sh / GLOW_SCALE,

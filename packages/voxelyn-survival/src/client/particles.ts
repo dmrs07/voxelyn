@@ -12,6 +12,7 @@
 // semeiam o mesmo burst, entao veem a mesma coisa sem trocar um byte a mais.
 
 import { SOLID_CRYSTAL } from '@voxelyn/survival-sim';
+import { COMBAT_PLANE_TILES } from './combat-plane';
 import type { FaceRamp } from './voxel-draw';
 import { drawVoxel } from './voxel-draw';
 import type { SemanticEvent } from '@voxelyn/survival-sim';
@@ -232,7 +233,8 @@ export class VoxelParticles {
     speed: number,
     lift: number,
     life: number,
-    salt: number
+    salt: number,
+    baseZ = 0
   ): void {
     const rnd = seeded(eventSeed(x, y, salt));
     for (let i = 0; i < count; i++) {
@@ -240,7 +242,7 @@ export class VoxelParticles {
       const mag = speed * (0.35 + rnd() * 0.65);
       this.push({
         x, y,
-        z: 0.12 + rnd() * 0.25,
+        z: baseZ + 0.12 + rnd() * 0.25,
         vx: Math.cos(angle) * mag,
         vy: Math.sin(angle) * mag,
         vz: lift * (0.4 + rnd() * 0.9),
@@ -272,7 +274,8 @@ export class VoxelParticles {
     count: number,
     radius: number,
     life: number,
-    salt: number
+    salt: number,
+    baseZ = 0
   ): void {
     const rnd = seeded(eventSeed(x, y, salt));
     const speed = radius / (life / 1000);
@@ -285,7 +288,7 @@ export class VoxelParticles {
       const mag = speed * (0.82 + rnd() * 0.18);
       this.push({
         x, y,
-        z: 0.06 + rnd() * 0.1,
+        z: baseZ + 0.06 + rnd() * 0.1,
         vx: Math.cos(angle) * mag,
         vy: Math.sin(angle) * mag,
         vz: 0,
@@ -402,8 +405,24 @@ export class VoxelParticles {
           // ciano do projetil (a paleta do atlas fx-impact-burst), em materia
           // voxel — impacto aqui e particula, nao sprite, desde o redesign dos
           // FX. O anel diz "acabou aqui"; os cacos escorrem da face atingida.
-          this.ring(ev.x, ev.y, 'spark', Math.max(5, n(9)), 0.55, 190, 23);
-          this.burst(ev.x + ev.nx * 0.08, ev.y + ev.ny * 0.08, 'crystalShard', n(4), 1.2, 1.6, 320, 29);
+          //
+          // E nasce NA ALTURA DO TIRO. O evento so carrega x/y porque a
+          // simulacao nao tem eixo Z, mas o corpo do projetil esta desenhado no
+          // plano de combate: um burst semeado no piso aparecia um tile abaixo
+          // do estilhaco que acabou de sumir, e o olho lia dois acontecimentos
+          // em vez de um. A altura sai da MESMA constante que o projetil usa.
+          this.ring(ev.x, ev.y, 'spark', Math.max(5, n(9)), 0.55, 190, 23, COMBAT_PLANE_TILES);
+          this.burst(
+            ev.x + ev.nx * 0.08,
+            ev.y + ev.ny * 0.08,
+            'crystalShard',
+            n(4),
+            1.2,
+            1.6,
+            320,
+            29,
+            COMBAT_PLANE_TILES,
+          );
           break;
         default:
           break;

@@ -2,6 +2,8 @@
   "id": "enemy-bishop",
   "version": 6,
   "atlas": "enemy-bishop.png",
+  "normalAtlas": "enemy-bishop.normal.png",
+  "normalScale": 2,
   "frameWidth": 112,
   "frameHeight": 124,
   "columns": 36,

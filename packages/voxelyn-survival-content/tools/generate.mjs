@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { blitToAtlas, colorsUsed, fitSpriteToMargin, grid, isEmpty } from './lib.mjs';
 import { ANIM_ORDER, ENTITY_SPECS } from './entities.mjs';
+import { withFaceCapture } from './voxel.mjs';
 import {
   BLOCK_KINDS,
   LIGHT_LEVELS,
@@ -24,6 +25,74 @@ mkdirSync(OUT, { recursive: true });
 const MAX_TEXTURE = 4096;
 
 const orderedAnims = (spec) => ANIM_ORDER.filter((a) => spec.animations[a]);
+
+/**
+ * Divisor de resolucao do MAPA DE FACES.
+ *
+ * A mesma razao do halo de emissivo no cliente (`GLOW_SCALE`), e pelo mesmo
+ * motivo: o dado e de BAIXA FREQUENCIA. O mapa nao carrega arte — carrega qual
+ * das tres faces do cubo pintou cada pixel —, e uma face de voxel mede no
+ * minimo 4x2 pixels na grade fina, entao ela sobrevive inteira a metade da
+ * resolucao. O que se perde e um pixel de precisao NA FRONTEIRA entre duas
+ * faces, e ali as duas recebem luz parecida de qualquer forma.
+ *
+ * O que se ganha nao e disco (o mapa tem tres cores e comprime a quase nada) —
+ * e MEMORIA DE VIDEO. Os atlas do jogo ja somam 139 MB decodificados; um mapa
+ * de faces em resolucao cheia por sprite dobraria isso num PWA que precisa
+ * rodar em celular. Em meia resolucao ele custa um quarto.
+ */
+const NORMAL_SCALE = 2;
+
+/**
+ * Reduz um frame de faces a metade, por MAIORIA e nao por amostragem.
+ *
+ * Amostrar um pixel de cada quatro escolheria a face do canto superior
+ * esquerdo do bloco, o que desloca sistematicamente toda fronteira meio pixel
+ * para a mesma direcao — nas bordas de um corpo inteiro isso vira um viés
+ * visivel de iluminacao. A maioria escolhe a face que de fato domina o bloco, e
+ * empate resolve pela ordem topo > esquerda > direita, que e deterministica.
+ *
+ * Alpha zero so quando os QUATRO sao vazios: um pixel de silhueta perdido aqui
+ * viraria um furo sem luz no meio do corpo.
+ */
+const halveFaces = (frame) => {
+  const w = Math.ceil(frame.w / NORMAL_SCALE);
+  const h = Math.ceil(frame.h / NORMAL_SCALE);
+  const out = grid(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const votes = [0, 0, 0];
+      for (let sy = 0; sy < NORMAL_SCALE; sy++) {
+        for (let sx = 0; sx < NORMAL_SCALE; sx++) {
+          const px = x * NORMAL_SCALE + sx;
+          const py = y * NORMAL_SCALE + sy;
+          if (px >= frame.w || py >= frame.h) continue;
+          const i = (py * frame.w + px) * 4;
+          if (frame.buf[i + 3] === 0) continue;
+          // O canal aceso E a face: vermelho topo, verde esquerda, azul direita.
+          if (frame.buf[i] > 0) votes[0]++;
+          else if (frame.buf[i + 1] > 0) votes[1]++;
+          else if (frame.buf[i + 2] > 0) votes[2]++;
+        }
+      }
+      const total = votes[0] + votes[1] + votes[2];
+      if (total === 0) continue;
+      let best = 0;
+      if (votes[1] > votes[best]) best = 1;
+      if (votes[2] > votes[best]) best = 2;
+      const o = (y * w + x) * 4;
+      out.buf[o + best] = 255;
+      out.buf[o + 3] = 255;
+    }
+  }
+  return out;
+};
+
+/**
+ * FX nao recebem luz do mundo: eles a EMITEM. Um mapa de faces para a chama do
+ * ciclone seria peso de memoria para iluminar o que ja e a fonte.
+ */
+const wantsNormalMap = (spec) => !spec.id.startsWith('fx-');
 
 const buildEntity = (spec) => {
   const anims = orderedAnims(spec);
@@ -45,6 +114,16 @@ const buildEntity = (spec) => {
   // recentralizada por conta propria e a animacao se desfaz (ver
   // fitSpriteToMargin).
   const raw = [];
+  /**
+   * Os MESMOS frames, pintados por face em vez de por material.
+   *
+   * Desenhados no mesmo laco e nao numa segunda varredura: qualquer estado que
+   * o modelo carregue entre chamadas (e ha — animacoes derivam pose de `f`)
+   * fica identico entre os dois, e a garantia de silhueta igual pixel a pixel
+   * nasce de os dois virem do mesmo `spec.draw` com os mesmos argumentos.
+   */
+  const rawFaces = [];
+  const withNormal = wantsNormalMap(spec);
   for (const dir of spec.authoredDirs) {
     frameMap[dir] = {};
     for (const anim of anims) {
@@ -57,6 +136,7 @@ const buildEntity = (spec) => {
         }
         if (isEmpty(rawFrame)) throw new Error(`${spec.id} ${dir}/${anim}/${f}: frame vazio`);
         raw.push(rawFrame);
+        if (withNormal) rawFaces.push(withFaceCapture(() => spec.draw(dir, anim, f)));
         col++;
       }
     }
@@ -75,13 +155,24 @@ const buildEntity = (spec) => {
   // entao dobrar a margem estouraria justamente os sprites mais apertados.
   const margin = 2;
   let frames;
+  let faceFrames = [];
   try {
     if (spec.id.startsWith('fx-')) {
       frames = raw;
-    } else if (fitReference.length > 0) {
-      frames = fitSpriteToMargin([...fitReference, ...raw], margin).slice(fitReference.length);
     } else {
-      frames = fitSpriteToMargin(raw, margin);
+      // Os frames de FACE entram no MESMO enquadramento, e nao num paralelo.
+      //
+      // `fitSpriteToMargin` deriva UM deslocamento da uniao das caixas de todos
+      // os frames que recebe. Enquadrar os dois conjuntos separadamente daria o
+      // mesmo numero hoje — as silhuetas sao identicas — e continuaria dando ate
+      // o dia em que nao desse, por um pixel, num sprite so. Um mapa de faces
+      // deslocado um pixel do sprite ilumina a face errada na borda de cada
+      // volume, e o defeito apareceria como um contorno sujo que ninguem
+      // associaria ao enquadramento. Passando juntos, o deslocamento e o mesmo
+      // por construcao.
+      const fitted = fitSpriteToMargin([...fitReference, ...raw, ...rawFaces], margin);
+      frames = fitted.slice(fitReference.length, fitReference.length + raw.length);
+      faceFrames = fitted.slice(fitReference.length + raw.length);
     }
   } catch (err) {
     throw new Error(`${spec.id}: ${err.message}`);
@@ -96,10 +187,36 @@ const buildEntity = (spec) => {
   const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
   writeFileSync(resolve(OUT, `${spec.id}.png`), pngBytes);
 
+  // O ATLAS DE FACES, em meia resolucao e na mesma grade de frames do sprite:
+  // mesma contagem de colunas, mesma ordem, so as dimensoes divididas. O
+  // cliente recorta o frame com o mesmo `frameMap`, dividindo o retangulo pela
+  // escala publicada no manifest.
+  let normalBytes = 0;
+  if (withNormal && faceFrames.length > 0) {
+    const half = faceFrames.map(halveFaces);
+    const normalAtlas = grid(
+      columns * Math.ceil(spec.frameWidth / NORMAL_SCALE),
+      rows * Math.ceil(spec.frameHeight / NORMAL_SCALE),
+    );
+    half.forEach((frame, i) => blitToAtlas(normalAtlas, frame, i % columns, Math.floor(i / columns)));
+    const normalPng = new PNG({ width: normalAtlas.w, height: normalAtlas.h });
+    normalPng.data = Buffer.from(normalAtlas.buf);
+    const bytes = PNG.sync.write(normalPng, { colorType: 6, inputColorType: 6 });
+    writeFileSync(resolve(OUT, `${spec.id}.normal.png`), bytes);
+    normalBytes = bytes.byteLength;
+  }
+
   const manifest = {
     id: spec.id,
     version: spec.version,
     atlas: `${spec.id}.png`,
+    /**
+     * O mapa de faces deste sprite, quando ha um. Ausente = o cliente cai na
+     * iluminacao por silhueta, que continua correta, so menos informativa.
+     */
+    ...(normalBytes > 0
+      ? { normalAtlas: `${spec.id}.normal.png`, normalScale: NORMAL_SCALE }
+      : {}),
     frameWidth: spec.frameWidth,
     frameHeight: spec.frameHeight,
     columns,
@@ -121,7 +238,14 @@ const buildEntity = (spec) => {
     },
   };
   writeFileSync(resolve(OUT, `${spec.id}.json`), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { id: spec.id, cols: totalCols, width: atlas.w, height: atlas.h, bytes: pngBytes.byteLength };
+  return {
+    id: spec.id,
+    cols: totalCols,
+    width: atlas.w,
+    height: atlas.h,
+    bytes: pngBytes.byteLength,
+    normalBytes,
+  };
 };
 
 /**
@@ -258,8 +382,34 @@ const buildProps = () => {
   const pngBytes = PNG.sync.write(png, { colorType: 6, inputColorType: 6 });
   writeFileSync(resolve(OUT, 'world-props.png'), pngBytes);
 
+  // MAPA DE FACES dos props. Mesma grade, meia resolucao, mesmas ancoras.
+  //
+  // Aqui o alinhamento e ainda mais direto que nos personagens: os props nao
+  // passam por `fitSpriteToMargin` — cada quadro e desenhado numa ancora fixa
+  // vinda de `propBounds()` — entao pedir os mesmos quadros com a captura de
+  // face ligada devolve exatamente a mesma geometria, sem deslocamento nenhum
+  // para reconciliar.
+  const faceFrames = withFaceCapture(() =>
+    buildPropFrames(frameWidth, frameHeight, -bounds.minX + 2, -bounds.minY + 2),
+  ).map(halveFaces);
+  const normalAtlas = grid(
+    columns * Math.ceil(frameWidth / NORMAL_SCALE),
+    rows * Math.ceil(frameHeight / NORMAL_SCALE),
+  );
+  faceFrames.forEach((frame, i) =>
+    blitToAtlas(normalAtlas, frame, i % columns, Math.floor(i / columns)),
+  );
+  const normalPng = new PNG({ width: normalAtlas.w, height: normalAtlas.h });
+  normalPng.data = Buffer.from(normalAtlas.buf);
+  writeFileSync(
+    resolve(OUT, 'world-props.normal.png'),
+    PNG.sync.write(normalPng, { colorType: 6, inputColorType: 6 }),
+  );
+
   const manifest = {
     id: 'world-props',
+    normalAtlas: 'world-props.normal.png',
+    normalScale: NORMAL_SCALE,
     // 2: grade voxel subdividida (MODEL_SCALE) — frame dobrado.
     // 3: props DECORATIVOS volumetricos (decor:<kind>:<variante>) no fim da
     // lista — fumarolas, monolitos, a broca e demais pecas com massa deixam

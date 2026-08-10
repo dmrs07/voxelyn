@@ -2,6 +2,8 @@
   "id": "enemy-stalker",
   "version": 6,
   "atlas": "enemy-stalker.png",
+  "normalAtlas": "enemy-stalker.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

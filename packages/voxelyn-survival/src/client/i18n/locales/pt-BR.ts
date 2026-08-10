@@ -706,4 +706,63 @@ export const PT_BR = {
   'echo.condition.dissolved': 'CORROÍDA',
   'echo.condition.overgrown': 'COLONIZADA',
   'echo.condition.intact': 'ÍNTEGRA',
+
+  // ---------------------------------------------------------------------
+  // Barra de comandos (desktop)
+  //
+  // Rótulos CURTOS: cada um cabe embaixo de uma tampa de tecla, e a barra
+  // encolhe junto com a janela. Verbo no infinitivo, como manual de operação.
+  // ---------------------------------------------------------------------
+  'controls.move': 'MOVER',
+  'controls.fire': 'ATIRAR',
+  'controls.dodge': 'ESQUIVA',
+  'controls.ability': 'HABILIDADE',
+  'controls.purge': 'PURGA',
+  'controls.interact': 'INTERAGIR',
+  'controls.menu': 'MENU',
+
+  // ---------------------------------------------------------------------
+  // Indução do operador (o documento de boas-vindas)
+  //
+  // A voz é a da companhia, e a companhia não ensina: ela NOTIFICA. Cada artigo
+  // diz o que o operador precisa saber para a primeira descida não ser um
+  // acidente, e para nas linhas em que a descoberta começa — o Veio reage a
+  // fogo, corrente e ácido, e QUAL reação vem de qual material é coisa que o
+  // jogador aprende no escuro, não num parágrafo.
+  // ---------------------------------------------------------------------
+  'menu.induction': 'Indução',
+  'aurix.doc.induction': 'AD-IND-0001 · leitura obrigatória',
+  'induction.title': 'INDUÇÃO DO OPERADOR',
+  'induction.preamble':
+    'Bem-vindo ao Programa Prospector. Este documento substitui o treinamento presencial, descontinuado por inviabilidade logística. Leia. A Aurix não repete instrução em campo.',
+  'induction.asset.code': '§1 · ATIVO',
+  'induction.asset.title': 'VOCÊ NÃO DESCE',
+  'induction.asset.body':
+    'Desce um chassi Prospector, operado remotamente por você. O chassi é material de consumo e a companhia contabiliza a perda como custo previsto. O CONTRATO não é consumível: cada unidade perdida volta como registro, e o registro autoriza a próxima a descer mais fundo.',
+  'induction.contract.code': '§2 · CONTRATO',
+  'induction.contract.title': 'DESÇA. RECUPERE. EXTRAIA.',
+  'induction.contract.body':
+    'Cada setor tem um poço para o setor seguinte. Onde houver Núcleo, recolha-o. A carga só é homologada na EXTRAÇÃO, na entrada do setor — minério ainda no chassi é minério perdido. Descer é opcional; voltar é o que paga.',
+  'induction.vein.code': '§3 · AMBIENTE',
+  'induction.vein.title': 'O VEIO REAGE',
+  'induction.vein.body':
+    'Nada ali é cenário. Rocha frágil cede ao tiro, fogo caminha pelo que está seco, corrente atravessa qualquer poça e ácido consome o que toca — inclusive o seu chassi. A Aurix não mantém documentação sobre o que acontece quando dois desses se encontram. Recomenda-se cautela. Registra-se que a cautela raramente é o que recupera Núcleos.',
+  'induction.heat.code': '§4 · ARMAMENTO',
+  'induction.heat.title': 'O CANO TEM LIMITE',
+  'induction.heat.body':
+    'A arma esquenta a cada disparo e trava quando satura. A barra fina sob a vida é o calor, e a marca nela é o ponto em que o aviso sonoro começa. Gatilho preso é a forma mais comum de perda de unidade neste programa.',
+  'induction.echo.code': '§5 · POÇO',
+  'induction.echo.title': 'O VEIO OUVE',
+  'induction.echo.body':
+    'Os poços oferecem habilidades, e a oferta não é sorteio: ela responde ao que você fez até ali. O que você queimou, eletrificou ou detonou volta como equipamento. Uma habilidade equipada tem recarga — a barra de comandos, no rodapé, diz quando ela volta.',
+  'induction.archive.code': '§6 · ARQUIVO',
+  'induction.archive.title': 'LEIA A MATRIZ',
+  'induction.archive.body':
+    'Toda unidade recuperada alimenta a MATRIZ GERACIONAL. Ali ficam os Arquivos Aurix — o que a companhia sabe sobre cada Ativo que você encontrou lá embaixo, liberado à medida que você o encontra — e os protocolos de hardware, que autorizam a geração seguinte a descer mais fundo, aguentar mais e mirar melhor. O que você não ler continua acontecendo com você.',
+  'induction.controls.title': 'ESQUEMA DE COMANDO · TERMINAL DE MESA',
+  'induction.controls.note':
+    'Em aparelho de toque o esquema é outro: manche esquerdo move, manche direito mira e dispara, e os botões acima dele repetem esta lista.',
+  'induction.begin': 'AUTORIZAR DESCIDA',
+  'induction.archiveButton': 'ARQUIVAR',
+  'induction.reopen': 'Este documento continua no despacho, em INDUÇÃO.',
 } as const;

@@ -1715,6 +1715,71 @@
       .codex-locked .codex-code {
         color: var(--ax-text-dead);
       }
+      /* Indução: a circular de boas-vindas. Reaproveita o cromo de documento
+         (.codex-doc / .codex-code / .codex-body) e acrescenta só o que é dela —
+         o preâmbulo, a tabela de comandos e o rodapé de autorização. */
+      .induction-preamble {
+        color: var(--ax-text);
+        line-height: 1.6;
+        margin: 2px 0 12px;
+        padding-left: 10px;
+        border-left: 2px solid var(--ax-brass);
+      }
+      .induction-scheme {
+        border-left-color: var(--ax-teal-bright);
+      }
+      /* Auto-fit e não colunas fixas: a folha estreita numa janela pequena, e
+         uma grade fixa quebraria o rótulo no meio da palavra. */
+      .induction-controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 6px 14px;
+        margin: 8px 0 6px;
+      }
+      .induction-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .induction-keys {
+        display: flex;
+        gap: 3px;
+        flex: 0 0 auto;
+      }
+      .induction-key {
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: var(--ax-text-bright);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--ax-key);
+        border-bottom-width: 2px;
+        border-radius: 3px;
+        padding: 2px 5px;
+        min-width: 12px;
+        text-align: center;
+      }
+      .induction-control-label {
+        color: var(--ax-text-mute);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .induction-footer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        margin: 16px 0 4px;
+      }
+      .induction-reopen {
+        color: var(--ax-text-mute);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+      }
       .codex-reveal-title {
         color: var(--ax-teal-bright);
         letter-spacing: 0.22em;
@@ -2184,6 +2249,7 @@
       <nav class="ax-rail">
         <div class="ax-rail-mark" id="menu-mark"></div>
         <span class="ax-rail-item is-active" data-i18n="aurix.rail.dispatch">Despacho</span>
+        <button id="btn-induction" class="ax-rail-item" data-i18n="menu.induction">Indução</button>
         <button id="btn-records" class="ax-rail-item" data-i18n="menu.records">Registro</button>
         <button id="btn-matrix" class="ax-rail-item" data-i18n="menu.matrix">
           Matriz Geracional
@@ -2485,6 +2551,36 @@
     <!-- Arquivo de expedições (Torre de Arquivo). O corpo e montado por
          records-panel.ts, com abas internas: resumo, ativos, descobertas,
          historico. -->
+    <!-- Inducao do operador: a circular obrigatoria antes da primeira descida.
+         Corpo montado por induction.ts. Abre sozinha uma vez (o storage lembra)
+         e fica no trilho para releitura. -->
+    <div id="induction" class="overlay ax-screen hidden">
+      <nav class="ax-rail">
+        <div class="ax-rail-mark" id="induction-mark"></div>
+        <button id="btn-induction-close" class="ax-rail-item" data-i18n="aurix.rail.dispatch">
+          Despacho
+        </button>
+        <span class="ax-rail-item is-active" data-i18n="menu.induction">Indução</span>
+        <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
+          Matriz Geracional
+        </button>
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">Registro</button>
+        <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
+        <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
+      </nav>
+      <div class="ax-sheet">
+        <div class="ax-sheet-head">
+          <div style="min-width: 0">
+            <h1 class="ax-doc-title" data-i18n="induction.title">INDUÇÃO DO OPERADOR</h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.induction">
+              AD-IND-0001 · leitura obrigatória
+            </div>
+          </div>
+        </div>
+        <div id="induction-body" class="ax-sheet-body"></div>
+      </div>
+    </div>
+
     <div id="records" class="overlay ax-screen hidden">
       <nav class="ax-rail">
         <div class="ax-rail-mark" id="records-mark"></div>

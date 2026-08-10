@@ -22,6 +22,15 @@ export type Flash = {
   power: number;
   startedMs: number;
   durationMs: number;
+  /**
+   * A COR do clarao, em hex.
+   *
+   * Uma explosao e laranja, uma descarga e azul-eletrico e um pulso cinetico
+   * nao tem cor nenhuma — ele desloca ar, nao queima. Antes do sistema de luz
+   * colorida os tres acendiam a sala do mesmo jeito, e a unica coisa que
+   * distinguia um do outro eram as particulas. Agora a SALA conta qual foi.
+   */
+  hex: string;
 };
 
 /**

@@ -2,6 +2,8 @@
   "id": "enemy-spore-bomber",
   "version": 6,
   "atlas": "enemy-spore-bomber.png",
+  "normalAtlas": "enemy-spore-bomber.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

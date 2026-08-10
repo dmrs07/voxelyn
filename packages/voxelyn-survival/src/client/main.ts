@@ -7,6 +7,13 @@ import type {
   SurvivalState,
 } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
+import { DesktopControlBar } from './desktop-controls';
+import {
+  inductionSeen,
+  markInductionSeen,
+  renderInduction,
+  type InductionMode,
+} from './induction';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { EngagementMemory, applyCombatAssist } from './combat-assist';
 import { SurvivalRenderer } from './render';
@@ -219,6 +226,11 @@ const renderState = (
 };
 const input = new SurvivalInput(canvas);
 const cooldownOverlay = new TouchCooldownOverlay(canvas);
+/**
+ * A barra de comandos do teclado. Irma do radial de toque, e no mesmo canvas:
+ * cada uma se cala na modalidade da outra, entao nunca ha duas na tela.
+ */
+const controlBar = new DesktopControlBar(canvas);
 input.attach();
 
 let quality: QualityLevel = loadQuality();
@@ -239,8 +251,18 @@ const readSafeArea = (): TouchSafeArea => ({
   left: readCssPixels('--safe-area-inset-left'),
 });
 
+/**
+ * A area segura corrente, guardada em vez de relida por quadro.
+ *
+ * `readSafeArea` faz quatro `getComputedStyle` no elemento raiz, e a barra de
+ * comandos precisa da folga de baixo em TODO quadro. Ela so muda quando a janela
+ * muda, que e exatamente quando `resize` roda.
+ */
+let safeInsets: TouchSafeArea = readSafeArea();
+
 const resize = (): void => {
   const safeArea = readSafeArea();
+  safeInsets = safeArea;
   renderer.setSafeArea(safeArea);
   renderer.resize();
   input.layoutButtons(window.innerWidth, window.innerHeight, safeArea);
@@ -249,9 +271,18 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 250));
 resize();
 
+/**
+ * De onde a mira do mouse e medida, em pixels de tela.
+ *
+ * O X e o centro (a camera segue o Prospector); o Y NAO e: o centro da tela e
+ * onde estao os PES dele, e mirar dos pes para o corpo de um alvo somava um erro
+ * de projecao que o jogo lia como distancia. O renderer publica o deslocamento
+ * do plano de combate — a mesma altura em que o tiro e desenhado — e e dele que
+ * o vetor sai. `aimAnchorLiftPx` depende do zoom, entao e lido por quadro.
+ */
 const playerScreen = (): { x: number; y: number } => ({
   x: window.innerWidth / 2,
-  y: window.innerHeight / 2,
+  y: window.innerHeight / 2 - renderer.aimAnchorLiftPx,
 });
 
 /**
@@ -1147,6 +1178,14 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
     // objeto novo a cada quadro, ele se daria por reiniciado sempre e o pulso de
     // pronto nunca chegaria a acontecer.
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
+    controlBar.render(
+      state,
+      input.state,
+      now,
+      window.innerWidth,
+      window.innerHeight,
+      safeInsets.bottom,
+    );
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
       const regions = renderer.renderChoice(view, vw, vh, input.state);
       const choice = input.consumeChoiceTap(regions);
@@ -1323,6 +1362,14 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
         audio.update(state, now);
         renderState(state, 1, input.state, now);
         cooldownOverlay.render(state, input.state, state.tick, now);
+        controlBar.render(
+          state,
+          input.state,
+          now,
+          window.innerWidth,
+          window.innerHeight,
+          safeInsets.bottom,
+        );
         const pendingChoice = state.playerExtra.pendingModuleChoice;
         if (pendingChoice && renderer.isChoiceRevealReady(now)) {
           const regions = renderer.renderChoice(
@@ -1526,11 +1573,63 @@ const startContract = (): void => {
   startSolo(contract);
 };
 
+// ---------------------------------------------------------------------------
+// Inducao do operador
+// ---------------------------------------------------------------------------
+const inductionOverlay = document.getElementById('induction') as HTMLDivElement;
+const inductionBody = document.getElementById('induction-body') as HTMLDivElement;
+
+/**
+ * Abre a circular. Em `briefing` ela SEGURA a descida ate o jogador autorizar.
+ *
+ * O `onDismiss` recebe o que fazer depois em vez de decidir aqui: e a mesma
+ * circular nos dois usos, e o que muda entre "li antes de descer" e "reabri no
+ * despacho" e so o que acontece quando ela fecha.
+ */
+const openInduction = (mode: InductionMode, after: () => void): void => {
+  renderInduction(inductionBody, {
+    mode,
+    onDismiss: () => {
+      markInductionSeen();
+      inductionOverlay.classList.add('hidden');
+      menu.classList.remove('hidden');
+      audio.ui();
+      after();
+    },
+  });
+  openOverlay(inductionOverlay);
+};
+
+/**
+ * Entrega a circular ANTES da primeira descida, uma vez por navegador.
+ *
+ * Antes do veu de deploy de proposito: o veu e o corte entre o terminal e o
+ * Veio, e uma tela de leitura DEPOIS dele seria a companhia interrompendo uma
+ * queda que ja aconteceu. Quem ja leu desce direto — a circular nunca fica no
+ * caminho duas vezes.
+ */
+const withInduction = (descend: () => void): void => {
+  if (inductionSeen()) {
+    descend();
+    return;
+  }
+  openInduction('briefing', descend);
+};
+
+document.getElementById('btn-induction')?.addEventListener('click', () => {
+  openInduction('archive', () => {});
+});
+document
+  .getElementById('btn-induction-close')
+  ?.addEventListener('click', () => closeOverlay(inductionOverlay));
+
 // `() => startSolo()` e nao `startSolo`: o handler receberia o MouseEvent como
 // primeiro argumento e o contrato passaria a ser um evento de clique.
-document.getElementById('btn-solo')?.addEventListener('click', () => startSolo());
-document.getElementById('btn-online')?.addEventListener('click', startOnline);
-contractButton.addEventListener('click', startContract);
+document
+  .getElementById('btn-solo')
+  ?.addEventListener('click', () => withInduction(() => startSolo()));
+document.getElementById('btn-online')?.addEventListener('click', () => withInduction(startOnline));
+contractButton.addEventListener('click', () => withInduction(startContract));
 serverInput.placeholder = defaultServerUrl();
 
 /**
@@ -2013,7 +2112,14 @@ document
 // pelo mesmo motivo da placa da pausa: o SVG vive em aurix.ts, unico lugar da
 // marca — cada chamada aqui so referencia o `<symbol>` compartilhado, nao
 // repete a geometria.
-for (const id of ['menu-mark', 'options-mark', 'records-mark', 'matrix-mark', 'rank-mark']) {
+for (const id of [
+  'menu-mark',
+  'options-mark',
+  'induction-mark',
+  'records-mark',
+  'matrix-mark',
+  'rank-mark',
+]) {
   const slot = document.getElementById(id);
   if (slot) slot.innerHTML = aurixMarkHtml();
 }
@@ -2023,6 +2129,7 @@ for (const id of ['menu-mark', 'options-mark', 'records-mark', 'matrix-mark', 'r
 // handlers ja escutam) e apertar o botao do menu correspondente — quem carrega
 // dados, toca som e esconde o menu continua sendo o handler existente.
 const NAV_BUTTON: Record<string, string> = {
+  induction: 'btn-induction',
   records: 'btn-records',
   matrix: 'btn-matrix',
   rank: 'btn-rank',

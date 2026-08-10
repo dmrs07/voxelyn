@@ -2,6 +2,8 @@
   "id": "enemy-frost-queen",
   "version": 1,
   "atlas": "enemy-frost-queen.png",
+  "normalAtlas": "enemy-frost-queen.normal.png",
+  "normalScale": 2,
   "frameWidth": 60,
   "frameHeight": 118,
   "columns": 68,

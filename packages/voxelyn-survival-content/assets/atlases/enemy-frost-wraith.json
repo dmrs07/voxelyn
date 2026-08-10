@@ -2,6 +2,8 @@
   "id": "enemy-frost-wraith",
   "version": 2,
   "atlas": "enemy-frost-wraith.png",
+  "normalAtlas": "enemy-frost-wraith.normal.png",
+  "normalScale": 2,
   "frameWidth": 64,
   "frameHeight": 64,
   "columns": 64,

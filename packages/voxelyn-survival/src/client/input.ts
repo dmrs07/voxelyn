@@ -49,20 +49,34 @@ export type InputState = {
   usingTouch: boolean;
   tapQueue: Array<{ x: number; y: number }>;
   /**
-   * O jogador esta MIRANDO agora — no toque, o manche direito saiu do repouso;
-   * no mouse, o gatilho esta apertado.
+   * A faixa de mira no chao deve estar na tela agora?
    *
-   * Existe para a faixa de mira no chao. Ela precisa aparecer so quando ha
-   * intencao de atirar: desenhada o tempo todo, ela vira mobilia da tela, e o
-   * jogador para de ve-la exatamente no instante em que ela deveria informar
-   * alguma coisa. No toque isso e literal — o manche tem posicao de repouso, e
-   * fora dela nao ha mira nenhuma acontecendo.
+   * NO TOQUE, so com o manche direito fora do repouso. O manche tem posicao de
+   * repouso e fora dela ja ha tiro saindo: mira e disparo sao literalmente a
+   * mesma coisa, e a faixa segue os dois.
+   *
+   * NO MOUSE, sempre que ha um cursor na tela — e aqui a decisao mudou. O
+   * argumento antigo era que "quem tem cursor ja ve para onde mira", e ele nao
+   * se sustenta em projecao isometrica: o cursor mostra um ponto de TELA, e o
+   * tiro corre no plano do CHAO, que e outro espaco. A faixa e a unica coisa que
+   * traduz um no outro — e ela tambem mostra em qual parede o tiro morre, o que
+   * cursor nenhum informa. O custo de "virar mobilia" e pago pela intensidade:
+   * apagada em repouso, cheia com o gatilho apertado (`firing`).
    *
    * Sai daqui e nao de uma releitura do estado no renderer porque e a MESMA
    * condicao que decide `cmd.fire`: separadas, faixa e tiro divergiriam no
    * primeiro ajuste de zona morta.
    */
   aiming: boolean;
+  /**
+   * O gatilho esta apertado AGORA.
+   *
+   * Separado de `aiming` porque no mouse os dois deixaram de coincidir: a faixa
+   * fica de pe o tempo todo (ver `aiming`) e so a INTENSIDADE dela muda quando
+   * o dedo aperta. No toque continuam iguais — o manche fora do repouso ja
+   * atira.
+   */
+  firing: boolean;
 };
 
 export const MOVE_JOYSTICK_RADIUS = 60;
@@ -208,6 +222,15 @@ export const screenToWorldAim = (sx: number, sy: number): Vec2 => {
 export class SurvivalInput {
   private readonly keys: Record<string, boolean> = {};
   private mouse = { x: 0, y: 0, down: false };
+  /**
+   * Ja houve um evento de mouse nesta sessao?
+   *
+   * A faixa de mira permanente do desktop depende de haver um cursor DE VERDADE
+   * em algum lugar. Antes do primeiro movimento, `mouse` e (0,0) — o canto
+   * superior esquerdo —, e desenhar a faixa dali apontaria o Prospector para uma
+   * diagonal que ninguem pediu, no primeiro quadro de toda run.
+   */
+  private mouseSeen = false;
   private queuedDodge = false;
   private queuedInteract = false;
   private queuedPurge = false;
@@ -233,6 +256,7 @@ export class SurvivalInput {
     usingTouch: false,
     tapQueue: [],
     aiming: false,
+    firing: false,
   };
 
   constructor(private readonly canvas: HTMLCanvasElement) {}
@@ -402,6 +426,7 @@ export class SurvivalInput {
       this.mouse.down = true;
       this.mouse.x = x;
       this.mouse.y = y;
+      this.mouseSeen = true;
       this.state.tapQueue.push({ x, y });
     }
   };
@@ -452,6 +477,7 @@ export class SurvivalInput {
       this.selectMouseModality();
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;
+      this.mouseSeen = true;
     }
   };
 
@@ -604,11 +630,12 @@ export class SurvivalInput {
       cmd.aim = screenToWorldAim(this.mouse.x - playerScreen.x, this.mouse.y - playerScreen.y);
       cmd.fire = this.mouse.down;
     }
-    // A faixa de mira segue o GATILHO, e nao o cursor. No toque o manche fora do
-    // repouso ja atira, entao as duas coisas coincidem; no mouse, o cursor esta
-    // sempre apontando para algum lugar e uma faixa permanente no chao seria
-    // ruido constante — quem tem cursor ja ve para onde mira sem ela.
-    this.state.aiming = cmd.fire;
+    // No toque a faixa segue o gatilho (o manche fora do repouso ja atira). No
+    // mouse ela fica de pe assim que existe um cursor: e ela que traduz o ponto
+    // de TELA em rumo de CHAO, e essa traducao e necessaria antes do disparo,
+    // nao durante. O que separa os dois estados e a intensidade, em `firing`.
+    this.state.firing = cmd.fire;
+    this.state.aiming = cmd.fire || (!this.state.usingTouch && this.mouseSeen);
 
     cmd.dodge = this.queuedDodge;
     cmd.interact = this.queuedInteract;
