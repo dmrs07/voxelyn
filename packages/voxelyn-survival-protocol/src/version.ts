@@ -431,6 +431,20 @@ export const PROTOCOL_VERSION = 21;
 // detonacao quebra e acende muda perto da parede. Dois peers em versoes
 // diferentes escavariam buracos diferentes com a mesma jogada, e um replay
 // pre-37 re-simulado sob a regra nova abriria outro mapa.
+//
+// Ainda na 37: `solidImpactPoint` passa a devolver a ULTIMA travessia numa
+// entrada por quina, e nao a primeira. Quando um sub-passo cruza a linha de x E
+// a de y antes de parar dentro do solido, a primeira travessia leva o projetil
+// para uma celula VIZINHA (vazia, senao a colisao teria sido com ela) e so a
+// segunda o poe na celula atingida. O contato saia, portanto, um tile ao lado
+// em todo tiro diagonal.
+//
+// Era um defeito cosmetico enquanto o ponto so posicionava o burst de plasma —
+// e por isso sobreviveu desde a 20, quando `bolt_impact` nasceu. Vira
+// autoritativo na mesma leva em que o ponto passa a ser o centro da detonacao,
+// e por isso os dois entram na MESMA versao: quem re-simula um replay antigo ja
+// vai abrir outro mapa por causa do centro, e separar as duas correcoes em duas
+// versoes cobraria duas quebras de compatibilidade pelo preco de uma.
 export const SIMULATION_VERSION = 37;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.

@@ -1666,7 +1666,7 @@ const bounceOffSolid = (
  * da face, entao o burst de impacto nasce NA superficie da parede — nem dentro
  * dela, nem no centro da celula errada, nem na posicao anterior do projetil.
  */
-const solidImpactPoint = (
+export const solidImpactPoint = (
   prevX: number,
   prevY: number,
   x: number,
@@ -1693,12 +1693,33 @@ const solidImpactPoint = (
       ny: horizontal ? 0 : -Math.sign(dy) || 1,
     };
   }
-  const t = Math.max(0, Math.min(1, Math.min(tx, ty)));
+  // ENTRADA POR QUINA: vale a ULTIMA travessia, e nao a primeira.
+  //
+  // Quando um sub-passo cruza a linha de x E a de y antes de terminar dentro da
+  // celula solida, cada travessia leva o projetil para uma celula diferente. Na
+  // primeira delas ele entra numa VIZINHA — que quase sempre esta vazia, senao
+  // a colisao teria sido com ela — e so na segunda entra na celula com que de
+  // fato colidiu. O ponto de contato e, portanto, o de MAIOR `t`.
+  //
+  // Isto ja estava errado quando o ponto so posicionava o burst de plasma (o
+  // clarao abria na celula ao lado, meio tile fora do lugar em que o tiro
+  // visivelmente bateu). Passou a importar de verdade quando o mesmo ponto
+  // virou o CENTRO da detonacao do bolt explosivo: o centro decide quais
+  // celulas quebram e acendem, e um centro na celula errada e um buraco
+  // diferente no mapa — estado autoritativo, nao decoracao.
+  //
+  // `Math.max` cru nao serve: o eixo que NAO foi cruzado vale infinito, e o
+  // maximo entre um finito e infinito e infinito. So ha ultima travessia
+  // quando ha duas travessias.
+  const corner = Number.isFinite(tx) && Number.isFinite(ty);
+  const entry = corner ? Math.max(tx, ty) : Math.min(tx, ty);
+  const t = Math.max(0, Math.min(1, entry));
   const ix = prevX + dx * t;
   const iy = prevY + dy * t;
-  // Quando as duas faces foram cruzadas no mesmo sub-passo (entrada por quina),
-  // a de MENOR t e a que o projetil tocou primeiro.
-  if (tx <= ty) return { x: ix, y: iy, nx: dx > 0 ? -1 : 1, ny: 0 };
+  // A normal e a da face cruzada NESSE instante. Fora da quina e a unica face
+  // cruzada; na quina, a de maior `t` — a que o projetil atravessou por ultimo.
+  const throughX = corner ? tx >= ty : Number.isFinite(tx);
+  if (throughX) return { x: ix, y: iy, nx: dx > 0 ? -1 : 1, ny: 0 };
   return { x: ix, y: iy, nx: 0, ny: dy > 0 ? -1 : 1 };
 };
 
