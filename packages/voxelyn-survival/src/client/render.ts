@@ -370,6 +370,17 @@ const KEY_RESTART = 'R';
 const KEY_TERMINAL = 'T';
 
 /**
+ * O que muda entre um chamador e outro da tela de fim.
+ *
+ * `actions` existe por causa da arena de chefes: la a tela de fim da simulacao
+ * e desenhada ATRAS do proprio resultado da ferramenta, em HTML, e o laco da
+ * arena nao le nem o toque nem as teclas R/T. Desenhar os dois botoes ali seria
+ * oferecer duas saidas que nao levam a lugar nenhum — pior do que nao oferecer
+ * nenhuma, porque um botao promete que funciona.
+ */
+export type EndScreenOptions = { input?: InputState; actions?: boolean };
+
+/**
  * Os glifos da nota. Simbolos, nao prosa: nenhuma lingua tem outra estrela.
  * Em variavel pela mesma razao das teclas — a varredura de texto solto le
  * `fillText('...')` como frase fora do catalogo, e ela esta certa em ler.
@@ -4757,15 +4768,17 @@ export class SurvivalRenderer {
    * proprio, porque esta tela ja e redesenhada a cada quadro.
    *
    * Devolve onde os dois botoes ficaram, para o laco saber o que um toque
-   * acertou; `null` quando nao ha sumario e a tela nem chegou a existir.
+   * acertou; `null` quando nao ha sumario — ou quando quem chamou dispensou o
+   * rodape (`actions: false`), e nao ha botao nenhum a acertar.
    */
   renderEnd(
     state: SurvivalState,
     vw: number,
     vh: number,
     nowMs: number,
-    input?: InputState,
+    opts: EndScreenOptions = {},
   ): EndActionRegions | null {
+    const { input, actions = true } = opts;
     const summary = state.summary;
     if (!summary) return null;
     // O relogio da animacao nasce no primeiro quadro DESTE sumario.
@@ -4832,7 +4845,10 @@ export class SurvivalRenderer {
       (cargo ? 1.45 : 0) +
       (record ? 1.45 : 0) +
       (hint ? 0.6 : 0) +
-      ACTIONS_UNITS;
+      // Sem rodape, so a folga do descendente da ultima linha: reservar a
+      // altura dos botoes que nao serao desenhados centraria o documento em
+      // volta de um vazio.
+      (actions ? ACTIONS_UNITS : 0.5);
     // Cabecalho (2.8) + respiro minimo antes do conteudo (1.6) + bloco.
     const neededUnits = 2.8 + 1.6 + blockUnits;
     const unitBase = Math.max(10, Math.min(20, vh / 24));
@@ -5005,6 +5021,7 @@ export class SurvivalRenderer {
     //
     // Teal em quem age, latao em quem sai: a mesma gramatica de cor do resto do
     // documento, onde o teal e sempre "o proximo gesto do operador".
+    if (!actions) return null;
     const regions = layoutEndActions(vw, y + unit * TOP_GAP_UNITS, unit, margin);
     this.drawEndButton(
       regions.restart,

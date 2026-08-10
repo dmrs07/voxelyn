@@ -251,7 +251,13 @@ const runArena = (conditions: ArenaConditions): void => {
       // `renderEnd` e a tela de fim NATIVA da sim (morte/extracao); vitoria
       // contra o chefe nao passa por `state.phase`, entao nao ha nada la para
       // desenhar — o overlay de HTML e o resultado inteiro nesse caso.
-      if (state.phase !== 'running') renderer.renderEnd(state, vw, vh, now, input.state);
+      //
+      // Sem o rodape de acoes: aqui ele fica ATRAS do resultado da ferramenta e
+      // este laco nao le toque nem as teclas R/T. Dois botoes que nao levam a
+      // lugar nenhum sao piores que nenhum — um botao promete que funciona.
+      if (state.phase !== 'running') {
+        renderer.renderEnd(state, vw, vh, now, { input: input.state, actions: false });
+      }
       if (!ended) {
         ended = true;
         showEnd(outcome, state);
