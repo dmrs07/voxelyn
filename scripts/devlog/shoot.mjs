@@ -44,16 +44,18 @@ function parseArgs(argv) {
 
 const log = (msg) => console.log(msg);
 
-async function shootRecipe(name, entry, dist, { debug }) {
+async function shootRecipe(name, entry, site, { debug }) {
   const recipe = recipes[name];
-  const page = resolve(dist, recipe.page);
-  if (!existsSync(page)) {
+  const found = [site.root, ...site.fallbacks].some((base) =>
+    existsSync(resolve(base, recipe.page)),
+  );
+  if (!found) {
     // arena.html e sprites.html nasceram no meio do historico: num commit
     // anterior a pagina simplesmente nao esta no bundle.
     throw Object.assign(new Error(`${recipe.page} nao existe neste build`), { soft: true });
   }
 
-  const server = await serveStatic(dist);
+  const server = await serveStatic(site.root, site.fallbacks);
   try {
     log(`  dirigindo receita "${name}" (${recipe.label})`);
     const { png, errors } = await capture(recipe, { port: server.port, debug, log });
@@ -111,7 +113,7 @@ async function main() {
               { soft: true },
             );
           }
-          install(dir, APPS[recipe.app].pkg, (m) => log(`  ${m}`));
+          install(dir, recipe.app, (m) => log(`  ${m}`));
           built.set(
             recipe.app,
             build(dir, recipe.app, (m) => log(`  ${m}`)),

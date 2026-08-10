@@ -43,6 +43,7 @@
     "@phosphor-icons/core": "^2.1.1",
     "electron": "^33.4.11",
     "electron-builder": "^24.13.3",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^2.46.1",

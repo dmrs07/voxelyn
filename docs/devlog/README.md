@@ -1,14 +1,29 @@
 # Pipeline do devlog retroativo
 
-O trabalho no Voxelyn já aconteceu — 49 PRs entre 31/07 e 10/08/2026. Este pipeline
-publica esse histórico **um post por dia**, na ordem em que foi feito, como se estivesse
-acontecendo agora. A ficção é só o calendário: o texto, os números e as imagens são todos
-do dia real do commit.
+O trabalho no Voxelyn já aconteceu — **107 unidades de trabalho entre 18/01 e 10/08/2026**.
+Este pipeline publica esse histórico **um post por dia**, na ordem em que foi feito, como
+se estivesse acontecendo agora. A ficção é só o calendário: o texto, os números e as
+imagens são todos do dia real do commit.
 
 O que sustenta isso é a captura: cada screenshot é gerada **construindo o commit daquela
 época** numa worktree isolada e dirigindo um Chromium até o quadro. O post do PR #86
 mostra o jogo do PR #86 — HUD mais simples, sem barra de comandos, sem contador de carga.
 Nada de usar o build de hoje fingindo ser o de duas semanas atrás.
+
+## As quatro eras
+
+O que existia para ser fotografado mudou três vezes em sete meses, e a escolha de receita
+respeita isso perguntando à árvore daquele commit quais apps existiam:
+
+| Era                           | O que dava para mostrar                           |
+| ----------------------------- | ------------------------------------------------- |
+| jan/2026                      | Os demos do core: Noita-like e iso Diablo-like    |
+| jan/2026 (a partir do dia 20) | O editor VoxelForge                               |
+| fev/2026                      | O Voxelyn Roguelike                               |
+| jul/2026 em diante            | O Voxelyn Survival, e o Atlas Studio desde agosto |
+
+Isso vale até para a assinatura do rodapé do carrossel: um post sobre 18 de janeiro assina
+`VOXELYN`, não `VOXELYN SURVIVAL` — o Survival só nasceria cinco meses depois.
 
 ## As quatro etapas
 
@@ -62,13 +77,17 @@ Para pular uma entrada (um PR de review que não rende post), marque `"skipped":
 
 `scripts/devlog/lib/recipes.mjs` define como dirigir o build até o quadro:
 
-| Receita        | Página         | O que mostra                               |
-| -------------- | -------------- | ------------------------------------------ |
-| `solo`         | `index.html`   | Uma run solo em andamento — o leito seguro |
-| `menu`         | `index.html`   | O terminal (Ordem de Despacho)             |
-| `arena`        | `arena.html`   | A arena de chefes                          |
-| `sprites`      | `sprites.html` | O visualizador de atlas                    |
-| `atlas-studio` | Atlas Studio   | O editor, em retrato                       |
+| Receita        | App          | O que mostra                                         |
+| -------------- | ------------ | ---------------------------------------------------- |
+| `noita`        | examples     | O demo de areia/água — a origem visual do projeto    |
+| `iso`          | examples     | O demo isométrico, do mesmo commit inicial           |
+| `editor`       | editor       | O VoxelForge                                         |
+| `roguelike`    | roguelike    | O roguelike rodando (seed fixa, sem menu)            |
+| `solo`         | survival     | Uma run solo em andamento — o leito seguro de julho+ |
+| `menu`         | survival     | O terminal (Ordem de Despacho)                       |
+| `arena`        | survival     | A arena de chefes                                    |
+| `sprites`      | survival     | O visualizador de atlas                              |
+| `atlas-studio` | atlas-studio | O editor de atlas, em retrato                        |
 
 `plan.mjs` escolhe as receitas de cada entrada pelas áreas que o PR tocou, e a escolha
 fica gravada no `plan.json` — pode ser editada à mão antes de capturar.
@@ -84,6 +103,19 @@ Três decisões tornam a captura confiável contra commits antigos:
   `voxelyn.induction.seen`, toda captura de gameplay vira foto de onboarding.
 - **Passos opcionais.** Um seletor que só nasceu no PR #120 não pode derrubar a captura do
   PR #95. O que derruba é terminar sem imagem nenhuma.
+
+### Duas formas de construir
+
+Os apps em pacote saem de `vite build` — chamado direto, não pelo script `build` do
+pacote, porque vários rodam `tsc --noEmit` antes e o typecheck de um commit de janeiro
+contra o TypeScript de hoje falha por motivos que não mudam um pixel do bundle.
+
+Os demos do core são outra história. Eles importam a biblioteca por caminho relativo **sem
+extensão** (`from "../../src/index"`), e o `tsc` da época emitia o `.js` mantendo o
+especificador como estava — coisa que nenhum browser resolve. Na prática aquele demo nunca
+rodou a partir do output do `tsc`. O pipeline empacota com o esbuild deste checkout: o
+código é o do commit, byte a byte, e o que muda é só quem costura os módulos. Ferramenta,
+não conteúdo.
 
 ## A redação
 
@@ -111,8 +143,8 @@ screenshot logo abaixo do cabeçalho, e o corpo contando o que mudou e **por qu�
 Sem `social/NNN.json` o carrossel ainda sai, derivado dos assuntos de commit — serve para
 testar o pipeline, não para publicar.
 
-Veja `entries/001-o-chao-parou-de-ser-um-bloco-so.md` e `social/001.json` como referência
-de tom e tamanho.
+Veja `entries/001-dia-1-uma-biblioteca-sem-tela.md` e `social/001.json` como referência de
+tom e tamanho.
 
 ## A publicação
 

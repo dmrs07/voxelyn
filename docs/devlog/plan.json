@@ -5,13 +5,13 @@
   "entries": [
     {
       "id": "001",
-      "pr": 86,
-      "kind": "pr",
-      "title": "Crostas de chao na grade fina, e a poca ganha bolhas e gotejamento",
-      "slug": "crostas-de-chao-na-grade-fina-e-a-poca-ganha-bolhas-e-goteja",
-      "tip": "f846006768fa40b2ca2d0cfabbfb2622511ef9af",
-      "tipShort": "f846006",
-      "realDate": "2026-08-01",
+      "pr": null,
+      "kind": "direct",
+      "title": "first commit",
+      "slug": "first-commit",
+      "tip": "aab5fba8b278427bc11a70b8a8e5bb93209c20fa",
+      "tipShort": "aab5fba",
+      "realDate": "2026-01-18",
       "publishDate": "2026-08-11",
       "areas": [],
       "stat": {
@@ -22,25 +22,32 @@
       },
       "commits": [
         {
-          "sha": "be9aa34",
-          "subject": "Crostas de chao na grade fina, e a poca ganha bolhas e gotejamento"
+          "sha": "aab5fba",
+          "subject": "first commit"
         }
       ],
       "recipes": [
-        "solo"
+        "noita",
+        "iso"
       ],
       "status": "published",
       "skipped": false,
       "shots": [
         {
-          "recipe": "solo",
-          "file": "001-solo.png",
-          "label": "run solo",
-          "bytes": 187112
+          "recipe": "noita",
+          "file": "001-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10469
+        },
+        {
+          "recipe": "iso",
+          "file": "001-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 9337
         }
       ],
       "shotError": null,
-      "entryFile": "001-o-chao-parou-de-ser-um-bloco-so.md",
+      "entryFile": "001-dia-1-uma-biblioteca-sem-tela.md",
       "carousel": [
         "001-01.png",
         "001-02.png",
@@ -52,6 +59,3876 @@
     },
     {
       "id": "002",
+      "pr": 1,
+      "kind": "pr",
+      "title": "feat: Enhance documentation and type safety across core modules",
+      "slug": "feat-enhance-documentation-and-type-safety-across-core-modul",
+      "tip": "c1dbd34c37be75f15431309a9bcb3df0d8b5ac11",
+      "tipShort": "c1dbd34",
+      "realDate": "2026-01-18",
+      "publishDate": "2026-08-12",
+      "areas": [
+        "src",
+        "examples",
+        ".gitignore",
+        "package-lock.json"
+      ],
+      "stat": {
+        "added": 2777,
+        "removed": 67,
+        "files": 23,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "0186350",
+          "subject": "feat: Enhance documentation and type safety across core modules"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "003",
+      "pr": 2,
+      "kind": "pr",
+      "title": "fix: Improve palette functions by handling sparse entries and refining variant calculations",
+      "slug": "fix-improve-palette-functions-by-handling-sparse-entries-and",
+      "tip": "3c8d773fc55f96de6050680c64bc32b30457150b",
+      "tipShort": "3c8d773",
+      "realDate": "2026-01-19",
+      "publishDate": "2026-08-13",
+      "areas": [
+        "src",
+        "examples"
+      ],
+      "stat": {
+        "added": 548,
+        "removed": 96,
+        "files": 11,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "5e6a565",
+          "subject": "feat: Update documentation and improve type safety in various modules"
+        },
+        {
+          "sha": "207adda",
+          "subject": "fix: Improve palette functions by handling sparse entries and refining variant calculations"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "004",
+      "pr": 3,
+      "kind": "pr",
+      "title": "feat: enhance updateSelectedMaterial function with generic type support",
+      "slug": "feat-enhance-updateselectedmaterial-function-with-generic-ty",
+      "tip": "f6fa747fc4709d28656a5f22ee61370ff2e4ec69",
+      "tipShort": "f6fa747",
+      "realDate": "2026-01-20",
+      "publishDate": "2026-08-14",
+      "areas": [
+        "packages/voxelforge-editor",
+        "packages/voxelyn-core",
+        "examples",
+        "packages/voxelforge-electron"
+      ],
+      "stat": {
+        "added": 14253,
+        "removed": 1031,
+        "files": 63,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "637c79a",
+          "subject": "feat: Add procedural warrior sprite and implement isometric movement controls"
+        },
+        {
+          "sha": "12f3363",
+          "subject": "feat: complete Phase 1 - monorepo, editor, electron, ci/cd"
+        },
+        {
+          "sha": "4c36ceb",
+          "subject": "feat: add procedural material textures and behavior system to voxelyn-core with editor integration"
+        },
+        {
+          "sha": "08afb4e",
+          "subject": "docs: add comprehensive material system documentation"
+        },
+        {
+          "sha": "243f26e",
+          "subject": "feat: update MaterialEditor and PalettePanel components for improved event handling and type imports"
+        },
+        {
+          "sha": "bd7a92f",
+          "subject": "feat: enhance MaterialEditor with orientation support and update PalettePanel to use details for MaterialEditor"
+        },
+        {
+          "sha": "21c3e71",
+          "subject": "feat: add layer locking, blending modes, and layer merging functionality"
+        },
+        {
+          "sha": "10f349e",
+          "subject": "feat: deprecate isGas in Material type and maintain for backward compatibility"
+        },
+        {
+          "sha": "345cc2c",
+          "subject": "feat: enhance updateSelectedMaterial function with generic type support"
+        }
+      ],
+      "recipes": [
+        "editor"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "005",
+      "pr": 5,
+      "kind": "pr",
+      "title": "feat: add build step for Core package in CI workflow",
+      "slug": "feat-add-build-step-for-core-package-in-ci-workflow",
+      "tip": "bc5378d0dc68225371f9551e5d0794ae2784f3e4",
+      "tipShort": "bc5378d",
+      "realDate": "2026-01-20",
+      "publishDate": "2026-08-15",
+      "areas": [
+        ".github"
+      ],
+      "stat": {
+        "added": 3,
+        "removed": 0,
+        "files": 1,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "bb479c3",
+          "subject": "feat: add build step for Core package in CI workflow"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "006",
+      "pr": 6,
+      "kind": "pr",
+      "title": "feat: update homepage and repository fields in package.json, and upgrade electron version to 33.4.1",
+      "slug": "feat-update-homepage-and-repository-fields-in-package-json-a",
+      "tip": "7e4008872835e068805209f70def8c9344ba4753",
+      "tipShort": "7e40088",
+      "realDate": "2026-01-20",
+      "publishDate": "2026-08-16",
+      "areas": [
+        "packages/voxelforge-electron",
+        "pnpm-lock.yaml"
+      ],
+      "stat": {
+        "added": 15,
+        "removed": 36,
+        "files": 2,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "4d7614f",
+          "subject": "Initial plan"
+        },
+        {
+          "sha": "528354b",
+          "subject": "fix: align Electron versions to ^33.4.11 across monorepo"
+        },
+        {
+          "sha": "423a7dd",
+          "subject": "Merge pull request #4 from dmrs07/copilot/sub-pr-3"
+        },
+        {
+          "sha": "6a20d39",
+          "subject": "feat: update homepage and repository fields in package.json, and upgrade electron version to 33.4.1"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "007",
+      "pr": 7,
+      "kind": "pr",
+      "title": "feat: implement initial setup for VoxelForge Electron app with renderer copying script",
+      "slug": "feat-implement-initial-setup-for-voxelforge-electron-app-wit",
+      "tip": "fcd449db0717426cd76468cfe3fa9b91f3fe3b80",
+      "tipShort": "fcd449d",
+      "realDate": "2026-01-20",
+      "publishDate": "2026-08-17",
+      "areas": [
+        "packages/voxelforge-electron"
+      ],
+      "stat": {
+        "added": 27,
+        "removed": 12,
+        "files": 3,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "3396685",
+          "subject": "feat: implement initial setup for VoxelForge Electron app with renderer copying script"
+        }
+      ],
+      "recipes": [
+        "editor"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "008",
+      "pr": 8,
+      "kind": "pr",
+      "title": "feat: set base path for Vite configuration",
+      "slug": "feat-set-base-path-for-vite-configuration",
+      "tip": "4e4a5f706af908a3409adbc62aa82ddbf5745616",
+      "tipShort": "4e4a5f7",
+      "realDate": "2026-01-20",
+      "publishDate": "2026-08-18",
+      "areas": [
+        "packages/voxelforge-editor"
+      ],
+      "stat": {
+        "added": 1,
+        "removed": 0,
+        "files": 1,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "95e88be",
+          "subject": "feat: set base path for Vite configuration"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "009",
+      "pr": 9,
+      "kind": "pr",
+      "title": "feat: update build process for Electron app and improve error handling in renderer loading",
+      "slug": "feat-update-build-process-for-electron-app-and-improve-error",
+      "tip": "ae2a5c0113396d09c06e987359df92d9e7b20e05",
+      "tipShort": "ae2a5c0",
+      "realDate": "2026-01-20",
+      "publishDate": "2026-08-19",
+      "areas": [
+        ".github",
+        "packages/voxelforge-electron"
+      ],
+      "stat": {
+        "added": 6,
+        "removed": 5,
+        "files": 2,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "84134dc",
+          "subject": "feat: update build process for Electron app and improve error handling in renderer loading"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "010",
+      "pr": 11,
+      "kind": "pr",
+      "title": "Add null checks before deleting WebGL resources",
+      "slug": "add-null-checks-before-deleting-webgl-resources",
+      "tip": "3abab14aa8302841679f5dac60d763d28707bba1",
+      "tipShort": "3abab14",
+      "realDate": "2026-01-21",
+      "publishDate": "2026-08-20",
+      "areas": [
+        "packages/voxelforge-editor",
+        "package-lock.json"
+      ],
+      "stat": {
+        "added": 6460,
+        "removed": 9,
+        "files": 3,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "8758f1e",
+          "subject": "Initial plan"
+        },
+        {
+          "sha": "4ed002e",
+          "subject": "Add WebGL resource cleanup with dispose() method"
+        },
+        {
+          "sha": "d14d447",
+          "subject": "Add null checks before deleting WebGL resources"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "011",
+      "pr": 10,
+      "kind": "pr",
+      "title": "Fix variable naming inconsistency in makePerspective documentation",
+      "slug": "fix-variable-naming-inconsistency-in-makeperspective-documen",
+      "tip": "3b9830866358219d1503854b699ab299d0e3f4a1",
+      "tipShort": "3b98308",
+      "realDate": "2026-01-21",
+      "publishDate": "2026-08-21",
+      "areas": [
+        "packages/voxelforge-editor"
+      ],
+      "stat": {
+        "added": 1865,
+        "removed": 180,
+        "files": 7,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "2a07434",
+          "subject": "feat: add voxel rendering capabilities with raycasting and mesh generation"
+        },
+        {
+          "sha": "e392867",
+          "subject": "feat: enhance voxel rendering with adaptive rendering logic and new voxel grid utilities"
+        },
+        {
+          "sha": "6439a6f",
+          "subject": "Update packages/voxelforge-editor/src/components/Canvas.svelte"
+        },
+        {
+          "sha": "3b0bde9",
+          "subject": "Update packages/voxelforge-editor/src/lib/render/webgl-renderer.ts"
+        },
+        {
+          "sha": "12094e5",
+          "subject": "Update packages/voxelforge-editor/src/lib/render/voxel-mesher.ts"
+        },
+        {
+          "sha": "9df05db",
+          "subject": "Update packages/voxelforge-editor/src/lib/render/render-voxel3d.ts"
+        },
+        {
+          "sha": "5d4aa1e",
+          "subject": "Update packages/voxelforge-editor/src/components/Canvas.svelte"
+        },
+        {
+          "sha": "66eb584",
+          "subject": "Update packages/voxelforge-editor/src/components/Canvas.svelte"
+        },
+        {
+          "sha": "5bb416f",
+          "subject": "Update packages/voxelforge-editor/src/components/Canvas.svelte"
+        },
+        {
+          "sha": "b652975",
+          "subject": "Update packages/voxelforge-editor/src/components/Canvas.svelte"
+        },
+        {
+          "sha": "52e0e44",
+          "subject": "Initial plan"
+        },
+        {
+          "sha": "3a5d3f8",
+          "subject": "Initial plan"
+        },
+        {
+          "sha": "d47d4c3",
+          "subject": "Add comprehensive documentation for matrix operations"
+        },
+        {
+          "sha": "e5fc2ee",
+          "subject": "Extract hardcoded horizon line ratio to named constant"
+        },
+        {
+          "sha": "b3b1725",
+          "subject": "Fix variable naming inconsistency in makePerspective documentation"
+        },
+        {
+          "sha": "cafb10f",
+          "subject": "Merge pull request #13 from dmrs07/copilot/add-documentation-for-matrix-operations"
+        },
+        {
+          "sha": "ab32cab",
+          "subject": "Merge pull request #12 from dmrs07/copilot/refactor-horizon-line-ratio"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "012",
+      "pr": 15,
+      "kind": "pr",
+      "title": "feat: Enhance 3D rendering and biome generation",
+      "slug": "feat-enhance-3d-rendering-and-biome-generation",
+      "tip": "56719e4bb3117b4257ebfeed0404d71169c919c4",
+      "tipShort": "56719e4",
+      "realDate": "2026-01-23",
+      "publishDate": "2026-08-22",
+      "areas": [
+        "packages/voxelforge-editor",
+        "packages/voxelyn-ai",
+        "pnpm-lock.yaml",
+        "packages/voxelyn-core"
+      ],
+      "stat": {
+        "added": 4877,
+        "removed": 68,
+        "files": 19,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "01ccf0c",
+          "subject": "feat: add @voxelyn/ai module with texture, object, and scenario generation capabilities"
+        },
+        {
+          "sha": "2384bbd",
+          "subject": "feat: Enhance 3D rendering and biome generation"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "013",
+      "pr": 14,
+      "kind": "pr",
+      "title": "Add AI terrain schema and generator hooks",
+      "slug": "add-ai-terrain-schema-and-generator-hooks",
+      "tip": "88028f11278a249599b94dd7c5640c02c17b3978",
+      "tipShort": "88028f1",
+      "realDate": "2026-01-23",
+      "publishDate": "2026-08-23",
+      "areas": [
+        "packages/voxelforge-editor",
+        "packages/voxelyn-core"
+      ],
+      "stat": {
+        "added": 783,
+        "removed": 1,
+        "files": 5,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "51e4010",
+          "subject": "Add AI terrain schema and generator hooks"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "014",
+      "pr": 16,
+      "kind": "pr",
+      "title": "fix: improve globalThis access pattern and remove unnecessary modulo operation",
+      "slug": "fix-improve-globalthis-access-pattern-and-remove-unnecessary",
+      "tip": "b825550913d77aed5c04cda80a34e2647ebc4c75",
+      "tipShort": "b825550",
+      "realDate": "2026-01-24",
+      "publishDate": "2026-08-24",
+      "areas": [
+        "packages/voxelyn-ai",
+        "packages/voxelforge-editor",
+        "packages/voxelyn-core",
+        "package-lock.json"
+      ],
+      "stat": {
+        "added": 16419,
+        "removed": 475,
+        "files": 45,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "bbe2ad2",
+          "subject": "feat: enrich layout generation with biome detection and enhancements"
+        },
+        {
+          "sha": "8439a9e",
+          "subject": "feat: implement voxel layer support with Z-level editing and rendering enhancements"
+        },
+        {
+          "sha": "1667105",
+          "subject": "Enhance scenario generation with detailed building and interior definitions"
+        },
+        {
+          "sha": "5373dee",
+          "subject": "feat(terrain): add procedural noise and shadow generation"
+        },
+        {
+          "sha": "c18dc03",
+          "subject": "feat: Implement multi-provider LLM client factory"
+        },
+        {
+          "sha": "e4582be",
+          "subject": "Merge branch 'main' into feature/voxelforge-initial-setup"
+        },
+        {
+          "sha": "842946c",
+          "subject": "feat: Add initial README with project overview, features, installation, and usage examples"
+        },
+        {
+          "sha": "7a2f8e9",
+          "subject": "Initial plan"
+        },
+        {
+          "sha": "f307e7b",
+          "subject": "fix: Clamp groundZ to valid range to prevent out-of-bounds errors in building generation"
+        },
+        {
+          "sha": "bd941b3",
+          "subject": "Remove unused variables and imports"
+        },
+        {
+          "sha": "fd59a78",
+          "subject": "Update packages/voxelyn-ai/src/llm/providers/copilot.ts"
+        },
+        {
+          "sha": "62cf1f3",
+          "subject": "Initial plan"
+        },
+        {
+          "sha": "06fc43e",
+          "subject": "fix: improve globalThis access pattern and remove unnecessary modulo operation"
+        },
+        {
+          "sha": "922f82b",
+          "subject": "Merge pull request #17 from dmrs07/copilot/sub-pr-16"
+        },
+        {
+          "sha": "7479d80",
+          "subject": "Merge pull request #18 from dmrs07/copilot/sub-pr-16-again"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "015",
+      "pr": 19,
+      "kind": "pr",
+      "title": "feat: add terrainGen export to index",
+      "slug": "feat-add-terraingen-export-to-index",
+      "tip": "a20fbf43e88d872d27ed04111bd16864b5d9b187",
+      "tipShort": "a20fbf4",
+      "realDate": "2026-01-24",
+      "publishDate": "2026-08-25",
+      "areas": [
+        "packages/voxelyn-core"
+      ],
+      "stat": {
+        "added": 1,
+        "removed": 0,
+        "files": 1,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "12c574f",
+          "subject": "feat: add terrainGen export to index"
+        }
+      ],
+      "recipes": [
+        "noita",
+        "iso"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "016",
+      "pr": 20,
+      "kind": "pr",
+      "title": "Update packages/voxelyn-roguelike/src/main.ts",
+      "slug": "update-packages-voxelyn-roguelike-src-main-ts",
+      "tip": "43396efb4c93c1777d70c7b43a0959be1667dcd2",
+      "tipShort": "43396ef",
+      "realDate": "2026-02-09",
+      "publishDate": "2026-08-26",
+      "areas": [
+        "packages/voxelyn-roguelike",
+        "packages/voxelyn-cli",
+        "packages/voxelyn-animation",
+        "examples"
+      ],
+      "stat": {
+        "added": 27693,
+        "removed": 1501,
+        "files": 168,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "c885766",
+          "subject": "feat: add materials and terrain generation for Noita-like simulation"
+        },
+        {
+          "sha": "09e09d2",
+          "subject": "feat: implement spring-damper camera physics and player flight mechanics"
+        },
+        {
+          "sha": "dea870d",
+          "subject": "Add chibi farmer and wheat crop sprites; update texture imports"
+        },
+        {
+          "sha": "0c9e8f3",
+          "subject": "feat: add enemy spawning logic and configuration for roguelike game"
+        },
+        {
+          "sha": "814a5b0",
+          "subject": "feat: expand enemy AI and combat interactions"
+        },
+        {
+          "sha": "9586947",
+          "subject": "feat: implement cellular automata for dungeon generation"
+        },
+        {
+          "sha": "0d49a10",
+          "subject": "feat: add pngjs dependency for image processing; implement hero spritesheet loader and animations feat: enhance enemy AI to auto-attack adjacent targets; update combat logic for player interactions feat: improve power-up system to handle max stacks and distinct options; add tests for power-up functionality fix: adjust grounding offsets and sprite rendering for player and enemy entities in isometric view"
+        },
+        {
+          "sha": "3e22070",
+          "subject": "feat: add CLI scaffolding tool and roguelike interaction system"
+        },
+        {
+          "sha": "a88f73a",
+          "subject": "fix: resolve TypeScript errors and enhance CLI with logger system"
+        },
+        {
+          "sha": "996dd40",
+          "subject": "Update packages/voxelforge-editor/src/lib/render/render-surface.ts"
+        },
+        {
+          "sha": "6d69fb7",
+          "subject": "Update packages/voxelyn-core/src/extras/importers/obj.ts"
+        },
+        {
+          "sha": "54236dd",
+          "subject": "Update packages/voxelyn-roguelike/src/powerups/system.ts"
+        },
+        {
+          "sha": "f85494e",
+          "subject": "Update packages/voxelyn-roguelike/src/main.ts"
+        }
+      ],
+      "recipes": [
+        "roguelike"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "017",
+      "pr": 25,
+      "kind": "pr",
+      "title": "fix: thirteenth Codex pass on PR #25 (fatal rejects, bad URLs, divergence resync)",
+      "slug": "fix-thirteenth-codex-pass-on-pr-25-fatal-rejects-bad-urls-di",
+      "tip": "0d029c22cc65116e66a170541dd7cb1de5c831d9",
+      "tipShort": "0d029c2",
+      "realDate": "2026-07-24",
+      "publishDate": "2026-08-27",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-server",
+        "packages/voxelyn-survival-content"
+      ],
+      "stat": {
+        "added": 11353,
+        "removed": 488,
+        "files": 122,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "eb259d5",
+          "subject": "docs: Phase 0 audit, art bible and survival redesign spec"
+        },
+        {
+          "sha": "384cdf1",
+          "subject": "feat(survival): headless deterministic survival sim with systemic reactions"
+        },
+        {
+          "sha": "47849f2",
+          "subject": "feat(survival): mobile-first canvas client with touch controls"
+        },
+        {
+          "sha": "3fba414",
+          "subject": "refactor(survival): Phase 2 - headless sim package + versioned co-op protocol"
+        },
+        {
+          "sha": "2f5135c",
+          "subject": "feat(content): @voxelyn/survival-content - validated sprite pipeline + first pack"
+        },
+        {
+          "sha": "217b316",
+          "subject": "feat(survival): render first-pack sprites in-game + sprite viewer"
+        },
+        {
+          "sha": "d696e75",
+          "subject": "feat(sim): co-op multiplayer support (players[], downed/revive, shared loot)"
+        },
+        {
+          "sha": "6047fe5",
+          "subject": "feat(server): authoritative co-op server (rooms, chunk sync, reconnect, resync)"
+        },
+        {
+          "sha": "43b252d",
+          "subject": "feat(client): online co-op in the browser + PWA + adaptive quality"
+        },
+        {
+          "sha": "c01c001",
+          "subject": "chore(deploy): Render blueprint (PWA static + ws service) + deploy/rollback docs"
+        },
+        {
+          "sha": "62973d9",
+          "subject": "fix(coop): address Codex review on PR #25 (entity IDs, camera, hostile hits, reconnect)"
+        },
+        {
+          "sha": "1e62eea",
+          "subject": "fix(coop): second Codex pass on PR #25 (teammate render, slot reservation, socket reap, resume reject)"
+        },
+        {
+          "sha": "7efb5ac",
+          "subject": "fix(coop): third Codex pass on PR #25 (slot claiming, room matchmaking, room expiry)"
+        },
+        {
+          "sha": "2820682",
+          "subject": "fix: fourth Codex pass on PR #25 (deploy build order, contamination waves, online choice, ghost slot)"
+        },
+        {
+          "sha": "8831bb7",
+          "subject": "fix: fifth Codex pass on PR #25 (lockfile, clean-build scripts, world flags)"
+        },
+        {
+          "sha": "75ab4dc",
+          "subject": "fix: sixth Codex pass on PR #25 (token entropy, edge commands, restart, guardian)"
+        },
+        {
+          "sha": "84188a8",
+          "subject": "fix: seventh Codex pass on PR #25 (edge throttle, R gating, PWA precache)"
+        },
+        {
+          "sha": "9305e63",
+          "subject": "fix: eighth Codex pass on PR #25 (disconnected slots, SW navigation cache)"
+        },
+        {
+          "sha": "a1685f3",
+          "subject": "fix: ninth Codex pass on PR #25 (resync size limit, hello reuse, payload cap, piercing)"
+        },
+        {
+          "sha": "2eaac51",
+          "subject": "fix: tenth Codex pass on PR #25 (slot reuse, chunk stride, co-op feedback, SW install)"
+        },
+        {
+          "sha": "4d30c43",
+          "subject": "fix: eleventh Codex pass on PR #25 (room capacity clamp, core release on death)"
+        },
+        {
+          "sha": "f5d4f83",
+          "subject": "fix: twelfth Codex pass on PR #25 (stale commands, resync flood, sprite tint)"
+        },
+        {
+          "sha": "e9fe1d6",
+          "subject": "fix: thirteenth Codex pass on PR #25 (fatal rejects, bad URLs, divergence resync)"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "018",
+      "pr": 26,
+      "kind": "pr",
+      "title": "chore(deploy): move Render server region to virginia",
+      "slug": "chore-deploy-move-render-server-region-to-virginia",
+      "tip": "a159d30cedfd3948cc5d05bfd99e69b1bd45a03a",
+      "tipShort": "a159d30",
+      "realDate": "2026-07-24",
+      "publishDate": "2026-08-28",
+      "areas": [
+        "render.yaml"
+      ],
+      "stat": {
+        "added": 1,
+        "removed": 1,
+        "files": 1,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "6d64f60",
+          "subject": "chore(deploy): move Render server region to virginia"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "019",
+      "pr": 27,
+      "kind": "pr",
+      "title": "docs(deploy): document Render-managed pnpm setup",
+      "slug": "docs-deploy-document-render-managed-pnpm-setup",
+      "tip": "5c125b015a767ef4fad149feeb0d80a2ec783d8d",
+      "tipShort": "5c125b0",
+      "realDate": "2026-07-24",
+      "publishDate": "2026-08-29",
+      "areas": [
+        "render.yaml",
+        "package.json",
+        "docs"
+      ],
+      "stat": {
+        "added": 29,
+        "removed": 18,
+        "files": 3,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "70ef9b2",
+          "subject": "fix(deploy): avoid Corepack write on Render"
+        },
+        {
+          "sha": "d56cc1e",
+          "subject": "fix(deploy): pin supported Node major"
+        },
+        {
+          "sha": "9b8f692",
+          "subject": "docs(deploy): document Render-managed pnpm setup"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "020",
+      "pr": 28,
+      "kind": "pr",
+      "title": "test(survival): satisfy strict indexed access",
+      "slug": "test-survival-satisfy-strict-indexed-access",
+      "tip": "a44c9834f03799baca43f5f3c3f99979e734c66a",
+      "tipShort": "a44c983",
+      "realDate": "2026-07-24",
+      "publishDate": "2026-08-30",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 868,
+        "removed": 140,
+        "files": 10,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "3e3c021",
+          "subject": "feat(survival): add fixed right aim joystick"
+        },
+        {
+          "sha": "e9eb6c9",
+          "subject": "feat(survival): add phosphor touch action icons"
+        },
+        {
+          "sha": "279616c",
+          "subject": "feat(survival): add art-bible voxel character fallbacks"
+        },
+        {
+          "sha": "5ee03cc",
+          "subject": "feat(survival): render twin-stick HUD and voxel characters"
+        },
+        {
+          "sha": "8875087",
+          "subject": "fix(survival): keep touch HUD inside mobile safe area"
+        },
+        {
+          "sha": "0defa83",
+          "subject": "fix(survival): preserve mouse aim on touch-capable desktops"
+        },
+        {
+          "sha": "e208b99",
+          "subject": "feat(survival): add radial cooldown reveal overlay"
+        },
+        {
+          "sha": "bae79e8",
+          "subject": "fix(survival): honor safe areas and hybrid input modality"
+        },
+        {
+          "sha": "3df2978",
+          "subject": "fix(survival): expose browser safe-area insets to touch layout"
+        },
+        {
+          "sha": "2ec7205",
+          "subject": "feat(survival): render touch cooldowns and use real safe areas"
+        },
+        {
+          "sha": "3cea666",
+          "subject": "chore(protocol): bump version for cooldown viewer state"
+        },
+        {
+          "sha": "a1e2c25",
+          "subject": "feat(protocol): expose local action cooldowns"
+        },
+        {
+          "sha": "c44380b",
+          "subject": "revert(protocol): keep HUD cooldowns client-side"
+        },
+        {
+          "sha": "81c0978",
+          "subject": "revert(protocol): keep viewer state unchanged"
+        },
+        {
+          "sha": "6643643",
+          "subject": "fix(survival): predict online cooldown reveal from local presses"
+        },
+        {
+          "sha": "574fd8f",
+          "subject": "feat(survival): expose action press sequence for cooldown HUD"
+        },
+        {
+          "sha": "13c8c2c",
+          "subject": "fix(survival): reset cooldown HUD across modality and run changes"
+        },
+        {
+          "sha": "cbe3e76",
+          "subject": "test(survival): cover radial cooldown math and safe-area layout"
+        },
+        {
+          "sha": "e8126ff",
+          "subject": "fix(survival): cancel touch controllers on mouse modality"
+        },
+        {
+          "sha": "4e64d9f",
+          "subject": "fix(survival): scope cooldown prediction to online sessions"
+        },
+        {
+          "sha": "7e12b19",
+          "subject": "test(survival): cover modality and cooldown lifecycle"
+        },
+        {
+          "sha": "5d1d22f",
+          "subject": "test(survival): satisfy strict indexed access"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "021",
+      "pr": 30,
+      "kind": "pr",
+      "title": "fix(pwa): account for inlined FX atlases",
+      "slug": "fix-pwa-account-for-inlined-fx-atlases",
+      "tip": "8bb872aea01e231917e384e55c1d39e5d1ee722e",
+      "tipShort": "8bb872a",
+      "realDate": "2026-07-25",
+      "publishDate": "2026-08-31",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "scripts",
+        ".github",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 3431,
+        "removed": 1719,
+        "files": 51,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "9ee63d6",
+          "subject": "docs(art): specify detailed voxel character sprite production"
+        },
+        {
+          "sha": "f6a8e3b",
+          "subject": "chore: stage voxel implementation bundle"
+        },
+        {
+          "sha": "5eef14c",
+          "subject": "chore: stage voxel implementation bundle"
+        },
+        {
+          "sha": "7019ee0",
+          "subject": "chore: stage voxel implementation bundle"
+        },
+        {
+          "sha": "c890f10",
+          "subject": "chore: stage voxel implementation bundle"
+        },
+        {
+          "sha": "68b23b4",
+          "subject": "chore: stage voxel implementation bundle"
+        },
+        {
+          "sha": "b1ceb4e",
+          "subject": "chore: stage voxel implementation bundle"
+        },
+        {
+          "sha": "651f6a9",
+          "subject": "chore: stage voxel implementation script"
+        },
+        {
+          "sha": "7c59594",
+          "subject": "chore: stage voxel implementation script"
+        },
+        {
+          "sha": "be951c6",
+          "subject": "chore: stage voxel implementation script"
+        },
+        {
+          "sha": "4bf67f3",
+          "subject": "ci: execute voxel character production spec"
+        },
+        {
+          "sha": "b67199d",
+          "subject": "ci: trigger voxel spec execution on PR updates"
+        },
+        {
+          "sha": "80df895",
+          "subject": "ci: diagnose workflow runner"
+        },
+        {
+          "sha": "6a7ff3f",
+          "subject": "ci(survival): execute voxel character production spec"
+        },
+        {
+          "sha": "b81090e",
+          "subject": "fix(ci): enable pnpm before dependency cache"
+        },
+        {
+          "sha": "ceac9de",
+          "subject": "ci(survival): report voxel spec execution failures"
+        },
+        {
+          "sha": "fbe6155",
+          "subject": "fix(ci): restore corrupted voxel implementation bundle"
+        },
+        {
+          "sha": "39cb255",
+          "subject": "ci(survival): capture full voxel execution log"
+        },
+        {
+          "sha": "d278af5",
+          "subject": "ci(survival): clean workflow trigger marker"
+        },
+        {
+          "sha": "0bf818b",
+          "subject": "ci(survival): rerun voxel spec execution"
+        },
+        {
+          "sha": "9526d7b",
+          "subject": "fix(ci): make execution log initialization valid YAML"
+        },
+        {
+          "sha": "0e3e102",
+          "subject": "ci(survival): persist voxel failure diagnostics"
+        },
+        {
+          "sha": "a002425",
+          "subject": "ci(survival): persist implementation before validation"
+        },
+        {
+          "sha": "5cc6db8",
+          "subject": "feat(survival): implement voxel character spec [voxel-spec-applied]"
+        },
+        {
+          "sha": "81e92a7",
+          "subject": "ci(survival): validate persisted voxel implementation"
+        },
+        {
+          "sha": "4b63576",
+          "subject": "ci(survival): upload voxel validation diagnostics"
+        },
+        {
+          "sha": "348151d",
+          "subject": "ci(survival): build workspace before voxel tests"
+        },
+        {
+          "sha": "7edb20c",
+          "subject": "fix(content): normalize sprite frames within safe margins"
+        },
+        {
+          "sha": "f18463a",
+          "subject": "fix(content): inset generated entity frames"
+        },
+        {
+          "sha": "6fd3b3e",
+          "subject": "ci(survival): regenerate normalized voxel atlases"
+        },
+        {
+          "sha": "3a9f893",
+          "subject": "fix(content): regenerate normalized voxel atlases [skip voxel]"
+        },
+        {
+          "sha": "bf9e096",
+          "subject": "test(content): expect authored isometric directions"
+        },
+        {
+          "sha": "e137de9",
+          "subject": "fix(pwa): account for inlined FX atlases"
+        }
+      ],
+      "recipes": [
+        "sprites"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "022",
+      "pr": 34,
+      "kind": "pr",
+      "title": "fix(content): face the camera, and let death break the body apart",
+      "slug": "fix-content-face-the-camera-and-let-death-break-the-body-apa",
+      "tip": "429ed16c7919f9af9eda2760d9ed75983b3482bc",
+      "tipShort": "429ed16",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-01",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "pnpm-lock.yaml"
+      ],
+      "stat": {
+        "added": 933,
+        "removed": 535,
+        "files": 25,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "67d0d90",
+          "subject": "feat(content): render the prospector as a voxel model at 32x40"
+        },
+        {
+          "sha": "d69a3cc",
+          "subject": "fix(content): author the prospector's non-locomotion animations"
+        },
+        {
+          "sha": "3c54423",
+          "subject": "feat(content): render all six characters as voxel models"
+        },
+        {
+          "sha": "c7b555b",
+          "subject": "fix(content): face the camera, and let death break the body apart"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "023",
+      "pr": 36,
+      "kind": "pr",
+      "title": "fix(content): regenerate normalized voxel atlases [skip voxel]",
+      "slug": "fix-content-regenerate-normalized-voxel-atlases-skip-voxel",
+      "tip": "0ed229ef941800fd0b5b57bf44d6a43eb93177b5",
+      "tipShort": "0ed229e",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-02",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival",
+        ".github"
+      ],
+      "stat": {
+        "added": 117,
+        "removed": 16,
+        "files": 11,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "b631aae",
+          "subject": "fix(survival): align voxel facings with isometric movement"
+        },
+        {
+          "sha": "e36ee3a",
+          "subject": "fix(survival): keep walk animation running between simulation ticks"
+        },
+        {
+          "sha": "aed7deb",
+          "subject": "test(survival): cover isometric voxel facing quadrants"
+        },
+        {
+          "sha": "e020450",
+          "subject": "test(survival): prevent walk animation resets between ticks"
+        },
+        {
+          "sha": "13d1710",
+          "subject": "test(survival): reject invalid voxel direction indices"
+        },
+        {
+          "sha": "6859dc3",
+          "subject": "ci(survival): capture atlas generation failures"
+        },
+        {
+          "sha": "a521998",
+          "subject": "ci(survival): build core before generating voxel atlases"
+        },
+        {
+          "sha": "281f1e3",
+          "subject": "fix(content): regenerate normalized voxel atlases [skip voxel]"
+        }
+      ],
+      "recipes": [
+        "sprites"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "024",
+      "pr": 37,
+      "kind": "pr",
+      "title": "test(survival): cover telegraphs and render-time recoil",
+      "slug": "test-survival-cover-telegraphs-and-render-time-recoil",
+      "tip": "a869012b443ee98829e4865ea00e2b538297c505",
+      "tipShort": "a869012",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-03",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 661,
+        "removed": 29,
+        "files": 13,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "cfd8c1b",
+          "subject": "feat(survival): add aligned prospector layer specs"
+        },
+        {
+          "sha": "4a6b74b",
+          "subject": "feat(survival): generate aligned player animation layers"
+        },
+        {
+          "sha": "8c9ec3c",
+          "subject": "feat(survival): compose independent player animation layers"
+        },
+        {
+          "sha": "7e83aaa",
+          "subject": "feat(survival): present locomotion and attacks independently"
+        },
+        {
+          "sha": "ab6ff02",
+          "subject": "test(survival): cover movement facing and recoil projection"
+        },
+        {
+          "sha": "4864a4e",
+          "subject": "test(survival): cover weapon recoil timing"
+        },
+        {
+          "sha": "02ed21c",
+          "subject": "test(survival): assert zero recoil without signed-zero coupling"
+        },
+        {
+          "sha": "9ade07e",
+          "subject": "fix(content): regenerate normalized voxel atlases [skip voxel]"
+        },
+        {
+          "sha": "d2417e8",
+          "subject": "fix(content): register layered player atlases in first pack"
+        },
+        {
+          "sha": "efdb2d6",
+          "subject": "test(survival): include colocated animation suites"
+        },
+        {
+          "sha": "6e69d0d",
+          "subject": "fix(survival): preserve telegraphs and smooth recoil"
+        },
+        {
+          "sha": "e741481",
+          "subject": "test(survival): cover telegraphs and render-time recoil"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "025",
+      "pr": 38,
+      "kind": "pr",
+      "title": "test(survival): cover every walking quadrant",
+      "slug": "test-survival-cover-every-walking-quadrant",
+      "tip": "71778d129dbb7bb2ae5d446f90e3a8f6ed699b45",
+      "tipShort": "71778d1",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-04",
+      "areas": [
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 67,
+        "removed": 9,
+        "files": 2,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "90d99c1",
+          "subject": "fix(survival): preserve movement facing while walking"
+        },
+        {
+          "sha": "0f7c757",
+          "subject": "test(survival): cover movement-facing fallback"
+        },
+        {
+          "sha": "52624c8",
+          "subject": "test(survival): cover every walking quadrant"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "026",
+      "pr": 39,
+      "kind": "pr",
+      "title": "feat(sim): every projectile class reacts with every material",
+      "slug": "feat-sim-every-projectile-class-reacts-with-every-material",
+      "tip": "65046b1cc1e4de0453db5585188eb6db2a347190",
+      "tipShort": "65046b1",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-05",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 3041,
+        "removed": 119,
+        "files": 44,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "3f77c43",
+          "subject": "feat(content): pre-render terrain as voxel blocks"
+        },
+        {
+          "sha": "af0617d",
+          "subject": "feat(client): voxel particles for gas, fire and explosions"
+        },
+        {
+          "sha": "2206304",
+          "subject": "feat: texture block sides like the top, and crumble blocks on destruction"
+        },
+        {
+          "sha": "edff0c4",
+          "subject": "fix(client): one gas mote per bucket, and step FX by real elapsed time"
+        },
+        {
+          "sha": "b9ea659",
+          "subject": "Merge remote-tracking branch 'origin/main' into claude/voxel-rasterizer"
+        },
+        {
+          "sha": "fa01fc5",
+          "subject": "feat(client): voxel projectiles with height, and a weapon that matches the gun"
+        },
+        {
+          "sha": "0502bd3",
+          "subject": "feat(sim): every projectile class reacts with every material"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "027",
+      "pr": 40,
+      "kind": "pr",
+      "title": "fix(client): a frente de choque chega ao raio que a simulacao aplica",
+      "slug": "fix-client-a-frente-de-choque-chega-ao-raio-que-a-simulacao-",
+      "tip": "caf2cfc033bd0932c3bf1ae7203f62f345e00caa",
+      "tipShort": "caf2cfc",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-06",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 2315,
+        "removed": 108,
+        "files": 26,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "a752516",
+          "subject": "feat(client): gas, poca e explosao viram materia voxel"
+        },
+        {
+          "sha": "b8399b2",
+          "subject": "feat(client): o Nucleo vira monumento voxel, nao uma mancha de cor"
+        },
+        {
+          "sha": "d1f5a30",
+          "subject": "feat(client): respingo de acerto na materia da criatura atingida"
+        },
+        {
+          "sha": "a8d4912",
+          "subject": "fix(client): tornar o numero de dano legivel sobre o terreno"
+        },
+        {
+          "sha": "25ef4d8",
+          "subject": "fix(client): a frente de choque chega ao raio que a simulacao aplica"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "028",
+      "pr": 41,
+      "kind": "pr",
+      "title": "fix(content): regenerate normalized voxel atlases [skip voxel]",
+      "slug": "fix-content-regenerate-normalized-voxel-atlases-skip-voxel",
+      "tip": "0615c77bfa67eb381e9d2f2cde91f5c36ba0174a",
+      "tipShort": "0615c77",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-07",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival",
+        "render.yaml"
+      ],
+      "stat": {
+        "added": 441,
+        "removed": 72,
+        "files": 9,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "cf2ad98",
+          "subject": "fix(deploy): restore dependency install in Render build commands"
+        },
+        {
+          "sha": "01a4c09",
+          "subject": "feat(art): a poca vira liquido e o gas sobe do chao como enxofre"
+        },
+        {
+          "sha": "0847e63",
+          "subject": "fix(content): shape gas into drifting voxel puffs"
+        },
+        {
+          "sha": "59c5224",
+          "subject": "test(content): lock gas puff geometry and motion"
+        },
+        {
+          "sha": "3c5e322",
+          "subject": "chore(content): format geometry test includes"
+        },
+        {
+          "sha": "55b1222",
+          "subject": "fix(content): regenerate normalized voxel atlases [skip voxel]"
+        }
+      ],
+      "recipes": [
+        "sprites"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "029",
+      "pr": 42,
+      "kind": "pr",
+      "title": "fix(client): seed each gas puff at spawn",
+      "slug": "fix-client-seed-each-gas-puff-at-spawn",
+      "tip": "6d5d6bc7e2c40a7a24e7d96f011e7cad9bd3c8d8",
+      "tipShort": "6d5d6bc",
+      "realDate": "2026-07-26",
+      "publishDate": "2026-09-08",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-content"
+      ],
+      "stat": {
+        "added": 213,
+        "removed": 212,
+        "files": 7,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "8382cca",
+          "subject": "fix(content): restore previous spore crust"
+        },
+        {
+          "sha": "8b2d4ee",
+          "subject": "fix(client): render gas motes as dissipating puffs"
+        },
+        {
+          "sha": "77ba1af",
+          "subject": "test(client): distinguish gas puffs from spores"
+        },
+        {
+          "sha": "a181e45",
+          "subject": "test(client): cover deterministic gas puff variation"
+        },
+        {
+          "sha": "468be00",
+          "subject": "fix(content): regenerate normalized voxel atlases [skip voxel]"
+        },
+        {
+          "sha": "03dbcfa",
+          "subject": "fix(client): keep gas puff orientation stable"
+        },
+        {
+          "sha": "563f77d",
+          "subject": "test(client): keep gas orientation stable across movement"
+        },
+        {
+          "sha": "390ab26",
+          "subject": "fix(client): seed each gas puff at spawn"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "030",
+      "pr": 43,
+      "kind": "pr",
+      "title": "chore: remove temporary projectile heat migration",
+      "slug": "chore-remove-temporary-projectile-heat-migration",
+      "tip": "b02171c87f540e355513ac0bc243183c52e097fe",
+      "tipShort": "b02171c",
+      "realDate": "2026-07-27",
+      "publishDate": "2026-09-09",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "scripts",
+        ".github",
+        "packages/voxelyn-survival-content"
+      ],
+      "stat": {
+        "added": 1108,
+        "removed": 656,
+        "files": 24,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "047e5e7",
+          "subject": "feat(sim): define separate spore and heated fungal states"
+        },
+        {
+          "sha": "2977dd0",
+          "subject": "feat(sim): separate fungal heating, spores, and gas combustion"
+        },
+        {
+          "sha": "e716400",
+          "subject": "feat(sim): give spores and wet fungus distinct projectile reactions"
+        },
+        {
+          "sha": "11208dc",
+          "subject": "feat(sim): make spore bomber leave spores instead of gas"
+        },
+        {
+          "sha": "d13eb75",
+          "subject": "feat(sim): export fungal heating transition"
+        },
+        {
+          "sha": "be3edd0",
+          "subject": "chore(protocol): bump simulation and content versions"
+        },
+        {
+          "sha": "1364238",
+          "subject": "feat(content): add spore cloud and heated fungal surfaces"
+        },
+        {
+          "sha": "4ea5b72",
+          "subject": "chore: add one-shot surface separation migration"
+        },
+        {
+          "sha": "ddfbb2c",
+          "subject": "test(content): distinguish spores, wet fungus, and gas"
+        },
+        {
+          "sha": "e169618",
+          "subject": "chore(ci): apply one-shot surface separation migration"
+        },
+        {
+          "sha": "5b4950d",
+          "subject": "docs: define spores fungus and gas contract"
+        },
+        {
+          "sha": "0816eb0",
+          "subject": "feat(survival): apply surface separation migration [skip voxel]"
+        },
+        {
+          "sha": "f2eeb45",
+          "subject": "chore: remove completed surface migration"
+        },
+        {
+          "sha": "8b9a35f",
+          "subject": "chore(ci): restore normal voxel validation"
+        },
+        {
+          "sha": "e7640cd",
+          "subject": "test(survival): preserve fungal drying under repeated heat"
+        },
+        {
+          "sha": "a51f01e",
+          "subject": "fix(survival): preserve fungal drying on repeated heat [skip voxel]"
+        },
+        {
+          "sha": "83604ac",
+          "subject": "chore(ci): restore normal validation after review fix"
+        },
+        {
+          "sha": "c6a1360",
+          "subject": "chore(ci): stage projectile heat deduplication"
+        },
+        {
+          "sha": "d9568cf",
+          "subject": "test(sim): cover projectile fungal heat deduplication"
+        },
+        {
+          "sha": "e072a1e",
+          "subject": "chore(ci): apply projectile heat review fix"
+        },
+        {
+          "sha": "2c02645",
+          "subject": "fix(sim): deduplicate projectile fungal heat [skip voxel]"
+        },
+        {
+          "sha": "d1ed6bb",
+          "subject": "chore(ci): restore normal voxel validation"
+        },
+        {
+          "sha": "6cdc525",
+          "subject": "chore: remove temporary projectile heat migration"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "031",
+      "pr": 44,
+      "kind": "pr",
+      "title": "fix(client): alfa do gas num dos niveis permitidos, e um teste que cobra isso",
+      "slug": "fix-client-alfa-do-gas-num-dos-niveis-permitidos-e-um-teste-",
+      "tip": "47782c0b0b91dafd4a9c73398cf7be4e2c2545a7",
+      "tipShort": "47782c0",
+      "realDate": "2026-07-27",
+      "publishDate": "2026-09-10",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 541,
+        "removed": 43,
+        "files": 6,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "505e4b9",
+          "subject": "feat(art): gas de enxofre vira penacho de respiradouro"
+        },
+        {
+          "sha": "0fc55b4",
+          "subject": "fix(client): gas encostado em parede parava de sumir dentro dela"
+        },
+        {
+          "sha": "11cf629",
+          "subject": "fix(client): alfa do gas num dos niveis permitidos, e um teste que cobra isso"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "032",
+      "pr": 45,
+      "kind": "pr",
+      "title": "feat(sim): segunda fase do guardiao fecha a arena e invoca quatro perseguidores",
+      "slug": "feat-sim-segunda-fase-do-guardiao-fecha-a-arena-e-invoca-qua",
+      "tip": "05e14bcbc90546304e44cf89faf0801db7f4f587",
+      "tipShort": "05e14bc",
+      "realDate": "2026-07-27",
+      "publishDate": "2026-09-11",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-protocol",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 1257,
+        "removed": 20,
+        "files": 12,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "1456345",
+          "subject": "feat(sim): inimigo reage a dano, e o bruiser arranca a parede e arremessa"
+        },
+        {
+          "sha": "f770632",
+          "subject": "fix(sim): guardiao acorda ao levar dano, e a municao respeita a borda"
+        },
+        {
+          "sha": "e483bf8",
+          "subject": "feat(sim): guardiao caça com busca de caminho e abre brecha na parede"
+        },
+        {
+          "sha": "9f18142",
+          "subject": "feat(sim): segunda fase do guardiao fecha a arena e invoca quatro perseguidores"
+        }
+      ],
+      "recipes": [
+        "arena"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "033",
+      "pr": 46,
+      "kind": "pr",
+      "title": "fix(client): a pedra do bruiser deixa de ser desenhada como cuspe de acido",
+      "slug": "fix-client-a-pedra-do-bruiser-deixa-de-ser-desenhada-como-cu",
+      "tip": "dcd0f57d9736fb50ec4f214aeaf668114193e059",
+      "tipShort": "dcd0f57",
+      "realDate": "2026-07-27",
+      "publishDate": "2026-09-12",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-protocol",
+        "packages/voxelyn-survival-server",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 77,
+        "removed": 5,
+        "files": 8,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "4c784ab",
+          "subject": "fix(client): a pedra do bruiser deixa de ser desenhada como cuspe de acido"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "034",
+      "pr": 48,
+      "kind": "pr",
+      "title": "chore: remove temporary reward polish workflows",
+      "slug": "chore-remove-temporary-reward-polish-workflows",
+      "tip": "8e87d44deec2ff64e92d0a9a5f9c12372daee2f1",
+      "tipShort": "8e87d44",
+      "realDate": "2026-07-27",
+      "publishDate": "2026-09-13",
+      "areas": [
+        ".github",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 3283,
+        "removed": 1648,
+        "files": 52,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "1274dcb",
+          "subject": "chore: materialize survival worktree"
+        },
+        {
+          "sha": "564ca6a",
+          "subject": "chore: run worktree archive for pull requests"
+        },
+        {
+          "sha": "0fcb85a",
+          "subject": "chore: add guarded survival patch workflow"
+        },
+        {
+          "sha": "8f0508b",
+          "subject": "chore: guard survival patch application with sentinel"
+        },
+        {
+          "sha": "57b8cb3",
+          "subject": "chore: assemble chunked survival patches"
+        },
+        {
+          "sha": "2c9b6dd",
+          "subject": "chore: stage survival simulation patch part 1"
+        },
+        {
+          "sha": "40e16aa",
+          "subject": "chore: stage survival simulation patch part 2"
+        },
+        {
+          "sha": "03cce72",
+          "subject": "chore: stage survival simulation patch part 3"
+        },
+        {
+          "sha": "0a234e8",
+          "subject": "chore: stage survival simulation patch part 4"
+        },
+        {
+          "sha": "5bff46d",
+          "subject": "chore: stage survival protocol patch part 1"
+        },
+        {
+          "sha": "ba1faa4",
+          "subject": "chore: stage survival protocol patch part 2"
+        },
+        {
+          "sha": "816a473",
+          "subject": "chore: stage survival UI patch part 1"
+        },
+        {
+          "sha": "cf28389",
+          "subject": "chore: stage survival UI patch part 2"
+        },
+        {
+          "sha": "382bcb0",
+          "subject": "chore: verify survival patch bundles before apply"
+        },
+        {
+          "sha": "79f8045",
+          "subject": "chore: run guarded survival redesign validation"
+        },
+        {
+          "sha": "5964f52",
+          "subject": "chore: trigger guarded survival validation"
+        },
+        {
+          "sha": "ac40482",
+          "subject": "chore: report guarded survival validation on PR"
+        },
+        {
+          "sha": "e270ed5",
+          "subject": "chore: link guarded validation run logs"
+        },
+        {
+          "sha": "d2305b8",
+          "subject": "chore: make survival validation observable"
+        },
+        {
+          "sha": "f0fddfd",
+          "subject": "chore: remove duplicate survival validation workflow"
+        },
+        {
+          "sha": "303f1c5",
+          "subject": "fix: make survival validation workflow valid"
+        },
+        {
+          "sha": "c71e2b7",
+          "subject": "chore: report survival validation failure output"
+        },
+        {
+          "sha": "2de522f",
+          "subject": "fix: build core before generating survival atlas"
+        },
+        {
+          "sha": "b0688b8",
+          "subject": "chore: split survival validation by package"
+        },
+        {
+          "sha": "c33e185",
+          "subject": "chore: isolate survival simulation test files"
+        },
+        {
+          "sha": "ceb66e7",
+          "subject": "chore: report only failing simulation file"
+        },
+        {
+          "sha": "08d9147",
+          "subject": "fix(survival): stage deterministic reaction fixture fix"
+        },
+        {
+          "sha": "7573aca",
+          "subject": "chore: include deterministic reaction fixes in validation"
+        },
+        {
+          "sha": "7537c69",
+          "subject": "fix: apply reaction corrections idempotently"
+        },
+        {
+          "sha": "852de27",
+          "subject": "fix: isolate siphon module fixture"
+        },
+        {
+          "sha": "f9a8164",
+          "subject": "chore: prioritize and summarize module test diagnostics"
+        },
+        {
+          "sha": "709437e",
+          "subject": "chore: consolidate survival validation status"
+        },
+        {
+          "sha": "d4feda5",
+          "subject": "chore: emit structured survival test diagnostics"
+        },
+        {
+          "sha": "8ed71b7",
+          "subject": "chore: isolate salvage module test diagnostics"
+        },
+        {
+          "sha": "76796df",
+          "subject": "fix: isolate explosive and terminal scan fixtures"
+        },
+        {
+          "sha": "7225155",
+          "subject": "chore: inspect materialized salvage test tail"
+        },
+        {
+          "sha": "997ec5d",
+          "subject": "chore: isolate remaining salvage tests"
+        },
+        {
+          "sha": "30607b5",
+          "subject": "chore: build core before isolated salvage tests"
+        },
+        {
+          "sha": "47d75e8",
+          "subject": "chore: bisect salvage test interference"
+        },
+        {
+          "sha": "41d2b43",
+          "subject": "chore: run final survival integration validation"
+        },
+        {
+          "sha": "8c85618",
+          "subject": "fix: align purge command protocol expectation"
+        },
+        {
+          "sha": "fef225d",
+          "subject": "fix: isolate reconnect preservation invariant"
+        },
+        {
+          "sha": "011361f",
+          "subject": "feat(survival): add temporary modules and salvage simulation"
+        },
+        {
+          "sha": "86a94be",
+          "subject": "feat(survival): synchronize per-player choices and world flags"
+        },
+        {
+          "sha": "f8071e1",
+          "subject": "feat(survival-ui): add salvage props, reward choice and module HUD"
+        },
+        {
+          "sha": "5213d5b",
+          "subject": "fix(survival): isolate deterministic fixtures and protocol invariants"
+        },
+        {
+          "sha": "611146b",
+          "subject": "chore(survival-content): regenerate salvage prop atlas"
+        },
+        {
+          "sha": "7cbe86a",
+          "subject": "chore: remove temporary survival validation scaffolding"
+        },
+        {
+          "sha": "77ac82d",
+          "subject": "chore: add guarded reward presentation polish"
+        },
+        {
+          "sha": "44553d1",
+          "subject": "chore: trigger guarded reward polish"
+        },
+        {
+          "sha": "76289d3",
+          "subject": "chore: expose reward polish validation on PR"
+        },
+        {
+          "sha": "6452888",
+          "subject": "chore: apply corrected guarded reward polish"
+        },
+        {
+          "sha": "97e7c16",
+          "subject": "fix: simplify corrected reward polish runner"
+        },
+        {
+          "sha": "0a8ea79",
+          "subject": "feat(survival-ui): animate purge cell reward reveal"
+        },
+        {
+          "sha": "a6e6894",
+          "subject": "chore: remove temporary reward polish workflows"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "035",
+      "pr": 50,
+      "kind": "pr",
+      "title": "fix(protocol): bump simulation version for Guardian worldgen",
+      "slug": "fix-protocol-bump-simulation-version-for-guardian-worldgen",
+      "tip": "d9043423de559842b7b9315ac3cba32f0e14c321",
+      "tipShort": "d904342",
+      "realDate": "2026-07-27",
+      "publishDate": "2026-09-14",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        ".github",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 432,
+        "removed": 324,
+        "files": 9,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "79d2d3f",
+          "subject": "ci: validate guardian spawn and arena softlock fix"
+        },
+        {
+          "sha": "90b5bba",
+          "subject": "fix(survival): prevent Guardian arena and spawn softlocks"
+        },
+        {
+          "sha": "b6e5d18",
+          "subject": "chore: remove temporary Guardian validation workflow"
+        },
+        {
+          "sha": "8382407",
+          "subject": "fix(protocol): bump simulation version for Guardian worldgen"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "036",
+      "pr": 51,
+      "kind": "pr",
+      "title": "chore: remove temporary telegraph validation workflow",
+      "slug": "chore-remove-temporary-telegraph-validation-workflow",
+      "tip": "1053a0d22274c5911de348275812511db7f5e330",
+      "tipShort": "1053a0d",
+      "realDate": "2026-07-28",
+      "publishDate": "2026-09-15",
+      "areas": [
+        ".github",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-content"
+      ],
+      "stat": {
+        "added": 1200,
+        "removed": 868,
+        "files": 28,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "d85b1b0",
+          "subject": "chore: export worktree for bruiser implementation"
+        },
+        {
+          "sha": "70832f8",
+          "subject": "chore: expose bruiser worktree export on PR"
+        },
+        {
+          "sha": "eecd061",
+          "subject": "chore: stage Bruiser implementation patch"
+        },
+        {
+          "sha": "8e4e27f",
+          "subject": "chore: complete Bruiser implementation patch"
+        },
+        {
+          "sha": "6ef3f96",
+          "subject": "chore: validate and publish Bruiser combat slice"
+        },
+        {
+          "sha": "4b0e7e4",
+          "subject": "chore: diagnose Bruiser patch transport"
+        },
+        {
+          "sha": "306ede5",
+          "subject": "chore: validate corrected Bruiser patch transport"
+        },
+        {
+          "sha": "dd9a92f",
+          "subject": "chore: export reconstructed Bruiser patch for byte comparison"
+        },
+        {
+          "sha": "848fd7e",
+          "subject": "chore: validate byte-corrected Bruiser implementation"
+        },
+        {
+          "sha": "85502aa",
+          "subject": "chore: expose Bruiser build failure diagnostics"
+        },
+        {
+          "sha": "3076f1d",
+          "subject": "chore: fix Bruiser build diagnostic reporting"
+        },
+        {
+          "sha": "bff9f9c",
+          "subject": "chore: validate Bruiser atlas and complete combat slice"
+        },
+        {
+          "sha": "0eeff4f",
+          "subject": "feat(survival): add predictive gorilla Bruiser hurl"
+        },
+        {
+          "sha": "bda6463",
+          "subject": "chore: remove temporary Bruiser validation transport"
+        },
+        {
+          "sha": "1c6b408",
+          "subject": "chore: validate networked stun feedback"
+        },
+        {
+          "sha": "8593327",
+          "subject": "feat(survival): synchronize and visualize stun state"
+        },
+        {
+          "sha": "e005c79",
+          "subject": "chore: remove temporary stun validation workflow"
+        },
+        {
+          "sha": "2d84811",
+          "subject": "chore: validate stun visual intent cancellation"
+        },
+        {
+          "sha": "a9be460",
+          "subject": "fix(survival-ui): cancel stale telegraphs during stun"
+        },
+        {
+          "sha": "941c56a",
+          "subject": "chore: remove temporary stun intent workflow"
+        },
+        {
+          "sha": "83a95ab",
+          "subject": "chore: validate authoritative stun telegraphs"
+        },
+        {
+          "sha": "335618d",
+          "subject": "fix(survival-ui): preserve authoritative telegraphs during stun"
+        },
+        {
+          "sha": "b5a1e04",
+          "subject": "chore: remove temporary telegraph validation workflow"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "037",
+      "pr": 52,
+      "kind": "pr",
+      "title": "fix(survival): capacidade de explosive tem de chegar em projectileClass",
+      "slug": "fix-survival-capacidade-de-explosive-tem-de-chegar-em-projec",
+      "tip": "7efa8a2e8672770075d383178a4fd3fac10a77b1",
+      "tipShort": "7efa8a2",
+      "realDate": "2026-07-28",
+      "publishDate": "2026-09-16",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-server",
+        "packages/voxelyn-survival-protocol",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 493,
+        "removed": 97,
+        "files": 15,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "4eaf585",
+          "subject": "fix(survival): resync entrega o ViewerState de quem pediu e ricochet nao desliga a escavacao"
+        },
+        {
+          "sha": "a3f5b4a",
+          "subject": "feat(survival): modulos empilham no mesmo tiro e so cobram no proc"
+        },
+        {
+          "sha": "40a5e2e",
+          "subject": "fix(survival): capacidade de explosive tem de chegar em projectileClass"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "038",
+      "pr": 53,
+      "kind": "pr",
+      "title": "test(protocol): reject reserved replay choice encoding",
+      "slug": "test-protocol-reject-reserved-replay-choice-encoding",
+      "tip": "6b00e8d2e058951a58329f1e512cb1a895cebf64",
+      "tipShort": "6b00e8d",
+      "realDate": "2026-07-29",
+      "publishDate": "2026-09-17",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-server",
+        "packages/voxelyn-survival-sim",
+        ".github"
+      ],
+      "stat": {
+        "added": 9012,
+        "removed": 1273,
+        "files": 75,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "283061a",
+          "subject": "feat(survival): camada de audio sintetica sobre os eventos semanticos"
+        },
+        {
+          "sha": "b38a22d",
+          "subject": "feat(survival): fim de run com memoria -- causa de morte, sumario e registro"
+        },
+        {
+          "sha": "6c46a0b",
+          "subject": "feat(survival): tres setores encadeados e codigo de sala no co-op"
+        },
+        {
+          "sha": "c00a9e1",
+          "subject": "feat(survival): ranking verificado por re-simulacao, com Postgres"
+        },
+        {
+          "sha": "9a9403d",
+          "subject": "chore: validate terminal run persistence fixes"
+        },
+        {
+          "sha": "9030c05",
+          "subject": "chore: run terminal persistence validation"
+        },
+        {
+          "sha": "7620f8a",
+          "subject": "chore: stage PR 53 review fixes for validation"
+        },
+        {
+          "sha": "02ad3e2",
+          "subject": "chore: finalize validated PR 53 review fixes"
+        },
+        {
+          "sha": "2a95690",
+          "subject": "chore: execute PR 53 fixes in survival validation"
+        },
+        {
+          "sha": "2f2d5a7",
+          "subject": "chore: publish PR 53 fixes after offline validation"
+        },
+        {
+          "sha": "9d50367",
+          "subject": "chore: restore canonical survival validator"
+        },
+        {
+          "sha": "258c3e6",
+          "subject": "fix: resolve PR 53 finalizer paths from repository root"
+        },
+        {
+          "sha": "3ad3cc6",
+          "subject": "fix(survival): persist terminal runs exactly once"
+        },
+        {
+          "sha": "8979c77",
+          "subject": "chore: stage online record gate reset fix"
+        },
+        {
+          "sha": "6d6f0fe",
+          "subject": "chore: finalize validated online reset fix"
+        },
+        {
+          "sha": "d6e9945",
+          "subject": "chore: validate online run record reset"
+        },
+        {
+          "sha": "39796b3",
+          "subject": "chore: publish online reset fix after offline validation"
+        },
+        {
+          "sha": "e4d2255",
+          "subject": "fix(survival-ui): reset online run record identity"
+        },
+        {
+          "sha": "01f2d47",
+          "subject": "docs(render): align deployment guide with current blueprint"
+        },
+        {
+          "sha": "4b1cb89",
+          "subject": "fix(server): trust explicit proxy hops for replay rate limits"
+        },
+        {
+          "sha": "b3a16db",
+          "subject": "fix(server): pass trusted proxy depth to replay limiter"
+        },
+        {
+          "sha": "96a13ba",
+          "subject": "fix(server): configure trusted proxy depth from environment"
+        },
+        {
+          "sha": "5ff169a",
+          "subject": "test(server): cover spoofed forwarding chains and bucket expiry"
+        },
+        {
+          "sha": "e3b1d3e",
+          "subject": "fix(render): configure one trusted edge proxy hop"
+        },
+        {
+          "sha": "c48ba37",
+          "subject": "docs(render): document trusted proxy rate-limit boundary"
+        },
+        {
+          "sha": "16b119d",
+          "subject": "fix(server): canonicalize verified replay digests"
+        },
+        {
+          "sha": "0bf2d64",
+          "subject": "chore: stage canonical replay and terminal reconnect fixes"
+        },
+        {
+          "sha": "5c3c407",
+          "subject": "chore: finalize canonical replay and terminal reconnect fixes"
+        },
+        {
+          "sha": "6071311",
+          "subject": "chore: validate canonical replay and terminal reconnect fixes"
+        },
+        {
+          "sha": "1178e3e",
+          "subject": "chore: publish replay and reconnect fixes after offline validation"
+        },
+        {
+          "sha": "8ea16bd",
+          "subject": "test(server): enforce byte-only canonical replay digests"
+        },
+        {
+          "sha": "8df42d2",
+          "subject": "fix(survival): canonicalize replays and retain terminal rooms"
+        },
+        {
+          "sha": "d4d4d64",
+          "subject": "test(server): escape control characters in sanitization fixture"
+        },
+        {
+          "sha": "66fab59",
+          "subject": "fix(protocol): reject reserved replay choice bits"
+        },
+        {
+          "sha": "bb99a3c",
+          "subject": "test(protocol): reject reserved replay choice encoding"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "039",
+      "pr": 54,
+      "kind": "pr",
+      "title": "chore: remove temporary descent migration",
+      "slug": "chore-remove-temporary-descent-migration",
+      "tip": "468f1fd1fb586109a93472f40c0861cc176162eb",
+      "tipShort": "468f1fd",
+      "realDate": "2026-07-29",
+      "publishDate": "2026-09-18",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival",
+        "scripts",
+        ".github"
+      ],
+      "stat": {
+        "added": 279,
+        "removed": 69,
+        "files": 10,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "304444b",
+          "subject": "feat(content): add animated sector descent prop"
+        },
+        {
+          "sha": "83ef20a",
+          "subject": "feat(client): select distinct descent objective prop"
+        },
+        {
+          "sha": "a2976aa",
+          "subject": "test(client): distinguish descent from final core"
+        },
+        {
+          "sha": "088fcfc",
+          "subject": "test(content): cover descent prop manifest"
+        },
+        {
+          "sha": "d6e9c5e",
+          "subject": "test(content): verify descent geometry and motion"
+        },
+        {
+          "sha": "6ffd1fa",
+          "subject": "chore(ci): prepare targeted descent renderer migration"
+        },
+        {
+          "sha": "031ba08",
+          "subject": "chore(ci): apply sector descent renderer update"
+        },
+        {
+          "sha": "d0effa4",
+          "subject": "test(client): keep final objective semantics past sector cap"
+        },
+        {
+          "sha": "fc26f7b",
+          "subject": "feat(survival): render sector descent transport [skip voxel]"
+        },
+        {
+          "sha": "f97a620",
+          "subject": "chore(ci): restore normal voxel validation"
+        },
+        {
+          "sha": "f34efa1",
+          "subject": "chore: remove temporary descent migration"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "040",
+      "pr": 56,
+      "kind": "pr",
+      "title": "Adiciona Bispo (setor 2) e Corcel Fungico (elite movel)",
+      "slug": "adiciona-bispo-setor-2-e-corcel-fungico-elite-movel",
+      "tip": "d8bfe947b7fac1670974c035f37b4d7d081a78e8",
+      "tipShort": "d8bfe94",
+      "realDate": "2026-07-29",
+      "publishDate": "2026-09-19",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-server"
+      ],
+      "stat": {
+        "added": 3173,
+        "removed": 84,
+        "files": 35,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "df2fabb",
+          "subject": "feat(survival): telemetria de diversao"
+        },
+        {
+          "sha": "f2e17a2",
+          "subject": "fix(server): telemetria herda o limite por origem corrigido do ranking"
+        },
+        {
+          "sha": "30cf6b6",
+          "subject": "feat(survival): menu de lancamento e convite de co-op compartilhavel"
+        },
+        {
+          "sha": "67cce7d",
+          "subject": "Adiciona Bispo (setor 2) e Corcel Fungico (elite movel)"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "041",
+      "pr": 62,
+      "kind": "pr",
+      "title": "fix(survival): fit all active modules in compact HUD",
+      "slug": "fix-survival-fit-all-active-modules-in-compact-hud",
+      "tip": "82f797f70b54489be48ef7755226094e7946befa",
+      "tipShort": "82f797f",
+      "realDate": "2026-07-29",
+      "publishDate": "2026-09-20",
+      "areas": [
+        "scripts",
+        "packages/voxelyn-survival",
+        "package.json"
+      ],
+      "stat": {
+        "added": 813,
+        "removed": 593,
+        "files": 12,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "ed885e3",
+          "subject": "chore(ci): stage mobile HUD implementation"
+        },
+        {
+          "sha": "78a3f17",
+          "subject": "chore(ci): finalize validated mobile HUD patch"
+        },
+        {
+          "sha": "8f48c3f",
+          "subject": "chore(ci): run mobile HUD patch before validation"
+        },
+        {
+          "sha": "0ab34e9",
+          "subject": "chore(ci): publish mobile HUD patch after offline validation"
+        },
+        {
+          "sha": "7e92fd8",
+          "subject": "chore(ci): trigger mobile HUD validation"
+        },
+        {
+          "sha": "8e882e2",
+          "subject": "chore(ci): escape nested HUD templates"
+        },
+        {
+          "sha": "5c0e5dd",
+          "subject": "chore(ci): repair transporter before HUD validation"
+        },
+        {
+          "sha": "389d247",
+          "subject": "chore(ci): clean transporter repair after validation"
+        },
+        {
+          "sha": "2901d9f",
+          "subject": "chore(ci): escape only replacement templates"
+        },
+        {
+          "sha": "df62e40",
+          "subject": "feat(survival): improve mobile HUD and dual-stick controls"
+        },
+        {
+          "sha": "62ebf2b",
+          "subject": "chore(ci): stage aim-zone separation fix"
+        },
+        {
+          "sha": "fb27f04",
+          "subject": "chore(ci): finalize validated aim-zone fix"
+        },
+        {
+          "sha": "10d3c09",
+          "subject": "chore(ci): validate aim-zone separation"
+        },
+        {
+          "sha": "434a8f3",
+          "subject": "chore(ci): publish aim-zone fix after offline validation"
+        },
+        {
+          "sha": "edfaf7b",
+          "subject": "fix(survival): separate aim activation from action buttons"
+        },
+        {
+          "sha": "34fe063",
+          "subject": "chore(ci): stage compact module HUD fix"
+        },
+        {
+          "sha": "1b96f38",
+          "subject": "chore(ci): finalize validated module HUD fix"
+        },
+        {
+          "sha": "a2512b7",
+          "subject": "chore(ci): validate compact module HUD"
+        },
+        {
+          "sha": "b3addb4",
+          "subject": "chore(ci): publish module HUD fix after offline validation"
+        },
+        {
+          "sha": "582911a",
+          "subject": "fix(survival): fit all active modules in compact HUD"
+        }
+      ],
+      "recipes": [
+        "menu"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "042",
+      "pr": 63,
+      "kind": "pr",
+      "title": "Reescreve o bestiario como relatorio corporativo; atlas do mineiro",
+      "slug": "reescreve-o-bestiario-como-relatorio-corporativo-atlas-do-mi",
+      "tip": "6378b9cf4834908cd7fac5056576deba4b241be8",
+      "tipShort": "6378b9c",
+      "realDate": "2026-07-29",
+      "publishDate": "2026-09-21",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-content",
+        "docs"
+      ],
+      "stat": {
+        "added": 1664,
+        "removed": 107,
+        "files": 37,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "249cc6b",
+          "subject": "Corrige orientacao e giro do Corcel"
+        },
+        {
+          "sha": "d593ad6",
+          "subject": "Corrige o ciclo de patas do Corcel: ele planava"
+        },
+        {
+          "sha": "4959dad",
+          "subject": "Adiciona Empoverished Miner e a cota de minerio"
+        },
+        {
+          "sha": "b2f36e8",
+          "subject": "Mostra o registro corporativo na tela de fim; rage heat a 66,6"
+        },
+        {
+          "sha": "58957d3",
+          "subject": "Da voz de morte propria ao mineiro"
+        },
+        {
+          "sha": "8e6ac83",
+          "subject": "Reescreve o bestiario como relatorio corporativo; atlas do mineiro"
+        }
+      ],
+      "recipes": [
+        "sprites"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "043",
+      "pr": 68,
+      "kind": "pr",
+      "title": "docs(survival): document echo lighting and HUD constraints",
+      "slug": "docs-survival-document-echo-lighting-and-hud-constraints",
+      "tip": "164c1b7e2a5c479bc6d0052aa9d5e6abe9b6f9e7",
+      "tipShort": "164c1b7",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-22",
+      "areas": [
+        "packages/voxelyn-survival",
+        ".github",
+        "docs"
+      ],
+      "stat": {
+        "added": 2952,
+        "removed": 1720,
+        "files": 14,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "06b51c1",
+          "subject": "docs(survival): specify death echoes rollout"
+        },
+        {
+          "sha": "9f5be69",
+          "subject": "feat(survival): add local death echo model"
+        },
+        {
+          "sha": "c1f46e7",
+          "subject": "test(survival): prove death echo projection"
+        },
+        {
+          "sha": "f3d7adf",
+          "subject": "feat(survival): render local death echoes"
+        },
+        {
+          "sha": "b7ffdda",
+          "subject": "feat(survival): load death echo presentation"
+        },
+        {
+          "sha": "87001ad",
+          "subject": "feat(survival): boot death echo layer"
+        },
+        {
+          "sha": "ff40b8e",
+          "subject": "test(survival): guard death echo presentation"
+        },
+        {
+          "sha": "c35e885",
+          "subject": "fix(survival): type renderer decoration explicitly"
+        },
+        {
+          "sha": "8a137e7",
+          "subject": "fix(survival): keep local echoes truthful in solo"
+        },
+        {
+          "sha": "2c91667",
+          "subject": "test(survival): reject ambiguous coop echoes"
+        },
+        {
+          "sha": "74d9ad9",
+          "subject": "docs(survival): define solo echo boundary"
+        },
+        {
+          "sha": "b783068",
+          "subject": "chore(ops): stage death echo refactor"
+        },
+        {
+          "sha": "fc862a7",
+          "subject": "chore(ops): run death echo refactor"
+        },
+        {
+          "sha": "044ab52",
+          "subject": "refactor(survival): integrate death echoes into world renderer"
+        },
+        {
+          "sha": "02248d2",
+          "subject": "fix(survival): version exact death echo placements"
+        },
+        {
+          "sha": "223c8da",
+          "subject": "chore(ci): stage final death echo review fixes"
+        },
+        {
+          "sha": "de28786",
+          "subject": "chore(ci): validate final death echo review fixes"
+        },
+        {
+          "sha": "29f52ca",
+          "subject": "chore(ci): align final fixes with versioned capsules"
+        },
+        {
+          "sha": "716ad91",
+          "subject": "chore(ci): use workspace TypeScript for death echo validation"
+        },
+        {
+          "sha": "0bdddf6",
+          "subject": "chore(ci): build server types before client typecheck"
+        },
+        {
+          "sha": "71cae15",
+          "subject": "chore(ci): apply layout replacement literally"
+        },
+        {
+          "sha": "1d7fb66",
+          "subject": "chore(ci): reject unusably short readout regions"
+        },
+        {
+          "sha": "a86f845",
+          "subject": "fix(survival): validate enemy projectile death causes"
+        },
+        {
+          "sha": "8cdd3be",
+          "subject": "fix(survival): keep death echo readout clear of HUD"
+        },
+        {
+          "sha": "e718e9c",
+          "subject": "chore(ci): remove death echo review transport"
+        },
+        {
+          "sha": "a96746d",
+          "subject": "chore(ci): stage death echo lighting fix"
+        },
+        {
+          "sha": "96a53ac",
+          "subject": "chore(ci): validate death echo lighting fix"
+        },
+        {
+          "sha": "bbd36d4",
+          "subject": "fix(survival): apply world lighting to death echoes"
+        },
+        {
+          "sha": "e64fb39",
+          "subject": "chore(ci): remove death echo lighting transport"
+        },
+        {
+          "sha": "55b6b00",
+          "subject": "docs(survival): document echo lighting and HUD constraints"
+        }
+      ],
+      "recipes": [
+        "menu"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "044",
+      "pr": 67,
+      "kind": "pr",
+      "title": "Reescreve o doc de carcacas como documento de lacuna",
+      "slug": "reescreve-o-doc-de-carcacas-como-documento-de-lacuna",
+      "tip": "548b2638b8816bb0ca35b24bd3a68ad683f36479",
+      "tipShort": "548b263",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-23",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival-sim",
+        "docs"
+      ],
+      "stat": {
+        "added": 1438,
+        "removed": 442,
+        "files": 27,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "9e3e28a",
+          "subject": "O Miner e um automato, e nao uma pessoa"
+        },
+        {
+          "sha": "f7b184f",
+          "subject": "Corrige velocidade dependente do rumo e o \"flicker\" do Miner"
+        },
+        {
+          "sha": "4b34cd2",
+          "subject": "Projeta carcacas: restos de outras runs em mapa procedural"
+        },
+        {
+          "sha": "b9e1c22",
+          "subject": "Reescreve o doc de carcacas como documento de lacuna"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "045",
+      "pr": 69,
+      "kind": "pr",
+      "title": "feat(survival): parear caixa-preta, carcaça por causa e fog of war de luzes",
+      "slug": "feat-survival-parear-caixa-preta-carcaca-por-causa-e-fog-of-",
+      "tip": "97198f686c5611df10aa3c44c078b0aad401d38e",
+      "tipShort": "97198f6",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-24",
+      "areas": [
+        "packages/voxelyn-survival",
+        "docs"
+      ],
+      "stat": {
+        "added": 1190,
+        "removed": 93,
+        "files": 8,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "2a8a021",
+          "subject": "feat(survival): parear caixa-preta, carcaça por causa e fog of war de luzes"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "046",
+      "pr": 73,
+      "kind": "pr",
+      "title": "fix(survival): corrige os cinco achados da review do PR #73",
+      "slug": "fix-survival-corrige-os-cinco-achados-da-review-do-pr-73",
+      "tip": "388275af12b7cf115007b3b2f907d458407e465c",
+      "tipShort": "388275a",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-25",
+      "areas": [
+        "packages/voxelyn-survival-server",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol",
+        "docs"
+      ],
+      "stat": {
+        "added": 3395,
+        "removed": 876,
+        "files": 24,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "64d60e8",
+          "subject": "feat(survival): pool comunitário de ecos e contrato de seed compartilhada"
+        },
+        {
+          "sha": "fdb4627",
+          "subject": "fix(survival): corrige os cinco achados da review do PR #73"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "047",
+      "pr": 74,
+      "kind": "pr",
+      "title": "fix(survival): sincroniza os Ecos no co-op e corrige a física do cone",
+      "slug": "fix-survival-sincroniza-os-ecos-no-co-op-e-corrige-a-fisica-",
+      "tip": "223636062811bd46612e5f466749facddd73e67f",
+      "tipShort": "2236360",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-26",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol",
+        "packages/voxelyn-survival-server"
+      ],
+      "stat": {
+        "added": 1650,
+        "removed": 115,
+        "files": 25,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "78922de",
+          "subject": "feat(survival): Desafio Semanal e cargas de módulo que duram a sala"
+        },
+        {
+          "sha": "0ac50d3",
+          "subject": "feat(survival): Ressonância do Poço — habilidades que nascem do que a run foi"
+        },
+        {
+          "sha": "4154b0f",
+          "subject": "fix(survival): sincroniza os Ecos no co-op e corrige a física do cone"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "048",
+      "pr": 75,
+      "kind": "pr",
+      "title": "fix(survival): PWA instalado nao pode depender da rede para abrir",
+      "slug": "fix-survival-pwa-instalado-nao-pode-depender-da-rede-para-ab",
+      "tip": "2b141b95f8a7b1118fdec6119dd4d713ef14046d",
+      "tipShort": "2b141b9",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-27",
+      "areas": [
+        "packages/voxelyn-survival",
+        "docs",
+        "render.yaml"
+      ],
+      "stat": {
+        "added": 596,
+        "removed": 61,
+        "files": 6,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "c79c817",
+          "subject": "fix(survival): PWA instalado nao pode depender da rede para abrir"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "049",
+      "pr": 76,
+      "kind": "pr",
+      "title": "fix(survival): o buffer de quadros nao pode sobreviver a troca de mundo",
+      "slug": "fix-survival-o-buffer-de-quadros-nao-pode-sobreviver-a-troca",
+      "tip": "7898de67c593b4bd5b6388b75b91422e5ac184dd",
+      "tipShort": "7898de6",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-28",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 1643,
+        "removed": 150,
+        "files": 11,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "68c8f03",
+          "subject": "fix(survival): co-op — o boneco parava de espelhar 60 vezes por segundo"
+        },
+        {
+          "sha": "cacff61",
+          "subject": "fix(survival): a mira chegava na simulacao colapsada em quatro diagonais"
+        },
+        {
+          "sha": "689ef47",
+          "subject": "fix(survival): tres correcoes do review no relogio de render do co-op"
+        },
+        {
+          "sha": "96fd1d6",
+          "subject": "fix(survival): o buffer de quadros nao pode sobreviver a troca de mundo"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "050",
+      "pr": 77,
+      "kind": "pr",
+      "title": "refactor(survival): extrai o relogio de exibicao do NetClient",
+      "slug": "refactor-survival-extrai-o-relogio-de-exibicao-do-netclient",
+      "tip": "db0e16a84a2e3f4fd7fdc48e6764b13708742ae9",
+      "tipShort": "db0e16a",
+      "realDate": "2026-07-30",
+      "publishDate": "2026-09-29",
+      "areas": [
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 678,
+        "removed": 289,
+        "files": 3,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "4306bc8",
+          "subject": "refactor(survival): extrai o relogio de exibicao do NetClient"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "051",
+      "pr": 78,
+      "kind": "pr",
+      "title": "fix(survival): tres correcoes do review no menu de campo",
+      "slug": "fix-survival-tres-correcoes-do-review-no-menu-de-campo",
+      "tip": "2cf97a763e01bee249dff5796a3eac2be0c354b7",
+      "tipShort": "2cf97a7",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-09-30",
+      "areas": [
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 1073,
+        "removed": 38,
+        "files": 7,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "6b3673d",
+          "subject": "feat(survival): menu de campo da Aurix, com abandono de run"
+        },
+        {
+          "sha": "0f747ee",
+          "subject": "fix(survival): tres correcoes do review no menu de campo"
+        }
+      ],
+      "recipes": [
+        "menu"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "052",
+      "pr": 79,
+      "kind": "pr",
+      "title": "Forma do projetil e halo param de mentir sobre opacidade e carga",
+      "slug": "forma-do-projetil-e-halo-param-de-mentir-sobre-opacidade-e-c",
+      "tip": "136e9ad6a642f39f59a230a3fbfd23043f37e885",
+      "tipShort": "136e9ad",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-01",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 3653,
+        "removed": 622,
+        "files": 66,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "6e96312",
+          "subject": "survival: calor visivel no cano, faixa de mira no chao e projeteis com forma"
+        },
+        {
+          "sha": "626d987",
+          "subject": "survival: Prospector vira o bot de mineracao PX, com passada de verdade"
+        },
+        {
+          "sha": "6a6ba4c",
+          "subject": "survival: oclusao de ambiente no rasterizador voxel"
+        },
+        {
+          "sha": "2176ebb",
+          "subject": "survival: realce de quina no rasterizador e halo dos emissivos no runtime"
+        },
+        {
+          "sha": "72c4d6c",
+          "subject": "survival: seis degraus intermediarios na paleta, e o farol vira material"
+        },
+        {
+          "sha": "3c0240f",
+          "subject": "survival: devolve o contraste — intermediarios preenchem, nao substituem"
+        },
+        {
+          "sha": "39bc1a2",
+          "subject": "Faixa de mira: so com o gatilho, e ate o ultimo quique"
+        },
+        {
+          "sha": "01586a7",
+          "subject": "Forma do projetil e halo param de mentir sobre opacidade e carga"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "053",
+      "pr": 80,
+      "kind": "pr",
+      "title": "fix: as doze issues de review que ainda descrevem o codigo",
+      "slug": "fix-as-doze-issues-de-review-que-ainda-descrevem-o-codigo",
+      "tip": "3c286d997b00a3140c98fd99e57e31bf38c5f92c",
+      "tipShort": "3c286d9",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-02",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 813,
+        "removed": 61,
+        "files": 16,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "8646203",
+          "subject": "fix: as doze issues de review que ainda descrevem o codigo"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "054",
+      "pr": 81,
+      "kind": "pr",
+      "title": "Prospector: tronco segue as pernas, arma com profundidade e tiro na altura do cano",
+      "slug": "prospector-tronco-segue-as-pernas-arma-com-profundidade-e-ti",
+      "tip": "2609c0edeacc99425207b2dbec17f899a0b24acc",
+      "tipShort": "2609c0e",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-03",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-content"
+      ],
+      "stat": {
+        "added": 465,
+        "removed": 50,
+        "files": 9,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "0dc8a7a",
+          "subject": "Prospector: tronco segue as pernas, arma com profundidade e tiro na altura do cano"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "055",
+      "pr": 82,
+      "kind": "pr",
+      "title": "i18n: fecha o toast do poço e o buraco que o deixou passar",
+      "slug": "i18n-fecha-o-toast-do-poco-e-o-buraco-que-o-deixou-passar",
+      "tip": "23153fd3dfb19e707247688900ef18eeb9198a41",
+      "tipShort": "23153fd",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-04",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 2057,
+        "removed": 393,
+        "files": 27,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "f6897e7",
+          "subject": "i18n: 100% dos textos do survival por catálogo, com pt-BR e inglês"
+        },
+        {
+          "sha": "b5cbe43",
+          "subject": "i18n: fecha o toast do poço e o buraco que o deixou passar"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "056",
+      "pr": 84,
+      "kind": "pr",
+      "title": "solo: fecha os tres vazamentos que a vista abriu, e leva o mundo junto",
+      "slug": "solo-fecha-os-tres-vazamentos-que-a-vista-abriu-e-leva-o-mun",
+      "tip": "ec63d9897633eccce10fd382708648a11fcd5b1d",
+      "tipShort": "ec63d98",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-05",
+      "areas": [
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 645,
+        "removed": 29,
+        "files": 3,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "3c5bae0",
+          "subject": "solo: o desenho passa a cair entre dois ticks, como no co-op"
+        },
+        {
+          "sha": "4ba301c",
+          "subject": "solo: fecha os tres vazamentos que a vista abriu, e leva o mundo junto"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "057",
+      "pr": 83,
+      "kind": "pr",
+      "title": "Uma batida por ciclo: curva do tique passa a ser monotona",
+      "slug": "uma-batida-por-ciclo-curva-do-tique-passa-a-ser-monotona",
+      "tip": "a18a938524ad7f08a494f2a40e9a9846cc617e92",
+      "tipShort": "a18a938",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-06",
+      "areas": [
+        "packages/voxelyn-survival",
+        "docs"
+      ],
+      "stat": {
+        "added": 289,
+        "removed": 49,
+        "files": 5,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "af820f8",
+          "subject": "Calor da arma avisa por tique acelerando, e so perto do travamento"
+        },
+        {
+          "sha": "a8af6f5",
+          "subject": "Uma batida por ciclo: curva do tique passa a ser monotona"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "058",
+      "pr": 85,
+      "kind": "pr",
+      "title": "Atlases de mundo sobem para version 2 junto com a grade fina",
+      "slug": "atlases-de-mundo-sobem-para-version-2-junto-com-a-grade-fina",
+      "tip": "9a9a732377fb48a0b7770f3612b621c2d0efcc75",
+      "tipShort": "9a9a732",
+      "realDate": "2026-07-31",
+      "publishDate": "2026-10-07",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "docs",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 1288,
+        "removed": 780,
+        "files": 50,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "4b8e09b",
+          "subject": "Idle vivo: os seis inimigos que congelavam em repouso passam a respirar"
+        },
+        {
+          "sha": "761a30e",
+          "subject": "Grade voxel subdividida: o dobro de resolucao, o mesmo mundo"
+        },
+        {
+          "sha": "c96e42e",
+          "subject": "Passe de detalhamento em meio-passo: o elenco inteiro, na grade fina"
+        },
+        {
+          "sha": "dabbbd3",
+          "subject": "Britador reesculpido: a silhueta da ficha — gorila de pedra agachado"
+        },
+        {
+          "sha": "4cb736b",
+          "subject": "Guardiao e Corcel reesculpidos pelas fichas: cidadela-montanha e corcel bardado"
+        },
+        {
+          "sha": "54a2473",
+          "subject": "Guardiao em escala de chefe: o unico canvas 112x128, acima do Britador"
+        },
+        {
+          "sha": "68b96fb",
+          "subject": "Bispo reesculpido pela ficha: cortina de raizes, bencao aberta e a hierarquia devolvida"
+        },
+        {
+          "sha": "da24e93",
+          "subject": "Trio pequeno reesculpido pelas fichas: aracnideo, jardim de cogumelos e o amanita ambulante"
+        },
+        {
+          "sha": "21c5dfa",
+          "subject": "Trio pequeno: de volta a pegada anterior, com a boca do Cuspidor de bonus"
+        },
+        {
+          "sha": "7407645",
+          "subject": "Atlases de mundo sobem para version 2 junto com a grade fina"
+        }
+      ],
+      "recipes": [
+        "sprites"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "059",
+      "pr": 86,
+      "kind": "pr",
+      "title": "Crostas de chao na grade fina, e a poca ganha bolhas e gotejamento",
+      "slug": "crostas-de-chao-na-grade-fina-e-a-poca-ganha-bolhas-e-goteja",
+      "tip": "f846006768fa40b2ca2d0cfabbfb2622511ef9af",
+      "tipShort": "f846006",
+      "realDate": "2026-08-01",
+      "publishDate": "2026-10-08",
+      "areas": [
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 354,
+        "removed": 64,
+        "files": 17,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "2d9e5cf",
+          "subject": "Prospector para de patinar, esquiva ganha foguetes e o cuspe vira gosma"
+        },
+        {
+          "sha": "be9aa34",
+          "subject": "Crostas de chao na grade fina, e a poca ganha bolhas e gotejamento"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "pending",
+      "skipped": false,
+      "shots": [],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "publishedAt": null
+    },
+    {
+      "id": "060",
       "pr": 87,
       "kind": "pr",
       "title": "A pedra erguida do Britador e a mesma que voa: tampa de osso e carga",
@@ -59,17 +3936,22 @@
       "tip": "fabc237e8c40443edf71c599712e637ed341e091",
       "tipShort": "fabc237",
       "realDate": "2026-08-01",
-      "publishDate": "2026-08-12",
+      "publishDate": "2026-10-09",
       "areas": [
-        "packages/voxelyn-survival-content"
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival"
       ],
       "stat": {
-        "added": 18,
-        "removed": 4,
-        "files": 3,
-        "partial": true
+        "added": 155,
+        "removed": 96,
+        "files": 10,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "550a7dd",
+          "subject": "FX de projeteis autorados nativos na grade fina, e a API morta sai"
+        },
         {
           "sha": "a6db755",
           "subject": "Ondulacao presa na poca, e a pedra do Britador deixa de se camuflar"
@@ -91,7 +3973,7 @@
       "publishedAt": null
     },
     {
-      "id": "003",
+      "id": "061",
       "pr": 88,
       "kind": "pr",
       "title": "Review: espreitador oculto vira ondulacao, hash cobre assinaturas, versoes sobem",
@@ -99,20 +3981,28 @@
       "tip": "e3f4159bda244452640b7af04fc5389bbd670664",
       "tipShort": "e3f4159",
       "realDate": "2026-08-01",
-      "publishDate": "2026-08-13",
+      "publishDate": "2026-10-10",
       "areas": [
-        "packages/voxelyn-survival",
         "packages/voxelyn-survival-content",
-        "packages/voxelyn-survival-protocol",
-        "packages/voxelyn-survival-sim"
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival",
+        "docs"
       ],
       "stat": {
-        "added": 245,
-        "removed": 104,
-        "files": 12,
-        "partial": true
+        "added": 3450,
+        "removed": 225,
+        "files": 52,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "fe257be",
+          "subject": "O Veio ganha estratos, ocupacoes e linhagens; a agua chega ao Aquifero"
+        },
+        {
+          "sha": "624b3fc",
+          "subject": "Segunda leva de estratos: Fenda Sulfurosa, Fornalha, Silica e Cripta Glacial"
+        },
         {
           "sha": "b066ead",
           "subject": "Bestiario de assinatura: um inimigo por estrato, operando a regra do bioma"
@@ -138,7 +4028,7 @@
       "publishedAt": null
     },
     {
-      "id": "004",
+      "id": "062",
       "pr": 89,
       "kind": "pr",
       "title": "Review: manifest do terreno anuncia v3, e o decor deriva do setor pristino",
@@ -146,20 +4036,24 @@
       "tip": "51aa6069651358eef63ccdf9b9eadc3e5fce77c6",
       "tipShort": "51aa606",
       "realDate": "2026-08-01",
-      "publishDate": "2026-08-14",
+      "publishDate": "2026-10-11",
       "areas": [
-        "packages/voxelyn-survival",
         "packages/voxelyn-survival-sim",
-        "docs",
-        "packages/voxelyn-survival-server"
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-content",
+        "docs"
       ],
       "stat": {
-        "added": 906,
-        "removed": 79,
-        "files": 12,
-        "partial": true
+        "added": 1414,
+        "removed": 108,
+        "files": 18,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "8d743f7",
+          "subject": "Cada estrato ganha um veu de cor, e a Lampreia vira fauna do Aquifero"
+        },
         {
           "sha": "206c6d7",
           "subject": "A parede diz o estrato, e cada estrato ganha a propria arquitetura"
@@ -189,7 +4083,7 @@
       "publishedAt": null
     },
     {
-      "id": "005",
+      "id": "063",
       "pr": 90,
       "kind": "pr",
       "title": "Extracao de retorno: pegar o Nucleo e so metade do contrato",
@@ -197,20 +4091,80 @@
       "tip": "a46512ecece15a4c5346ef80beb189fc4f4f6f94",
       "tipShort": "a46512e",
       "realDate": "2026-08-02",
-      "publishDate": "2026-08-15",
+      "publishDate": "2026-10-12",
       "areas": [
-        "packages/voxelyn-survival-content",
-        "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
-        "packages/voxelyn-survival-protocol"
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival-content",
+        "docs"
       ],
       "stat": {
-        "added": 1392,
-        "removed": 158,
-        "files": 27,
-        "partial": true
+        "added": 4154,
+        "removed": 294,
+        "files": 40,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "3e131b7",
+          "subject": "Teto e landmarks: a decoracao ganha a dimensao vertical e o coracao do salao"
+        },
+        {
+          "sha": "a986281",
+          "subject": "Morfologia de borda por estrato e composicao de decor por sala"
+        },
+        {
+          "sha": "292dc57",
+          "subject": "Kit Aurix de infraestrutura: passarela, trilho e a broca monumental"
+        },
+        {
+          "sha": "8f51ace",
+          "subject": "Rastro dedicado dos espreitadores: a lamina lembra por onde eles passaram"
+        },
+        {
+          "sha": "943e089",
+          "subject": "Inercia do gelo: sobre a lamina, o Prospector desliza"
+        },
+        {
+          "sha": "63bb87c",
+          "subject": "Fratura por camada na Silica e seams horizontais de minerio"
+        },
+        {
+          "sha": "7bdd655",
+          "subject": "Sala funcional do poco por estrato e Aurix adaptada ao substrato"
+        },
+        {
+          "sha": "340eec4",
+          "subject": "Fixture de morte ociosa re-semeado apos o pedestal do poco"
+        },
+        {
+          "sha": "3e38c20",
+          "subject": "Estrato Ferrifero: o veio principal que justificou a operacao"
+        },
+        {
+          "sha": "3d64a5c",
+          "subject": "Ruptura a Superficie: o setor raro em que o teto rachou ate o ceu"
+        },
+        {
+          "sha": "f512cde",
+          "subject": "Spec: etapas 10-16 registradas; backlog dos biomas coberto de ponta a ponta"
+        },
+        {
+          "sha": "6655a68",
+          "subject": "Review Codex: fenda so sobre salao vivo, rastro sem vazamento e sob a luz"
+        },
+        {
+          "sha": "1c28cef",
+          "subject": "Review Codex (2a rodada): rastro lembra a propria lamina; pedestal so de rocha comum"
+        },
+        {
+          "sha": "ff8d6de",
+          "subject": "CI: timeout proprio no teste de pontaria solo"
+        },
+        {
+          "sha": "8c0cc40",
+          "subject": "Props com massa: os volumetricos viram modelos voxel no atlas"
+        },
         {
           "sha": "ab7154f",
           "subject": "Textura volumetrica nos props do atlas: a mesma malha dos blocos"
@@ -244,7 +4198,7 @@
       "publishedAt": null
     },
     {
-      "id": "006",
+      "id": "064",
       "pr": 93,
       "kind": "pr",
       "title": "Espelho dos trilhos: firingAt so anda para frente (aviso vive ate a linha de render)",
@@ -252,7 +4206,7 @@
       "tip": "ad854eab31ed7cd4db92556c9a2d49dab9b0b68a",
       "tipShort": "ad854ea",
       "realDate": "2026-08-02",
-      "publishDate": "2026-08-16",
+      "publishDate": "2026-10-13",
       "areas": [
         "packages/voxelyn-survival",
         "packages/voxelyn-survival-content",
@@ -291,7 +4245,7 @@
       "publishedAt": null
     },
     {
-      "id": "007",
+      "id": "065",
       "pr": 94,
       "kind": "pr",
       "title": "Puxao entrega o alvo DENTRO da prensa, e o teste deixa de mascarar a borda",
@@ -299,19 +4253,24 @@
       "tip": "bc2d278a8c52003993690caced8d488b894e01c1",
       "tipShort": "bc2d278",
       "realDate": "2026-08-02",
-      "publishDate": "2026-08-17",
+      "publishDate": "2026-10-14",
       "areas": [
         "packages/voxelyn-survival-sim",
-        "packages/voxelyn-survival-protocol",
-        "packages/voxelyn-survival"
+        "packages/voxelyn-survival-content",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol"
       ],
       "stat": {
-        "added": 340,
-        "removed": 53,
-        "files": 6,
-        "partial": true
+        "added": 1579,
+        "removed": 149,
+        "files": 31,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "72863b6",
+          "subject": "Fauna afinada por bioma: chefe abatido nao volta, bandos de assinatura, dois corpos novos"
+        },
         {
           "sha": "bced91f",
           "subject": "Rework do Miner e os quatro achados do review da fauna"
@@ -353,7 +4312,7 @@
       "publishedAt": null
     },
     {
-      "id": "008",
+      "id": "066",
       "pr": 95,
       "kind": "pr",
       "title": "Orcamento explicito para a varredura da decoracao",
@@ -361,17 +4320,18 @@
       "tip": "512623288afc8213f9dfc9cc312cab45ed078cfb",
       "tipShort": "5126232",
       "realDate": "2026-08-02",
-      "publishDate": "2026-08-18",
+      "publishDate": "2026-10-15",
       "areas": [
         "packages/voxelyn-survival-sim",
         "docs",
-        "packages/voxelyn-survival-server"
+        "packages/voxelyn-survival-server",
+        "packages/voxelyn-survival-protocol"
       ],
       "stat": {
-        "added": 670,
-        "removed": 76,
-        "files": 9,
-        "partial": true
+        "added": 1042,
+        "removed": 79,
+        "files": 10,
+        "partial": false
       },
       "commits": [
         {
@@ -419,7 +4379,7 @@
       "publishedAt": null
     },
     {
-      "id": "009",
+      "id": "067",
       "pr": 96,
       "kind": "pr",
       "title": "A barreira deixa de ter excecao, e a impressao digital deixa de ter furo",
@@ -427,7 +4387,7 @@
       "tip": "9ec2657e8a4d1391a3b596edcc7c43760bcd7474",
       "tipShort": "9ec2657",
       "realDate": "2026-08-02",
-      "publishDate": "2026-08-19",
+      "publishDate": "2026-10-16",
       "areas": [
         "packages/voxelyn-survival-sim",
         "docs"
@@ -464,7 +4424,7 @@
       "publishedAt": null
     },
     {
-      "id": "010",
+      "id": "068",
       "pr": 97,
       "kind": "pr",
       "title": "Codex round 6: o rastreador compartilhado era erro de definicao",
@@ -472,20 +4432,56 @@
       "tip": "5a3f9409fcb375d2416265e82d1d868b12260574",
       "tipShort": "5a3f940",
       "realDate": "2026-08-03",
-      "publishDate": "2026-08-20",
+      "publishDate": "2026-10-17",
       "areas": [
         "packages/voxelyn-survival",
         "packages/voxelyn-survival-server",
         "packages/voxelyn-survival-sim",
-        "docs"
+        "packages/voxelyn-survival-protocol"
       ],
       "stat": {
-        "added": 2932,
-        "removed": 494,
-        "files": 25,
-        "partial": true
+        "added": 11385,
+        "removed": 1478,
+        "files": 51,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "222074d",
+          "subject": "A carga deixa de ser pontuacao: spec da Matriz Geracional Aurix"
+        },
+        {
+          "sha": "7e12ecc",
+          "subject": "Spec: Matriz Geracional Aurix com persistencia autoritativa"
+        },
+        {
+          "sha": "391b6f6",
+          "subject": "Slice 1: minerio deixa de pagar modulo e ganha uma arvore"
+        },
+        {
+          "sha": "84d02ed",
+          "subject": "Slice 2: a simulacao le o tuning congelado, e o hash o cobre"
+        },
+        {
+          "sha": "6762cb1",
+          "subject": "Slice 3: o contrato da progressao, e a carga no wire"
+        },
+        {
+          "sha": "3a8695a",
+          "subject": "Slices 4 e 5: o servidor decide, e o Codex nasce"
+        },
+        {
+          "sha": "8180109",
+          "subject": "Slice 6: o cliente pede autorizacao antes de descer"
+        },
+        {
+          "sha": "074e288",
+          "subject": "Slice 7: a Matriz Geracional e os Arquivos Aurix"
+        },
+        {
+          "sha": "d748f72",
+          "subject": "Slice 9: a tela de resultado diz o que a carga virou"
+        },
         {
           "sha": "cdf48dd",
           "subject": "Slice 8: o chassi cresce sem trocar de silhueta"
@@ -539,7 +4535,7 @@
       "publishedAt": null
     },
     {
-      "id": "011",
+      "id": "069",
       "pr": 98,
       "kind": "pr",
       "title": "Remove a retentativa de despertar: seguro contra o que nao temos",
@@ -547,7 +4543,7 @@
       "tip": "cc6952d0f029b6a2499d5f2cae782f1cce5ad485",
       "tipShort": "cc6952d",
       "realDate": "2026-08-03",
-      "publishDate": "2026-08-21",
+      "publishDate": "2026-10-18",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -595,7 +4591,7 @@
       "publishedAt": null
     },
     {
-      "id": "012",
+      "id": "070",
       "pr": 100,
       "kind": "pr",
       "title": "DOM tests for tab semantics and focus restoration (happy-dom)",
@@ -603,7 +4599,7 @@
       "tip": "838054a729632e49accb56f2dde868f059aedfed",
       "tipShort": "838054a",
       "realDate": "2026-08-03",
-      "publishDate": "2026-08-22",
+      "publishDate": "2026-10-19",
       "areas": [
         "packages/voxelyn-survival",
         "pnpm-lock.yaml"
@@ -644,7 +4640,7 @@
       "publishedAt": null
     },
     {
-      "id": "013",
+      "id": "071",
       "pr": 101,
       "kind": "pr",
       "title": "Deploy veil governs the run lifecycle; cost capped on large screens",
@@ -652,17 +4648,21 @@
       "tip": "4f6cd489f9aac842bc92e3e35d907f7609c51c7d",
       "tipShort": "4f6cd48",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-23",
+      "publishDate": "2026-10-20",
       "areas": [
         "packages/voxelyn-survival"
       ],
       "stat": {
-        "added": 1587,
-        "removed": 202,
-        "files": 17,
-        "partial": true
+        "added": 1868,
+        "removed": 264,
+        "files": 18,
+        "partial": false
       },
       "commits": [
+        {
+          "sha": "afe1b7e",
+          "subject": "Field feedback: options fill the sheet, pause terminal recomposed, sticky matrix header"
+        },
         {
           "sha": "9b0fba2",
           "subject": "CRT sweep for network-wait states (board 3p)"
@@ -728,7 +4728,7 @@
       "publishedAt": null
     },
     {
-      "id": "014",
+      "id": "072",
       "pr": 102,
       "kind": "pr",
       "title": "Veil wavefront: honeycomb stencil brings back the cell-by-cell look",
@@ -736,7 +4736,7 @@
       "tip": "4f7da40105e9786350e58de55b3f6f00a5e65773",
       "tipShort": "4f7da40",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-24",
+      "publishDate": "2026-10-21",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -768,7 +4768,7 @@
       "publishedAt": null
     },
     {
-      "id": "015",
+      "id": "073",
       "pr": 103,
       "kind": "pr",
       "title": "Deploy veil v3: zero cells — a shutter and a stenciled wavefront",
@@ -776,7 +4776,7 @@
       "tip": "526226719b0a8bc21bb95eaf15acbdbf0f806840",
       "tipShort": "5262267",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-25",
+      "publishDate": "2026-10-22",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -804,7 +4804,7 @@
       "publishedAt": null
     },
     {
-      "id": "016",
+      "id": "074",
       "pr": 104,
       "kind": "pr",
       "title": "Review Codex: habilidade equipada viaja no ViewerState",
@@ -812,7 +4812,7 @@
       "tip": "9170589e5167436d28879fc4fa9bd7d4901e54b3",
       "tipShort": "9170589",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-26",
+      "publishDate": "2026-10-23",
       "areas": [
         "packages/voxelyn-survival",
         "packages/voxelyn-survival-sim",
@@ -863,7 +4863,7 @@
       "publishedAt": null
     },
     {
-      "id": "017",
+      "id": "075",
       "pr": 105,
       "kind": "pr",
       "title": "Review Codex: bump protocolo 14 e simulacao 21 para o facing por movimento",
@@ -871,7 +4871,7 @@
       "tip": "043e6159c72ae52b9b660b47b9869d852c185ef5",
       "tipShort": "043e615",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-27",
+      "publishDate": "2026-10-24",
       "areas": [
         "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
@@ -906,7 +4906,7 @@
       "publishedAt": null
     },
     {
-      "id": "018",
+      "id": "076",
       "pr": 106,
       "kind": "pr",
       "title": "Sela protocolos atras de pre-requisito ausente na Matriz",
@@ -914,7 +4914,7 @@
       "tip": "5fc5ea928528a30126727b169b934756643c06b2",
       "tipShort": "5fc5ea9",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-28",
+      "publishDate": "2026-10-25",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -942,7 +4942,7 @@
       "publishedAt": null
     },
     {
-      "id": "019",
+      "id": "077",
       "pr": 107,
       "kind": "pr",
       "title": "Trilha IA — Cognição de Combate: quinta ramificação da Matriz Geracional",
@@ -950,7 +4950,7 @@
       "tip": "c18eebf01889a6c70df0c9b0db9a20799cc5ce31",
       "tipShort": "c18eebf",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-29",
+      "publishDate": "2026-10-26",
       "areas": [
         "packages/voxelyn-survival",
         "packages/voxelyn-survival-server",
@@ -980,7 +4980,7 @@
       "publishedAt": null
     },
     {
-      "id": "020",
+      "id": "078",
       "pr": 108,
       "kind": "pr",
       "title": "Trata a segunda review do PR #108: link fora do filtro e estado residual",
@@ -988,7 +4988,7 @@
       "tip": "447d0a136e79f016b65ff098df6a8d2e4b54958c",
       "tipShort": "447d0a1",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-30",
+      "publishDate": "2026-10-27",
       "areas": [
         "packages/voxelyn-survival-server",
         "packages/voxelyn-survival",
@@ -1047,7 +5047,7 @@
       "publishedAt": null
     },
     {
-      "id": "021",
+      "id": "079",
       "pr": 110,
       "kind": "pr",
       "title": "Corrige a orientação do atlas das assinaturas: frente de +x para -y",
@@ -1055,7 +5055,7 @@
       "tip": "ee7f3a50f48a2e4f97571c4f70e441631ea9680e",
       "tipShort": "ee7f3a5",
       "realDate": "2026-08-04",
-      "publishDate": "2026-08-31",
+      "publishDate": "2026-10-28",
       "areas": [
         "packages/voxelyn-survival-content",
         "packages/voxelyn-survival"
@@ -1077,8 +5077,7 @@
         }
       ],
       "recipes": [
-        "sprites",
-        "solo"
+        "sprites"
       ],
       "status": "pending",
       "skipped": false,
@@ -1089,7 +5088,7 @@
       "publishedAt": null
     },
     {
-      "id": "022",
+      "id": "080",
       "pr": 111,
       "kind": "pr",
       "title": "Tres listas que envelheceram calado",
@@ -1097,7 +5096,7 @@
       "tip": "0f5c868719ea95b042ab3fc984eec497b2a848ee",
       "tipShort": "0f5c868",
       "realDate": "2026-08-05",
-      "publishDate": "2026-09-01",
+      "publishDate": "2026-10-29",
       "areas": [
         "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
@@ -1176,7 +5175,7 @@
       "publishedAt": null
     },
     {
-      "id": "023",
+      "id": "081",
       "pr": 112,
       "kind": "pr",
       "title": "Recorta a geometria morta do wordmark do asset do emblema",
@@ -1184,7 +5183,7 @@
       "tip": "22c6fe088dbb81144a3d9e564538d236c51f759f",
       "tipShort": "22c6fe0",
       "realDate": "2026-08-05",
-      "publishDate": "2026-09-02",
+      "publishDate": "2026-10-30",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -1224,7 +5223,7 @@
       "publishedAt": null
     },
     {
-      "id": "024",
+      "id": "082",
       "pr": 113,
       "kind": "pr",
       "title": "Survival: linhagens de até sete setores por geração do Prospector",
@@ -1232,7 +5231,7 @@
       "tip": "029479b1f48366d8b74690386d71afe764351be4",
       "tipShort": "029479b",
       "realDate": "2026-08-05",
-      "publishDate": "2026-09-03",
+      "publishDate": "2026-10-31",
       "areas": [
         "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
@@ -1263,7 +5262,7 @@
       "publishedAt": null
     },
     {
-      "id": "025",
+      "id": "083",
       "pr": 115,
       "kind": "pr",
       "title": "Trata a review do PR #115: telegrafo na reconexão e atribuição de versão",
@@ -1271,7 +5270,7 @@
       "tip": "d51e14e2daf82acd7aa54c379992239a76326667",
       "tipShort": "d51e14e",
       "realDate": "2026-08-05",
-      "publishDate": "2026-09-04",
+      "publishDate": "2026-11-01",
       "areas": [
         "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
@@ -1310,7 +5309,7 @@
       "publishedAt": null
     },
     {
-      "id": "026",
+      "id": "084",
       "pr": 116,
       "kind": "pr",
       "title": "Fix arena abandonment on tab close and loadout/tuning conflation",
@@ -1318,7 +5317,7 @@
       "tip": "856032749127b9a10889307e1f4a6fd0b15b6d32",
       "tipShort": "8560327",
       "realDate": "2026-08-05",
-      "publishDate": "2026-09-05",
+      "publishDate": "2026-11-02",
       "areas": [
         "packages/voxelyn-survival-mcp",
         "packages/voxelyn-survival",
@@ -1350,8 +5349,7 @@
         }
       ],
       "recipes": [
-        "arena",
-        "solo"
+        "arena"
       ],
       "status": "pending",
       "skipped": false,
@@ -1362,7 +5360,7 @@
       "publishedAt": null
     },
     {
-      "id": "027",
+      "id": "085",
       "pr": 117,
       "kind": "pr",
       "title": "Fix virtual joystick losing grip in the Boss Arena",
@@ -1370,7 +5368,7 @@
       "tip": "a6f7d4d2e26a400c39ff3ae4054a701c10183559",
       "tipShort": "a6f7d4d",
       "realDate": "2026-08-05",
-      "publishDate": "2026-09-06",
+      "publishDate": "2026-11-03",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -1387,8 +5385,7 @@
         }
       ],
       "recipes": [
-        "arena",
-        "solo"
+        "arena"
       ],
       "status": "pending",
       "skipped": false,
@@ -1399,7 +5396,7 @@
       "publishedAt": null
     },
     {
-      "id": "028",
+      "id": "086",
       "pr": 119,
       "kind": "pr",
       "title": "Add Voxelyn Atlas Studio: PWA mobile-first para autorar atlases de sprite",
@@ -1407,7 +5404,7 @@
       "tip": "25e475e7b0b60ce709adb5aaa32561a89c6f1d0e",
       "tipShort": "25e475e",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-07",
+      "publishDate": "2026-11-04",
       "areas": [
         "packages/voxelyn-atlas-studio",
         "eslint.config.js",
@@ -1427,7 +5424,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1438,7 +5436,7 @@
       "publishedAt": null
     },
     {
-      "id": "029",
+      "id": "087",
       "pr": 120,
       "kind": "pr",
       "title": "Atlas Studio: modo voxel (montar como Lego) e catalogo Abrir do jogo",
@@ -1446,7 +5444,7 @@
       "tip": "268c625fb6a5586fd4a938a2ca5b23b3433c13fe",
       "tipShort": "268c625",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-08",
+      "publishDate": "2026-11-05",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1463,7 +5461,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1474,7 +5473,7 @@
       "publishedAt": null
     },
     {
-      "id": "030",
+      "id": "088",
       "pr": 118,
       "kind": "pr",
       "title": "Trata a review do PR #118: os cinco casos de borda",
@@ -1482,7 +5481,7 @@
       "tip": "7336b211f45eb16b9d31c96c292bd57d1c4120c5",
       "tipShort": "7336b21",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-09",
+      "publishDate": "2026-11-06",
       "areas": [
         "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
@@ -1516,7 +5515,7 @@
       "publishedAt": null
     },
     {
-      "id": "031",
+      "id": "089",
       "pr": 121,
       "kind": "pr",
       "title": "Atlas Studio voxel: construir direto na vista 3D, com zoom livre e sem corte",
@@ -1524,7 +5523,7 @@
       "tip": "af3bc0afeffb6a92cd19f22be9cb5092c4a80cb8",
       "tipShort": "af3bc0a",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-10",
+      "publishDate": "2026-11-07",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1541,7 +5540,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1552,7 +5552,7 @@
       "publishedAt": null
     },
     {
-      "id": "032",
+      "id": "090",
       "pr": 122,
       "kind": "pr",
       "title": "Diluvio: a carta unica do Leviata, e os dutos que a despejam",
@@ -1560,7 +5560,7 @@
       "tip": "042a1d28cb7f71e7af80433cb2fdeca421d92bd3",
       "tipShort": "042a1d2",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-11",
+      "publishDate": "2026-11-08",
       "areas": [
         "packages/voxelyn-survival-sim",
         "packages/voxelyn-survival",
@@ -1591,7 +5591,7 @@
       "publishedAt": null
     },
     {
-      "id": "033",
+      "id": "091",
       "pr": 123,
       "kind": "pr",
       "title": "Arena: so a camara do chefe, sem mobs — e o Aquifero ganha uma camara de verdade",
@@ -1599,7 +5599,7 @@
       "tip": "fc6e3056fce46477a28db6265daa353a996ba914",
       "tipShort": "fc6e305",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-12",
+      "publishDate": "2026-11-09",
       "areas": [
         "packages/voxelyn-survival",
         "packages/voxelyn-survival-sim",
@@ -1618,8 +5618,7 @@
         }
       ],
       "recipes": [
-        "arena",
-        "solo"
+        "arena"
       ],
       "status": "pending",
       "skipped": false,
@@ -1630,7 +5629,7 @@
       "publishedAt": null
     },
     {
-      "id": "034",
+      "id": "092",
       "pr": 124,
       "kind": "pr",
       "title": "Arena: espaco para circular, medido em vez de estimado",
@@ -1638,7 +5637,7 @@
       "tip": "bbc45670b97b1e6156ffbd1fdfb2af1a5fdac2be",
       "tipShort": "bbc4567",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-13",
+      "publishDate": "2026-11-10",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -1655,8 +5654,7 @@
         }
       ],
       "recipes": [
-        "arena",
-        "solo"
+        "arena"
       ],
       "status": "pending",
       "skipped": false,
@@ -1667,7 +5665,7 @@
       "publishedAt": null
     },
     {
-      "id": "035",
+      "id": "093",
       "pr": 125,
       "kind": "pr",
       "title": "Atlas Studio voxel: fim das torres no arrasto 3D, Caixa, balde cercado e duplicar camada",
@@ -1675,7 +5673,7 @@
       "tip": "0d7ea4cd150b30cb58bd5c1866be030fc043c243",
       "tipShort": "0d7ea4c",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-14",
+      "publishDate": "2026-11-11",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1692,7 +5690,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1703,7 +5702,7 @@
       "publishedAt": null
     },
     {
-      "id": "036",
+      "id": "094",
       "pr": 126,
       "kind": "pr",
       "title": "Atlas Studio: importar STL voxelizado como projeto voxel",
@@ -1711,7 +5710,7 @@
       "tip": "3729aa3399ef26cd15034220aa84eeb7cb135838",
       "tipShort": "3729aa3",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-15",
+      "publishDate": "2026-11-12",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1728,7 +5727,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1739,7 +5739,7 @@
       "publishedAt": null
     },
     {
-      "id": "037",
+      "id": "095",
       "pr": 127,
       "kind": "pr",
       "title": "Atlas Studio: animacao procedural — o autor escolhe o preset, o motor gera os frames",
@@ -1747,7 +5747,7 @@
       "tip": "0d38e7faa43409425cef833dd3b90bb6febc65ff",
       "tipShort": "0d38e7f",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-16",
+      "publishDate": "2026-11-13",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1764,7 +5764,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1775,7 +5776,7 @@
       "publishedAt": null
     },
     {
-      "id": "038",
+      "id": "096",
       "pr": 128,
       "kind": "pr",
       "title": "Atlas Studio: IA projeta as poses dos frames (motor de poses por partes + Claude API)",
@@ -1783,7 +5784,7 @@
       "tip": "42381108a07e04ed825a9f8a90023022a9f4e498",
       "tipShort": "4238110",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-17",
+      "publishDate": "2026-11-14",
       "areas": [
         "packages/voxelyn-atlas-studio",
         "pnpm-lock.yaml"
@@ -1801,7 +5802,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1812,7 +5814,7 @@
       "publishedAt": null
     },
     {
-      "id": "039",
+      "id": "097",
       "pr": 129,
       "kind": "pr",
       "title": "Atlas Studio: seletor de modelo para a IA que projeta as poses",
@@ -1820,7 +5822,7 @@
       "tip": "c0c4cf200c6d9bae56bfeb6c51e89a392db2c354",
       "tipShort": "c0c4cf2",
       "realDate": "2026-08-06",
-      "publishDate": "2026-09-18",
+      "publishDate": "2026-11-15",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1837,7 +5839,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1848,7 +5851,7 @@
       "publishedAt": null
     },
     {
-      "id": "040",
+      "id": "098",
       "pr": 130,
       "kind": "pr",
       "title": "Atlas Studio: segmentacao que enxerga membros, IA com visao e painel de partes",
@@ -1856,7 +5859,7 @@
       "tip": "a78700ae432efb2e995811b3925125a4a23aa819",
       "tipShort": "a78700a",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-19",
+      "publishDate": "2026-11-16",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1873,7 +5876,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1884,7 +5888,7 @@
       "publishedAt": null
     },
     {
-      "id": "041",
+      "id": "099",
       "pr": 131,
       "kind": "pr",
       "title": "Atlas Studio: mapa de partes so usa MATERIAIS (corrige \"material sem rampa\")",
@@ -1892,7 +5896,7 @@
       "tip": "aceff48156dfd95aceec65ddc40415ed13b0d2bb",
       "tipShort": "aceff48",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-20",
+      "publishDate": "2026-11-17",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1909,7 +5913,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1920,7 +5925,7 @@
       "publishedAt": null
     },
     {
-      "id": "042",
+      "id": "100",
       "pr": 132,
       "kind": "pr",
       "title": "Atlas Studio: cortes grossos de camada e selecao retangular na fatia",
@@ -1928,7 +5933,7 @@
       "tip": "33931a75c94aea3ad647625b12da030ea3a8c65e",
       "tipShort": "33931a7",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-21",
+      "publishDate": "2026-11-18",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1945,7 +5950,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1956,7 +5962,7 @@
       "publishedAt": null
     },
     {
-      "id": "043",
+      "id": "101",
       "pr": 133,
       "kind": "pr",
       "title": "Atlas Studio: esqueleto de verdade — hierarquia de ossos e juntas nos membros",
@@ -1964,7 +5970,7 @@
       "tip": "17a3183b2a085e4ea55fb7640873077fc6a6bbdf",
       "tipShort": "17a3183",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-22",
+      "publishDate": "2026-11-19",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -1981,7 +5987,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -1992,7 +5999,7 @@
       "publishedAt": null
     },
     {
-      "id": "044",
+      "id": "102",
       "pr": 134,
       "kind": "pr",
       "title": "Atlas Studio: importar GLB com a animacao junto",
@@ -2000,7 +6007,7 @@
       "tip": "28c2c8fe461ba351cc953b4929d8973ed29b62b5",
       "tipShort": "28c2c8f",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-23",
+      "publishDate": "2026-11-20",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -2021,7 +6028,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -2032,7 +6040,7 @@
       "publishedAt": null
     },
     {
-      "id": "045",
+      "id": "103",
       "pr": 135,
       "kind": "pr",
       "title": "Atlas Studio: GLB no contrato do jogo, e textura virando material por aproximacao",
@@ -2040,7 +6048,7 @@
       "tip": "269af147bef1dd03876ade44969b70eb414e9ae5",
       "tipShort": "269af14",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-24",
+      "publishDate": "2026-11-21",
       "areas": [
         "packages/voxelyn-atlas-studio"
       ],
@@ -2061,7 +6069,8 @@
         }
       ],
       "recipes": [
-        "atlas-studio"
+        "atlas-studio",
+        "solo"
       ],
       "status": "pending",
       "skipped": false,
@@ -2072,7 +6081,7 @@
       "publishedAt": null
     },
     {
-      "id": "046",
+      "id": "104",
       "pr": 136,
       "kind": "pr",
       "title": "Rainha da Geada: o volume vem do Studio, o atlas continua gerado",
@@ -2080,7 +6089,7 @@
       "tip": "66b56210b9806d27f694e05584e8c5916accee81",
       "tipShort": "66b5621",
       "realDate": "2026-08-07",
-      "publishDate": "2026-09-25",
+      "publishDate": "2026-11-22",
       "areas": [
         "packages/voxelyn-atlas-studio",
         "packages/voxelyn-survival-content"
@@ -2130,7 +6139,7 @@
       "publishedAt": null
     },
     {
-      "id": "047",
+      "id": "105",
       "pr": 137,
       "kind": "pr",
       "title": "Atlas Studio: grade de blocos no import — a mesma resolucao em que o jogo e autorado",
@@ -2138,7 +6147,7 @@
       "tip": "69f4900fd725dee17befcb5553ca7cb7a41e2659",
       "tipShort": "69f4900",
       "realDate": "2026-08-08",
-      "publishDate": "2026-09-26",
+      "publishDate": "2026-11-23",
       "areas": [
         "packages/voxelyn-survival-content",
         "packages/voxelyn-atlas-studio"
@@ -2172,7 +6181,7 @@
       "publishedAt": null
     },
     {
-      "id": "048",
+      "id": "106",
       "pr": 138,
       "kind": "pr",
       "title": "Entrada por quina: o contato e a ULTIMA travessia, nao a primeira",
@@ -2180,7 +6189,7 @@
       "tip": "b28a5ba8e5c5c345eb11fb52a48b6ca18dfcf9de",
       "tipShort": "b28a5ba",
       "realDate": "2026-08-10",
-      "publishDate": "2026-09-27",
+      "publishDate": "2026-11-24",
       "areas": [
         "packages/voxelyn-survival-content",
         "packages/voxelyn-survival",
@@ -2227,7 +6236,7 @@
       "publishedAt": null
     },
     {
-      "id": "049",
+      "id": "107",
       "pr": 139,
       "kind": "pr",
       "title": "A arena de chefes nao oferece duas saidas que nao existem",
@@ -2235,7 +6244,7 @@
       "tip": "fd7dcabc44f83efd0472db56ae20a44dfdb0347c",
       "tipShort": "fd7dcab",
       "realDate": "2026-08-10",
-      "publishDate": "2026-09-28",
+      "publishDate": "2026-11-25",
       "areas": [
         "packages/voxelyn-survival"
       ],
@@ -2260,19 +6269,11 @@
         }
       ],
       "recipes": [
-        "arena",
-        "solo"
+        "arena"
       ],
-      "status": "shot",
+      "status": "pending",
       "skipped": false,
-      "shots": [
-        {
-          "recipe": "solo",
-          "file": "049-solo.png",
-          "label": "run solo",
-          "bytes": 449298
-        }
-      ],
+      "shots": [],
       "shotError": null,
       "entryFile": null,
       "carousel": [],

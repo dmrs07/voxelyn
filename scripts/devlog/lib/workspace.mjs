@@ -1,14 +1,55 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+
+import esbuild from 'esbuild';
 
 import { git } from './git.mjs';
 import { repoRoot, workDir } from './paths.mjs';
 
-/** Apps construiveis do monorepo, por nome de receita. */
+/**
+ * Apps construiveis do monorepo, por nome.
+ *
+ * Sao QUATRO porque o devlog cobre sete meses, e o que existia para ser
+ * fotografado mudou tres vezes nesse periodo: o editor VoxelForge desde
+ * janeiro, o roguelike desde fevereiro, o Survival desde julho e o Atlas
+ * Studio desde agosto. Capturar 18/01 com o app de agosto seria justamente a
+ * mentira que este pipeline existe para evitar.
+ */
 export const APPS = {
-  survival: { pkg: '@voxelyn/survival', dir: 'packages/voxelyn-survival' },
-  'atlas-studio': { pkg: '@voxelyn/atlas-studio', dir: 'packages/voxelyn-atlas-studio' },
+  // Os demos do core, que existem desde o PRIMEIRO commit e sao a origem
+  // visual do projeto: o Noita-like e o iso Diablo-like em cima da biblioteca
+  // headless, meses antes de existir um jogo.
+  examples: {
+    kind: 'esbuild',
+    dir: '.',
+    probe: 'examples/browser-noita-like/index.html',
+    entries: ['examples/browser-noita-like/index.ts', 'examples/browser-iso-diablo-like/index.ts'],
+  },
+  editor: {
+    kind: 'vite',
+    pkg: '@voxelforge/editor',
+    dir: 'packages/voxelforge-editor',
+    probe: 'packages/voxelforge-editor/package.json',
+  },
+  roguelike: {
+    kind: 'vite',
+    pkg: '@voxelyn/roguelike',
+    dir: 'packages/voxelyn-roguelike',
+    probe: 'packages/voxelyn-roguelike/package.json',
+  },
+  survival: {
+    kind: 'vite',
+    pkg: '@voxelyn/survival',
+    dir: 'packages/voxelyn-survival',
+    probe: 'packages/voxelyn-survival/package.json',
+  },
+  'atlas-studio': {
+    kind: 'vite',
+    pkg: '@voxelyn/atlas-studio',
+    dir: 'packages/voxelyn-atlas-studio',
+    probe: 'packages/voxelyn-atlas-studio/package.json',
+  },
 };
 
 function run(cmd, args, cwd, { timeout = 15 * 60_000 } = {}) {
@@ -71,8 +112,13 @@ export function removeWorktree(sha) {
  *   o lockfile estava defasado, `--frozen-lockfile` falha alto e a captura
  *   morreria por um motivo que nao tem nada a ver com o que queremos mostrar.
  */
-export function install(dir, pkg, log = () => {}) {
-  const base = ['install', '--ignore-scripts', '--filter', `${pkg}...`];
+export function install(dir, app, log = () => {}) {
+  // Os demos da origem nao tem dependencia nenhuma: importam a biblioteca por
+  // caminho relativo, e quem empacota e o esbuild DESTE checkout. Nada a
+  // instalar dentro da worktree.
+  if (APPS[app].kind === 'esbuild') return;
+
+  const base = ['install', '--ignore-scripts', '--filter', `${APPS[app].pkg}...`];
   try {
     log('pnpm install --frozen-lockfile');
     run('pnpm', [...base, '--frozen-lockfile'], dir);
@@ -90,18 +136,64 @@ export function install(dir, pkg, log = () => {}) {
  * typecheck de um commit antigo contra o TypeScript de hoje e uma fonte de
  * falha que nao diz nada sobre a imagem que queremos: o bundle sai igual.
  */
+/**
+ * Empacota os demos do core com o esbuild deste checkout.
+ *
+ * O `tsc` do repositorio original nao servia: ele reescrevia os `.ts` em
+ * `.js` mantendo os especificadores como estavam — `from "../../src/index"`,
+ * sem extensao —, e nenhum browser resolve isso. Ou seja, o demo nunca rodou
+ * direto do output do tsc; quem abrisse aquilo veria tela preta.
+ *
+ * O esbuild resolve o `.ts` e entrega um bundle que o browser executa. O
+ * CODIGO e o do commit, byte a byte — o que muda e so quem costura os
+ * modulos, que e uma questao de ferramenta, nao de conteudo. A imagem
+ * continua sendo a daquele dia.
+ */
+function buildExamples(dir, app, log) {
+  const out = resolve(dir, '.devlog-build');
+  let built = 0;
+
+  for (const entry of app.entries) {
+    const source = resolve(dir, entry);
+    if (!existsSync(source)) continue; // demo que ainda nao existia nesse commit
+    const js = entry.replace(/\.ts$/, '.js');
+    log(`esbuild ${entry}`);
+    // Dois destinos, mesmo bundle: o HTML da origem pede `./index.js` ao lado
+    // de si, e o HTML de fevereiro em diante pede `../../dist/examples/...`.
+    // Escrever nos dois cobre as duas eras sem detectar qual e qual.
+    for (const target of [resolve(out, js), resolve(out, 'dist', js)]) {
+      mkdirSync(dirname(target), { recursive: true });
+      esbuild.buildSync({
+        entryPoints: [source],
+        bundle: true,
+        format: 'esm',
+        target: 'es2020',
+        outfile: target,
+        logLevel: 'silent',
+      });
+    }
+    built += 1;
+  }
+
+  if (!built) throw new Error('nenhum demo do core neste commit');
+  return { root: dir, fallbacks: [out] };
+}
+
 export function build(dir, app, log = () => {}) {
-  const { pkg, dir: pkgDir } = APPS[app];
+  const { kind, pkg, dir: pkgDir } = APPS[app];
+
+  if (kind === 'esbuild') return buildExamples(dir, APPS[app], log);
+
   log(`vite build (${pkg})`);
   run('pnpm', ['--filter', pkg, 'exec', 'vite', 'build'], dir);
   const dist = resolve(dir, pkgDir, 'dist');
   if (!existsSync(dist)) throw new Error(`build nao produziu ${pkgDir}/dist`);
-  return dist;
+  return { root: dist, fallbacks: [] };
 }
 
-/** Um app so e construivel num commit onde o pacote dele ja existia. */
+/** Um app so e construivel num commit onde ele ja existia. */
 export function appExistsAt(dir, app) {
-  return existsSync(resolve(dir, APPS[app].dir, 'package.json'));
+  return existsSync(resolve(dir, APPS[app].probe));
 }
 
 function firstLine(err) {

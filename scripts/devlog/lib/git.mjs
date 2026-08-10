@@ -9,6 +9,11 @@ export function git(args, opts = {}) {
     cwd: opts.cwd ?? repoRoot,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    // `quiet` cala o stderr de sondagens que FALHAM DE PROPOSITO — perguntar
+    // ao git se um pacote ja existia num commit antigo imprime "fatal: path
+    // ... exists on disk, but not in <sha>" para cada resposta negativa, e o
+    // resultado seria centenas de linhas de erro num comando bem-sucedido.
+    stdio: opts.quiet ? ['ignore', 'pipe', 'ignore'] : ['ignore', 'pipe', 'pipe'],
   }).trim();
 }
 
@@ -68,6 +73,32 @@ function hasParent(sha) {
 /** Assuntos que sao contabilidade de branch, nao entrega. */
 const BOOKKEEPING = /^(Merge |Revert ")/i;
 
+/**
+ * O devlog nao fala do devlog.
+ *
+ * O proprio pipeline vive no repositorio e portanto aparece no historico. Uma
+ * entrada sobre o commit que criou o pipeline seria um post anunciando a
+ * existencia do post — ruido, e ruido que se repete a cada dia publicado,
+ * porque cada publicacao tambem commita.
+ */
+const SELF = /^(docs\/devlog|scripts\/devlog)/;
+
+function isSelfReferential(commits) {
+  const files = new Set();
+  for (const c of commits) {
+    if (!hasParent(c.sha)) continue;
+    for (const f of git(['show', '--name-only', '--pretty=format:', c.sha]).split('\n'))
+      if (f.trim()) files.add(f.trim());
+  }
+  if (!files.size) return false;
+  // Maioria, nao unanimidade: o commit que cria o pipeline tambem encosta em
+  // package.json, eslint e lockfile, e exigir 100% deixaria justamente ele
+  // passar. Um PR de verdade que por acaso atualize um arquivo do devlog fica
+  // muito abaixo do corte.
+  const mine = [...files].filter((f) => SELF.test(f)).length;
+  return mine / files.size >= 0.6;
+}
+
 function representativeTitle(branch) {
   for (let i = branch.length - 1; i >= 0; i -= 1) {
     if (!BOOKKEEPING.test(branch[i].subject)) return branch[i].subject;
@@ -99,6 +130,7 @@ export function workUnits(ref = 'HEAD') {
       // entrada de devlog com o titulo "Merge pull request #85 from ..." e
       // exatamente o post que nao queremos.
       if (/^Merge (pull request|branch|origin)/i.test(commit.subject)) continue;
+      if (isSelfReferential([commit])) continue;
 
       units.push({
         kind: 'direct',
@@ -117,6 +149,7 @@ export function workUnits(ref = 'HEAD') {
     // Merge sem commits proprios (ex.: main puxada de volta pro branch) nao e
     // uma unidade de trabalho — nao ha o que contar sobre ele.
     if (branch.length === 0) continue;
+    if (isSelfReferential(branch)) continue;
 
     units.push({
       kind: 'pr',
@@ -135,6 +168,27 @@ export function workUnits(ref = 'HEAD') {
   }
 
   return units;
+}
+
+/**
+ * Quais apps ja existiam num commit.
+ *
+ * A escolha de receita precisa saber a ERA: em 18/01 so havia o editor, em
+ * fevereiro entrou o roguelike, o Survival so nasceu em julho. Perguntar a
+ * arvore daquele commit e mais barato e mais confiavel do que deduzir por
+ * data — um branch antigo mergeado tarde quebraria qualquer regra de calendario.
+ */
+export function appsPresentAt(sha, apps) {
+  const present = new Set();
+  for (const [name, { dir }] of Object.entries(apps)) {
+    try {
+      git(['cat-file', '-e', `${sha}:${dir}/package.json`], { quiet: true });
+      present.add(name);
+    } catch {
+      /* o pacote ainda nao existia neste ponto da historia */
+    }
+  }
+  return present;
 }
 
 /** Pacotes/areas tocados por um conjunto de commits, mais frequente primeiro. */

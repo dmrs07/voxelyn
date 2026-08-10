@@ -90,6 +90,74 @@ export const recipes = {
     ],
   },
 
+  /**
+   * O Noita-like: a PRIMEIRA coisa do Voxelyn que teve imagem.
+   *
+   * Existe desde o commit inicial, em 18/01, quando o projeto ainda era uma
+   * biblioteca headless de simulacao por celula e estes demos eram a unica
+   * forma de ver a biblioteca funcionando.
+   */
+  noita: {
+    app: 'examples',
+    page: 'examples/browser-noita-like/index.html',
+    viewport: DESKTOP,
+    label: 'demo Noita-like',
+    // Recorta NO CANVAS. Os demos sao uma caixa centrada numa pagina vazia:
+    // fotografar a janela entrega 80% de fundo preto, e recortar no `#wrap`
+    // nao resolve porque ele estica por `min-height: 100vh`. O titulo e o
+    // contador de fps sao cromo da pagina, nao o que o commit fez.
+    clip: '#c',
+    steps: [
+      // A areia leva alguns quadros para cair e formar pilha; capturar no
+      // primeiro quadro pega um mundo ainda em repouso.
+      { do: 'waitForInk', selector: '#c' },
+      { do: 'wait', ms: 2500 },
+    ],
+  },
+
+  /** O demo iso Diablo-like: a outra metade da origem, do mesmo commit. */
+  iso: {
+    app: 'examples',
+    page: 'examples/browser-iso-diablo-like/index.html',
+    viewport: DESKTOP,
+    label: 'demo iso Diablo-like',
+    optional: true,
+    clip: '#c',
+    steps: [
+      { do: 'waitForInk', selector: '#c' },
+      { do: 'wait', ms: 1500 },
+    ],
+  },
+
+  /**
+   * O roguelike: a origem jogavel do projeto, de fevereiro a julho.
+   *
+   * A captura mais facil do repositorio inteiro — o main.ts instancia o loop
+   * com seed fixa (0xdecafbad) e comeca a rodar. Sem menu, sem onboarding,
+   * sem servidor: carregou, ja e jogo.
+   */
+  roguelike: {
+    app: 'roguelike',
+    page: 'index.html',
+    viewport: DESKTOP,
+    label: 'roguelike',
+    steps: [
+      { do: 'waitForInk', selector: '#game' },
+      { do: 'wait', ms: 1500 },
+      { do: 'hold', key: 'd', ms: 700 },
+      { do: 'wait', ms: 1000 },
+    ],
+  },
+
+  /** VoxelForge: o editor, e a unica coisa com tela que existia em janeiro. */
+  editor: {
+    app: 'editor',
+    page: 'index.html',
+    viewport: DESKTOP,
+    label: 'VoxelForge',
+    steps: [{ do: 'waitFor', selector: '#app' }, { do: 'waitForFonts' }, { do: 'wait', ms: 2000 }],
+  },
+
   /** O editor de atlas, em retrato — e como ele foi desenhado pra ser usado. */
   'atlas-studio': {
     app: 'atlas-studio',
@@ -102,24 +170,47 @@ export const recipes = {
 };
 
 /**
- * Escolhe as receitas de uma entrada a partir das areas que o PR tocou.
+ * Escolhe as receitas de uma entrada.
  *
- * A primeira receita da lista e a CAPA (a que vira o slide 1 do carrossel), e
- * por isso a ordem aqui e intencional: o quadro mais especifico ao que o PR
- * mudou vem primeiro, e a run solo entra como leito de seguranca porque e a
- * unica que existe em todo o historico.
+ * A primeira da lista e a CAPA (o slide 1 do carrossel), entao a ordem e
+ * intencional: o quadro mais especifico ao que o PR mudou vem primeiro.
+ *
+ * `available` e o conjunto de apps que EXISTIAM naquele commit. Sem ele, um
+ * PR de fevereiro pediria uma run do Survival — um app que so nasceria cinco
+ * meses depois — e a entrada terminaria sem imagem. Com ele, cada era e
+ * fotografada pelo que ela tinha: o editor em janeiro, o roguelike de
+ * fevereiro a julho, o Survival dai em diante.
  */
-export function pickRecipes(areas, title = '') {
+export function pickRecipes(areas, title = '', available = null) {
+  const exists = (app) => available === null || available.has(app);
   const has = (needle) => areas.some((a) => a.includes(needle));
   const says = (re) => re.test(title.toLowerCase());
   const picked = [];
 
-  if (has('atlas-studio')) picked.push('atlas-studio');
-  if (says(/arena|chefe|boss/)) picked.push('arena');
-  if (says(/sprite|atlas|anima|frame|pose/) && !has('atlas-studio')) picked.push('sprites');
-  if (says(/menu|terminal|tela|hud|opcoes|op..es|ranking|registro/)) picked.push('menu');
+  if (exists('atlas-studio') && has('atlas-studio')) picked.push('atlas-studio');
 
-  if (has('voxelyn-survival') || picked.length === 0) picked.push('solo');
+  if (exists('survival')) {
+    if (says(/arena|chefe|boss/)) picked.push('arena');
+    if (says(/sprite|atlas|anima|frame|pose/) && !has('atlas-studio')) picked.push('sprites');
+    if (says(/menu|terminal|tela|hud|opcoes|op..es|ranking|registro/)) picked.push('menu');
+  }
 
-  return [...new Set(picked)].slice(0, 2);
+  // O leito de seguranca e o app jogavel mais recente que existia na epoca:
+  // toda entrada precisa de pelo menos um quadro, e ele nao pode vir de um
+  // app que ainda nao tinha sido escrito. A cadeia desce ate os demos do
+  // core, que existem desde o commit inicial — por isso nenhuma entrada do
+  // devlog fica sem imagem, nem as de janeiro.
+  if (!picked.length || !picked.some((r) => recipes[r].app !== 'atlas-studio')) {
+    if (exists('survival')) picked.push('solo');
+    else if (exists('roguelike')) picked.push('roguelike');
+    else if (says(/editor|voxelforge|material|palet/) && exists('editor')) picked.push('editor');
+    else if (exists('examples')) {
+      // Na era dos demos, os DOIS: sao quinze posts nessa janela e o mesmo
+      // quadro de areia caindo quinze vezes mataria o carrossel. Noita-like e
+      // iso Diablo-like mostram as duas metades da biblioteca headless.
+      picked.push('noita', 'iso');
+    }
+  }
+
+  return [...new Set(picked)].filter((r) => exists(recipes[r].app)).slice(0, 2);
 }

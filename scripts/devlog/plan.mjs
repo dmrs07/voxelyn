@@ -15,9 +15,10 @@
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 
-import { workUnits, touchedAreas, diffStat } from './lib/git.mjs';
+import { workUnits, touchedAreas, diffStat, appsPresentAt } from './lib/git.mjs';
 import { devlogDir, planPath } from './lib/paths.mjs';
 import { pickRecipes } from './lib/recipes.mjs';
+import { APPS } from './lib/workspace.mjs';
 
 /** Estados de uma entrada, em ordem de avanco. */
 export const STATUS = ['pending', 'shot', 'written', 'published'];
@@ -90,7 +91,7 @@ function buildPlan(previous, startDate) {
       areas: areas.slice(0, 4),
       stat,
       commits: unit.commits.map((c) => ({ sha: c.short, subject: c.subject })),
-      recipes: old?.recipes ?? pickRecipes(areas, unit.title),
+      recipes: old?.recipes ?? pickRecipes(areas, unit.title, appsPresentAt(unit.tip, APPS)),
       // Campos de progresso: preservados a todo custo entre regeracoes.
       status: old?.status ?? 'pending',
       skipped: old?.skipped ?? false,

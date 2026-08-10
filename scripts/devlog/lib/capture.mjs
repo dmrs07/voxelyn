@@ -21,20 +21,37 @@ const MIME = {
   '.wasm': 'application/wasm',
 };
 
-/** Servidor estatico minimo para o dist do build. Sem dependencia externa. */
-export function serveStatic(root) {
+/**
+ * Servidor estatico minimo para o build. Sem dependencia externa.
+ *
+ * `fallbacks` sao raizes tentadas quando o caminho nao existe na principal.
+ * Isso existe por causa da origem do projeto: o HTML dos demos pedia
+ * `./index.js` ao lado de si mesmo, enquanto o `tsc` emitia em
+ * `dist/examples/.../index.js`. Servir a raiz com o dist atras costura os dois
+ * sem precisar copiar arquivo nenhum.
+ */
+export function serveStatic(root, fallbacks = []) {
+  const roots = [root, ...fallbacks];
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     // normalize() antes de resolve() barra "../" no path: o servidor so pode
-    // enxergar dentro do dist, mesmo rodando local.
+    // enxergar dentro das raizes declaradas, mesmo rodando local.
     const rel = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
-    let file = resolve(root, `.${rel}`);
-    if (!file.startsWith(root)) {
-      res.writeHead(403).end();
-      return;
+
+    let file = null;
+    for (const base of roots) {
+      const candidate = resolve(base, `.${rel}`);
+      if (!candidate.startsWith(base)) {
+        res.writeHead(403).end();
+        return;
+      }
+      if (!existsSync(candidate)) continue;
+      file = statSync(candidate).isDirectory() ? join(candidate, 'index.html') : candidate;
+      if (existsSync(file)) break;
+      file = null;
     }
-    if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
-    if (!existsSync(file)) {
+
+    if (!file) {
       res.writeHead(404).end('nao encontrado');
       return;
     }
@@ -233,7 +250,11 @@ export async function capture(recipe, { port, seed = 20260810, debug = false, lo
 
     for (const step of recipe.steps) await runStep(page, step, log);
 
-    const png = await page.screenshot({ type: 'png' });
+    // `clip` recorta no elemento em vez da janela. Vale para paginas que sao
+    // uma caixa de conteudo num mar de fundo; para o jogo em tela cheia a
+    // janela E o enquadramento.
+    const target = recipe.clip ? await page.$(recipe.clip) : null;
+    const png = await (target ?? page).screenshot({ type: 'png' });
     await context.close();
     return { png, errors };
   } finally {

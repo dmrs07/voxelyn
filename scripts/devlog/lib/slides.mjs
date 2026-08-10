@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { mediaDir, repoRoot } from './paths.mjs';
+import { recipes } from './recipes.mjs';
 
 /**
  * O carrossel fala a lingua do jogo, nao a de um template generico.
@@ -147,9 +148,23 @@ const css = `
     color:${AX.textBright};flex:none}
 `;
 
-function foot(index, total, extra = '') {
-  return `<div class="foot"><span class="brand">VOXELYN SURVIVAL</span>
-    <span>${escapeHtml(extra)}${extra ? ' · ' : ''}${String(index).padStart(2, '0')}/${String(total).padStart(2, '0')}</span></div>`;
+/**
+ * A assinatura do rodape muda com a era.
+ *
+ * Um post sobre 18 de janeiro nao pode assinar "Voxelyn Survival": o Survival
+ * so nasceria em julho. O devlog e retroativo no calendario, nao nos fatos —
+ * cada post assina com o nome que o projeto tinha naquele dia.
+ */
+function brandFor(entry) {
+  const apps = new Set((entry.recipes ?? []).map((r) => recipes[r]?.app));
+  if (apps.has('survival') || apps.has('atlas-studio')) return 'VOXELYN SURVIVAL';
+  if (apps.has('roguelike')) return 'VOXELYN ROGUELIKE';
+  return 'VOXELYN';
+}
+
+function foot(brand, index, total) {
+  return `<div class="foot"><span class="brand">${escapeHtml(brand)}</span>
+    <span>${String(index).padStart(2, '0')}/${String(total).padStart(2, '0')}</span></div>`;
 }
 
 /**
@@ -229,9 +244,10 @@ export function buildSlides(entry, social, opts = {}) {
     </div>`,
     });
 
+  const brand = brandFor(entry);
   return slides.map((s, i) => ({
     ...s,
-    html: `<section class="slide ${s.kind ?? 'text'}" data-slide="${i + 1}">${s.html}${foot(i + 1, slides.length)}</section>`,
+    html: `<section class="slide ${s.kind ?? 'text'}" data-slide="${i + 1}">${s.html}${foot(brand, i + 1, slides.length)}</section>`,
   }));
 }
 
