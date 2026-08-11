@@ -1,8 +1,11 @@
 import {
+  LEYLINE_CHARGE_TICKS,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
+  SOLID_LEYLINE,
+  SOLID_LEYLINE_NODE,
   SOLID_NONE,
   SOLID_ROCK,
   SOLID_ORE,
@@ -189,6 +192,10 @@ const TERRAIN_KIND_INDEX: Record<number, number> = {
   [SOLID_ORE_SPENT]: 5,
   [SOLID_CRYSTAL_DULL]: 6,
   [SOLID_ORE_CHIPPED]: 7,
+  // Leylines: universais como minerio e cristal (linguagem mecanica), entao
+  // vivem na tabela e nao na pele por estrato. Indices 15/16 do atlas v5.
+  [SOLID_LEYLINE]: 15,
+  [SOLID_LEYLINE_NODE]: 16,
 };
 
 /**
@@ -1824,6 +1831,23 @@ export class SurvivalRenderer {
     const y1 = Math.min(h - 1, py + range);
 
     if (this.quality.dynamicLights) {
+      // A FASE de cada celula de leyline, para a luz do laco abaixo. Dormente
+      // ela e um brilho fraco constante — a linha e linguagem de orientacao e
+      // precisa ser seguivel no escuro. Carregando, o pulso sobe ate o tick da
+      // descarga: e O SINAL, o dano so existe porque esta luz veio antes. Em
+      // refrataria a linha apaga — gastou — e a escuridao e a leitura.
+      const leyPhase = new Map<number, number>();
+      for (const seg of state.leylineSegments) {
+        const charging = seg.dischargeAt > state.tick;
+        const refractory = !charging && state.tick < seg.refractoryUntil;
+        // 0 = dormente; 1 = refrataria; >1 = carregando (progresso 1..2).
+        const phase = charging
+          ? 2 - Math.min(1, (seg.dischargeAt - state.tick) / LEYLINE_CHARGE_TICKS)
+          : refractory
+            ? 1
+            : 0;
+        for (const cell of seg.cells) leyPhase.set(cell, phase);
+      }
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           const i = y * w + x;
@@ -1846,6 +1870,35 @@ export class SurvivalRenderer {
               // o chao ao pe delas.
               height: 0.9,
             });
+          else if (state.solid[i] === SOLID_LEYLINE) {
+            const phase = leyPhase.get(i) ?? 0;
+            if (phase === 0) {
+              // Dormente: cada TERCEIRA celula emite, num respiro lento. A
+              // linha inteira acesa por igual viraria um letreiro; pontos
+              // alternados leem como energia correndo por dentro.
+              if ((x + y) % 3 === 0) {
+                const breathe = 0.8 + 0.2 * Math.sin(nowMs / 900 + (x + y) * 0.7);
+                lights.push({ x: x + 0.5, y: y + 0.5, r: 2, power: 0.22 * breathe, hex: PAL.electric, height: 0.6 });
+              }
+            } else if (phase > 1) {
+              // Carregando: TODA celula acende e o pulso sobe com o relogio.
+              const t = phase - 1;
+              const flicker = 0.85 + 0.15 * Math.sin(nowMs / 45);
+              lights.push({
+                x: x + 0.5,
+                y: y + 0.5,
+                r: 2.5 + t,
+                power: (0.35 + 0.75 * t) * flicker,
+                hex: PAL.electric,
+                height: 0.6,
+              });
+            }
+            // Refrataria: nenhuma luz. O segmento gastou, e a escuridao dele
+            // e o aviso de que atirar de novo agora nao compra nada.
+          } else if (state.solid[i] === SOLID_LEYLINE_NODE)
+            // A juncao nunca apaga: e o marco que separa segmentos, e o olho
+            // precisa dela para ler onde um trecho termina.
+            lights.push({ x: x + 0.5, y: y + 0.5, r: 2.5, power: 0.4, hex: PAL.electric, height: 0.7 });
         }
       }
       for (const c of state.charges) {

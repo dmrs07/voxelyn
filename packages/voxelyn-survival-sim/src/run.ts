@@ -21,6 +21,7 @@ import {
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
   DISCHARGE_DAMAGE,
+  LEYLINE_REFRACTORY_TICKS,
   DELUGE_SHOCK_FULL_RANGE,
   DELUGE_SHOCK_MIN_SCALE,
   DODGE_SPEED,
@@ -83,6 +84,7 @@ import {
   resonanceOffers,
 } from './abilities.js';
 import {
+  chargeCells,
   dischargeAt,
   explodeAt,
   igniteCell,
@@ -94,6 +96,7 @@ import {
   explosiveArmedByDistance,
   impactSolid,
   impactSurface,
+  openNeighbours,
   projectileClass,
 } from './materials.js';
 import {
@@ -147,6 +150,7 @@ import {
 } from './progression.js';
 import type {
   DamageCause,
+  EffectOrigin,
   Entity,
   EnemyArchetype,
   ModuleId,
@@ -372,6 +376,14 @@ export const createRun = (config: RunConfig): SurvivalState => {
       firingAt: 0,
       fromEnd: 0 as const,
     })),
+    // Geometria da seed, relogios zerados: todo segmento nasce dormente. Ver
+    // LeylineSegment para o contrato (relogios no hash, celulas fora).
+    leylineSegments: world.leylines.map((seg) => ({
+      cells: seg.cells,
+      dischargeAt: 0,
+      refractoryUntil: 0,
+      triggeredBy: -1,
+    })),
     hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
@@ -488,6 +500,30 @@ const stepRailCarts = (state: SurvivalState, events: SemanticEvent[]): void => {
       });
       break;
     }
+  }
+};
+
+/**
+ * O relogio das leylines: cumpre a descarga que `impactSolid` anunciou.
+ *
+ * A carga sai pelas celulas ABERTAS coladas no segmento (openNeighbours — o
+ * mesmo caminho da descarga de veio) e vira UM evento `discharge`, sem `from`:
+ * dano plano, como as descargas de fonte multipla do Arquicantor. Um evento so
+ * por ativacao e o que entrega tres requisitos de graca, todos ja em
+ * resolveChainedEvents: um hit por entidade, o desconto de fogo amigo para o
+ * dono, e +1 ressonancia `current` por ATIVACAO (frequencia, nunca area).
+ *
+ * Roda antes de resolveChainedEvents para o dano sair no mesmo tick do evento.
+ */
+const stepLeylines = (state: SurvivalState, events: SemanticEvent[]): void => {
+  for (const seg of state.leylineSegments) {
+    if (seg.dischargeAt === 0 || state.tick < seg.dischargeAt) continue;
+    const origin: EffectOrigin =
+      seg.triggeredBy >= 0 ? { source: 'player', owner: seg.triggeredBy } : { source: 'environment' };
+    chargeCells(state, openNeighbours(state, seg.cells), events, origin);
+    seg.dischargeAt = 0;
+    seg.refractoryUntil = state.tick + LEYLINE_REFRACTORY_TICKS;
+    seg.triggeredBy = -1;
   }
 };
 
@@ -1903,8 +1939,13 @@ const stepProjectiles = (state: SurvivalState, events: SemanticEvent[]): void =>
 
         const eventStart = events.length;
         const { stop, broke } = impactSolid(state, cx, cy, cls, events, origin);
-        const dischargedHere = events.slice(eventStart).some((event) => event.t === 'discharge');
-        if (conductiveReady && ownerExtra && ownerSlot !== undefined && dischargedHere) {
+        const impactEvents = events.slice(eventStart);
+        const dischargedHere = impactEvents.some((event) => event.t === 'discharge');
+        // Armar uma leyline cobra a carga do modulo como qualquer descarga: a
+        // decisao eletrica do jogador aconteceu AQUI, no impacto — a descarga
+        // em si so sai do relogio dali a LEYLINE_CHARGE_TICKS (stepLeylines).
+        const armedLeylineHere = impactEvents.some((event) => event.t === 'leyline_charge');
+        if (conductiveReady && ownerExtra && ownerSlot !== undefined && (dischargedHere || armedLeylineHere)) {
           consumeModuleCharge(ownerExtra, 'conductive', ownerSlot, events);
         }
         // Quebrar cristal dentro de uma poca E o jogador usando corrente, mesmo
@@ -2445,6 +2486,7 @@ export const stepRun = (state: SurvivalState, commands: readonly PlayerCommand[]
   updateEnemies(state, events);
   stepCells(state, events);
   stepRailCarts(state, events);
+  stepLeylines(state, events);
   // O teto DEPOIS dos projeteis e do movimento: a estalactite cobra onde o
   // jogador terminou o tick, e nao onde ele estava quando ela foi marcada.
   stepCollapse(state, events);
@@ -2715,6 +2757,16 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.bossRuntime.delugeAt);
   mix(Math.round(state.bossRuntime.delugeX * 1000));
   mix(Math.round(state.bossRuntime.delugeY * 1000));
+  // Os relogios da leyline DECIDEM dano (a descarga sai deles), entao entram
+  // no hash — ao contrario dos railTimers, que so telegrafam um projetil que
+  // ja e hasheado por conta propria. Duas simulacoes discordando de
+  // `dischargeAt` divergiriam em vida um segundo depois, longe da causa.
+  // A geometria fica FORA: e derivada da seed, como hallCenters.
+  for (const seg of state.leylineSegments) {
+    mix(seg.dischargeAt);
+    mix(seg.refractoryUntil);
+    mix(seg.triggeredBy);
+  }
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

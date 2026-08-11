@@ -505,6 +505,13 @@ export class GameRoom {
         readyAt: track.readyAt,
         firingAt: track.firingAt,
       })),
+      // Relogios das leylines, pelo mesmo motivo dos trilhos: a geometria vem
+      // da seed, a FASE e runtime — e a janela de carga e exatamente quando
+      // uma reconexao precisa ver o aviso.
+      leylineClocks: this.state.leylineSegments.map((seg) => ({
+        dischargeAt: seg.dischargeAt,
+        refractoryUntil: seg.refractoryUntil,
+      })),
     };
   }
 

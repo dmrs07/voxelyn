@@ -150,7 +150,22 @@ describe('impressao digital da geracao', () => {
     // canos em volta de um monstro.
     //
     // So o Aquifero muda: o bloco esta atras de `profile.pipeCount > 0`.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1850403982);
+    // 3461746772 (era 1850403982), na SIMULATION_VERSION 38: entraram as
+    // LEYLINES — o condutor geologico persistente da Catedral Prismatica e da
+    // ocupacao Aurix (fora do Ferrifero, que ja tem a fiacao dele).
+    //
+    // A mudanca toca o terreno por dois caminhos, como os dutos: celulas de
+    // rocha viram SOLID_LEYLINE/SOLID_LEYLINE_NODE ao longo dos corredores
+    // (o `solid` muda), e as ancoras do tracado consomem a RNG do gerador,
+    // deslocando dutos, respiradouros e spawns nos setores COM leyline. A
+    // amostra de 64 seeds cobre a linhagem mineral (prismatic dos setores 2-3)
+    // e as intrusoes Aurix a partir do setor 2, entao a assinatura muda.
+    //
+    // O que NAO muda: a abertura do mapa (a gravacao so troca rocha por rocha
+    // depois de todas as provas — ha teste dedicado de byte-identidade da
+    // abertura em leylines-worldgen.test.ts) e todo estrato sem leyline, cujo
+    // bloco inteiro esta atras de `profile.leylines > 0`.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3461746772);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

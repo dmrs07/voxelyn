@@ -54,6 +54,23 @@ export const isPipe = (solid: number): boolean =>
   solid === SOLID_PIPE_E ||
   solid === SOLID_PIPE_S ||
   solid === SOLID_PIPE_W;
+/**
+ * A LEYLINE: condutor geologico persistente que acompanha a macroestrutura do
+ * setor. Ela nao rende minerio, nao recarrega nada e nao concede bonus — e
+ * linguagem de orientacao (a linha vai para dentro do Veio) que uma fonte
+ * eletrica pode energizar por SEGMENTO.
+ *
+ * Como os canos, ela nao aparece em `breakSolid` nem em `canRip`, e isso e a
+ * definicao e nao esquecimento: a leyline e permanente. O que vem e vai e a
+ * ENERGIA nela (ver `LeylineSegment` e `stepLeylines`), nunca a materia.
+ *
+ * A juncao (NODE) fecha o segmento: a propagacao de uma ativacao termina nela
+ * por construcao — o worldgen ja entrega os trechos separados, entao nao ha
+ * flood em runtime que pudesse atravessa-la. Neste corte ela e inerte a tudo;
+ * o comentario em `impactSolid` registra o futuro (roteamento) sem prometer.
+ */
+export const SOLID_LEYLINE = 13;
+export const SOLID_LEYLINE_NODE = 14;
 
 // Camada de superficie (o que cobre o chao de uma celula aberta).
 //
@@ -386,6 +403,22 @@ export const BUDGET_VEIN_CELLS = 64;
  */
 export const FERRIC_VEIN_SCALE = 3;
 export const BUDGET_RESONANCE_CELLS = 24;
+
+// Leyline: os numeros do ciclo dormente → carregando → descarga → refrataria.
+//
+// A carga e o SINAL PREVIO obrigatorio (0,8 s a 20 Hz — na janela do windup do
+// carrinho): quem esta em cima da linha ve e ouve a energia subindo antes de
+// qualquer dano. A descarga reusa DISCHARGE_DAMAGE e o evento `discharge`
+// comuns — a leyline nao tem "super choque"; a potencia dela e o ALCANCE do
+// segmento, e por isso o teto de celulas fica ABAIXO do veio comum (64): a
+// identidade de "a parede inteira e fiacao" continua sendo so do Ferrifero.
+// O refratario existe para a ativacao ser uma decisao com cadencia (armadilha,
+// nao metralhadora — a mesma razao do cooldown do carrinho).
+export const LEYLINE_CHARGE_TICKS = 16;
+export const LEYLINE_REFRACTORY_TICKS = 10 * TICK_HZ;
+export const LEYLINE_SEGMENT_MAX_CELLS = 56;
+/** Celulas de corredor entre uma juncao e a proxima no tracado do worldgen. */
+export const LEYLINE_JUNCTION_SPACING = 28;
 
 export const PLAYER_HP = 100;
 export const PLAYER_SPEED = 4.6; // tiles/s

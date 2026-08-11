@@ -910,6 +910,34 @@ export type RailTrack = {
   fromEnd: 0 | 1;
 };
 
+/**
+ * Um SEGMENTO de leyline: o trecho de condutor entre duas juncoes.
+ *
+ * A materia e permanente e vive no grid (`SOLID_LEYLINE`), entao ela chega ao
+ * cliente pelo diff de chunk e sobrevive a resync como qualquer parede. O que
+ * este tipo guarda e a FASE do segmento — os relogios do ciclo dormente →
+ * carregando → descarga → refrataria. Eles decidem dano, e por isso ENTRAM no
+ * hash autoritativo (diferente dos `railTimers`, que so telegrafam): duas
+ * simulacoes discordando de `dischargeAt` divergiriam em vida um segundo
+ * depois, longe da causa.
+ *
+ * `cells` e geometria derivada da seed (como `hallCenters`): reconstruida nas
+ * duas pontas pelo worldgen, nao viaja no wire nem entra no hash.
+ */
+export type LeylineSegment = {
+  cells: number[];
+  /** Tick da descarga anunciada; 0 = nao esta carregando. */
+  dischargeAt: number;
+  /** Ate quando o segmento ignora novas ativacoes; 0 = pronto. */
+  refractoryUntil: number;
+  /**
+   * ID da ENTIDADE do jogador que ativou (-1 = ambiente): decide o `source`
+   * do discharge — e, com ele, o desconto de fogo amigo e o credito de
+   * ressonancia. E id e nao slot porque e o que `recordPlayerResonance` casa.
+   */
+  triggeredBy: number;
+};
+
 export type SemanticEvent =
   | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
   /**
@@ -961,6 +989,14 @@ export type SemanticEvent =
       fromX?: number;
       fromY?: number;
     }
+  /**
+   * Um segmento de leyline foi energizado e VAI descarregar em `dischargeTick`.
+   * E o sinal previo obrigatorio: o dano so existe porque este aviso chegou
+   * antes (LEYLINE_CHARGE_TICKS de folga). Carrega as celulas porque o cliente
+   * precisa acender o trecho exato — reconstruir o segmento pela grade exigiria
+   * conhecer as juncoes, que sao informacao do worldgen.
+   */
+  | { t: 'leyline_charge'; seg: number; cells: number[]; dischargeTick: number }
   | { t: 'ignite'; x: number; y: number }
   /**
    * Alguem recuperou vida. Existe para o Bispo poder ser LIDO: sem um evento, a
@@ -1336,6 +1372,12 @@ export type SurvivalState = {
   vents: Vent[];
   /** Tramos da armadilha de carrinho. Vazio fora da operacao (Aurix/ferric). */
   railTracks: RailTrack[];
+  /**
+   * Segmentos de leyline do setor, na ordem em que o worldgen os entregou.
+   * Vazio em todo estrato sem leyline. Ver `LeylineSegment` para o contrato
+   * de hash/wire (relogios entram, geometria nao).
+   */
+  leylineSegments: LeylineSegment[];
   /**
    * Centros dos saloes carimbados pela gramatica espacial do estrato.
    *

@@ -88,7 +88,14 @@
 // prever a atenuacao da corrente, e prever dano errado num setor inteiramente
 // condutivo e a pior forma de discordancia possivel: ela aparece como vida
 // sumindo sem causa visivel.
-export const PROTOCOL_VERSION = 21;
+// 22: as LEYLINES entram no wire por dois campos. O evento `leyline_charge`
+// e O TELEGRAFO da descarga de segmento — um cliente que nao o conhece
+// tomaria o choque sem o sinal previo que justifica o dano existir, que e
+// exatamente a classe de quebra que este numero guarda. E `WorldFlags` ganha
+// `leylineClocks` (opcional, alinhado por indice como `railTimers`): quem
+// reconecta durante os 16 ticks de carga recebe o relogio e desenha o aviso;
+// servidor anterior simplesmente nao manda e tudo fica dormente.
+export const PROTOCOL_VERSION = 22;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -445,7 +452,19 @@ export const PROTOCOL_VERSION = 21;
 // e por isso os dois entram na MESMA versao: quem re-simula um replay antigo ja
 // vai abrir outro mapa por causa do centro, e separar as duas correcoes em duas
 // versoes cobraria duas quebras de compatibilidade pelo preco de uma.
-export const SIMULATION_VERSION = 37;
+// 38: as LEYLINES — condutor geologico persistente da Catedral Prismatica e
+// da ocupacao Aurix (fora do Ferrifero, cuja fiacao e outra identidade).
+//
+// Muda o hash por tres caminhos. O terreno semeado: corredores dos setores
+// com leyline ganham SOLID_LEYLINE/SOLID_LEYLINE_NODE na parede, e as
+// ancoras do tracado consomem RNG do gerador (dutos, respiradouros e spawns
+// deslocam NESSES setores; todo estrato sem leyline esta atras de
+// `profile.leylines > 0` e fica byte a byte). A reacao nova: tiro `energy`
+// na leyline arma o segmento em vez de descarregar no impacto. E os relogios
+// dos segmentos (`dischargeAt`/`refractoryUntil`/`triggeredBy`), que entram
+// no hash autoritativo porque DECIDEM dano — dois peers discordando deles
+// divergiriam em vida um segundo depois, longe da causa.
+export const SIMULATION_VERSION = 38;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -489,7 +508,11 @@ export const SIMULATION_VERSION = 37;
 // com a paleta ESFRIANDO para cima (`beam` na base, `fire` na ponta): o que
 // machuca e a base, e ela tem de ser a parte que puxa o olho. As tres cores da
 // coluna estao em EMISSIVE_HEX, entao ele acende sozinho no caminho de brilho.
-export const CONTENT_VERSION = 23;
+// 24: as LEYLINES entram no atlas de terreno (terrain-blocks v5, kinds
+// leyline e leylineNode no fim da lista, a regra do rockFerric). Ainda sem
+// arte dedicada elas desenham pelo fallback de rocha; o bump marca a
+// promessa — o pool de materia visivel mudou.
+export const CONTENT_VERSION = 24;
 
 export type VersionTriple = {
   protocolVersion: number;

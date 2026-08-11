@@ -366,6 +366,16 @@ export class VoxelParticles {
             this.burst(cx, cy, 'spark', n(2), 1.6, 2.6, 240, cell);
           }
           break;
+        case 'leyline_charge':
+          // Faiscas RALAS ao longo do segmento: o grosso do aviso e a luz
+          // subindo (render) — a particula so poe materia no primeiro instante,
+          // para o olho achar A LINHA antes de o pulso ficar obvio.
+          for (const cell of ev.cells.filter((_, k) => k % 4 === 0).slice(0, n(8))) {
+            const cx = (cell % worldWidth) + 0.5;
+            const cy = Math.floor(cell / worldWidth) + 0.5;
+            this.burst(cx, cy, 'spark', 1, 1.0, 1.6, 300, cell);
+          }
+          break;
         case 'break': {
           // O bloco se desfaz no PROPRIO material. O evento carrega qual era,
           // porque quando ele chega a grade ja mudou e o cliente nao teria mais

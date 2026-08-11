@@ -1,5 +1,6 @@
 import type {
   Entity,
+  LeylineSegment,
   PlayerExtra,
   Projectile,
   SalvageSite,
@@ -88,6 +89,7 @@ type Pose = {
   sectorBoss: SectorBossState;
   contamination: number;
   charges: Array<{ idx: number; until: number }>;
+  leylineSegments: LeylineSegment[];
   salvageSites: SalvageSite[];
   wellOffers: WellOffer[];
 };
@@ -134,6 +136,8 @@ const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
     sectorBoss: { ...state.sectorBoss },
     contamination: state.contamination,
     charges: state.charges.map((c) => ({ ...c })),
+    // Relogios por valor, celulas por referencia: a geometria nunca muda.
+    leylineSegments: state.leylineSegments.map((s) => ({ ...s })),
     salvageSites: state.salvageSites.map((s) => ({ ...s })),
     wellOffers: state.wellOffers.map((o) => ({ ...o })),
   };
@@ -239,6 +243,7 @@ export class LocalPlayout {
       sectorBoss: from.sectorBoss,
       contamination: from.contamination,
       charges: from.charges,
+      leylineSegments: from.leylineSegments,
       salvageSites: from.salvageSites,
       wellOffers: from.wellOffers,
       players,

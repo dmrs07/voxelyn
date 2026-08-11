@@ -395,6 +395,14 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
   state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
   state.hallCenters = world.hallCenters;
+  // Segmentos do setor novo, todos dormentes — os relogios do setor velho
+  // descreviam paredes que ja nao existem.
+  state.leylineSegments = world.leylines.map((seg) => ({
+    cells: seg.cells,
+    dischargeAt: 0,
+    refractoryUntil: 0,
+    triggeredBy: -1,
+  }));
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
@@ -499,6 +507,14 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
   state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
   state.hallCenters = world.hallCenters;
+  // Segmentos do setor novo, todos dormentes — os relogios do setor velho
+  // descreviam paredes que ja nao existem.
+  state.leylineSegments = world.leylines.map((seg) => ({
+    cells: seg.cells,
+    dischargeAt: 0,
+    refractoryUntil: 0,
+    triggeredBy: -1,
+  }));
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
