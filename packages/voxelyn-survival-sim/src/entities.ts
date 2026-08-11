@@ -695,7 +695,7 @@ export const damageEntity = (
     // fogo por baixo.
     extra.lastDamage = { cause, tick: state.tick };
     state.stats.damageTakenTenths = addDamageTenths(state.stats.damageTakenTenths, scaled);
-    events.push({ t: 'hit', x: ent.x, y: ent.y, amount: scaled, target: ent.id });
+    events.push({ t: 'hit', x: ent.x, y: ent.y, amount: scaled, target: ent.id, cause: cause.kind });
     return;
   }
   // Dano CAUSADO conta so o que e ATRIBUIVEL ao jogador, por lista fechada.

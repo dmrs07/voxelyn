@@ -64,6 +64,48 @@ describe('traducao de evento para som', () => {
     expect(VOICE_SPECS.hitPlayer.priority).toBeGreaterThan(VOICE_SPECS.hitEnemy.priority);
   });
 
+  // Dano ambiental por tick chega a 20 Hz; como pancada (`hitPlayer`) ele
+  // virava um thud grave continuo no centro do estereo. A causa no evento
+  // permite roteia-lo para a voz de pressao.
+  it('roteia dano ambiental no jogador local para a voz de pressao', () => {
+    for (const cause of ['gas', 'spores', 'fire'] as const) {
+      const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 0.55, target: 1, cause }, ctx);
+      expect(cue.voice, `causa ${cause}`).toBe('hitPlayerHazard');
+      // Escala fixa: o dano por tick e minusculo e constante.
+      expect(cue.scale).toBe(1);
+    }
+  });
+
+  // O whitelist tem de ser whitelist: qualquer causa fora de gas/esporo/fogo
+  // continua sendo pancada. Um `if (cause)` acidental quebraria aqui.
+  it('dano com causa fora do whitelist ambiental continua pancada', () => {
+    for (const cause of ['player_shot', 'enemy_contact', 'explosion', 'discharge'] as const) {
+      const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 10, target: 1, cause }, ctx);
+      expect(cue.voice, `causa ${cause}`).toBe('hitPlayer');
+    }
+  });
+
+  // Servidor sem `cause` (fixtures, eventos construidos a mao): cai no
+  // comportamento historico em vez de sumir.
+  it('dano sem causa cai na voz de pancada', () => {
+    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 10, target: 1 }, ctx);
+    expect(cue.voice).toBe('hitPlayer');
+  });
+
+  // A causa ambiental so muda o som de quem SENTE o dano: um bicho queimando
+  // continua relatado como dano nos outros.
+  it('dano ambiental nos outros continua hitEnemy', () => {
+    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 2, target: 7, cause: 'fire' }, ctx);
+    expect(cue.voice).toBe('hitEnemy');
+  });
+
+  it('a voz de pressao ambiental nao disputa com a pancada', () => {
+    expect(VOICE_SPECS.hitPlayerHazard.priority).toBeLessThan(VOICE_SPECS.hitPlayer.priority);
+    expect(VOICE_SPECS.hitPlayerHazard.gain).toBeLessThan(VOICE_SPECS.hitPlayer.gain);
+    // A trava longa e o que transforma 20 eventos/s em ~2 toques/s.
+    expect(VOICE_SPECS.hitPlayerHazard.minIntervalMs).toBeGreaterThanOrEqual(400);
+  });
+
   it('escala o impacto pelo dano, com piso audivel e teto', () => {
     expect(impactScale(0)).toBeGreaterThanOrEqual(0.55);
     expect(impactScale(6)).toBeLessThan(impactScale(42));

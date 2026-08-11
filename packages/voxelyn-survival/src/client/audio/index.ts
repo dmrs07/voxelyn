@@ -11,11 +11,13 @@
 // 'suspended' em todo browser movel e depois soa com atraso ou nao soa; criar
 // no primeiro toque e o que garante que o primeiro tiro da run ja tenha som.
 
+import { TICK_HZ, normalizedDepth, runSectorCount } from '@voxelyn/survival-sim';
 import type { SemanticEvent, SurvivalState } from '@voxelyn/survival-sim';
 import { SILENT_AMBIENCE, approachLevels, sampleAmbience, type AmbienceLevels } from './ambience';
 import { AmbienceBus } from './ambience-bus';
 import { cuesForEvents } from './cues';
 import { CueMixer, NEAR_CUTOFF_HZ } from './mixer';
+import { MusicBus } from './music-bus';
 import { VOICE_RENDERERS, createNoiseBuffer } from './synth';
 import { voiceSpec, type VoiceId } from './voices';
 
@@ -43,11 +45,21 @@ const SCHEDULE_LOOKAHEAD = 0.005;
  */
 const AMBIENCE_SAMPLE_MS = 100;
 
+/**
+ * Prioridade a partir da qual uma voz abaixa a musica (ducking). Nove pega os
+ * telegrafos e os stings de fim de ato; `hitPlayer` (prioridade 8) e a UNICA
+ * excecao deliberada abaixo da regra — a pancada no proprio corpo merece o
+ * canal inteiro, e e por nome, nao por prioridade, para a excecao ficar
+ * visivel aqui em vez de escondida num numero.
+ */
+const MUSIC_DUCK_PRIORITY = 9;
+
 export class AudioDirector {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
+  private musicBus: MusicBus | null = null;
 
   private readonly mixer = new CueMixer();
   private levels: AmbienceLevels = SILENT_AMBIENCE;
@@ -56,6 +68,7 @@ export class AudioDirector {
   private lastUpdateMs = 0;
 
   private volume = 0.8;
+  private musicVolume = 0.7;
   private muted = false;
   /**
    * Fase do quadro anterior, para detectar a transicao para 'dead'.
@@ -66,6 +79,14 @@ export class AudioDirector {
    * observa a transicao aqui — a sim nao deve saber que existe som.
    */
   private lastPhase: SurvivalState['phase'] | null = null;
+  /**
+   * Bioma do quadro anterior, pelo mesmo padrao do lastPhase: a musica troca
+   * quando o ESTADO diz que o lugar mudou, nao quando o evento
+   * `sector_entered` chega — evento nao sobrevive a resync, estado sim, entao
+   * quem reconecta no setor 4 ouve o tema do setor 4 de graca.
+   */
+  private lastStratum: SurvivalState['stratum'] | null = null;
+  private lastOccupation: SurvivalState['occupation'] | null = null;
   /** Id da entidade do jogador local; ouvinte e referencia de "dano em mim". */
   private localPlayerId = 1;
   private worldWidth = 96;
@@ -91,7 +112,18 @@ export class AudioDirector {
   setMuted(muted: boolean): void {
     this.muted = muted;
     this.applyMasterGain();
-    if (muted) this.ambienceBus?.silence();
+    if (muted) {
+      this.ambienceBus?.silence();
+      // O scheduler para junto (update retorna cedo com muted); silenciar o
+      // barramento evita que o desmute volte com um acorde pendurado.
+      this.musicBus?.silence();
+    }
+  }
+
+  /** Volume da musica (0..1). Multiplica o teto interno do barramento. */
+  setMusicVolume(volume: number): void {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    this.musicBus?.setVolume(this.musicVolume);
   }
 
   get isMuted(): boolean {
@@ -140,6 +172,9 @@ export class AudioDirector {
       this.noise = createNoiseBuffer(ctx);
       this.ambienceBus = new AmbienceBus(ctx, master, this.noise);
       this.ambienceBus.start();
+      this.musicBus = new MusicBus(ctx, master);
+      this.musicBus.start();
+      this.musicBus.setVolume(this.musicVolume);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -167,6 +202,25 @@ export class AudioDirector {
 
     if (this.lastPhase === 'running' && state.phase === 'dead') this.ui('died');
     this.lastPhase = state.phase;
+
+    if (state.phase === 'running') {
+      // Troca de tema pela MUDANCA DE ESTADO, com o precedente do lastPhase.
+      if (state.stratum !== this.lastStratum || state.occupation !== this.lastOccupation) {
+        this.lastStratum = state.stratum;
+        this.lastOccupation = state.occupation;
+        this.musicBus?.setTheme(state.stratum, state.occupation);
+      }
+      // wake e idempotente: religa depois de um mute que passou.
+      this.musicBus?.wake();
+      this.musicBus?.setIntensity(normalizedDepth(state.sector, runSectorCount(state)));
+      // A bomba do scheduler, com o TEMPO DA SIMULACAO: e isto que faz dois
+      // clientes de co-op tocarem o mesmo compasso.
+      this.musicBus?.update(state.tick / TICK_HZ);
+    } else {
+      // Morte e extracao calam a musica como calam a ambiencia: o sting
+      // (`died`/`extracted`) soa sozinho, e o silencio e o efeito.
+      this.musicBus?.silence();
+    }
 
     if (nowMs - this.lastSampleMs >= AMBIENCE_SAMPLE_MS) {
       this.lastSampleMs = nowMs;
@@ -200,7 +254,10 @@ export class AudioDirector {
     this.lastSampleMs = 0;
     this.lastUpdateMs = 0;
     this.lastPhase = null;
+    this.lastStratum = null;
+    this.lastOccupation = null;
     this.ambienceBus?.silence();
+    this.musicBus?.silence();
   }
 
   /** Suspende o contexto (aba escondida). Nao destroi nada. */
@@ -231,6 +288,13 @@ export class AudioDirector {
     if (!ctx || !master || !noise) return;
     const render = VOICE_RENDERERS[voice];
     if (!render) return;
+
+    // A musica cede o canal para o que informa: telegrafos/stings (>= 9) e a
+    // pancada no jogador local (excecao explicita, ver MUSIC_DUCK_PRIORITY).
+    const spec = voiceSpec(voice);
+    if (spec.priority >= MUSIC_DUCK_PRIORITY || voice === 'hitPlayer') {
+      this.musicBus?.duck();
+    }
 
     const t0 = ctx.currentTime + SCHEDULE_LOOKAHEAD;
 

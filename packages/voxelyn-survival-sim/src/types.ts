@@ -920,7 +920,15 @@ export type SemanticEvent =
    * NAO emite isto: ele coincide com o `endTick` que o cliente ja conhece.
    */
   | { t: 'action_end'; entity: number }
-  | { t: 'hit'; x: number; y: number; amount: number; target: number }
+  /**
+   * `cause` e a CATEGORIA do dano (so o kind — o objeto DamageCause inteiro
+   * carregaria archetype/elite/projectile no wire sem nenhum consumidor). O
+   * audio precisa dela para separar pancada de pressao ambiental: dano de
+   * gas/esporo/fogo roda TODO TICK, e sem a causa o cliente toca o impacto
+   * pleno a 20 Hz. Opcional por defesa (fixtures e eventos de teste antigos
+   * nao a carregam); a interoperabilidade real e garantida pelo handshake.
+   */
+  | { t: 'hit'; x: number; y: number; amount: number; target: number; cause?: DamageCause['kind'] }
   | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
   | { t: 'explosion'; x: number; y: number; radius: number; source: 'player' | 'enemy' | 'environment'; owner?: number }
   /**

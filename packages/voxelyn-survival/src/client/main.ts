@@ -101,6 +101,7 @@ const banner = document.getElementById('banner') as HTMLDivElement;
 const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 const volumeInput = document.getElementById('volume') as HTMLInputElement;
+const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
 const roomInput = document.getElementById('room') as HTMLInputElement;
@@ -351,8 +352,10 @@ const setBanner = (text: string | null, tone: BannerTone = 'warning'): void => {
 // aplicado assim que o contexto existir.
 const audioSettings = loadAudioSettings();
 audio.setVolume(audioSettings.volume);
+audio.setMusicVolume(audioSettings.musicVolume);
 audio.setMuted(audioSettings.muted);
 volumeInput.value = String(Math.round(audioSettings.volume * 100));
+musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
 
 const renderMuteLabel = (): void => {
   muteButton.textContent = t(audioSettings.muted ? 'options.sound.off' : 'options.sound.on');
@@ -370,6 +373,12 @@ const setMuted = (muted: boolean): void => {
 volumeInput.addEventListener('input', () => {
   audioSettings.volume = Number(volumeInput.value) / 100;
   audio.setVolume(audioSettings.volume);
+  saveAudioSettings(audioSettings);
+});
+
+musicVolumeInput.addEventListener('input', () => {
+  audioSettings.musicVolume = Number(musicVolumeInput.value) / 100;
+  audio.setMusicVolume(audioSettings.musicVolume);
   saveAudioSettings(audioSettings);
 });
 

@@ -35,7 +35,10 @@ Não há um único arquivo de som no repositório. Tudo é sintetizado em WebAud
 - **Som sintetizado tem parâmetro, não forma de onda.** A altura do telegrafo do bruiser é
   um número numa linha, ajustável em segundos — não um render novo.
 
-**Não há trilha sonora.** O jogo soa como um lugar, e o silêncio faz parte do lugar.
+**A trilha também é sintetizada.** Existe música — um tema de doom/drone por estrato
+(§5.5) — e ela segue a mesma regra: zero assets, tudo procedural, e mixagem subordinada
+por contrato (**SFX > música**, sempre). O silêncio continua fazendo parte do lugar: a
+música cala na morte e na extração para o sting soar sozinho.
 
 ## 2. Arquitetura
 
@@ -50,6 +53,8 @@ SemanticEvent[]  ──►  cues.ts     (evento → pedido de som)        │ pu
                       synth.ts    (receitas WebAudio)             │ browser
 SurvivalState    ──►  ambience.ts (amostra da grade → níveis)     │ puro, testável
                       ambience-bus.ts (leitos contínuos)          │ browser
+state.stratum    ──►  music.ts    (temas, compasso, notas)        │ puro, testável
+state.tick            music-bus.ts (drone/pad + scheduler)        │ browser
 ```
 
 A fronteira é deliberada e segue o mesmo *seam* de `flash.ts`: **a parte que decide o que o
@@ -64,6 +69,8 @@ suítes (`cues.test.ts`, `mixer.test.ts`, `ambience.test.ts`) rodam sem `AudioCo
 | `synth.ts` | Receitas de síntese, uma por voz |
 | `ambience.ts` | Amostragem da grade → níveis contínuos 0..1 |
 | `ambience-bus.ts` | Osciladores e loops persistentes dos leitos |
+| `music.ts` | Temas por estrato, timeline por tick, notas por compasso (puro) |
+| `music-bus.ts` | Drone/pad persistentes + scheduler lookahead do riff |
 | `index.ts` | `AudioDirector`: ciclo de vida, unlock, volume, mudo |
 
 ## 3. As três decisões do mixer
@@ -100,6 +107,13 @@ dois ruídos de banda larga se mascaram por mais alto que um deles esteja.
 Cada tipo de ação telegrafada tem voz **própria** — não um bipe genérico. `hurl` e `charge`
 chegam do bruiser com o mesmo corpo na tela, e o que separa "sai da frente" de "recua" é
 justamente qual dos dois começou.
+
+A mesma lógica separa **pancada** de **pressão**: o dano ambiental por tick (gás, esporo,
+fogo sob os pés) chega a 20 Hz e viajava como `hitPlayer` — um thud de chefe, catorze vezes
+por segundo, dentro de qualquer nuvem. Desde que o evento `hit` carrega a causa
+(`cause`, protocolo 22), ele vira `hitPlayerHazard`: surdo, sem transiente, prioridade de
+textura e trava de 500 ms. Quem informa "estou no perigo" é o leito contínuo; a voz só
+pontua o custo.
 
 ## 5. Ambiência
 
@@ -143,6 +157,50 @@ completo dobraria a taxa anunciada, e uma rampa `sawtooth` — que resolveria a 
 ainda deixaria a batida assimétrica — reabre a porta no próprio salto, com um fantasma
 medido a −8,6 dB.
 
+## 5.5 Música por estrato
+
+Um tema de doom/drone por estrato — lento (50–66 BPM), grave (fundamentais em E1–D2),
+esparso. Referências declaradas: Deftones (*Cherry Waves*), Electric Wizard
+(*Funeralopolis*), a trilha de Absolum. A música diz "você está em OUTRO lugar" pelo
+mesmo motivo que o véu de cor do render diz: identidade no primeiro relance.
+
+| Estrato | Root | Caráter |
+| --- | --- | --- |
+| `basalt` | E1 | a âncora neutra; pentatônica menor, quinta no pad |
+| `prismatic` | B1 | menor com nona; a catedral canta |
+| `aquifer` | G1 | frígio, o mais lento; swells, b9 no pad |
+| `sulfur` | A1 | lócrio; o tritono do riff é o ar errado |
+| `furnace` | F1 | o mais pesado; sawtooth, riff arrastado |
+| `silica` | D2 | riff sempre descendente, seco, silêncios largos |
+| `glacial` | Bb1 | quase sem baixo; pad detunado de ataque lento |
+| `ferric` | Ab1 | pulso metronômico de duas notas; industrial |
+
+Ocupações variam o tema sem trocá-lo: `mycelial` detuna uma **cópia** do drone (8 cents,
+batimento orgânico) e soma uma terça menor; `aurix` põe um portão de tremolo no pad e um
+tritono baixo de tensão. A profundidade (`normalizedDepth`) abre camadas por limiar —
+drone sempre; baixo ≥ 0,15; pad ≥ 0,35; tensão ≥ 0,7 — com rampas de 1–2 s (o limiar
+descreve desejo, nunca degrau de ganho).
+
+As quatro decisões estruturais:
+
+1. **O compasso vem do tick.** `barIndexForTick(state.tick)` é a identidade musical;
+   `AudioContext.currentTime` só agenda a reprodução local. Dois clientes de co-op — um
+   com unlock tardio, um recém-resyncado — tocam o mesmo compasso por construção. Não há
+   `Math.random()` em `music.ts`: variação sai de hash de (compasso, índice).
+2. **Teto de mixagem.** O barramento inteiro vive sob `MUSIC_CEILING = 0.13`, abaixo do
+   menor telegrafo. O slider "Música" **multiplica** o teto (1.0 = 0.13), nunca vira ganho
+   unitário. Ducking: vozes de prioridade ≥ 9 (e `hitPlayer`, exceção explícita) abaixam a
+   música para 0,5× por ~0,8 s, com `cancelAndHoldAtTime` para rajadas não empilharem.
+3. **Scheduler com contrato.** Lookahead de 0,4 s; ao voltar de suspensão ou stall o
+   cursor **pula** para o próximo compasso válido (`MAX_CATCHUP_BARS = 1`) — nota perdida
+   é perdida, nunca reposta em rajada.
+4. **Crossfade sem buraco.** Na troca de estrato o drone desce até ~20% (nunca zero),
+   re-afina no vale e volta em ~3 s; só pad e riff zeram. Trocar de bioma soa como o lugar
+   mudando, não como BGM religando. Intensidade **nunca** dispara crossfade — só rampas.
+
+A troca é detectada pela mudança de `state.stratum`/`state.occupation` (padrão
+`lastPhase`), não pelo evento `sector_entered`: evento não sobrevive a resync, estado sim.
+
 ## 6. Ciclo de vida
 
 **Nada é criado antes de um gesto do usuário.** Política de autoplay à parte, um
@@ -161,12 +219,14 @@ que não conta como gesto.
 ## 7. Verificação
 
 ```
-pnpm test           # 39 testes de áudio: cues, mixer, ambiência
+pnpm test           # testes de áudio: cues, mixer, ambiência, música
 pnpm build && pnpm check:audio
 ```
 
 `check:audio` (`scripts/check-audio.mjs`) abre o jogo num Chromium, **instrumenta o próprio
-`AudioContext`** e joga uma run de verdade, contando os nós criados. Existe porque as
+`AudioContext`** e joga uma run de verdade, contando os nós criados — e também o **saldo de
+nós vivos** depois de uma janela de assentamento: total criado crescendo com saldo limitado
+é o scheduler de música saudável; os dois crescendo juntos é vazamento. Existe porque as
 suítes unitárias não tocam em `main.ts`: um `audio.ingest` esquecido num dos dois loops,
 um contexto que nunca destrava, uma receita que lança — tudo isso passa verde nos
 unitários e entrega um jogo mudo. Não julga timbre (nenhum teste automático julga); julga
@@ -182,7 +242,7 @@ compilar. Em ambientes com Chromium já provisionado, use `CHROMIUM_PATH`.
   consultada. Um raycast por voz por quadro é caro no alvo móvel, e o corte por distância
   já entrega a maior parte da leitura.
 - **Sem reverb.** Uma sala grande soa igual a um corredor. Um `ConvolverNode` custaria uma
-  resposta ao impulso (asset) ou geração em runtime; fica para quando houver mais de um
-  bioma e a diferença tiver o que comunicar.
+  resposta ao impulso (asset) ou geração em runtime. Hoje quem diferencia os biomas no
+  ouvido é a música por estrato (§5.5); reverb por bioma continua na fila.
 - **Mono por fonte.** `StereoPannerNode` posiciona no eixo horizontal; não há altura nem
   profundidade. Suficiente para uma câmera isométrica de topo.

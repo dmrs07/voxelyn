@@ -134,6 +134,15 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
 
     case 'hit': {
       const mine = ev.target === ctx.localPlayerId;
+      // Dano ambiental por tick (gas, esporo, fogo sob os pes) NAO e pancada.
+      // Whitelist explicito de proposito: uma causa nova entra aqui por
+      // decisao, nunca por `if (cause)` — o resto do universo de causas
+      // continua soando como o impacto que e. Escala fixa porque o dano por
+      // tick e minusculo e constante; `impactScale` devolveria sempre o piso,
+      // e variacao aqui nao informa nada.
+      if (mine && (ev.cause === 'gas' || ev.cause === 'spores' || ev.cause === 'fire')) {
+        return [{ voice: 'hitPlayerHazard', x: ev.x, y: ev.y, scale: 1 }];
+      }
       return [
         {
           voice: mine ? 'hitPlayer' : 'hitEnemy',

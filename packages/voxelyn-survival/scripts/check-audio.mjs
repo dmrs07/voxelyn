@@ -71,14 +71,28 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 
 await page.addInitScript(() => {
-  window.__audio = { contexts: 0, oscillators: 0, buffers: 0, panners: 0 };
+  // Perfil de browser limpo cai na Inducao (primeira vez) em vez de comecar a
+  // run — e este teste mede a run. Marca o documento como lido antes do jogo
+  // carregar, como um jogador veterano.
+  localStorage.setItem('voxelyn.induction.seen', '1');
+  window.__audio = { contexts: 0, oscillators: 0, oscLive: 0, buffers: 0, panners: 0 };
   const Real = window.AudioContext;
   window.AudioContext = class extends Real {
     constructor(...args) {
       super(...args);
       window.__audio.contexts++;
       const osc = this.createOscillator.bind(this);
-      this.createOscillator = () => (window.__audio.oscillators++, osc());
+      // Alem do total CRIADO (prova que algo gerou som), o saldo VIVO: um
+      // oscilador efemero que nunca recebe stop() nao dispara 'ended' e fica
+      // pendurado no grafo — crescimento continuo de criados com saldo vivo
+      // limitado e scheduler saudavel; os dois crescendo juntos e vazamento.
+      this.createOscillator = () => {
+        window.__audio.oscillators++;
+        window.__audio.oscLive++;
+        const node = osc();
+        node.addEventListener('ended', () => window.__audio.oscLive--);
+        return node;
+      };
       const buf = this.createBufferSource.bind(this);
       this.createBufferSource = () => (window.__audio.buffers++, buf());
       const pan = this.createStereoPanner.bind(this);
@@ -112,6 +126,13 @@ await page.mouse.up();
 await page.waitForTimeout(600);
 const played = await snapshot();
 
+// Janela de assentamento: as vozes efemeras do combate acima ja terminaram e
+// as caudas do que a musica tenha agendado tambem. O que sobra vivo aqui tem
+// de ser essencialmente o conjunto persistente (leitos + drone/pad da musica)
+// mais um punhado em voo.
+await page.waitForTimeout(3000);
+const settled = await snapshot();
+
 const problems = [];
 // Criar o contexto no load quebraria em todo browser movel (fica 'suspended' e
 // depois soa com atraso). Este teste roda com a politica de autoplay relaxada,
@@ -121,15 +142,25 @@ if (started.contexts < 1) problems.push('nenhum AudioContext criado ao iniciar a
 // Dois leitos de ambiencia usam buffer de ruido (fogo e gas); os outros tres
 // sao osciladores (calor, contaminacao, ameaca).
 if (started.buffers < 2) problems.push(`leitos de ruido nao iniciaram (buffers=${started.buffers}, esperado >= 2)`);
-if (started.oscillators < 4) problems.push(`leitos tonais nao iniciaram (osciladores=${started.oscillators}, esperado >= 4)`);
+// Alem dos leitos tonais da ambiencia (>= 4 osciladores), o barramento de
+// musica cria os proprios persistentes (drone/pad/tensao) no unlock.
+if (started.oscillators < 10) problems.push(`leitos tonais + musica nao iniciaram (osciladores=${started.oscillators}, esperado >= 10)`);
 if (played.oscillators <= started.oscillators && played.buffers <= started.buffers) {
   problems.push('nenhuma voz de evento disparou durante o jogo');
+}
+// As duas metades da prova do scheduler de musica: o total criado pode so
+// crescer (notas agendadas), mas o saldo VIVO tem de ficar limitado — os
+// persistentes de ambiencia + musica somam ~12; 48 da folga para vozes de
+// evento em voo. Vivo acima disso e no que nao morre: vazamento.
+if (settled.oscLive > 48) {
+  problems.push(`osciladores vivos apos assentar: ${settled.oscLive} (esperado <= 48) — nota agendada sem stop()?`);
 }
 if (pageErrors.length > 0) problems.push(`erros de pagina: ${pageErrors.join(' | ')}`);
 
 console.log(`ocioso:    ${JSON.stringify(idle)}`);
 console.log(`iniciado:  ${JSON.stringify(started)}`);
 console.log(`apos jogo: ${JSON.stringify(played)}`);
+console.log(`assentado: ${JSON.stringify(settled)}`);
 
 await browser.close();
 server.close();
