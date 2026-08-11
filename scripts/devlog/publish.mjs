@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { carouselDir, devlogDir, entriesDir, mediaDir, socialDir } from './lib/paths.mjs';
+import { devlogDir, entriesDir, socialDir } from './lib/paths.mjs';
 import { nextEntry, readPlan, writePlan } from './plan.mjs';
 
 function parseArgs(argv) {
@@ -36,17 +36,28 @@ function findEntryFile(id) {
 }
 
 /**
+ * Uma peca existe se esta em disco OU no CDN.
+ *
+ * Depois de `upload.mjs --prune` o arquivo local nao existe mais de proposito,
+ * e exigir o disco faria toda publicacao seguinte abortar — a migracao para o
+ * CDN travaria a tarefa diaria. O que importa e que a peca esteja em ALGUM
+ * lugar de onde se possa servi-la.
+ */
+const present = (entry, relative) =>
+  existsSync(resolve(devlogDir, relative)) || Boolean(entry.cdn?.[relative]);
+
+/**
  * O que falta para a entrada estar pronta.
  *
  * Isto e a rede de seguranca da tarefa diaria: rodando sozinha as 9h, sem
  * ninguem olhando, o jeito de uma entrada quebrada virar "publicada" e nao
- * conferir. Cada item aqui e um arquivo que precisa EXISTIR em disco.
+ * conferir.
  */
 export function missingPieces(entry) {
   const missing = [];
   if (!entry.shots?.length) missing.push('screenshot (shoot.mjs)');
   for (const shot of entry.shots ?? [])
-    if (!existsSync(resolve(mediaDir, shot.file))) missing.push(`media/${shot.file} sumiu`);
+    if (!present(entry, `media/${shot.file}`)) missing.push(`media/${shot.file} sumiu`);
 
   if (!findEntryFile(entry.id)) missing.push(`entries/${entry.id}-*.md (a redacao)`);
 
@@ -67,7 +78,7 @@ export function missingPieces(entry) {
 
   if (!entry.carousel?.length) missing.push('carrossel (carousel.mjs)');
   for (const file of entry.carousel ?? [])
-    if (!existsSync(resolve(carouselDir, file))) missing.push(`carousel/${file} sumiu`);
+    if (!present(entry, `carousel/${file}`)) missing.push(`carousel/${file} sumiu`);
 
   return missing;
 }

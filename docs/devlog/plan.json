@@ -55,7 +55,6 @@
         "001-04.png",
         "001-05.png"
       ],
-      "publishedAt": "2026-08-11",
       "carousels": {
         "en": {
           "files": [
@@ -67,7 +66,9 @@
           ],
           "pdf": "001.pdf"
         }
-      }
+      },
+      "cdn": {},
+      "publishedAt": "2026-08-11"
     },
     {
       "id": "002",
@@ -107,6 +108,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -149,6 +152,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -220,6 +225,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -257,6 +264,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -307,6 +316,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -343,6 +354,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -380,6 +393,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -418,6 +433,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -464,6 +481,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -565,6 +584,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -609,6 +630,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -647,6 +670,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -743,6 +768,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -780,6 +807,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -867,6 +896,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -994,6 +1025,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1030,6 +1063,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1076,6 +1111,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1197,6 +1234,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1365,6 +1404,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1414,6 +1455,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1481,6 +1524,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1562,6 +1607,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1606,6 +1653,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1669,6 +1718,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1722,6 +1773,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1781,6 +1834,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1846,6 +1901,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -1973,6 +2030,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2018,6 +2077,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2069,6 +2130,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2108,6 +2171,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2363,6 +2428,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2413,6 +2480,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2540,6 +2609,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2587,6 +2658,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2762,6 +2835,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2841,6 +2916,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -2892,6 +2969,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3006,6 +3085,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3066,6 +3147,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3220,6 +3303,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3271,6 +3356,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3308,6 +3395,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3351,6 +3440,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3398,6 +3489,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3436,6 +3529,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3485,6 +3580,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3521,6 +3618,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3561,6 +3660,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3628,6 +3729,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3667,6 +3770,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3704,6 +3809,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3746,6 +3853,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3786,6 +3895,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3827,6 +3938,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3902,6 +4015,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3943,6 +4058,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -3988,6 +4105,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4043,6 +4162,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4098,6 +4219,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4213,6 +4336,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4260,6 +4385,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4327,6 +4454,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4394,6 +4523,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4439,6 +4570,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4550,6 +4683,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4606,6 +4741,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4655,6 +4792,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4743,6 +4882,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4783,6 +4924,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4819,6 +4962,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4878,6 +5023,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4921,6 +5068,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4957,6 +5106,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -4995,6 +5146,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5062,6 +5215,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5104,6 +5259,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5191,6 +5348,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5239,6 +5398,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5278,6 +5439,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5325,6 +5488,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5377,6 +5542,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5414,6 +5581,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5454,6 +5623,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5491,6 +5662,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5533,6 +5706,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5570,6 +5745,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5609,6 +5786,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5648,6 +5827,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5685,6 +5866,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5722,6 +5905,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5759,6 +5944,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5796,6 +5983,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5834,6 +6023,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5871,6 +6062,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5908,6 +6101,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5945,6 +6140,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -5982,6 +6179,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6019,6 +6218,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6060,6 +6261,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6101,6 +6304,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6159,6 +6364,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6201,6 +6408,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6256,6 +6465,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     },
     {
@@ -6301,6 +6512,8 @@
       "shotError": null,
       "entryFile": null,
       "carousel": [],
+      "carousels": {},
+      "cdn": {},
       "publishedAt": null
     }
   ]

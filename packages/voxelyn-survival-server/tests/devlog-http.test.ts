@@ -148,6 +148,22 @@ describe('o que nao esta publicado nao vaza', () => {
     expect((await fetch(`${base}/devlog/a/social/001.json`)).status).toBe(404);
   });
 
+  // Reportado pela review do Codex no PR #141, e reproduzido aqui antes da
+  // correcao: `url.pathname` NAO decodifica `%2F`, entao o guarda de dono via
+  // `media/001-x/../../carousel/002-01.png` como comecando em `media/001-`,
+  // enquanto o store normalizava para `carousel/002-01.png` e servia o arquivo
+  // da entrada que ainda nao saiu. Duas leituras diferentes do mesmo caminho.
+  it('recusa separador codificado que troca de entrada no meio do caminho', async () => {
+    for (const path of [
+      '/devlog/a/media/001-x%2F..%2F..%2Fcarousel%2F002-01.png',
+      '/devlog/a/media/001-x%2f..%2f..%2fmedia%2f002-noita.png',
+      '/devlog/a/carousel/001-x/../../media/002-noita.png',
+    ]) {
+      const res = await fetch(`${base}${path}`);
+      expect(res.status, path).toBe(404);
+    }
+  });
+
   it('recusa travessia de caminho', async () => {
     for (const path of [
       '/devlog/a/../../../etc/passwd',

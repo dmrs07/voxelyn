@@ -24,7 +24,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { ArenaTelemetryDigest, ArenaTelemetryStore } from './arena-telemetry.js';
 import type { DevlogEntry, DevlogSocial, DevlogStore } from './devlog.js';
-import { isEntryId } from './devlog.js';
+import { canonicalRelative, isEntryId } from './devlog.js';
 import { SubmissionRateLimiter, requestRateLimitKey } from './http-util.js';
 import type { TelemetryDigest, TelemetryStore } from './telemetry.js';
 
@@ -674,7 +674,15 @@ export const createDevlogHandler = (opts: DevlogHttpOptions) => {
     }
 
     if (path.startsWith('/devlog/a/')) {
-      const relative = decodeURIComponent(path.slice('/devlog/a/'.length));
+      // CANONIZA primeiro, decide depois. Autorizar sobre a string crua e ler
+      // sobre a normalizada é como o `%2F` conseguia atravessar de uma entrada
+      // publicada para uma que ainda não saiu.
+      const relative = canonicalRelative(decodeURIComponent(path.slice('/devlog/a/'.length)));
+      if (!relative) {
+        notFound(res);
+        return true;
+      }
+
       // Duas guardas, e as duas precisam passar.
       //
       // A pasta, porque só `media/` e `carousel/` guardam material de exibição

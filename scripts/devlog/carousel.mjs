@@ -47,7 +47,7 @@ export function readSocial(id, lang = null) {
 }
 
 export async function renderCarousel(entry, social, { lang = null } = {}) {
-  const slides = buildSlides(entry, social);
+  const slides = buildSlides(entry, social, { lang });
   const outDir = lang ? resolve(carouselDir, lang) : carouselDir;
   const browser = await chromium.launch({ executablePath: chromiumExecutable() });
   try {
@@ -71,19 +71,25 @@ export async function renderCarousel(entry, social, { lang = null } = {}) {
       files.push(file);
     }
 
-    // O PDF sai da MESMA pagina, entao os slides do documento e as imagens
-    // soltas nunca divergem: e um segundo formato do mesmo render, nao uma
-    // segunda montagem.
-    const pdf = `${entry.id}.pdf`;
-    writeFileSync(
-      resolve(outDir, pdf),
-      await page.pdf({
-        width: `${SLIDE.width}px`,
-        height: `${SLIDE.height}px`,
-        printBackground: true,
-        pageRanges: `1-${slides.length}`,
-      }),
-    );
+    // O PDF sai da MESMA pagina, entao o documento e as imagens soltas nunca
+    // divergem: e um segundo formato do mesmo render, nao uma segunda montagem.
+    //
+    // So no caminho por idioma, que e o do LinkedIn. O Instagram consome
+    // imagem, entao um PDF em portugues seria um arquivo que ninguem abre —
+    // e um binario a mais para versionar ou subir.
+    let pdf = null;
+    if (lang) {
+      pdf = `${entry.id}.pdf`;
+      writeFileSync(
+        resolve(outDir, pdf),
+        await page.pdf({
+          width: `${SLIDE.width}px`,
+          height: `${SLIDE.height}px`,
+          printBackground: true,
+          pageRanges: `1-${slides.length}`,
+        }),
+      );
+    }
 
     return { files, pdf };
   } finally {
@@ -129,7 +135,7 @@ async function main() {
     `carrossel da entrada ${entry.id}${args.lang ? ` (${args.lang})` : ''}: ${files.length} slides`,
   );
   for (const f of files) console.log(`  ${dir}/${f}`);
-  console.log(`  ${dir}/${pdf}  <- documento para o LinkedIn`);
+  if (pdf) console.log(`  ${dir}/${pdf}  <- documento para o LinkedIn`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

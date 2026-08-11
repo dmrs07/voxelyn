@@ -226,6 +226,11 @@ responder. Ele está prestes a remover o único outro lugar onde a imagem existe
 "200 OK" do upload sem conferir a entrega seria apagar o original porque a copiadora não
 reclamou.
 
+O `publish.mjs` aceita peça que esteja **em disco ou no CDN**, então podar não trava a
+publicação das entradas que ainda estão na fila. E `plan.mjs` carrega o mapa `cdn` entre
+reconciliações — ele roda no começo de toda tarefa diária, e perdê-lo deixaria a vitrine
+apontando para arquivo que não existe mais em lugar nenhum.
+
 Isso não recupera o histórico: os PNGs já commitados continuam nos objetos do git. Para
 zerar de verdade seria preciso reescrever a história, o que não vale a pena por ~1 MB.
 

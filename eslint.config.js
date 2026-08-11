@@ -78,6 +78,7 @@ export default [
         fetch: 'readonly',
         URLSearchParams: 'readonly',
         AbortSignal: 'readonly',
+        structuredClone: 'readonly',
       },
     },
   },

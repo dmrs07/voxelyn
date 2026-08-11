@@ -119,14 +119,38 @@ export interface DevlogStore {
 export const isEntryId = (value: string): boolean => /^\d{3}$/.test(value);
 
 /**
+ * A forma CANONICA de um caminho relativo, ou null se ele escapa da raiz.
+ *
+ * Existe porque quem autoriza e quem le precisam enxergar o MESMO caminho.
+ * `url.pathname` nao decodifica `%2F`, entao
+ * `media/001-x%2F..%2F..%2Fcarousel%2F002-01.png` chegava aqui como uma string
+ * que comeca em `media/001-` — o guarda de dono lia "entrada 001, publicada" e
+ * liberava, enquanto o `normalize` la embaixo transformava tudo em
+ * `carousel/002-01.png` e servia o arquivo de uma entrada que ainda nao saiu.
+ * Duas leituras do mesmo caminho e uma delas autoriza a outra.
+ *
+ * Canonizar ANTES de qualquer decisao elimina a divergencia na origem: a
+ * autorizacao e a leitura passam a operar sobre a mesma string.
+ */
+export const canonicalRelative = (relativePath: string): string | null => {
+  const cleaned = normalize(relativePath).replace(/\\/g, '/');
+  // Depois de normalizar, sobrar `..` significa que o caminho sai da raiz — e
+  // um caminho absoluto nunca foi relativo para comecar.
+  if (cleaned === '..' || cleaned.startsWith('../') || cleaned.startsWith('/')) return null;
+  const trimmed = cleaned.replace(/^\.\//, '');
+  return trimmed === '.' || trimmed === '' ? null : trimmed;
+};
+
+/**
  * Resolve um caminho DENTRO da raiz, ou null.
  *
- * `normalize` antes de `resolve` e a checagem de prefixo com separador: sem o
+ * A checagem de prefixo com separador continua como segunda barreira: sem o
  * separador, uma raiz `/srv/devlog` deixaria passar `/srv/devlog-secreto`,
  * porque a string realmente comeca com a outra.
  */
 const within = (root: string, relativePath: string): string | null => {
-  const cleaned = normalize(relativePath).replace(/^([./\\])+/, '');
+  const cleaned = canonicalRelative(relativePath);
+  if (!cleaned) return null;
   const full = resolve(root, cleaned);
   if (full !== root && !full.startsWith(root + sep)) return null;
   return full;
