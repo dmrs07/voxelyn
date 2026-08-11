@@ -37,7 +37,7 @@
           "recipe": "noita",
           "file": "001-noita.png",
           "label": "demo Noita-like",
-          "bytes": 10469
+          "bytes": 10355
         },
         {
           "recipe": "iso",
@@ -68,7 +68,19 @@
         }
       },
       "cdn": {},
-      "publishedAt": "2026-08-11"
+      "publishedAt": "2026-08-11",
+      "live": [
+        {
+          "recipe": "noita",
+          "page": "index.html",
+          "bytes": 11207
+        },
+        {
+          "recipe": "iso",
+          "page": "index.html",
+          "bytes": 5859
+        }
+      ]
     },
     {
       "id": "002",

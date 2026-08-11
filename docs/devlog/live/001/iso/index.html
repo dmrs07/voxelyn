@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voxelyn - Iso Diablo-like</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: monospace; }
+      canvas { image-rendering: pixelated; width: 640px; height: 480px; }
+      #wrap { display: grid; place-items: center; height: 100vh; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <div>Voxelyn Iso Diablo-like</div>
+      <canvas id="c" width="320" height="240"></canvas>
+    </div>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>

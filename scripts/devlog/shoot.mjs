@@ -17,6 +17,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { capture, serveStatic } from './lib/capture.mjs';
+import { snapshotLive } from './lib/live.mjs';
 import { mediaDir } from './lib/paths.mjs';
 import { recipes } from './lib/recipes.mjs';
 import {
@@ -96,6 +97,7 @@ async function main() {
 
   const built = new Map(); // app -> dist, para nao instalar duas vezes
   const shots = [];
+  const live = [];
   const problems = [];
 
   try {
@@ -119,7 +121,19 @@ async function main() {
             build(dir, recipe.app, (m) => log(`  ${m}`)),
           );
         }
-        shots.push(await shootRecipe(name, entry, built.get(recipe.app), args));
+        const site = built.get(recipe.app);
+        shots.push(await shootRecipe(name, entry, site, args));
+
+        // O build ja esta aqui e ja foi dirigido; guardar o site custa uma
+        // copia de arquivos. Falhar nisto NAO derruba a captura — a
+        // screenshot ja saiu, e o embed e um extra.
+        if (recipe.live) {
+          try {
+            live.push(snapshotLive(site, recipe, entry.id, name, log));
+          } catch (err) {
+            log(`  sem embed para ${name}: ${err.message.split('\n')[0]}`);
+          }
+        }
       } catch (err) {
         const line = `${name}: ${err.message.split('\n')[0]}`;
         // "soft" e ausencia esperada (app/pagina que ainda nao nasceu), nao
@@ -140,6 +154,11 @@ async function main() {
   const byRecipe = new Map((entry.shots ?? []).map((s) => [s.recipe, s]));
   for (const shot of shots) byRecipe.set(shot.recipe, shot);
   entry.shots = [...byRecipe.values()];
+  // Mesma regra de merge das screenshots: reexecutar uma receita so nao pode
+  // apagar o embed que outra ja produziu.
+  const liveByRecipe = new Map((entry.live ?? []).map((l) => [l.recipe, l]));
+  for (const snapshot of live) liveByRecipe.set(snapshot.recipe, snapshot);
+  entry.live = [...liveByRecipe.values()];
   entry.shotError = entry.shots.length ? null : (problems[0] ?? 'nenhuma receita produziu imagem');
   if (shots.length && entry.status === 'pending') entry.status = 'shot';
   writePlan(plan);

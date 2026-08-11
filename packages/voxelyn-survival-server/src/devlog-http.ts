@@ -5,6 +5,7 @@
 //   /devlog                 público  — as entradas já publicadas
 //   /devlog/e/<id>          público  — o post, com as imagens da época
 //   /devlog/a/<caminho>     público  — asset, SÓ de entrada publicada
+//   /devlog/live/<...>      público  — o build daquele commit, em sandbox
 //   /devlog/console         token    — a próxima entrada a postar, pronta
 //   /devlog/panel           token    — os digests de telemetria do jogo
 //
@@ -216,6 +217,17 @@ const CSS = `
     color:var(--bright);margin:14px 0}
   .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
   .thumbs img{margin:0}
+  .live{border:1px solid var(--brass);background:var(--sheet);margin:26px 0}
+  .live-head{display:flex;justify-content:space-between;align-items:center;gap:14px;
+    padding:12px 16px;border-bottom:1px solid var(--brass);flex-wrap:wrap}
+  .live-head .what{font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--gold)}
+  .live-head .size{font-size:12px;color:var(--mute)}
+  .live-stage{position:relative;height:620px;background:#000}
+  .live-stage iframe{width:100%;height:100%;border:0;display:block}
+  .live-stage .cover{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;text-align:center;padding:20px}
+  .live-stage .cover p{color:var(--mute);font-size:13px;max-width:34em}
   .ok{color:var(--teal)}
   .miss{color:var(--red)}
 `;
@@ -291,6 +303,55 @@ const renderIndex = (
   );
 };
 
+/**
+ * O build daquele commit, rodando dentro do post.
+ *
+ * Três decisões de segurança e uma de educação:
+ *
+ * - `sandbox` SEM `allow-same-origin`. O código embutido é do próprio
+ *   repositório, mas é código de sete meses atrás rodando numa origem que
+ *   também serve o console de operação — e o token do console viaja na query
+ *   string. Sem `allow-same-origin` o iframe vira origem opaca e não alcança a
+ *   página que o contém.
+ * - `referrerpolicy="no-referrer"`, para o `Referer` não levar junto a URL da
+ *   página de origem.
+ * - O `src` só é preenchido no CLIQUE. Uma simulação célula a célula iniciando
+ *   sozinha numa página aberta no celular queima bateria à toa, e quem abriu o
+ *   post talvez só quisesse ler.
+ */
+const renderLive = (entry: DevlogEntry): string =>
+  (entry.live ?? [])
+    .map((snapshot) => {
+      const src = `/devlog/live/${entry.id}/${snapshot.recipe}/${snapshot.page}`;
+      const kb = (snapshot.bytes / 1024).toFixed(0);
+      return `<div class="live">
+        <div class="live-head">
+          <span class="what">rodando o build de ${escapeHtml(entry.realDate)}</span>
+          <span class="size">${kb} KB · ${escapeHtml(snapshot.recipe)}</span>
+        </div>
+        <div class="live-stage">
+          <iframe title="build de ${escapeHtml(entry.realDate)}" data-src="${escapeHtml(src)}"
+            sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy" hidden></iframe>
+          <div class="cover">
+            <button data-run>&#9654; rodar aqui</button>
+            <p>É o build deste commit, não uma gravação. Carrega ${kb} KB.</p>
+          </div>
+        </div>
+      </div>`;
+    })
+    .join('');
+
+const LIVE_SCRIPT = `<script>
+  document.addEventListener('click', function (ev) {
+    if (!ev.target.hasAttribute || !ev.target.hasAttribute('data-run')) return;
+    var stage = ev.target.closest('.live-stage');
+    var frame = stage.querySelector('iframe');
+    frame.src = frame.getAttribute('data-src');
+    frame.hidden = false;
+    stage.querySelector('.cover').remove();
+  });
+</script>`;
+
 const renderEntry = (
   entry: DevlogEntry,
   markdown: string | null,
@@ -323,7 +384,9 @@ const renderEntry = (
     `publicado em ${entry.publishedAt ?? entry.publishDate} · commit ${entry.tipShort} de ${entry.realDate}`,
     `<nav class="rail"><a href="/devlog">← todas as entradas</a></nav>
      ${body}
-     <hr><p class="meta">commit ${escapeHtml(entry.tipShort)}${pr}</p>`,
+     ${renderLive(entry)}
+     <hr><p class="meta">commit ${escapeHtml(entry.tipShort)}${pr}</p>
+     ${entry.live?.length ? LIVE_SCRIPT : ''}`,
   );
 };
 
@@ -670,6 +733,39 @@ export const createDevlogHandler = (opts: DevlogHttpOptions) => {
         return true;
       }
       html(res, 200, renderEntry(entry, opts.store.post(entry.id), opts.store.headline(entry.id)));
+      return true;
+    }
+
+    if (path.startsWith('/devlog/live/')) {
+      const relative = canonicalRelative(decodeURIComponent(path.slice('/devlog/live/'.length)));
+      const owner = relative ? /^(\d{3})\//.exec(relative)?.[1] : null;
+      if (!relative || !owner || !isEntryId(owner) || !published.some((e) => e.id === owner)) {
+        notFound(res);
+        return true;
+      }
+      const asset = opts.store.liveAsset(relative);
+      if (!asset) {
+        notFound(res);
+        return true;
+      }
+      res.writeHead(200, {
+        'content-type': asset.contentType,
+        'cache-control': 'public, max-age=86400',
+        'x-content-type-options': 'nosniff',
+        // Sandbox TAMBÉM no cabeçalho, e não só no atributo do iframe: assim o
+        // isolamento vale mesmo se alguém abrir a URL direto numa aba, fora do
+        // post. `allow-scripts` porque sem script não há engine para rodar.
+        'content-security-policy': 'sandbox allow-scripts',
+        // CORS aberto, e é o sandbox que obriga: sem `allow-same-origin` o
+        // iframe roda numa origem opaca (`null`), e `<script type="module">` é
+        // SEMPRE buscado com CORS. Sem este cabeçalho o módulo é bloqueado e a
+        // engine nunca sobe — o embed vira uma moldura preta.
+        //
+        // Abrir não custa nada aqui: são arquivos estáticos de uma entrada já
+        // publicada, que qualquer um já podia baixar por esta mesma rota.
+        'access-control-allow-origin': '*',
+      });
+      res.end(asset.body);
       return true;
     }
 

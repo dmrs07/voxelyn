@@ -1,6 +1,14 @@
 /**
  * Receitas de captura: como dirigir um build JA PRONTO ate um quadro que vale
- * uma screenshot.
+ * uma screenshot — e, quando o build e leve, guarda-lo para rodar dentro do
+ * devlog.
+ *
+ * `live: true` marca a receita cujo build vale a pena embutir. Nao e sobre a
+ * receita ser interessante, e sobre PESO: os demos do core tem 30 KB e o
+ * roguelike 100 KB, enquanto o dist do Survival tem 9,28 MB, e as ~91 entradas
+ * dele dariam uns 845 MB no repositorio. Onde o embed cabe, o leitor mexe na
+ * engine daquele commit; onde nao cabe, a screenshot continua contando a
+ * historia.
  *
  * A regra que molda este arquivo: as receitas rodam contra commits de semanas
  * atras, onde seletores podem nao existir ainda. Por isso todo passo aceita
@@ -102,6 +110,9 @@ export const recipes = {
     page: 'examples/browser-noita-like/index.html',
     viewport: DESKTOP,
     label: 'demo Noita-like',
+    // 10 KB de bundle: MENOS que o PNG dele. Se algum quadro deste devlog
+    // merece ser interativo, e a areia caindo.
+    live: true,
     // Recorta NO CANVAS. Os demos sao uma caixa centrada numa pagina vazia:
     // fotografar a janela entrega 80% de fundo preto, e recortar no `#wrap`
     // nao resolve porque ele estica por `min-height: 100vh`. O titulo e o
@@ -122,6 +133,7 @@ export const recipes = {
     viewport: DESKTOP,
     label: 'demo iso Diablo-like',
     optional: true,
+    live: true,
     clip: '#c',
     steps: [
       { do: 'waitForInk', selector: '#c' },
@@ -141,6 +153,7 @@ export const recipes = {
     page: 'index.html',
     viewport: DESKTOP,
     label: 'roguelike',
+    live: true,
     steps: [
       { do: 'waitForInk', selector: '#game' },
       { do: 'wait', ms: 1500 },
@@ -154,7 +167,10 @@ export const recipes = {
     app: 'editor',
     page: 'index.html',
     viewport: DESKTOP,
+    // O teto de tamanho decide: se o dist do editor couber, ele entra; se nao,
+    // a captura registra o aviso e a entrada segue so com a screenshot.
     label: 'VoxelForge',
+    live: true,
     steps: [{ do: 'waitFor', selector: '#app' }, { do: 'waitForFonts' }, { do: 'wait', ms: 2000 }],
   },
 

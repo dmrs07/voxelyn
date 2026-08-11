@@ -37,6 +37,14 @@ export type DevlogEntry = {
    * quebra as entradas que ainda nao subiram.
    */
   cdn?: Record<string, string>;
+  /**
+   * Builds daquele commit guardados para rodar dentro do post.
+   *
+   * So existem onde o build e leve — os demos do core tem 10 KB, o dist do
+   * Survival tem 9,28 MB. Onde ha embed, o leitor mexe na engine daquele dia;
+   * onde nao ha, a screenshot continua contando a historia.
+   */
+  live?: Array<{ recipe: string; page: string; bytes: number }>;
   publishedAt: string | null;
   commits: Array<{ sha: string; subject: string }>;
   stat: { added: number; removed: number; files: number; partial?: boolean };
@@ -69,6 +77,30 @@ const MIME: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.pdf': 'application/pdf',
+};
+
+/**
+ * Tipos servives DENTRO de um snapshot interativo.
+ *
+ * Lista separada da de `asset()`, e mais larga de proposito: um site precisa
+ * de HTML e JS, que ali sao insumo do pipeline e nao podem sair. Aqui eles SAO
+ * o conteudo. O isolamento nao vem da extensao, vem do `sandbox` com que a
+ * rota serve e o iframe embute.
+ */
+const LIVE_MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm',
 };
 
 /**
@@ -113,6 +145,8 @@ export interface DevlogStore {
   headline(id: string): string | null;
   social(id: string, lang?: string | null): DevlogSocial | null;
   asset(relativePath: string): DevlogAsset | null;
+  /** Arquivo de um snapshot interativo, sob `live/<id>/<receita>/`. */
+  liveAsset(relativePath: string): DevlogAsset | null;
 }
 
 /** Ids sao sempre tres digitos; qualquer outra coisa nao e um id. */
@@ -262,6 +296,21 @@ export const createDevlogStore = (
       if (lang !== null && !/^[a-z]{2}$/.test(lang)) return null;
       const name = lang ? `${id}.${lang}.json` : `${id}.json`;
       return readJson<DevlogSocial>(join(dir, 'social', name));
+    },
+
+    liveAsset(relativePath): DevlogAsset | null {
+      if (!dir) return null;
+      const root = join(dir, 'live');
+      const full = within(root, relativePath);
+      if (!full) return null;
+      const contentType = LIVE_MIME[extensionOf(full)];
+      if (!contentType) return null;
+      try {
+        if (!statSync(full).isFile()) return null;
+        return { body: readFileSync(full), contentType };
+      } catch {
+        return null;
+      }
     },
 
     asset(relativePath): DevlogAsset | null {

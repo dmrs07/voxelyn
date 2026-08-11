@@ -86,6 +86,7 @@ const PROGRESS_FIELDS = {
   carousel: [],
   carousels: {},
   cdn: {},
+  live: [],
   publishedAt: null,
 };
 

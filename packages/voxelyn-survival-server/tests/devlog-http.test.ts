@@ -41,6 +41,7 @@ const entry = (id: string, status: string, extra: Record<string, unknown> = {}) 
   shotError: null,
   entryFile: null,
   carousel: [`${id}-01.png`],
+  live: [{ recipe: 'noita', page: 'index.html', bytes: 1234 }],
   publishedAt: status === 'published' ? '2026-08-11' : null,
   ...extra,
 });
@@ -51,6 +52,11 @@ beforeAll(async () => {
   mkdirSync(join(dir, 'social'));
   mkdirSync(join(dir, 'media'));
   mkdirSync(join(dir, 'carousel'));
+  for (const id of ['001', '002']) {
+    mkdirSync(join(dir, 'live', id, 'noita'), { recursive: true });
+    writeFileSync(join(dir, 'live', id, 'noita', 'index.html'), '<canvas id="c"></canvas>');
+    writeFileSync(join(dir, 'live', id, 'noita', 'index.js'), 'globalThis.x = 1;');
+  }
 
   writeFileSync(
     join(dir, 'plan.json'),
@@ -213,6 +219,45 @@ describe('superficie', () => {
 
   it('nao intercepta as outras rotas do servidor', async () => {
     expect((await fetch(`${base}/healthz`)).status).toBe(200);
+  });
+});
+
+describe('embed interativo', () => {
+  it('serve o build de entrada publicada, isolado', async () => {
+    const res = await fetch(`${base}/devlog/live/001/noita/index.js`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/javascript');
+    // Sandbox no cabecalho vale mesmo se a URL for aberta direto numa aba.
+    expect(res.headers.get('content-security-policy')).toBe('sandbox allow-scripts');
+    // Sem `allow-same-origin` o iframe tem origem `null`, e modulo ES e
+    // SEMPRE buscado com CORS: sem este cabecalho a engine nao sobe.
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+  });
+
+  it('nao serve o build de entrada que ainda nao saiu', async () => {
+    expect((await fetch(`${base}/devlog/live/002/noita/index.html`)).status).toBe(404);
+  });
+
+  it('recusa travessia dentro do live', async () => {
+    for (const path of [
+      '/devlog/live/001%2F..%2F..%2Fplan.json',
+      '/devlog/live/001/noita/../../../plan.json',
+      '/devlog/live/../plan.json',
+    ]) {
+      expect((await fetch(`${base}${path}`)).status, path).toBe(404);
+    }
+  });
+
+  it('embute em sandbox e so carrega no clique', async () => {
+    const body = await (await fetch(`${base}/devlog/e/001`)).text();
+    expect(body).toContain('sandbox="allow-scripts"');
+    // A ausencia disto e o ponto todo: com `allow-same-origin` o iframe
+    // alcancaria a pagina que o contem, e o console serve token na query.
+    expect(body).not.toContain('allow-same-origin');
+    expect(body).toContain('referrerpolicy="no-referrer"');
+    // `data-src`, nao `src`: nada roda antes de a pessoa pedir.
+    expect(body).toContain('data-src="/devlog/live/001/noita/index.html"');
+    expect(body).not.toContain('<iframe src=');
   });
 });
 

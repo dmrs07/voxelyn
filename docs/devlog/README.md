@@ -55,6 +55,7 @@ docs/devlog/
   carousel/NNN-NN.png       # os slides prontos pra postar
   carousel/en/NNN-NN.png    # os mesmos slides em inglês
   carousel/en/NNN.pdf       # o documento do LinkedIn
+  live/NNN/<receita>/       # o build daquele commit, para rodar no post
 ```
 
 As worktrees dos commits antigos vivem em `../.voxelyn-devlog-work/`, **fora** do repo, e
@@ -233,6 +234,47 @@ apontando para arquivo que não existe mais em lugar nenhum.
 
 Isso não recupera o histórico: os PNGs já commitados continuam nos objetos do git. Para
 zerar de verdade seria preciso reescrever a história, o que não vale a pena por ~1 MB.
+
+## Embeds interativos
+
+Onde o build é leve, o post não mostra só a screenshot: mostra a **engine daquele commit
+rodando**. O demo de areia caindo de 18 de janeiro tem 10 KB de bundle — menos que o PNG
+dele — e ali o quadro parado sempre foi o pior jeito de contar a história.
+
+A captura já constrói o commit; `snapshotLive` apenas deixa de jogar o resultado fora e
+copia o site para `docs/devlog/live/<id>/<receita>/`.
+
+Quem entra é decidido por **peso**, não por interesse, através de `live: true` na receita:
+
+| Receita                                    | Build           | Embute? |
+| ------------------------------------------ | --------------- | ------- |
+| `noita`, `iso`                             | 30 KB (os dois) | sim     |
+| `roguelike`                                | 100 KB          | sim     |
+| `editor`                                   | o teto decide   | tenta   |
+| `solo`, `arena`, `sprites`, `atlas-studio` | 9,28 MB         | não     |
+
+O dist do Survival tem 9,28 MB, dos quais 7,9 MB são atlas PNG; as ~91 entradas dele
+dariam uns 845 MB. Um teto de 2 MB por snapshot recusa qualquer coisa desse tamanho, com
+aviso, e a entrada segue apenas com a screenshot — é o que impede alguém marcar `live` num
+app pesado e dobrar o repositório sem perceber.
+
+### O isolamento, e o que ele cobra
+
+O embed roda em `<iframe sandbox="allow-scripts">` **sem `allow-same-origin`**. O código é
+do próprio repositório, mas é código de sete meses atrás rodando numa origem que também
+serve o console de operação — e o token do console viaja na query string. Sem
+`allow-same-origin`, o iframe é uma origem opaca e não alcança a página que o contém. A
+rota repete o isolamento no cabeçalho (`Content-Security-Policy: sandbox allow-scripts`),
+para valer também se alguém abrir a URL direto numa aba.
+
+Isso cobra um preço que só aparece rodando: com origem opaca, o iframe é `null`, e
+`<script type="module">` é **sempre** buscado com CORS. Sem `Access-Control-Allow-Origin`
+o módulo é bloqueado e o embed vira uma moldura preta — foi exatamente o que aconteceu na
+primeira tentativa. Por isso a rota manda `*`, o que não custa nada: são arquivos
+estáticos de uma entrada já publicada.
+
+E o `src` só é preenchido no clique. Uma simulação célula a célula iniciando sozinha numa
+página aberta no celular queima bateria à toa.
 
 ## O serviço
 
