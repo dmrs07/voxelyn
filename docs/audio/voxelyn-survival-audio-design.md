@@ -108,12 +108,14 @@ Cada tipo de ação telegrafada tem voz **própria** — não um bipe genérico.
 chegam do bruiser com o mesmo corpo na tela, e o que separa "sai da frente" de "recua" é
 justamente qual dos dois começou.
 
-A mesma lógica separa **pancada** de **pressão**: o dano ambiental por tick (gás, esporo,
+A mesma lógica separa **pancada** de **pressão**: o dano por tick do chão (gás, esporo,
 fogo sob os pés) chega a 20 Hz e viajava como `hitPlayer` — um thud de chefe, catorze vezes
-por segundo, dentro de qualquer nuvem. Desde que o evento `hit` carrega a causa
-(`cause`, protocolo 22), ele vira `hitPlayerHazard`: surdo, sem transiente, prioridade de
-textura e trava de 500 ms. Quem informa "estou no perigo" é o leito contínuo; a voz só
-pontua o custo.
+por segundo, dentro de qualquer nuvem. Desde que o evento `hit` carrega o flag `hazard`
+(protocolo 22, marcado pela própria simulação no call site do dano por tick), ele vira
+`hitPlayerHazard`: surdo, sem transiente, prioridade de textura e trava de 500 ms. É um
+flag, e não a causa do dano, de propósito: a varredura do Coração da Fornalha também fere
+com fogo e **é** pancada — ataque de chefe sai como impacto pleno, com ducking e tudo.
+Quem informa "estou no perigo" é o leito contínuo; a voz só pontua o custo.
 
 ## 5. Ambiência
 

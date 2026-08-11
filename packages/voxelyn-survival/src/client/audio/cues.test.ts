@@ -64,38 +64,42 @@ describe('traducao de evento para som', () => {
     expect(VOICE_SPECS.hitPlayer.priority).toBeGreaterThan(VOICE_SPECS.hitEnemy.priority);
   });
 
-  // Dano ambiental por tick chega a 20 Hz; como pancada (`hitPlayer`) ele
-  // virava um thud grave continuo no centro do estereo. A causa no evento
-  // permite roteia-lo para a voz de pressao.
-  it('roteia dano ambiental no jogador local para a voz de pressao', () => {
-    for (const cause of ['gas', 'spores', 'fire'] as const) {
-      const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 0.55, target: 1, cause }, ctx);
-      expect(cue.voice, `causa ${cause}`).toBe('hitPlayerHazard');
-      // Escala fixa: o dano por tick e minusculo e constante.
-      expect(cue.scale).toBe(1);
-    }
+  // Dano por tick do chao chega a 20 Hz; como pancada (`hitPlayer`) ele
+  // virava um thud grave continuo no centro do estereo. A sim marca `hazard`
+  // no proprio call site e o cliente so obedece.
+  it('roteia dano de hazard no jogador local para a voz de pressao', () => {
+    const [cue] = cuesForEvent(
+      { t: 'hit', x: 1, y: 1, amount: 0.55, target: 1, hazard: true },
+      ctx,
+    );
+    expect(cue.voice).toBe('hitPlayerHazard');
+    // Escala fixa: o dano por tick e minusculo e constante.
+    expect(cue.scale).toBe(1);
   });
 
-  // O whitelist tem de ser whitelist: qualquer causa fora de gas/esporo/fogo
-  // continua sendo pancada. Um `if (cause)` acidental quebraria aqui.
-  it('dano com causa fora do whitelist ambiental continua pancada', () => {
-    for (const cause of ['player_shot', 'enemy_contact', 'explosion', 'discharge'] as const) {
-      const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 10, target: 1, cause }, ctx);
-      expect(cue.voice, `causa ${cause}`).toBe('hitPlayer');
-    }
+  // O caso que derrubou a primeira forma deste campo (review do Codex no
+  // PR 142): a varredura da Fornalha fere com {kind:'fire'} mas E pancada de
+  // chefe — ela nao marca hazard, e tem de sair como impacto pleno.
+  it('pancada de chefe que por acaso e de fogo continua hitPlayer', () => {
+    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 12, target: 1 }, ctx);
+    expect(cue.voice).toBe('hitPlayer');
+    expect(cue.scale).toBeGreaterThan(1);
   });
 
-  // Servidor sem `cause` (fixtures, eventos construidos a mao): cai no
+  // Servidor sem o flag (fixtures, eventos construidos a mao): cai no
   // comportamento historico em vez de sumir.
-  it('dano sem causa cai na voz de pancada', () => {
+  it('dano sem flag cai na voz de pancada', () => {
     const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 10, target: 1 }, ctx);
     expect(cue.voice).toBe('hitPlayer');
   });
 
-  // A causa ambiental so muda o som de quem SENTE o dano: um bicho queimando
-  // continua relatado como dano nos outros.
-  it('dano ambiental nos outros continua hitEnemy', () => {
-    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 2, target: 7, cause: 'fire' }, ctx);
+  // O hazard so muda o som de quem SENTE o dano: um bicho queimando continua
+  // relatado como dano nos outros.
+  it('hazard nos outros continua hitEnemy', () => {
+    const [cue] = cuesForEvent(
+      { t: 'hit', x: 1, y: 1, amount: 2, target: 7, hazard: true },
+      ctx,
+    );
     expect(cue.voice).toBe('hitEnemy');
   });
 

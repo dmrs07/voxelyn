@@ -921,14 +921,17 @@ export type SemanticEvent =
    */
   | { t: 'action_end'; entity: number }
   /**
-   * `cause` e a CATEGORIA do dano (so o kind — o objeto DamageCause inteiro
-   * carregaria archetype/elite/projectile no wire sem nenhum consumidor). O
-   * audio precisa dela para separar pancada de pressao ambiental: dano de
-   * gas/esporo/fogo roda TODO TICK, e sem a causa o cliente toca o impacto
-   * pleno a 20 Hz. Opcional por defesa (fixtures e eventos de teste antigos
-   * nao a carregam); a interoperabilidade real e garantida pelo handshake.
+   * `hazard` marca dano POR TICK do chao cobrando presenca (gas, esporo, fogo
+   * sob os pes — os tres ramos de `applyCellHazards`). O audio precisa da
+   * distincao para nao tocar o impacto pleno a 20 Hz dentro de uma nuvem.
+   *
+   * E um flag do CALL SITE, nao da causa, de proposito: a varredura do
+   * Coracao da Fornalha tambem fere com `{kind:'fire'}`, mas e uma pancada de
+   * chefe e NAO marca — inferir da causa no cliente foi exatamente o erro que
+   * este campo corrige. Opcional por defesa (fixtures e eventos construidos a
+   * mao nao o carregam); a interoperabilidade real e garantida pelo handshake.
    */
-  | { t: 'hit'; x: number; y: number; amount: number; target: number; cause?: DamageCause['kind'] }
+  | { t: 'hit'; x: number; y: number; amount: number; target: number; hazard?: true }
   | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
   | { t: 'explosion'; x: number; y: number; radius: number; source: 'player' | 'enemy' | 'environment'; owner?: number }
   /**
