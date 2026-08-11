@@ -88,7 +88,20 @@
 // prever a atenuacao da corrente, e prever dano errado num setor inteiramente
 // condutivo e a pior forma de discordancia possivel: ela aparece como vida
 // sumindo sem causa visivel.
-export const PROTOCOL_VERSION = 21;
+// 22: o evento `hit` no jogador ganha `hazard` opcional — dano POR TICK do
+// chao cobrando presenca (gas, esporo, fogo sob os pes), apresentacao apenas.
+// Esse dano roda a 20 Hz, e sem a marca o cliente nao tem como distinguir a
+// pressao continua de uma pancada de chefe: ele tocava o impacto pleno
+// (`hitPlayer`) em ate 14 disparos por segundo dentro de uma nuvem de gas.
+// E um FLAG do call site (`applyCellHazards`), e nao a causa do dano, de
+// proposito: a primeira forma deste campo carregava `DamageCause['kind']` e o
+// cliente inferia "fogo => pressao" — inferencia que a varredura energizada
+// do Coracao da Fornalha desmentiu na primeira review, porque ela tambem fere
+// com {kind:'fire'} e E uma pancada. O campo permanece opcional por
+// TOLERANCIA DEFENSIVA no cliente (fixtures, eventos construidos a mao em
+// teste) — a interoperabilidade cliente-servidor e protegida pelo exact-match
+// deste numero; nao ha expectativa de conexao cruzada 21<->22.
+export const PROTOCOL_VERSION = 22;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de

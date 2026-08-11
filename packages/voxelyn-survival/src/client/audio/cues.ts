@@ -134,6 +134,15 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
 
     case 'hit': {
       const mine = ev.target === ctx.localPlayerId;
+      // Dano por tick do chao (gas, esporo, fogo sob os pes) NAO e pancada.
+      // A sim marca o flag no proprio call site do hazard — o cliente nao
+      // infere nada da causa, porque inferir ja errou uma vez: a varredura da
+      // Fornalha fere com fogo e E pancada. Escala fixa porque o dano por
+      // tick e minusculo e constante; `impactScale` devolveria sempre o piso,
+      // e variacao aqui nao informa nada.
+      if (mine && ev.hazard) {
+        return [{ voice: 'hitPlayerHazard', x: ev.x, y: ev.y, scale: 1 }];
+      }
       return [
         {
           voice: mine ? 'hitPlayer' : 'hitEnemy',

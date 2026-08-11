@@ -671,7 +671,13 @@ export const damageEntity = (
    * dano de producao passa a sua. Uma morte que chegue ao jogador como
    * "unknown" e um bug de contabilidade, nao um estado esperado.
    */
-  cause: DamageCause = { kind: 'unknown' }
+  cause: DamageCause = { kind: 'unknown' },
+  /**
+   * Dano por tick do chao cobrando presenca (so `applyCellHazards` liga).
+   * Distinto da causa: a varredura da Fornalha fere com {kind:'fire'} e NAO e
+   * hazard — e pancada de chefe, e o audio a trata como tal.
+   */
+  hazard = false
 ): void => {
   if (!ent.alive) return;
   if (ent.kind === 'player') {
@@ -695,7 +701,11 @@ export const damageEntity = (
     // fogo por baixo.
     extra.lastDamage = { cause, tick: state.tick };
     state.stats.damageTakenTenths = addDamageTenths(state.stats.damageTakenTenths, scaled);
-    events.push({ t: 'hit', x: ent.x, y: ent.y, amount: scaled, target: ent.id });
+    events.push(
+      hazard
+        ? { t: 'hit', x: ent.x, y: ent.y, amount: scaled, target: ent.id, hazard: true }
+        : { t: 'hit', x: ent.x, y: ent.y, amount: scaled, target: ent.id },
+    );
     return;
   }
   // Dano CAUSADO conta so o que e ATRIBUIVEL ao jogador, por lista fechada.

@@ -497,13 +497,13 @@ const applyCellHazards = (state: SurvivalState, events: SemanticEvent[]): void =
     if (!ent.alive) continue;
     const surf = state.surface[cellIndexAt(state, ent.x, ent.y)];
     if (surf === SURF_FIRE) {
-      damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events, { kind: 'fire' });
+      damageEntity(state, ent, FIRE_DAMAGE_PER_TICK, events, { kind: 'fire' }, true);
     } else if (surf === SURF_GAS && ent.kind === 'player') {
       // Gas sulfuroso e toxico; criaturas do Veio sao imunes ao proprio ambiente.
-      damageEntity(state, ent, GAS_DAMAGE_PER_TICK, events, { kind: 'gas' });
+      damageEntity(state, ent, GAS_DAMAGE_PER_TICK, events, { kind: 'gas' }, true);
     } else if (surf === SURF_SPORES && ent.kind === 'player') {
       // Esporos do bomber sao organicos e irritantes, mas nao volateis/explosivos.
-      damageEntity(state, ent, SPORE_DAMAGE_PER_TICK, events, { kind: 'spores' });
+      damageEntity(state, ent, SPORE_DAMAGE_PER_TICK, events, { kind: 'spores' }, true);
     }
   }
 };

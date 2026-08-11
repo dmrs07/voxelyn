@@ -149,7 +149,7 @@ export class AmbienceBus {
       gain.gain.value = 0;
       src.connect(filter).connect(gain).connect(out);
       src.start(t0);
-      this.beds.set('gas', { gain, ceiling: 0.17 });
+      this.beds.set('gas', { gain, ceiling: 0.14 });
     }
 
     // Calor: tique metalico que ACELERA rumo ao travamento — e silencio antes

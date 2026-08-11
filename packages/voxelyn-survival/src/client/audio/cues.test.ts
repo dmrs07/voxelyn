@@ -64,6 +64,52 @@ describe('traducao de evento para som', () => {
     expect(VOICE_SPECS.hitPlayer.priority).toBeGreaterThan(VOICE_SPECS.hitEnemy.priority);
   });
 
+  // Dano por tick do chao chega a 20 Hz; como pancada (`hitPlayer`) ele
+  // virava um thud grave continuo no centro do estereo. A sim marca `hazard`
+  // no proprio call site e o cliente so obedece.
+  it('roteia dano de hazard no jogador local para a voz de pressao', () => {
+    const [cue] = cuesForEvent(
+      { t: 'hit', x: 1, y: 1, amount: 0.55, target: 1, hazard: true },
+      ctx,
+    );
+    expect(cue.voice).toBe('hitPlayerHazard');
+    // Escala fixa: o dano por tick e minusculo e constante.
+    expect(cue.scale).toBe(1);
+  });
+
+  // O caso que derrubou a primeira forma deste campo (review do Codex no
+  // PR 142): a varredura da Fornalha fere com {kind:'fire'} mas E pancada de
+  // chefe — ela nao marca hazard, e tem de sair como impacto pleno.
+  it('pancada de chefe que por acaso e de fogo continua hitPlayer', () => {
+    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 12, target: 1 }, ctx);
+    expect(cue.voice).toBe('hitPlayer');
+    expect(cue.scale).toBeGreaterThan(1);
+  });
+
+  // Servidor sem o flag (fixtures, eventos construidos a mao): cai no
+  // comportamento historico em vez de sumir.
+  it('dano sem flag cai na voz de pancada', () => {
+    const [cue] = cuesForEvent({ t: 'hit', x: 1, y: 1, amount: 10, target: 1 }, ctx);
+    expect(cue.voice).toBe('hitPlayer');
+  });
+
+  // O hazard so muda o som de quem SENTE o dano: um bicho queimando continua
+  // relatado como dano nos outros.
+  it('hazard nos outros continua hitEnemy', () => {
+    const [cue] = cuesForEvent(
+      { t: 'hit', x: 1, y: 1, amount: 2, target: 7, hazard: true },
+      ctx,
+    );
+    expect(cue.voice).toBe('hitEnemy');
+  });
+
+  it('a voz de pressao ambiental nao disputa com a pancada', () => {
+    expect(VOICE_SPECS.hitPlayerHazard.priority).toBeLessThan(VOICE_SPECS.hitPlayer.priority);
+    expect(VOICE_SPECS.hitPlayerHazard.gain).toBeLessThan(VOICE_SPECS.hitPlayer.gain);
+    // A trava longa e o que transforma 20 eventos/s em ~2 toques/s.
+    expect(VOICE_SPECS.hitPlayerHazard.minIntervalMs).toBeGreaterThanOrEqual(400);
+  });
+
   it('escala o impacto pelo dano, com piso audivel e teto', () => {
     expect(impactScale(0)).toBeGreaterThanOrEqual(0.55);
     expect(impactScale(6)).toBeLessThan(impactScale(42));

@@ -71,6 +71,7 @@ export const PT_BR = {
   'options.quality.medium': 'Média',
   'options.quality.low': 'Baixa (30 FPS)',
   'options.volume': 'Volume',
+  'options.music': 'Música',
   'options.sound.on': 'Som: ligado',
   'options.sound.off': 'Som: desligado',
   'options.telemetry.on': 'Telemetria: ligada',

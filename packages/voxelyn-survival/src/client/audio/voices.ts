@@ -29,6 +29,7 @@ export type VoiceId =
   // --- impactos -----------------------------------------------------------
   | 'hitEnemy'
   | 'hitPlayer'
+  | 'hitPlayerHazard'
   | 'death'
   | 'deathGuardian'
   | 'deathMiner'
@@ -134,6 +135,12 @@ export const VOICE_SPECS: Record<VoiceId, VoiceSpec> = {
   // Dano em MIM e informacao de sobrevivencia, nao textura: prioridade alta e
   // trava curta o bastante para que dois golpes seguidos soem como dois.
   hitPlayer: { priority: 8, gain: 0.55, minIntervalMs: 70, spatial: false },
+  // Dano ambiental POR TICK (gas, esporo, fogo sob os pes). Nao e pancada, e
+  // pressao: o evento chega a 20 Hz e o leito continuo (gas/fire) e quem
+  // carrega a informacao de "estou no perigo" — esta voz so pontua o custo.
+  // A trava de 500 ms transforma os ~14 disparos/s em ~2 toques/s, e a
+  // prioridade 5 significa que perde-la no orcamento nao custa nada.
+  hitPlayerHazard: { priority: 5, gain: 0.3, minIntervalMs: 500, spatial: false },
   death: { priority: 5, gain: 0.4, minIntervalMs: 60, spatial: true },
   deathGuardian: { priority: 10, gain: 0.9, minIntervalMs: 0, spatial: false },
   // Prioridade 7 contra os 5 do `death` comum, e espacial.
