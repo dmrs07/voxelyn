@@ -24,7 +24,7 @@
 // setor N precisa ser conhecivel por um cliente que reconecta no meio da run e
 // reconstroi o mundo com `createRun({ sector: N })`, antes de qualquer tick.
 
-import { AQUIFER_PIPE_COUNT, MAX_LINEAGE_SECTORS, MINER_PER_SECTOR } from './constants.js';
+import { AQUIFER_PIPE_COUNT, DEFAULT_SECTOR_COUNT, MAX_LINEAGE_SECTORS, MINER_PER_SECTOR } from './constants.js';
 import type { EnemyArchetype } from './types.js';
 import type { WorldgenProfile } from './worldgen.js';
 
@@ -556,7 +556,42 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     }
   }
 
+  // A BOCA DO VEIO ensina a linguagem: o setor 1 traca UMA leyline, sempre.
+  // Antes disto o setor de abertura tinha 0% de chance e so 37% das runs
+  // encontravam a mecanica em qualquer setor — tres cortes de sistema que a
+  // maioria dos jogadores nunca via. Uma linha unica e discreta no basalto de
+  // abertura poe "siga a veia" no primeiro minuto de toda run. O basalto
+  // deixa de ser byte a byte historico de proposito; a impressao digital da
+  // geracao muda junto e o teste dela registra o porque.
+  if (sector === 1) profile.leylines = Math.max(profile.leylines, 1);
+
   return profile;
+};
+
+/**
+ * A GARANTIA DA DESCIDA: se os setores 2..3 — o trecho que TODA run alcanca,
+ * em qualquer geracao — nao teriam leyline natural nenhuma (nem Catedral nem
+ * cicatriz Aurix fora do Ferrifero), o setor 2 forca uma linha.
+ *
+ * Varre so ate DEFAULT_SECTOR_COUNT de proposito: o terreno de um setor e
+ * funcao PURA de (seed, setor), e uma garantia que dependesse da profundidade
+ * autorizada faria a mesma seed gerar setores 2 diferentes conforme a geracao
+ * do perfil. Os setores fundos nao precisam dela: a linha do setor 1 ja
+ * garantiu o primeiro encontro, e as fundas tem as proprias regras de
+ * densidade.
+ *
+ * Devolve o setor que recebe a garantia (2) ou null quando a descida ja tem
+ * leyline natural. Quem monta perfis de setor (createRun e as trocas) aplica.
+ */
+export const leylineGuaranteeSector = (runSeed: number): number | null => {
+  for (let sector = 2; sector <= DEFAULT_SECTOR_COUNT; sector++) {
+    const biome = sectorBiome(runSeed, sector);
+    const natural =
+      biome.stratum === 'prismatic' ||
+      (biome.occupation === 'aurix' && biome.stratum !== 'ferric');
+    if (natural) return null;
+  }
+  return 2;
 };
 
 /**

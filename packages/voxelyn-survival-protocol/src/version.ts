@@ -499,14 +499,18 @@ export const PROTOCOL_VERSION = 24;
 // fora do caminho hasheado (a impressao digital da geracao continua
 // 3461746772; os elos de construcao registrados na gravacao sao arrays JS —
 // zero RNG, zero grid).
-// 40: a rede de leylines DENSIFICA com a profundidade — a Catedral funda
-// (setor 4+) traca a quarta linha e a cicatriz Aurix funda expoe duas. As
-// linhas extras consomem RNG do gerador e gravam parede, entao o terreno
-// semeado dos setores 4+ desses biomas muda. A impressao digital da geracao
-// NAO muda: a amostra dela cobre setores 1-3, que ficam byte a byte — replays
-// de G-00/G-01, ranqueado e co-op raso continuam validos; so descidas fundas
-// (G-02+) re-simuladas sob a regra nova abririam outro mapa, e e para isso
-// que este numero sobe.
+// 40: a rede de leylines DENSIFICA com a profundidade e fica ENCONTRAVEL.
+// Tres mudancas na mesma leva (a versao nasceu e evoluiu na mesma branch):
+// a Catedral funda (setor 4+) traca a quarta linha e a cicatriz Aurix funda
+// expoe duas; o setor 1 traca UMA linha, sempre — medido em 20 mil seeds, a
+// abertura tinha 0% de chance e so 37% das runs viam a mecanica em qualquer
+// setor; e quando os setores 2-3 nao teriam leyline natural, o setor 2 forca
+// uma (leylineGuaranteeSector — funcao pura da seed, identica em createRun e
+// nas trocas de setor, entao o terreno de (seed, setor) continua puro em
+// qualquer geracao). O terreno semeado muda em quase toda seed (a linha do
+// setor 1 alcanca todas); a impressao digital registra o numero novo com o
+// porque. Replays pre-40 re-simulados sob a regra nova abririam outro mapa —
+// e para isso que este numero sobe.
 export const SIMULATION_VERSION = 40;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.

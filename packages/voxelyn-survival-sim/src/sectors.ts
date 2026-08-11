@@ -38,7 +38,7 @@ import { emptyBossRuntime } from './bosses.js';
 import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './depth.js';
 import { isConductiveSurface, setSurface } from './cells.js';
 import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
-import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
+import { biomeMix, biomeProfile, horseChanceFor, leylineGuaranteeSector, sectorBiome } from './strata.js';
 import { deriveLeylineNodes, generateWorld } from './worldgen.js';
 import { SURF_ICE } from './constants.js';
 import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
@@ -369,11 +369,17 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.stratum = biome.stratum;
   state.occupation = biome.occupation;
   state.lineage = biome.lineage;
+  const profile = biomeProfile(biome, state.sector);
+  // A garantia da descida (ver leylineGuaranteeSector): mesma regra do
+  // createRun, porque as trocas de setor regeneram o mundo pelo mesmo perfil.
+  if (leylineGuaranteeSector(state.config.seed) === state.sector) {
+    profile.leylines = Math.max(profile.leylines, 1);
+  }
   const world = generateWorld(
     sectorSeed((state.config.seed ^ RUN_SEED_MIX) >>> 0, state.sector),
     width,
     height,
-    biomeProfile(biome, state.sector),
+    profile,
   );
 
   state.solid = world.solid;
@@ -489,11 +495,17 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   state.stratum = biome.stratum;
   state.occupation = biome.occupation;
   state.lineage = biome.lineage;
+  const profile = biomeProfile(biome, state.sector);
+  // A garantia da descida (ver leylineGuaranteeSector): mesma regra do
+  // createRun, porque as trocas de setor regeneram o mundo pelo mesmo perfil.
+  if (leylineGuaranteeSector(state.config.seed) === state.sector) {
+    profile.leylines = Math.max(profile.leylines, 1);
+  }
   const world = generateWorld(
     sectorSeed((state.config.seed ^ RUN_SEED_MIX) >>> 0, state.sector),
     width,
     height,
-    biomeProfile(biome, state.sector),
+    profile,
   );
 
   state.solid = world.solid;

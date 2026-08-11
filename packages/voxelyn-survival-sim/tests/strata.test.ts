@@ -116,11 +116,19 @@ describe('perfis por estrato', () => {
     // e fissuras). O que continua intocavel: o automato como base, e as
     // materias — nada de agua, brasa, gelo ou nervura de cristal nele.
     // Variacao de materia no basalto segue sendo trabalho das ocupacoes.
+    //
+    // A segunda excecao deliberada (tambem de playtest): o SETOR 1 traca uma
+    // leyline. Sem ela a abertura tinha 0% de chance e a maioria das runs
+    // nunca via a mecanica — a boca do Veio ensina "siga a veia". Fora do
+    // setor 1, basalto limpo continua sem leyline nenhuma.
     for (const lineage of ['hydric', 'mineral', 'industrial', 'thermal', 'arid', 'cryo'] as const) {
       for (let sector = 1; sector <= DEFAULT_SECTOR_COUNT; sector++) {
         const clean: SectorBiome = { stratum: 'basalt', occupation: 'none', lineage };
         const profile = biomeProfile(clean, sector);
-        expect({ ...profile, halls: 'none' }, `${lineage} s${sector}`).toEqual(DEFAULT_PROFILE);
+        expect({ ...profile, halls: 'none', leylines: 0 }, `${lineage} s${sector}`).toEqual(
+          DEFAULT_PROFILE,
+        );
+        expect(profile.leylines, `${lineage} s${sector}`).toBe(sector === 1 ? 1 : 0);
         expect(profile.halls, `${lineage} s${sector}`).toBe('columns');
       }
     }

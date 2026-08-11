@@ -165,7 +165,26 @@ describe('impressao digital da geracao', () => {
     // depois de todas as provas — ha teste dedicado de byte-identidade da
     // abertura em leylines-worldgen.test.ts) e todo estrato sem leyline, cujo
     // bloco inteiro esta atras de `profile.leylines > 0`.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3461746772);
+    // 3910080846 (era 3461746772), ainda na SIMULATION_VERSION 40 (a versao
+    // nunca foi lancada — nasceu e mudou na mesma branch): DESCOBRIBILIDADE
+    // das leylines. Medido em 20 mil seeds, o setor 1 tinha 0% de chance de
+    // leyline e so 37% das runs encontravam a mecanica em qualquer setor —
+    // tres cortes de sistema que a maioria nunca via.
+    //
+    // Duas mudancas de proposito: o setor 1 traca UMA linha, sempre (a boca
+    // do Veio ensina "siga a veia" no primeiro minuto), e quando os setores
+    // 2-3 nao teriam leyline natural o setor 2 forca uma
+    // (leylineGuaranteeSector — funcao pura da seed, mesma em createRun e nas
+    // trocas de setor). O basalto de abertura deixa de ser byte a byte
+    // historico DE PROPOSITO, e por isso a assinatura muda em quase toda
+    // seed da amostra.
+    //
+    // O que NAO muda: a abertura de todo mapa (a gravacao segue trocando so
+    // rocha por rocha, depois das provas — o teste de byte-identidade em
+    // leylines-worldgen.test.ts continua valendo) e o contrato de pureza:
+    // o terreno de (seed, setor) continua identico em qualquer geracao,
+    // porque a garantia varre so os setores 2-3, que toda run alcanca.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3910080846);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

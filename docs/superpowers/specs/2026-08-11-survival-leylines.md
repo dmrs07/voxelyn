@@ -149,6 +149,24 @@ comuta um comutador natural. De brinde, um conserto real: o bit
 deriva de `DISCOVERY_LORE`, e ele não estava lá) — a descoberta do relé não
 persistia entre runs até este fragmento existir.
 
+## Descobribilidade (correção de playtest)
+
+O primeiro playtest não encontrou leyline nenhuma — e a matemática explicava:
+o setor 1 (sempre Basalto/none) tinha **0%** de chance, e só **37%** das runs
+G-00 encontravam a mecânica em qualquer setor. Duas regras corrigem:
+
+1. **A boca do Veio ensina a linguagem**: o setor 1 traça UMA leyline, sempre
+   — "siga a veia" no primeiro minuto de toda run. Exceção deliberada ao
+   basalto histórico, registrada no teste do contrato do estrato.
+2. **Garantia da descida** (`leylineGuaranteeSector`): se os setores 2–3 (o
+   trecho que toda run alcança, em qualquer geração) não teriam leyline
+   natural, o setor 2 força uma. Função pura da seed — o terreno de
+   (seed, setor) continua idêntico em qualquer geração. Dispara em ~63% das
+   seeds (exatamente as que não tinham nada).
+
+Impressão digital nova (3910080846) com o parágrafo ritual; SIMULATION segue
+40 (nunca lançada — a entrada foi reescrita para cobrir a leva inteira).
+
 ## Trabalho futuro
 
 - Sobrecarga (descarga total do nó) e desligar região, se o jogo pedir.
