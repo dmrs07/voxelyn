@@ -2,8 +2,8 @@
 
 **Data:** 2026-08-11
 **Escopo:** `voxelyn-survival-sim`, `voxelyn-survival-protocol`, `voxelyn-survival-server`, `voxelyn-survival` (cliente), `voxelyn-survival-content`
-**Versões:** 1º corte: `PROTOCOL` 21→22, `SIMULATION` 37→38, `CONTENT` 23→24. 2º corte: `PROTOCOL` 22→23, `SIMULATION` 38→39.
-**Status:** primeiro corte (worldgen + condução por segmento + render) e segundo corte (roteamento nas junções) implementados.
+**Versões:** 1º corte: `PROTOCOL` 21→22, `SIMULATION` 37→38, `CONTENT` 23→24. 2º corte: `PROTOCOL` 22→23, `SIMULATION` 38→39. 3º corte: `SIMULATION` 39→40.
+**Status:** três cortes implementados — condução por segmento, roteamento nas junções, verticalidade + lore.
 
 ## A decisão que rege tudo
 
@@ -129,9 +129,28 @@ Regras que valem registrar:
   toggle, entrada no codex. Fragmento de lore do servidor ficou de fora
   (sistema com grafo próprio; entra num corte de conteúdo).
 
+## Terceiro corte: a mesma veia, mais funda — e o documento que a arquiva
+
+**Vertical.** A rede densifica com a descida: a Catedral funda (setor 4+)
+traça a quarta linha e a cicatriz Aurix funda expõe duas
+(`biomeProfile`: `2 + clamp(depth-1, 0, 2)` / `max(·, depth≥3 ? 2 : 1)`).
+Setores 1–3 ficam byte a byte — a amostra da impressão digital para no
+setor 3 e ela continua 3461746772; só replays de descidas fundas (G-02+)
+divergem, e é isso que o bump de `SIMULATION` 40 marca. No cliente, a luz
+de REPOUSO da rede (dormente e junções) escala com `depthIntensity` — quem
+desce a linhagem mineral vê a veia clarear a cada estrato. A CARGA não
+escala: o telégrafo já é o sinal máximo.
+
+**Lore.** `AX-ENG-038` — "Ensaio 38 — comutação em veio condutor"
+(Engenharia, Ato II, relacionado a AX-ENG-022 e AX-UNK-067): o parecer que
+classifica a junção como comutador natural e arquiva a pergunta de quem
+comuta um comutador natural. De brinde, um conserto real: o bit
+`DISCOVERY_LEYLINE_ROUTED` era descartado do perfil (`LORE_DISCOVERY_MASK`
+deriva de `DISCOVERY_LORE`, e ele não estava lá) — a descoberta do relé não
+persistia entre runs até este fragmento existir.
+
 ## Trabalho futuro
 
 - Sobrecarga (descarga total do nó) e desligar região, se o jogo pedir.
 - Pulso ambiental rítmico (sem recarga), se o jogo pedir.
-- Continuidade visual/narrativa da linha entre setores da linhagem.
-- Fragmento de lore AX-* para a descoberta do relé.
+- Decor/landmark dedicado da leyline (nascente monumental num salão).

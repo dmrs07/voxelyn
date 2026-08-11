@@ -483,7 +483,15 @@ export const PROTOCOL_VERSION = 23;
 // fora do caminho hasheado (a impressao digital da geracao continua
 // 3461746772; os elos de construcao registrados na gravacao sao arrays JS —
 // zero RNG, zero grid).
-export const SIMULATION_VERSION = 39;
+// 40: a rede de leylines DENSIFICA com a profundidade — a Catedral funda
+// (setor 4+) traca a quarta linha e a cicatriz Aurix funda expoe duas. As
+// linhas extras consomem RNG do gerador e gravam parede, entao o terreno
+// semeado dos setores 4+ desses biomas muda. A impressao digital da geracao
+// NAO muda: a amostra dela cobre setores 1-3, que ficam byte a byte — replays
+// de G-00/G-01, ranqueado e co-op raso continuam validos; so descidas fundas
+// (G-02+) re-simuladas sob a regra nova abririam outro mapa, e e para isso
+// que este numero sobe.
+export const SIMULATION_VERSION = 40;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

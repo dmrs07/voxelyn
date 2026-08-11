@@ -136,3 +136,19 @@ describe('leylines: integracao com a run', () => {
     }
   });
 });
+
+describe('leylines: a rede densifica com a profundidade', () => {
+  it('setores 1-3 ficam identicos (o gate da impressao digital); o fundo ganha linhas', () => {
+    // Historico intacto onde a assinatura enxerga:
+    expect(biomeProfile(PRISMATIC, 2).leylines).toBe(2);
+    expect(biomeProfile(PRISMATIC, 3).leylines).toBe(3);
+    expect(biomeProfile(AURIX_BASALT, 2).leylines).toBe(1);
+    expect(biomeProfile(AURIX_BASALT, 3).leylines).toBe(1);
+    // A Catedral funda e mais nervada; a cicatriz funda expoe duas.
+    expect(biomeProfile(PRISMATIC, 4).leylines).toBe(4);
+    expect(biomeProfile(PRISMATIC, 7).leylines).toBe(4);
+    expect(biomeProfile(AURIX_BASALT, 4).leylines).toBe(2);
+    // O Ferrifero continua fora em qualquer profundidade.
+    expect(biomeProfile(AURIX_FERRIC, 7).leylines).toBe(0);
+  });
+});

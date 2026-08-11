@@ -50,6 +50,7 @@ import {
   DISCOVERY_CATHEDRAL_SILENCED,
   DISCOVERY_FURNACE_COOLED,
   DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_LEYLINE_ROUTED,
   DISCOVERY_LUNG_IGNITED,
   DISCOVERY_MAGNET_BANDED,
   DISCOVERY_QUEEN_THAWED,
@@ -329,6 +330,10 @@ export const DISCOVERY_LORE: readonly { bit: number; fragmentId: LoreFragmentId 
   { bit: DISCOVERY_MAGNET_BANDED, fragmentId: 'AX-INC-048' },
   { bit: DISCOVERY_GUARDIAN_FELLED, fragmentId: 'AX-EXE-042' },
   { bit: DISCOVERY_CORE_TAKEN, fragmentId: 'AX-UNK-050' },
+  // Uma descarga ATRAVESSOU uma juncao roteada: o instante em que o jogador
+  // descobre que a rede do Veio aceita ordens — e que a engenharia da
+  // companhia ja tinha arquivado exatamente essa pergunta.
+  { bit: DISCOVERY_LEYLINE_ROUTED, fragmentId: 'AX-ENG-038' },
 ];
 
 /**
@@ -496,7 +501,8 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-PUB-004': ['AX-PRC-022'],
   'AX-PUB-006': ['AX-EXE-036', 'AX-INC-032'],
   'AX-ENG-021': ['AX-INC-030', 'AX-PRC-022'],
-  'AX-ENG-022': ['AX-ENG-014'],
+  'AX-ENG-022': ['AX-ENG-014', 'AX-ENG-038'],
+  'AX-ENG-038': ['AX-ENG-022', 'AX-UNK-067'],
   'AX-ENG-025': ['AX-PRC-017', 'AX-INC-028'],
   'AX-PRC-022': ['AX-PUB-004', 'AX-ENG-021'],
   'AX-PRC-023': ['AX-PRC-014', 'AX-PRC-018'],
@@ -592,7 +598,7 @@ const RELATED: Record<LoreFragmentId, LoreFragmentId[]> = {
   'AX-INC-047': ['AX-ENG-035', 'AX-UNK-066'],
   'AX-UNK-066': ['AX-INC-047', 'AX-ENG-035', 'AX-UNK-054'],
   'AX-INC-048': ['AX-ENG-036', 'AX-UNK-067'],
-  'AX-UNK-067': ['AX-INC-048', 'AX-ENG-036', 'AX-UNK-054'],
+  'AX-UNK-067': ['AX-INC-048', 'AX-ENG-036', 'AX-UNK-054', 'AX-ENG-038'],
   'AX-EXE-039': ['AX-UNK-050', 'AX-EXE-042'],
   'AX-EXE-042': ['AX-EXE-039', 'AX-UNK-051'],
   'AX-UNK-043': ['AX-UNK-041', 'AX-GEN-G04'],
@@ -618,6 +624,7 @@ const REDACTION: Record<LoreFragmentId, 0 | 1 | 2 | 3> = {
   'AX-GEN-G04': 1,
   'AX-UNK-068': 1,
   'AX-ENG-022': 1,
+  'AX-ENG-038': 1,
   'AX-PRC-020': 1,
   'AX-PRC-023': 1,
   'AX-INC-022': 1,
@@ -731,6 +738,7 @@ const CHRONOLOGY: readonly LoreFragmentId[] = [
   'AX-ENG-034',
   'AX-ENG-035',
   'AX-ENG-036',
+  'AX-ENG-038',
   // Ato III — Custo
   'AX-PRC-014',
   'AX-PRC-015',

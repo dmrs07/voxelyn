@@ -265,6 +265,12 @@ const pt: Record<LoreFragmentId, LoreText> = {
     body: 'A descarga do armamento em meio líquido conduz. O raio efetivo em imersão é 3,1 vezes o raio em terreno seco.\n\nA especificação trata o comportamento como [REDACTED] e não como falha: o requisito de isolamento foi retirado na revisão 2 por custo.\n\nUnidades operando em setores alagados devem considerar o próprio armamento parte do ambiente.',
     source: 'Engenharia Elétrica — ficha de comportamento em campo',
   },
+  'AX-ENG-038': {
+    title: 'Ensaio 38 — comutação em veio condutor',
+    summary: 'A junção interrompe a corrente. Interromper é uma decisão.',
+    body: 'Ensaio de campo sobre o condutor geológico contínuo e os pontos nodais que o segmentam.\n\nA corrente injetada em um trecho para SEMPRE no nó seguinte. Não por saturação, não por perda de meio: o nó interrompe. Um material não interrompe — um material atenua. A engenharia registra a distinção e não a explica.\n\nDurante o ensaio, uma unidade em contato direto com o nó alterou o estado dele. A corrente do trecho adjacente atravessou e recarregou o trecho seguinte, com o mesmo perfil de descarga e o mesmo intervalo de rearme. A rede conduziu PARA ONDE SE MANDOU.\n\nO parecer recomenda classificar o nó como comutador natural e encerra o ensaio. A pergunta de quem comuta um comutador natural não consta do escopo.',
+    source: 'Engenharia de Sistemas — ensaio de campo, arquivado',
+  },
   'AX-ENG-025': {
     title: 'Tolerância térmica: unidades legadas',
     summary: 'A tabela que Produção mantinha sobre as unidades EX.',
@@ -1076,6 +1082,12 @@ const en: Record<LoreFragmentId, LoreText> = {
     summary: 'Discharge into water was never a design accident.',
     body: 'Weapon discharge into a liquid medium conducts. The effective radius in immersion is 3.1 times the dry-terrain radius.\n\nThe specification treats the behaviour as [REDACTED] rather than as a fault: the insulation requirement was removed in revision 2 on cost grounds.\n\nUnits operating in flooded sectors should consider their own weaponry part of the environment.',
     source: 'Electrical Engineering — field behaviour sheet',
+  },
+  'AX-ENG-038': {
+    title: 'Test 38 — switching in conductive seam',
+    summary: 'The junction interrupts the current. Interrupting is a decision.',
+    body: 'Field test on the continuous geological conductor and the nodal points that segment it.\n\nCurrent injected into a stretch ALWAYS stops at the next node. Not by saturation, not by loss in the medium: the node interrupts. A material does not interrupt — a material attenuates. Engineering records the distinction and does not explain it.\n\nDuring the test, a unit in direct contact with the node altered its state. Current from the adjacent stretch crossed over and recharged the next one, with the same discharge profile and the same rearm interval. The network conducted WHERE IT WAS TOLD TO.\n\nThe report recommends classifying the node as a natural switch and closes the test. The question of who switches a natural switch is outside the scope.',
+    source: 'Systems Engineering — field test, archived',
   },
   'AX-ENG-025': {
     title: 'Thermal tolerance: legacy units',

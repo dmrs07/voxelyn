@@ -1,4 +1,5 @@
 import {
+  depthIntensity,
   LEYLINE_CHARGE_TICKS,
   LEYLINE_NODE_INTERACT_RADIUS,
   SOLID_CRYSTAL,
@@ -1841,6 +1842,12 @@ export class SurvivalRenderer {
       for (const node of state.leylineNodes) {
         if (node.routed) routedNodeCells.add(node.cell);
       }
+      // A MESMA VEIA, mais carregada: a luz de repouso da rede escala com a
+      // profundidade da descida. Quem atravessa a linhagem mineral ve a
+      // Catedral clarear a cada estrato — e leitura de LUGAR, fora do hash,
+      // e a CARGA nao muda: o telegrafo ja e o sinal maximo e escala-lo
+      // diluiria o aviso.
+      const veinDepth = Math.min(4, depthIntensity(state.sector));
       const leyPhase = new Map<number, number>();
       for (const seg of state.leylineSegments) {
         const charging = seg.dischargeAt > state.tick;
@@ -1883,7 +1890,14 @@ export class SurvivalRenderer {
               // alternados leem como energia correndo por dentro.
               if ((x + y) % 3 === 0) {
                 const breathe = 0.8 + 0.2 * Math.sin(nowMs / 900 + (x + y) * 0.7);
-                lights.push({ x: x + 0.5, y: y + 0.5, r: 2, power: 0.22 * breathe, hex: PAL.electric, height: 0.6 });
+                lights.push({
+                  x: x + 0.5,
+                  y: y + 0.5,
+                  r: 2,
+                  power: 0.22 * breathe * (1 + 0.12 * veinDepth),
+                  hex: PAL.electric,
+                  height: 0.6,
+                });
               }
             } else if (phase > 1) {
               // Carregando: TODA celula acende e o pulso sobe com o relogio.
@@ -1906,10 +1920,17 @@ export class SurvivalRenderer {
             // RESPIRA — um pulso lento e mais largo. Constante = fechada,
             // respirando = rele aberto: um bit, uma diferenca de luz.
             if (routedNodeCells.has(i)) {
-              const breathe = 0.5 + 0.25 * Math.sin(nowMs / 600);
+              const breathe = (0.5 + 0.25 * Math.sin(nowMs / 600)) * (1 + 0.1 * veinDepth);
               lights.push({ x: x + 0.5, y: y + 0.5, r: 3.2, power: breathe, hex: PAL.electric, height: 0.7 });
             } else {
-              lights.push({ x: x + 0.5, y: y + 0.5, r: 2.5, power: 0.4, hex: PAL.electric, height: 0.7 });
+              lights.push({
+                x: x + 0.5,
+                y: y + 0.5,
+                r: 2.5,
+                power: 0.4 * (1 + 0.1 * veinDepth),
+                hex: PAL.electric,
+                height: 0.7,
+              });
             }
           }
         }
