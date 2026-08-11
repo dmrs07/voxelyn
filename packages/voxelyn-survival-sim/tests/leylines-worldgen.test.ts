@@ -30,6 +30,12 @@ const PRISMATIC: SectorBiome = { stratum: 'prismatic', occupation: 'none', linea
 const AURIX_BASALT: SectorBiome = { stratum: 'basalt', occupation: 'aurix', lineage: 'basaltic' };
 const AURIX_FERRIC: SectorBiome = { stratum: 'ferric', occupation: 'aurix', lineage: 'industrial' };
 
+/** Primeira seed de linhagem industrial: setores 2..7 sao todos ferricos. */
+const industrialSeed = (): number => {
+  for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'industrial') return s;
+  throw new Error('nenhuma seed industrial');
+};
+
 describe('leylines: onde existem', () => {
   it('a Catedral traca leylines; a cicatriz Aurix expoe uma; o Ferrifero nunca', () => {
     expect(biomeProfile(PRISMATIC, 2).leylines).toBeGreaterThan(0);
@@ -180,5 +186,27 @@ describe('leylines: descobribilidade', () => {
     // O setor 2 da seed sem leyline natural ganha a linha forcada.
     const forced = createRun({ seed: bare, sector: 2 });
     expect(forced.leylineSegments.length).toBeGreaterThan(0);
+  });
+
+  it('a garantia NUNCA entrega leyline ao Ferrifero — nem no caminho de producao', () => {
+    // O invariante "Ferrifero nunca" era cobrado so contra `biomeProfile`, e
+    // por isso passou verde enquanto a garantia — aplicada depois, no call
+    // site — forcava uma linha no setor 2 de TODA run industrial (posicoes
+    // 2..7 da linhagem sao ferricas). O teste que faltava e este: o mundo que
+    // a run REALMENTE monta.
+    const industrial = industrialSeed();
+    expect(leylineGuaranteeSector(industrial)).toBeNull();
+    for (const sector of [2, 3]) {
+      const state = createRun({ seed: industrial, sector });
+      expect(state.stratum, `setor ${sector}`).toBe('ferric');
+      expect(state.leylineSegments.length, `setor ${sector} ferrico com leyline`).toBe(0);
+      expect(
+        [...state.solid].some((s) => s === SOLID_LEYLINE || s === SOLID_LEYLINE_NODE),
+        `setor ${sector}: celula de leyline no Ferrifero`,
+      ).toBe(false);
+    }
+    // E a run industrial nao fica sem a mecanica: o setor 1 e basalto e traca
+    // a linha como em toda linhagem.
+    expect(createRun({ seed: industrial }).leylineSegments.length).toBeGreaterThan(0);
   });
 });

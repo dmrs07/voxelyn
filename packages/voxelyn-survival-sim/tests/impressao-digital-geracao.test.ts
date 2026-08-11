@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SECTOR_COUNT, RUN_SEED_MIX, WORLD_H, WORLD_W } from '../src/constants';
 import { sectorSeed } from '../src/sectors';
-import { biomeProfile, sectorBiome } from '../src/strata';
+import { sectorProfile } from '../src/strata';
 import { generateWorld, type GeneratedWorld } from '../src/worldgen';
 
 /** FNV-1a de 32 bits, o mesmo espirito do hash autoritativo da run. */
@@ -86,11 +86,23 @@ const fingerprint = (world: GeneratedWorld): number => {
   return h >>> 0;
 };
 
-/** O mesmo mundo que `createRun({ seed, sector })` monta. */
-const worldFor = (seed: number, sector: number): GeneratedWorld => {
-  const profile = biomeProfile(sectorBiome(seed, sector), sector);
-  return generateWorld(sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector), WORLD_W, WORLD_H, profile);
-};
+/**
+ * O mesmo mundo que `createRun({ seed, sector })` monta — e agora isto e
+ * verdade POR CONSTRUCAO.
+ *
+ * A montagem do perfil passou por `sectorProfile`, a fonte unica que a
+ * producao usa. Enquanto este helper remontava o perfil por conta propria, a
+ * assinatura media um mundo SEM a garantia da descida — ou seja, ela nao
+ * cobria o terreno real de nenhuma das seeds que recebem leyline forcada, e
+ * uma quebra de compatibilidade nesses setores passaria por aqui em silencio.
+ */
+const worldFor = (seed: number, sector: number): GeneratedWorld =>
+  generateWorld(
+    sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
+    WORLD_W,
+    WORLD_H,
+    sectorProfile(seed, sector),
+  );
 
 describe('impressao digital da geracao', () => {
   // 64 seeds x 3 setores = 192 mundos. Cobre as seis linhagens, os oito
@@ -184,7 +196,27 @@ describe('impressao digital da geracao', () => {
     // leylines-worldgen.test.ts continua valendo) e o contrato de pureza:
     // o terreno de (seed, setor) continua identico em qualquer geracao,
     // porque a garantia varre so os setores 2-3, que toda run alcanca.
-    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(3910080846);
+    // 1082481898 (era 3910080846), ainda na SIMULATION_VERSION 40: a
+    // assinatura passou a MEDIR O MUNDO DE PRODUCAO, e duas coisas mudaram
+    // com isso.
+    //
+    // 1. O helper `worldFor` remontava o perfil por conta propria e nao
+    //    aplicava a garantia da descida — entao o numero anterior nao cobria
+    //    o setor 2 de nenhuma das seeds que recebem leyline forcada, e uma
+    //    quebra de compatibilidade ali passaria por este guard em silencio.
+    //    Agora ele chama `sectorProfile`, a mesma fonte unica do `createRun`
+    //    e das trocas de setor: a paridade vale por construcao.
+    // 2. A garantia deixou de poder cair no FERRIFERO. A linhagem industrial
+    //    tem as posicoes 2 a 7 ferricas, entao a versao anterior forcava uma
+    //    leyline no setor 2 de toda run industrial — contradizendo no mundo
+    //    de verdade o invariante que `biomeProfile` declara e que o teste do
+    //    estrato cobra. `leylineGuaranteeSector` agora escolhe o primeiro
+    //    setor ELEGIVEL e devolve null quando nao ha nenhum.
+    //
+    // O contrato de alcancabilidade e o de pureza seguem intactos: a gravacao
+    // continua trocando so rocha por rocha depois das provas, e o terreno de
+    // (seed, setor) continua identico em qualquer geracao.
+    expect(h >>> 0, 'a geracao mudou — veja o cabecalho deste arquivo').toBe(1082481898);
   }, 120_000);
 
   it('a geracao e REPRODUZIVEL na mesma versao', () => {

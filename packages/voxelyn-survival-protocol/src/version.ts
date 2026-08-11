@@ -504,11 +504,16 @@ export const PROTOCOL_VERSION = 24;
 // a Catedral funda (setor 4+) traca a quarta linha e a cicatriz Aurix funda
 // expoe duas; o setor 1 traca UMA linha, sempre — medido em 20 mil seeds, a
 // abertura tinha 0% de chance e so 37% das runs viam a mecanica em qualquer
-// setor; e quando os setores 2-3 nao teriam leyline natural, o setor 2 forca
-// uma (leylineGuaranteeSector — funcao pura da seed, identica em createRun e
-// nas trocas de setor, entao o terreno de (seed, setor) continua puro em
-// qualquer geracao). O terreno semeado muda em quase toda seed (a linha do
-// setor 1 alcanca todas); a impressao digital registra o numero novo com o
+// setor; e quando os setores 2-3 nao teriam leyline natural, o primeiro setor
+// ELEGIVEL forca uma (leylineGuaranteeSector — funcao pura da seed). Elegivel
+// exclui o FERRIFERO: la a parede conectada ja e a fiacao do lugar, e forcar
+// leyline por cima contradiria o invariante que `biomeProfile` declara — a
+// linhagem industrial, ferrica das posicoes 2 a 7, fica sem garantia e
+// aprende a linguagem no setor 1, como todo mundo. O perfil de setor passa a
+// sair de UMA fonte (`sectorProfile`), usada tanto pela producao quanto pelos
+// testes que medem terreno: paridade por construcao, e nao por copiar a regra
+// em cada chamador. O terreno semeado muda em quase toda seed (a linha do
+// setor 1 alcanca todas); a impressao digital registra os numeros com o
 // porque. Replays pre-40 re-simulados sob a regra nova abririam outro mapa —
 // e para isso que este numero sobe.
 export const SIMULATION_VERSION = 40;

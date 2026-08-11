@@ -28,7 +28,7 @@ import { createRun } from '../src/run';
 import { isBossArchetype } from '../src/bosses';
 import { sectorSeed } from '../src/sectors';
 import { createTerrainDraft, floodOpen, generateWorld, stampBossArena } from '../src/worldgen';
-import { biomeProfile, lineageOf, sectorBiome } from '../src/strata';
+import { lineageOf, sectorProfile } from '../src/strata';
 import type { SurvivalState } from '../src/types';
 
 const seedWithLineage = (lineage: string): number => {
@@ -71,12 +71,13 @@ const bfsFromEntry = (solid: Uint8Array, entry: { x: number; y: number }): Int32
  * de createRun), e nao de uma entidade: desde bossForBiome, so o setor final
  * tem chefe vivo — a camara e a moldura continuam existindo em todos.
  */
+// Pela fonte unica: a camara medida e a da run, garantia da descida inclusa.
 const chamberOf = (seed: number, sector: number): { x: number; y: number } =>
   generateWorld(
     sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
     WORLD_W,
     WORLD_H,
-    biomeProfile(sectorBiome(seed, sector), sector),
+    sectorProfile(seed, sector),
   ).guardianSpawn;
 
 describe('arena do chefe por estrato', () => {
@@ -318,8 +319,7 @@ describe('arena do chefe por estrato', () => {
     let conferidos = 0;
     for (let seed = 1; seed <= 200; seed++) {
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
-        const biome = sectorBiome(seed, sector);
-        const profile = biomeProfile(biome, sector);
+        const profile = sectorProfile(seed, sector);
         const alvo = esperado[profile.halls];
         if (alvo === undefined) continue; // karst e lakes so pintam chao
         // Mesma derivacao de createRun, para olhar o MESMO mundo que a run ve.
@@ -364,8 +364,7 @@ describe('arena do chefe por estrato', () => {
     //     mundo que deixou de existir.
     for (let seed = 1; seed <= 220; seed++) {
       for (const sector of [MID_SECTOR, DEFAULT_SECTOR_COUNT]) {
-        const biome = sectorBiome(seed, sector);
-        const profile = biomeProfile(biome, sector);
+        const profile = sectorProfile(seed, sector);
         const world = generateWorld(
           sectorSeed((seed ^ RUN_SEED_MIX) >>> 0, sector),
           WORLD_W,

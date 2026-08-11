@@ -129,7 +129,7 @@ import {
   runDepth,
   runIsReturning,
 } from './depth.js';
-import { biomeProfile, sectorBiome, leylineGuaranteeSector } from './strata.js';
+import { sectorBiome, sectorProfile } from './strata.js';
 import {
   activeModule,
   consumeModuleCharge,
@@ -312,12 +312,8 @@ export const createRun = (config: RunConfig): SurvivalState => {
   // O bioma sai de derivacao PURA da seed (strata.ts): reconectar no setor N
   // reconstroi o mesmo estrato e a mesma ocupacao sem consumir a RNG da run.
   const biome = sectorBiome(config.seed, sector);
-  const profile = biomeProfile(biome, sector);
-  // A garantia da descida: sem leyline natural nos setores 2-3, o setor 2
-  // forca uma — sem isso, 63% das descidas nunca viam a mecanica.
-  if (leylineGuaranteeSector(config.seed) === sector) {
-    profile.leylines = Math.max(profile.leylines, 1);
-  }
+  // Perfil pela fonte unica (garantia da descida inclusa): ver sectorProfile.
+  const profile = sectorProfile(config.seed, sector);
   const world = generateWorld(
     sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector),
     width,
