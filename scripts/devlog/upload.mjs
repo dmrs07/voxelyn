@@ -154,8 +154,9 @@ async function main() {
   }
   if (!credentials) {
     console.error(
-      'credenciais do Cloudinary ausentes. Defina CLOUDINARY_URL, ou as tres:\n' +
-        '  CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET',
+      'credenciais do Cloudinary ausentes. Defina as tres:\n' +
+        '  CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET\n' +
+        'ou, se preferir uma variavel so, CLOUDINARY_URL=cloudinary://key:secret@cloud',
     );
     process.exit(1);
   }

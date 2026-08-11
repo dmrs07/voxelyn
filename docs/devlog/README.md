@@ -175,10 +175,24 @@ uma entrada somaria peso em vez de substituí-lo.
 Os binários vão para o Cloudinary:
 
 ```
-export CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>
+export CLOUDINARY_CLOUD_NAME=<cloud>
+export CLOUDINARY_API_KEY=<key>
+export CLOUDINARY_API_SECRET=<secret>
+# (ou, numa variável só: CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>)
+
 node scripts/devlog/upload.mjs --entry 001     # uma entrada
 node scripts/devlog/upload.mjs --all           # tudo que existe em disco
 ```
+
+**O ambiente precisa alcançar o Cloudinary.** O ambiente remoto do Claude Code só fala com
+hosts na allowlist de egresso, e por padrão o Cloudinary não está nela — o upload falha com
+`403 Host not in allowlist` mesmo com credencial correta. Libere:
+
+- `api.cloudinary.com` — o upload;
+- `res.cloudinary.com` — a conferência `HEAD` que o `--prune` faz antes de apagar.
+
+Isso vale também para o ambiente da tarefa diária: sem a liberação, ela captura e escreve
+normalmente e só o passo de upload falha.
 
 O upload grava, em cada entrada do plano, um mapa `cdn` de caminho relativo para URL
 pública, e reescreve as imagens do post para essas URLs — sem isso, tirar os PNGs do git

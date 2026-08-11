@@ -112,6 +112,14 @@ export const uploadFile = async (localPath, publicId, credentials, { timeoutMs =
     } catch {
       /* corpo nao-JSON: o texto cru ja e a melhor pista */
     }
+    // Bloqueio de egresso se parece com credencial errada se a mensagem nao
+    // disser o contrario: os dois chegam como HTTP de erro na mesma linha. O
+    // ambiente remoto do Claude Code so alcanca hosts na allowlist, e sem esta
+    // dica a investigacao comeca no lugar errado.
+    if (/not in allowlist|egress/i.test(detail)) {
+      detail +=
+        ' — libere api.cloudinary.com (e res.cloudinary.com para o --prune) no egresso do ambiente';
+    }
     throw new CloudinaryError(`upload de ${publicId} falhou (${response.status}): ${detail}`);
   }
 
