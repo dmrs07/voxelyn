@@ -581,4 +581,34 @@ describe('telegrafo da leyline em co-op', () => {
     expect(seg.dischargeAt).toBe(416);
     expect(seg.refractoryUntil).toBe(616);
   });
+
+  it('leylineRouting do snapshot espelha o rele das juncoes', () => {
+    const { client } = connect();
+    const mirror = (client as unknown as { state: { leylineNodes: Array<{ routed: boolean }> } })
+      .state;
+    expect(mirror.leylineNodes.length).toBeGreaterThan(0);
+    expect(mirror.leylineNodes.every((n) => !n.routed)).toBe(true);
+    const routing = mirror.leylineNodes.map((_, i) => i === 0);
+    client.receive(JSON.stringify({
+      t: 'snapshot',
+      serverTick: 400,
+      ackSeq: 0,
+      phase: 'running',
+      entities: [],
+      projectiles: [],
+      removedEntities: [],
+      chunkDiffs: [],
+      contamination: 0,
+      events: [],
+      world: {
+        salvageSites: [],
+        coreTaken: false,
+        bossAwake: false,
+        wellOffers: [],
+        leylineRouting: routing,
+      },
+    }));
+    expect(mirror.leylineNodes[0].routed).toBe(true);
+    expect(mirror.leylineNodes.slice(1).every((n) => !n.routed)).toBe(true);
+  });
 });

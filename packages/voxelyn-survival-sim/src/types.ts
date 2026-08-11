@@ -318,6 +318,12 @@ export const DISCOVERY_FURNACE_COOLED = 1 << 22;
 export const DISCOVERY_QUEEN_THAWED = 1 << 23;
 /** Ficou na FAIXA do Magnetarca: dentro do campo e fora das duas bordas. */
 export const DISCOVERY_MAGNET_BANDED = 1 << 24;
+/**
+ * Uma descarga ATRAVESSOU uma juncao roteada. Marcada no rele efetivo — quando
+ * a energia sai do outro lado — e nao no toggle: apertar o botao nao ensina
+ * nada; ver a corrente continuar por um caminho que VOCE abriu, sim.
+ */
+export const DISCOVERY_LEYLINE_ROUTED = 1 << 25;
 
 /**
  * Todo bit de descoberta que existe, num numero so.
@@ -336,9 +342,9 @@ export const DISCOVERY_MAGNET_BANDED = 1 << 24;
  * mentir sobre o que reconhece.
  *
  * O teste `descobertas.test.ts` confere que todo `DISCOVERY_*` exportado cabe
- * aqui dentro — e o que faz o bit 25 nascer coberto em vez de nascer perdido.
+ * aqui dentro — e o que faz o bit novo nascer coberto em vez de nascer perdido.
  */
-export const DISCOVERY_MASK = (1 << 25) - 1;
+export const DISCOVERY_MASK = (1 << 26) - 1;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -936,6 +942,30 @@ export type LeylineSegment = {
    * ressonancia. E id e nao slot porque e o que `recordPlayerResonance` casa.
    */
   triggeredBy: number;
+  /**
+   * Esta carga foi armada por RELE (juncao roteada), nao por tiro. Decide se
+   * o discharge futuro credita ressonancia — a cascata inteira e UMA decisao
+   * do jogador, entao so a ativacao original conta — e por decidir credito
+   * ENTRA no hash como os relogios.
+   */
+  relayed: boolean;
+};
+
+/**
+ * Uma JUNCAO de leyline e os segmentos que ela articula.
+ *
+ * `cell` e `segments` sao geometria derivada da seed (a adjacencia e por
+ * proximidade — Chebyshev <= 2 — ver `deriveLeylineNodes`): ficam fora do hash
+ * e do wire, como as celulas dos segmentos. So `routed` e autoritativo — ele
+ * decide se uma descarga atravessa, portanto decide dano, portanto hasheia e
+ * viaja (`WorldFlags.leylineRouting`).
+ */
+export type LeylineNode = {
+  cell: number;
+  /** Indices em `leylineSegments` dos segmentos que tocam esta juncao. */
+  segments: number[];
+  /** O jogador abriu o rele: descargas adjacentes atravessam. */
+  routed: boolean;
 };
 
 export type SemanticEvent =
@@ -988,6 +1018,12 @@ export type SemanticEvent =
       owner?: number;
       fromX?: number;
       fromY?: number;
+      /**
+       * A descarga veio de um segmento armado por RELE. Mantem autoria (dano,
+       * stun, fogo amigo continuam do dono) mas nao credita ressonancia de
+       * novo: a cascata inteira e uma ativacao so.
+       */
+      relayed?: boolean;
     }
   /**
    * Um segmento de leyline foi energizado e VAI descarregar em `dischargeTick`.
@@ -997,6 +1033,12 @@ export type SemanticEvent =
    * conhecer as juncoes, que sao informacao do worldgen.
    */
   | { t: 'leyline_charge'; seg: number; cells: number[]; dischargeTick: number }
+  /**
+   * Um jogador ROTEOU (ou fechou) uma juncao. Carrega a posicao porque cue e
+   * particula nao devem precisar do grid para achar o no; `routed` e o estado
+   * NOVO, para o feedback dizer o que aconteceu e nao o que havia.
+   */
+  | { t: 'leyline_routed'; node: number; x: number; y: number; routed: boolean; slot: number }
   | { t: 'ignite'; x: number; y: number }
   /**
    * Alguem recuperou vida. Existe para o Bispo poder ser LIDO: sem um evento, a
@@ -1378,6 +1420,11 @@ export type SurvivalState = {
    * de hash/wire (relogios entram, geometria nao).
    */
   leylineSegments: LeylineSegment[];
+  /**
+   * Juncoes da rede, com a adjacencia derivada da seed em `createRun`. So o
+   * `routed` de cada uma e autoritativo (hash + wire); ver `LeylineNode`.
+   */
+  leylineNodes: LeylineNode[];
   /**
    * Centros dos saloes carimbados pela gramatica espacial do estrato.
    *

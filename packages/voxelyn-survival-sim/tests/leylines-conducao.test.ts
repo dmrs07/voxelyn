@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DISCHARGE_DAMAGE,
   LEYLINE_CHARGE_TICKS,
+  LEYLINE_NODE_INTERACT_RADIUS,
   LEYLINE_REFRACTORY_TICKS,
   PLAYER_MODULE_FRIENDLY_DAMAGE_SCALE,
   SOLID_LEYLINE,
@@ -23,7 +24,9 @@ import {
 } from '../src/constants';
 import { impactSolid } from '../src/materials';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
-import type { SemanticEvent, SurvivalState } from '../src/types';
+import { deriveLeylineNodes } from '../src/worldgen';
+import { DISCOVERY_LEYLINE_ROUTED } from '../src/types';
+import type { PlayerCommand, SemanticEvent, SurvivalState } from '../src/types';
 
 const clearArea = (state: SurvivalState, x0: number, y0: number, x1: number, y1: number): void => {
   const w = state.config.width;
@@ -59,9 +62,17 @@ const scene = (): SurvivalState => {
     segB.push(30 * w + x);
   }
   state.leylineSegments = [
-    { cells: segA, dischargeAt: 0, refractoryUntil: 0, triggeredBy: -1 },
-    { cells: segB, dischargeAt: 0, refractoryUntil: 0, triggeredBy: -1 },
+    { cells: segA, dischargeAt: 0, refractoryUntil: 0, triggeredBy: -1, relayed: false },
+    { cells: segB, dischargeAt: 0, refractoryUntil: 0, triggeredBy: -1, relayed: false },
   ];
+  // A adjacencia sai da MESMA derivacao da run de verdade — aqui sem elos de
+  // construcao, entao a cena prova o ramo de PROXIMIDADE (Chebyshev <= 3)
+  // junto com o comportamento que depende dele.
+  state.leylineNodes = deriveLeylineNodes(
+    [{ cell: 30 * w + 33, segments: [] }],
+    state.leylineSegments,
+    w,
+  );
   // Longe da linha por padrao; cada teste posiciona quem deve levar o choque.
   state.player.x = 22.5;
   state.player.y = 26.5;
@@ -169,5 +180,120 @@ describe('ciclo da leyline', () => {
     expect(hashAuthoritativeState(a)).toBe(hashAuthoritativeState(b));
     b.leylineSegments[0].refractoryUntil = 100;
     expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
+  });
+});
+
+describe('roteamento nas juncoes', () => {
+  it('a adjacencia por proximidade liga a juncao aos dois segmentos que a tocam', () => {
+    const state = scene();
+    expect(state.leylineNodes.length).toBe(1);
+    // O no em x=33 toca segA (termina em 32) e segB (comeca em 34).
+    expect([...state.leylineNodes[0].segments].sort()).toEqual([0, 1]);
+  });
+
+  it('juncao roteada repassa: a descarga de A arma B como nova ativacao telegrafada', () => {
+    const state = scene();
+    state.leylineNodes[0].routed = true;
+    const events: SemanticEvent[] = [];
+    impactSolid(state, 28, 30, 'energy', events, playerOrigin(state));
+    const firstDischargeAt = state.leylineSegments[0].dischargeAt;
+
+    // Ate a descarga de A: B tem de acordar no MESMO tick, com aviso proprio.
+    let relayCharge: SemanticEvent | undefined;
+    while (state.tick < firstDischargeAt) {
+      relayCharge = stepIdle(state).find((ev) => ev.t === 'leyline_charge') ?? relayCharge;
+    }
+    expect(relayCharge).toBeDefined();
+    if (relayCharge?.t !== 'leyline_charge') throw new Error('unreachable');
+    expect(relayCharge.seg).toBe(1);
+    expect(state.leylineSegments[1].dischargeAt).toBe(state.tick + LEYLINE_CHARGE_TICKS);
+    expect(state.leylineSegments[1].relayed).toBe(true);
+    // Autoria propagada: a cascata continua sendo do jogador.
+    expect(state.leylineSegments[1].triggeredBy).toBe(state.player.id);
+
+    // A descarga repassada sai com relayed:true e source player.
+    let relayed: SemanticEvent | undefined;
+    while (state.tick < state.leylineSegments[1].dischargeAt) {
+      relayed = stepIdle(state).find((ev) => ev.t === 'discharge') ?? relayed;
+    }
+    expect(relayed).toBeDefined();
+    if (relayed?.t !== 'discharge') throw new Error('unreachable');
+    expect(relayed.source).toBe('player');
+    expect(relayed.relayed).toBe(true);
+
+    // Anti-loop por construcao: A esta refratario, o rele nao volta por ele.
+    expect(state.tick).toBeLessThan(state.leylineSegments[0].refractoryUntil);
+    expect(state.leylineSegments[0].dischargeAt).toBe(0);
+  });
+
+  it('juncao fechada nao repassa nada', () => {
+    const state = scene();
+    const events: SemanticEvent[] = [];
+    impactSolid(state, 28, 30, 'energy', events, playerOrigin(state));
+    for (let i = 0; i < LEYLINE_CHARGE_TICKS + 2; i++) stepIdle(state);
+    expect(state.leylineSegments[0].refractoryUntil).toBeGreaterThan(0);
+    expect(state.leylineSegments[1].dischargeAt).toBe(0);
+    expect(state.leylineSegments[1].relayed).toBe(false);
+  });
+
+  it('a cascata inteira credita +1 current — e a descoberta e do rele efetivo', () => {
+    const state = scene();
+    state.leylineNodes[0].routed = true;
+    const before = state.playerExtras[0].resonance.current;
+    expect(state.stats.discoveries & DISCOVERY_LEYLINE_ROUTED).toBe(0);
+    const events: SemanticEvent[] = [];
+    impactSolid(state, 28, 30, 'energy', events, playerOrigin(state));
+    // Ate B (o repassado) descarregar: duas descargas no total.
+    for (let i = 0; i < 2 * LEYLINE_CHARGE_TICKS + 4; i++) stepIdle(state);
+    expect(state.leylineSegments[1].refractoryUntil).toBeGreaterThan(0);
+    expect(state.playerExtras[0].resonance.current).toBe(before + 1);
+    expect(state.stats.discoveries & DISCOVERY_LEYLINE_ROUTED).toBe(DISCOVERY_LEYLINE_ROUTED);
+  });
+
+  it('interact adjacente toggla a juncao; longe demais, nao', () => {
+    const state = scene();
+    const w = state.config.width;
+    const interact = (): SemanticEvent[] => {
+      const cmd: PlayerCommand = { ...emptyCommand(), interact: true };
+      return stepRun(state, [cmd]).events;
+    };
+    // Colado na juncao (33,30): celula aberta logo acima.
+    state.player.x = 33.5;
+    state.player.y = 31.5;
+    const on = interact().find((ev) => ev.t === 'leyline_routed');
+    expect(on).toBeDefined();
+    if (on?.t !== 'leyline_routed') throw new Error('unreachable');
+    expect(on.routed).toBe(true);
+    expect(state.leylineNodes[0].routed).toBe(true);
+    // Toggle de volta.
+    const off = interact().find((ev) => ev.t === 'leyline_routed');
+    if (off?.t !== 'leyline_routed') throw new Error('sem evento de toggle');
+    expect(off.routed).toBe(false);
+    expect(state.leylineNodes[0].routed).toBe(false);
+    // Fora do alcance: nada acontece.
+    state.player.x = 33.5 + LEYLINE_NODE_INTERACT_RADIUS + 1;
+    state.player.y = 31.5;
+    expect(interact().some((ev) => ev.t === 'leyline_routed')).toBe(false);
+    expect(state.solid[30 * w + 33]).toBe(SOLID_LEYLINE_NODE);
+  });
+
+  it('o toggle sozinho nao marca a descoberta', () => {
+    const state = scene();
+    state.player.x = 33.5;
+    state.player.y = 31.5;
+    const cmd: PlayerCommand = { ...emptyCommand(), interact: true };
+    stepRun(state, [cmd]);
+    expect(state.leylineNodes[0].routed).toBe(true);
+    expect(state.stats.discoveries & DISCOVERY_LEYLINE_ROUTED).toBe(0);
+  });
+
+  it('routed e relayed entram no hash autoritativo', () => {
+    const a = scene();
+    const b = scene();
+    b.leylineNodes[0].routed = true;
+    expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(b));
+    const c = scene();
+    c.leylineSegments[0].relayed = true;
+    expect(hashAuthoritativeState(a)).not.toBe(hashAuthoritativeState(c));
   });
 });

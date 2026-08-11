@@ -20,7 +20,7 @@ import {
   WORLD_W,
 } from '../src/constants';
 import { biomeProfile, lineageOf } from '../src/strata';
-import { DEFAULT_PROFILE, generateWorld } from '../src/worldgen';
+import { DEFAULT_PROFILE, deriveLeylineNodes, generateWorld } from '../src/worldgen';
 import { createRun } from '../src/run';
 import type { SectorBiome } from '../src/strata';
 
@@ -65,7 +65,7 @@ describe('leylines: tracado', () => {
         expect(seg.cells.length).toBeLessThanOrEqual(LEYLINE_SEGMENT_MAX_CELLS);
         for (const cell of seg.cells) expect(world.solid[cell]).toBe(SOLID_LEYLINE);
       }
-      for (const node of world.leylineNodes) expect(world.solid[node]).toBe(SOLID_LEYLINE_NODE);
+      for (const node of world.leylineNodes) expect(world.solid[node.cell]).toBe(SOLID_LEYLINE_NODE);
       // Nenhuma celula do grid pertence a dois segmentos: a juncao separa.
       const all = world.leylines.flatMap((s) => s.cells);
       expect(new Set(all).size).toBe(all.length);
@@ -89,6 +89,29 @@ describe('leylines: tracado', () => {
     const b = generateWorld(42, WORLD_W, WORLD_H, profile);
     expect(a.leylines).toEqual(b.leylines);
     expect(a.leylineNodes).toEqual(b.leylineNodes);
+  });
+});
+
+describe('leylines: adjacencia das juncoes', () => {
+  it('a rede derivada tem juncoes que articulam dois segmentos em toda seed', () => {
+    const profile = biomeProfile(PRISMATIC, 2);
+    for (const seed of SEEDS) {
+      const world = generateWorld(seed, WORLD_W, WORLD_H, profile);
+      const nodes = deriveLeylineNodes(world.leylineNodes, world.leylines, WORLD_W);
+      expect(nodes.length).toBe(world.leylineNodes.length);
+      for (const node of nodes) expect(node.routed).toBe(false);
+      // Juncao ORFA (zero segmentos a Chebyshev <= 2) e aceita: a gravacao
+      // pode trocar de lado da parede e abrir um vao — o rele dela e no-op
+      // honesto, e ela tambem nao le como conectada na tela. O que a rede NAO
+      // pode e ser toda orfa: a maioria articula, e em toda seed existe
+      // juncao com >= 2 segmentos — sem ela o rele nao teria o que rotear.
+      const linked = nodes.filter((n) => n.segments.length > 0);
+      expect(linked.length, `seed ${seed}: rede sem juncoes ligadas`).toBeGreaterThan(nodes.length / 2);
+      expect(
+        nodes.some((n) => n.segments.length >= 2),
+        `seed ${seed}: nenhuma juncao articula dois segmentos`
+      ).toBe(true);
+    }
   });
 });
 

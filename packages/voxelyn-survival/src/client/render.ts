@@ -1,5 +1,6 @@
 import {
   LEYLINE_CHARGE_TICKS,
+  LEYLINE_NODE_INTERACT_RADIUS,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
@@ -1836,6 +1837,10 @@ export class SurvivalRenderer {
       // precisa ser seguivel no escuro. Carregando, o pulso sobe ate o tick da
       // descarga: e O SINAL, o dano so existe porque esta luz veio antes. Em
       // refrataria a linha apaga — gastou — e a escuridao e a leitura.
+      const routedNodeCells = new Set<number>();
+      for (const node of state.leylineNodes) {
+        if (node.routed) routedNodeCells.add(node.cell);
+      }
       const leyPhase = new Map<number, number>();
       for (const seg of state.leylineSegments) {
         const charging = seg.dischargeAt > state.tick;
@@ -1895,10 +1900,18 @@ export class SurvivalRenderer {
             }
             // Refrataria: nenhuma luz. O segmento gastou, e a escuridao dele
             // e o aviso de que atirar de novo agora nao compra nada.
-          } else if (state.solid[i] === SOLID_LEYLINE_NODE)
+          } else if (state.solid[i] === SOLID_LEYLINE_NODE) {
             // A juncao nunca apaga: e o marco que separa segmentos, e o olho
-            // precisa dela para ler onde um trecho termina.
-            lights.push({ x: x + 0.5, y: y + 0.5, r: 2.5, power: 0.4, hex: PAL.electric, height: 0.7 });
+            // precisa dela para ler onde um trecho termina. ROTEADA, ela
+            // RESPIRA — um pulso lento e mais largo. Constante = fechada,
+            // respirando = rele aberto: um bit, uma diferenca de luz.
+            if (routedNodeCells.has(i)) {
+              const breathe = 0.5 + 0.25 * Math.sin(nowMs / 600);
+              lights.push({ x: x + 0.5, y: y + 0.5, r: 3.2, power: breathe, hex: PAL.electric, height: 0.7 });
+            } else {
+              lights.push({ x: x + 0.5, y: y + 0.5, r: 2.5, power: 0.4, hex: PAL.electric, height: 0.7 });
+            }
+          }
         }
       }
       for (const c of state.charges) {
@@ -2641,6 +2654,24 @@ export class SurvivalRenderer {
       items.push({
         depth: offer.x + offer.y,
         draw: () => this.drawWellOffer(offer, osx, osy, z, spriteZoom, nowMs, reachable),
+      });
+    }
+
+    // O prompt das JUNCOES de leyline: aparece so com o jogador perto (a
+    // proximidade convida, o ato e o botao — a mesma regra da caixa-preta),
+    // na fila ordenada porque a juncao e parede do mundo como tudo aqui.
+    for (let n = 0; n < state.leylineNodes.length; n++) {
+      const node = state.leylineNodes[n];
+      const nx = (node.cell % state.config.width) + 0.5;
+      const ny = Math.floor(node.cell / state.config.width) + 0.5;
+      const dist = Math.hypot(state.player.x - nx, state.player.y - ny);
+      if (dist > 2.5) continue;
+      const [nsx, nsy] = toScreen(nx, ny);
+      if (nsx < -80 || nsx > vw + 80 || nsy < -100 || nsy > vh + 80) continue;
+      const reachable = dist <= LEYLINE_NODE_INTERACT_RADIUS;
+      items.push({
+        depth: nx + ny + 0.5,
+        draw: () => this.drawLeylineNodePrompt(node.routed, nsx, nsy, z, nowMs, reachable),
       });
     }
 
@@ -3958,6 +3989,39 @@ export class SurvivalRenderer {
     ctx.lineWidth = Math.max(1, z * (reachable ? 0.9 : 0.5));
     ctx.strokeRect(sx - width / 2, top, width, height);
     ctx.fillStyle = presentation.color;
+    ctx.fillText(label, sx, top + height / 2);
+    ctx.restore();
+  }
+
+  /**
+   * O prompt da juncao: rotear ou desfazer, pelo mesmo botao de tudo. A
+   * moldura e a da oferta do poco; a borda e eletrica porque a juncao e. O
+   * label diz o que o botao FARA (abrir/fechar o rele), nao o que ha.
+   */
+  private drawLeylineNodePrompt(
+    routed: boolean,
+    sx: number,
+    sy: number,
+    z: number,
+    nowMs: number,
+    reachable: boolean,
+  ): void {
+    const ctx = this.ctx;
+    const label = t(routed ? 'leyline.node.unroute' : 'leyline.node.route');
+    ctx.save();
+    ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(label).width + 10 * z;
+    const height = 11 * z;
+    const top = sy - 24 * z;
+    ctx.globalAlpha = reachable ? 0.92 : 0.55 + Math.sin(nowMs * 0.006) * 0.1;
+    ctx.fillStyle = 'rgba(11,14,20,0.9)';
+    ctx.fillRect(sx - width / 2, top, width, height);
+    ctx.strokeStyle = PAL.electric;
+    ctx.lineWidth = Math.max(1, z * (reachable ? 0.9 : 0.5));
+    ctx.strokeRect(sx - width / 2, top, width, height);
+    ctx.fillStyle = PAL.electric;
     ctx.fillText(label, sx, top + height / 2);
     ctx.restore();
   }

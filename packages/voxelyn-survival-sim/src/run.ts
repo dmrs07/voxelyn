@@ -21,6 +21,8 @@ import {
   PURGE_CELL_RADIUS,
   CONTAMINATION_PER_TICK,
   DISCHARGE_DAMAGE,
+  LEYLINE_CHARGE_TICKS,
+  LEYLINE_NODE_INTERACT_RADIUS,
   LEYLINE_REFRACTORY_TICKS,
   DELUGE_SHOCK_FULL_RANGE,
   DELUGE_SHOCK_MIN_SCALE,
@@ -111,7 +113,7 @@ import {
   surfaceSpeedMul,
   updateEnemies,
 } from './entities.js';
-import { generateWorld } from './worldgen.js';
+import { deriveLeylineNodes, generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
 import { ascend, descend, populateSector, sectorSeed } from './sectors.js';
 import {
@@ -140,6 +142,7 @@ import {
   DISCOVERY_CARGO_LOST,
   DISCOVERY_DISCHARGE_POOL,
   DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_LEYLINE_ROUTED,
   DISCOVERY_SELF_HARM,
 } from './types.js';
 import {
@@ -383,7 +386,10 @@ export const createRun = (config: RunConfig): SurvivalState => {
       dischargeAt: 0,
       refractoryUntil: 0,
       triggeredBy: -1,
+      relayed: false,
     })),
+    // Adjacencia derivada da seed, todo rele fechado. Ver deriveLeylineNodes.
+    leylineNodes: deriveLeylineNodes(world.leylineNodes, world.leylines, width),
     hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
@@ -516,14 +522,52 @@ const stepRailCarts = (state: SurvivalState, events: SemanticEvent[]): void => {
  * Roda antes de resolveChainedEvents para o dano sair no mesmo tick do evento.
  */
 const stepLeylines = (state: SurvivalState, events: SemanticEvent[]): void => {
-  for (const seg of state.leylineSegments) {
+  for (let segIdx = 0; segIdx < state.leylineSegments.length; segIdx++) {
+    const seg = state.leylineSegments[segIdx];
     if (seg.dischargeAt === 0 || state.tick < seg.dischargeAt) continue;
+    // Capturados ANTES do reset: o rele e a descarga leem os dois, e o bug
+    // classico aqui seria zerar primeiro e repassar autoria de ninguem.
+    const triggeredBy = seg.triggeredBy;
+    const wasRelayed = seg.relayed;
     const origin: EffectOrigin =
-      seg.triggeredBy >= 0 ? { source: 'player', owner: seg.triggeredBy } : { source: 'environment' };
-    chargeCells(state, openNeighbours(state, seg.cells), events, origin);
+      triggeredBy >= 0 ? { source: 'player', owner: triggeredBy } : { source: 'environment' };
+    chargeCells(state, openNeighbours(state, seg.cells), events, origin, undefined, wasRelayed);
+    // A descoberta e do RELE EFETIVO: a energia saiu do outro lado de uma
+    // juncao que o jogador abriu — nao do toggle, que sozinho nao ensina nada.
+    if (wasRelayed) markDiscovery(state.stats, DISCOVERY_LEYLINE_ROUTED);
     seg.dischargeAt = 0;
     seg.refractoryUntil = state.tick + LEYLINE_REFRACTORY_TICKS;
     seg.triggeredBy = -1;
+    seg.relayed = false;
+
+    // O RELE: toda juncao ROTEADA que toca este segmento repassa a carga aos
+    // vizinhos DORMENTES como ativacao nova — telegrafada (leyline_charge) e
+    // refrataria como qualquer outra. A excecao a "a propagacao termina na
+    // juncao" e paga por um ato deliberado do jogador na propria juncao.
+    //
+    // Anti-loop por construcao, nao por contador: este segmento acabou de
+    // ganhar 10 s de refrataria (LEYLINE_REFRACTORY_TICKS >> 16 ticks de
+    // carga), entao quando a cascata tentar voltar por ele, ele nao esta
+    // dormente e o rele nao arma. E o dischargeAt armado aqui e futuro
+    // (tick + carga), entao segmentos visitados adiante neste mesmo loop nao
+    // disparam neste tick.
+    for (const node of state.leylineNodes) {
+      if (!node.routed || !node.segments.includes(segIdx)) continue;
+      for (const otherIdx of node.segments) {
+        if (otherIdx === segIdx) continue;
+        const other = state.leylineSegments[otherIdx];
+        if (other.dischargeAt !== 0 || state.tick < other.refractoryUntil) continue;
+        other.dischargeAt = state.tick + LEYLINE_CHARGE_TICKS;
+        other.triggeredBy = triggeredBy;
+        other.relayed = true;
+        events.push({
+          t: 'leyline_charge',
+          seg: otherIdx,
+          cells: other.cells,
+          dischargeTick: other.dischargeAt,
+        });
+      }
+    }
   }
 };
 
@@ -584,7 +628,10 @@ export const resolveChainedEvents = (state: SurvivalState, events: SemanticEvent
       // eletrificar biofluido vazio continua sendo o jogador escolhendo resolver as
       // coisas com corrente, e quem quebra cristal para abrir caminho tambem esta
       // usando corrente. Preso ao stun, o registro so contaria com bicho em cima.
-      if (ev.source === 'player') recordPlayerResonance(state, ev.owner, 'current');
+      // Descarga REPASSADA por rele nao credita: a cascata inteira e uma
+      // ativacao so — a ressonancia mede frequencia do habito, nao o tamanho
+      // da rede que o jogador montou.
+      if (ev.source === 'player' && !ev.relayed) recordPlayerResonance(state, ev.owner, 'current');
       const cells = new Set(ev.cells);
       for (const ent of [...joinedPlayers(state), ...state.enemies]) {
         if (!ent.alive) continue;
@@ -1375,7 +1422,7 @@ const stepPlayer = (
     state.stats.purgeCellsUsed += 1;
   }
 
-  // interagir: revive parceiro > nucleo > terminal/cofre > extracao
+  // interagir: revive parceiro > nucleo > terminal/cofre > extracao > juncao
   if (cmd.interact) {
     // co-op: reviver parceiro abatido proximo tem prioridade
     if (coop) {
@@ -1613,6 +1660,27 @@ const stepPlayer = (
       } else {
         events.push({ t: 'message', key: 'sim.waitAtExit' });
       }
+      // O return que faltava: sem ele, um no de leyline por acaso colado na
+      // entrada toggle-aria JUNTO com a mensagem de "aguarde na saida".
+      return;
+    }
+
+    // JUNCAO DE LEYLINE — o ultimo alvo da cadeia, de proposito: a juncao e
+    // parede e nao disputa espaco com objetivo nenhum, mas o ultimo lugar
+    // GARANTE que rotear nunca rouba um interact de revive, poco, terminal,
+    // cofre ou extracao. O toggle e persistente ate a troca de setor; dois
+    // jogadores togglando no mesmo tick fazem liga-e-desliga com dois eventos
+    // (slot 0 age primeiro, como em toda a cadeia) — comportamento aceito e
+    // testado, nao defendido. Nenhuma descoberta aqui: o bit e do RELE
+    // efetivo (stepLeylines), nao do aperto de botao.
+    for (let n = 0; n < state.leylineNodes.length; n++) {
+      const node = state.leylineNodes[n];
+      const nx = (node.cell % state.config.width) + 0.5;
+      const ny = Math.floor(node.cell / state.config.width) + 0.5;
+      if (Math.hypot(player.x - nx, player.y - ny) > LEYLINE_NODE_INTERACT_RADIUS) continue;
+      node.routed = !node.routed;
+      events.push({ t: 'leyline_routed', node: n, x: nx, y: ny, routed: node.routed, slot });
+      return;
     }
   }
 };
@@ -2766,7 +2834,13 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
     mix(seg.dischargeAt);
     mix(seg.refractoryUntil);
     mix(seg.triggeredBy);
+    // `relayed` decide credito de ressonancia — divergir nele diverge a oferta
+    // do poco dali a um setor, longe da causa.
+    mix(seg.relayed ? 1 : 0);
   }
+  // O rele de cada juncao decide se a descarga ATRAVESSA — dano futuro.
+  // `cell`/`segments` ficam fora: geometria derivada da seed.
+  for (const node of state.leylineNodes) mix(node.routed ? 1 : 0);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

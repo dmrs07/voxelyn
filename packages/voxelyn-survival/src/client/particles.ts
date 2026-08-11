@@ -376,6 +376,11 @@ export class VoxelParticles {
             this.burst(cx, cy, 'spark', 1, 1.0, 1.6, 300, cell);
           }
           break;
+        case 'leyline_routed':
+          // Uma faisca curta no ponto do toggle: confirma o ato da mao. O
+          // estado continuado e trabalho da luz da juncao, nao de particula.
+          this.burst(ev.x, ev.y, 'spark', n(3), 1.2, 1.8, 260, ev.node);
+          break;
         case 'break': {
           // O bloco se desfaz no PROPRIO material. O evento carrega qual era,
           // porque quando ele chega a grade ja mudou e o cliente nao teria mais

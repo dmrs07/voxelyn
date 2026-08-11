@@ -201,6 +201,12 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       return [{ voice: 'discharge', x, y, scale: 0.45 }];
     }
 
+    case 'leyline_routed':
+      // Um clique de disjuntor, nao um evento de combate: a mesma voz
+      // eletrica no volume mais baixo do jogo. O feedback que importa e a
+      // luz da juncao mudando de constante para respiracao (e de volta).
+      return [{ voice: 'discharge', x: ev.x, y: ev.y, scale: 0.3 }];
+
     case 'ignite':
       return [{ voice: 'ignite', x: ev.x, y: ev.y, scale: 1 }];
 

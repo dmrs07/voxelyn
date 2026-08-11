@@ -95,7 +95,15 @@
 // `leylineClocks` (opcional, alinhado por indice como `railTimers`): quem
 // reconecta durante os 16 ticks de carga recebe o relogio e desenha o aviso;
 // servidor anterior simplesmente nao manda e tudo fica dormente.
-export const PROTOCOL_VERSION = 22;
+// 23: o ROTEAMENTO das leylines entra no wire por tres campos. `WorldFlags`
+// ganha `leylineRouting` (opcional, boolean por indice de juncao — o mesmo
+// contrato alinhado de railTimers/leylineClocks); o evento `discharge` ganha
+// `relayed` (a descarga repassada por rele, que nao credita ressonancia); e
+// nasce o evento `leyline_routed` (o toggle, para cue e particula). A metade
+// que doi: cliente antigo contra servidor novo nunca desenharia a juncao
+// roteada nem o prompt, e veria um rele "inexplicavel" atravessar — energia
+// pulando de segmento sem causa visivel.
+export const PROTOCOL_VERSION = 23;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -464,7 +472,18 @@ export const PROTOCOL_VERSION = 22;
 // dos segmentos (`dischargeAt`/`refractoryUntil`/`triggeredBy`), que entram
 // no hash autoritativo porque DECIDEM dano — dois peers discordando deles
 // divergiriam em vida um segundo depois, longe da causa.
-export const SIMULATION_VERSION = 38;
+// 39: o RELE das leylines — a juncao roteada (interact, toggle persistente no
+// setor) repassa a descarga ao segmento vizinho DORMENTE como ativacao nova,
+// telegrafada e refrataria como qualquer outra; a refrataria de 10 s e o que
+// impede a cascata de voltar, por construcao e nao por contador. `routed` (por
+// juncao) e `relayed` (por segmento) entram no hash autoritativo: os dois
+// decidem dano e credito — a ressonancia `current` conta UMA vez por cascata,
+// na ativacao original. Dois peers em versoes diferentes divergem no primeiro
+// rele. O terreno semeado NAO muda: a adjacencia no<->segmento e derivada
+// fora do caminho hasheado (a impressao digital da geracao continua
+// 3461746772; os elos de construcao registrados na gravacao sao arrays JS —
+// zero RNG, zero grid).
+export const SIMULATION_VERSION = 39;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

@@ -66,8 +66,10 @@ export const isPipe = (solid: number): boolean =>
  *
  * A juncao (NODE) fecha o segmento: a propagacao de uma ativacao termina nela
  * por construcao — o worldgen ja entrega os trechos separados, entao nao ha
- * flood em runtime que pudesse atravessa-la. Neste corte ela e inerte a tudo;
- * o comentario em `impactSolid` registra o futuro (roteamento) sem prometer.
+ * flood em runtime que pudesse atravessa-la. A excecao e paga por um ato: uma
+ * juncao ROTEADA (interact, ver stepPlayer) vira RELE e repassa a descarga ao
+ * vizinho como ativacao nova, telegrafada e refrataria como qualquer outra.
+ * A projetil ela continua inerte — o toggle e de mao, nao de bala.
  */
 export const SOLID_LEYLINE = 13;
 export const SOLID_LEYLINE_NODE = 14;
@@ -419,6 +421,11 @@ export const LEYLINE_REFRACTORY_TICKS = 10 * TICK_HZ;
 export const LEYLINE_SEGMENT_MAX_CELLS = 56;
 /** Celulas de corredor entre uma juncao e a proxima no tracado do worldgen. */
 export const LEYLINE_JUNCTION_SPACING = 28;
+/**
+ * Alcance do interact na juncao: o mesmo 1.45 do terminal de salvage, nomeado
+ * porque a sim (toggle em stepPlayer) e o cliente (prompt) leem o numero.
+ */
+export const LEYLINE_NODE_INTERACT_RADIUS = 1.45;
 
 export const PLAYER_HP = 100;
 export const PLAYER_SPEED = 4.6; // tiles/s

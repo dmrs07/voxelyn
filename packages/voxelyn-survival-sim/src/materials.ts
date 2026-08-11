@@ -311,9 +311,10 @@ export const impactSolid = (
     }
 
     case SOLID_LEYLINE_NODE:
-      // A juncao e inerte a TUDO neste corte: o papel dela e fechar o
-      // segmento. Roteamento (girar a alimentacao de um ramo, desligar uma
-      // regiao) e trabalho futuro e ganha reacoes proprias quando existir.
+      // A juncao continua inerte a projetil: ROTEA-LA e via interact
+      // (stepPlayer) — o toggle e de mao, nao de bala. Deixar a bala rotear
+      // misturaria o verbo de ativar a linha com o de reconfigura-la, e uma
+      // rajada perdida mudaria a rede sem o jogador decidir nada.
       return { stop: true, broke: false };
 
     case SOLID_CRYSTAL_DULL: {

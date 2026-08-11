@@ -438,6 +438,15 @@ export class NetClient {
         }
       }
     }
+    // O rele das juncoes aplica DIRETO: no espelho ele so decide prompt e
+    // luz — o armar autoritativo continua chegando pelos relogios acima, e
+    // por isso nao ha a corrida do dischargeAt a proteger aqui.
+    const routing = world.leylineRouting;
+    if (routing) {
+      for (let i = 0; i < state.leylineNodes.length && i < routing.length; i++) {
+        state.leylineNodes[i].routed = routing[i];
+      }
+    }
   }
 
   /**

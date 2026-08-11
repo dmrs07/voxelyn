@@ -2,8 +2,8 @@
 
 **Data:** 2026-08-11
 **Escopo:** `voxelyn-survival-sim`, `voxelyn-survival-protocol`, `voxelyn-survival-server`, `voxelyn-survival` (cliente), `voxelyn-survival-content`
-**Versões:** `PROTOCOL_VERSION` 21 → 22, `SIMULATION_VERSION` 37 → 38, `CONTENT_VERSION` 23 → 24
-**Status:** primeiro corte implementado (worldgen + condução por segmento + render).
+**Versões:** 1º corte: `PROTOCOL` 21→22, `SIMULATION` 37→38, `CONTENT` 23→24. 2º corte: `PROTOCOL` 22→23, `SIMULATION` 38→39.
+**Status:** primeiro corte (worldgen + condução por segmento + render) e segundo corte (roteamento nas junções) implementados.
 
 ## A decisão que rege tudo
 
@@ -94,8 +94,44 @@ escuro, sem virar letreiro); carregando = todas as células, pulso subindo até
 o tick anunciado; refratária = apagada; junção nunca apaga (é o marco que
 separa segmentos). Faíscas ralas + cue baixo no armamento.
 
+## Segundo corte: roteamento nas junções (o RELÉ)
+
+> Uma junção ROTEADA deixa a descarga atravessar: ao descarregar, o segmento
+> arma o(s) vizinho(s) DORMENTES como nova ativação — telegrafada
+> (`leyline_charge`, 16 ticks) e refratária como qualquer outra. O toggle é
+> persistente no setor, via interact (E) adjacente (raio 1.45, o do terminal),
+> o ÚLTIMO alvo da cadeia — rotear nunca rouba um interact de objetivo.
+
+Regras que valem registrar:
+
+- **Anti-loop por construção, não por contador**: o relé só arma segmento
+  dormente, e o que acabou de descarregar ganhou 10 s de refratária — a
+  cascata nunca volta por onde veio.
+- **Ressonância: +1 `current` por CASCATA**, na ativação original. A descarga
+  repassada viaja com `relayed: true` e mantém autoria (dano, stun, fogo
+  amigo do dono), mas não credita de novo — frequência do hábito, não tamanho
+  da rede.
+- **Descoberta** (`DISCOVERY_LEYLINE_ROUTED`, bit 25): marcada quando uma
+  descarga ATRAVESSA — o toggle sozinho não ensina nada.
+- **Adjacência nó↔segmento**: elos de CONSTRUÇÃO registrados na gravação (a
+  junção sabe qual segmento fechou e qual abriu; o nó forçado do encontro
+  liga-se ao dono do corredor cruzado — ancorado na célula do encontro, não
+  onde o nó pousou) somados a proximidade Chebyshev ≤ 3. Zero RNG, zero grid:
+  a impressão digital da geração continua 3461746772. ~19/20 seeds têm junção
+  articulando ≥2 segmentos; o mapa raro sem ela é variância aceita (relé
+  no-op honesto).
+- **Estado/wire**: `routed` (por nó) e `relayed` (por segmento) entram no hash
+  autoritativo; `WorldFlags.leylineRouting` viaja por índice como os clocks.
+  A junção continua inerte a projéteis — o toggle é de mão, não de bala.
+- **Apresentação**: junção fechada = luz constante; roteada = respiração lenta
+  (r 3.2, pulso 600 ms). Prompt no padrão da caixa-preta ("USAR — ROTEAR
+  JUNÇÃO"/"DESFAZER ROTEAMENTO"), cue de clique de disjuntor, faísca no
+  toggle, entrada no codex. Fragmento de lore do servidor ficou de fora
+  (sistema com grafo próprio; entra num corte de conteúdo).
+
 ## Trabalho futuro
 
-- Roteamento nas junções (girar alimentação, sobrecarregar, desligar região).
+- Sobrecarga (descarga total do nó) e desligar região, se o jogo pedir.
 - Pulso ambiental rítmico (sem recarga), se o jogo pedir.
 - Continuidade visual/narrativa da linha entre setores da linhagem.
+- Fragmento de lore AX-* para a descoberta do relé.

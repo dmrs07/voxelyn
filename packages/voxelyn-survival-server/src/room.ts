@@ -512,6 +512,9 @@ export class GameRoom {
         dischargeAt: seg.dischargeAt,
         refractoryUntil: seg.refractoryUntil,
       })),
+      // O rele de cada juncao: worldSig (JSON do objeto inteiro) dispara o
+      // envio sozinho no toggle, como faz com todo o resto.
+      leylineRouting: this.state.leylineNodes.map((node) => node.routed),
     };
   }
 

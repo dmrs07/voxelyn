@@ -27,7 +27,7 @@ import {
   SURF_WATER,
   WORLD_W,
 } from './constants.js';
-import type { Vec2 } from './types.js';
+import type { LeylineNode, Vec2 } from './types.js';
 
 export type GeneratedSalvageSite = { id: number; tier: 1 | 2 | 3; terminal: Vec2; cache: Vec2 };
 
@@ -185,8 +185,14 @@ export type GeneratedWorld = {
    * autoritativos) nascem zerados la.
    */
   leylines: Array<{ cells: number[] }>;
-  /** Celulas de juncao (SOLID_LEYLINE_NODE), para apresentacao e testes. */
-  leylineNodes: number[];
+  /**
+   * Juncoes (SOLID_LEYLINE_NODE) com os elos de CONSTRUCAO: a gravacao sabe
+   * de graca qual segmento cada juncao fechou e qual abriu — elos que a
+   * proximidade nao reconstroi, porque a linha e esparsa onde a parede ja
+   * tinha virado cristal/minerio. `deriveLeylineNodes` soma a estes elos os
+   * de proximidade (o encontro fisico das pernas) e monta o estado.
+   */
+  leylineNodes: Array<{ cell: number; segments: number[] }>;
   /**
    * Centros dos SALOES que a gramatica espacial carimbou — o anfiteatro, a
    * rotunda, a cupula. E informacao de APRESENTACAO: a simulacao nao le isto
@@ -197,6 +203,48 @@ export type GeneratedWorld = {
    */
   hallCenters: Vec2[];
 };
+
+/**
+ * A adjacencia no <-> segmentos do estado: os ELOS DE CONSTRUCAO que a
+ * gravacao registrou (exatos — a juncao fechou um segmento e abriu o
+ * seguinte), somados aos de PROXIMIDADE (Chebyshev <= 3), que capturam o
+ * encontro fisico das pernas — o no forcado da perna funda nasce colado na
+ * parede que a perna do salao ja gravou, e nenhuma ordem de construcao
+ * conhece esse cruzamento.
+ *
+ * Nenhum dos dois sozinho basta: a linha e ESPARSA onde a decoracao ja tinha
+ * tomado a parede (na Catedral, muito virou cristal), entao a proximidade
+ * perde elos que a construcao conhece de graca; e a construcao nao ve o
+ * cruzamento entre pernas, que so existe no espaco.
+ *
+ * Pura e deterministica: chamada na construcao do estado (`createRun` e as
+ * trocas de setor). O resultado e geometria derivada da seed — fora do hash
+ * e do wire, como as celulas dos segmentos. So o `routed` que nasce aqui em
+ * `false` e autoritativo depois.
+ */
+export const deriveLeylineNodes = (
+  nodes: Array<{ cell: number; segments: number[] }>,
+  segments: Array<{ cells: number[] }>,
+  width: number,
+): LeylineNode[] =>
+  nodes.map((node) => {
+    const nx = node.cell % width;
+    const ny = Math.floor(node.cell / width);
+    // Elos de construcao primeiro: sao exatos (a juncao fechou/abriu esses
+    // segmentos), e a proximidade sozinha os perderia — a linha e esparsa
+    // onde a decoracao ja tinha tomado a parede.
+    const adjacent = [...node.segments];
+    for (let s = 0; s < segments.length; s++) {
+      if (adjacent.includes(s)) continue;
+      const touches = segments[s].cells.some((c) => {
+        const dx = Math.abs((c % width) - nx);
+        const dy = Math.abs(Math.floor(c / width) - ny);
+        return Math.max(dx, dy) <= 3;
+      });
+      if (touches) adjacent.push(s);
+    }
+    return { cell: node.cell, segments: adjacent, routed: false };
+  });
 
 /**
  * Quantas celulas separam o objetivo da moldura do mapa.
@@ -1305,7 +1353,7 @@ const generateAttempt = (
   // "vire a direita no terminal". Com count 0 (todo estrato sem leyline)
   // nenhuma tirada de RNG acontece e a geracao historica fica byte a byte.
   const leylineSegments: Array<{ cells: number[] }> = [];
-  const leylineNodeCells: number[] = [];
+  const leylineNodesOut: Array<{ cell: number; segments: number[] }> = [];
   if (profile.leylines > 0) {
     const leyUsed = new Set<number>();
     // Descida deterministica sobre um campo de distancia BFS: do ponto ate a
@@ -1342,10 +1390,33 @@ const generateAttempt = (
     // segmento fecha numa juncao a cada LEYLINE_JUNCTION_SPACING celulas — e a
     // juncao e o que garante que uma ativacao nunca viaja o mapa inteiro: o
     // teto por segmento e ESTRUTURAL, decidido aqui e nao em runtime.
+    //
+    // Os ELOS de cada juncao (que segmento ela fechou, qual abriu) sao
+    // registrados aqui porque so a construcao os conhece — a linha fica
+    // esparsa onde a parede ja tinha virado cristal/minerio, e reconstruir o
+    // elo por distancia depois falha exatamente nesses vaos. So arrays JS:
+    // nenhuma tirada de RNG, nenhuma escrita de grid alem das que ja existiam
+    // — a impressao digital da geracao nao ve nada disto.
     let segCells: number[] = [];
-    const closeSegment = (): void => {
-      if (segCells.length > 0) leylineSegments.push({ cells: segCells });
+    /** Celulas de CORREDOR cujas paredes entraram no segmento em curso. */
+    let segCorridor: number[] = [];
+    /** Corredor -> segmento dono da parede ali: a verdade do encontro. */
+    const corridorSeg = new Map<number, number>();
+    /** Juncao que abriu o segmento em curso (-1 = comeco de linha). */
+    let prevNodeIdx = -1;
+    const link = (nodeIdx: number, segIdx: number): void => {
+      const segs = leylineNodesOut[nodeIdx].segments;
+      if (!segs.includes(segIdx)) segs.push(segIdx);
+    };
+    const closeSegment = (): number => {
+      if (segCells.length === 0) return -1;
+      leylineSegments.push({ cells: segCells });
       segCells = [];
+      const segIdx = leylineSegments.length - 1;
+      for (const cc of segCorridor) corridorSeg.set(cc, segIdx);
+      segCorridor = [];
+      if (prevNodeIdx >= 0) link(prevNodeIdx, segIdx);
+      return segIdx;
     };
     const engrave = (corridor: number[], forceNodeFirst: boolean): void => {
       let pending = forceNodeFirst;
@@ -1360,12 +1431,46 @@ const generateAttempt = (
           leyUsed.add(wi);
           if (pending || segCells.length + 1 >= Math.min(LEYLINE_JUNCTION_SPACING, LEYLINE_SEGMENT_MAX_CELLS)) {
             draft.setSolid(wi, SOLID_LEYLINE_NODE);
-            leylineNodeCells.push(wi);
-            closeSegment();
+            leylineNodesOut.push({ cell: wi, segments: [] });
+            const nodeIdx = leylineNodesOut.length - 1;
+            // A juncao FECHA o segmento acumulado (elo exato) e passa a ser
+            // quem ABRE o proximo — closeSegment fara o segundo elo.
+            const closedIdx = closeSegment();
+            if (closedIdx >= 0) link(nodeIdx, closedIdx);
+            // No FORCADO nasce onde duas pernas se cruzam (encontro do tronco,
+            // partida do ramo). A perna cruzada pode nao ter parede colada na
+            // juncao — a linha e esparsa onde a decoracao tomou a rocha —,
+            // mas o CORREDOR dela passou por ali, e o corredor a construcao
+            // conhece. O elo e procurado a partir da celula do ENCONTRO
+            // (corridor[0]), e nao de onde a juncao pousou: sem rocha
+            // elegivel no cruzamento, o no desliza corredor abaixo, e so o
+            // ponto de partida ainda aponta para a perna cruzada.
+            if (pending) {
+              const anchors = [corridor[0], c];
+              let joined: number | undefined;
+              for (const anchor of anchors) {
+                joined = corridorSeg.get(anchor);
+                if (joined !== undefined) break;
+                const ax = anchor % w;
+                const ay = Math.floor(anchor / w);
+                for (const [cc, si] of corridorSeg) {
+                  const dx = Math.abs((cc % w) - ax);
+                  const dy = Math.abs(Math.floor(cc / w) - ay);
+                  if (Math.max(dx, dy) <= 2) {
+                    joined = si;
+                    break;
+                  }
+                }
+                if (joined !== undefined) break;
+              }
+              if (joined !== undefined) link(nodeIdx, joined);
+            }
+            prevNodeIdx = nodeIdx;
             pending = false;
           } else {
             draft.setSolid(wi, SOLID_LEYLINE);
             segCells.push(wi);
+            segCorridor.push(c);
           }
           break;
         }
@@ -1373,6 +1478,9 @@ const generateAttempt = (
     };
 
     for (let line = 0; line < profile.leylines; line++) {
+      // Linha nova, elos zerados: a primeira parede desta linha nao pertence
+      // a juncao nenhuma da linha anterior.
+      prevNodeIdx = -1;
       // Ancora do meio: um salao da gramatica espacial, quando ha um aberto e
       // alcancavel; senao, uma celula na banda do meio da descida. O salao e a
       // escolha certa porque ja e o landmark monumental do estrato.
@@ -1564,7 +1672,7 @@ const generateAttempt = (
     arenaCells: [...arenaFilled],
     railTracks,
     leylines: leylineSegments,
-    leylineNodes: leylineNodeCells,
+    leylineNodes: leylineNodesOut,
     hallCenters: hallFill.hallCenters,
   };
 };
