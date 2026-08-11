@@ -166,6 +166,55 @@ mais", então ela precisa se sustentar sozinha.
 Veja `entries/001-dia-1-uma-biblioteca-sem-tela.md` e `social/001.json` como referência de
 tom e tamanho.
 
+## Imagens fora do git
+
+Cada entrada carrega ~1,3 MB de PNG. Nas 107, seriam ~140 MB versionados num repositório
+de código — e o git guarda **cada versão** de cada binário para sempre, então recapturar
+uma entrada somaria peso em vez de substituí-lo.
+
+Os binários vão para o Cloudinary:
+
+```
+export CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>
+node scripts/devlog/upload.mjs --entry 001     # uma entrada
+node scripts/devlog/upload.mjs --all           # tudo que existe em disco
+```
+
+O upload grava, em cada entrada do plano, um mapa `cdn` de caminho relativo para URL
+pública, e reescreve as imagens do post para essas URLs — sem isso, tirar os PNGs do git
+quebraria a renderização do markdown no próprio GitHub.
+
+**Quem exibe prefere a URL e cai no arquivo local quando ela não existe.** Vale para o
+serviço, para o carrossel e para o markdown. É isso que torna a migração incremental:
+entradas que ainda não subiram continuam funcionando pela rota local.
+
+O `public_id` é determinístico (`voxelyn/devlog/media/001-noita`), com `overwrite` e
+`invalidate`: recapturar a entrada 032 troca a imagem **naquela** URL em vez de criar uma
+segunda. Um devlog cujo link muda a cada reexecução não serve para nada.
+
+Nada de SDK: a assinatura é um SHA-1 dos parâmetros ordenados com o segredo no fim, e o
+upload é um POST de formulário — `node:crypto` mais `fetch` bastam. As credenciais vêm do
+ambiente e nunca de arquivo versionado; o que fica no `plan.json` é só a URL pública.
+
+### A virada
+
+Enquanto houver entrada sem `cdn`, os PNGs precisam continuar no git. Depois que
+`--all` cobrir tudo:
+
+```
+node scripts/devlog/upload.mjs --all --prune   # apaga o local que já subiu
+printf 'docs/devlog/media/\ndocs/devlog/carousel/\n' >> .gitignore
+git rm -r --cached docs/devlog/media docs/devlog/carousel
+```
+
+`--prune` faz um `HEAD` na URL antes de apagar cada arquivo, e mantém em disco o que não
+responder. Ele está prestes a remover o único outro lugar onde a imagem existe; confiar no
+"200 OK" do upload sem conferir a entrega seria apagar o original porque a copiadora não
+reclamou.
+
+Isso não recupera o histórico: os PNGs já commitados continuam nos objetos do git. Para
+zerar de verdade seria preciso reescrever a história, o que não vale a pena por ~1 MB.
+
 ## O serviço
 
 O `@voxelyn/survival-server` serve o devlog em `/devlog`. Não é um projeto novo: são

@@ -57,10 +57,17 @@ function fontFaces() {
     .join('\n');
 }
 
-function shotUri(file) {
+/**
+ * A arte de um slide, embutida em base64 ou apontada para o CDN.
+ *
+ * Depois que os binarios saem do git, o arquivo local pode nao existir mais —
+ * e o Chromium que renderiza os slides tem rede, entao a URL publica serve
+ * igual. Local primeiro porque e mais rapido e funciona offline.
+ */
+function shotUri(file, cdn = {}) {
   const path = resolve(mediaDir, file);
-  if (!existsSync(path)) return null;
-  return dataUri(path, 'image/png');
+  if (existsSync(path)) return dataUri(path, 'image/png');
+  return cdn[`media/${file}`] ?? null;
 }
 
 function escapeHtml(text) {
@@ -176,7 +183,8 @@ function foot(brand, index, total) {
  */
 export function buildSlides(entry, social, opts = {}) {
   const shots = entry.shots ?? [];
-  const cover = shotUri(shots[0]?.file ?? '');
+  const cdn = entry.cdn ?? {};
+  const cover = shotUri(shots[0]?.file ?? '', cdn);
   const dateLabel = opts.dateLabel ?? entry.publishDate;
   const slides = [];
 
@@ -197,7 +205,7 @@ export function buildSlides(entry, social, opts = {}) {
     : entry.commits.slice(0, 3).map((c) => ({ title: c.subject, body: '' }));
 
   for (const s of content) {
-    const art = s.shot ? shotUri(s.shot) : null;
+    const art = s.shot ? shotUri(s.shot, cdn) : null;
     slides.push({
       name: s.title?.slice(0, 24) ?? 'slide',
       kind: art ? 'shot' : 'text',

@@ -74,6 +74,10 @@ export default [
         // no-undef em codigo que nunca roda no Node.
         document: 'readonly',
         localStorage: 'readonly',
+        // Globais web que o Node tem desde a v18 e o upload usa.
+        fetch: 'readonly',
+        URLSearchParams: 'readonly',
+        AbortSignal: 'readonly',
       },
     },
   },

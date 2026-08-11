@@ -246,6 +246,16 @@ const pct = (value: number): string => `${(value * 100).toFixed(1)}%`;
 /* Páginas                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Para onde apontar um binário desta entrada.
+ *
+ * CDN quando há URL, rota local quando não há. A ordem importa: depois do
+ * upload o arquivo pode não existir mais em disco, e antes dele a URL não
+ * existe — a mesma função cobre as duas fases sem que nada quebre no meio.
+ */
+const assetHref = (entry: DevlogEntry, relative: string, localPrefix: string): string =>
+  entry.cdn?.[relative] ?? `${localPrefix}${relative}`;
+
 const coverOf = (entry: DevlogEntry): string | null => entry.shots?.[0]?.file ?? null;
 
 const renderIndex = (
@@ -264,7 +274,7 @@ const renderIndex = (
     .map((e) => {
       const cover = coverOf(e);
       return `<a class="card" href="/devlog/e/${e.id}">
-        ${cover ? `<img src="/devlog/a/media/${escapeHtml(cover)}" alt="" loading="lazy">` : ''}
+        ${cover ? `<img src="${escapeHtml(assetHref(e, `media/${cover}`, '/devlog/a/'))}" alt="" loading="lazy">` : ''}
         <div class="body">
           <div class="meta">${escapeHtml(e.id)} · ${escapeHtml(e.publishedAt ?? e.publishDate)}</div>
           <div class="t">${escapeHtml(headlineOf(e.id) ?? e.title)}</div>
@@ -287,9 +297,13 @@ const renderEntry = (
   headline: string | null,
 ): string => {
   const rewrite = (src: string): string => {
-    // O Markdown vive em `entries/` e referencia `../media/x.png`. A rota
-    // pública serve por `/devlog/a/`, então o caminho relativo é reescrito —
-    // e qualquer outra coisa é descartada em vez de virar link quebrado.
+    // Depois do upload, `upload.mjs` reescreve o markdown para a URL do CDN —
+    // isso mantém a imagem visível também no GitHub, que não passa por aqui.
+    // Só `https:` entra: `javascript:` e `data:` num `src` são exatamente o
+    // que uma página pública não deve carregar de um arquivo.
+    if (/^https:\/\//i.test(src)) return src;
+    // O que sobra é o caminho relativo de antes do upload (`../media/x.png`),
+    // servido pela rota local. Qualquer outra coisa é descartada.
     const match = /^\.\.\/(media|carousel)\/(.+)$/.exec(src);
     return match ? `/devlog/a/${match[1]}/${match[2]}` : '';
   };
@@ -342,8 +356,12 @@ const renderConsole = (
     return layout('Console', 'fila vazia', '<div class="empty">Nada pendente.</div>', rail);
   }
 
-  const file = (path: string, label: string): string =>
-    `<a href="/devlog/console/a/${path}${q}" download>${escapeHtml(label)}</a>`;
+  // No console o CDN também vale: baixar de lá poupa a banda do servidor, e
+  // depois do prune é o único lugar onde o arquivo existe.
+  const file = (path: string, label: string): string => {
+    const href = entry.cdn?.[path] ?? `/devlog/console/a/${path}${q}`;
+    return `<a href="${escapeHtml(href)}" download>${escapeHtml(label)}</a>`;
+  };
 
   const ptFiles = (entry.carousel ?? []).map((f) => file(`carousel/${f}`, f)).join('');
   const enPack = entry.carousels?.en;
@@ -355,7 +373,10 @@ const renderConsole = (
     : '';
 
   const thumbs = (entry.carousel ?? [])
-    .map((f) => `<img src="/devlog/console/a/carousel/${escapeHtml(f)}${q}" alt="" loading="lazy">`)
+    .map(
+      (f) =>
+        `<img src="${escapeHtml(entry.cdn?.[`carousel/${f}`] ?? `/devlog/console/a/carousel/${f}${q}`)}" alt="" loading="lazy">`,
+    )
     .join('');
 
   const check = (ok: boolean, label: string): string =>

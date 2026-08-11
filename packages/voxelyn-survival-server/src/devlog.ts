@@ -28,6 +28,15 @@ export type DevlogEntry = {
   shots: DevlogShot[];
   carousel: string[];
   carousels?: Record<string, { files: string[]; pdf: string }>;
+  /**
+   * Caminho relativo dentro de `docs/devlog` -> URL publica no CDN.
+   *
+   * Preenchido por `scripts/devlog/upload.mjs`. Quando existe, e ele que
+   * manda: o binario pode nem estar mais em disco. Quando nao existe, a rota
+   * local serve o arquivo — e por isso subir para o CDN e incremental e nao
+   * quebra as entradas que ainda nao subiram.
+   */
+  cdn?: Record<string, string>;
   publishedAt: string | null;
   commits: Array<{ sha: string; subject: string }>;
   stat: { added: number; removed: number; files: number; partial?: boolean };

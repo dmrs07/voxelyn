@@ -238,3 +238,36 @@ describe('createDevlogStore', () => {
     expect(store.social('001', '../..')).toBeNull();
   });
 });
+
+describe('CDN', () => {
+  const rewrite = (src: string): string => (/^https:\/\//i.test(src) ? src : '');
+
+  it('deixa passar https e barra esquema perigoso no src da imagem', () => {
+    const ok = renderMarkdown('![a](https://res.cloudinary.com/x/y.png)\n', rewrite);
+    expect(ok).toContain('src="https://res.cloudinary.com/x/y.png"');
+
+    const bad = renderMarkdown('![a](javascript:alert(1))\n', rewrite);
+    expect(bad).not.toContain('javascript:');
+  });
+
+  it('prefere a URL do CDN a rota local quando a entrada tem uma', async () => {
+    // O plano do fixture nao tem `cdn`, entao a rota local e o caminho normal.
+    // Aqui provamos o outro lado: com `cdn` preenchido, o indice aponta pra la.
+    const withCdn = {
+      ...entry('001', 'published'),
+      cdn: { 'media/001-noita.png': 'https://res.cloudinary.com/demo/voxelyn.png' },
+    };
+    writeFileSync(
+      join(dir, 'plan.json'),
+      JSON.stringify({
+        version: 1,
+        startDate: '2026-08-11',
+        cadence: 'daily',
+        entries: [withCdn, entry('002', 'shot')],
+      }),
+    );
+    const body = await (await fetch(`${base}/devlog`)).text();
+    expect(body).toContain('https://res.cloudinary.com/demo/voxelyn.png');
+    expect(body).not.toContain('/devlog/a/media/001-noita.png');
+  });
+});
