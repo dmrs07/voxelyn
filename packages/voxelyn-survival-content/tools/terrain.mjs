@@ -64,6 +64,17 @@ export const BLOCK_KINDS = [
   'rockSilica',
   'rockGlacial',
   'rockFerric',
+  // -----------------------------------------------------------------------
+  // LEYLINE. Linguagem MECANICA (conduz por segmento), entao e universal como
+  // minerio e cristal — a mesma pele em todo estrato. A veia eletrica e uma
+  // FAIXA continua atravessando o bloco na diagonal do corpo: blocos vizinhos
+  // encadeiam a faixa e a linha le como linha, nao como salpico. Sem 'loot' e
+  // sem agulhas de cristal: ela nao rende nada e nao pode fingir que rende.
+  // A juncao e o mesmo condutor com o NUCLEO denso: o ponto onde a rede
+  // articula, mais claro que qualquer trecho de linha.
+  // -----------------------------------------------------------------------
+  'leyline',
+  'leylineNode',
 ];
 
 const hash2 = (x, y, seed) => {
@@ -165,6 +176,28 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
     if (h % 3 === 0) return 'rockDeep';
     if (band === 0 && (h >>> 3) % (surface ? 4 : 6) === 0) return 'rust';
     if ((h >>> 6) % 12 === 0) return 'scorch';
+  } else if (kind === 'leyline' || kind === 'leylineNode') {
+    // A VEIA: uma faixa eletrica continua na diagonal do corpo, a meia altura.
+    // E funcao da POSICAO (cx+cy), nao do hash: blocos vizinhos emendam a
+    // faixa um no outro e o tracado do worldgen vira uma linha legivel na
+    // parede. O resto do corpo e mais escuro que rocha comum — o condutor
+    // vive dentro de pedra morta, e o contraste e o que faz a veia saltar.
+    const alongBand = ((cx + cy) >> 1) % 6 === 0;
+    const midHeight = cz >= 2 && cz <= top - 2;
+    if (kind === 'leylineNode') {
+      // O nucleo da juncao: um miolo denso que toma o centro do bloco. Mais
+      // eletrico que qualquer trecho de linha — e o ponto onde a rede
+      // articula, e o olho precisa achar juncoes para ler os segmentos.
+      const cxo = cx - FINE_COLS / 2;
+      const cyo = cy - FINE_COLS / 2;
+      if (cxo * cxo + cyo * cyo <= 16 && midHeight) return 'electric';
+      if (alongBand && midHeight) return 'electric';
+      if (h % 4 === 0) return 'rockDeep';
+      return base;
+    }
+    if (alongBand && midHeight && (h & 3) !== 0) return 'electric';
+    if ((h >>> 6) % 9 === 0) return 'ice';
+    if (h % 3 === 0) return 'rockDeep';
   }
   return base;
 };

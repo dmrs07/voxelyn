@@ -348,6 +348,9 @@ export const PT_BR = {
   'discovery.guardianFelled.title': 'O Guardião cai',
   'discovery.guardianFelled.lesson':
     'Ele sela a arena na metade da vida e chama companhia. O cerco desaba com ele.',
+  'discovery.leylineRouted.title': 'A junção obedece',
+  'discovery.leylineRouted.lesson':
+    'Uma junção roteada vira relé: a descarga atravessa e arma o trecho vizinho. A rede conduz para onde você mandar.',
   'discovery.coreTaken.title': 'O núcleo é só metade',
   'discovery.coreTaken.lesson': 'Pegá-lo dobra o ritmo da contaminação. A saída é a outra metade.',
 
@@ -699,6 +702,8 @@ export const PT_BR = {
   // Ecos do Veio (caixa-preta)
   // ---------------------------------------------------------------------
   'echo.prompt': 'USAR — PAREAR CAIXA-PRETA',
+  'leyline.node.route': 'USAR — ROTEAR JUNÇÃO',
+  'leyline.node.unroute': 'USAR — DESFAZER ROTEAMENTO',
   'echo.designation': 'UNIDADE {serial}',
   'echo.carcass': 'CARCAÇA {condition}',
   'echo.aggregate': '{count} UNIDADES PERDIDAS NESTA CÂMARA — CAUSA PREDOMINANTE ABAIXO',

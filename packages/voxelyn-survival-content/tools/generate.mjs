@@ -280,7 +280,9 @@ const buildTerrain = () => {
     // (prismatica, aquifera, sulfurosa, fornalha, silica, glacial). Fragil,
     // minerio e cristal continuam universais: sao linguagem mecanica.
     // 4: a pele do Estrato FERRIFERO (rockFerric) entra no fim da lista.
-    version: 4,
+    // 5: as LEYLINES (leyline e leylineNode no fim da lista) — o condutor
+    // geologico e a juncao dele, com a veia eletrica emendando entre blocos.
+    version: 5,
     atlas: 'terrain-blocks.png',
     frameWidth,
     frameHeight,

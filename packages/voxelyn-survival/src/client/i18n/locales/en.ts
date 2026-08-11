@@ -344,6 +344,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'discovery.guardianFelled.title': 'The Guardian falls',
   'discovery.guardianFelled.lesson':
     'It seals the arena at half health and calls company. The siege collapses with it.',
+  'discovery.leylineRouted.title': 'The junction obeys',
+  'discovery.leylineRouted.lesson':
+    'A routed junction becomes a relay: the discharge crosses over and arms the next stretch. The network conducts wherever you tell it to.',
   'discovery.coreTaken.title': 'The core is only half',
   'discovery.coreTaken.lesson':
     'Taking it doubles the pace of contamination. The way out is the other half.',
@@ -693,6 +696,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // Echoes of the Vein (black box)
   // ---------------------------------------------------------------------
   'echo.prompt': 'USE — PAIR BLACK BOX',
+  'leyline.node.route': 'USE — ROUTE JUNCTION',
+  'leyline.node.unroute': 'USE — UNROUTE JUNCTION',
   'echo.designation': 'UNIT {serial}',
   'echo.carcass': '{condition} CARCASS',
   'echo.aggregate': '{count} UNITS LOST IN THIS CHAMBER — PREDOMINANT CAUSE BELOW',

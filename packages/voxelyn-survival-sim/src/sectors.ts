@@ -39,7 +39,7 @@ import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './de
 import { isConductiveSurface, setSurface } from './cells.js';
 import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome } from './strata.js';
-import { generateWorld } from './worldgen.js';
+import { deriveLeylineNodes, generateWorld } from './worldgen.js';
 import { SURF_ICE } from './constants.js';
 import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
 
@@ -395,6 +395,17 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
   state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
   state.hallCenters = world.hallCenters;
+  // Segmentos do setor novo, todos dormentes — os relogios do setor velho
+  // descreviam paredes que ja nao existem.
+  state.leylineSegments = world.leylines.map((seg) => ({
+    cells: seg.cells,
+    dischargeAt: 0,
+    refractoryUntil: 0,
+    triggeredBy: -1,
+    relayed: false,
+  }));
+  // Os reles tambem zeram: o roteamento descrevia paredes que ja nao existem.
+  state.leylineNodes = deriveLeylineNodes(world.leylineNodes, world.leylines, state.config.width);
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
@@ -499,6 +510,17 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
   state.vents = world.ventPositions.map((p) => ({ x: p.x, y: p.y, nextEmitAt: 0 }));
   state.railTracks = world.railTracks.map((t) => ({ ...t, readyAt: 0, firingAt: 0, fromEnd: 0 as const }));
   state.hallCenters = world.hallCenters;
+  // Segmentos do setor novo, todos dormentes — os relogios do setor velho
+  // descreviam paredes que ja nao existem.
+  state.leylineSegments = world.leylines.map((seg) => ({
+    cells: seg.cells,
+    dischargeAt: 0,
+    refractoryUntil: 0,
+    triggeredBy: -1,
+    relayed: false,
+  }));
+  // Os reles tambem zeram: o roteamento descrevia paredes que ja nao existem.
+  state.leylineNodes = deriveLeylineNodes(world.leylineNodes, world.leylines, state.config.width);
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,

@@ -424,6 +424,29 @@ export class NetClient {
         }
       }
     }
+    // Relogios das leylines, pelo mesmo contrato dos trilhos: geometria da
+    // seed, fase autoritativa. O `dischargeAt` tambem so anda para frente —
+    // zera-lo aqui apagaria o aviso de carga um quadro antes de a descarga
+    // alcancar a linha de render, pela mesma corrida do carrinho. O
+    // refractoryUntil pode ser copiado direto: ele so escurece a linha.
+    const clocks = world.leylineClocks;
+    if (clocks) {
+      for (let i = 0; i < state.leylineSegments.length && i < clocks.length; i++) {
+        state.leylineSegments[i].refractoryUntil = clocks[i].refractoryUntil;
+        if (clocks[i].dischargeAt > state.leylineSegments[i].dischargeAt) {
+          state.leylineSegments[i].dischargeAt = clocks[i].dischargeAt;
+        }
+      }
+    }
+    // O rele das juncoes aplica DIRETO: no espelho ele so decide prompt e
+    // luz — o armar autoritativo continua chegando pelos relogios acima, e
+    // por isso nao ha a corrida do dischargeAt a proteger aqui.
+    const routing = world.leylineRouting;
+    if (routing) {
+      for (let i = 0; i < state.leylineNodes.length && i < routing.length; i++) {
+        state.leylineNodes[i].routed = routing[i];
+      }
+    }
   }
 
   /**

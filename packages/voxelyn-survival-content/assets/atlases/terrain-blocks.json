@@ -1,6 +1,6 @@
 {
   "id": "terrain-blocks",
-  "version": 4,
+  "version": 5,
   "atlas": "terrain-blocks.png",
   "frameWidth": 64,
   "frameHeight": 68,
@@ -22,7 +22,9 @@
     "rockFurnace",
     "rockSilica",
     "rockGlacial",
-    "rockFerric"
+    "rockFerric",
+    "leyline",
+    "leylineNode"
   ],
   "variants": 3,
   "lightLevels": 8,

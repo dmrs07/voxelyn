@@ -413,6 +413,7 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     railTracks: 0,
     pipeCount: 0,
     minerCap: MINER_PER_SECTOR,
+    leylines: 0,
     halls: 'none',
   };
 
@@ -428,6 +429,14 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     profile.crystalChance = 0.1 + depth * 0.04;
     profile.halls = 'radial';
     profile.crystalVeins = 6 + depth * 3;
+    // A Catedral e o estrato onde o mineral ja conduz ressonancia; a LEYLINE e
+    // a nervura-mestra geologica — a linha que organiza a nave e leva para
+    // dentro. A rede DENSIFICA com a descida: e a mesma veia, mais carregada,
+    // e quem desce a linhagem mineral ve a Catedral ficar mais nervada a cada
+    // estrato. Setores 2-3 ficam byte a byte identicos ao historico (2 e 3
+    // linhas) — a amostra da impressao digital para no setor 3, e ela e o
+    // gate; so a Catedral FUNDA (setor 4+) ganha a quarta linha.
+    profile.leylines = 2 + Math.max(0, Math.min(2, depth - 1));
     profile.oreChance = 0.05;
     profile.fragileThinChance = 0.45;
     profile.fungalBlobs = { count: 8, rMin: 1, rMax: 3 };
@@ -536,6 +545,15 @@ export const biomeProfile = (biome: SectorBiome, sector: number): WorldgenProfil
     profile.minerCap = Math.max(profile.minerCap, MINER_PER_SECTOR + 2);
     // A cicatriz deixou trilhos onde quer que tenha operado.
     profile.railTracks = Math.max(profile.railTracks, 2);
+    // A operacao prospectou SEGUINDO as leylines — a lavra expoe o condutor
+    // que a guiou ate aqui. Exceto no Ferrifero: la a parede inteira ja e
+    // fiacao (FERRIC_VEIN_SCALE), e uma leyline por cima diluiria as duas
+    // identidades em vez de somar. Fundo (setor 4+), a cicatriz expoe DUAS:
+    // a operacao seguiu a veia ate onde ela engrossa — mesma regra da
+    // Catedral, mesmo gate (setores 1-3 intactos, impressao digital idem).
+    if (biome.stratum !== 'ferric') {
+      profile.leylines = Math.max(profile.leylines, depth >= 3 ? 2 : 1);
+    }
   }
 
   return profile;

@@ -6,7 +6,9 @@ import {
   CART_WINDUP_TICKS,
   createRun,
   emptyCommand,
+  LEYLINE_CHARGE_TICKS,
   lineageOf,
+  type LeylineSegment,
   type PlayerCommand,
   type RailTrack,
 } from '@voxelyn/survival-sim';
@@ -503,5 +505,110 @@ describe('telegrafo do carrinho em co-op', () => {
     }));
     expect(track.firingAt).toBe(424);
     expect(track.readyAt).toBe(3);
+  });
+});
+
+describe('telegrafo da leyline em co-op', () => {
+  // O mesmo contrato dos trilhos: a geometria dos segmentos o cliente regenera
+  // da seed; os RELOGIOS (`leylineClocks`) viajam nas WorldFlags. Sem eles,
+  // quem entra ou reconecta durante os 16 ticks de carga veria o segmento
+  // dormente e tomaria a descarga sem o sinal previo que justifica o dano.
+  const seedMineral = (() => {
+    for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'mineral') return s;
+    throw new Error('nenhuma seed mineral');
+  })();
+
+  const connect = (): { client: NetClient; seg: LeylineSegment } => {
+    const reference = createRun({ seed: seedMineral, sector: 2, playerCount: 2 });
+    expect(reference.stratum).toBe('prismatic');
+    expect(reference.leylineSegments.length).toBeGreaterThan(0);
+    const client = new NetClient(() => {});
+    client.receive(JSON.stringify({
+      t: 'welcome',
+      versions: CURRENT_VERSIONS,
+      playerId: 1,
+      resumeToken: 'tk',
+      roomCode: 'SALA',
+      seed: seedMineral,
+      sector: 2,
+      worldWidth: reference.config.width,
+      worldHeight: reference.config.height,
+      mapHash: '',
+    }));
+    const mirror = (client as unknown as { state: { leylineSegments: LeylineSegment[] } }).state;
+    expect(mirror.leylineSegments.length).toBe(reference.leylineSegments.length);
+    return { client, seg: mirror.leylineSegments[0] };
+  };
+
+  const snapshotWith = (
+    serverTick: number,
+    clocks: Array<{ dischargeAt: number; refractoryUntil: number }>,
+  ): string =>
+    JSON.stringify({
+      t: 'snapshot',
+      serverTick,
+      ackSeq: 0,
+      phase: 'running',
+      entities: [],
+      projectiles: [],
+      removedEntities: [],
+      chunkDiffs: [],
+      contamination: 0,
+      events: [],
+      world: {
+        salvageSites: [],
+        coreTaken: false,
+        bossAwake: false,
+        wellOffers: [],
+        leylineClocks: clocks,
+      },
+    });
+
+  it('leylineClocks do snapshot rearmam o aviso do segmento espelhado', () => {
+    const { client, seg } = connect();
+    expect(seg.dischargeAt).toBe(0);
+    client.receive(snapshotWith(400, [{ dischargeAt: 400 + LEYLINE_CHARGE_TICKS, refractoryUntil: 0 }]));
+    expect(seg.dischargeAt).toBe(400 + LEYLINE_CHARGE_TICKS);
+  });
+
+  it('o snapshot da DESCARGA nao apaga o aviso antes da linha de render', () => {
+    // A mesma corrida do carrinho: o snapshot que zera o relogio chega antes
+    // de a linha de render alcancar o tick da descarga. O aviso so anda para
+    // frente e expira sozinho; a refrataria aplica direto — ela so escurece.
+    const { client, seg } = connect();
+    client.receive(snapshotWith(400, [{ dischargeAt: 416, refractoryUntil: 0 }]));
+    client.receive(snapshotWith(416, [{ dischargeAt: 0, refractoryUntil: 616 }]));
+    expect(seg.dischargeAt).toBe(416);
+    expect(seg.refractoryUntil).toBe(616);
+  });
+
+  it('leylineRouting do snapshot espelha o rele das juncoes', () => {
+    const { client } = connect();
+    const mirror = (client as unknown as { state: { leylineNodes: Array<{ routed: boolean }> } })
+      .state;
+    expect(mirror.leylineNodes.length).toBeGreaterThan(0);
+    expect(mirror.leylineNodes.every((n) => !n.routed)).toBe(true);
+    const routing = mirror.leylineNodes.map((_, i) => i === 0);
+    client.receive(JSON.stringify({
+      t: 'snapshot',
+      serverTick: 400,
+      ackSeq: 0,
+      phase: 'running',
+      entities: [],
+      projectiles: [],
+      removedEntities: [],
+      chunkDiffs: [],
+      contamination: 0,
+      events: [],
+      world: {
+        salvageSites: [],
+        coreTaken: false,
+        bossAwake: false,
+        wellOffers: [],
+        leylineRouting: routing,
+      },
+    }));
+    expect(mirror.leylineNodes[0].routed).toBe(true);
+    expect(mirror.leylineNodes.slice(1).every((n) => !n.routed)).toBe(true);
   });
 });

@@ -201,6 +201,21 @@ export const cuesForEvent = (ev: SemanticEvent, ctx: CueContext): Cue[] => {
       return [{ voice: 'discharge', x, y, scale: Math.min(1.3, 0.6 + ev.cells.length / 24) }];
     }
 
+    case 'leyline_charge': {
+      if (ev.cells.length === 0) return [];
+      const { x, y } = dischargeCentroid(ev.cells, ctx.worldWidth);
+      // A MESMA voz da descarga, baixa: e a mesma energia, ainda contida. O
+      // aviso principal e a luz subindo no segmento; o som so tira o olho do
+      // que o jogador estava fazendo. A descarga cheia soa dali a 16 ticks.
+      return [{ voice: 'discharge', x, y, scale: 0.45 }];
+    }
+
+    case 'leyline_routed':
+      // Um clique de disjuntor, nao um evento de combate: a mesma voz
+      // eletrica no volume mais baixo do jogo. O feedback que importa e a
+      // luz da juncao mudando de constante para respiracao (e de volta).
+      return [{ voice: 'discharge', x: ev.x, y: ev.y, scale: 0.3 }];
+
     case 'ignite':
       return [{ voice: 'ignite', x: ev.x, y: ev.y, scale: 1 }];
 

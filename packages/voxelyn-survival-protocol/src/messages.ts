@@ -323,6 +323,24 @@ export type WorldFlags = {
    * e o `worldSig` ja dispara o envio sozinho quando um gatilho e pisado.
    */
   railTimers?: Array<{ readyAt: number; firingAt: number }>;
+  /**
+   * Relogios dos SEGMENTOS de leyline, alinhados por indice com o
+   * `leylineSegments` que o cliente regenera da seed — o mesmo contrato dos
+   * `railTimers`. Sem eles, quem entra ou reconecta durante os 16 ticks de
+   * carga veria o segmento dormente e tomaria a descarga SEM o sinal previo
+   * que justifica o dano existir. Ausentes em servidores anteriores as
+   * leylines: o cliente trata como lista de zeros (tudo dormente).
+   */
+  leylineClocks?: Array<{ dischargeAt: number; refractoryUntil: number }>;
+  /**
+   * O RELE de cada juncao, alinhado por indice com os `leylineNodes` que o
+   * cliente regenera da seed — o mesmo contrato dos dois campos acima. So
+   * muda prompt e luz no cliente (o armar autoritativo continua chegando por
+   * `leylineClocks` e eventos), mas sem ele quem reconecta veria toda juncao
+   * fechada e um rele "inexplicavel" atravessando. Ausente em servidor
+   * antigo = tudo nao-roteado.
+   */
+  leylineRouting?: boolean[];
 };
 
 export type ServerWelcome = {

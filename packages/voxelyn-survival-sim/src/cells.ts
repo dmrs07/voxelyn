@@ -369,6 +369,12 @@ export const chargeCells = (
    * continua plano — que e o comportamento que essas descargas sempre tiveram.
    */
   from?: { x: number; y: number },
+  /**
+   * A carga veio de um segmento de leyline armado por RELE. Viaja no evento
+   * para `resolveChainedEvents` nao creditar ressonancia de novo — a cascata
+   * inteira e uma ativacao so. Dano, stun e fogo amigo nao mudam.
+   */
+  relayed?: boolean,
 ): void => {
   if (cells.length === 0) return;
   for (const i of cells) {
@@ -379,6 +385,7 @@ export const chargeCells = (
     cells,
     ...origin,
     ...(from ? { fromX: from.x, fromY: from.y } : {}),
+    ...(relayed ? { relayed: true } : {}),
   });
 };
 

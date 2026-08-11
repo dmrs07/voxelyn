@@ -15,10 +15,13 @@ import {
   BUDGET_RESONANCE_CELLS,
   BUDGET_VEIN_CELLS,
   FERRIC_VEIN_SCALE,
+  LEYLINE_CHARGE_TICKS,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
+  SOLID_LEYLINE,
+  SOLID_LEYLINE_NODE,
   SOLID_NONE,
   SOLID_ORE,
   SOLID_ORE_CHIPPED,
@@ -83,7 +86,7 @@ export const projectileClass = (
 const W = (state: SurvivalState): number => state.config.width;
 
 /** Celulas abertas coladas num conjunto de solidos: por onde a carga escapa. */
-const openNeighbours = (state: SurvivalState, cells: number[]): number[] => {
+export const openNeighbours = (state: SurvivalState, cells: number[]): number[] => {
   const w = W(state);
   const h = state.config.height;
   const out = new Set<number>();
@@ -277,6 +280,42 @@ export const impactSolid = (
       }
       return { stop: true, broke: breakSolid(state, cx, cy, events) };
     }
+
+    // -----------------------------------------------------------------------
+    case SOLID_LEYLINE: {
+      if (cls === 'energy') {
+        // A leyline NAO descarrega no impacto: ela ARMA. O tiro energiza o
+        // segmento — o trecho ate a proxima juncao, fechado pelo worldgen —
+        // e o `leyline_charge` anuncia a descarga LEYLINE_CHARGE_TICKS antes
+        // dela existir. O dano so acontece porque este aviso veio primeiro;
+        // quem esta em cima da linha tem quase um segundo para sair.
+        //
+        // Nao ha flood aqui: o alcance de uma ativacao e ESTRUTURAL (as
+        // celulas do segmento), entao a corrente nunca cruza a juncao nem
+        // viaja o mapa — o que separa "usei o terreno" de "limpei a sala".
+        const segIdx = state.leylineSegments.findIndex((s) => s.cells.includes(i));
+        if (segIdx >= 0) {
+          const seg = state.leylineSegments[segIdx];
+          // Carregando ou refrataria: o tiro morre na parede sem feedback
+          // mecanico novo — o estado ja e legivel pela luz do trecho.
+          if (seg.dischargeAt === 0 && state.tick >= seg.refractoryUntil) {
+            seg.dischargeAt = state.tick + LEYLINE_CHARGE_TICKS;
+            seg.triggeredBy = origin.source === 'player' && origin.owner !== undefined ? origin.owner : -1;
+            events.push({ t: 'leyline_charge', seg: segIdx, cells: seg.cells, dischargeTick: seg.dischargeAt });
+          }
+        }
+      }
+      // As outras classes nao mordem: a leyline e permanente. Nao rende
+      // lasca, nao corroi, nao funde — a materia dela nunca esteve em jogo.
+      return { stop: true, broke: false };
+    }
+
+    case SOLID_LEYLINE_NODE:
+      // A juncao continua inerte a projetil: ROTEA-LA e via interact
+      // (stepPlayer) — o toggle e de mao, nao de bala. Deixar a bala rotear
+      // misturaria o verbo de ativar a linha com o de reconfigura-la, e uma
+      // rajada perdida mudaria a rede sem o jogador decidir nada.
+      return { stop: true, broke: false };
 
     case SOLID_CRYSTAL_DULL: {
       // Opaco ainda quebra, mas sem descarga: a energia dele ja foi.

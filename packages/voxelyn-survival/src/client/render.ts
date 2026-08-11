@@ -1,8 +1,13 @@
 import {
+  depthIntensity,
+  LEYLINE_CHARGE_TICKS,
+  LEYLINE_NODE_INTERACT_RADIUS,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
   SOLID_FRAGILE_WEAK,
+  SOLID_LEYLINE,
+  SOLID_LEYLINE_NODE,
   SOLID_NONE,
   SOLID_ROCK,
   SOLID_ORE,
@@ -189,6 +194,10 @@ const TERRAIN_KIND_INDEX: Record<number, number> = {
   [SOLID_ORE_SPENT]: 5,
   [SOLID_CRYSTAL_DULL]: 6,
   [SOLID_ORE_CHIPPED]: 7,
+  // Leylines: universais como minerio e cristal (linguagem mecanica), entao
+  // vivem na tabela e nao na pele por estrato. Indices 15/16 do atlas v5.
+  [SOLID_LEYLINE]: 15,
+  [SOLID_LEYLINE_NODE]: 16,
 };
 
 /**
@@ -1824,6 +1833,33 @@ export class SurvivalRenderer {
     const y1 = Math.min(h - 1, py + range);
 
     if (this.quality.dynamicLights) {
+      // A FASE de cada celula de leyline, para a luz do laco abaixo. Dormente
+      // ela e um brilho fraco constante — a linha e linguagem de orientacao e
+      // precisa ser seguivel no escuro. Carregando, o pulso sobe ate o tick da
+      // descarga: e O SINAL, o dano so existe porque esta luz veio antes. Em
+      // refrataria a linha apaga — gastou — e a escuridao e a leitura.
+      const routedNodeCells = new Set<number>();
+      for (const node of state.leylineNodes) {
+        if (node.routed) routedNodeCells.add(node.cell);
+      }
+      // A MESMA VEIA, mais carregada: a luz de repouso da rede escala com a
+      // profundidade da descida. Quem atravessa a linhagem mineral ve a
+      // Catedral clarear a cada estrato — e leitura de LUGAR, fora do hash,
+      // e a CARGA nao muda: o telegrafo ja e o sinal maximo e escala-lo
+      // diluiria o aviso.
+      const veinDepth = Math.min(4, depthIntensity(state.sector));
+      const leyPhase = new Map<number, number>();
+      for (const seg of state.leylineSegments) {
+        const charging = seg.dischargeAt > state.tick;
+        const refractory = !charging && state.tick < seg.refractoryUntil;
+        // 0 = dormente; 1 = refrataria; >1 = carregando (progresso 1..2).
+        const phase = charging
+          ? 2 - Math.min(1, (seg.dischargeAt - state.tick) / LEYLINE_CHARGE_TICKS)
+          : refractory
+            ? 1
+            : 0;
+        for (const cell of seg.cells) leyPhase.set(cell, phase);
+      }
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
           const i = y * w + x;
@@ -1846,6 +1882,57 @@ export class SurvivalRenderer {
               // o chao ao pe delas.
               height: 0.9,
             });
+          else if (state.solid[i] === SOLID_LEYLINE) {
+            const phase = leyPhase.get(i) ?? 0;
+            if (phase === 0) {
+              // Dormente: cada TERCEIRA celula emite, num respiro lento. A
+              // linha inteira acesa por igual viraria um letreiro; pontos
+              // alternados leem como energia correndo por dentro.
+              if ((x + y) % 3 === 0) {
+                const breathe = 0.8 + 0.2 * Math.sin(nowMs / 900 + (x + y) * 0.7);
+                lights.push({
+                  x: x + 0.5,
+                  y: y + 0.5,
+                  r: 2,
+                  power: 0.22 * breathe * (1 + 0.12 * veinDepth),
+                  hex: PAL.electric,
+                  height: 0.6,
+                });
+              }
+            } else if (phase > 1) {
+              // Carregando: TODA celula acende e o pulso sobe com o relogio.
+              const t = phase - 1;
+              const flicker = 0.85 + 0.15 * Math.sin(nowMs / 45);
+              lights.push({
+                x: x + 0.5,
+                y: y + 0.5,
+                r: 2.5 + t,
+                power: (0.35 + 0.75 * t) * flicker,
+                hex: PAL.electric,
+                height: 0.6,
+              });
+            }
+            // Refrataria: nenhuma luz. O segmento gastou, e a escuridao dele
+            // e o aviso de que atirar de novo agora nao compra nada.
+          } else if (state.solid[i] === SOLID_LEYLINE_NODE) {
+            // A juncao nunca apaga: e o marco que separa segmentos, e o olho
+            // precisa dela para ler onde um trecho termina. ROTEADA, ela
+            // RESPIRA — um pulso lento e mais largo. Constante = fechada,
+            // respirando = rele aberto: um bit, uma diferenca de luz.
+            if (routedNodeCells.has(i)) {
+              const breathe = (0.5 + 0.25 * Math.sin(nowMs / 600)) * (1 + 0.1 * veinDepth);
+              lights.push({ x: x + 0.5, y: y + 0.5, r: 3.2, power: breathe, hex: PAL.electric, height: 0.7 });
+            } else {
+              lights.push({
+                x: x + 0.5,
+                y: y + 0.5,
+                r: 2.5,
+                power: 0.4 * (1 + 0.1 * veinDepth),
+                hex: PAL.electric,
+                height: 0.7,
+              });
+            }
+          }
         }
       }
       for (const c of state.charges) {
@@ -2588,6 +2675,24 @@ export class SurvivalRenderer {
       items.push({
         depth: offer.x + offer.y,
         draw: () => this.drawWellOffer(offer, osx, osy, z, spriteZoom, nowMs, reachable),
+      });
+    }
+
+    // O prompt das JUNCOES de leyline: aparece so com o jogador perto (a
+    // proximidade convida, o ato e o botao — a mesma regra da caixa-preta),
+    // na fila ordenada porque a juncao e parede do mundo como tudo aqui.
+    for (let n = 0; n < state.leylineNodes.length; n++) {
+      const node = state.leylineNodes[n];
+      const nx = (node.cell % state.config.width) + 0.5;
+      const ny = Math.floor(node.cell / state.config.width) + 0.5;
+      const dist = Math.hypot(state.player.x - nx, state.player.y - ny);
+      if (dist > 2.5) continue;
+      const [nsx, nsy] = toScreen(nx, ny);
+      if (nsx < -80 || nsx > vw + 80 || nsy < -100 || nsy > vh + 80) continue;
+      const reachable = dist <= LEYLINE_NODE_INTERACT_RADIUS;
+      items.push({
+        depth: nx + ny + 0.5,
+        draw: () => this.drawLeylineNodePrompt(node.routed, nsx, nsy, z, nowMs, reachable),
       });
     }
 
@@ -3905,6 +4010,39 @@ export class SurvivalRenderer {
     ctx.lineWidth = Math.max(1, z * (reachable ? 0.9 : 0.5));
     ctx.strokeRect(sx - width / 2, top, width, height);
     ctx.fillStyle = presentation.color;
+    ctx.fillText(label, sx, top + height / 2);
+    ctx.restore();
+  }
+
+  /**
+   * O prompt da juncao: rotear ou desfazer, pelo mesmo botao de tudo. A
+   * moldura e a da oferta do poco; a borda e eletrica porque a juncao e. O
+   * label diz o que o botao FARA (abrir/fechar o rele), nao o que ha.
+   */
+  private drawLeylineNodePrompt(
+    routed: boolean,
+    sx: number,
+    sy: number,
+    z: number,
+    nowMs: number,
+    reachable: boolean,
+  ): void {
+    const ctx = this.ctx;
+    const label = t(routed ? 'leyline.node.unroute' : 'leyline.node.route');
+    ctx.save();
+    ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(label).width + 10 * z;
+    const height = 11 * z;
+    const top = sy - 24 * z;
+    ctx.globalAlpha = reachable ? 0.92 : 0.55 + Math.sin(nowMs * 0.006) * 0.1;
+    ctx.fillStyle = 'rgba(11,14,20,0.9)';
+    ctx.fillRect(sx - width / 2, top, width, height);
+    ctx.strokeStyle = PAL.electric;
+    ctx.lineWidth = Math.max(1, z * (reachable ? 0.9 : 0.5));
+    ctx.strokeRect(sx - width / 2, top, width, height);
+    ctx.fillStyle = PAL.electric;
     ctx.fillText(label, sx, top + height / 2);
     ctx.restore();
   }

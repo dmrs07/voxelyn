@@ -101,7 +101,25 @@
 // TOLERANCIA DEFENSIVA no cliente (fixtures, eventos construidos a mao em
 // teste) — a interoperabilidade cliente-servidor e protegida pelo exact-match
 // deste numero; nao ha expectativa de conexao cruzada 21<->22.
-export const PROTOCOL_VERSION = 22;
+// 23: as LEYLINES entram no wire por dois campos. O evento `leyline_charge`
+// e O TELEGRAFO da descarga de segmento — um cliente que nao o conhece
+// tomaria o choque sem o sinal previo que justifica o dano existir, que e
+// exatamente a classe de quebra que este numero guarda. E `WorldFlags` ganha
+// `leylineClocks` (opcional, alinhado por indice como `railTimers`): quem
+// reconecta durante os 16 ticks de carga recebe o relogio e desenha o aviso;
+// servidor anterior simplesmente nao manda e tudo fica dormente. (Nasceu como
+// "22" na branch das leylines, em paralelo ao hazard acima; renumerado no
+// merge — dois protocolos diferentes nao podem dividir um numero que o
+// handshake compara por igualdade.)
+// 24: o ROTEAMENTO das leylines entra no wire por tres campos. `WorldFlags`
+// ganha `leylineRouting` (opcional, boolean por indice de juncao — o mesmo
+// contrato alinhado de railTimers/leylineClocks); o evento `discharge` ganha
+// `relayed` (a descarga repassada por rele, que nao credita ressonancia); e
+// nasce o evento `leyline_routed` (o toggle, para cue e particula). A metade
+// que doi: cliente antigo contra servidor novo nunca desenharia a juncao
+// roteada nem o prompt, e veria um rele "inexplicavel" atravessar — energia
+// pulando de segmento sem causa visivel.
+export const PROTOCOL_VERSION = 24;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -458,7 +476,38 @@ export const PROTOCOL_VERSION = 22;
 // e por isso os dois entram na MESMA versao: quem re-simula um replay antigo ja
 // vai abrir outro mapa por causa do centro, e separar as duas correcoes em duas
 // versoes cobraria duas quebras de compatibilidade pelo preco de uma.
-export const SIMULATION_VERSION = 37;
+// 38: as LEYLINES — condutor geologico persistente da Catedral Prismatica e
+// da ocupacao Aurix (fora do Ferrifero, cuja fiacao e outra identidade).
+//
+// Muda o hash por tres caminhos. O terreno semeado: corredores dos setores
+// com leyline ganham SOLID_LEYLINE/SOLID_LEYLINE_NODE na parede, e as
+// ancoras do tracado consomem RNG do gerador (dutos, respiradouros e spawns
+// deslocam NESSES setores; todo estrato sem leyline esta atras de
+// `profile.leylines > 0` e fica byte a byte). A reacao nova: tiro `energy`
+// na leyline arma o segmento em vez de descarregar no impacto. E os relogios
+// dos segmentos (`dischargeAt`/`refractoryUntil`/`triggeredBy`), que entram
+// no hash autoritativo porque DECIDEM dano — dois peers discordando deles
+// divergiriam em vida um segundo depois, longe da causa.
+// 39: o RELE das leylines — a juncao roteada (interact, toggle persistente no
+// setor) repassa a descarga ao segmento vizinho DORMENTE como ativacao nova,
+// telegrafada e refrataria como qualquer outra; a refrataria de 10 s e o que
+// impede a cascata de voltar, por construcao e nao por contador. `routed` (por
+// juncao) e `relayed` (por segmento) entram no hash autoritativo: os dois
+// decidem dano e credito — a ressonancia `current` conta UMA vez por cascata,
+// na ativacao original. Dois peers em versoes diferentes divergem no primeiro
+// rele. O terreno semeado NAO muda: a adjacencia no<->segmento e derivada
+// fora do caminho hasheado (a impressao digital da geracao continua
+// 3461746772; os elos de construcao registrados na gravacao sao arrays JS —
+// zero RNG, zero grid).
+// 40: a rede de leylines DENSIFICA com a profundidade — a Catedral funda
+// (setor 4+) traca a quarta linha e a cicatriz Aurix funda expoe duas. As
+// linhas extras consomem RNG do gerador e gravam parede, entao o terreno
+// semeado dos setores 4+ desses biomas muda. A impressao digital da geracao
+// NAO muda: a amostra dela cobre setores 1-3, que ficam byte a byte — replays
+// de G-00/G-01, ranqueado e co-op raso continuam validos; so descidas fundas
+// (G-02+) re-simuladas sob a regra nova abririam outro mapa, e e para isso
+// que este numero sobe.
+export const SIMULATION_VERSION = 40;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno
@@ -502,7 +551,11 @@ export const SIMULATION_VERSION = 37;
 // com a paleta ESFRIANDO para cima (`beam` na base, `fire` na ponta): o que
 // machuca e a base, e ela tem de ser a parte que puxa o olho. As tres cores da
 // coluna estao em EMISSIVE_HEX, entao ele acende sozinho no caminho de brilho.
-export const CONTENT_VERSION = 23;
+// 24: as LEYLINES entram no atlas de terreno (terrain-blocks v5, kinds
+// leyline e leylineNode no fim da lista, a regra do rockFerric). Ainda sem
+// arte dedicada elas desenham pelo fallback de rocha; o bump marca a
+// promessa — o pool de materia visivel mudou.
+export const CONTENT_VERSION = 24;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -529,11 +529,11 @@ describe('compra no store', () => {
 // ---------------------------------------------------------------------------
 
 describe('codex', () => {
-  it('tem 127 documentos: 30 protocolos, 8 por geracao, 47 de Ativo, 24 Descobertas, 17 compostos e o publico', () => {
-    expect(TOTAL_LORE_FRAGMENTS).toBe(127);
+  it('tem 128 documentos: 30 protocolos, 8 por geracao, 47 de Ativo, 25 Descobertas, 17 compostos e o publico', () => {
+    expect(TOTAL_LORE_FRAGMENTS).toBe(128);
     // A contagem de Ativo = 15 fichas + as trilhas de ASSET_MILESTONE_LORE,
     // derivada e nao chutada: se um arco ganhar um degrau, o teste acompanha.
-    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 23 + ASSET_MILESTONE_LORE.length + 24 + 17);
+    expect(TOTAL_LORE_FRAGMENTS).toBe(30 + 8 + 1 + 23 + ASSET_MILESTONE_LORE.length + 25 + 17);
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'upgrade')).toHaveLength(30);
     // OITO por geracao: os quatro marcos de homologacao do chassi
     // (`AX-GEN-*`) e as quatro autorizacoes de descida, que sao documentos
@@ -542,7 +542,7 @@ describe('codex', () => {
     expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'asset')).toHaveLength(
       23 + ASSET_MILESTONE_LORE.length,
     );
-    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(24);
+    expect(LORE_FRAGMENTS.filter((f) => f.trigger.kind === 'discovery')).toHaveLength(25);
     // Quatro dos seis compostos sao o arco do Bispo: ele aparece uma vez por
     // run, entao a revelacao dele sai de ENTENDER o encontro (viu a cura,
     // sobreviveu a Supernova) e nunca de repetir o abate.
