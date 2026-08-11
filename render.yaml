@@ -53,6 +53,14 @@ services:
       # sessao de campanha, e nao pode se misturar com o digest de cima.
       - key: ARENA_TELEMETRY_TOKEN
         generateValue: true
+      # Console e painel do devlog (/devlog/console, /devlog/panel). AUSENTE =
+      # as duas rotas respondem 404 e so a vitrine publica fica de pe.
+      #
+      # Sensibilidade IGUAL a de TELEMETRY_TOKEN, e por dois motivos: quem tem
+      # este token le os mesmos digests de campanha e Arena, e ainda ve o
+      # material que ainda nao foi publicado. E credencial de operador.
+      - key: DEVLOG_TOKEN
+        generateValue: true
       # Assinatura das sessoes de progressao. GERADO UMA VEZ e estavel entre
       # deploys — e a diferenca entre um perfil que sobrevive e um que nao.
       #

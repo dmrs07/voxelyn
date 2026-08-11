@@ -166,6 +166,46 @@ mais", então ela precisa se sustentar sozinha.
 Veja `entries/001-dia-1-uma-biblioteca-sem-tela.md` e `social/001.json` como referência de
 tom e tamanho.
 
+## O serviço
+
+O `@voxelyn/survival-server` serve o devlog em `/devlog`. Não é um projeto novo: são
+rotas no servidor que já está no Render, reaproveitando o rate limiter, o logging e os
+stores de telemetria que já existiam.
+
+| Rota                     | Acesso | O que é                                          |
+| ------------------------ | ------ | ------------------------------------------------ |
+| `/devlog`                | aberto | As entradas publicadas, da mais recente pra trás |
+| `/devlog/e/<id>`         | aberto | O post, com as imagens da época                  |
+| `/devlog/a/<caminho>`    | aberto | Asset — **só** de entrada publicada              |
+| `/devlog/console?token=` | token  | A próxima entrada a postar, pronta para baixar   |
+| `/devlog/panel?token=`   | token  | Os digests de telemetria do jogo                 |
+
+O token é `DEVLOG_TOKEN`. Sem ele as duas rotas de operador respondem 404 — mesma política
+de `/telemetry`, e mesma sensibilidade: quem o tem lê o funil de setor e vê material que
+ainda não saiu. É credencial de operador, não de leitor.
+
+**O acesso público deriva do status no plano, nunca do disco.** O pipeline gera as 107
+entradas de uma vez, então o carrossel do dia 40 já existe em disco hoje; servir o
+diretório entregaria a fila inteira cinco semanas antes da hora. A rota pública exige que
+o arquivo esteja em `media/` ou `carousel/` **e** que o id no nome pertença a uma entrada
+publicada.
+
+**O painel não coleta nada.** Ele desenha o digest que `/telemetry` e `/arena-telemetry`
+já produzem — a mesma função pura, os mesmos números. Nenhum evento novo, nenhum
+identificador, nenhum cookie: a disciplina de `telemetry.ts` (sem PII, sessão efêmera,
+opt-out) continua valendo porque o serviço não tem como quebrá-la.
+
+Para rodar local:
+
+```
+DEVLOG_TOKEN=umsegredo pnpm dev:server
+# http://localhost:8080/devlog
+```
+
+`DEVLOG_DIR` aponta o serviço para outro diretório de devlog; sem ela, ele sobe a árvore
+procurando `docs/devlog/plan.json`, o que funciona tanto rodando de `src/` quanto de
+`dist/`.
+
 ## A publicação
 
 `publish.mjs` confere que cada peça existe **em disco** antes de marcar a entrada como
