@@ -20,6 +20,8 @@ import { createDeathEchoHandler } from './death-echoes-http.js';
 import { createProgressionStore, type ProgressionStore } from './progression-store.js';
 import { createProgressionHandler } from './progression-http.js';
 import { resolveProgressionSecret } from './progression-auth.js';
+import { createDevlogStore } from './devlog.js';
+import { createDevlogHandler } from './devlog-http.js';
 import { createVerificationBudget } from './http-util.js';
 
 export type WsServerHandle = {
@@ -51,6 +53,13 @@ export type WsOptions = ServerOptions & {
   progressionSecret?: string;
   /** Tetos por origem da rota de progressao. Ver `progression-http.ts`. */
   progressionRateLimits?: { settlePerMinute?: number; readsPerMinute?: number };
+  /**
+   * Token do console e do painel do devlog. Ausente = as duas rotas fechadas.
+   *
+   * Credencial de OPERADOR, e nao de leitor: quem a tem ve o material ainda
+   * nao publicado e os mesmos digests que `TELEMETRY_TOKEN` protege.
+   */
+  devlogToken?: string;
 };
 
 /**
@@ -147,6 +156,19 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
   let progressionStore: ProgressionStore | null = null;
   let handleProgression: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean>) | null =
     null;
+
+  // O devlog le do DISCO, nao do banco, entao esta pronto antes de qualquer
+  // conexao — nao entra na corrida assincrona abaixo. Os digests, esses sim,
+  // sao lidos por funcao: quando o painel abre antes de o Postgres conectar,
+  // ele mostra "indisponivel" em vez de segurar a resposta.
+  const handleDevlog = createDevlogHandler({
+    store: createDevlogStore(undefined, log),
+    log,
+    trustedProxyHops: opts.trustedProxyHops,
+    operatorToken: opts.devlogToken ?? process.env.DEVLOG_TOKEN,
+    telemetry: () => telemetryStore,
+    arenaTelemetry: () => arenaTelemetryStore,
+  });
 
   // A conexao com o banco e assincrona; o servidor NAO espera por ela para
   // aceitar jogo. Ate o store existir, as rotas de ranking respondem 503 e o
@@ -303,6 +325,16 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         if (!res.headersSent) {
           res.writeHead(500, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'erro interno' }));
+        }
+      });
+      return;
+    }
+    if (req.url?.startsWith('/devlog')) {
+      void handleDevlog(req, res).catch((err: unknown) => {
+        log({ ev: 'devlog_error', error: err instanceof Error ? err.message : String(err) });
+        if (!res.headersSent) {
+          res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+          res.end('erro interno');
         }
       });
       return;

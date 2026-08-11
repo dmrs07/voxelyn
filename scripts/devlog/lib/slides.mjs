@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { mediaDir, repoRoot } from './paths.mjs';
@@ -57,10 +57,21 @@ function fontFaces() {
     .join('\n');
 }
 
-function shotUri(file) {
+/**
+ * A arte de um slide, embutida em base64 ou apontada para o CDN.
+ *
+ * Depois que os binarios saem do git, o arquivo local pode nao existir mais —
+ * e o Chromium que renderiza os slides tem rede, entao a URL publica serve
+ * igual. Local primeiro porque e mais rapido e funciona offline.
+ */
+function shotUri(file, cdn = {}) {
+  // Nome vazio (entrada sem screenshot) resolveria para o PROPRIO diretorio
+  // `media/`, que existe — e o `readFileSync` seguinte estoura com EISDIR em
+  // vez de simplesmente nao haver capa.
+  if (!file) return null;
   const path = resolve(mediaDir, file);
-  if (!existsSync(path)) return null;
-  return dataUri(path, 'image/png');
+  if (existsSync(path) && statSync(path).isFile()) return dataUri(path, 'image/png');
+  return cdn[`media/${file}`] ?? null;
 }
 
 function escapeHtml(text) {
@@ -149,6 +160,33 @@ const css = `
 `;
 
 /**
+ * O texto FIXO dos slides, por idioma.
+ *
+ * So o slide de numeros tem texto que nao vem da copy — e era justamente ele
+ * que saia em portugues dentro do carrossel em ingles, com "O QUE ENTROU" e
+ * "linhas" num documento anunciado como sendo em ingles. A copy o autor
+ * escreve; estes rotulos o codigo precisa saber traduzir.
+ */
+const LABELS = {
+  pt: {
+    entered: 'O QUE ENTROU',
+    onMain: 'na main',
+    commits: 'commits',
+    files: 'arquivos',
+    lines: 'linhas',
+    locale: 'pt-BR',
+  },
+  en: {
+    entered: 'WHAT LANDED',
+    onMain: 'on main',
+    commits: 'commits',
+    files: 'files',
+    lines: 'lines',
+    locale: 'en-US',
+  },
+};
+
+/**
  * A assinatura do rodape muda com a era.
  *
  * Um post sobre 18 de janeiro nao pode assinar "Voxelyn Survival": o Survival
@@ -175,8 +213,10 @@ function foot(brand, index, total) {
  * nao para virar o post publicado.
  */
 export function buildSlides(entry, social, opts = {}) {
+  const t = LABELS[opts.lang ?? 'pt'] ?? LABELS.pt;
   const shots = entry.shots ?? [];
-  const cover = shotUri(shots[0]?.file ?? '');
+  const cdn = entry.cdn ?? {};
+  const cover = shotUri(shots[0]?.file ?? '', cdn);
   const dateLabel = opts.dateLabel ?? entry.publishDate;
   const slides = [];
 
@@ -197,7 +237,7 @@ export function buildSlides(entry, social, opts = {}) {
     : entry.commits.slice(0, 3).map((c) => ({ title: c.subject, body: '' }));
 
   for (const s of content) {
-    const art = s.shot ? shotUri(s.shot) : null;
+    const art = s.shot ? shotUri(s.shot, cdn) : null;
     slides.push({
       name: s.title?.slice(0, 24) ?? 'slide',
       kind: art ? 'shot' : 'text',
@@ -224,13 +264,13 @@ export function buildSlides(entry, social, opts = {}) {
       name: 'numeros',
       kind: 'stats',
       html: `<div class="pad">
-      <div class="meta"><span>O QUE ENTROU</span></div>
-      <h2>${entry.pr ? `PR #${entry.pr}` : 'na main'}</h2>
+      <div class="meta"><span>${t.entered}</span></div>
+      <h2>${entry.pr ? `PR #${entry.pr}` : t.onMain}</h2>
       <div class="stats">
-        <div class="stat"><div class="n">${entry.commits.length}</div><div class="l">commits</div></div>
-        <div class="stat"><div class="n">${entry.stat.files}</div><div class="l">arquivos</div></div>
-        <div class="stat"><div class="n">+${entry.stat.added.toLocaleString('pt-BR')}</div><div class="l">linhas</div></div>
-        <div class="stat"><div class="n">-${entry.stat.removed.toLocaleString('pt-BR')}</div><div class="l">linhas</div></div>
+        <div class="stat"><div class="n">${entry.commits.length}</div><div class="l">${t.commits}</div></div>
+        <div class="stat"><div class="n">${entry.stat.files}</div><div class="l">${t.files}</div></div>
+        <div class="stat"><div class="n">+${entry.stat.added.toLocaleString(t.locale)}</div><div class="l">${t.lines}</div></div>
+        <div class="stat"><div class="n">-${entry.stat.removed.toLocaleString(t.locale)}</div><div class="l">${t.lines}</div></div>
       </div>
       <div class="commits">
         ${entry.commits

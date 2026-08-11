@@ -63,6 +63,43 @@ export function nextEntry(plan) {
   return plan.entries.find((e) => e.status !== 'published' && !e.skipped) ?? null;
 }
 
+/**
+ * Campos que pertencem ao PROGRESSO de uma entrada, com o valor inicial.
+ *
+ * Esta lista existe como lista, e nao como um punhado de `old?.x ?? y` soltos,
+ * porque a forma antiga falhava em silencio: quem acrescentasse um campo novo
+ * — foi o que aconteceu com `cdn` e `carousels` — o veria ser APAGADO na
+ * proxima reconciliacao, e a reconciliacao roda no comeco de toda tarefa
+ * diaria. Com `--prune` ja executado, perder `cdn` significa capa do indice e
+ * download do console apontando para arquivo que nao existe mais em lugar
+ * nenhum.
+ *
+ * Regra: campo derivado do git (titulo, areas, stat) e RECALCULADO; campo que
+ * registra trabalho feito entra aqui.
+ */
+const PROGRESS_FIELDS = {
+  status: 'pending',
+  skipped: false,
+  shots: [],
+  shotError: null,
+  entryFile: null,
+  carousel: [],
+  carousels: {},
+  cdn: {},
+  publishedAt: null,
+};
+
+/** Copia o progresso da entrada anterior, com o inicial de cada campo ausente. */
+function carryProgress(old) {
+  const carried = {};
+  for (const [field, initial] of Object.entries(PROGRESS_FIELDS)) {
+    // structuredClone no inicial: sem ele, todas as entradas novas
+    // compartilhariam o MESMO array e o mesmo objeto.
+    carried[field] = old?.[field] ?? structuredClone(initial);
+  }
+  return carried;
+}
+
 function buildPlan(previous, startDate) {
   const units = workUnits('HEAD');
   // Reconciliacao por sha: o progresso pertence ao COMMIT, nao a posicao na
@@ -92,14 +129,7 @@ function buildPlan(previous, startDate) {
       stat,
       commits: unit.commits.map((c) => ({ sha: c.short, subject: c.subject })),
       recipes: old?.recipes ?? pickRecipes(areas, unit.title, appsPresentAt(unit.tip, APPS)),
-      // Campos de progresso: preservados a todo custo entre regeracoes.
-      status: old?.status ?? 'pending',
-      skipped: old?.skipped ?? false,
-      shots: old?.shots ?? [],
-      shotError: old?.shotError ?? null,
-      entryFile: old?.entryFile ?? null,
-      carousel: old?.carousel ?? [],
-      publishedAt: old?.publishedAt ?? null,
+      ...carryProgress(old),
     };
   });
 

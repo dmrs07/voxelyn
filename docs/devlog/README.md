@@ -50,8 +50,11 @@ docs/devlog/
   INDEX.md                  # índice das entradas publicadas (GERADO)
   entries/NNN-slug.md       # o post do repositório, escrito à mão
   social/NNN.json           # a copy do Instagram (hook, slides, legenda, tags)
+  social/NNN.en.json        # a copy em inglês, para o LinkedIn
   media/NNN-receita.png     # screenshot crua, do build da época
   carousel/NNN-NN.png       # os slides prontos pra postar
+  carousel/en/NNN-NN.png    # os mesmos slides em inglês
+  carousel/en/NNN.pdf       # o documento do LinkedIn
 ```
 
 As worktrees dos commits antigos vivem em `../.voxelyn-devlog-work/`, **fora** do repo, e
@@ -141,10 +144,135 @@ screenshot logo abaixo do cabeçalho, e o corpo contando o que mudou e **por qu�
 
 `shot` é opcional: com ele o slide vira imagem com legenda, sem ele vira slide de texto.
 Sem `social/NNN.json` o carrossel ainda sai, derivado dos assuntos de commit — serve para
-testar o pipeline, não para publicar.
+testar o pipeline, não para publicar, e o `publish.mjs` recusa uma entrada nesse estado.
+
+### Inglês e LinkedIn
+
+`social/NNN.en.json` tem o mesmo formato e carrega a versão em inglês:
+
+```
+node scripts/devlog/carousel.mjs --entry NNN --lang en
+```
+
+Isso escreve em `carousel/en/` e, junto dos PNGs, um **`NNN.pdf`**. O PDF não é
+conveniência: o carrossel do LinkedIn é um _documento_, não uma sequência de imagens, e
+subir PDF é a única forma de conseguir aquele formato lá. Ele sai da mesma página
+renderizada que os PNGs, então os dois formatos nunca divergem.
+
+A legenda do LinkedIn é mais longa e mais sóbria que a do Instagram, com três ou quatro
+hashtags no máximo — o público é outro. A primeira linha é o que aparece antes do "ver
+mais", então ela precisa se sustentar sozinha.
 
 Veja `entries/001-dia-1-uma-biblioteca-sem-tela.md` e `social/001.json` como referência de
 tom e tamanho.
+
+## Imagens fora do git
+
+Cada entrada carrega ~1,3 MB de PNG. Nas 107, seriam ~140 MB versionados num repositório
+de código — e o git guarda **cada versão** de cada binário para sempre, então recapturar
+uma entrada somaria peso em vez de substituí-lo.
+
+Os binários vão para o Cloudinary:
+
+```
+export CLOUDINARY_CLOUD_NAME=<cloud>
+export CLOUDINARY_API_KEY=<key>
+export CLOUDINARY_API_SECRET=<secret>
+# (ou, numa variável só: CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>)
+
+node scripts/devlog/upload.mjs --entry 001     # uma entrada
+node scripts/devlog/upload.mjs --all           # tudo que existe em disco
+```
+
+**O ambiente precisa alcançar o Cloudinary.** O ambiente remoto do Claude Code só fala com
+hosts na allowlist de egresso, e por padrão o Cloudinary não está nela — o upload falha com
+`403 Host not in allowlist` mesmo com credencial correta. Libere:
+
+- `api.cloudinary.com` — o upload;
+- `res.cloudinary.com` — a conferência `HEAD` que o `--prune` faz antes de apagar.
+
+Isso vale também para o ambiente da tarefa diária: sem a liberação, ela captura e escreve
+normalmente e só o passo de upload falha.
+
+O upload grava, em cada entrada do plano, um mapa `cdn` de caminho relativo para URL
+pública, e reescreve as imagens do post para essas URLs — sem isso, tirar os PNGs do git
+quebraria a renderização do markdown no próprio GitHub.
+
+**Quem exibe prefere a URL e cai no arquivo local quando ela não existe.** Vale para o
+serviço, para o carrossel e para o markdown. É isso que torna a migração incremental:
+entradas que ainda não subiram continuam funcionando pela rota local.
+
+O `public_id` é determinístico (`voxelyn/devlog/media/001-noita`), com `overwrite` e
+`invalidate`: recapturar a entrada 032 troca a imagem **naquela** URL em vez de criar uma
+segunda. Um devlog cujo link muda a cada reexecução não serve para nada.
+
+Nada de SDK: a assinatura é um SHA-1 dos parâmetros ordenados com o segredo no fim, e o
+upload é um POST de formulário — `node:crypto` mais `fetch` bastam. As credenciais vêm do
+ambiente e nunca de arquivo versionado; o que fica no `plan.json` é só a URL pública.
+
+### A virada
+
+Enquanto houver entrada sem `cdn`, os PNGs precisam continuar no git. Depois que
+`--all` cobrir tudo:
+
+```
+node scripts/devlog/upload.mjs --all --prune   # apaga o local que já subiu
+printf 'docs/devlog/media/\ndocs/devlog/carousel/\n' >> .gitignore
+git rm -r --cached docs/devlog/media docs/devlog/carousel
+```
+
+`--prune` faz um `HEAD` na URL antes de apagar cada arquivo, e mantém em disco o que não
+responder. Ele está prestes a remover o único outro lugar onde a imagem existe; confiar no
+"200 OK" do upload sem conferir a entrega seria apagar o original porque a copiadora não
+reclamou.
+
+O `publish.mjs` aceita peça que esteja **em disco ou no CDN**, então podar não trava a
+publicação das entradas que ainda estão na fila. E `plan.mjs` carrega o mapa `cdn` entre
+reconciliações — ele roda no começo de toda tarefa diária, e perdê-lo deixaria a vitrine
+apontando para arquivo que não existe mais em lugar nenhum.
+
+Isso não recupera o histórico: os PNGs já commitados continuam nos objetos do git. Para
+zerar de verdade seria preciso reescrever a história, o que não vale a pena por ~1 MB.
+
+## O serviço
+
+O `@voxelyn/survival-server` serve o devlog em `/devlog`. Não é um projeto novo: são
+rotas no servidor que já está no Render, reaproveitando o rate limiter, o logging e os
+stores de telemetria que já existiam.
+
+| Rota                     | Acesso | O que é                                          |
+| ------------------------ | ------ | ------------------------------------------------ |
+| `/devlog`                | aberto | As entradas publicadas, da mais recente pra trás |
+| `/devlog/e/<id>`         | aberto | O post, com as imagens da época                  |
+| `/devlog/a/<caminho>`    | aberto | Asset — **só** de entrada publicada              |
+| `/devlog/console?token=` | token  | A próxima entrada a postar, pronta para baixar   |
+| `/devlog/panel?token=`   | token  | Os digests de telemetria do jogo                 |
+
+O token é `DEVLOG_TOKEN`. Sem ele as duas rotas de operador respondem 404 — mesma política
+de `/telemetry`, e mesma sensibilidade: quem o tem lê o funil de setor e vê material que
+ainda não saiu. É credencial de operador, não de leitor.
+
+**O acesso público deriva do status no plano, nunca do disco.** O pipeline gera as 107
+entradas de uma vez, então o carrossel do dia 40 já existe em disco hoje; servir o
+diretório entregaria a fila inteira cinco semanas antes da hora. A rota pública exige que
+o arquivo esteja em `media/` ou `carousel/` **e** que o id no nome pertença a uma entrada
+publicada.
+
+**O painel não coleta nada.** Ele desenha o digest que `/telemetry` e `/arena-telemetry`
+já produzem — a mesma função pura, os mesmos números. Nenhum evento novo, nenhum
+identificador, nenhum cookie: a disciplina de `telemetry.ts` (sem PII, sessão efêmera,
+opt-out) continua valendo porque o serviço não tem como quebrá-la.
+
+Para rodar local:
+
+```
+DEVLOG_TOKEN=umsegredo pnpm dev:server
+# http://localhost:8080/devlog
+```
+
+`DEVLOG_DIR` aponta o serviço para outro diretório de devlog; sem ela, ele sobe a árvore
+procurando `docs/devlog/plan.json`, o que funciona tanto rodando de `src/` quanto de
+`dist/`.
 
 ## A publicação
 

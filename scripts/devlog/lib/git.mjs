@@ -76,12 +76,17 @@ const BOOKKEEPING = /^(Merge |Revert ")/i;
 /**
  * O devlog nao fala do devlog.
  *
- * O proprio pipeline vive no repositorio e portanto aparece no historico. Uma
+ * O proprio sistema vive no repositorio e portanto aparece no historico. Uma
  * entrada sobre o commit que criou o pipeline seria um post anunciando a
  * existencia do post — ruido, e ruido que se repete a cada dia publicado,
  * porque cada publicacao tambem commita.
+ *
+ * A lista cobre as TRES casas do sistema: os arquivos gerados, os scripts do
+ * pipeline e o servico que os publica. Cobrir so as duas primeiras deixou os
+ * commits do servico virarem entradas 108 e 109 da fila.
  */
-const SELF = /^(docs\/devlog|scripts\/devlog)/;
+const SELF =
+  /^(docs\/devlog|scripts\/devlog|packages\/voxelyn-survival-server\/(src|tests)\/devlog)/;
 
 function isSelfReferential(commits) {
   const files = new Set();

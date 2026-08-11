@@ -3,7 +3,7 @@
 Um post por PR, em ordem cronologica. O texto conta o trabalho como ele foi feito;
 a imagem de cada entrada foi capturada construindo o commit daquele dia, nao o de hoje.
 
-1 de 107 entradas publicadas.
+1 de 109 entradas publicadas.
 
 | # | Data | Entrada | PR |
 | --- | --- | --- | --- |
