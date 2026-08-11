@@ -13,8 +13,10 @@
 //    do bruiser e um numero neste arquivo, ajustavel numa linha, e nao um
 //    render novo.
 //
-// O que ISTO NAO E: musica. Nao ha trilha. O jogo soa como um lugar, e
-// silencio faz parte do lugar.
+// O que ISTO NAO E: musica. A musica existe (music.ts / music-bus.ts, um tema
+// de doom/drone por estrato), mas nao vive aqui: este arquivo e SO eventos —
+// nos que nascem, tocam e morrem. A musica e feita de nos persistentes e de um
+// scheduler proprio, e a mixagem dela e subordinada por contrato: SFX > musica.
 
 /** Duracao do buffer de ruido compartilhado, em segundos. */
 const NOISE_SECONDS = 2;
@@ -248,6 +250,14 @@ export const VOICE_RENDERERS: Record<string, VoiceRenderer> = {
   hitPlayer: (ctx, out, t0, noise) => {
     tone(ctx, out, t0, { type: 'sine', from: 190, to: 62, peak: 0.75, decay: 0.24 });
     burst(ctx, out, t0, noise, { peak: 0.4, decay: 0.14, type: 'lowpass', from: 1400, to: 260 });
+  },
+  // Dano ambiental por tick. A diferenca para `hitPlayer` tem de ser
+  // CATEGORICA no ouvido: nenhum transiente agudo, nenhuma queda dramatica —
+  // uma pressao surda que aperta e solta. Quem informa "estou no gas" e o
+  // leito continuo; esta voz so lembra que a permanencia custa vida.
+  hitPlayerHazard: (ctx, out, t0, noise) => {
+    tone(ctx, out, t0, { type: 'sine', from: 85, to: 55, peak: 0.5, decay: 0.16, attack: 0.012 });
+    burst(ctx, out, t0, noise, { peak: 0.15, decay: 0.09, type: 'lowpass', from: 300, attack: 0.01 });
   },
   death: (ctx, out, t0, noise) => {
     burst(ctx, out, t0, noise, {

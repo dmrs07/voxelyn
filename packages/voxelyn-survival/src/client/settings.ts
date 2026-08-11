@@ -57,6 +57,12 @@ export const saveQuality = (level: QualityLevel): void => {
 export type AudioSettings = {
   /** Volume mestre, 0..1. */
   volume: number;
+  /**
+   * Volume da MUSICA, 0..1. Multiplica o teto interno do barramento de musica
+   * (MUSIC_CEILING), nunca vira ganho WebAudio unitario: 1.0 no slider e o
+   * teto projetado da mixagem, nao "musica no maximo do alto-falante".
+   */
+  musicVolume: number;
   muted: boolean;
 };
 
@@ -69,7 +75,7 @@ export type AudioSettings = {
  * injusto. Volume abaixo de 1 e a concessao: alto o bastante para informar,
  * baixo o bastante para nao assustar quem esta de fone.
  */
-const AUDIO_DEFAULTS: AudioSettings = { volume: 0.8, muted: false };
+const AUDIO_DEFAULTS: AudioSettings = { volume: 0.8, musicVolume: 0.7, muted: false };
 const AUDIO_KEY = 'voxelyn.audio';
 
 export const loadAudioSettings = (): AudioSettings => {
@@ -84,6 +90,12 @@ export const loadAudioSettings = (): AudioSettings => {
         typeof obj.volume === 'number' && Number.isFinite(obj.volume)
           ? Math.max(0, Math.min(1, obj.volume))
           : AUDIO_DEFAULTS.volume,
+      // Storage gravado antes da musica existir nao tem o campo: cai no
+      // padrao, sem migracao.
+      musicVolume:
+        typeof obj.musicVolume === 'number' && Number.isFinite(obj.musicVolume)
+          ? Math.max(0, Math.min(1, obj.musicVolume))
+          : AUDIO_DEFAULTS.musicVolume,
       muted: obj.muted === true,
     };
   } catch {

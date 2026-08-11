@@ -2,7 +2,7 @@
 
 **Data:** 2026-08-11
 **Escopo:** `voxelyn-survival-sim`, `voxelyn-survival-protocol`, `voxelyn-survival-server`, `voxelyn-survival` (cliente), `voxelyn-survival-content`
-**Versões:** 1º corte: `PROTOCOL` 21→22, `SIMULATION` 37→38, `CONTENT` 23→24. 2º corte: `PROTOCOL` 22→23, `SIMULATION` 38→39. 3º corte: `SIMULATION` 39→40.
+**Versões:** 1º corte: `SIMULATION` 37→38, `CONTENT` 23→24, wire das leylines em `PROTOCOL` 23 (renumerado no merge com o main — o 22 ficou com o `hazard` do PR #142). 2º corte: `PROTOCOL` 23→24 (roteamento), `SIMULATION` 38→39. 3º corte: `SIMULATION` 39→40.
 **Status:** três cortes implementados — condução por segmento, roteamento nas junções, verticalidade + lore.
 
 ## A decisão que rege tudo

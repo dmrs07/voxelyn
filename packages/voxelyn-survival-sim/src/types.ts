@@ -978,7 +978,18 @@ export type SemanticEvent =
    * NAO emite isto: ele coincide com o `endTick` que o cliente ja conhece.
    */
   | { t: 'action_end'; entity: number }
-  | { t: 'hit'; x: number; y: number; amount: number; target: number }
+  /**
+   * `hazard` marca dano POR TICK do chao cobrando presenca (gas, esporo, fogo
+   * sob os pes — os tres ramos de `applyCellHazards`). O audio precisa da
+   * distincao para nao tocar o impacto pleno a 20 Hz dentro de uma nuvem.
+   *
+   * E um flag do CALL SITE, nao da causa, de proposito: a varredura do
+   * Coracao da Fornalha tambem fere com `{kind:'fire'}`, mas e uma pancada de
+   * chefe e NAO marca — inferir da causa no cliente foi exatamente o erro que
+   * este campo corrige. Opcional por defesa (fixtures e eventos construidos a
+   * mao nao o carregam); a interoperabilidade real e garantida pelo handshake.
+   */
+  | { t: 'hit'; x: number; y: number; amount: number; target: number; hazard?: true }
   | { t: 'death'; x: number; y: number; entity: number; archetype: string; facingX: number; facingY: number; tick: number }
   | { t: 'explosion'; x: number; y: number; radius: number; source: 'player' | 'enemy' | 'environment'; owner?: number }
   /**
