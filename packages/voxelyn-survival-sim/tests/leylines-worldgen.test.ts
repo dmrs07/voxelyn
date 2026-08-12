@@ -19,7 +19,7 @@ import {
   WORLD_H,
   WORLD_W,
 } from '../src/constants';
-import { biomeProfile, lineageOf } from '../src/strata';
+import { biomeProfile, leylineGuaranteeSector, lineageOf } from '../src/strata';
 import { DEFAULT_PROFILE, deriveLeylineNodes, generateWorld } from '../src/worldgen';
 import { createRun } from '../src/run';
 import type { SectorBiome } from '../src/strata';
@@ -29,6 +29,12 @@ const SEEDS = [1, 2, 3, 42, 1337, 7];
 const PRISMATIC: SectorBiome = { stratum: 'prismatic', occupation: 'none', lineage: 'mineral' };
 const AURIX_BASALT: SectorBiome = { stratum: 'basalt', occupation: 'aurix', lineage: 'basaltic' };
 const AURIX_FERRIC: SectorBiome = { stratum: 'ferric', occupation: 'aurix', lineage: 'industrial' };
+
+/** Primeira seed de linhagem industrial: setores 2..7 sao todos ferricos. */
+const industrialSeed = (): number => {
+  for (let s = 1; s < 4096; s++) if (lineageOf(s) === 'industrial') return s;
+  throw new Error('nenhuma seed industrial');
+};
 
 describe('leylines: onde existem', () => {
   it('a Catedral traca leylines; a cicatriz Aurix expoe uma; o Ferrifero nunca', () => {
@@ -150,5 +156,57 @@ describe('leylines: a rede densifica com a profundidade', () => {
     expect(biomeProfile(AURIX_BASALT, 4).leylines).toBe(2);
     // O Ferrifero continua fora em qualquer profundidade.
     expect(biomeProfile(AURIX_FERRIC, 7).leylines).toBe(0);
+  });
+});
+
+describe('leylines: descobribilidade', () => {
+  it('o setor 1 traca uma linha em TODA linhagem, e a garantia cobre a descida', () => {
+    // A boca do Veio ensina a linguagem: perfil do setor 1 sempre tem >= 1.
+    for (const lineage of ['basaltic', 'cryo', 'thermal', 'arid', 'hydric', 'mineral', 'industrial'] as const) {
+      const s1 = biomeProfile({ stratum: 'basalt', occupation: 'none', lineage }, 1);
+      expect(s1.leylines, lineage).toBeGreaterThanOrEqual(1);
+    }
+    // E o grid do setor 1 realmente recebe a linha, em varias seeds.
+    for (const seed of SEEDS) {
+      const state = createRun({ seed });
+      expect(state.leylineSegments.length, `seed ${seed}: setor 1 sem leyline`).toBeGreaterThan(0);
+    }
+  });
+
+  it('a garantia forca o setor 2 quando a descida nao teria leyline natural', () => {
+    // Uma seed cuja descida 2-3 nao tem prismatic nem aurix fora do ferric.
+    let bare = 0;
+    let natural = 0;
+    for (let s = 1; s < 4096 && (bare === 0 || natural === 0); s++) {
+      if (leylineGuaranteeSector(s) === 2 && bare === 0) bare = s;
+      if (leylineGuaranteeSector(s) === null && natural === 0) natural = s;
+    }
+    expect(bare).toBeGreaterThan(0);
+    expect(natural).toBeGreaterThan(0);
+    // O setor 2 da seed sem leyline natural ganha a linha forcada.
+    const forced = createRun({ seed: bare, sector: 2 });
+    expect(forced.leylineSegments.length).toBeGreaterThan(0);
+  });
+
+  it('a garantia NUNCA entrega leyline ao Ferrifero — nem no caminho de producao', () => {
+    // O invariante "Ferrifero nunca" era cobrado so contra `biomeProfile`, e
+    // por isso passou verde enquanto a garantia — aplicada depois, no call
+    // site — forcava uma linha no setor 2 de TODA run industrial (posicoes
+    // 2..7 da linhagem sao ferricas). O teste que faltava e este: o mundo que
+    // a run REALMENTE monta.
+    const industrial = industrialSeed();
+    expect(leylineGuaranteeSector(industrial)).toBeNull();
+    for (const sector of [2, 3]) {
+      const state = createRun({ seed: industrial, sector });
+      expect(state.stratum, `setor ${sector}`).toBe('ferric');
+      expect(state.leylineSegments.length, `setor ${sector} ferrico com leyline`).toBe(0);
+      expect(
+        [...state.solid].some((s) => s === SOLID_LEYLINE || s === SOLID_LEYLINE_NODE),
+        `setor ${sector}: celula de leyline no Ferrifero`,
+      ).toBe(false);
+    }
+    // E a run industrial nao fica sem a mecanica: o setor 1 e basalto e traca
+    // a linha como em toda linhagem.
+    expect(createRun({ seed: industrial }).leylineSegments.length).toBeGreaterThan(0);
   });
 });

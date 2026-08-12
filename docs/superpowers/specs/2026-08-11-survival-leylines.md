@@ -149,6 +149,36 @@ comuta um comutador natural. De brinde, um conserto real: o bit
 deriva de `DISCOVERY_LORE`, e ele não estava lá) — a descoberta do relé não
 persistia entre runs até este fragmento existir.
 
+## Descobribilidade (correção de playtest)
+
+O primeiro playtest não encontrou leyline nenhuma — e a matemática explicava:
+o setor 1 (sempre Basalto/none) tinha **0%** de chance, e só **37%** das runs
+G-00 encontravam a mecânica em qualquer setor. Duas regras corrigem:
+
+1. **A boca do Veio ensina a linguagem**: o setor 1 traça UMA leyline, sempre
+   — "siga a veia" no primeiro minuto de toda run. Exceção deliberada ao
+   basalto histórico, registrada no teste do contrato do estrato.
+2. **Garantia da descida** (`leylineGuaranteeSector`): se os setores 2–3 (o
+   trecho que toda run alcança, em qualquer geração) não teriam leyline
+   natural, o primeiro setor **elegível** força uma. Função pura da seed — o
+   terreno de (seed, setor) continua idêntico em qualquer geração.
+
+**Elegível exclui o Ferrífero**, e a exclusão é o ponto: lá a parede conectada
+já é a fiação (`FERRIC_VEIN_SCALE`). A linhagem industrial — férrica das
+posições 2 a 7 — fica sem garantia e aprende a linguagem no setor 1, como toda
+run; dali para baixo encontra a versão ferrífera dela, a parede inteira
+conduzindo. Sem essa guarda (primeira versão, pega em review) toda run
+industrial recebia leyline forçada num setor Ferrífero, contradizendo no mundo
+real o invariante que a fonte declara.
+
+**Fonte única do perfil de setor** (`sectorProfile`): a garantia nasceu
+aplicada nos call sites, e o que é aplicado em call site não chega a quem não é
+call site — a impressão digital, o teste do terreno derivado e o da arena do
+chefe montavam o perfil por conta própria e mediam um mundo que a produção não
+gera. Com a montagem num lugar só, a paridade entre o que se testa e o que se
+joga vale por construção. Impressão digital nova (1082481898) com o parágrafo
+ritual; SIMULATION segue 40 (nunca lançada).
+
 ## Trabalho futuro
 
 - Sobrecarga (descarga total do nó) e desligar região, se o jogo pedir.

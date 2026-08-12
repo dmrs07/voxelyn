@@ -129,7 +129,7 @@ import {
   runDepth,
   runIsReturning,
 } from './depth.js';
-import { biomeProfile, sectorBiome } from './strata.js';
+import { sectorBiome, sectorProfile } from './strata.js';
 import {
   activeModule,
   consumeModuleCharge,
@@ -312,11 +312,13 @@ export const createRun = (config: RunConfig): SurvivalState => {
   // O bioma sai de derivacao PURA da seed (strata.ts): reconectar no setor N
   // reconstroi o mesmo estrato e a mesma ocupacao sem consumir a RNG da run.
   const biome = sectorBiome(config.seed, sector);
+  // Perfil pela fonte unica (garantia da descida inclusa): ver sectorProfile.
+  const profile = sectorProfile(config.seed, sector);
   const world = generateWorld(
     sectorSeed((config.seed ^ RUN_SEED_MIX) >>> 0, sector),
     width,
     height,
-    biomeProfile(biome, sector),
+    profile,
   );
   const rng = new RNG((config.seed * 0x85ebca6b + 0xc2b2ae35) >>> 0 || 1);
 
