@@ -4,6 +4,13 @@
 **Escopo:** `voxelyn-survival-sim`, `voxelyn-survival-protocol`, `voxelyn-survival-server`, `voxelyn-survival` (cliente), `voxelyn-survival-content`
 **Versões:** 1º corte: `SIMULATION` 37→38, `CONTENT` 23→24, wire das leylines em `PROTOCOL` 23 (renumerado no merge com o main — o 22 ficou com o `hazard` do PR #142). 2º corte: `PROTOCOL` 23→24 (roteamento), `SIMULATION` 38→39. 3º corte: `SIMULATION` 39→40.
 **Status:** três cortes implementados — condução por segmento, roteamento nas junções, verticalidade + lore.
+**Revisto em 2026-08-13:** o playtest do dono derrubou a tabela de papéis abaixo
+— sem o módulo Conductive a leyline não tem verbo nenhum, e orientação é
+redundante com a ramificação de Levantamento. A resposta está em
+[`2026-08-13-survival-leylines-circuito.md`](2026-08-13-survival-leylines-circuito.md),
+que substitui os DOIS papéis por um só: a rede é o circuito do setor, e fechá-lo
+é um puzzle. Tudo o que este documento descreve sobre traçado, ciclo, wire,
+relé e apresentação continua valendo.
 
 ## A decisão que rege tudo
 
@@ -181,6 +188,10 @@ ritual; SIMULATION segue 40 (nunca lançada).
 
 ## Trabalho futuro
 
+> Revisto pela spec do Circuito (2026-08-13). O pulso ambiental saiu da lista —
+> passou de adiado a recusado, porque é ele que tornaria a rede impossível de
+> ignorar de graça. O landmark ganhou destino: dar cara à NASCENTE.
+
 - Sobrecarga (descarga total do nó) e desligar região, se o jogo pedir.
-- Pulso ambiental rítmico (sem recarga), se o jogo pedir.
+- ~~Pulso ambiental rítmico (sem recarga)~~ — recusado, ver a spec do Circuito.
 - Decor/landmark dedicado da leyline (nascente monumental num salão).
