@@ -8,28 +8,40 @@
 // horizontal grande projeta um plano claro do tamanho do bicho, e o Corcel lia
 // como uma mesa. O sintoma so aparece ampliado e sobre fundo escuro.
 //
-//   node tools/preview.mjs <id> "dr:idle,dr:attack" saida.png [escala]
+//   node tools/preview.mjs <id> "dr:idle,dr:attack" saida.png [escala] [--strip]
 //
 // Uma linha por par direcao:animacao; uma coluna por quadro.
+//
+// Um terceiro campo fixa um unico quadro daquela animacao — `dr:idle:0` e o
+// quadro-chave da pose, sem os intermediarios. Com `--strip` as entradas
+// deixam de ser linhas e entram lado a lado numa faixa unica, que e o formato
+// de folha de personagem: a mesma pose vista nas quatro direcoes, ou quatro
+// poses distintas na mesma direcao, comparaveis de relance.
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../assets/atlases');
-const [, , id, spec, outName, scaleArg] = process.argv;
+const argv = process.argv.slice(2);
+const strip = argv.includes('--strip');
+const [id, spec, outName, scaleArg] = argv.filter((a) => !a.startsWith('--'));
 const m = JSON.parse(readFileSync(resolve(DIR, `${id}.json`), 'utf8'));
 const png = PNG.sync.read(readFileSync(resolve(DIR, m.atlas)));
 const scale = Number(scaleArg || 4);
 
 // spec: "dr:idle,dr:attack,ul:idle" -> uma linha por entrada, colunas = frames
-const rows = spec.split(',').map((s) => {
-  const [dir, anim] = s.split(':');
+// spec: "dr:idle:0" -> so o quadro 0 daquela animacao
+let rows = spec.split(',').map((s) => {
+  const [dir, anim, frame] = s.split(':');
   const start = m.frameMap[dir][anim];
-  const count = m.animations[anim].frames;
-  return { dir, anim, start, count };
+  if (frame !== undefined) return { dir, anim, start: start + Number(frame), count: 1 };
+  return { dir, anim, start, count: m.animations[anim].frames };
 });
-const cols = Math.max(...rows.map((r) => r.count));
+// --strip: uma faixa horizontal com todas as entradas em sequencia
+if (strip) rows = [{ cells: rows.flatMap((r) => Array.from({ length: r.count }, (_, f) => r.start + f)) }];
+rows = rows.map((r) => r.cells ?? Array.from({ length: r.count }, (_, f) => r.start + f));
+const cols = Math.max(...rows.map((r) => r.length));
 const out = new PNG({ width: cols * m.frameWidth * scale, height: rows.length * m.frameHeight * scale });
 out.data.fill(0);
 // fundo escuro para enxergar a silhueta
@@ -37,8 +49,8 @@ for (let i = 0; i < out.width * out.height; i++) {
   out.data[i * 4] = 20; out.data[i * 4 + 1] = 24; out.data[i * 4 + 2] = 32; out.data[i * 4 + 3] = 255;
 }
 rows.forEach((r, ri) => {
-  for (let f = 0; f < r.count; f++) {
-    const idx = r.start + f;
+  for (let f = 0; f < r.length; f++) {
+    const idx = r[f];
     const x0 = (idx % m.columns) * m.frameWidth;
     const y0 = Math.floor(idx / m.columns) * m.frameHeight;
     for (let y = 0; y < m.frameHeight; y++) {
