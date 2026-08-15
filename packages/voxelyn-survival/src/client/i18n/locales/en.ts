@@ -763,4 +763,41 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'induction.begin': 'AUTHORISE DESCENT',
   'induction.archiveButton': 'FILE',
   'induction.reopen': 'This document stays in dispatch, under INDUCTION.',
+  'induction.training': 'TRAINING OPERATION',
+
+  // ---------------------------------------------------------------------
+  // Training operation (the first-descent drill)
+  //
+  // Same corporate voice, now as a drill circular: numbered, short,
+  // imperative. Every step has a `.touch` variant because the command scheme
+  // differs there — an instruction naming the wrong key teaches wrong.
+  // ---------------------------------------------------------------------
+  'menu.training': 'Training op',
+  'aurix.doc.training': 'FORM AD-TRN-01 · induction exercise',
+  'training.step.move': 'Drill 1 — MOVE: W A S D. Advance down the gallery.',
+  'training.step.move.touch': 'Drill 1 — MOVE: left stick. Advance down the gallery.',
+  'training.step.clear':
+    'Drill 2 — FIRE: hold the left mouse button and aim with the cursor. Neutralise both specimens.',
+  'training.step.clear.touch':
+    'Drill 2 — FIRE: the right stick aims and fires. Neutralise both specimens.',
+  'training.step.dash': 'Drill 3 — DASH: SPACE. Execute an evasive burst between the pillars.',
+  'training.step.dash.touch':
+    'Drill 3 — DASH: the dodge button. Execute an evasive burst between the pillars.',
+  'training.step.core': 'Drill 4 — THE CORE: approach the pedestal and interact with E.',
+  'training.step.core.touch':
+    'Drill 4 — THE CORE: approach the pedestal and use the interact button.',
+  'training.step.extract':
+    'Final drill — EXTRACTION: return to the entry platform and interact with E. Cargo only counts outside the Vein.',
+  'training.step.extract.touch':
+    'Final drill — EXTRACTION: return to the entry platform and use the interact button. Cargo only counts outside the Vein.',
+  'training.done.move': '✓ movement logged',
+  'training.done.clear': '✓ neutralisation logged',
+  'training.done.dash': '✓ evasive logged',
+  'training.tip.heat':
+    'The barrel saturated. Release the trigger and let the heat fall — pacing is part of the armament.',
+  'training.complete.title': 'DRILL CERTIFIED',
+  'training.complete.body':
+    'Training record filed. No cargo was credited — training pays nothing. The Vein below does.',
+  'training.complete.descend': 'AUTHORISE DESCENT',
+  'training.complete.terminal': 'RETURN TO TERMINAL',
 };
