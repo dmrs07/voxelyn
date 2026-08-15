@@ -1992,6 +1992,16 @@
            fundo a 92% ele aparecia esmaecido a ponto de parecer defeito,
            justamente nas telas em que a mensagem e a informacao que falta. */
         z-index: 40;
+        /* O banner e texto, nunca alvo — e o topo da tela nao e dele.
+           A faixa de pausa vai de 0 a 120 px e o gesto que a abre escuta no
+           CANVAS (`pause-menu.ts`); o banner mora em cima dela (top 6 px,
+           44 px de altura, 512 px de largura medidos) e, sem esta linha,
+           `elementFromPoint` no centro dele devolve o proprio banner. Todo
+           toque longo que caisse ali morria antes do canvas — um pedaco morto
+           bem no meio da unica porta do menu no celular, justamente enquanto
+           uma mensagem estava na tela. Pior no caso da propria dica: ela manda
+           segurar o topo da tela sendo o que bloqueia o segurar. */
+        pointer-events: none;
       }
       #banner[data-tone='info'] {
         border-color: var(--ax-teal-dim);

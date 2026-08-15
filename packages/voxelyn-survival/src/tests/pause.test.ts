@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { isEditableTag } from '../client/input';
 import {
   HoldToOpen,
+  PAUSE_HINT_DEADLINE_MS,
+  PAUSE_HINT_DELAY_MS,
   PAUSE_HOLD_MS,
   PAUSE_SLOP_PX,
   isInPauseZone,
+  pauseHintVerdict,
   pauseZoneHeight,
 } from '../client/pause';
 
@@ -123,5 +126,39 @@ describe('HoldToOpen: o toque longo', () => {
     expect(hold.completed(9000)).toBe(false);
     hold.begin(2, 100, 20, 10_000);
     expect(hold.completed(10_000 + PAUSE_HOLD_MS)).toBe(true);
+  });
+});
+
+describe('a dica do gesto espera o banner em vez de desistir', () => {
+  it('banner livre: a dica entra', () => {
+    expect(pauseHintVerdict(0, false)).toBe('show');
+  });
+
+  it('banner ocupado dentro do prazo: espera a proxima vez', () => {
+    // A REGRESSAO QUE ISTO TRAVA. A versao antiga desistia da descida inteira
+    // aqui, e uma descida offline abre com "AURIX UNREACHABLE" ocupando o
+    // banner por 4,2 s — a unica tentativa caia sempre dentro dessa janela.
+    // Medido no jogo: banner ocupado de t+22 ms a t+4265 ms, dica jamais vista.
+    expect(pauseHintVerdict(0, true)).toBe('retry');
+    expect(pauseHintVerdict(2000, true)).toBe('retry');
+    // 4,2 s e o caso real: e depois do banner offline que a dica tem de caber.
+    expect(pauseHintVerdict(4300, true)).toBe('retry');
+  });
+
+  it('o prazo existe para a dica nao brotar no meio de uma luta', () => {
+    expect(pauseHintVerdict(PAUSE_HINT_DEADLINE_MS, true)).toBe('giveUp');
+    expect(pauseHintVerdict(PAUSE_HINT_DEADLINE_MS + 5000, true)).toBe('giveUp');
+  });
+
+  it('o prazo nao atropela um banner que acabou de desocupar', () => {
+    // Passado o prazo, mas a faixa esta livre: mostrar e melhor que calar —
+    // a desistencia so vale contra a ESPERA, nunca contra a oportunidade.
+    expect(pauseHintVerdict(PAUSE_HINT_DEADLINE_MS + 1, false)).toBe('show');
+  });
+
+  it('a janela de espera cobre com folga o banner que a bloqueava', () => {
+    // O prazo tem de ser maior que o banner offline (4,2 s) somado ao atraso
+    // inicial (1,6 s); sem essa folga o conserto seria so um empate mais lento.
+    expect(PAUSE_HINT_DEADLINE_MS).toBeGreaterThan(4200 + PAUSE_HINT_DELAY_MS);
   });
 });

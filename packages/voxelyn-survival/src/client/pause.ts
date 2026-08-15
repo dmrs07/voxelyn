@@ -110,3 +110,52 @@ export class HoldToOpen {
     return true;
   }
 }
+
+// ---------------------------------------------------------------------------
+// A DICA DO GESTO
+// ---------------------------------------------------------------------------
+
+/** Tempo ate a primeira tentativa: o polegar pousa antes de a dica pedir leitura. */
+export const PAUSE_HINT_DELAY_MS = 1600;
+/** Intervalo entre tentativas enquanto o banner estiver ocupado. */
+export const PAUSE_HINT_RETRY_MS = 600;
+/**
+ * Ate quando insistir DENTRO de uma descida.
+ *
+ * Existe para a dica nao brotar no meio de uma luta dez minutos depois: passado
+ * o prazo ela desiste sem gravar a chave, e a proxima descida tenta de novo.
+ */
+export const PAUSE_HINT_DEADLINE_MS = 20000;
+/** Quanto tempo a dica fica lida na tela. */
+export const PAUSE_HINT_DURATION_MS = 4000;
+
+export type PauseHintVerdict = 'show' | 'retry' | 'giveUp';
+
+/**
+ * A dica pode entrar na tela agora?
+ *
+ * O DEFEITO QUE ISTO CONSERTA: a dica era uma tentativa UNICA, 1,6 s depois da
+ * descida, e desistia calada se o banner estivesse ocupado — "banner ocupado tem
+ * prioridade, a dica fica para a proxima descida". A premissa era que um banner
+ * ocupado fosse eventual. Nao e: uma descida sem servidor abre com "AURIX
+ * UNREACHABLE" ocupando o banner por 4,2 s, e a tentativa cai DENTRO dessa
+ * janela em toda descida.
+ *
+ * Medido no jogo rodando, tablet com toque, chave da dica limpa: o banner ocupa
+ * de t+22 ms a t+4265 ms, a dica nunca aparece, e a chave permanece `null` —
+ * como a versao antiga desistia ANTES de gravar, a descida seguinte repetia o
+ * mesmo encontro. A dica era inalcancavel para sempre, e nao uma vez.
+ *
+ * Quem joga offline e exatamente quem mais precisa dela: e a plataforma sem
+ * teclado, sem ESC e — no PWA do iOS — sem botao de voltar, onde o toque longo
+ * no topo e o UNICO caminho ate o menu.
+ *
+ * A correcao mantem a prioridade do banner e troca a desistencia por espera.
+ *
+ * @param elapsedMs desde a primeira tentativa desta descida
+ * @param bannerBusy o banner esta ocupado por outra mensagem
+ */
+export const pauseHintVerdict = (elapsedMs: number, bannerBusy: boolean): PauseHintVerdict => {
+  if (!bannerBusy) return 'show';
+  return elapsedMs >= PAUSE_HINT_DEADLINE_MS ? 'giveUp' : 'retry';
+};

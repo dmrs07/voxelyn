@@ -77,6 +77,12 @@ import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
 import { deployVeil, veilActive } from './deploy-veil';
 import { aurixMarkHtml } from './aurix';
+import {
+  PAUSE_HINT_DELAY_MS,
+  PAUSE_HINT_DURATION_MS,
+  PAUSE_HINT_RETRY_MS,
+  pauseHintVerdict,
+} from './pause';
 import { PauseMenu } from './pause-menu';
 import {
   LOCALES,
@@ -993,12 +999,25 @@ const endScreenAction = (regions: EndActionRegions | null, armed: boolean): EndA
 const HINT_KEY = 'voxelyn.pausehint';
 /** Timer da dica no ar, para que abrir o menu possa aposenta-la na hora. */
 let hintTimer: ReturnType<typeof setTimeout> | null = null;
+/** Tentativa agendada, para a descida acabar sem deixar a dica pendurada. */
+let hintAttempt: ReturnType<typeof setTimeout> | null = null;
+
+const stopHintAttempts = (): void => {
+  if (hintAttempt === null) return;
+  clearTimeout(hintAttempt);
+  hintAttempt = null;
+};
 
 const clearHint = (): void => {
+  stopHintAttempts();
   if (hintTimer === null) return;
   clearTimeout(hintTimer);
   hintTimer = null;
-  setBanner(null);
+  // A faixa e compartilhada: entre mostrar a dica e aposenta-la, outra mensagem
+  // pode ter tomado o lugar dela. Apagar sem olhar roubaria o tempo de tela de
+  // um aviso que acabou de chegar — e o prazo da dica nao manda em quem veio
+  // depois. Se a dica ja nao esta na faixa, nao ha o que apagar.
+  if (banner.textContent === t('pause.hint')) setBanner(null);
 };
 
 const hintOnce = (): void => {
@@ -1007,18 +1026,37 @@ const hintOnce = (): void => {
   } catch {
     return; // sem storage nao ha "uma vez": melhor nunca do que toda vez
   }
-  setTimeout(() => {
-    // Um banner ocupado tem prioridade: "Conectando…" e informacao que o
-    // jogador esta esperando, e a dica pode ficar para a proxima descida.
-    if (!runInProgress || pauseMenu.isOpen || !banner.classList.contains('hidden')) return;
+  stopHintAttempts();
+  // O relogio corre da PRIMEIRA tentativa, e nao de cada uma: o prazo mede a
+  // paciencia da descida inteira, nao a da ultima espera.
+  let startedAt = 0;
+  const attempt = (): void => {
+    hintAttempt = null;
+    // A descida acabou, ou o jogador achou o menu sozinho: nao ha o que ensinar.
+    if (!runInProgress || pauseMenu.isOpen) return;
+    if (startedAt === 0) startedAt = performance.now();
+    // Um banner ocupado continua tendo prioridade — "Conectando…" e informacao
+    // que o jogador esta esperando. O que mudou e o que se faz com a vez
+    // perdida: espera-se a proxima, em vez de desistir da descida (ver
+    // `pauseHintVerdict`, que documenta a medicao).
+    const verdict = pauseHintVerdict(
+      performance.now() - startedAt,
+      !banner.classList.contains('hidden'),
+    );
+    if (verdict === 'giveUp') return;
+    if (verdict === 'retry') {
+      hintAttempt = setTimeout(attempt, PAUSE_HINT_RETRY_MS);
+      return;
+    }
     try {
       localStorage.setItem(HINT_KEY, '1');
     } catch {
       /* ignora */
     }
     setBanner(t('pause.hint'), 'info');
-    hintTimer = setTimeout(clearHint, 4000);
-  }, 1600);
+    hintTimer = setTimeout(clearHint, PAUSE_HINT_DURATION_MS);
+  };
+  hintAttempt = setTimeout(attempt, PAUSE_HINT_DELAY_MS);
 };
 
 /**
