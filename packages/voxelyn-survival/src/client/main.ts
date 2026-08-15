@@ -1285,6 +1285,46 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
 const trainingCompleteOverlay = document.getElementById('training-complete') as HTMLDivElement;
 
 /**
+ * O desfecho do exercicio corrente, lido pelo botao primario do formulario:
+ * homologado abre a descida real; nao homologado repete o exercicio.
+ */
+let trainingOutcome: 'certified' | 'incomplete' = 'certified';
+
+/**
+ * Mostra o formulario de fim de exercicio com o texto do DESFECHO, e assenta o
+ * estado da run no mesmo instante.
+ *
+ * Assentar aqui, e nao no clique dos botoes, e deliberado: com o laco parado e
+ * `runInProgress` ainda de pe, Esc (ou o voltar do navegador, pela sentinela de
+ * historico) abriria um menu de campo fantasma POR BAIXO do formulario — e o
+ * menu ainda levaria `#options-controls` para o proprio slot ao abrir. Depois
+ * desta funcao, `runActive()` e falso e nenhum dos dois caminhos existe.
+ */
+const showTrainingOutcome = (certified: boolean): void => {
+  trainingOutcome = certified ? 'certified' : 'incomplete';
+  // `dataset.i18n` acompanha o texto: se o idioma trocar com o formulario
+  // aberto, `applyStaticTranslations` reescreve na chave do desfecho certo.
+  const set = (id: string, key: MessageKey): void => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.dataset.i18n = key;
+    el.textContent = t(key);
+  };
+  set('training-complete-title', certified ? 'training.complete.title' : 'training.incomplete.title');
+  set('training-complete-body', certified ? 'training.complete.body' : 'training.incomplete.body');
+  set('btn-training-descend', certified ? 'training.complete.descend' : 'training.incomplete.retry');
+
+  runInProgress = false;
+  activeRunKind = 'none';
+  liveRun = null;
+  paused = false;
+  pauseMenu.disarmHistory();
+  input.clearPendingUiInput();
+  mountOptions(optionsSlot);
+  trainingCompleteOverlay.classList.remove('hidden');
+};
+
+/**
  * Prepara a operacao de treinamento: o irmao SINCRONO de `prepareSolo`.
  *
  * A mesma dupla playout/fila, o mesmo congelamento de pausa e o mesmo véu —
@@ -1385,19 +1425,21 @@ const prepareTraining = (): PreparedRun => {
     if (state.phase !== 'running') {
       eventQueue.flush(Number.POSITIVE_INFINITY);
 
-      // Extraiu — com ou sem o Nucleo (furar a ordem e sair de maos vazias
-      // tambem encerra o exercicio; o formulario explica o que faltou render).
-      // UMA vez: o formulario e DOM e nao precisa do laco — diferente da tela
-      // de fim real, que continua desenhando para escutar R/T.
+      // Extraiu. So a extracao COM o Nucleo homologa o exercicio — sair de
+      // maos vazias e uma decisao legitima numa run real, mas aqui significa
+      // que o curriculo foi pulado: o formulario diz isso e oferece repetir,
+      // sem marcar o treinamento como feito. UMA vez: o formulario e DOM e nao
+      // precisa do laco — diferente da tela de fim real, que continua
+      // desenhando para escutar R/T.
       if (state.phase === 'extracted' || state.phase === 'extracted_with_core') {
-        markTrainingDone();
+        const certified = state.phase === 'extracted_with_core';
+        if (certified) markTrainingDone();
         setBanner(null);
         audio.update(state, now);
         // O ultimo quadro fica congelado atras do formulario.
         draw(state, now);
         running = false;
-        input.clearPendingUiInput();
-        trainingCompleteOverlay.classList.remove('hidden');
+        showTrainingOutcome(certified);
         return;
       }
 
@@ -1861,13 +1903,15 @@ document.getElementById('btn-training-terminal')?.addEventListener('click', () =
     if (!ran) menu.classList.remove('hidden');
   });
 });
-// O caminho desenhado para o momento: o exercicio acabou de ensinar a extracao,
-// e a descida de verdade esta a um carimbo. `startSolo` cuida do véu e do
-// ticket — o treinamento so precisa sair da frente primeiro.
+// O botao primario segue o desfecho: exercicio homologado abre a descida real
+// (o carimbo que ele acabou de aprender a merecer); nao homologado repete o
+// exercicio. `startSolo`/`startTraining` cuidam do véu — o treinamento so
+// precisa sair da frente primeiro.
 document.getElementById('btn-training-descend')?.addEventListener('click', () => {
   audio.ui();
   teardownTraining();
-  startSolo();
+  if (trainingOutcome === 'certified') startSolo();
+  else startTraining();
 });
 
 // Rede de seguranca para o auto-start por query e para browsers que exigem um

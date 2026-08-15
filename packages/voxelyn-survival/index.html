@@ -2702,13 +2702,19 @@
         <div class="ax-form-head">
           <div id="training-complete-mark"></div>
           <div style="min-width: 0">
-            <h1 class="corp" data-i18n="training.complete.title">EXERCÍCIO HOMOLOGADO</h1>
+            <!-- Título, corpo e botão primário são REESCRITOS por
+                 showTrainingOutcome conforme o desfecho: homologado (Núcleo na
+                 plataforma) ou não homologado (extração de mãos vazias). Os
+                 data-i18n aqui são só o estado inicial. -->
+            <h1 id="training-complete-title" class="corp" data-i18n="training.complete.title">
+              EXERCÍCIO HOMOLOGADO
+            </h1>
             <div class="ax-doc-code" data-i18n="aurix.doc.training">
               FORMULÁRIO AD-TRN-01 · exercício de indução
             </div>
           </div>
         </div>
-        <div class="sub" data-i18n="training.complete.body">
+        <div id="training-complete-body" class="sub" data-i18n="training.complete.body">
           Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende.
           O Veio lá embaixo rende.
         </div>

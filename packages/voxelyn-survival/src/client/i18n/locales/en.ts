@@ -800,4 +800,11 @@ export const EN: Record<keyof typeof PT_BR, string> = {
     'Training record filed. No cargo was credited — training pays nothing. The Vein below does.',
   'training.complete.descend': 'AUTHORISE DESCENT',
   'training.complete.terminal': 'RETURN TO TERMINAL',
+  // Empty-handed extraction: the exit is logged, the drill is not. Same
+  // notifying voice — the contract asked for the Core, and the only
+  // consequence is the form offering a repeat.
+  'training.incomplete.title': 'DRILL NOT CERTIFIED',
+  'training.incomplete.body':
+    'Extraction with empty cargo. The exercise contract wants the Core on the platform — the company logs the exit, but does not certify it. Repeat the operation.',
+  'training.incomplete.retry': 'REPEAT DRILL',
 };

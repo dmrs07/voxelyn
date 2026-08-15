@@ -811,4 +811,11 @@ export const PT_BR = {
     'Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende. O Veio lá embaixo rende.',
   'training.complete.descend': 'AUTORIZAR DESCIDA',
   'training.complete.terminal': 'VOLTAR AO TERMINAL',
+  // Extração de mãos vazias: a saída é registrada, o exercício não. A voz
+  // continua notificando em vez de repreender — o contrato pedia o Núcleo, e
+  // a única consequência é o formulário oferecer a repetição.
+  'training.incomplete.title': 'EXERCÍCIO NÃO HOMOLOGADO',
+  'training.incomplete.body':
+    'Extração sem carga. O contrato do exercício pede o Núcleo na plataforma — a companhia registra a saída, mas não homologa. Repita a operação.',
+  'training.incomplete.retry': 'REPETIR EXERCÍCIO',
 } as const;
