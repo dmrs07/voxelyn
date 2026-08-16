@@ -1,8 +1,8 @@
-# 113 - The Training Operation
+# 111 - The Training Operation
 
 **2026-08-16** · commit `87262b8` · PR #145
 
-![The dispatch terminal, now with a TRAINING OP button under the descent stamp](../media/113-terminal.png)
+![The dispatch terminal, now with a TRAINING OP button under the descent stamp](../media/111-terminal.png)
 
 Somebody played Voxelyn blind. Three runs, got measurably further each time, no guide, no
 questions asked. Then he wrote the single most useful sentence anyone has ever sent me
@@ -32,7 +32,7 @@ politely refuses to be.
 Meet the Training Operation: a short, in fiction, fully playable drill. Two to three
 minutes. Five exercises. Move, fire, dash, take the Core, get back out.
 
-![The induction briefing, with AUTHORISE DESCENT as the stamp and TRAINING OPERATION as the second button](../media/113-briefing.png)
+![The induction briefing, with AUTHORISE DESCENT as the stamp and TRAINING OPERATION as the second button](../media/111-briefing.png)
 
 It shows up in two places and it is never mandatory in either of them. There is a
 permanent button on the dispatch terminal, and every first read of the induction now ends
@@ -77,7 +77,7 @@ The course is a straight line, on purpose, because the order of the rooms is the
 the lessons: entry platform, gallery, firing chamber with two stalkers in it, a corridor
 with pillars to dash around, and the pedestal chamber at the end.
 
-![Drill 1 on the entry platform, the gallery opening ahead](../media/113-drill-move.png)
+![Drill 1 on the entry platform, the gallery opening ahead](../media/111-drill-move.png)
 
 Everything not in that course becomes plain rock with its surface wiped. This copies the
 arena's closing philosophy rather than the lazy version of it. The lazy version fills the
@@ -123,7 +123,7 @@ locking up, and there is a test that walks that exact griefing path to prove it.
 
 ## Combat, or: how the screenshot bot learned to shoot
 
-![Drill 2, a stalker closing in, heat bar climbing](../media/113-combat.png)
+![Drill 2, a stalker closing in, heat bar climbing](../media/111-combat.png)
 
 To illustrate this post I wrote a script to play the drill. I want to be clear that the
 game won the first several rounds.
@@ -133,7 +133,7 @@ you", and, underneath it, the field recommendation: melee is telegraphed, the wi
 arrives before the blow. Being coached by your own death screen is a humbling experience I
 recommend to every developer.
 
-![The death screen inside the drill, one kill, 102 damage taken](../media/113-death.png)
+![The death screen inside the drill, one kill, 102 damage taken](../media/111-death.png)
 
 Round two I made the bot retreat while shooting, and it survived beautifully for thirty
 straight passes without killing anything, which is its own kind of failure.
@@ -148,14 +148,14 @@ Navigation was the same story twice more. It could not find the pedestal, so it 
 chase teal pixels. Then it drove face first into a wall in a perfectly straight line
 forever, so it learned to sidestep whenever the distance stops dropping.
 
-![The Core pedestal, lit, with the drill asking for E](../media/113-pedestal.png)
+![The Core pedestal, lit, with the drill asking for E](../media/111-pedestal.png)
 
 It picks up the Core reliably now, which is where the album stops. The bot never did
 figure out the way home, and every attempt to teach it cost more time than the screenshot
 was worth, so the extraction shot is missing and I have made my peace with that. A human
 walks it in about fifteen seconds.
 
-![Core taken, HUD flipped to EXTRACT AT THE ENTRANCE](../media/113-core-taken.png)
+![Core taken, HUD flipped to EXTRACT AT THE ENTRANCE](../media/111-core-taken.png)
 
 ## The plumbing nobody will ever see
 
@@ -179,7 +179,7 @@ for having learned nothing whatsoever. It congratulated you for skipping the ent
 curriculum. Now an empty extraction gets its own outcome, in the same company voice, and
 the primary button turns into REPEAT DRILL instead of sending you down for real.
 
-![DRILL NOT CERTIFIED, with REPEAT DRILL as the primary button](../media/113-not-certified.png)
+![DRILL NOT CERTIFIED, with REPEAT DRILL as the primary button](../media/111-not-certified.png)
 
 The second was a ghost. With the completion form on screen the run had stopped but had
 never been settled, so Escape still opened the field menu underneath the form, and the
