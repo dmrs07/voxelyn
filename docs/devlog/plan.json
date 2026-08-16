@@ -102,9 +102,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "002-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10436
+        },
+        {
+          "recipe": "iso",
+          "file": "002-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 9337
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -146,9 +159,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "003-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "003-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 21531
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -222,7 +248,7 @@
       "status": "pending",
       "skipped": false,
       "shots": [],
-      "shotError": null,
+      "shotError": "editor: Command failed: pnpm --filter @voxelforge/editor exec vite build",
       "entryFile": null,
       "carousel": [],
       "carousels": {},
@@ -258,9 +284,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "005-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10469
+        },
+        {
+          "recipe": "iso",
+          "file": "005-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 16760
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -310,9 +349,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "006-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "006-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 16916
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -351,7 +403,7 @@
       "status": "pending",
       "skipped": false,
       "shots": [],
-      "shotError": null,
+      "shotError": "editor: Command failed: pnpm --filter @voxelforge/editor exec vite build",
       "entryFile": null,
       "carousel": [],
       "carousels": {},
@@ -387,9 +439,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "008-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "008-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 17063
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -427,9 +492,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "009-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "009-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 16660
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -475,9 +553,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "010-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "010-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 17175
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -578,9 +669,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "011-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10486
+        },
+        {
+          "recipe": "iso",
+          "file": "011-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 16809
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -624,9 +728,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "012-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "012-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 17074
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -664,9 +781,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "013-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10508
+        },
+        {
+          "recipe": "iso",
+          "file": "013-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 17151
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -762,9 +892,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "014-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10526
+        },
+        {
+          "recipe": "iso",
+          "file": "014-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 16868
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -801,9 +944,22 @@
         "noita",
         "iso"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "noita",
+          "file": "015-noita.png",
+          "label": "demo Noita-like",
+          "bytes": 10546
+        },
+        {
+          "recipe": "iso",
+          "file": "015-iso.png",
+          "label": "demo iso Diablo-like",
+          "bytes": 17032
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -890,9 +1046,16 @@
       "recipes": [
         "roguelike"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "roguelike",
+          "file": "016-roguelike.png",
+          "label": "roguelike",
+          "bytes": 215193
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1019,9 +1182,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "017-solo.png",
+          "label": "run solo",
+          "bytes": 99113
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1057,9 +1227,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "018-solo.png",
+          "label": "run solo",
+          "bytes": 94209
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1105,9 +1282,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "019-solo.png",
+          "label": "run solo",
+          "bytes": 96864
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1228,9 +1412,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "020-solo.png",
+          "label": "run solo",
+          "bytes": 82262
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1398,9 +1589,22 @@
         "sprites",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "sprites",
+          "file": "021-sprites.png",
+          "label": "atlas de sprites",
+          "bytes": 115019
+        },
+        {
+          "recipe": "solo",
+          "file": "021-solo.png",
+          "label": "run solo",
+          "bytes": 99280
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1449,9 +1653,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "022-solo.png",
+          "label": "run solo",
+          "bytes": 85790
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1518,9 +1729,22 @@
         "sprites",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "sprites",
+          "file": "023-sprites.png",
+          "label": "atlas de sprites",
+          "bytes": 116825
+        },
+        {
+          "recipe": "solo",
+          "file": "023-solo.png",
+          "label": "run solo",
+          "bytes": 93555
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1601,9 +1825,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "024-solo.png",
+          "label": "run solo",
+          "bytes": 113075
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1647,9 +1878,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "025-solo.png",
+          "label": "run solo",
+          "bytes": 99178
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1712,9 +1950,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "026-solo.png",
+          "label": "run solo",
+          "bytes": 91005
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1767,9 +2012,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "027-solo.png",
+          "label": "run solo",
+          "bytes": 88640
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1828,9 +2080,22 @@
         "sprites",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "sprites",
+          "file": "028-sprites.png",
+          "label": "atlas de sprites",
+          "bytes": 116474
+        },
+        {
+          "recipe": "solo",
+          "file": "028-solo.png",
+          "label": "run solo",
+          "bytes": 82336
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -1895,9 +2160,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "029-solo.png",
+          "label": "run solo",
+          "bytes": 59220
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2024,9 +2296,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "030-solo.png",
+          "label": "run solo",
+          "bytes": 74427
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2071,9 +2350,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "031-solo.png",
+          "label": "run solo",
+          "bytes": 64630
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2124,9 +2410,16 @@
         "arena",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "032-solo.png",
+          "label": "run solo",
+          "bytes": 92398
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2165,9 +2458,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "033-solo.png",
+          "label": "run solo",
+          "bytes": 71045
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2422,9 +2722,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "034-solo.png",
+          "label": "run solo",
+          "bytes": 67927
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2474,9 +2781,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "035-solo.png",
+          "label": "run solo",
+          "bytes": 60350
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2603,9 +2917,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "036-solo.png",
+          "label": "run solo",
+          "bytes": 67881
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2652,9 +2973,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "037-solo.png",
+          "label": "run solo",
+          "bytes": 85619
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2829,9 +3157,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "038-solo.png",
+          "label": "run solo",
+          "bytes": 70626
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2910,9 +3245,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "039-solo.png",
+          "label": "run solo",
+          "bytes": 83730
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -2963,9 +3305,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "040-solo.png",
+          "label": "run solo",
+          "bytes": 116985
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3079,9 +3428,16 @@
       "recipes": [
         "menu"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "menu",
+          "file": "041-menu.png",
+          "label": "terminal",
+          "bytes": 80785
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3141,9 +3497,22 @@
         "sprites",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "sprites",
+          "file": "042-sprites.png",
+          "label": "atlas de sprites",
+          "bytes": 116825
+        },
+        {
+          "recipe": "solo",
+          "file": "042-solo.png",
+          "label": "run solo",
+          "bytes": 83296
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3297,9 +3666,16 @@
       "recipes": [
         "menu"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "menu",
+          "file": "043-menu.png",
+          "label": "terminal",
+          "bytes": 80785
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3350,9 +3726,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "044-solo.png",
+          "label": "run solo",
+          "bytes": 85249
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3389,9 +3772,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "045-solo.png",
+          "label": "run solo",
+          "bytes": 77618
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3434,9 +3824,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "046-solo.png",
+          "label": "run solo",
+          "bytes": 94770
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3483,9 +3880,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "047-solo.png",
+          "label": "run solo",
+          "bytes": 90050
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3523,9 +3927,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "048-solo.png",
+          "label": "run solo",
+          "bytes": 98817
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3574,9 +3985,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "049-solo.png",
+          "label": "run solo",
+          "bytes": 87886
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3612,9 +4030,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "050-solo.png",
+          "label": "run solo",
+          "bytes": 82719
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3654,9 +4079,16 @@
       "recipes": [
         "menu"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "menu",
+          "file": "051-menu.png",
+          "label": "terminal",
+          "bytes": 80785
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3723,9 +4155,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "052-solo.png",
+          "label": "run solo",
+          "bytes": 87035
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3764,9 +4203,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "053-solo.png",
+          "label": "run solo",
+          "bytes": 103554
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3803,9 +4249,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "054-solo.png",
+          "label": "run solo",
+          "bytes": 91755
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3847,9 +4300,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "055-solo.png",
+          "label": "run solo",
+          "bytes": 99258
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3889,9 +4349,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "056-solo.png",
+          "label": "run solo",
+          "bytes": 91524
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -3932,9 +4399,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "057-solo.png",
+          "label": "run solo",
+          "bytes": 81170
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4009,9 +4483,22 @@
         "sprites",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "sprites",
+          "file": "058-sprites.png",
+          "label": "atlas de sprites",
+          "bytes": 62657
+        },
+        {
+          "recipe": "solo",
+          "file": "058-solo.png",
+          "label": "run solo",
+          "bytes": 226058
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4052,9 +4539,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "059-solo.png",
+          "label": "run solo",
+          "bytes": 197719
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4099,9 +4593,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "060-solo.png",
+          "label": "run solo",
+          "bytes": 146240
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4156,9 +4657,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "061-solo.png",
+          "label": "run solo",
+          "bytes": 188061
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4213,9 +4721,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "062-solo.png",
+          "label": "run solo",
+          "bytes": 184111
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4330,9 +4845,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "063-solo.png",
+          "label": "run solo",
+          "bytes": 215019
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4379,9 +4901,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "064-solo.png",
+          "label": "run solo",
+          "bytes": 176768
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4448,9 +4977,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "065-solo.png",
+          "label": "run solo",
+          "bytes": 203946
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4517,9 +5053,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "066-solo.png",
+          "label": "run solo",
+          "bytes": 194790
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4564,9 +5107,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "067-solo.png",
+          "label": "run solo",
+          "bytes": 151676
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4677,9 +5227,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "068-solo.png",
+          "label": "run solo",
+          "bytes": 201453
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4735,9 +5292,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "069-solo.png",
+          "label": "run solo",
+          "bytes": 177297
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4786,9 +5350,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "070-solo.png",
+          "label": "run solo",
+          "bytes": 180509
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4876,9 +5447,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "071-solo.png",
+          "label": "run solo",
+          "bytes": 213143
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4918,9 +5496,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "072-solo.png",
+          "label": "run solo",
+          "bytes": 215878
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -4956,9 +5541,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "073-solo.png",
+          "label": "run solo",
+          "bytes": 169143
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5017,9 +5609,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "074-solo.png",
+          "label": "run solo",
+          "bytes": 182363
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5062,9 +5661,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "075-solo.png",
+          "label": "run solo",
+          "bytes": 192443
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5100,9 +5706,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "076-solo.png",
+          "label": "run solo",
+          "bytes": 148174
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5140,9 +5753,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "077-solo.png",
+          "label": "run solo",
+          "bytes": 151650
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5209,9 +5829,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "078-solo.png",
+          "label": "run solo",
+          "bytes": 167171
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5253,9 +5880,22 @@
         "sprites",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "sprites",
+          "file": "079-sprites.png",
+          "label": "atlas de sprites",
+          "bytes": 63033
+        },
+        {
+          "recipe": "solo",
+          "file": "079-solo.png",
+          "label": "run solo",
+          "bytes": 202538
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5342,9 +5982,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "080-solo.png",
+          "label": "run solo",
+          "bytes": 233032
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5392,9 +6039,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "081-solo.png",
+          "label": "run solo",
+          "bytes": 252058
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5433,9 +6087,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "082-solo.png",
+          "label": "run solo",
+          "bytes": 192086
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5482,9 +6143,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "083-solo.png",
+          "label": "run solo",
+          "bytes": 187060
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5536,9 +6204,22 @@
         "arena",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "arena",
+          "file": "084-arena.png",
+          "label": "arena de chefes",
+          "bytes": 160388
+        },
+        {
+          "recipe": "solo",
+          "file": "084-solo.png",
+          "label": "run solo",
+          "bytes": 197260
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5575,9 +6256,22 @@
         "arena",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "arena",
+          "file": "085-arena.png",
+          "label": "arena de chefes",
+          "bytes": 156137
+        },
+        {
+          "recipe": "solo",
+          "file": "085-solo.png",
+          "label": "run solo",
+          "bytes": 180070
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5617,9 +6311,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "086-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 71168
+        },
+        {
+          "recipe": "solo",
+          "file": "086-solo.png",
+          "label": "run solo",
+          "bytes": 224868
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5656,9 +6363,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "087-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 79452
+        },
+        {
+          "recipe": "solo",
+          "file": "087-solo.png",
+          "label": "run solo",
+          "bytes": 212622
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5700,9 +6420,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "088-solo.png",
+          "label": "run solo",
+          "bytes": 202180
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5739,9 +6466,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "089-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 79452
+        },
+        {
+          "recipe": "solo",
+          "file": "089-solo.png",
+          "label": "run solo",
+          "bytes": 158883
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5780,9 +6520,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "090-solo.png",
+          "label": "run solo",
+          "bytes": 275907
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5821,9 +6568,22 @@
         "arena",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "arena",
+          "file": "091-arena.png",
+          "label": "arena de chefes",
+          "bytes": 217191
+        },
+        {
+          "recipe": "solo",
+          "file": "091-solo.png",
+          "label": "run solo",
+          "bytes": 182357
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5860,9 +6620,22 @@
         "arena",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "arena",
+          "file": "092-arena.png",
+          "label": "arena de chefes",
+          "bytes": 223402
+        },
+        {
+          "recipe": "solo",
+          "file": "092-solo.png",
+          "label": "run solo",
+          "bytes": 162400
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5899,9 +6672,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "093-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 79452
+        },
+        {
+          "recipe": "solo",
+          "file": "093-solo.png",
+          "label": "run solo",
+          "bytes": 199584
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5938,9 +6724,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "094-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "094-solo.png",
+          "label": "run solo",
+          "bytes": 226428
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -5977,9 +6776,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "095-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "095-solo.png",
+          "label": "run solo",
+          "bytes": 154474
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6017,9 +6829,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "096-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "096-solo.png",
+          "label": "run solo",
+          "bytes": 141020
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6056,9 +6881,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "097-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "097-solo.png",
+          "label": "run solo",
+          "bytes": 260687
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6095,9 +6933,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "098-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "098-solo.png",
+          "label": "run solo",
+          "bytes": 218797
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6134,9 +6985,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "099-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "099-solo.png",
+          "label": "run solo",
+          "bytes": 147347
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6173,9 +7037,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "100-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "100-solo.png",
+          "label": "run solo",
+          "bytes": 228831
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6212,9 +7089,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "101-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 84158
+        },
+        {
+          "recipe": "solo",
+          "file": "101-solo.png",
+          "label": "run solo",
+          "bytes": 232762
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6255,9 +7145,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "102-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 94268
+        },
+        {
+          "recipe": "solo",
+          "file": "102-solo.png",
+          "label": "run solo",
+          "bytes": 211268
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6298,9 +7201,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "103-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 103887
+        },
+        {
+          "recipe": "solo",
+          "file": "103-solo.png",
+          "label": "run solo",
+          "bytes": 233919
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6358,9 +7274,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "104-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 103887
+        },
+        {
+          "recipe": "solo",
+          "file": "104-solo.png",
+          "label": "run solo",
+          "bytes": 178076
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6402,9 +7331,22 @@
         "atlas-studio",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "atlas-studio",
+          "file": "105-atlas-studio.png",
+          "label": "Atlas Studio",
+          "bytes": 103887
+        },
+        {
+          "recipe": "solo",
+          "file": "105-solo.png",
+          "label": "run solo",
+          "bytes": 204125
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6459,9 +7401,16 @@
       "recipes": [
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "106-solo.png",
+          "label": "run solo",
+          "bytes": 260790
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
@@ -6506,9 +7455,234 @@
         "arena",
         "solo"
       ],
-      "status": "pending",
+      "status": "shot",
       "skipped": false,
-      "shots": [],
+      "shots": [
+        {
+          "recipe": "arena",
+          "file": "107-arena.png",
+          "label": "arena de chefes",
+          "bytes": 263062
+        },
+        {
+          "recipe": "solo",
+          "file": "107-solo.png",
+          "label": "run solo",
+          "bytes": 246676
+        }
+      ],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "carousels": {},
+      "cdn": {},
+      "publishedAt": null
+    },
+    {
+      "id": "108",
+      "pr": 142,
+      "kind": "pr",
+      "title": "Review do Codex no #142: a varredura da Fornalha nao e hazard",
+      "slug": "review-do-codex-no-142-a-varredura-da-fornalha-nao-e-hazard",
+      "tip": "c938bcf2d5e2899eb16abb52fcd9645a24827d7b",
+      "tipShort": "c938bcf",
+      "realDate": "2026-08-11",
+      "publishDate": "2026-11-26",
+      "areas": [
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-sim",
+        "docs",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 1432,
+        "removed": 71,
+        "files": 20,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "ce3ec3e",
+          "subject": "Musica de fase por bioma e atenuacao dos SFX de gases"
+        },
+        {
+          "sha": "8e384d2",
+          "subject": "Review do Codex no #142: a varredura da Fornalha nao e hazard"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "shot",
+      "skipped": false,
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "108-solo.png",
+          "label": "run solo",
+          "bytes": 248468
+        }
+      ],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "carousels": {},
+      "cdn": {},
+      "publishedAt": null
+    },
+    {
+      "id": "109",
+      "pr": 143,
+      "kind": "pr",
+      "title": "Leylines 3: a rede densifica com a descida, e o lore que a arquiva",
+      "slug": "leylines-3-a-rede-densifica-com-a-descida-e-o-lore-que-a-arq",
+      "tip": "2afaa1779ec7ea15e4bdc0844c0bee9343962d3e",
+      "tipShort": "2afaa17",
+      "realDate": "2026-08-11",
+      "publishDate": "2026-11-27",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "packages/voxelyn-survival",
+        "packages/voxelyn-survival-protocol",
+        "packages/voxelyn-survival-server"
+      ],
+      "stat": {
+        "added": 3188,
+        "removed": 91,
+        "files": 46,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "cb8c059",
+          "subject": "Leylines: condutor geologico persistente com conducao por segmento"
+        },
+        {
+          "sha": "52e8a47",
+          "subject": "Leylines 2: roteamento nas juncoes — o RELE"
+        },
+        {
+          "sha": "eec3472",
+          "subject": "Leylines 3: a rede densifica com a descida, e o lore que a arquiva"
+        },
+        {
+          "sha": "73d0867",
+          "subject": "Merge main: renumera o wire das leylines apos o hazard do #142"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "shot",
+      "skipped": false,
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "109-solo.png",
+          "label": "run solo",
+          "bytes": 173932
+        }
+      ],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "carousels": {},
+      "cdn": {},
+      "publishedAt": null
+    },
+    {
+      "id": "110",
+      "pr": 144,
+      "kind": "pr",
+      "title": "Review do Codex no #144: a garantia nao entra no Ferrifero, e a assinatura mede o mundo real",
+      "slug": "review-do-codex-no-144-a-garantia-nao-entra-no-ferrifero-e-a",
+      "tip": "bc11139a29f7262da3fa3f810f91adbf507645b3",
+      "tipShort": "bc11139",
+      "realDate": "2026-08-11",
+      "publishDate": "2026-11-28",
+      "areas": [
+        "packages/voxelyn-survival-sim",
+        "docs",
+        "packages/voxelyn-survival-protocol"
+      ],
+      "stat": {
+        "added": 314,
+        "removed": 70,
+        "files": 10,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "ec60014",
+          "subject": "Leylines: descobribilidade — o setor 1 traca a linha, a descida garante"
+        },
+        {
+          "sha": "2e64cb9",
+          "subject": "Review do Codex no #144: a garantia nao entra no Ferrifero, e a assinatura mede o mundo real"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "shot",
+      "skipped": false,
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "110-solo.png",
+          "label": "run solo",
+          "bytes": 251118
+        }
+      ],
+      "shotError": null,
+      "entryFile": null,
+      "carousel": [],
+      "carousels": {},
+      "cdn": {},
+      "publishedAt": null
+    },
+    {
+      "id": "111",
+      "pr": 145,
+      "kind": "pr",
+      "title": "Training: require the Core to certify, and settle run state at the form",
+      "slug": "training-require-the-core-to-certify-and-settle-run-state-at",
+      "tip": "87262b837d5d5421fe8b64526b0884c3324dbbb8",
+      "tipShort": "87262b8",
+      "realDate": "2026-08-15",
+      "publishDate": "2026-11-29",
+      "areas": [
+        "packages/voxelyn-survival"
+      ],
+      "stat": {
+        "added": 1231,
+        "removed": 22,
+        "files": 9,
+        "partial": false
+      },
+      "commits": [
+        {
+          "sha": "95a49c9",
+          "subject": "Add the Training Operation: a playable first-descent drill"
+        },
+        {
+          "sha": "c68c7fe",
+          "subject": "Training: require the Core to certify, and settle run state at the form"
+        }
+      ],
+      "recipes": [
+        "solo"
+      ],
+      "status": "shot",
+      "skipped": false,
+      "shots": [
+        {
+          "recipe": "solo",
+          "file": "111-solo.png",
+          "label": "run solo",
+          "bytes": 315766
+        }
+      ],
       "shotError": null,
       "entryFile": null,
       "carousel": [],
