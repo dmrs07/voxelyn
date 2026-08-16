@@ -7673,7 +7673,7 @@
       "recipes": [
         "solo"
       ],
-      "status": "shot",
+      "status": "published",
       "skipped": false,
       "shots": [
         {
@@ -7684,11 +7684,22 @@
         }
       ],
       "shotError": null,
-      "entryFile": null,
-      "carousel": [],
+      "entryFile": "111-the-training-operation.md",
+      "carousel": [
+        "111-01.png",
+        "111-02.png",
+        "111-03.png",
+        "111-04.png",
+        "111-05.png",
+        "111-06.png",
+        "111-07.png",
+        "111-08.png",
+        "111-09.png",
+        "111-10.png"
+      ],
       "carousels": {},
       "cdn": {},
-      "publishedAt": null
+      "publishedAt": "2026-08-16"
     }
   ]
 }

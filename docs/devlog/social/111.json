@@ -1,0 +1,42 @@
+{
+  "hook": "Um jogador terminou três runs sem saber o objetivo",
+  "slides": [
+    {
+      "title": "A frase que abriu o chamado",
+      "body": "Alguém jogou às cegas: três runs, sem guia, indo mais longe a cada uma. E escreveu: \"eu não sabia exatamente qual era o objetivo\". O objetivo está escrito na Indução, artigo dois, na voz da companhia. Ele leu. Não colou. Isso é problema de design, e a correção nunca é escrever um parágrafo mais longo."
+    },
+    {
+      "title": "O documento já sabia",
+      "body": "O comentário no topo do induction.ts diz, há semanas, que aquilo não é tutorial guiado: ele torna a primeira descida legível, não a resolve. Estava certo sobre si mesmo. Ninguém aprende a esquivar lendo sobre esquiva.",
+      "shot": "111-briefing.png"
+    },
+    {
+      "title": "Operação de treinamento",
+      "body": "Dois a três minutos, cinco exercícios: mover, atirar, esquivar, pegar o Núcleo, sair vivo. Permanente no terminal e oferecido na primeira leitura da circular, com o carimbo grande continuando a mandar para o Veio de verdade. Nunca obrigatório."
+    },
+    {
+      "title": "Zero linha na simulação",
+      "body": "O truque é uma configuração que já existia: um setor, Núcleo nele. Setor 1 nunca tem chefe, então o pedestal nasce destravado; extrair com o Núcleo ali produz o MESMO desfecho de uma expedição real. E o HUD de verdade ensina sozinho: FIND THE CORE vira EXTRACT AT THE ENTRANCE.",
+      "shot": "111-pedestal.png"
+    },
+    {
+      "title": "O curso é esculpido",
+      "body": "Um setor normal é gerado de uma seed fixa e recortado antes do primeiro tick: plataforma, galeria, câmara de tiro, corredor de pilares, pedestal. Tudo fora do curso vira rocha lisa — senão o maciço selado guardaria cristal, e cristal acende luz num lugar que o exercício acabou de declarar inexistente."
+    },
+    {
+      "title": "O soft lock que quase foi",
+      "body": "O curso não tem portas. Dá para ignorar o pedido de dash e pegar o Núcleo antes. Se aquele passo escutasse só o evento, ele seria descartado e o drill esperaria para sempre por um segundo Núcleo que não existe. Fato irreversível se confere como fato; ação repetível, como evento."
+    },
+    {
+      "title": "O bug preferido do mês",
+      "body": "Extrair de mãos vazias homologava o exercício: quatro tiles para fora, quatro de volta, E, e o jogo parabenizava você por não ter aprendido nada. Agora a saída vazia tem desfecho próprio e o botão vira REPETIR EXERCÍCIO.",
+      "shot": "111-not-certified.png"
+    },
+    {
+      "title": "O que ele se recusa a fazer",
+      "body": "Não bloqueia, não desbloqueia e não paga nada — o formulário diz isso na cara. E quando ensina, ensina com a coisa real: mesmo Núcleo, mesma tecla, mesmo HUD, mesma extração que depois decide se uma hora de carga é creditada ou evapora."
+    }
+  ],
+  "caption": "Um jogador terminou três runs sem saber qual era o objetivo. O objetivo estava escrito numa tela que ele viu. Ler não é fazer, então o texto virou um exercício de dois minutos: mover, atirar, esquivar, pegar o Núcleo e voltar. Sem segunda engine, sem modo tutorial na simulação — o setor é real, recortado antes do primeiro tick, e o HUD que ensina é o mesmo que vai cobrar depois.",
+  "tags": ["#gamedev", "#indiedev", "#roguelike", "#gamedesign", "#tutorial", "#ux", "#voxel", "#indiegame"]
+}
