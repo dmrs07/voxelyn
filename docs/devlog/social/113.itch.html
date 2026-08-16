@@ -1,0 +1,116 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Voxelyn devlog 113 for itch.io</title>
+<!--
+  PARA PUBLICAR NO ITCH.IO
+  1. Abra este arquivo no navegador.
+  2. Ctrl+A, Ctrl+C.
+  3. Cole no campo Content do formulario de devlog.
+  O editor do itch e rich text e nao entende Markdown, entao a colagem de HTML
+  ja renderizado e o caminho que preserva titulos, negrito e citacao.
+  4. Onde estiver uma linha [ IMAGEM N ... ], apague a linha e insira a imagem
+  pelo botao de imagem da barra de ferramentas.
+-->
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         max-width: 46em; margin: 3em auto; padding: 0 1.2em; line-height: 1.6; color: #111; }
+  .slot { border: 1px dashed #b00; color: #b00; padding: .5em .8em; font-weight: 700; }
+</style>
+
+<p>Somebody played Voxelyn blind. Three runs, no guide, no questions asked, and he got measurably further each time. Then he wrote me the single most useful sentence anyone has ever sent about this game:</p>
+
+<blockquote><p>I didn't exactly know what the exact goal was.</p></blockquote>
+
+<p>Here is the thing. The goal is written down. It is on a screen he definitely saw, in the Operator Induction, article two, set in the mining company's own bold voice: descend, recover, extract, and cargo only clears once you get back out. We wrote that sentence carefully. We were proud of that sentence.</p>
+
+<p>He read it. It did not land. That is not a player problem, that is a design problem, and the fix for "my paragraph did not land" is never "write a longer paragraph".</p>
+
+<p class="slot">[ IMAGEM 1 · 113-terminal.png · The dispatch terminal, now with a training button under the descent stamp ]</p>
+
+<h2>The document already knew</h2>
+
+<p>The funniest part is that the induction file has been confessing this for weeks. There is a comment sitting at the top of it saying that it is not a guided tutorial, that it stops exactly where discovery begins, and that its job is to make the first descent legible rather than to solve it.</p>
+
+<p>It was right about itself. Reading about a dodge has never once taught anybody to dodge. So instead of rewriting the briefing for the fourth time, I built the thing the briefing politely refuses to be.</p>
+
+<p>Meet the Training Operation: a short, in fiction, fully playable drill. Two to three minutes. Five exercises. Move, fire, dash, take the Core, get back out alive.</p>
+
+<p class="slot">[ IMAGEM 2 · 113-briefing.png · The briefing, with AUTHORISE DESCENT as the stamp and TRAINING OPERATION as the second button ]</p>
+
+<p>It shows up in two places and it is never mandatory in either of them. There is a permanent button on the terminal, and the first time you read the induction it now ends with two buttons instead of one. The big glowing stamp still authorises a real descent. The quiet one under it starts the drill. If you open the briefing from the training button and then change your mind halfway down the page, the stamp still sends you into the real Vein, because the stamp means what it says and not what you clicked to get here.</p>
+
+<h2>No second engine, and I am insufferable about it</h2>
+
+<p>Zero lines changed in the simulation. Not one. The drill is the real game with surgery performed on it before the first tick.</p>
+
+<p>The whole trick is a run configuration that already existed:</p>
+
+<pre><code>sectorCount: 1, coreSectors: [1]</code></pre>
+
+<p>Read that as a sentence and it is literally the tutorial: this run is one sector long and the Core is in it. Two accidents of the existing rules make it work for free.</p>
+
+<p>First, the boss rule starts with "sector one never has a boss", so the pedestal is unlocked from the first frame with nothing to kill for the privilege. Second, extracting with the Core in sector one produces the exact same run outcome a real successful expedition produces. Not a lookalike. The same one.</p>
+
+<p>The best part is what that buys in the HUD. The objective line reads FIND THE CORE, and the moment you lift the Core off the pedestal it flips itself to EXTRACT AT THE ENTRANCE. That is the real HUD doing the real thing. There is no tutorial HUD, no special overlay, no tutorial mode hiding in the rules anywhere. The player learns the actual instrument panel because it is the actual instrument panel.</p>
+
+<h2>Carving a course out of a real sector</h2>
+
+<p>The map is not authored in an editor, because I do not have one and I did not want one. The game generates a normal sector from a fixed seed, and then the drill cuts into it before anything starts moving. The boss playtest tool has been doing exactly this for months, so the pattern was already sitting there with its receipts.</p>
+
+<p>The course is a straight line, on purpose, because the order of the rooms is the order of the lessons: entry platform, gallery, firing chamber with two stalkers in it, a corridor with pillars to dash around, and the pedestal chamber at the end.</p>
+
+<p class="slot">[ IMAGEM 3 · 113-drill-move.png · Drill 1 on the entry platform, the gallery opening ahead ]</p>
+
+<p>Everything not in that course becomes plain rock with its surface wiped. That is stricter than it sounds, and it matters. The lazy version just fills the gaps, which leaves the sealed rock holding all the ore and crystal the seed originally put in it. Crystal emits light. You would end up with a sealed wall quietly glowing blue, advertising a place the drill has just declared does not exist.</p>
+
+<p>Then there was the seed hunt, which went great, thanks for asking. The plan was to find a seed whose entrance sits somewhere roomy, so the course fits without touching the edge of the map. I scanned a few hundred. There is no such seed. The generator puts every single entrance flat against the border like a fire exit. So the course steps inward on its own and a short vestibule connects the platform to it.</p>
+
+<h2>The soft lock that would have been genuinely funny</h2>
+
+<p>The instruction layer watches the same event stream that feeds the renderer and the audio, and hands back cues: show this banner, queue that toast. The rule inside it took a couple of tries to get right, and it is this. Irreversible facts are checked as facts, repeatable actions are checked as events.</p>
+
+<p>Here is why that matters. The course has no doors. Nothing stops you from ignoring the dash prompt, strolling into the pedestal chamber, and lifting the Core while the game is still politely asking you to press space. If the Core step listened only for the pickup event, that event would arrive during the dash step, get thrown away, and then the drill would sit there forever waiting for a second Core to be picked up.</p>
+
+<p>There is no second Core. The tutorial becomes unfinishable, which is a spectacular thing for a tutorial to be.</p>
+
+<p>So dashing is checked as an event, because you can always dash again, and the Core is checked as a fact, because possession does not expire. Breaking the sequence now skips ahead instead of locking up.</p>
+
+<h2>Combat, or: how the screenshot bot learned to shoot</h2>
+
+<p class="slot">[ IMAGEM 4 · 113-combat.png · Drill 2, a stalker closing in, heat bar climbing ]</p>
+
+<p>To illustrate this post I wrote a script to play the drill for me. I want to be clear that the game won the first several rounds.</p>
+
+<p>Round one ended at twenty six seconds with a unit loss report that read "Stalker reached you", and underneath it, the field recommendation: melee is telegraphed, the windup sound arrives before the blow. Being coached by your own death screen is a humbling experience I recommend to every developer.</p>
+
+<p class="slot">[ IMAGEM 5 · 113-death.png · The death screen inside the drill: one kill, 102 damage taken ]</p>
+
+<p>Round two I made the bot retreat while shooting, and it survived beautifully for thirty straight passes without killing anything, which is its own kind of failure.</p>
+
+<p>Then it clicked. Aim assist is a purchased upgrade, and the drill deliberately runs the factory chassis with no upgrades at all, because that is exactly what a new player has. The bot had to actually aim. So it started reading the screen: find the red pixels, that is a stalker, put the mouse there. Combat went from "dies" to "cleared in eight passes" with one change.</p>
+
+<p>Navigation was the same story twice more. It could not find the pedestal, so it learned to chase the teal glow. Then it drove face first into a wall in a perfectly straight line forever, so it learned to sidestep whenever the distance stops dropping.</p>
+
+<p class="slot">[ IMAGEM 6 · 113-pedestal.png · The Core pedestal, lit, with the drill asking for E ]</p>
+
+<p>It picks up the Core reliably now, and that is where the album ends. The bot never did figure out the way home, and every attempt to teach it cost more time than the screenshot was worth. So there is no photo of the final extraction and I have made my peace with that. A human walks it in about fifteen seconds, which is either a nice comment on level design or a sad one on my scripting.</p>
+
+<p class="slot">[ IMAGEM 7 · 113-core-taken.png · Core taken, and the HUD flips itself to EXTRACT AT THE ENTRANCE ]</p>
+
+<h2>The bug I am most fond of</h2>
+
+<p>Two problems turned up in review, and I would have shipped both of them happily.</p>
+
+<p>The first is my favourite of the month. Extracting empty handed certified the drill. Walk four tiles out, walk four tiles back, press E, and the game hands you DRILL CERTIFIED for having learned absolutely nothing. It congratulated you for skipping the entire curriculum. Now an empty extraction gets its own outcome, in the same corporate voice, and the main button turns into REPEAT DRILL instead of waving you off into a real descent.</p>
+
+<p class="slot">[ IMAGEM 8 · 113-not-certified.png · DRILL NOT CERTIFIED, with REPEAT DRILL as the primary button ]</p>
+
+<p>The second was a ghost. With the completion form on screen the run had stopped but had never been properly closed, so pressing Escape still opened the field menu underneath the form, and the field menu helpfully took the shared options controls with it, leaving the terminal's Options screen empty afterwards. The run now closes the instant the form appears rather than when a button is finally clicked.</p>
+
+<h2>What it refuses to do</h2>
+
+<p>The drill never blocks you, never unlocks anything, and pays exactly nothing. The completion form says so out loud, because the fiction should stay honest: training yields nothing, the Vein below is where the money is.</p>
+
+<p>And when it does teach you, it teaches with the real thing. Same Core, same interact key, same HUD, same extraction, same rules that will later decide whether an hour of cargo banks or evaporates. Nobody practices on a toy version of the loop and then gets handed the real one at the worst possible moment.</p>
+
+<p>The button is on the terminal screen. It takes two minutes, and if it fails to land the way the briefing failed to land, I would very much like to hear about it, in as blunt a sentence as the one that started all this.</p>
