@@ -25,8 +25,6 @@
 
 <p>He read it. It did not land. That is not a player problem, that is a design problem, and the fix for "my paragraph did not land" is never "write a longer paragraph".</p>
 
-<p class="slot">[ IMAGEM 1 · 113-terminal.png · The dispatch terminal, now with a training button under the descent stamp ]</p>
-
 <h2>The document already knew</h2>
 
 <p>The funniest part is that the induction file has been confessing this for weeks. There is a comment sitting at the top of it saying that it is not a guided tutorial, that it stops exactly where discovery begins, and that its job is to make the first descent legible rather than to solve it.</p>
@@ -35,7 +33,7 @@
 
 <p>Meet the Training Operation: a short, in fiction, fully playable drill. Two to three minutes. Five exercises. Move, fire, dash, take the Core, get back out alive.</p>
 
-<p class="slot">[ IMAGEM 2 · 113-briefing.png · The briefing, with AUTHORISE DESCENT as the stamp and TRAINING OPERATION as the second button ]</p>
+<p class="slot">[ IMAGEM 1 · 113-briefing.png · The briefing, with AUTHORISE DESCENT as the stamp and TRAINING OPERATION as the second button ]</p>
 
 <p>It shows up in two places and it is never mandatory in either of them. There is a permanent button on the terminal, and the first time you read the induction it now ends with two buttons instead of one. The big glowing stamp still authorises a real descent. The quiet one under it starts the drill. If you open the briefing from the training button and then change your mind halfway down the page, the stamp still sends you into the real Vein, because the stamp means what it says and not what you clicked to get here.</p>
 
@@ -59,8 +57,6 @@
 
 <p>The course is a straight line, on purpose, because the order of the rooms is the order of the lessons: entry platform, gallery, firing chamber with two stalkers in it, a corridor with pillars to dash around, and the pedestal chamber at the end.</p>
 
-<p class="slot">[ IMAGEM 3 · 113-drill-move.png · Drill 1 on the entry platform, the gallery opening ahead ]</p>
-
 <p>Everything not in that course becomes plain rock with its surface wiped. That is stricter than it sounds, and it matters. The lazy version just fills the gaps, which leaves the sealed rock holding all the ore and crystal the seed originally put in it. Crystal emits light. You would end up with a sealed wall quietly glowing blue, advertising a place the drill has just declared does not exist.</p>
 
 <p>Then there was the seed hunt, which went great, thanks for asking. The plan was to find a seed whose entrance sits somewhere roomy, so the course fits without touching the edge of the map. I scanned a few hundred. There is no such seed. The generator puts every single entrance flat against the border like a fire exit. So the course steps inward on its own and a short vestibule connects the platform to it.</p>
@@ -77,13 +73,13 @@
 
 <h2>Combat, or: how the screenshot bot learned to shoot</h2>
 
-<p class="slot">[ IMAGEM 4 · 113-combat.png · Drill 2, a stalker closing in, heat bar climbing ]</p>
+<p class="slot">[ IMAGEM 2 · 113-combat.png · Drill 2, a stalker closing in, heat bar climbing ]</p>
 
 <p>To illustrate this post I wrote a script to play the drill for me. I want to be clear that the game won the first several rounds.</p>
 
 <p>Round one ended at twenty six seconds with a unit loss report that read "Stalker reached you", and underneath it, the field recommendation: melee is telegraphed, the windup sound arrives before the blow. Being coached by your own death screen is a humbling experience I recommend to every developer.</p>
 
-<p class="slot">[ IMAGEM 5 · 113-death.png · The death screen inside the drill: one kill, 102 damage taken ]</p>
+<p class="slot">[ IMAGEM 3 · 113-death.png · The death screen inside the drill: one kill, 102 damage taken ]</p>
 
 <p>Round two I made the bot retreat while shooting, and it survived beautifully for thirty straight passes without killing anything, which is its own kind of failure.</p>
 
@@ -91,19 +87,13 @@
 
 <p>Navigation was the same story twice more. It could not find the pedestal, so it learned to chase the teal glow. Then it drove face first into a wall in a perfectly straight line forever, so it learned to sidestep whenever the distance stops dropping.</p>
 
-<p class="slot">[ IMAGEM 6 · 113-pedestal.png · The Core pedestal, lit, with the drill asking for E ]</p>
-
-<p>It picks up the Core reliably now, and that is where the album ends. The bot never did figure out the way home, and every attempt to teach it cost more time than the screenshot was worth. So there is no photo of the final extraction and I have made my peace with that. A human walks it in about fifteen seconds, which is either a nice comment on level design or a sad one on my scripting.</p>
-
-<p class="slot">[ IMAGEM 7 · 113-core-taken.png · Core taken, and the HUD flips itself to EXTRACT AT THE ENTRANCE ]</p>
+<p>It lifts the Core off the pedestal reliably now. What it never worked out was the way home, and every attempt to teach it cost more time than the screenshot was worth, so the final extraction went unphotographed and I have made my peace with that. A human walks it in about fifteen seconds, which is either a nice comment on level design or a sad one on my scripting.</p>
 
 <h2>The bug I am most fond of</h2>
 
 <p>Two problems turned up in review, and I would have shipped both of them happily.</p>
 
 <p>The first is my favourite of the month. Extracting empty handed certified the drill. Walk four tiles out, walk four tiles back, press E, and the game hands you DRILL CERTIFIED for having learned absolutely nothing. It congratulated you for skipping the entire curriculum. Now an empty extraction gets its own outcome, in the same corporate voice, and the main button turns into REPEAT DRILL instead of waving you off into a real descent.</p>
-
-<p class="slot">[ IMAGEM 8 · 113-not-certified.png · DRILL NOT CERTIFIED, with REPEAT DRILL as the primary button ]</p>
 
 <p>The second was a ghost. With the completion form on screen the run had stopped but had never been properly closed, so pressing Escape still opened the field menu underneath the form, and the field menu helpfully took the shared options controls with it, leaving the terminal's Options screen empty afterwards. The run now closes the instant the form appears rather than when a button is finally clicked.</p>
 
