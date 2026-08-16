@@ -10,6 +10,8 @@
   ja renderizado e o caminho que preserva titulos, negrito e citacao.
   4. Onde estiver uma linha [ IMAGEM N ... ], apague a linha e insira a imagem
   pelo botao de imagem da barra de ferramentas.
+
+  IMAGENS (3): 113-briefing.png, 113-pedestal.png, 113-not-certified.png
 -->
 <style>
   body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -51,6 +53,8 @@
 
 <p>The best part is what that buys in the HUD. The objective line reads FIND THE CORE, and the moment you lift the Core off the pedestal it flips itself to EXTRACT AT THE ENTRANCE. That is the real HUD doing the real thing. There is no tutorial HUD, no special overlay, no tutorial mode hiding in the rules anywhere. The player learns the actual instrument panel because it is the actual instrument panel.</p>
 
+<p class="slot">[ IMAGEM 2 · 113-pedestal.png · Drill 4. The real objective, the real HUD reading FIND THE CORE, and the drill asking for one key ]</p>
+
 <h2>Carving a course out of a real sector</h2>
 
 <p>The map is not authored in an editor, because I do not have one and I did not want one. The game generates a normal sector from a fixed seed, and then the drill cuts into it before anything starts moving. The boss playtest tool has been doing exactly this for months, so the pattern was already sitting there with its receipts.</p>
@@ -71,29 +75,21 @@
 
 <p>So dashing is checked as an event, because you can always dash again, and the Core is checked as a fact, because possession does not expire. Breaking the sequence now skips ahead instead of locking up.</p>
 
-<h2>Combat, or: how the screenshot bot learned to shoot</h2>
+<h2>What a robot accidentally proved</h2>
 
-<p class="slot">[ IMAGEM 2 · 113-combat.png · Drill 2, a stalker closing in, heat bar climbing ]</p>
+<p>To take these screenshots I scripted a bot to play the drill, and the game beat it for several rounds. The first attempt died at twenty six seconds, and my own death screen coached me on the way out: melee is telegraphed, the windup sound arrives before the blow.</p>
 
-<p>To illustrate this post I wrote a script to play the drill for me. I want to be clear that the game won the first several rounds.</p>
+<p>It only started winning when it stopped spraying and began reading the screen. Find the red pixels, that is a stalker, put the mouse there.</p>
 
-<p>Round one ended at twenty six seconds with a unit loss report that read "Stalker reached you", and underneath it, the field recommendation: melee is telegraphed, the windup sound arrives before the blow. Being coached by your own death screen is a humbling experience I recommend to every developer.</p>
-
-<p class="slot">[ IMAGEM 3 · 113-death.png · The death screen inside the drill: one kill, 102 damage taken ]</p>
-
-<p>Round two I made the bot retreat while shooting, and it survived beautifully for thirty straight passes without killing anything, which is its own kind of failure.</p>
-
-<p>Then it clicked. Aim assist is a purchased upgrade, and the drill deliberately runs the factory chassis with no upgrades at all, because that is exactly what a new player has. The bot had to actually aim. So it started reading the screen: find the red pixels, that is a stalker, put the mouse there. Combat went from "dies" to "cleared in eight passes" with one change.</p>
-
-<p>Navigation was the same story twice more. It could not find the pedestal, so it learned to chase the teal glow. Then it drove face first into a wall in a perfectly straight line forever, so it learned to sidestep whenever the distance stops dropping.</p>
-
-<p>It lifts the Core off the pedestal reliably now. What it never worked out was the way home, and every attempt to teach it cost more time than the screenshot was worth, so the final extraction went unphotographed and I have made my peace with that. A human walks it in about fifteen seconds, which is either a nice comment on level design or a sad one on my scripting.</p>
+<p>Which is the part worth keeping. Aim assist in this game is a purchased upgrade, and the drill runs the factory chassis on purpose, because that is exactly what a new player has. Nobody gets help in here. That is why the two specimens wake up eleven tiles away instead of nine, just outside their own aggro range: far enough that stopping to read the instruction never costs you health.</p>
 
 <h2>The bug I am most fond of</h2>
 
 <p>Two problems turned up in review, and I would have shipped both of them happily.</p>
 
 <p>The first is my favourite of the month. Extracting empty handed certified the drill. Walk four tiles out, walk four tiles back, press E, and the game hands you DRILL CERTIFIED for having learned absolutely nothing. It congratulated you for skipping the entire curriculum. Now an empty extraction gets its own outcome, in the same corporate voice, and the main button turns into REPEAT DRILL instead of waving you off into a real descent.</p>
+
+<p class="slot">[ IMAGEM 3 · 113-not-certified.png · DRILL NOT CERTIFIED, with REPEAT DRILL as the primary button ]</p>
 
 <p>The second was a ghost. With the completion form on screen the run had stopped but had never been properly closed, so pressing Escape still opened the field menu underneath the form, and the field menu helpfully took the shared options controls with it, leaving the terminal's Options screen empty afterwards. The run now closes the instant the form appears rather than when a button is finally clicked.</p>
 
