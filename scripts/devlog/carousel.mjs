@@ -46,8 +46,8 @@ export function readSocial(id, lang = null) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-export async function renderCarousel(entry, social, { lang = null } = {}) {
-  const slides = buildSlides(entry, social, { lang });
+export async function renderCarousel(entry, social, { lang = null, dateLabel = null } = {}) {
+  const slides = buildSlides(entry, social, { lang, dateLabel });
   const outDir = lang ? resolve(carouselDir, lang) : carouselDir;
   const browser = await chromium.launch({ executablePath: chromiumExecutable() });
   try {
