@@ -773,4 +773,49 @@ export const PT_BR = {
   'induction.begin': 'AUTORIZAR DESCIDA',
   'induction.archiveButton': 'ARQUIVAR',
   'induction.reopen': 'Este documento continua no despacho, em INDUÇÃO.',
+  'induction.training': 'OPERAÇÃO DE TREINAMENTO',
+
+  // ---------------------------------------------------------------------
+  // Operação de treinamento (o exercício da primeira descida)
+  //
+  // A voz continua sendo a da companhia, agora em circular de exercício: a
+  // instrução é numerada, curta e imperativa. Cada passo tem uma variante
+  // `.touch` porque o esquema de comando é outro no toque — e a instrução que
+  // cita a tecla errada ensina errado.
+  // ---------------------------------------------------------------------
+  'menu.training': 'Operação de treinamento',
+  'aurix.doc.training': 'FORMULÁRIO AD-TRN-01 · exercício de indução',
+  'training.step.move': 'Exercício 1 — MOVER: W A S D. Avance pela galeria.',
+  'training.step.move.touch': 'Exercício 1 — MOVER: manche esquerdo. Avance pela galeria.',
+  'training.step.clear':
+    'Exercício 2 — FOGO: segure o botão esquerdo do mouse e mire com o cursor. Neutralize os dois espécimes.',
+  'training.step.clear.touch':
+    'Exercício 2 — FOGO: o manche direito mira e dispara. Neutralize os dois espécimes.',
+  'training.step.dash': 'Exercício 3 — ESQUIVA: ESPAÇO. Execute um avanço evasivo entre os pilares.',
+  'training.step.dash.touch':
+    'Exercício 3 — ESQUIVA: botão de esquiva. Execute um avanço evasivo entre os pilares.',
+  'training.step.core': 'Exercício 4 — O NÚCLEO: aproxime-se do pedestal e interaja com E.',
+  'training.step.core.touch':
+    'Exercício 4 — O NÚCLEO: aproxime-se do pedestal e use o botão de interação.',
+  'training.step.extract':
+    'Exercício final — EXTRAÇÃO: volte à plataforma de entrada e interaja com E. Carga só conta fora do Veio.',
+  'training.step.extract.touch':
+    'Exercício final — EXTRAÇÃO: volte à plataforma de entrada e use o botão de interação. Carga só conta fora do Veio.',
+  'training.done.move': '✓ deslocamento registrado',
+  'training.done.clear': '✓ neutralização registrada',
+  'training.done.dash': '✓ evasiva registrada',
+  'training.tip.heat':
+    'O cano saturou. Solte o gatilho e deixe o calor cair — ritmo é parte do armamento.',
+  'training.complete.title': 'EXERCÍCIO HOMOLOGADO',
+  'training.complete.body':
+    'Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende. O Veio lá embaixo rende.',
+  'training.complete.descend': 'AUTORIZAR DESCIDA',
+  'training.complete.terminal': 'VOLTAR AO TERMINAL',
+  // Extração de mãos vazias: a saída é registrada, o exercício não. A voz
+  // continua notificando em vez de repreender — o contrato pedia o Núcleo, e
+  // a única consequência é o formulário oferecer a repetição.
+  'training.incomplete.title': 'EXERCÍCIO NÃO HOMOLOGADO',
+  'training.incomplete.body':
+    'Extração sem carga. O contrato do exercício pede o Núcleo na plataforma — a companhia registra a saída, mas não homologa. Repita a operação.',
+  'training.incomplete.retry': 'REPETIR EXERCÍCIO',
 } as const;

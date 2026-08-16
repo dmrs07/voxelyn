@@ -14,10 +14,12 @@ import {
   renderInduction,
   type InductionMode,
 } from './induction';
+import { createTrainingRun, markTrainingDone } from './training-setup';
+import { TrainingDirector, type TrainingCue } from './training-director';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
 import { EngagementMemory, applyCombatAssist } from './combat-assist';
 import { SurvivalRenderer } from './render';
-import { DeathEchoController } from './death-echo-presentation';
+import { DeathEchoController, emptyDeathEchoFrame } from './death-echo-presentation';
 import {
   deathEchoPoolQuery,
   fetchDeathEchoContract,
@@ -309,6 +311,7 @@ type PreparedRun = { firstFrame: () => void; start: () => void };
 
 const backToMenu = (): void => {
   runInProgress = false;
+  activeRunKind = 'none';
   liveRun = null;
   paused = false;
   stopLoop = null;
@@ -809,6 +812,21 @@ let liveRun: SurvivalState | null = null;
  */
 let runInProgress = false;
 
+/**
+ * QUE TIPO de descida esta no ar.
+ *
+ * Existe por causa da telemetria de abandono: `abandonRun` e `reportAbandon`
+ * emitem para qualquer `liveRun` rodando, e a operacao de treinamento — que
+ * nunca abre run na telemetria — contaminaria contagem de runs e taxa de
+ * abandono a cada Esc, reload ou aba fechada no meio do exercicio.
+ *
+ * Escrito pelos DONOS do ciclo de vida, e so por eles: `startSolo`/`startOnline`
+ * marcam `standard` (o contrato termina em `startSolo`, entao nao precisa de
+ * linha propria), `startTraining` marca `training`, e as tres saidas
+ * (`abandonRun`, `backToMenu`, `teardownTraining`) devolvem `none`.
+ */
+let activeRunKind: 'none' | 'standard' | 'training' = 'none';
+
 // Aba fechada com a run em andamento. `pagehide` e nao `beforeunload`: este
 // ultimo nao dispara de forma confiavel em Safari movel, que e metade do
 // publico de um PWA.
@@ -828,6 +846,9 @@ let runInProgress = false;
 // embora. O que fica de fora e a aba escondida que o sistema mata sem aviso, e
 // perder esse caso e mais barato que inventar abandono a cada troca de app.
 const reportAbandon = (): void => {
+  // Treinamento nao e run: fechar a aba no meio do exercicio nao pode entrar
+  // no funil como uma descida perdida.
+  if (activeRunKind !== 'standard') return;
   const state = liveRun;
   if (!state || state.phase !== 'running' || state.tick < 20) return;
   telemetry.abandon(state.sector, state.tick, state.contamination);
@@ -881,9 +902,11 @@ const mountOptions = (slot: HTMLDivElement): void => {
  */
 const abandonRun = (): void => {
   const state = liveRun;
-  if (state && state.phase === 'running' && state.tick >= 20) {
+  // So run de verdade entra no funil de abandono; ver `activeRunKind`.
+  if (activeRunKind === 'standard' && state && state.phase === 'running' && state.tick >= 20) {
     telemetry.abandon(state.sector, state.tick, state.contamination);
   }
+  activeRunKind = 'none';
   // Invalida qualquer autorizacao em voo: sem isto, um ticket que chegasse depois
   // do abandono ainda ligaria um laco por tras da tela de titulo.
   descentToken++;
@@ -1255,6 +1278,245 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
 };
 
 // ---------------------------------------------------------------------------
+// OPERACAO DE TREINAMENTO (100% local: sem ticket, sem registro, sem ranking)
+// ---------------------------------------------------------------------------
+
+/** O formulario de homologacao do exercicio, mostrado sobre o mundo parado. */
+const trainingCompleteOverlay = document.getElementById('training-complete') as HTMLDivElement;
+
+/**
+ * O desfecho do exercicio corrente, lido pelo botao primario do formulario:
+ * homologado abre a descida real; nao homologado repete o exercicio.
+ */
+let trainingOutcome: 'certified' | 'incomplete' = 'certified';
+
+/**
+ * Mostra o formulario de fim de exercicio com o texto do DESFECHO, e assenta o
+ * estado da run no mesmo instante.
+ *
+ * Assentar aqui, e nao no clique dos botoes, e deliberado: com o laco parado e
+ * `runInProgress` ainda de pe, Esc (ou o voltar do navegador, pela sentinela de
+ * historico) abriria um menu de campo fantasma POR BAIXO do formulario — e o
+ * menu ainda levaria `#options-controls` para o proprio slot ao abrir. Depois
+ * desta funcao, `runActive()` e falso e nenhum dos dois caminhos existe.
+ */
+const showTrainingOutcome = (certified: boolean): void => {
+  trainingOutcome = certified ? 'certified' : 'incomplete';
+  // `dataset.i18n` acompanha o texto: se o idioma trocar com o formulario
+  // aberto, `applyStaticTranslations` reescreve na chave do desfecho certo.
+  const set = (id: string, key: MessageKey): void => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.dataset.i18n = key;
+    el.textContent = t(key);
+  };
+  set('training-complete-title', certified ? 'training.complete.title' : 'training.incomplete.title');
+  set('training-complete-body', certified ? 'training.complete.body' : 'training.incomplete.body');
+  set('btn-training-descend', certified ? 'training.complete.descend' : 'training.incomplete.retry');
+
+  runInProgress = false;
+  activeRunKind = 'none';
+  liveRun = null;
+  paused = false;
+  pauseMenu.disarmHistory();
+  input.clearPendingUiInput();
+  mountOptions(optionsSlot);
+  trainingCompleteOverlay.classList.remove('hidden');
+};
+
+/**
+ * Prepara a operacao de treinamento: o irmao SINCRONO de `prepareSolo`.
+ *
+ * A mesma dupla playout/fila, o mesmo congelamento de pausa e o mesmo véu —
+ * menos tudo o que fala com o mundo la fora: nao ha `authorizeExpedition`
+ * (nenhum ticket), nao ha `recorder` (nada a re-simular), e o fim nao grava,
+ * nao homologa, nao sobe ao ranking nem oferece carcaca ao pool. O exercicio
+ * nao rende de proposito — e essa e a licao que ele existe para dar.
+ *
+ * `prepareSolo` nao foi parametrizado de proposito: cada ramo de rede dele
+ * precisaria de uma guarda de modo, e a arena ja estabeleceu que uma copia
+ * enxuta do laco e o preco certo por um cenario sob medida.
+ */
+const prepareTraining = (): PreparedRun => {
+  descentToken++;
+  renderer.setLocalPlayerId(1);
+  audio.setLocalPlayerId(1);
+  audio.reset();
+  resetRunTracking();
+  // Dois residuos que `resetRunTracking` nao cobre e que atravessariam da run
+  // anterior: toasts ainda no ar, e a projecao de carcacas de outra descida —
+  // o treinamento nunca consulta o pool, entao o que estiver aqui e lixo.
+  renderer.messages.length = 0;
+  renderer.setDeathEchoes(emptyDeathEchoFrame());
+
+  let state: SurvivalState = createTrainingRun();
+  liveRun = state;
+  let accumulator = 0;
+  let lastTime = performance.now();
+  let running = true;
+
+  const director = new TrainingDirector();
+  const gate = new RestartGate(RESTART_ARM_MS);
+  const playout = new LocalPlayout();
+  playout.capture(state);
+  const assistMemory = new EngagementMemory();
+  let frameNow = lastTime;
+  const eventQueue = new TickEventQueue<SemanticEvent>((events) => {
+    renderer.ingestEvents(events, frameNow);
+    audio.ingest(events, frameNow, state);
+    haptics(events);
+    // O diretor escuta a MESMA fila que desenha e soa: a instrucao avanca
+    // quando o jogador VE o fato acontecer, nunca um tick antes.
+    director.ingest(events);
+  });
+  const rearm = (): void => {
+    playout.reset();
+    eventQueue.clear();
+    playout.capture(state);
+    assistMemory.clear();
+    input.consumeAimTap();
+  };
+
+  /** Os cues do diretor viram efeito AQUI — ele nao conhece banner nem toast. */
+  const applyCues = (cues: TrainingCue[], nowMs: number): void => {
+    for (const cue of cues) {
+      if (cue.type === 'banner') setBanner(t(cue.key), 'info');
+      else if (cue.type === 'clear-banner') setBanner(null);
+      else {
+        renderer.messages.push({
+          text: t(cue.key),
+          startsAt: cue.delayMs ? nowMs + cue.delayMs : undefined,
+          until: nowMs + (cue.delayMs ?? 0) + 3200,
+        });
+      }
+    }
+  };
+
+  /**
+   * O desenho do treinamento contorna `renderState` de proposito: ela pede o
+   * pool de carcacas na rede, e o exercicio nao pode gerar trafego. A carga do
+   * HUD continua sincronizada a mao — o renderer guarda `cargoOre` como estado
+   * proprio, e sem isto o contador da run anterior atravessaria.
+   */
+  const draw = (view: SurvivalState, nowMs: number): void => {
+    renderer.setCargoOre(view.stats.oreCollected);
+    renderer.render(view, 1, input.state, nowMs);
+  };
+
+  const frame = (now: number): void => {
+    if (!running) return;
+    frameNow = now;
+    if (paused) {
+      lastTime = now;
+      if (frozenFrameStale) {
+        frozenFrameStale = false;
+        draw(playout.sample(state, accumulator / TICK_MS) ?? state, now);
+      }
+      requestAnimationFrame(frame);
+      return;
+    }
+    const delta = Math.min(120, now - lastTime);
+    applyAdaptiveQuality(delta);
+    lastTime = now;
+    accumulator += delta;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    if (state.phase !== 'running') {
+      eventQueue.flush(Number.POSITIVE_INFINITY);
+
+      // Extraiu. So a extracao COM o Nucleo homologa o exercicio — sair de
+      // maos vazias e uma decisao legitima numa run real, mas aqui significa
+      // que o curriculo foi pulado: o formulario diz isso e oferece repetir,
+      // sem marcar o treinamento como feito. UMA vez: o formulario e DOM e nao
+      // precisa do laco — diferente da tela de fim real, que continua
+      // desenhando para escutar R/T.
+      if (state.phase === 'extracted' || state.phase === 'extracted_with_core') {
+        const certified = state.phase === 'extracted_with_core';
+        if (certified) markTrainingDone();
+        setBanner(null);
+        audio.update(state, now);
+        // O ultimo quadro fica congelado atras do formulario.
+        draw(state, now);
+        running = false;
+        showTrainingOutcome(certified);
+        return;
+      }
+
+      // Morreu: a mesma tela de fim de sempre — a leitura do resultado tambem
+      // e curriculo. Reiniciar e instantaneo (nao ha ticket a esperar).
+      const { drain, armed } = gate.frame(now, true);
+      if (drain) input.clearPendingUiInput();
+      audio.update(state, now);
+      draw(state, now);
+      const endRegions = renderer.renderEnd(state, vw, vh, now, { input: input.state });
+      const action = endScreenAction(endRegions, armed);
+      if (action === 'restart') {
+        state = createTrainingRun();
+        liveRun = state;
+        rearm();
+        audio.reset();
+        resetRunTracking();
+        renderer.messages.length = 0;
+        director.reset();
+        gate.reset();
+      } else if (action === 'terminal') {
+        audio.ui();
+        abandonRun();
+      }
+      accumulator = 0;
+      requestAnimationFrame(frame);
+      return;
+    }
+
+    while (accumulator >= TICK_MS) {
+      const raw = input.snapshot(playerScreen());
+      // A assistencia roda como no solo; o que NAO existe e o recorder — nada
+      // aqui sera re-simulado por ninguem.
+      applyCombatAssist(state, raw, input.consumeAimTap(), assistMemory);
+      const result = stepRun(state, [raw]);
+      playout.capture(state);
+      eventQueue.push(state.tick, result.events);
+      accumulator -= TICK_MS;
+      if (state.phase !== 'running') break;
+    }
+    const alpha = accumulator / TICK_MS;
+    const view = state.phase === 'running' ? (playout.sample(state, alpha) ?? state) : state;
+    eventQueue.flush(view.tick);
+    // Depois do flush, uma vez por quadro: o diretor le os fatos e devolve o
+    // que a tela deve mudar.
+    applyCues(director.frame(state, input.state.usingTouch), now);
+    if (gate.frame(now, false).drain) input.clearPendingUiInput();
+    audio.update(view, now);
+    draw(view, now);
+    cooldownOverlay.render(state, input.state, state.tick + alpha, now);
+    controlBar.render(
+      state,
+      input.state,
+      now,
+      window.innerWidth,
+      window.innerHeight,
+      safeInsets.bottom,
+    );
+    requestAnimationFrame(frame);
+  };
+
+  return {
+    firstFrame: (): void => {
+      frameNow = performance.now();
+      draw(playout.sample(state, 0) ?? state, frameNow);
+    },
+    start: (): void => {
+      lastTime = performance.now();
+      requestAnimationFrame(frame);
+      stopLoop = () => {
+        running = false;
+      };
+    },
+  };
+};
+
+// ---------------------------------------------------------------------------
 // ONLINE (servidor autoritativo; solo permanece disponivel offline)
 // ---------------------------------------------------------------------------
 const defaultServerUrl = (): string => {
@@ -1526,6 +1788,7 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
     prepare: async () => {
       stopLoop?.();
       runInProgress = true;
+      activeRunKind = 'standard';
       run = await prepareSolo();
       // Autorizacao superada (outra descida ja e a atual): o anuncio se desfaz
       // e o swap mantem o terminal na tela.
@@ -1563,6 +1826,7 @@ const startOnline = (): void => {
     prepare: () => {
       stopLoop?.();
       runInProgress = true;
+      activeRunKind = 'standard';
       run = runOnline(serverInput.value.trim() || defaultServerUrl(), code || null);
       if (!run) runInProgress = false;
     },
@@ -1578,6 +1842,77 @@ const startOnline = (): void => {
     hintOnce();
   });
 };
+
+/**
+ * Inicia a operacao de treinamento: o clone de `startSolo` sem autorizacao.
+ *
+ * `hintOnce` fica de fora de proposito: o banner e o canal de instrucao do
+ * exercicio, e a dica de pausa por cima da primeira licao seria as duas
+ * mensagens se atropelando. A dica continua existindo para a primeira run
+ * REAL, que e onde o menu de campo vira necessidade.
+ */
+const startTraining = (): void => {
+  if (veilActive()) return;
+  contractRun = null;
+  audio.unlock();
+  audio.ui();
+  let run: PreparedRun | null = null;
+  void deployVeil({
+    sound: veilSound,
+    prepare: () => {
+      stopLoop?.();
+      runInProgress = true;
+      activeRunKind = 'training';
+      run = prepareTraining();
+    },
+    swap: () => {
+      if (!run) return;
+      menu.classList.add('hidden');
+      run.firstFrame();
+    },
+  }).then((ran) => {
+    if (!ran || !run) return;
+    pauseMenu.armHistory();
+    run.start();
+  });
+};
+
+/**
+ * Recolhe o exercicio terminado: o espelho local de `abandonRun`, sem
+ * telemetria (nunca houve run) e com o formulario de homologacao a fechar.
+ */
+const teardownTraining = (): void => {
+  descentToken++;
+  stopLoop?.();
+  stopLoop = null;
+  liveRun = null;
+  runInProgress = false;
+  activeRunKind = 'none';
+  paused = false;
+  pauseMenu.disarmHistory();
+  input.clearPendingUiInput();
+  setBanner(null);
+  audio.reset();
+  trainingCompleteOverlay.classList.add('hidden');
+};
+
+document.getElementById('btn-training-terminal')?.addEventListener('click', () => {
+  audio.ui();
+  teardownTraining();
+  void deployVeil({ swap: () => menu.classList.remove('hidden'), sound: veilSound }).then((ran) => {
+    if (!ran) menu.classList.remove('hidden');
+  });
+});
+// O botao primario segue o desfecho: exercicio homologado abre a descida real
+// (o carimbo que ele acabou de aprender a merecer); nao homologado repete o
+// exercicio. `startSolo`/`startTraining` cuidam do véu — o treinamento so
+// precisa sair da frente primeiro.
+document.getElementById('btn-training-descend')?.addEventListener('click', () => {
+  audio.ui();
+  teardownTraining();
+  if (trainingOutcome === 'certified') startSolo();
+  else startTraining();
+});
 
 // Rede de seguranca para o auto-start por query e para browsers que exigem um
 // gesto DENTRO do documento: qualquer primeiro toque/tecla destrava o audio.
@@ -1635,16 +1970,31 @@ const inductionBody = document.getElementById('induction-body') as HTMLDivElemen
  * circular nos dois usos, e o que muda entre "li antes de descer" e "reabri no
  * despacho" e so o que acontece quando ela fecha.
  */
-const openInduction = (mode: InductionMode, after: () => void): void => {
-  renderInduction(inductionBody, {
-    mode,
-    onDismiss: () => {
+/**
+ * Abre a circular com DUAS continuacoes conceitualmente diferentes: a do
+ * carimbo primario (`onAuthorise` — a acao que trouxe o jogador aqui) e a do
+ * botao de treinamento (`onTraining`, so no briefing). Ambas marcam a leitura
+ * e fecham a circular antes de seguir — mudar de ideia depois de ler e
+ * exatamente o que os dois botoes existem para permitir.
+ */
+const openInduction = (
+  mode: InductionMode,
+  onAuthorise: () => void,
+  onTraining?: () => void,
+): void => {
+  const dismissInto =
+    (next: () => void) =>
+    (): void => {
       markInductionSeen();
       inductionOverlay.classList.add('hidden');
       menu.classList.remove('hidden');
       audio.ui();
-      after();
-    },
+      next();
+    };
+  renderInduction(inductionBody, {
+    mode,
+    onDismiss: dismissInto(onAuthorise),
+    onTraining: onTraining ? dismissInto(onTraining) : undefined,
   });
   openOverlay(inductionOverlay);
 };
@@ -1656,13 +2006,18 @@ const openInduction = (mode: InductionMode, after: () => void): void => {
  * Veio, e uma tela de leitura DEPOIS dele seria a companhia interrompendo uma
  * queda que ja aconteceu. Quem ja leu desce direto — a circular nunca fica no
  * caminho duas vezes.
+ *
+ * Todo briefing de primeira leitura oferece o treinamento como caminho
+ * secundario. So o botao DE TREINAMENTO inicia o treinamento: o carimbo
+ * primario executa sempre a acao que abriu a circular — e o "nunca
+ * obrigatorio" expresso em fiacao.
  */
 const withInduction = (descend: () => void): void => {
   if (inductionSeen()) {
     descend();
     return;
   }
-  openInduction('briefing', descend);
+  openInduction('briefing', descend, startTraining);
 };
 
 document.getElementById('btn-induction')?.addEventListener('click', () => {
@@ -1679,6 +2034,14 @@ document
   ?.addEventListener('click', () => withInduction(() => startSolo()));
 document.getElementById('btn-online')?.addEventListener('click', () => withInduction(startOnline));
 contractButton.addEventListener('click', () => withInduction(startContract));
+// NAO e `withInduction(startTraining)`: isso faria o carimbo "AUTORIZAR
+// DESCIDA" da circular iniciar o treinamento. Quem nunca leu recebe o briefing
+// normal — com a descida real no primario e o exercicio no secundario — e quem
+// ja leu vai direto ao exercicio.
+document.getElementById('btn-training')?.addEventListener('click', () => {
+  if (inductionSeen()) startTraining();
+  else openInduction('briefing', () => startSolo(), startTraining);
+});
 serverInput.placeholder = defaultServerUrl();
 
 /**
@@ -2168,6 +2531,7 @@ for (const id of [
   'records-mark',
   'matrix-mark',
   'rank-mark',
+  'training-complete-mark',
 ]) {
   const slot = document.getElementById(id);
   if (slot) slot.innerHTML = aurixMarkHtml();

@@ -2331,6 +2331,14 @@
             <button id="btn-online" class="ax-order-secondary is-uplink" data-i18n="menu.online">
               Co-op online
             </button>
+            <!--
+              A operação de treinamento: o exercício da primeira descida.
+              Permanente e nunca obrigatório — quem quiser reaprender o chassi
+              volta aqui; quem nunca precisou nem repara nele.
+            -->
+            <button id="btn-training" class="ax-order-secondary" data-i18n="menu.training">
+              Operação de treinamento
+            </button>
             <button
               id="btn-contract"
               class="ax-order-secondary is-directive hidden"
@@ -2682,6 +2690,51 @@
       transitorio e some sozinho, e o convite precisa continuar la ate alguem
       entrar.
     -->
+    <!--
+      Homologação do exercício: o formulário que fecha a operação de
+      treinamento. DOM e não canvas de propósito — diferente da tela de fim de
+      uma run real, aqui não há R/T a escutar: só dois caminhos, e os dois são
+      botões. O corpo diz a única coisa que o exercício não pôde mostrar:
+      treinamento não credita carga.
+    -->
+    <div id="training-complete" class="overlay hidden">
+      <div class="ax-form">
+        <div class="ax-form-head">
+          <div id="training-complete-mark"></div>
+          <div style="min-width: 0">
+            <!-- Título, corpo e botão primário são REESCRITOS por
+                 showTrainingOutcome conforme o desfecho: homologado (Núcleo na
+                 plataforma) ou não homologado (extração de mãos vazias). Os
+                 data-i18n aqui são só o estado inicial. -->
+            <h1 id="training-complete-title" class="corp" data-i18n="training.complete.title">
+              EXERCÍCIO HOMOLOGADO
+            </h1>
+            <div class="ax-doc-code" data-i18n="aurix.doc.training">
+              FORMULÁRIO AD-TRN-01 · exercício de indução
+            </div>
+          </div>
+        </div>
+        <div id="training-complete-body" class="sub" data-i18n="training.complete.body">
+          Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende.
+          O Veio lá embaixo rende.
+        </div>
+        <button
+          id="btn-training-descend"
+          class="primary ax-stamp"
+          data-i18n="training.complete.descend"
+        >
+          AUTORIZAR DESCIDA
+        </button>
+        <button
+          id="btn-training-terminal"
+          class="ax-order-secondary"
+          data-i18n="training.complete.terminal"
+        >
+          VOLTAR AO TERMINAL
+        </button>
+      </div>
+    </div>
+
     <div id="invite" class="hidden">
       <span data-i18n="invite.channel">canal cifrado</span>
       <span id="invite-code"></span>

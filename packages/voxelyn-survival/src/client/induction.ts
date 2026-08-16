@@ -74,6 +74,12 @@ export type InductionHost = {
   mode: InductionMode;
   /** O jogador terminou de ler. Em `briefing`, e aqui que a descida sai. */
   onDismiss: () => void;
+  /**
+   * O jogador prefere o exercicio antes do contrato. So aparece no `briefing`
+   * (e so quando o chamador oferece): e a alternativa da primeira leitura, e
+   * quem reabre a circular no despacho ja tem o botao proprio no terminal.
+   */
+  onTraining?: () => void;
 };
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -136,6 +142,17 @@ export const renderInduction = (body: HTMLElement, host: InductionHost): void =>
   action.textContent = t(host.mode === 'briefing' ? 'induction.begin' : 'induction.archiveButton');
   action.addEventListener('click', () => host.onDismiss());
   footer.append(action);
+  // A alternativa do novato: treinar antes de autorizar. Secundaria de
+  // proposito — a descida real continua sendo o carimbo, e o exercicio nunca
+  // e obrigatorio.
+  if (host.mode === 'briefing' && host.onTraining) {
+    const training = el('button', 'ax-order-secondary');
+    training.type = 'button';
+    training.textContent = t('induction.training');
+    const onTraining = host.onTraining;
+    training.addEventListener('click', () => onTraining());
+    footer.append(training);
+  }
   // So no briefing: quem esta reabrindo o documento acabou de achar onde ele
   // mora, e nao precisa que a tela explique onde ele mora.
   if (host.mode === 'briefing') {
