@@ -1,5 +1,6 @@
 import type {
   Entity,
+  LeylineCircuit,
   LeylineNode,
   LeylineSegment,
   PlayerExtra,
@@ -92,6 +93,8 @@ type Pose = {
   charges: Array<{ idx: number; until: number }>;
   leylineSegments: LeylineSegment[];
   leylineNodes: LeylineNode[];
+  leylineCircuit: LeylineCircuit;
+  stratumSubverted: boolean;
   salvageSites: SalvageSite[];
   wellOffers: WellOffer[];
 };
@@ -142,6 +145,10 @@ const capturePose = (state: SurvivalState, grid: GridBuffer): Pose => {
     // geometria nunca muda.
     leylineSegments: state.leylineSegments.map((s) => ({ ...s })),
     leylineNodes: state.leylineNodes.map((n) => ({ ...n })),
+    // Fase do circuito por valor (ela muda); a geometria dele — nascente e
+    // membros — vai junto por referencia, como as celulas dos segmentos.
+    leylineCircuit: { ...state.leylineCircuit, reached: [...state.leylineCircuit.reached] },
+    stratumSubverted: state.stratumSubverted,
     salvageSites: state.salvageSites.map((s) => ({ ...s })),
     wellOffers: state.wellOffers.map((o) => ({ ...o })),
   };
@@ -249,6 +256,8 @@ export class LocalPlayout {
       charges: from.charges,
       leylineSegments: from.leylineSegments,
       leylineNodes: from.leylineNodes,
+      leylineCircuit: from.leylineCircuit,
+      stratumSubverted: from.stratumSubverted,
       salvageSites: from.salvageSites,
       wellOffers: from.wellOffers,
       players,

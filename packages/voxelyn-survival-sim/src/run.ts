@@ -68,7 +68,11 @@ import {
   SURF_FUNGAL,
   SURF_FUNGAL_HEATED,
   SURF_SCORCHED,
+  SOLID_CRYSTAL,
+  SOLID_CRYSTAL_DULL,
   SURF_GAS,
+  SURF_GLASS,
+  SURF_SILT,
   SURF_NONE,
   SURF_SPORES,
   TICK_HZ,
@@ -91,6 +95,7 @@ import {
   explodeAt,
   igniteCell,
   isConductiveSurface,
+  markDirty,
   setSurface,
   stepCells,
 } from './cells.js';
@@ -99,6 +104,7 @@ import {
   impactSolid,
   impactSurface,
   openNeighbours,
+  leylineSegmentShorted,
   projectileClass,
 } from './materials.js';
 import {
@@ -113,7 +119,7 @@ import {
   surfaceSpeedMul,
   updateEnemies,
 } from './entities.js';
-import { deriveLeylineNodes, generateWorld } from './worldgen.js';
+import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { buildSummary, emptyStats, markDiscovery } from './stats.js';
 import { ascend, descend, populateSector, sectorSeed } from './sectors.js';
 import {
@@ -142,6 +148,7 @@ import {
   DISCOVERY_CARGO_LOST,
   DISCOVERY_DISCHARGE_POOL,
   DISCOVERY_LEVIATHAN_SHOCKED,
+  DISCOVERY_LEYLINE_CIRCUIT,
   DISCOVERY_LEYLINE_ROUTED,
   DISCOVERY_SELF_HARM,
 } from './types.js';
@@ -320,6 +327,7 @@ export const createRun = (config: RunConfig): SurvivalState => {
     height,
     profile,
   );
+  const leylineNetwork = deriveLeylineNetwork(world, width);
   const rng = new RNG((config.seed * 0x85ebca6b + 0xc2b2ae35) >>> 0 || 1);
 
   // posicoes de spawn proximas a entrada (deterministicas, sem sobrepor)
@@ -390,8 +398,17 @@ export const createRun = (config: RunConfig): SurvivalState => {
       triggeredBy: -1,
       relayed: false,
     })),
-    // Adjacencia derivada da seed, todo rele fechado. Ver deriveLeylineNodes.
-    leylineNodes: deriveLeylineNodes(world.leylineNodes, world.leylines, width),
+    // Adjacencia e circuito derivados da seed, num lugar so. Ver
+    // deriveLeylineNetwork.
+    leylineNodes: leylineNetwork.nodes,
+    leylineCircuit: {
+      sourceNode: leylineNetwork.circuit.sourceNode,
+      members: leylineNetwork.circuit.members,
+      reached: [],
+      live: false,
+      closed: false,
+    },
+    stratumSubverted: false,
     hallCenters: world.hallCenters,
     charges: [],
     contamination: 0,
@@ -534,6 +551,13 @@ const stepLeylines = (state: SurvivalState, events: SemanticEvent[]): void => {
     const origin: EffectOrigin =
       triggeredBy >= 0 ? { source: 'player', owner: triggeredBy } : { source: 'environment' };
     chargeCells(state, openNeighbours(state, seg.cells), events, origin, undefined, wasRelayed);
+    // A cascata do circuito registra por onde passou. Ordenado e sem repetir
+    // para o hash nao depender da ordem em que os segmentos calharam de
+    // descarregar dentro do mesmo tick.
+    if (state.leylineCircuit.live && !state.leylineCircuit.reached.includes(segIdx)) {
+      state.leylineCircuit.reached.push(segIdx);
+      state.leylineCircuit.reached.sort((a, b) => a - b);
+    }
     // A descoberta e do RELE EFETIVO: a energia saiu do outro lado de uma
     // juncao que o jogador abriu — nao do toggle, que sozinho nao ensina nada.
     if (wasRelayed) markDiscovery(state.stats, DISCOVERY_LEYLINE_ROUTED);
@@ -559,6 +583,13 @@ const stepLeylines = (state: SurvivalState, events: SemanticEvent[]): void => {
         if (otherIdx === segIdx) continue;
         const other = state.leylineSegments[otherIdx];
         if (other.dischargeAt !== 0 || state.tick < other.refractoryUntil) continue;
+        // O CURTO para a cascata aqui. E o obstaculo do circuito: o trecho
+        // com cristal e minerio demais encostados sangra a carga, e so volta
+        // a conduzir depois que o jogador limpar a parede.
+        if (leylineSegmentShorted(state, other.cells)) {
+          events.push({ t: 'leyline_short', seg: otherIdx, cells: other.cells });
+          continue;
+        }
         other.dischargeAt = state.tick + LEYLINE_CHARGE_TICKS;
         other.triggeredBy = triggeredBy;
         other.relayed = true;
@@ -570,6 +601,135 @@ const stepLeylines = (state: SurvivalState, events: SemanticEvent[]): void => {
         });
       }
     }
+  }
+  settleCircuit(state, events);
+};
+
+/**
+ * O LANCAMENTO: a nascente arma os segmentos que ela toca e a cascata comeca.
+ *
+ * Nao cobra nada — nem carga de modulo, nem recurso, nem cooldown proprio. O
+ * unico limite e o ciclo que ja existia: segmento carregando ou refratario nao
+ * rearma, entao lancar de novo no meio de uma cascata nao a acelera.
+ *
+ * Relanca com o circuito ja fechado de proposito: a rede continua sendo uma
+ * arma depois de resolvida, e travar a nascente puniria quem quer usar a
+ * descarga em combate por ter fechado o circuito antes.
+ */
+const launchCircuit = (state: SurvivalState, player: Entity, events: SemanticEvent[]): void => {
+  const circuit = state.leylineCircuit;
+  const node = state.leylineNodes[circuit.sourceNode];
+  if (!node) return;
+
+  let armed = 0;
+  for (const segIdx of node.segments) {
+    const seg = state.leylineSegments[segIdx];
+    if (seg.dischargeAt !== 0 || state.tick < seg.refractoryUntil) continue;
+    if (leylineSegmentShorted(state, seg.cells)) {
+      events.push({ t: 'leyline_short', seg: segIdx, cells: seg.cells });
+      continue;
+    }
+    seg.dischargeAt = state.tick + LEYLINE_CHARGE_TICKS;
+    seg.triggeredBy = player.id;
+    // A ativacao original NAO e `relayed`: ela credita a ressonancia `current`
+    // uma vez, e o resto da cascata viaja repassado como sempre.
+    seg.relayed = false;
+    armed++;
+    events.push({
+      t: 'leyline_charge',
+      seg: segIdx,
+      cells: seg.cells,
+      dischargeTick: seg.dischargeAt,
+    });
+  }
+
+  // Sem nada armado nao ha cascata para julgar: marcar `live` aqui faria
+  // `settleCircuit` fechar o veredito no mesmo tick, contra uma rede que nunca
+  // acendeu.
+  if (armed === 0) return;
+  circuit.live = true;
+  circuit.reached = [];
+};
+
+/**
+ * A SUBVERSAO: a propriedade que da identidade ao estrato para de valer ate a
+ * proxima descida.
+ *
+ * O premio nao e um numero no personagem, e uma REGRA DO MUNDO que desliga —
+ * e e essa escolha que mantem a ajuda pequena sem precisar de um multiplicador
+ * timido. Quase toda propriedade desligada aqui servia aos DOIS lados: sem
+ * conducao no Aquifero o jogador tambem perde eletrificar poca; com os
+ * cristais opacos na Catedral ele perde a fonte gratis de ressonancia
+ * `current`. Duas sao assimetricas de proposito (a brasa da Fornalha e a
+ * sobrecarga do Miner so pressionam o jogador), e nesses dois o preco esta no
+ * custo de fechar, nao no premio.
+ *
+ * Dois estratos pedem varredura de grid porque a materia deles E a
+ * propriedade; o resto so levanta `stratumSubverted` e quem le decide. Manter
+ * a leitura espalhada e deliberado: `isConductiveCell` sabe da agua, o calor
+ * sabe da brasa, o Miner sabe da sobrecarga. Centralizar viraria uma tabela de
+ * excecoes que ninguem mantem.
+ *
+ * O basalto nao tem entrada, e a ausencia e a regra: ele nao tem propriedade
+ * hostil para desligar. O setor 1 e sempre basalto, entao o primeiro circuito
+ * da run ensina a linguagem sem pagar premio — e e assim que deve ser.
+ */
+const subvertStratum = (state: SurvivalState, events: SemanticEvent[]): void => {
+  state.stratumSubverted = true;
+  markDiscovery(state.stats, DISCOVERY_LEYLINE_CIRCUIT);
+
+  const w = state.config.width;
+  if (state.stratum === 'prismatic') {
+    // O cristal fica OPACO: nao descarrega mais (nem em voce, nem para voce),
+    // e o Arquicantor perde a municao dele. `SOLID_CRYSTAL_DULL` ja existia
+    // como o cristal que o acido gastou — aqui a rede faz o mesmo de uma vez.
+    for (let i = 0; i < state.solid.length; i++) {
+      if (state.solid[i] !== SOLID_CRYSTAL) continue;
+      state.solid[i] = SOLID_CRYSTAL_DULL;
+      markDirty(state, i % w, Math.floor(i / w));
+    }
+  } else if (state.stratum === 'silica') {
+    // A silica solta VITRIFICA: vidro e chao firme, e o Devorador Branco nao
+    // sobe por ele. E o mesmo efeito que o calor ja produzia celula a celula
+    // (ver o ramo SURF_SILT em cells.ts), aplicado ao setor.
+    for (let i = 0; i < state.surface.length; i++) {
+      if (state.surface[i] !== SURF_SILT) continue;
+      setSurface(state, i, SURF_GLASS, 0);
+    }
+  }
+
+  events.push({ t: 'message', key: 'sim.leylineCircuitClosed' });
+};
+
+/**
+ * A cascata do circuito acabou? Entao o setor tem uma resposta.
+ *
+ * Roda no fim de `stepLeylines`, e nao junto de cada descarga, porque "acabou"
+ * e uma propriedade da REDE e nao de um segmento: enquanto sobrar um relogio
+ * armado a cascata ainda esta viajando, e julgar antes cobraria do jogador um
+ * circuito que ainda estava acendendo.
+ *
+ * Fechar exige acender TODOS os `members` na MESMA cascata — e por isso
+ * `reached` zera aqui, no desfecho, em vez de acumular entre lancamentos.
+ * Somar tentativas transformaria o circuito em persistencia: bastaria lancar
+ * uma vez por segmento, sem nunca resolver a rede como rede.
+ */
+const settleCircuit = (state: SurvivalState, events: SemanticEvent[]): void => {
+  const circuit = state.leylineCircuit;
+  if (!circuit.live) return;
+  if (state.leylineSegments.some((seg) => seg.dischargeAt !== 0)) return;
+
+  const lit = circuit.members.filter((m) => circuit.reached.includes(m)).length;
+  const closed = circuit.members.length > 0 && lit === circuit.members.length;
+  events.push({ t: 'leyline_circuit', closed, lit, total: circuit.members.length });
+  circuit.live = false;
+  circuit.reached = [];
+  // `closed` e pegajoso ate a troca de setor: a subversao e uma mudanca do
+  // MUNDO, e desfaze-la porque uma segunda cascata correu pior faria o jogador
+  // perder o previo por mexer na rede que ele acabou de resolver.
+  if (closed && !circuit.closed) {
+    circuit.closed = true;
+    subvertStratum(state, events);
   }
 };
 
@@ -1231,7 +1391,8 @@ const stepPlayer = (
     // remove-la: MV-04 promete "mais controle no gelo", nao chao seco. Com a
     // arvore inteira o embalo cai de 0,82 para ~0,62 — o Prospector ainda
     // escorrega, so nao patina por tres tiles depois de soltar o comando.
-    const glide = ICE_GLIDE * (1 - tuning.iceGlide);
+    // Circuito fechado na Cripta: a inercia da lamina some junto com o degelo.
+    const glide = state.stratumSubverted && state.stratum === 'glacial' ? 0 : ICE_GLIDE * (1 - tuning.iceGlide);
     const vx = player.vx * glide + desiredX * (1 - glide);
     const vy = player.vy * glide + desiredY * (1 - glide);
     // Abaixo do limiar o embalo morre de vez: deslizar para sempre por um
@@ -1265,7 +1426,12 @@ const stepPlayer = (
   const onEmber = state.surface[cellIndexAt(state, player.x, player.y)] === SURF_EMBER;
   extra.heat = Math.max(
     0,
-    extra.heat - tuning.heatDecayPerTick * (onEmber ? EMBER_HEAT_DECAY_SCALE : 1),
+    extra.heat -
+      tuning.heatDecayPerTick *
+        // Circuito fechado na Fornalha: a fissura para de segurar o calor da
+        // arma. E uma das duas subversoes assimetricas — brasa so pressiona o
+        // jogador —, e o preco dela esta no custo de fechar, nao no premio.
+        (onEmber && !(state.stratumSubverted && state.stratum === 'furnace') ? EMBER_HEAT_DECAY_SCALE : 1),
   );
 
   // Canal do sopro que chegou ao proprio fim: liquida ANTES do gate de cast —
@@ -1680,6 +1846,17 @@ const stepPlayer = (
       const nx = (node.cell % state.config.width) + 0.5;
       const ny = Math.floor(node.cell / state.config.width) + 0.5;
       if (Math.hypot(player.x - nx, player.y - ny) > LEYLINE_NODE_INTERACT_RADIUS) continue;
+      // A NASCENTE tem outro verbo: ela LANCA a cascata do circuito em vez de
+      // togglar o proprio rele. Uma tecla, um verbo — e a nascente ja nasce
+      // roteada (deriveLeylineNetwork), entao nao ha nada para togglar nela.
+      //
+      // Este e o ponto que tira a leyline de tras do modulo Conductive: lancar
+      // nao cobra item, carga nem desbloqueio. Quem entrou no setor pode
+      // acender a rede.
+      if (n === state.leylineCircuit.sourceNode) {
+        launchCircuit(state, player, events);
+        return;
+      }
       node.routed = !node.routed;
       events.push({ t: 'leyline_routed', node: n, x: nx, y: ny, routed: node.routed, slot });
       return;
@@ -2843,6 +3020,16 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   // O rele de cada juncao decide se a descarga ATRAVESSA — dano futuro.
   // `cell`/`segments` ficam fora: geometria derivada da seed.
   for (const node of state.leylineNodes) mix(node.routed ? 1 : 0);
+  // O CIRCUITO decide o mundo: `closed` desliga a propriedade do estrato, e
+  // `live`/`reached` decidem se a proxima cascata vai fecha-lo. Divergir aqui
+  // divergiria a fisica do setor inteiro — a agua conduzindo numa ponta e nao
+  // na outra — muito depois de a causa ter passado.
+  //
+  // `sourceNode`/`members` ficam FORA: geometria derivada da seed, como as
+  // celulas dos segmentos.
+  mix(state.leylineCircuit.live ? 1 : 0);
+  mix(state.leylineCircuit.closed ? 1 : 0);
+  for (const seg of state.leylineCircuit.reached) mix(seg);
   for (const enemy of state.enemies) {
     mix(enemy.id);
     mix(Math.round(enemy.x * 1000));

@@ -119,7 +119,17 @@
 // que doi: cliente antigo contra servidor novo nunca desenharia a juncao
 // roteada nem o prompt, e veria um rele "inexplicavel" atravessar — energia
 // pulando de segmento sem causa visivel.
-export const PROTOCOL_VERSION = 24;
+// 25: o CIRCUITO da leyline entra no wire por tres campos. `WorldFlags` ganha
+// `leylineCircuit` (opcional: `closed`/`live` e o placar `lit`/`total`) —
+// `closed` nao e enfeite, ele desliga a propriedade do estrato, entao quem
+// reconecta sem ele desenharia a agua do Aquifero conduzindo onde a sim ja
+// decidiu que nao conduz, prometendo um choque que nao vem. E nascem dois
+// eventos: `leyline_short` (o segmento recusou a carga por ter cristal e
+// minerio demais encostados — sem ele o obstaculo seria indistinguivel de a
+// mecanica estar quebrada) e `leyline_circuit` (o desfecho da cascata). A
+// metade que doi: cliente antigo contra servidor novo veria a cascata morrer
+// no meio sem motivo e nunca saberia que o setor tinha um circuito.
+export const PROTOCOL_VERSION = 25;
 // 14: sistema de biomas — estratos/ocupacoes/linhagens mudam a geracao semeada
 // dos setores 2+ e a populacao de inimigos; agua/brasa/gelo mudam reacoes de
 // celula; cinco arquetipos de assinatura entram na simulacao e no hash de
@@ -516,7 +526,33 @@ export const PROTOCOL_VERSION = 24;
 // setor 1 alcanca todas); a impressao digital registra os numeros com o
 // porque. Replays pre-40 re-simulados sob a regra nova abririam outro mapa —
 // e para isso que este numero sobe.
-export const SIMULATION_VERSION = 40;
+// 41: o CIRCUITO — a leyline deixa de esperar um item e vira o problema do
+// setor. Tres mudancas que alteram a simulacao, e nao so a apresentacao:
+//
+// 1. A NASCENTE (juncao do maior componente mais proxima da entrada, derivada
+//    da seed) nasce roteada e o interact nela LANCA a cascata. E o conserto do
+//    defeito de fundo: `energy` so existe com o modulo Conductive, entao sem
+//    ele a leyline nao tinha verbo nenhum e a run era indistinguivel de uma
+//    sem leylines.
+// 2. O CURTO: um segmento com >= LEYLINE_SHORT_CELLS (6) celulas de cristal ou
+//    minerio encostadas recusa a carga, e a cascata para nele. O numero e
+//    medido, nao estetico — com limiar 1, 73% a 89% dos segmentos nasciam em
+//    curto e nenhuma rede da amostra nascia limpa. Liquido NAO entra: a agua
+//    do Aquifero e estatica e o jogo nao tem verbo que a remova, entao curto
+//    por poca tornaria aquele circuito impossivel em vez de dificil.
+// 3. A SUBVERSAO: fechar o circuito (uma unica cascata acendendo TODOS os
+//    segmentos do componente) desliga a propriedade que da identidade ao
+//    estrato ate a descida — a agua para de conduzir, a brasa devolve a
+//    dissipacao, o cristal fica opaco, a silica vitrifica, o respiradouro
+//    trava, o gelo para de derreter, o Miner perde a sobrecarga.
+//
+// `leylineCircuit` (live/closed/reached) entra no hash: ele decide a FISICA do
+// setor, e dois peers discordando dele divergiriam na agua conduzindo de um
+// lado e nao do outro, muito depois da causa. O terreno semeado NAO muda — a
+// derivacao so LE o mundo (a impressao digital da geracao continua
+// 1082481898). Sobe porque um replay pre-41 re-simulado sob a regra nova
+// veria a cascata parar num curto que antes nao existia.
+export const SIMULATION_VERSION = 41;
 // 11: rocha por estrato no atlas de terreno — seis peles novas da parede
 // comum, com fragil/minerio/cristal continuando universais.
 // 12: a pele de rocha do Estrato Ferrifero entra no atlas de terreno

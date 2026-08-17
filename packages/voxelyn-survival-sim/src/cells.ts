@@ -192,8 +192,17 @@ export const delugeField = (state: SurvivalState): Uint16Array => {
  * outros — e a incoerencia apareceria como "o choque nao pegou" no meio da
  * unica fase em que o mapa inteiro e um circuito.
  */
-export const isConductiveCell = (state: SurvivalState, i: number): boolean =>
-  isConductiveSurface(state.surface[i]) || isDeluged(state, i);
+export const isConductiveCell = (state: SurvivalState, i: number): boolean => {
+  // A SUBVERSAO do Aquifero passa por aqui, e passa AQUI e nao em
+  // `isConductiveSurface` de proposito: a funcao de superficie e pura (le um
+  // `kind`, nao um estado) e e o vocabulario que o cliente tambem usa. Quem
+  // conhece o setor e esta.
+  //
+  // O Diluvio NAO e desligado: ele e obra do Leviata, nao propriedade do
+  // estrato — e a fase em que o mapa inteiro vira circuito continua sendo dele.
+  if (state.stratumSubverted && state.stratum === 'aquifer') return isDeluged(state, i);
+  return isConductiveSurface(state.surface[i]) || isDeluged(state, i);
+};
 
 export const setSurface = (state: SurvivalState, i: number, kind: number, timer: number): void => {
   state.surface[i] = kind;
@@ -208,6 +217,10 @@ export const setSurface = (state: SurvivalState, i: number, kind: number, timer:
 
 /** Derrete uma celula de gelo em agua condutiva que vai recongelar sozinha. */
 export const meltIce = (state: SurvivalState, i: number): boolean => {
+  // Circuito fechado na Cripta: a lamina para de derreter. Some junto a agua
+  // condutiva que o degelo criava — e some a janela de rota que ela abria,
+  // que e o lado da moeda que o jogador paga.
+  if (state.stratumSubverted && state.stratum === 'glacial') return false;
   if (state.surface[i] !== SURF_ICE) return false;
   setSurface(state, i, SURF_WATER, ICE_REFREEZE_TICKS);
   return true;
@@ -455,6 +468,9 @@ export const stepCells = (state: SurvivalState, events: SemanticEvent[]): void =
     // de sorteio) para as duas maquinas de uma sala concordarem sem trocar um
     // byte. Nos demais estratos o comportamento historico fica intacto.
     if (state.stratum === 'sulfur') {
+      // Circuito fechado: a ventilacao trava DESLIGADA. A identidade da Fenda
+      // e a respiracao das camaras, e desliga-la e o premio dela.
+      if (state.stratumSubverted) continue;
       const phase = (vent.x * 7 + vent.y * 13) % 2;
       const window = Math.floor(state.tick / VENT_CYCLE_TICKS) % 2;
       if (window !== phase) continue;

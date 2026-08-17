@@ -2,9 +2,11 @@
 
 **Data:** 2026-08-13
 **Escopo:** design. Nenhum pacote alterado neste corte.
-**Status:** proposta, para aprovação antes de qualquer código.
-**Versões:** nenhuma. Enquanto for documento, `SIMULATION`, `PROTOCOL` e
-`CONTENT` ficam onde estão.
+**Status:** implementado. O desenho abaixo é o que o código faz, e ele difere
+da proposta original em três pontos — todos derrubados por medição, todos
+registrados aqui com o número que os derrubou.
+**Versões:** `SIMULATION` 40→41, `PROTOCOL` 24→25. `CONTENT` fica em 24 (nenhum
+asset mudou).
 **Sucede:** `2026-08-11-survival-leylines.md` na pergunta "qual é o papel delas".
 O traçado, o wire, a apresentação e o relé continuam valendo; o que este
 documento revoga é a resposta de que orientação bastava.
@@ -53,12 +55,11 @@ opcional.
 ## 2. A decisão que rege tudo
 
 > A leyline deixa de ser um condutor que espera um item e passa a ser **o
-> CIRCUITO do setor**. O circuito pode ser FECHADO: levar uma cascata da
-> NASCENTE até o COLETOR, atravessando junções que o jogador roteia. Fechar é um
-> puzzle opcional de leitura e preparação, na escala do setor inteiro, e a
-> dificuldade dele é a matéria do estrato. O prêmio é pequeno, é sempre do mesmo
-> tipo, e dura até a próxima descida: **a propriedade que dá identidade ao
-> estrato para de valer.**
+> CIRCUITO do setor**. O circuito pode ser FECHADO: uma ÚNICA cascata, lançada
+> na NASCENTE, tem de acender **todos** os segmentos da rede. Fechar é um
+> objetivo opcional de escala do setor, e a dificuldade dele é a matéria do
+> estrato. O prêmio é pequeno, é sempre do mesmo tipo, e dura até a próxima
+> descida: **a propriedade que dá identidade ao estrato para de valer.**
 
 Três consequências que decidem o resto do documento:
 
@@ -72,7 +73,7 @@ Três consequências que decidem o resto do documento:
 
 ---
 
-## 3. As três peças novas
+## 3. As peças novas
 
 Todas derivadas da geometria que o worldgen já desenha: **nenhuma tirada de RNG
 nova**, no mesmo espírito de `deriveLeylineNodes` (`worldgen.ts:225-247`).
@@ -86,67 +87,104 @@ adjacente entra em `carregando` e o ciclo que já existe faz o resto.
 É esta peça que mata o gate. A partir dela, a leyline tem um verbo disponível no
 primeiro minuto de qualquer run, sem item, sem desbloqueio e sem sorte.
 
-### Coletor
+### O que era o COLETOR, e por que ele não existe
 
-A junção mais próxima da âncora profunda — a célula em `distFromEntry >=
-0.82 · maxPath` que o traçado já escolhe (`worldgen.ts:1502-1527`). Receber uma
-cascata que nasceu na nascente **fecha o circuito**.
+A proposta original mandava levar a corrente da nascente até um **coletor** na
+banda profunda, roteando as junções do caminho sob um orçamento `K`. **A
+medição matou os dois.** Em 637 setores com rede (seeds 1–200 × setores 1–7):
 
-O worldgen entrega a rede com três pontas: a perna do salão, a perna funda e o
-ramo que morre a seis células de um terminal (`worldgen.ts:1532-1541`). Nascente
-e coletor são duas delas; a terceira é um beco. **O beco não é um acidente do
-gerador — é a primeira peça do puzzle**, e o orçamento de §4 existe para que
-deixá-lo fechado seja uma decisão.
+| | |
+| --- | --- |
+| Setores com circuito possível | 81,2% |
+| Sem nenhuma junção articulada → sem circuito | 18,8% |
+| Circuitos que exigiam rotear **1 junção** | **71,6%** |
+| 2 junções | 27,7% |
+| 3 junções | 0,8% |
+
+Mediana de **uma** junção, nos sete estratos. E há um segundo motivo, este
+estrutural: o relé arma **todos** os vizinhos dormentes, então a cascata inunda
+o subgrafo roteado — mesmo com três junções não existia escolha de rota, só
+"rotear tudo". Um orçamento `K` menor que o caminho tornaria o circuito
+impossível; maior, irrelevante. Não havia número certo.
+
+Exigir a **rede inteira** resolve os dois de uma vez: o mesmo grafo raso vira um
+objetivo de escala do setor (percorrer a linha da entrada ao fundo abrindo cada
+junção), sem inventar topologia que o gerador não entrega.
 
 ### Curto
 
-Um segmento cujo entorno impede a cascata de atravessar. O curto é onde mora a
-dificuldade, e ele tem **duas famílias**, porque o jogo não tem matéria
-condutiva em todo estrato:
+Um segmento com **≥ 6 células distintas de cristal ou minério encostadas**
+(vizinhança de oito) sangra a carga e **recusa a ativação** — por lançamento,
+por relé ou por tiro `energy`. A cascata para ali, e o evento `leyline_short`
+diz qual segmento, para o obstáculo não ser confundido com a mecânica quebrada.
 
-- **Vazamento** — a matéria do estrato rouba a carga e a cascata morre ali.
-  Existe onde existe condutor: água e biofluido (`isConductiveSurface`,
-  `cells.ts:70`), cristal, veio de minério.
-- **Acesso** — a carga passaria, mas o jogador não consegue chegar à junção para
-  roteá-la. Existe onde o estrato ataca a permanência: gás, brasa, chão que cede.
+O número é medido, não estético. Com limiar 1 ("qualquer vizinho condutor"):
 
-Distinguir as duas importa: a primeira se conserta mudando o MUNDO, a segunda se
-conserta mudando o MOMENTO. Um estrato que só tivesse vazamento viraria um jogo
-de limpar terreno; um que só tivesse acesso viraria um jogo de esperar.
+| Limiar | Segmentos em curto | Redes 100% limpas |
+| --- | --- | --- |
+| 1 célula | 73% a 89% | **0%** |
+| 6 células | 9% a 39% | 61% a 74% |
 
----
+Com 1, a regra deixava de ser obstáculo e virava imposto. Com 6, a distribuição
+por estrato diz a coisa certa:
+
+| Estrato | Segmentos em curto | Redes com ≥1 curto |
+| --- | --- | --- |
+| Catedral Prismática | 39% | 96% |
+| Cripta Glacial | 27% | 62% |
+| Aquífero Negro | 20% | 57% |
+| Fenda Sulfurosa | 17% | 43% |
+| Fornalha Abissal | 14% | 43% |
+| Basalto | 9% | 27% |
+| Sumidouros de Sílica | 9% | 26% |
+
+A Catedral — o estrato **do** cristal — é quase sempre o problema, e o basalto
+do setor 1 quase sempre ensina a rede sem obstáculo. O conserto é o verbo
+central do jogo: quebrar o cristal, esgotar o veio até `SOLID_ORE_SPENT`. A
+regra lê o grid a cada pergunta, então o segmento volta a conduzir no tick
+seguinte, sem nenhum estado novo para sincronizar.
+
+**Líquido não entra, e a ausência é deliberada.** A proposta original mandava a
+água curto-circuitar a linha — mas a água do Aquífero é *estática* e o jogo não
+tem verbo que a remova. Curto por poça tornaria aquele circuito **impossível**
+em vez de difícil. O que a água faz continua sendo o que sempre fez: conduzir a
+descarga contra quem estiver nela.
 
 ## 4. Por que é difícil
 
 ### 4.1 O obstáculo é o estrato
 
-| Estrato | O curto | Família | O conserto, com verbos que já existem |
-| --- | --- | --- | --- |
-| `aquifer` | água/biofluido encostados na linha | vazamento | drenar quebrando rocha, ou congelar a lâmina |
-| `glacial` | gelo derretido conduz enquanto não recongela (`ICE_REFREEZE_TICKS = 280`, ~14 s) | vazamento | a janela é o inimigo: fechar antes de derreter, ou dentro dos 14 s |
-| `prismatic` | cristal adjacente ressoa e rouba a carga | vazamento | quebrar antes — e quebrar cristal já paga `current` (`cells.ts:635`) |
-| `ferric` | a parede inteira é fiação (`FERRIC_VEIN_SCALE = 3`) e sangra a carga | vazamento | esgotar o veio minerando até `SOLID_ORE_SPENT` — o estrato mais caro |
-| `sulfur` | pulmão de gás na junção; faísca em gás explode (`materials.ts:348`) | acesso | esperar o ciclo do respiradouro (`VENT_CYCLE_TICKS = 200`) ou ventilar |
-| `furnace` | brasa segurando o calor da arma (`EMBER_HEAT_DECAY_SCALE = 0.35`) | acesso | apagar com água ou gelo antes de parar ali |
-| `silica` | chão frágil: o caminho até a junção cede | acesso | vitrificar a sílica solta (`SURF_SILT` → `SURF_GLASS`, `cells.ts:287-296`) |
-| `basalt` | nenhum | — | o setor 1 fecha de primeira: é o tutorial da linguagem |
+O curto da §3 é a regra nova, e ela morde onde o estrato tem cristal ou veio. O
+resto da pressão **já existia no jogo e não precisou de código**: o gás da Fenda
+machuca quem para na junção, a brasa da Fornalha segura o calor da arma, o chão
+da Sílica cede, o Devorador e os Miners moram lá. Percorrer a rede inteira é
+justamente o que expõe o jogador a tudo isso.
 
-A simetria que faz o desenho valer a pena: **o estrato te impede de subvertê-lo
-com exatamente a propriedade que você quer desligar.** A água do Aquífero é o
-curto e é o prêmio. A brasa da Fornalha é o obstáculo e é o prêmio. O puzzle e a
-recompensa são a mesma frase lida em duas direções.
+| Estrato | O que atrapalha fechar | É regra nova? |
+| --- | --- | --- |
+| Catedral Prismática | cristal encostado na linha (96% das redes) | sim — o curto |
+| Ferrífero | a parede inteira é fiação (`FERRIC_VEIN_SCALE = 3`) | sim — o curto |
+| Cripta Glacial | veio e cristal, e o degelo mudando o chão sob você | sim — o curto |
+| Fenda Sulfurosa | pulmão de gás na junção; faísca em gás explode | não, já existia |
+| Fornalha Abissal | brasa segurando o calor (`EMBER_HEAT_DECAY_SCALE`) | não, já existia |
+| Sumidouros de Sílica | chão frágil no caminho até a junção | não, já existia |
+| Basalto | nada | — o setor 1 é o tutorial |
 
-### 4.2 O orçamento de junções roteadas
+A simetria que faz o desenho valer a pena: **o estrato atrapalha com a mesma
+propriedade que você quer desligar.** O cristal da Catedral é o curto e é o
+prêmio; a brasa da Fornalha é o obstáculo e é o prêmio. O puzzle e a recompensa
+são a mesma frase lida em duas direções.
 
-A cascata só atravessa junção `routed` (`run.ts:556-572`), e rotear passa a ter
-teto: **no máximo K junções roteadas ao mesmo tempo** no setor. Rotear a
-(K+1)-ésima desfaz a mais antiga — FIFO determinístico, no hash, sem sorteio.
+### 4.2 A rede inteira, e não um caminho
 
-É isto que transforma "aperte todos os botões" em decisão: com a rede tendo três
-pontas e o orçamento menor que o número de junções, o beco tem de ficar fechado,
-e descobrir qual ponta é beco exige ler a rede — não tentar.
+Não há orçamento de roteamento — a medição da §3 mostrou que ele não morde. O
+que cobra é a **extensão**: a cascata só atravessa junção `routed`, então fechar
+exige abrir **cada** junção da rede, e a rede vai da entrada à banda profunda
+por construção do traçado. O trabalho é percorrer o setor, não deduzir uma rota.
 
-**K não é fixado aqui.** Ver §9: a rede típica precisa ser medida antes.
+A honestidade que isso pede: a dificuldade do circuito é **logística e
+territorial**, não combinatória. O gerador não entrega um grafo com escolhas, e
+fingir que entrega seria pior do que dizer o que ele é.
 
 ### 4.3 O custo é tempo e contaminação, nunca dano
 
@@ -173,7 +211,7 @@ Fechar o circuito **desliga a propriedade-identidade do estrato até a descida**
 | `ferric` | os Miners perdem o gatilho de sobrecarga (`MINER_RAGE_HEAT = 66.6`) | nada: aqui o prêmio é assimétrico, e é o estrato mais caro de fechar |
 | `sulfur` | os respiradouros travam desligados | gás + faísca era uma bomba que você podia armar |
 | `furnace` | a brasa devolve a dissipação de calor | nada: a brasa é pressão só sobre o jogador |
-| `silica` | a sílica solta vira vidro: o Devorador Branco perde o chão por onde sobe | você gasta de uma vez o contra-jogo territorial dele |
+| `silica` | a sílica solta (`SURF_SILT`) vira vidro: o Devorador Branco perde o chão por onde sobe | você gasta de uma vez o contra-jogo territorial dele |
 
 **O princípio, e é ele que responde ao pedido de "ajuda pequena":** você não
 ganha um poder, você **desliga uma regra** — e a regra servia aos dois lados.
@@ -187,15 +225,22 @@ paredes que já não existem".
 
 ---
 
-## 6. O módulo deixa de ser gate e vira atalho
+## 6. O módulo deixa de ser gate e vira alternativa cara
 
 Um tiro `energy` num segmento continua armando **aquele** segmento, exatamente
-como hoje. Quem tem o `conductive` injeta a cascata no meio da rede e pula a
-metade de cima do circuito.
+como antes — e, se houver cascata do circuito viajando, o segmento aceso conta
+como alcançado. Isso dá ao `conductive` um papel que ele não tinha: **acender à
+mão um trecho que o roteamento não alcança** (uma junção órfã, um ramo que a
+gravação deixou solto), pagando uma carga por segmento.
 
-Isso é melhor para o módulo do que o desenho atual: hoje ele é a chave de uma
-porta que quase ninguém abre; ali ele é uma otimização de um problema que todo
-mundo tem. E a carga continua sendo cobrada no armamento (`run.ts:2014-2020`).
+O que ele **não** faz é pular o circuito. Fechar exige a rede toda na mesma
+cascata, e a nascente é a única ponta que a alcança inteira pelo relé; substituir
+o percurso por tiros custaria uma carga por segmento e o mesmo deslocamento.
+
+A diferença que importa é de papel: antes o módulo era a chave de uma porta que
+quase ninguém abria — sem ele a leyline não tinha verbo nenhum. Agora ele é uma
+otimização de um problema que todo mundo tem. A carga continua sendo cobrada no
+armamento (`run.ts:2014-2020`).
 
 ---
 
@@ -242,32 +287,40 @@ E o que este desenho **não resolve**, dito na cara:
   requisito. Mas a apresentação tem de deixar claro quando não há circuito, ou o
   jogador vai procurar um puzzle que não existe — que é a versão nova do bug de
   descobribilidade que já nos pegou uma vez.
-- **O setor 1 é sempre basalto**, então o tutorial é um circuito sem obstáculo.
-  Se isso lê como anticlímax é uma pergunta de playtest, não de spec (§9).
+- **O setor 1 é sempre basalto**, então o tutorial é um circuito sem obstáculo
+  e sem prêmio. É deliberado (§9), mas se lê como anticlímax é playtest.
+- **A dificuldade não é combinatória.** Quem esperava um quebra-cabeça de rota
+  vai achar um percurso longo e exposto. O gerador não entrega o grafo que o
+  outro desenho pediria — ver §4.2.
 
 ---
 
-## 9. Perguntas que só o playtest responde
+## 9. O que a medição respondeu, e o que sobra para o playtest
 
-1. **Quanto vale K?** Antes de fixar, medir quantas junções e quantos segmentos
-   uma seed típica entrega por linha. O teste existente
-   (`leylines-worldgen.test.ts:102`) só garante que existe *alguma* junção
-   articulando dois segmentos — não quantas. Se a rede típica tiver três
-   junções, K=2 é um puzzle; se tiver dez, K=2 é uma parede.
-2. **O curto mata a cascata ou só a atenua?** Matar é legível e binário; atenuar
-   permite circuitos "quase" fechados e uma recompensa parcial, ao custo de uma
-   regra a mais para o jogador ler.
-3. **O setor 1 deve mesmo ser trivial?** Um curto de mentirinha ensinaria o
-   verbo do conserto junto com o da rede.
-4. **No Ferrífero, "os Miners perdem o gatilho" é pequeno o bastante?** É o
-   estrato com a maior densidade deles, então o prêmio pode ser grande demais
-   justamente onde o puzzle é mais caro — o que pode ser certo ou pode ser um
-   pico de dificuldade recompensado duas vezes.
-5. **A nascente precisa ser encontrável?** Ela fica perto da entrada por
-   construção, mas "perto da entrada" num mapa de 96×96 ainda é um lugar que se
-   procura.
+**Respondido antes do código** (as três perguntas que a proposta deixou abertas):
 
----
+1. **K não existe.** Mediana de uma junção entre as pontas, e o relé inunda o
+   subgrafo — nenhum valor de K seria simultaneamente possível e restritivo.
+2. **O curto MATA a cascata**, não atenua. Binário é legível, e "quase fechado"
+   pediria uma segunda regra de recompensa parcial que o prêmio pequeno não
+   comporta.
+3. **O setor 1 fica trivial de propósito.** Basalto tem 9% de segmentos em curto
+   e nenhuma propriedade para subverter: o primeiro circuito da run ensina a
+   linguagem sem pagar prêmio, que é o papel dele.
+
+**Sobra para o playtest:**
+
+- **O circuito compensa o tempo que custa?** O preço é atravessar o setor duas
+  vezes com a contaminação subindo. Se não compensar, o botão de ajuste é o
+  prêmio, não a dificuldade.
+- **18,8% dos setores não têm circuito.** A apresentação ainda não diz isso — a
+  nascente simplesmente não existe lá, e o jogador pode procurar um puzzle que
+  não há. É o candidato mais forte a próximo corte.
+- **No Ferrífero, "os Miners perdem o gatilho" é pequeno o bastante?** É o
+  estrato com a maior densidade deles *e* o mais caro de fechar (a parede
+  inteira é veio). Pode ser um pico recompensado duas vezes.
+- **A nascente é encontrável?** Ela fica perto da entrada por construção, mas
+  "perto da entrada" num mapa de 96×96 ainda é um lugar que se procura.
 
 ## 10. Trabalho futuro (herdado e revisto)
 

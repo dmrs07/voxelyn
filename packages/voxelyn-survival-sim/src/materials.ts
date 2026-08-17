@@ -16,6 +16,7 @@ import {
   BUDGET_VEIN_CELLS,
   FERRIC_VEIN_SCALE,
   LEYLINE_CHARGE_TICKS,
+  LEYLINE_SHORT_CELLS,
   SOLID_CRYSTAL,
   SOLID_CRYSTAL_DULL,
   SOLID_FRAGILE,
@@ -100,6 +101,46 @@ export const openNeighbours = (state: SurvivalState, cells: number[]): number[] 
     }
   }
   return [...out];
+};
+
+/**
+ * O segmento esta em CURTO: cristal e minerio encostados nele sangram a carga
+ * e ele recusa a ativacao.
+ *
+ * Le o GRID a cada pergunta, de proposito: e isso que faz o conserto existir.
+ * Quebrar o cristal e esgotar o veio ate `SOLID_ORE_SPENT` sao o verbo central
+ * do jogo, e o segmento volta a armar no tick seguinte sem nenhum estado novo
+ * para sincronizar.
+ *
+ * Vizinhanca de OITO, e nao de quatro como `openNeighbours`: o veio encostado
+ * na diagonal conduz igual, e foi com oito que `LEYLINE_SHORT_CELLS` foi
+ * calibrado. Conta celulas DISTINTAS — dois segmentos de parede podem olhar
+ * para o mesmo veio, e contar duas vezes inventaria curto onde nao ha.
+ */
+export const leylineSegmentShorted = (state: SurvivalState, cells: number[]): boolean => {
+  const w = W(state);
+  const h = state.config.height;
+  const seen = new Set<number>();
+  for (const i of cells) {
+    const cx = i % w;
+    const cy = Math.floor(i / w);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const n = ny * w + nx;
+        if (seen.has(n)) continue;
+        const solid = state.solid[n];
+        if (solid === SOLID_CRYSTAL || solid === SOLID_ORE || solid === SOLID_ORE_CHIPPED) {
+          seen.add(n);
+          if (seen.size >= LEYLINE_SHORT_CELLS) return true;
+        }
+      }
+    }
+  }
+  return false;
 };
 
 export type SolidImpact = {
@@ -296,9 +337,16 @@ export const impactSolid = (
         const segIdx = state.leylineSegments.findIndex((s) => s.cells.includes(i));
         if (segIdx >= 0) {
           const seg = state.leylineSegments[segIdx];
-          // Carregando ou refrataria: o tiro morre na parede sem feedback
-          // mecanico novo — o estado ja e legivel pela luz do trecho.
-          if (seg.dischargeAt === 0 && state.tick >= seg.refractoryUntil) {
+          // O CURTO recusa a ativacao, e recusa de forma LEGIVEL: o evento diz
+          // qual segmento sangrou, entao o cliente aponta a parede que pede
+          // picareta em vez de deixar o tiro morrer mudo.
+          //
+          // Carregando ou refrataria continuam morrendo em silencio: ali o
+          // estado ja e legivel pela luz do trecho, e um aviso a mais seria
+          // ruido sobre informacao que o jogador ja tem.
+          if (leylineSegmentShorted(state, seg.cells)) {
+            events.push({ t: 'leyline_short', seg: segIdx, cells: seg.cells });
+          } else if (seg.dischargeAt === 0 && state.tick >= seg.refractoryUntil) {
             seg.dischargeAt = state.tick + LEYLINE_CHARGE_TICKS;
             seg.triggeredBy = origin.source === 'player' && origin.owner !== undefined ? origin.owner : -1;
             events.push({ t: 'leyline_charge', seg: segIdx, cells: seg.cells, dischargeTick: seg.dischargeAt });

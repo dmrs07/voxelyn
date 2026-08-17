@@ -584,10 +584,16 @@ describe('telegrafo da leyline em co-op', () => {
 
   it('leylineRouting do snapshot espelha o rele das juncoes', () => {
     const { client } = connect();
-    const mirror = (client as unknown as { state: { leylineNodes: Array<{ routed: boolean }> } })
-      .state;
+    const mirror = (
+      client as unknown as {
+        state: { leylineNodes: Array<{ routed: boolean }>; leylineCircuit: { sourceNode: number } };
+      }
+    ).state;
     expect(mirror.leylineNodes.length).toBeGreaterThan(0);
-    expect(mirror.leylineNodes.every((n) => !n.routed)).toBe(true);
+    // Toda juncao nasce fechada MENOS a nascente, que nasce roteada porque o
+    // interact nela lanca o circuito em vez de togglar (ver LeylineCircuit).
+    const source = mirror.leylineCircuit.sourceNode;
+    expect(mirror.leylineNodes.every((n, i) => i === source || !n.routed)).toBe(true);
     const routing = mirror.leylineNodes.map((_, i) => i === 0);
     client.receive(JSON.stringify({
       t: 'snapshot',
@@ -609,6 +615,9 @@ describe('telegrafo da leyline em co-op', () => {
       },
     }));
     expect(mirror.leylineNodes[0].routed).toBe(true);
+    // O snapshot e a VERDADE do rele: ele sobrescreve inclusive a nascente,
+    // senao um espelho que reconecta divergiria do servidor por causa de um
+    // padrao local.
     expect(mirror.leylineNodes.slice(1).every((n) => !n.routed)).toBe(true);
   });
 });

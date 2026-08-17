@@ -39,9 +39,33 @@ import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './de
 import { isConductiveSurface, setSurface } from './cells.js';
 import { SIGNATURE_OF_STRATUM, SIGNATURE_PACK, spawnEnemy } from './entities.js';
 import { biomeMix, biomeProfile, horseChanceFor, sectorBiome, sectorProfile } from './strata.js';
-import { deriveLeylineNodes, generateWorld } from './worldgen.js';
+import { deriveLeylineNetwork, generateWorld } from './worldgen.js';
 import { SURF_ICE } from './constants.js';
-import type { EnemyArchetype, SemanticEvent, SurvivalState } from './types.js';
+import type { EnemyArchetype, SemanticEvent, SurvivalState, Vec2 } from './types.js';
+
+/**
+ * A rede de leyline do setor novo, montada num lugar so.
+ *
+ * `descend` e `ascend` faziam isto identico e lado a lado, e foi exatamente
+ * essa duplicacao que o review do PR #144 pegou em outra forma: o que se
+ * escreve duas vezes diverge na terceira. Com o circuito somando quatro campos
+ * ao que precisa zerar, a copia deixaria de ser barata.
+ */
+const resetLeylineNetwork = (
+  state: SurvivalState,
+  world: { leylines: Array<{ cells: number[] }>; leylineNodes: Array<{ cell: number; segments: number[] }>; entry: Vec2 },
+): void => {
+  const network = deriveLeylineNetwork(world, state.config.width);
+  state.leylineNodes = network.nodes;
+  state.leylineCircuit = {
+    sourceNode: network.circuit.sourceNode,
+    members: network.circuit.members,
+    reached: [],
+    live: false,
+    closed: false,
+  };
+  state.stratumSubverted = false;
+};
 
 /**
  * Seed do setor N a partir da seed da run.
@@ -407,8 +431,10 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
     triggeredBy: -1,
     relayed: false,
   }));
-  // Os reles tambem zeram: o roteamento descrevia paredes que ja nao existem.
-  state.leylineNodes = deriveLeylineNodes(world.leylineNodes, world.leylines, state.config.width);
+  // Os reles e o circuito tambem zeram: o roteamento descrevia paredes que ja
+  // nao existem, e a subversao do estrato VELHO nao acompanha quem desceu — e
+  // isso que faz o premio ser "ate a proxima descida" sem nenhum relogio.
+  resetLeylineNetwork(state, world);
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
@@ -525,8 +551,10 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
     triggeredBy: -1,
     relayed: false,
   }));
-  // Os reles tambem zeram: o roteamento descrevia paredes que ja nao existem.
-  state.leylineNodes = deriveLeylineNodes(world.leylineNodes, world.leylines, state.config.width);
+  // Os reles e o circuito tambem zeram: o roteamento descrevia paredes que ja
+  // nao existem, e a subversao do estrato VELHO nao acompanha quem desceu — e
+  // isso que faz o premio ser "ate a proxima descida" sem nenhum relogio.
+  resetLeylineNetwork(state, world);
   state.salvageSites = world.salvageSites.map((site) => ({
     ...site,
     terminalState: 'inactive' as const,
