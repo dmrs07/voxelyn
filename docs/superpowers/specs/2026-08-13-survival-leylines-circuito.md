@@ -81,8 +81,15 @@ nova**, no mesmo espírito de `deriveLeylineNodes` (`worldgen.ts:225-247`).
 ### Nascente
 
 A junção da rede mais próxima da entrada. Interact (E) no raio que a junção já
-usa (`LEYLINE_NODE_INTERACT_RADIUS = 1.45`) **lança** uma cascata: o segmento
-adjacente entra em `carregando` e o ciclo que já existe faz o resto.
+usa (`LEYLINE_NODE_INTERACT_RADIUS = 1.45`) **lança** uma cascata: **todos** os
+segmentos elegíveis que ela toca entram em `carregando`, e o ciclo que já existe
+faz o resto. Elegível = dormente, fora da refratária e sem curto.
+
+Armar todos, e não escolher um, é consequência direta de o alvo ser a rede
+inteira: não existe "direção certa" a privilegiar — o segmento que aponta para a
+entrada também precisa acender. Sob o desenho antigo (uma corrente indo até um
+coletor) escolher importaria, e escolher errado mandaria a tentativa para trás;
+com a rede como alvo, dividir é o mecanismo, não um efeito colateral.
 
 É esta peça que mata o gate. A partir dela, a leyline tem um verbo disponível no
 primeiro minuto de qualquer run, sem item, sem desbloqueio e sem sorte.
@@ -163,7 +170,6 @@ justamente o que expõe o jogador a tudo isso.
 | Estrato | O que atrapalha fechar | É regra nova? |
 | --- | --- | --- |
 | Catedral Prismática | cristal encostado na linha (96% das redes) | sim — o curto |
-| Ferrífero | a parede inteira é fiação (`FERRIC_VEIN_SCALE = 3`) | sim — o curto |
 | Cripta Glacial | veio e cristal, e o degelo mudando o chão sob você | sim — o curto |
 | Fenda Sulfurosa | pulmão de gás na junção; faísca em gás explode | não, já existia |
 | Fornalha Abissal | brasa segurando o calor (`EMBER_HEAT_DECAY_SCALE`) | não, já existia |
@@ -208,16 +214,15 @@ Fechar o circuito **desliga a propriedade-identidade do estrato até a descida**
 | `aquifer` | a lâmina deixa de conduzir | você perde eletrificar poça, que é uma das melhores jogadas do jogo |
 | `glacial` | a lâmina para de derreter; o deslize cessa | derreter gelo era rota e condução |
 | `prismatic` | os cristais ficam opacos (`SOLID_CRYSTAL_DULL`) — o Arquicantor perde munição | quebrar cristal era sua fonte grátis de `current` |
-| `ferric` | os Miners perdem o gatilho de sobrecarga (`MINER_RAGE_HEAT = 66.6`) | nada: aqui o prêmio é assimétrico, e é o estrato mais caro de fechar |
 | `sulfur` | os respiradouros travam desligados | gás + faísca era uma bomba que você podia armar |
 | `furnace` | a brasa devolve a dissipação de calor | nada: a brasa é pressão só sobre o jogador |
 | `silica` | a sílica solta (`SURF_SILT`) vira vidro: o Devorador Branco perde o chão por onde sobe | você gasta de uma vez o contra-jogo territorial dele |
 
 **O princípio, e é ele que responde ao pedido de "ajuda pequena":** você não
 ganha um poder, você **desliga uma regra** — e a regra servia aos dois lados.
-Duas linhas da tabela são assimétricas de propósito (`furnace` e `ferric`),
-porque brasa e sobrecarga de Miner são pressões que só existem contra o
-jogador; nos dois casos o preço está no custo de fechar, não no prêmio.
+Uma linha da tabela é assimétrica de propósito (`furnace`), porque a brasa é
+pressão que só existe contra o jogador; ali o preço está no custo de fechar,
+não no prêmio.
 
 O prazo sai de graça: `descend` e `ascend` já zeram relógios e `routed`
 (`sectors.ts:403` e `:521`), porque "os relógios do setor velho descreviam
@@ -250,8 +255,8 @@ armamento (`run.ts:2014-2020`).
    rede joga exatamente o jogo de hoje e não leva um ponto de dano por ela.
 2. **Nenhum número do personagem muda.** A subversão mexe no mundo, nunca no
    Prospector. É a diferença entre buff e terreno.
-3. **A economia fica intocada.** Nenhuma subversão rende minério — por isso o
-   Ferrífero ganha "os Miners perdem o gatilho" e não rendimento de veio.
+3. **A economia fica intocada.** Nenhuma subversão rende minério, e nenhuma
+   toca a cota: o prêmio muda o terreno, nunca o que ele paga.
 4. **Legível sem HUD.** Toda subversão muda a aparência do mundo: a lâmina para
    de faiscar, o cristal apaga, o respiradouro fecha. Nada disso precisa de
    ícone.
@@ -289,6 +294,15 @@ E o que este desenho **não resolve**, dito na cara:
   descobribilidade que já nos pegou uma vez.
 - **O setor 1 é sempre basalto**, então o tutorial é um circuito sem obstáculo
   e sem prêmio. É deliberado (§9), mas se lê como anticlímax é playtest.
+- **O Ferrífero não tem circuito, e nunca vai ter por este caminho.**
+  `biomeProfile` não traça leyline em setor ferrífero e `leylineGuaranteeSector`
+  o exclui da garantia — medido: 3294 setores ferríferos numa varredura de 4000
+  seeds, **zero** com leyline, e nenhum deles no setor 1, onde a regra da boca do
+  Veio poderia resgatá-los. A primeira versão desta spec listava um obstáculo e
+  um prêmio ferríferos, e o código chegou a trazer o prêmio: **código morto**,
+  removido. O invariante "Ferrífero nunca" é load-bearing (lá a parede conectada
+  já É a fiação, e o review do #144 já o defendeu uma vez); quebrá-lo para dar
+  circuito ao estrato custaria mais do que o circuito vale.
 - **A dificuldade não é combinatória.** Quem esperava um quebra-cabeça de rota
   vai achar um percurso longo e exposto. O gerador não entrega o grafo que o
   outro desenho pediria — ver §4.2.
@@ -316,9 +330,11 @@ E o que este desenho **não resolve**, dito na cara:
 - **18,8% dos setores não têm circuito.** A apresentação ainda não diz isso — a
   nascente simplesmente não existe lá, e o jogador pode procurar um puzzle que
   não há. É o candidato mais forte a próximo corte.
-- **No Ferrífero, "os Miners perdem o gatilho" é pequeno o bastante?** É o
-  estrato com a maior densidade deles *e* o mais caro de fechar (a parede
-  inteira é veio). Pode ser um pico recompensado duas vezes.
+- **O Ferrífero fica de fora do sistema inteiro, e isso incomoda.** É o estrato
+  com a maior densidade de Miners e a identidade mais elétrica de todas — a
+  parede que conduz —, e é justamente o único que nunca vê um circuito. A saída
+  não é dar leyline a ele (ver §8); seria dar ao veio ferrífero um verbo
+  próprio, de outro sistema. Fica registrado como dívida de design.
 - **A nascente é encontrável?** Ela fica perto da entrada por construção, mas
   "perto da entrada" num mapa de 96×96 ainda é um lugar que se procura.
 

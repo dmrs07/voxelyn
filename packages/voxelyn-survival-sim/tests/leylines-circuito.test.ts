@@ -29,7 +29,7 @@ import { impactSolid } from '../src/materials';
 import { createRun, emptyCommand, hashAuthoritativeState, stepRun } from '../src/run';
 import { descend } from '../src/sectors';
 import { deriveLeylineCircuit, deriveLeylineNetwork, generateWorld } from '../src/worldgen';
-import { sectorProfile } from '../src/strata';
+import { sectorBiome, sectorProfile } from '../src/strata';
 import { sectorSeed } from '../src/sectors';
 import { DISCOVERY_LEYLINE_CIRCUIT } from '../src/types';
 import type { PlayerCommand, SemanticEvent, SurvivalState } from '../src/types';
@@ -319,6 +319,26 @@ describe('circuito: estado autoritativo', () => {
     settle(state);
     expect(hashAuthoritativeState(state)).not.toBe(before);
     expect(state.leylineCircuit.closed).toBe(true);
+  });
+});
+
+describe('circuito: o Ferrifero fica de fora', () => {
+  it('nenhum setor ferrico tem leyline — logo, nenhum tem circuito', () => {
+    // O review do Codex pegou a spec prometendo obstaculo e premio ferriferos,
+    // e o codigo chegou a trazer o premio (os Miners perdendo a sobrecarga):
+    // codigo MORTO, porque `biomeProfile` nao traca leyline em setor ferrico e
+    // `leylineGuaranteeSector` o exclui da garantia. Este teste e o que impede
+    // a promessa de voltar sem a geometria que a sustentaria.
+    let ferricos = 0;
+    for (let seed = 1; seed <= 1500; seed++) {
+      for (let sector = 1; sector <= 7; sector++) {
+        if (sectorBiome(seed, sector).stratum !== 'ferric') continue;
+        ferricos++;
+        expect(sectorProfile(seed, sector).leylines, `seed ${seed} setor ${sector}`).toBe(0);
+      }
+    }
+    // A amostra tem de conter ferricos, senao o teste passaria por vacuidade.
+    expect(ferricos).toBeGreaterThan(100);
   });
 });
 

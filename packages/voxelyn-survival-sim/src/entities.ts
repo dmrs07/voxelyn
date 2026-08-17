@@ -1776,11 +1776,7 @@ const settleMinerMood = (state: SurvivalState, ent: Entity, events: SemanticEven
   if (ent.mood !== MINER_MOOD_PASSIVE) return;
   const heat = approachingHeat(state, ent);
   if (heat < 0) return;
-  // Circuito fechado no Ferrifero: a corrente da grade foi roteada para longe
-  // do cabeamento deles, e o calor da sua arma deixa de sobrecarregar o
-  // circuito. Eles continuam fugindo — perdem o gatilho da FALHA, nao o medo.
-  const podeSobrecarregar = !(state.stratumSubverted && state.stratum === 'ferric');
-  if (podeSobrecarregar && heat >= MINER_RAGE_HEAT) {
+  if (heat >= MINER_RAGE_HEAT) {
     ent.mood = MINER_MOOD_ENRAGED;
     markDiscovery(state.stats, DISCOVERY_MINER_ENRAGED);
     events.push({ t: 'miner_mood', entity: ent.id, x: ent.x, y: ent.y, mood: MINER_MOOD_ENRAGED });
