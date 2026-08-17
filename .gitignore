@@ -6,6 +6,12 @@ dist/
 build/
 out/
 
+# Zips de release do Survival (o dist/ empacotado para upload no itch.io).
+# Mesmo motivo do dist/: e artefato gerado, reproduzivel por `pnpm --filter
+# @voxelyn/survival build`, e alguns megabytes de binario que ficariam no
+# historico para sempre.
+voxelyn-survival-*.zip
+
 # TypeScript cache
 *.tsbuildinfo
 
