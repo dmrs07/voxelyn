@@ -1099,6 +1099,62 @@ export const CONTAMINATION_CARRYOVER = 0.6;
 export const CONTAMINATION_PER_TICK = 1 / (TICK_HZ * 60 * 14); // ~14 min ate 1.0
 export const VENT_BASE_INTERVAL_TICKS = 160;
 
+// ---------------------------------------------------------------------------
+// SATURACAO: o que acontece quando a barra enche
+// ---------------------------------------------------------------------------
+// O erro que estas constantes corrigem: por muito tempo a contaminacao PARAVA
+// em 1,0 e nada acontecia. A escada de ondas terminava em 0,85, o `Math.min(1,
+// ...)` grampeava o valor, e dali em diante o relogio girava sem cobrar nada.
+// Isso fazia da saturacao o estado mais SEGURO da run — todas as ondas ja
+// tinham disparado, e nenhuma outra viria. Um relogio que para de importar
+// exatamente quando chega ao fim nao e um relogio: e um enfeite.
+//
+// A regra do jogo continua valendo aqui — nenhum sistema novo. A saturacao nao
+// inventa um mecanismo: usa `damageEntity`, que ja move todo o dano ambiental
+// (fogo, gas, esporos), e as mesmas ondas que a escada ja disparava.
+
+/** Acima disto o Veio parou de avisar e passou a cobrar. */
+export const CONTAMINATION_SATURATED_AT = 1;
+
+/**
+ * Intervalo entre as mordidas da saturacao.
+ *
+ * Um segundo cheio, e nao dano continuo por tick, porque a saturacao precisa
+ * ser LIDA e nao so sofrida: uma pancada por segundo tem cadencia audivel e
+ * visivel, e o jogador consegue contar quantas ainda aguenta enquanto corre.
+ * Uma sangria de 0,1 por tick tira a mesma vida e nao ensina nada.
+ */
+export const CONTAMINATION_SATURATION_PULSE_TICKS = TICK_HZ;
+
+/**
+ * A escalada da mordida: primeira pancada, quanto cada pancada seguinte
+ * acrescenta, e o teto.
+ *
+ * A curva e deliberadamente mansa no comeco e cruel no fim. Os dez primeiros
+ * segundos de saturacao custam cerca de um terco da vida — o bastante para
+ * doer, longe do bastante para matar quem correu na hora. Ignorada por
+ * completo, a partir da vida cheia ela mata em torno de vinte segundos.
+ *
+ * Esse formato existe para proteger a decisao que o jogo inteiro protege:
+ * ABANDONAR o contrato continua sendo jogada legitima. Saturar precisa
+ * significar "saia agora", nunca "voce ja morreu" — morte instantanea
+ * apagaria a corrida ate a extracao, que e a parte interessante.
+ */
+export const CONTAMINATION_SATURATION_BASE_DAMAGE = 1.5;
+export const CONTAMINATION_SATURATION_RAMP = 0.35;
+export const CONTAMINATION_SATURATION_MAX_DAMAGE = 9;
+
+/**
+ * Depois do ultimo degrau da escada, as ondas passam a REPETIR neste intervalo.
+ *
+ * Sem isto, cruzar 0,85 era o fim da pressao: a escada tinha acabado, e o
+ * setor tardio — justamente o mais contaminado — ficava mais vazio que o
+ * inicio. O intervalo e longo de proposito (perto de meio minuto): a onda
+ * repetida e uma cobranca de permanencia, nao um cerco.
+ */
+export const CONTAMINATION_SURGE_INTERVAL_TICKS = TICK_HZ * 35;
+export const CONTAMINATION_SURGE_COUNT = 3;
+
 /**
  * Bispo — o chefe de qualquer mapa profundamente ocupado pelo micelio.
  *

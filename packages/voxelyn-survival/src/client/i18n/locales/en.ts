@@ -371,6 +371,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.cause.spores.headline': 'The spores took you',
   'summary.cause.spores.lesson':
     "The Bearer's cloud does not spread, but it stays. Step out of it instead of through it.",
+  'summary.cause.contamination.headline': 'The air finished you',
+  'summary.cause.contamination.lesson':
+    'Saturation has no cloud to leave — it charges by the second, and the bill grows. Descending clears it; standing still never does.',
   'summary.cause.discharge.self.headline': 'Your own discharge caught you',
   'summary.cause.discharge.self.lesson':
     'Conductive runs the whole pool. Before you electrify, look at where you are standing.',
@@ -564,6 +567,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'summary.cargo.lost': 'CARGO NOT RECOVERED: {ore} ⬡ · NO RECOVERY VALUE',
   'summary.cargo.cleared': 'CARGO TRANSMITTED FOR CLEARANCE: {ore} ⬡',
   'summary.cargo.core': 'CARGO AND CORES TRANSMITTED FOR CLEARANCE: {ore} ⬡ · {cores} ◉',
+  'hud.contamination': 'CONTAMINATION',
+  'hud.contamination.saturated': 'AIR SATURATED — GET OUT',
   'hud.cargo': '{count} CARGO',
   'hud.purgeCells': 'PURGE CELL ×{count}',
   'hud.sector': 'SECTOR {sector}/{total}',
@@ -624,6 +629,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'sim.reviveBeforeExtract': 'Revive the downed partner before extracting.',
   'sim.waitAtExit': 'Wait for everyone at the exit to extract.',
   'sim.contaminationRising': 'The Vein stirs — contamination is rising.',
+  'sim.contaminationCritical':
+    'The air is saturated. Every second down here costs blood now — extract or descend.',
   'sim.coreDropped': 'The core fell with its bearer.',
   'sim.arenaSealed': 'The Vein closes in. Open a way or fight.',
   'sim.ceilingCollapsing': 'The ceiling gives. The chamber is coming down.',

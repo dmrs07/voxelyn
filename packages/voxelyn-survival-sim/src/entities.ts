@@ -1015,7 +1015,14 @@ export const isStoneEnemy = (enemy: Entity): boolean =>
  * uma reducao de dano geral que a arvore nunca prometeu.
  */
 export const isEnvironmentalCause = (cause: DamageCause): boolean =>
-  cause.kind === 'fire' || cause.kind === 'gas' || cause.kind === 'spores';
+  cause.kind === 'fire' ||
+  cause.kind === 'gas' ||
+  cause.kind === 'spores' ||
+  // Saturacao e o caso mais puro da lista: nao ha nuvem em que pisar, e o
+  // "chao" que cobra presenca e o setor inteiro. Ficar de fora faria dela o
+  // unico dano ambiental imune a selagem que o jogador COMPRA para aguentar
+  // ambiente — o upgrade valeria contra a fumaca e nao contra o ar.
+  cause.kind === 'contamination';
 
 /** Aplica controle autoritativo e interrompe a acao corrente do alvo. */
 export const stunEntity = (state: SurvivalState, entity: Entity, durationTicks: number): void => {

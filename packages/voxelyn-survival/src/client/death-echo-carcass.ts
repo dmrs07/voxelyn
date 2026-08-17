@@ -160,7 +160,11 @@ export const carcassVariant = (cause: DamageCause): CarcassVariant => {
       return arced;
     case 'explosion':
       return ruptured;
+    // Saturacao e gas sem nuvem: o corpo que ela deixa e o mesmo que o ar
+    // dissolve, porque a diferenca entre as duas mortes esta em QUANTO tempo
+    // se ficou, e tempo nao muda o que sobra.
     case 'gas':
+    case 'contamination':
       return dissolved;
     case 'spores':
       return overgrown;

@@ -104,6 +104,11 @@ export const describeCause = (cause: DamageCause | null): CauseText => {
         headline: t('summary.cause.spores.headline'),
         lesson: t('summary.cause.spores.lesson'),
       };
+    case 'contamination':
+      return {
+        headline: t('summary.cause.contamination.headline'),
+        lesson: t('summary.cause.contamination.lesson'),
+      };
     case 'discharge':
       return cause.source === 'player'
         ? {

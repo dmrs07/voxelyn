@@ -432,6 +432,13 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
   // de explorar mais antes de descer.
   state.contamination = Math.min(1, state.contamination * CONTAMINATION_CARRYOVER);
   state.contaminationWaves = 0;
+  // Os relogios da saturacao zeram junto com as ondas. O carryover derruba a
+  // contaminacao abaixo do limiar, entao descer SEMPRE tira o jogador da
+  // saturacao — e o alivio real que paga o risco de descer. Nao zerar deixaria
+  // o setor novo herdando a escalada de um ar que ele nao tem.
+  state.contaminationSaturatedAt = 0;
+  state.contaminationNextPulseAt = 0;
+  state.contaminationNextSurgeAt = 0;
 
   const offsets = [
     { x: 0.5, y: 0.5 },
