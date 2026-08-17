@@ -2692,9 +2692,27 @@ export class SurvivalRenderer {
       const [nsx, nsy] = toScreen(nx, ny);
       if (nsx < -80 || nsx > vw + 80 || nsy < -100 || nsy > vh + 80) continue;
       const reachable = dist <= LEYLINE_NODE_INTERACT_RADIUS;
+      // A NASCENTE tem outro verbo e por isso outro rotulo: ela lanca a
+      // cascata do circuito em vez de togglar o proprio rele. Dizer "ROTEAR"
+      // ali seria prometer o que a tecla nao faz.
+      const source = n === state.leylineCircuit.sourceNode;
       items.push({
         depth: nx + ny + 0.5,
-        draw: () => this.drawLeylineNodePrompt(node.routed, nsx, nsy, z, nowMs, reachable),
+        draw: () =>
+          this.drawLeylineNodePrompt(
+            source
+              ? state.leylineCircuit.closed
+                ? 'leyline.source.again'
+                : 'leyline.source.launch'
+              : node.routed
+                ? 'leyline.node.unroute'
+                : 'leyline.node.route',
+            nsx,
+            nsy,
+            z,
+            nowMs,
+            reachable,
+          ),
       });
     }
 
@@ -4022,7 +4040,7 @@ export class SurvivalRenderer {
    * label diz o que o botao FARA (abrir/fechar o rele), nao o que ha.
    */
   private drawLeylineNodePrompt(
-    routed: boolean,
+    key: 'leyline.node.route' | 'leyline.node.unroute' | 'leyline.source.launch' | 'leyline.source.again',
     sx: number,
     sy: number,
     z: number,
@@ -4030,7 +4048,7 @@ export class SurvivalRenderer {
     reachable: boolean,
   ): void {
     const ctx = this.ctx;
-    const label = t(routed ? 'leyline.node.unroute' : 'leyline.node.route');
+    const label = t(key);
     ctx.save();
     ctx.font = `bold ${Math.round(6.5 * z)}px monospace`;
     ctx.textAlign = 'center';

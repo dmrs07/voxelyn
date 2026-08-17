@@ -345,6 +345,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'discovery.guardianFelled.lesson':
     'It seals the arena at half health and calls company. The siege collapses with it.',
   'discovery.leylineRouted.title': 'The junction obeys',
+  'discovery.leylineCircuit.title': 'The whole network, at once',
+  'discovery.leylineCircuit.lesson':
+    'A single cascade lit every stretch of the conductor. The stratum stopped working against you — and the property it lost was yours too.',
   'discovery.leylineRouted.lesson':
     'A routed junction becomes a relay: the discharge crosses over and arms the next stretch. The network conducts wherever you tell it to.',
   'discovery.coreTaken.title': 'The core is only half',
@@ -632,6 +635,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'sim.contaminationCritical':
     'The air is saturated. Every second down here costs blood now — extract or descend.',
   'sim.coreDropped': 'The core fell with its bearer.',
+  'sim.leylineCircuitClosed': 'The conductor closed. The stratum yields until the descent.',
   'sim.arenaSealed': 'The Vein closes in. Open a way or fight.',
   'sim.ceilingCollapsing': 'The ceiling gives. The chamber is coming down.',
   'sim.delugeRising': 'The water table is rising — the whole sector is going under.',
@@ -704,6 +708,8 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   'echo.prompt': 'USE — PAIR BLACK BOX',
   'leyline.node.route': 'USE — ROUTE JUNCTION',
+  'leyline.source.launch': 'USE — LAUNCH CIRCUIT',
+  'leyline.source.again': 'USE — LAUNCH AGAIN',
   'leyline.node.unroute': 'USE — UNROUTE JUNCTION',
   'echo.designation': 'UNIT {serial}',
   'echo.carcass': '{condition} CARCASS',

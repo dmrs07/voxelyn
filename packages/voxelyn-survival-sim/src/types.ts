@@ -334,6 +334,16 @@ export const DISCOVERY_MAGNET_BANDED = 1 << 24;
  * nada; ver a corrente continuar por um caminho que VOCE abriu, sim.
  */
 export const DISCOVERY_LEYLINE_ROUTED = 1 << 25;
+/**
+ * O CIRCUITO fechou: uma unica cascata acendeu a rede inteira do setor, e a
+ * propriedade que da identidade ao estrato parou de valer.
+ *
+ * Distinta de `DISCOVERY_LEYLINE_ROUTED` porque ensinam coisas diferentes: o
+ * rele ensina que a corrente atravessa uma juncao aberta, o circuito ensina
+ * que a rede inteira e um objetivo. Quem fecha um circuito ja marcou o rele no
+ * caminho; o contrario nunca acontece.
+ */
+export const DISCOVERY_LEYLINE_CIRCUIT = 1 << 26;
 
 /**
  * Todo bit de descoberta que existe, num numero so.
@@ -354,7 +364,7 @@ export const DISCOVERY_LEYLINE_ROUTED = 1 << 25;
  * O teste `descobertas.test.ts` confere que todo `DISCOVERY_*` exportado cabe
  * aqui dentro — e o que faz o bit novo nascer coberto em vez de nascer perdido.
  */
-export const DISCOVERY_MASK = (1 << 26) - 1;
+export const DISCOVERY_MASK = (1 << 27) - 1;
 
 /**
  * O resultado congelado de uma run. Construido uma vez, quando a run termina.
@@ -978,6 +988,47 @@ export type LeylineNode = {
   routed: boolean;
 };
 
+/**
+ * O CIRCUITO do setor: a rede de leyline vista como um problema, e nao como
+ * decoracao.
+ *
+ * A pergunta que ele responde e "o que a leyline PEDE do jogador". Fechar o
+ * circuito e fazer uma UNICA cascata acender todos os segmentos de `members`,
+ * o que obriga a percorrer a rede inteira roteando cada juncao e a consertar
+ * os segmentos em curto antes de lancar.
+ *
+ * Por que a rede inteira, e nao um caminho da nascente ate uma ponta funda:
+ * porque a topologia medida nao comporta um caminho. Em 637 setores com rede,
+ * 71,6% dos circuitos separavam as duas pontas por UMA juncao (mediana 1 em
+ * todos os sete estratos), e o rele arma TODOS os vizinhos dormentes — entao
+ * "rotear tudo" sempre venceu e escolher rota nunca foi decisao. Exigir a rede
+ * toda transforma o mesmo grafo raso num objetivo de escala do setor.
+ *
+ * `sourceNode` e `members` sao geometria derivada da seed (como `cells` e
+ * `hallCenters`): ficam fora do hash e do wire. `reached`, `live` e `closed`
+ * decidem o mundo — `closed` desliga a propriedade do estrato — e por isso
+ * hasheiam.
+ */
+export type LeylineCircuit = {
+  /**
+   * Indice em `leylineNodes` da NASCENTE: a juncao do componente por onde o
+   * jogador lanca a cascata. -1 quando a rede nao comporta circuito (nenhum
+   * componente com dois segmentos) — 18,8% dos setores com leyline, medido.
+   *
+   * A nascente nasce `routed` e o interact nela LANCA em vez de togglar: ela e
+   * a ponta, e um verbo por tecla vale mais do que economizar um no.
+   */
+  sourceNode: number;
+  /** Segmentos que precisam acender na mesma cascata. Vazio sem circuito. */
+  members: number[];
+  /** Segmentos ja acesos pela cascata em curso, em ordem crescente. */
+  reached: number[];
+  /** Ha cascata em curso lancada pela nascente. */
+  live: boolean;
+  /** O circuito fechou neste setor: a subversao do estrato esta valendo. */
+  closed: boolean;
+};
+
 export type SemanticEvent =
   | { t: 'action_start'; entity: number; action: EntityActionKind; x: number; y: number; dx: number; dy: number; startTick: number; releaseTick: number; endTick: number }
   /**
@@ -1060,6 +1111,27 @@ export type SemanticEvent =
    * NOVO, para o feedback dizer o que aconteceu e nao o que havia.
    */
   | { t: 'leyline_routed'; node: number; x: number; y: number; routed: boolean; slot: number }
+  /**
+   * Um segmento recusou a ativacao por estar em CURTO — cristal e minerio
+   * encostados nele sangram a carga (ver `leylineSegmentShorted`).
+   *
+   * Existe porque um obstaculo que nao se anuncia e um bug para quem joga: sem
+   * ele, lancar o circuito num setor com um segmento sujo seria indistinguivel
+   * de a mecanica estar quebrada. Carrega as celulas pelo mesmo motivo que
+   * `leyline_charge` carrega: o cliente precisa acender a parede exata que
+   * pede picareta.
+   */
+  | { t: 'leyline_short'; seg: number; cells: number[] }
+  /**
+   * A cascata lancada na nascente terminou. `closed` diz se ela acendeu TODOS
+   * os segmentos do circuito; `lit` e `total` deixam o cliente dizer o quanto
+   * faltou sem recontar nada.
+   *
+   * Um evento so para os dois desfechos, e nao um par sucesso/fracasso, porque
+   * quem escuta faz a mesma coisa nos dois casos — encerra o telegrafo e
+   * mostra o placar; ramificar no tipo espalharia essa decisao pelo cliente.
+   */
+  | { t: 'leyline_circuit'; closed: boolean; lit: number; total: number }
   | { t: 'ignite'; x: number; y: number }
   /**
    * Alguem recuperou vida. Existe para o Bispo poder ser LIDO: sem um evento, a
@@ -1263,6 +1335,8 @@ export type SemanticEvent =
  * tela do jogador, como uma chave crua.
  */
 export type SimMessageKey =
+  /** O circuito da leyline fechou: o estrato parou de valer contra voce. */
+  | 'sim.leylineCircuitClosed'
   | 'sim.partnerRevived'
   | 'sim.reviveBeforeDescend'
   | 'sim.waitAtShaft'
@@ -1448,6 +1522,23 @@ export type SurvivalState = {
    * `routed` de cada uma e autoritativo (hash + wire); ver `LeylineNode`.
    */
   leylineNodes: LeylineNode[];
+  /**
+   * O circuito do setor: o que a rede pede do jogador. Ver `LeylineCircuit`.
+   */
+  leylineCircuit: LeylineCircuit;
+  /**
+   * O circuito fechou e a propriedade que da identidade a este estrato parou
+   * de valer ate a proxima descida.
+   *
+   * Um booleano so, e nao um efeito por estrato, porque quem sabe o que
+   * desligar e cada sistema — `isConductiveCell` sabe da agua, o calor sabe da
+   * brasa, o Miner sabe da sobrecarga. Espalhar a leitura e o que impede este
+   * campo de virar uma tabela de excecoes que ninguem mantem.
+   *
+   * Espelha `leylineCircuit.closed` para os leitores quentes nao precisarem
+   * alcancar o objeto do circuito a cada tick.
+   */
+  stratumSubverted: boolean;
   /**
    * Centros dos saloes carimbados pela gramatica espacial do estrato.
    *

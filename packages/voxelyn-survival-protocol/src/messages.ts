@@ -341,6 +341,19 @@ export type WorldFlags = {
    * antigo = tudo nao-roteado.
    */
   leylineRouting?: boolean[];
+  /**
+   * O CIRCUITO do setor: se ele ja fechou, e se ha cascata viajando agora.
+   *
+   * `closed` nao e enfeite — ele desliga a propriedade do estrato, entao um
+   * cliente que reconecta sem ele desenharia agua conduzindo onde a sim ja
+   * decidiu que nao conduz, e prometeria ao jogador um choque que nao vem. A
+   * geometria (nascente e membros) NAO viaja: o cliente a regenera da seed,
+   * como faz com os proprios segmentos.
+   *
+   * Ausente em servidor antigo = circuito fechado em lugar nenhum, que e
+   * exatamente o mundo de antes deste corte.
+   */
+  leylineCircuit?: { closed: boolean; live: boolean; lit: number; total: number };
 };
 
 export type ServerWelcome = {

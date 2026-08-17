@@ -426,6 +426,30 @@ export const LEYLINE_JUNCTION_SPACING = 28;
  * porque a sim (toggle em stepPlayer) e o cliente (prompt) leem o numero.
  */
 export const LEYLINE_NODE_INTERACT_RADIUS = 1.45;
+/**
+ * O CURTO: quantas celulas de cristal/minerio encostadas num segmento bastam
+ * para ele sangrar a carga e recusar a ativacao.
+ *
+ * O numero nao e estetico, e medido. Com limiar 1 ("qualquer vizinho conduz")
+ * 73% a 89% dos segmentos nasciam em curto e NENHUMA rede da amostra nascia
+ * limpa — a regra deixaria de ser obstaculo e viraria imposto. Com 6:
+ *
+ *   Catedral Prismatica  39% dos segmentos, 96% das redes com >= 1 curto
+ *   Cripta Glacial       27% / 62%      Aquifero Negro  20% / 57%
+ *   Fenda Sulfurosa      17% / 43%      Fornalha        14% / 43%
+ *   Basalto               9% / 27%      Silica           9% / 26%
+ *
+ * A leitura que isso entrega e a certa: a Catedral — o estrato DO cristal — e
+ * quase sempre o problema, e o basalto do setor 1 quase sempre ensina a rede
+ * sem obstaculo. O conserto e o verbo central do jogo (quebrar o cristal,
+ * esgotar o veio ate SOLID_ORE_SPENT), entao nenhum curto e uma parede.
+ *
+ * LIQUIDO NAO ENTRA, e a ausencia e deliberada: a agua do Aquifero e ESTATICA
+ * e o jogo nao tem verbo que a remova. Curto por poca tornaria o circuito do
+ * Aquifero impossivel em vez de dificil — o que a agua faz continua sendo o
+ * que ela sempre fez, conduzir a descarga contra quem estiver nela.
+ */
+export const LEYLINE_SHORT_CELLS = 6;
 
 export const PLAYER_HP = 100;
 export const PLAYER_SPEED = 4.6; // tiles/s

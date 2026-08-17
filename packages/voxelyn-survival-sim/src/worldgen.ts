@@ -247,6 +247,106 @@ export const deriveLeylineNodes = (
   });
 
 /**
+ * O CIRCUITO derivado da rede: qual juncao e a nascente e quais segmentos
+ * precisam acender juntos.
+ *
+ * O componente escolhido e o MAIOR do grafo de segmentos (arestas = juncoes
+ * que articulam dois ou mais), e nao a rede inteira, porque a rede inteira
+ * costuma nao ser conexa: a gravacao troca de lado da parede e abre vaos, e
+ * exigir segmentos que nenhuma cascata alcanca tornaria o circuito impossivel
+ * em vez de dificil. Em 18,8% dos setores com leyline nenhum componente chega
+ * a dois segmentos — ali `sourceNode` e -1 e o setor simplesmente nao tem
+ * circuito, o que e variancia aceita (bonus, nunca requisito), mas a
+ * apresentacao precisa dizer.
+ *
+ * A nascente e a juncao do componente mais PROXIMA DA ENTRADA, com empate
+ * resolvido pelo menor indice: quem entra no setor encontra a ponta de cima
+ * da rede antes de qualquer outra coisa dela. Ela nasce `routed` porque o
+ * interact nela lanca em vez de togglar — ver `LeylineCircuit`.
+ *
+ * Pura e deterministica, como `deriveLeylineNodes`: mesma seed, mesmo
+ * circuito. Nada aqui entra no hash.
+ */
+export const deriveLeylineCircuit = (
+  nodes: LeylineNode[],
+  segmentCount: number,
+  entry: Vec2,
+  width: number,
+): { sourceNode: number; members: number[] } => {
+  if (segmentCount === 0 || nodes.length === 0) return { sourceNode: -1, members: [] };
+
+  // Componentes do grafo de segmentos. Uniao por juncao: todos os segmentos
+  // que uma juncao articula ficam no mesmo componente.
+  const parent = Array.from({ length: segmentCount }, (_, i) => i);
+  const find = (a: number): number => {
+    let r = a;
+    while (parent[r] !== r) r = parent[r];
+    while (parent[a] !== r) { const n = parent[a]; parent[a] = r; a = n; }
+    return r;
+  };
+  for (const node of nodes) {
+    for (let k = 1; k < node.segments.length; k++) {
+      const a = find(node.segments[0]);
+      const b = find(node.segments[k]);
+      if (a !== b) parent[b] = a;
+    }
+  }
+
+  const size = new Map<number, number>();
+  for (let s = 0; s < segmentCount; s++) {
+    const r = find(s);
+    size.set(r, (size.get(r) ?? 0) + 1);
+  }
+  // Maior componente, empate pelo menor representante: determinismo antes de
+  // qualquer coisa, porque este numero decide o objetivo do setor.
+  let best = -1;
+  let bestSize = 1; // exige DOIS segmentos: um segmento so nao e circuito.
+  for (const [root, n] of [...size].sort((a, b) => a[0] - b[0])) {
+    if (n > bestSize) { best = root; bestSize = n; }
+  }
+  if (best < 0) return { sourceNode: -1, members: [] };
+
+  const members: number[] = [];
+  for (let s = 0; s < segmentCount; s++) if (find(s) === best) members.push(s);
+
+  let sourceNode = -1;
+  let bestDist = Infinity;
+  for (let n = 0; n < nodes.length; n++) {
+    const node = nodes[n];
+    if (!node.segments.some((s) => find(s) === best)) continue;
+    const dx = (node.cell % width) - entry.x;
+    const dy = Math.floor(node.cell / width) - entry.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) { bestDist = d; sourceNode = n; }
+  }
+  if (sourceNode < 0) return { sourceNode: -1, members: [] };
+  return { sourceNode, members };
+};
+
+/**
+ * A REDE de leyline de um setor, montada num lugar so.
+ *
+ * Existe pela licao que o review do PR #144 cobrou caro: o que se aplica em
+ * call site nao chega a quem nao e call site. `createRun`, `descend` e
+ * `ascend` montavam a rede cada um por sua conta, e bastaria um deles esquecer
+ * a nascente `routed` para o circuito existir no teste e nao no jogo. Com a
+ * montagem aqui, a paridade vale por construcao.
+ *
+ * A nascente nasce ROTEADA porque o interact nela lanca a cascata em vez de
+ * togglar (ver `LeylineCircuit`): sem isso ela seria a unica juncao do mapa
+ * que o jogador nao consegue abrir, e a cascata morreria na propria origem.
+ */
+export const deriveLeylineNetwork = (
+  world: Pick<GeneratedWorld, 'leylines' | 'leylineNodes' | 'entry'>,
+  width: number,
+): { nodes: LeylineNode[]; circuit: { sourceNode: number; members: number[] } } => {
+  const nodes = deriveLeylineNodes(world.leylineNodes, world.leylines, width);
+  const circuit = deriveLeylineCircuit(nodes, world.leylines.length, world.entry, width);
+  if (circuit.sourceNode >= 0) nodes[circuit.sourceNode].routed = true;
+  return { nodes, circuit };
+};
+
+/**
  * Quantas celulas separam o objetivo da moldura do mapa.
  *
  * DUAS, e o numero e um teto e nao um desejo. O que esta margem protege e o

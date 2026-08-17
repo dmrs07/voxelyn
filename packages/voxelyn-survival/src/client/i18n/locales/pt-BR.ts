@@ -349,6 +349,9 @@ export const PT_BR = {
   'discovery.guardianFelled.lesson':
     'Ele sela a arena na metade da vida e chama companhia. O cerco desaba com ele.',
   'discovery.leylineRouted.title': 'A junção obedece',
+  'discovery.leylineCircuit.title': 'A rede inteira, de uma vez',
+  'discovery.leylineCircuit.lesson':
+    'Uma única cascata acendeu todos os trechos do condutor. O estrato parou de trabalhar contra você — e a propriedade que ele perdeu também era sua.',
   'discovery.leylineRouted.lesson':
     'Uma junção roteada vira relé: a descarga atravessa e arma o trecho vizinho. A rede conduz para onde você mandar.',
   'discovery.coreTaken.title': 'O núcleo é só metade',
@@ -641,6 +644,7 @@ export const PT_BR = {
   'sim.contaminationCritical':
     'O ar saturou. Cada segundo aqui embaixo custa sangue agora — extraia ou desça.',
   'sim.coreDropped': 'O núcleo caiu com o portador.',
+  'sim.leylineCircuitClosed': 'O condutor fechou. O estrato cede até a descida.',
   'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
   'sim.ceilingCollapsing': 'O teto cede. A câmara está desabando.',
   'sim.delugeRising': 'O lençol está subindo — o setor inteiro vai submergir.',
@@ -710,6 +714,8 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   'echo.prompt': 'USAR — PAREAR CAIXA-PRETA',
   'leyline.node.route': 'USAR — ROTEAR JUNÇÃO',
+  'leyline.source.launch': 'USAR — LANÇAR CIRCUITO',
+  'leyline.source.again': 'USAR — LANÇAR DE NOVO',
   'leyline.node.unroute': 'USAR — DESFAZER ROTEAMENTO',
   'echo.designation': 'UNIDADE {serial}',
   'echo.carcass': 'CARCAÇA {condition}',

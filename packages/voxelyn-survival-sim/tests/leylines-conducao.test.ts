@@ -73,6 +73,12 @@ const scene = (): SurvivalState => {
     state.leylineSegments,
     w,
   );
+  // A cena e do RELE, nao do circuito: sem nascente, o interact numa juncao
+  // sempre toggla. Explicito porque `createRun` deixou aqui o circuito do
+  // mundo de verdade, e se a nascente dele calhasse de ser o no 0 desta cena
+  // o teste de toggle passaria a LANCAR — verde por sorte, vermelho no dia em
+  // que a seed 1 mudasse.
+  state.leylineCircuit = { sourceNode: -1, members: [], reached: [], live: false, closed: false };
   // Longe da linha por padrao; cada teste posiciona quem deve levar o choque.
   state.player.x = 22.5;
   state.player.y = 26.5;

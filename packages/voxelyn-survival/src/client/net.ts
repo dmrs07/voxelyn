@@ -447,6 +447,17 @@ export class NetClient {
         state.leylineNodes[i].routed = routing[i];
       }
     }
+    // O circuito aplica DIRETO pelo mesmo motivo do rele — e `closed` aplica
+    // com prioridade, porque dele depende a fisica que o espelho desenha: a
+    // agua do Aquifero para de conduzir, o cristal da Catedral ja esta opaco
+    // no proprio grid. `reached` nao viaja (o cliente nao decide cascata); o
+    // placar chega pronto em `lit`/`total`.
+    const circuit = world.leylineCircuit;
+    if (circuit) {
+      state.leylineCircuit.closed = circuit.closed;
+      state.leylineCircuit.live = circuit.live;
+      state.stratumSubverted = circuit.closed;
+    }
   }
 
   /**

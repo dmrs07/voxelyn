@@ -36,6 +36,7 @@
 import {
   DISCOVERY_CORE_TAKEN,
   DISCOVERY_DISCHARGE_POOL,
+  DISCOVERY_LEYLINE_CIRCUIT,
   DISCOVERY_LEYLINE_ROUTED,
   DISCOVERY_FIRE_SPREAD,
   DISCOVERY_FRAGILE_BREACH,
@@ -256,6 +257,11 @@ export const DISCOVERIES: readonly Discovery[] = [
     bit: DISCOVERY_LEYLINE_ROUTED,
     title: 'discovery.leylineRouted.title',
     lesson: 'discovery.leylineRouted.lesson',
+  },
+  {
+    bit: DISCOVERY_LEYLINE_CIRCUIT,
+    title: 'discovery.leylineCircuit.title',
+    lesson: 'discovery.leylineCircuit.lesson',
   },
   {
     bit: DISCOVERY_ORE_CHAIN,
