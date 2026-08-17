@@ -167,6 +167,16 @@ export type DamageCause =
   | { kind: 'fire' }
   | { kind: 'gas' }
   | { kind: 'spores' }
+  /**
+   * Saturacao: o ar do setor inteiro, cobrando permanencia.
+   *
+   * Tem causa propria em vez de reaproveitar `gas` porque a licao da tela de
+   * morte e outra. `gas` significa "voce pisou numa nuvem" e ensina a desviar;
+   * esta significa "voce ficou tempo demais" e ensina a sair. Duas mortes
+   * diferentes que dessem a mesma frase apagariam a unica coisa que a tela de
+   * morte tem para fazer.
+   */
+  | { kind: 'contamination' }
   | { kind: 'discharge'; source: EffectOrigin['source'] }
   | { kind: 'explosion'; source: EffectOrigin['source'] }
   | { kind: 'overheat' }
@@ -1261,6 +1271,8 @@ export type SimMessageKey =
   | 'sim.reviveBeforeExtract'
   | 'sim.waitAtExit'
   | 'sim.contaminationRising'
+  /** O ar saturou: dali em diante ficar custa vida. Dispara UMA vez por setor. */
+  | 'sim.contaminationCritical'
   | 'sim.coreDropped'
   | 'sim.arenaSealed'
   | 'sim.siegeCollapsed'
@@ -1449,6 +1461,17 @@ export type SurvivalState = {
   charges: Array<{ idx: number; until: number }>;
   contamination: number;
   contaminationWaves: number;
+  /**
+   * Tick em que a saturacao comecou, ou 0 enquanto ela nao chegou.
+   *
+   * Mora no estado (e nao num contador do cliente) porque a escalada da mordida
+   * se mede a partir dele: duas maquinas que discordem de quando o ar virou
+   * divergem no dano do proximo pulso.
+   */
+  contaminationSaturatedAt: number;
+  /** Proximo tick em que a saturacao cobra, e em que a onda tardia repete. */
+  contaminationNextPulseAt: number;
+  contaminationNextSurgeAt: number;
   nextEntityId: number;
   reactionQueue: number[];
   stats: RunStats;

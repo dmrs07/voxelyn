@@ -375,6 +375,9 @@ export const PT_BR = {
   'summary.cause.spores.headline': 'Os esporos te tomaram',
   'summary.cause.spores.lesson':
     'A nuvem do Portador não se espalha, mas fica. Saia dela em vez de atravessá-la.',
+  'summary.cause.contamination.headline': 'O ar te terminou',
+  'summary.cause.contamination.lesson':
+    'A saturação não deixa nuvem em que pisar — ela cobra por segundo, e a conta cresce. Descer limpa; ficar parado nunca.',
   'summary.cause.discharge.self.headline': 'Sua própria descarga te pegou',
   'summary.cause.discharge.self.lesson':
     'Condutivo percorre a poça inteira. Antes de eletrificar, olhe onde você pisa.',
@@ -569,6 +572,8 @@ export const PT_BR = {
   'summary.cargo.lost': 'CARGA NÃO RECUPERADA: {ore} ⬡ · SEM VALOR DE RECUPERAÇÃO',
   'summary.cargo.cleared': 'CARGA TRANSMITIDA PARA HOMOLOGAÇÃO: {ore} ⬡',
   'summary.cargo.core': 'CARGA E NÚCLEOS TRANSMITIDOS PARA HOMOLOGAÇÃO: {ore} ⬡ · {cores} ◉',
+  'hud.contamination': 'CONTAMINAÇÃO',
+  'hud.contamination.saturated': 'AR SATURADO — SAIA',
   'hud.cargo': '{count} CARGA',
   'hud.purgeCells': 'CÉLULA DE PURGA ×{count}',
   'hud.sector': 'SETOR {sector}/{total}',
@@ -633,6 +638,8 @@ export const PT_BR = {
   'sim.reviveBeforeExtract': 'Revele o parceiro abatido antes de extrair.',
   'sim.waitAtExit': 'Aguarde todos na saída para extrair.',
   'sim.contaminationRising': 'O Veio se agita — a contaminação aumenta.',
+  'sim.contaminationCritical':
+    'O ar saturou. Cada segundo aqui embaixo custa sangue agora — extraia ou desça.',
   'sim.coreDropped': 'O núcleo caiu com o portador.',
   'sim.arenaSealed': 'O Veio se fecha. Abra caminho ou lute.',
   'sim.ceilingCollapsing': 'O teto cede. A câmara está desabando.',

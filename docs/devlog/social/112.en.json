@@ -1,0 +1,27 @@
+{
+  "hook": "The clock that stopped mattering",
+  "slides": [
+    {
+      "title": "\"I never saw a canary\"",
+      "body": "Four words from a player, and they took a whole feature down with them. The mine hangs cages of canaries that fall silent on the same tick contamination crosses the line — wired to the authoritative value, not a visual approximation. I was very pleased with it. I put it in the store copy."
+    },
+    {
+      "title": "A prop with a 15% attendance record",
+      "body": "Canary cages live in the mining company's occupation kit, so they only exist in sectors that company took over: guaranteed on one of three map lineages, otherwise behind a 15% intrusion roll, and even then competing with crates and struts for a capped decoration budget. Most runs never spawn one."
+    },
+    {
+      "title": "Then I read the mechanic",
+      "body": "Contamination rose on a timer and spawned a wave of enemies at 35%, 60% and 85%. At 100% it hit a Math.min and stopped. Forever. The last scheduled consequence in the entire system lived at 85% — so maxing the danger meter put you in the safest state the simulation could produce."
+    },
+    {
+      "title": "Saturation now charges by the second",
+      "body": "Three regimes: the ladder is unchanged, waves repeat past the last rung instead of never, and at 100% the air stops warning you and starts collecting — one escalating hit per second. Ten seconds costs a quarter of your health. Twenty-one kills you. Enough to run, nowhere near enough to fight."
+    },
+    {
+      "title": "The parts that were easy to get wrong",
+      "body": "Descending clears it, so going deeper to survive is a real decision. Downed co-op players are exempt — they're already on a bleedout clock. It had to count as environmental damage, or the reduction upgrade players buy would work against smoke but not air. And it got its own death cause: \"you stepped in a cloud\" and \"you stayed too long\" are different lessons."
+    }
+  ],
+  "caption": "\"I never saw a canary.\"\n\nFour words. Took down an entire feature.\n\nSome context. My game has a contamination meter — a clock that ticks up while you're underground, and the reason you shouldn't linger. To show it off, I'd hung cages of canaries through the mine that all go silent on the same tick the number crosses the line. Diegetic readout, wired to the authoritative value, not a visual approximation. I was extremely pleased with myself.\n\nI put it in the store copy. I put it in the trailer treatment. I wrote a whole paragraph about it.\n\nThen someone who'd actually played the game asked why they'd never seen one.\n\nSo I read my own code, where I learned that canary cages only spawn in sectors the mining company occupied — guaranteed on exactly one of three map lineages, otherwise sitting behind a 15% roll. And even then they compete with crates and struts for a capped decoration budget.\n\nI had built a marketing campaign around a prop with a 15% attendance record.\n\nFine. Embarrassing. Fixable. So I opened the actual mechanic, purely to confirm it was fine.\n\nIt was not fine.\n\nContamination rose on a timer. It spawned a wave of enemies at 35%, 60% and 85%. And then at 100% it hit a Math.min and stopped. Forever. The last scheduled consequence in the entire system lived at 85%.\n\nRead that back as a player experience: the most contaminated stretch of the run — the part the fiction insists is lethal — was the emptiest part of the run. Maxing out the danger meter put you in the single safest state my simulation could produce, because every consequence it had was already behind you.\n\nI shipped a progress bar that fills up and then congratulates you by leaving.\n\nThe rework, in three parts: the wave ladder stays; past the last rung waves now repeat instead of never; and at saturation the air stops warning you and starts charging — one hit per second, escalating, until you leave, descend, or die.\n\nMeasured against a stationary player at full health: 10 seconds costs a quarter of your HP. 21 seconds kills you. Enough to run, nowhere near enough to fight — because instant death would have quietly deleted the run for the exit, which is the only interesting part.\n\nFour things that nearly slipped past, and I think they're the actual craft:\n\n→ Descending clears it. Which makes \"go deeper to survive\" a real decision, and a very stupid-feeling one, and I love it.\n→ Downed co-op players are exempt. They're already on a bleedout clock; stacking a second one erases the rescue window.\n→ It had to be registered as environmental damage — otherwise the damage-reduction upgrade players buy would work against smoke but not against air.\n→ It got its own death cause instead of reusing the gas one. \"You stepped in a cloud\" and \"you stayed too long\" are different lessons, and the death screen only has one job.\n\n12 new tests, and they pin the promises, not the numbers: that saturating costs, that the bill grows, that ten seconds still leaves you alive, that descending clears it, that determinism holds. The tuning constants can move. The shape can't.\n\nThe canaries are all still in there, doing exactly what they always did. They're just no longer the only witness to a number that can now actually kill you.\n\nVoxelyn Survival is free and playable in your browser: [link]\n\nTell me what killed you. Statistically, it'll be the air.",
+  "tags": ["#gamedev", "#typescript", "#indiedev", "#gamedesign"]
+}

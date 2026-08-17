@@ -48,6 +48,13 @@ import {
   CARGO_LOST_DISCOVERY_ORE,
   CONTAMINATION_WAVES,
   CONTAMINATION_SECTOR_SCALE,
+  CONTAMINATION_SATURATED_AT,
+  CONTAMINATION_SATURATION_PULSE_TICKS,
+  CONTAMINATION_SATURATION_BASE_DAMAGE,
+  CONTAMINATION_SATURATION_RAMP,
+  CONTAMINATION_SATURATION_MAX_DAMAGE,
+  CONTAMINATION_SURGE_INTERVAL_TICKS,
+  CONTAMINATION_SURGE_COUNT,
   FURNACE_HEART_CYCLONE_TOUCH_TICKS,
   MAX_LINEAGE_SECTORS,
   RUN_SEED_MIX,
@@ -396,6 +403,9 @@ export const createRun = (config: RunConfig): SurvivalState => {
     charges: [],
     contamination: 0,
     contaminationWaves: 0,
+    contaminationSaturatedAt: 0,
+    contaminationNextPulseAt: 0,
+    contaminationNextSurgeAt: 0,
     // reserva todos os ids de player (1..playerCount) antes dos inimigos, para
     // que nenhum inimigo colida com um id de player nos snapshots por id
     nextEntityId: playerCount + 1,
@@ -2351,7 +2361,41 @@ const stepSalvageSites = (state: SurvivalState, events: SemanticEvent[]): void =
   }
 };
 
-/** Ondas de pressao por contaminacao (thresholds unicos). */
+/**
+ * Solta uma leva de contaminacao no anel de distancia do jogador.
+ *
+ * Extraido porque agora tem DOIS chamadores — os degraus da escada e a onda
+ * tardia que repete. Enquanto era um so, o corpo inline era honesto; com dois,
+ * duplicar significaria que a onda repetida poderia nascer colada no jogador
+ * sem que ninguem percebesse.
+ */
+const spawnContaminationWave = (state: SurvivalState, count: number): void => {
+  let spawned = 0;
+  for (let attempt = 0; attempt < 80 && spawned < count; attempt++) {
+    const x = state.rng.nextInt(state.config.width);
+    const y = state.rng.nextInt(state.config.height);
+    const i = y * state.config.width + x;
+    if (state.solid[i] !== SOLID_NONE) continue;
+    const ref = nearestStandingPlayer(state, x + 0.5, y + 0.5) ?? state.players[0];
+    const d = Math.hypot(x + 0.5 - ref.x, y + 0.5 - ref.y);
+    if (d < 11 || d > 26) continue;
+    spawnEnemy(state, spawned % 2 === 0 ? 'stalker' : 'bomber', x, y, false);
+    spawned++;
+  }
+};
+
+/**
+ * Ondas de pressao por contaminacao, e a cobranca da saturacao.
+ *
+ * Tres regimes, em ordem de gravidade:
+ *
+ * 1. ESCADA (0,35 / 0,6 / 0,85): uma leva por degrau, uma vez cada.
+ * 2. ONDA TARDIA: passado o ultimo degrau, a leva volta a cada
+ *    `CONTAMINATION_SURGE_INTERVAL_TICKS`. Antes, cruzar 0,85 ENCERRAVA a
+ *    pressao — o trecho mais contaminado da run era o mais tranquilo.
+ * 3. SATURACAO (>= 1,0): o ar cobra direto, em pancadas de um segundo que
+ *    escalam. Antes, 1,0 era so onde a barra parava.
+ */
 const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void => {
   // O ritmo cresce com a profundidade E com o nucleo na mao. A profundidade e
   // o que impede o poco de virar botao de reset; o nucleo e a cobranca do
@@ -2368,19 +2412,52 @@ const stepContamination = (state: SurvivalState, events: SemanticEvent[]): void 
     if (state.contamination >= level && state.contaminationWaves <= w) {
       state.contaminationWaves = w + 1;
       events.push({ t: 'message', key: 'sim.contaminationRising' });
-      let spawned = 0;
-      for (let attempt = 0; attempt < 80 && spawned < count; attempt++) {
-        const x = state.rng.nextInt(state.config.width);
-        const y = state.rng.nextInt(state.config.height);
-        const i = y * state.config.width + x;
-        if (state.solid[i] !== SOLID_NONE) continue;
-        const ref = nearestStandingPlayer(state, x + 0.5, y + 0.5) ?? state.players[0];
-        const d = Math.hypot(x + 0.5 - ref.x, y + 0.5 - ref.y);
-        if (d < 11 || d > 26) continue;
-        spawnEnemy(state, spawned % 2 === 0 ? 'stalker' : 'bomber', x, y, false);
-        spawned++;
-      }
+      spawnContaminationWave(state, count);
     }
+  }
+
+  const lastStep = CONTAMINATION_WAVES[CONTAMINATION_WAVES.length - 1][0];
+  if (state.contamination >= lastStep) {
+    // O relogio da onda tardia so comeca a contar quando o ultimo degrau cai —
+    // armado aqui, e nao no inicio da run, senao ele venceria imediatamente e a
+    // primeira leva tardia sairia junto com o degrau que a precede.
+    if (state.contaminationNextSurgeAt === 0) {
+      state.contaminationNextSurgeAt = state.tick + CONTAMINATION_SURGE_INTERVAL_TICKS;
+    } else if (state.tick >= state.contaminationNextSurgeAt) {
+      state.contaminationNextSurgeAt = state.tick + CONTAMINATION_SURGE_INTERVAL_TICKS;
+      events.push({ t: 'message', key: 'sim.contaminationRising' });
+      spawnContaminationWave(state, CONTAMINATION_SURGE_COUNT);
+    }
+  }
+
+  if (state.contamination < CONTAMINATION_SATURATED_AT) return;
+
+  if (state.contaminationSaturatedAt === 0) {
+    state.contaminationSaturatedAt = state.tick;
+    // A primeira pancada nao sai junto com o aviso: o jogador ganha um pulso
+    // inteiro para ler a tela e escolher o rumo antes de pagar por estar ali.
+    state.contaminationNextPulseAt = state.tick + CONTAMINATION_SATURATION_PULSE_TICKS;
+    events.push({ t: 'message', key: 'sim.contaminationCritical' });
+    return;
+  }
+
+  if (state.tick < state.contaminationNextPulseAt) return;
+  state.contaminationNextPulseAt = state.tick + CONTAMINATION_SATURATION_PULSE_TICKS;
+
+  // A escalada se mede pelo tempo saturado, e nao por um contador de pulsos,
+  // para que um pulso perdido (pausa, alt-tab, tick engolido) nao devolva
+  // desconto: o ar nao esquece quanto tempo voce ficou nele.
+  const secondsSaturated =
+    (state.tick - state.contaminationSaturatedAt) / CONTAMINATION_SATURATION_PULSE_TICKS;
+  const damage = Math.min(
+    CONTAMINATION_SATURATION_MAX_DAMAGE,
+    CONTAMINATION_SATURATION_BASE_DAMAGE + CONTAMINATION_SATURATION_RAMP * (secondsSaturated - 1),
+  );
+  // Abatido nao paga: no co-op ele ja esta num relogio proprio (`bleedout`), e
+  // somar os dois transformaria cada queda tardia em morte sem janela de
+  // resgate — o oposto do que a saturacao quer ensinar, que e correr junto.
+  for (const p of standingPlayers(state)) {
+    damageEntity(state, p, damage, events, { kind: 'contamination' }, true);
   }
 };
 
@@ -2763,6 +2840,12 @@ export const hashAuthoritativeState = (state: SurvivalState): string => {
   mix(state.coresTakenMask);
   mix(Math.round(state.contamination * 100000));
   mix(state.contaminationWaves);
+  // Os relogios da saturacao entram no hash porque REALIMENTAM a simulacao: o
+  // dano do proximo pulso sai da diferenca entre o tick atual e o tick em que o
+  // ar saturou. Duas maquinas que discordem disso divergem em vida.
+  mix(state.contaminationSaturatedAt);
+  mix(state.contaminationNextPulseAt);
+  mix(state.contaminationNextSurgeAt);
   // Contadores entram no hash apesar de nao afetarem a simulacao.
   //
   // Poderiam ficar de fora — nada aqui realimenta o mundo. Entram porque o

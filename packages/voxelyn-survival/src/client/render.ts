@@ -30,6 +30,8 @@ import {
   SURF_SILT,
   SURF_RAIL_V,
   CANARY_DEAD_AT,
+  CONTAMINATION_WAVES,
+  TICK_HZ,
   LURKER_HIDDEN,
   BOSS_PHASE_OVERHEAT,
   DIAMANDIS_DEMOLISH_RADIUS,
@@ -4399,10 +4401,44 @@ export class SurvivalRenderer {
     ctx.textBaseline = 'alphabetic';
 
     // Contaminacao continua sendo a unica faixa presa ao topo inteiro.
+    //
+    // Ela era tres pixels de acido sem numero e sem rotulo — o suficiente para
+    // quem ja sabia o que aquilo media, e invisivel para todo mundo que nao
+    // sabia. Um relogio que mata precisa ser LIDO antes de cobrar, entao a
+    // faixa ganhou tres coisas: espessura que muda com o perigo, a cor que
+    // percorre acido -> fogo -> sangue conforme sobe, e o numero, que so
+    // aparece quando ha o que decidir (do primeiro degrau em diante). Antes
+    // disso o valor nao muda nenhuma escolha, e um HUD que grita o tempo todo
+    // ensina a nao olhar.
+    const contam = state.contamination;
+    const saturated = contam >= 1;
+    const firstStep = CONTAMINATION_WAVES[0][0];
+    const lastStep = CONTAMINATION_WAVES[CONTAMINATION_WAVES.length - 1][0];
+    // A pulsacao e do RELOGIO da simulacao, nao de `nowMs`: ela bate junto com
+    // a pancada que o ar cobra, entao o brilho e o dano sao o mesmo evento.
+    const pulse = saturated ? 0.55 + 0.45 * Math.sin((state.tick / TICK_HZ) * Math.PI * 2) : 1;
+    const barH = saturated ? 6 : contam >= lastStep ? 5 : 3;
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(0, 0, vw, 3);
-    ctx.fillStyle = PAL.acid;
-    ctx.fillRect(0, 0, vw * state.contamination, 3);
+    ctx.fillRect(0, 0, vw, barH);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = saturated ? PAL.blood : contam >= lastStep ? PAL.fire : PAL.acid;
+    ctx.fillRect(0, 0, vw * contam, barH);
+    ctx.globalAlpha = 1;
+
+    if (contam >= firstStep) {
+      const label = saturated
+        ? t('hud.contamination.saturated')
+        : `${t('hud.contamination')} ${Math.round(contam * 100)}%`;
+      ctx.font = `bold ${saturated ? 9 : 8}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillText(label, vw / 2 + 1, barH + 11);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = saturated ? PAL.blood : contam >= lastStep ? PAL.fire : PAL.acid;
+      ctx.fillText(label, vw / 2, barH + 10);
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'left';
+    }
 
     const revealed = state.salvageSites
       .filter((site) => site.cacheRevealed && !site.cacheOpened)
