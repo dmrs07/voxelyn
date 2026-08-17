@@ -14,6 +14,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { readSocial, renderCarousel } from './carousel.mjs';
 import { devlogDir, entriesDir, socialDir } from './lib/paths.mjs';
 import { nextEntry, readPlan, writePlan } from './plan.mjs';
 
@@ -117,7 +118,38 @@ function buildIndex(plan) {
   return `${lines.join('\n')}\n`;
 }
 
-function main() {
+/**
+ * Recarimba a capa com a data em que a entrada SAIU.
+ *
+ * A ordem do pipeline e `carousel.mjs` e so depois `publish.mjs`, entao no
+ * momento de desenhar os slides `publishedAt` ainda e null e a capa cai na
+ * `publishDate` — a vaga que a entrada ocupa na fila da retrospectiva. Enquanto
+ * a fila e publicada em ordem, as duas datas coincidem e ninguem nota. Publicar
+ * FORA de ordem (curadoria) faz a capa anunciar uma data futura: a 111 esta
+ * agendada para novembro e saiu em agosto.
+ *
+ * Redesenhar aqui e o unico ponto em que a data verdadeira ja existe. So roda
+ * quando as duas divergem, entao a fila em ordem nao paga nada por isto.
+ */
+async function restampCarousel(entry) {
+  if (entry.publishedAt === entry.publishDate) return [];
+  const redone = [];
+  const langs = [null, ...Object.keys(entry.carousels ?? {})];
+  for (const lang of langs) {
+    if (lang === null && !entry.carousel?.length) continue;
+    const social = readSocial(entry.id, lang);
+    const { files, pdf } = await renderCarousel(entry, social, {
+      lang,
+      dateLabel: entry.publishedAt,
+    });
+    if (lang) entry.carousels[lang] = { files, pdf };
+    else entry.carousel = files;
+    redone.push(lang ?? 'pt');
+  }
+  return redone;
+}
+
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   const plan = readPlan();
   if (!plan) {
@@ -144,11 +176,16 @@ function main() {
   entry.entryFile = findEntryFile(entry.id);
   entry.status = 'published';
   entry.publishedAt = args.at ?? new Date().toISOString().slice(0, 10);
+  const redone = await restampCarousel(entry);
   writePlan(plan);
 
   writeFileSync(resolve(devlogDir, 'INDEX.md'), buildIndex(plan));
 
   console.log(`entrada ${entry.id} publicada em ${entry.publishedAt}: ${entry.title}`);
+  if (redone.length)
+    console.log(
+      `capa recarimbada com ${entry.publishedAt} (agendada era ${entry.publishDate}): ${redone.join(', ')}`,
+    );
   if (missing.length) console.log(`aviso: publicada com pendencias — ${missing.join('; ')}`);
   const next = nextEntry(plan);
   console.log(next ? `proxima: ${next.id} (${next.publishDate}) — ${next.title}` : 'fila vazia.');
@@ -158,4 +195,8 @@ function main() {
     );
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (import.meta.url === `file://${process.argv[1]}`)
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

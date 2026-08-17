@@ -217,7 +217,11 @@ export function buildSlides(entry, social, opts = {}) {
   const shots = entry.shots ?? [];
   const cdn = entry.cdn ?? {};
   const cover = shotUri(shots[0]?.file ?? '', cdn);
-  const dateLabel = opts.dateLabel ?? entry.publishDate;
+  // A data que a CAPA anuncia e a da publicacao de fato, e so cai na agendada
+  // enquanto a entrada nao saiu. Publicar fora de ordem (uma entrada do fim da
+  // fila que vira post hoje) carimbava o slide com uma data futura: o post
+  // aparecia no feed em agosto dizendo novembro. O INDEX.md ja resolvia assim.
+  const dateLabel = opts.dateLabel ?? entry.publishedAt ?? entry.publishDate;
   const slides = [];
 
   // 1. Capa: a arte manda, o titulo ancora.

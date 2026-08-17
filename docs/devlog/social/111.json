@@ -1,0 +1,42 @@
+{
+  "hook": "A player finished three runs without knowing the goal",
+  "slides": [
+    {
+      "title": "The sentence that opened the ticket",
+      "body": "Somebody played blind: three runs, no guide, getting further each time. Then he wrote: \"I didn't exactly know what the exact goal was.\" The goal is written down, in the Induction, article two, in the company's own voice. He read it. It did not land. That is a design problem, and the fix is never a longer paragraph."
+    },
+    {
+      "title": "The document already knew",
+      "body": "A comment at the top of induction.ts has been confessing this for weeks: it is not a guided tutorial, it makes the first descent legible rather than solving it. It was right about itself. Reading about a dodge has never taught anybody to dodge.",
+      "shot": "111-briefing.png"
+    },
+    {
+      "title": "The Training Operation",
+      "body": "Two to three minutes, five exercises: move, fire, dash, take the Core, get out alive. Permanent on the terminal and offered on the first read of the briefing, with the big stamp still sending you to the real Vein. Never mandatory, in either place."
+    },
+    {
+      "title": "Zero lines in the simulation",
+      "body": "The trick is a run config that already existed: one sector, Core in it. Sector one never has a boss, so the pedestal is live from the first frame, and extracting with the Core there produces the SAME outcome a real expedition does. The real HUD teaches it alone: FIND THE CORE flips to EXTRACT AT THE ENTRANCE.",
+      "shot": "111-pedestal.png"
+    },
+    {
+      "title": "The course is carved",
+      "body": "A normal sector is generated from a fixed seed, then cut into before the first tick: platform, gallery, firing chamber, pillar corridor, pedestal. Everything outside becomes plain rock, because sealed rock keeps its crystal, and crystal emits light in a place the drill just declared does not exist."
+    },
+    {
+      "title": "The soft lock that almost shipped",
+      "body": "The course has no doors. You can ignore the dash prompt and lift the Core early. If that step listened only for the event, it would be discarded and the drill would wait forever for a second Core that does not exist. Irreversible facts are checked as facts, repeatable actions as events."
+    },
+    {
+      "title": "Favourite bug of the month",
+      "body": "Extracting empty handed certified the drill: four tiles out, four back, press E, and the game congratulated you for learning nothing. Now an empty extraction gets its own outcome and the button becomes REPEAT DRILL.",
+      "shot": "111-not-certified.png"
+    },
+    {
+      "title": "What it refuses to do",
+      "body": "It never blocks you, never unlocks anything, and pays exactly nothing, and the form says so out loud. When it does teach, it teaches with the real thing: same Core, same key, same HUD, same extraction that will later decide whether an hour of cargo banks or evaporates."
+    }
+  ],
+  "caption": "A player finished three runs without knowing what the goal was. The goal was written on a screen he saw. Reading is not doing, so the text became a two minute drill: move, fire, dash, take the Core, walk it back. No second engine and no tutorial mode in the rules. The sector is real, carved before the first tick, and the HUD that teaches you is the same one that charges you later.",
+  "tags": ["#gamedev", "#indiedev", "#roguelike", "#gamedesign", "#tutorial", "#ux", "#voxel", "#indiegame"]
+}
