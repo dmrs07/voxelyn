@@ -1,0 +1,187 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  /* As duas vozes do jogo, carregadas do proprio repositorio: Chakra Petch e a
+     autoridade Aurix (placa usinada), VT323 e o pixel do terminal. */
+  @font-face { font-family: 'Chakra Petch'; font-weight: 600;
+    src: url('file:///home/user/voxelyn/packages/voxelyn-survival/src/assets/fonts/chakra-petch-600.woff2') format('woff2'); }
+  @font-face { font-family: 'Chakra Petch'; font-weight: 700;
+    src: url('file:///home/user/voxelyn/packages/voxelyn-survival/src/assets/fonts/chakra-petch-700.woff2') format('woff2'); }
+  @font-face { font-family: 'VT323'; font-weight: 400;
+    src: url('file:///home/user/voxelyn/packages/voxelyn-survival/src/assets/fonts/vt323-400.woff2') format('woff2'); }
+
+  /* Paleta da art bible, valores exatos de render.ts — nada inventado. */
+  :root {
+    --dark: #0b0e14;
+    --rock-shadow: #1d2430;
+    --rock: #2e3a4d;
+    --rock-light: #46566e;
+    --biolum: #59f2c2;
+    --acid: #a8e63c;
+    --fire: #ff7a2f;
+    --blood: #d93b4c;
+    --bone: #b8a98f;
+    --loot: #ffd166;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body { width: 1200px; height: 630px; overflow: hidden; background: var(--dark); }
+
+  .frame {
+    position: relative; width: 1200px; height: 630px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 74px 74px 48px;
+    background:
+      radial-gradient(ellipse 900px 420px at 22% 62%, rgba(89,242,194,0.10), transparent 62%),
+      radial-gradient(ellipse 700px 360px at 88% 18%, rgba(217,59,76,0.13), transparent 65%),
+      linear-gradient(180deg, #10151d 0%, var(--dark) 45%, #070a0f 100%);
+  }
+
+  /* Varredura de fosforo: o jogo inteiro e lido atraves dela. */
+  .scan {
+    position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background: repeating-linear-gradient(180deg,
+      rgba(255,255,255,.028) 0px, rgba(255,255,255,.028) 1px, transparent 1px, transparent 3px);
+  }
+
+  /* ---- O circuito, ao fundo: a rede que virou objetivo ---- */
+  svg.circuit { position: absolute; inset: 0; width: 1200px; height: 630px; }
+
+  /* ---- A faixa de contaminacao, presa ao topo exatamente como no HUD ---- */
+  .contam-track {
+    position: absolute; top: 0; left: 0; width: 1200px; height: 9px;
+    background: rgba(0,0,0,.45);
+  }
+  .contam-fill {
+    position: absolute; top: 0; left: 0; width: 1200px; height: 9px;
+    background: linear-gradient(90deg,
+      var(--acid) 0%, var(--acid) 34%, var(--fire) 62%, var(--blood) 86%, #ff5566 100%);
+    box-shadow: 0 0 22px rgba(217,59,76,.85), 0 0 60px rgba(217,59,76,.35);
+  }
+  .contam-label {
+    position: absolute; top: 20px; left: 0; width: 1200px; text-align: center;
+    font-family: 'Chakra Petch', sans-serif; font-weight: 700;
+    font-size: 15px; letter-spacing: .30em; color: var(--blood);
+    text-shadow: 0 0 16px rgba(217,59,76,.75), 0 2px 0 rgba(0,0,0,.85);
+  }
+
+  /* ---- Bloco central ---- */
+  /* Largura travada em 680: e ela que impede o titulo de correr por baixo do
+     circuito, que vive na faixa direita da arte. */
+  .stack { position: relative; z-index: 2; width: 680px;
+           display: flex; flex-direction: column; gap: 20px; }
+
+  .eyebrow {
+    font-family: 'VT323', monospace; font-size: 25px; letter-spacing: .16em;
+    color: var(--biolum); text-transform: uppercase;
+    text-shadow: 0 0 14px rgba(89,242,194,.5);
+  }
+
+  h1 {
+    font-family: 'Chakra Petch', sans-serif; font-weight: 700;
+    font-size: 64px; line-height: 1.0; letter-spacing: -.012em;
+    color: #eef3f8; text-wrap: balance;
+    text-shadow: 0 3px 0 rgba(0,0,0,.6), 0 0 46px rgba(120,170,210,.16);
+  }
+  h1 .dim { color: var(--rock-light); }
+  h1 .hot { color: var(--blood); text-shadow: 0 0 30px rgba(217,59,76,.55), 0 3px 0 rgba(0,0,0,.6); }
+
+  .rule { width: 132px; height: 3px; background: var(--loot); opacity: .85; }
+
+  .sub {
+    font-family: 'Chakra Petch', sans-serif; font-weight: 600;
+    font-size: 20px; line-height: 1.5; color: var(--bone); max-width: 27em;
+  }
+  .sub b { color: #e6edf4; font-weight: 700; }
+
+  /* ---- Rodape ---- */
+  .foot { position: relative; z-index: 2;
+          display: flex; align-items: flex-end; justify-content: space-between; }
+  .wordmark {
+    font-family: 'Chakra Petch', sans-serif; font-weight: 700;
+    font-size: 25px; letter-spacing: .30em; color: #dfe7ef;
+  }
+  .wordmark span { display: block; font-family: 'VT323', monospace; font-weight: 400;
+    font-size: 19px; letter-spacing: .14em; color: var(--rock-light); margin-top: 5px; }
+  .build {
+    font-family: 'VT323', monospace; font-size: 21px; letter-spacing: .09em;
+    color: var(--rock-light); text-align: right; line-height: 1.45;
+  }
+  .build b { color: var(--loot); font-weight: 400; }
+</style>
+
+<div class="frame">
+
+  <!-- A rede: junções acesas na cascata, e UMA em curto. As duas regras do
+       Circuito num desenho só. -->
+  <svg class="circuit" viewBox="0 0 1200 630" fill="none">
+    <defs>
+      <filter id="glowTeal" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="7" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="glowRed" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="6" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- rocha: lascas frias, longe do texto -->
+    <g stroke="#1d2430" stroke-width="2" opacity=".95">
+      <path d="M0 604 L104 566 L212 606 L316 562 L430 608 L534 570 L648 612 L770 566 L890 610 L1010 568 L1120 606 L1200 574"/>
+      <path d="M0 74 L112 34 L228 78 L338 32 L452 74"/>
+      <path d="M1200 118 L1108 66 L992 116 L884 62"/>
+    </g>
+
+    <!-- os segmentos acesos pela cascata -->
+    <g filter="url(#glowTeal)" stroke="#59f2c2" stroke-width="3.5" stroke-linecap="round" opacity=".95">
+      <path d="M812 128 L910 188"/>
+      <path d="M910 188 L886 300"/>
+      <path d="M886 300 L994 360"/>
+      <path d="M910 188 L1034 164"/>
+      <path d="M1034 164 L1112 240"/>
+    </g>
+    <g fill="#0b0e14" stroke="#59f2c2" stroke-width="3.5" filter="url(#glowTeal)">
+      <circle cx="812" cy="128" r="10"/>
+      <circle cx="910" cy="188" r="10"/>
+      <circle cx="886" cy="300" r="10"/>
+      <circle cx="1034" cy="164" r="10"/>
+    </g>
+
+    <!-- o segmento em CURTO: a cascata para aqui. Tracejado e vermelho, e a
+         unica coisa vermelha do desenho além da barra. -->
+    <path d="M994 360 L974 452" stroke="#d93b4c" stroke-width="3.5" stroke-linecap="round"
+          stroke-dasharray="11 9" filter="url(#glowRed)" opacity=".92"/>
+    <circle cx="994" cy="360" r="10" fill="#0b0e14" stroke="#d93b4c" stroke-width="3.5" filter="url(#glowRed)"/>
+    <g stroke="#d93b4c" stroke-width="2.5" stroke-linecap="round" opacity=".8">
+      <path d="M1016 376 L1032 386"/><path d="M1012 398 L1030 402"/>
+    </g>
+    <circle cx="974" cy="452" r="8" fill="#0b0e14" stroke="#2e3a4d" stroke-width="3"/>
+
+    <!-- cristal encostado: o que causa o curto -->
+    <g fill="#46566e" opacity=".85">
+      <path d="M1022 416 l13 -21 l13 21 l-13 20 z"/>
+      <path d="M1048 446 l10 -16 l10 16 l-10 15 z"/>
+      <path d="M1000 440 l9 -15 l9 15 l-9 14 z"/>
+    </g>
+  </svg>
+
+  <div class="contam-track"></div>
+  <div class="contam-fill"></div>
+  <div class="contam-label">AIR SATURATED — GET OUT</div>
+
+  <div class="stack">
+    <div class="eyebrow">Devlog 113 · build 2026-08-17</div>
+    <h1>Two systems that were<br><span class="dim">quietly</span> <span class="hot">doing nothing</span></h1>
+    <div class="rule"></div>
+    <p class="sub">The contamination bar filled up and then <b>stopped mattering</b>. The leylines did nothing without one optional module. Both shipped. Both worked exactly as written.</p>
+  </div>
+
+  <div class="foot">
+    <div class="wordmark">VOXELYN SURVIVAL<span>free · in your browser</span></div>
+    <div class="build">SIMULATION 40 → <b>41</b><br>PROTOCOL 24 → <b>25</b></div>
+  </div>
+
+  <div class="scan"></div>
+</div>
