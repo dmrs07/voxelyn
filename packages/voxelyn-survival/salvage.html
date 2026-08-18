@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Voxelyn Survival - Salvage Viewer</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --safe-area-inset-top: env(safe-area-inset-top, 0px);
+        --safe-area-inset-right: env(safe-area-inset-right, 0px);
+        --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-area-inset-left: env(safe-area-inset-left, 0px);
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b0e14;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Harness de VERIFICACAO VISUAL do sistema de salvamento (dev-only, como
+         sprites.html): monta uma run real, forca o estado pedido pela URL e
+         desenha com o renderer de verdade. Cenas:
+           ?scene=world&tier=3&opened=1     — cofre no mundo
+           ?scene=choice&a=ricochet&b=siphon&tier=2&owned=ricochet
+           ?scene=locator&tier=3&angle=45&dist=12&extra=2
+           ?scene=hardware                  — os seis cartuchos lado a lado -->
+    <canvas id="canvas"></canvas>
+    <script type="module" src="/src/client/salvage-viewer.ts"></script>
+  </body>
+</html>

@@ -184,6 +184,13 @@ export type ProjectileSnapshot = {
    */
   piercing?: boolean;
   bouncy?: boolean;
+  /**
+   * Sifao muda o CORPO inteiro do tiro (a serpente verde de dreno), entao
+   * viaja pela mesma razao dos dois acima. Tambem opcional e tambem ja
+   * filtrado por cargas vivas no servidor — a serpente nao promete cura que
+   * o dono ja nao tem.
+   */
+  siphon?: boolean;
 };
 
 /**

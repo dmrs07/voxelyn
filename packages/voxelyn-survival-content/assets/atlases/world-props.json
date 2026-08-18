@@ -2,7 +2,7 @@
   "id": "world-props",
   "normalAtlas": "world-props.normal.png",
   "normalScale": 2,
-  "version": 4,
+  "version": 5,
   "atlas": "world-props.png",
   "frameWidth": 108,
   "frameHeight": 142,
@@ -499,6 +499,26 @@
       "name": "portal:sealed",
       "frames": 1,
       "frameMs": 0
+    },
+    {
+      "name": "salvageCacheT2",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "salvageCacheT2Opened",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "salvageCacheT3",
+      "frames": 1,
+      "frameMs": 0
+    },
+    {
+      "name": "salvageCacheT3Opened",
+      "frames": 1,
+      "frameMs": 0
     }
   ],
   "paletteColors": [
@@ -522,7 +542,8 @@
     "#e8f1ff",
     "#ff7a2f",
     "#ffa63f",
-    "#ffd166"
+    "#ffd166",
+    "#ffe9b8"
   ],
   "generation": {
     "tool": "procedural voxel raster (tools/props.mjs)",

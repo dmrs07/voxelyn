@@ -581,11 +581,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'hud.objective.findCore': 'FIND THE CORE',
   'hud.objective.breakSeal': 'THE SECTOR SEAL HOLDS — BRING DOWN WHAT SUSTAINS IT',
   'hud.cores': 'CORES {taken}/{total}',
-  'hud.cache': 'CACHE: {direction} · ~{distance}m',
-  'hud.direction.east': 'EAST',
-  'hud.direction.west': 'WEST',
-  'hud.direction.south': 'SOUTH',
-  'hud.direction.north': 'NORTH',
+  'hud.locator.distance': '{distance}m',
 
   // Strata and occupations of the Vein (the descent's biome grammar)
   'biome.stratum.basalt': 'BASALT GALLERIES',
@@ -649,10 +645,19 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   // Module choice
   // ---------------------------------------------------------------------
-  'choice.title': 'MODULE DATA FOUND',
+  'choice.title': 'MODULE DATA RECOVERED',
   'choice.card': '[{index}] {label}',
   'choice.recharge': 'RECHARGE · {lifetime}',
   'choice.volatile': 'VOLATILE',
+  'choice.terminal.brand': 'AURIX DYNAMICS // RECOVERY',
+  'choice.terminal.unit': 'AD-SLV 04',
+  'choice.cacheClass': 'CACHE CLASS {tier}',
+  'choice.integrity': 'DATA INTEGRITY {percent}%',
+  'choice.select': 'SELECT RECOVERABLE HARDWARE',
+  'choice.moduleIndex': 'MODULE 0{index}',
+  'choice.moduleTier': 'TIER {tier}',
+  'choice.install': '[{index}] INSTALL',
+  'choice.rechargeAction': '[{index}] RECHARGE',
 
   'module.piercing.label': 'PIERCING',
   'module.piercing.description':

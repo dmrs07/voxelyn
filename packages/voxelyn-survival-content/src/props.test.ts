@@ -20,6 +20,17 @@ describe('atlas de objetos de mundo', () => {
     expect(propKindIndex(manifest, 'inexistente')).toBe(-1);
   });
 
+  // Classes II/III do cofre: ANEXADAS ao fim da lista — os indices historicos
+  // (salvageCache=7, salvageCacheOpened=8) nao podem se mover, ou um atlas
+  // antigo em cache vestiria cada prop com a arte do vizinho.
+  it('declara as classes de cofre sem mover os indices historicos', () => {
+    expect(propKindIndex(manifest, 'salvageCache')).toBe(7);
+    expect(propKindIndex(manifest, 'salvageCacheOpened')).toBe(8);
+    for (const name of ['salvageCacheT2', 'salvageCacheT2Opened', 'salvageCacheT3', 'salvageCacheT3Opened']) {
+      expect(propKindIndex(manifest, name), name).toBeGreaterThan(8);
+    }
+  });
+
   it('da um recorte distinto a cada tipo e quadro, todos dentro do atlas', () => {
     const width = manifest.columns * manifest.frameWidth;
     const seen = new Set<string>();

@@ -26,6 +26,7 @@ export type ProjectileLike = {
     explosive?: { armAfterDistance: number };
     piercing?: true;
     ricochet?: { remainingBounces: number };
+    siphon?: true;
   };
   distanceTravelled?: number;
 };
@@ -33,6 +34,12 @@ export type ProjectileLike = {
 /** Estilhaco mineral do jogador contra cuspe acido do inimigo. */
 const PLAYER_RAMP: FaceRamp = ['#e8f1ff', '#59f2c2', '#2f6b4f'];
 const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
+/**
+ * Tiro com SIFAO: verde vivido, a cor do que drena e recupera. O que o separa
+ * do cuspe hostil (tambem verde) e a FORMA — serpente segmentada contra gota
+ * redonda balancando — e a origem: ele sai da arma do Prospector.
+ */
+const SIPHON_RAMP: FaceRamp = ['#a8e63c', '#66c28a', '#1f3d33'];
 /** Drone rastreador: chassi frio; a carga ambar pulsa no centro. */
 const SEEKER_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 /** Borrao dos rotores: o cinza-azulado `mist` da paleta mestra. */
@@ -277,6 +284,89 @@ const drawPiercingDart = (
 };
 
 /**
+ * SIFAO: um dreno de vida com cauda LONGA — um cometa de energia verde.
+ *
+ * O dreno nao e municao: e um fluxo que sai da arma atras de fluido, e o
+ * corpo diz isso — uma cabeca solida com uma fita de energia de ~2,4 tiles
+ * ondulando atras, afinando e se desfazendo em fiapos na ponta. A fita e
+ * REDONDA de proposito: no mundo facetado, a curva e o que separa energia e
+ * fluido de materia (a regra do cuspe, do disco e da bola de ricochete).
+ *
+ * A cauda NASCE no cano e cresce com a distancia percorrida: nos primeiros
+ * tiles ela ainda e curta, porque o fluxo ainda nao existia atras dela.
+ *
+ * Tudo cosmetico e honesto: a posicao autoritativa e a CABECA, a sombra
+ * continua marcando o caminho real, a ondulacao tem amplitude curta
+ * (<= 0,16 tile) e a fase vem da DISTANCIA percorrida — o fluxo ondula
+ * porque voa, e congela quando o mundo pausa.
+ */
+const drawSiphonSerpent = (
+  ctx: CanvasRenderingContext2D,
+  project: (x: number, y: number) => [number, number],
+  x: number,
+  y: number,
+  dir: { dx: number; dy: number },
+  lift: number,
+  size: number,
+  phase: number,
+  ramp: FaceRamp
+): void => {
+  // Perpendicular no MUNDO: a ondulacao acompanha o chao, nao a tela.
+  const px = -dir.dy;
+  const py = dir.dx;
+  const span = Math.min(2.4, phase);
+  const segments = 14;
+
+  // Ponto da fita a `back` tiles atras da cabeca, ja com a ondulacao. A onda
+  // VIAJA pela cauda (fase por distancia no mundo), como um chicote de fluido.
+  const ribbonPoint = (back: number, extraSway = 0): [number, number] => {
+    const t = span > 0 ? back / span : 0;
+    const sway = Math.sin(phase * 9 - back * 6.5) * 0.16 * (0.3 + 0.7 * t) + extraSway;
+    return project(x - dir.dx * back + px * sway, y - dir.dy * back + py * sway);
+  };
+
+  // Fiapos se desgarrando da ponta da cauda: o fluxo se desfaz no ar. Fase
+  // deterministica pela distancia — nada de Math.random por quadro.
+  if (span > 0.8) {
+    for (const [drift, seed] of [[0.86, 1.7], [1.02, 4.1]] as const) {
+      const wob = Math.sin(phase * 5 + seed) * 0.22;
+      const [wxp, wyp] = ribbonPoint(span * drift, wob);
+      const fade = 0.3 + 0.2 * Math.sin(phase * 7 + seed);
+      ctx.globalAlpha = Math.max(0.12, fade);
+      ctx.fillStyle = ramp[1];
+      const wr = size * 0.14;
+      ctx.beginPath();
+      ctx.ellipse(wxp, wyp - lift, wr, wr * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // A fita, da ponta para a cabeca: blobs redondos densos o bastante para
+  // lerem como UM fluxo continuo, afinando e apagando para tras.
+  for (let i = segments; i >= 1; i--) {
+    const t = i / segments;
+    const [sx, sy] = ribbonPoint(t * span);
+    const r = size * (0.14 + 0.52 * (1 - t));
+    ctx.globalAlpha = Math.max(0.1, 0.85 * (1 - t) + 0.1);
+    ctx.fillStyle = i % 3 === 0 ? ramp[0] : ramp[1];
+    ctx.beginPath();
+    ctx.ellipse(sx, sy - lift, r, r * 0.78, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // A cabeca: o unico corpo SOLIDO do fluxo — quase nao ondula, porque e ela
+  // que aponta o alvo — com a ponta clara por cima.
+  const headSway = Math.sin(phase * 9) * 0.05;
+  const [headX, headYRaw] = project(x + px * headSway, y + py * headSway);
+  const headY = headYRaw - lift;
+  drawVoxel(ctx, headX, headY, size, ramp);
+  ctx.fillStyle = '#e8f1ff';
+  const glint = Math.max(1, Math.round(size * 0.22));
+  ctx.fillRect(Math.round(headX - glint / 2), Math.round(headY - glint / 2), glint, glint);
+};
+
+/**
  * CUSPE: uma gota de gosma, nao um projetil de bala.
  *
  * O cuspe compartilhava o corpo facetado do estilhaco do jogador — dois voxels
@@ -405,11 +495,14 @@ export class ProjectileView {
     // lancou e que ainda esta no ar procurando alguem.
     const seeker = projectile.kind === 'seeker';
     const armed = Boolean(projectile.modules?.explosive && (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance);
+    // O ARMADO vence o sifao de proposito: risco fala mais alto que cura, e o
+    // aviso laranja do explosivo nao pode ser pintado de verde por cima.
     const ramp = rock ? ROCK_RAMP
       : disc ? DISC_RAMP
       : seeker ? SEEKER_RAMP
       : armed ? ARMED_RAMP
       : projectile.hostile ? HOSTILE_RAMP
+      : projectile.modules?.siphon ? SIPHON_RAMP
       : PLAYER_RAMP;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
@@ -579,6 +672,29 @@ export class ProjectileView {
         ctx.globalAlpha = 1;
       }
       drawSpitGlob(ctx, sx, sy - lift, size, track?.travelled ?? 0, ramp);
+      return;
+    }
+    // SIFAO puro: a serpente E corpo e rastro ao mesmo tempo. So quando ele e
+    // o unico modulo de forma — bola de ricochete e dardo perfurante mantem a
+    // silhueta deles (que promete comportamento) e herdam apenas o VERDE.
+    if (
+      !projectile.hostile &&
+      projectile.modules?.siphon &&
+      !projectile.modules.ricochet &&
+      !projectile.modules.piercing &&
+      heading
+    ) {
+      drawSiphonSerpent(
+        ctx,
+        project,
+        projectile.x,
+        projectile.y,
+        heading,
+        lift,
+        size,
+        track?.travelled ?? 0,
+        ramp,
+      );
       return;
     }
     if (heading) {
