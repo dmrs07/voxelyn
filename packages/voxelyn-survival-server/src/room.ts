@@ -547,6 +547,7 @@ export class GameRoom {
         armed: Boolean(modules?.explosive && p.distanceTravelled >= modules.explosive.armAfterDistance),
         piercing: Boolean(modules?.piercing),
         bouncy: (modules?.ricochet?.remainingBounces ?? 0) > 0,
+        siphon: Boolean(modules?.siphon),
       };
     });
   }

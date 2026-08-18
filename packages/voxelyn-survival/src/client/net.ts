@@ -607,11 +607,12 @@ export class NetClient {
           // e copia-los pela metade aqui criaria uma segunda fonte de verdade
           // sobre uma mecanica que o cliente nem simula.
           modules:
-            p.armed || p.piercing || p.bouncy
+            p.armed || p.piercing || p.bouncy || p.siphon
               ? {
                   ...(p.armed ? { explosive: { armAfterDistance: 0 } } : {}),
                   ...(p.piercing ? { piercing: true as const } : {}),
                   ...(p.bouncy ? { ricochet: { remainingBounces: 1 } } : {}),
+                  ...(p.siphon ? { siphon: true as const } : {}),
                 }
               : undefined,
           distanceTravelled: p.armed ? 1 : 0,
