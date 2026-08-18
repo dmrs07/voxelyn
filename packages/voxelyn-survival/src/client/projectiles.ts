@@ -284,17 +284,21 @@ const drawPiercingDart = (
 };
 
 /**
- * SIFAO: uma serpente de energia verde vivida.
+ * SIFAO: um dreno de vida com cauda LONGA — um cometa de energia verde.
  *
- * O dreno nao e municao — e algo VIVO que sai da arma atras de fluido, e o
- * corpo diz isso: segmentos que ondulam perpendicularmente a linha de voo,
- * afinando para a cauda, com a cabeca clara na frente. A ondulacao e
- * PURAMENTE cosmetica: a posicao autoritativa do projetil e a cabeca da
- * linha, a sombra continua marcando o caminho REAL, e a amplitude e curta o
- * bastante (0,15 tile) para nunca mentir sobre o que o tiro vai acertar.
+ * O dreno nao e municao: e um fluxo que sai da arma atras de fluido, e o
+ * corpo diz isso — uma cabeca solida com uma fita de energia de ~2,4 tiles
+ * ondulando atras, afinando e se desfazendo em fiapos na ponta. A fita e
+ * REDONDA de proposito: no mundo facetado, a curva e o que separa energia e
+ * fluido de materia (a regra do cuspe, do disco e da bola de ricochete).
  *
- * A fase vem da DISTANCIA percorrida, como a gota do cuspe e o giro do disco:
- * a serpente serpenteia porque voa, e congela quando o mundo pausa.
+ * A cauda NASCE no cano e cresce com a distancia percorrida: nos primeiros
+ * tiles ela ainda e curta, porque o fluxo ainda nao existia atras dela.
+ *
+ * Tudo cosmetico e honesto: a posicao autoritativa e a CABECA, a sombra
+ * continua marcando o caminho real, a ondulacao tem amplitude curta
+ * (<= 0,16 tile) e a fase vem da DISTANCIA percorrida — o fluxo ondula
+ * porque voa, e congela quando o mundo pausa.
  */
 const drawSiphonSerpent = (
   ctx: CanvasRenderingContext2D,
@@ -310,23 +314,53 @@ const drawSiphonSerpent = (
   // Perpendicular no MUNDO: a ondulacao acompanha o chao, nao a tela.
   const px = -dir.dy;
   const py = dir.dx;
-  const segments = 5;
-  let headX = 0;
-  let headY = 0;
-  for (let i = segments; i >= 0; i--) {
-    const back = i * 0.17;
-    // A cabeca ondula menos que o corpo: e ela que aponta o alvo.
-    const sway = Math.sin(phase * 9 - i * 1.2) * 0.15 * (i === 0 ? 0.6 : 1);
-    const [sx, sy] = project(x - dir.dx * back + px * sway, y - dir.dy * back + py * sway);
-    ctx.globalAlpha = i === 0 ? 1 : Math.max(0.18, 0.8 - i * 0.13);
-    drawVoxel(ctx, sx, sy - lift, size * (i === 0 ? 1 : 0.85 - i * 0.11), ramp);
-    if (i === 0) {
-      headX = sx;
-      headY = sy - lift;
+  const span = Math.min(2.4, phase);
+  const segments = 14;
+
+  // Ponto da fita a `back` tiles atras da cabeca, ja com a ondulacao. A onda
+  // VIAJA pela cauda (fase por distancia no mundo), como um chicote de fluido.
+  const ribbonPoint = (back: number, extraSway = 0): [number, number] => {
+    const t = span > 0 ? back / span : 0;
+    const sway = Math.sin(phase * 9 - back * 6.5) * 0.16 * (0.3 + 0.7 * t) + extraSway;
+    return project(x - dir.dx * back + px * sway, y - dir.dy * back + py * sway);
+  };
+
+  // Fiapos se desgarrando da ponta da cauda: o fluxo se desfaz no ar. Fase
+  // deterministica pela distancia — nada de Math.random por quadro.
+  if (span > 0.8) {
+    for (const [drift, seed] of [[0.86, 1.7], [1.02, 4.1]] as const) {
+      const wob = Math.sin(phase * 5 + seed) * 0.22;
+      const [wxp, wyp] = ribbonPoint(span * drift, wob);
+      const fade = 0.3 + 0.2 * Math.sin(phase * 7 + seed);
+      ctx.globalAlpha = Math.max(0.12, fade);
+      ctx.fillStyle = ramp[1];
+      const wr = size * 0.14;
+      ctx.beginPath();
+      ctx.ellipse(wxp, wyp - lift, wr, wr * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
+
+  // A fita, da ponta para a cabeca: blobs redondos densos o bastante para
+  // lerem como UM fluxo continuo, afinando e apagando para tras.
+  for (let i = segments; i >= 1; i--) {
+    const t = i / segments;
+    const [sx, sy] = ribbonPoint(t * span);
+    const r = size * (0.14 + 0.52 * (1 - t));
+    ctx.globalAlpha = Math.max(0.1, 0.85 * (1 - t) + 0.1);
+    ctx.fillStyle = i % 3 === 0 ? ramp[0] : ramp[1];
+    ctx.beginPath();
+    ctx.ellipse(sx, sy - lift, r, r * 0.78, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalAlpha = 1;
-  // Olho/ponta clara da cabeca — o unico pixel branco da serpente.
+
+  // A cabeca: o unico corpo SOLIDO do fluxo — quase nao ondula, porque e ela
+  // que aponta o alvo — com a ponta clara por cima.
+  const headSway = Math.sin(phase * 9) * 0.05;
+  const [headX, headYRaw] = project(x + px * headSway, y + py * headSway);
+  const headY = headYRaw - lift;
+  drawVoxel(ctx, headX, headY, size, ramp);
   ctx.fillStyle = '#e8f1ff';
   const glint = Math.max(1, Math.round(size * 0.22));
   ctx.fillRect(Math.round(headX - glint / 2), Math.round(headY - glint / 2), glint, glint);
