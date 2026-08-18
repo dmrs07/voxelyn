@@ -26,6 +26,7 @@ export type ProjectileLike = {
     explosive?: { armAfterDistance: number };
     piercing?: true;
     ricochet?: { remainingBounces: number };
+    siphon?: true;
   };
   distanceTravelled?: number;
 };
@@ -33,6 +34,12 @@ export type ProjectileLike = {
 /** Estilhaco mineral do jogador contra cuspe acido do inimigo. */
 const PLAYER_RAMP: FaceRamp = ['#e8f1ff', '#59f2c2', '#2f6b4f'];
 const HOSTILE_RAMP: FaceRamp = ['#d7ff7a', '#a8e63c', '#2f6b4f'];
+/**
+ * Tiro com SIFAO: verde vivido, a cor do que drena e recupera. O que o separa
+ * do cuspe hostil (tambem verde) e a FORMA — serpente segmentada contra gota
+ * redonda balancando — e a origem: ele sai da arma do Prospector.
+ */
+const SIPHON_RAMP: FaceRamp = ['#a8e63c', '#66c28a', '#1f3d33'];
 /** Drone rastreador: chassi frio; a carga ambar pulsa no centro. */
 const SEEKER_RAMP: FaceRamp = ['#e8f1ff', '#7ab8ff', '#2e3a4d'];
 /** Borrao dos rotores: o cinza-azulado `mist` da paleta mestra. */
@@ -277,6 +284,55 @@ const drawPiercingDart = (
 };
 
 /**
+ * SIFAO: uma serpente de energia verde vivida.
+ *
+ * O dreno nao e municao — e algo VIVO que sai da arma atras de fluido, e o
+ * corpo diz isso: segmentos que ondulam perpendicularmente a linha de voo,
+ * afinando para a cauda, com a cabeca clara na frente. A ondulacao e
+ * PURAMENTE cosmetica: a posicao autoritativa do projetil e a cabeca da
+ * linha, a sombra continua marcando o caminho REAL, e a amplitude e curta o
+ * bastante (0,15 tile) para nunca mentir sobre o que o tiro vai acertar.
+ *
+ * A fase vem da DISTANCIA percorrida, como a gota do cuspe e o giro do disco:
+ * a serpente serpenteia porque voa, e congela quando o mundo pausa.
+ */
+const drawSiphonSerpent = (
+  ctx: CanvasRenderingContext2D,
+  project: (x: number, y: number) => [number, number],
+  x: number,
+  y: number,
+  dir: { dx: number; dy: number },
+  lift: number,
+  size: number,
+  phase: number,
+  ramp: FaceRamp
+): void => {
+  // Perpendicular no MUNDO: a ondulacao acompanha o chao, nao a tela.
+  const px = -dir.dy;
+  const py = dir.dx;
+  const segments = 5;
+  let headX = 0;
+  let headY = 0;
+  for (let i = segments; i >= 0; i--) {
+    const back = i * 0.17;
+    // A cabeca ondula menos que o corpo: e ela que aponta o alvo.
+    const sway = Math.sin(phase * 9 - i * 1.2) * 0.15 * (i === 0 ? 0.6 : 1);
+    const [sx, sy] = project(x - dir.dx * back + px * sway, y - dir.dy * back + py * sway);
+    ctx.globalAlpha = i === 0 ? 1 : Math.max(0.18, 0.8 - i * 0.13);
+    drawVoxel(ctx, sx, sy - lift, size * (i === 0 ? 1 : 0.85 - i * 0.11), ramp);
+    if (i === 0) {
+      headX = sx;
+      headY = sy - lift;
+    }
+  }
+  ctx.globalAlpha = 1;
+  // Olho/ponta clara da cabeca — o unico pixel branco da serpente.
+  ctx.fillStyle = '#e8f1ff';
+  const glint = Math.max(1, Math.round(size * 0.22));
+  ctx.fillRect(Math.round(headX - glint / 2), Math.round(headY - glint / 2), glint, glint);
+};
+
+/**
  * CUSPE: uma gota de gosma, nao um projetil de bala.
  *
  * O cuspe compartilhava o corpo facetado do estilhaco do jogador — dois voxels
@@ -405,11 +461,14 @@ export class ProjectileView {
     // lancou e que ainda esta no ar procurando alguem.
     const seeker = projectile.kind === 'seeker';
     const armed = Boolean(projectile.modules?.explosive && (projectile.distanceTravelled ?? 0) >= projectile.modules.explosive.armAfterDistance);
+    // O ARMADO vence o sifao de proposito: risco fala mais alto que cura, e o
+    // aviso laranja do explosivo nao pode ser pintado de verde por cima.
     const ramp = rock ? ROCK_RAMP
       : disc ? DISC_RAMP
       : seeker ? SEEKER_RAMP
       : armed ? ARMED_RAMP
       : projectile.hostile ? HOSTILE_RAMP
+      : projectile.modules?.siphon ? SIPHON_RAMP
       : PLAYER_RAMP;
     // Massa se le por TAMANHO antes de qualquer outra coisa. Um bloco de parede
     // no calibre de um cuspe nao pesa, por mais certa que esteja a cor.
@@ -579,6 +638,29 @@ export class ProjectileView {
         ctx.globalAlpha = 1;
       }
       drawSpitGlob(ctx, sx, sy - lift, size, track?.travelled ?? 0, ramp);
+      return;
+    }
+    // SIFAO puro: a serpente E corpo e rastro ao mesmo tempo. So quando ele e
+    // o unico modulo de forma — bola de ricochete e dardo perfurante mantem a
+    // silhueta deles (que promete comportamento) e herdam apenas o VERDE.
+    if (
+      !projectile.hostile &&
+      projectile.modules?.siphon &&
+      !projectile.modules.ricochet &&
+      !projectile.modules.piercing &&
+      heading
+    ) {
+      drawSiphonSerpent(
+        ctx,
+        project,
+        projectile.x,
+        projectile.y,
+        heading,
+        lift,
+        size,
+        track?.travelled ?? 0,
+        ramp,
+      );
       return;
     }
     if (heading) {

@@ -375,6 +375,20 @@ describe('modulos vivos de um projetil', () => {
    * conhece — nao ha o que conferir. Apagar aqui seria apagar um modulo que
    * existe, so porque a lista local esta vazia.
    */
+  // O sifao entrou na lista quando o tiro dele ganhou corpo proprio (a
+  // serpente verde): sem carga o dreno nao proca, e a serpente mentiria cura.
+  it('apaga a marca de sifao que ficou sem carga com o tiro no ar', () => {
+    const state = createRun({ seed: 911 });
+    grantOrRechargeModule(extraOf(state), 'siphon', state.tick);
+    const modules = { siphon: true as const };
+    expect(liveProjectileModules(modules, extraOf(state), state.tick)).toBe(modules);
+    const charges = MODULE_DEFINITIONS.siphon.defaultCharges ?? 1;
+    for (let i = 0; i < charges; i++) {
+      consumeModuleCharge(extraOf(state), 'siphon', 0, []);
+    }
+    expect(liveProjectileModules(modules, extraOf(state), state.tick)?.siphon).toBeUndefined();
+  });
+
   it('nao apaga nada quando as cargas do dono nao estao a vista', () => {
     const modules = { piercing: true as const };
     expect(liveProjectileModules(modules, undefined, 0)).toBe(modules);

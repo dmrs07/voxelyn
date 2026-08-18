@@ -239,7 +239,9 @@ export const rollModuleChoice = (
  * Devolve o MESMO objeto quando nada caducou, que e o caso normal: assim o
  * caminho quente nao aloca por quadro.
  */
-export const liveProjectileModules = <T extends { piercing?: true; ricochet?: unknown; explosive?: unknown }>(
+export const liveProjectileModules = <
+  T extends { piercing?: true; ricochet?: unknown; explosive?: unknown; siphon?: true },
+>(
   modules: T | undefined,
   extra: PlayerExtra | undefined,
   tick: number
@@ -248,7 +250,10 @@ export const liveProjectileModules = <T extends { piercing?: true; ricochet?: un
   // Sem o dono a vista (projetil hostil, ou parceiro cujas cargas so o servidor
   // conhece) nao ha o que conferir: quem produziu a marca ja e a fonte certa.
   if (!extra) return modules;
-  const ids = ['piercing', 'ricochet', 'explosive'] as const;
+  // `siphon` entrou na lista quando o tiro dele ganhou corpo proprio (a
+  // serpente verde): a marca caduca cobra a mesma honestidade das outras —
+  // sem carga, o dreno nao proca, e a serpente estaria prometendo cura.
+  const ids = ['piercing', 'ricochet', 'explosive', 'siphon'] as const;
   const stale = ids.filter((id) => modules[id] !== undefined && !moduleHasCapacity(extra, id, tick));
   if (stale.length === 0) return modules;
   const live = { ...modules };

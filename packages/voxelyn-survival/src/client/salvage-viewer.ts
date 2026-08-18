@@ -60,6 +60,37 @@ if (scene === 'world') {
     other.cacheOpened = false;
     other.tier = ((i % 3) + 1) as CacheTier;
   }
+} else if (scene === 'shot') {
+  // Um tiro do jogador em voo continuo, para OLHAR a serpente do sifao (ou
+  // qualquer combinacao de modulos via ?mods=siphon,ricochet). O projetil e
+  // sintetico e re-animado em loop pelo quadro — nada de stepRun.
+  state.player.x = site.cache.x + 6.5;
+  state.player.y = site.cache.y + 6.5;
+  const mods = (params.get('mods') ?? 'siphon').split(',');
+  const projectileModules: Record<string, unknown> = {};
+  if (mods.includes('siphon')) {
+    projectileModules.siphon = true;
+    state.playerExtra.activeModules.push({
+      id: 'siphon',
+      lifetime: { kind: 'charges', remaining: 80, maximum: 80 },
+    });
+  }
+  if (mods.includes('ricochet')) projectileModules.ricochet = { remainingBounces: 1 };
+  if (mods.includes('piercing')) projectileModules.piercing = true;
+  state.projectiles.push({
+    kind: 'bolt',
+    id: 900001,
+    owner: 1,
+    x: state.player.x,
+    y: state.player.y,
+    vx: 0,
+    vy: 0,
+    damage: 0,
+    modules: projectileModules,
+    distanceTravelled: 0,
+    hostile: false,
+    leavesBiofluid: false,
+  } as (typeof state.projectiles)[number]);
 } else if (scene === 'choice') {
   const a = (params.get('a') ?? 'ricochet') as ModuleId;
   const b = (params.get('b') ?? 'siphon') as ModuleId;
@@ -126,6 +157,13 @@ const frame = (): void => {
       const angle = now * 0.0006;
       state.player.x = site.cache.x + 0.5 - Math.cos(angle) * orbitDist;
       state.player.y = site.cache.y + 0.5 - Math.sin(angle) * orbitDist;
+    }
+    if (scene === 'shot') {
+      // Voo em loop: sai do jogador rumo ao nordeste da tela e recomeca.
+      const proj = state.projectiles[state.projectiles.length - 1];
+      const travelled = ((now * 0.008) % 9);
+      proj.x = state.player.x + travelled * 0.7;
+      proj.y = state.player.y - travelled * 0.7;
     }
     renderer.render(state, 1, input.state, now);
     if (state.playerExtra.pendingModuleChoice) {
