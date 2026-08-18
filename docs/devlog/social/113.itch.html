@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Voxelyn devlog 113 for itch.io</title>
+<!--
+  PARA PUBLICAR NO ITCH.IO
+  1. Abra este arquivo no navegador.
+  2. Ctrl+A, Ctrl+C.
+  3. Cole no campo Content do formulario de devlog.
+  O editor do itch e rich text e nao entende Markdown, entao a colagem de HTML
+  ja renderizado e o caminho que preserva titulos, negrito e citacao.
+  4. Onde estiver uma linha [ IMAGEM N ... ], apague a linha e insira a imagem
+  pelo botao de imagem da barra de ferramentas.
+
+  IMAGENS (2): 113-saturated.png, 113-wellspring.png
+
+  A TABELA da curva de saturacao sobrevive a colagem no editor do itch, mas ela
+  e a primeira coisa a quebrar se o editor mudar. Se sair torta, o paragrafo
+  antes dela ja diz o mesmo em prosa — apague a tabela e nao se perde nada.
+-->
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         max-width: 46em; margin: 3em auto; padding: 0 1.2em; line-height: 1.6; color: #111; }
+  .slot { border: 1px dashed #b00; color: #b00; padding: .5em .8em; font-weight: 700; }
+  table { border-collapse: collapse; margin: 1.4em 0; }
+  th, td { border: 1px solid #ccc; padding: .35em .8em; text-align: left; }
+  th { background: #f4f4f4; }
+</style>
+
+<p>This build fixes two features that shipped, worked exactly as written, and were nevertheless not doing their job. Both were found the same way, which is the part I want to talk about: somebody played the game and said a short, unflattering sentence, and the sentence turned out to be measurable.</p>
+
+<p>If you played over the weekend, this is what is different.</p>
+
+<h2>"I never saw a canary"</h2>
+
+<p>That was the first sentence. Four words, and they took a whole feature down.</p>
+
+<p>The game has a contamination meter &mdash; a clock that climbs while you are underground and is supposed to be the reason you do not linger. To dramatise it, the mine hangs cages of canaries that all fall silent on the same tick the number crosses the line. Wired to the authoritative value, not a visual approximation. I was extremely pleased with it. I put it in the store description.</p>
+
+<p>Then somebody who had actually played asked why they had never seen one.</p>
+
+<p>Reader, the cages only spawn in sectors the mining company itself occupied. Guaranteed on exactly one of three map lineages, otherwise sitting behind a 15% roll, and even then competing with crates and struts for a capped decoration budget. Most runs never spawn one. I had built a marketing campaign around a prop with a 15% attendance record.</p>
+
+<p>Embarrassing, fixable, fine. So I opened the actual mechanic, purely to confirm <em>it</em> was fine.</p>
+
+<h2>The bar filled up and then stopped meaning anything</h2>
+
+<p>It was not fine.</p>
+
+<p>Contamination rose on a timer. It spawned a wave of enemies at 35%, 60% and 85%. And then at 100% it hit a clamp and stopped. Forever. The last scheduled consequence in the entire system lived at 85%.</p>
+
+<p>Read that back as a player experience. The most contaminated stretch of the run &mdash; the part the fiction insists will kill you &mdash; was the emptiest part of the run. Maxing out the danger meter put you in the single safest state the simulation could produce, because every consequence it had was already behind you.</p>
+
+<p>I shipped a progress bar that fills up and then congratulates you by leaving.</p>
+
+<p><strong>So saturation now collects.</strong> At 100% the air stops warning you and starts charging: one hit per second, escalating for as long as you stay. Standing still at full health, this is the whole curve:</p>
+
+<table>
+  <tr><th>Time saturated</th><th>HP remaining</th></tr>
+  <tr><td>5 s</td><td>92</td></tr>
+  <tr><td>10 s</td><td>74</td></tr>
+  <tr><td>15 s</td><td>47</td></tr>
+  <tr><td>20 s</td><td>12</td></tr>
+  <tr><td>21 s</td><td>dead</td></tr>
+</table>
+
+<p>That curve is deliberate and it is the only number I actually agonised over. Saturation has to mean "leave now", never "you are already dead" &mdash; because abandoning a contract at any depth has always been a legitimate way to play, and an instant kill would quietly delete the run for the exit, which is the interesting part. So it is gentle early and cruel late. You can run. You cannot stay, and you certainly cannot fight.</p>
+
+<p>Two things that follow from it, and I like both:</p>
+
+<p><strong>Descending is the relief.</strong> Carryover drops contamination below the threshold when you go deeper, so the saturation clocks reset with it. Going <em>further into the mine</em> is the only thing that clears the air, which is a very stupid-feeling decision to be handed and I am delighted it exists.</p>
+
+<p><strong>Waves no longer stop coming.</strong> Past 85% they now repeat every 35 seconds instead of never.</p>
+
+<p>The HUD had the same problem in miniature &mdash; contamination was three unlabelled pixels at the top of the screen, perfectly legible if you already knew what it was. It now thickens with the danger, walks acid to fire to blood, shows the percentage once there is a decision to make, and at the top replaces the number with the only instruction that matters.</p>
+
+<p class="slot">[ IMAGEM 1 &middot; 113-saturated.png &middot; The HUD at saturation, reading AIR SATURATED — GET OUT ]</p>
+
+<p>The canaries are all still in there, doing exactly what they always did. They are just no longer the only witness to a number that can now kill you.</p>
+
+<h2>"The leylines are boring and serve no fundamental role"</h2>
+
+<p>That was the second sentence, and it was mine, about my own game, which is the only kind of feedback you cannot dismiss as a skill issue.</p>
+
+<p>The glowing lines in the walls only responded to one thing: an <code>energy</code> shot, which requires the <code>conductive</code> module, which is one of two options in a tier-2 vault. Without it the entire system returned at the first check and your run was indistinguishable from one with no leylines in it. They were also the only conductor in the game that did not conduct the game's own electricity &mdash; breaking crystal, electrifying a pool, none of it reached them.</p>
+
+<p>Three previous passes had made them more numerous, more guaranteed and more luminous. None of that fixes a system whose only verb is optional.</p>
+
+<p><strong>They are now the sector's circuit.</strong> The junction nearest the entrance is a wellspring: press USE and it launches a cascade through the network. No item, no unlock, available in the first minute of any run. Closing the circuit means lighting <em>every</em> segment in a single cascade, which means opening every junction from the entrance down to the deep band.</p>
+
+<p>Getting in your way is the <strong>short</strong>: a segment with six or more crystal or ore cells touching it bleeds the charge and refuses to light. The fix is the game's central verb &mdash; break the crystal, spend the vein.</p>
+
+<p class="slot">[ IMAGEM 2 &middot; 113-wellspring.png &middot; The wellspring prompt, USE — LAUNCH CIRCUIT ]</p>
+
+<p>And here is the part the whole redesign exists for. Closing the circuit <strong>switches off whatever property gives that stratum its identity</strong>, until you descend. The Aquifer's water stops conducting. The Cathedral's crystal goes dull and the Archcantor loses its ammunition. The Sulfur Rift's vents lock shut. The Furnace gives you your heat dissipation back. Loose silica turns to glass and the White Devourer loses the floor it climbs on.</p>
+
+<p>Which means the obstacle and the reward are the same substance. The Cathedral's crystal is the thing shorting your circuit <em>and</em> the thing you win by switching off. The puzzle and the prize are one sentence read in two directions.</p>
+
+<p>It also cuts both ways, on purpose. You do not gain a power &mdash; you switch off a rule, and the rule was serving you too. Kill the Aquifer's conductivity and you also lose electrifying pools, which is one of the best plays in the game. Dull the Cathedral and you lose your free source of resonance. That is what lets the reward stay small without being timid about it.</p>
+
+<h2>Things I am telling you instead of letting you find out</h2>
+
+<p><strong>About 19% of sectors have no circuit at all.</strong> The network came out too short and the wellspring simply is not there. Nothing on screen says so yet, so if you go hunting and find nothing, it may genuinely be nothing. That is the next thing I am fixing.</p>
+
+<p><strong>Sector one is deliberately trivial.</strong> It is always basalt, which has no identity property to switch off, so the first circuit teaches the grammar and pays you nothing. If that reads as an anticlimax rather than a tutorial, tell me &mdash; that is a playtest question and I do not get to answer it myself.</p>
+
+<p><strong>The Ferric stratum is not in this system and never will be.</strong> It is the stratum with the most electrical identity of all &mdash; the wall that conducts &mdash; and it is the only one that never sees a circuit. A scan of 4000 seeds found 3294 ferric sectors and exactly zero leylines. The answer is not to force leylines in there; it is to give the ferric vein its own verb, in another system, some other week. Logged as debt rather than quietly dropped.</p>
+
+<h2>One housekeeping note</h2>
+
+<p>If you play online co-op: the protocol version changed. A tab you left open since the last build will refuse to join a room and tell you to reload, which is on purpose &mdash; the alternative is two clients silently disagreeing about the world.</p>
+
+<p>Free, in your browser, no download. Go get something out of the ground, and tell me what killed you.</p>
+
+<p>Statistically, it is now the air.</p>
