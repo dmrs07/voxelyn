@@ -1,0 +1,117 @@
+# The salvage line
+
+The salvage system worked. Scan a terminal, follow a text hint, open a crate, pick one of
+two modules. Mechanically it was one of the better loops in the game. Visually it was
+four strangers standing in a queue: a terminal, a line of debug text, a generic box, and
+a card popup that looked like it escaped from a deck builder. This week the four
+strangers became one machine.
+
+## A crate should confess its class
+
+Caches have carried a tier since the day they existed — tier decides the module pool, and
+a Tier III cache even wakes an extra Undertaker somewhere in the dark. The simulation knew
+all of this. The renderer drew the same crate every time.
+
+The rule I set before touching a voxel: **class must survive a grayscale screenshot.**
+Color is reinforcement, never the message. So each class changed geometry, not paint:
+
+- **Class I — field cache.** The old compact shell: one latch, one gold seal line.
+  Ordinary recoverable hardware.
+- **Class II — secured.** A step taller, two steel cargo straps around the body, a double
+  latch, two status lights. Something worth strapping down.
+- **Class III — restricted.** The tallest, with a full-footprint armored lid overhanging
+  the base, triple lock, three lit slits, corner bumpers, and three class notches stamped
+  on top. Aurix did not expect ordinary personnel to open this.
+
+>> IMAGE 1 · 113-caches.png · The six shells: classes I, II and III, closed and opened
+
+Opened shells keep their identity — the straps, locks and notches stay, only the lights
+die to rust. Class III keeps exactly one amber breach light, because a thing like that
+does not go quietly.
+
+Atlas discipline: the four new props are appended at the *end* of the kind list, the
+historical `salvageCache` names stay put as Class I, and the renderer falls back to them
+if an old cached atlas is still on disk. Nobody's Core gets drawn wearing a portal's
+pixels.
+
+## Killing the compass text
+
+`CACHE: EAST · ~10m` was navigation by prose. It also lied a little: EAST is a fact about
+the grid, and the player steers a screen. The replacement is a small surveying instrument
+at the top-center of the HUD — a flattened ring where a diamond marker orbits in *screen*
+direction, run through the isometric projection so "marker on the right" always means
+"walk right".
+
+>> IMAGE 2 · 113-locator.png · The locator: ring, class notches, approximate distance
+
+A ring instead of a compass strip for one honest reason: the camera never rotates, so a
+strip has nothing to scroll against, and the classic 359°→0° jump cannot exist on a
+circle — sine and cosine do not have seams. The marker carries the cache class (roman
+numeral plus one-to-three amber notches, same stamp language as the shells) and an
+approximate distance. Signal strength rises as you close in; at arm's reach it locks with
+steady brackets, because frantic blinking next to the thing you are about to touch helps
+nobody.
+
+No minimap. The instrument says *something valuable is that way*, never *here is the
+route*. The cave stays yours to solve.
+
+## The recovery terminal
+
+Opening a cache now boots a machine instead of summoning two floating rectangles. Metal
+housing with corner screws, a chipped corner and a short caution stripe; inside it, a
+phosphor CRT — scanlines, a vignette, one fast sync roll, about 400 ms of boot after the
+reveal. The game keeps running underneath the whole time, the keyboard still answers
+`[1]` and `[2]`, and the touch hit rectangles are byte-identical to the old layout's.
+The redesign is paint, not policy.
+
+>> IMAGE 3 · 113-terminal.png · The Aurix recovery terminal: Class III cache, Tier III options
+
+The header finally says the thing the UI used to mumble: **CACHE CLASS** is the container
+you cracked, **TIER** is the technology inside each bay — and they are allowed to
+disagree. A Class III cache offering a Tier I module is normal salvage, and a UI that
+implied otherwise would be promising loot the roll never guaranteed. Volatile stays its
+own axis: the explosive bay gets the orange border and a drawn hazard triangle whether it
+is Tier III or not, because red means *dangerous*, not *expensive*. And if you already
+own a module, the bay says RECHARGE in plain letters instead of cosplaying a second slot.
+
+## Modules you can hold
+
+The abstract glyphs stayed in the HUD, where 24 pixels is all they get and abstraction is
+a feature. But the reward moment deserved objects, so every module now has a cartridge:
+one shared chassis — steel body, rear connector fins, amber Aurix plate, corner screws —
+and one dominant functional component each. A ringed penetrator barrel. An exposed coil
+with a jumping arc. A clamped red containment chamber with a heartbeat. A mirror set at
+45 degrees with the beam visibly breaking on it. A luminous disc in a launcher cradle.
+
+>> IMAGE 4 · 113-cartridges.png · The six cartridges on the bench
+
+## The serpent
+
+The siphon cartridge went through review three times, and the third note was the right
+one: the *shot* itself still looked like everyone else's bolt. A drain is not ammunition.
+It is something alive that leaves the barrel hunting for fluid.
+
+So the siphon shot is now a serpent: a solid head with a bright tip, towing about two and
+a half tiles of vivid green ribbon that undulates, tapers, and dissolves into wisps at
+the end. The tail grows out of the muzzle as the shot flies, because the stream did not
+exist before the trigger did.
+
+>> IMAGE 5 · 113-serpent.png · The siphon serpent in flight, twice
+
+The honesty rules survived the theatrics, all of them. The authoritative position is the
+head. The ground shadow marks the true path. The undulation is capped small enough to
+never misreport a hit. The animation is phased by distance travelled, so it freezes when
+the world pauses instead of writhing through a pause menu. And when the last siphon
+charge is spent mid-flight, the green dies with it — including over the network, where a
+review bot correctly caught that the serpent flag was not travelling in co-op snapshots.
+It travels now, filtered by live charges on the server, so the serpent your partner sees
+cannot promise a drain you no longer have.
+
+## The line, assembled
+
+Terminal found → scan → signal acquired → the ring lights up → you walk a bearing → a
+shell that confesses its class → the CRT boots → two cartridges under glass → you pick
+one and the world never stopped moving. One system, finally dressed like one.
+
+Zero simulation changes. Same rolls, same tiers, same spawns, same replays. The suites
+agree: 995 client tests, 662 sim, 277 server, 71 protocol, 208 content — all green.
