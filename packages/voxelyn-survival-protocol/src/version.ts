@@ -600,7 +600,11 @@ export const SIMULATION_VERSION = 41;
 // leyline e leylineNode no fim da lista, a regra do rockFerric). Ainda sem
 // arte dedicada elas desenham pelo fallback de rocha; o bump marca a
 // promessa — o pool de materia visivel mudou.
-export const CONTENT_VERSION = 24;
+// 25: COFRES POR CLASSE no atlas world-props (v5): salvageCacheT2/T3,
+// fechado e aberto, ANEXADOS ao fim da lista. A classe I mantem os nomes
+// historicos salvageCache/salvageCacheOpened, que tambem servem de fallback
+// para atlas antigo em cache. Puro conteudo visual — tier ja existia na sim.
+export const CONTENT_VERSION = 25;
 
 export type VersionTriple = {
   protocolVersion: number;

@@ -586,11 +586,9 @@ export const PT_BR = {
   'hud.objective.findCore': 'ENCONTRE O NÚCLEO',
   'hud.objective.breakSeal': 'O SELO DO SETOR RESISTE — DERRUBE QUEM O SUSTENTA',
   'hud.cores': 'NÚCLEOS {taken}/{total}',
-  'hud.cache': 'COFRE: {direction} · ~{distance}m',
-  'hud.direction.east': 'LESTE',
-  'hud.direction.west': 'OESTE',
-  'hud.direction.south': 'SUL',
-  'hud.direction.north': 'NORTE',
+  // O localizador de cofre virou instrumento 360° no topo-centro (ver
+  // cache-locator.ts); o texto cardinal "COFRE: LESTE" morreu com ele.
+  'hud.locator.distance': '{distance}m',
 
   // Estratos e ocupações do Veio (a gramática de biomas da descida)
   'biome.stratum.basalt': 'GALERIAS DE BASALTO',
@@ -658,10 +656,21 @@ export const PT_BR = {
   // ---------------------------------------------------------------------
   // Escolha de módulos
   // ---------------------------------------------------------------------
-  'choice.title': 'DADOS DE MÓDULO ENCONTRADOS',
+  'choice.title': 'DADOS DE MÓDULO RECUPERADOS',
   'choice.card': '[{index}] {label}',
   'choice.recharge': 'RECARGA · {lifetime}',
   'choice.volatile': 'VOLÁTIL',
+  // O terminal de recuperação Aurix: texto de equipamento corporativo
+  // indiferente, curto o bastante para caber no CRT de um celular deitado.
+  'choice.terminal.brand': 'AURIX DYNAMICS // RECUPERAÇÃO',
+  'choice.terminal.unit': 'AD-SLV 04',
+  'choice.cacheClass': 'COFRE CLASSE {tier}',
+  'choice.integrity': 'INTEGRIDADE DE DADOS {percent}%',
+  'choice.select': 'SELECIONE O EQUIPAMENTO RECUPERÁVEL',
+  'choice.moduleIndex': 'MÓDULO 0{index}',
+  'choice.moduleTier': 'NÍVEL {tier}',
+  'choice.install': '[{index}] INSTALAR',
+  'choice.rechargeAction': '[{index}] RECARREGAR',
 
   'module.piercing.label': 'PIERCING',
   'module.piercing.description': 'Perfura alvos sem repetir dano durante a travessia.',

@@ -1250,7 +1250,7 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
       safeInsets.bottom,
     );
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
-      const regions = renderer.renderChoice(view, vw, vh, input.state);
+      const regions = renderer.renderChoice(view, vw, vh, input.state, now);
       const choice = input.consumeChoiceTap(regions);
       if (choice !== null) queuedChoice = choice;
     } else if (pendingChoice) {
@@ -1679,6 +1679,7 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
             window.innerWidth,
             window.innerHeight,
             input.state,
+            now,
           );
           const choice = menuOpen ? null : input.consumeChoiceTap(regions);
           if (choice !== null) queuedChoice = choice;

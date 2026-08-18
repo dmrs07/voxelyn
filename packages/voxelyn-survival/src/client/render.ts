@@ -116,6 +116,16 @@ import {
 } from './material-response';
 import { drawVoxelEntity } from './voxel-fallback';
 import { modulePresentation } from './module-presentation';
+import { cachePropChain, choiceSourceTier, dataIntegrityPercent } from './salvage-presentation';
+import { cacheLocatorLayout, lerpBearingDeg, locatorTargets } from './cache-locator';
+import { drawCacheLocator } from './cache-locator-draw';
+import {
+  choiceBootPhase,
+  drawCrtOverlay,
+  drawModuleChoiceCard,
+  drawRecoveryTerminal,
+  salvageTerminalLayout,
+} from './salvage-choice-presentation';
 import { abilityPresentation } from './ability-presentation';
 import {
   moduleChoiceLayout,
@@ -1224,6 +1234,14 @@ export class SurvivalRenderer {
     startScreen?: { x: number; y: number };
   } | null = null;
   private choiceRevealAt = 0;
+  /**
+   * Estado do localizador de cofre: o bearing desenhado persegue o real pelo
+   * MENOR arco (ver cache-locator.ts), entao o marcador nunca da meia-volta no
+   * anel para andar dois graus. Trocar de alvo rearma sem suavizar.
+   */
+  private locatorBearing: number | null = null;
+  private locatorSiteId: number | null = null;
+  private locatorLastMs = 0;
   private purgePulseUntil = 0;
   /** Pulso do contador de carga, disparado por `ore_gained`. */
   private cargoPulseUntil = 0;
@@ -2627,14 +2645,11 @@ export class SurvivalRenderer {
       items.push({
         depth: site.cache.x + site.cache.y,
         draw: () => {
-          const prop = site.cacheOpened ? 'salvageCacheOpened' : 'salvageCache';
-          if (
-            this.props.draw(
-              ctx, prop, nowMs, csx, csy, z,
-              bodyFaceLight(site.cache.x, site.cache.y, PROP_RESPONSE),
-            )
-          ) {
-            return;
+          // A classe do cofre e GEOMETRIA de prop, nao recolor: ver
+          // cachePropChain — a classe I e o fallback para atlas antigo.
+          const faces = bodyFaceLight(site.cache.x, site.cache.y, PROP_RESPONSE);
+          for (const prop of cachePropChain(site.tier, site.cacheOpened)) {
+            if (this.props.draw(ctx, prop, nowMs, csx, csy, z, faces)) return;
           }
           ctx.fillStyle = shade(PAL.rock, 0.5 + cb * 0.4);
           ctx.fillRect(csx - 5 * z, csy - 5 * z, 10 * z, 5 * z);
@@ -4205,20 +4220,14 @@ export class SurvivalRenderer {
     const extra = state.playerExtra;
     const safeTop = this.safeArea.top + 10;
     const safeLeft = this.safeArea.left + 12;
-    const revealed = state.salvageSites
-      .filter((site) => site.cacheRevealed && !site.cacheOpened)
-      .sort((a, b) => {
-        const da = Math.hypot(a.cache.x + 0.5 - state.player.x, a.cache.y + 0.5 - state.player.y);
-        const db = Math.hypot(b.cache.x + 0.5 - state.player.x, b.cache.y + 0.5 - state.player.y);
-        return da - db;
-      })[0];
     const hasModules = extra.activeModules.length > 0;
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
     const sectorY = safeTop + (hasModules ? 112 : 84);
     const biomeY = sectorY + 14;
     const objectiveY = biomeY + 18;
-    const cacheY = objectiveY + 17;
-    const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
+    // O painel nao reserva mais a linha do cofre: o localizador de cofre vive
+    // no topo-centro (ver renderHud), e a caixa-preta encosta mais alto.
+    const panelH = objectiveY - safeTop + 13;
     const region = deathEchoReadoutRegion(vw, vh, this.safeArea, {
       x: safeLeft,
       y: safeTop,
@@ -4458,13 +4467,37 @@ export class SurvivalRenderer {
       ctx.textAlign = 'left';
     }
 
-    const revealed = state.salvageSites
-      .filter((site) => site.cacheRevealed && !site.cacheOpened)
-      .sort((a, b) => {
-        const da = Math.hypot(a.cache.x + 0.5 - state.player.x, a.cache.y + 0.5 - state.player.y);
-        const db = Math.hypot(b.cache.x + 0.5 - state.player.x, b.cache.y + 0.5 - state.player.y);
-        return da - db;
-      })[0];
+    // O LOCALIZADOR DE COFRE: instrumento 360° no topo-centro, no lugar do
+    // antigo texto "COFRE: LESTE · ~10m" do painel esquerdo. O bearing e
+    // suavizado pelo MENOR arco entre quadros; trocar de alvo (cofre aberto →
+    // proximo promovido) rearma o marcador sem varrer a volta longa.
+    const targets = locatorTargets(state.salvageSites, state.player.x, state.player.y);
+    if (targets.length > 0) {
+      const primary = targets[0];
+      const dtMs = Math.min(120, Math.max(0, nowMs - this.locatorLastMs));
+      this.locatorLastMs = nowMs;
+      if (this.locatorSiteId !== primary.siteId || this.locatorBearing === null) {
+        this.locatorSiteId = primary.siteId;
+        this.locatorBearing = primary.bearingDeg;
+      } else {
+        this.locatorBearing = lerpBearingDeg(
+          this.locatorBearing,
+          primary.bearingDeg,
+          1 - Math.exp(-dtMs * 0.012),
+        );
+      }
+      drawCacheLocator(
+        ctx,
+        cacheLocatorLayout(vw, vh, this.safeArea),
+        primary,
+        this.locatorBearing,
+        targets.slice(1),
+        nowMs,
+      );
+    } else {
+      this.locatorSiteId = null;
+      this.locatorBearing = null;
+    }
 
     const hasModules = extra.activeModules.length > 0;
     const panelW = Math.min(300, Math.max(230, vw * 0.34));
@@ -4472,8 +4505,9 @@ export class SurvivalRenderer {
     const sectorY = safeTop + (hasModules ? 112 : 84);
     const biomeY = sectorY + 14;
     const objectiveY = biomeY + 18;
-    const cacheY = objectiveY + 17;
-    const panelH = (revealed ? cacheY : objectiveY) - safeTop + 13;
+    // O espaco vertical do antigo texto de cofre foi DEVOLVIDO ao painel: o
+    // localizador vive no topo-centro e nao ocupa mais uma linha aqui.
+    const panelH = objectiveY - safeTop + 13;
 
     const roundedPanel = (x: number, y: number, w: number, h: number, radius: number): void => {
       const r = Math.min(radius, w / 2, h / 2);
@@ -4664,26 +4698,6 @@ export class SurvivalRenderer {
           : 'hud.objective.descend';
     ctx.fillText(t(objectiveKey), safeLeft + 12, objectiveY);
 
-    if (revealed) {
-      const dx = revealed.cache.x + 0.5 - state.player.x;
-      const dy = revealed.cache.y + 0.5 - state.player.y;
-      const direction = t(
-        Math.abs(dx) > Math.abs(dy)
-          ? dx > 0
-            ? 'hud.direction.east'
-            : 'hud.direction.west'
-          : dy > 0
-            ? 'hud.direction.south'
-            : 'hud.direction.north',
-      );
-      ctx.fillStyle = PAL.biolum;
-      ctx.fillText(
-        t('hud.cache', { direction, distance: Math.round(Math.hypot(dx, dy)) }),
-        safeLeft + 12,
-        cacheY,
-      );
-    }
-
     // mensagens centrais
     this.messages = this.messages.filter((m) => m.until > nowMs);
     const visibleMessages = this.messages.filter((m) => (m.startsAt ?? 0) <= nowMs);
@@ -4865,74 +4879,52 @@ export class SurvivalRenderer {
     }
   }
 
-  /** Painel nao-bloqueante de escolha privada do jogador local. */
+  /**
+   * Painel nao-bloqueante de escolha privada do jogador local.
+   *
+   * A composicao vive em salvage-choice-presentation.ts: carcaca Aurix, CRT,
+   * cabecalho com a CLASSE do cofre de origem (derivada de sourceSiteId +
+   * salvageSites — nenhum campo novo de protocolo) e os dois compartimentos
+   * com os cartuchos fisicos. Os retangulos devolvidos continuam sendo
+   * EXATAMENTE os cards de moduleChoiceLayout — o contrato de acerto do
+   * input nao mudou. O boot (~400 ms de tinta apos choiceRevealAt) nunca
+   * atrasa a interacao nem a simulacao por baixo.
+   */
   renderChoice(
     state: SurvivalState,
     vw: number,
     vh: number,
     input?: InputState,
+    nowMs: number = typeof performance !== 'undefined' ? performance.now() : 0,
   ): Array<{ x: number; y: number; w: number; h: number }> {
     const pending = state.playerExtra.pendingModuleChoice;
     if (!pending) return [];
     const ctx = this.ctx;
     const reserveTouch = input?.usingTouch ? Math.min(190, vh * 0.28) : 0;
-    const cards = moduleChoiceLayout(vw, vh, this.safeArea, reserveTouch);
+    const layout = salvageTerminalLayout(vw, vh, this.safeArea, reserveTouch);
+    const boot = choiceBootPhase(nowMs, this.choiceRevealAt);
 
     ctx.fillStyle = 'rgba(11,14,20,0.38)';
     ctx.fillRect(0, 0, vw, vh);
-    ctx.fillStyle = PAL.loot;
-    ctx.font = 'bold 17px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(t('choice.title'), vw / 2, Math.max(30, cards[0].y - 38));
 
+    drawRecoveryTerminal(
+      ctx,
+      layout,
+      {
+        cacheTier: choiceSourceTier(state.salvageSites, pending.sourceSiteId),
+        integrityPercent: dataIntegrityPercent(pending.sourceSiteId),
+      },
+      boot,
+      nowMs,
+    );
     pending.options.forEach((id, index) => {
-      const card: Rect = cards[index];
-      const presentation = modulePresentation(id);
       const active = state.playerExtra.activeModules.some((module) => module.id === id);
-      ctx.fillStyle = 'rgba(24,31,43,0.94)';
-      ctx.fillRect(card.x, card.y, card.w, card.h);
-      ctx.strokeStyle = presentation.risk === 'volatile' ? PAL.fire : PAL.loot;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(card.x, card.y, card.w, card.h);
-
-      const iconX = card.x + 38;
-      const iconY = card.y + 42;
-      ctx.fillStyle = 'rgba(46,58,77,0.9)';
-      ctx.fillRect(iconX - 24, iconY - 24, 48, 48);
-      drawModuleGlyph(ctx, id, iconX, iconY, 22, PAL.biolum);
-
-      ctx.textAlign = 'left';
-      ctx.fillStyle = PAL.player;
-      ctx.font = 'bold 15px monospace';
-      ctx.fillText(
-        t('choice.card', { index: index + 1, label: presentation.label }),
-        card.x + 72,
-        card.y + 30,
-      );
-      ctx.font = 'bold 10px monospace';
-      ctx.fillStyle = PAL.loot;
-      ctx.fillText(
-        active
-          ? t('choice.recharge', { lifetime: presentation.lifetimeLabel })
-          : presentation.lifetimeLabel,
-        card.x + 72,
-        card.y + 49,
-      );
-      if (presentation.risk === 'volatile') {
-        ctx.fillStyle = PAL.fire;
-        ctx.fillText(t('choice.volatile'), card.x + 72, card.y + 65);
-      }
-
-      ctx.fillStyle = PAL.bone;
-      ctx.font = '11px monospace';
-      const lines = wrapMeasuredText(ctx, presentation.shortDescription, card.w - 28);
-      let lineY = Math.max(card.y + 88, iconY + 38);
-      for (const line of lines.slice(0, 4)) {
-        ctx.fillText(line, card.x + 14, lineY);
-        lineY += 15;
-      }
+      drawModuleChoiceCard(ctx, layout.cards[index], { id, index, active }, boot, nowMs);
     });
-    return cards;
+    // Os embelezamentos de vidro (vinheta, reflexo) seguem a qualidade; o
+    // conteudo — classe, tier, cartucho, CTA — nunca depende dela.
+    drawCrtOverlay(ctx, layout, boot, this.quality.bloom);
+    return layout.cards;
   }
 
   /**

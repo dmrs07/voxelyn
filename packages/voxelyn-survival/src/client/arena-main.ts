@@ -291,7 +291,7 @@ const runArena = (conditions: ArenaConditions): void => {
     cooldownOverlay.render(state, input.state, state.tick + alpha, now);
     const pendingChoice = view.playerExtra.pendingModuleChoice;
     if (pendingChoice && renderer.isChoiceRevealReady(now)) {
-      const regions = renderer.renderChoice(view, vw, vh, input.state);
+      const regions = renderer.renderChoice(view, vw, vh, input.state, now);
       const choice = input.consumeChoiceTap(regions);
       if (choice !== null) queuedChoice = choice;
     } else if (pendingChoice) {

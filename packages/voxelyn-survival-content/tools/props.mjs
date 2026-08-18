@@ -42,6 +42,15 @@ export const PROP_KINDS = [
   // PORTAIS por bioma (portal:<chave>) + o poco selado da extracao de
   // retorno. Ver portal-props.mjs — o `descent` acima vira fallback.
   ...PORTAL_PROP_KINDS,
+  // COFRES POR CLASSE (II e III). Anexados AO FIM, como manda a regra: os
+  // nomes historicos `salvageCache`/`salvageCacheOpened` continuam sendo a
+  // classe I, e um atlas antigo em cache ainda resolve todos os indices
+  // anteriores. A classe precisa ser lida da GEOMETRIA (travas, bandas,
+  // altura), nao so da cor — ver salvageCacheTieredModel.
+  { name: 'salvageCacheT2', frames: 1, frameMs: 0 },
+  { name: 'salvageCacheT2Opened', frames: 1, frameMs: 0 },
+  { name: 'salvageCacheT3', frames: 1, frameMs: 0 },
+  { name: 'salvageCacheT3Opened', frames: 1, frameMs: 0 },
 ];
 
 /** Meia-largura da base, em voxels. */
@@ -238,6 +247,100 @@ const salvageCacheModel = (opened) => {
   return boxes;
 };
 
+/**
+ * As classes II e III do cofre. A regra dura: a classe tem de sobreviver a uma
+ * captura em ESCALA DE CINZA — por isso cada tier muda silhueta e contagem, e
+ * nunca so a cor:
+ *
+ *   - classe I  (acima): baixo, uma trava, um selo.
+ *   - classe II : corpo um degrau mais alto, quatro montantes de canto
+ *     ameiados, trava DUPLA, placa de blindagem frontal e DUAS luzes.
+ *   - classe III: o mais vertical, tampa blindada em balanco cobrindo a base
+ *     inteira, trava TRIPLA, TRES fendas iluminadas e tres entalhes de classe
+ *     na tampa.
+ *
+ * Aberto, o cofre conserva a identidade: montantes, travas (mortas) e entalhes
+ * ficam; so as luzes morrem (ferrugem) — na classe III resta UMA luz ambar de
+ * violacao. O amarelo continua sendo selo/acento, nunca o volume.
+ */
+const salvageCacheTieredModel = (tier, opened) => {
+  const boxes = [];
+  boxes.push(box(-4, -3, 0, 8, 6, 2, 'rockDeep'));
+
+  // A camera ve as faces topo, SUL (+y, baixo-esquerda) e LESTE (+x,
+  // baixo-direita). Toda a gramatica de classe — travas, fendas, faixas —
+  // mora na face sul de proposito; no lado norte ela seria estampa invisivel.
+  // Aberto, a tampa desloca para o NORTE (atras), para nunca cobrir a face
+  // que carrega a informacao. Nada de torres nem ameias: a silhueta e de
+  // equipamento de mineracao — cintas, aletas, tampa blindada.
+  if (tier === 2) {
+    boxes.push(box(-3, -2, 2, 6, 4, opened ? 3 : 5, 'rock'));
+    // Duas CINTAS de carga envolvendo o corpo, meio passo salientes: e o que
+    // separa "caixa" de "carga cintada para transporte".
+    boxes.push(box(-3.5, -2.5, 3, 7, 5, 1, 'rockDeep'));
+    if (!opened) boxes.push(box(-3.5, -2.5, 5, 7, 5, 1, 'rockDeep'));
+    // Tampa propria com dobradica ao norte.
+    boxes.push(box(-3, -2, opened ? 5 : 7, 6, 4, 1, opened ? 'rockDeep' : 'rock'));
+    boxes.push(box(-3, -2, opened ? 6 : 8, 6, 1, 1, 'rockDeep'));
+    // Trava dupla na face sul, sobre as cintas.
+    boxes.push(box(-2, 2, 3, 1, 1, opened ? 1 : 3, opened ? 'rockDeep' : 'bone'));
+    boxes.push(box(1, 2, 3, 1, 1, opened ? 1 : 3, opened ? 'rockDeep' : 'bone'));
+    // Faixa de identificacao ambar na borda sul da tampa.
+    boxes.push(box(-3, 1, opened ? 5 : 7, 6, 1, 1, opened ? 'rust' : 'loot'));
+    // Duas luzes de estado salientes na parede sul, entre as travas.
+    boxes.push(box(-0.5, 2, opened ? 4 : 5, 1, 1, 1, opened ? 'rust' : 'biolum'));
+    boxes.push(box(-0.5, 2, opened ? 3 : 4, 1, 1, 1, opened ? 'rust' : 'biolum'));
+    if (opened) {
+      // Tampa recuada para tras do corpo, com a faixa morta ainda visivel.
+      boxes.push(box(-3, -3, 6, 6, 1, 1, 'rockDeep'));
+      boxes.push(box(-2, -3, 7, 4, 1, 1, 'rock'));
+    }
+    return boxes;
+  }
+
+  // Classe III — restrito/pesado.
+  boxes.push(box(-3, -2, 2, 6, 4, opened ? 4 : 6, 'rock'));
+  // Pes/bumpers blindados nos cantos do plinto: agarrado ao chao.
+  for (const [fx, fy] of [[-4, -3], [3, -3], [-4, 2], [3, 2]]) {
+    boxes.push(box(fx, fy, 2, 1, 1, 2, 'rust'));
+  }
+  // Ranhuras de painel na face sul: tres sulcos escuros verticais.
+  for (const gx of [-2, 0, 1.5]) {
+    boxes.push(box(gx, 1.5, 2, 0.5, 0.5, opened ? 2 : 3, 'rockDeep'));
+  }
+  // Aletas de dissipacao na face leste: radiador, nao muralha.
+  boxes.push(box(3, -2, 3, 0.5, 4, 1, 'rockDeep'));
+  boxes.push(box(3, -2, 5, 0.5, 4, 1, 'rockDeep'));
+  // Trava tripla na face sul.
+  for (const lx of [-3, -0.5, 2]) {
+    boxes.push(box(lx, 2, 3, 1, 1, 2, opened ? 'rockDeep' : 'bone'));
+  }
+  // Tres fendas iluminadas: a assinatura energizada da classe. Aberto, morrem
+  // em ferrugem e sobra UMA luz ambar de violacao no centro.
+  for (const sx of [-3, -0.5, 2]) {
+    const lit = opened ? (sx === -0.5 ? 'lamp' : 'rust') : 'biolum';
+    boxes.push(box(sx, 2, opened ? 5 : 6, 1, 1, 1, lit));
+  }
+  if (opened) {
+    // Tampa blindada deslocada para tras, inteira: pesada demais para sumir.
+    boxes.push(box(-4, -3, 6, 8, 2, 1, 'rockDeep'));
+    boxes.push(box(-3, -3, 7, 6, 1, 1, 'rock'));
+    // Entalhes de classe seguem visiveis na tampa deslocada.
+    for (const nx of [-2, 0, 2]) boxes.push(box(nx, -2, 7, 1, 1, 1, 'bone'));
+    return boxes;
+  }
+  // Tampa blindada em balanco: cobre o plinto inteiro e da o perfil pesado
+  // de prensa industrial que nenhuma outra classe tem.
+  boxes.push(box(-4, -3, 8, 8, 6, 1, 'rockDeep'));
+  boxes.push(box(-3, -2, 9, 6, 4, 1, 'rock'));
+  // Dois cantos ambar da tampa, no lado visivel: marcacao de alto acesso.
+  boxes.push(box(-4, 2, 8, 1, 1, 1, 'lamp'));
+  boxes.push(box(3, 2, 8, 1, 1, 1, 'lamp'));
+  // Tres entalhes de classe estampados na borda sul do topo.
+  for (const nx of [-2, 0, 2]) boxes.push(box(nx, 1, 9, 1, 1, 1, 'bone'));
+  return boxes;
+};
+
 export const propModel = (kind, frame) => {
   const spec = PROP_KINDS.find((k) => k.name === kind);
   if (!spec) throw new Error(`prop desconhecido: ${kind}`);
@@ -252,6 +355,10 @@ export const propModel = (kind, frame) => {
   if (kind === 'salvageTerminalScanning') return salvageTerminalModel(phase, 'scanning');
   if (kind === 'salvageTerminalComplete') return salvageTerminalModel(phase, 'complete');
   if (kind === 'salvageCache') return salvageCacheModel(false);
+  if (kind === 'salvageCacheT2') return salvageCacheTieredModel(2, false);
+  if (kind === 'salvageCacheT2Opened') return salvageCacheTieredModel(2, true);
+  if (kind === 'salvageCacheT3') return salvageCacheTieredModel(3, false);
+  if (kind === 'salvageCacheT3Opened') return salvageCacheTieredModel(3, true);
   return salvageCacheModel(true);
 };
 

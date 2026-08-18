@@ -419,7 +419,10 @@ const buildProps = () => {
     // 4: PORTAIS por bioma (portal:<chave>, 10 chaves animadas) + o poco
     // SELADO da extracao de retorno (portal:sealed) no fim da lista; o
     // `descent` continua no atlas como fallback.
-    version: 4,
+    // 5: COFRES POR CLASSE (salvageCacheT2/T3, fechado+aberto) no fim da
+    // lista; `salvageCache`/`salvageCacheOpened` continuam como classe I e
+    // como fallback para atlas antigo em cache.
+    version: 5,
     atlas: 'world-props.png',
     frameWidth,
     frameHeight,
