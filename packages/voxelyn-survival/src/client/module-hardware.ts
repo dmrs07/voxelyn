@@ -31,6 +31,7 @@ const HW = {
   electric: '#7ab8ff',
   white: '#e8f1ff',
   fungusLight: '#66c28a',
+  acid: '#a8e63c',
 };
 
 const hexChannel = (hex: string, index: number): number =>
@@ -195,25 +196,29 @@ const drawExplosive = (d: Draw, heartbeat: number): void => {
   drawStatusLed(d, HW.fire);
 };
 
-/** SIFAO: bomba de recuperacao com canal de fluido e reservatorio luminoso. */
+/**
+ * SIFAO: o DISPARO serpenteante e o componente — uma onda em S de verde
+ * vivido saindo do emissor, com a cabeca clara na ponta. A cruz de
+ * recuperacao continua como marcacao secundaria na bomba, nunca o icone.
+ */
 const drawSiphon = (d: Draw): void => {
-  // Corpo da bomba.
-  rect(d, 8, 4, 7, 7, HW.steelLight);
-  rect(d, 9, 5, 5, 2, HW.steelDark);
-  rect(d, 9, 9, 5, 1, HW.rust);
-  // Canal de fluido: tubo subindo e cruzando para o reservatorio.
-  const tube = HW.bone;
-  rect(d, 15, 6, 7, 1, tube);
-  rect(d, 21, 6, 1, 3, tube);
-  // Reservatorio com nivel de fluido verde-cyan.
-  rect(d, 23, 2, 6, 9, HW.steelDark);
-  rect(d, 24, 3, 4, 7, HW.dark);
-  rect(d, 24, 6, 4, 4, accent(d, HW.fungusLight));
-  rect(d, 24, 6, 4, 1, accent(d, HW.cyan));
+  // Bomba emissora compacta a esquerda.
+  rect(d, 7, 5, 5, 6, HW.steelLight);
+  rect(d, 8, 9, 3, 1, HW.rust);
   // Marcacao de recuperacao (cruz pequena, secundaria) na bomba.
-  rect(d, 10, 7, 3, 1, accent(d, HW.fungusLight));
-  rect(d, 11, 6, 1, 3, accent(d, HW.fungusLight));
-  drawStatusLed(d, HW.fungusLight);
+  rect(d, 8, 7, 3, 1, accent(d, HW.fungusLight));
+  rect(d, 9, 6, 1, 3, accent(d, HW.fungusLight));
+  // A serpente: segmentos 2×2 ondulando do emissor ate a cabeca.
+  const wave: Array<[number, number]> = [
+    [12, 6], [14, 4], [16, 3], [18, 4], [20, 6], [22, 7], [24, 6], [26, 4],
+  ];
+  wave.forEach(([x, y], i) => {
+    rect(d, x, y, 2, 2, accent(d, i % 2 === 0 ? HW.acid : HW.fungusLight));
+  });
+  // Cabeca, mais viva e com a ponta branca.
+  rect(d, 28, 2, 3, 3, accent(d, HW.acid));
+  rect(d, 30, 3, 1, 1, accent(d, HW.white));
+  drawStatusLed(d, HW.acid);
 };
 
 /** RICOCHETE: emissor curto + prisma/espelho articulado a 45°. */

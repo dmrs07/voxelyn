@@ -910,11 +910,15 @@ const drawModuleGlyph = (
       ctx.fillRect(cx + dx * u - u / 2, cy + dy * u - u / 2, u, u);
     }
   } else if (id === 'siphon') {
+    // Onda serpenteante com a cabeca cheia: o mesmo disparo em S do cartucho
+    // (module-hardware.ts), para HUD e terminal dizerem a mesma coisa.
+    ctx.lineWidth = Math.max(1.5, u * 1.4);
     ctx.beginPath();
-    ctx.arc(cx, cy, 3 * u, 0, Math.PI * 2);
+    ctx.moveTo(cx - 4 * u, cy + 2 * u);
+    ctx.quadraticCurveTo(cx - 2 * u, cy - 4 * u, cx, cy);
+    ctx.quadraticCurveTo(cx + 2 * u, cy + 4 * u, cx + 4 * u, cy - u);
     ctx.stroke();
-    ctx.fillRect(cx - u, cy - 4 * u, 2 * u, 8 * u);
-    ctx.fillRect(cx - 4 * u, cy - u, 8 * u, 2 * u);
+    ctx.fillRect(cx + 3 * u, cy - 3 * u, 2 * u, 2 * u);
   } else if (id === 'ricochet') {
     ctx.beginPath();
     ctx.moveTo(cx - 4 * u, cy + 3 * u);
