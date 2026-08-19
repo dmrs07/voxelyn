@@ -39,6 +39,7 @@ import {
   readJsonBody,
   requestRateLimitKey,
   type VerificationBudget,
+  operatorTokenMatches,
 } from './http-util.js';
 import { MAX_REPLAY_BYTES, resimulateRun } from './replay.js';
 import {
@@ -252,7 +253,7 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
     // O digest de leitura dos Arquivos Aurix. Rota de OPERADOR: nao ha perfil
     // autenticado aqui, e nenhum id de perfil sai na resposta.
     if (path === '/api/progression/lore-digest' && req.method === 'GET') {
-      if (!opts.digestToken || url.searchParams.get('token') !== opts.digestToken) {
+      if (!operatorTokenMatches(opts.digestToken, url, req)) {
         res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
         res.end('not found');
         return true;

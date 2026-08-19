@@ -25,7 +25,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ArenaTelemetryDigest, ArenaTelemetryStore } from './arena-telemetry.js';
 import type { DevlogEntry, DevlogSocial, DevlogStore } from './devlog.js';
 import { canonicalRelative, isEntryId } from './devlog.js';
-import { SubmissionRateLimiter, requestRateLimitKey } from './http-util.js';
+import { SubmissionRateLimiter, requestRateLimitKey,
+  operatorTokenMatches,
+} from './http-util.js';
 import type { TelemetryDigest, TelemetryStore } from './telemetry.js';
 
 /** Linhas lidas para montar o digest do painel. */
@@ -602,13 +604,18 @@ export const createDevlogHandler = (opts: DevlogHttpOptions) => {
         res.end('devagar');
         return true;
       }
-      const token = url.searchParams.get('token');
-      if (!tokenMatches(opts.operatorToken, token)) {
+      if (!operatorTokenMatches(opts.operatorToken, url, req)) {
         // 404 e não 401: a existência do console é ela própria informação, e a
         // rota de digest do jogo já responde assim. Duas portas, mesma cara.
         notFound(res);
         return true;
       }
+
+      // O valor real do token, para os links da propria pagina. O `+` volta
+      // pelo mesmo motivo da checagem, e os renderers ja passam por
+      // `encodeURIComponent` — sem isso, cada link do painel derrubaria a
+      // sessao do operador no primeiro clique.
+      const token = (url.searchParams.get('token') ?? '').replace(/ /g, '+');
 
       if (path.startsWith('/devlog/console/a/')) {
         const asset = opts.store.asset(decodeURIComponent(path.slice('/devlog/console/a/'.length)));

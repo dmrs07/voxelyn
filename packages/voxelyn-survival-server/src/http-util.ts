@@ -9,6 +9,7 @@
 //
 // Nada aqui sabe o que é um placar, um evento ou uma cápsula.
 
+import { timingSafeEqual } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { IncomingMessage } from 'node:http';
 
@@ -200,3 +201,53 @@ export const readJsonBody = (req: IncomingMessage, limit: number): Promise<strin
     });
     req.on('error', () => resolve(null));
   });
+
+// ---------------------------------------------------------------------------
+// Token de operador
+// ---------------------------------------------------------------------------
+
+const safeEqual = (expected: string, given: string): boolean => {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(given);
+  // O comprimento vaza; o conteudo nao. Comparar tamanhos antes e o que permite
+  // usar `timingSafeEqual`, que exige buffers iguais.
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+};
+
+/**
+ * O token de operador confere?
+ *
+ * Aceita `?token=` e tambem `Authorization: Bearer`, e o motivo do segundo e o
+ * bug que o primeiro escondia:
+ *
+ * `URLSearchParams` decodifica `+` como ESPACO — comportamento correto de
+ * formulario, herdado pela query string. Os tokens deste servico nascem do
+ * `generateValue` do Render, que produz BASE64, e base64 usa `+`. Colar um
+ * token desses na barra do navegador entregava ao servidor uma string com
+ * espacos no lugar dos mais, a comparacao falhava e a rota respondia 404 — como
+ * se o segredo estivesse errado.
+ *
+ * Esse e o pior modo de falha possivel: parece configuracao, nao bug. As quatro
+ * rotas de operador (telemetria, arena, devlog e este digest) compartilhavam
+ * ele, entao nenhuma delas abria com um token que sorteasse um `+`.
+ *
+ * A restauracao do espaco para `+` conserta o caso comum sem pedir que ninguem
+ * saiba disso; o header existe para quem prefere nao passar segredo por URL, e
+ * porque URL vai parar em log de proxy.
+ */
+export const operatorTokenMatches = (
+  expected: string | undefined,
+  url: URL,
+  req?: { headers: IncomingMessage['headers'] },
+): boolean => {
+  if (!expected) return false;
+  const auth = req?.headers.authorization;
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+    if (safeEqual(expected, auth.slice('Bearer '.length))) return true;
+  }
+  const given = url.searchParams.get('token');
+  if (given === null) return false;
+  if (safeEqual(expected, given)) return true;
+  return safeEqual(expected, given.replace(/ /g, '+'));
+};

@@ -6,7 +6,9 @@
 // contra fraude — um testador que inventa um resultado so engana o proprio
 // digest que ele mesmo vai ler depois.
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { SubmissionRateLimiter, readJsonBody, requestRateLimitKey } from './http-util.js';
+import { SubmissionRateLimiter, readJsonBody, requestRateLimitKey,
+  operatorTokenMatches,
+} from './http-util.js';
 import type { ArenaOutcome, ArenaTelemetryEvent, ArenaTelemetryStore } from './arena-telemetry.js';
 
 /** Corpo maximo. Um evento cabe em ~500 bytes (o loadout e a parte variavel). */
@@ -118,7 +120,7 @@ export const createArenaTelemetryHandler = (opts: ArenaTelemetryHttpOptions) => 
     }
 
     if (req.method === 'GET') {
-      if (!opts.digestToken || url.searchParams.get('token') !== opts.digestToken) {
+      if (!operatorTokenMatches(opts.digestToken, url, req)) {
         json(res, 404, { error: 'nao encontrado' });
         return true;
       }
