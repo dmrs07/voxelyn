@@ -207,6 +207,10 @@ export const createWsServer = (opts: WsOptions = {}): WsServerHandle => {
         ),
         allowedOrigins: opts.allowedOrigins,
         trustedProxyHops: opts.trustedProxyHops,
+        // O digest de leitura de lore usa o MESMO token dos outros digests: e
+        // a mesma classe de dado (agregado, sem PII) e quem opera o painel ja
+        // tem esse segredo em maos.
+        digestToken: opts.telemetryToken ?? process.env.TELEMETRY_TOKEN,
         // MESMO orcamento do ranking e do pool: os tres re-simulam contra o
         // event loop que roda o tick autoritativo. Tres orcamentos de um
         // significariam tres replays concorrentes.

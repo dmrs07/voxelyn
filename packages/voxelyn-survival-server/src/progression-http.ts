@@ -74,6 +74,16 @@ export type ProgressionHttpOptions = {
    * que ja tem testes proprios em `http-util`.
    */
   rateLimits?: { settlePerMinute?: number; readsPerMinute?: number };
+  /**
+   * Token de OPERADOR para o digest de leitura de lore.
+   *
+   * Reaproveita o `TELEMETRY_TOKEN` de proposito, em vez de inventar um
+   * terceiro segredo: o dado tem a mesma natureza e a mesma sensibilidade dos
+   * outros digests (agregado, sem PII), e quem opera o painel ja tem esse
+   * token na mao. Ausente, a rota responde 404 como as demais rotas de
+   * operador — nao 401, para nao confirmar que ela existe.
+   */
+  digestToken?: string;
 };
 
 const STATUS_BY_ERROR: Record<ProgressionErrorCode, number> = {
@@ -236,6 +246,18 @@ export const createProgressionHandler = (opts: ProgressionHttpOptions) => {
       const profile = await authenticate(req);
       if (!profile) return (fail(res, 'unauthenticated'), true);
       json(res, 200, { profile: publicProfile(profile) });
+      return true;
+    }
+
+    // O digest de leitura dos Arquivos Aurix. Rota de OPERADOR: nao ha perfil
+    // autenticado aqui, e nenhum id de perfil sai na resposta.
+    if (path === '/api/progression/lore-digest' && req.method === 'GET') {
+      if (!opts.digestToken || url.searchParams.get('token') !== opts.digestToken) {
+        res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('not found');
+        return true;
+      }
+      json(res, 200, await opts.store.loreDigest());
       return true;
     }
 

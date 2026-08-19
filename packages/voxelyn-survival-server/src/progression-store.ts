@@ -109,6 +109,8 @@ export interface ProgressionStore {
   /** Idempotente; nao sobe profileVersion (ver `decideMarkRead`). */
   markLoreRead(profileId: string, fragmentId: LoreFragmentId, now: string): Promise<MarkReadOutput>;
   ledger(profileId: string): Promise<ProgressionLedgerEntry[]>;
+  /** Agregado de leitura dos Arquivos Aurix. Sem PII: ver `loreDigestOf`. */
+  loreDigest(): Promise<LoreDigest>;
   close(): Promise<void>;
 }
 
@@ -274,6 +276,15 @@ export class MemoryProgressionStore implements ProgressionStore {
     if (!decision.ok) return decision;
     if (decision.changed) this.profiles.set(profileId, decision.profile);
     return { ok: true, readLoreFragmentIds: [...decision.profile.readLoreFragmentIds] };
+  }
+
+  async loreDigest(): Promise<LoreDigest> {
+    return loreDigestOf(
+      [...this.profiles.values()].map((p) => ({
+        unlocked: p.unlockedLoreFragmentIds,
+        read: p.readLoreFragmentIds,
+      })),
+    );
   }
 
   async ledger(profileId: string): Promise<ProgressionLedgerEntry[]> {
@@ -891,6 +902,21 @@ export class PostgresProgressionStore implements ProgressionStore {
     );
   }
 
+  async loreDigest(): Promise<LoreDigest> {
+    // Le as duas colunas de TODOS os perfis e agrega em memoria, em vez de
+    // somar no SQL. A escala manda: sao dezenas de perfis, nao milhoes, e a
+    // funcao pura ja existe e e a mesma que o store de memoria usa — divergir
+    // as duas para economizar uma varredura seria trocar confianca por nada.
+    const result = await this.pool.query(
+      'select unlocked_lore, read_lore from progression_profiles',
+    );
+    return loreDigestOf(
+      result.rows.map((row) => ({
+        unlocked: (row.unlocked_lore as string[] | null) ?? [],
+        read: (row.read_lore as string[] | null) ?? [],
+      })),
+    );
+  }
   async ledger(profileId: string): Promise<ProgressionLedgerEntry[]> {
     const result = await this.pool.query(
       'select * from progression_ledger where profile_id = $1 order by id asc',
@@ -964,3 +990,100 @@ export const createProgressionStore = async (
 };
 
 export { publicProfile };
+
+// ---------------------------------------------------------------------------
+// Leitura de lore, em agregado
+// ---------------------------------------------------------------------------
+// Existem 257 fragmentos e 27 mil palavras de Arquivos Aurix. A pergunta que
+// nenhum numero respondia era simples: ALGUEM LE ISSO? O perfil ja guarda
+// `read_lore` (so `markLoreRead` escreve nela) e `unlocked_lore`, entao a
+// resposta ja estava no banco esperando alguem somar.
+//
+// Nao ha evento novo e nao ha identificador novo: o digest le o que a
+// progressao ja persiste e devolve contagem. A mesma disciplina de
+// `telemetry.ts` — sem PII, so agregado.
+
+/** Quantos fragmentos um perfil leu, em faixas. A CURVA de desistencia. */
+export type LoreReadBucket = { bucket: string; profiles: number };
+
+export type LoreDigest = {
+  profiles: number;
+  /** Perfis com ao menos um fragmento desbloqueado (o denominador honesto). */
+  profilesWithUnlocked: number;
+  /** Perfis que abriram ao menos um. */
+  profilesWithAnyRead: number;
+  unlockedTotal: number;
+  readTotal: number;
+  /** Lidos sobre desbloqueados. 0 significa que ninguem abriu nada. */
+  readRate: number;
+  /** Mediana de lidos entre quem tem algo desbloqueado. */
+  medianRead: number;
+  readBuckets: LoreReadBucket[];
+  /**
+   * Por fragmento, ordenado do mais desbloqueado para o menos. `read: 0` num
+   * item muito desbloqueado e exatamente o texto que ninguem quis.
+   */
+  fragments: { id: string; unlocked: number; read: number }[];
+};
+
+type LoreRow = { unlocked: readonly string[]; read: readonly string[] };
+
+const BUCKETS: readonly { label: string; test: (n: number) => boolean }[] = [
+  { label: '0', test: (n) => n === 0 },
+  { label: '1', test: (n) => n === 1 },
+  { label: '2-5', test: (n) => n >= 2 && n <= 5 },
+  { label: '6-15', test: (n) => n >= 6 && n <= 15 },
+  { label: '16+', test: (n) => n >= 16 },
+];
+
+/** Funcao PURA: os dois stores passam por ela, entao nao podem divergir. */
+export const loreDigestOf = (rows: readonly LoreRow[]): LoreDigest => {
+  const unlockedBy = new Map<string, number>();
+  const readBy = new Map<string, number>();
+  const readCounts: number[] = [];
+  let unlockedTotal = 0;
+  let readTotal = 0;
+  let profilesWithUnlocked = 0;
+  let profilesWithAnyRead = 0;
+
+  for (const row of rows) {
+    // O lido e intersectado com o desbloqueado: um fragmento que saiu do
+    // catalogo continua no `read_lore` de quem leu, e contá-lo daria taxa
+    // acima de 100% — numero que faz o painel perder credibilidade inteira.
+    const unlocked = new Set(row.unlocked);
+    const read = row.read.filter((id) => unlocked.has(id));
+    unlockedTotal += unlocked.size;
+    readTotal += read.length;
+    if (unlocked.size > 0) {
+      profilesWithUnlocked += 1;
+      readCounts.push(read.length);
+    }
+    if (read.length > 0) profilesWithAnyRead += 1;
+    for (const id of unlocked) unlockedBy.set(id, (unlockedBy.get(id) ?? 0) + 1);
+    for (const id of read) readBy.set(id, (readBy.get(id) ?? 0) + 1);
+  }
+
+  const sorted = [...readCounts].sort((a, b) => a - b);
+  const medianRead = sorted.length
+    ? sorted.length % 2
+      ? sorted[(sorted.length - 1) / 2]
+      : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+    : 0;
+
+  return {
+    profiles: rows.length,
+    profilesWithUnlocked,
+    profilesWithAnyRead,
+    unlockedTotal,
+    readTotal,
+    readRate: unlockedTotal > 0 ? readTotal / unlockedTotal : 0,
+    medianRead,
+    readBuckets: BUCKETS.map((b) => ({
+      bucket: b.label,
+      profiles: readCounts.filter((n) => b.test(n)).length,
+    })),
+    fragments: [...unlockedBy.entries()]
+      .map(([id, unlocked]) => ({ id, unlocked, read: readBy.get(id) ?? 0 }))
+      .sort((a, b) => b.unlocked - a.unlocked || a.id.localeCompare(b.id)),
+  };
+};
