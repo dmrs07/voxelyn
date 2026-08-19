@@ -31,6 +31,7 @@
 // o arquivo mora.
 
 import { t } from './i18n';
+import { isoDocumentIconSvg } from './matrix-icons';
 
 /** O que o cartao precisa saber sobre um fragmento. */
 export type LoreToastItem = {
@@ -157,17 +158,26 @@ export class LoreToasts {
     const card = el('button', `lore-toast${debut ? ' is-debut' : ''}`);
     card.type = 'button';
 
+    // A folha isometrica, deitada na mesma projecao do mundo. Ela e o que faz
+    // o cartao ser reconhecido antes de ser lido — em um canto da tela, a
+    // silhueta chega primeiro que qualquer palavra. `innerHTML` de constante,
+    // como o resto dos icones: nao ha texto de jogador nenhum aqui dentro.
+    const icon = el('span', 'lore-toast-icon');
+    icon.innerHTML = isoDocumentIconSvg();
+
     const head = el('div', 'lore-toast-head');
     head.append(
       el('span', 'lore-toast-tag', t(debut ? 'lore.toast.debut' : 'lore.toast.unlocked')),
       el('span', 'lore-toast-code', item.code),
     );
-    card.append(head, el('div', 'lore-toast-title', item.title));
 
+    const column = el('div', 'lore-toast-col');
+    column.append(head, el('div', 'lore-toast-title', item.title));
     if (debut) {
-      card.append(el('p', 'lore-toast-body', excerpt(item.body)));
+      column.append(el('p', 'lore-toast-body', excerpt(item.body)));
     }
-    card.append(el('div', 'lore-toast-cta', t('lore.toast.open')));
+    column.append(el('div', 'lore-toast-cta', t('lore.toast.open')));
+    card.append(icon, column);
 
     card.addEventListener('click', () => {
       this.host.ui?.();

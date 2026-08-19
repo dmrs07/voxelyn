@@ -597,7 +597,12 @@
         pointer-events: auto;
         position: relative;
         overflow: hidden;
-        display: block;
+        /* Icone a esquerda, texto em coluna: a folha isometrica funciona como
+           selo do cartao, e alinha-la ao TOPO mantem o selo no mesmo lugar
+           quer o cartao tenha corpo (estreia) ou nao. */
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
         width: min(340px, calc(100vw - 24px));
         text-align: left;
         font: inherit;
@@ -645,6 +650,26 @@
       .lore-toast:focus-visible {
         border-color: var(--ax-teal);
         color: var(--ax-teal-bright);
+      }
+      /* A coluna do texto: `min-width: 0` para o titulo longo truncar dentro
+         dela em vez de esticar o cartao. */
+      .lore-toast-col {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      /* O selo nao encolhe e nao recebe o clique: quem e o botao e o cartao. */
+      .lore-toast-icon {
+        flex: 0 0 auto;
+        display: block;
+        width: 22px;
+        margin-top: 2px;
+        color: var(--ax-teal);
+        pointer-events: none;
+      }
+      .lore-toast-icon svg {
+        display: block;
+        width: 100%;
+        height: auto;
       }
       .lore-toast-head {
         display: flex;

@@ -142,3 +142,32 @@ export const newDotSpan = (label: string): HTMLSpanElement => {
   dot.appendChild(sr);
   return dot;
 };
+
+/**
+ * O documento em ISOMÉTRICO — a folha deitada no chão do jogo.
+ *
+ * Único ícone desenhado à mão aqui, e por um motivo: o Phosphor desenha
+ * documento de frente, e de frente ele vira "arquivo de sistema operacional".
+ * Deitado na mesma projeção do mundo (2:1, `TILE_W` 32 por `TILE_H` 16 em
+ * `render.ts`), ele vira uma coisa que existe LÁ EMBAIXO, recuperada do Veio.
+ * A inclinação é a mesma de qualquer piso que o jogador atravessa.
+ *
+ * A geometria é a projeção de um retângulo de mundo: cada aresta longa anda 2
+ * na horizontal para 1 na vertical, e as pautas correm paralelas à aresta de
+ * topo. Trocar a proporção do jogo sem trocar a daqui faria o ícone brigar
+ * com o cenário que ele cita.
+ *
+ * Lê a partir de uns 18px. Abaixo disso as pautas se fundem e sobra a laje —
+ * quem montar menor que isso deveria montar sem pauta, não menor.
+ */
+export const isoDocumentIconSvg = (): string =>
+  '<svg viewBox="0 0 28 22" fill="none" aria-hidden="true">' +
+  // a espessura: a folha tem corpo, senão lê como buraco no chão
+  '<path d="M3.92 8.44 L16.77 14.87 L26.85 9.83 L26.85 11.73 L16.77 16.77 L3.92 10.34 Z" fill="currentColor" opacity="0.34" />' +
+  '<path d="M14 3.4 L26.85 9.83 L16.77 14.87 L3.92 8.44 Z" fill="currentColor" opacity="0.18" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />' +
+  // as pautas: três linhas, a última curta — o desenho universal de "texto"
+  '<g stroke="currentColor" stroke-width="1.15" stroke-linecap="round" opacity="0.85">' +
+  '<line x1="12.89" y1="6.27" x2="20.85" y2="10.25" />' +
+  '<line x1="10.06" y1="7.68" x2="18.03" y2="11.67" />' +
+  '<line x1="7.44" y1="8.99" x2="12.2" y2="11.37" />' +
+  '</g></svg>';
