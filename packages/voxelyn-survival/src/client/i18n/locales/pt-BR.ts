@@ -840,4 +840,14 @@ export const PT_BR = {
   'training.incomplete.body':
     'Extração sem carga. O contrato do exercício pede o Núcleo na plataforma — a companhia registra a saída, mas não homologa. Repita a operação.',
   'training.incomplete.retry': 'REPETIR EXERCÍCIO',
+
+  // ---------------------------------------------------------------------
+  // Arquivo desbloqueado (o aviso, nao o painel)
+  //
+  // Curto por medida: o cartao avisa, quem le e o documento. 'LIBERADO'
+  // e a voz da companhia — ela nao presenteia, ela autoriza acesso.
+  // ---------------------------------------------------------------------
+  'lore.toast.unlocked': 'ARQUIVO LIBERADO',
+  'lore.toast.debut': 'PRIMEIRO ARQUIVO',
+  'lore.toast.open': 'abrir documento',
 } as const;

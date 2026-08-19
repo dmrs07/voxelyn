@@ -572,6 +572,133 @@
           radial-gradient(140% 140% at 50% 50%, transparent 64%, rgba(0, 0, 0, 0.55) 100%);
         box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.45);
       }
+
+      /* ----------------------------------------------------------------
+         Arquivo desbloqueado: o aviso que tira o lore do painel.
+         O digest de leitura mostrou 20 de 28 perfis que nunca abriram um
+         fragmento sequer — o problema nunca foi o tamanho do texto, foi o
+         primeiro clique. Este cartao leva o primeiro contato ate onde o
+         jogador ja esta olhando.
+         Mesmo tubo do terminal de campo: fosforo teal, varredura por cima
+         e vinheta. Discreto de proposito — ele avisa, nao interrompe.
+         ---------------------------------------------------------------- */
+      #lore-toasts {
+        position: fixed;
+        right: calc(12px + env(safe-area-inset-right));
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        z-index: 61;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        pointer-events: none;
+      }
+      .lore-toast {
+        pointer-events: auto;
+        position: relative;
+        overflow: hidden;
+        display: block;
+        width: min(340px, calc(100vw - 24px));
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+        padding: 9px 12px 10px;
+        border: 1px solid var(--ax-teal-dim);
+        background: rgba(6, 14, 13, 0.94);
+        color: var(--ax-teal-mute);
+        box-shadow:
+          0 0 0 1px rgba(3, 5, 5, 0.6),
+          0 10px 26px rgba(0, 0, 0, 0.55);
+        opacity: 0;
+        transform: translateY(6px);
+        transition:
+          opacity 260ms ease,
+          transform 260ms ease;
+      }
+      .lore-toast.is-in {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .lore-toast.is-leaving {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      /* O vidro do tubo: varredura dominante na horizontal, triade so
+         insinuada na vertical. Decoracao, entao nunca captura o clique. */
+      .lore-toast::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 4px),
+          repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 3px);
+      }
+      .lore-toast::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(80% 40% at 50% 0%, rgba(143, 240, 230, 0.08), transparent 64%);
+      }
+      .lore-toast:hover,
+      .lore-toast:focus-visible {
+        border-color: var(--ax-teal);
+        color: var(--ax-teal-bright);
+      }
+      .lore-toast-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 3px;
+      }
+      .lore-toast-tag {
+        font-size: 9px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--ax-teal);
+        text-shadow: 0 0 12px rgba(79, 214, 201, 0.45);
+      }
+      .lore-toast-code {
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        color: var(--ax-teal-dim);
+      }
+      .lore-toast-title {
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--ax-text-bright);
+      }
+      /* So a estreia carrega corpo: e o unico cartao que existe para ser
+         LIDO, e nao apenas notado. */
+      .lore-toast-body {
+        margin: 6px 0 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--ax-teal-mute);
+      }
+      .lore-toast-cta {
+        margin-top: 7px;
+        font-size: 9px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ax-gold-dim);
+      }
+      .lore-toast:hover .lore-toast-cta,
+      .lore-toast:focus-visible .lore-toast-cta {
+        color: var(--ax-gold);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .lore-toast {
+          transition: none;
+          transform: none;
+        }
+        .lore-toast.is-in,
+        .lore-toast.is-leaving {
+          transform: none;
+        }
+      }
       .hidden {
         display: none !important;
       }
@@ -2224,6 +2351,67 @@
           white-space: normal;
         }
       }
+
+      /* ------------------------------------------------------------------
+         Leitura de documento em tela pequena.
+         ------------------------------------------------------------------
+         O Codex e um acordeao: a lista inteira fica na tela e o corpo abre
+         DENTRO dela. Em 390px isso vira um funil — cada ficha fechada gasta
+         tres linhas (codigo, titulo, resumo), e o documento aberto herda o
+         que sobrou. Trocar de documento vira rolagem as cegas.
+
+         A correcao nao aumenta a folha, ela reparte a folha de outro jeito:
+         a lista encolhe para INDICE (uma linha de resumo por ficha) e o
+         documento aberto fica com a area que a lista devolveu. Somado ao
+         painel de carteira, que nao tem o que dizer enquanto se le, o
+         documento ganha a tela quase inteira sem nenhuma navegacao nova.
+         ------------------------------------------------------------------ */
+      @media (max-width: 700px), (max-height: 560px) {
+        /* Minerio, nucleos, geracao e protocolos sao da OUTRA aba. Enquanto o
+           Codex esta aberto eles so ocupam o topo. */
+        .ax-head-stats.is-codex {
+          display: none;
+        }
+        #matrix-body .codex-doc {
+          margin: 6px 0;
+          padding: 6px 8px;
+        }
+        /* O resumo fica, cortado em uma linha: ele e o que faz escolher qual
+           documento abrir, entao esconde-lo transformaria a lista numa fileira
+           de codigos. Uma linha preserva o faro e devolve a altura. */
+        #matrix-body .codex-doc:not(.is-open):not(.codex-locked) > .sub {
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        /* O aberto e o unico que cresce: mais respiro, entrelinha de leitura
+           longa, e a barra lateral em teal para dizer onde se esta na pilha. */
+        #matrix-body .codex-doc.is-open {
+          border-left-color: var(--ax-teal);
+          padding: 8px 10px 12px;
+        }
+        #matrix-body .codex-doc.is-open .codex-body {
+          margin: 8px 0;
+          line-height: 1.7;
+        }
+      }
+      /* Em retrato o trilho vira barra INFERIOR de 56px, e o cartao ancorado
+         em baixo a direita cobria os botoes de navegacao enquanto estivesse na
+         tela. A folga tira o cartao de cima do trilho; em jogo, com o menu
+         fechado, ela so o levanta um pouco. */
+      @media (max-width: 700px) {
+        #lore-toasts {
+          bottom: calc(68px + env(safe-area-inset-bottom));
+        }
+      }
+
+      /* O cabecalho sobe para o topo da area de rolagem ao abrir (ver
+         `renderMatrixPanel`); a margem impede que ele encoste na borda. */
+      .codex-doc-header {
+        scroll-margin-top: 10px;
+      }
     </style>
   </head>
   <body>
@@ -2742,6 +2930,9 @@
     </div>
 
     <div id="banner" class="hidden"></div>
+
+    <!-- Onde os avisos de arquivo desbloqueado nascem. Vazio ate o primeiro. -->
+    <div id="lore-toasts"></div>
 
     <script type="module" src="./src/client/main.ts"></script>
   </body>
