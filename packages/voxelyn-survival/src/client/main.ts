@@ -53,7 +53,8 @@ import {
   requestRunTicketWithSession,
   settleRun,
 } from './progression-api';
-import { readCachedProfile, writeCachedProfile } from './progression-cache';
+import { cachedUnlockBaseline, readCachedProfile, writeCachedProfile } from './progression-cache';
+import { LoreToasts, newlyUnlocked } from './lore-toast';
 import { SettlementQueue } from './settlement-queue';
 import { LatestQuery, type Query } from './latest-query';
 import { renderRecordsPanel, type RecordsCodexLink } from './records-panel';
@@ -528,6 +529,16 @@ const authorizeExpedition = async (
 };
 
 /**
+ * A geracao de avisos de lore em curso.
+ *
+ * Declarada AQUI, acima do primeiro leitor, e nao junto do cartao la embaixo:
+ * `transmitSettlement` chega a ser chamada por `refreshProfile`, e um `let`
+ * lido antes da sua propria linha de inicializacao e um ReferenceError, nao um
+ * zero. `resetRunTracking()` a incrementa; ver a chamada la.
+ */
+let loreEpoch = 0;
+
+/**
  * Envia o que o jogador apertou, e mostra o que o SERVIDOR decidiu.
  *
  * Repare no que nao e enviado: minerio, nucleo, fase, tempo. O servidor
@@ -535,6 +546,18 @@ const authorizeExpedition = async (
  */
 /** Envia (ou reenvia) uma liquidacao. Idempotente do lado do servidor. */
 const transmitSettlement = (url: string, runId: string, log: string): void => {
+  // O RETRATO E TIRADO AGORA, e nao quando a resposta chega.
+  //
+  // Entre o pedido e a resposta, outra coisa pode gravar o cache com o perfil
+  // JA liquidado: `refreshProfile()` (a Matriz aberta na espera) e
+  // `openSession()` (o jogador autorizando a descida seguinte) escrevem os dois.
+  // Lido depois, o "antes" ja conteria os desbloqueios novos, o delta sairia
+  // vazio, e o aviso que existe para isto sumiria em silencio.
+  //
+  // A epoca acompanha pelo mesmo motivo, do outro lado do tempo: ver
+  // `announceLoreUnlocks`.
+  const knownLore = cachedUnlockBaseline();
+  const bornInEpoch = loreEpoch;
   void settleRun(url, runId, log).then((result) => {
     if (!result.ok) {
       // GUARDA para reenviar, CHAVEADO POR runId.
@@ -552,6 +575,11 @@ const transmitSettlement = (url: string, runId: string, log: string): void => {
     // So o proprio runId sai do mapa. Ver o comentario da falha, acima.
     pendingSettlements.settled(runId);
     writeCachedProfile(result.value.profile, Date.now());
+    // `url`, e nao `progressionUrl()`: os ids saíram DESTE servidor, e os
+    // corpos precisam sair do mesmo. Quem voltou ao menu e trocou o endereco
+    // enquanto a liquidacao estava no ar buscaria os documentos no servidor
+    // novo com os ids do antigo.
+    announceLoreUnlocks(url, bornInEpoch, knownLore, result.value.profile.unlockedLoreFragmentIds);
     const credited = result.value.result;
     // Tres frases, e nao uma com "+0 NUCLEO" no fim: a extracao antecipada e
     // uma decisao legitima, e anunciar o zero que ela nao trouxe a transforma
@@ -692,6 +720,15 @@ const resetRunTracking = (): void => {
   // para a proxima, porque os ids de entidade sao reciclados. Ver
   // `resetRunPresentation`.
   renderer.resetRunPresentation();
+  // O cartao de arquivo liberado tambem morre aqui. Ele nasce da liquidacao,
+  // que resolve depois do fim da run — quem aperta R rapido levaria o aviso da
+  // expedicao anterior para dentro da proxima descida.
+  //
+  // `clear()` sozinho nao bastava: ele varre o que JA existe, e a liquidacao (ou
+  // a busca do codex) ainda no ar entregaria o cartao depois, dentro da descida
+  // nova. A epoca invalida o que estava a caminho.
+  loreEpoch += 1;
+  loreToasts.clear();
 };
 
 // ---------------------------------------------------------------------------
@@ -2317,6 +2354,66 @@ const refreshCodex = async (): Promise<void> => {
   matrixView.codex = result.ok ? result.value : null;
   matrixView.codexNotice = result.ok ? null : failureNotice(result);
   drawMatrix();
+};
+
+/**
+ * O aviso de arquivo liberado.
+ *
+ * Mora aqui, e nao no painel, porque o problema que ele resolve e o painel: o
+ * digest de leitura mostrou 21 de 28 perfis que nunca abriram um documento. O
+ * cartao leva o primeiro contato ate onde o jogador ja esta olhando, e clicar
+ * nele abre a Matriz JA no documento — a navegacao sai do caminho.
+ */
+const loreToasts = new LoreToasts(document.getElementById('lore-toasts') as HTMLDivElement, {
+  ui: () => audio.ui(),
+  onOpen: (id) => {
+    // O mesmo caminho de "Ver docs" no Registro, menos o retorno: nao ha
+    // painel anterior para voltar, o cartao veio da tela de fim de expedicao.
+    matrixView.tab = 'codex';
+    matrixView.codexContext = { kind: 'all' };
+    matrixView.codexReturn = false;
+    matrixView.notice = null;
+    openCodexDocument(id);
+    drawMatrix();
+    openOverlay(matrixOverlay);
+    void refreshCodex();
+    void refreshProfile();
+  },
+});
+
+/**
+ * Anuncia o que a liquidacao acabou de liberar.
+ *
+ * A resposta da liquidacao traz o perfil inteiro e nenhum delta, entao quem
+ * descobre a novidade e o cliente, comparando com o perfil em cache ANTES da
+ * escrita. Titulo e corpo nao estao no perfil (so os ids), e por isso o codex
+ * e buscado — mas so quando existe algo novo para mostrar, nunca por rotina.
+ */
+const announceLoreUnlocks = (
+  serverUrl: string,
+  bornInEpoch: number,
+  before: readonly string[] | null | undefined,
+  after: readonly string[] | null | undefined,
+): void => {
+  const fresh = new Set(newlyUnlocked(before, after));
+  if (fresh.size === 0) return;
+  void fetchCodex(serverUrl, getLocale()).then((result) => {
+    // Uma descida nova comecou enquanto isto voltava: o aviso perdeu a hora.
+    if (!result.ok || bornInEpoch !== loreEpoch) return;
+    loreToasts.push(
+      // A ordem e a do indice do servidor (cronologia), e nao a da lista de
+      // desbloqueados: se dois arquivos cairem na mesma run, eles chegam na
+      // ordem em que a historia os conta.
+      result.value.unlocked
+        .filter((fragment) => fresh.has(fragment.id))
+        .map((fragment) => ({
+          id: fragment.id,
+          code: fragment.documentCode,
+          title: fragment.title,
+          body: fragment.body,
+        })),
+    );
+  });
 };
 
 const matrixHandlers: MatrixHandlers = {

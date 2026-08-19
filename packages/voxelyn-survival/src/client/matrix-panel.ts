@@ -263,6 +263,10 @@ const headStat = (label: MessageKey, value: string, note: string): HTMLElement =
 const renderHeadStats = (view: MatrixViewState): void => {
   const host = document.getElementById('matrix-head-stats');
   if (!host) return;
+  // A carteira nao tem o que dizer enquanto se le um documento. Em tela
+  // pequena a folha inteira e a area de leitura, e o CSS usa esta classe para
+  // devolver o topo ao texto. Ver "Leitura de documento em tela pequena".
+  host.classList.toggle('is-codex', view.tab === 'codex');
   host.textContent = '';
   const profile = view.profile;
   host.appendChild(
@@ -618,8 +622,8 @@ const renderFragment = (
   /** Ids visiveis sob o filtro atual; null = sem filtro. Ver o link de relacionado. */
   contextIds: ReadonlySet<string> | null = null,
 ): HTMLElement => {
-  const card = el('article', 'codex-doc');
   const open = openDocId === fragment.id;
+  const card = el('article', `codex-doc${open ? ' is-open' : ''}`);
 
   // O cabecalho e um BOTAO: abrir o documento e a acao que marca leitura, e
   // precisa ser alcancavel por teclado e anunciada por leitor de tela.
@@ -639,7 +643,15 @@ const renderFragment = (
     // `renderCodexTab` — a mesma porta usada pelo link de relacionado e pela
     // navegacao "Ver docs". Uma porta so, para a bolinha nao depender do
     // caminho que abriu o corpo.
-    openDocId = openDocId === fragment.id ? null : fragment.id;
+    const opening = openDocId !== fragment.id;
+    openDocId = opening ? fragment.id : null;
+    // ABRIR pede o topo da area de rolagem; FECHAR nao mexe em nada.
+    //
+    // Sem isto, um documento no meio da lista abre um corpo inteiro ABAIXO da
+    // dobra: em tela pequena o jogador ve o cabecalho que acabou de tocar e
+    // precisa rolar as cegas para achar a primeira linha. Subir o cabecalho
+    // transforma o resto da folha em area de leitura sem custo de navegacao.
+    if (opening) focusDocId = fragment.id;
     redraw();
   });
   card.appendChild(header);
@@ -682,6 +694,23 @@ const renderFragment = (
     }
   }
   return card;
+};
+
+/**
+ * Sobe o documento ate o topo da AREA DE ROLAGEM DO CODEX, e de nada mais.
+ *
+ * Um delta sobre `scrollTop` do proprio container: nenhum ancestral se move, e
+ * o cabecalho da folha continua onde estava. Sem container (layout futuro, ou
+ * teste sem CSS), cai no comportamento minimo do navegador.
+ */
+const scrollDocToTop = (doc: HTMLElement): void => {
+  const scroller = doc.closest('.matrix-body');
+  const card = doc.closest('.codex-doc') ?? doc;
+  if (!(scroller instanceof HTMLElement)) {
+    doc.scrollIntoView?.({ block: 'nearest' });
+    return;
+  }
+  scroller.scrollTop += card.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
 };
 
 const renderCodexTab = (
@@ -840,8 +869,14 @@ export const renderMatrixPanel = (
     );
     focusDocId = null;
     if (doc) {
-      doc.focus();
-      doc.scrollIntoView?.({ block: 'nearest' });
+      // `preventScroll`, e a rolagem feita a mao logo abaixo.
+      //
+      // `scrollIntoView` sozinho parecia certo e nao era: ele sobe a arvore
+      // inteira e rola TAMBEM o que tem `overflow: hidden` — a folha da Matriz.
+      // O titulo e as abas saiam de vista e nao voltavam, porque um container
+      // escondido nao tem barra para o jogador arrastar de volta.
+      doc.focus({ preventScroll: true });
+      scrollDocToTop(doc);
       return;
     }
   }

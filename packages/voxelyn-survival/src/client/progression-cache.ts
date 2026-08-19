@@ -83,3 +83,28 @@ export const CACHE_STALE_MS = 24 * 60 * 60 * 1000;
 
 export const isStale = (cached: CachedProgressionProfile, nowMs: number): boolean =>
   nowMs - cached.cachedAt > CACHE_STALE_MS;
+
+/**
+ * A lista de desbloqueados COMO ELA FOI GRAVADA, sem o preenchimento.
+ *
+ * `readCachedProfile` completa campos narrativos ausentes com vazio, e isso e
+ * certo la: o objetivo dela e o desenho nao explodir. Aqui seria desastroso.
+ * Um cache gravado antes de os campos narrativos existirem viraria "este perfil
+ * nao tinha documento nenhum", e a liquidacao seguinte anunciaria os doze de
+ * uma vez como se fossem novidade.
+ *
+ * `null` significa "nao da para saber o que ele tinha" — cache ausente,
+ * ilegivel, ou de uma versao anterior aos campos. Nao saber e motivo para ficar
+ * calado, nunca para supor o vazio.
+ */
+export const cachedUnlockBaseline = (): readonly string[] | null => {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    const ids = (parsed as CachedProgressionProfile | null)?.profile?.unlockedLoreFragmentIds;
+    return Array.isArray(ids) ? ids : null;
+  } catch {
+    return null;
+  }
+};

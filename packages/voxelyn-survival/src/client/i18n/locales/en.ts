@@ -825,4 +825,14 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'training.incomplete.body':
     'Extraction with empty cargo. The exercise contract wants the Core on the platform — the company logs the exit, but does not certify it. Repeat the operation.',
   'training.incomplete.retry': 'REPEAT DRILL',
+
+  // ---------------------------------------------------------------------
+  // Arquivo desbloqueado (o aviso, nao o painel)
+  //
+  // Curto por medida: o cartao avisa, quem le e o documento. 'LIBERADO'
+  // e a voz da companhia — ela nao presenteia, ela autoriza acesso.
+  // ---------------------------------------------------------------------
+  'lore.toast.unlocked': 'FILE RELEASED',
+  'lore.toast.debut': 'FIRST FILE',
+  'lore.toast.open': 'open document',
 };
