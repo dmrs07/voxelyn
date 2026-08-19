@@ -13,7 +13,9 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { DISCOVERY_MASK } from '@voxelyn/survival-sim';
-import { SubmissionRateLimiter, readJsonBody, requestRateLimitKey } from './http-util.js';
+import { SubmissionRateLimiter, readJsonBody, requestRateLimitKey,
+  operatorTokenMatches,
+} from './http-util.js';
 import type { RunOutcome, TelemetryEvent, TelemetryStore } from './telemetry.js';
 
 /** Corpo maximo. Um evento cabe em ~400 bytes; o resto e margem. */
@@ -149,7 +151,7 @@ export const createTelemetryHandler = (opts: TelemetryHttpOptions) => {
     }
 
     if (req.method === 'GET') {
-      if (!opts.digestToken || url.searchParams.get('token') !== opts.digestToken) {
+      if (!operatorTokenMatches(opts.digestToken, url, req)) {
         json(res, 404, { error: 'nao encontrado' });
         return true;
       }
