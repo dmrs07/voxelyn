@@ -1,4 +1,18 @@
-import { CATS, HACK_TICKS, HOURS_PER_TICK, JUDGES, TREATS_START } from '../sim/index.js';
+import {
+  BOLINHA,
+  HACK_TICKS,
+  HOURS_PER_TICK,
+  JUDGES,
+  PEIXINHO,
+  SPEC_LABEL,
+  TIER_LABEL,
+  TRAIT_LABEL,
+  TREATS_START,
+  fmtCost,
+  type Candidate,
+  type TraitId,
+} from '../sim/index.js';
+import type { Cat } from '../sim/types.js';
 import type { CatId, HackState, SimEvent, Task } from '../sim/types.js';
 
 /**
@@ -118,9 +132,14 @@ export type Hud = {
    * tocava "cortar" e nada acontecia. Botao que existe fica existindo.
    */
   rows: Map<string, TaskRow>;
+  /** Containers que bindTeam preenche a cada run. */
+  teamBar: HTMLElement;
+  abilityRow: HTMLElement;
   onCut: (taskId: string) => void;
   onFeedToggle: () => void;
   onChoose: (task: string, option: string) => void;
+  onSelect: (cat: CatId) => void;
+  onAbility: (cat: CatId) => void;
 };
 
 export const createHud = (
@@ -235,30 +254,11 @@ export const createHud = (
   });
   dock.append(dockHead, dockNow, dockMeters.energia.row, dockMeters.estresse.row, dockMeters.moral.row, dockDetails);
 
-  // A BARRA DA EQUIPE: quatro retratos na borda esquerda. Selecionar um gato
-  // nao exige cacar 22 pixels em movimento.
+  // A BARRA DA EQUIPE e as HABILIDADES de palco: containers vazios aqui —
+  // o time agora e GERADO por run, e bindTeam preenche a cada recrutamento.
   const teamBar = el('div', 'team-bar');
   const teamBtns = new Map<CatId, HTMLButtonElement>();
-  const TEAM_SWATCH: Record<CatId, string> = {
-    bigode: '#e6dac4',
-    cheeto: '#e8943e',
-    almofada: '#8e8e98',
-    smoking: '#2c2a32',
-  };
-  for (const c of CATS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'team-btn';
-    const sw = el('span', 'team-swatch');
-    sw.style.background = TEAM_SWATCH[c.id];
-    b.append(sw, el('span', 'team-name', c.name.toLowerCase()));
-    b.addEventListener('click', () => handlers.onSelect(c.id));
-    teamBtns.set(c.id, b);
-    teamBar.appendChild(b);
-  }
 
-  // O PALCO. Gauge da plateia, relogio e UMA habilidade por gato — cada uma
-  // com palavra propria, porque cada gato faz uma gracinha diferente.
   const pitchPanel = el('div', 'pitch-panel');
   pitchPanel.hidden = true;
   pitchPanel.appendChild(el('div', 'pitch-title', 'O PITCH — segura a plateia!'));
@@ -269,24 +269,7 @@ export const createHud = (
   const pitchCrisis = el('div', 'pitch-crisis', 'A DEMO TRAVOU! qualquer gato improvisa!');
   pitchCrisis.hidden = true;
   const abilityRow = el('div', 'pitch-abilities');
-  const ABILITY_WORD: Record<CatId, string> = {
-    bigode: 'encarada',
-    cheeto: 'cacar cursor',
-    almofada: 'ronronar',
-    smoking: 'paozinho',
-  };
   const pitchBtns = new Map<CatId, HTMLButtonElement>();
-  for (const c of CATS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'soft-btn pitch-ability';
-    const sw = el('span', 'team-swatch');
-    sw.style.background = TEAM_SWATCH[c.id];
-    b.append(sw, el('span', 'btn-word', `${c.name.toLowerCase()}: ${ABILITY_WORD[c.id]}`));
-    b.addEventListener('click', () => handlers.onAbility(c.id));
-    pitchBtns.set(c.id, b);
-    abilityRow.appendChild(b);
-  }
   pitchPanel.append(gaugeBar, pitchTimer, pitchCrisis, abilityRow);
 
   // O PAINEL DE SOM: cinco faixas independentes, com palavra, atras de botao.
@@ -332,7 +315,7 @@ export const createHud = (
   hint.setAttribute('role', 'status');
   host.appendChild(hint);
 
-  return {
+  const hudRef: Hud = {
     root,
     clock,
     remain,
@@ -360,8 +343,56 @@ export const createHud = (
     pitchCrisis,
     pitchBtns,
     rows: new Map(),
+    teamBar,
+    abilityRow,
     ...handlers,
   };
+  return hudRef;
+};
+
+const CSS_HEX = (v: number): string => `#${v.toString(16).padStart(6, '0')}`;
+
+/** O estilo de palco de cada personalidade — a palavra do botao. */
+const ABILITY_WORD: Record<string, string> = {
+  perfeccionista: 'encarada',
+  cowboy: 'cacar cursor',
+  calmo: 'ronronar',
+  'julga-em-silencio': 'paozinho',
+};
+
+/**
+ * Constroi retratos e habilidades para O TIME DESTA RUN. Chamado a cada
+ * recrutamento; o quadro de tarefas tambem renasce (o projeto mudou).
+ */
+export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
+  hud.teamBar.replaceChildren();
+  hud.teamBtns.clear();
+  hud.abilityRow.replaceChildren();
+  hud.pitchBtns.clear();
+  hud.rows.clear();
+  hud.board.replaceChildren();
+  hud.feedPanel.replaceChildren();
+  for (const c of cats) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'team-btn';
+    const sw = el('span', 'team-swatch');
+    sw.style.background = CSS_HEX(c.coat.body);
+    b.append(sw, el('span', 'team-name', c.name.toLowerCase()));
+    b.addEventListener('click', () => hud.onSelect(c.id));
+    hud.teamBtns.set(c.id, b);
+    hud.teamBar.appendChild(b);
+
+    const pb = document.createElement('button');
+    pb.type = 'button';
+    pb.className = 'soft-btn pitch-ability';
+    const psw = el('span', 'team-swatch');
+    psw.style.background = CSS_HEX(c.coat.body);
+    pb.append(psw, el('span', 'btn-word', `${c.name.toLowerCase()}: ${ABILITY_WORD[c.personality] ?? 'gracinha'}`));
+    pb.addEventListener('click', () => hud.onAbility(c.id));
+    hud.pitchBtns.set(c.id, pb);
+    hud.abilityRow.appendChild(pb);
+  }
 };
 
 const TRACK_LABEL: Record<string, string> = {
@@ -455,7 +486,7 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 };
 
 const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
-  const name = (id: string): string => CATS.find((c) => c.id === id)?.name ?? id;
+  const name = (id: string): string => state.cats.find((c) => c.id === id)?.name ?? id;
   switch (e.kind) {
     case 'ship':
       return `${name(e.by)} shipou "${e.task}"`;
@@ -501,6 +532,10 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return 'A DEMO TRAVOU AO VIVO! qualquer gato: improvisa!';
     case 'improviso':
       return `${name(e.cat)} transformou o bug em demo improvisada. A plateia AMOU.`;
+    case 'trait-revealed':
+      return `o curriculo nao contava: ${name(e.cat)} e "${TRAIT_LABEL[e.trait as TraitId] ?? e.trait}"`;
+    case 'sponsor-outage':
+      return 'A INTEGRACAO DO SPONSOR CAIU: build fora do ar (leva alguem ao rack)';
     default:
       return null;
   }
@@ -616,19 +651,18 @@ export const drawCard = (hud: Hud, state: HackState, selected: string | null): v
     return;
   }
   const cat = state.cats.find((x) => x.id === selected);
-  const meta = CATS.find((x) => x.id === selected);
-  if (!cat || !meta) {
+  if (!cat) {
     hud.dock.hidden = true;
     return;
   }
   hud.dock.hidden = false;
-  setText(hud.dockName, `${meta.name} · ${meta.specialty}`);
+  setText(hud.dockName, `${cat.name} · ${SPEC_LABEL[cat.specialty]} ${TIER_LABEL(cat.tier)}`);
   setText(hud.dockNow, `agora: ${MODE_LABEL[cat.mode] ?? cat.mode}`);
   hud.dockMeters.energia.fill.style.width = `${Math.round(cat.energy * 100)}%`;
   hud.dockMeters.estresse.fill.style.width = `${Math.round(cat.stress * 100)}%`;
   hud.dockMeters.moral.fill.style.width = `${Math.round(cat.moral * 100)}%`;
   hud.dockHunger.fill.style.width = `${Math.round(cat.hunger * 100)}%`;
-  setText(hud.dockBio, meta.bio);
+  setText(hud.dockBio, cat.bio);
 };
 
 /** A tela final: as tres notas, o veredito e a historia que deu nisso. */
@@ -706,15 +740,85 @@ export const showTitle = (host: HTMLElement, onStart: () => void): void => {
   wrap.appendChild(
     el('p', 'title-brief', 'desafio da organizacao: "plataforma de adocao com IA, acessivel, mas sustentavel". 48 horas. tres juizes. uma mao.')
   );
-  const team = el('div', 'title-team');
-  for (const c of CATS) team.appendChild(el('div', 'team-line', `${c.name} — ${c.bio}`));
-  wrap.appendChild(team);
   wrap.appendChild(
-    el('p', 'title-help', 'arrasta um gato para a mesa dele. segura o dedo em cima = carinho (e o "shipa" do Bigode). petisco = botao. corta escopo no painel de projeto. emergencia? leva alguem ao rack.')
+    el('p', 'title-help', 'primeiro, o RECRUTAMENTO: seis candidatos, tres moedas, um orcamento. depois: arrasta gato para mesa, segura o dedo = carinho, corta escopo no projeto, emergencia = rack.')
   );
-  const start = softButton(ICONS.badge, 'comecar', 'big');
+  const start = softButton(ICONS.badge, 'abrir o e-mail', 'big');
   start.addEventListener('click', onStart);
   wrap.appendChild(start);
+  host.appendChild(wrap);
+};
+
+
+/**
+ * O RECRUTAMENTO, diegetico: um e-mail do recrutador com seis crachas em
+ * anexo. Cada candidato mostra raca, tier, disciplina, DOIS traits (o
+ * terceiro o curriculo nao conta) e o custo nas tres moedas. Contrata-se
+ * 3 ou 4, dentro do orcamento — e uma decisao, nao uma soma obvia.
+ */
+export const showRecruit = (
+  host: HTMLElement,
+  candidates: readonly Candidate[],
+  budget: number,
+  project: { name: string; brief: string; emphasis: string },
+  layoutName: string,
+  onDone: (hired: Candidate[]) => void
+): void => {
+  const wrap = el('div', 'screen recruit');
+  wrap.appendChild(el('h1', 'recruit-title', 'Re: Candidatos para a CATATHON'));
+  wrap.appendChild(
+    el(
+      'p',
+      'recruit-intro',
+      `"separei seis perfis. teu orcamento da para tres ou quatro, dependendo do tier. o desafio desta edicao e ${project.name}: ${project.brief}. a banca vai pesar ${project.emphasis}. teu booth: ${layoutName}."`
+    )
+  );
+
+  const hired = new Set<string>();
+  const spent = (): number =>
+    candidates.filter((c) => hired.has(c.id)).reduce((s, c) => s + c.cost, 0);
+
+  const saldo = el('div', 'recruit-saldo', '');
+  const closeBtn = softButton(ICONS.badge, 'fechar equipe', 'big');
+  const refresh = (): void => {
+    const left = budget - spent();
+    setText(saldo, `saldo: ${fmtCost(Math.max(0, left))}${left < 0 ? ' (ESTOUROU)' : ''} · equipe: ${hired.size}`);
+    closeBtn.disabled = hired.size < 3 || hired.size > 4 || left < 0;
+  };
+
+  const grid = el('div', 'recruit-grid');
+  for (const c of candidates) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'cand-card';
+    const head = el('div', 'cand-head');
+    const sw = el('span', 'team-swatch');
+    sw.style.background = `#${c.coat.body.toString(16).padStart(6, '0')}`;
+    head.append(sw, el('span', 'cand-name', c.name));
+    head.appendChild(el('span', 'cand-tier', TIER_LABEL(c.tier)));
+    card.appendChild(head);
+    card.appendChild(el('div', 'cand-spec', `${SPEC_LABEL[c.specialty]} · ${c.breed}`));
+    const traits = el('div', 'cand-traits');
+    for (const t of c.traits) traits.appendChild(el('span', 'cand-trait', TRAIT_LABEL[t]));
+    traits.appendChild(el('span', 'cand-trait cand-hidden', '???'));
+    card.appendChild(traits);
+    card.appendChild(el('div', 'cand-cv', `"${c.cv}" — ${c.note}`));
+    card.appendChild(el('div', 'cand-cost', fmtCost(c.cost)));
+    card.addEventListener('click', () => {
+      if (hired.has(c.id)) hired.delete(c.id);
+      else hired.add(c.id);
+      card.classList.toggle('hired', hired.has(c.id));
+      refresh();
+    });
+    grid.appendChild(card);
+  }
+  wrap.append(grid, saldo);
+  closeBtn.addEventListener('click', () => {
+    if (closeBtn.disabled) return;
+    onDone(candidates.filter((c) => hired.has(c.id)));
+  });
+  wrap.appendChild(closeBtn);
+  refresh();
   host.appendChild(wrap);
 };
 

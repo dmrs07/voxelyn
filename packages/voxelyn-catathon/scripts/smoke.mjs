@@ -73,9 +73,27 @@ if (earlyCtx) throw new Error('AudioContext criado antes do primeiro gesto');
 const gestures = await page.evaluate(() => getComputedStyle(document.body).touchAction);
 if (gestures !== 'none') throw new Error(`a pagina rola sob o dedo: touch-action=${gestures}`);
 
-// Todo botao tem PALAVRA e alvo >= 44px (licoes de toque, agora portao).
-await page.getByRole('button', { name: 'comecar' }).tap();
+// --- RECRUTAMENTO: o e-mail do recrutador, seis crachas, um orcamento ------
+await page.getByRole('button', { name: 'abrir o e-mail' }).tap();
+await page.waitForTimeout(300);
+const candCount = await page.locator('.cand-card').count();
+if (candCount !== 6) throw new Error(`o recrutador mandou ${candCount} curriculos (esperava 6)`);
+// O botao de fechar equipe NASCE desabilitado: sem equipe nao ha hackathon.
+if (await page.getByRole('button', { name: 'fechar equipe' }).isEnabled()) {
+  throw new Error('da para fechar equipe vazia');
+}
+for (let i = 0; i < 4; i++) await page.locator('.cand-card').nth(i).tap();
+await shot('c1b-recrutamento');
+await page.getByRole('button', { name: 'fechar equipe' }).tap();
 await page.waitForTimeout(400);
+const team = await sim(() => window.catathon.app.state.cats.map((c) => ({ id: c.id, name: c.name, specialty: c.specialty, personality: c.personality })));
+if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
+const bk = team.find((c) => c.specialty === 'backend');
+if (!bk) throw new Error('nenhum backend contratado entre os 4 primeiros (cobertura quebrou)');
+step.push(`recrutados: ${team.map((c) => c.name).join(', ')} — ${await sim(() => window.catathon.app.state.project.name)} no ${await sim(() => window.catathon.app.state.layoutName)}`);
+
+// Todo botao tem PALAVRA e alvo >= 44px (licoes de toque, agora portao).
+await page.waitForTimeout(200);
 const buttons = await page.evaluate(() =>
   Array.from(document.querySelectorAll('button'))
     .filter((b) => b.offsetParent !== null)
@@ -107,14 +125,14 @@ step.push('decisao pelo dedo: b1 = monolito felino');
 await page.getByRole('button', { name: 'projeto' }).tap();
 
 // --- EQUIPE: selecionar pelo retrato abre a ficha COMPACTA no rodape -------
-await page.locator('.team-bar button', { hasText: 'almofada' }).tap();
+await page.locator('.team-bar button').nth(2).tap();
 await page.waitForTimeout(250);
 if (!(await page.locator('.cat-dock').isVisible())) throw new Error('a ficha compacta nao abriu');
 const dockBox = await page.locator('.cat-dock').boundingBox();
 const vp = page.viewportSize();
 if (dockBox.y < vp.height * 0.4) throw new Error('a ficha compacta invadiu a area jogavel do topo');
 step.push(`ficha compacta no rodape: ${await page.locator('.dock-name').textContent()}`);
-await page.locator('.team-bar button', { hasText: 'almofada' }).tap();
+await page.locator('.team-bar button').nth(2).tap();
 
 // O feed e uma FAIXA unica (historico atras de toque), nao uma pilha.
 if (!(await page.locator('.feed-strip').isVisible())) throw new Error('a faixa de feed nao existe');
@@ -128,10 +146,10 @@ const stageScale = Math.min(box.width / 480, box.height / 270);
 const stageOffX = box.x + (box.width - 480 * stageScale) / 2;
 const stageOffY = box.y + (box.height - 270 * stageScale) / 2;
 const toClient = (sx, sy) => [stageOffX + sx * stageScale, stageOffY + sy * stageScale];
-const catPos = await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
+const catPos = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { x: c.x, y: c.y };
-});
+}, bk.id);
 const drag = async (fromX, fromY, toX, toY) => {
   const [cx, cy] = toClient(fromX, fromY);
   const [tx, ty] = toClient(toX, toY);
@@ -154,18 +172,25 @@ const drag = async (fromX, fromY, toX, toY) => {
   );
 };
 const deskPos = await sim(() => {
-  const s = window.catathon.slots.find((x) => x.id === 'desk-backend');
+  const s = window.catathon.app.state.slots.find((x) => x.id === 'desk-backend');
   return { x: s.x, y: s.y };
 });
 await drag(catPos.x, catPos.y - 4, deskPos.x, deskPos.y);
 await page.waitForTimeout(1200);
-const afterDrag = await sim(() => {
-  const app = window.catathon.app;
-  const c = app.state.cats.find((x) => x.id === 'bigode');
+const afterDrag = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { slot: c.slot, mode: c.mode };
-});
-step.push(`arrasto: bigode slot=${afterDrag.slot} mode=${afterDrag.mode}`);
-if (afterDrag.slot !== 'desk-backend') throw new Error('arrastar nao colocou o gato na mesa');
+}, bk.id);
+step.push(`arrasto: ${bk.name} slot=${afterDrag.slot} mode=${afterDrag.mode}`);
+if (afterDrag.slot !== 'desk-backend') {
+  const dbgS = await page.evaluate((id) => {
+    const app = window.catathon.app;
+    const c = app.state.cats.find((x) => x.id === id);
+    return { held: app.state.held, mode: c.mode, x: c.x, y: c.y, slot: c.slot, inX: app.input.x, inY: app.input.y, inDown: app.input.down, q: app.input.queue.length, handX: app.state.handX, handY: app.state.handY, tick: app.state.tick, phase: app.phase };
+  }, bk.id);
+  console.error('DEBUG', JSON.stringify(dbgS), 'catPos', JSON.stringify(catPos), 'deskPos', JSON.stringify(deskPos));
+  throw new Error('arrastar nao colocou o gato na mesa');
+}
 
 // O quadro ANDA: b1 progride com o especialista na mesa.
 await page.waitForTimeout(1500);
@@ -174,11 +199,11 @@ step.push(`b1 progrediu: ${Math.round(progress)} unidades`);
 if (progress <= 0) throw new Error('a mesa nao produz');
 
 // --- CARINHO: segurar o dedo parado em cima do gato ------------------------
-const energyBeforePet = await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
+const energyBeforePet = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   c.stress = 0.7;
   return c.energy;
-});
+}, bk.id);
 const [px2, py2] = toClient(deskPos.x, deskPos.y - 6);
 await page.evaluate(
   async ([x, y]) => {
@@ -193,10 +218,10 @@ await page.evaluate(
   },
   [px2, py2]
 );
-const petOut = await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
+const petOut = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { stress: c.stress, energy: c.energy };
-});
+}, bk.id);
 step.push(`carinho: estresse 0.70 -> ${petOut.stress.toFixed(2)}`);
 if (petOut.stress >= 0.68) throw new Error('segurar o dedo nao faz carinho');
 // O EXPLOIT morto continua morto: carinho NAO recupera energia.
@@ -206,11 +231,11 @@ await shot('c2-jogando');
 
 // --- PETISCO: botao com palavra, depois toque no gato ----------------------
 await page.getByRole('button', { name: /petisco/ }).tap();
-const cheeto = await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'cheeto');
+const eater = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { x: c.x, y: c.y };
-});
-const [fx, fy] = toClient(cheeto.x, cheeto.y - 4);
+}, team[1].id);
+const [fx, fy] = toClient(eater.x, eater.y - 4);
 await page.touchscreen.tap(fx, fy);
 await page.waitForTimeout(300);
 const treats = await sim(() => window.catathon.app.state.treats);
@@ -221,7 +246,9 @@ if (treats !== 2) throw new Error(`petisco nao desceu: ${treats}`);
 const boardHidden = await page.evaluate(() => document.querySelector('.hud-board').hidden);
 if (!boardHidden) throw new Error('o quadro nasce aberto e cobre o pavilhao');
 await page.getByRole('button', { name: 'projeto' }).tap();
-await page.locator('.task', { hasText: 'autoscaling' }).getByRole('button', { name: 'cortar' }).tap();
+// O rotulo de o3 e GERADO por run: corta pelo nome real do quadro.
+const o3Label = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').label);
+await page.locator('.task', { hasText: o3Label }).getByRole('button', { name: 'cortar' }).tap();
 await page.waitForTimeout(300);
 const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').cut);
 step.push(`cortar escopo: o3.cut=${cutOk}`);
@@ -260,11 +287,16 @@ const phasePitch = await sim(() => window.catathon.app.state.phase);
 if (phasePitch !== 'pitch') throw new Error(`as 48h acabaram e o palco nao abriu: phase=${phasePitch}`);
 if (!(await page.locator('.pitch-panel').isVisible())) throw new Error('o painel do pitch nao aparece');
 const g0 = await sim(() => window.catathon.app.state.pitch.gauge);
-await page.locator('.pitch-ability', { hasText: 'ronronar' }).tap();
+// Um gato NAO-cowboy: o cursor do cowboy pode mudar o slide e derrubar o
+// gauge de proposito — gate deterministico pede palco sem risco.
+const safeCat = team.find((c) => c.personality !== 'cowboy') ?? team[0];
+await page.locator('.pitch-ability', { hasText: safeCat.name.toLowerCase() }).tap();
 await page.waitForTimeout(300);
 const g1 = await sim(() => window.catathon.app.state.pitch.gauge);
-if (g1 <= g0) throw new Error(`a habilidade de palco nao mexeu na plateia: ${g0} -> ${g1}`);
-step.push(`pitch: plateia ${g0.toFixed(2)} -> ${g1.toFixed(2)} com um ronrom no microfone`);
+if (safeCat.personality !== 'cowboy' && g1 <= g0) {
+  throw new Error(`a habilidade de palco nao mexeu na plateia: ${g0} -> ${g1}`);
+}
+step.push(`pitch: plateia ${g0.toFixed(2)} -> ${g1.toFixed(2)} com a gracinha de ${safeCat.name}`);
 await shot('c4-pitch');
 await sim(() => {
   window.catathon.app.state.pitch.ticksLeft = 30;

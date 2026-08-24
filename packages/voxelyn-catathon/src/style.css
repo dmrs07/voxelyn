@@ -535,3 +535,43 @@ body {
 .dim-value { font-weight: 800; color: var(--accent); }
 .result-plateia { margin: 0; font-weight: 700; }
 .result-improviso { margin: 0; color: var(--ok); font-weight: 700; }
+
+/* ---------------------------------------------------------- recrutamento */
+
+/* O e-mail do recrutador: seis crachas em anexo, tres moedas, um orcamento. */
+.screen.recruit { max-width: min(720px, 94vw); text-align: left; justify-items: stretch; }
+.recruit-title { margin: 0; color: var(--accent); font-size: 1.15em; }
+.recruit-intro { margin: 0; font-size: 0.88em; opacity: 0.92; font-style: italic; }
+.recruit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.cand-card {
+  pointer-events: auto;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.86em;
+  min-height: 44px;
+}
+.cand-card.hired { border-color: var(--ok); box-shadow: 0 0 10px rgba(120, 214, 140, 0.35); }
+.cand-card:active { transform: scale(0.98); }
+.cand-head { display: flex; align-items: center; gap: 6px; }
+.cand-name { font-weight: 800; }
+.cand-tier { margin-left: auto; font-size: 0.78em; color: var(--accent); text-transform: uppercase; font-weight: 700; }
+.cand-spec { font-size: 0.82em; opacity: 0.9; }
+.cand-traits { display: flex; gap: 4px; flex-wrap: wrap; }
+.cand-trait {
+  background: rgba(246, 228, 200, 0.12);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.74em;
+}
+.cand-trait.cand-hidden { opacity: 0.55; font-style: italic; }
+.cand-cv { font-size: 0.76em; opacity: 0.75; font-style: italic; }
+.cand-cost { font-weight: 700; color: var(--accent); font-size: 0.82em; }
+.recruit-saldo { font-weight: 800; text-align: center; }

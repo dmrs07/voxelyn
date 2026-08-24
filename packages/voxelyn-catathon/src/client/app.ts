@@ -1,5 +1,15 @@
 import { presentToCanvas } from '@voxelyn/core/adapters/canvas2d';
-import { TICK_MS, createHackathon, step } from '../sim/index.js';
+import {
+  CLASSIC_TEAM,
+  RUN_BUDGET,
+  TICK_MS,
+  createHackathon,
+  rollCandidates,
+  rollLayout,
+  rollProject,
+  step,
+  type Candidate,
+} from '../sim/index.js';
 import type { HackState, SimEvent } from '../sim/types.js';
 import {
   createAudioEngine,
@@ -17,7 +27,7 @@ import {
   type BusId,
 } from './audio/index.js';
 import { attachInput, attachKeyboard, buildCommand, createInput, type InputState, type InputTeardown } from './input.js';
-import { clearScreens, createHud, drawCard, drawHud, pushFeed, showResult, showTitle, type Hud } from './hud.js';
+import { bindTeam, clearScreens, createHud, drawCard, drawHud, pushFeed, showRecruit, showResult, showTitle, type Hud } from './hud.js';
 import { createView, drawHand, drawScene, type View } from './render.js';
 
 export type App = {
@@ -29,7 +39,9 @@ export type App = {
   hud: Hud;
   audio: AudioEngine;
   screenHost: HTMLElement;
-  phase: 'title' | 'playing' | 'result';
+  phase: 'title' | 'recruit' | 'playing' | 'result';
+  /** A semente DESTA edicao: candidatos, projeto e layout saem dela. */
+  seed: number;
   accumulator: number;
   lastFrame: number;
   frameHandle: number;
@@ -80,17 +92,37 @@ const tickGame = (app: App): void => {
     // O ritual da submissao: a musica congela, o deploy fala, e o final e
     // festa intima ou feltro gentil — nunca tragedia.
     demoAudio(app.audio, app.state);
-    showResult(app.screenHost, app.state, () => restart(app));
+    showResult(app.screenHost, app.state, () => openRecruit(app));
   }
 };
 
-const restart = (app: App): void => {
+/**
+ * O RECRUTAMENTO abre uma edicao nova: semente nova (daqui saem candidatos,
+ * projeto e layout — a sim nunca ve relogio, so a semente congelada), seis
+ * curriculos na tela, e a equipe contratada entra na run como argumento.
+ */
+const openRecruit = (app: App): void => {
+  clearScreens(app.screenHost);
+  app.phase = 'recruit';
+  app.seed = (Date.now() ^ 0xca7a7040) >>> 0;
+  const project = rollProject(app.seed);
+  const layout = rollLayout(app.seed);
+  showRecruit(
+    app.screenHost,
+    rollCandidates(app.seed),
+    RUN_BUDGET,
+    { name: project.name, brief: project.brief, emphasis: project.emphasis },
+    layout.name,
+    (hired) => startRun(app, hired)
+  );
+};
+
+const startRun = (app: App, team: readonly Candidate[]): void => {
   clearScreens(app.screenHost);
   stopGameAudio(app.audio);
   startGameAudio(app.audio);
-  // A semente vem do relogio UMA vez, aqui no cliente. A simulacao nunca ve
-  // tempo real — so a semente congelada.
-  app.state = createHackathon((Date.now() ^ 0xca7a7040) >>> 0);
+  app.state = createHackathon(app.seed, team);
+  bindTeam(app.hud, app.state.cats);
   app.input.selected = null;
   app.input.queue.length = 0;
   app.phase = 'playing';
@@ -117,7 +149,7 @@ const frame = (app: App, now: number): void => {
     app.hud.root.hidden = false;
   } else {
     app.accumulator = 0;
-    app.hud.root.hidden = app.phase === 'title';
+    app.hud.root.hidden = app.phase === 'title' || app.phase === 'recruit';
   }
 
   drawScene(app.view, app.state, app.state.tick, app.input.selected);
@@ -135,10 +167,12 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   const input = createInput();
   const audio = createAudioEngine();
   const app: App = {
+    seed: 20260821,
     canvas,
     ctx,
     view: createView(),
-    state: createHackathon(20260821),
+    // A cena do titulo: o time classico no booth original.
+    state: createHackathon(20260821, CLASSIC_TEAM, { classic: true }),
     input,
     hud: createHud(hudHost, {
       onCut: (taskId) => input.queue.push({ cut: taskId }),
@@ -169,8 +203,7 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   window.addEventListener('touchstart', () => unlockAudio(app.audio), { once: true, passive: true });
 
   showTitle(screenHost, () => {
-    clearScreens(screenHost);
-    restart(app);
+    openRecruit(app);
   });
 
   return app;
