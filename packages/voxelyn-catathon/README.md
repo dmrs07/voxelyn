@@ -48,6 +48,15 @@ alguem ao rack.
   estabilidade (bugs vivos), experiencia (polimento e a trilha de design). O
   crash da demo e sorteado com o rng da partida: vergonha reprodutivel.
 
+## O som
+
+Sintetizado inteiro, nenhum arquivo de audio. Uma faixa adaptativa em re maior
+com seis camadas ligadas ao ESTADO (trabalho poe o groove, bloqueio poe a
+harmonia suspensa, exaustao filtra o mundo), digitacao procedural por
+personalidade, vozes felinas com regras de escassez, e o ritual da submissao.
+Painel `som` com cinco volumes independentes. Detalhes e decisoes em
+[`docs/audio.md`](docs/audio.md).
+
 ## Disciplina de engenharia
 
 A mesma dos irmaos maiores (Survival, Iliada): simulacao autoritativa sem DOM
@@ -59,7 +68,7 @@ demo crashada, em qualquer semente) e **sabe ser vencida** (um bot decente
 chega ao podio) — e que cada traco de personalidade tem efeito mecanico.
 
 ```bash
-pnpm --filter @voxelyn/catathon test     # 17 testes de simulacao
+pnpm --filter @voxelyn/catathon test     # 31 testes: simulacao + teoria musical
 pnpm --filter @voxelyn/catathon build
 pnpm --filter @voxelyn/catathon smoke    # fumaca de TOQUE: joga so com dedos
 ```

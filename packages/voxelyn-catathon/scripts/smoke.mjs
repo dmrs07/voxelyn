@@ -56,6 +56,11 @@ await page.goto('http://localhost:4189/', { waitUntil: 'networkidle' });
 step.push(`titulo: ${await page.locator('.title-logo').textContent()}`);
 await shot('c1-titulo');
 
+// AUDIO: nenhum AudioContext antes do primeiro gesto (politica de autoplay —
+// e a garantia de que o jogo nao abre ja bloqueado pelo navegador).
+const earlyCtx = await sim(() => window.catathon.app.audio.unlocked);
+if (earlyCtx) throw new Error('AudioContext criado antes do primeiro gesto');
+
 // Gestos de pagina desligados sob o dedo — a base de tudo.
 const gestures = await page.evaluate(() => getComputedStyle(document.body).touchAction);
 if (gestures !== 'none') throw new Error(`a pagina rola sob o dedo: touch-action=${gestures}`);
@@ -163,6 +168,28 @@ const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id =
 step.push(`cortar escopo: o3.cut=${cutOk}`);
 if (!cutOk) throw new Error('cortar nao cortou');
 await shot('c3-quadro');
+
+// --- AUDIO ADAPTATIVO: o grafo responde ao estado, verificavel sem ouvido --
+const audio1 = await sim(() => {
+  const app = window.catathon.app;
+  return { unlocked: app.audio.unlocked, layers: app.audio.debug.layers };
+});
+step.push(`audio: destravado=${audio1.unlocked} camadas=[${audio1.layers.join(',')}]`);
+if (!audio1.unlocked) throw new Error('o toque nao destravou o audio');
+if (!audio1.layers.includes('bed')) throw new Error('a cama harmonica nao esta ativa');
+if (!audio1.layers.includes('work')) throw new Error('ha gato trabalhando e a camada de ritmo nao subiu');
+
+// Bloqueio poe a camada de tensao (harmonia suspensa, nunca buzina).
+await sim(() => {
+  window.catathon.app.state.cableOut = true;
+});
+await page.waitForTimeout(2600); // a troca espera fronteira de compasso
+const audio2 = await sim(() => window.catathon.app.audio.debug.layers);
+if (!audio2.includes('tension')) throw new Error(`cabo mordido sem camada de tensao: [${audio2.join(',')}]`);
+await sim(() => {
+  window.catathon.app.state.cableOut = false;
+});
+step.push(`audio: a camada de tensao respondeu ao bloqueio`);
 
 console.log('\nfumaca de toque do CATATHON (Pixel 7, sem teclado nem mouse)\n');
 for (const line of step) console.log(`  ${line}`);

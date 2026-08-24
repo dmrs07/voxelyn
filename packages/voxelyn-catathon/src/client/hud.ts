@@ -47,7 +47,13 @@ export type Hud = {
 
 export const createHud = (
   host: HTMLElement,
-  handlers: { onCut: (taskId: string) => void; onFeedToggle: () => void }
+  handlers: {
+    onCut: (taskId: string) => void;
+    onFeedToggle: () => void;
+    /** Controle por barramento (direcao §14): musica, efeitos, teclados, ambiente, gatos. */
+    onLevel: (bus: string, level01: number) => void;
+    levels: () => Record<string, number>;
+  }
 ): Hud => {
   const root = el('div', 'hud');
 
@@ -75,7 +81,40 @@ export const createHud = (
   boardBtn.addEventListener('click', () => {
     board.hidden = !board.hidden;
   });
-  root.append(top, board, feed, card);
+
+  // O PAINEL DE SOM: cinco faixas independentes, com palavra, atras de botao.
+  // "Jogar horas sem fadiga auditiva" comeca em poder abaixar exatamente o que
+  // cansa — e um controle por barramento e acessibilidade, nao luxo.
+  const soundBtn = el('button', 'hud-btn', 'som');
+  soundBtn.type = 'button';
+  const soundPanel = el('div', 'hud-sound');
+  soundPanel.hidden = true;
+  const BUS_LABEL: Record<string, string> = {
+    music: 'musica',
+    sfx: 'efeitos',
+    typing: 'teclados',
+    ambience: 'ambiente',
+    vocals: 'gatos',
+  };
+  for (const bus of Object.keys(BUS_LABEL)) {
+    const rowEl = el('label', 'sound-row');
+    rowEl.appendChild(el('span', 'sound-label', BUS_LABEL[bus]));
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '100';
+    slider.value = String(Math.round((handlers.levels()[bus] ?? 1) * 100));
+    slider.setAttribute('aria-label', `volume de ${BUS_LABEL[bus]}`);
+    slider.addEventListener('input', () => handlers.onLevel(bus, Number(slider.value) / 100));
+    rowEl.appendChild(slider);
+    soundPanel.appendChild(rowEl);
+  }
+  soundBtn.addEventListener('click', () => {
+    soundPanel.hidden = !soundPanel.hidden;
+  });
+  top.insertBefore(soundBtn, treatsBtn);
+
+  root.append(top, board, soundPanel, feed, card);
   host.appendChild(root);
   return { root, clock, score, treatsBtn, board, feed, card, rows: new Map(), ...handlers };
 };

@@ -1,7 +1,21 @@
 import { presentToCanvas } from '@voxelyn/core/adapters/canvas2d';
 import { TICK_MS, createHackathon, step } from '../sim/index.js';
 import type { HackState, SimEvent } from '../sim/types.js';
-import { createAudio, setPurr, sfxAlarm, sfxBug, sfxClack, sfxDrop, sfxGrab, sfxMeow, sfxShip, sfxTreat, unlock, type AudioEngine } from './audio.js';
+import {
+  createAudioEngine,
+  demoAudio,
+  eventsAudio,
+  getLevels,
+  grabVocal,
+  setLevel,
+  setPetPurr,
+  startGameAudio,
+  stopGameAudio,
+  tickAudio,
+  unlockAudio,
+  type AudioEngine,
+  type BusId,
+} from './audio/index.js';
 import { attachInput, attachKeyboard, buildCommand, createInput, type InputState, type InputTeardown } from './input.js';
 import { clearScreens, createHud, drawCard, drawHud, pushFeed, showResult, showTitle, type Hud } from './hud.js';
 import { createView, drawHand, drawScene, type View } from './render.js';
@@ -22,58 +36,36 @@ export type App = {
   detach: InputTeardown[];
 };
 
-const playSfx = (app: App, events: SimEvent[]): void => {
-  for (const e of events) {
-    switch (e.kind) {
-      case 'ship':
-      case 'shortcut':
-        sfxShip(app.audio);
-        break;
-      case 'bug':
-        sfxBug(app.audio);
-        break;
-      case 'cable':
-      case 'hairball':
-      case 'build-broken':
-        sfxAlarm(app.audio);
-        break;
-      case 'zoomies':
-        sfxMeow(app.audio);
-        break;
-      case 'treat':
-        sfxTreat(app.audio);
-        break;
-      default:
-        break;
-    }
-  }
-  // Clacks de teclado enquanto alguem trabalha: o som ambiente do hackathon.
-  if (app.state.cats.some((c) => c.mode === 'work') && app.state.tick % 9 === 0 && Math.random() < 0.6) {
-    sfxClack(app.audio);
-  }
-};
-
 const tickGame = (app: App): void => {
   const wasHeld = app.state.held;
   const cmd = buildCommand(app.input, app.state, () => performance.now());
   const events = step(app.state, cmd);
 
-  if (!wasHeld && app.state.held) sfxGrab(app.audio);
-  if (wasHeld && !app.state.held) sfxDrop(app.audio);
-  setPurr(app.audio, app.input.petting !== null && app.state.phase === 'hack');
+  // Pegar um gato PODE arrancar um chirp de reconhecimento — pode: as regras
+  // de escassez (cooldown, vaga global, 1 em 3 silencioso) moram no modulo de
+  // vozes, nao aqui.
+  if (!wasHeld && app.state.held) grabVocal(app.audio, app.state, app.state.held);
 
-  playSfx(app, events);
+  const petted = app.input.petting ? app.state.cats.find((c) => c.id === app.input.petting) ?? null : null;
+  setPetPurr(app.audio, app.state.phase === 'hack' ? petted : null);
+
+  tickAudio(app.audio, app.state);
+  eventsAudio(app.audio, app.state, events);
   pushFeed(app.hud, app.state, events);
 
   if (app.state.phase === 'done') {
     app.phase = 'result';
-    setPurr(app.audio, false);
+    // O ritual da submissao: a musica congela, o deploy fala, e o final e
+    // festa intima ou feltro gentil — nunca tragedia.
+    demoAudio(app.audio, app.state);
     showResult(app.screenHost, app.state, () => restart(app));
   }
 };
 
 const restart = (app: App): void => {
   clearScreens(app.screenHost);
+  stopGameAudio(app.audio);
+  startGameAudio(app.audio);
   // A semente vem do relogio UMA vez, aqui no cliente. A simulacao nunca ve
   // tempo real — so a semente congelada.
   app.state = createHackathon((Date.now() ^ 0xca7a7040) >>> 0);
@@ -116,6 +108,7 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   canvas.height = 270;
 
   const input = createInput();
+  const audio = createAudioEngine();
   const app: App = {
     canvas,
     ctx,
@@ -127,8 +120,10 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
       onFeedToggle: () => {
         input.feedArmed = !input.feedArmed;
       },
+      onLevel: (bus, level) => setLevel(audio, bus as BusId, level),
+      levels: () => getLevels(audio),
     }),
-    audio: createAudio(),
+    audio,
     screenHost,
     phase: 'title',
     accumulator: 0,
@@ -139,7 +134,8 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
 
   app.detach.push(attachInput(input, canvas, () => app.state, () => performance.now()));
   app.detach.push(attachKeyboard(input, () => app.state));
-  window.addEventListener('pointerdown', () => unlock(app.audio), { once: true });
+  window.addEventListener('pointerdown', () => unlockAudio(app.audio), { once: true });
+  window.addEventListener('touchstart', () => unlockAudio(app.audio), { once: true, passive: true });
 
   showTitle(screenHost, () => {
     clearScreens(screenHost);

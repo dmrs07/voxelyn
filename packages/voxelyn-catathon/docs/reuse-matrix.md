@@ -13,6 +13,11 @@ Auditoria feita lendo codigo e testes dos pacotes (nao os READMEs).
 | `voxelyn-survival-server` / `-protocol` | **Fora (por ora)** | Padroes para co-op autoritativo futuro. A sim ja e determinista de proposito. |
 | `voxelyn-atlas-studio` / `voxelforge-*` | **Fora (slice)** | Ferramentas de autoria; entram quando os gatos ganharem atlas assado. |
 
+**Audio do Survival** (3.8k linhas): **referencia estrutural**. Os assentos do
+audio daqui (transport/mixer/voices/grafo adaptativo/ducking/preferencias)
+espelham os de la de proposito, e `docs/audio.md` explica por que a extracao de
+um `voxelyn-audio` compartilhado espera um segundo consumidor.
+
 **RNG**: xorshift32 identico ao `voxelyn-core`, reescrito como funcao pura
 sobre estado serializado — a classe do core guarda estado privado, e um hash
 autoritativo precisa misturar o estado do gerador (mesma razao do `Stream` da
