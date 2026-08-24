@@ -180,8 +180,11 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
     const occupant = state.cats.find((c) => c.slot === cmd.drop && c.id !== cat.id);
     if (occupant && cmd.drop !== 'puff' && cmd.drop !== 'cafe') {
       occupant.slot = null;
-      occupant.mode = 'idle';
-      occupant.targetX = occupant.x + 20;
+      // 'walk' e o unico modo que anda ate o alvo; em 'idle' o desalojado
+      // ficava parado embaixo do recem-chegado, disputando o toque.
+      occupant.mode = 'walk';
+      occupant.targetX = Math.min(450, occupant.x + 20);
+      occupant.targetY = occupant.y;
       // O territorial nao esquece de quem era a mesa.
       if (occupant.quirk === 'territorial') occupant.stress = Math.min(1, occupant.stress + TERRITORIAL_DISPLACED);
     }

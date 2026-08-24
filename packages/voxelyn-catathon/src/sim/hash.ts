@@ -50,6 +50,10 @@ export const hashState = (state: HackState): string => {
     h.str(c.id);
     h.fixed(c.x, HASH_POS);
     h.fixed(c.y, HASH_POS);
+    // Em walk/zoomies o alvo determina as proximas posicoes: sem ele, dois
+    // estados divergentes davam o mesmo hash.
+    h.fixed(c.targetX, HASH_POS);
+    h.fixed(c.targetY, HASH_POS);
     h.fixed(c.energy, HASH_METER);
     h.fixed(c.hunger, HASH_METER);
     h.fixed(c.stress, HASH_METER);

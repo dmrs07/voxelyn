@@ -97,7 +97,13 @@ step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
 // --- ARRASTAR: Bigode para a mesa de backend, so com toque -----------------
 const box = await page.locator('#stage').boundingBox();
-const toClient = (sx, sy) => [box.x + (sx / 480) * box.width, box.y + (sy / 270) * box.height];
+// O canvas usa object-fit: contain: o dedo de verdade toca o bitmap em
+// caixa, nao o elemento inteiro. O mapeamento daqui espelha o do input.ts —
+// antes os dois erravam igual e o erro se cancelava.
+const stageScale = Math.min(box.width / 480, box.height / 270);
+const stageOffX = box.x + (box.width - 480 * stageScale) / 2;
+const stageOffY = box.y + (box.height - 270 * stageScale) / 2;
+const toClient = (sx, sy) => [stageOffX + sx * stageScale, stageOffY + sy * stageScale];
 const catPos = await sim(() => {
   const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
   return { x: c.x, y: c.y };

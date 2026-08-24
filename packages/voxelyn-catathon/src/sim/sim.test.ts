@@ -84,6 +84,24 @@ describe('determinismo', () => {
     }
     expect(hashState(a)).not.toBe(hashState(b));
   });
+
+  it('o alvo de movimento entra no hash: dois estados prestes a divergir divergem JA', () => {
+    const a = createHackathon(9);
+    const b = createHackathon(9);
+    // Mesma posicao, mesmo modo — so o DESTINO difere. No proximo tick as
+    // posicoes divergem; o hash tem de acusar antes.
+    for (const s of [a, b]) {
+      const c = catOf(s, 'bigode')!;
+      c.mode = 'walk';
+      c.targetY = c.y;
+    }
+    catOf(a, 'bigode')!.targetX = 100;
+    catOf(b, 'bigode')!.targetX = 400;
+    expect(hashState(a)).not.toBe(hashState(b));
+    step(a, emptyCommand());
+    step(b, emptyCommand());
+    expect(catOf(a, 'bigode')!.x).not.toBe(catOf(b, 'bigode')!.x);
+  });
 });
 
 describe('a partida sabe ser perdida', () => {
@@ -222,6 +240,24 @@ describe('psicologia felina (cada traco e mecanico)', () => {
     const gainCalmo = calmo.stress - 0.2;
     const gainJulgador = julgador.stress - 0.2;
     expect(gainJulgador).toBeGreaterThan(gainCalmo * 2.5);
+  });
+});
+
+describe('territorio', () => {
+  it('o desalojado ANDA para longe da mesa — nao fica embaixo do novo dono', () => {
+    const state = createHackathon(11);
+    const invader = catOf(state, 'cheeto')!;
+    const owner = catOf(state, 'bigode')!;
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    while (catOf(state, 'bigode')!.mode === 'walk') step(state, emptyCommand());
+    const deskX = owner.x;
+    step(state, { grab: 'cheeto' });
+    step(state, { drop: 'desk-backend' });
+    expect(owner.slot).toBeNull();
+    while (catOf(state, 'bigode')!.mode === 'walk') step(state, emptyCommand());
+    expect(invader.slot).toBe('desk-backend');
+    expect(Math.abs(owner.x - deskX)).toBeGreaterThanOrEqual(18);
   });
 });
 

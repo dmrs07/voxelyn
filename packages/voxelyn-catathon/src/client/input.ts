@@ -84,10 +84,16 @@ export const attachInput = (
   nowMs: () => number
 ): InputTeardown => {
   const toScene = (clientX: number, clientY: number): { x: number; y: number } => {
+    // O canvas usa object-fit: contain — o bitmap 480x270 fica em caixa
+    // dentro do elemento. Mapear pelo retangulo do elemento erra o alvo em
+    // qualquer tela que nao seja 16:9; mapeamos pelo retangulo contido.
     const rect = canvas.getBoundingClientRect();
+    const scale = Math.min(rect.width / 480, rect.height / 270);
+    const offX = rect.left + (rect.width - 480 * scale) / 2;
+    const offY = rect.top + (rect.height - 270 * scale) / 2;
     return {
-      x: ((clientX - rect.left) / rect.width) * 480,
-      y: ((clientY - rect.top) / rect.height) * 270,
+      x: (clientX - offX) / scale,
+      y: (clientY - offY) / scale,
     };
   };
 
