@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>CATATHON — o maior hackathon do mundo</title>
+    <meta name="color-scheme" content="dark" />
+    <!-- Favicon embutido: sem ele, o 404 de /favicon.ico derruba qualquer
+         teste de fumaca que trate erro de console como falha. Licao paga. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23262233'/%3E%3Cpath d='M3 6l2-3 2 2h2l2-2 2 3v5a2 2 0 01-2 2H5a2 2 0 01-2-2z' fill='%23e8943e'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="stage" width="480" height="270" role="img" aria-label="O pavilhao do Catathon, com quatro mesas, um rack de servidores, um puff e o balcao de racao"></canvas>
+      <div id="hud" class="hud-host"></div>
+      <div id="screens" class="screens"></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
