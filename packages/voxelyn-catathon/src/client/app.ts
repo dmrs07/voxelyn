@@ -69,8 +69,8 @@ const tickGame = (app: App): void => {
   tickAudio(app.audio, app.state);
   eventsAudio(app.audio, app.state, events);
   for (const e of events) {
-    if (e.kind === 'hairball' || e.kind === 'cable' || e.kind === 'build-broken') buzz([30, 40, 30]);
-    else if (e.kind === 'ship') buzz(12);
+    if (e.kind === 'hairball' || e.kind === 'cable' || e.kind === 'build-broken' || e.kind === 'demo-glitch') buzz([30, 40, 30]);
+    else if (e.kind === 'ship' || e.kind === 'improviso') buzz(12);
     else if (e.kind === 'treat') buzz([8, 20, 8]);
   }
   pushFeed(app.hud, app.state, events);
@@ -147,6 +147,12 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
       },
       onLevel: (bus, level) => setLevel(audio, bus as BusId, level),
       levels: () => getLevels(audio),
+      // Selecao pelos retratos da equipe: sem cacar 22 pixels em movimento.
+      onSelect: (cat) => {
+        input.selected = input.selected === cat ? null : cat;
+      },
+      onChoose: (task, option) => input.queue.push({ choose: { task, option } }),
+      onAbility: (cat) => input.queue.push({ ability: cat }),
     }),
     audio,
     screenHost,

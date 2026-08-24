@@ -97,6 +97,28 @@ if (new Set(cluster).size !== cluster.length) throw new Error('dois botoes macio
 if (!(await page.locator('.action-bar').isVisible())) throw new Error('a barra de acoes nao existe');
 step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
+// --- DECISAO: a tarefa com escolha nao anda ate decidir pelo projeto -------
+await page.getByRole('button', { name: 'projeto' }).tap();
+await page.locator('.task-choice', { hasText: 'monolito felino' }).tap();
+await page.waitForTimeout(200);
+const chosen = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'b1').chosen);
+if (chosen !== 'monolito') throw new Error(`a decisao nao pegou: chosen=${chosen}`);
+step.push('decisao pelo dedo: b1 = monolito felino');
+await page.getByRole('button', { name: 'projeto' }).tap();
+
+// --- EQUIPE: selecionar pelo retrato abre a ficha COMPACTA no rodape -------
+await page.locator('.team-bar button', { hasText: 'almofada' }).tap();
+await page.waitForTimeout(250);
+if (!(await page.locator('.cat-dock').isVisible())) throw new Error('a ficha compacta nao abriu');
+const dockBox = await page.locator('.cat-dock').boundingBox();
+const vp = page.viewportSize();
+if (dockBox.y < vp.height * 0.4) throw new Error('a ficha compacta invadiu a area jogavel do topo');
+step.push(`ficha compacta no rodape: ${await page.locator('.dock-name').textContent()}`);
+await page.locator('.team-bar button', { hasText: 'almofada' }).tap();
+
+// O feed e uma FAIXA unica (historico atras de toque), nao uma pilha.
+if (!(await page.locator('.feed-strip').isVisible())) throw new Error('a faixa de feed nao existe');
+
 // --- ARRASTAR: Bigode para a mesa de backend, so com toque -----------------
 const box = await page.locator('#stage').boundingBox();
 // O canvas usa object-fit: contain: o dedo de verdade toca o bitmap em
@@ -152,9 +174,10 @@ step.push(`b1 progrediu: ${Math.round(progress)} unidades`);
 if (progress <= 0) throw new Error('a mesa nao produz');
 
 // --- CARINHO: segurar o dedo parado em cima do gato ------------------------
-await sim(() => {
+const energyBeforePet = await sim(() => {
   const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
   c.stress = 0.7;
+  return c.energy;
 });
 const [px2, py2] = toClient(deskPos.x, deskPos.y - 6);
 await page.evaluate(
@@ -170,9 +193,15 @@ await page.evaluate(
   },
   [px2, py2]
 );
-const stressAfter = await sim(() => window.catathon.app.state.cats.find((x) => x.id === 'bigode').stress);
-step.push(`carinho: estresse 0.70 -> ${stressAfter.toFixed(2)}`);
-if (stressAfter >= 0.68) throw new Error('segurar o dedo nao faz carinho');
+const petOut = await sim(() => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
+  return { stress: c.stress, energy: c.energy };
+});
+step.push(`carinho: estresse 0.70 -> ${petOut.stress.toFixed(2)}`);
+if (petOut.stress >= 0.68) throw new Error('segurar o dedo nao faz carinho');
+// O EXPLOIT morto continua morto: carinho NAO recupera energia.
+if (petOut.energy > energyBeforePet + 0.001) throw new Error('carinho recuperou energia: o exploit voltou');
+step.push('carinho nao recupera energia (o exploit segue morto)');
 await shot('c2-jogando');
 
 // --- PETISCO: botao com palavra, depois toque no gato ----------------------
@@ -220,6 +249,31 @@ await sim(() => {
   window.catathon.app.state.cableOut = false;
 });
 step.push(`audio: a camada de tensao respondeu ao bloqueio`);
+
+// --- O PITCH: fase jogavel no dedo -----------------------------------------
+// Avanca o relogio ate o fim das 48h; o loop do jogo faz o resto.
+await sim(() => {
+  window.catathon.app.state.tick = 14398; // HACK_TICKS - 2
+});
+await page.waitForTimeout(500);
+const phasePitch = await sim(() => window.catathon.app.state.phase);
+if (phasePitch !== 'pitch') throw new Error(`as 48h acabaram e o palco nao abriu: phase=${phasePitch}`);
+if (!(await page.locator('.pitch-panel').isVisible())) throw new Error('o painel do pitch nao aparece');
+const g0 = await sim(() => window.catathon.app.state.pitch.gauge);
+await page.locator('.pitch-ability', { hasText: 'ronronar' }).tap();
+await page.waitForTimeout(300);
+const g1 = await sim(() => window.catathon.app.state.pitch.gauge);
+if (g1 <= g0) throw new Error(`a habilidade de palco nao mexeu na plateia: ${g0} -> ${g1}`);
+step.push(`pitch: plateia ${g0.toFixed(2)} -> ${g1.toFixed(2)} com um ronrom no microfone`);
+await shot('c4-pitch');
+await sim(() => {
+  window.catathon.app.state.pitch.ticksLeft = 30;
+});
+await page.waitForTimeout(1200);
+if ((await sim(() => window.catathon.app.state.phase)) !== 'done') throw new Error('o pitch nao terminou');
+if (!(await page.locator('.result-dims').isVisible())) throw new Error('resultado sem as cinco dimensoes');
+step.push('resultado em cinco dimensoes na tela final');
+await shot('c5-resultado');
 
 console.log('\nfumaca de toque do CATATHON (Pixel 7, sem teclado nem mouse)\n');
 for (const line of step) console.log(`  ${line}`);
