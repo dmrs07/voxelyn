@@ -81,7 +81,9 @@ body {
 .hud-build { color: var(--ok); font-weight: 700; }
 .hud-build.chip-bad { color: var(--alarm); animation: blink 1.1s steps(2) infinite; }
 .hud-proj { font-weight: 700; }
-.hud-bugs { color: var(--alarm); font-weight: 700; }
+/* O chip de bug e BOTAO: o pai .hud-top desliga pointer-events, entao o
+   chip religa — alerta inclicavel e decoracao (achado de revisao). */
+.hud-bugs { color: var(--alarm); font-weight: 700; pointer-events: auto; font-family: var(--font); font-size: 1em; }
 .hud-alarm-chip { color: var(--alarm); font-weight: 800; animation: blink 1.1s steps(2) infinite; }
 
 /* -------------------------------------------------------- botoes macios */

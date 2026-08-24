@@ -255,6 +255,24 @@ step.push(`cortar escopo: o3.cut=${cutOk}`);
 if (!cutOk) throw new Error('cortar nao cortou');
 await shot('c3-quadro');
 
+// --- O CHIP DE BUG e clicavel e abre o projeto (achado de revisao) ---------
+await page.getByRole('button', { name: 'projeto' }).tap(); // fecha o quadro
+await sim(() => {
+  const st = window.catathon.app.state;
+  st.bugs.push({ id: 99, track: 'design', by: st.cats[0].id, cost: 600, progress: 0, fixed: false });
+});
+await page.waitForTimeout(250);
+await page.locator('.hud-bugs').tap();
+await page.waitForTimeout(150);
+if (await page.evaluate(() => document.querySelector('.hud-board').hidden)) {
+  throw new Error('o chip de bug nao abre o projeto');
+}
+step.push('chip de bug clicavel: abre o projeto');
+await page.getByRole('button', { name: 'projeto' }).tap();
+await sim(() => {
+  window.catathon.app.state.bugs = window.catathon.app.state.bugs.filter((b) => b.id !== 99);
+});
+
 // --- AUDIO ADAPTATIVO: o grafo responde ao estado, verificavel sem ouvido --
 const audio1 = await sim(() => {
   const app = window.catathon.app;
