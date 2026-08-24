@@ -146,6 +146,51 @@ services:
         source: /*
         destination: /index.html
 
+  # ---------------------------------------------------------------------------
+  # CATATHON (site estatico)
+  # ---------------------------------------------------------------------------
+  # Um site ESTATICO, e nao um servico web: o jogo e determinista e roda
+  # inteiro no navegador — nao ha servidor, nao ha banco, nao ha estado
+  # remoto. O save mora no `localStorage` de quem joga.
+  - type: web
+    runtime: static
+    name: catathon
+    branch: main
+    buildCommand: ./scripts/render-build-catathon.sh
+    staticPublishPath: packages/voxelyn-catathon/dist
+    # Publica so quando algo que ENTRA no jogo muda. Um commit que mexe apenas
+    # em documentacao nao precisa gastar um build inteiro.
+    buildFilter:
+      paths:
+        - packages/voxelyn-catathon/**
+        - scripts/render-build-catathon.sh
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - render.yaml
+    envVars:
+      # O Playwright so serve ao teste de fumaca, que nao roda aqui. Sem isto
+      # um build de publicacao pode baixar 180 MB de navegador para nada.
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: '1'
+    headers:
+      # Os assets levam hash no nome: mudou o conteudo, mudou o nome. Podem
+      # ser guardados para sempre.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      # O `index.html` NAO. Ele e quem aponta para os assets novos, e um html
+      # em cache serve o jogo velho indefinidamente depois de uma publicacao.
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+    routes:
+      # O jogo e uma pagina so. Qualquer caminho digitado a mao devolve o
+      # jogo em vez de um 404 do Render.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
 # -----------------------------------------------------------------------------
 # Banco do ranking
 # -----------------------------------------------------------------------------
