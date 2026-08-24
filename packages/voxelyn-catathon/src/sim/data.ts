@@ -149,29 +149,3 @@ export const SLOTS: readonly { id: SlotId; x: number; y: number; track: Track | 
 
 export const slotOf = (id: SlotId) => SLOTS.find((s) => s.id === id)!;
 export const deskOfTrack = (track: Track): SlotId => SLOTS.find((s) => s.track === track)!.id;
-
-export const startCats = (): Cat[] =>
-  CATS.map((c, i) => ({
-    id: c.id,
-    name: c.name,
-    specialty: c.specialty,
-    personality: c.personality,
-    quirk: c.quirk,
-    x: 150 + i * 46,
-    y: 190,
-    targetX: 150 + i * 46,
-    targetY: 190,
-    mode: 'idle',
-    modeUntil: 0,
-    slot: null,
-    // Escalonadas de proposito: quatro gatos com o mesmo relogio apagam todos
-    // juntos, e uma "onda de soneca" com uma mao so e injusta — nao dificil,
-    // injusta. Escalonar transforma a onda em rodizio.
-    energy: 1 - i * 0.07,
-    hunger: 1 - i * 0.05,
-    stress: 0.12 + i * 0.03,
-    // Moral tambem escalonada, pela mesma razao das energias.
-    moral: 0.62 + i * 0.04,
-    petStreak: 0,
-    petLastTick: -1,
-  }));

@@ -62,6 +62,8 @@ export const hashState = (state: HackState): string => {
     h.fixed(c.moral, HASH_METER);
     h.u32(c.petStreak);
     h.u32(c.petLastTick + 1);
+    // A revelacao do trait oculto muda eventos futuros: entra.
+    h.u32(c.revealed ? 1 : 0);
     h.str(c.mode);
     h.str(c.slot ?? '-');
     h.u32(c.modeUntil);

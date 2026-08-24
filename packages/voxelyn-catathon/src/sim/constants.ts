@@ -157,16 +157,16 @@ export const PITCH_GAUGE_DECAY = 0.4 / PITCH_TICKS;
 /** Habilidade de palco: cooldown por gato; repetir a MESMA rende metade. */
 export const ABILITY_COOLDOWN = 4 * TICK_HZ;
 export const ABILITY_REPEAT_SCALE = 0.5;
-/** O efeito de cada gato no gauge (personalidade no palco). */
+/** O estilo de palco vem da PERSONALIDADE — o time agora e gerado. */
 export const ABILITY_EFFECT: Record<string, number> = {
-  bigode: 0.1, // encarada felina: pressiona jurado indeciso
-  cheeto: 0.16, // cacar o cursor: entretenimento puro...
-  almofada: 0.08, // ronronar no microfone: acalma e sustenta
-  smoking: 0.12, // amassar paozinho: fofura dirigida
+  perfeccionista: 0.1, // encarada felina: pressiona jurado indeciso
+  cowboy: 0.16, // cacar o cursor: entretenimento puro...
+  calmo: 0.08, // ronronar no microfone: acalma e sustenta
+  'julga-em-silencio': 0.12, // amassar paozinho: fofura dirigida
 };
-/** ...mas o cursor pode mudar o slide (o risco e do Cheeto). */
-export const ABILITY_CHEETO_MISHAP_P = 0.25;
-export const ABILITY_CHEETO_MISHAP = -0.08;
+/** ...mas o cursor pode mudar o slide (o risco e do cowboy). */
+export const ABILITY_COWBOY_MISHAP_P = 0.25;
+export const ABILITY_COWBOY_MISHAP = -0.08;
 /** Crise de demo: janela de resposta e o premio do improviso heroico. */
 export const CRISIS_WINDOW = 3 * TICK_HZ;
 export const CRISIS_DRAIN = 0.05 / TICK_HZ;
@@ -202,3 +202,42 @@ export const CUT_MENTION = 36;
 
 export const HASH_POS = 10;
 export const HASH_METER = 1000;
+
+// ---------------------------------------------------------- tiers e traits
+
+/** Junior: comeca devagar e APRENDE durante a run (ate +0.18). */
+export const JUNIOR_SPEED = 0.78;
+export const JUNIOR_LEARN = 0.18;
+export const JUNIOR_BUG_EXTRA = 0.12;
+export const JUNIOR_ENERGY_SCALE = 0.85;
+/** Senior: conserta 1.4x e shipa 2x mais limpo. */
+export const SENIOR_SPEED = 1.05;
+export const SENIOR_FIX = 1.4;
+export const SENIOR_CLEAN = 0.5;
+/** Especialista: voa na trilha dele, afunda fora. */
+export const SPECIALIST_MATCH = 1.3;
+export const FREESTYLER_SPEED = 0.75;
+
+export const TRAIT_FIX_HUNTER = 1.5;
+export const TRAIT_FIX_LEGACY = 0.6;
+export const TRAIT_NAP_FAST = 1.5;
+export const TRAIT_SPEED_POLY = 1.1;
+export const TRAIT_PITCH_UP = 1.5;
+export const TRAIT_PITCH_DOWN = 0.5;
+export const TRAIT_SHORTCUT_P = 0.1;
+export const TRAIT_MAIN_BUG = 0.12;
+export const TRAIT_SLEEPY_KB_P = 0.4;
+export const TRAIT_ZOOMIES_SCALE = 1.6;
+export const TRAIT_ZOOMIES_AFTER = 0.6;
+export const TRAIT_ZEN = 0.85;
+export const TRAIT_HUNGRY = 1.4;
+/** O trait oculto age desde o inicio; REVELA-SE aqui (a surpresa e ver antes de saber). */
+export const REVEAL_AT = 0.3;
+
+// ------------------------------------------------------------------ riscos
+
+export const RISK_OUTAGE_AT = 0.55;
+export const RISK_HYPE_DECAY = 1.3;
+export const RISK_BUGCOST = 1.25;
+/** A enfase anunciada da banca multiplica UMA dimensao. */
+export const EMPHASIS_SCALE = 1.25;

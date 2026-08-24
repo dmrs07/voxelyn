@@ -1,7 +1,7 @@
 import {
-  ABILITY_CHEETO_MISHAP,
-  ABILITY_CHEETO_MISHAP_P,
   ABILITY_COOLDOWN,
+  ABILITY_COWBOY_MISHAP,
+  ABILITY_COWBOY_MISHAP_P,
   ABILITY_EFFECT,
   ABILITY_REPEAT_SCALE,
   BIGODE_CSS_SPEED,
@@ -27,7 +27,13 @@ import {
   ENERGY_NAP_TO,
   ENERGY_WORK_DRAIN,
   GRABBED_FROM_NAP,
+  EMPHASIS_SCALE,
+  FREESTYLER_SPEED,
   IMPROVISO_BONUS,
+  JUNIOR_BUG_EXTRA,
+  JUNIOR_ENERGY_SCALE,
+  JUNIOR_LEARN,
+  JUNIOR_SPEED,
   MORAL_DISPLACED,
   MORAL_OVERWORK_AT,
   MORAL_OVERWORK_RATE,
@@ -45,6 +51,14 @@ import {
   PITCH_GAUGE_START,
   PITCH_SCORE_SCALE,
   PITCH_TICKS,
+  REVEAL_AT,
+  RISK_BUGCOST,
+  RISK_HYPE_DECAY,
+  RISK_OUTAGE_AT,
+  SENIOR_CLEAN,
+  SENIOR_FIX,
+  SENIOR_SPEED,
+  SPECIALIST_MATCH,
   HACK_TICKS,
   HAIRBALL_AT,
   HAIRBALL_COST,
@@ -70,6 +84,19 @@ import {
   SHORTCUT_HEADSTART,
   SPONSOR_RISK_CRASH,
   STABILITY_CRASH_RELIEF,
+  TRAIT_FIX_HUNTER,
+  TRAIT_FIX_LEGACY,
+  TRAIT_HUNGRY,
+  TRAIT_MAIN_BUG,
+  TRAIT_NAP_FAST,
+  TRAIT_PITCH_DOWN,
+  TRAIT_PITCH_UP,
+  TRAIT_SHORTCUT_P,
+  TRAIT_SLEEPY_KB_P,
+  TRAIT_SPEED_POLY,
+  TRAIT_ZEN,
+  TRAIT_ZOOMIES_AFTER,
+  TRAIT_ZOOMIES_SCALE,
   STRESS_AFTER_PROC,
   STRESS_DANGER,
   STRESS_IDLE_RATE,
@@ -83,8 +110,9 @@ import {
   ZOOMIES_SPEED,
   ZOOMIES_TICKS,
 } from './constants.js';
-import { SLOTS, TASKS, slotOf, startCats } from './data.js';
-import type { Cat, CatId, Command, DemoResult, HackState, Outcome, SimEvent, SlotId, Task, Track } from './types.js';
+import { SLOTS, TASKS } from './data.js';
+import { CLASSIC_LAYOUT, rollLayout, rollProject, type Candidate } from './gen.js';
+import type { Cat, CatId, Command, DemoResult, HackState, Outcome, SimEvent, SlotId, Spec, Task, Track } from './types.js';
 
 /**
  * xorshift32 como FUNCAO PURA sobre estado serializado.
@@ -118,13 +146,63 @@ const hairballFireTick = (seed: number, index: number): number => {
   return Math.round(HACK_TICKS * HAIRBALL_AT[index] + jitter);
 };
 
-export const createHackathon = (seed: number): HackState => ({
+/** Um trait age desde o inicio — visivel ou nao. A revelacao so INFORMA. */
+const hasTrait = (cat: Cat, trait: string): boolean =>
+  cat.traits.includes(trait) || cat.hiddenTrait === trait;
+
+const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
+  team.map((c, i) => ({
+    id: c.id,
+    name: c.name,
+    specialty: c.specialty,
+    personality: c.personality,
+    quirk: c.quirk,
+    tier: c.tier,
+    traits: c.traits,
+    hiddenTrait: c.hiddenTrait,
+    revealed: false,
+    coat: { ...c.coat },
+    pattern: c.pattern,
+    big: c.big,
+    bio: `${c.note} ${c.cv}`,
+    x: 150 + i * 46,
+    y: 190,
+    targetX: 150 + i * 46,
+    targetY: 190,
+    mode: 'idle' as const,
+    modeUntil: 0,
+    slot: null,
+    // Escalonadas de proposito: quatro relogios iguais apagam juntos, e uma
+    // "onda de soneca" com uma mao so e injusta. Escalonar vira rodizio.
+    energy: 1 - i * 0.07,
+    hunger: 1 - i * 0.05,
+    stress: 0.12 + i * 0.03,
+    moral: 0.62 + i * 0.04,
+    petStreak: 0,
+    petLastTick: -1,
+  }));
+
+/**
+ * Uma run nasce de (semente, EQUIPE CONTRATADA). Projeto e layout saem da
+ * mesma semente; a equipe e a decisao do jogador no recrutamento — e por
+ * isso entra como argumento, nao como sorteio: replay = (semente, equipe,
+ * comandos). `classic: true` fixa projeto e booth originais (testes, demo).
+ */
+export const createHackathon = (
+  seed: number,
+  team: readonly Candidate[],
+  opts: { classic?: boolean } = {}
+): HackState => {
+  const project = opts.classic ? null : rollProject(seed >>> 0);
+  const layout = opts.classic ? CLASSIC_LAYOUT : rollLayout(seed >>> 0);
+  const taskDefs = project ? project.tasks : TASKS;
+  return {
   tick: 0,
   phase: 'hack',
   seed: seed >>> 0,
   rngState: nextU32(seed >>> 0),
-  cats: startCats(),
-  tasks: TASKS.map((t) => ({ ...t, progress: 0, done: false, cut: false, awaitingShip: false, chosen: null })),
+  cats: catsFromTeam(team),
+  tasks: taskDefs.map((t) => ({ ...t, progress: 0, done: false, cut: false, awaitingShip: false, chosen: null })),
   bugs: [],
   hairball: {
     active: false,
@@ -146,10 +224,18 @@ export const createHackathon = (seed: number): HackState => ({
   uxCare: 0,
   stability: 0,
   sponsorRisk: false,
+  project: project
+    ? { name: project.name, brief: project.brief, emphasis: project.emphasis, risk: project.risk }
+    : { name: 'MiauDota', brief: 'plataforma de adocao de gatos com IA, acessivel, mas sustentavel', emphasis: 'tecnica', risk: 'hype' },
+  layoutId: layout.id,
+  layoutName: layout.name,
+  layoutMods: { ...layout.mods },
+  slots: layout.slots.map((s) => ({ ...s })),
   pitch: null,
   events: [],
   result: null,
-});
+  };
+};
 
 export const emptyCommand = (): Command => ({});
 
@@ -167,12 +253,22 @@ export const workable = (state: HackState, task: Task): boolean =>
 export const nextTask = (state: HackState, track: Track): Task | undefined =>
   state.tasks.find((t) => t.track === track && workable(state, t) && !t.awaitingShip);
 
-const sendTo = (cat: Cat, slot: SlotId): void => {
-  const s = slotOf(slot);
+/** O slot no BOOTH DESTA RUN — as coordenadas moram no estado (layout). */
+const slotIn = (state: HackState, id: SlotId) => state.slots.find((s) => s.id === id)!;
+
+const sendTo = (state: HackState, cat: Cat, slot: SlotId): void => {
+  const s = slotIn(state, slot);
   cat.slot = slot;
   cat.targetX = s.x;
   cat.targetY = s.y;
   cat.mode = 'walk';
+};
+
+/** Todo bug nasce aqui: o risco 'dados-sensiveis' encarece cada um. */
+const pushBug = (state: HackState, track: Track, by: CatId, cause: 'teclado' | 'sem-teste', events: SimEvent[]): void => {
+  const cost = Math.round(BUG_COST * (state.project.risk === 'dados-sensiveis' ? RISK_BUGCOST : 1));
+  state.bugs.push({ id: state.bugs.length, track, by, cost, progress: 0, fixed: false });
+  events.push({ kind: 'bug', tick: state.tick, by, track, cause });
 };
 
 const shipTask = (state: HackState, task: Task, by: Cat, events: SimEvent[]): void => {
@@ -183,22 +279,28 @@ const shipTask = (state: HackState, task: Task, by: Cat, events: SimEvent[]): vo
   // Shippar levanta a MORAL: mais a de quem shipou, um pouco a de todos.
   // Sucesso e contagioso num booth de quatro gatos.
   for (const c of state.cats) {
-    c.moral = Math.min(1, c.moral + (c.id === by.id ? MORAL_SHIP_OWN : MORAL_SHIP_TEAM));
+    const gain = c.id === by.id ? MORAL_SHIP_OWN : MORAL_SHIP_TEAM * state.layoutMods.moralShip;
+    c.moral = Math.min(1, c.moral + gain);
   }
 
-  if (by.personality === 'cowboy') {
-    // Shipou sem testar: as vezes vem bug junto; as vezes, sem querer, ele
-    // reescreve algo muito melhor — o atalho genial do junior laranja.
-    if (draw01(state) < COWBOY_BUG_P) {
-      state.bugs.push({ id: state.bugs.length, track: task.track, by: by.id, cost: BUG_COST, progress: 0, fixed: false });
-      events.push({ kind: 'bug', tick: state.tick, by: by.id, track: task.track, cause: 'sem-teste' });
-    }
-    if (draw01(state) < COWBOY_SHORTCUT_P) {
-      const next = state.tasks.find((t) => t.track === task.track && !t.done && !t.cut);
-      if (next) {
-        next.progress = Math.min(next.cost, next.progress + next.cost * SHORTCUT_HEADSTART);
-        events.push({ kind: 'shortcut', tick: state.tick, task: next.label, by: by.id });
-      }
+  // A SUJEIRA do ship compoe: cowboy shipa sem testar, junior ainda aprende,
+  // producao-em-main e o que o nome diz — e o senior limpa metade de tudo.
+  let bugP = 0;
+  if (by.personality === 'cowboy') bugP += COWBOY_BUG_P;
+  if (by.tier === 'junior') bugP += JUNIOR_BUG_EXTRA;
+  if (hasTrait(by, 'producao-em-main')) bugP += TRAIT_MAIN_BUG;
+  if (by.tier === 'senior') bugP *= SENIOR_CLEAN;
+  if (bugP > 0 && draw01(state) < bugP) pushBug(state, task.track, by.id, 'sem-teste', events);
+
+  // O atalho genial: dom do cowboy, oficio da gambiarra-elegante.
+  let shortcutP = 0;
+  if (by.personality === 'cowboy') shortcutP += COWBOY_SHORTCUT_P;
+  if (hasTrait(by, 'gambiarra-elegante')) shortcutP += TRAIT_SHORTCUT_P;
+  if (shortcutP > 0 && draw01(state) < shortcutP) {
+    const next = state.tasks.find((t) => t.track === task.track && !t.done && !t.cut);
+    if (next) {
+      next.progress = Math.min(next.cost, next.progress + next.cost * SHORTCUT_HEADSTART);
+      events.push({ kind: 'shortcut', tick: state.tick, task: next.label, by: by.id });
     }
   }
 };
@@ -233,7 +335,7 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
       // Ser despejado desanima qualquer um.
       occupant.moral = Math.max(0, occupant.moral - MORAL_DISPLACED);
     }
-    sendTo(cat, cmd.drop);
+    sendTo(state, cat, cmd.drop);
     state.held = null;
   }
 
@@ -366,12 +468,20 @@ const stepHairball = (state: HackState, events: SimEvent[]): void => {
   }
 };
 
-/** A velocidade de um gato numa trilha. Personalidades E moral moram aqui. */
-const speedOf = (cat: Cat, track: Track): number => {
-  let s = cat.specialty === track ? 1 : OFFSPEC_SPEED;
-  // O siames RECUSA CSS: em frontend ele rende quase nada, sob protesto.
-  if (cat.id === 'bigode' && track === 'frontend') s = BIGODE_CSS_SPEED;
+/** A velocidade de um gato numa trilha: especializacao, tier, traits e moral. */
+const speedOf = (state: HackState, cat: Cat, track: Track): number => {
+  let s: number;
+  if (cat.specialty === 'freestyler') s = FREESTYLER_SPEED;
+  else if (cat.specialty === track) s = cat.tier === 'especialista' ? SPECIALIST_MATCH : 1;
+  else s = OFFSPEC_SPEED;
+  // O trait anti-CSS (o protesto classico do Bigode) vale para qualquer um.
+  if (hasTrait(cat, 'recusa-css') && track === 'frontend') s = BIGODE_CSS_SPEED;
   if (cat.personality === 'cowboy') s *= COWBOY_SPEED;
+  if (cat.tier === 'junior') {
+    // O junior APRENDE: comeca devagar e cresce com a run.
+    s *= JUNIOR_SPEED + JUNIOR_LEARN * Math.min(1, state.tick / HACK_TICKS);
+  } else if (cat.tier === 'senior') s *= SENIOR_SPEED;
+  if (hasTrait(cat, 'polidactila')) s *= TRAIT_SPEED_POLY;
   // Gato desanimado rende menos; radiante, mais. A moral NAO e enfeite.
   s *= MORAL_SPEED_MIN + cat.moral * (MORAL_SPEED_MAX - MORAL_SPEED_MIN);
   return s;
@@ -380,9 +490,11 @@ const speedOf = (cat: Cat, track: Track): number => {
 const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   if (cat.slot === 'rack') {
     // O rack atende DUAS emergencias, na ordem: bola de pelo, cabo mordido.
-    if (state.hairball.active) state.hairball.progress += 1;
+    // O layout Server Corner conserta mais rapido — proximidade e mecanica.
+    const fix = state.layoutMods.fixSpeed;
+    if (state.hairball.active) state.hairball.progress += fix;
     else if (state.cableOut) {
-      state.cableProgress += 1;
+      state.cableProgress += fix;
       if (state.cableProgress >= CABLE_FIX_COST) {
         state.cableOut = false;
         state.cableProgress = 0;
@@ -393,15 +505,21 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   }
   if (cat.slot === 'puff' || cat.slot === 'cafe') return;
 
-  const track = slotOf(cat.slot!).track!;
+  const track = slotIn(state, cat.slot!).track!;
   // Repositorio travado ou build fora do ar: ninguem testa, ninguem mergeia.
   if (state.hairball.active || state.buildBroken || state.cableOut) return;
 
-  const speed = speedOf(cat, track);
+  const speed = speedOf(state, cat, track);
 
   const bug = liveBug(state, track);
   if (bug) {
-    bug.progress += speed;
+    // Consertar bug tem oficio proprio: cacador acha, senior poda, e quem
+    // detesta legado enrola.
+    let fixRate = speed;
+    if (hasTrait(cat, 'cacador-de-bugs')) fixRate *= TRAIT_FIX_HUNTER;
+    if (cat.tier === 'senior') fixRate *= SENIOR_FIX;
+    if (hasTrait(cat, 'detesta-legado')) fixRate *= TRAIT_FIX_LEGACY;
+    bug.progress += fixRate;
     if (bug.progress >= bug.cost) {
       bug.fixed = true;
       events.push({ kind: 'bugfix', tick: state.tick, track });
@@ -483,7 +601,7 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
 
   if (cat.mode === 'zoomies') {
     if (state.tick >= cat.modeUntil) {
-      if (cat.slot) sendTo(cat, cat.slot);
+      if (cat.slot) sendTo(state, cat, cat.slot);
       else cat.mode = 'idle';
     } else {
       const dx = cat.targetX - cat.x;
@@ -503,7 +621,9 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
     return;
   }
   if (cat.mode === 'nap') {
-    const rate = cat.quirk === 'caixa' ? ENERGY_NAP_RATE * QUIRK_BOX_NAP_SCALE : ENERGY_NAP_RATE;
+    let rate = cat.quirk === 'caixa' ? ENERGY_NAP_RATE * QUIRK_BOX_NAP_SCALE : ENERGY_NAP_RATE;
+    if (hasTrait(cat, 'dorme-rapido')) rate *= TRAIT_NAP_FAST;
+    rate *= state.layoutMods.napRate;
     cat.energy = Math.min(ENERGY_NAP_TO, cat.energy + rate);
     cat.stress = Math.max(0, cat.stress - STRESS_IDLE_RATE * 2);
     if (cat.energy >= ENERGY_NAP_TO) {
@@ -536,7 +656,7 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
         events.push({ kind: 'nap', tick: state.tick, cat: cat.id });
       } else if (cat.slot === 'cafe') {
         cat.mode = 'eat';
-        cat.modeUntil = state.tick + EAT_TICKS;
+        cat.modeUntil = state.tick + Math.round(EAT_TICKS * state.layoutMods.eatScale);
         events.push({ kind: 'eat', tick: state.tick, cat: cat.id });
       } else {
         cat.mode = cat.slot ? 'work' : 'idle';
@@ -549,15 +669,19 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
 
   // Medidores.
   const working = cat.mode === 'work';
-  cat.energy = Math.max(0, cat.energy - (working ? ENERGY_WORK_DRAIN : ENERGY_IDLE_DRAIN));
-  cat.hunger = Math.max(0, cat.hunger - HUNGER_DRAIN);
+  const energyDrain = (working ? ENERGY_WORK_DRAIN : ENERGY_IDLE_DRAIN) * (cat.tier === 'junior' ? JUNIOR_ENERGY_SCALE : 1);
+  cat.energy = Math.max(0, cat.energy - energyDrain);
+  cat.hunger = Math.max(0, cat.hunger - HUNGER_DRAIN * (hasTrait(cat, 'guloso') ? TRAIT_HUNGRY : 1));
   // Trabalhar exausto corroi a moral: virar a noite tem preco alem do sono.
   if (working && cat.energy < MORAL_OVERWORK_AT) {
     cat.moral = Math.max(0, cat.moral - MORAL_OVERWORK_RATE);
   }
 
-  let stressRate = working ? STRESS_WORK_RATE : STRESS_IDLE_RATE;
+  let stressRate = working
+    ? STRESS_WORK_RATE * state.layoutMods.stressWork
+    : STRESS_IDLE_RATE * state.layoutMods.stressIdle;
   if (cat.personality === 'calmo') stressRate *= CALM_SCALE;
+  if (hasTrait(cat, 'zen')) stressRate *= TRAIT_ZEN;
   // O tuxedo sofre com bug vivo em QUALQUER trilha. Ele sabe. Ele sempre sabe.
   if (cat.personality === 'julga-em-silencio' && state.bugs.some((b) => !b.fixed)) {
     stressRate *= JUDGE_BUG_SCALE;
@@ -566,17 +690,23 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
 
   // Necessidades tomam o corpo: fome primeiro, depois sono.
   if (cat.hunger <= HUNGER_EAT_AT && (working || cat.mode === 'idle')) {
-    sendTo(cat, 'cafe');
+    sendTo(state, cat, 'cafe');
     return;
   }
   if (cat.energy <= ENERGY_NAP_AT && (working || cat.mode === 'idle')) {
-    // O Almofada cochila NO RACK (mania). Os outros vao ao puff — o Smoking
-    // dorme na caixa ao lado, que e a mesma coordenada e o dobro do charme.
-    sendTo(cat, cat.quirk === 'dorme-no-rack' ? 'rack' : 'puff');
+    // Quem DORME NO TECLADO pode apagar em cima da propria trilha: bug.
+    if (working && hasTrait(cat, 'dorme-no-teclado') && cat.slot && slotIn(state, cat.slot).track) {
+      if (draw01(state) < TRAIT_SLEEPY_KB_P) {
+        pushBug(state, slotIn(state, cat.slot).track!, cat.id, 'teclado', events);
+      }
+    }
+    // Quem tem a mania cochila NO RACK. Os outros vao ao puff — o gato de
+    // caixa dorme na caixa ao lado, mesma coordenada e o dobro do charme.
+    sendTo(state, cat, cat.quirk === 'dorme-no-rack' ? 'rack' : 'puff');
     if (cat.quirk === 'dorme-no-rack') {
       // No rack ele dorme de verdade (nao trabalha): modo nap ao chegar.
       cat.slot = 'puff';
-      const rack = slotOf('rack');
+      const rack = slotIn(state, 'rack');
       cat.targetX = rack.x - 10;
       cat.targetY = rack.y - 6;
     }
@@ -585,15 +715,17 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
 
   // O DADO DO DESASTRE. Na mesa: senta no teclado (bug na trilha). Fora dela:
   // o Cheeto pode MORDER O CABO (build fora do ar); os demais, zoomies.
-  if (cat.stress >= STRESS_DANGER && draw01(state) < STRESS_PROC_P) {
+  const procP =
+    STRESS_PROC_P *
+    (hasTrait(cat, 'zoomies-noturnos') && state.tick > HACK_TICKS * TRAIT_ZOOMIES_AFTER ? TRAIT_ZOOMIES_SCALE : 1);
+  if (cat.stress >= STRESS_DANGER && draw01(state) < procP) {
     cat.stress = STRESS_AFTER_PROC;
-    const atDesk = working && cat.slot && slotOf(cat.slot).track;
+    const atDesk = working && cat.slot && slotIn(state, cat.slot).track;
     if (atDesk) {
-      const track = slotOf(cat.slot!).track!;
+      const track = slotIn(state, cat.slot!).track!;
       cat.mode = 'keyboard';
       cat.modeUntil = state.tick + KEYBOARD_TICKS;
-      state.bugs.push({ id: state.bugs.length, track, by: cat.id, cost: BUG_COST, progress: 0, fixed: false });
-      events.push({ kind: 'bug', tick: state.tick, by: cat.id, track, cause: 'teclado' });
+      pushBug(state, track, cat.id, 'teclado', events);
     } else if (cat.quirk === 'morde-cabo' && !state.cableOut && draw01(state) < CABLE_BITE_P) {
       state.cableOut = true;
       state.cableProgress = 0;
@@ -633,11 +765,13 @@ const startPitch = (state: HackState, events: SimEvent[]): void => {
       );
   const willCrash = !state.buildBroken && draw01(state) < crashP;
   const crisisAt = willCrash ? Math.round(PITCH_TICKS * (0.35 + draw01(state) * 0.3)) : -1;
+  const readyAt: Record<string, number> = {};
+  for (const c of state.cats) readyAt[c.id] = 0;
   state.pitch = {
     ticksLeft: PITCH_TICKS,
     gauge: PITCH_GAUGE_START,
     lastAbility: null,
-    readyAt: { bigode: 0, cheeto: 0, almofada: 0, smoking: 0 },
+    readyAt,
     crisisAt,
     crisisUntil: 0,
     crisisResolved: !willCrash,
@@ -670,12 +804,15 @@ const stepPitch = (state: HackState, cmd: Command, events: SimEvent[]): void => 
         p.gauge = Math.min(1, p.gauge + IMPROVISO_BONUS);
         events.push({ kind: 'improviso', tick: state.tick, cat: cat.id });
       } else {
-        let effect = ABILITY_EFFECT[cat.id] ?? 0.08;
+        // O estilo de palco vem da personalidade; os traits temperam.
+        let effect = ABILITY_EFFECT[cat.personality] ?? 0.08;
+        if (hasTrait(cat, 'pitchador-nato')) effect *= TRAIT_PITCH_UP;
+        if (hasTrait(cat, 'medo-de-palco')) effect *= TRAIT_PITCH_DOWN;
         // Repetir a mesma gracinha rende metade: plateia tem memoria.
         if (p.lastAbility === cat.id) effect *= ABILITY_REPEAT_SCALE;
-        // O risco do Cheeto: cacar o cursor PODE mudar o slide.
-        if (cat.id === 'cheeto' && draw01(state) < ABILITY_CHEETO_MISHAP_P) {
-          effect = ABILITY_CHEETO_MISHAP;
+        // O risco do cowboy: cacar o cursor PODE mudar o slide.
+        if (cat.personality === 'cowboy' && draw01(state) < ABILITY_COWBOY_MISHAP_P) {
+          effect = ABILITY_COWBOY_MISHAP;
         }
         p.gauge = Math.max(0, Math.min(1, p.gauge + effect));
         p.lastAbility = cat.id;
@@ -684,8 +821,9 @@ const stepPitch = (state: HackState, cmd: Command, events: SimEvent[]): void => 
     }
   }
 
-  // A plateia esfria sozinha; numa crise aberta, esfria MUITO.
-  p.gauge = Math.max(0, p.gauge - PITCH_GAUGE_DECAY - (crisisOpen ? CRISIS_DRAIN : 0));
+  // A plateia esfria sozinha; com HYPE demais, mais rapido; em crise, MUITO.
+  const decay = PITCH_GAUGE_DECAY * (state.project.risk === 'hype' ? RISK_HYPE_DECAY : 1);
+  p.gauge = Math.max(0, p.gauge - decay - (crisisOpen ? CRISIS_DRAIN : 0));
   p.ticksLeft--;
   state.tick++;
   if (p.ticksLeft <= 0) runDemo(state, events);
@@ -714,14 +852,24 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
     state.stability * SCORE_STABILITY_CHOICE;
   const designDone = state.tasks.filter((t) => t.track === 'design' && !t.polish).every((t) => t.done);
   const experiencia = polish * SCORE_POLISH + (designDone ? SCORE_DESIGN_DONE_BONUS : 0) + state.uxCare * SCORE_UX_CARE;
-  const inovacao = state.innovation * SCORE_INNOVATION;
+  let inovacao = state.innovation * SCORE_INNOVATION;
   const pitchScore = Math.round(p.gauge * PITCH_SCORE_SCALE);
+
+  // A LENTE anunciada no convite: a banca desta edicao valoriza uma dimensao.
+  let tecnicaW = tecnica;
+  let estabilidadeW = estabilidade;
+  let experienciaW = experiencia;
+  const emph = state.project.emphasis;
+  if (emph === 'tecnica') tecnicaW = Math.round(tecnica * EMPHASIS_SCALE);
+  else if (emph === 'estabilidade') estabilidadeW = Math.round(estabilidade * EMPHASIS_SCALE);
+  else if (emph === 'experiencia') experienciaW = Math.round(experiencia * EMPHASIS_SCALE);
+  else if (emph === 'inovacao') inovacao = Math.round(inovacao * EMPHASIS_SCALE);
 
   // Os tres juizes leem as dimensoes pelas proprias lentes; o pitch e a
   // plateia entram por fora, como voto popular.
-  const vonWhiskers = tecnica + inovacao;
-  const meowper = estabilidade;
-  const cocada = experiencia;
+  const vonWhiskers = tecnicaW + inovacao;
+  const meowper = estabilidadeW;
+  const cocada = experienciaW;
   const score = vonWhiskers + meowper + cocada + pitchScore;
 
   let outcome: Outcome;
@@ -737,7 +885,7 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
     bugs,
     looseEnds,
     perJudge: [vonWhiskers, meowper, cocada],
-    dimensions: { tecnica, estabilidade, experiencia, inovacao, pitch: pitchScore },
+    dimensions: { tecnica: tecnicaW, estabilidade: estabilidadeW, experiencia: experienciaW, inovacao, pitch: pitchScore },
     plateia: p.gauge,
     score,
     crashed,
@@ -762,6 +910,27 @@ export const step = (state: HackState, cmd: Command): SimEvent[] => {
   applyCommand(state, cmd, events);
   stepHairball(state, events);
   for (const cat of state.cats) stepCat(state, cat, cmd, events);
+
+  // O curriculo nao contava tudo: no meio da run, o trait oculto aparece.
+  if (state.tick === Math.round(HACK_TICKS * REVEAL_AT)) {
+    for (const cat of state.cats) {
+      if (!cat.revealed) {
+        cat.revealed = true;
+        events.push({ kind: 'trait-revealed', tick: state.tick, cat: cat.id, trait: cat.hiddenTrait });
+      }
+    }
+  }
+  // O risco oculto do projeto: a integracao do sponsor CAI no meio da run.
+  if (
+    state.project.risk === 'integracao-instavel' &&
+    state.tick === Math.round(HACK_TICKS * RISK_OUTAGE_AT) &&
+    !state.cableOut &&
+    !state.buildBroken
+  ) {
+    state.cableOut = true;
+    state.cableProgress = 0;
+    events.push({ kind: 'sponsor-outage', tick: state.tick });
+  }
 
   state.tick++;
   if (state.tick >= HACK_TICKS) startPitch(state, events);

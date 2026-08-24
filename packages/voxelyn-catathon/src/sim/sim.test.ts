@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ABILITY_COOLDOWN, HACK_TICKS, PET_MEMORY_TICKS, STRESS_DANGER, TASK_CORE_COST, TREATS_START } from './constants.js';
-import { catOf, createHackathon, emptyCommand, hashState, liveBug, nextTask, step, workable } from './index.js';
+import { CLASSIC_TEAM, catOf, createHackathon, emptyCommand, hashState, liveBug, nextTask, step, workable } from './index.js';
 import type { CatId, Command, HackState, SlotId } from './types.js';
 
 /**
@@ -39,12 +39,16 @@ const runCompetent = (state: HackState): void => {
   let stage = 0;
   while (state.phase !== 'done') {
     if (state.phase === 'pitch') {
-      // No palco: revezar quem age, sempre que alguem estiver pronto — e
-      // qualquer um pronto responde a crise (a janela e curta).
+      // No palco: revezar quem age — mas com RESERVA. A primeira versao do
+      // bot gastava as quatro habilidades e, quando a demo travava, todo
+      // mundo estava em cooldown (4s) com a janela de crise aberta (3s).
+      // Enquanto a crise puder vir, um gato fica de prontidao.
       const p = state.pitch!;
+      const crisisOpen = p.crisisUntil > 0 && state.tick < p.crisisUntil && !p.crisisResolved;
       const ready = PITCH_ORDER.filter((id) => (p.readyAt[id] ?? 0) <= state.tick);
-      const pick = ready.find((id) => id === PITCH_ORDER[stage % 4]) ?? ready[0];
-      if (pick) {
+      const mustReserve = !p.crisisResolved && !crisisOpen;
+      if (ready.length > 0 && (crisisOpen || !mustReserve || ready.length >= 2)) {
+        const pick = ready.find((id) => id === PITCH_ORDER[stage % 4]) ?? ready[0];
         stage++;
         step(state, { ability: pick });
       } else {
@@ -93,8 +97,8 @@ const runCompetent = (state: HackState): void => {
 
 describe('determinismo', () => {
   it('mesma semente, mesmos comandos, mesmo hash', () => {
-    const a = createHackathon(777);
-    const b = createHackathon(777);
+    const a = createHackathon(777, CLASSIC_TEAM, { classic: true });
+    const b = createHackathon(777, CLASSIC_TEAM, { classic: true });
     for (let i = 0; i < 4000; i++) {
       step(a, emptyCommand());
       step(b, emptyCommand());
@@ -103,8 +107,8 @@ describe('determinismo', () => {
   });
 
   it('sementes diferentes divergem', () => {
-    const a = createHackathon(1);
-    const b = createHackathon(2);
+    const a = createHackathon(1, CLASSIC_TEAM, { classic: true });
+    const b = createHackathon(2, CLASSIC_TEAM, { classic: true });
     for (let i = 0; i < 4000; i++) {
       step(a, emptyCommand());
       step(b, emptyCommand());
@@ -113,8 +117,8 @@ describe('determinismo', () => {
   });
 
   it('o alvo de movimento entra no hash: dois estados prestes a divergir divergem JA', () => {
-    const a = createHackathon(9);
-    const b = createHackathon(9);
+    const a = createHackathon(9, CLASSIC_TEAM, { classic: true });
+    const b = createHackathon(9, CLASSIC_TEAM, { classic: true });
     // Mesma posicao, mesmo modo — so o DESTINO difere. No proximo tick as
     // posicoes divergem; o hash tem de acusar antes.
     for (const s of [a, b]) {
@@ -134,7 +138,7 @@ describe('determinismo', () => {
 describe('a partida sabe ser perdida', () => {
   it('parado, o build quebra e a demo crasha — em qualquer semente', () => {
     for (const seed of [7, 42, 99, 12345]) {
-      const state = createHackathon(seed);
+      const state = createHackathon(seed, CLASSIC_TEAM, { classic: true });
       runIdle(state);
       expect(state.buildBroken, `seed ${seed}`).toBe(true);
       expect(state.result?.outcome, `seed ${seed}`).toBe('crashed');
@@ -146,7 +150,7 @@ describe('a partida sabe ser perdida', () => {
 describe('a partida sabe ser vencida', () => {
   it('o jogador decente sobe ao podio, em varias sementes', () => {
     for (const seed of [42, 7, 99, 2026]) {
-      const state = createHackathon(seed);
+      const state = createHackathon(seed, CLASSIC_TEAM, { classic: true });
       runCompetent(state);
       const r = state.result!;
       expect(r, `seed ${seed}`).not.toBeNull();
@@ -159,7 +163,7 @@ describe('a partida sabe ser vencida', () => {
 
 describe('o grafo de dependencias', () => {
   it('o dashboard NAO anda antes da API, e a API nao anda antes do schema', () => {
-    const state = createHackathon(1);
+    const state = createHackathon(1, CLASSIC_TEAM, { classic: true });
     const f2 = state.tasks.find((t) => t.id === 'f2')!;
     const b2 = state.tasks.find((t) => t.id === 'b2')!;
     expect(workable(state, f2)).toBe(false);
@@ -173,13 +177,13 @@ describe('o grafo de dependencias', () => {
   });
 
   it('uma mesa sem tarefa desbloqueada nao produz nada', () => {
-    const state = createHackathon(1);
+    const state = createHackathon(1, CLASSIC_TEAM, { classic: true });
     // frontend: f1 depende de d1, f2 de b2+d1 — no comeco, nada workable.
     expect(nextTask(state, 'frontend')).toBeUndefined();
   });
 
   it('cortar tira a tarefa do quadro e ela nao vira ponta solta', () => {
-    const state = createHackathon(1);
+    const state = createHackathon(1, CLASSIC_TEAM, { classic: true });
     const f3 = state.tasks.find((t) => t.id === 'f3')!;
     f3.progress = 100;
     step(state, { cut: 'f3' });
@@ -194,7 +198,7 @@ describe('o grafo de dependencias', () => {
 
 describe('psicologia felina (cada traco e mecanico)', () => {
   it('o perfeccionista SEGURA a feature pronta; o carinho e o "shipa"', () => {
-    const state = createHackathon(3);
+    const state = createHackathon(3, CLASSIC_TEAM, { classic: true });
     const bigode = catOf(state, 'bigode')!;
     step(state, { choose: { task: 'b1', option: 'monolito' } });
     step(state, { grab: 'bigode' });
@@ -217,7 +221,7 @@ describe('psicologia felina (cada traco e mecanico)', () => {
     // a chance de 35% tem de aparecer em ~40 ships.
     let dirty = 0;
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-      const state = createHackathon(seed);
+      const state = createHackathon(seed, CLASSIC_TEAM, { classic: true });
       for (const t of state.tasks) {
         (t as { deps: readonly string[] }).deps = [];
         (t as { cost: number }).cost = 60;
@@ -231,7 +235,7 @@ describe('psicologia felina (cada traco e mecanico)', () => {
   });
 
   it('o Cheeto morde o cabo fora da mesa, e o rack religa', () => {
-    const state = createHackathon(11);
+    const state = createHackathon(11, CLASSIC_TEAM, { classic: true });
     const cheeto = catOf(state, 'cheeto')!;
     let guard = 0;
     while (!state.cableOut && guard++ < 20000 && state.phase === 'hack') {
@@ -257,7 +261,7 @@ describe('psicologia felina (cada traco e mecanico)', () => {
   });
 
   it('o calmo estressa mais devagar que o julgador com bug vivo', () => {
-    const state = createHackathon(5);
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
     state.bugs.push({ id: 0, track: 'backend', by: 'cheeto', cost: 600, progress: 0, fixed: false });
     const calmo = catOf(state, 'almofada')!;
     const julgador = catOf(state, 'smoking')!;
@@ -274,7 +278,7 @@ describe('psicologia felina (cada traco e mecanico)', () => {
 
 describe('territorio', () => {
   it('o desalojado ANDA para longe da mesa — nao fica embaixo do novo dono', () => {
-    const state = createHackathon(11);
+    const state = createHackathon(11, CLASSIC_TEAM, { classic: true });
     const invader = catOf(state, 'cheeto')!;
     const owner = catOf(state, 'bigode')!;
     step(state, { grab: 'bigode' });
@@ -292,7 +296,7 @@ describe('territorio', () => {
 
 describe('necessidades', () => {
   it('fome baixa manda o gato ao balcao, e ele volta cheio', () => {
-    const state = createHackathon(9);
+    const state = createHackathon(9, CLASSIC_TEAM, { classic: true });
     const cat = catOf(state, 'smoking')!;
     cat.hunger = 0.21;
     let guard = 0;
@@ -303,7 +307,7 @@ describe('necessidades', () => {
   });
 
   it('sentar no teclado cria bug NA MESA; petiscos acabam', () => {
-    const state = createHackathon(5);
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
     const cat = catOf(state, 'smoking')!;
     step(state, { grab: 'smoking' });
     step(state, { drop: 'desk-design' });
@@ -322,7 +326,7 @@ describe('necessidades', () => {
   });
 
   it('bug vivo bloqueia a trilha e consertar reabre', () => {
-    const state = createHackathon(9);
+    const state = createHackathon(9, CLASSIC_TEAM, { classic: true });
     state.bugs.push({ id: 0, track: 'design', by: 'cheeto', cost: 60, progress: 0, fixed: false });
     step(state, { choose: { task: 'd1', option: 'componentesLocais' } });
     step(state, { grab: 'smoking' });
@@ -339,7 +343,7 @@ describe('necessidades', () => {
 
 describe('a bola de pelo', () => {
   it('ignorada, quebra o build na janela', () => {
-    const state = createHackathon(11);
+    const state = createHackathon(11, CLASSIC_TEAM, { classic: true });
     while (!state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
     expect(state.hairball.active).toBe(true);
     while (state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
@@ -347,7 +351,7 @@ describe('a bola de pelo', () => {
   });
 
   it('um gato no rack resolve e o build sobrevive', () => {
-    const state = createHackathon(11);
+    const state = createHackathon(11, CLASSIC_TEAM, { classic: true });
     while (!state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
     step(state, { grab: 'almofada' });
     step(state, { drop: 'rack' });
@@ -365,7 +369,7 @@ describe('carinho com memoria (o exploit morreu)', () => {
   };
 
   it('carinho baixa estresse e sobe moral — e NAO recupera energia', () => {
-    const state = createHackathon(21);
+    const state = createHackathon(21, CLASSIC_TEAM, { classic: true });
     const cheeto = catOf(state, 'cheeto')!;
     cheeto.stress = 0.6;
     const moral0 = cheeto.moral;
@@ -377,7 +381,7 @@ describe('carinho com memoria (o exploit morreu)', () => {
   });
 
   it('a terceira sessao seguida SUPERESTIMULA: estresse sobe', () => {
-    const state = createHackathon(21);
+    const state = createHackathon(21, CLASSIC_TEAM, { classic: true });
     const cheeto = catOf(state, 'cheeto')!;
     cheeto.stress = 0.5;
     petSession(state, 'cheeto', 20);
@@ -389,7 +393,7 @@ describe('carinho com memoria (o exploit morreu)', () => {
   });
 
   it('a memoria decai: depois de um tempo, carinho vale cheio de novo', () => {
-    const state = createHackathon(21);
+    const state = createHackathon(21, CLASSIC_TEAM, { classic: true });
     const cheeto = catOf(state, 'cheeto')!;
     petSession(state, 'cheeto', 20);
     petSession(state, 'cheeto', 20);
@@ -404,7 +408,7 @@ describe('carinho com memoria (o exploit morreu)', () => {
 
 describe('decisoes de engenharia', () => {
   it('tarefa com decisao aberta NAO anda; decidir muda custo e tags', () => {
-    const state = createHackathon(5);
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
     step(state, { grab: 'bigode' });
     step(state, { drop: 'desk-backend' });
     while (catOf(state, 'bigode')!.mode === 'walk') step(state, emptyCommand());
@@ -423,7 +427,7 @@ describe('decisoes de engenharia', () => {
   });
 
   it('microsservicos custam agora e pagam depois: b2 fica mais barato', () => {
-    const state = createHackathon(5);
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
     const b2 = state.tasks.find((t) => t.id === 'b2')!;
     const before = b2.cost;
     step(state, { choose: { task: 'b1', option: 'micro' } });
@@ -439,7 +443,7 @@ describe('o pitch e jogavel', () => {
   };
 
   it('parado no palco, a plateia esfria — pitch tambem sabe ser perdido', () => {
-    const state = createHackathon(2);
+    const state = createHackathon(2, CLASSIC_TEAM, { classic: true });
     toPitch(state);
     while (state.phase !== 'done') step(state, emptyCommand());
     expect(state.result!.plateia).toBeLessThan(0.2);
@@ -447,7 +451,7 @@ describe('o pitch e jogavel', () => {
   });
 
   it('habilidade sobe o gauge; repetir a MESMA rende metade', () => {
-    const state = createHackathon(2);
+    const state = createHackathon(2, CLASSIC_TEAM, { classic: true });
     toPitch(state);
     step(state, { ability: 'bigode' });
     const first = state.events.filter((e) => e.kind === 'ability').at(-1)!;
@@ -461,7 +465,7 @@ describe('o pitch e jogavel', () => {
   });
 
   it('crise respondida vira improviso heroico; ignorada, a demo crasha', () => {
-    const answer = createHackathon(2);
+    const answer = createHackathon(2, CLASSIC_TEAM, { classic: true });
     toPitch(answer);
     answer.pitch!.crisisAt = 10;
     answer.pitch!.crisisResolved = false;
@@ -473,7 +477,7 @@ describe('o pitch e jogavel', () => {
     expect(answer.result!.crashed).toBe(false);
     expect(answer.result!.improvised).toBe(true);
 
-    const ignore = createHackathon(2);
+    const ignore = createHackathon(2, CLASSIC_TEAM, { classic: true });
     toPitch(ignore);
     ignore.pitch!.crisisAt = 10;
     ignore.pitch!.crisisResolved = false;

@@ -11,9 +11,26 @@
  * cada uma com efeito mecanico, nunca so numero pintado).
  */
 
-export type CatId = 'bigode' | 'cheeto' | 'almofada' | 'smoking';
+/**
+ * Desde o Slice B o time e GERADO: o id e uma string por candidato. Os
+ * quatro classicos (bigode, cheeto, almofada, smoking) viraram o time de
+ * demonstracao e de teste.
+ */
+export type CatId = string;
 
 export type Track = 'backend' | 'frontend' | 'design' | 'devops';
+
+/** Especializacao: as quatro trilhas ou o freestyler (rende 0.75 em tudo). */
+export type Spec = Track | 'freestyler';
+
+/**
+ * Tier muda a FORMA de jogar, nao so a velocidade: junior aprende durante a
+ * run e shipa sujo; senior conserta rapido e shipa limpo; especialista voa
+ * na propria trilha e afunda fora dela.
+ */
+export type Tier = 'junior' | 'pleno' | 'senior' | 'especialista';
+
+export type CoatPattern = 'solid' | 'tabby' | 'tuxedo' | 'siames' | 'sphynx';
 
 /**
  * PERSONALIDADE: como o gato trabalha.
@@ -58,9 +75,21 @@ export type CatMode =
 export type Cat = {
   id: CatId;
   name: string;
-  specialty: Track;
+  specialty: Spec;
   personality: Personality;
   quirk: Quirk;
+  tier: Tier;
+  /** Traits visiveis + o oculto (revelado no meio da run). Todos mecanicos. */
+  traits: readonly string[];
+  hiddenTrait: string;
+  /** O trait oculto ja apareceu? (entra no hash: muda eventos futuros) */
+  revealed: boolean;
+  /** Pelagem 0xRRGGBB + padrao: dados puros, o cliente converte. */
+  coat: { body: number; mark: number; belly: number };
+  pattern: CoatPattern;
+  big: boolean;
+  /** A ficha em uma linha (nota do recrutador + curriculo). */
+  bio: string;
   x: number;
   y: number;
   targetX: number;
@@ -198,8 +227,8 @@ export type PitchState = {
   gauge: number;
   /** Ultima habilidade usada (repetir perde efeito). */
   lastAbility: CatId | null;
-  /** Tick em que cada gato pode agir de novo. */
-  readyAt: Record<CatId, number>;
+  /** Tick em que cada gato pode agir de novo (chaveado por id do time). */
+  readyAt: Record<string, number>;
   /** Tick da crise de demo (-1 = nao havera). */
   crisisAt: number;
   /** Fim da janela de resposta da crise (0 = sem crise ativa). */
@@ -225,6 +254,8 @@ export type SimEvent =
   | { kind: 'treat'; tick: number; cat: CatId }
   | { kind: 'cut'; tick: number; task: string }
   | { kind: 'overpet'; tick: number; cat: CatId }
+  | { kind: 'trait-revealed'; tick: number; cat: CatId; trait: string }
+  | { kind: 'sponsor-outage'; tick: number }
   | { kind: 'decision-needed'; tick: number; task: string }
   | { kind: 'decision'; tick: number; task: string; option: string }
   | { kind: 'pitch-start'; tick: number }
@@ -259,6 +290,13 @@ export type HackState = {
   stability: number;
   /** Uma escolha amarrou o projeto ao patrocinador: risco extra na demo. */
   sponsorRisk: boolean;
+  /** O projeto desta edicao (gerado da semente; classico nos testes). */
+  project: { name: string; brief: string; emphasis: string; risk: string };
+  /** O booth desta edicao: coordenadas E modificadores. */
+  layoutId: string;
+  layoutName: string;
+  layoutMods: { stressWork: number; stressIdle: number; fixSpeed: number; napRate: number; moralShip: number; eatScale: number };
+  slots: { id: SlotId; x: number; y: number; track: Track | null }[];
   pitch: PitchState | null;
   events: SimEvent[];
   result: DemoResult | null;
