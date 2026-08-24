@@ -36,6 +36,19 @@ export type App = {
   detach: InputTeardown[];
 };
 
+/**
+ * VIBRACAO: o tato do telefone, com a mesma disciplina das vozes — escassa.
+ * Pegar e soltar sao toquinhos; so os CRITICOS ganham padrao. Guardada porque
+ * nem todo aparelho (nem todo humano) quer vibrar.
+ */
+const buzz = (pattern: number | number[]): void => {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    // sem vibracao nao e sem jogo
+  }
+};
+
 const tickGame = (app: App): void => {
   const wasHeld = app.state.held;
   const cmd = buildCommand(app.input, app.state, () => performance.now());
@@ -44,13 +57,22 @@ const tickGame = (app: App): void => {
   // Pegar um gato PODE arrancar um chirp de reconhecimento — pode: as regras
   // de escassez (cooldown, vaga global, 1 em 3 silencioso) moram no modulo de
   // vozes, nao aqui.
-  if (!wasHeld && app.state.held) grabVocal(app.audio, app.state, app.state.held);
+  if (!wasHeld && app.state.held) {
+    grabVocal(app.audio, app.state, app.state.held);
+    buzz(8);
+  }
+  if (wasHeld && !app.state.held) buzz(14);
 
   const petted = app.input.petting ? app.state.cats.find((c) => c.id === app.input.petting) ?? null : null;
   setPetPurr(app.audio, app.state.phase === 'hack' ? petted : null);
 
   tickAudio(app.audio, app.state);
   eventsAudio(app.audio, app.state, events);
+  for (const e of events) {
+    if (e.kind === 'hairball' || e.kind === 'cable' || e.kind === 'build-broken') buzz([30, 40, 30]);
+    else if (e.kind === 'ship') buzz(12);
+    else if (e.kind === 'treat') buzz([8, 20, 8]);
+  }
   pushFeed(app.hud, app.state, events);
 
   if (app.state.phase === 'done') {
@@ -89,6 +111,9 @@ const frame = (app: App, now: number): void => {
     }
     drawHud(app.hud, app.state);
     drawCard(app.hud, app.state, app.input.selected);
+    // O botao de petisco pulsa enquanto armado: o proximo toque num gato
+    // alimenta, e o jogador precisa VER que o modo esta ligado.
+    app.hud.treatsBtn.classList.toggle('armed', app.input.feedArmed);
     app.hud.root.hidden = false;
   } else {
     app.accumulator = 0;

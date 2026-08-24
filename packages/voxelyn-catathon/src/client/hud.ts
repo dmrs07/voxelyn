@@ -7,6 +7,55 @@ import type { HackState, SimEvent, Task } from '../sim/types.js';
  * tela de graca. O canvas fica com o que tem posicao no mundo; o resto e DOM.
  */
 
+/**
+ * Icones FOFOS em SVG desenhado a mao, herdando a cor do botao.
+ *
+ * A licao da Iliada vale aqui dobrada: icone sozinho nao ensina (nao ha hover
+ * num dedo), entao TODO botao leva icone + PALAVRA. E SVG e nao emoji porque a
+ * plataforma pinta emoji com a paleta dela — um peixinho azul brilhante no
+ * meio do creme-e-laranja do pavilhao seria o escudo azul da Iliada de novo.
+ */
+const svg = (body: string): string =>
+  `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" ` +
+  `stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+
+export const ICONS = {
+  /** O peixinho do petisco: corpo, rabinho, olho feliz. */
+  fish: svg('<path d="M4 12c3-4 8-5 12-2 2 1.5 2 4.5 0 6-4 3-9 2-12-2z"/><path d="M16 9l4-3-1 6 1 6-4-3"/><circle cx="8" cy="11" r="0.6" fill="currentColor"/>'),
+  /** O quadro de tarefas: prancheta com post-its. */
+  board: svg('<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2.5h6v3H9z"/><path d="M7.5 10h4"/><path d="M7.5 14h6"/><path d="M7.5 18h3"/><circle cx="16.5" cy="10" r="1.1"/>'),
+  /** Som: uma orelhinha de gato ouvindo uma nota. */
+  sound: svg('<path d="M5 14V7l4-4 3 6v5a3.5 3.5 0 11-7 0z"/><path d="M16 6v9"/><circle cx="14.2" cy="15.8" r="1.8"/><path d="M16 6l3 1.5"/>'),
+  /** Cortar escopo: tesourinha. */
+  scissors: svg('<circle cx="6" cy="7" r="2.4"/><circle cx="6" cy="17" r="2.4"/><path d="M8.2 8.4L19 17"/><path d="M8.2 15.6L19 7"/>'),
+  /** A credencial do hackathon: comecar e pendurar o cracha. */
+  badge: svg('<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M12 8V5"/><path d="M8 3h8l-1.5 2h-5z"/><path d="M9.5 13h5"/><path d="M9.5 16.5h3.5"/>'),
+  /** Jogar de novo: a seta que volta. */
+  again: svg('<path d="M5 12a7 7 0 1 1 2 5"/><path d="M5 17v-5h5"/>'),
+} as const;
+
+/**
+ * Um botao MACIO: cantos generosos, gradiente quente, e fisica de apertar
+ * (afunda e perde a sombra). A fofura mora na TEXTURA e no gesto — nunca em
+ * formato de pata ou orelha: botao fantasiado de gato e caricatura, e a
+ * direcao do jogo inteiro e "gatos produtivos a meia-noite", nao desenho
+ * animado. Icone + PALAVRA sempre: num dedo nao existe hover.
+ */
+const softButton = (icon: string, word: string, className = ''): HTMLButtonElement => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `soft-btn ${className}`.trim();
+  const ic = document.createElement('span');
+  ic.className = 'btn-icon';
+  ic.innerHTML = icon;
+  ic.setAttribute('aria-hidden', 'true');
+  const w = document.createElement('span');
+  w.className = 'btn-word';
+  w.textContent = word;
+  b.append(ic, w);
+  return b;
+};
+
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className: string,
@@ -60,15 +109,16 @@ export const createHud = (
   const top = el('div', 'hud-top');
   const clock = el('div', 'hud-clock', 'SEX 18:00');
   const score = el('div', 'hud-score', '');
-  const treatsBtn = el('button', 'hud-btn', `petisco x${TREATS_START}`);
-  treatsBtn.type = 'button';
+  // Os botoes de acao moram num CACHO no canto inferior direito — o alcance
+  // do polegar de quem segura o aparelho. O topo fica so com informacao.
+  const treatsBtn = softButton(ICONS.fish, `petisco x${TREATS_START}`, 'treat');
   treatsBtn.addEventListener('click', handlers.onFeedToggle);
-  // O quadro e um PAINEL ABERTO POR BOTAO, nao um moviel permanente: fixo, ele
+  // O quadro e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo, ele
   // cobria as mesas de design e devops e o rack — metade do pavilhao atras de
   // uma lista. Aberto por vontade, pode ser grande a vontade.
-  const boardBtn = el('button', 'hud-btn push', 'quadro');
-  boardBtn.type = 'button';
-  top.append(clock, score, boardBtn, treatsBtn);
+  const boardBtn = softButton(ICONS.board, 'quadro');
+  top.append(clock, score);
+  const cluster = el('div', 'btn-cluster');
 
   const board = el('div', 'hud-board');
   board.hidden = true;
@@ -85,8 +135,7 @@ export const createHud = (
   // O PAINEL DE SOM: cinco faixas independentes, com palavra, atras de botao.
   // "Jogar horas sem fadiga auditiva" comeca em poder abaixar exatamente o que
   // cansa — e um controle por barramento e acessibilidade, nao luxo.
-  const soundBtn = el('button', 'hud-btn', 'som');
-  soundBtn.type = 'button';
+  const soundBtn = softButton(ICONS.sound, 'som');
   const soundPanel = el('div', 'hud-sound');
   soundPanel.hidden = true;
   const BUS_LABEL: Record<string, string> = {
@@ -112,10 +161,18 @@ export const createHud = (
   soundBtn.addEventListener('click', () => {
     soundPanel.hidden = !soundPanel.hidden;
   });
-  top.insertBefore(soundBtn, treatsBtn);
+  cluster.append(soundBtn, boardBtn, treatsBtn);
 
-  root.append(top, board, soundPanel, feed, card);
+  root.append(top, cluster, board, soundPanel, feed, card);
   host.appendChild(root);
+
+  // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
+  // nunca bloqueio — e mora no HOST, fora do root que se esconde no titulo:
+  // e justamente na tela de titulo que girar mais ajuda.
+  const hint = el('div', 'rotate-hint', 'gire o aparelho para ver o pavilhao inteiro');
+  hint.setAttribute('role', 'status');
+  host.appendChild(hint);
+
   return { root, clock, score, treatsBtn, board, feed, card, rows: new Map(), ...handlers };
 };
 
@@ -141,8 +198,10 @@ const makeRow = (t: Task, onCut: (id: string) => void): TaskRow => {
   const bar = el('span', 'task-bar');
   const fill = el('span', 'task-fill');
   bar.appendChild(fill);
-  const cutBtn = el('button', 'task-cut', 'cortar');
+  const cutBtn = document.createElement('button');
   cutBtn.type = 'button';
+  cutBtn.className = 'task-cut';
+  cutBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.scissors}</span><span>cortar</span>`;
   cutBtn.title = 'tirar do escopo: nao pontua, mas nao vira ponta solta';
   cutBtn.addEventListener('click', () => onCut(t.id));
   row.append(state, bar, cutBtn);
@@ -226,7 +285,10 @@ export const drawHud = (hud: Hud, state: HackState): void => {
   hud.score.textContent =
     `features ${shipped}/12 · bugs ${bugs}` + (flags.length ? ` · ${flags.join(' · ')}` : '');
   hud.score.classList.toggle('hud-alarm', flags.length > 0);
-  hud.treatsBtn.textContent = `petisco x${state.treats}`;
+  // O rotulo vive no span da palavra: trocar textContent do botao inteiro
+  // apagaria os toe beans e o peixinho.
+  const word = hud.treatsBtn.querySelector('.btn-word');
+  if (word && word.textContent !== `petisco x${state.treats}`) word.textContent = `petisco x${state.treats}`;
   hud.treatsBtn.disabled = state.treats <= 0;
 
   if (hud.rows.size === 0) {
@@ -332,8 +394,7 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
     wrap.appendChild(story);
   }
 
-  const again = el('button', 'hud-btn big', 'jogar de novo');
-  again.type = 'button';
+  const again = softButton(ICONS.again, 'jogar de novo', 'big');
   again.addEventListener('click', onAgain);
   wrap.appendChild(again);
   host.appendChild(wrap);
@@ -352,8 +413,7 @@ export const showTitle = (host: HTMLElement, onStart: () => void): void => {
   wrap.appendChild(
     el('p', 'title-help', 'arrasta um gato para a mesa dele. segura o dedo em cima = carinho (e o "shipa" do Bigode). petisco = botao. corta escopo no quadro. emergencia? leva alguem ao rack.')
   );
-  const start = el('button', 'hud-btn big', 'comecar');
-  start.type = 'button';
+  const start = softButton(ICONS.badge, 'comecar', 'big');
   start.addEventListener('click', onStart);
   wrap.appendChild(start);
   host.appendChild(wrap);

@@ -52,8 +52,16 @@ const step = [];
 const shot = (name) => page.screenshot({ path: join(outDir, `${name}.png`) });
 const sim = (fn) => page.evaluate(fn);
 
+// Primeiro em RETRATO: o aviso de girar tem de existir (aviso, nao bloqueio).
+await page.setViewportSize({ width: phone.viewport.width, height: phone.viewport.height });
 await page.goto('http://localhost:4189/', { waitUntil: 'networkidle' });
 step.push(`titulo: ${await page.locator('.title-logo').textContent()}`);
+await shot('c0-retrato');
+const hint = await page.locator('.rotate-hint').isVisible();
+if (!hint) throw new Error('o aviso de girar nao aparece em retrato');
+step.push('aviso de girar visivel em retrato');
+await page.setViewportSize({ width: phone.viewport.height, height: phone.viewport.width });
+await page.waitForTimeout(200);
 await shot('c1-titulo');
 
 // AUDIO: nenhum AudioContext antes do primeiro gesto (politica de autoplay —
@@ -71,11 +79,21 @@ await page.waitForTimeout(400);
 const buttons = await page.evaluate(() =>
   Array.from(document.querySelectorAll('button'))
     .filter((b) => b.offsetParent !== null)
-    .map((b) => ({ text: (b.textContent ?? '').trim(), h: b.getBoundingClientRect().height }))
+    .map((b) => ({
+      text: (b.textContent ?? '').trim(),
+      h: b.getBoundingClientRect().height,
+      icon: b.querySelector('.btn-icon')?.innerHTML ?? '',
+    }))
 );
 if (buttons.some((b) => b.text.length < 3)) throw new Error('botao sem palavra');
 if (buttons.some((b) => b.text !== 'cortar' && b.h < 44)) throw new Error('botao com alvo < 44px');
-step.push(`botoes com palavra e alvo ok: ${buttons.length}`);
+// Icones DISTINTOS entre si no cacho: dois botoes com o mesmo desenho e a
+// ilegibilidade do »/≫ da Iliada de novo.
+const cluster = await page.evaluate(() =>
+  Array.from(document.querySelectorAll('.btn-cluster .soft-btn .btn-icon')).map((n) => n.innerHTML)
+);
+if (new Set(cluster).size !== cluster.length) throw new Error('dois botoes do cacho com o mesmo icone');
+step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
 // --- ARRASTAR: Bigode para a mesa de backend, so com toque -----------------
 const box = await page.locator('#stage').boundingBox();

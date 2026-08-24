@@ -70,30 +70,74 @@ body {
 .hud-score { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
 .hud-alarm { color: var(--alarm); font-weight: 700; }
 
-.hud-btn {
+/* -------------------------------------------------------- botoes macios */
+
+/*
+ * O BOTAO MACIO. A fofura e TEXTURA, nao fantasia: canto generoso, gradiente
+ * quente de creme, sombra "de espessura" que some quando o dedo afunda o
+ * botao — apertar TEM fisica. Nada de formato de pata, orelha ou toe bean:
+ * botao fantasiado de gato e caricatura, e a direcao do jogo e "gatos
+ * produtivos a meia-noite", nao desenho animado.
+ *
+ * Icone + PALAVRA sempre (nao ha hover num dedo), alvo minimo 56px.
+ */
+.soft-btn {
   pointer-events: auto;
-  min-height: 44px; /* alvo de toque minimo: nunca menos */
-  padding: 6px 16px;
-  border-radius: 22px;
-  border: 1px solid var(--accent);
-  background: rgba(232, 148, 62, 0.16);
-  color: var(--accent);
+  min-height: 56px;
+  min-width: 76px;
+  padding: 9px 16px;
+  border-radius: 16px;
+  border: 1.5px solid #b9825a;
+  background: linear-gradient(180deg, #f4e2c6 0%, #e9cba0 100%);
+  color: #6f4526;
   font-family: var(--font);
   font-weight: 700;
-  font-size: inherit;
+  font-size: 0.95em;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 3px 0 #96653f, 0 6px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 70ms ease, box-shadow 70ms ease;
 }
-.hud-btn:disabled { opacity: 0.4; }
-/* O primeiro botao empurra o grupo para a borda; sem isto ele caia no meio da
-   faixa do palco, laranja sobre laranja, ilegivel. */
-.hud-btn.push { margin-left: auto; }
-.hud-btn.big { min-height: 52px; padding: 10px 28px; font-size: 1.2em; }
+.soft-btn:active {
+  transform: translateY(3px) scale(0.97);
+  box-shadow: 0 0 0 #96653f, 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+.soft-btn:disabled { opacity: 0.45; filter: grayscale(0.6); }
+
+.soft-btn .btn-icon { line-height: 0; }
+.soft-btn .btn-word { font-size: 0.8em; letter-spacing: 0.02em; }
+
+.soft-btn.big { min-width: 160px; font-size: 1.12em; flex-direction: row; gap: 8px; padding: 12px 24px; }
+
+/* Petisco ARMADO: o proximo toque num gato alimenta — um brilho calmo avisa. */
+.soft-btn.treat.armed {
+  border-color: var(--accent);
+  box-shadow: 0 3px 0 #96653f, 0 0 14px rgba(232, 148, 62, 0.55);
+}
+
+/* O cacho dos botoes: canto inferior direito, alcance do polegar. */
+.btn-cluster {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+.btn-cluster .soft-btn { pointer-events: auto; }
 
 /* ---------------------------------------------------------------- quadro */
 
 .hud-board {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 52px);
-  right: calc(env(safe-area-inset-right, 0px) + 8px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  right: calc(env(safe-area-inset-right, 0px) + 96px);
   width: min(340px, 60vw);
   display: grid;
   gap: 6px;
@@ -123,15 +167,21 @@ body {
 
 .task-cut {
   pointer-events: auto;
-  min-height: 28px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-  border-radius: 14px;
-  padding: 0 8px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1.5px solid #b9825a;
+  background: rgba(246, 228, 200, 0.12);
+  color: #eccfa4;
+  border-radius: 17px;
+  padding: 2px 10px;
   font-size: 0.78em;
   font-family: var(--font);
 }
+.task-cut .btn-icon { line-height: 0; }
+.task-cut .btn-icon svg { width: 13px; height: 13px; }
+.task-cut:active { transform: scale(0.94); }
 
 /* ------------------------------------------------------------------ feed */
 
@@ -210,8 +260,8 @@ body {
 
 .hud-sound {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 52px);
-  right: calc(env(safe-area-inset-right, 0px) + 8px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  right: calc(env(safe-area-inset-right, 0px) + 96px);
   width: min(260px, 56vw);
   background: var(--panel);
   border: 1px solid var(--border);
@@ -226,3 +276,32 @@ body {
 .sound-row { display: flex; align-items: center; gap: 8px; }
 .sound-label { width: 70px; font-size: 0.85em; }
 .sound-row input[type='range'] { flex: 1; accent-color: var(--accent); min-height: 32px; }
+
+
+/* O feed nao disputa com o cacho: fica a esquerda, e em tela estreita sobe. */
+@media (max-width: 720px) {
+  .hud-feed { width: 52vw; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  .hud-board, .hud-sound { right: calc(env(safe-area-inset-right, 0px) + 8px); bottom: calc(env(safe-area-inset-bottom, 0px) + 86px); width: min(320px, 78vw); }
+  .soft-btn { min-width: 68px; font-size: 0.88em; }
+}
+
+/* ------------------------------------------------------ retrato (aviso) */
+
+.rotate-hint { display: none; }
+
+@media (orientation: portrait) and (max-width: 620px) {
+  .rotate-hint {
+    display: block;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+    background: var(--panel);
+    border: 1.5px solid #b9825a;
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 6;
+  }
+}
