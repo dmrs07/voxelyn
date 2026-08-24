@@ -1,0 +1,75 @@
+import { HASH_METER, HASH_POS } from './constants.js';
+import type { HackState } from './types.js';
+
+/**
+ * FNV-1a, o mesmo formato dos irmaos (Survival, Iliada). O valor de um hash de
+ * determinismo esta em ser o MESMO em toda a casa: e o que permite comparar
+ * divergencia entre dois processos com as ferramentas que ja existem.
+ */
+const FNV_OFFSET = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+class Fnv1a {
+  private h = FNV_OFFSET;
+
+  u32(v: number): void {
+    let x = v >>> 0;
+    for (let i = 0; i < 4; i++) {
+      this.h ^= x & 0xff;
+      this.h = Math.imul(this.h, FNV_PRIME) >>> 0;
+      x >>>= 8;
+    }
+  }
+
+  /** Ponto fixo explicito: float direto no hash e divergencia garantida. */
+  fixed(v: number, scale: number): void {
+    this.u32(Math.round(v * scale) | 0);
+  }
+
+  str(s: string): void {
+    this.u32(s.length);
+    for (let i = 0; i < s.length; i++) this.u32(s.charCodeAt(i));
+  }
+
+  digest(): string {
+    return (this.h >>> 0).toString(16).padStart(8, '0');
+  }
+}
+
+export const hashState = (state: HackState): string => {
+  const h = new Fnv1a();
+  h.u32(state.tick);
+  h.u32(state.rngState);
+  h.str(state.phase);
+  h.u32(state.treats);
+  h.u32(state.buildBroken ? 1 : 0);
+  h.str(state.held ?? '-');
+  h.u32(state.cableOut ? 1 : 0);
+  h.fixed(state.cableProgress, 1);
+  for (const c of state.cats) {
+    h.str(c.id);
+    h.fixed(c.x, HASH_POS);
+    h.fixed(c.y, HASH_POS);
+    h.fixed(c.energy, HASH_METER);
+    h.fixed(c.hunger, HASH_METER);
+    h.fixed(c.stress, HASH_METER);
+    h.str(c.mode);
+    h.str(c.slot ?? '-');
+    h.u32(c.modeUntil);
+  }
+  for (const t of state.tasks) {
+    h.fixed(t.progress, 1);
+    h.u32((t.done ? 1 : 0) | (t.cut ? 2 : 0) | (t.awaitingShip ? 4 : 0));
+  }
+  for (const b of state.bugs) {
+    h.u32(b.id);
+    h.str(b.track);
+    h.fixed(b.progress, 1);
+    h.u32(b.fixed ? 1 : 0);
+  }
+  h.u32(state.hairball.fired);
+  h.u32(state.hairball.active ? 1 : 0);
+  h.fixed(state.hairball.progress, 1);
+  h.u32(state.events.length);
+  return h.digest();
+};
