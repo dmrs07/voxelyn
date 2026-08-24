@@ -57,13 +57,36 @@ export const hashState = (state: HackState): string => {
     h.fixed(c.energy, HASH_METER);
     h.fixed(c.hunger, HASH_METER);
     h.fixed(c.stress, HASH_METER);
+    // Moral manda na velocidade; a memoria do carinho manda no proximo
+    // carinho. Ambos determinam o futuro — ambos entram.
+    h.fixed(c.moral, HASH_METER);
+    h.u32(c.petStreak);
+    h.u32(c.petLastTick + 1);
     h.str(c.mode);
     h.str(c.slot ?? '-');
     h.u32(c.modeUntil);
   }
   for (const t of state.tasks) {
     h.fixed(t.progress, 1);
+    // A decisao muda custos e tags: dois estados com escolhas diferentes NAO
+    // podem colidir.
+    h.u32(t.cost);
+    h.str(t.chosen ?? '-');
     h.u32((t.done ? 1 : 0) | (t.cut ? 2 : 0) | (t.awaitingShip ? 4 : 0));
+  }
+  h.u32(state.debt + 8);
+  h.u32(state.innovation + 8);
+  h.u32(state.uxCare);
+  h.u32(state.stability);
+  h.u32(state.sponsorRisk ? 1 : 0);
+  if (state.pitch) {
+    h.u32(state.pitch.ticksLeft);
+    h.fixed(state.pitch.gauge, HASH_METER);
+    h.str(state.pitch.lastAbility ?? '-');
+    h.u32(state.pitch.crisisAt + 1);
+    h.u32(state.pitch.crisisUntil);
+    h.u32(state.pitch.crisisResolved ? 1 : 0);
+    for (const id of ['bigode', 'cheeto', 'almofada', 'smoking'] as const) h.u32(state.pitch.readyAt[id]);
   }
   for (const b of state.bugs) {
     h.u32(b.id);

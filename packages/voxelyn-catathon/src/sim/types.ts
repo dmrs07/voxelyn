@@ -78,6 +78,32 @@ export type Cat = {
    * Gerir estresse E gerir bugs, porque bug nasce de estresse.
    */
   stress: number;
+  /**
+   * 0..1. MORAL: cooperacao e vontade. Sobe com carinho (bem dado), ship
+   * proprio e da equipe; desce trabalhando exausto e sendo despejado. Manda
+   * na VELOCIDADE de trabalho — gato desanimado rende menos, e nenhum
+   * medidor e enfeite.
+   */
+  moral: number;
+  /**
+   * Carinho tem MEMORIA: sessoes seguidas rendem cada vez menos, e a
+   * terceira SUPERESTIMULA (estresse sobe). Streak decai com o tempo — o
+   * jogador aprende o ritmo de cada gato em vez de esfregar o dedo.
+   */
+  petStreak: number;
+  /** Tick do fim da ultima sessao de carinho (-1 = nunca). */
+  petLastTick: number;
+};
+
+/**
+ * DECISAO DE ENGENHARIA embutida numa tarefa: a tarefa com `choice` NAO anda
+ * enquanto o jogador nao escolher — colocar um gato e esperar barras encherem
+ * nao e jogo. Cada opcao mexe em custos (agora e depois) e em tags de
+ * pontuacao (divida, inovacao, estabilidade, risco do patrocinador).
+ */
+export type TaskChoice = {
+  prompt: string;
+  options: readonly { id: string; label: string; hint: string }[];
 };
 
 export type Task = {
@@ -86,6 +112,9 @@ export type Task = {
   label: string;
   polish: boolean;
   cost: number;
+  choice?: TaskChoice;
+  /** Opcao escolhida (id) ou null enquanto a decisao esta aberta. */
+  chosen: string | null;
   /**
    * O GRAFO. Uma tarefa so pode ser trabalhada com as dependencias prontas — o
    * dashboard espera a API, que espera o schema. E o que transforma "aloque
@@ -127,6 +156,19 @@ export type Hairball = {
 
 export type Outcome = 'grand-prize' | 'podio' | 'mencao' | 'participacao' | 'crashed';
 
+/**
+ * A nota nao e um numero: e CINCO dimensoes + o voto popular. O projeto com
+ * mais features nem sempre vence — estabilidade, experiencia, inovacao e o
+ * proprio pitch pesam, e o detalhamento e o pos-jogo inteiro.
+ */
+export type ScoreDimensions = {
+  tecnica: number;
+  estabilidade: number;
+  experiencia: number;
+  inovacao: number;
+  pitch: number;
+};
+
 export type DemoResult = {
   core: number;
   polish: number;
@@ -134,9 +176,36 @@ export type DemoResult = {
   looseEnds: number;
   /** As tres notas, uma por juiz, na ordem de JUDGES. */
   perJudge: [number, number, number];
+  dimensions: ScoreDimensions;
+  /** 0..1: onde o gauge da plateia terminou. */
+  plateia: number;
   score: number;
   crashed: boolean;
+  /** A crise de demo virou improviso heroico? Historia pra contar. */
+  improvised: boolean;
   outcome: Outcome;
+};
+
+/**
+ * O PITCH e fase jogavel, nao cutscene: o gauge da plateia decai sozinho e
+ * cada gato tem UMA habilidade de palco (cooldown proprio; repetir a mesma
+ * rende metade). A crise de demo — o bug que estourou — abre uma janela
+ * curta: responder com qualquer habilidade vira improviso heroico.
+ */
+export type PitchState = {
+  ticksLeft: number;
+  /** 0..1: atencao/afeicao da plateia. */
+  gauge: number;
+  /** Ultima habilidade usada (repetir perde efeito). */
+  lastAbility: CatId | null;
+  /** Tick em que cada gato pode agir de novo. */
+  readyAt: Record<CatId, number>;
+  /** Tick da crise de demo (-1 = nao havera). */
+  crisisAt: number;
+  /** Fim da janela de resposta da crise (0 = sem crise ativa). */
+  crisisUntil: number;
+  /** A crise ja foi respondida (ou nunca existiu)? */
+  crisisResolved: boolean;
 };
 
 export type SimEvent =
@@ -155,9 +224,16 @@ export type SimEvent =
   | { kind: 'build-broken'; tick: number }
   | { kind: 'treat'; tick: number; cat: CatId }
   | { kind: 'cut'; tick: number; task: string }
+  | { kind: 'overpet'; tick: number; cat: CatId }
+  | { kind: 'decision-needed'; tick: number; task: string }
+  | { kind: 'decision'; tick: number; task: string; option: string }
+  | { kind: 'pitch-start'; tick: number }
+  | { kind: 'ability'; tick: number; cat: CatId; effect: number }
+  | { kind: 'demo-glitch'; tick: number }
+  | { kind: 'improviso'; tick: number; cat: CatId }
   | { kind: 'demo'; tick: number; result: DemoResult };
 
-export type Phase = 'hack' | 'done';
+export type Phase = 'hack' | 'pitch' | 'done';
 
 export type HackState = {
   tick: number;
@@ -176,6 +252,14 @@ export type HackState = {
   held: CatId | null;
   handX: number;
   handY: number;
+  /** Tags acumuladas pelas DECISOES de tarefa. Cada uma pesa na banca. */
+  debt: number;
+  innovation: number;
+  uxCare: number;
+  stability: number;
+  /** Uma escolha amarrou o projeto ao patrocinador: risco extra na demo. */
+  sponsorRisk: boolean;
+  pitch: PitchState | null;
   events: SimEvent[];
   result: DemoResult | null;
 };
@@ -190,6 +274,10 @@ export type Command = {
   release?: boolean;
   /** Cortar uma tarefa do escopo, pelo quadro. */
   cut?: string;
+  /** Decidir uma tarefa com escolha aberta. */
+  choose?: { task: string; option: string };
+  /** No pitch: mandar um gato usar a habilidade de palco. */
+  ability?: CatId;
   handX?: number;
   handY?: number;
 };

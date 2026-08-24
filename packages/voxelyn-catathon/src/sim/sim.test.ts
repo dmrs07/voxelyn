@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HACK_TICKS, STRESS_DANGER, TREATS_START } from './constants.js';
+import { ABILITY_COOLDOWN, HACK_TICKS, PET_MEMORY_TICKS, STRESS_DANGER, TASK_CORE_COST, TREATS_START } from './constants.js';
 import { catOf, createHackathon, emptyCommand, hashState, liveBug, nextTask, step, workable } from './index.js';
 import type { CatId, Command, HackState, SlotId } from './types.js';
 
@@ -17,7 +17,9 @@ const DESKS: Record<CatId, SlotId> = {
 };
 
 const runIdle = (state: HackState): void => {
-  while (state.phase === 'hack') step(state, emptyCommand());
+  // Ate o FIM — inclusive o pitch, onde ficar parado tambem perde: a plateia
+  // esfria e a crise de demo passa sem resposta.
+  while (state.phase !== 'done') step(state, emptyCommand());
 };
 
 /**
@@ -30,9 +32,34 @@ const runIdle = (state: HackState): void => {
  * bot o arrancava do puff, ele fugia de volta, e o build quebrava com o
  * "conserto" em andamento. A triagem e o jogo.
  */
+/** A ordem de palco do bot: revezar habilidades (repetir rende metade). */
+const PITCH_ORDER = ['bigode', 'cheeto', 'almofada', 'smoking'] as const;
+
 const runCompetent = (state: HackState): void => {
-  while (state.phase === 'hack') {
+  let stage = 0;
+  while (state.phase !== 'done') {
+    if (state.phase === 'pitch') {
+      // No palco: revezar quem age, sempre que alguem estiver pronto — e
+      // qualquer um pronto responde a crise (a janela e curta).
+      const p = state.pitch!;
+      const ready = PITCH_ORDER.filter((id) => (p.readyAt[id] ?? 0) <= state.tick);
+      const pick = ready.find((id) => id === PITCH_ORDER[stage % 4]) ?? ready[0];
+      if (pick) {
+        stage++;
+        step(state, { ability: pick });
+      } else {
+        step(state, emptyCommand());
+      }
+      continue;
+    }
     const cmd: Command = {};
+    // Decisao aberta e a PRIMEIRA prioridade: mesa parada nao produz.
+    const open = state.tasks.find((t) => t.choice && t.chosen === null && !t.done && !t.cut);
+    if (open) {
+      const pickOption = open.id === 'b1' ? 'micro' : open.id === 'd1' ? 'sistemaPrimeiro' : 'pipelineCompleto';
+      step(state, { choose: { task: open.id, option: pickOption } });
+      continue;
+    }
     const emergency = state.hairball.active || state.cableOut;
     const atRack = state.cats.find((c) => c.slot === 'rack' && c.mode !== 'nap');
     // O bombeiro e o gato com a PIOR necessidade mais folgada: energia OU fome
@@ -157,9 +184,10 @@ describe('o grafo de dependencias', () => {
     f3.progress = 100;
     step(state, { cut: 'f3' });
     expect(f3.cut).toBe(true);
-    // Forca a demo e confere que a cortada nao conta como ponta solta.
+    // Forca o fim das 48h, atravessa o pitch e confere que a cortada nao
+    // conta como ponta solta.
     state.tick = HACK_TICKS - 1;
-    step(state, emptyCommand());
+    while (state.phase !== 'done') step(state, emptyCommand());
     expect(state.result!.looseEnds).toBe(0);
   });
 });
@@ -168,6 +196,7 @@ describe('psicologia felina (cada traco e mecanico)', () => {
   it('o perfeccionista SEGURA a feature pronta; o carinho e o "shipa"', () => {
     const state = createHackathon(3);
     const bigode = catOf(state, 'bigode')!;
+    step(state, { choose: { task: 'b1', option: 'monolito' } });
     step(state, { grab: 'bigode' });
     step(state, { drop: 'desk-backend' });
     while (bigode.mode === 'walk') step(state, emptyCommand());
@@ -295,6 +324,7 @@ describe('necessidades', () => {
   it('bug vivo bloqueia a trilha e consertar reabre', () => {
     const state = createHackathon(9);
     state.bugs.push({ id: 0, track: 'design', by: 'cheeto', cost: 60, progress: 0, fixed: false });
+    step(state, { choose: { task: 'd1', option: 'componentesLocais' } });
     step(state, { grab: 'smoking' });
     step(state, { drop: 'desk-design' });
     const cat = catOf(state, 'smoking')!;
@@ -325,5 +355,130 @@ describe('a bola de pelo', () => {
     while (state.hairball.active && guard++ < HACK_TICKS) step(state, emptyCommand());
     expect(state.buildBroken).toBe(false);
     expect(state.events.some((e) => e.kind === 'hairball-fixed')).toBe(true);
+  });
+});
+
+describe('carinho com memoria (o exploit morreu)', () => {
+  const petSession = (state: HackState, cat: string, ticks: number): void => {
+    for (let i = 0; i < ticks; i++) step(state, { pet: cat as 'cheeto' });
+    step(state, emptyCommand()); // fecha a sessao: a memoria registra
+  };
+
+  it('carinho baixa estresse e sobe moral — e NAO recupera energia', () => {
+    const state = createHackathon(21);
+    const cheeto = catOf(state, 'cheeto')!;
+    cheeto.stress = 0.6;
+    const moral0 = cheeto.moral;
+    const energy0 = cheeto.energy;
+    petSession(state, 'cheeto', 30);
+    expect(cheeto.stress).toBeLessThan(0.6);
+    expect(cheeto.moral).toBeGreaterThan(moral0);
+    expect(cheeto.energy).toBeLessThanOrEqual(energy0);
+  });
+
+  it('a terceira sessao seguida SUPERESTIMULA: estresse sobe', () => {
+    const state = createHackathon(21);
+    const cheeto = catOf(state, 'cheeto')!;
+    cheeto.stress = 0.5;
+    petSession(state, 'cheeto', 20);
+    petSession(state, 'cheeto', 20);
+    const before = cheeto.stress;
+    petSession(state, 'cheeto', 20);
+    expect(cheeto.stress).toBeGreaterThan(before);
+    expect(state.events.some((e) => e.kind === 'overpet' && e.cat === 'cheeto')).toBe(true);
+  });
+
+  it('a memoria decai: depois de um tempo, carinho vale cheio de novo', () => {
+    const state = createHackathon(21);
+    const cheeto = catOf(state, 'cheeto')!;
+    petSession(state, 'cheeto', 20);
+    petSession(state, 'cheeto', 20);
+    // Passa o tempo da memoria sem carinho nenhum — jogando, nao editando.
+    for (let i = 0; i < PET_MEMORY_TICKS + 2; i++) step(state, emptyCommand());
+    cheeto.stress = 0.5;
+    const before = cheeto.stress;
+    petSession(state, 'cheeto', 20);
+    expect(cheeto.stress).toBeLessThan(before);
+  });
+});
+
+describe('decisoes de engenharia', () => {
+  it('tarefa com decisao aberta NAO anda; decidir muda custo e tags', () => {
+    const state = createHackathon(5);
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    while (catOf(state, 'bigode')!.mode === 'walk') step(state, emptyCommand());
+    const b1 = state.tasks.find((t) => t.id === 'b1')!;
+    for (let i = 0; i < 320; i++) step(state, emptyCommand());
+    expect(b1.progress).toBe(0);
+    expect(state.events.some((e) => e.kind === 'decision-needed')).toBe(true);
+
+    step(state, { choose: { task: 'b1', option: 'serverless' } });
+    expect(b1.chosen).toBe('serverless');
+    expect(b1.cost).toBe(Math.round(TASK_CORE_COST * 0.7));
+    expect(state.sponsorRisk).toBe(true);
+    expect(state.innovation).toBe(1);
+    for (let i = 0; i < 30; i++) step(state, emptyCommand());
+    expect(b1.progress).toBeGreaterThan(0);
+  });
+
+  it('microsservicos custam agora e pagam depois: b2 fica mais barato', () => {
+    const state = createHackathon(5);
+    const b2 = state.tasks.find((t) => t.id === 'b2')!;
+    const before = b2.cost;
+    step(state, { choose: { task: 'b1', option: 'micro' } });
+    expect(b2.cost).toBeLessThan(before);
+  });
+});
+
+describe('o pitch e jogavel', () => {
+  const toPitch = (state: HackState): void => {
+    state.tick = HACK_TICKS - 1;
+    step(state, emptyCommand());
+    expect(state.phase).toBe('pitch');
+  };
+
+  it('parado no palco, a plateia esfria — pitch tambem sabe ser perdido', () => {
+    const state = createHackathon(2);
+    toPitch(state);
+    while (state.phase !== 'done') step(state, emptyCommand());
+    expect(state.result!.plateia).toBeLessThan(0.2);
+    expect(state.result!.dimensions.pitch).toBeLessThanOrEqual(5);
+  });
+
+  it('habilidade sobe o gauge; repetir a MESMA rende metade', () => {
+    const state = createHackathon(2);
+    toPitch(state);
+    step(state, { ability: 'bigode' });
+    const first = state.events.filter((e) => e.kind === 'ability').at(-1)!;
+    for (let i = 0; i < ABILITY_COOLDOWN + 1; i++) step(state, emptyCommand());
+    step(state, { ability: 'bigode' });
+    const second = state.events.filter((e) => e.kind === 'ability').at(-1)!;
+    expect(first.kind === 'ability' && second.kind === 'ability').toBe(true);
+    if (first.kind === 'ability' && second.kind === 'ability') {
+      expect(second.effect).toBeCloseTo(first.effect * 0.5, 5);
+    }
+  });
+
+  it('crise respondida vira improviso heroico; ignorada, a demo crasha', () => {
+    const answer = createHackathon(2);
+    toPitch(answer);
+    answer.pitch!.crisisAt = 10;
+    answer.pitch!.crisisResolved = false;
+    for (let i = 0; i < 11; i++) step(answer, emptyCommand());
+    expect(answer.events.some((e) => e.kind === 'demo-glitch')).toBe(true);
+    step(answer, { ability: 'almofada' });
+    expect(answer.events.some((e) => e.kind === 'improviso')).toBe(true);
+    while (answer.phase !== 'done') step(answer, emptyCommand());
+    expect(answer.result!.crashed).toBe(false);
+    expect(answer.result!.improvised).toBe(true);
+
+    const ignore = createHackathon(2);
+    toPitch(ignore);
+    ignore.pitch!.crisisAt = 10;
+    ignore.pitch!.crisisResolved = false;
+    while (ignore.phase !== 'done') step(ignore, emptyCommand());
+    expect(ignore.result!.crashed).toBe(true);
+    expect(ignore.result!.outcome).toBe('crashed');
   });
 });

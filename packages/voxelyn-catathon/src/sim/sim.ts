@@ -1,14 +1,22 @@
 import {
+  ABILITY_CHEETO_MISHAP,
+  ABILITY_CHEETO_MISHAP_P,
+  ABILITY_COOLDOWN,
+  ABILITY_EFFECT,
+  ABILITY_REPEAT_SCALE,
   BIGODE_CSS_SPEED,
   BUG_COST,
   CABLE_BITE_P,
   CABLE_FIX_COST,
   CALM_SCALE,
+  CHOICE_COST,
   COWBOY_BUG_P,
   COWBOY_SHORTCUT_P,
   COWBOY_SPEED,
   CRASH_CABLE_OUT,
   CRASH_PER_BUG,
+  CRISIS_DRAIN,
+  CRISIS_WINDOW,
   CUT_GRAND,
   CUT_MENTION,
   CUT_PODIUM,
@@ -17,9 +25,26 @@ import {
   ENERGY_NAP_AT,
   ENERGY_NAP_RATE,
   ENERGY_NAP_TO,
-  ENERGY_PET_RATE,
   ENERGY_WORK_DRAIN,
   GRABBED_FROM_NAP,
+  IMPROVISO_BONUS,
+  MORAL_DISPLACED,
+  MORAL_OVERWORK_AT,
+  MORAL_OVERWORK_RATE,
+  MORAL_PET_RATE,
+  MORAL_SHIP_OWN,
+  MORAL_SHIP_TEAM,
+  MORAL_SPEED_MAX,
+  MORAL_SPEED_MIN,
+  MORAL_TREAT,
+  OVERPET_STRESS_RATE,
+  PET_DECAY_SCALE,
+  PET_MEMORY_TICKS,
+  PET_PROFILE,
+  PITCH_GAUGE_DECAY,
+  PITCH_GAUGE_START,
+  PITCH_SCORE_SCALE,
+  PITCH_TICKS,
   HACK_TICKS,
   HAIRBALL_AT,
   HAIRBALL_COST,
@@ -34,11 +59,17 @@ import {
   SCORE_BUG_PENALTY,
   SCORE_CORE,
   SCORE_DESIGN_DONE_BONUS,
+  SCORE_DEBT_PENALTY,
+  SCORE_INNOVATION,
   SCORE_LOOSE_END,
   SCORE_POLISH,
   SCORE_STABILITY_BASE,
+  SCORE_STABILITY_CHOICE,
+  SCORE_UX_CARE,
   SCORE_ZERO_BUG_BONUS,
   SHORTCUT_HEADSTART,
+  SPONSOR_RISK_CRASH,
+  STABILITY_CRASH_RELIEF,
   STRESS_AFTER_PROC,
   STRESS_DANGER,
   STRESS_IDLE_RATE,
@@ -53,7 +84,7 @@ import {
   ZOOMIES_TICKS,
 } from './constants.js';
 import { SLOTS, TASKS, slotOf, startCats } from './data.js';
-import type { Cat, Command, DemoResult, HackState, Outcome, SimEvent, SlotId, Task, Track } from './types.js';
+import type { Cat, CatId, Command, DemoResult, HackState, Outcome, SimEvent, SlotId, Task, Track } from './types.js';
 
 /**
  * xorshift32 como FUNCAO PURA sobre estado serializado.
@@ -93,7 +124,7 @@ export const createHackathon = (seed: number): HackState => ({
   seed: seed >>> 0,
   rngState: nextU32(seed >>> 0),
   cats: startCats(),
-  tasks: TASKS.map((t) => ({ ...t, progress: 0, done: false, cut: false, awaitingShip: false })),
+  tasks: TASKS.map((t) => ({ ...t, progress: 0, done: false, cut: false, awaitingShip: false, chosen: null })),
   bugs: [],
   hairball: {
     active: false,
@@ -110,6 +141,12 @@ export const createHackathon = (seed: number): HackState => ({
   held: null,
   handX: 240,
   handY: 135,
+  debt: 0,
+  innovation: 0,
+  uxCare: 0,
+  stability: 0,
+  sponsorRisk: false,
+  pitch: null,
   events: [],
   result: null,
 });
@@ -142,6 +179,12 @@ const shipTask = (state: HackState, task: Task, by: Cat, events: SimEvent[]): vo
   task.done = true;
   task.awaitingShip = false;
   events.push({ kind: 'ship', tick: state.tick, task: task.label, track: task.track, by: by.id });
+
+  // Shippar levanta a MORAL: mais a de quem shipou, um pouco a de todos.
+  // Sucesso e contagioso num booth de quatro gatos.
+  for (const c of state.cats) {
+    c.moral = Math.min(1, c.moral + (c.id === by.id ? MORAL_SHIP_OWN : MORAL_SHIP_TEAM));
+  }
 
   if (by.personality === 'cowboy') {
     // Shipou sem testar: as vezes vem bug junto; as vezes, sem querer, ele
@@ -187,6 +230,8 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
       occupant.targetY = occupant.y;
       // O territorial nao esquece de quem era a mesa.
       if (occupant.quirk === 'territorial') occupant.stress = Math.min(1, occupant.stress + TERRITORIAL_DISPLACED);
+      // Ser despejado desanima qualquer um.
+      occupant.moral = Math.max(0, occupant.moral - MORAL_DISPLACED);
     }
     sendTo(cat, cmd.drop);
     state.held = null;
@@ -207,6 +252,7 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
       cat.energy = 1;
       cat.hunger = 1;
       cat.stress = Math.max(0, cat.stress - STRESS_TREAT_DROP);
+      cat.moral = Math.min(1, cat.moral + MORAL_TREAT);
       if (cat.mode === 'nap' || cat.mode === 'eat') cat.mode = 'idle';
       state.treats--;
       events.push({ kind: 'treat', tick: state.tick, cat: cat.id });
@@ -222,6 +268,72 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
       task.awaitingShip = false;
       events.push({ kind: 'cut', tick: state.tick, task: task.label });
     }
+  }
+
+  if (cmd.choose) {
+    const task = state.tasks.find((t) => t.id === cmd.choose!.task);
+    if (task?.choice && task.chosen === null && !task.done && !task.cut) {
+      const opt = task.choice.options.find((o) => o.id === cmd.choose!.option);
+      if (opt) {
+        task.chosen = opt.id;
+        applyChoice(state, task, opt.id);
+        events.push({ kind: 'decision', tick: state.tick, task: task.label, option: opt.label });
+      }
+    }
+  }
+};
+
+/**
+ * O EFEITO de cada decisao — custo agora, custo depois, e tags que a banca
+ * cobra. Nada aqui e "+10%": cada opcao muda o formato da run.
+ */
+const applyChoice = (state: HackState, task: Task, option: string): void => {
+  const scale = (id: string, k: number): void => {
+    const t = state.tasks.find((x) => x.id === id);
+    if (t && !t.done) t.cost = Math.round(t.cost * k);
+  };
+  switch (option) {
+    case 'monolito':
+      scale(task.id, CHOICE_COST.monolito);
+      state.debt += 1;
+      break;
+    case 'micro':
+      scale(task.id, CHOICE_COST.micro);
+      scale('b2', CHOICE_COST.microDownstream);
+      scale('b3', CHOICE_COST.microDownstream);
+      state.innovation += 1;
+      break;
+    case 'serverless':
+      scale(task.id, CHOICE_COST.serverless);
+      state.sponsorRisk = true;
+      state.innovation += 1;
+      break;
+    case 'sistemaPrimeiro':
+      scale(task.id, CHOICE_COST.sistemaPrimeiro);
+      scale('d2', CHOICE_COST.sistemaDownstream);
+      scale('d3', CHOICE_COST.sistemaDownstream);
+      state.uxCare += 1;
+      break;
+    case 'componentesLocais':
+      scale(task.id, CHOICE_COST.componentesLocais);
+      state.debt += 1;
+      break;
+    case 'templateSponsor':
+      scale(task.id, CHOICE_COST.templateSponsor);
+      state.innovation -= 1;
+      break;
+    case 'pipelineCompleto':
+      scale(task.id, CHOICE_COST.pipelineCompleto);
+      state.stability += 1;
+      break;
+    case 'deployNaMao':
+      scale(task.id, CHOICE_COST.deployNaMao);
+      state.debt += 1;
+      break;
+    case 'presetSponsor':
+      scale(task.id, CHOICE_COST.presetSponsor);
+      state.sponsorRisk = true;
+      break;
   }
 };
 
@@ -254,12 +366,14 @@ const stepHairball = (state: HackState, events: SimEvent[]): void => {
   }
 };
 
-/** A velocidade de um gato numa trilha. As personalidades moram aqui. */
+/** A velocidade de um gato numa trilha. Personalidades E moral moram aqui. */
 const speedOf = (cat: Cat, track: Track): number => {
   let s = cat.specialty === track ? 1 : OFFSPEC_SPEED;
   // O siames RECUSA CSS: em frontend ele rende quase nada, sob protesto.
   if (cat.id === 'bigode' && track === 'frontend') s = BIGODE_CSS_SPEED;
   if (cat.personality === 'cowboy') s *= COWBOY_SPEED;
+  // Gato desanimado rende menos; radiante, mais. A moral NAO e enfeite.
+  s *= MORAL_SPEED_MIN + cat.moral * (MORAL_SPEED_MAX - MORAL_SPEED_MIN);
   return s;
 };
 
@@ -305,6 +419,12 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
 
   const task = nextTask(state, track);
   if (!task) return;
+  // Tarefa com DECISAO aberta nao anda: o gato senta, olha para o quadro e o
+  // jogo cobra a escolha. Colocar gato e esperar barra encher nao e jogo.
+  if (task.choice && task.chosen === null) {
+    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: task.label });
+    return;
+  }
   task.progress += speed;
   if (task.progress >= task.cost) {
     task.progress = task.cost;
@@ -330,17 +450,36 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   const petted = cmd.pet === cat.id && !state.held;
   if (petted && cat.mode !== 'nap' && cat.mode !== 'zoomies') {
     // O carinho tambem e o "SHIPA" do perfeccionista: a feature que ele
-    // segurava mergeia na hora, com a bencao.
+    // segurava mergeia na hora, com a bencao. Comunicacao, nao cuidado —
+    // funciona em qualquer streak.
     if (cat.personality === 'perfeccionista') {
       const awaiting = state.tasks.find((t) => t.awaitingShip && !t.cut);
       if (awaiting) shipTask(state, awaiting, cat, events);
     }
+    if (cat.mode !== 'petted') {
+      // COMECO de sessao: a memoria decide quanto este carinho vale.
+      if (cat.petLastTick >= 0 && state.tick - cat.petLastTick > PET_MEMORY_TICKS) cat.petStreak = 0;
+      if (cat.petStreak >= 2) events.push({ kind: 'overpet', tick: state.tick, cat: cat.id });
+    }
     cat.mode = 'petted';
-    cat.stress = Math.max(0, cat.stress - STRESS_PET_RATE);
-    cat.energy = Math.min(1, cat.energy + ENERGY_PET_RATE);
+    const profile = PET_PROFILE[cat.personality] ?? { stress: 1, moral: 1 };
+    if (cat.petStreak >= 2) {
+      // SUPERESTIMULADO: a terceira sessao seguida irrita. E gato.
+      cat.stress = Math.min(1, cat.stress + OVERPET_STRESS_RATE);
+    } else {
+      const decay = cat.petStreak === 0 ? 1 : PET_DECAY_SCALE;
+      cat.stress = Math.max(0, cat.stress - STRESS_PET_RATE * decay * profile.stress);
+      cat.moral = Math.min(1, cat.moral + MORAL_PET_RATE * decay * profile.moral);
+    }
+    // Carinho NAO recupera energia: comida e sono existem por um motivo.
     return;
   }
-  if (cat.mode === 'petted') cat.mode = cat.slot ? 'walk' : 'idle';
+  if (cat.mode === 'petted') {
+    // FIM de sessao: a memoria registra.
+    cat.petStreak++;
+    cat.petLastTick = state.tick;
+    cat.mode = cat.slot ? 'walk' : 'idle';
+  }
 
   if (cat.mode === 'zoomies') {
     if (state.tick >= cat.modeUntil) {
@@ -412,6 +551,10 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   const working = cat.mode === 'work';
   cat.energy = Math.max(0, cat.energy - (working ? ENERGY_WORK_DRAIN : ENERGY_IDLE_DRAIN));
   cat.hunger = Math.max(0, cat.hunger - HUNGER_DRAIN);
+  // Trabalhar exausto corroi a moral: virar a noite tem preco alem do sono.
+  if (working && cat.energy < MORAL_OVERWORK_AT) {
+    cat.moral = Math.max(0, cat.moral - MORAL_OVERWORK_RATE);
+  }
 
   let stressRate = working ? STRESS_WORK_RATE : STRESS_IDLE_RATE;
   if (cat.personality === 'calmo') stressRate *= CALM_SCALE;
@@ -468,7 +611,88 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   if (cat.mode === 'work') workAt(state, cat, events);
 };
 
+/**
+ * O PITCH COMECA: as 48h acabaram, a equipe sobe ao palco. A chance de crash
+ * e sorteada AQUI (uma vez, com o rng da partida) e vira uma CRISE jogavel no
+ * meio do pitch — respondida a tempo, e improviso heroico; ignorada, a demo
+ * crasha de verdade. Build quebrado nao tem crise: nao ha o que improvisar.
+ */
+const startPitch = (state: HackState, events: SimEvent[]): void => {
+  const bugs = state.bugs.filter((b) => !b.fixed).length;
+  const crashP = state.buildBroken
+    ? 1
+    : Math.min(
+        0.95,
+        Math.max(
+          0,
+          bugs * CRASH_PER_BUG +
+            (state.cableOut ? CRASH_CABLE_OUT : 0) +
+            (state.sponsorRisk ? SPONSOR_RISK_CRASH : 0) -
+            state.stability * STABILITY_CRASH_RELIEF
+        )
+      );
+  const willCrash = !state.buildBroken && draw01(state) < crashP;
+  const crisisAt = willCrash ? Math.round(PITCH_TICKS * (0.35 + draw01(state) * 0.3)) : -1;
+  state.pitch = {
+    ticksLeft: PITCH_TICKS,
+    gauge: PITCH_GAUGE_START,
+    lastAbility: null,
+    readyAt: { bigode: 0, cheeto: 0, almofada: 0, smoking: 0 },
+    crisisAt,
+    crisisUntil: 0,
+    crisisResolved: !willCrash,
+  };
+  state.phase = 'pitch';
+  events.push({ kind: 'pitch-start', tick: state.tick });
+};
+
+const stepPitch = (state: HackState, cmd: Command, events: SimEvent[]): void => {
+  const p = state.pitch!;
+  const elapsed = PITCH_TICKS - p.ticksLeft;
+
+  // A crise estoura no meio do palco.
+  if (p.crisisAt >= 0 && elapsed === p.crisisAt) {
+    p.crisisUntil = state.tick + CRISIS_WINDOW;
+    events.push({ kind: 'demo-glitch', tick: state.tick });
+  }
+  const crisisOpen = p.crisisUntil > 0 && state.tick < p.crisisUntil && !p.crisisResolved;
+
+  if (cmd.ability) {
+    const cat = catOf(state, cmd.ability);
+    const ready = (p.readyAt[cmd.ability] ?? 0) <= state.tick;
+    if (cat && ready) {
+      p.readyAt[cmd.ability] = state.tick + ABILITY_COOLDOWN;
+      if (crisisOpen) {
+        // QUALQUER habilidade dentro da janela vira improviso heroico: o bug
+        // ao vivo vira demo improvisada, e a plateia ama uma recuperacao.
+        p.crisisResolved = true;
+        p.crisisUntil = 0;
+        p.gauge = Math.min(1, p.gauge + IMPROVISO_BONUS);
+        events.push({ kind: 'improviso', tick: state.tick, cat: cat.id });
+      } else {
+        let effect = ABILITY_EFFECT[cat.id] ?? 0.08;
+        // Repetir a mesma gracinha rende metade: plateia tem memoria.
+        if (p.lastAbility === cat.id) effect *= ABILITY_REPEAT_SCALE;
+        // O risco do Cheeto: cacar o cursor PODE mudar o slide.
+        if (cat.id === 'cheeto' && draw01(state) < ABILITY_CHEETO_MISHAP_P) {
+          effect = ABILITY_CHEETO_MISHAP;
+        }
+        p.gauge = Math.max(0, Math.min(1, p.gauge + effect));
+        p.lastAbility = cat.id;
+        events.push({ kind: 'ability', tick: state.tick, cat: cat.id, effect });
+      }
+    }
+  }
+
+  // A plateia esfria sozinha; numa crise aberta, esfria MUITO.
+  p.gauge = Math.max(0, p.gauge - PITCH_GAUGE_DECAY - (crisisOpen ? CRISIS_DRAIN : 0));
+  p.ticksLeft--;
+  state.tick++;
+  if (p.ticksLeft <= 0) runDemo(state, events);
+};
+
 const runDemo = (state: HackState, events: SimEvent[]): void => {
+  const p = state.pitch!;
   const core = state.tasks.filter((t) => !t.polish && t.done).length;
   const polish = state.tasks.filter((t) => t.polish && t.done).length;
   const bugs = state.bugs.filter((b) => !b.fixed).length;
@@ -476,14 +700,29 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
   // perfeccionista segurou ate o fim. Cortar a tempo teria custado zero.
   const looseEnds = state.tasks.filter((t) => !t.done && !t.cut && (t.progress > 0 || t.awaitingShip)).length;
 
-  const vonWhiskers = core * SCORE_CORE + looseEnds * SCORE_LOOSE_END;
-  const meowper = SCORE_STABILITY_BASE + bugs * SCORE_BUG_PENALTY + (bugs === 0 ? SCORE_ZERO_BUG_BONUS : 0);
-  const designDone = state.tasks.filter((t) => t.track === 'design' && !t.polish).every((t) => t.done);
-  const cocada = polish * SCORE_POLISH + (designDone ? SCORE_DESIGN_DONE_BONUS : 0);
-  const score = vonWhiskers + meowper + cocada;
+  // Crise nao resolvida (ou build quebrado) = a demo crashou de verdade.
+  const crashed = state.buildBroken || (p.crisisAt >= 0 && !p.crisisResolved);
+  const improvised = p.crisisAt >= 0 && p.crisisResolved && !state.buildBroken;
 
-  const crashP = state.buildBroken ? 1 : Math.min(0.95, bugs * CRASH_PER_BUG + (state.cableOut ? CRASH_CABLE_OUT : 0));
-  const crashed = draw01(state) < crashP;
+  // As CINCO dimensoes. O projeto com mais features nem sempre vence.
+  const tecnica = core * SCORE_CORE + looseEnds * SCORE_LOOSE_END;
+  const estabilidade =
+    SCORE_STABILITY_BASE +
+    bugs * SCORE_BUG_PENALTY +
+    (bugs === 0 ? SCORE_ZERO_BUG_BONUS : 0) +
+    state.debt * SCORE_DEBT_PENALTY +
+    state.stability * SCORE_STABILITY_CHOICE;
+  const designDone = state.tasks.filter((t) => t.track === 'design' && !t.polish).every((t) => t.done);
+  const experiencia = polish * SCORE_POLISH + (designDone ? SCORE_DESIGN_DONE_BONUS : 0) + state.uxCare * SCORE_UX_CARE;
+  const inovacao = state.innovation * SCORE_INNOVATION;
+  const pitchScore = Math.round(p.gauge * PITCH_SCORE_SCALE);
+
+  // Os tres juizes leem as dimensoes pelas proprias lentes; o pitch e a
+  // plateia entram por fora, como voto popular.
+  const vonWhiskers = tecnica + inovacao;
+  const meowper = estabilidade;
+  const cocada = experiencia;
+  const score = vonWhiskers + meowper + cocada + pitchScore;
 
   let outcome: Outcome;
   if (crashed) outcome = 'crashed';
@@ -498,8 +737,11 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
     bugs,
     looseEnds,
     perJudge: [vonWhiskers, meowper, cocada],
+    dimensions: { tecnica, estabilidade, experiencia, inovacao, pitch: pitchScore },
+    plateia: p.gauge,
     score,
     crashed,
+    improvised,
     outcome,
   };
   state.result = result;
@@ -508,15 +750,21 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
 };
 
 export const step = (state: HackState, cmd: Command): SimEvent[] => {
-  if (state.phase !== 'hack') return [];
+  if (state.phase === 'done') return [];
   const events: SimEvent[] = [];
+
+  if (state.phase === 'pitch') {
+    stepPitch(state, cmd, events);
+    state.events.push(...events);
+    return events;
+  }
 
   applyCommand(state, cmd, events);
   stepHairball(state, events);
   for (const cat of state.cats) stepCat(state, cat, cmd, events);
 
   state.tick++;
-  if (state.tick >= HACK_TICKS) runDemo(state, events);
+  if (state.tick >= HACK_TICKS) startPitch(state, events);
 
   state.events.push(...events);
   return events;
