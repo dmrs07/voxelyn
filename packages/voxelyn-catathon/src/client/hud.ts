@@ -78,7 +78,11 @@ type TaskRow = {
 export type Hud = {
   root: HTMLElement;
   clock: HTMLElement;
-  score: HTMLElement;
+  remain: HTMLElement;
+  build: HTMLElement;
+  proj: HTMLElement;
+  bugsChip: HTMLElement;
+  alarm: HTMLElement;
   treatsBtn: HTMLButtonElement;
   board: HTMLElement;
   feed: HTMLElement;
@@ -106,19 +110,34 @@ export const createHud = (
 ): Hud => {
   const root = el('div', 'hud');
 
+  /**
+   * O topo e so INFORMACAO, em chips com hierarquia: prazo primeiro (e o
+   * unico numero que decide tudo), depois build, projeto e bugs — que so
+   * aparecem quando existem e mudam de peso quando aparecem. "features 0/12"
+   * numa frase minuscula era telemetria de debug, nao HUD.
+   */
   const top = el('div', 'hud-top');
-  const clock = el('div', 'hud-clock', 'SEX 18:00');
-  const score = el('div', 'hud-score', '');
-  // Os botoes de acao moram num CACHO no canto inferior direito — o alcance
-  // do polegar de quem segura o aparelho. O topo fica so com informacao.
-  const treatsBtn = softButton(ICONS.fish, `petisco x${TREATS_START}`, 'treat');
+  const clock = el('div', 'hud-chip hud-clock', 'DIA 1 · SEX · 18:00');
+  const remain = el('div', 'hud-chip hud-remain', '48h00 restantes');
+  const build = el('div', 'hud-chip hud-build', 'BUILD OK');
+  const proj = el('div', 'hud-chip hud-proj', '0/12');
+  const bugsChip = el('div', 'hud-chip hud-bugs', '');
+  bugsChip.hidden = true;
+  const alarm = el('div', 'hud-chip hud-alarm-chip', '');
+  alarm.hidden = true;
+  // As ACOES moram numa barra contextual embaixo, com base escura coerente
+  // com o HUD — nao botoes soltos flutuando sobre o cenario. Petisco separa
+  // ACAO (a palavra) de INVENTARIO (a badge com o numero).
+  const treatsBtn = softButton(ICONS.fish, 'petisco', 'treat');
+  const treatsBadge = el('span', 'btn-badge', `×${TREATS_START}`);
+  treatsBtn.appendChild(treatsBadge);
   treatsBtn.addEventListener('click', handlers.onFeedToggle);
-  // O quadro e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo, ele
-  // cobria as mesas de design e devops e o rack — metade do pavilhao atras de
-  // uma lista. Aberto por vontade, pode ser grande a vontade.
-  const boardBtn = softButton(ICONS.board, 'quadro');
-  top.append(clock, score);
-  const cluster = el('div', 'btn-cluster');
+  // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo,
+  // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
+  // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
+  const boardBtn = softButton(ICONS.board, 'projeto');
+  top.append(clock, remain, build, proj, bugsChip, alarm);
+  const cluster = el('div', 'action-bar');
 
   const board = el('div', 'hud-board');
   board.hidden = true;
@@ -134,8 +153,10 @@ export const createHud = (
 
   // O PAINEL DE SOM: cinco faixas independentes, com palavra, atras de botao.
   // "Jogar horas sem fadiga auditiva" comeca em poder abaixar exatamente o que
-  // cansa — e um controle por barramento e acessibilidade, nao luxo.
-  const soundBtn = softButton(ICONS.sound, 'som');
+  // cansa — e um controle por barramento e acessibilidade, nao luxo. O botao
+  // mora no CANTO de configuracoes (topo direito), fora das acoes de jogo:
+  // "som" nao e um verbo da partida.
+  const soundBtn = softButton(ICONS.sound, 'som', 'dim som-corner');
   const soundPanel = el('div', 'hud-sound');
   soundPanel.hidden = true;
   const BUS_LABEL: Record<string, string> = {
@@ -161,9 +182,9 @@ export const createHud = (
   soundBtn.addEventListener('click', () => {
     soundPanel.hidden = !soundPanel.hidden;
   });
-  cluster.append(soundBtn, boardBtn, treatsBtn);
+  cluster.append(boardBtn, treatsBtn);
 
-  root.append(top, cluster, board, soundPanel, feed, card);
+  root.append(top, soundBtn, cluster, board, soundPanel, feed, card);
   host.appendChild(root);
 
   // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
@@ -173,7 +194,7 @@ export const createHud = (
   hint.setAttribute('role', 'status');
   host.appendChild(hint);
 
-  return { root, clock, score, treatsBtn, board, feed, card, rows: new Map(), ...handlers };
+  return { root, clock, remain, build, proj, bugsChip, alarm, treatsBtn, board, feed, card, rows: new Map(), ...handlers };
 };
 
 const TRACK_LABEL: Record<string, string> = {
@@ -185,10 +206,18 @@ const TRACK_LABEL: Record<string, string> = {
 
 const clockText = (tick: number): string => {
   const hours = 18 + tick * HOURS_PER_TICK;
-  const day = ['SEX', 'SAB', 'DOM'][Math.min(2, Math.floor(hours / 24))];
+  const dayIdx = Math.min(2, Math.floor(hours / 24));
+  const day = ['SEX', 'SAB', 'DOM'][dayIdx];
   const hh = Math.floor(hours % 24);
   const mm = Math.floor((hours % 1) * 60);
-  return `${day} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  return `DIA ${dayIdx + 1} · ${day} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
+const remainText = (tick: number): string => {
+  const left = Math.max(0, (HACK_TICKS - tick) * HOURS_PER_TICK);
+  const hh = Math.floor(left);
+  const mm = Math.floor((left % 1) * 60);
+  return `${hh}h${String(mm).padStart(2, '0')} restantes`;
 };
 
 const makeRow = (t: Task, onCut: (id: string) => void): TaskRow => {
@@ -274,21 +303,30 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
   }
 };
 
+const setText = (node: HTMLElement, value: string): void => {
+  if (node.textContent !== value) node.textContent = value;
+};
+
 export const drawHud = (hud: Hud, state: HackState): void => {
-  hud.clock.textContent = clockText(state.tick);
+  setText(hud.clock, clockText(state.tick));
+  setText(hud.remain, remainText(state.tick));
   const shipped = state.tasks.filter((t) => t.done).length;
   const bugs = state.bugs.filter((b) => !b.fixed).length;
-  const flags: string[] = [];
-  if (state.hairball.active) flags.push('MERGE TRAVADO');
-  if (state.cableOut) flags.push('BUILD FORA DO AR');
-  if (state.buildBroken) flags.push('BUILD QUEBRADO');
-  hud.score.textContent =
-    `features ${shipped}/12 · bugs ${bugs}` + (flags.length ? ` · ${flags.join(' · ')}` : '');
-  hud.score.classList.toggle('hud-alarm', flags.length > 0);
-  // O rotulo vive no span da palavra: trocar textContent do botao inteiro
-  // apagaria os toe beans e o peixinho.
-  const word = hud.treatsBtn.querySelector('.btn-word');
-  if (word && word.textContent !== `petisco x${state.treats}`) word.textContent = `petisco x${state.treats}`;
+
+  // Build com cor de estado; bugs so existem no HUD quando existem no jogo,
+  // e chegam ja com peso de alarme — nao como rodape de frase.
+  const buildState = state.buildBroken ? 'BUILD QUEBRADO' : state.cableOut ? 'BUILD FORA DO AR' : 'BUILD OK';
+  setText(hud.build, buildState);
+  hud.build.classList.toggle('chip-bad', buildState !== 'BUILD OK');
+  setText(hud.proj, `${shipped}/12`);
+  hud.bugsChip.hidden = bugs === 0;
+  if (bugs > 0) setText(hud.bugsChip, `${bugs} bug${bugs > 1 ? 's' : ''}`);
+  hud.alarm.hidden = !state.hairball.active;
+  if (state.hairball.active) setText(hud.alarm, 'MERGE TRAVADO — leva alguem ao rack');
+
+  // O numero vive na badge: acao e inventario separados no mesmo botao.
+  const badge = hud.treatsBtn.querySelector('.btn-badge');
+  if (badge && badge.textContent !== `×${state.treats}`) badge.textContent = `×${state.treats}`;
   hud.treatsBtn.disabled = state.treats <= 0;
 
   if (hud.rows.size === 0) {
@@ -315,7 +353,9 @@ export const pushFeed = (hud: Hud, state: HackState, events: SimEvent[]): void =
     if (!text) continue;
     const line = el('div', 'feed-line', text);
     hud.feed.prepend(line);
-    while (hud.feed.children.length > 4) hud.feed.lastChild?.remove();
+    // Tres linhas no maximo: o feed mora sobre o canto de descanso e nao
+    // pode virar uma coluna cobrindo o sofa.
+    while (hud.feed.children.length > 3) hud.feed.lastChild?.remove();
   }
 };
 
@@ -411,7 +451,7 @@ export const showTitle = (host: HTMLElement, onStart: () => void): void => {
   for (const c of CATS) team.appendChild(el('div', 'team-line', `${c.name} — ${c.bio}`));
   wrap.appendChild(team);
   wrap.appendChild(
-    el('p', 'title-help', 'arrasta um gato para a mesa dele. segura o dedo em cima = carinho (e o "shipa" do Bigode). petisco = botao. corta escopo no quadro. emergencia? leva alguem ao rack.')
+    el('p', 'title-help', 'arrasta um gato para a mesa dele. segura o dedo em cima = carinho (e o "shipa" do Bigode). petisco = botao. corta escopo no painel de projeto. emergencia? leva alguem ao rack.')
   );
   const start = softButton(ICONS.badge, 'comecar', 'big');
   start.addEventListener('click', onStart);

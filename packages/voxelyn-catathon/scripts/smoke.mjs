@@ -87,12 +87,14 @@ const buttons = await page.evaluate(() =>
 );
 if (buttons.some((b) => b.text.length < 3)) throw new Error('botao sem palavra');
 if (buttons.some((b) => b.text !== 'cortar' && b.h < 44)) throw new Error('botao com alvo < 44px');
-// Icones DISTINTOS entre si no cacho: dois botoes com o mesmo desenho e a
-// ilegibilidade do »/≫ da Iliada de novo.
+// Icones DISTINTOS entre si nos botoes macios (barra de acoes + som): dois
+// botoes com o mesmo desenho e a ilegibilidade do »/≫ da Iliada de novo.
 const cluster = await page.evaluate(() =>
-  Array.from(document.querySelectorAll('.btn-cluster .soft-btn .btn-icon')).map((n) => n.innerHTML)
+  Array.from(document.querySelectorAll('.hud .soft-btn .btn-icon')).map((n) => n.innerHTML)
 );
-if (new Set(cluster).size !== cluster.length) throw new Error('dois botoes do cacho com o mesmo icone');
+if (new Set(cluster).size !== cluster.length) throw new Error('dois botoes macios com o mesmo icone');
+// A barra de acoes existe e tem base propria (nao botoes soltos no cenario).
+if (!(await page.locator('.action-bar').isVisible())) throw new Error('a barra de acoes nao existe');
 step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
 // --- ARRASTAR: Bigode para a mesa de backend, so com toque -----------------
@@ -129,7 +131,11 @@ const drag = async (fromX, fromY, toX, toY) => {
     [cx, cy, tx, ty]
   );
 };
-await drag(catPos.x, catPos.y - 4, 96, 118);
+const deskPos = await sim(() => {
+  const s = window.catathon.slots.find((x) => x.id === 'desk-backend');
+  return { x: s.x, y: s.y };
+});
+await drag(catPos.x, catPos.y - 4, deskPos.x, deskPos.y);
 await page.waitForTimeout(1200);
 const afterDrag = await sim(() => {
   const app = window.catathon.app;
@@ -150,7 +156,7 @@ await sim(() => {
   const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
   c.stress = 0.7;
 });
-const [px2, py2] = toClient(96, 112);
+const [px2, py2] = toClient(deskPos.x, deskPos.y - 6);
 await page.evaluate(
   async ([x, y]) => {
     const stage = document.querySelector('#stage');
@@ -185,7 +191,7 @@ if (treats !== 2) throw new Error(`petisco nao desceu: ${treats}`);
 // --- CORTAR ESCOPO: abre o quadro pelo botao com palavra, corta, fecha -----
 const boardHidden = await page.evaluate(() => document.querySelector('.hud-board').hidden);
 if (!boardHidden) throw new Error('o quadro nasce aberto e cobre o pavilhao');
-await page.getByRole('button', { name: 'quadro' }).tap();
+await page.getByRole('button', { name: 'projeto' }).tap();
 await page.locator('.task', { hasText: 'autoscaling' }).getByRole('button', { name: 'cortar' }).tap();
 await page.waitForTimeout(300);
 const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').cut);

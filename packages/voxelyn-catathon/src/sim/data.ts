@@ -84,15 +84,20 @@ export const JUDGES: readonly { name: string; lens: string }[] = [
   { name: 'Cocada', lens: 'experiencia: polimento e a trilha de design' },
 ];
 
-/** Coordenadas de cena (480x270). O balcao do cafe cuida da fome. */
+/**
+ * Coordenadas de cena (480x270). O booth tem RELACOES espaciais, nao fileiras:
+ * duas estacoes de cada lado olhando para o centro, quadro de planejamento no
+ * meio, area social embaixo no centro, descanso no canto esquerdo e o servidor
+ * no direito. O corredor central fica livre para os gatos circularem.
+ */
 export const SLOTS: readonly { id: SlotId; x: number; y: number; track: Track | null }[] = [
-  { id: 'desk-backend', x: 96, y: 118, track: 'backend' },
-  { id: 'desk-frontend', x: 192, y: 118, track: 'frontend' },
-  { id: 'desk-design', x: 288, y: 118, track: 'design' },
-  { id: 'desk-devops', x: 384, y: 118, track: 'devops' },
-  { id: 'puff', x: 60, y: 214, track: null },
-  { id: 'rack', x: 424, y: 206, track: null },
-  { id: 'cafe', x: 240, y: 226, track: null },
+  { id: 'desk-backend', x: 86, y: 126, track: 'backend' },
+  { id: 'desk-frontend', x: 394, y: 126, track: 'frontend' },
+  { id: 'desk-design', x: 86, y: 190, track: 'design' },
+  { id: 'desk-devops', x: 394, y: 190, track: 'devops' },
+  { id: 'puff', x: 56, y: 240, track: null },
+  { id: 'rack', x: 432, y: 208, track: null },
+  { id: 'cafe', x: 240, y: 210, track: null },
 ];
 
 export const slotOf = (id: SlotId) => SLOTS.find((s) => s.id === id)!;

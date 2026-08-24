@@ -1,3 +1,4 @@
+import { SLOTS } from './sim/index.js';
 import { createApp, start } from './client/app.js';
 import './style.css';
 
@@ -11,4 +12,6 @@ start(app);
 
 // Ponte de depuracao/fumaca — mesmo contrato dos irmaos: o teste de fumaca
 // inspeciona o estado REAL, nao um mock.
-(window as unknown as { catathon?: unknown }).catathon = { app };
+// SLOTS na ponte: a fumaca mira as MESAS REAIS, nao coordenadas decoradas —
+// mover um movel no layout nunca deveria quebrar o teste por numero magico.
+(window as unknown as { catathon?: unknown }).catathon = { app, slots: SLOTS };
