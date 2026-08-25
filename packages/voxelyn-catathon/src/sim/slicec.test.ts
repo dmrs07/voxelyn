@@ -100,3 +100,36 @@ describe('premio e daily', () => {
     expect(dailySeed('2026-08-25')).not.toBe(dailySeed('2026-08-26'));
   });
 });
+
+describe('achados de revisao (vigiados para sempre)', () => {
+  it('cooldown de palco de TIME GERADO entra no hash', async () => {
+    const { hashState, rollCandidates } = await import('./index.js');
+    const seed = 314;
+    const team = rollCandidates(seed).slice(0, 4);
+    const a = createHackathon(seed, team);
+    const b = createHackathon(seed, team);
+    for (const s of [a, b]) {
+      s.tick = HACK_TICKS - 1;
+      step(s, emptyCommand());
+      expect(s.phase).toBe('pitch');
+    }
+    // So o cooldown de UM gato gerado difere: o hash tem de acusar.
+    b.pitch!.readyAt[team[0]!.id] = 999;
+    expect(hashState(a)).not.toBe(hashState(b));
+  });
+
+  it('o toque da raca e mecanica: soneca do Bengal rende menos', () => {
+    const slow = mk(5);
+    const fast = mk(5);
+    for (const s of [slow, fast]) {
+      const c = s.cats[0]!;
+      c.mode = 'nap';
+      c.energy = 0.3;
+      c.slot = 'puff';
+    }
+    slow.cats[0]!.breedMod = { nap: 0.85, stress: 1, hunger: 1, social: 1 };
+    step(slow, emptyCommand());
+    step(fast, emptyCommand());
+    expect(slow.cats[0]!.energy).toBeLessThan(fast.cats[0]!.energy);
+  });
+});

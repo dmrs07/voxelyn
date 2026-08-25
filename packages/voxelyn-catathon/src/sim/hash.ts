@@ -101,7 +101,9 @@ export const hashState = (state: HackState): string => {
     h.u32(state.pitch.crisisAt + 1);
     h.u32(state.pitch.crisisUntil);
     h.u32(state.pitch.crisisResolved ? 1 : 0);
-    for (const id of ['bigode', 'cheeto', 'almofada', 'smoking'] as const) h.u32(state.pitch.readyAt[id]);
+    // Os cooldowns do TIME DESTA RUN, na ordem do elenco — iterar os ids
+    // classicos deixava todo time gerado fora do hash (achado de revisao).
+    for (const c of state.cats) h.u32(state.pitch.readyAt[c.id] ?? 0);
   }
   for (const b of state.bugs) {
     h.u32(b.id);

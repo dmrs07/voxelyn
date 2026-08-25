@@ -221,6 +221,7 @@ const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
     petStreak: 0,
     petLastTick: -1,
     speedBoost: 0,
+    breedMod: { ...c.breedMod },
   }));
 
 /**
@@ -352,7 +353,10 @@ const shipTask = (state: HackState, task: Task, by: Cat, events: SimEvent[]): vo
   // Shippar levanta a MORAL: mais a de quem shipou, um pouco a de todos.
   // Sucesso e contagioso num booth de quatro gatos.
   for (const c of state.cats) {
-    const gain = c.id === by.id ? MORAL_SHIP_OWN : MORAL_SHIP_TEAM * state.layoutMods.moralShip;
+    // O toque social da raca entra na parte de EQUIPE: um Maine Coon no
+    // booth faz o sucesso dos outros valer mais para ele (e vice-versa).
+    const gain =
+      c.id === by.id ? MORAL_SHIP_OWN : MORAL_SHIP_TEAM * state.layoutMods.moralShip * c.breedMod.social;
     c.moral = Math.min(1, c.moral + gain);
   }
 
@@ -786,7 +790,7 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   if (cat.mode === 'nap') {
     let rate = cat.quirk === 'caixa' ? ENERGY_NAP_RATE * QUIRK_BOX_NAP_SCALE : ENERGY_NAP_RATE;
     if (hasTrait(cat, 'dorme-rapido')) rate *= TRAIT_NAP_FAST;
-    rate *= state.layoutMods.napRate;
+    rate *= state.layoutMods.napRate * cat.breedMod.nap;
     cat.energy = Math.min(ENERGY_NAP_TO, cat.energy + rate);
     cat.stress = Math.max(0, cat.stress - STRESS_IDLE_RATE * 2);
     if (cat.energy >= ENERGY_NAP_TO) {
@@ -834,7 +838,7 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   const working = cat.mode === 'work';
   const energyDrain = (working ? ENERGY_WORK_DRAIN : ENERGY_IDLE_DRAIN) * (cat.tier === 'junior' ? JUNIOR_ENERGY_SCALE : 1);
   cat.energy = Math.max(0, cat.energy - energyDrain);
-  cat.hunger = Math.max(0, cat.hunger - HUNGER_DRAIN * (hasTrait(cat, 'guloso') ? TRAIT_HUNGRY : 1));
+  cat.hunger = Math.max(0, cat.hunger - HUNGER_DRAIN * (hasTrait(cat, 'guloso') ? TRAIT_HUNGRY : 1) * cat.breedMod.hunger);
   // Trabalhar exausto corroi a moral: virar a noite tem preco alem do sono.
   if (working && cat.energy < MORAL_OVERWORK_AT) {
     cat.moral = Math.max(0, cat.moral - MORAL_OVERWORK_RATE);
@@ -845,6 +849,7 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
     : STRESS_IDLE_RATE * state.layoutMods.stressIdle;
   if (cat.personality === 'calmo') stressRate *= CALM_SCALE;
   if (hasTrait(cat, 'zen')) stressRate *= TRAIT_ZEN;
+  stressRate *= cat.breedMod.stress;
   // O tuxedo sofre com bug vivo em QUALQUER trilha. Ele sabe. Ele sempre sabe.
   if (cat.personality === 'julga-em-silencio' && state.bugs.some((b) => !b.fixed)) {
     stressRate *= JUDGE_BUG_SCALE;

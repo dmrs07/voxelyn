@@ -153,6 +153,12 @@ export type Cat = {
   petLastTick: number;
   /** Bonus permanente de velocidade (workshop). Entra no hash. */
   speedBoost: number;
+  /**
+   * O toque da RACA (estatico por run): soneca, estresse, fome e social.
+   * 1 = neutro. Maine Coon tranquiliza colegas, Bengal dorme menos, Persa
+   * estressa menos — a raca muda comportamento, nunca profissao.
+   */
+  breedMod: { nap: number; stress: number; hunger: number; social: number };
 };
 
 /**

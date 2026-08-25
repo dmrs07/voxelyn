@@ -114,10 +114,14 @@ export const NEGATIVE_TRAITS: readonly TraitId[] = [
 ];
 
 
+export type BreedMod = { nap: number; stress: number; hunger: number; social: number };
+
 export type Candidate = {
   id: string;
   name: string;
   breed: string;
+  /** O toque mecanico da raca (1 = neutro). */
+  breedMod: BreedMod;
   pattern: CoatPattern;
   /** Cores 0xRRGGBB — dados puros; o cliente converte. */
   coat: { body: number; mark: number; belly: number };
@@ -231,6 +235,7 @@ const rollCandidate = (d: Dice, spec: Spec, usedNames: string[], locale: Locale)
     id: `${name.toLowerCase()}-${d.int(1000)}`,
     name,
     breed: breed.name,
+    breedMod: { nap: 1, stress: 1, hunger: 1, social: 1, ...breed.nudge },
     pattern: breed.pattern,
     coat: { body: breed.body, mark: breed.mark, belly: breed.belly },
     big: breed.big ?? false,
@@ -445,6 +450,7 @@ const CLASSIC_BASE: readonly Candidate[] = [
     id: 'bigode',
     name: 'Bigode',
     breed: 'Siames',
+    breedMod: { nap: 1, stress: 1, hunger: 1, social: 1 },
     pattern: 'siames',
     coat: { body: 0xe6dac4, mark: 0x5e4a3e, belly: 0xf0e8d6 },
     big: false,
@@ -462,6 +468,7 @@ const CLASSIC_BASE: readonly Candidate[] = [
     id: 'cheeto',
     name: 'Cheeto',
     breed: 'SRD',
+    breedMod: { nap: 1, stress: 1, hunger: 1, social: 1 },
     pattern: 'tabby',
     coat: { body: 0xe8943e, mark: 0xc47028, belly: 0xf4d2a0 },
     big: false,
@@ -479,6 +486,7 @@ const CLASSIC_BASE: readonly Candidate[] = [
     id: 'almofada',
     name: 'Almofada',
     breed: 'Maine Coon',
+    breedMod: { nap: 1, stress: 1, hunger: 1, social: 1 },
     pattern: 'solid',
     coat: { body: 0x8e8e98, mark: 0x6e6e7a, belly: 0xc4c4cc },
     big: true,
@@ -496,6 +504,7 @@ const CLASSIC_BASE: readonly Candidate[] = [
     id: 'smoking',
     name: 'Smoking',
     breed: 'Bombay',
+    breedMod: { nap: 1, stress: 1, hunger: 1, social: 1 },
     pattern: 'tuxedo',
     coat: { body: 0x2c2a32, mark: 0x1c1a22, belly: 0xeeeef0 },
     big: false,
