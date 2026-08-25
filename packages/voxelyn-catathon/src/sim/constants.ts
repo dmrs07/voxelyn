@@ -114,6 +114,11 @@ export const WALK_SPEED = 1.9;
 export const CABLE_BITE_P = 0.5;
 /** Religar o cabo: 6s de qualquer gato no rack. Sem prazo: fica caido ate. */
 export const CABLE_FIX_COST = 6 * TICK_HZ;
+/**
+ * Reerguer um build perdido exige uma intervencao maior no rack. Continua
+ * sendo uma crise cara, mas nunca transforma o resto da run em tempo morto.
+ */
+export const BUILD_REPAIR_COST = 18 * TICK_HZ;
 
 // ----------------------------------------------------------------- hairball
 
