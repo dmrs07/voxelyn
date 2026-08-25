@@ -90,7 +90,8 @@ const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): 
     return { w: frame.w, h: frame.h, data };
   });
   if (collarSpec && collar !== undefined && collarSpec.donor !== undefined) {
-    // pinta o colar nas posicoes da pelagem doadora (mesma raca)
+    // pinta o colar nas posicoes da pelagem doadora (mesma raca); onde a
+    // doadora tem o GUIZO, esta pelagem ganha a credencial
     const donorCoat = collarSpec.donor;
     const donorColors = COLLARS[breed]![donorCoat]!.own!;
     const main = packHex(donorColors[0]!);
@@ -100,19 +101,38 @@ const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): 
     frames.forEach((frame, fi) => {
       const donor = donorFrames[fi];
       if (!donor || donor.w !== frame.w || donor.h !== frame.h) return;
+      let bx = -1, by = 0;
       for (let i = 0; i < frame.data.length; i++) {
-        if (frame.data[i] === 0) continue;
         const d = donor.data[i]!;
+        if (d === bell) {
+          const x = i % frame.w;
+          if (x > bx) { bx = x; by = (i / frame.w) | 0; }
+          continue;
+        }
+        if (frame.data[i] === 0) continue;
         if (d === main) frame.data[i] = packRgb(collar);
         else if (dark !== 0 && d === dark) frame.data[i] = darkRgb(collar);
-        else if (d === bell) frame.data[i] = bell;
       }
+      if (bx >= 0) badgeCard(frame, bx, by, collar);
     });
+  }
+  if (collarSpec?.own && collar !== undefined) {
+    // o GUIZO do colar original vira a CREDENCIAL pendurada
+    for (const frame of frames) {
+      const bell = packHex(BELL_HEX);
+      let bx = -1, by = 0;
+      for (let i = 0; i < frame.data.length; i++) {
+        if (frame.data[i] === bell) {
+          const x = i % frame.w;
+          if (x > bx) { bx = x; by = (i / frame.w) | 0; }
+        }
+      }
+      if (bx >= 0) badgeCard(frame, bx, by, collar);
+    }
   }
   if (collarSpec?.eye && collar !== undefined) {
     // faixa de colar ancorada no olho (longhair nao tem colar no pack)
     const eyes = collarSpec.eye.map(packHex);
-    const bell = packHex(BELL_HEX);
     for (const frame of frames) {
       let ex = 0, ey = 0, en = 0;
       for (let y = 0; y < frame.h; y++) {
@@ -128,11 +148,31 @@ const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): 
       };
       for (let dx = -4; dx <= -1; dx++) put(ex + dx, ey + 4, packRgb(collar));
       for (let dx = -4; dx <= -2; dx++) put(ex + dx, ey + 5, darkRgb(collar));
-      put(ex - 1, ey + 5, bell);
+      badgeCard(frame, ex - 1, ey + 6, collar);
     }
   }
   frameCache.set(id, frames);
   return frames;
+};
+
+const CARD = packRGBA(242, 230, 204);
+const CARD_EDGE = packRGBA(198, 184, 158);
+
+/**
+ * A CREDENCIAL do cracha original: cartaozinho creme pendurado no colar com
+ * o ponto da cor da trilha. Desenha SEM mascara — um cracha pendura e pode
+ * sair 1px da silhueta, como qualquer coisa dependurada num gato.
+ */
+const badgeCard = (frame: SpriteFrame, bx: number, by: number, collar: number): void => {
+  const put = (x: number, y: number, color: number) => {
+    if (x >= 0 && y >= 0 && x < frame.w && y < frame.h) frame.data[y * frame.w + x] = color;
+  };
+  put(bx - 1, by, CARD);
+  put(bx, by, CARD);
+  put(bx + 1, by, CARD);
+  put(bx - 1, by + 1, CARD_EDGE);
+  put(bx, by + 1, packRgb(collar));
+  put(bx + 1, by + 1, CARD_EDGE);
 };
 
 const timelineCache = new Map<string, Uint16Array>();
