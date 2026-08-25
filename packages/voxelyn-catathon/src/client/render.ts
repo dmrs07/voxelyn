@@ -1,8 +1,9 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
+import { heldFrame, lookFor, packFrame, pmFrame, type SpriteFrame } from './catsprites.js';
 import { ganttEntries } from './ganttlog.js';
 import type { Locale } from '../sim/text.js';
-import type { Cat, HackState, Spec, Task, Track } from '../sim/types.js';
+import type { Cat, HackState, Task, Track } from '../sim/types.js';
 
 /**
  * O PAVILHAO, desenhado pixel a pixel num Surface2D do @voxelyn/core.
@@ -54,29 +55,21 @@ const CORAL_ERR = c(235, 103, 103); // #EB6767
 const SCREEN_OFF = c(40, 48, 58);
 const MAGENTA = c(216, 104, 176);
 
-/** A cor de credencial — o cracha no peito e o monitor. Freestyler: creme. */
-const SPEC_COLOR: Record<Spec, number> = {
-  frontend: CYAN_ACT,
-  backend: VIOLET_SEL,
-  devops: AMBER_ALERT,
-  design: MAGENTA,
-  freestyler: CREAM,
+/** Cracha da especialidade: o COLAR do sprite ganha a cor da trilha. */
+const SPEC_RGB: Record<Cat['specialty'], number> = {
+  frontend: 0x54c6d4,
+  backend: 0x8c72f2,
+  devops: 0xf0b552,
+  design: 0xd868b0,
+  freestyler: 0xf4e4c8,
 };
+
 const TRACK_COLOR: Record<Track, number> = {
   frontend: CYAN_ACT,
   backend: VIOLET_SEL,
   devops: AMBER_ALERT,
   design: MAGENTA,
 };
-
-/** Pelagem: o time e GERADO, entao a paleta vem do proprio gato (0xRRGGBB). */
-const hex = (v: number): number => c((v >> 16) & 255, (v >> 8) & 255, v & 255);
-const coatOf = (cat: Cat): { body: number; mark: number; belly: number; big: boolean } => ({
-  body: hex(cat.coat.body),
-  mark: hex(cat.coat.mark),
-  belly: hex(cat.coat.belly),
-  big: cat.big,
-});
 
 const px = (v: View, x: number, y: number, color: number): void => {
   const xi = x | 0;
@@ -380,9 +373,13 @@ const drawStation = (v: View, sx: number, sy: number, track: Track, state: HackS
   rect(v, dx + 2, sy - 2, 2, 6, adjustBrightness(WOOD, -36));
   rect(v, dx + 42, sy - 2, 2, 6, adjustBrightness(WOOD, -36));
 
-  // Teclado largo na beira proxima do gato.
-  rect(v, sx - 7, sy - 8, 14, 4, c(58, 56, 70));
-  for (let i = 0; i < 6; i++) px(v, sx - 5 + i * 2, sy - 7, c(76, 74, 90));
+  // Teclado largo na beira proxima do gato — a mesa CEDE o teclado quando
+  // ocupada: a pose de trabalho desenha o dela sob as patas, e dois
+  // teclados na mesma mesa seriam ruido.
+  if (!working) {
+    rect(v, sx - 7, sy - 8, 14, 4, c(58, 56, 70));
+    for (let i = 0; i < 6; i++) px(v, sx - 5 + i * 2, sy - 7, c(76, 74, 90));
+  }
 
   // Monitor no lado do CENTRO, para a tela aparecer para o jogador.
   const mx = left ? sx + 4 : sx - 20;
@@ -631,10 +628,13 @@ const drawRack = (v: View, sx: number, sy: number, state: HackState, tick: numbe
   for (let y = sy - 36; y > FLOOR_Y - 4; y--) path.push([sx + 14, y]);
   for (let x = sx + 14; x > 404; x--) path.push([x, FLOOR_Y - 4]);
   for (let y = FLOOR_Y - 4; y > 72; y--) path.push([404, y]);
-  for (const [cxp, cyp] of path) px(v, cxp, cyp, adjustBrightness(WALL_DEEP, -26));
+  // O cabo passa POR TRAS do quadro de planejamento: uma linha cruzando o
+  // gantt por cima lia como artefato, nao como infraestrutura.
+  const behindBoard = (xp: number, yp: number): boolean => xp >= 204 && xp <= 278 && yp >= 92 && yp <= 150;
+  for (const [cxp, cyp] of path) if (!behindBoard(cxp, cyp)) px(v, cxp, cyp, adjustBrightness(WALL_DEEP, -26));
   if (!state.buildBroken && !state.cableOut) {
     const p = path[(tick * 2) % path.length];
-    if (p) px(v, p[0], p[1], GREEN_BUILD);
+    if (p && !behindBoard(p[0], p[1])) px(v, p[0], p[1], GREEN_BUILD);
   }
   if (state.cableOut) {
     // O cabo mordido, visivelmente solto no chao.
@@ -701,219 +701,141 @@ const drawSlots = (v: View, state: HackState, tick: number): void => {
  * (lanyard) da propria trilha; orelhas e rabo respondem ao ESTRESSE — o
  * estado emocional e legivel na silhueta, nao so na ficha.
  */
+/** Blit de um frame do pack: ancora no centro horizontal, chao na ultima linha. */
+const blitFrame = (v: View, fr: SpriteFrame, cx: number, groundY: number, mirror: boolean): void => {
+  const bx = Math.round(cx) - (fr.w >> 1);
+  const by = Math.round(groundY) - fr.h;
+  for (let yy = 0; yy < fr.h; yy++) {
+    for (let xx = 0; xx < fr.w; xx++) {
+      const color = fr.data[yy * fr.w + (mirror ? fr.w - 1 - xx : xx)]!;
+      if (color !== 0) px(v, bx + xx, by + yy, color);
+    }
+  }
+};
+
 export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): void => {
-  const p = coatOf(cat);
-  const w = p.big ? 28 : 22;
-  const h = p.big ? 17 : 14;
-  const x = Math.round(cat.x - w / 2);
-  const y = Math.round(cat.y - h);
-  const stressed = cat.stress > 0.6;
+  // TODOS os modos vem do pack girlypixels por aproximacao
+  // (docs/sprites/bundle-audit.md §9): a anatomia, o gait e o timing sao os
+  // originais comprados; o Catathon so escolhe QUAL animacao conta a acao.
+  // Direcao nativa do pack e DIREITA; esquerda = espelho.
+  const look = lookFor(cat.coat.body, cat.pattern, cat.big);
+  const collar = SPEC_RGB[cat.specialty];
+  const cx = Math.round(cat.x);
+  const ground = Math.round(cat.y) + 2;
+  const toCenter = cat.x > 240; // parado, o gato olha para dentro do pavilhao
 
-  if (cat.mode !== 'held') contactShadow(v, Math.round(cat.x), Math.round(cat.y) + 2, (w / 2) | 0, 3, 0.34);
+  if (cat.mode !== 'held') contactShadow(v, cx, ground, 8, 3, 0.34);
 
-  // Selecao: sombra violeta sob as patas + contorno claro de 1px — nada de
-  // orbitas piscando por cima do personagem.
+  // Selecao: um ANEL compacto de 1px nos pes — nada de poca saturada
+  // competindo com o corpo, nada de caixa retangular em volta de um gato.
   if (selected) {
-    lightPool(v, Math.round(cat.x), Math.round(cat.y) + 2, (w / 2) + 2, 3, VIOLET_SEL, 0.4);
+    for (let i = 0; i < 22; i++) {
+      const a = (i / 22) * Math.PI * 2;
+      px(v, Math.round(cat.x + Math.cos(a) * 11), ground + Math.round(Math.sin(a) * 2.6), VIOLET_SEL);
+    }
   }
 
   if (cat.mode === 'held') {
-    // Dangling: o corpo estica na vertical, patas soltas. Fisica de gato.
-    rect(v, x + w / 2 - 5, y - 3, 10, h + 10, p.body);
-    rect(v, x + w / 2 - 4, y + h + 7, 3, 4, p.mark);
-    rect(v, x + w / 2 + 1, y + h + 7, 3, 4, p.mark);
-    drawHead(v, cat, x + w / 2 - 6, y - 11, p, tick, false, stressed);
+    // Na mao: o frame FRONTAL do Turning — o gato encara quem o segura.
+    blitFrame(v, heldFrame(look, collar), cx, Math.round(cat.y) + 10, false);
     return;
   }
-  if (cat.mode === 'nap') {
-    // LOAF. A pose mais importante do jogo.
-    rect(v, x + 1, y + 5, w - 2, h - 5, p.body);
-    rect(v, x + 2, y + 4, w - 4, 2, p.body);
-    drawHead(v, cat, x + 1, y + 1, p, tick, true, false);
-    if ((tick >> 4) % 3 !== 2) {
-      px(v, x + w + 1, y - 2, CREAM);
-      px(v, x + w + 3, y - 5, CREAM);
-    }
-    return;
-  }
-  if (cat.mode === 'fight') {
-    // Bola de pelos, patas alternadas e riscos de unha: exagerado, curto e
-    // legivel. A dupla para somente quando a mao pega um dos briguentos.
-    const shake = (tick >> 1) % 3 - 1;
-    rect(v, x + shake, y + 2, w, h - 2, p.body);
-    drawHead(v, cat, x + (tick % 2 ? -3 : w - 8), y - 6, p, tick, false, true);
-    for (let i = 0; i < 4; i++) {
-      const sx = Math.round(cat.x) - 12 + ((tick * 3 + i * 11) % 25);
-      const sy = y - 8 + ((tick + i * 7) % 18);
-      px(v, sx, sy, CREAM);
-      px(v, sx + 2, sy - 2, CREAM);
-      px(v, sx + 4, sy - 4, CREAM);
-    }
+
+  if (cat.mode === 'walk') {
+    blitFrame(v, packFrame(look, 'walk', tick, collar), cx, ground, cat.targetX < cx);
     return;
   }
   if (cat.mode === 'zoomies') {
-    // Esticado horizontal + poeira atras.
-    rect(v, x - 3, y + 4, w + 6, h - 6, p.body);
-    drawHead(v, cat, cat.targetX > cat.x ? x + w - 1 : x - 8, y, p, tick, false, false);
-    for (let i = 1; i <= 3; i++) px(v, cat.x - (cat.targetX > cat.x ? i * 6 : -i * 6), cat.y - 2, c(180, 170, 160));
+    // Running + poeira atras.
+    const mirror = cat.targetX < cat.x;
+    blitFrame(v, packFrame(look, 'run', tick, collar), cx, ground, mirror);
+    for (let i = 1; i <= 3; i++) px(v, cat.x - (mirror ? -i * 6 : i * 6), cat.y - 2, c(180, 170, 160));
     return;
   }
-
-  const bounce = cat.mode === 'work' ? Math.round(Math.abs(Math.sin(tick / 3)) * 1) : 0;
-  const step = cat.mode === 'walk' ? Math.round(Math.abs(Math.sin(tick / 4)) * 2) : 0;
-
-  if (selected) {
-    // Contorno claro de 1px em volta do corpo — a leitura da selecao.
-    for (let i = 0; i < w; i++) {
-      px(v, x + i, y - bounce, CREAM);
-      px(v, x + i, y + h - 1, CREAM);
+  if (cat.mode === 'work') {
+    if (cat.slot === 'rack') {
+      // Consertando o rack: Attack_swat = pata estendida na maquina.
+      blitFrame(v, packFrame(look, 'swat', tick, collar), cx, ground, false);
+      return;
     }
-    for (let i = 0; i < h; i++) {
-      px(v, x - 1, y + i - bounce, CREAM);
-      px(v, x + w, y + i - bounce, CREAM);
+    // Na mesa: sentado encarando a bancada (mesas vivem nas paredes leste/
+    // oeste); em qualquer outro posto, sentado voltado para o centro.
+    const mirror = cat.slot?.startsWith('desk-') ? cat.x < 240 : toCenter;
+    blitFrame(v, packFrame(look, 'sit', tick, collar), cx, ground, mirror);
+    return;
+  }
+  if (cat.mode === 'nap') {
+    const fr = packFrame(look, 'sleep', tick, collar);
+    blitFrame(v, fr, cx, ground, toCenter);
+    if ((tick >> 4) % 3 !== 2) {
+      const zx = cx + (toCenter ? -10 : 10);
+      px(v, zx, ground - fr.h - 1, CREAM);
+      px(v, zx + 2, ground - fr.h - 4, CREAM);
     }
+    return;
   }
-
-  // Corpo com franja de pelo — menos o sphynx, que e todo pele e dignidade.
-  rect(v, x + 1, y + 2 - bounce, w - 2, h - 4, p.body);
-  if (cat.pattern !== 'sphynx') {
-    for (let i = 0; i < w - 2; i += 2) {
-      const fluff = Math.sin(tick / 8 + i) > 0.2 ? 1 : 0;
-      px(v, x + 1 + i, y + 1 - bounce - fluff, p.body);
+  if (cat.mode === 'eat') {
+    // Crouch de cabeca baixa sobre a tigela.
+    blitFrame(v, packFrame(look, 'crouch', tick, collar), cx, ground, toCenter);
+    rect(v, cx + (toCenter ? -13 : 8), ground - 1, 5, 2, c(220, 190, 140));
+    return;
+  }
+  if (cat.mode === 'fight') {
+    // A dupla briga com as PROPRIAS animacoes de briga do pack: um ataca,
+    // o outro bufa (id decide, deterministico), pelos voando por cima.
+    const anim = cat.id.charCodeAt(cat.id.length - 1) % 2 === 0 ? 'attack' : 'hiss';
+    blitFrame(v, packFrame(look, anim, tick, collar), cx, ground, cat.targetX < cat.x);
+    for (let i = 0; i < 4; i++) {
+      const sx = cx - 12 + ((tick * 3 + i * 11) % 25);
+      const sy = ground - 24 + ((tick + i * 7) % 18);
+      px(v, sx, sy, CREAM);
+      px(v, sx + 2, sy - 2, CREAM);
     }
-  } else {
-    // Dobrinhas de pele no lugar da franja.
-    rect(v, x + 3, y + 4 - bounce, w - 8, 1, adjustBrightness(p.body, -12));
-  }
-  rect(v, x + 2, y + h - 3, w - 4, 2, p.belly);
-  // O PADRAO da pelagem: listras do tabby; o sphynx nao tem franja (abaixo).
-  if (cat.pattern === 'tabby') for (let i = 0; i < 4; i++) rect(v, x + 5 + i * 5, y + 2 - bounce, 2, 4, p.mark);
-  // O CRACHA da trilha: lanyard no peito, credencial embaixo. Cada gato
-  // carrega a propria cor de disciplina — silhueta com funcao.
-  const specColor = SPEC_COLOR[cat.specialty];
-  rect(v, x + 4, y + 3 - bounce, 2, 5, specColor);
-  rect(v, x + 3, y + 8 - bounce, 4, 3, CREAM);
-  px(v, x + 4, y + 9 - bounce, adjustBrightness(specColor, -20));
-  // Patas.
-  rect(v, x + 4, y + h - 1 - step, 3, 2 + step, p.mark);
-  rect(v, x + w - 7, y + h - 1, 3, 2, p.mark);
-  // Rabo: alto e ondulante quando bem; caido quando estressado.
-  const tx = x + w - 1;
-  for (let i = 0; i < 6; i++) {
-    const wave = stressed ? i * 0.8 : Math.round(Math.sin(tick / 9 + i * 0.8) * 2.5);
-    px(v, tx + i, y + 3 + (stressed ? Math.round(wave) : wave) - bounce, p.mark);
-  }
-
-  drawHead(v, cat, x - 1, y - 7 - bounce, p, tick, false, stressed);
-
-  if (cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
-    // TECLANDO de verdade: as patinhas dianteiras martelam o teclado em
-    // alternancia rapida (a referencia e o gato de sueter no laptop), com
-    // plinks de tecla saltando — trabalho TEM corpo, nao so barra enchendo.
-    const up = (tick >> 1) % 2;
-    const kbY = Math.round(cat.y) - 8;
-    rect(v, Math.round(cat.x) - 6, kbY - (up ? 2 : 0), 3, 3, p.mark);
-    rect(v, Math.round(cat.x) + 3, kbY - (up ? 0 : 2), 3, 3, p.mark);
-    px(v, Math.round(cat.x) - 6 + ((tick * 3) % 13), kbY - 4 - ((tick >> 2) % 3), CREAM);
+    return;
   }
   if (cat.mode === 'keyboard') {
-    // ";;;;;" subindo do teclado: o bug nascendo, visivel.
+    // Sentado NO teclado, ";;;;;" subindo: o bug nascendo, visivel.
+    const fr = packFrame(look, 'sit', tick, collar);
+    blitFrame(v, fr, cx, ground, toCenter);
     const t = (tick >> 2) % 4;
-    for (let i = 0; i < 3; i++) px(v, cat.x - 5 + i * 5, y - 12 - t - i, CORAL_ERR);
+    for (let i = 0; i < 3; i++) px(v, cx - 5 + i * 5, ground - fr.h - 2 - t - i, CORAL_ERR);
+    return;
   }
-  if (cat.mode === 'petted' && (tick >> 3) % 2 === 0) {
-    px(v, cat.x + 10, y - 9, c(240, 110, 130));
-    px(v, cat.x + 11, y - 10, c(240, 110, 130));
-    px(v, cat.x + 12, y - 9, c(240, 110, 130));
-    px(v, cat.x + 11, y - 8, c(240, 110, 130));
+  if (cat.mode === 'petted') {
+    // Sitting_head_turn: o gato vira a cabeca para a mao que faz carinho.
+    const fr = packFrame(look, 'sitturn', tick, collar);
+    blitFrame(v, fr, cx, ground, toCenter);
+    if ((tick >> 3) % 2 === 0) {
+      const hx2 = cx + (toCenter ? -11 : 10);
+      const hy2 = ground - fr.h + 3;
+      px(v, hx2, hy2, c(240, 110, 130));
+      px(v, hx2 + 1, hy2 - 1, c(240, 110, 130));
+      px(v, hx2 + 2, hy2, c(240, 110, 130));
+      px(v, hx2 + 1, hy2 + 1, c(240, 110, 130));
+    }
+    return;
   }
-  if (cat.mode === 'eat') rect(v, x + 3, y + h - 1, 5, 2, c(220, 190, 140));
+  // idle (e qualquer modo futuro): parado observando o pavilhao.
+  blitFrame(v, packFrame(look, 'idle', tick, collar), cx, ground, toCenter);
 };
 
-const drawHead = (
-  v: View,
-  cat: Cat,
-  hx: number,
-  hy: number,
-  p: { body: number; mark: number; belly: number },
-  tick: number,
-  asleep: boolean,
-  stressed: boolean
-): void => {
-  rect(v, hx, hy, 12, 10, p.body);
-  // Mascara do siames / peitoral branco do tuxedo — pelo PADRAO da pelagem.
-  if (cat.pattern === 'siames') rect(v, hx + 3, hy + 4, 6, 5, adjustBrightness(p.mark, 30));
-  if (cat.pattern === 'tuxedo') rect(v, hx + 4, hy + 6, 4, 4, p.belly);
-  // Orelhas: em pe quando bem, ACHATADAS quando estressado — o humor mora na
-  // silhueta.
-  if (stressed) {
-    rect(v, hx - 1, hy, 3, 1, p.mark);
-    rect(v, hx + 10, hy, 3, 1, p.mark);
-  } else {
-    px(v, hx + 1, hy - 1, p.mark);
-    px(v, hx + 2, hy - 2, p.mark);
-    px(v, hx + 3, hy - 1, p.mark);
-    px(v, hx + 8, hy - 1, p.mark);
-    px(v, hx + 9, hy - 2, p.mark);
-    px(v, hx + 10, hy - 1, p.mark);
-  }
-  // Olhos: fechados dormindo, piscando de vez em quando.
-  const blink = asleep || (tick % 140) < 6;
-  const eye = blink ? p.mark : c(30, 60, 50);
-  rect(v, hx + 3, hy + 4, 1, blink ? 1 : 2, eye);
-  rect(v, hx + 8, hy + 4, 1, blink ? 1 : 2, eye);
-};
-
-/**
- * O PM: o quinto gato, de OCULOS, camisa com gravata e prancheta debaixo do
- * braco. Sempre presente, nunca na mao do jogador. Quando o projeto esta
- * atras da curva, a preocupacao mora na testa: gota de suor piscando.
- */
 const drawPm = (v: View, state: HackState, tick: number): void => {
+  // O PM e o unico shorthair/grey_tabby do pavilhao (PM_LOOK), de oculos e
+  // gravata — overlay Catathon baked sobre os frames originais do pack,
+  // ancorado no olho/colar do proprio sprite (catsprites.ts).
   const pm = state.pm;
-  const x = Math.round(pm.x) - 11;
-  const y = Math.round(pm.y) - 14;
-  const body = c(150, 134, 122);
-  const mark = c(110, 96, 86);
-  const shirt = c(238, 234, 226);
+  const cx = Math.round(pm.x);
+  const ground = Math.round(pm.y) + 2;
   const moving = Math.hypot(pm.targetX - pm.x, pm.targetY - pm.y) > 2;
-  const step = moving ? Math.round(Math.abs(Math.sin(tick / 4)) * 2) : 0;
-  contactShadow(v, Math.round(pm.x), Math.round(pm.y) + 2, 11, 3, 0.34);
-  rect(v, x + 1, y + 2, 20, 10, body);
-  // A camisa cobre o peito; colarinho e GRAVATA por cima.
-  rect(v, x + 3, y + 5, 16, 8, shirt);
-  rect(v, x + 8, y + 5, 6, 2, adjustBrightness(shirt, -18));
-  rect(v, x + 10, y + 7, 2, 5, c(176, 58, 66));
-  px(v, x + 9, y + 11, c(140, 42, 50));
-  px(v, x + 12, y + 11, c(140, 42, 50));
-  // Patas.
-  rect(v, x + 4, y + 12 - step, 3, 3 + step, mark);
-  rect(v, x + 15, y + 12, 3, 3, mark);
-  // A PRANCHETA debaixo do braco: o PM nunca larga o plano.
-  rect(v, x + 18, y + 4, 6, 8, adjustBrightness(WOOD, -12));
-  rect(v, x + 19, y + 5, 4, 6, CREAM);
-  px(v, x + 20, y + 6, VIOLET_SEL);
-  px(v, x + 21, y + 8, CYAN_ACT);
-  // Cabeca com orelhas e OCULOS redondos com ponte.
-  const hx = x - 1;
-  const hy = y - 7;
-  rect(v, hx, hy, 12, 10, body);
-  px(v, hx + 1, hy - 1, mark);
-  px(v, hx + 2, hy - 2, mark);
-  px(v, hx + 3, hy - 1, mark);
-  px(v, hx + 8, hy - 1, mark);
-  px(v, hx + 9, hy - 2, mark);
-  px(v, hx + 10, hy - 1, mark);
-  rect(v, hx + 2, hy + 3, 3, 3, c(40, 38, 52));
-  rect(v, hx + 7, hy + 3, 3, 3, c(40, 38, 52));
-  px(v, hx + 3, hy + 4, c(214, 224, 232));
-  px(v, hx + 8, hy + 4, c(214, 224, 232));
-  px(v, hx + 5, hy + 4, c(40, 38, 52));
-  px(v, hx + 6, hy + 4, c(40, 38, 52));
+  const mirror = moving ? pm.targetX < pm.x : pm.x > 240;
+  contactShadow(v, cx, ground, 8, 3, 0.34);
+  const fr = pmFrame(moving ? 'walk' : 'idle', tick);
+  blitFrame(v, fr, cx, ground, mirror);
+
   // Atras da curva? O suor conta — a mesma conta do resmungo no feed.
   const alive = state.tasks.filter((t) => !t.cut);
   const behind = Math.floor((state.tick / HACK_TICKS) * alive.length) > alive.filter((t) => t.done).length;
-  if (behind && (tick >> 3) % 2 === 0) px(v, hx + 13, hy + 1, CYAN_ACT);
+  if (behind && (tick >> 3) % 2 === 0) px(v, cx + (mirror ? -9 : 9), ground - fr.h - 1, CYAN_ACT);
 };
 
 /** A mao do jogador: uma patinha. Cursor e personagem ao mesmo tempo. */

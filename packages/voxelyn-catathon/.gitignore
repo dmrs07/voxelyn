@@ -1,2 +1,7 @@
 dist/
 shots/
+
+# Pack de sprites comprado (girlypixels) — a licenca proibe redistribuicao;
+# os PNGs crus NUNCA entram no repo publico. Extraia o zip aqui e rode
+# scripts/import-cats.mjs para regenerar src/client/assets/catSprites.ts.
+assets-src/
