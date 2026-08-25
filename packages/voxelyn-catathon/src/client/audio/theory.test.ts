@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHackathon } from '../../sim/index.js';
+import { CLASSIC_TEAM, createHackathon } from '../../sim/index.js';
 import {
   BASS_ROOTS,
   MOTIF,
@@ -81,7 +81,7 @@ describe('as camadas respondem ao estado certo', () => {
   });
 
   it('os sinais derivam da simulacao, nunca de animacao', () => {
-    const state = createHackathon(1);
+    const state = createHackathon(1, CLASSIC_TEAM, { classic: true });
     const s = signalsOf(state);
     expect(s.workingCount).toBe(0);
     expect(s.blocked).toBe(false);

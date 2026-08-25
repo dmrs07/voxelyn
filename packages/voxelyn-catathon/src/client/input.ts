@@ -1,4 +1,3 @@
-import { SLOTS } from '../sim/index.js';
 import type { Cat, CatId, Command, HackState, SlotId } from '../sim/types.js';
 
 /**
@@ -27,6 +26,8 @@ export type InputState = {
   petting: CatId | null;
   selected: CatId | null;
   feedArmed: boolean;
+  /** Catnip armado: o proximo toque num gato dosa (como o petisco). */
+  catnipArmed: boolean;
   /** Acoes de um tiro na fila; a sim consome uma por tick. */
   queue: Command[];
 };
@@ -43,6 +44,7 @@ export const createInput = (): InputState => ({
   petting: null,
   selected: null,
   feedArmed: false,
+  catnipArmed: false,
   queue: [],
 });
 
@@ -62,10 +64,10 @@ export const catAt = (state: HackState, x: number, y: number): Cat | null => {
   return best;
 };
 
-export const slotAt = (x: number, y: number): SlotId | null => {
+export const slotAt = (state: HackState, x: number, y: number): SlotId | null => {
   let best: SlotId | null = null;
   let bestD = 30;
-  for (const slot of SLOTS) {
+  for (const slot of state.slots) {
     const d = Math.hypot(slot.x - x, slot.y - y);
     if (d < bestD) {
       bestD = d;
@@ -109,7 +111,11 @@ export const attachInput = (
     const s = state();
     const cat = catAt(s, p.x, p.y);
     input.downCat = cat?.id ?? null;
-    if (input.feedArmed && cat) {
+    if (input.catnipArmed && cat) {
+      input.queue.push({ catnip: cat.id });
+      input.catnipArmed = false;
+      input.downCat = null;
+    } else if (input.feedArmed && cat) {
       input.queue.push({ treat: cat.id });
       input.feedArmed = false;
       input.downCat = null;
@@ -137,7 +143,7 @@ export const attachInput = (
     const s = state();
     const heldNow = s.held;
     if (heldNow) {
-      const slot = slotAt(input.x, input.y);
+      const slot = slotAt(s, input.x, input.y);
       input.queue.push(slot ? { drop: slot } : { release: true });
     } else if (input.downCat && !input.moved && nowMs() - input.downAtMs < HOLD_MS) {
       // Toque curto: seleciona (a ficha aparece no HUD, nunca so em hover).
@@ -218,7 +224,8 @@ export const buildCommand = (input: InputState, state: HackState, nowMs: () => n
 
 /** Teclado completo: 1-4 pega/solta, QWER mesas, Z puff, X rack, C cafe, P carinho. */
 export const attachKeyboard = (input: InputState, state: () => HackState): InputTeardown => {
-  const CAT_KEYS: Record<string, CatId> = { Digit1: 'bigode', Digit2: 'cheeto', Digit3: 'almofada', Digit4: 'smoking' };
+  // O time e GERADO: 1-4 mapeia por INDICE no elenco da run, nao por nome.
+  const CAT_INDEX: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 };
   const SLOT_KEYS: Record<string, SlotId> = {
     KeyQ: 'desk-backend',
     KeyW: 'desk-frontend',
@@ -230,9 +237,10 @@ export const attachKeyboard = (input: InputState, state: () => HackState): Input
   };
   const onKey = (e: KeyboardEvent): void => {
     const s = state();
-    if (CAT_KEYS[e.code]) {
+    if (CAT_INDEX[e.code] !== undefined) {
       e.preventDefault();
-      const id = CAT_KEYS[e.code];
+      const id = s.cats[CAT_INDEX[e.code]!]?.id;
+      if (!id) return;
       if (s.held === id) input.queue.push({ release: true });
       else if (!s.held) {
         input.queue.push({ grab: id });

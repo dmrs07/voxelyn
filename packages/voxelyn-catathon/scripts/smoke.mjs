@@ -73,9 +73,51 @@ if (earlyCtx) throw new Error('AudioContext criado antes do primeiro gesto');
 const gestures = await page.evaluate(() => getComputedStyle(document.body).touchAction);
 if (gestures !== 'none') throw new Error(`a pagina rola sob o dedo: touch-action=${gestures}`);
 
-// Todo botao tem PALAVRA e alvo >= 44px (licoes de toque, agora portao).
-await page.getByRole('button', { name: 'comecar' }).tap();
+// --- RECRUTAMENTO: o e-mail do recrutador, seis crachas, um orcamento ------
+await page.getByRole('button', { name: /open the email · career/ }).tap();
+await page.waitForTimeout(300);
+const candCount = await page.locator('.cand-card').count();
+if (candCount !== 6) throw new Error(`o recrutador mandou ${candCount} curriculos (esperava 6)`);
+// Slice D: o convite anuncia a CATEGORIA ESPECIAL e o RIVAL provoca — na
+// primeira edicao de carreira o rival ja nasceu (e ficou no localStorage).
+if (!(await page.locator('.recruit-special').isVisible())) throw new Error('o convite nao anuncia a categoria especial');
+if (!(await page.locator('.recruit-rival').first().isVisible())) throw new Error('o rival nao provoca no e-mail da carreira');
+step.push(`convite: ${await page.locator('.recruit-special').textContent()}`);
+step.push(`rival: ${await page.locator('.recruit-rival').first().textContent()}`);
+// O botao de fechar equipe NASCE desabilitado: sem equipe nao ha hackathon.
+if (await page.getByRole('button', { name: 'lock the team' }).isEnabled()) {
+  throw new Error('da para fechar equipe vazia');
+}
+for (let i = 0; i < 4; i++) await page.locator('.cand-card').nth(i).tap();
+// A LOJINHA: tres ofertas; compra a primeira (portao de apetrecho no estado).
+const shopCount = await page.locator('.shop-item').count();
+if (shopCount !== 3) throw new Error(`a lojinha ofereceu ${shopCount} itens (esperava 3)`);
+await page.locator('.shop-item').nth(0).tap();
+await shot('c1b-recrutamento');
+await page.getByRole('button', { name: 'lock the team' }).tap();
 await page.waitForTimeout(400);
+const team = await sim(() => window.catathon.app.state.cats.map((c) => ({ id: c.id, name: c.name, specialty: c.specialty, personality: c.personality })));
+const gearBought = await sim(() => window.catathon.app.state.gear);
+if (gearBought.length !== 1) throw new Error(`o apetrecho comprado nao chegou ao estado: ${JSON.stringify(gearBought)}`);
+step.push(`apetrecho no booth: ${gearBought[0]}`);
+// Consumiveis SEM doses nao aparecem (display de autor vs hidden: vacinado).
+await page.waitForTimeout(200);
+const ghostBtns = await page.evaluate(() => ({
+  catnipLeft: window.catathon.app.state.catnipLeft,
+  laserLeft: window.catathon.app.state.laserLeft,
+  visible: Array.from(document.querySelectorAll('.action-bar .soft-btn')).filter((b) => b.offsetParent !== null).length,
+}));
+const expectedBtns = 2 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
+if (ghostBtns.visible !== expectedBtns) {
+  throw new Error(`botoes fantasmas na barra: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
+}
+if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
+const bk = team.find((c) => c.specialty === 'backend');
+if (!bk) throw new Error('nenhum backend contratado entre os 4 primeiros (cobertura quebrou)');
+step.push(`recrutados: ${team.map((c) => c.name).join(', ')} — ${await sim(() => window.catathon.app.state.project.name)} no ${await sim(() => window.catathon.app.state.layoutName)}`);
+
+// Todo botao tem PALAVRA e alvo >= 44px (licoes de toque, agora portao).
+await page.waitForTimeout(200);
 const buttons = await page.evaluate(() =>
   Array.from(document.querySelectorAll('button'))
     .filter((b) => b.offsetParent !== null)
@@ -86,7 +128,7 @@ const buttons = await page.evaluate(() =>
     }))
 );
 if (buttons.some((b) => b.text.length < 3)) throw new Error('botao sem palavra');
-if (buttons.some((b) => b.text !== 'cortar' && b.h < 44)) throw new Error('botao com alvo < 44px');
+if (buttons.some((b) => b.text !== 'cut' && b.h < 44)) throw new Error('botao com alvo < 44px');
 // Icones DISTINTOS entre si nos botoes macios (barra de acoes + som): dois
 // botoes com o mesmo desenho e a ilegibilidade do »/≫ da Iliada de novo.
 const cluster = await page.evaluate(() =>
@@ -97,6 +139,28 @@ if (new Set(cluster).size !== cluster.length) throw new Error('dois botoes macio
 if (!(await page.locator('.action-bar').isVisible())) throw new Error('a barra de acoes nao existe');
 step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
+// --- DECISAO: a tarefa com escolha nao anda ate decidir pelo projeto -------
+await page.getByRole('button', { name: 'project' }).tap();
+await page.locator('.task-choice', { hasText: 'feline monolith' }).tap();
+await page.waitForTimeout(200);
+const chosen = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'b1').chosen);
+if (chosen !== 'monolito') throw new Error(`a decisao nao pegou: chosen=${chosen}`);
+step.push('decisao pelo dedo: b1 = feline monolith');
+await page.getByRole('button', { name: 'project' }).tap();
+
+// --- EQUIPE: selecionar pelo retrato abre a ficha COMPACTA no rodape -------
+await page.locator('.team-bar button').nth(2).tap();
+await page.waitForTimeout(250);
+if (!(await page.locator('.cat-dock').isVisible())) throw new Error('a ficha compacta nao abriu');
+const dockBox = await page.locator('.cat-dock').boundingBox();
+const vp = page.viewportSize();
+if (dockBox.y < vp.height * 0.4) throw new Error('a ficha compacta invadiu a area jogavel do topo');
+step.push(`ficha compacta no rodape: ${await page.locator('.dock-name').textContent()}`);
+await page.locator('.team-bar button').nth(2).tap();
+
+// O feed e uma FAIXA unica (historico atras de toque), nao uma pilha.
+if (!(await page.locator('.feed-strip').isVisible())) throw new Error('a faixa de feed nao existe');
+
 // --- ARRASTAR: Bigode para a mesa de backend, so com toque -----------------
 const box = await page.locator('#stage').boundingBox();
 // O canvas usa object-fit: contain: o dedo de verdade toca o bitmap em
@@ -106,10 +170,10 @@ const stageScale = Math.min(box.width / 480, box.height / 270);
 const stageOffX = box.x + (box.width - 480 * stageScale) / 2;
 const stageOffY = box.y + (box.height - 270 * stageScale) / 2;
 const toClient = (sx, sy) => [stageOffX + sx * stageScale, stageOffY + sy * stageScale];
-const catPos = await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
+const catPos = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { x: c.x, y: c.y };
-});
+}, bk.id);
 const drag = async (fromX, fromY, toX, toY) => {
   const [cx, cy] = toClient(fromX, fromY);
   const [tx, ty] = toClient(toX, toY);
@@ -132,18 +196,25 @@ const drag = async (fromX, fromY, toX, toY) => {
   );
 };
 const deskPos = await sim(() => {
-  const s = window.catathon.slots.find((x) => x.id === 'desk-backend');
+  const s = window.catathon.app.state.slots.find((x) => x.id === 'desk-backend');
   return { x: s.x, y: s.y };
 });
 await drag(catPos.x, catPos.y - 4, deskPos.x, deskPos.y);
 await page.waitForTimeout(1200);
-const afterDrag = await sim(() => {
-  const app = window.catathon.app;
-  const c = app.state.cats.find((x) => x.id === 'bigode');
+const afterDrag = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { slot: c.slot, mode: c.mode };
-});
-step.push(`arrasto: bigode slot=${afterDrag.slot} mode=${afterDrag.mode}`);
-if (afterDrag.slot !== 'desk-backend') throw new Error('arrastar nao colocou o gato na mesa');
+}, bk.id);
+step.push(`arrasto: ${bk.name} slot=${afterDrag.slot} mode=${afterDrag.mode}`);
+if (afterDrag.slot !== 'desk-backend') {
+  const dbgS = await page.evaluate((id) => {
+    const app = window.catathon.app;
+    const c = app.state.cats.find((x) => x.id === id);
+    return { held: app.state.held, mode: c.mode, x: c.x, y: c.y, slot: c.slot, inX: app.input.x, inY: app.input.y, inDown: app.input.down, q: app.input.queue.length, handX: app.state.handX, handY: app.state.handY, tick: app.state.tick, phase: app.phase };
+  }, bk.id);
+  console.error('DEBUG', JSON.stringify(dbgS), 'catPos', JSON.stringify(catPos), 'deskPos', JSON.stringify(deskPos));
+  throw new Error('arrastar nao colocou o gato na mesa');
+}
 
 // O quadro ANDA: b1 progride com o especialista na mesa.
 await page.waitForTimeout(1500);
@@ -152,10 +223,11 @@ step.push(`b1 progrediu: ${Math.round(progress)} unidades`);
 if (progress <= 0) throw new Error('a mesa nao produz');
 
 // --- CARINHO: segurar o dedo parado em cima do gato ------------------------
-await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'bigode');
+const energyBeforePet = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   c.stress = 0.7;
-});
+  return c.energy;
+}, bk.id);
 const [px2, py2] = toClient(deskPos.x, deskPos.y - 6);
 await page.evaluate(
   async ([x, y]) => {
@@ -170,18 +242,24 @@ await page.evaluate(
   },
   [px2, py2]
 );
-const stressAfter = await sim(() => window.catathon.app.state.cats.find((x) => x.id === 'bigode').stress);
-step.push(`carinho: estresse 0.70 -> ${stressAfter.toFixed(2)}`);
-if (stressAfter >= 0.68) throw new Error('segurar o dedo nao faz carinho');
+const petOut = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
+  return { stress: c.stress, energy: c.energy };
+}, bk.id);
+step.push(`carinho: estresse 0.70 -> ${petOut.stress.toFixed(2)}`);
+if (petOut.stress >= 0.68) throw new Error('segurar o dedo nao faz carinho');
+// O EXPLOIT morto continua morto: carinho NAO recupera energia.
+if (petOut.energy > energyBeforePet + 0.001) throw new Error('carinho recuperou energia: o exploit voltou');
+step.push('carinho nao recupera energia (o exploit segue morto)');
 await shot('c2-jogando');
 
 // --- PETISCO: botao com palavra, depois toque no gato ----------------------
-await page.getByRole('button', { name: /petisco/ }).tap();
-const cheeto = await sim(() => {
-  const c = window.catathon.app.state.cats.find((x) => x.id === 'cheeto');
+await page.getByRole('button', { name: /treat/ }).tap();
+const eater = await page.evaluate((id) => {
+  const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { x: c.x, y: c.y };
-});
-const [fx, fy] = toClient(cheeto.x, cheeto.y - 4);
+}, team[1].id);
+const [fx, fy] = toClient(eater.x, eater.y - 4);
 await page.touchscreen.tap(fx, fy);
 await page.waitForTimeout(300);
 const treats = await sim(() => window.catathon.app.state.treats);
@@ -191,13 +269,50 @@ if (treats !== 2) throw new Error(`petisco nao desceu: ${treats}`);
 // --- CORTAR ESCOPO: abre o quadro pelo botao com palavra, corta, fecha -----
 const boardHidden = await page.evaluate(() => document.querySelector('.hud-board').hidden);
 if (!boardHidden) throw new Error('o quadro nasce aberto e cobre o pavilhao');
-await page.getByRole('button', { name: 'projeto' }).tap();
-await page.locator('.task', { hasText: 'autoscaling' }).getByRole('button', { name: 'cortar' }).tap();
+await page.getByRole('button', { name: 'project' }).tap();
+// O rotulo de o3 e GERADO por run: corta pelo nome real do quadro.
+const o3Label = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').label);
+await page.locator('.task', { hasText: o3Label }).getByRole('button', { name: 'cut' }).tap();
 await page.waitForTimeout(300);
 const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').cut);
 step.push(`cortar escopo: o3.cut=${cutOk}`);
 if (!cutOk) throw new Error('cortar nao cortou');
 await shot('c3-quadro');
+
+// --- EVENTO SOCIAL: o pavilhao interrompe com uma escolha A/B --------------
+await sim(() => {
+  const st = window.catathon.app.state;
+  st.social[0].kind = 'workshop';
+  st.social[0].at = st.tick + 15;
+});
+await page.waitForTimeout(700);
+if (!(await page.locator('.social-modal').isVisible())) throw new Error('o modal do evento social nao abriu');
+await shot('c3b-social');
+await page.locator('.social-a').tap();
+await page.waitForTimeout(250);
+const socialTaken = await sim(() => window.catathon.app.state.social[0]);
+if (!socialTaken.resolved || socialTaken.taken !== 'a') throw new Error('a escolha A nao resolveu o evento');
+const boosted = await sim(() => window.catathon.app.state.cats.some((c) => c.speedBoost > 0));
+if (!boosted) throw new Error('o workshop nao aplicou o boost');
+step.push('evento social pelo dedo: workshop, opcao A, +8% aplicado');
+
+// --- O CHIP DE BUG e clicavel e abre o projeto (achado de revisao) ---------
+await page.getByRole('button', { name: 'project' }).tap(); // fecha o quadro
+await sim(() => {
+  const st = window.catathon.app.state;
+  st.bugs.push({ id: 99, track: 'design', by: st.cats[0].id, cost: 600, progress: 0, fixed: false });
+});
+await page.waitForTimeout(250);
+await page.locator('.hud-bugs').tap();
+await page.waitForTimeout(150);
+if (await page.evaluate(() => document.querySelector('.hud-board').hidden)) {
+  throw new Error('o chip de bug nao abre o projeto');
+}
+step.push('chip de bug clicavel: abre o projeto');
+await page.getByRole('button', { name: 'project' }).tap();
+await sim(() => {
+  window.catathon.app.state.bugs = window.catathon.app.state.bugs.filter((b) => b.id !== 99);
+});
 
 // --- AUDIO ADAPTATIVO: o grafo responde ao estado, verificavel sem ouvido --
 const audio1 = await sim(() => {
@@ -220,6 +335,52 @@ await sim(() => {
   window.catathon.app.state.cableOut = false;
 });
 step.push(`audio: a camada de tensao respondeu ao bloqueio`);
+
+// --- O PITCH: fase jogavel no dedo -----------------------------------------
+// Avanca o relogio ate o fim das 48h; o loop do jogo faz o resto.
+await sim(() => {
+  window.catathon.app.state.tick = 14398; // HACK_TICKS - 2
+});
+await page.waitForTimeout(500);
+const phasePitch = await sim(() => window.catathon.app.state.phase);
+if (phasePitch !== 'pitch') throw new Error(`as 48h acabaram e o palco nao abriu: phase=${phasePitch}`);
+if (!(await page.locator('.pitch-panel').isVisible())) throw new Error('o painel do pitch nao aparece');
+const g0 = await sim(() => window.catathon.app.state.pitch.gauge);
+// Um gato NAO-cowboy: o cursor do cowboy pode mudar o slide e derrubar o
+// gauge de proposito — gate deterministico pede palco sem risco.
+const safeCat = team.find((c) => c.personality !== 'cowboy') ?? team[0];
+await page.locator('.pitch-ability', { hasText: safeCat.name.toLowerCase() }).tap();
+await page.waitForTimeout(300);
+const g1 = await sim(() => window.catathon.app.state.pitch.gauge);
+if (safeCat.personality !== 'cowboy' && g1 <= g0) {
+  throw new Error(`a habilidade de palco nao mexeu na plateia: ${g0} -> ${g1}`);
+}
+step.push(`pitch: plateia ${g0.toFixed(2)} -> ${g1.toFixed(2)} com a gracinha de ${safeCat.name}`);
+await shot('c4-pitch');
+await sim(() => {
+  window.catathon.app.state.pitch.ticksLeft = 30;
+});
+await page.waitForTimeout(1200);
+if ((await sim(() => window.catathon.app.state.phase)) !== 'done') throw new Error('o pitch nao terminou');
+if (!(await page.locator('.result-dims').isVisible())) throw new Error('resultado sem as cinco dimensoes');
+if (!(await page.locator('.result-prize').isVisible())) throw new Error('resultado sem o premio');
+// O EXTRATO do premio (achado de revisao): a fumaca escolheu monolito, entao
+// ha divida — o extrato tem parcela nao-zero em QUALQUER desfecho.
+if (!(await page.locator('.result-ledger').isVisible())) throw new Error('resultado sem o extrato do premio');
+step.push(`extrato: ${await page.locator('.result-ledger').textContent()}`);
+// Slice D: o pos-jogo mostra o DUELO com o rival e a REPUTACAO da carreira.
+if (!(await page.locator('.result-rival').isVisible())) throw new Error('o resultado nao mostra o duelo com o rival');
+if (!(await page.locator('.result-rep').isVisible())) throw new Error('o resultado nao mostra a reputacao');
+step.push(`duelo: ${await page.locator('.result-rival').textContent()}`);
+const career = await page.evaluate(() => JSON.parse(localStorage.getItem('catathon-career') ?? 'null'));
+if (!career || typeof career.wallet !== 'number' || career.runs < 1) {
+  throw new Error(`a carreira nao persistiu: ${JSON.stringify(career)}`);
+}
+if (typeof career.rep !== 'number' || !career.rival || typeof career.rival.skill !== 'number') {
+  throw new Error(`a carreira nao guarda reputacao/rival: ${JSON.stringify(career)}`);
+}
+step.push(`resultado com premio e carreira persistida (carteira: ${career.wallet}, runs: ${career.runs}, rep: ${career.rep}, rival: ${career.rival.name})`);
+await shot('c5-resultado');
 
 console.log('\nfumaca de toque do CATATHON (Pixel 7, sem teclado nem mouse)\n');
 for (const line of step) console.log(`  ${line}`);

@@ -1,6 +1,25 @@
 import { presentToCanvas } from '@voxelyn/core/adapters/canvas2d';
-import { TICK_MS, createHackathon, step } from '../sim/index.js';
-import type { HackState, SimEvent } from '../sim/types.js';
+import {
+  CLASSIC_TEAM,
+  RIVAL_TAUNT_TEXT,
+  RUN_BUDGET,
+  TICK_MS,
+  createHackathon,
+  dailySeed,
+  returningCandidate,
+  rivalScoreFor,
+  rollCandidates,
+  rollGearOffers,
+  rollLayout,
+  rollProject,
+  rollSpecialCategory,
+  rollSponsorOffer,
+  step,
+  type Candidate,
+  type GearId,
+} from '../sim/index.js';
+import { applyRun, ensureRival, loadCareer, todayUTC, type Mode } from './career.js';
+import type { HackState, SimEvent, SponsorContract } from '../sim/types.js';
 import {
   createAudioEngine,
   demoAudio,
@@ -17,7 +36,8 @@ import {
   type BusId,
 } from './audio/index.js';
 import { attachInput, attachKeyboard, buildCommand, createInput, type InputState, type InputTeardown } from './input.js';
-import { clearScreens, createHud, drawCard, drawHud, pushFeed, showResult, showTitle, type Hud } from './hud.js';
+import { getLocale, t } from './i18n.js';
+import { bindTeam, clearScreens, createHud, drawCard, drawHud, pushFeed, showRecruit, showResult, showTitle, type Hud } from './hud.js';
 import { createView, drawHand, drawScene, type View } from './render.js';
 
 export type App = {
@@ -29,7 +49,18 @@ export type App = {
   hud: Hud;
   audio: AudioEngine;
   screenHost: HTMLElement;
-  phase: 'title' | 'playing' | 'result';
+  phase: 'title' | 'recruit' | 'playing' | 'result';
+  /** A semente DESTA edicao: candidatos, projeto e layout saem dela. */
+  seed: number;
+  /** O modo da edicao: carreira persiste a carteira; daily fixa a semente. */
+  mode: Mode;
+  /** O que esta edicao custou (contratos + apetrechos, menos o adiantamento
+   * do sponsor) — a carreira desconta. */
+  spent: number;
+  /** A equipe contratada desta run (a carreira le crescimento daqui). */
+  hired: readonly Candidate[];
+  /** O contrato de sponsor assinado nesta edicao, se houve. */
+  sponsor: SponsorContract | null;
   accumulator: number;
   lastFrame: number;
   frameHandle: number;
@@ -69,8 +100,8 @@ const tickGame = (app: App): void => {
   tickAudio(app.audio, app.state);
   eventsAudio(app.audio, app.state, events);
   for (const e of events) {
-    if (e.kind === 'hairball' || e.kind === 'cable' || e.kind === 'build-broken') buzz([30, 40, 30]);
-    else if (e.kind === 'ship') buzz(12);
+    if (e.kind === 'hairball' || e.kind === 'cable' || e.kind === 'build-broken' || e.kind === 'demo-glitch') buzz([30, 40, 30]);
+    else if (e.kind === 'ship' || e.kind === 'improviso') buzz(12);
     else if (e.kind === 'treat') buzz([8, 20, 8]);
   }
   pushFeed(app.hud, app.state, events);
@@ -80,17 +111,90 @@ const tickGame = (app: App): void => {
     // O ritual da submissao: a musica congela, o deploy fala, e o final e
     // festa intima ou feltro gentil — nunca tragedia.
     demoAudio(app.audio, app.state);
-    showResult(app.screenHost, app.state, () => restart(app));
+    // A CARREIRA fecha a conta da edicao: carteira, reputacao, o duelo com o
+    // rival, os juniores que cresceram, a estrela que talvez tenha ido
+    // embora. A nota do rival usa o skill de ANTES da run (a carreira so e
+    // salva nos fechamentos — durante a run ela nao muda).
+    const career = loadCareer();
+    const rivalScore =
+      app.mode === 'career' && career.rival ? rivalScoreFor(app.state.seed, career.rival.skill) : null;
+    const close = applyRun(career, app.state, {
+      mode: app.mode,
+      spent: app.spent,
+      hired: app.hired,
+      rivalScore,
+    });
+    showResult(app.screenHost, app.state, close, () => openRecruit(app, app.mode));
   }
 };
 
-const restart = (app: App): void => {
+/**
+ * O RECRUTAMENTO abre uma edicao nova: semente nova (daqui saem candidatos,
+ * projeto e layout — a sim nunca ve relogio, so a semente congelada), seis
+ * curriculos na tela, e a equipe contratada entra na run como argumento.
+ */
+const openRecruit = (app: App, mode: Mode): void => {
+  clearScreens(app.screenHost);
+  app.phase = 'recruit';
+  app.mode = mode;
+  // DAILY: a semente do dia UTC, igual para todo mundo. Nos outros modos, o
+  // relogio e lido UMA vez aqui — a sim nunca ve tempo real.
+  app.seed = mode === 'daily' ? dailySeed(todayUTC()) : (Date.now() ^ 0xca7a7040) >>> 0;
+  const career = mode === 'career' ? loadCareer() : null;
+  const budget = career ? career.wallet : RUN_BUDGET;
+  const project = rollProject(app.seed, getLocale());
+  const layout = rollLayout(app.seed);
+  const candidates = rollCandidates(app.seed, getLocale());
+  // EVOLUCAO DO JUNIOR entre runs: um alumnus (deterministico pela semente)
+  // toma a vaga do primeiro curinga — mesmo gato, agora pleno, com desconto.
+  if (career && career.alumni.length > 0) {
+    const alum = career.alumni[app.seed % career.alumni.length]!;
+    candidates[4] = returningCandidate(alum, getLocale());
+  }
+  // O RIVAL nasce na primeira edicao de carreira; o SPONSOR so procura quem
+  // a reputacao ja apresentou. Nada disso existe no quick/daily — a
+  // comparacao justa do daily nao pode depender da tua carreira.
+  const rival = career ? ensureRival(career, app.seed) : null;
+  const taunts = RIVAL_TAUNT_TEXT[getLocale()];
+  showRecruit(
+    app.screenHost,
+    candidates,
+    rollGearOffers(app.seed),
+    budget,
+    { name: project.name, brief: project.brief, emphasis: project.emphasis },
+    layout.name,
+    {
+      sponsor: career ? rollSponsorOffer(app.seed, career.rep) : null,
+      rivalLine: rival ? t().rivalIntro(rival.name, taunts[app.seed % taunts.length]!) : null,
+      rosterLine: rival && rival.roster.length > 0 ? t().rivalRoster(rival.roster.join(', ')) : null,
+      special: rollSpecialCategory(app.seed),
+    },
+    (hired, gear, sponsor) => startRun(app, hired, gear, sponsor)
+  );
+};
+
+const startRun = (
+  app: App,
+  team: readonly Candidate[],
+  gear: readonly GearId[],
+  sponsor: SponsorContract | null
+): void => {
   clearScreens(app.screenHost);
   stopGameAudio(app.audio);
   startGameAudio(app.audio);
-  // A semente vem do relogio UMA vez, aqui no cliente. A simulacao nunca ve
-  // tempo real — so a semente congelada.
-  app.state = createHackathon((Date.now() ^ 0xca7a7040) >>> 0);
+  app.hired = team;
+  app.sponsor = sponsor;
+  // O adiantamento do sponsor ABATE o gasto da edicao: dinheiro que entrou
+  // junto com a letra miuda. Pode ate deixar o saldo positivo.
+  app.spent =
+    team.reduce((s, c) => s + c.cost, 0) +
+    gear.reduce((s, g) => {
+      const offer = rollGearOffers(app.seed).find((o) => o.id === g);
+      return s + (offer?.cost ?? 0);
+    }, 0) -
+    (sponsor?.budget ?? 0);
+  app.state = createHackathon(app.seed, team, { locale: getLocale(), gear, sponsor });
+  bindTeam(app.hud, app.state.cats);
   app.input.selected = null;
   app.input.queue.length = 0;
   app.phase = 'playing';
@@ -114,13 +218,14 @@ const frame = (app: App, now: number): void => {
     // O botao de petisco pulsa enquanto armado: o proximo toque num gato
     // alimenta, e o jogador precisa VER que o modo esta ligado.
     app.hud.treatsBtn.classList.toggle('armed', app.input.feedArmed);
+    app.hud.catnipBtn.classList.toggle('armed', app.input.catnipArmed);
     app.hud.root.hidden = false;
   } else {
     app.accumulator = 0;
-    app.hud.root.hidden = app.phase === 'title';
+    app.hud.root.hidden = app.phase === 'title' || app.phase === 'recruit';
   }
 
-  drawScene(app.view, app.state, app.state.tick, app.input.selected);
+  drawScene(app.view, app.state, app.state.tick, app.input.selected, getLocale());
   if (app.phase === 'playing') drawHand(app.view, app.input.x, app.input.y, app.state.held !== null);
   presentToCanvas(app.ctx, app.view.surface);
   app.frameHandle = requestAnimationFrame((t) => frame(app, t));
@@ -135,22 +240,42 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   const input = createInput();
   const audio = createAudioEngine();
   const app: App = {
+    seed: 20260821,
     canvas,
     ctx,
     view: createView(),
-    state: createHackathon(20260821),
+    // A cena do titulo: o time classico no booth original.
+    state: createHackathon(20260821, CLASSIC_TEAM, { classic: true, locale: getLocale() }),
     input,
     hud: createHud(hudHost, {
       onCut: (taskId) => input.queue.push({ cut: taskId }),
       onFeedToggle: () => {
         input.feedArmed = !input.feedArmed;
+        if (input.feedArmed) input.catnipArmed = false;
       },
       onLevel: (bus, level) => setLevel(audio, bus as BusId, level),
       levels: () => getLevels(audio),
+      // Selecao pelos retratos da equipe: sem cacar 22 pixels em movimento.
+      onSelect: (cat) => {
+        input.selected = input.selected === cat ? null : cat;
+      },
+      onChoose: (task, option) => input.queue.push({ choose: { task, option } }),
+      onAbility: (cat) => input.queue.push({ ability: cat }),
+      // Armar o catnip desarma o petisco (e vice-versa): uma mao, um modo.
+      onCatnipToggle: () => {
+        input.catnipArmed = !input.catnipArmed;
+        if (input.catnipArmed) input.feedArmed = false;
+      },
+      onLaser: () => input.queue.push({ laser: true }),
+      onSocial: (option) => input.queue.push({ social: option }),
     }),
     audio,
     screenHost,
     phase: 'title',
+    mode: 'career',
+    spent: 0,
+    hired: CLASSIC_TEAM,
+    sponsor: null,
     accumulator: 0,
     lastFrame: 0,
     frameHandle: 0,
@@ -162,9 +287,8 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   window.addEventListener('pointerdown', () => unlockAudio(app.audio), { once: true });
   window.addEventListener('touchstart', () => unlockAudio(app.audio), { once: true, passive: true });
 
-  showTitle(screenHost, () => {
-    clearScreens(screenHost);
-    restart(app);
+  showTitle(screenHost, (mode) => {
+    openRecruit(app, mode);
   });
 
   return app;

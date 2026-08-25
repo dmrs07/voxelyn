@@ -54,13 +54,45 @@ export const CATS: readonly {
  * trilhas de proposito: o dashboard espera a API, que espera o schema, e a
  * banca nao aceita frontend bonito sobre backend imaginario.
  */
-export const TASKS: readonly Omit<Task, 'progress' | 'done' | 'cut' | 'awaitingShip'>[] = [
+export const TASKS: readonly Omit<Task, 'progress' | 'done' | 'cut' | 'awaitingShip' | 'chosen'>[] = [
   // backend
-  { id: 'b1', track: 'backend', label: 'schema dos adotaveis', polish: false, cost: TASK_CORE_COST, deps: [] },
+  {
+    id: 'b1',
+    track: 'backend',
+    label: 'schema dos adotaveis',
+    polish: false,
+    cost: TASK_CORE_COST,
+    deps: [],
+    // A primeira DECISAO da run: a arquitetura. A tarefa nao anda ate o
+    // jogador escolher — e cada opcao muda a partida, nao so um numero.
+    choice: {
+      prompt: 'arquitetura do backend?',
+      options: [
+        { id: 'monolito', label: 'monolito felino', hint: 'rapido agora, divida depois' },
+        { id: 'micro', label: 'microsservicos', hint: 'caro agora, backend rende depois' },
+        { id: 'serverless', label: 'serverless do sponsor', hint: 'rapidissimo, e se a API deles cair na demo?' },
+      ],
+    },
+  },
   { id: 'b2', track: 'backend', label: 'API /adotar com auth por bigode', polish: false, cost: TASK_CORE_COST, deps: ['b1'] },
   { id: 'b3', track: 'backend', label: 'cache de sardinha', polish: true, cost: TASK_POLISH_COST, deps: ['b2'] },
   // design
-  { id: 'd1', track: 'design', label: 'design system Patinha', polish: false, cost: TASK_CORE_COST, deps: [] },
+  {
+    id: 'd1',
+    track: 'design',
+    label: 'design system Patinha',
+    polish: false,
+    cost: TASK_CORE_COST,
+    deps: [],
+    choice: {
+      prompt: 'como atacar a UI?',
+      options: [
+        { id: 'sistemaPrimeiro', label: 'design system primeiro', hint: 'lento agora, telas rendem depois' },
+        { id: 'componentesLocais', label: 'componentes locais', hint: 'rapido, inconsistencia vira divida' },
+        { id: 'templateSponsor', label: 'template do sponsor', hint: 'muito rapido, zero originalidade' },
+      ],
+    },
+  },
   { id: 'd2', track: 'design', label: 'fluxo de adocao acessivel', polish: false, cost: TASK_CORE_COST, deps: ['d1'] },
   { id: 'd3', track: 'design', label: 'modo escuro (para gatos)', polish: true, cost: TASK_POLISH_COST, deps: ['d1'] },
   // frontend
@@ -68,7 +100,22 @@ export const TASKS: readonly Omit<Task, 'progress' | 'done' | 'cut' | 'awaitingS
   { id: 'f2', track: 'frontend', label: 'dashboard de adocoes', polish: false, cost: TASK_CORE_COST, deps: ['b2', 'd1'] },
   { id: 'f3', track: 'frontend', label: 'confete de lazinha', polish: true, cost: TASK_POLISH_COST, deps: ['f2'] },
   // devops
-  { id: 'o1', track: 'devops', label: 'pipeline de deploy', polish: false, cost: TASK_CORE_COST, deps: ['b1'] },
+  {
+    id: 'o1',
+    track: 'devops',
+    label: 'pipeline de deploy',
+    polish: false,
+    cost: TASK_CORE_COST,
+    deps: ['b1'],
+    choice: {
+      prompt: 'como vai ao ar?',
+      options: [
+        { id: 'pipelineCompleto', label: 'pipeline completo', hint: 'caro, e a demo agradece' },
+        { id: 'deployNaMao', label: 'deploy na mao', hint: 'rapido, divida na certa' },
+        { id: 'presetSponsor', label: 'preset do sponsor', hint: 'confortavel, e amarra a demo neles' },
+      ],
+    },
+  },
   { id: 'o2', track: 'devops', label: 'miau-metrics no grafana', polish: false, cost: TASK_CORE_COST, deps: ['o1'] },
   { id: 'o3', track: 'devops', label: 'autoscaling de sonecas', polish: true, cost: TASK_POLISH_COST, deps: ['o2'] },
 ];
@@ -102,25 +149,3 @@ export const SLOTS: readonly { id: SlotId; x: number; y: number; track: Track | 
 
 export const slotOf = (id: SlotId) => SLOTS.find((s) => s.id === id)!;
 export const deskOfTrack = (track: Track): SlotId => SLOTS.find((s) => s.track === track)!.id;
-
-export const startCats = (): Cat[] =>
-  CATS.map((c, i) => ({
-    id: c.id,
-    name: c.name,
-    specialty: c.specialty,
-    personality: c.personality,
-    quirk: c.quirk,
-    x: 150 + i * 46,
-    y: 190,
-    targetX: 150 + i * 46,
-    targetY: 190,
-    mode: 'idle',
-    modeUntil: 0,
-    slot: null,
-    // Escalonadas de proposito: quatro gatos com o mesmo relogio apagam todos
-    // juntos, e uma "onda de soneca" com uma mao so e injusta — nao dificil,
-    // injusta. Escalonar transforma a onda em rodizio.
-    energy: 1 - i * 0.07,
-    hunger: 1 - i * 0.05,
-    stress: 0.12 + i * 0.03,
-  }));

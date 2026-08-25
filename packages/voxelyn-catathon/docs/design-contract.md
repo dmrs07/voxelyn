@@ -39,3 +39,26 @@ e da Iliada. Tudo que o cliente mostra vem de eventos da simulacao.
 
 Reusar capacidades de ENGINE do Voxelyn; nao herdar identidade do Survival.
 Nada de mineracao re-skinada, inimigo renomeado de bug, arma virando teclado.
+
+## Slice A — a run com decisões (adendo)
+
+O playtest no aparelho real pediu quatro correções de fundo, todas mecânicas:
+
+1. **O exploit do carinho morreu.** Carinho não recupera energia; mexe em
+   estresse e MORAL (o quarto medidor, que manda na velocidade), tem memória
+   (sessões seguidas rendem menos) e a terceira seguida superestimula.
+   Personalidades respondem diferente. O "shipa" segue valendo sempre.
+2. **Tarefas têm DECISÕES.** Arquitetura (b1), abordagem de UI (d1) e deploy
+   (o1) não andam até o jogador escolher entre três opções que mudam custo
+   agora/depois e tags cobradas pela banca (dívida, inovação, estabilidade,
+   risco de sponsor). Colocar gato e ver barra encher não é jogo.
+3. **O pitch é fase jogável.** Gauge da plateia decai; cada gato tem uma
+   habilidade de palco com cooldown (repetir rende metade); o crash da demo
+   virou crise respondível — improviso heroico ou vexame.
+4. **A nota tem cinco dimensões** (técnica, estabilidade, experiência,
+   inovação, pitch) + voto popular. O projeto com mais features nem sempre
+   vence.
+
+UI correspondente: ficha compacta no rodapé (a grande cobria a estação do
+selecionado), barra da equipe com anéis de estado, feed em faixa única com
+histórico atrás de toque, chip de bug clicável, painel de palco.

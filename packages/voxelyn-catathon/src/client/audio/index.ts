@@ -95,20 +95,14 @@ export const eventsAudio = (a: AudioEngine, state: HackState, events: SimEvent[]
     if (critical) duck(a.mix);
     const now = performance.now();
     const at = (id: CatId): Cat | undefined => state.cats.find((c) => c.id === id);
-    if (e.kind === 'bug') {
-      const cat = at(e.by);
-      if (cat) vocalize(a.vocals, a.mix, e.by, cat.x, 'annoyed', now);
-    } else if (e.kind === 'cable') {
-      const cat = at(e.by);
-      // O chirp CULPADO da direcao §9.
-      if (cat) vocalize(a.vocals, a.mix, e.by, cat.x, 'chirp', now);
-    } else if (e.kind === 'zoomies') {
-      const cat = at(e.cat);
-      if (cat) vocalize(a.vocals, a.mix, e.cat, cat.x, 'chirp', now);
-    } else if (e.kind === 'ship') {
-      const cat = at(e.by);
-      if (cat) vocalize(a.vocals, a.mix, e.by, cat.x, 'chirp', now);
-    }
+    const cowboy = state.cats.find((c) => c.personality === 'cowboy') ?? null;
+    const say = (cat: Cat | undefined, kind: 'chirp' | 'mrrp' | 'annoyed'): void => {
+      if (cat) vocalize(a.vocals, a.mix!, cat, kind, now, cowboy);
+    };
+    if (e.kind === 'bug') say(at(e.by), 'annoyed');
+    else if (e.kind === 'cable') say(at(e.by), 'chirp'); // o chirp CULPADO da direcao §9
+    else if (e.kind === 'zoomies') say(at(e.cat), 'chirp');
+    else if (e.kind === 'ship') say(at(e.by), 'chirp');
   }
 };
 
@@ -116,7 +110,8 @@ export const eventsAudio = (a: AudioEngine, state: HackState, events: SimEvent[]
 export const grabVocal = (a: AudioEngine, state: HackState, id: CatId): void => {
   if (!a.mix) return;
   const cat = state.cats.find((c) => c.id === id);
-  if (cat) vocalize(a.vocals, a.mix, id, cat.x, 'chirp', performance.now());
+  const cowboy = state.cats.find((c) => c.personality === 'cowboy') ?? null;
+  if (cat) vocalize(a.vocals, a.mix, cat, 'chirp', performance.now(), cowboy);
 };
 
 /**
@@ -171,8 +166,7 @@ export const demoAudio = (a: AudioEngine, state: HackState): void => {
     if (result.crashed || result.outcome === 'participacao') {
       playSoftLoss(mix);
     } else {
-      const xs = Object.fromEntries(state.cats.map((c) => [c.id, c.x])) as Record<CatId, number>;
-      teamCelebration(a.vocals, mix, xs);
+      teamCelebration(a.vocals, mix, state.cats);
     }
   });
 };

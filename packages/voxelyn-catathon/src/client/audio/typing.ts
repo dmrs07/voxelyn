@@ -19,12 +19,14 @@ import { panOf, type Mixer } from './mixer.js';
 
 type Style = { rate: number; freq: number; burst: number; rest: number };
 
+/** O ritmo de teclado vem da PERSONALIDADE — o time e gerado. */
 const STYLES: Record<string, Style> = {
-  bigode: { rate: 7, freq: 2200, burst: 999, rest: 0 },
-  cheeto: { rate: 13, freq: 2800, burst: 10, rest: 1.1 },
-  almofada: { rate: 3.4, freq: 1500, burst: 999, rest: 0 },
-  smoking: { rate: 6, freq: 2500, burst: 14, rest: 0.55 },
+  perfeccionista: { rate: 7, freq: 2200, burst: 999, rest: 0 },
+  cowboy: { rate: 13, freq: 2800, burst: 10, rest: 1.1 },
+  calmo: { rate: 3.4, freq: 1500, burst: 999, rest: 0 },
+  'julga-em-silencio': { rate: 6, freq: 2500, burst: 14, rest: 0.55 },
 };
+const DEFAULT_STYLE: Style = { rate: 8, freq: 2400, burst: 24, rest: 0.4 };
 
 export type Typing = {
   next: Record<string, number>;
@@ -37,7 +39,7 @@ export const stepTyping = (t: Typing, mix: Mixer, state: HackState, nowS: number
   const silenced = state.hairball.active || state.cableOut || state.buildBroken;
   for (const cat of state.cats) {
     if (cat.mode !== 'work' || cat.slot === 'rack' || silenced) continue;
-    const s = STYLES[cat.id];
+    const s = STYLES[cat.personality] ?? DEFAULT_STYLE;
     const due = t.next[cat.id] ?? 0;
     if (nowS < due) continue;
     let left = t.burstLeft[cat.id] ?? s.burst;

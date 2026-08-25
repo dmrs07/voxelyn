@@ -1,5 +1,26 @@
-import { CATS, HACK_TICKS, HOURS_PER_TICK, JUDGES, TREATS_START } from '../sim/index.js';
-import type { HackState, SimEvent, Task } from '../sim/types.js';
+import {
+  ACHIEVEMENT_TEXT,
+  GEAR_TEXT,
+  HACK_TICKS,
+  HOURS_PER_TICK,
+  JUDGES,
+  SOCIAL_TEXT,
+  SOCIAL_WINDOW,
+  SPECIAL_TEXT,
+  SPONSOR_TEXT,
+  TREATS_START,
+  fmtCost,
+  vibeOf,
+  type Candidate,
+  type GearId,
+} from '../sim/index.js';
+import { getLocale, setLocale, specLabel, t, tierLabel, traitLabel } from './i18n.js';
+import type { RunClose } from './career.js';
+
+/** Alias do dicionario para escopos onde `t` e uma Task. */
+const i18n = t;
+import type { Cat } from '../sim/types.js';
+import type { CatId, HackState, SimEvent, SpecialCategoryId, SponsorContract, Task } from '../sim/types.js';
 
 /**
  * O HUD e HTML, nao pixels — a regra de acessibilidade da casa: botao com
@@ -32,6 +53,10 @@ export const ICONS = {
   badge: svg('<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M12 8V5"/><path d="M8 3h8l-1.5 2h-5z"/><path d="M9.5 13h5"/><path d="M9.5 16.5h3.5"/>'),
   /** Jogar de novo: a seta que volta. */
   again: svg('<path d="M5 12a7 7 0 1 1 2 5"/><path d="M5 17v-5h5"/>'),
+  /** Catnip: a folhinha com talo. */
+  leaf: svg('<path d="M12 21c-5-2-7-6-7-11 5 0 9 2 11 7-1 2-2 3-4 4z"/><path d="M12 21C12 14 9 9 5 6"/><path d="M12 10V3"/>'),
+  /** Laser: o ponto e o feixe — o unico botao que mira o chao. */
+  laser: svg('<circle cx="7" cy="17" r="2.5"/><path d="M9.5 14.5L20 4"/><path d="M16 4h4v4"/>'),
 } as const;
 
 /**
@@ -73,7 +98,11 @@ type TaskRow = {
   bar: HTMLElement;
   fill: HTMLElement;
   cutBtn: HTMLButtonElement;
+  /** Botoes de DECISAO (so em tarefas com escolha), criados uma vez. */
+  choices: HTMLElement | null;
 };
+
+type Meter = { row: HTMLElement; fill: HTMLElement };
 
 export type Hud = {
   root: HTMLElement;
@@ -81,12 +110,35 @@ export type Hud = {
   remain: HTMLElement;
   build: HTMLElement;
   proj: HTMLElement;
-  bugsChip: HTMLElement;
+  bugsChip: HTMLButtonElement;
   alarm: HTMLElement;
   treatsBtn: HTMLButtonElement;
   board: HTMLElement;
-  feed: HTMLElement;
-  card: HTMLElement;
+  /** O feed virou FAIXA unica + painel expansivel: tres logs empilhados
+   * cobriam o canto de descanso inteiro. */
+  feedStrip: HTMLButtonElement;
+  feedLatest: HTMLElement;
+  feedBadge: HTMLElement;
+  feedPanel: HTMLElement;
+  /** A FICHA COMPACTA no rodape: nunca cobre o gato nem a estacao dele. */
+  dock: HTMLElement;
+  dockName: HTMLElement;
+  dockNow: HTMLElement;
+  dockMeters: Record<'energia' | 'estresse' | 'moral', Meter>;
+  dockDetails: HTMLElement;
+  dockBio: HTMLElement;
+  dockHunger: Meter;
+  /** CONVIVENCIA: com quem este gato vibra e com quem ele bufa — visivel
+   * so depois da revelacao (o comportamento voce ja via; o nome, so agora). */
+  dockVibes: HTMLElement;
+  /** Retratos da equipe na borda esquerda: selecao sem cacar pixel. */
+  teamBtns: Map<CatId, HTMLButtonElement>;
+  /** O palco: gauge da plateia, timer e uma habilidade por gato. */
+  pitchPanel: HTMLElement;
+  pitchGauge: HTMLElement;
+  pitchTimer: HTMLElement;
+  pitchCrisis: HTMLElement;
+  pitchBtns: Map<CatId, HTMLButtonElement>;
   /**
    * Linhas do quadro, criadas UMA vez e atualizadas no lugar. A primeira
    * versao reconstruia o quadro a cada frame — e um botao recriado 60x por
@@ -94,8 +146,24 @@ export type Hud = {
    * tocava "cortar" e nada acontecia. Botao que existe fica existindo.
    */
   rows: Map<string, TaskRow>;
+  /** Containers que bindTeam preenche a cada run. */
+  teamBar: HTMLElement;
+  abilityRow: HTMLElement;
+  /** Consumiveis: aparecem na barra so quando ha doses. */
+  catnipBtn: HTMLButtonElement;
+  laserBtn: HTMLButtonElement;
+  /** O modal do evento social: titulo, A/B e a barra do prazo. */
+  socialModal: HTMLElement;
+  socialTitle: HTMLElement;
+  socialA: HTMLButtonElement;
+  socialB: HTMLButtonElement;
+  socialTimer: HTMLElement;
+  socialKind: { current: string | null };
   onCut: (taskId: string) => void;
   onFeedToggle: () => void;
+  onChoose: (task: string, option: string) => void;
+  onSelect: (cat: CatId) => void;
+  onAbility: (cat: CatId) => void;
 };
 
 export const createHud = (
@@ -106,6 +174,12 @@ export const createHud = (
     /** Controle por barramento (direcao §14): musica, efeitos, teclados, ambiente, gatos. */
     onLevel: (bus: string, level01: number) => void;
     levels: () => Record<string, number>;
+    onSelect: (cat: CatId) => void;
+    onChoose: (task: string, option: string) => void;
+    onAbility: (cat: CatId) => void;
+    onCatnipToggle: () => void;
+    onLaser: () => void;
+    onSocial: (option: 'a' | 'b') => void;
   }
 ): Hud => {
   const root = el('div', 'hud');
@@ -121,51 +195,121 @@ export const createHud = (
   const remain = el('div', 'hud-chip hud-remain', '48h00 restantes');
   const build = el('div', 'hud-chip hud-build', 'BUILD OK');
   const proj = el('div', 'hud-chip hud-proj', '0/12');
-  const bugsChip = el('div', 'hud-chip hud-bugs', '');
+  // O chip de bug e CLICAVEL: toca-lo abre o projeto, onde a trilha travada
+  // esta a vista. Alerta que nao leva a lugar nenhum e decoracao.
+  const bugsChip = document.createElement('button');
+  bugsChip.type = 'button';
+  bugsChip.className = 'hud-chip hud-bugs';
   bugsChip.hidden = true;
   const alarm = el('div', 'hud-chip hud-alarm-chip', '');
   alarm.hidden = true;
   // As ACOES moram numa barra contextual embaixo, com base escura coerente
   // com o HUD — nao botoes soltos flutuando sobre o cenario. Petisco separa
   // ACAO (a palavra) de INVENTARIO (a badge com o numero).
-  const treatsBtn = softButton(ICONS.fish, 'petisco', 'treat');
+  const treatsBtn = softButton(ICONS.fish, t().btnTreat, 'treat');
   const treatsBadge = el('span', 'btn-badge', `×${TREATS_START}`);
   treatsBtn.appendChild(treatsBadge);
   treatsBtn.addEventListener('click', handlers.onFeedToggle);
   // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo,
   // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
-  const boardBtn = softButton(ICONS.board, 'projeto');
+  const boardBtn = softButton(ICONS.board, t().btnProject);
   top.append(clock, remain, build, proj, bugsChip, alarm);
   const cluster = el('div', 'action-bar');
 
   const board = el('div', 'hud-board');
   board.hidden = true;
-  const feed = el('div', 'hud-feed');
-  feed.setAttribute('role', 'log');
-  feed.setAttribute('aria-live', 'polite');
-  const card = el('div', 'hud-card');
-  card.hidden = true;
 
   boardBtn.addEventListener('click', () => {
     board.hidden = !board.hidden;
   });
+  bugsChip.addEventListener('click', () => {
+    board.hidden = false;
+  });
+
+  // O FEED virou uma faixa unica: a ultima noticia + um contador. Tres logs
+  // empilhados cobriam o canto de descanso inteiro. O historico mora num
+  // painel que abre por toque e fecha por toque.
+  const feedStrip = document.createElement('button');
+  feedStrip.type = 'button';
+  feedStrip.className = 'feed-strip';
+  const feedLatest = el('span', 'feed-latest', t().welcome);
+  const feedBadge = el('span', 'feed-badge', '0');
+  feedStrip.append(feedLatest, feedBadge);
+  const feedPanel = el('div', 'feed-panel');
+  feedPanel.hidden = true;
+  feedPanel.setAttribute('role', 'log');
+  feedPanel.setAttribute('aria-live', 'polite');
+  feedStrip.addEventListener('click', () => {
+    feedPanel.hidden = !feedPanel.hidden;
+  });
+
+  // A FICHA COMPACTA: ancorada no rodape esquerdo, ACIMA da faixa de feed —
+  // nunca sobre o gato selecionado nem sobre a estacao dele. A ficha grande
+  // (bio + fome) abre por "detalhes", nao por padrao.
+  const dock = el('div', 'cat-dock');
+  dock.hidden = true;
+  const dockHead = el('div', 'dock-head');
+  const dockName = el('span', 'dock-name', '');
+  const detailsBtn = document.createElement('button');
+  detailsBtn.type = 'button';
+  detailsBtn.className = 'dock-details-btn';
+  detailsBtn.textContent = t().btnDetails;
+  dockHead.append(dockName, detailsBtn);
+  const dockNow = el('div', 'dock-now', '');
+  const meterOf = (label: string, cls: string): Meter => {
+    const rowEl = el('div', 'dock-meter');
+    rowEl.appendChild(el('span', 'dock-meter-label', label));
+    const bar = el('span', `dock-bar ${cls}`);
+    const fill = el('span', 'dock-fill');
+    bar.appendChild(fill);
+    rowEl.appendChild(bar);
+    return { row: rowEl, fill };
+  };
+  const dockMeters = {
+    energia: meterOf(t().meters.energy, 'bar-energy'),
+    estresse: meterOf(t().meters.stress, 'bar-stress'),
+    moral: meterOf(t().meters.morale, 'bar-moral'),
+  };
+  const dockDetails = el('div', 'dock-details');
+  dockDetails.hidden = true;
+  const dockBio = el('div', 'dock-bio', '');
+  const dockHunger = meterOf(t().meters.hunger, 'bar-hunger');
+  const dockVibes = el('div', 'dock-vibes', '');
+  dockVibes.hidden = true;
+  dockDetails.append(dockBio, dockHunger.row, dockVibes);
+  detailsBtn.addEventListener('click', () => {
+    dockDetails.hidden = !dockDetails.hidden;
+  });
+  dock.append(dockHead, dockNow, dockMeters.energia.row, dockMeters.estresse.row, dockMeters.moral.row, dockDetails);
+
+  // A BARRA DA EQUIPE e as HABILIDADES de palco: containers vazios aqui —
+  // o time agora e GERADO por run, e bindTeam preenche a cada recrutamento.
+  const teamBar = el('div', 'team-bar');
+  const teamBtns = new Map<CatId, HTMLButtonElement>();
+
+  const pitchPanel = el('div', 'pitch-panel');
+  pitchPanel.hidden = true;
+  pitchPanel.appendChild(el('div', 'pitch-title', t().pitchTitle));
+  const gaugeBar = el('div', 'pitch-gauge-bar');
+  const pitchGauge = el('span', 'pitch-gauge-fill');
+  gaugeBar.appendChild(pitchGauge);
+  const pitchTimer = el('div', 'pitch-timer', '');
+  const pitchCrisis = el('div', 'pitch-crisis', t().pitchCrisis);
+  pitchCrisis.hidden = true;
+  const abilityRow = el('div', 'pitch-abilities');
+  const pitchBtns = new Map<CatId, HTMLButtonElement>();
+  pitchPanel.append(gaugeBar, pitchTimer, pitchCrisis, abilityRow);
 
   // O PAINEL DE SOM: cinco faixas independentes, com palavra, atras de botao.
   // "Jogar horas sem fadiga auditiva" comeca em poder abaixar exatamente o que
   // cansa — e um controle por barramento e acessibilidade, nao luxo. O botao
   // mora no CANTO de configuracoes (topo direito), fora das acoes de jogo:
   // "som" nao e um verbo da partida.
-  const soundBtn = softButton(ICONS.sound, 'som', 'dim som-corner');
+  const soundBtn = softButton(ICONS.sound, t().btnSound, 'dim som-corner');
   const soundPanel = el('div', 'hud-sound');
   soundPanel.hidden = true;
-  const BUS_LABEL: Record<string, string> = {
-    music: 'musica',
-    sfx: 'efeitos',
-    typing: 'teclados',
-    ambience: 'ambiente',
-    vocals: 'gatos',
-  };
+  const BUS_LABEL: Record<string, string> = t().buses;
   for (const bus of Object.keys(BUS_LABEL)) {
     const rowEl = el('label', 'sound-row');
     rowEl.appendChild(el('span', 'sound-label', BUS_LABEL[bus]));
@@ -182,19 +326,127 @@ export const createHud = (
   soundBtn.addEventListener('click', () => {
     soundPanel.hidden = !soundPanel.hidden;
   });
-  cluster.append(boardBtn, treatsBtn);
+  // Consumiveis: catnip arma (proximo toque num gato dosa), laser dispara.
+  // Escondidos ate existirem doses — botao sem uso e ruido.
+  const catnipBtn = softButton(ICONS.leaf, t().btnCatnip, 'treat');
+  const catnipBadge = el('span', 'btn-badge', '×0');
+  catnipBtn.appendChild(catnipBadge);
+  catnipBtn.hidden = true;
+  catnipBtn.addEventListener('click', handlers.onCatnipToggle);
+  const laserBtn = softButton(ICONS.laser, t().btnLaser, '');
+  const laserBadge = el('span', 'btn-badge', '×0');
+  laserBtn.appendChild(laserBadge);
+  laserBtn.hidden = true;
+  laserBtn.addEventListener('click', handlers.onLaser);
+  cluster.append(catnipBtn, laserBtn, boardBtn, treatsBtn);
 
-  root.append(top, soundBtn, cluster, board, soundPanel, feed, card);
+  // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
+  // o default do prazo — o modal informa, nunca chantageia.
+  const socialModal = el('div', 'social-modal');
+  socialModal.hidden = true;
+  const socialTitle = el('div', 'social-title', '');
+  const socialA = document.createElement('button');
+  socialA.type = 'button';
+  socialA.className = 'task-choice social-a';
+  socialA.addEventListener('click', () => handlers.onSocial('a'));
+  const socialB = document.createElement('button');
+  socialB.type = 'button';
+  socialB.className = 'task-choice social-b';
+  socialB.addEventListener('click', () => handlers.onSocial('b'));
+  const socialTimerBar = el('div', 'social-timer-bar');
+  const socialTimer = el('span', 'social-timer-fill');
+  socialTimerBar.appendChild(socialTimer);
+  socialModal.append(socialTitle, socialA, socialB, socialTimerBar);
+
+  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal);
   host.appendChild(root);
 
   // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
   // nunca bloqueio — e mora no HOST, fora do root que se esconde no titulo:
   // e justamente na tela de titulo que girar mais ajuda.
-  const hint = el('div', 'rotate-hint', 'gire o aparelho para ver o pavilhao inteiro');
+  const hint = el('div', 'rotate-hint', t().rotateHint);
   hint.setAttribute('role', 'status');
   host.appendChild(hint);
 
-  return { root, clock, remain, build, proj, bugsChip, alarm, treatsBtn, board, feed, card, rows: new Map(), ...handlers };
+  const hudRef: Hud = {
+    root,
+    clock,
+    remain,
+    build,
+    proj,
+    bugsChip,
+    alarm,
+    treatsBtn,
+    board,
+    feedStrip,
+    feedLatest,
+    feedBadge,
+    feedPanel,
+    dock,
+    dockName,
+    dockNow,
+    dockMeters,
+    dockDetails,
+    dockBio,
+    dockHunger,
+    dockVibes,
+    teamBtns,
+    pitchPanel,
+    pitchGauge,
+    pitchTimer,
+    pitchCrisis,
+    pitchBtns,
+    rows: new Map(),
+    teamBar,
+    abilityRow,
+    catnipBtn,
+    laserBtn,
+    socialModal,
+    socialTitle,
+    socialA,
+    socialB,
+    socialTimer,
+    socialKind: { current: null },
+    ...handlers,
+  };
+  return hudRef;
+};
+
+const CSS_HEX = (v: number): string => `#${v.toString(16).padStart(6, '0')}`;
+
+/**
+ * Constroi retratos e habilidades para O TIME DESTA RUN. Chamado a cada
+ * recrutamento; o quadro de tarefas tambem renasce (o projeto mudou).
+ */
+export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
+  hud.teamBar.replaceChildren();
+  hud.teamBtns.clear();
+  hud.abilityRow.replaceChildren();
+  hud.pitchBtns.clear();
+  hud.rows.clear();
+  hud.board.replaceChildren();
+  hud.feedPanel.replaceChildren();
+  for (const c of cats) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'team-btn';
+    const sw = el('span', 'team-swatch');
+    sw.style.background = CSS_HEX(c.coat.body);
+    b.append(sw, el('span', 'team-name', c.name.toLowerCase()));
+    b.addEventListener('click', () => hud.onSelect(c.id));
+    hud.teamBtns.set(c.id, b);
+    hud.teamBar.appendChild(b);
+
+    const pb = document.createElement('button');
+    pb.type = 'button';
+    pb.className = 'soft-btn pitch-ability';
+    const psw = el('span', 'team-swatch');
+    psw.style.background = CSS_HEX(c.coat.body);
+    pb.append(psw, el('span', 'btn-word', `${c.name.toLowerCase()}: ${t().abilityWord[c.personality]}`));
+    pb.addEventListener('click', () => hud.onAbility(c.id));
+    hud.pitchBtns.set(c.id, pb);
+    hud.abilityRow.appendChild(pb);
+  }
 };
 
 const TRACK_LABEL: Record<string, string> = {
@@ -207,20 +459,20 @@ const TRACK_LABEL: Record<string, string> = {
 const clockText = (tick: number): string => {
   const hours = 18 + tick * HOURS_PER_TICK;
   const dayIdx = Math.min(2, Math.floor(hours / 24));
-  const day = ['SEX', 'SAB', 'DOM'][dayIdx];
+  const day = t().weekdays[dayIdx];
   const hh = Math.floor(hours % 24);
   const mm = Math.floor((hours % 1) * 60);
-  return `DIA ${dayIdx + 1} · ${day} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  return `${t().day} ${dayIdx + 1} · ${day} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
 const remainText = (tick: number): string => {
   const left = Math.max(0, (HACK_TICKS - tick) * HOURS_PER_TICK);
   const hh = Math.floor(left);
   const mm = Math.floor((left % 1) * 60);
-  return `${hh}h${String(mm).padStart(2, '0')} restantes`;
+  return t().left(hh, String(mm).padStart(2, '0'));
 };
 
-const makeRow = (t: Task, onCut: (id: string) => void): TaskRow => {
+const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, option: string) => void): TaskRow => {
   const row = el('div', 'task');
   row.appendChild(el('span', 'task-name', t.label + (t.polish ? ' ✦' : '')));
   const state = el('span', 'task-state', '');
@@ -230,11 +482,29 @@ const makeRow = (t: Task, onCut: (id: string) => void): TaskRow => {
   const cutBtn = document.createElement('button');
   cutBtn.type = 'button';
   cutBtn.className = 'task-cut';
-  cutBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.scissors}</span><span>cortar</span>`;
-  cutBtn.title = 'tirar do escopo: nao pontua, mas nao vira ponta solta';
+  cutBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.scissors}</span><span>${i18n().btnCut}</span>`;
+  cutBtn.title = i18n().cutHint;
   cutBtn.addEventListener('click', () => onCut(t.id));
   row.append(state, bar, cutBtn);
-  return { row, state, bar, fill, cutBtn };
+  // A DECISAO mora no proprio quadro: tres opcoes com palavra e dica, criadas
+  // uma vez (a licao dos botoes detached vale dobrado para decisoes).
+  let choices: HTMLElement | null = null;
+  if (t.choice) {
+    choices = el('div', 'task-choices');
+    choices.appendChild(el('div', 'task-choice-prompt', t.choice.prompt));
+    for (const opt of t.choice.options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'task-choice';
+      b.textContent = opt.label;
+      b.title = opt.hint;
+      b.appendChild(el('span', 'task-choice-hint', opt.hint));
+      b.addEventListener('click', () => onChoose(t.id, opt.id));
+      choices.appendChild(b);
+    }
+    row.appendChild(choices);
+  }
+  return { row, state, bar, fill, cutBtn, choices };
 };
 
 const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
@@ -242,21 +512,27 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
   const depsPending = t.deps.filter((d) => !state.tasks.find((x) => x.id === d)?.done);
   const locked = depsPending.length > 0 && !t.done && !t.cut;
 
+  const deciding = !!t.choice && t.chosen === null && !t.done && !t.cut;
+  if (r.choices) r.choices.style.display = deciding ? '' : 'none';
+
   let text = '';
   let blink = false;
-  if (t.done) text = 'shipada';
-  else if (t.cut) text = 'cortada';
-  else if (t.awaitingShip) {
-    text = 'Bigode espera teu SHIPA (carinho nele)';
+  if (t.done) text = i18n().taskShipped;
+  else if (t.cut) text = i18n().taskCut;
+  else if (deciding) {
+    text = i18n().taskDeciding;
+    blink = true;
+  } else if (t.awaitingShip) {
+    text = i18n().taskAwaitShip;
     blink = true;
   } else if (locked) {
-    text = `espera: ${depsPending.map((d) => state.tasks.find((x) => x.id === d)?.label ?? d).join(', ')}`;
+    text = i18n().taskWaits(depsPending.map((d) => state.tasks.find((x) => x.id === d)?.label ?? d).join(', '));
   }
   if (r.state.textContent !== text) r.state.textContent = text;
   r.state.className = `task-state ${blink ? 'task-blink' : ''}`;
   r.state.style.display = text ? '' : 'none';
 
-  const showBar = !t.done && !t.cut && !t.awaitingShip && !locked;
+  const showBar = !t.done && !t.cut && !t.awaitingShip && !locked && !deciding;
   r.bar.style.display = showBar ? '' : 'none';
   if (showBar) r.fill.style.width = `${Math.round((t.progress / t.cost) * 100)}%`;
 
@@ -264,40 +540,63 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 };
 
 const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
-  const name = (id: string): string => CATS.find((c) => c.id === id)?.name ?? id;
+  const name = (id: string): string => state.cats.find((c) => c.id === id)?.name ?? id;
+  const d = t();
   switch (e.kind) {
     case 'ship':
-      return `${name(e.by)} shipou "${e.task}"`;
+      return d.ev.ship(name(e.by), e.task);
     case 'await-ship':
-      return `${name(e.by)} terminou "${e.task}" e NAO deixa mergear. Faz carinho nele.`;
+      return d.ev.awaitShip(name(e.by), e.task);
     case 'shortcut':
-      return `${name(e.by)} descobriu um atalho genial sem querer: "${e.task}" adiantou`;
+      return d.ev.shortcut(name(e.by), e.task);
     case 'bug':
-      return e.cause === 'teclado'
-        ? `${name(e.by)} sentou no teclado: BUG em ${TRACK_LABEL[e.track]}`
-        : `${name(e.by)} shipou sem testar: BUG em ${TRACK_LABEL[e.track]}`;
+      return e.cause === 'teclado' ? d.ev.bugKeyboard(name(e.by), e.track) : d.ev.bugUntested(name(e.by), e.track);
     case 'bugfix':
-      return `bug de ${TRACK_LABEL[e.track]} consertado`;
+      return d.ev.bugfix(e.track);
     case 'zoomies':
-      return `${name(e.cat)} entrou em zoomies pelas mesas`;
+      return d.ev.zoomies(name(e.cat));
     case 'cable':
-      return `${name(e.by)} MORDEU O CABO: build fora do ar (leva alguem ao rack)`;
+      return d.ev.cable(name(e.by));
     case 'cable-fixed':
-      return 'cabo religado, build de volta';
+      return d.ev.cableFixed;
     case 'nap':
-      return `${name(e.cat)} apagou`;
+      return d.ev.nap(name(e.cat));
     case 'eat':
-      return `${name(e.cat)} foi comer`;
+      return d.ev.eat(name(e.cat));
     case 'hairball':
-      return 'BOLA DE PELO no repositorio: merge travado! (leva alguem ao rack)';
+      return d.ev.hairball;
     case 'hairball-fixed':
-      return 'bola de pelo resolvida, merge liberado';
+      return d.ev.hairballFixed;
     case 'build-broken':
-      return 'O BUILD QUEBROU. Nao ha mais conserto.';
+      return d.ev.buildBroken;
     case 'treat':
-      return `${name(e.cat)} ganhou petisco`;
+      return d.ev.treat(name(e.cat));
     case 'cut':
-      return `escopo cortado: "${e.task}"`;
+      return d.ev.cut(e.task);
+    case 'overpet':
+      return d.ev.overpet(name(e.cat));
+    case 'decision-needed':
+      return d.ev.decisionNeeded(e.task);
+    case 'decision':
+      return d.ev.decision(e.option);
+    case 'pitch-start':
+      return d.ev.pitchStart;
+    case 'demo-glitch':
+      return d.ev.demoGlitch;
+    case 'improviso':
+      return d.ev.improviso(name(e.cat));
+    case 'trait-revealed':
+      return d.ev.traitRevealed(name(e.cat), traitLabel(e.trait));
+    case 'sponsor-outage':
+      return d.ev.sponsorOutage;
+    case 'harmony':
+      return d.ev.harmony(name(e.a), name(e.b));
+    case 'friction':
+      return d.ev.friction(name(e.a), name(e.b));
+    case 'mentor':
+      return d.ev.mentor(name(e.mentor), name(e.junior));
+    case 'grown':
+      return d.ev.grown(name(e.cat));
     default:
       return null;
   }
@@ -315,14 +614,14 @@ export const drawHud = (hud: Hud, state: HackState): void => {
 
   // Build com cor de estado; bugs so existem no HUD quando existem no jogo,
   // e chegam ja com peso de alarme — nao como rodape de frase.
-  const buildState = state.buildBroken ? 'BUILD QUEBRADO' : state.cableOut ? 'BUILD FORA DO AR' : 'BUILD OK';
+  const buildState = state.buildBroken ? t().buildDead : state.cableOut ? t().buildDown : t().buildOk;
   setText(hud.build, buildState);
-  hud.build.classList.toggle('chip-bad', buildState !== 'BUILD OK');
-  setText(hud.proj, `${shipped}/12`);
+  hud.build.classList.toggle('chip-bad', state.buildBroken || state.cableOut);
+  setText(hud.proj, t().features(shipped));
   hud.bugsChip.hidden = bugs === 0;
-  if (bugs > 0) setText(hud.bugsChip, `${bugs} bug${bugs > 1 ? 's' : ''}`);
+  if (bugs > 0) setText(hud.bugsChip, t().bugs(bugs));
   hud.alarm.hidden = !state.hairball.active;
-  if (state.hairball.active) setText(hud.alarm, 'MERGE TRAVADO — leva alguem ao rack');
+  if (state.hairball.active) setText(hud.alarm, t().mergeLocked);
 
   // O numero vive na badge: acao e inventario separados no mesmo botao.
   const badge = hud.treatsBtn.querySelector('.btn-badge');
@@ -334,7 +633,7 @@ export const drawHud = (hud: Hud, state: HackState): void => {
       const group = el('div', 'board-track');
       group.appendChild(el('div', 'board-title', TRACK_LABEL[track]));
       for (const t of state.tasks.filter((x) => x.track === track)) {
-        const r = makeRow(t, hud.onCut);
+        const r = makeRow(t, hud.onCut, hud.onChoose);
         hud.rows.set(t.id, r);
         group.appendChild(r.row);
       }
@@ -345,82 +644,222 @@ export const drawHud = (hud: Hud, state: HackState): void => {
     const r = hud.rows.get(t.id);
     if (r) updateRow(state, t, r);
   }
+
+  // Aneis de estado nos retratos da equipe: quem trabalha, quem dorme, quem
+  // esta na zona de perigo — legivel sem abrir ficha nenhuma.
+  for (const cat of state.cats) {
+    const btn = hud.teamBtns.get(cat.id);
+    if (!btn) continue;
+    const danger = cat.stress > 0.72;
+    const cls = `team-btn ${danger ? 'ring-danger' : cat.mode === 'work' ? 'ring-work' : cat.mode === 'nap' ? 'ring-nap' : ''}`;
+    if (btn.className !== cls.trim()) btn.className = cls.trim();
+  }
+
+  // Consumiveis na barra: visiveis enquanto houver doses, com o estoque na
+  // badge (acao na palavra, inventario na badge — regra da casa).
+  hud.catnipBtn.hidden = state.catnipLeft <= 0;
+  const cb = hud.catnipBtn.querySelector('.btn-badge');
+  if (cb && cb.textContent !== `×${state.catnipLeft}`) cb.textContent = `×${state.catnipLeft}`;
+  hud.laserBtn.hidden = state.laserLeft <= 0;
+  const lb = hud.laserBtn.querySelector('.btn-badge');
+  if (lb && lb.textContent !== `×${state.laserLeft}`) lb.textContent = `×${state.laserLeft}`;
+
+  // O EVENTO SOCIAL aberto (se houver): texto por tipo, prazo na barra.
+  const openSocial = state.social.find((s) => !s.resolved && s.until > 0 && state.tick < s.until);
+  hud.socialModal.hidden = !openSocial;
+  if (openSocial) {
+    if (hud.socialKind.current !== openSocial.kind) {
+      hud.socialKind.current = openSocial.kind;
+      const st = SOCIAL_TEXT[getLocale()][openSocial.kind]!;
+      setText(hud.socialTitle, st.title);
+      setText(hud.socialA, st.a);
+      setText(hud.socialB, st.b);
+    }
+    const frac = Math.max(0, (openSocial.until - state.tick) / SOCIAL_WINDOW);
+    hud.socialTimer.style.width = `${Math.round(frac * 100)}%`;
+  } else {
+    hud.socialKind.current = null;
+  }
+
+  // O PALCO: o painel so existe durante o pitch, e enquanto existe e o jogo
+  // — as acoes de booth (petisco, projeto, equipe) saem do caminho.
+  const inPitch = state.phase === 'pitch' && state.pitch !== null;
+  hud.root.classList.toggle('in-pitch', inPitch);
+  hud.pitchPanel.hidden = !inPitch;
+  if (inPitch) {
+    // Subiu ao palco: os paineis de booth fecham sozinhos.
+    hud.board.hidden = true;
+    const p = state.pitch!;
+    hud.pitchGauge.style.width = `${Math.round(p.gauge * 100)}%`;
+    hud.pitchGauge.classList.toggle('gauge-hot', p.gauge > 0.7);
+    setText(hud.pitchTimer, t().pitchTimer(Math.ceil(p.ticksLeft / 30)));
+    const crisisOpen = p.crisisUntil > 0 && state.tick < p.crisisUntil && !p.crisisResolved;
+    hud.pitchCrisis.hidden = !crisisOpen;
+    for (const [id, btn] of hud.pitchBtns) {
+      btn.disabled = (p.readyAt[id] ?? 0) > state.tick;
+    }
+  }
 };
 
 export const pushFeed = (hud: Hud, state: HackState, events: SimEvent[]): void => {
   for (const e of events) {
     const text = EVENT_TEXT(state, e);
     if (!text) continue;
+    // A faixa mostra a ULTIMA noticia; o historico mora no painel.
+    setText(hud.feedLatest, text);
     const line = el('div', 'feed-line', text);
-    hud.feed.prepend(line);
-    // Tres linhas no maximo: o feed mora sobre o canto de descanso e nao
-    // pode virar uma coluna cobrindo o sofa.
-    while (hud.feed.children.length > 3) hud.feed.lastChild?.remove();
+    hud.feedPanel.prepend(line);
+    while (hud.feedPanel.children.length > 12) hud.feedPanel.lastChild?.remove();
+    setText(hud.feedBadge, String(hud.feedPanel.children.length));
   }
 };
+
+/**
+ * A FICHA COMPACTA no rodape. A primeira versao era um cartao no canto
+ * superior esquerdo que cobria UM QUARTO da area jogavel — exatamente sobre a
+ * estacao do gato selecionado. Agora: nome, o que ele esta fazendo AGORA e
+ * tres micro-medidores; bio e fome atras de "detalhes".
+ */
+
 
 export const drawCard = (hud: Hud, state: HackState, selected: string | null): void => {
   if (!selected) {
-    hud.card.hidden = true;
+    hud.dock.hidden = true;
     return;
   }
   const cat = state.cats.find((x) => x.id === selected);
-  const meta = CATS.find((x) => x.id === selected);
-  if (!cat || !meta) {
-    hud.card.hidden = true;
+  if (!cat) {
+    hud.dock.hidden = true;
     return;
   }
-  hud.card.hidden = false;
-  hud.card.replaceChildren();
-  hud.card.appendChild(el('div', 'card-name', `${meta.name} · ${meta.specialty}`));
-  hud.card.appendChild(el('div', 'card-bio', meta.bio));
-  const bars = el('div', 'card-bars');
-  for (const [label, value, cls] of [
-    ['energia', cat.energy, 'bar-energy'],
-    ['fome', cat.hunger, 'bar-hunger'],
-    ['estresse', cat.stress, 'bar-stress'],
-  ] as const) {
-    const rowEl = el('div', 'card-bar-row');
-    rowEl.appendChild(el('span', 'card-bar-label', label));
-    const bar = el('span', `card-bar ${cls}`);
-    const fill = el('span', 'card-fill');
-    fill.style.width = `${Math.round(value * 100)}%`;
-    bar.appendChild(fill);
-    rowEl.appendChild(bar);
-    bars.appendChild(rowEl);
+  hud.dock.hidden = false;
+  setText(hud.dockName, `${cat.name} · ${specLabel(cat.specialty)} ${tierLabel(cat.tier)}`);
+  setText(hud.dockNow, t().dockNow(t().modes[cat.mode] ?? cat.mode));
+  hud.dockMeters.energia.fill.style.width = `${Math.round(cat.energy * 100)}%`;
+  hud.dockMeters.estresse.fill.style.width = `${Math.round(cat.stress * 100)}%`;
+  hud.dockMeters.moral.fill.style.width = `${Math.round(cat.moral * 100)}%`;
+  hud.dockHunger.fill.style.width = `${Math.round(cat.hunger * 100)}%`;
+  setText(hud.dockBio, cat.bio);
+  // A CONVIVENCIA nomeada so depois da revelacao: o vibe le o trait oculto,
+  // e a ficha nao pode contar o que o curriculo ainda esconde — ate la o
+  // jogador ve o comportamento (o feed anuncia bufos) sem ver o mapa.
+  if (cat.revealed) {
+    const parts: string[] = [];
+    for (const other of state.cats) {
+      if (other.id === cat.id) continue;
+      const v = vibeOf(cat, other);
+      if (v > 0) parts.push(`♥ ${other.name}`);
+      else if (v < 0) parts.push(`⚡ ${other.name}`);
+    }
+    hud.dockVibes.hidden = parts.length === 0;
+    setText(hud.dockVibes, parts.length > 0 ? `${t().vibesLabel}: ${parts.join(' · ')}` : '');
+  } else {
+    hud.dockVibes.hidden = true;
   }
-  hud.card.appendChild(bars);
 };
 
 /** A tela final: as tres notas, o veredito e a historia que deu nisso. */
-export const showResult = (host: HTMLElement, state: HackState, onAgain: () => void): void => {
+export const showResult = (
+  host: HTMLElement,
+  state: HackState,
+  extras: RunClose,
+  onAgain: () => void
+): void => {
   const r = state.result!;
   const wrap = el('div', 'screen result');
-  const title: Record<string, string> = {
-    'grand-prize': 'GRAND PRIZE! 🏆',
-    podio: 'PODIO!',
-    mencao: 'mencao honrosa',
-    participacao: 'certificado de participacao',
-    crashed: 'A DEMO CRASHOU.',
-  };
-  wrap.appendChild(el('h1', 'result-title', title[r.outcome]));
+  wrap.appendChild(el('h1', 'result-title', t().resultTitle[r.outcome] ?? r.outcome));
   if (r.crashed) {
-    wrap.appendChild(
-      el('p', 'result-sub', state.buildBroken ? 'o build estava quebrado desde a bola de pelo.' : `${r.bugs} bug(s) vivos na demo. os deuses da demo cobraram.`)
-    );
+    wrap.appendChild(el('p', 'result-sub', state.buildBroken ? t().crashedBuild : t().crashedBugs(r.bugs)));
   }
   const judges = el('div', 'result-judges');
   JUDGES.forEach((j, i) => {
     const jj = el('div', 'judge');
     jj.appendChild(el('div', 'judge-name', j.name));
-    jj.appendChild(el('div', 'judge-lens', j.lens));
+    jj.appendChild(el('div', 'judge-lens', t().judgeLens[i] ?? j.lens));
     jj.appendChild(el('div', 'judge-score', String(r.perJudge[i])));
     judges.appendChild(jj);
   });
   wrap.appendChild(judges);
+  // As CINCO dimensoes + o voto popular: o pos-jogo ensina O QUE pesou —
+  // "foi o pitch que te tirou o podio" e uma licao tao boa quanto o bug vivo.
+  const dims = el('div', 'result-dims');
+  for (const [label, value] of [
+    [t().dims.tecnica, r.dimensions.tecnica],
+    [t().dims.estabilidade, r.dimensions.estabilidade],
+    [t().dims.experiencia, r.dimensions.experiencia],
+    [t().dims.inovacao, r.dimensions.inovacao],
+    [t().dims.pitch, r.dimensions.pitch],
+  ] as const) {
+    const d = el('div', 'result-dim');
+    d.appendChild(el('span', 'dim-label', label));
+    d.appendChild(el('span', 'dim-value', String(value)));
+    dims.appendChild(d);
+  }
+  wrap.appendChild(dims);
+  wrap.appendChild(el('p', 'result-plateia', t().plateia(Math.round(r.plateia * 100))));
+  if (r.improvised) {
+    wrap.appendChild(el('p', 'result-improviso', t().improviso));
+  }
   wrap.appendChild(
-    el('p', 'result-stats', `${r.core} core · ${r.polish} polimentos · ${r.bugs} bugs vivos · ${r.looseEnds} pontas soltas · total ${r.score}`)
+    el('p', 'result-stats', t().stats(r.core, r.polish, r.bugs, r.looseEnds, r.score))
   );
+  // O PREMIO em moedas fisicas — e, na carreira, a carteira que ele virou.
+  const prizeRow = el('p', 'result-prize', t().prizeLine(fmtCost(r.prize, getLocale())));
+  wrap.appendChild(prizeRow);
+  // O EXTRATO do premio: a sim itemiza (prizeParts) exatamente para a tela
+  // poder ser honesta — sem ele, o jogador nunca ve a mordida da divida nem
+  // o payout do sponsor (achado de revisao).
+  const ledger = (Object.keys(r.prizeParts) as (keyof typeof r.prizeParts)[])
+    .filter((k) => r.prizeParts[k] !== 0)
+    .map((k) => `${t().prizePartName[k]} ${r.prizeParts[k] > 0 ? '+' : ''}${r.prizeParts[k]}`);
+  if (ledger.length > 0) wrap.appendChild(el('p', 'result-ledger', ledger.join(' · ')));
+  if (extras.wallet !== null) {
+    wrap.appendChild(el('p', 'result-wallet', t().walletAfter(fmtCost(extras.wallet, getLocale()))));
+  }
+
+  // O DUELO com o rival: a nota deles contra a tua, e quem esta insuportavel.
+  if (extras.rival) {
+    const rv = extras.rival;
+    const line = rv.beat ? t().rivalBeat(rv.name, rv.score, r.score) : t().rivalLost(rv.name, rv.score, r.score);
+    wrap.appendChild(el('p', `result-rival ${rv.beat ? 'rival-beat' : 'rival-lost'}`, line));
+  }
+  // REPUTACAO (so na carreira): o telao lembra.
+  if (extras.wallet !== null) {
+    wrap.appendChild(el('p', 'result-rep', t().repLine(extras.repAfter, extras.repAfter - extras.repBefore)));
+  }
+  // O VEREDITO do sponsor, se havia contrato: cumprido paga, furado corre.
+  if (state.sponsor && r.sponsorMet !== null) {
+    const sn = SPONSOR_TEXT[getLocale()][state.sponsor.id]!.name;
+    wrap.appendChild(
+      el('p', `result-sponsor ${r.sponsorMet ? 'sponsor-met' : 'sponsor-failed'}`,
+        r.sponsorMet ? t().sponsorMetLine(sn) : t().sponsorFailedLine(sn))
+    );
+  }
+  // O trofeu da categoria especial, quando o predicado fechou.
+  if (r.specialWon) {
+    const spName = SPECIAL_TEXT[getLocale()][state.specialCategory]!.name;
+    wrap.appendChild(el('p', 'result-special', t().specialWonLine(spName)));
+  }
+  // Os juniores que cresceram — e a estrela que foi embora, se foi.
+  if (extras.graduates.length > 0) {
+    wrap.appendChild(el('p', 'result-grown', t().graduatesLine(extras.graduates.join(', '))));
+  }
+  if (extras.poachedStar && extras.rival) {
+    wrap.appendChild(el('p', 'result-poached', t().poachedLine(extras.poachedStar, extras.rival.name)));
+  }
+  if (extras.newAchievements.length > 0) {
+    const ach = el('div', 'result-achs');
+    ach.appendChild(el('div', 'achs-title', t().achievementsTitle));
+    const achRow = el('div', 'achs-row');
+    for (const id of extras.newAchievements) {
+      const at = ACHIEVEMENT_TEXT[getLocale()][id];
+      const chip = el('span', 'ach-chip', at?.name ?? id);
+      chip.title = at?.hint ?? '';
+      achRow.appendChild(chip);
+    }
+    ach.appendChild(achRow);
+    wrap.appendChild(ach);
+  }
 
   // A historia: os tres eventos mais contaveis da partida. E o que faz alguem
   // dizer "o laranja quebrou o build duas vezes e mesmo assim ganhamos".
@@ -434,28 +873,184 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
     wrap.appendChild(story);
   }
 
-  const again = softButton(ICONS.again, 'jogar de novo', 'big');
+  const again = softButton(ICONS.again, t().btnAgain, 'big');
   again.addEventListener('click', onAgain);
   wrap.appendChild(again);
   host.appendChild(wrap);
 };
 
-export const showTitle = (host: HTMLElement, onStart: () => void): void => {
+export const showTitle = (host: HTMLElement, onStart: (mode: 'career' | 'quick' | 'daily') => void): void => {
   const wrap = el('div', 'screen title');
   wrap.appendChild(el('h1', 'title-logo', 'CATATHON'));
-  wrap.appendChild(el('p', 'title-sub', 'o maior hackathon do mundo. a tua equipe e de gatos.'));
+  wrap.appendChild(el('p', 'title-sub', t().titleSub));
+  wrap.appendChild(el('p', 'title-brief', t().titleBrief));
+  wrap.appendChild(el('p', 'title-help', t().titleHelp));
+  // Os TRES MODOS: carreira (a carteira persiste), quick run (tudo
+  // sorteado), daily (a semente do dia, igual para todo mundo).
+  const modeRow = el('div', 'mode-row');
+  const modes: ['career' | 'quick' | 'daily', string][] = [
+    ['career', t().modeCareer],
+    ['quick', t().modeQuick],
+    ['daily', t().modeDaily],
+  ];
+  for (const [mode, word] of modes) {
+    const b = softButton(ICONS.badge, `${t().btnOpenEmail} · ${word}`, mode === 'career' ? 'big' : 'dim');
+    b.addEventListener('click', () => onStart(mode));
+    modeRow.appendChild(b);
+  }
+  wrap.appendChild(modeRow);
+  // O botao de IDIOMA: o outro idioma, pelo nome dele. Troca e recarrega — o
+  // HUD e construido uma vez, de proposito (a licao dos botoes detached).
+  const lang = softButton(ICONS.sound, t().langWord, 'dim');
+  lang.querySelector('.btn-icon')?.remove();
+  lang.addEventListener('click', () => {
+    setLocale(getLocale() === 'en' ? 'pt' : 'en');
+    location.reload();
+  });
+  wrap.appendChild(lang);
+  host.appendChild(wrap);
+};
+
+
+/**
+ * O RECRUTAMENTO, diegetico: um e-mail do recrutador com seis crachas em
+ * anexo. Cada candidato mostra raca, tier, disciplina, DOIS traits (o
+ * terceiro o curriculo nao conta) e o custo nas tres moedas. Contrata-se
+ * 3 ou 4, dentro do orcamento — e uma decisao, nao uma soma obvia.
+ */
+export const showRecruit = (
+  host: HTMLElement,
+  candidates: readonly Candidate[],
+  gearOffers: readonly { id: GearId; cost: number }[],
+  budget: number,
+  project: { name: string; brief: string; emphasis: string },
+  layoutName: string,
+  extras: {
+    /** A oferta de sponsor desta edicao (carreira com reputacao) ou null. */
+    sponsor: SponsorContract | null;
+    /** A provocacao do rival (carreira) e quem eles ja levaram de ti. */
+    rivalLine: string | null;
+    rosterLine: string | null;
+    /** A categoria especial da edicao, anunciada no convite. */
+    special: SpecialCategoryId;
+  },
+  onDone: (hired: Candidate[], gear: GearId[], sponsor: SponsorContract | null) => void
+): void => {
+  const wrap = el('div', 'screen recruit');
+  wrap.appendChild(el('h1', 'recruit-title', i18n().recruitTitle));
   wrap.appendChild(
-    el('p', 'title-brief', 'desafio da organizacao: "plataforma de adocao com IA, acessivel, mas sustentavel". 48 horas. tres juizes. uma mao.')
+    el(
+      'p',
+      'recruit-intro',
+      i18n().recruitIntro(project.name, project.brief, i18n().emphasisName[project.emphasis] ?? project.emphasis, layoutName)
+    )
   );
-  const team = el('div', 'title-team');
-  for (const c of CATS) team.appendChild(el('div', 'team-line', `${c.name} — ${c.bio}`));
-  wrap.appendChild(team);
-  wrap.appendChild(
-    el('p', 'title-help', 'arrasta um gato para a mesa dele. segura o dedo em cima = carinho (e o "shipa" do Bigode). petisco = botao. corta escopo no painel de projeto. emergencia? leva alguem ao rack.')
-  );
-  const start = softButton(ICONS.badge, 'comecar', 'big');
-  start.addEventListener('click', onStart);
-  wrap.appendChild(start);
+  // A CATEGORIA ESPECIAL vem no convite, como a lente da banca: um segundo
+  // objetivo anunciado muda como se joga a edicao inteira.
+  const sp = SPECIAL_TEXT[getLocale()][extras.special]!;
+  wrap.appendChild(el('p', 'recruit-special', i18n().specialLine(sp.name, sp.hint)));
+  // O RIVAL provoca no proprio e-mail: os Golden Retrievers existem para
+  // serem vencidos, e a provocacao e o lembrete.
+  if (extras.rivalLine) wrap.appendChild(el('p', 'recruit-rival', extras.rivalLine));
+  if (extras.rosterLine) wrap.appendChild(el('p', 'recruit-rival roster', extras.rosterLine));
+
+  const hired = new Set<string>();
+  const cart = new Set<GearId>();
+  let signed = false;
+  const spent = (): number =>
+    candidates.filter((c) => hired.has(c.id)).reduce((s, c) => s + c.cost, 0) +
+    gearOffers.filter((g) => cart.has(g.id)).reduce((s, g) => s + g.cost, 0);
+
+  const saldo = el('div', 'recruit-saldo', '');
+  const closeBtn = softButton(ICONS.badge, i18n().btnLockTeam, 'big');
+  const refresh = (): void => {
+    // O adiantamento do sponsor entra no saldo NA HORA da assinatura: e
+    // dinheiro de verdade para esta edicao (e a letra miuda tambem vale).
+    const left = budget + (signed && extras.sponsor ? extras.sponsor.budget : 0) - spent();
+    setText(saldo, i18n().recruitBalance(fmtCost(Math.max(0, left), getLocale()), hired.size, left < 0));
+    closeBtn.disabled = hired.size < 3 || hired.size > 4 || left < 0;
+  };
+
+  const grid = el('div', 'recruit-grid');
+  for (const c of candidates) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'cand-card';
+    const head = el('div', 'cand-head');
+    const sw = el('span', 'team-swatch');
+    sw.style.background = `#${c.coat.body.toString(16).padStart(6, '0')}`;
+    head.append(sw, el('span', 'cand-name', c.name));
+    head.appendChild(el('span', 'cand-tier', tierLabel(c.tier)));
+    card.appendChild(head);
+    card.appendChild(el('div', 'cand-spec', `${specLabel(c.specialty)} · ${c.breed}`));
+    const traits = el('div', 'cand-traits');
+    for (const tr of c.traits) traits.appendChild(el('span', 'cand-trait', traitLabel(tr)));
+    traits.appendChild(el('span', 'cand-trait cand-hidden', '???'));
+    card.appendChild(traits);
+    card.appendChild(el('div', 'cand-cv', `"${c.cv}" — ${c.note}`));
+    card.appendChild(el('div', 'cand-cost', fmtCost(c.cost, getLocale())));
+    card.addEventListener('click', () => {
+      if (hired.has(c.id)) hired.delete(c.id);
+      else hired.add(c.id);
+      card.classList.toggle('hired', hired.has(c.id));
+      refresh();
+    });
+    grid.appendChild(card);
+  }
+  // A LOJINHA: tres apetrechos por edicao, trade-off escrito no objeto.
+  const shop = el('div', 'shop');
+  shop.appendChild(el('div', 'shop-title', i18n().shopTitle));
+  const shopRow = el('div', 'shop-row');
+  for (const g of gearOffers) {
+    const gt = GEAR_TEXT[getLocale()][g.id]!;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'shop-item';
+    b.append(el('span', 'shop-name', gt.name), el('span', 'shop-hint', gt.hint), el('span', 'cand-cost', fmtCost(g.cost, getLocale())));
+    b.addEventListener('click', () => {
+      if (cart.has(g.id)) cart.delete(g.id);
+      else cart.add(g.id);
+      b.classList.toggle('hired', cart.has(g.id));
+      refresh();
+    });
+    shopRow.appendChild(b);
+  }
+  shop.appendChild(shopRow);
+
+  // O SPONSOR: um cartao com o contrato ESCRITO — o que paga, o que cobra e
+  // o que amarra. Assinar e opcional e reversivel ate fechar a equipe.
+  let sponsorBox: HTMLElement | null = null;
+  if (extras.sponsor) {
+    const st = SPONSOR_TEXT[getLocale()][extras.sponsor.id]!;
+    sponsorBox = el('div', 'sponsor-box');
+    sponsorBox.appendChild(el('div', 'shop-title', i18n().sponsorTitle));
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'shop-item sponsor-card';
+    card.append(
+      el('span', 'shop-name', st.name),
+      el('span', 'shop-hint', st.offer),
+      el('span', 'sponsor-strings', st.strings)
+    );
+    const signedTag = el('span', 'sponsor-signed', i18n().sponsorSigned);
+    signedTag.hidden = true;
+    card.appendChild(signedTag);
+    card.addEventListener('click', () => {
+      signed = !signed;
+      card.classList.toggle('hired', signed);
+      signedTag.hidden = !signed;
+      refresh();
+    });
+    sponsorBox.appendChild(card);
+  }
+
+  wrap.append(grid, shop, ...(sponsorBox ? [sponsorBox] : []), saldo);
+  closeBtn.addEventListener('click', () => {
+    if (closeBtn.disabled) return;
+    onDone(candidates.filter((c) => hired.has(c.id)), [...cart], signed ? extras.sponsor : null);
+  });
+  wrap.appendChild(closeBtn);
+  refresh();
   host.appendChild(wrap);
 };
 

@@ -1,6 +1,7 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
-import { HACK_TICKS, HOURS_PER_TICK, SLOTS } from '../sim/index.js';
-import type { Cat, HackState, Task, Track } from '../sim/types.js';
+import { HACK_TICKS, HOURS_PER_TICK } from '../sim/index.js';
+import type { Locale } from '../sim/text.js';
+import type { Cat, HackState, Spec, Task, Track } from '../sim/types.js';
 
 /**
  * O PAVILHAO, desenhado pixel a pixel num Surface2D do @voxelyn/core.
@@ -52,7 +53,14 @@ const CORAL_ERR = c(235, 103, 103); // #EB6767
 const SCREEN_OFF = c(40, 48, 58);
 const MAGENTA = c(216, 104, 176);
 
-/** A cor de credencial de cada trilha — o cracha no peito e o monitor. */
+/** A cor de credencial — o cracha no peito e o monitor. Freestyler: creme. */
+const SPEC_COLOR: Record<Spec, number> = {
+  frontend: CYAN_ACT,
+  backend: VIOLET_SEL,
+  devops: AMBER_ALERT,
+  design: MAGENTA,
+  freestyler: CREAM,
+};
 const TRACK_COLOR: Record<Track, number> = {
   frontend: CYAN_ACT,
   backend: VIOLET_SEL,
@@ -60,20 +68,14 @@ const TRACK_COLOR: Record<Track, number> = {
   design: MAGENTA,
 };
 
-/** Paleta de cada gato: corpo, marcacao, detalhe. A silhueta identifica. */
-const CAT_COLORS: Record<string, { body: number; mark: number; belly: number; big: boolean }> = {
-  bigode: { body: c(230, 218, 196), mark: c(94, 74, 62), belly: c(240, 232, 214), big: false },
-  cheeto: { body: c(232, 148, 62), mark: c(196, 112, 40), belly: c(244, 210, 160), big: false },
-  almofada: { body: c(142, 142, 152), mark: c(110, 110, 122), belly: c(196, 196, 204), big: true },
-  smoking: { body: c(44, 42, 50), mark: c(30, 28, 36), belly: c(238, 238, 240), big: false },
-};
-
-const TRACK_OF_CAT: Record<string, Track> = {
-  bigode: 'backend',
-  cheeto: 'frontend',
-  almofada: 'devops',
-  smoking: 'design',
-};
+/** Pelagem: o time e GERADO, entao a paleta vem do proprio gato (0xRRGGBB). */
+const hex = (v: number): number => c((v >> 16) & 255, (v >> 8) & 255, v & 255);
+const coatOf = (cat: Cat): { body: number; mark: number; belly: number; big: boolean } => ({
+  body: hex(cat.coat.body),
+  mark: hex(cat.coat.mark),
+  belly: hex(cat.coat.belly),
+  big: cat.big,
+});
 
 const px = (v: View, x: number, y: number, color: number): void => {
   const xi = x | 0;
@@ -165,6 +167,8 @@ const GLYPHS: Record<string, number[]> = {
   R: [0b111, 0b101, 0b110, 0b101, 0b101],
   S: [0b111, 0b100, 0b111, 0b001, 0b111],
   T: [0b111, 0b010, 0b010, 0b010, 0b010],
+  W: [0b101, 0b101, 0b101, 0b111, 0b101],
+  Y: [0b101, 0b101, 0b010, 0b010, 0b010],
   U: [0b101, 0b101, 0b101, 0b101, 0b111],
   V: [0b101, 0b101, 0b101, 0b101, 0b010],
   '0': [0b111, 0b101, 0b101, 0b101, 0b111],
@@ -268,7 +272,7 @@ const drawFloor = (v: View, tick: number): void => {
  * Alterna CATATHON com features, build e prazo; a regua inferior mostra as
  * quatro trilhas, bugs e entregas. Na ultima hora, so pede uma coisa.
  */
-const drawPanel = (v: View, state: HackState, tick: number): void => {
+const drawPanel = (v: View, state: HackState, tick: number, locale: Locale): void => {
   const x0 = 78;
   const w = 324;
   const y0 = 30;
@@ -300,11 +304,16 @@ const drawPanel = (v: View, state: HackState, tick: number): void => {
       word = `FEATURES ${shipped}/12`;
       scale = 2;
     } else if (mode === 3) {
-      word = state.buildBroken ? 'BUILD PERDIDO' : state.cableOut ? 'BUILD FORA' : 'BUILD OK';
+      word = state.buildBroken
+        ? locale === 'pt' ? 'BUILD PERDIDO' : 'BUILD DEAD'
+        : state.cableOut
+          ? locale === 'pt' ? 'BUILD FORA' : 'BUILD DOWN'
+          : 'BUILD OK';
       scale = 2;
     } else if (mode === 5) {
       const hh = Math.floor(hoursLeft);
-      word = `FALTA ${hh}H${String(Math.floor((hoursLeft % 1) * 60)).padStart(2, '0')}`;
+      const mm = String(Math.floor((hoursLeft % 1) * 60)).padStart(2, '0');
+      word = locale === 'pt' ? `FALTA ${hh}H${mm}` : `${hh}H${mm} LEFT`;
       scale = 2;
     } else {
       word = 'CATATHON';
@@ -314,7 +323,7 @@ const drawPanel = (v: View, state: HackState, tick: number): void => {
   const ty = y0 + (scale === 3 ? 8 : 10);
   const tcol = lastHour
     ? (tick >> 4) % 2 === 0 ? adjustBrightness(CORAL, -60) : CREAM
-    : word === 'BUILD FORA' || word === 'BUILD PERDIDO' ? adjustBrightness(CREAM, 10)
+    : word.startsWith('BUILD') && word !== 'BUILD OK' ? adjustBrightness(CREAM, 10)
     : CREAM;
   text(v, Math.round(x0 + (w - tw) / 2), ty, word, scale, tcol);
 
@@ -624,7 +633,7 @@ const drawClutter = (v: View, elapsed: number): void => {
 const drawSlots = (v: View, state: HackState, tick: number): void => {
   const elapsed = Math.min(1, state.tick / HACK_TICKS);
   drawWhiteboard(v, state);
-  for (const slot of SLOTS) {
+  for (const slot of state.slots) {
     if (slot.track) drawStation(v, slot.x, slot.y, slot.track, state, tick);
     else if (slot.id === 'rack') drawRack(v, slot.x, slot.y, state, tick);
     else if (slot.id === 'puff') drawRest(v, slot.x, slot.y);
@@ -645,7 +654,7 @@ const drawSlots = (v: View, state: HackState, tick: number): void => {
  * estado emocional e legivel na silhueta, nao so na ficha.
  */
 export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): void => {
-  const p = CAT_COLORS[cat.id]!;
+  const p = coatOf(cat);
   const w = p.big ? 28 : 22;
   const h = p.big ? 17 : 14;
   const x = Math.round(cat.x - w / 2);
@@ -702,21 +711,26 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
     }
   }
 
-  // Corpo com franja de pelo.
+  // Corpo com franja de pelo — menos o sphynx, que e todo pele e dignidade.
   rect(v, x + 1, y + 2 - bounce, w - 2, h - 4, p.body);
-  for (let i = 0; i < w - 2; i += 2) {
-    const fluff = Math.sin(tick / 8 + i) > 0.2 ? 1 : 0;
-    px(v, x + 1 + i, y + 1 - bounce - fluff, p.body);
+  if (cat.pattern !== 'sphynx') {
+    for (let i = 0; i < w - 2; i += 2) {
+      const fluff = Math.sin(tick / 8 + i) > 0.2 ? 1 : 0;
+      px(v, x + 1 + i, y + 1 - bounce - fluff, p.body);
+    }
+  } else {
+    // Dobrinhas de pele no lugar da franja.
+    rect(v, x + 3, y + 4 - bounce, w - 8, 1, adjustBrightness(p.body, -12));
   }
   rect(v, x + 2, y + h - 3, w - 4, 2, p.belly);
-  // Listras do tabby / pontos do siames.
-  if (cat.id === 'cheeto') for (let i = 0; i < 4; i++) rect(v, x + 5 + i * 5, y + 2 - bounce, 2, 4, p.mark);
+  // O PADRAO da pelagem: listras do tabby; o sphynx nao tem franja (abaixo).
+  if (cat.pattern === 'tabby') for (let i = 0; i < 4; i++) rect(v, x + 5 + i * 5, y + 2 - bounce, 2, 4, p.mark);
   // O CRACHA da trilha: lanyard no peito, credencial embaixo. Cada gato
   // carrega a propria cor de disciplina — silhueta com funcao.
-  const track = TRACK_OF_CAT[cat.id]!;
-  rect(v, x + 4, y + 3 - bounce, 2, 5, TRACK_COLOR[track]);
+  const specColor = SPEC_COLOR[cat.specialty];
+  rect(v, x + 4, y + 3 - bounce, 2, 5, specColor);
   rect(v, x + 3, y + 8 - bounce, 4, 3, CREAM);
-  px(v, x + 4, y + 9 - bounce, TRACK_COLOR[track]);
+  px(v, x + 4, y + 9 - bounce, adjustBrightness(specColor, -20));
   // Patas.
   rect(v, x + 4, y + h - 1 - step, 3, 2 + step, p.mark);
   rect(v, x + w - 7, y + h - 1, 3, 2, p.mark);
@@ -754,9 +768,9 @@ const drawHead = (
   stressed: boolean
 ): void => {
   rect(v, hx, hy, 12, 10, p.body);
-  // Mascara do siames / smoking do tuxedo.
-  if (cat.id === 'bigode') rect(v, hx + 3, hy + 4, 6, 5, adjustBrightness(p.mark, 30));
-  if (cat.id === 'smoking') rect(v, hx + 4, hy + 6, 4, 4, p.belly);
+  // Mascara do siames / peitoral branco do tuxedo — pelo PADRAO da pelagem.
+  if (cat.pattern === 'siames') rect(v, hx + 3, hy + 4, 6, 5, adjustBrightness(p.mark, 30));
+  if (cat.pattern === 'tuxedo') rect(v, hx + 4, hy + 6, 4, 4, p.belly);
   // Orelhas: em pe quando bem, ACHATADAS quando estressado — o humor mora na
   // silhueta.
   if (stressed) {
@@ -785,9 +799,9 @@ export const drawHand = (v: View, x: number, y: number, holding: boolean): void 
   if (!holding) rect(v, x - 2, y - 1, 5, 3, c(226, 160, 170));
 };
 
-export const drawScene = (v: View, state: HackState, tick: number, selected: string | null): void => {
+export const drawScene = (v: View, state: HackState, tick: number, selected: string | null, locale: Locale = 'en'): void => {
   drawFloor(v, tick);
-  drawPanel(v, state, tick);
+  drawPanel(v, state, tick, locale);
   drawSlots(v, state, tick);
   const order = [...state.cats].sort((a, b) => a.y - b.y);
   for (const cat of order) if (cat.mode !== 'held') drawCat(v, cat, tick, selected === cat.id);

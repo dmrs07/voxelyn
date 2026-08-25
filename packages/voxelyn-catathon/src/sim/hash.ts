@@ -48,6 +48,20 @@ export const hashState = (state: HackState): string => {
   h.fixed(state.cableProgress, 1);
   for (const c of state.cats) {
     h.str(c.id);
+    // A FICHA MECANICA do contratado e ENTRADA do replay: dois elencos com
+    // os mesmos ids e fichas diferentes divergem JA no tick zero — sem
+    // isto, a ferramenta de divergencia so acusava muito depois (achado de
+    // revisao do Slice D).
+    h.str(c.specialty);
+    h.str(c.personality);
+    h.str(c.quirk);
+    h.str(c.tier);
+    for (const tr of c.traits) h.str(tr);
+    h.str(c.hiddenTrait);
+    h.fixed(c.breedMod.nap, HASH_METER);
+    h.fixed(c.breedMod.stress, HASH_METER);
+    h.fixed(c.breedMod.hunger, HASH_METER);
+    h.fixed(c.breedMod.social, HASH_METER);
     h.fixed(c.x, HASH_POS);
     h.fixed(c.y, HASH_POS);
     // Em walk/zoomies o alvo determina as proximas posicoes: sem ele, dois
@@ -57,13 +71,62 @@ export const hashState = (state: HackState): string => {
     h.fixed(c.energy, HASH_METER);
     h.fixed(c.hunger, HASH_METER);
     h.fixed(c.stress, HASH_METER);
+    // Moral manda na velocidade; a memoria do carinho manda no proximo
+    // carinho. Ambos determinam o futuro — ambos entram.
+    h.fixed(c.moral, HASH_METER);
+    h.u32(c.petStreak);
+    h.u32(c.petLastTick + 1);
+    // A revelacao do trait oculto muda eventos futuros: entra.
+    h.u32(c.revealed ? 1 : 0);
+    h.fixed(c.speedBoost, HASH_METER);
+    // O aprendizado do junior manda na velocidade dele; o contador de ships
+    // decide crescimento e estrela. Ambos determinam o futuro — entram.
+    h.fixed(c.learned, HASH_METER);
+    h.u32(c.shipped);
     h.str(c.mode);
     h.str(c.slot ?? '-');
     h.u32(c.modeUntil);
   }
   for (const t of state.tasks) {
     h.fixed(t.progress, 1);
+    // A decisao muda custos e tags: dois estados com escolhas diferentes NAO
+    // podem colidir.
+    h.u32(t.cost);
+    h.str(t.chosen ?? '-');
     h.u32((t.done ? 1 : 0) | (t.cut ? 2 : 0) | (t.awaitingShip ? 4 : 0));
+  }
+  h.u32(state.debt + 8);
+  h.u32(state.innovation + 8);
+  h.u32(state.uxCare);
+  h.u32(state.stability);
+  h.u32(state.sponsorRisk ? 1 : 0);
+  for (const g of state.gear) h.str(g);
+  h.u32(state.catnipLeft);
+  h.u32(state.laserLeft);
+  h.fixed(state.hype, HASH_METER);
+  h.u32(state.prizeBonus);
+  h.u32(state.petSessions);
+  // O contrato de sponsor muda custos de bug, risco de crash e o palco; a
+  // categoria especial muda o premio; os pares anunciados mudam eventos.
+  h.str(state.sponsor?.id ?? '-');
+  h.str(state.specialCategory);
+  for (const v of state.vibesSeen) h.str(v);
+  for (const s of state.social) {
+    h.str(s.kind);
+    h.u32(s.at);
+    h.u32(s.until);
+    h.u32((s.resolved ? 1 : 0) | (s.taken === 'a' ? 2 : s.taken === 'b' ? 4 : 0));
+  }
+  if (state.pitch) {
+    h.u32(state.pitch.ticksLeft);
+    h.fixed(state.pitch.gauge, HASH_METER);
+    h.str(state.pitch.lastAbility ?? '-');
+    h.u32(state.pitch.crisisAt + 1);
+    h.u32(state.pitch.crisisUntil);
+    h.u32(state.pitch.crisisResolved ? 1 : 0);
+    // Os cooldowns do TIME DESTA RUN, na ordem do elenco — iterar os ids
+    // classicos deixava todo time gerado fora do hash (achado de revisao).
+    for (const c of state.cats) h.u32(state.pitch.readyAt[c.id] ?? 0);
   }
   for (const b of state.bugs) {
     h.u32(b.id);
