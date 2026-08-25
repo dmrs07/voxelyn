@@ -47,6 +47,15 @@ export const hashState = (state: HackState): string => {
   h.str(state.held ?? '-');
   h.str(state.fight?.a ?? '-');
   h.str(state.fight?.b ?? '-');
+  // O PM anda e agenda pep talks: posicao, alvo e relogios determinam o
+  // futuro dele (e a moral de quem recebe o boost) — entram.
+  h.fixed(state.pm.x, HASH_POS);
+  h.fixed(state.pm.y, HASH_POS);
+  h.fixed(state.pm.targetX, HASH_POS);
+  h.fixed(state.pm.targetY, HASH_POS);
+  h.u32(state.pm.nextPepAt);
+  h.str(state.pm.pepCat ?? '-');
+  h.u32(state.pm.lastWorryAt + 1);
   h.u32(state.cableOut ? 1 : 0);
   h.fixed(state.cableProgress, HASH_FIX);
   for (const c of state.cats) {

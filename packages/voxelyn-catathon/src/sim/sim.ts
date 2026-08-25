@@ -63,6 +63,11 @@ import {
   MORAL_SPEED_MIN,
   MORAL_TREAT,
   OVERPET_STRESS_RATE,
+  PM_PEP_MORAL,
+  PM_PEP_PERIOD,
+  PM_PEP_STRESS,
+  PM_WALK_SPEED,
+  PM_WORRY_PERIOD,
   PET_DECAY_SCALE,
   PET_MEMORY_TICKS,
   PET_PROFILE,
@@ -362,6 +367,8 @@ export const createHackathon = (
   buildProgress: 0,
   held: null,
   fight: null,
+  // O PM nasce diante do quadro de planejamento — o posto natural dele.
+  pm: { x: 262, y: 168, targetX: 262, targetY: 168, nextPepAt: PM_PEP_PERIOD, pepCat: null, lastWorryAt: 0 },
   handX: 240,
   handY: 135,
   debt: 0,
@@ -1389,6 +1396,54 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
   events.push({ kind: 'demo', tick: state.tick, result });
 };
 
+/**
+ * O PM em acao: anda ate o dev de menor moral numa mesa e entrega o pep
+ * talk NA CHEGADA (+moral, -estresse); sem alvo, volta ao posto diante do
+ * quadro. Atras da curva de entregas, resmunga o prazo no feed — com teto
+ * de frequencia. Tudo deterministico: nenhum draw01, nenhum relogio.
+ */
+const stepPm = (state: HackState, events: SimEvent[]): void => {
+  const pm = state.pm;
+  const dx = pm.targetX - pm.x;
+  const dy = pm.targetY - pm.y;
+  const len = Math.hypot(dx, dy);
+  if (len > 2) {
+    pm.x += (dx / len) * PM_WALK_SPEED;
+    pm.y += (dy / len) * PM_WALK_SPEED;
+  } else if (pm.pepCat) {
+    const cat = catOf(state, pm.pepCat);
+    pm.pepCat = null;
+    if (cat && cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
+      cat.moral = Math.min(1, cat.moral + PM_PEP_MORAL);
+      cat.stress = Math.max(0, cat.stress - PM_PEP_STRESS);
+      events.push({ kind: 'pep', tick: state.tick, cat: cat.id });
+    }
+  }
+  if (state.tick >= pm.nextPepAt) {
+    pm.nextPepAt = state.tick + PM_PEP_PERIOD;
+    let target: Cat | null = null;
+    for (const c of state.cats) {
+      if (c.slot?.startsWith('desk-') && c.mode === 'work' && (!target || c.moral < target.moral)) target = c;
+    }
+    if (target) {
+      pm.pepCat = target.id;
+      pm.targetX = target.x - 16;
+      pm.targetY = target.y + 8;
+    } else {
+      pm.targetX = 262;
+      pm.targetY = 168;
+    }
+  }
+  // A CURVA: entregas esperadas pela fracao do tempo vs entregues de fato.
+  const alive = state.tasks.filter((t) => !t.cut);
+  const done = alive.filter((t) => t.done).length;
+  const expected = Math.floor((state.tick / HACK_TICKS) * alive.length);
+  if (expected > done && state.tick >= pm.lastWorryAt + PM_WORRY_PERIOD) {
+    pm.lastWorryAt = state.tick;
+    events.push({ kind: 'pm-worry', tick: state.tick, behind: expected - done });
+  }
+};
+
 export const step = (state: HackState, cmd: Command): SimEvent[] => {
   if (state.phase === 'done') return [];
   const events: SimEvent[] = [];
@@ -1402,6 +1457,7 @@ export const step = (state: HackState, cmd: Command): SimEvent[] => {
   applyCommand(state, cmd, events);
   stepHairball(state, events);
   for (const cat of state.cats) stepCat(state, cat, cmd, events);
+  stepPm(state, events);
 
   // Eventos SOCIAIS: abrem a janela no instante agendado; ignorados, fecham
   // sozinhos na opcao segura.

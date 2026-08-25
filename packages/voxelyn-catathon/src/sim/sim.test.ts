@@ -335,6 +335,32 @@ describe('recuperacao, venues e brigas', () => {
     expect(Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY)).toBeGreaterThan(10);
   });
 
+  it('o PM e presenca fixa: pep talk sobe a moral de quem trabalha', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    expect(state.cats.length).toBe(4); // o PM NAO e contratavel nem pegavel
+    expect(state.pm).toBeTruthy();
+    step(state, { choose: { task: 'b1', option: 'monolito' } });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    const cat = catOf(state, 'bigode')!;
+    while (cat.mode === 'walk') step(state, emptyCommand());
+    cat.moral = 0.3;
+    // Um periodo de pep + a caminhada do PM ate a mesa.
+    let guard = 0;
+    while (!state.events.some((e) => e.kind === 'pep') && guard++ < 3000) step(state, emptyCommand());
+    expect(state.events.some((e) => e.kind === 'pep' && e.cat === 'bigode')).toBe(true);
+    expect(cat.moral).toBeGreaterThan(0.3);
+  });
+
+  it('atras da curva, o PM resmunga o prazo — com teto de frequencia', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    state.tick = Math.round(HACK_TICKS / 2); // metade da run, zero entregas
+    step(state, emptyCommand());
+    expect(state.events.filter((e) => e.kind === 'pm-worry').length).toBe(1);
+    step(state, emptyCommand());
+    expect(state.events.filter((e) => e.kind === 'pm-worry').length).toBe(1);
+  });
+
   it('fracoes do conserto entram no hash: 1078.6 e 1079.4 NAO colidem', () => {
     // fixSpeed 1.3 avanca em decimos: na escala 1 estes dois estados davam o
     // mesmo hash e o tick seguinte conserta um build e deixa o outro quebrado.

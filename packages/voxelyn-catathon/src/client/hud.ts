@@ -11,8 +11,6 @@ import {
   SPONSOR_TEXT,
   TREATS_START,
   fmtCost,
-  liveBug,
-  nextTask,
   vibeOf,
   workable,
   type Candidate,
@@ -25,9 +23,7 @@ import type { RunClose } from './career.js';
 const i18n = t;
 import type { Cat } from '../sim/types.js';
 import { applyItemSprite, type ItemSpriteId } from './atlas.js';
-
-/** Um trecho de trabalho na raia do gantt: quem, o que, de quando a quando. */
-type GanttSeg = { key: string; label: string; start: number; end: number; el: HTMLElement };
+import { ganttEntries, resetGanttLog, sampleGantt, type GanttEntry } from './ganttlog.js';
 import type { CatId, HackState, SimEvent, SpecialCategoryId, SponsorContract, Task } from '../sim/types.js';
 
 /**
@@ -182,7 +178,7 @@ export type Hud = {
    */
   ganttLanes: Map<CatId, HTMLElement>;
   ganttNow: Map<CatId, HTMLElement>;
-  ganttSegs: Map<CatId, GanttSeg[]>;
+  ganttSegs: Map<CatId, HTMLElement[]>;
   /** Containers que bindTeam preenche a cada run. */
   teamBar: HTMLElement;
   abilityRow: HTMLElement;
@@ -471,6 +467,7 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
   hud.ganttLanes.clear();
   hud.ganttNow.clear();
   hud.ganttSegs.clear();
+  resetGanttLog();
   hud.board.replaceChildren();
   hud.feedPanel.replaceChildren();
   for (const c of cats) {
@@ -589,56 +586,37 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 };
 
 /**
- * O que este gato esta fazendo AGORA, na taxonomia do gantt: a tarefa da
- * trilha (cor da trilha), um bug (alarme), uma emergencia no rack (alarme
- * listrado) — ou nada que renda barra (andar, comer, dormir, decidir).
+ * Sincroniza o DOM do gantt com o LOG compartilhado (ganttlog.ts): um
+ * elemento por trecho, o ultimo esticando a cada frame. A amostragem em si
+ * mora no log — o quadro fisico do pavilhao desenha da mesma fonte.
  */
-const ganttActivity = (state: HackState, cat: Cat): { key: string; label: string; cls: string } | null => {
-  if (cat.mode !== 'work' || !cat.slot) return null;
-  if (cat.slot === 'rack') {
-    if (state.hairball.active) return { key: 'hairball', label: 'rack', cls: 'seg-fix' };
-    if (state.buildBroken) return { key: 'build', label: 'rack', cls: 'seg-fix' };
-    if (state.cableOut) return { key: 'cable', label: 'rack', cls: 'seg-fix' };
-    return null;
-  }
-  const track = state.slots.find((s) => s.id === cat.slot)?.track;
-  if (!track) return null;
-  if (state.hairball.active || state.buildBroken || state.cableOut) return null;
-  const bug = liveBug(state, track);
-  if (bug) return { key: `bug${bug.id}`, label: `bug · ${track}`, cls: 'seg-bug' };
-  const task = nextTask(state, track);
-  if (!task || (task.choice && task.chosen === null)) return null;
-  return { key: task.id, label: task.label, cls: `track-${task.track}` };
-};
+const segClass = (e: GanttEntry): string =>
+  e.kind === 'task' ? `track-${e.track}` : e.kind === 'bug' ? 'seg-bug' : 'seg-fix';
 
-/**
- * Amostra o estado e estende (ou abre) o segmento da raia de cada gato.
- * Uma pausa real — comer, dormir, decidir — fecha o segmento e a proxima
- * sessao abre outro: as interrupcoes ficam VISIVEIS no vao.
- */
 const updateGantt = (state: HackState, hud: Hud): void => {
+  sampleGantt(state);
   for (const cat of state.cats) {
     const lane = hud.ganttLanes.get(cat.id);
     if (!lane) continue;
     const nowline = hud.ganttNow.get(cat.id)!;
     const nowLeft = `${Math.min(100, (state.tick / HACK_TICKS) * 100).toFixed(2)}%`;
     if (nowline.style.left !== nowLeft) nowline.style.left = nowLeft;
-    const act = ganttActivity(state, cat);
-    if (!act) continue;
-    const segs = hud.ganttSegs.get(cat.id)!;
-    let seg = segs[segs.length - 1];
-    if (!seg || seg.key !== act.key || state.tick - seg.end > 8) {
-      const node = el('span', `gantt-seg ${act.cls}`);
-      node.style.left = `${((state.tick / HACK_TICKS) * 100).toFixed(2)}%`;
+    const entries = ganttEntries(cat.id);
+    if (entries.length === 0) continue;
+    const els = hud.ganttSegs.get(cat.id)!;
+    while (els.length < entries.length) {
+      const entry = entries[els.length]!;
+      const node = el('span', `gantt-seg ${segClass(entry)}`);
+      node.style.left = `${((entry.start / HACK_TICKS) * 100).toFixed(2)}%`;
       lane.appendChild(node);
-      seg = { key: act.key, label: act.label, start: state.tick, end: state.tick, el: node };
-      segs.push(seg);
+      els.push(node);
     }
-    seg.end = state.tick;
-    seg.el.style.width = `${Math.max(0.4, ((seg.end - seg.start) / HACK_TICKS) * 100).toFixed(2)}%`;
-    const hours = (seg.end - seg.start) * HOURS_PER_TICK;
-    const title = `${seg.label} · ${Math.floor(hours)}h${String(Math.floor((hours % 1) * 60)).padStart(2, '0')}`;
-    if (seg.el.title !== title) seg.el.title = title;
+    const last = entries[entries.length - 1]!;
+    const node = els[entries.length - 1]!;
+    node.style.width = `${Math.max(0.4, ((last.end - last.start) / HACK_TICKS) * 100).toFixed(2)}%`;
+    const hours = (last.end - last.start) * HOURS_PER_TICK;
+    const title = `${last.label} · ${Math.floor(hours)}h${String(Math.floor((hours % 1) * 60)).padStart(2, '0')}`;
+    if (node.title !== title) node.title = title;
   }
 };
 
@@ -684,6 +662,11 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.decisionNeeded(e.task);
     case 'decision':
       return d.ev.decision(e.option);
+    case 'pep':
+      // A variedade e deterministica: o tick escolhe a fala.
+      return d.ev.pep(name(e.cat), e.tick % 3);
+    case 'pm-worry':
+      return d.ev.pmWorry(e.behind, e.tick % 3);
     case 'pitch-start':
       return d.ev.pitchStart;
     case 'demo-glitch':

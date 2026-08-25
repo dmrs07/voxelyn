@@ -133,6 +133,8 @@ type Dict = {
     overpet: (name: string) => string;
     decisionNeeded: (task: string) => string;
     decision: (option: string) => string;
+    pep: (name: string, flavor: number) => string;
+    pmWorry: (behind: number, flavor: number) => string;
     pitchStart: string;
     demoGlitch: string;
     improviso: (name: string) => string;
@@ -277,6 +279,18 @@ const EN: Dict = {
     overpet: (name) => `${name} is OVERSTIMULATED: enough petting for now`,
     decisionNeeded: (task) => `the project awaits a DECISION: "${task}" (open the project)`,
     decision: (option) => `decided: ${option}`,
+    pep: (name, flavor) =>
+      [
+        `Biscoito (PM) to ${name}: "you are CRUSHING it. hydrate."`,
+        `Biscoito (PM) pats ${name}: "one commit at a time, champion"`,
+        `Biscoito (PM) to ${name}: "the demo believes in you. I believe in you."`,
+      ][flavor]!,
+    pmWorry: (behind, flavor) =>
+      [
+        `Biscoito (PM) stares at the gantt: ${behind} feature${behind > 1 ? 's' : ''} behind the curve...`,
+        `Biscoito (PM) recalculates the burndown for the ${behind}th time`,
+        `Biscoito (PM), sweating: "we are ${behind} behind but it's FINE. it's fine."`,
+      ][flavor]!,
     pitchStart: 'THE 48 HOURS ARE UP. Everyone on stage: pitch time!',
     demoGlitch: 'THE DEMO FROZE LIVE! any cat: improvise!',
     improviso: (name) => `${name} turned the bug into an improvised demo. The crowd LOVED it.`,
@@ -421,6 +435,18 @@ const PT: Dict = {
     overpet: (name) => `${name} ficou SUPERESTIMULADO: chega de carinho por ora`,
     decisionNeeded: (task) => `o projeto espera uma DECISAO: "${task}" (abre o projeto)`,
     decision: (option) => `decidido: ${option}`,
+    pep: (name, flavor) =>
+      [
+        `Biscoito (PM) para ${name}: "voce esta ARRASANDO. bebe agua."`,
+        `Biscoito (PM) da tapinha em ${name}: "um commit de cada vez, campeao"`,
+        `Biscoito (PM) para ${name}: "a demo acredita em voce. EU acredito."`,
+      ][flavor]!,
+    pmWorry: (behind, flavor) =>
+      [
+        `Biscoito (PM) encara o gantt: ${behind} feature${behind > 1 ? 's' : ''} atras da curva...`,
+        `Biscoito (PM) recalcula o burndown pela ${behind}a vez`,
+        `Biscoito (PM), suando: "estamos ${behind} atras mas TA TUDO BEM. ta tudo bem."`,
+      ][flavor]!,
     pitchStart: 'AS 48H ACABARAM. Todos ao palco: e hora do pitch!',
     demoGlitch: 'A DEMO TRAVOU AO VIVO! qualquer gato: improvisa!',
     improviso: (name) => `${name} transformou o bug em demo improvisada. A plateia AMOU.`,

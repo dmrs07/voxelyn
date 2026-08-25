@@ -1,5 +1,6 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
+import { ganttEntries } from './ganttlog.js';
 import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Spec, Task, Track } from '../sim/types.js';
 
@@ -476,13 +477,16 @@ const drawStation = (v: View, sx: number, sy: number, track: Track, state: HackS
  * fisica do painel de projeto, legivel a distancia.
  */
 const drawWhiteboard = (v: View, state: HackState): void => {
+  // O quadro cresceu para carregar o GANTT em miniatura: subiu na parede
+  // (o pe nao invade a roda de decisao) e ganhou uma faixa de raias abaixo
+  // dos post-its — a MESMA imagem do gantt do painel, so que de longe.
   const bx = 208;
-  const by = 108;
-  contactShadow(v, bx + 32, by + 40, 34, 5, 0.3);
-  rect(v, bx + 6, by + 30, 3, 10, adjustBrightness(WOOD, -30));
-  rect(v, bx + 55, by + 30, 3, 10, adjustBrightness(WOOD, -30));
-  rect(v, bx - 2, by - 2, 68, 34, adjustBrightness(WOOD, -18));
-  rect(v, bx, by, 64, 30, adjustBrightness(CREAM, -8));
+  const by = 96;
+  contactShadow(v, bx + 32, by + 52, 34, 5, 0.3);
+  rect(v, bx + 6, by + 44, 3, 8, adjustBrightness(WOOD, -30));
+  rect(v, bx + 55, by + 44, 3, 8, adjustBrightness(WOOD, -30));
+  rect(v, bx - 2, by - 2, 68, 48, adjustBrightness(WOOD, -18));
+  rect(v, bx, by, 64, 44, adjustBrightness(CREAM, -8));
   rect(v, bx, by, 64, 1, CREAM);
   // Fita nos cantos.
   rect(v, bx + 1, by + 1, 4, 2, adjustBrightness(AMBER_ALERT, -30));
@@ -513,6 +517,25 @@ const drawWhiteboard = (v: View, state: HackState): void => {
     }
     i++;
   }
+  // A MINIATURA do gantt: as mesmas raias do painel (uma por gato, cores
+  // por trilha, alarme para bug e rack), desenhadas do MESMO log — nenhuma
+  // copia de estado pode ficar atrasada.
+  const gx = bx + 4;
+  const gw = 56;
+  let laneY = by + 31;
+  for (const cat of state.cats.slice(0, 4)) {
+    rect(v, gx, laneY, gw, 3, adjustBrightness(CREAM, -26));
+    for (const seg of ganttEntries(cat.id)) {
+      const x0 = gx + Math.round((seg.start / HACK_TICKS) * gw);
+      const wpx = Math.max(1, Math.round(((seg.end - seg.start) / HACK_TICKS) * gw));
+      const color = seg.kind === 'task' ? TRACK_COLOR[seg.track!] : CORAL_ERR;
+      rect(v, x0, laneY, Math.min(wpx, gx + gw - x0), 3, color);
+    }
+    laneY += 4;
+  }
+  // A linha do AGORA atravessa as raias.
+  const nowX = gx + Math.min(gw, Math.round((state.tick / HACK_TICKS) * gw));
+  rect(v, nowX, by + 30, 1, 13, adjustBrightness(WOOD, -34));
   // DECISAO aberta: um balao de "?" pisca sobre o quadro enquanto os devs
   // se juntam embaixo — o alerta existe no mundo, nao so no chip do HUD.
   const deciding = state.tasks.some(
@@ -783,6 +806,16 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
 
   drawHead(v, cat, x - 1, y - 7 - bounce, p, tick, false, stressed);
 
+  if (cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
+    // TECLANDO de verdade: as patinhas dianteiras martelam o teclado em
+    // alternancia rapida (a referencia e o gato de sueter no laptop), com
+    // plinks de tecla saltando — trabalho TEM corpo, nao so barra enchendo.
+    const up = (tick >> 1) % 2;
+    const kbY = Math.round(cat.y) - 8;
+    rect(v, Math.round(cat.x) - 6, kbY - (up ? 2 : 0), 3, 3, p.mark);
+    rect(v, Math.round(cat.x) + 3, kbY - (up ? 0 : 2), 3, 3, p.mark);
+    px(v, Math.round(cat.x) - 6 + ((tick * 3) % 13), kbY - 4 - ((tick >> 2) % 3), CREAM);
+  }
   if (cat.mode === 'keyboard') {
     // ";;;;;" subindo do teclado: o bug nascendo, visivel.
     const t = (tick >> 2) % 4;
@@ -831,6 +864,58 @@ const drawHead = (
   rect(v, hx + 8, hy + 4, 1, blink ? 1 : 2, eye);
 };
 
+/**
+ * O PM: o quinto gato, de OCULOS, camisa com gravata e prancheta debaixo do
+ * braco. Sempre presente, nunca na mao do jogador. Quando o projeto esta
+ * atras da curva, a preocupacao mora na testa: gota de suor piscando.
+ */
+const drawPm = (v: View, state: HackState, tick: number): void => {
+  const pm = state.pm;
+  const x = Math.round(pm.x) - 11;
+  const y = Math.round(pm.y) - 14;
+  const body = c(150, 134, 122);
+  const mark = c(110, 96, 86);
+  const shirt = c(238, 234, 226);
+  const moving = Math.hypot(pm.targetX - pm.x, pm.targetY - pm.y) > 2;
+  const step = moving ? Math.round(Math.abs(Math.sin(tick / 4)) * 2) : 0;
+  contactShadow(v, Math.round(pm.x), Math.round(pm.y) + 2, 11, 3, 0.34);
+  rect(v, x + 1, y + 2, 20, 10, body);
+  // A camisa cobre o peito; colarinho e GRAVATA por cima.
+  rect(v, x + 3, y + 5, 16, 8, shirt);
+  rect(v, x + 8, y + 5, 6, 2, adjustBrightness(shirt, -18));
+  rect(v, x + 10, y + 7, 2, 5, c(176, 58, 66));
+  px(v, x + 9, y + 11, c(140, 42, 50));
+  px(v, x + 12, y + 11, c(140, 42, 50));
+  // Patas.
+  rect(v, x + 4, y + 12 - step, 3, 3 + step, mark);
+  rect(v, x + 15, y + 12, 3, 3, mark);
+  // A PRANCHETA debaixo do braco: o PM nunca larga o plano.
+  rect(v, x + 18, y + 4, 6, 8, adjustBrightness(WOOD, -12));
+  rect(v, x + 19, y + 5, 4, 6, CREAM);
+  px(v, x + 20, y + 6, VIOLET_SEL);
+  px(v, x + 21, y + 8, CYAN_ACT);
+  // Cabeca com orelhas e OCULOS redondos com ponte.
+  const hx = x - 1;
+  const hy = y - 7;
+  rect(v, hx, hy, 12, 10, body);
+  px(v, hx + 1, hy - 1, mark);
+  px(v, hx + 2, hy - 2, mark);
+  px(v, hx + 3, hy - 1, mark);
+  px(v, hx + 8, hy - 1, mark);
+  px(v, hx + 9, hy - 2, mark);
+  px(v, hx + 10, hy - 1, mark);
+  rect(v, hx + 2, hy + 3, 3, 3, c(40, 38, 52));
+  rect(v, hx + 7, hy + 3, 3, 3, c(40, 38, 52));
+  px(v, hx + 3, hy + 4, c(214, 224, 232));
+  px(v, hx + 8, hy + 4, c(214, 224, 232));
+  px(v, hx + 5, hy + 4, c(40, 38, 52));
+  px(v, hx + 6, hy + 4, c(40, 38, 52));
+  // Atras da curva? O suor conta — a mesma conta do resmungo no feed.
+  const alive = state.tasks.filter((t) => !t.cut);
+  const behind = Math.floor((state.tick / HACK_TICKS) * alive.length) > alive.filter((t) => t.done).length;
+  if (behind && (tick >> 3) % 2 === 0) px(v, hx + 13, hy + 1, CYAN_ACT);
+};
+
 /** A mao do jogador: uma patinha. Cursor e personagem ao mesmo tempo. */
 export const drawHand = (v: View, x: number, y: number, holding: boolean): void => {
   const col = c(244, 226, 198);
@@ -843,6 +928,9 @@ export const drawScene = (v: View, state: HackState, tick: number, selected: str
   drawFloor(v, tick);
   drawPanel(v, state, tick, locale);
   drawSlots(v, state, tick);
+  // O PM desenha antes do elenco: presenca constante, nunca por cima de
+  // quem o jogador pode pegar.
+  drawPm(v, state, tick);
   const order = [...state.cats].sort((a, b) => a.y - b.y);
   for (const cat of order) if (cat.mode !== 'held') drawCat(v, cat, tick, selected === cat.id);
   // O gato seguro desenha por ultimo, acima de tudo: esta na tua mao.

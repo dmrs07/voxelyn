@@ -126,6 +126,10 @@ if (ghostBtns.visible !== expectedBtns) {
   throw new Error(`slots fantasmas na hotbar: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
 }
 if (!ghostBtns.projTop) throw new Error('o botao de projeto nao esta no topo');
+// O PM existe, e fixo, e NAO esta no elenco pegavel.
+const pmOk = await sim(() => !!window.catathon.app.state.pm && window.catathon.app.state.cats.length === 4);
+if (!pmOk) throw new Error('o PM sumiu ou entrou no elenco');
+step.push('o PM esta de plantao diante do quadro');
 if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
 const bk = team.find((c) => c.specialty === 'backend');
 if (!bk) throw new Error('nenhum backend contratado entre os 4 primeiros (cobertura quebrou)');
