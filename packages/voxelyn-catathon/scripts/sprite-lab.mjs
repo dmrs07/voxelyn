@@ -46,6 +46,24 @@ const cell = (label, w, h, sc, dark, draw) => {
   d.append(c, l);
   return d;
 };
+// Amostras da paleta no topo da folha.
+{
+  const d = document.createElement('div');
+  d.className = 'row';
+  for (const [ch, col] of Object.entries(SPEC.pal)) {
+    const sw = document.createElement('div');
+    sw.className = 'cell';
+    const c = document.createElement('canvas');
+    c.width = 28; c.height = 28;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = col; ctx.fillRect(0, 0, 28, 28);
+    const l = document.createElement('div');
+    l.textContent = ch + ' ' + col;
+    sw.append(c, l);
+    d.appendChild(sw);
+  }
+  sheet.appendChild(d);
+}
 for (const [name, s] of Object.entries(SPEC.sprites)) {
   const w = Math.max(...s.rows.map(r => r.length));
   const h = s.rows.length;
@@ -68,6 +86,12 @@ for (const [name, s] of Object.entries(SPEC.sprites)) {
     }
   }));
   sheet.appendChild(row);
+  if (s.desc) {
+    const d = document.createElement('div');
+    d.style.maxWidth = '900px';
+    d.textContent = s.desc;
+    sheet.appendChild(d);
+  }
 }
 </script>`;
 

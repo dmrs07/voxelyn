@@ -1,0 +1,205 @@
+{
+ "pal": {
+  "b": "#d98a4b",
+  "m": "#a65f2e",
+  "s": "#8a4f26",
+  "y": "#f2e3c8",
+  "e": "#3a6b4d",
+  "p": "#1c2f24",
+  "g": "#eaf2e6",
+  "n": "#c96b6b",
+  "i": "#d9958a",
+  "k": "#6e3a1c"
+ },
+ "sprites": {
+  "opcao A (compacto)": {
+   "rows": [
+    "........................",
+    "......mm.....mm.........",
+    ".....bbbbb..mbbb........",
+    "....bbbbbbbbbbbbb.......",
+    "...bbbbbbbbbbbbbbb......",
+    "...bmmbbbbbbmmbbbb......",
+    "..bbeepbbbbbepbbbb......",
+    "..bbbbbbbbbbbbbbbb......",
+    ".bbbbbbbyyynyyyybbb.....",
+    ".bbbbbbbyyykyyyybbb.....",
+    "..bbbbbbyyyyyybbbb......",
+    "....bbbbbbbbbbbbb.......",
+    "....bbbbyyyybbbb........",
+    "...bbbbyyyyyybbbbb......",
+    "..bbbbbyyyyyybbbbbb.....",
+    ".bbbbbbyyyyyybbbbbbb....",
+    ".bbbbbyybbsyybbbmbbb....",
+    "mbbbbbyybbsyybbmbbbb....",
+    "mmbbbbyybbsyybbbmbbb....",
+    ".mbbbbyyybsyyybbbbyy....",
+    "..bbbb.yyy..yyy...yy...."
+   ],
+   "anchors": {
+    "orelha": [
+     6,
+     1
+    ],
+    "olho": [
+     4,
+     6
+    ],
+    "nariz": [
+     11,
+     8
+    ],
+    "pescoco": [
+     9,
+     12
+    ],
+    "pata": [
+     8,
+     20
+    ],
+    "garupa": [
+     3,
+     17
+    ],
+    "rabo": [
+     0,
+     17
+    ],
+    "pata-tras": [
+     18,
+     20
+    ]
+   },
+   "desc": "A \u2014 compacto e redondo: orelhas curtas, bochechas dominantes, corpo baixo e largo, rabo em curl curto junto ao corpo. Silhueta = circulo empilhado em pera."
+  },
+  "opcao B (dsh)": {
+   "rows": [
+    "......m.................",
+    ".....mim......m.........",
+    ".....bbbb....mim........",
+    "....bbbbbbbbbbbb........",
+    "...bbbbbbbbbbbbbb.......",
+    "...bmmbbbbbbmmbbb.......",
+    "..bbeepgbbbbepbbb.......",
+    "..bbbbbbbbbbbbbbb.......",
+    "..bbbbbbyyynyyybb.......",
+    "...bbbbbyyykyyybb.......",
+    "...bbbbbbyyyyybbb.......",
+    "....bbbbbbbbbbbb........",
+    ".....bbbbyybbbb.........",
+    "....bbbbyyyybbbbb.......",
+    "...bbbbyyyyyybbbbb......",
+    ".mbbbbbyyyyyybbbbbb.....",
+    "mmbbbbbyybbyybbmbbb.....",
+    "mbbbbbbyybsyybbbmbb.....",
+    "mbbbbbbyybsyybbmbbb.....",
+    "mmbbbbbyybsyyybbbbb.....",
+    ".mmbbbbyyybsyyybbyy.....",
+    "..bbbb.yyy..yyy..yy....."
+   ],
+   "anchors": {
+    "orelha": [
+     6,
+     0
+    ],
+    "olho": [
+     4,
+     6
+    ],
+    "nariz": [
+     11,
+     8
+    ],
+    "pescoco": [
+     9,
+     12
+    ],
+    "ombro": [
+     6,
+     15
+    ],
+    "pata": [
+     8,
+     21
+    ],
+    "garupa": [
+     16,
+     18
+    ],
+    "rabo-raiz": [
+     1,
+     20
+    ],
+    "rabo-ponta": [
+     0,
+     15
+    ],
+    "pata-tras": [
+     17,
+     21
+    ]
+   },
+   "desc": "B \u2014 shorthair equilibrado: proporcao classica, orelha longe menor e inclinada (3/4), rabo erguendo em curva pelo flanco esquerdo, listras so no flanco direito para o rabo ser inconfundivel."
+  },
+  "opcao C (esguio)": {
+   "rows": [
+    "......m.......m.........",
+    ".....mim......mim.......",
+    ".....mbm.....mbm........",
+    ".....bbbb...bbbb........",
+    "....bbbbbbbbbbbb........",
+    "....bmmbbbbmmbbb........",
+    "...bbeepbbbepbbb........",
+    "...bbeepbbbepbbb........",
+    "...bbbbbyynyybbb........",
+    "....bbbbyykyybbb........",
+    "....bbbbbyyybbb.........",
+    ".....bbbbbbbbbb.........",
+    "m.....bbbyybbb..........",
+    "m....bbbyyyybbbb........",
+    "m...bbbyyyyyybbbb.......",
+    "m..bbbbyyyyyybbbbb......",
+    "m.bbbbyybbsyybbmbbb.....",
+    "mmbbbbyybbsyybbbmbb.....",
+    ".mbbbbyybbsyybbmbbb.....",
+    ".mbbbbyyybsyyybbbyy.....",
+    "..bbbb.yyy..yyy...yy...."
+   ],
+   "anchors": {
+    "orelha": [
+     6,
+     0
+    ],
+    "olho": [
+     5,
+     6
+    ],
+    "nariz": [
+     10,
+     8
+    ],
+    "pescoco": [
+     9,
+     12
+    ],
+    "pata": [
+     8,
+     20
+    ],
+    "garupa": [
+     16,
+     17
+    ],
+    "rabo-ponta": [
+     0,
+     12
+    ],
+    "pata-tras": [
+     17,
+     19
+    ]
+   },
+   "desc": "C \u2014 esguio e alerta: orelhas longas retas, rosto estreito, olhos abertos de 2px com pupila direcionada, pescoco fino, rabo LONGO erguido em curva alta. Silhueta vertical."
+  }
+ }
+}
