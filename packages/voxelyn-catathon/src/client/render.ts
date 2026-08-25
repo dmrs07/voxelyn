@@ -529,11 +529,20 @@ const drawSocial = (v: View, sx: number, sy: number, elapsed: number, tick: numb
   // Cafeteira no canto da mesa, luzinha piscando.
   box(v, sx + 13, sy - 18, 6, 5, 2, c(70, 66, 82));
   px(v, sx + 14, sy - 16, (tick >> 5) % 2 === 0 ? AMBER_ALERT : adjustBrightness(AMBER_ALERT, -50));
-  // A pizza chega na metade da madrugada — o clutter conta o tempo.
+  // A pizza chega na metade da madrugada. Tampa aberta e pepperoni fazem o
+  // objeto ler como pizza — nao como quadrado sem funcao.
   if (elapsed > 0.5) {
-    rect(v, sx + 24, sy + 2, 12, 8, adjustBrightness(CREAM, -26));
-    rect(v, sx + 25, sy + 3, 10, 6, adjustBrightness(CORAL, -30));
-    if (elapsed > 0.8) rect(v, sx + 25, sy + 3, 5, 6, adjustBrightness(CREAM, -26));
+    const px0 = sx + 24;
+    const py0 = sy + 2;
+    rect(v, px0, py0, 13, 8, adjustBrightness(c(168, 134, 92), -8));
+    rect(v, px0 + 1, py0 - 7, 11, 7, adjustBrightness(CREAM, -34));
+    rect(v, px0 + 2, py0 - 6, 9, 1, adjustBrightness(CREAM, -12));
+    for (let row = 0; row < 5; row++) {
+      rect(v, px0 + 2 + row, py0 + 1 + row, Math.max(1, 8 - row * 2), 1, adjustBrightness(AMBER_ALERT, 8));
+    }
+    px(v, px0 + 4, py0 + 3, CORAL_ERR);
+    px(v, px0 + 8, py0 + 2, CORAL_ERR);
+    if (elapsed > 0.8) rect(v, px0 + 1, py0 + 1, 5, 6, adjustBrightness(CREAM, -26));
   }
 };
 
