@@ -6,6 +6,7 @@ import {
   ABILITY_REPEAT_SCALE,
   BIGODE_CSS_SPEED,
   BUG_COST,
+  BUILD_REPAIR_COST,
   CABLE_BITE_P,
   CABLE_FIX_COST,
   CALM_SCALE,
@@ -356,6 +357,7 @@ export const createHackathon = (
   cableProgress: 0,
   treats: TREATS_START,
   buildBroken: false,
+  buildProgress: 0,
   held: null,
   handX: 240,
   handY: 135,
@@ -423,11 +425,27 @@ export const nextTask = (state: HackState, track: Track): Task | undefined =>
 /** O slot no BOOTH DESTA RUN — as coordenadas moram no estado (layout). */
 const slotIn = (state: HackState, id: SlotId) => state.slots.find((s) => s.id === id)!;
 
+/**
+ * Postos sociais aceitam mais de um gato, mas cada corpo recebe uma vaga
+ * visual/tocavel propria. A escolha da primeira vaga livre e deterministica.
+ */
+const VENUE_OFFSETS: Partial<Record<SlotId, readonly [number, number][]>> = {
+  cafe: [[-26, 3], [26, 3], [-12, 10], [12, 10]],
+  puff: [[-14, 1], [14, 1], [-23, 8], [23, 8]],
+  rack: [[-18, 4], [18, 4], [-18, -9], [18, -9]],
+};
+
 const sendTo = (state: HackState, cat: Cat, slot: SlotId): void => {
   const s = slotIn(state, slot);
+  const offsets = VENUE_OFFSETS[slot] ?? [[0, 0] as [number, number]];
+  const occupied = state.cats.filter((c) => c.id !== cat.id && c.slot === slot);
+  const offset =
+    offsets.find(([ox, oy]) =>
+      occupied.every((c) => Math.hypot(c.targetX - (s.x + ox), c.targetY - (s.y + oy)) > 4)
+    ) ?? offsets[offsets.length - 1]!;
   cat.slot = slot;
-  cat.targetX = s.x;
-  cat.targetY = s.y;
+  cat.targetX = s.x + offset[0];
+  cat.targetY = s.y + offset[1];
   cat.mode = 'walk';
 };
 
@@ -727,9 +745,10 @@ const stepHairball = (state: HackState, events: SimEvent[]): void => {
     return;
   }
   if (state.tick >= hb.deadline && !state.buildBroken) {
-    // Quebra e FICA quebrado. E a unica punicao irreversivel, e chega com 50
-    // segundos de sirene.
+    // A falha e grave e para todas as trilhas, mas pode ser recuperada no
+    // rack: uma crise deve cobrar replanejamento, nao encerrar a interacao.
     state.buildBroken = true;
+    state.buildProgress = 0;
     hb.active = false;
     hb.fired++;
     hb.at = hb.fired < HAIRBALL_AT.length ? hairballFireTick(state.seed, hb.fired) : HACK_TICKS * 10;
@@ -761,11 +780,18 @@ const speedOf = (state: HackState, cat: Cat, track: Track): number => {
 
 const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   if (cat.slot === 'rack') {
-    // O rack atende DUAS emergencias, na ordem: bola de pelo, cabo mordido.
-    // O layout Server Corner conserta mais rapido — proximidade e mecanica.
+    // O rack atende emergencias na ordem de prazo: bola de pelo, build perdido,
+    // cabo mordido. O layout Server Corner conserta mais rapido.
     const fix = state.layoutMods.fixSpeed;
     if (state.hairball.active) state.hairball.progress += fix;
-    else if (state.cableOut) {
+    else if (state.buildBroken) {
+      state.buildProgress += fix;
+      if (state.buildProgress >= BUILD_REPAIR_COST) {
+        state.buildBroken = false;
+        state.buildProgress = 0;
+        events.push({ kind: 'build-fixed', tick: state.tick });
+      }
+    } else if (state.cableOut) {
       state.cableProgress += fix;
       if (state.cableProgress >= CABLE_FIX_COST) {
         state.cableOut = false;
