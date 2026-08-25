@@ -74,17 +74,17 @@ const gestures = await page.evaluate(() => getComputedStyle(document.body).touch
 if (gestures !== 'none') throw new Error(`a pagina rola sob o dedo: touch-action=${gestures}`);
 
 // --- RECRUTAMENTO: o e-mail do recrutador, seis crachas, um orcamento ------
-await page.getByRole('button', { name: 'abrir o e-mail' }).tap();
+await page.getByRole('button', { name: 'open the email' }).tap();
 await page.waitForTimeout(300);
 const candCount = await page.locator('.cand-card').count();
 if (candCount !== 6) throw new Error(`o recrutador mandou ${candCount} curriculos (esperava 6)`);
 // O botao de fechar equipe NASCE desabilitado: sem equipe nao ha hackathon.
-if (await page.getByRole('button', { name: 'fechar equipe' }).isEnabled()) {
+if (await page.getByRole('button', { name: 'lock the team' }).isEnabled()) {
   throw new Error('da para fechar equipe vazia');
 }
 for (let i = 0; i < 4; i++) await page.locator('.cand-card').nth(i).tap();
 await shot('c1b-recrutamento');
-await page.getByRole('button', { name: 'fechar equipe' }).tap();
+await page.getByRole('button', { name: 'lock the team' }).tap();
 await page.waitForTimeout(400);
 const team = await sim(() => window.catathon.app.state.cats.map((c) => ({ id: c.id, name: c.name, specialty: c.specialty, personality: c.personality })));
 if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
@@ -104,7 +104,7 @@ const buttons = await page.evaluate(() =>
     }))
 );
 if (buttons.some((b) => b.text.length < 3)) throw new Error('botao sem palavra');
-if (buttons.some((b) => b.text !== 'cortar' && b.h < 44)) throw new Error('botao com alvo < 44px');
+if (buttons.some((b) => b.text !== 'cut' && b.h < 44)) throw new Error('botao com alvo < 44px');
 // Icones DISTINTOS entre si nos botoes macios (barra de acoes + som): dois
 // botoes com o mesmo desenho e a ilegibilidade do »/≫ da Iliada de novo.
 const cluster = await page.evaluate(() =>
@@ -116,13 +116,13 @@ if (!(await page.locator('.action-bar').isVisible())) throw new Error('a barra d
 step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
 // --- DECISAO: a tarefa com escolha nao anda ate decidir pelo projeto -------
-await page.getByRole('button', { name: 'projeto' }).tap();
-await page.locator('.task-choice', { hasText: 'monolito felino' }).tap();
+await page.getByRole('button', { name: 'project' }).tap();
+await page.locator('.task-choice', { hasText: 'feline monolith' }).tap();
 await page.waitForTimeout(200);
 const chosen = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'b1').chosen);
 if (chosen !== 'monolito') throw new Error(`a decisao nao pegou: chosen=${chosen}`);
-step.push('decisao pelo dedo: b1 = monolito felino');
-await page.getByRole('button', { name: 'projeto' }).tap();
+step.push('decisao pelo dedo: b1 = feline monolith');
+await page.getByRole('button', { name: 'project' }).tap();
 
 // --- EQUIPE: selecionar pelo retrato abre a ficha COMPACTA no rodape -------
 await page.locator('.team-bar button').nth(2).tap();
@@ -230,7 +230,7 @@ step.push('carinho nao recupera energia (o exploit segue morto)');
 await shot('c2-jogando');
 
 // --- PETISCO: botao com palavra, depois toque no gato ----------------------
-await page.getByRole('button', { name: /petisco/ }).tap();
+await page.getByRole('button', { name: /treat/ }).tap();
 const eater = await page.evaluate((id) => {
   const c = window.catathon.app.state.cats.find((x) => x.id === id);
   return { x: c.x, y: c.y };
@@ -245,10 +245,10 @@ if (treats !== 2) throw new Error(`petisco nao desceu: ${treats}`);
 // --- CORTAR ESCOPO: abre o quadro pelo botao com palavra, corta, fecha -----
 const boardHidden = await page.evaluate(() => document.querySelector('.hud-board').hidden);
 if (!boardHidden) throw new Error('o quadro nasce aberto e cobre o pavilhao');
-await page.getByRole('button', { name: 'projeto' }).tap();
+await page.getByRole('button', { name: 'project' }).tap();
 // O rotulo de o3 e GERADO por run: corta pelo nome real do quadro.
 const o3Label = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').label);
-await page.locator('.task', { hasText: o3Label }).getByRole('button', { name: 'cortar' }).tap();
+await page.locator('.task', { hasText: o3Label }).getByRole('button', { name: 'cut' }).tap();
 await page.waitForTimeout(300);
 const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').cut);
 step.push(`cortar escopo: o3.cut=${cutOk}`);
@@ -256,7 +256,7 @@ if (!cutOk) throw new Error('cortar nao cortou');
 await shot('c3-quadro');
 
 // --- O CHIP DE BUG e clicavel e abre o projeto (achado de revisao) ---------
-await page.getByRole('button', { name: 'projeto' }).tap(); // fecha o quadro
+await page.getByRole('button', { name: 'project' }).tap(); // fecha o quadro
 await sim(() => {
   const st = window.catathon.app.state;
   st.bugs.push({ id: 99, track: 'design', by: st.cats[0].id, cost: 600, progress: 0, fixed: false });
@@ -268,7 +268,7 @@ if (await page.evaluate(() => document.querySelector('.hud-board').hidden)) {
   throw new Error('o chip de bug nao abre o projeto');
 }
 step.push('chip de bug clicavel: abre o projeto');
-await page.getByRole('button', { name: 'projeto' }).tap();
+await page.getByRole('button', { name: 'project' }).tap();
 await sim(() => {
   window.catathon.app.state.bugs = window.catathon.app.state.bugs.filter((b) => b.id !== 99);
 });

@@ -112,6 +112,7 @@ import {
 } from './constants.js';
 import { SLOTS, TASKS } from './data.js';
 import { CLASSIC_LAYOUT, rollLayout, rollProject, type Candidate } from './gen.js';
+import { CHOICE_TEXT, TASK_TEXT, type Locale } from './text.js';
 import type { Cat, CatId, Command, DemoResult, HackState, Outcome, SimEvent, SlotId, Spec, Task, Track } from './types.js';
 
 /**
@@ -191,11 +192,20 @@ const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
 export const createHackathon = (
   seed: number,
   team: readonly Candidate[],
-  opts: { classic?: boolean } = {}
+  opts: { classic?: boolean; locale?: Locale } = {}
 ): HackState => {
-  const project = opts.classic ? null : rollProject(seed >>> 0);
+  const locale: Locale = opts.locale ?? 'en';
+  const project = opts.classic ? null : rollProject(seed >>> 0, locale);
   const layout = opts.classic ? CLASSIC_LAYOUT : rollLayout(seed >>> 0);
-  const taskDefs = project ? project.tasks : TASKS;
+  // O projeto classico tambem fala o idioma da run: rotulos e decisoes vem
+  // das tabelas de texto — estado se GERA no idioma, nao se traduz depois.
+  const taskDefs = project
+    ? project.tasks
+    : TASKS.map((t) => ({
+        ...t,
+        label: TASK_TEXT[locale][t.id]?.[0] ?? t.label,
+        choice: CHOICE_TEXT[locale][t.id] ?? undefined,
+      }));
   return {
   tick: 0,
   phase: 'hack',
@@ -226,7 +236,15 @@ export const createHackathon = (
   sponsorRisk: false,
   project: project
     ? { name: project.name, brief: project.brief, emphasis: project.emphasis, risk: project.risk }
-    : { name: 'MiauDota', brief: 'plataforma de adocao de gatos com IA, acessivel, mas sustentavel', emphasis: 'tecnica', risk: 'hype' },
+    : {
+        name: 'MiauDota',
+        brief:
+          locale === 'pt'
+            ? 'plataforma de adocao de gatos com IA, acessivel, mas sustentavel'
+            : 'an AI-assisted cat adoption platform, accessible yet sustainable',
+        emphasis: 'tecnica',
+        risk: 'hype',
+      },
   layoutId: layout.id,
   layoutName: layout.name,
   layoutMods: { ...layout.mods },

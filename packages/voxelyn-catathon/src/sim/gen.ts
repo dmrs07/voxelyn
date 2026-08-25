@@ -1,5 +1,17 @@
 import { TASK_CORE_COST, TASK_POLISH_COST } from './constants.js';
 import { SLOTS, TASKS } from './data.js';
+import {
+  AUDIENCES_TEXT,
+  CHOICE_TEXT,
+  CLASSIC_BIO,
+  CONSTRAINTS_TEXT,
+  CURRENCY_TEXT,
+  CVS_TEXT,
+  DOMAINS_TEXT,
+  NOTES_TEXT,
+  TASK_TEXT,
+  type Locale,
+} from './text.js';
 import type { CoatPattern, Personality, Quirk, SlotId, Spec, Task, Tier, Track } from './types.js';
 
 /**
@@ -49,15 +61,16 @@ export const PEIXINHO = 100;
 /** O orcamento de uma run: da para 3 ou 4 gatos, dependendo do tier. */
 export const RUN_BUDGET = 420;
 
-export const fmtCost = (c: number): string => {
+export const fmtCost = (c: number, locale: Locale = 'en'): string => {
+  const cur = CURRENCY_TEXT[locale];
   const fish = Math.floor(c / PEIXINHO);
   const ball = Math.floor((c % PEIXINHO) / BOLINHA);
   const cap = c % BOLINHA;
   const parts: string[] = [];
-  if (fish) parts.push(`${fish} peixinho${fish > 1 ? 's' : ''}`);
-  if (ball) parts.push(`${ball} bolinha${ball > 1 ? 's' : ''}`);
-  if (cap) parts.push(`${cap} tampinha${cap > 1 ? 's' : ''}`);
-  return parts.join(' + ') || 'de graca';
+  if (fish) parts.push(`${fish} ${cur.fish[fish > 1 ? 1 : 0]}`);
+  if (ball) parts.push(`${ball} ${cur.ball[ball > 1 ? 1 : 0]}`);
+  if (cap) parts.push(`${cap} ${cur.cap[cap > 1 ? 1 : 0]}`);
+  return parts.join(' + ') || cur.free;
 };
 
 // ------------------------------------------------------------------ tipos
@@ -100,21 +113,6 @@ export const NEGATIVE_TRAITS: readonly TraitId[] = [
   'guloso',
 ];
 
-export const TRAIT_LABEL: Record<TraitId, string> = {
-  'cacador-de-bugs': 'cacador de bugs',
-  'dorme-rapido': 'dorme rapido',
-  polidactila: 'digitacao polidactila',
-  'pitchador-nato': 'pitchador nato',
-  'gambiarra-elegante': 'gambiarra elegante',
-  zen: 'zen',
-  'dorme-no-teclado': 'dorme no teclado',
-  'zoomies-noturnos': 'zoomies noturnos',
-  'producao-em-main': 'producao direta em main',
-  'detesta-legado': 'detesta legado',
-  'medo-de-palco': 'medo de palco',
-  guloso: 'guloso',
-  'recusa-css': 'recusa CSS',
-};
 
 export type Candidate = {
   id: string;
@@ -199,34 +197,8 @@ const TIER_META: Record<Tier, { label: string; base: number }> = {
   especialista: { label: 'especialista', base: 400 },
 };
 
-export const TIER_LABEL = (t: Tier): string => TIER_META[t].label;
 
-const SPEC_LABEL: Record<Spec, string> = {
-  backend: 'backend',
-  frontend: 'frontend',
-  design: 'design',
-  devops: 'devops',
-  freestyler: 'freestyler',
-};
-export { SPEC_LABEL };
 
-const NOTES = [
-  'referencias impecaveis, exceto por um vaso.',
-  'trabalhou no booth vencedor do ano passado. dormiu no trofeu.',
-  'pediu para nao trabalhar perto de aspiradores.',
-  'so aceita reuniao depois do cafe. do cafe DELE.',
-  'trouxe o proprio teclado. e o proprio rato (de brinquedo).',
-  'ex-startup de comedouros: saiu quando pivotaram para caes.',
-] as const;
-
-const CVS = [
-  'oito anos de experiencia em derrubar objetos de mesas.',
-  'fluente em quatro linguagens e dois miados regionais.',
-  'lidera pela frente, especialmente na fila do atum.',
-  'serenidade comprovada em incidentes (dormiu durante um).',
-  'portfolio inteiro em caixas de papelao numeradas.',
-  'nunca perdeu um deploy. ja perdeu tres bolinhas atras da geladeira.',
-] as const;
 
 const PERSONALITIES: readonly Personality[] = ['perfeccionista', 'cowboy', 'calmo', 'julga-em-silencio'];
 const QUIRKS: readonly Quirk[] = ['territorial', 'morde-cabo', 'dorme-no-rack', 'caixa'];
@@ -241,7 +213,7 @@ const rollTrait = (d: Dice, pool: readonly TraitId[], not: TraitId[]): TraitId =
   return pool[0]!;
 };
 
-const rollCandidate = (d: Dice, spec: Spec, usedNames: string[]): Candidate => {
+const rollCandidate = (d: Dice, spec: Spec, usedNames: string[], locale: Locale): Candidate => {
   const breed = d.pick(BREEDS);
   let name = d.pick(NAMES) as string;
   while (usedNames.includes(name)) name = d.pick(NAMES) as string;
@@ -269,8 +241,8 @@ const rollCandidate = (d: Dice, spec: Spec, usedNames: string[]): Candidate => {
     traits: [t1, t2],
     hiddenTrait: hidden,
     cost,
-    note: d.pick(NOTES),
-    cv: d.pick(CVS),
+    note: d.pick(NOTES_TEXT[locale]),
+    cv: d.pick(CVS_TEXT[locale]),
   };
 };
 
@@ -286,11 +258,11 @@ const TIER_DOWN: Record<Tier, Tier> = {
   junior: 'junior',
 };
 
-export const rollCandidates = (seed: number): Candidate[] => {
+export const rollCandidates = (seed: number, locale: Locale = 'en'): Candidate[] => {
   const d = new Dice(seed, 0xca7a11);
   const used: string[] = [];
   const tracks: Spec[] = ['backend', 'frontend', 'design', 'devops'];
-  const out = tracks.map((t) => rollCandidate(d, t, used));
+  const out = tracks.map((t) => rollCandidate(d, t, used, locale));
   // O quarteto de COBERTURA tem de caber no orcamento: quatro tiers caros
   // juntos fariam a unica equipe completa custar mais que a run permite.
   // Rebaixa o mais caro (deterministicamente) ate caber — a variedade fica,
@@ -306,8 +278,8 @@ export const rollCandidates = (seed: number): Candidate[] => {
     rich.cost = Math.max(6, rich.cost - delta);
   }
   const wild: Spec[] = ['backend', 'frontend', 'design', 'devops', 'freestyler', 'freestyler'];
-  out.push(rollCandidate(d, d.pick(wild), used));
-  out.push(rollCandidate(d, d.pick(wild), used));
+  out.push(rollCandidate(d, d.pick(wild), used, locale));
+  out.push(rollCandidate(d, d.pick(wild), used, locale));
   return out;
 };
 
@@ -328,22 +300,6 @@ export type ProjectSpec = {
 
 const NAME_A = ['Ronro', 'Fish', 'Box', 'Miau', 'Purr', 'Nap', 'Lamb', 'Cat'] as const;
 const NAME_B = ['med', 'Flow', 'Box', 'Hub', 'Ship', 'Deck', 'Lab', 'Go'] as const;
-const DOMAINS = [
-  'triagem veterinaria por IA',
-  'logistica de peixes sustentaveis',
-  'avaliacao de caixas de papelao',
-  'adocao de gatos com IA',
-  'monitoramento de sonecas coletivas',
-  'entrega de petiscos por drone',
-] as const;
-const AUDIENCES = ['abrigos', 'catios urbanos', 'clinicas', 'condominios felinos', 'ONGs'] as const;
-const CONSTRAINTS = [
-  'com modo offline',
-  'acessivel',
-  'com dados sensiveis',
-  'em tempo real',
-  'sustentavel',
-] as const;
 
 /** Tres FORMAS de grafo curadas — validadas aciclicas e completaveis. */
 const GRAPH_SHAPES: readonly Record<string, readonly string[]>[] = [
@@ -355,29 +311,18 @@ const GRAPH_SHAPES: readonly Record<string, readonly string[]>[] = [
   { b1: [], b2: ['b1', 'o1'], b3: ['b2'], d1: [], d2: ['d1'], d3: ['d2'], f1: ['d1'], f2: ['b2', 'd1'], f3: ['f2'], o1: ['b1'], o2: ['o1'], o3: ['o2'] },
 ];
 
-const TASK_LABELS: Record<string, readonly string[]> = {
-  b1: ['schema dos adotaveis', 'modelo de dados felino', 'schema com historico de ronrons'],
-  b2: ['API /adotar com auth por bigode', 'API de matching por vibracao', 'API com auth por patinha'],
-  b3: ['cache de sardinha', 'fila de mensagens de miado', 'cache morno de colo'],
-  d1: ['design system Patinha', 'design system Almofada', 'design system Bigorna (de pelo)'],
-  d2: ['fluxo de adocao acessivel', 'fluxo de triagem acessivel', 'jornada do adotante'],
-  d3: ['modo escuro (para gatos)', 'microinteracoes de orelha', 'ilustracoes de recibo'],
-  f1: ['onboarding com novelo', 'onboarding com laser', 'tour guiado por cheiro'],
-  f2: ['dashboard de adocoes', 'dashboard em tempo real', 'painel da fila de espera'],
-  f3: ['confete de lazinha', 'easter egg do ronrom', 'animacao de pouso de pata'],
-  o1: ['pipeline de deploy', 'pipeline com gate de soneca', 'deploy azul-cinza (daltonico)'],
-  o2: ['miau-metrics no grafana', 'alertas por bigode', 'observabilidade de tigela'],
-  o3: ['autoscaling de sonecas', 'backup em caixa de papelao', 'chaos monkey (literal)'],
-};
-
-export const rollProject = (seed: number): ProjectSpec => {
+export const rollProject = (seed: number, locale: Locale = 'en'): ProjectSpec => {
   const d = new Dice(seed, 0x9e0057);
   const name = `${d.pick(NAME_A)}${d.pick(NAME_B)}`;
-  const brief = `plataforma de ${d.pick(DOMAINS)} para ${d.pick(AUDIENCES)}, ${d.pick(CONSTRAINTS)}`;
+  const brief =
+    locale === 'pt'
+      ? `plataforma de ${d.pick(DOMAINS_TEXT.pt)} para ${d.pick(AUDIENCES_TEXT.pt)}, ${d.pick(CONSTRAINTS_TEXT.pt)}`
+      : `a ${d.pick(DOMAINS_TEXT.en)} platform for ${d.pick(AUDIENCES_TEXT.en)}, ${d.pick(CONSTRAINTS_TEXT.en)}`;
   const shape = d.pick(GRAPH_SHAPES);
   const tasks = TASKS.map((t) => ({
     ...t,
-    label: d.pick(TASK_LABELS[t.id] ?? [t.label]),
+    label: d.pick(TASK_TEXT[locale][t.id] ?? [t.label]),
+    choice: CHOICE_TEXT[locale][t.id] ?? undefined,
     deps: shape[t.id] ?? t.deps,
     // Jitter de custo: mesma forma, pesos diferentes por edicao.
     cost: Math.round((t.polish ? TASK_POLISH_COST : TASK_CORE_COST) * (0.85 + d.roll() * 0.3)),
@@ -492,7 +437,10 @@ export const rollLayout = (seed: number): LayoutSpec => {
  * candidatos plenos sem traits extras (menos o protesto anti-CSS do
  * Bigode). E o time dos testes de arquetipo e o rosto do jogo.
  */
-export const CLASSIC_TEAM: readonly Candidate[] = [
+export const classicTeam = (locale: Locale = 'en'): readonly Candidate[] =>
+  CLASSIC_BASE.map((c) => ({ ...c, note: CLASSIC_BIO[locale][c.id]!.note, cv: CLASSIC_BIO[locale][c.id]!.cv }));
+
+const CLASSIC_BASE: readonly Candidate[] = [
   {
     id: 'bigode',
     name: 'Bigode',
@@ -571,3 +519,5 @@ export const CLASSIC_LAYOUT: LayoutSpec = {
   slots: SLOTS.map((s) => ({ ...s })),
   mods: MODS({}),
 };
+
+export const CLASSIC_TEAM: readonly Candidate[] = classicTeam('en');

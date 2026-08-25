@@ -27,6 +27,7 @@ import {
   type BusId,
 } from './audio/index.js';
 import { attachInput, attachKeyboard, buildCommand, createInput, type InputState, type InputTeardown } from './input.js';
+import { getLocale } from './i18n.js';
 import { bindTeam, clearScreens, createHud, drawCard, drawHud, pushFeed, showRecruit, showResult, showTitle, type Hud } from './hud.js';
 import { createView, drawHand, drawScene, type View } from './render.js';
 
@@ -105,11 +106,11 @@ const openRecruit = (app: App): void => {
   clearScreens(app.screenHost);
   app.phase = 'recruit';
   app.seed = (Date.now() ^ 0xca7a7040) >>> 0;
-  const project = rollProject(app.seed);
+  const project = rollProject(app.seed, getLocale());
   const layout = rollLayout(app.seed);
   showRecruit(
     app.screenHost,
-    rollCandidates(app.seed),
+    rollCandidates(app.seed, getLocale()),
     RUN_BUDGET,
     { name: project.name, brief: project.brief, emphasis: project.emphasis },
     layout.name,
@@ -121,7 +122,7 @@ const startRun = (app: App, team: readonly Candidate[]): void => {
   clearScreens(app.screenHost);
   stopGameAudio(app.audio);
   startGameAudio(app.audio);
-  app.state = createHackathon(app.seed, team);
+  app.state = createHackathon(app.seed, team, { locale: getLocale() });
   bindTeam(app.hud, app.state.cats);
   app.input.selected = null;
   app.input.queue.length = 0;
@@ -152,7 +153,7 @@ const frame = (app: App, now: number): void => {
     app.hud.root.hidden = app.phase === 'title' || app.phase === 'recruit';
   }
 
-  drawScene(app.view, app.state, app.state.tick, app.input.selected);
+  drawScene(app.view, app.state, app.state.tick, app.input.selected, getLocale());
   if (app.phase === 'playing') drawHand(app.view, app.input.x, app.input.y, app.state.held !== null);
   presentToCanvas(app.ctx, app.view.surface);
   app.frameHandle = requestAnimationFrame((t) => frame(app, t));
@@ -172,7 +173,7 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
     ctx,
     view: createView(),
     // A cena do titulo: o time classico no booth original.
-    state: createHackathon(20260821, CLASSIC_TEAM, { classic: true }),
+    state: createHackathon(20260821, CLASSIC_TEAM, { classic: true, locale: getLocale() }),
     input,
     hud: createHud(hudHost, {
       onCut: (taskId) => input.queue.push({ cut: taskId }),

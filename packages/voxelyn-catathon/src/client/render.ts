@@ -1,5 +1,6 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK } from '../sim/index.js';
+import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Spec, Task, Track } from '../sim/types.js';
 
 /**
@@ -166,6 +167,8 @@ const GLYPHS: Record<string, number[]> = {
   R: [0b111, 0b101, 0b110, 0b101, 0b101],
   S: [0b111, 0b100, 0b111, 0b001, 0b111],
   T: [0b111, 0b010, 0b010, 0b010, 0b010],
+  W: [0b101, 0b101, 0b101, 0b111, 0b101],
+  Y: [0b101, 0b101, 0b010, 0b010, 0b010],
   U: [0b101, 0b101, 0b101, 0b101, 0b111],
   V: [0b101, 0b101, 0b101, 0b101, 0b010],
   '0': [0b111, 0b101, 0b101, 0b101, 0b111],
@@ -269,7 +272,7 @@ const drawFloor = (v: View, tick: number): void => {
  * Alterna CATATHON com features, build e prazo; a regua inferior mostra as
  * quatro trilhas, bugs e entregas. Na ultima hora, so pede uma coisa.
  */
-const drawPanel = (v: View, state: HackState, tick: number): void => {
+const drawPanel = (v: View, state: HackState, tick: number, locale: Locale): void => {
   const x0 = 78;
   const w = 324;
   const y0 = 30;
@@ -301,11 +304,16 @@ const drawPanel = (v: View, state: HackState, tick: number): void => {
       word = `FEATURES ${shipped}/12`;
       scale = 2;
     } else if (mode === 3) {
-      word = state.buildBroken ? 'BUILD PERDIDO' : state.cableOut ? 'BUILD FORA' : 'BUILD OK';
+      word = state.buildBroken
+        ? locale === 'pt' ? 'BUILD PERDIDO' : 'BUILD DEAD'
+        : state.cableOut
+          ? locale === 'pt' ? 'BUILD FORA' : 'BUILD DOWN'
+          : 'BUILD OK';
       scale = 2;
     } else if (mode === 5) {
       const hh = Math.floor(hoursLeft);
-      word = `FALTA ${hh}H${String(Math.floor((hoursLeft % 1) * 60)).padStart(2, '0')}`;
+      const mm = String(Math.floor((hoursLeft % 1) * 60)).padStart(2, '0');
+      word = locale === 'pt' ? `FALTA ${hh}H${mm}` : `${hh}H${mm} LEFT`;
       scale = 2;
     } else {
       word = 'CATATHON';
@@ -315,7 +323,7 @@ const drawPanel = (v: View, state: HackState, tick: number): void => {
   const ty = y0 + (scale === 3 ? 8 : 10);
   const tcol = lastHour
     ? (tick >> 4) % 2 === 0 ? adjustBrightness(CORAL, -60) : CREAM
-    : word === 'BUILD FORA' || word === 'BUILD PERDIDO' ? adjustBrightness(CREAM, 10)
+    : word.startsWith('BUILD') && word !== 'BUILD OK' ? adjustBrightness(CREAM, 10)
     : CREAM;
   text(v, Math.round(x0 + (w - tw) / 2), ty, word, scale, tcol);
 
@@ -791,9 +799,9 @@ export const drawHand = (v: View, x: number, y: number, holding: boolean): void 
   if (!holding) rect(v, x - 2, y - 1, 5, 3, c(226, 160, 170));
 };
 
-export const drawScene = (v: View, state: HackState, tick: number, selected: string | null): void => {
+export const drawScene = (v: View, state: HackState, tick: number, selected: string | null, locale: Locale = 'en'): void => {
   drawFloor(v, tick);
-  drawPanel(v, state, tick);
+  drawPanel(v, state, tick, locale);
   drawSlots(v, state, tick);
   const order = [...state.cats].sort((a, b) => a.y - b.y);
   for (const cat of order) if (cat.mode !== 'held') drawCat(v, cat, tick, selected === cat.id);

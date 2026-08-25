@@ -1,17 +1,8 @@
-import {
-  BOLINHA,
-  HACK_TICKS,
-  HOURS_PER_TICK,
-  JUDGES,
-  PEIXINHO,
-  SPEC_LABEL,
-  TIER_LABEL,
-  TRAIT_LABEL,
-  TREATS_START,
-  fmtCost,
-  type Candidate,
-  type TraitId,
-} from '../sim/index.js';
+import { HACK_TICKS, HOURS_PER_TICK, JUDGES, TREATS_START, fmtCost, type Candidate } from '../sim/index.js';
+import { getLocale, setLocale, specLabel, t, tierLabel, traitLabel } from './i18n.js';
+
+/** Alias do dicionario para escopos onde `t` e uma Task. */
+const i18n = t;
 import type { Cat } from '../sim/types.js';
 import type { CatId, HackState, SimEvent, Task } from '../sim/types.js';
 
@@ -179,14 +170,14 @@ export const createHud = (
   // As ACOES moram numa barra contextual embaixo, com base escura coerente
   // com o HUD — nao botoes soltos flutuando sobre o cenario. Petisco separa
   // ACAO (a palavra) de INVENTARIO (a badge com o numero).
-  const treatsBtn = softButton(ICONS.fish, 'petisco', 'treat');
+  const treatsBtn = softButton(ICONS.fish, t().btnTreat, 'treat');
   const treatsBadge = el('span', 'btn-badge', `×${TREATS_START}`);
   treatsBtn.appendChild(treatsBadge);
   treatsBtn.addEventListener('click', handlers.onFeedToggle);
   // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo,
   // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
-  const boardBtn = softButton(ICONS.board, 'projeto');
+  const boardBtn = softButton(ICONS.board, t().btnProject);
   top.append(clock, remain, build, proj, bugsChip, alarm);
   const cluster = el('div', 'action-bar');
 
@@ -206,7 +197,7 @@ export const createHud = (
   const feedStrip = document.createElement('button');
   feedStrip.type = 'button';
   feedStrip.className = 'feed-strip';
-  const feedLatest = el('span', 'feed-latest', 'bem-vindos ao CATATHON');
+  const feedLatest = el('span', 'feed-latest', t().welcome);
   const feedBadge = el('span', 'feed-badge', '0');
   feedStrip.append(feedLatest, feedBadge);
   const feedPanel = el('div', 'feed-panel');
@@ -227,7 +218,7 @@ export const createHud = (
   const detailsBtn = document.createElement('button');
   detailsBtn.type = 'button';
   detailsBtn.className = 'dock-details-btn';
-  detailsBtn.textContent = 'detalhes';
+  detailsBtn.textContent = t().btnDetails;
   dockHead.append(dockName, detailsBtn);
   const dockNow = el('div', 'dock-now', '');
   const meterOf = (label: string, cls: string): Meter => {
@@ -240,14 +231,14 @@ export const createHud = (
     return { row: rowEl, fill };
   };
   const dockMeters = {
-    energia: meterOf('energia', 'bar-energy'),
-    estresse: meterOf('estresse', 'bar-stress'),
-    moral: meterOf('moral', 'bar-moral'),
+    energia: meterOf(t().meters.energy, 'bar-energy'),
+    estresse: meterOf(t().meters.stress, 'bar-stress'),
+    moral: meterOf(t().meters.morale, 'bar-moral'),
   };
   const dockDetails = el('div', 'dock-details');
   dockDetails.hidden = true;
   const dockBio = el('div', 'dock-bio', '');
-  const dockHunger = meterOf('fome', 'bar-hunger');
+  const dockHunger = meterOf(t().meters.hunger, 'bar-hunger');
   dockDetails.append(dockBio, dockHunger.row);
   detailsBtn.addEventListener('click', () => {
     dockDetails.hidden = !dockDetails.hidden;
@@ -261,12 +252,12 @@ export const createHud = (
 
   const pitchPanel = el('div', 'pitch-panel');
   pitchPanel.hidden = true;
-  pitchPanel.appendChild(el('div', 'pitch-title', 'O PITCH — segura a plateia!'));
+  pitchPanel.appendChild(el('div', 'pitch-title', t().pitchTitle));
   const gaugeBar = el('div', 'pitch-gauge-bar');
   const pitchGauge = el('span', 'pitch-gauge-fill');
   gaugeBar.appendChild(pitchGauge);
   const pitchTimer = el('div', 'pitch-timer', '');
-  const pitchCrisis = el('div', 'pitch-crisis', 'A DEMO TRAVOU! qualquer gato improvisa!');
+  const pitchCrisis = el('div', 'pitch-crisis', t().pitchCrisis);
   pitchCrisis.hidden = true;
   const abilityRow = el('div', 'pitch-abilities');
   const pitchBtns = new Map<CatId, HTMLButtonElement>();
@@ -277,16 +268,10 @@ export const createHud = (
   // cansa — e um controle por barramento e acessibilidade, nao luxo. O botao
   // mora no CANTO de configuracoes (topo direito), fora das acoes de jogo:
   // "som" nao e um verbo da partida.
-  const soundBtn = softButton(ICONS.sound, 'som', 'dim som-corner');
+  const soundBtn = softButton(ICONS.sound, t().btnSound, 'dim som-corner');
   const soundPanel = el('div', 'hud-sound');
   soundPanel.hidden = true;
-  const BUS_LABEL: Record<string, string> = {
-    music: 'musica',
-    sfx: 'efeitos',
-    typing: 'teclados',
-    ambience: 'ambiente',
-    vocals: 'gatos',
-  };
+  const BUS_LABEL: Record<string, string> = t().buses;
   for (const bus of Object.keys(BUS_LABEL)) {
     const rowEl = el('label', 'sound-row');
     rowEl.appendChild(el('span', 'sound-label', BUS_LABEL[bus]));
@@ -311,7 +296,7 @@ export const createHud = (
   // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
   // nunca bloqueio — e mora no HOST, fora do root que se esconde no titulo:
   // e justamente na tela de titulo que girar mais ajuda.
-  const hint = el('div', 'rotate-hint', 'gire o aparelho para ver o pavilhao inteiro');
+  const hint = el('div', 'rotate-hint', t().rotateHint);
   hint.setAttribute('role', 'status');
   host.appendChild(hint);
 
@@ -352,14 +337,6 @@ export const createHud = (
 
 const CSS_HEX = (v: number): string => `#${v.toString(16).padStart(6, '0')}`;
 
-/** O estilo de palco de cada personalidade — a palavra do botao. */
-const ABILITY_WORD: Record<string, string> = {
-  perfeccionista: 'encarada',
-  cowboy: 'cacar cursor',
-  calmo: 'ronronar',
-  'julga-em-silencio': 'paozinho',
-};
-
 /**
  * Constroi retratos e habilidades para O TIME DESTA RUN. Chamado a cada
  * recrutamento; o quadro de tarefas tambem renasce (o projeto mudou).
@@ -388,7 +365,7 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
     pb.className = 'soft-btn pitch-ability';
     const psw = el('span', 'team-swatch');
     psw.style.background = CSS_HEX(c.coat.body);
-    pb.append(psw, el('span', 'btn-word', `${c.name.toLowerCase()}: ${ABILITY_WORD[c.personality] ?? 'gracinha'}`));
+    pb.append(psw, el('span', 'btn-word', `${c.name.toLowerCase()}: ${t().abilityWord[c.personality]}`));
     pb.addEventListener('click', () => hud.onAbility(c.id));
     hud.pitchBtns.set(c.id, pb);
     hud.abilityRow.appendChild(pb);
@@ -405,17 +382,17 @@ const TRACK_LABEL: Record<string, string> = {
 const clockText = (tick: number): string => {
   const hours = 18 + tick * HOURS_PER_TICK;
   const dayIdx = Math.min(2, Math.floor(hours / 24));
-  const day = ['SEX', 'SAB', 'DOM'][dayIdx];
+  const day = t().weekdays[dayIdx];
   const hh = Math.floor(hours % 24);
   const mm = Math.floor((hours % 1) * 60);
-  return `DIA ${dayIdx + 1} · ${day} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  return `${t().day} ${dayIdx + 1} · ${day} · ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
 const remainText = (tick: number): string => {
   const left = Math.max(0, (HACK_TICKS - tick) * HOURS_PER_TICK);
   const hh = Math.floor(left);
   const mm = Math.floor((left % 1) * 60);
-  return `${hh}h${String(mm).padStart(2, '0')} restantes`;
+  return t().left(hh, String(mm).padStart(2, '0'));
 };
 
 const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, option: string) => void): TaskRow => {
@@ -428,8 +405,8 @@ const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, 
   const cutBtn = document.createElement('button');
   cutBtn.type = 'button';
   cutBtn.className = 'task-cut';
-  cutBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.scissors}</span><span>cortar</span>`;
-  cutBtn.title = 'tirar do escopo: nao pontua, mas nao vira ponta solta';
+  cutBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.scissors}</span><span>${i18n().btnCut}</span>`;
+  cutBtn.title = i18n().cutHint;
   cutBtn.addEventListener('click', () => onCut(t.id));
   row.append(state, bar, cutBtn);
   // A DECISAO mora no proprio quadro: tres opcoes com palavra e dica, criadas
@@ -463,16 +440,16 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 
   let text = '';
   let blink = false;
-  if (t.done) text = 'shipada';
-  else if (t.cut) text = 'cortada';
+  if (t.done) text = i18n().taskShipped;
+  else if (t.cut) text = i18n().taskCut;
   else if (deciding) {
-    text = 'DECISAO aberta: a mesa espera';
+    text = i18n().taskDeciding;
     blink = true;
   } else if (t.awaitingShip) {
-    text = 'Bigode espera teu SHIPA (carinho nele)';
+    text = i18n().taskAwaitShip;
     blink = true;
   } else if (locked) {
-    text = `espera: ${depsPending.map((d) => state.tasks.find((x) => x.id === d)?.label ?? d).join(', ')}`;
+    text = i18n().taskWaits(depsPending.map((d) => state.tasks.find((x) => x.id === d)?.label ?? d).join(', '));
   }
   if (r.state.textContent !== text) r.state.textContent = text;
   r.state.className = `task-state ${blink ? 'task-blink' : ''}`;
@@ -487,55 +464,54 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 
 const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
   const name = (id: string): string => state.cats.find((c) => c.id === id)?.name ?? id;
+  const d = t();
   switch (e.kind) {
     case 'ship':
-      return `${name(e.by)} shipou "${e.task}"`;
+      return d.ev.ship(name(e.by), e.task);
     case 'await-ship':
-      return `${name(e.by)} terminou "${e.task}" e NAO deixa mergear. Faz carinho nele.`;
+      return d.ev.awaitShip(name(e.by), e.task);
     case 'shortcut':
-      return `${name(e.by)} descobriu um atalho genial sem querer: "${e.task}" adiantou`;
+      return d.ev.shortcut(name(e.by), e.task);
     case 'bug':
-      return e.cause === 'teclado'
-        ? `${name(e.by)} sentou no teclado: BUG em ${TRACK_LABEL[e.track]}`
-        : `${name(e.by)} shipou sem testar: BUG em ${TRACK_LABEL[e.track]}`;
+      return e.cause === 'teclado' ? d.ev.bugKeyboard(name(e.by), e.track) : d.ev.bugUntested(name(e.by), e.track);
     case 'bugfix':
-      return `bug de ${TRACK_LABEL[e.track]} consertado`;
+      return d.ev.bugfix(e.track);
     case 'zoomies':
-      return `${name(e.cat)} entrou em zoomies pelas mesas`;
+      return d.ev.zoomies(name(e.cat));
     case 'cable':
-      return `${name(e.by)} MORDEU O CABO: build fora do ar (leva alguem ao rack)`;
+      return d.ev.cable(name(e.by));
     case 'cable-fixed':
-      return 'cabo religado, build de volta';
+      return d.ev.cableFixed;
     case 'nap':
-      return `${name(e.cat)} apagou`;
+      return d.ev.nap(name(e.cat));
     case 'eat':
-      return `${name(e.cat)} foi comer`;
+      return d.ev.eat(name(e.cat));
     case 'hairball':
-      return 'BOLA DE PELO no repositorio: merge travado! (leva alguem ao rack)';
+      return d.ev.hairball;
     case 'hairball-fixed':
-      return 'bola de pelo resolvida, merge liberado';
+      return d.ev.hairballFixed;
     case 'build-broken':
-      return 'O BUILD QUEBROU. Nao ha mais conserto.';
+      return d.ev.buildBroken;
     case 'treat':
-      return `${name(e.cat)} ganhou petisco`;
+      return d.ev.treat(name(e.cat));
     case 'cut':
-      return `escopo cortado: "${e.task}"`;
+      return d.ev.cut(e.task);
     case 'overpet':
-      return `${name(e.cat)} ficou SUPERESTIMULADO: chega de carinho por ora`;
+      return d.ev.overpet(name(e.cat));
     case 'decision-needed':
-      return `o projeto espera uma DECISAO: "${e.task}" (abre o projeto)`;
+      return d.ev.decisionNeeded(e.task);
     case 'decision':
-      return `decidido: ${e.option}`;
+      return d.ev.decision(e.option);
     case 'pitch-start':
-      return 'AS 48H ACABARAM. Todos ao palco: e hora do pitch!';
+      return d.ev.pitchStart;
     case 'demo-glitch':
-      return 'A DEMO TRAVOU AO VIVO! qualquer gato: improvisa!';
+      return d.ev.demoGlitch;
     case 'improviso':
-      return `${name(e.cat)} transformou o bug em demo improvisada. A plateia AMOU.`;
+      return d.ev.improviso(name(e.cat));
     case 'trait-revealed':
-      return `o curriculo nao contava: ${name(e.cat)} e "${TRAIT_LABEL[e.trait as TraitId] ?? e.trait}"`;
+      return d.ev.traitRevealed(name(e.cat), traitLabel(e.trait));
     case 'sponsor-outage':
-      return 'A INTEGRACAO DO SPONSOR CAIU: build fora do ar (leva alguem ao rack)';
+      return d.ev.sponsorOutage;
     default:
       return null;
   }
@@ -553,14 +529,14 @@ export const drawHud = (hud: Hud, state: HackState): void => {
 
   // Build com cor de estado; bugs so existem no HUD quando existem no jogo,
   // e chegam ja com peso de alarme — nao como rodape de frase.
-  const buildState = state.buildBroken ? 'BUILD QUEBRADO' : state.cableOut ? 'BUILD FORA DO AR' : 'BUILD OK';
+  const buildState = state.buildBroken ? t().buildDead : state.cableOut ? t().buildDown : t().buildOk;
   setText(hud.build, buildState);
-  hud.build.classList.toggle('chip-bad', buildState !== 'BUILD OK');
-  setText(hud.proj, `features ${shipped}/12`);
+  hud.build.classList.toggle('chip-bad', state.buildBroken || state.cableOut);
+  setText(hud.proj, t().features(shipped));
   hud.bugsChip.hidden = bugs === 0;
-  if (bugs > 0) setText(hud.bugsChip, `${bugs} bug${bugs > 1 ? 's' : ''}`);
+  if (bugs > 0) setText(hud.bugsChip, t().bugs(bugs));
   hud.alarm.hidden = !state.hairball.active;
-  if (state.hairball.active) setText(hud.alarm, 'MERGE TRAVADO — leva alguem ao rack');
+  if (state.hairball.active) setText(hud.alarm, t().mergeLocked);
 
   // O numero vive na badge: acao e inventario separados no mesmo botao.
   const badge = hud.treatsBtn.querySelector('.btn-badge');
@@ -605,7 +581,7 @@ export const drawHud = (hud: Hud, state: HackState): void => {
     const p = state.pitch!;
     hud.pitchGauge.style.width = `${Math.round(p.gauge * 100)}%`;
     hud.pitchGauge.classList.toggle('gauge-hot', p.gauge > 0.7);
-    setText(hud.pitchTimer, `${Math.ceil(p.ticksLeft / 30)}s de palco`);
+    setText(hud.pitchTimer, t().pitchTimer(Math.ceil(p.ticksLeft / 30)));
     const crisisOpen = p.crisisUntil > 0 && state.tick < p.crisisUntil && !p.crisisResolved;
     hud.pitchCrisis.hidden = !crisisOpen;
     for (const [id, btn] of hud.pitchBtns) {
@@ -633,17 +609,7 @@ export const pushFeed = (hud: Hud, state: HackState, events: SimEvent[]): void =
  * estacao do gato selecionado. Agora: nome, o que ele esta fazendo AGORA e
  * tres micro-medidores; bio e fome atras de "detalhes".
  */
-const MODE_LABEL: Record<string, string> = {
-  idle: 'parado, pensando na vida',
-  walk: 'andando',
-  work: 'trabalhando',
-  nap: 'dormindo',
-  eat: 'comendo',
-  zoomies: 'ZOOMIES pelo booth',
-  keyboard: 'sentado no teclado (bug!)',
-  held: 'na tua mao',
-  petted: 'recebendo carinho',
-};
+
 
 export const drawCard = (hud: Hud, state: HackState, selected: string | null): void => {
   if (!selected) {
@@ -656,8 +622,8 @@ export const drawCard = (hud: Hud, state: HackState, selected: string | null): v
     return;
   }
   hud.dock.hidden = false;
-  setText(hud.dockName, `${cat.name} · ${SPEC_LABEL[cat.specialty]} ${TIER_LABEL(cat.tier)}`);
-  setText(hud.dockNow, `agora: ${MODE_LABEL[cat.mode] ?? cat.mode}`);
+  setText(hud.dockName, `${cat.name} · ${specLabel(cat.specialty)} ${tierLabel(cat.tier)}`);
+  setText(hud.dockNow, t().dockNow(t().modes[cat.mode] ?? cat.mode));
   hud.dockMeters.energia.fill.style.width = `${Math.round(cat.energy * 100)}%`;
   hud.dockMeters.estresse.fill.style.width = `${Math.round(cat.stress * 100)}%`;
   hud.dockMeters.moral.fill.style.width = `${Math.round(cat.moral * 100)}%`;
@@ -669,24 +635,15 @@ export const drawCard = (hud: Hud, state: HackState, selected: string | null): v
 export const showResult = (host: HTMLElement, state: HackState, onAgain: () => void): void => {
   const r = state.result!;
   const wrap = el('div', 'screen result');
-  const title: Record<string, string> = {
-    'grand-prize': 'GRAND PRIZE! 🏆',
-    podio: 'PODIO!',
-    mencao: 'mencao honrosa',
-    participacao: 'certificado de participacao',
-    crashed: 'A DEMO CRASHOU.',
-  };
-  wrap.appendChild(el('h1', 'result-title', title[r.outcome]));
+  wrap.appendChild(el('h1', 'result-title', t().resultTitle[r.outcome] ?? r.outcome));
   if (r.crashed) {
-    wrap.appendChild(
-      el('p', 'result-sub', state.buildBroken ? 'o build estava quebrado desde a bola de pelo.' : `${r.bugs} bug(s) vivos na demo. os deuses da demo cobraram.`)
-    );
+    wrap.appendChild(el('p', 'result-sub', state.buildBroken ? t().crashedBuild : t().crashedBugs(r.bugs)));
   }
   const judges = el('div', 'result-judges');
   JUDGES.forEach((j, i) => {
     const jj = el('div', 'judge');
     jj.appendChild(el('div', 'judge-name', j.name));
-    jj.appendChild(el('div', 'judge-lens', j.lens));
+    jj.appendChild(el('div', 'judge-lens', t().judgeLens[i] ?? j.lens));
     jj.appendChild(el('div', 'judge-score', String(r.perJudge[i])));
     judges.appendChild(jj);
   });
@@ -695,11 +652,11 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
   // "foi o pitch que te tirou o podio" e uma licao tao boa quanto o bug vivo.
   const dims = el('div', 'result-dims');
   for (const [label, value] of [
-    ['tecnica', r.dimensions.tecnica],
-    ['estabilidade', r.dimensions.estabilidade],
-    ['experiencia', r.dimensions.experiencia],
-    ['inovacao', r.dimensions.inovacao],
-    ['pitch', r.dimensions.pitch],
+    [t().dims.tecnica, r.dimensions.tecnica],
+    [t().dims.estabilidade, r.dimensions.estabilidade],
+    [t().dims.experiencia, r.dimensions.experiencia],
+    [t().dims.inovacao, r.dimensions.inovacao],
+    [t().dims.pitch, r.dimensions.pitch],
   ] as const) {
     const d = el('div', 'result-dim');
     d.appendChild(el('span', 'dim-label', label));
@@ -707,12 +664,12 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
     dims.appendChild(d);
   }
   wrap.appendChild(dims);
-  wrap.appendChild(el('p', 'result-plateia', `plateia: ${Math.round(r.plateia * 100)}% de pe`));
+  wrap.appendChild(el('p', 'result-plateia', t().plateia(Math.round(r.plateia * 100))));
   if (r.improvised) {
-    wrap.appendChild(el('p', 'result-improviso', 'a demo TRAVOU ao vivo — e virou improviso heroico. lenda.'));
+    wrap.appendChild(el('p', 'result-improviso', t().improviso));
   }
   wrap.appendChild(
-    el('p', 'result-stats', `${r.core} core · ${r.polish} polimentos · ${r.bugs} bugs vivos · ${r.looseEnds} pontas soltas · total ${r.score}`)
+    el('p', 'result-stats', t().stats(r.core, r.polish, r.bugs, r.looseEnds, r.score))
   );
 
   // A historia: os tres eventos mais contaveis da partida. E o que faz alguem
@@ -727,7 +684,7 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
     wrap.appendChild(story);
   }
 
-  const again = softButton(ICONS.again, 'jogar de novo', 'big');
+  const again = softButton(ICONS.again, t().btnAgain, 'big');
   again.addEventListener('click', onAgain);
   wrap.appendChild(again);
   host.appendChild(wrap);
@@ -736,16 +693,21 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
 export const showTitle = (host: HTMLElement, onStart: () => void): void => {
   const wrap = el('div', 'screen title');
   wrap.appendChild(el('h1', 'title-logo', 'CATATHON'));
-  wrap.appendChild(el('p', 'title-sub', 'o maior hackathon do mundo. a tua equipe e de gatos.'));
-  wrap.appendChild(
-    el('p', 'title-brief', 'desafio da organizacao: "plataforma de adocao com IA, acessivel, mas sustentavel". 48 horas. tres juizes. uma mao.')
-  );
-  wrap.appendChild(
-    el('p', 'title-help', 'primeiro, o RECRUTAMENTO: seis candidatos, tres moedas, um orcamento. depois: arrasta gato para mesa, segura o dedo = carinho, corta escopo no projeto, emergencia = rack.')
-  );
-  const start = softButton(ICONS.badge, 'abrir o e-mail', 'big');
+  wrap.appendChild(el('p', 'title-sub', t().titleSub));
+  wrap.appendChild(el('p', 'title-brief', t().titleBrief));
+  wrap.appendChild(el('p', 'title-help', t().titleHelp));
+  const start = softButton(ICONS.badge, t().btnOpenEmail, 'big');
   start.addEventListener('click', onStart);
   wrap.appendChild(start);
+  // O botao de IDIOMA: o outro idioma, pelo nome dele. Troca e recarrega — o
+  // HUD e construido uma vez, de proposito (a licao dos botoes detached).
+  const lang = softButton(ICONS.sound, t().langWord, 'dim');
+  lang.querySelector('.btn-icon')?.remove();
+  lang.addEventListener('click', () => {
+    setLocale(getLocale() === 'en' ? 'pt' : 'en');
+    location.reload();
+  });
+  wrap.appendChild(lang);
   host.appendChild(wrap);
 };
 
@@ -765,12 +727,12 @@ export const showRecruit = (
   onDone: (hired: Candidate[]) => void
 ): void => {
   const wrap = el('div', 'screen recruit');
-  wrap.appendChild(el('h1', 'recruit-title', 'Re: Candidatos para a CATATHON'));
+  wrap.appendChild(el('h1', 'recruit-title', i18n().recruitTitle));
   wrap.appendChild(
     el(
       'p',
       'recruit-intro',
-      `"separei seis perfis. teu orcamento da para tres ou quatro, dependendo do tier. o desafio desta edicao e ${project.name}: ${project.brief}. a banca vai pesar ${project.emphasis}. teu booth: ${layoutName}."`
+      i18n().recruitIntro(project.name, project.brief, i18n().emphasisName[project.emphasis] ?? project.emphasis, layoutName)
     )
   );
 
@@ -779,10 +741,10 @@ export const showRecruit = (
     candidates.filter((c) => hired.has(c.id)).reduce((s, c) => s + c.cost, 0);
 
   const saldo = el('div', 'recruit-saldo', '');
-  const closeBtn = softButton(ICONS.badge, 'fechar equipe', 'big');
+  const closeBtn = softButton(ICONS.badge, i18n().btnLockTeam, 'big');
   const refresh = (): void => {
     const left = budget - spent();
-    setText(saldo, `saldo: ${fmtCost(Math.max(0, left))}${left < 0 ? ' (ESTOUROU)' : ''} · equipe: ${hired.size}`);
+    setText(saldo, i18n().recruitBalance(fmtCost(Math.max(0, left), getLocale()), hired.size, left < 0));
     closeBtn.disabled = hired.size < 3 || hired.size > 4 || left < 0;
   };
 
@@ -795,15 +757,15 @@ export const showRecruit = (
     const sw = el('span', 'team-swatch');
     sw.style.background = `#${c.coat.body.toString(16).padStart(6, '0')}`;
     head.append(sw, el('span', 'cand-name', c.name));
-    head.appendChild(el('span', 'cand-tier', TIER_LABEL(c.tier)));
+    head.appendChild(el('span', 'cand-tier', tierLabel(c.tier)));
     card.appendChild(head);
-    card.appendChild(el('div', 'cand-spec', `${SPEC_LABEL[c.specialty]} · ${c.breed}`));
+    card.appendChild(el('div', 'cand-spec', `${specLabel(c.specialty)} · ${c.breed}`));
     const traits = el('div', 'cand-traits');
-    for (const t of c.traits) traits.appendChild(el('span', 'cand-trait', TRAIT_LABEL[t]));
+    for (const tr of c.traits) traits.appendChild(el('span', 'cand-trait', traitLabel(tr)));
     traits.appendChild(el('span', 'cand-trait cand-hidden', '???'));
     card.appendChild(traits);
     card.appendChild(el('div', 'cand-cv', `"${c.cv}" — ${c.note}`));
-    card.appendChild(el('div', 'cand-cost', fmtCost(c.cost)));
+    card.appendChild(el('div', 'cand-cost', fmtCost(c.cost, getLocale())));
     card.addEventListener('click', () => {
       if (hired.has(c.id)) hired.delete(c.id);
       else hired.add(c.id);
