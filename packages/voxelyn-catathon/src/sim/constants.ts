@@ -203,6 +203,19 @@ export const CUT_GRAND = 118;
 export const CUT_PODIUM = 74;
 export const CUT_MENTION = 36;
 
+// ---------------------------------------------------------------------- pm
+
+/**
+ * O PM circula num ritmo proprio: escolhe DETERMINISTICAMENTE o dev de
+ * menor moral numa mesa, anda ate ele e entrega o pep talk na chegada.
+ * O resmungo de prazo tem teto de frequencia — preocupado, nao spam.
+ */
+export const PM_PEP_PERIOD = 40 * TICK_HZ;
+export const PM_PEP_MORAL = 0.05;
+export const PM_PEP_STRESS = 0.03;
+export const PM_WALK_SPEED = 1.6;
+export const PM_WORRY_PERIOD = 70 * TICK_HZ;
+
 // -------------------------------------------------------------------- hash
 
 export const HASH_POS = 10;

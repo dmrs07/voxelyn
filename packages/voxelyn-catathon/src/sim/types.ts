@@ -370,6 +370,8 @@ export type SimEvent =
   /** star: no poach A, QUEM o recrutador rival abordou — a carreira lembra. */
   | { kind: 'social-taken'; tick: number; social: SocialKind; option: 'a' | 'b'; star?: CatId }
   | { kind: 'decision-needed'; tick: number; task: string }
+  | { kind: 'pep'; tick: number; cat: CatId }
+  | { kind: 'pm-worry'; tick: number; behind: number }
   | { kind: 'decision'; tick: number; task: string; option: string }
   | { kind: 'pitch-start'; tick: number }
   | { kind: 'ability'; tick: number; cat: CatId; effect: number }
@@ -398,6 +400,23 @@ export type HackState = {
   held: CatId | null;
   /** Uma briga ativa termina quando o jogador pega qualquer participante. */
   fight: { a: CatId; b: CatId } | null;
+  /**
+   * O PM: o quinto gato, SEMPRE presente e nunca contratavel (nao vive em
+   * cats — a mao nao o pega, o hire nao o lista). Circula dando pep talk em
+   * quem trabalha e sofre com o prazo na frente do gantt, como um PM real.
+   */
+  pm: {
+    x: number;
+    y: number;
+    targetX: number;
+    targetY: number;
+    /** O proximo instante de escolher alguem para animar. */
+    nextPepAt: number;
+    /** O gato a caminho de receber o pep talk (o boost cai na CHEGADA). */
+    pepCat: CatId | null;
+    /** O ultimo resmungo de prazo: no maximo um por periodo. */
+    lastWorryAt: number;
+  };
   handX: number;
   handY: number;
   /** Tags acumuladas pelas DECISOES de tarefa. Cada uma pesa na banca. */

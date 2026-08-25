@@ -63,6 +63,11 @@ import {
   MORAL_SPEED_MIN,
   MORAL_TREAT,
   OVERPET_STRESS_RATE,
+  PM_PEP_MORAL,
+  PM_PEP_PERIOD,
+  PM_PEP_STRESS,
+  PM_WALK_SPEED,
+  PM_WORRY_PERIOD,
   PET_DECAY_SCALE,
   PET_MEMORY_TICKS,
   PET_PROFILE,
@@ -362,6 +367,8 @@ export const createHackathon = (
   buildProgress: 0,
   held: null,
   fight: null,
+  // O PM nasce diante do quadro de planejamento — o posto natural dele.
+  pm: { x: 262, y: 168, targetX: 262, targetY: 168, nextPepAt: PM_PEP_PERIOD, pepCat: null, lastWorryAt: 0 },
   handX: 240,
   handY: 135,
   debt: 0,
@@ -805,6 +812,24 @@ const speedOf = (state: HackState, cat: Cat, track: Track): number => {
   return s;
 };
 
+/**
+ * A DECISAO aberta que trava a trilha DESTE gato — nula quando bug ou
+ * feature pronta passam na frente (a mesma ordem de prioridade do workAt).
+ * Compartilhada entre o workAt (montar a cena) e o passo de caminhada
+ * (desmontar a cena NA HORA em que alguem decide, sem terminar a viagem
+ * ate um quadro obsoleto).
+ */
+const openDecisionFor = (state: HackState, cat: Cat): Task | null => {
+  if (!cat.slot?.startsWith('desk-')) return null;
+  const track = slotIn(state, cat.slot).track;
+  if (!track) return null;
+  if (liveBug(state, track)) return null;
+  const awaiting = state.tasks.find((t) => t.track === track && t.awaitingShip && !t.cut);
+  if (awaiting && cat.personality !== 'perfeccionista') return null;
+  const pending = nextTask(state, track);
+  return pending?.choice && pending.chosen === null ? pending : null;
+};
+
 const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   if (cat.slot === 'rack') {
     // O rack atende emergencias na ordem de prazo: bola de pelo, build perdido,
@@ -840,12 +865,12 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   const awaitingTask = state.tasks.find((t) => t.track === track && t.awaitingShip && !t.cut);
   const canShipAwaiting = !!awaitingTask && cat.personality !== 'perfeccionista';
   const pending = nextTask(state, track);
-  const deciding = !bug && !canShipAwaiting && !!pending?.choice && pending.chosen === null;
+  const decisionTask = openDecisionFor(state, cat);
 
   // Tarefa com DECISAO aberta nao anda — e isso vira CENA: os devs da trilha
   // largam o teclado e se juntam na frente do quadro de planejamento, cada
   // um numa vaga propria (a licao dos venues), ate alguem decidir por eles.
-  if (deciding) {
+  if (decisionTask) {
     const spot = DECIDE_SPOTS[state.cats.indexOf(cat) % DECIDE_SPOTS.length]!;
     const gx = DECIDE_X + spot[0];
     const gy = DECIDE_Y + spot[1];
@@ -854,7 +879,7 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
       cat.targetY = gy;
       cat.mode = 'walk';
     }
-    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: pending.label });
+    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: decisionTask.label });
     return;
   }
   // Fora da cena de decisao, o posto de trabalho e a MESA: quem estava no
@@ -998,6 +1023,13 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   }
 
   if (cat.mode === 'walk') {
+    // Decisao resolvida NO MEIO do caminho ao quadro: o dev vira para a
+    // mesa na hora, em vez de completar a viagem ate um destino obsoleto
+    // (achado de revisao — a reacao rapida do jogador merece resposta).
+    if (cat.slot?.startsWith('desk-') && !openDecisionFor(state, cat)) {
+      const seat = slotIn(state, cat.slot);
+      if (Math.hypot(cat.targetX - seat.x, cat.targetY - seat.y) > 2) sendTo(state, cat, cat.slot);
+    }
     const dx = cat.targetX - cat.x;
     const dy = cat.targetY - cat.y;
     const len = Math.hypot(dx, dy);
@@ -1389,6 +1421,69 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
   events.push({ kind: 'demo', tick: state.tick, result });
 };
 
+/**
+ * O PM em acao: anda ate o dev de menor moral numa mesa e entrega o pep
+ * talk NA CHEGADA (+moral, -estresse); sem alvo, volta ao posto diante do
+ * quadro. Atras da curva de entregas, resmunga o prazo no feed — com teto
+ * de frequencia. Tudo deterministico: nenhum draw01, nenhum relogio.
+ */
+const stepPm = (state: HackState, events: SimEvent[]): void => {
+  const pm = state.pm;
+  // A visita ACOMPANHA o gato: se o jogador o moveu de mesa no meio do
+  // caminho, o PM vira junto; se ele saiu do teclado, a visita e desfeita
+  // e o PM volta ao posto. Pep talk se entrega PESSOALMENTE — nunca a uma
+  // mesa vazia (achado de revisao).
+  if (pm.pepCat) {
+    const cat = catOf(state, pm.pepCat);
+    if (cat && cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
+      pm.targetX = cat.x - 16;
+      pm.targetY = cat.y + 8;
+    } else {
+      pm.pepCat = null;
+      pm.targetX = 262;
+      pm.targetY = 168;
+    }
+  }
+  const dx = pm.targetX - pm.x;
+  const dy = pm.targetY - pm.y;
+  const len = Math.hypot(dx, dy);
+  if (len > 2) {
+    pm.x += (dx / len) * PM_WALK_SPEED;
+    pm.y += (dy / len) * PM_WALK_SPEED;
+  } else if (pm.pepCat) {
+    const cat = catOf(state, pm.pepCat)!;
+    pm.pepCat = null;
+    if (Math.hypot(cat.x - pm.x, cat.y - pm.y) <= 26) {
+      cat.moral = Math.min(1, cat.moral + PM_PEP_MORAL);
+      cat.stress = Math.max(0, cat.stress - PM_PEP_STRESS);
+      events.push({ kind: 'pep', tick: state.tick, cat: cat.id });
+    }
+  }
+  if (state.tick >= pm.nextPepAt) {
+    pm.nextPepAt = state.tick + PM_PEP_PERIOD;
+    let target: Cat | null = null;
+    for (const c of state.cats) {
+      if (c.slot?.startsWith('desk-') && c.mode === 'work' && (!target || c.moral < target.moral)) target = c;
+    }
+    if (target) {
+      pm.pepCat = target.id;
+      pm.targetX = target.x - 16;
+      pm.targetY = target.y + 8;
+    } else {
+      pm.targetX = 262;
+      pm.targetY = 168;
+    }
+  }
+  // A CURVA: entregas esperadas pela fracao do tempo vs entregues de fato.
+  const alive = state.tasks.filter((t) => !t.cut);
+  const done = alive.filter((t) => t.done).length;
+  const expected = Math.floor((state.tick / HACK_TICKS) * alive.length);
+  if (expected > done && state.tick >= pm.lastWorryAt + PM_WORRY_PERIOD) {
+    pm.lastWorryAt = state.tick;
+    events.push({ kind: 'pm-worry', tick: state.tick, behind: expected - done });
+  }
+};
+
 export const step = (state: HackState, cmd: Command): SimEvent[] => {
   if (state.phase === 'done') return [];
   const events: SimEvent[] = [];
@@ -1402,6 +1497,7 @@ export const step = (state: HackState, cmd: Command): SimEvent[] => {
   applyCommand(state, cmd, events);
   stepHairball(state, events);
   for (const cat of state.cats) stepCat(state, cat, cmd, events);
+  stepPm(state, events);
 
   // Eventos SOCIAIS: abrem a janela no instante agendado; ignorados, fecham
   // sozinhos na opcao segura.
