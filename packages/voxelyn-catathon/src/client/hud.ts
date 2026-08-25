@@ -372,13 +372,6 @@ export const createHud = (
   root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal);
   host.appendChild(root);
 
-  // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
-  // nunca bloqueio — e mora no HOST, fora do root que se esconde no titulo:
-  // e justamente na tela de titulo que girar mais ajuda.
-  const hint = el('div', 'rotate-hint', t().rotateHint);
-  hint.setAttribute('role', 'status');
-  host.appendChild(hint);
-
   const hudRef: Hud = {
     root,
     clock,

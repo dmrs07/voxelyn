@@ -58,7 +58,6 @@ type Dict = {
   titleHelp: string;
   langWord: string;
   welcome: string;
-  rotateHint: string;
   buses: Record<string, string>;
   dockNow: (mode: string) => string;
   meters: { energy: string; stress: string; morale: string; hunger: string };
@@ -172,7 +171,6 @@ const EN: Dict = {
     'first, RECRUITMENT: six candidates, three currencies, one budget. then: drag a cat to a desk, hold your finger = petting, cut scope in the project, emergency = rack.',
   langWord: 'PT-BR',
   welcome: 'welcome to CATATHON',
-  rotateHint: 'rotate your device to see the whole pavilion',
   buses: { music: 'music', sfx: 'effects', typing: 'keyboards', ambience: 'ambience', vocals: 'cats' },
   dockNow: (mode) => `now: ${mode}`,
   meters: { energy: 'energy', stress: 'stress', morale: 'morale', hunger: 'hunger' },
@@ -316,7 +314,6 @@ const PT: Dict = {
     'primeiro, o RECRUTAMENTO: seis candidatos, tres moedas, um orcamento. depois: arrasta gato para mesa, segura o dedo = carinho, corta escopo no projeto, emergencia = rack.',
   langWord: 'EN',
   welcome: 'bem-vindos ao CATATHON',
-  rotateHint: 'gire o aparelho para ver o pavilhao inteiro',
   buses: { music: 'musica', sfx: 'efeitos', typing: 'teclados', ambience: 'ambiente', vocals: 'gatos' },
   dockNow: (mode) => `agora: ${mode}`,
   meters: { energy: 'energia', stress: 'estresse', morale: 'moral', hunger: 'fome' },
