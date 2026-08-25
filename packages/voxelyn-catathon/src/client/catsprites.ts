@@ -34,14 +34,50 @@ const CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 // ---------------------------------------------------------------------------
 const frameCache = new Map<string, SpriteFrame[]>();
 
-const decode = (breed: number, key: CatAnimKey, coat: number): SpriteFrame[] => {
-  const id = `${breed}:${key}:${coat}`;
+/**
+ * CRACHA por trilha: o colar do proprio sprite vira a cor da especialidade.
+ * Tres mecanismos por pelagem (docs/sprites/bundle-audit.md):
+ * - own: a pelagem tem colar -> remap de paleta (cor principal -> spec,
+ *   secundaria -> spec escurecida); o guizo dourado fica.
+ * - donor: sem colar, mas uma irma de raca tem (mascaras ~identicas) ->
+ *   pinta o spec nas POSICOES do colar da doadora, frame a frame.
+ * - eye: raca sem colar nenhum (longhair) -> faixa ancorada no olho
+ *   (cores exclusivas por pelagem), so em frames com olho visivel.
+ */
+type CollarSpec = { own?: string[]; donor?: number; eye?: string[] };
+const COLLARS: CollarSpec[][] = [
+  // bobtail: black and white, brown tabby, mekong, orange spotted
+  [{ own: ['e6482e', 'a93b3b'] }, { own: ['394778'] }, { donor: 0 }, { donor: 0 }],
+  // longhair: blue, orange siamese, orange tabby, white
+  [{ eye: ['fcdf9b'] }, { eye: ['dff6f5'] }, { eye: ['f47e1b'] }, { eye: ['71aa34'] }],
+  // shorthair: abyssinian, grey_tabby (PM), siamese, tuxedo
+  [{ own: ['f26d8c'] }, { own: ['165a4c'] }, { own: ['564064'] }, { own: ['39314b'] }],
+];
+const BELL_HEX = 'f4b41b';
+
+const packHex = (hexColor: string): number => {
+  const value = parseInt(hexColor, 16);
+  return packRGBA((value >> 16) & 255, (value >> 8) & 255, value & 255);
+};
+const packRgb = (rgb: number): number =>
+  packRGBA((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
+const darkRgb = (rgb: number): number =>
+  packRGBA((((rgb >> 16) & 255) * 0.62) | 0, (((rgb >> 8) & 255) * 0.62) | 0, ((rgb & 255) * 0.62) | 0);
+
+/** collar = 0xRRGGBB da trilha; ausente = cores originais do pack. */
+const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): SpriteFrame[] => {
+  const id = `${breed}:${key}:${coat}:${collar ?? -1}`;
   const hit = frameCache.get(id);
   if (hit) return hit;
   const spec = CAT_SPRITES[breed]!;
+  const collarSpec = collar === undefined ? null : COLLARS[breed]![coat]!;
   const palette = spec.palettes[coat]!.map((hexColor) => {
-    const value = parseInt(hexColor, 16);
-    return packRGBA((value >> 16) & 255, (value >> 8) & 255, value & 255);
+    if (collarSpec?.own && collar !== undefined) {
+      const at = collarSpec.own.indexOf(hexColor);
+      if (at === 0) return packRgb(collar);
+      if (at > 0) return darkRgb(collar);
+    }
+    return packHex(hexColor);
   });
   const frames = spec.anims[key].coats[coat]!.map((frame) => {
     const data = new Uint32Array(frame.w * frame.h);
@@ -53,6 +89,48 @@ const decode = (breed: number, key: CatAnimKey, coat: number): SpriteFrame[] => 
     });
     return { w: frame.w, h: frame.h, data };
   });
+  if (collarSpec && collar !== undefined && collarSpec.donor !== undefined) {
+    // pinta o colar nas posicoes da pelagem doadora (mesma raca)
+    const donorCoat = collarSpec.donor;
+    const donorColors = COLLARS[breed]![donorCoat]!.own!;
+    const main = packHex(donorColors[0]!);
+    const dark = donorColors[1] !== undefined ? packHex(donorColors[1]) : 0;
+    const bell = packHex(BELL_HEX);
+    const donorFrames = decode(breed, key, donorCoat);
+    frames.forEach((frame, fi) => {
+      const donor = donorFrames[fi];
+      if (!donor || donor.w !== frame.w || donor.h !== frame.h) return;
+      for (let i = 0; i < frame.data.length; i++) {
+        if (frame.data[i] === 0) continue;
+        const d = donor.data[i]!;
+        if (d === main) frame.data[i] = packRgb(collar);
+        else if (dark !== 0 && d === dark) frame.data[i] = darkRgb(collar);
+        else if (d === bell) frame.data[i] = bell;
+      }
+    });
+  }
+  if (collarSpec?.eye && collar !== undefined) {
+    // faixa de colar ancorada no olho (longhair nao tem colar no pack)
+    const eyes = collarSpec.eye.map(packHex);
+    const bell = packHex(BELL_HEX);
+    for (const frame of frames) {
+      let ex = 0, ey = 0, en = 0;
+      for (let y = 0; y < frame.h; y++) {
+        for (let x = 0; x < frame.w; x++) {
+          if (eyes.includes(frame.data[y * frame.w + x]!)) { ex += x; ey += y; en++; }
+        }
+      }
+      if (en === 0) continue; // olho fechado/oculto: cracha coberto pelo pelo
+      ex = Math.round(ex / en); ey = Math.round(ey / en);
+      const put = (x: number, y: number, color: number) => {
+        const i = y * frame.w + x;
+        if (x >= 0 && y >= 0 && x < frame.w && y < frame.h && frame.data[i] !== 0) frame.data[i] = color;
+      };
+      for (let dx = -4; dx <= -1; dx++) put(ex + dx, ey + 4, packRgb(collar));
+      for (let dx = -4; dx <= -2; dx++) put(ex + dx, ey + 5, darkRgb(collar));
+      put(ex - 1, ey + 5, bell);
+    }
+  }
   frameCache.set(id, frames);
   return frames;
 };
@@ -80,19 +158,19 @@ const timeline = (breed: number, key: CatAnimKey): Uint16Array => {
  * Frame corrente. Fallback de aproximacao: pelagem sem a animacao (unico
  * caso real: bobtail/mekong sem Hissing) cai para `attack`.
  */
-export const packFrame = (look: CatLook, key: CatAnimKey, tick: number): SpriteFrame => {
-  let frames = decode(look.breed, key, look.coat);
+export const packFrame = (look: CatLook, key: CatAnimKey, tick: number, collar?: number): SpriteFrame => {
+  let frames = decode(look.breed, key, look.coat, collar);
   if (frames.length === 0) {
     key = 'attack';
-    frames = decode(look.breed, key, look.coat);
+    frames = decode(look.breed, key, look.coat, collar);
   }
   const line = timeline(look.breed, key);
   return frames[line[tick % line.length]! % frames.length]!;
 };
 
 /** Pose de carregado: o frame FRONTAL do Turning (gato encarando a mao). */
-export const heldFrame = (look: CatLook): SpriteFrame => {
-  const frames = decode(look.breed, 'turn', look.coat);
+export const heldFrame = (look: CatLook, collar?: number): SpriteFrame => {
+  const frames = decode(look.breed, 'turn', look.coat, collar);
   return frames[frames.length >> 1]!;
 };
 
@@ -213,21 +291,20 @@ const pmDecorate = (key: CatAnimKey): SpriteFrame[] => {
     if (en > 0) { ex = Math.round(ex / en); ey = Math.round(ey / en); prev = { ex, ey }; }
     else if (prev) { ex = prev.ex; ey = prev.ey; } // piscada: o oculos fica
     else { ex = -99; ey = -99; }
-    // lente redonda na frente do olho + haste (vista lateral)
-    for (const [dx, dy] of [[-2, -1], [-2, 0], [-2, 1], [2, -1], [2, 0], [2, 1], [-1, -2], [0, -2], [1, -2], [-1, 2], [0, 2], [1, 2]] as const) {
+    // lente 3x3 COLADA no olho (aro de 1px, olho visivel) + haste curta
+    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]] as const) {
       put(ex + dx, ey + dy, INK);
     }
     put(ex - 1, ey - 1, GLINT);
-    put(ex - 3, ey - 1, INK);
-    put(ex - 4, ey - 2, INK);
+    put(ex - 2, ey - 1, INK); // haste
     if (cx >= 0) {
-      // colarinho + no e gravata pendendo do proprio colar do pack
+      // colarinho + gravata pendendo RETA para baixo do colar
       put(cx - 1, cy, SHIRT); put(cx - 3, cy, SHIRT);
-      put(cx - 2, cy + 1, TIE_D); put(cx - 1, cy + 1, TIE_D);
+      put(cx - 2, cy + 1, TIE_D); put(cx - 1, cy + 1, TIE_D); // no
       put(cx - 2, cy + 2, TIE); put(cx - 1, cy + 2, TIE);
-      put(cx - 3, cy + 3, TIE); put(cx - 2, cy + 3, TIE);
-      put(cx - 3, cy + 4, TIE); put(cx - 2, cy + 4, TIE_D);
-      put(cx - 3, cy + 5, TIE_D);
+      put(cx - 2, cy + 3, TIE); put(cx - 1, cy + 3, TIE);
+      put(cx - 2, cy + 4, TIE_D); put(cx - 1, cy + 4, TIE);
+      put(cx - 2, cy + 5, TIE_D);
     }
     return { w: src.w, h: src.h, data };
   });

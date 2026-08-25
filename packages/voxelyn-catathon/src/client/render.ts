@@ -55,6 +55,15 @@ const CORAL_ERR = c(235, 103, 103); // #EB6767
 const SCREEN_OFF = c(40, 48, 58);
 const MAGENTA = c(216, 104, 176);
 
+/** Cracha da especialidade: o COLAR do sprite ganha a cor da trilha. */
+const SPEC_RGB: Record<Cat['specialty'], number> = {
+  frontend: 0x54c6d4,
+  backend: 0x8c72f2,
+  devops: 0xf0b552,
+  design: 0xd868b0,
+  freestyler: 0xf4e4c8,
+};
+
 const TRACK_COLOR: Record<Track, number> = {
   frontend: CYAN_ACT,
   backend: VIOLET_SEL,
@@ -710,6 +719,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   // originais comprados; o Catathon so escolhe QUAL animacao conta a acao.
   // Direcao nativa do pack e DIREITA; esquerda = espelho.
   const look = lookFor(cat.coat.body, cat.pattern, cat.big);
+  const collar = SPEC_RGB[cat.specialty];
   const cx = Math.round(cat.x);
   const ground = Math.round(cat.y) + 2;
   const toCenter = cat.x > 240; // parado, o gato olha para dentro do pavilhao
@@ -727,35 +737,35 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
 
   if (cat.mode === 'held') {
     // Na mao: o frame FRONTAL do Turning — o gato encara quem o segura.
-    blitFrame(v, heldFrame(look), cx, Math.round(cat.y) + 10, false);
+    blitFrame(v, heldFrame(look, collar), cx, Math.round(cat.y) + 10, false);
     return;
   }
 
   if (cat.mode === 'walk') {
-    blitFrame(v, packFrame(look, 'walk', tick), cx, ground, cat.targetX < cx);
+    blitFrame(v, packFrame(look, 'walk', tick, collar), cx, ground, cat.targetX < cx);
     return;
   }
   if (cat.mode === 'zoomies') {
     // Running + poeira atras.
     const mirror = cat.targetX < cat.x;
-    blitFrame(v, packFrame(look, 'run', tick), cx, ground, mirror);
+    blitFrame(v, packFrame(look, 'run', tick, collar), cx, ground, mirror);
     for (let i = 1; i <= 3; i++) px(v, cat.x - (mirror ? -i * 6 : i * 6), cat.y - 2, c(180, 170, 160));
     return;
   }
   if (cat.mode === 'work') {
     if (cat.slot === 'rack') {
       // Consertando o rack: Attack_swat = pata estendida na maquina.
-      blitFrame(v, packFrame(look, 'swat', tick), cx, ground, false);
+      blitFrame(v, packFrame(look, 'swat', tick, collar), cx, ground, false);
       return;
     }
     // Na mesa: sentado encarando a bancada (mesas vivem nas paredes leste/
     // oeste); em qualquer outro posto, sentado voltado para o centro.
     const mirror = cat.slot?.startsWith('desk-') ? cat.x < 240 : toCenter;
-    blitFrame(v, packFrame(look, 'sit', tick), cx, ground, mirror);
+    blitFrame(v, packFrame(look, 'sit', tick, collar), cx, ground, mirror);
     return;
   }
   if (cat.mode === 'nap') {
-    const fr = packFrame(look, 'sleep', tick);
+    const fr = packFrame(look, 'sleep', tick, collar);
     blitFrame(v, fr, cx, ground, toCenter);
     if ((tick >> 4) % 3 !== 2) {
       const zx = cx + (toCenter ? -10 : 10);
@@ -766,7 +776,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   }
   if (cat.mode === 'eat') {
     // Crouch de cabeca baixa sobre a tigela.
-    blitFrame(v, packFrame(look, 'crouch', tick), cx, ground, toCenter);
+    blitFrame(v, packFrame(look, 'crouch', tick, collar), cx, ground, toCenter);
     rect(v, cx + (toCenter ? -13 : 8), ground - 1, 5, 2, c(220, 190, 140));
     return;
   }
@@ -774,7 +784,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
     // A dupla briga com as PROPRIAS animacoes de briga do pack: um ataca,
     // o outro bufa (id decide, deterministico), pelos voando por cima.
     const anim = cat.id.charCodeAt(cat.id.length - 1) % 2 === 0 ? 'attack' : 'hiss';
-    blitFrame(v, packFrame(look, anim, tick), cx, ground, cat.targetX < cat.x);
+    blitFrame(v, packFrame(look, anim, tick, collar), cx, ground, cat.targetX < cat.x);
     for (let i = 0; i < 4; i++) {
       const sx = cx - 12 + ((tick * 3 + i * 11) % 25);
       const sy = ground - 24 + ((tick + i * 7) % 18);
@@ -785,7 +795,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   }
   if (cat.mode === 'keyboard') {
     // Sentado NO teclado, ";;;;;" subindo: o bug nascendo, visivel.
-    const fr = packFrame(look, 'sit', tick);
+    const fr = packFrame(look, 'sit', tick, collar);
     blitFrame(v, fr, cx, ground, toCenter);
     const t = (tick >> 2) % 4;
     for (let i = 0; i < 3; i++) px(v, cx - 5 + i * 5, ground - fr.h - 2 - t - i, CORAL_ERR);
@@ -793,7 +803,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   }
   if (cat.mode === 'petted') {
     // Sitting_head_turn: o gato vira a cabeca para a mao que faz carinho.
-    const fr = packFrame(look, 'sitturn', tick);
+    const fr = packFrame(look, 'sitturn', tick, collar);
     blitFrame(v, fr, cx, ground, toCenter);
     if ((tick >> 3) % 2 === 0) {
       const hx2 = cx + (toCenter ? -11 : 10);
@@ -806,7 +816,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
     return;
   }
   // idle (e qualquer modo futuro): parado observando o pavilhao.
-  blitFrame(v, packFrame(look, 'idle', tick), cx, ground, toCenter);
+  blitFrame(v, packFrame(look, 'idle', tick, collar), cx, ground, toCenter);
 };
 
 const drawPm = (v: View, state: HackState, tick: number): void => {
