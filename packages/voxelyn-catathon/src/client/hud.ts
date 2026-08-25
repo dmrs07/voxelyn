@@ -606,6 +606,10 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.harmony(name(e.a), name(e.b));
     case 'friction':
       return d.ev.friction(name(e.a), name(e.b));
+    case 'fight':
+      return d.ev.fight(name(e.a), name(e.b));
+    case 'fight-separated':
+      return d.ev.fightSeparated(name(e.a), name(e.b));
     case 'mentor':
       return d.ev.mentor(name(e.mentor), name(e.junior));
     case 'grown':
