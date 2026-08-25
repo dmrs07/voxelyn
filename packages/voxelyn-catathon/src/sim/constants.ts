@@ -207,6 +207,11 @@ export const CUT_MENTION = 36;
 
 export const HASH_POS = 10;
 export const HASH_METER = 1000;
+/**
+ * Progresso de conserto avanca em fracoes (fixSpeed 1.3 no Server Corner):
+ * na escala 1 o arredondamento colava estados que divergem no tick seguinte.
+ */
+export const HASH_FIX = 10;
 
 // ---------------------------------------------------------- tiers e traits
 

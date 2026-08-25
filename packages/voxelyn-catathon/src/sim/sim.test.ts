@@ -321,6 +321,17 @@ describe('recuperacao, venues e brigas', () => {
     expect(b.mode).toBe('walk');
     expect(state.events.some((e) => e.kind === 'fight-separated')).toBe(true);
   });
+
+  it('fracoes do conserto entram no hash: 1078.6 e 1079.4 NAO colidem', () => {
+    // fixSpeed 1.3 avanca em decimos: na escala 1 estes dois estados davam o
+    // mesmo hash e o tick seguinte conserta um build e deixa o outro quebrado.
+    const a = createHackathon(3, CLASSIC_TEAM, { classic: true });
+    const b = createHackathon(3, CLASSIC_TEAM, { classic: true });
+    a.buildBroken = b.buildBroken = true;
+    a.buildProgress = 1078.6;
+    b.buildProgress = 1079.4;
+    expect(hashState(a)).not.toBe(hashState(b));
+  });
 });
 
 describe('carinho com memoria (o exploit morreu)', () => {

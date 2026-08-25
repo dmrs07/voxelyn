@@ -46,6 +46,8 @@ export const ICONS = {
   fish: svg('<path d="M4 12c3-4 8-5 12-2 2 1.5 2 4.5 0 6-4 3-9 2-12-2z"/><path d="M16 9l4-3-1 6 1 6-4-3"/><circle cx="8" cy="11" r="0.6" fill="currentColor"/>'),
   /** O quadro de tarefas: prancheta com post-its. */
   board: svg('<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2.5h6v3H9z"/><path d="M7.5 10h4"/><path d="M7.5 14h6"/><path d="M7.5 18h3"/><circle cx="16.5" cy="10" r="1.1"/>'),
+  /** Gantt: barras deslocadas no tempo — nenhum icone repete na barra. */
+  gantt: svg('<rect x="3" y="4" width="10" height="3.4" rx="1.2"/><rect x="7" y="10.3" width="12" height="3.4" rx="1.2"/><rect x="11" y="16.6" width="8" height="3.4" rx="1.2"/>'),
   /** Som: uma orelhinha de gato ouvindo uma nota. */
   sound: svg('<path d="M5 14V7l4-4 3 6v5a3.5 3.5 0 11-7 0z"/><path d="M16 6v9"/><circle cx="14.2" cy="15.8" r="1.8"/><path d="M16 6l3 1.5"/>'),
   /** Cortar escopo: tesourinha. */
@@ -215,7 +217,7 @@ export const createHud = (
   // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
   const boardBtn = softButton(ICONS.board, t().btnProject);
-  const ganttBtn = softButton(ICONS.board, 'Gantt');
+  const ganttBtn = softButton(ICONS.gantt, 'Gantt');
   top.append(clock, remain, build, proj, bugsChip, alarm);
   const cluster = el('div', 'action-bar');
 

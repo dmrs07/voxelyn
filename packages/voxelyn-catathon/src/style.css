@@ -245,6 +245,7 @@ body {
   min-height: 25px;
   display: grid;
   grid-template-columns: minmax(120px, 1fr) minmax(90px, 1.4fr) auto;
+  align-items: center;
   gap: 6px;
   padding: 3px 6px;
   border-left: 3px solid var(--accent);
@@ -258,7 +259,8 @@ body {
 .hud-board.gantt .task-bar { display: block !important; width: 100%; height: 9px; }
 .hud-board.gantt .task.done .task-bar { opacity: 0.8; }
 .hud-board.gantt .task.cut .task-bar { opacity: 0.25; }
-.hud-board.gantt .task-cut { min-height: 28px; padding: 1px 8px; }
+/* O alvo minimo de 56px vale TAMBEM no Gantt: o quadro rola, a linha cresce. */
+.hud-board.gantt .task-cut { min-height: 56px; padding: 1px 8px; }
 .hud-board.gantt .task-choices { grid-column: 1 / -1; }
 
 .task-cut {
@@ -291,7 +293,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  /* Discreto no olho, honesto no dedo: a faixa encolheu, o alvo nao. */
+  min-height: 44px;
   padding: 4px 9px;
   background: rgba(30, 26, 40, 0.68);
   border: 1px solid var(--border);

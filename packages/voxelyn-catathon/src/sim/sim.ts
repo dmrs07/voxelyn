@@ -1077,12 +1077,16 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   }
   cat.stress = Math.min(1, cat.stress + stressRate);
 
-  // Necessidades tomam o corpo: fome primeiro, depois sono.
-  if (cat.hunger <= HUNGER_EAT_AT && (working || cat.mode === 'idle')) {
+  // Necessidades tomam o corpo: fome primeiro, depois sono. EXCECAO: quem
+  // esta consertando uma emergencia no rack termina o conserto — largar no
+  // meio deixava o build quebrado sem ninguem voltar (comer zera o slot), e
+  // o preco de virar a noite ja e cobrado em moral e energia.
+  const onRackDuty = working && cat.slot === 'rack' && (state.hairball.active || state.buildBroken || state.cableOut);
+  if (cat.hunger <= HUNGER_EAT_AT && (working || cat.mode === 'idle') && !onRackDuty) {
     sendTo(state, cat, 'cafe');
     return;
   }
-  if (cat.energy <= ENERGY_NAP_AT && (working || cat.mode === 'idle')) {
+  if (cat.energy <= ENERGY_NAP_AT && (working || cat.mode === 'idle') && !onRackDuty) {
     // Quem DORME NO TECLADO pode apagar em cima da propria trilha: bug.
     if (working && hasTrait(cat, 'dorme-no-teclado') && cat.slot && slotIn(state, cat.slot).track) {
       if (draw01(state) < TRAIT_SLEEPY_KB_P) {

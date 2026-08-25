@@ -43,6 +43,14 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
+// A semente da edicao nasce de Date.now() ^ 0xca7a7040; o resto do jogo anda
+// por performance.now/rAF. Congelar SO o Date.now torna a fumaca
+// deterministica: neste instante o quarteto 0-3 + o primeiro apetrecho cabem
+// no orcamento — com relogio livre, rolagens caras travavam o "lock the team".
+await page.addInitScript(() => {
+  Date.now = () => 1756100000000;
+});
+
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`));
@@ -107,7 +115,8 @@ const ghostBtns = await page.evaluate(() => ({
   laserLeft: window.catathon.app.state.laserLeft,
   visible: Array.from(document.querySelectorAll('.action-bar .soft-btn')).filter((b) => b.offsetParent !== null).length,
 }));
-const expectedBtns = 2 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
+// 3 fixos: projeto (Kanban), Gantt e petiscos.
+const expectedBtns = 3 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
 if (ghostBtns.visible !== expectedBtns) {
   throw new Error(`botoes fantasmas na barra: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
 }
@@ -128,7 +137,8 @@ const buttons = await page.evaluate(() =>
     }))
 );
 if (buttons.some((b) => b.text.length < 3)) throw new Error('botao sem palavra');
-if (buttons.some((b) => b.text !== 'cut' && b.h < 44)) throw new Error('botao com alvo < 44px');
+const shortBtns = buttons.filter((b) => b.text !== 'cut' && b.h < 44);
+if (shortBtns.length) throw new Error(`botao com alvo < 44px: ${JSON.stringify(shortBtns)}`);
 // Icones DISTINTOS entre si nos botoes macios (barra de acoes + som): dois
 // botoes com o mesmo desenho e a ilegibilidade do »/≫ da Iliada de novo.
 const cluster = await page.evaluate(() =>
