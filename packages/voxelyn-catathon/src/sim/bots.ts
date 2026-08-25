@@ -56,14 +56,16 @@ export const runCompetent = (state: HackState): void => {
       step(state, { choose: { task: open.id, option: pickOption } });
       continue;
     }
-    const emergency = state.hairball.active || state.cableOut;
+    const emergency = state.hairball.active || state.buildBroken || state.cableOut;
     const atRack = state.cats.find((c) => c.slot === 'rack' && c.mode !== 'nap');
     // O bombeiro e o gato com a PIOR necessidade mais folgada: energia OU
     // fome baixa o tiram do rack no meio do conserto.
     const fitness = (c: (typeof state.cats)[number]) => Math.min(c.energy, c.hunger);
     const fixer = atRack ?? [...state.cats].sort((a, b) => fitness(b) - fitness(a))[0]!;
 
-    if (state.held) {
+    if (state.fight && !state.held) {
+      cmd.grab = state.fight.a;
+    } else if (state.held) {
       const held = catOf(state, state.held)!;
       cmd.drop = emergency && held.id === fixer.id ? 'rack' : DESKS[held.id];
     } else if (emergency && fitness(fixer) < 0.4 && state.treats > 0) {
