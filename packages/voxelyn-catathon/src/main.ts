@@ -1,6 +1,11 @@
 import { SLOTS } from './sim/index.js';
 import { createApp, start } from './client/app.js';
+import { applyCatUi } from './client/catui.js';
 import './style.css';
+
+// A pele de UI de gato (CatMegaBundle) entra ANTES do primeiro paint do HUD:
+// as pecas viram custom properties --cui-* que o style.css consome.
+applyCatUi();
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement | null;
 const hud = document.getElementById('hud');

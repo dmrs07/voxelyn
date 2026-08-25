@@ -1,6 +1,7 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
-import { heldFrame, lookFor, packFrame, pmFrame, type SpriteFrame } from './catsprites.js';
+import { heldFrame, lookFor, packFrame, type SpriteFrame } from './catsprites.js';
+import { pochiFrame } from './pochi.js';
 import { ganttEntries } from './ganttlog.js';
 import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Task, Track } from '../sim/types.js';
@@ -720,6 +721,9 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   // Direcao nativa do pack e DIREITA; esquerda = espelho.
   const look = lookFor(cat.coat.body, cat.pattern, cat.big);
   const collar = SPEC_RGB[cat.specialty];
+  // JITTER de fase por gato: sem isto o pavilhao inteiro balanca o rabo em
+  // uchronia — cada gato entra na timeline com um offset proprio (id).
+  tick += (cat.id.charCodeAt(0) * 7 + cat.id.charCodeAt(cat.id.length - 1) * 13) % 29;
   const cx = Math.round(cat.x);
   const ground = Math.round(cat.y) + 2;
   const toCenter = cat.x > 240; // parado, o gato olha para dentro do pavilhao
@@ -758,9 +762,10 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
       blitFrame(v, packFrame(look, 'swat', tick, collar), cx, ground, false);
       return;
     }
-    // Na mesa: sentado encarando a bancada (mesas vivem nas paredes leste/
-    // oeste); em qualquer outro posto, sentado voltado para o centro.
-    const mirror = cat.slot?.startsWith('desk-') ? cat.x < 240 : toCenter;
+    // Na mesa o MONITOR fica na ponta interna da bancada: o gato encara a
+    // tela (nunca fica de costas para o computador). Nos outros postos,
+    // sentado voltado para o centro — que da no mesmo espelho.
+    const mirror = toCenter;
     blitFrame(v, packFrame(look, 'sit', tick, collar), cx, ground, mirror);
     return;
   }
@@ -820,22 +825,18 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
 };
 
 const drawPm = (v: View, state: HackState, tick: number): void => {
-  // O PM e o unico shorthair/grey_tabby do pavilhao (PM_LOOK), de oculos e
-  // gravata — overlay Catathon baked sobre os frames originais do pack,
-  // ancorado no olho/colar do proprio sprite (catsprites.ts).
+  // O PM e o POCHI — o chibi frontal 64px do CatMegaBundle, maior que o
+  // elenco de proposito, de oculos e gravata (overlay baked em pochi.ts).
+  // Atras da curva? Ele CHORA olhando o gantt, como um PM de verdade.
   const pm = state.pm;
   const cx = Math.round(pm.x);
   const ground = Math.round(pm.y) + 2;
   const moving = Math.hypot(pm.targetX - pm.x, pm.targetY - pm.y) > 2;
-  const mirror = moving ? pm.targetX < pm.x : pm.x > 240;
-  contactShadow(v, cx, ground, 8, 3, 0.34);
-  const fr = pmFrame(moving ? 'walk' : 'idle', tick);
-  blitFrame(v, fr, cx, ground, mirror);
-
-  // Atras da curva? O suor conta — a mesma conta do resmungo no feed.
   const alive = state.tasks.filter((t) => !t.cut);
   const behind = Math.floor((state.tick / HACK_TICKS) * alive.length) > alive.filter((t) => t.done).length;
-  if (behind && (tick >> 3) % 2 === 0) px(v, cx + (mirror ? -9 : 9), ground - fr.h - 1, CYAN_ACT);
+  contactShadow(v, cx, ground, 10, 3, 0.34);
+  const fr = pochiFrame(moving ? 'walk' : behind ? 'cry' : 'idle', tick);
+  blitFrame(v, fr, cx, ground, moving && pm.targetX < pm.x);
 };
 
 /** A mao do jogador: uma patinha. Cursor e personagem ao mesmo tempo. */

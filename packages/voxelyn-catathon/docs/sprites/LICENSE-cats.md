@@ -19,3 +19,12 @@ commitados** — commita-los seria redistribuicao. O fluxo e:
    Catathon por cima dos frames originais, nunca redesenho.
 
 Ao publicar o jogo, creditar: *cat sprites by girlypixels (itch.io)*.
+
+## CatMegaBundle (segundo pack)
+
+O PM (Pochi) e a pele de UI do HUD vem do pack **CatMegaBundle** (compra do
+dono do projeto). O zip nao traz arquivo de licenca; assumido o mesmo regime
+do pack acima (uso no jogo permitido, redistribuicao nao) ate o dono anexar
+os termos/link da pagina — os arquivos crus ficam fora do repo
+(`assets-src/mega`, gitignorado) e so entram no build via
+`scripts/import-mega.mjs`.
