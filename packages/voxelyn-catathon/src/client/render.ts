@@ -1,7 +1,6 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
-import { heldFrame, lookFor, packFrame, type SpriteFrame } from './catsprites.js';
-import { pochiFrame } from './pochi.js';
+import { heldFrame, lookFor, packFrame, pmFrame, type SpriteFrame } from './catsprites.js';
 import { ganttEntries } from './ganttlog.js';
 import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Task, Track } from '../sim/types.js';
@@ -825,18 +824,22 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
 };
 
 const drawPm = (v: View, state: HackState, tick: number): void => {
-  // O PM e o POCHI — o chibi frontal 64px do CatMegaBundle, maior que o
-  // elenco de proposito, de oculos e gravata (overlay baked em pochi.ts).
-  // Atras da curva? Ele CHORA olhando o gantt, como um PM de verdade.
+  // O PM e o unico shorthair/grey_tabby do pavilhao (PM_LOOK), de oculos e
+  // gravata — overlay Catathon baked sobre os frames originais do pack,
+  // ancorado no olho/colar do proprio sprite (catsprites.ts).
   const pm = state.pm;
   const cx = Math.round(pm.x);
   const ground = Math.round(pm.y) + 2;
   const moving = Math.hypot(pm.targetX - pm.x, pm.targetY - pm.y) > 2;
+  const mirror = moving ? pm.targetX < pm.x : pm.x > 240;
+  contactShadow(v, cx, ground, 8, 3, 0.34);
+  const fr = pmFrame(moving ? 'walk' : 'idle', tick);
+  blitFrame(v, fr, cx, ground, mirror);
+
+  // Atras da curva? O suor conta — a mesma conta do resmungo no feed.
   const alive = state.tasks.filter((t) => !t.cut);
   const behind = Math.floor((state.tick / HACK_TICKS) * alive.length) > alive.filter((t) => t.done).length;
-  contactShadow(v, cx, ground, 10, 3, 0.34);
-  const fr = pochiFrame(moving ? 'walk' : behind ? 'cry' : 'idle', tick);
-  blitFrame(v, fr, cx, ground, moving && pm.targetX < pm.x);
+  if (behind && (tick >> 3) % 2 === 0) px(v, cx + (mirror ? -9 : 9), ground - fr.h - 1, CYAN_ACT);
 };
 
 /** A mao do jogador: uma patinha. Cursor e personagem ao mesmo tempo. */

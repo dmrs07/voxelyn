@@ -317,3 +317,72 @@ export const lookFor = (body: number, pattern: CoatPattern, big: boolean): CatLo
   lookCache.set(id, look);
   return look;
 };
+
+// ---------------------------------------------------------------------------
+// PM: overlay de oculos + colarinho/gravata baked em COPIAS dos frames do
+// grey_tabby, ancorado pelas cores exclusivas de olho e colar do proprio pack.
+// ---------------------------------------------------------------------------
+const EYE_A = packRGBA(0x71, 0xaa, 0x34);
+const EYE_B = packRGBA(0xb6, 0xd5, 0x3c);
+const COLLAR = packRGBA(0x16, 0x5a, 0x4c);
+const INK = packRGBA(0x2f, 0x33, 0x40);
+const GLINT = packRGBA(0xdf, 0xe8, 0xf2);
+const TIE = packRGBA(0xc1, 0x44, 0x44);
+const TIE_D = packRGBA(0x7e, 0x2f, 0x2f);
+const SHIRT = packRGBA(0xee, 0xf1, 0xea);
+const BELL = packHex(BELL_HEX);
+
+const pmCache = new Map<CatAnimKey, SpriteFrame[]>();
+
+const pmDecorate = (key: CatAnimKey): SpriteFrame[] => {
+  const hit = pmCache.get(key);
+  if (hit) return hit;
+  let prev: { ex: number; ey: number } | null = null;
+  const frames = decode(PM_LOOK.breed, key, PM_LOOK.coat).map((src) => {
+    const data = src.data.slice();
+    const put = (x: number, y: number, color: number) => {
+      if (x >= 0 && y >= 0 && x < src.w && y < src.h) data[y * src.w + x] = color;
+    };
+    let ex = 0, ey = 0, en = 0, cx = -1, cy = 0;
+    for (let y = 0; y < src.h; y++) {
+      for (let x = 0; x < src.w; x++) {
+        const i = y * src.w + x;
+        const color = src.data[i]!;
+        if (color === EYE_A || color === EYE_B) { ex += x; ey += y; en++; }
+        if (color === COLLAR && x > cx) { cx = x; cy = y; }
+        // a gravata DA A VOLTA no pescoco: o colar do sprite (que ja
+        // contorna o pescoco) vira a alca vermelha, e o guizo vira o no.
+        if (color === COLLAR) data[i] = TIE;
+        else if (color === BELL) data[i] = TIE_D;
+      }
+    }
+    if (en > 0) { ex = Math.round(ex / en); ey = Math.round(ey / en); prev = { ex, ey }; }
+    else if (prev) { ex = prev.ex; ey = prev.ey; } // piscada: o oculos fica
+    else { ex = -99; ey = -99; }
+    // lente 3x3 COLADA no olho (aro de 1px, olho visivel) + haste curta
+    for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]] as const) {
+      put(ex + dx, ey + dy, INK);
+    }
+    put(ex - 1, ey - 1, GLINT);
+    put(ex - 2, ey - 1, INK); // haste
+    if (cx >= 0) {
+      // colarinho + gravata pendendo RETA para baixo do colar
+      put(cx - 1, cy, SHIRT); put(cx - 3, cy, SHIRT);
+      put(cx - 2, cy + 1, TIE_D); put(cx - 1, cy + 1, TIE_D); // no
+      put(cx - 2, cy + 2, TIE); put(cx - 1, cy + 2, TIE);
+      put(cx - 2, cy + 3, TIE); put(cx - 1, cy + 3, TIE);
+      put(cx - 2, cy + 4, TIE_D); put(cx - 1, cy + 4, TIE);
+      put(cx - 2, cy + 5, TIE_D);
+    }
+    return { w: src.w, h: src.h, data };
+  });
+  pmCache.set(key, frames);
+  return frames;
+};
+
+/** Frame do PM (grey_tabby + figurino) para um tick. */
+export const pmFrame = (key: CatAnimKey, tick: number): SpriteFrame => {
+  const frames = pmDecorate(key);
+  const line = timeline(PM_LOOK.breed, key);
+  return frames[line[tick % line.length]! % frames.length]!;
+};
