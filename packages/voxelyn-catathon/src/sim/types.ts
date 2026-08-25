@@ -351,6 +351,7 @@ export type SimEvent =
   | { kind: 'hairball'; tick: number }
   | { kind: 'hairball-fixed'; tick: number }
   | { kind: 'build-broken'; tick: number }
+  | { kind: 'build-fixed'; tick: number }
   | { kind: 'treat'; tick: number; cat: CatId }
   | { kind: 'cut'; tick: number; task: string }
   | { kind: 'overpet'; tick: number; cat: CatId }
@@ -389,6 +390,8 @@ export type HackState = {
   cableProgress: number;
   treats: number;
   buildBroken: boolean;
+  /** Progresso da recuperacao manual do build perdido no rack. */
+  buildProgress: number;
   held: CatId | null;
   handX: number;
   handY: number;
