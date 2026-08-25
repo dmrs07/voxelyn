@@ -45,6 +45,8 @@ export const hashState = (state: HackState): string => {
   h.u32(state.buildBroken ? 1 : 0);
   h.fixed(state.buildProgress, 1);
   h.str(state.held ?? '-');
+  h.str(state.fight?.a ?? '-');
+  h.str(state.fight?.b ?? '-');
   h.u32(state.cableOut ? 1 : 0);
   h.fixed(state.cableProgress, 1);
   for (const c of state.cats) {
