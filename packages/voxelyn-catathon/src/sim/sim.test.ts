@@ -322,6 +322,19 @@ describe('recuperacao, venues e brigas', () => {
     expect(state.events.some((e) => e.kind === 'fight-separated')).toBe(true);
   });
 
+  it('o rack e posto social: o segundo gato NAO desaloja o primeiro', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'rack' });
+    step(state, { grab: 'cheeto' });
+    step(state, { drop: 'rack' });
+    const a = catOf(state, 'bigode')!;
+    const b = catOf(state, 'cheeto')!;
+    expect(a.slot).toBe('rack');
+    expect(b.slot).toBe('rack');
+    expect(Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY)).toBeGreaterThan(10);
+  });
+
   it('fracoes do conserto entram no hash: 1078.6 e 1079.4 NAO colidem', () => {
     // fixSpeed 1.3 avanca em decimos: na escala 1 estes dois estados davam o
     // mesmo hash e o tick seguinte conserta um build e deixa o outro quebrado.

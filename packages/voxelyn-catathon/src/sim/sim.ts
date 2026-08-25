@@ -535,7 +535,9 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
   if (cmd.drop && state.held) {
     const cat = catOf(state, state.held)!;
     const occupant = state.cats.find((c) => c.slot === cmd.drop && c.id !== cat.id);
-    if (occupant && cmd.drop !== 'puff' && cmd.drop !== 'cafe') {
+    // Postos sociais (VENUE_OFFSETS) tem vagas para varios corpos: chegar
+    // nao desaloja ninguem. Mesa e territorio de um gato so.
+    if (occupant && !(cmd.drop in VENUE_OFFSETS)) {
       occupant.slot = null;
       // 'walk' e o unico modo que anda ate o alvo; em 'idle' o desalojado
       // ficava parado embaixo do recem-chegado, disputando o toque.
