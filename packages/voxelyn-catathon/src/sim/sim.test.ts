@@ -282,6 +282,47 @@ describe('a bola de pelo', () => {
   });
 });
 
+describe('recuperacao, venues e brigas', () => {
+  it('um build perdido volta quando um gato trabalha no rack', () => {
+    const state = createHackathon(11, CLASSIC_TEAM, { classic: true });
+    while (!state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
+    while (state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
+    expect(state.buildBroken).toBe(true);
+    step(state, { grab: 'almofada' });
+    step(state, { drop: 'rack' });
+    let guard = 0;
+    while (state.buildBroken && guard++ < HACK_TICKS) step(state, emptyCommand());
+    expect(state.buildBroken).toBe(false);
+    expect(state.buildProgress).toBe(0);
+    expect(state.events.some((e) => e.kind === 'build-fixed')).toBe(true);
+  });
+
+  it('gatos no mesmo venue recebem alvos separados e tocaveis', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'cafe' });
+    step(state, { grab: 'cheeto' });
+    step(state, { drop: 'cafe' });
+    const a = catOf(state, 'bigode')!;
+    const b = catOf(state, 'cheeto')!;
+    expect(Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY)).toBeGreaterThan(20);
+  });
+
+  it('pegar um briguento separa a dupla', () => {
+    const state = createHackathon(8, CLASSIC_TEAM, { classic: true });
+    const a = catOf(state, 'bigode')!;
+    const b = catOf(state, 'cheeto')!;
+    a.mode = b.mode = 'fight';
+    a.slot = b.slot = null;
+    state.fight = { a: a.id, b: b.id };
+    step(state, { grab: a.id });
+    expect(state.fight).toBeNull();
+    expect(a.mode).toBe('held');
+    expect(b.mode).toBe('walk');
+    expect(state.events.some((e) => e.kind === 'fight-separated')).toBe(true);
+  });
+});
+
 describe('carinho com memoria (o exploit morreu)', () => {
   const petSession = (state: HackState, cat: string, ticks: number): void => {
     for (let i = 0; i < ticks; i++) step(state, { pet: cat as 'cheeto' });
