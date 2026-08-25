@@ -806,6 +806,13 @@ export const showResult = (
   // O PREMIO em moedas fisicas — e, na carreira, a carteira que ele virou.
   const prizeRow = el('p', 'result-prize', t().prizeLine(fmtCost(r.prize, getLocale())));
   wrap.appendChild(prizeRow);
+  // O EXTRATO do premio: a sim itemiza (prizeParts) exatamente para a tela
+  // poder ser honesta — sem ele, o jogador nunca ve a mordida da divida nem
+  // o payout do sponsor (achado de revisao).
+  const ledger = (Object.keys(r.prizeParts) as (keyof typeof r.prizeParts)[])
+    .filter((k) => r.prizeParts[k] !== 0)
+    .map((k) => `${t().prizePartName[k]} ${r.prizeParts[k] > 0 ? '+' : ''}${r.prizeParts[k]}`);
+  if (ledger.length > 0) wrap.appendChild(el('p', 'result-ledger', ledger.join(' · ')));
   if (extras.wallet !== null) {
     wrap.appendChild(el('p', 'result-wallet', t().walletAfter(fmtCost(extras.wallet, getLocale()))));
   }

@@ -48,6 +48,20 @@ export const hashState = (state: HackState): string => {
   h.fixed(state.cableProgress, 1);
   for (const c of state.cats) {
     h.str(c.id);
+    // A FICHA MECANICA do contratado e ENTRADA do replay: dois elencos com
+    // os mesmos ids e fichas diferentes divergem JA no tick zero — sem
+    // isto, a ferramenta de divergencia so acusava muito depois (achado de
+    // revisao do Slice D).
+    h.str(c.specialty);
+    h.str(c.personality);
+    h.str(c.quirk);
+    h.str(c.tier);
+    for (const tr of c.traits) h.str(tr);
+    h.str(c.hiddenTrait);
+    h.fixed(c.breedMod.nap, HASH_METER);
+    h.fixed(c.breedMod.stress, HASH_METER);
+    h.fixed(c.breedMod.hunger, HASH_METER);
+    h.fixed(c.breedMod.social, HASH_METER);
     h.fixed(c.x, HASH_POS);
     h.fixed(c.y, HASH_POS);
     // Em walk/zoomies o alvo determina as proximas posicoes: sem ele, dois

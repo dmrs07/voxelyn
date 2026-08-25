@@ -184,8 +184,10 @@ export type Cat = {
   speedBoost: number;
   /**
    * O toque da RACA (estatico por run): soneca, estresse, fome e social.
-   * 1 = neutro. Maine Coon tranquiliza colegas, Bengal dorme menos, Persa
-   * estressa menos — a raca muda comportamento, nunca profissao.
+   * 1 = neutro; todos multiplicam TAXAS. Maine Coon tranquiliza colegas,
+   * Persa estressa menos, e o Bengal "dorme menos" com nap > 1: recupera
+   * mais RAPIDO, logo a soneca acaba antes (a direcao ja saiu invertida
+   * uma vez — achado de revisao do Slice D).
    */
   breedMod: { nap: number; stress: number; hunger: number; social: number };
   /**

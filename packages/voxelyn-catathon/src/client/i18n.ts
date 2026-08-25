@@ -93,6 +93,8 @@ type Dict = {
   btnCatnip: string;
   btnLaser: string;
   prizeLine: (prize: string) => string;
+  /** Rotulos do EXTRATO do premio (prizeParts) na tela final. */
+  prizePartName: Record<'placement' | 'zeroBugs' | 'deals' | 'sponsor' | 'special' | 'juniors' | 'debt', string>;
   walletAfter: (wallet: string) => string;
   achievementsTitle: string;
   sponsorTitle: string;
@@ -225,6 +227,15 @@ const EN: Dict = {
   btnCatnip: 'catnip',
   btnLaser: 'laser',
   prizeLine: (prize) => `prize: ${prize}`,
+  prizePartName: {
+    placement: 'placement',
+    zeroBugs: 'zero bugs',
+    deals: 'deals',
+    sponsor: 'sponsor',
+    special: 'special trophy',
+    juniors: 'junior growth',
+    debt: 'tech debt',
+  },
   walletAfter: (wallet) => `career wallet: ${wallet}`,
   achievementsTitle: 'achievements unlocked',
   sponsorTitle: 'a sponsor came by the booth',
@@ -357,6 +368,15 @@ const PT: Dict = {
   btnCatnip: 'catnip',
   btnLaser: 'laser',
   prizeLine: (prize) => `premio: ${prize}`,
+  prizePartName: {
+    placement: 'colocacao',
+    zeroBugs: 'zero bugs',
+    deals: 'acordos',
+    sponsor: 'sponsor',
+    special: 'trofeu especial',
+    juniors: 'crescimento de junior',
+    debt: 'divida tecnica',
+  },
   walletAfter: (wallet) => `carteira da carreira: ${wallet}`,
   achievementsTitle: 'conquistas desbloqueadas',
   sponsorTitle: 'um sponsor passou no booth',

@@ -12,6 +12,7 @@ import {
   SPONSOR_BRANDING_GAUGE,
 } from './constants.js';
 import {
+  BREEDS,
   CLASSIC_TEAM,
   SPONSORS,
   catOf,
@@ -20,6 +21,7 @@ import {
   hashState,
   returningCandidate,
   rivalScoreFor,
+  rollCandidates,
   rollSpecialCategory,
   rollSponsorOffer,
   step,
@@ -263,6 +265,32 @@ describe('categoria especial e o extrato do premio', () => {
     const p = state.result!.prizeParts;
     const sum = p.placement + p.zeroBugs + p.deals + p.sponsor + p.special + p.juniors + p.debt;
     expect(state.result!.prize).toBe(Math.max(0, sum));
+  });
+});
+
+describe('achados de revisao do Slice D (vigiados para sempre)', () => {
+  it('a FICHA MECANICA do contratado entra no hash: mesmo id, tier diferente, hash diferente', () => {
+    // O elenco e ENTRADA do replay: dois payloads com os mesmos ids e
+    // fichas diferentes divergem ja no tick zero, nao "muito depois".
+    const team = rollCandidates(314).slice(0, 4);
+    const twisted = team.map((c, i) =>
+      i === 0 ? { ...c, tier: c.tier === 'senior' ? ('pleno' as const) : ('senior' as const) } : c
+    );
+    const a = createHackathon(314, team);
+    const b = createHackathon(314, twisted);
+    expect(hashState(a)).not.toBe(hashState(b));
+    // O breedMod tambem e ficha: so ele diferente ja diverge.
+    const shifted = team.map((c, i) => (i === 1 ? { ...c, breedMod: { ...c.breedMod, nap: c.breedMod.nap + 0.2 } } : c));
+    expect(hashState(createHackathon(314, shifted))).not.toBe(hashState(a));
+  });
+
+  it('"dorme menos" e direcao de DADOS: o nap do Bengal e maior que 1', () => {
+    // A primeira versao dava nap 0.85 ao Bengal — recuperacao mais lenta,
+    // soneca mais LONGA: o oposto do anunciado. Direcao agora vigiada.
+    for (const name of ['Bengal', 'Savannah', 'Abissinio']) {
+      const breed = BREEDS.find((b) => b.name === name)!;
+      expect(breed.nudge?.nap ?? 1, name).toBeGreaterThan(1);
+    }
   });
 });
 

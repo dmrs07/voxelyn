@@ -677,3 +677,6 @@ body {
 .result-special { margin: 0; font-weight: 700; color: var(--accent); }
 .result-grown { margin: 0; font-size: 0.9em; color: var(--ok); }
 .result-poached { margin: 0; font-size: 0.88em; color: var(--alarm); font-style: italic; }
+
+/* O extrato do premio: cada parcela nomeada, com sinal — a tela honesta. */
+.result-ledger { margin: 0; font-size: 0.82em; opacity: 0.9; }

@@ -118,18 +118,20 @@ describe('achados de revisao (vigiados para sempre)', () => {
     expect(hashState(a)).not.toBe(hashState(b));
   });
 
-  it('o toque da raca e mecanica: soneca do Bengal rende menos', () => {
-    const slow = mk(5);
-    const fast = mk(5);
-    for (const s of [slow, fast]) {
+  it('o toque da raca e mecanica: quem "dorme menos" recupera mais RAPIDO (a soneca encurta)', () => {
+    // A direcao ja saiu invertida uma vez (nap 0.85 fazia o Bengal dormir
+    // MAIS): nap > 1 = recuperacao mais rapida = levanta antes.
+    const perky = mk(5);
+    const plain = mk(5);
+    for (const s of [perky, plain]) {
       const c = s.cats[0]!;
       c.mode = 'nap';
       c.energy = 0.3;
       c.slot = 'puff';
     }
-    slow.cats[0]!.breedMod = { nap: 0.85, stress: 1, hunger: 1, social: 1 };
-    step(slow, emptyCommand());
-    step(fast, emptyCommand());
-    expect(slow.cats[0]!.energy).toBeLessThan(fast.cats[0]!.energy);
+    perky.cats[0]!.breedMod = { nap: 1.18, stress: 1, hunger: 1, social: 1 };
+    step(perky, emptyCommand());
+    step(plain, emptyCommand());
+    expect(perky.cats[0]!.energy).toBeGreaterThan(plain.cats[0]!.energy);
   });
 });

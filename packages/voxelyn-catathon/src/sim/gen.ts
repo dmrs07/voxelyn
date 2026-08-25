@@ -164,6 +164,9 @@ export type Candidate = {
 /**
  * 30 racas. A raca muda COMPORTAMENTO e aparencia — nunca determina
  * profissao. `nudge` e o toque mecanico leve de algumas racas notaveis.
+ * DIRECAO dos campos: todos multiplicam TAXAS — nap > 1 recupera mais
+ * rapido (soneca mais curta: o Bengal "dorme menos" porque LEVANTA antes,
+ * nao porque a cama rende menos — achado de revisao do Slice D).
  */
 type Breed = {
   name: string;
@@ -180,7 +183,7 @@ export const BREEDS: readonly Breed[] = [
   { name: 'Siames', pattern: 'siames', body: 0xe6dac4, mark: 0x5e4a3e, belly: 0xf0e8d6 },
   { name: 'Maine Coon', pattern: 'tabby', body: 0x8e8e98, mark: 0x6e6e7a, belly: 0xc4c4cc, big: true, nudge: { social: 1.2 } },
   { name: 'Persa', pattern: 'solid', body: 0xd8cfc0, mark: 0xb8ab96, belly: 0xefe9dc, nudge: { stress: 0.9 } },
-  { name: 'Bengal', pattern: 'tabby', body: 0xd8a050, mark: 0x7a5222, belly: 0xecd0a0, nudge: { nap: 0.85 } },
+  { name: 'Bengal', pattern: 'tabby', body: 0xd8a050, mark: 0x7a5222, belly: 0xecd0a0, nudge: { nap: 1.18 } },
   { name: 'Sphynx', pattern: 'sphynx', body: 0xd8b0a0, mark: 0xb08878, belly: 0xecd0c4 },
   { name: 'Ragdoll', pattern: 'siames', body: 0xe8e0d4, mark: 0x8a7a6e, belly: 0xf4efe6, big: true, nudge: { social: 1.15 } },
   { name: 'British Shorthair', pattern: 'solid', body: 0x9098a8, mark: 0x707888, belly: 0xbcc2ce },
@@ -188,7 +191,7 @@ export const BREEDS: readonly Breed[] = [
   { name: 'Angora', pattern: 'solid', body: 0xf0ece2, mark: 0xccc6b8, belly: 0xfaf8f0 },
   { name: 'Siberiano', pattern: 'tabby', body: 0xa88c68, mark: 0x7a6248, belly: 0xd8c4a4, big: true },
   { name: 'Noruegues da Floresta', pattern: 'tabby', body: 0x988670, mark: 0x6e5e4c, belly: 0xccc0aa, big: true },
-  { name: 'Abissinio', pattern: 'solid', body: 0xc09058, mark: 0x94682e, belly: 0xe0c49c, nudge: { nap: 0.9 } },
+  { name: 'Abissinio', pattern: 'solid', body: 0xc09058, mark: 0x94682e, belly: 0xe0c49c, nudge: { nap: 1.1 } },
   { name: 'Birmanes', pattern: 'siames', body: 0xdccbb4, mark: 0x6e5648, belly: 0xefe4d2 },
   { name: 'Burmese', pattern: 'solid', body: 0x6e5240, mark: 0x503a2c, belly: 0x9a7c64 },
   { name: 'Bombay', pattern: 'solid', body: 0x2c2a32, mark: 0x1c1a22, belly: 0x44424c },
@@ -204,7 +207,7 @@ export const BREEDS: readonly Breed[] = [
   { name: 'Somali', pattern: 'tabby', body: 0xc89860, mark: 0x966c36, belly: 0xe4ccA4 },
   { name: 'Turkish Van', pattern: 'tuxedo', body: 0xf0ece4, mark: 0xd08a4a, belly: 0xfaf8f2 },
   { name: 'Egyptian Mau', pattern: 'tabby', body: 0xb8bcac, mark: 0x76806a, belly: 0xdadec8 },
-  { name: 'Savannah', pattern: 'tabby', body: 0xccae72, mark: 0x8c703e, belly: 0xe8d8ae, nudge: { nap: 0.85 } },
+  { name: 'Savannah', pattern: 'tabby', body: 0xccae72, mark: 0x8c703e, belly: 0xe8d8ae, nudge: { nap: 1.18 } },
   { name: 'Munchkin', pattern: 'tuxedo', body: 0x8c8494, mark: 0x37343c, belly: 0xece8f0 },
 ];
 

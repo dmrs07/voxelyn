@@ -364,6 +364,10 @@ await page.waitForTimeout(1200);
 if ((await sim(() => window.catathon.app.state.phase)) !== 'done') throw new Error('o pitch nao terminou');
 if (!(await page.locator('.result-dims').isVisible())) throw new Error('resultado sem as cinco dimensoes');
 if (!(await page.locator('.result-prize').isVisible())) throw new Error('resultado sem o premio');
+// O EXTRATO do premio (achado de revisao): a fumaca escolheu monolito, entao
+// ha divida — o extrato tem parcela nao-zero em QUALQUER desfecho.
+if (!(await page.locator('.result-ledger').isVisible())) throw new Error('resultado sem o extrato do premio');
+step.push(`extrato: ${await page.locator('.result-ledger').textContent()}`);
 // Slice D: o pos-jogo mostra o DUELO com o rival e a REPUTACAO da carreira.
 if (!(await page.locator('.result-rival').isVisible())) throw new Error('o resultado nao mostra o duelo com o rival');
 if (!(await page.locator('.result-rep').isVisible())) throw new Error('o resultado nao mostra a reputacao');
