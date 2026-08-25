@@ -155,7 +155,21 @@ mapa de paleta deterministico para novas pelagens — nunca recolor por IA.
 
 ## 10. Status
 
-Fase de auditoria concluida sem modificar nem gerar arte. Proximo passo
-(apos aprovacao): importar o bundle intacto para um diretorio de assets
-fonte (respeitando §1), normalizar por METADATA (nomes/ancoras via JSON,
-nunca editando PNG) e montar a fatia vertical do §8.
+Auditoria concluida sem modificar nem gerar arte. Decisao do dono
+(2026-08-25): o repo e publico, entao os sprites vao SO no build.
+
+Pipeline implementado (fatia vertical do §8 no ar):
+
+- `scripts/import-cats.mjs` le o pack de `assets-src/` (gitignorado; extrair
+  o zip comprado ali) e gera `src/client/assets/catSprites.ts` — formato
+  indexado lossless (round-trip verificado), paleta+indices POR pelagem
+  (o recolor do pack nao e mapa 1:1: siamese tem coloracao point), delays
+  originais dos GIFs. Unico desvio de pixel: 1px orfao com alpha 33% em
+  Walking10 (cisco da autora, identico nas 4 pelagens) cai para transparente.
+- `src/client/catsprites.ts` decodifica uma vez e responde o frame por tick
+  (30 Hz; delay 100ms = 3 ticks) — display-only, fora do hash.
+- `render.ts`: modos `walk` e `idle` usam Walking/Idle do pack (direita
+  nativa, esquerda por espelho; chao do frame na ultima linha). Pelagem do
+  pack = a de cor dominante mais proxima do `coat.body` gerado do gato.
+- Proximo: Sitting/Sleeping, depois as poses com overlay (§9) e a passada
+  de proporcao do mundo para o metro de 32px (§7).

@@ -1,5 +1,6 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
+import { coatIndexFor, spriteFrame } from './catsprites.js';
 import { ganttEntries } from './ganttlog.js';
 import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Spec, Task, Track } from '../sim/types.js';
@@ -896,8 +897,25 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
     return;
   }
 
+  if (cat.mode === 'walk' || cat.mode === 'idle') {
+    // FATIA VERTICAL do pack girlypixels (docs/sprites/bundle-audit.md §8):
+    // Walking + Idle vem dos sprites comprados, pixels originais 1:1; as
+    // demais poses seguem procedurais ate as proximas animacoes do pack
+    // entrarem. Direcao nativa do pack e DIREITA; esquerda = espelho.
+    const facingLeft = cat.mode === 'walk' ? cat.targetX < Math.round(cat.x) : cat.x > 240;
+    const fr = spriteFrame(cat.mode, coatIndexFor(cat.coat.body), tick);
+    const bx = Math.round(cat.x) - (fr.w >> 1);
+    const by = Math.round(cat.y) + 2 - fr.h; // linha do chao do frame = ultima linha
+    for (let yy = 0; yy < fr.h; yy++) {
+      for (let xx = 0; xx < fr.w; xx++) {
+        const color = fr.data[yy * fr.w + (facingLeft ? fr.w - 1 - xx : xx)]!;
+        if (color !== 0) px(v, bx + xx, by + yy, color);
+      }
+    }
+    return;
+  }
+
   const bounce = cat.mode === 'work' ? Math.round(Math.abs(Math.sin(tick / 3)) * 1) : 0;
-  const step = cat.mode === 'walk' ? Math.round(Math.abs(Math.sin(tick / 4)) * 2) : 0;
 
   // (A selecao vive no anel dos pes + no aro do retrato: caixa retangular
   // em volta de um gato quebrava a silhueta que ela deveria destacar.)
@@ -923,7 +941,7 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   rect(v, x + 3, y + 8 - bounce, 4, 3, CREAM);
   px(v, x + 4, y + 9 - bounce, adjustBrightness(specColor, -20));
   // Patas.
-  rect(v, x + 4, y + h - 1 - step, 3, 2 + step, p.mark);
+  rect(v, x + 4, y + h - 1, 3, 2, p.mark);
   rect(v, x + w - 7, y + h - 1, 3, 2, p.mark);
   // Rabo: alto e ondulante quando bem; caido quando estressado.
   const tx = x + w - 1;
