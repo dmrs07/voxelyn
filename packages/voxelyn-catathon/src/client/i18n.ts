@@ -127,6 +127,7 @@ type Dict = {
     hairball: string;
     hairballFixed: string;
     buildBroken: string;
+    buildFixed: string;
     treat: (name: string) => string;
     cut: (task: string) => string;
     overpet: (name: string) => string;
@@ -267,7 +268,8 @@ const EN: Dict = {
     eat: (name) => `${name} went to eat`,
     hairball: 'HAIRBALL in the repository: merge locked! (send someone to the rack)',
     hairballFixed: 'hairball resolved, merge unlocked',
-    buildBroken: 'THE BUILD BROKE. There is no fixing it now.',
+    buildBroken: 'BUILD LOST. Send a cat to the rack to recover it.',
+    buildFixed: 'build recovered, merges are moving again',
     treat: (name) => `${name} got a treat`,
     cut: (task) => `scope cut: "${task}"`,
     overpet: (name) => `${name} is OVERSTIMULATED: enough petting for now`,
@@ -408,7 +410,8 @@ const PT: Dict = {
     eat: (name) => `${name} foi comer`,
     hairball: 'BOLA DE PELO no repositorio: merge travado! (leva alguem ao rack)',
     hairballFixed: 'bola de pelo resolvida, merge liberado',
-    buildBroken: 'O BUILD QUEBROU. Nao ha mais conserto.',
+    buildBroken: 'BUILD PERDIDO. Leve um gato ao rack para recuperar.',
+    buildFixed: 'build recuperado, merges liberados novamente',
     treat: (name) => `${name} ganhou petisco`,
     cut: (task) => `escopo cortado: "${task}"`,
     overpet: (name) => `${name} ficou SUPERESTIMULADO: chega de carinho por ora`,
