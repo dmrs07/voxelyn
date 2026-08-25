@@ -65,6 +65,10 @@ export const hashState = (state: HackState): string => {
     // A revelacao do trait oculto muda eventos futuros: entra.
     h.u32(c.revealed ? 1 : 0);
     h.fixed(c.speedBoost, HASH_METER);
+    // O aprendizado do junior manda na velocidade dele; o contador de ships
+    // decide crescimento e estrela. Ambos determinam o futuro — entram.
+    h.fixed(c.learned, HASH_METER);
+    h.u32(c.shipped);
     h.str(c.mode);
     h.str(c.slot ?? '-');
     h.u32(c.modeUntil);
@@ -88,6 +92,11 @@ export const hashState = (state: HackState): string => {
   h.fixed(state.hype, HASH_METER);
   h.u32(state.prizeBonus);
   h.u32(state.petSessions);
+  // O contrato de sponsor muda custos de bug, risco de crash e o palco; a
+  // categoria especial muda o premio; os pares anunciados mudam eventos.
+  h.str(state.sponsor?.id ?? '-');
+  h.str(state.specialCategory);
+  for (const v of state.vibesSeen) h.str(v);
   for (const s of state.social) {
     h.str(s.kind);
     h.u32(s.at);

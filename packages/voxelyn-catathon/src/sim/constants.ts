@@ -218,6 +218,32 @@ export const SENIOR_CLEAN = 0.5;
 export const SPECIALIST_MATCH = 1.3;
 export const FREESTYLER_SPEED = 0.75;
 
+// ------------------------------------------------------------- convivencia
+//
+// COMPATIBILIDADE: gatos trabalhando em mesas VIZINHAS se afetam. O vibe de
+// um par vem de personalidade + traits — inclusive o OCULTO, desde o inicio:
+// o atrito aparece no comportamento antes de o curriculo explicar o porque
+// (e a profundidade do trait oculto). O raio faz o LAYOUT importar: mesas
+// juntas na Ilha Central conversam; cubiculos isolam.
+
+/** Mesas a ate isto (px de cena) sao vizinhas. */
+export const VIBE_RADIUS = 110;
+/** Vizinho bom: estresse de trabalho rende 0.88x; ruim: 1.18x. */
+export const VIBE_STRESS_GOOD = 0.88;
+export const VIBE_STRESS_BAD = 1.18;
+/** Deriva de moral por tick ao lado de amigo (+) ou rival (-). */
+export const VIBE_MORAL_DRIFT = 0.0005;
+
+/**
+ * MENTORIA: o junior aprende TRABALHANDO (nao por relogio) — e 1.6x mais
+ * rapido com um senior/especialista numa mesa vizinha. Sozinho, ~240s de
+ * trabalho chegam ao teto; mentorado, ~150s.
+ */
+export const JUNIOR_LEARN_RATE = 1 / (240 * TICK_HZ);
+export const MENTOR_LEARN_SCALE = 1.6;
+/** learned daqui para cima = CRESCEU: bonus no premio, volta como pleno. */
+export const JUNIOR_GROWN_AT = 0.75;
+
 export const TRAIT_FIX_HUNTER = 1.5;
 export const TRAIT_FIX_LEGACY = 0.6;
 export const TRAIT_NAP_FAST = 1.5;
@@ -284,3 +310,44 @@ export const PRIZE_BY_OUTCOME: Record<string, number> = {
 export const PRIZE_ZERO_BUGS = 30;
 /** "Ship It": um deploy no ultimo minuto das 48h. */
 export const SHIP_IT_WINDOW = 60 * TICK_HZ;
+/**
+ * O premio tambem paga DESENVOLVIMENTO (§7 do brief): cada junior que
+ * cresceu na run vale tampinhas — e a divida tecnica restante MORDE o
+ * cheque. A banca premia; o financeiro desconta.
+ */
+export const PRIZE_JUNIOR_GROWTH = 25;
+export const PRIZE_DEBT_MALUS = 8;
+/** O trofeu da categoria especial da edicao. */
+export const PRIZE_SPECIAL = 40;
+
+// ---------------------------------------------------------------- sponsors
+
+/** O terno de mascote do sponsor: a plateia ve o anuncio antes do pitch. */
+export const SPONSOR_BRANDING_GAUGE = 0.08;
+/** Auditoria do sponsor: cada bug custa mais para consertar. */
+export const SPONSOR_AUDIT_BUGCOST = 1.25;
+/** Limiares dos objetivos checaveis. */
+export const SPONSOR_SHIP_TARGET = 8;
+export const SPONSOR_CROWD_TARGET = 0.8;
+export const SPONSOR_INNOVATION_TARGET = 2;
+
+// ------------------------------------------------------ categoria especial
+
+/** Limiares das categorias especiais (sobre as dimensoes FINAIS da banca). */
+export const SPECIAL_INNOVATION_AT = 10;
+export const SPECIAL_UX_AT = 20;
+export const SPECIAL_STABILITY_AT = 18;
+export const SPECIAL_CROWD_AT = 0.85;
+
+// -------------------------------------------------------------- rivalidade
+
+/**
+ * O RIVAL (os Golden Retrievers do booth ao lado): a nota deles e funcao
+ * pura de (semente, skill). Skill 0 = 38..78 — o bot parado perde ate para
+ * eles; o jogador decente vence com folga. Cada derrota TUA os deixa mais
+ * confiantes (a carreira sobe o skill deles); vence-los os abala um pouco.
+ */
+export const RIVAL_BASE = 58;
+export const RIVAL_PER_SKILL = 45;
+export const RIVAL_JITTER = 20;
+export const RIVAL_MIN_SCORE = 15;

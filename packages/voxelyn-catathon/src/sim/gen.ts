@@ -1,4 +1,11 @@
-import { TASK_CORE_COST, TASK_POLISH_COST } from './constants.js';
+import {
+  RIVAL_BASE,
+  RIVAL_JITTER,
+  RIVAL_MIN_SCORE,
+  RIVAL_PER_SKILL,
+  TASK_CORE_COST,
+  TASK_POLISH_COST,
+} from './constants.js';
 import { SLOTS, TASKS } from './data.js';
 import {
   AUDIENCES_TEXT,
@@ -9,10 +16,23 @@ import {
   CVS_TEXT,
   DOMAINS_TEXT,
   NOTES_TEXT,
+  RETURNING_TEXT,
   TASK_TEXT,
   type Locale,
 } from './text.js';
-import type { CoatPattern, GearId, Personality, Quirk, SlotId, Spec, Task, Tier, Track } from './types.js';
+import type {
+  CoatPattern,
+  GearId,
+  Personality,
+  Quirk,
+  SlotId,
+  Spec,
+  SpecialCategoryId,
+  SponsorContract,
+  Task,
+  Tier,
+  Track,
+} from './types.js';
 
 /**
  * O GERADOR: cada run sorteia uma equipe possivel, um projeto problematico e
@@ -550,6 +570,100 @@ export const rollGearOffers = (seed: number): { id: GearId; cost: number }[] => 
   for (let i = 0; i < 3; i++) out.push(pool.splice(d.int(pool.length), 1)[0]!);
   return out;
 };
+
+// --------------------------------------------------------------- sponsors
+
+/**
+ * O CATALOGO de sponsors. Cada contrato paga orcamento adiantado, cobra um
+ * objetivo checavel na demo e AMARRA algo em troca: a API deles no caminho
+ * da demo, a auditoria que encarece bugs, ou o terno de mascote no palco.
+ * Patrocinio de graca nao existe — e a reputacao abre as portas: os grandes
+ * so patrocinam quem ja apareceu no telao.
+ */
+export const SPONSORS: readonly SponsorContract[] = [
+  { id: 'tunacloud', budget: 60, objective: 'ship-8', payout: 60, strings: 'demo-api' },
+  { id: 'litterbox-vc', budget: 50, objective: 'crowd', payout: 70, strings: 'branding' },
+  { id: 'purrdata', budget: 80, objective: 'zero-bugs', payout: 80, strings: 'audit' },
+  { id: 'meowware', budget: 100, objective: 'innovation', payout: 90, strings: 'demo-api' },
+];
+
+/** Reputacao minima para cada sponsor sequer te procurar. */
+export const SPONSOR_REP_GATE: Record<string, number> = {
+  tunacloud: 1,
+  'litterbox-vc': 2,
+  purrdata: 3,
+  meowware: 5,
+};
+
+/**
+ * A OFERTA da edicao: no maximo UM sponsor procura o booth, sorteado da
+ * semente entre os que a reputacao ja desbloqueou. Rep 0 = ninguem liga.
+ */
+export const rollSponsorOffer = (seed: number, rep: number): SponsorContract | null => {
+  const unlocked = SPONSORS.filter((s) => rep >= (SPONSOR_REP_GATE[s.id] ?? 99));
+  if (unlocked.length === 0) return null;
+  const d = new Dice(seed, 0x5b0050);
+  return d.pick(unlocked);
+};
+
+// ------------------------------------------------------ categoria especial
+
+const SPECIAL_CATEGORIES: readonly SpecialCategoryId[] = [
+  'golden-whisker',
+  'smooth-paws',
+  'iron-litter',
+  'crowd-purr',
+  'clean-scratch',
+];
+
+/** A categoria especial da edicao — anunciada no convite, como a enfase. */
+export const rollSpecialCategory = (seed: number): SpecialCategoryId => {
+  const d = new Dice(seed, 0x57ec1a1);
+  return d.pick(SPECIAL_CATEGORIES);
+};
+
+// -------------------------------------------------------------- rivalidade
+
+/** O booth ao lado e de CACHORROS. Nomes proprios: iguais nos dois idiomas. */
+export const RIVAL_NAMES = [
+  'The Golden Retrievers',
+  'Team Fetch',
+  'The Debug Doghouse',
+  'Woofstack',
+] as const;
+
+export const rollRivalName = (seed: number): string => {
+  const d = new Dice(seed, 0xd06e5);
+  return d.pick(RIVAL_NAMES);
+};
+
+/**
+ * A nota do rival nesta edicao: funcao pura de (semente, skill da carreira).
+ * Skill 0 fica em 38..78 — acima do bot parado, abaixo do jogador decente.
+ * Cada derrota tua sobe o skill deles na carreira; o daily usa skill 0.
+ */
+export const rivalScoreFor = (seed: number, skill: number): number => {
+  const h = nextU32(nextU32((seed ^ 0x51de11a7) >>> 0));
+  const jitter = (h % (RIVAL_JITTER * 2 + 1)) - RIVAL_JITTER;
+  return Math.max(RIVAL_MIN_SCORE, Math.round(RIVAL_BASE + skill * RIVAL_PER_SKILL + jitter));
+};
+
+// ----------------------------------------------------------------- alumni
+
+/**
+ * EVOLUCAO DO JUNIOR entre runs: quem cresceu (learned >= JUNIOR_GROWN_AT)
+ * volta numa edicao futura como PLENO, com desconto de lealdade — mesmo
+ * nome, mesma pelagem, mesmos traits (os que voce ja conhece: e o valor).
+ */
+export const ALUMNI_DISCOUNT = 0.8;
+
+export const returningCandidate = (alum: Candidate, locale: Locale = 'en'): Candidate => ({
+  ...alum,
+  tier: 'pleno',
+  cost: Math.max(6, Math.round(TIER_META.pleno.base * ALUMNI_DISCOUNT)),
+  note: RETURNING_TEXT[locale].note,
+  cv: RETURNING_TEXT[locale].cv,
+});
 
 // ------------------------------------------------------------- daily seed
 

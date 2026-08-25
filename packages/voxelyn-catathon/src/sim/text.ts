@@ -290,6 +290,103 @@ export const SOCIAL_TEXT: Record<Locale, Record<string, { title: string; a: stri
   },
 };
 
+/** A nota do recrutador para o gato que VOLTOU (evolucao do junior). */
+export const RETURNING_TEXT: Record<Locale, { note: string; cv: string }> = {
+  pt: {
+    note: 'cresceu no teu booth e voltou como pleno — com desconto de lealdade.',
+    cv: 'a ultima edicao esta no curriculo. e no coracao.',
+  },
+  en: {
+    note: 'grew up in your booth and came back as mid-level — loyalty discount included.',
+    cv: 'last edition is on the resume. and in the heart.',
+  },
+};
+
+/**
+ * Os SPONSORS: nome e o contrato ESCRITO no objeto — o que pagam, o que
+ * cobram e o que amarram. Ler o contrato e jogar melhor.
+ */
+export const SPONSOR_TEXT: Record<Locale, Record<string, { name: string; offer: string; strings: string }>> = {
+  pt: {
+    tunacloud: {
+      name: 'TunaCloud',
+      offer: '+60 tampinhas agora; +60 se shipar 8+ features',
+      strings: 'a demo roda na API deles (que pode cair no palco)',
+    },
+    'litterbox-vc': {
+      name: 'LitterBox Ventures',
+      offer: '+50 tampinhas agora; +70 se a plateia terminar em 80%+',
+      strings: 'alguem apresenta de terno de mascote (a plateia comeca mais fria)',
+    },
+    purrdata: {
+      name: 'PurrData',
+      offer: '+80 tampinhas agora; +80 se terminar sem nenhum bug vivo',
+      strings: 'auditoria deles no repo: cada bug custa mais para consertar',
+    },
+    meowware: {
+      name: 'MeowWare',
+      offer: '+100 tampinhas agora; +90 se a banca ver inovacao de verdade',
+      strings: 'a demo roda na API deles (que pode cair no palco)',
+    },
+  },
+  en: {
+    tunacloud: {
+      name: 'TunaCloud',
+      offer: '+60 bottle caps now; +60 if you ship 8+ features',
+      strings: 'the demo runs on their API (which may die on stage)',
+    },
+    'litterbox-vc': {
+      name: 'LitterBox Ventures',
+      offer: '+50 bottle caps now; +70 if the crowd ends at 80%+',
+      strings: 'someone presents in the mascot suit (the crowd starts colder)',
+    },
+    purrdata: {
+      name: 'PurrData',
+      offer: '+80 bottle caps now; +80 if you finish with zero live bugs',
+      strings: 'their audit on the repo: every bug costs more to fix',
+    },
+    meowware: {
+      name: 'MeowWare',
+      offer: '+100 bottle caps now; +90 if the judges see real innovation',
+      strings: 'the demo runs on their API (which may die on stage)',
+    },
+  },
+};
+
+/** As CATEGORIAS ESPECIAIS: o trofeu ortogonal da edicao, anunciado no convite. */
+export const SPECIAL_TEXT: Record<Locale, Record<string, { name: string; hint: string }>> = {
+  pt: {
+    'golden-whisker': { name: 'Bigode de Ouro', hint: 'inovacao de verdade na banca' },
+    'smooth-paws': { name: 'Patas Macias', hint: 'a melhor experiencia do pavilhao' },
+    'iron-litter': { name: 'Caixa de Areia de Ferro', hint: 'estabilidade acima de tudo' },
+    'crowd-purr': { name: 'Ronrom da Plateia', hint: 'termine com a plateia a 85%+' },
+    'clean-scratch': { name: 'Arranhao Limpo', hint: 'zero bugs E zero pontas soltas' },
+  },
+  en: {
+    'golden-whisker': { name: 'Golden Whisker', hint: 'real innovation before the judges' },
+    'smooth-paws': { name: 'Smooth Paws', hint: 'the best experience in the pavilion' },
+    'iron-litter': { name: 'Iron Litterbox', hint: 'stability above all' },
+    'crowd-purr': { name: 'Crowd Purr', hint: 'end with the crowd at 85%+' },
+    'clean-scratch': { name: 'Clean Scratch', hint: 'zero bugs AND zero loose ends' },
+  },
+};
+
+/** As provocacoes do rival — cachorros com CI verde sao insuportaveis. */
+export const RIVAL_TAUNT_TEXT: Record<Locale, readonly string[]> = {
+  pt: [
+    'passaram abanando o rabo e "desejando sorte".',
+    'penduraram o trofeu do ano passado VIRADO para o teu booth.',
+    'o estagiario deles trouxe biscoitos. ninguem comeu. era psicologico.',
+    'fizeram deploy as 9h da manha. quem faz isso?',
+  ],
+  en: [
+    'they walked by wagging their tails, "wishing you luck".',
+    "they hung last year's trophy FACING your booth.",
+    'their intern brought biscuits. nobody ate one. it was psychological.',
+    'they deployed at 9am sharp. who does that?',
+  ],
+};
+
 /** As conquistas: nome e como se ganha. */
 export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hint: string }>> = {
   pt: {

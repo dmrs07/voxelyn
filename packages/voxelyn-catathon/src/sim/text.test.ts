@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { NEGATIVE_TRAITS, POSITIVE_TRAITS } from './gen.js';
-import { CHOICE_TEXT, TASK_TEXT, TRAIT_TEXT } from './text.js';
+import { NEGATIVE_TRAITS, POSITIVE_TRAITS, SPONSORS } from './gen.js';
+import { CHOICE_TEXT, SPECIAL_TEXT, SPONSOR_TEXT, TASK_TEXT, TRAIT_TEXT } from './text.js';
 
 /**
  * PARIDADE de idiomas: o tipo do dicionario da interface ja e verificado
@@ -30,5 +30,17 @@ describe('paridade en/pt dos catalogos', () => {
       expect(TRAIT_TEXT.en[tr], `en ${tr}`).toBeTruthy();
       expect(TRAIT_TEXT.pt[tr], `pt ${tr}`).toBeTruthy();
     }
+  });
+
+  it('todo sponsor do catalogo tem contrato escrito nos dois idiomas', () => {
+    expect(Object.keys(SPONSOR_TEXT.en).sort()).toEqual(Object.keys(SPONSOR_TEXT.pt).sort());
+    for (const s of SPONSORS) {
+      expect(SPONSOR_TEXT.en[s.id], `en ${s.id}`).toBeTruthy();
+      expect(SPONSOR_TEXT.pt[s.id], `pt ${s.id}`).toBeTruthy();
+    }
+  });
+
+  it('toda categoria especial tem trofeu nos dois idiomas', () => {
+    expect(Object.keys(SPECIAL_TEXT.en).sort()).toEqual(Object.keys(SPECIAL_TEXT.pt).sort());
   });
 });

@@ -47,6 +47,35 @@ export type GearId =
   | 'laser-pointer';
 
 /**
+ * SPONSOR: um contrato de patrocinio fechado ANTES da run (carreira). Paga
+ * orcamento adiantado, cobra um OBJETIVO checavel mecanicamente na demo, e
+ * amarra alguma coisa em troca — patrocinio de graca nao existe.
+ */
+export type SponsorObjective = 'zero-bugs' | 'ship-8' | 'crowd' | 'innovation';
+export type SponsorString = 'demo-api' | 'audit' | 'branding';
+export type SponsorContract = {
+  id: string;
+  /** Tampinhas adiantadas no recrutamento (o cliente soma a carteira). */
+  budget: number;
+  objective: SponsorObjective;
+  /** Tampinhas extras no premio SE o objetivo for cumprido. */
+  payout: number;
+  /** O que o contrato amarra (efeito mecanico na run). */
+  strings: SponsorString;
+};
+
+/**
+ * CATEGORIA ESPECIAL da edicao: um trofeu ortogonal a colocacao, anunciado
+ * no convite e checado mecanicamente na demo. Da run um segundo objetivo.
+ */
+export type SpecialCategoryId =
+  | 'golden-whisker'
+  | 'smooth-paws'
+  | 'iron-litter'
+  | 'crowd-purr'
+  | 'clean-scratch';
+
+/**
  * EVENTO SOCIAL: o pavilhao interrompe o booth com uma escolha A/B numa
  * janela curta. Ignorar escolhe B (a opcao segura) — o jogo nunca trava
  * esperando, mas a escolha boa premia quem presta atencao.
@@ -159,6 +188,15 @@ export type Cat = {
    * estressa menos — a raca muda comportamento, nunca profissao.
    */
   breedMod: { nap: number; stress: number; hunger: number; social: number };
+  /**
+   * 0..1: o quanto o JUNIOR ja aprendeu NESTA run. Sobe TRABALHANDO (nao
+   * por relogio) e mais rapido com um senior na mesa ao lado — mentoria e
+   * espacial. Nos outros tiers fica 0. Chegando a JUNIOR_GROWN_AT, o gato
+   * "cresceu": vale bonus no premio e volta como pleno na carreira.
+   */
+  learned: number;
+  /** Features shipadas por ESTE gato nesta run (crescimento e estrela). */
+  shipped: number;
 };
 
 /**
@@ -245,8 +283,29 @@ export type DemoResult = {
   dimensions: ScoreDimensions;
   /** 0..1: onde o gauge da plateia terminou. */
   plateia: number;
-  /** O premio em tampinhas: colocacao + bonus de zero bugs + acordos. */
+  /** O premio em tampinhas — a SOMA de prizeParts. */
   prize: number;
+  /**
+   * O EXTRATO do premio, para a tela de resultado ser honesta: colocacao,
+   * zero bugs, acordos da run, sponsor cumprido, categoria especial,
+   * juniores crescidos — e a mordida da divida tecnica (§7 do brief:
+   * premio tambem paga desenvolvimento de junior e cobra divida restante).
+   */
+  prizeParts: {
+    placement: number;
+    zeroBugs: number;
+    deals: number;
+    sponsor: number;
+    special: number;
+    juniors: number;
+    debt: number;
+  };
+  /** O objetivo do sponsor foi cumprido? (null = run sem sponsor) */
+  sponsorMet: boolean | null;
+  /** A categoria especial da edicao foi conquistada? */
+  specialWon: boolean;
+  /** Quantos juniores CRESCERAM (learned >= JUNIOR_GROWN_AT) nesta run. */
+  juniorsGrown: number;
   score: number;
   crashed: boolean;
   /** A crise de demo virou improviso heroico? Historia pra contar. */
@@ -294,6 +353,10 @@ export type SimEvent =
   | { kind: 'cut'; tick: number; task: string }
   | { kind: 'overpet'; tick: number; cat: CatId }
   | { kind: 'trait-revealed'; tick: number; cat: CatId; trait: string }
+  | { kind: 'harmony'; tick: number; a: CatId; b: CatId }
+  | { kind: 'friction'; tick: number; a: CatId; b: CatId }
+  | { kind: 'mentor'; tick: number; mentor: CatId; junior: CatId }
+  | { kind: 'grown'; tick: number; cat: CatId }
   | { kind: 'sponsor-outage'; tick: number }
   | { kind: 'catnip'; tick: number; cat: CatId; zoomies: boolean }
   | { kind: 'laser'; tick: number }
@@ -351,6 +414,18 @@ export type HackState = {
   prizeBonus: number;
   /** Sessoes de carinho na run (conquistas leem daqui). */
   petSessions: number;
+  /**
+   * O contrato de sponsor DESTA run (fechado no recrutamento; entrada da
+   * sim, como a equipe). null = sem patrocinio.
+   */
+  sponsor: SponsorContract | null;
+  /** A categoria especial da edicao (sorteada da semente, como o projeto). */
+  specialCategory: SpecialCategoryId;
+  /**
+   * Pares que ja anunciaram harmonia/atrito/mentoria no feed (uma vez por
+   * par por run — o feed narra a descoberta, nao o tick).
+   */
+  vibesSeen: string[];
   social: SocialEvent[];
   events: SimEvent[];
   result: DemoResult | null;

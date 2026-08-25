@@ -45,8 +45,11 @@ import {
   IMPROVISO_BONUS,
   JUNIOR_BUG_EXTRA,
   JUNIOR_ENERGY_SCALE,
+  JUNIOR_GROWN_AT,
   JUNIOR_LEARN,
+  JUNIOR_LEARN_RATE,
   JUNIOR_SPEED,
+  MENTOR_LEARN_SCALE,
   MORAL_DISPLACED,
   MORAL_OVERWORK_AT,
   MORAL_OVERWORK_RATE,
@@ -69,6 +72,9 @@ import {
   POACH_STAR_MORAL,
   POACH_STAR_STRESS,
   PRIZE_BY_OUTCOME,
+  PRIZE_DEBT_MALUS,
+  PRIZE_JUNIOR_GROWTH,
+  PRIZE_SPECIAL,
   PRIZE_ZERO_BUGS,
   REVEAL_AT,
   RISK_BUGCOST,
@@ -104,7 +110,16 @@ import {
   SOCIAL_AT,
   SOCIAL_JITTER_TICKS,
   SOCIAL_WINDOW,
+  SPECIAL_CROWD_AT,
+  SPECIAL_INNOVATION_AT,
+  SPECIAL_STABILITY_AT,
+  SPECIAL_UX_AT,
+  SPONSOR_AUDIT_BUGCOST,
+  SPONSOR_BRANDING_GAUGE,
+  SPONSOR_CROWD_TARGET,
+  SPONSOR_INNOVATION_TARGET,
   SPONSOR_RISK_CRASH,
+  SPONSOR_SHIP_TARGET,
   STABILITY_CRASH_RELIEF,
   TRAIT_FIX_HUNTER,
   TRAIT_FIX_LEGACY,
@@ -130,14 +145,35 @@ import {
   STRESS_WORK_RATE,
   TERRITORIAL_DISPLACED,
   TREATS_START,
+  VIBE_MORAL_DRIFT,
+  VIBE_RADIUS,
+  VIBE_STRESS_BAD,
+  VIBE_STRESS_GOOD,
   WALK_SPEED,
   ZOOMIES_SPEED,
   ZOOMIES_TICKS,
 } from './constants.js';
 import { SLOTS, TASKS } from './data.js';
-import { CLASSIC_LAYOUT, rollLayout, rollProject, type Candidate } from './gen.js';
+import { CLASSIC_LAYOUT, rollLayout, rollProject, rollSpecialCategory, type Candidate } from './gen.js';
 import { CHOICE_TEXT, TASK_TEXT, type Locale } from './text.js';
-import type { Cat, CatId, Command, DemoResult, GearId, HackState, Outcome, SimEvent, SlotId, SocialEvent, SocialKind, Spec, Task, Track } from './types.js';
+import type {
+  Cat,
+  CatId,
+  Command,
+  DemoResult,
+  GearId,
+  HackState,
+  Outcome,
+  Personality,
+  SimEvent,
+  SlotId,
+  SocialEvent,
+  SocialKind,
+  Spec,
+  SponsorContract,
+  Task,
+  Track,
+} from './types.js';
 
 /**
  * xorshift32 como FUNCAO PURA sobre estado serializado.
@@ -190,6 +226,49 @@ const socialScheduleFor = (seed: number): SocialEvent[] => {
 const hasTrait = (cat: Cat, trait: string): boolean =>
   cat.traits.includes(trait) || cat.hiddenTrait === trait;
 
+// -------------------------------------------------------------- convivencia
+
+/** O que o vibe precisa ler — Cat e Candidate servem. */
+export type VibeSide = { personality: Personality; traits: readonly string[]; hiddenTrait: string };
+
+const sideHas = (s: VibeSide, trait: string): boolean =>
+  s.traits.includes(trait) || s.hiddenTrait === trait;
+
+/** A quimica de personalidades (simetrica; ausente = neutro). */
+const VIBE_PAIR: Partial<Record<Personality, Partial<Record<Personality, number>>>> = {
+  // Dois laranjas ressoam (um neuronio, compartilhado). O cowboy shipando
+  // sem testar enlouquece o perfeccionista — e o julgador VE cada ship sujo.
+  cowboy: { cowboy: 1, perfeccionista: -1, 'julga-em-silencio': -1 },
+  perfeccionista: { cowboy: -1, 'julga-em-silencio': 1 },
+  'julga-em-silencio': { cowboy: -1, perfeccionista: 1, calmo: 1 },
+  calmo: { 'julga-em-silencio': 1 },
+};
+
+/**
+ * COMPATIBILIDADE de um par: -1 (atrito), 0 (neutro) ou +1 (harmonia), de
+ * personalidade + traits. O trait OCULTO conta desde o inicio — o atrito na
+ * mesa aparece ANTES de o curriculo explicar o porque, e essa e a
+ * profundidade dele: voce ve o comportamento antes de saber o nome.
+ */
+export const vibeOf = (a: VibeSide, b: VibeSide): number => {
+  let v = VIBE_PAIR[a.personality]?.[b.personality] ?? 0;
+  if (sideHas(a, 'zen') && sideHas(b, 'zen')) v += 1;
+  if (sideHas(a, 'gambiarra-elegante') && sideHas(b, 'gambiarra-elegante')) v += 1;
+  // O cacador de bugs sabe EXATAMENTE quem comita direto na main.
+  if (
+    (sideHas(a, 'producao-em-main') && sideHas(b, 'cacador-de-bugs')) ||
+    (sideHas(b, 'producao-em-main') && sideHas(a, 'cacador-de-bugs'))
+  )
+    v -= 1;
+  // Zoomies as 3h da manha na mesa ao lado do zen: nao.
+  if (
+    (sideHas(a, 'zoomies-noturnos') && sideHas(b, 'zen')) ||
+    (sideHas(b, 'zoomies-noturnos') && sideHas(a, 'zen'))
+  )
+    v -= 1;
+  return Math.max(-1, Math.min(1, v));
+};
+
 const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
   team.map((c, i) => ({
     id: c.id,
@@ -222,6 +301,8 @@ const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
     petLastTick: -1,
     speedBoost: 0,
     breedMod: { ...c.breedMod },
+    learned: 0,
+    shipped: 0,
   }));
 
 /**
@@ -233,9 +314,16 @@ const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
 export const createHackathon = (
   seed: number,
   team: readonly Candidate[],
-  opts: { classic?: boolean; locale?: Locale; gear?: readonly GearId[] } = {}
+  opts: {
+    classic?: boolean;
+    locale?: Locale;
+    gear?: readonly GearId[];
+    /** O contrato de sponsor fechado no recrutamento (carreira). */
+    sponsor?: SponsorContract | null;
+  } = {}
 ): HackState => {
   const gear = [...(opts.gear ?? [])];
+  const sponsor = opts.sponsor ?? null;
   const locale: Locale = opts.locale ?? 'en';
   const project = opts.classic ? null : rollProject(seed >>> 0, locale);
   const layout = opts.classic ? CLASSIC_LAYOUT : rollLayout(seed >>> 0);
@@ -275,7 +363,9 @@ export const createHackathon = (
   innovation: 0,
   uxCare: 0,
   stability: 0,
-  sponsorRisk: false,
+  // O contrato 'demo-api' amarra a demo na API do sponsor DESDE o inicio —
+  // o mesmo risco da escolha serverless, so que assinado antes da run.
+  sponsorRisk: sponsor?.strings === 'demo-api',
   project: project
     ? { name: project.name, brief: project.brief, emphasis: project.emphasis, risk: project.risk }
     : {
@@ -305,6 +395,9 @@ export const createHackathon = (
   hype: 0,
   prizeBonus: 0,
   petSessions: 0,
+  sponsor,
+  specialCategory: rollSpecialCategory(seed >>> 0),
+  vibesSeen: [],
   social: socialScheduleFor(seed >>> 0),
   events: [],
   result: null,
@@ -338,9 +431,16 @@ const sendTo = (state: HackState, cat: Cat, slot: SlotId): void => {
   cat.mode = 'walk';
 };
 
-/** Todo bug nasce aqui: o risco 'dados-sensiveis' encarece cada um. */
+/**
+ * Todo bug nasce aqui: o risco 'dados-sensiveis' encarece cada um — e a
+ * AUDITORIA do sponsor 'audit' tambem (os dois compoem: assinou, paga).
+ */
 const pushBug = (state: HackState, track: Track, by: CatId, cause: 'teclado' | 'sem-teste', events: SimEvent[]): void => {
-  const cost = Math.round(BUG_COST * (state.project.risk === 'dados-sensiveis' ? RISK_BUGCOST : 1));
+  const cost = Math.round(
+    BUG_COST *
+      (state.project.risk === 'dados-sensiveis' ? RISK_BUGCOST : 1) *
+      (state.sponsor?.strings === 'audit' ? SPONSOR_AUDIT_BUGCOST : 1)
+  );
   state.bugs.push({ id: state.bugs.length, track, by, cost, progress: 0, fixed: false });
   events.push({ kind: 'bug', tick: state.tick, by, track, cause });
 };
@@ -348,6 +448,7 @@ const pushBug = (state: HackState, track: Track, by: CatId, cause: 'teclado' | '
 const shipTask = (state: HackState, task: Task, by: Cat, events: SimEvent[]): void => {
   task.done = true;
   task.awaitingShip = false;
+  by.shipped++;
   events.push({ kind: 'ship', tick: state.tick, task: task.label, track: task.track, by: by.id });
 
   // Shippar levanta a MORAL: mais a de quem shipou, um pouco a de todos.
@@ -642,8 +743,9 @@ const speedOf = (state: HackState, cat: Cat, track: Track): number => {
   if (hasTrait(cat, 'recusa-css') && track === 'frontend') s = BIGODE_CSS_SPEED;
   if (cat.personality === 'cowboy') s *= COWBOY_SPEED;
   if (cat.tier === 'junior') {
-    // O junior APRENDE: comeca devagar e cresce com a run.
-    s *= JUNIOR_SPEED + JUNIOR_LEARN * Math.min(1, state.tick / HACK_TICKS);
+    // O junior APRENDE — desde o Slice D, aprendendo FAZENDO (learned sobe
+    // trabalhando, mais rapido com mentor ao lado), nao por relogio.
+    s *= JUNIOR_SPEED + JUNIOR_LEARN * cat.learned;
   } else if (cat.tier === 'senior') s *= SENIOR_SPEED;
   if (hasTrait(cat, 'polidactila')) s *= TRAIT_SPEED_POLY;
   if (state.gear.includes('teclado-mecanico')) s *= GEAR_KEYBOARD_SPEED;
@@ -850,6 +952,50 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   if (cat.personality === 'calmo') stressRate *= CALM_SCALE;
   if (hasTrait(cat, 'zen')) stressRate *= TRAIT_ZEN;
   stressRate *= cat.breedMod.stress;
+
+  // CONVIVENCIA: quem trabalha numa mesa VIZINHA me afeta. O raio faz o
+  // layout importar (a Ilha Central conversa; os cubiculos isolam) — e o
+  // trait oculto conta desde ja: o atrito aparece antes do curriculo
+  // explicar. O feed anuncia cada dupla UMA vez, na descoberta.
+  let vibeSum = 0;
+  let mentorNear = false;
+  if (working) {
+    for (const other of state.cats) {
+      if (other.id === cat.id || other.mode !== 'work') continue;
+      if (Math.hypot(other.x - cat.x, other.y - cat.y) > VIBE_RADIUS) continue;
+      const v = vibeOf(cat, other);
+      vibeSum += v;
+      if (other.tier === 'senior' || other.tier === 'especialista') mentorNear = true;
+      if (v !== 0 && cat.id < other.id) {
+        const key = `${cat.id}|${other.id}`;
+        if (!state.vibesSeen.includes(key)) {
+          state.vibesSeen.push(key);
+          events.push({ kind: v > 0 ? 'harmony' : 'friction', tick: state.tick, a: cat.id, b: other.id });
+        }
+      }
+      if (cat.tier === 'junior' && (other.tier === 'senior' || other.tier === 'especialista')) {
+        const mkey = `m:${other.id}|${cat.id}`;
+        if (!state.vibesSeen.includes(mkey)) {
+          state.vibesSeen.push(mkey);
+          events.push({ kind: 'mentor', tick: state.tick, mentor: other.id, junior: cat.id });
+        }
+      }
+    }
+    if (vibeSum > 0) stressRate *= VIBE_STRESS_GOOD;
+    else if (vibeSum < 0) stressRate *= VIBE_STRESS_BAD;
+    if (vibeSum !== 0) {
+      cat.moral = Math.max(0, Math.min(1, cat.moral + VIBE_MORAL_DRIFT * Math.sign(vibeSum)));
+    }
+  }
+
+  // A EVOLUCAO do junior: aprende TRABALHANDO, 1.6x com mentor na vizinha.
+  if (working && cat.tier === 'junior' && cat.learned < 1) {
+    const before = cat.learned;
+    cat.learned = Math.min(1, cat.learned + JUNIOR_LEARN_RATE * (mentorNear ? MENTOR_LEARN_SCALE : 1));
+    if (before < JUNIOR_GROWN_AT && cat.learned >= JUNIOR_GROWN_AT) {
+      events.push({ kind: 'grown', tick: state.tick, cat: cat.id });
+    }
+  }
   // O tuxedo sofre com bug vivo em QUALQUER trilha. Ele sabe. Ele sempre sabe.
   if (cat.personality === 'julga-em-silencio' && state.bugs.some((b) => !b.fixed)) {
     stressRate *= JUDGE_BUG_SCALE;
@@ -937,8 +1083,16 @@ const startPitch = (state: HackState, events: SimEvent[]): void => {
   for (const c of state.cats) readyAt[c.id] = 0;
   state.pitch = {
     ticksLeft: PITCH_TICKS,
-    // O hype do influencer chega junto com a equipe ao palco.
-    gauge: Math.min(1, PITCH_GAUGE_START + state.hype),
+    // O hype do influencer chega junto com a equipe ao palco — e o terno de
+    // mascote do sponsor 'branding' esfria a largada: a plateia viu o
+    // anuncio antes de ver a demo.
+    gauge: Math.max(
+      0,
+      Math.min(
+        1,
+        PITCH_GAUGE_START + state.hype - (state.sponsor?.strings === 'branding' ? SPONSOR_BRANDING_GAUGE : 0)
+      )
+    ),
     lastAbility: null,
     readyAt,
     crisisAt,
@@ -1048,9 +1202,58 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
   else if (score >= CUT_MENTION) outcome = 'mencao';
   else outcome = 'participacao';
 
-  // O PREMIO em tampinhas: colocacao + bonus de zero bugs + acordos feitos
-  // durante a run. E o que a carreira leva para a proxima edicao.
-  const prize = (PRIZE_BY_OUTCOME[outcome] ?? 0) + (bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0) + state.prizeBonus;
+  // O OBJETIVO do sponsor, checado mecanicamente. Demo crashada nao paga
+  // sponsor nenhum: nenhum contrato sobrevive ao logo deles numa tela azul.
+  const sp = state.sponsor;
+  let sponsorMet: boolean | null = null;
+  if (sp) {
+    if (crashed) sponsorMet = false;
+    else if (sp.objective === 'zero-bugs') sponsorMet = bugs === 0;
+    else if (sp.objective === 'ship-8') sponsorMet = core + polish >= SPONSOR_SHIP_TARGET;
+    else if (sp.objective === 'crowd') sponsorMet = p.gauge >= SPONSOR_CROWD_TARGET;
+    else sponsorMet = state.innovation >= SPONSOR_INNOVATION_TARGET;
+  }
+
+  // A CATEGORIA ESPECIAL da edicao — o trofeu ortogonal, sobre as
+  // dimensoes FINAIS (a lente da banca ja aplicada).
+  const special = state.specialCategory;
+  const specialWon =
+    !crashed &&
+    (special === 'golden-whisker'
+      ? inovacao >= SPECIAL_INNOVATION_AT
+      : special === 'smooth-paws'
+        ? experienciaW >= SPECIAL_UX_AT
+        : special === 'iron-litter'
+          ? estabilidadeW >= SPECIAL_STABILITY_AT
+          : special === 'crowd-purr'
+            ? p.gauge >= SPECIAL_CROWD_AT
+            : bugs === 0 && looseEnds === 0);
+
+  const juniorsGrown = state.cats.filter((c) => c.tier === 'junior' && c.learned >= JUNIOR_GROWN_AT).length;
+
+  // O PREMIO em tampinhas, agora um EXTRATO (§7 do brief): colocacao, zero
+  // bugs, acordos, sponsor cumprido, categoria especial, juniores crescidos
+  // — e a divida tecnica restante MORDE o cheque. Nunca negativo: o piso da
+  // vergonha e zero.
+  const prizeParts = {
+    placement: PRIZE_BY_OUTCOME[outcome] ?? 0,
+    zeroBugs: bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0,
+    deals: state.prizeBonus,
+    sponsor: sponsorMet ? (sp?.payout ?? 0) : 0,
+    special: specialWon ? PRIZE_SPECIAL : 0,
+    juniors: juniorsGrown * PRIZE_JUNIOR_GROWTH,
+    debt: -state.debt * PRIZE_DEBT_MALUS,
+  };
+  const prize = Math.max(
+    0,
+    prizeParts.placement +
+      prizeParts.zeroBugs +
+      prizeParts.deals +
+      prizeParts.sponsor +
+      prizeParts.special +
+      prizeParts.juniors +
+      prizeParts.debt
+  );
 
   const result: DemoResult = {
     core,
@@ -1058,6 +1261,10 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
     bugs,
     looseEnds,
     prize,
+    prizeParts,
+    sponsorMet,
+    specialWon,
+    juniorsGrown,
     perJudge: [vonWhiskers, meowper, cocada],
     dimensions: { tecnica: tecnicaW, estabilidade: estabilidadeW, experiencia: experienciaW, inovacao, pitch: pitchScore },
     plateia: p.gauge,

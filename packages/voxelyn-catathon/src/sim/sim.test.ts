@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ABILITY_COOLDOWN, HACK_TICKS, PET_MEMORY_TICKS, STRESS_DANGER, TASK_CORE_COST, TREATS_START } from './constants.js';
+import { ABILITY_COOLDOWN, HACK_TICKS, PET_MEMORY_TICKS, TASK_CORE_COST, TREATS_START } from './constants.js';
 import { CLASSIC_TEAM, catOf, createHackathon, emptyCommand, hashState, liveBug, nextTask, step, workable } from './index.js';
-import type { CatId, Command, HackState, SlotId } from './types.js';
+import { runCompetent, runIdle } from './bots.js';
+import type { HackState } from './types.js';
 
 /**
  * A licao do Livro II da Iliada, aplicada desde o primeiro commit: uma partida
@@ -9,91 +10,10 @@ import type { CatId, Command, HackState, SlotId } from './types.js';
  * simulacao — nunca inspecionando constantes.
  */
 
-const DESKS: Record<CatId, SlotId> = {
-  bigode: 'desk-backend',
-  cheeto: 'desk-frontend',
-  almofada: 'desk-devops',
-  smoking: 'desk-design',
-};
-
-const runIdle = (state: HackState): void => {
-  // Ate o FIM — inclusive o pitch, onde ficar parado tambem perde: a plateia
-  // esfria e a crise de demo passa sem resposta.
-  while (state.phase !== 'done') step(state, emptyCommand());
-};
-
-/**
- * O jogador DECENTE: cada gato na propria mesa, carinho em quem esta na zona
- * de perigo, "shipa" no perfeccionista, o gato mais descansado nas
- * emergencias do rack. Uma acao por tick, como o jogo permite.
- *
- * A escolha do bombeiro pelo MAIS DESCANSADO nao e detalhe: a primeira versao
- * mandava sempre o mesmo gato, e quando a bola de pelo o pegava dormindo, o
- * bot o arrancava do puff, ele fugia de volta, e o build quebrava com o
- * "conserto" em andamento. A triagem e o jogo.
+/*
+ * Os bots (parado e decente) moram em bots.ts desde o Slice D: a suite do
+ * rival joga com os MESMOS dois jogadores desta suite.
  */
-/** A ordem de palco do bot: revezar habilidades (repetir rende metade). */
-const PITCH_ORDER = ['bigode', 'cheeto', 'almofada', 'smoking'] as const;
-
-const runCompetent = (state: HackState): void => {
-  let stage = 0;
-  while (state.phase !== 'done') {
-    if (state.phase === 'pitch') {
-      // No palco: revezar quem age — mas com RESERVA. A primeira versao do
-      // bot gastava as quatro habilidades e, quando a demo travava, todo
-      // mundo estava em cooldown (4s) com a janela de crise aberta (3s).
-      // Enquanto a crise puder vir, um gato fica de prontidao.
-      const p = state.pitch!;
-      const crisisOpen = p.crisisUntil > 0 && state.tick < p.crisisUntil && !p.crisisResolved;
-      const ready = PITCH_ORDER.filter((id) => (p.readyAt[id] ?? 0) <= state.tick);
-      const mustReserve = !p.crisisResolved && !crisisOpen;
-      if (ready.length > 0 && (crisisOpen || !mustReserve || ready.length >= 2)) {
-        const pick = ready.find((id) => id === PITCH_ORDER[stage % 4]) ?? ready[0];
-        stage++;
-        step(state, { ability: pick });
-      } else {
-        step(state, emptyCommand());
-      }
-      continue;
-    }
-    const cmd: Command = {};
-    // Decisao aberta e a PRIMEIRA prioridade: mesa parada nao produz.
-    const open = state.tasks.find((t) => t.choice && t.chosen === null && !t.done && !t.cut);
-    if (open) {
-      const pickOption = open.id === 'b1' ? 'micro' : open.id === 'd1' ? 'sistemaPrimeiro' : 'pipelineCompleto';
-      step(state, { choose: { task: open.id, option: pickOption } });
-      continue;
-    }
-    const emergency = state.hairball.active || state.cableOut;
-    const atRack = state.cats.find((c) => c.slot === 'rack' && c.mode !== 'nap');
-    // O bombeiro e o gato com a PIOR necessidade mais folgada: energia OU fome
-    // baixa o tiram do rack no meio do conserto (a fome custou um build na
-    // primeira versao deste bot — ele mandou um gato faminto, que largou a
-    // emergencia para ir ao balcao).
-    const fitness = (c: (typeof state.cats)[number]) => Math.min(c.energy, c.hunger);
-    const fixer = atRack ?? [...state.cats].sort((a, b) => fitness(b) - fitness(a))[0];
-
-    if (state.held) {
-      const held = catOf(state, state.held)!;
-      cmd.drop = emergency && held.id === fixer.id ? 'rack' : DESKS[held.id];
-    } else if (emergency && fitness(fixer) < 0.4 && state.treats > 0) {
-      cmd.treat = fixer.id;
-    } else if (emergency && fixer.slot !== 'rack' && fixer.mode !== 'held') {
-      cmd.grab = fixer.id;
-    } else {
-      const awaiting = state.tasks.some((t) => t.awaitingShip && !t.cut);
-      const bigode = catOf(state, 'bigode')!;
-      const risky = state.cats.find((c) => c.stress > STRESS_DANGER - 0.06 && c.mode === 'work');
-      const loose = state.cats.find(
-        (c) => c.mode === 'idle' && c.slot === null && !(emergency && c.id === fixer.id)
-      );
-      if (awaiting && bigode.mode !== 'held' && bigode.mode !== 'nap') cmd.pet = 'bigode';
-      else if (risky) cmd.pet = risky.id;
-      else if (loose) cmd.grab = loose.id;
-    }
-    step(state, cmd);
-  }
-};
 
 describe('determinismo', () => {
   it('mesma semente, mesmos comandos, mesmo hash', () => {
