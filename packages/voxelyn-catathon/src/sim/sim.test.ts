@@ -335,6 +335,24 @@ describe('recuperacao, venues e brigas', () => {
     expect(Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY)).toBeGreaterThan(10);
   });
 
+  it('decidir NO MEIO da caminhada vira o dev para a mesa na hora', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    const cat = catOf(state, 'bigode')!;
+    // Espera o momento em que ele PARTE para o quadro (alvo = roda de
+    // decisao) e ainda esta longe dele: no meio do caminho.
+    let guard = 0;
+    while (!(cat.mode === 'walk' && Math.abs(cat.targetX - 240) < 40) && guard++ < 600) step(state, emptyCommand());
+    expect(cat.mode).toBe('walk');
+    expect(Math.abs(cat.x - 240)).toBeGreaterThan(60);
+    // ...o jogador decide: o alvo troca para a mesa no passo seguinte.
+    step(state, { choose: { task: 'b1', option: 'monolito' } });
+    step(state, emptyCommand());
+    const seat = state.slots.find((s) => s.id === 'desk-backend')!;
+    expect(Math.hypot(cat.targetX - seat.x, cat.targetY - seat.y)).toBeLessThanOrEqual(2);
+  });
+
   it('o PM e presenca fixa: pep talk sobe a moral de quem trabalha', () => {
     const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
     expect(state.cats.length).toBe(4); // o PM NAO e contratavel nem pegavel

@@ -699,6 +699,14 @@ body {
     bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
     max-width: calc(100vw - 20px);
   }
+  /* O historico expandido tambem respeita o palco: abre ACIMA da faixa e
+     o teto deriva de --stage-bot — em retrato, nada cobre o pavilhao. */
+  .feed-panel {
+    left: calc(env(safe-area-inset-left, 0px) + 10px);
+    width: min(420px, calc(100vw - 20px));
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
+    max-height: max(96px, calc(100vh - var(--stage-bot) - 154px));
+  }
   .hud-board {
     width: min(560px, calc(100vw - 20px));
     max-height: calc(100vh - var(--stage-bot) - 104px);

@@ -812,6 +812,24 @@ const speedOf = (state: HackState, cat: Cat, track: Track): number => {
   return s;
 };
 
+/**
+ * A DECISAO aberta que trava a trilha DESTE gato — nula quando bug ou
+ * feature pronta passam na frente (a mesma ordem de prioridade do workAt).
+ * Compartilhada entre o workAt (montar a cena) e o passo de caminhada
+ * (desmontar a cena NA HORA em que alguem decide, sem terminar a viagem
+ * ate um quadro obsoleto).
+ */
+const openDecisionFor = (state: HackState, cat: Cat): Task | null => {
+  if (!cat.slot?.startsWith('desk-')) return null;
+  const track = slotIn(state, cat.slot).track;
+  if (!track) return null;
+  if (liveBug(state, track)) return null;
+  const awaiting = state.tasks.find((t) => t.track === track && t.awaitingShip && !t.cut);
+  if (awaiting && cat.personality !== 'perfeccionista') return null;
+  const pending = nextTask(state, track);
+  return pending?.choice && pending.chosen === null ? pending : null;
+};
+
 const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   if (cat.slot === 'rack') {
     // O rack atende emergencias na ordem de prazo: bola de pelo, build perdido,
@@ -847,12 +865,12 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   const awaitingTask = state.tasks.find((t) => t.track === track && t.awaitingShip && !t.cut);
   const canShipAwaiting = !!awaitingTask && cat.personality !== 'perfeccionista';
   const pending = nextTask(state, track);
-  const deciding = !bug && !canShipAwaiting && !!pending?.choice && pending.chosen === null;
+  const decisionTask = openDecisionFor(state, cat);
 
   // Tarefa com DECISAO aberta nao anda — e isso vira CENA: os devs da trilha
   // largam o teclado e se juntam na frente do quadro de planejamento, cada
   // um numa vaga propria (a licao dos venues), ate alguem decidir por eles.
-  if (deciding) {
+  if (decisionTask) {
     const spot = DECIDE_SPOTS[state.cats.indexOf(cat) % DECIDE_SPOTS.length]!;
     const gx = DECIDE_X + spot[0];
     const gy = DECIDE_Y + spot[1];
@@ -861,7 +879,7 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
       cat.targetY = gy;
       cat.mode = 'walk';
     }
-    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: pending.label });
+    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: decisionTask.label });
     return;
   }
   // Fora da cena de decisao, o posto de trabalho e a MESA: quem estava no
@@ -1005,6 +1023,13 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   }
 
   if (cat.mode === 'walk') {
+    // Decisao resolvida NO MEIO do caminho ao quadro: o dev vira para a
+    // mesa na hora, em vez de completar a viagem ate um destino obsoleto
+    // (achado de revisao — a reacao rapida do jogador merece resposta).
+    if (cat.slot?.startsWith('desk-') && !openDecisionFor(state, cat)) {
+      const seat = slotIn(state, cat.slot);
+      if (Math.hypot(cat.targetX - seat.x, cat.targetY - seat.y) > 2) sendTo(state, cat, cat.slot);
+    }
     const dx = cat.targetX - cat.x;
     const dy = cat.targetY - cat.y;
     const len = Math.hypot(dx, dy);
