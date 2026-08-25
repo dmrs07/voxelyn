@@ -5,11 +5,15 @@ documento e as folhas de contato derivam apenas de leitura dos PNGs originais.
 
 ## 1. Licenca
 
+- Pagina oficial do pack: <https://girlypixels.itch.io/animated-cat-sprites>
+  ("Animated Cat Sprites", girlypixels).
 - **Dentro do zip NAO existe arquivo de licenca/readme** (2266 arquivos:
   1978 png + 288 gif, nada de texto).
-- Termos fornecidos pela pagina do pack (itch.io, girlypixels): *"You can
-  modify and use these assets in commercial projects, however, you cannot
-  redistribute or resell these assets."*
+- Termos publicados na pagina do pack: *"You can modify and use these assets
+  in commercial projects, however, you cannot redistribute or resell these
+  assets."* A autora pede avaliacao/feedback e gosta de ver o uso — vale
+  creditar "cat sprites by girlypixels" nos creditos do jogo e avisar o
+  defeito do mekong/Hissing (§2).
 - Consequencias praticas:
   - Uso no jogo (inclusive comercial) e modificacao (recolor, overlays,
     frames derivados): **permitido**.
