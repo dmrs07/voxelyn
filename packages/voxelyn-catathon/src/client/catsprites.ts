@@ -155,8 +155,15 @@ const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): 
         while (x0 - 1 >= 0 && frame.data[rowY * frame.w + (x0 - 1)] !== 0) x0--;
         while (x1 + 1 < frame.w && frame.data[rowY * frame.w + (x1 + 1)] !== 0) x1++;
       }
-      for (let x = x0; x <= x1; x++) put(x, ey + 4, packRgb(collar));
-      for (let x = x0; x <= x1 - 1; x++) put(x, ey + 5, darkRgb(collar));
+      // ...e respeita a CURVATURA do pescoco: como no colar desenhado pela
+      // autora (grey_tabby), a banda e uma diagonal em degraus — mais alta
+      // na nuca (tras), descendo 2px ate a garganta (frente).
+      for (let x = x0; x <= x1; x++) {
+        const t = x1 === x0 ? 1 : (x - x0) / (x1 - x0);
+        const yBand = ey + 3 + Math.round(t * 2);
+        put(x, yBand, packRgb(collar));
+        put(x, yBand + 1, darkRgb(collar));
+      }
       badgeCard(frame, x1 - 1, ey + 6, collar);
     }
   }
