@@ -140,6 +140,8 @@ type Dict = {
     sponsorOutage: string;
     harmony: (a: string, b: string) => string;
     friction: (a: string, b: string) => string;
+    fight: (a: string, b: string) => string;
+    fightSeparated: (a: string, b: string) => string;
     mentor: (mentor: string, junior: string) => string;
     grown: (name: string) => string;
   };
