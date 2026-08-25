@@ -697,6 +697,21 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
     }
     return;
   }
+  if (cat.mode === 'fight') {
+    // Bola de pelos, patas alternadas e riscos de unha: exagerado, curto e
+    // legivel. A dupla para somente quando a mao pega um dos briguentos.
+    const shake = (tick >> 1) % 3 - 1;
+    rect(v, x + shake, y + 2, w, h - 2, p.body);
+    drawHead(v, cat, x + (tick % 2 ? -3 : w - 8), y - 6, p, tick, false, true);
+    for (let i = 0; i < 4; i++) {
+      const sx = Math.round(cat.x) - 12 + ((tick * 3 + i * 11) % 25);
+      const sy = y - 8 + ((tick + i * 7) % 18);
+      px(v, sx, sy, CREAM);
+      px(v, sx + 2, sy - 2, CREAM);
+      px(v, sx + 4, sy - 4, CREAM);
+    }
+    return;
+  }
   if (cat.mode === 'zoomies') {
     // Esticado horizontal + poeira atras.
     rect(v, x - 3, y + 4, w + 6, h - 6, p.body);
