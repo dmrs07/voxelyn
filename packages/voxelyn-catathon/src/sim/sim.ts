@@ -43,6 +43,8 @@ import {
   LASER_ZOOMIES_TICKS,
   EMPHASIS_SCALE,
   FREESTYLER_SPEED,
+  FIGHT_P,
+  FIGHT_STRESS_RATE,
   IMPROVISO_BONUS,
   JUNIOR_BUG_EXTRA,
   JUNIOR_ENERGY_SCALE,
@@ -359,6 +361,7 @@ export const createHackathon = (
   buildBroken: false,
   buildProgress: 0,
   held: null,
+  fight: null,
   handX: 240,
   handY: 135,
   debt: 0,
@@ -508,6 +511,19 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
   if (cmd.grab && !state.held) {
     const cat = catOf(state, cmd.grab);
     if (cat && cat.mode !== 'held') {
+      // Pegar qualquer participante separa a briga imediatamente.
+      if (state.fight && (state.fight.a === cat.id || state.fight.b === cat.id)) {
+        const fight = state.fight;
+        const other = catOf(state, fight.a === cat.id ? fight.b : fight.a);
+        if (other) {
+          other.mode = 'walk';
+          other.slot = null;
+          other.targetX = Math.max(30, Math.min(450, other.x + (other.x >= cat.x ? 28 : -28)));
+          other.targetY = other.y;
+        }
+        state.fight = null;
+        events.push({ kind: 'fight-separated', tick: state.tick, a: fight.a, b: fight.b });
+      }
       // Pegar um gato dormindo PODE: acorda rabugento. Uma troca, nao proibicao.
       if (cat.mode === 'nap') cat.stress = Math.min(1, cat.stress + GRABBED_FROM_NAP);
       cat.mode = 'held';
@@ -863,6 +879,12 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
     return;
   }
 
+  if (cat.mode === 'fight') {
+    cat.stress = Math.min(1, cat.stress + FIGHT_STRESS_RATE);
+    cat.energy = Math.max(0, cat.energy - ENERGY_WORK_DRAIN);
+    return;
+  }
+
   const petted = cmd.pet === cat.id && !state.held;
   if (petted && cat.mode !== 'nap' && cat.mode !== 'zoomies') {
     // O carinho tambem e o "SHIPA" do perfeccionista: a feature que ele
@@ -996,6 +1018,26 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
       const v = vibeOf(cat, other);
       vibeSum += v;
       if (other.tier === 'senior' || other.tier === 'especialista') mentorNear = true;
+      if (
+        v < 0 &&
+        !state.fight &&
+        cat.id < other.id &&
+        cat.stress > 0.55 &&
+        other.stress > 0.55 &&
+        draw01(state) < FIGHT_P
+      ) {
+        const mx = (cat.x + other.x) / 2;
+        const my = (cat.y + other.y) / 2;
+        cat.mode = 'fight';
+        other.mode = 'fight';
+        cat.slot = null;
+        other.slot = null;
+        cat.x = mx - 7;
+        other.x = mx + 7;
+        cat.y = other.y = my;
+        state.fight = { a: cat.id, b: other.id };
+        events.push({ kind: 'fight', tick: state.tick, a: cat.id, b: other.id });
+      }
       if (v !== 0 && cat.id < other.id) {
         const key = `${cat.id}|${other.id}`;
         if (!state.vibesSeen.includes(key)) {
@@ -1017,6 +1059,9 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
       cat.moral = Math.max(0, Math.min(1, cat.moral + VIBE_MORAL_DRIFT * Math.sign(vibeSum)));
     }
   }
+
+  // Uma briga interrompe toda produtividade ate a mao separar a dupla.
+  if (cat.mode === 'fight') return;
 
   // A EVOLUCAO do junior: aprende TRABALHANDO, 1.6x com mentor na vizinha.
   if (working && cat.tier === 'junior' && cat.learned < 1) {
