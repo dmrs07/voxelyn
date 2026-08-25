@@ -1,4 +1,16 @@
-import { HACK_TICKS, HOURS_PER_TICK, JUDGES, TREATS_START, fmtCost, type Candidate } from '../sim/index.js';
+import {
+  ACHIEVEMENT_TEXT,
+  GEAR_TEXT,
+  HACK_TICKS,
+  HOURS_PER_TICK,
+  JUDGES,
+  SOCIAL_TEXT,
+  SOCIAL_WINDOW,
+  TREATS_START,
+  fmtCost,
+  type Candidate,
+  type GearId,
+} from '../sim/index.js';
 import { getLocale, setLocale, specLabel, t, tierLabel, traitLabel } from './i18n.js';
 
 /** Alias do dicionario para escopos onde `t` e uma Task. */
@@ -37,6 +49,10 @@ export const ICONS = {
   badge: svg('<rect x="7" y="8" width="10" height="13" rx="2"/><path d="M12 8V5"/><path d="M8 3h8l-1.5 2h-5z"/><path d="M9.5 13h5"/><path d="M9.5 16.5h3.5"/>'),
   /** Jogar de novo: a seta que volta. */
   again: svg('<path d="M5 12a7 7 0 1 1 2 5"/><path d="M5 17v-5h5"/>'),
+  /** Catnip: a folhinha com talo. */
+  leaf: svg('<path d="M12 21c-5-2-7-6-7-11 5 0 9 2 11 7-1 2-2 3-4 4z"/><path d="M12 21C12 14 9 9 5 6"/><path d="M12 10V3"/>'),
+  /** Laser: o ponto e o feixe — o unico botao que mira o chao. */
+  laser: svg('<circle cx="7" cy="17" r="2.5"/><path d="M9.5 14.5L20 4"/><path d="M16 4h4v4"/>'),
 } as const;
 
 /**
@@ -126,6 +142,16 @@ export type Hud = {
   /** Containers que bindTeam preenche a cada run. */
   teamBar: HTMLElement;
   abilityRow: HTMLElement;
+  /** Consumiveis: aparecem na barra so quando ha doses. */
+  catnipBtn: HTMLButtonElement;
+  laserBtn: HTMLButtonElement;
+  /** O modal do evento social: titulo, A/B e a barra do prazo. */
+  socialModal: HTMLElement;
+  socialTitle: HTMLElement;
+  socialA: HTMLButtonElement;
+  socialB: HTMLButtonElement;
+  socialTimer: HTMLElement;
+  socialKind: { current: string | null };
   onCut: (taskId: string) => void;
   onFeedToggle: () => void;
   onChoose: (task: string, option: string) => void;
@@ -144,6 +170,9 @@ export const createHud = (
     onSelect: (cat: CatId) => void;
     onChoose: (task: string, option: string) => void;
     onAbility: (cat: CatId) => void;
+    onCatnipToggle: () => void;
+    onLaser: () => void;
+    onSocial: (option: 'a' | 'b') => void;
   }
 ): Hud => {
   const root = el('div', 'hud');
@@ -288,9 +317,39 @@ export const createHud = (
   soundBtn.addEventListener('click', () => {
     soundPanel.hidden = !soundPanel.hidden;
   });
-  cluster.append(boardBtn, treatsBtn);
+  // Consumiveis: catnip arma (proximo toque num gato dosa), laser dispara.
+  // Escondidos ate existirem doses — botao sem uso e ruido.
+  const catnipBtn = softButton(ICONS.leaf, t().btnCatnip, 'treat');
+  const catnipBadge = el('span', 'btn-badge', '×0');
+  catnipBtn.appendChild(catnipBadge);
+  catnipBtn.hidden = true;
+  catnipBtn.addEventListener('click', handlers.onCatnipToggle);
+  const laserBtn = softButton(ICONS.laser, t().btnLaser, '');
+  const laserBadge = el('span', 'btn-badge', '×0');
+  laserBtn.appendChild(laserBadge);
+  laserBtn.hidden = true;
+  laserBtn.addEventListener('click', handlers.onLaser);
+  cluster.append(catnipBtn, laserBtn, boardBtn, treatsBtn);
 
-  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel);
+  // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
+  // o default do prazo — o modal informa, nunca chantageia.
+  const socialModal = el('div', 'social-modal');
+  socialModal.hidden = true;
+  const socialTitle = el('div', 'social-title', '');
+  const socialA = document.createElement('button');
+  socialA.type = 'button';
+  socialA.className = 'task-choice social-a';
+  socialA.addEventListener('click', () => handlers.onSocial('a'));
+  const socialB = document.createElement('button');
+  socialB.type = 'button';
+  socialB.className = 'task-choice social-b';
+  socialB.addEventListener('click', () => handlers.onSocial('b'));
+  const socialTimerBar = el('div', 'social-timer-bar');
+  const socialTimer = el('span', 'social-timer-fill');
+  socialTimerBar.appendChild(socialTimer);
+  socialModal.append(socialTitle, socialA, socialB, socialTimerBar);
+
+  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal);
   host.appendChild(root);
 
   // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
@@ -330,6 +389,14 @@ export const createHud = (
     rows: new Map(),
     teamBar,
     abilityRow,
+    catnipBtn,
+    laserBtn,
+    socialModal,
+    socialTitle,
+    socialA,
+    socialB,
+    socialTimer,
+    socialKind: { current: null },
     ...handlers,
   };
   return hudRef;
@@ -570,6 +637,32 @@ export const drawHud = (hud: Hud, state: HackState): void => {
     if (btn.className !== cls.trim()) btn.className = cls.trim();
   }
 
+  // Consumiveis na barra: visiveis enquanto houver doses, com o estoque na
+  // badge (acao na palavra, inventario na badge — regra da casa).
+  hud.catnipBtn.hidden = state.catnipLeft <= 0;
+  const cb = hud.catnipBtn.querySelector('.btn-badge');
+  if (cb && cb.textContent !== `×${state.catnipLeft}`) cb.textContent = `×${state.catnipLeft}`;
+  hud.laserBtn.hidden = state.laserLeft <= 0;
+  const lb = hud.laserBtn.querySelector('.btn-badge');
+  if (lb && lb.textContent !== `×${state.laserLeft}`) lb.textContent = `×${state.laserLeft}`;
+
+  // O EVENTO SOCIAL aberto (se houver): texto por tipo, prazo na barra.
+  const openSocial = state.social.find((s) => !s.resolved && s.until > 0 && state.tick < s.until);
+  hud.socialModal.hidden = !openSocial;
+  if (openSocial) {
+    if (hud.socialKind.current !== openSocial.kind) {
+      hud.socialKind.current = openSocial.kind;
+      const st = SOCIAL_TEXT[getLocale()][openSocial.kind]!;
+      setText(hud.socialTitle, st.title);
+      setText(hud.socialA, st.a);
+      setText(hud.socialB, st.b);
+    }
+    const frac = Math.max(0, (openSocial.until - state.tick) / SOCIAL_WINDOW);
+    hud.socialTimer.style.width = `${Math.round(frac * 100)}%`;
+  } else {
+    hud.socialKind.current = null;
+  }
+
   // O PALCO: o painel so existe durante o pitch, e enquanto existe e o jogo
   // — as acoes de booth (petisco, projeto, equipe) saem do caminho.
   const inPitch = state.phase === 'pitch' && state.pitch !== null;
@@ -632,7 +725,12 @@ export const drawCard = (hud: Hud, state: HackState, selected: string | null): v
 };
 
 /** A tela final: as tres notas, o veredito e a historia que deu nisso. */
-export const showResult = (host: HTMLElement, state: HackState, onAgain: () => void): void => {
+export const showResult = (
+  host: HTMLElement,
+  state: HackState,
+  extras: { newAchievements: string[]; wallet: number | null },
+  onAgain: () => void
+): void => {
   const r = state.result!;
   const wrap = el('div', 'screen result');
   wrap.appendChild(el('h1', 'result-title', t().resultTitle[r.outcome] ?? r.outcome));
@@ -671,6 +769,25 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
   wrap.appendChild(
     el('p', 'result-stats', t().stats(r.core, r.polish, r.bugs, r.looseEnds, r.score))
   );
+  // O PREMIO em moedas fisicas — e, na carreira, a carteira que ele virou.
+  const prizeRow = el('p', 'result-prize', t().prizeLine(fmtCost(r.prize, getLocale())));
+  wrap.appendChild(prizeRow);
+  if (extras.wallet !== null) {
+    wrap.appendChild(el('p', 'result-wallet', t().walletAfter(fmtCost(extras.wallet, getLocale()))));
+  }
+  if (extras.newAchievements.length > 0) {
+    const ach = el('div', 'result-achs');
+    ach.appendChild(el('div', 'achs-title', t().achievementsTitle));
+    const achRow = el('div', 'achs-row');
+    for (const id of extras.newAchievements) {
+      const at = ACHIEVEMENT_TEXT[getLocale()][id];
+      const chip = el('span', 'ach-chip', at?.name ?? id);
+      chip.title = at?.hint ?? '';
+      achRow.appendChild(chip);
+    }
+    ach.appendChild(achRow);
+    wrap.appendChild(ach);
+  }
 
   // A historia: os tres eventos mais contaveis da partida. E o que faz alguem
   // dizer "o laranja quebrou o build duas vezes e mesmo assim ganhamos".
@@ -690,15 +807,26 @@ export const showResult = (host: HTMLElement, state: HackState, onAgain: () => v
   host.appendChild(wrap);
 };
 
-export const showTitle = (host: HTMLElement, onStart: () => void): void => {
+export const showTitle = (host: HTMLElement, onStart: (mode: 'career' | 'quick' | 'daily') => void): void => {
   const wrap = el('div', 'screen title');
   wrap.appendChild(el('h1', 'title-logo', 'CATATHON'));
   wrap.appendChild(el('p', 'title-sub', t().titleSub));
   wrap.appendChild(el('p', 'title-brief', t().titleBrief));
   wrap.appendChild(el('p', 'title-help', t().titleHelp));
-  const start = softButton(ICONS.badge, t().btnOpenEmail, 'big');
-  start.addEventListener('click', onStart);
-  wrap.appendChild(start);
+  // Os TRES MODOS: carreira (a carteira persiste), quick run (tudo
+  // sorteado), daily (a semente do dia, igual para todo mundo).
+  const modeRow = el('div', 'mode-row');
+  const modes: ['career' | 'quick' | 'daily', string][] = [
+    ['career', t().modeCareer],
+    ['quick', t().modeQuick],
+    ['daily', t().modeDaily],
+  ];
+  for (const [mode, word] of modes) {
+    const b = softButton(ICONS.badge, `${t().btnOpenEmail} · ${word}`, mode === 'career' ? 'big' : 'dim');
+    b.addEventListener('click', () => onStart(mode));
+    modeRow.appendChild(b);
+  }
+  wrap.appendChild(modeRow);
   // O botao de IDIOMA: o outro idioma, pelo nome dele. Troca e recarrega — o
   // HUD e construido uma vez, de proposito (a licao dos botoes detached).
   const lang = softButton(ICONS.sound, t().langWord, 'dim');
@@ -721,10 +849,11 @@ export const showTitle = (host: HTMLElement, onStart: () => void): void => {
 export const showRecruit = (
   host: HTMLElement,
   candidates: readonly Candidate[],
+  gearOffers: readonly { id: GearId; cost: number }[],
   budget: number,
   project: { name: string; brief: string; emphasis: string },
   layoutName: string,
-  onDone: (hired: Candidate[]) => void
+  onDone: (hired: Candidate[], gear: GearId[]) => void
 ): void => {
   const wrap = el('div', 'screen recruit');
   wrap.appendChild(el('h1', 'recruit-title', i18n().recruitTitle));
@@ -737,8 +866,10 @@ export const showRecruit = (
   );
 
   const hired = new Set<string>();
+  const cart = new Set<GearId>();
   const spent = (): number =>
-    candidates.filter((c) => hired.has(c.id)).reduce((s, c) => s + c.cost, 0);
+    candidates.filter((c) => hired.has(c.id)).reduce((s, c) => s + c.cost, 0) +
+    gearOffers.filter((g) => cart.has(g.id)).reduce((s, g) => s + g.cost, 0);
 
   const saldo = el('div', 'recruit-saldo', '');
   const closeBtn = softButton(ICONS.badge, i18n().btnLockTeam, 'big');
@@ -774,10 +905,30 @@ export const showRecruit = (
     });
     grid.appendChild(card);
   }
-  wrap.append(grid, saldo);
+  // A LOJINHA: tres apetrechos por edicao, trade-off escrito no objeto.
+  const shop = el('div', 'shop');
+  shop.appendChild(el('div', 'shop-title', i18n().shopTitle));
+  const shopRow = el('div', 'shop-row');
+  for (const g of gearOffers) {
+    const gt = GEAR_TEXT[getLocale()][g.id]!;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'shop-item';
+    b.append(el('span', 'shop-name', gt.name), el('span', 'shop-hint', gt.hint), el('span', 'cand-cost', fmtCost(g.cost, getLocale())));
+    b.addEventListener('click', () => {
+      if (cart.has(g.id)) cart.delete(g.id);
+      else cart.add(g.id);
+      b.classList.toggle('hired', cart.has(g.id));
+      refresh();
+    });
+    shopRow.appendChild(b);
+  }
+  shop.appendChild(shopRow);
+
+  wrap.append(grid, shop, saldo);
   closeBtn.addEventListener('click', () => {
     if (closeBtn.disabled) return;
-    onDone(candidates.filter((c) => hired.has(c.id)));
+    onDone(candidates.filter((c) => hired.has(c.id)), [...cart]);
   });
   wrap.appendChild(closeBtn);
   refresh();

@@ -4,12 +4,16 @@ import {
   RUN_BUDGET,
   TICK_MS,
   createHackathon,
+  dailySeed,
   rollCandidates,
+  rollGearOffers,
   rollLayout,
   rollProject,
   step,
   type Candidate,
+  type GearId,
 } from '../sim/index.js';
+import { achievementsFor, loadCareer, saveCareer, todayUTC, type Mode } from './career.js';
 import type { HackState, SimEvent } from '../sim/types.js';
 import {
   createAudioEngine,
@@ -43,6 +47,10 @@ export type App = {
   phase: 'title' | 'recruit' | 'playing' | 'result';
   /** A semente DESTA edicao: candidatos, projeto e layout saem dela. */
   seed: number;
+  /** O modo da edicao: carreira persiste a carteira; daily fixa a semente. */
+  mode: Mode;
+  /** O que esta edicao custou (contratos + apetrechos) — a carreira desconta. */
+  spent: number;
   accumulator: number;
   lastFrame: number;
   frameHandle: number;
@@ -93,7 +101,20 @@ const tickGame = (app: App): void => {
     // O ritual da submissao: a musica congela, o deploy fala, e o final e
     // festa intima ou feltro gentil — nunca tragedia.
     demoAudio(app.audio, app.state);
-    showResult(app.screenHost, app.state, () => openRecruit(app));
+    // A CARREIRA fecha a conta da edicao: desconta o gasto, soma o premio,
+    // nunca cai abaixo do piso. Conquistas persistem em qualquer modo.
+    const career = loadCareer();
+    const unlocked = achievementsFor(app.state);
+    const fresh = unlocked.filter((a) => !career.achievements.includes(a));
+    career.achievements.push(...fresh);
+    career.runs++;
+    let wallet: number | null = null;
+    if (app.mode === 'career') {
+      career.wallet = Math.max(RUN_BUDGET, career.wallet - app.spent + (app.state.result?.prize ?? 0));
+      wallet = career.wallet;
+    }
+    saveCareer(career);
+    showResult(app.screenHost, app.state, { newAchievements: fresh, wallet }, () => openRecruit(app, app.mode));
   }
 };
 
@@ -102,27 +123,36 @@ const tickGame = (app: App): void => {
  * projeto e layout — a sim nunca ve relogio, so a semente congelada), seis
  * curriculos na tela, e a equipe contratada entra na run como argumento.
  */
-const openRecruit = (app: App): void => {
+const openRecruit = (app: App, mode: Mode): void => {
   clearScreens(app.screenHost);
   app.phase = 'recruit';
-  app.seed = (Date.now() ^ 0xca7a7040) >>> 0;
+  app.mode = mode;
+  // DAILY: a semente do dia UTC, igual para todo mundo. Nos outros modos, o
+  // relogio e lido UMA vez aqui — a sim nunca ve tempo real.
+  app.seed = mode === 'daily' ? dailySeed(todayUTC()) : (Date.now() ^ 0xca7a7040) >>> 0;
+  const budget = mode === 'career' ? loadCareer().wallet : RUN_BUDGET;
   const project = rollProject(app.seed, getLocale());
   const layout = rollLayout(app.seed);
   showRecruit(
     app.screenHost,
     rollCandidates(app.seed, getLocale()),
-    RUN_BUDGET,
+    rollGearOffers(app.seed),
+    budget,
     { name: project.name, brief: project.brief, emphasis: project.emphasis },
     layout.name,
-    (hired) => startRun(app, hired)
+    (hired, gear) => startRun(app, hired, gear)
   );
 };
 
-const startRun = (app: App, team: readonly Candidate[]): void => {
+const startRun = (app: App, team: readonly Candidate[], gear: readonly GearId[]): void => {
   clearScreens(app.screenHost);
   stopGameAudio(app.audio);
   startGameAudio(app.audio);
-  app.state = createHackathon(app.seed, team, { locale: getLocale() });
+  app.spent = team.reduce((s, c) => s + c.cost, 0) + gear.reduce((s, g) => {
+    const offer = rollGearOffers(app.seed).find((o) => o.id === g);
+    return s + (offer?.cost ?? 0);
+  }, 0);
+  app.state = createHackathon(app.seed, team, { locale: getLocale(), gear });
   bindTeam(app.hud, app.state.cats);
   app.input.selected = null;
   app.input.queue.length = 0;
@@ -147,6 +177,7 @@ const frame = (app: App, now: number): void => {
     // O botao de petisco pulsa enquanto armado: o proximo toque num gato
     // alimenta, e o jogador precisa VER que o modo esta ligado.
     app.hud.treatsBtn.classList.toggle('armed', app.input.feedArmed);
+    app.hud.catnipBtn.classList.toggle('armed', app.input.catnipArmed);
     app.hud.root.hidden = false;
   } else {
     app.accumulator = 0;
@@ -179,6 +210,7 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
       onCut: (taskId) => input.queue.push({ cut: taskId }),
       onFeedToggle: () => {
         input.feedArmed = !input.feedArmed;
+        if (input.feedArmed) input.catnipArmed = false;
       },
       onLevel: (bus, level) => setLevel(audio, bus as BusId, level),
       levels: () => getLevels(audio),
@@ -188,10 +220,19 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
       },
       onChoose: (task, option) => input.queue.push({ choose: { task, option } }),
       onAbility: (cat) => input.queue.push({ ability: cat }),
+      // Armar o catnip desarma o petisco (e vice-versa): uma mao, um modo.
+      onCatnipToggle: () => {
+        input.catnipArmed = !input.catnipArmed;
+        if (input.catnipArmed) input.feedArmed = false;
+      },
+      onLaser: () => input.queue.push({ laser: true }),
+      onSocial: (option) => input.queue.push({ social: option }),
     }),
     audio,
     screenHost,
     phase: 'title',
+    mode: 'career',
+    spent: 0,
     accumulator: 0,
     lastFrame: 0,
     frameHandle: 0,
@@ -203,8 +244,8 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   window.addEventListener('pointerdown', () => unlockAudio(app.audio), { once: true });
   window.addEventListener('touchstart', () => unlockAudio(app.audio), { once: true, passive: true });
 
-  showTitle(screenHost, () => {
-    openRecruit(app);
+  showTitle(screenHost, (mode) => {
+    openRecruit(app, mode);
   });
 
   return app;

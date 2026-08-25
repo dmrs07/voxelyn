@@ -84,6 +84,17 @@ type Dict = {
   improviso: string;
   stats: (core: number, polish: number, bugs: number, loose: number, total: number) => string;
   judgeLens: [string, string, string];
+  modeCareer: string;
+  modeQuick: string;
+  modeDaily: string;
+  walletLine: (cost: string) => string;
+  shopTitle: string;
+  gearOwned: string;
+  btnCatnip: string;
+  btnLaser: string;
+  prizeLine: (prize: string) => string;
+  walletAfter: (wallet: string) => string;
+  achievementsTitle: string;
   ev: {
     ship: (name: string, task: string) => string;
     awaitShip: (name: string, task: string) => string;
@@ -186,6 +197,17 @@ const EN: Dict = {
   stats: (core, polish, bugs, loose, total) =>
     `${core} core · ${polish} polish · ${bugs} live bugs · ${loose} loose ends · total ${total}`,
   judgeLens: ['architecture: core features and loose ends', 'stability: live bugs in the demo', 'experience: polish and the design track'],
+  modeCareer: 'career',
+  modeQuick: 'quick run',
+  modeDaily: 'daily',
+  walletLine: (cost) => `wallet: ${cost}`,
+  shopTitle: 'gear shop (this edition offers three)',
+  gearOwned: 'in the cart',
+  btnCatnip: 'catnip',
+  btnLaser: 'laser',
+  prizeLine: (prize) => `prize: ${prize}`,
+  walletAfter: (wallet) => `career wallet: ${wallet}`,
+  achievementsTitle: 'achievements unlocked',
   ev: {
     ship: (name, task) => `${name} shipped "${task}"`,
     awaitShip: (name, task) => `${name} finished "${task}" and will NOT let it merge. Pet them.`,
@@ -288,6 +310,17 @@ const PT: Dict = {
   stats: (core, polish, bugs, loose, total) =>
     `${core} core · ${polish} polimentos · ${bugs} bugs vivos · ${loose} pontas soltas · total ${total}`,
   judgeLens: ['arquitetura: features core e pontas soltas', 'estabilidade: bugs vivos na demo', 'experiencia: polimento e a trilha de design'],
+  modeCareer: 'carreira',
+  modeQuick: 'quick run',
+  modeDaily: 'daily',
+  walletLine: (cost) => `carteira: ${cost}`,
+  shopTitle: 'lojinha de apetrechos (a edicao oferece tres)',
+  gearOwned: 'no carrinho',
+  btnCatnip: 'catnip',
+  btnLaser: 'laser',
+  prizeLine: (prize) => `premio: ${prize}`,
+  walletAfter: (wallet) => `carteira da carreira: ${wallet}`,
+  achievementsTitle: 'conquistas desbloqueadas',
   ev: {
     ship: (name, task) => `${name} shipou "${task}"`,
     awaitShip: (name, task) => `${name} terminou "${task}" e NAO deixa mergear. Faz carinho nele.`,

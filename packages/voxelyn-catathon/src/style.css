@@ -577,3 +577,73 @@ body {
 .cand-cv { font-size: 0.76em; opacity: 0.75; font-style: italic; }
 .cand-cost { font-weight: 700; color: var(--accent); font-size: 0.82em; }
 .recruit-saldo { font-weight: 800; text-align: center; }
+
+/* -------------------------------------------------------------- slice C */
+
+/* Os tres modos no titulo: carreira em destaque, os outros discretos. */
+.mode-row { display: grid; gap: 8px; justify-items: stretch; width: 100%; }
+.mode-row .soft-btn { width: 100%; }
+
+/* A lojinha do recrutamento: tres apetrechos, trade-off escrito. */
+.shop { display: grid; gap: 6px; }
+.shop-title { font-weight: 700; color: var(--accent); font-size: 0.9em; }
+.shop-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.shop-item {
+  pointer-events: auto;
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.84em;
+  min-height: 44px;
+}
+.shop-item.hired { border-color: var(--ok); box-shadow: 0 0 10px rgba(120, 214, 140, 0.35); }
+.shop-item:active { transform: scale(0.98); }
+.shop-name { font-weight: 800; }
+.shop-hint { font-size: 0.86em; opacity: 0.8; }
+
+/* O modal do evento social: centro-topo, prazo visivel, B e o caminho calmo. */
+.social-modal {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  width: min(480px, 88vw);
+  background: var(--panel);
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: grid;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 8;
+}
+.social-modal[hidden] { display: none; }
+.social-title { font-weight: 800; }
+.social-timer-bar { height: 5px; background: #262233; border-radius: 3px; overflow: hidden; }
+.social-timer-fill { display: block; height: 100%; background: var(--accent); transition: width 120ms linear; }
+
+/* Premio, carteira e conquistas na tela final. */
+.result-prize { margin: 0; font-weight: 800; color: var(--accent); }
+.result-wallet { margin: 0; font-size: 0.9em; }
+.result-achs { display: grid; gap: 4px; justify-items: center; }
+.achs-title { font-weight: 700; font-size: 0.85em; color: var(--ok); }
+.achs-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.ach-chip {
+  background: rgba(120, 214, 140, 0.14);
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+/* `display` de autor derrota o atributo hidden — a armadilha ja paga uma
+   vez no hud-host, agora vacinada para todo botao macio. */
+.soft-btn[hidden] { display: none; }

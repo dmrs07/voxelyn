@@ -26,6 +26,8 @@ export type InputState = {
   petting: CatId | null;
   selected: CatId | null;
   feedArmed: boolean;
+  /** Catnip armado: o proximo toque num gato dosa (como o petisco). */
+  catnipArmed: boolean;
   /** Acoes de um tiro na fila; a sim consome uma por tick. */
   queue: Command[];
 };
@@ -42,6 +44,7 @@ export const createInput = (): InputState => ({
   petting: null,
   selected: null,
   feedArmed: false,
+  catnipArmed: false,
   queue: [],
 });
 
@@ -108,7 +111,11 @@ export const attachInput = (
     const s = state();
     const cat = catAt(s, p.x, p.y);
     input.downCat = cat?.id ?? null;
-    if (input.feedArmed && cat) {
+    if (input.catnipArmed && cat) {
+      input.queue.push({ catnip: cat.id });
+      input.catnipArmed = false;
+      input.downCat = null;
+    } else if (input.feedArmed && cat) {
       input.queue.push({ treat: cat.id });
       input.feedArmed = false;
       input.downCat = null;

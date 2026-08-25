@@ -74,7 +74,7 @@ const gestures = await page.evaluate(() => getComputedStyle(document.body).touch
 if (gestures !== 'none') throw new Error(`a pagina rola sob o dedo: touch-action=${gestures}`);
 
 // --- RECRUTAMENTO: o e-mail do recrutador, seis crachas, um orcamento ------
-await page.getByRole('button', { name: 'open the email' }).tap();
+await page.getByRole('button', { name: /open the email · career/ }).tap();
 await page.waitForTimeout(300);
 const candCount = await page.locator('.cand-card').count();
 if (candCount !== 6) throw new Error(`o recrutador mandou ${candCount} curriculos (esperava 6)`);
@@ -83,10 +83,28 @@ if (await page.getByRole('button', { name: 'lock the team' }).isEnabled()) {
   throw new Error('da para fechar equipe vazia');
 }
 for (let i = 0; i < 4; i++) await page.locator('.cand-card').nth(i).tap();
+// A LOJINHA: tres ofertas; compra a primeira (portao de apetrecho no estado).
+const shopCount = await page.locator('.shop-item').count();
+if (shopCount !== 3) throw new Error(`a lojinha ofereceu ${shopCount} itens (esperava 3)`);
+await page.locator('.shop-item').nth(0).tap();
 await shot('c1b-recrutamento');
 await page.getByRole('button', { name: 'lock the team' }).tap();
 await page.waitForTimeout(400);
 const team = await sim(() => window.catathon.app.state.cats.map((c) => ({ id: c.id, name: c.name, specialty: c.specialty, personality: c.personality })));
+const gearBought = await sim(() => window.catathon.app.state.gear);
+if (gearBought.length !== 1) throw new Error(`o apetrecho comprado nao chegou ao estado: ${JSON.stringify(gearBought)}`);
+step.push(`apetrecho no booth: ${gearBought[0]}`);
+// Consumiveis SEM doses nao aparecem (display de autor vs hidden: vacinado).
+await page.waitForTimeout(200);
+const ghostBtns = await page.evaluate(() => ({
+  catnipLeft: window.catathon.app.state.catnipLeft,
+  laserLeft: window.catathon.app.state.laserLeft,
+  visible: Array.from(document.querySelectorAll('.action-bar .soft-btn')).filter((b) => b.offsetParent !== null).length,
+}));
+const expectedBtns = 2 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
+if (ghostBtns.visible !== expectedBtns) {
+  throw new Error(`botoes fantasmas na barra: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
+}
 if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
 const bk = team.find((c) => c.specialty === 'backend');
 if (!bk) throw new Error('nenhum backend contratado entre os 4 primeiros (cobertura quebrou)');
@@ -255,6 +273,23 @@ step.push(`cortar escopo: o3.cut=${cutOk}`);
 if (!cutOk) throw new Error('cortar nao cortou');
 await shot('c3-quadro');
 
+// --- EVENTO SOCIAL: o pavilhao interrompe com uma escolha A/B --------------
+await sim(() => {
+  const st = window.catathon.app.state;
+  st.social[0].kind = 'workshop';
+  st.social[0].at = st.tick + 15;
+});
+await page.waitForTimeout(700);
+if (!(await page.locator('.social-modal').isVisible())) throw new Error('o modal do evento social nao abriu');
+await shot('c3b-social');
+await page.locator('.social-a').tap();
+await page.waitForTimeout(250);
+const socialTaken = await sim(() => window.catathon.app.state.social[0]);
+if (!socialTaken.resolved || socialTaken.taken !== 'a') throw new Error('a escolha A nao resolveu o evento');
+const boosted = await sim(() => window.catathon.app.state.cats.some((c) => c.speedBoost > 0));
+if (!boosted) throw new Error('o workshop nao aplicou o boost');
+step.push('evento social pelo dedo: workshop, opcao A, +8% aplicado');
+
 // --- O CHIP DE BUG e clicavel e abre o projeto (achado de revisao) ---------
 await page.getByRole('button', { name: 'project' }).tap(); // fecha o quadro
 await sim(() => {
@@ -322,7 +357,12 @@ await sim(() => {
 await page.waitForTimeout(1200);
 if ((await sim(() => window.catathon.app.state.phase)) !== 'done') throw new Error('o pitch nao terminou');
 if (!(await page.locator('.result-dims').isVisible())) throw new Error('resultado sem as cinco dimensoes');
-step.push('resultado em cinco dimensoes na tela final');
+if (!(await page.locator('.result-prize').isVisible())) throw new Error('resultado sem o premio');
+const career = await page.evaluate(() => JSON.parse(localStorage.getItem('catathon-career') ?? 'null'));
+if (!career || typeof career.wallet !== 'number' || career.runs < 1) {
+  throw new Error(`a carreira nao persistiu: ${JSON.stringify(career)}`);
+}
+step.push(`resultado com premio e carreira persistida (carteira: ${career.wallet}, runs: ${career.runs})`);
 await shot('c5-resultado');
 
 console.log('\nfumaca de toque do CATATHON (Pixel 7, sem teclado nem mouse)\n');
