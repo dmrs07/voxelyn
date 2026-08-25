@@ -1,92 +1,117 @@
-# Devlog — Slice A: a run com decisões
+# CATATHON Devlog — Slice A: The Run With Decisions
 
-*CATATHON · dois commits (`bf872da` sim, `0952ea7` cliente) · 41 testes · PR #156*
+*Two commits (sim, then client) · 41 tests · the slice where the game learned to say no to your finger.*
 
-## O que este slice corrige
+## Where this game came from
 
-O playtest no aparelho real (uma run inteira, 12/12 features) expôs quatro
-problemas de fundo. O Slice A é a resposta: **corrigir a partida atual antes
-de qualquer variabilidade**.
+CATATHON started as five words in a chat: *"the world's biggest hackathon,
+featuring dev fluffy cats."* That's it. That was the brief.
 
-## 1. O exploit do carinho
+But we had something most five-word briefs don't get: an engine with
+opinions. This repo already carried **Voxelyn** — a small voxel/2D engine —
+and two sibling games built on its house discipline: a survival roguelike
+and a full 24-book adaptation of the *Iliad*. Both taught expensive lessons
+(integer ticks, seeded RNG as pure functions, authoritative state hashes,
+"no DOM in the simulation" enforced by test, touch as the primary citizen).
+CATATHON inherited every one of those scars on day one, for free.
 
-O maior achado do playtest nem foi visual: lendo a sim, o carinho recuperava
-**energia** (`ENERGY_PET_RATE`). Segurar o dedo substituía comida, sono e
-planejamento — o jogo inteiro colapsava num gesto.
+The founding design decision — written into a design contract *before any
+code* — was that the heart of the game is **task orchestration plus cat
+psychology**, and that every cute thing must be mechanical. A cat is a
+discipline + a personality + a feline quirk, and all three have gameplay
+teeth. The perfectionist finishes a feature and *refuses to let it merge*
+until you pet him ("ship it"). The orange cowboy ships without testing.
+Stress doesn't fill a bar for decoration: a stressed cat **sits on the
+keyboard**, and that's where bugs come from. Managing mood and managing
+technical debt are literally the same verb. That's the joke, and the joke
+is the mechanic.
 
-A correção não foi "nerfar o número", foi dar ESTRUTURA ao gesto:
+## What Slice A is
 
-- **Moral** virou o quarto medidor. Sobe com carinho bem dado, ship próprio
-  (+0.10) e da equipe (+0.04); desce trabalhando exausto e sendo despejado.
-  E manda na velocidade (0.85×–1.1×): nenhum medidor é enfeite.
-- **Carinho tem memória** (`petStreak`/`petLastTick`, ambos no hash): a
-  segunda sessão seguida rende metade; a terceira **superestimula** — o
-  estresse SOBE e o feed avisa. ~40s sem carinho zeram o streak.
-- **Personalidade responde diferente**: o cowboy é carente (1.2×/1.3×), o
-  calmo já está bem (0.6×/0.7×), o julgador-em-silêncio precisa ser visto.
-- O "shipa" do perfeccionista **funciona em qualquer streak**: é
-  comunicação, não cuidado.
+The first vertical slice shipped and got played — a whole 48-hour run on a
+real phone, 12/12 features. The playtest brief that came back was blunt:
+the game had a good scene and a shallow loop. Slice A is the answer, and
+its rule was: **fix the current run before making runs variable.**
 
-O jogador agora aprende o ritmo de cada gato em vez de esfregar o botão.
+### 1. Killing the petting exploit
 
-## 2. Decisões de engenharia
+Reading the sim with playtest eyes found the real villain: petting restored
+**energy**. Hold your finger on a cat and you'd replaced food, sleep and
+planning with one gesture. The whole management game collapsed into a
+thumb.
 
-"Colocar um gato e esperar a barra encher não é jogo." Três tarefas-raiz
-ganharam `choice`: arquitetura (b1), abordagem de UI (d1) e deploy (o1).
-A tarefa **não anda** até o jogador decidir — o gato senta, o quadro pisca.
+The fix wasn't nerfing a number — it was giving the gesture *structure*:
 
-Cada opção muda o formato da run, nunca só um número: monólito é barato e
-cria dívida; microsserviços custam agora e barateiam b2/b3; serverless é
-rapidíssimo e **amarra a demo no sponsor** (risco real de crash no palco);
-design system primeiro paga nas telas seguintes; pipeline completo compra
-estabilidade na banca.
+- **Morale** became the fourth meter. It rises with well-timed petting,
+  your own ship (+0.10) and the team's (+0.04); it falls when a cat works
+  exhausted or gets evicted from its desk. And it drives **work speed**
+  (0.85×–1.1×), because no meter in this house is allowed to be
+  decoration.
+- **Petting got memory** (`petStreak` / `petLastTick`, both hashed): the
+  second consecutive session yields half; the third **overstimulates** —
+  stress goes *up* and the feed tells you so. Roughly 40 seconds of
+  restraint resets the streak.
+- Personalities answer differently (the cowboy is needy: 1.2×/1.3×; the
+  calm one is fine, thanks: 0.6×/0.7×). The perfectionist's "ship it"
+  still works on any streak — that's communication, not care.
 
-## 3. O pitch é jogável
+The player now learns each cat's rhythm instead of rubbing the screen.
 
-O crash da demo era um sorteio ao fim — decisivo e inassistível. Virou
-**fase**: 30 segundos de palco, gauge da plateia decaindo sozinho, uma
-habilidade por gato (cooldown de 4s; repetir a MESMA rende metade; o cursor
-do Cheeto pode mudar o slide), e o sorteio do crash virou **crise
-respondível** no meio do pitch: qualquer habilidade dentro da janela de 3s
-vira *improviso heroico* (+gauge, a plateia ama); ignorada, a demo crasha de
-verdade.
+### 2. Tasks with decisions
 
-## 4. Pontuação em cinco dimensões
+"Place a cat and watch a bar fill" is not a game. Three root tasks gained
+a `choice` field, and a task with an open choice **does not progress** —
+the cat sits down, the board blinks *DECISION open*, and the game charges
+you for an answer. Feline monolith (fast now, debt later), microservices
+(pricey now, the backend pays you back), sponsor serverless (blazing —
+and their API might die *mid-demo*, which is a real crash-probability
+term). Design-system-first discounts every later screen. A full pipeline
+buys stability points the judges can see.
 
-Técnica, estabilidade, experiência, inovação e pitch + voto popular. Dívida
-morde a estabilidade; escolhas pagam onde prometeram; o pitch vale até 30.
-Cortes retunados (118/74/36) e — como sempre — validados **jogando**: o bot
-parado perde até no palco; o bot decente decide, revezar habilidades e sobe
-ao pódio em quatro sementes.
+Technically each option is one entry in a switch: cost multipliers applied
+once at decision time, plus scoring tags (`debt`, `innovation`, `uxCare`,
+`stability`, `sponsorRisk`) that the finale reads. Cheap to write, and it
+reshapes the run.
 
-## A tela obedeceu (§16 do brief)
+### 3. The pitch became playable
 
-- A ficha do gato cobria **um quarto da área jogável**, exatamente sobre a
-  estação do selecionado. Virou **ficha compacta no rodapé** (nome, "agora:
-  …", três micro-medidores; bio e fome atrás de `detalhes`).
-- **Barra da equipe** na borda esquerda com anéis de estado (verde
-  trabalhando, coral piscando na zona de perigo).
-- **Feed em faixa única** + histórico atrás de toque: três logs empilhados
-  cobriam o canto de descanso.
-- Chip `features n/12` com palavra; **chip de bug é botão** que abre o
-  projeto; no palco, as ações de booth saem do caminho sozinhas.
+The demo crash used to be a dice roll at the end — decisive and
+unwatchable. It's now a **phase**: thirty seconds on stage, a crowd gauge
+decaying on its own, and one stage ability per cat (4s cooldown; repeating
+the same trick yields half — crowds have memory; the cowboy's
+cursor-chasing is the biggest hit *and* can flip the slide). The crash
+roll turned into a **crisis window**: the demo freezes mid-pitch, and any
+ability used within three seconds converts disaster into *heroic improv*
+(+gauge, the crowd loves a recovery). Ignored, the demo genuinely crashes.
 
-## Defeitos pegos pelos portões durante o slice
+### 4. Five-dimension scoring
 
-1. O teste de memória do carinho rebobinava `petLastTick` para negativo — e
-   o sentinela ignorava. O teste passou a **passar o tempo jogando**.
-2. O painel do projeto ficava aberto POR CIMA do palco: o pitch agora fecha
-   os painéis de booth ao começar.
-3. As dimensões do resultado nasceram sem estilo ("tecnica-5" grudado) — o
-   screenshot pegou antes de qualquer humano.
+Engineering, stability, experience, innovation, pitch — plus the crowd as
+a popular vote. Debt bites stability; choices pay where they promised; the
+result screen shows *what cost you the podium*, because the post-game
+lesson is the whole post-game.
 
-## Números
+## Craft notes
 
-- 41 testes (eram 33): +superestimulação, +decaimento da memória, +decisão
-  trava/aplica, +micro barateia b2, +palco parado perde, +repetição rende
-  metade, +crise respondida/ignorada.
-- Fumaça: 6 portões novos — decisão pelo dedo, ficha compacta NO RODAPÉ,
-  faixa de feed, **carinho não recupera energia** (o exploit vigiado para
-  sempre), habilidade mexe na plateia, resultado em cinco dimensões.
-- Hash: moral, memória de carinho, custos decididos, estado inteiro do
-  pitch.
+- **Tuning is proven by playing, never by inspecting constants** — a
+  lesson bought in the Iliad's Book II. Two bots gate every balance
+  change: the idle bot must lose (now it loses *on stage too* — the crowd
+  cools, the crisis goes unanswered), and a competent bot — assign
+  specialists, pet the risky, answer emergencies by triage — must reach
+  the podium across seeds.
+- The UI obeyed the playtest line by line: the cat card used to cover **a
+  quarter of the playfield**, exactly over the selected cat's own station.
+  It became a compact dock at the bottom edge; the team got portrait
+  buttons with state rings; three stacked log lines became one strip with
+  the history behind a tap; the bug chip became a *button* (an alert that
+  leads nowhere is decoration).
+- Small honest bugs the gates caught during the slice: a test that
+  rewound the pet-memory clock into negative numbers (the sentinel
+  ignored it — the test now *plays* the time forward); the project panel
+  sitting open on top of the stage; result dimensions rendering unstyled.
+  All three were caught by tests or by looking at actual screenshots
+  before any human did.
+
+**Numbers:** 33 → 41 tests. The state hash grew to cover morale, pet
+memory, decided costs and the entire pitch state — because everything
+that determines the future belongs in the hash.
