@@ -1,4 +1,4 @@
-import { HASH_METER, HASH_POS } from './constants.js';
+import { HASH_FIX, HASH_METER, HASH_POS } from './constants.js';
 import type { HackState } from './types.js';
 
 /**
@@ -43,9 +43,12 @@ export const hashState = (state: HackState): string => {
   h.str(state.phase);
   h.u32(state.treats);
   h.u32(state.buildBroken ? 1 : 0);
+  h.fixed(state.buildProgress, HASH_FIX);
   h.str(state.held ?? '-');
+  h.str(state.fight?.a ?? '-');
+  h.str(state.fight?.b ?? '-');
   h.u32(state.cableOut ? 1 : 0);
-  h.fixed(state.cableProgress, 1);
+  h.fixed(state.cableProgress, HASH_FIX);
   for (const c of state.cats) {
     h.str(c.id);
     // A FICHA MECANICA do contratado e ENTRADA do replay: dois elencos com
@@ -136,7 +139,7 @@ export const hashState = (state: HackState): string => {
   }
   h.u32(state.hairball.fired);
   h.u32(state.hairball.active ? 1 : 0);
-  h.fixed(state.hairball.progress, 1);
+  h.fixed(state.hairball.progress, HASH_FIX);
   h.u32(state.events.length);
   return h.digest();
 };

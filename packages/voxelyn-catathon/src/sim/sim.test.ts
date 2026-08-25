@@ -282,6 +282,71 @@ describe('a bola de pelo', () => {
   });
 });
 
+describe('recuperacao, venues e brigas', () => {
+  it('um build perdido volta quando um gato trabalha no rack', () => {
+    const state = createHackathon(11, CLASSIC_TEAM, { classic: true });
+    while (!state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
+    while (state.hairball.active && state.phase === 'hack') step(state, emptyCommand());
+    expect(state.buildBroken).toBe(true);
+    step(state, { grab: 'almofada' });
+    step(state, { drop: 'rack' });
+    let guard = 0;
+    while (state.buildBroken && guard++ < HACK_TICKS) step(state, emptyCommand());
+    expect(state.buildBroken).toBe(false);
+    expect(state.buildProgress).toBe(0);
+    expect(state.events.some((e) => e.kind === 'build-fixed')).toBe(true);
+  });
+
+  it('gatos no mesmo venue recebem alvos separados e tocaveis', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'cafe' });
+    step(state, { grab: 'cheeto' });
+    step(state, { drop: 'cafe' });
+    const a = catOf(state, 'bigode')!;
+    const b = catOf(state, 'cheeto')!;
+    expect(Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY)).toBeGreaterThan(20);
+  });
+
+  it('pegar um briguento separa a dupla', () => {
+    const state = createHackathon(8, CLASSIC_TEAM, { classic: true });
+    const a = catOf(state, 'bigode')!;
+    const b = catOf(state, 'cheeto')!;
+    a.mode = b.mode = 'fight';
+    a.slot = b.slot = null;
+    state.fight = { a: a.id, b: b.id };
+    step(state, { grab: a.id });
+    expect(state.fight).toBeNull();
+    expect(a.mode).toBe('held');
+    expect(b.mode).toBe('walk');
+    expect(state.events.some((e) => e.kind === 'fight-separated')).toBe(true);
+  });
+
+  it('o rack e posto social: o segundo gato NAO desaloja o primeiro', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'rack' });
+    step(state, { grab: 'cheeto' });
+    step(state, { drop: 'rack' });
+    const a = catOf(state, 'bigode')!;
+    const b = catOf(state, 'cheeto')!;
+    expect(a.slot).toBe('rack');
+    expect(b.slot).toBe('rack');
+    expect(Math.hypot(a.targetX - b.targetX, a.targetY - b.targetY)).toBeGreaterThan(10);
+  });
+
+  it('fracoes do conserto entram no hash: 1078.6 e 1079.4 NAO colidem', () => {
+    // fixSpeed 1.3 avanca em decimos: na escala 1 estes dois estados davam o
+    // mesmo hash e o tick seguinte conserta um build e deixa o outro quebrado.
+    const a = createHackathon(3, CLASSIC_TEAM, { classic: true });
+    const b = createHackathon(3, CLASSIC_TEAM, { classic: true });
+    a.buildBroken = b.buildBroken = true;
+    a.buildProgress = 1078.6;
+    b.buildProgress = 1079.4;
+    expect(hashState(a)).not.toBe(hashState(b));
+  });
+});
+
 describe('carinho com memoria (o exploit morreu)', () => {
   const petSession = (state: HackState, cat: string, ticks: number): void => {
     for (let i = 0; i < ticks; i++) step(state, { pet: cat as 'cheeto' });

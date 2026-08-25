@@ -114,6 +114,11 @@ export const WALK_SPEED = 1.9;
 export const CABLE_BITE_P = 0.5;
 /** Religar o cabo: 6s de qualquer gato no rack. Sem prazo: fica caido ate. */
 export const CABLE_FIX_COST = 6 * TICK_HZ;
+/**
+ * Reerguer um build perdido exige uma intervencao maior no rack. Continua
+ * sendo uma crise cara, mas nunca transforma o resto da run em tempo morto.
+ */
+export const BUILD_REPAIR_COST = 18 * TICK_HZ;
 
 // ----------------------------------------------------------------- hairball
 
@@ -202,6 +207,11 @@ export const CUT_MENTION = 36;
 
 export const HASH_POS = 10;
 export const HASH_METER = 1000;
+/**
+ * Progresso de conserto avanca em fracoes (fixSpeed 1.3 no Server Corner):
+ * na escala 1 o arredondamento colava estados que divergem no tick seguinte.
+ */
+export const HASH_FIX = 10;
 
 // ---------------------------------------------------------- tiers e traits
 
@@ -233,6 +243,9 @@ export const VIBE_STRESS_GOOD = 0.88;
 export const VIBE_STRESS_BAD = 1.18;
 /** Deriva de moral por tick ao lado de amigo (+) ou rival (-). */
 export const VIBE_MORAL_DRIFT = 0.0005;
+/** Atrito alto entre vizinhos pode escalar; raro o bastante para ser historia. */
+export const FIGHT_P = 0.00012;
+export const FIGHT_STRESS_RATE = 0.00035;
 
 /**
  * MENTORIA: o junior aprende TRABALHANDO (nao por relogio) — e 1.6x mais

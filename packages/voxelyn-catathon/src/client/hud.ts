@@ -3,6 +3,7 @@ import {
   GEAR_TEXT,
   HACK_TICKS,
   HOURS_PER_TICK,
+  BUILD_REPAIR_COST,
   JUDGES,
   SOCIAL_TEXT,
   SOCIAL_WINDOW,
@@ -45,6 +46,8 @@ export const ICONS = {
   fish: svg('<path d="M4 12c3-4 8-5 12-2 2 1.5 2 4.5 0 6-4 3-9 2-12-2z"/><path d="M16 9l4-3-1 6 1 6-4-3"/><circle cx="8" cy="11" r="0.6" fill="currentColor"/>'),
   /** O quadro de tarefas: prancheta com post-its. */
   board: svg('<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2.5h6v3H9z"/><path d="M7.5 10h4"/><path d="M7.5 14h6"/><path d="M7.5 18h3"/><circle cx="16.5" cy="10" r="1.1"/>'),
+  /** Gantt: barras deslocadas no tempo — nenhum icone repete na barra. */
+  gantt: svg('<rect x="3" y="4" width="10" height="3.4" rx="1.2"/><rect x="7" y="10.3" width="12" height="3.4" rx="1.2"/><rect x="11" y="16.6" width="8" height="3.4" rx="1.2"/>'),
   /** Som: uma orelhinha de gato ouvindo uma nota. */
   sound: svg('<path d="M5 14V7l4-4 3 6v5a3.5 3.5 0 11-7 0z"/><path d="M16 6v9"/><circle cx="14.2" cy="15.8" r="1.8"/><path d="M16 6l3 1.5"/>'),
   /** Cortar escopo: tesourinha. */
@@ -214,6 +217,7 @@ export const createHud = (
   // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
   const boardBtn = softButton(ICONS.board, t().btnProject);
+  const ganttBtn = softButton(ICONS.gantt, 'Gantt');
   top.append(clock, remain, build, proj, bugsChip, alarm);
   const cluster = el('div', 'action-bar');
 
@@ -221,7 +225,14 @@ export const createHud = (
   board.hidden = true;
 
   boardBtn.addEventListener('click', () => {
-    board.hidden = !board.hidden;
+    const wasKanban = !board.hidden && !board.classList.contains('gantt');
+    board.classList.remove('gantt');
+    board.hidden = wasKanban;
+  });
+  ganttBtn.addEventListener('click', () => {
+    const wasGantt = !board.hidden && board.classList.contains('gantt');
+    board.classList.add('gantt');
+    board.hidden = wasGantt;
   });
   bugsChip.addEventListener('click', () => {
     board.hidden = false;
@@ -338,7 +349,7 @@ export const createHud = (
   laserBtn.appendChild(laserBadge);
   laserBtn.hidden = true;
   laserBtn.addEventListener('click', handlers.onLaser);
-  cluster.append(catnipBtn, laserBtn, boardBtn, treatsBtn);
+  cluster.append(catnipBtn, laserBtn, boardBtn, ganttBtn, treatsBtn);
 
   // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
   // o default do prazo — o modal informa, nunca chantageia.
@@ -473,7 +484,7 @@ const remainText = (tick: number): string => {
 };
 
 const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, option: string) => void): TaskRow => {
-  const row = el('div', 'task');
+  const row = el('div', `task track-${t.track}`);
   row.appendChild(el('span', 'task-name', t.label + (t.polish ? ' ✦' : '')));
   const state = el('span', 'task-state', '');
   const bar = el('span', 'task-bar');
@@ -508,7 +519,7 @@ const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, 
 };
 
 const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
-  r.row.className = `task ${t.done ? 'done' : ''} ${t.cut ? 'cut' : ''} ${t.awaitingShip ? 'await' : ''}`;
+  r.row.className = `task track-${t.track} ${t.done ? 'done' : ''} ${t.cut ? 'cut' : ''} ${t.awaitingShip ? 'await' : ''}`;
   const depsPending = t.deps.filter((d) => !state.tasks.find((x) => x.id === d)?.done);
   const locked = depsPending.length > 0 && !t.done && !t.cut;
 
@@ -534,7 +545,9 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 
   const showBar = !t.done && !t.cut && !t.awaitingShip && !locked && !deciding;
   r.bar.style.display = showBar ? '' : 'none';
-  if (showBar) r.fill.style.width = `${Math.round((t.progress / t.cost) * 100)}%`;
+  const progress = t.done ? 100 : t.cut ? 0 : Math.round((t.progress / t.cost) * 100);
+  r.fill.style.width = `${progress}%`;
+  r.row.style.setProperty('--task-progress', `${progress}%`);
 
   r.cutBtn.style.display = t.done || t.cut ? 'none' : '';
 };
@@ -569,6 +582,8 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.hairballFixed;
     case 'build-broken':
       return d.ev.buildBroken;
+    case 'build-fixed':
+      return d.ev.buildFixed;
     case 'treat':
       return d.ev.treat(name(e.cat));
     case 'cut':
@@ -593,6 +608,10 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.harmony(name(e.a), name(e.b));
     case 'friction':
       return d.ev.friction(name(e.a), name(e.b));
+    case 'fight':
+      return d.ev.fight(name(e.a), name(e.b));
+    case 'fight-separated':
+      return d.ev.fightSeparated(name(e.a), name(e.b));
     case 'mentor':
       return d.ev.mentor(name(e.mentor), name(e.junior));
     case 'grown':
@@ -614,7 +633,9 @@ export const drawHud = (hud: Hud, state: HackState): void => {
 
   // Build com cor de estado; bugs so existem no HUD quando existem no jogo,
   // e chegam ja com peso de alarme — nao como rodape de frase.
-  const buildState = state.buildBroken ? t().buildDead : state.cableOut ? t().buildDown : t().buildOk;
+  const buildState = state.buildBroken
+    ? `${t().buildDead} · ${Math.min(100, Math.round((state.buildProgress / BUILD_REPAIR_COST) * 100))}%`
+    : state.cableOut ? t().buildDown : t().buildOk;
   setText(hud.build, buildState);
   hud.build.classList.toggle('chip-bad', state.buildBroken || state.cableOut);
   setText(hud.proj, t().features(shipped));

@@ -6,6 +6,7 @@ import {
   ABILITY_REPEAT_SCALE,
   BIGODE_CSS_SPEED,
   BUG_COST,
+  BUILD_REPAIR_COST,
   CABLE_BITE_P,
   CABLE_FIX_COST,
   CALM_SCALE,
@@ -42,6 +43,8 @@ import {
   LASER_ZOOMIES_TICKS,
   EMPHASIS_SCALE,
   FREESTYLER_SPEED,
+  FIGHT_P,
+  FIGHT_STRESS_RATE,
   IMPROVISO_BONUS,
   JUNIOR_BUG_EXTRA,
   JUNIOR_ENERGY_SCALE,
@@ -356,7 +359,9 @@ export const createHackathon = (
   cableProgress: 0,
   treats: TREATS_START,
   buildBroken: false,
+  buildProgress: 0,
   held: null,
+  fight: null,
   handX: 240,
   handY: 135,
   debt: 0,
@@ -423,11 +428,27 @@ export const nextTask = (state: HackState, track: Track): Task | undefined =>
 /** O slot no BOOTH DESTA RUN — as coordenadas moram no estado (layout). */
 const slotIn = (state: HackState, id: SlotId) => state.slots.find((s) => s.id === id)!;
 
+/**
+ * Postos sociais aceitam mais de um gato, mas cada corpo recebe uma vaga
+ * visual/tocavel propria. A escolha da primeira vaga livre e deterministica.
+ */
+const VENUE_OFFSETS: Partial<Record<SlotId, readonly [number, number][]>> = {
+  cafe: [[-26, 3], [26, 3], [-12, 10], [12, 10]],
+  puff: [[-14, 1], [14, 1], [-23, 8], [23, 8]],
+  rack: [[-18, 4], [18, 4], [-18, -9], [18, -9]],
+};
+
 const sendTo = (state: HackState, cat: Cat, slot: SlotId): void => {
   const s = slotIn(state, slot);
+  const offsets = VENUE_OFFSETS[slot] ?? [[0, 0] as [number, number]];
+  const occupied = state.cats.filter((c) => c.id !== cat.id && c.slot === slot);
+  const offset =
+    offsets.find(([ox, oy]) =>
+      occupied.every((c) => Math.hypot(c.targetX - (s.x + ox), c.targetY - (s.y + oy)) > 4)
+    ) ?? offsets[offsets.length - 1]!;
   cat.slot = slot;
-  cat.targetX = s.x;
-  cat.targetY = s.y;
+  cat.targetX = s.x + offset[0];
+  cat.targetY = s.y + offset[1];
   cat.mode = 'walk';
 };
 
@@ -490,6 +511,19 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
   if (cmd.grab && !state.held) {
     const cat = catOf(state, cmd.grab);
     if (cat && cat.mode !== 'held') {
+      // Pegar qualquer participante separa a briga imediatamente.
+      if (state.fight && (state.fight.a === cat.id || state.fight.b === cat.id)) {
+        const fight = state.fight;
+        const other = catOf(state, fight.a === cat.id ? fight.b : fight.a);
+        if (other) {
+          other.mode = 'walk';
+          other.slot = null;
+          other.targetX = Math.max(30, Math.min(450, other.x + (other.x >= cat.x ? 28 : -28)));
+          other.targetY = other.y;
+        }
+        state.fight = null;
+        events.push({ kind: 'fight-separated', tick: state.tick, a: fight.a, b: fight.b });
+      }
       // Pegar um gato dormindo PODE: acorda rabugento. Uma troca, nao proibicao.
       if (cat.mode === 'nap') cat.stress = Math.min(1, cat.stress + GRABBED_FROM_NAP);
       cat.mode = 'held';
@@ -501,7 +535,9 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
   if (cmd.drop && state.held) {
     const cat = catOf(state, state.held)!;
     const occupant = state.cats.find((c) => c.slot === cmd.drop && c.id !== cat.id);
-    if (occupant && cmd.drop !== 'puff' && cmd.drop !== 'cafe') {
+    // Postos sociais (VENUE_OFFSETS) tem vagas para varios corpos: chegar
+    // nao desaloja ninguem. Mesa e territorio de um gato so.
+    if (occupant && !(cmd.drop in VENUE_OFFSETS)) {
       occupant.slot = null;
       // 'walk' e o unico modo que anda ate o alvo; em 'idle' o desalojado
       // ficava parado embaixo do recem-chegado, disputando o toque.
@@ -727,9 +763,10 @@ const stepHairball = (state: HackState, events: SimEvent[]): void => {
     return;
   }
   if (state.tick >= hb.deadline && !state.buildBroken) {
-    // Quebra e FICA quebrado. E a unica punicao irreversivel, e chega com 50
-    // segundos de sirene.
+    // A falha e grave e para todas as trilhas, mas pode ser recuperada no
+    // rack: uma crise deve cobrar replanejamento, nao encerrar a interacao.
     state.buildBroken = true;
+    state.buildProgress = 0;
     hb.active = false;
     hb.fired++;
     hb.at = hb.fired < HAIRBALL_AT.length ? hairballFireTick(state.seed, hb.fired) : HACK_TICKS * 10;
@@ -761,11 +798,18 @@ const speedOf = (state: HackState, cat: Cat, track: Track): number => {
 
 const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   if (cat.slot === 'rack') {
-    // O rack atende DUAS emergencias, na ordem: bola de pelo, cabo mordido.
-    // O layout Server Corner conserta mais rapido — proximidade e mecanica.
+    // O rack atende emergencias na ordem de prazo: bola de pelo, build perdido,
+    // cabo mordido. O layout Server Corner conserta mais rapido.
     const fix = state.layoutMods.fixSpeed;
     if (state.hairball.active) state.hairball.progress += fix;
-    else if (state.cableOut) {
+    else if (state.buildBroken) {
+      state.buildProgress += fix;
+      if (state.buildProgress >= BUILD_REPAIR_COST) {
+        state.buildBroken = false;
+        state.buildProgress = 0;
+        events.push({ kind: 'build-fixed', tick: state.tick });
+      }
+    } else if (state.cableOut) {
       state.cableProgress += fix;
       if (state.cableProgress >= CABLE_FIX_COST) {
         state.cableOut = false;
@@ -834,6 +878,12 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   if (cat.mode === 'held') {
     cat.x = state.handX;
     cat.y = state.handY;
+    return;
+  }
+
+  if (cat.mode === 'fight') {
+    cat.stress = Math.min(1, cat.stress + FIGHT_STRESS_RATE);
+    cat.energy = Math.max(0, cat.energy - ENERGY_WORK_DRAIN);
     return;
   }
 
@@ -970,6 +1020,26 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
       const v = vibeOf(cat, other);
       vibeSum += v;
       if (other.tier === 'senior' || other.tier === 'especialista') mentorNear = true;
+      if (
+        v < 0 &&
+        !state.fight &&
+        cat.id < other.id &&
+        cat.stress > 0.55 &&
+        other.stress > 0.55 &&
+        draw01(state) < FIGHT_P
+      ) {
+        const mx = (cat.x + other.x) / 2;
+        const my = (cat.y + other.y) / 2;
+        cat.mode = 'fight';
+        other.mode = 'fight';
+        cat.slot = null;
+        other.slot = null;
+        cat.x = mx - 7;
+        other.x = mx + 7;
+        cat.y = other.y = my;
+        state.fight = { a: cat.id, b: other.id };
+        events.push({ kind: 'fight', tick: state.tick, a: cat.id, b: other.id });
+      }
       if (v !== 0 && cat.id < other.id) {
         const key = `${cat.id}|${other.id}`;
         if (!state.vibesSeen.includes(key)) {
@@ -992,6 +1062,9 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
     }
   }
 
+  // Uma briga interrompe toda produtividade ate a mao separar a dupla.
+  if (cat.mode === 'fight') return;
+
   // A EVOLUCAO do junior: aprende TRABALHANDO, 1.6x com mentor na vizinha.
   if (working && cat.tier === 'junior' && cat.learned < 1) {
     const before = cat.learned;
@@ -1006,12 +1079,16 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
   }
   cat.stress = Math.min(1, cat.stress + stressRate);
 
-  // Necessidades tomam o corpo: fome primeiro, depois sono.
-  if (cat.hunger <= HUNGER_EAT_AT && (working || cat.mode === 'idle')) {
+  // Necessidades tomam o corpo: fome primeiro, depois sono. EXCECAO: quem
+  // esta consertando uma emergencia no rack termina o conserto — largar no
+  // meio deixava o build quebrado sem ninguem voltar (comer zera o slot), e
+  // o preco de virar a noite ja e cobrado em moral e energia.
+  const onRackDuty = working && cat.slot === 'rack' && (state.hairball.active || state.buildBroken || state.cableOut);
+  if (cat.hunger <= HUNGER_EAT_AT && (working || cat.mode === 'idle') && !onRackDuty) {
     sendTo(state, cat, 'cafe');
     return;
   }
-  if (cat.energy <= ENERGY_NAP_AT && (working || cat.mode === 'idle')) {
+  if (cat.energy <= ENERGY_NAP_AT && (working || cat.mode === 'idle') && !onRackDuty) {
     // Quem DORME NO TECLADO pode apagar em cima da propria trilha: bug.
     if (working && hasTrait(cat, 'dorme-no-teclado') && cat.slot && slotIn(state, cat.slot).track) {
       if (draw01(state) < TRAIT_SLEEPY_KB_P) {

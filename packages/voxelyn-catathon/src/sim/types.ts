@@ -127,6 +127,7 @@ export type CatMode =
   | 'eat'
   | 'zoomies'
   | 'keyboard'
+  | 'fight'
   | 'held'
   | 'petted';
 
@@ -351,12 +352,15 @@ export type SimEvent =
   | { kind: 'hairball'; tick: number }
   | { kind: 'hairball-fixed'; tick: number }
   | { kind: 'build-broken'; tick: number }
+  | { kind: 'build-fixed'; tick: number }
   | { kind: 'treat'; tick: number; cat: CatId }
   | { kind: 'cut'; tick: number; task: string }
   | { kind: 'overpet'; tick: number; cat: CatId }
   | { kind: 'trait-revealed'; tick: number; cat: CatId; trait: string }
   | { kind: 'harmony'; tick: number; a: CatId; b: CatId }
   | { kind: 'friction'; tick: number; a: CatId; b: CatId }
+  | { kind: 'fight'; tick: number; a: CatId; b: CatId }
+  | { kind: 'fight-separated'; tick: number; a: CatId; b: CatId }
   | { kind: 'mentor'; tick: number; mentor: CatId; junior: CatId }
   | { kind: 'grown'; tick: number; cat: CatId }
   | { kind: 'sponsor-outage'; tick: number }
@@ -389,7 +393,11 @@ export type HackState = {
   cableProgress: number;
   treats: number;
   buildBroken: boolean;
+  /** Progresso da recuperacao manual do build perdido no rack. */
+  buildProgress: number;
   held: CatId | null;
+  /** Uma briga ativa termina quando o jogador pega qualquer participante. */
+  fight: { a: CatId; b: CatId } | null;
   handX: number;
   handY: number;
   /** Tags acumuladas pelas DECISOES de tarefa. Cada uma pesa na banca. */

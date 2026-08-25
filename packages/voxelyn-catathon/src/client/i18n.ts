@@ -127,6 +127,7 @@ type Dict = {
     hairball: string;
     hairballFixed: string;
     buildBroken: string;
+    buildFixed: string;
     treat: (name: string) => string;
     cut: (task: string) => string;
     overpet: (name: string) => string;
@@ -139,6 +140,8 @@ type Dict = {
     sponsorOutage: string;
     harmony: (a: string, b: string) => string;
     friction: (a: string, b: string) => string;
+    fight: (a: string, b: string) => string;
+    fightSeparated: (a: string, b: string) => string;
     mentor: (mentor: string, junior: string) => string;
     grown: (name: string) => string;
   };
@@ -267,7 +270,8 @@ const EN: Dict = {
     eat: (name) => `${name} went to eat`,
     hairball: 'HAIRBALL in the repository: merge locked! (send someone to the rack)',
     hairballFixed: 'hairball resolved, merge unlocked',
-    buildBroken: 'THE BUILD BROKE. There is no fixing it now.',
+    buildBroken: 'BUILD LOST. Send a cat to the rack to recover it.',
+    buildFixed: 'build recovered, merges are moving again',
     treat: (name) => `${name} got a treat`,
     cut: (task) => `scope cut: "${task}"`,
     overpet: (name) => `${name} is OVERSTIMULATED: enough petting for now`,
@@ -280,6 +284,8 @@ const EN: Dict = {
     sponsorOutage: "THE SPONSOR'S INTEGRATION WENT DOWN: build is down (send someone to the rack)",
     harmony: (a, b) => `${a} and ${b} are purring in sync at neighboring desks`,
     friction: (a, b) => `${a} and ${b} are hissing across the desks — bad chemistry`,
+    fight: (a, b) => `${a} and ${b} ARE SCRATCHING EACH OTHER — separate them!`,
+    fightSeparated: (a, b) => `${a} and ${b} were separated. dignity not recovered.`,
     mentor: (mentor, junior) => `${mentor} is mentoring ${junior} from the next desk`,
     grown: (name) => `${name} GREW UP this edition: junior no more (in spirit)`,
   },
@@ -408,7 +414,8 @@ const PT: Dict = {
     eat: (name) => `${name} foi comer`,
     hairball: 'BOLA DE PELO no repositorio: merge travado! (leva alguem ao rack)',
     hairballFixed: 'bola de pelo resolvida, merge liberado',
-    buildBroken: 'O BUILD QUEBROU. Nao ha mais conserto.',
+    buildBroken: 'BUILD PERDIDO. Leve um gato ao rack para recuperar.',
+    buildFixed: 'build recuperado, merges liberados novamente',
     treat: (name) => `${name} ganhou petisco`,
     cut: (task) => `escopo cortado: "${task}"`,
     overpet: (name) => `${name} ficou SUPERESTIMULADO: chega de carinho por ora`,
@@ -421,6 +428,8 @@ const PT: Dict = {
     sponsorOutage: 'A INTEGRACAO DO SPONSOR CAIU: build fora do ar (leva alguem ao rack)',
     harmony: (a, b) => `${a} e ${b} estao ronronando em sincronia nas mesas vizinhas`,
     friction: (a, b) => `${a} e ${b} estao se bufando entre as mesas — quimica ruim`,
+    fight: (a, b) => `${a} e ${b} ESTAO SE UNHANDO — separe os dois!`,
+    fightSeparated: (a, b) => `${a} e ${b} foram separados. a dignidade nao.`,
     mentor: (mentor, junior) => `${mentor} esta mentorando ${junior} da mesa ao lado`,
     grown: (name) => `${name} CRESCEU nesta edicao: junior so no cracha`,
   },

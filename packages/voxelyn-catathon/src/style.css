@@ -222,7 +222,46 @@ body {
 @keyframes blink { 50% { opacity: 0.35; } }
 
 .task-bar { width: 64px; height: 7px; background: #262233; border-radius: 4px; overflow: hidden; }
-.task-fill { display: block; height: 100%; background: var(--accent); }
+.task-fill { display: block; height: 100%; background: var(--accent); transition: width 100ms linear; }
+.task.track-backend .task-fill { background: #8c72f2; }
+.task.track-frontend .task-fill { background: #55c8dc; }
+.task.track-design .task-fill { background: #dc6fb1; }
+.task.track-devops .task-fill { background: #e8b55a; }
+
+/*
+ * Gantt usa os MESMOS nos do Kanban: nenhuma copia de estado pode ficar
+ * atrasada. O comprimento muda a cada tick; cor identifica o tipo de tarefa.
+ */
+.hud-board.gantt { width: min(560px, 82vw); gap: 8px; }
+.hud-board.gantt .board-track {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: start;
+  gap: 3px 8px;
+}
+.hud-board.gantt .board-title { grid-row: 1 / span 20; padding-top: 5px; }
+.hud-board.gantt .task {
+  position: relative;
+  min-height: 25px;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(90px, 1.4fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-left: 3px solid var(--accent);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+.hud-board.gantt .task.track-backend { border-left-color: #8c72f2; }
+.hud-board.gantt .task.track-frontend { border-left-color: #55c8dc; }
+.hud-board.gantt .task.track-design { border-left-color: #dc6fb1; }
+.hud-board.gantt .task.track-devops { border-left-color: #e8b55a; }
+.hud-board.gantt .task-bar { display: block !important; width: 100%; height: 9px; }
+.hud-board.gantt .task.done .task-bar { opacity: 0.8; }
+.hud-board.gantt .task.cut .task-bar { opacity: 0.25; }
+/* O alvo minimo de 56px vale TAMBEM no Gantt: o quadro rola, a linha cresce. */
+.hud-board.gantt .task-cut { min-height: 56px; padding: 1px 8px; }
+.hud-board.gantt .task-choices { grid-column: 1 / -1; }
 
 .task-cut {
   pointer-events: auto;
@@ -254,18 +293,24 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Discreto no olho, honesto no dedo: a faixa encolheu, o alvo nao. */
   min-height: 44px;
-  padding: 6px 12px;
-  background: var(--panel);
+  padding: 4px 9px;
+  background: rgba(30, 26, 40, 0.68);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: 10px;
   color: var(--text);
   font-family: var(--font);
-  font-size: 0.9em;
+  font-size: 0.82em;
+  opacity: 0.78;
   pointer-events: auto;
+  transition: opacity 120ms ease, background 120ms ease;
   text-align: left;
 }
+.feed-strip:hover,
+.feed-strip:focus-visible,
+.feed-strip:active { opacity: 1; background: var(--panel); }
 .feed-latest { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-badge {
   background: var(--accent);
@@ -283,7 +328,7 @@ body {
   width: min(420px, 52vw);
   display: grid;
   gap: 3px;
-  max-height: 46vh;
+  max-height: 34vh;
   overflow-y: auto;
   background: rgba(20, 17, 28, 0.7);
   border-radius: 10px;
@@ -330,10 +375,22 @@ body {
 .dock-meter-label { width: 56px; font-size: 0.76em; }
 .dock-bar { flex: 1; height: 7px; background: #262233; border-radius: 4px; overflow: hidden; }
 .dock-fill { display: block; height: 100%; }
-.bar-energy .dock-fill { background: #78d68c; }
-.bar-hunger .dock-fill { background: #e8c05a; }
-.bar-stress .dock-fill { background: #f0705a; }
-.bar-moral .dock-fill { background: #8c72f2; }
+.dock-fill {
+  background-size: 12px 100%;
+  image-rendering: pixelated;
+}
+.bar-energy .dock-fill {
+  background: repeating-linear-gradient(90deg, #78d68c 0 7px, #4fae69 7px 12px);
+}
+.bar-hunger .dock-fill {
+  background: repeating-linear-gradient(90deg, #e8c05a 0 7px, #b98c35 7px 12px);
+}
+.bar-stress .dock-fill {
+  background: repeating-linear-gradient(90deg, #f0705a 0 7px, #bd493f 7px 12px);
+}
+.bar-moral .dock-fill {
+  background: repeating-linear-gradient(90deg, #8c72f2 0 7px, #604bb8 7px 12px);
+}
 .dock-details[hidden] { display: none; }
 .dock-bio { font-size: 0.8em; opacity: 0.85; margin: 4px 0 2px; }
 
