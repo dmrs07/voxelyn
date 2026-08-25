@@ -3,6 +3,7 @@ import {
   GEAR_TEXT,
   HACK_TICKS,
   HOURS_PER_TICK,
+  BUILD_REPAIR_COST,
   JUDGES,
   SOCIAL_TEXT,
   SOCIAL_WINDOW,
@@ -214,6 +215,7 @@ export const createHud = (
   // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
   const boardBtn = softButton(ICONS.board, t().btnProject);
+  const ganttBtn = softButton(ICONS.board, 'Gantt');
   top.append(clock, remain, build, proj, bugsChip, alarm);
   const cluster = el('div', 'action-bar');
 
@@ -221,7 +223,14 @@ export const createHud = (
   board.hidden = true;
 
   boardBtn.addEventListener('click', () => {
-    board.hidden = !board.hidden;
+    const wasKanban = !board.hidden && !board.classList.contains('gantt');
+    board.classList.remove('gantt');
+    board.hidden = wasKanban;
+  });
+  ganttBtn.addEventListener('click', () => {
+    const wasGantt = !board.hidden && board.classList.contains('gantt');
+    board.classList.add('gantt');
+    board.hidden = wasGantt;
   });
   bugsChip.addEventListener('click', () => {
     board.hidden = false;
@@ -338,7 +347,7 @@ export const createHud = (
   laserBtn.appendChild(laserBadge);
   laserBtn.hidden = true;
   laserBtn.addEventListener('click', handlers.onLaser);
-  cluster.append(catnipBtn, laserBtn, boardBtn, treatsBtn);
+  cluster.append(catnipBtn, laserBtn, boardBtn, ganttBtn, treatsBtn);
 
   // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
   // o default do prazo — o modal informa, nunca chantageia.
@@ -473,7 +482,7 @@ const remainText = (tick: number): string => {
 };
 
 const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, option: string) => void): TaskRow => {
-  const row = el('div', 'task');
+  const row = el('div', `task track-${t.track}`);
   row.appendChild(el('span', 'task-name', t.label + (t.polish ? ' ✦' : '')));
   const state = el('span', 'task-state', '');
   const bar = el('span', 'task-bar');
@@ -508,7 +517,7 @@ const makeRow = (t: Task, onCut: (id: string) => void, onChoose: (task: string, 
 };
 
 const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
-  r.row.className = `task ${t.done ? 'done' : ''} ${t.cut ? 'cut' : ''} ${t.awaitingShip ? 'await' : ''}`;
+  r.row.className = `task track-${t.track} ${t.done ? 'done' : ''} ${t.cut ? 'cut' : ''} ${t.awaitingShip ? 'await' : ''}`;
   const depsPending = t.deps.filter((d) => !state.tasks.find((x) => x.id === d)?.done);
   const locked = depsPending.length > 0 && !t.done && !t.cut;
 
@@ -534,7 +543,9 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
 
   const showBar = !t.done && !t.cut && !t.awaitingShip && !locked && !deciding;
   r.bar.style.display = showBar ? '' : 'none';
-  if (showBar) r.fill.style.width = `${Math.round((t.progress / t.cost) * 100)}%`;
+  const progress = t.done ? 100 : t.cut ? 0 : Math.round((t.progress / t.cost) * 100);
+  r.fill.style.width = `${progress}%`;
+  r.row.style.setProperty('--task-progress', `${progress}%`);
 
   r.cutBtn.style.display = t.done || t.cut ? 'none' : '';
 };
@@ -569,6 +580,8 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.hairballFixed;
     case 'build-broken':
       return d.ev.buildBroken;
+    case 'build-fixed':
+      return d.ev.buildFixed;
     case 'treat':
       return d.ev.treat(name(e.cat));
     case 'cut':
@@ -614,7 +627,9 @@ export const drawHud = (hud: Hud, state: HackState): void => {
 
   // Build com cor de estado; bugs so existem no HUD quando existem no jogo,
   // e chegam ja com peso de alarme — nao como rodape de frase.
-  const buildState = state.buildBroken ? t().buildDead : state.cableOut ? t().buildDown : t().buildOk;
+  const buildState = state.buildBroken
+    ? `${t().buildDead} · ${Math.min(100, Math.round((state.buildProgress / BUILD_REPAIR_COST) * 100))}%`
+    : state.cableOut ? t().buildDown : t().buildOk;
   setText(hud.build, buildState);
   hud.build.classList.toggle('chip-bad', state.buildBroken || state.cableOut);
   setText(hud.proj, t().features(shipped));
