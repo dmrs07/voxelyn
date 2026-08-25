@@ -238,6 +238,9 @@ export const VIBE_STRESS_GOOD = 0.88;
 export const VIBE_STRESS_BAD = 1.18;
 /** Deriva de moral por tick ao lado de amigo (+) ou rival (-). */
 export const VIBE_MORAL_DRIFT = 0.0005;
+/** Atrito alto entre vizinhos pode escalar; raro o bastante para ser historia. */
+export const FIGHT_P = 0.00012;
+export const FIGHT_STRESS_RATE = 0.00035;
 
 /**
  * MENTORIA: o junior aprende TRABALHANDO (nao por relogio) — e 1.6x mais
