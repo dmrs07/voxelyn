@@ -1429,6 +1429,21 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
  */
 const stepPm = (state: HackState, events: SimEvent[]): void => {
   const pm = state.pm;
+  // A visita ACOMPANHA o gato: se o jogador o moveu de mesa no meio do
+  // caminho, o PM vira junto; se ele saiu do teclado, a visita e desfeita
+  // e o PM volta ao posto. Pep talk se entrega PESSOALMENTE — nunca a uma
+  // mesa vazia (achado de revisao).
+  if (pm.pepCat) {
+    const cat = catOf(state, pm.pepCat);
+    if (cat && cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
+      pm.targetX = cat.x - 16;
+      pm.targetY = cat.y + 8;
+    } else {
+      pm.pepCat = null;
+      pm.targetX = 262;
+      pm.targetY = 168;
+    }
+  }
   const dx = pm.targetX - pm.x;
   const dy = pm.targetY - pm.y;
   const len = Math.hypot(dx, dy);
@@ -1436,9 +1451,9 @@ const stepPm = (state: HackState, events: SimEvent[]): void => {
     pm.x += (dx / len) * PM_WALK_SPEED;
     pm.y += (dy / len) * PM_WALK_SPEED;
   } else if (pm.pepCat) {
-    const cat = catOf(state, pm.pepCat);
+    const cat = catOf(state, pm.pepCat)!;
     pm.pepCat = null;
-    if (cat && cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
+    if (Math.hypot(cat.x - pm.x, cat.y - pm.y) <= 26) {
       cat.moral = Math.min(1, cat.moral + PM_PEP_MORAL);
       cat.stress = Math.max(0, cat.stress - PM_PEP_STRESS);
       events.push({ kind: 'pep', tick: state.tick, cat: cat.id });

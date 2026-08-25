@@ -368,6 +368,26 @@ describe('recuperacao, venues e brigas', () => {
     while (!state.events.some((e) => e.kind === 'pep') && guard++ < 3000) step(state, emptyCommand());
     expect(state.events.some((e) => e.kind === 'pep' && e.cat === 'bigode')).toBe(true);
     expect(cat.moral).toBeGreaterThan(0.3);
+    // A entrega e PESSOAL: o PM esta ao lado do gato quando o pep sai.
+    expect(Math.hypot(state.pm.x - cat.x, state.pm.y - cat.y)).toBeLessThanOrEqual(26);
+  });
+
+  it('pep talk nao aterrissa em mesa vazia: gato pego no colo cancela a visita', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { choose: { task: 'b1', option: 'monolito' } });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    const cat = catOf(state, 'bigode')!;
+    while (cat.mode === 'walk') step(state, emptyCommand());
+    cat.moral = 0.2;
+    let guard = 0;
+    while (state.pm.pepCat === null && guard++ < 2000) step(state, emptyCommand());
+    expect(state.pm.pepCat).toBe('bigode');
+    // O jogador pega o gato no meio da visita: o PM desiste e volta ao posto.
+    step(state, { grab: 'bigode' });
+    for (let i = 0; i < 200; i++) step(state, emptyCommand());
+    expect(state.pm.pepCat).toBeNull();
+    expect(state.events.some((e) => e.kind === 'pep')).toBe(false);
   });
 
   it('atras da curva, o PM resmunga o prazo — com teto de frequencia', () => {
