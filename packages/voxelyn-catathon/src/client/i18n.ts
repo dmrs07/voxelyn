@@ -95,6 +95,21 @@ type Dict = {
   prizeLine: (prize: string) => string;
   walletAfter: (wallet: string) => string;
   achievementsTitle: string;
+  sponsorTitle: string;
+  sponsorAccept: string;
+  sponsorSigned: string;
+  specialLine: (name: string, hint: string) => string;
+  rivalIntro: (name: string, taunt: string) => string;
+  rivalRoster: (names: string) => string;
+  rivalBeat: (name: string, theirs: number, yours: number) => string;
+  rivalLost: (name: string, theirs: number, yours: number) => string;
+  repLine: (rep: number, delta: number) => string;
+  sponsorMetLine: (name: string) => string;
+  sponsorFailedLine: (name: string) => string;
+  specialWonLine: (name: string) => string;
+  graduatesLine: (names: string) => string;
+  poachedLine: (star: string, rival: string) => string;
+  vibesLabel: string;
   ev: {
     ship: (name: string, task: string) => string;
     awaitShip: (name: string, task: string) => string;
@@ -120,6 +135,10 @@ type Dict = {
     improviso: (name: string) => string;
     traitRevealed: (name: string, trait: string) => string;
     sponsorOutage: string;
+    harmony: (a: string, b: string) => string;
+    friction: (a: string, b: string) => string;
+    mentor: (mentor: string, junior: string) => string;
+    grown: (name: string) => string;
   };
 };
 
@@ -208,6 +227,21 @@ const EN: Dict = {
   prizeLine: (prize) => `prize: ${prize}`,
   walletAfter: (wallet) => `career wallet: ${wallet}`,
   achievementsTitle: 'achievements unlocked',
+  sponsorTitle: 'a sponsor came by the booth',
+  sponsorAccept: 'sign the contract',
+  sponsorSigned: 'signed — read the fine print again if you dare',
+  specialLine: (name, hint) => `special category this edition: ${name} — ${hint}`,
+  rivalIntro: (name, taunt) => `next booth: ${name}. ${taunt}`,
+  rivalRoster: (names) => `on their team now: ${names}`,
+  rivalBeat: (name, theirs, yours) => `you beat ${name}! their ${theirs} vs your ${yours}. the tail wagging stopped.`,
+  rivalLost: (name, theirs, yours) => `${name} scored ${theirs} vs your ${yours}. they are UNBEARABLE about it.`,
+  repLine: (rep, delta) => `reputation: ${rep}${delta === 0 ? '' : delta > 0 ? ` (+${delta})` : ` (${delta})`}`,
+  sponsorMetLine: (name) => `${name} contract fulfilled: the payout is in the prize`,
+  sponsorFailedLine: (name) => `${name} contract MISSED — word gets around (reputation down)`,
+  specialWonLine: (name) => `special trophy won: ${name}`,
+  graduatesLine: (names) => `grew up this edition: ${names} — will return as mid-level`,
+  poachedLine: (star, rival) => `${star} left for ${rival}. the money was good. the booth is quieter.`,
+  vibesLabel: 'vibes',
   ev: {
     ship: (name, task) => `${name} shipped "${task}"`,
     awaitShip: (name, task) => `${name} finished "${task}" and will NOT let it merge. Pet them.`,
@@ -233,6 +267,10 @@ const EN: Dict = {
     improviso: (name) => `${name} turned the bug into an improvised demo. The crowd LOVED it.`,
     traitRevealed: (name, trait) => `the resume didn't mention: ${name} is a "${trait}"`,
     sponsorOutage: "THE SPONSOR'S INTEGRATION WENT DOWN: build is down (send someone to the rack)",
+    harmony: (a, b) => `${a} and ${b} are purring in sync at neighboring desks`,
+    friction: (a, b) => `${a} and ${b} are hissing across the desks — bad chemistry`,
+    mentor: (mentor, junior) => `${mentor} is mentoring ${junior} from the next desk`,
+    grown: (name) => `${name} GREW UP this edition: junior no more (in spirit)`,
   },
 };
 
@@ -321,6 +359,21 @@ const PT: Dict = {
   prizeLine: (prize) => `premio: ${prize}`,
   walletAfter: (wallet) => `carteira da carreira: ${wallet}`,
   achievementsTitle: 'conquistas desbloqueadas',
+  sponsorTitle: 'um sponsor passou no booth',
+  sponsorAccept: 'assinar o contrato',
+  sponsorSigned: 'assinado — rele a letra miuda se tiver coragem',
+  specialLine: (name, hint) => `categoria especial desta edicao: ${name} — ${hint}`,
+  rivalIntro: (name, taunt) => `booth ao lado: ${name}. ${taunt}`,
+  rivalRoster: (names) => `no time deles agora: ${names}`,
+  rivalBeat: (name, theirs, yours) => `voce venceu ${name}! ${theirs} deles vs ${yours} teus. o rabo parou de abanar.`,
+  rivalLost: (name, theirs, yours) => `${name} fez ${theirs} vs teus ${yours}. eles estao INSUPORTAVEIS.`,
+  repLine: (rep, delta) => `reputacao: ${rep}${delta === 0 ? '' : delta > 0 ? ` (+${delta})` : ` (${delta})`}`,
+  sponsorMetLine: (name) => `contrato da ${name} cumprido: o payout esta no premio`,
+  sponsorFailedLine: (name) => `contrato da ${name} FURADO — a noticia corre (reputacao cai)`,
+  specialWonLine: (name) => `trofeu especial conquistado: ${name}`,
+  graduatesLine: (names) => `cresceram nesta edicao: ${names} — voltam como plenos`,
+  poachedLine: (star, rival) => `${star} foi para ${rival}. o dinheiro era bom. o booth ficou mais quieto.`,
+  vibesLabel: 'convivencia',
   ev: {
     ship: (name, task) => `${name} shipou "${task}"`,
     awaitShip: (name, task) => `${name} terminou "${task}" e NAO deixa mergear. Faz carinho nele.`,
@@ -346,6 +399,10 @@ const PT: Dict = {
     improviso: (name) => `${name} transformou o bug em demo improvisada. A plateia AMOU.`,
     traitRevealed: (name, trait) => `o curriculo nao contava: ${name} e "${trait}"`,
     sponsorOutage: 'A INTEGRACAO DO SPONSOR CAIU: build fora do ar (leva alguem ao rack)',
+    harmony: (a, b) => `${a} e ${b} estao ronronando em sincronia nas mesas vizinhas`,
+    friction: (a, b) => `${a} e ${b} estao se bufando entre as mesas — quimica ruim`,
+    mentor: (mentor, junior) => `${mentor} esta mentorando ${junior} da mesa ao lado`,
+    grown: (name) => `${name} CRESCEU nesta edicao: junior so no cracha`,
   },
 };
 

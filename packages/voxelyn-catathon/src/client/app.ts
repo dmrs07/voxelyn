@@ -1,20 +1,25 @@
 import { presentToCanvas } from '@voxelyn/core/adapters/canvas2d';
 import {
   CLASSIC_TEAM,
+  RIVAL_TAUNT_TEXT,
   RUN_BUDGET,
   TICK_MS,
   createHackathon,
   dailySeed,
+  returningCandidate,
+  rivalScoreFor,
   rollCandidates,
   rollGearOffers,
   rollLayout,
   rollProject,
+  rollSpecialCategory,
+  rollSponsorOffer,
   step,
   type Candidate,
   type GearId,
 } from '../sim/index.js';
-import { achievementsFor, loadCareer, saveCareer, todayUTC, type Mode } from './career.js';
-import type { HackState, SimEvent } from '../sim/types.js';
+import { applyRun, ensureRival, loadCareer, todayUTC, type Mode } from './career.js';
+import type { HackState, SimEvent, SponsorContract } from '../sim/types.js';
 import {
   createAudioEngine,
   demoAudio,
@@ -31,7 +36,7 @@ import {
   type BusId,
 } from './audio/index.js';
 import { attachInput, attachKeyboard, buildCommand, createInput, type InputState, type InputTeardown } from './input.js';
-import { getLocale } from './i18n.js';
+import { getLocale, t } from './i18n.js';
 import { bindTeam, clearScreens, createHud, drawCard, drawHud, pushFeed, showRecruit, showResult, showTitle, type Hud } from './hud.js';
 import { createView, drawHand, drawScene, type View } from './render.js';
 
@@ -49,8 +54,13 @@ export type App = {
   seed: number;
   /** O modo da edicao: carreira persiste a carteira; daily fixa a semente. */
   mode: Mode;
-  /** O que esta edicao custou (contratos + apetrechos) — a carreira desconta. */
+  /** O que esta edicao custou (contratos + apetrechos, menos o adiantamento
+   * do sponsor) — a carreira desconta. */
   spent: number;
+  /** A equipe contratada desta run (a carreira le crescimento daqui). */
+  hired: readonly Candidate[];
+  /** O contrato de sponsor assinado nesta edicao, se houve. */
+  sponsor: SponsorContract | null;
   accumulator: number;
   lastFrame: number;
   frameHandle: number;
@@ -101,20 +111,20 @@ const tickGame = (app: App): void => {
     // O ritual da submissao: a musica congela, o deploy fala, e o final e
     // festa intima ou feltro gentil — nunca tragedia.
     demoAudio(app.audio, app.state);
-    // A CARREIRA fecha a conta da edicao: desconta o gasto, soma o premio,
-    // nunca cai abaixo do piso. Conquistas persistem em qualquer modo.
+    // A CARREIRA fecha a conta da edicao: carteira, reputacao, o duelo com o
+    // rival, os juniores que cresceram, a estrela que talvez tenha ido
+    // embora. A nota do rival usa o skill de ANTES da run (a carreira so e
+    // salva nos fechamentos — durante a run ela nao muda).
     const career = loadCareer();
-    const unlocked = achievementsFor(app.state);
-    const fresh = unlocked.filter((a) => !career.achievements.includes(a));
-    career.achievements.push(...fresh);
-    career.runs++;
-    let wallet: number | null = null;
-    if (app.mode === 'career') {
-      career.wallet = Math.max(RUN_BUDGET, career.wallet - app.spent + (app.state.result?.prize ?? 0));
-      wallet = career.wallet;
-    }
-    saveCareer(career);
-    showResult(app.screenHost, app.state, { newAchievements: fresh, wallet }, () => openRecruit(app, app.mode));
+    const rivalScore =
+      app.mode === 'career' && career.rival ? rivalScoreFor(app.state.seed, career.rival.skill) : null;
+    const close = applyRun(career, app.state, {
+      mode: app.mode,
+      spent: app.spent,
+      hired: app.hired,
+      rivalScore,
+    });
+    showResult(app.screenHost, app.state, close, () => openRecruit(app, app.mode));
   }
 };
 
@@ -130,29 +140,60 @@ const openRecruit = (app: App, mode: Mode): void => {
   // DAILY: a semente do dia UTC, igual para todo mundo. Nos outros modos, o
   // relogio e lido UMA vez aqui — a sim nunca ve tempo real.
   app.seed = mode === 'daily' ? dailySeed(todayUTC()) : (Date.now() ^ 0xca7a7040) >>> 0;
-  const budget = mode === 'career' ? loadCareer().wallet : RUN_BUDGET;
+  const career = mode === 'career' ? loadCareer() : null;
+  const budget = career ? career.wallet : RUN_BUDGET;
   const project = rollProject(app.seed, getLocale());
   const layout = rollLayout(app.seed);
+  const candidates = rollCandidates(app.seed, getLocale());
+  // EVOLUCAO DO JUNIOR entre runs: um alumnus (deterministico pela semente)
+  // toma a vaga do primeiro curinga — mesmo gato, agora pleno, com desconto.
+  if (career && career.alumni.length > 0) {
+    const alum = career.alumni[app.seed % career.alumni.length]!;
+    candidates[4] = returningCandidate(alum, getLocale());
+  }
+  // O RIVAL nasce na primeira edicao de carreira; o SPONSOR so procura quem
+  // a reputacao ja apresentou. Nada disso existe no quick/daily — a
+  // comparacao justa do daily nao pode depender da tua carreira.
+  const rival = career ? ensureRival(career, app.seed) : null;
+  const taunts = RIVAL_TAUNT_TEXT[getLocale()];
   showRecruit(
     app.screenHost,
-    rollCandidates(app.seed, getLocale()),
+    candidates,
     rollGearOffers(app.seed),
     budget,
     { name: project.name, brief: project.brief, emphasis: project.emphasis },
     layout.name,
-    (hired, gear) => startRun(app, hired, gear)
+    {
+      sponsor: career ? rollSponsorOffer(app.seed, career.rep) : null,
+      rivalLine: rival ? t().rivalIntro(rival.name, taunts[app.seed % taunts.length]!) : null,
+      rosterLine: rival && rival.roster.length > 0 ? t().rivalRoster(rival.roster.join(', ')) : null,
+      special: rollSpecialCategory(app.seed),
+    },
+    (hired, gear, sponsor) => startRun(app, hired, gear, sponsor)
   );
 };
 
-const startRun = (app: App, team: readonly Candidate[], gear: readonly GearId[]): void => {
+const startRun = (
+  app: App,
+  team: readonly Candidate[],
+  gear: readonly GearId[],
+  sponsor: SponsorContract | null
+): void => {
   clearScreens(app.screenHost);
   stopGameAudio(app.audio);
   startGameAudio(app.audio);
-  app.spent = team.reduce((s, c) => s + c.cost, 0) + gear.reduce((s, g) => {
-    const offer = rollGearOffers(app.seed).find((o) => o.id === g);
-    return s + (offer?.cost ?? 0);
-  }, 0);
-  app.state = createHackathon(app.seed, team, { locale: getLocale(), gear });
+  app.hired = team;
+  app.sponsor = sponsor;
+  // O adiantamento do sponsor ABATE o gasto da edicao: dinheiro que entrou
+  // junto com a letra miuda. Pode ate deixar o saldo positivo.
+  app.spent =
+    team.reduce((s, c) => s + c.cost, 0) +
+    gear.reduce((s, g) => {
+      const offer = rollGearOffers(app.seed).find((o) => o.id === g);
+      return s + (offer?.cost ?? 0);
+    }, 0) -
+    (sponsor?.budget ?? 0);
+  app.state = createHackathon(app.seed, team, { locale: getLocale(), gear, sponsor });
   bindTeam(app.hud, app.state.cats);
   app.input.selected = null;
   app.input.queue.length = 0;
@@ -233,6 +274,8 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
     phase: 'title',
     mode: 'career',
     spent: 0,
+    hired: CLASSIC_TEAM,
+    sponsor: null,
     accumulator: 0,
     lastFrame: 0,
     frameHandle: 0,

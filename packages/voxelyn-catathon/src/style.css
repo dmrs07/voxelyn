@@ -647,3 +647,33 @@ body {
 /* `display` de autor derrota o atributo hidden — a armadilha ja paga uma
    vez no hud-host, agora vacinada para todo botao macio. */
 .soft-btn[hidden] { display: none; }
+
+/* ---- Slice D: sponsor, rival, categoria especial, convivencia ---------- */
+
+/* O convite anuncia a categoria especial e a provocacao do rival: duas
+   frases com cor de estado (ambar = objetivo, coral = provocacao). */
+.recruit-special { margin: 0; font-size: 0.86em; color: var(--accent); font-weight: 700; }
+.recruit-rival { margin: 0; font-size: 0.84em; color: var(--alarm); font-style: italic; }
+.recruit-rival.roster { opacity: 0.85; font-style: normal; }
+
+/* O cartao do sponsor: o contrato ESCRITO, com a letra miuda em coral. */
+.sponsor-box { display: grid; gap: 4px; }
+.sponsor-card { border-color: var(--accent); }
+.sponsor-strings { font-size: 0.8em; color: var(--alarm); }
+.sponsor-signed { font-size: 0.78em; color: var(--ok); font-weight: 700; }
+
+/* A convivencia na ficha: coracoes e raios com nome, nunca so icone. */
+.dock-vibes { font-size: 0.82em; opacity: 0.95; }
+
+/* O pos-jogo do Slice D: duelo, reputacao, veredito do sponsor, trofeu,
+   crescimento e a despedida — cada linha com a cor do que aconteceu. */
+.result-rival { margin: 0; font-weight: 700; }
+.result-rival.rival-beat { color: var(--ok); }
+.result-rival.rival-lost { color: var(--alarm); }
+.result-rep { margin: 0; font-size: 0.9em; }
+.result-sponsor { margin: 0; font-size: 0.9em; }
+.result-sponsor.sponsor-met { color: var(--ok); }
+.result-sponsor.sponsor-failed { color: var(--alarm); }
+.result-special { margin: 0; font-weight: 700; color: var(--accent); }
+.result-grown { margin: 0; font-size: 0.9em; color: var(--ok); }
+.result-poached { margin: 0; font-size: 0.88em; color: var(--alarm); font-style: italic; }

@@ -78,6 +78,12 @@ await page.getByRole('button', { name: /open the email · career/ }).tap();
 await page.waitForTimeout(300);
 const candCount = await page.locator('.cand-card').count();
 if (candCount !== 6) throw new Error(`o recrutador mandou ${candCount} curriculos (esperava 6)`);
+// Slice D: o convite anuncia a CATEGORIA ESPECIAL e o RIVAL provoca — na
+// primeira edicao de carreira o rival ja nasceu (e ficou no localStorage).
+if (!(await page.locator('.recruit-special').isVisible())) throw new Error('o convite nao anuncia a categoria especial');
+if (!(await page.locator('.recruit-rival').first().isVisible())) throw new Error('o rival nao provoca no e-mail da carreira');
+step.push(`convite: ${await page.locator('.recruit-special').textContent()}`);
+step.push(`rival: ${await page.locator('.recruit-rival').first().textContent()}`);
 // O botao de fechar equipe NASCE desabilitado: sem equipe nao ha hackathon.
 if (await page.getByRole('button', { name: 'lock the team' }).isEnabled()) {
   throw new Error('da para fechar equipe vazia');
@@ -358,11 +364,18 @@ await page.waitForTimeout(1200);
 if ((await sim(() => window.catathon.app.state.phase)) !== 'done') throw new Error('o pitch nao terminou');
 if (!(await page.locator('.result-dims').isVisible())) throw new Error('resultado sem as cinco dimensoes');
 if (!(await page.locator('.result-prize').isVisible())) throw new Error('resultado sem o premio');
+// Slice D: o pos-jogo mostra o DUELO com o rival e a REPUTACAO da carreira.
+if (!(await page.locator('.result-rival').isVisible())) throw new Error('o resultado nao mostra o duelo com o rival');
+if (!(await page.locator('.result-rep').isVisible())) throw new Error('o resultado nao mostra a reputacao');
+step.push(`duelo: ${await page.locator('.result-rival').textContent()}`);
 const career = await page.evaluate(() => JSON.parse(localStorage.getItem('catathon-career') ?? 'null'));
 if (!career || typeof career.wallet !== 'number' || career.runs < 1) {
   throw new Error(`a carreira nao persistiu: ${JSON.stringify(career)}`);
 }
-step.push(`resultado com premio e carreira persistida (carteira: ${career.wallet}, runs: ${career.runs})`);
+if (typeof career.rep !== 'number' || !career.rival || typeof career.rival.skill !== 'number') {
+  throw new Error(`a carreira nao guarda reputacao/rival: ${JSON.stringify(career)}`);
+}
+step.push(`resultado com premio e carreira persistida (carteira: ${career.wallet}, runs: ${career.runs}, rep: ${career.rep}, rival: ${career.rival.name})`);
 await shot('c5-resultado');
 
 console.log('\nfumaca de toque do CATATHON (Pixel 7, sem teclado nem mouse)\n');

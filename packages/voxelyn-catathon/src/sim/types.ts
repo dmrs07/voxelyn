@@ -361,7 +361,8 @@ export type SimEvent =
   | { kind: 'catnip'; tick: number; cat: CatId; zoomies: boolean }
   | { kind: 'laser'; tick: number }
   | { kind: 'social-open'; tick: number; social: SocialKind }
-  | { kind: 'social-taken'; tick: number; social: SocialKind; option: 'a' | 'b' }
+  /** star: no poach A, QUEM o recrutador rival abordou — a carreira lembra. */
+  | { kind: 'social-taken'; tick: number; social: SocialKind; option: 'a' | 'b'; star?: CatId }
   | { kind: 'decision-needed'; tick: number; task: string }
   | { kind: 'decision'; tick: number; task: string; option: string }
   | { kind: 'pitch-start'; tick: number }

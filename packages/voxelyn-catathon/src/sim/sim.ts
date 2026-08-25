@@ -665,6 +665,7 @@ const resolveSocial = (state: HackState, ev: SocialEvent, option: 'a' | 'b', eve
   ev.resolved = true;
   ev.taken = option;
   ev.until = 0;
+  let poachedStar: CatId | undefined;
   if (ev.kind === 'influencer') {
     if (option === 'a') {
       // Posar com os gatos: hype para o palco, estresse para todos.
@@ -680,6 +681,9 @@ const resolveSocial = (state: HackState, ev: SocialEvent, option: 'a' | 'b', eve
       if (star) {
         star.stress = Math.min(1, star.stress + POACH_STAR_STRESS);
         star.moral = Math.max(0, star.moral - POACH_STAR_MORAL);
+        // O evento registra QUEM foi abordado: a carreira lembra — e o
+        // rival tambem (consequencia entre hackathons).
+        poachedStar = star.id;
       }
     } else {
       // Blindar a equipe: todo mundo se sente escolhido.
@@ -701,7 +705,7 @@ const resolveSocial = (state: HackState, ev: SocialEvent, option: 'a' | 'b', eve
       }
     }
   }
-  events.push({ kind: 'social-taken', tick: state.tick, social: ev.kind, option });
+  events.push({ kind: 'social-taken', tick: state.tick, social: ev.kind, option, star: poachedStar });
 };
 
 const stepHairball = (state: HackState, events: SimEvent[]): void => {

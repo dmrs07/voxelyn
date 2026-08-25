@@ -6,17 +6,21 @@ import {
   JUDGES,
   SOCIAL_TEXT,
   SOCIAL_WINDOW,
+  SPECIAL_TEXT,
+  SPONSOR_TEXT,
   TREATS_START,
   fmtCost,
+  vibeOf,
   type Candidate,
   type GearId,
 } from '../sim/index.js';
 import { getLocale, setLocale, specLabel, t, tierLabel, traitLabel } from './i18n.js';
+import type { RunClose } from './career.js';
 
 /** Alias do dicionario para escopos onde `t` e uma Task. */
 const i18n = t;
 import type { Cat } from '../sim/types.js';
-import type { CatId, HackState, SimEvent, Task } from '../sim/types.js';
+import type { CatId, HackState, SimEvent, SpecialCategoryId, SponsorContract, Task } from '../sim/types.js';
 
 /**
  * O HUD e HTML, nao pixels — a regra de acessibilidade da casa: botao com
@@ -124,6 +128,9 @@ export type Hud = {
   dockDetails: HTMLElement;
   dockBio: HTMLElement;
   dockHunger: Meter;
+  /** CONVIVENCIA: com quem este gato vibra e com quem ele bufa — visivel
+   * so depois da revelacao (o comportamento voce ja via; o nome, so agora). */
+  dockVibes: HTMLElement;
   /** Retratos da equipe na borda esquerda: selecao sem cacar pixel. */
   teamBtns: Map<CatId, HTMLButtonElement>;
   /** O palco: gauge da plateia, timer e uma habilidade por gato. */
@@ -268,7 +275,9 @@ export const createHud = (
   dockDetails.hidden = true;
   const dockBio = el('div', 'dock-bio', '');
   const dockHunger = meterOf(t().meters.hunger, 'bar-hunger');
-  dockDetails.append(dockBio, dockHunger.row);
+  const dockVibes = el('div', 'dock-vibes', '');
+  dockVibes.hidden = true;
+  dockDetails.append(dockBio, dockHunger.row, dockVibes);
   detailsBtn.addEventListener('click', () => {
     dockDetails.hidden = !dockDetails.hidden;
   });
@@ -380,6 +389,7 @@ export const createHud = (
     dockDetails,
     dockBio,
     dockHunger,
+    dockVibes,
     teamBtns,
     pitchPanel,
     pitchGauge,
@@ -579,6 +589,14 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.traitRevealed(name(e.cat), traitLabel(e.trait));
     case 'sponsor-outage':
       return d.ev.sponsorOutage;
+    case 'harmony':
+      return d.ev.harmony(name(e.a), name(e.b));
+    case 'friction':
+      return d.ev.friction(name(e.a), name(e.b));
+    case 'mentor':
+      return d.ev.mentor(name(e.mentor), name(e.junior));
+    case 'grown':
+      return d.ev.grown(name(e.cat));
     default:
       return null;
   }
@@ -722,13 +740,29 @@ export const drawCard = (hud: Hud, state: HackState, selected: string | null): v
   hud.dockMeters.moral.fill.style.width = `${Math.round(cat.moral * 100)}%`;
   hud.dockHunger.fill.style.width = `${Math.round(cat.hunger * 100)}%`;
   setText(hud.dockBio, cat.bio);
+  // A CONVIVENCIA nomeada so depois da revelacao: o vibe le o trait oculto,
+  // e a ficha nao pode contar o que o curriculo ainda esconde — ate la o
+  // jogador ve o comportamento (o feed anuncia bufos) sem ver o mapa.
+  if (cat.revealed) {
+    const parts: string[] = [];
+    for (const other of state.cats) {
+      if (other.id === cat.id) continue;
+      const v = vibeOf(cat, other);
+      if (v > 0) parts.push(`♥ ${other.name}`);
+      else if (v < 0) parts.push(`⚡ ${other.name}`);
+    }
+    hud.dockVibes.hidden = parts.length === 0;
+    setText(hud.dockVibes, parts.length > 0 ? `${t().vibesLabel}: ${parts.join(' · ')}` : '');
+  } else {
+    hud.dockVibes.hidden = true;
+  }
 };
 
 /** A tela final: as tres notas, o veredito e a historia que deu nisso. */
 export const showResult = (
   host: HTMLElement,
   state: HackState,
-  extras: { newAchievements: string[]; wallet: number | null },
+  extras: RunClose,
   onAgain: () => void
 ): void => {
   const r = state.result!;
@@ -774,6 +808,37 @@ export const showResult = (
   wrap.appendChild(prizeRow);
   if (extras.wallet !== null) {
     wrap.appendChild(el('p', 'result-wallet', t().walletAfter(fmtCost(extras.wallet, getLocale()))));
+  }
+
+  // O DUELO com o rival: a nota deles contra a tua, e quem esta insuportavel.
+  if (extras.rival) {
+    const rv = extras.rival;
+    const line = rv.beat ? t().rivalBeat(rv.name, rv.score, r.score) : t().rivalLost(rv.name, rv.score, r.score);
+    wrap.appendChild(el('p', `result-rival ${rv.beat ? 'rival-beat' : 'rival-lost'}`, line));
+  }
+  // REPUTACAO (so na carreira): o telao lembra.
+  if (extras.wallet !== null) {
+    wrap.appendChild(el('p', 'result-rep', t().repLine(extras.repAfter, extras.repAfter - extras.repBefore)));
+  }
+  // O VEREDITO do sponsor, se havia contrato: cumprido paga, furado corre.
+  if (state.sponsor && r.sponsorMet !== null) {
+    const sn = SPONSOR_TEXT[getLocale()][state.sponsor.id]!.name;
+    wrap.appendChild(
+      el('p', `result-sponsor ${r.sponsorMet ? 'sponsor-met' : 'sponsor-failed'}`,
+        r.sponsorMet ? t().sponsorMetLine(sn) : t().sponsorFailedLine(sn))
+    );
+  }
+  // O trofeu da categoria especial, quando o predicado fechou.
+  if (r.specialWon) {
+    const spName = SPECIAL_TEXT[getLocale()][state.specialCategory]!.name;
+    wrap.appendChild(el('p', 'result-special', t().specialWonLine(spName)));
+  }
+  // Os juniores que cresceram — e a estrela que foi embora, se foi.
+  if (extras.graduates.length > 0) {
+    wrap.appendChild(el('p', 'result-grown', t().graduatesLine(extras.graduates.join(', '))));
+  }
+  if (extras.poachedStar && extras.rival) {
+    wrap.appendChild(el('p', 'result-poached', t().poachedLine(extras.poachedStar, extras.rival.name)));
   }
   if (extras.newAchievements.length > 0) {
     const ach = el('div', 'result-achs');
@@ -853,7 +918,16 @@ export const showRecruit = (
   budget: number,
   project: { name: string; brief: string; emphasis: string },
   layoutName: string,
-  onDone: (hired: Candidate[], gear: GearId[]) => void
+  extras: {
+    /** A oferta de sponsor desta edicao (carreira com reputacao) ou null. */
+    sponsor: SponsorContract | null;
+    /** A provocacao do rival (carreira) e quem eles ja levaram de ti. */
+    rivalLine: string | null;
+    rosterLine: string | null;
+    /** A categoria especial da edicao, anunciada no convite. */
+    special: SpecialCategoryId;
+  },
+  onDone: (hired: Candidate[], gear: GearId[], sponsor: SponsorContract | null) => void
 ): void => {
   const wrap = el('div', 'screen recruit');
   wrap.appendChild(el('h1', 'recruit-title', i18n().recruitTitle));
@@ -864,9 +938,18 @@ export const showRecruit = (
       i18n().recruitIntro(project.name, project.brief, i18n().emphasisName[project.emphasis] ?? project.emphasis, layoutName)
     )
   );
+  // A CATEGORIA ESPECIAL vem no convite, como a lente da banca: um segundo
+  // objetivo anunciado muda como se joga a edicao inteira.
+  const sp = SPECIAL_TEXT[getLocale()][extras.special]!;
+  wrap.appendChild(el('p', 'recruit-special', i18n().specialLine(sp.name, sp.hint)));
+  // O RIVAL provoca no proprio e-mail: os Golden Retrievers existem para
+  // serem vencidos, e a provocacao e o lembrete.
+  if (extras.rivalLine) wrap.appendChild(el('p', 'recruit-rival', extras.rivalLine));
+  if (extras.rosterLine) wrap.appendChild(el('p', 'recruit-rival roster', extras.rosterLine));
 
   const hired = new Set<string>();
   const cart = new Set<GearId>();
+  let signed = false;
   const spent = (): number =>
     candidates.filter((c) => hired.has(c.id)).reduce((s, c) => s + c.cost, 0) +
     gearOffers.filter((g) => cart.has(g.id)).reduce((s, g) => s + g.cost, 0);
@@ -874,7 +957,9 @@ export const showRecruit = (
   const saldo = el('div', 'recruit-saldo', '');
   const closeBtn = softButton(ICONS.badge, i18n().btnLockTeam, 'big');
   const refresh = (): void => {
-    const left = budget - spent();
+    // O adiantamento do sponsor entra no saldo NA HORA da assinatura: e
+    // dinheiro de verdade para esta edicao (e a letra miuda tambem vale).
+    const left = budget + (signed && extras.sponsor ? extras.sponsor.budget : 0) - spent();
     setText(saldo, i18n().recruitBalance(fmtCost(Math.max(0, left), getLocale()), hired.size, left < 0));
     closeBtn.disabled = hired.size < 3 || hired.size > 4 || left < 0;
   };
@@ -925,10 +1010,37 @@ export const showRecruit = (
   }
   shop.appendChild(shopRow);
 
-  wrap.append(grid, shop, saldo);
+  // O SPONSOR: um cartao com o contrato ESCRITO — o que paga, o que cobra e
+  // o que amarra. Assinar e opcional e reversivel ate fechar a equipe.
+  let sponsorBox: HTMLElement | null = null;
+  if (extras.sponsor) {
+    const st = SPONSOR_TEXT[getLocale()][extras.sponsor.id]!;
+    sponsorBox = el('div', 'sponsor-box');
+    sponsorBox.appendChild(el('div', 'shop-title', i18n().sponsorTitle));
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'shop-item sponsor-card';
+    card.append(
+      el('span', 'shop-name', st.name),
+      el('span', 'shop-hint', st.offer),
+      el('span', 'sponsor-strings', st.strings)
+    );
+    const signedTag = el('span', 'sponsor-signed', i18n().sponsorSigned);
+    signedTag.hidden = true;
+    card.appendChild(signedTag);
+    card.addEventListener('click', () => {
+      signed = !signed;
+      card.classList.toggle('hired', signed);
+      signedTag.hidden = !signed;
+      refresh();
+    });
+    sponsorBox.appendChild(card);
+  }
+
+  wrap.append(grid, shop, ...(sponsorBox ? [sponsorBox] : []), saldo);
   closeBtn.addEventListener('click', () => {
     if (closeBtn.disabled) return;
-    onDone(candidates.filter((c) => hired.has(c.id)), [...cart]);
+    onDone(candidates.filter((c) => hired.has(c.id)), [...cart], signed ? extras.sponsor : null);
   });
   wrap.appendChild(closeBtn);
   refresh();
