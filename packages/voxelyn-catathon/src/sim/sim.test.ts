@@ -407,8 +407,27 @@ describe('decisoes de engenharia', () => {
     expect(b1.cost).toBe(Math.round(TASK_CORE_COST * 0.7));
     expect(state.sponsorRisk).toBe(true);
     expect(state.innovation).toBe(1);
-    for (let i = 0; i < 30; i++) step(state, emptyCommand());
+    // A cena de decisao custa a caminhada de volta do quadro ate a mesa.
+    for (let i = 0; i < 200; i++) step(state, emptyCommand());
     expect(b1.progress).toBeGreaterThan(0);
+  });
+
+  it('decisao aberta e CENA: o dev vai ao quadro e volta quando decidem', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    const cat = catOf(state, 'bigode')!;
+    for (let i = 0; i < 260; i++) step(state, emptyCommand());
+    // Juntou-se na frente do quadro de planejamento (x ~240, y ~156)...
+    expect(Math.abs(cat.x - 240)).toBeLessThan(40);
+    expect(Math.abs(cat.y - 160)).toBeLessThan(20);
+    // ...e a mesa continua sendo o slot dele: decidir manda ele de volta.
+    expect(cat.slot).toBe('desk-backend');
+    step(state, { choose: { task: 'b1', option: 'monolito' } });
+    for (let i = 0; i < 200; i++) step(state, emptyCommand());
+    const seat = state.slots.find((s) => s.id === 'desk-backend')!;
+    expect(Math.hypot(cat.x - seat.x, cat.y - seat.y)).toBeLessThanOrEqual(2);
+    expect(state.tasks.find((t) => t.id === 'b1')!.progress).toBeGreaterThan(0);
   });
 
   it('microsservicos custam agora e pagam depois: b2 fica mais barato', () => {

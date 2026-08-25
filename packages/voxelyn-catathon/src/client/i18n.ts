@@ -43,6 +43,7 @@ type Dict = {
   buildDown: string;
   buildDead: string;
   bugs: (n: number) => string;
+  decisions: (n: number) => string;
   mergeLocked: string;
   btnTreat: string;
   btnProject: string;
@@ -155,6 +156,7 @@ const EN: Dict = {
   buildDown: 'BUILD IS DOWN',
   buildDead: 'BUILD BROKEN',
   bugs: (n) => `${n} bug${n > 1 ? 's' : ''}`,
+  decisions: (n) => (n > 1 ? `${n} decisions!` : 'decision!'),
   mergeLocked: 'MERGE LOCKED — send someone to the rack',
   btnTreat: 'treat',
   btnProject: 'project',
@@ -298,6 +300,7 @@ const PT: Dict = {
   buildDown: 'BUILD FORA DO AR',
   buildDead: 'BUILD QUEBRADO',
   bugs: (n) => `${n} bug${n > 1 ? 's' : ''}`,
+  decisions: (n) => (n > 1 ? `${n} decisoes!` : 'decisao!'),
   mergeLocked: 'MERGE TRAVADO — leva alguem ao rack',
   btnTreat: 'petisco',
   btnProject: 'projeto',

@@ -12,6 +12,7 @@ import {
   TREATS_START,
   fmtCost,
   vibeOf,
+  workable,
   type Candidate,
   type GearId,
 } from '../sim/index.js';
@@ -114,6 +115,7 @@ export type Hud = {
   build: HTMLElement;
   proj: HTMLElement;
   bugsChip: HTMLButtonElement;
+  decideChip: HTMLButtonElement;
   alarm: HTMLElement;
   treatsBtn: HTMLButtonElement;
   board: HTMLElement;
@@ -204,6 +206,12 @@ export const createHud = (
   bugsChip.type = 'button';
   bugsChip.className = 'hud-chip hud-bugs';
   bugsChip.hidden = true;
+  // DECISAO aberta e alarme com destino: o chip pisca enquanto os devs se
+  // juntam no quadro, e toca-lo abre o projeto onde a escolha mora.
+  const decideChip = document.createElement('button');
+  decideChip.type = 'button';
+  decideChip.className = 'hud-chip hud-decide';
+  decideChip.hidden = true;
   const alarm = el('div', 'hud-chip hud-alarm-chip', '');
   alarm.hidden = true;
   // As ACOES moram numa barra contextual embaixo, com base escura coerente
@@ -218,7 +226,7 @@ export const createHud = (
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
   const boardBtn = softButton(ICONS.board, t().btnProject);
   const ganttBtn = softButton(ICONS.gantt, 'Gantt');
-  top.append(clock, remain, build, proj, bugsChip, alarm);
+  top.append(clock, remain, build, proj, bugsChip, decideChip, alarm);
   const cluster = el('div', 'action-bar');
 
   const board = el('div', 'hud-board');
@@ -235,6 +243,10 @@ export const createHud = (
     board.hidden = wasGantt;
   });
   bugsChip.addEventListener('click', () => {
+    board.hidden = false;
+  });
+  decideChip.addEventListener('click', () => {
+    board.classList.remove('gantt');
     board.hidden = false;
   });
 
@@ -379,6 +391,7 @@ export const createHud = (
     build,
     proj,
     bugsChip,
+    decideChip,
     alarm,
     treatsBtn,
     board,
@@ -634,6 +647,13 @@ export const drawHud = (hud: Hud, state: HackState): void => {
   setText(hud.proj, t().features(shipped));
   hud.bugsChip.hidden = bugs === 0;
   if (bugs > 0) setText(hud.bugsChip, t().bugs(bugs));
+  // Decisao aberta em tarefa DESBLOQUEADA: o alerta so grita quando a
+  // escolha ja esta travando alguem de verdade.
+  const decisions = state.tasks.filter(
+    (task) => !task.done && !task.cut && !!task.choice && task.chosen === null && workable(state, task)
+  ).length;
+  hud.decideChip.hidden = decisions === 0;
+  if (decisions > 0) setText(hud.decideChip, t().decisions(decisions));
   hud.alarm.hidden = !state.hairball.active;
   if (state.hairball.active) setText(hud.alarm, t().mergeLocked);
 

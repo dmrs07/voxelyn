@@ -1,5 +1,5 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
-import { HACK_TICKS, HOURS_PER_TICK } from '../sim/index.js';
+import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
 import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Spec, Task, Track } from '../sim/types.js';
 
@@ -183,6 +183,7 @@ const GLYPHS: Record<string, number[]> = {
   '9': [0b111, 0b101, 0b111, 0b001, 0b111],
   '/': [0b001, 0b001, 0b010, 0b100, 0b100],
   '!': [0b010, 0b010, 0b010, 0b000, 0b010],
+  '?': [0b110, 0b001, 0b010, 0b000, 0b010],
   ' ': [0, 0, 0, 0, 0],
 };
 
@@ -511,6 +512,21 @@ const drawWhiteboard = (v: View, state: HackState): void => {
       }
     }
     i++;
+  }
+  // DECISAO aberta: um balao de "?" pisca sobre o quadro enquanto os devs
+  // se juntam embaixo — o alerta existe no mundo, nao so no chip do HUD.
+  const deciding = state.tasks.some(
+    (t) => !t.done && !t.cut && !!t.choice && t.chosen === null && workable(state, t)
+  );
+  if (deciding && (state.tick >> 4) % 2 === 0) {
+    const qx = bx + 26;
+    const qy = by - 13;
+    rect(v, qx - 3, qy - 2, 13, 11, CREAM);
+    rect(v, qx - 4, qy - 1, 1, 9, adjustBrightness(CREAM, -40));
+    rect(v, qx + 10, qy - 1, 1, 9, adjustBrightness(CREAM, -40));
+    px(v, qx + 2, qy + 9, CREAM);
+    px(v, qx + 3, qy + 10, CREAM);
+    text(v, qx, qy, '?', 2, AMBER_ALERT);
   }
 };
 

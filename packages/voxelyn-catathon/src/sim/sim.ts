@@ -438,6 +438,15 @@ const VENUE_OFFSETS: Partial<Record<SlotId, readonly [number, number][]>> = {
   rack: [[-18, 4], [18, 4], [-18, -9], [18, -9]],
 };
 
+/**
+ * A CENA DE DECISAO acontece na frente do quadro de planejamento do centro
+ * (o quadro fisico de render.ts vive em 208..274 x 108..138): vagas com a
+ * mesma disciplina dos venues — nenhum corpo em cima de outro.
+ */
+const DECIDE_X = 240;
+const DECIDE_Y = 156;
+const DECIDE_SPOTS: readonly [number, number][] = [[-16, 2], [16, 2], [-4, 11], [28, 11]];
+
 const sendTo = (state: HackState, cat: Cat, slot: SlotId): void => {
   const s = slotIn(state, slot);
   const offsets = VENUE_OFFSETS[slot] ?? [[0, 0] as [number, number]];
@@ -828,6 +837,34 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
   const speed = speedOf(state, cat, track);
 
   const bug = liveBug(state, track);
+  const awaitingTask = state.tasks.find((t) => t.track === track && t.awaitingShip && !t.cut);
+  const canShipAwaiting = !!awaitingTask && cat.personality !== 'perfeccionista';
+  const pending = nextTask(state, track);
+  const deciding = !bug && !canShipAwaiting && !!pending?.choice && pending.chosen === null;
+
+  // Tarefa com DECISAO aberta nao anda — e isso vira CENA: os devs da trilha
+  // largam o teclado e se juntam na frente do quadro de planejamento, cada
+  // um numa vaga propria (a licao dos venues), ate alguem decidir por eles.
+  if (deciding) {
+    const spot = DECIDE_SPOTS[state.cats.indexOf(cat) % DECIDE_SPOTS.length]!;
+    const gx = DECIDE_X + spot[0];
+    const gy = DECIDE_Y + spot[1];
+    if (Math.hypot(cat.x - gx, cat.y - gy) > 2) {
+      cat.targetX = gx;
+      cat.targetY = gy;
+      cat.mode = 'walk';
+    }
+    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: pending.label });
+    return;
+  }
+  // Fora da cena de decisao, o posto de trabalho e a MESA: quem estava no
+  // quadro caminha de volta ao teclado antes de produzir qualquer coisa.
+  const seat = slotIn(state, cat.slot!);
+  if (Math.hypot(cat.x - seat.x, cat.y - seat.y) > 2) {
+    sendTo(state, cat, cat.slot!);
+    return;
+  }
+
   if (bug) {
     // Consertar bug tem oficio proprio: cacador acha, senior poda, e quem
     // detesta legado enrola.
@@ -845,20 +882,13 @@ const workAt = (state: HackState, cat: Cat, events: SimEvent[]): void => {
 
   // O perfeccionista segurando uma feature pronta: qualquer OUTRO gato na mesa
   // simplesmente mergeia ("clicou no botao que o Bigode nao clica").
-  const awaiting = state.tasks.find((t) => t.track === track && t.awaitingShip && !t.cut);
-  if (awaiting && cat.personality !== 'perfeccionista') {
-    shipTask(state, awaiting, cat, events);
+  if (canShipAwaiting) {
+    shipTask(state, awaitingTask!, cat, events);
     return;
   }
 
-  const task = nextTask(state, track);
+  const task = pending;
   if (!task) return;
-  // Tarefa com DECISAO aberta nao anda: o gato senta, olha para o quadro e o
-  // jogo cobra a escolha. Colocar gato e esperar barra encher nao e jogo.
-  if (task.choice && task.chosen === null) {
-    if (state.tick % 300 === 0) events.push({ kind: 'decision-needed', tick: state.tick, task: task.label });
-    return;
-  }
   task.progress += speed;
   if (task.progress >= task.cost) {
     task.progress = task.cost;
