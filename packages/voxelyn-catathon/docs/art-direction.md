@@ -1,86 +1,80 @@
-# Direção de arte — o booth que gatos construíram
+# Catathon — direcao de arte dos gatos
 
-> Norte: manter o pixel/voxel compacto e o roxo noturno, mas substituir o
-> vazio por relações espaciais, aumentar os gatos, dar função ao letreiro,
-> transformar computadores isolados em estações felinas e fazer cada cor
-> importante representar um estado real do projeto.
+Os sprites sao PROCEDURAIS (desenhados pixel a pixel em `client/render.ts`),
+mas as regras de um bom sprite sheet valem igual. Este documento e o portao
+de qualidade: toda pose nova passa por ele antes de entrar.
 
-## As três regras da cena
+## A regra central
 
-1. **Hierarquia por valor.** Parede mais escura (`#252334`), chão 10–15% mais
-   claro (`#343145` / losangos `#3D394F`), móveis intermediários, gatos em
-   contraste forte. A cena funciona em escala de cinza. O padrão do chão tem
-   contraste interno baixo de propósito: ele sugere profundidade, não disputa
-   com personagens.
-2. **Tudo toca o chão.** Cada objeto tem sombra de contato desenhada por
-   MISTURA de pixel (`mixPx`), com queda para a borda — nunca um retângulo
-   chapado. Luminosos (monitores, letreiro, servidor) abrem pequenas poças de
-   luz pelo mesmo mecanismo. Dois degraus, nunca bloom.
-3. **Cada cor importante é um estado.** Ciano `#54C6D4` = atividade, verde
-   `#65D39A` = build vivo, âmbar `#F0B552` = alerta, coral `#EB6767` = erro,
-   violeta `#8C72F2` = seleção. Decoração não usa cor de estado.
+> Um gato precisa ler como GATO na silhueta, e uma acao precisa ler na pose
+> — nunca em pixels soltos que "significam" a acao.
 
-## Composição (480×270)
+A splash oficial e a referencia de identidade (raca, expressao, pose
+intencional, contato fisico com o objeto). Os primeiros sprites simples sao
+a referencia de charme iconico. Os frames que viraram "retangulo + dois
+pixels de mao" sao referencia de BUG, nunca de arte.
 
-```
-chips do HUD (DOM, sobre a faixa alta da parede)
-LETREIRO = PAINEL DO PROJETO (y 30–70)
-corredor do pavilhão (y 74–92): silhuetas, HALL C · 1248, luzes vizinhas
-ESTAÇÃO backend        QUADRO CENTRAL        ESTAÇÃO frontend
-ESTAÇÃO design         ÁREA SOCIAL           ESTAÇÃO devops
-DESCANSO (sofá+caixa)                        SERVIDOR (acima da barra)
-feed (DOM, 3 linhas)              barra de ações (DOM, base escura)
-```
+## Anatomia (toda pose, todo frame)
 
-- **O letreiro trabalha.** Alterna `CATATHON`, `FEATURES n/12`, estado do
-  build e `FALTA nHmm`; na última hora vira `SHIP IT!` piscando. A régua
-  inferior mostra as quatro trilhas (feito/total na cor da trilha), pips de
-  bugs e a barra verde de entregas.
-- **Estações por disciplina.** Mesas completas (tampo claro, pernas, teclado
-  largo, cabo ao chão, almofada na cor da trilha), monitores diferentes:
-  frontend = janelas coloridas; backend = terminal escuro + torre local;
-  design = tela clara + tablet + planta; devops = dois monitores com
-  gráficos. Quando há gato trabalhando o conteúdo anima e uma barra de 1px na
-  beira da tela espelha o progresso da tarefa VIVA da trilha.
-- **O quadro central** tem um post-it por tarefa: cor da trilha, verde com
-  tick quando shipada, X quando cortada. É a cópia física do painel de
-  projeto.
-- **O servidor** é grande, tem cor de estado, ventilador girando, e um cabo
-  que sobe até o painel com um pulso viajando enquanto o build vive.
-- **Clutter progressivo.** Canecas, latas, post-its, pizza e papel amassado
-  aparecem em marcos de tempo, derivados só de `state.tick`: a mesma partida
-  produz o mesmo lixo, e a janela conta a história do hackathon.
-- **O corredor** vende a escala do evento com paralaxe barata: silhuetas de
-  competidores passando, luzes de booths vizinhos vazando, placa
-  `HALL C 1248`.
+- A silhueta preserva pelo menos quatro de: orelhas, focinho/bochecha,
+  peito, anca, antebraco, perna, rabo, curva do dorso.
+- Pata pertence a um braco: colunas continuas do ombro ao contato. Nenhum
+  pixel flutuante representa membro.
+- Roupa VESTE o corpo: a camisa segue o volume do peito e para na anca; a
+  gravata pende do colarinho; oculos alinham com os dois olhos. Se o
+  figurino transforma o torso em caixa, a pose esta errada — refazer.
+- Padrao de pelagem acompanha o volume (listras cruzam o dorso em arco),
+  nunca vira ruido de superficie.
+- Contato estavel com chao/mesa/cadeira em todo frame.
 
-## Gatos
+## Acao = pontos de contato + olhar
 
-30% maiores que a primeira versão — personagem manda mais que móvel. Cada um
-carrega o **crachá** (lanyard) da própria trilha. **Orelhas e rabo respondem
-ao estresse**: acima de 0.6, orelhas achatam e o rabo cai — o humor é legível
-na silhueta, não só na ficha. Seleção = contorno claro de 1px + sombra
-violeta sob as patas (nada orbitando o personagem).
+- Teclar: sentado DE COSTAS para a camera, virado para a mesa; as duas
+  patas pousadas na beira do teclado; cabeca entre os antebracos encarando
+  o monitor (`drawTypingCat`).
+- Consertar no rack, comer, dormir, brigar, carinho: cada um tem ancora
+  fisica explicita (alcance visivel ao objeto, focinho na tigela, apoio do
+  peito, contato dos golpes).
+- O olhar sustenta a acao: focinho e ombros giram para a ferramenta. Um
+  gato nunca tecla olhando para fora da mesa.
 
-## HUD
+## Animacao (nunca "icone piscando")
 
-- Topo em chips com hierarquia: prazo primeiro (maior), build com cor de
-  estado, projeto `n/12`, bugs só quando existem (e já com peso de alarme).
-- Ações numa **barra contextual** com base escura translúcida no canto
-  inferior direito: `projeto` e `petisco` (ação na palavra, inventário na
-  badge `×n`). `som` mora no canto de configurações, topo direito — não é um
-  verbo da partida.
+- Corpo conectado: pata → antebraco → ombro leve → massa plantada.
+- Movimento secundario: flick de orelha, ponta do rabo, piscada.
+- Ritmo IRREGULAR para trabalho: rajada, pausa de leitura, um toque
+  deliberado. Alternancia mecanica perfeita parece robo.
+- Dois pixels oscilando NAO sao uma animacao.
 
-## Lição de engenharia paga aqui
+## Espaco individual (sistema, nao z-index)
 
-`height: 100%` num item de grid com linha `auto` é circular; o navegador cai
-no aspect-ratio intrínseco do canvas e o elemento fica MAIS ALTO que a tela —
-o fundo da cena era cortado no celular. O canvas agora é `position: absolute;
-inset: 0`, e o mapeamento de toque (contain) bate com o que o olho vê.
+- Postos sociais tem VAGAS deterministicas (`VENUE_OFFSETS`,
+  `DECIDE_SPOTS`) com separacao minima — silhuetas de vagas ocupadas nunca
+  se intersectam.
+- Mesa e territorio de UM gato (drop desaloja); posto social nunca desaloja.
+- O PM aborda pelo lado LIVRE da mesa (`PM_PEP_SIDE`, lado do centro) e a
+  entrega exige proximidade real (`PM_PEP_RADIUS`) — presenca ao lado, nunca
+  sobreposicao.
+- Toque: `catAt` resolve o gato MAIS PROXIMO — vagas distintas garantem
+  alvos distintos.
 
-## Adiado com nome (P1/P2)
+## Regras de pixel
 
-Atlas assado para gatos e móveis · variações de acessório (headset, lenço,
-mochila) · ciclo de iluminação do pavilhão · incidentes físicos (caneca
-derrubada) · reações coletivas a falhas e conquistas · drones de câmera e
-confete no corredor.
+- Posicao inteira sempre (`Math.round` nas ancoras); nada de subpixel.
+- Aglomerados deliberados; pixel isolado so para olho, bigode ou brilho.
+- Paleta por gato limitada (body/mark/belly + derivados via
+  `adjustBrightness`).
+- Conferir toda pose em 1x no view do jogo (mobile), nao so ampliada.
+
+## Portoes de rejeicao
+
+Rejeitar qualquer pose/frame se:
+
+- a acao nao se identifica sem texto de UI;
+- alguma pata esta desconectada do corpo;
+- o gato opera um objeto olhando para o lado oposto;
+- o figurino destroi a silhueta felina;
+- dois gatos se fundem visualmente num posto;
+- o volume do corpo muda sem intencao entre frames;
+- o movimento e so pixel isolado piscando;
+- a versao ampliada parece boa mas a escala nativa nao.

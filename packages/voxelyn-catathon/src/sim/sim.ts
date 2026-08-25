@@ -65,6 +65,8 @@ import {
   OVERPET_STRESS_RATE,
   PM_PEP_MORAL,
   PM_PEP_PERIOD,
+  PM_PEP_RADIUS,
+  PM_PEP_SIDE,
   PM_PEP_STRESS,
   PM_WALK_SPEED,
   PM_WORRY_PERIOD,
@@ -1436,8 +1438,11 @@ const stepPm = (state: HackState, events: SimEvent[]): void => {
   if (pm.pepCat) {
     const cat = catOf(state, pm.pepCat);
     if (cat && cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
-      pm.targetX = cat.x - 16;
-      pm.targetY = cat.y + 8;
+      // Aborda pelo lado do CENTRO: e o espaco livre ao lado de toda mesa —
+      // o PM para AO LADO do dev, nunca em cima da silhueta dele.
+      const side = cat.x < 240 ? 1 : -1;
+      pm.targetX = cat.x + side * PM_PEP_SIDE;
+      pm.targetY = cat.y + 6;
     } else {
       pm.pepCat = null;
       pm.targetX = 262;
@@ -1453,7 +1458,7 @@ const stepPm = (state: HackState, events: SimEvent[]): void => {
   } else if (pm.pepCat) {
     const cat = catOf(state, pm.pepCat)!;
     pm.pepCat = null;
-    if (Math.hypot(cat.x - pm.x, cat.y - pm.y) <= 26) {
+    if (Math.hypot(cat.x - pm.x, cat.y - pm.y) <= PM_PEP_RADIUS) {
       cat.moral = Math.min(1, cat.moral + PM_PEP_MORAL);
       cat.stress = Math.max(0, cat.stress - PM_PEP_STRESS);
       events.push({ kind: 'pep', tick: state.tick, cat: cat.id });

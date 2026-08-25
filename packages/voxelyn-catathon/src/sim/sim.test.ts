@@ -369,7 +369,7 @@ describe('recuperacao, venues e brigas', () => {
     expect(state.events.some((e) => e.kind === 'pep' && e.cat === 'bigode')).toBe(true);
     expect(cat.moral).toBeGreaterThan(0.3);
     // A entrega e PESSOAL: o PM esta ao lado do gato quando o pep sai.
-    expect(Math.hypot(state.pm.x - cat.x, state.pm.y - cat.y)).toBeLessThanOrEqual(26);
+    expect(Math.hypot(state.pm.x - cat.x, state.pm.y - cat.y)).toBeLessThanOrEqual(30);
   });
 
   it('pep talk nao aterrissa em mesa vazia: gato pego no colo cancela a visita', () => {

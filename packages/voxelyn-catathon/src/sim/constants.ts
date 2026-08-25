@@ -215,6 +215,10 @@ export const PM_PEP_MORAL = 0.05;
 export const PM_PEP_STRESS = 0.03;
 export const PM_WALK_SPEED = 1.6;
 export const PM_WORRY_PERIOD = 70 * TICK_HZ;
+/** A visita aborda pelo lado LIVRE da mesa (espaco negativo do centro):
+ * silhuetas nunca se fundem, e a entrega exige estar de fato ao lado. */
+export const PM_PEP_SIDE = 26;
+export const PM_PEP_RADIUS = 30;
 
 // -------------------------------------------------------------------- hash
 

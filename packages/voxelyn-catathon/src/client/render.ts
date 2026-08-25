@@ -701,6 +701,95 @@ const drawSlots = (v: View, state: HackState, tick: number): void => {
  * (lanyard) da propria trilha; orelhas e rabo respondem ao ESTRESSE — o
  * estado emocional e legivel na silhueta, nao so na ficha.
  */
+/**
+ * A POSE DE TRABALHO, construida dos pontos de contato para fora:
+ * ancas plantadas no chao → dorso → ombros → dois antebracos CONTINUOS ate
+ * as patas pousadas na beira da mesa (onde vive o teclado) → cabeca vista
+ * de costas, entre os antebracos, virada para o monitor. O padrao da
+ * pelagem acompanha o volume do dorso; o rabo enrosca no chao do lado
+ * oposto ao monitor. Nenhum pixel solto: cada pata pertence a um braco.
+ */
+const drawTypingCat = (
+  v: View,
+  cat: Cat,
+  p: { body: number; mark: number; belly: number; big: boolean },
+  tick: number,
+  stressed: boolean
+): void => {
+  const cx = Math.round(cat.x);
+  const cy = Math.round(cat.y);
+  const bw = p.big ? 18 : 14;
+  const ms = cat.x < 240 ? 1 : -1; // o monitor fica do lado do CENTRO
+  const dark = adjustBrightness(p.body, -18);
+
+  // RITMO IRREGULAR: rajada → pausa de leitura → um toque deliberado.
+  const phase = (tick >> 4) % 6;
+  let press = -1; // -1 nenhuma; 0 esquerda; 1 direita
+  if (phase < 4) press = (tick >> 1) % 2;
+  else if (phase === 5 && (tick >> 2) % 3 === 0) press = (tick >> 4) % 2;
+
+  // Rabo enroscado no chao (lado oposto ao monitor); a PONTA vive.
+  const tailLen = stressed ? 4 : 6;
+  for (let i = 0; i < tailLen; i++) {
+    const wave = i >= tailLen - 2 ? Math.round(Math.sin(tick / 9)) : 0;
+    px(v, cx - ms * (bw / 2 + i - 1), cy - 1 + wave, p.mark);
+  }
+
+  // Ancas (a massa mais larga) e dorso subindo aos ombros.
+  rect(v, cx - bw / 2 + 1, cy - 1, bw - 2, 1, dark);
+  rect(v, cx - bw / 2, cy - 5, bw, 4, p.body);
+  rect(v, cx - bw / 2 + 1, cy - 10, bw - 2, 5, p.body);
+  // Franja de pelo no topo do dorso — menos o sphynx, todo pele.
+  if (cat.pattern !== 'sphynx') {
+    for (let i = 0; i < bw - 4; i += 2) {
+      if (Math.sin(tick / 8 + i) > 0.2) px(v, cx - bw / 2 + 2 + i, cy - 11, p.body);
+    }
+  }
+  // O padrao ACOMPANHA o volume: listras do tabby cruzam o dorso em arco.
+  if (cat.pattern === 'tabby') {
+    for (const row of [cy - 8, cy - 5, cy - 3]) {
+      rect(v, cx - bw / 2 + 3, row, bw - 6, 1, p.mark);
+      px(v, cx - bw / 2 + 2, row + 1, p.mark);
+      px(v, cx + bw / 2 - 3, row + 1, p.mark);
+    }
+  }
+  if (cat.pattern === 'sphynx') rect(v, cx - bw / 2 + 3, cy - 7, bw - 6, 1, dark);
+
+  // ANTEBRACOS: colunas continuas do ombro ate a pata na beira da mesa.
+  const armXs: [number, number] = [cx - 8, cx + 6];
+  for (let side = 0; side < 2; side++) {
+    const ax = armXs[side]!;
+    const pressed = press === side;
+    const pawTop = pressed ? cy - 12 : cy - 13;
+    rect(v, ax, pawTop + 2, 2, cy - 9 - (pawTop + 2) + 1, p.body); // braco
+    rect(v, ax - 1, pawTop, 4, 2, p.mark); // pata pousada na beira
+    if (pressed) px(v, ax, pawTop - 1, CREAM); // o toque acende a tecla
+  }
+
+  // CABECA de costas, deslocada 1px na direcao do monitor: o olhar segue a
+  // tela. Siames carrega a mascara escura; a bochecha oposta ganha bigode.
+  const hx = cx - 5 + ms;
+  const hy = cy - 19;
+  const headColor = cat.pattern === 'siames' ? p.mark : p.body;
+  rect(v, hx + 1, hy, 8, 1, headColor);
+  rect(v, hx, hy + 1, 10, 7, headColor);
+  if (cat.pattern === 'tuxedo') rect(v, hx + 3, hy + 6, 4, 2, p.belly);
+  // Bochecha e bigode do lado oposto ao monitor (a cabeca esta em 3/4).
+  px(v, hx + (ms > 0 ? -1 : 10), hy + 5, headColor);
+  px(v, hx + (ms > 0 ? -2 : 11), hy + 5, CREAM);
+  // Orelhas: em pe (com flick ocasional) ou ACHATADAS no estresse.
+  const flick = tick % 97 < 4 ? 1 : 0;
+  if (stressed) {
+    rect(v, hx, hy - 1, 3, 1, p.mark);
+    rect(v, hx + 7, hy - 1, 3, 1, p.mark);
+  } else {
+    px(v, hx + 1, hy - 1 + flick, p.mark);
+    px(v, hx + 2, hy - 2 + flick, p.mark);
+    px(v, hx + 7, hy - 1, p.mark);
+    px(v, hx + 8, hy - 2, p.mark);
+  }
+};
+
 export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): void => {
   const p = coatOf(cat);
   const w = p.big ? 28 : 22;
@@ -723,6 +812,17 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
     rect(v, x + w / 2 - 4, y + h + 7, 3, 4, p.mark);
     rect(v, x + w / 2 + 1, y + h + 7, 3, 4, p.mark);
     drawHead(v, cat, x + w / 2 - 6, y - 11, p, tick, false, stressed);
+    return;
+  }
+  if (cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
+    // TRABALHANDO DE VERDADE: pose propria, reconstruida do esqueleto — o
+    // gato sentado DE COSTAS para a camera, virado para a mesa, como o gato
+    // de sueter no laptop da referencia. Ancoras fisicas: ancas plantadas
+    // no chao, dorso subindo aos ombros, DOIS antebracos continuos dos
+    // ombros ate as patas sobre a beira do teclado, cabeca entre eles
+    // encarando o monitor. O ritmo e irregular (rajada, pausa, um toque
+    // deliberado); orelha e ponta do rabo carregam o movimento secundario.
+    drawTypingCat(v, cat, p, tick, stressed);
     return;
   }
   if (cat.mode === 'nap') {
@@ -806,16 +906,6 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
 
   drawHead(v, cat, x - 1, y - 7 - bounce, p, tick, false, stressed);
 
-  if (cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
-    // TECLANDO de verdade: as patinhas dianteiras martelam o teclado em
-    // alternancia rapida (a referencia e o gato de sueter no laptop), com
-    // plinks de tecla saltando — trabalho TEM corpo, nao so barra enchendo.
-    const up = (tick >> 1) % 2;
-    const kbY = Math.round(cat.y) - 8;
-    rect(v, Math.round(cat.x) - 6, kbY - (up ? 2 : 0), 3, 3, p.mark);
-    rect(v, Math.round(cat.x) + 3, kbY - (up ? 0 : 2), 3, 3, p.mark);
-    px(v, Math.round(cat.x) - 6 + ((tick * 3) % 13), kbY - 4 - ((tick >> 2) % 3), CREAM);
-  }
   if (cat.mode === 'keyboard') {
     // ";;;;;" subindo do teclado: o bug nascendo, visivel.
     const t = (tick >> 2) % 4;
@@ -865,9 +955,13 @@ const drawHead = (
 };
 
 /**
- * O PM: o quinto gato, de OCULOS, camisa com gravata e prancheta debaixo do
- * braco. Sempre presente, nunca na mao do jogador. Quando o projeto esta
- * atras da curva, a preocupacao mora na testa: gota de suor piscando.
+ * O PM, reconstruido DA ANATOMIA para fora: primeiro um gato legivel —
+ * peito e anca separados, quatro patas no chao, rabo erguido, cabeca com
+ * focinho — e SO ENTAO a roupa vestindo esse corpo: a camisa cobre o
+ * peito seguindo o volume (nunca vira caixa), a gravata pende do
+ * colarinho junto ao pescoco, os oculos alinham com os DOIS olhos, e a
+ * prancheta fica presa entre o antebraco e o flanco. Atras da curva de
+ * entregas, a preocupacao mora na testa: gota de suor piscando.
  */
 const drawPm = (v: View, state: HackState, tick: number): void => {
   const pm = state.pm;
@@ -876,40 +970,69 @@ const drawPm = (v: View, state: HackState, tick: number): void => {
   const body = c(150, 134, 122);
   const mark = c(110, 96, 86);
   const shirt = c(238, 234, 226);
+  const tie = c(176, 58, 66);
   const moving = Math.hypot(pm.targetX - pm.x, pm.targetY - pm.y) > 2;
   const step = moving ? Math.round(Math.abs(Math.sin(tick / 4)) * 2) : 0;
   contactShadow(v, Math.round(pm.x), Math.round(pm.y) + 2, 11, 3, 0.34);
-  rect(v, x + 1, y + 2, 20, 10, body);
-  // A camisa cobre o peito; colarinho e GRAVATA por cima.
-  rect(v, x + 3, y + 5, 16, 8, shirt);
-  rect(v, x + 8, y + 5, 6, 2, adjustBrightness(shirt, -18));
-  rect(v, x + 10, y + 7, 2, 5, c(176, 58, 66));
-  px(v, x + 9, y + 11, c(140, 42, 50));
-  px(v, x + 12, y + 11, c(140, 42, 50));
-  // Patas.
-  rect(v, x + 4, y + 12 - step, 3, 3 + step, mark);
-  rect(v, x + 15, y + 12, 3, 3, mark);
-  // A PRANCHETA debaixo do braco: o PM nunca larga o plano.
-  rect(v, x + 18, y + 4, 6, 8, adjustBrightness(WOOD, -12));
-  rect(v, x + 19, y + 5, 4, 6, CREAM);
-  px(v, x + 20, y + 6, VIOLET_SEL);
-  px(v, x + 21, y + 8, CYAN_ACT);
-  // Cabeca com orelhas e OCULOS redondos com ponte.
+
+  // CORPO FELINO: anca traseira mais alta e redonda, lombo, peito.
+  rect(v, x + 13, y + 2, 8, 10, body); // anca
+  px(v, x + 12, y + 2, body);
+  rect(v, x + 3, y + 4, 11, 8, body); // peito e torso
+  rect(v, x + 4, y + 3, 9, 1, body); // curva do lombo
+  // RABO erguido, curvando atras da anca — vivo, como o dos outros.
+  for (let i = 0; i < 5; i++) {
+    px(v, x + 21 + (i > 2 ? 1 : 0), y + 3 - i + (i > 3 ? Math.round(Math.sin(tick / 9)) : 0), mark);
+  }
+  // QUATRO patas: dianteiras sob o peito, traseiras sob a anca.
+  rect(v, x + 4, y + 12 - step, 2, 2 + step, mark);
+  rect(v, x + 8, y + 12, 2, 2, mark);
+  rect(v, x + 14, y + 12, 2, 2, mark);
+  rect(v, x + 18, y + 12 - step, 2, 2 + step, mark);
+
+  // A CAMISA veste o peito (segue o volume, para na anca), com colarinho
+  // no pescoco e a GRAVATA pendurada DELE sobre o peito.
+  rect(v, x + 3, y + 6, 9, 6, shirt);
+  px(v, x + 2, y + 8, shirt);
+  px(v, x + 2, y + 9, shirt);
+  rect(v, x + 3, y + 5, 4, 1, adjustBrightness(shirt, -22)); // colarinho
+  px(v, x + 4, y + 6, adjustBrightness(tie, 14)); // no
+  const sway = moving ? (tick >> 3) % 2 : 0;
+  rect(v, x + 4 + sway, y + 7, 2, 3, tie);
+  px(v, x + 4 + sway, y + 10, adjustBrightness(tie, -24)); // ponta
+
+  // A PRANCHETA presa entre o antebraco dianteiro e o flanco.
+  rect(v, x + 1, y + 5, 3, 7, adjustBrightness(WOOD, -12));
+  rect(v, x + 2, y + 6, 1, 5, CREAM);
+  rect(v, x + 3, y + 8, 2, 4, body); // o antebraco por cima: segurando
+
+  // CABECA com focinho, orelhas e OCULOS alinhados aos dois olhos.
   const hx = x - 1;
   const hy = y - 7;
   rect(v, hx, hy, 12, 10, body);
+  px(v, hx - 1, hy + 6, body); // focinho
+  px(v, hx - 1, hy + 5, c(70, 48, 44)); // nariz
   px(v, hx + 1, hy - 1, mark);
   px(v, hx + 2, hy - 2, mark);
   px(v, hx + 3, hy - 1, mark);
   px(v, hx + 8, hy - 1, mark);
   px(v, hx + 9, hy - 2, mark);
   px(v, hx + 10, hy - 1, mark);
-  rect(v, hx + 2, hy + 3, 3, 3, c(40, 38, 52));
-  rect(v, hx + 7, hy + 3, 3, 3, c(40, 38, 52));
-  px(v, hx + 3, hy + 4, c(214, 224, 232));
-  px(v, hx + 8, hy + 4, c(214, 224, 232));
-  px(v, hx + 5, hy + 4, c(40, 38, 52));
-  px(v, hx + 6, hy + 4, c(40, 38, 52));
+  // Aros na linha DOS OLHOS (a mesma dos outros gatos), ponte entre eles e
+  // haste ate a orelha — oculos usados, nao pintados.
+  const rim = c(40, 38, 52);
+  for (const lx of [hx + 2, hx + 7]) {
+    rect(v, lx, hy + 3, 3, 1, rim);
+    rect(v, lx, hy + 5, 3, 1, rim);
+    px(v, lx, hy + 4, rim);
+    px(v, lx + 2, hy + 4, rim);
+    px(v, lx + 1, hy + 4, c(30, 60, 50)); // o olho DENTRO da lente
+  }
+  px(v, hx + 5, hy + 4, rim); // ponte
+  px(v, hx + 6, hy + 4, rim);
+  px(v, hx + 10, hy + 4, rim); // haste
+  px(v, hx + 3, hy + 3, c(214, 224, 232)); // brilho da lente
+
   // Atras da curva? O suor conta — a mesma conta do resmungo no feed.
   const alive = state.tasks.filter((t) => !t.cut);
   const behind = Math.floor((state.tick / HACK_TICKS) * alive.length) > alive.filter((t) => t.done).length;
