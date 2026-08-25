@@ -146,15 +146,21 @@ const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): 
         const i = y * frame.w + x;
         if (x >= 0 && y >= 0 && x < frame.w && y < frame.h && frame.data[i] !== 0) frame.data[i] = color;
       };
-      // o lanyard DA A VOLTA: a banda cruza o pescoco inteiro. A extensao
-      // vem da propria silhueta — o trecho opaco continuo da cabeca na
-      // altura do queixo (ey+2), nunca uma largura fixa.
+      // o lanyard DA A VOLTA no pescoco — e SO no pescoco. A silhueta na
+      // altura do queixo (ey+2) da a extensao, mas em poses onde a cabeca
+      // se conecta ao dorso (sentado, frames de caminhada) essa fileira
+      // percorre o corpo inteiro; por isso a banda e SEMPRE recortada para
+      // a zona anatomica do pescoco relativa ao olho ([ex-6, ex+1], a
+      // mesma faixa do colar desenhado pela autora no grey_tabby).
       const rowY = ey + 2;
       let x0 = ex, x1 = ex;
       if (rowY >= 0 && rowY < frame.h) {
         while (x0 - 1 >= 0 && frame.data[rowY * frame.w + (x0 - 1)] !== 0) x0--;
         while (x1 + 1 < frame.w && frame.data[rowY * frame.w + (x1 + 1)] !== 0) x1++;
       }
+      x0 = Math.max(x0, ex - 6);
+      x1 = Math.min(x1, ex + 1);
+      if (x1 < x0) continue;
       // ...e respeita a CURVATURA do pescoco: como no colar desenhado pela
       // autora (grey_tabby), a banda e uma diagonal em degraus — mais alta
       // na nuca (tras), descendo 2px ate a garganta (frente).
