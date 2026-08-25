@@ -372,10 +372,22 @@ body {
 .dock-meter-label { width: 56px; font-size: 0.76em; }
 .dock-bar { flex: 1; height: 7px; background: #262233; border-radius: 4px; overflow: hidden; }
 .dock-fill { display: block; height: 100%; }
-.bar-energy .dock-fill { background: #78d68c; }
-.bar-hunger .dock-fill { background: #e8c05a; }
-.bar-stress .dock-fill { background: #f0705a; }
-.bar-moral .dock-fill { background: #8c72f2; }
+.dock-fill {
+  background-size: 12px 100%;
+  image-rendering: pixelated;
+}
+.bar-energy .dock-fill {
+  background: repeating-linear-gradient(90deg, #78d68c 0 7px, #4fae69 7px 12px);
+}
+.bar-hunger .dock-fill {
+  background: repeating-linear-gradient(90deg, #e8c05a 0 7px, #b98c35 7px 12px);
+}
+.bar-stress .dock-fill {
+  background: repeating-linear-gradient(90deg, #f0705a 0 7px, #bd493f 7px 12px);
+}
+.bar-moral .dock-fill {
+  background: repeating-linear-gradient(90deg, #8c72f2 0 7px, #604bb8 7px 12px);
+}
 .dock-details[hidden] { display: none; }
 .dock-bio { font-size: 0.8em; opacity: 0.85; margin: 4px 0 2px; }
 
