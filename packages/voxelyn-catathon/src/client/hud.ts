@@ -11,6 +11,8 @@ import {
   SPONSOR_TEXT,
   TREATS_START,
   fmtCost,
+  liveBug,
+  nextTask,
   vibeOf,
   workable,
   type Candidate,
@@ -22,6 +24,9 @@ import type { RunClose } from './career.js';
 /** Alias do dicionario para escopos onde `t` e uma Task. */
 const i18n = t;
 import type { Cat } from '../sim/types.js';
+
+/** Um trecho de trabalho na raia do gantt: quem, o que, de quando a quando. */
+type GanttSeg = { key: string; label: string; start: number; end: number; el: HTMLElement };
 import type { CatId, HackState, SimEvent, SpecialCategoryId, SponsorContract, Task } from '../sim/types.js';
 
 /**
@@ -47,8 +52,6 @@ export const ICONS = {
   fish: svg('<path d="M4 12c3-4 8-5 12-2 2 1.5 2 4.5 0 6-4 3-9 2-12-2z"/><path d="M16 9l4-3-1 6 1 6-4-3"/><circle cx="8" cy="11" r="0.6" fill="currentColor"/>'),
   /** O quadro de tarefas: prancheta com post-its. */
   board: svg('<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2.5h6v3H9z"/><path d="M7.5 10h4"/><path d="M7.5 14h6"/><path d="M7.5 18h3"/><circle cx="16.5" cy="10" r="1.1"/>'),
-  /** Gantt: barras deslocadas no tempo — nenhum icone repete na barra. */
-  gantt: svg('<rect x="3" y="4" width="10" height="3.4" rx="1.2"/><rect x="7" y="10.3" width="12" height="3.4" rx="1.2"/><rect x="11" y="16.6" width="8" height="3.4" rx="1.2"/>'),
   /** Som: uma orelhinha de gato ouvindo uma nota. */
   sound: svg('<path d="M5 14V7l4-4 3 6v5a3.5 3.5 0 11-7 0z"/><path d="M16 6v9"/><circle cx="14.2" cy="15.8" r="1.8"/><path d="M16 6l3 1.5"/>'),
   /** Cortar escopo: tesourinha. */
@@ -151,6 +154,15 @@ export type Hud = {
    * tocava "cortar" e nada acontecia. Botao que existe fica existindo.
    */
   rows: Map<string, TaskRow>;
+  /**
+   * O GANTT REAL dentro do Kanban: 48h de vao, uma raia por gato, e os
+   * segmentos vao preenchendo conforme cada um trabalha — cor por trilha,
+   * duracao no tooltip. Derivado por AMOSTRAGEM do estado a cada frame:
+   * display puro, nada disso entra na simulacao nem no hash.
+   */
+  ganttLanes: Map<CatId, HTMLElement>;
+  ganttNow: Map<CatId, HTMLElement>;
+  ganttSegs: Map<CatId, GanttSeg[]>;
   /** Containers que bindTeam preenche a cada run. */
   teamBar: HTMLElement;
   abilityRow: HTMLElement;
@@ -225,28 +237,24 @@ export const createHud = (
   // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
   // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
   const boardBtn = softButton(ICONS.board, t().btnProject);
-  const ganttBtn = softButton(ICONS.gantt, 'Gantt');
   top.append(clock, remain, build, proj, bugsChip, decideChip, alarm);
+  // A barra vira DOIS grupos com base propria: o painel do projeto num
+  // lado, os apetrechos/consumiveis (catnip, laser, petisco) no outro —
+  // abrir um quadro e gastar uma dose sao gestos de natureza diferente.
   const cluster = el('div', 'action-bar');
+  const groupProject = el('div', 'action-group');
+  const groupItems = el('div', 'action-group');
 
   const board = el('div', 'hud-board');
   board.hidden = true;
 
   boardBtn.addEventListener('click', () => {
-    const wasKanban = !board.hidden && !board.classList.contains('gantt');
-    board.classList.remove('gantt');
-    board.hidden = wasKanban;
-  });
-  ganttBtn.addEventListener('click', () => {
-    const wasGantt = !board.hidden && board.classList.contains('gantt');
-    board.classList.add('gantt');
-    board.hidden = wasGantt;
+    board.hidden = !board.hidden;
   });
   bugsChip.addEventListener('click', () => {
     board.hidden = false;
   });
   decideChip.addEventListener('click', () => {
-    board.classList.remove('gantt');
     board.hidden = false;
   });
 
@@ -361,7 +369,9 @@ export const createHud = (
   laserBtn.appendChild(laserBadge);
   laserBtn.hidden = true;
   laserBtn.addEventListener('click', handlers.onLaser);
-  cluster.append(catnipBtn, laserBtn, boardBtn, ganttBtn, treatsBtn);
+  groupProject.append(boardBtn);
+  groupItems.append(catnipBtn, laserBtn, treatsBtn);
+  cluster.append(groupProject, groupItems);
 
   // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
   // o default do prazo — o modal informa, nunca chantageia.
@@ -414,6 +424,9 @@ export const createHud = (
     pitchCrisis,
     pitchBtns,
     rows: new Map(),
+    ganttLanes: new Map(),
+    ganttNow: new Map(),
+    ganttSegs: new Map(),
     teamBar,
     abilityRow,
     catnipBtn,
@@ -441,6 +454,9 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
   hud.abilityRow.replaceChildren();
   hud.pitchBtns.clear();
   hud.rows.clear();
+  hud.ganttLanes.clear();
+  hud.ganttNow.clear();
+  hud.ganttSegs.clear();
   hud.board.replaceChildren();
   hud.feedPanel.replaceChildren();
   for (const c of cats) {
@@ -558,6 +574,60 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
   r.cutBtn.style.display = t.done || t.cut ? 'none' : '';
 };
 
+/**
+ * O que este gato esta fazendo AGORA, na taxonomia do gantt: a tarefa da
+ * trilha (cor da trilha), um bug (alarme), uma emergencia no rack (alarme
+ * listrado) — ou nada que renda barra (andar, comer, dormir, decidir).
+ */
+const ganttActivity = (state: HackState, cat: Cat): { key: string; label: string; cls: string } | null => {
+  if (cat.mode !== 'work' || !cat.slot) return null;
+  if (cat.slot === 'rack') {
+    if (state.hairball.active) return { key: 'hairball', label: 'rack', cls: 'seg-fix' };
+    if (state.buildBroken) return { key: 'build', label: 'rack', cls: 'seg-fix' };
+    if (state.cableOut) return { key: 'cable', label: 'rack', cls: 'seg-fix' };
+    return null;
+  }
+  const track = state.slots.find((s) => s.id === cat.slot)?.track;
+  if (!track) return null;
+  if (state.hairball.active || state.buildBroken || state.cableOut) return null;
+  const bug = liveBug(state, track);
+  if (bug) return { key: `bug${bug.id}`, label: `bug · ${track}`, cls: 'seg-bug' };
+  const task = nextTask(state, track);
+  if (!task || (task.choice && task.chosen === null)) return null;
+  return { key: task.id, label: task.label, cls: `track-${task.track}` };
+};
+
+/**
+ * Amostra o estado e estende (ou abre) o segmento da raia de cada gato.
+ * Uma pausa real — comer, dormir, decidir — fecha o segmento e a proxima
+ * sessao abre outro: as interrupcoes ficam VISIVEIS no vao.
+ */
+const updateGantt = (state: HackState, hud: Hud): void => {
+  for (const cat of state.cats) {
+    const lane = hud.ganttLanes.get(cat.id);
+    if (!lane) continue;
+    const nowline = hud.ganttNow.get(cat.id)!;
+    const nowLeft = `${Math.min(100, (state.tick / HACK_TICKS) * 100).toFixed(2)}%`;
+    if (nowline.style.left !== nowLeft) nowline.style.left = nowLeft;
+    const act = ganttActivity(state, cat);
+    if (!act) continue;
+    const segs = hud.ganttSegs.get(cat.id)!;
+    let seg = segs[segs.length - 1];
+    if (!seg || seg.key !== act.key || state.tick - seg.end > 8) {
+      const node = el('span', `gantt-seg ${act.cls}`);
+      node.style.left = `${((state.tick / HACK_TICKS) * 100).toFixed(2)}%`;
+      lane.appendChild(node);
+      seg = { key: act.key, label: act.label, start: state.tick, end: state.tick, el: node };
+      segs.push(seg);
+    }
+    seg.end = state.tick;
+    seg.el.style.width = `${Math.max(0.4, ((seg.end - seg.start) / HACK_TICKS) * 100).toFixed(2)}%`;
+    const hours = (seg.end - seg.start) * HOURS_PER_TICK;
+    const title = `${seg.label} · ${Math.floor(hours)}h${String(Math.floor((hours % 1) * 60)).padStart(2, '0')}`;
+    if (seg.el.title !== title) seg.el.title = title;
+  }
+};
+
 const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
   const name = (id: string): string => state.cats.find((c) => c.id === id)?.name ?? id;
   const d = t();
@@ -673,11 +743,35 @@ export const drawHud = (hud: Hud, state: HackState): void => {
       }
       hud.board.appendChild(group);
     }
+    // O GANTT mora NO Kanban, nao numa vista paralela: mesmo painel, mesma
+    // paleta. O vao e o hackathon inteiro (48h) com guias a cada 12h; cada
+    // gato tem a sua raia e os segmentos nascem do que ele REALMENTE fez.
+    const gsec = el('div', 'board-gantt');
+    const ghead = el('div', 'gantt-row gantt-head');
+    ghead.appendChild(el('span', 'board-title', 'gantt'));
+    const scale = el('span', 'gantt-scale');
+    for (const h of [0, 12, 24, 36, 48]) scale.appendChild(el('span', '', `${h}h`));
+    ghead.appendChild(scale);
+    gsec.appendChild(ghead);
+    for (const c of state.cats) {
+      const row = el('div', 'gantt-row');
+      row.appendChild(el('span', 'gantt-cat', c.name.toLowerCase()));
+      const lane = el('div', 'gantt-lane');
+      const nowline = el('span', 'gantt-nowline');
+      lane.appendChild(nowline);
+      hud.ganttLanes.set(c.id, lane);
+      hud.ganttNow.set(c.id, nowline);
+      hud.ganttSegs.set(c.id, []);
+      row.appendChild(lane);
+      gsec.appendChild(row);
+    }
+    hud.board.appendChild(gsec);
   }
   for (const t of state.tasks) {
     const r = hud.rows.get(t.id);
     if (r) updateRow(state, t, r);
   }
+  updateGantt(state, hud);
 
   // Aneis de estado nos retratos da equipe: quem trabalha, quem dorme, quem
   // esta na zona de perigo — legivel sem abrir ficha nenhuma.

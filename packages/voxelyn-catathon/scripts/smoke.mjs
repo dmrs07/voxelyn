@@ -119,8 +119,8 @@ const ghostBtns = await page.evaluate(() => ({
   laserLeft: window.catathon.app.state.laserLeft,
   visible: Array.from(document.querySelectorAll('.action-bar .soft-btn')).filter((b) => b.offsetParent !== null).length,
 }));
-// 3 fixos: projeto (Kanban), Gantt e petiscos.
-const expectedBtns = 3 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
+// 2 fixos: projeto e petiscos — o gantt mora DENTRO do Kanban agora.
+const expectedBtns = 2 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
 if (ghostBtns.visible !== expectedBtns) {
   throw new Error(`botoes fantasmas na barra: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
 }
@@ -342,6 +342,16 @@ await page.waitForTimeout(300);
 const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').cut);
 step.push(`cortar escopo: o3.cut=${cutOk}`);
 if (!cutOk) throw new Error('cortar nao cortou');
+// O GANTT dentro do Kanban: uma raia por gato e pelo menos um segmento ja
+// preenchido (o backend trabalhou b1 desde o arrasto).
+const gantt = await page.evaluate(() => ({
+  lanes: document.querySelectorAll('.board-gantt .gantt-lane').length,
+  segs: document.querySelectorAll('.board-gantt .gantt-seg').length,
+  cats: window.catathon.app.state.cats.length,
+}));
+if (gantt.lanes !== gantt.cats) throw new Error(`gantt: ${gantt.lanes} raias para ${gantt.cats} gatos`);
+if (gantt.segs < 1) throw new Error('gantt: nenhum segmento preenchido com trabalho ja feito');
+step.push(`gantt no quadro: ${gantt.lanes} raias, ${gantt.segs} segmentos`);
 await shot('c3-quadro');
 
 // --- EVENTO SOCIAL: o pavilhao interrompe com uma escolha A/B --------------
