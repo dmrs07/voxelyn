@@ -124,6 +124,9 @@ describe('mentoria (evolucao do junior)', () => {
     seat(state, 'cheeto', 'desk-frontend');
     // f1 depende de d1: libera o quadro para as mesas terem o que puxar.
     for (const t of state.tasks) (t as { deps: readonly string[] }).deps = [];
+    // o1 tem decisao aberta e o mentor iria ao QUADRO decidir em vez de
+    // mentorar da mesa vizinha: o teste decide antes, como um jogador faria.
+    step(state, { choose: { task: 'o1', option: 'pipelineCompleto' } });
     if (withMentor) seat(state, 'almofada', 'desk-devops'); // mesa VIZINHA
     return state;
   };

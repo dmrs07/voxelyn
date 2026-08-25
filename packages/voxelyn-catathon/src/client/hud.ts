@@ -11,7 +11,10 @@ import {
   SPONSOR_TEXT,
   TREATS_START,
   fmtCost,
+  liveBug,
+  nextTask,
   vibeOf,
+  workable,
   type Candidate,
   type GearId,
 } from '../sim/index.js';
@@ -21,6 +24,10 @@ import type { RunClose } from './career.js';
 /** Alias do dicionario para escopos onde `t` e uma Task. */
 const i18n = t;
 import type { Cat } from '../sim/types.js';
+import { applyItemSprite, type ItemSpriteId } from './atlas.js';
+
+/** Um trecho de trabalho na raia do gantt: quem, o que, de quando a quando. */
+type GanttSeg = { key: string; label: string; start: number; end: number; el: HTMLElement };
 import type { CatId, HackState, SimEvent, SpecialCategoryId, SponsorContract, Task } from '../sim/types.js';
 
 /**
@@ -46,8 +53,6 @@ export const ICONS = {
   fish: svg('<path d="M4 12c3-4 8-5 12-2 2 1.5 2 4.5 0 6-4 3-9 2-12-2z"/><path d="M16 9l4-3-1 6 1 6-4-3"/><circle cx="8" cy="11" r="0.6" fill="currentColor"/>'),
   /** O quadro de tarefas: prancheta com post-its. */
   board: svg('<rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2.5h6v3H9z"/><path d="M7.5 10h4"/><path d="M7.5 14h6"/><path d="M7.5 18h3"/><circle cx="16.5" cy="10" r="1.1"/>'),
-  /** Gantt: barras deslocadas no tempo — nenhum icone repete na barra. */
-  gantt: svg('<rect x="3" y="4" width="10" height="3.4" rx="1.2"/><rect x="7" y="10.3" width="12" height="3.4" rx="1.2"/><rect x="11" y="16.6" width="8" height="3.4" rx="1.2"/>'),
   /** Som: uma orelhinha de gato ouvindo uma nota. */
   sound: svg('<path d="M5 14V7l4-4 3 6v5a3.5 3.5 0 11-7 0z"/><path d="M16 6v9"/><circle cx="14.2" cy="15.8" r="1.8"/><path d="M16 6l3 1.5"/>'),
   /** Cortar escopo: tesourinha. */
@@ -84,6 +89,25 @@ const softButton = (icon: string, word: string, className = ''): HTMLButtonEleme
   return b;
 };
 
+/**
+ * Um SLOT de item, com apelo de inventario de Minecraft: moldura quadrada
+ * com bisel fundo, O OBJETO em pixel art recortado do atlas, a contagem no
+ * canto e a palavra em letra miuda embaixo (a regra da casa: sem hover num
+ * dedo, todo botao carrega palavra).
+ */
+const itemSlot = (sprite: ItemSpriteId, word: string): HTMLButtonElement => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'item-slot';
+  const frame = el('span', 'slot-frame');
+  const spr = el('span', 'slot-sprite');
+  spr.setAttribute('aria-hidden', 'true');
+  applyItemSprite(spr, sprite, 3);
+  frame.append(spr, el('span', 'btn-badge', ''));
+  b.append(frame, el('span', 'slot-word', word));
+  return b;
+};
+
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className: string,
@@ -114,6 +138,7 @@ export type Hud = {
   build: HTMLElement;
   proj: HTMLElement;
   bugsChip: HTMLButtonElement;
+  decideChip: HTMLButtonElement;
   alarm: HTMLElement;
   treatsBtn: HTMLButtonElement;
   board: HTMLElement;
@@ -149,6 +174,15 @@ export type Hud = {
    * tocava "cortar" e nada acontecia. Botao que existe fica existindo.
    */
   rows: Map<string, TaskRow>;
+  /**
+   * O GANTT REAL dentro do Kanban: 48h de vao, uma raia por gato, e os
+   * segmentos vao preenchendo conforme cada um trabalha — cor por trilha,
+   * duracao no tooltip. Derivado por AMOSTRAGEM do estado a cada frame:
+   * display puro, nada disso entra na simulacao nem no hash.
+   */
+  ganttLanes: Map<CatId, HTMLElement>;
+  ganttNow: Map<CatId, HTMLElement>;
+  ganttSegs: Map<CatId, GanttSeg[]>;
   /** Containers que bindTeam preenche a cada run. */
   teamBar: HTMLElement;
   abilityRow: HTMLElement;
@@ -204,37 +238,41 @@ export const createHud = (
   bugsChip.type = 'button';
   bugsChip.className = 'hud-chip hud-bugs';
   bugsChip.hidden = true;
+  // DECISAO aberta e alarme com destino: o chip pisca enquanto os devs se
+  // juntam no quadro, e toca-lo abre o projeto onde a escolha mora.
+  const decideChip = document.createElement('button');
+  decideChip.type = 'button';
+  decideChip.className = 'hud-chip hud-decide';
+  decideChip.hidden = true;
   const alarm = el('div', 'hud-chip hud-alarm-chip', '');
   alarm.hidden = true;
-  // As ACOES moram numa barra contextual embaixo, com base escura coerente
-  // com o HUD — nao botoes soltos flutuando sobre o cenario. Petisco separa
-  // ACAO (a palavra) de INVENTARIO (a badge com o numero).
-  const treatsBtn = softButton(ICONS.fish, t().btnTreat, 'treat');
-  const treatsBadge = el('span', 'btn-badge', `×${TREATS_START}`);
-  treatsBtn.appendChild(treatsBadge);
+  // O petisco e um ITEM: slot quadrado com o peixinho do atlas e a contagem
+  // no canto — inventario com cara de inventario.
+  const treatsBtn = itemSlot('petisco', t().btnTreat);
+  treatsBtn.querySelector('.btn-badge')!.textContent = `×${TREATS_START}`;
   treatsBtn.addEventListener('click', handlers.onFeedToggle);
-  // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo,
-  // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
-  // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
-  const boardBtn = softButton(ICONS.board, t().btnProject);
-  const ganttBtn = softButton(ICONS.gantt, 'Gantt');
-  top.append(clock, remain, build, proj, bugsChip, alarm);
+  // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente — e o
+  // botao mora NO TOPO, junto dos chips de estado: abrir o quadro e leitura
+  // de projeto, nao uso de item; embaixo ficou so o inventario.
+  const boardBtn = document.createElement('button');
+  boardBtn.type = 'button';
+  boardBtn.className = 'proj-btn';
+  boardBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.board}</span><span>${t().btnProject}</span>`;
+  top.append(clock, remain, build, proj, boardBtn, bugsChip, decideChip, alarm);
+  // Embaixo, a HOTBAR: so os itens, cada um no seu slot.
   const cluster = el('div', 'action-bar');
+  const groupItems = el('div', 'action-group');
 
   const board = el('div', 'hud-board');
   board.hidden = true;
 
   boardBtn.addEventListener('click', () => {
-    const wasKanban = !board.hidden && !board.classList.contains('gantt');
-    board.classList.remove('gantt');
-    board.hidden = wasKanban;
-  });
-  ganttBtn.addEventListener('click', () => {
-    const wasGantt = !board.hidden && board.classList.contains('gantt');
-    board.classList.add('gantt');
-    board.hidden = wasGantt;
+    board.hidden = !board.hidden;
   });
   bugsChip.addEventListener('click', () => {
+    board.hidden = false;
+  });
+  decideChip.addEventListener('click', () => {
     board.hidden = false;
   });
 
@@ -338,18 +376,16 @@ export const createHud = (
     soundPanel.hidden = !soundPanel.hidden;
   });
   // Consumiveis: catnip arma (proximo toque num gato dosa), laser dispara.
-  // Escondidos ate existirem doses — botao sem uso e ruido.
-  const catnipBtn = softButton(ICONS.leaf, t().btnCatnip, 'treat');
-  const catnipBadge = el('span', 'btn-badge', '×0');
-  catnipBtn.appendChild(catnipBadge);
+  // Escondidos ate existirem doses — slot vazio e ruido. Cada um renderiza
+  // O OBJETO recortado do mesmo atlas da lojinha.
+  const catnipBtn = itemSlot('catnip', t().btnCatnip);
   catnipBtn.hidden = true;
   catnipBtn.addEventListener('click', handlers.onCatnipToggle);
-  const laserBtn = softButton(ICONS.laser, t().btnLaser, '');
-  const laserBadge = el('span', 'btn-badge', '×0');
-  laserBtn.appendChild(laserBadge);
+  const laserBtn = itemSlot('laser-pointer', t().btnLaser);
   laserBtn.hidden = true;
   laserBtn.addEventListener('click', handlers.onLaser);
-  cluster.append(catnipBtn, laserBtn, boardBtn, ganttBtn, treatsBtn);
+  groupItems.append(catnipBtn, laserBtn, treatsBtn);
+  cluster.append(groupItems);
 
   // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
   // o default do prazo — o modal informa, nunca chantageia.
@@ -372,13 +408,6 @@ export const createHud = (
   root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal);
   host.appendChild(root);
 
-  // Aviso de RETRATO: o pavilhao e largo, e deitado se ve o dobro. Aviso,
-  // nunca bloqueio — e mora no HOST, fora do root que se esconde no titulo:
-  // e justamente na tela de titulo que girar mais ajuda.
-  const hint = el('div', 'rotate-hint', t().rotateHint);
-  hint.setAttribute('role', 'status');
-  host.appendChild(hint);
-
   const hudRef: Hud = {
     root,
     clock,
@@ -386,6 +415,7 @@ export const createHud = (
     build,
     proj,
     bugsChip,
+    decideChip,
     alarm,
     treatsBtn,
     board,
@@ -408,6 +438,9 @@ export const createHud = (
     pitchCrisis,
     pitchBtns,
     rows: new Map(),
+    ganttLanes: new Map(),
+    ganttNow: new Map(),
+    ganttSegs: new Map(),
     teamBar,
     abilityRow,
     catnipBtn,
@@ -435,6 +468,9 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
   hud.abilityRow.replaceChildren();
   hud.pitchBtns.clear();
   hud.rows.clear();
+  hud.ganttLanes.clear();
+  hud.ganttNow.clear();
+  hud.ganttSegs.clear();
   hud.board.replaceChildren();
   hud.feedPanel.replaceChildren();
   for (const c of cats) {
@@ -552,6 +588,60 @@ const updateRow = (state: HackState, t: Task, r: TaskRow): void => {
   r.cutBtn.style.display = t.done || t.cut ? 'none' : '';
 };
 
+/**
+ * O que este gato esta fazendo AGORA, na taxonomia do gantt: a tarefa da
+ * trilha (cor da trilha), um bug (alarme), uma emergencia no rack (alarme
+ * listrado) — ou nada que renda barra (andar, comer, dormir, decidir).
+ */
+const ganttActivity = (state: HackState, cat: Cat): { key: string; label: string; cls: string } | null => {
+  if (cat.mode !== 'work' || !cat.slot) return null;
+  if (cat.slot === 'rack') {
+    if (state.hairball.active) return { key: 'hairball', label: 'rack', cls: 'seg-fix' };
+    if (state.buildBroken) return { key: 'build', label: 'rack', cls: 'seg-fix' };
+    if (state.cableOut) return { key: 'cable', label: 'rack', cls: 'seg-fix' };
+    return null;
+  }
+  const track = state.slots.find((s) => s.id === cat.slot)?.track;
+  if (!track) return null;
+  if (state.hairball.active || state.buildBroken || state.cableOut) return null;
+  const bug = liveBug(state, track);
+  if (bug) return { key: `bug${bug.id}`, label: `bug · ${track}`, cls: 'seg-bug' };
+  const task = nextTask(state, track);
+  if (!task || (task.choice && task.chosen === null)) return null;
+  return { key: task.id, label: task.label, cls: `track-${task.track}` };
+};
+
+/**
+ * Amostra o estado e estende (ou abre) o segmento da raia de cada gato.
+ * Uma pausa real — comer, dormir, decidir — fecha o segmento e a proxima
+ * sessao abre outro: as interrupcoes ficam VISIVEIS no vao.
+ */
+const updateGantt = (state: HackState, hud: Hud): void => {
+  for (const cat of state.cats) {
+    const lane = hud.ganttLanes.get(cat.id);
+    if (!lane) continue;
+    const nowline = hud.ganttNow.get(cat.id)!;
+    const nowLeft = `${Math.min(100, (state.tick / HACK_TICKS) * 100).toFixed(2)}%`;
+    if (nowline.style.left !== nowLeft) nowline.style.left = nowLeft;
+    const act = ganttActivity(state, cat);
+    if (!act) continue;
+    const segs = hud.ganttSegs.get(cat.id)!;
+    let seg = segs[segs.length - 1];
+    if (!seg || seg.key !== act.key || state.tick - seg.end > 8) {
+      const node = el('span', `gantt-seg ${act.cls}`);
+      node.style.left = `${((state.tick / HACK_TICKS) * 100).toFixed(2)}%`;
+      lane.appendChild(node);
+      seg = { key: act.key, label: act.label, start: state.tick, end: state.tick, el: node };
+      segs.push(seg);
+    }
+    seg.end = state.tick;
+    seg.el.style.width = `${Math.max(0.4, ((seg.end - seg.start) / HACK_TICKS) * 100).toFixed(2)}%`;
+    const hours = (seg.end - seg.start) * HOURS_PER_TICK;
+    const title = `${seg.label} · ${Math.floor(hours)}h${String(Math.floor((hours % 1) * 60)).padStart(2, '0')}`;
+    if (seg.el.title !== title) seg.el.title = title;
+  }
+};
+
 const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
   const name = (id: string): string => state.cats.find((c) => c.id === id)?.name ?? id;
   const d = t();
@@ -641,6 +731,13 @@ export const drawHud = (hud: Hud, state: HackState): void => {
   setText(hud.proj, t().features(shipped));
   hud.bugsChip.hidden = bugs === 0;
   if (bugs > 0) setText(hud.bugsChip, t().bugs(bugs));
+  // Decisao aberta em tarefa DESBLOQUEADA: o alerta so grita quando a
+  // escolha ja esta travando alguem de verdade.
+  const decisions = state.tasks.filter(
+    (task) => !task.done && !task.cut && !!task.choice && task.chosen === null && workable(state, task)
+  ).length;
+  hud.decideChip.hidden = decisions === 0;
+  if (decisions > 0) setText(hud.decideChip, t().decisions(decisions));
   hud.alarm.hidden = !state.hairball.active;
   if (state.hairball.active) setText(hud.alarm, t().mergeLocked);
 
@@ -660,11 +757,35 @@ export const drawHud = (hud: Hud, state: HackState): void => {
       }
       hud.board.appendChild(group);
     }
+    // O GANTT mora NO Kanban, nao numa vista paralela: mesmo painel, mesma
+    // paleta. O vao e o hackathon inteiro (48h) com guias a cada 12h; cada
+    // gato tem a sua raia e os segmentos nascem do que ele REALMENTE fez.
+    const gsec = el('div', 'board-gantt');
+    const ghead = el('div', 'gantt-row gantt-head');
+    ghead.appendChild(el('span', 'board-title', 'gantt'));
+    const scale = el('span', 'gantt-scale');
+    for (const h of [0, 12, 24, 36, 48]) scale.appendChild(el('span', '', `${h}h`));
+    ghead.appendChild(scale);
+    gsec.appendChild(ghead);
+    for (const c of state.cats) {
+      const row = el('div', 'gantt-row');
+      row.appendChild(el('span', 'gantt-cat', c.name.toLowerCase()));
+      const lane = el('div', 'gantt-lane');
+      const nowline = el('span', 'gantt-nowline');
+      lane.appendChild(nowline);
+      hud.ganttLanes.set(c.id, lane);
+      hud.ganttNow.set(c.id, nowline);
+      hud.ganttSegs.set(c.id, []);
+      row.appendChild(lane);
+      gsec.appendChild(row);
+    }
+    hud.board.appendChild(gsec);
   }
   for (const t of state.tasks) {
     const r = hud.rows.get(t.id);
     if (r) updateRow(state, t, r);
   }
+  updateGantt(state, hud);
 
   // Aneis de estado nos retratos da equipe: quem trabalha, quem dorme, quem
   // esta na zona de perigo — legivel sem abrir ficha nenhuma.
@@ -1027,7 +1148,11 @@ export const showRecruit = (
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'shop-item';
-    b.append(el('span', 'shop-name', gt.name), el('span', 'shop-hint', gt.hint), el('span', 'cand-cost', fmtCost(g.cost, getLocale())));
+    // O objeto REAL do apetrecho, recortado do mesmo atlas da hotbar.
+    const spr = el('span', 'slot-sprite shop-sprite');
+    spr.setAttribute('aria-hidden', 'true');
+    applyItemSprite(spr, g.id, 2);
+    b.append(spr, el('span', 'shop-name', gt.name), el('span', 'shop-hint', gt.hint), el('span', 'cand-cost', fmtCost(g.cost, getLocale())));
     b.addEventListener('click', () => {
       if (cart.has(g.id)) cart.delete(g.id);
       else cart.add(g.id);

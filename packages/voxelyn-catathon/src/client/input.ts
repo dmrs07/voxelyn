@@ -85,11 +85,23 @@ export const attachInput = (
   state: () => HackState,
   nowMs: () => number
 ): InputTeardown => {
+  // Mesma media query do style.css: em retrato o palco vira cover cortado.
+  const portraitMq = window.matchMedia('(orientation: portrait)');
+
   const toScene = (clientX: number, clientY: number): { x: number; y: number } => {
-    // O canvas usa object-fit: contain — o bitmap 480x270 fica em caixa
-    // dentro do elemento. Mapear pelo retangulo do elemento erra o alvo em
-    // qualquer tela que nao seja 16:9; mapeamos pelo retangulo contido.
     const rect = canvas.getBoundingClientRect();
+    if (portraitMq.matches) {
+      // Retrato usa object-fit: cover com corte simetrico em torno de 240
+      // (style.css): a altura manda na escala e a largura visivel deriva
+      // dela — a mesma conta do navegador, entao o dedo nunca erra o alvo.
+      const scale = rect.height / 270;
+      const x0 = 240 - rect.width / scale / 2;
+      return { x: x0 + (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
+    }
+    // Deitado, o canvas usa object-fit: contain — o bitmap 480x270 fica em
+    // caixa dentro do elemento. Mapear pelo retangulo do elemento erra o
+    // alvo em qualquer tela que nao seja 16:9; mapeamos pelo retangulo
+    // contido.
     const scale = Math.min(rect.width / 480, rect.height / 270);
     const offX = rect.left + (rect.width - 480 * scale) / 2;
     const offY = rect.top + (rect.height - 270 * scale) / 2;

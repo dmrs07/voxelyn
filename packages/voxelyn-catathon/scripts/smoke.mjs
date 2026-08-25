@@ -60,14 +60,18 @@ const step = [];
 const shot = (name) => page.screenshot({ path: join(outDir, `${name}.png`) });
 const sim = (fn) => page.evaluate(fn);
 
-// Primeiro em RETRATO: o aviso de girar tem de existir (aviso, nao bloqueio).
+// Primeiro em RETRATO: layout de primeira classe — o palco corta o mundo
+// para 440/270 (cover) e nenhum aviso de girar existe mais.
 await page.setViewportSize({ width: phone.viewport.width, height: phone.viewport.height });
 await page.goto('http://localhost:4189/', { waitUntil: 'networkidle' });
 step.push(`titulo: ${await page.locator('.title-logo').textContent()}`);
 await shot('c0-retrato');
-const hint = await page.locator('.rotate-hint').isVisible();
-if (!hint) throw new Error('o aviso de girar nao aparece em retrato');
-step.push('aviso de girar visivel em retrato');
+const pStage = await page.locator('#stage').boundingBox();
+if (Math.abs(pStage.width / pStage.height - 440 / 270) > 0.02) {
+  throw new Error(`retrato: o palco nao cortou para 440/270 (${pStage.width}x${pStage.height})`);
+}
+if (await page.locator('.rotate-hint').count()) throw new Error('o aviso de girar sobreviveu ao retrato jogavel');
+step.push('retrato: palco cortado 440/270, sem aviso de girar');
 await page.setViewportSize({ width: phone.viewport.height, height: phone.viewport.width });
 await page.waitForTimeout(200);
 await shot('c1-titulo');
@@ -113,17 +117,70 @@ await page.waitForTimeout(200);
 const ghostBtns = await page.evaluate(() => ({
   catnipLeft: window.catathon.app.state.catnipLeft,
   laserLeft: window.catathon.app.state.laserLeft,
-  visible: Array.from(document.querySelectorAll('.action-bar .soft-btn')).filter((b) => b.offsetParent !== null).length,
+  visible: Array.from(document.querySelectorAll('.action-bar .item-slot')).filter((b) => b.offsetParent !== null).length,
+  projTop: !!document.querySelector('.hud-top .proj-btn'),
 }));
-// 3 fixos: projeto (Kanban), Gantt e petiscos.
-const expectedBtns = 3 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
+// A hotbar so tem ITENS (1 fixo: petisco); o projeto subiu para o topo.
+const expectedBtns = 1 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
 if (ghostBtns.visible !== expectedBtns) {
-  throw new Error(`botoes fantasmas na barra: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
+  throw new Error(`slots fantasmas na hotbar: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
 }
+if (!ghostBtns.projTop) throw new Error('o botao de projeto nao esta no topo');
 if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
 const bk = team.find((c) => c.specialty === 'backend');
 if (!bk) throw new Error('nenhum backend contratado entre os 4 primeiros (cobertura quebrou)');
 step.push(`recrutados: ${team.map((c) => c.name).join(', ')} — ${await sim(() => window.catathon.app.state.project.name)} no ${await sim(() => window.catathon.app.state.layoutName)}`);
+
+// --- RETRATO JOGAVEL: HUD nas margens, toque acerta no palco cortado -------
+await page.setViewportSize({ width: phone.viewport.width, height: phone.viewport.height });
+await page.waitForTimeout(400);
+const pRun = await page.locator('#stage').boundingBox();
+const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+for (const sel of ['.team-bar', '.action-bar', '.feed-strip']) {
+  const r = await page.locator(sel).boundingBox();
+  if (r && overlaps(pRun, r)) throw new Error(`retrato: ${sel} cobre o palco`);
+}
+// Arrastar em retrato usa a conta do COVER (altura manda; corte simetrico
+// em torno de 240) — espelho do input.ts, como o contain e do modo deitado.
+{
+  const pScale = pRun.height / 270;
+  const pX0 = 240 - pRun.width / pScale / 2;
+  const toP = (sx, sy) => [pRun.x + (sx - pX0) * pScale, pRun.y + sy * pScale];
+  const who = team[1].id;
+  const from = await page.evaluate((id) => {
+    const c = window.catathon.app.state.cats.find((x) => x.id === id);
+    return { x: c.x, y: c.y };
+  }, who);
+  const cafe = await sim(() => {
+    const s = window.catathon.app.state.slots.find((x) => x.id === 'cafe');
+    return { x: s.x, y: s.y };
+  });
+  const [ax, ay] = toP(from.x, from.y - 4);
+  const [bx, by] = toP(cafe.x, cafe.y);
+  await page.evaluate(
+    async ([x0, y0, x1, y1]) => {
+      const stage = document.querySelector('#stage');
+      const send = (type, x, y) => {
+        const t = new Touch({ identifier: 7, target: stage, clientX: x, clientY: y });
+        stage.dispatchEvent(new TouchEvent(type, { touches: type === 'touchend' ? [] : [t], changedTouches: [t], bubbles: true, cancelable: true }));
+      };
+      send('touchstart', x0, y0);
+      for (let i = 1; i <= 14; i++) {
+        send('touchmove', x0 + ((x1 - x0) * i) / 14, y0 + ((y1 - y0) * i) / 14);
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      send('touchend', x1, y1);
+    },
+    [ax, ay, bx, by]
+  );
+  await page.waitForTimeout(500);
+  const landed = await page.evaluate((id) => window.catathon.app.state.cats.find((x) => x.id === id).slot, who);
+  if (landed !== 'cafe') throw new Error(`retrato: o arrasto errou o alvo (slot=${landed})`);
+  step.push('retrato jogavel: HUD nas margens e arrasto certeiro no palco cortado');
+}
+await shot('c1c-retrato-jogavel');
+await page.setViewportSize({ width: phone.viewport.height, height: phone.viewport.width });
+await page.waitForTimeout(400);
 
 // Todo botao tem PALAVRA e alvo >= 44px (licoes de toque, agora portao).
 await page.waitForTimeout(200);
@@ -287,6 +344,16 @@ await page.waitForTimeout(300);
 const cutOk = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'o3').cut);
 step.push(`cortar escopo: o3.cut=${cutOk}`);
 if (!cutOk) throw new Error('cortar nao cortou');
+// O GANTT dentro do Kanban: uma raia por gato e pelo menos um segmento ja
+// preenchido (o backend trabalhou b1 desde o arrasto).
+const gantt = await page.evaluate(() => ({
+  lanes: document.querySelectorAll('.board-gantt .gantt-lane').length,
+  segs: document.querySelectorAll('.board-gantt .gantt-seg').length,
+  cats: window.catathon.app.state.cats.length,
+}));
+if (gantt.lanes !== gantt.cats) throw new Error(`gantt: ${gantt.lanes} raias para ${gantt.cats} gatos`);
+if (gantt.segs < 1) throw new Error('gantt: nenhum segmento preenchido com trabalho ja feito');
+step.push(`gantt no quadro: ${gantt.lanes} raias, ${gantt.segs} segmentos`);
 await shot('c3-quadro');
 
 // --- EVENTO SOCIAL: o pavilhao interrompe com uma escolha A/B --------------
