@@ -98,6 +98,29 @@ body {
 }
 .hud-alarm-chip { color: var(--alarm); font-weight: 800; animation: blink 1.1s steps(2) infinite; }
 
+/* O botao de PROJETO subiu para o topo, junto dos chips de estado — abrir o
+   quadro e leitura de projeto, nao uso de item. Estilo proprio: prancheta,
+   borda de destaque e fisica de apertar. */
+.proj-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 14px;
+  background: linear-gradient(180deg, #3a3350, #292339);
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 1em;
+  font-weight: 800;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+.proj-btn .btn-icon { line-height: 0; }
+.proj-btn .btn-icon svg { width: 16px; height: 16px; }
+.proj-btn:active { transform: translateY(1px); box-shadow: none; }
+
 /* -------------------------------------------------------- botoes macios */
 
 /*
@@ -141,9 +164,56 @@ body {
 .soft-btn.big { min-width: 160px; font-size: 1.12em; flex-direction: row; gap: 8px; padding: 12px 24px; }
 
 /* Petisco ARMADO: o proximo toque num gato alimenta — um brilho calmo avisa. */
-.soft-btn.treat.armed {
+/* ---------------------------------------------------- slots de item */
+
+/*
+ * A HOTBAR: cada consumivel num SLOT quadrado com apelo de inventario de
+ * Minecraft — moldura com bisel fundo (sombra em cima/esquerda, luz
+ * embaixo/direita), O OBJETO em pixel art recortado do atlas, a contagem
+ * no canto e a palavra em letra miuda (a regra da casa vale aqui tambem).
+ */
+.item-slot {
+  pointer-events: auto;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 56px;
+}
+.item-slot[hidden] { display: none; }
+.slot-frame {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  background: #262233;
+  border: 2px solid #14111d;
+  border-radius: 4px;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.55), inset -2px -2px 0 rgba(238, 230, 216, 0.14);
+}
+.slot-sprite { display: block; image-rendering: pixelated; background-repeat: no-repeat; }
+.slot-word { font-size: 0.64em; opacity: 0.85; }
+.item-slot .btn-badge {
+  /* contagem NO slot, canto de baixo, com sombra dura de fonte de jogo. */
+  top: auto;
+  right: 2px;
+  bottom: 1px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #fff;
+  text-shadow: 1px 1px 0 #17141f;
+}
+.item-slot:disabled { opacity: 0.45; }
+.item-slot:active .slot-frame { transform: translateY(1px); }
+.item-slot.armed .slot-frame {
   border-color: var(--accent);
-  box-shadow: 0 3px 0 #96653f, 0 0 14px rgba(232, 148, 62, 0.55);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.35), inset -2px -2px 0 rgba(232, 148, 62, 0.35), 0 0 12px rgba(232, 148, 62, 0.55);
 }
 
 /* A badge de INVENTARIO no canto do botao: "petisco" e a acao, ×3 e o
@@ -222,7 +292,9 @@ body {
   display: grid;
   gap: 6px;
   pointer-events: auto;
-  max-height: 74vh;
+  /* O painel NUNCA cobre a fileira de chips do topo — e la que mora o botao
+     que o abre e fecha: teto = viewport menos a fileira e a base. */
+  max-height: min(74vh, calc(100vh - 152px));
   overflow-y: auto;
   background: rgba(20, 17, 28, 0.6);
   border-radius: 10px;
@@ -634,6 +706,7 @@ body {
 }
 
 /* Durante o pitch, o palco e o jogo: as acoes de booth saem do caminho. */
+.hud.in-pitch .proj-btn,
 .hud.in-pitch .action-bar,
 .hud.in-pitch .team-bar,
 .hud.in-pitch .cat-dock,
@@ -721,6 +794,8 @@ body {
   min-height: 44px;
 }
 .shop-item.hired { border-color: var(--ok); box-shadow: 0 0 10px rgba(120, 214, 140, 0.35); }
+/* O objeto do apetrecho vem do MESMO atlas da hotbar: comprar e reconhecer. */
+.shop-sprite { justify-self: center; }
 .shop-item:active { transform: scale(0.98); }
 .shop-name { font-weight: 800; }
 .shop-hint { font-size: 0.86em; opacity: 0.8; }

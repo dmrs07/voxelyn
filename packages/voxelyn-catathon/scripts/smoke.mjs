@@ -117,13 +117,15 @@ await page.waitForTimeout(200);
 const ghostBtns = await page.evaluate(() => ({
   catnipLeft: window.catathon.app.state.catnipLeft,
   laserLeft: window.catathon.app.state.laserLeft,
-  visible: Array.from(document.querySelectorAll('.action-bar .soft-btn')).filter((b) => b.offsetParent !== null).length,
+  visible: Array.from(document.querySelectorAll('.action-bar .item-slot')).filter((b) => b.offsetParent !== null).length,
+  projTop: !!document.querySelector('.hud-top .proj-btn'),
 }));
-// 2 fixos: projeto e petiscos — o gantt mora DENTRO do Kanban agora.
-const expectedBtns = 2 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
+// A hotbar so tem ITENS (1 fixo: petisco); o projeto subiu para o topo.
+const expectedBtns = 1 + (ghostBtns.catnipLeft > 0 ? 1 : 0) + (ghostBtns.laserLeft > 0 ? 1 : 0);
 if (ghostBtns.visible !== expectedBtns) {
-  throw new Error(`botoes fantasmas na barra: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
+  throw new Error(`slots fantasmas na hotbar: ${ghostBtns.visible} visiveis, esperava ${expectedBtns}`);
 }
+if (!ghostBtns.projTop) throw new Error('o botao de projeto nao esta no topo');
 if (team.length !== 4) throw new Error(`a run comecou com ${team.length} gatos`);
 const bk = team.find((c) => c.specialty === 'backend');
 if (!bk) throw new Error('nenhum backend contratado entre os 4 primeiros (cobertura quebrou)');

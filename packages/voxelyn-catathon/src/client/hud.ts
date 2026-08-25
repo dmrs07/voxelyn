@@ -24,6 +24,7 @@ import type { RunClose } from './career.js';
 /** Alias do dicionario para escopos onde `t` e uma Task. */
 const i18n = t;
 import type { Cat } from '../sim/types.js';
+import { applyItemSprite, type ItemSpriteId } from './atlas.js';
 
 /** Um trecho de trabalho na raia do gantt: quem, o que, de quando a quando. */
 type GanttSeg = { key: string; label: string; start: number; end: number; el: HTMLElement };
@@ -85,6 +86,25 @@ const softButton = (icon: string, word: string, className = ''): HTMLButtonEleme
   w.className = 'btn-word';
   w.textContent = word;
   b.append(ic, w);
+  return b;
+};
+
+/**
+ * Um SLOT de item, com apelo de inventario de Minecraft: moldura quadrada
+ * com bisel fundo, O OBJETO em pixel art recortado do atlas, a contagem no
+ * canto e a palavra em letra miuda embaixo (a regra da casa: sem hover num
+ * dedo, todo botao carrega palavra).
+ */
+const itemSlot = (sprite: ItemSpriteId, word: string): HTMLButtonElement => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'item-slot';
+  const frame = el('span', 'slot-frame');
+  const spr = el('span', 'slot-sprite');
+  spr.setAttribute('aria-hidden', 'true');
+  applyItemSprite(spr, sprite, 3);
+  frame.append(spr, el('span', 'btn-badge', ''));
+  b.append(frame, el('span', 'slot-word', word));
   return b;
 };
 
@@ -226,23 +246,21 @@ export const createHud = (
   decideChip.hidden = true;
   const alarm = el('div', 'hud-chip hud-alarm-chip', '');
   alarm.hidden = true;
-  // As ACOES moram numa barra contextual embaixo, com base escura coerente
-  // com o HUD — nao botoes soltos flutuando sobre o cenario. Petisco separa
-  // ACAO (a palavra) de INVENTARIO (a badge com o numero).
-  const treatsBtn = softButton(ICONS.fish, t().btnTreat, 'treat');
-  const treatsBadge = el('span', 'btn-badge', `×${TREATS_START}`);
-  treatsBtn.appendChild(treatsBadge);
+  // O petisco e um ITEM: slot quadrado com o peixinho do atlas e a contagem
+  // no canto — inventario com cara de inventario.
+  const treatsBtn = itemSlot('petisco', t().btnTreat);
+  treatsBtn.querySelector('.btn-badge')!.textContent = `×${TREATS_START}`;
   treatsBtn.addEventListener('click', handlers.onFeedToggle);
-  // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente: fixo,
-  // ele cobria metade do pavilhao atras de uma lista. Aberto por vontade,
-  // pode ser grande a vontade — e o quadro FISICO do centro mostra o resumo.
-  const boardBtn = softButton(ICONS.board, t().btnProject);
-  top.append(clock, remain, build, proj, bugsChip, decideChip, alarm);
-  // A barra vira DOIS grupos com base propria: o painel do projeto num
-  // lado, os apetrechos/consumiveis (catnip, laser, petisco) no outro —
-  // abrir um quadro e gastar uma dose sao gestos de natureza diferente.
+  // O projeto e um PAINEL ABERTO POR BOTAO, nao um movel permanente — e o
+  // botao mora NO TOPO, junto dos chips de estado: abrir o quadro e leitura
+  // de projeto, nao uso de item; embaixo ficou so o inventario.
+  const boardBtn = document.createElement('button');
+  boardBtn.type = 'button';
+  boardBtn.className = 'proj-btn';
+  boardBtn.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.board}</span><span>${t().btnProject}</span>`;
+  top.append(clock, remain, build, proj, boardBtn, bugsChip, decideChip, alarm);
+  // Embaixo, a HOTBAR: so os itens, cada um no seu slot.
   const cluster = el('div', 'action-bar');
-  const groupProject = el('div', 'action-group');
   const groupItems = el('div', 'action-group');
 
   const board = el('div', 'hud-board');
@@ -358,20 +376,16 @@ export const createHud = (
     soundPanel.hidden = !soundPanel.hidden;
   });
   // Consumiveis: catnip arma (proximo toque num gato dosa), laser dispara.
-  // Escondidos ate existirem doses — botao sem uso e ruido.
-  const catnipBtn = softButton(ICONS.leaf, t().btnCatnip, 'treat');
-  const catnipBadge = el('span', 'btn-badge', '×0');
-  catnipBtn.appendChild(catnipBadge);
+  // Escondidos ate existirem doses — slot vazio e ruido. Cada um renderiza
+  // O OBJETO recortado do mesmo atlas da lojinha.
+  const catnipBtn = itemSlot('catnip', t().btnCatnip);
   catnipBtn.hidden = true;
   catnipBtn.addEventListener('click', handlers.onCatnipToggle);
-  const laserBtn = softButton(ICONS.laser, t().btnLaser, '');
-  const laserBadge = el('span', 'btn-badge', '×0');
-  laserBtn.appendChild(laserBadge);
+  const laserBtn = itemSlot('laser-pointer', t().btnLaser);
   laserBtn.hidden = true;
   laserBtn.addEventListener('click', handlers.onLaser);
-  groupProject.append(boardBtn);
   groupItems.append(catnipBtn, laserBtn, treatsBtn);
-  cluster.append(groupProject, groupItems);
+  cluster.append(groupItems);
 
   // O EVENTO SOCIAL: um modal curto com prazo VISIVEL. B e a opcao segura e
   // o default do prazo — o modal informa, nunca chantageia.
@@ -1134,7 +1148,11 @@ export const showRecruit = (
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'shop-item';
-    b.append(el('span', 'shop-name', gt.name), el('span', 'shop-hint', gt.hint), el('span', 'cand-cost', fmtCost(g.cost, getLocale())));
+    // O objeto REAL do apetrecho, recortado do mesmo atlas da hotbar.
+    const spr = el('span', 'slot-sprite shop-sprite');
+    spr.setAttribute('aria-hidden', 'true');
+    applyItemSprite(spr, g.id, 2);
+    b.append(spr, el('span', 'shop-name', gt.name), el('span', 'shop-hint', gt.hint), el('span', 'cand-cost', fmtCost(g.cost, getLocale())));
     b.addEventListener('click', () => {
       if (cart.has(g.id)) cart.delete(g.id);
       else cart.add(g.id);
