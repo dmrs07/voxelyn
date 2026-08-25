@@ -146,9 +146,18 @@ const decode = (breed: number, key: CatAnimKey, coat: number, collar?: number): 
         const i = y * frame.w + x;
         if (x >= 0 && y >= 0 && x < frame.w && y < frame.h && frame.data[i] !== 0) frame.data[i] = color;
       };
-      for (let dx = -4; dx <= -1; dx++) put(ex + dx, ey + 4, packRgb(collar));
-      for (let dx = -4; dx <= -2; dx++) put(ex + dx, ey + 5, darkRgb(collar));
-      badgeCard(frame, ex - 1, ey + 6, collar);
+      // o lanyard DA A VOLTA: a banda cruza o pescoco inteiro. A extensao
+      // vem da propria silhueta — o trecho opaco continuo da cabeca na
+      // altura do queixo (ey+2), nunca uma largura fixa.
+      const rowY = ey + 2;
+      let x0 = ex, x1 = ex;
+      if (rowY >= 0 && rowY < frame.h) {
+        while (x0 - 1 >= 0 && frame.data[rowY * frame.w + (x0 - 1)] !== 0) x0--;
+        while (x1 + 1 < frame.w && frame.data[rowY * frame.w + (x1 + 1)] !== 0) x1++;
+      }
+      for (let x = x0; x <= x1; x++) put(x, ey + 4, packRgb(collar));
+      for (let x = x0; x <= x1 - 1; x++) put(x, ey + 5, darkRgb(collar));
+      badgeCard(frame, x1 - 1, ey + 6, collar);
     }
   }
   frameCache.set(id, frames);
@@ -308,6 +317,7 @@ const GLINT = packRGBA(0xdf, 0xe8, 0xf2);
 const TIE = packRGBA(0xc1, 0x44, 0x44);
 const TIE_D = packRGBA(0x7e, 0x2f, 0x2f);
 const SHIRT = packRGBA(0xee, 0xf1, 0xea);
+const BELL = packHex(BELL_HEX);
 
 const pmCache = new Map<CatAnimKey, SpriteFrame[]>();
 
@@ -323,9 +333,14 @@ const pmDecorate = (key: CatAnimKey): SpriteFrame[] => {
     let ex = 0, ey = 0, en = 0, cx = -1, cy = 0;
     for (let y = 0; y < src.h; y++) {
       for (let x = 0; x < src.w; x++) {
-        const color = src.data[y * src.w + x]!;
+        const i = y * src.w + x;
+        const color = src.data[i]!;
         if (color === EYE_A || color === EYE_B) { ex += x; ey += y; en++; }
         if (color === COLLAR && x > cx) { cx = x; cy = y; }
+        // a gravata DA A VOLTA no pescoco: o colar do sprite (que ja
+        // contorna o pescoco) vira a alca vermelha, e o guizo vira o no.
+        if (color === COLLAR) data[i] = TIE;
+        else if (color === BELL) data[i] = TIE_D;
       }
     }
     if (en > 0) { ex = Math.round(ex / en); ey = Math.round(ey / en); prev = { ex, ey }; }
