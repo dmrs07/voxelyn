@@ -241,3 +241,46 @@ export const RISK_HYPE_DECAY = 1.3;
 export const RISK_BUGCOST = 1.25;
 /** A enfase anunciada da banca multiplica UMA dimensao. */
 export const EMPHASIS_SCALE = 1.25;
+
+// -------------------------------------------------------------- apetrechos
+
+/** Passivos: modificadores do booth. Consumiveis: usos por run. */
+export const GEAR_KEYBOARD_SPEED = 1.08;
+export const GEAR_CUSHION_NAP = 1.25;
+export const GEAR_DUCK_STRESS = 0.9;
+export const GEAR_COFFEE_EAT = 0.7;
+export const CATNIP_USES = 2;
+export const CATNIP_MORAL = 0.35;
+export const CATNIP_STRESS_DROP = 0.1;
+export const CATNIP_ZOOMIES_P = 0.4;
+export const LASER_USES = 1;
+export const LASER_STRESS_DROP = 0.18;
+export const LASER_ZOOMIES_TICKS = Math.round(2.5 * TICK_HZ);
+
+// ---------------------------------------------------------- eventos sociais
+
+export const SOCIAL_AT = [0.42, 0.72] as const;
+export const SOCIAL_JITTER_TICKS = 8 * TICK_HZ;
+export const SOCIAL_WINDOW = 15 * TICK_HZ;
+export const INFLUENCER_STRESS = 0.08;
+export const INFLUENCER_HYPE = 0.06;
+export const POACH_BONUS = 80;
+export const POACH_STAR_STRESS = 0.15;
+export const POACH_STAR_MORAL = 0.1;
+export const POACH_SHIELD_MORAL = 0.05;
+export const WORKSHOP_BOOST = 0.08;
+export const WORKSHOP_AWAY_TICKS = 15 * TICK_HZ;
+
+// ------------------------------------------------------------------ premio
+
+/** O premio por colocacao, em tampinhas. Zero bugs paga bonus. */
+export const PRIZE_BY_OUTCOME: Record<string, number> = {
+  'grand-prize': 250,
+  podio: 120,
+  mencao: 60,
+  participacao: 20,
+  crashed: 0,
+};
+export const PRIZE_ZERO_BUGS = 30;
+/** "Ship It": um deploy no ultimo minuto das 48h. */
+export const SHIP_IT_WINDOW = 60 * TICK_HZ;

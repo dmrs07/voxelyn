@@ -64,6 +64,7 @@ export const hashState = (state: HackState): string => {
     h.u32(c.petLastTick + 1);
     // A revelacao do trait oculto muda eventos futuros: entra.
     h.u32(c.revealed ? 1 : 0);
+    h.fixed(c.speedBoost, HASH_METER);
     h.str(c.mode);
     h.str(c.slot ?? '-');
     h.u32(c.modeUntil);
@@ -81,6 +82,18 @@ export const hashState = (state: HackState): string => {
   h.u32(state.uxCare);
   h.u32(state.stability);
   h.u32(state.sponsorRisk ? 1 : 0);
+  for (const g of state.gear) h.str(g);
+  h.u32(state.catnipLeft);
+  h.u32(state.laserLeft);
+  h.fixed(state.hype, HASH_METER);
+  h.u32(state.prizeBonus);
+  h.u32(state.petSessions);
+  for (const s of state.social) {
+    h.str(s.kind);
+    h.u32(s.at);
+    h.u32(s.until);
+    h.u32((s.resolved ? 1 : 0) | (s.taken === 'a' ? 2 : s.taken === 'b' ? 4 : 0));
+  }
   if (state.pitch) {
     h.u32(state.pitch.ticksLeft);
     h.fixed(state.pitch.gauge, HASH_METER);

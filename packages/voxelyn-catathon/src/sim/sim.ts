@@ -9,6 +9,10 @@ import {
   CABLE_BITE_P,
   CABLE_FIX_COST,
   CALM_SCALE,
+  CATNIP_MORAL,
+  CATNIP_STRESS_DROP,
+  CATNIP_USES,
+  CATNIP_ZOOMIES_P,
   CHOICE_COST,
   COWBOY_BUG_P,
   COWBOY_SHORTCUT_P,
@@ -26,7 +30,16 @@ import {
   ENERGY_NAP_RATE,
   ENERGY_NAP_TO,
   ENERGY_WORK_DRAIN,
+  GEAR_COFFEE_EAT,
+  GEAR_CUSHION_NAP,
+  GEAR_DUCK_STRESS,
+  GEAR_KEYBOARD_SPEED,
   GRABBED_FROM_NAP,
+  INFLUENCER_HYPE,
+  INFLUENCER_STRESS,
+  LASER_STRESS_DROP,
+  LASER_USES,
+  LASER_ZOOMIES_TICKS,
   EMPHASIS_SCALE,
   FREESTYLER_SPEED,
   IMPROVISO_BONUS,
@@ -51,6 +64,12 @@ import {
   PITCH_GAUGE_START,
   PITCH_SCORE_SCALE,
   PITCH_TICKS,
+  POACH_BONUS,
+  POACH_SHIELD_MORAL,
+  POACH_STAR_MORAL,
+  POACH_STAR_STRESS,
+  PRIZE_BY_OUTCOME,
+  PRIZE_ZERO_BUGS,
   REVEAL_AT,
   RISK_BUGCOST,
   RISK_HYPE_DECAY,
@@ -82,6 +101,9 @@ import {
   SCORE_UX_CARE,
   SCORE_ZERO_BUG_BONUS,
   SHORTCUT_HEADSTART,
+  SOCIAL_AT,
+  SOCIAL_JITTER_TICKS,
+  SOCIAL_WINDOW,
   SPONSOR_RISK_CRASH,
   STABILITY_CRASH_RELIEF,
   TRAIT_FIX_HUNTER,
@@ -97,6 +119,8 @@ import {
   TRAIT_ZEN,
   TRAIT_ZOOMIES_AFTER,
   TRAIT_ZOOMIES_SCALE,
+  WORKSHOP_AWAY_TICKS,
+  WORKSHOP_BOOST,
   STRESS_AFTER_PROC,
   STRESS_DANGER,
   STRESS_IDLE_RATE,
@@ -113,7 +137,7 @@ import {
 import { SLOTS, TASKS } from './data.js';
 import { CLASSIC_LAYOUT, rollLayout, rollProject, type Candidate } from './gen.js';
 import { CHOICE_TEXT, TASK_TEXT, type Locale } from './text.js';
-import type { Cat, CatId, Command, DemoResult, HackState, Outcome, SimEvent, SlotId, Spec, Task, Track } from './types.js';
+import type { Cat, CatId, Command, DemoResult, GearId, HackState, Outcome, SimEvent, SlotId, SocialEvent, SocialKind, Spec, Task, Track } from './types.js';
 
 /**
  * xorshift32 como FUNCAO PURA sobre estado serializado.
@@ -145,6 +169,21 @@ const hairballFireTick = (seed: number, index: number): number => {
   h = nextU32(nextU32(h));
   const jitter = (h % (HAIRBALL_JITTER_TICKS * 2)) - HAIRBALL_JITTER_TICKS;
   return Math.round(HACK_TICKS * HAIRBALL_AT[index] + jitter);
+};
+
+/**
+ * Agenda dos eventos SOCIAIS, derivada da semente como as bolas de pelo:
+ * dois por run, tipo e instante puros — replays nao divergem.
+ */
+const socialScheduleFor = (seed: number): SocialEvent[] => {
+  const kinds: SocialKind[] = ['influencer', 'poach', 'workshop'];
+  return SOCIAL_AT.map((frac, i) => {
+    let h = (seed ^ (0x51ca7e11 + i * 0x9e3779b9)) >>> 0;
+    h = nextU32(nextU32(h));
+    const jitter = (h % (SOCIAL_JITTER_TICKS * 2)) - SOCIAL_JITTER_TICKS;
+    const kind = kinds[nextU32(h) % kinds.length]!;
+    return { kind, at: Math.round(HACK_TICKS * frac + jitter), until: 0, resolved: false, taken: null };
+  });
 };
 
 /** Um trait age desde o inicio — visivel ou nao. A revelacao so INFORMA. */
@@ -181,6 +220,7 @@ const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
     moral: 0.62 + i * 0.04,
     petStreak: 0,
     petLastTick: -1,
+    speedBoost: 0,
   }));
 
 /**
@@ -192,8 +232,9 @@ const catsFromTeam = (team: readonly Candidate[]): Cat[] =>
 export const createHackathon = (
   seed: number,
   team: readonly Candidate[],
-  opts: { classic?: boolean; locale?: Locale } = {}
+  opts: { classic?: boolean; locale?: Locale; gear?: readonly GearId[] } = {}
 ): HackState => {
+  const gear = [...(opts.gear ?? [])];
   const locale: Locale = opts.locale ?? 'en';
   const project = opts.classic ? null : rollProject(seed >>> 0, locale);
   const layout = opts.classic ? CLASSIC_LAYOUT : rollLayout(seed >>> 0);
@@ -247,9 +288,23 @@ export const createHackathon = (
       },
   layoutId: layout.id,
   layoutName: layout.name,
-  layoutMods: { ...layout.mods },
+  // Os passivos dos apetrechos entram DIRETO nos modificadores do booth: a
+  // sim nunca pergunta "tenho a almofada?" no meio do tick.
+  layoutMods: {
+    ...layout.mods,
+    napRate: layout.mods.napRate * (gear.includes('almofada-termica') ? GEAR_CUSHION_NAP : 1),
+    stressWork: layout.mods.stressWork * (gear.includes('rubber-duck') ? GEAR_DUCK_STRESS : 1),
+    eatScale: layout.mods.eatScale * (gear.includes('cafeteira-pro') ? GEAR_COFFEE_EAT : 1),
+  },
   slots: layout.slots.map((s) => ({ ...s })),
   pitch: null,
+  gear,
+  catnipLeft: gear.includes('catnip') ? CATNIP_USES : 0,
+  laserLeft: gear.includes('laser-pointer') ? LASER_USES : 0,
+  hype: 0,
+  prizeBonus: 0,
+  petSessions: 0,
+  social: socialScheduleFor(seed >>> 0),
   events: [],
   result: null,
   };
@@ -390,6 +445,45 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
     }
   }
 
+  if (cmd.catnip && state.catnipLeft > 0) {
+    const cat = catOf(state, cmd.catnip);
+    if (cat && cat.mode !== 'held') {
+      state.catnipLeft--;
+      cat.moral = Math.min(1, cat.moral + CATNIP_MORAL);
+      cat.stress = Math.max(0, cat.stress - CATNIP_STRESS_DROP);
+      // O risco do catnip: as vezes a moral vem com ZOOMIES juntos.
+      const zoom = draw01(state) < CATNIP_ZOOMIES_P;
+      if (zoom && cat.mode !== 'nap') {
+        cat.mode = 'zoomies';
+        cat.modeUntil = state.tick + LASER_ZOOMIES_TICKS * 2;
+        cat.targetX = 30 + draw01(state) * 420;
+        cat.targetY = 60 + draw01(state) * 180;
+      }
+      events.push({ kind: 'catnip', tick: state.tick, cat: cat.id, zoomies: zoom });
+    }
+  }
+
+  if (cmd.laser && state.laserLeft > 0) {
+    state.laserLeft--;
+    // O laser acalma a equipe INTEIRA — e interrompe a equipe inteira,
+    // porque e um laser e eles sao gatos. Trade-off no proprio objeto.
+    for (const cat of state.cats) {
+      cat.stress = Math.max(0, cat.stress - LASER_STRESS_DROP);
+      if (cat.mode === 'work' || cat.mode === 'idle' || cat.mode === 'walk' || cat.mode === 'keyboard') {
+        cat.mode = 'zoomies';
+        cat.modeUntil = state.tick + LASER_ZOOMIES_TICKS;
+        cat.targetX = 30 + draw01(state) * 420;
+        cat.targetY = 60 + draw01(state) * 180;
+      }
+    }
+    events.push({ kind: 'laser', tick: state.tick });
+  }
+
+  if (cmd.social) {
+    const open = state.social.find((s) => !s.resolved && s.until > 0 && state.tick < s.until);
+    if (open) resolveSocial(state, open, cmd.social, events);
+  }
+
   if (cmd.choose) {
     const task = state.tasks.find((t) => t.id === cmd.choose!.task);
     if (task?.choice && task.chosen === null && !task.done && !task.cut) {
@@ -457,6 +551,54 @@ const applyChoice = (state: HackState, task: Task, option: string): void => {
   }
 };
 
+/**
+ * O EFEITO de cada evento social. A opcao B e sempre a segura (e o default
+ * quando a janela expira); a A paga mais e cobra algo — prestar atencao ao
+ * pavilhao e uma habilidade.
+ */
+const resolveSocial = (state: HackState, ev: SocialEvent, option: 'a' | 'b', events: SimEvent[]): void => {
+  ev.resolved = true;
+  ev.taken = option;
+  ev.until = 0;
+  if (ev.kind === 'influencer') {
+    if (option === 'a') {
+      // Posar com os gatos: hype para o palco, estresse para todos.
+      state.hype += INFLUENCER_HYPE;
+      for (const c of state.cats) c.stress = Math.min(1, c.stress + INFLUENCER_STRESS);
+    }
+  } else if (ev.kind === 'poach') {
+    if (option === 'a') {
+      // Ouvir a proposta do recrutador rival: dinheiro no fim, e a estrela
+      // do time fica com a cabeca virada.
+      state.prizeBonus += POACH_BONUS;
+      const star = [...state.cats].sort((x, y) => y.moral - x.moral)[0];
+      if (star) {
+        star.stress = Math.min(1, star.stress + POACH_STAR_STRESS);
+        star.moral = Math.max(0, star.moral - POACH_STAR_MORAL);
+      }
+    } else {
+      // Blindar a equipe: todo mundo se sente escolhido.
+      for (const c of state.cats) c.moral = Math.min(1, c.moral + POACH_SHIELD_MORAL);
+    }
+  } else if (ev.kind === 'workshop') {
+    if (option === 'a') {
+      // Mandar o mais descansado ao workshop: volta melhor — mas passa um
+      // tempo fora da mesa (zoomies de ida e volta).
+      const rested = [...state.cats].sort((x, y) => y.energy - x.energy)[0];
+      if (rested) {
+        rested.speedBoost += WORKSHOP_BOOST;
+        if (rested.mode !== 'nap' && rested.mode !== 'held') {
+          rested.mode = 'zoomies';
+          rested.modeUntil = state.tick + WORKSHOP_AWAY_TICKS;
+          rested.targetX = 30 + draw01(state) * 420;
+          rested.targetY = 60 + draw01(state) * 180;
+        }
+      }
+    }
+  }
+  events.push({ kind: 'social-taken', tick: state.tick, social: ev.kind, option });
+};
+
 const stepHairball = (state: HackState, events: SimEvent[]): void => {
   const hb = state.hairball;
   if (!hb.active) {
@@ -500,6 +642,8 @@ const speedOf = (state: HackState, cat: Cat, track: Track): number => {
     s *= JUNIOR_SPEED + JUNIOR_LEARN * Math.min(1, state.tick / HACK_TICKS);
   } else if (cat.tier === 'senior') s *= SENIOR_SPEED;
   if (hasTrait(cat, 'polidactila')) s *= TRAIT_SPEED_POLY;
+  if (state.gear.includes('teclado-mecanico')) s *= GEAR_KEYBOARD_SPEED;
+  s *= 1 + cat.speedBoost;
   // Gato desanimado rende menos; radiante, mais. A moral NAO e enfeite.
   s *= MORAL_SPEED_MIN + cat.moral * (MORAL_SPEED_MAX - MORAL_SPEED_MIN);
   return s;
@@ -594,6 +738,7 @@ const stepCat = (state: HackState, cat: Cat, cmd: Command, events: SimEvent[]): 
     }
     if (cat.mode !== 'petted') {
       // COMECO de sessao: a memoria decide quanto este carinho vale.
+      state.petSessions++;
       if (cat.petLastTick >= 0 && state.tick - cat.petLastTick > PET_MEMORY_TICKS) cat.petStreak = 0;
       if (cat.petStreak >= 2) events.push({ kind: 'overpet', tick: state.tick, cat: cat.id });
     }
@@ -787,7 +932,8 @@ const startPitch = (state: HackState, events: SimEvent[]): void => {
   for (const c of state.cats) readyAt[c.id] = 0;
   state.pitch = {
     ticksLeft: PITCH_TICKS,
-    gauge: PITCH_GAUGE_START,
+    // O hype do influencer chega junto com a equipe ao palco.
+    gauge: Math.min(1, PITCH_GAUGE_START + state.hype),
     lastAbility: null,
     readyAt,
     crisisAt,
@@ -897,11 +1043,16 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
   else if (score >= CUT_MENTION) outcome = 'mencao';
   else outcome = 'participacao';
 
+  // O PREMIO em tampinhas: colocacao + bonus de zero bugs + acordos feitos
+  // durante a run. E o que a carreira leva para a proxima edicao.
+  const prize = (PRIZE_BY_OUTCOME[outcome] ?? 0) + (bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0) + state.prizeBonus;
+
   const result: DemoResult = {
     core,
     polish,
     bugs,
     looseEnds,
+    prize,
     perJudge: [vonWhiskers, meowper, cocada],
     dimensions: { tecnica: tecnicaW, estabilidade: estabilidadeW, experiencia: experienciaW, inovacao, pitch: pitchScore },
     plateia: p.gauge,
@@ -928,6 +1079,17 @@ export const step = (state: HackState, cmd: Command): SimEvent[] => {
   applyCommand(state, cmd, events);
   stepHairball(state, events);
   for (const cat of state.cats) stepCat(state, cat, cmd, events);
+
+  // Eventos SOCIAIS: abrem a janela no instante agendado; ignorados, fecham
+  // sozinhos na opcao segura.
+  for (const ev of state.social) {
+    if (!ev.resolved && ev.until === 0 && state.tick === ev.at) {
+      ev.until = state.tick + SOCIAL_WINDOW;
+      events.push({ kind: 'social-open', tick: state.tick, social: ev.kind });
+    } else if (!ev.resolved && ev.until > 0 && state.tick >= ev.until) {
+      resolveSocial(state, ev, 'b', events);
+    }
+  }
 
   // O curriculo nao contava tudo: no meio da run, o trait oculto aparece.
   if (state.tick === Math.round(HACK_TICKS * REVEAL_AT)) {

@@ -231,3 +231,85 @@ export const CLASSIC_BIO: Record<Locale, Record<string, { note: string; cv: stri
     smoking: { note: 'beautiful interfaces; suffers silently at every live bug.', cv: 'he KNOWS.' },
   },
 };
+
+/** A lojinha de apetrechos: nome e dica (o trade-off ESCRITO no objeto). */
+export const GEAR_TEXT: Record<Locale, Record<string, { name: string; hint: string }>> = {
+  pt: {
+    'teclado-mecanico': { name: 'teclado mecanico de patas', hint: '+8% de velocidade para todos' },
+    'almofada-termica': { name: 'almofada aquecida', hint: 'sonecas rendem 25% mais' },
+    'rubber-duck': { name: 'rubber duck', hint: 'estresse de trabalho -10%' },
+    'cafeteira-pro': { name: 'cafeteira pro', hint: 'comer leva 30% menos tempo' },
+    catnip: { name: 'catnip (2 doses)', hint: 'moral na hora... e 40% de chance de zoomies' },
+    'laser-pointer': { name: 'laser pointer (1 uso)', hint: 'acalma a equipe INTEIRA. e interrompe a equipe inteira' },
+  },
+  en: {
+    'teclado-mecanico': { name: 'mechanical paw keyboard', hint: '+8% speed for everyone' },
+    'almofada-termica': { name: 'heated cushion', hint: 'naps recover 25% more' },
+    'rubber-duck': { name: 'rubber duck', hint: 'work stress -10%' },
+    'cafeteira-pro': { name: 'pro coffee machine', hint: 'eating takes 30% less time' },
+    catnip: { name: 'catnip (2 doses)', hint: 'instant morale... and a 40% chance of zoomies' },
+    'laser-pointer': { name: 'laser pointer (1 use)', hint: 'calms the WHOLE team. also interrupts the whole team' },
+  },
+};
+
+/** Os eventos sociais: titulo e as duas escolhas (B e sempre a segura). */
+export const SOCIAL_TEXT: Record<Locale, Record<string, { title: string; a: string; b: string }>> = {
+  pt: {
+    influencer: {
+      title: 'uma influencer felina parou no booth com a camera ligada!',
+      a: 'posar com os gatos (hype no pitch, estresse em todos)',
+      b: 'seguir codando (nada muda)',
+    },
+    poach: {
+      title: 'um recrutador rival quer conversar com a estrela do teu time.',
+      a: 'deixar ouvir a proposta (+80 tampinhas no premio, estrela balancada)',
+      b: 'blindar a equipe (+moral para todos)',
+    },
+    workshop: {
+      title: 'workshop gratuito de IA felina comecando no hall!',
+      a: 'mandar o mais descansado (+8% permanente, 15s fora da mesa)',
+      b: 'ninguem sai do booth',
+    },
+  },
+  en: {
+    influencer: {
+      title: 'a feline influencer stopped by the booth, camera rolling!',
+      a: 'pose with the cats (pitch hype, stress for everyone)',
+      b: 'keep coding (nothing changes)',
+    },
+    poach: {
+      title: "a rival recruiter wants a word with your team's star.",
+      a: 'let them hear the offer (+80 bottle caps prize, star gets shaken)',
+      b: 'shield the team (+morale for everyone)',
+    },
+    workshop: {
+      title: 'free feline-AI workshop starting in the hall!',
+      a: 'send the most rested (+8% permanent, 15s away from the desk)',
+      b: 'nobody leaves the booth',
+    },
+  },
+};
+
+/** As conquistas: nome e como se ganha. */
+export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hint: string }>> = {
+  pt: {
+    'zero-bugs': { name: 'Zero Bugs, Alegadamente', hint: 'termine sem nenhum bug vivo' },
+    'ship-it': { name: 'Ship It', hint: 'shipe uma feature no ultimo minuto das 48h' },
+    'scope-social': { name: 'Escopo e uma Construcao Social', hint: 'corte 4+ tarefas e suba ao podio' },
+    'no-touchy': { name: 'No Touchy', hint: 'venca sem nenhum carinho' },
+    'standing-ovation': { name: 'Standing Ovation', hint: 'termine o pitch com a plateia a 99%+' },
+    'orange-crew': { name: 'One Orange Brain Cell', hint: 'equipe inteira de cowboys' },
+    'improv-legend': { name: 'Demo Gods', hint: 'transforme o crash da demo em improviso heroico' },
+    grand: { name: 'Grand Prize', hint: 'venca o grande premio' },
+  },
+  en: {
+    'zero-bugs': { name: 'Zero Bugs, Allegedly', hint: 'finish with no live bugs' },
+    'ship-it': { name: 'Ship It', hint: 'ship a feature in the final minute of the 48h' },
+    'scope-social': { name: 'Scope Is a Social Construct', hint: 'cut 4+ tasks and reach the podium' },
+    'no-touchy': { name: 'No Touchy', hint: 'win without a single pet' },
+    'standing-ovation': { name: 'Standing Ovation', hint: 'end the pitch with the crowd at 99%+' },
+    'orange-crew': { name: 'One Orange Brain Cell', hint: 'an all-cowboy team' },
+    'improv-legend': { name: 'Demo Gods', hint: 'turn the demo crash into heroic improv' },
+    grand: { name: 'Grand Prize', hint: 'win the grand prize' },
+  },
+};

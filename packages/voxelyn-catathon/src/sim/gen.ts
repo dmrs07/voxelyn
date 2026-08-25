@@ -12,7 +12,7 @@ import {
   TASK_TEXT,
   type Locale,
 } from './text.js';
-import type { CoatPattern, Personality, Quirk, SlotId, Spec, Task, Tier, Track } from './types.js';
+import type { CoatPattern, GearId, Personality, Quirk, SlotId, Spec, Task, Tier, Track } from './types.js';
 
 /**
  * O GERADOR: cada run sorteia uma equipe possivel, um projeto problematico e
@@ -521,3 +521,38 @@ export const CLASSIC_LAYOUT: LayoutSpec = {
 };
 
 export const CLASSIC_TEAM: readonly Candidate[] = classicTeam('en');
+
+// ------------------------------------------------------------- apetrechos
+
+/** O catalogo da lojinha; a edicao oferece TRES por vez (sorteio da semente). */
+export const GEAR: readonly { id: GearId; cost: number }[] = [
+  { id: 'teclado-mecanico', cost: 45 },
+  { id: 'almofada-termica', cost: 30 },
+  { id: 'rubber-duck', cost: 25 },
+  { id: 'cafeteira-pro', cost: 35 },
+  { id: 'catnip', cost: 20 },
+  { id: 'laser-pointer', cost: 15 },
+];
+
+export const rollGearOffers = (seed: number): { id: GearId; cost: number }[] => {
+  const d = new Dice(seed, 0x6ea60ff);
+  const pool = [...GEAR];
+  const out: { id: GearId; cost: number }[] = [];
+  for (let i = 0; i < 3; i++) out.push(pool.splice(d.int(pool.length), 1)[0]!);
+  return out;
+};
+
+// ------------------------------------------------------------- daily seed
+
+/**
+ * O DAILY: a mesma semente para todo mundo no mesmo dia (UTC) — mesmos
+ * candidatos, mesmo projeto, mesmo booth. Comparar pontuacao vira conversa.
+ */
+export const dailySeed = (isoDate: string): number => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < isoDate.length; i++) {
+    h ^= isoDate.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return nextU32(nextU32(h ^ 0xda17ca7));
+};

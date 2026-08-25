@@ -33,6 +33,35 @@ export type Tier = 'junior' | 'pleno' | 'senior' | 'especialista';
 export type CoatPattern = 'solid' | 'tabby' | 'tuxedo' | 'siames' | 'sphynx';
 
 /**
+ * APETRECHOS: comprados no recrutamento, com trade-off. Quatro passivos
+ * (modificadores do booth) e dois CONSUMIVEIS — o catnip da moral e pode dar
+ * zoomies; o laser acalma a equipe INTEIRA e interrompe todo mundo, porque
+ * e um laser e eles sao gatos.
+ */
+export type GearId =
+  | 'teclado-mecanico'
+  | 'almofada-termica'
+  | 'rubber-duck'
+  | 'cafeteira-pro'
+  | 'catnip'
+  | 'laser-pointer';
+
+/**
+ * EVENTO SOCIAL: o pavilhao interrompe o booth com uma escolha A/B numa
+ * janela curta. Ignorar escolhe B (a opcao segura) — o jogo nunca trava
+ * esperando, mas a escolha boa premia quem presta atencao.
+ */
+export type SocialKind = 'influencer' | 'poach' | 'workshop';
+export type SocialEvent = {
+  kind: SocialKind;
+  at: number;
+  /** Fim da janela (0 = ainda nao abriu). */
+  until: number;
+  resolved: boolean;
+  taken: 'a' | 'b' | null;
+};
+
+/**
  * PERSONALIDADE: como o gato trabalha.
  * - perfeccionista: termina e NAO deixa mergear — segura a feature pronta ate
  *   alguem dizer "shipa" (um carinho). Qualidade impecavel, ansiedade tua.
@@ -122,6 +151,8 @@ export type Cat = {
   petStreak: number;
   /** Tick do fim da ultima sessao de carinho (-1 = nunca). */
   petLastTick: number;
+  /** Bonus permanente de velocidade (workshop). Entra no hash. */
+  speedBoost: number;
 };
 
 /**
@@ -208,6 +239,8 @@ export type DemoResult = {
   dimensions: ScoreDimensions;
   /** 0..1: onde o gauge da plateia terminou. */
   plateia: number;
+  /** O premio em tampinhas: colocacao + bonus de zero bugs + acordos. */
+  prize: number;
   score: number;
   crashed: boolean;
   /** A crise de demo virou improviso heroico? Historia pra contar. */
@@ -256,6 +289,10 @@ export type SimEvent =
   | { kind: 'overpet'; tick: number; cat: CatId }
   | { kind: 'trait-revealed'; tick: number; cat: CatId; trait: string }
   | { kind: 'sponsor-outage'; tick: number }
+  | { kind: 'catnip'; tick: number; cat: CatId; zoomies: boolean }
+  | { kind: 'laser'; tick: number }
+  | { kind: 'social-open'; tick: number; social: SocialKind }
+  | { kind: 'social-taken'; tick: number; social: SocialKind; option: 'a' | 'b' }
   | { kind: 'decision-needed'; tick: number; task: string }
   | { kind: 'decision'; tick: number; task: string; option: string }
   | { kind: 'pitch-start'; tick: number }
@@ -298,6 +335,17 @@ export type HackState = {
   layoutMods: { stressWork: number; stressIdle: number; fixSpeed: number; napRate: number; moralShip: number; eatScale: number };
   slots: { id: SlotId; x: number; y: number; track: Track | null }[];
   pitch: PitchState | null;
+  /** Apetrechos comprados no recrutamento (passivos ja aplicados). */
+  gear: GearId[];
+  catnipLeft: number;
+  laserLeft: number;
+  /** Hype acumulado (influencer): entra no gauge inicial do pitch. */
+  hype: number;
+  /** Bonus de premio negociado em eventos (poach). */
+  prizeBonus: number;
+  /** Sessoes de carinho na run (conquistas leem daqui). */
+  petSessions: number;
+  social: SocialEvent[];
   events: SimEvent[];
   result: DemoResult | null;
 };
@@ -316,6 +364,11 @@ export type Command = {
   choose?: { task: string; option: string };
   /** No pitch: mandar um gato usar a habilidade de palco. */
   ability?: CatId;
+  /** Consumiveis: catnip num gato; laser para a equipe inteira. */
+  catnip?: CatId;
+  laser?: boolean;
+  /** Responder o evento social aberto. */
+  social?: 'a' | 'b';
   handX?: number;
   handY?: number;
 };
