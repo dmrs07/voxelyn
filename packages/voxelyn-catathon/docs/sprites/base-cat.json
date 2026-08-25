@@ -1,0 +1,143 @@
+{
+ "pal": {
+  "b": "#d98a4b",
+  "m": "#a65f2e",
+  "s": "#8a4f26",
+  "y": "#f2e3c8",
+  "e": "#2f5e42",
+  "g": "#eaf2e6",
+  "n": "#c96b6b",
+  "i": "#d9958a",
+  "k": "#6e3a1c",
+  "w": "#f5efe2"
+ },
+ "sprites": {
+  "base v2": {
+   "rows": [
+    ".........m......m.....",
+    "........mim....mim....",
+    "........bbbb..bbbb....",
+    "........bbbbbbbbbb....",
+    "......bbbbbbbbbbbbb...",
+    "......bbbbbbbbbbbbb...",
+    "......bbegbbbbegbbb...",
+    "......bbeebbbbeebbb...",
+    ".....bbbbbyyyybbbbb...",
+    ".....bbbbyynnyybbbb...",
+    "......bbbyyykyyybb....",
+    ".......bbyyyyyybb.....",
+    ".......bbbyyyybbb.....",
+    "...bbmbbbbyyyybbb.....",
+    "..bbbmbbbbyyyyybb.....",
+    ".bbbbmbbbbyyyyybb.....",
+    ".bbbmbbbbbyyyyybb.....",
+    ".bbbmbbbbyybyybbb.....",
+    ".bbmbbbbbyybyybbb.....",
+    ".bbmbbbbbyybyybbb.....",
+    ".bbbbbbbbyybyybbb.....",
+    ".bbbbbbbbyybyybbb.....",
+    "mbbbbb..byyybyyyb.....",
+    "mmmmm....yyy.yyy......"
+   ],
+   "anchors": {
+    "orelha": [
+     9,
+     0
+    ],
+    "olho": [
+     8,
+     6
+    ],
+    "nariz": [
+     12,
+     9
+    ],
+    "boca": [
+     12,
+     10
+    ],
+    "peito": [
+     12,
+     13
+    ],
+    "garupa": [
+     4,
+     17
+    ],
+    "pata-tras": [
+     2,
+     22
+    ],
+    "pata": [
+     10,
+     23
+    ],
+    "rabo": [
+     0,
+     23
+    ]
+   }
+  },
+  "pose v2": {
+   "rows": [
+    "............m......m......",
+    "...........mim....mim.....",
+    "...........bbbb..bbbb.....",
+    "...........bbbbbbbbbb.....",
+    "..........bbbbbbbbbbbb....",
+    "..........bbbbbbbbbbbbb...",
+    "..........bbegbbbbegbbb...",
+    "..........bbeebbbbeebbb...",
+    "..........bbbbyyyyyyynn...",
+    "...........bbyyyyyyyyk....",
+    "...........bbyyyyyyyy.....",
+    ".....bbbbbbbyyyyyyyy......",
+    "...bbbbbbbbbbyyyyyy.......",
+    "..bbbbbbbbbbbyybyy........",
+    ".bbbbmbbbbbbbyybyy........",
+    ".bbbbmbbbbbbbyybyy........",
+    ".bbbmbbbbbbbbyybyy........",
+    ".bbbmbbbbbbyyybbyy........",
+    ".bbmbbbbbbbbbbbbyyy.......",
+    ".bbmbbbbbbbbbb............",
+    ".bbbbbbbbbbbb.............",
+    "mbbbbbbyy.................",
+    "mmmmm....................."
+   ],
+   "anchors": {
+    "olho": [
+     18,
+     6
+    ],
+    "nariz": [
+     21,
+     8
+    ],
+    "ombro": [
+     14,
+     13
+    ],
+    "pata-longe": [
+     13,
+     17
+    ],
+    "pata-perto": [
+     17,
+     18
+    ],
+    "garupa": [
+     4,
+     16
+    ],
+    "pata-tras": [
+     7,
+     21
+    ],
+    "rabo": [
+     0,
+     22
+    ]
+   }
+  }
+ }
+}
