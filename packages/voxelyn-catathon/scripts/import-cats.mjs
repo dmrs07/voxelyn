@@ -14,10 +14,13 @@
  *   CATATHON_CAT_BUNDLE=<dir com cats/> node scripts/import-cats.mjs
  *   (default: <pacote>/assets-src — extraia o zip comprado ali)
  *
- * Fatia vertical atual: longhair (4 pelagens) com Walking(10) + Idle(5).
- * Ampliar = acrescentar em ANIMS e rodar de novo.
+ * Cobertura: 3 racas x 4 pelagens (halloween fica de fora do elenco) com as
+ * animacoes que os modos do jogo usam por aproximacao. Frame counts variam
+ * por raca (shorthair tem Sitting estendido) e ha um buraco conhecido:
+ * bobtail/mekong nao tem PNGs de Hissing (defeito do pack) — sai vazio e o
+ * runtime cai para Attack_hit.
  */
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,11 +29,25 @@ const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BUNDLE = resolve(process.env.CATATHON_CAT_BUNDLE ?? join(PKG, 'assets-src'));
 const OUT = join(PKG, 'src', 'client', 'assets', 'catSprites.ts');
 
-const BREED = 'longhair';
-const COATS = ['orange tabby', 'blue', 'orange siamese', 'white'];
+const BREEDS = [
+  { name: 'bobtail', coats: ['black and white', 'brown tabby', 'mekong', 'orange spotted'] },
+  { name: 'longhair', coats: ['blue', 'orange siamese', 'orange tabby', 'white'] },
+  { name: 'shorthair', coats: ['abyssinian', 'grey_tabby', 'siamese', 'tuxedo'] },
+];
+
+// modo do jogo -> animacao do pack (aproximacao; ver render.ts drawCat)
 const ANIMS = [
-  { key: 'walk', dir: 'Walking', gif: 'Walking.gif' },
-  { key: 'idle', dir: 'Idle', gif: 'Idle.gif' },
+  { key: 'idle', dir: 'Idle' },
+  { key: 'walk', dir: 'Walking' },
+  { key: 'run', dir: 'Running' },
+  { key: 'sleep', dir: 'Sleeping' },
+  { key: 'sit', dir: 'Sitting' },
+  { key: 'sitturn', dir: 'Sitting_head_turn', gif: 'Sit_head_turn.gif' },
+  { key: 'crouch', dir: 'Crouch' },
+  { key: 'hiss', dir: 'Hissing' },
+  { key: 'attack', dir: 'Attack_hit' },
+  { key: 'swat', dir: 'Attack_swat' },
+  { key: 'turn', dir: 'Turning' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -116,110 +133,110 @@ const gifDelays = (path) => {
 const naturalPngs = (dir) =>
   readdirSync(dir)
     .filter((f) => f.endsWith('.png'))
-    .sort((a, b) => {
-      const na = Number(a.replace(/\D+/g, '')), nb = Number(b.replace(/\D+/g, ''));
-      return na - nb;
-    });
+    .sort((a, b) => Number(a.replace(/\D+/g, '')) - Number(b.replace(/\D+/g, '')));
 
 // ---------------------------------------------------------------------------
-// Leitura + indexacao, POR PELAGEM (indices e paleta proprios).
+// Leitura + indexacao POR PELAGEM (indices e paleta proprios: o recolor do
+// pack nao e mapa 1:1 de paleta — o siamese tem coloracao point).
 // ---------------------------------------------------------------------------
 const CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const refCoat = COATS[0];
-// A mascara de alpha e identica entre pelagens da mesma raca (auditoria §6),
-// mas o recolor NAO e um mapa global de paleta — o siamese tem coloracao
-// "point" (face/orelhas escuras), correspondencia espacial e nao 1:1. Entao
-// cada pelagem guarda seus proprios indices + paleta propria.
-const palettes = COATS.map(() => []); // [coatIdx] -> ['rrggbb', ...]
-const animsOut = [];
-
 const colorKey = (rgba, i) =>
   ((rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2]).toString(16).padStart(6, '0');
 
-for (const anim of ANIMS) {
-  const refDir = join(BUNDLE, 'cats', BREED, refCoat, anim.dir);
-  const files = naturalPngs(refDir);
-  if (files.length === 0) throw new Error(`sem frames em ${refDir}`);
-  const perCoat = COATS.map((coat) =>
-    files.map((f) => decodePng(join(BUNDLE, 'cats', BREED, coat, anim.dir, f))));
-  const coatFrames = COATS.map(() => []);
-  let maskDiffs = 0; // pelagens sao ~recolors, mas ha retoques pontuais
+const breedsOut = [];
+let totalFrames = 0;
 
-  for (let fi = 0; fi < files.length; fi++) {
-    for (let ci = 0; ci < COATS.length; ci++) {
-      const img = perCoat[ci][fi];
-      const ref = perCoat[0][fi];
-      const rows = [];
-      for (let y = 0; y < img.h; y++) {
-        let row = '';
-        for (let x = 0; x < img.w; x++) {
-          const i = (y * img.w + x) * 4;
-          let alpha = img.rgba[i + 3];
-          if (alpha !== 0 && alpha !== 255) {
-            // cisco de autoria: Walking10 tem 1px orfao com alpha 33% e cor
-            // fora de toda paleta (#585b6e), identico nas 4 pelagens. Alpha
-            // <128 cai para transparente; nada no pack chega perto do limiar.
-            console.warn(`aviso: alpha ${alpha} em ${files[fi]} (${x},${y}) -> ${alpha < 128 ? 'transparente' : 'opaco'}`);
-            alpha = alpha < 128 ? 0 : 255;
-          }
-          if ((alpha === 0) !== (ref.rgba[i + 3] === 0)) maskDiffs++;
-          if (alpha === 0) { row += '.'; continue; }
-          const key = colorKey(img.rgba, i);
-          let idx = palettes[ci].indexOf(key);
-          if (idx === -1) {
-            idx = palettes[ci].length;
-            if (idx >= CHARS.length) throw new Error('paleta maior que o charset');
-            palettes[ci].push(key);
-          }
-          row += CHARS[idx];
+for (const breed of BREEDS) {
+  const palettes = breed.coats.map(() => []);
+  const anims = {};
+
+  const indexFrame = (img, coatIdx, label) => {
+    const rows = [];
+    for (let y = 0; y < img.h; y++) {
+      let row = '';
+      for (let x = 0; x < img.w; x++) {
+        const i = (y * img.w + x) * 4;
+        let alpha = img.rgba[i + 3];
+        if (alpha !== 0 && alpha !== 255) {
+          // cisco de autoria (auditoria: 1px orfao 33% no Walking10) — alpha
+          // <128 cai para transparente; nada no pack chega perto do limiar.
+          console.warn(`aviso: alpha ${alpha} em ${label} (${x},${y}) -> ${alpha < 128 ? 'transparente' : 'opaco'}`);
+          alpha = alpha < 128 ? 0 : 255;
         }
-        rows.push(row);
+        if (alpha === 0) { row += '.'; continue; }
+        const key = colorKey(img.rgba, i);
+        let idx = palettes[coatIdx].indexOf(key);
+        if (idx === -1) {
+          idx = palettes[coatIdx].length;
+          if (idx >= CHARS.length) throw new Error(`paleta maior que o charset (${label})`);
+          palettes[coatIdx].push(key);
+        }
+        row += CHARS[idx];
       }
-      coatFrames[ci].push({ w: img.w, h: img.h, rows });
+      rows.push(row);
     }
-  }
+    return { w: img.w, h: img.h, rows };
+  };
 
-  // round-trip: reconstruir cada pelagem a partir de (indices, paleta) e
-  // comparar com o RGBA original — lossless comprovado.
-  for (let ci = 0; ci < COATS.length; ci++) {
-    for (let fi = 0; fi < files.length; fi++) {
-      const src = perCoat[ci][fi];
-      for (let y = 0; y < src.h; y++) {
-        for (let x = 0; x < src.w; x++) {
-          const i = (y * src.w + x) * 4;
-          const ch = coatFrames[ci][fi].rows[y][x];
-          if (ch === '.') {
-            if (src.rgba[i + 3] >= 128) throw new Error('round-trip: alpha');
-          } else if (src.rgba[i + 3] < 128 || colorKey(src.rgba, i) !== palettes[ci][CHARS.indexOf(ch)]) {
-            throw new Error('round-trip: cor');
+  for (const anim of ANIMS) {
+    const coatFrames = [];
+    let refDelays = null;
+    for (let ci = 0; ci < breed.coats.length; ci++) {
+      const coat = breed.coats[ci];
+      const dir = join(BUNDLE, 'cats', breed.name, coat, anim.dir);
+      const files = existsSync(dir) ? naturalPngs(dir) : [];
+      if (files.length === 0) {
+        console.warn(`aviso: ${breed.name}/${coat}/${anim.dir} sem PNGs — vazio (runtime usa fallback)`);
+        coatFrames.push([]);
+        continue;
+      }
+      const frames = [];
+      for (const f of files) {
+        const img = decodePng(join(dir, f));
+        const frame = indexFrame(img, ci, `${breed.name}/${coat}/${anim.dir}/${f}`);
+        // round-trip: reconstruir e comparar com o RGBA original — lossless
+        for (let y = 0; y < img.h; y++) {
+          for (let x = 0; x < img.w; x++) {
+            const i = (y * img.w + x) * 4;
+            const ch = frame.rows[y][x];
+            if (ch === '.') {
+              if (img.rgba[i + 3] >= 128) throw new Error(`round-trip alpha: ${f}`);
+            } else if (img.rgba[i + 3] < 128 ||
+              colorKey(img.rgba, i) !== palettes[ci][CHARS.indexOf(ch)]) {
+              throw new Error(`round-trip cor: ${f}`);
+            }
           }
         }
+        frames.push(frame);
+      }
+      totalFrames += frames.length;
+      coatFrames.push(frames);
+      if (refDelays === null) {
+        const gifPath = join(BUNDLE, 'cats', breed.name, coat, 'Gifs', anim.gif ?? `${anim.dir}.gif`);
+        let delays = existsSync(gifPath) ? gifDelays(gifPath) : [];
+        // conta divergente (raro): repete o ultimo delay / trunca
+        while (delays.length < frames.length) delays.push(delays[delays.length - 1] ?? 10);
+        delays = delays.slice(0, frames.length);
+        refDelays = delays;
       }
     }
+    anims[anim.key] = { delays: refDelays ?? [10], coats: coatFrames };
   }
-
-  if (maskDiffs > 0) console.warn(`aviso: ${anim.dir}: ${maskDiffs}px de mascara divergem entre pelagens (retoques da autora)`);
-  const delays = gifDelays(join(BUNDLE, 'cats', BREED, refCoat, 'Gifs', anim.gif));
-  if (delays.length !== files.length) {
-    console.warn(`aviso: ${anim.gif} tem ${delays.length} delays para ${files.length} frames`);
-  }
-  animsOut.push({ key: anim.key, coatFrames, delays });
-  console.log(`${anim.dir}: ${files.length} frames x ${COATS.length} pelagens, delays(1/100s)=${delays.join(',')}`);
+  breedsOut.push({ breed: breed.name, coats: breed.coats, palettes, anims });
+  console.log(`${breed.name}: ${breed.coats.length} pelagens ok`);
 }
 
 // ---------------------------------------------------------------------------
-// Emissao
+// Emissao (JSON compacto — o arquivo e gerado, diff legivel nao e objetivo)
 // ---------------------------------------------------------------------------
 const ts = `/**
  * GERADO por scripts/import-cats.mjs — NAO editar a mao, NAO redesenhar.
  *
  * Fonte: pack "Animated Cat Sprites" de girlypixels
- * (https://girlypixels.itch.io/animated-cat-sprites), raca ${BREED}.
- * Representacao indexada LOSSLESS dos frames originais (round-trip verificado
- * no importador): cada char de \`rows\` indexa a paleta da pelagem, '.' e
- * transparente. \`delays\` sao os delays originais dos GIFs em 1/100s.
- * Indices por pelagem: o recolor do pack nao e mapa global de paleta (o
- * siamese tem coloracao point), so a mascara de alpha e compartilhada.
+ * (https://girlypixels.itch.io/animated-cat-sprites), racas bobtail/longhair/
+ * shorthair. Representacao indexada LOSSLESS dos frames originais (round-trip
+ * verificado no importador): cada char de \`rows\` indexa a paleta da pelagem,
+ * '.' e transparente. \`delays\` sao os delays originais dos GIFs em 1/100s.
  *
  * Licenca do pack: uso comercial e modificacao permitidos; redistribuicao
  * proibida — por isso os PNGs crus nao vivem neste repo publico e este modulo
@@ -231,32 +248,22 @@ export type CatAnimKey = ${ANIMS.map((a) => `'${a.key}'`).join(' | ')};
 
 export type CatFrame = { w: number; h: number; rows: string[] };
 
-export const CAT_COATS = ${JSON.stringify(COATS)} as const;
-
-/** Paleta por pelagem: hex rrggbb na ordem dos indices dos frames. */
-export const CAT_PALETTES: string[][] = ${JSON.stringify(palettes)};
-
-/** [anim][pelagem] -> frames; delays por anim (1/100s, dos GIFs originais). */
-export const CAT_ANIMS: Record<CatAnimKey, { delays: number[]; coats: CatFrame[][] }> = {
-${animsOut
-  .map(
-    (a) =>
-      `  ${a.key}: {\n    delays: ${JSON.stringify(a.delays)},\n    coats: [\n${a.coatFrames
-        .map(
-          (frames) =>
-            `      [\n${frames
-              .map(
-                (f) =>
-                  `        { w: ${f.w}, h: ${f.h}, rows: [\n${f.rows
-                    .map((r) => `          '${r}',`)
-                    .join('\n')}\n        ] },`,
-              )
-              .join('\n')}\n      ],`,
-        )
-        .join('\n')}\n    ],\n  },`,
-  )
-  .join('\n')}
+export type PackAnim = {
+  /** delays por frame em 1/100s (do GIF original da raca). */
+  delays: number[];
+  /** [pelagem] -> frames ([] quando o pack nao traz — ex.: mekong/Hissing). */
+  coats: CatFrame[][];
 };
+
+export type BreedSprites = {
+  breed: string;
+  coats: string[];
+  /** paleta por pelagem: hex rrggbb na ordem dos indices dos frames. */
+  palettes: string[][];
+  anims: Record<CatAnimKey, PackAnim>;
+};
+
+export const CAT_SPRITES: BreedSprites[] = ${JSON.stringify(breedsOut)};
 `;
 writeFileSync(OUT, ts);
-console.log(`ok ${OUT} (${(ts.length / 1024).toFixed(1)} KiB, ${COATS.length} pelagens)`);
+console.log(`ok ${OUT} (${(ts.length / 1024).toFixed(1)} KiB, ${totalFrames} frames)`);

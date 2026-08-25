@@ -168,8 +168,17 @@ Pipeline implementado (fatia vertical do §8 no ar):
   Walking10 (cisco da autora, identico nas 4 pelagens) cai para transparente.
 - `src/client/catsprites.ts` decodifica uma vez e responde o frame por tick
   (30 Hz; delay 100ms = 3 ticks) — display-only, fora do hash.
-- `render.ts`: modos `walk` e `idle` usam Walking/Idle do pack (direita
-  nativa, esquerda por espelho; chao do frame na ultima linha). Pelagem do
-  pack = a de cor dominante mais proxima do `coat.body` gerado do gato.
-- Proximo: Sitting/Sleeping, depois as poses com overlay (§9) e a passada
-  de proporcao do mundo para o metro de 32px (§7).
+- `render.ts`: TODOS os modos de gato usam o pack por aproximacao (§9):
+  walk→Walking, idle→Idle, zoomies→Running, nap→Sleeping, work→Sitting,
+  rack→Attack_swat, eat→Crouch, fight→Attack_hit/Hissing (mekong sem
+  Hissing cai para Attack_hit), petted→Sitting_head_turn, keyboard→Sitting,
+  held→frame frontal do Turning. Direita nativa, esquerda por espelho;
+  efeitos (zzz, coracao, ';;;', poeira, pelos) seguem por cima.
+- Elenco: 12 pelagens de bobtail/longhair/shorthair (941 frames embutidos;
+  halloween fora do elenco). Gato gerado → pelagem por PADRAO
+  (tabby/point/tuxedo/solid) + cor dominante mais proxima; `big` puxa para
+  longhair. `shorthair/grey_tabby` e reservado ao PM, que ganha oculos +
+  colarinho/gravata como overlay baked ancorado nas cores exclusivas de
+  olho/colar do proprio sprite.
+- Proximo: overlay de teclar na mesa (patas no teclado), cracha/colar por
+  trilha e a passada de proporcao do mundo para o metro de 32px (§7).
