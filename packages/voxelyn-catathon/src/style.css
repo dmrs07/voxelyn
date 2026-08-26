@@ -1105,3 +1105,8 @@ body {
   font-weight: 700;
 }
 .kickoff-skip:active { transform: scale(0.97); }
+
+/* No palco, o feed sai de cena: o pitch e cinematica + painel de palco —
+   noticia de booth e ruido na hora do show. */
+.in-pitch .feed-strip,
+.in-pitch .feed-panel { display: none; }

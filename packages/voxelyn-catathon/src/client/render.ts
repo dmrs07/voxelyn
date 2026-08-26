@@ -879,33 +879,78 @@ const CROWD_COATS: readonly number[] = [
 type CrowdMood = 'hyped' | 'warm' | 'cold' | 'shock';
 
 /**
- * Um gato da PLATEIA, visto de costas (ele olha o palco, como voce): orelhas,
- * cabeca, corpo e o rabo — que e o medidor emocional de um gato de verdade.
- * Empolgado PULA; morno balanca; frio congela e o rabo mal se mexe.
+ * Um gato da PLATEIA, visto de costas (ele olha o palco, como voce). A
+ * silhueta e de GATO SENTADO de verdade: ancas largas afinando para os
+ * ombros, cabeca redonda MENOR que o corpo, orelhas triangulares com
+ * orelha interna, e o rabo longo enrolado na base — o medidor emocional de
+ * um gato de verdade. Empolgado PULA; morno balanca; frio congela e o rabo
+ * mal se mexe. Alguns sao rajados (listras pela semente): plateia e povo,
+ * nao clone.
  */
-const drawAudienceCat = (v: View, x: number, y: number, body: number, tick: number, phase: number, mood: CrowdMood): void => {
+const drawAudienceCat = (
+  v: View,
+  x: number,
+  y: number,
+  body: number,
+  tick: number,
+  phase: number,
+  mood: CrowdMood,
+  striped = false
+): void => {
   let bob = 0;
   if (mood === 'hyped') bob = -Math.round(Math.abs(Math.sin(tick / 5 + phase * 6.28)) * 3);
   else if (mood === 'warm') bob = -Math.round(Math.abs(Math.sin(tick / 11 + phase * 6.28)) * 1);
+  const yy = y + bob;
+  const head = adjustBrightness(body, 10);
   const dark = adjustBrightness(body, -26);
-  contactShadow(v, x + 4, y + 1, 6, 2, 0.28);
-  rect(v, x, y - 7 + bob, 9, 7, body);
-  rect(v, x, y - 7 + bob, 9, 1, adjustBrightness(body, 14));
-  rect(v, x + 1, y - 12 + bob, 7, 6, adjustBrightness(body, 8));
-  px(v, x + 1, y - 13 + bob, body);
-  px(v, x + 2, y - 14 + bob, body);
-  px(v, x + 6, y - 14 + bob, body);
-  px(v, x + 7, y - 13 + bob, body);
-  // O rabo: rapido na empolgacao, pendulo no morno, quase parado no frio.
+  const inner = adjustBrightness(body, -42);
+  contactShadow(v, x + 5, y + 1, 7, 2, 0.28);
+
+  // ANCAS -> OMBROS (de baixo para cima): a pera sentada do gato de costas.
+  rect(v, x + 1, yy - 1, 9, 1, dark); // a base assenta em sombra
+  rect(v, x, yy - 4, 11, 3, body);
+  rect(v, x + 1, yy - 5, 9, 1, body);
+  rect(v, x + 2, yy - 7, 7, 2, body);
+
+  // CABECA redonda, menor que o corpo, com o topo aparado (nada de bloco).
+  rect(v, x + 3, yy - 11, 5, 4, head);
+  px(v, x + 2, yy - 9, head);
+  px(v, x + 8, yy - 9, head);
+  px(v, x + 2, yy - 10, head);
+  px(v, x + 8, yy - 10, head);
+
+  // ORELHAS triangulares de verdade, com a orelha interna escura.
+  px(v, x + 2, yy - 12, body);
+  px(v, x + 3, yy - 12, body);
+  px(v, x + 3, yy - 13, body);
+  px(v, x + 7, yy - 12, body);
+  px(v, x + 8, yy - 12, body);
+  px(v, x + 7, yy - 13, body);
+  px(v, x + 3, yy - 12, inner);
+  px(v, x + 7, yy - 12, inner);
+
+  // LISTRAS de rajado (alguns): tres riscos no lombo e um na cabeca.
+  if (striped) {
+    px(v, x + 3, yy - 4, dark);
+    px(v, x + 5, yy - 5, dark);
+    px(v, x + 7, yy - 4, dark);
+    px(v, x + 5, yy - 11, dark);
+  }
+
+  // O RABO: longo, enrolado na base e com a ponta viva — rapido na
+  // empolgacao, pendulo no morno, quase parado no frio.
   const wagSpeed = mood === 'hyped' ? 4 : mood === 'warm' ? 12 : 30;
   const wag = mood === 'shock' ? 0 : Math.round(Math.sin(tick / wagSpeed + phase * 6) * 2);
-  px(v, x + 9, y - 4 + bob, dark);
-  px(v, x + 10, y - 6 + bob + wag, dark);
-  px(v, x + 10, y - 8 + bob + wag, body);
+  px(v, x + 10, yy - 1, dark);
+  px(v, x + 11, yy - 2, dark);
+  px(v, x + 12, yy - 4, body);
+  px(v, x + 12, yy - 6 + wag, body);
+  px(v, x + 11, yy - 8 + wag, head);
+
   if (mood === 'shock') {
     // O susto da crise: exclamacao coral sobre algumas cabecas.
-    rect(v, x + 4, y - 21, 1, 4, CORAL_ERR);
-    px(v, x + 4, y - 16, CORAL_ERR);
+    rect(v, x + 5, y - 20, 1, 4, CORAL_ERR);
+    px(v, x + 5, y - 15, CORAL_ERR);
   }
 };
 
@@ -1352,8 +1397,13 @@ const drawPitchScene = (v: View, state: HackState, tick: number, locale: Locale)
       const bob2 = g > 0.6 ? Math.round(Math.abs(Math.sin(tick / 6 + hb * 6.28)) * 2) : 0;
       const sy2 = 262 + Math.floor(hb * 4) - bob2;
       rect(v, x, sy2 - 6, 9, 8, SHADOW_INK);
+      // Orelhas em triangulo ate na silhueta: fundao de gatos, nao de imps.
       px(v, x + 1, sy2 - 7, SHADOW_INK);
+      px(v, x + 2, sy2 - 7, SHADOW_INK);
+      px(v, x + 1, sy2 - 8, SHADOW_INK);
+      px(v, x + 6, sy2 - 7, SHADOW_INK);
       px(v, x + 7, sy2 - 7, SHADOW_INK);
+      px(v, x + 7, sy2 - 8, SHADOW_INK);
       if (winEnd || g > 0.85) if (vhash(state.seed, x, 12) > 0.7 && (tick + x) % 40 < 20) heart(v, x + 3, sy2 - 14);
     }
   }
@@ -1394,7 +1444,7 @@ const drawPitchScene = (v: View, state: HackState, tick: number, locale: Locale)
       else if (g > enthusiasm - 0.3) mood = 'warm';
       else mood = 'cold';
       const body = CROWD_COATS[Math.floor(vhash(state.seed, id, 5) * CROWD_COATS.length)]!;
-      drawAudienceCat(v, x, row.y, body, tick, hx, mood);
+      drawAudienceCat(v, x, row.y, body, tick, hx, mood, vhash(state.seed, id, 13) < 0.4);
       // Coracoes sobem da plateia conquistada — o voto popular tem rosto.
       if (mood === 'hyped' && vhash(state.seed, id, 6) > 0.6) {
         const beat = (tick + id * 9) % 46;
