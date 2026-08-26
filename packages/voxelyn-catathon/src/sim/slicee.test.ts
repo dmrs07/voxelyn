@@ -16,6 +16,7 @@ import {
   eventForRep,
   hashState,
   nextLockedEvent,
+  nextTask,
   rollCandidates,
   rollProject,
   rollStretchOffers,
@@ -123,6 +124,24 @@ describe('stretch sprint: as oportunidades da edicao', () => {
     expect(state.prizeBonus).toBe(STRETCH_SPONSOR_PRIZE);
     expect(state.events.some((e) => e.kind === 'stretch-done')).toBe(true);
     expect(state.sprint.offers[1]!.status).toBe('open');
+  });
+
+  it('o stretch ACEITO fura a fila da trilha — a mesa pivota para a aposta', () => {
+    const state = mk(5);
+    shipCore(state);
+    step(state, emptyCommand());
+    state.sprint.offers[0] = { kind: 'polimento-obsessivo', taskId: 's1', label: 'polir', status: 'open' };
+    step(state, { stretch: true });
+    // O polimento comum da mesma trilha (d3) segue vivo e vem ANTES no
+    // array — mas a mesa puxa a aposta primeiro (achado de review).
+    const d3 = state.tasks.find((t) => t.id === 'd3')!;
+    expect(d3.done).toBe(false);
+    expect(d3.cut).toBe(false);
+    expect(nextTask(state, 'design')!.id).toBe('s1');
+    // Stretch shipado, a fila volta ao normal.
+    state.tasks.find((t) => t.id === 's1')!.done = true;
+    state.sprint.offers[0]!.status = 'done';
+    expect(nextTask(state, 'design')!.id).toBe('d3');
   });
 
   it('o multiplicador multiplica a nota inteira, exatamente', () => {

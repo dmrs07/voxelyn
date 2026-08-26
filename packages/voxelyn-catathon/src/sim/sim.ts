@@ -473,9 +473,19 @@ export const liveBug = (state: HackState, track: Track) =>
 export const workable = (state: HackState, task: Task): boolean =>
   !task.done && !task.cut && task.deps.every((d) => state.tasks.find((t) => t.id === d)?.done === true);
 
-/** A proxima tarefa que uma mesa consegue puxar, na ordem do quadro. */
-export const nextTask = (state: HackState, track: Track): Task | undefined =>
-  state.tasks.find((t) => t.track === track && workable(state, t) && !t.awaitingShip);
+/**
+ * A proxima tarefa que uma mesa consegue puxar, na ordem do quadro — com uma
+ * excecao: o STRETCH ACEITO fura a fila da propria trilha. O jogador acabou
+ * de apostar nele; a mesa pivota para a oportunidade em vez de terminar um
+ * polimento antigo primeiro (achado de review: o stretch aceito atras de um
+ * polish comum podia nunca comecar antes do prazo).
+ */
+export const nextTask = (state: HackState, track: Track): Task | undefined => {
+  const pool = state.tasks.filter((t) => t.track === track && workable(state, t) && !t.awaitingShip);
+  return (
+    pool.find((t) => state.sprint.offers.some((o) => o.taskId === t.id && o.status === 'taken')) ?? pool[0]
+  );
+};
 
 /** O slot no BOOTH DESTA RUN — as coordenadas moram no estado (layout). */
 const slotIn = (state: HackState, id: SlotId) => state.slots.find((s) => s.id === id)!;
