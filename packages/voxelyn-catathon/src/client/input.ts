@@ -160,6 +160,10 @@ export const attachInput = (
     } else if (input.downCat && !input.moved && nowMs() - input.downAtMs < HOLD_MS) {
       // Toque curto: seleciona (a ficha aparece no HUD, nunca so em hover).
       input.selected = input.selected === input.downCat ? null : input.downCat;
+    } else if (!input.downCat && !input.moved) {
+      // Toque curto no chao VAZIO: desseleciona — a ficha do gato fecha ao
+      // tocar fora dela (perder o foco), como o dono espera de um cartao.
+      input.selected = null;
     }
     input.down = false;
     input.downCat = null;
