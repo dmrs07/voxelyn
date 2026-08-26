@@ -39,8 +39,6 @@ const UI_PIECES = {
   paw: [377, 153, 35, 30],
   fish: [470, 195, 20, 11],
   'bubble-cream': [454, 584, 21, 18],
-  // cartao de PERFIL (orelhas + barras + moeda) — reservado para retratos
-  'profile-card': [2, 2, 76, 28],
 };
 
 // ---------------------------------------------------------------------------

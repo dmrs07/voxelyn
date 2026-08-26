@@ -449,6 +449,16 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     mods: MODS({ stressWork: 0.8, stressIdle: 0.9, moralShip: 0.7 }),
   },
   {
+    id: 'bancada',
+    name: 'Bancada Unica',
+    blurb: 'todos os PCs juntos: pareamento e cotovelos',
+    // mesas em passo de 46px (a largura exata da mesa): os tampos se emendam
+    // numa BANCADA continua, e a regra do monitor (lado do centro) agrupa os
+    // 4 PCs no meio dela.
+    slots: S([156, 205], [202, 205], [248, 205], [294, 205], [56, 240], [432, 208], [380, 244]),
+    mods: MODS({ moralShip: 1.4, stressIdle: 1.2 }),
+  },
+  {
     id: 'cafeteria',
     name: 'Perto da Cafeteria',
     blurb: 'fome controlada, movimento constante',
