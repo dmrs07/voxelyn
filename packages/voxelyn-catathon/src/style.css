@@ -379,8 +379,15 @@ body {
    cobriam o canto de descanso inteiro. O historico abre por toque. */
 .feed-strip {
   position: absolute;
-  left: calc(env(safe-area-inset-left, 0px) + 68px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  /* CENTRALIZADO no TOPO (pedido do dono + achado do smoke): encostado a
+     esquerda embaixo ele cobria o puff das camas e roubava o toque de quem
+     tentava pegar o gato dormindo; centralizado embaixo, roubava o toque
+     do petisco no centro. A unica faixa SEM gameplay e a parede do topo
+     (mundo y<96): o feed vira um ticker sob os chips, cobrindo so letreiro.
+   */
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
   max-width: min(420px, 46vw);
   display: flex;
   align-items: center;
@@ -415,8 +422,9 @@ body {
 }
 .feed-panel {
   position: absolute;
-  left: calc(env(safe-area-inset-left, 0px) + 68px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 58px);
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 104px);
   width: min(420px, 52vw);
   display: grid;
   gap: 3px;
@@ -695,7 +703,11 @@ body {
     width: min(420px, calc(100vw - 20px));
   }
   .feed-strip {
+    /* Em retrato o HUD vive nas MARGENS: a faixa volta para baixo do palco
+       (e anula o top/center do modo paisagem). */
     left: calc(env(safe-area-inset-left, 0px) + 10px);
+    transform: none;
+    top: auto;
     bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
     max-width: calc(100vw - 20px);
   }
@@ -703,6 +715,8 @@ body {
      o teto deriva de --stage-bot — em retrato, nada cobre o pavilhao. */
   .feed-panel {
     left: calc(env(safe-area-inset-left, 0px) + 10px);
+    transform: none;
+    top: auto;
     width: min(420px, calc(100vw - 20px));
     bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
     max-height: max(96px, calc(100vh - var(--stage-bot) - 154px));
@@ -947,4 +961,14 @@ body {
   background: var(--cui-bubble-cream);
   background-size: 100% 100%;
   image-rendering: pixelated;
+}
+
+
+/* Retrato com CARINHA: a cabeca do sprite do gato (frame frontal do
+   Turning, cracha incluso) em 2x, no lugar da bolinha de cor. */
+.team-face {
+  width: 32px;
+  height: 28px;
+  image-rendering: pixelated;
+  flex: none;
 }

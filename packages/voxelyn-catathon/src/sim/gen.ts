@@ -413,7 +413,7 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     id: 'open-booth',
     name: 'Open Booth',
     blurb: 'colaboracao facil, distracao tambem',
-    slots: S([86, 126], [394, 126], [86, 190], [394, 190], [56, 240], [432, 208], [240, 210]),
+    slots: S([86, 126], [394, 126], [86, 190], [394, 190], [56, 226], [432, 208], [240, 210]),
     mods: MODS({ moralShip: 1.5, stressIdle: 1.15 }),
   },
   {
@@ -422,14 +422,14 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     blurb: 'foco individual, comunicacao lenta',
     // rack no canto inferior direito — o centro pertence ao quadro (regra
     // do dono: rack NUNCA ocupa o espaco do board).
-    slots: S([70, 118], [412, 118], [70, 214], [412, 196], [190, 240], [432, 244], [310, 238]),
+    slots: S([70, 118], [412, 118], [70, 214], [412, 196], [190, 226], [432, 244], [310, 238]),
     mods: MODS({ stressWork: 0.85, moralShip: 0.8 }),
   },
   {
     id: 'ilha-central',
     name: 'Ilha Central',
     blurb: 'pair programming, gargalo no meio',
-    slots: S([172, 148], [308, 148], [172, 208], [308, 208], [56, 238], [432, 208], [56, 140]),
+    slots: S([172, 148], [308, 148], [172, 208], [308, 208], [56, 224], [432, 208], [56, 140]),
     mods: MODS({ moralShip: 1.3, stressWork: 1.05 }),
   },
   {
@@ -438,14 +438,14 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     blurb: 'deploy eficiente, calor e cochilos no rack',
     // rack na parede direita: o CENTRO pertence ao quadro e a roda de
     // decisao — rack NUNCA ocupa o espaco do board (regra do dono).
-    slots: S([100, 130], [340, 122], [100, 196], [340, 196], [56, 240], [432, 168], [410, 240]),
+    slots: S([100, 130], [340, 122], [100, 196], [340, 196], [56, 226], [432, 168], [410, 240]),
     mods: MODS({ fixSpeed: 1.3, napRate: 0.9 }),
   },
   {
     id: 'quiet-zone',
     name: 'Quiet Zone',
     blurb: 'foco elevado, moral social menor',
-    slots: S([90, 120], [396, 120], [160, 210], [330, 210], [56, 240], [432, 160], [240, 244]),
+    slots: S([90, 120], [396, 120], [160, 210], [330, 210], [56, 226], [432, 160], [240, 244]),
     mods: MODS({ stressWork: 0.8, stressIdle: 0.9, moralShip: 0.7 }),
   },
   {
@@ -455,14 +455,14 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     // mesas em passo de 46px (a largura exata da mesa): os tampos se emendam
     // numa BANCADA continua, e a regra do monitor (lado do centro) agrupa os
     // 4 PCs no meio dela.
-    slots: S([156, 205], [202, 205], [248, 205], [294, 205], [56, 240], [432, 208], [380, 244]),
+    slots: S([156, 205], [202, 205], [248, 205], [294, 205], [56, 226], [432, 208], [380, 244]),
     mods: MODS({ moralShip: 1.4, stressIdle: 1.2 }),
   },
   {
     id: 'cafeteria',
     name: 'Perto da Cafeteria',
     blurb: 'fome controlada, movimento constante',
-    slots: S([86, 132], [394, 132], [120, 208], [360, 208], [56, 244], [432, 176], [240, 160]),
+    slots: S([86, 132], [394, 132], [120, 208], [360, 208], [56, 228], [432, 176], [240, 160]),
     mods: MODS({ eatScale: 0.6, stressIdle: 1.1 }),
   },
 ];

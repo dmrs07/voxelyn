@@ -142,7 +142,7 @@ export const SLOTS: readonly { id: SlotId; x: number; y: number; track: Track | 
   { id: 'desk-frontend', x: 394, y: 126, track: 'frontend' },
   { id: 'desk-design', x: 86, y: 190, track: 'design' },
   { id: 'desk-devops', x: 394, y: 190, track: 'devops' },
-  { id: 'puff', x: 56, y: 240, track: null },
+  { id: 'puff', x: 56, y: 226, track: null },
   { id: 'rack', x: 432, y: 208, track: null },
   { id: 'cafe', x: 240, y: 210, track: null },
 ];
