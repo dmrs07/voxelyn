@@ -474,9 +474,8 @@ const drawStation = (v: View, sx: number, sy: number, track: Track, state: HackS
  * fisica do painel de projeto, legivel a distancia.
  */
 const drawWhiteboard = (v: View, state: HackState): void => {
-  // O quadro cresceu para carregar o GANTT em miniatura: subiu na parede
-  // (o pe nao invade a roda de decisao) e ganhou uma faixa de raias abaixo
-  // dos post-its — a MESMA imagem do gantt do painel, so que de longe.
+  // O quadro subiu na parede (o pe nao invade a roda de decisao); os
+  // post-its sao a copia fisica do kanban do painel.
   const bx = 208;
   const by = 96;
   contactShadow(v, bx + 32, by + 52, 34, 5, 0.3);
@@ -488,9 +487,9 @@ const drawWhiteboard = (v: View, state: HackState): void => {
   // Fita nos cantos.
   rect(v, bx + 1, by + 1, 4, 2, adjustBrightness(AMBER_ALERT, -30));
   rect(v, bx + 59, by + 1, 4, 2, adjustBrightness(AMBER_ALERT, -30));
-  // O diagrama de dependencias rabiscado.
-  for (let i = 0; i < 5; i++) px(v, bx + 6 + i, by + 6 + ((i / 2) | 0), VIOLET_SEL);
-  for (let i = 0; i < 4; i++) px(v, bx + 11 + i, by + 8, CYAN_ACT);
+  // (O rabisco de "dependencias" acima dos post-its saiu: lia como um
+  // gantt falso em cima do quadro — decisao do dono. A miniatura de gantt
+  // REAL, no rodape, fica.)
   // Um post-it por tarefa, ordem estavel do quadro real.
   let i = 0;
   for (const t of state.tasks) {
@@ -720,6 +719,9 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
   // Direcao nativa do pack e DIREITA; esquerda = espelho.
   const look = lookFor(cat.coat.body, cat.pattern, cat.big);
   const collar = SPEC_RGB[cat.specialty];
+  // JITTER de fase por gato: sem isto o pavilhao inteiro balanca o rabo em
+  // uchronia — cada gato entra na timeline com um offset proprio (id).
+  tick += (cat.id.charCodeAt(0) * 7 + cat.id.charCodeAt(cat.id.length - 1) * 13) % 29;
   const cx = Math.round(cat.x);
   const ground = Math.round(cat.y) + 2;
   const toCenter = cat.x > 240; // parado, o gato olha para dentro do pavilhao
@@ -758,9 +760,10 @@ export const drawCat = (v: View, cat: Cat, tick: number, selected: boolean): voi
       blitFrame(v, packFrame(look, 'swat', tick, collar), cx, ground, false);
       return;
     }
-    // Na mesa: sentado encarando a bancada (mesas vivem nas paredes leste/
-    // oeste); em qualquer outro posto, sentado voltado para o centro.
-    const mirror = cat.slot?.startsWith('desk-') ? cat.x < 240 : toCenter;
+    // Na mesa o MONITOR fica na ponta interna da bancada: o gato encara a
+    // tela (nunca fica de costas para o computador). Nos outros postos,
+    // sentado voltado para o centro — que da no mesmo espelho.
+    const mirror = toCenter;
     blitFrame(v, packFrame(look, 'sit', tick, collar), cx, ground, mirror);
     return;
   }
