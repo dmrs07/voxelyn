@@ -60,6 +60,9 @@ export const PT_BR = {
   'aurix.options.video': 'Sistema de vídeo',
   'aurix.options.audio': 'Áudio',
   'aurix.options.telemetry': 'Telemetria',
+  'aurix.options.credits': 'Créditos',
+  'credits.game': 'jogo por Daniel Moraes Ribeiro da Silva (@dmrs07)',
+  'credits.music': 'trilha sonora por Clevo (@clevoclevoclevo)',
   'aurix.options.footer': 'alterações salvas localmente',
 
   'options.title': 'OPÇÕES',
@@ -75,7 +78,6 @@ export const PT_BR = {
   'options.musicSource': 'Trilha',
   'options.musicSource.composed': 'Composta',
   'options.musicSource.synth': 'Sintetizada (clássica)',
-  'options.musicSource.credit': 'música por Clevo (@clevoclevoclevo)',
   'options.sound.on': 'Som: ligado',
   'options.sound.off': 'Som: desligado',
   'options.telemetry.on': 'Telemetria: ligada',

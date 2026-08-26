@@ -55,6 +55,9 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'aurix.options.video': 'Video system',
   'aurix.options.audio': 'Audio',
   'aurix.options.telemetry': 'Telemetry',
+  'aurix.options.credits': 'Credits',
+  'credits.game': 'game by Daniel Moraes Ribeiro da Silva (@dmrs07)',
+  'credits.music': 'soundtrack by Clevo (@clevoclevoclevo)',
   'aurix.options.footer': 'changes saved locally',
 
   'options.title': 'OPTIONS',
@@ -70,7 +73,6 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.musicSource': 'Soundtrack',
   'options.musicSource.composed': 'Composed',
   'options.musicSource.synth': 'Synthesized (classic)',
-  'options.musicSource.credit': 'music by Clevo (@clevoclevoclevo)',
   'options.sound.on': 'Sound: on',
   'options.sound.off': 'Sound: off',
   'options.telemetry.on': 'Telemetry: on',

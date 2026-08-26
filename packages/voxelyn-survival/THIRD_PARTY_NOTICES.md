@@ -35,4 +35,4 @@ constantes; nenhuma outra parte da biblioteca é distribuída.
 Arquivo: `public/audio/voxelyn-survival-theme.flac` — o master do compositor
 empacotado sem perda por `scripts/prepare-soundtrack.mjs` (nenhuma alteração
 no áudio além do container). O crédito também aparece no jogo, em
-Opções → Trilha.
+Opções → Créditos.
