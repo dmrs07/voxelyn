@@ -70,6 +70,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.musicSource': 'Soundtrack',
   'options.musicSource.composed': 'Composed',
   'options.musicSource.synth': 'Synthesized (classic)',
+  'options.musicSource.credit': 'music by Clevo (@clevoclevoclevo)',
   'options.sound.on': 'Sound: on',
   'options.sound.off': 'Sound: off',
   'options.telemetry.on': 'Telemetry: on',

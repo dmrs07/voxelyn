@@ -1,5 +1,8 @@
 # Trilha composta do Voxelyn Survival
 
+**Música por Clevo (@clevoclevoclevo)** — composta para o jogo, usada com
+permissão do autor (ver `THIRD_PARTY_NOTICES.md`).
+
 Este diretório recebe `voxelyn-survival-theme.flac` — a trilha do compositor,
 em loop, tocada em **todos os estratos** no lugar dos oito temas procedurais
 (que continuam no bundle como backup: fallback automático quando este arquivo

@@ -25,3 +25,14 @@ software; as fontes não são vendidas isoladamente.
 Arquivo: `src/client/matrix-icons.ts` — os `path` SVG são copiados de
 `@phosphor-icons/core` (peso regular, viewBox 256) e embutidos como
 constantes; nenhuma outra parte da biblioteca é distribuída.
+
+## Música
+
+| Obra                                                | Uso                                          | Autor                            | Termos                                 |
+| --------------------------------------------------- | -------------------------------------------- | -------------------------------- | -------------------------------------- |
+| **Trilha composta do Voxelyn Survival** (FLAC, loop) | Trilha sonora da run, em todos os estratos | Clevo (@clevoclevoclevo)         | Composta para o jogo; usada com permissão do autor |
+
+Arquivo: `public/audio/voxelyn-survival-theme.flac` — o master do compositor
+empacotado sem perda por `scripts/prepare-soundtrack.mjs` (nenhuma alteração
+no áudio além do container). O crédito também aparece no jogo, em
+Opções → Trilha.

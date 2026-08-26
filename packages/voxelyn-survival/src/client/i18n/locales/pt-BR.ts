@@ -75,6 +75,7 @@ export const PT_BR = {
   'options.musicSource': 'Trilha',
   'options.musicSource.composed': 'Composta',
   'options.musicSource.synth': 'Sintetizada (clássica)',
+  'options.musicSource.credit': 'música por Clevo (@clevoclevoclevo)',
   'options.sound.on': 'Som: ligado',
   'options.sound.off': 'Som: desligado',
   'options.telemetry.on': 'Telemetria: ligada',
