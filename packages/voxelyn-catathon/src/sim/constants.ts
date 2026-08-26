@@ -218,6 +218,9 @@ export const PM_WORRY_PERIOD = 70 * TICK_HZ;
 /** A visita aborda pelo lado LIVRE da mesa (espaco negativo do centro):
  * silhuetas nunca se fundem, e a entrega exige estar de fato ao lado. */
 export const PM_PEP_SIDE = 26;
+/** Folga minima do PM para os OUTROS gatos de mesa na hora do pep — abaixo
+ * disto as silhuetas fundem (mesas de bancada ficam a 46px). */
+export const PM_PEP_CLEAR = 24;
 export const PM_PEP_RADIUS = 30;
 
 // -------------------------------------------------------------------- hash

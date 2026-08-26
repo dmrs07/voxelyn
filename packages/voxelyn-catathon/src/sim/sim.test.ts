@@ -372,6 +372,33 @@ describe('recuperacao, venues e brigas', () => {
     expect(Math.hypot(state.pm.x - cat.x, state.pm.y - cat.y)).toBeLessThanOrEqual(30);
   });
 
+  it('bancada: o pep talk nao invade a silhueta do vizinho de mesa', () => {
+    const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
+    // Reproduz a Bancada Unica: mesas vizinhas em passo de 46px.
+    const bk = state.slots.find((s) => s.id === 'desk-backend')!;
+    const fe = state.slots.find((s) => s.id === 'desk-frontend')!;
+    bk.x = 202; bk.y = 205;
+    fe.x = 248; fe.y = 205;
+    step(state, { choose: { task: 'b1', option: 'monolito' } });
+    step(state, { grab: 'bigode' });
+    step(state, { drop: 'desk-backend' });
+    step(state, { grab: 'cheeto' });
+    step(state, { drop: 'desk-frontend' });
+    const alvo = catOf(state, 'bigode')!;
+    const vizinho = catOf(state, 'cheeto')!;
+    let guard = 0;
+    while ((alvo.mode === 'walk' || vizinho.mode === 'walk') && guard++ < 600) step(state, emptyCommand());
+    alvo.moral = 0.1;
+    vizinho.moral = 0.9;
+    guard = 0;
+    while (!state.events.some((e) => e.kind === 'pep' && e.cat === 'bigode') && guard++ < 4000) step(state, emptyCommand());
+    expect(state.events.some((e) => e.kind === 'pep' && e.cat === 'bigode')).toBe(true);
+    // A entrega segue PESSOAL ao alvo...
+    expect(Math.hypot(state.pm.x - alvo.x, state.pm.y - alvo.y)).toBeLessThanOrEqual(30);
+    // ...mas o PM nunca funde a silhueta com o VIZINHO da bancada.
+    expect(Math.hypot(state.pm.x - vizinho.x, state.pm.y - vizinho.y)).toBeGreaterThanOrEqual(24);
+  });
+
   it('pep talk nao aterrissa em mesa vazia: gato pego no colo cancela a visita', () => {
     const state = createHackathon(5, CLASSIC_TEAM, { classic: true });
     step(state, { choose: { task: 'b1', option: 'monolito' } });
