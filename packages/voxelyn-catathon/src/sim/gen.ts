@@ -420,7 +420,9 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     id: 'cubiculos',
     name: 'Cubiculos',
     blurb: 'foco individual, comunicacao lenta',
-    slots: S([70, 118], [412, 118], [70, 214], [412, 196], [190, 240], [240, 148], [310, 238]),
+    // rack no canto inferior direito — o centro pertence ao quadro (regra
+    // do dono: rack NUNCA ocupa o espaco do board).
+    slots: S([70, 118], [412, 118], [70, 214], [412, 196], [190, 240], [432, 244], [310, 238]),
     mods: MODS({ stressWork: 0.85, moralShip: 0.8 }),
   },
   {
@@ -434,7 +436,9 @@ export const LAYOUTS: readonly LayoutSpec[] = [
     id: 'server-corner',
     name: 'Server Corner',
     blurb: 'deploy eficiente, calor e cochilos no rack',
-    slots: S([100, 130], [340, 122], [100, 196], [340, 196], [56, 240], [240, 156], [410, 240]),
+    // rack na parede direita: o CENTRO pertence ao quadro e a roda de
+    // decisao — rack NUNCA ocupa o espaco do board (regra do dono).
+    slots: S([100, 130], [340, 122], [100, 196], [340, 196], [56, 240], [432, 168], [410, 240]),
     mods: MODS({ fixSpeed: 1.3, napRate: 0.9 }),
   },
   {

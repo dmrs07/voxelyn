@@ -1,7 +1,6 @@
 import { adjustBrightness, createSurface2D, packRGBA, type Surface2D } from '@voxelyn/core';
 import { HACK_TICKS, HOURS_PER_TICK, workable } from '../sim/index.js';
 import { heldFrame, lookFor, packFrame, pmFrame, type SpriteFrame } from './catsprites.js';
-import { ganttEntries } from './ganttlog.js';
 import type { Locale } from '../sim/text.js';
 import type { Cat, HackState, Task, Track } from '../sim/types.js';
 
@@ -474,9 +473,8 @@ const drawStation = (v: View, sx: number, sy: number, track: Track, state: HackS
  * fisica do painel de projeto, legivel a distancia.
  */
 const drawWhiteboard = (v: View, state: HackState): void => {
-  // O quadro cresceu para carregar o GANTT em miniatura: subiu na parede
-  // (o pe nao invade a roda de decisao) e ganhou uma faixa de raias abaixo
-  // dos post-its — a MESMA imagem do gantt do painel, so que de longe.
+  // O quadro subiu na parede (o pe nao invade a roda de decisao); os
+  // post-its sao a copia fisica do kanban do painel.
   const bx = 208;
   const by = 96;
   contactShadow(v, bx + 32, by + 52, 34, 5, 0.3);
@@ -488,9 +486,8 @@ const drawWhiteboard = (v: View, state: HackState): void => {
   // Fita nos cantos.
   rect(v, bx + 1, by + 1, 4, 2, adjustBrightness(AMBER_ALERT, -30));
   rect(v, bx + 59, by + 1, 4, 2, adjustBrightness(AMBER_ALERT, -30));
-  // O diagrama de dependencias rabiscado.
-  for (let i = 0; i < 5; i++) px(v, bx + 6 + i, by + 6 + ((i / 2) | 0), VIOLET_SEL);
-  for (let i = 0; i < 4; i++) px(v, bx + 11 + i, by + 8, CYAN_ACT);
+  // (O rabisco de "dependencias" saiu: lia como um mini gantt no topo do
+  // quadro — decisao do dono, o quadro fisico e SO o kanban.)
   // Um post-it por tarefa, ordem estavel do quadro real.
   let i = 0;
   for (const t of state.tasks) {
@@ -514,25 +511,8 @@ const drawWhiteboard = (v: View, state: HackState): void => {
     }
     i++;
   }
-  // A MINIATURA do gantt: as mesmas raias do painel (uma por gato, cores
-  // por trilha, alarme para bug e rack), desenhadas do MESMO log — nenhuma
-  // copia de estado pode ficar atrasada.
-  const gx = bx + 4;
-  const gw = 56;
-  let laneY = by + 31;
-  for (const cat of state.cats.slice(0, 4)) {
-    rect(v, gx, laneY, gw, 3, adjustBrightness(CREAM, -26));
-    for (const seg of ganttEntries(cat.id)) {
-      const x0 = gx + Math.round((seg.start / HACK_TICKS) * gw);
-      const wpx = Math.max(1, Math.round(((seg.end - seg.start) / HACK_TICKS) * gw));
-      const color = seg.kind === 'task' ? TRACK_COLOR[seg.track!] : CORAL_ERR;
-      rect(v, x0, laneY, Math.min(wpx, gx + gw - x0), 3, color);
-    }
-    laneY += 4;
-  }
-  // A linha do AGORA atravessa as raias.
-  const nowX = gx + Math.min(gw, Math.round((state.tick / HACK_TICKS) * gw));
-  rect(v, nowX, by + 30, 1, 13, adjustBrightness(WOOD, -34));
+  // (A miniatura de gantt saiu do quadro por decisao do dono: o gantt de
+  // verdade vive no painel de projeto; o quadro fisico e so o kanban.)
   // DECISAO aberta: um balao de "?" pisca sobre o quadro enquanto os devs
   // se juntam embaixo — o alerta existe no mundo, nao so no chip do HUD.
   const deciding = state.tasks.some(
