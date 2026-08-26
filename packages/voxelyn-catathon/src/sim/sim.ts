@@ -66,6 +66,7 @@ import {
   PM_PEP_MORAL,
   PM_PEP_PERIOD,
   PM_PEP_RADIUS,
+  PM_PEP_CLEAR,
   PM_PEP_SIDE,
   PM_PEP_STRESS,
   PM_WALK_SPEED,
@@ -1438,11 +1439,26 @@ const stepPm = (state: HackState, events: SimEvent[]): void => {
   if (pm.pepCat) {
     const cat = catOf(state, pm.pepCat);
     if (cat && cat.mode === 'work' && cat.slot?.startsWith('desk-')) {
-      // Aborda pelo lado do CENTRO: e o espaco livre ao lado de toda mesa —
-      // o PM para AO LADO do dev, nunca em cima da silhueta dele.
+      // Aborda pelo lado LIVRE. O lado do centro e o preferido (o espaco
+      // classico ao lado de toda mesa), mas em bancadas continuas o vizinho
+      // senta a 46px e o PM a PM_PEP_SIDE do alvo invadiria a silhueta
+      // dele (achado de review). Os candidatos sao testados em ordem FIXA
+      // e vence o primeiro com folga >= PM_PEP_CLEAR dos outros gatos de
+      // mesa; a diagonal frontal cobre o meio da bancada, onde nenhum lado
+      // puro e livre. Deterministico: ordem fixa, nenhum draw01.
       const side = cat.x < 240 ? 1 : -1;
-      pm.targetX = cat.x + side * PM_PEP_SIDE;
-      pm.targetY = cat.y + 6;
+      const others = state.cats.filter((c) => c.id !== cat.id && c.slot?.startsWith('desk-'));
+      const clearance = (x: number, y: number): number =>
+        others.reduce((m, o) => Math.min(m, Math.hypot(o.x - x, o.y - y)), Infinity);
+      const spots: readonly (readonly [number, number])[] = [
+        [cat.x + side * PM_PEP_SIDE, cat.y + 6],
+        [cat.x - side * PM_PEP_SIDE, cat.y + 6],
+        [cat.x + side * 18, cat.y + 18],
+        [cat.x - side * 18, cat.y + 18],
+      ];
+      const spot = spots.find(([x, y]) => clearance(x, y) >= PM_PEP_CLEAR) ?? spots[2]!;
+      pm.targetX = spot[0];
+      pm.targetY = spot[1];
     } else {
       pm.pepCat = null;
       pm.targetX = 262;
