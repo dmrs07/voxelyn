@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NEGATIVE_TRAITS, POSITIVE_TRAITS, SPONSORS } from './gen.js';
-import { CHOICE_TEXT, SPECIAL_TEXT, SPONSOR_TEXT, TASK_TEXT, TRAIT_TEXT } from './text.js';
+import { CHOICE_TEXT, CHOICE_TEXT_ALT, CHOICE_VARIANTS, SPECIAL_TEXT, SPONSOR_TEXT, TASK_TEXT, TRAIT_TEXT } from './text.js';
 
 /**
  * PARIDADE de idiomas: o tipo do dicionario da interface ja e verificado
@@ -15,13 +15,25 @@ describe('paridade en/pt dos catalogos', () => {
     }
   });
 
-  it('toda decisao tem as mesmas opcoes (ids estaveis) nos dois idiomas', () => {
-    expect(Object.keys(CHOICE_TEXT.en).sort()).toEqual(Object.keys(CHOICE_TEXT.pt).sort());
-    for (const id of Object.keys(CHOICE_TEXT.en)) {
-      expect(
-        CHOICE_TEXT.en[id]!.options.map((o) => o.id),
-        id
-      ).toEqual(CHOICE_TEXT.pt[id]!.options.map((o) => o.id));
+  it('toda decisao tem as mesmas opcoes (ids estaveis) nos dois idiomas — variacoes incluidas', () => {
+    for (const [name, table] of [
+      ['original', CHOICE_TEXT],
+      ['variacao', CHOICE_TEXT_ALT],
+    ] as const) {
+      expect(Object.keys(table.en).sort(), name).toEqual(Object.keys(table.pt).sort());
+      for (const id of Object.keys(table.en)) {
+        expect(
+          table.en[id]!.options.map((o) => o.id),
+          `${name}/${id}`
+        ).toEqual(table.pt[id]!.options.map((o) => o.id));
+      }
+    }
+    // O indice de variacoes cobre as MESMAS decisoes nos dois idiomas, com
+    // dois conjuntos por decisao (o original e a variacao).
+    expect(Object.keys(CHOICE_VARIANTS.en).sort()).toEqual(Object.keys(CHOICE_VARIANTS.pt).sort());
+    for (const id of Object.keys(CHOICE_VARIANTS.en)) {
+      expect(CHOICE_VARIANTS.en[id]!.length, id).toBe(2);
+      expect(CHOICE_VARIANTS.pt[id]!.length, id).toBe(2);
     }
   });
 

@@ -14,7 +14,7 @@ import {
   CATNIP_STRESS_DROP,
   CATNIP_USES,
   CATNIP_ZOOMIES_P,
-  CHOICE_COST,
+  CHOICE_EFFECTS,
   COWBOY_BUG_P,
   COWBOY_SHORTCUT_P,
   COWBOY_SPEED,
@@ -803,56 +803,25 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
 
 /**
  * O EFEITO de cada decisao — custo agora, custo depois, e tags que a banca
- * cobra. Nada aqui e "+10%": cada opcao muda o formato da run.
+ * cobra. Nada aqui e "+10%": cada opcao muda o formato da run. O switch
+ * virou TABELA (CHOICE_EFFECTS) quando as variacoes multiplicaram o
+ * vocabulario: uma linha por opcao, e o teste vigia que nenhum card
+ * ofereca opcao sem efeito.
  */
 const applyChoice = (state: HackState, task: Task, option: string): void => {
+  const fx = CHOICE_EFFECTS[option];
+  if (!fx) return;
   const scale = (id: string, k: number): void => {
     const t = state.tasks.find((x) => x.id === id);
     if (t && !t.done) t.cost = Math.round(t.cost * k);
   };
-  switch (option) {
-    case 'monolito':
-      scale(task.id, CHOICE_COST.monolito);
-      state.debt += 1;
-      break;
-    case 'micro':
-      scale(task.id, CHOICE_COST.micro);
-      scale('b2', CHOICE_COST.microDownstream);
-      scale('b3', CHOICE_COST.microDownstream);
-      state.innovation += 1;
-      break;
-    case 'serverless':
-      scale(task.id, CHOICE_COST.serverless);
-      state.sponsorRisk = true;
-      state.innovation += 1;
-      break;
-    case 'sistemaPrimeiro':
-      scale(task.id, CHOICE_COST.sistemaPrimeiro);
-      scale('d2', CHOICE_COST.sistemaDownstream);
-      scale('d3', CHOICE_COST.sistemaDownstream);
-      state.uxCare += 1;
-      break;
-    case 'componentesLocais':
-      scale(task.id, CHOICE_COST.componentesLocais);
-      state.debt += 1;
-      break;
-    case 'templateSponsor':
-      scale(task.id, CHOICE_COST.templateSponsor);
-      state.innovation -= 1;
-      break;
-    case 'pipelineCompleto':
-      scale(task.id, CHOICE_COST.pipelineCompleto);
-      state.stability += 1;
-      break;
-    case 'deployNaMao':
-      scale(task.id, CHOICE_COST.deployNaMao);
-      state.debt += 1;
-      break;
-    case 'presetSponsor':
-      scale(task.id, CHOICE_COST.presetSponsor);
-      state.sponsorRisk = true;
-      break;
-  }
+  if (fx.self !== undefined) scale(task.id, fx.self);
+  for (const [id, k] of fx.downstream ?? []) scale(id, k);
+  state.debt += fx.debt ?? 0;
+  state.innovation += fx.innovation ?? 0;
+  state.uxCare += fx.uxCare ?? 0;
+  state.stability += fx.stability ?? 0;
+  if (fx.sponsorRisk) state.sponsorRisk = true;
 };
 
 /**

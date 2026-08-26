@@ -85,6 +85,23 @@ risk inside a single run — horizontal progression, so easy runs never get
 easier. The daily stays clean: same seed, no career buffs, and the Hub
 points at it daily as the fair fight.
 
+## Addendum: the kickoff cards
+
+A follow-up landed right after: the project's initial decisions now appear
+as **cards on screen**, one track at a time — backend, then frontend, then
+design, then DevOps — each with its options and the trade-offs written on
+them, gear-shop style. Frontend gained a decision of its own (it was the
+only track without one), and every decision now has **two possible option
+sets** rolled from the seed: one edition asks "backend architecture?",
+another asks "where does the data live?" — same mechanical vocabulary,
+different conversation. The old switch of effects became a single table
+(`CHOICE_EFFECTS`), and a test guards that no card can ever offer an
+option without an effect.
+
+The card is a shortcut, never a cage: "decide later" defers to the board
+(the deciding-at-the-whiteboard scene is untouched), the board remains a
+live fallback, and the touch smoke now proves both paths with one finger.
+
 ## Numbers
 
 - 12 new sim tests (offers, MVP gate, freeze economics, multiplier

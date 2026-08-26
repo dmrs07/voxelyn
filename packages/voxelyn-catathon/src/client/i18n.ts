@@ -112,6 +112,10 @@ type Dict = {
   graduatesLine: (names: string) => string;
   poachedLine: (star: string, rival: string) => string;
   vibesLabel: string;
+  /** O KICKOFF: as decisoes iniciais em cards, uma trilha por vez. */
+  kickoffTitle: string;
+  kickoffStep: (n: number, total: number, track: string) => string;
+  kickoffSkip: string;
   /** O STRETCH SPRINT no HUD: o painel que abre quando o MVP fecha. */
   sprintTitle: string;
   sprintFreezeWord: string;
@@ -307,6 +311,9 @@ const EN: Dict = {
   graduatesLine: (names) => `grew up this edition: ${names} — will return as mid-level`,
   poachedLine: (star, rival) => `${star} left for ${rival}. the money was good. the booth is quieter.`,
   vibesLabel: 'vibes',
+  kickoffTitle: 'KICKOFF — the project decisions',
+  kickoffStep: (n, total, track) => `decision ${n}/${total} · ${track}`,
+  kickoffSkip: 'decide later',
   sprintTitle: 'MVP READY — freeze it, or reach higher?',
   sprintFreezeWord: 'freeze the build',
   sprintFreezeHint: (pts) => `early delivery: +${pts} pts + stability, guaranteed`,
@@ -510,6 +517,9 @@ const PT: Dict = {
   graduatesLine: (names) => `cresceram nesta edicao: ${names} — voltam como plenos`,
   poachedLine: (star, rival) => `${star} foi para ${rival}. o dinheiro era bom. o booth ficou mais quieto.`,
   vibesLabel: 'convivencia',
+  kickoffTitle: 'KICKOFF — as decisoes do projeto',
+  kickoffStep: (n, total, track) => `decisao ${n}/${total} · ${track}`,
+  kickoffSkip: 'decidir depois',
   sprintTitle: 'MVP PRONTO — congela, ou mira mais alto?',
   sprintFreezeWord: 'congelar a build',
   sprintFreezeHint: (pts) => `entrega antecipada: +${pts} pts + estabilidade, garantidos`,

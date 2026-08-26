@@ -199,6 +199,15 @@ export type Hud = {
   sprintOfferRisk: HTMLElement;
   sprintAcceptBtn: HTMLButtonElement;
   sprintOfferKind: { current: string | null };
+  /** O KICKOFF: as decisoes iniciais do projeto em cards, uma trilha por
+   * vez (backend, frontend, design, devops) — decidir ou adiar, com os
+   * trade-offs escritos. O quadro segue sendo o caminho de sempre. */
+  kickoffCard: HTMLElement;
+  kickoffStepEl: HTMLElement;
+  kickoffPrompt: HTMLElement;
+  kickoffOptions: HTMLElement;
+  kickoffSkipBtn: HTMLButtonElement;
+  kickoff: { queue: string[] | null; skipped: string[]; built: string | null };
   /**
    * O GANTT REAL dentro do Kanban: 48h de vao, uma raia por gato, e os
    * segmentos vao preenchendo conforme cada um trabalha — cor por trilha,
@@ -454,7 +463,25 @@ export const createHud = (
   sprintOfferBox.append(sprintOfferName, sprintOfferGain, sprintOfferRisk, sprintAcceptBtn);
   sprintPanel.append(sprintMultEl, sprintFreezeBtn, sprintFreezeHint, sprintOfferBox);
 
-  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal, sprintPanel);
+  // O KICKOFF: as decisoes iniciais em CARDS, uma trilha por vez. O card e
+  // atalho, nao gaiola: "decidir depois" adia para o quadro, como sempre.
+  const kickoff: Hud['kickoff'] = { queue: null, skipped: [], built: null };
+  const kickoffCard = el('div', 'kickoff-card');
+  kickoffCard.hidden = true;
+  kickoffCard.appendChild(el('div', 'kickoff-title', t().kickoffTitle));
+  const kickoffStepEl = el('div', 'kickoff-step', '');
+  const kickoffPrompt = el('div', 'kickoff-prompt', '');
+  const kickoffOptions = el('div', 'kickoff-options');
+  const kickoffSkipBtn = document.createElement('button');
+  kickoffSkipBtn.type = 'button';
+  kickoffSkipBtn.className = 'kickoff-skip';
+  kickoffSkipBtn.textContent = t().kickoffSkip;
+  kickoffSkipBtn.addEventListener('click', () => {
+    if (kickoff.built) kickoff.skipped.push(kickoff.built);
+  });
+  kickoffCard.append(kickoffStepEl, kickoffPrompt, kickoffOptions, kickoffSkipBtn);
+
+  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal, sprintPanel, kickoffCard);
   host.appendChild(root);
 
   const hudRef: Hud = {
@@ -498,6 +525,12 @@ export const createHud = (
     sprintOfferRisk,
     sprintAcceptBtn,
     sprintOfferKind: { current: null },
+    kickoffCard,
+    kickoffStepEl,
+    kickoffPrompt,
+    kickoffOptions,
+    kickoffSkipBtn,
+    kickoff,
     ganttLanes: new Map(),
     ganttNow: new Map(),
     ganttSegs: new Map(),
@@ -555,6 +588,9 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
   hud.rows.clear();
   hud.trackGroups.clear();
   hud.sprintOfferKind.current = null;
+  hud.kickoff.queue = null;
+  hud.kickoff.skipped.length = 0;
+  hud.kickoff.built = null;
   hud.ganttLanes.clear();
   hud.ganttNow.clear();
   hud.ganttSegs.clear();
@@ -899,6 +935,50 @@ export const drawHud = (hud: Hud, state: HackState): void => {
       setText(hud.sprintOfferRisk, t().sprintRisk(st.risk));
     }
     if (!open) hud.sprintOfferKind.current = null;
+  }
+
+  // O KICKOFF: as decisoes iniciais do projeto em CARDS, na ordem das
+  // trilhas (backend, frontend, design, devops), cada opcao com o trade-off
+  // escrito. Um card por vez; decidir (ou o quadro, ou "decidir depois")
+  // avanca para o proximo. O card fecha sozinho quando a fila acaba e sai
+  // da frente quando o quadro esta aberto — atalho, nunca gaiola.
+  if (hud.kickoff.queue === null) {
+    const order = ['backend', 'frontend', 'design', 'devops'] as const;
+    hud.kickoff.queue = order
+      .map((track) => state.tasks.find((task) => task.track === track && !!task.choice)?.id)
+      .filter((id): id is string => id !== undefined);
+  }
+  const kickoffPending =
+    state.phase === 'hack'
+      ? hud.kickoff.queue.find((id) => {
+          if (hud.kickoff.skipped.includes(id)) return false;
+          const task = state.tasks.find((x) => x.id === id);
+          return !!task?.choice && task.chosen === null && !task.done && !task.cut;
+        })
+      : undefined;
+  const showKickoff = !!kickoffPending && hud.board.hidden;
+  hud.kickoffCard.hidden = !showKickoff;
+  if (showKickoff && hud.kickoff.built !== kickoffPending) {
+    hud.kickoff.built = kickoffPending!;
+    const task = state.tasks.find((x) => x.id === kickoffPending)!;
+    const idx = hud.kickoff.queue.indexOf(kickoffPending!);
+    setText(
+      hud.kickoffStepEl,
+      t().kickoffStep(idx + 1, hud.kickoff.queue.length, TRACK_LABEL[task.track] ?? task.track)
+    );
+    setText(hud.kickoffPrompt, task.choice!.prompt);
+    // As opcoes renascem SO na troca de card (nunca por frame): a licao dos
+    // botoes detached continua valendo — botao que existe fica existindo.
+    hud.kickoffOptions.replaceChildren();
+    for (const opt of task.choice!.options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'task-choice kickoff-option';
+      b.textContent = opt.label;
+      b.appendChild(el('span', 'task-choice-hint', opt.hint));
+      b.addEventListener('click', () => hud.onChoose(task.id, opt.id));
+      hud.kickoffOptions.appendChild(b);
+    }
   }
 
   // Aneis de estado nos retratos da equipe: quem trabalha, quem dorme, quem

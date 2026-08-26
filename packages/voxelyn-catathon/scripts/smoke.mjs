@@ -210,13 +210,47 @@ if (new Set(cluster).size !== cluster.length) throw new Error('dois botoes macio
 if (!(await page.locator('.action-bar').isVisible())) throw new Error('a barra de acoes nao existe');
 step.push(`botoes com palavra, alvo e icones distintos: ${buttons.length}`);
 
-// --- DECISAO: a tarefa com escolha nao anda ate decidir pelo projeto -------
+// --- KICKOFF: as decisoes iniciais em CARDS, na ordem das trilhas ----------
+if (!(await page.locator('.kickoff-card').isVisible())) throw new Error('o card de kickoff nao abriu');
+const kickHead1 = await page.locator('.kickoff-step').textContent();
+if (!/1\/4/.test(kickHead1) || !/backend/.test(kickHead1)) {
+  throw new Error(`o primeiro card nao e o de backend: ${kickHead1}`);
+}
+// Cada opcao carrega o TRADE-OFF escrito — ler o card e jogar melhor.
+const hintCount = await page.locator('.kickoff-card .task-choice-hint').count();
+if (hintCount !== 3) throw new Error(`card sem trade-offs escritos: ${hintCount} dicas`);
+// Decide o backend pela primeira opcao do card. O rotulo vem do ESTADO: os
+// conjuntos de opcoes VARIAM por semente (variacao e feature, nao acaso).
+const kickB1 = await sim(() => {
+  const t = window.catathon.app.state.tasks.find((x) => x.track === 'backend' && x.choice);
+  return { id: t.id, optId: t.choice.options[0].id, label: t.choice.options[0].label };
+});
+await page.locator('.kickoff-card .task-choice', { hasText: kickB1.label }).first().tap();
+await page.waitForTimeout(300);
+const kickChosen = await sim(() => window.catathon.app.state.tasks.find((x) => x.track === 'backend' && x.choice).chosen);
+if (kickChosen !== kickB1.optId) throw new Error(`o card nao decidiu: chosen=${kickChosen}`);
+step.push(`kickoff: backend = ${kickB1.label} (card 1/4)`);
+// A sequencia segue as trilhas, e "decidir depois" adia sem travar nada.
+const kickHead2 = await page.locator('.kickoff-step').textContent();
+if (!/frontend/.test(kickHead2)) throw new Error(`o segundo card nao e o de frontend: ${kickHead2}`);
+for (let i = 0; i < 3; i++) {
+  await page.locator('.kickoff-skip').tap();
+  await page.waitForTimeout(200);
+}
+if (await page.locator('.kickoff-card').isVisible()) throw new Error('os cards de kickoff nao terminaram');
+step.push('kickoff: 4 cards na ordem das trilhas — 1 decidido, 3 adiados');
+
+// --- DECISAO pelo quadro segue viva: o card e atalho, nao substituto -------
 await page.getByRole('button', { name: 'project' }).tap();
-await page.locator('.task-choice', { hasText: 'feline monolith' }).tap();
+const boardD1 = await sim(() => {
+  const t = window.catathon.app.state.tasks.find((x) => x.track === 'design' && x.choice);
+  return { id: t.id, optId: t.choice.options[0].id, label: t.choice.options[0].label };
+});
+await page.locator('.hud-board .task-choice', { hasText: boardD1.label }).first().tap();
 await page.waitForTimeout(200);
-const chosen = await sim(() => window.catathon.app.state.tasks.find((t) => t.id === 'b1').chosen);
-if (chosen !== 'monolito') throw new Error(`a decisao nao pegou: chosen=${chosen}`);
-step.push('decisao pelo dedo: b1 = feline monolith');
+const chosen = await sim(() => window.catathon.app.state.tasks.find((x) => x.track === 'design' && x.choice).chosen);
+if (chosen !== boardD1.optId) throw new Error(`a decisao pelo quadro nao pegou: chosen=${chosen}`);
+step.push(`decisao pelo quadro: design = ${boardD1.label}`);
 await page.getByRole('button', { name: 'project' }).tap();
 
 // --- EQUIPE: selecionar pelo retrato abre a ficha COMPACTA no rodape -------
@@ -445,8 +479,8 @@ await page.waitForTimeout(1200);
 if ((await sim(() => window.catathon.app.state.phase)) !== 'done') throw new Error('o pitch nao terminou');
 if (!(await page.locator('.result-dims').isVisible())) throw new Error('resultado sem as cinco dimensoes');
 if (!(await page.locator('.result-prize').isVisible())) throw new Error('resultado sem o premio');
-// O EXTRATO do premio (achado de revisao): a fumaca escolheu monolito, entao
-// ha divida — o extrato tem parcela nao-zero em QUALQUER desfecho.
+// O EXTRATO do premio (achado de revisao): a colocacao sempre paga algo,
+// entao o extrato tem parcela nao-zero em QUALQUER desfecho.
 if (!(await page.locator('.result-ledger').isVisible())) throw new Error('resultado sem o extrato do premio');
 step.push(`extrato: ${await page.locator('.result-ledger').textContent()}`);
 // Slice D: o pos-jogo mostra o DUELO com o rival e a REPUTACAO da carreira.

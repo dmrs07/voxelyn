@@ -9,7 +9,7 @@ import {
 import { SLOTS, TASKS } from './data.js';
 import {
   AUDIENCES_TEXT,
-  CHOICE_TEXT,
+  CHOICE_VARIANTS,
   CLASSIC_BIO,
   CONSTRAINTS_TEXT,
   CURRENCY_TEXT,
@@ -348,14 +348,19 @@ export const rollProject = (seed: number, locale: Locale = 'en'): ProjectSpec =>
       ? `plataforma de ${d.pick(DOMAINS_TEXT.pt)} para ${d.pick(AUDIENCES_TEXT.pt)}, ${d.pick(CONSTRAINTS_TEXT.pt)}`
       : `a ${d.pick(DOMAINS_TEXT.en)} platform for ${d.pick(AUDIENCES_TEXT.en)}, ${d.pick(CONSTRAINTS_TEXT.en)}`;
   const shape = d.pick(GRAPH_SHAPES);
-  const tasks = TASKS.map((t) => ({
-    ...t,
-    label: d.pick(TASK_TEXT[locale][t.id] ?? [t.label]),
-    choice: CHOICE_TEXT[locale][t.id] ?? undefined,
-    deps: shape[t.id] ?? t.deps,
-    // Jitter de custo: mesma forma, pesos diferentes por edicao.
-    cost: Math.round((t.polish ? TASK_POLISH_COST : TASK_CORE_COST) * (0.85 + d.roll() * 0.3)),
-  }));
+  const tasks = TASKS.map((t) => {
+    // A VARIACAO da decisao: cada edicao sorteia QUAL pergunta esta trilha
+    // faz (mesmo peso mecanico no vocabulario, outra conversa no card).
+    const variants = CHOICE_VARIANTS[locale][t.id];
+    return {
+      ...t,
+      label: d.pick(TASK_TEXT[locale][t.id] ?? [t.label]),
+      choice: variants ? d.pick(variants) : undefined,
+      deps: shape[t.id] ?? t.deps,
+      // Jitter de custo: mesma forma, pesos diferentes por edicao.
+      cost: Math.round((t.polish ? TASK_POLISH_COST : TASK_CORE_COST) * (0.85 + d.roll() * 0.3)),
+    };
+  });
   const emphasis = d.pick(['tecnica', 'estabilidade', 'experiencia', 'inovacao'] as const);
   const risk = d.pick(['integracao-instavel', 'hype', 'dados-sensiveis'] as const);
   return { name, brief, tasks, emphasis, risk };

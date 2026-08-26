@@ -45,7 +45,13 @@ export const TASK_TEXT: Record<Locale, Record<string, readonly string[]>> = {
   },
 };
 
-/** As tres DECISOES (b1/d1/o1): ids estaveis, texto por idioma. */
+/**
+ * As DECISOES INICIAIS do projeto — agora as QUATRO trilhas tem uma, e cada
+ * uma tem VARIACOES (conjuntos alternativos de opcoes, sorteados pela
+ * semente no gerador). Ids de opcao sao estaveis e globais: o efeito mora em
+ * CHOICE_EFFECTS (constants.ts); aqui mora o texto, com o trade-off ESCRITO
+ * em cada opcao — ler o card e jogar melhor.
+ */
 export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
   pt: {
     b1: {
@@ -54,6 +60,14 @@ export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
         { id: 'monolito', label: 'monolito felino', hint: 'rapido agora, divida depois' },
         { id: 'micro', label: 'microsservicos', hint: 'caro agora, backend rende depois' },
         { id: 'serverless', label: 'serverless do sponsor', hint: 'rapidissimo, e se a API deles cair na demo?' },
+      ],
+    },
+    f1: {
+      prompt: 'como construir o front?',
+      options: [
+        { id: 'spaArtesanal', label: 'SPA artesanal', hint: 'caro agora, o resto do front rende depois' },
+        { id: 'frameworkFofo', label: 'framework da moda', hint: 'rapido, o churn vira divida' },
+        { id: 'pwaAcessivel', label: 'PWA acessivel', hint: 'um pouco mais caro, e a banca sente o cuidado' },
       ],
     },
     d1: {
@@ -82,6 +96,14 @@ export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
         { id: 'serverless', label: 'sponsor serverless', hint: 'blazing fast — and if their API dies mid-demo?' },
       ],
     },
+    f1: {
+      prompt: 'how do we build the front?',
+      options: [
+        { id: 'spaArtesanal', label: 'artisanal SPA', hint: 'pricey now, the rest of the front pays off later' },
+        { id: 'frameworkFofo', label: 'framework of the week', hint: 'fast, the churn becomes debt' },
+        { id: 'pwaAcessivel', label: 'accessible PWA', hint: 'a bit pricier, and the judges feel the care' },
+      ],
+    },
     d1: {
       prompt: 'how do we attack the UI?',
       options: [
@@ -99,6 +121,92 @@ export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
       ],
     },
   },
+};
+
+/**
+ * As VARIACOES: um segundo conjunto de opcoes por decisao — mesma trilha,
+ * outra pergunta. O gerador sorteia qual conjunto a edicao pergunta; o
+ * classico (testes, demo) fica sempre no primeiro.
+ */
+export const CHOICE_TEXT_ALT: Record<Locale, Record<string, TaskChoice>> = {
+  pt: {
+    b1: {
+      prompt: 'onde moram os dados?',
+      options: [
+        { id: 'postgresDeRaca', label: 'postgres de raca pura', hint: 'paga agora, estabilidade na banca' },
+        { id: 'nosqlZoomies', label: 'NoSQL em zoomies', hint: 'rapidissimo, o esquema vira divida' },
+        { id: 'planilhaDoSponsor', label: 'planilha do sponsor', hint: 'quase de graca, e se a API deles cair na demo?' },
+      ],
+    },
+    f1: {
+      prompt: 'quem renderiza?',
+      options: [
+        { id: 'ssrCaprichado', label: 'SSR caprichado', hint: 'caro agora, estabilidade na demo' },
+        { id: 'clientOnly', label: 'tudo no cliente', hint: 'rapido, divida na certa' },
+        { id: 'microFrontends', label: 'micro-frontends', hint: 'caro agora, o resto do front rende depois' },
+      ],
+    },
+    d1: {
+      prompt: 'qual e a alma da UI?',
+      options: [
+        { id: 'testeComGatos', label: 'testar com gatos de verdade', hint: 'lento e caro, experiencia de verdade' },
+        { id: 'copiarConcorrente', label: 'copiar o concorrente', hint: 'rapido, zero originalidade' },
+        { id: 'brutalismoFofo', label: 'brutalismo fofo', hint: 'inovacao real, e uma ponta de divida estetica' },
+      ],
+    },
+    o1: {
+      prompt: 'quando vai ao ar?',
+      options: [
+        { id: 'deployContinuo', label: 'deploy continuo', hint: 'caro, e a demo agradece' },
+        { id: 'deployNaSexta', label: 'deploy na sexta', hint: 'rapido, divida na certa' },
+        { id: 'containerDoSponsor', label: 'container do sponsor', hint: 'confortavel, e amarra a demo neles' },
+      ],
+    },
+  },
+  en: {
+    b1: {
+      prompt: 'where does the data live?',
+      options: [
+        { id: 'postgresDeRaca', label: 'purebred postgres', hint: 'pay now, stability before the judges' },
+        { id: 'nosqlZoomies', label: 'NoSQL in zoomies', hint: 'blazing fast, the schema becomes debt' },
+        { id: 'planilhaDoSponsor', label: 'sponsor spreadsheet', hint: 'nearly free — and if their API dies mid-demo?' },
+      ],
+    },
+    f1: {
+      prompt: 'who renders?',
+      options: [
+        { id: 'ssrCaprichado', label: 'lovingly tuned SSR', hint: 'pricey now, stability in the demo' },
+        { id: 'clientOnly', label: 'everything client-side', hint: 'fast, guaranteed debt' },
+        { id: 'microFrontends', label: 'micro-frontends', hint: 'pricey now, the rest of the front pays off later' },
+      ],
+    },
+    d1: {
+      prompt: 'what is the soul of the UI?',
+      options: [
+        { id: 'testeComGatos', label: 'test with real cats', hint: 'slow and pricey, real experience' },
+        { id: 'copiarConcorrente', label: 'copy the competitor', hint: 'fast, zero originality' },
+        { id: 'brutalismoFofo', label: 'cozy brutalism', hint: 'real innovation, and a pinch of aesthetic debt' },
+      ],
+    },
+    o1: {
+      prompt: 'when does it go live?',
+      options: [
+        { id: 'deployContinuo', label: 'continuous deploy', hint: 'pricey, and the demo thanks you' },
+        { id: 'deployNaSexta', label: 'deploy on friday', hint: 'fast, guaranteed debt' },
+        { id: 'containerDoSponsor', label: 'sponsor container', hint: 'comfy, and ties the demo to them' },
+      ],
+    },
+  },
+};
+
+/** Os conjuntos por decisao, na ordem [original, variacao] — o gerador sorteia. */
+export const CHOICE_VARIANTS: Record<Locale, Record<string, readonly TaskChoice[]>> = {
+  pt: Object.fromEntries(
+    Object.keys(CHOICE_TEXT.pt).map((id) => [id, [CHOICE_TEXT.pt[id]!, CHOICE_TEXT_ALT.pt[id]!]])
+  ),
+  en: Object.fromEntries(
+    Object.keys(CHOICE_TEXT.en).map((id) => [id, [CHOICE_TEXT.en[id]!, CHOICE_TEXT_ALT.en[id]!]])
+  ),
 };
 
 export const NOTES_TEXT: Record<Locale, readonly string[]> = {

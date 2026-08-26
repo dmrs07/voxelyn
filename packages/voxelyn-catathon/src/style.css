@@ -1065,3 +1065,43 @@ body {
 .hub-ach-date { font-size: 0.66em; opacity: 0.65; font-variant-numeric: tabular-nums; }
 .hub-daily { margin: 0; text-align: center; font-size: 0.82em; opacity: 0.85; }
 .hub-actions { justify-content: center; }
+
+/* O KICKOFF: um card central por decisao — pergunta, tres opcoes com o
+   trade-off escrito, e a porta de sair ("decidir depois"). Atalho para o
+   quadro, nunca gaiola: o jogo continua vivo atras dele. */
+.kickoff-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, 90vw);
+  max-height: 84vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: grid;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 8;
+}
+.kickoff-card[hidden] { display: none; }
+.kickoff-title { font-weight: 800; color: var(--accent); letter-spacing: 0.04em; }
+.kickoff-step { font-size: 0.76em; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.06em; }
+.kickoff-prompt { font-weight: 800; font-size: 1.05em; }
+.kickoff-options { display: grid; gap: 6px; }
+.kickoff-skip {
+  pointer-events: auto;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  opacity: 0.85;
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-family: var(--font);
+  font-size: 0.85em;
+  font-weight: 700;
+}
+.kickoff-skip:active { transform: scale(0.97); }

@@ -129,20 +129,59 @@ export const HAIRBALL_COST = 12 * TICK_HZ;
 
 // ---------------------------------------------------------------- escolhas
 
-/** Multiplicadores de custo das opcoes (aplicados UMA vez, na decisao). */
-export const CHOICE_COST = {
-  monolito: 0.8,
-  micro: 1.25,
-  microDownstream: 0.85,
-  serverless: 0.7,
-  sistemaPrimeiro: 1.3,
-  sistemaDownstream: 0.75,
-  componentesLocais: 0.85,
-  templateSponsor: 0.6,
-  pipelineCompleto: 1.25,
-  deployNaMao: 0.7,
-  presetSponsor: 0.8,
-} as const;
+/**
+ * O EFEITO de cada opcao de decisao, por id GLOBAL — o vocabulario inteiro
+ * das variacoes numa tabela so: custo agora (self), custo depois
+ * (downstream), e as tags que a banca cobra. O texto mora em text.ts; toda
+ * opcao que aparece num card TEM de ter uma linha aqui (teste vigia).
+ */
+export type ChoiceEffect = {
+  /** Multiplica o custo da PROPRIA tarefa (aplicado uma vez, na decisao). */
+  self?: number;
+  /** Tarefas a jusante que ficam mais baratas (ou caras): [id, escala]. */
+  downstream?: readonly (readonly [string, number])[];
+  debt?: number;
+  innovation?: number;
+  uxCare?: number;
+  stability?: number;
+  /** Amarra a demo na API do sponsor (pode cair no palco). */
+  sponsorRisk?: boolean;
+};
+
+export const CHOICE_EFFECTS: Record<string, ChoiceEffect> = {
+  // b1 — arquitetura do backend
+  monolito: { self: 0.8, debt: 1 },
+  micro: { self: 1.25, downstream: [['b2', 0.85], ['b3', 0.85]], innovation: 1 },
+  serverless: { self: 0.7, sponsorRisk: true, innovation: 1 },
+  // b1 (variacao) — onde moram os dados
+  postgresDeRaca: { self: 1.15, stability: 1 },
+  nosqlZoomies: { self: 0.75, debt: 1 },
+  planilhaDoSponsor: { self: 0.6, sponsorRisk: true },
+  // f1 — como construir o front
+  spaArtesanal: { self: 1.25, downstream: [['f2', 0.85], ['f3', 0.85]], innovation: 1 },
+  frameworkFofo: { self: 0.75, debt: 1 },
+  pwaAcessivel: { self: 1.1, uxCare: 1 },
+  // f1 (variacao) — quem renderiza
+  ssrCaprichado: { self: 1.2, stability: 1 },
+  clientOnly: { self: 0.8, debt: 1 },
+  microFrontends: { self: 1.25, downstream: [['f2', 0.85], ['f3', 0.85]], innovation: 1 },
+  // d1 — como atacar a UI
+  sistemaPrimeiro: { self: 1.3, downstream: [['d2', 0.75], ['d3', 0.75]], uxCare: 1 },
+  componentesLocais: { self: 0.85, debt: 1 },
+  templateSponsor: { self: 0.6, innovation: -1 },
+  // d1 (variacao) — a alma da UI
+  testeComGatos: { self: 1.3, uxCare: 1 },
+  copiarConcorrente: { self: 0.7, innovation: -1 },
+  brutalismoFofo: { self: 0.9, innovation: 1, debt: 1 },
+  // o1 — como vai ao ar
+  pipelineCompleto: { self: 1.25, stability: 1 },
+  deployNaMao: { self: 0.7, debt: 1 },
+  presetSponsor: { self: 0.8, sponsorRisk: true },
+  // o1 (variacao) — quando vai ao ar
+  deployContinuo: { self: 1.2, stability: 1 },
+  deployNaSexta: { self: 0.7, debt: 1 },
+  containerDoSponsor: { self: 0.8, sponsorRisk: true },
+};
 /** Cada ponto de divida tecnica exposta morde a estabilidade na banca. */
 export const SCORE_DEBT_PENALTY = -4;
 export const SCORE_INNOVATION = 5;

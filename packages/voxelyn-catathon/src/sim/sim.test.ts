@@ -146,6 +146,9 @@ describe('psicologia felina (cada traco e mecanico)', () => {
         (t as { deps: readonly string[] }).deps = [];
         (t as { cost: number }).cost = 60;
       }
+      // f1 agora tem DECISAO: decide antes, como um jogador faria — o teste
+      // mede a sujeira do ship do cowboy, nao a cena do quadro.
+      step(state, { choose: { task: 'f1', option: 'frameworkFofo' } });
       step(state, { grab: 'cheeto' });
       step(state, { drop: 'desk-frontend' });
       for (let i = 0; i < 3000 && state.phase === 'hack'; i++) step(state, emptyCommand());

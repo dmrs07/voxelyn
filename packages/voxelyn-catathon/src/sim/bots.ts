@@ -49,11 +49,21 @@ export const runCompetent = (state: HackState): void => {
       continue;
     }
     const cmd: Command = {};
-    // Decisao aberta e a PRIMEIRA prioridade: mesa parada nao produz.
+    // Decisao aberta e a PRIMEIRA prioridade: mesa parada nao produz. O bot
+    // prefere o investimento classico de cada trilha; num conjunto VARIANTE
+    // (outra pergunta, outros ids) cai na primeira opcao — decidir alguma
+    // coisa vale mais que a opcao perfeita.
     const open = state.tasks.find((t) => t.choice && t.chosen === null && !t.done && !t.cut);
     if (open) {
-      const pickOption = open.id === 'b1' ? 'micro' : open.id === 'd1' ? 'sistemaPrimeiro' : 'pipelineCompleto';
-      step(state, { choose: { task: open.id, option: pickOption } });
+      const prefer: Record<string, string> = {
+        b1: 'micro',
+        f1: 'spaArtesanal',
+        d1: 'sistemaPrimeiro',
+        o1: 'pipelineCompleto',
+      };
+      const option =
+        open.choice!.options.find((o) => o.id === prefer[open.id])?.id ?? open.choice!.options[0]!.id;
+      step(state, { choose: { task: open.id, option } });
       continue;
     }
     const emergency = state.hairball.active || state.buildBroken || state.cableOut;

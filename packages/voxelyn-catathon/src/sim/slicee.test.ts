@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CHOICE_EFFECTS,
+  CHOICE_VARIANTS,
   CIRCUIT,
   CLASSIC_TEAM,
   EARLY_SCORE_MAX,
@@ -14,6 +16,8 @@ import {
   eventForRep,
   hashState,
   nextLockedEvent,
+  rollCandidates,
+  rollProject,
   rollStretchOffers,
   step,
 } from './index.js';
@@ -215,6 +219,61 @@ describe('catathon circuit: a identidade declarada do palco', () => {
     toDone(base);
     toDone(staged);
     expect(staged.result!.prize).toBe(Math.round(base.result!.prize * global.prizeScale));
+  });
+});
+
+describe('as decisoes iniciais do projeto (os cards de kickoff, lado da sim)', () => {
+  it('as QUATRO trilhas tem decisao — no classico e no gerado', () => {
+    const classic = mk(5);
+    const generated = rollProject(77, 'en');
+    for (const track of ['backend', 'frontend', 'design', 'devops'] as const) {
+      for (const [name, tasks] of [
+        ['classico', classic.tasks],
+        ['gerado', generated.tasks],
+      ] as const) {
+        const dec = tasks.find((t) => t.track === track && t.choice);
+        expect(dec, `${name}/${track}`).toBeTruthy();
+        expect(dec!.choice!.options.length, `${name}/${track}`).toBe(3);
+      }
+    }
+  });
+
+  it('a VARIACAO do conjunto de opcoes e sorteada por semente, deterministica', () => {
+    const promptOf = (seed: number): string =>
+      rollProject(seed, 'en').tasks.find((t) => t.id === 'b1')!.choice!.prompt;
+    expect(promptOf(9)).toBe(promptOf(9));
+    const prompts = new Set(Array.from({ length: 40 }, (_, i) => promptOf(i * 131 + 7)));
+    expect(prompts.size).toBeGreaterThan(1);
+  });
+
+  it('toda opcao de todo conjunto tem EFEITO na tabela — card nunca oferece opcao morta', () => {
+    for (const locale of ['en', 'pt'] as const) {
+      for (const variants of Object.values(CHOICE_VARIANTS[locale])) {
+        for (const variant of variants) {
+          for (const o of variant.options) {
+            expect(CHOICE_EFFECTS[o.id], `${locale}/${o.id}`).toBeTruthy();
+          }
+        }
+      }
+    }
+  });
+
+  it('uma opcao de variacao aplica custo e tag como as classicas', () => {
+    // Acha uma semente cuja edicao pergunta a VARIACAO do backend.
+    const seed = Array.from({ length: 400 }, (_, i) => i).find((s) =>
+      rollProject(s, 'en')
+        .tasks.find((t) => t.id === 'b1')!
+        .choice!.options.some((o) => o.id === 'nosqlZoomies')
+    )!;
+    expect(seed).toBeDefined();
+    const state = createHackathon(seed, rollCandidates(seed).slice(0, 4));
+    const b1 = state.tasks.find((t) => t.id === 'b1')!;
+    const costBefore = b1.cost;
+    const debtBefore = state.debt;
+    step(state, { choose: { task: 'b1', option: 'nosqlZoomies' } });
+    expect(b1.chosen).toBe('nosqlZoomies');
+    expect(b1.cost).toBe(Math.round(costBefore * 0.75));
+    expect(state.debt).toBe(debtBefore + 1);
   });
 });
 
