@@ -1,6 +1,6 @@
-import { HACK_TICKS, JUNIOR_GROWN_AT, RUN_BUDGET, SHIP_IT_WINDOW, rollRivalName } from '../sim/index.js';
-import type { Candidate } from '../sim/gen.js';
-import type { HackState } from '../sim/types.js';
+import { CIRCUIT, HACK_TICKS, JUNIOR_GROWN_AT, RUN_BUDGET, SHIP_IT_WINDOW, nextLockedEvent, rollRivalName } from '../sim/index.js';
+import type { Candidate, CircuitEventId, CircuitEventSpec } from '../sim/gen.js';
+import type { HackState, Outcome } from '../sim/types.js';
 
 export type Mode = 'career' | 'quick' | 'daily';
 
@@ -28,19 +28,73 @@ export type RivalState = {
   roster: string[];
 };
 
+/**
+ * UMA LINHA do historico: o suficiente para a Central contar a jornada —
+ * "quase bati meu rival", "faltou um podio para o Nacional".
+ */
+export type RunRecord = {
+  /** Dia UTC do fechamento (o unico relogio da carreira). */
+  date: string;
+  mode: Mode;
+  outcome: Outcome;
+  score: number;
+  /** O palco do circuito (null = quick/daily). */
+  eventId: CircuitEventId | null;
+  rival: { score: number; beat: boolean } | null;
+};
+
 export type Career = {
   wallet: number;
   achievements: string[];
+  /** Dia UTC em que cada conquista caiu (a galeria mostra a data). */
+  achievedAt: Record<string, string>;
   runs: number;
   /** REPUTACAO: colocacoes somam, vexames descontam, sponsors exigem. */
   rep: number;
   rival: RivalState | null;
   /** Juniores que CRESCERAM em edicoes tuas: voltam como plenos. */
   alumni: Candidate[];
+  /** Recordes: a melhor nota e a melhor colocacao de todas as runs. */
+  bestScore: number;
+  bestOutcome: Outcome | null;
+  /** As ultimas runs, da mais recente para tras (teto HISTORY_CAP). */
+  history: RunRecord[];
+  /** Colocacoes no podio (ou melhores) por palco do circuito. */
+  circuitWins: Partial<Record<CircuitEventId, number>>;
+  /** A temporada fechou: podio no Global COM o rival batido. */
+  seasonWon: boolean;
 };
 
 const KEY = 'catathon-career';
 const ALUMNI_CAP = 6;
+const HISTORY_CAP = 12;
+
+/** Ordem de "melhor colocacao" para o recorde (crashed e o fundo do poco). */
+const OUTCOME_RANK: Record<string, number> = {
+  crashed: 0,
+  participacao: 1,
+  mencao: 2,
+  podio: 3,
+  'grand-prize': 4,
+};
+
+const betterOutcome = (a: Outcome | null, b: Outcome): Outcome =>
+  a === null || (OUTCOME_RANK[b] ?? 0) > (OUTCOME_RANK[a] ?? 0) ? b : a;
+
+const FRESH: Career = {
+  wallet: RUN_BUDGET,
+  achievements: [],
+  achievedAt: {},
+  runs: 0,
+  rep: 0,
+  rival: null,
+  alumni: [],
+  bestScore: 0,
+  bestOutcome: null,
+  history: [],
+  circuitWins: {},
+  seasonWon: false,
+};
 
 export const loadCareer = (): Career => {
   try {
@@ -50,6 +104,7 @@ export const loadCareer = (): Career => {
       return {
         wallet: Math.max(RUN_BUDGET, (c.wallet ?? RUN_BUDGET) | 0),
         achievements: Array.isArray(c.achievements) ? c.achievements : [],
+        achievedAt: c.achievedAt && typeof c.achievedAt === 'object' ? c.achievedAt : {},
         runs: (c.runs ?? 0) | 0,
         rep: Math.max(0, (c.rep ?? 0) | 0),
         rival: c.rival && typeof c.rival.name === 'string'
@@ -62,12 +117,17 @@ export const loadCareer = (): Career => {
             }
           : null,
         alumni: Array.isArray(c.alumni) ? (c.alumni as Candidate[]) : [],
+        bestScore: Math.max(0, (c.bestScore ?? 0) | 0),
+        bestOutcome: typeof c.bestOutcome === 'string' ? (c.bestOutcome as Outcome) : null,
+        history: Array.isArray(c.history) ? (c.history as RunRecord[]).slice(0, HISTORY_CAP) : [],
+        circuitWins: c.circuitWins && typeof c.circuitWins === 'object' ? c.circuitWins : {},
+        seasonWon: c.seasonWon === true,
       };
     }
   } catch {
     // storage indisponivel ou corrompido: carreira nova, jogo igual
   }
-  return { wallet: RUN_BUDGET, achievements: [], runs: 0, rep: 0, rival: null, alumni: [] };
+  return { ...FRESH, achievedAt: {}, achievements: [], alumni: [], history: [], circuitWins: {} };
 };
 
 export const saveCareer = (c: Career): void => {
@@ -104,8 +164,30 @@ export const achievementsFor = (state: HackState): string[] => {
   if (state.cats.length > 0 && state.cats.every((c) => c.personality === 'cowboy')) out.push('orange-crew');
   if (r.improvised) out.push('improv-legend');
   if (r.outcome === 'grand-prize') out.push('grand');
+  // Stretch Sprint: parar cedo com estilo, esticar ate o talo, e o ovo.
+  if (state.sprint.frozenAt >= 0 && state.sprint.frozenAt <= HACK_TICKS * 0.75 && placed) out.push('early-bird');
+  if (state.sprint.done >= 3 && placed) out.push('overclock');
+  if (state.sprint.offers.some((o) => o.kind === 'easter-egg-felino' && o.status === 'done')) out.push('egg-hunter');
   return out;
 };
+
+/**
+ * A GALERIA: todas as conquistas do jogo, na ordem da vitrine. `secret`
+ * esconde nome e condicao ate cair — surpresa e parte da recompensa.
+ */
+export const ACHIEVEMENTS_ALL: readonly { id: string; secret: boolean }[] = [
+  { id: 'zero-bugs', secret: false },
+  { id: 'ship-it', secret: false },
+  { id: 'scope-social', secret: false },
+  { id: 'no-touchy', secret: false },
+  { id: 'standing-ovation', secret: false },
+  { id: 'orange-crew', secret: false },
+  { id: 'improv-legend', secret: true },
+  { id: 'grand', secret: false },
+  { id: 'early-bird', secret: false },
+  { id: 'overclock', secret: false },
+  { id: 'egg-hunter', secret: true },
+];
 
 /** O que o FECHAMENTO de uma edicao devolve para a tela de resultado. */
 export type RunClose = {
@@ -119,6 +201,12 @@ export type RunClose = {
   graduates: string[];
   /** A estrela que o recrutador rival levou (poach aceito), se levou. */
   poachedStar: string | null;
+  /** A reputacao CRUZOU um gate: classificado para este palco do circuito. */
+  qualified: CircuitEventId | null;
+  /** Recorde pessoal de nota quebrado NESTA run. */
+  newBest: boolean;
+  /** A temporada fechou AGORA: podio no Global com o rival batido. */
+  seasonWonNow: boolean;
 };
 
 /** Reputacao por colocacao: o telao lembra de quem sobe — e de quem crasha. */
@@ -139,12 +227,21 @@ const REP_BY_OUTCOME: Record<string, number> = {
 export const applyRun = (
   career: Career,
   state: HackState,
-  opts: { mode: Mode; spent: number; hired: readonly Candidate[]; rivalScore: number | null }
+  opts: {
+    mode: Mode;
+    spent: number;
+    hired: readonly Candidate[];
+    rivalScore: number | null;
+    /** O palco do circuito desta run (carreira; null fora dele). */
+    event?: CircuitEventSpec | null;
+  }
 ): RunClose => {
   const r = state.result!;
+  const today = todayUTC();
   const unlocked = achievementsFor(state);
   const fresh = unlocked.filter((a) => !career.achievements.includes(a));
   career.achievements.push(...fresh);
+  for (const a of fresh) career.achievedAt[a] = today;
   career.runs++;
 
   const close: RunClose = {
@@ -155,7 +252,18 @@ export const applyRun = (
     rival: null,
     graduates: [],
     poachedStar: null,
+    qualified: null,
+    newBest: false,
+    seasonWonNow: false,
   };
+
+  // RECORDES e HISTORICO valem em todo modo: a Central conta a jornada
+  // inteira, e o "seu recorde" do daily nasce daqui.
+  if (r.score > career.bestScore) {
+    career.bestScore = r.score;
+    close.newBest = true;
+  }
+  career.bestOutcome = betterOutcome(career.bestOutcome, r.outcome);
 
   if (opts.mode === 'career') {
     career.wallet = Math.max(RUN_BUDGET, career.wallet - opts.spent + r.prize);
@@ -202,12 +310,51 @@ export const applyRun = (
     let rep = career.rep + (REP_BY_OUTCOME[r.outcome] ?? 0);
     if (close.rival?.beat) rep += 1;
     if (r.sponsorMet === false) rep -= 1;
+    // O gate que a reputacao NOVA abriu e a antiga nao abria: classificado.
+    const lockedBefore = nextLockedEvent(career.rep);
     career.rep = Math.max(0, rep);
     close.repAfter = career.rep;
+    if (lockedBefore && career.rep >= lockedBefore.repGate) close.qualified = lockedBefore.id;
+
+    // O CIRCUITO lembra dos podios por palco — e a temporada fecha quando o
+    // Global cai COM o rival batido no mesmo palco.
+    const event = opts.event ?? null;
+    const placed = r.outcome === 'podio' || r.outcome === 'grand-prize';
+    if (event && placed) {
+      career.circuitWins[event.id] = (career.circuitWins[event.id] ?? 0) + 1;
+      if (event.id === 'global' && close.rival?.beat && !career.seasonWon) {
+        career.seasonWon = true;
+        close.seasonWonNow = true;
+      }
+    }
   }
+
+  // O HISTORICO guarda a run em qualquer modo (o daily compara consigo).
+  career.history.unshift({
+    date: today,
+    mode: opts.mode,
+    outcome: r.outcome,
+    score: r.score,
+    eventId: opts.mode === 'career' ? (opts.event?.id ?? null) : null,
+    rival: close.rival ? { score: close.rival.score, beat: close.rival.beat } : null,
+  });
+  while (career.history.length > HISTORY_CAP) career.history.pop();
 
   saveCareer(career);
   return close;
+};
+
+/** Os palcos da temporada com o estado de cada um, para a Central. */
+export const circuitLadder = (
+  career: Career
+): { spec: CircuitEventSpec; unlocked: boolean; wins: number; current: boolean }[] => {
+  const currentId = CIRCUIT.filter((ev) => career.rep >= ev.repGate).at(-1)?.id;
+  return CIRCUIT.map((spec) => ({
+    spec,
+    unlocked: career.rep >= spec.repGate,
+    wins: career.circuitWins[spec.id] ?? 0,
+    current: spec.id === currentId,
+  }));
 };
 
 /** A semente do DAILY vem do dia UTC — unica leitura de relogio do modo. */

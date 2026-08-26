@@ -972,3 +972,96 @@ body {
   image-rendering: pixelated;
   flex: none;
 }
+/* ---- Slice E: Stretch Sprint, Catathon Circuit e a Central ------------- */
+
+/* O painel do SPRINT: centro-baixo, acima da hotbar — a decisao do fim de
+   run mora onde a mao ja esta, sem cobrir o pavilhao. */
+.sprint-panel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
+  width: min(420px, 88vw);
+  background: var(--panel);
+  border: 1.5px solid var(--ok);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  pointer-events: auto;
+  z-index: 7;
+}
+.sprint-panel[hidden] { display: none; }
+.sprint-title { font-weight: 800; color: var(--ok); }
+.sprint-mult { font-size: 0.82em; opacity: 0.9; font-variant-numeric: tabular-nums; }
+.sprint-freeze-hint { font-size: 0.8em; opacity: 0.85; }
+.sprint-offer {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+}
+.sprint-offer[hidden] { display: none; }
+.sprint-offer-name { font-weight: 800; color: var(--accent); }
+.sprint-offer-gain { font-size: 0.82em; color: var(--ok); }
+.sprint-offer-risk { font-size: 0.82em; color: var(--alarm); }
+.task.task-stretch .task-name { color: var(--accent); font-weight: 700; }
+
+/* O convite do circuito: a identidade DECLARADA em ambar, antes de tudo. */
+.recruit-event { margin: 0; font-size: 0.9em; color: var(--accent); font-weight: 800; }
+
+/* O pos-jogo do arco novo: palco, entrega antecipada, stretch e a jornada. */
+.result-event { margin: 0; font-size: 0.86em; opacity: 0.9; }
+.result-early { margin: 0; font-size: 0.9em; color: var(--ok); }
+.result-stretch { margin: 0; font-size: 0.9em; color: var(--accent); font-weight: 700; }
+.result-best { margin: 0; font-weight: 800; color: var(--ok); }
+.result-qualified { margin: 0; font-weight: 800; color: var(--accent); animation: blink 1.1s steps(2) infinite; }
+.result-season { margin: 0; font-weight: 800; color: var(--ok); }
+
+/* A CENTRAL DA CARREIRA: mais larga que as outras telas — e uma vitrine. */
+.screen.hub { max-width: min(680px, 94vw); text-align: left; justify-items: stretch; }
+.hub-title { margin: 0; text-align: center; color: var(--accent); letter-spacing: 0.08em; }
+.hub-section { display: grid; gap: 4px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.hub-section-title { font-weight: 800; font-size: 0.85em; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+.hub-season-won { margin: 0; color: var(--ok); font-weight: 800; }
+.hub-ladder { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 6px; }
+.hub-event { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; display: grid; gap: 2px; }
+.hub-event.locked { opacity: 0.55; }
+.hub-event.current { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+.hub-event-paws { font-size: 0.7em; letter-spacing: 0.14em; color: var(--accent); }
+.hub-event-name { font-weight: 800; font-size: 0.85em; }
+.hub-event-blurb { font-size: 0.72em; opacity: 0.8; }
+.hub-event-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.hub-tag { font-size: 0.68em; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; opacity: 0.9; }
+.hub-tag.tag-current { border-color: var(--ok); color: var(--ok); font-weight: 700; }
+.hub-tag.tag-locked { border-color: var(--alarm); color: var(--alarm); }
+.hub-tag.tag-wins { border-color: var(--ok); color: var(--ok); }
+.hub-next-unlock { margin: 0; font-size: 0.88em; font-weight: 700; color: var(--accent); }
+.hub-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.hub-stat { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; text-align: center; }
+.hub-stat-value { font-weight: 800; font-size: 1.05em; color: var(--accent); }
+.hub-stat-label { font-size: 0.72em; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; }
+.hub-rival-name { margin: 0; font-weight: 800; color: var(--alarm); }
+.hub-rival-score { margin: 0; font-size: 0.9em; }
+.hub-rival-roster { margin: 0; font-size: 0.82em; opacity: 0.85; font-style: italic; }
+.hub-empty { margin: 0; font-size: 0.85em; opacity: 0.7; }
+.hub-alumni-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.hub-alum { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82em; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px 2px 4px; }
+.hub-alum canvas { width: 22px; height: auto; image-rendering: pixelated; border-radius: 50%; }
+.hub-run { font-size: 0.82em; font-variant-numeric: tabular-nums; border-bottom: 1px dashed rgba(74, 66, 88, 0.5); padding: 2px 0; }
+.hub-run:last-child { border-bottom: none; }
+.hub-ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.hub-ach { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; display: grid; gap: 2px; }
+.hub-ach.got { border-color: var(--ok); background: rgba(120, 214, 140, 0.08); }
+.hub-ach.missing { opacity: 0.6; }
+.hub-ach-name { font-weight: 700; font-size: 0.82em; }
+.hub-ach.got .hub-ach-name { color: var(--ok); }
+.hub-ach-hint { font-size: 0.7em; opacity: 0.85; }
+.hub-ach-date { font-size: 0.66em; opacity: 0.65; font-variant-numeric: tabular-nums; }
+.hub-daily { margin: 0; text-align: center; font-size: 0.82em; opacity: 0.85; }
+.hub-actions { justify-content: center; }

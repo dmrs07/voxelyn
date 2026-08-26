@@ -38,7 +38,7 @@ type Dict = {
   weekdays: [string, string, string];
   day: string;
   left: (h: number, mm: string) => string;
-  features: (n: number) => string;
+  features: (n: number, total: number) => string;
   buildOk: string;
   buildDown: string;
   buildDead: string;
@@ -112,6 +112,50 @@ type Dict = {
   graduatesLine: (names: string) => string;
   poachedLine: (star: string, rival: string) => string;
   vibesLabel: string;
+  /** O STRETCH SPRINT no HUD: o painel que abre quando o MVP fecha. */
+  sprintTitle: string;
+  sprintFreezeWord: string;
+  sprintFreezeHint: (pts: number) => string;
+  sprintAccept: string;
+  sprintTakenTag: string;
+  sprintMult: (mult: string) => string;
+  sprintGain: (gain: string) => string;
+  sprintRisk: (risk: string) => string;
+  /** O CIRCUITO: convite, resultado e a Central. */
+  btnHub: string;
+  eventInvite: (name: string, blurb: string, paws: string, prize: string) => string;
+  eventAt: (name: string) => string;
+  earlyLine: (pts: number) => string;
+  stretchLine: (n: number, mult: string) => string;
+  qualifiedLine: (name: string) => string;
+  newBestLine: (score: number) => string;
+  seasonWonLine: string;
+  hubTitle: string;
+  hubCircuitTitle: string;
+  hubSeasonWon: string;
+  hubStatRuns: string;
+  hubStatBest: string;
+  hubStatRep: string;
+  hubStatWallet: string;
+  hubNever: string;
+  hubNextUnlock: (name: string, missing: number) => string;
+  hubAllOpen: string;
+  hubLockedTag: (gate: number) => string;
+  hubWinsTag: (n: number) => string;
+  hubCurrentTag: string;
+  hubRivalTitle: string;
+  hubRivalLine: (wins: number, losses: number) => string;
+  hubNoRival: string;
+  hubAlumniTitle: string;
+  hubNoAlumni: string;
+  hubHistoryTitle: string;
+  hubNoHistory: string;
+  hubAchTitle: (got: number, total: number) => string;
+  hubSecret: string;
+  hubDailyLine: (date: string) => string;
+  hubPlayNext: (name: string) => string;
+  hubBack: string;
+  modeWord: Record<'career' | 'quick' | 'daily', string>;
   ev: {
     ship: (name: string, task: string) => string;
     awaitShip: (name: string, task: string) => string;
@@ -146,6 +190,11 @@ type Dict = {
     fightSeparated: (a: string, b: string) => string;
     mentor: (mentor: string, junior: string) => string;
     grown: (name: string) => string;
+    mvpReady: string;
+    stretchOpen: (name: string) => string;
+    stretchTaken: (name: string) => string;
+    stretchDone: (name: string) => string;
+    freeze: string;
   };
 };
 
@@ -153,7 +202,7 @@ const EN: Dict = {
   weekdays: ['FRI', 'SAT', 'SUN'],
   day: 'DAY',
   left: (h, mm) => `${h}h${mm} left`,
-  features: (n) => `features ${n}/12`,
+  features: (n, total) => `features ${n}/${total}`,
   buildOk: 'BUILD OK',
   buildDown: 'BUILD IS DOWN',
   buildDead: 'BUILD BROKEN',
@@ -258,6 +307,48 @@ const EN: Dict = {
   graduatesLine: (names) => `grew up this edition: ${names} — will return as mid-level`,
   poachedLine: (star, rival) => `${star} left for ${rival}. the money was good. the booth is quieter.`,
   vibesLabel: 'vibes',
+  sprintTitle: 'MVP READY — freeze it, or reach higher?',
+  sprintFreezeWord: 'freeze the build',
+  sprintFreezeHint: (pts) => `early delivery: +${pts} pts + stability, guaranteed`,
+  sprintAccept: 'take it on',
+  sprintTakenTag: 'on the board',
+  sprintMult: (mult) => `score multiplier ×${mult}`,
+  sprintGain: (gain) => `pays: ${gain}`,
+  sprintRisk: (risk) => `risk: ${risk}`,
+  btnHub: 'career hub',
+  eventInvite: (name, blurb, paws, prize) => `this stage of the circuit: ${name} — ${blurb}. difficulty ${paws} · prize ×${prize}`,
+  eventAt: (name) => `stage: ${name}`,
+  earlyLine: (pts) => `early delivery: +${pts} pts (frozen with time to spare)`,
+  stretchLine: (n, mult) => `stretch sprint: ${n} ambitious feature${n > 1 ? 's' : ''} shipped — score ×${mult}`,
+  qualifiedLine: (name) => `QUALIFIED: the ${name} invite just arrived`,
+  newBestLine: (score) => `new personal best: ${score}`,
+  seasonWonLine: 'THE SEASON IS YOURS: Global Catathon won with the rival beaten.',
+  hubTitle: 'CAREER HUB',
+  hubCircuitTitle: 'CATATHON CIRCUIT — the season',
+  hubSeasonWon: 'season complete: the Global is yours',
+  hubStatRuns: 'runs',
+  hubStatBest: 'personal best',
+  hubStatRep: 'reputation',
+  hubStatWallet: 'wallet',
+  hubNever: '—',
+  hubNextUnlock: (name, missing) => `${missing} reputation short of the ${name}`,
+  hubAllOpen: 'the whole season is open',
+  hubLockedTag: (gate) => `rep ${gate}`,
+  hubWinsTag: (n) => `${n}× podium`,
+  hubCurrentTag: 'current stage',
+  hubRivalTitle: 'THE RIVAL',
+  hubRivalLine: (wins, losses) => `you ${wins} × ${losses} them`,
+  hubNoRival: 'no rival yet: play your first career edition',
+  hubAlumniTitle: 'ALUMNI',
+  hubNoAlumni: 'no graduates yet: hire juniors and let a senior sit next door',
+  hubHistoryTitle: 'RECENT RUNS',
+  hubNoHistory: 'no runs on record yet',
+  hubAchTitle: (got, total) => `ACHIEVEMENT GALLERY · ${got}/${total}`,
+  hubSecret: '??? (secret)',
+  hubDailyLine: (date) => `today's daily (${date}): same seed for everyone — one fair fight`,
+  hubPlayNext: (name) => `play: ${name}`,
+  hubBack: 'back',
+  modeWord: { career: 'career', quick: 'quick', daily: 'daily' },
   ev: {
     ship: (name, task) => `${name} shipped "${task}"`,
     awaitShip: (name, task) => `${name} finished "${task}" and will NOT let it merge. Pet them.`,
@@ -302,6 +393,11 @@ const EN: Dict = {
     fightSeparated: (a, b) => `${a} and ${b} were separated. dignity not recovered.`,
     mentor: (mentor, junior) => `${mentor} is mentoring ${junior} from the next desk`,
     grown: (name) => `${name} GREW UP this edition: junior no more (in spirit)`,
+    mvpReady: 'MVP READY: freeze the submission, or reach for more (open the sprint panel)',
+    stretchOpen: (name) => `stretch opportunity open: ${name}`,
+    stretchTaken: (name) => `stretch accepted: "${name}" is on the board`,
+    stretchDone: (name) => `STRETCH SHIPPED: ${name} — the score multiplier went up`,
+    freeze: 'BUILD FROZEN. Early delivery in the pocket — straight to the stage!',
   },
 };
 
@@ -309,7 +405,7 @@ const PT: Dict = {
   weekdays: ['SEX', 'SAB', 'DOM'],
   day: 'DIA',
   left: (h, mm) => `${h}h${mm} restantes`,
-  features: (n) => `features ${n}/12`,
+  features: (n, total) => `features ${n}/${total}`,
   buildOk: 'BUILD OK',
   buildDown: 'BUILD FORA DO AR',
   buildDead: 'BUILD QUEBRADO',
@@ -414,6 +510,48 @@ const PT: Dict = {
   graduatesLine: (names) => `cresceram nesta edicao: ${names} — voltam como plenos`,
   poachedLine: (star, rival) => `${star} foi para ${rival}. o dinheiro era bom. o booth ficou mais quieto.`,
   vibesLabel: 'convivencia',
+  sprintTitle: 'MVP PRONTO — congela, ou mira mais alto?',
+  sprintFreezeWord: 'congelar a build',
+  sprintFreezeHint: (pts) => `entrega antecipada: +${pts} pts + estabilidade, garantidos`,
+  sprintAccept: 'topar',
+  sprintTakenTag: 'no quadro',
+  sprintMult: (mult) => `multiplicador de score ×${mult}`,
+  sprintGain: (gain) => `paga: ${gain}`,
+  sprintRisk: (risk) => `risco: ${risk}`,
+  btnHub: 'central da carreira',
+  eventInvite: (name, blurb, paws, prize) => `este palco do circuito: ${name} — ${blurb}. dificuldade ${paws} · premiacao ×${prize}`,
+  eventAt: (name) => `palco: ${name}`,
+  earlyLine: (pts) => `entrega antecipada: +${pts} pts (congelou com folga)`,
+  stretchLine: (n, mult) => `stretch sprint: ${n} feature${n > 1 ? 's' : ''} ambiciosa${n > 1 ? 's' : ''} shipada${n > 1 ? 's' : ''} — score ×${mult}`,
+  qualifiedLine: (name) => `CLASSIFICADO: chegou o convite do ${name}`,
+  newBestLine: (score) => `novo recorde pessoal: ${score}`,
+  seasonWonLine: 'A TEMPORADA E TUA: Global Catathon vencido com o rival batido.',
+  hubTitle: 'CENTRAL DA CARREIRA',
+  hubCircuitTitle: 'CATATHON CIRCUIT — a temporada',
+  hubSeasonWon: 'temporada completa: o Global e teu',
+  hubStatRuns: 'runs',
+  hubStatBest: 'recorde pessoal',
+  hubStatRep: 'reputacao',
+  hubStatWallet: 'carteira',
+  hubNever: '—',
+  hubNextUnlock: (name, missing) => `faltam ${missing} de reputacao para o ${name}`,
+  hubAllOpen: 'a temporada inteira esta aberta',
+  hubLockedTag: (gate) => `rep ${gate}`,
+  hubWinsTag: (n) => `${n}× podio`,
+  hubCurrentTag: 'palco atual',
+  hubRivalTitle: 'O RIVAL',
+  hubRivalLine: (wins, losses) => `voce ${wins} × ${losses} eles`,
+  hubNoRival: 'ainda sem rival: jogue a primeira edicao da carreira',
+  hubAlumniTitle: 'ALUMNI',
+  hubNoAlumni: 'nenhum formado ainda: contrate juniores e sente um senior ao lado',
+  hubHistoryTitle: 'ULTIMAS RUNS',
+  hubNoHistory: 'nenhuma run registrada ainda',
+  hubAchTitle: (got, total) => `GALERIA DE CONQUISTAS · ${got}/${total}`,
+  hubSecret: '??? (secreta)',
+  hubDailyLine: (date) => `daily de hoje (${date}): a mesma semente para todo mundo — briga justa`,
+  hubPlayNext: (name) => `jogar: ${name}`,
+  hubBack: 'voltar',
+  modeWord: { career: 'carreira', quick: 'quick', daily: 'daily' },
   ev: {
     ship: (name, task) => `${name} shipou "${task}"`,
     awaitShip: (name, task) => `${name} terminou "${task}" e NAO deixa mergear. Faz carinho nele.`,
@@ -458,6 +596,11 @@ const PT: Dict = {
     fightSeparated: (a, b) => `${a} e ${b} foram separados. a dignidade nao.`,
     mentor: (mentor, junior) => `${mentor} esta mentorando ${junior} da mesa ao lado`,
     grown: (name) => `${name} CRESCEU nesta edicao: junior so no cracha`,
+    mvpReady: 'MVP PRONTO: congele a submissao, ou mire mais alto (abra o painel do sprint)',
+    stretchOpen: (name) => `oportunidade de stretch aberta: ${name}`,
+    stretchTaken: (name) => `stretch aceito: "${name}" entrou no quadro`,
+    stretchDone: (name) => `STRETCH SHIPADO: ${name} — o multiplicador de score subiu`,
+    freeze: 'BUILD CONGELADA. Entrega antecipada no bolso — direto ao palco!',
   },
 };
 
