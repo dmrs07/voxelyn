@@ -102,6 +102,32 @@ The card is a shortcut, never a cage: "decide later" defers to the board
 (the deciding-at-the-whiteboard scene is untouched), the board remains a
 live fallback, and the touch smoke now proves both paths with one finger.
 
+## Addendum: the pitch became a show
+
+The pitch stopped being a DOM panel over the booth. When the 48 hours end,
+the scene itself changes: a stage, a demo big-screen that *plays the
+project* (app flow, live dashboard, the feature graph — glitching into
+static during the demo crisis, showing the verdict at the end), the team
+performing (the presenter faces the audience; a freshly used stage ability
+becomes that personality's *number* — the cowboy chases the cursor across
+the stage, the judge makes biscuits), the PM chewing nails in the wings —
+and a procedural CROWD of cats, seated with their backs to you, reacting
+to the gauge: tails wag faster, excited cats bounce and float hearts, a
+cold crowd freezes and *seats empty out*. The crisis shocks them with
+coral exclamation marks; the improv and high gauges rain confetti. All of
+it is display-only, derived from `(state, tick, seed)` — deterministic,
+outside the hash, pure reading of the sim.
+
+And the venue scales with the CIRCUIT stage — a different stage and crowd
+per challenge level: the Neighborhood pitch happens in a garage (string
+lights, a demo projected on a bedsheet with clothespins, five cats and a
+cardboard trophy on a shelf); the Regional gets a gym stage with two
+spotlights; the Convention dresses the hall in themed drapes; the National
+adds press cats with flashing cameras; the Global is an arena — giant
+LED, four beams, dense rows plus a silhouette back wall. Quick runs and
+the daily play the generic gym. `scripts/venue-shots.mjs` photographs all
+five for art direction.
+
 ## Numbers
 
 - 12 new sim tests (offers, MVP gate, freeze economics, multiplier
