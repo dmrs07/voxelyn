@@ -316,6 +316,39 @@ export const LASER_USES = 1;
 export const LASER_STRESS_DROP = 0.18;
 export const LASER_ZOOMIES_TICKS = Math.round(2.5 * TICK_HZ);
 
+// ----------------------------------------------------------- stretch sprint
+//
+// O TEMPO MORTO que esta secao mata: com o nucleo pronto cedo, sobrava
+// microgerencia sem decisao. Agora o fim de run e push-your-luck: congelar
+// paga entrega antecipada; cada oportunidade concluida multiplica o score e
+// abre uma proxima MAIS arriscada. Parar e sempre uma opcao respeitada.
+
+/** Cada oportunidade concluida soma isto ao multiplicador de score. */
+export const STRETCH_MULT_STEP = 0.08;
+/** Custo base da tarefa de stretch; cada tier seguinte custa 20% mais. */
+export const STRETCH_COST = 26 * TICK_HZ;
+export const STRETCH_COST_STEP = 0.2;
+/** Entrega antecipada: ate isto em pontos, linear na folga do congelamento. */
+export const EARLY_SCORE_MAX = 18;
+/** Congelar tambem paga estabilidade: build parado nao quebra no palco. */
+export const FREEZE_STABILITY = 1;
+/** Polimento obsessivo: estressa quem vive de design/frontend. */
+export const STRETCH_POLISH_STRESS = 0.1;
+/** Demo viral exige gatos DESCANSADOS: os cansados pagam em estresse. */
+export const STRETCH_VIRAL_ENERGY = 0.5;
+export const STRETCH_VIRAL_STRESS = 0.08;
+/** Feature patrocinada: cheque gordo — e o contrato pode ser descumprido. */
+export const STRETCH_SPONSOR_PRIZE = 40;
+/** Escala absurda: pode derrubar o build no ship. */
+export const STRETCH_SCALE_CABLE_P = 0.3;
+/** Refactor heroico: pode reabrir dependencias (bug no backend). */
+export const STRETCH_REFACTOR_BUG_P = 0.25;
+/** Easter egg felino: resultado imprevisivel por definicao. */
+export const STRETCH_EGG_GOOD_P = 0.55;
+export const STRETCH_HYPE_VIRAL = 0.08;
+export const STRETCH_HYPE_EGG = 0.06;
+export const STRETCH_HYPE_POLISH = 0.03;
+
 // ---------------------------------------------------------- eventos sociais
 
 export const SOCIAL_AT = [0.42, 0.72] as const;

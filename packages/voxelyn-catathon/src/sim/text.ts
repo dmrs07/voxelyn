@@ -387,6 +387,114 @@ export const RIVAL_TAUNT_TEXT: Record<Locale, readonly string[]> = {
   ],
 };
 
+/**
+ * O STRETCH SPRINT: cada oportunidade com nome, o rotulo da TAREFA que o
+ * aceite cria no quadro, o beneficio e o risco — trade-off ESCRITO no
+ * objeto, como nos apetrechos e sponsors.
+ */
+export const STRETCH_TEXT: Record<
+  Locale,
+  Record<string, { name: string; task: string; gain: string; risk: string }>
+> = {
+  pt: {
+    'polimento-obsessivo': {
+      name: 'polimento obsessivo',
+      task: 'polir cada pixel do fluxo',
+      gain: 'experiencia e um sopro de voto popular',
+      risk: 'estressa quem vive de design e frontend',
+    },
+    'demo-viral': {
+      name: 'demo viral',
+      task: 'gravar a demo que o pavilhao compartilha',
+      gain: 'hype de plateia para o pitch',
+      risk: 'exige gatos descansados — os cansados pagam',
+    },
+    'feature-patrocinada': {
+      name: 'feature patrocinada',
+      task: 'integrar o SDK do patrocinador',
+      gain: '+40 tampinhas no premio',
+      risk: 'amarra a demo neles: o contrato pode ser descumprido',
+    },
+    'refactor-heroico': {
+      name: 'refactor heroico',
+      task: 'reescrever o nucleo sem quebrar nada',
+      gain: 'estabilidade, e a divida tecnica diminui',
+      risk: 'pode reabrir dependencias (bug no backend)',
+    },
+    'escala-absurda': {
+      name: 'escala absurda',
+      task: 'aguentar um milhao de gatos simultaneos',
+      gain: 'inovacao de verdade na banca',
+      risk: 'pode derrubar o build na hora do ship',
+    },
+    'easter-egg-felino': {
+      name: 'easter egg felino',
+      task: 'esconder um segredo ronronante',
+      gain: 'voto popular — e uma conquista',
+      risk: 'resultado imprevisivel por definicao',
+    },
+  },
+  en: {
+    'polimento-obsessivo': {
+      name: 'obsessive polish',
+      task: 'polish every pixel of the flow',
+      gain: 'experience and a whiff of crowd love',
+      risk: 'stresses whoever lives off design and frontend',
+    },
+    'demo-viral': {
+      name: 'viral demo',
+      task: 'record the demo the pavilion shares',
+      gain: 'crowd hype for the pitch',
+      risk: 'demands rested cats — the tired ones pay',
+    },
+    'feature-patrocinada': {
+      name: 'sponsored feature',
+      task: "integrate the sponsor's SDK",
+      gain: '+40 bottle caps in the prize',
+      risk: 'ties the demo to them: the contract may be missed',
+    },
+    'refactor-heroico': {
+      name: 'heroic refactor',
+      task: 'rewrite the core without breaking anything',
+      gain: 'stability, and tech debt shrinks',
+      risk: 'may reopen dependencies (backend bug)',
+    },
+    'escala-absurda': {
+      name: 'absurd scale',
+      task: 'survive a million simultaneous cats',
+      gain: 'real innovation before the judges',
+      risk: 'may take the build down on ship',
+    },
+    'easter-egg-felino': {
+      name: 'feline easter egg',
+      task: 'hide a purring secret',
+      gain: 'crowd love — and an achievement',
+      risk: 'unpredictable by definition',
+    },
+  },
+};
+
+/**
+ * O CIRCUITO: os cinco palcos da temporada, do bairro ao mundo. Nome e
+ * clima por idioma; os numeros (patas, gates, premiacao) moram em gen.ts.
+ */
+export const CIRCUIT_TEXT: Record<Locale, Record<string, { name: string; blurb: string }>> = {
+  pt: {
+    bairro: { name: 'Hackathon de Bairro', blurb: 'garagem, wifi emprestado, trofeu de papelao' },
+    regional: { name: 'Regional Catathon', blurb: 'o ginasio lotou; o rival trouxe faixa' },
+    convencao: { name: 'Convencao Tematica', blurb: 'banca especializada, plateia exigente' },
+    nacional: { name: 'Nacional Catathon', blurb: 'telao de verdade, imprensa felina' },
+    global: { name: 'Global Catathon', blurb: 'o maior palco do mundo. o rival tambem chegou.' },
+  },
+  en: {
+    bairro: { name: 'Neighborhood Hackathon', blurb: 'a garage, borrowed wifi, a cardboard trophy' },
+    regional: { name: 'Regional Catathon', blurb: 'the gym is packed; the rival brought a banner' },
+    convencao: { name: 'Themed Convention', blurb: 'specialist judges, demanding crowd' },
+    nacional: { name: 'National Catathon', blurb: 'a real big screen, feline press' },
+    global: { name: 'Global Catathon', blurb: 'the biggest stage on earth. the rival made it too.' },
+  },
+};
+
 /** As conquistas: nome e como se ganha. */
 export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hint: string }>> = {
   pt: {
@@ -398,6 +506,9 @@ export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hin
     'orange-crew': { name: 'One Orange Brain Cell', hint: 'equipe inteira de cowboys' },
     'improv-legend': { name: 'Demo Gods', hint: 'transforme o crash da demo em improviso heroico' },
     grand: { name: 'Grand Prize', hint: 'venca o grande premio' },
+    'early-bird': { name: 'Entregue e Dormindo', hint: 'congele a submissao com 25%+ do prazo sobrando e suba ao podio' },
+    overclock: { name: 'Overclock Felino', hint: 'conclua as tres oportunidades do Stretch Sprint e suba ao podio' },
+    'egg-hunter': { name: 'Ovo de Pascoa', hint: 'shipe o easter egg felino do Stretch Sprint' },
   },
   en: {
     'zero-bugs': { name: 'Zero Bugs, Allegedly', hint: 'finish with no live bugs' },
@@ -408,5 +519,8 @@ export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hin
     'orange-crew': { name: 'One Orange Brain Cell', hint: 'an all-cowboy team' },
     'improv-legend': { name: 'Demo Gods', hint: 'turn the demo crash into heroic improv' },
     grand: { name: 'Grand Prize', hint: 'win the grand prize' },
+    'early-bird': { name: 'Shipped and Asleep', hint: 'freeze the submission with 25%+ of the clock left and reach the podium' },
+    overclock: { name: 'Feline Overclock', hint: 'complete all three Stretch Sprint opportunities and reach the podium' },
+    'egg-hunter': { name: 'Egg Hunter', hint: 'ship the feline easter egg from the Stretch Sprint' },
   },
 };
