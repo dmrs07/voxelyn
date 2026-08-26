@@ -56,7 +56,7 @@ const SCREEN_OFF = c(40, 48, 58);
 const MAGENTA = c(216, 104, 176);
 
 /** Cracha da especialidade: o COLAR do sprite ganha a cor da trilha. */
-const SPEC_RGB: Record<Cat['specialty'], number> = {
+export const SPEC_RGB: Record<Cat['specialty'], number> = {
   frontend: 0x54c6d4,
   backend: 0x8c72f2,
   devops: 0xf0b552,

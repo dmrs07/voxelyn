@@ -23,6 +23,8 @@ import type { RunClose } from './career.js';
 const i18n = t;
 import type { Cat } from '../sim/types.js';
 import { applyItemSprite, type ItemSpriteId } from './atlas.js';
+import { faceFrame, lookFor } from './catsprites.js';
+import { SPEC_RGB } from './render.js';
 import { ganttEntries, resetGanttLog, sampleGantt, type GanttEntry } from './ganttlog.js';
 import type { CatId, HackState, SimEvent, SpecialCategoryId, SponsorContract, Task } from '../sim/types.js';
 
@@ -455,6 +457,31 @@ export const createHud = (
 const CSS_HEX = (v: number): string => `#${v.toString(16).padStart(6, '0')}`;
 
 /**
+ * O RETRATO com carinha: a cabeca do proprio sprite do gato (frame frontal
+ * do Turning, com o colar/cracha da trilha) num canvas 2x — no lugar da
+ * bolinha de cor (pedido do dono).
+ */
+const faceCanvas = (c: { coat: { body: number }; pattern: Cat['pattern']; big: boolean; specialty: Cat['specialty'] }): HTMLCanvasElement => {
+  const fr = faceFrame(lookFor(c.coat.body, c.pattern, c.big), SPEC_RGB[c.specialty]);
+  const cv = document.createElement('canvas');
+  cv.width = fr.w;
+  cv.height = fr.h;
+  cv.className = 'team-face';
+  const ctx = cv.getContext('2d')!;
+  const img = ctx.createImageData(fr.w, fr.h);
+  for (let i = 0; i < fr.data.length; i++) {
+    const col = fr.data[i]!;
+    if (col === 0) continue;
+    img.data[i * 4] = col & 255;
+    img.data[i * 4 + 1] = (col >> 8) & 255;
+    img.data[i * 4 + 2] = (col >> 16) & 255;
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
+};
+
+/**
  * Constroi retratos e habilidades para O TIME DESTA RUN. Chamado a cada
  * recrutamento; o quadro de tarefas tambem renasce (o projeto mudou).
  */
@@ -474,9 +501,7 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'team-btn';
-    const sw = el('span', 'team-swatch');
-    sw.style.background = CSS_HEX(c.coat.body);
-    b.append(sw, el('span', 'team-name', c.name.toLowerCase()));
+    b.append(faceCanvas(c), el('span', 'team-name', c.name.toLowerCase()));
     b.addEventListener('click', () => hud.onSelect(c.id));
     hud.teamBtns.set(c.id, b);
     hud.teamBar.appendChild(b);
@@ -484,9 +509,7 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
     const pb = document.createElement('button');
     pb.type = 'button';
     pb.className = 'soft-btn pitch-ability';
-    const psw = el('span', 'team-swatch');
-    psw.style.background = CSS_HEX(c.coat.body);
-    pb.append(psw, el('span', 'btn-word', `${c.name.toLowerCase()}: ${t().abilityWord[c.personality]}`));
+    pb.append(faceCanvas(c), el('span', 'btn-word', `${c.name.toLowerCase()}: ${t().abilityWord[c.personality]}`));
     pb.addEventListener('click', () => hud.onAbility(c.id));
     hud.pitchBtns.set(c.id, pb);
     hud.abilityRow.appendChild(pb);
@@ -1102,9 +1125,7 @@ export const showRecruit = (
     card.type = 'button';
     card.className = 'cand-card';
     const head = el('div', 'cand-head');
-    const sw = el('span', 'team-swatch');
-    sw.style.background = `#${c.coat.body.toString(16).padStart(6, '0')}`;
-    head.append(sw, el('span', 'cand-name', c.name));
+    head.append(faceCanvas(c), el('span', 'cand-name', c.name));
     head.appendChild(el('span', 'cand-tier', tierLabel(c.tier)));
     card.appendChild(head);
     card.appendChild(el('div', 'cand-spec', `${specLabel(c.specialty)} · ${c.breed}`));

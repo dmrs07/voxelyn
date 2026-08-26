@@ -962,3 +962,13 @@ body {
   background-size: 100% 100%;
   image-rendering: pixelated;
 }
+
+
+/* Retrato com CARINHA: a cabeca do sprite do gato (frame frontal do
+   Turning, cracha incluso) em 2x, no lugar da bolinha de cor. */
+.team-face {
+  width: 32px;
+  height: 28px;
+  image-rendering: pixelated;
+  flex: none;
+}

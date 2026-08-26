@@ -236,6 +236,66 @@ export const heldFrame = (look: CatLook, collar?: number): SpriteFrame => {
   return frames[frames.length >> 1]!;
 };
 
+const faceCache = new Map<string, SpriteFrame>();
+
+/**
+ * A CARINHA para retratos do HUD: recorte da cabeca do frame frontal do
+ * Turning (o unico momento em que o pack mostra o rosto de frente). 16x14
+ * a partir do topo da silhueta, centrado no peso das primeiras fileiras —
+ * pega orelhas, olhos e o comeco do colar/cracha.
+ */
+export const faceFrame = (look: CatLook, collar?: number): SpriteFrame => {
+  const id = `${look.breed}:${look.coat}:${collar ?? -1}`;
+  const hit = faceCache.get(id);
+  if (hit) return hit;
+  // O frame FRONTAL limpo e o T4 (indice 3) em todas as racas; o do meio
+  // (length>>1) e o mais "virado", com a cabeca pequena e o rabo alto.
+  const frames = decode(look.breed, 'turn', look.coat, collar);
+  const src = frames[Math.min(3, frames.length - 1)]!;
+  const FACE_W = 16;
+  const FACE_H = 14;
+  // A cabeca comeca na primeira fileira LARGA (vao >= 10): o rabo erguido
+  // acima dela e estreito (2-7px) e fica FORA do recorte. As orelhas do
+  // bobtail vivem 1-2 fileiras acima com vao >= 6 — entram tambem.
+  const span = (y: number): [number, number] | null => {
+    let x0 = -1;
+    let x1 = -1;
+    for (let x = 0; x < src.w; x++) {
+      if (src.data[y * src.w + x] !== 0) { if (x0 < 0) x0 = x; x1 = x; }
+    }
+    return x0 < 0 ? null : [x0, x1];
+  };
+  let top = 0;
+  for (let y = 0; y < src.h; y++) {
+    const s = span(y);
+    if (s && s[1] - s[0] + 1 >= 10) { top = y; break; }
+  }
+  for (let back = 0; back < 2 && top > 0; back++) {
+    const s = span(top - 1);
+    if (s && s[1] - s[0] + 1 >= 6) top--;
+    else break;
+  }
+  let sx = 0;
+  let n = 0;
+  for (let y = top; y < Math.min(src.h, top + 9); y++) {
+    for (let x = 0; x < src.w; x++) {
+      if (src.data[y * src.w + x] !== 0) { sx += x; n++; }
+    }
+  }
+  const cx = n > 0 ? Math.round(sx / n) : src.w >> 1;
+  const x0 = Math.max(0, Math.min(src.w - FACE_W, cx - (FACE_W >> 1)));
+  const data = new Uint32Array(FACE_W * FACE_H);
+  for (let y = 0; y < FACE_H; y++) {
+    for (let x = 0; x < FACE_W; x++) {
+      const yy = top + y;
+      if (yy < src.h) data[y * FACE_W + x] = src.data[yy * src.w + (x0 + x)]!;
+    }
+  }
+  const frame = { w: FACE_W, h: FACE_H, data };
+  faceCache.set(id, frame);
+  return frame;
+};
+
 // ---------------------------------------------------------------------------
 // Gato gerado -> (raca, pelagem) do pack
 // ---------------------------------------------------------------------------
