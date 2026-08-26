@@ -881,3 +881,70 @@ body {
 
 /* O extrato do premio: cada parcela nomeada, com sinal — a tela honesta. */
 .result-ledger { margin: 0; font-size: 0.82em; opacity: 0.9; }
+
+
+/* ============= CatUI v2 — pecas do CatMegaBundle no papel certo =========
+   Pilulas EM BRANCO para chips informativos; botoes redondos para acoes;
+   balaozinho no feed. O cartao de perfil (orelhas+barras) NAO e fundo de
+   chip — fica reservado para retratos. Fatias em escala inteira. */
+
+.hud-chip {
+  background: none;
+  border: 7px solid transparent;
+  border-image: var(--cui-pill-brown) 7 fill round;
+  border-radius: 0;
+  image-rendering: pixelated;
+}
+.hud-remain { border-color: transparent; }
+
+.hud-decide,
+.proj-btn {
+  background: none;
+  border: 7px solid transparent;
+  border-image: var(--cui-pill-rose) 7 fill round;
+  border-radius: 0;
+  box-shadow: none;
+  image-rendering: pixelated;
+  color: #4a2420;
+  min-height: 44px;
+}
+.proj-btn:active { transform: translateY(1px); }
+
+.soft-btn {
+  background: none;
+  border: 10px solid transparent;
+  border-image: var(--cui-btn-light) 5 fill round;
+  border-radius: 0;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  image-rendering: pixelated;
+  color: #6f4526;
+}
+.soft-btn:active {
+  border-image-source: var(--cui-btn-light-on);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+/* Variante discreta (som): a peca ESCURA do kit, texto claro do HUD. */
+.soft-btn.dim {
+  border-image-source: var(--cui-btn-mid);
+  color: var(--text);
+}
+.soft-btn.dim:active { border-image-source: var(--cui-btn-mid-on); }
+
+.slot-frame {
+  background: none;
+  border: 5px solid transparent;
+  border-image: var(--cui-btn-mid) 5 fill round;
+  border-radius: 0;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  image-rendering: pixelated;
+}
+
+.feed-strip::before {
+  content: '';
+  flex: none;
+  width: 21px;
+  height: 18px;
+  background: var(--cui-bubble-cream);
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+}
