@@ -18,11 +18,14 @@ import { AmbienceBus } from './ambience-bus';
 import { cuesForEvents } from './cues';
 import { CueMixer, NEAR_CUTOFF_HZ } from './mixer';
 import { MusicBus } from './music-bus';
+import { SOUNDTRACK_URL, resolveMusicSource, type MusicSource } from './soundtrack';
+import { SoundtrackBus } from './soundtrack-bus';
 import { VOICE_RENDERERS, createNoiseBuffer } from './synth';
 import { voiceSpec, type VoiceId } from './voices';
 
 export type { AmbienceLevels } from './ambience';
 export type { Cue } from './cues';
+export type { MusicSource } from './soundtrack';
 export type { VoiceId } from './voices';
 
 /**
@@ -60,6 +63,7 @@ export class AudioDirector {
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
   private musicBus: MusicBus | null = null;
+  private soundtrackBus: SoundtrackBus | null = null;
 
   private readonly mixer = new CueMixer();
   private levels: AmbienceLevels = SILENT_AMBIENCE;
@@ -70,6 +74,15 @@ export class AudioDirector {
   private volume = 0.8;
   private musicVolume = 0.7;
   private muted = false;
+  /**
+   * Preferencia de trilha do jogador: a composta (arquivo, padrao) ou a
+   * sintetizada (os oito temas procedurais — o backup, por escolha). O que
+   * SOA a cada quadro e resolveMusicSource(preferencia, arquivo pronto):
+   * enquanto o FLAC carrega — ou se falhar — o backup toca sozinho.
+   */
+  private musicSource: MusicSource = 'composed';
+  /** Fonte que soou no quadro anterior, para detectar a transicao. */
+  private activeSource: MusicSource | null = null;
   /**
    * Fase do quadro anterior, para detectar a transicao para 'dead'.
    *
@@ -117,6 +130,7 @@ export class AudioDirector {
       // O scheduler para junto (update retorna cedo com muted); silenciar o
       // barramento evita que o desmute volte com um acorde pendurado.
       this.musicBus?.silence();
+      this.soundtrackBus?.silence();
     }
   }
 
@@ -124,6 +138,20 @@ export class AudioDirector {
   setMusicVolume(volume: number): void {
     this.musicVolume = Math.max(0, Math.min(1, volume));
     this.musicBus?.setVolume(this.musicVolume);
+    this.soundtrackBus?.setVolume(this.musicVolume);
+  }
+
+  /**
+   * Preferencia de trilha (opcoes). A troca em si acontece no proximo
+   * update(): e la que a fonte antiga cala e a nova acorda, com as rampas de
+   * cada barramento — nada estala aqui.
+   */
+  setMusicSource(source: MusicSource): void {
+    this.musicSource = source;
+  }
+
+  get currentMusicSource(): MusicSource {
+    return this.musicSource;
   }
 
   get isMuted(): boolean {
@@ -175,6 +203,13 @@ export class AudioDirector {
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
       this.musicBus.setVolume(this.musicVolume);
+      this.soundtrackBus = new SoundtrackBus(ctx, master);
+      this.soundtrackBus.start();
+      this.soundtrackBus.setVolume(this.musicVolume);
+      // O load e assincrono e fora do caminho critico do gesto: ate resolver,
+      // resolveMusicSource devolve o backup procedural e o jogo tem musica
+      // desde o primeiro compasso. Falha (404/decode) = backup para sempre.
+      void this.soundtrackBus.load(SOUNDTRACK_URL);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -204,22 +239,51 @@ export class AudioDirector {
     this.lastPhase = state.phase;
 
     if (state.phase === 'running') {
-      // Troca de tema pela MUDANCA DE ESTADO, com o precedente do lastPhase.
-      if (state.stratum !== this.lastStratum || state.occupation !== this.lastOccupation) {
-        this.lastStratum = state.stratum;
-        this.lastOccupation = state.occupation;
-        this.musicBus?.setTheme(state.stratum, state.occupation);
+      // Qual trilha soa AGORA: a composta quando o jogador a prefere e o
+      // arquivo ja decodificou; o backup procedural em qualquer outro caso.
+      // A resolucao e por quadro de proposito — o FLAC que termina de
+      // carregar no meio da run entra aqui, em crossfade, sem evento.
+      const active = resolveMusicSource(
+        this.musicSource,
+        this.soundtrackBus?.ready ?? false,
+      );
+      if (active !== this.activeSource) {
+        // A fonte que sai cala com a propria rampa; a que entra acorda na
+        // dela. Voltar ao synth exige re-apresentar o tema do estrato atual:
+        // zerar o precedente forca o setTheme abaixo.
+        if (active === 'composed') this.musicBus?.silence();
+        else {
+          this.soundtrackBus?.silence();
+          this.lastStratum = null;
+          this.lastOccupation = null;
+        }
+        this.activeSource = active;
       }
-      // wake e idempotente: religa depois de um mute que passou.
-      this.musicBus?.wake();
-      this.musicBus?.setIntensity(normalizedDepth(state.sector, runSectorCount(state)));
-      // A bomba do scheduler, com o TEMPO DA SIMULACAO: e isto que faz dois
-      // clientes de co-op tocarem o mesmo compasso.
-      this.musicBus?.update(state.tick / TICK_HZ);
+
+      if (active === 'composed') {
+        // A trilha composta e uma so para todos os estratos (contrato do
+        // compositor): sem setTheme, sem intensidade, sem tick — atmosfera
+        // continua no relogio do proprio contexto.
+        this.soundtrackBus?.wake();
+      } else {
+        // Troca de tema pela MUDANCA DE ESTADO, com o precedente do lastPhase.
+        if (state.stratum !== this.lastStratum || state.occupation !== this.lastOccupation) {
+          this.lastStratum = state.stratum;
+          this.lastOccupation = state.occupation;
+          this.musicBus?.setTheme(state.stratum, state.occupation);
+        }
+        // wake e idempotente: religa depois de um mute que passou.
+        this.musicBus?.wake();
+        this.musicBus?.setIntensity(normalizedDepth(state.sector, runSectorCount(state)));
+        // A bomba do scheduler, com o TEMPO DA SIMULACAO: e isto que faz dois
+        // clientes de co-op tocarem o mesmo compasso.
+        this.musicBus?.update(state.tick / TICK_HZ);
+      }
     } else {
       // Morte e extracao calam a musica como calam a ambiencia: o sting
       // (`died`/`extracted`) soa sozinho, e o silencio e o efeito.
       this.musicBus?.silence();
+      this.soundtrackBus?.silence();
     }
 
     if (nowMs - this.lastSampleMs >= AMBIENCE_SAMPLE_MS) {
@@ -258,6 +322,8 @@ export class AudioDirector {
     this.lastOccupation = null;
     this.ambienceBus?.silence();
     this.musicBus?.silence();
+    this.soundtrackBus?.silence();
+    this.activeSource = null;
   }
 
   /** Suspende o contexto (aba escondida). Nao destroi nada. */
@@ -293,7 +359,10 @@ export class AudioDirector {
     // pancada no jogador local (excecao explicita, ver MUSIC_DUCK_PRIORITY).
     const spec = voiceSpec(voice);
     if (spec.priority >= MUSIC_DUCK_PRIORITY || voice === 'hitPlayer') {
+      // Ambos os barramentos: so um esta audivel, e duck num bus calado e
+      // inocuo — mais simples que perguntar qual esta ativo.
       this.musicBus?.duck();
+      this.soundtrackBus?.duck();
     }
 
     const t0 = ctx.currentTime + SCHEDULE_LOOKAHEAD;

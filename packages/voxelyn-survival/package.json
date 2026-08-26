@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "build:offline-check": "vite build && node scripts/check-precache.mjs",
-    "check:audio": "node scripts/check-audio.mjs"
+    "check:audio": "node scripts/check-audio.mjs",
+    "soundtrack:prepare": "node scripts/prepare-soundtrack.mjs"
   },
   "dependencies": {
     "@voxelyn/survival-content": "workspace:*",

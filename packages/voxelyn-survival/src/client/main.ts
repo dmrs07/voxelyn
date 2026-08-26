@@ -105,6 +105,7 @@ const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 const volumeInput = document.getElementById('volume') as HTMLInputElement;
 const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
+const musicSourceButton = document.getElementById('btn-music-source') as HTMLButtonElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
 const roomInput = document.getElementById('room') as HTMLInputElement;
@@ -358,6 +359,7 @@ const audioSettings = loadAudioSettings();
 audio.setVolume(audioSettings.volume);
 audio.setMusicVolume(audioSettings.musicVolume);
 audio.setMuted(audioSettings.muted);
+audio.setMusicSource(audioSettings.musicSource);
 volumeInput.value = String(Math.round(audioSettings.volume * 100));
 musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
 
@@ -366,6 +368,25 @@ const renderMuteLabel = (): void => {
   muteButton.classList.toggle('primary', !audioSettings.muted);
 };
 renderMuteLabel();
+
+const renderMusicSourceLabel = (): void => {
+  musicSourceButton.textContent = t(
+    audioSettings.musicSource === 'composed'
+      ? 'options.musicSource.composed'
+      : 'options.musicSource.synth',
+  );
+};
+renderMusicSourceLabel();
+
+// Alterna trilha composta <-> sintetizada (a antiga, mantida como backup). A
+// troca sonora em si acontece no proximo update() do AudioDirector, com as
+// rampas de cada barramento.
+musicSourceButton.addEventListener('click', () => {
+  audioSettings.musicSource = audioSettings.musicSource === 'composed' ? 'synth' : 'composed';
+  audio.setMusicSource(audioSettings.musicSource);
+  saveAudioSettings(audioSettings);
+  renderMusicSourceLabel();
+});
 
 const setMuted = (muted: boolean): void => {
   audioSettings.muted = muted;
@@ -2671,6 +2692,7 @@ onLocaleChange(() => {
   // dentro de uma run.
   frozenFrameStale = true;
   renderMuteLabel();
+  renderMusicSourceLabel();
   renderTelemetryLabel();
   languageSelect.value = getLocale();
   if (advertisedContract) contractLabel.textContent = contractText(advertisedContract);
