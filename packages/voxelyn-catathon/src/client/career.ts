@@ -1,4 +1,4 @@
-import { CIRCUIT, HACK_TICKS, JUNIOR_GROWN_AT, RUN_BUDGET, SHIP_IT_WINDOW, nextLockedEvent, rollRivalName } from '../sim/index.js';
+import { CIRCUIT, HACK_TICKS, JUNIOR_GROWN_AT, RUN_BUDGET, SHIP_IT_WINDOW, rollRivalName } from '../sim/index.js';
 import type { Candidate, CircuitEventId, CircuitEventSpec } from '../sim/gen.js';
 import type { HackState, Outcome } from '../sim/types.js';
 
@@ -310,11 +310,13 @@ export const applyRun = (
     let rep = career.rep + (REP_BY_OUTCOME[r.outcome] ?? 0);
     if (close.rival?.beat) rep += 1;
     if (r.sponsorMet === false) rep -= 1;
-    // O gate que a reputacao NOVA abriu e a antiga nao abria: classificado.
-    const lockedBefore = nextLockedEvent(career.rep);
     career.rep = Math.max(0, rep);
     close.repAfter = career.rep;
-    if (lockedBefore && career.rep >= lockedBefore.repGate) close.qualified = lockedBefore.id;
+    // A classificacao anuncia o MAIOR gate que esta run cruzou: uma run
+    // gloriosa pode pular dois palcos de uma vez, e a mensagem tem de bater
+    // com o palco que a Central vai selecionar (achado de review).
+    const crossed = CIRCUIT.filter((ev) => close.repBefore < ev.repGate && career.rep >= ev.repGate);
+    close.qualified = crossed.at(-1)?.id ?? null;
 
     // O CIRCUITO lembra dos podios por palco — e a temporada fecha quando o
     // Global cai COM o rival batido no mesmo palco.

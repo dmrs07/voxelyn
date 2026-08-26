@@ -70,6 +70,26 @@ describe('a carreira conta a jornada', () => {
     expect(ladder.find((r) => r.spec.id === 'global')!.unlocked).toBe(false);
   });
 
+  it('uma run gloriosa que cruza DOIS gates anuncia o MAIOR — o mesmo que a Central seleciona', () => {
+    // rep 2 + grand prize (+3) + rival batido (+1) = 6: cruza o gate 3 do
+    // Regional E o gate 6 da Convencao — o convite anunciado e o da Convencao
+    // (achado de review: anunciar o menor descasava mensagem e palco).
+    const career = loadCareer();
+    career.rep = 2;
+    career.rival = { name: 'Team Fetch', skill: 0, wins: 0, losses: 0, roster: [] };
+    const state = doneState(5, 'grand-prize');
+    const close = applyRun(career, state, {
+      mode: 'career',
+      spent: 0,
+      hired: CLASSIC_TEAM,
+      rivalScore: 1,
+      event: CIRCUIT[0],
+    });
+    expect(career.rep).toBe(6);
+    expect(close.qualified).toBe('convencao');
+    expect(circuitLadder(career).find((r) => r.current)!.spec.id).toBe('convencao');
+  });
+
   it('a temporada fecha no Global, com o rival batido — uma vez so', () => {
     const career = loadCareer();
     career.rep = 20;

@@ -134,6 +134,7 @@ export const hashState = (state: HackState): string => {
   }
   h.str(state.circuit?.id ?? '-');
   h.fixed(state.circuit?.prizeScale ?? 1, HASH_METER);
+  h.fixed(state.circuit?.taskCostScale ?? 1, HASH_METER);
   for (const v of state.vibesSeen) h.str(v);
   for (const s of state.social) {
     h.str(s.kind);

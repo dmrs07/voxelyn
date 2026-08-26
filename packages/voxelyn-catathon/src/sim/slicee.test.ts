@@ -218,7 +218,29 @@ describe('catathon circuit: a identidade declarada do palco', () => {
     }
     toDone(base);
     toDone(staged);
-    expect(staged.result!.prize).toBe(Math.round(base.result!.prize * global.prizeScale));
+    // A escala multiplica CADA parcela do extrato (achado de review: escalar
+    // so o total quebrava o invariante prize = soma das partes).
+    const bp = base.result!.prizeParts;
+    const sp = staged.result!.prizeParts;
+    for (const k of Object.keys(bp) as (keyof typeof bp)[]) {
+      expect(sp[k], k).toBe(Math.round(bp[k] * global.prizeScale));
+    }
+    const sum = sp.placement + sp.zeroBugs + sp.deals + sp.sponsor + sp.special + sp.juniors + sp.debt;
+    expect(staged.result!.prize).toBe(Math.max(0, sum));
+  });
+
+  it('a tarefa de STRETCH nasce com a escala do palco — o Global nao cobra preco de Bairro', () => {
+    const global = CIRCUIT[4]!;
+    const base = mk(9);
+    const staged = mk(9, { circuit: global });
+    for (const state of [base, staged]) {
+      shipCore(state);
+      step(state, emptyCommand());
+      step(state, { stretch: true });
+    }
+    const costOf = (state: HackState): number =>
+      state.tasks.find((t) => t.id === state.sprint.offers[0]!.taskId)!.cost;
+    expect(costOf(staged)).toBe(Math.round(costOf(base) * global.taskCostScale));
   });
 });
 

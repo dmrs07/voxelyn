@@ -451,7 +451,9 @@ export const createHackathon = (
   sponsor,
   specialCategory: rollSpecialCategory(seed >>> 0),
   sprint: { mvpAt: -1, frozenAt: -1, offers: sprintOffers, done: 0 },
-  circuit: circuit ? { id: circuit.id, prizeScale: circuit.prizeScale } : null,
+  circuit: circuit
+    ? { id: circuit.id, prizeScale: circuit.prizeScale, taskCostScale: circuit.taskCostScale }
+    : null,
   vibesSeen: [],
   social: socialScheduleFor(seed >>> 0),
   events: [],
@@ -752,7 +754,12 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
         track: STRETCH_TRACK[offer.kind],
         label: offer.label,
         polish: true,
-        cost: Math.round(STRETCH_COST * (1 + STRETCH_COST_STEP * index)),
+        // O palco encarece o escopo ATE no fim de run: a tarefa de stretch
+        // nasce com a mesma escala declarada das outras (achado de review —
+        // o Global cobrava stretch a preco de Bairro).
+        cost: Math.round(
+          STRETCH_COST * (1 + STRETCH_COST_STEP * index) * (state.circuit?.taskCostScale ?? 1)
+        ),
         deps: [],
         chosen: null,
         progress: 0,
@@ -1500,31 +1507,31 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
 
   // O PREMIO em tampinhas, agora um EXTRATO (§7 do brief): colocacao, zero
   // bugs, acordos, sponsor cumprido, categoria especial, juniores crescidos
-  // — e a divida tecnica restante MORDE o cheque. Nunca negativo: o piso da
-  // vergonha e zero.
+  // — e a divida tecnica restante MORDE o cheque. O palco do CIRCUITO
+  // multiplica CADA parcela (achado de review: escalar so o total quebrava
+  // o invariante do extrato — a tela mostraria um cheque que as parcelas
+  // nao somam). A divida tambem escala: palco grande, vergonha grande.
+  // Nunca negativo: o piso da vergonha e zero.
+  const prizeScale = state.circuit?.prizeScale ?? 1;
+  const scaledPart = (v: number): number => Math.round(v * prizeScale);
   const prizeParts = {
-    placement: PRIZE_BY_OUTCOME[outcome] ?? 0,
-    zeroBugs: bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0,
-    deals: state.prizeBonus,
-    sponsor: sponsorMet ? (sp?.payout ?? 0) : 0,
-    special: specialWon ? PRIZE_SPECIAL : 0,
-    juniors: juniorsGrown * PRIZE_JUNIOR_GROWTH,
-    debt: -state.debt * PRIZE_DEBT_MALUS,
+    placement: scaledPart(PRIZE_BY_OUTCOME[outcome] ?? 0),
+    zeroBugs: scaledPart(bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0),
+    deals: scaledPart(state.prizeBonus),
+    sponsor: scaledPart(sponsorMet ? (sp?.payout ?? 0) : 0),
+    special: scaledPart(specialWon ? PRIZE_SPECIAL : 0),
+    juniors: scaledPart(juniorsGrown * PRIZE_JUNIOR_GROWTH),
+    debt: scaledPart(-state.debt * PRIZE_DEBT_MALUS),
   };
-  // O palco multiplica o cheque: e a promessa DECLARADA do circuito (o
-  // Global paga o dobro). Fora do circuito, escala 1 e o extrato bate 1:1.
   const prize = Math.max(
     0,
-    Math.round(
-      (prizeParts.placement +
-        prizeParts.zeroBugs +
-        prizeParts.deals +
-        prizeParts.sponsor +
-        prizeParts.special +
-        prizeParts.juniors +
-        prizeParts.debt) *
-        (state.circuit?.prizeScale ?? 1)
-    )
+    prizeParts.placement +
+      prizeParts.zeroBugs +
+      prizeParts.deals +
+      prizeParts.sponsor +
+      prizeParts.special +
+      prizeParts.juniors +
+      prizeParts.debt
   );
 
   const result: DemoResult = {

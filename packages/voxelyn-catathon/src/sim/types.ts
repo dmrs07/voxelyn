@@ -121,6 +121,12 @@ export type CircuitStage = {
   id: string;
   /** Multiplica o cheque da demo (o Global paga o dobro do Regional). */
   prizeScale: number;
+  /**
+   * O prestigio encarece o escopo — inclusive as tarefas de STRETCH criadas
+   * no meio da run (achado de review: o Global cobrava escopo de Bairro no
+   * fim de run).
+   */
+  taskCostScale: number;
 };
 
 /**
