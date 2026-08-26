@@ -14,7 +14,7 @@ import {
   CATNIP_STRESS_DROP,
   CATNIP_USES,
   CATNIP_ZOOMIES_P,
-  CHOICE_COST,
+  CHOICE_EFFECTS,
   COWBOY_BUG_P,
   COWBOY_SHORTCUT_P,
   COWBOY_SPEED,
@@ -121,6 +121,21 @@ import {
   SOCIAL_AT,
   SOCIAL_JITTER_TICKS,
   SOCIAL_WINDOW,
+  EARLY_SCORE_MAX,
+  FREEZE_STABILITY,
+  STRETCH_COST,
+  STRETCH_COST_STEP,
+  STRETCH_EGG_GOOD_P,
+  STRETCH_HYPE_EGG,
+  STRETCH_HYPE_POLISH,
+  STRETCH_HYPE_VIRAL,
+  STRETCH_MULT_STEP,
+  STRETCH_POLISH_STRESS,
+  STRETCH_REFACTOR_BUG_P,
+  STRETCH_SCALE_CABLE_P,
+  STRETCH_SPONSOR_PRIZE,
+  STRETCH_VIRAL_ENERGY,
+  STRETCH_VIRAL_STRESS,
   SPECIAL_CROWD_AT,
   SPECIAL_INNOVATION_AT,
   SPECIAL_STABILITY_AT,
@@ -165,8 +180,8 @@ import {
   ZOOMIES_TICKS,
 } from './constants.js';
 import { SLOTS, TASKS } from './data.js';
-import { CLASSIC_LAYOUT, rollLayout, rollProject, rollSpecialCategory, type Candidate } from './gen.js';
-import { CHOICE_TEXT, TASK_TEXT, type Locale } from './text.js';
+import { CLASSIC_LAYOUT, STRETCH_TRACK, rollLayout, rollProject, rollSpecialCategory, rollStretchOffers, type Candidate, type CircuitEventSpec } from './gen.js';
+import { CHOICE_TEXT, STRETCH_TEXT, TASK_TEXT, type Locale } from './text.js';
 import type {
   Cat,
   CatId,
@@ -182,6 +197,7 @@ import type {
   SocialKind,
   Spec,
   SponsorContract,
+  StretchOffer,
   Task,
   Track,
 } from './types.js';
@@ -331,10 +347,13 @@ export const createHackathon = (
     gear?: readonly GearId[];
     /** O contrato de sponsor fechado no recrutamento (carreira). */
     sponsor?: SponsorContract | null;
+    /** O evento do CIRCUITO desta run (carreira): a identidade declarada. */
+    circuit?: CircuitEventSpec | null;
   } = {}
 ): HackState => {
   const gear = [...(opts.gear ?? [])];
   const sponsor = opts.sponsor ?? null;
+  const circuit = opts.circuit ?? null;
   const locale: Locale = opts.locale ?? 'en';
   const project = opts.classic ? null : rollProject(seed >>> 0, locale);
   const layout = opts.classic ? CLASSIC_LAYOUT : rollLayout(seed >>> 0);
@@ -347,13 +366,32 @@ export const createHackathon = (
         label: TASK_TEXT[locale][t.id]?.[0] ?? t.label,
         choice: CHOICE_TEXT[locale][t.id] ?? undefined,
       }));
+  // O prestigio do palco encarece o escopo — parte da identidade DECLARADA
+  // do evento, aplicada na criacao (o custo entra no hash, como as escolhas).
+  const costScale = circuit?.taskCostScale ?? 1;
+  // As TRES oportunidades do Stretch Sprint, sorteadas da semente em ordem
+  // crescente de risco. Os rotulos nascem no idioma da run, como tudo.
+  const sprintOffers: StretchOffer[] = rollStretchOffers(seed >>> 0).map((kind, i) => ({
+    kind,
+    taskId: `s${i + 1}`,
+    label: STRETCH_TEXT[locale][kind]!.task,
+    status: 'locked',
+  }));
   return {
   tick: 0,
   phase: 'hack',
   seed: seed >>> 0,
   rngState: nextU32(seed >>> 0),
   cats: catsFromTeam(team),
-  tasks: taskDefs.map((t) => ({ ...t, progress: 0, done: false, cut: false, awaitingShip: false, chosen: null })),
+  tasks: taskDefs.map((t) => ({
+    ...t,
+    cost: Math.round(t.cost * costScale),
+    progress: 0,
+    done: false,
+    cut: false,
+    awaitingShip: false,
+    chosen: null,
+  })),
   bugs: [],
   hairball: {
     active: false,
@@ -412,6 +450,10 @@ export const createHackathon = (
   petSessions: 0,
   sponsor,
   specialCategory: rollSpecialCategory(seed >>> 0),
+  sprint: { mvpAt: -1, frozenAt: -1, offers: sprintOffers, done: 0 },
+  circuit: circuit
+    ? { id: circuit.id, prizeScale: circuit.prizeScale, taskCostScale: circuit.taskCostScale }
+    : null,
   vibesSeen: [],
   social: socialScheduleFor(seed >>> 0),
   events: [],
@@ -431,9 +473,19 @@ export const liveBug = (state: HackState, track: Track) =>
 export const workable = (state: HackState, task: Task): boolean =>
   !task.done && !task.cut && task.deps.every((d) => state.tasks.find((t) => t.id === d)?.done === true);
 
-/** A proxima tarefa que uma mesa consegue puxar, na ordem do quadro. */
-export const nextTask = (state: HackState, track: Track): Task | undefined =>
-  state.tasks.find((t) => t.track === track && workable(state, t) && !t.awaitingShip);
+/**
+ * A proxima tarefa que uma mesa consegue puxar, na ordem do quadro — com uma
+ * excecao: o STRETCH ACEITO fura a fila da propria trilha. O jogador acabou
+ * de apostar nele; a mesa pivota para a oportunidade em vez de terminar um
+ * polimento antigo primeiro (achado de review: o stretch aceito atras de um
+ * polish comum podia nunca comecar antes do prazo).
+ */
+export const nextTask = (state: HackState, track: Track): Task | undefined => {
+  const pool = state.tasks.filter((t) => t.track === track && workable(state, t) && !t.awaitingShip);
+  return (
+    pool.find((t) => state.sprint.offers.some((o) => o.taskId === t.id && o.status === 'taken')) ?? pool[0]
+  );
+};
 
 /** O slot no BOOTH DESTA RUN — as coordenadas moram no estado (layout). */
 const slotIn = (state: HackState, id: SlotId) => state.slots.find((s) => s.id === id)!;
@@ -519,6 +571,49 @@ const shipTask = (state: HackState, task: Task, by: Cat, events: SimEvent[]): vo
     if (next) {
       next.progress = Math.min(next.cost, next.progress + next.cost * SHORTCUT_HEADSTART);
       events.push({ kind: 'shortcut', tick: state.tick, task: next.label, by: by.id });
+    }
+  }
+
+  // Shipou uma oportunidade de STRETCH: o beneficio paga, o risco rola, o
+  // multiplicador sobe — e a proxima porta (mais arriscada) se abre.
+  const offer = state.sprint.offers.find((o) => o.taskId === task.id && o.status === 'taken');
+  if (offer) {
+    offer.status = 'done';
+    state.sprint.done++;
+    if (offer.kind === 'polimento-obsessivo') {
+      state.uxCare += 1;
+      state.hype += STRETCH_HYPE_POLISH;
+    } else if (offer.kind === 'demo-viral') {
+      state.hype += STRETCH_HYPE_VIRAL;
+    } else if (offer.kind === 'feature-patrocinada') {
+      state.prizeBonus += STRETCH_SPONSOR_PRIZE;
+    } else if (offer.kind === 'refactor-heroico') {
+      state.stability += 1;
+      state.debt = Math.max(0, state.debt - 1);
+      // "Pode reabrir dependencias": o legado morde de volta.
+      if (draw01(state) < STRETCH_REFACTOR_BUG_P) pushBug(state, 'backend', by.id, 'sem-teste', events);
+    } else if (offer.kind === 'escala-absurda') {
+      state.innovation += 1;
+      // Um milhao de gatos simultaneos: o build PODE nao aguentar.
+      if (draw01(state) < STRETCH_SCALE_CABLE_P && !state.cableOut && !state.buildBroken) {
+        state.cableOut = true;
+        state.cableProgress = 0;
+        events.push({ kind: 'cable', tick: state.tick, by: by.id });
+      }
+    } else if (offer.kind === 'easter-egg-felino') {
+      // Imprevisivel por definicao: ou a plateia ama, ou nasceu um bug.
+      if (draw01(state) < STRETCH_EGG_GOOD_P) {
+        state.hype += STRETCH_HYPE_EGG;
+        state.innovation += 1;
+      } else {
+        pushBug(state, 'frontend', by.id, 'sem-teste', events);
+      }
+    }
+    events.push({ kind: 'stretch-done', tick: state.tick, offer: offer.kind });
+    const next = state.sprint.offers.find((o) => o.status === 'locked');
+    if (next) {
+      next.status = 'open';
+      events.push({ kind: 'stretch-open', tick: state.tick, offer: next.kind });
     }
   }
 };
@@ -655,60 +750,95 @@ const applyCommand = (state: HackState, cmd: Command, events: SimEvent[]): void 
       }
     }
   }
+
+  // ACEITAR a oportunidade de Stretch Sprint aberta: a tarefa entra no
+  // quadro (sem dependencias — o nucleo ja fechou) e o risco de ACEITE
+  // cobra na hora. O beneficio so paga quem shipa.
+  if (cmd.stretch && state.sprint.mvpAt >= 0) {
+    const offer = state.sprint.offers.find((o) => o.status === 'open');
+    if (offer) {
+      offer.status = 'taken';
+      const index = state.sprint.offers.indexOf(offer);
+      state.tasks.push({
+        id: offer.taskId,
+        track: STRETCH_TRACK[offer.kind],
+        label: offer.label,
+        polish: true,
+        // O palco encarece o escopo ATE no fim de run: a tarefa de stretch
+        // nasce com a mesma escala declarada das outras (achado de review —
+        // o Global cobrava stretch a preco de Bairro).
+        cost: Math.round(
+          STRETCH_COST * (1 + STRETCH_COST_STEP * index) * (state.circuit?.taskCostScale ?? 1)
+        ),
+        deps: [],
+        chosen: null,
+        progress: 0,
+        done: false,
+        cut: false,
+        awaitingShip: false,
+      });
+      if (offer.kind === 'polimento-obsessivo') {
+        // Polir o polido estressa quem vive disso: design e frontend pagam.
+        for (const c of state.cats) {
+          if (c.specialty === 'design' || c.specialty === 'frontend') {
+            c.stress = Math.min(1, c.stress + STRETCH_POLISH_STRESS);
+          }
+        }
+      } else if (offer.kind === 'demo-viral') {
+        // A demo viral exige gatos DESCANSADOS: os cansados pagam em estresse.
+        for (const c of state.cats) {
+          if (c.energy < STRETCH_VIRAL_ENERGY) c.stress = Math.min(1, c.stress + STRETCH_VIRAL_STRESS);
+        }
+      } else if (offer.kind === 'feature-patrocinada') {
+        // O SDK deles entra no caminho da demo: o contrato pode ser
+        // descumprido — a mesma amarra do 'demo-api', aceita no fim da run.
+        state.sponsorRisk = true;
+      }
+      events.push({ kind: 'stretch-taken', tick: state.tick, offer: offer.kind });
+    }
+  }
+
+  // CONGELAR a submissao: so com o MVP pronto. As oportunidades aceitas e
+  // NAO comecadas saem do quadro sem custo (parar e decisao respeitada);
+  // as comecadas viram ponta solta — o preco de ter apostado. Estabilidade
+  // e os pontos de entrega antecipada pagam quem para cedo.
+  if (cmd.freeze && state.sprint.mvpAt >= 0 && state.phase === 'hack' && state.sprint.frozenAt < 0) {
+    state.sprint.frozenAt = state.tick;
+    state.stability += FREEZE_STABILITY;
+    for (const offer of state.sprint.offers) {
+      if (offer.status !== 'taken') continue;
+      const task = state.tasks.find((t) => t.id === offer.taskId);
+      if (task && !task.done && !task.cut && task.progress === 0 && !task.awaitingShip) {
+        task.cut = true;
+        events.push({ kind: 'cut', tick: state.tick, task: task.label });
+      }
+    }
+    events.push({ kind: 'freeze', tick: state.tick });
+    startPitch(state, events);
+  }
 };
 
 /**
  * O EFEITO de cada decisao — custo agora, custo depois, e tags que a banca
- * cobra. Nada aqui e "+10%": cada opcao muda o formato da run.
+ * cobra. Nada aqui e "+10%": cada opcao muda o formato da run. O switch
+ * virou TABELA (CHOICE_EFFECTS) quando as variacoes multiplicaram o
+ * vocabulario: uma linha por opcao, e o teste vigia que nenhum card
+ * ofereca opcao sem efeito.
  */
 const applyChoice = (state: HackState, task: Task, option: string): void => {
+  const fx = CHOICE_EFFECTS[option];
+  if (!fx) return;
   const scale = (id: string, k: number): void => {
     const t = state.tasks.find((x) => x.id === id);
     if (t && !t.done) t.cost = Math.round(t.cost * k);
   };
-  switch (option) {
-    case 'monolito':
-      scale(task.id, CHOICE_COST.monolito);
-      state.debt += 1;
-      break;
-    case 'micro':
-      scale(task.id, CHOICE_COST.micro);
-      scale('b2', CHOICE_COST.microDownstream);
-      scale('b3', CHOICE_COST.microDownstream);
-      state.innovation += 1;
-      break;
-    case 'serverless':
-      scale(task.id, CHOICE_COST.serverless);
-      state.sponsorRisk = true;
-      state.innovation += 1;
-      break;
-    case 'sistemaPrimeiro':
-      scale(task.id, CHOICE_COST.sistemaPrimeiro);
-      scale('d2', CHOICE_COST.sistemaDownstream);
-      scale('d3', CHOICE_COST.sistemaDownstream);
-      state.uxCare += 1;
-      break;
-    case 'componentesLocais':
-      scale(task.id, CHOICE_COST.componentesLocais);
-      state.debt += 1;
-      break;
-    case 'templateSponsor':
-      scale(task.id, CHOICE_COST.templateSponsor);
-      state.innovation -= 1;
-      break;
-    case 'pipelineCompleto':
-      scale(task.id, CHOICE_COST.pipelineCompleto);
-      state.stability += 1;
-      break;
-    case 'deployNaMao':
-      scale(task.id, CHOICE_COST.deployNaMao);
-      state.debt += 1;
-      break;
-    case 'presetSponsor':
-      scale(task.id, CHOICE_COST.presetSponsor);
-      state.sponsorRisk = true;
-      break;
-  }
+  if (fx.self !== undefined) scale(task.id, fx.self);
+  for (const [id, k] of fx.downstream ?? []) scale(id, k);
+  state.debt += fx.debt ?? 0;
+  state.innovation += fx.innovation ?? 0;
+  state.uxCare += fx.uxCare ?? 0;
+  state.stability += fx.stability ?? 0;
+  if (fx.sponsorRisk) state.sponsorRisk = true;
 };
 
 /**
@@ -1339,7 +1469,15 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
   const vonWhiskers = tecnicaW + inovacao;
   const meowper = estabilidadeW;
   const cocada = experienciaW;
-  const score = vonWhiskers + meowper + cocada + pitchScore;
+  // O STRETCH multiplica a nota inteira (a ambicao paga em cima de tudo); a
+  // ENTREGA ANTECIPADA soma por fora, linear na folga do congelamento — o
+  // premio de quem parou nao deve inflar com o risco que ele recusou.
+  const mult = 1 + state.sprint.done * STRETCH_MULT_STEP;
+  const early =
+    state.sprint.frozenAt >= 0
+      ? Math.round((EARLY_SCORE_MAX * (HACK_TICKS - state.sprint.frozenAt)) / HACK_TICKS)
+      : 0;
+  const score = Math.round((vonWhiskers + meowper + cocada + pitchScore) * mult) + early;
 
   let outcome: Outcome;
   if (crashed) outcome = 'crashed';
@@ -1379,16 +1517,21 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
 
   // O PREMIO em tampinhas, agora um EXTRATO (§7 do brief): colocacao, zero
   // bugs, acordos, sponsor cumprido, categoria especial, juniores crescidos
-  // — e a divida tecnica restante MORDE o cheque. Nunca negativo: o piso da
-  // vergonha e zero.
+  // — e a divida tecnica restante MORDE o cheque. O palco do CIRCUITO
+  // multiplica CADA parcela (achado de review: escalar so o total quebrava
+  // o invariante do extrato — a tela mostraria um cheque que as parcelas
+  // nao somam). A divida tambem escala: palco grande, vergonha grande.
+  // Nunca negativo: o piso da vergonha e zero.
+  const prizeScale = state.circuit?.prizeScale ?? 1;
+  const scaledPart = (v: number): number => Math.round(v * prizeScale);
   const prizeParts = {
-    placement: PRIZE_BY_OUTCOME[outcome] ?? 0,
-    zeroBugs: bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0,
-    deals: state.prizeBonus,
-    sponsor: sponsorMet ? (sp?.payout ?? 0) : 0,
-    special: specialWon ? PRIZE_SPECIAL : 0,
-    juniors: juniorsGrown * PRIZE_JUNIOR_GROWTH,
-    debt: -state.debt * PRIZE_DEBT_MALUS,
+    placement: scaledPart(PRIZE_BY_OUTCOME[outcome] ?? 0),
+    zeroBugs: scaledPart(bugs === 0 && !crashed ? PRIZE_ZERO_BUGS : 0),
+    deals: scaledPart(state.prizeBonus),
+    sponsor: scaledPart(sponsorMet ? (sp?.payout ?? 0) : 0),
+    special: scaledPart(specialWon ? PRIZE_SPECIAL : 0),
+    juniors: scaledPart(juniorsGrown * PRIZE_JUNIOR_GROWTH),
+    debt: scaledPart(-state.debt * PRIZE_DEBT_MALUS),
   };
   const prize = Math.max(
     0,
@@ -1411,6 +1554,8 @@ const runDemo = (state: HackState, events: SimEvent[]): void => {
     sponsorMet,
     specialWon,
     juniorsGrown,
+    early,
+    stretched: state.sprint.done,
     perJudge: [vonWhiskers, meowper, cocada],
     dimensions: { tecnica: tecnicaW, estabilidade: estabilidadeW, experiencia: experienciaW, inovacao, pitch: pitchScore },
     plateia: p.gauge,
@@ -1516,6 +1661,12 @@ export const step = (state: HackState, cmd: Command): SimEvent[] => {
   }
 
   applyCommand(state, cmd, events);
+  // CONGELOU a submissao: a run pulou direto ao palco neste comando — o
+  // resto do tick de booth nao existe mais.
+  if (state.phase !== 'hack') {
+    state.events.push(...events);
+    return events;
+  }
   stepHairball(state, events);
   for (const cat of state.cats) stepCat(state, cat, cmd, events);
   stepPm(state, events);
@@ -1528,6 +1679,22 @@ export const step = (state: HackState, cmd: Command): SimEvent[] => {
       events.push({ kind: 'social-open', tick: state.tick, social: ev.kind });
     } else if (!ev.resolved && ev.until > 0 && state.tick >= ev.until) {
       resolveSocial(state, ev, 'b', events);
+    }
+  }
+
+  // O NUCLEO fechou antes do prazo? O Stretch Sprint abre: dali em diante o
+  // fim da run e decisao (congelar ou esticar), nunca tempo morto. Escopo
+  // todo cortado nao e MVP: e preciso ter shipado ALGO.
+  if (state.sprint.mvpAt < 0) {
+    const core = state.tasks.filter((t) => !t.polish);
+    if (core.some((t) => t.done) && core.every((t) => t.done || t.cut)) {
+      state.sprint.mvpAt = state.tick;
+      events.push({ kind: 'mvp-ready', tick: state.tick });
+      const first = state.sprint.offers[0];
+      if (first && first.status === 'locked') {
+        first.status = 'open';
+        events.push({ kind: 'stretch-open', tick: state.tick, offer: first.kind });
+      }
     }
   }
 

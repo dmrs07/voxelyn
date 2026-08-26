@@ -129,20 +129,59 @@ export const HAIRBALL_COST = 12 * TICK_HZ;
 
 // ---------------------------------------------------------------- escolhas
 
-/** Multiplicadores de custo das opcoes (aplicados UMA vez, na decisao). */
-export const CHOICE_COST = {
-  monolito: 0.8,
-  micro: 1.25,
-  microDownstream: 0.85,
-  serverless: 0.7,
-  sistemaPrimeiro: 1.3,
-  sistemaDownstream: 0.75,
-  componentesLocais: 0.85,
-  templateSponsor: 0.6,
-  pipelineCompleto: 1.25,
-  deployNaMao: 0.7,
-  presetSponsor: 0.8,
-} as const;
+/**
+ * O EFEITO de cada opcao de decisao, por id GLOBAL — o vocabulario inteiro
+ * das variacoes numa tabela so: custo agora (self), custo depois
+ * (downstream), e as tags que a banca cobra. O texto mora em text.ts; toda
+ * opcao que aparece num card TEM de ter uma linha aqui (teste vigia).
+ */
+export type ChoiceEffect = {
+  /** Multiplica o custo da PROPRIA tarefa (aplicado uma vez, na decisao). */
+  self?: number;
+  /** Tarefas a jusante que ficam mais baratas (ou caras): [id, escala]. */
+  downstream?: readonly (readonly [string, number])[];
+  debt?: number;
+  innovation?: number;
+  uxCare?: number;
+  stability?: number;
+  /** Amarra a demo na API do sponsor (pode cair no palco). */
+  sponsorRisk?: boolean;
+};
+
+export const CHOICE_EFFECTS: Record<string, ChoiceEffect> = {
+  // b1 — arquitetura do backend
+  monolito: { self: 0.8, debt: 1 },
+  micro: { self: 1.25, downstream: [['b2', 0.85], ['b3', 0.85]], innovation: 1 },
+  serverless: { self: 0.7, sponsorRisk: true, innovation: 1 },
+  // b1 (variacao) — onde moram os dados
+  postgresDeRaca: { self: 1.15, stability: 1 },
+  nosqlZoomies: { self: 0.75, debt: 1 },
+  planilhaDoSponsor: { self: 0.6, sponsorRisk: true },
+  // f1 — como construir o front
+  spaArtesanal: { self: 1.25, downstream: [['f2', 0.85], ['f3', 0.85]], innovation: 1 },
+  frameworkFofo: { self: 0.75, debt: 1 },
+  pwaAcessivel: { self: 1.1, uxCare: 1 },
+  // f1 (variacao) — quem renderiza
+  ssrCaprichado: { self: 1.2, stability: 1 },
+  clientOnly: { self: 0.8, debt: 1 },
+  microFrontends: { self: 1.25, downstream: [['f2', 0.85], ['f3', 0.85]], innovation: 1 },
+  // d1 — como atacar a UI
+  sistemaPrimeiro: { self: 1.3, downstream: [['d2', 0.75], ['d3', 0.75]], uxCare: 1 },
+  componentesLocais: { self: 0.85, debt: 1 },
+  templateSponsor: { self: 0.6, innovation: -1 },
+  // d1 (variacao) — a alma da UI
+  testeComGatos: { self: 1.3, uxCare: 1 },
+  copiarConcorrente: { self: 0.7, innovation: -1 },
+  brutalismoFofo: { self: 0.9, innovation: 1, debt: 1 },
+  // o1 — como vai ao ar
+  pipelineCompleto: { self: 1.25, stability: 1 },
+  deployNaMao: { self: 0.7, debt: 1 },
+  presetSponsor: { self: 0.8, sponsorRisk: true },
+  // o1 (variacao) — quando vai ao ar
+  deployContinuo: { self: 1.2, stability: 1 },
+  deployNaSexta: { self: 0.7, debt: 1 },
+  containerDoSponsor: { self: 0.8, sponsorRisk: true },
+};
 /** Cada ponto de divida tecnica exposta morde a estabilidade na banca. */
 export const SCORE_DEBT_PENALTY = -4;
 export const SCORE_INNOVATION = 5;
@@ -315,6 +354,39 @@ export const CATNIP_ZOOMIES_P = 0.4;
 export const LASER_USES = 1;
 export const LASER_STRESS_DROP = 0.18;
 export const LASER_ZOOMIES_TICKS = Math.round(2.5 * TICK_HZ);
+
+// ----------------------------------------------------------- stretch sprint
+//
+// O TEMPO MORTO que esta secao mata: com o nucleo pronto cedo, sobrava
+// microgerencia sem decisao. Agora o fim de run e push-your-luck: congelar
+// paga entrega antecipada; cada oportunidade concluida multiplica o score e
+// abre uma proxima MAIS arriscada. Parar e sempre uma opcao respeitada.
+
+/** Cada oportunidade concluida soma isto ao multiplicador de score. */
+export const STRETCH_MULT_STEP = 0.08;
+/** Custo base da tarefa de stretch; cada tier seguinte custa 20% mais. */
+export const STRETCH_COST = 26 * TICK_HZ;
+export const STRETCH_COST_STEP = 0.2;
+/** Entrega antecipada: ate isto em pontos, linear na folga do congelamento. */
+export const EARLY_SCORE_MAX = 18;
+/** Congelar tambem paga estabilidade: build parado nao quebra no palco. */
+export const FREEZE_STABILITY = 1;
+/** Polimento obsessivo: estressa quem vive de design/frontend. */
+export const STRETCH_POLISH_STRESS = 0.1;
+/** Demo viral exige gatos DESCANSADOS: os cansados pagam em estresse. */
+export const STRETCH_VIRAL_ENERGY = 0.5;
+export const STRETCH_VIRAL_STRESS = 0.08;
+/** Feature patrocinada: cheque gordo — e o contrato pode ser descumprido. */
+export const STRETCH_SPONSOR_PRIZE = 40;
+/** Escala absurda: pode derrubar o build no ship. */
+export const STRETCH_SCALE_CABLE_P = 0.3;
+/** Refactor heroico: pode reabrir dependencias (bug no backend). */
+export const STRETCH_REFACTOR_BUG_P = 0.25;
+/** Easter egg felino: resultado imprevisivel por definicao. */
+export const STRETCH_EGG_GOOD_P = 0.55;
+export const STRETCH_HYPE_VIRAL = 0.08;
+export const STRETCH_HYPE_EGG = 0.06;
+export const STRETCH_HYPE_POLISH = 0.03;
 
 // ---------------------------------------------------------- eventos sociais
 

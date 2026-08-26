@@ -1,11 +1,13 @@
 import { presentToCanvas } from '@voxelyn/core/adapters/canvas2d';
 import {
+  CIRCUIT_TEXT,
   CLASSIC_TEAM,
   RIVAL_TAUNT_TEXT,
   RUN_BUDGET,
   TICK_MS,
   createHackathon,
   dailySeed,
+  eventForRep,
   returningCandidate,
   rivalScoreFor,
   rollCandidates,
@@ -16,6 +18,7 @@ import {
   rollSponsorOffer,
   step,
   type Candidate,
+  type CircuitEventSpec,
   type GearId,
 } from '../sim/index.js';
 import { applyRun, ensureRival, loadCareer, todayUTC, type Mode } from './career.js';
@@ -37,7 +40,7 @@ import {
 } from './audio/index.js';
 import { attachInput, attachKeyboard, buildCommand, createInput, type InputState, type InputTeardown } from './input.js';
 import { getLocale, t } from './i18n.js';
-import { bindTeam, clearScreens, createHud, drawCard, drawHud, pushFeed, showRecruit, showResult, showTitle, type Hud } from './hud.js';
+import { bindTeam, clearScreens, createHud, drawCard, drawHud, pushFeed, showHub, showRecruit, showResult, showTitle, type Hud } from './hud.js';
 import { createView, drawHand, drawScene, type View } from './render.js';
 
 export type App = {
@@ -61,6 +64,8 @@ export type App = {
   hired: readonly Candidate[];
   /** O contrato de sponsor assinado nesta edicao, se houve. */
   sponsor: SponsorContract | null;
+  /** O palco do CIRCUITO desta edicao (carreira; null fora dela). */
+  event: CircuitEventSpec | null;
   accumulator: number;
   lastFrame: number;
   frameHandle: number;
@@ -116,15 +121,20 @@ const tickGame = (app: App): void => {
     // embora. A nota do rival usa o skill de ANTES da run (a carreira so e
     // salva nos fechamentos — durante a run ela nao muda).
     const career = loadCareer();
+    // O rival leva o CIRCUITO a serio: o bonus do palco soma ao skill que a
+    // carreira acumulou — a final do Global e contra o rival no auge.
     const rivalScore =
-      app.mode === 'career' && career.rival ? rivalScoreFor(app.state.seed, career.rival.skill) : null;
+      app.mode === 'career' && career.rival
+        ? rivalScoreFor(app.state.seed, career.rival.skill + (app.event?.rivalBonus ?? 0))
+        : null;
     const close = applyRun(career, app.state, {
       mode: app.mode,
       spent: app.spent,
       hired: app.hired,
       rivalScore,
+      event: app.event,
     });
-    showResult(app.screenHost, app.state, close, () => openRecruit(app, app.mode));
+    showResult(app.screenHost, app.state, close, () => openRecruit(app, app.mode), () => openHub(app));
   }
 };
 
@@ -156,6 +166,10 @@ const openRecruit = (app: App, mode: Mode): void => {
   // comparacao justa do daily nao pode depender da tua carreira.
   const rival = career ? ensureRival(career, app.seed) : null;
   const taunts = RIVAL_TAUNT_TEXT[getLocale()];
+  // O PALCO desta edicao: a carreira joga o maior evento que a reputacao ja
+  // abriu, com a identidade DECLARADA no convite (patas, premiacao).
+  app.event = career ? eventForRep(career.rep) : null;
+  const evText = app.event ? CIRCUIT_TEXT[getLocale()][app.event.id]! : null;
   showRecruit(
     app.screenHost,
     candidates,
@@ -168,6 +182,15 @@ const openRecruit = (app: App, mode: Mode): void => {
       rivalLine: rival ? t().rivalIntro(rival.name, taunts[app.seed % taunts.length]!) : null,
       rosterLine: rival && rival.roster.length > 0 ? t().rivalRoster(rival.roster.join(', ')) : null,
       special: rollSpecialCategory(app.seed),
+      eventLine:
+        app.event && evText
+          ? t().eventInvite(
+              evText.name,
+              evText.blurb,
+              '●'.repeat(app.event.paws) + '○'.repeat(5 - app.event.paws),
+              String(app.event.prizeScale)
+            )
+          : null,
     },
     (hired, gear, sponsor) => startRun(app, hired, gear, sponsor)
   );
@@ -193,7 +216,7 @@ const startRun = (
       return s + (offer?.cost ?? 0);
     }, 0) -
     (sponsor?.budget ?? 0);
-  app.state = createHackathon(app.seed, team, { locale: getLocale(), gear, sponsor });
+  app.state = createHackathon(app.seed, team, { locale: getLocale(), gear, sponsor, circuit: app.event });
   bindTeam(app.hud, app.state.cats);
   app.input.selected = null;
   app.input.queue.length = 0;
@@ -268,6 +291,9 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
       },
       onLaser: () => input.queue.push({ laser: true }),
       onSocial: (option) => input.queue.push({ social: option }),
+      // O STRETCH SPRINT: congelar a submissao ou topar a oportunidade.
+      onFreeze: () => input.queue.push({ freeze: true }),
+      onStretch: () => input.queue.push({ stretch: true }),
     }),
     audio,
     screenHost,
@@ -276,6 +302,7 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
     spent: 0,
     hired: CLASSIC_TEAM,
     sponsor: null,
+    event: null,
     accumulator: 0,
     lastFrame: 0,
     frameHandle: 0,
@@ -287,11 +314,30 @@ export const createApp = (canvas: HTMLCanvasElement, hudHost: HTMLElement, scree
   window.addEventListener('pointerdown', () => unlockAudio(app.audio), { once: true });
   window.addEventListener('touchstart', () => unlockAudio(app.audio), { once: true, passive: true });
 
-  showTitle(screenHost, (mode) => {
-    openRecruit(app, mode);
-  });
+  openTitle(app);
 
   return app;
+};
+
+/** A tela de titulo, com a porta para a CENTRAL DA CARREIRA. */
+const openTitle = (app: App): void => {
+  clearScreens(app.screenHost);
+  app.phase = 'title';
+  showTitle(
+    app.screenHost,
+    (mode) => openRecruit(app, mode),
+    () => openHub(app)
+  );
+};
+
+/** A Central: a jornada visivel — e as portas de volta para o jogo. */
+const openHub = (app: App): void => {
+  clearScreens(app.screenHost);
+  app.phase = 'title';
+  showHub(app.screenHost, loadCareer(), {
+    onBack: () => openTitle(app),
+    onPlay: (mode) => openRecruit(app, mode),
+  });
 };
 
 export const start = (app: App): void => {

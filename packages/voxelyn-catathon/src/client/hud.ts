@@ -1,5 +1,7 @@
 import {
   ACHIEVEMENT_TEXT,
+  CIRCUIT_TEXT,
+  EARLY_SCORE_MAX,
   GEAR_TEXT,
   HACK_TICKS,
   HOURS_PER_TICK,
@@ -9,15 +11,18 @@ import {
   SOCIAL_WINDOW,
   SPECIAL_TEXT,
   SPONSOR_TEXT,
+  STRETCH_MULT_STEP,
+  STRETCH_TEXT,
   TREATS_START,
   fmtCost,
+  nextLockedEvent,
   vibeOf,
   workable,
   type Candidate,
   type GearId,
 } from '../sim/index.js';
 import { getLocale, setLocale, specLabel, t, tierLabel, traitLabel } from './i18n.js';
-import type { RunClose } from './career.js';
+import { ACHIEVEMENTS_ALL, circuitLadder, todayUTC, type Career, type RunClose } from './career.js';
 
 /** Alias do dicionario para escopos onde `t` e uma Task. */
 const i18n = t;
@@ -63,6 +68,12 @@ export const ICONS = {
   leaf: svg('<path d="M12 21c-5-2-7-6-7-11 5 0 9 2 11 7-1 2-2 3-4 4z"/><path d="M12 21C12 14 9 9 5 6"/><path d="M12 10V3"/>'),
   /** Laser: o ponto e o feixe — o unico botao que mira o chao. */
   laser: svg('<circle cx="7" cy="17" r="2.5"/><path d="M9.5 14.5L20 4"/><path d="M16 4h4v4"/>'),
+  /** Congelar a build: o floco de neve do deploy em paz. */
+  snow: svg('<path d="M12 3v18"/><path d="M4 7l16 10"/><path d="M20 7L4 17"/><path d="M12 3l-2.5 2.5M12 3l2.5 2.5"/><path d="M12 21l-2.5-2.5M12 21l2.5-2.5"/>'),
+  /** Topar o stretch: a seta que sobe alem do combinado. */
+  spark: svg('<path d="M5 19L19 5"/><path d="M11 5h8v8"/><path d="M5 12v7h7"/>'),
+  /** A Central da Carreira: o trofeu na estante. */
+  trophy: svg('<path d="M8 4h8v5a4 4 0 11-8 0z"/><path d="M8 5H4c0 3 1.5 5 4 5"/><path d="M16 5h4c0 3-1.5 5-4 5"/><path d="M12 13v4"/><path d="M8 21h8l-1-4h-6z"/>'),
 } as const;
 
 /**
@@ -172,6 +183,31 @@ export type Hud = {
    * tocava "cortar" e nada acontecia. Botao que existe fica existindo.
    */
   rows: Map<string, TaskRow>;
+  /** Grupos por trilha no quadro: as tarefas de STRETCH nascem no meio da
+   * run e precisam de onde brotar (a licao dos botoes detached vale: a
+   * linha nova e criada UMA vez e atualizada no lugar). */
+  trackGroups: Map<string, HTMLElement>;
+  /** O painel do STRETCH SPRINT: aparece quando o MVP fecha — congelar a
+   * submissao ou topar a oportunidade aberta. */
+  sprintPanel: HTMLElement;
+  sprintFreezeBtn: HTMLButtonElement;
+  sprintFreezeHint: HTMLElement;
+  sprintMultEl: HTMLElement;
+  sprintOfferBox: HTMLElement;
+  sprintOfferName: HTMLElement;
+  sprintOfferGain: HTMLElement;
+  sprintOfferRisk: HTMLElement;
+  sprintAcceptBtn: HTMLButtonElement;
+  sprintOfferKind: { current: string | null };
+  /** O KICKOFF: as decisoes iniciais do projeto em cards, uma trilha por
+   * vez (backend, frontend, design, devops) — decidir ou adiar, com os
+   * trade-offs escritos. O quadro segue sendo o caminho de sempre. */
+  kickoffCard: HTMLElement;
+  kickoffStepEl: HTMLElement;
+  kickoffPrompt: HTMLElement;
+  kickoffOptions: HTMLElement;
+  kickoffSkipBtn: HTMLButtonElement;
+  kickoff: { queue: string[] | null; skipped: string[]; built: string | null };
   /**
    * O GANTT REAL dentro do Kanban: 48h de vao, uma raia por gato, e os
    * segmentos vao preenchendo conforme cada um trabalha — cor por trilha,
@@ -199,6 +235,8 @@ export type Hud = {
   onChoose: (task: string, option: string) => void;
   onSelect: (cat: CatId) => void;
   onAbility: (cat: CatId) => void;
+  onFreeze: () => void;
+  onStretch: () => void;
 };
 
 export const createHud = (
@@ -215,6 +253,8 @@ export const createHud = (
     onCatnipToggle: () => void;
     onLaser: () => void;
     onSocial: (option: 'a' | 'b') => void;
+    onFreeze: () => void;
+    onStretch: () => void;
   }
 ): Hud => {
   const root = el('div', 'hud');
@@ -403,7 +443,45 @@ export const createHud = (
   socialTimerBar.appendChild(socialTimer);
   socialModal.append(socialTitle, socialA, socialB, socialTimerBar);
 
-  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal);
+  // O STRETCH SPRINT: quando o MVP fecha, ESTE painel e a decisao do fim de
+  // run — congelar (garantido) ou topar a oportunidade aberta (multiplica e
+  // arrisca). Botoes criados UMA vez; o drawHud so mostra e atualiza.
+  const sprintPanel = el('div', 'sprint-panel');
+  sprintPanel.hidden = true;
+  sprintPanel.appendChild(el('div', 'sprint-title', t().sprintTitle));
+  const sprintMultEl = el('div', 'sprint-mult', '');
+  const sprintFreezeBtn = softButton(ICONS.snow, t().sprintFreezeWord, 'sprint-freeze');
+  sprintFreezeBtn.addEventListener('click', handlers.onFreeze);
+  const sprintFreezeHint = el('div', 'sprint-freeze-hint', '');
+  const sprintOfferBox = el('div', 'sprint-offer');
+  sprintOfferBox.hidden = true;
+  const sprintOfferName = el('div', 'sprint-offer-name', '');
+  const sprintOfferGain = el('div', 'sprint-offer-gain', '');
+  const sprintOfferRisk = el('div', 'sprint-offer-risk', '');
+  const sprintAcceptBtn = softButton(ICONS.spark, t().sprintAccept, 'sprint-accept');
+  sprintAcceptBtn.addEventListener('click', handlers.onStretch);
+  sprintOfferBox.append(sprintOfferName, sprintOfferGain, sprintOfferRisk, sprintAcceptBtn);
+  sprintPanel.append(sprintMultEl, sprintFreezeBtn, sprintFreezeHint, sprintOfferBox);
+
+  // O KICKOFF: as decisoes iniciais em CARDS, uma trilha por vez. O card e
+  // atalho, nao gaiola: "decidir depois" adia para o quadro, como sempre.
+  const kickoff: Hud['kickoff'] = { queue: null, skipped: [], built: null };
+  const kickoffCard = el('div', 'kickoff-card');
+  kickoffCard.hidden = true;
+  kickoffCard.appendChild(el('div', 'kickoff-title', t().kickoffTitle));
+  const kickoffStepEl = el('div', 'kickoff-step', '');
+  const kickoffPrompt = el('div', 'kickoff-prompt', '');
+  const kickoffOptions = el('div', 'kickoff-options');
+  const kickoffSkipBtn = document.createElement('button');
+  kickoffSkipBtn.type = 'button';
+  kickoffSkipBtn.className = 'kickoff-skip';
+  kickoffSkipBtn.textContent = t().kickoffSkip;
+  kickoffSkipBtn.addEventListener('click', () => {
+    if (kickoff.built) kickoff.skipped.push(kickoff.built);
+  });
+  kickoffCard.append(kickoffStepEl, kickoffPrompt, kickoffOptions, kickoffSkipBtn);
+
+  root.append(top, soundBtn, teamBar, cluster, board, soundPanel, dock, feedStrip, feedPanel, pitchPanel, socialModal, sprintPanel, kickoffCard);
   host.appendChild(root);
 
   const hudRef: Hud = {
@@ -436,6 +514,23 @@ export const createHud = (
     pitchCrisis,
     pitchBtns,
     rows: new Map(),
+    trackGroups: new Map(),
+    sprintPanel,
+    sprintFreezeBtn,
+    sprintFreezeHint,
+    sprintMultEl,
+    sprintOfferBox,
+    sprintOfferName,
+    sprintOfferGain,
+    sprintOfferRisk,
+    sprintAcceptBtn,
+    sprintOfferKind: { current: null },
+    kickoffCard,
+    kickoffStepEl,
+    kickoffPrompt,
+    kickoffOptions,
+    kickoffSkipBtn,
+    kickoff,
     ganttLanes: new Map(),
     ganttNow: new Map(),
     ganttSegs: new Map(),
@@ -491,6 +586,11 @@ export const bindTeam = (hud: Hud, cats: readonly Cat[]): void => {
   hud.abilityRow.replaceChildren();
   hud.pitchBtns.clear();
   hud.rows.clear();
+  hud.trackGroups.clear();
+  hud.sprintOfferKind.current = null;
+  hud.kickoff.queue = null;
+  hud.kickoff.skipped.length = 0;
+  hud.kickoff.built = null;
   hud.ganttLanes.clear();
   hud.ganttNow.clear();
   hud.ganttSegs.clear();
@@ -712,6 +812,16 @@ const EVENT_TEXT = (state: HackState, e: SimEvent): string | null => {
       return d.ev.mentor(name(e.mentor), name(e.junior));
     case 'grown':
       return d.ev.grown(name(e.cat));
+    case 'mvp-ready':
+      return d.ev.mvpReady;
+    case 'stretch-open':
+      return d.ev.stretchOpen(STRETCH_TEXT[getLocale()][e.offer]!.name);
+    case 'stretch-taken':
+      return d.ev.stretchTaken(STRETCH_TEXT[getLocale()][e.offer]!.name);
+    case 'stretch-done':
+      return d.ev.stretchDone(STRETCH_TEXT[getLocale()][e.offer]!.name);
+    case 'freeze':
+      return d.ev.freeze;
     default:
       return null;
   }
@@ -734,7 +844,7 @@ export const drawHud = (hud: Hud, state: HackState): void => {
     : state.cableOut ? t().buildDown : t().buildOk;
   setText(hud.build, buildState);
   hud.build.classList.toggle('chip-bad', state.buildBroken || state.cableOut);
-  setText(hud.proj, t().features(shipped));
+  setText(hud.proj, t().features(shipped, state.tasks.length));
   hud.bugsChip.hidden = bugs === 0;
   if (bugs > 0) setText(hud.bugsChip, t().bugs(bugs));
   // Decisao aberta em tarefa DESBLOQUEADA: o alerta so grita quando a
@@ -761,6 +871,7 @@ export const drawHud = (hud: Hud, state: HackState): void => {
         hud.rows.set(t.id, r);
         group.appendChild(r.row);
       }
+      hud.trackGroups.set(track, group);
       hud.board.appendChild(group);
     }
     // O GANTT mora NO Kanban, nao numa vista paralela: mesmo painel, mesma
@@ -787,11 +898,88 @@ export const drawHud = (hud: Hud, state: HackState): void => {
     }
     hud.board.appendChild(gsec);
   }
+  // Tarefas de STRETCH nascem no MEIO da run: quem ainda nao tem linha
+  // ganha uma agora, no grupo da propria trilha (criada uma vez, como todas).
+  for (const t of state.tasks) {
+    if (hud.rows.has(t.id)) continue;
+    const group = hud.trackGroups.get(t.track);
+    if (!group) continue;
+    const r = makeRow(t, hud.onCut, hud.onChoose);
+    r.row.classList.add('task-stretch');
+    hud.rows.set(t.id, r);
+    group.appendChild(r.row);
+  }
   for (const t of state.tasks) {
     const r = hud.rows.get(t.id);
     if (r) updateRow(state, t, r);
   }
   updateGantt(state, hud);
+
+  // O PAINEL DO SPRINT: existe da hora em que o MVP fecha ate o palco. O
+  // congelamento mostra o bonus REAL do instante (a folga derrete junto com
+  // o relogio — a decisao tem preco visivel).
+  const sprintOn = state.phase === 'hack' && state.sprint.mvpAt >= 0;
+  hud.sprintPanel.hidden = !sprintOn;
+  if (sprintOn) {
+    const earlyNow = Math.round((EARLY_SCORE_MAX * (HACK_TICKS - state.tick)) / HACK_TICKS);
+    setText(hud.sprintFreezeHint, t().sprintFreezeHint(earlyNow));
+    const mult = (1 + state.sprint.done * STRETCH_MULT_STEP).toFixed(2);
+    setText(hud.sprintMultEl, t().sprintMult(mult));
+    const open = state.sprint.offers.find((o) => o.status === 'open');
+    hud.sprintOfferBox.hidden = !open;
+    if (open && hud.sprintOfferKind.current !== open.kind) {
+      hud.sprintOfferKind.current = open.kind;
+      const st = STRETCH_TEXT[getLocale()][open.kind]!;
+      setText(hud.sprintOfferName, st.name);
+      setText(hud.sprintOfferGain, t().sprintGain(st.gain));
+      setText(hud.sprintOfferRisk, t().sprintRisk(st.risk));
+    }
+    if (!open) hud.sprintOfferKind.current = null;
+  }
+
+  // O KICKOFF: as decisoes iniciais do projeto em CARDS, na ordem das
+  // trilhas (backend, frontend, design, devops), cada opcao com o trade-off
+  // escrito. Um card por vez; decidir (ou o quadro, ou "decidir depois")
+  // avanca para o proximo. O card fecha sozinho quando a fila acaba e sai
+  // da frente quando o quadro esta aberto — atalho, nunca gaiola.
+  if (hud.kickoff.queue === null) {
+    const order = ['backend', 'frontend', 'design', 'devops'] as const;
+    hud.kickoff.queue = order
+      .map((track) => state.tasks.find((task) => task.track === track && !!task.choice)?.id)
+      .filter((id): id is string => id !== undefined);
+  }
+  const kickoffPending =
+    state.phase === 'hack'
+      ? hud.kickoff.queue.find((id) => {
+          if (hud.kickoff.skipped.includes(id)) return false;
+          const task = state.tasks.find((x) => x.id === id);
+          return !!task?.choice && task.chosen === null && !task.done && !task.cut;
+        })
+      : undefined;
+  const showKickoff = !!kickoffPending && hud.board.hidden;
+  hud.kickoffCard.hidden = !showKickoff;
+  if (showKickoff && hud.kickoff.built !== kickoffPending) {
+    hud.kickoff.built = kickoffPending!;
+    const task = state.tasks.find((x) => x.id === kickoffPending)!;
+    const idx = hud.kickoff.queue.indexOf(kickoffPending!);
+    setText(
+      hud.kickoffStepEl,
+      t().kickoffStep(idx + 1, hud.kickoff.queue.length, TRACK_LABEL[task.track] ?? task.track)
+    );
+    setText(hud.kickoffPrompt, task.choice!.prompt);
+    // As opcoes renascem SO na troca de card (nunca por frame): a licao dos
+    // botoes detached continua valendo — botao que existe fica existindo.
+    hud.kickoffOptions.replaceChildren();
+    for (const opt of task.choice!.options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'task-choice kickoff-option';
+      b.textContent = opt.label;
+      b.appendChild(el('span', 'task-choice-hint', opt.hint));
+      b.addEventListener('click', () => hud.onChoose(task.id, opt.id));
+      hud.kickoffOptions.appendChild(b);
+    }
+  }
 
   // Aneis de estado nos retratos da equipe: quem trabalha, quem dorme, quem
   // esta na zona de perigo — legivel sem abrir ficha nenhuma.
@@ -911,11 +1099,17 @@ export const showResult = (
   host: HTMLElement,
   state: HackState,
   extras: RunClose,
-  onAgain: () => void
+  onAgain: () => void,
+  onHub?: () => void
 ): void => {
   const r = state.result!;
   const wrap = el('div', 'screen result');
   wrap.appendChild(el('h1', 'result-title', t().resultTitle[r.outcome] ?? r.outcome));
+  // O PALCO da run (circuito): o resultado diz ONDE isso aconteceu.
+  if (state.circuit) {
+    const evName = CIRCUIT_TEXT[getLocale()][state.circuit.id]?.name ?? state.circuit.id;
+    wrap.appendChild(el('p', 'result-event', t().eventAt(evName)));
+  }
   if (r.crashed) {
     wrap.appendChild(el('p', 'result-sub', state.buildBroken ? t().crashedBuild : t().crashedBugs(r.bugs)));
   }
@@ -951,6 +1145,13 @@ export const showResult = (
   wrap.appendChild(
     el('p', 'result-stats', t().stats(r.core, r.polish, r.bugs, r.looseEnds, r.score))
   );
+  // O ARCO DO FIM DA RUN: a entrega antecipada e o stretch aparecem no
+  // extrato — a decisao de congelar ou esticar merece ser lida depois.
+  if (r.early > 0) wrap.appendChild(el('p', 'result-early', t().earlyLine(r.early)));
+  if (r.stretched > 0) {
+    const mult = (1 + r.stretched * STRETCH_MULT_STEP).toFixed(2);
+    wrap.appendChild(el('p', 'result-stretch', t().stretchLine(r.stretched, mult)));
+  }
   // O PREMIO em moedas fisicas — e, na carreira, a carteira que ele virou.
   const prizeRow = el('p', 'result-prize', t().prizeLine(fmtCost(r.prize, getLocale())));
   wrap.appendChild(prizeRow);
@@ -975,6 +1176,13 @@ export const showResult = (
   if (extras.wallet !== null) {
     wrap.appendChild(el('p', 'result-rep', t().repLine(extras.repAfter, extras.repAfter - extras.repBefore)));
   }
+  // A JORNADA legivel: recorde quebrado, convite novo, temporada fechada.
+  if (extras.newBest) wrap.appendChild(el('p', 'result-best', t().newBestLine(r.score)));
+  if (extras.qualified) {
+    const qName = CIRCUIT_TEXT[getLocale()][extras.qualified]?.name ?? extras.qualified;
+    wrap.appendChild(el('p', 'result-qualified', t().qualifiedLine(qName)));
+  }
+  if (extras.seasonWonNow) wrap.appendChild(el('p', 'result-season', t().seasonWonLine));
   // O VEREDITO do sponsor, se havia contrato: cumprido paga, furado corre.
   if (state.sponsor && r.sponsorMet !== null) {
     const sn = SPONSOR_TEXT[getLocale()][state.sponsor.id]!.name;
@@ -1024,10 +1232,20 @@ export const showResult = (
   const again = softButton(ICONS.again, t().btnAgain, 'big');
   again.addEventListener('click', onAgain);
   wrap.appendChild(again);
+  // A jornada continua na CENTRAL: e la que o resultado vira contexto.
+  if (onHub) {
+    const hubBtn = softButton(ICONS.trophy, t().btnHub, 'dim');
+    hubBtn.addEventListener('click', onHub);
+    wrap.appendChild(hubBtn);
+  }
   host.appendChild(wrap);
 };
 
-export const showTitle = (host: HTMLElement, onStart: (mode: 'career' | 'quick' | 'daily') => void): void => {
+export const showTitle = (
+  host: HTMLElement,
+  onStart: (mode: 'career' | 'quick' | 'daily') => void,
+  onHub?: () => void
+): void => {
   const wrap = el('div', 'screen title');
   wrap.appendChild(el('h1', 'title-logo', 'CATATHON'));
   wrap.appendChild(el('p', 'title-sub', t().titleSub));
@@ -1047,6 +1265,13 @@ export const showTitle = (host: HTMLElement, onStart: (mode: 'career' | 'quick' 
     modeRow.appendChild(b);
   }
   wrap.appendChild(modeRow);
+  // A CENTRAL DA CARREIRA: a jornada inteira numa tela — o que voce
+  // construiu, o que desbloqueou e qual e o proximo desafio.
+  if (onHub) {
+    const hubBtn = softButton(ICONS.trophy, t().btnHub, 'dim');
+    hubBtn.addEventListener('click', onHub);
+    wrap.appendChild(hubBtn);
+  }
   // O botao de IDIOMA: o outro idioma, pelo nome dele. Troca e recarrega — o
   // HUD e construido uma vez, de proposito (a licao dos botoes detached).
   const lang = softButton(ICONS.sound, t().langWord, 'dim');
@@ -1081,11 +1306,16 @@ export const showRecruit = (
     rosterLine: string | null;
     /** A categoria especial da edicao, anunciada no convite. */
     special: SpecialCategoryId;
+    /** O palco do circuito, com a identidade DECLARADA (carreira). */
+    eventLine?: string | null;
   },
   onDone: (hired: Candidate[], gear: GearId[], sponsor: SponsorContract | null) => void
 ): void => {
   const wrap = el('div', 'screen recruit');
   wrap.appendChild(el('h1', 'recruit-title', i18n().recruitTitle));
+  // A IDENTIDADE DO EVENTO vem ANTES de tudo: dificuldade assumida e
+  // recompensa declarada — nunca loteria disfarcada de variedade.
+  if (extras.eventLine) wrap.appendChild(el('p', 'recruit-event', extras.eventLine));
   wrap.appendChild(
     el(
       'p',
@@ -1201,6 +1431,172 @@ export const showRecruit = (
   });
   wrap.appendChild(closeBtn);
   refresh();
+  host.appendChild(wrap);
+};
+
+/**
+ * A CENTRAL DA CARREIRA: os sistemas que ja existiam (reputacao, rival,
+ * alumni, carteira, conquistas, daily) finalmente numa tela persistente. A
+ * entrega de maior retorno da direcao: nada aqui e mecanica nova — e a
+ * jornada que estava escondida ganhando forma. O jogador sai sabendo tres
+ * coisas: o que construiu, o que desbloqueou, e qual e o proximo desafio.
+ */
+export const showHub = (
+  host: HTMLElement,
+  career: Career,
+  handlers: { onBack: () => void; onPlay: (mode: 'career' | 'quick' | 'daily') => void }
+): void => {
+  const d = t();
+  const loc = getLocale();
+  const wrap = el('div', 'screen hub');
+  wrap.appendChild(el('h1', 'hub-title', d.hubTitle));
+
+  // O CIRCUITO: a temporada em cinco palcos — feitos, o atual e os gates.
+  const circuit = el('div', 'hub-section hub-circuit');
+  circuit.appendChild(el('div', 'hub-section-title', d.hubCircuitTitle));
+  if (career.seasonWon) circuit.appendChild(el('p', 'hub-season-won', d.hubSeasonWon));
+  const ladder = el('div', 'hub-ladder');
+  for (const rung of circuitLadder(career)) {
+    const evText = CIRCUIT_TEXT[loc][rung.spec.id]!;
+    const card = el('div', `hub-event ${rung.unlocked ? 'open' : 'locked'} ${rung.current ? 'current' : ''}`);
+    card.appendChild(el('div', 'hub-event-paws', '●'.repeat(rung.spec.paws) + '○'.repeat(5 - rung.spec.paws)));
+    card.appendChild(el('div', 'hub-event-name', evText.name));
+    card.appendChild(el('div', 'hub-event-blurb', evText.blurb));
+    const tags = el('div', 'hub-event-tags');
+    if (rung.current) tags.appendChild(el('span', 'hub-tag tag-current', d.hubCurrentTag));
+    if (!rung.unlocked) tags.appendChild(el('span', 'hub-tag tag-locked', d.hubLockedTag(rung.spec.repGate)));
+    if (rung.wins > 0) tags.appendChild(el('span', 'hub-tag tag-wins', d.hubWinsTag(rung.wins)));
+    tags.appendChild(el('span', 'hub-tag', `×${rung.spec.prizeScale}`));
+    card.appendChild(tags);
+    ladder.appendChild(card);
+  }
+  circuit.appendChild(ladder);
+  // O PROXIMO DESBLOQUEIO, em numero: "faltam 4 pontos para o Global".
+  const locked = nextLockedEvent(career.rep);
+  circuit.appendChild(
+    el(
+      'p',
+      'hub-next-unlock',
+      locked ? d.hubNextUnlock(CIRCUIT_TEXT[loc][locked.id]!.name, locked.repGate - career.rep) : d.hubAllOpen
+    )
+  );
+  wrap.appendChild(circuit);
+
+  // OS NUMEROS DA JORNADA: runs, recorde, reputacao, carteira.
+  const stats = el('div', 'hub-stats');
+  const stat = (label: string, value: string): void => {
+    const box = el('div', 'hub-stat');
+    box.appendChild(el('div', 'hub-stat-value', value));
+    box.appendChild(el('div', 'hub-stat-label', label));
+    stats.appendChild(box);
+  };
+  stat(d.hubStatRuns, String(career.runs));
+  stat(
+    d.hubStatBest,
+    career.bestOutcome ? `${career.bestScore} · ${d.resultTitle[career.bestOutcome] ?? career.bestOutcome}` : d.hubNever
+  );
+  stat(d.hubStatRep, String(career.rep));
+  stat(d.hubStatWallet, fmtCost(career.wallet, loc));
+  wrap.appendChild(stats);
+
+  // O RIVAL: o placar da rivalidade — e quem eles ja levaram de ti.
+  const rivalBox = el('div', 'hub-section hub-rival');
+  rivalBox.appendChild(el('div', 'hub-section-title', d.hubRivalTitle));
+  if (career.rival) {
+    rivalBox.appendChild(el('p', 'hub-rival-name', career.rival.name));
+    rivalBox.appendChild(el('p', 'hub-rival-score', d.hubRivalLine(career.rival.wins, career.rival.losses)));
+    if (career.rival.roster.length > 0) {
+      rivalBox.appendChild(el('p', 'hub-rival-roster', d.rivalRoster(career.rival.roster.join(', '))));
+    }
+  } else {
+    rivalBox.appendChild(el('p', 'hub-empty', d.hubNoRival));
+  }
+  wrap.appendChild(rivalBox);
+
+  // ALUMNI: os juniores que cresceram no teu booth (e podem voltar).
+  const alumniBox = el('div', 'hub-section hub-alumni');
+  alumniBox.appendChild(el('div', 'hub-section-title', d.hubAlumniTitle));
+  if (career.alumni.length > 0) {
+    const row = el('div', 'hub-alumni-row');
+    for (const a of career.alumni) {
+      const chip = el('span', 'hub-alum');
+      chip.append(faceCanvas(a), el('span', '', `${a.name} · ${specLabel(a.specialty)}`));
+      row.appendChild(chip);
+    }
+    alumniBox.appendChild(row);
+  } else {
+    alumniBox.appendChild(el('p', 'hub-empty', d.hubNoAlumni));
+  }
+  wrap.appendChild(alumniBox);
+
+  // O HISTORICO: as ultimas runs, com o duelo quando houve.
+  const histBox = el('div', 'hub-section hub-history');
+  histBox.appendChild(el('div', 'hub-section-title', d.hubHistoryTitle));
+  if (career.history.length > 0) {
+    for (const rec of career.history) {
+      const parts = [
+        rec.date,
+        d.modeWord[rec.mode],
+        rec.eventId ? (CIRCUIT_TEXT[loc][rec.eventId]?.name ?? rec.eventId) : null,
+        d.resultTitle[rec.outcome] ?? rec.outcome,
+        String(rec.score),
+        rec.rival ? (rec.rival.beat ? `> ${rec.rival.score}` : `< ${rec.rival.score}`) : null,
+      ].filter((p): p is string => p !== null);
+      histBox.appendChild(el('div', 'hub-run', parts.join(' · ')));
+    }
+  } else {
+    histBox.appendChild(el('p', 'hub-empty', d.hubNoHistory));
+  }
+  wrap.appendChild(histBox);
+
+  // A GALERIA: TODAS as conquistas — as tuas com data, as abertas com a
+  // condicao legivel, as secretas em silencio. Chip descartavel nunca mais.
+  const achBox = el('div', 'hub-section hub-achs');
+  achBox.appendChild(
+    el('div', 'hub-section-title', d.hubAchTitle(career.achievements.length, ACHIEVEMENTS_ALL.length))
+  );
+  const grid = el('div', 'hub-ach-grid');
+  for (const entry of ACHIEVEMENTS_ALL) {
+    const got = career.achievements.includes(entry.id);
+    const at = ACHIEVEMENT_TEXT[loc][entry.id];
+    const card = el('div', `hub-ach ${got ? 'got' : 'missing'}`);
+    if (got) {
+      card.appendChild(el('div', 'hub-ach-name', at?.name ?? entry.id));
+      card.appendChild(el('div', 'hub-ach-hint', at?.hint ?? ''));
+      const date = career.achievedAt[entry.id];
+      if (date) card.appendChild(el('div', 'hub-ach-date', date));
+    } else if (entry.secret) {
+      card.appendChild(el('div', 'hub-ach-name', d.hubSecret));
+    } else {
+      card.appendChild(el('div', 'hub-ach-name', at?.name ?? entry.id));
+      card.appendChild(el('div', 'hub-ach-hint', at?.hint ?? ''));
+    }
+    grid.appendChild(card);
+  }
+  achBox.appendChild(grid);
+  wrap.appendChild(achBox);
+
+  // O DAILY DE HOJE: a briga justa da mesma semente.
+  wrap.appendChild(el('p', 'hub-daily', d.hubDailyLine(todayUTC())));
+
+  // AS SAIDAS: o proximo palco da carreira, os outros modos, e voltar.
+  const current = circuitLadder(career).find((r) => r.current);
+  const actions = el('div', 'mode-row hub-actions');
+  const playBtn = softButton(
+    ICONS.badge,
+    d.hubPlayNext(current ? CIRCUIT_TEXT[loc][current.spec.id]!.name : d.modeCareer),
+    'big'
+  );
+  playBtn.addEventListener('click', () => handlers.onPlay('career'));
+  actions.appendChild(playBtn);
+  const dailyBtn = softButton(ICONS.badge, `${d.btnOpenEmail} · ${d.modeDaily}`, 'dim');
+  dailyBtn.addEventListener('click', () => handlers.onPlay('daily'));
+  actions.appendChild(dailyBtn);
+  const backBtn = softButton(ICONS.again, d.hubBack, 'dim');
+  backBtn.addEventListener('click', handlers.onBack);
+  actions.appendChild(backBtn);
+  wrap.appendChild(actions);
+
   host.appendChild(wrap);
 };
 

@@ -76,6 +76,60 @@ export type SpecialCategoryId =
   | 'clean-scratch';
 
 /**
+ * STRETCH SPRINT: quando o NUCLEO do projeto fecha antes do prazo, o fim da
+ * run vira decisao em vez de tempo morto — congelar a submissao (entrega
+ * antecipada paga estabilidade e pontos) ou aceitar uma OPORTUNIDADE
+ * ambiciosa. Cada oportunidade e uma tarefa nova com beneficio e risco
+ * proprios; concluir uma sobe o multiplicador de score e abre a proxima,
+ * mais arriscada. Push-your-luck com o botao de parar sempre a vista.
+ */
+export type StretchKind =
+  | 'polimento-obsessivo'
+  | 'demo-viral'
+  | 'feature-patrocinada'
+  | 'refactor-heroico'
+  | 'escala-absurda'
+  | 'easter-egg-felino';
+
+export type StretchOffer = {
+  kind: StretchKind;
+  /** A tarefa que o aceite cria no quadro (s1/s2/s3). */
+  taskId: string;
+  /** Rotulo da tarefa, gerado no idioma da run (estado se gera, nao se traduz). */
+  label: string;
+  status: 'locked' | 'open' | 'taken' | 'done';
+};
+
+export type SprintState = {
+  /** Tick em que o MVP fechou (-1 = ainda nao). */
+  mvpAt: number;
+  /** Tick em que o jogador congelou a submissao (-1 = foi ate o fim). */
+  frozenAt: number;
+  /** As tres oportunidades da edicao, em ordem crescente de risco. */
+  offers: StretchOffer[];
+  /** Oportunidades CONCLUIDAS: cada uma soma no multiplicador de score. */
+  done: number;
+};
+
+/**
+ * O EVENTO DO CIRCUITO em que esta run acontece (carreira). A identidade e
+ * DECLARADA antes do recrutamento: dificuldade em patas, custo das tarefas
+ * e premiacao escalam com o prestigio do palco. null = fora do circuito
+ * (quick run, daily, testes).
+ */
+export type CircuitStage = {
+  id: string;
+  /** Multiplica o cheque da demo (o Global paga o dobro do Regional). */
+  prizeScale: number;
+  /**
+   * O prestigio encarece o escopo — inclusive as tarefas de STRETCH criadas
+   * no meio da run (achado de review: o Global cobrava escopo de Bairro no
+   * fim de run).
+   */
+  taskCostScale: number;
+};
+
+/**
  * EVENTO SOCIAL: o pavilhao interrompe o booth com uma escolha A/B numa
  * janela curta. Ignorar escolhe B (a opcao segura) — o jogo nunca trava
  * esperando, mas a escolha boa premia quem presta atencao.
@@ -309,6 +363,10 @@ export type DemoResult = {
   specialWon: boolean;
   /** Quantos juniores CRESCERAM (learned >= JUNIOR_GROWN_AT) nesta run. */
   juniorsGrown: number;
+  /** Pontos de ENTREGA ANTECIPADA (congelou a submissao com folga). */
+  early: number;
+  /** Oportunidades de Stretch Sprint concluidas (cada uma multiplica). */
+  stretched: number;
   score: number;
   crashed: boolean;
   /** A crise de demo virou improviso heroico? Historia pra contar. */
@@ -370,6 +428,13 @@ export type SimEvent =
   /** star: no poach A, QUEM o recrutador rival abordou — a carreira lembra. */
   | { kind: 'social-taken'; tick: number; social: SocialKind; option: 'a' | 'b'; star?: CatId }
   | { kind: 'decision-needed'; tick: number; task: string }
+  /** O NUCLEO fechou antes do prazo: o Stretch Sprint abre. */
+  | { kind: 'mvp-ready'; tick: number }
+  | { kind: 'stretch-open'; tick: number; offer: StretchKind }
+  | { kind: 'stretch-taken'; tick: number; offer: StretchKind }
+  | { kind: 'stretch-done'; tick: number; offer: StretchKind }
+  /** O jogador congelou a submissao: direto ao palco, com folga no bolso. */
+  | { kind: 'freeze'; tick: number }
   | { kind: 'pep'; tick: number; cat: CatId }
   | { kind: 'pm-worry'; tick: number; behind: number }
   | { kind: 'decision'; tick: number; task: string; option: string }
@@ -452,6 +517,16 @@ export type HackState = {
   /** A categoria especial da edicao (sorteada da semente, como o projeto). */
   specialCategory: SpecialCategoryId;
   /**
+   * O STRETCH SPRINT desta run: quando o MVP fecha, congelar ou esticar
+   * vira A decisao do fim de run (mata o tempo morto das runs faceis).
+   */
+  sprint: SprintState;
+  /**
+   * O evento do CIRCUITO em que a run acontece (entrada da sim, como a
+   * equipe): so o que a demo precisa saber — id (hash) e premiacao.
+   */
+  circuit: CircuitStage | null;
+  /**
    * Pares que ja anunciaram harmonia/atrito/mentoria no feed (uma vez por
    * par por run — o feed narra a descoberta, nao o tick).
    */
@@ -480,6 +555,10 @@ export type Command = {
   laser?: boolean;
   /** Responder o evento social aberto. */
   social?: 'a' | 'b';
+  /** Congelar a submissao (so com o MVP pronto): direto ao palco. */
+  freeze?: boolean;
+  /** Aceitar a oportunidade de Stretch Sprint aberta. */
+  stretch?: boolean;
   handX?: number;
   handY?: number;
 };

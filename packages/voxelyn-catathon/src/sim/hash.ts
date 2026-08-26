@@ -122,6 +122,19 @@ export const hashState = (state: HackState): string => {
   // categoria especial muda o premio; os pares anunciados mudam eventos.
   h.str(state.sponsor?.id ?? '-');
   h.str(state.specialCategory);
+  // O SPRINT decide o fim da run (congelar, esticar, multiplicar) e o
+  // CIRCUITO decide o cheque: dois estados em palcos diferentes, ou com
+  // ofertas em fases diferentes, NAO podem colidir.
+  h.u32(state.sprint.mvpAt + 1);
+  h.u32(state.sprint.frozenAt + 1);
+  h.u32(state.sprint.done);
+  for (const o of state.sprint.offers) {
+    h.str(o.kind);
+    h.str(o.status);
+  }
+  h.str(state.circuit?.id ?? '-');
+  h.fixed(state.circuit?.prizeScale ?? 1, HASH_METER);
+  h.fixed(state.circuit?.taskCostScale ?? 1, HASH_METER);
   for (const v of state.vibesSeen) h.str(v);
   for (const s of state.social) {
     h.str(s.kind);

@@ -45,7 +45,13 @@ export const TASK_TEXT: Record<Locale, Record<string, readonly string[]>> = {
   },
 };
 
-/** As tres DECISOES (b1/d1/o1): ids estaveis, texto por idioma. */
+/**
+ * As DECISOES INICIAIS do projeto — agora as QUATRO trilhas tem uma, e cada
+ * uma tem VARIACOES (conjuntos alternativos de opcoes, sorteados pela
+ * semente no gerador). Ids de opcao sao estaveis e globais: o efeito mora em
+ * CHOICE_EFFECTS (constants.ts); aqui mora o texto, com o trade-off ESCRITO
+ * em cada opcao — ler o card e jogar melhor.
+ */
 export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
   pt: {
     b1: {
@@ -54,6 +60,14 @@ export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
         { id: 'monolito', label: 'monolito felino', hint: 'rapido agora, divida depois' },
         { id: 'micro', label: 'microsservicos', hint: 'caro agora, backend rende depois' },
         { id: 'serverless', label: 'serverless do sponsor', hint: 'rapidissimo, e se a API deles cair na demo?' },
+      ],
+    },
+    f1: {
+      prompt: 'como construir o front?',
+      options: [
+        { id: 'spaArtesanal', label: 'SPA artesanal', hint: 'caro agora, o resto do front rende depois' },
+        { id: 'frameworkFofo', label: 'framework da moda', hint: 'rapido, o churn vira divida' },
+        { id: 'pwaAcessivel', label: 'PWA acessivel', hint: 'um pouco mais caro, e a banca sente o cuidado' },
       ],
     },
     d1: {
@@ -82,6 +96,14 @@ export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
         { id: 'serverless', label: 'sponsor serverless', hint: 'blazing fast — and if their API dies mid-demo?' },
       ],
     },
+    f1: {
+      prompt: 'how do we build the front?',
+      options: [
+        { id: 'spaArtesanal', label: 'artisanal SPA', hint: 'pricey now, the rest of the front pays off later' },
+        { id: 'frameworkFofo', label: 'framework of the week', hint: 'fast, the churn becomes debt' },
+        { id: 'pwaAcessivel', label: 'accessible PWA', hint: 'a bit pricier, and the judges feel the care' },
+      ],
+    },
     d1: {
       prompt: 'how do we attack the UI?',
       options: [
@@ -99,6 +121,92 @@ export const CHOICE_TEXT: Record<Locale, Record<string, TaskChoice>> = {
       ],
     },
   },
+};
+
+/**
+ * As VARIACOES: um segundo conjunto de opcoes por decisao — mesma trilha,
+ * outra pergunta. O gerador sorteia qual conjunto a edicao pergunta; o
+ * classico (testes, demo) fica sempre no primeiro.
+ */
+export const CHOICE_TEXT_ALT: Record<Locale, Record<string, TaskChoice>> = {
+  pt: {
+    b1: {
+      prompt: 'onde moram os dados?',
+      options: [
+        { id: 'postgresDeRaca', label: 'postgres de raca pura', hint: 'paga agora, estabilidade na banca' },
+        { id: 'nosqlZoomies', label: 'NoSQL em zoomies', hint: 'rapidissimo, o esquema vira divida' },
+        { id: 'planilhaDoSponsor', label: 'planilha do sponsor', hint: 'quase de graca, e se a API deles cair na demo?' },
+      ],
+    },
+    f1: {
+      prompt: 'quem renderiza?',
+      options: [
+        { id: 'ssrCaprichado', label: 'SSR caprichado', hint: 'caro agora, estabilidade na demo' },
+        { id: 'clientOnly', label: 'tudo no cliente', hint: 'rapido, divida na certa' },
+        { id: 'microFrontends', label: 'micro-frontends', hint: 'caro agora, o resto do front rende depois' },
+      ],
+    },
+    d1: {
+      prompt: 'qual e a alma da UI?',
+      options: [
+        { id: 'testeComGatos', label: 'testar com gatos de verdade', hint: 'lento e caro, experiencia de verdade' },
+        { id: 'copiarConcorrente', label: 'copiar o concorrente', hint: 'rapido, zero originalidade' },
+        { id: 'brutalismoFofo', label: 'brutalismo fofo', hint: 'inovacao real, e uma ponta de divida estetica' },
+      ],
+    },
+    o1: {
+      prompt: 'quando vai ao ar?',
+      options: [
+        { id: 'deployContinuo', label: 'deploy continuo', hint: 'caro, e a demo agradece' },
+        { id: 'deployNaSexta', label: 'deploy na sexta', hint: 'rapido, divida na certa' },
+        { id: 'containerDoSponsor', label: 'container do sponsor', hint: 'confortavel, e amarra a demo neles' },
+      ],
+    },
+  },
+  en: {
+    b1: {
+      prompt: 'where does the data live?',
+      options: [
+        { id: 'postgresDeRaca', label: 'purebred postgres', hint: 'pay now, stability before the judges' },
+        { id: 'nosqlZoomies', label: 'NoSQL in zoomies', hint: 'blazing fast, the schema becomes debt' },
+        { id: 'planilhaDoSponsor', label: 'sponsor spreadsheet', hint: 'nearly free — and if their API dies mid-demo?' },
+      ],
+    },
+    f1: {
+      prompt: 'who renders?',
+      options: [
+        { id: 'ssrCaprichado', label: 'lovingly tuned SSR', hint: 'pricey now, stability in the demo' },
+        { id: 'clientOnly', label: 'everything client-side', hint: 'fast, guaranteed debt' },
+        { id: 'microFrontends', label: 'micro-frontends', hint: 'pricey now, the rest of the front pays off later' },
+      ],
+    },
+    d1: {
+      prompt: 'what is the soul of the UI?',
+      options: [
+        { id: 'testeComGatos', label: 'test with real cats', hint: 'slow and pricey, real experience' },
+        { id: 'copiarConcorrente', label: 'copy the competitor', hint: 'fast, zero originality' },
+        { id: 'brutalismoFofo', label: 'cozy brutalism', hint: 'real innovation, and a pinch of aesthetic debt' },
+      ],
+    },
+    o1: {
+      prompt: 'when does it go live?',
+      options: [
+        { id: 'deployContinuo', label: 'continuous deploy', hint: 'pricey, and the demo thanks you' },
+        { id: 'deployNaSexta', label: 'deploy on friday', hint: 'fast, guaranteed debt' },
+        { id: 'containerDoSponsor', label: 'sponsor container', hint: 'comfy, and ties the demo to them' },
+      ],
+    },
+  },
+};
+
+/** Os conjuntos por decisao, na ordem [original, variacao] — o gerador sorteia. */
+export const CHOICE_VARIANTS: Record<Locale, Record<string, readonly TaskChoice[]>> = {
+  pt: Object.fromEntries(
+    Object.keys(CHOICE_TEXT.pt).map((id) => [id, [CHOICE_TEXT.pt[id]!, CHOICE_TEXT_ALT.pt[id]!]])
+  ),
+  en: Object.fromEntries(
+    Object.keys(CHOICE_TEXT.en).map((id) => [id, [CHOICE_TEXT.en[id]!, CHOICE_TEXT_ALT.en[id]!]])
+  ),
 };
 
 export const NOTES_TEXT: Record<Locale, readonly string[]> = {
@@ -387,6 +495,114 @@ export const RIVAL_TAUNT_TEXT: Record<Locale, readonly string[]> = {
   ],
 };
 
+/**
+ * O STRETCH SPRINT: cada oportunidade com nome, o rotulo da TAREFA que o
+ * aceite cria no quadro, o beneficio e o risco — trade-off ESCRITO no
+ * objeto, como nos apetrechos e sponsors.
+ */
+export const STRETCH_TEXT: Record<
+  Locale,
+  Record<string, { name: string; task: string; gain: string; risk: string }>
+> = {
+  pt: {
+    'polimento-obsessivo': {
+      name: 'polimento obsessivo',
+      task: 'polir cada pixel do fluxo',
+      gain: 'experiencia e um sopro de voto popular',
+      risk: 'estressa quem vive de design e frontend',
+    },
+    'demo-viral': {
+      name: 'demo viral',
+      task: 'gravar a demo que o pavilhao compartilha',
+      gain: 'hype de plateia para o pitch',
+      risk: 'exige gatos descansados — os cansados pagam',
+    },
+    'feature-patrocinada': {
+      name: 'feature patrocinada',
+      task: 'integrar o SDK do patrocinador',
+      gain: '+40 tampinhas no premio',
+      risk: 'amarra a demo neles: o contrato pode ser descumprido',
+    },
+    'refactor-heroico': {
+      name: 'refactor heroico',
+      task: 'reescrever o nucleo sem quebrar nada',
+      gain: 'estabilidade, e a divida tecnica diminui',
+      risk: 'pode reabrir dependencias (bug no backend)',
+    },
+    'escala-absurda': {
+      name: 'escala absurda',
+      task: 'aguentar um milhao de gatos simultaneos',
+      gain: 'inovacao de verdade na banca',
+      risk: 'pode derrubar o build na hora do ship',
+    },
+    'easter-egg-felino': {
+      name: 'easter egg felino',
+      task: 'esconder um segredo ronronante',
+      gain: 'voto popular — e uma conquista',
+      risk: 'resultado imprevisivel por definicao',
+    },
+  },
+  en: {
+    'polimento-obsessivo': {
+      name: 'obsessive polish',
+      task: 'polish every pixel of the flow',
+      gain: 'experience and a whiff of crowd love',
+      risk: 'stresses whoever lives off design and frontend',
+    },
+    'demo-viral': {
+      name: 'viral demo',
+      task: 'record the demo the pavilion shares',
+      gain: 'crowd hype for the pitch',
+      risk: 'demands rested cats — the tired ones pay',
+    },
+    'feature-patrocinada': {
+      name: 'sponsored feature',
+      task: "integrate the sponsor's SDK",
+      gain: '+40 bottle caps in the prize',
+      risk: 'ties the demo to them: the contract may be missed',
+    },
+    'refactor-heroico': {
+      name: 'heroic refactor',
+      task: 'rewrite the core without breaking anything',
+      gain: 'stability, and tech debt shrinks',
+      risk: 'may reopen dependencies (backend bug)',
+    },
+    'escala-absurda': {
+      name: 'absurd scale',
+      task: 'survive a million simultaneous cats',
+      gain: 'real innovation before the judges',
+      risk: 'may take the build down on ship',
+    },
+    'easter-egg-felino': {
+      name: 'feline easter egg',
+      task: 'hide a purring secret',
+      gain: 'crowd love — and an achievement',
+      risk: 'unpredictable by definition',
+    },
+  },
+};
+
+/**
+ * O CIRCUITO: os cinco palcos da temporada, do bairro ao mundo. Nome e
+ * clima por idioma; os numeros (patas, gates, premiacao) moram em gen.ts.
+ */
+export const CIRCUIT_TEXT: Record<Locale, Record<string, { name: string; blurb: string }>> = {
+  pt: {
+    bairro: { name: 'Hackathon de Bairro', blurb: 'garagem, wifi emprestado, trofeu de papelao' },
+    regional: { name: 'Regional Catathon', blurb: 'o ginasio lotou; o rival trouxe faixa' },
+    convencao: { name: 'Convencao Tematica', blurb: 'banca especializada, plateia exigente' },
+    nacional: { name: 'Nacional Catathon', blurb: 'telao de verdade, imprensa felina' },
+    global: { name: 'Global Catathon', blurb: 'o maior palco do mundo. o rival tambem chegou.' },
+  },
+  en: {
+    bairro: { name: 'Neighborhood Hackathon', blurb: 'a garage, borrowed wifi, a cardboard trophy' },
+    regional: { name: 'Regional Catathon', blurb: 'the gym is packed; the rival brought a banner' },
+    convencao: { name: 'Themed Convention', blurb: 'specialist judges, demanding crowd' },
+    nacional: { name: 'National Catathon', blurb: 'a real big screen, feline press' },
+    global: { name: 'Global Catathon', blurb: 'the biggest stage on earth. the rival made it too.' },
+  },
+};
+
 /** As conquistas: nome e como se ganha. */
 export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hint: string }>> = {
   pt: {
@@ -398,6 +614,9 @@ export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hin
     'orange-crew': { name: 'One Orange Brain Cell', hint: 'equipe inteira de cowboys' },
     'improv-legend': { name: 'Demo Gods', hint: 'transforme o crash da demo em improviso heroico' },
     grand: { name: 'Grand Prize', hint: 'venca o grande premio' },
+    'early-bird': { name: 'Entregue e Dormindo', hint: 'congele a submissao com 25%+ do prazo sobrando e suba ao podio' },
+    overclock: { name: 'Overclock Felino', hint: 'conclua as tres oportunidades do Stretch Sprint e suba ao podio' },
+    'egg-hunter': { name: 'Ovo de Pascoa', hint: 'shipe o easter egg felino do Stretch Sprint' },
   },
   en: {
     'zero-bugs': { name: 'Zero Bugs, Allegedly', hint: 'finish with no live bugs' },
@@ -408,5 +627,8 @@ export const ACHIEVEMENT_TEXT: Record<Locale, Record<string, { name: string; hin
     'orange-crew': { name: 'One Orange Brain Cell', hint: 'an all-cowboy team' },
     'improv-legend': { name: 'Demo Gods', hint: 'turn the demo crash into heroic improv' },
     grand: { name: 'Grand Prize', hint: 'win the grand prize' },
+    'early-bird': { name: 'Shipped and Asleep', hint: 'freeze the submission with 25%+ of the clock left and reach the podium' },
+    overclock: { name: 'Feline Overclock', hint: 'complete all three Stretch Sprint opportunities and reach the podium' },
+    'egg-hunter': { name: 'Egg Hunter', hint: 'ship the feline easter egg from the Stretch Sprint' },
   },
 };

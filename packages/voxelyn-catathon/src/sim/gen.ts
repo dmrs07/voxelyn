@@ -9,7 +9,7 @@ import {
 import { SLOTS, TASKS } from './data.js';
 import {
   AUDIENCES_TEXT,
-  CHOICE_TEXT,
+  CHOICE_VARIANTS,
   CLASSIC_BIO,
   CONSTRAINTS_TEXT,
   CURRENCY_TEXT,
@@ -29,6 +29,7 @@ import type {
   Spec,
   SpecialCategoryId,
   SponsorContract,
+  StretchKind,
   Task,
   Tier,
   Track,
@@ -347,14 +348,19 @@ export const rollProject = (seed: number, locale: Locale = 'en'): ProjectSpec =>
       ? `plataforma de ${d.pick(DOMAINS_TEXT.pt)} para ${d.pick(AUDIENCES_TEXT.pt)}, ${d.pick(CONSTRAINTS_TEXT.pt)}`
       : `a ${d.pick(DOMAINS_TEXT.en)} platform for ${d.pick(AUDIENCES_TEXT.en)}, ${d.pick(CONSTRAINTS_TEXT.en)}`;
   const shape = d.pick(GRAPH_SHAPES);
-  const tasks = TASKS.map((t) => ({
-    ...t,
-    label: d.pick(TASK_TEXT[locale][t.id] ?? [t.label]),
-    choice: CHOICE_TEXT[locale][t.id] ?? undefined,
-    deps: shape[t.id] ?? t.deps,
-    // Jitter de custo: mesma forma, pesos diferentes por edicao.
-    cost: Math.round((t.polish ? TASK_POLISH_COST : TASK_CORE_COST) * (0.85 + d.roll() * 0.3)),
-  }));
+  const tasks = TASKS.map((t) => {
+    // A VARIACAO da decisao: cada edicao sorteia QUAL pergunta esta trilha
+    // faz (mesmo peso mecanico no vocabulario, outra conversa no card).
+    const variants = CHOICE_VARIANTS[locale][t.id];
+    return {
+      ...t,
+      label: d.pick(TASK_TEXT[locale][t.id] ?? [t.label]),
+      choice: variants ? d.pick(variants) : undefined,
+      deps: shape[t.id] ?? t.deps,
+      // Jitter de custo: mesma forma, pesos diferentes por edicao.
+      cost: Math.round((t.polish ? TASK_POLISH_COST : TASK_CORE_COST) * (0.85 + d.roll() * 0.3)),
+    };
+  });
   const emphasis = d.pick(['tecnica', 'estabilidade', 'experiencia', 'inovacao'] as const);
   const risk = d.pick(['integracao-instavel', 'hype', 'dados-sensiveis'] as const);
   return { name, brief, tasks, emphasis, risk };
@@ -681,6 +687,78 @@ export const returningCandidate = (alum: Candidate, locale: Locale = 'en'): Cand
   note: RETURNING_TEXT[locale].note,
   cv: RETURNING_TEXT[locale].cv,
 });
+
+// --------------------------------------------------------- stretch sprint
+
+/**
+ * As TRES oportunidades do Stretch Sprint da edicao, sorteadas da semente em
+ * ordem crescente de risco: uma segura, uma media, uma selvagem. Puras como
+ * tudo aqui — o replay reabre exatamente as mesmas portas.
+ */
+const STRETCH_TIERS: readonly (readonly StretchKind[])[] = [
+  ['polimento-obsessivo', 'demo-viral'],
+  ['feature-patrocinada', 'refactor-heroico'],
+  ['escala-absurda', 'easter-egg-felino'],
+];
+
+export const rollStretchOffers = (seed: number): StretchKind[] => {
+  const d = new Dice(seed, 0x57e7c4);
+  return STRETCH_TIERS.map((tier) => d.pick(tier));
+};
+
+/** A trilha onde cada oportunidade vira tarefa (a mesa que ela ocupa). */
+export const STRETCH_TRACK: Record<StretchKind, Track> = {
+  'polimento-obsessivo': 'design',
+  'demo-viral': 'frontend',
+  'feature-patrocinada': 'devops',
+  'refactor-heroico': 'backend',
+  'escala-absurda': 'backend',
+  'easter-egg-felino': 'frontend',
+};
+
+// ---------------------------------------------------------------- circuito
+
+/**
+ * O CATATHON CIRCUIT: a carreira vira uma TEMPORADA de cinco palcos, do
+ * bairro ao mundo. A identidade de cada evento e DECLARADA antes do
+ * recrutamento (patas, custo das tarefas, premiacao, o quanto o rival leva
+ * a serio) — dificuldade assumida, nunca loteria disfarcada. Classifica-se
+ * por REPUTACAO: nao e preciso vencer todos, e preciso aparecer no telao.
+ */
+export type CircuitEventId = 'bairro' | 'regional' | 'convencao' | 'nacional' | 'global';
+
+export type CircuitEventSpec = {
+  id: CircuitEventId;
+  /** Dificuldade declarada: 1 a 5 patas no convite. */
+  paws: number;
+  /** Reputacao minima para o convite chegar. */
+  repGate: number;
+  /** O prestigio encarece o escopo: multiplica o custo das tarefas. */
+  taskCostScale: number;
+  /** O rival leva o circuito a serio: bonus de skill por palco. */
+  rivalBonus: number;
+  /** A premiacao escala com o palco (multiplica o cheque da demo). */
+  prizeScale: number;
+};
+
+export const CIRCUIT: readonly CircuitEventSpec[] = [
+  { id: 'bairro', paws: 1, repGate: 0, taskCostScale: 0.92, rivalBonus: 0, prizeScale: 0.8 },
+  { id: 'regional', paws: 2, repGate: 3, taskCostScale: 1, rivalBonus: 0.15, prizeScale: 1 },
+  { id: 'convencao', paws: 3, repGate: 6, taskCostScale: 1.06, rivalBonus: 0.35, prizeScale: 1.25 },
+  { id: 'nacional', paws: 4, repGate: 10, taskCostScale: 1.12, rivalBonus: 0.6, prizeScale: 1.6 },
+  { id: 'global', paws: 5, repGate: 15, taskCostScale: 1.2, rivalBonus: 0.9, prizeScale: 2 },
+];
+
+/** O palco ATUAL de uma carreira: o maior evento que a reputacao ja abriu. */
+export const eventForRep = (rep: number): CircuitEventSpec => {
+  let current = CIRCUIT[0]!;
+  for (const ev of CIRCUIT) if (rep >= ev.repGate) current = ev;
+  return current;
+};
+
+/** O proximo palco AINDA fechado (null = a temporada esta toda aberta). */
+export const nextLockedEvent = (rep: number): CircuitEventSpec | null =>
+  CIRCUIT.find((ev) => rep < ev.repGate) ?? null;
 
 // ------------------------------------------------------------- daily seed
 
