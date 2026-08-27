@@ -47,8 +47,12 @@ export const SOUNDTRACK_URL = 'audio/voxelyn-survival-theme.flac';
  * 0 dBFS de pico e, no mesmo teto, soaria acima do leito que a mixagem
  * promete. `scripts/prepare-soundtrack.mjs` mede o LUFS integrado do arquivo
  * e imprime o valor calibrado para colar aqui junto do asset.
+ *
+ * Calibrado para "TEMA DE EXPLORACAO 3.0" (Clevo): -17.1 LUFS integrado,
+ * true peak +0.1 dBTP -> 1.74 poe o leito em -30 LUFS no jogo com o slider
+ * no maximo. Trocou o master, rode o script de novo.
  */
-export const COMPOSED_TRIM = 1.0;
+export const COMPOSED_TRIM = 1.74;
 
 /** Faixa sana do trim: fora disto o erro esta no master, nao no jogo. */
 export const COMPOSED_TRIM_MIN = 0.25;

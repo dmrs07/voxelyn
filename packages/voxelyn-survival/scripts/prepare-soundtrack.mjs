@@ -113,10 +113,15 @@ if (!isLossless) {
 // que e o que o trim precisa (pico nao diz nada sobre percepcao).
 const loud = run(FFMPEG, ['-hide_banner', '-nostats', '-i', input, '-af', 'ebur128=peak=true', '-f', 'null', '-']);
 const loudText = loud.stderr;
-const lufsMatch = loudText.match(/I:\s*(-?[\d.]+)\s*LUFS/);
-const peakMatch = loudText.match(/Peak:\s*(-?[\d.]+)\s*dBFS/);
-const inputLufs = lufsMatch ? Number(lufsMatch[1]) : NaN;
-const truePeak = peakMatch ? Number(peakMatch[1]) : NaN;
+// O ebur128 loga o I: PROGRESSIVO a cada 100 ms e so o ultimo bloco (Summary)
+// tem o valor integrado da faixa inteira: pegar a PRIMEIRA ocorrencia leria o
+// fade-in do comeco. Sempre a ultima.
+const lastMatch = (re) => {
+  const all = [...loudText.matchAll(re)];
+  return all.length ? Number(all[all.length - 1][1]) : NaN;
+};
+const inputLufs = lastMatch(/I:\s*(-?[\d.]+)\s*LUFS/g);
+const truePeak = lastMatch(/Peak:\s*(-?[\d.]+)\s*dBFS/g);
 
 console.log('== loudness ==');
 console.log(`LUFS integrado: ${Number.isNaN(inputLufs) ? 'nao medido' : inputLufs.toFixed(1)}`);

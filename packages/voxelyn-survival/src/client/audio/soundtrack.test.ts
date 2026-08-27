@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LAYER_GAINS, MUSIC_CEILING } from './music';
+import { MUSIC_CEILING } from './music';
 import {
   COMPOSED_TRIM,
   COMPOSED_TRIM_MAX,
@@ -25,14 +25,18 @@ describe('contrato da trilha composta', () => {
   });
 
   it('a trilha respeita o teto da musica: SFX > musica, sempre', () => {
-    // No slider maximo, o ganho da trilha composta nao pode passar do que a
-    // mixagem procedural ja se permitia (teto * soma das camadas continuas).
+    // Comparar ganho com ganho da procedural seria enganoso: os osciladores
+    // procedurais tocam perto de full scale, o master do compositor senta em
+    // -17 LUFS — o trim calibrado por loudness (script de preparacao) pode
+    // legitimamente passar da soma de LAYER_GAINS. O contrato REAL e com os
+    // SFX: no slider maximo, o ganho da trilha fica abaixo do menor telegrafo
+    // (0.45) — musica e chao, nunca canal de informacao. A folga percebida e
+    // bem maior do que a de ganho: o conteudo do master esta ~17 dB abaixo do
+    // proprio full scale, o telegrafo sintetizado nao.
     const composed = composedBaseGain(1);
-    const proceduralMax =
-      MUSIC_CEILING * (LAYER_GAINS.drone + LAYER_GAINS.bass + LAYER_GAINS.pad + LAYER_GAINS.tension);
-    expect(composed).toBeLessThanOrEqual(proceduralMax + 1e-9);
-    // E o menor telegrafo (0.45) segue acima do teto inteiro com folga.
     expect(composed).toBeLessThan(0.45);
+    // E nunca ultrapassa o pior caso declarado do proprio contrato.
+    expect(composed).toBeLessThanOrEqual(MUSIC_CEILING * COMPOSED_TRIM_MAX + 1e-9);
   });
 
   it('composedBaseGain satura o slider em [0,1]', () => {
