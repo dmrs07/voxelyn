@@ -30,7 +30,16 @@ const NAV_TIMEOUT_MS = 3000;
 // um arquivo com hash que nunca foi armazenado e abre em branco.
 const SHELL = ['./', './index.html'];
 // OPCIONAIS: cosmeticos/metadados. Um icone ausente nao pode derrubar o install.
-const OPTIONAL = ['./manifest.webmanifest', './icon-192.png', './icon-512.png'];
+// A trilha composta entra aqui pelo mesmo criterio: sem ela o solo offline
+// toca o backup procedural (que vive no bundle) — musica ausente nao pode
+// custar o install do PWA. E como e um arquivo de public/ (nao passa pelo
+// rollup), a lista injetada do precache nunca o veria.
+const OPTIONAL = [
+  './manifest.webmanifest',
+  './icon-192.png',
+  './icon-512.png',
+  './audio/voxelyn-survival-theme.flac',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

@@ -64,6 +64,13 @@ export type AudioSettings = {
    */
   musicVolume: number;
   muted: boolean;
+  /**
+   * Qual trilha toca na run: 'composed' e a trilha do compositor (arquivo em
+   * loop, padrao); 'synth' e a antiga — os oito temas procedurais por estrato,
+   * mantidos como backup e como escolha. Se o arquivo nao carregar, o jogo cai
+   * no synth sozinho, independente do valor aqui.
+   */
+  musicSource: 'composed' | 'synth';
 };
 
 /**
@@ -75,7 +82,12 @@ export type AudioSettings = {
  * injusto. Volume abaixo de 1 e a concessao: alto o bastante para informar,
  * baixo o bastante para nao assustar quem esta de fone.
  */
-const AUDIO_DEFAULTS: AudioSettings = { volume: 0.8, musicVolume: 0.7, muted: false };
+const AUDIO_DEFAULTS: AudioSettings = {
+  volume: 0.8,
+  musicVolume: 0.7,
+  muted: false,
+  musicSource: 'composed',
+};
 const AUDIO_KEY = 'voxelyn.audio';
 
 export const loadAudioSettings = (): AudioSettings => {
@@ -97,6 +109,12 @@ export const loadAudioSettings = (): AudioSettings => {
           ? Math.max(0, Math.min(1, obj.musicVolume))
           : AUDIO_DEFAULTS.musicVolume,
       muted: obj.muted === true,
+      // Storage anterior a trilha composta nao tem o campo: padrao, sem
+      // migracao — mesmo criterio do musicVolume acima.
+      musicSource:
+        obj.musicSource === 'composed' || obj.musicSource === 'synth'
+          ? obj.musicSource
+          : AUDIO_DEFAULTS.musicSource,
     };
   } catch {
     // JSON corrompido ou storage bloqueado (modo privativo): o jogo tem de
