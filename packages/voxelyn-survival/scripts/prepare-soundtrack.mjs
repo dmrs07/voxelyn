@@ -226,7 +226,9 @@ if (!Number.isNaN(inputLufs)) {
   const trim = Math.pow(10, trimDb / 20);
   const clamped = Math.max(TRIM_MIN, Math.min(TRIM_MAX, trim));
   console.log('== calibracao do trim ==');
-  console.log(`alvo no jogo: ${TARGET_INGAME_LUFS} LUFS  ->  COMPOSED_TRIM = ${clamped.toFixed(2)}`);
+  console.log(
+    `alvo no jogo: ${TARGET_INGAME_LUFS} LUFS  ->  ${SLOTS[slot].trimConst} = ${clamped.toFixed(2)}`,
+  );
   if (clamped !== trim) {
     console.warn(`(valor bruto ${trim.toFixed(2)} saturado na faixa [${TRIM_MIN}, ${TRIM_MAX}] — se saturou, o master esta muito longe do leito e vale conversar com o compositor em vez de forcar ganho)`);
   }

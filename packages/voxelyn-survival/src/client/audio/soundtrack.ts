@@ -113,10 +113,13 @@ export const composedBaseGain = (musicVolume: number): number =>
 export const MENU_SOUNDTRACK_URL = 'audio/voxelyn-survival-menu.flac';
 
 /**
- * Trim da trilha de menu, mesmo papel do COMPOSED_TRIM. 1.0 ate o asset
- * chegar; `prepare-soundtrack.mjs --slot menu` imprime o valor calibrado.
+ * Trim da trilha de menu, mesmo papel do COMPOSED_TRIM.
+ *
+ * Calibrado para o tema de abertura (Clevo): -15,0 LUFS integrado, true peak
+ * +0,2 dBTP -> 1.37 poe o leito em -30 LUFS com o slider no maximo. Trocou o
+ * master, rode `prepare-soundtrack.mjs --slot menu` de novo.
  */
-export const MENU_TRIM = 1.0;
+export const MENU_TRIM = 1.37;
 
 /** Ganho base da trilha de menu sob o slider. */
 export const menuBaseGain = (musicVolume: number): number =>
