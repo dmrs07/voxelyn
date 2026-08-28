@@ -3,10 +3,15 @@
 **Música por Clevo (@clevoclevoclevo)** — composta para o jogo, usada com
 permissão do autor (ver `THIRD_PARTY_NOTICES.md`).
 
-Este diretório recebe `voxelyn-survival-theme.flac` — a trilha do compositor,
-em loop, tocada em **todos os estratos** no lugar dos oito temas procedurais
-(que continuam no bundle como backup: fallback automático quando este arquivo
-não carrega, e escolha explícita em Opções → Trilha).
+Este diretório recebe os dois slots do pipeline de trilha:
+
+- `voxelyn-survival-theme.flac` — a trilha da **run**, em loop, tocada em
+  todos os estratos no lugar dos oito temas procedurais (que continuam no
+  bundle como backup: fallback automático quando este arquivo não carrega, e
+  escolha explícita em Opções → Trilha).
+- `voxelyn-survival-menu.flac` — a trilha de **abertura** (tela de título e
+  overlays do terminal), em loop; cala sob o véu quando a descida começa.
+  Ausente, o menu fica em silêncio — o comportamento histórico.
 
 ## Contrato (do compositor, preservado pelo código)
 
@@ -24,12 +29,14 @@ não carrega, e escolha explícita em Opções → Trilha).
 ## Como gerar o asset a partir do arquivo do compositor
 
 ```sh
-node scripts/prepare-soundtrack.mjs <arquivo-do-compositor>
+node scripts/prepare-soundtrack.mjs <arquivo-do-compositor>              # run
+node scripts/prepare-soundtrack.mjs <arquivo-do-compositor> --slot menu  # abertura
 ```
 
 O script analisa (LUFS, true peak, mid/side em banda cheia e <120 Hz, bordas
-do loop), empacota em FLAC sem alterar o áudio e imprime o `COMPOSED_TRIM`
-calibrado para colar em `src/client/audio/soundtrack.ts`.
+do loop), empacota em FLAC sem alterar o áudio e imprime o trim calibrado
+(`COMPOSED_TRIM` ou `MENU_TRIM`) para colar em
+`src/client/audio/soundtrack.ts`.
 
 O arquivo não versionado aqui ainda? O jogo toca o backup procedural e nada
 quebra — inclusive o install offline do PWA (a trilha é entrada OPCIONAL do
