@@ -21,7 +21,11 @@
 // compositor pedir uma emenda de loop justa.
 //
 // Uso:
-//   node scripts/prepare-soundtrack.mjs <entrada> [--out <caminho>] [--trim-silence]
+//   node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu] [--out <caminho>] [--trim-silence]
+//
+// --slot escolhe o destino no pipeline: 'run' (padrao) e a trilha da descida
+// (public/audio/voxelyn-survival-theme.flac, COMPOSED_TRIM); 'menu' e a
+// trilha de abertura do terminal (voxelyn-survival-menu.flac, MENU_TRIM).
 //
 // Precisa de ffmpeg/ffprobe no PATH (ou FFMPEG/FFPROBE no ambiente).
 
@@ -67,14 +71,29 @@ const dB = (linear) => 20 * Math.log10(linear);
 // --- argumentos --------------------------------------------------------------
 
 const argv = process.argv.slice(2);
-const input = argv.find((a) => !a.startsWith('--'));
-if (!input) die('uso: node scripts/prepare-soundtrack.mjs <entrada> [--out <caminho>] [--trim-silence]');
+const slotFlag = argv.indexOf('--slot');
+const slot = slotFlag >= 0 ? argv[slotFlag + 1] : 'run';
+if (slot !== 'run' && slot !== 'menu') die(`--slot invalido: ${slot} (use run ou menu)`);
+// Valores de flags nao sao "o arquivo sem --": exclui-los da busca pela
+// entrada — por INDICE, nao por valor (indexOf ausente daria -1 e o +1
+// apontaria para o proprio argv[0]).
+const flagValueIdx = new Set();
+for (const flag of ['--slot', '--out']) {
+  const i = argv.indexOf(flag);
+  if (i >= 0) flagValueIdx.add(i + 1);
+}
+const input = argv.find((a, i) => !a.startsWith('--') && !flagValueIdx.has(i));
+if (!input) die('uso: node scripts/prepare-soundtrack.mjs <entrada> [--slot run|menu] [--out <caminho>] [--trim-silence]');
 if (!existsSync(input)) die(`entrada nao existe: ${input}`);
+const SLOTS = {
+  run: { file: 'voxelyn-survival-theme.flac', trimConst: 'COMPOSED_TRIM' },
+  menu: { file: 'voxelyn-survival-menu.flac', trimConst: 'MENU_TRIM' },
+};
 const outFlag = argv.indexOf('--out');
 const output =
   outFlag >= 0
     ? resolve(argv[outFlag + 1])
-    : resolve(__dirname, '../public/audio/voxelyn-survival-theme.flac');
+    : resolve(__dirname, `../public/audio/${SLOTS[slot].file}`);
 const trimSilence = argv.includes('--trim-silence');
 
 // --- 1. o que o arquivo E ----------------------------------------------------
@@ -211,5 +230,7 @@ if (!Number.isNaN(inputLufs)) {
   if (clamped !== trim) {
     console.warn(`(valor bruto ${trim.toFixed(2)} saturado na faixa [${TRIM_MIN}, ${TRIM_MAX}] — se saturou, o master esta muito longe do leito e vale conversar com o compositor em vez de forcar ganho)`);
   }
-  console.log('Cole em src/client/audio/soundtrack.ts: export const COMPOSED_TRIM = ' + clamped.toFixed(2) + ';');
+  console.log(
+    `Cole em src/client/audio/soundtrack.ts: export const ${SLOTS[slot].trimConst} = ${clamped.toFixed(2)};`,
+  );
 }

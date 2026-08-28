@@ -59,6 +59,12 @@ export class SoundtrackBus {
   constructor(
     private readonly ctx: AudioContext,
     private readonly out: AudioNode,
+    /**
+     * Ganho base sob o slider de musica. Cada trilha (run, menu) tem o
+     * proprio trim calibrado, entao o bus recebe a funcao em vez de conhecer
+     * uma constante — duas instancias, um contrato.
+     */
+    private readonly baseGain: (musicVolume: number) => number = composedBaseGain,
   ) {}
 
   /** O arquivo decodificou e a trilha pode soar? */
@@ -113,7 +119,7 @@ export class SoundtrackBus {
     if (!this.busGain || this.silenced) return;
     const t = this.ctx.currentTime;
     cancelAndHold(this.busGain.gain, t);
-    this.busGain.gain.setTargetAtTime(composedBaseGain(this.musicVolume), t, 0.1);
+    this.busGain.gain.setTargetAtTime(this.baseGain(this.musicVolume), t, 0.1);
   }
 
   /** Abaixa a trilha sob um som que precisa do canal. Igual ao music-bus. */
@@ -146,7 +152,7 @@ export class SoundtrackBus {
     this.attachSource();
     const t = this.ctx.currentTime;
     cancelAndHold(this.busGain.gain, t);
-    this.busGain.gain.setTargetAtTime(composedBaseGain(this.musicVolume), t, COMPOSED_FADE_UP_TAU);
+    this.busGain.gain.setTargetAtTime(this.baseGain(this.musicVolume), t, COMPOSED_FADE_UP_TAU);
   }
 
   dispose(): void {

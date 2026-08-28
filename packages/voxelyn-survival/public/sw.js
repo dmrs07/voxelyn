@@ -39,6 +39,7 @@ const OPTIONAL = [
   './icon-192.png',
   './icon-512.png',
   './audio/voxelyn-survival-theme.flac',
+  './audio/voxelyn-survival-menu.flac',
 ];
 
 self.addEventListener('install', (event) => {

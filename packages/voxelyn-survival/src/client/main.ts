@@ -318,6 +318,7 @@ const backToMenu = (): void => {
   paused = false;
   stopLoop = null;
   pauseMenu.disarmHistory();
+  audio.setScreen('menu');
   // A volta ao terminal tambem passa pela escotilha: a unidade e recolhida.
   // Se um véu estiver no ar (nao deveria: as falhas de partida vivem no
   // `prepare` dele), a volta nao pode se perder — mostra o menu sem cerimonia.
@@ -986,6 +987,7 @@ const abandonRun = (): void => {
   showInvite(null);
   setBanner(null);
   audio.reset();
+  audio.setScreen('menu');
   void deployVeil({ swap: () => menu.classList.remove('hidden'), sound: veilSound }).then((ran) => {
     if (!ran) menu.classList.remove('hidden');
   });
@@ -1855,6 +1857,9 @@ const startSolo = (contract: DeathEchoContract | null = null): void => {
     },
     swap: () => {
       if (!run) return;
+      // A troca acontece sob o preto do veu: a trilha do terminal desce aqui
+      // e a da run nasce nos primeiros quadros — nunca as duas ao mesmo tempo.
+      audio.setScreen('run');
       menu.classList.add('hidden');
       run.firstFrame();
     },
@@ -1891,6 +1896,7 @@ const startOnline = (): void => {
     },
     swap: () => {
       if (!run) return;
+      audio.setScreen('run');
       menu.classList.add('hidden');
       run.firstFrame();
     },
@@ -1926,6 +1932,7 @@ const startTraining = (): void => {
     },
     swap: () => {
       if (!run) return;
+      audio.setScreen('run');
       menu.classList.add('hidden');
       run.firstFrame();
     },
@@ -1958,6 +1965,7 @@ const teardownTraining = (): void => {
 document.getElementById('btn-training-terminal')?.addEventListener('click', () => {
   audio.ui();
   teardownTraining();
+  audio.setScreen('menu');
   void deployVeil({ swap: () => menu.classList.remove('hidden'), sound: veilSound }).then((ran) => {
     if (!ran) menu.classList.remove('hidden');
   });

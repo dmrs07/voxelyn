@@ -18,7 +18,13 @@ import { AmbienceBus } from './ambience-bus';
 import { cuesForEvents } from './cues';
 import { CueMixer, NEAR_CUTOFF_HZ } from './mixer';
 import { MusicBus } from './music-bus';
-import { SOUNDTRACK_URL, resolveMusicSource, type MusicSource } from './soundtrack';
+import {
+  MENU_SOUNDTRACK_URL,
+  SOUNDTRACK_URL,
+  menuBaseGain,
+  resolveMusicSource,
+  type MusicSource,
+} from './soundtrack';
 import { SoundtrackBus } from './soundtrack-bus';
 import { VOICE_RENDERERS, createNoiseBuffer } from './synth';
 import { voiceSpec, type VoiceId } from './voices';
@@ -64,6 +70,7 @@ export class AudioDirector {
   private ambienceBus: AmbienceBus | null = null;
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
+  private menuTrackBus: SoundtrackBus | null = null;
 
   private readonly mixer = new CueMixer();
   private levels: AmbienceLevels = SILENT_AMBIENCE;
@@ -83,6 +90,13 @@ export class AudioDirector {
   private musicSource: MusicSource = 'composed';
   /** Fonte que soou no quadro anterior, para detectar a transicao. */
   private activeSource: MusicSource | null = null;
+  /**
+   * Onde o jogador esta: no terminal (menu e overlays de titulo) ou numa run.
+   * Quem informa e o main.ts, nas MESMAS transicoes que mostram/escondem o
+   * menu sob o veu de deploy — o audio nao adivinha tela por DOM. A trilha de
+   * menu toca em 'menu' (quando o arquivo existe), cala em 'run'.
+   */
+  private screen: 'menu' | 'run' = 'menu';
   /**
    * Fase do quadro anterior, para detectar a transicao para 'dead'.
    *
@@ -131,6 +145,11 @@ export class AudioDirector {
       // barramento evita que o desmute volte com um acorde pendurado.
       this.musicBus?.silence();
       this.soundtrackBus?.silence();
+      this.menuTrackBus?.silence();
+    } else if (this.screen === 'menu') {
+      // Desmutou no terminal: a trilha de menu volta sozinha — nao ha
+      // update() de run para religa-la, entao o religamento mora aqui.
+      this.menuTrackBus?.wake();
     }
   }
 
@@ -139,6 +158,21 @@ export class AudioDirector {
     this.musicVolume = Math.max(0, Math.min(1, volume));
     this.musicBus?.setVolume(this.musicVolume);
     this.soundtrackBus?.setVolume(this.musicVolume);
+    this.menuTrackBus?.setVolume(this.musicVolume);
+  }
+
+  /**
+   * Transicao de tela, chamada pelo main.ts junto das trocas de DOM sob o
+   * veu. Toda a politica da trilha de menu vive aqui: acorda no terminal,
+   * cala na descida. Idempotente — wake/silence ja o sao.
+   */
+  setScreen(screen: 'menu' | 'run'): void {
+    this.screen = screen;
+    if (screen === 'run') {
+      this.menuTrackBus?.silence();
+    } else if (!this.muted) {
+      this.menuTrackBus?.wake();
+    }
   }
 
   /**
@@ -210,6 +244,15 @@ export class AudioDirector {
       // resolveMusicSource devolve o backup procedural e o jogo tem musica
       // desde o primeiro compasso. Falha (404/decode) = backup para sempre.
       void this.soundtrackBus.load(SOUNDTRACK_URL);
+      // A trilha do terminal: nasce querendo tocar (o unlock e um gesto NO
+      // menu na esmagadora maioria dos casos) — o wake antes do load e
+      // inocuo, e o attach acontece sozinho quando o FLAC decodificar. Sem o
+      // arquivo, o menu segue em silencio, como sempre foi.
+      this.menuTrackBus = new SoundtrackBus(ctx, master, menuBaseGain);
+      this.menuTrackBus.start();
+      this.menuTrackBus.setVolume(this.musicVolume);
+      void this.menuTrackBus.load(MENU_SOUNDTRACK_URL);
+      if (this.screen === 'menu' && !this.muted) this.menuTrackBus.wake();
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -239,6 +282,10 @@ export class AudioDirector {
     this.lastPhase = state.phase;
 
     if (state.phase === 'running') {
+      // Cinto de seguranca: update() com run correndo implica tela de run —
+      // se algum caminho novo esquecer o setScreen, a trilha de menu nao
+      // pode vazar por baixo da descida. silence() ja silenciado e gratis.
+      this.menuTrackBus?.silence();
       // Qual trilha soa AGORA: a composta quando o jogador a prefere e o
       // arquivo ja decodificou; o backup procedural em qualquer outro caso.
       // A resolucao e por quadro de proposito — o FLAC que termina de

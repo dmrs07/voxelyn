@@ -84,9 +84,40 @@ export const resolveMusicSource = (
   composedReady: boolean,
 ): MusicSource => (preference === 'composed' && composedReady ? 'composed' : 'synth');
 
-/** Ganho base da trilha composta sob o slider (contrato do teto preservado). */
-export const composedBaseGain = (musicVolume: number): number => {
+const trackBaseGain = (trim: number, musicVolume: number): number => {
   const vol = Math.max(0, Math.min(1, musicVolume));
-  const trim = Math.max(COMPOSED_TRIM_MIN, Math.min(COMPOSED_TRIM_MAX, COMPOSED_TRIM));
-  return MUSIC_CEILING * trim * vol;
+  const t = Math.max(COMPOSED_TRIM_MIN, Math.min(COMPOSED_TRIM_MAX, trim));
+  return MUSIC_CEILING * t * vol;
 };
+
+/** Ganho base da trilha composta sob o slider (contrato do teto preservado). */
+export const composedBaseGain = (musicVolume: number): number =>
+  trackBaseGain(COMPOSED_TRIM, musicVolume);
+
+// ---------------------------------------------------------------------------
+// Trilha de abertura (menu)
+// ---------------------------------------------------------------------------
+
+/**
+ * Segundo slot do pipeline: a trilha da tela de titulo. Mesmo contrato da
+ * trilha da run (FLAC lossless, imagem estereo intacta, loop gapless, teto da
+ * musica), com uma diferenca de ciclo de vida: toca enquanto o jogador esta
+ * no terminal (menu e overlays de opcoes/ranking), cala sob o veu quando a
+ * descida comeca. Sem o arquivo, o menu fica em silencio — que e o
+ * comportamento historico, nunca um erro.
+ *
+ * A preferencia composta/sintetizada NAO se aplica aqui: o backup procedural
+ * so existe para a run (oito temas por estrato); o menu nunca teve tema
+ * sintetizado para voltar.
+ */
+export const MENU_SOUNDTRACK_URL = 'audio/voxelyn-survival-menu.flac';
+
+/**
+ * Trim da trilha de menu, mesmo papel do COMPOSED_TRIM. 1.0 ate o asset
+ * chegar; `prepare-soundtrack.mjs --slot menu` imprime o valor calibrado.
+ */
+export const MENU_TRIM = 1.0;
+
+/** Ganho base da trilha de menu sob o slider. */
+export const menuBaseGain = (musicVolume: number): number =>
+  trackBaseGain(MENU_TRIM, musicVolume);

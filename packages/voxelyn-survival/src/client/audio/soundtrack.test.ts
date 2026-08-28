@@ -4,9 +4,12 @@ import {
   COMPOSED_TRIM,
   COMPOSED_TRIM_MAX,
   COMPOSED_TRIM_MIN,
+  MENU_SOUNDTRACK_URL,
+  MENU_TRIM,
   SOUNDTRACK_URL,
   composedBaseGain,
   isMusicSource,
+  menuBaseGain,
   resolveMusicSource,
 } from './soundtrack';
 
@@ -56,6 +59,18 @@ describe('resolucao de fonte (fallback para o backup procedural)', () => {
   it('preferencia synth ignora a disponibilidade do arquivo', () => {
     expect(resolveMusicSource('synth', true)).toBe('synth');
     expect(resolveMusicSource('synth', false)).toBe('synth');
+  });
+
+  it('a trilha de menu segue o mesmo contrato: lossless, teto, trim na faixa', () => {
+    expect(MENU_SOUNDTRACK_URL.endsWith('.flac')).toBe(true);
+    expect(MENU_SOUNDTRACK_URL.startsWith('/')).toBe(false);
+    // Slots distintos: menu e run nao podem disputar o mesmo arquivo.
+    expect(MENU_SOUNDTRACK_URL).not.toBe(SOUNDTRACK_URL);
+    expect(MENU_TRIM).toBeGreaterThanOrEqual(COMPOSED_TRIM_MIN);
+    expect(MENU_TRIM).toBeLessThanOrEqual(COMPOSED_TRIM_MAX);
+    expect(menuBaseGain(1)).toBeLessThan(0.45);
+    expect(menuBaseGain(-1)).toBe(0);
+    expect(menuBaseGain(0.5)).toBeCloseTo(menuBaseGain(1) / 2, 10);
   });
 
   it('isMusicSource valida o que vem do storage', () => {
