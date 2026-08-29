@@ -27,6 +27,7 @@
     "build:animation": "pnpm --filter @voxelyn/animation build",
     "build:electron": "pnpm --filter @voxelforge/electron dist",
     "icons:generate": "node scripts/generate-icons.mjs",
+    "prospector:typology": "node packages/voxelyn-survival-content/tools/typology.mjs && node scripts/render-svg.mjs docs/prospector/prospector-typology.svg docs/prospector/prospector-typology.png 2",
     "devlog:plan": "node scripts/devlog/plan.mjs",
     "devlog:shoot": "node scripts/devlog/shoot.mjs",
     "devlog:carousel": "node scripts/devlog/carousel.mjs",

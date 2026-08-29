@@ -1,0 +1,445 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2416" height="2364" viewBox="0 0 2416 2364">
+  <style>
+    text { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; fill: #d5cdba; }
+    .mono, tspan.mono { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; }
+    .title { font-size: 46px; font-weight: 700; fill: #ffe9b8; letter-spacing: 0.5px; }
+    .subtitle { font-size: 17px; fill: #7b8ba3; }
+    .kicker { font-size: 13px; fill: #ffa63f; letter-spacing: 3.5px; }
+    .sect { font-size: 15px; fill: #7b8ba3; letter-spacing: 3.5px; }
+    .grouphead { font-size: 13px; font-weight: 700; letter-spacing: 3.5px; }
+    .lead { font-size: 14.5px; fill: #d5cdba; }
+    .mult { fill: #ffa63f; font-weight: 700; }
+    .card { fill: #12161e; stroke: #1d2430; }
+    .cardname { font-size: 15px; fill: #ffe9b8; font-weight: 600; }
+    .cardmeta { font-size: 12.5px; fill: #7b8ba3; }
+    .th { font-size: 12px; fill: #7b8ba3; letter-spacing: 2px; }
+    .td { font-size: 14px; fill: #d5cdba; }
+    .note { font-size: 13.5px; fill: #b8a98f; }
+    .tree { font-size: 14.5px; }
+    .dim { fill: #59f2c2; }
+    .warn { fill: #ff7a2f; }
+  </style>
+  <rect width="100%" height="100%" fill="#0b0e14"/>
+  <rect x="40" y="40" width="2336" height="2284" fill="none" stroke="#1d2430"/>
+
+  <text x="70" y="98" class="kicker">AURIX DYNAMICS · UNIDADE MODULAR PX</text>
+  <text x="70" y="152" class="title">PROSPECTOR — TIPOLOGIA DE PEÇAS</text>
+  <text x="70" y="182" class="subtitle">Vista explodida e catálogo, rasterizados do modelo voxel de produção. Referência de impressão 3D.</text>
+  <text x="2346" y="98" text-anchor="end" class="th">20 TIPOS · 25 PEÇAS FÍSICAS · 49 CAIXAS</text>
+  <text x="2346" y="124" text-anchor="end" class="th mono">prospector.mjs · renderVoxels() · MODEL_SCALE 2</text>
+  <text x="2346" y="150" text-anchor="end" class="th">ENVELOPE 7 x 8.5 x 15 U AUTORADAS</text>
+  <text x="2346" y="176" text-anchor="end" class="th">1 U = 90 MM REAIS · FICHA 1,35 M / 280 KG</text>
+
+  <text x="319" y="240" class="sect">VISTA EXPLODIDA</text>
+  <image x="319" y="270" width="592" height="800" href="data:image/png;base64,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" style="image-rendering:pixelated"/>
+  
+    <g>
+      <path d="M 607.0 366.0 L 303.0 366.0 L 285.0 366.0" stroke="#59f2c2" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="607.0" cy="366.0" r="2.8" fill="#59f2c2"/>
+      <text x="277.0" y="370.0" text-anchor="end" class="lead">Cabeça + moldura do visor</text>
+    </g>
+    <g>
+      <path d="M 359.0 434.0 L 303.0 434.0 L 285.0 434.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="359.0" cy="434.0" r="2.8" fill="#ffa63f"/>
+      <text x="277.0" y="438.0" text-anchor="end" class="lead">Hardpoint traseiro</text>
+    </g>
+    <g>
+      <path d="M 527.0 446.0 L 303.0 466.0 L 285.0 466.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="527.0" cy="446.0" r="2.8" fill="#ffa63f"/>
+      <text x="277.0" y="470.0" text-anchor="end" class="lead">Cabo condutivo</text>
+    </g>
+    <g>
+      <path d="M 335.0 558.0 L 303.0 558.0 L 285.0 558.0" stroke="#ffd166" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="335.0" cy="558.0" r="2.8" fill="#ffd166"/>
+      <text x="277.0" y="562.0" text-anchor="end" class="lead">Câmara de energia</text>
+    </g>
+    <g>
+      <path d="M 583.0 586.0 L 303.0 590.0 L 285.0 590.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="583.0" cy="586.0" r="2.8" fill="#ffa63f"/>
+      <text x="277.0" y="594.0" text-anchor="end" class="lead">Chassi + chapa de topo</text>
+    </g>
+    <g>
+      <path d="M 359.0 638.0 L 303.0 638.0 L 285.0 638.0" stroke="#ffd166" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="359.0" cy="638.0" r="2.8" fill="#ffd166"/>
+      <text x="277.0" y="642.0" text-anchor="end" class="lead">Receptor + trilho</text>
+    </g>
+    <g>
+      <path d="M 479.0 646.0 L 303.0 670.0 L 285.0 670.0" stroke="#ffd166" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="479.0" cy="646.0" r="2.8" fill="#ffd166"/>
+      <text x="277.0" y="674.0" text-anchor="end" class="lead">Boca do cano</text>
+    </g>
+    <g>
+      <path d="M 399.0 658.0 L 303.0 702.0 L 285.0 702.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="399.0" cy="658.0" r="2.8" fill="#ffa63f"/>
+      <text x="277.0" y="706.0" text-anchor="end" class="lead">Costura de chapa</text>
+    </g>
+    <g>
+      <path d="M 575.0 686.0 L 303.0 734.0 L 285.0 734.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="575.0" cy="686.0" r="2.8" fill="#ffa63f"/>
+      <text x="277.0" y="738.0" text-anchor="end" class="lead">Bacia</text>
+    </g>
+    <g>
+      <path d="M 391.0 698.0 L 303.0 766.0 L 285.0 766.0" stroke="#66c28a" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="391.0" cy="698.0" r="2.8" fill="#66c28a"/>
+      <text x="277.0" y="770.0" text-anchor="end" class="lead">Braço da arma</text>
+    </g>
+    <g>
+      <path d="M 863.0 302.0 L 927.0 302.0 L 945.0 302.0" stroke="#59f2c2" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="863.0" cy="302.0" r="2.8" fill="#59f2c2"/>
+      <text x="953.0" y="306.0" text-anchor="start" class="lead">Farol tático</text>
+    </g>
+    <g>
+      <path d="M 779.0 354.0 L 927.0 354.0 L 945.0 354.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="779.0" cy="354.0" r="2.8" fill="#ffa63f"/>
+      <text x="953.0" y="358.0" text-anchor="start" class="lead">Ombreira + rebite <tspan class="mult">x2</tspan></text>
+    </g>
+    <g>
+      <path d="M 751.0 398.0 L 927.0 398.0 L 945.0 398.0" stroke="#59f2c2" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="751.0" cy="398.0" r="2.8" fill="#59f2c2"/>
+      <text x="953.0" y="402.0" text-anchor="start" class="lead">Visor</text>
+    </g>
+    <g>
+      <path d="M 771.0 472.0 L 927.0 472.0 L 945.0 472.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="771.0" cy="472.0" r="2.8" fill="#ffa63f"/>
+      <text x="953.0" y="476.0" text-anchor="start" class="lead">Venezianas de exaustão</text>
+    </g>
+    <g>
+      <path d="M 879.0 484.0 L 927.0 504.0 L 945.0 504.0" stroke="#66c28a" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="879.0" cy="484.0" r="2.8" fill="#66c28a"/>
+      <text x="953.0" y="508.0" text-anchor="start" class="lead">Braço de extração + garra</text>
+    </g>
+    <g>
+      <path d="M 655.0 606.0 L 927.0 606.0 L 945.0 606.0" stroke="#7ab8ff" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="655.0" cy="606.0" r="2.8" fill="#7ab8ff"/>
+      <text x="953.0" y="610.0" text-anchor="start" class="lead">Coxa (2 degraus) <tspan class="mult">x2</tspan></text>
+    </g>
+    <g>
+      <path d="M 795.0 684.0 L 927.0 684.0 L 945.0 684.0" stroke="#ffa63f" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="795.0" cy="684.0" r="2.8" fill="#ffa63f"/>
+      <text x="953.0" y="688.0" text-anchor="start" class="lead">Núcleo de energia</text>
+    </g>
+    <g>
+      <path d="M 655.0 694.0 L 927.0 716.0 L 945.0 716.0" stroke="#7ab8ff" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="655.0" cy="694.0" r="2.8" fill="#7ab8ff"/>
+      <text x="953.0" y="720.0" text-anchor="start" class="lead">Jarrete + pino <tspan class="mult">x2</tspan></text>
+    </g>
+    <g>
+      <path d="M 719.0 814.0 L 927.0 814.0 L 945.0 814.0" stroke="#7ab8ff" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="719.0" cy="814.0" r="2.8" fill="#7ab8ff"/>
+      <text x="953.0" y="818.0" text-anchor="start" class="lead">Canela + pistão <tspan class="mult">x2</tspan></text>
+    </g>
+    <g>
+      <path d="M 767.0 926.0 L 927.0 926.0 L 945.0 926.0" stroke="#7ab8ff" fill="none" stroke-width="1.1" opacity="0.5"/>
+      <circle cx="767.0" cy="926.0" r="2.8" fill="#7ab8ff"/>
+      <text x="953.0" y="930.0" text-anchor="start" class="lead">Pé + garras <tspan class="mult">x2</tspan></text>
+    </g>
+
+  <g transform="translate(319 1166)">
+    <text x="0" y="0" class="sect">MONTADO · 4 DIREÇÕES AUTORADAS</text>
+    
+    <g transform="translate(0 26)">
+      <image x="0" y="0" width="144" height="228" href="data:image/png;base64,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" style="image-rendering:pixelated"/>
+      <text x="72" y="250" text-anchor="middle" class="cardmeta mono">dr</text>
+    </g>
+    <g transform="translate(170 26)">
+      <image x="0" y="0" width="156" height="234" href="data:image/png;base64,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" style="image-rendering:pixelated"/>
+      <text x="78" y="256" text-anchor="middle" class="cardmeta mono">dl</text>
+    </g>
+    <g transform="translate(352 26)">
+      <image x="0" y="0" width="156" height="240" href="data:image/png;base64,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" style="image-rendering:pixelated"/>
+      <text x="78" y="262" text-anchor="middle" class="cardmeta mono">ur</text>
+    </g>
+    <g transform="translate(534 26)">
+      <image x="0" y="0" width="144" height="240" href="data:image/png;base64,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" style="image-rendering:pixelated"/>
+      <text x="72" y="262" text-anchor="middle" class="cardmeta mono">ul</text>
+    </g>
+  </g>
+
+  <g transform="translate(70 1532)">
+    <text x="0" y="0" class="sect">TOPOLOGIA DE MONTAGEM</text>
+    <text x="0" y="34" class="tree mono" fill="#ffa63f">CHASSI</text><text x="24" y="60" class="tree mono" fill="#ffa63f">├─ BACIA</text><text x="48" y="86" class="tree mono" fill="#7ab8ff">│   └─ COXA ─ JARRETE ─ CANELA ─ PÉ</text><text x="24" y="112" class="tree mono" fill="#ffa63f">├─ NÚCLEO DE ENERGIA</text><text x="24" y="138" class="tree mono" fill="#ffa63f">├─ VENEZIANAS (esq.) / COSTURA (dir.)</text><text x="24" y="164" class="tree mono" fill="#ffa63f">├─ HARDPOINT ─ CABO CONDUTIVO</text><text x="24" y="190" class="tree mono" fill="#ffa63f">├─ OMBREIRA x2</text><text x="48" y="216" class="tree mono" fill="#66c28a">│   ├─ BRAÇO DE EXTRAÇÃO ─ GARRA (esq.)</text><text x="48" y="242" class="tree mono" fill="#66c28a">│   └─ BRAÇO DA ARMA ─ RECEPTOR ─ CÂMARA + BOCA (dir.)</text><text x="24" y="268" class="tree mono" fill="#59f2c2">└─ CABEÇA ─ VISOR + FAROL (esq.)</text>
+  </g>
+
+  <g transform="translate(70 1892)">
+    <text x="0" y="0" class="sect">MATERIAIS · RAMPA [TOPO / ESQUERDA / DIREITA]</text>
+    <rect x="0" y="26" width="22" height="20" rx="2" fill="#2e3a4d" stroke="#1d2430"><title>rock #2e3a4d</title></rect><rect x="26" y="26" width="22" height="20" rx="2" fill="#1d2430" stroke="#1d2430"><title>rockShadow #1d2430</title></rect><rect x="52" y="26" width="22" height="20" rx="2" fill="#0b0e14" stroke="#1d2430"><title>dark #0b0e14</title></rect>
+      <text x="100" y="40" class="td mono ">rockDeep</text>
+      <text x="210" y="40" class="cardmeta mono">#2e3a4d  #1d2430  #0b0e14</text>
+      <text x="500" y="40" class="cardmeta">Pé, Canela, Bacia, Chassi, Venezianas de exaustão, Costura d…</text><rect x="0" y="60" width="22" height="20" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone #b8a98f</title></rect><rect x="26" y="60" width="22" height="20" rx="2" fill="#8a7154" stroke="#1d2430"><title>brass #8a7154</title></rect><rect x="52" y="60" width="22" height="20" rx="2" fill="#1d2430" stroke="#1d2430"><title>rockShadow #1d2430</title></rect>
+      <text x="100" y="74" class="td mono ">bone</text>
+      <text x="210" y="74" class="cardmeta mono">#b8a98f  #8a7154  #1d2430</text>
+      <text x="500" y="74" class="cardmeta">Pé, Canela, Ombreira, Braço de extração, Receptor</text><rect x="0" y="94" width="22" height="20" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone #b8a98f</title></rect><rect x="26" y="94" width="22" height="20" rx="2" fill="#8a7154" stroke="#1d2430"><title>brass #8a7154</title></rect><rect x="52" y="94" width="22" height="20" rx="2" fill="#1d2430" stroke="#1d2430"><title>rockShadow #1d2430</title></rect>
+      <text x="100" y="108" class="td mono ">rust</text>
+      <text x="210" y="108" class="cardmeta mono">#b8a98f  #8a7154  #1d2430</text>
+      <text x="500" y="108" class="cardmeta">Jarrete, Coxa (2 degraus), Chassi, Hardpoint traseiro, Ombre…</text><rect x="0" y="128" width="22" height="20" rx="2" fill="#ffd166" stroke="#1d2430"><title>loot #ffd166</title></rect><rect x="26" y="128" width="22" height="20" rx="2" fill="#8a7154" stroke="#1d2430"><title>brass #8a7154</title></rect><rect x="52" y="128" width="22" height="20" rx="2" fill="#1d2430" stroke="#1d2430"><title>rockShadow #1d2430</title></rect>
+      <text x="100" y="142" class="td mono ">loot</text>
+      <text x="210" y="142" class="cardmeta mono">#ffd166  #8a7154  #1d2430</text>
+      <text x="500" y="142" class="cardmeta">Jarrete</text><rect x="0" y="162" width="22" height="20" rx="2" fill="#59f2c2" stroke="#1d2430"><title>biolum #59f2c2</title></rect><rect x="26" y="162" width="22" height="20" rx="2" fill="#66c28a" stroke="#1d2430"><title>fungusLight #66c28a</title></rect><rect x="52" y="162" width="22" height="20" rx="2" fill="#2f6b4f" stroke="#1d2430"><title>fungus #2f6b4f</title></rect>
+      <text x="100" y="176" class="td mono dim">biolum *</text>
+      <text x="210" y="176" class="cardmeta mono">#59f2c2  #66c28a  #2f6b4f</text>
+      <text x="500" y="176" class="cardmeta">Núcleo de energia, Hardpoint traseiro, Visor, Câmara de ener…</text><rect x="0" y="196" width="22" height="20" rx="2" fill="#7ab8ff" stroke="#1d2430"><title>electric #7ab8ff</title></rect><rect x="26" y="196" width="22" height="20" rx="2" fill="#7b8ba3" stroke="#1d2430"><title>mist #7b8ba3</title></rect><rect x="52" y="196" width="22" height="20" rx="2" fill="#2e3a4d" stroke="#1d2430"><title>rock #2e3a4d</title></rect>
+      <text x="100" y="210" class="td mono dim">electric *</text>
+      <text x="210" y="210" class="cardmeta mono">#7ab8ff  #7b8ba3  #2e3a4d</text>
+      <text x="500" y="210" class="cardmeta">Cabo condutivo</text><rect x="0" y="230" width="22" height="20" rx="2" fill="#ffe9b8" stroke="#1d2430"><title>beam #ffe9b8</title></rect><rect x="26" y="230" width="22" height="20" rx="2" fill="#ffa63f" stroke="#1d2430"><title>amber #ffa63f</title></rect><rect x="52" y="230" width="22" height="20" rx="2" fill="#ff7a2f" stroke="#1d2430"><title>fire #ff7a2f</title></rect>
+      <text x="100" y="244" class="td mono dim">lamp *</text>
+      <text x="210" y="244" class="cardmeta mono">#ffe9b8  #ffa63f  #ff7a2f</text>
+      <text x="500" y="244" class="cardmeta">Farol tático</text>
+    <text x="0" y="284" class="cardmeta"><tspan class="dim">*</tspan> emissivo — pinte por último, ou imprima em filamento translúcido.</text>
+  </g>
+
+  <text x="1250" y="210" class="sect">CATÁLOGO DE PEÇAS</text>
+  <text x="1250" y="254" class="grouphead" fill="#7ab8ff">LOCOMOÇÃO</text>
+    <g transform="translate(1250 270)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#7ab8ff"/>
+      <image x="16" y="24" width="132.0" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJAAAABgCAYAAADy1PuhAAACEklEQVR4Ae3BoW5kZQCG4ff/sjdQ0yA4guToZiQproKsGUdYiapcmupqTCUrUbXYcVxAdVM9CaII7uJwA6w4+TrZme77PIMT8ePPvy6s8Nefvw90cEEqBKkQpEKQCkEqDL6Qi8vtwgrffPsda/z7z9+s8fy4G2i1IBWCVAhSIUiFIBUGr+TicrvwFXl+3A1EkApBKgSpEKRCkAqDz7i43C7o1Tw/7gZvUJAKQSoEqRCkQpAK4+Jyu6Cj8/y4G5yAIBWCVAhSIUiFIBXGNG8WVjg7n9DxeX7cDb6AIBWCVAhSIUiFIBXGNG8WDujsfEKHd39zxRrvP9wOXkGQCkEqBKkQpEKQCmOaNwtH5Ox8QnB/c8Uxef/hdvA/glQIUiFIhSAVglQY07xZOGFn5xOn4P7mircoSIUgFYJUCFIhSIXBStO8WThhZ+cTr+H+5oq36PrugTWCVAhSIUiFIBWCVBgc2DRvFk7YH7/9wim7vnvgkIJUCFIhSIUgFYJUGByZad4sHJGP25k1Lr7/gUO6vnvgmASpEKRCkApBKgSpMDhx07xZOKCP25lD+rTbc8qCVAhSIUiFIBWCVHjHiXvZPw1WmObNgj7rZf80WCFIhSAVglQIUiFIhXd8ZV72T4NV5oUT9rJ/GhxQkApBKgSpEKRCkAoDvar7258WVvi027PGy/5pcESCVAhSIUiFIBWCVPgPan1MOV249q4AAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Pé + garras <tspan class="mult">x2</tspan></text>
+      <text x="132" y="48" class="cardmeta mono">2 x 4 x 1 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">lower</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect></g>
+    </g>
+    <g transform="translate(1622 270)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#7ab8ff"/>
+      <image x="16" y="24" width="88.0" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAABtklEQVR4Ae3BIYobYQCG4ff/GKiOWSp2xEKgLkRHRtRFFXqDtc0Bqmsi2xPU1sbtAUJliGsZWDERJaI5wvQCW/FDhi9hv+cp3Ij3Hz8NVHj68bVwA0RYibASYSXCSoRVwWS2WA1UeHv/QI0/x2dqHHbbgoEIKxFWIqxEWImwKlzIbLEaeEUOu23hAkRYibASYSXCSoRV4T9mi9VAXMxhty28QISVCCsRViKsRFiV2WI1EDYirERYibASYSXCqjmfempM7loCNuslNT48fuElIqxEWImwEmElwqq00/nAiCZ3Lbdgs17iIMJKhJUIKxFWIqwaRnY+9dSY3LWMabNeMqbHz9+pIcJKhJUIKxFWIqwarsz51FPj7+lIjcPPN9T4tu0YkwgrEVYirERYibASYSXCSoSVCCsRViKsGl6Z469nrokIKxFWIqxEWImwEmElwkqElQgrEVYirERYibASYSXCSoSVCKum7/aFCu10PhAXI8JKhJUIKxFWIqwaKvXdvlChnc4Hrsj9uweq/O4YkwgrEVYirERYibBqGFnf7QsV2ul84Ib13b5QQYSVCCsRViKsRFj9A0QaQCFE2TeIAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Canela + pistão <tspan class="mult">x2</tspan></text>
+      <text x="132" y="48" class="cardmeta mono">2 x 2.5 x 2 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">lower</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect></g>
+    </g>
+    <g transform="translate(1994 270)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#7ab8ff"/>
+      <image x="16" y="32" width="96.0" height="72" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABICAYAAAAJZ/BjAAABeElEQVR4Ae3BMYpaUQCF4f8e3EammkIYsEkj2EebVCO4ihSvySJsXuEqhHQ2kl6QgQERBpvXuZCXDcwUF3wcJef7Cg/i4/1vT4WX7z8KD0CElQgrEVYirERYFUz227anwrfnF2pcuw9qLFZNwUCElQgrEVYirERYFW5kv217/iOLVVO4ARFWIqxEWImwEmFV+MJ+2/bEzSxWTeETIqxEWImwEmElwqrst21P2IiwEmElwkqElQir0fl4oMZkOiNgPr5Q4+n1jc+IsBJhJcJKhJUIq7Julj0DmkxnPIL5+IKDCCsRViKsRFiJsBoxsPPxQI3JdMaQ5uMLQ3p6faOGCCsRViKsRFiJsBpxZ87HAzU2u44av34+U2Oz6xiSCCsRViKsRFiJsBr9bv8UKqybZU986dqdChVEWImwEmElwkqEVWFg62bZM6DNrmNI1+5UGJAIKxFWIqxEWImwKtyZdbPsqbDZddS4dqfCHRFhJcJKhJUIKxFW/wDPn0HIqGceUQAAAABJRU5ErkJggg==" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Jarrete + pino <tspan class="mult">x2</tspan></text>
+      <text x="132" y="48" class="cardmeta mono">2 x 2.5 x 1 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">lower</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#ffd166" stroke="#1d2430"><title>loot</title></rect></g>
+    </g>
+    <g transform="translate(1250 428)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#7ab8ff"/>
+      <image x="16" y="24" width="88.0" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAABlklEQVR4Ae3BMWoCUQBF0fsfbiNduoBNGsE+uADBFbiAqd2BjYUrsLS2kfSCTUAEu+lcyGQDsfjg8Ebyzim8iNvPd0eFj8+vwgsQYSXCSoSVCCsRVgWT437TUeHt/YMa9/ZGjdmiKRiIsBJhJcJKhJUIq8KTHPebjn9ktmgKTyDCSoSVCCsRViKsCg8c95uOeJrZoin8QYSVCCsRViKsRFiV437TETYirERYibASYSXCanQ9n6gxnkyJx5arHTVEWImwEmElwkqE1YhK1/OJGuPJlFe2XO3okwgrEVYirERYibAa0bPr+USN8WRKn5arHUMiwkqElQgrEVYirEYMzPV8osb20PLKRFiJsBJhJcJKhJUIKxFWIqxEWImwEmElwkqElQgrEVYirERYibASYSXCSoSVCCsRViKsRFiJsBJhJcJKhFWh0rqZdwzI9tAyJPf2UqggwkqElQgrEVYirAo9Wzfzjh5tDy19ureXQo9EWImwEmElwkqEVWFg1s28o8L20FLj3l4KAyLCSoSVCCsRViKsfgGhWz20UCQ96AAAAABJRU5ErkJggg==" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Coxa (2 degraus) <tspan class="mult">x2</tspan></text>
+      <text x="132" y="48" class="cardmeta mono">2 x 2 x 2 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">lower</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect></g>
+    </g><text x="1250" y="610" class="grouphead" fill="#ffa63f">ESTRUTURA</text>
+    <g transform="translate(1250 626)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="24" width="125.7" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAACoCAYAAADeiGMIAAADiElEQVR4Ae3BMWqjZwBF0fs9vAE3JkVUBFwL11pAOrVZRhaTZaR1lwVYvVErUthFEMIGgeo/EKbMQDSRR3rWPWcgXYCff/l14gh//P7bQARJtYKkWkFSrSCpVpBUayB9gPliOXGEH378iWP89fonx3h+ehx8QkFSrSCpVpBUK0iqFSTVGkj/wXyxnLgiz0+PgwJBUq0gqVaQVCtIqhUk1RroKs0XywmdzPPT4+AMgqRaQVKtIKlWkFQrSKo10KcwXywnVOP56XFwAkFSrSCpVpBUK0iqFSTVGugizRfLCemL56fHwb8IkmoFSbWCpFpBUq0gqdZA38V8sZyQTixIqhUk1QqSagVJtYKkWgN9k/liOSGd2Ga94hhBUq0gqVaQVCtIqhUk1RroH/PFckI6sc16xUcKkmoFSbWCpFpBUq0gqdbgk5ovlhPSiW3WKy5JkFQrSKoVJNUKkmoFSbUGJeaL5YR0Ypv1imZBUq0gqVaQVCtIqhUk1RqcyXyxnJBObLNecU2CpFpBUq0gqVaQVCtIqjU4kfliOSGd2Ga9Ql8XJNUKkmoFSbWCpFpBUq3BV8wXywnpxDbrFTqdIKlWkFQrSKoVJNUKkmqN+WI5IX2jzXqFzidIqhUk1QqSagVJtYKkWjfv2xeOcXs3Q5/XZr1C53PY7wZHCJJqBUm1gqRaQVKtIKnWDUd6375wjNu7GTqfzXqFzuew3w0+UJBUK0iqFSTVCpJqBUm1bvhg79sXjnF7N0Nft1mv0Pkc9rvBBQmSagVJtYKkWkFSrSCp1g0X5n37wjFu72Y026xX6HwO+92gWJBUK0iqFSTVCpJqBUm1bij3vn3hGLd3Mz7SZr1C53PY7wZXJEiqFSTVCpJqBUm1gqRaN1yZ9+0Lx3jbvqLzOex3A31VkFQrSKoVJNUKkmoFSbVukL6jw3430MkESbWCpFpBUq0gqVaQVOsG6X847HcDnU2QVCtIqhUk1QqSagVJtQZHmt0/TFyRt+0r1+Sw3w1UI0iqFSTVCpJqBUm1gqRagw82u3+YKPa2faXZYb8b6NMKkmoFSbWCpFpBUq0gqdbgwszuHyYuyNv2lUty2O8G0hdBUq0gqVaQVCtIqhUk1RqUm90/THygt+0rH+mw3w2kbxQk1QqSagVJtYKkWkFSrcGVmd0/TBzhbfvKMQ773UD6ToKkWkFSrSCpVpBUK0iq9TfdtJnRBBe2LgAAAABJRU5ErkJggg==" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Bacia</text>
+      <text x="132" y="48" class="cardmeta mono">7 x 3 x 2 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">2 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g>
+    <g transform="translate(1622 626)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="24" width="83.4" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANgAAADkCAYAAAD6mOo7AAAEhUlEQVR4Ae3BMU4ziQGG4Xc++QJQWClMEYnaB/AB0rlDuQUrcQ3K+BZpp8sBoEWIclAKbxFRLEdwpCjNSmGVWfHt74H3eQb0Jfzlrz+dmOEff//bgOqCpJogqSZIqgmSaoKkmgGdpe1uf2KGP23+zBz/+vmfzPH8MA5otiCpJkiqCZJqgqSaIKlmQH+I7W5/4ht5fhgHRJBUEyTVBEk1QVJNkFQzoN9lu9uf0Kd5fhgHvqAgqSZIqgmSaoKkmiCpZkD/sd3tT2gxnh/GgQUIkmqCpJogqSZIqgmSaga+qO1uf0L6r+eHceAHCJJqgqSaIKkmSKoJkmoGFmK725+Q/iDPD+PAJwiSaoKkmiCpJkiqCZJqBn6Q7W5/Qvoinh/Ggf8hSKoJkmqCpJogqSZIqhn4JNvd/oSkXwmSaoKkmiCpJkiqCZJqBj6w3e1PSPqV15dH5giSaoKkmiCpJkiqCZJqhu1uf0L6pl5fHmkKkmqCpJogqSZIqgmSalbvb0fmuFhfIZ2r15dHzkmQVBMk1QRJNUFSTZBUs2Km97cjc1ysr5B+r9eXR5YsSKoJkmqCpJogqSZIqllR9v52ZI6L9RX6ul5fHlmyy/WGOYKkmiCpJkiqCZJqgqSaFWfm/e3IHBfrK/TjvL48smSX6w1NQVJNkFQTJNUESTVBUs3qdn/NHIdx4py8vx2Z42J9hT72+vLIkl2uN5yTIKkmSKoJkmqCpJogqWbFTLf7a+Y4jBPn5P3tyBwX6yuW7PXlkSW7XG9YsiCpJkiqCZJqgqSaIKlmRdnt/po5DuPEOXl/OzLHxfqKpteXR5bscr3hOwmSaoKkmiCpJkiqCZJqVpyZ2/01cxzGiXPy/nZkjl/efmbJLtcb9LEgqSZIqgmSaoKkmiCpZsXC3e6vmeMwTuhjl+sN+jxBUk2QVBMk1QRJNUFSzYpv5nZ/zRyHcWLJLtcb9OMESTVBUk2QVBMk1QRJNSv0m27318xxGCeaLtcbtBxBUk2QVBMk1QRJNUFSzQp9qtv9NXMcRvSFBUk1QVJNkFQTJNUESTVBUk2QVBMk1QRJNUFSTZBUEyTVBEk1QVJNkFQTJNUESTVBUk2QVBMk1QRJNUFSTZBUEyTVBEk1QVJNkFQTJNUESTVBUk2QVBMk1QRJNUFSTZBUEyTVBEk1QVJNkFQTJNUESTUrJP3fjtPTwAxBUk2QVBMk1QRJNUFSzQrpGztOTwNFQVJNkFQTJNUESTVBUs3ATPd3Nyf0aQ7jhD7PcXoaOCNBUk2QVBMk1QRJNUFSzUDZ/d3NCX3oME7oY8fpaWDBgqSaIKkmSKoJkmqCpJqBM3N/d3PiGzmME9/JcXoa+EaCpJogqSZIqgmSaoKkmoGFu7+7ObFgh3FiyY7T04A+FCTVBEk1QVJNkFQTJNUMfDP3dzcnzshhnDgnx+lpQJ8mSKoJkmqCpJogqSZIqhnQb7q/uzlRdBgnmo7T04B+mCCpJkiqCZJqgqSaIKlmQJ/q/u7mxAyHcWKO4/Q0oMUIkmqCpJogqSZIqgmSav4N0eeqR4/bfrMAAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Chassi + chapa de topo</text>
+      <text x="132" y="48" class="cardmeta mono">5 x 4 x 5 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g>
+    <g transform="translate(1994 626)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="35" width="60.0" height="66" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABCCAYAAAAL1LXDAAABLklEQVR4AeXBoXHDMACF4V/vsoCImJgH8BQewWN4mI5RGlYYYBhgEhgQg5xBMoK6gAN0F13ae98XeGEYp0KFn++vwD8gzAgzwowwI8yEYZwKb3Bfr9RY5mPgA4QZYUaYEWaEmZC7vlAhpswnLPMx8AbCjDAjzAgzwkzIXV9oKKbMJyzzMbBDmBFmhBlhRpgJvDCMU2HH5XyipZgyLQkzwowwI8wIM2EYp8Ib3Ncre57bjZYe20oNYUaYEWaEGWHmcDmfqBFTpkZMmRrP7UZLwowwI8wIM8LMgUrP7UaNmDI1YsrUiCmzZ5mPgR3CjDAjzAgzwkygUu76QkMxZVoSZoQZYUaYEWYCjeWuLzT02FZqCDPCjDAjzAgzgT8md32hwmNbqSHMCDPCjDAjzPwCXCk360BBkAgAAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Venezianas de exaustão</text>
+      <text x="132" y="48" class="cardmeta mono">0.5 x 2 x 1.5 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g>
+    <g transform="translate(1250 784)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="26" width="24.0" height="84" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAABUCAYAAACY7ffvAAAAsUlEQVR4AbXBMRHCQAAAwfsbtEVCZEQMMiKBEgG0GKCiiIVgIBRf3O7gj2XdTiY89vvggsQkJjGJSWws63YSkpjEJCYxid3eryczju+HGRKTmMQkJjGJSUxiEpOYxCQmMYlJTGISk5jEJCYxiUlMYhKTmMQkJjGJSUxiEpOYxCQmMYlJTGISk5jEJCYxiUlMYhKTmMQkJjGJSUxiEpOYxCQmMYlJTGISk5jEJCYxiUnsB/r9C9UkfDn9AAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Costura de chapa</text>
+      <text x="132" y="48" class="cardmeta mono">0.5 x 0.5 x 3 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g>
+    <g transform="translate(1622 784)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="24" width="64.8" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFQAAAByCAYAAADNnvbqAAAB10lEQVR4Ae3BoW7bUACF4f8emZYPhOwFTCd5fKg2KNjeYg9SuHco6EBA4XiVlAWEBs2oijYpUrAnDWfgSsdKupzvK8Rfnz5/najw4/u3wgkirERYibASYSXCqvCfart+osK7xXscRFiJsBJhJcJKhFXhjWi7fuIMdtsVNURYibASYSXCSoRV4Uzarp84g912xZxEWImwEmElwkqEVcGk7fqJM9htVzgM45IaT4s7ThFhJcJKhJUIKxFWhX9ou37iDHbbFXMaxiVzEmElwkqElQgrEVZN2/UTM9ptVzgM45IaT4s7TrnZrKnx8vhMDRFWIqxEWImwEmHV/H79SY1fryNzGsYlDsO45KTNmjmJsBJhJcJKhJUIq4YLc7NZU+Pl8ZkaH758ZE4irERYibASYSXCSoSVCCsRViKsRFiJsBJhJcJKhJUIKxFWIqxEWImwEmElwkqElQgrEVYirERYibASYSXCSoSVCCsRViKsRFiJsGq4Mg+399Q4HvaFCiKsRFiJsBJhJcKq4cocD/vCjERYibASYSXCSoRVw4V5uL2nxvGwL1wQEVYirERYibASYdVwYY6HfeENE2ElwkqElQgrEVYNMzse9oUrIsJKhJUIKxFWIqz+ANLVSB+8/9TXAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Núcleo de energia</text>
+      <text x="132" y="48" class="cardmeta mono">3 x 1 x 3 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 3 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#59f2c2" stroke="#2f6b4f"><title>biolum</title></rect><rect x="34" y="0" width="13" height="13" rx="2" fill="#59f2c2" stroke="#2f6b4f"><title>biolum</title></rect></g>
+    </g>
+    <g transform="translate(1994 784)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="24" width="67.7" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAACcCAYAAAC0sW9GAAACcklEQVR4Ae3BsUpzBwCG4fd85AZcpEMz/OAcnHMBBYesHRy9gP9iegGODl0dhF6A7pJVOuhQgigImU+hcx0OGJJ8vs8zoP/89vvPkQn++vOPgSMQVC2oWlC1oGpB1QZKLZarkQl++fUHU/zz8jdTPN7fDuxBULWgakHVgqoFVRs4EovlauQbeby/HfgCQdWCqgVVC6oWVG1gTxbL1Yi+zOP97cD/CKoWVC2oWlC1oGoDX2SxXI3o4ARVC6oWVC2oWlC1gU8slqsRHZyn9QNTBFULqhZULahaULVhsVyNaG+e1g/sUlC1oGpB1YKqBVWbvW+emeLkdI4+97R+4JAEVQuqFlQtqFpQtRkTvW+emeLkdM4xe1o/cMyCqgVVC6oWVC2o2owde988M8XJ6Zxdelo/8J0EVQuqFlQtqFpQtRkH5n3zzBRvmxf0uaBqQdWCqgVVC6o2u7i+ZIq7qxt0PIKqBVULqhZULajajIkuri+Z4u7qBu1PULWgakHVgqoFVQuqFlQtqFpQtaBqQdWCqgVVC6oWVC2oWlC12d3VDVNcXF+i4xFULahaULWgakHVZkx0d3WDjkdQtaBqQdWCqgVVC6oWVC2oWlC1oGpB1YKqBVULqhZULahaULWgakHVgqoFVQuqFlQtqFpQtaBqQdWCqgVVm6Gjsv14HZggqFpQtaBqQdWCqs3QXm0/Xgd2KKhaULWgakHVgqoNTDQ/Ox85IG+bFw7J9uN14IAEVQuqFlQtqFpQtYEdm5+dj+zQ2+aFXdp+vA4csaBqQdWCqgVVC6o2cGDmZ+cjE7xtXphi+/E68I0EVQuqFlQtqFpQtX8BtuFZlu4LMuIAAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Hardpoint traseiro</text>
+      <text x="132" y="48" class="cardmeta mono">3 x 2.5 x 4 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 4 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="34" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="51" y="0" width="13" height="13" rx="2" fill="#59f2c2" stroke="#2f6b4f"><title>biolum</title></rect></g>
+    </g>
+    <g transform="translate(1250 942)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="24" width="44.0" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAABgCAYAAABbjPFwAAAA+klEQVR4AdXBsVFCQQAA0b0d2rEPIiuwEswMSCxDIhKCb0AFFiAFnQ1ocDMw4743uJPDdU4WHPdjcAcSJ3ESJ3ESN/jD4Ton/8hxPwa/kDiJkziJk7hxuM5JmMRJnMRJnMTtxu3Eivn0wiN9vj2zQuIkTuIkTuJ2LBq3Eyu2y5lHkjiJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJkziJk7jBotf3j8mC7XJmxffXNlggcRIncRIncT/Hwhr5I8owJQAAAABJRU5ErkJggg==" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Cabo condutivo</text>
+      <text x="132" y="48" class="cardmeta mono">1 x 1 x 3 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#7ab8ff" stroke="#2e3a4d"><title>electric</title></rect></g>
+    </g>
+    <g transform="translate(1622 942)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffa63f"/>
+      <image x="16" y="24" width="107.6" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAABsCAYAAACrUxpIAAACEklEQVR4Ae3BIYokZwCG4ff/2GvErVtoE9MwPrSJK+hTRJTJIcqs6FMsxLVZ4gMxgSGwrlwfpGI/kQkUTJOZ3vd5Bq/k21+/b+zw6cefBnpzglSCVIJUglSCVAYv+Prl88YOP3z8xB639Rt7nM7zQHcXpBKkEqQSpBKkMr5++bzxgE7neaDdglSCVIJUglSCVMYyTxs7HI5PPKLTeR6IIJUglSCVIJUglbHM08YdHY5PPKLTeR48oCCVIJUglSCVIJWxzNPGG3I4PvGITud58A4EqQSpBKkEqQSpjGWeNt6xw/GJR3Q6z4P/QZBKkEqQSpBKkMpY5mnjO3I4PvGITud58AqCVIJUglSCVIJUxjJPG3rR4fjEIzqd58G/CFIJUglSCVIJUhnLPG3o1RyOT7xnQSpBKkEqQSpBKh/Qq/r7zz/Y43Jd2eOXnz+yx+W6skeQSpBKkEqQSpDKh18//zbYYZmnDT2sIJUglSCVIJUglcGdLfO0oRddriv3dFufBzsEqQSpBKkEqQSpDN6YZZ42viOX68o93dbnwQ5BKkEqQSpBKkEqg3dumaeNd+xyXbmn2/o82CFIJUglSCVIJUhl8J1Z5mnjDblcV+7ptj4PdghSCVIJUglSCVIZ6D8t87RxR5fryj3d1ufBDkEqQSpBKkEqQSoDvaplnjZ2uFxX9ritz4M7ClIJUglSCVIJUvkH98lgPbJr/m8AAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Ombreira + rebite <tspan class="mult">x2</tspan></text>
+      <text x="132" y="48" class="cardmeta mono">1 x 4.5 x 2 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect></g>
+    </g><text x="1250" y="1124" class="grouphead" fill="#66c28a">MEMBROS</text>
+    <g transform="translate(1250 1140)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#66c28a"/>
+      <image x="16" y="24" width="45.4" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAC6CAYAAABRPUhxAAACr0lEQVR4Ae3BoWqdBwCG4ff/ODcQEyZ6xCA6RJbWj5q4sF7B5AbHxOQOYgKLrKodqTquvln1YTJjohHjMFIYTP+7gVb8kJ/vnPR9noFH8sOPv4xM8P63XwdEUFVQVVBVUFVQ1cBXHL84HZngu2ffM8Xf938xxeZ2PfAEBVUFVQVVBVUFVQ3HL05HnqDN7XpgDwRVBVUFVQVVBVUNy6OTkQkODpc8RZvb9UBBUFVQVVBVUFVQ1bA8OhmZ0cHhkn22uV0PzCioKqgqqCqoKqhqwcw+bz8xxcHhkjn9+cfv7JKgqqCqoKqgqqCqBTvm8/YTUzxs79lnQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVUFVQVVBVQMTLY9ORnbIw/aeOf337z8DMwqqCqoKqgqqCqoamNny6GRkRg/bex7DuzcXTPHq9WrgEQRVBVUFVQVVBVUNzOxydTYywfX6jiketvd8ybs3F+ySV69XA18QVBVUFVQVVBVUNTCzy9XZyIyOn79knwVVBVUFVQVVBVUt2HObjx+Y4vj5S+b008VbpgiqCqoKqgqqCqpa8I3ZfPzAFNfrO+YUVBVUFVQVVBVUFVQVVBVUFVQVVBVUtWDHXK/vmOLn0yP2WVBVUFVQVVBVUNWCPXd+dTMwweXqbGSHBFUFVQVVBVUFVS34xpxf3QxMcLk6G5ngen3HFEFVQVVBVUFVQVULZnZ+dTOgrwqqCqoKqgqqCqoKqgqqCqoKqgqqCqr6HyEmVjE13AjzAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Braço de extração + garra</text>
+      <text x="132" y="48" class="cardmeta mono">1 x 3 x 6 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 4 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect><rect x="34" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect><rect x="51" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect></g>
+    </g>
+    <g transform="translate(1622 1140)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#66c28a"/>
+      <image x="16" y="24" width="58.7" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABsCAYAAADJ0PRnAAABd0lEQVR4Ae3BMWoUYQCG4ff/yAW2CRZOIWwdts4B7NJ6DA/jMWy38wCxD7ZikS1kCBsQrMcL6AsDGUzC9zyDJ/L+w8eFFb58/jR4AUKpUCqUCqVCqcE/XF3fLKzw5u071vh5+sEad7fHwX8QSoVSoVQoFUqNq+ubhVfo7vY4eAKhVCgVSoVSodSY9oeFFXaXE6/R3e1x8BehVCgVSoVSodSY9oeFDe0uJ16yUCqUCqVCqVDqgo09zvessbuc2NL3b19ZI5QKpUKpUCqUuuCZeZzvWeM8n9hSKBVKhVKhVCgVSoVSoVQoFUqFUqFUKBVKhVKhVCgVSoVSoVQoFUqFUqFUKBVKhVKhVCgVSoVSoVQoFUqFUqFUKBVKhVKhVCgVSoVSoVQoFUqFUqFUKBVKhVKhVCg1WGnaHxaekfN8YkuhVCgVSoVSodRgY9P+sLCh83xiS6FUKBVKhVKh1OCZmfaHhRXO84k1fv96GKwQSoVSoVQoFUr9ATrGL9FoAOo3AAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Braço da arma</text>
+      <text x="132" y="48" class="cardmeta mono">1 x 2 x 3 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g><text x="1250" y="1322" class="grouphead" fill="#59f2c2">SENSOR</text>
+    <g transform="translate(1250 1338)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#59f2c2"/>
+      <image x="16" y="24" width="117.3" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAACQCAYAAABeUmTwAAADe0lEQVR4Ae3BMWojdwDF4fd/+ALjYkjhKcK6XIzb9QHSqRO5xQZ0DZXRFVKlnS4HkEgrVEqksIowGBkMLlJNIKTcDUzQIM2+3/cV4R8//PhTrwF++/XnIkyeBQSzgGAWEMwCgllAsKJv1MPTrNcA3919ryH+PP6hIbbrtghXxwKCWUAwCwhmAcEsIFjRRDw8zXoF2a7bIozOAoJZQDALCGYBwSwgWNGFPDzNeuFstuu2CINZQDALCGYBwSwgmAUEKzqTh6dZL0zGdt0WQRYQzAKCWUAwCwhmAcGKvuLhadYL+Nd23RZ9gywgmAUEs4BgFhDMAoKVh6dZL+DMtuu2aAIsIJgFBLOAYBYQzAKCleb+sdcAVd0IOLftui26AAsIZgHBLCCYBQSzgGCluX/sNaKqbgT8X9t1WzQiCwhmAcEsIJgFBLOAYDca2Wv3rCGquhG+XYfdRtfEAoJZQDALCGYBwSwg2I2uzGv3rCGquhEu57DbaMosIJgFBLOAYBYQzAKC3Xye3WuIVbvXNXntnjVEVTfC1x12GyWxgGAWEMwCgllAMAsIdqOBPs/uNcSq3euavHbPGqKqG03ZYbfRFHz4+Elf0esLtuu26AwsIJgFBLOAYBYQzAKCleVi3uuKrNq9pqyqG43psNtoCm7rOw1R1Y3GtF23RV9gAcEsIJgFBLOAYBYQrCwX814Ttmr3mrJTd9QU3NZ3GlNVN7oECwhmAcEsIJgFBLOAYEUDLRfzXhO2ave6JqfuqEu4re80pqpudAmH3UZDWEAwCwhmAcEsIJgFBCsa2XIx7zVhq3avMZ26o87htr7TmKq60SUcdhuNyQKCWUAwCwhmAcEsIFjRlVku5r0mbNXuNcSpO+pLPnz8pCFeu2cNUdWNLuGw2+iaWEAwCwhmAcEsIJgFBCuauOVi3mvCfvn9L03ZYbfRlFlAMAsIZgHBLCCYBQQrCrNczHtdkVW71xBV3WhMh91GU/b+9lI0gAUEs4BgFhDMAoJZQLAi/KflYt5rRKt2rzGduqOm7P3tpWhEFhDMAoJZQDALCGYBwYpwVsvFvNcAq3avMZ26o67J+9tL0RWxgGAWEMwCgllAMAsIVoSLau4fe43o1B01pve3l6IJs4BgFhDMAoJZQDALCFaESWnuH3sNcOqOGuL97aUoiAUEs4BgFhDMAoJZQLC/AXJ+riyTMBVnAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Cabeça + moldura do visor</text>
+      <text x="132" y="48" class="cardmeta mono">3 x 5 x 2 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 3 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="34" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g>
+    <g transform="translate(1622 1338)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#59f2c2"/>
+      <image x="16" y="32" width="96.0" height="72" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABICAYAAAAJZ/BjAAABQUlEQVR4Ae3BsU3DUABF0fuf0iazUFJlDy/ADl4ByaVnQCm9gqVIocONBzEDGIkaii8Rvdi8cwrxrVnGlQpvp3PhD4iwEmElwkqElQirwk41y7jyQN5O58IPRFiJsBJhJcJKhFVhI5plXNkhEVYirERYibASYVUwaZZxZYfmtqOGCCsRViKsRFiJsCr8kWYZV3ZobjvuSYSVCCsRViKsRFgVftEs48oOzW3HIxFhJcJKhJUIKxFWpVnGlQ2b244tE2ElwkqElQgrEVaH48eNGp9Pz9zT3HZs2dQPhQoirERYibASYSXC6kCl48eNGu+XK1s29UPhjkRYibASYSXCSoTVgX9m6ofCAxFhJcJKhJUIKxFWBzZu6ofChomwEmElwkqElQirQqWX8XWlwvvlSo2pHwr/iAgrEVYirERYibD6AqMoN1UzoTyeAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Visor</text>
+      <text x="132" y="48" class="cardmeta mono">3 x 1 x 1 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#59f2c2" stroke="#2f6b4f"><title>biolum</title></rect></g>
+    </g>
+    <g transform="translate(1994 1338)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#59f2c2"/>
+      <image x="16" y="24" width="88.0" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAABtklEQVR4Ae3BoW5TYQCG4ff/cm6gpkNwBMnRy9EzEyRkZpabWIIl3ADDwkUgZibqSCapbpvJJiQUgdwd/NwAE3/S5ttpv+cp7Mm79x8qDX7cfSsEIqxEWImwEmElwqrwjPOL60qDV6/f0OLvn1+02CwXhSMkwkqElQgrEVYirMr5xXXlCG2Wi8IEiLASYSXCSoSVCKvSD2OlwWzec4w2y0XBQISVCCsRViKsRFiVfhgrBzSb90zB+v6GFuXsqrAHIqxEWImwEmElwqr0w1h5QWbznn1Y39/wkpSzq8J/iLASYSXCSoSVCKvSD2Nlwn7//MKUibASYSXCSoSVCKuOqXu4pcnbTxzU14+0EGElwkqElQgrEVYdp+bhliaPTxySCCsRViKsRFiJsBJhJcJKhJUIKxFWIqxEWImwEmElwkqElQirbrddFRr0w1iJvRFhJcJKhJUIKxFWHY1221WhQT+MlXiWCCsRViKsRFiJsOo4sN12VWjQD2PlhIiwEmElwkqElQirjhdmt10VmlxWJkyElQgrEVYirERYFU5M/X5ZafH4RIvyeV1oIMJKhJUIKxFWIqz+AaNjO0LORrQbAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Farol tático</text>
+      <text x="132" y="48" class="cardmeta mono">1 x 3 x 2 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">upper</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#ffe9b8" stroke="#ff7a2f"><title>lamp</title></rect></g>
+    </g><text x="1250" y="1520" class="grouphead" fill="#ffd166">ARMA</text>
+    <g transform="translate(1250 1536)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffd166"/>
+      <image x="16" y="24" width="110.0" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAABgCAYAAADW4bYkAAACBklEQVR4Ae3BMW4aUQBF0fuf2AAuUAooIlEj1ywg3XQouyAS26DM7CLtdFkAbi3kcqwUuIgozBImG4iLL3lkeH7nFG7Et+8/Bir8/vWzEIiwJsKaCGsirImwVvggq3UzUOHL/Cs1/r78ocbx0BUMibAmwpoIayKsibBWeCerdTPwiRwPXeEGiLAmwpoIayKsibBWeMNq3QzEuzkeusIHEGFNhDUR1kRYE2GtrNbNQFyd46ErvAMR1kRYE2FNhDUR1spieT9QYTpbENfneOgK/yHCmghrIqyJsCbCWlks7wdGNJ0tiI8jwpoIayKsibAmwtpk2yyp0XY9NS7nEzWmswXxtuenB2qIsCbCmghrIqyJsDah0rZZUqPtempczidqTGcLbtnz0wNjEmFNhDUR1kRYE2Ftwsi2zZIabddT43I+UWM6WzCm56cHxnQ3m1NDhDUR1kRYE2FNhLUJV2bbLKnRdj01LucTNV7PL4zpbjZnTCKsibAmwpoIayKsFSrtd5uBG9Z2PTVezy/UuJvNuSYirImwJsKaCGsirBVGtt9tBm5Y2/XcMhHWRFgTYU2ENRHWCldmv9sMXJG267kmp/6xUEGENRHWRFgTYU2EtcKN2+82AyNqu54xnfrHwohEWBNhTYQ1EdZEWCt8MvvdZqBC2/XUOPWPhSsiwpoIayKsibAmwto/4CZgucXOmrwAAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Receptor + trilho</text>
+      <text x="132" y="48" class="cardmeta mono">2 x 3 x 1.5 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">gun</tspan> · 2 caixas</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">0.5 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>bone</title></rect><rect x="17" y="0" width="13" height="13" rx="2" fill="#2e3a4d" stroke="#0b0e14"><title>rockDeep</title></rect></g>
+    </g>
+    <g transform="translate(1622 1536)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffd166"/>
+      <image x="16" y="44" width="48.0" height="48" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAuklEQVR4AdXBsU1CUQBA0ftvaGEWSyv2YAF3cAUTS2cglK7wExLosHEQHOC7gBYvgYR7zsSN7K7zwoD9ZjtxAxIncRIncRI38Y/ddV54IPvNduIPEidxEidxEjftrvNCmMRJnMRJnMSt1pcTI36enrmn79d3RkicxEmcxEncikHry4kR58ORe5I4iZM4iZM4iZM4iZM4iZM4iZM4iZM4iZO4iUEv89vCgPPhyIivj8+JARIncRIncRL3CzduGyWySFfGAAAAAElFTkSuQmCC" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Câmara de energia</text>
+      <text x="132" y="48" class="cardmeta mono">1 x 1 x 1 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">gun</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#59f2c2" stroke="#2f6b4f"><title>biolum</title></rect></g>
+    </g>
+    <g transform="translate(1994 1536)">
+      <rect x="0" y="0" width="352" height="136" rx="6" class="card"/>
+      <rect x="0" y="0" width="3" height="136" rx="1.5" fill="#ffd166"/>
+      <image x="16" y="44" width="48.0" height="48" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAy0lEQVR4AdXBIYpCYRiG0ed/cRu2aYLFMmCXWcCAK3ABZndgMbiCiWaL2AXLgAi33eZC7mxgDB9oeM5pvEj3ex4omMwWjRcIckEuyAW5INd44nTYDRSMPyZUPPqOiq/luvGPIBfkglyQC3LtdNgNiAW5IBfkglyQG92vFyqmn3PeabX5oSLIBbkgF+SC3Iii+/VCxf7Y805BLsgFuSAX5IJckAtyQS7IBbkgF+SCXJALckGuUbRdfw8U7I89FY/+1igIckEuyAW5IPcHfhgeUqAeBZ4AAAAASUVORK5CYII=" style="image-rendering:pixelated"/>
+      <text x="132" y="26" class="cardname">Boca do cano</text>
+      <text x="132" y="48" class="cardmeta mono">1 x 1 x 1 u</text>
+      <text x="132" y="68" class="cardmeta">camada <tspan class="mono">gun</tspan> · 1 caixa</text>
+      <text x="132" y="88" class="cardmeta">feature mín. <tspan class="mono dim">1 u</tspan></text>
+      <g transform="translate(132 100)"><rect x="0" y="0" width="13" height="13" rx="2" fill="#b8a98f" stroke="#1d2430"><title>rust</title></rect></g>
+    </g>
+
+  <g transform="translate(1250 1744)">
+    <text x="0" y="0" class="sect">ESCALA DE IMPRESSÃO</text>
+    <g transform="translate(0 46)">
+      <text x="0"   y="0" class="th">ALTURA</text>
+      <text x="110" y="0" class="th">ESCALA</text>
+      <text x="230" y="0" class="th">1 U AUTORADA</text>
+      <text x="400" y="0" class="th">MEIO-PASSO</text>
+      <text x="680" y="0" class="th">BASE NECESSÁRIA</text>
+      <line x1="0" y1="14" x2="1056" y2="14" stroke="#1d2430"/>
+      <g transform="translate(0 44)">
+    <g transform="translate(0 0)">
+      <text x="0"   y="0" class="td mono">54 mm</text>
+      <text x="110" y="0" class="td mono">1:25</text>
+      <text x="230" y="0" class="td mono">3.60 mm</text>
+      <text x="400" y="0" class="td mono dim">1.80 mm</text>
+      <text x="680" y="0" class="td mono">25 x 31 mm</text>
+    </g>
+    <g transform="translate(0 28)">
+      <text x="0"   y="0" class="td mono">75 mm</text>
+      <text x="110" y="0" class="td mono">1:18</text>
+      <text x="230" y="0" class="td mono">5.00 mm</text>
+      <text x="400" y="0" class="td mono dim">2.50 mm</text>
+      <text x="680" y="0" class="td mono">35 x 43 mm</text>
+    </g>
+    <g transform="translate(0 56)">
+      <text x="0"   y="0" class="td mono">100 mm</text>
+      <text x="110" y="0" class="td mono">1:14</text>
+      <text x="230" y="0" class="td mono">6.67 mm</text>
+      <text x="400" y="0" class="td mono dim">3.33 mm</text>
+      <text x="680" y="0" class="td mono">47 x 57 mm</text>
+    </g>
+    <g transform="translate(0 84)">
+      <text x="0"   y="0" class="td mono">150 mm</text>
+      <text x="110" y="0" class="td mono">1:9</text>
+      <text x="230" y="0" class="td mono">10.00 mm</text>
+      <text x="400" y="0" class="td mono dim">5.00 mm</text>
+      <text x="680" y="0" class="td mono">70 x 85 mm</text>
+    </g>
+    <g transform="translate(0 112)">
+      <text x="0"   y="0" class="td mono">200 mm</text>
+      <text x="110" y="0" class="td mono">1:7</text>
+      <text x="230" y="0" class="td mono">13.33 mm</text>
+      <text x="400" y="0" class="td mono dim">6.67 mm</text>
+      <text x="680" y="0" class="td mono">93 x 113 mm</text>
+    </g></g>
+    </g>
+  </g>
+
+  <g transform="translate(1250 2034)">
+    <text x="0" y="0" class="sect">NOTAS DE IMPRESSÃO</text>
+    <text x="0" y="32" class="note">· O modelo é ortogonal: nenhuma curva, nenhum overhang. Toda face é vertical ou horizontal — dispensa suporte.</text><text x="0" y="54" class="note">· O <tspan class="dim">meio-passo (0,5 u)</tspan> é a menor feature do bot: pistão, pino da junta, rebites, dedos da garra, trilhos do</text><text x="0" y="76" class="note">   hardpoint e barras do núcleo. Ele vale exatamente 1 voxel fino (MODEL_SCALE 2) e some antes de todo o resto.</text><text x="0" y="98" class="note">· Applique é SALIENTE, nunca rente: venezianas, costura, rebites, trilhos e pino se projetam meio voxel para FORA</text><text x="0" y="120" class="note">   da face que decoram. Rente à casca a peça é enterrada pela geometria vizinha e desaparece na montagem.</text><text x="0" y="142" class="note">· Peças <tspan class="dim">emissivas</tspan> — visor, duas barras do núcleo, indicador do hardpoint, câmara da arma e lente do farol —</text><text x="0" y="164" class="note">   pedem filamento translúcido ou pintura à parte: imprima soltas e encaixe depois.</text><text x="0" y="186" class="note">· O bot é assimétrico DE PROPÓSITO: farol e braço de extração à esquerda, arma à direita. Só as peças marcadas</text><text x="0" y="208" class="note">   x2 têm par espelhado; as outras dezesseis são únicas.</text><text x="0" y="230" class="note">· Pé e bacia são as únicas superfícies de apoio reais. Pernas deitadas na mesa, chassi de pé sobre a base.</text>
+  </g>
+</svg>

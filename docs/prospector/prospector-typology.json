@@ -1,0 +1,416 @@
+{
+  "model": "player-prospector",
+  "source": "packages/voxelyn-survival-content/tools/prospector.mjs",
+  "generator": "packages/voxelyn-survival-content/tools/typology.mjs",
+  "authoredUnits": {
+    "w": 7,
+    "d": 8.5,
+    "h": 15
+  },
+  "modelScale": 2,
+  "canonHeightMm": 1350,
+  "mmPerAuthoredUnitAtCanon": 90,
+  "pieceTypes": 20,
+  "physicalPieces": 25,
+  "pieces": [
+    {
+      "id": "pe",
+      "label": "Pé + garras",
+      "group": "Locomoção",
+      "layer": "lower",
+      "count": 2,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 2,
+        "d": 4,
+        "h": 1,
+        "z": 0
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rockDeep",
+        "bone"
+      ],
+      "note": "Planta longa e chata com garras pálidas à frente. Base de apoio: imprime deitada, sem suporte."
+    },
+    {
+      "id": "canela",
+      "label": "Canela + pistão",
+      "group": "Locomoção",
+      "layer": "lower",
+      "count": 2,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 2,
+        "d": 2.5,
+        "h": 2,
+        "z": 1
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rockDeep",
+        "bone"
+      ],
+      "note": "Sobe PARA TRÁS a partir do pé. O pistão é meio-passo saliente — a menor feature da perna."
+    },
+    {
+      "id": "jarrete",
+      "label": "Jarrete + pino",
+      "group": "Locomoção",
+      "layer": "lower",
+      "count": 2,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 2,
+        "d": 2.5,
+        "h": 1,
+        "z": 3
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rust",
+        "loot"
+      ],
+      "note": "Junta que dobra ao contrário. O pino de meio-passo se projeta da face frontal — não afunde na casca."
+    },
+    {
+      "id": "coxa",
+      "label": "Coxa (2 degraus)",
+      "group": "Locomoção",
+      "layer": "lower",
+      "count": 2,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 2,
+        "d": 2,
+        "h": 2,
+        "z": 4
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rust",
+        "rust"
+      ],
+      "note": "Dois degraus: metade de baixo gira com a passada, metade de cima presa ao quadril."
+    },
+    {
+      "id": "bacia",
+      "label": "Bacia",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 7,
+        "d": 3,
+        "h": 2,
+        "z": 6
+      },
+      "minFeatureUnits": 2,
+      "materials": [
+        "rockDeep"
+      ],
+      "note": "Mais larga que o chassi: recebe as duas pernas e esconde a emenda entre as camadas."
+    },
+    {
+      "id": "chassi",
+      "label": "Chassi + chapa de topo",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 5,
+        "d": 4,
+        "h": 5,
+        "z": 8
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rust",
+        "rockDeep"
+      ],
+      "note": "Volume dominante. Latão nas LATERAIS, chapa escura no topo — nenhuma horizontal grande fica em latão."
+    },
+    {
+      "id": "venezianas",
+      "label": "Venezianas de exaustão",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 0.5,
+        "d": 2,
+        "h": 1.5,
+        "z": 9
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rockDeep",
+        "rockDeep"
+      ],
+      "note": "Duas fendas no flanco esquerdo. Applique: saliente meio-passo para FORA da face."
+    },
+    {
+      "id": "costura",
+      "label": "Costura de chapa",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 0.5,
+        "d": 0.5,
+        "h": 3,
+        "z": 8.5
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rockDeep"
+      ],
+      "note": "Junta vertical dividindo o flanco direito em dois painéis. Applique de meio-passo."
+    },
+    {
+      "id": "nucleo",
+      "label": "Núcleo de energia",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 3,
+      "extentUnits": {
+        "w": 3,
+        "d": 1,
+        "h": 3,
+        "z": 8.5
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rockDeep",
+        "biolum",
+        "biolum"
+      ],
+      "note": "Nicho escuro embutido com DUAS barras de cyan dentro. Nicho recuado, barras rentes à boca do nicho."
+    },
+    {
+      "id": "hardpoint",
+      "label": "Hardpoint traseiro",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 4,
+      "extentUnits": {
+        "w": 3,
+        "d": 2.5,
+        "h": 4,
+        "z": 9
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rockDeep",
+        "rust",
+        "rust",
+        "biolum"
+      ],
+      "note": "Módulo das costas com dois trilhos-padrão Aurix e o indicador aceso. Fecha a silhueta por trás."
+    },
+    {
+      "id": "cabo",
+      "label": "Cabo condutivo",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 1,
+        "d": 1,
+        "h": 3,
+        "z": 8
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "electric"
+      ],
+      "note": "UM cabo, do módulo pelo flanco. A fiação é assinatura, não textura — não duplique."
+    },
+    {
+      "id": "ombreira",
+      "label": "Ombreira + rebite",
+      "group": "Estrutura",
+      "layer": "upper",
+      "count": 2,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 1,
+        "d": 4.5,
+        "h": 2,
+        "z": 11
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rust",
+        "bone"
+      ],
+      "note": "A linha mais larga do corpo. Um rebite pálido por ombro, no canto da frente."
+    },
+    {
+      "id": "braco-extracao",
+      "label": "Braço de extração + garra",
+      "group": "Membros",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 4,
+      "extentUnits": {
+        "w": 1,
+        "d": 3,
+        "h": 6,
+        "z": 5
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "rockDeep",
+        "bone",
+        "bone",
+        "bone"
+      ],
+      "note": "Membro esquerdo. Termina em DOIS dedos de meio-passo abertos para baixo, com vão entre eles."
+    },
+    {
+      "id": "braco-arma",
+      "label": "Braço da arma",
+      "group": "Membros",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 1,
+        "d": 2,
+        "h": 3,
+        "z": 9
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rockDeep"
+      ],
+      "note": "Membro direito: curto e recolhido, porque ele sustenta o Cravador."
+    },
+    {
+      "id": "cabeca",
+      "label": "Cabeça + moldura do visor",
+      "group": "Sensor",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 3,
+      "extentUnits": {
+        "w": 3,
+        "d": 5,
+        "h": 2,
+        "z": 13
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rust",
+        "rockDeep",
+        "rockDeep"
+      ],
+      "note": "SEM PESCOÇO, estreita (3 sobre um chassi de 5) e inclinada à frente. A moldura isola o cyan do latão."
+    },
+    {
+      "id": "visor",
+      "label": "Visor",
+      "group": "Sensor",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 3,
+        "d": 1,
+        "h": 1,
+        "z": 14
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "biolum"
+      ],
+      "note": "Fresta cyan DENTRO da moldura, nunca colada por cima. Peça emissiva."
+    },
+    {
+      "id": "farol",
+      "label": "Farol tático",
+      "group": "Sensor",
+      "layer": "upper",
+      "count": 1,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 1,
+        "d": 3,
+        "h": 2,
+        "z": 13
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rockDeep",
+        "lamp"
+      ],
+      "note": "Só na face ESQUERDA. A assimetria é o que torna o rumo do bot legível nas quatro direções."
+    },
+    {
+      "id": "receptor",
+      "label": "Receptor + trilho",
+      "group": "Arma",
+      "layer": "gun",
+      "count": 1,
+      "boxes": 2,
+      "extentUnits": {
+        "w": 2,
+        "d": 3,
+        "h": 1.5,
+        "z": 10
+      },
+      "minFeatureUnits": 0.5,
+      "materials": [
+        "bone",
+        "rockDeep"
+      ],
+      "note": "Receptor pálido atravessado contra o chassi escuro; trilho escuro de meio-passo por cima."
+    },
+    {
+      "id": "camara",
+      "label": "Câmara de energia",
+      "group": "Arma",
+      "layer": "gun",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 1,
+        "d": 1,
+        "h": 1,
+        "z": 11
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "biolum"
+      ],
+      "note": "Um voxel emissivo. Marca a arma como energizada sem engordar a silhueta."
+    },
+    {
+      "id": "boca",
+      "label": "Boca do cano",
+      "group": "Arma",
+      "layer": "gun",
+      "count": 1,
+      "boxes": 1,
+      "extentUnits": {
+        "w": 1,
+        "d": 1,
+        "h": 1,
+        "z": 10
+      },
+      "minFeatureUnits": 1,
+      "materials": [
+        "rust"
+      ],
+      "note": "O único voxel que TROCA de material no disparo (rust -> loot). É por ele que o projétil sai."
+    }
+  ]
+}

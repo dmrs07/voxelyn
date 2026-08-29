@@ -13,3 +13,9 @@ node_modules
 # prettier e o gerador, que reescreve os dois a cada execucao.
 docs/devlog/plan.json
 docs/devlog/INDEX.md
+
+# Prancha de tipologia do Prospector: SVG e JSON sao escritos por
+# tools/typology.mjs a cada execucao. Reformatar aqui so poe o prettier para
+# brigar com o gerador, que reescreve os dois na proxima geracao.
+docs/prospector/prospector-typology.json
+docs/prospector/prospector-typology.svg
