@@ -34,6 +34,7 @@ import {
   SURF_FUNGAL,
 } from './constants.js';
 import { emptyResonance } from './abilities.js';
+import { resetMinigun } from './minigun.js';
 import { emptyBossRuntime } from './bosses.js';
 import { isFinalSector, resolveSectorBoss, runDepth, runSectorCount } from './depth.js';
 import { isConductiveSurface, setSurface } from './cells.js';
@@ -490,6 +491,10 @@ export const descend = (state: SurvivalState, events: SemanticEvent[]): void => 
     }
     extra.heat = 0;
     extra.overheatedUntil = 0;
+    // Os canos param junto com o calor, e pela mesma razao: a sala nova nao
+    // tem a luta que estava acontecendo, e descer o poco com a arma girando
+    // faria o setor seguinte comecar com uma rajada numa sala vazia.
+    resetMinigun(extra.minigun);
     // O canal do sopro nao atravessa a descida: o mapa novo nao tem o fogo que
     // o canal estava pintando, e um bolt travado sem chama na tela mentiria.
     // A MIRA fica — trocar de setor nao gira o Prospector.
@@ -601,6 +606,7 @@ export const ascend = (state: SurvivalState, events: SemanticEvent[]): void => {
     }
     extra.heat = 0;
     extra.overheatedUntil = 0;
+    resetMinigun(extra.minigun);
     // Mesma regra da descida: canal do sopro nao atravessa a transicao; mira sim.
     extra.channelingUntil = 0;
     extra.dodgeUntil = 0;

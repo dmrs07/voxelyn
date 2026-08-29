@@ -436,6 +436,11 @@ export class GameRoom {
         options: [...e.pendingModuleChoice.options] as [typeof e.pendingModuleChoice.options[0], typeof e.pendingModuleChoice.options[1]],
         createdAtTick: e.pendingModuleChoice.createdAtTick,
       } : null,
+      // Copia rasa e nao a referencia: o `ViewerState` vai para o
+      // serializador e a simulacao continua mutando este objeto no tick
+      // seguinte — mandar a referencia entregaria a rotacao do tick errado
+      // sempre que o envio nao coubesse no mesmo turno.
+      minigun: { ...e.minigun },
       hasCore: e.hasCore,
       coreCount: countBits(e.carriedCoreMask),
       downed: e.downed,

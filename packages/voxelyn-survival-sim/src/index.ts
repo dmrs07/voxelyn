@@ -152,7 +152,21 @@ export {
   consumeModuleCharge,
   expireTimedModules,
   rollModuleChoice,
+  activeWeaponModule,
+  isWeaponModule,
 } from './modules.js';
+export {
+  emptyMinigunState,
+  minigunDrainAccumulator,
+  minigunJitter,
+  minigunNextSpin,
+  minigunPhaseFor,
+  minigunPrimedAccumulator,
+  minigunRateMilli,
+  minigunSpread,
+  resetMinigun,
+  rotateUnit,
+} from './minigun.js';
 export {
   BASE_PURGE_CELLS,
   DEFAULT_PLAYER_TUNING,

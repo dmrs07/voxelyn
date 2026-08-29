@@ -1,4 +1,5 @@
 import { RNG } from '@voxelyn/core';
+import { MINIGUN_AMMO } from './constants.js';
 import type {
   ActiveModule,
   ModuleId,
@@ -88,6 +89,22 @@ export const MODULE_DEFINITIONS: Record<ModuleId, ModuleDefinition> = {
     tier: 3,
     tags: ['projectile', 'defensive', 'safe'],
   },
+  /**
+   * MINIGUN: 300, e o numero nao segue a regua de procs acima porque ela nao
+   * conta procs — ela conta BALAS. Cada carga e um projetil, cobrado na saida
+   * e nao no acerto, porque aqui o gatilho E o efeito: nao existe uma
+   * "minigun que nao procou". Trezentas balas a 16 por segundo sao 18,7
+   * segundos de gatilho puro, que o calor estica para quatro rajadas com
+   * travamento entre elas — a mesma ordem de grandeza de vida util dos
+   * outros tier 3, distribuida de outro jeito.
+   */
+  minigun: {
+    id: 'minigun',
+    lifetime: 'charges',
+    defaultCharges: MINIGUN_AMMO,
+    tier: 3,
+    tags: ['projectile', 'weapon', 'safe'],
+  },
 };
 
 export const moduleDefinition = (id: ModuleId): ModuleDefinition => MODULE_DEFINITIONS[id];
@@ -101,6 +118,57 @@ export const moduleHasCapacity = (extra: PlayerExtra, id: ModuleId, tick: number
   if (module.lifetime.kind === 'charges') return module.lifetime.remaining > 0;
   return tick < module.lifetime.expiresAtTick;
 };
+
+/**
+ * MATRIZ DE COMPATIBILIDADE ENTRE MODULOS.
+ *
+ * O jogo permite varios modulos ativos ao mesmo tempo, e ate agora isso nunca
+ * foi um problema: perfura, ricochete, condutivo, sifao e explosivo sao
+ * MODIFICADORES do mesmo tiro, e o disco de retorno so troca o veiculo que os
+ * carrega. Todos cobram no proc, e o proc acontece no maximo quatro vezes por
+ * segundo.
+ *
+ * A Minigun quebra as duas premissas. Ela nao modifica o tiro — ela ocupa o
+ * gatilho — e ela dispara dezesseis vezes por segundo. Um so exemplo basta
+ * para fechar a questao: `explosive` com Minigun seriam DEZESSEIS explosoes
+ * de raio 2,4 por segundo, cada uma podendo matar o proprio Prospector. Nao e
+ * uma combinacao forte, e uma combinacao que nao tem orcamento — nem de
+ * balanceamento, nem de particula, nem de projetil vivo.
+ *
+ * A regra, entao, e conservadora e explicita:
+ *
+ *   | equipado com Minigun ativa | efeito na bala da Minigun          |
+ *   |----------------------------|------------------------------------|
+ *   | piercing                   | NAO se aplica                      |
+ *   | conductive                 | NAO se aplica                      |
+ *   | explosive                  | NAO se aplica                      |
+ *   | siphon                     | NAO se aplica                      |
+ *   | ricochet                   | NAO se aplica                      |
+ *   | return_disc                | NAO dispara enquanto ha Minigun    |
+ *
+ * Os modulos continuam INSTALADOS, com as cargas intactas, e voltam a valer
+ * sozinhos no instante em que a bala 300 sair. Guardar as cargas em vez de
+ * consumi-las e a metade que importa: quem pega Minigun com Ricochete
+ * carregado nao perde o Ricochete, so o poe na prateleira por vinte segundos.
+ *
+ * Quem faz valer e o `weapon` no `tags`, lido por `activeWeaponModule` — e nao
+ * uma comparacao com o literal `'minigun'` espalhada pelo `run.ts`.
+ */
+export const isWeaponModule = (id: ModuleId): boolean =>
+  MODULE_DEFINITIONS[id].tags.includes('weapon');
+
+/**
+ * O modulo-arma que esta com o gatilho AGORA, ou `undefined` para o tiro comum.
+ *
+ * Devolve o primeiro em ordem de id porque `activeModules` e mantido ordenado
+ * — e um criterio arbitrario, mas TOTAL: hoje so existe uma arma, e no dia em
+ * que existirem duas o desempate ja e deterministico em vez de depender da
+ * ordem em que o jogador as pegou.
+ */
+export const activeWeaponModule = (extra: PlayerExtra, tick: number): ModuleId | undefined =>
+  extra.activeModules.find(
+    (module) => isWeaponModule(module.id) && moduleHasCapacity(extra, module.id, tick),
+  )?.id;
 
 const createModule = (id: ModuleId, tick: number): ActiveModule => {
   const def = moduleDefinition(id);
@@ -137,20 +205,40 @@ export const consumeModuleCharge = (
   extra: PlayerExtra,
   id: ModuleId,
   slot: number,
-  events: SemanticEvent[]
+  events: SemanticEvent[],
+  /**
+   * Nao publicar o `module_charge_consumed` desta carga.
+   *
+   * Existe por causa da cadencia da Minigun e de mais nada. Um proc de
+   * perfura ou de descarga acontece algumas vezes por segundo e o recibo
+   * sonoro/visual dele e informacao: "a carga saiu". A Minigun cobra dezesseis
+   * cargas por segundo, e o mesmo recibo viraria dezesseis eventos de rede,
+   * dezesseis pulsos no icone da HUD e — pela trava de 40 ms da voz
+   * `moduleCharge` — vinte e cinco cliques por segundo empilhados sobre a
+   * propria rajada. O contador de municao ja viaja no `ViewerState` a cada
+   * snapshot, entao nada se perde: o que a HUD desenha e o RESTANTE, nao a
+   * sequencia de decrementos.
+   *
+   * O `module_expired` NUNCA e silenciado: o fim do modulo e o unico evento
+   * desta funcao que decide alguma coisa (a ejecao visual, o retorno do tiro
+   * comum), e ele continua saindo exatamente uma vez.
+   */
+  quiet = false
 ): boolean => {
   const index = extra.activeModules.findIndex((module) => module.id === id);
   if (index < 0) return false;
   const module = extra.activeModules[index];
   if (module.lifetime.kind !== 'charges' || module.lifetime.remaining <= 0) return false;
   module.lifetime.remaining--;
-  events.push({
-    t: 'module_charge_consumed',
-    slot,
-    module: id,
-    remaining: module.lifetime.remaining,
-    maximum: module.lifetime.maximum,
-  });
+  if (!quiet) {
+    events.push({
+      t: 'module_charge_consumed',
+      slot,
+      module: id,
+      remaining: module.lifetime.remaining,
+      maximum: module.lifetime.maximum,
+    });
+  }
   if (module.lifetime.remaining === 0) {
     extra.activeModules.splice(index, 1);
     events.push({ t: 'module_expired', slot, module: id });
