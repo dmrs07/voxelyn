@@ -19,6 +19,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // ---------------------------------------------------------------------
   // Boot sequence (see src/client/boot/)
   // ---------------------------------------------------------------------
+  'boot.ident.alt': 'Developer mark',
   'boot.title.line1': 'VOXELYN',
   'boot.title.line2': 'SURVIVAL',
   'boot.status.start': 'Bringing unit systems online',

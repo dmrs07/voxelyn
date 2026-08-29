@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runBootSequence } from './index';
 import { BOOT_TIMING_FULL, identityTotalMs } from './boot-flow';
 import type { BootTask } from './boot-tasks';
+import { DEVELOPER_IDENT, hasDeveloperIdent } from './developer-ident';
 
 const mountBootMarkup = (): void => {
   document.body.innerHTML = `
@@ -241,14 +242,21 @@ describe('abertura ligada de ponta a ponta', () => {
   });
 
   it('sem identidade cadastrada, a abertura comeca na tela de carregamento', async () => {
-    // O estado de HOJE do repositorio: `DEVELOPER_IDENT` esta vazio porque a
-    // marca do desenvolvedor ainda nao existe, e a Aurix Dynamics — a
-    // companhia FICTICIA do jogo — nao pode fazer as vezes dela. A fase de
-    // identidade continua na maquina (a ordem e um contrato), mas dura zero:
-    // ninguem espera dois segundos diante de um preto vazio.
+    // O caminho de quando NAO ha marca de desenvolvedor: a fase de identidade
+    // continua na maquina (a ordem e um contrato), mas dura zero. Ninguem
+    // espera dois segundos diante de um preto vazio — e a Aurix Dynamics, que
+    // e a companhia FICTICIA do jogo, nao pode fazer as vezes dela.
+    //
+    // A identidade vazia e passada explicitamente, e nao herdada do modulo: o
+    // teste cobre o COMPORTAMENTO, e nao o conteudo de `DEVELOPER_IDENT` — que
+    // muda quando a marca e trocada e nao pode quebrar esta garantia.
     const onReady = vi.fn();
     const gate = deferredTask('atlas-core', true);
-    void runBootSequence({ buildTasks: () => [gate.task], onReady });
+    void runBootSequence({
+      buildTasks: () => [gate.task],
+      onReady,
+      ident: { name: '', markUrl: '' },
+    });
 
     await advanceFrames(2);
     expect(currentStage()).toBe('boot-loading');
@@ -260,6 +268,21 @@ describe('abertura ligada de ponta a ponta', () => {
     now += BOOT_TIMING_FULL.loadingMinMs;
     await advanceFrames(3);
     expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('a identidade cadastrada no repositorio e apresentada por padrao', async () => {
+    // O contraponto do teste acima, e a rede de seguranca contra apagar a
+    // marca sem querer: com o modulo como esta versionado, a abertura mostra a
+    // identidade em vez de pular direto para o carregamento.
+    expect(hasDeveloperIdent()).toBe(true);
+    const gate = deferredTask('atlas-core', true);
+    void runBootSequence({ buildTasks: () => [gate.task], onReady: () => {} });
+    await advanceFrames(1);
+    expect(currentStage()).toBe('boot-identity');
+    expect(document.querySelector('#boot-ident-mark img')?.getAttribute('src')).toBe(
+      DEVELOPER_IDENT.markUrl,
+    );
+    gate.settle(true);
   });
 
   it('sem o markup da abertura, o menu e entregue direto', async () => {

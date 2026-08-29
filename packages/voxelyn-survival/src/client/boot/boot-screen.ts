@@ -92,7 +92,10 @@ export class BootScreen {
     if (!markSlot || !ident.markUrl) return null;
     const image = document.createElement('img');
     image.className = 'ax-boot-ident-mark';
-    image.alt = ident.markAlt ?? ident.name;
+    // Sem `markAlt` e sem nome, o texto alternativo vem do catalogo: um `alt`
+    // vazio diria ao leitor de tela que a imagem e decorativa, e a marca de
+    // quem fez o jogo nao e decoracao.
+    image.alt = ident.markAlt ?? (ident.name || t('boot.ident.alt'));
     // `onerror` esconde o no: um `<img>` que falha desenha o icone de imagem
     // quebrada do navegador, e uma tela de abertura com um icone quebrado no
     // centro e pior do que uma tela de abertura sem marca.

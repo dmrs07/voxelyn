@@ -47,6 +47,7 @@ const OPTIONAL = [
   './audio/voxelyn-survival-theme.flac',
   './audio/voxelyn-survival-menu.flac',
   './boot/keyart-1600.webp',
+  './ident/developer-mark.webp',
 ];
 
 self.addEventListener('install', (event) => {

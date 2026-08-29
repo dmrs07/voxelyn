@@ -2577,10 +2577,21 @@
          (o preload comeca em t=0), mas mostrar isso aqui transformaria uma
          apresentacao numa tela de espera. */
       .ax-boot-ident-mark {
-        width: clamp(84px, 15vh, 132px);
+        /* A escala e a de uma IDENTIDADE, nao a de um icone: esta marca e o
+           unico assunto da tela e precisa ocupar o quadro como tal. Medida em
+           `vh` porque a altura e o que falta em paisagem de celular, com piso
+           para telas baixas e teto para nao virar um cartaz em monitor grande. */
+        width: clamp(112px, 24vh, 240px);
         max-width: 62vw;
         height: auto;
         display: block;
+        /* O halo NAO e enfeite. A marca e desenhada com contorno preto, e o
+           leito desta tela e #0a0a0b: sem um pouco de luz por tras, a silhueta
+           externa dissolve no fundo e o desenho parece recortado pela metade.
+           Duas sombras concentricas — uma curta e opaca para definir a borda,
+           uma larga e fraca para o volume — resolvem sem tocar no arquivo. */
+        filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.28))
+          drop-shadow(0 0 22px rgba(190, 140, 255, 0.22));
       }
       .ax-boot-ident-name {
         font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;

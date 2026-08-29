@@ -58,13 +58,20 @@ export type DeveloperIdent = {
 };
 
 /**
- * A identidade em vigor. VAZIA de proposito — ver o cabecalho.
+ * A identidade em vigor.
  *
- * O dia em que a marca chegar, este objeto e a unica coisa a editar.
+ * `name` esta vazio de proposito: a marca fala sozinha, e a tela fica com o
+ * desenho no centro do preto e nada mais. Preencher o nome e escrever a string
+ * aqui — a tipografia aparece sob a marca sem nenhuma outra mudanca.
+ *
+ * O arquivo e produzido por `pnpm ident:prepare` a partir da arte versionada
+ * em `docs/art/ident/`: o script recorta o fundo branco por inundacao, apara a
+ * moldura vazia e reduz para 512 px em WebP (~32 KB). Ver
+ * `scripts/prepare-developer-ident.mjs`.
  */
 export const DEVELOPER_IDENT: DeveloperIdent = {
   name: '',
-  markUrl: '',
+  markUrl: 'ident/developer-mark.webp',
 };
 
 /**

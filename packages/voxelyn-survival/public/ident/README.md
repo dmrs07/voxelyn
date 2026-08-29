@@ -11,10 +11,13 @@ diria ao jogador que a Aurix fez o Voxelyn Survival.
 
 ## Como instalar a marca
 
-1. Ponha o arquivo aqui. **SVG de preferência** — a abertura escala de um
+1. Ponha a arte de origem em `docs/art/ident/` e rode `pnpm ident:prepare`, que
+   recorta o fundo, apara a moldura e escreve o WebP aqui. Para instalar um
+   arquivo já pronto, ponha-o direto aqui. **SVG de preferência** — a abertura escala de um
    celular de 320 px a um monitor 4K, e um vetor atravessa isso sem borrar. PNG
    com fundo transparente também serve; mande no dobro do tamanho de exibição
-   (a marca é desenhada com até 132 px de altura, então 264 px de lado bastam).
+   (a marca é desenhada com até 240 px de altura, então 512 px de lado bastam —
+   é o que `pnpm ident:prepare` produz).
 2. Preencha `src/client/boot/developer-ident.ts`:
 
    ```ts

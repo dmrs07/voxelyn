@@ -28,6 +28,7 @@
     "build:electron": "pnpm --filter @voxelforge/electron dist",
     "icons:generate": "node scripts/generate-icons.mjs",
     "keyart:boot": "node scripts/prepare-boot-keyart.mjs",
+    "ident:prepare": "node scripts/prepare-developer-ident.mjs",
     "devlog:plan": "node scripts/devlog/plan.mjs",
     "devlog:shoot": "node scripts/devlog/shoot.mjs",
     "devlog:carousel": "node scripts/devlog/carousel.mjs",

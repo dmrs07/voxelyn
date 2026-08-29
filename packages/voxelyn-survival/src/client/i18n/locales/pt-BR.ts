@@ -32,6 +32,7 @@ export const PT_BR = {
   // A voz é a da companhia preparando a unidade — nunca "carregando arquivo
   // 3 de 8", que é vocabulário de instalador, não de despacho.
   // ---------------------------------------------------------------------
+  'boot.ident.alt': 'Marca do desenvolvedor',
   'boot.title.line1': 'VOXELYN',
   'boot.title.line2': 'SURVIVAL',
   'boot.status.start': 'Iniciando sistemas da unidade',
