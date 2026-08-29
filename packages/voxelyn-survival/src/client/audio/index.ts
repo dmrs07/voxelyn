@@ -66,6 +66,21 @@ const MUSIC_DUCK_PRIORITY = 9;
 export class AudioDirector {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /**
+   * Barramento dos EFEITOS: tudo o que o mundo faz passa por aqui antes do
+   * mestre — as vozes de `play()` e o leito de ambiencia.
+   *
+   * A ambiencia entra junto de proposito. Ela e o vento, o gotejo, o zumbido
+   * da maquina: som do MUNDO, do mesmo lado da fronteira que um tiro, e do
+   * lado oposto da trilha. Quem baixa "Efeitos" quer o mundo mais baixo, nao
+   * so as explosoes — deixar o leito no mestre faria o slider parecer
+   * quebrado justamente no silencio, que e quando a ambiencia e tudo o que se
+   * ouve.
+   *
+   * O que NAO passa por aqui: os tres barramentos de musica. E a fronteira
+   * inteira da feature.
+   */
+  private sfxBus: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
   private musicBus: MusicBus | null = null;
@@ -80,6 +95,8 @@ export class AudioDirector {
 
   private volume = 0.8;
   private musicVolume = 0.7;
+  /** 1.0 = a mixagem do jogo. Ver `AudioSettings.sfxVolume`. */
+  private sfxVolume = 1;
   private muted = false;
   /**
    * Preferencia de trilha do jogador: a composta (arquivo, padrao) ou a
@@ -162,6 +179,21 @@ export class AudioDirector {
   }
 
   /**
+   * Volume dos efeitos (0..1). Ganho unitario: 1.0 e a mixagem do jogo.
+   *
+   * A rampa e a mesma do mestre (`setTargetAtTime`, 50 ms) e existe pelo mesmo
+   * motivo: arrastar um slider escreve dezenas de valores por segundo, e
+   * atribuir `gain.value` a cada um deles produz um degrau audivel por
+   * atribuicao — um chiado, exatamente enquanto a pessoa procura o volume que
+   * quer.
+   */
+  setSfxVolume(volume: number): void {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+    if (!this.ctx || !this.sfxBus) return;
+    this.sfxBus.gain.setTargetAtTime(this.sfxVolume, this.ctx.currentTime, 0.05);
+  }
+
+  /**
    * Transicao de tela, chamada pelo main.ts junto das trocas de DOM sob o
    * veu. Toda a politica da trilha de menu vive aqui: acorda no terminal,
    * cala na descida. Idempotente — wake/silence ja o sao.
@@ -229,10 +261,19 @@ export class AudioDirector {
 
       master.connect(compressor).connect(ctx.destination);
 
+      // O barramento de efeitos entra ANTES do mestre e DEPOIS de tudo o que
+      // o mundo produz. A musica continua indo direto ao mestre, entao o
+      // compressor do barramento final segue vendo a soma inteira — o
+      // ducking e o teto da mixagem nao mudam de lugar.
+      const sfxBus = ctx.createGain();
+      sfxBus.gain.value = this.sfxVolume;
+      sfxBus.connect(master);
+
       this.ctx = ctx;
       this.master = master;
+      this.sfxBus = sfxBus;
       this.noise = createNoiseBuffer(ctx);
-      this.ambienceBus = new AmbienceBus(ctx, master, this.noise);
+      this.ambienceBus = new AmbienceBus(ctx, sfxBus, this.noise);
       this.ambienceBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
@@ -290,10 +331,7 @@ export class AudioDirector {
       // arquivo ja decodificou; o backup procedural em qualquer outro caso.
       // A resolucao e por quadro de proposito — o FLAC que termina de
       // carregar no meio da run entra aqui, em crossfade, sem evento.
-      const active = resolveMusicSource(
-        this.musicSource,
-        this.soundtrackBus?.ready ?? false,
-      );
+      const active = resolveMusicSource(this.musicSource, this.soundtrackBus?.ready ?? false);
       if (active !== this.activeSource) {
         // A fonte que sai cala com a propria rampa; a que entra acorda na
         // dela. Voltar ao synth exige re-apresentar o tema do estrato atual:
@@ -396,9 +434,12 @@ export class AudioDirector {
 
   private play(voice: VoiceId, gain: number, pan: number, cutoffHz: number): void {
     const ctx = this.ctx;
-    const master = this.master;
+    // A saida das vozes e o barramento de EFEITOS, nunca o mestre direto: e o
+    // que faz o slider de efeitos valer para todo som do mundo sem que cada
+    // voz precise saber que ele existe.
+    const out = this.sfxBus;
     const noise = this.noise;
-    if (!ctx || !master || !noise) return;
+    if (!ctx || !out || !noise) return;
     const render = VOICE_RENDERERS[voice];
     if (!render) return;
 
@@ -431,7 +472,7 @@ export class AudioDirector {
       tail.connect(panner);
       tail = panner;
     }
-    tail.connect(master);
+    tail.connect(out);
 
     render(ctx, voiceGain, t0, noise);
   }

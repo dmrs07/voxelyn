@@ -8,12 +8,7 @@ import type {
 } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { DesktopControlBar } from './desktop-controls';
-import {
-  inductionSeen,
-  markInductionSeen,
-  renderInduction,
-  type InductionMode,
-} from './induction';
+import { inductionSeen, markInductionSeen, renderInduction, type InductionMode } from './induction';
 import { createTrainingRun, markTrainingDone } from './training-setup';
 import { TrainingDirector, type TrainingCue } from './training-director';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
@@ -107,6 +102,7 @@ const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 const volumeInput = document.getElementById('volume') as HTMLInputElement;
 const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
+const sfxVolumeInput = document.getElementById('sfx-volume') as HTMLInputElement;
 const musicSourceButton = document.getElementById('btn-music-source') as HTMLButtonElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
@@ -361,10 +357,12 @@ const setBanner = (text: string | null, tone: BannerTone = 'warning'): void => {
 const audioSettings = loadAudioSettings();
 audio.setVolume(audioSettings.volume);
 audio.setMusicVolume(audioSettings.musicVolume);
+audio.setSfxVolume(audioSettings.sfxVolume);
 audio.setMuted(audioSettings.muted);
 audio.setMusicSource(audioSettings.musicSource);
 volumeInput.value = String(Math.round(audioSettings.volume * 100));
 musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
+sfxVolumeInput.value = String(Math.round(audioSettings.sfxVolume * 100));
 
 const renderMuteLabel = (): void => {
   muteButton.textContent = t(audioSettings.muted ? 'options.sound.off' : 'options.sound.on');
@@ -407,6 +405,17 @@ volumeInput.addEventListener('input', () => {
 musicVolumeInput.addEventListener('input', () => {
   audioSettings.musicVolume = Number(musicVolumeInput.value) / 100;
   audio.setMusicVolume(audioSettings.musicVolume);
+  saveAudioSettings(audioSettings);
+});
+
+// Efeitos: mesmo padrao dos outros dois sliders — o valor vai para o
+// barramento na hora e o disco grava a cada movimento. Sem retorno sonoro
+// proprio aqui de proposito: o jogador quase sempre mexe neste slider com o
+// jogo fazendo barulho atras, e um bipe por passo do slider disputaria com
+// justamente o som que ele esta tentando ajustar.
+sfxVolumeInput.addEventListener('input', () => {
+  audioSettings.sfxVolume = Number(sfxVolumeInput.value) / 100;
+  audio.setSfxVolume(audioSettings.sfxVolume);
   saveAudioSettings(audioSettings);
 });
 
@@ -1130,7 +1139,11 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
   recorder.start(seed);
   resetRunTracking();
   telemetry.begin();
-  let state: SurvivalState = createRun({ seed, tuning: authorized.tuning, depth: authorized.depth });
+  let state: SurvivalState = createRun({
+    seed,
+    tuning: authorized.tuning,
+    depth: authorized.depth,
+  });
   liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
@@ -1372,9 +1385,15 @@ const showTrainingOutcome = (certified: boolean): void => {
     el.dataset.i18n = key;
     el.textContent = t(key);
   };
-  set('training-complete-title', certified ? 'training.complete.title' : 'training.incomplete.title');
+  set(
+    'training-complete-title',
+    certified ? 'training.complete.title' : 'training.incomplete.title',
+  );
   set('training-complete-body', certified ? 'training.complete.body' : 'training.incomplete.body');
-  set('btn-training-descend', certified ? 'training.complete.descend' : 'training.incomplete.retry');
+  set(
+    'btn-training-descend',
+    certified ? 'training.complete.descend' : 'training.incomplete.retry',
+  );
 
   runInProgress = false;
   activeRunKind = 'none';
@@ -1753,13 +1772,9 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
         if (terminal) {
           recordRun(state);
           if (state.summary) telemetry.finish(state.summary, state.sector);
-          const endRegions = renderer.renderEnd(
-            state,
-            window.innerWidth,
-            window.innerHeight,
-            now,
-            { input: input.state },
-          );
+          const endRegions = renderer.renderEnd(state, window.innerWidth, window.innerHeight, now, {
+            input: input.state,
+          });
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
           // reabre o socket — o matchmaking so considera salas 'running'.
@@ -2051,15 +2066,13 @@ const openInduction = (
   onAuthorise: () => void,
   onTraining?: () => void,
 ): void => {
-  const dismissInto =
-    (next: () => void) =>
-    (): void => {
-      markInductionSeen();
-      inductionOverlay.classList.add('hidden');
-      menu.classList.remove('hidden');
-      audio.ui();
-      next();
-    };
+  const dismissInto = (next: () => void) => (): void => {
+    markInductionSeen();
+    inductionOverlay.classList.add('hidden');
+    menu.classList.remove('hidden');
+    audio.ui();
+    next();
+  };
   renderInduction(inductionBody, {
     mode,
     onDismiss: dismissInto(onAuthorise),

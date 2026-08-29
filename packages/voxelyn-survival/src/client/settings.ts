@@ -24,9 +24,33 @@ export type QualityPreset = {
 };
 
 export const PRESETS: Record<QualityLevel, QualityPreset> = {
-  high: { level: 'high', maxDpr: 2, maxFx: 120, dynamicLights: true, shakeScale: 1, targetFps: 60, bloom: true },
-  medium: { level: 'medium', maxDpr: 1.5, maxFx: 60, dynamicLights: true, shakeScale: 0.7, targetFps: 45, bloom: true },
-  low: { level: 'low', maxDpr: 1, maxFx: 24, dynamicLights: false, shakeScale: 0.4, targetFps: 30, bloom: false },
+  high: {
+    level: 'high',
+    maxDpr: 2,
+    maxFx: 120,
+    dynamicLights: true,
+    shakeScale: 1,
+    targetFps: 60,
+    bloom: true,
+  },
+  medium: {
+    level: 'medium',
+    maxDpr: 1.5,
+    maxFx: 60,
+    dynamicLights: true,
+    shakeScale: 0.7,
+    targetFps: 45,
+    bloom: true,
+  },
+  low: {
+    level: 'low',
+    maxDpr: 1,
+    maxFx: 24,
+    dynamicLights: false,
+    shakeScale: 0.4,
+    targetFps: 30,
+    bloom: false,
+  },
 };
 
 const KEY = 'voxelyn.quality';
@@ -63,6 +87,21 @@ export type AudioSettings = {
    * teto projetado da mixagem, nao "musica no maximo do alto-falante".
    */
   musicVolume: number;
+  /**
+   * Volume dos EFEITOS, 0..1 — tudo o que o mundo faz: tiros, passos, chefes,
+   * telegrafos, e o leito de ambiencia que sustenta os tres.
+   *
+   * Existe porque o slider mestre nao resolve o que as pessoas querem resolver.
+   * Quem baixa o volume por causa dos SFX baixa a musica junto e perde o leito
+   * que o compositor calibrou; quem sobe para ouvir a trilha leva as explosoes
+   * junto. Com os dois independentes, o mestre volta a ser o que ele deve ser:
+   * quanto o jogo INTEIRO fala.
+   *
+   * Ao contrario do musicVolume, este multiplica ganho unitario: 1.0 e "os
+   * efeitos como o jogo os mixou", que e o padrao — o teto do SFX ja esta
+   * embutido no ganho de cada voz, e mexer nele aqui recalibraria a mixagem.
+   */
+  sfxVolume: number;
   muted: boolean;
   /**
    * Qual trilha toca na run: 'composed' e a trilha do compositor (arquivo em
@@ -85,6 +124,10 @@ export type AudioSettings = {
 const AUDIO_DEFAULTS: AudioSettings = {
   volume: 0.8,
   musicVolume: 0.7,
+  // 1.0, e nao 0.8 como o mestre: o padrao dos efeitos tem de ser exatamente a
+  // mixagem que o jogo sempre teve. Qualquer valor menor rebaixaria o som de
+  // todo mundo que ja jogava, sem ninguem ter pedido.
+  sfxVolume: 1,
   muted: false,
   musicSource: 'composed',
 };
@@ -108,6 +151,13 @@ export const loadAudioSettings = (): AudioSettings => {
         typeof obj.musicVolume === 'number' && Number.isFinite(obj.musicVolume)
           ? Math.max(0, Math.min(1, obj.musicVolume))
           : AUDIO_DEFAULTS.musicVolume,
+      // Storage anterior ao barramento de efeitos nao tem o campo: cai em 1.0,
+      // que e a mixagem de antes — mesmo criterio (sem migracao) do
+      // musicVolume acima. Quem ja jogava nao ouve diferenca nenhuma.
+      sfxVolume:
+        typeof obj.sfxVolume === 'number' && Number.isFinite(obj.sfxVolume)
+          ? Math.max(0, Math.min(1, obj.sfxVolume))
+          : AUDIO_DEFAULTS.sfxVolume,
       muted: obj.muted === true,
       // Storage anterior a trilha composta nao tem o campo: padrao, sem
       // migracao — mesmo criterio do musicVolume acima.

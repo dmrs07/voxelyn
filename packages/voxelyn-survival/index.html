@@ -1354,6 +1354,21 @@
         #options #options-controls .ax-optgroup {
           gap: 6px;
         }
+        /* Mesma regra da paisagem baixa, e pelo mesmo motivo: numa coluna
+           estreita o botao e espremido abaixo do natural, quebra o rotulo em
+           duas linhas e a linha dobra de altura. Quem cede largura e o slider,
+           que funciona em qualquer uma. */
+        #options #options-controls .row label {
+          min-width: 60px;
+        }
+        #options #options-controls input[type='range'] {
+          min-width: 0;
+          flex: 0 1 90px;
+        }
+        #options #options-controls .row button {
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
         #options #options-controls .ax-section-label {
           margin-top: 0;
           padding-bottom: 2px;
@@ -2330,6 +2345,29 @@
           gap: 6px;
           margin-bottom: 6px;
         }
+        /* A linha do Volume custava 48px enquanto as dos outros sliders
+           custavam 20: numa coluna de ~290px, o rotulo (72) + o slider (110) +
+           o botao de som nao cabiam juntos, e o botao quebrava em duas linhas.
+           Estreitar o rotulo e o slider devolve a largura que falta e a linha
+           volta a uma so — sem encolher nenhum alvo de toque: o botao continua
+           do mesmo tamanho e o slider, com 90px, continua largo o bastante
+           para um polegar. */
+        #options #options-controls .row label {
+          min-width: 60px;
+        }
+        #options #options-controls input[type='range'] {
+          width: 90px;
+          /* Quem cede largura e o SLIDER, nunca o botao: arrastar funciona em
+             qualquer largura, mas um botao espremido 8px abaixo do natural
+             quebra o rotulo em duas linhas e a linha inteira dobra de altura.
+             Era exatamente isso que estava acontecendo com "Som: ligado". */
+          min-width: 0;
+          flex: 0 1 90px;
+        }
+        #options #options-controls .row button {
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
         #options #options-controls .ax-credits {
           margin-top: 2px;
         }
@@ -3121,6 +3159,15 @@
                   <label for="volume" data-i18n="options.volume">Volume</label>
                   <input id="volume" type="range" min="0" max="100" step="1" />
                   <button id="btn-mute" class="compact primary">Som: ligado</button>
+                </div>
+                <!--
+                  Efeitos ANTES de musica, e depois do mestre: e a ordem de um
+                  mixer — quanto o jogo inteiro fala, quanto o mundo fala,
+                  quanto a trilha fala.
+                -->
+                <div class="row">
+                  <label for="sfx-volume" data-i18n="options.sfx">Efeitos</label>
+                  <input id="sfx-volume" type="range" min="0" max="100" step="1" />
                 </div>
                 <div class="row">
                   <label for="music-volume" data-i18n="options.music">Música</label>

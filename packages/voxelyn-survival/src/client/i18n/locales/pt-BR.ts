@@ -103,6 +103,7 @@ export const PT_BR = {
   'options.quality.medium': 'Média',
   'options.quality.low': 'Baixa (30 FPS)',
   'options.volume': 'Volume',
+  'options.sfx': 'Efeitos',
   'options.music': 'Música',
   'options.musicSource': 'Trilha',
   'options.musicSource.composed': 'Composta',

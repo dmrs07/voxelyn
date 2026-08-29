@@ -87,6 +87,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.quality.medium': 'Medium',
   'options.quality.low': 'Low (30 FPS)',
   'options.volume': 'Volume',
+  'options.sfx': 'Effects',
   'options.music': 'Music',
   'options.musicSource': 'Soundtrack',
   'options.musicSource.composed': 'Composed',
