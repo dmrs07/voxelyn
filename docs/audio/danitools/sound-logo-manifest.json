@@ -1,0 +1,751 @@
+{
+  "nome": "DaniTools — logo sonoro",
+  "descricao": "Assinatura sonora do estudio DaniTools. Sintetizada por inteiro: nenhum sample, nenhuma biblioteca de audio, nenhum plugin.",
+  "geradoPor": "scripts/audio-logo/render.mjs",
+  "reprodutibilidade": {
+    "garantia": "Os quatro mestres WAV saem byte a byte iguais a cada execucao NA MESMA build do Node/V8. Todo ruido vem de um PRNG semeado (mulberry32) e nao ha estado global nem relogio no caminho.",
+    "ressalva": "A garantia nao atravessa versoes de motor. A sintese usa Math.sin, Math.cos, Math.exp, Math.tanh e o operador **, que a especificacao do ECMAScript deixa a cargo da implementacao (ECMA-262, sec. 21.3): uma build de V8 diferente pode divergir no ultimo bit, o que aparece como um punhado de bytes diferentes num WAV de 24 bits. Reproducao exata entre maquinas exige a mesma versao do Node.",
+    "comprovacao": "node scripts/audio-logo/render.mjs --verify confere os mestres contra os hashes abaixo sem escrever nada. O teste audio-logo.test.mjs roda a mesma checagem.",
+    "escopo": "A garantia forte e dos WAV, que saem deste codigo. MP3, OGG e FLAC saem do ffmpeg com -fflags +bitexact, o que os torna estaveis entre execucoes na mesma build do encoder — sem essa flag o multiplexador Ogg sorteia o numero de serie do fluxo a cada execucao e re-renderizar sujava o repositorio sem nenhuma mudanca de audio. Entre builds diferentes de ffmpeg os bytes ainda podem mudar; os hashes desses tres formatos valem como integridade, nao como garantia de reproducao."
+  },
+  "dependencias": {
+    "execucao": "Node >= 22. Nenhum pacote externo.",
+    "opcional": "ffmpeg, so para MP3/OGG. Os WAV mestres saem sem ele (--no-encode).",
+    "tomadasDeVoz": "espeak-ng 1.51, usado UMA vez para gerar os WAV em scripts/audio-logo/takes/, que estao versionados. O render nao chama espeak."
+  },
+  "musica": {
+    "andamentoBpm": 120,
+    "tonalidade": "Mi maior com nona acrescentada (E add9)",
+    "afinacao": "Temperamento igual, A4 = 440 Hz",
+    "acorde": [
+      {
+        "nota": "E2",
+        "hz": 82.407
+      },
+      {
+        "nota": "B2",
+        "hz": 123.471
+      },
+      {
+        "nota": "E3",
+        "hz": 164.814
+      },
+      {
+        "nota": "G#3",
+        "hz": 207.652
+      },
+      {
+        "nota": "B3",
+        "hz": 246.942
+      },
+      {
+        "nota": "F#4",
+        "hz": 369.994
+      }
+    ],
+    "arpejo": [
+      {
+        "nota": "B3",
+        "hz": 246.942
+      },
+      {
+        "nota": "E4",
+        "hz": 329.628
+      },
+      {
+        "nota": "G#4",
+        "hz": 415.305
+      },
+      {
+        "nota": "B4",
+        "hz": 493.883
+      }
+    ],
+    "sinos": [
+      {
+        "nota": "E5",
+        "hz": 659.255
+      },
+      {
+        "nota": "G#5",
+        "hz": 830.609
+      },
+      {
+        "nota": "B5",
+        "hz": 987.767
+      },
+      {
+        "nota": "E6",
+        "hz": 1318.51
+      },
+      {
+        "nota": "F#6",
+        "hz": 1479.978
+      },
+      {
+        "nota": "B6",
+        "hz": 1975.533
+      }
+    ],
+    "gradeSegundos": {
+      "latch": 0.02,
+      "riser": 0.02,
+      "arp": 0.27,
+      "hit": 0.52,
+      "voice": 0.64,
+      "bells": 1.6
+    }
+  },
+  "traducaoDaMarca": {
+    "voxel / pixel": "pulso chiptune de duty 0,25 preso a grade de 32avos + camada de bitcrush 8 bits / 11 kHz na voz",
+    "degrade roxo -> magenta": "supersaw de 5 vozes por nota desafinadas em 15 cents, com o corte abrindo de 420 Hz a 5,4 kHz — uma cor so, com largura",
+    "letreiro de neon": "sinos aditivos inarmonicos, placa brilhante (damping 0,13) e eco de semicolcheia pontuada",
+    "ferramentas (tools)": "estalo de encaixe em passa-banda, na abertura da peca e no ataque do impacto",
+    "a palavra e a marca": "acorde e sinos abaixam 4,5 dB sob a locucao, e o ducking e devolvido a voz para ela nao se abaixar junto"
+  },
+  "voz": {
+    "palavra": "DANITOOLS",
+    "tomadas": {
+      "en-us": {
+        "comando": "espeak-ng -v en-us -s 130 -p 42 -a 200 -w danitools-en-us.wav \"DaniTools\"",
+        "fonemas": "d'ani t'u:lz"
+      },
+      "pt-br": {
+        "comando": "espeak-ng -v pt-br -s 130 -p 42 -a 200 -w danitools-pt-br.wav \"Dâni Túls\"",
+        "fonemas": "d'&~ni t'uls"
+      }
+    },
+    "espectroDaFonte": {
+      "medidoEm": "tomada en-us crua, DFT esparsa por banda, energia relativa ao total",
+      "bandas": {
+        "60Hz": "-17.0 dB",
+        "120Hz": "-8.5 dB",
+        "250Hz": "-3.1 dB",
+        "500Hz": "-7.1 dB",
+        "1kHz": "-9.4 dB",
+        "2kHz": "-14.5 dB",
+        "4kHz": "-30.8 dB",
+        "8kHz": "-34.9 dB"
+      },
+      "conclusao": "A fonte e encaixotada em 250 Hz e praticamente vazia acima de 4 kHz. Por isso a cadeia CORTA 280 Hz e GERA o brilho por transposicao de oitava, em vez de realcar um espectro sem conteudo."
+    },
+    "camadas": {
+      "nucleo": "HP 105 Hz; -4,0 dB em 280 Hz (a caixa medida); -2,0 dB em 720 Hz (nasalidade de formante); +4,5 dB em 2,6 kHz; shelf +5,0 dB em 3,8 kHz para o \"-LS\" final",
+      "peso": "transposicao -12 st (resample + overlap-add, grao 85 ms), LP 600 Hz, ganho 0,52",
+      "brilho": "transposicao +12 st (grao 35 ms), HP 2,6 kHz, ganho 0,15 — leva o conteudo de 2-4 kHz para 4-8 kHz",
+      "pixel": "bitcrush 8 bits / 11,025 kHz, passa-banda em 1,5 kHz, ganho 0,17",
+      "cola": "saturacao tanh (drive 1,45) -> compressor 3,2:1 em -20 dBFS -> chorus de 3 vozes (11-20 ms, 0,42 Hz), 42% de largura sobre o centro seco"
+    }
+  },
+  "medicao": {
+    "norma": "ITU-R BS.1770-4 com gating duplo (-70 LUFS absoluto, -10 LU relativo); filtros K com os coeficientes normativos de 48 kHz.",
+    "afericao": "O medidor foi conferido contra o caso 1 do EBU Tech 3341: seno de 1 kHz estereo a -20 dBFS mede -20,0 LUFS.",
+    "janelas": "A EBU R128 define duas janelas que nao sao intercambiaveis: momentary (M) usa 400 ms e short-term (S) usa 3 s. Os campos loudnessMomentaneaMaximaLufs e loudnessCurtoPrazoMaximaLufs dizem qual e qual. Numa peca com menos de 3 s nao cabe uma unica janela short-term: o campo vem null e janelasCurtoPrazo vem 0, em vez de um numero tirado de uma janela curta demais. O gating da integrada continua sobre os blocos de 400 ms, que e o que a BS.1770-4 manda ali.",
+    "ressalva": "O pico inter-amostra e ESTIMADO por sobreamostragem 8x com interpolacao de Hermite, nao pelo FIR normativo de 4x. Vale como margem de seguranca, nao como certificado de conformidade.",
+    "margemDaVoz": "Energia RMS da voz menos a da soma das outras faixas, por banda, na janela exata da palavra. Nas bandas de 1 a 8 kHz — onde mora a inteligibilidade da fala — a margem TEM que ser positiva. Em banda larga e em 200-800 Hz a margem negativa e o projeto: ali o corpo do acorde e o sub e que mandam, e a voz foi cortada de proposito nessa regiao."
+  },
+  "entregas": [
+    {
+      "id": "danitools-sound-logo",
+      "uso": "A assinatura. Abertura e encerramento de video, trailer, vitrine de loja.",
+      "variante": "full",
+      "tomada": "en-us",
+      "duracaoSec": 3.502,
+      "medicao": {
+        "loudnessIntegradaLufs": -14,
+        "loudnessMomentaneaMaximaLufs": -11.9,
+        "loudnessCurtoPrazoMaximaLufs": -14.3,
+        "janelasCurtoPrazo": 6,
+        "alvoLufs": -14,
+        "picoDeAmostraDbfs": [
+          -2.9,
+          -3
+        ],
+        "picoInterAmostraEstimadoDbtp": [
+          -2.9,
+          -3
+        ],
+        "correlacaoEstereo": 0.97,
+        "energiaPorBanda": {
+          "sub": "-9.3 dB",
+          "baixo": "-5.7 dB",
+          "medio-grave": "-4.5 dB",
+          "medio": "-7.6 dB",
+          "presenca": "-12.2 dB",
+          "brilho": "-16.4 dB"
+        },
+        "ganhoAplicadoNoMasterDb": -1.5,
+        "reducaoMaximaDoLimitadorDb": 0
+      },
+      "margemDaVoz": {
+        "bandaLarga": {
+          "vozDb": -18.1,
+          "musicaDb": -17,
+          "margemDb": -1.1
+        },
+        "200-800Hz": {
+          "vozDb": -22.5,
+          "musicaDb": -22,
+          "margemDb": -0.5
+        },
+        "1-2kHz": {
+          "vozDb": -25.6,
+          "musicaDb": -31.1,
+          "margemDb": 5.5
+        },
+        "2-4kHz": {
+          "vozDb": -25.6,
+          "musicaDb": -36.1,
+          "margemDb": 10.4
+        },
+        "4-8kHz": {
+          "vozDb": -29.1,
+          "musicaDb": -42.1,
+          "margemDb": 13
+        }
+      },
+      "duckingDb": -4.5,
+      "eventos": [
+        {
+          "name": "latch",
+          "atSec": 0.02,
+          "nota": "estalo de encaixe — o \"tools\" da marca"
+        },
+        {
+          "name": "riser",
+          "atSec": 0.02,
+          "durSec": 0.5,
+          "varreduraHz": [
+            320,
+            7400
+          ]
+        },
+        {
+          "name": "arp",
+          "atSec": 0.27,
+          "notas": [
+            "B3",
+            "E4",
+            "G#4",
+            "B4"
+          ],
+          "passoSec": 0.063,
+          "duty": 0.25
+        },
+        {
+          "name": "impacto",
+          "atSec": 0.52,
+          "camadas": [
+            "sub 180->41,2 Hz",
+            "estalo em 3,1 kHz",
+            "quadrada E2+E3"
+          ],
+          "subDecaySec": 0.8
+        },
+        {
+          "name": "acorde",
+          "atSec": 0.52,
+          "notas": [
+            "E2",
+            "B2",
+            "E3",
+            "G#3",
+            "B3",
+            "F#4"
+          ],
+          "filtroHz": [
+            420,
+            5400
+          ],
+          "vozesPorNota": 5,
+          "desafinacaoCents": 15
+        },
+        {
+          "name": "voz",
+          "atSec": 0.64,
+          "palavra": "DANITOOLS",
+          "durSec": 0.912,
+          "camadas": {
+            "core": 1,
+            "sub": 0.52,
+            "air": 0.15,
+            "pixel": 0.17
+          }
+        },
+        {
+          "name": "sinos",
+          "atSec": 1.6,
+          "notas": [
+            "E5",
+            "G#5",
+            "B5",
+            "E6",
+            "F#6",
+            "B6"
+          ],
+          "passoSec": 0.055,
+          "ecoSec": 0.188
+        }
+      ],
+      "arquivos": [
+        {
+          "nome": "danitools-sound-logo.wav",
+          "formato": "WAV PCM 48 kHz / 24 bits / estereo",
+          "bytes": 1008602,
+          "sha256": "2e69c16fda8ecb44a1b7ff19694ff29ee43e962e72ccabb9a66f312c2f9d253d"
+        },
+        {
+          "nome": "stems/danitools-sound-logo-anacruse.flac",
+          "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
+          "bytes": 111162,
+          "sha256": "87fbf68e02d8eade59df5c11baedba8860c460f9b2526d6ee0324a41cabe9bc6"
+        },
+        {
+          "nome": "stems/danitools-sound-logo-impacto.flac",
+          "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
+          "bytes": 47823,
+          "sha256": "1da16990722be65cf4a7cd83e53f70dd1a0b7c70fa803c7799d79febe3deff1d"
+        },
+        {
+          "nome": "stems/danitools-sound-logo-acorde.flac",
+          "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
+          "bytes": 307035,
+          "sha256": "900ee167bce2755fdf5d39d1688368e19ed727d3cbc7ebd1b5af5b7d02b73e12"
+        },
+        {
+          "nome": "stems/danitools-sound-logo-voz.flac",
+          "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
+          "bytes": 188173,
+          "sha256": "e3857af520f0036ce52631233eee73afe509428e2fd3862dbee8c9f3e32a251c"
+        },
+        {
+          "nome": "stems/danitools-sound-logo-sinos.flac",
+          "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
+          "bytes": 194193,
+          "sha256": "cc4cabeaddc2cc321dd3974a8259621e02fe0cc6fa81e47948c96f7c5ba66e68"
+        },
+        {
+          "nome": "stems/danitools-sound-logo-caudas.flac",
+          "formato": "FLAC 48 kHz / 24 bits / estereo (stem, antes da masterizacao)",
+          "bytes": 564880,
+          "sha256": "2793976bdc41f77eaa5c073dec6eaf4743b063952a6f23d3f2eb1b0788db11a6"
+        },
+        {
+          "nome": "danitools-sound-logo.mp3",
+          "formato": "MP3 320 kbps CBR",
+          "bytes": 142100,
+          "sha256": "2a1b3dd0f9d171cc9118cf714b3ab3b51334627b580a552861f6e6e6ce57fe51",
+          "comando": "ffmpeg -i danitools-sound-logo.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo.mp3"
+        },
+        {
+          "nome": "danitools-sound-logo.ogg",
+          "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
+          "bytes": 79863,
+          "sha256": "9e8f29c8a1cac3e6d9ea9b8823bc32c681f339fb82a37badf5455f14ab3d5864",
+          "comando": "ffmpeg -i danitools-sound-logo.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo.ogg"
+        }
+      ]
+    },
+    {
+      "id": "danitools-sound-logo-short",
+      "uso": "Bumper. Splash de app, vinheta de live, transicao curta.",
+      "variante": "short",
+      "tomada": "en-us",
+      "duracaoSec": 2.602,
+      "medicao": {
+        "loudnessIntegradaLufs": -14,
+        "loudnessMomentaneaMaximaLufs": -12.2,
+        "loudnessCurtoPrazoMaximaLufs": null,
+        "janelasCurtoPrazo": 0,
+        "alvoLufs": -14,
+        "picoDeAmostraDbfs": [
+          -1.8,
+          -1.8
+        ],
+        "picoInterAmostraEstimadoDbtp": [
+          -1.8,
+          -1.8
+        ],
+        "correlacaoEstereo": 0.96,
+        "energiaPorBanda": {
+          "sub": "-8.4 dB",
+          "baixo": "-5.5 dB",
+          "medio-grave": "-4.9 dB",
+          "medio": "-7.5 dB",
+          "presenca": "-12.4 dB",
+          "brilho": "-17.5 dB"
+        },
+        "ganhoAplicadoNoMasterDb": -1.5,
+        "reducaoMaximaDoLimitadorDb": 0
+      },
+      "margemDaVoz": {
+        "bandaLarga": {
+          "vozDb": -18.1,
+          "musicaDb": -17,
+          "margemDb": -1.1
+        },
+        "200-800Hz": {
+          "vozDb": -22.5,
+          "musicaDb": -22,
+          "margemDb": -0.5
+        },
+        "1-2kHz": {
+          "vozDb": -25.6,
+          "musicaDb": -31.1,
+          "margemDb": 5.5
+        },
+        "2-4kHz": {
+          "vozDb": -25.6,
+          "musicaDb": -36,
+          "margemDb": 10.4
+        },
+        "4-8kHz": {
+          "vozDb": -29.1,
+          "musicaDb": -42.1,
+          "margemDb": 13
+        }
+      },
+      "duckingDb": -4.5,
+      "eventos": [
+        {
+          "name": "impacto",
+          "atSec": 0.02,
+          "camadas": [
+            "sub 180->41,2 Hz",
+            "estalo em 3,1 kHz",
+            "quadrada E2+E3"
+          ],
+          "subDecaySec": 0.8
+        },
+        {
+          "name": "acorde",
+          "atSec": 0.02,
+          "notas": [
+            "E2",
+            "B2",
+            "E3",
+            "G#3",
+            "B3",
+            "F#4"
+          ],
+          "filtroHz": [
+            420,
+            5400
+          ],
+          "vozesPorNota": 5,
+          "desafinacaoCents": 15
+        },
+        {
+          "name": "voz",
+          "atSec": 0.14,
+          "palavra": "DANITOOLS",
+          "durSec": 0.912,
+          "camadas": {
+            "core": 1,
+            "sub": 0.52,
+            "air": 0.15,
+            "pixel": 0.17
+          }
+        },
+        {
+          "name": "sinos",
+          "atSec": 1.1,
+          "notas": [
+            "E5",
+            "G#5",
+            "B5",
+            "E6",
+            "F#6",
+            "B6"
+          ],
+          "passoSec": 0.055,
+          "ecoSec": 0.188
+        }
+      ],
+      "arquivos": [
+        {
+          "nome": "danitools-sound-logo-short.wav",
+          "formato": "WAV PCM 48 kHz / 24 bits / estereo",
+          "bytes": 749402,
+          "sha256": "6e1d4a865351f4623ef7963f6e10663f5f56ebb00b71e01140458e1f3e94ffaf"
+        },
+        {
+          "nome": "danitools-sound-logo-short.mp3",
+          "formato": "MP3 320 kbps CBR",
+          "bytes": 106580,
+          "sha256": "7d29164476043ecf51f34a90b424a7e61417b1028b9b8eaac4bc5dc24ea82f59",
+          "comando": "ffmpeg -i danitools-sound-logo-short.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo-short.mp3"
+        },
+        {
+          "nome": "danitools-sound-logo-short.ogg",
+          "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
+          "bytes": 59950,
+          "sha256": "dabdd5bac699d1b34afd7d8fb1a75ddf3aac178ef4124f0602217062d6e4e801",
+          "comando": "ffmpeg -i danitools-sound-logo-short.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo-short.ogg"
+        }
+      ]
+    },
+    {
+      "id": "danitools-sound-logo-tag",
+      "uso": "So a locucao com a cauda, sem musica. Para deitar sobre trilha que ja existe.",
+      "variante": "tag",
+      "tomada": "en-us",
+      "duracaoSec": 2.402,
+      "medicao": {
+        "loudnessIntegradaLufs": -16,
+        "loudnessMomentaneaMaximaLufs": -14.4,
+        "loudnessCurtoPrazoMaximaLufs": null,
+        "janelasCurtoPrazo": 0,
+        "alvoLufs": -16,
+        "picoDeAmostraDbfs": [
+          -3.7,
+          -3.1
+        ],
+        "picoInterAmostraEstimadoDbtp": [
+          -3.6,
+          -3.1
+        ],
+        "correlacaoEstereo": 0.92,
+        "energiaPorBanda": {
+          "sub": "-19.4 dB",
+          "baixo": "-8 dB",
+          "medio-grave": "-5 dB",
+          "medio": "-5.8 dB",
+          "presenca": "-7.5 dB",
+          "brilho": "-11.5 dB"
+        },
+        "ganhoAplicadoNoMasterDb": -2.8,
+        "reducaoMaximaDoLimitadorDb": 0
+      },
+      "margemDaVoz": {
+        "bandaLarga": {
+          "vozDb": -18.1,
+          "musicaDb": -45.6,
+          "margemDb": 27.5
+        },
+        "200-800Hz": {
+          "vozDb": -22.5,
+          "musicaDb": -48.7,
+          "margemDb": 26.2
+        },
+        "1-2kHz": {
+          "vozDb": -25.6,
+          "musicaDb": -53.2,
+          "margemDb": 27.6
+        },
+        "2-4kHz": {
+          "vozDb": -25.6,
+          "musicaDb": -53.6,
+          "margemDb": 28
+        },
+        "4-8kHz": {
+          "vozDb": -29.1,
+          "musicaDb": -58.5,
+          "margemDb": 29.4
+        }
+      },
+      "duckingDb": -4.5,
+      "eventos": [
+        {
+          "name": "voz",
+          "atSec": 0.14,
+          "palavra": "DANITOOLS",
+          "durSec": 0.912,
+          "camadas": {
+            "core": 1,
+            "sub": 0.52,
+            "air": 0.15,
+            "pixel": 0.17
+          }
+        }
+      ],
+      "arquivos": [
+        {
+          "nome": "danitools-sound-logo-tag.wav",
+          "formato": "WAV PCM 48 kHz / 24 bits / estereo",
+          "bytes": 691802,
+          "sha256": "1eb3861b58ea76f70b5937b26e32209467098e60fd7968827319c91c52325f91"
+        },
+        {
+          "nome": "danitools-sound-logo-tag.mp3",
+          "formato": "MP3 320 kbps CBR",
+          "bytes": 98900,
+          "sha256": "92299da20da78ee5a3a74dd53fd9548cb525a46e3ed0412858f43ef4ffcb4507",
+          "comando": "ffmpeg -i danitools-sound-logo-tag.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo-tag.mp3"
+        },
+        {
+          "nome": "danitools-sound-logo-tag.ogg",
+          "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
+          "bytes": 62806,
+          "sha256": "37b0845ccf23aec34c56791fe241fa051cbd859338ea91e3dfc4fd1bc0d9a93d",
+          "comando": "ffmpeg -i danitools-sound-logo-tag.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo-tag.ogg"
+        }
+      ]
+    },
+    {
+      "id": "danitools-sound-logo-ptbr",
+      "uso": "Mesma assinatura com a pronuncia aportuguesada, para peca em pt-BR.",
+      "variante": "full",
+      "tomada": "pt-br",
+      "duracaoSec": 3.401,
+      "medicao": {
+        "loudnessIntegradaLufs": -14,
+        "loudnessMomentaneaMaximaLufs": -11.8,
+        "loudnessCurtoPrazoMaximaLufs": -14.4,
+        "janelasCurtoPrazo": 5,
+        "alvoLufs": -14,
+        "picoDeAmostraDbfs": [
+          -2.6,
+          -2.6
+        ],
+        "picoInterAmostraEstimadoDbtp": [
+          -2.6,
+          -2.5
+        ],
+        "correlacaoEstereo": 0.97,
+        "energiaPorBanda": {
+          "sub": "-9.4 dB",
+          "baixo": "-5.7 dB",
+          "medio-grave": "-4.4 dB",
+          "medio": "-7.9 dB",
+          "presenca": "-12.3 dB",
+          "brilho": "-15.5 dB"
+        },
+        "ganhoAplicadoNoMasterDb": -1.5,
+        "reducaoMaximaDoLimitadorDb": 0
+      },
+      "margemDaVoz": {
+        "bandaLarga": {
+          "vozDb": -16.7,
+          "musicaDb": -16.9,
+          "margemDb": 0.2
+        },
+        "200-800Hz": {
+          "vozDb": -20.2,
+          "musicaDb": -22.3,
+          "margemDb": 2.1
+        },
+        "1-2kHz": {
+          "vozDb": -25.7,
+          "musicaDb": -31.4,
+          "margemDb": 5.7
+        },
+        "2-4kHz": {
+          "vozDb": -26.5,
+          "musicaDb": -36.5,
+          "margemDb": 10
+        },
+        "4-8kHz": {
+          "vozDb": -27.1,
+          "musicaDb": -42.7,
+          "margemDb": 15.6
+        }
+      },
+      "duckingDb": -4.5,
+      "eventos": [
+        {
+          "name": "latch",
+          "atSec": 0.02,
+          "nota": "estalo de encaixe — o \"tools\" da marca"
+        },
+        {
+          "name": "riser",
+          "atSec": 0.02,
+          "durSec": 0.5,
+          "varreduraHz": [
+            320,
+            7400
+          ]
+        },
+        {
+          "name": "arp",
+          "atSec": 0.27,
+          "notas": [
+            "B3",
+            "E4",
+            "G#4",
+            "B4"
+          ],
+          "passoSec": 0.063,
+          "duty": 0.25
+        },
+        {
+          "name": "impacto",
+          "atSec": 0.52,
+          "camadas": [
+            "sub 180->41,2 Hz",
+            "estalo em 3,1 kHz",
+            "quadrada E2+E3"
+          ],
+          "subDecaySec": 0.8
+        },
+        {
+          "name": "acorde",
+          "atSec": 0.52,
+          "notas": [
+            "E2",
+            "B2",
+            "E3",
+            "G#3",
+            "B3",
+            "F#4"
+          ],
+          "filtroHz": [
+            420,
+            5400
+          ],
+          "vozesPorNota": 5,
+          "desafinacaoCents": 15
+        },
+        {
+          "name": "voz",
+          "atSec": 0.64,
+          "palavra": "DANITOOLS",
+          "durSec": 0.811,
+          "camadas": {
+            "core": 1,
+            "sub": 0.52,
+            "air": 0.15,
+            "pixel": 0.17
+          }
+        },
+        {
+          "name": "sinos",
+          "atSec": 1.6,
+          "notas": [
+            "E5",
+            "G#5",
+            "B5",
+            "E6",
+            "F#6",
+            "B6"
+          ],
+          "passoSec": 0.055,
+          "ecoSec": 0.188
+        }
+      ],
+      "arquivos": [
+        {
+          "nome": "danitools-sound-logo-ptbr.wav",
+          "formato": "WAV PCM 48 kHz / 24 bits / estereo",
+          "bytes": 979448,
+          "sha256": "6d5859c641b7f5e2bb87019ef921c7035e20de32b6f3db209b7d68e2234f750a"
+        },
+        {
+          "nome": "danitools-sound-logo-ptbr.mp3",
+          "formato": "MP3 320 kbps CBR",
+          "bytes": 138260,
+          "sha256": "3112706044f6b8748daedc330979b1e9ce48e4c4b9fe11bca80d8d763784a708",
+          "comando": "ffmpeg -i danitools-sound-logo-ptbr.wav -codec:a libmp3lame -b:a 320k -fflags +bitexact danitools-sound-logo-ptbr.mp3"
+        },
+        {
+          "nome": "danitools-sound-logo-ptbr.ogg",
+          "formato": "Ogg Vorbis q7 (~224 kbps VBR)",
+          "bytes": 75968,
+          "sha256": "db169a992983f899a5eaf9189f01846df71fb1d3480c3ef0b902da802786141f",
+          "comando": "ffmpeg -i danitools-sound-logo-ptbr.wav -codec:a libvorbis -qscale:a 7 -fflags +bitexact danitools-sound-logo-ptbr.ogg"
+        }
+      ]
+    }
+  ]
+}
