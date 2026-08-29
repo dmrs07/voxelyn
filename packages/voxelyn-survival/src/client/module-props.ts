@@ -196,6 +196,13 @@ export class ModulePropField {
     facingX = 0,
     facingY = 0,
     heat = 0,
+    /**
+     * REDUCAO DE MOVIMENTO. A peca aparece JA ASSENTADA ao lado do bot, sem
+     * arco, sem giro e sem quique — a mesma informacao ("este modulo acabou e
+     * saiu daqui"), sem o movimento. Nunca menos informacao: ela continua
+     * visivel, com a mesma arte e o mesmo tempo de permanencia.
+     */
+    reducedMotion = false,
   ): void {
     if (!this.claim(`exp:${slot}:${module}:${tick}`, nowMs)) return;
     if (this.ejected.length >= MAX_EJECTED_PROPS) this.ejected.shift();
@@ -207,15 +214,15 @@ export class ModulePropField {
     const by = -facingY / len;
     this.ejected.push({
       module,
-      x,
-      y,
-      z: 0.7,
-      vx: bx * 1.9 + 0.6,
-      vy: by * 1.9 - 0.35,
-      vz: 3.1,
+      x: reducedMotion ? x + bx * 0.8 : x,
+      y: reducedMotion ? y + by * 0.8 : y,
+      z: reducedMotion ? 0 : 0.7,
+      vx: reducedMotion ? 0 : bx * 1.9 + 0.6,
+      vy: reducedMotion ? 0 : by * 1.9 - 0.35,
+      vz: reducedMotion ? 0 : 3.1,
       spin: 0,
-      spinRate: 5.2,
-      bounces: 2,
+      spinRate: reducedMotion ? 0 : 5.2,
+      bounces: reducedMotion ? 0 : 2,
       life: EJECT_LIFE_MS,
       maxLife: EJECT_LIFE_MS,
       heat,
@@ -301,11 +308,20 @@ export class ModulePropField {
       ctx.globalAlpha = fade;
       ctx.translate(sx, py);
       ctx.rotate(p.spin);
-      // O cartucho sai APAGADO — `lit` baixo. Ele acabou: nada nele deve
-      // continuar aceso, e a diferenca para o cartucho vivo do terminal e
-      // exatamente o que conta "isto esta gasto".
-      drawModuleHardware(ctx, p.module, 0, 0, Math.max(24, 26 * zoom), {
-        lit: 0.28 + p.heat * 0.35,
+      // TAMANHO: quase o do corpo que o cuspiu, e nao um icone.
+      //
+      // A primeira versao desenhava o cartucho no calibre de um item de chao e
+      // ele sumia contra a rocha — o que devia ser o instante de "a peca
+      // acabou e saiu de mim" virava um bloco escuro passando. A prancheta e
+      // de 32 unidades, entao qualquer tamanho entre 64 e 95 px cai na mesma
+      // unidade de dois pixels: e o menor calibre em que o conjunto de canos
+      // e o tambor continuam legiveis.
+      //
+      // O cartucho sai APAGADO — `lit` parcial. Ele acabou: nada nele deve
+      // continuar aceso como no terminal, e essa diferenca e o que conta
+      // "isto esta gasto". A Minigun ainda quente acende um pouco mais.
+      drawModuleHardware(ctx, p.module, 0, 0, Math.max(32, 34 * zoom), {
+        lit: 0.42 + p.heat * 0.4,
         nowMs,
         heat: p.heat,
         spin: p.spin / (Math.PI * 2),

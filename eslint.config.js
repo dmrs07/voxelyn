@@ -61,8 +61,14 @@ export default [
     },
   },
   {
-    // pipeline do devlog: roda em Node, fora de qualquer pacote
-    files: ['scripts/**/*.mjs'],
+    // pipeline do devlog + verificacoes de fumaca dos pacotes: rodam em Node.
+    //
+    // `packages/voxelyn-survival/scripts/**` entrou junto porque cai
+    // exatamente na mesma categoria e estava de fora por omissao: os quatro
+    // scripts de la (precache, audio, minigun, soundtrack) sao ferramentas de
+    // linha de comando e acusavam `no-undef` em `console`/`process` desde
+    // sempre. Um portao que grita por ruido constante deixa de ser lido.
+    files: ['scripts/**/*.mjs', 'packages/voxelyn-survival/scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         Buffer: 'readonly',
@@ -74,6 +80,9 @@ export default [
         // no-undef em codigo que nunca roda no Node.
         document: 'readonly',
         localStorage: 'readonly',
+        window: 'readonly',
+        requestAnimationFrame: 'readonly',
+        matchMedia: 'readonly',
         // Globais web que o Node tem desde a v18 e o upload usa.
         fetch: 'readonly',
         URLSearchParams: 'readonly',

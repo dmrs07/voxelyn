@@ -4604,6 +4604,7 @@ export class SurvivalRenderer {
           player.facing.x,
           player.facing.y,
           heat,
+          prefersReducedMotion(),
         );
       }
       this.pendingEjections = stillPending;
@@ -4627,6 +4628,11 @@ export class SurvivalRenderer {
   ): void {
     if (this.moduleProps.flightCount === 0) return;
     const hudFallback = { x: this.safeArea.left + 30, y: this.safeArea.top + 80 };
+    // REDUCAO DE MOVIMENTO: quem pediu menos movimento nao recebe o arco, e
+    // sim o clarao de encaixe direto sobre o proprio Prospector. Nao ha um
+    // segundo caminho para manter — recusar a origem e exatamente o mesmo
+    // recuo do cofre fora da camera, que ja existe e ja e testado.
+    const reduced = prefersReducedMotion();
     this.moduleProps.drawScreen(
       this.ctx,
       nowMs,
@@ -4640,6 +4646,7 @@ export class SurvivalRenderer {
         return { x: sx, y: sy - 18 * this.zoom };
       },
       (origin) => {
+        if (reduced) return null;
         if (origin.space === 'screen') return { x: origin.x, y: origin.y };
         const [sx, sy] = toScreen(origin.x, origin.y);
         // Cofre fora da camera: sem origem visivel nao ha arco honesto a
@@ -4868,11 +4875,18 @@ export class SurvivalRenderer {
       const spinY = safeTop + 37;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(hpBarX, spinY, hpBarW, 2);
-      // Verde enquanto sobe, ambar quando ja esta cuspindo: a cor troca no
+      // Verde enquanto sobe, BRANCO quando ja esta cuspindo: a cor troca no
       // MESMO ponto em que a arma comeca a atirar, entao a barra ensina o
       // limiar sem numero nenhum.
+      //
+      // Branco e nao ambar de proposito. O trilho de calor logo acima e
+      // laranja, e um segundo trilho ambar colado nele daria duas leituras
+      // quase da mesma cor a um pixel de distancia — o jogador teria de
+      // decidir qual das duas esta olhando no meio de uma rajada. Verde ->
+      // branco e a mesma progressao "subindo -> pronto" que o resto do jogo
+      // usa, e nenhuma das duas colide com o calor.
       const firing = extra.minigun.phase === 'firing';
-      ctx.fillStyle = firing ? PAL.loot : PAL.biolum;
+      ctx.fillStyle = firing ? PAL.player : PAL.biolum;
       ctx.fillRect(hpBarX, spinY, hpBarW * spinFrac, 2);
       // A marca do limiar operacional: o ponto a partir do qual sai bala.
       ctx.fillStyle = 'rgba(232,241,255,0.5)';
@@ -5178,7 +5192,7 @@ export class SurvivalRenderer {
       ctx.strokeStyle = PAL.player;
       ctx.lineWidth = pulse ? 2.5 : 1.5;
       ctx.strokeRect(cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
-      if (module.id === 'minigun' && minigunSpin > 0) {
+      if (module.id === 'minigun' && minigunSpin > 0 && !prefersReducedMotion()) {
         // Gira em torno do proprio centro. O angulo sai da rotacao
         // AUTORITATIVA, e nao de `nowMs`: um relogio proprio faria o icone
         // girar durante o travamento por superaquecimento, que e exatamente o

@@ -222,6 +222,36 @@ describe('recuos: a selecao nunca quebra por falta de imagem', () => {
     expect(ctx.calls).toHaveLength(0);
   });
 
+  it('reducao de movimento: o cartucho aparece assentado, sem arco nem quique', () => {
+    const field = new ModulePropField();
+    field.eject('minigun', 0, 10, 10, 1, 0, 1, 0, 0.5, true);
+    expect(field.ejectedCount).toBe(1);
+    // Um unico passo: sem velocidade nem quique, ele ja esta onde vai ficar.
+    field.step(16, 16);
+    expect(field.ejectedCount).toBe(1);
+    // E continua tendo o mesmo tempo de permanencia: menos movimento, nunca
+    // menos informacao.
+    for (let i = 0; i < 400; i++) field.step(16, i * 16);
+    expect(field.ejectedCount).toBe(0);
+  });
+
+  it('dentro da camera, o cartucho E desenhado', () => {
+    const field = new ModulePropField();
+    const ctx = spyCtx();
+    field.eject('minigun', 0, 10, 10, 1, 0, 1, 0, 0.6);
+    field.drawWorld(
+      ctx,
+      (x, y) => [x * 32, y * 16],
+      2,
+      16,
+      () => true,
+      0,
+    );
+    // Sombra + cartucho: as duas passam por `fill`/`fillRect`.
+    expect(ctx.calls).toContain('fillRect');
+    expect(ctx.calls).toContain('translate');
+  });
+
   it('o culling da camera impede o desenho do cartucho fora da tela', () => {
     const field = new ModulePropField();
     const ctx = spyCtx();
