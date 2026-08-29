@@ -1,0 +1,239 @@
+{
+  "preset": "guardian-core",
+  "resolution": {
+    "width": 3840,
+    "height": 2160,
+    "samples": 4
+  },
+  "world": {
+    "runSeed": 518,
+    "sector": 1,
+    "width": 96,
+    "height": 96,
+    "stratum": "basalt",
+    "occupation": "none",
+    "lineage": "basaltic",
+    "corePos": {
+      "x": 75,
+      "y": 92
+    },
+    "entry": {
+      "x": 5,
+      "y": 2
+    },
+    "hallCenters": [
+      {
+        "x": 38,
+        "y": 30
+      },
+      {
+        "x": 65,
+        "y": 72
+      }
+    ],
+    "leylineSegments": 3
+  },
+  "window": {
+    "x0": 58,
+    "y0": 70,
+    "x1": 96,
+    "y1": 96,
+    "depthTiles": 9
+  },
+  "camera": {
+    "position": {
+      "x": 90.36,
+      "y": 84.98,
+      "z": 7.31
+    },
+    "target": {
+      "x": 78,
+      "y": 89,
+      "z": 0.4
+    },
+    "fovY": 28,
+    "roll": 0,
+    "positionVoxels": [
+      517.76,
+      239.68000000000006,
+      116.96
+    ],
+    "targetVoxels": [
+      320,
+      304,
+      6.4
+    ],
+    "forward": [
+      -0.8396744943253124,
+      0.27309801514464016,
+      -0.46942967279837444
+    ],
+    "right": [
+      0.3092948310075883,
+      0.9509661968293023,
+      0
+    ],
+    "up": [
+      -0.44641175061989397,
+      0.14519217131812073,
+      0.8829698648857792
+    ]
+  },
+  "screen": {
+    "prospector": {
+      "x": 769,
+      "y": 1636,
+      "depthVoxels": 173
+    },
+    "guardian": {
+      "x": 1920,
+      "y": 921,
+      "depthVoxels": 231
+    },
+    "core": {
+      "x": 2394,
+      "y": 425,
+      "depthVoxels": 281
+    }
+  },
+  "vein": {
+    "chargedCells": 21,
+    "source": {
+      "x": 75,
+      "y": 73,
+      "cell": 7083,
+      "d": 19
+    },
+    "simEvents": [
+      "discharge"
+    ],
+    "segmentCells": 18
+  },
+  "lights": [
+    {
+      "tag": "core",
+      "intensity": 11,
+      "radius": 544
+    },
+    {
+      "tag": "cradle",
+      "intensity": 4,
+      "radius": 96
+    },
+    {
+      "tag": "vein",
+      "intensity": 3.4,
+      "radius": 67.2
+    },
+    {
+      "tag": "vein",
+      "intensity": 3.011428571428571,
+      "radius": 67.2
+    },
+    {
+      "tag": "aurix",
+      "intensity": 2.4,
+      "radius": 80
+    },
+    {
+      "tag": "aurix",
+      "intensity": 1.5,
+      "radius": 64
+    },
+    {
+      "tag": "fill",
+      "intensity": 0.3,
+      "radius": 640
+    }
+  ],
+  "placements": [
+    {
+      "id": "core",
+      "source": "tools/props.mjs:coreModel(phase=0.25, taken=false)",
+      "tile": {
+        "x": 75,
+        "y": 92
+      },
+      "origin": "worldgen: GeneratedWorld.corePos",
+      "boxes": 106
+    },
+    {
+      "id": "guardian",
+      "source": "tools/entities.mjs:guardianModel('idle', 2)",
+      "tile": {
+        "x": 78,
+        "y": 89
+      },
+      "origin": "encenacao: avanco a partir de GeneratedWorld.guardianSpawn",
+      "turns": 1,
+      "boxes": 53
+    },
+    {
+      "id": "prospector",
+      "source": "tools/prospector.mjs:prospectorParts({ bob })",
+      "tile": {
+        "x": 81,
+        "y": 85
+      },
+      "origin": "encenacao: celula aberta na Vein, escolhida por busca em largura",
+      "turns": 2,
+      "boxes": 49
+    },
+    {
+      "id": "salvageTerminalIdle",
+      "source": "tools/props.mjs:propModel('salvageTerminalIdle', 0)",
+      "tile": {
+        "x": 74,
+        "y": 86
+      },
+      "origin": "encenacao: terminal Aurix ao fundo a esquerda — o unico ponto ambar do lado frio do quadro",
+      "boxes": 6
+    },
+    {
+      "id": "salvageCacheT3",
+      "source": "tools/props.mjs:propModel('salvageCacheT3', 0)",
+      "tile": {
+        "x": 83,
+        "y": 90
+      },
+      "origin": "encenacao: cofre de classe III no primeiro plano direito, sob a area do branding",
+      "boxes": 24
+    },
+    {
+      "id": "decor:crate:0",
+      "source": "tools/props.mjs:propModel('decor:crate:0', 0)",
+      "tile": {
+        "x": 84,
+        "y": 88
+      },
+      "origin": "encenacao: caixa Aurix dando massa ao canto direito sem competir com o chefe",
+      "boxes": 848
+    }
+  ],
+  "post": {
+    "exposure": 0.82,
+    "bloom": {
+      "strength": 0.3,
+      "radius": 0.018,
+      "iterations": 5
+    },
+    "grade": {
+      "lift": 0.016,
+      "shadowTint": [
+        0.95,
+        0.99,
+        1.06
+      ],
+      "midTint": [
+        1.1,
+        1.01,
+        0.9
+      ],
+      "saturation": 1.06,
+      "contrast": 1.08
+    },
+    "vignette": 0.16
+  },
+  "groundVoxel": 8,
+  "voxelsPerTile": 16
+}

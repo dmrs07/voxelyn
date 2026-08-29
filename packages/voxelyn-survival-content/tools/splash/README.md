@@ -206,3 +206,8 @@ Em `artifacts/splash/guardian-core/` (fora do controle de versao):
 | `*-albedo/normal/depth/ao/shadow/emissive/object.png` | passes auxiliares |
 | `*-manifest.json` | o registro completo do que produziu a imagem |
 | `comparison-reference-vs-render.png` | referencia ao lado do render |
+
+`artifacts/` fica fora do controle de versao por ser saida regeneravel. A copia
+curada do que interessa guardar — as duas resolucoes de entrega, a versao sem
+branding, o passe de segmentacao, o comparativo e o manifest — esta versionada em
+[`docs/art/splash/`](../../../../docs/art/splash/README.md).
