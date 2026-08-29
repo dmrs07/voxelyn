@@ -228,6 +228,9 @@ importers:
       '@voxelyn/core':
         specifier: workspace:*
         version: link:../voxelyn-core
+      '@voxelyn/survival-sim':
+        specifier: workspace:*
+        version: link:../voxelyn-survival-sim
     devDependencies:
       pngjs:
         specifier: ^7.0.0

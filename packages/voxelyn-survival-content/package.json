@@ -17,7 +17,8 @@
     "build": "tsc -p tsconfig.json",
     "generate": "node tools/generate.mjs",
     "validate": "node tools/validate.mjs",
-    "test": "node tools/validate.mjs && vitest run"
+    "test": "node tools/validate.mjs && vitest run",
+    "render:splash": "node tools/splash/render-splash.mjs"
   },
   "devDependencies": {
     "pngjs": "^7.0.0",
@@ -25,6 +26,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@voxelyn/core": "workspace:*"
+    "@voxelyn/core": "workspace:*",
+    "@voxelyn/survival-sim": "workspace:*"
   }
 }

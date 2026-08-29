@@ -209,7 +209,7 @@ const voxelMaterial = (cx, cy, cz, kind, variant, top) => {
  * (veios, cristais, ferrugem) sao sorteadas por voxel FINO, entao a textura
  * volumetrica tem o dobro da frequencia da grade autorada.
  */
-const blockModel = (kind, variant) => {
+export const blockModel = (kind, variant) => {
   const boxes = [];
   const F = MODEL_SCALE;
   const half = BLOCK_COLS / 2;
