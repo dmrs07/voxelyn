@@ -14,12 +14,14 @@
 // muda, que e exatamente o que uma camera de verdade faz ao trocar de sensor. O
 // branding acompanha porque esta em unidades de altura de quadro.
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const script = join(here, 'render-splash.mjs');
 const out = 'artifacts/splash/guardian-core';
+const repoRoot = resolve(here, '../../../..');
 
 /**
  * As entregas. `samples` cai nas proporcoes secundarias porque elas existem para
@@ -46,5 +48,25 @@ for (const o of OUTPUTS) {
   if (o.branding) args.push('--branding');
   console.log(`\n=== ${o.width}x${o.height} — ${o.note}`);
   const r = spawnSync(process.execPath, args, { stdio: 'inherit' });
+  if (r.status !== 0) process.exit(r.status ?? 1);
+}
+
+// O COMPARATIVO fecha a entrega, e precisa estar aqui.
+//
+// Ele era gerado a mao depois do conjunto, e o README ja o listava entre as
+// saidas do comando — ou seja, quem rodasse `render:splash:all` num diretorio
+// limpo receberia uma entrega a menos do que a documentacao promete. A unica
+// forma de a lista nao mentir e o comando produzir tudo o que ela diz.
+//
+// Ele depende da referencia versionada em `docs/art/splash/`; se ela nao estiver
+// la, o conjunto ja renderizado continua valendo e so o comparativo e pulado —
+// derrubar a entrega inteira por causa de um arquivo de briefing ausente seria
+// desproporcional.
+const reference = join(repoRoot, 'docs/art/splash/reference-ai-briefing.png');
+console.log('\n=== comparativo com a referencia');
+if (!existsSync(reference)) {
+  console.log(`  pulado: referencia ausente em ${reference}`);
+} else {
+  const r = spawnSync(process.execPath, [join(here, 'compare.mjs')], { stdio: 'inherit' });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }

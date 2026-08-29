@@ -44,6 +44,59 @@ const NORMALS = [
   [0, 0, 1],
 ];
 
+const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+
+/**
+ * Passo da permutacao que embaralha as linhas do padrao de amostragem.
+ *
+ * Precisa ser coprimo com `n` para `(i * k) mod n` percorrer TODOS os indices —
+ * com um divisor comum a sequencia entra em ciclo curto e varias amostras caem na
+ * mesma linha. Entre os coprimos, o mais proximo da razao aurea de `n` e o que
+ * espalha melhor, que e a mesma heuristica das sequencias de baixa discrepancia.
+ */
+const permutationStride = (n) => {
+  if (n <= 2) return 1;
+  for (let k = Math.round(n * 0.6180339887498949); k > 1; k--) {
+    if (gcd(k, n) === 1) return k;
+  }
+  return 1;
+};
+
+/**
+ * Deslocamentos das `n` amostras dentro de um pixel, em torno do centro.
+ *
+ * O PADRAO ANTERIOR ESTAVA ERRADO PARA n = 2, e o defeito era silencioso.
+ * Ele derivava a coluna de `s % 2` e a linha de `s >> 1`, o que forma uma grade
+ * 2x2 correta quando `n = 4` — e degenera quando `n = 2`: `s >> 1` vale zero
+ * para as duas amostras, entao ambas caiam na MESMA linha. As entregas de duas
+ * amostras (o preview de jogo, o 16:10 e a paisagem de celular) saiam com
+ * antialiasing so no eixo horizontal e, pior, deslocadas um quarto de pixel para
+ * cima — porque a media das duas linhas nao era o centro do pixel.
+ *
+ * Aqui o padrao e N-ROOKS e vale para qualquer `n`: uma amostra por coluna e uma
+ * por linha, com as linhas embaralhadas por uma permutacao. Duas propriedades
+ * que o padrao antigo nao tinha:
+ *
+ *   - a media dos deslocamentos e exatamente o centro do pixel nos dois eixos,
+ *     porque as linhas sao uma permutacao das colunas — nao ha viés possivel,
+ *     seja qual for `n`;
+ *   - toda amostra ocupa uma faixa vertical e uma horizontal propria, entao uma
+ *     aresta em qualquer angulo e cortada por todas elas.
+ *
+ * Continua deterministico: a permutacao vem de aritmetica sobre o indice, nunca
+ * de um gerador aleatorio, entao dois renders da mesma cena saem identicos bit a
+ * bit.
+ */
+export const sampleOffsets = (n) => {
+  const k = permutationStride(n);
+  const out = new Float64Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    out[i * 2] = (i + 0.5) / n - 0.5;
+    out[i * 2 + 1] = (((i * k) % n) + 0.5) / n - 0.5;
+  }
+  return out;
+};
+
 /**
  * Oclusao de ambiente por amostragem da vizinhanca da face atingida.
  *
@@ -123,6 +176,8 @@ export const renderBand = (scene, cam, lights, buffers, rowStart, rowEnd, option
     fog,
   } = lights;
   const samples = options.samples ?? 1;
+  // Calculado uma vez por faixa: o padrao depende so da contagem de amostras.
+  const offsets = sampleOffsets(samples);
   const { width, height } = buffers;
 
   for (let py = rowStart; py < rowEnd; py++) {
@@ -143,12 +198,7 @@ export const renderBand = (scene, cam, lights, buffers, rowStart, rowEnd, option
       let eb = 0;
 
       for (let s = 0; s < samples; s++) {
-        // Amostragem em grade rotacionada dentro do pixel. Determinística: o
-        // deslocamento sai do indice da amostra, nunca de um gerador aleatorio,
-        // para dois renders da mesma cena serem identicos bit a bit.
-        const jx = samples === 1 ? 0 : ((s % 2) - 0.5) * 0.5;
-        const jy = samples === 1 ? 0 : ((s >> 1) - 0.5) * 0.5;
-        rayDirection(cam, px + jx, py + jy, dir);
+        rayDirection(cam, px + offsets[s * 2], py + offsets[s * 2 + 1], dir);
         trace(scene, cam.position[0], cam.position[1], cam.position[2], dir[0], dir[1], dir[2], maxT, hit);
 
         let sr = 0;

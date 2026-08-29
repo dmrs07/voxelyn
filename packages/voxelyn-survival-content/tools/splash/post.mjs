@@ -99,6 +99,12 @@ export const buildBloom = (emissive, width, height, iterations) => {
   const accum = new Float32Array(width * height * 3);
   let level = { data: emissive, width, height };
   for (let i = 0; i < iterations; i++) {
+    // Um nivel de um pixel nao tem o que borrar, e continuar reduzindo so
+    // repetiria o mesmo pixel nas iteracoes restantes. A imagem de 4K nunca
+    // chega la em cinco passadas (2160 -> 1080 -> 540 -> 270 -> 135 -> 67), mas
+    // o comando aceita qualquer resolucao, e uma miniatura chega: 36 -> 18 -> 9
+    // -> 4 -> 2 -> 1.
+    if (level.width <= 1 && level.height <= 1) break;
     level = downsample(level.data, level.width, level.height);
     let blurred = blurAxis(level.data, level.width, level.height, true);
     blurred = blurAxis(blurred, level.width, level.height, false);
@@ -110,17 +116,26 @@ export const buildBloom = (emissive, width, height, iterations) => {
   return accum;
 };
 
-/** Amostragem do nivel grosso para a resolucao cheia, com filtragem bilinear. */
+/**
+ * Amostragem do nivel grosso para a resolucao cheia, com filtragem bilinear.
+ *
+ * As coordenadas sao presas em ZERO por baixo, alem do teto por cima. O teto
+ * sozinho nao basta e a falha era silenciosa e total: com uma dimensao de um
+ * pixel, `sh - 1.001` vale -0,001, o indice truncado vira -1, a leitura devolve
+ * `undefined`, e o NaN atravessa o bloom e o compositor inteiro — o PNG final
+ * sai preto. So acontecia em resolucoes pequenas o bastante para a piramide
+ * chegar a um pixel, entao nenhuma das entregas o exibia.
+ */
 const upsampleAddFull = (target, tw, th, src, sw, sh, weight) => {
   const fx = sw / tw;
   const fy = sh / th;
   for (let y = 0; y < th; y++) {
-    const gy = Math.min(sh - 1.001, y * fy);
+    const gy = Math.max(0, Math.min(sh - 1.001, y * fy));
     const y0 = Math.floor(gy);
     const y1 = Math.min(sh - 1, y0 + 1);
     const ty = gy - y0;
     for (let x = 0; x < tw; x++) {
-      const gx = Math.min(sw - 1.001, x * fx);
+      const gx = Math.max(0, Math.min(sw - 1.001, x * fx));
       const x0 = Math.floor(gx);
       const x1 = Math.min(sw - 1, x0 + 1);
       const tx = gx - x0;
