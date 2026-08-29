@@ -241,6 +241,74 @@ describe('abertura ligada de ponta a ponta', () => {
     expect(phase()).toBe('done');
   });
 
+  it('arma o audio na SPLASH — uma vez, depois da identidade e antes do menu', async () => {
+    // A ordem e a garantia: o gancho nao pode disparar durante a identidade
+    // (que e muda de proposito) nem so no menu (que e o comportamento antigo,
+    // e o motivo de a trilha so comecar depois do primeiro toque).
+    const order: string[] = [];
+    const onSplash = vi.fn(() => order.push('splash'));
+    const onReady = vi.fn(() => order.push('ready'));
+    const gate = deferredTask('atlas-core', true);
+    void runBootSequence({
+      buildTasks: () => [gate.task],
+      onSplash,
+      onReady,
+      env: { withoutIdentity: false },
+    });
+
+    await advanceFrames(2);
+    expect(currentStage()).toBe('boot-identity');
+    expect(onSplash).not.toHaveBeenCalled();
+
+    now = identityTotalMs(BOOT_TIMING_FULL);
+    await advanceFrames(2);
+    expect(currentStage()).toBe('boot-loading');
+    expect(onSplash).toHaveBeenCalledTimes(1);
+    expect(onReady).not.toHaveBeenCalled();
+
+    gate.settle(true);
+    now += BOOT_TIMING_FULL.loadingMinMs;
+    await advanceFrames(4);
+    expect(order).toEqual(['splash', 'ready']);
+    // Muitos quadros depois: continua uma so.
+    now += 10_000;
+    await advanceFrames(4);
+    expect(onSplash).toHaveBeenCalledTimes(1);
+  });
+
+  it('arma o audio tambem quando a splash nao chega a ser pintada', async () => {
+    // `?boot=skip` atravessa as fases num quadro. Quem depende do gancho
+    // depende de "a abertura passou da identidade", nao de um quadro visivel.
+    const onSplash = vi.fn();
+    const core = deferredTask('atlas-core', true);
+    void runBootSequence({
+      buildTasks: () => [core.task],
+      onSplash,
+      onReady: () => {},
+      env: { skip: true },
+    });
+    core.settle(true);
+    await advanceFrames(4);
+    expect(onSplash).toHaveBeenCalledTimes(1);
+  });
+
+  it('uma falha critica arma o audio mesmo assim', async () => {
+    // A tela de erro tambem e "depois da identidade": o jogador esta parado
+    // nela, e nao ha razao para o audio continuar desarmado enquanto ele le.
+    const onSplash = vi.fn();
+    const core = deferredTask('atlas-core', true);
+    void runBootSequence({
+      buildTasks: () => [core.task],
+      onSplash,
+      onReady: () => {},
+      env: { skip: true },
+    });
+    core.settle(false);
+    await advanceFrames(4);
+    expect(currentStage()).toBe('boot-failure');
+    expect(onSplash).toHaveBeenCalledTimes(1);
+  });
+
   it('sem identidade cadastrada, a abertura comeca na tela de carregamento', async () => {
     // O caminho de quando NAO ha marca de desenvolvedor: a fase de identidade
     // continua na maquina (a ordem e um contrato), mas dura zero. Ninguem

@@ -21,11 +21,14 @@
 // - nao cria run, nao gera mundo, nao roda tick de simulacao. Preparar o
 //   aplicativo e comecar uma partida sao coisas diferentes, e o preload so
 //   toca em recursos COMPARTILHADOS (fontes, atlas, imagem de fundo).
-// - nao encosta em audio. O `AudioContext` continua nascendo de um gesto do
-//   jogador, como o navegador exige e como o jogo sempre fez; uma identidade
-//   com jingle exigiria burlar a politica de autoplay para acabar em contexto
-//   suspenso e som nenhum. O dia em que houver um sting de abertura, ele entra
-//   como qualquer outro som: depois do primeiro toque.
+// - nao burla a politica de autoplay. A identidade e muda, e o `AudioContext`
+//   continua nascendo pelos caminhos legitimos. O que a abertura faz e ARMAR o
+//   audio quando a tela de carregamento entra (`onSplash`), em vez de esperar o
+//   primeiro toque: onde o navegador permite (um PWA instalado, um site com
+//   engajamento de midia) o contexto ja nasce tocando e a trilha do terminal
+//   comeca na splash; onde nao permite, o contexto nasce suspenso, o arquivo da
+//   trilha comeca a viajar mais cedo, e o primeiro gesto o retoma. Nos dois
+//   casos e melhor do que antes, e em nenhum deles o navegador e contrariado.
 
 import {
   advanceBoot,
@@ -55,6 +58,19 @@ export type BootOptions = {
     keyart: HTMLImageElement | null;
     identMark: HTMLImageElement | null;
   }) => BootTask[];
+  /**
+   * Chamado UMA vez, quando a tela de carregamento entra.
+   *
+   * E o gancho de "a abertura ja tem cara de jogo": daqui `main.ts` arma o
+   * audio, para que a trilha do terminal comece na splash onde o navegador
+   * deixar, em vez de so no primeiro toque. O boot nao sabe o que ha do outro
+   * lado — nao ha um import de audio neste modulo, e nao deve haver.
+   *
+   * Dispara mesmo quando a splash nao chega a ser pintada (o atalho de
+   * desenvolvimento atravessa as fases num quadro): quem depende dele depende
+   * de "a abertura passou da identidade", nao de um quadro especifico.
+   */
+  onSplash?: () => void;
   /** Chamado UMA vez, com a abertura ja escurecida: e a hora de revelar o menu. */
   onReady: () => void;
   /**
@@ -102,6 +118,7 @@ const failureDetail = (report: BootReport): string =>
  */
 export const runBootSequence = async ({
   buildTasks,
+  onSplash,
   onReady,
   ident = DEVELOPER_IDENT,
   env,
@@ -133,9 +150,16 @@ export const runBootSequence = async ({
 
   let state: BootState = initialBootState(performance.now(), timing);
   let delivered = false;
+  let armed = false;
 
   const paint = (phase: BootPhase): void => {
     screen.showPhase(phase);
+    // Passou da identidade: a abertura ja e do jogo. Uma vez so, e antes da
+    // entrega — e o que faz a trilha comecar na splash e nao no menu.
+    if (!armed && phase !== 'identity') {
+      armed = true;
+      onSplash?.();
+    }
     if (delivered) return;
     // `menu` conta junto com `handoff`, e nao por simetria: com um perfil de
     // duracao zero (o atalho de desenvolvimento, o handoff sob movimento

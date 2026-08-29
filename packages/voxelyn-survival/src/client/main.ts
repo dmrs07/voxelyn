@@ -2773,6 +2773,18 @@ if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
 
 void runBootSequence({
   buildTasks: ({ keyart, identMark }) => buildBootPlan({ renderer, keyart, identMark }),
+  // A trilha do terminal comeca na SPLASH, e nao no menu.
+  //
+  // `unlock` e o mesmo caminho de sempre, chamado mais cedo — nao ha truque
+  // de autoplay aqui. Onde o navegador permite (um PWA instalado, um site com
+  // engajamento de midia) o contexto nasce tocando e a musica cobre a tela de
+  // carregamento inteira. Onde nao permite, ele nasce suspenso e nada soa
+  // ainda; mas o FLAC ja comeca a viajar, entao quando o primeiro gesto
+  // chegar a trilha entra na hora em vez de depois de um download.
+  //
+  // Mudo continua mudo: `unlock` respeita a preferencia, que ja foi aplicada
+  // la em cima com o resto das configuracoes de audio.
+  onSplash: () => audio.unlock(),
   onReady: () => {
     // O menu entra sob o escurecimento da abertura — nunca por cima da barra
     // ainda visivel. Sem `deployVeil` aqui de proposito: o veu e a ficcao da

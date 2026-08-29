@@ -18,11 +18,7 @@
 // reiniciar o loop a cada resync seria audivel e pior. O relogio do proprio
 // AudioContext basta.
 
-import {
-  COMPOSED_FADE_DOWN_TAU,
-  COMPOSED_FADE_UP_TAU,
-  composedBaseGain,
-} from './soundtrack';
+import { COMPOSED_FADE_DOWN_TAU, COMPOSED_FADE_UP_TAU, composedBaseGain } from './soundtrack';
 
 /** Ducking: mesmos valores do music-bus, para a musica ceder o canal igual. */
 const DUCK_FACTOR = 0.5;
@@ -96,7 +92,14 @@ export class SoundtrackBus {
     if (this.loading) return false;
     this.loading = true;
     try {
-      const res = await fetch(url);
+      // PRIORIDADE BAIXA, e isto passou a importar quando a abertura comecou a
+      // armar o audio ja na tela de carregamento: os dois FLAC somam ~45 MB e
+      // agora viajam JUNTO com os atlas que a abertura espera. Sem a dica, o
+      // navegador os trata como qualquer fetch e eles disputam a banda do
+      // caminho critico — a musica chegaria mais cedo ao custo de o menu
+      // chegar mais tarde, que e a troca errada. Navegador sem suporte ignora
+      // a propriedade e nada muda.
+      const res = await fetch(url, { priority: 'low' } as RequestInit);
       if (!res.ok) return false;
       const bytes = await res.arrayBuffer();
       // decodeAudioData entrega PCM float: fim da cadeia lossless do FLAC.
