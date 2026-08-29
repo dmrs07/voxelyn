@@ -337,6 +337,68 @@ export const emissiveMask = (
   return half;
 };
 
+// ---------------------------------------------------------------------------
+// Liquidacao dos atlas — o que a tela de carregamento observa
+// ---------------------------------------------------------------------------
+//
+// Os bancos sempre carregaram os atlas do mesmo jeito: `load()` dispara os
+// `Image` e o desenho consulta `ready` por quadro, caindo na reserva enquanto
+// a imagem nao chega. Isso continua exatamente igual — o que faltava era um
+// jeito de PERGUNTAR quando aquilo terminou.
+//
+// E o que `whenSettled` devolve, e a distincao no nome importa: liquidar nao e
+// carregar. A promessa resolve tanto no sucesso quanto na falha, e NUNCA
+// rejeita, porque quem espera por ela e uma tela de carregamento — e uma tela
+// de carregamento presa esperando um arquivo que nunca vem e o pior desfecho
+// possivel. O sucesso vira progresso; a falha vira uma linha no console e a
+// reserva que o jogo ja desenhava antes desta feature existir.
+//
+// Nenhuma requisicao nova nasce aqui. A tela de carregamento observa os mesmos
+// objetos `Image` que o jogo vai usar depois — e por isso que entrar no jogo
+// nao rebaixa nada nem rebaixa a rede: o download ja aconteceu, uma vez so.
+
+type Settlement = {
+  promise: Promise<boolean>;
+  resolve: (loaded: boolean) => void;
+  done: boolean;
+};
+
+const newSettlement = (): Settlement => {
+  let resolve: (loaded: boolean) => void = () => {};
+  const promise = new Promise<boolean>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve, done: false };
+};
+
+const settle = (settlement: Settlement, loaded: boolean): void => {
+  if (settlement.done) return;
+  settlement.done = true;
+  settlement.resolve(loaded);
+};
+
+/**
+ * Os atlas sem os quais a abertura NAO entrega o menu.
+ *
+ * A lista nao foi inventada aqui: e exatamente a que `scripts/check-precache.mjs`
+ * ja cobra do build ("os seis personagens sao assets externos por tamanho e
+ * precisam existir no precache"). Sao o jogador e os cinco corpos que qualquer
+ * run encontra — sem eles o jogo abre, mas abre como um esboco de si mesmo, e
+ * e melhor dizer isso ao jogador com uma tela de erro e um botao do que
+ * entregar em silencio um mundo de silhuetas.
+ *
+ * Todo o resto (chefes, FX, terreno, chao, props) e nao critico: falha vira
+ * log e reserva, e a abertura segue para o menu.
+ */
+export const REQUIRED_ATLAS_IDS: readonly string[] = [
+  'player-prospector',
+  'enemy-stalker',
+  'enemy-spitter',
+  'enemy-spore-bomber',
+  'enemy-bruiser',
+  'enemy-guardian',
+];
+
 const SOURCES: Array<{ manifest: SpriteManifestEntry; url: string }> = [
   { manifest: playerManifest as unknown as SpriteManifestEntry, url: playerUrl },
   { manifest: playerLowerManifest as unknown as SpriteManifestEntry, url: playerLowerUrl },
@@ -418,13 +480,25 @@ export class TerrainBank {
   private readonly manifest = terrainManifest as unknown as TerrainManifest;
   private readonly image = new Image();
   private ready = false;
+  private settlement = newSettlement();
 
   load(): void {
-    this.image.onload = () => { this.ready = true; };
+    this.image.onload = () => { this.ready = true; settle(this.settlement, true); };
     this.image.onerror = () => {
       console.warn('[terrain] atlas failed to load; using flat blocks');
+      settle(this.settlement, false);
     };
     this.image.src = terrainUrl;
+  }
+
+  /** Ver "Liquidacao dos atlas". Resolve `true` se carregou; nunca rejeita. */
+  whenSettled(): Promise<boolean> { return this.settlement.promise; }
+
+  /** Re-emite o pedido se (e so se) ele ja falhou. Idempotente. */
+  retryFailed(): void {
+    if (this.ready || !this.settlement.done) return;
+    this.settlement = newSettlement();
+    this.load();
   }
 
   get kinds(): string[] { return this.manifest.kinds; }
@@ -478,13 +552,25 @@ export class SurfaceBank {
   private readonly offsets = surfaceOffsets(surfaceManifest as unknown as SurfaceManifest);
   private readonly image = new Image();
   private ready = false;
+  private settlement = newSettlement();
 
   load(): void {
-    this.image.onload = () => { this.ready = true; };
+    this.image.onload = () => { this.ready = true; settle(this.settlement, true); };
     this.image.onerror = () => {
       console.warn('[surfaces] atlas failed to load; using flat floor');
+      settle(this.settlement, false);
     };
     this.image.src = surfaceUrl;
+  }
+
+  /** Ver "Liquidacao dos atlas". Resolve `true` se carregou; nunca rejeita. */
+  whenSettled(): Promise<boolean> { return this.settlement.promise; }
+
+  /** Re-emite o pedido se (e so se) ele ja falhou. Idempotente. */
+  retryFailed(): void {
+    if (this.ready || !this.settlement.done) return;
+    this.settlement = newSettlement();
+    this.load();
   }
 
   get kinds(): string[] { return this.manifest.kinds.map((k) => k.name); }
@@ -543,16 +629,28 @@ export class PropBank {
   private readonly offsets = propOffsets(propManifest as unknown as PropManifest);
   private readonly image = new Image();
   private ready = false;
+  private settlement = newSettlement();
   /** Mapa de faces, sob demanda — mesma politica dos corpos. Ver `requestNormal`. */
   private normal: HTMLImageElement | null = null;
   private normalState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
 
   load(): void {
-    this.image.onload = () => { this.ready = true; };
+    this.image.onload = () => { this.ready = true; settle(this.settlement, true); };
     this.image.onerror = () => {
       console.warn('[props] atlas failed to load; using flat markers');
+      settle(this.settlement, false);
     };
     this.image.src = propUrl;
+  }
+
+  /** Ver "Liquidacao dos atlas". Resolve `true` se carregou; nunca rejeita. */
+  whenSettled(): Promise<boolean> { return this.settlement.promise; }
+
+  /** Re-emite o pedido se (e so se) ele ja falhou. Idempotente. */
+  retryFailed(): void {
+    if (this.ready || !this.settlement.done) return;
+    this.settlement = newSettlement();
+    this.load();
   }
 
   /**
@@ -765,6 +863,8 @@ export const recoilScreenOffset = (
 
 export class SpriteBank {
   private readonly byId = new Map<string, Loaded>();
+  /** Uma liquidacao por atlas. Ver "Liquidacao dos atlas". */
+  private readonly settlements = new Map<string, Settlement>();
   private tintBuffer: HTMLCanvasElement | null = null;
   /**
    * Halo ligado. Vem do preset de qualidade e nao de uma constante: e o unico
@@ -774,40 +874,97 @@ export class SpriteBank {
   bloom = true;
 
   load(): void {
-    for (const { manifest, url } of SOURCES) {
-      const image = new Image();
-      const entry: Loaded = {
-        manifest,
-        image,
-        ready: false,
-        failed: false,
-        glow: null,
-        normal: null,
-        // `absent` quando o sprite nao tem mapa (os FX), `idle` quando tem e
-        // ainda ninguem precisou dele. A distincao existe para `requestNormal`
-        // nao ficar tentando buscar um arquivo que nunca foi gerado.
-        normalState: manifest.normalAtlas ? 'idle' : 'absent',
-      };
-      image.onload = () => {
-        entry.ready = true;
-        // A mascara e construida UMA vez, no load, e nunca por quadro. Ler pixel
-        // de um atlas de meio milhao deles em tempo de jogo seria travar o
-        // quadro; aqui acontece atras da tela de carregamento.
-        try {
-          entry.glow = emissiveMask(image, image.naturalWidth, image.naturalHeight, EMISSIVE_HEX);
-        } catch {
-          // Canvas bloqueado (contexto perdido, aba em segundo plano no load):
-          // o jogo segue sem halo, que e cosmetico.
-          entry.glow = null;
+    for (const source of SOURCES) this.loadSource(source);
+  }
+
+  /**
+   * Um atlas. Separado de `load()` para que a nova tentativa depois de uma
+   * falha re-emita SO o pedido que falhou — repetir a lista inteira baixaria
+   * de novo dezenas de megabytes que ja estao em memoria.
+   *
+   * Um atlas ja carregado e ignorado: chamar `load()` duas vezes nao produz um
+   * segundo download nem um segundo `emissiveMask`.
+   */
+  private loadSource({ manifest, url }: { manifest: SpriteManifestEntry; url: string }): void {
+    if (this.byId.get(manifest.id)?.ready) return;
+    const image = new Image();
+    const entry: Loaded = {
+      manifest,
+      image,
+      ready: false,
+      failed: false,
+      glow: null,
+      normal: null,
+      // `absent` quando o sprite nao tem mapa (os FX), `idle` quando tem e
+      // ainda ninguem precisou dele. A distincao existe para `requestNormal`
+      // nao ficar tentando buscar um arquivo que nunca foi gerado.
+      normalState: manifest.normalAtlas ? 'idle' : 'absent',
+    };
+    const settlement = this.settlements.get(manifest.id) ?? newSettlement();
+    this.settlements.set(manifest.id, settlement);
+    image.onload = () => {
+      entry.ready = true;
+      // A mascara e construida UMA vez, no load, e nunca por quadro. Ler pixel
+      // de um atlas de meio milhao deles em tempo de jogo seria travar o
+      // quadro; aqui acontece atras da tela de carregamento — que, desde a
+      // sequencia de abertura, e uma tela de verdade e nao uma figura de
+      // linguagem: a mascara fica pronta antes de o menu aparecer.
+      try {
+        entry.glow = emissiveMask(image, image.naturalWidth, image.naturalHeight, EMISSIVE_HEX);
+      } catch {
+        // Canvas bloqueado (contexto perdido, aba em segundo plano no load):
+        // o jogo segue sem halo, que e cosmetico.
+        entry.glow = null;
+      }
+      settle(settlement, true);
+    };
+    image.onerror = () => {
+      entry.failed = true;
+      console.warn(`[sprites] atlas failed to load; using fallback: ${manifest.id}`);
+      settle(settlement, false);
+    };
+    image.src = url;
+    this.byId.set(manifest.id, entry);
+  }
+
+  /**
+   * Liquidacao de um subconjunto de atlas, pelo id.
+   *
+   * Devolve os ids que FALHARAM (lista vazia = todos carregaram), porque e
+   * disso que a tarefa de boot precisa para decidir entre seguir com a reserva
+   * e parar numa tela de erro. Um id desconhecido conta como falha — pedir um
+   * atlas que nao existe e um erro de programacao, e silencia-lo esconderia
+   * justamente o caso em que a lista de criticos e renomeada e ninguem percebe.
+   */
+  async whenSettled(ids: readonly string[]): Promise<string[]> {
+    const failed: string[] = [];
+    await Promise.all(
+      ids.map(async (id) => {
+        const settlement = this.settlements.get(id);
+        if (!settlement) {
+          console.warn(`[sprites] atlas desconhecido no preload: ${id}`);
+          failed.push(id);
+          return;
         }
-      };
-      image.onerror = () => {
-        entry.failed = true;
-        console.warn(`[sprites] atlas failed to load; using fallback: ${manifest.id}`);
-      };
-      image.src = url;
-      this.byId.set(manifest.id, entry);
-    }
+        if (!(await settlement.promise)) failed.push(id);
+      }),
+    );
+    return failed;
+  }
+
+  /** Todos os ids que `load()` registrou — a lista completa do preload. */
+  allIds(): string[] {
+    return [...this.settlements.keys()];
+  }
+
+  /**
+   * Re-emite os pedidos que falharam. Idempotente e barato: um banco inteiro
+   * carregado devolve na hora, sem tocar em rede.
+   */
+  retryFailed(): void {
+    const again = SOURCES.filter((source) => this.byId.get(source.manifest.id)?.failed);
+    for (const { manifest } of again) this.settlements.set(manifest.id, newSettlement());
+    for (const source of again) this.loadSource(source);
   }
 
   /**

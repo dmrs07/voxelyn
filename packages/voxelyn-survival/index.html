@@ -11,6 +11,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0a0a0b" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <!--
+      A VIRGULA SONORA do estudio, pedida antes de qualquer script.
+
+      Ela precisa estar decodificada nos primeiros ~400 ms — e a assinatura que
+      toca sobre a marca, e uma peca que chega depois da tela dela nao e uma
+      assinatura, e um som solto. Sem esta linha o `fetch` dela nasce dentro do
+      modulo, ou seja, DEPOIS de o renderizador ja ter disparado 8,4 MB de
+      atlas: numa conexao HTTP/1.1 os seis slots ficam ocupados e o arquivo de
+      106 KB espera na fila. Medido: chegava aos 2,9 s, com a identidade ja
+      terminada.
+
+      `as="fetch"` porque quem a consome e `fetch()` + `decodeAudioData`, e nao
+      um `<audio>`. Arquivo ausente = um aviso no console e nada mais; a
+      abertura ja trata a virgula como opcional em todos os caminhos.
+    -->
+    <link
+      rel="preload"
+      href="./ident/danitools-sound-logo.mp3"
+      as="fetch"
+      fetchpriority="high"
+      crossorigin
+    />
     <link rel="icon" href="./icon-192.png" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>Voxelyn Survival</title>
@@ -1266,6 +1288,33 @@
       #options-controls .row {
         justify-content: space-between;
       }
+      /* A faixa de creditos.
+         O rotulo corre NA MESMA LINHA do texto, e nao acima dele com a regra
+         de secao que os grupos de controle usam. Os outros quatro grupos sao
+         formularios — a regra separa o rotulo do campo que ele nomeia; este e
+         um colofao, onde "CRÉDITOS: fulano" e uma frase so. A linha
+         economizada e o que faz a folha caber numa paisagem de celular. */
+      .ax-credits {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 12px;
+      }
+      .ax-credits .ax-section-label {
+        border-bottom: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        flex: 0 0 auto;
+      }
+      /* As duas linhas correm lado a lado e so quebram quando a largura acaba.
+         `gap` em duas medidas — pouco entre elas empilhadas, mais lado a lado
+         — para que os dois estados fiquem legiveis sem uma segunda regra. */
+      .ax-credits-lines {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px 22px;
+        min-width: 0;
+      }
       #options-controls .row label {
         min-width: 72px;
       }
@@ -1276,15 +1325,82 @@
       #options #options-controls {
         max-width: 860px;
       }
-      /* Na folha de opcoes em paisagem, a grade 2×2 do board 3c: tudo visivel
-         de uma vez, sem rolagem — a rolagem so volta como rede de seguranca em
-         telas realmente curtas. */
-      @media (min-width: 701px) {
+      /* Na folha de opcoes em paisagem, DUAS COLUNAS: tudo visivel de uma vez,
+         sem rolagem — a rolagem so volta como rede de seguranca em telas
+         realmente curtas.
+
+         Fluxo em colunas (`columns`) e nao grade, e a diferenca e o que faz a
+         tela caber. Uma grade posiciona por LINHA: com cinco grupos em duas
+         colunas, o quinto abre uma terceira linha sozinho e empurra os
+         Creditos para fora do enquadro — enquanto a coluna da direita fica
+         vazia abaixo de Telemetria. O fluxo em coluna preenche esse vazio: os
+         grupos escorrem, o navegador equilibra as duas alturas, e a folha
+         inteira encolhe para a altura da coluna mais alta.
+         `break-inside: avoid` e o que impede um grupo de ser partido no meio.
+         O `gap` do flex nao vale em fluxo de blocos, entao o respiro volta
+         como margem.
+         O ponto de corte e 560px e nao 701px porque paisagens curtas de
+         celular (667x375, 740x360) sao justamente as que mais precisam da
+         segunda coluna: empilhadas, elas nao caberiam de jeito nenhum. */
+      @media (min-width: 560px) {
         #options #options-controls {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px 32px;
-          align-content: start;
+          display: block;
+          columns: 2;
+          column-gap: 32px;
+        }
+        #options #options-controls .ax-optgroup {
+          break-inside: avoid;
+          margin-bottom: 12px;
+        }
+        #options #options-controls .ax-optgroup:last-child {
+          margin-bottom: 0;
+        }
+        /* O colofao atravessa: uma faixa larga sob as colunas custa uma linha
+           curta, enquanto o mesmo bloco DENTRO de uma coluna custa tres (o
+           nome completo quebra numa coluna estreita). */
+        #options #options-controls .ax-credits {
+          column-span: all;
+          margin-top: 4px;
+        }
+      }
+
+      /* Retrato estreito: sem largura para a segunda coluna, os cinco grupos
+         empilham e a folha fica alta. A compactacao e a mesma da paisagem
+         baixa — e pelo mesmo motivo, so que pelo outro eixo: o respiro encolhe
+         antes do conteudo, e nenhum alvo de toque fica menor.
+
+         Aqui a folha ainda pode rolar num aparelho realmente pequeno (a soma
+         dos cinco grupos passa da altura util), mas os creditos deixam de ser
+         o unico bloco sempre cortado: eles custam UMA linha em vez de tres. */
+      @media (max-width: 700px) {
+        #options #options-controls .ax-optgroup {
+          gap: 6px;
+        }
+        /* Mesma regra da paisagem baixa, e pelo mesmo motivo: numa coluna
+           estreita o botao e espremido abaixo do natural, quebra o rotulo em
+           duas linhas e a linha dobra de altura. Quem cede largura e o slider,
+           que funciona em qualquer uma. */
+        #options #options-controls .row label {
+          min-width: 60px;
+        }
+        #options #options-controls input[type='range'] {
+          min-width: 0;
+          flex: 0 1 90px;
+        }
+        #options #options-controls .row button {
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
+        #options #options-controls .ax-section-label {
+          margin-top: 0;
+          padding-bottom: 2px;
+        }
+        #options .ax-sheet-head {
+          padding: 5px 14px;
+        }
+        #options .ax-sheet-foot {
+          padding: 4px 14px;
+          min-height: 24px;
         }
       }
 
@@ -2238,8 +2354,62 @@
         .overlay {
           gap: 8px;
         }
+        /* A folha de opcoes numa tela baixa: o respiro encolhe ANTES do
+           conteudo. Cada um destes numeros vale poucos pixels sozinho, e
+           juntos valem a diferenca entre a folha inteira caber e os creditos
+           ficarem cortados na borda de baixo — que era exatamente o defeito.
+           Nenhum controle muda de tamanho: o que encolhe e o espaco entre
+           eles. */
         #options-controls {
           gap: 7px;
+        }
+        #options #options-controls .ax-optgroup {
+          gap: 6px;
+          margin-bottom: 6px;
+        }
+        /* A linha do Volume custava 48px enquanto as dos outros sliders
+           custavam 20: numa coluna de ~290px, o rotulo (72) + o slider (110) +
+           o botao de som nao cabiam juntos, e o botao quebrava em duas linhas.
+           Estreitar o rotulo e o slider devolve a largura que falta e a linha
+           volta a uma so — sem encolher nenhum alvo de toque: o botao continua
+           do mesmo tamanho e o slider, com 90px, continua largo o bastante
+           para um polegar. */
+        #options #options-controls .row label {
+          min-width: 60px;
+        }
+        #options #options-controls input[type='range'] {
+          width: 90px;
+          /* Quem cede largura e o SLIDER, nunca o botao: arrastar funciona em
+             qualquer largura, mas um botao espremido 8px abaixo do natural
+             quebra o rotulo em duas linhas e a linha inteira dobra de altura.
+             Era exatamente isso que estava acontecendo com "Som: ligado". */
+          min-width: 0;
+          flex: 0 1 90px;
+        }
+        #options #options-controls .row button {
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
+        #options #options-controls .ax-credits {
+          margin-top: 2px;
+        }
+        #options #options-controls .ax-section-label {
+          margin-top: 0;
+          padding-bottom: 1px;
+        }
+        #options .ax-sheet-body {
+          padding: 3px 14px;
+        }
+        /* O cromo da folha e o maior gasto de altura numa paisagem de celular:
+           cabecalho e rodape somavam 97px dos 360 da tela. Encolhe-los aqui
+           devolve a altura para o CONTEUDO — nenhum controle fica menor, e o
+           alvo de toque de cada linha continua o mesmo. */
+        #options .ax-sheet-head {
+          padding: 5px 14px;
+        }
+        #options .ax-sheet-foot {
+          padding: 3px 14px;
+          min-height: 22px;
         }
         h1 {
           font-size: clamp(14px, 3.4vw, 20px);
@@ -2437,10 +2607,367 @@
       .codex-doc-header {
         scroll-margin-top: 10px;
       }
+
+      /* ==================================================================
+         SEQUENCIA DE ABERTURA (ver src/client/boot/)
+
+           preto -> identidade -> tela de carregamento -> menu
+
+         Tres regras de CSS que a feature inteira depende:
+
+         1) ELA E A PRIMEIRA PINTURA. `#boot` nao nasce escondido e nao espera
+            JavaScript para existir: ele esta no HTML, opaco, sobre o preto do
+            `body`. Se dependesse de uma classe posta em tempo de execucao, o
+            navegador pintaria o menu no quadro anterior — o "flash de menu"
+            que esta sequencia existe para eliminar. Pelo mesmo motivo o
+            `#menu` nasce com `hidden` e quem o revela e o fim do boot.
+
+         2) OS TEMPOS VEM DO TypeScript, NAO DAQUI. As duracoes sao variaveis
+            (`--boot-fade-in`, `--boot-fade-out`, `--boot-handoff`) escritas
+            por `boot-screen.ts` a partir do perfil de `boot-flow.ts`. Ter os
+            numeros nos dois lugares e como garantir que um dia eles discordem;
+            `prefers-reduced-motion` e o modo de desenvolvimento ja chegam aqui
+            como zero.
+
+         3) NADA ANIMA GEOMETRIA. So `opacity` — uma propriedade composta, sem
+            layout e sem repintura, porque este e exatamente o momento em que o
+            aparelho esta ocupado decodificando megabytes de atlas. Uma
+            abertura que engasga e pior do que nenhuma abertura.
+
+         O z-index e 70: acima de tudo, inclusive dos cartoes de arquivo (61) e
+         do banner de sistema (40). Enquanto a abertura existe ela e a unica
+         tela — e engole qualquer toque, para que um dedo apressado nao
+         acerte um botao do menu por baixo.
+         ================================================================== */
+      .ax-boot {
+        position: fixed;
+        inset: 0;
+        z-index: 70;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: var(--ax-void);
+        /* Engole toque e clique: nada por baixo pode ser acionado. */
+        pointer-events: all;
+        /* A saida da abertura inteira, no handoff. */
+        transition: opacity var(--boot-handoff, 420ms) ease-in;
+      }
+      .ax-boot[hidden] {
+        display: none;
+      }
+      .ax-boot[data-phase='done'] {
+        opacity: 0;
+      }
+
+      /* A key art (PR da splash 3D) como leito da tela de carregamento.
+         Entra em `is-ready`, quando a imagem terminou de DECODIFICAR — nunca
+         antes, para o primeiro quadro dela nao ser o quadro em que o navegador
+         para tudo para decodificar. Ausente o arquivo, esta camada
+         simplesmente nunca acende e a tela fica com o leito escuro; e por isso
+         que ela e uma tarefa NAO critica do preload. */
+      .ax-boot-keyart {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 700ms ease-out;
+        /* A arte e leito, nao assunto: a folha de texto por cima precisa de
+           contraste, e a vinheta abaixo fecha as bordas. */
+        filter: saturate(0.9) brightness(0.72);
+      }
+      .ax-boot-keyart.is-ready {
+        opacity: 0.5;
+      }
+      /* A IDENTIDADE E PRETA, ponto. A imagem pode terminar de decodificar
+         durante a marca — o preload roda desde t=0 —, e sem esta regra ela
+         acenderia por tras dela: uma composicao que devia ser so o emblema
+         sobre o vazio ganharia uma cena de jogo mal iluminada atras. O fundo
+         pertence a tela de carregamento e ao escurecimento que a segue. */
+      .ax-boot[data-phase='identity'] .ax-boot-keyart {
+        opacity: 0;
+      }
+      /* Vinheta + escurecimento inferior: o mesmo vocabulario das overlays
+         (`.overlay::after`), para a abertura pertencer ao mesmo jogo. */
+      .ax-boot::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(120% 90% at 50% 40%, transparent 30%, rgba(6, 6, 5, 0.86) 100%),
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.013) 0 1px, transparent 1px 3px);
+      }
+
+      /* As tres telas ocupam a MESMA celula do grid e trocam por opacidade:
+         nenhuma reflui, nenhuma empurra a outra, e a transicao e um crossfade
+         de duas camadas ja compostas. */
+      .ax-boot-stage {
+        grid-area: 1 / 1;
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(10px, 2.4vh, 20px);
+        padding: calc(24px + var(--safe-area-inset-top)) calc(20px + var(--safe-area-inset-right))
+          calc(24px + var(--safe-area-inset-bottom)) calc(20px + var(--safe-area-inset-left));
+        width: 100%;
+        max-width: 720px;
+        opacity: 0;
+        /* `visibility` alem de `opacity`: uma tela invisivel nao pode continuar
+           sendo lida por leitor de tela nem receber foco. */
+        visibility: hidden;
+        transition:
+          opacity var(--boot-fade-out, 380ms) ease-in,
+          visibility 0s linear var(--boot-fade-out, 380ms);
+      }
+      .ax-boot-stage.is-current {
+        opacity: 1;
+        visibility: visible;
+        transition:
+          opacity var(--boot-fade-in, 380ms) ease-out,
+          visibility 0s;
+      }
+
+      /* ---- Identidade ------------------------------------------------- */
+      /* A UNICA tela sem transicao de CSS: a opacidade dela e escrita por
+         quadro por `setIdentityOpacity`, a partir da curva de `identityOpacity`
+         (entra / fica / SAI, tudo dentro da propria fase). Uma transicao aqui
+         so poderia comecar quando a fase acabasse, e a marca sairia por cima da
+         tela de carregamento entrando — dois assuntos no mesmo centro. */
+      .ax-boot-identity,
+      .ax-boot-identity.is-current {
+        transition: none;
+      }
+      /* Composicao limpa: a marca, o nome, nada mais. Sem HUD, sem barra, sem
+         indicador de carregamento — o carregamento ESTA acontecendo por tras
+         (o preload comeca em t=0), mas mostrar isso aqui transformaria uma
+         apresentacao numa tela de espera. */
+      .ax-boot-ident-mark {
+        /* A escala e a de uma IDENTIDADE, nao a de um icone: esta marca e o
+           unico assunto da tela e precisa ocupar o quadro como tal. Medida em
+           `vh` porque a altura e o que falta em paisagem de celular, com piso
+           para telas baixas e teto para nao virar um cartaz em monitor grande. */
+        width: clamp(112px, 24vh, 240px);
+        max-width: 62vw;
+        height: auto;
+        display: block;
+        /* O halo NAO e enfeite. A marca e desenhada com contorno preto, e o
+           leito desta tela e #0a0a0b: sem um pouco de luz por tras, a silhueta
+           externa dissolve no fundo e o desenho parece recortado pela metade.
+           Duas sombras concentricas — uma curta e opaca para definir a borda,
+           uma larga e fraca para o volume — resolvem sem tocar no arquivo. */
+        filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.28))
+          drop-shadow(0 0 22px rgba(190, 140, 255, 0.22));
+      }
+      .ax-boot-ident-name {
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-weight: 600;
+        font-size: clamp(13px, 2.2vh, 17px);
+        letter-spacing: 0.42em;
+        /* A ultima letra tambem ganha o espacamento, e sem isto o bloco fica
+           deslocado meio caractere para a esquerda. */
+        text-indent: 0.42em;
+        color: var(--ax-gold);
+      }
+
+      /* ---- Tela de carregamento --------------------------------------- */
+      .ax-boot-wordmark {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 0.94;
+        text-align: center;
+      }
+      .ax-boot-word-1,
+      .ax-boot-word-2 {
+        font-family: 'Chakra Petch', Georgia, 'Times New Roman', serif;
+        font-weight: 700;
+        /* Escala pela largura E pela altura: em paisagem de celular a altura e
+           que falta, e uma medida so em `vw` estouraria a viewport. */
+        font-size: clamp(30px, min(9.5vw, 11vh), 76px);
+        letter-spacing: 0.14em;
+        text-indent: 0.14em;
+      }
+      .ax-boot-word-1 {
+        color: var(--ax-text-bright);
+      }
+      .ax-boot-word-2 {
+        color: var(--ax-teal);
+      }
+      .ax-boot-tagline {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-style: italic;
+        font-size: clamp(11px, 1.7vh, 14px);
+        color: var(--ax-text-mute);
+        text-align: center;
+      }
+
+      /* O medidor: a placa usinada do sistema de design, nao um spinner de
+         site. Largura limitada por `min()` para nunca encostar nas bordas nem
+         esticar numa tela ultralarga. */
+      .ax-boot-meter {
+        margin-top: clamp(8px, 2vh, 18px);
+        width: min(420px, 76vw);
+        height: 10px;
+        border: 1px solid var(--ax-teal-dim);
+        background: rgba(8, 14, 13, 0.72);
+        padding: 2px;
+      }
+      .ax-boot-meter-fill {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--ax-teal-dim), var(--ax-teal));
+        /* A largura anima por transicao curta para a barra nao pular em degraus
+           quando duas tarefas liquidam no mesmo quadro. O VALOR continua sendo
+           trabalho real — isto suaviza o desenho, nao inventa progresso. */
+        transition: width 180ms linear;
+      }
+      .ax-boot-readout {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+        width: min(420px, 76vw);
+        font-size: clamp(9px, 1.4vh, 11px);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ax-teal-mute);
+      }
+      .ax-boot-percent {
+        font-family: 'VT323', ui-monospace, monospace;
+        font-size: clamp(15px, 2.2vh, 19px);
+        letter-spacing: 0.06em;
+        color: var(--ax-teal-bright);
+        /* Tabular para o numero nao dancar de 9% para 10%. */
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---- Falha ------------------------------------------------------- */
+      /* Vermelho aqui e legitimo pela semantica do doc AD-UI-2.0: a abertura
+         nao conseguiu montar o jogo, e isso e perda — o jogador nao entra. */
+      .ax-boot-fail-title {
+        font-family: 'Chakra Petch', Georgia, serif;
+        font-weight: 700;
+        font-size: clamp(15px, 2.6vh, 20px);
+        letter-spacing: 0.16em;
+        color: var(--ax-red-text);
+        text-align: center;
+      }
+      .ax-boot-fail-body {
+        margin: 0;
+        max-width: 46ch;
+        text-align: center;
+        font-size: clamp(11px, 1.7vh, 13px);
+        line-height: 1.6;
+        color: var(--ax-text-mute);
+      }
+      .ax-boot-fail-detail {
+        max-width: 46ch;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10px;
+        line-height: 1.5;
+        color: var(--ax-text-dim);
+        word-break: break-word;
+        text-align: center;
+      }
+
+      /* Sem `transition` nenhuma quando o sistema pede menos movimento. As
+         duracoes ja chegam zeradas do TypeScript; esta regra e o cinto de
+         seguranca para qualquer caminho que esqueca de escrever a variavel. */
+      @media (prefers-reduced-motion: reduce) {
+        .ax-boot,
+        .ax-boot-stage,
+        .ax-boot-keyart,
+        .ax-boot-meter-fill {
+          transition: none;
+        }
+      }
     </style>
   </head>
   <body>
     <canvas id="game"></canvas>
+
+    <!--
+      A SEQUENCIA DE ABERTURA. Ver o bloco de CSS `.ax-boot` e `src/client/boot/`.
+
+      Ela vem PRIMEIRO no corpo e ja pintada, sem depender de JavaScript, porque
+      e ela que precisa ser a primeira coisa que o jogador ve. As tres telas
+      moram na mesma celula de grid e trocam por opacidade; `data-phase` no
+      elemento raiz e o unico estado que o CSS le, e quem o escreve e
+      `boot-screen.ts`.
+
+      Os textos sao localizados como todo o resto (`data-i18n`), com o
+      portugues no HTML como reserva legivel para o caso de o catalogo ainda
+      nao ter sido aplicado no primeiro quadro.
+    -->
+    <div id="boot" class="ax-boot" data-phase="identity">
+      <img id="boot-keyart" class="ax-boot-keyart" alt="" aria-hidden="true" />
+
+      <!--
+        Identidade do DESENVOLVEDOR — a pessoa real que faz o jogo, e nunca a
+        Aurix Dynamics, que e a companhia FICTICIA de dentro dele. Os dois nos
+        abaixo nascem vazios e sao preenchidos por `boot-screen.ts` a partir de
+        `boot/developer-ident.ts`, que e o unico lugar a editar quando a marca
+        existir. Sem identidade cadastrada, esta fase dura zero e a abertura
+        comeca na tela de carregamento.
+      -->
+      <section class="ax-boot-stage ax-boot-identity is-current" id="boot-identity">
+        <div id="boot-ident-mark"></div>
+        <div class="ax-boot-ident-name" id="boot-ident-name"></div>
+      </section>
+
+      <!--
+        Tela de carregamento. O medidor e `role="progressbar"` com valor real:
+        um leitor de tela anuncia o mesmo numero que a barra desenha, porque os
+        dois saem da mesma fracao de tarefas liquidadas.
+      -->
+      <section class="ax-boot-stage ax-boot-loading" id="boot-loading">
+        <div class="ax-boot-wordmark">
+          <span class="ax-boot-word-1" data-i18n="boot.title.line1">VOXELYN</span>
+          <span class="ax-boot-word-2" data-i18n="boot.title.line2">SURVIVAL</span>
+        </div>
+        <div class="ax-boot-tagline" data-i18n="menu.tagline">o Veio está vivo — sobreviva</div>
+        <div
+          class="ax-boot-meter"
+          id="boot-meter"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <i class="ax-boot-meter-fill" id="boot-meter-fill"></i>
+        </div>
+        <div class="ax-boot-readout">
+          <span id="boot-status" data-i18n="boot.status.start"
+            >Preparando sistemas de sobrevivência</span
+          >
+          <span class="ax-boot-percent" id="boot-percent">0%</span>
+        </div>
+      </section>
+
+      <!--
+        Falha do caminho critico. Existe para que a barra nunca fique parada em
+        87% para sempre: toda tarefa liquida, e uma critica que falhou vira ESTA
+        tela, com o motivo e um botao que tenta de novo de verdade (re-emite os
+        pedidos que falharam, sem recarregar a pagina).
+      -->
+      <section class="ax-boot-stage ax-boot-failure" id="boot-failure">
+        <div class="ax-boot-fail-title" data-i18n="boot.error.title">FALHA NA INICIALIZAÇÃO</div>
+        <p class="ax-boot-fail-body" data-i18n="boot.error.body">
+          Recursos essenciais da unidade não chegaram. Verifique a conexão e autorize nova
+          tentativa.
+        </p>
+        <p class="ax-boot-fail-detail" id="boot-error-detail"></p>
+        <button id="btn-boot-retry" class="ax-order-secondary" data-i18n="boot.error.retry">
+          Tentar de novo
+        </button>
+      </section>
+    </div>
 
     <!--
       Tela de titulo: a Ordem de Despacho (direção 2a do doc AD-UI-2.0).
@@ -2458,7 +2985,11 @@
       3. requisicao (sala, seed, servidor) · 4. trilho de arquivo ·
       5. telemetria de rodape.
     -->
-    <div id="menu" class="overlay ax-screen">
+    <!-- `hidden` desde o HTML: quem revela o menu e o fim da sequencia de
+         abertura (`boot/index.ts`). Sem isto o navegador pintaria a Ordem de
+         Despacho no primeiro quadro, antes de o modulo carregar — o flash de
+         menu que a abertura existe para eliminar. -->
+    <div id="menu" class="overlay ax-screen hidden">
       <nav class="ax-rail">
         <div class="ax-rail-mark" id="menu-mark"></div>
         <span class="ax-rail-item is-active" data-i18n="aurix.rail.dispatch">Despacho</span>
@@ -2651,6 +3182,15 @@
                   <input id="volume" type="range" min="0" max="100" step="1" />
                   <button id="btn-mute" class="compact primary">Som: ligado</button>
                 </div>
+                <!--
+                  Efeitos ANTES de musica, e depois do mestre: e a ordem de um
+                  mixer — quanto o jogo inteiro fala, quanto o mundo fala,
+                  quanto a trilha fala.
+                -->
+                <div class="row">
+                  <label for="sfx-volume" data-i18n="options.sfx">Efeitos</label>
+                  <input id="sfx-volume" type="range" min="0" max="100" step="1" />
+                </div>
                 <div class="row">
                   <label for="music-volume" data-i18n="options.music">Música</label>
                   <input id="music-volume" type="range" min="0" max="100" step="1" />
@@ -2669,13 +3209,23 @@
                   dados anônimos de sessão, sem identificação
                 </div>
               </div>
-              <div class="ax-optgroup">
+              <!--
+                Os creditos sao a unica secao que nao configura NADA: sao o
+                colofao da folha. Por isso eles atravessam as duas colunas em
+                vez de disputar uma delas (`column-span: all`), e as duas
+                linhas correm lado a lado quando ha largura — o que os tira do
+                caminho vertical e mantem a folha inteira dentro do enquadro
+                numa paisagem de celular.
+              -->
+              <div class="ax-optgroup ax-credits">
                 <div class="ax-section-label" data-i18n="aurix.options.credits">Créditos</div>
-                <div class="sub" data-i18n="credits.game">
-                  jogo por Daniel Moraes Ribeiro da Silva (@dmrs07)
-                </div>
-                <div class="sub" data-i18n="credits.music">
-                  trilha sonora por Clevo (@clevoclevoclevo)
+                <div class="ax-credits-lines">
+                  <span class="sub" data-i18n="credits.game">
+                    jogo por DaniTools (@dani.tools)
+                  </span>
+                  <span class="sub" data-i18n="credits.music">
+                    trilha sonora por Clevo (@clevoclevoclevo)
+                  </span>
                 </div>
               </div>
             </div>
@@ -2802,7 +3352,9 @@
         <button class="ax-rail-item" data-ax-nav="matrix" data-i18n="menu.matrix">
           Matriz Geracional
         </button>
-        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">Registro</button>
+        <button class="ax-rail-item" data-ax-nav="records" data-i18n="menu.records">
+          Registro
+        </button>
         <button class="ax-rail-item" data-ax-nav="options" data-i18n="menu.options">Opções</button>
         <div class="ax-rail-copy" data-i18n="aurix.rail.copy">Via do operador</div>
       </nav>
@@ -2941,8 +3493,8 @@
           </div>
         </div>
         <div id="training-complete-body" class="sub" data-i18n="training.complete.body">
-          Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende.
-          O Veio lá embaixo rende.
+          Registro de treinamento arquivado. Nenhuma carga foi creditada — treinamento não rende. O
+          Veio lá embaixo rende.
         </div>
         <button
           id="btn-training-descend"

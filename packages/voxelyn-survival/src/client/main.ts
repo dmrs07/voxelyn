@@ -8,12 +8,7 @@ import type {
 } from '@voxelyn/survival-sim';
 import { TouchCooldownOverlay } from './cooldown-overlay';
 import { DesktopControlBar } from './desktop-controls';
-import {
-  inductionSeen,
-  markInductionSeen,
-  renderInduction,
-  type InductionMode,
-} from './induction';
+import { inductionSeen, markInductionSeen, renderInduction, type InductionMode } from './induction';
 import { createTrainingRun, markTrainingDone } from './training-setup';
 import { TrainingDirector, type TrainingCue } from './training-director';
 import { SurvivalInput, isEditingText, type TouchSafeArea } from './input';
@@ -79,6 +74,9 @@ import { renderRankPanel } from './rank-panel';
 import { TelemetrySession, isOptedOut, setOptedOut } from './telemetry';
 import { inviteUrlFrom } from './invite';
 import { deployVeil, veilActive } from './deploy-veil';
+import { runBootSequence } from './boot';
+import { buildBootPlan } from './boot/boot-plan';
+import { identitySting } from './boot/developer-ident';
 import { aurixMarkHtml } from './aurix';
 import { PauseMenu } from './pause-menu';
 import {
@@ -93,6 +91,14 @@ import {
   type MessageKey,
 } from './i18n';
 
+/**
+ * A URL da virgula sonora do estudio, resolvida no topo do modulo.
+ *
+ * Vazia quando nao ha identidade sonora cadastrada — nesse caso o adiantamento
+ * abaixo nao acontece e a abertura segue muda, como sempre.
+ */
+const IDENTITY_STING_URL = identitySting() ?? '';
+
 const canvas = document.getElementById('game');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Canvas #game nao encontrado.');
 
@@ -105,6 +111,7 @@ const serverInput = document.getElementById('server') as HTMLInputElement;
 const qualitySelect = document.getElementById('quality') as HTMLSelectElement;
 const volumeInput = document.getElementById('volume') as HTMLInputElement;
 const musicVolumeInput = document.getElementById('music-volume') as HTMLInputElement;
+const sfxVolumeInput = document.getElementById('sfx-volume') as HTMLInputElement;
 const musicSourceButton = document.getElementById('btn-music-source') as HTMLButtonElement;
 const muteButton = document.getElementById('btn-mute') as HTMLButtonElement;
 const seedInput = document.getElementById('seed') as HTMLInputElement;
@@ -184,6 +191,18 @@ let advertisedContract: DeathEchoContract | null = null;
  * nao pode ficar preso a um contrato antigo depois de o jogador trocar a seed.
  */
 let contractRun: DeathEchoContract | null = null;
+
+// A VIRGULA SONORA e adiantada AQUI, antes do renderizador existir.
+//
+// O construtor do renderizador dispara os 57 atlas, e cada um constroi a
+// mascara de halo com uma leitura de pixel na thread principal — tudo o que
+// depende de uma tarefa espera atras disso. Pedir a peca ANTES tira o decode
+// dessa fila (422 ms -> 34 ms, medido). O que sobra e a leitura do corpo, que
+// continua atras das mascaras; ver `prepareIdentitySting`.
+//
+// Nada toca aqui: `prepare` so busca e decodifica, e quem decide se ha som e o
+// `playIdentitySting` la embaixo, com o mudo ja carregado.
+if (IDENTITY_STING_URL) void audio.prepareIdentitySting(IDENTITY_STING_URL);
 
 const renderer = new SurvivalRenderer(canvas);
 const deathEchoes = new DeathEchoController();
@@ -359,10 +378,15 @@ const setBanner = (text: string | null, tone: BannerTone = 'warning'): void => {
 const audioSettings = loadAudioSettings();
 audio.setVolume(audioSettings.volume);
 audio.setMusicVolume(audioSettings.musicVolume);
+audio.setSfxVolume(audioSettings.sfxVolume);
 audio.setMuted(audioSettings.muted);
+// A abertura e da assinatura do estudio: a trilha do terminal so ganha voz
+// quando a sequencia chega a tela de carregamento (ver `onSplash` abaixo).
+audio.setScreen('boot');
 audio.setMusicSource(audioSettings.musicSource);
 volumeInput.value = String(Math.round(audioSettings.volume * 100));
 musicVolumeInput.value = String(Math.round(audioSettings.musicVolume * 100));
+sfxVolumeInput.value = String(Math.round(audioSettings.sfxVolume * 100));
 
 const renderMuteLabel = (): void => {
   muteButton.textContent = t(audioSettings.muted ? 'options.sound.off' : 'options.sound.on');
@@ -405,6 +429,17 @@ volumeInput.addEventListener('input', () => {
 musicVolumeInput.addEventListener('input', () => {
   audioSettings.musicVolume = Number(musicVolumeInput.value) / 100;
   audio.setMusicVolume(audioSettings.musicVolume);
+  saveAudioSettings(audioSettings);
+});
+
+// Efeitos: mesmo padrao dos outros dois sliders — o valor vai para o
+// barramento na hora e o disco grava a cada movimento. Sem retorno sonoro
+// proprio aqui de proposito: o jogador quase sempre mexe neste slider com o
+// jogo fazendo barulho atras, e um bipe por passo do slider disputaria com
+// justamente o som que ele esta tentando ajustar.
+sfxVolumeInput.addEventListener('input', () => {
+  audioSettings.sfxVolume = Number(sfxVolumeInput.value) / 100;
+  audio.setSfxVolume(audioSettings.sfxVolume);
   saveAudioSettings(audioSettings);
 });
 
@@ -1128,7 +1163,11 @@ const prepareSolo = async (): Promise<PreparedRun | null> => {
   recorder.start(seed);
   resetRunTracking();
   telemetry.begin();
-  let state: SurvivalState = createRun({ seed, tuning: authorized.tuning, depth: authorized.depth });
+  let state: SurvivalState = createRun({
+    seed,
+    tuning: authorized.tuning,
+    depth: authorized.depth,
+  });
   liveRun = state;
   let accumulator = 0;
   let lastTime = performance.now();
@@ -1370,9 +1409,15 @@ const showTrainingOutcome = (certified: boolean): void => {
     el.dataset.i18n = key;
     el.textContent = t(key);
   };
-  set('training-complete-title', certified ? 'training.complete.title' : 'training.incomplete.title');
+  set(
+    'training-complete-title',
+    certified ? 'training.complete.title' : 'training.incomplete.title',
+  );
   set('training-complete-body', certified ? 'training.complete.body' : 'training.incomplete.body');
-  set('btn-training-descend', certified ? 'training.complete.descend' : 'training.incomplete.retry');
+  set(
+    'btn-training-descend',
+    certified ? 'training.complete.descend' : 'training.incomplete.retry',
+  );
 
   runInProgress = false;
   activeRunKind = 'none';
@@ -1751,13 +1796,9 @@ const runOnline = (url: string, roomCode: string | null): PreparedRun | null => 
         if (terminal) {
           recordRun(state);
           if (state.summary) telemetry.finish(state.summary, state.sector);
-          const endRegions = renderer.renderEnd(
-            state,
-            window.innerWidth,
-            window.innerHeight,
-            now,
-            { input: input.state },
-          );
+          const endRegions = renderer.renderEnd(state, window.innerWidth, window.innerHeight, now, {
+            input: input.state,
+          });
           // a sala acabou: reiniciar significa entrar numa sala NOVA. Descarta o
           // resume token (senao o hello reentraria nesta mesma sala terminal) e
           // reabre o socket — o matchmaking so considera salas 'running'.
@@ -2049,15 +2090,13 @@ const openInduction = (
   onAuthorise: () => void,
   onTraining?: () => void,
 ): void => {
-  const dismissInto =
-    (next: () => void) =>
-    (): void => {
-      markInductionSeen();
-      inductionOverlay.classList.add('hidden');
-      menu.classList.remove('hidden');
-      audio.ui();
-      next();
-    };
+  const dismissInto = (next: () => void) => (): void => {
+    markInductionSeen();
+    inductionOverlay.classList.add('hidden');
+    menu.classList.remove('hidden');
+    audio.ui();
+    next();
+  };
   renderInduction(inductionBody, {
     mode,
     onDismiss: dismissInto(onAuthorise),
@@ -2729,13 +2768,73 @@ if (new URLSearchParams(location.search).get('dev') === '1') {
 // CACHE, entao nao espera a rede. A busca do perfil ao vivo o reescreve depois.
 renderDescentClearance();
 
-// auto-start por query (?online=1). ?room=XYZ transforma o convite num LINK,
-// que e como as pessoas realmente compartilham: quem recebe entra direto.
+// ---------------------------------------------------------------------------
+// A sequencia de abertura
+// ---------------------------------------------------------------------------
+//
+// Ate aqui este arquivo terminava revelando nada: o `#menu` ja estava pintado
+// desde o HTML e o modulo so pendurava handlers nele. Agora o menu nasce
+// `hidden` e QUEM O REVELA e o fim da abertura — a identidade da companhia, a
+// tela de carregamento com preload real, e so entao o terminal.
+//
+// Tres cuidados que esta ligacao precisa ter, e que o resto do arquivo assume:
+//
+// 1) NENHUMA RUN COMECA AQUI. O preload prepara recursos compartilhados
+//    (fontes, atlas, imagem de fundo) e nada mais: nenhum `createRun`, nenhum
+//    tick, nenhum mundo. O auto-start por query — que E um pedido explicito do
+//    jogador, feito no link — foi movido para DEPOIS do boot pelo mesmo
+//    motivo: uma descida nao pode nascer atras de uma tela de carregamento.
+//
+// 2) O AUDIO NAO E TOCADO. O `AudioContext` continua nascendo do primeiro
+//    gesto, como o navegador exige; a abertura e muda de propósito.
+//
+// 3) A ENTREGA ACONTECE UMA VEZ. `onReady` roda no maximo uma vez em toda a
+//    vida da pagina (garantido por `boot/index.ts`), entao nada aqui pode ser
+//    inicializado duas vezes.
 const params = new URLSearchParams(location.search);
 const roomParam = params.get('room');
 if (roomParam) roomInput.value = normalizeRoomCode(roomParam);
-if (roomParam || params.get('online') === '1') startOnline();
-else if (params.get('solo') === '1') startSolo();
+
+void runBootSequence({
+  buildTasks: ({ keyart, identMark }) => buildBootPlan({ renderer, keyart, identMark }),
+  // A VIRGULA SONORA do estudio, sobre a tela de identidade.
+  //
+  // Devolve a duracao so quando a peca REALMENTE comecou — e e isso que faz a
+  // marca ficar na tela ate o ultimo acorde. Onde o navegador nao autoriza
+  // audio sem gesto, devolve `null` e a identidade segue curta e silenciosa,
+  // como era. Nunca ha uma tela preta esperando um som que nao veio.
+  onIdentitySting: (url) => audio.playIdentitySting(url),
+  // A trilha do terminal comeca na SPLASH, e nao no menu.
+  //
+  // `unlock` e o mesmo caminho de sempre, chamado mais cedo — nao ha truque
+  // de autoplay aqui. Onde o navegador permite (um PWA instalado, um site com
+  // engajamento de midia) o contexto nasce tocando e a musica cobre a tela de
+  // carregamento inteira. Onde nao permite, ele nasce suspenso e nada soa
+  // ainda; mas o FLAC ja comeca a viajar, entao quando o primeiro gesto
+  // chegar a trilha entra na hora em vez de depois de um download.
+  //
+  // Mudo continua mudo: `unlock` respeita a preferencia, que ja foi aplicada
+  // la em cima com o resto das configuracoes de audio.
+  onSplash: () => {
+    // Sai de 'boot' e entra em 'menu': ate aqui a trilha do terminal ficou
+    // calada de proposito, para nao tocar por baixo da assinatura do estudio.
+    audio.setScreen('menu');
+    audio.unlock();
+  },
+  onReady: () => {
+    // O menu entra sob o escurecimento da abertura — nunca por cima da barra
+    // ainda visivel. Sem `deployVeil` aqui de proposito: o veu e a ficcao da
+    // DESCIDA (o casco se abrindo para o Veio), e usa-lo para entrar no
+    // terminal gastaria o gesto no lugar errado.
+    menu.classList.remove('hidden');
+    // auto-start por query (?online=1). ?room=XYZ transforma o convite num
+    // LINK, que e como as pessoas realmente compartilham: quem recebe entra
+    // direto — agora com os atlas ja carregados, entao a run que nasce do
+    // link nasce desenhada.
+    if (roomParam || params.get('online') === '1') startOnline();
+    else if (params.get('solo') === '1') startSolo();
+  },
+});
 
 // PWA: registra o service worker (app shell offline para o solo)
 if ('serviceWorker' in navigator) {

@@ -19,6 +19,35 @@ export const PT_BR = {
   // Marca e telas de menu
   // ---------------------------------------------------------------------
   'app.title': 'Voxelyn Survival',
+
+  // ---------------------------------------------------------------------
+  // Sequência de abertura (ver src/client/boot/)
+  //
+  // O wordmark vem QUEBRADO em duas linhas porque na tela de carregamento ele
+  // é a composição inteira, empilhado e centralizado — diferente de
+  // `menu.title`, que é uma linha só no cabeçalho da folha de despacho. São
+  // dois usos tipográficos distintos da mesma marca, e por isso duas chaves.
+  //
+  // Os rótulos de estado nomeiam a tarefa mais pesada que ainda não terminou.
+  // A voz é a da companhia preparando a unidade — nunca "carregando arquivo
+  // 3 de 8", que é vocabulário de instalador, não de despacho.
+  // ---------------------------------------------------------------------
+  'boot.ident.alt': 'Marca do desenvolvedor',
+  'boot.title.line1': 'VOXELYN',
+  'boot.title.line2': 'SURVIVAL',
+  'boot.status.start': 'Iniciando sistemas da unidade',
+  'boot.status.fonts': 'Carregando tipografia da companhia',
+  'boot.status.core': 'Montando chassi e corpos de contato',
+  'boot.status.terrain': 'Levantando estratos e superfícies',
+  'boot.status.props': 'Instalando equipamento de campo',
+  'boot.status.keyart': 'Compondo imagem de abertura',
+  'boot.status.ready': 'Unidade pronta para despacho',
+  // A falha é da INICIALIZAÇÃO, não da run: o jogador não perdeu nada, o jogo
+  // é que não conseguiu montar. Por isso o texto pede uma ação e não lamenta.
+  'boot.error.title': 'FALHA NA INICIALIZAÇÃO',
+  'boot.error.body':
+    'Recursos essenciais da unidade não chegaram. Verifique a conexão e autorize nova tentativa.',
+  'boot.error.retry': 'Tentar de novo',
   'menu.title': 'VOXELYN SURVIVAL',
   'menu.tagline': 'o Veio está vivo — sobreviva',
   'menu.solo': 'Descer',
@@ -61,7 +90,7 @@ export const PT_BR = {
   'aurix.options.audio': 'Áudio',
   'aurix.options.telemetry': 'Telemetria',
   'aurix.options.credits': 'Créditos',
-  'credits.game': 'jogo por Daniel Moraes Ribeiro da Silva (@dmrs07)',
+  'credits.game': 'jogo por DaniTools (@dani.tools)',
   'credits.music': 'trilha sonora por Clevo (@clevoclevoclevo)',
   'aurix.options.footer': 'alterações salvas localmente',
 
@@ -74,6 +103,7 @@ export const PT_BR = {
   'options.quality.medium': 'Média',
   'options.quality.low': 'Baixa (30 FPS)',
   'options.volume': 'Volume',
+  'options.sfx': 'Efeitos',
   'options.music': 'Música',
   'options.musicSource': 'Trilha',
   'options.musicSource.composed': 'Composta',
@@ -819,7 +849,8 @@ export const PT_BR = {
     'Exercício 2 — FOGO: segure o botão esquerdo do mouse e mire com o cursor. Neutralize os dois espécimes.',
   'training.step.clear.touch':
     'Exercício 2 — FOGO: o manche direito mira e dispara. Neutralize os dois espécimes.',
-  'training.step.dash': 'Exercício 3 — ESQUIVA: ESPAÇO. Execute um avanço evasivo entre os pilares.',
+  'training.step.dash':
+    'Exercício 3 — ESQUIVA: ESPAÇO. Execute um avanço evasivo entre os pilares.',
   'training.step.dash.touch':
     'Exercício 3 — ESQUIVA: botão de esquiva. Execute um avanço evasivo entre os pilares.',
   'training.step.core': 'Exercício 4 — O NÚCLEO: aproxime-se do pedestal e interaja com E.',

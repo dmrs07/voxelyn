@@ -66,11 +66,29 @@ const MUSIC_DUCK_PRIORITY = 9;
 export class AudioDirector {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  /**
+   * Barramento dos EFEITOS: tudo o que o mundo faz passa por aqui antes do
+   * mestre — as vozes de `play()` e o leito de ambiencia.
+   *
+   * A ambiencia entra junto de proposito. Ela e o vento, o gotejo, o zumbido
+   * da maquina: som do MUNDO, do mesmo lado da fronteira que um tiro, e do
+   * lado oposto da trilha. Quem baixa "Efeitos" quer o mundo mais baixo, nao
+   * so as explosoes — deixar o leito no mestre faria o slider parecer
+   * quebrado justamente no silencio, que e quando a ambiencia e tudo o que se
+   * ouve.
+   *
+   * O que NAO passa por aqui: os tres barramentos de musica. E a fronteira
+   * inteira da feature.
+   */
+  private sfxBus: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private ambienceBus: AmbienceBus | null = null;
   private musicBus: MusicBus | null = null;
   private soundtrackBus: SoundtrackBus | null = null;
   private menuTrackBus: SoundtrackBus | null = null;
+
+  /** A virgula sonora decodificada (ou a promessa dela). Ver `prepareIdentitySting`. */
+  private identSting: Promise<AudioBuffer | null> | null = null;
 
   private readonly mixer = new CueMixer();
   private levels: AmbienceLevels = SILENT_AMBIENCE;
@@ -80,6 +98,8 @@ export class AudioDirector {
 
   private volume = 0.8;
   private musicVolume = 0.7;
+  /** 1.0 = a mixagem do jogo. Ver `AudioSettings.sfxVolume`. */
+  private sfxVolume = 1;
   private muted = false;
   /**
    * Preferencia de trilha do jogador: a composta (arquivo, padrao) ou a
@@ -96,7 +116,11 @@ export class AudioDirector {
    * menu sob o veu de deploy — o audio nao adivinha tela por DOM. A trilha de
    * menu toca em 'menu' (quando o arquivo existe), cala em 'run'.
    */
-  private screen: 'menu' | 'run' = 'menu';
+  // 'boot' e o padrao, e nao 'menu': assim um `unlock()` chamado cedo — antes
+  // de a sequencia de abertura sequer existir — nao acorda a trilha do
+  // terminal por baixo da assinatura do estudio. Quem liga o terminal e um
+  // `setScreen('menu')` explicito.
+  private screen: 'boot' | 'menu' | 'run' = 'boot';
   /**
    * Fase do quadro anterior, para detectar a transicao para 'dead'.
    *
@@ -162,17 +186,110 @@ export class AudioDirector {
   }
 
   /**
+   * Volume dos efeitos (0..1). Ganho unitario: 1.0 e a mixagem do jogo.
+   *
+   * A rampa e a mesma do mestre (`setTargetAtTime`, 50 ms) e existe pelo mesmo
+   * motivo: arrastar um slider escreve dezenas de valores por segundo, e
+   * atribuir `gain.value` a cada um deles produz um degrau audivel por
+   * atribuicao — um chiado, exatamente enquanto a pessoa procura o volume que
+   * quer.
+   */
+  setSfxVolume(volume: number): void {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+    if (!this.ctx || !this.sfxBus) return;
+    this.sfxBus.gain.setTargetAtTime(this.sfxVolume, this.ctx.currentTime, 0.05);
+  }
+
+  /**
    * Transicao de tela, chamada pelo main.ts junto das trocas de DOM sob o
    * veu. Toda a politica da trilha de menu vive aqui: acorda no terminal,
    * cala na descida. Idempotente — wake/silence ja o sao.
    */
-  setScreen(screen: 'menu' | 'run'): void {
+  setScreen(screen: 'boot' | 'menu' | 'run'): void {
     this.screen = screen;
-    if (screen === 'run') {
-      this.menuTrackBus?.silence();
-    } else if (!this.muted) {
-      this.menuTrackBus?.wake();
-    }
+    // 'boot' cala a trilha do terminal pelo mesmo motivo que 'run': a tela de
+    // identidade e da VIRGULA SONORA do estudio, e uma trilha por baixo dela
+    // roubaria a peca inteira. O terminal so ganha voz quando a abertura chega
+    // a tela de carregamento — e `main.ts` que faz a troca.
+    if (screen === 'menu' && !this.muted) this.menuTrackBus?.wake();
+    else this.menuTrackBus?.silence();
+  }
+
+  /**
+   * Busca e decodifica a virgula sonora, SEM tocar nada.
+   *
+   * Separada de `playIdentitySting` por uma razao medida, e nao por gosto: no
+   * primeiro segundo de vida da pagina a thread principal esta tomada
+   * construindo as mascaras de halo dos 57 atlas (`emissiveMask`, uma leitura
+   * de pixel por atlas), e tudo o que depende de uma tarefa espera atras disso.
+   *
+   * Medido, com o pedido saindo antes do renderizador: resposta aos 337 ms,
+   * corpo lido so aos 1171 ms, decode em 34 ms. Adiantar o pedido tirou o
+   * DECODE da fila (eram 422 ms), mas a leitura do corpo continua atras das
+   * mascaras — o gargalo e a thread, nao a rede, e resolve-lo de verdade
+   * significa fatiar `emissiveMask` ou leva-lo para um worker, que e uma
+   * mudanca do banco de sprites e nao desta abertura.
+   *
+   * Idempotente: a segunda chamada devolve a mesma promessa.
+   */
+  prepareIdentitySting(url: string): Promise<AudioBuffer | null> {
+    if (this.identSting) return this.identSting;
+    this.identSting = (async () => {
+      this.unlock();
+      const ctx = this.ctx;
+      if (!ctx) return null;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        return await ctx.decodeAudioData(await res.arrayBuffer());
+      } catch {
+        return null;
+      }
+    })();
+    return this.identSting;
+  }
+
+  /**
+   * A VIRGULA SONORA do estudio, tocada uma vez sobre a tela de identidade.
+   *
+   * Resolve com a duracao da peca em ms quando ela REALMENTE comecou a tocar, e
+   * com `null` quando nao tocou. Esse retorno nao e um detalhe: e ele que
+   * decide quanto tempo a marca fica na tela (ver `identity-hold-until` em
+   * `boot-flow.ts`). Segurar uma tela preta pela duracao de um audio que nunca
+   * soou seria uma espera inventada, e esta abertura se proibiu isso.
+   *
+   * Os tres motivos de `null`, todos legitimos e nenhum um erro:
+   *
+   * - o jogador esta no mudo;
+   * - o navegador nao autorizou o audio ainda (nao houve gesto, e este site
+   *   nao tem engajamento de midia suficiente) — o contexto fica suspenso e a
+   *   peca seria tocada para ninguem;
+   * - o arquivo nao existe, nao baixou ou nao decodificou.
+   *
+   * Governada pelo MESTRE e pelo mudo, e nao pelos sliders de efeitos ou
+   * musica: a assinatura do estudio nao e som do mundo nem trilha do jogo — e
+   * a apresentacao, e responde ao "quanto o jogo inteiro fala".
+   */
+  async playIdentitySting(url: string): Promise<number | null> {
+    const buffer = await this.prepareIdentitySting(url);
+    const ctx = this.ctx;
+    const master = this.master;
+    // As checagens acontecem no momento de TOCAR, e nao no de preparar: entre
+    // as duas coisas o jogador pode ter chegado com o mudo ligado, e o
+    // navegador so decide sobre o contexto quando ele e retomado.
+    //
+    // `running` e a pergunta certa, e nao "existe contexto": um contexto
+    // suspenso aceita `start()` sem erro e nao produz som nenhum — a marca
+    // ficaria parada 2,6 s de gracas.
+    if (!buffer || !ctx || !master || this.muted || ctx.state !== 'running') return null;
+    // A peca ja vem masterizada em -14 LUFS com teto de -1,8 dBFS (ver o
+    // manifesto em docs/audio/danitools/): o ganho aqui e unitario de
+    // proposito. Recalibra-la seria desfazer a mixagem que ela tem.
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(master);
+    source.start();
+    return buffer.duration * 1000;
   }
 
   /**
@@ -229,10 +346,19 @@ export class AudioDirector {
 
       master.connect(compressor).connect(ctx.destination);
 
+      // O barramento de efeitos entra ANTES do mestre e DEPOIS de tudo o que
+      // o mundo produz. A musica continua indo direto ao mestre, entao o
+      // compressor do barramento final segue vendo a soma inteira — o
+      // ducking e o teto da mixagem nao mudam de lugar.
+      const sfxBus = ctx.createGain();
+      sfxBus.gain.value = this.sfxVolume;
+      sfxBus.connect(master);
+
       this.ctx = ctx;
       this.master = master;
+      this.sfxBus = sfxBus;
       this.noise = createNoiseBuffer(ctx);
-      this.ambienceBus = new AmbienceBus(ctx, master, this.noise);
+      this.ambienceBus = new AmbienceBus(ctx, sfxBus, this.noise);
       this.ambienceBus.start();
       this.musicBus = new MusicBus(ctx, master);
       this.musicBus.start();
@@ -290,10 +416,7 @@ export class AudioDirector {
       // arquivo ja decodificou; o backup procedural em qualquer outro caso.
       // A resolucao e por quadro de proposito — o FLAC que termina de
       // carregar no meio da run entra aqui, em crossfade, sem evento.
-      const active = resolveMusicSource(
-        this.musicSource,
-        this.soundtrackBus?.ready ?? false,
-      );
+      const active = resolveMusicSource(this.musicSource, this.soundtrackBus?.ready ?? false);
       if (active !== this.activeSource) {
         // A fonte que sai cala com a propria rampa; a que entra acorda na
         // dela. Voltar ao synth exige re-apresentar o tema do estrato atual:
@@ -396,9 +519,12 @@ export class AudioDirector {
 
   private play(voice: VoiceId, gain: number, pan: number, cutoffHz: number): void {
     const ctx = this.ctx;
-    const master = this.master;
+    // A saida das vozes e o barramento de EFEITOS, nunca o mestre direto: e o
+    // que faz o slider de efeitos valer para todo som do mundo sem que cada
+    // voz precise saber que ele existe.
+    const out = this.sfxBus;
     const noise = this.noise;
-    if (!ctx || !master || !noise) return;
+    if (!ctx || !out || !noise) return;
     const render = VOICE_RENDERERS[voice];
     if (!render) return;
 
@@ -431,7 +557,7 @@ export class AudioDirector {
       tail.connect(panner);
       tail = panner;
     }
-    tail.connect(master);
+    tail.connect(out);
 
     render(ctx, voiceGain, t0, noise);
   }

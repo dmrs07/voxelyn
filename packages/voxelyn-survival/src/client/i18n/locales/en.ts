@@ -15,6 +15,24 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   // Brand and menus
   // ---------------------------------------------------------------------
   'app.title': 'Voxelyn Survival',
+
+  // ---------------------------------------------------------------------
+  // Boot sequence (see src/client/boot/)
+  // ---------------------------------------------------------------------
+  'boot.ident.alt': 'Developer mark',
+  'boot.title.line1': 'VOXELYN',
+  'boot.title.line2': 'SURVIVAL',
+  'boot.status.start': 'Bringing unit systems online',
+  'boot.status.fonts': 'Loading company typography',
+  'boot.status.core': 'Assembling chassis and contact bodies',
+  'boot.status.terrain': 'Raising strata and surfaces',
+  'boot.status.props': 'Installing field equipment',
+  'boot.status.keyart': 'Composing opening plate',
+  'boot.status.ready': 'Unit ready for dispatch',
+  'boot.error.title': 'INITIALISATION FAILED',
+  'boot.error.body':
+    'Essential unit resources did not arrive. Check your connection and authorise another attempt.',
+  'boot.error.retry': 'Try again',
   'menu.title': 'VOXELYN SURVIVAL',
   'menu.tagline': 'the Vein is alive — survive it',
   'menu.solo': 'Descend',
@@ -56,7 +74,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'aurix.options.audio': 'Audio',
   'aurix.options.telemetry': 'Telemetry',
   'aurix.options.credits': 'Credits',
-  'credits.game': 'game by Daniel Moraes Ribeiro da Silva (@dmrs07)',
+  'credits.game': 'game by DaniTools (@dani.tools)',
   'credits.music': 'soundtrack by Clevo (@clevoclevoclevo)',
   'aurix.options.footer': 'changes saved locally',
 
@@ -69,6 +87,7 @@ export const EN: Record<keyof typeof PT_BR, string> = {
   'options.quality.medium': 'Medium',
   'options.quality.low': 'Low (30 FPS)',
   'options.volume': 'Volume',
+  'options.sfx': 'Effects',
   'options.music': 'Music',
   'options.musicSource': 'Soundtrack',
   'options.musicSource.composed': 'Composed',
