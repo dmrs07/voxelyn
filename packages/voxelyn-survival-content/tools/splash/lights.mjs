@@ -93,7 +93,7 @@ const point = ({ pos, color, intensity, radius, falloff = 0.0006, shadow = false
  * (ver `chargeVein`): a Vein nao brilha inteira, brilha onde a corrente esta —
  * que e o que a tagline afirma e o que o sistema do jogo de fato faz.
  */
-export const buildLights = (state, win, veinCells, propLights) => {
+export const buildLights = (state, win, veinCells, propLights, cameraVoxel) => {
   const points = [];
 
   // -----------------------------------------------------------------------
@@ -118,7 +118,12 @@ export const buildLights = (state, win, veinCells, propLights) => {
       shadow: true,
       // A unica fonte que espalha no ar. E ela que faz o berco ler como fonte
       // dentro de um espaco, e nao como um objeto brilhante colado no fundo.
-      volumetric: 0.0022,
+      // A DENSIDADE foi calibrada contra o histograma, nao a olho. Em 0,0034 o
+      // halo deixava de ser halo: cobria a metade superior do quadro com um veu
+      // ciano, as sombras caiam de 62% para 33% da imagem e a media do canal
+      // verde subia de 28 para 47. O espalhamento tem de dizer onde a fonte
+      // esta, e nao pintar a caverna inteira da cor dela.
+      volumetric: 0.0011,
       tag: 'core',
     })
   );
@@ -185,6 +190,34 @@ export const buildLights = (state, win, veinCells, propLights) => {
         radius: (p.radius ?? 4) * VOXELS_PER_TILE,
         falloff: 0.003,
         tag: 'aurix',
+      })
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // 4. FILL, na posicao da CAMERA. O minimo que o briefing autoriza:
+  //    "suficiente para separar o Guardiao do fundo".
+  //
+  // O problema que ele resolve e concreto e aparece so no render final: o
+  // Guardiao e uma massa de basalto escuro recortada contra rocha do mesmo
+  // basalto escuro. As luzes da cena estao todas do outro lado dele (o nucleo
+  // fica atras, a key vem de cima), entao as faces viradas para a camera nao
+  // recebiam nada e a silhueta de cidadela — que o passe de segmentacao mostrava
+  // perfeita — simplesmente sumia no beauty.
+  //
+  // Uma luz na camera nao inventa fonte: e a mesma claridade ambiente da caverna
+  // chegando pelo lado de ca, e por isso ela e fraca, fria e sem sombra. O
+  // alcance e longo para nao criar um circulo de luz em volta do primeiro plano,
+  // e a queda e quase linear pelo mesmo motivo.
+  if (cameraVoxel) {
+    points.push(
+      point({
+        pos: cameraVoxel,
+        color: towardWhite(COLORS.mist, 0.5),
+        intensity: 0.30,
+        radius: 40 * VOXELS_PER_TILE,
+        falloff: 0.00008,
+        tag: 'fill',
       })
     );
   }
@@ -267,15 +300,20 @@ export const buildLights = (state, win, veinCells, propLights) => {
        */
       byObject: {
         [OBJ.VEIN]: 3.2,
-        [OBJ.GUARDIAN]: 0.55,
+        [OBJ.GUARDIAN]: 0.7,
         [OBJ.CORE]: 1.15,
+        // O visor e o farol do Prospector sao o quarto degrau da hierarquia
+        // luminosa que o briefing fixa, e no primeiro plano eles competem com a
+        // rocha iluminada pelo fill. Sem o reforco, o bot lia como silhueta sem
+        // vida — e o visor aceso e o que diz que ele esta ligado e olhando.
+        [OBJ.PROSPECTOR]: 1.6,
       },
     },
     // Bruma: cor fria e densidade baixa. E ela que abre a profundidade e cria a
     // area mais clara ao fundo, sem o veu uniforme que o briefing proibe.
     fog: {
       color: towardWhite(COLORS.rockShadow, 0.45).map((c) => c * 0.075),
-      density: 0.0016,
+      density: 0.0010,
     },
   };
 };

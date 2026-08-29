@@ -146,17 +146,30 @@ export const PRESET = {
 
   // POS-PROCESSAMENTO. Ver post.mjs para o que cada numero faz.
   post: {
-    exposure: 1.0,
+    exposure: 0.82,
     // Bloom so no que EMITE, e a partir do passe emissivo — nunca por limiar de
     // brilho sobre a imagem final, que e o que produz o halo continuo e chapado
     // que o briefing rejeita.
     bloom: { strength: 0.3, radius: 0.018, iterations: 5 },
     // Graduacao: leve elevacao do preto para nada esmagar, e um empurrao frio
     // nas sombras contra um leve calor nos meios-tons.
+    // GRADUACAO: sombra levemente fria contra meio-tom levemente quente.
+    //
+    // Os pesos foram medidos e nao escolhidos. O basalto do Voxelyn e azul na
+    // paleta ([46 58 77]), e a caverna e iluminada por luz fria — somando os
+    // dois, o render saia com media de canal (8 23 41) contra os (20 28 28) da
+    // referencia, ou seja, azul demais para o proprio material dizer alguma
+    // coisa. Esfriar as sombras ainda MAIS, como fazia a primeira versao desta
+    // tabela, empurrava na direcao errada.
+    //
+    // Aqui a sombra quase nao e tocada e o meio-tom recebe o empurrao quente. E
+    // a separacao de temperatura que faz a rocha iluminada ler como pedra e nao
+    // como gelo, sem recorrer ao teal-and-orange chapado que o briefing rejeita
+    // — a correcao e de poucos por cento por canal, nao uma camada de cor.
     grade: {
       lift: 0.016,
-      shadowTint: [0.86, 0.96, 1.12],
-      midTint: [1.03, 1.0, 0.97],
+      shadowTint: [0.95, 0.99, 1.06],
+      midTint: [1.10, 1.01, 0.90],
       saturation: 1.06,
       contrast: 1.08,
     },

@@ -21,6 +21,7 @@ import { buildLights } from './lights.mjs';
 import { chargeVein } from './vein.mjs';
 import { veinAxis } from './scout-seed.mjs';
 import { createBuffers, renderBand } from './render.mjs';
+import { renderBrandingLayer, composite } from './branding.mjs';
 import {
   compose,
   writePng,
@@ -45,6 +46,7 @@ const parseArgs = (argv) => {
     else if (a === '--samples') args.samples = Number(argv[++i]);
     else if (a === '--workers') args.workers = Number(argv[++i]);
     else if (a === '--no-post') args.noPost = true;
+    else if (a === '--branding') args.branding = true;
   }
   return args;
 };
@@ -88,7 +90,11 @@ export const buildAll = () => {
   const segment = state.leylineSegments?.[axis.index] ?? { cells: [] };
   const charge = chargeVein(state, segment);
 
-  const lights = buildLights(state, win, charge.cells, PRESET.propLights);
+  // A camera e construida ANTES das luzes porque o fill mora na posicao dela —
+  // ver o item 4 de `buildLights`. A resolucao nao afeta posicao nem direcao,
+  // entao uma camera de referencia serve para as duas resolucoes de entrega.
+  const refCam = buildCamera(win, 1920, 1080);
+  const lights = buildLights(state, win, charge.cells, PRESET.propLights, refCam.position);
 
   return {
     state,
@@ -202,6 +208,13 @@ const main = async () => {
     writePng(join(outDir, `${stem}-ao.png`), grayPass(shared.buffers.ao, width, height, (v) => v), width, height);
     writePng(join(outDir, `${stem}-shadow.png`), grayPass(shared.buffers.shadow, width, height, (v) => v), width, height);
     console.log('  passes  -> raw, albedo, emissive, normal, object, depth, ao, shadow');
+  }
+
+  if (args.branding) {
+    const layer = await renderBrandingLayer({ width: args.width, height: args.height });
+    const branded = composite(rgba, layer, args.width, args.height);
+    writePng(join(outDir, `${stem}-branded.png`), branded, args.width, args.height);
+    console.log(`  branding-> ${stem}-branded.png`);
   }
 
   writeFileSync(
